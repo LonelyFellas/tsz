@@ -1,0 +1,24 @@
+{
+  "name": "tsz",
+  "version": "1.0.0",
+  "private": true,
+  "description": "天生字 — 词汇学习平台 (师生合一 + 平台后台)",
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "dev": "pnpm --filter @tsz/web dev",
+    "dev:admin": "pnpm --filter @tsz/admin dev",
+    "dev:all": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,md}\""
+  },
+  "devDependencies": {
+    "@tsz/config": "workspace:*",
+    "prettier": "^3.8.4"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
