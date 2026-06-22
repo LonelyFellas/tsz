@@ -4,5 +4,6 @@ dist/
 build/
 out/
 coverage/
+.vscode/
 pnpm-lock.yaml
 *.tsbuildinfo
