@@ -50,3 +50,25 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+  # E2E 较慢,独立 job 不阻塞单测反馈。
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @tsz/e2e exec playwright install --with-deps chromium
+
+      - name: E2E (smoke)
+        run: pnpm test:e2e

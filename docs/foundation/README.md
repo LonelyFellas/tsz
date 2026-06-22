@@ -12,7 +12,7 @@
 | 2    | Turborepo 任务编排与缓存 | [tier2-turborepo.md](./tier2-turborepo.md)                           | ✅ 完成 |
 | 3    | Next 应用健壮性          | [tier3-nextjs-robustness.md](./tier3-nextjs-robustness.md)           | ✅ 完成 |
 | 4    | 文档与提交规范           | [tier4-docs-and-conventions.md](./tier4-docs-and-conventions.md)     | ✅ 完成 |
-| 5    | 测试面扩展(应用 + E2E)   | [tier5-testing-expansion.md](./tier5-testing-expansion.md)           | ⬜ 待做 |
+| 5    | 测试面扩展(应用 + E2E)   | [tier5-testing-expansion.md](./tier5-testing-expansion.md)           | ✅ 完成 |
 
 > 建议顺序:1 → 2 → 3 → 4 → 5。其中有两处跨 tier 依赖:
 >
