@@ -15,11 +15,17 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,css,md}\"",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:cov": "vitest run --coverage"
+    "test:cov": "vitest run --coverage",
+    "prepare": "lefthook install"
+  },
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
   },
   "devDependencies": {
     "@tsz/config": "workspace:*",
     "@vitest/coverage-v8": "^4.1.9",
+    "lefthook": "^2.1.9",
     "prettier": "^3.8.4",
     "vitest": "^4.1.9"
   },
