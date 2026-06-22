@@ -27,6 +27,15 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # 二次运行时恢复 turbo 缓存:未改动的包的 lint/typecheck/build 直接命中跳过。
+      - name: Restore turbo cache
+        uses: actions/cache@v4
+        with:
+          path: .turbo
+          key: turbo-${{ github.sha }}
+          restore-keys: |
+            turbo-
+
       - name: Lint
         run: pnpm lint
 
