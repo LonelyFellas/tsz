@@ -1,5 +1,5 @@
 import type { AuthResponse } from "@tsz/api-client";
-import { setAccessToken } from "@/lib/request";
+import { setAccessToken, scheduleRefresh } from "@/lib/request";
 
 // 登录 / 注册表单共用的输入框样式。
 export const AUTH_INPUT_CLASS =
@@ -25,7 +25,10 @@ export function translateAuthError(
   return map[key] ?? COMMON_ERRORS[key] ?? (msg || fallback);
 }
 
-/** 登录 / 注册成功后，将 access token 存入内存。refresh token 由 HttpOnly cookie 自动管理。 */
-export function persistSession(auth: Pick<AuthResponse, "access_token">): void {
+/** 登录 / 注册成功后，将 access token 存入内存并启动主动刷新定时器。 */
+export function persistSession(
+  auth: Pick<AuthResponse, "access_token" | "expires_in">
+): void {
   setAccessToken(auth.access_token);
+  scheduleRefresh(auth.expires_in);
 }

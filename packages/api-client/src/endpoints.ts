@@ -16,6 +16,16 @@ export interface AuthResponse {
   user: User;
   access_token: string;
   active_role: string;
+  /** access token 剩余有效期（秒），用于调度主动刷新定时器。 */
+  expires_in: number;
+  /** refresh token 过期的 Unix 时间戳（秒），可用于提前告知用户会话即将结束。 */
+  refresh_token_expires_at: number;
+}
+
+export interface RefreshResponse {
+  access_token: string;
+  expires_in: number;
+  refresh_token_expires_at: number;
 }
 
 export interface MeResponse {
@@ -45,7 +55,7 @@ export function createEndpoints(http: HttpClient) {
       login: (identifier: string, password: string) =>
         http.post<AuthResponse>("/auth/login", { identifier, password }),
       /** POST /auth/refresh — 刷新 access token（refresh token 由 cookie 自动携带，无需 body） */
-      refresh: () => http.post<{ access_token: string }>("/auth/refresh"),
+      refresh: () => http.post<RefreshResponse>("/auth/refresh"),
       /** POST /auth/logout — 吊销 refresh token（cookie 自动携带，无需 body） */
       logout: () => http.post<void>("/auth/logout"),
       /** POST /auth/send-code — 发送验证码 */

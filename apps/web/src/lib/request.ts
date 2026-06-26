@@ -4,31 +4,33 @@ import { env } from "./env";
 
 // access token 存内存：页面刷新后需重新通过 /auth/refresh 恢复会话。
 let accessToken: string | null = null;
-let tokenExpiresAt: number | null = null; // Unix ms
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function setAccessToken(token: string | null) {
   accessToken = token;
-  tokenExpiresAt = token ? parseJwtExpiry(token) : null;
-}
-
-function parseJwtExpiry(jwt: string): number | null {
-  try {
-    const payload = JSON.parse(atob(jwt.split(".")[1]!)) as {
-      exp?: number;
-    };
-    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
-  } catch {
-    return null;
+  // token 清除时同步取消定时器，防止已登出后仍触发刷新。
+  if (!token) {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = null;
   }
 }
 
-// 提前 5 分钟主动刷新，与后端 15 分钟 TTL 配合。
-const REFRESH_BEFORE_MS = 5 * 60 * 1000;
-
-function isExpiringSoon(): boolean {
-  return (
-    tokenExpiresAt !== null && Date.now() >= tokenExpiresAt - REFRESH_BEFORE_MS
-  );
+/**
+ * 在 expiresIn 秒后（提前 30 秒）自动触发 refreshTokens()。
+ * 刷新成功后用新的 expires_in 重新排期，形成自滚动定时器。
+ * 每次调用会先取消上一个定时器，保证同一时刻只有一个在跑。
+ */
+export function scheduleRefresh(expiresIn: number) {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  const delay = Math.max((expiresIn - 30) * 1000, 0);
+  refreshTimer = setTimeout(async () => {
+    try {
+      await refreshTokens();
+      // refreshTokens 成功后内部已调用 scheduleRefresh(data.expires_in)，无需重复。
+    } catch {
+      // 刷新失败（401）→ onSessionExpired 会跳转登录页，定时器自然结束。
+    }
+  }, delay);
 }
 
 const baseUrl = env.NEXT_PUBLIC_API_BASE_URL;
@@ -45,9 +47,13 @@ export function refreshTokens(): Promise<string> {
   })
     .then(async (res) => {
       if (!res.ok) throw new Error("refresh failed");
-      const { access_token } = (await res.json()) as { access_token: string };
-      setAccessToken(access_token);
-      return access_token;
+      const data = (await res.json()) as {
+        access_token: string;
+        expires_in: number;
+      };
+      setAccessToken(data.access_token);
+      scheduleRefresh(data.expires_in); // 用后端返回的 expires_in 重新排期
+      return data.access_token;
     })
     .finally(() => {
       refreshingPromise = null;
@@ -58,21 +64,10 @@ export function refreshTokens(): Promise<string> {
 
 const http = createHttpClient({
   baseUrl,
-  getToken: async () => {
-    if (accessToken && isExpiringSoon()) {
-      try {
-        // 主动刷新：当前 token 未过期但即将到期，提前换新，做到无感刷新。
-        return await refreshTokens();
-      } catch {
-        // 主动刷新失败则用现有 token 继续，让后续 401 走被动刷新路径。
-      }
-    }
-    return accessToken ?? undefined;
-  },
-  // 被动刷新：收到 401 时复用同一个 refreshTokens()，竞态保护同样生效。
+  getToken: () => accessToken ?? undefined,
   onRefresh: refreshTokens,
   onSessionExpired: () => {
-    setAccessToken(null);
+    setAccessToken(null); // 同时清除定时器
     if (typeof window !== "undefined") window.location.href = "/login";
   }
 });
