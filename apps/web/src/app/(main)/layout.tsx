@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getSession, hasRole } from "@/lib/auth";
+import { LogoutButton } from "@/features/auth/components/LogoutButton";
 
 // 登录后主布局:角色感知导航。师生共用「词表」,各自看到自己的专属入口。
 export default async function MainLayout({
@@ -17,7 +18,7 @@ export default async function MainLayout({
         <Link href="/" className="font-bold">
           天生字
         </Link>
-        <nav className="flex gap-4 text-sm">
+        <nav className="flex flex-1 gap-4 text-sm">
           <Link href="/wordlists">词表</Link>
           {isTeacher && (
             <>
@@ -38,6 +39,7 @@ export default async function MainLayout({
             </Link>
           )}
         </nav>
+        <LogoutButton />
       </header>
       <main className="py-6">{children}</main>
     </div>
