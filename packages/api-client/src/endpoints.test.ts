@@ -24,6 +24,22 @@ describe("createEndpoints · auth", () => {
     expect(http.get).toHaveBeenCalledWith("/me");
   });
 
+  it("register → POST /auth/register 带 payload", () => {
+    const api = createEndpoints(http);
+    api.auth.register({
+      phone: "13800138000",
+      password: "s3cret",
+      display_name: "张三",
+      role: "student"
+    });
+    expect(http.post).toHaveBeenCalledWith("/auth/register", {
+      phone: "13800138000",
+      password: "s3cret",
+      display_name: "张三",
+      role: "student"
+    });
+  });
+
   it("login → POST /auth/login 带 identifier + password", () => {
     const api = createEndpoints(http);
     api.auth.login("13800138000", "s3cret");
