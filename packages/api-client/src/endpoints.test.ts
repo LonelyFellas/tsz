@@ -18,10 +18,10 @@ beforeEach(() => {
 });
 
 describe("createEndpoints · auth", () => {
-  it("me → GET /auth/me", () => {
+  it("me → GET /me", () => {
     const api = createEndpoints(http);
     api.auth.me();
-    expect(http.get).toHaveBeenCalledWith("/auth/me");
+    expect(http.get).toHaveBeenCalledWith("/me");
   });
 
   it("applyTeacher → POST /auth/apply-teacher 带 { profile }", () => {

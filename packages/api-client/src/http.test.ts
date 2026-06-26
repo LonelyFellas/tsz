@@ -26,21 +26,18 @@ afterEach(() => {
 });
 
 describe("HttpError", () => {
-  it("是 Error 的子类并携带 status/code", () => {
-    const err = new HttpError(404, 1001, "not found");
+  it("是 Error 的子类并携带 status", () => {
+    const err = new HttpError(404, "not found");
     expect(err).toBeInstanceOf(Error);
     expect(err.name).toBe("HttpError");
     expect(err.status).toBe(404);
-    expect(err.code).toBe(1001);
     expect(err.message).toBe("not found");
   });
 });
 
 describe("createHttpClient", () => {
-  it("get:拼接 baseUrl + path,带默认 Content-Type,返回 data", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 0, message: "ok", data: { id: "1" } })
-    );
+  it("get:拼接 baseUrl + path,带默认 Content-Type,返回响应体", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ id: "1" }));
     const http = createHttpClient({ baseUrl: "https://api.test" });
 
     const data = await http.get<{ id: string }>("/users/1");
@@ -55,22 +52,15 @@ describe("createHttpClient", () => {
   });
 
   it("get:默认不带 method(走 fetch 默认 GET)", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 0, message: "ok", data: null })
-    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
     await http.get("/x");
     expect(fetchMock.mock.calls[0]![1].method).toBeUndefined();
   });
 
   it("有 token 时注入 Authorization", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 0, message: "ok", data: null })
-    );
-    const http = createHttpClient({
-      baseUrl: "",
-      getToken: () => "abc"
-    });
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
+    const http = createHttpClient({ baseUrl: "", getToken: () => "abc" });
     await http.get("/me");
     const headers = fetchMock.mock.calls[0]![1].headers as Record<
       string,
@@ -80,9 +70,7 @@ describe("createHttpClient", () => {
   });
 
   it("无 token 时不带 Authorization", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 0, message: "ok", data: null })
-    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
     await http.get("/me");
     const headers = fetchMock.mock.calls[0]![1].headers as Record<
@@ -93,9 +81,7 @@ describe("createHttpClient", () => {
   });
 
   it("getToken 返回 Promise 会被 await", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 0, message: "ok", data: null })
-    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({
       baseUrl: "",
       getToken: async () => "async-token"
@@ -109,9 +95,7 @@ describe("createHttpClient", () => {
   });
 
   it("post:method=POST 且 body 为 JSON 字符串", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 0, message: "ok", data: { ok: true } })
-    );
+    fetchMock.mockResolvedValueOnce(jsonResponse({ ok: true }));
     const http = createHttpClient({ baseUrl: "" });
     await http.post("/items", { name: "a" });
     const init = fetchMock.mock.calls[0]![1];
@@ -120,9 +104,7 @@ describe("createHttpClient", () => {
   });
 
   it("put:method=PUT 且 body 为 JSON 字符串", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 0, message: "ok", data: null })
-    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
     await http.put("/items/1", { name: "b" });
     const init = fetchMock.mock.calls[0]![1];
@@ -131,50 +113,42 @@ describe("createHttpClient", () => {
   });
 
   it("del:method=DELETE", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 0, message: "ok", data: null })
-    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
     await http.del("/items/1");
     expect(fetchMock.mock.calls[0]![1].method).toBe("DELETE");
   });
 
-  it("HTTP 非 2xx 抛 HttpError,带 status 与 body 信息", async () => {
+  it("204 No Content 返回 undefined", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      status: 204,
+      statusText: "No Content",
+      json: async () => {
+        throw new Error("no body");
+      }
+    } as unknown as Response);
+    const http = createHttpClient({ baseUrl: "" });
+    const result = await http.del("/items/1");
+    expect(result).toBeUndefined();
+  });
+
+  it("HTTP 非 2xx 抛 HttpError,带 status 与 error 信息", async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse(
-        { code: 500, message: "服务器错误", data: null },
-        { ok: false, status: 500 }
-      )
+      jsonResponse({ error: "서버 오류" }, { ok: false, status: 500 })
     );
     const http = createHttpClient({ baseUrl: "" });
 
     await expect(http.get("/boom")).rejects.toMatchObject({
       name: "HttpError",
       status: 500,
-      code: 500,
-      message: "服务器错误"
+      message: "서버 오류"
     });
   });
 
-  it("ok 但业务 code !== 0 也抛 HttpError", async () => {
+  it("非 2xx 且无 error 字段时回退到 statusText", async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 1002, message: "无权限", data: null })
-    );
-    const http = createHttpClient({ baseUrl: "" });
-
-    await expect(http.get("/secret")).rejects.toMatchObject({
-      status: 200,
-      code: 1002,
-      message: "无权限"
-    });
-  });
-
-  it("body.message 缺失时回退到 statusText", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse(
-        { code: 403, data: null },
-        { ok: false, status: 403, statusText: "Forbidden" }
-      )
+      jsonResponse({}, { ok: false, status: 403, statusText: "Forbidden" })
     );
     const http = createHttpClient({ baseUrl: "" });
 
@@ -184,16 +158,69 @@ describe("createHttpClient", () => {
   });
 
   it("init.headers 可覆盖/追加请求头", async () => {
-    fetchMock.mockResolvedValueOnce(
-      jsonResponse({ code: 0, message: "ok", data: null })
-    );
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
-    // post 内部带了 method/body,这里验证自定义 header 合并能力通过 request 实现。
     await http.post("/x", { a: 1 });
     const headers = fetchMock.mock.calls[0]![1].headers as Record<
       string,
       string
     >;
     expect(headers["Content-Type"]).toBe("application/json");
+  });
+
+  it("401 无 token 时直接抛 HttpError，不触发 onRefresh", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "invalid credentials" }, { ok: false, status: 401 })
+    );
+    const onRefresh = vi.fn();
+    const http = createHttpClient({ baseUrl: "", onRefresh });
+
+    await expect(http.post("/auth/login", {})).rejects.toMatchObject({
+      status: 401,
+      message: "invalid credentials"
+    });
+    expect(onRefresh).not.toHaveBeenCalled();
+  });
+
+  it("401 有 token 时触发 onRefresh 并重试", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse(
+          { error: "invalid or expired token" },
+          { ok: false, status: 401 }
+        )
+      )
+      .mockResolvedValueOnce(jsonResponse({ id: "1" }));
+
+    const onRefresh = vi.fn().mockResolvedValue("new-token");
+    const http = createHttpClient({
+      baseUrl: "",
+      getToken: () => "old-token",
+      onRefresh
+    });
+
+    const data = await http.get("/me");
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(data).toEqual({ id: "1" });
+  });
+
+  it("onRefresh 失败时调 onSessionExpired 并抛错", async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        { error: "invalid or expired token" },
+        { ok: false, status: 401 }
+      )
+    );
+    const onRefresh = vi.fn().mockRejectedValue(new Error("refresh failed"));
+    const onSessionExpired = vi.fn();
+    const http = createHttpClient({
+      baseUrl: "",
+      getToken: () => "tok",
+      onRefresh,
+      onSessionExpired
+    });
+
+    await expect(http.get("/me")).rejects.toMatchObject({ status: 401 });
+    expect(onSessionExpired).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,16 +1,23 @@
 // 运行环境无关的请求层。web 与 admin 各自注入 baseUrl / token。
-import type { ApiResponse } from "@tsz/types";
 
 export interface HttpClientOptions {
   baseUrl: string;
-  /** 每次请求动态获取 token(SSR/CSR 都适用)。 */
+  /** 每次请求动态获取 access token。 */
   getToken?: () => string | undefined | Promise<string | undefined>;
+  /**
+   * access token 过期(401)时调用。实现应：
+   *   1. 用 refresh token 换取新的 access token
+   *   2. 持久化新 token 并返回新的 access token 字符串
+   *   3. 若 refresh 本身也 401 则抛出(http 层会调 onSessionExpired)
+   */
+  onRefresh?: () => Promise<string>;
+  /** refresh 失败后调用(通常跳转登录页)。 */
+  onSessionExpired?: () => void;
 }
 
 export class HttpError extends Error {
   constructor(
     public status: number,
-    public code: number,
     message: string
   ) {
     super(message);
@@ -18,8 +25,27 @@ export class HttpError extends Error {
   }
 }
 
-export function createHttpClient({ baseUrl, getToken }: HttpClientOptions) {
-  async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+async function parseError(res: Response): Promise<string> {
+  try {
+    const body = (await res.json()) as { error?: string };
+    if (body.error) return body.error;
+  } catch {
+    // ignore
+  }
+  return res.statusText;
+}
+
+export function createHttpClient({
+  baseUrl,
+  getToken,
+  onRefresh,
+  onSessionExpired
+}: HttpClientOptions) {
+  async function request<T>(
+    path: string,
+    init: RequestInit = {},
+    retrying = false
+  ): Promise<T> {
     const token = await getToken?.();
     const res = await fetch(`${baseUrl}${path}`, {
       ...init,
@@ -30,15 +56,26 @@ export function createHttpClient({ baseUrl, getToken }: HttpClientOptions) {
       }
     });
 
-    const body = (await res.json()) as ApiResponse<T>;
-    if (!res.ok || body.code !== 0) {
-      throw new HttpError(
-        res.status,
-        body.code,
-        body.message ?? res.statusText
-      );
+    // 只有携带了 access token 的请求才触发 refresh 逻辑。
+    // 无 token 时(如登录接口)，401 代表凭证错误，直接抛出即可。
+    if (res.status === 401 && !retrying && token && onRefresh) {
+      try {
+        await onRefresh();
+        return request<T>(path, init, true);
+      } catch {
+        onSessionExpired?.();
+        throw new HttpError(401, "session expired");
+      }
     }
-    return body.data;
+
+    if (!res.ok) {
+      throw new HttpError(res.status, await parseError(res));
+    }
+
+    // 204 No Content
+    if (res.status === 204) return undefined as T;
+
+    return res.json() as Promise<T>;
   }
 
   return {
