@@ -15,7 +15,6 @@ import type { HttpClient } from "./http";
 export interface AuthResponse {
   user: User;
   access_token: string;
-  refresh_token: string;
   active_role: string;
 }
 
@@ -24,23 +23,31 @@ export interface MeResponse {
   active_role: string;
 }
 
+export interface RegisterPayload {
+  phone: string;
+  email?: string;
+  password: string;
+  display_name: string;
+  role: "student" | "teacher";
+  /** 验证码登录/注册校验(原型「获取验证码」)。 */
+  code?: string;
+}
+
 export function createEndpoints(http: HttpClient) {
   return {
     auth: {
       /** GET /me — 当前登录用户信息 */
       me: () => http.get<MeResponse>("/me"),
+      /** POST /auth/register — 注册并自动登录 */
+      register: (payload: RegisterPayload) =>
+        http.post<AuthResponse>("/auth/register", payload),
       /** POST /auth/login — 账号密码登录 */
       login: (identifier: string, password: string) =>
         http.post<AuthResponse>("/auth/login", { identifier, password }),
-      /** POST /auth/refresh — 刷新 access token */
-      refresh: (refresh_token: string) =>
-        http.post<{ access_token: string; refresh_token: string }>(
-          "/auth/refresh",
-          { refresh_token }
-        ),
-      /** POST /auth/logout — 吊销 refresh token */
-      logout: (refresh_token: string) =>
-        http.post<void>("/auth/logout", { refresh_token }),
+      /** POST /auth/refresh — 刷新 access token（refresh token 由 cookie 自动携带，无需 body） */
+      refresh: () => http.post<{ access_token: string }>("/auth/refresh"),
+      /** POST /auth/logout — 吊销 refresh token（cookie 自动携带，无需 body） */
+      logout: () => http.post<void>("/auth/logout"),
       /** POST /auth/send-code — 发送验证码 */
       sendCode: (identifier: string) =>
         http.post<{ status: string }>("/auth/send-code", { identifier }),

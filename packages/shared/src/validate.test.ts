@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { isEmail, isPhone, isValidAccount } from "./validate";
+import {
+  isCode,
+  isEmail,
+  isPhone,
+  isRegisterPassword,
+  isValidAccount
+} from "./validate";
 
 describe("isPhone", () => {
   it.each(["13800138000", "15912345678", "19999999999", "17000000000"])(
@@ -53,5 +59,41 @@ describe("isValidAccount", () => {
   it("两者都不合法则拒绝", () => {
     expect(isValidAccount("bad")).toBe(false);
     expect(isValidAccount("")).toBe(false);
+  });
+});
+
+describe("isCode", () => {
+  it.each(["1234", "123456", "12345678"])("接受纯数字验证码 %s", (v) => {
+    expect(isCode(v)).toBe(true);
+  });
+
+  it.each([
+    ["", "空串"],
+    ["123", "不足 4 位"],
+    ["123456789", "超过 8 位"],
+    ["12 34", "含空格"],
+    ["12a4", "含字母"]
+  ])("拒绝 %s(%s)", (v) => {
+    expect(isCode(v)).toBe(false);
+  });
+});
+
+describe("isRegisterPassword", () => {
+  it.each(["abc12345678", "Pass1234word", "aaaaaaaaaa1A"])(
+    "接受 11-20 位字母+数字 %s",
+    (v) => {
+      expect(isRegisterPassword(v)).toBe(true);
+    }
+  );
+
+  it.each([
+    ["", "空串"],
+    ["abc1234567", "只有 10 位"],
+    ["abc123456789012345678", "超过 20 位"],
+    ["abcdefghijk", "缺少数字"],
+    ["12345678901", "缺少字母"],
+    ["abc1234567!", "含特殊字符"]
+  ])("拒绝 %s(%s)", (v) => {
+    expect(isRegisterPassword(v)).toBe(false);
   });
 });

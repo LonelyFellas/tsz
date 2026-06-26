@@ -48,6 +48,7 @@ export function createHttpClient({
   ): Promise<T> {
     const token = await getToken?.();
     const res = await fetch(`${baseUrl}${path}`, {
+      credentials: "include",
       ...init,
       headers: {
         "Content-Type": "application/json",

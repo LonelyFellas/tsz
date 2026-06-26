@@ -33,20 +33,16 @@ describe("createEndpoints · auth", () => {
     });
   });
 
-  it("refresh → POST /auth/refresh 带 refresh_token", () => {
+  it("refresh → POST /auth/refresh 无 body（refresh token 由 cookie 自动携带）", () => {
     const api = createEndpoints(http);
-    api.auth.refresh("rt-abc");
-    expect(http.post).toHaveBeenCalledWith("/auth/refresh", {
-      refresh_token: "rt-abc"
-    });
+    api.auth.refresh();
+    expect(http.post).toHaveBeenCalledWith("/auth/refresh");
   });
 
-  it("logout → POST /auth/logout 带 refresh_token", () => {
+  it("logout → POST /auth/logout 无 body（refresh token 由 cookie 自动携带）", () => {
     const api = createEndpoints(http);
-    api.auth.logout("rt-abc");
-    expect(http.post).toHaveBeenCalledWith("/auth/logout", {
-      refresh_token: "rt-abc"
-    });
+    api.auth.logout();
+    expect(http.post).toHaveBeenCalledWith("/auth/logout");
   });
 
   it("sendCode → POST /auth/send-code 带 identifier", () => {
