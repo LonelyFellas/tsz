@@ -32,21 +32,29 @@ describe("createEndpoints · auth", () => {
       display_name: "张三",
       role: "student"
     });
-    expect(http.post).toHaveBeenCalledWith("/auth/register", {
-      phone: "13800138000",
-      password: "s3cret",
-      display_name: "张三",
-      role: "student"
-    });
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/register",
+      {
+        phone: "13800138000",
+        password: "s3cret",
+        display_name: "张三",
+        role: "student"
+      },
+      { skipAuth: true }
+    );
   });
 
   it("login → POST /auth/login 带 identifier + password", () => {
     const api = createEndpoints(http);
     api.auth.login("13800138000", "s3cret");
-    expect(http.post).toHaveBeenCalledWith("/auth/login", {
-      identifier: "13800138000",
-      password: "s3cret"
-    });
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/login",
+      {
+        identifier: "13800138000",
+        password: "s3cret"
+      },
+      { skipAuth: true }
+    );
   });
 
   it("refresh → POST /auth/refresh 无 body（refresh token 由 cookie 自动携带）", () => {
@@ -64,18 +72,26 @@ describe("createEndpoints · auth", () => {
   it("sendCode → POST /auth/send-code 带 identifier", () => {
     const api = createEndpoints(http);
     api.auth.sendCode("13800138000");
-    expect(http.post).toHaveBeenCalledWith("/auth/send-code", {
-      identifier: "13800138000"
-    });
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/send-code",
+      {
+        identifier: "13800138000"
+      },
+      { skipAuth: true }
+    );
   });
 
   it("loginWithCode → POST /auth/login/code 带 identifier + code", () => {
     const api = createEndpoints(http);
     api.auth.loginWithCode("13800138000", "123456");
-    expect(http.post).toHaveBeenCalledWith("/auth/login/code", {
-      identifier: "13800138000",
-      code: "123456"
-    });
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/login/code",
+      {
+        identifier: "13800138000",
+        code: "123456"
+      },
+      { skipAuth: true }
+    );
   });
 
   it("applyTeacher → POST /auth/apply-teacher 带 { profile }", () => {

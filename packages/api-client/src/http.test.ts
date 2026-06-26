@@ -175,6 +175,17 @@ describe("createHttpClient", () => {
     expect(headers["Content-Type"]).toBe("application/json");
   });
 
+  it("skipAuth 时不附加 Authorization（即使有 token）", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
+    const http = createHttpClient({ baseUrl: "", getToken: () => "stale" });
+    await http.post("/auth/login", {}, { skipAuth: true });
+    const headers = fetchMock.mock.calls[0]![1].headers as Record<
+      string,
+      string
+    >;
+    expect(headers.Authorization).toBeUndefined();
+  });
+
   it("401 无 token 时直接抛 HttpError，不触发 onRefresh", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ error: "invalid credentials" }, { ok: false, status: 401 })

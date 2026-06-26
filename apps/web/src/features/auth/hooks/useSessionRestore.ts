@@ -16,7 +16,7 @@ export function useSessionRestore() {
       .then(() => api.auth.me())
       .then(({ user }) => setUser(user))
       .catch(() => {
-        // 无有效 refresh cookie，保持未登录。
+        // 无有效会话，保持未登录，由路由守卫决定跳转。
       });
   }, [setUser]);
 }

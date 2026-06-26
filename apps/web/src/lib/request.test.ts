@@ -51,13 +51,11 @@ describe("scheduleRefresh", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("expiresIn ≤ 30 时立即触发（delay 钳为 0）", async () => {
+  it("expiresIn ≤ 30 时不排期定时器（防止无限刷新循环）", async () => {
     setAccessToken("tok");
-    refreshOk("tok2", 20);
-
     scheduleRefresh(20);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("重复调用只保留最新的定时器", async () => {
@@ -69,6 +67,25 @@ describe("scheduleRefresh", () => {
 
     await vi.advanceTimersByTimeAsync(870_000);
     expect(fetchMock).toHaveBeenCalledTimes(1); // 只触发一次
+  });
+
+  it("定时器触发刷新失败时调 redirectToLogin 跳转登录页", async () => {
+    const assignMock = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: {
+        set href(v: string) {
+          assignMock(v);
+        }
+      }
+    });
+
+    setAccessToken("tok");
+    refreshFail();
+
+    scheduleRefresh(900);
+    await vi.advanceTimersByTimeAsync(870_000);
+    expect(assignMock).toHaveBeenCalledWith("/login");
   });
 
   it("setAccessToken(null) 取消定时器", async () => {
