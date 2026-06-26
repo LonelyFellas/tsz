@@ -13,6 +13,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 vi.mock("@/lib/request", () => ({
+  setAccessToken: vi.fn(),
   api: {
     auth: {
       register: vi.fn(),
