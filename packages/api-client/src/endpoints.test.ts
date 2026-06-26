@@ -24,6 +24,48 @@ describe("createEndpoints · auth", () => {
     expect(http.get).toHaveBeenCalledWith("/me");
   });
 
+  it("login → POST /auth/login 带 identifier + password", () => {
+    const api = createEndpoints(http);
+    api.auth.login("13800138000", "s3cret");
+    expect(http.post).toHaveBeenCalledWith("/auth/login", {
+      identifier: "13800138000",
+      password: "s3cret"
+    });
+  });
+
+  it("refresh → POST /auth/refresh 带 refresh_token", () => {
+    const api = createEndpoints(http);
+    api.auth.refresh("rt-abc");
+    expect(http.post).toHaveBeenCalledWith("/auth/refresh", {
+      refresh_token: "rt-abc"
+    });
+  });
+
+  it("logout → POST /auth/logout 带 refresh_token", () => {
+    const api = createEndpoints(http);
+    api.auth.logout("rt-abc");
+    expect(http.post).toHaveBeenCalledWith("/auth/logout", {
+      refresh_token: "rt-abc"
+    });
+  });
+
+  it("sendCode → POST /auth/send-code 带 identifier", () => {
+    const api = createEndpoints(http);
+    api.auth.sendCode("13800138000");
+    expect(http.post).toHaveBeenCalledWith("/auth/send-code", {
+      identifier: "13800138000"
+    });
+  });
+
+  it("loginWithCode → POST /auth/login/code 带 identifier + code", () => {
+    const api = createEndpoints(http);
+    api.auth.loginWithCode("13800138000", "123456");
+    expect(http.post).toHaveBeenCalledWith("/auth/login/code", {
+      identifier: "13800138000",
+      code: "123456"
+    });
+  });
+
   it("applyTeacher → POST /auth/apply-teacher 带 { profile }", () => {
     const api = createEndpoints(http);
     api.auth.applyTeacher({ realName: "张三" });
