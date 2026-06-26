@@ -18,10 +18,10 @@ const mockMe = vi.mocked(api.auth.me);
 const MOCK_USER: User = {
   id: "u1",
   phone: "13800138000",
-  display_name: "Alice",
+  nickname: "Alice",
   roles: ["student"],
-  created_at: "",
-  updated_at: ""
+  coins: 0,
+  createdAt: ""
 };
 
 // ── 工具 ──────────────────────────────────────────────────────────────────────
