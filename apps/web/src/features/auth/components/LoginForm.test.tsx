@@ -90,7 +90,6 @@ describe("LoginForm — 登录流程", () => {
         createdAt: ""
       },
       access_token: "at",
-      refresh_token: "rt",
       active_role: "student"
     });
     renderWithProviders(<LoginForm />);
@@ -98,7 +97,7 @@ describe("LoginForm — 登录流程", () => {
     await fillAndSubmit();
 
     await waitFor(() => {
-      expect(mockLogin).toHaveBeenCalledWith("13800138000", "abc123");
+      expect(mockLogin).toHaveBeenCalledWith("13800138000", "ABC123");
       expect(mockPush).toHaveBeenCalledWith("/");
     });
   });

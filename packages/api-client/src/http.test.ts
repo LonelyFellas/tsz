@@ -58,6 +58,13 @@ describe("createHttpClient", () => {
     expect(fetchMock.mock.calls[0]![1].method).toBeUndefined();
   });
 
+  it("所有请求携带 credentials: include（让浏览器自动发送 refresh cookie）", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
+    const http = createHttpClient({ baseUrl: "" });
+    await http.get("/x");
+    expect(fetchMock.mock.calls[0]![1].credentials).toBe("include");
+  });
+
   it("有 token 时注入 Authorization", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "", getToken: () => "abc" });
