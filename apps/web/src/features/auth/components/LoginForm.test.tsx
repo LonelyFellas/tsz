@@ -13,6 +13,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/lib/request", () => ({
   setAccessToken: vi.fn(),
+  scheduleRefresh: vi.fn(),
   api: {
     auth: {
       login: vi.fn()
@@ -91,7 +92,9 @@ describe("LoginForm — 登录流程", () => {
         createdAt: ""
       },
       access_token: "at",
-      active_role: "student"
+      active_role: "student",
+      expires_in: 900,
+      refresh_token_expires_at: 9999999999
     });
     renderWithProviders(<LoginForm />);
 

@@ -47,9 +47,11 @@ describe("persistSession", () => {
     vi.spyOn(request, "setAccessToken");
   });
 
-  it("将 access token 写入内存，不操作 cookie", () => {
-    persistSession({ access_token: "at-123" });
+  it("将 access token 写入内存并启动刷新定时器，不操作 cookie", () => {
+    vi.spyOn(request, "scheduleRefresh");
+    persistSession({ access_token: "at-123", expires_in: 900 });
     expect(request.setAccessToken).toHaveBeenCalledWith("at-123");
+    expect(request.scheduleRefresh).toHaveBeenCalledWith(900);
     expect(document.cookie).not.toContain("at-123");
   });
 });
