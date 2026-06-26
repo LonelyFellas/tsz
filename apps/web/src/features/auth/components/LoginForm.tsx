@@ -5,21 +5,19 @@ import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
-import { TOKEN_COOKIE } from "@/lib/constants";
+import { AuthBranding } from "./AuthBranding";
+import {
+  AUTH_INPUT_CLASS,
+  persistSession,
+  translateAuthError
+} from "../shared";
 
 type Tab = "password" | "phone" | "email";
 
-const ERROR_MAP: Record<string, string> = {
+const LOGIN_ERRORS: Record<string, string> = {
   "invalid credentials": "账号或密码错误，请重新输入",
-  "user not found": "该账号不存在",
-  "session expired": "登录已过期，请重新登录",
-  "invalid refresh token": "登录已过期，请重新登录"
+  "user not found": "该账号不存在"
 };
-
-function toChineseError(msg: string): string {
-  const key = msg.toLowerCase().trim();
-  return ERROR_MAP[key] ?? (msg || "登录失败，请稍后重试");
-}
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "password", label: "账号密码" },
@@ -48,17 +46,18 @@ export function LoginForm() {
     setError("");
     setLoading(true);
     try {
-      const { user, access_token, refresh_token } = await api.auth.login(
+      const auth = await api.auth.login(
         account,
-        password
+        // 业务规则:密码不区分大小写,与注册一致统一转大写。
+        password.toUpperCase()
       );
-      document.cookie = `${TOKEN_COOKIE}=${access_token}; path=/; max-age=900`;
-      document.cookie = `tsz_refresh_token=${refresh_token}; path=/; max-age=${60 * 60 * 24 * 30}`;
-      setUser(user);
+      persistSession(auth);
+      setUser(auth.user);
       const redirect = searchParams.get("redirect") ?? "/";
       router.push(redirect);
     } catch (e: unknown) {
-      setError(toChineseError(e instanceof Error ? e.message : ""));
+      const msg = e instanceof Error ? e.message : "";
+      setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
     } finally {
       setLoading(false);
     }
@@ -66,29 +65,7 @@ export function LoginForm() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Left panel */}
-      <div className="hidden lg:flex lg:w-1/2 flex-col justify-center px-16 bg-blue-600 text-white">
-        <div className="flex items-center gap-3 mb-6">
-          <span className="text-2xl">📖</span>
-          <span className="text-3xl font-bold">天生会背</span>
-        </div>
-        <p className="text-lg mb-2">智能英语单词学习平台</p>
-        <p className="text-sm opacity-80 mb-12">
-          科学记忆算法 · 个性化学习路径 · 高效词汇掌握
-        </p>
-        <ul className="space-y-5 text-sm">
-          {["实时学习进度跟踪", "智能记忆算法优化", "名校教材同步词库"].map(
-            (item) => (
-              <li key={item} className="flex items-center gap-3 opacity-90">
-                <span className="w-6 h-6 rounded-full border border-white/50 flex items-center justify-center text-xs">
-                  ✓
-                </span>
-                {item}
-              </li>
-            )
-          )}
-        </ul>
-      </div>
+      <AuthBranding />
 
       {/* Right panel */}
       <div className="flex flex-1 items-center justify-center px-8 py-16 bg-white">
@@ -126,7 +103,7 @@ export function LoginForm() {
                   placeholder="请输入手机号/邮箱号码"
                   value={account}
                   onChange={(e) => setAccount(e.target.value)}
-                  className="w-full rounded-full border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className={AUTH_INPUT_CLASS}
                 />
               </div>
               <div>
@@ -138,7 +115,7 @@ export function LoginForm() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                    className="w-full rounded-full border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 pr-12"
+                    className={`${AUTH_INPUT_CLASS} pr-12`}
                   />
                   <button
                     type="button"
@@ -183,7 +160,7 @@ export function LoginForm() {
                   placeholder={tab === "phone" ? "请输入手机号" : "请输入邮箱"}
                   value={account}
                   onChange={(e) => setAccount(e.target.value)}
-                  className="w-full rounded-full border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  className={AUTH_INPUT_CLASS}
                 />
               </div>
               <p className="text-sm text-gray-400 text-center py-4">
