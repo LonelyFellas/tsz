@@ -5,14 +5,19 @@ on:
     branches: [main]
   pull_request:
 
-# 同一分支新推送时取消进行中的旧任务。
+# 默认只给只读权限,按需在单个 job 内提权(最小权限,降低 token 被滥用的风险)。
+permissions:
+  contents: read
+
+# PR 上新推送时取消进行中的旧任务;但 main 不取消(避免取消接续部署的半成品构建)。
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -51,9 +56,39 @@ jobs:
       - name: Build
         run: pnpm build
 
+  # 校验本次 PR 内所有提交是否符合 conventional commits(兜底本地 commit-msg 钩子被 --no-verify 绕过的情况)。
+  commitlint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # push 到 main 时没有 PR 范围可校验,故只在 PR 上跑。
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # commitlint 需要 base..head 之间的完整提交历史。
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint commit messages
+        run: >
+          pnpm commitlint
+          --from ${{ github.event.pull_request.base.sha }}
+          --to ${{ github.event.pull_request.head.sha }}
+          --verbose
+
   # E2E 较慢,独立 job 不阻塞单测反馈。
   e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -67,8 +102,36 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
+      # 缓存 Playwright 浏览器二进制(按 Playwright 版本),避免每次跑都重新下载。
+      - name: Resolve Playwright version
+        id: pw
+        run: echo "version=$(pnpm --filter @tsz/e2e exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      # 命中缓存:浏览器已在,只补系统依赖(apt 包不随缓存走)。
+      - name: Install Playwright system deps
+        if: steps.pw-cache.outputs.cache-hit == 'true'
+        run: pnpm --filter @tsz/e2e exec playwright install-deps chromium
+
+      # 未命中缓存:连浏览器带系统依赖一起装。
       - name: Install Playwright browsers
+        if: steps.pw-cache.outputs.cache-hit != 'true'
         run: pnpm --filter @tsz/e2e exec playwright install --with-deps chromium
 
       - name: E2E (smoke)
         run: pnpm test:e2e
+
+      # 失败时上传报告,便于排查 flaky 用例。
+      - name: Upload Playwright report
+        if: ${{ !cancelled() && failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7

@@ -1,0 +1,32 @@
+version: 2
+updates:
+  # npm/pnpm 依赖:每周一次,统一成一个 PR 减少噪音。
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      # 配合 commitlint 的 conventional commits 校验。
+      prefix: chore
+      prefix-development: chore
+    groups:
+      # 非破坏性更新(minor/patch)合并成一个 PR;major 单独开便于人工评估。
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  # GitHub Actions 版本更新(替代手动钉 SHA 的维护负担)。
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns:
+          - "*"
