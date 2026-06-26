@@ -44,9 +44,11 @@ export function createHttpClient({
   async function request<T>(
     path: string,
     init: RequestInit = {},
-    retrying = false
+    retrying = false,
+    skipAuth = false
   ): Promise<T> {
-    const token = await getToken?.();
+    // 公开端点(登录/注册等)不带 access token，避免遗留的旧 token 污染请求。
+    const token = skipAuth ? undefined : await getToken?.();
     const res = await fetch(`${baseUrl}${path}`, {
       credentials: "include",
       ...init,
@@ -81,8 +83,13 @@ export function createHttpClient({
 
   return {
     get: <T>(path: string) => request<T>(path),
-    post: <T>(path: string, data?: unknown) =>
-      request<T>(path, { method: "POST", body: JSON.stringify(data) }),
+    post: <T>(path: string, data?: unknown, opts?: { skipAuth?: boolean }) =>
+      request<T>(
+        path,
+        { method: "POST", body: JSON.stringify(data) },
+        false,
+        opts?.skipAuth
+      ),
     put: <T>(path: string, data?: unknown) =>
       request<T>(path, { method: "PUT", body: JSON.stringify(data) }),
     del: <T>(path: string) => request<T>(path, { method: "DELETE" })

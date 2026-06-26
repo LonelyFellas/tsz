@@ -50,20 +50,32 @@ export function createEndpoints(http: HttpClient) {
       me: () => http.get<MeResponse>("/me"),
       /** POST /auth/register — 注册并自动登录 */
       register: (payload: RegisterPayload) =>
-        http.post<AuthResponse>("/auth/register", payload),
+        http.post<AuthResponse>("/auth/register", payload, { skipAuth: true }),
       /** POST /auth/login — 账号密码登录 */
       login: (identifier: string, password: string) =>
-        http.post<AuthResponse>("/auth/login", { identifier, password }),
+        http.post<AuthResponse>(
+          "/auth/login",
+          { identifier, password },
+          { skipAuth: true }
+        ),
       /** POST /auth/refresh — 刷新 access token（refresh token 由 cookie 自动携带，无需 body） */
       refresh: () => http.post<RefreshResponse>("/auth/refresh"),
       /** POST /auth/logout — 吊销 refresh token（cookie 自动携带，无需 body） */
       logout: () => http.post<void>("/auth/logout"),
       /** POST /auth/send-code — 发送验证码 */
       sendCode: (identifier: string) =>
-        http.post<{ status: string }>("/auth/send-code", { identifier }),
+        http.post<{ status: string }>(
+          "/auth/send-code",
+          { identifier },
+          { skipAuth: true }
+        ),
       /** POST /auth/login/code — 验证码登录 */
       loginWithCode: (identifier: string, code: string) =>
-        http.post<AuthResponse>("/auth/login/code", { identifier, code }),
+        http.post<AuthResponse>(
+          "/auth/login/code",
+          { identifier, code },
+          { skipAuth: true }
+        ),
       applyTeacher: (profile: Record<string, string>) =>
         http.post<User>("/auth/apply-teacher", { profile })
     },
