@@ -22,3 +22,5 @@ pre-push:
       run: pnpm typecheck
     test:
       run: pnpm test
+    e2e:
+      run: pnpm --filter @tsz/e2e test:e2e
