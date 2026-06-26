@@ -1,6 +1,6 @@
 "use client";
 
-import { isValidAccount, isEmail, isPhone } from "@tsz/shared";
+import { isValidAccount } from "@tsz/shared";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/request";
