@@ -10,10 +10,43 @@ import type {
 } from "@tsz/types";
 import type { HttpClient } from "./http";
 
+// ---- Auth 相关类型(对齐后端 API 文档) ----
+
+export interface AuthResponse {
+  user: User;
+  access_token: string;
+  refresh_token: string;
+  active_role: string;
+}
+
+export interface MeResponse {
+  user: User;
+  active_role: string;
+}
+
 export function createEndpoints(http: HttpClient) {
   return {
     auth: {
-      me: () => http.get<User>("/auth/me"),
+      /** GET /me — 当前登录用户信息 */
+      me: () => http.get<MeResponse>("/me"),
+      /** POST /auth/login — 账号密码登录 */
+      login: (identifier: string, password: string) =>
+        http.post<AuthResponse>("/auth/login", { identifier, password }),
+      /** POST /auth/refresh — 刷新 access token */
+      refresh: (refresh_token: string) =>
+        http.post<{ access_token: string; refresh_token: string }>(
+          "/auth/refresh",
+          { refresh_token }
+        ),
+      /** POST /auth/logout — 吊销 refresh token */
+      logout: (refresh_token: string) =>
+        http.post<void>("/auth/logout", { refresh_token }),
+      /** POST /auth/send-code — 发送验证码 */
+      sendCode: (identifier: string) =>
+        http.post<{ status: string }>("/auth/send-code", { identifier }),
+      /** POST /auth/login/code — 验证码登录 */
+      loginWithCode: (identifier: string, code: string) =>
+        http.post<AuthResponse>("/auth/login/code", { identifier, code }),
       applyTeacher: (profile: Record<string, string>) =>
         http.post<User>("/auth/apply-teacher", { profile })
     },

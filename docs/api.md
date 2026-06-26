@@ -21,6 +21,138 @@ Login is **strict single-device**. Each successful login/register issues a refre
 
 > **Frontend implication:** store both `access_token` and `refresh_token`. On a `401` from a protected endpoint, call `/auth/refresh`, save the **new** `refresh_token` it returns, and retry. If refresh itself returns `401`, the session is dead — send the user back to login.
 
+## Handling 401 errors
+
+All `401` responses share the same shape but come from different sources. Use the `error` field to tell them apart.
+
+### All possible 401 error values
+
+| `error` value                               | Source                            | Meaning                                                  |
+| ------------------------------------------- | --------------------------------- | -------------------------------------------------------- |
+| `invalid credentials`                       | `/auth/login`, `/auth/login/code` | Wrong phone/email or password/code                       |
+| `invalid refresh token`                     | `/auth/refresh`                   | Refresh token expired, revoked, or invalid               |
+| `missing or malformed authorization header` | Any authenticated endpoint        | `Authorization` header is absent or not `Bearer <token>` |
+| `invalid or expired token`                  | Any authenticated endpoint        | Access token has expired or is tampered                  |
+
+### Decision logic for the frontend
+
+```
+response.status === 401 ?
+  ├── request was /auth/login or /auth/login/code
+  │     → show "手机号或密码错误" to the user (never tell them which one is wrong)
+  │
+  ├── request was /auth/refresh
+  │     → session is over, clear tokens, redirect to login
+  │
+  └── any other (authenticated) endpoint
+        error === "missing or malformed authorization header"
+          → bug in your code, access token was not attached — fix the request
+        error === "invalid or expired token"
+          → call /auth/refresh to get new tokens, then retry the original request
+          → if /auth/refresh also returns 401, session is over → redirect to login
+```
+
+### Recommended implementation
+
+```ts
+// http.ts
+const http = axios.create({ baseURL: "/api/v1" });
+
+// Attach access token to every request
+http.interceptors.request.use((config) => {
+  const token = localStorage.getItem("access_token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+// Handle 401 centrally
+http.interceptors.response.use(
+  (res) => res,
+  async (err) => {
+    if (!axios.isAxiosError(err)) return Promise.reject(err);
+
+    const status = err.response?.status;
+    const errorMsg = err.response?.data?.error;
+    const url = err.config?.url ?? "";
+
+    // ① Login / code-login: wrong credentials — let the calling function handle it
+    if (
+      status === 401 &&
+      (url.includes("/auth/login") || url.includes("/auth/login/code"))
+    ) {
+      return Promise.reject(err);
+    }
+
+    // ② Refresh failed — session is over
+    if (status === 401 && url.includes("/auth/refresh")) {
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      window.location.href = "/login";
+      return Promise.reject(err);
+    }
+
+    // ③ Access token expired on a protected endpoint — try to refresh once
+    if (
+      status === 401 &&
+      errorMsg === "invalid or expired token" &&
+      !err.config._retry
+    ) {
+      err.config._retry = true;
+      try {
+        const refreshToken = localStorage.getItem("refresh_token");
+        const { data } = await http.post("/auth/refresh", {
+          refresh_token: refreshToken
+        });
+        localStorage.setItem("access_token", data.access_token);
+        localStorage.setItem("refresh_token", data.refresh_token); // always save the new one
+        err.config.headers.Authorization = `Bearer ${data.access_token}`;
+        return http(err.config); // retry original request
+      } catch {
+        // refresh itself returned 401 → handled by case ② above on the retry
+        return Promise.reject(err);
+      }
+    }
+
+    return Promise.reject(err);
+  }
+);
+
+export default http;
+```
+
+```ts
+// api/auth.ts — login only needs to handle its own 401
+export async function login(identifier: string, password: string) {
+  try {
+    const { data } = await http.post("/auth/login", { identifier, password });
+    localStorage.setItem("access_token", data.access_token);
+    localStorage.setItem("refresh_token", data.refresh_token);
+    return data;
+  } catch (err) {
+    if (axios.isAxiosError(err) && err.response?.status === 401) {
+      throw new Error("手机号或密码错误");
+    }
+    throw err;
+  }
+}
+```
+
+```ts
+// component — no HTTP knowledge needed
+try {
+  await login(identifier, password);
+  router.push("/dashboard");
+} catch (err) {
+  setError(err.message); // "手机号或密码错误"
+}
+```
+
+### Why not distinguish "wrong password" from "account not found"?
+
+Telling the user which one is wrong lets an attacker enumerate valid accounts (try many phone numbers; whichever says "wrong password" exists). Returning a single `invalid credentials` for both is intentional.
+
+---
+
 ## Error format
 
 Errors return the relevant HTTP status with a body:

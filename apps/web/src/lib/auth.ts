@@ -1,13 +1,12 @@
 // 鉴权工具:读取/解析当前会话。这里给出占位实现,接后端时替换。
 import type { Role } from "@tsz/types";
 import { cookies } from "next/headers";
+import { TOKEN_COOKIE } from "./constants";
 
 export interface Session {
   userId: string;
   roles: Role[];
 }
-
-const TOKEN_COOKIE = "tsz_token";
 
 /** 服务端读取会话(用于 middleware 之外的 RSC / server action)。 */
 export async function getSession(): Promise<Session | null> {
@@ -21,4 +20,4 @@ export function hasRole(session: Session | null, role: Role): boolean {
   return !!session?.roles.includes(role);
 }
 
-export { TOKEN_COOKIE };
+export { TOKEN_COOKIE } from "./constants";
