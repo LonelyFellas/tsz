@@ -1,11 +1,10 @@
 "use client";
 
-import { useSessionRestore } from "@tsz/shared/auth";
-import { authRuntime } from "@/lib/auth";
+import { useAdminSessionRestore } from "@/features/auth/hooks/useAdminSessionRestore";
 
-// 应用挂载时用 refresh cookie 静默恢复会话，写入 user / activeRole / hydrated。
+// 应用挂载时用 admin refresh cookie 静默恢复会话，写入 profile / level / hydrated。
 function SessionRestorer() {
-  useSessionRestore(authRuntime);
+  useAdminSessionRestore();
   return null;
 }
 

@@ -1,35 +1,18 @@
 "use client";
 
-import type { AdminProfile } from "@tsz/api-client";
-import { useEffect, useState } from "react";
-import { api, useAuthStore } from "@/lib/auth";
+import { useAuthStore } from "@/lib/auth";
 import { useAdminLogout } from "./useAdminLogout";
 
 /**
- * 后台顶栏：调门禁探针 GET /admin/profile 拿身份，渲染「已登录为 X」+ 登出。
- * 探针失败（如 token 状态异常）时回退到 store 里的用户昵称。
+ * 后台顶栏：渲染「已登录为 X」+ 登出。
+ * 身份来自 store.profile —— 登录与会话恢复（useAdminSessionRestore）已写入，
+ * 守卫保证进到这里时 profile 必有值，无需再单独探一次 /admin/profile。
  */
 export function AdminHeader() {
-  const storeUser = useAuthStore((s) => s.user);
-  const [profile, setProfile] = useState<AdminProfile | null>(null);
+  const profile = useAuthStore((s) => s.profile);
   const logout = useAdminLogout();
 
-  useEffect(() => {
-    let alive = true;
-    api.admin
-      .profile()
-      .then((p) => {
-        if (alive) setProfile(p);
-      })
-      .catch(() => {
-        // 探针失败不阻断渲染；guard 已保证当前为 admin，用 store 兜底显示。
-      });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
-  const name = profile?.display_name ?? storeUser?.nickname ?? "管理员";
+  const name = profile?.display_name ?? "管理员";
 
   return (
     <header className="flex items-center justify-between border-b bg-white px-6 py-3">

@@ -1,45 +1,43 @@
-import type { Role } from "@tsz/types";
+import type { AdminAuthResponse } from "@tsz/api-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
+let mockRedirect: string | null = null;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush, replace: mockReplace }),
-  useSearchParams: () => ({ get: () => null })
+  useSearchParams: () => ({ get: () => mockRedirect })
 }));
 
 vi.mock("@/lib/auth", async () => {
-  const { createAuthStore } = await import("@tsz/shared/auth");
+  const { createAdminAuthStore } = await import("@tsz/shared/auth");
   return {
-    useAuthStore: createAuthStore(),
+    useAuthStore: createAdminAuthStore(),
     api: { auth: { login: vi.fn() } },
-    tokens: { setAccessToken: vi.fn() },
     persistSession: vi.fn()
   };
 });
 
 import { AdminLoginForm } from "./AdminLoginForm";
-import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
+import { api, persistSession, useAuthStore } from "@/lib/auth";
 
 const mockLogin = vi.mocked(api.auth.login);
 const mockPersist = vi.mocked(persistSession);
-const mockSetToken = vi.mocked(tokens.setAccessToken);
 
-const ADMIN_USER = {
-  id: "a1",
-  nickname: "Admin",
-  roles: ["admin"] as Role[],
-  coins: 0,
-  createdAt: ""
-};
-
-function authResponse(activeRole: string) {
+function authResponse(level: "admin" | "super_admin"): AdminAuthResponse {
   return {
-    user: ADMIN_USER,
+    admin: {
+      id: "a1",
+      phone: "13800138000",
+      display_name: "审核员小王",
+      level,
+      status: "active",
+      created_at: "2026-06-27T00:00:00Z"
+    },
     access_token: "at-1",
-    active_role: activeRole,
+    level,
     expires_in: 900,
     refresh_token_expires_at: 0
   };
@@ -57,33 +55,22 @@ function fillAndSubmit() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useAuthStore.setState({ user: null, activeRole: null });
+  mockRedirect = null;
+  useAuthStore.setState({ profile: null, level: null });
 });
 
 describe("AdminLoginForm", () => {
-  it("admin 账号登录成功：持久化会话、写入 store、跳转后台", async () => {
-    mockLogin.mockResolvedValue(authResponse("admin"));
+  it("登录成功：持久化会话、写入 profile、跳转后台", async () => {
+    mockLogin.mockResolvedValue(authResponse("super_admin"));
     render(<AdminLoginForm />);
     fillAndSubmit();
 
     await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/"));
-    // 密码统一转大写后提交。
-    expect(mockLogin).toHaveBeenCalledWith("13800138000", "SECRET123");
+    // admin 密码按原文提交，不做大小写转换（web 端怪癖不适用后台）。
+    expect(mockLogin).toHaveBeenCalledWith("13800138000", "secret123");
     expect(mockPersist).toHaveBeenCalled();
-    expect(useAuthStore.getState().activeRole).toBe("admin");
-  });
-
-  it("非 admin 账号：清 token、报无权、不跳转", async () => {
-    mockLogin.mockResolvedValue(authResponse("teacher"));
-    render(<AdminLoginForm />);
-    fillAndSubmit();
-
-    await waitFor(() =>
-      expect(screen.getByText(/无平台后台权限/)).toBeInTheDocument()
-    );
-    expect(mockSetToken).toHaveBeenCalledWith(null);
-    expect(mockPersist).not.toHaveBeenCalled();
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().profile?.display_name).toBe("审核员小王");
+    expect(useAuthStore.getState().level).toBe("super_admin");
   });
 
   it("凭证错误：展示翻译后的中文文案", async () => {
@@ -95,5 +82,121 @@ describe("AdminLoginForm", () => {
       expect(screen.getByText("账号或密码错误，请重新输入")).toBeInTheDocument()
     );
     expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("账号被禁用：展示禁用提示", async () => {
+    mockLogin.mockRejectedValue(new Error("account disabled"));
+    render(<AdminLoginForm />);
+    fillAndSubmit();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("该账号已被禁用，请联系超级管理员")
+      ).toBeInTheDocument()
+    );
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("登录成功跳转到 redirect 指定页", async () => {
+    mockRedirect = "/users";
+    mockLogin.mockResolvedValue(authResponse("admin"));
+    render(<AdminLoginForm />);
+    fillAndSubmit();
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/users"));
+  });
+
+  it("已登录访问登录页：直接 replace 到目标页", () => {
+    mockRedirect = "/reviews";
+    useAuthStore.setState({
+      profile: {
+        id: "a1",
+        phone: "1",
+        display_name: "X",
+        level: "admin"
+      },
+      level: "admin"
+    });
+    render(<AdminLoginForm />);
+    expect(mockReplace).toHaveBeenCalledWith("/reviews");
+  });
+
+  it("切换密码显隐", () => {
+    render(<AdminLoginForm />);
+    const pwd = screen.getByPlaceholderText("请输入登录密码");
+    expect(pwd).toHaveAttribute("type", "password");
+    fireEvent.click(screen.getByRole("button", { name: "显示密码" }));
+    expect(pwd).toHaveAttribute("type", "text");
+    fireEvent.click(screen.getByRole("button", { name: "隐藏密码" }));
+    expect(pwd).toHaveAttribute("type", "password");
+  });
+
+  it("密码框回车提交", async () => {
+    mockLogin.mockResolvedValue(authResponse("admin"));
+    render(<AdminLoginForm />);
+    fireEvent.change(screen.getByPlaceholderText("请输入手机号或邮箱"), {
+      target: { value: "13800138000" }
+    });
+    fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
+      target: { value: "secret123" }
+    });
+    fireEvent.keyDown(screen.getByPlaceholderText("请输入登录密码"), {
+      key: "Enter"
+    });
+    await waitFor(() => expect(mockLogin).toHaveBeenCalled());
+  });
+
+  it("未填写完整时回车不触发登录（canSubmit 兜底）", () => {
+    render(<AdminLoginForm />);
+    fireEvent.keyDown(screen.getByPlaceholderText("请输入登录密码"), {
+      key: "Enter"
+    });
+    expect(mockLogin).not.toHaveBeenCalled();
+  });
+
+  it("密码不足 8 位：按钮禁用且回车不打后端（与后端 8–72 规则一致）", () => {
+    render(<AdminLoginForm />);
+    fireEvent.change(screen.getByPlaceholderText("请输入手机号或邮箱"), {
+      target: { value: "13800138000" }
+    });
+    fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
+      target: { value: "short12" } // 7 位
+    });
+    expect(screen.getByRole("button", { name: "登录" })).toBeDisabled();
+    fireEvent.keyDown(screen.getByPlaceholderText("请输入登录密码"), {
+      key: "Enter"
+    });
+    expect(mockLogin).not.toHaveBeenCalled();
+  });
+
+  it("账号格式非法：按钮禁用，不打后端", () => {
+    render(<AdminLoginForm />);
+    fireEvent.change(screen.getByPlaceholderText("请输入手机号或邮箱"), {
+      target: { value: "not-an-account" }
+    });
+    fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
+      target: { value: "secret123" }
+    });
+    expect(screen.getByRole("button", { name: "登录" })).toBeDisabled();
+  });
+
+  it("登录请求进行中：按钮置「登录中」并禁用，防止重复提交", async () => {
+    let resolveLogin!: (v: ReturnType<typeof authResponse>) => void;
+    mockLogin.mockReturnValue(
+      new Promise((res) => {
+        resolveLogin = res;
+      })
+    );
+    render(<AdminLoginForm />);
+    fillAndSubmit();
+
+    // 进行中：文案变更 + 禁用，二次点击不会再发请求。
+    const btn = await screen.findByRole("button", { name: "登录中..." });
+    expect(btn).toBeDisabled();
+    fireEvent.click(btn);
+    expect(mockLogin).toHaveBeenCalledTimes(1);
+
+    resolveLogin(authResponse("admin"));
+    await waitFor(() => expect(mockPush).toHaveBeenCalled());
   });
 });
