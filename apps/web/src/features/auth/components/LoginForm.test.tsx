@@ -16,7 +16,8 @@ vi.mock("@/lib/request", () => ({
   scheduleRefresh: vi.fn(),
   api: {
     auth: {
-      login: vi.fn()
+      login: vi.fn(),
+      me: vi.fn()
     }
   }
 }));
@@ -24,10 +25,26 @@ vi.mock("@/lib/request", () => ({
 // 引入 mock 后拿到有类型的引用
 import { api } from "@/lib/request";
 const mockLogin = vi.mocked(api.auth.login);
+const mockMe = vi.mocked(api.auth.me);
+
+const ME_USER = {
+  id: "1",
+  nickname: "Alice",
+  roles: ["student"],
+  coins: 0,
+  createdAt: ""
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockPush.mockReset();
+  // 默认：老用户（已 onboarded），登录后进目标页。
+  mockMe.mockResolvedValue({
+    user: ME_USER,
+    active_role: "student",
+    learning_settings: { cefr_level: "B1", english_variant: "BrE" },
+    onboarded: true
+  } as never);
 });
 
 // ── 按钮状态 ──────────────────────────────────────────
@@ -103,6 +120,29 @@ describe("LoginForm — 登录流程", () => {
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith("13800138000", "ABC123");
       expect(mockPush).toHaveBeenCalledWith("/");
+    });
+  });
+
+  it("新用户登录（未 onboarded）→ 跳转到 /onboarding", async () => {
+    mockLogin.mockResolvedValueOnce({
+      user: ME_USER,
+      access_token: "at",
+      active_role: "student",
+      expires_in: 900,
+      refresh_token_expires_at: 9999999999
+    } as never);
+    mockMe.mockResolvedValueOnce({
+      user: ME_USER,
+      active_role: "student",
+      learning_settings: null,
+      onboarded: false
+    } as never);
+    renderWithProviders(<LoginForm />);
+
+    await fillAndSubmit();
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith("/onboarding");
     });
   });
 
@@ -212,5 +252,32 @@ describe("LoginForm — tab 切换", () => {
     expect(
       screen.queryByText("账号或密码错误，请重新输入")
     ).not.toBeInTheDocument();
+  });
+});
+
+// ── 交互细节 ──────────────────────────────────────────
+describe("LoginForm — 交互细节", () => {
+  it("点击眼睛图标 → 切换密码明文/密文", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    const pwd = screen.getByPlaceholderText("请输入登录密码");
+    expect(pwd).toHaveAttribute("type", "password");
+
+    await user.click(screen.getByRole("button", { name: "显示密码" }));
+    expect(pwd).toHaveAttribute("type", "text");
+
+    await user.click(screen.getByRole("button", { name: "隐藏密码" }));
+    expect(pwd).toHaveAttribute("type", "password");
+  });
+
+  it("点击「没有账号，立即注册」→ 跳 /register", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await user.click(
+      screen.getByRole("button", { name: "没有账号，立即注册" })
+    );
+    expect(mockPush).toHaveBeenCalledWith("/register");
   });
 });

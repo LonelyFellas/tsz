@@ -1,46 +1,16 @@
-import Link from "next/link";
-import { getSession, hasRole } from "@/lib/auth";
-import { LogoutButton } from "@/features/auth/components/LogoutButton";
+import { MainNav } from "@/features/auth/components/MainNav";
 
-// 登录后主布局:角色感知导航。师生共用「词表」,各自看到自己的专属入口。
-export default async function MainLayout({
+// 登录后主布局：角色感知导航。
+// 注意：主区本身不强制登录——词表浏览对游客开放；
+// 受保护区域（student/teacher）各自的 layout 用 RouteGuard 单独把关。
+export default function MainLayout({
   children
 }: {
   children: React.ReactNode;
 }) {
-  const session = await getSession();
-  const isTeacher = hasRole(session, "teacher");
-  const isStudent = hasRole(session, "student");
-
   return (
     <div className="mx-auto max-w-5xl px-4">
-      <header className="flex items-center gap-6 border-b py-4">
-        <Link href="/" className="font-bold">
-          天生字
-        </Link>
-        <nav className="flex flex-1 gap-4 text-sm">
-          <Link href="/wordlists">词表</Link>
-          {isTeacher && (
-            <>
-              <Link href="/teacher/tasks">任务管理</Link>
-              <Link href="/teacher/classes">班级管理</Link>
-              <Link href="/teacher/stats">数据统计</Link>
-            </>
-          )}
-          {isStudent && (
-            <>
-              <Link href="/student/practice">练习</Link>
-              <Link href="/student/coins">天生币</Link>
-            </>
-          )}
-          {!isTeacher && (
-            <Link href="/apply-teacher" className="text-blue-600">
-              申请成为老师
-            </Link>
-          )}
-        </nav>
-        <LogoutButton />
-      </header>
+      <MainNav />
       <main className="py-6">{children}</main>
     </div>
   );

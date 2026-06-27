@@ -157,6 +157,57 @@ describe("refreshTokens — 竞态保护", () => {
   });
 });
 
+// ── visibilitychange 自动刷新 ─────────────────────────────────────────────────
+
+describe("visibilitychange — 切回前台时按需刷新", () => {
+  function setVisibility(state: "visible" | "hidden") {
+    Object.defineProperty(document, "visibilityState", {
+      configurable: true,
+      get: () => state
+    });
+  }
+
+  it("切回前台且 token 即将过期 → 触发刷新", () => {
+    setAccessToken("tok");
+    scheduleRefresh(10); // tokenExpiresAt = now+10s（<30s 阈值），且不排定时器
+    refreshOk("fresh");
+
+    setVisibility("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("页面仍在后台（hidden）→ 不刷新", () => {
+    setAccessToken("tok");
+    scheduleRefresh(10);
+
+    setVisibility("hidden");
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("token 仍有较长有效期 → 不刷新", () => {
+    vi.useFakeTimers();
+    setAccessToken("tok");
+    scheduleRefresh(900); // tokenExpiresAt 远未到期
+
+    setVisibility("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("无 access token（已登出）→ 不刷新", () => {
+    setAccessToken(null);
+    setVisibility("visible");
+    document.dispatchEvent(new Event("visibilitychange"));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 // ── setAccessToken ────────────────────────────────────────────────────────────
 
 describe("setAccessToken", () => {

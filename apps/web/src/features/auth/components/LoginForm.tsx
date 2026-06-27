@@ -8,6 +8,7 @@ import { useUserStore } from "@/stores/user";
 import { AuthBranding } from "./AuthBranding";
 import {
   AUTH_INPUT_CLASS,
+  navigateAfterAuth,
   persistSession,
   translateAuthError
 } from "../shared";
@@ -53,8 +54,9 @@ export function LoginForm() {
       );
       persistSession(auth);
       setUser(auth.user);
+      // 拉取 /me 判断是否新用户：新用户先进引导页，老用户进目标页。
       const redirect = searchParams.get("redirect") ?? "/";
-      router.push(redirect);
+      await navigateAfterAuth((href) => router.push(href), redirect);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
       setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));

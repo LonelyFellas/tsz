@@ -28,9 +28,31 @@ export interface RefreshResponse {
   refresh_token_expires_at: number;
 }
 
+/** CEFR 难度等级，A1 最简单 … C2 最难。 */
+export type CEFRLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
+
+/** 英语口音 / 拼写习惯：英式或美式。 */
+export type EnglishVariant = "BrE" | "AmE";
+
+/** 学习者的两项基础设置（onboarding 选择），始终成对写入。 */
+export interface LearningSettings {
+  cefr_level: CEFRLevel;
+  english_variant: EnglishVariant;
+}
+
 export interface MeResponse {
   user: User;
   active_role: string;
+  /** onboarding 完成前为 null。 */
+  learning_settings: LearningSettings | null;
+  /** 后端推导：learning_settings 已设置则为 true。客户端据此判断是否新用户。 */
+  onboarded: boolean;
+}
+
+export interface LearningSettingsResponse {
+  learning_settings: LearningSettings;
+  /** 此处恒为 true —— 设置刚刚写入。 */
+  onboarded: boolean;
 }
 
 export interface RegisterPayload {
@@ -77,7 +99,10 @@ export function createEndpoints(http: HttpClient) {
           { skipAuth: true }
         ),
       applyTeacher: (profile: Record<string, string>) =>
-        http.post<User>("/auth/apply-teacher", { profile })
+        http.post<User>("/auth/apply-teacher", { profile }),
+      /** PUT /me/learning-settings — 设置 CEFR 等级 + 英式/美式（新用户 onboarding 与后续修改共用） */
+      updateLearningSettings: (settings: LearningSettings) =>
+        http.put<LearningSettingsResponse>("/me/learning-settings", settings)
     },
     word: {
       list: (page = 1) => http.get<Paginated<Word>>(`/words?page=${page}`)

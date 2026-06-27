@@ -101,6 +101,18 @@ describe("createEndpoints · auth", () => {
       profile: { realName: "张三" }
     });
   });
+
+  it("updateLearningSettings → PUT /me/learning-settings 带 cefr_level + english_variant", () => {
+    const api = createEndpoints(http);
+    api.auth.updateLearningSettings({
+      cefr_level: "B1",
+      english_variant: "BrE"
+    });
+    expect(http.put).toHaveBeenCalledWith("/me/learning-settings", {
+      cefr_level: "B1",
+      english_variant: "BrE"
+    });
+  });
 });
 
 describe("createEndpoints · word", () => {

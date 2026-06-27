@@ -1,5 +1,9 @@
 import type { AuthResponse } from "@tsz/api-client";
-import { setAccessToken, scheduleRefresh } from "@/lib/request";
+import { api, setAccessToken, scheduleRefresh } from "@/lib/request";
+import { useUserStore } from "@/stores/user";
+
+/** 新用户引导页路径（选择难度等级 + 英式/美式）。 */
+export const ONBOARDING_PATH = "/onboarding";
 
 // 登录 / 注册表单共用的输入框样式。
 export const AUTH_INPUT_CLASS =
@@ -31,4 +35,20 @@ export function persistSession(
 ): void {
   setAccessToken(auth.access_token);
   scheduleRefresh(auth.expires_in);
+}
+
+/**
+ * 登录 / 注册成功后的统一跳转决策：
+ * 拉取 /me 判断是否新用户（未完成 onboarding），新用户先进引导页，
+ * 老用户进目标页（redirect 或首页）。同时把用户态写入全局 store。
+ */
+export async function navigateAfterAuth(
+  push: (href: string) => void,
+  redirect = "/"
+): Promise<void> {
+  const me = await api.auth.me();
+  const { setUser, setOnboarded } = useUserStore.getState();
+  setUser(me.user);
+  setOnboarded(me.onboarded);
+  push(me.onboarded ? redirect : ONBOARDING_PATH);
 }

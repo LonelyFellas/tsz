@@ -10,13 +10,22 @@ import { api, refreshTokens } from "@/lib/request";
  */
 export function useSessionRestore() {
   const setUser = useUserStore((s) => s.setUser);
+  const setOnboarded = useUserStore((s) => s.setOnboarded);
+  const setHydrated = useUserStore((s) => s.setHydrated);
 
   useEffect(() => {
     refreshTokens()
       .then(() => api.auth.me())
-      .then(({ user }) => setUser(user))
+      .then(({ user, onboarded }) => {
+        setUser(user);
+        setOnboarded(onboarded);
+      })
       .catch(() => {
         // 无有效会话，保持未登录，由路由守卫决定跳转。
+      })
+      .finally(() => {
+        // 无论成功失败，标记会话恢复已完成，UI 据此区分「恢复中」与「未登录」。
+        setHydrated(true);
       });
-  }, [setUser]);
+  }, [setUser, setOnboarded, setHydrated]);
 }
