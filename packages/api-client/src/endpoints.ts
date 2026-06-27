@@ -55,6 +55,15 @@ export interface LearningSettingsResponse {
   onboarded: boolean;
 }
 
+/** GET /admin/profile 的响应：后台门禁探针 + "已登录为 X" 头部所需身份。 */
+export interface AdminProfile {
+  id: string;
+  phone: string;
+  display_name: string;
+  roles: string[];
+  active_role: string;
+}
+
 export interface RegisterPayload {
   phone: string;
   email?: string;
@@ -122,6 +131,10 @@ export function createEndpoints(http: HttpClient) {
     task: {
       list: () => http.get<Task[]>("/tasks"),
       create: (data: Partial<Task>) => http.post<Task>("/tasks", data)
+    },
+    admin: {
+      /** GET /admin/profile — 后台门禁探针：200=admin / 401=未登录 / 403=非 admin */
+      profile: () => http.get<AdminProfile>("/admin/profile")
     }
   };
 }

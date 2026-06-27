@@ -2,7 +2,9 @@
   "extends": "@tsz/config/tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "noEmit": true
+    "noEmit": true,
+    "lib": ["DOM", "DOM.Iterable", "ES2022"],
+    "jsx": "react-jsx"
   },
   "include": ["src"]
 }
