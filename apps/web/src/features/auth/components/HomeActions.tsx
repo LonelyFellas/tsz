@@ -57,6 +57,12 @@ export function HomeActions() {
         >
           {loading ? "退出中..." : "退出登录"}
         </button>
+        <Link
+          href="/account/delete"
+          className="text-sm text-gray-400 transition-colors hover:text-red-500"
+        >
+          注销账号
+        </Link>
       </div>
     </div>
   );

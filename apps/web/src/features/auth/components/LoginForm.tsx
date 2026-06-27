@@ -44,6 +44,8 @@ export function LoginForm() {
 
   // 从找回密码流程跳回时展示成功提示，引导用户用新密码登录。
   const resetSuccess = searchParams.get("reset") === "success";
+  // 从注销账号流程跳回时展示成功提示。
+  const deletedSuccess = searchParams.get("deleted") === "success";
 
   async function handleLogin() {
     if (!canSubmit) return;
@@ -80,6 +82,12 @@ export function LoginForm() {
           {resetSuccess && (
             <p className="mb-6 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-600">
               密码重置成功，请用新密码登录。
+            </p>
+          )}
+
+          {deletedSuccess && (
+            <p className="mb-6 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-600">
+              账号已注销成功。
             </p>
           )}
 

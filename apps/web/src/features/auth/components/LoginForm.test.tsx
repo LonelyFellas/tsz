@@ -5,13 +5,19 @@ import { renderWithProviders } from "@/test/render";
 import { LoginForm } from "./LoginForm";
 
 const mockPush = vi.fn();
-// 可变的 reset 查询参数，便于覆盖「找回密码跳回」的成功提示分支。
+// 可变的查询参数，便于覆盖「找回密码 / 注销账号跳回」的成功提示分支。
 let mockResetParam: string | null = null;
+let mockDeletedParam: string | null = null;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
   useSearchParams: () => ({
-    get: (key: string) => (key === "reset" ? mockResetParam : null)
+    get: (key: string) =>
+      key === "reset"
+        ? mockResetParam
+        : key === "deleted"
+          ? mockDeletedParam
+          : null
   })
 }));
 
@@ -43,6 +49,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockPush.mockReset();
   mockResetParam = null;
+  mockDeletedParam = null;
   // 默认：老用户（已 onboarded），登录后进目标页。
   mockMe.mockResolvedValue({
     user: ME_USER,
@@ -301,5 +308,12 @@ describe("LoginForm — 交互细节", () => {
     expect(
       screen.getByText("密码重置成功，请用新密码登录。")
     ).toBeInTheDocument();
+  });
+
+  it("URL 带 deleted=success → 顶部显示注销成功提示", () => {
+    mockDeletedParam = "success";
+    renderWithProviders(<LoginForm />);
+
+    expect(screen.getByText("账号已注销成功。")).toBeInTheDocument();
   });
 });

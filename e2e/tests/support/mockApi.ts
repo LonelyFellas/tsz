@@ -6,6 +6,7 @@ import type { Page, Route } from "@playwright/test";
 export const TEST_USER = {
   id: "u1",
   phone: "13800138000",
+  email: "alice@example.com",
   nickname: "Alice",
   roles: ["student"] as const,
   coins: 0,
@@ -39,6 +40,8 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
   const { authenticated = false, onboarded = true } = opts;
   // 可变：onboarding 提交后 /me 应返回 onboarded:true。
   let onboardedState = onboarded;
+  // 可变：账号注销后会话失效，后续 /auth/refresh 应 401（模拟账号已删）。
+  let deleted = false;
 
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace(
@@ -48,7 +51,7 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
     const method = route.request().method();
 
     if (path === "/auth/refresh" && method === "POST") {
-      return authenticated
+      return authenticated && !deleted
         ? json(route, 200, {
             access_token: "test-access-token",
             expires_in: 900,
@@ -89,6 +92,13 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
       return json(route, 200, { status: "reset" });
     }
     if (path === "/auth/logout" && method === "POST") {
+      return route.fulfill({ status: 204, body: "" });
+    }
+    if (path === "/auth/account/deletion-code" && method === "POST") {
+      return json(route, 200, { status: "sent" });
+    }
+    if (path === "/auth/account" && method === "DELETE") {
+      deleted = true;
       return route.fulfill({ status: 204, body: "" });
     }
     // 其他端点返回空体，避免命中真实网络。
