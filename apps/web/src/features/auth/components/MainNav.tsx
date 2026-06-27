@@ -14,7 +14,7 @@ export function MainNav() {
   return (
     <header className="flex items-center gap-6 border-b py-4">
       <Link href="/" className="font-bold">
-        天生字
+        天生会背
       </Link>
       <nav className="flex flex-1 gap-4 text-sm">
         <Link href="/wordlists">词表</Link>
