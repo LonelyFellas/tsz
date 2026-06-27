@@ -92,7 +92,12 @@ export function createHttpClient({
       ),
     put: <T>(path: string, data?: unknown) =>
       request<T>(path, { method: "PUT", body: JSON.stringify(data) }),
-    del: <T>(path: string) => request<T>(path, { method: "DELETE" })
+    del: <T>(path: string, data?: unknown) =>
+      request<T>(path, {
+        method: "DELETE",
+        // 部分删除接口需要请求体（如注销账号需带 channel + code）。
+        ...(data !== undefined ? { body: JSON.stringify(data) } : {})
+      })
   };
 }
 

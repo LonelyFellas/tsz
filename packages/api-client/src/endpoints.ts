@@ -55,6 +55,12 @@ export interface LearningSettingsResponse {
   onboarded: boolean;
 }
 
+/**
+ * 注销账号的验证渠道：验证码始终发往账号本人「在档」的手机或邮箱（二选一），
+ * 而非请求里的值——以此证明账号归属。仅绑定其中一项的账号只能用对应渠道。
+ */
+export type DeletionChannel = "phone" | "email";
+
 export interface RegisterPayload {
   phone: string;
   email?: string;
@@ -115,6 +121,20 @@ export function createEndpoints(http: HttpClient) {
           { phone, code, new_password: newPassword },
           { skipAuth: true }
         ),
+      /**
+       * POST /auth/account/deletion-code — 请求账号注销验证码。
+       * 验证码发往账号本人在档的手机/邮箱（由 channel 决定），5 分钟有效。
+       */
+      requestDeletionCode: (channel: DeletionChannel) =>
+        http.post<{ status: string }>("/auth/account/deletion-code", {
+          channel
+        }),
+      /**
+       * DELETE /auth/account — 校验验证码后永久删除当前账号。
+       * 不可恢复：级联清除角色/资料/会话，用户全端登出，手机号/邮箱释放可重新注册。
+       */
+      deleteAccount: (channel: DeletionChannel, code: string) =>
+        http.del<void>("/auth/account", { channel, code }),
       applyTeacher: (profile: Record<string, string>) =>
         http.post<User>("/auth/apply-teacher", { profile }),
       /** PUT /me/learning-settings — 设置 CEFR 等级 + 英式/美式（新用户 onboarding 与后续修改共用） */

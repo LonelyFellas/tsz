@@ -124,6 +124,19 @@ describe("createHttpClient", () => {
     const http = createHttpClient({ baseUrl: "" });
     await http.del("/items/1");
     expect(fetchMock.mock.calls[0]![1].method).toBe("DELETE");
+    // 无 data 时不带请求体。
+    expect(fetchMock.mock.calls[0]![1].body).toBeUndefined();
+  });
+
+  it("del:带 data 时序列化为请求体", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
+    const http = createHttpClient({ baseUrl: "" });
+    await http.del("/items/1", { channel: "phone", code: "123456" });
+    const init = fetchMock.mock.calls[0]![1];
+    expect(init.method).toBe("DELETE");
+    expect(init.body).toBe(
+      JSON.stringify({ channel: "phone", code: "123456" })
+    );
   });
 
   it("204 No Content 返回 undefined", async () => {

@@ -118,6 +118,23 @@ describe("createEndpoints · auth", () => {
     );
   });
 
+  it("requestDeletionCode → POST /auth/account/deletion-code 带 channel", () => {
+    const api = createEndpoints(http);
+    api.auth.requestDeletionCode("phone");
+    expect(http.post).toHaveBeenCalledWith("/auth/account/deletion-code", {
+      channel: "phone"
+    });
+  });
+
+  it("deleteAccount → DELETE /auth/account 带 channel + code", () => {
+    const api = createEndpoints(http);
+    api.auth.deleteAccount("email", "123456");
+    expect(http.del).toHaveBeenCalledWith("/auth/account", {
+      channel: "email",
+      code: "123456"
+    });
+  });
+
   it("applyTeacher → POST /auth/apply-teacher 带 { profile }", () => {
     const api = createEndpoints(http);
     api.auth.applyTeacher({ realName: "张三" });
