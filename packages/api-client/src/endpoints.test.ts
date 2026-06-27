@@ -94,6 +94,30 @@ describe("createEndpoints · auth", () => {
     );
   });
 
+  it("forgotPassword → POST /auth/password/forgot 带 phone", () => {
+    const api = createEndpoints(http);
+    api.auth.forgotPassword("13800138000");
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/password/forgot",
+      { phone: "13800138000" },
+      { skipAuth: true }
+    );
+  });
+
+  it("resetPassword → POST /auth/password/reset 带 phone + code + new_password", () => {
+    const api = createEndpoints(http);
+    api.auth.resetPassword("13800138000", "123456", "NEWPASS1234");
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/password/reset",
+      {
+        phone: "13800138000",
+        code: "123456",
+        new_password: "NEWPASS1234"
+      },
+      { skipAuth: true }
+    );
+  });
+
   it("applyTeacher → POST /auth/apply-teacher 带 { profile }", () => {
     const api = createEndpoints(http);
     api.auth.applyTeacher({ realName: "张三" });

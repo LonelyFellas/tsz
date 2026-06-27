@@ -98,6 +98,23 @@ export function createEndpoints(http: HttpClient) {
           { identifier, code },
           { skipAuth: true }
         ),
+      /** POST /auth/password/forgot — 找回密码：向手机号发送短信验证码（验证码 5 分钟有效） */
+      forgotPassword: (phone: string) =>
+        http.post<{ status: string }>(
+          "/auth/password/forgot",
+          { phone },
+          { skipAuth: true }
+        ),
+      /**
+       * POST /auth/password/reset — 校验验证码并设置新密码。
+       * 成功后服务端会吊销该用户所有会话，用户须用新密码重新登录。
+       */
+      resetPassword: (phone: string, code: string, newPassword: string) =>
+        http.post<{ status: string }>(
+          "/auth/password/reset",
+          { phone, code, new_password: newPassword },
+          { skipAuth: true }
+        ),
       applyTeacher: (profile: Record<string, string>) =>
         http.post<User>("/auth/apply-teacher", { profile }),
       /** PUT /me/learning-settings — 设置 CEFR 等级 + 英式/美式（新用户 onboarding 与后续修改共用） */

@@ -5,10 +5,14 @@ import { renderWithProviders } from "@/test/render";
 import { LoginForm } from "./LoginForm";
 
 const mockPush = vi.fn();
+// 可变的 reset 查询参数，便于覆盖「找回密码跳回」的成功提示分支。
+let mockResetParam: string | null = null;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
-  useSearchParams: () => ({ get: () => null })
+  useSearchParams: () => ({
+    get: (key: string) => (key === "reset" ? mockResetParam : null)
+  })
 }));
 
 vi.mock("@/lib/request", () => ({
@@ -38,6 +42,7 @@ const ME_USER = {
 beforeEach(() => {
   vi.clearAllMocks();
   mockPush.mockReset();
+  mockResetParam = null;
   // 默认：老用户（已 onboarded），登录后进目标页。
   mockMe.mockResolvedValue({
     user: ME_USER,
@@ -279,5 +284,22 @@ describe("LoginForm — 交互细节", () => {
       screen.getByRole("button", { name: "没有账号，立即注册" })
     );
     expect(mockPush).toHaveBeenCalledWith("/register");
+  });
+
+  it("点击「忘记密码」→ 跳 /forgot-password", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "忘记密码" }));
+    expect(mockPush).toHaveBeenCalledWith("/forgot-password");
+  });
+
+  it("URL 带 reset=success → 顶部显示重置成功提示", () => {
+    mockResetParam = "success";
+    renderWithProviders(<LoginForm />);
+
+    expect(
+      screen.getByText("密码重置成功，请用新密码登录。")
+    ).toBeInTheDocument();
   });
 });

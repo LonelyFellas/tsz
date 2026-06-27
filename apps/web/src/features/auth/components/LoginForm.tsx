@@ -42,6 +42,9 @@ export function LoginForm() {
   const passwordValid = password.length >= 6;
   const canSubmit = accountValid && passwordValid && !loading;
 
+  // 从找回密码流程跳回时展示成功提示，引导用户用新密码登录。
+  const resetSuccess = searchParams.get("reset") === "success";
+
   async function handleLogin() {
     if (!canSubmit) return;
     setError("");
@@ -73,6 +76,12 @@ export function LoginForm() {
       <div className="flex flex-1 items-center justify-center px-8 py-16 bg-white">
         <div className="w-full max-w-sm">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">欢迎回来</h1>
+
+          {resetSuccess && (
+            <p className="mb-6 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-600">
+              密码重置成功，请用新密码登录。
+            </p>
+          )}
 
           {/* Tabs */}
           <div className="flex gap-6 mb-8 border-b border-gray-100">
@@ -147,9 +156,13 @@ export function LoginForm() {
                 没有账号，立即注册
               </button>
 
-              <p className="text-center text-sm text-blue-500 cursor-pointer hover:underline">
+              <button
+                type="button"
+                onClick={() => router.push("/forgot-password")}
+                className="w-full text-center text-sm text-blue-500 hover:underline"
+              >
                 忘记密码
-              </p>
+              </button>
             </div>
           ) : (
             <div className="space-y-4">
