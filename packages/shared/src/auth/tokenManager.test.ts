@@ -97,4 +97,37 @@ describe("createTokenManager", () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("redirectToLogin 清 token 并跳默认登录页", () => {
+    // 先在无 window 的 node 环境构造（跳过 visibilitychange 注册），再注入 window 触发跳转分支。
+    const tm = createTokenManager({ baseUrl: "/api/v1" });
+    tm.setAccessToken("at-1");
+    const location = { href: "" };
+    vi.stubGlobal("window", { location });
+
+    tm.redirectToLogin();
+
+    expect(tm.getToken()).toBeUndefined();
+    expect(location.href).toBe("/login");
+    vi.unstubAllGlobals();
+  });
+
+  it("redirectToLogin 跳自定义 loginPath", () => {
+    const tm = createTokenManager({ baseUrl: "/api/v1", loginPath: "/admin" });
+    const location = { href: "" };
+    vi.stubGlobal("window", { location });
+
+    tm.redirectToLogin();
+
+    expect(location.href).toBe("/admin");
+    vi.unstubAllGlobals();
+  });
+
+  it("无 window（SSR/node）时 redirectToLogin 只清 token、不跳转", () => {
+    const tm = createTokenManager({ baseUrl: "/api/v1" });
+    tm.setAccessToken("at-1");
+
+    expect(() => tm.redirectToLogin()).not.toThrow();
+    expect(tm.getToken()).toBeUndefined();
+  });
 });

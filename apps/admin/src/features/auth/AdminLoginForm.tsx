@@ -4,15 +4,16 @@ import { isValidAccount } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
+import { api, persistSession, useAuthStore } from "@/lib/auth";
 
 const INPUT_CLASS =
   "w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500";
 
 const LOGIN_ERRORS: Record<string, string> = {
+  // 401：不区分是账号还是密码错，防枚举。
   "invalid credentials": "账号或密码错误，请重新输入",
-  "account disabled": "该账号已被禁用",
-  "admin role required": "该账号无平台后台权限"
+  // 403：账号被禁用。
+  "account disabled": "该账号已被禁用，请联系超级管理员"
 };
 
 export function AdminLoginForm() {
@@ -22,40 +23,36 @@ export function AdminLoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const setUser = useAuthStore((s) => s.setUser);
-  const setActiveRole = useAuthStore((s) => s.setActiveRole);
-  const user = useAuthStore((s) => s.user);
-  const activeRole = useAuthStore((s) => s.activeRole);
+  const setProfile = useAuthStore((s) => s.setProfile);
+  const profile = useAuthStore((s) => s.profile);
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  // 已是登录的管理员访问登录页：直接进后台。
+  // 已登录的管理员访问登录页：直接进后台。
   useEffect(() => {
-    if (user && activeRole === "admin") {
+    if (profile) {
       router.replace(searchParams.get("redirect") ?? "/");
     }
-  }, [user, activeRole, router, searchParams]);
+  }, [profile, router, searchParams]);
 
-  const canSubmit = isValidAccount(account) && password.length >= 6 && !loading;
+  // admin 密码后端规则为长度 8–72；此处提前拦下过短输入。
+  const canSubmit = isValidAccount(account) && password.length >= 8 && !loading;
 
   async function handleLogin() {
     if (!canSubmit) return;
     setError("");
     setLoading(true);
     try {
-      // 业务规则：密码不区分大小写，与注册一致统一转大写。
-      const auth = await api.auth.login(account, password.toUpperCase());
-
-      // 后台门禁看「当前激活角色」：非 admin 不放行（独立 admin 账号登录后即为 admin）。
-      if (auth.active_role !== "admin") {
-        tokens.setAccessToken(null);
-        setError("该账号无平台后台权限，请使用管理员账号登录");
-        return;
-      }
+      // 后台是独立账号体系：登录成功即为有效 admin，无需再判角色。
+      const auth = await api.auth.login(account, password);
 
       persistSession(auth);
-      setUser(auth.user);
-      setActiveRole(auth.active_role);
+      setProfile({
+        id: auth.admin.id,
+        phone: auth.admin.phone,
+        display_name: auth.admin.display_name,
+        level: auth.level
+      });
       router.push(searchParams.get("redirect") ?? "/");
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";

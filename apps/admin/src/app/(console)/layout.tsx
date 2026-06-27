@@ -2,7 +2,7 @@ import Link from "next/link";
 import { AdminHeader } from "@/features/auth/AdminHeader";
 import { AdminRouteGuard } from "@/features/auth/AdminRouteGuard";
 
-// 受保护的后台壳：门禁守卫 + 侧栏 + 顶栏。仅 active_role === 'admin' 可见。
+// 受保护的后台壳：门禁守卫 + 侧栏 + 顶栏。仅登录的 admin 账号可见。
 export default function ConsoleLayout({
   children
 }: Readonly<{ children: React.ReactNode }>) {
