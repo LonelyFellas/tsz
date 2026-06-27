@@ -1,4 +1,4 @@
-# 天生字(tsz)
+# 天生会背(tsz)
 
 词汇学习平台 —— 师生合一前台(`apps/web`)+ 平台后台(`apps/admin`),pnpm monorepo,Turborepo 任务编排。
 

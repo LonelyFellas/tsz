@@ -2,7 +2,7 @@
   "name": "tsz",
   "version": "1.0.0",
   "private": true,
-  "description": "天生字 — 词汇学习平台 (师生合一 + 平台后台)",
+  "description": "天生会背 — 词汇学习平台 (师生合一 + 平台后台)",
   "packageManager": "pnpm@10.33.0",
   "scripts": {
     "dev": "turbo run dev --filter=@tsz/web",

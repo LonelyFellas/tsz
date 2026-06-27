@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "天生字 · 平台后台"
+  title: "天生会背 · 平台后台"
 };
 
 // 平台后台:词库/词表管理、用户(学生/老师)管理、老师申请审核、敏感词与公开词表审核。
