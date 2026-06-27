@@ -1,6 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { persistSession, translateAuthError } from "./shared";
+import type { User } from "@tsz/types";
+import {
+  navigateAfterAuth,
+  persistSession,
+  translateAuthError
+} from "./shared";
 import * as request from "@/lib/request";
+import { useUserStore } from "@/stores/user";
+
+const ME_USER: User = {
+  id: "u1",
+  phone: "13800138000",
+  nickname: "Alice",
+  roles: ["student"],
+  coins: 0,
+  createdAt: ""
+};
 
 describe("translateAuthError", () => {
   const map = { "invalid credentials": "账号或密码错误，请重新输入" };
@@ -53,5 +68,56 @@ describe("persistSession", () => {
     expect(request.setAccessToken).toHaveBeenCalledWith("at-123");
     expect(request.scheduleRefresh).toHaveBeenCalledWith(900);
     expect(document.cookie).not.toContain("at-123");
+  });
+});
+
+describe("navigateAfterAuth", () => {
+  beforeEach(() => {
+    useUserStore.setState({ user: null, onboarded: null });
+  });
+
+  it("老用户（已 onboarded）→ 跳目标页并写入用户态", async () => {
+    vi.spyOn(request.api.auth, "me").mockResolvedValueOnce({
+      user: ME_USER,
+      active_role: "student",
+      learning_settings: { cefr_level: "B1", english_variant: "BrE" },
+      onboarded: true
+    });
+    const push = vi.fn();
+
+    await navigateAfterAuth(push, "/wordlists");
+
+    expect(push).toHaveBeenCalledWith("/wordlists");
+    expect(useUserStore.getState().user).toEqual(ME_USER);
+    expect(useUserStore.getState().onboarded).toBe(true);
+  });
+
+  it("新用户（未 onboarded）→ 跳 /onboarding", async () => {
+    vi.spyOn(request.api.auth, "me").mockResolvedValueOnce({
+      user: ME_USER,
+      active_role: "student",
+      learning_settings: null,
+      onboarded: false
+    });
+    const push = vi.fn();
+
+    await navigateAfterAuth(push);
+
+    expect(push).toHaveBeenCalledWith("/onboarding");
+    expect(useUserStore.getState().onboarded).toBe(false);
+  });
+
+  it("redirect 默认首页", async () => {
+    vi.spyOn(request.api.auth, "me").mockResolvedValueOnce({
+      user: ME_USER,
+      active_role: "student",
+      learning_settings: { cefr_level: "A1", english_variant: "AmE" },
+      onboarded: true
+    });
+    const push = vi.fn();
+
+    await navigateAfterAuth(push);
+
+    expect(push).toHaveBeenCalledWith("/");
   });
 });

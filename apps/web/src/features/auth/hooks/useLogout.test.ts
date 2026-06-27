@@ -49,16 +49,16 @@ describe("useLogout", () => {
     expect(mockPush).toHaveBeenCalledWith("/login");
   });
 
-  it("logout API 失败：本地状态仍然清除，仍然跳转 /login", async () => {
+  it("logout API 失败：吞掉错误（始终 resolve），本地状态仍清除并跳转 /login", async () => {
     mockLogout.mockRejectedValueOnce(new Error("network error"));
 
     const logout = renderLogout();
-    // finally 执行后错误仍会抛出，这里主动吞掉，只验证副作用。
+    // 新契约：logout() 始终 resolve，调用方无需 catch。
     await act(async () => {
-      await logout().catch(() => {});
+      await expect(logout()).resolves.toBeUndefined();
     });
 
-    // finally 保证：即使后端报错，本地必须清干净
+    // 即使后端报错，本地必须清干净
     expect(mockSetAccessToken).toHaveBeenCalledWith(null);
     expect(useUserStore.getState().user).toBeNull();
     expect(mockPush).toHaveBeenCalledWith("/login");
@@ -79,7 +79,7 @@ describe("useLogout", () => {
 
     const logout = renderLogout();
     await act(async () => {
-      await logout().catch(() => {});
+      await logout();
     });
 
     expect(callOrder).toEqual(["setAccessToken", "clearUser", "push"]);

@@ -1,3 +1,8 @@
 export { LoginForm } from "./components/LoginForm";
 export { RegisterForm } from "./components/RegisterForm";
 export { ApplyTeacherForm } from "./components/ApplyTeacherForm";
+export { OnboardingForm } from "./components/OnboardingForm";
+export { HomeActions } from "./components/HomeActions";
+export { RouteGuard } from "./components/RouteGuard";
+export { GuestGuard } from "./components/GuestGuard";
+export { MainNav } from "./components/MainNav";

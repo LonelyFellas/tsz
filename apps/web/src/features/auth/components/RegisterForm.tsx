@@ -8,6 +8,7 @@ import { useUserStore } from "@/stores/user";
 import { AuthBranding } from "./AuthBranding";
 import {
   AUTH_INPUT_CLASS,
+  navigateAfterAuth,
   persistSession,
   translateAuthError
 } from "../shared";
@@ -92,7 +93,8 @@ export function RegisterForm() {
       });
       persistSession(auth);
       setUser(auth.user);
-      router.push("/");
+      // 新注册用户必为新用户，navigateAfterAuth 会据 /me 引导至 onboarding。
+      await navigateAfterAuth((href) => router.push(href));
     } catch (e: unknown) {
       setError(translateError(e));
     } finally {

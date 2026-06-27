@@ -28,7 +28,7 @@ const MOCK_USER: User = {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useUserStore.setState({ user: null });
+  useUserStore.setState({ user: null, onboarded: null, hydrated: false });
 });
 
 // ── 用例 ──────────────────────────────────────────────────────────────────────
@@ -36,7 +36,12 @@ beforeEach(() => {
 describe("useSessionRestore", () => {
   it("refresh 成功 → 调 /me → 写入 user store", async () => {
     mockRefreshTokens.mockResolvedValueOnce("new-at");
-    mockMe.mockResolvedValueOnce({ user: MOCK_USER, active_role: "student" });
+    mockMe.mockResolvedValueOnce({
+      user: MOCK_USER,
+      active_role: "student",
+      learning_settings: null,
+      onboarded: true
+    });
 
     renderHook(() => useSessionRestore());
 
@@ -58,6 +63,10 @@ describe("useSessionRestore", () => {
     });
     expect(mockMe).not.toHaveBeenCalled();
     expect(useUserStore.getState().user).toBeNull();
+    // 即便失败，也应标记会话恢复完成，供 UI 区分「恢复中」与「未登录」。
+    await waitFor(() => {
+      expect(useUserStore.getState().hydrated).toBe(true);
+    });
   });
 
   it("refresh 成功但 /me 失败 → user store 保持 null", async () => {
@@ -74,7 +83,12 @@ describe("useSessionRestore", () => {
 
   it("只在挂载时执行一次，不重复调用", async () => {
     mockRefreshTokens.mockResolvedValue("new-at");
-    mockMe.mockResolvedValue({ user: MOCK_USER, active_role: "student" });
+    mockMe.mockResolvedValue({
+      user: MOCK_USER,
+      active_role: "student",
+      learning_settings: null,
+      onboarded: true
+    });
 
     const { rerender } = renderHook(() => useSessionRestore());
     rerender();

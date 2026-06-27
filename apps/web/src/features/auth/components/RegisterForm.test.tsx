@@ -18,7 +18,8 @@ vi.mock("@/lib/request", () => ({
   api: {
     auth: {
       register: vi.fn(),
-      sendCode: vi.fn()
+      sendCode: vi.fn(),
+      me: vi.fn()
     }
   }
 }));
@@ -26,6 +27,7 @@ vi.mock("@/lib/request", () => ({
 import { api } from "@/lib/request";
 const mockRegister = vi.mocked(api.auth.register);
 const mockSendCode = vi.mocked(api.auth.sendCode);
+const mockMe = vi.mocked(api.auth.me);
 
 const VALID_PHONE = "13800138000";
 const VALID_CODE = "123456";
@@ -35,6 +37,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockPush.mockReset();
   mockBack.mockReset();
+  // 注册成功后 navigateAfterAuth 会调 /me；新注册用户默认未 onboarded。
+  mockMe.mockResolvedValue({
+    user: authResult().user,
+    active_role: "student",
+    learning_settings: null,
+    onboarded: false
+  } as never);
 });
 
 async function fillForm(
@@ -121,7 +130,7 @@ describe("RegisterForm — 获取验证码", () => {
 
 // ── 注册流程 ──────────────────────────────────────────
 describe("RegisterForm — 注册流程", () => {
-  it("注册成功 → 跳转到 /", async () => {
+  it("注册成功（新用户）→ 跳转到 /onboarding", async () => {
     mockRegister.mockResolvedValueOnce(authResult());
     renderWithProviders(<RegisterForm />);
     const user = userEvent.setup();
@@ -138,7 +147,7 @@ describe("RegisterForm — 注册流程", () => {
           role: "student"
         })
       );
-      expect(mockPush).toHaveBeenCalledWith("/");
+      expect(mockPush).toHaveBeenCalledWith("/onboarding");
     });
   });
 
