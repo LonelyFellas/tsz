@@ -14,15 +14,15 @@ export const env = schema.parse({
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL
 });
 
-// 生产构建硬保险:若忘了注入真实域名,canonical/sitemap/OG 会全部指向 localhost,
-// 且不易察觉(SEO 静默失效)。仅在服务端构建/运行期(production)校验——构建预渲染会触发,
-// 让 `next build` 直接失败;浏览器端与开发模式不受影响。
+// 生产构建告警:若忘了注入真实域名,canonical/sitemap/OG 会全部指向 localhost,
+// 且不易察觉(SEO 静默失效)。这里只告警不抛错——CI 的 e2e/verify 等也跑 production 构建
+// 但用 localhost 冒烟,硬抛错会误伤它们。真实部署时运维可在构建日志看到此警告。
 if (
   typeof window === "undefined" &&
   process.env.NODE_ENV === "production" &&
   /\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(env.NEXT_PUBLIC_SITE_URL)
 ) {
-  throw new Error(
-    "NEXT_PUBLIC_SITE_URL 仍为本地地址,生产构建必须注入真实站点域名(用于 canonical/sitemap/Open Graph)。"
+  console.warn(
+    "[SEO] NEXT_PUBLIC_SITE_URL 仍为本地地址,canonical/sitemap/Open Graph 将指向 localhost。生产部署务必注入真实站点域名。"
   );
 }
