@@ -5,9 +5,11 @@ import { renderWithProviders } from "@/test/render";
 import { LoginForm } from "./LoginForm";
 
 const mockPush = vi.fn();
-// 可变的查询参数，便于覆盖「找回密码 / 注销账号跳回」的成功提示分支。
+// 可变的查询参数，便于覆盖「找回密码 / 注销账号跳回」的成功提示分支
+// 与登录后回跳 redirect 目标分支。
 let mockResetParam: string | null = null;
 let mockDeletedParam: string | null = null;
+let mockRedirectParam: string | null = null;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
@@ -17,7 +19,9 @@ vi.mock("next/navigation", () => ({
         ? mockResetParam
         : key === "deleted"
           ? mockDeletedParam
-          : null
+          : key === "redirect"
+            ? mockRedirectParam
+            : null
   })
 }));
 
@@ -54,6 +58,7 @@ beforeEach(() => {
   mockPush.mockReset();
   mockResetParam = null;
   mockDeletedParam = null;
+  mockRedirectParam = null;
   // 默认：老用户（已 onboarded），登录后进目标页。
   mockMe.mockResolvedValue({
     user: ME_USER,
@@ -200,6 +205,24 @@ describe("LoginForm — 登录流程", () => {
 
     await waitFor(() => {
       expect(screen.getByText("登录失败，请稍后重试")).toBeInTheDocument();
+    });
+  });
+
+  it("URL 带 redirect → 登录后回跳到该目标页", async () => {
+    mockRedirectParam = "/student/practice";
+    mockLogin.mockResolvedValueOnce({
+      user: ME_USER,
+      access_token: "at",
+      active_role: "student",
+      expires_in: 900,
+      refresh_token_expires_at: 9999999999
+    } as never);
+    renderWithProviders(<LoginForm />);
+
+    await fillAndSubmit();
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith("/student/practice");
     });
   });
 });

@@ -198,6 +198,28 @@ describe("ForgotPasswordForm — 重置流程", () => {
       expect(screen.getByText("操作失败，请稍后重试")).toBeInTheDocument();
     });
   });
+
+  it("邮箱 tab 重置 → forgot/reset 均以邮箱为 identifier", async () => {
+    mockForgot.mockResolvedValueOnce({ status: "sent" });
+    mockReset.mockResolvedValueOnce({ status: "reset" });
+    renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "邮箱" }));
+    const email = "alice@example.com";
+    await user.type(screen.getByPlaceholderText("请输入邮箱"), email);
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+    await waitFor(() => expect(mockForgot).toHaveBeenCalledWith(email));
+
+    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
+    await user.type(screen.getByPlaceholderText("请输入新密码"), "abcDEF12345");
+    await user.click(screen.getByRole("button", { name: "重置密码" }));
+
+    await waitFor(() => {
+      expect(mockReset).toHaveBeenCalledWith(email, VALID_CODE, "ABCDEF12345");
+      expect(mockPush).toHaveBeenCalledWith("/login?reset=success");
+    });
+  });
 });
 
 // ── 交互细节 ──────────────────────────────────────────
@@ -230,5 +252,100 @@ describe("ForgotPasswordForm — 交互细节", () => {
     expect(input).toHaveAttribute("type", "text");
     await user.click(screen.getByRole("button", { name: "隐藏密码" }));
     expect(input).toHaveAttribute("type", "password");
+  });
+
+  it("发送验证码失败(非 Error)→ 显示兜底文案", async () => {
+    mockForgot.mockRejectedValueOnce("boom");
+    renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByPlaceholderText("请输入手机号"), VALID_PHONE);
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("操作失败，请稍后重试")).toBeInTheDocument();
+    });
+  });
+});
+
+// ── 手机 / 邮箱 tab ───────────────────────────────────
+describe("ForgotPasswordForm — 手机/邮箱 tab", () => {
+  it("默认手机 tab → 显示手机号输入框", () => {
+    renderWithProviders(<ForgotPasswordForm />);
+    expect(screen.getByPlaceholderText("请输入手机号")).toBeInTheDocument();
+  });
+
+  it("切到邮箱 tab → 显示邮箱输入框", async () => {
+    renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "邮箱" }));
+
+    expect(screen.getByPlaceholderText("请输入邮箱")).toBeInTheDocument();
+  });
+
+  it("邮箱 tab 输入非法邮箱 → 显示邮箱格式错误", async () => {
+    renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "邮箱" }));
+    await user.type(screen.getByPlaceholderText("请输入邮箱"), "not-an-email");
+
+    expect(screen.getByText("邮箱格式错误")).toBeInTheDocument();
+  });
+
+  it("邮箱 tab 非法邮箱 → 获取验证码按钮禁用", async () => {
+    renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "邮箱" }));
+    await user.type(screen.getByPlaceholderText("请输入邮箱"), "bad@");
+
+    expect(screen.getByRole("button", { name: "获取验证码" })).toBeDisabled();
+  });
+
+  it("切换渠道 → 清空已填账号与验证码", async () => {
+    renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByPlaceholderText("请输入手机号"), VALID_PHONE);
+    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
+
+    await user.click(screen.getByRole("button", { name: "邮箱" }));
+
+    expect(screen.getByPlaceholderText("请输入邮箱")).toHaveValue("");
+    expect(screen.getByPlaceholderText("请输入验证码")).toHaveValue("");
+  });
+
+  it("切换渠道 → 重置倒计时（可重新获取验证码）", async () => {
+    mockForgot.mockResolvedValueOnce({ status: "sent" });
+    renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+
+    // 手机渠道先发一次，进入倒计时。
+    await user.type(screen.getByPlaceholderText("请输入手机号"), VALID_PHONE);
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /后重发/ })).toBeDisabled()
+    );
+
+    // 切到邮箱：倒计时应被清零，「获取验证码」按钮回归。
+    await user.click(screen.getByRole("button", { name: "邮箱" }));
+    expect(
+      screen.getByRole("button", { name: "获取验证码" })
+    ).toBeInTheDocument();
+  });
+
+  it("点击当前所在 tab → 不清空已填内容", async () => {
+    renderWithProviders(<ForgotPasswordForm />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByPlaceholderText("请输入手机号"), VALID_PHONE);
+    // 再次点击「手机」（当前 tab）：switchTab 提前 return，内容保留。
+    await user.click(screen.getByRole("button", { name: "手机" }));
+
+    expect(screen.getByPlaceholderText("请输入手机号")).toHaveValue(
+      VALID_PHONE
+    );
   });
 });
