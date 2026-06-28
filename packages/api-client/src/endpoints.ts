@@ -77,6 +77,22 @@ export function createEndpoints(http: HttpClient) {
     auth: {
       /** GET /me — 当前登录用户信息 */
       me: () => http.get<MeResponse>("/me"),
+      /** PATCH /me — 改昵称(去空格后 1–50 字符);返回刷新后的 user */
+      updateProfile: (display_name: string) =>
+        http.patch<{ user: User }>("/me", { display_name }),
+      /**
+       * POST /me/contact/bind-code — 发码到「新」联系方式(绑定/换绑用)。
+       * contact 含 @ 走邮件,否则走短信;前端把绑定框输入原样传入。
+       * 与登录/找回的 send-code 语义相反(那些发往在档联系方式),不要复用。
+       */
+      requestContactBindCode: (contact: string) =>
+        http.post<{ status: string }>("/me/contact/bind-code", { contact }),
+      /**
+       * POST /me/contact/bind — 带验证码确认绑定/换绑。
+       * contact 必须与发码时完全一致;返回带新 phone/email 的 user。
+       */
+      bindContact: (contact: string, code: string) =>
+        http.post<{ user: User }>("/me/contact/bind", { contact, code }),
       /** POST /auth/register — 注册并自动登录 */
       register: (payload: RegisterPayload) =>
         http.post<AuthResponse>("/auth/register", payload, { skipAuth: true }),
@@ -158,7 +174,7 @@ export function createEndpoints(http: HttpClient) {
       publish: (id: string) => http.post<WordList>(`/wordlists/${id}/publish`)
     },
     comment: {
-      create: (data: Pick<Comment, "targetType" | "targetId" | "content">) =>
+      create: (data: Pick<Comment, "target_type" | "target_id" | "content">) =>
         http.post<Comment>("/comments", data)
     },
     task: {

@@ -2,6 +2,8 @@ export { LoginForm } from "./components/LoginForm";
 export { RegisterForm } from "./components/RegisterForm";
 export { ForgotPasswordForm } from "./components/ForgotPasswordForm";
 export { DeleteAccountForm } from "./components/DeleteAccountForm";
+export { EditProfileForm } from "./components/EditProfileForm";
+export { ProfileHub } from "./components/ProfileHub";
 export { ApplyTeacherForm } from "./components/ApplyTeacherForm";
 export { OnboardingForm } from "./components/OnboardingForm";
 export { RouteGuard } from "./components/RouteGuard";

@@ -21,10 +21,12 @@ import { api, setAccessToken } from "@/lib/request";
 const USER: User = {
   id: "u1",
   phone: "13800138000",
-  nickname: "Alice",
+  display_name: "Alice",
   roles: ["student"],
-  coins: 0,
-  createdAt: ""
+  avatar_url: "",
+  status: "active",
+  created_at: "",
+  updated_at: ""
 };
 
 beforeEach(() => {
@@ -49,7 +51,7 @@ describe("AccountMenu", () => {
 
   it("昵称缺失 → 回退为「用户」/首字「用」", () => {
     useUserStore.setState({
-      user: { ...USER, nickname: undefined } as unknown as User
+      user: { ...USER, display_name: undefined } as unknown as User
     });
     render(<AccountMenu />);
     expect(screen.getByRole("button", { name: "账户菜单" })).toHaveTextContent(
@@ -59,7 +61,7 @@ describe("AccountMenu", () => {
 
   it("有头像 → 渲染头像图片", () => {
     useUserStore.setState({
-      user: { ...USER, avatar: "https://example.com/a.png" }
+      user: { ...USER, avatar_url: "https://example.com/a.png" }
     });
     render(<AccountMenu />);
     const img = screen.getByRole("img", { name: "Alice" });
