@@ -4,7 +4,8 @@ import {
   FeatureShowcase,
   LearningFlow,
   RoleEntry,
-  HomeFooter
+  HomeFooter,
+  HomeJsonLd
 } from "@/features/home";
 
 // 首页:落地展示框架,各区块为占位结构,具体功能后续逐步接入。
@@ -12,6 +13,7 @@ import {
 export default function HomePage() {
   return (
     <div className="flex flex-col">
+      <HomeJsonLd />
       <HomeNav />
       <HomeHero />
       <FeatureShowcase />
