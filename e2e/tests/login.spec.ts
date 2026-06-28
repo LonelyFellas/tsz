@@ -11,9 +11,15 @@ test.describe("登录页", () => {
     await expect(page.getByRole("button", { name: "邮箱验证" })).toBeVisible();
   });
 
-  test("默认展示手机验证 tab：手机号 + 验证码输入框与获取验证码按钮", async ({
+  test("默认展示账号密码 tab：账号 + 密码输入框", async ({ page }) => {
+    await expect(page.getByPlaceholder("请输入手机号/邮箱号码")).toBeVisible();
+    await expect(page.getByPlaceholder("请输入登录密码")).toBeVisible();
+  });
+
+  test("切换到手机验证 tab：手机号 + 验证码输入框与获取验证码按钮", async ({
     page
   }) => {
+    await page.getByRole("button", { name: "手机验证" }).click();
     await expect(page.getByPlaceholder("请输入手机号")).toBeVisible();
     await expect(page.getByPlaceholder("请输入验证码")).toBeVisible();
     await expect(
@@ -26,6 +32,7 @@ test.describe("登录页", () => {
   });
 
   test("手机验证：填入合法手机号和验证码后按钮可用", async ({ page }) => {
+    await page.getByRole("button", { name: "手机验证" }).click();
     await page.getByPlaceholder("请输入手机号").fill("13800138000");
     await page.getByPlaceholder("请输入验证码").fill("123456");
     await expect(page.getByRole("button", { name: "立即登录" })).toBeEnabled();

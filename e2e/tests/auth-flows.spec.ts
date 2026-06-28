@@ -35,8 +35,7 @@ test.describe("鉴权与引导端到端流程", () => {
     await mockApi(page, { authenticated: false, onboarded: true });
 
     await page.goto("/login");
-    // 默认 tab 为「手机验证」，密码登录先切到「账号密码」。
-    await page.getByRole("button", { name: "账号密码" }).click();
+    // 默认即「账号密码」tab，直接填账号密码登录。
     await page.getByPlaceholder("请输入手机号/邮箱号码").fill("13800138000");
     await page.getByPlaceholder("请输入登录密码").fill("abc123");
     await page.getByRole("button", { name: "立即登录" }).click();
@@ -53,7 +52,8 @@ test.describe("鉴权与引导端到端流程", () => {
     await mockApi(page, { authenticated: false, onboarded: true });
 
     await page.goto("/login");
-    // 默认即「手机验证」tab：手机号 → 获取验证码 → 填验证码 → 登录。
+    // 切到「手机验证」tab：手机号 → 获取验证码 → 填验证码 → 登录。
+    await page.getByRole("button", { name: "手机验证" }).click();
     await page.getByPlaceholder("请输入手机号").fill("13800138000");
     await page.getByRole("button", { name: "获取验证码" }).click();
     await page.getByPlaceholder("请输入验证码").fill("123456");

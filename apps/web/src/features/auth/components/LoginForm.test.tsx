@@ -70,12 +70,9 @@ beforeEach(() => {
 
 // ── 按钮状态 ──────────────────────────────────────────
 describe("LoginForm — 按钮状态", () => {
-  // 默认 tab 为「手机验证」，账号密码相关用例先切到「账号密码」tab。
-  beforeEach(async () => {
+  // 默认 tab 即为「账号密码」，无需再切换。
+  beforeEach(() => {
     renderWithProviders(<LoginForm />);
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "账号密码" }));
   });
 
   it("初始状态下立即登录按钮禁用", () => {
@@ -257,10 +254,10 @@ describe("LoginForm — 错误映射", () => {
 
 // ── Tab 切换 ──────────────────────────────────────────
 describe("LoginForm — tab 切换", () => {
-  it("默认展示「手机验证」tab → 显示手机号输入框", () => {
+  it("默认展示「账号密码」tab → 显示密码输入框", () => {
     renderWithProviders(<LoginForm />);
 
-    expect(screen.getByPlaceholderText("请输入手机号")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("请输入登录密码")).toBeInTheDocument();
   });
 
   it("切换到账号密码 tab → 显示密码输入框", async () => {
