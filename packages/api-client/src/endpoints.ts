@@ -62,7 +62,8 @@ export interface LearningSettingsResponse {
 export type DeletionChannel = "phone" | "email";
 
 export interface RegisterPayload {
-  phone: string;
+  /** 手机号与邮箱二选一即可：两个都不传后端返回 400 phone or email is required。 */
+  phone?: string;
   email?: string;
   password: string;
   display_name: string;
@@ -104,21 +105,25 @@ export function createEndpoints(http: HttpClient) {
           { identifier, code },
           { skipAuth: true }
         ),
-      /** POST /auth/password/forgot — 找回密码：向手机号发送短信验证码（验证码 5 分钟有效） */
-      forgotPassword: (phone: string) =>
+      /**
+       * POST /auth/password/forgot — 找回密码：向 identifier（手机号→短信，邮箱→邮件）
+       * 发送验证码（5 分钟有效）。总是返回 200（防账号枚举），命中频控时 429。
+       */
+      forgotPassword: (identifier: string) =>
         http.post<{ status: string }>(
           "/auth/password/forgot",
-          { phone },
+          { identifier },
           { skipAuth: true }
         ),
       /**
        * POST /auth/password/reset — 校验验证码并设置新密码。
+       * identifier 必须与 forgot 时一致（验证码按发送目标绑定，手机/邮箱不可混用）。
        * 成功后服务端会吊销该用户所有会话，用户须用新密码重新登录。
        */
-      resetPassword: (phone: string, code: string, newPassword: string) =>
+      resetPassword: (identifier: string, code: string, newPassword: string) =>
         http.post<{ status: string }>(
           "/auth/password/reset",
-          { phone, code, new_password: newPassword },
+          { identifier, code, new_password: newPassword },
           { skipAuth: true }
         ),
       /**

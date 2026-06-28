@@ -82,7 +82,8 @@ export function RegisterForm() {
     setLoading(true);
     try {
       const auth = await api.auth.register({
-        phone: tab === "phone" ? account : "",
+        // 手机/邮箱二选一：未选中的那个不传（后端按字段是否存在判断）。
+        phone: tab === "phone" ? account : undefined,
         email: tab === "email" ? account : undefined,
         // 业务规则:密码不区分大小写,统一转大写后入库。
         password: password.toUpperCase(),

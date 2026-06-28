@@ -44,6 +44,26 @@ describe("createEndpoints · auth", () => {
     );
   });
 
+  it("register → 纯邮箱账号（phone 可省略）原样透传 payload", () => {
+    const api = createEndpoints(http);
+    api.auth.register({
+      email: "alice@example.com",
+      password: "s3cret",
+      display_name: "Alice",
+      role: "teacher"
+    });
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/register",
+      {
+        email: "alice@example.com",
+        password: "s3cret",
+        display_name: "Alice",
+        role: "teacher"
+      },
+      { skipAuth: true }
+    );
+  });
+
   it("login → POST /auth/login 带 identifier + password", () => {
     const api = createEndpoints(http);
     api.auth.login("13800138000", "s3cret");
@@ -94,23 +114,33 @@ describe("createEndpoints · auth", () => {
     );
   });
 
-  it("forgotPassword → POST /auth/password/forgot 带 phone", () => {
+  it("forgotPassword → POST /auth/password/forgot 带 identifier", () => {
     const api = createEndpoints(http);
     api.auth.forgotPassword("13800138000");
     expect(http.post).toHaveBeenCalledWith(
       "/auth/password/forgot",
-      { phone: "13800138000" },
+      { identifier: "13800138000" },
       { skipAuth: true }
     );
   });
 
-  it("resetPassword → POST /auth/password/reset 带 phone + code + new_password", () => {
+  it("forgotPassword → identifier 也可为邮箱", () => {
+    const api = createEndpoints(http);
+    api.auth.forgotPassword("user@example.com");
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/password/forgot",
+      { identifier: "user@example.com" },
+      { skipAuth: true }
+    );
+  });
+
+  it("resetPassword → POST /auth/password/reset 带 identifier + code + new_password", () => {
     const api = createEndpoints(http);
     api.auth.resetPassword("13800138000", "123456", "NEWPASS1234");
     expect(http.post).toHaveBeenCalledWith(
       "/auth/password/reset",
       {
-        phone: "13800138000",
+        identifier: "13800138000",
         code: "123456",
         new_password: "NEWPASS1234"
       },

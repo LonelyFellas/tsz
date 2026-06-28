@@ -242,7 +242,7 @@ describe("RegisterForm — 密码归一化与边界", () => {
     });
   });
 
-  it("邮箱 tab 注册 → 提交 email,phone 为空", async () => {
+  it("邮箱 tab 注册 → 提交 email,phone 不传", async () => {
     mockRegister.mockResolvedValueOnce(authResult());
     renderWithProviders(<RegisterForm />);
     const user = userEvent.setup();
@@ -261,7 +261,10 @@ describe("RegisterForm — 密码归一化与边界", () => {
 
     await waitFor(() => {
       expect(mockRegister).toHaveBeenCalledWith(
-        expect.objectContaining({ email: "alice@example.com", phone: "" })
+        expect.objectContaining({
+          email: "alice@example.com",
+          phone: undefined
+        })
       );
     });
   });
@@ -293,5 +296,83 @@ describe("RegisterForm — 发送验证码", () => {
     await waitFor(() => {
       expect(screen.getByText("too many requests")).toBeInTheDocument();
     });
+  });
+});
+
+// ── 校验与错误映射 ────────────────────────────────────
+describe("RegisterForm — 校验与错误映射", () => {
+  it("邮箱 tab 输入非法邮箱 → 显示邮箱格式错误", async () => {
+    renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "邮箱" }));
+    await user.type(screen.getByPlaceholderText("请输入邮箱"), "bad-email");
+
+    expect(screen.getByText("邮箱格式错误")).toBeInTheDocument();
+  });
+
+  it("邮箱已注册(409)→ 显示中文错误提示", async () => {
+    mockRegister.mockRejectedValueOnce(new Error("email already registered"));
+    renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "邮箱" }));
+    await user.type(
+      screen.getByPlaceholderText("请输入邮箱"),
+      "alice@example.com"
+    );
+    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
+    await user.type(
+      screen.getByPlaceholderText("请输入登录密码"),
+      VALID_PASSWORD
+    );
+    await user.click(screen.getByRole("button", { name: "立即注册" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("该邮箱已注册，请直接登录")).toBeInTheDocument();
+    });
+  });
+
+  it("验证码错误(invalid credentials)→ 显示中文提示", async () => {
+    mockRegister.mockRejectedValueOnce(new Error("invalid credentials"));
+    renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+
+    await fillForm(user);
+    await user.click(screen.getByRole("button", { name: "立即注册" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("验证码错误或已失效，请重新获取")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("未知错误 → 显示兜底文案，且按钮恢复可用", async () => {
+    // translateAuthError 对未知非空消息会透传原文，空消息才走兜底文案。
+    mockRegister.mockRejectedValueOnce(new Error(""));
+    renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+
+    await fillForm(user);
+    await user.click(screen.getByRole("button", { name: "立即注册" }));
+
+    await waitFor(() => {
+      expect(screen.getByText("注册失败，请稍后重试")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "立即注册" })).toBeEnabled();
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  it("切换显示密码 → 输入框类型在 password / text 间切换", async () => {
+    renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+    const input = screen.getByPlaceholderText("请输入登录密码");
+
+    expect(input).toHaveAttribute("type", "password");
+    await user.click(screen.getByRole("button", { name: "显示密码" }));
+    expect(input).toHaveAttribute("type", "text");
+    await user.click(screen.getByRole("button", { name: "隐藏密码" }));
+    expect(input).toHaveAttribute("type", "password");
   });
 });

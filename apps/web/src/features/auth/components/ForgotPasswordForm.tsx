@@ -1,13 +1,15 @@
 "use client";
 
-import { isCode, isPhone, isRegisterPassword } from "@tsz/shared";
+import { isCode, isEmail, isPhone, isRegisterPassword } from "@tsz/shared";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
 import { AuthBranding } from "./AuthBranding";
 import { AUTH_INPUT_CLASS, translateAuthError } from "../shared";
 
-// 找回密码全程只需手机号：forgot 发短信验证码 → reset 用验证码 + 新密码重置。
+// 找回密码：forgot 向手机/邮箱发验证码 → reset 用验证码 + 新密码重置。
+// identifier 支持手机号或邮箱（手机→短信，邮箱→邮件），两步须用同一 identifier
+// （验证码按发送目标绑定，手机/邮箱不可混用）。
 // 错误文案对齐后端 /auth/password/{forgot,reset}（见 api.md）。
 const RESET_ERRORS: Record<string, string> = {
   "too many code requests, try again later": "验证码发送过于频繁，请稍后再试",
@@ -15,10 +17,18 @@ const RESET_ERRORS: Record<string, string> = {
   "account disabled": "该账号已被禁用，无法重置密码"
 };
 
+type Tab = "phone" | "email";
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: "phone", label: "手机" },
+  { id: "email", label: "邮箱" }
+];
+
 const CODE_COUNTDOWN = 60;
 
 export function ForgotPasswordForm() {
-  const [phone, setPhone] = useState("");
+  const [tab, setTab] = useState<Tab>("phone");
+  const [account, setAccount] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -36,11 +46,21 @@ export function ForgotPasswordForm() {
     return () => clearTimeout(timer);
   }, [countdown]);
 
-  const phoneValid = isPhone(phone);
+  const accountValid = tab === "phone" ? isPhone(account) : isEmail(account);
   const codeValid = isCode(code);
   const passwordValid = isRegisterPassword(password);
-  const canSendCode = phoneValid && countdown === 0 && !sending;
-  const canSubmit = phoneValid && codeValid && passwordValid && !loading;
+  const canSendCode = accountValid && countdown === 0 && !sending;
+  const canSubmit = accountValid && codeValid && passwordValid && !loading;
+
+  function switchTab(next: Tab) {
+    if (next === tab) return;
+    // 切换渠道即重置：验证码按发送目标绑定，旧码对新 identifier 无效。
+    setTab(next);
+    setAccount("");
+    setCode("");
+    setError("");
+    setCountdown(0);
+  }
 
   function translate(e: unknown): string {
     const msg = e instanceof Error ? e.message : "";
@@ -52,7 +72,7 @@ export function ForgotPasswordForm() {
     setError("");
     setSending(true);
     try {
-      await api.auth.forgotPassword(phone);
+      await api.auth.forgotPassword(account);
       setCountdown(CODE_COUNTDOWN);
     } catch (e: unknown) {
       setError(translate(e));
@@ -68,7 +88,7 @@ export function ForgotPasswordForm() {
     setLoading(true);
     try {
       // 业务规则:密码不区分大小写,与注册/登录一致统一转大写。
-      await api.auth.resetPassword(phone, code, password.toUpperCase());
+      await api.auth.resetPassword(account, code, password.toUpperCase());
       // 重置成功后服务端已吊销所有会话，需用新密码重新登录。
       router.push("/login?reset=success");
     } catch (e: unknown) {
@@ -97,24 +117,44 @@ export function ForgotPasswordForm() {
           </div>
 
           <p className="mb-6 text-sm text-gray-400">
-            输入注册时的手机号，获取短信验证码后设置新密码。
+            输入注册时的手机号或邮箱，获取验证码后设置新密码。
           </p>
 
+          {/* Tabs：手机 / 邮箱二选一，与注册页一致 */}
+          <div className="flex gap-6 mb-8 border-b border-gray-100">
+            {TABS.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => switchTab(id)}
+                className={`pb-3 text-sm font-medium transition-colors ${
+                  tab === id
+                    ? "text-blue-600 border-b-2 border-blue-600"
+                    : "text-gray-400 hover:text-gray-600"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
           <form className="space-y-4" onSubmit={handleReset}>
-            {/* 手机号 */}
+            {/* 账号 */}
             <div>
               <label className="block text-sm text-gray-700 mb-1">
-                手机号码
+                {tab === "phone" ? "手机号码" : "邮箱"}
               </label>
               <input
-                type="tel"
-                placeholder="请输入手机号"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                type={tab === "phone" ? "tel" : "email"}
+                placeholder={tab === "phone" ? "请输入手机号" : "请输入邮箱"}
+                value={account}
+                onChange={(e) => setAccount(e.target.value)}
                 className={AUTH_INPUT_CLASS}
               />
-              {phone && !phoneValid && (
-                <p className="mt-1 text-xs text-red-500">手机号码错误</p>
+              {account && !accountValid && (
+                <p className="mt-1 text-xs text-red-500">
+                  {tab === "phone" ? "手机号码错误" : "邮箱格式错误"}
+                </p>
               )}
             </div>
 
