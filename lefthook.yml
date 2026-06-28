@@ -17,6 +17,12 @@ commit-msg:
       run: pnpm commitlint --edit {1}
 
 pre-push:
+  # lefthook 默认用 `git diff HEAD @{push}` 取「待推送文件」作为下面命令的触发依据。
+  # 但新分支首次推送时 @{push} 尚不存在 → 文件集为空 → typecheck/test/e2e 被静默跳过
+  # (开 PR 最常见的「首推」场景下,本地这道校验形同虚设,只能靠 CI 兜底)。
+  # 自定义 files 命令补 fallback:@{push} → @{u} → 与 main 的三点 diff → 全部跟踪文件,
+  # 保证首推也能算出文件并触发校验;无待推送提交时仍返回空、照常跳过,不会过度触发。
+  files: git diff --name-only HEAD @{push} 2>/dev/null || git diff --name-only HEAD @{u} 2>/dev/null || git diff --name-only origin/main...HEAD 2>/dev/null || git ls-files
   commands:
     typecheck:
       run: pnpm typecheck
