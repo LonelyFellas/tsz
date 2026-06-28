@@ -72,6 +72,9 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
     if (path === "/auth/login" && method === "POST") {
       return json(route, 200, AUTH_RESPONSE);
     }
+    if (path === "/auth/login/code" && method === "POST") {
+      return json(route, 200, AUTH_RESPONSE);
+    }
     if (path === "/auth/register" && method === "POST") {
       return json(route, 200, AUTH_RESPONSE);
     }
