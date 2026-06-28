@@ -46,6 +46,6 @@ test.describe("找回密码端到端流程", () => {
     await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
     await page.getByRole("button", { name: "立即登录" }).click();
 
-    await expect(page.getByText("你好，Alice")).toBeVisible();
+    await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
   });
 });

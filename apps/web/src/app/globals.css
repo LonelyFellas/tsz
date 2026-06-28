@@ -11,3 +11,145 @@ body {
   color: var(--foreground);
   background: var(--background);
 }
+
+/* 滚动进场动画。
+   用 CSS scroll-driven animation(animation-timeline: view()),
+   无需 JS,组件保持 Server Component。
+   仅在「支持该特性」且「用户未要求减少动效」时启用——
+   不支持的浏览器(Safari/Firefox)直接显示内容,无闪烁、无副作用。 */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: reveal-up linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 28%;
+    }
+  }
+}
+
+@keyframes reveal-up {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- 进阶动画 ---------- */
+
+/* 首屏入场(基于时间,加载即播);配合内联 animation-delay 做 stagger。 */
+@media (prefers-reduced-motion: no-preference) {
+  .animate-in {
+    animation: reveal-up 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  /* Hero 视觉卡轻浮动,给静态画面一点生命。 */
+  .animate-float {
+    animation: float 7s ease-in-out infinite;
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* 以下为「滚动进入视口时激活」的插画内动画。
+   仅在支持 scroll-driven animation 且未要求减少动效时启用;
+   初始隐藏态只写在 @supports 内,不支持的浏览器直接显示终态。 */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    /* 曲线手绘:配合 path 上 pathLength="1"。 */
+    .draw-on {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      animation: draw 1s linear both;
+      animation-timeline: view();
+      animation-range: entry 8% cover 36%;
+    }
+
+    /* 柱状图自底部生长。 */
+    .grow-up {
+      transform-origin: bottom;
+      animation: grow-y 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-timeline: view();
+      animation-range: entry 5% cover 32%;
+    }
+
+    /* 进度条从左充能。 */
+    .fill-x {
+      transform-origin: left;
+      animation: fill-x 1s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-timeline: view();
+      animation-range: entry 5% cover 32%;
+    }
+
+    /* 元素逐个弹入(打卡圆点等)。 */
+    .pop-in {
+      animation: pop-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+      animation-timeline: view();
+      animation-range: entry 4% cover 30%;
+    }
+  }
+}
+
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes grow-y {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes fill-x {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 标题随滚动展开:往下滚时放大并淡出(基于页面滚动时间轴)。 */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: scroll()) {
+    .scroll-expand {
+      animation: scroll-expand linear both;
+      animation-timeline: scroll(root);
+      animation-range: 0 70vh;
+    }
+  }
+}
+
+@keyframes scroll-expand {
+  to {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}

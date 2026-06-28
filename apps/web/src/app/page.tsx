@@ -1,12 +1,23 @@
-import { HomeActions } from "@/features/auth";
+import {
+  HomeNav,
+  HomeHero,
+  FeatureShowcase,
+  LearningFlow,
+  RoleEntry,
+  HomeFooter
+} from "@/features/home";
 
-// 入口:落地后根据登录状态展示登录或「进入学习 / 退出登录」。
+// 首页:落地展示框架,各区块为占位结构,具体功能后续逐步接入。
+// 逻辑全在 feature 里,page 只组合区块;各区块自管内部宽度,便于 Hero 全宽出血。
 export default function HomePage() {
   return (
-    <main className="mx-auto flex max-w-xl flex-col items-center gap-6 py-24 text-center">
-      <h1 className="text-3xl font-bold">天生会背</h1>
-      <p className="text-gray-500">词汇学习平台 · 师生合一</p>
-      <HomeActions />
-    </main>
+    <div className="flex flex-col">
+      <HomeNav />
+      <HomeHero />
+      <FeatureShowcase />
+      <LearningFlow />
+      <RoleEntry />
+      <HomeFooter />
+    </div>
   );
 }
