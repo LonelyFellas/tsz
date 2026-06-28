@@ -35,6 +35,8 @@ test.describe("鉴权与引导端到端流程", () => {
     await mockApi(page, { authenticated: false, onboarded: true });
 
     await page.goto("/login");
+    // 默认 tab 为「手机验证」，密码登录先切到「账号密码」。
+    await page.getByRole("button", { name: "账号密码" }).click();
     await page.getByPlaceholder("请输入手机号/邮箱号码").fill("13800138000");
     await page.getByPlaceholder("请输入登录密码").fill("abc123");
     await page.getByRole("button", { name: "立即登录" }).click();
@@ -45,6 +47,20 @@ test.describe("鉴权与引导端到端流程", () => {
     await page.getByText("退出登录").click();
     await expect(page).toHaveURL(/\/login/);
     await expect(page.getByRole("button", { name: "立即登录" })).toBeVisible();
+  });
+
+  test("手机验证码登录 → 主页", async ({ page }) => {
+    await mockApi(page, { authenticated: false, onboarded: true });
+
+    await page.goto("/login");
+    // 默认即「手机验证」tab：手机号 → 获取验证码 → 填验证码 → 登录。
+    await page.getByPlaceholder("请输入手机号").fill("13800138000");
+    await page.getByRole("button", { name: "获取验证码" }).click();
+    await page.getByPlaceholder("请输入验证码").fill("123456");
+    await page.getByRole("button", { name: "立即登录" }).click();
+
+    // 老用户（已引导）直接进主页。
+    await expect(page.getByText("你好，Alice")).toBeVisible();
   });
 
   test("已登录用户访问 /login 被自动跳走", async ({ page }) => {

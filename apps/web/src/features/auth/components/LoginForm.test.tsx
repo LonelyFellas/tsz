@@ -27,6 +27,8 @@ vi.mock("@/lib/request", () => ({
   api: {
     auth: {
       login: vi.fn(),
+      sendCode: vi.fn(),
+      loginWithCode: vi.fn(),
       me: vi.fn()
     }
   }
@@ -35,6 +37,8 @@ vi.mock("@/lib/request", () => ({
 // 引入 mock 后拿到有类型的引用
 import { api } from "@/lib/request";
 const mockLogin = vi.mocked(api.auth.login);
+const mockSendCode = vi.mocked(api.auth.sendCode);
+const mockLoginWithCode = vi.mocked(api.auth.loginWithCode);
 const mockMe = vi.mocked(api.auth.me);
 
 const ME_USER = {
@@ -61,8 +65,12 @@ beforeEach(() => {
 
 // ── 按钮状态 ──────────────────────────────────────────
 describe("LoginForm — 按钮状态", () => {
-  beforeEach(() => {
+  // 默认 tab 为「手机验证」，账号密码相关用例先切到「账号密码」tab。
+  beforeEach(async () => {
     renderWithProviders(<LoginForm />);
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "账号密码" }));
   });
 
   it("初始状态下立即登录按钮禁用", () => {
@@ -103,6 +111,7 @@ describe("LoginForm — 按钮状态", () => {
 describe("LoginForm — 登录流程", () => {
   async function fillAndSubmit(account = "13800138000", password = "abc123") {
     const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "账号密码" }));
     await user.type(
       screen.getByPlaceholderText("请输入手机号/邮箱号码"),
       account
@@ -209,6 +218,7 @@ describe("LoginForm — 错误映射", () => {
     renderWithProviders(<LoginForm />);
 
     const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "账号密码" }));
     await user.type(
       screen.getByPlaceholderText("请输入手机号/邮箱号码"),
       "13800138000"
@@ -224,20 +234,26 @@ describe("LoginForm — 错误映射", () => {
 
 // ── Tab 切换 ──────────────────────────────────────────
 describe("LoginForm — tab 切换", () => {
-  it("切换到手机验证码 tab → 显示手机号输入框", async () => {
-    const user = userEvent.setup();
+  it("默认展示「手机验证」tab → 显示手机号输入框", () => {
     renderWithProviders(<LoginForm />);
-
-    await user.click(screen.getByRole("button", { name: "手机验证码" }));
 
     expect(screen.getByPlaceholderText("请输入手机号")).toBeInTheDocument();
   });
 
-  it("切换到邮箱验证码 tab → 显示邮箱输入框", async () => {
+  it("切换到账号密码 tab → 显示密码输入框", async () => {
     const user = userEvent.setup();
     renderWithProviders(<LoginForm />);
 
-    await user.click(screen.getByRole("button", { name: "邮箱验证码" }));
+    await user.click(screen.getByRole("button", { name: "账号密码" }));
+
+    expect(screen.getByPlaceholderText("请输入登录密码")).toBeInTheDocument();
+  });
+
+  it("切换到邮箱验证 tab → 显示邮箱输入框", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "邮箱验证" }));
 
     expect(screen.getByPlaceholderText("请输入邮箱")).toBeInTheDocument();
   });
@@ -247,6 +263,7 @@ describe("LoginForm — tab 切换", () => {
     renderWithProviders(<LoginForm />);
 
     const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "账号密码" }));
     await user.type(
       screen.getByPlaceholderText("请输入手机号/邮箱号码"),
       "13800138000"
@@ -259,11 +276,120 @@ describe("LoginForm — tab 切换", () => {
       ).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "手机验证码" }));
+    await user.click(screen.getByRole("button", { name: "手机验证" }));
 
     expect(
       screen.queryByText("账号或密码错误，请重新输入")
     ).not.toBeInTheDocument();
+  });
+});
+
+// ── 验证码登录 ────────────────────────────────────────
+describe("LoginForm — 验证码登录", () => {
+  const AUTH_OK = {
+    user: ME_USER,
+    access_token: "at",
+    active_role: "student",
+    expires_in: 900,
+    refresh_token_expires_at: 9999999999
+  };
+
+  it("合法手机号 → 获取验证码按钮可用，点击后调用 sendCode 并进入倒计时", async () => {
+    const user = userEvent.setup();
+    mockSendCode.mockResolvedValueOnce({ status: "sent" });
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "手机验证" }));
+    const sendBtn = screen.getByRole("button", { name: "获取验证码" });
+    expect(sendBtn).toBeDisabled();
+
+    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
+    expect(sendBtn).toBeEnabled();
+
+    await user.click(sendBtn);
+
+    await waitFor(() => {
+      expect(mockSendCode).toHaveBeenCalledWith("13800138000");
+      expect(screen.getByText(/后重发/)).toBeInTheDocument();
+    });
+  });
+
+  it("非法手机号 → 获取验证码按钮禁用", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "手机验证" }));
+    await user.type(screen.getByPlaceholderText("请输入手机号"), "123");
+
+    expect(screen.getByRole("button", { name: "获取验证码" })).toBeDisabled();
+  });
+
+  it("手机号 + 验证码登录成功 → 调用 loginWithCode 并跳转", async () => {
+    const user = userEvent.setup();
+    mockLoginWithCode.mockResolvedValueOnce(AUTH_OK as never);
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "手机验证" }));
+    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
+    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+
+    await waitFor(() => {
+      expect(mockLoginWithCode).toHaveBeenCalledWith("13800138000", "123456");
+      expect(mockPush).toHaveBeenCalledWith("/");
+    });
+  });
+
+  it("验证码错误 → 显示中文错误提示", async () => {
+    const user = userEvent.setup();
+    mockLoginWithCode.mockRejectedValueOnce(new Error("invalid credentials"));
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "手机验证" }));
+    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
+    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("验证码错误或已失效，请重新获取")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("发送过于频繁 → 显示限流提示", async () => {
+    const user = userEvent.setup();
+    mockSendCode.mockRejectedValueOnce(
+      new Error("too many code requests, try again later")
+    );
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "手机验证" }));
+    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("验证码发送过于频繁，请稍后再试")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("邮箱验证码 tab → 用邮箱作为 identifier 调用 sendCode", async () => {
+    const user = userEvent.setup();
+    mockSendCode.mockResolvedValueOnce({ status: "sent" });
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "邮箱验证" }));
+    await user.type(
+      screen.getByPlaceholderText("请输入邮箱"),
+      "alice@example.com"
+    );
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+
+    await waitFor(() => {
+      expect(mockSendCode).toHaveBeenCalledWith("alice@example.com");
+    });
   });
 });
 
@@ -273,6 +399,7 @@ describe("LoginForm — 交互细节", () => {
     const user = userEvent.setup();
     renderWithProviders(<LoginForm />);
 
+    await user.click(screen.getByRole("button", { name: "账号密码" }));
     const pwd = screen.getByPlaceholderText("请输入登录密码");
     expect(pwd).toHaveAttribute("type", "password");
 
