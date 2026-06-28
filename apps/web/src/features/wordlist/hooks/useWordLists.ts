@@ -14,10 +14,11 @@ export const wordListKeys = {
   detail: (id: string) => [...wordListKeys.all, "detail", id] as const
 };
 
+// 创建词表的请求 DTO:经 api.wordList.create 直接作为 POST body,故字段对齐 wire(snake_case)。
 export interface CreateWordListInput {
   name: string;
-  wordIds: string[];
-  customWords: WordListCustomWord[];
+  word_ids: string[];
+  custom_words: WordListCustomWord[];
   visibility: WordListVisibility;
 }
 
@@ -40,21 +41,21 @@ export function useCreateWordList() {
       // TODO: return api.wordList.create(input);
       await new Promise((r) => setTimeout(r, 600));
       const needsReview =
-        input.visibility === "public" && input.customWords.length > 0;
+        input.visibility === "public" && input.custom_words.length > 0;
       const created: WordList = {
         id: `wl_${Date.now()}`,
         name: input.name,
-        ownerId: "demo",
-        wordIds: input.wordIds,
-        customWords: input.customWords,
+        owner_id: "demo",
+        word_ids: input.word_ids,
+        custom_words: input.custom_words,
         visibility: input.visibility,
-        reviewStatus:
+        review_status:
           input.visibility === "public"
             ? needsReview
               ? "pending"
               : "approved"
             : undefined,
-        createdAt: new Date().toISOString()
+        created_at: new Date().toISOString()
       };
       MOCK_WORDLISTS.unshift(created);
       return created;

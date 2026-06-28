@@ -8,34 +8,34 @@ export type TaskTargetType = "user" | "class";
 export interface Task {
   id: string;
   type: TaskType;
-  creatorId: string;
-  wordListIds: string[];
-  targetType: TaskTargetType;
-  targetIds: string[];
+  creator_id: string;
+  word_list_ids: string[];
+  target_type: TaskTargetType;
+  target_ids: string[];
   /** 每日任务:每天题目数量与截止时间 */
-  dailyQuestionCount?: number;
+  daily_question_count?: number;
   deadline?: string;
-  createdAt: string;
+  created_at: string;
 }
 
 export interface ClassRoom {
   id: string;
   name: string;
-  teacherId: string;
-  studentIds: string[];
+  teacher_id: string;
+  student_ids: string[];
   /** 系统为班级生成的长期任务 */
-  longTermTaskIds: string[];
-  createdAt: string;
+  long_term_task_ids: string[];
+  created_at: string;
 }
 
 /** 学生练习记录 / 每日打卡。 */
 export interface PracticeRecord {
   id: string;
-  studentId: string;
-  taskId: string;
+  student_id: string;
+  task_id: string;
   date: string; // YYYY-MM-DD
   /** 当日是否完成所有练习 */
   completed: boolean;
   /** 完成后获得的天生币 */
-  coinsEarned: number;
+  coins_earned: number;
 }

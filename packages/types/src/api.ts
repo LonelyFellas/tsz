@@ -10,5 +10,5 @@ export interface Paginated<T> {
   list: T[];
   total: number;
   page: number;
-  pageSize: number;
+  page_size: number;
 }

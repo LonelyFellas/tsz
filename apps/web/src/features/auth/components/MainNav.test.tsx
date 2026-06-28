@@ -17,10 +17,12 @@ function userWithRoles(roles: Role[]): User {
   return {
     id: "u1",
     phone: "13800138000",
-    nickname: "Alice",
+    display_name: "Alice",
     roles,
-    coins: 0,
-    createdAt: ""
+    avatar_url: "",
+    status: "active",
+    created_at: "",
+    updated_at: ""
   };
 }
 

@@ -4,10 +4,12 @@ import { createAuthStore } from "./store";
 
 const USER = {
   id: "u1",
-  nickname: "管理员",
+  display_name: "管理员",
   roles: ["admin"],
-  coins: 0,
-  createdAt: ""
+  avatar_url: "",
+  status: "active",
+  created_at: "",
+  updated_at: ""
 } as User;
 
 describe("createAuthStore", () => {

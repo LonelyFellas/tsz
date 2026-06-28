@@ -44,10 +44,12 @@ function userWith({ phone, email }: { phone?: string; email?: string }): User {
     id: "u1",
     phone,
     email,
-    nickname: "Alice",
+    display_name: "Alice",
     roles: ["student"],
-    coins: 0,
-    createdAt: ""
+    avatar_url: "",
+    status: "active",
+    created_at: "",
+    updated_at: ""
   };
 }
 
