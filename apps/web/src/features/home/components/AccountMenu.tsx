@@ -51,7 +51,7 @@ export function AccountMenu() {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        aria-haspopup="menu"
+        aria-haspopup="true"
         aria-expanded={open}
         aria-label="账户菜单"
         className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gray-900 text-xs font-semibold text-white transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
@@ -71,10 +71,7 @@ export function AccountMenu() {
       </button>
 
       {open && (
-        <div
-          role="menu"
-          className="absolute right-0 mt-2 w-48 overflow-hidden rounded-2xl border border-gray-200 bg-white p-1 shadow-xl shadow-gray-900/5"
-        >
+        <div className="absolute right-0 mt-2 w-48 overflow-hidden rounded-2xl border border-gray-200 bg-white p-1 shadow-xl shadow-gray-900/5">
           <div className="px-3 py-2">
             <p className="truncate text-sm font-medium text-gray-900">
               {displayName}
@@ -84,7 +81,6 @@ export function AccountMenu() {
           <div className="my-1 h-px bg-gray-100" />
           <button
             type="button"
-            role="menuitem"
             onClick={handleLogout}
             disabled={loading}
             className="block w-full rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50 disabled:opacity-40"
@@ -92,7 +88,6 @@ export function AccountMenu() {
             {loading ? "退出中…" : "退出登录"}
           </button>
           <Link
-            role="menuitem"
             href="/account/delete"
             onClick={() => setOpen(false)}
             className="block rounded-lg px-3 py-2 text-sm text-gray-500 transition hover:bg-red-50 hover:text-red-600"

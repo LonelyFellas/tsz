@@ -9,7 +9,8 @@ test.describe("注销账号端到端流程", () => {
 
     await page.goto("/");
 
-    // 登录态下首页出现「注销账号」入口。
+    // 登录态下首页顶栏头像菜单内出现「注销账号」入口。
+    await page.getByRole("button", { name: "账户菜单" }).click();
     await page.getByRole("link", { name: "注销账号" }).click();
     await expect(page).toHaveURL(/\/account\/delete/);
     await expect(page.getByRole("heading", { name: "注销账号" })).toBeVisible();
