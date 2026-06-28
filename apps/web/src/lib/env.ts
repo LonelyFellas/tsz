@@ -13,3 +13,16 @@ export const env = schema.parse({
   NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
   NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL
 });
+
+// 生产构建硬保险:若忘了注入真实域名,canonical/sitemap/OG 会全部指向 localhost,
+// 且不易察觉(SEO 静默失效)。仅在服务端构建/运行期(production)校验——构建预渲染会触发,
+// 让 `next build` 直接失败;浏览器端与开发模式不受影响。
+if (
+  typeof window === "undefined" &&
+  process.env.NODE_ENV === "production" &&
+  /\/\/(localhost|127\.0\.0\.1)(:|\/|$)/.test(env.NEXT_PUBLIC_SITE_URL)
+) {
+  throw new Error(
+    "NEXT_PUBLIC_SITE_URL 仍为本地地址,生产构建必须注入真实站点域名(用于 canonical/sitemap/Open Graph)。"
+  );
+}

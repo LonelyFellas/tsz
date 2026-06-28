@@ -16,7 +16,6 @@ export default function robots(): MetadataRoute.Robots {
         "/onboarding"
       ]
     },
-    sitemap: `${site.url}/sitemap.xml`,
-    host: site.url
+    sitemap: `${site.url}/sitemap.xml`
   };
 }
