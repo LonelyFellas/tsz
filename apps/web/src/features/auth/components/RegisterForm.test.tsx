@@ -59,10 +59,12 @@ function authResult(): AuthResponse {
   return {
     user: {
       id: "1",
-      nickname: VALID_PHONE,
+      display_name: VALID_PHONE,
       roles: ["student"],
-      coins: 0,
-      createdAt: ""
+      avatar_url: "",
+      status: "active",
+      created_at: "",
+      updated_at: ""
     },
     access_token: "at",
     active_role: "student",

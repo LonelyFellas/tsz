@@ -6,11 +6,11 @@ export const MOCK_WORDLISTS: WordList[] = [
   {
     id: "wl1",
     name: "小学一年级核心词",
-    ownerId: "demo",
-    wordIds: ["w1", "w2", "w3"],
-    customWords: [],
+    owner_id: "demo",
+    word_ids: ["w1", "w2", "w3"],
+    custom_words: [],
     visibility: "public",
-    reviewStatus: "approved",
-    createdAt: new Date().toISOString()
+    review_status: "approved",
+    created_at: new Date().toISOString()
   }
 ];

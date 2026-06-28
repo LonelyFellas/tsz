@@ -7,10 +7,12 @@ export const TEST_USER = {
   id: "u1",
   phone: "13800138000",
   email: "alice@example.com",
-  nickname: "Alice",
+  display_name: "Alice",
+  avatar_url: "",
+  status: "active" as const,
   roles: ["student"] as const,
-  coins: 0,
-  createdAt: "2026-01-01T00:00:00Z"
+  created_at: "2026-01-01T00:00:00Z",
+  updated_at: "2026-01-01T00:00:00Z"
 };
 
 const AUTH_RESPONSE = {

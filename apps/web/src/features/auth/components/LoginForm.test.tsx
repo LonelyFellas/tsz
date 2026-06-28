@@ -47,10 +47,12 @@ const mockMe = vi.mocked(api.auth.me);
 
 const ME_USER = {
   id: "1",
-  nickname: "Alice",
+  display_name: "Alice",
   roles: ["student"],
-  coins: 0,
-  createdAt: ""
+  avatar_url: "",
+  status: "active",
+  created_at: "",
+  updated_at: ""
 };
 
 beforeEach(() => {
@@ -126,10 +128,12 @@ describe("LoginForm — 登录流程", () => {
     mockLogin.mockResolvedValueOnce({
       user: {
         id: "1",
-        nickname: "Alice",
+        display_name: "Alice",
         roles: ["student"],
-        coins: 0,
-        createdAt: ""
+        avatar_url: "",
+        status: "active",
+        created_at: "",
+        updated_at: ""
       },
       access_token: "at",
       active_role: "student",

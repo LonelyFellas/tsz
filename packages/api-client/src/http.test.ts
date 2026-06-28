@@ -119,6 +119,15 @@ describe("createHttpClient", () => {
     expect(init.body).toBe(JSON.stringify({ name: "b" }));
   });
 
+  it("patch:method=PATCH 且 body 为 JSON 字符串", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
+    const http = createHttpClient({ baseUrl: "" });
+    await http.patch("/me", { display_name: "b" });
+    const init = fetchMock.mock.calls[0]![1];
+    expect(init.method).toBe("PATCH");
+    expect(init.body).toBe(JSON.stringify({ display_name: "b" }));
+  });
+
   it("del:method=DELETE", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });

@@ -11,7 +11,7 @@ export interface Word {
   definition?: string;
   phonetic?: string;
   example?: string;
-  createdAt: string;
+  created_at: string;
 }
 
 /** 词表可见性:私密 / 公开(公开需过审)。 */
@@ -20,15 +20,15 @@ export type WordListVisibility = "private" | "public";
 export interface WordList {
   id: string;
   name: string;
-  ownerId: string;
+  owner_id: string;
   /** 来源:平台智能词库选词 + 自定义词汇 */
-  wordIds: string[];
-  customWords: WordListCustomWord[];
+  word_ids: string[];
+  custom_words: WordListCustomWord[];
   visibility: WordListVisibility;
   /** 公开词表的审核状态 */
-  reviewStatus?: ReviewStatus;
-  rejectReason?: string;
-  createdAt: string;
+  review_status?: ReviewStatus;
+  reject_reason?: string;
+  created_at: string;
 }
 
 /** 用户自定义词汇(对应「是否有自定义词汇」分支,需敏感词审核)。 */
@@ -40,11 +40,11 @@ export interface WordListCustomWord {
 /** 对单词/词表的评论(需敏感词审核)。 */
 export interface Comment {
   id: string;
-  authorId: string;
+  author_id: string;
   /** 评论目标:单词或词表 */
-  targetType: "word" | "wordlist";
-  targetId: string;
+  target_type: "word" | "wordlist";
+  target_id: string;
   content: string;
-  reviewStatus: ReviewStatus;
-  createdAt: string;
+  review_status: ReviewStatus;
+  created_at: string;
 }

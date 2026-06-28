@@ -7,41 +7,41 @@ export const MOCK_WORDS: Word[] = [
     text: "天",
     definition: "天空;一天",
     phonetic: "tiān",
-    createdAt: ""
+    created_at: ""
   },
   {
     id: "w2",
     text: "生",
     definition: "出生;生长",
     phonetic: "shēng",
-    createdAt: ""
+    created_at: ""
   },
   {
     id: "w3",
     text: "字",
     definition: "文字;字体",
     phonetic: "zì",
-    createdAt: ""
+    created_at: ""
   },
   {
     id: "w4",
     text: "学",
     definition: "学习;学问",
     phonetic: "xué",
-    createdAt: ""
+    created_at: ""
   },
   {
     id: "w5",
     text: "习",
     definition: "练习;习惯",
     phonetic: "xí",
-    createdAt: ""
+    created_at: ""
   },
   {
     id: "w6",
     text: "词",
     definition: "词语;单词",
     phonetic: "cí",
-    createdAt: ""
+    created_at: ""
   }
 ];

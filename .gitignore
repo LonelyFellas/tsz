@@ -19,3 +19,6 @@ next-env.d.ts
 test-results/
 playwright-report/
 playwright/.cache/
+
+# 本地编辑器 / 工具配置
+.claude/

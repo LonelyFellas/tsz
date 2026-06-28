@@ -34,11 +34,11 @@ export function WordListBrowser() {
                     <span className="font-medium">{l.name}</span>
                     <span className="text-xs text-gray-400">
                       {l.visibility === "public" ? "公开" : "私密"}
-                      {l.reviewStatus === "pending" && " · 审核中"}
+                      {l.review_status === "pending" && " · 审核中"}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-gray-400">
-                    {l.wordIds.length + l.customWords.length} 个词
+                    {l.word_ids.length + l.custom_words.length} 个词
                   </p>
                 </Card>
               </Link>

@@ -24,8 +24,8 @@ describe("useCreateWordList", () => {
 
     await result.current.mutateAsync({
       name: "私密词表",
-      wordIds: ["w1"],
-      customWords: [],
+      word_ids: ["w1"],
+      custom_words: [],
       visibility: "private"
     });
 
@@ -33,48 +33,48 @@ describe("useCreateWordList", () => {
     expect(MOCK_WORDLISTS[0]!.name).toBe("私密词表");
   });
 
-  it("公开 + 自定义词汇 → reviewStatus 为 pending", async () => {
+  it("公开 + 自定义词汇 → review_status 为 pending", async () => {
     const { result } = renderHook(() => useCreateWordList(), {
       wrapper: QueryWrapper
     });
 
     const created = await result.current.mutateAsync({
       name: "公开含自定义",
-      wordIds: ["w1"],
-      customWords: [{ text: "彩虹" }],
+      word_ids: ["w1"],
+      custom_words: [{ text: "彩虹" }],
       visibility: "public"
     });
 
-    expect(created.reviewStatus).toBe("pending");
+    expect(created.review_status).toBe("pending");
   });
 
-  it("公开 + 无自定义词汇 → reviewStatus 为 approved", async () => {
+  it("公开 + 无自定义词汇 → review_status 为 approved", async () => {
     const { result } = renderHook(() => useCreateWordList(), {
       wrapper: QueryWrapper
     });
 
     const created = await result.current.mutateAsync({
       name: "公开无自定义",
-      wordIds: ["w1", "w2"],
-      customWords: [],
+      word_ids: ["w1", "w2"],
+      custom_words: [],
       visibility: "public"
     });
 
-    expect(created.reviewStatus).toBe("approved");
+    expect(created.review_status).toBe("approved");
   });
 
-  it("私密 → reviewStatus 为 undefined", async () => {
+  it("私密 → review_status 为 undefined", async () => {
     const { result } = renderHook(() => useCreateWordList(), {
       wrapper: QueryWrapper
     });
 
     const created = await result.current.mutateAsync({
       name: "私密",
-      wordIds: ["w1"],
-      customWords: [{ text: "月亮" }],
+      word_ids: ["w1"],
+      custom_words: [{ text: "月亮" }],
       visibility: "private"
     });
 
-    expect(created.reviewStatus).toBeUndefined();
+    expect(created.review_status).toBeUndefined();
   });
 });

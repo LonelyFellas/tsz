@@ -64,8 +64,8 @@ export function WordListCreator() {
   async function submit() {
     await createWordList.mutateAsync({
       name: name.trim(),
-      wordIds: [...selectedIds],
-      customWords,
+      word_ids: [...selectedIds],
+      custom_words: customWords,
       visibility
     });
     setStep("done");

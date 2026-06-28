@@ -7,6 +7,7 @@ const http = {
   get: vi.fn(),
   post: vi.fn(),
   put: vi.fn(),
+  patch: vi.fn(),
   del: vi.fn()
 } as unknown as HttpClient & {
   get: ReturnType<typeof vi.fn>;
@@ -22,6 +23,29 @@ describe("createEndpoints · auth", () => {
     const api = createEndpoints(http);
     api.auth.me();
     expect(http.get).toHaveBeenCalledWith("/me");
+  });
+
+  it("updateProfile → PATCH /me 带 display_name", () => {
+    const api = createEndpoints(http);
+    api.auth.updateProfile("Bob");
+    expect(http.patch).toHaveBeenCalledWith("/me", { display_name: "Bob" });
+  });
+
+  it("requestContactBindCode → POST /me/contact/bind-code 带 contact", () => {
+    const api = createEndpoints(http);
+    api.auth.requestContactBindCode("new@qq.com");
+    expect(http.post).toHaveBeenCalledWith("/me/contact/bind-code", {
+      contact: "new@qq.com"
+    });
+  });
+
+  it("bindContact → POST /me/contact/bind 带 contact + code", () => {
+    const api = createEndpoints(http);
+    api.auth.bindContact("new@qq.com", "123456");
+    expect(http.post).toHaveBeenCalledWith("/me/contact/bind", {
+      contact: "new@qq.com",
+      code: "123456"
+    });
   });
 
   it("register → POST /auth/register 带 payload", () => {
@@ -230,8 +254,8 @@ describe("createEndpoints · comment", () => {
   it("create → POST /comments 带 data", () => {
     const api = createEndpoints(http);
     const payload = {
-      targetType: "word" as const,
-      targetId: "w1",
+      target_type: "word" as const,
+      target_id: "w1",
       content: "好"
     };
     api.comment.create(payload);
