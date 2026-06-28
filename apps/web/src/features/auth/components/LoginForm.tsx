@@ -30,13 +30,13 @@ const CODE_ERRORS: Record<string, string> = {
 const CODE_COUNTDOWN = 60;
 
 const TABS: { id: Tab; label: string }[] = [
+  { id: "password", label: "账号密码" },
   { id: "email", label: "邮箱验证" },
-  { id: "phone", label: "手机验证" },
-  { id: "password", label: "账号密码" }
+  { id: "phone", label: "手机验证" }
 ];
 
 export function LoginForm() {
-  const [tab, setTab] = useState<Tab>("phone");
+  const [tab, setTab] = useState<Tab>("password");
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
