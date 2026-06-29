@@ -24,13 +24,13 @@
     "pnpm": ">=10"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.0.2",
-    "@commitlint/config-conventional": "^21.0.2",
+    "@commitlint/cli": "^21.1.0",
+    "@commitlint/config-conventional": "^21.1.0",
     "@tsz/config": "workspace:*",
     "@vitest/coverage-v8": "^4.1.9",
     "lefthook": "^2.1.9",
-    "prettier": "^3.8.4",
-    "turbo": "^2.9.18",
+    "prettier": "^3.9.3",
+    "turbo": "^2.10.0",
     "vitest": "^4.1.9"
   },
   "keywords": [],
