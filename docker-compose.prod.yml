@@ -1,11 +1,13 @@
 # Production compose for the FRONTEND tier (web + admin + nginx) on the app ECS.
 # The Go backend runs from its own repo/compose (tshb-go) and publishes :8080 on
-# the host; these containers reach it via host.docker.internal, so this stack is
-# fully independent — nothing here touches the backend compose.
+# the host; nginx reaches it via host.docker.internal, so this stack is fully
+# independent — nothing here touches the backend compose.
 #
-# Browser → nginx(:80) → web/admin (Next SSR) → /api/v1 rewrite → backend :8080
-# The browser never talks to the backend directly (same-origin via Next rewrite),
-# so there is no CORS to configure.
+# Browser → nginx(:80):
+#   /api/v1/* → Go backend :8080   (same-origin, so no CORS)
+#   /*        → web/admin (Next SSR) by subdomain
+# nginx (not Next) proxies the API, because Next 'output: standalone' freezes
+# rewrites() at build time — see deploy/nginx/conf.d/tsz.conf.
 services:
   web:
     build:
@@ -13,11 +15,6 @@ services:
       dockerfile: apps/web/Dockerfile
     environment:
       PORT: "3000"
-      # Next's rewrites() proxies /api/v1/* here at runtime. host-gateway lets the
-      # container reach the backend published on the host's :8080.
-      BACKEND_API_URL: "http://host.docker.internal:8080/api/v1"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     expose:
       - "3000"
     restart: unless-stopped
@@ -28,9 +25,6 @@ services:
       dockerfile: apps/admin/Dockerfile
     environment:
       PORT: "3001"
-      BACKEND_API_URL: "http://host.docker.internal:8080/api/v1"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     expose:
       - "3001"
     restart: unless-stopped
@@ -47,4 +41,8 @@ services:
     volumes:
       - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
       # - ./deploy/nginx/certs:/etc/nginx/certs:ro   # mount certs for 443
+    # Lets nginx resolve host.docker.internal -> the host, to reach the backend
+    # published on :8080.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
