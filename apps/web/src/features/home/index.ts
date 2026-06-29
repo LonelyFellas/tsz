@@ -4,3 +4,4 @@ export { FeatureShowcase } from "./components/FeatureShowcase";
 export { LearningFlow } from "./components/LearningFlow";
 export { RoleEntry } from "./components/RoleEntry";
 export { HomeFooter } from "./components/HomeFooter";
+export { HomeJsonLd } from "./components/HomeJsonLd";
