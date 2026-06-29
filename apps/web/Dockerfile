@@ -16,7 +16,11 @@ FROM base AS build
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
-RUN pnpm --filter @tsz/web build
+# Persist Next's + turbo's compiler caches across builds so a rebuild after a
+# small change recompiles incrementally instead of from scratch.
+RUN --mount=type=cache,id=next-web,target=/app/apps/web/.next/cache \
+    --mount=type=cache,id=turbo,target=/app/.turbo \
+    pnpm --filter @tsz/web build
 
 # ---- runtime stage: standalone server only ----
 FROM base AS runner
