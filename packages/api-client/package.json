@@ -22,7 +22,7 @@
     "@tsz/config": "workspace:*",
     "eslint": "^9.39.0",
     "typescript": "^5.6.0",
-    "js-yaml": "4.2.0",
+    "js-yaml": "5.2.0",
     "vitest": "^4.1.9"
   }
 }
