@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { site } from "@/lib/site";
+import { themeInitScript } from "@/lib/theme";
 import { Providers } from "./providers";
 import { WebVitals } from "./web-vitals";
 
@@ -50,8 +51,10 @@ export default function RootLayout({
   children
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="zh-CN">
-      <body className="min-h-screen bg-gray-50 font-sans text-gray-900 antialiased">
+    <html lang="zh-CN" suppressHydrationWarning>
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased">
+        {/* 首屏前置:在 paint 前给 <html> 打上明/暗 class,杜绝主题闪烁。 */}
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <WebVitals />
         <Providers>{children}</Providers>
       </body>

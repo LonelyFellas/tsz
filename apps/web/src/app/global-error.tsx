@@ -11,11 +11,11 @@ export default function GlobalError({
 }) {
   return (
     <html lang="zh-CN">
-      <body className="flex min-h-screen flex-col items-center justify-center gap-4">
+      <body className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background text-foreground">
         <h1 className="text-xl font-bold">页面出错了</h1>
-        <p className="text-sm text-gray-500">{error.message}</p>
+        <p className="text-sm text-foreground-muted">{error.message}</p>
         <button
-          className="rounded bg-blue-600 px-4 py-2 text-white"
+          className="rounded bg-primary px-4 py-2 text-primary-foreground"
           onClick={reset}
         >
           重试

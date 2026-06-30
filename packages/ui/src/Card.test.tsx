@@ -13,7 +13,7 @@ describe("Card", () => {
     const cls = screen.getByTestId("c").className;
     expect(cls).toContain("rounded-lg");
     expect(cls).toContain("border");
-    expect(cls).toContain("bg-white");
+    expect(cls).toContain("bg-surface");
   });
 
   it("追加自定义 className", () => {

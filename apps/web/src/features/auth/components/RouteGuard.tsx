@@ -41,7 +41,7 @@ export function RouteGuard({
   // 恢复中或即将跳转：不渲染受保护内容。
   if (!hydrated || needsLogin || needsOnboarding) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-gray-400">
+      <div className="flex min-h-[40vh] items-center justify-center text-sm text-foreground-subtle">
         加载中...
       </div>
     );

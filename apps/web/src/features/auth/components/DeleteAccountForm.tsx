@@ -114,7 +114,7 @@ export function DeleteAccountForm() {
   // 会话恢复完成（hydrated）由路由守卫保证；此处仅兜底无可用渠道的极端情况。
   if (channels.length === 0) {
     return (
-      <div className="mx-auto max-w-md py-16 text-center text-sm text-gray-400">
+      <div className="mx-auto max-w-md py-16 text-center text-sm text-foreground-subtle">
         当前账号未绑定可用于验证的手机号或邮箱，无法注销。
       </div>
     );
@@ -126,21 +126,21 @@ export function DeleteAccountForm() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="text-sm text-gray-500 transition-colors hover:text-gray-800"
+          className="text-sm text-foreground-muted transition-colors hover:text-foreground"
         >
           ← 返回
         </button>
-        <h1 className="flex-1 text-center text-xl font-bold text-gray-900">
+        <h1 className="flex-1 text-center text-xl font-bold text-foreground">
           注销账号
         </h1>
         {/* 占位，让标题视觉居中 */}
         <span className="w-8" aria-hidden />
       </div>
 
-      <div className="rounded-2xl border border-gray-100 bg-white px-6 py-8 shadow-sm">
+      <div className="rounded-2xl border border-border bg-surface px-6 py-8 shadow-sm">
         {/* 渠道切换：仅当账号同时绑定手机与邮箱时显示 */}
         {channels.length > 1 && (
-          <div className="mb-6 flex gap-6 border-b border-gray-100">
+          <div className="mb-6 flex gap-6 border-b border-border">
             {channels.map((c) => (
               <button
                 key={c}
@@ -148,8 +148,8 @@ export function DeleteAccountForm() {
                 onClick={() => switchChannel(c)}
                 className={`pb-3 text-sm font-medium transition-colors ${
                   channel === c
-                    ? "border-b-2 border-blue-600 text-blue-600"
-                    : "text-gray-400 hover:text-gray-600"
+                    ? "border-b-2 border-primary text-primary"
+                    : "text-foreground-subtle hover:text-foreground-muted"
                 }`}
               >
                 {CHANNEL_LABEL[c]}
@@ -160,7 +160,7 @@ export function DeleteAccountForm() {
 
         <form className="space-y-4" onSubmit={handleDelete}>
           <div>
-            <label className="mb-1 block text-sm text-gray-700">
+            <label className="mb-1 block text-sm text-foreground-muted">
               {channel === "phone" ? "手机号码" : "邮箱号码"}
             </label>
             {/* 验证码始终发往账号在档联系方式，此处只读展示，不可改 */}
@@ -169,12 +169,14 @@ export function DeleteAccountForm() {
               value={target ?? ""}
               readOnly
               disabled
-              className={`${AUTH_INPUT_CLASS} cursor-not-allowed bg-gray-50 text-gray-500`}
+              className={`${AUTH_INPUT_CLASS} cursor-not-allowed bg-muted text-foreground-muted`}
             />
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-gray-700">验证码</label>
+            <label className="mb-1 block text-sm text-foreground-muted">
+              验证码
+            </label>
             <div className="flex gap-3">
               <input
                 type="text"
@@ -188,7 +190,7 @@ export function DeleteAccountForm() {
                 type="button"
                 onClick={handleSendCode}
                 disabled={!canSendCode}
-                className="shrink-0 rounded-full bg-blue-50 px-4 py-3 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+                className="shrink-0 rounded-full bg-primary-muted px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {countdown > 0
                   ? `${countdown}s 后重发`
@@ -199,19 +201,19 @@ export function DeleteAccountForm() {
             </div>
           </div>
 
-          <div className="text-xs leading-relaxed text-red-500">
+          <div className="text-xs leading-relaxed text-danger">
             <p className="font-medium">重要提示：</p>
             <p>
               注销后资产将全部清除，注册新的账号不再拥有当前账号的所有信息和资产，请慎重选择！
             </p>
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
 
           <button
             type="submit"
             disabled={!canSubmit}
-            className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {loading ? "注销中..." : "确认注销"}
           </button>

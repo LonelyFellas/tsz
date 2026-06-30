@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useUserStore } from "@/stores/user";
+import { ThemeToggle } from "@/features/theme/ThemeToggle";
 import { LogoutButton } from "./LogoutButton";
 
 // 登录后主区导航：角色感知（师/生看到各自入口）。
@@ -12,7 +13,7 @@ export function MainNav() {
   const isStudent = !!user?.roles.includes("student");
 
   return (
-    <header className="flex items-center gap-6 border-b py-4">
+    <header className="flex items-center gap-6 border-b border-border py-4">
       <Link href="/" className="font-bold">
         天生会背
       </Link>
@@ -32,11 +33,12 @@ export function MainNav() {
           </>
         )}
         {!isTeacher && (
-          <Link href="/apply-teacher" className="text-blue-600">
+          <Link href="/apply-teacher" className="text-primary">
             申请成为老师
           </Link>
         )}
       </nav>
+      <ThemeToggle />
       <LogoutButton />
     </header>
   );

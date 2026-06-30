@@ -9,33 +9,33 @@ const STEPS = [
 
 export function LearningFlow() {
   return (
-    <section className="bg-gray-50 py-16 sm:py-24 lg:py-32">
+    <section className="bg-background py-16 sm:py-24 lg:py-32">
       <div className="mx-auto w-full max-w-5xl px-6">
         <div className="reveal mb-12 text-center sm:mb-16">
-          <h2 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
+          <h2 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
             简单四步。
           </h2>
-          <p className="mt-3 text-lg font-medium text-gray-400 sm:text-xl">
+          <p className="mt-3 text-lg font-medium text-foreground-subtle sm:text-xl">
             形成可持续的学习闭环。
           </p>
         </div>
 
         <ol className="relative grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* 桌面贯穿连接线,纯视觉 */}
-          <div className="pointer-events-none absolute inset-x-0 top-6 hidden h-px bg-gradient-to-r from-transparent via-gray-300 to-transparent lg:block" />
+          <div className="pointer-events-none absolute inset-x-0 top-6 hidden h-px bg-gradient-to-r from-transparent via-border to-transparent lg:block" />
           {STEPS.map((s) => (
             <li
               key={s.step}
               className="reveal relative flex items-start gap-4 lg:flex-col lg:gap-0"
             >
-              <span className="relative z-10 flex h-12 w-12 flex-none items-center justify-center rounded-full bg-white text-base font-semibold text-[#0071e3] shadow-sm ring-1 ring-gray-200">
+              <span className="relative z-10 flex h-12 w-12 flex-none items-center justify-center rounded-full bg-surface text-base font-semibold text-primary shadow-sm ring-1 ring-border">
                 {s.step}
               </span>
               <div className="lg:mt-5">
-                <h3 className="text-lg font-semibold tracking-tight text-gray-900">
+                <h3 className="text-lg font-semibold tracking-tight text-foreground">
                   {s.title}
                 </h3>
-                <p className="mt-1.5 text-sm leading-relaxed text-gray-500">
+                <p className="mt-1.5 text-sm leading-relaxed text-foreground-muted">
                   {s.desc}
                 </p>
               </div>

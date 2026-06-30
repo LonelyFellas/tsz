@@ -75,7 +75,7 @@ export function WordListCreator() {
     <section className="mx-auto max-w-2xl">
       <header className="mb-4">
         <h1 className="text-xl font-bold">创建词表</h1>
-        <p className="text-sm text-gray-500">{STEP_TITLES[step]}</p>
+        <p className="text-sm text-foreground-muted">{STEP_TITLES[step]}</p>
       </header>
 
       {step === "words" && (
@@ -88,10 +88,10 @@ export function WordListCreator() {
                 return (
                   <li key={w.id}>
                     <label
-                      className={`flex cursor-pointer items-center gap-2 rounded border px-3 py-2 ${
+                      className={`flex cursor-pointer items-center gap-2 rounded border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle ${
                         checked
-                          ? "border-blue-500 bg-blue-50"
-                          : "border-gray-200"
+                          ? "border-primary bg-primary-muted"
+                          : "border-border"
                       }`}
                     >
                       <input
@@ -100,7 +100,7 @@ export function WordListCreator() {
                         onChange={() => toggleWord(w.id)}
                       />
                       <span className="font-medium">{w.text}</span>
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-foreground-subtle">
                         {w.phonetic}
                       </span>
                     </label>
@@ -114,7 +114,7 @@ export function WordListCreator() {
             <h2 className="mb-2 font-medium">自定义词汇(可选)</h2>
             <div className="flex gap-2">
               <input
-                className="flex-1 rounded border px-3 py-2"
+                className="flex-1 rounded border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle"
                 placeholder="输入一个词后点添加"
                 value={customDraft}
                 onChange={(e) => setCustomDraft(e.target.value)}
@@ -129,7 +129,7 @@ export function WordListCreator() {
                 {customWords.map((c, i) => (
                   <span
                     key={`${c.text}-${i}`}
-                    className="rounded bg-gray-100 px-2 py-1 text-sm"
+                    className="rounded bg-muted px-2 py-1 text-sm"
                   >
                     {c.text}
                   </span>
@@ -144,7 +144,7 @@ export function WordListCreator() {
           </div>
 
           <div className="flex justify-between">
-            <span className="self-center text-sm text-gray-500">
+            <span className="self-center text-sm text-foreground-muted">
               已选 {totalWords} 个词
             </span>
             <Button disabled={totalWords === 0} onClick={() => setStep("name")}>
@@ -159,13 +159,13 @@ export function WordListCreator() {
           <div>
             <label className="mb-1 block text-sm">词表名称</label>
             <input
-              className="w-full rounded border px-3 py-2"
+              className="w-full rounded border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如:小学一年级核心词"
             />
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-foreground-muted">
             共 {totalWords} 个词({selectedWords.length} 智能 +{" "}
             {customWords.length} 自定义)
           </p>
@@ -189,10 +189,10 @@ export function WordListCreator() {
             {(["private", "public"] as const).map((v) => (
               <label
                 key={v}
-                className={`flex cursor-pointer items-start gap-2 rounded border px-3 py-2 ${
+                className={`flex cursor-pointer items-start gap-2 rounded border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle ${
                   visibility === v
-                    ? "border-blue-500 bg-blue-50"
-                    : "border-gray-200"
+                    ? "border-primary bg-primary-muted"
+                    : "border-border"
                 }`}
               >
                 <input
@@ -205,7 +205,7 @@ export function WordListCreator() {
                   <span className="font-medium">
                     {v === "private" ? "私密" : "公开"}
                   </span>
-                  <span className="block text-xs text-gray-500">
+                  <span className="block text-xs text-foreground-muted">
                     {v === "private"
                       ? "仅自己可见"
                       : "发布到老师/学生可浏览(需审核)"}
@@ -221,7 +221,7 @@ export function WordListCreator() {
             </p>
           )}
           {createWordList.isError && (
-            <p className="text-sm text-red-500">
+            <p className="text-sm text-danger">
               创建失败:{(createWordList.error as Error).message}
             </p>
           )}
@@ -239,7 +239,7 @@ export function WordListCreator() {
       {step === "done" && (
         <Card className="flex flex-col items-center gap-4 py-8 text-center">
           <h2 className="text-lg font-bold">「{name}」创建成功</h2>
-          <p className="text-gray-500">
+          <p className="text-foreground-muted">
             {visibility === "private"
               ? "已保存为私密词表。"
               : needsReview
