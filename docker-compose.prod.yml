@@ -1,0 +1,48 @@
+# Production compose for the FRONTEND tier (web + admin + nginx) on the app ECS.
+# The Go backend runs from its own repo/compose (tshb-go) and publishes :8080 on
+# the host; nginx reaches it via host.docker.internal, so this stack is fully
+# independent — nothing here touches the backend compose.
+#
+# Browser → nginx(:80):
+#   /api/v1/* → Go backend :8080   (same-origin, so no CORS)
+#   /*        → web/admin (Next SSR) by subdomain
+# nginx (not Next) proxies the API, because Next 'output: standalone' freezes
+# rewrites() at build time — see deploy/nginx/conf.d/tsz.conf.
+services:
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      PORT: "3000"
+    expose:
+      - "3000"
+    restart: unless-stopped
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    environment:
+      PORT: "3001"
+    expose:
+      - "3001"
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:1.27-alpine
+    depends_on:
+      - web
+      - admin
+    ports:
+      - "80:80"
+      # 443 is wired once a TLS cert exists — see deploy/nginx/ and the README.
+      # - "443:443"
+    volumes:
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      # - ./deploy/nginx/certs:/etc/nginx/certs:ro   # mount certs for 443
+    # Lets nginx resolve host.docker.internal -> the host, to reach the backend
+    # published on :8080.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
