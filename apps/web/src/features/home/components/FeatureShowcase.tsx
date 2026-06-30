@@ -58,13 +58,13 @@ const FEATURES: Feature[] = [
 
 export function FeatureShowcase() {
   return (
-    <section className="bg-white">
+    <section className="bg-surface">
       <div className="mx-auto w-full max-w-5xl px-6 py-16 sm:py-24 lg:py-32">
         <div className="reveal mb-12 text-center sm:mb-14">
-          <h2 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
+          <h2 className="text-4xl font-semibold tracking-tight text-foreground sm:text-5xl">
             强大功能。
           </h2>
-          <p className="mt-3 text-lg font-medium text-gray-400 sm:text-xl">
+          <p className="mt-3 text-lg font-medium text-foreground-subtle sm:text-xl">
             覆盖从词表到练习的完整学习闭环。
           </p>
         </div>
@@ -75,8 +75,8 @@ export function FeatureShowcase() {
               key={f.title}
               className={`reveal flex flex-col rounded-3xl p-6 transition duration-300 hover:-translate-y-1 sm:p-7 ${
                 f.dark
-                  ? "bg-gray-900 text-white hover:shadow-xl hover:shadow-gray-900/20"
-                  : "bg-gray-50 text-gray-900 hover:bg-gray-100 hover:shadow-xl hover:shadow-gray-900/5"
+                  ? "bg-gray-900 text-white hover:shadow-xl hover:shadow-gray-900/20 dark:ring-1 dark:ring-border"
+                  : "bg-muted text-foreground hover:bg-border hover:shadow-xl hover:shadow-black/5"
               }`}
             >
               <f.Visual />
@@ -86,7 +86,7 @@ export function FeatureShowcase() {
                 </h3>
                 <p
                   className={`mt-1.5 text-sm leading-relaxed ${
-                    f.dark ? "text-white/60" : "text-gray-500"
+                    f.dark ? "text-white/60" : "text-foreground-muted"
                   }`}
                 >
                   {f.desc}

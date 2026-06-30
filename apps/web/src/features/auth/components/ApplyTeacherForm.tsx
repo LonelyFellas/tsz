@@ -21,7 +21,7 @@ export function ApplyTeacherForm({ rejectReason }: { rejectReason?: string }) {
   return (
     <Card>
       {rejectReason && (
-        <div className="mb-4 rounded bg-red-50 p-3 text-sm text-red-600">
+        <div className="mb-4 rounded bg-danger/10 p-3 text-sm text-danger">
           上次申请被拒:{rejectReason}
         </div>
       )}

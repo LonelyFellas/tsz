@@ -11,12 +11,12 @@ describe("Button", () => {
 
   it("默认 variant 为 primary", () => {
     render(<Button>主</Button>);
-    expect(screen.getByRole("button").className).toContain("bg-blue-600");
+    expect(screen.getByRole("button").className).toContain("bg-primary");
   });
 
   it.each([
-    ["primary", "bg-blue-600"],
-    ["secondary", "bg-gray-100"],
+    ["primary", "bg-primary"],
+    ["secondary", "bg-muted"],
     ["ghost", "bg-transparent"]
   ] as const)("variant=%s 应用对应样式", (variant, cls) => {
     render(<Button variant={variant}>x</Button>);

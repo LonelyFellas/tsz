@@ -59,7 +59,7 @@ export function ProfileHub() {
 
   if (loadError) {
     return (
-      <div className="mx-auto max-w-2xl px-6 py-24 text-center text-sm text-gray-400">
+      <div className="mx-auto max-w-2xl px-6 py-24 text-center text-sm text-foreground-subtle">
         资料加载失败,请刷新重试。
       </div>
     );
@@ -67,7 +67,7 @@ export function ProfileHub() {
 
   if (!me) {
     return (
-      <div className="mx-auto max-w-2xl px-6 py-24 text-center text-sm text-gray-400">
+      <div className="mx-auto max-w-2xl px-6 py-24 text-center text-sm text-foreground-subtle">
         加载中…
       </div>
     );
@@ -84,19 +84,19 @@ export function ProfileHub() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="-ml-2 rounded-full px-3 py-1.5 text-sm font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
+          className="-ml-2 rounded-full px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-muted hover:text-foreground"
         >
           ← 返回
         </button>
-        <h1 className="flex-1 text-center text-2xl font-semibold tracking-tight text-gray-900">
+        <h1 className="flex-1 text-center text-2xl font-semibold tracking-tight text-foreground">
           个人中心
         </h1>
         <span className="w-12" aria-hidden />
       </div>
 
       {/* 资料卡 */}
-      <div className="mb-4 flex items-center gap-5 rounded-3xl border border-gray-100 bg-white p-6 shadow-xl shadow-gray-900/5">
-        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full ring-1 ring-gray-900/5">
+      <div className="mb-4 flex items-center gap-5 rounded-3xl border border-border bg-surface p-6 shadow-xl shadow-black/5">
+        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full ring-1 ring-border">
           {user.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -111,40 +111,40 @@ export function ProfileHub() {
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-lg font-semibold tracking-tight text-gray-900">
+          <p className="truncate text-lg font-semibold tracking-tight text-foreground">
             {displayName}
           </p>
           {contact && (
-            <p className="truncate text-sm text-gray-500">{contact}</p>
+            <p className="truncate text-sm text-foreground-muted">{contact}</p>
           )}
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <span className="inline-flex max-w-[15rem] items-center gap-1 text-xs text-gray-400">
+            <span className="inline-flex max-w-[15rem] items-center gap-1 text-xs text-foreground-subtle">
               <span className="min-w-0 truncate">ID:{user.id}</span>
               <button
                 type="button"
                 onClick={() => copyId(user.id)}
                 aria-label="复制 ID"
-                className="shrink-0 text-gray-400 transition-colors hover:text-gray-700"
+                className="shrink-0 text-foreground-subtle transition-colors hover:text-foreground-muted"
               >
                 {copyState === "copied" ? <CheckIcon /> : <CopyIcon />}
               </button>
               {copyState === "copied" && (
-                <span className="shrink-0 whitespace-nowrap font-medium text-[#0071e3]">
+                <span className="shrink-0 whitespace-nowrap font-medium text-primary">
                   已复制
                 </span>
               )}
               {copyState === "failed" && (
-                <span className="shrink-0 whitespace-nowrap font-medium text-red-500">
+                <span className="shrink-0 whitespace-nowrap font-medium text-danger">
                   复制失败
                 </span>
               )}
             </span>
             {learning_settings && (
               <>
-                <span className="rounded-full bg-[#0071e3] px-2.5 py-0.5 text-xs font-semibold text-white">
+                <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-white">
                   {learning_settings.cefr_level}
                 </span>
-                <span className="rounded-full bg-[#0071e3] px-2.5 py-0.5 text-xs font-semibold text-white">
+                <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-white">
                   {VARIANT_LABEL[learning_settings.english_variant]}
                 </span>
               </>
@@ -153,7 +153,7 @@ export function ProfileHub() {
         </div>
         <Link
           href="/account/profile"
-          className="shrink-0 rounded-full bg-[#0071e3] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-[#0077ed] active:scale-95"
+          className="shrink-0 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-white transition hover:opacity-90 active:scale-95"
         >
           编辑资料
         </Link>
@@ -165,17 +165,17 @@ export function ProfileHub() {
           <Link
             key={tile.label}
             href={tile.href}
-            className="group flex items-center gap-3.5 rounded-3xl border border-gray-100 bg-white p-5 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-gray-900/5"
+            className="group flex items-center gap-3.5 rounded-3xl border border-border bg-surface p-5 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/5"
           >
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gray-50 transition group-hover:bg-[#0071e3]/10">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted transition group-hover:bg-primary/10">
               {tile.icon}
             </span>
-            <span className="flex-1 text-sm font-medium text-gray-800">
+            <span className="flex-1 text-sm font-medium text-foreground">
               {tile.label}
             </span>
             <span
               aria-hidden
-              className="text-gray-300 transition group-hover:translate-x-0.5 group-hover:text-gray-400"
+              className="text-foreground-subtle transition group-hover:translate-x-0.5 group-hover:text-foreground-subtle"
             >
               →
             </span>

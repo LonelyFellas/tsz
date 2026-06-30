@@ -21,7 +21,7 @@ export function HeroCTA() {
     return (
       <Link
         href={studyHref}
-        className="inline-flex items-center rounded-full bg-[#0071e3] px-7 py-3 text-base font-medium text-white transition hover:bg-[#0077ed] active:scale-95"
+        className="inline-flex items-center rounded-full bg-primary px-7 py-3 text-base font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-95"
       >
         进入学习
       </Link>
@@ -33,13 +33,13 @@ export function HeroCTA() {
     <div className="flex items-center gap-6">
       <Link
         href="/login"
-        className="inline-flex items-center rounded-full bg-[#0071e3] px-7 py-3 text-base font-medium text-white transition hover:bg-[#0077ed] active:scale-95"
+        className="inline-flex items-center rounded-full bg-primary px-7 py-3 text-base font-medium text-primary-foreground transition hover:bg-primary/90 active:scale-95"
       >
         登录
       </Link>
       <Link
         href="/wordlists"
-        className="text-base font-medium text-[#0071e3] transition hover:underline"
+        className="text-base font-medium text-primary transition hover:underline"
       >
         浏览词表 ›
       </Link>

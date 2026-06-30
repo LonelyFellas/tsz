@@ -54,7 +54,7 @@ export function AccountMenu() {
         aria-haspopup="true"
         aria-expanded={open}
         aria-label="账户菜单"
-        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-gray-900 text-xs font-semibold text-white transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0071e3] focus-visible:ring-offset-2"
+        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-foreground text-xs font-semibold text-background transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         {showImage ? (
           // 任意来源的远程头像,next/image 需维护域名白名单,脚手架阶段用原生 img。
@@ -71,18 +71,18 @@ export function AccountMenu() {
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-48 overflow-hidden rounded-2xl border border-gray-200 bg-white p-1 shadow-xl shadow-gray-900/5">
+        <div className="absolute right-0 mt-2 w-48 overflow-hidden rounded-2xl border border-border bg-surface p-1 shadow-xl shadow-black/5">
           <div className="px-3 py-2">
-            <p className="truncate text-sm font-medium text-gray-900">
+            <p className="truncate text-sm font-medium text-foreground">
               {displayName}
             </p>
-            <p className="truncate text-xs text-gray-400">已登录</p>
+            <p className="truncate text-xs text-foreground-subtle">已登录</p>
           </div>
-          <div className="my-1 h-px bg-gray-100" />
+          <div className="my-1 h-px bg-border" />
           <Link
             href="/account"
             onClick={() => setOpen(false)}
-            className="block rounded-lg px-3 py-2 text-sm text-gray-700 transition hover:bg-gray-50"
+            className="block rounded-lg px-3 py-2 text-sm text-foreground-muted transition hover:bg-muted"
           >
             个人中心
           </Link>
@@ -90,14 +90,14 @@ export function AccountMenu() {
             type="button"
             onClick={handleLogout}
             disabled={loading}
-            className="block w-full rounded-lg px-3 py-2 text-left text-sm text-gray-700 transition hover:bg-gray-50 disabled:opacity-40"
+            className="block w-full rounded-lg px-3 py-2 text-left text-sm text-foreground-muted transition hover:bg-muted disabled:opacity-40"
           >
             {loading ? "退出中…" : "退出登录"}
           </button>
           <Link
             href="/account/delete"
             onClick={() => setOpen(false)}
-            className="block rounded-lg px-3 py-2 text-sm text-gray-500 transition hover:bg-red-50 hover:text-red-600"
+            className="block rounded-lg px-3 py-2 text-sm text-foreground-muted transition hover:bg-danger/10 hover:text-danger"
           >
             注销账号
           </Link>

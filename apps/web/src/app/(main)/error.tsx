@@ -14,7 +14,7 @@ export default function MainError({
   return (
     <div className="flex flex-col items-center gap-4 py-16 text-center">
       <h2 className="text-lg font-bold">加载失败</h2>
-      <p className="text-sm text-gray-500">{error.message}</p>
+      <p className="text-sm text-foreground-muted">{error.message}</p>
       <Button onClick={reset}>重试</Button>
     </div>
   );

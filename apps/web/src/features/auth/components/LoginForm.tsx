@@ -142,32 +142,32 @@ export function LoginForm() {
       <AuthBranding />
 
       {/* Right panel */}
-      <div className="flex flex-1 items-center justify-center px-8 py-16 bg-white">
+      <div className="flex flex-1 items-center justify-center px-8 py-16 bg-surface">
         <div className="w-full max-w-sm">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">欢迎回来</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-8">欢迎回来</h1>
 
           {resetSuccess && (
-            <p className="mb-6 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-600">
+            <p className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success">
               密码重置成功，请用新密码登录。
             </p>
           )}
 
           {deletedSuccess && (
-            <p className="mb-6 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-600">
+            <p className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success">
               账号已注销成功。
             </p>
           )}
 
           {/* Tabs */}
-          <div className="flex gap-6 mb-8 border-b border-gray-100">
+          <div className="flex gap-6 mb-8 border-b border-border">
             {TABS.map(({ id, label }) => (
               <button
                 key={id}
                 onClick={() => switchTab(id)}
                 className={`pb-3 text-sm font-medium transition-colors ${
                   tab === id
-                    ? "text-blue-600 border-b-2 border-blue-600"
-                    : "text-gray-400 hover:text-gray-600"
+                    ? "text-primary border-b-2 border-primary"
+                    : "text-foreground-subtle hover:text-foreground-muted"
                 }`}
               >
                 {label}
@@ -178,7 +178,7 @@ export function LoginForm() {
           {tab === "password" ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-700 mb-1">
+                <label className="block text-sm text-foreground-muted mb-1">
                   手机号/邮箱号码
                 </label>
                 <input
@@ -190,7 +190,9 @@ export function LoginForm() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-gray-700 mb-1">密码</label>
+                <label className="block text-sm text-foreground-muted mb-1">
+                  密码
+                </label>
                 <div className="relative">
                   <input
                     type={showPassword ? "text" : "password"}
@@ -203,7 +205,7 @@ export function LoginForm() {
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-muted"
                     aria-label={showPassword ? "隐藏密码" : "显示密码"}
                   >
                     {showPassword ? "🙈" : "👁"}
@@ -211,12 +213,12 @@ export function LoginForm() {
                 </div>
               </div>
 
-              {error && <p className="text-sm text-red-500">{error}</p>}
+              {error && <p className="text-sm text-danger">{error}</p>}
 
               <button
                 onClick={handleLogin}
                 disabled={!canSubmit}
-                className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading ? "登录中..." : "立即登录"}
               </button>
@@ -224,7 +226,7 @@ export function LoginForm() {
           ) : (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-700 mb-1">
+                <label className="block text-sm text-foreground-muted mb-1">
                   {tab === "phone" ? "手机号码" : "邮箱"}
                 </label>
                 <div className="relative">
@@ -238,7 +240,7 @@ export function LoginForm() {
                     className={AUTH_INPUT_CLASS}
                   />
                   {account && !identifierValid && (
-                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-red-500">
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-danger">
                       {tab === "phone" ? "手机号码错误" : "邮箱格式错误"}
                     </span>
                   )}
@@ -246,7 +248,7 @@ export function LoginForm() {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-700 mb-1">
+                <label className="block text-sm text-foreground-muted mb-1">
                   验证码
                 </label>
                 <div className="flex gap-3">
@@ -261,7 +263,7 @@ export function LoginForm() {
                       className={`${AUTH_INPUT_CLASS} pr-20`}
                     />
                     {code && !isCode(code) && (
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-red-500">
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-danger">
                         验证码错误
                       </span>
                     )}
@@ -270,7 +272,7 @@ export function LoginForm() {
                     type="button"
                     onClick={handleSendCode}
                     disabled={!canSendCode}
-                    className="shrink-0 rounded-full bg-blue-50 px-4 py-3 text-sm font-medium text-blue-600 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="shrink-0 rounded-full bg-primary-muted px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
                   >
                     {countdown > 0
                       ? `${countdown}s 后重发`
@@ -281,12 +283,12 @@ export function LoginForm() {
                 </div>
               </div>
 
-              {error && <p className="text-sm text-red-500">{error}</p>}
+              {error && <p className="text-sm text-danger">{error}</p>}
 
               <button
                 onClick={handleCodeLogin}
                 disabled={!canCodeSubmit}
-                className="w-full rounded-full bg-blue-600 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {loading ? "登录中..." : "立即登录"}
               </button>
@@ -297,7 +299,7 @@ export function LoginForm() {
           <div className="mt-4 space-y-4">
             <button
               onClick={() => router.push("/register")}
-              className="w-full rounded-full border border-gray-200 py-3 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+              className="w-full rounded-full border border-border py-3 text-sm text-foreground-muted hover:bg-muted transition-colors"
             >
               没有账号，立即注册
             </button>
@@ -305,7 +307,7 @@ export function LoginForm() {
             <button
               type="button"
               onClick={() => router.push("/forgot-password")}
-              className="w-full text-center text-sm text-blue-500 hover:underline"
+              className="w-full text-center text-sm text-primary hover:underline"
             >
               忘记密码
             </button>

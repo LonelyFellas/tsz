@@ -16,7 +16,7 @@ export function LogoutButton() {
     <button
       onClick={handleLogout}
       disabled={loading}
-      className="text-sm text-gray-500 hover:text-gray-800 disabled:opacity-40 transition-colors"
+      className="text-sm text-foreground-muted hover:text-foreground disabled:opacity-40 transition-colors"
     >
       {loading ? "退出中..." : "退出登录"}
     </button>

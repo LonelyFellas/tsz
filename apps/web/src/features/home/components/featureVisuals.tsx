@@ -7,7 +7,7 @@ const BLUE_BRIGHT = "#6aa8ff";
 // 浅色卡通用面板
 function LightPanel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="rounded-xl bg-white text-left ring-1 ring-gray-200/70">
+    <div className="rounded-xl bg-surface text-left ring-1 ring-border/70">
       {children}
     </div>
   );
@@ -65,7 +65,7 @@ export function MemoryVisual() {
           />
         </svg>
         <div className="mt-3 flex gap-1.5 text-[11px] font-medium">
-          <span className="rounded-md bg-[#0071e3] px-2 py-0.5 text-white">
+          <span className="rounded-md bg-primary px-2 py-0.5 text-white">
             1 天
           </span>
           <span className="rounded-md bg-white/10 px-2 py-0.5 text-white/60">
@@ -92,17 +92,19 @@ export function WordbankVisual() {
   ];
   return (
     <LightPanel>
-      <ul className="divide-y divide-gray-100">
+      <ul className="divide-y divide-border">
         {rows.map((r) => (
           <li
             key={r.w}
             className="flex items-center justify-between px-3 py-2.5"
           >
             <span className="flex items-baseline gap-2">
-              <span className="text-sm font-semibold text-gray-900">{r.w}</span>
-              <span className="text-[11px] text-gray-400">{r.t}</span>
+              <span className="text-sm font-semibold text-foreground">
+                {r.w}
+              </span>
+              <span className="text-[11px] text-foreground-subtle">{r.t}</span>
             </span>
-            <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-medium text-foreground-muted">
               {r.tag}
             </span>
           </li>
@@ -122,13 +124,15 @@ export function TaskVisual() {
   return (
     <LightPanel>
       <div className="p-3">
-        <p className="px-1 text-[11px] font-medium text-gray-400">今日任务</p>
+        <p className="px-1 text-[11px] font-medium text-foreground-subtle">
+          今日任务
+        </p>
         <ul className="mt-2 space-y-2">
           {items.map((it) => (
             <li key={it.label} className="flex items-center gap-2 px-1">
               <span
                 className={`flex h-4 w-4 items-center justify-center rounded-[5px] ${
-                  it.done ? "bg-[#0071e3]" : "ring-1 ring-gray-300"
+                  it.done ? "bg-primary" : "ring-1 ring-border"
                 }`}
               >
                 {it.done && (
@@ -145,15 +149,15 @@ export function TaskVisual() {
                 )}
               </span>
               <span
-                className={`text-xs ${it.done ? "text-gray-400 line-through" : "text-gray-700"}`}
+                className={`text-xs ${it.done ? "text-foreground-subtle line-through" : "text-foreground-muted"}`}
               >
                 {it.label}
               </span>
             </li>
           ))}
         </ul>
-        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-gray-100">
-          <div className="fill-x h-full w-2/3 rounded-full bg-[#0071e3]" />
+        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+          <div className="fill-x h-full w-2/3 rounded-full bg-primary" />
         </div>
       </div>
     </LightPanel>
@@ -166,15 +170,15 @@ export function StatsVisual() {
   return (
     <LightPanel>
       <div className="p-4">
-        <p className="text-2xl font-semibold tracking-tight text-gray-900">
+        <p className="text-2xl font-semibold tracking-tight text-foreground">
           92%
         </p>
-        <p className="text-[11px] text-gray-400">本周正确率</p>
+        <p className="text-[11px] text-foreground-subtle">本周正确率</p>
         <div className="mt-3 flex h-14 items-end gap-2">
           {bars.map((h, i) => (
             <span
               key={i}
-              className={`grow-up flex-1 rounded-t-md ${i === bars.length - 1 ? "bg-[#0071e3]" : "bg-gray-200"}`}
+              className={`grow-up flex-1 rounded-t-md ${i === bars.length - 1 ? "bg-primary" : "bg-border"}`}
               style={{ height: `${h}%` }}
             />
           ))}
@@ -191,20 +195,20 @@ export function ClassVisual() {
     <LightPanel>
       <div className="p-4">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-semibold text-gray-900">三年级二班</p>
-          <span className="text-[11px] text-gray-400">32 人</span>
+          <p className="text-sm font-semibold text-foreground">三年级二班</p>
+          <span className="text-[11px] text-foreground-subtle">32 人</span>
         </div>
         <div className="mt-3 flex items-center">
           {members.map((m, i) => (
             <span
               key={m}
-              className="-ml-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-gray-100 text-[11px] font-medium text-gray-600 ring-2 ring-white first:ml-0"
+              className="-ml-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-muted text-[11px] font-medium text-foreground-muted ring-2 ring-surface first:ml-0"
               style={{ zIndex: members.length - i }}
             >
               {m}
             </span>
           ))}
-          <span className="-ml-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#0071e3] text-[10px] font-medium text-white ring-2 ring-white">
+          <span className="-ml-1.5 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-white ring-2 ring-surface">
             +27
           </span>
         </div>
@@ -222,10 +226,10 @@ export function CoinsVisual() {
       <div className="p-4">
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-2xl font-semibold tracking-tight text-gray-900">
+            <p className="text-2xl font-semibold tracking-tight text-foreground">
               1,280
             </p>
-            <p className="text-[11px] text-gray-400">天生币</p>
+            <p className="text-[11px] text-foreground-subtle">天生币</p>
           </div>
           <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-600">
             连续打卡 5 天
@@ -237,8 +241,8 @@ export function CoinsVisual() {
               <span
                 className={`pop-in flex h-6 w-6 items-center justify-center rounded-full ${
                   checked[i]
-                    ? "bg-[#0071e3] text-white"
-                    : "bg-gray-100 text-gray-300"
+                    ? "bg-primary text-white"
+                    : "bg-muted text-foreground-subtle"
                 }`}
               >
                 {checked[i] ? (
@@ -256,7 +260,7 @@ export function CoinsVisual() {
                   <span className="h-1 w-1 rounded-full bg-current" />
                 )}
               </span>
-              <span className="text-[10px] text-gray-400">{d}</span>
+              <span className="text-[10px] text-foreground-subtle">{d}</span>
             </span>
           ))}
         </div>
@@ -273,7 +277,7 @@ export function StudentVisual() {
         <p className="text-[11px] text-white/50">选择正确释义</p>
         <p className="mt-1 text-lg font-semibold text-white">diligent</p>
         <div className="mt-3 space-y-1.5 text-xs">
-          <p className="rounded-lg bg-[#0071e3] px-3 py-1.5 text-white">
+          <p className="rounded-lg bg-primary px-3 py-1.5 text-white">
             adj. 勤奋的
           </p>
           <p className="rounded-lg bg-white/10 px-3 py-1.5 text-white/60">
@@ -303,10 +307,10 @@ export function TeacherVisual() {
           {stats.map((s) => (
             <div
               key={s.l}
-              className="rounded-lg bg-gray-50 px-2 py-2 text-center"
+              className="rounded-lg bg-muted px-2 py-2 text-center"
             >
-              <p className="text-base font-semibold text-gray-900">{s.v}</p>
-              <p className="text-[10px] text-gray-400">{s.l}</p>
+              <p className="text-base font-semibold text-foreground">{s.v}</p>
+              <p className="text-[10px] text-foreground-subtle">{s.l}</p>
             </div>
           ))}
         </div>
@@ -314,7 +318,7 @@ export function TeacherVisual() {
           {bars.map((h, i) => (
             <span
               key={i}
-              className={`grow-up flex-1 rounded-t ${i === bars.length - 1 ? "bg-[#0071e3]" : "bg-gray-200"}`}
+              className={`grow-up flex-1 rounded-t ${i === bars.length - 1 ? "bg-primary" : "bg-border"}`}
               style={{ height: `${h}%` }}
             />
           ))}

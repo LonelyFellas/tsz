@@ -10,7 +10,7 @@ export const ONBOARDING_PATH = "/onboarding";
 
 // 登录 / 注册表单共用的输入框样式。
 export const AUTH_INPUT_CLASS =
-  "w-full rounded-full border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500";
+  "w-full rounded-full border border-border bg-surface px-4 py-3 text-sm text-foreground outline-none placeholder:text-foreground-subtle focus:border-primary focus:ring-1 focus:ring-primary";
 
 /** 登录 / 注册成功后，将 access token 存入内存并启动主动刷新定时器。 */
 export function persistSession(

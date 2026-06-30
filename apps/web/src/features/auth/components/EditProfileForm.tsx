@@ -11,7 +11,7 @@ import { translateAuthError } from "../shared";
 
 // 精细化输入框:Apple 风圆角 + 品牌蓝聚焦环,贴合落地页设计体系。
 const INPUT_CLASS =
-  "w-full rounded-2xl border border-gray-200 bg-gray-50/60 px-4 py-3 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-[#0071e3] focus:bg-white focus:ring-2 focus:ring-[#0071e3]/15";
+  "w-full rounded-2xl border border-border bg-muted/60 px-4 py-3 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/15";
 
 // 编辑资料:进入拉 /me 展示资料,支持改昵称 + 绑定/换绑邮箱或手机(两步:发码→确认)。
 // 头像上传后端未实现(OSS 依赖),本页置灰占位;等级/口音只读(改等级请联系客服)。
@@ -85,7 +85,7 @@ export function EditProfileForm() {
 
   if (loadError) {
     return (
-      <div className="mx-auto max-w-md px-6 py-24 text-center text-sm text-gray-400">
+      <div className="mx-auto max-w-md px-6 py-24 text-center text-sm text-foreground-subtle">
         资料加载失败,请刷新重试。
       </div>
     );
@@ -93,7 +93,7 @@ export function EditProfileForm() {
 
   if (!me) {
     return (
-      <div className="mx-auto max-w-md px-6 py-24 text-center text-sm text-gray-400">
+      <div className="mx-auto max-w-md px-6 py-24 text-center text-sm text-foreground-subtle">
         加载中…
       </div>
     );
@@ -219,17 +219,17 @@ export function EditProfileForm() {
         <button
           type="button"
           onClick={() => router.back()}
-          className="-ml-2 rounded-full px-3 py-1.5 text-sm font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
+          className="-ml-2 rounded-full px-3 py-1.5 text-sm font-medium text-foreground-muted transition hover:bg-muted hover:text-foreground"
         >
           ← 返回
         </button>
-        <h1 className="flex-1 text-center text-2xl font-semibold tracking-tight text-gray-900">
+        <h1 className="flex-1 text-center text-2xl font-semibold tracking-tight text-foreground">
           编辑资料
         </h1>
         <span className="w-12" aria-hidden />
       </div>
 
-      <div className="rounded-3xl border border-gray-100 bg-white p-8 shadow-xl shadow-gray-900/5">
+      <div className="rounded-3xl border border-border bg-surface p-8 shadow-xl shadow-black/5">
         {/* 头像:占位,上传未实现 */}
         <div className="mb-7 flex flex-col items-center gap-3">
           <button
@@ -238,7 +238,7 @@ export function EditProfileForm() {
             aria-label="更换头像"
             className="group relative h-24 w-24 transition active:scale-95"
           >
-            <span className="block h-full w-full overflow-hidden rounded-full ring-1 ring-gray-900/5">
+            <span className="block h-full w-full overflow-hidden rounded-full ring-1 ring-border">
               {user.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
@@ -252,34 +252,38 @@ export function EditProfileForm() {
                 </span>
               )}
             </span>
-            <span className="absolute bottom-0.5 right-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-[#0071e3] text-white ring-2 ring-white transition group-hover:bg-[#0077ed]">
+            <span className="absolute bottom-0.5 right-0.5 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-white ring-2 ring-white transition group-hover:opacity-90">
               <CameraIcon />
             </span>
           </button>
           {topContact && (
-            <p className="text-sm font-medium text-gray-500">{topContact}</p>
+            <p className="text-sm font-medium text-foreground-muted">
+              {topContact}
+            </p>
           )}
 
           {/* 等级 / 口音:本页只读 */}
           {learning_settings && (
             <div className="flex items-center justify-center gap-2">
-              <span className="rounded-full bg-[#0071e3] px-2.5 py-0.5 text-xs font-semibold text-white">
+              <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-white">
                 {learning_settings.cefr_level}
               </span>
-              <span className="rounded-full bg-[#0071e3] px-2.5 py-0.5 text-xs font-semibold text-white">
+              <span className="rounded-full bg-primary px-2.5 py-0.5 text-xs font-semibold text-white">
                 {VARIANT_LABEL[learning_settings.english_variant]}
               </span>
             </div>
           )}
-          <p className="text-xs text-gray-400">若要修改等级,请联系平台客服</p>
+          <p className="text-xs text-foreground-subtle">
+            若要修改等级,请联系平台客服
+          </p>
         </div>
 
-        <div className="mb-7 h-px bg-gray-100" />
+        <div className="mb-7 h-px bg-muted" />
 
         <form className="space-y-5" onSubmit={handleSubmit}>
           {/* 昵称 */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-foreground-muted">
               昵称
             </label>
             <div className="relative">
@@ -291,18 +295,18 @@ export function EditProfileForm() {
                 onChange={(e) => setDisplayName(e.target.value)}
                 className={`${INPUT_CLASS} pr-14`}
               />
-              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-foreground-subtle">
                 {displayName.length}/{NICKNAME_MAX}
               </span>
             </div>
             {nameError && (
-              <p className="mt-1.5 text-sm text-red-500">{nameError}</p>
+              <p className="mt-1.5 text-sm text-danger">{nameError}</p>
             )}
           </div>
 
           {/* 绑定 / 换绑 */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-foreground-muted">
               {bindLabel}
             </label>
             <input
@@ -317,15 +321,15 @@ export function EditProfileForm() {
               className={INPUT_CLASS}
             />
             {!contactValid ? (
-              <p className="mt-1.5 text-sm text-red-500">{formatHint}</p>
+              <p className="mt-1.5 text-sm text-danger">{formatHint}</p>
             ) : contactError ? (
-              <p className="mt-1.5 text-sm text-red-500">{contactError}</p>
+              <p className="mt-1.5 text-sm text-danger">{contactError}</p>
             ) : null}
           </div>
 
           {/* 验证码 */}
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-foreground-muted">
               验证码
             </label>
             <div className="flex gap-3">
@@ -345,7 +349,7 @@ export function EditProfileForm() {
                 type="button"
                 onClick={handleSendCode}
                 disabled={!canSendCode}
-                className="shrink-0 rounded-2xl bg-[#0071e3]/10 px-4 text-sm font-medium text-[#0071e3] transition hover:bg-[#0071e3]/15 disabled:cursor-not-allowed disabled:opacity-40"
+                className="shrink-0 rounded-2xl bg-primary/10 px-4 text-sm font-medium text-primary transition hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {countdown > 0
                   ? `${countdown}s 后重发`
@@ -355,12 +359,12 @@ export function EditProfileForm() {
               </button>
             </div>
             {codeError && (
-              <p className="mt-1.5 text-sm text-red-500">{codeError}</p>
+              <p className="mt-1.5 text-sm text-danger">{codeError}</p>
             )}
           </div>
 
           {success && (
-            <p className="flex items-center justify-center gap-1.5 rounded-2xl bg-green-50 px-4 py-3 text-center text-sm font-medium text-green-600">
+            <p className="flex items-center justify-center gap-1.5 rounded-2xl bg-success/10 px-4 py-3 text-center text-sm font-medium text-success">
               <CheckIcon />
               操作成功
             </p>
@@ -370,14 +374,14 @@ export function EditProfileForm() {
             <button
               type="button"
               onClick={() => router.back()}
-              className="flex-1 rounded-full border border-gray-200 py-3 text-sm font-medium text-gray-600 transition hover:bg-gray-50 active:scale-95"
+              className="flex-1 rounded-full border border-border py-3 text-sm font-medium text-foreground-muted transition hover:bg-muted active:scale-95"
             >
               取消
             </button>
             <button
               type="submit"
               disabled={!canSubmit}
-              className="flex-1 rounded-full bg-[#0071e3] py-3 text-sm font-medium text-white transition hover:bg-[#0077ed] active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex-1 rounded-full bg-primary py-3 text-sm font-medium text-white transition hover:opacity-90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {saving ? "保存中..." : "确定"}
             </button>

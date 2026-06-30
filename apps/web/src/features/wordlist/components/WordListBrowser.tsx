@@ -19,25 +19,25 @@ export function WordListBrowser() {
       </div>
 
       {isPending ? (
-        <p className="text-gray-500">加载中…</p>
+        <p className="text-foreground-muted">加载中…</p>
       ) : isError ? (
-        <p className="text-red-500">加载失败:{(error as Error).message}</p>
+        <p className="text-danger">加载失败:{(error as Error).message}</p>
       ) : lists.length === 0 ? (
-        <p className="text-gray-500">暂无词表。</p>
+        <p className="text-foreground-muted">暂无词表。</p>
       ) : (
         <ul className="grid gap-3">
           {lists.map((l) => (
             <li key={l.id}>
               <Link href={`/wordlists/${l.id}`}>
-                <Card className="transition-colors hover:border-blue-300">
+                <Card className="transition-colors hover:border-primary">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">{l.name}</span>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-foreground-subtle">
                       {l.visibility === "public" ? "公开" : "私密"}
                       {l.review_status === "pending" && " · 审核中"}
                     </span>
                   </div>
-                  <p className="mt-1 text-xs text-gray-400">
+                  <p className="mt-1 text-xs text-foreground-subtle">
                     {l.word_ids.length + l.custom_words.length} 个词
                   </p>
                 </Card>

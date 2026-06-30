@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useUserStore } from "@/stores/user";
+import { ThemeToggle } from "@/features/theme/ThemeToggle";
 import { AccountMenu } from "./AccountMenu";
 
 // 首页吸顶导航——Apple 风毛玻璃细顶栏。
@@ -11,25 +12,28 @@ export function HomeNav() {
   const hydrated = useUserStore((s) => s.hydrated);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-gray-200/70 bg-white/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-border/70 bg-surface/80 backdrop-blur-xl">
       <div className="mx-auto flex h-12 w-full max-w-5xl items-center justify-between px-6">
         <Link href="/" className="text-sm font-semibold tracking-tight">
           天生会背
         </Link>
 
-        {/* 账户区:会话恢复完成前占位(尺寸同头像),避免登录态闪烁与布局抖动 */}
-        {!hydrated ? (
-          <div className="h-8 w-8" aria-hidden />
-        ) : !user ? (
-          <Link
-            href="/login"
-            className="text-xs font-medium text-[#0071e3] transition hover:underline"
-          >
-            登录
-          </Link>
-        ) : (
-          <AccountMenu />
-        )}
+        <div className="flex items-center gap-3">
+          <ThemeToggle />
+          {/* 账户区:会话恢复完成前占位(尺寸同头像),避免登录态闪烁与布局抖动 */}
+          {!hydrated ? (
+            <div className="h-8 w-8" aria-hidden />
+          ) : !user ? (
+            <Link
+              href="/login"
+              className="text-xs font-medium text-primary transition hover:underline"
+            >
+              登录
+            </Link>
+          ) : (
+            <AccountMenu />
+          )}
+        </div>
       </div>
     </header>
   );
