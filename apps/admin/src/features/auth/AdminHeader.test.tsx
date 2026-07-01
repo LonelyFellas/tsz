@@ -51,7 +51,7 @@ describe("AdminHeader", () => {
     useAuthStore.setState({ profile: PROFILE, level: PROFILE.level });
     render(<AdminHeader />);
 
-    fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
+    fireEvent.click(screen.getByRole("button", { name: /退出登录/ }));
 
     await waitFor(() =>
       expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true })
@@ -66,7 +66,7 @@ describe("AdminHeader", () => {
     useAuthStore.setState({ profile: PROFILE, level: PROFILE.level });
     render(<AdminHeader />);
 
-    fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
+    fireEvent.click(screen.getByRole("button", { name: /退出登录/ }));
 
     await waitFor(() =>
       expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true })

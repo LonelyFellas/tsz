@@ -6,6 +6,7 @@ import { NotFoundPage } from "@/pages/NotFound";
 import { ReviewsPage } from "@/pages/Reviews";
 import { RouteErrorPage } from "@/pages/RouteError";
 import { UsersPage } from "@/pages/Users";
+import { WordCreatePage } from "@/pages/WordCreate";
 import { WordListsPage } from "@/pages/WordLists";
 import { WordsPage } from "@/pages/Words";
 import { RootProviders } from "./providers";
@@ -24,6 +25,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <HomePage /> },
           { path: "words", element: <WordsPage /> },
+          { path: "words/create", element: <WordCreatePage /> },
           { path: "wordlists", element: <WordListsPage /> },
           { path: "users", element: <UsersPage /> },
           { path: "reviews", element: <ReviewsPage /> }

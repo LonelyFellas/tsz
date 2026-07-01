@@ -14,3 +14,10 @@ export const { api, tokens, persistSession } = authRuntime;
 
 /** 后台用户态 store（含 profile / level，门禁据 profile 是否存在判定）。 */
 export const useAuthStore = authRuntime.store;
+
+// dev-only：把 store 挂到 window，便于本地无后端时在控制台注入登录态调试受保护页。
+// 生产构建（import.meta.env.DEV=false）下整段被 tree-shake 掉，不会泄露。
+if (import.meta.env.DEV) {
+  (window as unknown as { __authStore?: typeof useAuthStore }).__authStore =
+    useAuthStore;
+}
