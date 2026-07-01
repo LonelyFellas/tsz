@@ -21,6 +21,14 @@ git pull --ff-only
 echo "==> Building and rolling containers"
 docker compose -f "$COMPOSE_FILE" up -d --build
 
+# Rebuilt web/admin containers get fresh IPs on the compose network, but the
+# unchanged nginx container still holds the upstream IPs it resolved at startup
+# (the conf uses static `proxy_pass http://web:3000` / `http://admin:3001`), so it
+# keeps hitting the old IPs and 502s until it re-resolves. Restart nginx so it
+# picks up the current web/admin IPs. Cheap and idempotent.
+echo "==> Restarting nginx to re-resolve upstreams"
+docker compose -f "$COMPOSE_FILE" restart nginx
+
 echo "==> Waiting for ${HEALTH_URL} (up to ${HEALTH_TIMEOUT}s)"
 deadline=$(( SECONDS + HEALTH_TIMEOUT ))
 until curl -fsS -o /dev/null "$HEALTH_URL"; do
