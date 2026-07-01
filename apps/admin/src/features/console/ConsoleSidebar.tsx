@@ -1,7 +1,4 @@
-"use client";
-
-import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { Link, useLocation } from "react-router-dom";
 
 /**
  * 后台侧栏导航框架（与截图一致的分组结构）。
@@ -57,7 +54,7 @@ function NavItem({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
 
   if (!leaf.href) {
     return (
-      <span className={`${base} cursor-not-allowed text-gray-300`}>
+      <span className={`${base} cursor-not-allowed text-muted-foreground/50`}>
         {leaf.label}
       </span>
     );
@@ -65,11 +62,11 @@ function NavItem({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
 
   return (
     <Link
-      href={leaf.href}
+      to={leaf.href}
       className={`${base} ${
         active
-          ? "bg-blue-50 font-medium text-blue-600"
-          : "text-gray-600 hover:bg-gray-50"
+          ? "bg-primary/10 font-medium text-primary"
+          : "text-muted-foreground hover:bg-muted hover:text-foreground"
       }`}
     >
       {leaf.label}
@@ -78,15 +75,15 @@ function NavItem({ leaf, active }: { leaf: NavLeaf; active: boolean }) {
 }
 
 export function ConsoleSidebar() {
-  const pathname = usePathname();
+  const pathname = useLocation().pathname;
 
   return (
-    <aside className="flex min-h-screen w-56 shrink-0 flex-col border-r border-gray-100 bg-white">
+    <aside className="flex min-h-screen w-56 shrink-0 flex-col border-r border-border bg-card">
       <div className="flex items-center gap-2 px-6 py-5">
         <span aria-hidden className="text-2xl">
           📖
         </span>
-        <span className="text-lg font-bold text-blue-600">天生会背</span>
+        <span className="text-lg font-bold text-primary">天生会背</span>
       </div>
       <nav className="flex flex-col gap-1 px-3 pb-6">
         {NAV.map((group) => {
@@ -104,7 +101,7 @@ export function ConsoleSidebar() {
 
           return (
             <div key={group.label} className="mt-2">
-              <p className="px-3 py-1.5 text-xs font-medium text-gray-400">
+              <p className="px-3 py-1.5 text-xs font-medium text-muted-foreground">
                 {group.label}
               </p>
               {group.children.map((leaf) => (

@@ -8,16 +8,16 @@ afterEach(() => {
 
 describe("env", () => {
   it("未配置时回退到默认相对路径", async () => {
-    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", undefined);
+    vi.stubEnv("VITE_API_BASE_URL", undefined);
     vi.resetModules();
     const { env } = await import("./env");
-    expect(env.NEXT_PUBLIC_API_BASE_URL).toBe("/api/v1");
+    expect(env.API_BASE_URL).toBe("/api/v1");
   });
 
   it("采用配置的 API 基址", async () => {
-    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "https://api.example.com/api/v1");
+    vi.stubEnv("VITE_API_BASE_URL", "https://api.example.com/api/v1");
     vi.resetModules();
     const { env } = await import("./env");
-    expect(env.NEXT_PUBLIC_API_BASE_URL).toBe("https://api.example.com/api/v1");
+    expect(env.API_BASE_URL).toBe("https://api.example.com/api/v1");
   });
 });

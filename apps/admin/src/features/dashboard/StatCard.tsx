@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Card } from "@tsz/ui";
+import { Card } from "@tsz/ui/components";
 
 export interface StatItem {
   label: string;
@@ -21,14 +21,14 @@ export function StatCard({ title, items, action }: StatCardProps) {
   return (
     <Card className="p-6">
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-sm font-medium text-gray-500">{title}</h2>
+        <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
         {action}
       </div>
       <dl className="flex justify-between gap-4">
         {items.map((item) => (
           <div key={item.label}>
-            <dd className="text-3xl font-bold text-gray-900">{item.value}</dd>
-            <dt className="mt-2 text-sm text-gray-400">{item.label}</dt>
+            <dd className="text-3xl font-bold text-foreground">{item.value}</dd>
+            <dt className="mt-2 text-sm text-muted-foreground">{item.label}</dt>
           </div>
         ))}
       </dl>

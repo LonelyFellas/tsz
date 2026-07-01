@@ -1,21 +1,21 @@
 import { render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
-
-// usePathname 用可变值，便于切换路由验证高亮分支。
-let pathname = "/";
-vi.mock("next/navigation", () => ({
-  usePathname: () => pathname
-}));
-
+import { MemoryRouter } from "react-router-dom";
+import { describe, expect, it } from "vitest";
 import { ConsoleSidebar } from "./ConsoleSidebar";
 
-afterEach(() => {
-  pathname = "/";
-});
+// 侧栏依赖 react-router 的 Link + useLocation，用 MemoryRouter 提供路由上下文，
+// initialEntries 控制当前路径以验证高亮分支。
+function renderAt(path: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <ConsoleSidebar />
+    </MemoryRouter>
+  );
+}
 
 describe("ConsoleSidebar", () => {
   it("渲染 logo 与各分组标题", () => {
-    render(<ConsoleSidebar />);
+    renderAt("/");
     expect(screen.getByText("天生会背")).toBeInTheDocument();
     for (const group of [
       "用户管理",
@@ -32,21 +32,20 @@ describe("ConsoleSidebar", () => {
   });
 
   it("在首页时把「首页」标记为可跳转并高亮当前路由", () => {
-    render(<ConsoleSidebar />);
+    renderAt("/");
     const home = screen.getByRole("link", { name: "首页" });
     expect(home).toHaveAttribute("href", "/");
-    expect(home.className).toContain("text-blue-600");
+    expect(home.className).toContain("text-primary");
   });
 
   it("不在首页时首页链接不高亮", () => {
-    pathname = "/somewhere";
-    render(<ConsoleSidebar />);
+    renderAt("/somewhere");
     const home = screen.getByRole("link", { name: "首页" });
-    expect(home.className).not.toContain("text-blue-600");
+    expect(home.className).not.toContain("text-primary");
   });
 
   it("未实现模块渲染为禁用态条目（非链接）", () => {
-    render(<ConsoleSidebar />);
+    renderAt("/");
     // 教师管理无 href，应不是链接。
     expect(
       screen.queryByRole("link", { name: "教师管理" })

@@ -2,13 +2,12 @@ import type { AdminAuthResponse } from "@tsz/api-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockPush = vi.fn();
-const mockReplace = vi.fn();
+const mockNavigate = vi.fn();
 let mockRedirect: string | null = null;
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush, replace: mockReplace }),
-  useSearchParams: () => ({ get: () => mockRedirect })
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => mockNavigate,
+  useSearchParams: () => [{ get: () => mockRedirect }]
 }));
 
 vi.mock("@/lib/auth", async () => {
@@ -65,7 +64,9 @@ describe("AdminLoginForm", () => {
     render(<AdminLoginForm />);
     fillAndSubmit();
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/"));
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true })
+    );
     // admin 密码按原文提交，不做大小写转换（web 端怪癖不适用后台）。
     expect(mockLogin).toHaveBeenCalledWith("13800138000", "secret123");
     expect(mockPersist).toHaveBeenCalled();
@@ -81,7 +82,7 @@ describe("AdminLoginForm", () => {
     await waitFor(() =>
       expect(screen.getByText("账号或密码错误，请重新输入")).toBeInTheDocument()
     );
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("账号被禁用：展示禁用提示", async () => {
@@ -94,7 +95,7 @@ describe("AdminLoginForm", () => {
         screen.getByText("该账号已被禁用，请联系超级管理员")
       ).toBeInTheDocument()
     );
-    expect(mockPush).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("登录成功跳转到 redirect 指定页", async () => {
@@ -103,7 +104,9 @@ describe("AdminLoginForm", () => {
     render(<AdminLoginForm />);
     fillAndSubmit();
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/users"));
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith("/users", { replace: true })
+    );
   });
 
   it("已登录访问登录页：直接 replace 到目标页", () => {
@@ -118,8 +121,21 @@ describe("AdminLoginForm", () => {
       level: "admin"
     });
     render(<AdminLoginForm />);
-    expect(mockReplace).toHaveBeenCalledWith("/reviews");
+    expect(mockNavigate).toHaveBeenCalledWith("/reviews", { replace: true });
   });
+
+  it.each(["//evil.com", "/\\evil.com", "https://evil.com", "/login"])(
+    "已登录时恶意/无意义 redirect %s 归一到首页",
+    (hostile) => {
+      mockRedirect = hostile;
+      useAuthStore.setState({
+        profile: { id: "a1", phone: "1", display_name: "X", level: "admin" },
+        level: "admin"
+      });
+      render(<AdminLoginForm />);
+      expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true });
+    }
+  );
 
   it("切换密码显隐", () => {
     render(<AdminLoginForm />);
@@ -197,6 +213,6 @@ describe("AdminLoginForm", () => {
     expect(mockLogin).toHaveBeenCalledTimes(1);
 
     resolveLogin(authResponse("admin"));
-    await waitFor(() => expect(mockPush).toHaveBeenCalled());
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
   });
 });

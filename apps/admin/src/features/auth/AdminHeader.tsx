@@ -1,5 +1,4 @@
-"use client";
-
+import { Button } from "@tsz/ui/components";
 import { useAuthStore } from "@/lib/auth";
 import { useAdminLogout } from "./useAdminLogout";
 
@@ -15,16 +14,18 @@ export function AdminHeader() {
   const name = profile?.display_name ?? "管理员";
 
   return (
-    <header className="flex items-center justify-between border-b bg-white px-6 py-3">
-      <span className="text-sm text-gray-500">
-        已登录为 <span className="font-medium text-gray-900">{name}</span>
+    <header className="flex items-center justify-between border-b bg-card px-6 py-3">
+      <span className="text-sm text-muted-foreground">
+        已登录为 <span className="font-medium text-foreground">{name}</span>
       </span>
-      <button
+      <Button
+        variant="outline"
+        size="sm"
+        className="rounded-full"
         onClick={() => void logout()}
-        className="rounded-full border border-gray-200 px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
       >
         退出登录
-      </button>
+      </Button>
     </header>
   );
 }

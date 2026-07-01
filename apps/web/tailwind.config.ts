@@ -10,7 +10,11 @@ const config: Config = {
   content: [
     "./src/**/*.{ts,tsx}",
     // 扫描共享 UI 包,使其 className 不被 purge。
-    "../../packages/ui/src/**/*.{ts,tsx}"
+    "../../packages/ui/src/**/*.{ts,tsx}",
+    // 但排除 shadcn 组件目录:web 不引用它们,且它们用的是 admin 专属的 hsl token
+    // (bg-card/border-input/...),web 未定义这些色值——扫进来只会白扫,且一旦有人
+    // 误在 web 引用会静默渲染成透明/黑色。web 迁 shadcn 时再放开这条排除。
+    "!../../packages/ui/src/components/**"
   ],
   theme: {
     extend: {

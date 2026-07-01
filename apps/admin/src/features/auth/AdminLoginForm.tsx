@@ -1,13 +1,10 @@
-"use client";
-
 import { isValidAccount } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
+import { Button, Card, Input, Label } from "@tsz/ui/components";
+import { Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, persistSession, useAuthStore } from "@/lib/auth";
-
-const INPUT_CLASS =
-  "w-full rounded-lg border border-gray-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500";
 
 const LOGIN_ERRORS: Record<string, string> = {
   // 401：不区分是账号还是密码错，防枚举。
@@ -15,6 +12,23 @@ const LOGIN_ERRORS: Record<string, string> = {
   // 403：账号被禁用。
   "account disabled": "该账号已被禁用，请联系超级管理员"
 };
+
+// redirect 参数来自 URL、用户可控。只接受站内绝对路径（单个 "/" 开头），拒绝
+// "//host"、"/\host"（浏览器会把 \ 规范化为 /，同样是协议相对 URL）、"https://host"
+// 这类协议相对/绝对 URL，避免登录后被导去意外目标。回跳到登录页自身也无意义，归一到首页。
+function safeRedirect(raw: string | null): string {
+  if (
+    raw &&
+    raw.startsWith("/") &&
+    !raw.startsWith("//") &&
+    !raw.startsWith("/\\") &&
+    raw !== "/login" &&
+    !raw.startsWith("/login?")
+  ) {
+    return raw;
+  }
+  return "/";
+}
 
 export function AdminLoginForm() {
   const [account, setAccount] = useState("");
@@ -25,15 +39,15 @@ export function AdminLoginForm() {
 
   const setProfile = useAuthStore((s) => s.setProfile);
   const profile = useAuthStore((s) => s.profile);
-  const router = useRouter();
-  const searchParams = useSearchParams();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // 已登录的管理员访问登录页：直接进后台。
   useEffect(() => {
     if (profile) {
-      router.replace(searchParams.get("redirect") ?? "/");
+      navigate(safeRedirect(searchParams.get("redirect")), { replace: true });
     }
-  }, [profile, router, searchParams]);
+  }, [profile, navigate, searchParams]);
 
   // admin 密码后端规则为长度 8–72；此处提前拦下过短输入。
   const canSubmit = isValidAccount(account) && password.length >= 8 && !loading;
@@ -53,7 +67,8 @@ export function AdminLoginForm() {
         display_name: auth.admin.display_name,
         level: auth.level
       });
-      router.push(searchParams.get("redirect") ?? "/");
+      // 用 replace：登录成功后不把 /login 留在历史，避免「后退」回到登录页。
+      navigate(safeRedirect(searchParams.get("redirect")), { replace: true });
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
       setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
@@ -63,57 +78,62 @@ export function AdminLoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm">
-        <h1 className="mb-1 text-2xl font-bold text-gray-900">平台后台</h1>
-        <p className="mb-8 text-sm text-gray-400">请使用管理员账号登录</p>
+    <div className="flex min-h-screen items-center justify-center bg-muted px-4">
+      <Card className="w-full max-w-sm p-8">
+        <h1 className="mb-1 text-2xl font-bold text-foreground">平台后台</h1>
+        <p className="mb-8 text-sm text-muted-foreground">
+          请使用管理员账号登录
+        </p>
 
         <div className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm text-gray-700">
-              手机号 / 邮箱
-            </label>
-            <input
+          <div className="space-y-1.5">
+            <Label htmlFor="account">手机号 / 邮箱</Label>
+            <Input
+              id="account"
               type="text"
               placeholder="请输入手机号或邮箱"
               value={account}
               onChange={(e) => setAccount(e.target.value)}
-              className={INPUT_CLASS}
             />
           </div>
-          <div>
-            <label className="mb-1 block text-sm text-gray-700">密码</label>
+          <div className="space-y-1.5">
+            <Label htmlFor="password">密码</Label>
             <div className="relative">
-              <input
+              <Input
+                id="password"
                 type={showPassword ? "text" : "password"}
                 placeholder="请输入登录密码"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                className={`${INPUT_CLASS} pr-12`}
+                className="pr-10"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 aria-label={showPassword ? "隐藏密码" : "显示密码"}
               >
-                {showPassword ? "🙈" : "👁"}
+                {showPassword ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
               </button>
             </div>
           </div>
 
-          {error && <p className="text-sm text-red-500">{error}</p>}
+          {error && <p className="text-sm text-destructive">{error}</p>}
 
-          <button
+          <Button
             onClick={handleLogin}
             disabled={!canSubmit}
-            className="w-full rounded-lg bg-blue-600 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+            className="w-full"
           >
             {loading ? "登录中..." : "登录"}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

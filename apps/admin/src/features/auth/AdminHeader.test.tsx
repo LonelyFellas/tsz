@@ -2,10 +2,10 @@ import type { AdminProfile } from "@tsz/api-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockPush = vi.fn();
+const mockNavigate = vi.fn();
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush })
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => mockNavigate
 }));
 
 vi.mock("@/lib/auth", async () => {
@@ -53,7 +53,9 @@ describe("AdminHeader", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/login"));
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true })
+    );
     expect(mockLogout).toHaveBeenCalledTimes(1);
     expect(mockSetToken).toHaveBeenCalledWith(null);
     expect(useAuthStore.getState().profile).toBeNull();
@@ -66,7 +68,9 @@ describe("AdminHeader", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
 
-    await waitFor(() => expect(mockPush).toHaveBeenCalledWith("/login"));
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true })
+    );
     expect(mockSetToken).toHaveBeenCalledWith(null);
   });
 });
