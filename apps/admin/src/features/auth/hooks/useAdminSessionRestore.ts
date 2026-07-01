@@ -1,7 +1,10 @@
-"use client";
-
 import { useEffect } from "react";
 import { api, tokens, useAuthStore } from "@/lib/auth";
+
+// 在途去重：StrictMode 下 dev 会双跑挂载 effect，若不拦会并发发两次
+// refresh + profile，可能撞上后端的 refresh token 轮换互相踩踏。用共享 promise
+// 合并「同时在途」的调用；结算后释放，后续（极少见的）重新挂载可再探一次。
+let restorePromise: Promise<void> | null = null;
 
 /**
  * 页面刷新后 access token 丢失（仅存内存），通过 admin refresh cookie 静默恢复会话。
@@ -13,7 +16,8 @@ export function useAdminSessionRestore() {
   const setHydrated = useAuthStore((s) => s.setHydrated);
 
   useEffect(() => {
-    tokens
+    // zustand 的 action 引用稳定，可安全在只创建一次的 promise 里闭包捕获。
+    restorePromise ??= tokens
       .refreshTokens()
       .then(() => api.profile())
       .then((profile) => {
@@ -24,6 +28,8 @@ export function useAdminSessionRestore() {
       })
       .finally(() => {
         setHydrated(true);
+        // 结算后释放在途标记，让后续重新挂载能再发起一次恢复。
+        restorePromise = null;
       });
   }, [setProfile, setHydrated]);
 }

@@ -1,7 +1,5 @@
-"use client";
-
 import { useEffect, type ReactNode } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
 
 /**
@@ -16,20 +14,24 @@ import { useAuthStore } from "@/lib/auth";
 export function AdminRouteGuard({ children }: { children: ReactNode }) {
   const profile = useAuthStore((s) => s.profile);
   const hydrated = useAuthStore((s) => s.hydrated);
-  const router = useRouter();
-  const pathname = usePathname();
+  const navigate = useNavigate();
+  const location = useLocation();
+  // 完整回跳目标：含 query 与 hash，否则登录后会丢掉筛选/分页/锚点等上下文。
+  const redirectTo = `${location.pathname}${location.search}${location.hash}`;
 
   const needsLogin = hydrated && !profile;
 
   useEffect(() => {
     if (needsLogin) {
-      router.replace(`/login?redirect=${encodeURIComponent(pathname)}`);
+      navigate(`/login?redirect=${encodeURIComponent(redirectTo)}`, {
+        replace: true
+      });
     }
-  }, [needsLogin, pathname, router]);
+  }, [needsLogin, redirectTo, navigate]);
 
   if (!hydrated || needsLogin) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-gray-400">
+      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
         加载中...
       </div>
     );

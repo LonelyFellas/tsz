@@ -2,12 +2,14 @@ import type { AdminProfile } from "@tsz/api-client";
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockReplace = vi.fn();
-const mockPush = vi.fn();
+const mockNavigate = vi.fn();
 
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ replace: mockReplace, push: mockPush }),
-  usePathname: () => "/users"
+// 可变 location：便于验证回跳保留 query/hash。
+let mockLocation = { pathname: "/users", search: "", hash: "" };
+
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => mockNavigate,
+  useLocation: () => mockLocation
 }));
 
 // 提供真实 admin store（驱动各门禁态）。
@@ -32,6 +34,7 @@ function setState(s: Partial<ReturnType<typeof useAuthStore.getState>>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockLocation = { pathname: "/users", search: "", hash: "" };
   setState({ profile: null, level: null, hydrated: false });
 });
 
@@ -54,8 +57,28 @@ describe("AdminRouteGuard", () => {
         <div>后台内容</div>
       </AdminRouteGuard>
     );
-    expect(mockReplace).toHaveBeenCalledWith("/login?redirect=%2Fusers");
+    expect(mockNavigate).toHaveBeenCalledWith("/login?redirect=%2Fusers", {
+      replace: true
+    });
     expect(screen.queryByText("后台内容")).not.toBeInTheDocument();
+  });
+
+  it("回跳保留 query 与 hash", () => {
+    mockLocation = {
+      pathname: "/users",
+      search: "?tab=teachers&page=3",
+      hash: "#top"
+    };
+    setState({ hydrated: true, profile: null });
+    render(
+      <AdminRouteGuard>
+        <div>后台内容</div>
+      </AdminRouteGuard>
+    );
+    expect(mockNavigate).toHaveBeenCalledWith(
+      "/login?redirect=%2Fusers%3Ftab%3Dteachers%26page%3D3%23top",
+      { replace: true }
+    );
   });
 
   it("已登录的 admin：渲染受保护内容", () => {
@@ -66,6 +89,6 @@ describe("AdminRouteGuard", () => {
       </AdminRouteGuard>
     );
     expect(screen.getByText("后台内容")).toBeInTheDocument();
-    expect(mockReplace).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 });

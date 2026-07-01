@@ -8,31 +8,23 @@ WORKDIR /app
 # China mirror for npm tarballs — big speed win on a mainland ECS. Override with
 # --build-arg NPM_REGISTRY=https://registry.npmjs.org for the default registry.
 ARG NPM_REGISTRY=https://registry.npmmirror.com
-ENV npm_config_registry=$NPM_REGISTRY \
-    NEXT_TELEMETRY_DISABLED=1
+ENV npm_config_registry=$NPM_REGISTRY
 
-# ---- build stage: install all deps, build only @tsz/admin ----
+# ---- build stage: install all deps, build only @tsz/admin (Vite → static dist) ----
 FROM base AS build
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --frozen-lockfile
-# Persist Next's + turbo's compiler caches across builds so a rebuild after a
-# small change recompiles incrementally instead of from scratch.
-RUN --mount=type=cache,id=next-admin,target=/app/apps/admin/.next/cache \
-    --mount=type=cache,id=turbo,target=/app/.turbo \
+# Persist turbo's cache across builds so a rebuild after a small change is fast.
+RUN --mount=type=cache,id=turbo,target=/app/.turbo \
     pnpm --filter @tsz/admin build
 
-# ---- runtime stage: standalone server only ----
-FROM base AS runner
-ENV NODE_ENV=production \
-    PORT=3001 \
-    HOSTNAME=0.0.0.0
-RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
-# standalone output (with outputFileTracingRoot=repo root) lays files out under
-# apps/admin/.next/standalone/<repo-relative paths>, so server.js ends up at
-# apps/admin/server.js and the pruned node_modules at the root.
-COPY --from=build --chown=nextjs:nodejs /app/apps/admin/.next/standalone ./
-COPY --from=build --chown=nextjs:nodejs /app/apps/admin/.next/static ./apps/admin/.next/static
-USER nextjs
+# ---- runtime stage: nginx serving the static SPA on :3001 ----
+# admin 是纯客户端 SPA，无需 Node 运行时；用 nginx 托管静态产物即可。
+# 用 nginx-unprivileged 变体：容器以非 root（uid 101）运行 master+worker，pid/temp/cache
+# 路径已预置为该用户可写，与 apps/web 的非 root 约定一致。监听 3001（>1024）非特权端口，
+# 无需 root 即可绑定。静态文件与 conf 由 COPY 以 root 写入、对 nginx 用户只读，足够。
+FROM nginxinc/nginx-unprivileged:1.27-alpine AS runner
+COPY apps/admin/deploy/nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/apps/admin/dist /usr/share/nginx/html
 EXPOSE 3001
-CMD ["node", "apps/admin/server.js"]

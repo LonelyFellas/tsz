@@ -1,27 +1,55 @@
 import type { Config } from "tailwindcss";
 
-// 语义色：值来自 CSS 变量（见 globals.css 的 :root）。
-// admin 仅浅色（不做暗黑切换），但共享的 @tsz/ui 组件用了这些语义类,
-// 故此处必须同样声明,否则按钮/卡片颜色会落空。值与 web 的浅色一致。
-const semantic = (name: string) => `rgb(var(--color-${name}) / <alpha-value>)`;
-
+// shadcn/ui 的 Tailwind 配置（仅浅色）。颜色映射到 hsl(var(--*))，值见 globals.css。
+// 用 extend 保留 Tailwind 默认调色板（gray/blue 等仍可用）。content 扫描本 app 与
+// @tsz/ui 的 shadcn 组件目录（仅 components/，不含 root 的旧手写 Button/Card）。
 const config: Config = {
-  content: ["./src/**/*.{ts,tsx}", "../../packages/ui/src/**/*.{ts,tsx}"],
+  content: [
+    "./index.html",
+    "./src/**/*.{ts,tsx}",
+    "../../packages/ui/src/components/**/*.{ts,tsx}"
+  ],
   theme: {
     extend: {
       colors: {
-        background: semantic("background"),
-        surface: semantic("surface"),
-        muted: semantic("muted"),
-        foreground: semantic("foreground"),
-        "foreground-muted": semantic("foreground-muted"),
-        "foreground-subtle": semantic("foreground-subtle"),
-        border: semantic("border"),
-        primary: semantic("primary"),
-        "primary-foreground": semantic("primary-foreground"),
-        "primary-muted": semantic("primary-muted"),
-        success: semantic("success"),
-        danger: semantic("danger")
+        border: "hsl(var(--border))",
+        input: "hsl(var(--input))",
+        ring: "hsl(var(--ring))",
+        background: "hsl(var(--background))",
+        foreground: "hsl(var(--foreground))",
+        primary: {
+          DEFAULT: "hsl(var(--primary))",
+          foreground: "hsl(var(--primary-foreground))"
+        },
+        secondary: {
+          DEFAULT: "hsl(var(--secondary))",
+          foreground: "hsl(var(--secondary-foreground))"
+        },
+        destructive: {
+          DEFAULT: "hsl(var(--destructive))",
+          foreground: "hsl(var(--destructive-foreground))"
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))"
+        },
+        accent: {
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))"
+        },
+        popover: {
+          DEFAULT: "hsl(var(--popover))",
+          foreground: "hsl(var(--popover-foreground))"
+        },
+        card: {
+          DEFAULT: "hsl(var(--card))",
+          foreground: "hsl(var(--card-foreground))"
+        }
+      },
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)"
       }
     }
   },

@@ -1,6 +1,7 @@
+import { Button } from "@tsz/ui/components";
 import { StatCard, type StatItem } from "@/features/dashboard/StatCard";
 
-// 看板数据当前为占位，待 /admin 统计接口落地后改为服务端拉取。
+// 看板数据当前为占位，待 /admin 统计接口落地后接 TanStack Query 拉取。
 const USER_STATS: StatItem[] = [
   { label: "累计", value: "12335" },
   { label: "今日", value: "234" },
@@ -29,7 +30,7 @@ const COIN_STATS: StatItem[] = [
   { label: "本月", value: "100" }
 ];
 
-export default function AdminHome() {
+export function HomePage() {
   return (
     <div>
       <h1 className="sr-only">首页数据</h1>
@@ -41,13 +42,17 @@ export default function AdminHome() {
           title="天生币"
           items={COIN_STATS}
           action={
-            <div className="flex items-center gap-4 text-sm">
-              <button className="font-medium text-blue-600 hover:text-blue-700">
+            <div className="flex items-center gap-2">
+              <Button variant="link" size="sm" className="h-auto p-0">
                 发放
-              </button>
-              <button className="text-gray-400 hover:text-gray-600">
+              </Button>
+              <Button
+                variant="link"
+                size="sm"
+                className="h-auto p-0 text-muted-foreground"
+              >
                 扣除
-              </button>
+              </Button>
             </div>
           }
         />
