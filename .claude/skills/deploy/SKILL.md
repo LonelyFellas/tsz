@@ -15,6 +15,8 @@ description: 把已合入 main 的前端(web+admin+nginx)部署到 tshb-test 测
   （`git@gitee.com:tshb_1/tshb-react.git`），不是 GitHub——服务器在国内，拉 Gitee 快。
 - 本地仓库的 `origin` 是**双 push URL**（GitHub + Gitee 镜像）：`git push origin main`
   会同时推两边；但 **GitHub 上合并 PR 只更新 GitHub，Gitee 不会自动同步**。
+  为此有 CI 自动镜像（`.github/workflows/mirror-gitee.yml`，main 更新时自动推 Gitee，
+  依赖仓库 secret `GITEE_MIRROR_URL`）——第 3 步先验证它是否已同步，没同步才手动补。
 - 部署脚本：仓库根的 [deploy.sh](../../../deploy.sh)（服务器上执行）。它做四件事：
   `git pull --ff-only` → `docker compose -f docker-compose.prod.yml up -d --build`
   → **restart nginx**（重建的 web/admin 容器换了 IP，nginx 静态 `proxy_pass` 缓存旧 IP
@@ -47,16 +49,19 @@ gh api repos/{owner}/{repo}/commits/$(git rev-parse origin/main)/check-runs \
   main 的 CI 没过，附上失败的 check 名与链接（`gh run list --commit <sha>`），等修复后重来。
 - 若该提交没有任何 check（如纯文档提交未触发 workflow）→ 说明情况后可继续，由用户判断。
 
-### 3. 同步 Gitee main（关键前置，跳过必 502 于「拉不到新代码」）
-服务器只认 Gitee。GitHub 刚合并的 PR 必须手动 ff 到 Gitee：
+### 3. 确认 Gitee main 已同步（关键前置，跳过必栽在「服务器拉不到新代码」）
+服务器只认 Gitee。CI 的 mirror-gitee workflow 会在 main 更新时自动推 Gitee，**先验证**：
 ```bash
-git fetch origin
-git switch main && git merge --ff-only origin/main
-git push origin main   # 双 push URL,GitHub no-op + Gitee ff
+git ls-remote gitee refs/heads/main   # 应与 git rev-parse origin/main 一致
 ```
-- 若 `--ff-only` 失败（本地 main 有私货）→ 停下告知用户，绝不 force。
-- 推完可反向核对：`ssh tshb-test 'cd /opt/tshb-react && git fetch && git log -1 --oneline origin/main'`
-  应与 GitHub main 一致。
+- 一致 → 已同步，直接进第 4 步。
+- 不一致（mirror 未配 secret / 跑挂了）→ 手动 ff 补推：
+  ```bash
+  git fetch origin
+  git switch main && git merge --ff-only origin/main
+  git push origin main   # 双 push URL,GitHub no-op + Gitee ff
+  ```
+  若 `--ff-only` 失败（本地 main 有私货）→ 停下告知用户，绝不 force。
 
 ### 4. 执行部署
 ```bash
@@ -87,7 +92,7 @@ ssh tshb-test 'cd /opt/tshb-react && ./deploy.sh'
 | `git pull --ff-only` 失败 | 服务器仓库被人改过/分叉。**停下告知用户**，不要在服务器上 reset --hard |
 | 部署后 502 | nginx 缓存旧上游 IP。`ssh tshb-test 'cd /opt/tshb-react && docker compose -f docker-compose.prod.yml restart nginx'` |
 | 健康检查超时 | 脚本已自动打印 nginx/web/admin 最后 40 行日志，从日志定位；Next 冷启动本身可能要一会儿 |
-| 服务器上没新代码 | 十有八九是忘了第 2 步（Gitee 没同步），回去补 |
+| 服务器上没新代码 | 十有八九是 Gitee 没同步（mirror 没跑成又没手动补），回第 3 步核对 |
 | 公网带域名 Host 返回 403 | 阿里云对未备案域名的拦截(请求不进 nginx 日志),非部署故障;服务器本机验证即可 |
 | `/docs` 打不开 | 那是后端 Swagger 的代理，后端(tshb-go)的事,不归本 skill 管,提醒用户即可 |
 

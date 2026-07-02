@@ -1,0 +1,45 @@
+name: Mirror to Gitee
+
+# GitHub 上合并 PR 只更新 GitHub 的 main;而测试服务器(/opt/tshb-react)只拉 Gitee 镜像。
+# 之前每次部署前都要人工把 main ff 推到 Gitee(deploy skill 第 3 步),漏了必然
+# 「服务器拉不到新代码」。本 workflow 在 main 更新时自动推 Gitee,消灭这步手动同步。
+#
+# 需要配置仓库 secret `GITEE_MIRROR_URL`,值为带凭证的 HTTPS 地址:
+#   https://<Gitee用户名>:<Gitee私人令牌>@gitee.com/tshb_1/tshb-react.git
+# (令牌在 Gitee「设置 → 私人令牌」创建,勾选 projects 权限即可。)
+# 未配置该 secret 时 job 直接跳过不报错,继续沿用手动同步。
+
+on:
+  push:
+    branches: [main]
+  # 手动触发入口:验证 secret 配置、或镜像失败后手动补跑。
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 同一时刻只跑一个镜像任务,后到的排队而非取消(每次 main 更新都该被推过去)。
+concurrency:
+  group: mirror-gitee
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Gitee 侧需要完整历史才能 fast-forward,浅克隆推过去会被拒。
+          fetch-depth: 0
+
+      - name: Push main to Gitee (fast-forward only)
+        env:
+          GITEE_MIRROR_URL: ${{ secrets.GITEE_MIRROR_URL }}
+        run: |
+          if [ -z "$GITEE_MIRROR_URL" ]; then
+            echo "::notice::GITEE_MIRROR_URL secret 未配置,跳过镜像(部署前需手动同步 Gitee)。"
+            exit 0
+          fi
+          # 不带 --force:若 Gitee 侧分叉(被人直接改过),让推送失败暴露问题,而不是静默覆盖。
+          git push "$GITEE_MIRROR_URL" HEAD:main
