@@ -1,6 +1,20 @@
+import { Spin, Typography } from "antd";
 import { createBrowserRouter } from "react-router-dom";
+import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { RouteErrorPage } from "@/pages/RouteError";
 import { RootProviders } from "./providers";
+
+// 首屏兜底：路由全部走 route.lazy，首个匹配的 chunk 就绪前 react-router 需要
+// HydrateFallback（缺省会告警）。渲染在 RootProviders 之外（无 ConfigProvider，
+// antd token 走默认值），视觉与门禁加载态一致，启动时不闪变。
+function BootFallback() {
+  return (
+    <FullscreenCenter>
+      <Spin size="small" />
+      <Typography.Text type="secondary">加载中...</Typography.Text>
+    </FullscreenCenter>
+  );
+}
 
 // 路由树：RootProviders（Query + 会话恢复）为根 layout，包住登录页与受保护后台壳。
 // (console) 分组 → ConsoleLayout 这个 pathless layout route（门禁 + 侧栏 + 顶栏）。
@@ -15,6 +29,7 @@ export const router = createBrowserRouter([
     // 兜底：任一子路由渲染/loader 抛错（含 lazy chunk 加载失败）时渲染此页，
     // 而非 react-router 的空白默认错误页。
     errorElement: <RouteErrorPage />,
+    hydrateFallbackElement: <BootFallback />,
     children: [
       {
         path: "/login",
@@ -40,9 +55,10 @@ export const router = createBrowserRouter([
             })
           },
           {
-            path: "words/create",
+            // 词条编辑页:创建(POST 得到草稿壳)与编辑存量词条都进这里,按 wordId 加载整棵树。
+            path: "words/:wordId/edit",
             lazy: async () => ({
-              Component: (await import("@/pages/WordCreate")).WordCreatePage
+              Component: (await import("@/pages/WordEdit")).WordEditPage
             })
           },
           {

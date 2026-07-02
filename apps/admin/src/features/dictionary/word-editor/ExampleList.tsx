@@ -1,11 +1,12 @@
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button, Divider, Flex, Form, Input, Typography } from "antd";
+import { defaultExample } from "./mapping";
 import { VoiceActions } from "./VoiceActions";
 import { SENTENCE_MAX } from "./widths";
 
 const { Text } = Typography;
 
-// —— 多维例句：某个词义下的例句列表（纯文本 + 语音操作）。———————————————————————
+// —— 多维例句：某个词义下的例句列表(文本快照;弱引用例句模块属后续功能)。——————————————
 export function ExampleList({ senseName }: { senseName: number }) {
   return (
     <>
@@ -25,7 +26,7 @@ export function ExampleList({ senseName }: { senseName: number }) {
                 <div style={{ width: 20, color: "#888", flexShrink: 0 }}>
                   {idx + 1}
                 </div>
-                <Form.Item name={[ex.name]} noStyle>
+                <Form.Item name={[ex.name, "text"]} noStyle>
                   <Input
                     placeholder="…centre the picture on the wall."
                     style={{ flex: 1, minWidth: 0, maxWidth: SENTENCE_MAX }}
@@ -45,7 +46,7 @@ export function ExampleList({ senseName }: { senseName: number }) {
             <Button
               type="dashed"
               icon={<PlusOutlined />}
-              onClick={() => add("")}
+              onClick={() => add(defaultExample())}
               style={{ marginInlineStart: 28 }}
             >
               增加例句

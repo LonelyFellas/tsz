@@ -1,12 +1,27 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { HomePage } from "./Home";
 import { ReviewsPage } from "./Reviews";
 import { UsersPage } from "./Users";
 import { WordListsPage } from "./WordLists";
 import { WordsPage } from "./Words";
+
+// 智能词库页走真实数据层(React Query + api.words),烟雾测试只验渲染,
+// 把请求端点 mock 成稳定响应,避免触网。
+vi.mock("@/lib/auth", () => ({
+  api: {
+    words: {
+      list: vi.fn().mockResolvedValue({
+        words: [],
+        page: { page: 1, page_size: 20, total: 0 }
+      }),
+      stats: vi.fn().mockResolvedValue({ total: 0, today: 0, month: 0 })
+    }
+  }
+}));
 
 // 平台后台各模块页。烟雾测试保证：页面能正常渲染、关键内容正确，
 // 守住「导入错误 / 渲染时抛错」这类回归；待其余模块功能落地后在此补充业务测试。
@@ -39,9 +54,11 @@ describe("admin 页面烟雾测试", () => {
     // 可访问名（jsdom 下大量 getComputedStyle）导致极慢。
     render(
       <MemoryRouter>
-        <AntApp>
-          <WordsPage />
-        </AntApp>
+        <QueryClientProvider client={new QueryClient()}>
+          <AntApp>
+            <WordsPage />
+          </AntApp>
+        </QueryClientProvider>
       </MemoryRouter>
     );
     expect(screen.getByText("创建单词")).toBeInTheDocument();

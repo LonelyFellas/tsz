@@ -5,7 +5,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import yaml from "js-yaml";
+// 具名导入而非 default:js-yaml 是 CJS,Node 25 起 ESM 互操作不再合成 default 导出。
+import { load } from "js-yaml";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source =
@@ -16,7 +17,7 @@ const out = resolve(here, "../src/openapi.snapshot.json");
 
 const API_PREFIX = "/api/v1";
 
-const spec = yaml.load(readFileSync(source, "utf8"));
+const spec = load(readFileSync(source, "utf8"));
 if (!spec?.paths) {
   throw new Error(`spec 无 paths 字段: ${source}`);
 }

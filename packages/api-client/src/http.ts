@@ -18,21 +18,34 @@ export interface HttpClientOptions {
 export class HttpError extends Error {
   constructor(
     public status: number,
-    message: string
+    message: string,
+    /** 422 发布完整性检查的逐条违规(词库对接文档 §3.4);其余错误为空。 */
+    public details: string[] = []
   ) {
     super(message);
     this.name = "HttpError";
   }
 }
 
-async function parseError(res: Response): Promise<string> {
+/** 422 发布完整性检查:带 details 的 HttpError。 */
+export function isIncompleteHttpError(
+  err: unknown
+): err is HttpError & { details: string[] } {
+  return err instanceof HttpError && err.status === 422;
+}
+
+async function parseError(
+  res: Response
+): Promise<{ message: string; details: string[] }> {
   try {
-    const body = (await res.json()) as { error?: string };
-    if (body.error) return body.error;
+    const body = (await res.json()) as { error?: string; details?: string[] };
+    if (body.error) {
+      return { message: body.error, details: body.details ?? [] };
+    }
   } catch {
     // ignore
   }
-  return res.statusText;
+  return { message: res.statusText, details: [] };
 }
 
 export function createHttpClient({
@@ -72,7 +85,8 @@ export function createHttpClient({
     }
 
     if (!res.ok) {
-      throw new HttpError(res.status, await parseError(res));
+      const { message, details } = await parseError(res);
+      throw new HttpError(res.status, message, details);
     }
 
     // 204 No Content

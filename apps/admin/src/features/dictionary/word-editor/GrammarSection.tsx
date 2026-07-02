@@ -1,19 +1,22 @@
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button, Card, Flex, Form, Input, Typography } from "antd";
-import { shownDialects } from "../editorConstants";
+import type { Dialect } from "@tsz/types";
+import { DIALECT_LABEL, shownDialects } from "../editorConstants";
+import { defaultGrammarRow } from "./mapping";
 import { SectionTitle } from "./SectionTitle";
 import { VoiceActions } from "./VoiceActions";
 import { SENTENCE_MAX } from "./widths";
 
 const { Text } = Typography;
 
-// —— 语法结构：编号列表，每条按方言各一行例句 + 语音操作。未区分方言时用单一「默认」行。——
+// —— 语法结构：编号列表，每条按方言各一行措辞 + 语音操作。未区分方言时用单一 common 行。——
+// 措辞文本存于 [row, "texts", dialect];variantIds/variantRich 是隐藏簿记,保存时用。
 export function GrammarSection({
   posName,
   dialects
 }: {
   posName: number;
-  dialects: string[];
+  dialects: Dialect[];
 }) {
   const shown = shownDialects(dialects);
   return (
@@ -37,9 +40,9 @@ export function GrammarSection({
                         style={{ marginBottom: 6 }}
                       >
                         <Text style={{ width: 32, color: "#0071e3" }} strong>
-                          {dialect}
+                          {DIALECT_LABEL[dialect]}
                         </Text>
-                        <Form.Item name={[item.name, dialect]} noStyle>
+                        <Form.Item name={[item.name, "texts", dialect]} noStyle>
                           <Input
                             placeholder="请完善语法结构"
                             style={{
@@ -64,7 +67,7 @@ export function GrammarSection({
               <Button
                 type="dashed"
                 icon={<PlusOutlined />}
-                onClick={() => add()}
+                onClick={() => add(defaultGrammarRow())}
                 style={{ marginInlineStart: 32 }}
               >
                 增加语法结构
