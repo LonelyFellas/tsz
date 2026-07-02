@@ -1,10 +1,19 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ConsoleSidebar } from "./ConsoleSidebar";
 
-// 侧栏依赖 react-router 的 Link + useLocation，用 MemoryRouter 提供路由上下文，
-// initialEntries 控制当前路径以验证高亮分支。
+// useNavigate 用 spy 替换以断言「点击已落地模块 → 跳转」；useLocation 等保留真实实现。
+const { mockNavigate } = vi.hoisted(() => ({ mockNavigate: vi.fn() }));
+vi.mock("react-router-dom", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router-dom")>();
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+
+beforeEach(() => mockNavigate.mockClear());
+
+// 侧栏依赖 react-router 的 useLocation/useNavigate，用 MemoryRouter 提供路由上下文，
+// initialEntries 控制当前路径。侧栏已改为 antd Menu，断言其菜单项与禁用态。
 function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -31,26 +40,52 @@ describe("ConsoleSidebar", () => {
     }
   });
 
-  it("在首页时把「首页」标记为可跳转并高亮当前路由", () => {
-    renderAt("/");
-    const home = screen.getByRole("link", { name: "首页" });
-    expect(home).toHaveAttribute("href", "/");
-    expect(home.className).toContain("text-primary");
-  });
+  it("分类分组默认收起，展开后已落地模块可点、未落地模块禁用", () => {
+    renderAt("/words");
+    // 分类默认收起：子项初始不在可访问树中。
+    expect(screen.queryByRole("menuitem", { name: "智能词库" })).toBeNull();
 
-  it("不在首页时首页链接不高亮", () => {
-    renderAt("/somewhere");
-    const home = screen.getByRole("link", { name: "首页" });
-    expect(home.className).not.toContain("text-primary");
-  });
-
-  it("未实现模块渲染为禁用态条目（非链接）", () => {
-    renderAt("/");
-    // 教师管理无 href，应不是链接。
+    // 展开「词库管理」分组后，智能词库（已挂真实路由）可点。
+    fireEvent.click(screen.getByText("词库管理"));
     expect(
-      screen.queryByRole("link", { name: "教师管理" })
-    ).not.toBeInTheDocument();
-    const teacher = screen.getByText("教师管理");
-    expect(teacher.className).toContain("cursor-not-allowed");
+      screen.getByRole("menuitem", { name: "智能词库" })
+    ).toBeInTheDocument();
+
+    // 展开「用户管理」分组后，教师管理（尚未落地）为禁用态。
+    fireEvent.click(screen.getByText("用户管理"));
+    expect(screen.getByRole("menuitem", { name: "教师管理" })).toHaveAttribute(
+      "aria-disabled",
+      "true"
+    );
+  });
+
+  it("点击已落地模块跳转其路由并回调 onNavigate", () => {
+    const onNavigate = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <ConsoleSidebar onNavigate={onNavigate} />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByText("词库管理"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "智能词库" }));
+    expect(mockNavigate).toHaveBeenCalledWith("/words");
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+  });
+
+  it("未传 onNavigate 时点击已落地模块仍安全跳转", () => {
+    // onNavigate 缺省：进入跳转分支后 onNavigate?.() 应短路不抛错。
+    renderAt("/");
+    fireEvent.click(screen.getByText("词表管理"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "智能词表" }));
+    expect(mockNavigate).toHaveBeenCalledWith("/wordlists");
+  });
+
+  it("收起态隐藏站名、仅保留图标", () => {
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <ConsoleSidebar collapsed />
+      </MemoryRouter>
+    );
+    expect(screen.queryByText("天生会背")).toBeNull();
   });
 });

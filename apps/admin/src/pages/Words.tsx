@@ -1,4 +1,6 @@
-// 词库管理:创建单词 → 填写内容 → 完成创建。
+import { SmartDictionary } from "@/features/dictionary/SmartDictionary";
+
+// 词库管理 → 智能词库：搜索 + 表格 + 词条增删改查（当前对接 Mock 数据）。
 export function WordsPage() {
-  return <h1 className="text-xl font-bold">词库管理</h1>;
+  return <SmartDictionary />;
 }

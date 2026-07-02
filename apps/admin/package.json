@@ -12,11 +12,14 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@ant-design/icons": "^6.3.2",
     "@tanstack/react-query": "^5.101.2",
     "@tsz/api-client": "workspace:*",
     "@tsz/shared": "workspace:*",
     "@tsz/types": "workspace:*",
     "@tsz/ui": "workspace:*",
+    "antd": "^6.5.0",
+    "dayjs": "^1.11.21",
     "lucide-react": "^0.469.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
