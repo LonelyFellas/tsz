@@ -18,7 +18,7 @@ commit-msg:
 
 pre-push:
   # lefthook 默认用 `git diff HEAD @{push}` 取「待推送文件」作为下面命令的触发依据。
-  # 但新分支首次推送时 @{push} 尚不存在 → 文件集为空 → typecheck/test/e2e 被静默跳过
+  # 但新分支首次推送时 @{push} 尚不存在 → 文件集为空 → typecheck/test 被静默跳过
   # (开 PR 最常见的「首推」场景下,本地这道校验形同虚设,只能靠 CI 兜底)。
   # 自定义 files 命令补 fallback:@{push} → @{u} → 与 main 的三点 diff → 全部跟踪文件,
   # 保证首推也能算出文件并触发校验;无待推送提交时仍返回空、照常跳过,不会过度触发。
@@ -30,5 +30,5 @@ pre-push:
     # 避免覆盖率不达标的改动本地全绿、推到 CI 才红。
     test:
       run: pnpm test:cov
-    e2e:
-      run: pnpm --filter @tsz/e2e test:e2e
+    # e2e 不在 pre-push 跑:Playwright 要起服务、全量跑数分钟,是每次推送的最大等待项,
+    # 且 CI 的 e2e job 跑同一套件兜底(合 main 仍有门禁)。推送前想自查可手动 pnpm test:e2e。
