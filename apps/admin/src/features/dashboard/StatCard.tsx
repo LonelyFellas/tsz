@@ -1,5 +1,5 @@
+import { Card, Flex, Statistic, Typography } from "antd";
 import type { ReactNode } from "react";
-import { Card } from "@tsz/ui/components";
 
 export interface StatItem {
   label: string;
@@ -14,24 +14,25 @@ interface StatCardProps {
 }
 
 /**
- * 首页数据看板的统计卡：标题行 + 一排「大数值 / 灰标签」指标。
+ * 首页数据看板的统计卡：标题行 + 一排指标（antd Statistic：灰标签在上、大数值在下）。
  * 数值目前为占位，后续接 /admin 统计接口后由父级传入。
+ * Card 的 title 只是普通 div，包一层 Typography.Title 保住 heading 语义。
  */
 export function StatCard({ title, items, action }: StatCardProps) {
   return (
-    <Card className="p-6">
-      <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-sm font-medium text-muted-foreground">{title}</h2>
-        {action}
-      </div>
-      <dl className="flex justify-between gap-4">
+    <Card
+      title={
+        <Typography.Title level={5} style={{ margin: 0 }}>
+          {title}
+        </Typography.Title>
+      }
+      extra={action}
+    >
+      <Flex justify="space-between" gap={16} wrap>
         {items.map((item) => (
-          <div key={item.label}>
-            <dd className="text-3xl font-bold text-foreground">{item.value}</dd>
-            <dt className="mt-2 text-sm text-muted-foreground">{item.label}</dt>
-          </div>
+          <Statistic key={item.label} title={item.label} value={item.value} />
         ))}
-      </dl>
+      </Flex>
     </Card>
   );
 }

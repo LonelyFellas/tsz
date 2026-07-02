@@ -42,6 +42,9 @@ function authResponse(level: "admin" | "super_admin"): AdminAuthResponse {
   };
 }
 
+// antd 两字按钮会自动插空格（「登 录」），用正则兼容。
+const LOGIN_BUTTON = /^登\s?录$/;
+
 function fillAndSubmit() {
   fireEvent.change(screen.getByPlaceholderText("请输入手机号或邮箱"), {
     target: { value: "13800138000" }
@@ -49,7 +52,7 @@ function fillAndSubmit() {
   fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
     target: { value: "secret123" }
   });
-  fireEvent.click(screen.getByRole("button", { name: "登录" }));
+  fireEvent.click(screen.getByRole("button", { name: LOGIN_BUTTON }));
 }
 
 beforeEach(() => {
@@ -141,9 +144,10 @@ describe("AdminLoginForm", () => {
     render(<AdminLoginForm />);
     const pwd = screen.getByPlaceholderText("请输入登录密码");
     expect(pwd).toHaveAttribute("type", "password");
-    fireEvent.click(screen.getByRole("button", { name: "显示密码" }));
+    // Input.Password 的显隐开关是 @ant-design/icons 图标（role=img + aria-label）。
+    fireEvent.click(screen.getByRole("img", { name: "eye-invisible" }));
     expect(pwd).toHaveAttribute("type", "text");
-    fireEvent.click(screen.getByRole("button", { name: "隐藏密码" }));
+    fireEvent.click(screen.getByRole("img", { name: "eye" }));
     expect(pwd).toHaveAttribute("type", "password");
   });
 
@@ -178,7 +182,7 @@ describe("AdminLoginForm", () => {
     fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
       target: { value: "short12" } // 7 位
     });
-    expect(screen.getByRole("button", { name: "登录" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: LOGIN_BUTTON })).toBeDisabled();
     fireEvent.keyDown(screen.getByPlaceholderText("请输入登录密码"), {
       key: "Enter"
     });
@@ -193,7 +197,7 @@ describe("AdminLoginForm", () => {
     fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
       target: { value: "secret123" }
     });
-    expect(screen.getByRole("button", { name: "登录" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: LOGIN_BUTTON })).toBeDisabled();
   });
 
   it("登录请求进行中：按钮置「登录中」并禁用，防止重复提交", async () => {
@@ -207,7 +211,8 @@ describe("AdminLoginForm", () => {
     fillAndSubmit();
 
     // 进行中：文案变更 + 禁用，二次点击不会再发请求。
-    const btn = await screen.findByRole("button", { name: "登录中..." });
+    // loading 图标（role=img, aria-label="loading"）会并入按钮可访问名，用正则匹配。
+    const btn = await screen.findByRole("button", { name: /登录中\.\.\./ });
     expect(btn).toBeDisabled();
     fireEvent.click(btn);
     expect(mockLogin).toHaveBeenCalledTimes(1);

@@ -1,4 +1,5 @@
-import { Button } from "@tsz/ui/components";
+import { Button, Col, Row, Space } from "antd";
+import type { ReactNode } from "react";
 import { StatCard, type StatItem } from "@/features/dashboard/StatCard";
 
 // 看板数据当前为占位，待 /admin 统计接口落地后接 TanStack Query 拉取。
@@ -30,33 +31,43 @@ const COIN_STATS: StatItem[] = [
   { label: "本月", value: "100" }
 ];
 
+interface DashboardCard {
+  title: string;
+  items: StatItem[];
+  action?: ReactNode;
+}
+
+const CARDS: DashboardCard[] = [
+  { title: "用户数据", items: USER_STATS },
+  { title: "任务数据", items: TASK_STATS },
+  { title: "智能词库", items: WORDBANK_STATS },
+  {
+    title: "天生币",
+    items: COIN_STATS,
+    action: (
+      <Space>
+        <Button type="link" size="small" style={{ padding: 0 }}>
+          发放
+        </Button>
+        <Button type="link" size="small" style={{ padding: 0 }}>
+          扣除
+        </Button>
+      </Space>
+    )
+  }
+];
+
 export function HomePage() {
   return (
     <div>
       <h1 className="sr-only">首页数据</h1>
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <StatCard title="用户数据" items={USER_STATS} />
-        <StatCard title="任务数据" items={TASK_STATS} />
-        <StatCard title="智能词库" items={WORDBANK_STATS} />
-        <StatCard
-          title="天生币"
-          items={COIN_STATS}
-          action={
-            <div className="flex items-center gap-2">
-              <Button variant="link" size="sm" className="h-auto p-0">
-                发放
-              </Button>
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto p-0 text-muted-foreground"
-              >
-                扣除
-              </Button>
-            </div>
-          }
-        />
-      </div>
+      <Row gutter={[20, 20]}>
+        {CARDS.map(({ title, items, action }) => (
+          <Col key={title} xs={24} lg={12}>
+            <StatCard title={title} items={items} action={action} />
+          </Col>
+        ))}
+      </Row>
     </div>
   );
 }
