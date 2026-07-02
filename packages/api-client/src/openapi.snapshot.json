@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend openapi.yaml via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-go/docs/openapi.yaml",
-  "_generatedAt": "2026-06-28T07:29:23.162Z",
+  "_generatedAt": "2026-07-02T05:43:27.183Z",
   "paths": {
     "/healthz": ["get"],
     "/auth/register": ["post"],
@@ -37,6 +37,13 @@
     "/admin/coin/deduct": ["post"],
     "/admin/coin/leaderboard": ["get"],
     "/admin/users/{userId}/coin/ledger": ["get"],
-    "/admin/audit-logs": ["get"]
+    "/admin/audit-logs": ["get"],
+    "/admin/words": ["get", "post"],
+    "/admin/words/stats": ["get"],
+    "/admin/words/batch-delete": ["post"],
+    "/admin/words/related-search": ["get"],
+    "/admin/words/{wordId}": ["delete", "get"],
+    "/admin/words/{wordId}/content": ["put"],
+    "/admin/words/{wordId}/publish": ["post"]
   }
 }

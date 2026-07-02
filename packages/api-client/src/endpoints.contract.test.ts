@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createAdminEndpoints } from "./admin";
 import { createEndpoints } from "./endpoints";
 import snapshot from "./openapi.snapshot.json";
 
@@ -36,13 +37,16 @@ const PENDING = new Set<string>([
 // 调用端点函数时给位置参数填的哨兵值,使 `/wordlists/${id}` 这类模板渲染成 `/wordlists/_`。
 const SENTINEL = "_";
 
-/** 录下 createEndpoints 真正发出的 (method, path),不触网。 */
-function collectCalls(): { method: string; path: string }[] {
+/** 录下端点工厂真正发出的 (method, path),不触网。prefix 用于补回 baseUrl 里的段。 */
+function collectCalls(
+  factory: (http: never) => unknown,
+  prefix = ""
+): { method: string; path: string }[] {
   const calls: { method: string; path: string }[] = [];
   const record =
     (method: string) =>
     (path: string): unknown => {
-      calls.push({ method, path });
+      calls.push({ method, path: `${prefix}${path}` });
       return undefined;
     };
   const http = {
@@ -66,7 +70,7 @@ function collectCalls(): { method: string; path: string }[] {
       Object.values(node).forEach(walk);
     }
   };
-  walk(createEndpoints(http as never));
+  walk(factory(http as never));
   return calls;
 }
 
@@ -85,7 +89,11 @@ function normalize(call: { method: string; path: string }) {
   return { method: call.method, path, key: `${call.method} ${path}` };
 }
 
-const calls = collectCalls();
+// admin 端点绑定在 baseUrl=/api/v1/admin 上,相对路径须补回 /admin 前缀才能对上快照。
+const calls = [
+  ...collectCalls((http) => createEndpoints(http)),
+  ...collectCalls((http) => createAdminEndpoints(http), "/admin")
+];
 const matchers = specMatchers();
 
 function inSpec(method: string, path: string): boolean {

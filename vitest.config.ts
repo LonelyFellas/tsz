@@ -37,10 +37,13 @@ export default defineConfig({
         "apps/web/src/lib/constants.ts",
         // 根布局渲染 <html>/<body> 装配壳，不纳入单测。
         "apps/admin/src/app/layout.tsx",
-        // 智能词库当前为 Mock 占位实现（未对接后端），逻辑将随接入真实接口重写；
-        // 现阶段由 WordEditor/pages 冒烟测试与后续 e2e 保底，暂不纳入单测覆盖门槛。
-        // TODO(智能词库): 对接后端后移除本排除项并补齐单测至 90% 门槛。
-        "apps/admin/src/features/dictionary/**"
+        // 智能词库已接真实接口:纯逻辑层(mapping/listQuery/labels/editorConstants)
+        // 纳入 90% 门槛;下面两类仍排除——
+        // ① .tsx 表单/表格装配与交互组件:由 WordEditor/pages 冒烟测试保底,
+        //    TODO(智能词库): 补组件级交互测试(保存冲突 409、发布 422 详情、关联词选择)后移除;
+        // ② api.ts 是 React Query 薄装配(useQuery/useMutation 包 api.words.*),无业务分支。
+        "apps/admin/src/features/dictionary/**/*.tsx",
+        "apps/admin/src/features/dictionary/api.ts"
       ],
       // 按目录分别设门槛：包内逻辑 100%；应用业务逻辑层 90%。
       thresholds: {

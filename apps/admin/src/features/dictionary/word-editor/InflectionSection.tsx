@@ -14,12 +14,14 @@ import {
   Typography
 } from "antd";
 import type { ReactNode } from "react";
+import type { Dialect } from "@tsz/types";
 import {
-  FORM_CATEGORY_OPTIONS,
-  PRONOUNCE_STYLE_OPTIONS,
-  shownDialects,
-  toOptions
+  DIALECT_LABEL,
+  FORM_TYPE_OPTIONS,
+  PRON_STYLE_OPTIONS,
+  shownDialects
 } from "../editorConstants";
+import { defaultInflectionRow } from "./mapping";
 import { SectionTitle } from "./SectionTitle";
 import { VoiceActions } from "./VoiceActions";
 import { TABLE_MAX } from "./widths";
@@ -35,13 +37,14 @@ function ColHead({ children, flex }: { children: ReactNode; flex: string }) {
 }
 
 // —— 词形变化：某个词性下、按方言分块，每块一张表（首行固定为「原形」+ 动态词形行）。——
-// 未区分方言时用单一「默认」块。多列行较宽，窄屏整块横向滚动、超宽屏封顶避免过散。
+// 一行 = 一个读音;相邻且「类别+拼写」相同的行保存时合并为同一词形的多个读音。
+// 未区分方言时用单一 common 块。多列行较宽，窄屏整块横向滚动、超宽屏封顶避免过散。
 export function InflectionSection({
   posName,
   dialects
 }: {
   posName: number;
-  dialects: string[];
+  dialects: Dialect[];
 }) {
   const shown = shownDialects(dialects);
   return (
@@ -54,7 +57,8 @@ export function InflectionSection({
           style={{ marginBottom: 12, background: "#f5f8ff" }}
         >
           <Text strong>
-            方言类型 <Text style={{ color: "#0071e3" }}>{dialect}</Text>
+            方言类型{" "}
+            <Text style={{ color: "#0071e3" }}>{DIALECT_LABEL[dialect]}</Text>
           </Text>
           <Form.List name={[posName, "inflections", dialect]}>
             {(rows, { add, remove }) => (
@@ -82,7 +86,7 @@ export function InflectionSection({
                           <Form.Item name={[row.name, "category"]} noStyle>
                             <Select
                               placeholder="词形类别"
-                              options={toOptions(FORM_CATEGORY_OPTIONS)}
+                              options={FORM_TYPE_OPTIONS}
                               style={{ width: "100%" }}
                             />
                           </Form.Item>
@@ -108,7 +112,7 @@ export function InflectionSection({
                       </Form.Item>
                       <Form.Item name={[row.name, "style"]} noStyle>
                         <Select
-                          options={toOptions(PRONOUNCE_STYLE_OPTIONS)}
+                          options={PRON_STYLE_OPTIONS}
                           style={{ flex: "0 0 96px", width: 96 }}
                         />
                       </Form.Item>
@@ -117,7 +121,9 @@ export function InflectionSection({
                           type="text"
                           size="small"
                           icon={<PlusCircleOutlined />}
-                          onClick={() => add({ style: "正常" }, idx + 1)}
+                          onClick={() =>
+                            add(defaultInflectionRow("base"), idx + 1)
+                          }
                         />
                         <Button
                           type="text"
@@ -133,7 +139,7 @@ export function InflectionSection({
                   <Button
                     type="dashed"
                     icon={<PlusOutlined />}
-                    onClick={() => add({ style: "正常" })}
+                    onClick={() => add(defaultInflectionRow("base"))}
                     style={{ marginTop: 4 }}
                   >
                     增加词形

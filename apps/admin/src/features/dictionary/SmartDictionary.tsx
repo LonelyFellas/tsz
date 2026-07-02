@@ -5,6 +5,7 @@ import {
   SearchOutlined
 } from "@ant-design/icons";
 import {
+  Alert,
   App,
   Breadcrumb,
   Button,
@@ -20,208 +21,149 @@ import {
   Typography
 } from "antd";
 import type { TableColumnsType } from "antd";
-import dayjs, { type Dayjs } from "dayjs";
-import { useMemo, useState } from "react";
+import dayjs from "dayjs";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { toOptions } from "./editorConstants";
-import { MOCK_STATS, MOCK_WORDS } from "./mock";
+import type { AdminWordKind, AdminWordListItem, CefrLevel } from "@tsz/types";
+import { isIncompleteHttpError } from "@tsz/api-client/http";
+import {
+  useBatchDeleteWords,
+  useDeleteWord,
+  usePublishWord,
+  useWordList,
+  useWordStats
+} from "./api";
+import { CreateWordModal } from "./CreateWordModal";
+import { DetailsList } from "./DetailsList";
 import {
   CEFR_OPTIONS,
-  POS_OPTIONS,
-  type Cefr,
-  type DictWord,
-  type WordType
-} from "./types";
-import { WordFormModal, type WordFormValues } from "./WordFormModal";
+  cefrColor,
+  KIND_LABEL,
+  KIND_OPTIONS,
+  POS_TAG_ABBR,
+  POS_TAG_OPTIONS,
+  STATUS_LABEL,
+  STATUS_OPTIONS
+} from "./labels";
+import { toListQuery, type WordFilterValues } from "./listQuery";
 
 const { RangePicker } = DatePicker;
-
-interface Filters {
-  keyword?: string;
-  meaning?: string;
-  type?: WordType;
-  pos?: string;
-  difficulty?: Cefr;
-  range?: [Dayjs, Dayjs] | null;
-}
-
-// CEFR 难度着色：A 绿、B 蓝、C 金，便于一眼分级。
-function cefrColor(level: Cefr): string {
-  if (level.startsWith("A")) return "green";
-  if (level.startsWith("B")) return "blue";
-  return "gold";
-}
-
-const typeOpts = [
-  { label: "单词", value: "单词" },
-  { label: "短语", value: "短语" }
-];
-const posOpts = toOptions(POS_OPTIONS);
-const cefrOpts = toOptions(CEFR_OPTIONS);
-
-type ModalState =
-  | { open: false }
-  | {
-      open: true;
-      fixedType: WordType;
-      record: DictWord | null;
-      readOnly: boolean;
-    };
 
 export function SmartDictionary() {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
-  const [form] = Form.useForm<Filters>();
+  const [form] = Form.useForm<WordFilterValues>();
 
-  const [rows, setRows] = useState<DictWord[]>(MOCK_WORDS);
-  const [filters, setFilters] = useState<Filters>({});
+  // 服务端分页 + 筛选:三者共同构成列表查询,任何变化都触发重取。
+  const [filters, setFilters] = useState<WordFilterValues>({});
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
-  const [modalState, setModalState] = useState<ModalState>({ open: false });
+  const [createKind, setCreateKind] = useState<AdminWordKind | null>(null);
 
-  // 客户端过滤（Mock 阶段）。真实实现应把 filters 作为查询参数交后端分页返回。
-  const filtered = useMemo(() => {
-    return rows.filter((w) => {
-      const { keyword, meaning, type, pos, difficulty, range } = filters;
-      if (keyword) {
-        const k = keyword.trim().toLowerCase();
-        if (
-          !w.word.toLowerCase().includes(k) &&
-          !w.creator.includes(keyword.trim())
-        )
-          return false;
-      }
-      if (meaning && !w.meaning.includes(meaning.trim())) return false;
-      if (type && w.type !== type) return false;
-      if (pos && !w.pos.includes(pos as never)) return false;
-      if (difficulty && !w.difficulty.includes(difficulty)) return false;
-      if (range && range[0] && range[1]) {
-        const created = dayjs(w.createdAt);
-        if (
-          created.isBefore(range[0], "day") ||
-          created.isAfter(range[1], "day")
-        )
-          return false;
-      }
-      return true;
-    });
-  }, [rows, filters]);
+  const listQuery = useWordList(toListQuery(filters, page, pageSize));
+  const stats = useWordStats();
+  const publishWord = usePublishWord();
+  const deleteWord = useDeleteWord();
+  const batchDelete = useBatchDeleteWords();
 
-  const openCreate = (fixedType: WordType) =>
-    setModalState({ open: true, fixedType, record: null, readOnly: false });
-  const openEdit = (record: DictWord) =>
-    setModalState({
-      open: true,
-      fixedType: record.type,
-      record,
-      readOnly: false
-    });
-  const openView = (record: DictWord) =>
-    setModalState({
-      open: true,
-      fixedType: record.type,
-      record,
-      readOnly: true
-    });
-  const closeModal = () => setModalState({ open: false });
+  const rows = listQuery.data?.words ?? [];
+  const total = listQuery.data?.page.total ?? 0;
 
-  const nowStamp = () => dayjs().format("YYYY-MM-DD HH:mm");
-
-  const handleSubmit = (values: WordFormValues) => {
-    if (modalState.open && modalState.record) {
-      const id = modalState.record.id;
-      setRows((prev) =>
-        prev.map((w) =>
-          w.id === id ? { ...w, ...values, updatedAt: nowStamp() } : w
-        )
-      );
-      message.success("已保存修改");
-    } else {
-      setRows((prev) => {
-        const nextId = prev.reduce((m, w) => Math.max(m, w.id), 0) + 1;
-        const created: DictWord = {
-          id: nextId,
-          ...values,
-          creator: "当前管理员",
-          status: "草稿",
-          createdAt: nowStamp(),
-          updatedAt: nowStamp()
-        };
-        return [created, ...prev];
-      });
-      message.success(`已创建${values.type}`);
-    }
-    closeModal();
+  const applyFilters = (values: WordFilterValues) => {
+    setFilters(values);
+    setPage(1);
+    setSelectedKeys([]);
   };
 
-  const publish = (record: DictWord) => {
-    setRows((prev) =>
-      prev.map((w) =>
-        w.id === record.id
-          ? { ...w, status: "已发布", updatedAt: nowStamp() }
-          : w
-      )
-    );
-    message.success(`「${record.word}」已发布`);
+  const publish = (record: AdminWordListItem) => {
+    publishWord.mutate(record.id, {
+      onSuccess: () => message.success(`「${record.headword}」已发布`),
+      onError: (err) => {
+        // 422:发布完整性检查未过(V1–V10),details 逐条列出违规。
+        if (isIncompleteHttpError(err)) {
+          modal.warning({
+            title: `「${record.headword}」内容不完整,无法发布`,
+            content: <DetailsList details={err.details} />,
+            okText: "去完善",
+            onOk: () => navigate(`/words/${record.id}/edit`)
+          });
+          return;
+        }
+        message.error(err.message);
+      }
+    });
   };
 
-  const removeOne = (record: DictWord) => {
+  const removeOne = (record: AdminWordListItem) => {
     modal.confirm({
-      title: `删除「${record.word}」？`,
-      content: "删除后不可恢复。",
+      title: `删除「${record.headword}」?`,
+      content: "整棵词条树将一并删除,不可恢复。",
       okText: "删除",
       okButtonProps: { danger: true },
       cancelText: "取消",
-      onOk: () => {
-        setRows((prev) => prev.filter((w) => w.id !== record.id));
-        setSelectedKeys((prev) => prev.filter((k) => k !== record.id));
-        message.success("已删除");
-      }
+      onOk: () =>
+        deleteWord
+          .mutateAsync(record.id)
+          .then(() => {
+            setSelectedKeys((prev) => prev.filter((k) => k !== record.id));
+            message.success("已删除");
+          })
+          .catch((err: unknown) => {
+            message.error(err instanceof Error ? err.message : "删除失败");
+          })
     });
   };
 
   const removeSelected = () => {
     if (selectedKeys.length === 0) return;
     modal.confirm({
-      title: `删除选中的 ${selectedKeys.length} 个词条？`,
-      content: "删除后不可恢复。",
+      title: `删除选中的 ${selectedKeys.length} 个词条?`,
+      content: "整棵词条树将一并删除,不可恢复。",
       okText: "删除",
       okButtonProps: { danger: true },
       cancelText: "取消",
-      onOk: () => {
-        const set = new Set(selectedKeys);
-        setRows((prev) => prev.filter((w) => !set.has(w.id)));
-        setSelectedKeys([]);
-        message.success("已删除所选词条");
-      }
+      onOk: () =>
+        batchDelete
+          .mutateAsync(selectedKeys.map(String))
+          .then(({ deleted }) => {
+            setSelectedKeys([]);
+            message.success(`已删除 ${deleted} 个词条`);
+          })
+          .catch((err: unknown) => {
+            message.error(err instanceof Error ? err.message : "删除失败");
+          })
     });
   };
 
-  const columns: TableColumnsType<DictWord> = [
-    { title: "ID", dataIndex: "id", width: 64, fixed: "left" },
+  const columns: TableColumnsType<AdminWordListItem> = [
     {
       title: "词汇",
-      dataIndex: "word",
-      width: 130,
+      dataIndex: "headword",
+      width: 140,
+      fixed: "left",
       render: (w: string) => <span style={{ fontWeight: 600 }}>{w}</span>
     },
     {
       title: "类型",
-      dataIndex: "type",
+      dataIndex: "kind",
       width: 80,
-      render: (t: WordType) => (
-        <Tag color={t === "短语" ? "geekblue" : "default"}>{t}</Tag>
+      render: (k: AdminWordKind) => (
+        <Tag color={k === "phrase" ? "geekblue" : "default"}>
+          {KIND_LABEL[k]}
+        </Tag>
       )
     },
-    { title: "释义", dataIndex: "meaning", width: 180, ellipsis: true },
+    { title: "释义", dataIndex: "gloss", width: 180, ellipsis: true },
     {
       title: "基本词性",
-      dataIndex: "pos",
+      dataIndex: "pos_list",
       width: 180,
-      render: (pos: DictWord["pos"]) => (
+      render: (list: AdminWordListItem["pos_list"]) => (
         <Space size={[4, 4]} wrap>
-          {pos.map((p) => (
+          {list.map((p) => (
             <Tag key={p} style={{ margin: 0 }}>
-              {p}
+              {POS_TAG_ABBR[p]}
             </Tag>
           ))}
         </Space>
@@ -229,9 +171,9 @@ export function SmartDictionary() {
     },
     {
       title: "难度",
-      dataIndex: "difficulty",
+      dataIndex: "levels",
       width: 170,
-      render: (levels: Cefr[]) => (
+      render: (levels: CefrLevel[]) => (
         <Space size={[4, 4]} wrap>
           {levels.map((lv) => (
             <Tag key={lv} color={cefrColor(lv)} style={{ margin: 0 }}>
@@ -241,37 +183,50 @@ export function SmartDictionary() {
         </Space>
       )
     },
-    { title: "创建时间", dataIndex: "createdAt", width: 150 },
-    { title: "创建人", dataIndex: "creator", width: 100 },
+    {
+      title: "创建时间",
+      dataIndex: "created_at",
+      width: 150,
+      render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
+    },
+    { title: "创建人", dataIndex: "created_by_name", width: 100 },
     {
       title: "状态",
       dataIndex: "status",
       width: 90,
-      render: (s: DictWord["status"]) => (
-        <Tag color={s === "已发布" ? "success" : "default"}>{s}</Tag>
+      render: (s: AdminWordListItem["status"]) => (
+        <Tag color={s === "published" ? "success" : "default"}>
+          {STATUS_LABEL[s]}
+        </Tag>
       )
     },
-    { title: "更新时间", dataIndex: "updatedAt", width: 150 },
+    {
+      title: "更新时间",
+      dataIndex: "updated_at",
+      width: 150,
+      render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
+    },
     {
       title: "操作",
       key: "action",
-      width: 200,
+      width: 160,
       fixed: "right",
-      render: (_: unknown, record: DictWord) => (
+      render: (_: unknown, record: AdminWordListItem) => (
         <Space size={4}>
-          <Button type="link" size="small" onClick={() => openView(record)}>
-            查看
+          <Button
+            type="link"
+            size="small"
+            onClick={() => navigate(`/words/${record.id}/edit`)}
+          >
+            编辑
           </Button>
           <Button
             type="link"
             size="small"
-            disabled={record.status === "已发布"}
+            disabled={record.status === "published"}
             onClick={() => publish(record)}
           >
             发布
-          </Button>
-          <Button type="link" size="small" onClick={() => openEdit(record)}>
-            编辑
           </Button>
           <Button
             type="link"
@@ -294,7 +249,7 @@ export function SmartDictionary() {
         <Form
           form={form}
           layout="inline"
-          onFinish={(v) => setFilters(v)}
+          onFinish={applyFilters}
           style={{
             rowGap: 12,
             columnGap: 8,
@@ -309,13 +264,13 @@ export function SmartDictionary() {
               style={{ width: 180 }}
             />
           </Form.Item>
-          <Form.Item name="meaning" label="释义">
+          <Form.Item name="gloss" label="释义">
             <Input placeholder="请输入释义" allowClear style={{ width: 160 }} />
           </Form.Item>
-          <Form.Item name="type" label="类型">
+          <Form.Item name="kind" label="类型">
             <Select
               placeholder="请选择词汇类型"
-              options={typeOpts}
+              options={KIND_OPTIONS}
               allowClear
               style={{ width: 150 }}
             />
@@ -323,15 +278,23 @@ export function SmartDictionary() {
           <Form.Item name="pos" label="基本词性">
             <Select
               placeholder="请选择基本词性"
-              options={posOpts}
+              options={POS_TAG_OPTIONS}
               allowClear
               style={{ width: 140 }}
             />
           </Form.Item>
-          <Form.Item name="difficulty" label="难度">
+          <Form.Item name="level" label="难度">
             <Select
               placeholder="请选择难度"
-              options={cefrOpts}
+              options={CEFR_OPTIONS}
+              allowClear
+              style={{ width: 120 }}
+            />
+          </Form.Item>
+          <Form.Item name="status" label="状态">
+            <Select
+              placeholder="请选择状态"
+              options={STATUS_OPTIONS}
               allowClear
               style={{ width: 120 }}
             />
@@ -352,7 +315,7 @@ export function SmartDictionary() {
                 icon={<ReloadOutlined />}
                 onClick={() => {
                   form.resetFields();
-                  setFilters({});
+                  applyFilters({});
                 }}
               >
                 重置
@@ -374,17 +337,21 @@ export function SmartDictionary() {
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => navigate("/words/create")}
+              onClick={() => setCreateKind("word")}
             >
               创建单词
             </Button>
-            <Button icon={<PlusOutlined />} onClick={() => openCreate("短语")}>
+            <Button
+              icon={<PlusOutlined />}
+              onClick={() => setCreateKind("phrase")}
+            >
               创建短语
             </Button>
             <Button
               danger
               icon={<DeleteOutlined />}
               disabled={selectedKeys.length === 0}
+              loading={batchDelete.isPending}
               onClick={removeSelected}
             >
               删除{selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
@@ -392,47 +359,72 @@ export function SmartDictionary() {
           </Space>
           <Space size="large" wrap>
             <Typography.Text type="secondary">
-              累计智能词汇：
-              <Typography.Text strong>{MOCK_STATS.total}</Typography.Text>
+              累计智能词汇:
+              <Typography.Text strong>
+                {stats.data?.total ?? "-"}
+              </Typography.Text>
             </Typography.Text>
             <Typography.Text type="secondary">
-              今日创编：
-              <Typography.Text strong>{MOCK_STATS.today}</Typography.Text>
+              今日创编:
+              <Typography.Text strong>
+                {stats.data?.today ?? "-"}
+              </Typography.Text>
             </Typography.Text>
             <Typography.Text type="secondary">
-              本月创编：
-              <Typography.Text strong>{MOCK_STATS.month}</Typography.Text>
+              本月创编:
+              <Typography.Text strong>
+                {stats.data?.month ?? "-"}
+              </Typography.Text>
             </Typography.Text>
           </Space>
         </Flex>
 
-        <Table<DictWord>
+        {listQuery.isError && (
+          <Alert
+            type="error"
+            showIcon
+            style={{ marginBottom: 12 }}
+            title="词条列表加载失败"
+            description={listQuery.error.message}
+            action={
+              <Button size="small" onClick={() => void listQuery.refetch()}>
+                重试
+              </Button>
+            }
+          />
+        )}
+
+        <Table<AdminWordListItem>
           rowKey="id"
           size="middle"
           columns={columns}
-          dataSource={filtered}
+          dataSource={rows}
+          loading={listQuery.isPending}
           scroll={{ x: 1400 }}
           rowSelection={{
             selectedRowKeys: selectedKeys,
             onChange: setSelectedKeys
           }}
           pagination={{
+            current: page,
+            pageSize,
+            total,
             showSizeChanger: true,
             showTotal: (t) => `共 ${t} 条`,
-            defaultPageSize: 10,
-            pageSizeOptions: [10, 20, 50]
+            pageSizeOptions: [10, 20, 50, 100],
+            onChange: (nextPage, nextSize) => {
+              setPage(nextSize !== pageSize ? 1 : nextPage);
+              setPageSize(nextSize);
+            }
           }}
         />
       </Card>
 
-      {modalState.open && (
-        <WordFormModal
-          open={modalState.open}
-          fixedType={modalState.fixedType}
-          initial={modalState.record}
-          readOnly={modalState.readOnly}
-          onCancel={closeModal}
-          onSubmit={handleSubmit}
+      {createKind && (
+        <CreateWordModal
+          open
+          kind={createKind}
+          onClose={() => setCreateKind(null)}
         />
       )}
     </Flex>

@@ -1,5 +1,6 @@
 import { MinusCircleOutlined, PlusOutlined } from "@ant-design/icons";
 import { Button, Card, Flex, Form, Input } from "antd";
+import { newId } from "./mapping";
 import { SectionTitle } from "./SectionTitle";
 import { FIELD_MAX } from "./widths";
 
@@ -38,7 +39,7 @@ export function SenseRangesSection() {
             <Button
               type="dashed"
               icon={<PlusOutlined />}
-              onClick={() => add({ name: "" })}
+              onClick={() => add({ id: newId(), name: "" })}
               style={{ marginInlineStart: 32 }}
             >
               增加语义区间

@@ -3,10 +3,14 @@ import { Button, Flex } from "antd";
 
 // —— 底部 sticky 操作栏：贴内容区底部（不遮挡侧栏），随内容滚动固定在视口底部。————————
 export function EditorFooter({
+  saving,
+  publishing,
   onSaveDraft,
   onGenerateVoice,
   onSubmit
 }: {
+  saving?: boolean;
+  publishing?: boolean;
   onSaveDraft: () => void;
   onGenerateVoice: () => void;
   onSubmit: () => void;
@@ -27,11 +31,18 @@ export function EditorFooter({
         borderRadius: 8
       }}
     >
-      <Button onClick={onSaveDraft}>保存草稿</Button>
+      <Button loading={saving} onClick={onSaveDraft}>
+        保存
+      </Button>
       <Button icon={<ThunderboltFilled />} onClick={onGenerateVoice}>
         生成语音
       </Button>
-      <Button type="primary" icon={<ThunderboltFilled />} onClick={onSubmit}>
+      <Button
+        type="primary"
+        icon={<ThunderboltFilled />}
+        loading={publishing}
+        onClick={onSubmit}
+      >
         提交
       </Button>
     </Flex>

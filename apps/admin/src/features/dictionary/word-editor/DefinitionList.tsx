@@ -4,19 +4,50 @@ import {
   PlusOutlined
 } from "@ant-design/icons";
 import { Button, Divider, Flex, Form, Input, Select, Typography } from "antd";
+import { useMemo } from "react";
+import type { Dialect } from "@tsz/types";
 import {
-  MEANING_TYPE_OPTIONS,
+  DEF_TYPE_OPTIONS,
   SENSE_LEVEL_OPTIONS,
+  shownDialects,
   toOptions
 } from "../editorConstants";
-import { defaultDefinition } from "./defaults";
+import { defaultDefinition, type GrammarRow } from "./mapping";
 import { VoiceActions } from "./VoiceActions";
 import { FIELD_MAX, SENTENCE_MAX } from "./widths";
 
 const { Text } = Typography;
 
 // —— 多维释义：某个词义下的释义列表。每条 = 等级 + 释义类型 + 释义文本 + 关联语法结构。——
-export function DefinitionList({ senseName }: { senseName: number }) {
+// 语法结构下拉引用**同一 pos** 下的结构(存 id,显示编号+首个方言措辞)。
+export function DefinitionList({
+  posName,
+  senseName
+}: {
+  posName: number;
+  senseName: number;
+}) {
+  // ⚠️ preserve 必须开:GrammarRow 的 id/variantIds 没有对应 Form.Item(隐藏簿记),
+  // 默认 useWatch 只回已注册字段,拿不到 id 会让选项 value 变 undefined,点了也选不上。
+  const grammar = Form.useWatch<GrammarRow[] | undefined>(
+    ["posList", posName, "grammar"],
+    { preserve: true }
+  );
+  const dialects = Form.useWatch<Dialect[] | undefined>("dialects", {
+    preserve: true
+  });
+  // memo:词义下每行释义共用这份选项,别让无关字段的输入反复重建(Select 选项引用稳定)。
+  const grammarOptions = useMemo(() => {
+    const shown = shownDialects(dialects ?? []);
+    return (grammar ?? [])
+      .map((g, idx) => {
+        if (!g) return null;
+        const text = shown.map((d) => g.texts?.[d]).find((t) => t?.trim());
+        return { value: g.id, label: `${idx + 1}. ${text ?? "(未填写)"}` };
+      })
+      .filter((o): o is { value: string; label: string } => o !== null);
+  }, [grammar, dialects]);
+
   return (
     <>
       <Divider titlePlacement="start" style={{ margin: "8px 0 12px" }}>
@@ -43,9 +74,9 @@ export function DefinitionList({ senseName }: { senseName: number }) {
                         style={{ width: 80 }}
                       />
                     </Form.Item>
-                    <Form.Item name={[def.name, "type"]} noStyle>
+                    <Form.Item name={[def.name, "defType"]} noStyle>
                       <Select
-                        options={toOptions(MEANING_TYPE_OPTIONS)}
+                        options={DEF_TYPE_OPTIONS}
                         style={{ width: 120 }}
                       />
                     </Form.Item>
@@ -86,10 +117,10 @@ export function DefinitionList({ senseName }: { senseName: number }) {
                     >
                       语法结构
                     </Text>
-                    <Form.Item name={[def.name, "grammar"]} noStyle>
+                    <Form.Item name={[def.name, "grammarId"]} noStyle>
                       <Select
-                        placeholder="This is an English sentence."
-                        options={[]}
+                        placeholder="关联本词性下的语法结构(可空)"
+                        options={grammarOptions}
                         allowClear
                         style={{ flex: 1, minWidth: 0, maxWidth: SENTENCE_MAX }}
                       />

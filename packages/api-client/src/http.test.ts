@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createHttpClient, HttpError } from "./http";
+import { createHttpClient, HttpError, isIncompleteHttpError } from "./http";
 
 const fetchMock = vi.fn();
 
@@ -32,6 +32,14 @@ describe("HttpError", () => {
     expect(err.name).toBe("HttpError");
     expect(err.status).toBe(404);
     expect(err.message).toBe("not found");
+  });
+
+  it("isIncompleteHttpError:仅 422 的 HttpError 命中,其余错误不命中", () => {
+    expect(
+      isIncompleteHttpError(new HttpError(422, "incomplete", ["v1"]))
+    ).toBe(true);
+    expect(isIncompleteHttpError(new HttpError(409, "conflict"))).toBe(false);
+    expect(isIncompleteHttpError(new Error("boom"))).toBe(false);
   });
 });
 
@@ -175,14 +183,34 @@ describe("createHttpClient", () => {
     });
   });
 
-  it("非 2xx 且无 error 字段时回退到 statusText", async () => {
+  it("非 2xx 且无 error 字段时回退到 statusText,details 为空数组", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({}, { ok: false, status: 403, statusText: "Forbidden" })
     );
     const http = createHttpClient({ baseUrl: "" });
 
     await expect(http.get("/x")).rejects.toMatchObject({
-      message: "Forbidden"
+      message: "Forbidden",
+      details: []
+    });
+  });
+
+  it("422 发布完整性检查:error 之外还带 details 逐条违规", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          error: "word is incomplete",
+          details: ["frequency is required", "pos verb: at least one sense"]
+        },
+        { ok: false, status: 422 }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.post("/words/w-1/publish")).rejects.toMatchObject({
+      status: 422,
+      message: "word is incomplete",
+      details: ["frequency is required", "pos verb: at least one sense"]
     });
   });
 

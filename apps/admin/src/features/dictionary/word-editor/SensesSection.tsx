@@ -1,5 +1,5 @@
 import { Form, Tabs } from "antd";
-import { defaultSense } from "./defaults";
+import { defaultSense } from "./mapping";
 import { SectionTitle } from "./SectionTitle";
 import { SenseFields } from "./SenseFields";
 
@@ -7,6 +7,7 @@ import { SenseFields } from "./SenseFields";
 // Tabs 的 key 用 Form.List 的稳定 field.key（而非位置 name），删除中间项时不会错位；
 // onEdit 删除再由 key 反查 name 交给 remove。
 export function SensesSection({ posName }: { posName: number }) {
+  const form = Form.useFormInstance();
   return (
     <>
       <SectionTitle>多维词义</SectionTitle>
@@ -16,7 +17,8 @@ export function SensesSection({ posName }: { posName: number }) {
             type="editable-card"
             onEdit={(targetKey, action) => {
               if (action === "add") {
-                add(defaultSense());
+                // 交互约定(文档 §6):新建词义默认带出词条词频。
+                add(defaultSense(form.getFieldValue("frequency")));
                 return;
               }
               const target = senses.find((s) => String(s.key) === targetKey);
@@ -26,7 +28,7 @@ export function SensesSection({ posName }: { posName: number }) {
               key: String(sense.key),
               label: `词义 ${idx + 1}`,
               closable: senses.length > 1,
-              children: <SenseFields senseName={sense.name} />
+              children: <SenseFields posName={posName} senseName={sense.name} />
             }))}
           />
         )}
