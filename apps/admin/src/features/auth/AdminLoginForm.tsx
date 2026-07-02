@@ -1,9 +1,9 @@
 import { isValidAccount } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
-import { Button, Card, Input, Label } from "@tsz/ui/components";
-import { Eye, EyeOff } from "lucide-react";
+import { Alert, Button, Card, Form, Input, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { api, persistSession, useAuthStore } from "@/lib/auth";
 
 const LOGIN_ERRORS: Record<string, string> = {
@@ -30,10 +30,13 @@ function safeRedirect(raw: string | null): string {
   return "/";
 }
 
+// antd Form 在此只做布局（label/间距），不接管字段状态：
+// 1) 交互沿用「未达标只禁用按钮、不飘红」，用不上 rules 校验；
+// 2) Form.useWatch 在 antd v6 + React 19 的 jsdom 测试环境下不触发重渲染，
+//    受控 useState 是能被测试覆盖的可靠写法。
 export function AdminLoginForm() {
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -78,62 +81,54 @@ export function AdminLoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted px-4">
-      <Card className="w-full max-w-sm p-8">
-        <h1 className="mb-1 text-2xl font-bold text-foreground">平台后台</h1>
-        <p className="mb-8 text-sm text-muted-foreground">
+    <FullscreenCenter>
+      <Card style={{ width: "100%", maxWidth: 384 }}>
+        <Typography.Title level={3} style={{ marginBottom: 4 }}>
+          平台后台
+        </Typography.Title>
+        <Typography.Paragraph type="secondary" style={{ marginBottom: 24 }}>
           请使用管理员账号登录
-        </p>
+        </Typography.Paragraph>
 
-        <div className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="account">手机号 / 邮箱</Label>
+        <Form layout="vertical">
+          <Form.Item label="手机号 / 邮箱">
             <Input
-              id="account"
-              type="text"
               placeholder="请输入手机号或邮箱"
+              autoComplete="username"
               value={account}
               onChange={(e) => setAccount(e.target.value)}
             />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password">密码</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="请输入登录密码"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                className="pr-10"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                aria-label={showPassword ? "隐藏密码" : "显示密码"}
-              >
-                {showPassword ? (
-                  <EyeOff className="size-4" />
-                ) : (
-                  <Eye className="size-4" />
-                )}
-              </button>
-            </div>
-          </div>
+          </Form.Item>
+          <Form.Item label="密码">
+            <Input.Password
+              placeholder="请输入登录密码"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              onPressEnter={() => void handleLogin()}
+            />
+          </Form.Item>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && (
+            <Alert
+              type="error"
+              message={error}
+              showIcon
+              style={{ marginBottom: 16 }}
+            />
+          )}
 
           <Button
-            onClick={handleLogin}
+            type="primary"
+            block
+            loading={loading}
             disabled={!canSubmit}
-            className="w-full"
+            onClick={() => void handleLogin()}
           >
             {loading ? "登录中..." : "登录"}
           </Button>
-        </div>
+        </Form>
       </Card>
-    </div>
+    </FullscreenCenter>
   );
 }

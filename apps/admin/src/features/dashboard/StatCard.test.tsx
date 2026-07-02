@@ -13,7 +13,8 @@ describe("StatCard", () => {
     expect(
       screen.getByRole("heading", { name: "用户数据" })
     ).toBeInTheDocument();
-    expect(screen.getByText("12335")).toBeInTheDocument();
+    // antd Statistic 会给数字加千分位分隔。
+    expect(screen.getByText("12,335")).toBeInTheDocument();
     expect(screen.getByText("累计")).toBeInTheDocument();
     expect(screen.getByText("234")).toBeInTheDocument();
     expect(screen.getByText("今日")).toBeInTheDocument();

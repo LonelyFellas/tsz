@@ -1,5 +1,7 @@
+import { Spin, Typography } from "antd";
 import { useEffect, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { useAuthStore } from "@/lib/auth";
 
 /**
@@ -31,9 +33,10 @@ export function AdminRouteGuard({ children }: { children: ReactNode }) {
 
   if (!hydrated || needsLogin) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
-        加载中...
-      </div>
+      <FullscreenCenter>
+        <Spin size="small" />
+        <Typography.Text type="secondary">加载中...</Typography.Text>
+      </FullscreenCenter>
     );
   }
 
