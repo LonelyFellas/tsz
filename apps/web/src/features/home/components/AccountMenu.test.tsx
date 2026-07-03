@@ -1,4 +1,10 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { User } from "@tsz/types";
@@ -66,6 +72,31 @@ describe("AccountMenu", () => {
     render(<AccountMenu />);
     const img = screen.getByRole("img", { name: "Alice" });
     expect(img).toHaveAttribute("src", "https://example.com/a.png");
+  });
+
+  it("头像加载失败 → 回退首字母;avatar_url 更新(换头像)后自动重试新图", () => {
+    useUserStore.setState({
+      user: { ...USER, avatar_url: "https://example.com/old.png" }
+    });
+    render(<AccountMenu />);
+
+    // 旧图加载失败 → 回退首字母。
+    fireEvent.error(screen.getByRole("img", { name: "Alice" }));
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "账户菜单" })).toHaveTextContent(
+      "A"
+    );
+
+    // 换头像后 store 更新(URL 版本化必然不同)→ 失败记录不适用于新 URL,应重试渲染。
+    act(() => {
+      useUserStore.setState({
+        user: { ...USER, avatar_url: "https://example.com/new.png" }
+      });
+    });
+    expect(screen.getByRole("img", { name: "Alice" })).toHaveAttribute(
+      "src",
+      "https://example.com/new.png"
+    );
   });
 
   it("点击头像 → 展开菜单(退出登录 / 注销账号)", async () => {

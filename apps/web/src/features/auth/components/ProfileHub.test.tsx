@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { MeResponse } from "@tsz/api-client";
@@ -98,6 +98,25 @@ describe("ProfileHub — 渲染", () => {
     expect(
       await screen.findByText("资料加载失败,请刷新重试。")
     ).toBeInTheDocument();
+  });
+
+  it("有头像 → 渲染图片;加载失败 → 回退昵称首字母", async () => {
+    mockMe.mockResolvedValue(
+      meResponse({
+        user: userWith({ avatar_url: "https://example.com/a.png" })
+      })
+    );
+    render(<ProfileHub />);
+    await screen.findByText("Along");
+
+    const img = screen.getByRole("img", { name: "Along" });
+    expect(img).toHaveAttribute("src", "https://example.com/a.png");
+
+    fireEvent.error(img);
+    expect(
+      screen.queryByRole("img", { name: "Along" })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("A")).toBeInTheDocument();
   });
 });
 

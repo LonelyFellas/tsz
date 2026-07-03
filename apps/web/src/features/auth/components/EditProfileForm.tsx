@@ -2,24 +2,46 @@
 
 import type { MeResponse } from "@tsz/api-client";
 import { isEmail, isPhone } from "@tsz/shared";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import type { User } from "@tsz/types";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
 import { VARIANT_LABEL, displayNameOf } from "@/lib/user";
+import {
+  AVATAR_ACCEPT,
+  isAvatarStorageUnavailable,
+  uploadAvatar
+} from "../avatar";
 import { translateAuthError } from "../shared";
 
 // 精细化输入框:Apple 风圆角 + 品牌蓝聚焦环,贴合落地页设计体系。
 const INPUT_CLASS =
   "w-full rounded-2xl border border-border bg-muted/60 px-4 py-3 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/15";
 
-// 编辑资料:进入拉 /me 展示资料,支持改昵称 + 绑定/换绑邮箱或手机(两步:发码→确认)。
-// 头像上传后端未实现(OSS 依赖),本页置灰占位;等级/口音只读(改等级请联系客服)。
+// 编辑资料:进入拉 /me 展示资料,支持改昵称 + 绑定/换绑邮箱或手机(两步:发码→确认)、
+// 更换头像(OSS 预签名直传,流程在 ../avatar);等级/口音只读(改等级请联系客服)。
 // 错误文案对齐后端 /me 系列接口返回(权威来源见 Swagger /docs)。
 
 // 改昵称(PATCH /me)错误。
 const PROFILE_ERRORS: Record<string, string> = {
   "display name cannot be blank": "昵称需为 1–50 个字符",
+  "user not found": "账号不存在,请重新登录"
+};
+
+// 501 存储未开通的提示,「首次探测到」与「会话内已知」两条路径共用同一份。
+const AVATAR_UNAVAILABLE_MSG = "头像功能即将上线";
+
+// 头像上传三步流程错误(对接文档 §5;前端预检抛的文案与后端一致,共用此表)。
+const AVATAR_ERRORS: Record<string, string> = {
+  "unsupported avatar content type": "仅支持 JPG / PNG / WebP 格式图片",
+  "avatar file too large": "图片不能超过 5MB",
+  "avatar storage not configured": AVATAR_UNAVAILABLE_MSG,
+  "oss upload failed": "上传失败,请重试",
+  "avatar upload not completed": "上传未完成,请重试",
+  "invalid avatar key": "上传凭证已失效,请重试",
+  // confirm 500:暂存仍在,重试即可(§5 最后一行)。
+  "internal error": "保存失败,请重试",
   "user not found": "账号不存在,请重新登录"
 };
 
@@ -57,6 +79,13 @@ export function EditProfileForm() {
   const [contactError, setContactError] = useState("");
   const [codeError, setCodeError] = useState("");
   const [success, setSuccess] = useState(false);
+
+  // 头像上传。整个三步流程是一个不可重入的提交动作(uploading 期间按钮禁用)。
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  // 记录「哪个 URL」加载失败(与 AccountMenu 同模式):换头像后 URL 变化,新图自动重试。
+  const [avatarFailedUrl, setAvatarFailedUrl] = useState("");
 
   // 拉取资料(GET /me)。RouteGuard 已保证登录态。
   useEffect(() => {
@@ -101,7 +130,7 @@ export function EditProfileForm() {
 
   const { user, learning_settings } = me;
 
-  // 缺哪个绑哪个;两个都已绑定时按邮箱换绑(罕见,原型只覆盖单边)。
+  // 缺哪个绑哪个;两个都已绑定时按手机换绑(罕见,原型只覆盖单边)。
   const bindKind: "email" | "phone" = user.email == null ? "email" : "phone";
   const isEmailBind = bindKind === "email";
   const contactPlaceholder = isEmailBind ? "请输入邮箱号" : "请输入手机号";
@@ -127,18 +156,52 @@ export function EditProfileForm() {
   const avatarInitial = displayNameOf(user).charAt(0).toUpperCase();
 
   const canSendCode = contactFilled && countdown === 0 && !sending;
-  const canSubmit = (nameChanged || wantsBind) && !saving;
+  // !avatarUploading:保存与头像上传互斥,见 handleAvatar 的说明。
+  const canSubmit = (nameChanged || wantsBind) && !saving && !avatarUploading;
 
   function clearMessages() {
     setNameError("");
     setContactError("");
     setCodeError("");
+    setAvatarError("");
     setSuccess(false);
   }
 
+  // 服务端回传的 user 立即写入 store 与本页 me,头像/昵称/绑定共用。
+  function commit(u: User) {
+    setUser(u);
+    setMe((prev) => (prev ? { ...prev, user: u } : prev));
+  }
+
   function handleAvatar() {
+    // 与表单保存互斥:两条流程都用服务端回传的完整 user 快照 commit,
+    // 并发会互相覆盖(慢网上传中改昵称保存,后到的旧快照会盖掉新头像)。
+    if (avatarUploading || saving) return;
+    // 会话内已探测到存储未开通(501)→ 直接提示,不再弹选图、不再请求。
+    if (isAvatarStorageUnavailable()) {
+      clearMessages();
+      setAvatarError(AVATAR_UNAVAILABLE_MSG);
+      return;
+    }
+    // 注意此处不 clearMessages:用户弹出选图框又取消是常见路径,
+    // 不应清掉页面上已有的成功/错误提示;真正选了文件才清(下方)。
+    fileInputRef.current?.click();
+  }
+
+  async function handleAvatarChange(file: File | undefined) {
+    if (!file || avatarUploading || saving) return;
     clearMessages();
-    setNameError("头像功能即将上线");
+    setAvatarUploading(true);
+    try {
+      commit(await uploadAvatar(file));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "";
+      setAvatarError(
+        translateAuthError(msg, AVATAR_ERRORS, "头像上传失败,请稍后再试")
+      );
+    } finally {
+      setAvatarUploading(false);
+    }
   }
 
   async function handleSendCode() {
@@ -170,12 +233,8 @@ export function EditProfileForm() {
 
     setSaving(true);
     try {
-      // 每步成功后立即提交服务端回传的 user:即便后一步失败,
+      // 每步成功后立即 commit 服务端回传的 user:即便后一步失败,
       // 已落库的改动(如昵称)也会同步到本地 store/me,不会丢。
-      const commit = (u: typeof user) => {
-        setUser(u);
-        setMe((prev) => (prev ? { ...prev, user: u } : prev));
-      };
 
       // ① 昵称有改动才提交。
       if (nameChanged) {
@@ -230,25 +289,46 @@ export function EditProfileForm() {
       </div>
 
       <div className="rounded-3xl border border-border bg-surface p-8 shadow-xl shadow-black/5">
-        {/* 头像:占位,上传未实现 */}
+        {/* 头像:点击选图 → OSS 直传三步流程(../avatar) */}
         <div className="mb-7 flex flex-col items-center gap-3">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={AVATAR_ACCEPT}
+            className="hidden"
+            aria-label="选择头像图片"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              // 立即清空 value:同一张图重选(失败重试)也要触发 change。
+              e.target.value = "";
+              handleAvatarChange(file);
+            }}
+          />
           <button
             type="button"
             onClick={handleAvatar}
+            disabled={avatarUploading}
             aria-label="更换头像"
-            className="group relative h-24 w-24 transition active:scale-95"
+            aria-busy={avatarUploading}
+            className="group relative h-24 w-24 transition active:scale-95 disabled:cursor-wait"
           >
             <span className="block h-full w-full overflow-hidden rounded-full ring-1 ring-border">
-              {user.avatar_url ? (
+              {user.avatar_url && user.avatar_url !== avatarFailedUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={user.avatar_url}
                   alt="头像"
                   className="h-full w-full object-cover"
+                  onError={() => setAvatarFailedUrl(user.avatar_url)}
                 />
               ) : (
                 <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900 text-3xl font-semibold text-white">
                   {avatarInitial}
+                </span>
+              )}
+              {avatarUploading && (
+                <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40">
+                  <SpinnerIcon />
                 </span>
               )}
             </span>
@@ -256,6 +336,7 @@ export function EditProfileForm() {
               <CameraIcon />
             </span>
           </button>
+          {avatarError && <p className="text-sm text-danger">{avatarError}</p>}
           {topContact && (
             <p className="text-sm font-medium text-foreground-muted">
               {topContact}
@@ -389,6 +470,34 @@ export function EditProfileForm() {
         </form>
       </div>
     </div>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden
+      className="animate-spin text-white"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeOpacity="0.3"
+      />
+      <path
+        d="M21 12a9 9 0 0 0-9-9"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
 

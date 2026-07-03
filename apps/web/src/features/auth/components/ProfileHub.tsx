@@ -26,6 +26,8 @@ export function ProfileHub() {
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">(
     "idle"
   );
+  // 记录「哪个 URL」加载失败(与 AccountMenu 同模式):换头像后 URL 变化,新图自动重试。
+  const [avatarFailedUrl, setAvatarFailedUrl] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -97,12 +99,13 @@ export function ProfileHub() {
       {/* 资料卡 */}
       <div className="mb-4 flex items-center gap-5 rounded-3xl border border-border bg-surface p-6 shadow-xl shadow-black/5">
         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-full ring-1 ring-border">
-          {user.avatar_url ? (
+          {user.avatar_url && user.avatar_url !== avatarFailedUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={user.avatar_url}
               alt={displayName}
               className="h-full w-full object-cover"
+              onError={() => setAvatarFailedUrl(user.avatar_url)}
             />
           ) : (
             <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900 text-2xl font-semibold text-white">

@@ -10,7 +10,7 @@ export interface User {
   email?: string;
   /** 昵称(后端 display_name) */
   display_name: string;
-  /** 头像引用;当前后端恒为 "",前端用默认图兜底(OSS 上传未实现) */
+  /** 头像绝对地址(版本化,每次换头像 URL 都不同);未设置时为 "",前端用默认图兜底 */
   avatar_url: string;
   status: "active" | "disabled";
   roles: Role[];
