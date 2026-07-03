@@ -387,6 +387,30 @@ describe("EditProfileForm — 头像上传", () => {
     });
   });
 
+  it("上传中直接触发表单 submit(绕过禁用按钮) → 不发保存请求(互斥不只靠 disabled)", async () => {
+    let resolve!: (u: User) => void;
+    mockUploadAvatar.mockReturnValue(new Promise((r) => (resolve = r)));
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    const user = userEvent.setup();
+
+    const input = screen.getByDisplayValue("Alice");
+    await user.clear(input);
+    await user.type(input, "Bob");
+    await pickFile(user);
+
+    // requestSubmit()/回车隐式提交可绕过按钮 disabled,handleSubmit 必须自己拦。
+    fireEvent.submit(
+      screen.getByRole("button", { name: "确定" }).closest("form")!
+    );
+    expect(mockUpdate).not.toHaveBeenCalled();
+
+    resolve(userWith({ avatar_url: AVATAR_URL }));
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "确定" })).toBeEnabled();
+    });
+  });
+
   it("保存中 → 点「更换头像」不弹选图(反向互斥)", async () => {
     let resolve!: (v: { user: User }) => void;
     mockUpdate.mockReturnValue(new Promise((r) => (resolve = r)));

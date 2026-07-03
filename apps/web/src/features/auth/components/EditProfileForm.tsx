@@ -223,7 +223,9 @@ export function EditProfileForm() {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (saving) return;
+    // avatarUploading 同样拦截:互斥不能只靠按钮 disabled,
+    // 表单还能经 requestSubmit()/回车隐式提交触发,慢网下旧快照会盖掉新头像。
+    if (saving || avatarUploading) return;
     clearMessages();
 
     if (!nameChanged && !wantsBind) {

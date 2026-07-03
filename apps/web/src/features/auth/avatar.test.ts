@@ -113,6 +113,40 @@ describe("uploadAvatar — 三步流程", () => {
     expect(user).toBe(NEW_USER);
   });
 
+  it("超时对齐预签名有效期(expires_in 秒 → 毫秒)", async () => {
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    await uploadAvatar(fileOf("image/png"));
+    expect(timeoutSpy).toHaveBeenCalledWith(600_000);
+    timeoutSpy.mockRestore();
+  });
+
+  it("expires_in 为 0/缺失(后端契约漂移) → 兜底 600s,不至 0ms 立即中止", async () => {
+    mockCreate.mockResolvedValue({ upload: { ...UPLOAD, expires_in: 0 } });
+    const timeoutSpy = vi.spyOn(AbortSignal, "timeout");
+    await expect(uploadAvatar(fileOf("image/png"))).resolves.toBe(NEW_USER);
+    expect(timeoutSpy).toHaveBeenCalledWith(600_000);
+    timeoutSpy.mockRestore();
+  });
+
+  it("AbortSignal.timeout 缺失(旧 Safari/WebView) → 不设超时照常直传,不因特性缺失必挂", async () => {
+    // Safari 16 才有该静态方法;jsdom/Node 都有,手动移除模拟旧环境(同 PR #38 教训)。
+    const ctor = AbortSignal as unknown as {
+      timeout?: (ms: number) => AbortSignal;
+    };
+    const original = ctor.timeout;
+    ctor.timeout = undefined;
+    try {
+      const user = await uploadAvatar(fileOf("image/png"));
+      expect(user).toBe(NEW_USER);
+      expect(mockFetch).toHaveBeenCalledWith(
+        UPLOAD.url,
+        expect.objectContaining({ signal: undefined })
+      );
+    } finally {
+      ctor.timeout = original;
+    }
+  });
+
   it("OSS PUT 失败(403 过期等) → 抛错且不 confirm(旧 URL 不可续期,整体重来)", async () => {
     mockFetch.mockResolvedValue({ ok: false, status: 403 });
     await expect(uploadAvatar(fileOf("image/png"))).rejects.toThrow(
