@@ -13,8 +13,9 @@ export const AVATAR_ACCEPT = AVATAR_CONTENT_TYPES.join(",");
 /** 服务端大小上限 5 MiB;前端预检提前拦截,真实大小 confirm 时后端仍会核验。 */
 export const AVATAR_MAX_BYTES = 5 * 1024 * 1024;
 
-// Windows 的 MIME 注册表被破坏时,合法图片的 File.type 可能是空串
-// (localhost/jsdom 复现不了,同 PR #38 的 insecure-context 教训)——按扩展名降级推断。
+// Windows 的 MIME 注册表被破坏时,合法图片的 File.type 可能是空串或
+// 非标变体(image/jpg、image/pjpeg 等)——localhost/jsdom 复现不了,
+// 同 PR #38 的 insecure-context 教训——按扩展名降级推断。
 const EXTENSION_TYPES: Record<string, AvatarContentType> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
@@ -26,13 +27,14 @@ function isAllowedType(type: string): type is AvatarContentType {
   return (AVATAR_CONTENT_TYPES as readonly string[]).includes(type);
 }
 
-/** 解析文件的白名单 MIME;type 缺失时按扩展名降级,仍不在白名单则 undefined。 */
+/**
+ * 解析文件的白名单 MIME;type 不可用(缺失或非标变体)时一律按扩展名降级,
+ * 仍不在白名单则 undefined。签名/落库用的都是白名单值,不透传原始 type;
+ * 声明与真实字节不符(如 gif 改名 .png)由后端 confirm 核验兜底。
+ */
 function contentTypeOf(file: File): AvatarContentType | undefined {
   if (isAllowedType(file.type)) return file.type;
-  if (file.type === "") {
-    return EXTENSION_TYPES[file.name.split(".").pop()?.toLowerCase() ?? ""];
-  }
-  return undefined;
+  return EXTENSION_TYPES[file.name.split(".").pop()?.toLowerCase() ?? ""];
 }
 
 // 501 = 当前环境存储未开通(功能开关)。会话内记住,避免反复请求;

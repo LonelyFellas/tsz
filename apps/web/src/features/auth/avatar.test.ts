@@ -72,6 +72,18 @@ describe("uploadAvatar — 前端预检", () => {
     expect(mockCreate).toHaveBeenCalledWith("image/png", 1024);
   });
 
+  it("File.type 为非标变体(image/jpg 等,Windows 注册表破损) → 按扩展名降级推断", async () => {
+    await uploadAvatar(fileOf("image/jpg", 1024, "photo.jpg"));
+    expect(mockCreate).toHaveBeenCalledWith("image/jpeg", 1024);
+  });
+
+  it("File.type 非标且扩展名也不在白名单 → 拒绝", async () => {
+    await expect(
+      uploadAvatar(fileOf("image/pjpeg", 1024, "photo.heic"))
+    ).rejects.toThrow("unsupported avatar content type");
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
+
   it("File.type 为空串且扩展名不在白名单 → 拒绝", async () => {
     await expect(uploadAvatar(fileOf("", 1024, "photo.heic"))).rejects.toThrow(
       "unsupported avatar content type"
