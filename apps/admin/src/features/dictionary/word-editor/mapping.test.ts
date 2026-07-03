@@ -1,11 +1,12 @@
 import type { AdminWord, RichText, WordForm } from "@tsz/types";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   defaultPos,
   defaultSense,
   fromWire,
   frequencyToNumber,
   frequencyToWire,
+  newId,
   toRichText,
   toWire
 } from "./mapping";
@@ -496,5 +497,24 @@ describe("工具函数", () => {
     const sense = defaultSense(1.5);
     expect(sense.frequency).toBe(1.5);
     expect(sense.definitions).toHaveLength(1);
+  });
+
+  it("newId:无 randomUUID(HTTP 非安全上下文)降级手拼,仍是合法 UUID v4", () => {
+    // tshb-test 裸 IP HTTP 下浏览器不暴露 crypto.randomUUID,整页崩的回归。
+    const real = globalThis.crypto;
+    vi.stubGlobal("crypto", {
+      getRandomValues: real.getRandomValues.bind(real)
+    });
+    try {
+      const a = newId();
+      const b = newId();
+      const v4 =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+      expect(a).toMatch(v4);
+      expect(b).toMatch(v4);
+      expect(a).not.toBe(b);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
