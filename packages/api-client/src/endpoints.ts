@@ -61,6 +61,29 @@ export interface LearningSettingsResponse {
  */
 export type DeletionChannel = "phone" | "email";
 
+/** 头像上传的 MIME 白名单（与后端一致；被签进预签名 URL，PUT 时必须完全一致）。 */
+export const AVATAR_CONTENT_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp"
+] as const;
+
+export type AvatarContentType = (typeof AVATAR_CONTENT_TYPES)[number];
+
+/** 预签名直传许可（OSS 直传三步流程之第一步的返回，见对接文档 §2）。 */
+export interface AvatarUpload {
+  /** 暂存 key（带 uploads/ 前缀），不透明，confirm 时原样回传。 */
+  key: string;
+  /** 预签名 PUT 地址（OSS 域名）；URL 本身即凭证，直传时勿带 Authorization/cookie。 */
+  url: string;
+  /** PUT 时必须原样携带的请求头（目前是 Content-Type）。 */
+  headers: Record<string, string>;
+  /** URL 有效秒数（默认 600）；过期后须重新申请，不可续期。 */
+  expires_in: number;
+  /** 服务端大小上限（5 MiB），可用于前端预检。 */
+  max_bytes: number;
+}
+
 export interface RegisterPayload {
   /** 手机号与邮箱二选一即可：两个都不传后端返回 400 phone or email is required。 */
   phone?: string;
@@ -160,7 +183,24 @@ export function createEndpoints(http: HttpClient) {
         http.post<User>("/auth/apply-teacher", { profile }),
       /** PUT /me/learning-settings — 设置 CEFR 等级 + 英式/美式（新用户 onboarding 与后续修改共用） */
       updateLearningSettings: (settings: LearningSettings) =>
-        http.put<LearningSettingsResponse>("/me/learning-settings", settings)
+        http.put<LearningSettingsResponse>("/me/learning-settings", settings),
+      /**
+       * POST /me/avatar/upload-url — 申请头像直传许可（三步流程①）。
+       * content_type 必须与实际 PUT 的 Content-Type 完全一致（签进签名）；
+       * size 仅预检，confirm 时后端会核验真实大小。每次返回的 key 都不同，勿缓存复用。
+       * 存储未开通的环境返回 501 avatar storage not configured。
+       */
+      createAvatarUpload: (content_type: AvatarContentType, size: number) =>
+        http.post<{ upload: AvatarUpload }>("/me/avatar/upload-url", {
+          content_type,
+          size
+        }),
+      /**
+       * POST /me/avatar — 直传成功后 confirm 落库（三步流程③,不 confirm 头像不生效）。
+       * 返回带新 avatar_url（绝对地址、版本化）的 user；500 可直接重试,无需重新上传。
+       */
+      confirmAvatar: (key: string) =>
+        http.post<{ user: User }>("/me/avatar", { key })
     },
     word: {
       list: (page = 1) => http.get<Paginated<Word>>(`/words?page=${page}`)

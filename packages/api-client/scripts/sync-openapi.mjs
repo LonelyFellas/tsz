@@ -7,6 +7,9 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 // 具名导入而非 default:js-yaml 是 CJS,Node 25 起 ESM 互操作不再合成 default 导出。
 import { load } from "js-yaml";
+// 输出过一遍 prettier:JSON.stringify 直出与仓库格式不一致,
+// 每次同步都会造成整文件格式抖动、淹没真实的路径增量。
+import { format } from "prettier";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source =
@@ -43,5 +46,5 @@ const snapshot = {
   paths
 };
 
-writeFileSync(out, JSON.stringify(snapshot, null, 2) + "\n");
+writeFileSync(out, await format(JSON.stringify(snapshot), { parser: "json" }));
 console.log(`✅ 写入 ${out}\n   共 ${Object.keys(paths).length} 条路径`);

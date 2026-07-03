@@ -13,7 +13,8 @@ export function AccountMenu() {
   const logout = useLogout();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [imgError, setImgError] = useState(false);
+  // 记录「哪个 URL」加载失败而非布尔闩锁:换头像后 avatar_url 变化,新图自动重试。
+  const [errorUrl, setErrorUrl] = useState("");
   const ref = useRef<HTMLDivElement>(null);
 
   // 点击外部 / 按 Esc 收起菜单。
@@ -39,7 +40,7 @@ export function AccountMenu() {
 
   const displayName = displayNameOf(user);
   const initial = displayName.charAt(0).toUpperCase();
-  const showImage = !!user.avatar_url && !imgError;
+  const showImage = !!user.avatar_url && user.avatar_url !== errorUrl;
 
   async function handleLogout() {
     setLoading(true);
@@ -63,7 +64,7 @@ export function AccountMenu() {
             src={user.avatar_url}
             alt={displayName}
             className="h-full w-full object-cover"
-            onError={() => setImgError(true)}
+            onError={() => setErrorUrl(user.avatar_url)}
           />
         ) : (
           initial

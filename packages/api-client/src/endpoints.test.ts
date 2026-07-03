@@ -208,6 +208,23 @@ describe("createEndpoints · auth", () => {
       english_variant: "BrE"
     });
   });
+
+  it("createAvatarUpload → POST /me/avatar/upload-url 带 content_type + size", () => {
+    const api = createEndpoints(http);
+    api.auth.createAvatarUpload("image/webp", 12345);
+    expect(http.post).toHaveBeenCalledWith("/me/avatar/upload-url", {
+      content_type: "image/webp",
+      size: 12345
+    });
+  });
+
+  it("confirmAvatar → POST /me/avatar 带 key(暂存 key 原样回传)", () => {
+    const api = createEndpoints(http);
+    api.auth.confirmAvatar("uploads/avatars/u1/x.webp");
+    expect(http.post).toHaveBeenCalledWith("/me/avatar", {
+      key: "uploads/avatars/u1/x.webp"
+    });
+  });
 });
 
 describe("createEndpoints · word", () => {
