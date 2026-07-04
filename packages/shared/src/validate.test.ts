@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  accountToDisplayName,
+  hasDisplayNameForbiddenChars,
   isCode,
   isEmail,
   isPhone,
@@ -95,5 +97,53 @@ describe("isRegisterPassword", () => {
     ["abc1234567!", "含特殊字符"]
   ])("拒绝 %s(%s)", (v) => {
     expect(isRegisterPassword(v)).toBe(false);
+  });
+});
+
+describe("hasDisplayNameForbiddenChars", () => {
+  // 不可见字符一律用 \u 转义写,避免源码里出现肉眼不可辨的字面量。
+  it.each([
+    ["标签字符 <", "<script>"],
+    ["标签字符 >", "a>b"],
+    ["控制字符 NUL", "a\u0000b"],
+    ["零宽空格", "a\u200bb"],
+    ["BOM", "\ufeffAlice"],
+    ["bidi 覆盖", "a\u202eb"]
+  ])("检出禁字符:%s", (_label, v) => {
+    expect(hasDisplayNameForbiddenChars(v)).toBe(true);
+  });
+
+  // " ' & 与后端规则一致,属合法昵称字符,不得误拦。
+  it.each(["Alice", "小明", "他/她", "user_01", "O'Brien", "Tom&Jerry", 'a"b'])(
+    "放行正常昵称 %s",
+    (v) => {
+      expect(hasDisplayNameForbiddenChars(v)).toBe(false);
+    }
+  );
+});
+
+describe("accountToDisplayName", () => {
+  it("手机号原样返回", () => {
+    expect(accountToDisplayName("13800138000")).toBe("13800138000");
+  });
+
+  it("邮箱取 @ 前缀;合法的 ' & 保留", () => {
+    expect(accountToDisplayName("alice@example.com")).toBe("alice");
+    expect(accountToDisplayName("o'brien@x.com")).toBe("o'brien");
+    expect(accountToDisplayName("tom&jerry@qq.com")).toBe("tom&jerry");
+  });
+
+  it("剔除 local part 里的禁字符", () => {
+    expect(accountToDisplayName('"a<b"@x.com')).toBe('"ab"');
+    expect(accountToDisplayName("zero\u200bwidth@x.com")).toBe("zerowidth");
+  });
+
+  it("超长 local part 按字符截到 50", () => {
+    const local = "a".repeat(64);
+    expect(accountToDisplayName(`${local}@x.com`)).toBe("a".repeat(50));
+  });
+
+  it("剔空退回默认昵称「用户」", () => {
+    expect(accountToDisplayName("<><>@x.com")).toBe("用户");
   });
 });

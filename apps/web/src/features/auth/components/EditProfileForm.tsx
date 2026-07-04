@@ -1,7 +1,12 @@
 "use client";
 
 import type { MeResponse } from "@tsz/api-client";
-import { isEmail, isPhone } from "@tsz/shared";
+import {
+  DISPLAY_NAME_MAX,
+  hasDisplayNameForbiddenChars,
+  isEmail,
+  isPhone
+} from "@tsz/shared";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "@tsz/types";
@@ -23,9 +28,16 @@ const INPUT_CLASS =
 // 更换头像(OSS 预签名直传,流程在 ../avatar);等级/口音只读(改等级请联系客服)。
 // 错误文案对齐后端 /me 系列接口返回(权威来源见 Swagger /docs)。
 
-// 改昵称(PATCH /me)错误。
+// 昵称禁字符提示:前端预检与后端 400 兜底共用同一句(规则见 @tsz/shared 的
+// hasDisplayNameForbiddenChars,与后端 validateDisplayName 对齐)。
+const NICKNAME_FORBIDDEN_MSG = "昵称不能包含 < > 或不可见字符";
+
+// 改昵称(PATCH /me)错误。键须与后端返回的英文原文逐字一致(translateAuthError
+// 精确匹配),原文见 tsz-go docs/api.md。
 const PROFILE_ERRORS: Record<string, string> = {
   "display name cannot be blank": "昵称需为 1–50 个字符",
+  "display name cannot contain < > or invisible characters":
+    NICKNAME_FORBIDDEN_MSG,
   "user not found": "账号不存在,请重新登录"
 };
 
@@ -56,7 +68,8 @@ const BIND_ERRORS: Record<string, string> = {
 };
 
 const CODE_COUNTDOWN = 60;
-const NICKNAME_MAX = 50;
+// 昵称上限与后端一致,单一来源在 @tsz/shared。
+const NICKNAME_MAX = DISPLAY_NAME_MAX;
 
 export function EditProfileForm() {
   const router = useRouter();
@@ -147,9 +160,18 @@ export function EditProfileForm() {
     contact === "" || (isEmailBind ? isEmail(contact) : isPhone(contact));
   const contactFilled =
     contact !== "" && (isEmailBind ? isEmail(contact) : isPhone(contact));
-  const nameInitial = user.display_name ?? "";
+  // 与 trimmedName 同口径 trim:遗留数据/其他客户端可能存入带首尾空格的
+  // 昵称,原样比较会把未编辑的表单误判为「已修改」。
+  const nameInitial = (user.display_name ?? "").trim();
   const trimmedName = displayName.trim();
   const nameChanged = trimmedName !== "" && trimmedName !== nameInitial;
+  // 禁字符预检,与后端 display_name 规则对齐;命中即禁用保存,不发请求。
+  // 只在昵称有改动时预检:未改动则提交不带昵称,历史遗留的禁字符昵称
+  // 不应锁死绑定联系方式等无关操作。
+  const nameForbidden =
+    nameChanged && hasDisplayNameForbiddenChars(trimmedName);
+  // 昵称槽位单条提示:预检命中优先于后端返回的 nameError。
+  const nameMessage = nameForbidden ? NICKNAME_FORBIDDEN_MSG : nameError;
   const wantsBind = contactFilled && code.trim() !== "";
 
   const topContact = user.phone ?? user.email ?? "";
@@ -157,7 +179,8 @@ export function EditProfileForm() {
 
   const canSendCode = contactFilled && countdown === 0 && !sending;
   // !avatarUploading:保存与头像上传互斥,见 handleAvatar 的说明。
-  const canSubmit = (nameChanged || wantsBind) && !saving && !avatarUploading;
+  const canSubmit =
+    (nameChanged || wantsBind) && !nameForbidden && !saving && !avatarUploading;
 
   function clearMessages() {
     setNameError("");
@@ -375,15 +398,19 @@ export function EditProfileForm() {
                 placeholder="请输入昵称"
                 maxLength={NICKNAME_MAX}
                 value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
+                onChange={(e) => {
+                  // 一编辑就清掉上次提交失败的红字,避免对新输入展示陈旧错误。
+                  setNameError("");
+                  setDisplayName(e.target.value);
+                }}
                 className={`${INPUT_CLASS} pr-14`}
               />
               <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-xs text-foreground-subtle">
                 {displayName.length}/{NICKNAME_MAX}
               </span>
             </div>
-            {nameError && (
-              <p className="mt-1.5 text-sm text-danger">{nameError}</p>
+            {nameMessage && (
+              <p className="mt-1.5 text-sm text-danger">{nameMessage}</p>
             )}
           </div>
 

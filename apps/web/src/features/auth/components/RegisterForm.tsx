@@ -1,6 +1,12 @@
 "use client";
 
-import { isCode, isEmail, isPhone, isRegisterPassword } from "@tsz/shared";
+import {
+  accountToDisplayName,
+  isCode,
+  isEmail,
+  isPhone,
+  isRegisterPassword
+} from "@tsz/shared";
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
@@ -87,8 +93,9 @@ export function RegisterForm() {
         email: tab === "email" ? account : undefined,
         // 业务规则:密码不区分大小写,统一转大写后入库。
         password: password.toUpperCase(),
-        // 原型未单独采集昵称,默认用账号占位(后端要求 1-50 字符)。
-        display_name: account,
+        // 原型未单独采集昵称,默认用账号占位;邮箱账号剥域名、剔后端禁的
+        // < > 与不可见字符、截到 50 字上限,否则整个注册被 400。
+        display_name: accountToDisplayName(account),
         role: "student",
         code
       });
