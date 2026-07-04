@@ -146,7 +146,9 @@ describe("RegisterForm — 注册流程", () => {
           phone: VALID_PHONE,
           password: VALID_PASSWORD.toUpperCase(),
           code: VALID_CODE,
-          role: "student"
+          role: "student",
+          // 占位昵称 = 账号(手机号无禁字符,原样透传)。
+          display_name: VALID_PHONE
         })
       );
       expect(mockPush).toHaveBeenCalledWith("/onboarding");
@@ -241,6 +243,62 @@ describe("RegisterForm — 密码归一化与边界", () => {
 
     await waitFor(() => {
       expect(mockRegister).toHaveBeenCalled();
+    });
+  });
+
+  it("邮箱注册 → 占位昵称取 local part,' 等合法字符原样保留", async () => {
+    mockRegister.mockResolvedValueOnce(authResult());
+    renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "邮箱" }));
+    // ' 在邮箱 local part 与后端 display_name 校验里都合法,不得误剔。
+    await user.type(
+      screen.getByPlaceholderText("请输入邮箱"),
+      "o'brien@example.com"
+    );
+    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
+    await user.type(
+      screen.getByPlaceholderText("请输入登录密码"),
+      VALID_PASSWORD
+    );
+    await user.click(screen.getByRole("button", { name: "立即注册" }));
+
+    await waitFor(() => {
+      expect(mockRegister).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: "o'brien@example.com",
+          display_name: "o'brien"
+        })
+      );
+    });
+  });
+
+  it("邮箱 local part 超 50 字 → 占位昵称截断,注册不被 400", async () => {
+    mockRegister.mockResolvedValueOnce(authResult());
+    renderWithProviders(<RegisterForm />);
+    const user = userEvent.setup();
+
+    const local = "a".repeat(60);
+    await user.click(screen.getByRole("button", { name: "邮箱" }));
+    await user.type(
+      screen.getByPlaceholderText("请输入邮箱"),
+      `${local}@example.com`
+    );
+    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
+    await user.type(
+      screen.getByPlaceholderText("请输入登录密码"),
+      VALID_PASSWORD
+    );
+    await user.click(screen.getByRole("button", { name: "立即注册" }));
+
+    await waitFor(() => {
+      expect(mockRegister).toHaveBeenCalledWith(
+        expect.objectContaining({
+          email: `${local}@example.com`,
+          display_name: "a".repeat(50)
+        })
+      );
     });
   });
 

@@ -177,6 +177,89 @@ describe("EditProfileForm — 昵称", () => {
     expect(mockBind).not.toHaveBeenCalled();
   });
 
+  it("昵称含禁字符 → 实时红字提示且确定禁用,不发请求", async () => {
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    const user = userEvent.setup();
+
+    const input = screen.getByDisplayValue("Alice");
+    await user.clear(input);
+    await user.type(input, "Bob<Alice");
+
+    expect(
+      screen.getByText("昵称不能包含 < > 或不可见字符")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确定" })).toBeDisabled();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("含 & ' 的合法昵称 → 不误拦,正常提交", async () => {
+    mockUpdate.mockResolvedValue({
+      user: userWith({ display_name: "Tom&Jerry" })
+    });
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    const user = userEvent.setup();
+
+    const input = screen.getByDisplayValue("Alice");
+    await user.clear(input);
+    await user.type(input, "Tom&Jerry");
+
+    expect(
+      screen.queryByText("昵称不能包含 < > 或不可见字符")
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "确定" }));
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith("Tom&Jerry");
+    });
+  });
+
+  it("绕过预检的禁字符被后端 400 → 映射为同一句中文提示", async () => {
+    mockUpdate.mockRejectedValue(
+      new Error("display name cannot contain < > or invisible characters")
+    );
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    const user = userEvent.setup();
+
+    const input = screen.getByDisplayValue("Alice");
+    await user.clear(input);
+    // 零宽空格(U+200B)预检同样能拦;此处直接走后端拒绝路径,
+    // 验证 PROFILE_ERRORS 的键与后端原文逐字一致。
+    await user.type(input, "Bob");
+    await user.click(screen.getByRole("button", { name: "确定" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("昵称不能包含 < > 或不可见字符")
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("遗留昵称含禁字符但未改动 → 不提示、不锁绑定操作", async () => {
+    mockMe.mockResolvedValue(
+      meResponse({ user: userWith({ display_name: "A<lice" }) })
+    );
+    mockBind.mockResolvedValue({ user: userWith({ email: NEW_EMAIL }) });
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("A<lice");
+    const user = userEvent.setup();
+
+    expect(
+      screen.queryByText("昵称不能包含 < > 或不可见字符")
+    ).not.toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText("请输入邮箱号"), NEW_EMAIL);
+    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
+    await user.click(screen.getByRole("button", { name: "确定" }));
+
+    await waitFor(() => {
+      expect(mockBind).toHaveBeenCalledWith(NEW_EMAIL, VALID_CODE);
+    });
+    // 未改动的昵称不随绑定一并提交。
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
   it("昵称校验失败(400) → 红字提示且不绑定", async () => {
     mockUpdate.mockRejectedValue(new Error("display name cannot be blank"));
     render(<EditProfileForm />);
@@ -191,6 +274,37 @@ describe("EditProfileForm — 昵称", () => {
     await waitFor(() => {
       expect(screen.getByText("昵称需为 1–50 个字符")).toBeInTheDocument();
     });
+  });
+
+  it("提交失败的红字在再次编辑昵称时立即清除", async () => {
+    mockUpdate.mockRejectedValue(new Error("display name cannot be blank"));
+    render(<EditProfileForm />);
+    await screen.findByDisplayValue("Alice");
+    const user = userEvent.setup();
+
+    const input = screen.getByDisplayValue("Alice");
+    await user.clear(input);
+    await user.type(input, "Bob");
+    await user.click(screen.getByRole("button", { name: "确定" }));
+    await waitFor(() => {
+      expect(screen.getByText("昵称需为 1–50 个字符")).toBeInTheDocument();
+    });
+
+    // 不需要重新提交,输入一有变化陈旧错误就该消失。
+    await user.type(input, "by");
+    expect(screen.queryByText("昵称需为 1–50 个字符")).not.toBeInTheDocument();
+  });
+
+  it("遗留昵称带首尾空格且未编辑 → 不误判为已修改,确定保持禁用", async () => {
+    mockMe.mockResolvedValue(
+      meResponse({ user: userWith({ display_name: " Alice " }) })
+    );
+    render(<EditProfileForm />);
+    // testing-library 默认 normalizer 会 trim,能匹配到 " Alice "。
+    await screen.findByDisplayValue("Alice");
+
+    expect(screen.getByRole("button", { name: "确定" })).toBeDisabled();
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
 

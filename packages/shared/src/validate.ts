@@ -29,3 +29,29 @@ const REGISTER_PASSWORD_RE = /^(?=.*[a-zA-Z])(?=.*\d)[a-zA-Z\d]{11,20}$/;
 export function isRegisterPassword(v: string): boolean {
   return REGISTER_PASSWORD_RE.test(v);
 }
+
+// 昵称禁字符:与后端 validateDisplayName 对齐(tsz-go internal/user/service.go,
+// 规则同见 docs/api.md)——只拒标签字符 < > 与控制/不可见字符(Cc/Cf:NUL、
+// 零宽空格、BOM、bidi 覆盖等);" ' & 是合法昵称字符(O'Brien、Tom&Jerry),不拦。
+const DISPLAY_NAME_FORBIDDEN_RE = /[<>\p{Cc}\p{Cf}]/u;
+const DISPLAY_NAME_FORBIDDEN_RE_G = /[<>\p{Cc}\p{Cf}]/gu;
+
+// 后端 display_name 长度上限(1–50 字符,docs/api.md)。
+export const DISPLAY_NAME_MAX = 50;
+
+export function hasDisplayNameForbiddenChars(v: string): boolean {
+  return DISPLAY_NAME_FORBIDDEN_RE.test(v);
+}
+
+/**
+ * 账号 → 注册占位昵称。原型注册页不单独采集昵称,用账号占位;邮箱要
+ * 剥掉域名,且 local part 可长于 50(上限 64)、极端形式(引号写法)还能
+ * 含禁字符,直接透传会被后端 400。剔禁字符、按字符截到上限,剔空则退回「用户」。
+ */
+export function accountToDisplayName(account: string): string {
+  const name = account
+    .replace(/@.*$/, "")
+    .replace(DISPLAY_NAME_FORBIDDEN_RE_G, "")
+    .trim();
+  return [...name].slice(0, DISPLAY_NAME_MAX).join("") || "用户";
+}
