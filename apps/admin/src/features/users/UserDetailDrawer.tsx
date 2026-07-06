@@ -1,5 +1,5 @@
-// 用户详情（只读抽屉）。后端暂无详情接口，复用列表行数据 + mock 补充字段展示。
-// TODO(backend): 见 backend-todos.md #3（详情接口）。
+// 用户详情（只读抽屉）。列表项已是完整 AdminUser（详情接口 GET /admin/users/{id} 同形），
+// 故直接复用行数据、无需二次请求。等级/天生币余额后端暂不返回，显示占位「-」。
 import { Avatar, Badge, Descriptions, Drawer, Space, Tag } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";

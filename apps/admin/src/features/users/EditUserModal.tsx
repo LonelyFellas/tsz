@@ -1,5 +1,5 @@
-// 编辑用户（mock：当前仅改昵称的最小可演示形态）。
-// TODO(backend): 见 backend-todos.md #5——待后端明确可编辑字段与 PATCH /admin/users/{id}。
+// 编辑用户：对接 PATCH /admin/users/{id}（super_admin）。本轮后端只开放昵称一个可编辑字段
+// （1–50 字符、trim 后非空）；联系方式走用户自己的绑定流程，不在此改。
 import { App, Form, Input, Modal } from "antd";
 import { useEffect } from "react";
 import type { AdminUserView } from "@tsz/types";
