@@ -63,6 +63,11 @@ function renderPage() {
   );
 }
 
+/** 整表内按可见文案点第 idx 个匹配按钮：避免 getByRole 扫全表算可访问名（CLAUDE.md 超时陷阱）。 */
+function clickButton(label: string | RegExp, idx = 0) {
+  fireEvent.click(screen.getAllByText(label)[idx]!);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   mockList.mockResolvedValue(listResponse([plainAdmin, superAdmin]));
@@ -82,7 +87,7 @@ describe("AdminManagement", () => {
     mockSetStatus.mockResolvedValue({ ...plainAdmin, status: "disabled" });
     renderPage();
     await screen.findByText("审核员小王");
-    fireEvent.click(screen.getAllByRole("button", { name: /禁\s?用/ })[0]!);
+    clickButton(/禁\s?用/, 0);
     await waitFor(() =>
       expect(mockSetStatus).toHaveBeenCalledWith("a1", "disabled")
     );
@@ -96,7 +101,7 @@ describe("AdminManagement", () => {
     renderPage();
     await screen.findByText("总管阿强");
     // 超管行也是 active，取第二个禁用按钮。
-    fireEvent.click(screen.getAllByRole("button", { name: /禁\s?用/ })[1]!);
+    clickButton(/禁\s?用/, 1);
     // 断言点中的确是超管行（a2），而非任意行——否则错误映射就名不副实。
     await waitFor(() =>
       expect(mockSetStatus).toHaveBeenCalledWith("a2", "disabled")
@@ -113,7 +118,7 @@ describe("AdminManagement", () => {
     mockSetStatus.mockResolvedValue({ ...disabled, status: "active" });
     renderPage();
     await screen.findByText("审核员小王");
-    fireEvent.click(screen.getByRole("button", { name: /启\s?用/ }));
+    clickButton(/启\s?用/);
     await waitFor(() =>
       expect(mockSetStatus).toHaveBeenCalledWith("a1", "active")
     );
@@ -124,7 +129,7 @@ describe("AdminManagement", () => {
     mockReset.mockResolvedValue({ temporary_password: "Kd7mNpQ2rXt9" });
     renderPage();
     await screen.findByText("审核员小王");
-    fireEvent.click(screen.getAllByRole("button", { name: "重置密码" })[0]!);
+    clickButton("重置密码", 0);
     await waitFor(() => expect(mockReset).toHaveBeenCalledWith("a1"));
     expect(await screen.findByText("Kd7mNpQ2rXt9")).toBeInTheDocument();
     expect(screen.getByText("临时密码已生成")).toBeInTheDocument();
@@ -134,7 +139,7 @@ describe("AdminManagement", () => {
     mockReset.mockRejectedValue(new Error("cannot reset a super admin"));
     renderPage();
     await screen.findByText("审核员小王");
-    fireEvent.click(screen.getAllByRole("button", { name: "重置密码" })[0]!);
+    clickButton("重置密码", 0);
     expect(
       await screen.findByText("cannot reset a super admin")
     ).toBeInTheDocument();
@@ -143,16 +148,16 @@ describe("AdminManagement", () => {
   it("超管行的重置密码按钮禁用", async () => {
     renderPage();
     await screen.findByText("总管阿强");
-    // 第二行（超管）的重置密码按钮 disabled。
+    // 第二行（超管）的重置密码按钮 disabled。用文案定位后取其 button 祖先断言禁用态。
     expect(
-      screen.getAllByRole("button", { name: "重置密码" })[1]
+      screen.getAllByText("重置密码")[1]!.closest("button")
     ).toBeDisabled();
   });
 
   it("点新建管理员打开建号弹窗", async () => {
     renderPage();
     await screen.findByText("审核员小王");
-    fireEvent.click(screen.getByRole("button", { name: /新建管理员/ }));
+    clickButton(/新建管理员/);
     expect(
       await screen.findByPlaceholderText("登录用手机号")
     ).toBeInTheDocument();
@@ -164,7 +169,7 @@ describe("AdminManagement", () => {
     fireEvent.change(screen.getByPlaceholderText("手机 / 邮箱 / 昵称"), {
       target: { value: "小王" }
     });
-    fireEvent.click(screen.getByRole("button", { name: /搜\s?索/ }));
+    clickButton(/搜\s?索/);
     await waitFor(() =>
       expect(mockList).toHaveBeenCalledWith(
         expect.objectContaining({ q: "小王", page: 1 })
