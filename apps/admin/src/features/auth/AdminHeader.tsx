@@ -1,5 +1,6 @@
-import { LogoutOutlined } from "@ant-design/icons";
+import { LockOutlined, LogoutOutlined } from "@ant-design/icons";
 import { Button, Space, Typography } from "antd";
+import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/lib/auth";
 import { useAdminLogout } from "./useAdminLogout";
 
@@ -11,6 +12,7 @@ import { useAdminLogout } from "./useAdminLogout";
 export function AdminHeader() {
   const profile = useAuthStore((s) => s.profile);
   const logout = useAdminLogout();
+  const navigate = useNavigate();
 
   const name = profile?.display_name ?? "管理员";
 
@@ -28,6 +30,12 @@ export function AdminHeader() {
         已登录为 <Typography.Text strong>{name}</Typography.Text>
       </Typography.Text>
       <Space>
+        <Button
+          icon={<LockOutlined />}
+          onClick={() => navigate("/change-password")}
+        >
+          修改密码
+        </Button>
         <Button icon={<LogoutOutlined />} onClick={() => void logout()}>
           退出登录
         </Button>

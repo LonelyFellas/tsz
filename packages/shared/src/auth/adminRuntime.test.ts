@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createAdminAuthRuntime } from "./adminRuntime";
+import {
+  createAdminAuthRuntime,
+  redirectToChangePassword
+} from "./adminRuntime";
 
 // ── 工具 ──────────────────────────────────────────────────────────────────────
 
@@ -161,5 +164,63 @@ describe("createAdminAuthRuntime · 401 拦截器与 realm 隔离", () => {
     // 只发一次请求：登录失败不应触发 refresh 重试。
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock.mock.calls[0]![0]).toBe("/api/v1/admin/auth/login");
+  });
+
+  it("受保护请求 403 must_change_password → 整页跳改密页，且仍抛 403", async () => {
+    fetchMock.mockResolvedValueOnce(
+      resp(403, {
+        error: "password change required",
+        code: "must_change_password"
+      })
+    );
+    // 本包测试跑在 node 环境（无 window/document）。注入 window.location 观测跳转；
+    // tokenManager 见 window 存在会注册 visibilitychange，故一并补 document 桩。
+    const location = { href: "", pathname: "/words" };
+    vi.stubGlobal("window", { location });
+    vi.stubGlobal("document", { addEventListener: () => undefined });
+
+    const rt = createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
+    rt.tokens.setAccessToken("at-1");
+
+    await expect(rt.api.profile()).rejects.toMatchObject({
+      status: 403,
+      code: "must_change_password"
+    });
+    expect(location.href).toBe("/change-password");
+  });
+});
+
+// ── 待改密拦截决策（纯逻辑，注入 window.location 桩）───────────────────────────────
+describe("redirectToChangePassword", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("code=must_change_password 且不在改密页：整页跳改密页", () => {
+    const location = { href: "", pathname: "/words" };
+    vi.stubGlobal("window", { location });
+    redirectToChangePassword("must_change_password", "/change-password");
+    expect(location.href).toBe("/change-password");
+  });
+
+  it("已在改密页：不跳（防会话恢复探 profile 的 403 触发自循环）", () => {
+    const location = { href: "", pathname: "/change-password" };
+    vi.stubGlobal("window", { location });
+    redirectToChangePassword("must_change_password", "/change-password");
+    expect(location.href).toBe("");
+  });
+
+  it("其它 403 code（如 account disabled 无 code）：不跳", () => {
+    const location = { href: "", pathname: "/words" };
+    vi.stubGlobal("window", { location });
+    redirectToChangePassword(undefined, "/change-password");
+    expect(location.href).toBe("");
+  });
+
+  it("无 window（SSR/node）：不抛错", () => {
+    vi.stubGlobal("window", undefined);
+    expect(() =>
+      redirectToChangePassword("must_change_password", "/change-password")
+    ).not.toThrow();
   });
 });

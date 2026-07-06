@@ -26,11 +26,30 @@ export interface AdminAuthRuntimeOptions {
   baseUrl: string;
   /** refresh 失败后跳转的登录页路径。默认 /login。 */
   loginPath?: string;
+  /** 待改密（403 code:must_change_password）时整页跳转的改密页路径。默认 /change-password。 */
+  changePasswordPath?: string;
+}
+
+/**
+ * 待改密拦截：仅当 403 的业务 code 为 must_change_password、且当前不在改密页时，
+ * 整页跳转到改密页。整页跳转（而非 SPA 导航）与 redirectToLogin 同款，规避 RouteGuard 竞态；
+ * 「已在改密页不跳」防止改密页内产生的 403（如会话恢复探 /profile 也被守卫 403）触发自循环。
+ * 抽成具名导出便于单测（注入 window.location 桩，不触发真实导航）。
+ */
+export function redirectToChangePassword(
+  code: string | undefined,
+  changePasswordPath: string
+): void {
+  if (code !== "must_change_password") return;
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === changePasswordPath) return;
+  window.location.href = changePasswordPath;
 }
 
 export function createAdminAuthRuntime({
   baseUrl,
-  loginPath
+  loginPath,
+  changePasswordPath = "/change-password"
 }: AdminAuthRuntimeOptions): AdminAuthRuntime {
   const tokens = createTokenManager({ baseUrl, loginPath });
   const store = createAdminAuthStore();
@@ -39,7 +58,8 @@ export function createAdminAuthRuntime({
     baseUrl,
     getToken: tokens.getToken,
     onRefresh: tokens.refreshTokens,
-    onSessionExpired: tokens.redirectToLogin
+    onSessionExpired: tokens.redirectToLogin,
+    onForbidden: (code) => redirectToChangePassword(code, changePasswordPath)
   });
   const api = createAdminEndpoints(http);
 
