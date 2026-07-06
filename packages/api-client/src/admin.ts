@@ -2,6 +2,10 @@
 // 独立登录 / 独立 token / 独立 refresh cookie（path=/api/v1/admin）。
 // 这些端点要绑定到 baseUrl=/api/v1/admin 的 HttpClient 上，路径才会落到 /api/v1/admin/*。
 import type {
+  AdminListQuery,
+  AdminListResponse,
+  AdminUserListQuery,
+  AdminUserListResponse,
   AdminWordBatchDeleteResponse,
   AdminWordCreateInput,
   AdminWordEnvelope,
@@ -10,47 +14,36 @@ import type {
   AdminWordListResponse,
   AdminWordSaveInput,
   AdminWordStats,
-  RelatedSearchResponse
+  AdminStatus,
+  CreateAdminInput,
+  Admin,
+  AdminAuthResponse,
+  AdminProfile,
+  RelatedSearchResponse,
+  ResetPasswordResponse
 } from "@tsz/types";
 import type { RefreshResponse } from "./endpoints";
 import type { HttpClient } from "./http";
 
-/** admin 权限等级：super_admin 额外可管理管理员账号。 */
-export type AdminLevel = "admin" | "super_admin";
-
-/** admin 账号状态。 */
-export type AdminStatus = "active" | "disabled";
-
-/** GET /admin/profile 的响应：登录管理员自身身份，用于门禁探针 + 顶栏「已登录为 X」。 */
-export interface AdminProfile {
-  id: string;
-  phone: string;
-  display_name: string;
-  level: AdminLevel;
-}
-
-/** 账号管理里看到的完整 admin 对象（含状态与创建时间）。 */
-export interface Admin {
-  id: string;
-  phone: string;
-  email?: string;
-  display_name: string;
-  level: AdminLevel;
-  status: AdminStatus;
-  /** ISO8601 */
-  created_at: string;
-}
-
-/** POST /admin/auth/login 的响应。 */
-export interface AdminAuthResponse {
-  admin: Admin;
-  access_token: string;
-  level: AdminLevel;
-  /** access token 剩余有效期（秒），约 900。 */
-  expires_in: number;
-  /** refresh token 过期的 Unix 时间戳（秒）。 */
-  refresh_token_expires_at: number;
-}
+// admin 账号体系的 wire 类型已收敛到 @tsz/types（wire 类型唯一家）。此处 re-export，
+// 保持既有 `import { AdminProfile, ... } from "@tsz/api-client"` 的消费方不破。
+export type {
+  Admin,
+  AdminAuthResponse,
+  AdminChangePasswordInput,
+  AdminLevel,
+  AdminListQuery,
+  AdminListResponse,
+  AdminProfile,
+  AdminStatus,
+  AdminUser,
+  AdminUserListQuery,
+  AdminUserListResponse,
+  AdminUserView,
+  CreateAdminInput,
+  PageMeta,
+  ResetPasswordResponse
+} from "@tsz/types";
 
 /** 把可选查询参数编成 query string;跳过 undefined / null / 空串,空对象返回 ""。 */
 function qs(params: Record<string, string | number | undefined>): string {
@@ -82,7 +75,17 @@ export function createAdminEndpoints(http: HttpClient) {
       /** POST /admin/auth/logout — 吊销当前会话 refresh token（cookie 自动携带）。 */
       logout: () => http.post<void>("/auth/logout"),
       /** POST /admin/auth/logout-all — 吊销该 admin 全部会话（带 Bearer）。 */
-      logoutAll: () => http.post<void>("/auth/logout-all")
+      logoutAll: () => http.post<void>("/auth/logout-all"),
+      /**
+       * POST /admin/auth/change-password — 登录管理员改自己的密码（带 Bearer）→ 204。
+       * must_change_password 未清前少数可达端点之一。400 = 新密码同旧/不满足策略；
+       * 401 = 当前密码错误。
+       */
+      changePassword: (currentPassword: string, newPassword: string) =>
+        http.post<void>("/auth/change-password", {
+          current_password: currentPassword,
+          new_password: newPassword
+        })
     },
     /** GET /admin/profile — 门禁探针：200=有效 admin / 401=未登录。 */
     profile: () => http.get<AdminProfile>("/profile"),
@@ -128,6 +131,38 @@ export function createAdminEndpoints(http: HttpClient) {
         http.get<RelatedSearchResponse>(
           `/words/related-search${qs({ q, kind: opts?.kind, limit: opts?.limit })}`
         )
+    },
+    /**
+     * 用户管理：C 端用户（web 学员/教师）的后台目录。当前契约只有列表查询，
+     * 详情 / 启禁用 / 编辑 / 删除等尚未冻结（见 docs/features/admin-user-management/backend-todos.md）。
+     */
+    users: {
+      /** GET /admin/users — 列表页：role/关键字筛选 + 分页。后台可见联系方式（不脱敏）。 */
+      list: (query: AdminUserListQuery = {}) =>
+        http.get<AdminUserListResponse>(`/users${qs({ ...query })}`)
+    },
+    /**
+     * 管理员账号管理（`super_admin` 专属；普通 admin 调用得 403 super admin required）。
+     * 契约见 openapi `Admin (accounts)` 标签、docs/tsz-go admin-frontend-integration §7。
+     */
+    admins: {
+      /** GET /admin/admins — 列表：level/关键字筛选 + 分页。 */
+      list: (query: AdminListQuery = {}) =>
+        http.get<AdminListResponse>(`/admins${qs({ ...query })}`),
+      /** POST /admin/admins — 建号；201 返回新 Admin；409 = 手机号已被占用。 */
+      create: (input: CreateAdminInput) => http.post<Admin>("/admins", input),
+      /**
+       * PATCH /admin/admins/{id}/status — 启用/禁用；返回更新后的 Admin。
+       * 409 = 不能禁用最后一个 active super_admin。
+       */
+      setStatus: (adminId: string, status: AdminStatus) =>
+        http.patch<Admin>(`/admins/${adminId}/status`, { status }),
+      /**
+       * POST /admin/admins/{id}/reset-password — 把某 level=admin 账号重置为一次性临时密码，
+       * 返回明文（仅此一次）。403 = 目标是 super_admin（超管不在此重置）。
+       */
+      resetPassword: (adminId: string) =>
+        http.post<ResetPasswordResponse>(`/admins/${adminId}/reset-password`)
     }
   };
 }

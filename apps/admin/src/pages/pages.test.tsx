@@ -41,11 +41,34 @@ describe("admin 页面烟雾测试", () => {
 
   it.each([
     [WordListsPage, "词表管理"],
-    [UsersPage, "用户管理"],
     [ReviewsPage, "审核中心"]
   ] as const)("%o 渲染标题 %s", (Page, title) => {
     render(<Page />);
     expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
+  });
+
+  it("用户管理页渲染搜索行、角色 tab 与表格列", () => {
+    // 已接数据层（React Query + mock 用户源），需 antd App context 与路由。
+    // 用文本查询而非 getByRole：表格每行含多个操作按钮，getByRole 会极慢。
+    render(
+      <MemoryRouter>
+        <QueryClientProvider client={new QueryClient()}>
+          <AntApp>
+            <UsersPage />
+          </AntApp>
+        </QueryClientProvider>
+      </MemoryRouter>
+    );
+    // 搜索行与角色 tab。
+    expect(screen.getByText("邮箱号码")).toBeInTheDocument();
+    for (const tab of ["全部", "老师", "学生"]) {
+      expect(screen.getByText(tab)).toBeInTheDocument();
+    }
+    // 表格关键列（mock 补齐的等级/更新时间也在）。fixed 列表头在 antd 下会重复渲染，
+    // 用 getAllByText 容纳多次出现。
+    for (const col of ["用户ID", "等级", "天生币余额", "更新时间"]) {
+      expect(screen.getAllByText(col).length).toBeGreaterThan(0);
+    }
   });
 
   it("智能词库页渲染搜索、工具栏与表格", () => {

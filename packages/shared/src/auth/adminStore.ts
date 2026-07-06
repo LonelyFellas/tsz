@@ -1,4 +1,4 @@
-import type { AdminLevel, AdminProfile } from "@tsz/api-client";
+import type { AdminLevel, AdminProfile } from "@tsz/types";
 import { create, type StoreApi, type UseBoundStore } from "zustand";
 
 export interface AdminAuthState {

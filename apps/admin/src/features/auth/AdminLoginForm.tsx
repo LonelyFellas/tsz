@@ -1,10 +1,12 @@
 import { isValidAccount } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
+import type { AdminAuthResponse } from "@tsz/types";
 import { Alert, Button, Card, Form, Input, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { api, persistSession, useAuthStore } from "@/lib/auth";
+import { ForceChangePasswordModal } from "./ForceChangePasswordModal";
 
 const LOGIN_ERRORS: Record<string, string> = {
   // 401：不区分是账号还是密码错，防枚举。
@@ -39,6 +41,8 @@ export function AdminLoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // 登录返回 must_change_password 时,挂起登录态(不放行进后台),先弹强制改密弹窗。
+  const [mustChange, setMustChange] = useState<AdminAuthResponse | null>(null);
 
   const setProfile = useAuthStore((s) => s.setProfile);
   const profile = useAuthStore((s) => s.profile);
@@ -55,6 +59,17 @@ export function AdminLoginForm() {
   // admin 密码后端规则为长度 8–72；此处提前拦下过短输入。
   const canSubmit = isValidAccount(account) && password.length >= 8 && !loading;
 
+  // 登录态落地：写用户态 store + 跳转进后台。用 replace：不把 /login 留在历史，避免「后退」回登录页。
+  function enterConsole(auth: AdminAuthResponse) {
+    setProfile({
+      id: auth.admin.id,
+      phone: auth.admin.phone,
+      display_name: auth.admin.display_name,
+      level: auth.level
+    });
+    navigate(safeRedirect(searchParams.get("redirect")), { replace: true });
+  }
+
   async function handleLogin() {
     if (!canSubmit) return;
     setError("");
@@ -62,22 +77,27 @@ export function AdminLoginForm() {
     try {
       // 后台是独立账号体系：登录成功即为有效 admin，无需再判角色。
       const auth = await api.auth.login(account, password);
-
+      // change-password 是 must_change 期间少数可达端点之一、需 Bearer——故先建立 access token。
       persistSession(auth);
-      setProfile({
-        id: auth.admin.id,
-        phone: auth.admin.phone,
-        display_name: auth.admin.display_name,
-        level: auth.level
-      });
-      // 用 replace：登录成功后不把 /login 留在历史，避免「后退」回到登录页。
-      navigate(safeRedirect(searchParams.get("redirect")), { replace: true });
+      if (auth.must_change_password) {
+        // 挂起登录态：不 setProfile（不放行进后台），先弹强制改密；password 作 current_password。
+        setMustChange(auth);
+        return;
+      }
+      enterConsole(auth);
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "";
       setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
     } finally {
       setLoading(false);
     }
+  }
+
+  // 放弃强制改密 → 退出登录：吊销会话（best-effort）并回到登录表单。
+  function handleForceCancel() {
+    void api.auth.logout().catch(() => undefined);
+    setMustChange(null);
+    setPassword("");
   }
 
   return (
@@ -129,6 +149,15 @@ export function AdminLoginForm() {
           </Button>
         </Form>
       </Card>
+
+      <ForceChangePasswordModal
+        open={!!mustChange}
+        currentPassword={password}
+        onSuccess={() => {
+          if (mustChange) enterConsole(mustChange);
+        }}
+        onCancel={handleForceCancel}
+      />
     </FullscreenCenter>
   );
 }

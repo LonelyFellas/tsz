@@ -5,9 +5,9 @@
 import {
   createAdminEndpoints,
   createHttpClient,
-  type AdminAuthResponse,
   type AdminEndpoints
 } from "@tsz/api-client";
+import type { AdminAuthResponse } from "@tsz/types";
 import { createAdminAuthStore, type AdminAuthStore } from "./adminStore";
 import { createTokenManager, type TokenManager } from "./tokenManager";
 
