@@ -44,14 +44,32 @@ describe("toUserListQuery", () => {
     expect(q.q).toBeUndefined();
   });
 
-  it("registeredDate 不进 wire（后端无参数）", () => {
+  it("registeredDate 映射为半开区间 [当日 00:00, 次日 00:00)", () => {
+    // 用本地日期（非带 Z 的时刻）构造，避免因运行机时区把「当日」推到隔壁天。
+    const day = dayjs("2026-06-15").hour(13).minute(45);
     const q = toUserListQuery({
-      filters: { registeredDate: dayjs() },
+      filters: { registeredDate: day },
       role: "all",
       page: 1,
       pageSize: 10
     });
+    // camelCase 表单字段不进 wire；下传的是 snake_case 时间区间。
     expect("registeredDate" in q).toBe(false);
-    expect(q.q).toBeUndefined();
+    const from = dayjs(q.registered_from);
+    const to = dayjs(q.registered_to);
+    expect(from.isSame(day.startOf("day"))).toBe(true);
+    // 半开区间：上界正好是下界 + 1 天。
+    expect(to.isSame(from.add(1, "day"))).toBe(true);
+  });
+
+  it("无 registeredDate 时不带时间参数", () => {
+    const q = toUserListQuery({
+      filters: { nickname: "alice" },
+      role: "all",
+      page: 1,
+      pageSize: 10
+    });
+    expect(q.registered_from).toBeUndefined();
+    expect(q.registered_to).toBeUndefined();
   });
 });

@@ -19,8 +19,18 @@ vi.mock("@/lib/auth", () => ({
         page: { page: 1, page_size: 20, total: 0 }
       }),
       stats: vi.fn().mockResolvedValue({ total: 0, today: 0, month: 0 })
+    },
+    users: {
+      list: vi.fn().mockResolvedValue({
+        items: [],
+        page: { page: 1, page_size: 20, total: 0 }
+      })
     }
-  }
+  },
+  // 用户管理页据 level 决定写操作是否置灰；烟雾测试给个超管即可。
+  useAuthStore: (
+    selector: (s: { profile: { level: string } | null }) => unknown
+  ) => selector({ profile: { level: "super_admin" } })
 }));
 
 // 平台后台各模块页。烟雾测试保证：页面能正常渲染、关键内容正确，
@@ -48,7 +58,7 @@ describe("admin 页面烟雾测试", () => {
   });
 
   it("用户管理页渲染搜索行、角色 tab 与表格列", () => {
-    // 已接数据层（React Query + mock 用户源），需 antd App context 与路由。
+    // 已接真实数据层（React Query + api.users.list，此处返回空列表），需 antd App context 与路由。
     // 用文本查询而非 getByRole：表格每行含多个操作按钮，getByRole 会极慢。
     render(
       <MemoryRouter>
@@ -64,7 +74,7 @@ describe("admin 页面烟雾测试", () => {
     for (const tab of ["全部", "老师", "学生"]) {
       expect(screen.getByText(tab)).toBeInTheDocument();
     }
-    // 表格关键列（mock 补齐的等级/更新时间也在）。fixed 列表头在 antd 下会重复渲染，
+    // 表格关键列（等级/天生币余额后端暂不填充但列头仍在）。fixed 列表头在 antd 下会重复渲染，
     // 用 getAllByText 容纳多次出现。
     for (const col of ["用户ID", "等级", "天生币余额", "更新时间"]) {
       expect(screen.getAllByText(col).length).toBeGreaterThan(0);

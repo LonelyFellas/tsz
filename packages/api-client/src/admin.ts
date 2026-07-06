@@ -4,8 +4,10 @@
 import type {
   AdminListQuery,
   AdminListResponse,
+  AdminUser,
   AdminUserListQuery,
   AdminUserListResponse,
+  AdminUserUpdateInput,
   AdminWordBatchDeleteResponse,
   AdminWordCreateInput,
   AdminWordEnvelope,
@@ -39,6 +41,7 @@ export type {
   AdminUser,
   AdminUserListQuery,
   AdminUserListResponse,
+  AdminUserUpdateInput,
   AdminUserView,
   CreateAdminInput,
   PageMeta,
@@ -133,13 +136,25 @@ export function createAdminEndpoints(http: HttpClient) {
         )
     },
     /**
-     * 用户管理：C 端用户（web 学员/教师）的后台目录。当前契约只有列表查询，
-     * 详情 / 启禁用 / 编辑 / 删除等尚未冻结（见 docs/features/admin-user-management/backend-todos.md）。
+     * 用户管理：C 端用户（web 学员/教师）的后台目录。读（列表/详情）任意 admin 可见；
+     * 写（启禁用/编辑）后端限 super_admin（普通 admin 得 403 super admin required）。
+     * 删除用户后端本轮 out of scope，无对应端点。
      */
     users: {
-      /** GET /admin/users — 列表页：role/关键字筛选 + 分页。后台可见联系方式（不脱敏）。 */
+      /** GET /admin/users — 列表页：role/关键字/注册时间筛选 + 分页。联系方式不脱敏。 */
       list: (query: AdminUserListQuery = {}) =>
-        http.get<AdminUserListResponse>(`/users${qs({ ...query })}`)
+        http.get<AdminUserListResponse>(`/users${qs({ ...query })}`),
+      /** GET /admin/users/{id} — 用户详情（单个 AdminUser）。 */
+      get: (id: string) => http.get<AdminUser>(`/users/${id}`),
+      /**
+       * PATCH /admin/users/{id}/status — 启用/禁用；返回更新后的 AdminUser。
+       * 禁用在用户下次登录/刷新时生效（一个 access-token TTL 内），不强制吊销活跃会话。
+       */
+      setStatus: (id: string, status: AdminUser["status"]) =>
+        http.patch<AdminUser>(`/users/${id}/status`, { status }),
+      /** PATCH /admin/users/{id} — 编辑可管理字段（本轮仅昵称）；返回更新后的 AdminUser。 */
+      update: (id: string, input: AdminUserUpdateInput) =>
+        http.patch<AdminUser>(`/users/${id}`, input)
     },
     /**
      * 管理员账号管理（`super_admin` 专属；普通 admin 调用得 403 super admin required）。

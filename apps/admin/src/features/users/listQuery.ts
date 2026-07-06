@@ -15,9 +15,8 @@ export interface UserFilterValues {
   /** 绑定邮箱。 */
   email?: string;
   /**
-   * 注册日期（单日）。后端 GET /admin/users 当前无时间筛选参数，
-   * 故不进 wire query，由 mock 层客户端过滤。
-   * TODO(backend): 见 docs/features/admin-user-management/backend-todos.md #2。
+   * 注册日期（单日）。映射为后端 registered_from / registered_to 半开区间
+   * [当日 00:00, 次日 00:00)，即「注册于这一天」。
    */
   registeredDate?: Dayjs | null;
 }
@@ -33,9 +32,11 @@ export interface UserListParams {
 /**
  * 组装**发往后端**的列表查询：
  * - role: all → 不传；否则透传 student/teacher。
- * - q: 后端是单一自由文本（匹配手机/邮箱/昵称），故把已填的昵称/手机/邮箱以空格拼接为一个 q。
- *   （精确的分字段过滤当前只在 mock 层实现；真实后端需 q 支持，见 backend-todos #2 说明。）
- * - registeredDate 不进 wire（后端无参数）。
+ * - q: 后端是单一自由文本（对手机/邮箱/昵称做字面子串匹配），故把已填的昵称/手机/邮箱
+ *   以空格拼接为一个 q。注意后端是「整串子串」匹配，同时填多个字段时可能匹配不到，
+ *   分字段精确过滤待后端支持（保留三字段 UI）。
+ * - registeredDate（单日）→ registered_from = 当日 00:00、registered_to = 次日 00:00，
+ *   即后端的半开区间 [from, to)「注册于这一天」。
  */
 export function toUserListQuery(params: UserListParams): AdminUserListQuery {
   const { filters, role, page, pageSize } = params;
@@ -47,5 +48,10 @@ export function toUserListQuery(params: UserListParams): AdminUserListQuery {
   const query: AdminUserListQuery = { page, page_size: pageSize };
   if (role !== "all") query.role = role;
   if (q) query.q = q;
+  if (filters.registeredDate) {
+    const from = filters.registeredDate.startOf("day");
+    query.registered_from = from.toISOString();
+    query.registered_to = from.add(1, "day").toISOString();
+  }
   return query;
 }

@@ -1,5 +1,6 @@
-// 用户管理（C 端用户，师生合一）：角色 tab + 搜索行 + 表格 + 详情 + 行操作。
-// 契约已有字段走真实、缺失字段/筛选/写操作走 mock（features/users/mock.ts）；
+// 用户管理（C 端用户，师生合一）：角色 tab + 搜索行 + 表格 + 详情 + 行操作。全对接真实
+// api.users.*。读任意 admin 可见；写（编辑/启禁用）后端限 super_admin，故非超管时置灰。
+// 等级/天生币余额两列后端暂不填充（恒显示「-」）；删除用户后端本轮未做，故按钮为占位置灰。
 // 天生币/等级/方言管理是独立模块，本次仅占位（点击提示「功能待接入」）。
 import {
   Alert,
@@ -13,14 +14,16 @@ import {
   Segmented,
   Space,
   Table,
-  Tag
+  Tag,
+  Tooltip
 } from "antd";
 import type { TableColumnsType } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useState } from "react";
 import type { AdminUserView, Role } from "@tsz/types";
-import { useDeleteUser, useSetUserStatus, useUserList } from "./api";
+import { useAuthStore } from "@/lib/auth";
+import { useSetUserStatus, useUserList } from "./api";
 import { EditUserModal } from "./EditUserModal";
 import { ROLE_LABEL, ROLE_TAG_COLOR, levelColor } from "./labels";
 import type { UserFilterValues, UserRoleTab } from "./listQuery";
@@ -34,7 +37,9 @@ const ROLE_TABS = [
 ];
 
 export function UserManagement() {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
+  // 写操作后端限 super_admin：非超管时把编辑/启禁用置灰，避免点了才吃 403。
+  const isSuperAdmin = useAuthStore((s) => s.profile?.level === "super_admin");
 
   const [filters, setFilters] = useState<UserFilterValues>({});
   const [role, setRole] = useState<UserRoleTab>("all");
@@ -44,7 +49,6 @@ export function UserManagement() {
   const [editUser, setEditUser] = useState<AdminUserView | null>(null);
 
   const listQuery = useUserList({ filters, role, page, pageSize });
-  const deleteUser = useDeleteUser();
   const setStatus = useSetUserStatus();
 
   const rows = listQuery.data?.items ?? [];
@@ -64,28 +68,6 @@ export function UserManagement() {
   // TODO(backend): 见 backend-todos.md #6。
   const notReady = (label: string) =>
     message.info(`${label}功能待接入，接口开发中`);
-
-  const removeOne = (record: AdminUserView) => {
-    modal.confirm({
-      title: `删除用户「${record.display_name}」?`,
-      content: "删除后该用户将从列表移除（当前为 mock 演示，不影响真实数据）。",
-      okText: "删除",
-      okButtonProps: { danger: true },
-      cancelText: "取消",
-      onOk: () =>
-        deleteUser
-          .mutateAsync(record.id)
-          .then(() => {
-            message.success("已删除");
-            // 删掉当前页最后一条时回退一页：分页 current 是受控的、不会自动夹取，
-            // 否则会停在一张空白的越界页。
-            if (rows.length === 1 && page > 1) setPage(page - 1);
-          })
-          .catch((err: unknown) =>
-            message.error(err instanceof Error ? err.message : "删除失败")
-          )
-    });
-  };
 
   const toggleStatus = (record: AdminUserView) => {
     const next = record.status === "active" ? "disabled" : "active";
@@ -204,20 +186,32 @@ export function UserManagement() {
           <Button type="link" size="small" onClick={() => notReady("方言管理")}>
             方言管理
           </Button>
-          <Button type="link" size="small" onClick={() => setEditUser(record)}>
-            编辑
-          </Button>
-          <Button type="link" size="small" onClick={() => toggleStatus(record)}>
-            {record.status === "active" ? "禁用" : "启用"}
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            onClick={() => removeOne(record)}
-          >
-            删除
-          </Button>
+          <Tooltip title={isSuperAdmin ? "" : "需超级管理员"}>
+            <Button
+              type="link"
+              size="small"
+              disabled={!isSuperAdmin}
+              onClick={() => setEditUser(record)}
+            >
+              编辑
+            </Button>
+          </Tooltip>
+          <Tooltip title={isSuperAdmin ? "" : "需超级管理员"}>
+            <Button
+              type="link"
+              size="small"
+              disabled={!isSuperAdmin}
+              onClick={() => toggleStatus(record)}
+            >
+              {record.status === "active" ? "禁用" : "启用"}
+            </Button>
+          </Tooltip>
+          {/* 删除用户后端本轮 out of scope，暂无接口：占位置灰，待后端接口就绪再启用。 */}
+          <Tooltip title="删除功能暂未开放">
+            <Button type="link" size="small" danger disabled>
+              删除
+            </Button>
+          </Tooltip>
         </Space>
       )
     }

@@ -1,10 +1,20 @@
 # 后端对接待办清单 —— 后台「用户管理」（C 端用户）
 
-> 本清单列出后台「用户管理」页所需、但当前 `openapi.yaml` 契约**尚未覆盖**的接口/字段。
-> 前端已按下列**建议形状**先行 mock（`apps/admin/src/features/users/mock.ts`），页面按产品原型完整呈现；
-> 后端按此对齐后，前端切 `USE_MOCK_USERS=false` 即接真实接口。字段一律 snake_case wire。
+> **对接状态（2026-07-06）**：后端已上线 `/admin/users` 目录/详情/启停/改名（tsz-go PR #51），
+> 前端已删除 mock、全量接真实 `api.users.*`。本清单大部已落地，下面每条标注了结果。
+> 仍未提供的只剩 `level` 取值口径（#1）、分字段精确搜索（#2）、删除接口（#5）。
 >
 > 管理员管理（`/admin/admins*`）接口已实现，不在此清单——那部分直接接真实接口。
+
+结果速览：
+
+- ✅ #1 avatar_url / updated_at 已并入 `AdminUser`；`level` 后端仍不返回（取值口径待产品定），列表/详情显示「-」。
+- ✅ #2 registered_from / registered_to 已支持（半开区间）；但 `q` 仍是单一自由文本，多字段精确过滤未做。
+- ✅ #3 `GET /admin/users/{id}` 已提供（与列表项同形，前端复用行数据即可）。
+- ✅ #4 `PATCH /admin/users/{id}/status` 已提供（super_admin）。
+- ⚠️ #5 `PATCH /admin/users/{id}`（改昵称）已提供；**删除用户后端本轮 out of scope**，无 `DELETE` 接口——前端「删除」按钮置灰占位。
+- ➖ #6 天生币 / 等级 / 方言：独立模块，仍占位。
+- ✅ #7 强制改密流程已联调（后端已实现）。
 
 ---
 
