@@ -13,6 +13,12 @@ export interface HttpClientOptions {
   onRefresh?: () => Promise<string>;
   /** refresh 失败后调用(通常跳转登录页)。 */
   onSessionExpired?: () => void;
+  /**
+   * 收到 403 时以副作用形式通知(携带业务 code)。用于全局分支——如
+   * code==="must_change_password" 时整页跳改密页。仅通知、不吞错:请求仍照常抛 HttpError,
+   * 调用方可继续 catch 做局部处理。web 端不传即维持原行为(向后兼容)。
+   */
+  onForbidden?: (code: string | undefined) => void;
 }
 
 export class HttpError extends Error {
@@ -20,7 +26,12 @@ export class HttpError extends Error {
     public status: number,
     message: string,
     /** 422 发布完整性检查的逐条违规(词库对接文档 §3.4);其余错误为空。 */
-    public details: string[] = []
+    public details: string[] = [],
+    /**
+     * 后端稳定错误码(如 403 的 "must_change_password")。文案可变、code 是稳定契约,
+     * 需要按错误码分支的全局处理据此判定,而非匹配 message。多数错误无此字段。
+     */
+    public code?: string
   ) {
     super(message);
     this.name = "HttpError";
@@ -36,11 +47,19 @@ export function isIncompleteHttpError(
 
 async function parseError(
   res: Response
-): Promise<{ message: string; details: string[] }> {
+): Promise<{ message: string; details: string[]; code?: string }> {
   try {
-    const body = (await res.json()) as { error?: string; details?: string[] };
+    const body = (await res.json()) as {
+      error?: string;
+      details?: string[];
+      code?: string;
+    };
     if (body.error) {
-      return { message: body.error, details: body.details ?? [] };
+      return {
+        message: body.error,
+        details: body.details ?? [],
+        code: body.code
+      };
     }
   } catch {
     // ignore
@@ -52,7 +71,8 @@ export function createHttpClient({
   baseUrl,
   getToken,
   onRefresh,
-  onSessionExpired
+  onSessionExpired,
+  onForbidden
 }: HttpClientOptions) {
   async function request<T>(
     path: string,
@@ -85,8 +105,10 @@ export function createHttpClient({
     }
 
     if (!res.ok) {
-      const { message, details } = await parseError(res);
-      throw new HttpError(res.status, message, details);
+      const { message, details, code } = await parseError(res);
+      // 403 全局通知(如 must_change_password → 跳改密页)。只作副作用,不吞错:仍照常抛出。
+      if (res.status === 403) onForbidden?.(code);
+      throw new HttpError(res.status, message, details, code);
     }
 
     // 204 No Content

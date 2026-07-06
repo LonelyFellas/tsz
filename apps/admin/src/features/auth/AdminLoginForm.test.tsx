@@ -1,6 +1,6 @@
 import type { AdminAuthResponse } from "@tsz/api-client";
+import { HttpError } from "@tsz/api-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { App as AntApp } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockNavigate = vi.fn();
@@ -26,8 +26,6 @@ import { AdminLoginForm } from "./AdminLoginForm";
 import { api, persistSession, useAuthStore } from "@/lib/auth";
 
 const mockLogin = vi.mocked(api.auth.login);
-const mockChangePassword = vi.mocked(api.auth.changePassword);
-const mockLogout = vi.mocked(api.auth.logout);
 const mockPersist = vi.mocked(persistSession);
 
 function authResponse(
@@ -230,58 +228,65 @@ describe("AdminLoginForm", () => {
     await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
   });
 
-  it("must_change_password：弹强制改密、挂起进后台，改密成功后落地", async () => {
+  it("must_change_password：建立会话后跳独立改密页(带临时密码 state)，不放行进后台", async () => {
     mockLogin.mockResolvedValue(authResponse("admin", true));
-    mockChangePassword.mockResolvedValue(undefined);
-    render(
-      <AntApp>
-        <AdminLoginForm />
-      </AntApp>
-    );
+    render(<AdminLoginForm />);
     fillAndSubmit();
 
-    // 登录成功但被挂起：已建立 token（供改密），弹改密弹窗，未 setProfile / 未跳转。
-    expect(await screen.findByText("请先修改初始密码")).toBeInTheDocument();
+    // 登录成功但被挂起：已建立 token（供改密），跳改密页并把临时密码经 state 预填，未 setProfile。
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith("/change-password", {
+        state: { currentPassword: "secret123" }
+      })
+    );
     expect(mockPersist).toHaveBeenCalled();
-    expect(mockNavigate).not.toHaveBeenCalled();
     expect(useAuthStore.getState().profile).toBeNull();
-
-    // 填新密码 + 确认后提交。
-    fireEvent.change(screen.getByPlaceholderText("至少 12 位，非纯数字"), {
-      target: { value: "brand-new-pw-2026" }
-    });
-    fireEvent.change(screen.getByPlaceholderText("再次输入新密码"), {
-      target: { value: "brand-new-pw-2026" }
-    });
-    fireEvent.click(screen.getByRole("button", { name: "修改并进入" }));
-
-    // current_password 用登录时输入的临时密码。
-    await waitFor(() =>
-      expect(mockChangePassword).toHaveBeenCalledWith(
-        "secret123",
-        "brand-new-pw-2026"
-      )
-    );
-    await waitFor(() =>
-      expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true })
-    );
-    expect(useAuthStore.getState().profile?.display_name).toBe("审核员小王");
   });
 
-  it("must_change_password：点退出登录吊销会话、留在登录页", async () => {
-    mockLogin.mockResolvedValue(authResponse("admin", true));
-    mockLogout.mockResolvedValue(undefined);
-    render(
-      <AntApp>
-        <AdminLoginForm />
-      </AntApp>
-    );
-    fillAndSubmit();
-    await screen.findByText("请先修改初始密码");
+  // antd 的 loading 图标退场动画在 jsdom 里不触发 animationend，spinner 会滞留 DOM 使
+  // 按钮可及名残留 "loading"，无法按 /^登录$/ 精确匹配。直接取主按钮元素判用禁态更稳。
+  const primaryButton = (c: HTMLElement) =>
+    c.querySelector("button.ant-btn-primary") as HTMLButtonElement;
 
-    fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
-    await waitFor(() => expect(mockLogout).toHaveBeenCalled());
+  it("账号被锁定(423)：提示锁定并置灰登录按钮，改动密码后恢复可点", async () => {
+    mockLogin.mockRejectedValue(
+      new HttpError(
+        423,
+        "account temporarily locked due to too many failed login attempts"
+      )
+    );
+    const { container } = render(<AdminLoginForm />);
+    fillAndSubmit();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("账号已被锁定，请约 15 分钟后再试")
+      ).toBeInTheDocument()
+    );
+    expect(primaryButton(container)).toBeDisabled();
     expect(mockNavigate).not.toHaveBeenCalled();
-    expect(useAuthStore.getState().profile).toBeNull();
+
+    // 改动密码 = 新一次尝试意图：清提示、解除置灰。
+    fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
+      target: { value: "another-secret" }
+    });
+    expect(
+      screen.queryByText("账号已被锁定，请约 15 分钟后再试")
+    ).not.toBeInTheDocument();
+    expect(primaryButton(container)).toBeEnabled();
+  });
+
+  it("账号被锁定(423)：改动账号同样解除置灰", async () => {
+    mockLogin.mockRejectedValue(
+      new HttpError(423, "account temporarily locked")
+    );
+    const { container } = render(<AdminLoginForm />);
+    fillAndSubmit();
+
+    await waitFor(() => expect(primaryButton(container)).toBeDisabled());
+    fireEvent.change(screen.getByPlaceholderText("请输入手机号或邮箱"), {
+      target: { value: "13900139000" }
+    });
+    expect(primaryButton(container)).toBeEnabled();
   });
 });

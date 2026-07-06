@@ -38,6 +38,14 @@ export const router = createBrowserRouter([
         })
       },
       {
+        // 顶层路由（不进 (console) 门禁壳）：强制改密态 profile 为空、其余接口皆 403，
+        // 唯有独立可达的改密页能让被重置的管理员完成改密。
+        path: "/change-password",
+        lazy: async () => ({
+          Component: (await import("@/pages/ChangePassword")).ChangePasswordPage
+        })
+      },
+      {
         lazy: async () => ({
           Component: (await import("@/layouts/ConsoleLayout")).ConsoleLayout
         }),

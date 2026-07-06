@@ -47,6 +47,13 @@ describe("AdminHeader", () => {
     expect(screen.getByText("管理员")).toBeInTheDocument();
   });
 
+  it("点「修改密码」跳改密页（自助改密入口）", () => {
+    useAuthStore.setState({ profile: PROFILE, level: PROFILE.level });
+    render(<AdminHeader />);
+    fireEvent.click(screen.getByRole("button", { name: /修改密码/ }));
+    expect(mockNavigate).toHaveBeenCalledWith("/change-password");
+  });
+
   it("点退出：吊销会话、清 token、清 profile、回登录页", async () => {
     useAuthStore.setState({ profile: PROFILE, level: PROFILE.level });
     render(<AdminHeader />);

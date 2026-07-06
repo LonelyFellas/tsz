@@ -272,6 +272,58 @@ describe("createHttpClient", () => {
     expect(data).toEqual({ id: "1" });
   });
 
+  it("403 触发 onForbidden(code) 且仍抛 HttpError（携带 code）", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { error: "password change required", code: "must_change_password" },
+        { ok: false, status: 403 }
+      )
+    );
+    const onForbidden = vi.fn();
+    const http = createHttpClient({ baseUrl: "", onForbidden });
+
+    await expect(http.get("/words")).rejects.toMatchObject({
+      status: 403,
+      message: "password change required",
+      code: "must_change_password"
+    });
+    expect(onForbidden).toHaveBeenCalledWith("must_change_password");
+  });
+
+  it("403 无 code：onForbidden 收到 undefined", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "account disabled" }, { ok: false, status: 403 })
+    );
+    const onForbidden = vi.fn();
+    const http = createHttpClient({ baseUrl: "", onForbidden });
+
+    await expect(http.get("/x")).rejects.toMatchObject({
+      status: 403,
+      code: undefined
+    });
+    expect(onForbidden).toHaveBeenCalledWith(undefined);
+  });
+
+  it("非 403 错误不触发 onForbidden", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "boom" }, { ok: false, status: 500 })
+    );
+    const onForbidden = vi.fn();
+    const http = createHttpClient({ baseUrl: "", onForbidden });
+
+    await expect(http.get("/x")).rejects.toMatchObject({ status: 500 });
+    expect(onForbidden).not.toHaveBeenCalled();
+  });
+
+  it("未传 onForbidden 时 403 仍正常抛 HttpError（web 端向后兼容）", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ error: "forbidden" }, { ok: false, status: 403 })
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/x")).rejects.toMatchObject({ status: 403 });
+  });
+
   it("onRefresh 失败时调 onSessionExpired 并抛错", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(

@@ -1,3 +1,4 @@
+import { HttpError } from "@tsz/api-client";
 import { isValidAccount } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
 import type { AdminAuthResponse } from "@tsz/types";
@@ -6,7 +7,6 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { api, persistSession, useAuthStore } from "@/lib/auth";
-import { ForceChangePasswordModal } from "./ForceChangePasswordModal";
 
 const LOGIN_ERRORS: Record<string, string> = {
   // 401：不区分是账号还是密码错，防枚举。
@@ -41,8 +41,9 @@ export function AdminLoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  // 登录返回 must_change_password 时,挂起登录态(不放行进后台),先弹强制改密弹窗。
-  const [mustChange, setMustChange] = useState<AdminAuthResponse | null>(null);
+  // 账号被后端锁定(连续失败触发 423):置灰登录按钮,阻断徒劳的连点重试。
+  // 以后端 423 为唯一事实来源,前端不本地计数;用户改动账号/密码(新尝试意图)时解除。
+  const [locked, setLocked] = useState(false);
 
   const setProfile = useAuthStore((s) => s.setProfile);
   const profile = useAuthStore((s) => s.profile);
@@ -56,8 +57,21 @@ export function AdminLoginForm() {
     }
   }, [profile, navigate, searchParams]);
 
-  // admin 密码后端规则为长度 8–72；此处提前拦下过短输入。
-  const canSubmit = isValidAccount(account) && password.length >= 8 && !loading;
+  // admin 密码后端规则为长度 8–72；此处提前拦下过短输入。锁定期间禁提交。
+  const canSubmit =
+    isValidAccount(account) && password.length >= 8 && !loading && !locked;
+
+  // 输入变更即视为新一次尝试意图：清错误 + 解除锁定置灰（仍在锁定窗口内会再拿到 423）。
+  function onAccountChange(value: string) {
+    setAccount(value);
+    if (error) setError("");
+    if (locked) setLocked(false);
+  }
+  function onPasswordChange(value: string) {
+    setPassword(value);
+    if (error) setError("");
+    if (locked) setLocked(false);
+  }
 
   // 登录态落地：写用户态 store + 跳转进后台。用 replace：不把 /login 留在历史，避免「后退」回登录页。
   function enterConsole(auth: AdminAuthResponse) {
@@ -80,24 +94,24 @@ export function AdminLoginForm() {
       // change-password 是 must_change 期间少数可达端点之一、需 Bearer——故先建立 access token。
       persistSession(auth);
       if (auth.must_change_password) {
-        // 挂起登录态：不 setProfile（不放行进后台），先弹强制改密；password 作 current_password。
-        setMustChange(auth);
+        // 挂起登录态：不 setProfile（不放行进后台），跳独立改密页（profile 空 → 该页判定为强制改密）；
+        // 刚输入的临时密码经路由 state 预填当前密码，省一次重输。
+        navigate("/change-password", { state: { currentPassword: password } });
         return;
       }
       enterConsole(auth);
     } catch (e: unknown) {
+      // 423 = 账号被临时锁定（连续失败触发）：区别于 401 凭证错，置灰按钮并提示 15 分钟后再试。
+      if (e instanceof HttpError && e.status === 423) {
+        setError("账号已被锁定，请约 15 分钟后再试");
+        setLocked(true);
+        return;
+      }
       const msg = e instanceof Error ? e.message : "";
       setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
     } finally {
       setLoading(false);
     }
-  }
-
-  // 放弃强制改密 → 退出登录：吊销会话（best-effort）并回到登录表单。
-  function handleForceCancel() {
-    void api.auth.logout().catch(() => undefined);
-    setMustChange(null);
-    setPassword("");
   }
 
   return (
@@ -116,7 +130,7 @@ export function AdminLoginForm() {
               placeholder="请输入手机号或邮箱"
               autoComplete="username"
               value={account}
-              onChange={(e) => setAccount(e.target.value)}
+              onChange={(e) => onAccountChange(e.target.value)}
             />
           </Form.Item>
           <Form.Item label="密码">
@@ -124,7 +138,7 @@ export function AdminLoginForm() {
               placeholder="请输入登录密码"
               autoComplete="current-password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(e) => onPasswordChange(e.target.value)}
               onPressEnter={() => void handleLogin()}
             />
           </Form.Item>
@@ -149,15 +163,6 @@ export function AdminLoginForm() {
           </Button>
         </Form>
       </Card>
-
-      <ForceChangePasswordModal
-        open={!!mustChange}
-        currentPassword={password}
-        onSuccess={() => {
-          if (mustChange) enterConsole(mustChange);
-        }}
-        onCancel={handleForceCancel}
-      />
     </FullscreenCenter>
   );
 }
