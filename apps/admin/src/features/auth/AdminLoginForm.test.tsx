@@ -1,5 +1,6 @@
 import type { AdminAuthResponse } from "@tsz/api-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { App as AntApp } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockNavigate = vi.fn();
@@ -14,7 +15,9 @@ vi.mock("@/lib/auth", async () => {
   const { createAdminAuthStore } = await import("@tsz/shared/auth");
   return {
     useAuthStore: createAdminAuthStore(),
-    api: { auth: { login: vi.fn() } },
+    api: {
+      auth: { login: vi.fn(), changePassword: vi.fn(), logout: vi.fn() }
+    },
     persistSession: vi.fn()
   };
 });
@@ -23,9 +26,14 @@ import { AdminLoginForm } from "./AdminLoginForm";
 import { api, persistSession, useAuthStore } from "@/lib/auth";
 
 const mockLogin = vi.mocked(api.auth.login);
+const mockChangePassword = vi.mocked(api.auth.changePassword);
+const mockLogout = vi.mocked(api.auth.logout);
 const mockPersist = vi.mocked(persistSession);
 
-function authResponse(level: "admin" | "super_admin"): AdminAuthResponse {
+function authResponse(
+  level: "admin" | "super_admin",
+  mustChange = false
+): AdminAuthResponse {
   return {
     admin: {
       id: "a1",
@@ -38,7 +46,8 @@ function authResponse(level: "admin" | "super_admin"): AdminAuthResponse {
     access_token: "at-1",
     level,
     expires_in: 900,
-    refresh_token_expires_at: 0
+    refresh_token_expires_at: 0,
+    must_change_password: mustChange
   };
 }
 
@@ -219,5 +228,60 @@ describe("AdminLoginForm", () => {
 
     resolveLogin(authResponse("admin"));
     await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+  });
+
+  it("must_change_password：弹强制改密、挂起进后台，改密成功后落地", async () => {
+    mockLogin.mockResolvedValue(authResponse("admin", true));
+    mockChangePassword.mockResolvedValue(undefined);
+    render(
+      <AntApp>
+        <AdminLoginForm />
+      </AntApp>
+    );
+    fillAndSubmit();
+
+    // 登录成功但被挂起：已建立 token（供改密），弹改密弹窗，未 setProfile / 未跳转。
+    expect(await screen.findByText("请先修改初始密码")).toBeInTheDocument();
+    expect(mockPersist).toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().profile).toBeNull();
+
+    // 填新密码 + 确认后提交。
+    fireEvent.change(screen.getByPlaceholderText("至少 12 位，非纯数字"), {
+      target: { value: "brand-new-pw-2026" }
+    });
+    fireEvent.change(screen.getByPlaceholderText("再次输入新密码"), {
+      target: { value: "brand-new-pw-2026" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "修改并进入" }));
+
+    // current_password 用登录时输入的临时密码。
+    await waitFor(() =>
+      expect(mockChangePassword).toHaveBeenCalledWith(
+        "secret123",
+        "brand-new-pw-2026"
+      )
+    );
+    await waitFor(() =>
+      expect(mockNavigate).toHaveBeenCalledWith("/", { replace: true })
+    );
+    expect(useAuthStore.getState().profile?.display_name).toBe("审核员小王");
+  });
+
+  it("must_change_password：点退出登录吊销会话、留在登录页", async () => {
+    mockLogin.mockResolvedValue(authResponse("admin", true));
+    mockLogout.mockResolvedValue(undefined);
+    render(
+      <AntApp>
+        <AdminLoginForm />
+      </AntApp>
+    );
+    fillAndSubmit();
+    await screen.findByText("请先修改初始密码");
+
+    fireEvent.click(screen.getByRole("button", { name: "退出登录" }));
+    await waitFor(() => expect(mockLogout).toHaveBeenCalled());
+    expect(mockNavigate).not.toHaveBeenCalled();
+    expect(useAuthStore.getState().profile).toBeNull();
   });
 });

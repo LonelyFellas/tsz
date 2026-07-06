@@ -8,11 +8,13 @@ const http = {
   get: vi.fn(),
   post: vi.fn(),
   put: vi.fn(),
+  patch: vi.fn(),
   del: vi.fn()
 } as unknown as HttpClient & {
   get: ReturnType<typeof vi.fn>;
   post: ReturnType<typeof vi.fn>;
   put: ReturnType<typeof vi.fn>;
+  patch: ReturnType<typeof vi.fn>;
   del: ReturnType<typeof vi.fn>;
 };
 
@@ -47,6 +49,15 @@ describe("createAdminEndpoints", () => {
     const api = createAdminEndpoints(http);
     api.auth.logoutAll();
     expect(http.post).toHaveBeenCalledWith("/auth/logout-all");
+  });
+
+  it("changePassword → POST /auth/change-password 带 current/new 密码", () => {
+    const api = createAdminEndpoints(http);
+    api.auth.changePassword("old-temp-pw!!", "brand-new-pw-2026");
+    expect(http.post).toHaveBeenCalledWith("/auth/change-password", {
+      current_password: "old-temp-pw!!",
+      new_password: "brand-new-pw-2026"
+    });
   });
 
   it("profile → GET /profile", () => {
@@ -159,5 +170,71 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(sp.get("q")).toBe("big");
     expect(sp.get("kind")).toBe("word");
     expect(sp.get("limit")).toBe("10");
+  });
+});
+
+describe("createAdminEndpoints — 用户管理 users", () => {
+  it("list 无参 → GET /users(不带 ?)", () => {
+    const api = createAdminEndpoints(http);
+    api.users.list();
+    expect(http.get).toHaveBeenCalledWith("/users");
+  });
+
+  it("list 带筛选 → 仅非空参数进 query", () => {
+    const api = createAdminEndpoints(http);
+    api.users.list({ role: "teacher", q: "alice", page: 3, page_size: 20 });
+    const [path] = http.get.mock.calls[0] as [string];
+    const sp = new URLSearchParams(path.split("?")[1]);
+    expect(path.startsWith("/users?")).toBe(true);
+    expect(sp.get("role")).toBe("teacher");
+    expect(sp.get("q")).toBe("alice");
+    expect(sp.get("page")).toBe("3");
+    expect(sp.get("page_size")).toBe("20");
+  });
+});
+
+describe("createAdminEndpoints — 管理员管理 admins", () => {
+  it("list 无参 → GET /admins(不带 ?)", () => {
+    const api = createAdminEndpoints(http);
+    api.admins.list();
+    expect(http.get).toHaveBeenCalledWith("/admins");
+  });
+
+  it("list 带筛选 → level/q/分页进 query", () => {
+    const api = createAdminEndpoints(http);
+    api.admins.list({ level: "admin", q: "王", page: 1, page_size: 50 });
+    const [path] = http.get.mock.calls[0] as [string];
+    const sp = new URLSearchParams(path.split("?")[1]);
+    expect(path.startsWith("/admins?")).toBe(true);
+    expect(sp.get("level")).toBe("admin");
+    expect(sp.get("q")).toBe("王");
+    expect(sp.get("page")).toBe("1");
+    expect(sp.get("page_size")).toBe("50");
+  });
+
+  it("create → POST /admins 带建号入参", () => {
+    const api = createAdminEndpoints(http);
+    const input = {
+      phone: "13800138000",
+      password: "str0ng-admin-pw!",
+      display_name: "审核员小王",
+      level: "admin" as const
+    };
+    api.admins.create(input);
+    expect(http.post).toHaveBeenCalledWith("/admins", input);
+  });
+
+  it("setStatus → PATCH /admins/{id}/status 带 status", () => {
+    const api = createAdminEndpoints(http);
+    api.admins.setStatus("a-1", "disabled");
+    expect(http.patch).toHaveBeenCalledWith("/admins/a-1/status", {
+      status: "disabled"
+    });
+  });
+
+  it("resetPassword → POST /admins/{id}/reset-password 无 body", () => {
+    const api = createAdminEndpoints(http);
+    api.admins.resetPassword("a-1");
+    expect(http.post).toHaveBeenCalledWith("/admins/a-1/reset-password");
   });
 });
