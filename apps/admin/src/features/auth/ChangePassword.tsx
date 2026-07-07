@@ -12,6 +12,7 @@
 // 改密即吊销当前会话，本页整页重载会在改密成功后把管理员弹回 /login（refresh 401 → redirectToLogin）。
 // 届时须改为：后端在 204 前返回新 token → 前端 persistSession 后 SPA 落地，去掉对 refresh cookie 的依赖。
 import { HttpError } from "@tsz/api-client";
+import { findAdminPasswordWeakWord } from "@tsz/shared";
 import { App, Button, Card, Form, Input, Typography } from "antd";
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -117,6 +118,17 @@ export function ChangePassword() {
                   v && /^\d+$/.test(v)
                     ? Promise.reject(new Error("密码不能是纯数字"))
                     : Promise.resolve()
+              },
+              {
+                // 弱词预检:与后端策略对齐,提交前即提示,不必等 400。后端仍是权威校验。
+                validator: (_, v: string) => {
+                  const weak = v && findAdminPasswordWeakWord(v);
+                  return weak
+                    ? Promise.reject(
+                        new Error(`密码包含常见弱词「${weak}」，请更换`)
+                      )
+                    : Promise.resolve();
+                }
               },
               ({ getFieldValue }) => ({
                 validator: (_, v: string) =>
