@@ -4,6 +4,7 @@
 import type {
   AdminListQuery,
   AdminListResponse,
+  AdminRole,
   AdminUser,
   AdminUserListQuery,
   AdminUserListResponse,
@@ -19,11 +20,15 @@ import type {
   AdminStatus,
   CreateAdminInput,
   CreateAdminResponse,
+  CreateRoleRequest,
   Admin,
   AdminAuthResponse,
   AdminProfile,
+  PermissionCatalogResponse,
   RelatedSearchResponse,
-  ResetPasswordResponse
+  ResetPasswordResponse,
+  RoleListResponse,
+  UpdateRoleRequest
 } from "@tsz/types";
 import type { RefreshResponse } from "./endpoints";
 import type { HttpClient } from "./http";
@@ -38,6 +43,7 @@ export type {
   AdminListQuery,
   AdminListResponse,
   AdminProfile,
+  AdminRole,
   AdminStatus,
   AdminUser,
   AdminUserListQuery,
@@ -46,8 +52,16 @@ export type {
   AdminUserView,
   CreateAdminInput,
   CreateAdminResponse,
+  CreateRoleRequest,
+  MenuPermission,
   PageMeta,
-  ResetPasswordResponse
+  PermissionCatalogItem,
+  PermissionCatalogResponse,
+  PermissionKey,
+  ResetPasswordResponse,
+  RoleListResponse,
+  SetAdminRoleRequest,
+  UpdateRoleRequest
 } from "@tsz/types";
 
 /** 把可选查询参数编成 query string;跳过 undefined / null / 空串,空对象返回 ""。 */
@@ -183,7 +197,41 @@ export function createAdminEndpoints(http: HttpClient) {
        * 返回明文（仅此一次）。403 = 目标是 super_admin（超管不在此重置）。
        */
       resetPassword: (adminId: string) =>
-        http.post<ResetPasswordResponse>(`/admins/${adminId}/reset-password`)
+        http.post<ResetPasswordResponse>(`/admins/${adminId}/reset-password`),
+      /**
+       * PATCH /admin/admins/{id}/role — 给普通管理员派 / 换 / 清角色（RBAC 第二段）→ 204。
+       * roleId 传 null = 收回（降为仅首页）。403 = 目标是超管（不挂角色）；
+       * 404 = 管理员或 roleId 指向的角色不存在。成功后重拉角色列表刷新 member_count。
+       */
+      setRole: (adminId: string, roleId: string | null) =>
+        http.patch<void>(`/admins/${adminId}/role`, { role_id: roleId })
+    },
+    /**
+     * 后台 RBAC「角色治理」（`super_admin` 专属；普通 admin 调用得 403 super admin required）。
+     * 契约见 openapi `Admin (roles)` 标签、docs/admin-rbac-frontend-integration.md。
+     */
+    roles: {
+      /** GET /admin/permissions — 权限目录（渲染勾选框；顺序即侧栏顺序，别硬编码 key）。 */
+      permissions: () => http.get<PermissionCatalogResponse>("/permissions"),
+      /** GET /admin/roles — 角色列表（系统角色最前，permissions 按 key 字母序）。 */
+      list: () => http.get<RoleListResponse>("/roles"),
+      /**
+       * POST /admin/roles — 建角色。201 返回新 AdminRole；409 = 重名（大小写不敏感）；
+       * 400 = 名称非法或勾了目录外 key（code=unknown_permission_key）。
+       */
+      create: (input: CreateRoleRequest) =>
+        http.post<AdminRole>("/roles", input),
+      /**
+       * PATCH /admin/roles/{id} — 改名/描述/权限集（部分更新；permissions 传了就是全量替换）。
+       * 200 返回更新后的 AdminRole；403 = 系统角色禁改；404 = 已被删；409 = 重名；400 同 create。
+       */
+      update: (roleId: string, input: UpdateRoleRequest) =>
+        http.patch<AdminRole>(`/roles/${roleId}`, input),
+      /**
+       * DELETE /admin/roles/{id} — 删角色 → 204，名下管理员自动解绑降为仅首页。
+       * 403 = 系统角色禁删；404 = 不存在。删前用 member_count 二次确认。
+       */
+      remove: (roleId: string) => http.del<void>(`/roles/${roleId}`)
     }
   };
 }

@@ -128,6 +128,25 @@ describe("ConsoleSidebar", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/admins");
   });
 
+  it("super_admin：用户管理分组下显示「角色权限管理」并跳转 /roles", () => {
+    setLevel("super_admin");
+    renderAt("/");
+    fireEvent.click(screen.getByText("用户管理"));
+    const entry = screen.getByText("角色权限管理");
+    expect(entry).toBeInTheDocument();
+    fireEvent.click(entry);
+    expect(mockNavigate).toHaveBeenCalledWith("/roles");
+  });
+
+  it("普通 admin：用户管理分组下无「角色权限管理」入口", () => {
+    // 给普通 admin users.access 以便展开用户管理分组，验证 superOnly 叶子仍不渲染。
+    setLevel("admin", ["users.access"]);
+    renderAt("/");
+    fireEvent.click(screen.getByText("用户管理"));
+    expect(screen.queryByText("角色权限管理")).toBeNull();
+    expect(screen.queryByText("管理员管理")).toBeNull();
+  });
+
   it("分类分组默认收起，展开后已落地模块可点", () => {
     renderAt("/words");
     // 分类默认收起：子项初始不在可访问树中。

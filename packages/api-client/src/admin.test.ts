@@ -236,4 +236,64 @@ describe("createAdminEndpoints — 管理员管理 admins", () => {
     api.admins.resetPassword("a-1");
     expect(http.post).toHaveBeenCalledWith("/admins/a-1/reset-password");
   });
+
+  it("setRole → PATCH /admins/{id}/role 带 role_id", () => {
+    const api = createAdminEndpoints(http);
+    api.admins.setRole("a-1", "r-9");
+    expect(http.patch).toHaveBeenCalledWith("/admins/a-1/role", {
+      role_id: "r-9"
+    });
+  });
+
+  it("setRole(null) → PATCH /admins/{id}/role 收回角色", () => {
+    const api = createAdminEndpoints(http);
+    api.admins.setRole("a-1", null);
+    expect(http.patch).toHaveBeenCalledWith("/admins/a-1/role", {
+      role_id: null
+    });
+  });
+});
+
+describe("createAdminEndpoints — 角色治理 roles", () => {
+  it("permissions → GET /permissions", () => {
+    const api = createAdminEndpoints(http);
+    api.roles.permissions();
+    expect(http.get).toHaveBeenCalledWith("/permissions");
+  });
+
+  it("list → GET /roles", () => {
+    const api = createAdminEndpoints(http);
+    api.roles.list();
+    expect(http.get).toHaveBeenCalledWith("/roles");
+  });
+
+  it("create → POST /roles 带 name/description/permissions", () => {
+    const api = createAdminEndpoints(http);
+    const input = {
+      name: "词库管理员",
+      description: "管理智能词库与词表",
+      permissions: ["words.access", "wordlists.access"] as const
+    };
+    api.roles.create({ ...input, permissions: [...input.permissions] });
+    expect(http.post).toHaveBeenCalledWith("/roles", {
+      name: "词库管理员",
+      description: "管理智能词库与词表",
+      permissions: ["words.access", "wordlists.access"]
+    });
+  });
+
+  it("update → PATCH /roles/{id} 全量替换权限集", () => {
+    const api = createAdminEndpoints(http);
+    api.roles.update("r-1", { name: "高级词库管理员", permissions: [] });
+    expect(http.patch).toHaveBeenCalledWith("/roles/r-1", {
+      name: "高级词库管理员",
+      permissions: []
+    });
+  });
+
+  it("remove → DELETE /roles/{id}", () => {
+    const api = createAdminEndpoints(http);
+    api.roles.remove("r-1");
+    expect(http.del).toHaveBeenCalledWith("/roles/r-1");
+  });
 });

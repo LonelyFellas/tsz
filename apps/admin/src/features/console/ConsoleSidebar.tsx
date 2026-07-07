@@ -52,7 +52,8 @@ const GROUPS: Group[] = [
     label: "用户管理",
     leaves: [
       { key: "/users", label: "用户管理", perm: "users.access" },
-      { key: "/admins", label: "管理员管理", superOnly: true }
+      { key: "/admins", label: "管理员管理", superOnly: true },
+      { key: "/roles", label: "角色权限管理", superOnly: true }
     ]
   },
   {

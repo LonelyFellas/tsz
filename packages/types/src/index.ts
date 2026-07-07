@@ -8,6 +8,7 @@ export * from "./task";
 export * from "./api";
 export * from "./admin";
 export * from "./admin-user";
+export * from "./admin-role";
 export type {
   AdminWordKind,
   AdminWordListItem,
