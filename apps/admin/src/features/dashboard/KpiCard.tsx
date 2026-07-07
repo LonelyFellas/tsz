@@ -13,7 +13,6 @@ interface KpiCardProps {
  */
 export function KpiCard({ item }: KpiCardProps) {
   const { label, value, suffix, delta, hint } = item;
-  const up = delta ? delta.value >= 0 : true;
 
   return (
     <Card size="small" style={{ height: "100%" }}>
@@ -25,12 +24,16 @@ export function KpiCard({ item }: KpiCardProps) {
         suffix={suffix}
         styles={{ content: { fontSize: 26, fontWeight: 600, lineHeight: 1.3 } }}
       />
-      {delta && (
+      {/* 零增量视为持平：不渲染趋势行（与 KpiItem 契约一致）。仅正/负才出涨跌行。 */}
+      {delta && delta.value !== 0 && (
         <Typography.Text
-          style={{ fontSize: 12, color: up ? "#52c41a" : "#ff4d4f" }}
+          style={{
+            fontSize: 12,
+            color: delta.value > 0 ? "#52c41a" : "#ff4d4f"
+          }}
         >
-          {up ? <ArrowUpOutlined /> : <ArrowDownOutlined />} {delta.label}{" "}
-          {up ? "+" : ""}
+          {delta.value > 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}{" "}
+          {delta.label} {delta.value > 0 ? "+" : ""}
           {delta.value.toLocaleString()}
         </Typography.Text>
       )}

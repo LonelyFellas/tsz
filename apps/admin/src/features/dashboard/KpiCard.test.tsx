@@ -36,6 +36,22 @@ describe("KpiCard", () => {
     expect(screen.getByText(/55/)).toBeInTheDocument();
   });
 
+  it("零增量视为持平：不渲染趋势行", () => {
+    render(
+      <KpiCard
+        item={{
+          key: "users",
+          label: "累计用户",
+          value: 137,
+          delta: { label: "今日", value: 0 }
+        }}
+      />
+    );
+    // 持平不出涨跌行：既无口径文案，也不出「+0」。
+    expect(screen.queryByText(/今日/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/\+0/)).not.toBeInTheDocument();
+  });
+
   it("负增量渲染下跌趋势（无加号）且不渲染缺省的 hint", () => {
     render(
       <KpiCard

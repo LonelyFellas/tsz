@@ -20,7 +20,8 @@ export function AdminHeader() {
   const [open, setOpen] = useState(false);
 
   const name = profile?.display_name ?? "管理员";
-  const roleLabel = profile ? ADMIN_LEVEL_LABEL[profile.level] : "管理员";
+  // 未映射的 level（后端将来新增等级、前端未跟上）回退「管理员」，不留空白角色行。
+  const roleLabel = (profile && ADMIN_LEVEL_LABEL[profile.level]) || "管理员";
 
   // 选一项后先收起 Popover，再执行动作（改密走 SPA 导航，登出走整页跳转）。
   const goChangePassword = () => {
