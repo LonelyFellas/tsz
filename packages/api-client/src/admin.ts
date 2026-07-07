@@ -18,6 +18,7 @@ import type {
   AdminWordStats,
   AdminStatus,
   CreateAdminInput,
+  CreateAdminResponse,
   Admin,
   AdminAuthResponse,
   AdminProfile,
@@ -44,6 +45,7 @@ export type {
   AdminUserUpdateInput,
   AdminUserView,
   CreateAdminInput,
+  CreateAdminResponse,
   PageMeta,
   ResetPasswordResponse
 } from "@tsz/types";
@@ -164,8 +166,12 @@ export function createAdminEndpoints(http: HttpClient) {
       /** GET /admin/admins — 列表：level/关键字筛选 + 分页。 */
       list: (query: AdminListQuery = {}) =>
         http.get<AdminListResponse>(`/admins${qs({ ...query })}`),
-      /** POST /admin/admins — 建号；201 返回新 Admin；409 = 手机号已被占用。 */
-      create: (input: CreateAdminInput) => http.post<Admin>("/admins", input),
+      /**
+       * POST /admin/admins — 建号。前端不再传密码/等级：后端生成一次性临时密码、
+       * 等级恒为 admin。201 返回 { admin, temporary_password }；409 = 手机号/邮箱已被占用。
+       */
+      create: (input: CreateAdminInput) =>
+        http.post<CreateAdminResponse>("/admins", input),
       /**
        * PATCH /admin/admins/{id}/status — 启用/禁用；返回更新后的 Admin。
        * 409 = 不能禁用最后一个 active super_admin。

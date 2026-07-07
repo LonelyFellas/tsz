@@ -19,7 +19,8 @@ const PROFILE_BODY = {
   id: "a1",
   phone: "13800138000",
   display_name: "Administrator",
-  level: "admin"
+  level: "admin",
+  permissions: []
 };
 
 // ── 装配 ──────────────────────────────────────────────────────────────────────
@@ -52,7 +53,8 @@ describe("createAdminAuthRuntime · 装配", () => {
       id: "a1",
       phone: "1",
       display_name: "X",
-      level: "admin"
+      level: "admin",
+      permissions: []
     });
     expect(b.store.getState().profile).toBeNull();
   });

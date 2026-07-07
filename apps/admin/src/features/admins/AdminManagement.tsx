@@ -23,6 +23,7 @@ import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
 import { useState } from "react";
 import type { Admin, AdminLevel, AdminListQuery } from "@tsz/types";
+import { GatedButton } from "@/components/GatedButton";
 import { useAdminList, useResetAdminPassword, useSetAdminStatus } from "./api";
 import { CreateAdminModal } from "./CreateAdminModal";
 import {
@@ -61,6 +62,12 @@ export function AdminManagement() {
 
   const rows = listQuery.data?.items ?? [];
   const total = listQuery.data?.page.total ?? 0;
+
+  // 一次性临时密码在「重置密码 / 建号」两条流程间共用同一个 ResetPasswordResult 弹窗展示，
+  // 且临时密码仅此一次返回、不可再取。若两条流程交错触发，后 resolve 的 setResetResult
+  // 会覆盖前一个、令尚未复制的那个永久丢失。故：有临时密码正在生成（重置请求在飞）或
+  // 已展示待确认（resetResult 未清）时，禁掉全部「建号 / 重置密码」入口，串行化秘密的产生。
+  const secretBusy = resetPassword.isPending || resetResult !== null;
 
   const applyFilters = (values: FilterValues) => {
     setFilters(values);
@@ -133,32 +140,40 @@ export function AdminManagement() {
       key: "action",
       width: 200,
       fixed: "right",
-      render: (_: unknown, record) => (
-        <Space size={4} wrap>
-          <Button
-            type="link"
-            size="small"
-            loading={
-              setStatus.isPending && setStatus.variables?.id === record.id
-            }
-            onClick={() => toggleStatus(record)}
-          >
-            {record.status === "active" ? "禁用" : "启用"}
-          </Button>
-          {/* 超管不在此重置（后端 403）；直接禁用入口，不依赖后端兜底。 */}
-          <Button
-            type="link"
-            size="small"
-            disabled={record.level === "super_admin"}
-            loading={
-              resetPassword.isPending && resetPassword.variables === record.id
-            }
-            onClick={() => doResetPassword(record)}
-          >
-            重置密码
-          </Button>
-        </Space>
-      )
+      render: (_: unknown, record) => {
+        // 超管拥有最高权限，超管账号不允许被互操作：整行操作按钮置灰。
+        // 启禁用/重置密码只针对普通管理员。
+        const isSuper = record.level === "super_admin";
+        return (
+          <Space size={4} wrap>
+            <GatedButton
+              type="link"
+              size="small"
+              reason="超级管理员不可操作"
+              disabled={isSuper}
+              loading={
+                setStatus.isPending && setStatus.variables?.id === record.id
+              }
+              onClick={() => toggleStatus(record)}
+            >
+              {record.status === "active" ? "禁用" : "启用"}
+            </GatedButton>
+            {/* 重置会产出一次性临时密码：超管不可重置，且另一条秘密流程进行中时也禁用。 */}
+            <GatedButton
+              type="link"
+              size="small"
+              reason={isSuper ? "超级管理员不可操作" : "请先处理上一条临时密码"}
+              disabled={isSuper || secretBusy}
+              loading={
+                resetPassword.isPending && resetPassword.variables === record.id
+              }
+              onClick={() => doResetPassword(record)}
+            >
+              重置密码
+            </GatedButton>
+          </Space>
+        );
+      }
     }
   ];
 
@@ -222,13 +237,15 @@ export function AdminManagement() {
           align="center"
           style={{ marginBottom: 12 }}
         >
-          <Button
+          <GatedButton
             type="primary"
             icon={<PlusOutlined />}
+            reason="请先处理上一条临时密码"
+            disabled={secretBusy}
             onClick={() => setCreateOpen(true)}
           >
             新建管理员
-          </Button>
+          </GatedButton>
         </Flex>
 
         {listQuery.isError && (
@@ -271,6 +288,7 @@ export function AdminManagement() {
       <CreateAdminModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+        onCreated={(result) => setResetResult(result)}
       />
       <ResetPasswordResult
         password={resetResult?.password ?? null}

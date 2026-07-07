@@ -22,7 +22,8 @@ const PROFILE: AdminProfile = {
   id: "a1",
   phone: "13800138000",
   display_name: "Administrator",
-  level: "super_admin"
+  level: "super_admin",
+  permissions: []
 };
 
 beforeEach(() => {

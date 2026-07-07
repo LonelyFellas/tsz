@@ -14,18 +14,24 @@ import {
   Segmented,
   Space,
   Table,
-  Tag,
-  Tooltip
+  Tag
 } from "antd";
 import type { TableColumnsType } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import { useState } from "react";
 import type { AdminUserView, Role } from "@tsz/types";
-import { useAuthStore } from "@/lib/auth";
+import { CopyableText } from "@/components/CopyableText";
+import { GatedButton } from "@/components/GatedButton";
+import { useIsSuperAdmin } from "@/lib/auth";
 import { useSetUserStatus, useUserList } from "./api";
 import { EditUserModal } from "./EditUserModal";
-import { ROLE_LABEL, ROLE_TAG_COLOR, levelColor } from "./labels";
+import {
+  ROLE_LABEL,
+  ROLE_TAG_COLOR,
+  levelColor,
+  userActionError
+} from "./labels";
 import type { UserFilterValues, UserRoleTab } from "./listQuery";
 import { UserDetailDrawer } from "./UserDetailDrawer";
 import { UserFilters } from "./UserFilters";
@@ -39,7 +45,7 @@ const ROLE_TABS = [
 export function UserManagement() {
   const { message } = App.useApp();
   // 写操作后端限 super_admin：非超管时把编辑/启禁用置灰，避免点了才吃 403。
-  const isSuperAdmin = useAuthStore((s) => s.profile?.level === "super_admin");
+  const isSuperAdmin = useIsSuperAdmin();
 
   const [filters, setFilters] = useState<UserFilterValues>({});
   const [role, setRole] = useState<UserRoleTab>("all");
@@ -74,13 +80,18 @@ export function UserManagement() {
     setStatus
       .mutateAsync({ id: record.id, status: next })
       .then(() => message.success(next === "disabled" ? "已禁用" : "已启用"))
-      .catch((err: unknown) =>
-        message.error(err instanceof Error ? err.message : "操作失败")
-      );
+      .catch((err: unknown) => message.error(userActionError(err, "操作失败")));
   };
 
   const columns: TableColumnsType<AdminUserView> = [
-    { title: "用户ID", dataIndex: "id", width: 100, fixed: "left" },
+    {
+      title: "用户ID",
+      dataIndex: "id",
+      width: 140,
+      fixed: "left",
+      // UUID 太长：单行截断 + 悬浮看全 + 一键复制完整 ID。
+      render: (id: string) => <CopyableText value={id} ellipsis={96} />
+    },
     {
       title: "头像",
       dataIndex: "avatar_url",
@@ -134,14 +145,14 @@ export function UserManagement() {
     {
       title: "绑定电话",
       dataIndex: "phone",
-      width: 130,
-      render: (p?: string) => p || "-"
+      width: 150,
+      render: (p?: string) => <CopyableText value={p} />
     },
     {
       title: "绑定邮箱",
       dataIndex: "email",
-      width: 180,
-      render: (e?: string) => e || "-"
+      width: 200,
+      render: (e?: string) => <CopyableText value={e} ellipsis={150} />
     },
     {
       title: "注册时间",
@@ -186,32 +197,34 @@ export function UserManagement() {
           <Button type="link" size="small" onClick={() => notReady("方言管理")}>
             方言管理
           </Button>
-          <Tooltip title={isSuperAdmin ? "" : "需超级管理员"}>
-            <Button
-              type="link"
-              size="small"
-              disabled={!isSuperAdmin}
-              onClick={() => setEditUser(record)}
-            >
-              编辑
-            </Button>
-          </Tooltip>
-          <Tooltip title={isSuperAdmin ? "" : "需超级管理员"}>
-            <Button
-              type="link"
-              size="small"
-              disabled={!isSuperAdmin}
-              onClick={() => toggleStatus(record)}
-            >
-              {record.status === "active" ? "禁用" : "启用"}
-            </Button>
-          </Tooltip>
+          <GatedButton
+            type="link"
+            size="small"
+            reason="需超级管理员"
+            disabled={!isSuperAdmin}
+            onClick={() => setEditUser(record)}
+          >
+            编辑
+          </GatedButton>
+          <GatedButton
+            type="link"
+            size="small"
+            reason="需超级管理员"
+            disabled={!isSuperAdmin}
+            onClick={() => toggleStatus(record)}
+          >
+            {record.status === "active" ? "禁用" : "启用"}
+          </GatedButton>
           {/* 删除用户后端本轮 out of scope，暂无接口：占位置灰，待后端接口就绪再启用。 */}
-          <Tooltip title="删除功能暂未开放">
-            <Button type="link" size="small" danger disabled>
-              删除
-            </Button>
-          </Tooltip>
+          <GatedButton
+            type="link"
+            size="small"
+            danger
+            disabled
+            reason="删除功能暂未开放"
+          >
+            删除
+          </GatedButton>
         </Space>
       )
     }
@@ -252,7 +265,7 @@ export function UserManagement() {
           columns={columns}
           dataSource={rows}
           loading={listQuery.isPending}
-          scroll={{ x: 1600 }}
+          scroll={{ x: 1700 }}
           pagination={{
             current: page,
             pageSize,

@@ -3,13 +3,13 @@
 import { Button, Result } from "antd";
 import { useNavigate } from "react-router-dom";
 import { AdminManagement } from "@/features/admins/AdminManagement";
-import { useAuthStore } from "@/lib/auth";
+import { useIsSuperAdmin } from "@/lib/auth";
 
 export function AdminsPage() {
-  const level = useAuthStore((s) => s.profile?.level);
+  const isSuperAdmin = useIsSuperAdmin();
   const navigate = useNavigate();
 
-  if (level !== "super_admin") {
+  if (!isSuperAdmin) {
     return (
       <Result
         status="403"

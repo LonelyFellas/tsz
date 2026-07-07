@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
+import type { MenuPermission } from "@tsz/types";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useAuthStore } from "@/lib/auth";
@@ -11,17 +12,44 @@ vi.mock("react-router-dom", async (importOriginal) => {
   return { ...actual, useNavigate: () => mockNavigate };
 });
 
-function setLevel(level: "admin" | "super_admin" | null) {
-  useAuthStore
-    .getState()
-    .setProfile(
-      level
-        ? { id: "a-1", phone: "13800138000", display_name: "管理员", level }
-        : null
-    );
+// 全部可委派权限：普通管理员默认拿全量，等价于旧行为（菜单全出），个别用例再收窄。
+const FULL_PERMISSIONS: MenuPermission[] = [
+  "users.access",
+  "classes.access",
+  "words.access",
+  "customdict.access",
+  "sentences.access",
+  "wordlists.access",
+  "customwordlist.access",
+  "tasks.access",
+  "reviews.access",
+  "teacherapply.access",
+  "comments.access",
+  "coins.access"
+];
+
+function setLevel(
+  level: "admin" | "super_admin" | null,
+  permissions: MenuPermission[] = FULL_PERMISSIONS
+) {
+  useAuthStore.getState().setProfile(
+    level
+      ? {
+          id: "a-1",
+          phone: "13800138000",
+          display_name: "管理员",
+          level,
+          permissions
+        }
+      : null
+  );
 }
 
-beforeEach(() => mockNavigate.mockClear());
+beforeEach(() => {
+  mockNavigate.mockClear();
+  // 默认全权普通管理员，使不显式设 profile 的用例仍渲染出全部菜单叶子（旧行为）。
+  setLevel("admin");
+});
 // 侧栏「管理员管理」入口按 level 渲染，且 store 为单例，用例间需复位避免串味。
 afterEach(() => setLevel(null));
 
@@ -68,6 +96,26 @@ describe("ConsoleSidebar", () => {
     renderAt("/");
     fireEvent.click(screen.getByText("用户管理"));
     expect(screen.queryByText("管理员管理")).toBeNull();
+  });
+
+  it("按后端权限过滤菜单：只有 words.access 时仅词库管理组可见", () => {
+    setLevel("admin", ["words.access"]);
+    renderAt("/");
+    expect(screen.getByText("词库管理")).toBeInTheDocument();
+    // 无 users.access / reviews.access / coins.access → 这些分组整组不渲染。
+    expect(screen.queryByText("用户管理")).toBeNull();
+    expect(screen.queryByText("审核管理")).toBeNull();
+    expect(screen.queryByText("天生币管理")).toBeNull();
+  });
+
+  it("super_admin 即便 permissions 为空也可见全部委派菜单", () => {
+    setLevel("super_admin", []);
+    renderAt("/");
+    // 超管隐式全权：委派菜单组照常出，管理员管理叶子按 level 显示。
+    expect(screen.getByText("词库管理")).toBeInTheDocument();
+    expect(screen.getByText("审核管理")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("用户管理"));
+    expect(screen.getByText("管理员管理")).toBeInTheDocument();
   });
 
   it("super_admin：用户管理分组下显示「管理员管理」并跳转 /admins", () => {

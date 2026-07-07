@@ -1,4 +1,4 @@
-import type { AdminAuthResponse } from "@tsz/api-client";
+import type { AdminAuthResponse, AdminProfile } from "@tsz/api-client";
 import { HttpError } from "@tsz/api-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -16,17 +16,23 @@ vi.mock("@/lib/auth", async () => {
   return {
     useAuthStore: createAdminAuthStore(),
     api: {
-      auth: { login: vi.fn(), changePassword: vi.fn(), logout: vi.fn() }
+      auth: { login: vi.fn(), changePassword: vi.fn(), logout: vi.fn() },
+      // 登录成功后拉 /profile 补全菜单权限（permissions）——登录响应不含它。
+      profile: vi.fn()
     },
-    persistSession: vi.fn()
+    persistSession: vi.fn(),
+    // enterConsole 失败时撤销会话会调 tokens.setAccessToken(null)。
+    tokens: { setAccessToken: vi.fn() }
   };
 });
 
 import { AdminLoginForm } from "./AdminLoginForm";
-import { api, persistSession, useAuthStore } from "@/lib/auth";
+import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
 
 const mockLogin = vi.mocked(api.auth.login);
+const mockProfile = vi.mocked(api.profile);
 const mockPersist = vi.mocked(persistSession);
+const mockSetAccessToken = vi.mocked(tokens.setAccessToken);
 
 function authResponse(
   level: "admin" | "super_admin",
@@ -49,6 +55,18 @@ function authResponse(
   };
 }
 
+// 登录后 enterConsole 拉的 /profile 响应（含菜单权限）。display_name 与 authResponse 对齐，
+// 让「写入 profile」断言不受来源切换影响。
+function profileResponse(level: "admin" | "super_admin"): AdminProfile {
+  return {
+    id: "a1",
+    phone: "13800138000",
+    display_name: "审核员小王",
+    level,
+    permissions: level === "super_admin" ? [] : ["users.access"]
+  };
+}
+
 // antd 两字按钮会自动插空格（「登 录」），用正则兼容。
 const LOGIN_BUTTON = /^登\s?录$/;
 
@@ -65,12 +83,15 @@ function fillAndSubmit() {
 beforeEach(() => {
   vi.clearAllMocks();
   mockRedirect = null;
+  // enterConsole 默认拿到一个普通管理员 profile；需要超管的用例各自覆盖。
+  mockProfile.mockResolvedValue(profileResponse("admin"));
   useAuthStore.setState({ profile: null, level: null });
 });
 
 describe("AdminLoginForm", () => {
   it("登录成功：持久化会话、写入 profile、跳转后台", async () => {
     mockLogin.mockResolvedValue(authResponse("super_admin"));
+    mockProfile.mockResolvedValue(profileResponse("super_admin"));
     render(<AdminLoginForm />);
     fillAndSubmit();
 
@@ -82,6 +103,26 @@ describe("AdminLoginForm", () => {
     expect(mockPersist).toHaveBeenCalled();
     expect(useAuthStore.getState().profile?.display_name).toBe("审核员小王");
     expect(useAuthStore.getState().level).toBe("super_admin");
+  });
+
+  it("登录成功但拉 profile 失败：撤销会话、提示重试、不放行进后台", async () => {
+    mockLogin.mockResolvedValue(authResponse("admin"));
+    // 登录已 200 并 persistSession，但 /profile 失败（弱网/5xx）。
+    mockProfile.mockRejectedValue(new Error("profile fetch failed"));
+    render(<AdminLoginForm />);
+    fillAndSubmit();
+
+    // 文案不与「凭证错误」混淆，明确指向 profile 加载失败。
+    await waitFor(() =>
+      expect(
+        screen.getByText("登录成功但加载账号信息失败，请重试")
+      ).toBeInTheDocument()
+    );
+    // 撤销刚建立的会话：清 access token（连带 clearTimeout 刷新定时器）。
+    expect(mockSetAccessToken).toHaveBeenCalledWith(null);
+    // 未放行：不写 profile、不跳转后台。
+    expect(useAuthStore.getState().profile).toBeNull();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("凭证错误：展示翻译后的中文文案", async () => {
@@ -126,7 +167,8 @@ describe("AdminLoginForm", () => {
         id: "a1",
         phone: "1",
         display_name: "X",
-        level: "admin"
+        level: "admin",
+        permissions: []
       },
       level: "admin"
     });
@@ -139,7 +181,13 @@ describe("AdminLoginForm", () => {
     (hostile) => {
       mockRedirect = hostile;
       useAuthStore.setState({
-        profile: { id: "a1", phone: "1", display_name: "X", level: "admin" },
+        profile: {
+          id: "a1",
+          phone: "1",
+          display_name: "X",
+          level: "admin",
+          permissions: []
+        },
         level: "admin"
       });
       render(<AdminLoginForm />);

@@ -4,6 +4,7 @@ import { Avatar, Badge, Descriptions, Drawer, Space, Tag } from "antd";
 import { UserOutlined } from "@ant-design/icons";
 import dayjs from "dayjs";
 import type { AdminUserView } from "@tsz/types";
+import { CopyableText } from "@/components/CopyableText";
 import { ROLE_LABEL, ROLE_TAG_COLOR, levelColor } from "./labels";
 
 interface Props {
@@ -31,7 +32,9 @@ export function UserDetailDrawer({ user, onClose }: Props) {
     >
       {user && (
         <Descriptions column={1} bordered size="small">
-          <Descriptions.Item label="用户 ID">{user.id}</Descriptions.Item>
+          <Descriptions.Item label="用户 ID">
+            <CopyableText value={user.id} />
+          </Descriptions.Item>
           <Descriptions.Item label="分类">
             <Space size={[4, 4]} wrap>
               {user.roles.map((r) => (
@@ -52,10 +55,10 @@ export function UserDetailDrawer({ user, onClose }: Props) {
             {user.coin_balance ?? "-"}
           </Descriptions.Item>
           <Descriptions.Item label="绑定电话">
-            {user.phone || "-"}
+            <CopyableText value={user.phone} />
           </Descriptions.Item>
           <Descriptions.Item label="绑定邮箱">
-            {user.email || "-"}
+            <CopyableText value={user.email} />
           </Descriptions.Item>
           <Descriptions.Item label="状态">
             <Badge
