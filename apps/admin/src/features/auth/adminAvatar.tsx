@@ -17,11 +17,12 @@ const AVATAR_BY_LEVEL: Record<AdminLevel, AdminAvatarStyle> = {
 };
 
 /**
- * 权限等级 → 默认头像样式。level 缺省（理论上守卫后 profile 必有值）回退普通管理员。
- * 纯函数，便于单测。
+ * 权限等级 → 默认头像样式。level 缺省或落在映射之外（后端将来新增等级、前端未跟上）
+ * 一律回退普通管理员——`?? AVATAR_BY_LEVEL.admin` 兜住未知 key 取到 undefined 的情况，
+ * 避免调用方解构 undefined 崩溃。纯函数，便于单测。
  */
 export function adminAvatarStyle(level?: AdminLevel): AdminAvatarStyle {
-  return AVATAR_BY_LEVEL[level ?? "admin"];
+  return AVATAR_BY_LEVEL[level ?? "admin"] ?? AVATAR_BY_LEVEL.admin;
 }
 
 interface AdminAvatarProps {

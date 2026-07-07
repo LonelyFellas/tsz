@@ -1,4 +1,5 @@
 import { CrownOutlined, UserOutlined } from "@ant-design/icons";
+import type { AdminLevel } from "@tsz/types";
 import { describe, expect, it } from "vitest";
 import { adminAvatarStyle } from "./adminAvatar";
 
@@ -18,5 +19,10 @@ describe("adminAvatarStyle", () => {
 
   it("缺省 level 回退普通管理员样式", () => {
     expect(adminAvatarStyle(undefined)).toEqual(adminAvatarStyle("admin"));
+  });
+
+  it("未映射的 level（后端将来新增等级）回退普通管理员，不返回 undefined", () => {
+    const s = adminAvatarStyle("moderator" as AdminLevel);
+    expect(s).toEqual(adminAvatarStyle("admin"));
   });
 });

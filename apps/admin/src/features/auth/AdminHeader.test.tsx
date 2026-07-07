@@ -75,6 +75,22 @@ describe("AdminHeader", () => {
     expect(screen.getByText("超级管理员")).toBeInTheDocument();
   });
 
+  it("未映射的 level（后端将来新增等级）角色行回退「管理员」而非空白", async () => {
+    const unknownProfile = {
+      ...PROFILE,
+      level: "moderator" as AdminProfile["level"]
+    };
+    useAuthStore.setState({
+      profile: unknownProfile,
+      level: unknownProfile.level
+    });
+    render(<AdminHeader />);
+    await openAccountMenu();
+    // 名称仍来自 display_name，角色行兜底为「管理员」。
+    expect(screen.getByText("审核员小王")).toBeInTheDocument();
+    expect(screen.getByText("管理员")).toBeInTheDocument();
+  });
+
   it("无 profile 时回退到「管理员」", async () => {
     render(<AdminHeader />);
     await openAccountMenu();
