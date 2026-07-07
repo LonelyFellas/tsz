@@ -34,7 +34,8 @@ const PROFILE = {
   id: "a1",
   phone: "13800138000",
   display_name: "审核员小王",
-  level: "admin" as const
+  level: "admin" as const,
+  permissions: []
 };
 
 // forced = profile 为空（登录/刷新两条强制路径）；自助改密时 profile 有值。

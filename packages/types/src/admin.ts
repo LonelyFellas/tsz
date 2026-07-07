@@ -8,6 +8,26 @@
 /** admin 权限等级：super_admin 额外可管理管理员账号。 */
 export type AdminLevel = "admin" | "super_admin";
 
+/**
+ * 后台侧栏菜单权限 key —— 每个可委派菜单叶子一个，与后端 internal/authz 目录一一对应
+ * （docs/admin-rbac-design.md）。普通管理员持有其角色被授予的子集；super_admin 隐式持有
+ * 全部（后端在 profile 里直接下发整份目录）。「首页」无 key（恒显示）；「管理员管理」不走 key，
+ * 仍按 level==super_admin 判定。
+ */
+export type MenuPermission =
+  | "users.access"
+  | "classes.access"
+  | "words.access"
+  | "customdict.access"
+  | "sentences.access"
+  | "wordlists.access"
+  | "customwordlist.access"
+  | "tasks.access"
+  | "reviews.access"
+  | "teacherapply.access"
+  | "comments.access"
+  | "coins.access";
+
 /** admin 账号状态。disabled 的账号无法登录 / 刷新。 */
 export type AdminStatus = "active" | "disabled";
 
@@ -19,12 +39,17 @@ export interface PageMeta {
   total: number;
 }
 
-/** GET /admin/profile 的响应：登录管理员自身身份，用于门禁探针 + 顶栏「已登录为 X」。 */
+/** GET /admin/profile 的响应：登录管理员自身身份，用于门禁探针 + 顶栏「已登录为 X」+ 动态菜单。 */
 export interface AdminProfile {
   id: string;
   phone: string;
   display_name: string;
   level: AdminLevel;
+  /**
+   * 本管理员持有的菜单权限 key（RBAC）。前端据此决定侧栏各叶子是否渲染；super_admin 会拿到
+   * 整份可委派目录。恒为数组（可空数组表示无任何可委派菜单）。
+   */
+  permissions: MenuPermission[];
 }
 
 /** 账号管理里看到的完整 admin 对象（含状态与创建时间）。 */
@@ -56,18 +81,28 @@ export interface AdminAuthResponse {
   must_change_password: boolean;
 }
 
-/** POST /admin/admins 请求体（超管建号）。对齐 openapi CreateAdminRequest。 */
+/**
+ * POST /admin/admins 请求体（超管建号）。对齐 openapi CreateAdminRequest。
+ * 密码由后端生成（响应里一次性返回，见 CreateAdminResponse），等级恒为 admin
+ * （不能经此接口建超管），故请求体**不含** password / level——传了也会被后端忽略。
+ */
 export interface CreateAdminInput {
   /** 5–20 位。 */
   phone: string;
-  /** ≥12 位；非纯数字；非弱密码；不含手机号。违反 → 400。 */
-  password: string;
   /** 1–50 字符；服务端 trim；含 < > 或控制/不可见字符 → 400。 */
   display_name: string;
   /** 可选。 */
   email?: string;
-  /** 缺省为 admin。 */
-  level?: AdminLevel;
+}
+
+/**
+ * POST /admin/admins 的 201 响应：新账号 + 一次性临时密码。
+ * temporary_password 为后端生成的明文，仅此一次返回（不存储、不记日志），
+ * 新账号带 must_change_password，对方用它首登后被强制改密。
+ */
+export interface CreateAdminResponse {
+  admin: Admin;
+  temporary_password: string;
 }
 
 /** GET /admin/admins 查询参数（可按 level / 关键字过滤 + 分页）。 */

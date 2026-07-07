@@ -1,12 +1,11 @@
 import { HttpError } from "@tsz/api-client";
 import { isValidAccount } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
-import type { AdminAuthResponse } from "@tsz/types";
 import { Alert, Button, Card, Form, Input, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
-import { api, persistSession, useAuthStore } from "@/lib/auth";
+import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
 
 const LOGIN_ERRORS: Record<string, string> = {
   // 401：不区分是账号还是密码错，防枚举。
@@ -73,14 +72,11 @@ export function AdminLoginForm() {
     if (locked) setLocked(false);
   }
 
-  // 登录态落地：写用户态 store + 跳转进后台。用 replace：不把 /login 留在历史，避免「后退」回登录页。
-  function enterConsole(auth: AdminAuthResponse) {
-    setProfile({
-      id: auth.admin.id,
-      phone: auth.admin.phone,
-      display_name: auth.admin.display_name,
-      level: auth.level
-    });
+  // 登录态落地：登录响应不含菜单权限（permissions），故拉一次 /profile 作为其唯一事实来源
+  // （与会话恢复走同一探针），写入用户态 store 后跳转进后台。用 replace：不把 /login 留在历史，
+  // 避免「后退」回登录页。
+  async function enterConsole() {
+    setProfile(await api.profile());
     navigate(safeRedirect(searchParams.get("redirect")), { replace: true });
   }
 
@@ -99,7 +95,15 @@ export function AdminLoginForm() {
         navigate("/change-password", { state: { currentPassword: password } });
         return;
       }
-      enterConsole(auth);
+      try {
+        await enterConsole();
+      } catch {
+        // 登录本身已成功、persistSession 已建立 access token + 刷新定时器，但拉 /profile 失败。
+        // 撤销刚建立的会话（setAccessToken(null) 连带 clearTimeout 清定时器），避免留下
+        // 「token 活着自我续期、profile 恒 null」的挂起态；文案不与「凭证错误」混淆，提示重试。
+        tokens.setAccessToken(null);
+        setError("登录成功但加载账号信息失败，请重试");
+      }
     } catch (e: unknown) {
       // 423 = 账号被临时锁定（连续失败触发）：区别于 401 凭证错，置灰按钮并提示 15 分钟后再试。
       if (e instanceof HttpError && e.status === 423) {

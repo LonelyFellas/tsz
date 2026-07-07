@@ -27,7 +27,8 @@ const PROFILE: AdminProfile = {
   id: "a1",
   phone: "13800138000",
   display_name: "审核员小王",
-  level: "admin"
+  level: "admin",
+  permissions: []
 };
 
 beforeEach(() => {

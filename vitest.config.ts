@@ -23,9 +23,10 @@ export default defineConfig({
         "apps/web/src/features/auth/**",
         "apps/web/src/lib/**",
         "apps/web/src/stores/**",
-        // 与 web 对称：只纳入业务逻辑层（features/lib），app 路由壳由集成/e2e 覆盖。
+        // 与 web 对称：只纳入业务逻辑层（features/lib/components），app 路由壳由集成/e2e 覆盖。
         "apps/admin/src/features/**",
-        "apps/admin/src/lib/**"
+        "apps/admin/src/lib/**",
+        "apps/admin/src/components/**"
       ],
       exclude: [
         "**/index.ts",

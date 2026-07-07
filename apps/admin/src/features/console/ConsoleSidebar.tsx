@@ -11,84 +11,171 @@ import {
 } from "@ant-design/icons";
 import { Menu } from "antd";
 import type { MenuProps } from "antd";
+import type { MenuPermission } from "@tsz/types";
+import type { ReactNode } from "react";
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuthStore } from "@/lib/auth";
+import { useAuthStore, useIsSuperAdmin } from "@/lib/auth";
 
 /**
- * 后台侧栏导航（antd Menu）。
- *
- * 已落地真实路由的叶子挂 path（key 即路由），点击跳转；未落地的模块 key 以 `todo:`
- * 前缀标记，渲染为禁用态，避免路由未建好前产生死链——各模块上线时把 key 换成真实
- * path 即可点亮。当前高亮由 useLocation().pathname 推导。
+ * 后台侧栏导航（antd Menu）。**由后端驱动**：每个叶子挂一个菜单权限 key（RBAC，
+ * docs/admin-rbac-design.md），仅当当前管理员持有该 key（super_admin 隐式持有全部）时才渲染
+ * ——菜单可见性=后端下发的 profile.permissions。这与「路由是否已落地」正交：已落地叶子挂真实
+ * path（key 即路由），点击跳转；未落地的以 `todo:` 前缀标记并渲染为禁用态，避免死链。「首页」
+ * 无权限恒显示；「管理员管理」不走 key，仍按 level==super_admin 判定（D9）。当前高亮由
+ * useLocation().pathname 推导。
  */
 type MenuItem = Required<MenuProps>["items"][number];
 
-/**
- * 构造导航树。「用户管理」分组下两个 section：用户管理（C 端用户，所有 admin 可见）、
- * 管理员管理（后台管理员，**仅 super_admin 可见**——非超管时不渲染该叶子）。
- */
-function buildNav(isSuperAdmin: boolean): MenuItem[] {
-  const userChildren: MenuItem[] = [{ key: "/users", label: "用户管理" }];
-  if (isSuperAdmin) {
-    userChildren.push({ key: "/admins", label: "管理员管理" });
+/** 一个菜单叶子：perm 为其权限 key；superOnly 的叶子改按 super_admin 判定（不走 key）。 */
+interface Leaf {
+  key: string;
+  label: string;
+  perm?: MenuPermission;
+  superOnly?: boolean;
+  disabled?: boolean;
+}
+
+interface Group {
+  key: string;
+  icon: ReactNode;
+  label: string;
+  leaves: Leaf[];
+}
+
+// 分组与叶子的静态定义（label/icon/path 属前端关注点，不由后端下发）。可见性在 buildNav
+// 里按权限过滤：叶子不可见就从分组剔除，分组无可见叶子则整组不渲染。
+const GROUPS: Group[] = [
+  {
+    key: "grp-user",
+    icon: <UserOutlined />,
+    label: "用户管理",
+    leaves: [
+      { key: "/users", label: "用户管理", perm: "users.access" },
+      { key: "/admins", label: "管理员管理", superOnly: true }
+    ]
+  },
+  {
+    key: "grp-class",
+    icon: <TeamOutlined />,
+    label: "班级管理",
+    leaves: [
+      {
+        key: "todo:classes",
+        label: "班级管理",
+        perm: "classes.access",
+        disabled: true
+      }
+    ]
+  },
+  {
+    key: "grp-dict",
+    icon: <BookOutlined />,
+    label: "词库管理",
+    leaves: [
+      { key: "/words", label: "智能词库", perm: "words.access" },
+      {
+        key: "todo:custom-dict",
+        label: "自定义词库",
+        perm: "customdict.access",
+        disabled: true
+      },
+      {
+        key: "todo:sentences",
+        label: "多维例句",
+        perm: "sentences.access",
+        disabled: true
+      }
+    ]
+  },
+  {
+    key: "grp-wordlist",
+    icon: <ReadOutlined />,
+    label: "词表管理",
+    leaves: [
+      { key: "/wordlists", label: "智能词表", perm: "wordlists.access" },
+      {
+        key: "todo:custom-wordlist",
+        label: "自定义词表",
+        perm: "customwordlist.access",
+        disabled: true
+      }
+    ]
+  },
+  {
+    key: "grp-task",
+    icon: <ScheduleOutlined />,
+    label: "任务管理",
+    leaves: [
+      {
+        key: "todo:tasks",
+        label: "任务管理",
+        perm: "tasks.access",
+        disabled: true
+      }
+    ]
+  },
+  {
+    key: "grp-review",
+    icon: <AuditOutlined />,
+    label: "审核管理",
+    leaves: [
+      { key: "/reviews", label: "词表审核", perm: "reviews.access" },
+      {
+        key: "todo:teacher-apply",
+        label: "教师申请审核",
+        perm: "teacherapply.access",
+        disabled: true
+      },
+      {
+        key: "todo:comments",
+        label: "评论审核",
+        perm: "comments.access",
+        disabled: true
+      }
+    ]
+  },
+  {
+    key: "grp-coin",
+    icon: <DollarOutlined />,
+    label: "天生币管理",
+    leaves: [
+      {
+        key: "todo:coins",
+        label: "天生币管理",
+        perm: "coins.access",
+        disabled: true
+      }
+    ]
   }
-  return [
-    { key: "/", icon: <HomeOutlined />, label: "首页" },
-    {
-      key: "grp-user",
-      icon: <UserOutlined />,
-      label: "用户管理",
-      children: userChildren
-    },
-    {
-      key: "grp-class",
-      icon: <TeamOutlined />,
-      label: "班级管理",
-      children: [{ key: "todo:classes", label: "班级管理", disabled: true }]
-    },
-    {
-      key: "grp-dict",
-      icon: <BookOutlined />,
-      label: "词库管理",
-      children: [
-        { key: "/words", label: "智能词库" },
-        { key: "todo:custom-dict", label: "自定义词库", disabled: true },
-        { key: "todo:sentences", label: "多维例句", disabled: true }
-      ]
-    },
-    {
-      key: "grp-wordlist",
-      icon: <ReadOutlined />,
-      label: "词表管理",
-      children: [
-        { key: "/wordlists", label: "智能词表" },
-        { key: "todo:custom-wordlist", label: "自定义词表", disabled: true }
-      ]
-    },
-    {
-      key: "grp-task",
-      icon: <ScheduleOutlined />,
-      label: "任务管理",
-      children: [{ key: "todo:tasks", label: "任务管理", disabled: true }]
-    },
-    {
-      key: "grp-review",
-      icon: <AuditOutlined />,
-      label: "审核管理",
-      children: [
-        { key: "/reviews", label: "词表审核" },
-        { key: "todo:teacher-apply", label: "教师申请审核", disabled: true },
-        { key: "todo:comments", label: "评论审核", disabled: true }
-      ]
-    },
-    {
-      key: "grp-coin",
-      icon: <DollarOutlined />,
-      label: "天生币管理",
-      children: [{ key: "todo:coins", label: "天生币管理", disabled: true }]
-    }
+];
+
+/**
+ * 构造导航树。「首页」恒显示。每个叶子按权限过滤：superOnly 叶子看 isSuperAdmin；其余叶子
+ * 当 super_admin 或 permissions 含其 key 时可见（super 隐式全权，即便 permissions 为空也放行）。
+ * 分组过滤掉不可见叶子后若为空则整组不渲染。
+ */
+function buildNav(
+  permissions: ReadonlySet<string>,
+  isSuperAdmin: boolean
+): MenuItem[] {
+  const visible = (l: Leaf): boolean =>
+    l.superOnly
+      ? isSuperAdmin
+      : isSuperAdmin || (l.perm !== undefined && permissions.has(l.perm));
+
+  const items: MenuItem[] = [
+    { key: "/", icon: <HomeOutlined />, label: "首页" }
   ];
+  for (const g of GROUPS) {
+    const children = g.leaves
+      .filter(visible)
+      .map((l) => ({ key: l.key, label: l.label, disabled: l.disabled }));
+    if (children.length > 0) {
+      items.push({ key: g.key, icon: g.icon, label: g.label, children });
+    }
+  }
+  return items;
 }
 
 export function ConsoleSidebar({
@@ -101,8 +188,17 @@ export function ConsoleSidebar({
 }) {
   const pathname = useLocation().pathname;
   const navigate = useNavigate();
-  const isSuperAdmin = useAuthStore((s) => s.profile?.level === "super_admin");
-  const nav = useMemo(() => buildNav(isSuperAdmin), [isSuperAdmin]);
+  const isSuperAdmin = useIsSuperAdmin();
+  const permissions = useAuthStore((s) => s.profile?.permissions);
+  // permissions 引用随 profile 变化而变；Set 只在其变化时重建。
+  const permSet = useMemo(
+    () => new Set<string>(permissions ?? []),
+    [permissions]
+  );
+  const nav = useMemo(
+    () => buildNav(permSet, isSuperAdmin),
+    [permSet, isSuperAdmin]
+  );
 
   const onClick: MenuProps["onClick"] = ({ key }) => {
     // 占位项以 todo: 前缀标记（且已 disabled，正常点不到），保险起见再拦一次。

@@ -212,13 +212,12 @@ describe("createAdminEndpoints — 管理员管理 admins", () => {
     expect(sp.get("page_size")).toBe("50");
   });
 
-  it("create → POST /admins 带建号入参", () => {
+  it("create → POST /admins 带建号入参（不含密码/等级，后端生成临时密码）", () => {
     const api = createAdminEndpoints(http);
     const input = {
       phone: "13800138000",
-      password: "str0ng-admin-pw!",
       display_name: "审核员小王",
-      level: "admin" as const
+      email: "wang@example.com"
     };
     api.admins.create(input);
     expect(http.post).toHaveBeenCalledWith("/admins", input);

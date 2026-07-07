@@ -18,9 +18,8 @@ vi.mock("@/lib/auth", () => ({
       update: vi.fn()
     }
   },
-  useAuthStore: (
-    selector: (s: { profile: { level: string } | null }) => unknown
-  ) => selector({ profile: { level: mockAdminLevel } })
+  // UserManagement 经共享 useIsSuperAdmin 决定写操作是否置灰；直接按 mockAdminLevel 返回布尔。
+  useIsSuperAdmin: () => mockAdminLevel === "super_admin"
 }));
 
 import { api } from "@/lib/auth";

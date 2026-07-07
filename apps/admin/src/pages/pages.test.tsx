@@ -27,10 +27,8 @@ vi.mock("@/lib/auth", () => ({
       })
     }
   },
-  // 用户管理页据 level 决定写操作是否置灰；烟雾测试给个超管即可。
-  useAuthStore: (
-    selector: (s: { profile: { level: string } | null }) => unknown
-  ) => selector({ profile: { level: "super_admin" } })
+  // 用户管理页据 useIsSuperAdmin 决定写操作是否置灰；烟雾测试给个超管即可。
+  useIsSuperAdmin: () => true
 }));
 
 // 平台后台各模块页。烟雾测试保证：页面能正常渲染、关键内容正确，
