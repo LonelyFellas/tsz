@@ -2,7 +2,7 @@ import { HttpError } from "@tsz/api-client";
 import { isValidAccount } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
 import { Alert, Button, Card, Form, Input, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
@@ -46,6 +46,10 @@ export function AdminLoginForm() {
   // 账号被后端锁定(连续失败触发 423):置灰登录按钮,阻断徒劳的连点重试。
   // 以后端 423 为唯一事实来源,前端不本地计数;用户改动账号/密码(新尝试意图)时解除。
   const [locked, setLocked] = useState(false);
+  // 同步在途锁：setLoading 是异步的，两次原生提交若落在同一帧（快速连按 Enter），
+  // 按钮 disabled 尚未重渲染、handleLogin 闭包里的 canSubmit 仍为旧值，会双发登录请求。
+  // 用 ref 在进入时立即置真、finally 复位，堵住这个竞态。
+  const inFlight = useRef(false);
 
   const setProfile = useAuthStore((s) => s.setProfile);
   const profile = useAuthStore((s) => s.profile);
@@ -84,7 +88,8 @@ export function AdminLoginForm() {
   }
 
   async function handleLogin() {
-    if (!canSubmit) return;
+    if (inFlight.current || !canSubmit) return;
+    inFlight.current = true;
     setError("");
     setLoading(true);
     try {
@@ -118,6 +123,7 @@ export function AdminLoginForm() {
       setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
     } finally {
       setLoading(false);
+      inFlight.current = false;
     }
   }
 

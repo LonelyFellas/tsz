@@ -276,6 +276,31 @@ describe("AdminLoginForm", () => {
     await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
   });
 
+  it("同一帧内两次原生提交只发一次登录请求（同步在途锁）", async () => {
+    let resolveLogin!: (v: ReturnType<typeof authResponse>) => void;
+    mockLogin.mockReturnValue(
+      new Promise((res) => {
+        resolveLogin = res;
+      })
+    );
+    const { container } = render(<AdminLoginForm />);
+    fireEvent.change(screen.getByPlaceholderText("请输入手机号或邮箱"), {
+      target: { value: "13800138000" }
+    });
+    fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
+      target: { value: "secret123" }
+    });
+    // 两次提交紧邻派发（按钮 disabled 尚未重渲染）：在途锁应挡住第二次。
+    submitForm(container);
+    submitForm(container);
+    // 放一拍让两次 onFinish 的 validateFields 微任务都跑完，再断言只发了一次。
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mockLogin).toHaveBeenCalledTimes(1);
+
+    resolveLogin(authResponse("admin"));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalled());
+  });
+
   it("must_change_password：建立会话后跳独立改密页(带临时密码 state)，不放行进后台", async () => {
     mockLogin.mockResolvedValue(authResponse("admin", true));
     render(<AdminLoginForm />);
