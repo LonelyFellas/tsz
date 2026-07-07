@@ -108,6 +108,18 @@ describe("ChangePassword · 本地校验", () => {
     expect(mockChange).not.toHaveBeenCalled();
   });
 
+  it("含弱词的新密码被前端预检拦截，不打后端", async () => {
+    renderSelf();
+    fillCurrent("current-real-pw-1");
+    // Admin123admin!@ → 小写含 "admin123"，命中弱词表。
+    fillNew("Admin123admin!@");
+    submit();
+    expect(
+      await screen.findByText("密码包含常见弱词「admin123」，请更换")
+    ).toBeInTheDocument();
+    expect(mockChange).not.toHaveBeenCalled();
+  });
+
   it("新密码与当前相同被拦截", async () => {
     renderSelf();
     fillCurrent("brand-new-pw-2026");
@@ -225,7 +237,8 @@ describe("ChangePassword · 自助改密", () => {
     mockChange.mockRejectedValue(new HttpError(400, "password is too common"));
     renderSelf();
     fillCurrent("current-real-pw-1");
-    fillNew("password-common");
+    // 用一个能过前端预检的密码,以确保打到后端、验证 400 文案透传（而非被前端拦下）。
+    fillNew("brand-new-pw-2026");
     submit();
     expect(
       await screen.findByText("password is too common")

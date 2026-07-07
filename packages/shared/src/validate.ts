@@ -30,6 +30,29 @@ export function isRegisterPassword(v: string): boolean {
   return REGISTER_PASSWORD_RE.test(v);
 }
 
+// 后台管理员密码弱词黑名单:与后端 validateAdminPassword 对齐(tsz-go
+// internal/admin/service.go 的 commonWeakSubstrings)。前端做提交前预检、即时提示,
+// 后端仍是权威把关——这张表只镜像那 7 个词,后端增删时须两处同步。
+// 注意后端注释:"admin" 是本域合法 token,故意不在表内,只拦更具体的 "admin123"。
+const ADMIN_PASSWORD_WEAK_SUBSTRINGS = [
+  "password",
+  "qwerty",
+  "123456",
+  "letmein",
+  "iloveyou",
+  "welcome",
+  "admin123"
+];
+
+/**
+ * 后台密码若命中弱词黑名单(子串,不区分大小写)返回命中的词,否则 null。
+ * 返回命中词而非布尔,便于前端提示「包含常见弱词『admin123』」。
+ */
+export function findAdminPasswordWeakWord(v: string): string | null {
+  const lower = v.toLowerCase();
+  return ADMIN_PASSWORD_WEAK_SUBSTRINGS.find((w) => lower.includes(w)) ?? null;
+}
+
 // 昵称禁字符:与后端 validateDisplayName 对齐(tsz-go internal/user/service.go,
 // 规则同见 docs/api.md)——只拒标签字符 < > 与控制/不可见字符(Cc/Cf:NUL、
 // 零宽空格、BOM、bidi 覆盖等);" ' & 是合法昵称字符(O'Brien、Tom&Jerry),不拦。

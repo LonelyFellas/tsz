@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   accountToDisplayName,
+  findAdminPasswordWeakWord,
   hasDisplayNameForbiddenChars,
   isCode,
   isEmail,
@@ -77,6 +78,27 @@ describe("isCode", () => {
     ["12a4", "含字母"]
   ])("拒绝 %s(%s)", (v) => {
     expect(isCode(v)).toBe(false);
+  });
+});
+
+describe("findAdminPasswordWeakWord", () => {
+  it.each([
+    ["Admin123admin!@", "admin123"],
+    ["S3cret-Password", "password"],
+    ["Qwerty-tunnel-9x", "qwerty"],
+    ["my-123456-key", "123456"],
+    ["WelcomeHome-2026", "welcome"]
+  ])("命中弱词的返回该词 %s → %s", (input, hit) => {
+    expect(findAdminPasswordWeakWord(input)).toBe(hit);
+  });
+
+  it("大小写不敏感", () => {
+    expect(findAdminPasswordWeakWord("PASSWORD-abc")).toBe("password");
+  });
+
+  it("无命中返回 null", () => {
+    expect(findAdminPasswordWeakWord("brand-new-pw-2026")).toBeNull();
+    expect(findAdminPasswordWeakWord("")).toBeNull();
   });
 });
 
