@@ -34,15 +34,25 @@ vi.mock("@/lib/auth", () => ({
 // 平台后台各模块页。烟雾测试保证：页面能正常渲染、关键内容正确，
 // 守住「导入错误 / 渲染时抛错」这类回归；待其余模块功能落地后在此补充业务测试。
 describe("admin 页面烟雾测试", () => {
-  it("首页渲染数据看板与四张统计卡", () => {
+  it("首页渲染 KPI 指标行与四张图表卡", () => {
     render(<HomePage />);
     expect(
       screen.getByRole("heading", { name: "首页数据" })
     ).toBeInTheDocument();
-    for (const title of ["用户数据", "任务数据", "智能词库", "天生币"]) {
+    // 顶部 KPI 四格。
+    for (const label of ["累计用户", "任务总量", "词库累计", "天生币流通"]) {
+      expect(screen.getByText(label)).toBeInTheDocument();
+    }
+    // 下方四张图表卡的标题。
+    for (const title of [
+      "用户增长趋势",
+      "天生币收支",
+      "学习进度分布",
+      "词库创建趋势"
+    ]) {
       expect(screen.getByRole("heading", { name: title })).toBeInTheDocument();
     }
-    // 天生币卡的操作位。
+    // 天生币收支卡的操作位。
     expect(screen.getByRole("button", { name: "发放" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "扣除" })).toBeInTheDocument();
   });
