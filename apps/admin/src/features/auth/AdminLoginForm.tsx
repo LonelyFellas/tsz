@@ -2,7 +2,7 @@ import { HttpError } from "@tsz/api-client";
 import { isValidAccount } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
 import { Alert, Button, Card, Form, Input, Typography } from "antd";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
@@ -31,8 +31,11 @@ function safeRedirect(raw: string | null): string {
   return "/";
 }
 
-// antd Form 在此只做布局（label/间距），不接管字段状态：
-// 1) 交互沿用「未达标只禁用按钮、不飘红」，用不上 rules 校验；
+// antd Form 在此负责「原生提交」（htmlType=submit + onFinish）：让浏览器把这次交互识别为
+// 一次登录，从而触发密码管理器的「保存密码」提示（纯 onClick + XHR 的 SPA 登录识别率很低）。
+// 回车由表单隐式提交驱动，不再单挂 onPressEnter，避免与 submit 双触发后端请求。
+// 但 Form 不接管字段状态：
+// 1) 交互沿用「未达标只禁用按钮、不飘红」，用不上 rules 校验（onFinish 里由 canSubmit 兜底）；
 // 2) Form.useWatch 在 antd v6 + React 19 的 jsdom 测试环境下不触发重渲染，
 //    受控 useState 是能被测试覆盖的可靠写法。
 export function AdminLoginForm() {
@@ -43,6 +46,10 @@ export function AdminLoginForm() {
   // 账号被后端锁定(连续失败触发 423):置灰登录按钮,阻断徒劳的连点重试。
   // 以后端 423 为唯一事实来源,前端不本地计数;用户改动账号/密码(新尝试意图)时解除。
   const [locked, setLocked] = useState(false);
+  // 同步在途锁：setLoading 是异步的，两次原生提交若落在同一帧（快速连按 Enter），
+  // 按钮 disabled 尚未重渲染、handleLogin 闭包里的 canSubmit 仍为旧值，会双发登录请求。
+  // 用 ref 在进入时立即置真、finally 复位，堵住这个竞态。
+  const inFlight = useRef(false);
 
   const setProfile = useAuthStore((s) => s.setProfile);
   const profile = useAuthStore((s) => s.profile);
@@ -81,7 +88,8 @@ export function AdminLoginForm() {
   }
 
   async function handleLogin() {
-    if (!canSubmit) return;
+    if (inFlight.current || !canSubmit) return;
+    inFlight.current = true;
     setError("");
     setLoading(true);
     try {
@@ -115,6 +123,7 @@ export function AdminLoginForm() {
       setError(translateAuthError(msg, LOGIN_ERRORS, "登录失败，请稍后重试"));
     } finally {
       setLoading(false);
+      inFlight.current = false;
     }
   }
 
@@ -128,7 +137,7 @@ export function AdminLoginForm() {
           请使用管理员账号登录
         </Typography.Paragraph>
 
-        <Form layout="vertical">
+        <Form layout="vertical" onFinish={() => void handleLogin()}>
           <Form.Item label="手机号 / 邮箱">
             <Input
               placeholder="请输入手机号或邮箱"
@@ -143,7 +152,6 @@ export function AdminLoginForm() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => onPasswordChange(e.target.value)}
-              onPressEnter={() => void handleLogin()}
             />
           </Form.Item>
 
@@ -158,10 +166,10 @@ export function AdminLoginForm() {
 
           <Button
             type="primary"
+            htmlType="submit"
             block
             loading={loading}
             disabled={!canSubmit}
-            onClick={() => void handleLogin()}
           >
             {loading ? "登录中..." : "登录"}
           </Button>

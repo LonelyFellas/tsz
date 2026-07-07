@@ -149,6 +149,8 @@ export function AdminManagement() {
             <GatedButton
               type="link"
               size="small"
+              // 禁用是破坏性动作，置红警示；启用是恢复性动作，保持常规蓝。
+              danger={record.status === "active"}
               reason="超级管理员不可操作"
               disabled={isSuper}
               loading={
