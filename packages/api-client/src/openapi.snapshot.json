@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend openapi.yaml via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-go/docs/openapi.yaml",
-  "_generatedAt": "2026-07-06T13:53:51.989Z",
+  "_generatedAt": "2026-07-07T08:41:54.845Z",
   "paths": {
     "/healthz": ["get"],
     "/auth/register": ["post"],
@@ -33,6 +33,10 @@
     "/admin/admins": ["get", "post"],
     "/admin/admins/{adminId}/status": ["patch"],
     "/admin/admins/{adminId}/reset-password": ["post"],
+    "/admin/admins/{adminId}/role": ["patch"],
+    "/admin/permissions": ["get"],
+    "/admin/roles": ["get", "post"],
+    "/admin/roles/{roleId}": ["delete", "patch"],
     "/admin/stats/overview": ["get"],
     "/admin/profile": ["get"],
     "/admin/users": ["get"],
