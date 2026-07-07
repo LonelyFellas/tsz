@@ -18,7 +18,7 @@
     "@tsz/shared": "workspace:*",
     "@tsz/types": "workspace:*",
     "@tsz/ui": "workspace:*",
-    "next": "^16.2.9",
+    "next": "^16.2.10",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "zod": "^4.4.3",
@@ -30,18 +30,18 @@
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@tsz/config": "workspace:*",
-    "@types/node": "^26.0.1",
+    "@types/node": "^26.1.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.0.3",
     "autoprefixer": "^10.5.2",
     "eslint": "^9.39.0",
-    "eslint-config-next": "^16.2.9",
+    "eslint-config-next": "^16.2.10",
     "eslint-config-prettier": "^10.1.8",
     "jsdom": "^29.1.1",
     "postcss": "^8.5.16",
     "tailwindcss": "^3.4.0",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }

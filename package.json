@@ -24,15 +24,15 @@
     "pnpm": ">=10"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.1.0",
-    "@commitlint/config-conventional": "^21.1.0",
+    "@commitlint/cli": "^21.2.0",
+    "@commitlint/config-conventional": "^21.2.0",
     "@tsz/config": "workspace:*",
-    "@vitest/coverage-v8": "^4.1.9",
+    "@vitest/coverage-v8": "^4.1.10",
     "lefthook": "^2.1.9",
-    "prettier": "^3.9.3",
-    "turbo": "^2.10.0",
+    "prettier": "^3.9.4",
+    "turbo": "^2.10.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   },
   "keywords": [],
   "author": "",
