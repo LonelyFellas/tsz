@@ -36,6 +36,8 @@ export default defineConfig({
         "apps/web/src/features/auth/components/AuthBranding.tsx",
         "apps/web/src/lib/query-client.ts",
         "apps/web/src/lib/constants.ts",
+        // SEO 常量单一来源，纯文案对象无逻辑分支，与 constants.ts 同类。
+        "apps/web/src/lib/site.ts",
         // 根布局渲染 <html>/<body> 装配壳，不纳入单测。
         "apps/admin/src/app/layout.tsx",
         // 智能词库已接真实接口:纯逻辑层(mapping/listQuery/labels/editorConstants)
