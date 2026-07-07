@@ -206,31 +206,33 @@ describe("AdminLoginForm", () => {
     expect(pwd).toHaveAttribute("type", "password");
   });
 
-  it("密码框回车提交", async () => {
+  // 浏览器里密码框回车会触发表单原生提交（htmlType=submit）；jsdom 不模拟回车的隐式提交，
+  // 直接对 <form> 派发 submit 来等价验证 onFinish 路径。
+  const submitForm = (c: HTMLElement) =>
+    fireEvent.submit(c.querySelector("form") as HTMLFormElement);
+
+  it("回车/原生提交触发登录", async () => {
     mockLogin.mockResolvedValue(authResponse("admin"));
-    render(<AdminLoginForm />);
+    const { container } = render(<AdminLoginForm />);
     fireEvent.change(screen.getByPlaceholderText("请输入手机号或邮箱"), {
       target: { value: "13800138000" }
     });
     fireEvent.change(screen.getByPlaceholderText("请输入登录密码"), {
       target: { value: "secret123" }
     });
-    fireEvent.keyDown(screen.getByPlaceholderText("请输入登录密码"), {
-      key: "Enter"
-    });
+    submitForm(container);
     await waitFor(() => expect(mockLogin).toHaveBeenCalled());
   });
 
-  it("未填写完整时回车不触发登录（canSubmit 兜底）", () => {
-    render(<AdminLoginForm />);
-    fireEvent.keyDown(screen.getByPlaceholderText("请输入登录密码"), {
-      key: "Enter"
-    });
-    expect(mockLogin).not.toHaveBeenCalled();
+  it("未填写完整时原生提交不触发登录（canSubmit 兜底）", async () => {
+    const { container } = render(<AdminLoginForm />);
+    submitForm(container);
+    // onFinish 异步（validateFields 微任务）：留出一拍，仍不应打后端。
+    await waitFor(() => expect(mockLogin).not.toHaveBeenCalled());
   });
 
-  it("密码不足 8 位：按钮禁用且回车不打后端（与后端 8–72 规则一致）", () => {
-    render(<AdminLoginForm />);
+  it("密码不足 8 位：按钮禁用且原生提交不打后端（与后端 8–72 规则一致）", async () => {
+    const { container } = render(<AdminLoginForm />);
     fireEvent.change(screen.getByPlaceholderText("请输入手机号或邮箱"), {
       target: { value: "13800138000" }
     });
@@ -238,10 +240,8 @@ describe("AdminLoginForm", () => {
       target: { value: "short12" } // 7 位
     });
     expect(screen.getByRole("button", { name: LOGIN_BUTTON })).toBeDisabled();
-    fireEvent.keyDown(screen.getByPlaceholderText("请输入登录密码"), {
-      key: "Enter"
-    });
-    expect(mockLogin).not.toHaveBeenCalled();
+    submitForm(container);
+    await waitFor(() => expect(mockLogin).not.toHaveBeenCalled());
   });
 
   it("账号格式非法：按钮禁用，不打后端", () => {

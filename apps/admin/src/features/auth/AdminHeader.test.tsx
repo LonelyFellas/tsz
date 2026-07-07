@@ -1,6 +1,6 @@
 import type { AdminProfile } from "@tsz/api-client";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockNavigate = vi.fn();
 
@@ -31,9 +31,24 @@ const PROFILE: AdminProfile = {
   permissions: []
 };
 
+// 登出走整页跳转 window.location.replace("/login")，jsdom 里桩掉以便断言。
+let originalLocation: Location;
 beforeEach(() => {
   vi.clearAllMocks();
   useAuthStore.setState({ profile: null, level: null });
+  originalLocation = window.location;
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    writable: true,
+    value: { replace: vi.fn() }
+  });
+});
+afterEach(() => {
+  Object.defineProperty(window, "location", {
+    configurable: true,
+    writable: true,
+    value: originalLocation
+  });
 });
 
 describe("AdminHeader", () => {
@@ -55,14 +70,15 @@ describe("AdminHeader", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/change-password");
   });
 
-  it("点退出：吊销会话、清 token、清 profile、回登录页", async () => {
+  it("点退出：吊销会话、清 token、清 profile、整页跳登录页", async () => {
     useAuthStore.setState({ profile: PROFILE, level: PROFILE.level });
     render(<AdminHeader />);
 
     fireEvent.click(screen.getByRole("button", { name: /退出登录/ }));
 
+    // 整页跳裸 /login（不带 redirect）：保证再次登录从首页进，且避开门禁抢注 redirect 的竞态。
     await waitFor(() =>
-      expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true })
+      expect(window.location.replace).toHaveBeenCalledWith("/login")
     );
     expect(mockLogout).toHaveBeenCalledTimes(1);
     expect(mockSetToken).toHaveBeenCalledWith(null);
@@ -77,7 +93,7 @@ describe("AdminHeader", () => {
     fireEvent.click(screen.getByRole("button", { name: /退出登录/ }));
 
     await waitFor(() =>
-      expect(mockNavigate).toHaveBeenCalledWith("/login", { replace: true })
+      expect(window.location.replace).toHaveBeenCalledWith("/login")
     );
     expect(mockSetToken).toHaveBeenCalledWith(null);
   });

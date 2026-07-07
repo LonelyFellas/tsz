@@ -31,8 +31,11 @@ function safeRedirect(raw: string | null): string {
   return "/";
 }
 
-// antd Form 在此只做布局（label/间距），不接管字段状态：
-// 1) 交互沿用「未达标只禁用按钮、不飘红」，用不上 rules 校验；
+// antd Form 在此负责「原生提交」（htmlType=submit + onFinish）：让浏览器把这次交互识别为
+// 一次登录，从而触发密码管理器的「保存密码」提示（纯 onClick + XHR 的 SPA 登录识别率很低）。
+// 回车由表单隐式提交驱动，不再单挂 onPressEnter，避免与 submit 双触发后端请求。
+// 但 Form 不接管字段状态：
+// 1) 交互沿用「未达标只禁用按钮、不飘红」，用不上 rules 校验（onFinish 里由 canSubmit 兜底）；
 // 2) Form.useWatch 在 antd v6 + React 19 的 jsdom 测试环境下不触发重渲染，
 //    受控 useState 是能被测试覆盖的可靠写法。
 export function AdminLoginForm() {
@@ -128,7 +131,7 @@ export function AdminLoginForm() {
           请使用管理员账号登录
         </Typography.Paragraph>
 
-        <Form layout="vertical">
+        <Form layout="vertical" onFinish={() => void handleLogin()}>
           <Form.Item label="手机号 / 邮箱">
             <Input
               placeholder="请输入手机号或邮箱"
@@ -143,7 +146,6 @@ export function AdminLoginForm() {
               autoComplete="current-password"
               value={password}
               onChange={(e) => onPasswordChange(e.target.value)}
-              onPressEnter={() => void handleLogin()}
             />
           </Form.Item>
 
@@ -158,10 +160,10 @@ export function AdminLoginForm() {
 
           <Button
             type="primary"
+            htmlType="submit"
             block
             loading={loading}
             disabled={!canSubmit}
-            onClick={() => void handleLogin()}
           >
             {loading ? "登录中..." : "登录"}
           </Button>
