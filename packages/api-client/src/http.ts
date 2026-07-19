@@ -111,10 +111,10 @@ export function createHttpClient({
       throw new HttpError(res.status, message, details, code);
     }
 
-    // 204 No Content
-    if (res.status === 204) return undefined as T;
-
-    return res.json() as Promise<T>;
+    // 204 No Content / 202 Accepted(otp/send)等空 body:直接 res.json() 会抛
+    // SyntaxError,统一按文本解析、空则返回 undefined。
+    const text = await res.text();
+    return (text ? JSON.parse(text) : undefined) as T;
   }
 
   return {

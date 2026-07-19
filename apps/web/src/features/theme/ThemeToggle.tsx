@@ -3,8 +3,8 @@
 import { useTheme } from "./useTheme";
 
 // 明/暗切换按钮。Apple 风圆形细描边,点击在两套主题间翻转。
-// 图标由 useTheme 驱动:SSR 用浅色快照,hydration 后以真实主题重渲染;
-// 按钮带 suppressHydrationWarning,避免明/暗不一致时的 hydration 警告。
+// 图标由 useTheme 驱动:SSR 与水合首帧都是浅色快照(月亮),水合完成后
+// useSyncExternalStore 以真实主题重渲染 —— 快照一致,无需 suppressHydrationWarning。
 export function ThemeToggle({ className = "" }: { className?: string }) {
   const { resolved, toggle } = useTheme();
   const isDark = resolved === "dark";
@@ -13,7 +13,6 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     <button
       type="button"
       onClick={toggle}
-      suppressHydrationWarning
       aria-label={isDark ? "切换到浅色模式" : "切换到深色模式"}
       title={isDark ? "浅色模式" : "深色模式"}
       className={`inline-flex h-8 w-8 items-center justify-center rounded-full border border-border text-foreground-muted transition hover:bg-muted hover:text-foreground ${className}`}

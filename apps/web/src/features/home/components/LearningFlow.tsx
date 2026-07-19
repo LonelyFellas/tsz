@@ -22,13 +22,13 @@ export function LearningFlow() {
 
         <ol className="relative grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
           {/* 桌面贯穿连接线,纯视觉 */}
-          <div className="pointer-events-none absolute inset-x-0 top-6 hidden h-px bg-gradient-to-r from-transparent via-border to-transparent lg:block" />
+          <div className="pointer-events-none absolute inset-x-0 top-6 hidden h-px bg-linear-to-r from-transparent via-border to-transparent lg:block" />
           {STEPS.map((s) => (
             <li
               key={s.step}
               className="reveal relative flex items-start gap-4 lg:flex-col lg:gap-0"
             >
-              <span className="relative z-10 flex h-12 w-12 flex-none items-center justify-center rounded-full bg-surface text-base font-semibold text-primary shadow-sm ring-1 ring-border">
+              <span className="relative z-10 flex h-12 w-12 flex-none items-center justify-center rounded-full bg-surface text-base font-semibold text-primary shadow-xs ring-1 ring-border">
                 {s.step}
               </span>
               <div className="lg:mt-5">

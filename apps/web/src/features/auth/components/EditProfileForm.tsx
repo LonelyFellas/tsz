@@ -22,7 +22,7 @@ import { translateAuthError } from "../shared";
 
 // 精细化输入框:Apple 风圆角 + 品牌蓝聚焦环,贴合落地页设计体系。
 const INPUT_CLASS =
-  "w-full rounded-2xl border border-border bg-muted/60 px-4 py-3 text-sm text-foreground outline-none transition placeholder:text-foreground-subtle focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/15";
+  "w-full rounded-2xl border border-border bg-muted/60 px-4 py-3 text-sm text-foreground outline-hidden transition placeholder:text-foreground-subtle focus:border-primary focus:bg-surface focus:ring-2 focus:ring-primary/15";
 
 // 编辑资料:进入拉 /me 展示资料,支持改昵称 + 绑定/换绑邮箱或手机(两步:发码→确认)、
 // 更换头像(OSS 预签名直传,流程在 ../avatar);等级/口音只读(改等级请联系客服)。
@@ -347,7 +347,7 @@ export function EditProfileForm() {
                   onError={() => setAvatarFailedUrl(user.avatar_url)}
                 />
               ) : (
-                <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900 text-3xl font-semibold text-white">
+                <span className="flex h-full w-full items-center justify-center bg-linear-to-br from-gray-700 to-gray-900 text-3xl font-semibold text-white">
                   {avatarInitial}
                 </span>
               )}

@@ -3,7 +3,7 @@ import { mockApi } from "./support/mockApi";
 
 test.describe("找回密码端到端流程", () => {
   test("登录页 → 忘记密码 → 重置成功 → 跳回登录并提示", async ({ page }) => {
-    await mockApi(page, { authenticated: false, onboarded: true });
+    await mockApi(page, { authenticated: false });
 
     await page.goto("/login");
 
@@ -29,7 +29,7 @@ test.describe("找回密码端到端流程", () => {
   });
 
   test("重置成功后可用新密码登录进入主页", async ({ page }) => {
-    await mockApi(page, { authenticated: false, onboarded: true });
+    await mockApi(page, { authenticated: false });
 
     await page.goto("/forgot-password");
 

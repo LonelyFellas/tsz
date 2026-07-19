@@ -55,7 +55,7 @@ export function AccountMenu() {
         aria-haspopup="true"
         aria-expanded={open}
         aria-label="账户菜单"
-        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-foreground text-xs font-semibold text-background transition hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-foreground text-xs font-semibold text-background transition hover:opacity-80 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         {showImage ? (
           // 任意来源的远程头像,next/image 需维护域名白名单,脚手架阶段用原生 img。

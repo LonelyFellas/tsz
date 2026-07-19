@@ -5,7 +5,7 @@ test.describe("注销账号端到端流程", () => {
   test("首页 → 注销账号 → 验证码 → 确认注销 → 跳回登录并提示", async ({
     page
   }) => {
-    await mockApi(page, { authenticated: true, onboarded: true });
+    await mockApi(page, { authenticated: true });
 
     await page.goto("/");
 
@@ -27,7 +27,7 @@ test.describe("注销账号端到端流程", () => {
   });
 
   test("同时绑定手机/邮箱时可切换渠道注销", async ({ page }) => {
-    await mockApi(page, { authenticated: true, onboarded: true });
+    await mockApi(page, { authenticated: true });
 
     await page.goto("/account/delete");
     await expect(page.getByRole("heading", { name: "注销账号" })).toBeVisible();

@@ -1,13 +1,7 @@
 "use client";
 
-import {
-  accountToDisplayName,
-  isCode,
-  isEmail,
-  isPhone,
-  isRegisterPassword
-} from "@tsz/shared";
-import { useEffect, useState, type FormEvent } from "react";
+import { isEmail, isPhone, isRegisterPassword } from "@tsz/shared";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
@@ -21,10 +15,9 @@ import {
 
 type Tab = "phone" | "email";
 
+// 对齐 tsz-rust 真实错误文案:手机/邮箱占用统一返回 409 "user already exists"。
 const REGISTER_ERRORS: Record<string, string> = {
-  "phone already registered": "该手机号已注册，请直接登录",
-  "email already registered": "该邮箱已注册，请直接登录",
-  "invalid credentials": "验证码错误或已失效，请重新获取"
+  "user already exists": "该账号已注册，请直接登录"
 };
 
 const TABS: { id: Tab; label: string }[] = [
@@ -32,53 +25,25 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "email", label: "邮箱" }
 ];
 
-const CODE_COUNTDOWN = 60;
-
 export function RegisterForm() {
   const [tab, setTab] = useState<Tab>("phone");
   const [account, setAccount] = useState("");
-  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [countdown, setCountdown] = useState(0);
-  const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const setUser = useUserStore((s) => s.setUser);
   const router = useRouter();
 
-  // 验证码倒计时。
-  useEffect(() => {
-    if (countdown <= 0) return;
-    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
-  }, [countdown]);
-
   const accountValid = tab === "phone" ? isPhone(account) : isEmail(account);
-  const codeValid = isCode(code);
   const passwordValid = isRegisterPassword(password);
-  const canSendCode = accountValid && countdown === 0 && !sending;
-  const canSubmit = accountValid && codeValid && passwordValid && !loading;
+  const canSubmit = accountValid && passwordValid && !loading;
 
   function switchTab(next: Tab) {
     setTab(next);
     setAccount("");
     setError("");
-  }
-
-  async function handleSendCode() {
-    if (!canSendCode) return;
-    setError("");
-    setSending(true);
-    try {
-      await api.auth.sendCode(account);
-      setCountdown(CODE_COUNTDOWN);
-    } catch (e: unknown) {
-      setError(translateError(e));
-    } finally {
-      setSending(false);
-    }
   }
 
   async function handleRegister(e: FormEvent) {
@@ -87,21 +52,28 @@ export function RegisterForm() {
     setError("");
     setLoading(true);
     try {
-      const auth = await api.auth.register({
+      // 业务规则:密码不区分大小写,统一转大写后入库(登录侧同样转换)。
+      const normalizedPassword = password.toUpperCase();
+      // 注册不自动登录(后端 201 只返回 user_id):注册成功后链式用同一凭证登录换会话。
+      // 昵称由后端生成(「同学XXXX」),角色恒 student,前端不再传。
+      await api.auth.register({
         // 手机/邮箱二选一：未选中的那个不传（后端按字段是否存在判断）。
         phone: tab === "phone" ? account : undefined,
         email: tab === "email" ? account : undefined,
-        // 业务规则:密码不区分大小写,统一转大写后入库。
-        password: password.toUpperCase(),
-        // 原型未单独采集昵称,默认用账号占位;邮箱账号剥域名、剔后端禁的
-        // < > 与不可见字符、截到 50 字上限,否则整个注册被 400。
-        display_name: accountToDisplayName(account),
-        role: "student",
-        code
+        password: normalizedPassword
       });
+      // 两步不共用 catch:注册已成功(账号已建),链式登录若因网络抖动/瞬时 5xx
+      // 失败,按「注册失败」报错会误导用户重试再撞 409。改为带成功提示去登录页。
+      let auth;
+      try {
+        auth = await api.auth.login(account, normalizedPassword);
+      } catch {
+        router.push("/login?registered=success");
+        return;
+      }
       persistSession(auth);
       setUser(auth.user);
-      // 新注册用户必为新用户，navigateAfterAuth 会据 /me 引导至 onboarding。
+      // navigateAfterAuth 拉 /me 决定是否进 onboarding(后端未实现前恒跳过)。
       await navigateAfterAuth((href) => router.push(href));
     } catch (e: unknown) {
       setError(translateError(e));
@@ -171,30 +143,9 @@ export function RegisterForm() {
               )}
             </div>
 
-            {/* 验证码 */}
-            <div>
-              <label className="block text-sm text-foreground-muted mb-1">
-                验证码
-              </label>
-              <div className="flex gap-3">
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="请输入验证码"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  className={`${AUTH_INPUT_CLASS} min-w-0`}
-                />
-                <button
-                  type="button"
-                  onClick={handleSendCode}
-                  disabled={!canSendCode}
-                  className="shrink-0 rounded-full bg-primary-muted px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {countdown > 0 ? `${countdown}s 后重发` : "获取验证码"}
-                </button>
-              </div>
-            </div>
+            {/* 验证码栏暂撤:后端注册接口不校验 OTP(Purpose 枚举也无 register),
+                挂一个不被校验的验证码框只会误导用户「已验证」。等后端注册纳入
+                OTP 校验后,恢复 sendCode(account, "register") + code 提交。 */}
 
             {/* 密码 */}
             <div>

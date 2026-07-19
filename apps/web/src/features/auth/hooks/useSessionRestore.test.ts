@@ -21,9 +21,7 @@ const MOCK_USER: User = {
   display_name: "Alice",
   roles: ["student"],
   avatar_url: "",
-  status: "active",
-  created_at: "",
-  updated_at: ""
+  active_role: "student"
 };
 
 // ── 工具 ──────────────────────────────────────────────────────────────────────

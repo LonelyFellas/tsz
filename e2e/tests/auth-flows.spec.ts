@@ -2,20 +2,27 @@ import { expect, test } from "@playwright/test";
 import { mockApi } from "./support/mockApi";
 
 test.describe("鉴权与引导端到端流程", () => {
-  test("新用户注册 → 进入引导页 → 选择后进入主页", async ({ page }) => {
-    await mockApi(page, { authenticated: false, onboarded: false });
+  test("新用户注册 → 链式自动登录进入主页", async ({ page }) => {
+    await mockApi(page, { authenticated: false });
 
     await page.goto("/register");
 
-    // 填写注册表单（手机 + 验证码 + 密码）。
+    // 填写注册表单（手机 + 密码;验证码栏已撤,后端注册不校验 OTP）。
     await page.getByPlaceholder("请输入手机号").fill("13800138000");
-    await page.getByRole("button", { name: "获取验证码" }).click();
-    await page.getByPlaceholder("请输入验证码").fill("123456");
     await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
     await page.getByRole("button", { name: "立即注册" }).click();
 
-    // 新用户被引导到 onboarding。
-    await expect(page).toHaveURL(/\/onboarding/);
+    // 注册(201 无 token)后前端链式登录;onboarding 后端未实现
+    // (me() 适配器恒 onboarded:true),注册后直接进主页。
+    await expect(page).toHaveURL(/\/$/);
+    await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
+  });
+
+  test("显式访问引导页 → 选择难度与口音 → 保存后进入主页", async ({ page }) => {
+    await mockApi(page, { authenticated: true });
+
+    // 引导页不再对已 onboarded 用户自动弹回:定级测试 CTA / 直接访问一律放行。
+    await page.goto("/onboarding");
     await expect(
       page.getByRole("heading", { name: "1. 选择难度级别" })
     ).toBeVisible();
@@ -31,7 +38,7 @@ test.describe("鉴权与引导端到端流程", () => {
   });
 
   test("登录 → 主页 → 退出登录回到登录页", async ({ page }) => {
-    await mockApi(page, { authenticated: false, onboarded: true });
+    await mockApi(page, { authenticated: false });
 
     await page.goto("/login");
     // 默认即「账号密码」tab，直接填账号密码登录。
@@ -47,7 +54,7 @@ test.describe("鉴权与引导端到端流程", () => {
   });
 
   test("手机验证码登录 → 主页", async ({ page }) => {
-    await mockApi(page, { authenticated: false, onboarded: true });
+    await mockApi(page, { authenticated: false });
 
     await page.goto("/login");
     // 切到「手机验证」tab：手机号 → 获取验证码 → 填验证码 → 登录。
@@ -62,7 +69,7 @@ test.describe("鉴权与引导端到端流程", () => {
   });
 
   test("已登录用户访问 /login 被自动跳走", async ({ page }) => {
-    await mockApi(page, { authenticated: true, onboarded: true });
+    await mockApi(page, { authenticated: true });
 
     await page.goto("/login");
 

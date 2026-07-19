@@ -2,6 +2,7 @@
 
 import type { CEFRLevel, EnglishVariant } from "@tsz/api-client";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
@@ -37,8 +38,13 @@ const ONBOARDING_ERRORS: Record<string, string> = {
     "当前账号没有学生身份，无法设置学习偏好"
 };
 
-export function OnboardingForm() {
-  const [level, setLevel] = useState<CEFRLevel | null>(null);
+interface OnboardingFormProps {
+  /** 来自定级测试(/placement)的预选难度。 */
+  initialLevel?: CEFRLevel;
+}
+
+export function OnboardingForm({ initialLevel }: OnboardingFormProps = {}) {
+  const [level, setLevel] = useState<CEFRLevel | null>(initialLevel ?? null);
   const [variant, setVariant] = useState<EnglishVariant | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -83,11 +89,17 @@ export function OnboardingForm() {
 
       <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
         {/* 卡片 1：选择难度级别 */}
-        <section className="rounded-2xl bg-surface p-8 shadow-sm">
+        <section className="rounded-2xl bg-surface p-8 shadow-xs">
           <h2 className="mb-3 text-xl font-bold">1. 选择难度级别</h2>
-          <p className="mb-6 text-sm leading-relaxed text-foreground-muted">
+          <p className="mb-2 text-sm leading-relaxed text-foreground-muted">
             必须根据自身水平，选择适合的难度级别，才能将正确的学习内容适配给你。
           </p>
+          <Link
+            href="/placement"
+            className="mb-6 inline-block text-sm font-medium text-primary hover:underline"
+          >
+            不确定选哪个？1 分钟测一测 →
+          </Link>
 
           <div className="space-y-2">
             {LEVELS.map(({ level: lv, color, stage, band }) => {
@@ -128,7 +140,7 @@ export function OnboardingForm() {
         </section>
 
         {/* 卡片 2：英式 or 美式 */}
-        <section className="flex flex-col rounded-2xl bg-surface p-8 shadow-sm">
+        <section className="flex flex-col rounded-2xl bg-surface p-8 shadow-xs">
           <h2 className="mb-3 text-xl font-bold">2. 英式 or 美式？</h2>
           <p className="mb-6 text-sm leading-relaxed text-foreground-muted">
             只能二选一，否则无法确认正确的发音和拼写形式，然后才能开启“天生会背”之旅。

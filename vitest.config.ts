@@ -21,6 +21,7 @@ export default defineConfig({
         "packages/ui/src/**",
         "packages/api-client/src/**",
         "apps/web/src/features/auth/**",
+        "apps/web/src/features/placement/**",
         "apps/web/src/lib/**",
         "apps/web/src/stores/**",
         // 与 web 对称：只纳入业务逻辑层（features/lib/components），app 路由壳由集成/e2e 覆盖。
@@ -40,6 +41,14 @@ export default defineConfig({
         "apps/web/src/lib/site.ts",
         // 根布局渲染 <html>/<body> 装配壳，不纳入单测。
         "apps/admin/src/app/layout.tsx",
+        // 定级测试(placement):流程编排(PlacementFlow)与各屏组件已有 jsdom
+        // 集成测试(PlacementFlow.test.tsx,经注入的假 client 驱动全部分支);
+        // 仅 SwipeCard 依赖 PointerEvent 手势/pointer capture/WAAPI 动画,
+        // jsdom 无法有效驱动(按钮/键盘路径已随流程测试覆盖),由 e2e 保底。
+        // TODO(定级): Playwright 补真实滑卡手势用例后评估是否移除本行。
+        "apps/web/src/features/placement/components/SwipeCard.tsx",
+        // mock↔http 装配点,单行无逻辑分支(同 query-client.ts)。
+        "apps/web/src/features/placement/lib/client.ts",
         // 智能词库已接真实接口:纯逻辑层(mapping/listQuery/labels/editorConstants)
         // 纳入 90% 门槛;下面两类仍排除——
         // ① .tsx 表单/表格装配与交互组件:由 WordEditor/pages 冒烟测试保底,

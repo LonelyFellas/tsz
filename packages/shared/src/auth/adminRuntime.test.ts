@@ -11,7 +11,9 @@ function resp(status: number, body: unknown, ok = status < 400): Response {
     ok,
     status,
     statusText: "",
-    json: async () => body
+    json: async () => body,
+    // http 层成功路径按 text() 解析(兼容 202/空 body),桩要同步提供。
+    text: async () => (body === undefined ? "" : JSON.stringify(body))
   } as unknown as Response;
 }
 

@@ -30,6 +30,12 @@ describe("translateAuthError", () => {
     expect(translateAuthError("weird thing", {}, "兜底")).toBe("weird thing");
   });
 
+  it("后端未实现的端点(404 Not Found)映射为「暂未开放」而非透传英文", () => {
+    expect(translateAuthError("Not Found", {}, "兜底")).toBe(
+      "该功能暂未开放，敬请期待"
+    );
+  });
+
   it("空消息回退到兜底文案", () => {
     expect(translateAuthError("", {}, "兜底")).toBe("兜底");
   });

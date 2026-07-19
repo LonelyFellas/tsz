@@ -10,6 +10,7 @@ const mockPush = vi.fn();
 let mockResetParam: string | null = null;
 let mockDeletedParam: string | null = null;
 let mockRedirectParam: string | null = null;
+let mockRegisteredParam: string | null = null;
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: mockPush }),
@@ -21,7 +22,9 @@ vi.mock("next/navigation", () => ({
           ? mockDeletedParam
           : key === "redirect"
             ? mockRedirectParam
-            : null
+            : key === "registered"
+              ? mockRegisteredParam
+              : null
   })
 }));
 
@@ -50,9 +53,7 @@ const ME_USER = {
   display_name: "Alice",
   roles: ["student"],
   avatar_url: "",
-  status: "active",
-  created_at: "",
-  updated_at: ""
+  active_role: "student"
 };
 
 beforeEach(() => {
@@ -61,6 +62,7 @@ beforeEach(() => {
   mockResetParam = null;
   mockDeletedParam = null;
   mockRedirectParam = null;
+  mockRegisteredParam = null;
   // 默认：老用户（已 onboarded），登录后进目标页。
   mockMe.mockResolvedValue({
     user: ME_USER,
@@ -131,12 +133,9 @@ describe("LoginForm — 登录流程", () => {
         display_name: "Alice",
         roles: ["student"],
         avatar_url: "",
-        status: "active",
-        created_at: "",
-        updated_at: ""
+        active_role: "student"
       },
       access_token: "at",
-      active_role: "student",
       expires_in: 900,
       refresh_token_expires_at: 9999999999
     });
@@ -232,7 +231,9 @@ describe("LoginForm — 登录流程", () => {
 describe("LoginForm — 错误映射", () => {
   const cases: [string, string][] = [
     ["invalid credentials", "账号或密码错误，请重新输入"],
-    ["user not found", "该账号不存在"],
+    // 后端对「账号不存在/密码错误」返回同一条 401(防枚举),没有单独的 user not found;
+    // 403 forbidden = 密码正确但账号被禁用。
+    ["forbidden", "该账号已被禁用，请联系客服"],
     ["session expired", "登录已过期，请重新登录"],
     ["invalid refresh token", "登录已过期，请重新登录"]
   ];
@@ -320,7 +321,7 @@ describe("LoginForm — 验证码登录", () => {
 
   it("合法手机号 → 获取验证码按钮可用，点击后调用 sendCode 并进入倒计时", async () => {
     const user = userEvent.setup();
-    mockSendCode.mockResolvedValueOnce({ status: "sent" });
+    mockSendCode.mockResolvedValueOnce(undefined); // otp/send 202 无 body
     renderWithProviders(<LoginForm />);
 
     await user.click(screen.getByRole("button", { name: "手机验证" }));
@@ -366,7 +367,8 @@ describe("LoginForm — 验证码登录", () => {
 
   it("验证码错误 → 显示中文错误提示", async () => {
     const user = userEvent.setup();
-    mockLoginWithCode.mockRejectedValueOnce(new Error("invalid credentials"));
+    // tsz-rust /auth/login-otp 的验证码错误文案是 "invalid code"。
+    mockLoginWithCode.mockRejectedValueOnce(new Error("invalid code"));
     renderWithProviders(<LoginForm />);
 
     await user.click(screen.getByRole("button", { name: "手机验证" }));
@@ -383,9 +385,8 @@ describe("LoginForm — 验证码登录", () => {
 
   it("发送过于频繁 → 显示限流提示", async () => {
     const user = userEvent.setup();
-    mockSendCode.mockRejectedValueOnce(
-      new Error("too many code requests, try again later")
-    );
+    // tsz-rust 429 统一文案 "too many requests"。
+    mockSendCode.mockRejectedValueOnce(new Error("too many requests"));
     renderWithProviders(<LoginForm />);
 
     await user.click(screen.getByRole("button", { name: "手机验证" }));
@@ -401,7 +402,7 @@ describe("LoginForm — 验证码登录", () => {
 
   it("邮箱验证码 tab → 用邮箱作为 identifier 调用 sendCode", async () => {
     const user = userEvent.setup();
-    mockSendCode.mockResolvedValueOnce({ status: "sent" });
+    mockSendCode.mockResolvedValueOnce(undefined); // otp/send 202 无 body
     renderWithProviders(<LoginForm />);
 
     await user.click(screen.getByRole("button", { name: "邮箱验证" }));
@@ -466,5 +467,14 @@ describe("LoginForm — 交互细节", () => {
     renderWithProviders(<LoginForm />);
 
     expect(screen.getByText("账号已注销成功。")).toBeInTheDocument();
+  });
+
+  it("URL 带 registered=success → 顶部显示注册成功提示(注册后自动登录失败跳回)", () => {
+    mockRegisteredParam = "success";
+    renderWithProviders(<LoginForm />);
+
+    expect(
+      screen.getByText("注册成功，请用刚设置的账号密码登录。")
+    ).toBeInTheDocument();
   });
 });

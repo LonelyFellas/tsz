@@ -1,7 +1,9 @@
 import type { Page, Route } from "@playwright/test";
 
 // 前端 E2E 在不启动真实后端的前提下，拦截 /api/v1/** 并返回可控的桩响应。
-// 通过选项模拟「是否已登录」「是否已完成引导」，并支持 onboarding 提交后状态翻转。
+// 路径与响应形状对齐 tsz-rust(见 api-client openapi.snapshot.json):
+// /auth/me 返回扁平 UserProfile;注册 201 不带 token(前端链式登录);
+// onboarding 状态后端未实现(me() 适配器恒 onboarded:true),桩不再模拟。
 
 export const TEST_USER = {
   id: "u1",
@@ -9,16 +11,13 @@ export const TEST_USER = {
   email: "alice@example.com",
   display_name: "Alice",
   avatar_url: "",
-  status: "active" as const,
   roles: ["student"] as const,
-  created_at: "2026-01-01T00:00:00Z",
-  updated_at: "2026-01-01T00:00:00Z"
+  active_role: "student" as const
 };
 
 const AUTH_RESPONSE = {
   user: TEST_USER,
   access_token: "test-access-token",
-  active_role: "student",
   expires_in: 900,
   refresh_token_expires_at: 9999999999
 };
@@ -34,14 +33,10 @@ function json(route: Route, status: number, body: unknown) {
 interface MockOptions {
   /** 初始会话恢复（/auth/refresh）是否成功，即首屏是否已登录。 */
   authenticated?: boolean;
-  /** /me 初始返回的 onboarded。 */
-  onboarded?: boolean;
 }
 
 export async function mockApi(page: Page, opts: MockOptions = {}) {
-  const { authenticated = false, onboarded = true } = opts;
-  // 可变：onboarding 提交后 /me 应返回 onboarded:true。
-  let onboardedState = onboarded;
+  const { authenticated = false } = opts;
   // 可变：账号注销后会话失效，后续 /auth/refresh 应 401（模拟账号已删）。
   let deleted = false;
 
@@ -61,30 +56,28 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
           })
         : json(route, 401, { error: "missing refresh token" });
     }
-    if (path === "/me" && method === "GET") {
-      return json(route, 200, {
-        user: TEST_USER,
-        active_role: "student",
-        learning_settings: onboardedState
-          ? { cefr_level: "B1", english_variant: "BrE" }
-          : null,
-        onboarded: onboardedState
-      });
+    if (path === "/auth/me" && method === "GET") {
+      // tsz-rust 返回扁平 UserProfile(active_role 在 user 内,无包壳)
+      return json(route, 200, TEST_USER);
     }
     if (path === "/auth/login" && method === "POST") {
       return json(route, 200, AUTH_RESPONSE);
     }
-    if (path === "/auth/login/code" && method === "POST") {
+    if (path === "/auth/login-otp" && method === "POST") {
       return json(route, 200, AUTH_RESPONSE);
     }
-    if (path === "/auth/register" && method === "POST") {
-      return json(route, 200, AUTH_RESPONSE);
+    if (path === "/user/register" && method === "POST") {
+      // 201 不含 token:注册不自动登录,前端随后链式调 /auth/login
+      return json(route, 201, {
+        user_id: TEST_USER.id,
+        display_name: TEST_USER.display_name,
+        role: "student"
+      });
     }
-    if (path === "/auth/send-code" && method === "POST") {
-      return json(route, 200, { status: "sent" });
+    if (path === "/otp/send" && method === "POST") {
+      return route.fulfill({ status: 202, body: "" });
     }
     if (path === "/me/learning-settings" && method === "PUT") {
-      onboardedState = true;
       return json(route, 200, {
         learning_settings: { cefr_level: "B1", english_variant: "BrE" },
         onboarded: true

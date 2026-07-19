@@ -71,6 +71,32 @@ describe("OnboardingForm", () => {
     expect(screen.getByText("美式")).toBeInTheDocument();
   });
 
+  it("展示定级测试入口链接", () => {
+    renderWithProviders(<OnboardingForm />);
+    const link = screen.getByRole("link", { name: /1 分钟测一测/ });
+    expect(link).toHaveAttribute("href", "/placement");
+  });
+
+  it("initialLevel(来自定级测试)预选难度,只需再选口音即可提交", async () => {
+    mockUpdate.mockResolvedValueOnce({
+      learning_settings: { cefr_level: "B2", english_variant: "BrE" },
+      onboarded: true
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<OnboardingForm initialLevel="B2" />);
+
+    expect(screen.getByText("已选")).toBeInTheDocument();
+    await user.click(screen.getByText("英式英语"));
+    await user.click(screen.getByRole("button", { name: "完成，开始学习" }));
+
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalledWith({
+        cefr_level: "B2",
+        english_variant: "BrE"
+      });
+    });
+  });
+
   it("提交失败 → 显示错误文案，不跳转", async () => {
     mockUpdate.mockRejectedValueOnce(
       new Error("learning settings require a student profile")

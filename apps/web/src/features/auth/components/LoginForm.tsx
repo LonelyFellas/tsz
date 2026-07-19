@@ -16,15 +16,19 @@ import {
 
 type Tab = "password" | "phone" | "email";
 
+// 后端(tsz-rust)对「账号不存在」与「密码错误」返回逐字节一致的 401
+// invalid credentials(防枚举),前端不区分;403 forbidden = 密码对但账号被禁。
 const LOGIN_ERRORS: Record<string, string> = {
   "invalid credentials": "账号或密码错误，请重新输入",
-  "user not found": "该账号不存在"
+  forbidden: "该账号已被禁用，请联系客服"
 };
 
-// 验证码登录的错误文案，对齐后端 /auth/{send-code,login/code}（见 api.md）。
+// 验证码登录的错误文案,对齐后端 /otp/send + /auth/login-otp 的真实 message。
 const CODE_ERRORS: Record<string, string> = {
-  "invalid credentials": "验证码错误或已失效，请重新获取",
-  "too many code requests, try again later": "验证码发送过于频繁，请稍后再试"
+  "invalid code": "验证码错误或已失效，请重新获取",
+  "user not found": "该账号未注册，请先注册",
+  "too many requests": "验证码发送过于频繁，请稍后再试",
+  "service unavailable": "验证码服务暂时不可用，请稍后再试"
 };
 
 const CODE_COUNTDOWN = 60;
@@ -70,6 +74,8 @@ export function LoginForm() {
   const resetSuccess = searchParams.get("reset") === "success";
   // 从注销账号流程跳回时展示成功提示。
   const deletedSuccess = searchParams.get("deleted") === "success";
+  // 注册成功但自动登录失败(网络抖动等)跳回时展示成功提示，避免误以为注册失败。
+  const registeredSuccess = searchParams.get("registered") === "success";
 
   function switchTab(id: Tab) {
     setTab(id);
@@ -155,6 +161,12 @@ export function LoginForm() {
           {deletedSuccess && (
             <p className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success">
               账号已注销成功。
+            </p>
+          )}
+
+          {registeredSuccess && (
+            <p className="mb-6 rounded-lg bg-success/10 px-4 py-3 text-sm text-success">
+              注册成功，请用刚设置的账号密码登录。
             </p>
           )}
 

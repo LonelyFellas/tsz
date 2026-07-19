@@ -114,7 +114,7 @@ export function WordListCreator() {
             <h2 className="mb-2 font-medium">自定义词汇(可选)</h2>
             <div className="flex gap-2">
               <input
-                className="flex-1 rounded border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle"
+                className="flex-1 rounded-sm border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle"
                 placeholder="输入一个词后点添加"
                 value={customDraft}
                 onChange={(e) => setCustomDraft(e.target.value)}
@@ -129,7 +129,7 @@ export function WordListCreator() {
                 {customWords.map((c, i) => (
                   <span
                     key={`${c.text}-${i}`}
-                    className="rounded bg-muted px-2 py-1 text-sm"
+                    className="rounded-sm bg-muted px-2 py-1 text-sm"
                   >
                     {c.text}
                   </span>
@@ -159,7 +159,7 @@ export function WordListCreator() {
           <div>
             <label className="mb-1 block text-sm">词表名称</label>
             <input
-              className="w-full rounded border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle"
+              className="w-full rounded-sm border border-border bg-surface px-3 py-2 text-foreground placeholder:text-foreground-subtle"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="例如:小学一年级核心词"
@@ -215,7 +215,7 @@ export function WordListCreator() {
             ))}
           </div>
           {needsReview && (
-            <p className="rounded bg-amber-50 p-3 text-sm text-amber-700">
+            <p className="rounded-sm bg-amber-50 p-3 text-sm text-amber-700">
               公开 + 含自定义词汇 →
               提交后将进入敏感词审核,通过后才会对师生可见。
             </p>
