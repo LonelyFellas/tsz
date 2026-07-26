@@ -23,12 +23,25 @@ beforeEach(() => {
 });
 
 describe("createAdminEndpoints", () => {
-  it("login → POST /auth/login 带 identifier + password，skipAuth", () => {
+  // admin 登录是三要素 2FA（手机号+密码+验证码，后端 AdminLoginRequest 三字段全 required）。
+  // 登录标识仅手机号（Q9：admin 无 email，get_by_phone 精确匹配），故字段名是 phone 不是 identifier。
+  it("login → POST /auth/login 带 phone + password + code，skipAuth", () => {
     const api = createAdminEndpoints(http);
-    api.auth.login("13800138000", "s3cretpass");
+    api.auth.login("13800138000", "s3cretpass", "123456");
     expect(http.post).toHaveBeenCalledWith(
       "/auth/login",
-      { identifier: "13800138000", password: "s3cretpass" },
+      { phone: "13800138000", password: "s3cretpass", code: "123456" },
+      { skipAuth: true }
+    );
+  });
+
+  // 2FA 第一步：先发码。后端 login-code 恒 202（反枚举），前端无凭证要求 → skipAuth。
+  it("requestLoginCode → POST /auth/login-code 带 phone，skipAuth", () => {
+    const api = createAdminEndpoints(http);
+    api.auth.requestLoginCode("13800138000");
+    expect(http.post).toHaveBeenCalledWith(
+      "/auth/login-code",
+      { phone: "13800138000" },
       { skipAuth: true }
     );
   });

@@ -22,13 +22,13 @@ const PROFILE: AdminProfile = {
   id: "a1",
   phone: "13800138000",
   display_name: "Administrator",
-  level: "super_admin",
+  role: "super_admin",
   permissions: []
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useAuthStore.setState({ profile: null, level: null, hydrated: false });
+  useAuthStore.setState({ profile: null, role: null, hydrated: false });
 });
 
 describe("useAdminSessionRestore", () => {
@@ -41,7 +41,7 @@ describe("useAdminSessionRestore", () => {
     await waitFor(() => {
       expect(useAuthStore.getState().profile).toEqual(PROFILE);
     });
-    expect(useAuthStore.getState().level).toBe("super_admin");
+    expect(useAuthStore.getState().role).toBe("super_admin");
     expect(useAuthStore.getState().hydrated).toBe(true);
     expect(mockRefresh).toHaveBeenCalledTimes(1);
     expect(mockProfile).toHaveBeenCalledTimes(1);

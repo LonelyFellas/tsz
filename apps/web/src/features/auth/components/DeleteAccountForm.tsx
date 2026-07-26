@@ -137,7 +137,7 @@ export function DeleteAccountForm() {
         <span className="w-8" aria-hidden />
       </div>
 
-      <div className="rounded-2xl border border-border bg-surface px-6 py-8 shadow-sm">
+      <div className="rounded-2xl border border-border bg-surface px-6 py-8 shadow-xs">
         {/* 渠道切换：仅当账号同时绑定手机与邮箱时显示 */}
         {channels.length > 1 && (
           <div className="mb-6 flex gap-6 border-b border-border">

@@ -1,47 +1,92 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* 语义色板。值为「R G B」三通道（不带 rgb()），
-   供 Tailwind 的 rgb(var(--x) / <alpha-value>) 拼装,从而支持 /80 透明度。
-   组件统一用语义类(bg-surface/text-foreground...),切到 .dark 时整体翻转。 */
+@source '../../../../packages/ui/src/**/*.{ts,tsx}';
+/* 排除 admin 迁移期沉淀的 shadcn 组件目录(继承自 v3 tailwind.config.ts 的排除项):
+   它们用 web 未定义的 hsl 语义 token(bg-card/border-input/ring-ring 等),
+   扫入只会白白增重 CSS;且 web 侧若误引用会静默渲染成透明/黑色而无构建报错,
+   保持不生成这些类可让误引用更快暴露。 */
+@source not '../../../../packages/ui/src/components';
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: rgb(var(--ch-background));
+  --color-surface: rgb(var(--ch-surface));
+  --color-muted: rgb(var(--ch-muted));
+  --color-foreground: rgb(var(--ch-foreground));
+  --color-foreground-muted: rgb(var(--ch-foreground-muted));
+  --color-foreground-subtle: rgb(var(--ch-foreground-subtle));
+  --color-border: rgb(var(--ch-border));
+  --color-primary: rgb(var(--ch-primary));
+  --color-primary-foreground: rgb(var(--ch-primary-foreground));
+  --color-primary-muted: rgb(var(--ch-primary-muted));
+  --color-success: rgb(var(--ch-success));
+  --color-danger: rgb(var(--ch-danger));
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "PingFang SC",
+    "Microsoft YaHei", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
+
+/* 语义色板原始三通道值「R G B」（不带 rgb()）。
+   上方 @theme inline 用 rgb(var(--ch-x)) 包成 Tailwind 色 token——
+   故原始通道必须用 --ch-* 前缀，与 --color-* token 不同名（同名会循环/覆盖）。
+   透明度修饰(bg-surface/80)由 v4 的 color-mix 处理；切 .dark 时整体翻转。 */
 :root {
-  --color-background: 249 250 251; /* gray-50 页面底 */
-  --color-surface: 255 255 255; /* white 卡片面 */
-  --color-muted: 243 244 246; /* gray-100 次级填充 */
-  --color-foreground: 17 24 39; /* gray-900 主文字 */
-  --color-foreground-muted: 75 85 99; /* gray-600 次级文字 */
-  --color-foreground-subtle: 156 163 175; /* gray-400 三级文字 */
-  --color-border: 229 231 235; /* gray-200 描边 */
-  --color-primary: 0 113 227; /* #0071e3 品牌蓝 */
-  --color-primary-foreground: 255 255 255;
-  --color-primary-muted: 239 246 255; /* blue-50 浅底 */
-  --color-success: 22 163 74; /* green-600 */
-  --color-danger: 220 38 38; /* red-600 */
+  --ch-background: 249 250 251; /* gray-50 页面底 */
+  --ch-surface: 255 255 255; /* white 卡片面 */
+  --ch-muted: 243 244 246; /* gray-100 次级填充 */
+  --ch-foreground: 17 24 39; /* gray-900 主文字 */
+  --ch-foreground-muted: 75 85 99; /* gray-600 次级文字 */
+  --ch-foreground-subtle: 156 163 175; /* gray-400 三级文字 */
+  --ch-border: 229 231 235; /* gray-200 描边 */
+  --ch-primary: 0 113 227; /* #0071e3 品牌蓝 */
+  --ch-primary-foreground: 255 255 255;
+  --ch-primary-muted: 239 246 255; /* blue-50 浅底 */
+  --ch-success: 22 163 74; /* green-600 */
+  --ch-danger: 220 38 38; /* red-600 */
 
   color-scheme: light;
 }
 
 .dark {
-  --color-background: 10 10 12; /* 近黑页面底 */
-  --color-surface: 24 24 27; /* zinc-900 卡片面 */
-  --color-muted: 39 39 42; /* zinc-800 次级填充 */
-  --color-foreground: 244 244 245; /* zinc-100 主文字 */
-  --color-foreground-muted: 161 161 170; /* zinc-400 次级文字 */
-  --color-foreground-subtle: 113 113 122; /* zinc-500 三级文字 */
-  --color-border: 39 39 42; /* zinc-800 描边 */
-  --color-primary: 10 132 255; /* #0a84ff 暗色下更亮的蓝 */
-  --color-primary-foreground: 255 255 255;
-  --color-primary-muted: 23 37 62; /* 深蓝浅底 */
-  --color-success: 34 197 94; /* green-500 */
-  --color-danger: 248 113 113; /* red-400 暗色下更亮 */
+  --ch-background: 10 10 12; /* 近黑页面底 */
+  --ch-surface: 24 24 27; /* zinc-900 卡片面 */
+  --ch-muted: 39 39 42; /* zinc-800 次级填充 */
+  --ch-foreground: 244 244 245; /* zinc-100 主文字 */
+  --ch-foreground-muted: 161 161 170; /* zinc-400 次级文字 */
+  --ch-foreground-subtle: 113 113 122; /* zinc-500 三级文字 */
+  --ch-border: 39 39 42; /* zinc-800 描边 */
+  --ch-primary: 10 132 255; /* #0a84ff 暗色下更亮的蓝 */
+  --ch-primary-foreground: 255 255 255;
+  --ch-primary-muted: 23 37 62; /* 深蓝浅底 */
+  --ch-success: 34 197 94; /* green-500 */
+  --ch-danger: 248 113 113; /* red-400 暗色下更亮 */
 
   color-scheme: dark;
 }
 
 body {
-  color: rgb(var(--color-foreground));
-  background: rgb(var(--color-background));
+  color: rgb(var(--ch-foreground));
+  background: rgb(var(--ch-background));
 }
 
 /* 滚动进场动画。

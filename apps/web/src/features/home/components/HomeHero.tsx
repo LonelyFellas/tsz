@@ -7,7 +7,7 @@ export function HomeHero() {
   return (
     <section className="relative isolate overflow-hidden bg-surface">
       {/* 极淡顶部光晕,几乎不可见,只为去掉纯白的呆板 */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-gradient-to-b from-primary-muted/60 to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-linear-to-b from-primary-muted/60 to-transparent" />
 
       <div className="relative mx-auto flex w-full max-w-5xl flex-col items-center px-6 pb-16 pt-24 text-center sm:pb-32 sm:pt-36">
         <p className="animate-in text-sm font-semibold tracking-wide text-primary">

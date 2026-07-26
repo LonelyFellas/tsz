@@ -108,7 +108,7 @@ export function ProfileHub() {
               onError={() => setAvatarFailedUrl(user.avatar_url)}
             />
           ) : (
-            <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-gray-700 to-gray-900 text-2xl font-semibold text-white">
+            <span className="flex h-full w-full items-center justify-center bg-linear-to-br from-gray-700 to-gray-900 text-2xl font-semibold text-white">
               {initial}
             </span>
           )}
@@ -121,7 +121,7 @@ export function ProfileHub() {
             <p className="truncate text-sm text-foreground-muted">{contact}</p>
           )}
           <div className="mt-1.5 flex flex-wrap items-center gap-2">
-            <span className="inline-flex max-w-[15rem] items-center gap-1 text-xs text-foreground-subtle">
+            <span className="inline-flex max-w-60 items-center gap-1 text-xs text-foreground-subtle">
               <span className="min-w-0 truncate">ID:{user.id}</span>
               <button
                 type="button"
@@ -168,7 +168,7 @@ export function ProfileHub() {
           <Link
             key={tile.label}
             href={tile.href}
-            className="group flex items-center gap-3.5 rounded-3xl border border-border bg-surface p-5 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/5"
+            className="group flex items-center gap-3.5 rounded-3xl border border-border bg-surface p-5 shadow-xs transition duration-300 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/5"
           >
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-muted transition group-hover:bg-primary/10">
               {tile.icon}

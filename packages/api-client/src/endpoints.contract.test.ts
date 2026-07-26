@@ -21,6 +21,21 @@ const specPaths = snapshot.paths as Record<string, string[]>;
 //
 // 形如 "<method> <path>";路径里的占位段用 "_"(见下方 SENTINEL)。
 const PENDING = new Set<string>([
+  // ---- 后端已切换为 tsz-rust(重写进行中),spec 只含 auth 核心 7 条路由。 ----
+  // 以下按 tsz-rust 落地节奏逐步从白名单移除(T 系列见 tsz-rust/docs/frontend-integration.md §6)。
+
+  // 个人资料 / 学习设置 / 联系方式 / 头像(tsz-rust 未实现)。
+  "patch /me",
+  "post /me/contact/bind-code",
+  "post /me/contact/bind",
+  "put /me/learning-settings",
+  "post /me/avatar/upload-url",
+  "post /me/avatar",
+  // 找回密码 / 注销账号(tsz-rust 未实现)。
+  "post /auth/password/forgot",
+  "post /auth/password/reset",
+  "post /auth/account/deletion-code",
+  "delete /auth/account",
   // 教师申请:ApplyTeacherForm 在用,但后端 spec 暂无此路由。
   "post /auth/apply-teacher",
   // 词库 / 词表 / 评论 / 任务:目前全是前端 mock(useWordLists 等),后端未实现。
@@ -31,7 +46,34 @@ const PENDING = new Set<string>([
   "post /wordlists/_/publish",
   "post /comments",
   "get /tasks",
-  "post /tasks"
+  "post /tasks",
+  // 平台后台(admin):auth 一期已在 tsz-rust 落地(login/login-code/logout/refresh/profile),
+  // 已纳入正式校验;其余(logout-all/change-password/words/users/admins/roles)待对接。
+  "post /admin/auth/logout-all",
+  "post /admin/auth/change-password",
+  "get /admin/words",
+  "get /admin/words/stats",
+  "post /admin/words",
+  "get /admin/words/_",
+  "put /admin/words/_/content",
+  "post /admin/words/_/publish",
+  "delete /admin/words/_",
+  "post /admin/words/batch-delete",
+  "get /admin/words/related-search",
+  "get /admin/users",
+  "get /admin/users/_",
+  "patch /admin/users/_/status",
+  "patch /admin/users/_",
+  "get /admin/admins",
+  "post /admin/admins",
+  "patch /admin/admins/_/status",
+  "post /admin/admins/_/reset-password",
+  "patch /admin/admins/_/role",
+  "get /admin/permissions",
+  "get /admin/roles",
+  "post /admin/roles",
+  "patch /admin/roles/_",
+  "delete /admin/roles/_"
 ]);
 
 // 调用端点函数时给位置参数填的哨兵值,使 `/wordlists/${id}` 这类模板渲染成 `/wordlists/_`。
@@ -47,7 +89,10 @@ function collectCalls(
     (method: string) =>
     (path: string): unknown => {
       calls.push({ method, path: `${prefix}${path}` });
-      return undefined;
+      // 永不 settle 的 Promise:有的端点在 http.* 结果上链 .then 做响应装配
+      // (如 me),返回 undefined 会让链式调用同步炸掉;永挂起则链上回调
+      // 永不执行——收集器只关心「发出的调用」,不关心响应。
+      return new Promise(() => {});
     };
   const http = {
     get: record("get"),

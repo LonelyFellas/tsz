@@ -15,7 +15,7 @@ export function HeroVisual() {
   return (
     <div className="animate-float relative w-full">
       {/* 背后柔光,纯氛围 */}
-      <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] bg-gradient-to-tr from-primary/30 via-primary/15 to-transparent blur-2xl" />
+      <div className="pointer-events-none absolute -inset-6 -z-10 rounded-[2.5rem] bg-linear-to-tr from-primary/30 via-primary/15 to-transparent blur-2xl" />
 
       {/* 叠层卡:错位露出一角,营造层次景深 */}
       <div className="absolute inset-x-4 -bottom-4 h-full rounded-[1.75rem] border border-border bg-surface/70 shadow-lg" />

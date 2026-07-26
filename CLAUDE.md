@@ -1,7 +1,9 @@
 # CLAUDE.md
 
 天生会背 — 词汇学习平台前端 monorepo（pnpm + turbo，Node ≥ 22）。
-后端是独立仓库 tsz-go（Go），本仓库只管前端与部署编排。
+后端正从独立仓库 tsz-go（Go）重写迁移至 tsz-rust（Rust，同上级目录），
+前端已切到 tsz-rust 对接（当前只落地 auth 核心，其余端点见 api-client 契约测试
+PENDING 白名单）；本仓库只管前端与部署编排。
 
 ## 布局
 
@@ -63,8 +65,11 @@
 
 ## API 文档
 
-- 权威来源：Swagger `http://localhost:8080/docs`（spec 为 `/docs/openapi.yaml`；
-  8080 是到测试服后端的 SSH 隧道）。源文件在 tsz-go 仓库 `docs/api.md`。
+- 权威来源：tsz-rust 仓库 `docs/openapi.json`（`pnpm --filter @tsz/api-client sync:openapi`
+  同步为 `openapi.snapshot.json`，契约测试以此对账）；对接节奏见 tsz-rust
+  `docs/frontend-integration.md`。
+- 本地 dev 代理默认 `http://localhost:8383/api/v1`（本地 `cargo run` 的 tsz-rust；
+  可用 `BACKEND_API_URL` 覆盖）。旧 tsz-go 的 Swagger（8080 SSH 隧道）仅存量参考。
 
 ## 部署
 

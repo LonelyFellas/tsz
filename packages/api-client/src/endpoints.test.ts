@@ -19,10 +19,25 @@ beforeEach(() => {
 });
 
 describe("createEndpoints · auth", () => {
-  it("me → GET /me", () => {
+  it("me → GET /auth/me,扁平 UserProfile 装配成 MeResponse", async () => {
+    const user = {
+      id: "u1",
+      display_name: "同学1234",
+      avatar_url: "",
+      roles: ["student"],
+      active_role: "student"
+    };
+    http.get.mockResolvedValueOnce(user);
     const api = createEndpoints(http);
-    api.auth.me();
-    expect(http.get).toHaveBeenCalledWith("/me");
+    const me = await api.auth.me();
+    expect(http.get).toHaveBeenCalledWith("/auth/me");
+    // 后端未实现 learning_settings/onboarded,适配器填 null/true(见 endpoints.ts)。
+    expect(me).toEqual({
+      user,
+      active_role: "student",
+      learning_settings: null,
+      onboarded: true
+    });
   });
 
   it("updateProfile → PATCH /me 带 display_name", () => {
@@ -48,21 +63,17 @@ describe("createEndpoints · auth", () => {
     });
   });
 
-  it("register → POST /auth/register 带 payload", () => {
+  it("register → POST /user/register 带 payload(不含昵称/角色,后端生成)", () => {
     const api = createEndpoints(http);
     api.auth.register({
       phone: "13800138000",
-      password: "s3cret",
-      display_name: "张三",
-      role: "student"
+      password: "s3cret66"
     });
     expect(http.post).toHaveBeenCalledWith(
-      "/auth/register",
+      "/user/register",
       {
         phone: "13800138000",
-        password: "s3cret",
-        display_name: "张三",
-        role: "student"
+        password: "s3cret66"
       },
       { skipAuth: true }
     );
@@ -72,17 +83,13 @@ describe("createEndpoints · auth", () => {
     const api = createEndpoints(http);
     api.auth.register({
       email: "alice@example.com",
-      password: "s3cret",
-      display_name: "Alice",
-      role: "teacher"
+      password: "s3cret66"
     });
     expect(http.post).toHaveBeenCalledWith(
-      "/auth/register",
+      "/user/register",
       {
         email: "alice@example.com",
-        password: "s3cret",
-        display_name: "Alice",
-        role: "teacher"
+        password: "s3cret66"
       },
       { skipAuth: true }
     );
@@ -113,23 +120,37 @@ describe("createEndpoints · auth", () => {
     expect(http.post).toHaveBeenCalledWith("/auth/logout");
   });
 
-  it("sendCode → POST /auth/send-code 带 identifier", () => {
+  it("sendCode → POST /otp/send:手机号入 phone 字段,默认 purpose=login", () => {
     const api = createEndpoints(http);
     api.auth.sendCode("13800138000");
     expect(http.post).toHaveBeenCalledWith(
-      "/auth/send-code",
+      "/otp/send",
       {
-        identifier: "13800138000"
+        phone: "13800138000",
+        purpose: "login"
       },
       { skipAuth: true }
     );
   });
 
-  it("loginWithCode → POST /auth/login/code 带 identifier + code", () => {
+  it("sendCode → 含 @ 的 identifier 入 email 字段,purpose 可显式指定", () => {
+    const api = createEndpoints(http);
+    api.auth.sendCode("alice@example.com", "password_reset");
+    expect(http.post).toHaveBeenCalledWith(
+      "/otp/send",
+      {
+        email: "alice@example.com",
+        purpose: "password_reset"
+      },
+      { skipAuth: true }
+    );
+  });
+
+  it("loginWithCode → POST /auth/login-otp 带 identifier + code", () => {
     const api = createEndpoints(http);
     api.auth.loginWithCode("13800138000", "123456");
     expect(http.post).toHaveBeenCalledWith(
-      "/auth/login/code",
+      "/auth/login-otp",
       {
         identifier: "13800138000",
         code: "123456"

@@ -47,9 +47,7 @@ function userWith({ phone, email }: { phone?: string; email?: string }): User {
     display_name: "Alice",
     roles: ["student"],
     avatar_url: "",
-    status: "active",
-    created_at: "",
-    updated_at: ""
+    active_role: "student"
   };
 }
 

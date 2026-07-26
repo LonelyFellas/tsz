@@ -4,7 +4,11 @@
 const COMMON_ERRORS: Record<string, string> = {
   "session expired": "登录已过期，请重新登录",
   "missing refresh token": "登录已过期，请重新登录",
-  "invalid refresh token": "登录已过期，请重新登录"
+  "invalid refresh token": "登录已过期，请重新登录",
+  // tsz-rust 重写过渡期:部分界面可达的端点后端尚未实现(api-client 契约测试
+  // PENDING 白名单),404 时 http 层落到 statusText "Not Found"——给中文兜底,
+  // 避免英文原文透传给用户。后端补齐、白名单清空后可删。
+  "not found": "该功能暂未开放，敬请期待"
 };
 
 /**

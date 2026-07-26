@@ -13,16 +13,16 @@ export const authRuntime = createAdminAuthRuntime({
 
 export const { api, tokens, persistSession } = authRuntime;
 
-/** 后台用户态 store（含 profile / level，门禁据 profile 是否存在判定）。 */
+/** 后台用户态 store（含 profile / role，门禁据 profile 是否存在判定）。 */
 export const useAuthStore = authRuntime.store;
 
 /** 「当前登录管理员是否超级管理员」选择器（纯函数，可单测）。 */
 export const selectIsSuperAdmin = (s: AdminAuthState): boolean =>
-  s.profile?.level === "super_admin";
+  s.profile?.role === "super_admin";
 
 /**
  * 当前登录管理员是否超级管理员。写操作门禁 / 侧栏入口可见性 / 页面守卫共用同一判定，
- * 避免 `profile?.level === "super_admin"` 散落各处——等级模型变化时只改这里一处。
+ * 避免 `profile?.role === "super_admin"` 散落各处——身份模型变化时只改这里一处。
  */
 export const useIsSuperAdmin = (): boolean => useAuthStore(selectIsSuperAdmin);
 

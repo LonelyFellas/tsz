@@ -6,10 +6,8 @@ const USER = {
   id: "u1",
   display_name: "管理员",
   roles: ["admin"],
-  avatar_url: "",
-  status: "active",
-  created_at: "",
-  updated_at: ""
+  active_role: "admin",
+  avatar_url: ""
 } as User;
 
 describe("createAuthStore", () => {

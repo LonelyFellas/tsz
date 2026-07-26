@@ -10,12 +10,11 @@ import type {
 } from "@tsz/types";
 import type { HttpClient } from "./http";
 
-// ---- Auth 相关类型(对齐后端 API 文档) ----
+// ---- Auth 相关类型(对齐 tsz-rust 后端,权威 spec 见 openapi.snapshot.json) ----
 
 export interface AuthResponse {
   user: User;
   access_token: string;
-  active_role: string;
   /** access token 剩余有效期（秒），用于调度主动刷新定时器。 */
   expires_in: number;
   /** refresh token 过期的 Unix 时间戳（秒），可用于提前告知用户会话即将结束。 */
@@ -40,12 +39,17 @@ export interface LearningSettings {
   english_variant: EnglishVariant;
 }
 
+/**
+ * me() 的前端装配形状。后端现返回扁平 UserProfile(GET /auth/me)；
+ * learning_settings / onboarded 后端尚未实现,由 me() 适配器暂时填充
+ * (null / true)。后端 T2(/me + MeResponse 包壳)落地后删除适配、直连即可。
+ */
 export interface MeResponse {
   user: User;
   active_role: string;
-  /** onboarding 完成前为 null。 */
+  /** 后端未实现学习设置,暂恒 null。 */
   learning_settings: LearningSettings | null;
-  /** 后端推导：learning_settings 已设置则为 true。客户端据此判断是否新用户。 */
+  /** 后端未实现 onboarding,暂恒 true(跳过引导页)。 */
   onboarded: boolean;
 }
 
@@ -85,21 +89,41 @@ export interface AvatarUpload {
 }
 
 export interface RegisterPayload {
-  /** 手机号与邮箱二选一即可：两个都不传后端返回 400 phone or email is required。 */
+  /** 手机号与邮箱二选一：两个都不传后端 400。 */
   phone?: string;
   email?: string;
+  /** 8–72 字节(bcrypt 上限)。 */
   password: string;
-  display_name: string;
-  role: "student" | "teacher";
-  /** 验证码登录/注册校验(原型「获取验证码」)。 */
-  code?: string;
 }
+
+/**
+ * 注册成功(201)。⚠️ 不含 token——注册**不自动登录**,前端需链式调 login。
+ * display_name 由后端生成(「同学XXXX」),role 恒 student。
+ */
+export interface RegisterResponse {
+  user_id: string;
+  display_name: string;
+  role: string;
+}
+
+/** OTP 用途(otp/send 的 purpose 字段,snake_case 对齐后端枚举)。 */
+export type OtpPurpose =
+  "login" | "password_reset" | "account_deletion" | "contact_bind";
 
 export function createEndpoints(http: HttpClient) {
   return {
     auth: {
-      /** GET /me — 当前登录用户信息 */
-      me: () => http.get<MeResponse>("/me"),
+      /**
+       * GET /auth/me — 当前登录用户信息。后端返回扁平 UserProfile,
+       * 此处装配成 MeResponse(见类型注释;T2 落地后删适配直连 /me)。
+       */
+      me: (): Promise<MeResponse> =>
+        http.get<User>("/auth/me").then((user) => ({
+          user,
+          active_role: user.active_role,
+          learning_settings: null,
+          onboarded: true
+        })),
       /** PATCH /me — 改昵称(去空格后 1–50 字符);返回刷新后的 user */
       updateProfile: (display_name: string) =>
         http.patch<{ user: User }>("/me", { display_name }),
@@ -116,9 +140,11 @@ export function createEndpoints(http: HttpClient) {
        */
       bindContact: (contact: string, code: string) =>
         http.post<{ user: User }>("/me/contact/bind", { contact, code }),
-      /** POST /auth/register — 注册并自动登录 */
+      /** POST /user/register — 注册(201,**不自动登录**,需链式调 login) */
       register: (payload: RegisterPayload) =>
-        http.post<AuthResponse>("/auth/register", payload, { skipAuth: true }),
+        http.post<RegisterResponse>("/user/register", payload, {
+          skipAuth: true
+        }),
       /** POST /auth/login — 账号密码登录 */
       login: (identifier: string, password: string) =>
         http.post<AuthResponse>(
@@ -130,17 +156,23 @@ export function createEndpoints(http: HttpClient) {
       refresh: () => http.post<RefreshResponse>("/auth/refresh"),
       /** POST /auth/logout — 吊销 refresh token（cookie 自动携带，无需 body） */
       logout: () => http.post<void>("/auth/logout"),
-      /** POST /auth/send-code — 发送验证码 */
-      sendCode: (identifier: string) =>
-        http.post<{ status: string }>(
-          "/auth/send-code",
-          { identifier },
+      /**
+       * POST /otp/send — 发送验证码(202 无 body)。后端按 phone/email 字段
+       * 二选一收目标,前端把 identifier 按「含 @ → 邮箱」拆分。
+       * 短信/邮件 provider 未接通前是 Mock:验证码只打在后端日志里。
+       */
+      sendCode: (identifier: string, purpose: OtpPurpose = "login") =>
+        http.post<void>(
+          "/otp/send",
+          identifier.includes("@")
+            ? { email: identifier, purpose }
+            : { phone: identifier, purpose },
           { skipAuth: true }
         ),
-      /** POST /auth/login/code — 验证码登录 */
+      /** POST /auth/login-otp — 验证码登录 */
       loginWithCode: (identifier: string, code: string) =>
         http.post<AuthResponse>(
-          "/auth/login/code",
+          "/auth/login-otp",
           { identifier, code },
           { skipAuth: true }
         ),

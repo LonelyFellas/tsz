@@ -1,4 +1,6 @@
-// 从后端权威 spec(tsz-go/docs/openapi.yaml)生成一份精简的路径快照,供契约测试对账。
+// 从后端权威 spec(tsz-rust/docs/openapi.json)生成一份精简的路径快照,供契约测试对账。
+// tsz-rust 的 spec 由 utoipa 生成:后端 `cargo run --features swagger` 后
+// `curl http://localhost:8383/api-docs/openapi.json -o ../tsz-rust/docs/openapi.json`。
 // 快照只保留 path -> [methods],剥掉 /api/v1 前缀(前端 http baseURL 默认就是 /api/v1)。
 // 用法:pnpm --filter @tsz/api-client sync:openapi
 // 后端 spec 位置可用 OPENAPI_SOURCE 覆盖(CI 里 checkout 路径不同的话)。
@@ -14,7 +16,7 @@ import { format } from "prettier";
 const here = dirname(fileURLToPath(import.meta.url));
 const source =
   process.env.OPENAPI_SOURCE ??
-  resolve(here, "../../../../tsz-go/docs/openapi.yaml");
+  resolve(here, "../../../../tsz-rust/docs/openapi.json");
 // 放进 src/:契约测试可直接 import(免 node 类型、免 rootDir 越界)。
 const out = resolve(here, "../src/openapi.snapshot.json");
 

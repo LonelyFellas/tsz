@@ -20,8 +20,8 @@ export function AdminHeader() {
   const [open, setOpen] = useState(false);
 
   const name = profile?.display_name ?? "管理员";
-  // 未映射的 level（后端将来新增等级、前端未跟上）回退「管理员」，不留空白角色行。
-  const roleLabel = (profile && ADMIN_LEVEL_LABEL[profile.level]) || "管理员";
+  // 未映射的 role（后端将来新增等级、前端未跟上）回退「管理员」，不留空白角色行。
+  const roleLabel = (profile && ADMIN_LEVEL_LABEL[profile.role]) || "管理员";
 
   // 选一项后先收起 Popover，再执行动作（改密走 SPA 导航，登出走整页跳转）。
   const goChangePassword = () => {
@@ -36,7 +36,7 @@ export function AdminHeader() {
   const menu = (
     <div style={{ width: 220 }}>
       <Space align="center" style={{ padding: "4px 4px 12px" }}>
-        <AdminAvatar level={profile?.level} />
+        <AdminAvatar level={profile?.role} />
         <div style={{ minWidth: 0 }}>
           <Typography.Text strong ellipsis style={{ display: "block" }}>
             {name}
@@ -100,7 +100,7 @@ export function AdminHeader() {
           style={{ height: "auto", padding: "4px 8px" }}
         >
           <Space size={8}>
-            <AdminAvatar level={profile?.level} size="small" />
+            <AdminAvatar level={profile?.role} size="small" />
             <DownOutlined style={{ fontSize: 12, color: "#8c8c8c" }} />
           </Space>
         </Button>

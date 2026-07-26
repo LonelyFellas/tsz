@@ -6,7 +6,7 @@ const PROFILE: AdminProfile = {
   id: "a1",
   phone: "13800138000",
   display_name: "Administrator",
-  level: "super_admin",
+  role: "super_admin",
   permissions: []
 };
 
@@ -14,7 +14,7 @@ describe("createAdminAuthStore", () => {
   it("初始为未登录未恢复", () => {
     const s = createAdminAuthStore().getState();
     expect(s.profile).toBeNull();
-    expect(s.level).toBeNull();
+    expect(s.role).toBeNull();
     expect(s.hydrated).toBe(false);
   });
 
@@ -22,7 +22,7 @@ describe("createAdminAuthStore", () => {
     const store = createAdminAuthStore();
     store.getState().setProfile(PROFILE);
     expect(store.getState().profile).toEqual(PROFILE);
-    expect(store.getState().level).toBe("super_admin");
+    expect(store.getState().role).toBe("super_admin");
   });
 
   it("setProfile(null) 清空 profile 与 level", () => {
@@ -30,7 +30,7 @@ describe("createAdminAuthStore", () => {
     store.getState().setProfile(PROFILE);
     store.getState().setProfile(null);
     expect(store.getState().profile).toBeNull();
-    expect(store.getState().level).toBeNull();
+    expect(store.getState().role).toBeNull();
   });
 
   it("setHydrated 标记会话恢复完成", () => {

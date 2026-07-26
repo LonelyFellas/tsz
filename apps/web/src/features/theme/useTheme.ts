@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useSyncExternalStore } from "react";
 import {
   getStoredTheme,
   resolveTheme,
@@ -11,24 +11,28 @@ import {
   type Theme
 } from "@/lib/theme";
 
-// 客户端主题 hook。
-// 状态从「已保存的选择」派生(resolveTheme(stored))——不读 <html> class,
-// 因为 React 水合会把前置脚本加的 class 剥掉,读 DOM 会拿到错值导致按钮脱节。
-// - 惰性初始化:SSR 取不到 localStorage → system → light;客户端读真实选择。
-// - effect 内只在订阅回调里 setState(非同步体),无级联渲染,且满足 lint。
+// 客户端主题 hook,基于 useSyncExternalStore:
+// - 服务端/水合快照恒为默认值(system → light),与 SSR HTML 逐字节一致,
+//   不会水合失配(旧实现在惰性初始化里读 localStorage,存了暗色的用户
+//   首帧就渲染太阳图标,与服务端月亮图标结构不同 → 整树水合失败);
+// - 水合完成后 React 自动改用真实快照(localStorage)重渲染 —— 官方机制,
+//   不在 effect 同步体里 setState(满足 lint),也不读 <html> class
+//   (React 水合会把前置脚本加的 class 剥掉,读 DOM 会拿到错值)。
 export function useTheme() {
-  const [theme, setThemeState] = useState<Theme>(getStoredTheme);
-  const [resolved, setResolved] = useState<ResolvedTheme>(() =>
-    resolveTheme(getStoredTheme())
+  const theme = useSyncExternalStore<Theme>(
+    subscribeTheme,
+    getStoredTheme,
+    () => "system"
+  );
+  const resolved = useSyncExternalStore<ResolvedTheme>(
+    subscribeTheme,
+    () => resolveTheme(getStoredTheme()),
+    () => "light"
   );
 
   useEffect(() => {
-    // 水合后再断言一次 DOM(惰性初始化已对齐 React 状态,故此处只补 DOM)。
+    // 水合后重新断言 DOM(前置脚本加的 class 已被水合剥掉,补一次)。
     syncThemeToDom();
-    return subscribeTheme(() => {
-      setThemeState(getStoredTheme());
-      setResolved(resolveTheme(getStoredTheme()));
-    });
   }, []);
 
   const setTheme = useCallback((next: Theme) => setThemeStore(next), []);

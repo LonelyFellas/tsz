@@ -15,7 +15,7 @@ export default function GlobalError({
         <h1 className="text-xl font-bold">页面出错了</h1>
         <p className="text-sm text-foreground-muted">{error.message}</p>
         <button
-          className="rounded bg-primary px-4 py-2 text-primary-foreground"
+          className="rounded-sm bg-primary px-4 py-2 text-primary-foreground"
           onClick={reset}
         >
           重试

@@ -82,11 +82,20 @@ function qs(params: Record<string, string | number | undefined>): string {
 export function createAdminEndpoints(http: HttpClient) {
   return {
     auth: {
-      /** POST /admin/auth/login — 仅密码，无验证码。identifier = 手机号或邮箱。 */
-      login: (identifier: string, password: string) =>
+      /**
+       * POST /admin/auth/login-code — 2FA 第一步：给手机号发登录验证码。
+       * 后端恒 202（反枚举，查无此号/冷却也 202）；无凭证要求 → skipAuth。
+       */
+      requestLoginCode: (phone: string) =>
+        http.post<void>("/auth/login-code", { phone }, { skipAuth: true }),
+      /**
+       * POST /admin/auth/login — 手机号 + 密码 + 验证码三要素 2FA。
+       * 登录标识仅手机号（Q9：admin 无 email，后端 get_by_phone 精确匹配）。
+       */
+      login: (phone: string, password: string, code: string) =>
         http.post<AdminAuthResponse>(
           "/auth/login",
-          { identifier, password },
+          { phone, password, code },
           { skipAuth: true }
         ),
       /** POST /admin/auth/refresh — 刷新 access token（refresh cookie 自动携带，无 body）。 */

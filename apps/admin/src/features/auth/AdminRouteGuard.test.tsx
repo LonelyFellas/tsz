@@ -25,7 +25,7 @@ const PROFILE: AdminProfile = {
   id: "a1",
   phone: "13800138000",
   display_name: "Admin",
-  level: "super_admin",
+  role: "super_admin",
   permissions: []
 };
 
@@ -36,7 +36,7 @@ function setState(s: Partial<ReturnType<typeof useAuthStore.getState>>) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockLocation = { pathname: "/users", search: "", hash: "" };
-  setState({ profile: null, level: null, hydrated: false });
+  setState({ profile: null, role: null, hydrated: false });
 });
 
 describe("AdminRouteGuard", () => {
@@ -83,7 +83,7 @@ describe("AdminRouteGuard", () => {
   });
 
   it("已登录的 admin：渲染受保护内容", () => {
-    setState({ hydrated: true, profile: PROFILE, level: PROFILE.level });
+    setState({ hydrated: true, profile: PROFILE, role: PROFILE.role });
     render(
       <AdminRouteGuard>
         <div>后台内容</div>

@@ -12,7 +12,9 @@ function jsonResponse(
     ok: init.ok ?? true,
     status: init.status ?? 200,
     statusText: init.statusText ?? "OK",
-    json: async () => body
+    json: async () => body,
+    // 生产代码成功路径按 text() 解析(兼容 202/空 body),桩也要提供。
+    text: async () => (body === undefined ? "" : JSON.stringify(body))
   } as unknown as Response;
 }
 
@@ -163,7 +165,8 @@ describe("createHttpClient", () => {
       statusText: "No Content",
       json: async () => {
         throw new Error("no body");
-      }
+      },
+      text: async () => ""
     } as unknown as Response);
     const http = createHttpClient({ baseUrl: "" });
     const result = await http.del("/items/1");

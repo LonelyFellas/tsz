@@ -20,9 +20,7 @@ function userWithRoles(roles: Role[]): User {
     display_name: "Alice",
     roles,
     avatar_url: "",
-    status: "active",
-    created_at: "",
-    updated_at: ""
+    active_role: "student"
   };
 }
 

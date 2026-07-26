@@ -21,13 +21,13 @@ export function ApplyTeacherForm({ rejectReason }: { rejectReason?: string }) {
   return (
     <Card>
       {rejectReason && (
-        <div className="mb-4 rounded bg-danger/10 p-3 text-sm text-danger">
+        <div className="mb-4 rounded-sm bg-danger/10 p-3 text-sm text-danger">
           上次申请被拒:{rejectReason}
         </div>
       )}
       <label className="mb-1 block text-sm">真实姓名</label>
       <input
-        className="mb-3 w-full rounded border px-3 py-2"
+        className="mb-3 w-full rounded-sm border px-3 py-2"
         value={realName}
         onChange={(e) => setRealName(e.target.value)}
       />
