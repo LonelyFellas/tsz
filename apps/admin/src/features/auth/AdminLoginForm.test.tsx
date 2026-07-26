@@ -32,7 +32,7 @@ vi.mock("@/lib/auth", async () => {
         logout: vi.fn()
       },
       // 登录成功后拉 /profile 补全菜单权限（permissions）——登录响应不含它。
-      // 注意：本轮后端 GET /admin/profile 尚未实现，真实端到端登录走不通；此处仍用 mock。
+      // 后端 GET /admin/profile 已上线（2026-07-26）；单测仍 mock，隔离网络。
       profile: vi.fn()
     },
     persistSession: vi.fn(),

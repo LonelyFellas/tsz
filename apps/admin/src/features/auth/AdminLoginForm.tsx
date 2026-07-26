@@ -1,7 +1,7 @@
 import { HttpError } from "@tsz/api-client";
 import { isCode, isPhone } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
-import { Alert, Button, Card, Form, Input, Typography } from "antd";
+import { Alert, Button, Card, Form, Input, theme, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
@@ -59,6 +59,7 @@ export function AdminLoginForm() {
   const profile = useAuthStore((s) => s.profile);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { token } = theme.useToken();
 
   // 已登录的管理员访问登录页：直接进后台。
   useEffect(() => {
@@ -166,35 +167,50 @@ export function AdminLoginForm() {
   }
 
   return (
-    <FullscreenCenter>
-      <Card style={{ width: "100%", maxWidth: 384 }}>
-        <Typography.Title level={3} style={{ marginBottom: 4 }}>
-          平台后台
-        </Typography.Title>
-        <Typography.Paragraph type="secondary" style={{ marginBottom: 24 }}>
-          请使用管理员账号登录
-        </Typography.Paragraph>
+    <FullscreenCenter vertical>
+      <Card
+        style={{
+          width: "100%",
+          maxWidth: 400,
+          borderRadius: 12,
+          boxShadow:
+            "0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06)"
+        }}
+        styles={{ body: { padding: 32 } }}
+      >
+        <div style={{ marginBottom: 28 }}>
+          <Typography.Text
+            strong
+            style={{
+              color: token.colorPrimary,
+              fontSize: 13,
+              letterSpacing: 1
+            }}
+          >
+            天生会背
+          </Typography.Text>
+          <Typography.Title level={3} style={{ margin: "6px 0 4px" }}>
+            平台后台
+          </Typography.Title>
+          <Typography.Text type="secondary">
+            请使用管理员账号登录
+          </Typography.Text>
+        </div>
 
         <Form layout="vertical" onFinish={() => void handleLogin()}>
           <Form.Item label="手机号">
             <Input
+              size="large"
               placeholder="请输入手机号"
               autoComplete="username"
               value={account}
               onChange={(e) => onAccountChange(e.target.value)}
             />
           </Form.Item>
-          <Form.Item label="密码">
-            <Input.Password
-              placeholder="请输入登录密码"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => onPasswordChange(e.target.value)}
-            />
-          </Form.Item>
           <Form.Item label="验证码">
             <div style={{ display: "flex", gap: 8 }}>
               <Input
+                size="large"
                 placeholder="请输入验证码"
                 inputMode="numeric"
                 autoComplete="one-time-code"
@@ -203,6 +219,7 @@ export function AdminLoginForm() {
                 style={{ flex: 1 }}
               />
               <Button
+                size="large"
                 htmlType="button"
                 onClick={() => void handleSendCode()}
                 disabled={!canSendCode}
@@ -214,6 +231,15 @@ export function AdminLoginForm() {
                     : "获取验证码"}
               </Button>
             </div>
+          </Form.Item>
+          <Form.Item label="密码">
+            <Input.Password
+              size="large"
+              placeholder="请输入登录密码"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => onPasswordChange(e.target.value)}
+            />
           </Form.Item>
 
           {error && (
@@ -229,6 +255,7 @@ export function AdminLoginForm() {
             type="primary"
             htmlType="submit"
             block
+            size="large"
             loading={loading}
             disabled={!canSubmit}
           >
@@ -236,6 +263,9 @@ export function AdminLoginForm() {
           </Button>
         </Form>
       </Card>
+      <Typography.Text type="secondary" style={{ fontSize: 12, marginTop: 24 }}>
+        © {new Date().getFullYear()} 天生会背
+      </Typography.Text>
     </FullscreenCenter>
   );
 }
