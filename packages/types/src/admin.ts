@@ -44,10 +44,11 @@ export interface AdminProfile {
   id: string;
   phone: string;
   display_name: string;
-  level: AdminLevel;
+  /** 身份等级——后端字段名统一为 role（Q11），值域同 AdminLevel。 */
+  role: AdminLevel;
   /**
-   * 本管理员持有的菜单权限 key（RBAC）。前端据此决定侧栏各叶子是否渲染；super_admin 会拿到
-   * 整份可委派目录。恒为数组（可空数组表示无任何可委派菜单）。
+   * 菜单权限 key 目录。Q10 取消 RBAC 后为全量死数据（全员全功能），保留仅为菜单渲染
+   * 零改动；恒为数组，顺序即侧栏顺序。「管理员管理」不走 key，按 role 判定。
    */
   permissions: MenuPermission[];
 }
@@ -65,20 +66,29 @@ export interface Admin {
   created_at: string;
 }
 
-/** POST /admin/auth/login 的响应。refresh token 不在 body（在 admin_refresh_token cookie）。 */
+/**
+ * POST /admin/auth/login 的响应。refresh token 不在 body（在 admin_refresh_token cookie）。
+ * 后端 flatten 结构：admin_profile 概要 + 平铺的 access token + refresh 死线。
+ */
 export interface AdminAuthResponse {
-  admin: Admin;
+  /** 登录管理员概要（后端 AdminProfile：仅这 4 字段）；完整档案另经 GET /admin/profile 拉取。 */
+  admin_profile: {
+    id: string;
+    display_name: string;
+    phone: string;
+    /** 身份等级——后端字段名统一为 role（Q11），值域同 AdminLevel。 */
+    role: AdminLevel;
+  };
   access_token: string;
-  level: AdminLevel;
   /** access token 剩余有效期（秒），约 900。 */
   expires_in: number;
   /** refresh token 过期的 Unix 时间戳（秒）。 */
   refresh_token_expires_at: number;
   /**
-   * true = 该账号刚被重置密码，必须先改密：其余 admin 接口在改密前一律 403
-   * `must_change_password`（仅 change-password / logout 可达）。前端须路由到改密流程。
+   * true = 该账号刚被重置密码，必须先改密。后端 must_change 守卫落地后才下发，
+   * 当前恒 undefined；前端据此路由到改密流程。
    */
-  must_change_password: boolean;
+  must_change_password?: boolean;
 }
 
 /**

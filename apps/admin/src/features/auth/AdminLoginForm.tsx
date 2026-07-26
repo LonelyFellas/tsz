@@ -1,5 +1,5 @@
 import { HttpError } from "@tsz/api-client";
-import { isValidAccount } from "@tsz/shared";
+import { isCode, isPhone } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
 import { Alert, Button, Card, Form, Input, Typography } from "antd";
 import { useEffect, useRef, useState } from "react";
@@ -8,8 +8,8 @@ import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
 
 const LOGIN_ERRORS: Record<string, string> = {
-  // 401：不区分是账号还是密码错，防枚举。
-  "invalid credentials": "账号或密码错误，请重新输入",
+  // 401：密码错 / 验证码错 / 查无此号逐字节一致（防枚举），前端统一文案不区分。
+  "invalid credentials": "账号、密码或验证码错误，请重新输入",
   // 403：账号被禁用。
   "account disabled": "该账号已被禁用，请联系超级管理员"
 };
@@ -41,8 +41,12 @@ function safeRedirect(raw: string | null): string {
 export function AdminLoginForm() {
   const [account, setAccount] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // 验证码倒计时（发码后 60s 内禁止重发）与在途发码态。
+  const [countdown, setCountdown] = useState(0);
+  const [sending, setSending] = useState(false);
   // 账号被后端锁定(连续失败触发 423):置灰登录按钮,阻断徒劳的连点重试。
   // 以后端 423 为唯一事实来源,前端不本地计数;用户改动账号/密码(新尝试意图)时解除。
   const [locked, setLocked] = useState(false);
@@ -63,9 +67,22 @@ export function AdminLoginForm() {
     }
   }, [profile, navigate, searchParams]);
 
-  // admin 密码后端规则为长度 8–72；此处提前拦下过短输入。锁定期间禁提交。
+  // 验证码倒计时（与 web 端一致：发码后 60→0 递减）。
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
+
+  // 三要素 2FA：手机号 + 密码(≥8，后端 8–72) + 验证码(4–8 位数字) 齐全才可提交；锁定期间禁提交。
   const canSubmit =
-    isValidAccount(account) && password.length >= 8 && !loading && !locked;
+    isPhone(account) &&
+    password.length >= 8 &&
+    isCode(code) &&
+    !loading &&
+    !locked;
+  // 发码：仅手机号合法、不在倒计时、无在途发码时可点。
+  const canSendCode = isPhone(account) && countdown === 0 && !sending;
 
   // 输入变更即视为新一次尝试意图：清错误 + 解除锁定置灰（仍在锁定窗口内会再拿到 423）。
   function onAccountChange(value: string) {
@@ -78,6 +95,11 @@ export function AdminLoginForm() {
     if (error) setError("");
     if (locked) setLocked(false);
   }
+  function onCodeChange(value: string) {
+    setCode(value);
+    if (error) setError("");
+    if (locked) setLocked(false);
+  }
 
   // 登录态落地：登录响应不含菜单权限（permissions），故拉一次 /profile 作为其唯一事实来源
   // （与会话恢复走同一探针），写入用户态 store 后跳转进后台。用 replace：不把 /login 留在历史，
@@ -87,6 +109,22 @@ export function AdminLoginForm() {
     navigate(safeRedirect(searchParams.get("redirect")), { replace: true });
   }
 
+  // 2FA 第一步：发码。后端恒 202（查无此号/冷却也 202），前端只据成功与否起倒计时。
+  async function handleSendCode() {
+    if (!canSendCode) return;
+    setError("");
+    setSending(true);
+    try {
+      await api.auth.requestLoginCode(account);
+      setCountdown(60);
+    } catch {
+      // 发码失败（手机格式 400 / 基础设施 503）：提示重试，不进入倒计时（按钮仍可点）。
+      setError("验证码发送失败，请稍后重试");
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function handleLogin() {
     if (inFlight.current || !canSubmit) return;
     inFlight.current = true;
@@ -94,7 +132,7 @@ export function AdminLoginForm() {
     setLoading(true);
     try {
       // 后台是独立账号体系：登录成功即为有效 admin，无需再判角色。
-      const auth = await api.auth.login(account, password);
+      const auth = await api.auth.login(account, password, code);
       // change-password 是 must_change 期间少数可达端点之一、需 Bearer——故先建立 access token。
       persistSession(auth);
       if (auth.must_change_password) {
@@ -138,9 +176,9 @@ export function AdminLoginForm() {
         </Typography.Paragraph>
 
         <Form layout="vertical" onFinish={() => void handleLogin()}>
-          <Form.Item label="手机号 / 邮箱">
+          <Form.Item label="手机号">
             <Input
-              placeholder="请输入手机号或邮箱"
+              placeholder="请输入手机号"
               autoComplete="username"
               value={account}
               onChange={(e) => onAccountChange(e.target.value)}
@@ -153,6 +191,29 @@ export function AdminLoginForm() {
               value={password}
               onChange={(e) => onPasswordChange(e.target.value)}
             />
+          </Form.Item>
+          <Form.Item label="验证码">
+            <div style={{ display: "flex", gap: 8 }}>
+              <Input
+                placeholder="请输入验证码"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={code}
+                onChange={(e) => onCodeChange(e.target.value)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                htmlType="button"
+                onClick={() => void handleSendCode()}
+                disabled={!canSendCode}
+              >
+                {countdown > 0
+                  ? `${countdown}s 后重发`
+                  : sending
+                    ? "发送中..."
+                    : "获取验证码"}
+              </Button>
+            </div>
           </Form.Item>
 
           {error && (

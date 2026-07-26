@@ -34,7 +34,7 @@ const PROFILE = {
   id: "a1",
   phone: "13800138000",
   display_name: "审核员小王",
-  level: "admin" as const,
+  role: "admin" as const,
   permissions: []
 };
 
@@ -47,7 +47,7 @@ function renderForced() {
   );
 }
 function renderSelf() {
-  useAuthStore.setState({ profile: PROFILE, level: PROFILE.level });
+  useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
   renderForced();
 }
 
@@ -73,7 +73,7 @@ let originalLocation: Location;
 beforeEach(() => {
   vi.clearAllMocks();
   mockState = null;
-  useAuthStore.setState({ profile: null, level: null });
+  useAuthStore.setState({ profile: null, role: null });
   originalLocation = window.location;
   Object.defineProperty(window, "location", {
     configurable: true,

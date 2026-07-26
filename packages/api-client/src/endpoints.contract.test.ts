@@ -47,13 +47,10 @@ const PENDING = new Set<string>([
   "post /comments",
   "get /tasks",
   "post /tasks",
-  // 平台后台(admin):tsz-rust 尚未开始重写,全量待对接。
-  "post /admin/auth/login",
-  "post /admin/auth/refresh",
-  "post /admin/auth/logout",
+  // 平台后台(admin):auth 一期已在 tsz-rust 落地(login/login-code/logout/refresh/profile),
+  // 已纳入正式校验;其余(logout-all/change-password/words/users/admins/roles)待对接。
   "post /admin/auth/logout-all",
   "post /admin/auth/change-password",
-  "get /admin/profile",
   "get /admin/words",
   "get /admin/words/stats",
   "post /admin/words",

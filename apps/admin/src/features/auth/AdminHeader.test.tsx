@@ -27,7 +27,7 @@ const PROFILE: AdminProfile = {
   id: "a1",
   phone: "13800138000",
   display_name: "审核员小王",
-  level: "admin",
+  role: "admin",
   permissions: []
 };
 
@@ -42,7 +42,7 @@ async function openAccountMenu() {
 let originalLocation: Location;
 beforeEach(() => {
   vi.clearAllMocks();
-  useAuthStore.setState({ profile: null, level: null });
+  useAuthStore.setState({ profile: null, role: null });
   originalLocation = window.location;
   Object.defineProperty(window, "location", {
     configurable: true,
@@ -60,7 +60,7 @@ afterEach(() => {
 
 describe("AdminHeader", () => {
   it("头像菜单里展示 store 里的 display_name 与角色文案", async () => {
-    useAuthStore.setState({ profile: PROFILE, level: PROFILE.level });
+    useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
     render(<AdminHeader />);
     await openAccountMenu();
     expect(screen.getByText("审核员小王")).toBeInTheDocument();
@@ -68,8 +68,8 @@ describe("AdminHeader", () => {
   });
 
   it("超级管理员展示超管角色文案", async () => {
-    const superProfile: AdminProfile = { ...PROFILE, level: "super_admin" };
-    useAuthStore.setState({ profile: superProfile, level: superProfile.level });
+    const superProfile: AdminProfile = { ...PROFILE, role: "super_admin" };
+    useAuthStore.setState({ profile: superProfile, role: superProfile.role });
     render(<AdminHeader />);
     await openAccountMenu();
     expect(screen.getByText("超级管理员")).toBeInTheDocument();
@@ -78,11 +78,11 @@ describe("AdminHeader", () => {
   it("未映射的 level（后端将来新增等级）角色行回退「管理员」而非空白", async () => {
     const unknownProfile = {
       ...PROFILE,
-      level: "moderator" as AdminProfile["level"]
+      role: "moderator" as AdminProfile["role"]
     };
     useAuthStore.setState({
       profile: unknownProfile,
-      level: unknownProfile.level
+      role: unknownProfile.role
     });
     render(<AdminHeader />);
     await openAccountMenu();
@@ -99,7 +99,7 @@ describe("AdminHeader", () => {
   });
 
   it("点「修改密码」跳改密页（自助改密入口）", async () => {
-    useAuthStore.setState({ profile: PROFILE, level: PROFILE.level });
+    useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
     render(<AdminHeader />);
     await openAccountMenu();
     fireEvent.click(screen.getByRole("button", { name: /修改密码/ }));
@@ -107,7 +107,7 @@ describe("AdminHeader", () => {
   });
 
   it("点退出：吊销会话、清 token、清 profile、整页跳登录页", async () => {
-    useAuthStore.setState({ profile: PROFILE, level: PROFILE.level });
+    useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
     render(<AdminHeader />);
     await openAccountMenu();
 
@@ -124,7 +124,7 @@ describe("AdminHeader", () => {
 
   it("后端吊销失败也完成本地登出", async () => {
     mockLogout.mockRejectedValueOnce(new Error("network"));
-    useAuthStore.setState({ profile: PROFILE, level: PROFILE.level });
+    useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
     render(<AdminHeader />);
     await openAccountMenu();
 

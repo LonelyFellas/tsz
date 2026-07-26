@@ -9,19 +9,19 @@ import {
   useAuthStore
 } from "./auth";
 
-// 只关心 selectIsSuperAdmin 读的 profile.level，其余 store 字段用最小桩填充。
-function stateWith(level: AdminProfile["level"] | null): AdminAuthState {
+// 只关心 selectIsSuperAdmin 读的 profile.role，其余 store 字段用最小桩填充。
+function stateWith(level: AdminProfile["role"] | null): AdminAuthState {
   return {
     profile: level
       ? {
           id: "a-1",
           phone: "13800138000",
           display_name: "管理员",
-          level,
+          role: level,
           permissions: []
         }
       : null,
-    level,
+    role: level,
     hydrated: true,
     setProfile: () => {},
     setHydrated: () => {}

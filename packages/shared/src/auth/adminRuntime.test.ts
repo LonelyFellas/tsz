@@ -21,7 +21,7 @@ const PROFILE_BODY = {
   id: "a1",
   phone: "13800138000",
   display_name: "Administrator",
-  level: "admin",
+  role: "admin",
   permissions: []
 };
 
@@ -55,7 +55,7 @@ describe("createAdminAuthRuntime · 装配", () => {
       id: "a1",
       phone: "1",
       display_name: "X",
-      level: "admin",
+      role: "admin",
       permissions: []
     });
     expect(b.store.getState().profile).toBeNull();
@@ -163,7 +163,7 @@ describe("createAdminAuthRuntime · 401 拦截器与 realm 隔离", () => {
     const rt = createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
 
     await expect(
-      rt.api.auth.login("13800138000", "wrongpass")
+      rt.api.auth.login("13800138000", "wrongpass", "123456")
     ).rejects.toMatchObject({ status: 401, message: "invalid credentials" });
     // 只发一次请求：登录失败不应触发 refresh 重试。
     expect(fetchMock).toHaveBeenCalledTimes(1);

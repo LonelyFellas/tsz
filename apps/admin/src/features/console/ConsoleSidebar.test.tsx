@@ -38,7 +38,7 @@ function setLevel(
           id: "a-1",
           phone: "13800138000",
           display_name: "管理员",
-          level,
+          role: level,
           permissions
         }
       : null
