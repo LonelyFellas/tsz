@@ -1,0 +1,18 @@
+# tsz-web：Next.js standalone 服务（C 端 web），部署位置 /etc/systemd/system/tsz-web.service。
+# 产物由 deploy/deploy-web.sh 同步到 /opt/tsz-web（standalone 自包含，服务器无需 pnpm install）。
+# 只绑 127.0.0.1：对外一律经 nginx（见 nginx/tshb-test.conf），3000 不进安全组。
+[Unit]
+Description=tsz-web Next.js server
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/tsz-web
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=HOSTNAME=127.0.0.1
+ExecStart=/usr/bin/node apps/web/server.js
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target
