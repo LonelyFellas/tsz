@@ -39,6 +39,11 @@ export interface PageMeta {
   total: number;
 }
 
+/** tsz-rust 管理员列表返回的分页元数据。 */
+export interface AdminPaginationMeta extends PageMeta {
+  total_pages: number;
+}
+
 /** GET /admin/profile 的响应：登录管理员自身身份，用于门禁探针 + 顶栏「已登录为 X」+ 动态菜单。 */
 export interface AdminProfile {
   id: string;
@@ -57,13 +62,17 @@ export interface AdminProfile {
 export interface Admin {
   id: string;
   phone: string;
-  /** 未设置时省略。 */
-  email?: string;
   display_name: string;
-  level: AdminLevel;
+  role: AdminLevel;
+  created_by?: {
+    id: string;
+    display_name: string;
+  } | null;
   status: AdminStatus;
   /** ISO8601 */
   created_at: string;
+  /** ISO8601 */
+  updated_at: string;
 }
 
 /**
@@ -94,15 +103,15 @@ export interface AdminAuthResponse {
 /**
  * POST /admin/admins 请求体（超管建号）。对齐 openapi CreateAdminRequest。
  * 密码由后端生成（响应里一次性返回，见 CreateAdminResponse），等级恒为 admin
- * （不能经此接口建超管），故请求体**不含** password / level——传了也会被后端忽略。
+ * （不能经此接口建超管），故请求体不含 password / role。
  */
 export interface CreateAdminInput {
   /** 5–20 位。 */
   phone: string;
-  /** 1–50 字符；服务端 trim；含 < > 或控制/不可见字符 → 400。 */
-  display_name: string;
-  /** 可选。 */
-  email?: string;
+  /** 1–50 字符；服务端 trim；含 < > 或控制/不可见字符 → 400；不传则自动生成。 */
+  display_name?: string;
+  /** 当前超级管理员手机号收到的 admin_create 验证码。 */
+  code: string;
 }
 
 /**
@@ -115,11 +124,11 @@ export interface CreateAdminResponse {
   temporary_password: string;
 }
 
-/** GET /admin/admins 查询参数（可按 level / 关键字过滤 + 分页）。 */
+/** GET /admin/admins 查询参数（筛选条件同时传入时按 AND 组合）。 */
 export interface AdminListQuery {
-  level?: AdminLevel;
-  /** 手机 / 邮箱 / 昵称的自由文本匹配。 */
-  q?: string;
+  role?: AdminLevel;
+  phone?: string;
+  display_name?: string;
   page?: number;
   page_size?: number;
 }
@@ -127,7 +136,7 @@ export interface AdminListQuery {
 /** GET /admin/admins 的响应。 */
 export interface AdminListResponse {
   items: Admin[];
-  page: PageMeta;
+  pagination: AdminPaginationMeta;
 }
 
 /** PATCH /admin/admins/{id}/status 请求体。 */

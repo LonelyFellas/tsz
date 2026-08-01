@@ -111,9 +111,11 @@ const plainAdmin = {
   id: "a-plain",
   phone: "13800138000",
   display_name: "审核员小王",
-  level: "admin" as const,
+  role: "admin" as const,
   status: "active" as const,
-  created_at: "2026-07-01T00:00:00Z"
+  created_at: "2026-07-01T00:00:00Z",
+  updated_at: "2026-07-01T00:00:00Z",
+  created_by: null
 };
 
 function renderPage() {
@@ -154,7 +156,7 @@ beforeEach(() => {
   });
   mockAdminList.mockResolvedValue({
     items: [plainAdmin],
-    page: { page: 1, page_size: 100, total: 1 }
+    pagination: { page: 1, page_size: 100, total: 1, total_pages: 1 }
   });
 });
 

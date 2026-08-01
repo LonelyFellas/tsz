@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "turbo run dev --filter=@tsz/web",
     "dev:admin": "turbo run dev --filter=@tsz/admin",
+    "dev:admin:test": "pnpm --filter @tsz/admin dev:test",
     "dev:all": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",

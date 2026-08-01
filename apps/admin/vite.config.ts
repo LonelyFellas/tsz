@@ -8,7 +8,8 @@ import { defineConfig } from "vitest/config";
 // dev 代理配置：把 /api/v1/* 转发到后端，保证 refresh 的 HttpOnly cookie 与请求同源。
 // 复用 web 相同的 BACKEND_API_URL（默认已含 /api/v1 前缀），行为与旧 next.config
 // rewrites 一致：/api/v1/<rest> → <BACKEND_API_URL>/<rest>。指向测试线时把它写进
-// apps/admin/.env.local，如 BACKEND_API_URL=https://<test-host>/api/v1。
+// 本地地址写进 apps/admin/.env.local；线上测试地址写进 .env.test，并通过
+// `pnpm dev:test`（Vite 的 test mode）加载。
 // 生产由 nginx 在子域层做同样的分流（见 deploy/nginx）。
 function buildDevProxy(mode: string) {
   // 读 .env / .env.local（含非 VITE_ 前缀的 BACKEND_API_URL——Vite 不会把它自动注入

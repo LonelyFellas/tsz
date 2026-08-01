@@ -183,18 +183,20 @@ export function createAdminEndpoints(http: HttpClient) {
     },
     /**
      * 管理员账号管理（`super_admin` 专属；普通 admin 调用得 403 super admin required）。
-     * 契约见 openapi `Admin (accounts)` 标签、docs/tsz-go admin-frontend-integration §7。
+     * 契约见 tsz-rust openapi `admin-accounts` 标签。
      */
     admins: {
-      /** GET /admin/admins — 列表：level/关键字筛选 + 分页。 */
+      /** GET /admin/admins — 列表：role/手机号/昵称筛选 + 分页。 */
       list: (query: AdminListQuery = {}) =>
         http.get<AdminListResponse>(`/admins${qs({ ...query })}`),
       /**
        * POST /admin/admins — 建号。前端不再传密码/等级：后端生成一次性临时密码、
-       * 等级恒为 admin。201 返回 { admin, temporary_password }；409 = 手机号/邮箱已被占用。
+       * 角色恒为 admin。201 返回 { admin, temporary_password }；409 = 手机号已被占用。
        */
       create: (input: CreateAdminInput) =>
         http.post<CreateAdminResponse>("/admins", input),
+      /** POST /admin/admins/create-code — 给当前超管的数据库手机号发送建号确认码。 */
+      requestCreateCode: () => http.post<void>("/admins/create-code"),
       /**
        * PATCH /admin/admins/{id}/status — 启用/禁用；返回更新后的 Admin。
        * 409 = 不能禁用最后一个 active super_admin。
@@ -202,7 +204,7 @@ export function createAdminEndpoints(http: HttpClient) {
       setStatus: (adminId: string, status: AdminStatus) =>
         http.patch<Admin>(`/admins/${adminId}/status`, { status }),
       /**
-       * POST /admin/admins/{id}/reset-password — 把某 level=admin 账号重置为一次性临时密码，
+       * POST /admin/admins/{id}/reset-password — 把某 role=admin 账号重置为一次性临时密码，
        * 返回明文（仅此一次）。403 = 目标是 super_admin（超管不在此重置）。
        */
       resetPassword: (adminId: string) =>

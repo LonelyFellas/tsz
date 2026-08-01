@@ -1,7 +1,7 @@
 // 派角色弹窗（super_admin）：把某个「普通管理员」设为某角色，或收回（降为仅首页）。
 // 按 §6 红框做「单向指派」：后端本期不下发管理员当前所属角色，故控件不回显当前值、
 // 只承诺「设为 / 收回」，不做「显示并切换」。超管不挂角色（派超管回 403），故管理员下拉
-// 只取 level=admin。204 后由 useSetAdminRole 失效角色列表刷新 member_count。
+// 只取 role=admin。204 后由 useSetAdminRole 失效角色列表刷新 member_count。
 import { App, Alert, Form, Modal, Select } from "antd";
 import type { AdminRole } from "@tsz/types";
 import { useAdminList } from "@/features/admins/api";
@@ -27,7 +27,7 @@ export function AssignRoleModal({ open, roles, onClose }: Props) {
   const { message } = App.useApp();
   const [form] = Form.useForm<FormValues>();
   // 仅普通管理员可被派角色；超管不挂角色。一次取较多，前端本地搜索（当前规模足够）。
-  const adminList = useAdminList({ level: "admin", page_size: 100 });
+  const adminList = useAdminList({ role: "admin", page_size: 100 });
   const setAdminRole = useSetAdminRole();
 
   const adminOptions = (adminList.data?.items ?? []).map((a) => ({

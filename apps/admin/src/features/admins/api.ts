@@ -1,6 +1,5 @@
-// 管理员管理数据层：React Query hooks 包 api.admins.*（@tsz/api-client）。
-// 全部接口要求 super_admin（后端已实现）；写操作后失效列表重取。
-import type { AdminListQuery, AdminStatus, CreateAdminInput } from "@tsz/types";
+// 管理员管理数据层：按 tsz-rust 当前已落地契约封装列表、建号和建号发码。
+import type { AdminListQuery, CreateAdminInput } from "@tsz/types";
 import {
   keepPreviousData,
   useMutation,
@@ -35,17 +34,8 @@ export function useCreateAdmin() {
   });
 }
 
-export function useSetAdminStatus() {
-  const invalidate = useInvalidateAdmins();
+export function useRequestCreateAdminCode() {
   return useMutation({
-    mutationFn: (vars: { id: string; status: AdminStatus }) =>
-      api.admins.setStatus(vars.id, vars.status),
-    onSuccess: invalidate
-  });
-}
-
-export function useResetAdminPassword() {
-  return useMutation({
-    mutationFn: (id: string) => api.admins.resetPassword(id)
+    mutationFn: () => api.admins.requestCreateCode()
   });
 }
