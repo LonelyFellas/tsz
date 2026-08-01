@@ -20,14 +20,14 @@
     "zustand": "^5.0.0"
   },
   "peerDependencies": {
-    "react": "^19.0.0"
+    "react": "^19.2.8"
   },
   "devDependencies": {
     "@tsz/config": "workspace:*",
     "@types/react": "^19.0.0",
     "eslint": "^9.39.0",
-    "react": "^19.0.0",
+    "react": "^19.2.8",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.10"
   }
 }
