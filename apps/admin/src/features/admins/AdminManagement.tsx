@@ -1,4 +1,4 @@
-// 管理员管理（super_admin 专属）：列表 + 新建 + 启禁用 + 重置密码。全对接真实接口。
+// 管理员管理（super_admin 专属）：按 tsz-rust 当前契约提供列表、筛选与验证码建号。
 import {
   PlusOutlined,
   ReloadOutlined,
@@ -6,7 +6,6 @@ import {
 } from "@ant-design/icons";
 import {
   Alert,
-  App,
   Badge,
   Breadcrumb,
   Button,
@@ -24,28 +23,25 @@ import dayjs from "dayjs";
 import { useState } from "react";
 import type { Admin, AdminLevel, AdminListQuery } from "@tsz/types";
 import { GatedButton } from "@/components/GatedButton";
-import { useAdminList, useResetAdminPassword, useSetAdminStatus } from "./api";
+import { useAdminList } from "./api";
 import { CreateAdminModal } from "./CreateAdminModal";
-import {
-  ADMIN_LEVEL_LABEL,
-  ADMIN_LEVEL_OPTIONS,
-  adminActionError
-} from "./labels";
+import { ADMIN_LEVEL_LABEL, ADMIN_LEVEL_OPTIONS } from "./labels";
 import { ResetPasswordResult } from "./ResetPasswordResult";
 
 interface FilterValues {
-  level?: AdminLevel;
-  q?: string;
+  role?: AdminLevel;
+  phone?: string;
+  display_name?: string;
 }
 
 export function AdminManagement() {
-  const { message } = App.useApp();
   const [form] = Form.useForm<FilterValues>();
 
   const [filters, setFilters] = useState<FilterValues>({});
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [createOpen, setCreateOpen] = useState(false);
+  const [createPending, setCreatePending] = useState(false);
   const [resetResult, setResetResult] = useState<{
     password: string;
     name: string;
@@ -57,66 +53,37 @@ export function AdminManagement() {
     page_size: pageSize
   };
   const listQuery = useAdminList(query);
-  const setStatus = useSetAdminStatus();
-  const resetPassword = useResetAdminPassword();
 
   const rows = listQuery.data?.items ?? [];
-  const total = listQuery.data?.page.total ?? 0;
+  const total = listQuery.data?.pagination.total ?? 0;
 
-  // 一次性临时密码在「重置密码 / 建号」两条流程间共用同一个 ResetPasswordResult 弹窗展示，
-  // 且临时密码仅此一次返回、不可再取。若两条流程交错触发，后 resolve 的 setResetResult
-  // 会覆盖前一个、令尚未复制的那个永久丢失。故：有临时密码正在生成（重置请求在飞）或
-  // 已展示待确认（resetResult 未清）时，禁掉全部「建号 / 重置密码」入口，串行化秘密的产生。
-  const secretBusy = resetPassword.isPending || resetResult !== null;
+  // 建号临时密码仅返回一次；展示期间禁止再次建号，避免新结果覆盖尚未复制的密码。
+  const secretBusy = createPending || resetResult !== null;
 
   const applyFilters = (values: FilterValues) => {
     setFilters(values);
     setPage(1);
   };
 
-  const toggleStatus = (record: Admin) => {
-    const next = record.status === "active" ? "disabled" : "active";
-    setStatus
-      .mutateAsync({ id: record.id, status: next })
-      .then(() => message.success(next === "disabled" ? "已禁用" : "已启用"))
-      .catch((err: unknown) => {
-        // 409 = 不能禁用最后一个 active super_admin，映射为中文提示（不直接抛后端英文原文）。
-        message.error(adminActionError(err, "操作失败"));
-      });
-  };
-
-  const doResetPassword = (record: Admin) => {
-    resetPassword
-      .mutateAsync(record.id)
-      .then((res) =>
-        setResetResult({
-          password: res.temporary_password,
-          name: record.display_name
-        })
-      )
-      .catch((err: unknown) =>
-        message.error(adminActionError(err, "重置失败"))
-      );
-  };
-
   const columns: TableColumnsType<Admin> = [
     { title: "手机号", dataIndex: "phone", width: 140, fixed: "left" },
     { title: "昵称", dataIndex: "display_name", width: 160 },
     {
-      title: "邮箱",
-      dataIndex: "email",
-      width: 200,
-      render: (e?: string) => e || "-"
-    },
-    {
       title: "权限等级",
-      dataIndex: "level",
+      dataIndex: "role",
       width: 130,
       render: (lv: AdminLevel) => (
         <Tag color={lv === "super_admin" ? "purple" : "blue"}>
           {ADMIN_LEVEL_LABEL[lv]}
         </Tag>
       )
+    },
+    {
+      title: "创建人",
+      dataIndex: "created_by",
+      width: 150,
+      render: (creator: Admin["created_by"]) =>
+        creator?.display_name ?? "系统 / 历史数据"
     },
     {
       title: "状态",
@@ -134,48 +101,6 @@ export function AdminManagement() {
       dataIndex: "created_at",
       width: 160,
       render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
-    },
-    {
-      title: "操作",
-      key: "action",
-      width: 200,
-      fixed: "right",
-      render: (_: unknown, record) => {
-        // 超管拥有最高权限，超管账号不允许被互操作：整行操作按钮置灰。
-        // 启禁用/重置密码只针对普通管理员。
-        const isSuper = record.level === "super_admin";
-        return (
-          <Space size={4} wrap>
-            <GatedButton
-              type="link"
-              size="small"
-              // 禁用是破坏性动作，置红警示；启用是恢复性动作，保持常规蓝。
-              danger={record.status === "active"}
-              reason="超级管理员不可操作"
-              disabled={isSuper}
-              loading={
-                setStatus.isPending && setStatus.variables?.id === record.id
-              }
-              onClick={() => toggleStatus(record)}
-            >
-              {record.status === "active" ? "禁用" : "启用"}
-            </GatedButton>
-            {/* 重置会产出一次性临时密码：超管不可重置，且另一条秘密流程进行中时也禁用。 */}
-            <GatedButton
-              type="link"
-              size="small"
-              reason={isSuper ? "超级管理员不可操作" : "请先处理上一条临时密码"}
-              disabled={isSuper || secretBusy}
-              loading={
-                resetPassword.isPending && resetPassword.variables === record.id
-              }
-              onClick={() => doResetPassword(record)}
-            >
-              重置密码
-            </GatedButton>
-          </Space>
-        );
-      }
     }
   ];
 
@@ -195,14 +120,13 @@ export function AdminManagement() {
             flexWrap: "wrap"
           }}
         >
-          <Form.Item name="q" label="关键字">
-            <Input
-              placeholder="手机 / 邮箱 / 昵称"
-              allowClear
-              style={{ width: 200 }}
-            />
+          <Form.Item name="phone" label="手机号">
+            <Input placeholder="手机号包含" allowClear style={{ width: 160 }} />
           </Form.Item>
-          <Form.Item name="level" label="权限等级">
+          <Form.Item name="display_name" label="昵称">
+            <Input placeholder="昵称包含" allowClear style={{ width: 160 }} />
+          </Form.Item>
+          <Form.Item name="role" label="权限等级">
             <Select
               placeholder="全部"
               allowClear
@@ -290,6 +214,7 @@ export function AdminManagement() {
       <CreateAdminModal
         open={createOpen}
         onClose={() => setCreateOpen(false)}
+        onPendingChange={setCreatePending}
         onCreated={(result) => setResetResult(result)}
       />
       <ResetPasswordResult

@@ -63,8 +63,6 @@ const PENDING = new Set<string>([
   "get /admin/users/_",
   "patch /admin/users/_/status",
   "patch /admin/users/_",
-  "get /admin/admins",
-  "post /admin/admins",
   "patch /admin/admins/_/status",
   "post /admin/admins/_/reset-password",
   "patch /admin/admins/_/role",

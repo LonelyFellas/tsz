@@ -8,6 +8,7 @@ build/
 .env
 .env.local
 .env*.local
+apps/admin/.env.test
 .turbo/
 coverage/
 *.tsbuildinfo

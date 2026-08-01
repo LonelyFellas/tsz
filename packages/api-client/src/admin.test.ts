@@ -213,14 +213,21 @@ describe("createAdminEndpoints — 管理员管理 admins", () => {
     expect(http.get).toHaveBeenCalledWith("/admins");
   });
 
-  it("list 带筛选 → level/q/分页进 query", () => {
+  it("list 带筛选 → role/手机号/昵称/分页进 query", () => {
     const api = createAdminEndpoints(http);
-    api.admins.list({ level: "admin", q: "王", page: 1, page_size: 50 });
+    api.admins.list({
+      role: "admin",
+      phone: "1380",
+      display_name: "王",
+      page: 1,
+      page_size: 50
+    });
     const [path] = http.get.mock.calls[0] as [string];
     const sp = new URLSearchParams(path.split("?")[1]);
     expect(path.startsWith("/admins?")).toBe(true);
-    expect(sp.get("level")).toBe("admin");
-    expect(sp.get("q")).toBe("王");
+    expect(sp.get("role")).toBe("admin");
+    expect(sp.get("phone")).toBe("1380");
+    expect(sp.get("display_name")).toBe("王");
     expect(sp.get("page")).toBe("1");
     expect(sp.get("page_size")).toBe("50");
   });
@@ -230,10 +237,16 @@ describe("createAdminEndpoints — 管理员管理 admins", () => {
     const input = {
       phone: "13800138000",
       display_name: "审核员小王",
-      email: "wang@example.com"
+      code: "123456"
     };
     api.admins.create(input);
     expect(http.post).toHaveBeenCalledWith("/admins", input);
+  });
+
+  it("requestCreateCode → POST /admins/create-code 无 body", () => {
+    const api = createAdminEndpoints(http);
+    api.admins.requestCreateCode();
+    expect(http.post).toHaveBeenCalledWith("/admins/create-code");
   });
 
   it("setStatus → PATCH /admins/{id}/status 带 status", () => {
