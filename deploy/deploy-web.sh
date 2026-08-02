@@ -7,7 +7,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "==> build @tsz/web (standalone)"
-pnpm --filter @tsz/web build
+# NEXT_PUBLIC_* 会在构建时内联进产物。测试服默认使用公网 IP，避免 canonical、
+# sitemap 与 Open Graph URL 回退到 localhost；域名启用后可在执行脚本时显式覆盖。
+TSZ_DEPLOY_SITE_URL="${NEXT_PUBLIC_SITE_URL:-http://47.121.142.19}"
+echo "==> canonical site URL: ${TSZ_DEPLOY_SITE_URL}"
+NEXT_PUBLIC_SITE_URL="$TSZ_DEPLOY_SITE_URL" pnpm --filter @tsz/web build
 
 echo "==> rsync standalone + static -> tshb-test:/opt/tsz-web"
 # standalone 不含 .next/static（Next 约定交给 CDN/自行拷贝），须单独同步到产物内的对应路径。
