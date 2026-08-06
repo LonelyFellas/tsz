@@ -2,18 +2,19 @@ import { expect, test } from "@playwright/test";
 import { mockApi } from "./support/mockApi";
 
 test.describe("鉴权与引导端到端流程", () => {
-  test("新用户注册 → 链式自动登录进入主页", async ({ page }) => {
+  test("新用户验证码注册 → 直接建立会话进入主页", async ({ page }) => {
     await mockApi(page, { authenticated: false });
 
     await page.goto("/register");
 
-    // 填写注册表单（手机 + 密码;验证码栏已撤,后端注册不校验 OTP）。
+    // 注册验证码与手机号绑定；获取验证码后填写完整注册表单。
     await page.getByPlaceholder("请输入手机号").fill("13800138000");
+    await page.getByRole("button", { name: "获取验证码" }).click();
+    await page.getByPlaceholder("请输入验证码").fill("123456");
     await page.getByPlaceholder("请输入登录密码").fill("abc12345678");
     await page.getByRole("button", { name: "立即注册" }).click();
 
-    // 注册(201 无 token)后前端链式登录;onboarding 后端未实现
-    // (me() 适配器恒 onboarded:true),注册后直接进主页。
+    // /auth/register 直接返回会话；me() 适配器恒 onboarded:true，进入主页。
     await expect(page).toHaveURL(/\/$/);
     await expect(page.getByRole("button", { name: "账户菜单" })).toBeVisible();
   });

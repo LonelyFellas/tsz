@@ -2,7 +2,7 @@ import type { Page, Route } from "@playwright/test";
 
 // 前端 E2E 在不启动真实后端的前提下，拦截 /api/v1/** 并返回可控的桩响应。
 // 路径与响应形状对齐 tsz-rust(见 api-client openapi.snapshot.json):
-// /auth/me 返回扁平 UserProfile;注册 201 不带 token(前端链式登录);
+// /auth/me 返回扁平 UserProfile;/auth/register 直接返回登录会话;
 // onboarding 状态后端未实现(me() 适配器恒 onboarded:true),桩不再模拟。
 
 export const TEST_USER = {
@@ -66,13 +66,8 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
     if (path === "/auth/login-otp" && method === "POST") {
       return json(route, 200, AUTH_RESPONSE);
     }
-    if (path === "/user/register" && method === "POST") {
-      // 201 不含 token:注册不自动登录,前端随后链式调 /auth/login
-      return json(route, 201, {
-        user_id: TEST_USER.id,
-        display_name: TEST_USER.display_name,
-        role: "student"
-      });
+    if (path === "/auth/register" && method === "POST") {
+      return json(route, 200, AUTH_RESPONSE);
     }
     if (path === "/otp/send" && method === "POST") {
       return route.fulfill({ status: 202, body: "" });
