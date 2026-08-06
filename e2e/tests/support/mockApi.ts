@@ -25,7 +25,8 @@ const AUTH_RESPONSE = {
 function json(route: Route, status: number, body: unknown) {
   return route.fulfill({
     status,
-    contentType: "application/json",
+    contentType:
+      status >= 400 ? "application/problem+json" : "application/json",
     body: JSON.stringify(body)
   });
 }
@@ -54,7 +55,13 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
             expires_in: 900,
             refresh_token_expires_at: 9999999999
           })
-        : json(route, 401, { error: "missing refresh token" });
+        : json(route, 401, {
+            type: "urn:tsz:problem:invalid_refresh_token",
+            title: "Invalid refresh token",
+            status: 401,
+            detail: "invalid refresh token",
+            code: "invalid_refresh_token"
+          });
     }
     if (path === "/auth/me" && method === "GET") {
       // tsz-rust 返回扁平 UserProfile(active_role 在 user 内,无包壳)

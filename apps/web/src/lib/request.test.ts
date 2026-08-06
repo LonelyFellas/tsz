@@ -29,7 +29,13 @@ function refreshFail() {
   return fetchMock.mockResolvedValueOnce({
     ok: false,
     status: 401,
-    json: async () => ({ error: "invalid refresh token" })
+    json: async () => ({
+      type: "urn:tsz:problem:invalid_refresh_token",
+      title: "Invalid refresh token",
+      status: 401,
+      detail: "invalid refresh token",
+      code: "invalid_refresh_token"
+    })
   } as unknown as Response);
 }
 
