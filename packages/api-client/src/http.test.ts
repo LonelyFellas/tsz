@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ProblemDetails } from "@tsz/types";
 import { createHttpClient, HttpError, isIncompleteHttpError } from "./http";
 
 const fetchMock = vi.fn();
@@ -6,16 +7,35 @@ const fetchMock = vi.fn();
 // 构造一个最小的 Response 桩。
 function jsonResponse(
   body: unknown,
-  init: { ok?: boolean; status?: number; statusText?: string } = {}
+  init: {
+    ok?: boolean;
+    status?: number;
+    statusText?: string;
+    contentType?: string;
+  } = {}
 ) {
   return {
     ok: init.ok ?? true,
     status: init.status ?? 200,
     statusText: init.statusText ?? "OK",
+    headers: new Headers({
+      "Content-Type": init.contentType ?? "application/json"
+    }),
     json: async () => body,
     // 生产代码成功路径按 text() 解析(兼容 202/空 body),桩也要提供。
     text: async () => (body === undefined ? "" : JSON.stringify(body))
   } as unknown as Response;
+}
+
+function problem(overrides: Partial<ProblemDetails> = {}): ProblemDetails {
+  return {
+    type: "urn:tsz:problem:internal_error",
+    title: "Internal server error",
+    status: 500,
+    detail: "internal error",
+    code: "internal_error",
+    ...overrides
+  };
 }
 
 beforeEach(() => {
@@ -173,9 +193,13 @@ describe("createHttpClient", () => {
     expect(result).toBeUndefined();
   });
 
-  it("HTTP 非 2xx 抛 HttpError,带 status 与 error 信息", async () => {
+  it("HTTP 非 2xx 抛 HttpError,带 status 与 detail 信息", async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ error: "서버 오류" }, { ok: false, status: 500 })
+      jsonResponse(problem({ detail: "서버 오류" }), {
+        ok: false,
+        status: 500,
+        contentType: "application/problem+json"
+      })
     );
     const http = createHttpClient({ baseUrl: "" });
 
@@ -186,7 +210,138 @@ describe("createHttpClient", () => {
     });
   });
 
-  it("非 2xx 且无 error 字段时回退到 statusText,details 为空数组", async () => {
+  it("RFC 9457 响应读取 detail,并保留完整 Problem 元数据", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          type: "urn:tsz:problem:invalid_phone",
+          title: "Invalid phone",
+          status: 400,
+          detail: "phone is invalid",
+          code: "invalid_phone",
+          field: "phone",
+          ignored_extension: true
+        },
+        { ok: false, status: 400 }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.post("/auth/register", {})).rejects.toMatchObject({
+      status: 400,
+      message: "phone is invalid",
+      code: "invalid_phone",
+      problem: {
+        type: "urn:tsz:problem:invalid_phone",
+        title: "Invalid phone",
+        status: 400,
+        detail: "phone is invalid",
+        code: "invalid_phone",
+        field: "phone"
+      }
+    });
+  });
+
+  it("application/problem+json 能按最新契约解析", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          type: "urn:tsz:problem:internal_error",
+          title: "Internal server error",
+          status: 500,
+          detail: "internal error",
+          code: "internal_error"
+        },
+        {
+          ok: false,
+          status: 500,
+          contentType: "application/problem+json"
+        }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/boom")).rejects.toMatchObject({
+      status: 500,
+      message: "internal error",
+      code: "internal_error",
+      problem: {
+        type: "urn:tsz:problem:internal_error",
+        detail: "internal error"
+      }
+    });
+  });
+
+  it("body.status 与 HTTP 状态不一致时以 HTTP 状态为准且不保存 Problem", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        problem({
+          type: "urn:tsz:problem:invalid_token",
+          title: "Invalid token",
+          status: 401,
+          detail: "invalid token",
+          code: "invalid_token"
+        }),
+        {
+          ok: false,
+          status: 403,
+          statusText: "Forbidden",
+          contentType: "application/problem+json"
+        }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/x")).rejects.toMatchObject({
+      status: 403,
+      message: "invalid token",
+      code: "invalid_token",
+      problem: undefined
+    });
+  });
+
+  it.each([0, -1, 400.5, 600])(
+    "body.status=%s 非法时拒绝保存 Problem",
+    async (bodyStatus) => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(
+          { ...problem({ status: 400 }), status: bodyStatus },
+          {
+            ok: false,
+            status: 400,
+            contentType: "application/problem+json"
+          }
+        )
+      );
+      const http = createHttpClient({ baseUrl: "" });
+
+      await expect(http.get("/x")).rejects.toMatchObject({
+        status: 400,
+        message: "internal error",
+        code: "internal_error",
+        problem: undefined
+      });
+    }
+  );
+
+  it("detail 只有空白时回退 statusText", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(problem({ status: 500, detail: "  \n " }), {
+        ok: false,
+        status: 500,
+        statusText: "Internal Server Error",
+        contentType: "application/problem+json"
+      })
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/x")).rejects.toMatchObject({
+      message: "Internal Server Error",
+      problem: { detail: "  \n " }
+    });
+  });
+
+  it("缺少标准字段时回退到 statusText,details 为空数组", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({}, { ok: false, status: 403, statusText: "Forbidden" })
     );
@@ -198,14 +353,98 @@ describe("createHttpClient", () => {
     });
   });
 
-  it("422 发布完整性检查:error 之外还带 details 逐条违规", async () => {
+  it("只有 code、没有可用文案时回退 statusText 且不丢机器错误码", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { code: "forbidden", detail: "" },
+        { ok: false, status: 403, statusText: "Forbidden" }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/x")).rejects.toMatchObject({
+      message: "Forbidden",
+      code: "forbidden",
+      problem: undefined
+    });
+  });
+
+  it.each([null, [], "error", { detail: 1, title: false, code: 2 }])(
+    "畸形错误载荷 %# 安全回退到 statusText",
+    async (body) => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(body, {
+          ok: false,
+          status: 502,
+          statusText: "Bad Gateway"
+        })
+      );
+      const http = createHttpClient({ baseUrl: "" });
+
+      await expect(http.get("/x")).rejects.toMatchObject({
+        message: "Bad Gateway",
+        details: [],
+        code: undefined,
+        problem: undefined
+      });
+    }
+  );
+
+  it("畸形 field 与 details 扩展安全降级", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
         {
-          error: "word is incomplete",
+          ...problem({ status: 422 }),
+          field: 42,
+          details: ["valid", 42]
+        },
+        { ok: false, status: 422, contentType: "application/problem+json" }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/x")).rejects.toMatchObject({
+      status: 422,
+      message: "internal error",
+      code: "internal_error",
+      details: [],
+      problem: undefined
+    });
+  });
+
+  it("错误响应不是合法 JSON 时安全回退到 statusText", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      statusText: "Bad Gateway",
+      json: async () => {
+        throw new SyntaxError("invalid JSON");
+      }
+    } as unknown as Response);
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/x")).rejects.toMatchObject({
+      message: "Bad Gateway",
+      details: [],
+      code: undefined,
+      problem: undefined
+    });
+  });
+
+  it("422 Problem 可携带 details 扩展逐条违规", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          ...problem({
+            type: "urn:tsz:problem:invalid_request_body",
+            title: "Request validation failed",
+            status: 422,
+            detail: "word is incomplete",
+            code: "invalid_request_body"
+          }),
           details: ["frequency is required", "pos verb: at least one sense"]
         },
-        { ok: false, status: 422 }
+        { ok: false, status: 422, contentType: "application/problem+json" }
       )
     );
     const http = createHttpClient({ baseUrl: "" });
@@ -241,7 +480,16 @@ describe("createHttpClient", () => {
 
   it("401 无 token 时直接抛 HttpError，不触发 onRefresh", async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ error: "invalid credentials" }, { ok: false, status: 401 })
+      jsonResponse(
+        problem({
+          type: "urn:tsz:problem:invalid_credentials",
+          title: "Invalid credentials",
+          status: 401,
+          detail: "invalid credentials",
+          code: "invalid_credentials"
+        }),
+        { ok: false, status: 401, contentType: "application/problem+json" }
+      )
     );
     const onRefresh = vi.fn();
     const http = createHttpClient({ baseUrl: "", onRefresh });
@@ -257,8 +505,14 @@ describe("createHttpClient", () => {
     fetchMock
       .mockResolvedValueOnce(
         jsonResponse(
-          { error: "invalid or expired token" },
-          { ok: false, status: 401 }
+          problem({
+            type: "urn:tsz:problem:invalid_token",
+            title: "Invalid token",
+            status: 401,
+            detail: "invalid or expired token",
+            code: "invalid_token"
+          }),
+          { ok: false, status: 401, contentType: "application/problem+json" }
         )
       )
       .mockResolvedValueOnce(jsonResponse({ id: "1" }));
@@ -275,10 +529,16 @@ describe("createHttpClient", () => {
     expect(data).toEqual({ id: "1" });
   });
 
-  it("403 触发 onForbidden(code) 且仍抛 HttpError（携带 code）", async () => {
+  it("RFC 9457 的 403 触发 onForbidden(code) 且仍抛 HttpError", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
-        { error: "password change required", code: "must_change_password" },
+        {
+          type: "urn:tsz:problem:must_change_password",
+          title: "Password change required",
+          status: 403,
+          detail: "password change required",
+          code: "must_change_password"
+        },
         { ok: false, status: 403 }
       )
     );
@@ -295,7 +555,15 @@ describe("createHttpClient", () => {
 
   it("403 无 code：onForbidden 收到 undefined", async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ error: "account disabled" }, { ok: false, status: 403 })
+      jsonResponse(
+        {
+          type: "urn:tsz:problem:account_disabled",
+          title: "Account disabled",
+          status: 403,
+          detail: "account disabled"
+        },
+        { ok: false, status: 403, contentType: "application/problem+json" }
+      )
     );
     const onForbidden = vi.fn();
     const http = createHttpClient({ baseUrl: "", onForbidden });
@@ -309,7 +577,11 @@ describe("createHttpClient", () => {
 
   it("非 403 错误不触发 onForbidden", async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ error: "boom" }, { ok: false, status: 500 })
+      jsonResponse(problem({ detail: "boom" }), {
+        ok: false,
+        status: 500,
+        contentType: "application/problem+json"
+      })
     );
     const onForbidden = vi.fn();
     const http = createHttpClient({ baseUrl: "", onForbidden });
@@ -318,9 +590,18 @@ describe("createHttpClient", () => {
     expect(onForbidden).not.toHaveBeenCalled();
   });
 
-  it("未传 onForbidden 时 403 仍正常抛 HttpError（web 端向后兼容）", async () => {
+  it("未传 onForbidden 时 403 仍正常抛 HttpError", async () => {
     fetchMock.mockResolvedValueOnce(
-      jsonResponse({ error: "forbidden" }, { ok: false, status: 403 })
+      jsonResponse(
+        problem({
+          type: "urn:tsz:problem:forbidden",
+          title: "Forbidden",
+          status: 403,
+          detail: "forbidden",
+          code: "forbidden"
+        }),
+        { ok: false, status: 403, contentType: "application/problem+json" }
+      )
     );
     const http = createHttpClient({ baseUrl: "" });
 
@@ -330,8 +611,14 @@ describe("createHttpClient", () => {
   it("onRefresh 失败时调 onSessionExpired 并抛错", async () => {
     fetchMock.mockResolvedValue(
       jsonResponse(
-        { error: "invalid or expired token" },
-        { ok: false, status: 401 }
+        problem({
+          type: "urn:tsz:problem:invalid_token",
+          title: "Invalid token",
+          status: 401,
+          detail: "invalid or expired token",
+          code: "invalid_token"
+        }),
+        { ok: false, status: 401, contentType: "application/problem+json" }
       )
     );
     const onRefresh = vi.fn().mockRejectedValue(new Error("refresh failed"));
@@ -345,5 +632,13 @@ describe("createHttpClient", () => {
 
     await expect(http.get("/me")).rejects.toMatchObject({ status: 401 });
     expect(onSessionExpired).toHaveBeenCalledTimes(1);
+  });
+
+  it("网络失败保留原异常,不伪装成 HttpError", async () => {
+    const networkError = new TypeError("Failed to fetch");
+    fetchMock.mockRejectedValueOnce(networkError);
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/x")).rejects.toBe(networkError);
   });
 });

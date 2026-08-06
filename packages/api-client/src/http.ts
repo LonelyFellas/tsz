@@ -1,5 +1,7 @@
 // 运行环境无关的请求层。web 与 admin 各自注入 baseUrl / token。
 
+import type { ProblemDetails } from "@tsz/types";
+
 export interface HttpClientOptions {
   baseUrl: string;
   /** 每次请求动态获取 access token。 */
@@ -31,7 +33,9 @@ export class HttpError extends Error {
      * 后端稳定错误码(如 403 的 "must_change_password")。文案可变、code 是稳定契约,
      * 需要按错误码分支的全局处理据此判定,而非匹配 message。多数错误无此字段。
      */
-    public code?: string
+    public code?: string,
+    /** 完整 RFC 9457 响应；响应不完整或畸形时为空。 */
+    public problem?: ProblemDetails
   ) {
     super(message);
     this.name = "HttpError";
@@ -45,26 +49,78 @@ export function isIncompleteHttpError(
   return err instanceof HttpError && err.status === 422;
 }
 
-async function parseError(
-  res: Response
-): Promise<{ message: string; details: string[]; code?: string }> {
+interface ParsedError {
+  message: string;
+  details: string[];
+  code: string | undefined;
+  problem: ProblemDetails | undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0
+    ? value
+    : undefined;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === "string")
+    ? value
+    : [];
+}
+
+function toProblemDetails(
+  body: Record<string, unknown>,
+  responseStatus: number
+): ProblemDetails | undefined {
+  const type = nonEmptyString(body.type);
+  const title = nonEmptyString(body.title);
+  const code = nonEmptyString(body.code);
+  if (
+    type === undefined ||
+    title === undefined ||
+    !Number.isInteger(body.status) ||
+    body.status !== responseStatus ||
+    typeof body.detail !== "string" ||
+    code === undefined ||
+    (body.field !== undefined && nonEmptyString(body.field) === undefined)
+  ) {
+    return undefined;
+  }
+
+  return {
+    type,
+    title,
+    status: responseStatus,
+    detail: body.detail,
+    code,
+    ...(typeof body.field === "string" ? { field: body.field } : {})
+  };
+}
+
+async function parseError(res: Response): Promise<ParsedError> {
   try {
-    const body = (await res.json()) as {
-      error?: string;
-      details?: string[];
-      code?: string;
-    };
-    if (body.error) {
+    const body: unknown = await res.json();
+    if (isRecord(body)) {
       return {
-        message: body.error,
-        details: body.details ?? [],
-        code: body.code
+        message: nonEmptyString(body.detail) ?? res.statusText,
+        details: stringArray(body.details),
+        code: nonEmptyString(body.code),
+        problem: toProblemDetails(body, res.status)
       };
     }
   } catch {
     // ignore
   }
-  return { message: res.statusText, details: [] };
+  return {
+    message: res.statusText,
+    details: [],
+    code: undefined,
+    problem: undefined
+  };
 }
 
 export function createHttpClient({
@@ -105,10 +161,10 @@ export function createHttpClient({
     }
 
     if (!res.ok) {
-      const { message, details, code } = await parseError(res);
+      const { message, details, code, problem } = await parseError(res);
       // 403 全局通知(如 must_change_password → 跳改密页)。只作副作用,不吞错:仍照常抛出。
       if (res.status === 403) onForbidden?.(code);
-      throw new HttpError(res.status, message, details, code);
+      throw new HttpError(res.status, message, details, code, problem);
     }
 
     // 204 No Content / 202 Accepted(otp/send)等空 body:直接 res.json() 会抛

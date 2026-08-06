@@ -17,6 +17,16 @@ function resp(status: number, body: unknown, ok = status < 400): Response {
   } as unknown as Response;
 }
 
+function problem(status: number, code: string, title: string, detail: string) {
+  return {
+    type: `urn:tsz:problem:${code}`,
+    title,
+    status,
+    detail,
+    code
+  };
+}
+
 const PROFILE_BODY = {
   id: "a1",
   phone: "13800138000",
@@ -81,7 +91,12 @@ describe("createAdminAuthRuntime · 401 拦截器与 realm 隔离", () => {
 
   it("access 过期(401) → 打 admin refresh 端点续期 → 用新 token 重试原请求", async () => {
     fetchMock
-      .mockResolvedValueOnce(resp(401, { error: "invalid or expired token" })) // profile
+      .mockResolvedValueOnce(
+        resp(
+          401,
+          problem(401, "invalid_token", "Invalid token", "invalid token")
+        )
+      ) // profile
       .mockResolvedValueOnce(
         resp(200, { access_token: "at-2", expires_in: 900 })
       ) // refresh
@@ -118,8 +133,18 @@ describe("createAdminAuthRuntime · 401 拦截器与 realm 隔离", () => {
 
   it("并发请求同时 401 → 只触发一次 refresh（single-flight，防 refresh token 互相转旋失效）", async () => {
     fetchMock
-      .mockResolvedValueOnce(resp(401, { error: "x" })) // 请求 A
-      .mockResolvedValueOnce(resp(401, { error: "x" })) // 请求 B
+      .mockResolvedValueOnce(
+        resp(
+          401,
+          problem(401, "invalid_token", "Invalid token", "invalid token")
+        )
+      ) // 请求 A
+      .mockResolvedValueOnce(
+        resp(
+          401,
+          problem(401, "invalid_token", "Invalid token", "invalid token")
+        )
+      ) // 请求 B
       .mockResolvedValueOnce(
         resp(200, { access_token: "at-2", expires_in: 900 })
       ) // 唯一一次 refresh
@@ -142,9 +167,23 @@ describe("createAdminAuthRuntime · 401 拦截器与 realm 隔离", () => {
 
   it("refresh 自身也 401（admin 被禁用/会话过期）→ 清内存 token，会话结束", async () => {
     fetchMock
-      .mockResolvedValueOnce(resp(401, { error: "invalid or expired token" })) // profile
       .mockResolvedValueOnce(
-        resp(401, { error: "invalid refresh token" }, false)
+        resp(
+          401,
+          problem(401, "invalid_token", "Invalid token", "invalid token")
+        )
+      ) // profile
+      .mockResolvedValueOnce(
+        resp(
+          401,
+          problem(
+            401,
+            "invalid_refresh_token",
+            "Invalid refresh token",
+            "invalid refresh token"
+          ),
+          false
+        )
       ); // refresh 失败
 
     const rt = createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
@@ -157,7 +196,15 @@ describe("createAdminAuthRuntime · 401 拦截器与 realm 隔离", () => {
 
   it("login 走 skipAuth：401 直接抛凭证错误，不误触发 refresh", async () => {
     fetchMock.mockResolvedValueOnce(
-      resp(401, { error: "invalid credentials" })
+      resp(
+        401,
+        problem(
+          401,
+          "invalid_credentials",
+          "Invalid credentials",
+          "invalid credentials"
+        )
+      )
     );
 
     const rt = createAdminAuthRuntime({ baseUrl: "/api/v1/admin" });
@@ -172,10 +219,15 @@ describe("createAdminAuthRuntime · 401 拦截器与 realm 隔离", () => {
 
   it("受保护请求 403 must_change_password → 整页跳改密页，且仍抛 403", async () => {
     fetchMock.mockResolvedValueOnce(
-      resp(403, {
-        error: "password change required",
-        code: "must_change_password"
-      })
+      resp(
+        403,
+        problem(
+          403,
+          "must_change_password",
+          "Password change required",
+          "password change required"
+        )
+      )
     );
     // 本包测试跑在 node 环境（无 window/document）。注入 window.location 观测跳转；
     // tokenManager 见 window 存在会注册 visibilitychange，故一并补 document 桩。
