@@ -1,7 +1,7 @@
 "use client";
 
-import { isEmail, isPhone, isRegisterPassword } from "@tsz/shared";
-import { useState, type FormEvent } from "react";
+import { isPhone, isRegisterPassword } from "@tsz/shared";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
@@ -13,86 +13,96 @@ import {
   translateAuthError
 } from "../shared";
 
-type Tab = "phone" | "email";
+const CODE_COUNTDOWN = 60;
+const REGISTER_CODE_RE = /^\d{6}$/;
 
-// 对齐 tsz-rust 真实错误文案:手机/邮箱占用统一返回 409 "user already exists"。
 const REGISTER_ERRORS: Record<string, string> = {
-  "user already exists": "该账号已注册，请直接登录"
+  "invalid code": "验证码错误或已失效，请重新获取",
+  "user already exists": "该手机号已注册，请直接登录",
+  "too many requests": "验证码发送过于频繁，请稍后再试",
+  "service unavailable": "验证码服务暂时不可用，请稍后再试"
 };
 
-const TABS: { id: Tab; label: string }[] = [
-  { id: "phone", label: "手机" },
-  { id: "email", label: "邮箱" }
-];
-
 export function RegisterForm() {
-  const [tab, setTab] = useState<Tab>("phone");
-  const [account, setAccount] = useState("");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [countdown, setCountdown] = useState(0);
+  const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const setUser = useUserStore((s) => s.setUser);
+  const setUser = useUserStore((state) => state.setUser);
   const router = useRouter();
 
-  const accountValid = tab === "phone" ? isPhone(account) : isEmail(account);
-  const passwordValid = isRegisterPassword(password);
-  const canSubmit = accountValid && passwordValid && !loading;
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown((value) => value - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
-  function switchTab(next: Tab) {
-    setTab(next);
-    setAccount("");
+  const phoneValid = isPhone(phone);
+  const codeValid = REGISTER_CODE_RE.test(code);
+  const passwordValid = isRegisterPassword(password);
+  const canSendCode = phoneValid && countdown === 0 && !sending;
+  const canSubmit = phoneValid && codeValid && passwordValid && !loading;
+
+  function translateError(value: unknown, fallback: string): string {
+    const message = value instanceof Error ? value.message : "";
+    return translateAuthError(message, REGISTER_ERRORS, fallback);
+  }
+
+  function handlePhoneChange(nextPhone: string) {
+    if (nextPhone === phone) return;
+    setPhone(nextPhone);
+    // 验证码与发送冷却都绑定手机号；换号后不能沿用旧号码的状态。
+    setCode("");
+    setCountdown(0);
     setError("");
   }
 
-  async function handleRegister(e: FormEvent) {
-    e.preventDefault();
+  async function handleSendCode() {
+    if (!canSendCode) return;
+    setError("");
+    setSending(true);
+    try {
+      await api.auth.sendCode(phone, "register");
+      setCountdown(CODE_COUNTDOWN);
+    } catch (cause: unknown) {
+      setError(translateError(cause, "验证码发送失败，请稍后重试"));
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function handleRegister(event: FormEvent) {
+    event.preventDefault();
     if (!canSubmit) return;
     setError("");
     setLoading(true);
     try {
-      // 业务规则:密码不区分大小写,统一转大写后入库(登录侧同样转换)。
-      const normalizedPassword = password.toUpperCase();
-      // 注册不自动登录(后端 201 只返回 user_id):注册成功后链式用同一凭证登录换会话。
-      // 昵称由后端生成(「同学XXXX」),角色恒 student,前端不再传。
-      await api.auth.register({
-        // 手机/邮箱二选一：未选中的那个不传（后端按字段是否存在判断）。
-        phone: tab === "phone" ? account : undefined,
-        email: tab === "email" ? account : undefined,
-        password: normalizedPassword
+      // 与现有密码登录保持一致：提交前统一转大写。
+      const auth = await api.auth.register({
+        phone,
+        password: password.toUpperCase(),
+        code
       });
-      // 两步不共用 catch:注册已成功(账号已建),链式登录若因网络抖动/瞬时 5xx
-      // 失败,按「注册失败」报错会误导用户重试再撞 409。改为带成功提示去登录页。
-      let auth;
-      try {
-        auth = await api.auth.login(account, normalizedPassword);
-      } catch {
-        router.push("/login?registered=success");
-        return;
-      }
       persistSession(auth);
       setUser(auth.user);
-      // navigateAfterAuth 拉 /me 决定是否进 onboarding(后端未实现前恒跳过)。
       await navigateAfterAuth((href) => router.push(href));
-    } catch (e: unknown) {
-      setError(translateError(e));
+    } catch (cause: unknown) {
+      setError(translateError(cause, "注册失败，请稍后重试"));
     } finally {
       setLoading(false);
     }
-  }
-
-  function translateError(e: unknown): string {
-    const msg = e instanceof Error ? e.message : "";
-    return translateAuthError(msg, REGISTER_ERRORS, "注册失败，请稍后重试");
   }
 
   return (
     <div className="flex min-h-screen">
       <AuthBranding />
 
-      {/* Right panel */}
-      <div className="flex flex-1 items-center justify-center px-8 py-16 bg-surface">
+      <div className="flex flex-1 items-center justify-center bg-surface px-8 py-16">
         <div className="w-full max-w-sm">
           <div className="mb-8 flex items-center justify-between">
             <h1 className="text-3xl font-bold text-foreground">注册账号</h1>
@@ -105,64 +115,96 @@ export function RegisterForm() {
             </button>
           </div>
 
-          {/* Tabs */}
-          <div className="flex gap-6 mb-8 border-b border-border">
-            {TABS.map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => switchTab(id)}
-                className={`pb-3 text-sm font-medium transition-colors ${
-                  tab === id
-                    ? "text-primary border-b-2 border-primary"
-                    : "text-foreground-subtle hover:text-foreground-muted"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="mb-8 flex gap-6 border-b border-border">
+            <button
+              type="button"
+              className="border-b-2 border-primary pb-3 text-sm font-medium text-primary"
+            >
+              手机
+            </button>
+            <button
+              type="button"
+              disabled
+              aria-label="邮箱（未开放）"
+              className="flex cursor-not-allowed items-center gap-2 pb-3 text-sm font-medium text-foreground-subtle opacity-60"
+            >
+              邮箱
+              <span className="rounded-full bg-border px-2 py-0.5 text-[10px] leading-none">
+                未开放
+              </span>
+            </button>
           </div>
 
           <form className="space-y-4" onSubmit={handleRegister}>
-            {/* 账号 */}
             <div>
-              <label className="block text-sm text-foreground-muted mb-1">
-                {tab === "phone" ? "手机号码" : "邮箱"}
+              <label className="mb-1 block text-sm text-foreground-muted">
+                手机号码
               </label>
               <input
-                type={tab === "phone" ? "tel" : "email"}
-                placeholder={tab === "phone" ? "请输入手机号" : "请输入邮箱"}
-                value={account}
-                onChange={(e) => setAccount(e.target.value)}
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                placeholder="请输入手机号"
+                value={phone}
+                disabled={sending || loading}
+                onChange={(event) => handlePhoneChange(event.target.value)}
                 className={AUTH_INPUT_CLASS}
               />
-              {account && !accountValid && (
+              {phone && !phoneValid && (
+                <p className="mt-1 text-xs text-danger">手机号码错误</p>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm text-foreground-muted">
+                验证码
+              </label>
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="请输入验证码"
+                  value={code}
+                  onChange={(event) => setCode(event.target.value)}
+                  className={`${AUTH_INPUT_CLASS} min-w-0 flex-1`}
+                />
+                <button
+                  type="button"
+                  disabled={!canSendCode}
+                  onClick={handleSendCode}
+                  className="shrink-0 rounded-full border border-primary px-4 text-sm font-medium text-primary transition-opacity hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {sending
+                    ? "发送中..."
+                    : countdown > 0
+                      ? `${countdown}s 后重发`
+                      : "获取验证码"}
+                </button>
+              </div>
+              {code && !codeValid && (
                 <p className="mt-1 text-xs text-danger">
-                  {tab === "phone" ? "手机号码错误" : "邮箱格式错误"}
+                  请输入 6 位数字验证码
                 </p>
               )}
             </div>
 
-            {/* 验证码栏暂撤:后端注册接口不校验 OTP(Purpose 枚举也无 register),
-                挂一个不被校验的验证码框只会误导用户「已验证」。等后端注册纳入
-                OTP 校验后,恢复 sendCode(account, "register") + code 提交。 */}
-
-            {/* 密码 */}
             <div>
-              <label className="block text-sm text-foreground-muted mb-1">
+              <label className="mb-1 block text-sm text-foreground-muted">
                 密码
               </label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
                   placeholder="请输入登录密码"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                   className={`${AUTH_INPUT_CLASS} pr-12`}
                 />
                 <button
                   type="button"
-                  onClick={() => setShowPassword((v) => !v)}
+                  onClick={() => setShowPassword((value) => !value)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 text-foreground-subtle hover:text-foreground-muted"
                   aria-label={showPassword ? "隐藏密码" : "显示密码"}
                 >
@@ -185,7 +227,7 @@ export function RegisterForm() {
             <button
               type="submit"
               disabled={!canSubmit}
-              className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+              className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {loading ? "注册中..." : "立即注册"}
             </button>
