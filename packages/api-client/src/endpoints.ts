@@ -89,26 +89,17 @@ export interface AvatarUpload {
 }
 
 export interface RegisterPayload {
-  /** 手机号与邮箱二选一：两个都不传后端 400。 */
-  phone?: string;
-  email?: string;
+  /** 当前仅支持中国大陆手机号注册。 */
+  phone: string;
   /** 8–72 字节(bcrypt 上限)。 */
   password: string;
-}
-
-/**
- * 注册成功(201)。⚠️ 不含 token——注册**不自动登录**,前端需链式调 login。
- * display_name 由后端生成(「同学XXXX」),role 恒 student。
- */
-export interface RegisterResponse {
-  user_id: string;
-  display_name: string;
-  role: string;
+  /** `/otp/send` 以 purpose=register 发出的短信验证码。 */
+  code: string;
 }
 
 /** OTP 用途(otp/send 的 purpose 字段,snake_case 对齐后端枚举)。 */
 export type OtpPurpose =
-  "login" | "password_reset" | "account_deletion" | "contact_bind";
+  "login" | "register" | "password_reset" | "account_deletion" | "contact_bind";
 
 export function createEndpoints(http: HttpClient) {
   return {
@@ -140,9 +131,9 @@ export function createEndpoints(http: HttpClient) {
        */
       bindContact: (contact: string, code: string) =>
         http.post<{ user: User }>("/me/contact/bind", { contact, code }),
-      /** POST /user/register — 注册(201,**不自动登录**,需链式调 login) */
+      /** POST /auth/register — 手机号验证码注册；成功直接建立登录会话。 */
       register: (payload: RegisterPayload) =>
-        http.post<RegisterResponse>("/user/register", payload, {
+        http.post<AuthResponse>("/auth/register", payload, {
           skipAuth: true
         }),
       /** POST /auth/login — 账号密码登录 */

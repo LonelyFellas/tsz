@@ -63,33 +63,32 @@ describe("createEndpoints · auth", () => {
     });
   });
 
-  it("register → POST /user/register 带 payload(不含昵称/角色,后端生成)", () => {
+  it("register → POST /auth/register 带手机号、密码和注册验证码", () => {
     const api = createEndpoints(http);
     api.auth.register({
       phone: "13800138000",
-      password: "s3cret66"
+      password: "s3cret66",
+      code: "123456"
     });
     expect(http.post).toHaveBeenCalledWith(
-      "/user/register",
+      "/auth/register",
       {
         phone: "13800138000",
-        password: "s3cret66"
+        password: "s3cret66",
+        code: "123456"
       },
       { skipAuth: true }
     );
   });
 
-  it("register → 纯邮箱账号（phone 可省略）原样透传 payload", () => {
+  it("sendCode → 注册用途原样传 register", () => {
     const api = createEndpoints(http);
-    api.auth.register({
-      email: "alice@example.com",
-      password: "s3cret66"
-    });
+    api.auth.sendCode("13800138000", "register");
     expect(http.post).toHaveBeenCalledWith(
-      "/user/register",
+      "/otp/send",
       {
-        email: "alice@example.com",
-        password: "s3cret66"
+        phone: "13800138000",
+        purpose: "register"
       },
       { skipAuth: true }
     );
