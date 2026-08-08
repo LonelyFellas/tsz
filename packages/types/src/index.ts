@@ -9,6 +9,8 @@ export * from "./api";
 export * from "./admin";
 export * from "./admin-user";
 export * from "./admin-role";
+export * from "./admin-word-v2";
+export { isAdminWordV2 } from "./admin-word";
 export type {
   AdminWordKind,
   AdminWordListItem,
@@ -16,6 +18,7 @@ export type {
   AdminWord,
   AdminWordBatchDeleteResponse,
   AdminWordCreateInput,
+  AdminWordAnyEnvelope,
   AdminWordEnvelope,
   AdminWordIncompleteError,
   AdminWordListPage,

@@ -1,0 +1,404 @@
+import {
+  CheckCircleFilled,
+  CloseCircleFilled,
+  InfoCircleOutlined,
+  SafetyCertificateOutlined
+} from "@ant-design/icons";
+import {
+  Alert,
+  App,
+  Button,
+  Card,
+  Col,
+  Descriptions,
+  Form,
+  Input,
+  Row,
+  Select,
+  Space,
+  Tag,
+  Typography
+} from "antd";
+import type {
+  AdminWordV2,
+  DetectWordResponseV2,
+  WordHeadwordsV2
+} from "@tsz/types";
+import { HttpError } from "@tsz/api-client/http";
+import { useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { POS_TAG_ABBR } from "../labels";
+import { newWordNodeId } from "../word-model/primitives";
+import { useCreateWordV2, useDetectWordV2 } from "./api";
+import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
+
+interface Props {
+  onHeadwordsChange: (headwords?: WordHeadwordsV2) => void;
+  onCreated: (word: AdminWordV2) => void;
+}
+
+interface BasicsFormValues {
+  language: "en";
+  headword: string;
+}
+
+function StepHeading() {
+  return (
+    <div className="word-step-heading">
+      <span className="word-step-number">STEP 01</span>
+      <Typography.Title level={2} style={{ margin: 0 }}>
+        创建新词条
+      </Typography.Title>
+      <Typography.Paragraph className="word-step-description">
+        录入词条后，系统将判断词条类型、检查智能词库重复项，并从内置词典带出英美主词、基本词性、词形和音标建议。
+      </Typography.Paragraph>
+    </div>
+  );
+}
+
+function DetectionStatus({ result }: { result: DetectWordResponseV2 }) {
+  const builtin = result.builtin_dictionary;
+  const smart = result.smart_dictionary;
+  const canContinue =
+    result.entry_kind === "word" &&
+    builtin.status === "matched" &&
+    smart.status === "clear";
+  return (
+    <Card
+      title="词典检测结果"
+      extra={
+        <Tag color={canContinue ? "success" : "error"}>
+          {canContinue ? "已匹配" : "不可继续"}
+        </Tag>
+      }
+    >
+      <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+        <Alert
+          type={canContinue ? "success" : "warning"}
+          showIcon
+          title={
+            result.entry_kind === "phrase"
+              ? "检测结果为短语，请使用创建短语流程"
+              : builtin.status === "matched"
+                ? "内置词典已找到规范词条"
+                : builtin.status === "not_found"
+                  ? "内置词典没有匹配项"
+                  : "内置词典暂时不可用"
+          }
+        />
+        <Descriptions column={1} size="small">
+          <Descriptions.Item label="词条类型">
+            {result.entry_kind === "word" ? "单词" : "短语"}
+          </Descriptions.Item>
+          <Descriptions.Item label="重复检测">
+            {smart.status === "clear" ? (
+              <Space>
+                <CheckCircleFilled style={{ color: "#22a06b" }} />
+                未发现
+              </Space>
+            ) : smart.status === "duplicate" ? (
+              <Space orientation="vertical" size={4}>
+                <Space>
+                  <CloseCircleFilled style={{ color: "#d4380d" }} />
+                  已存在重复词条
+                </Space>
+                {smart.duplicates.map((item) => (
+                  <a key={item.word_id} href={`/words/${item.word_id}/edit`}>
+                    {item.headword} ({item.dialect})
+                  </a>
+                ))}
+              </Space>
+            ) : (
+              "智能词库暂时不可用"
+            )}
+          </Descriptions.Item>
+          {builtin.status === "matched" && (
+            <Descriptions.Item label="建议词性">
+              <Space size={[4, 4]} wrap>
+                {builtin.suggested_forms.pos.map((item) => (
+                  <Tag key={item.pos_id} color="blue">
+                    {POS_TAG_ABBR[item.pos]}
+                  </Tag>
+                ))}
+              </Space>
+            </Descriptions.Item>
+          )}
+        </Descriptions>
+      </Space>
+    </Card>
+  );
+}
+
+function HeadwordConfirmation({
+  value,
+  onChange
+}: {
+  value: WordHeadwordsV2;
+  onChange: (next: WordHeadwordsV2) => void;
+}) {
+  if (value.mode === "unified") {
+    return (
+      <Card size="small" title="确认主词">
+        <Form.Item label="统一词形" style={{ marginBottom: 0 }}>
+          <Input value={value.common} readOnly />
+        </Form.Item>
+      </Card>
+    );
+  }
+  const source = value.source_dialect;
+  return (
+    <Card size="small" title="确认英美主词">
+      <Alert
+        type="info"
+        showIcon
+        icon={<SafetyCertificateOutlined />}
+        title={`${source === "uk" ? "英式" : "美式"}是本次输入命中的检测基准，保持只读；请确认另一侧。`}
+        style={{ marginBottom: 16 }}
+      />
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <div className="dialect-panel dialect-panel-uk">
+            <Typography.Text strong>British English · BrE</Typography.Text>
+            <Input
+              aria-label="英式主词"
+              value={value.uk}
+              readOnly={source === "uk"}
+              onChange={(event) =>
+                onChange({ ...value, uk: event.target.value })
+              }
+              style={{ marginTop: 10 }}
+            />
+          </div>
+        </Col>
+        <Col xs={24} md={12}>
+          <div className="dialect-panel dialect-panel-us">
+            <Typography.Text strong>American English · AmE</Typography.Text>
+            <Input
+              aria-label="美式主词"
+              value={value.us}
+              readOnly={source === "us"}
+              onChange={(event) =>
+                onChange({ ...value, us: event.target.value })
+              }
+              style={{ marginTop: 10 }}
+            />
+          </div>
+        </Col>
+      </Row>
+    </Card>
+  );
+}
+
+export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
+  const { message } = App.useApp();
+  const navigate = useNavigate();
+  const [form] = Form.useForm<BasicsFormValues>();
+  const detectWord = useDetectWordV2();
+  const createWord = useCreateWordV2();
+  const [result, setResult] = useState<DetectWordResponseV2>();
+  const [headwords, setHeadwords] = useState<WordHeadwordsV2>();
+  const [dirty, setDirty] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const requestVersion = useRef(0);
+  const createKey = useRef(newWordNodeId());
+  const allowSavedNavigation = useUnsavedWordChanges(dirty);
+
+  const resetDetection = () => {
+    requestVersion.current += 1;
+    setResult(undefined);
+    setHeadwords(undefined);
+    onHeadwordsChange(undefined);
+    createKey.current = newWordNodeId();
+    detectWord.reset();
+  };
+
+  const runDetection = async () => {
+    let values: BasicsFormValues;
+    try {
+      values = await form.validateFields();
+    } catch {
+      return;
+    }
+    const headword = values.headword.trim();
+    const version = ++requestVersion.current;
+    createKey.current = newWordNodeId();
+    setResult(undefined);
+    setHeadwords(undefined);
+    onHeadwordsChange(undefined);
+    detectWord.reset();
+    try {
+      const next = await detectWord.mutateAsync({
+        language: "en",
+        headword
+      });
+      const currentHeadword = String(
+        form.getFieldValue("headword") ?? ""
+      ).trim();
+      if (
+        version !== requestVersion.current ||
+        currentHeadword !== headword ||
+        next.request.language !== values.language ||
+        next.request.headword !== headword
+      ) {
+        return;
+      }
+      const expiresAt = Date.parse(next.expires_at);
+      if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+        message.warning("检测结果已过期，请重新检测");
+        return;
+      }
+      setResult(next);
+      const matched = next.builtin_dictionary;
+      const nextHeadwords =
+        matched.status === "matched" ? matched.headwords : undefined;
+      setHeadwords(nextHeadwords);
+      onHeadwordsChange(nextHeadwords);
+    } catch (error) {
+      if (version === requestVersion.current) {
+        message.error(error instanceof Error ? error.message : "词典检测失败");
+      }
+    }
+  };
+
+  const canCreate =
+    result?.entry_kind === "word" &&
+    result.builtin_dictionary.status === "matched" &&
+    result.smart_dictionary.status === "clear" &&
+    headwords !== undefined &&
+    (headwords.mode === "unified"
+      ? headwords.common.trim() !== ""
+      : headwords.uk.trim() !== "" && headwords.us.trim() !== "");
+
+  const createDraft = async () => {
+    if (!result || !headwords || !canCreate || creating) return;
+    setCreating(true);
+    try {
+      const { word } = await createWord.mutateAsync({
+        schema_version: 2,
+        idempotency_key: createKey.current,
+        detection_id: result.detection_id,
+        headwords
+      });
+      message.success(
+        `已创建「${word.headwords.mode === "unified" ? word.headwords.common : word.headwords[word.headwords.source_dialect]}」草稿`
+      );
+      setDirty(false);
+      allowSavedNavigation();
+      onCreated(word);
+    } catch (error) {
+      if (error instanceof HttpError && error.status === 410) {
+        resetDetection();
+        message.warning("检测结果已过期，请重新检测");
+        return;
+      }
+      message.error(error instanceof Error ? error.message : "创建草稿失败");
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  return (
+    <>
+      <StepHeading />
+      <fieldset
+        className="word-request-lock"
+        disabled={creating}
+        aria-busy={creating}
+      >
+        <Row gutter={[24, 24]} align="top">
+          <Col xs={24} xl={12}>
+            <Card>
+              <Form
+                form={form}
+                layout="vertical"
+                initialValues={{ language: "en" }}
+                onValuesChange={() => {
+                  setDirty(true);
+                  resetDetection();
+                }}
+              >
+                <Form.Item label="所属语言" name="language">
+                  <Select
+                    options={[{ value: "en", label: "English  英语" }]}
+                    disabled
+                  />
+                </Form.Item>
+                <Form.Item
+                  label="录入词条"
+                  name="headword"
+                  rules={[
+                    { required: true, whitespace: true, message: "请输入词条" },
+                    { max: 200, message: "词条不能超过 200 个字符" }
+                  ]}
+                >
+                  <Input
+                    size="large"
+                    placeholder="例如 center"
+                    autoComplete="off"
+                    onPressEnter={() => void runDetection()}
+                  />
+                </Form.Item>
+                <Button
+                  type="primary"
+                  loading={detectWord.isPending}
+                  onClick={() => void runDetection()}
+                >
+                  词典检测
+                </Button>
+              </Form>
+            </Card>
+
+            {headwords && (
+              <div style={{ marginTop: 20 }}>
+                <HeadwordConfirmation
+                  value={headwords}
+                  onChange={(next) => {
+                    createKey.current = newWordNodeId();
+                    setDirty(true);
+                    setHeadwords(next);
+                    onHeadwordsChange(next);
+                  }}
+                />
+              </div>
+            )}
+          </Col>
+          <Col xs={24} xl={12}>
+            {result ? (
+              <DetectionStatus result={result} />
+            ) : (
+              <Card>
+                <Alert
+                  type="info"
+                  showIcon
+                  icon={<InfoCircleOutlined />}
+                  title="等待检测"
+                  description="检测不会创建草稿。确认检测结果并进入下一步时，系统才会生成可恢复的 V2 草稿。"
+                />
+              </Card>
+            )}
+            {result?.entry_kind === "phrase" && (
+              <Button
+                style={{ marginTop: 12 }}
+                onClick={() => navigate("/words")}
+              >
+                返回创建短语
+              </Button>
+            )}
+          </Col>
+        </Row>
+
+        <div className="word-step-actions">
+          <Button onClick={() => navigate("/words")}>取消</Button>
+          <Button
+            type="primary"
+            disabled={!canCreate}
+            loading={creating}
+            onClick={() => void createDraft()}
+          >
+            确认并进入词形与发音
+          </Button>
+        </div>
+      </fieldset>
+    </>
+  );
+}

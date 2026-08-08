@@ -1,4 +1,4 @@
-// 用户管理搜索行：用户昵称 / 手机号 / 邮箱号码 / 注册时间 + 搜索 / 重置。
+// 用户管理搜索行：单一关键词（昵称 / 手机号 / 邮箱）+ 注册时间 + 搜索 / 重置。
 import { ReloadOutlined, SearchOutlined } from "@ant-design/icons";
 import { Button, Card, DatePicker, Form, Input, Space } from "antd";
 import type { UserFilterValues } from "./listQuery";
@@ -19,21 +19,11 @@ export function UserFilters({ onSearch, onReset }: Props) {
         onFinish={onSearch}
         style={{ rowGap: 12, columnGap: 8, display: "flex", flexWrap: "wrap" }}
       >
-        <Form.Item name="nickname" label="用户昵称">
+        <Form.Item name="q" label="关键词">
           <Input
-            placeholder="请输入用户昵称"
+            placeholder="手机号 / 邮箱 / 用户昵称"
             allowClear
-            style={{ width: 180 }}
-          />
-        </Form.Item>
-        <Form.Item name="phone" label="手机号">
-          <Input placeholder="请输入手机号" allowClear style={{ width: 160 }} />
-        </Form.Item>
-        <Form.Item name="email" label="邮箱号码">
-          <Input
-            placeholder="请输入邮箱号码"
-            allowClear
-            style={{ width: 200 }}
+            style={{ width: 240 }}
           />
         </Form.Item>
         <Form.Item name="registeredDate" label="注册时间">

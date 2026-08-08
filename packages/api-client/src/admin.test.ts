@@ -1,4 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type {
+  PreviewFormsImpactInputV2,
+  PublishAdminWordV2Input,
+  SaveFormsStepInput,
+  SaveMeaningsStepInput,
+  SuggestDialectVariantsInputV2
+} from "@tsz/types";
 import { createAdminEndpoints } from "./admin";
 import type { HttpClient } from "./http";
 
@@ -119,6 +126,24 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.get).toHaveBeenCalledWith("/words/stats");
   });
 
+  it("detect → POST /words/detect 原样透传语言与待检测词头", () => {
+    const api = createAdminEndpoints(http);
+    const input = { language: "en" as const, headword: "center" };
+    api.words.detect(input);
+    expect(http.post).toHaveBeenCalledWith("/words/detect", input);
+  });
+
+  it("suggestDialectVariants → POST /words/dialect-variants 原样透传建议项", () => {
+    const api = createAdminEndpoints(http);
+    const input: SuggestDialectVariantsInputV2 = {
+      source_dialect: "uk",
+      target_dialect: "us",
+      items: [{ client_id: "form-1", field_kind: "form", value: "centre" }]
+    };
+    api.words.suggestDialectVariants(input);
+    expect(http.post).toHaveBeenCalledWith("/words/dialect-variants", input);
+  });
+
   it("create → POST /words 带 headword + kind", () => {
     const api = createAdminEndpoints(http);
     api.words.create({ headword: "take", kind: "word" });
@@ -126,6 +151,23 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       headword: "take",
       kind: "word"
     });
+  });
+
+  it("createV2 → POST /words 带 schema、幂等键、detection 与确认词头", () => {
+    const api = createAdminEndpoints(http);
+    const input = {
+      schema_version: 2 as const,
+      idempotency_key: "op-create-1",
+      detection_id: "det-1",
+      headwords: {
+        mode: "distinguish" as const,
+        uk: "centre",
+        us: "center",
+        source_dialect: "us" as const
+      }
+    };
+    api.words.createV2(input);
+    expect(http.post).toHaveBeenCalledWith("/words", input);
   });
 
   it("get → GET /words/{id}", () => {
@@ -148,10 +190,66 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.put).toHaveBeenCalledWith("/words/w-1/content", input);
   });
 
+  it("previewFormsImpact → POST /words/{id}/steps/forms/impact", () => {
+    const api = createAdminEndpoints(http);
+    const input: PreviewFormsImpactInputV2 = {
+      base_revision: 3,
+      content: { pos: [] }
+    };
+    api.words.previewFormsImpact("w-2", input);
+    expect(http.post).toHaveBeenCalledWith(
+      "/words/w-2/steps/forms/impact",
+      input
+    );
+  });
+
+  it("saveFormsStep → PUT /words/{id}/steps/forms 原样透传分步保存输入", () => {
+    const api = createAdminEndpoints(http);
+    const input: SaveFormsStepInput = {
+      base_revision: 3,
+      operation_id: "op-forms-1",
+      intent: "save",
+      confirmed_impact_token: null,
+      content: { pos: [] }
+    };
+    api.words.saveFormsStep("w-2", input);
+    expect(http.put).toHaveBeenCalledWith("/words/w-2/steps/forms", input);
+  });
+
+  it("saveMeaningsStep → PUT /words/{id}/steps/meanings 原样透传分步保存输入", () => {
+    const api = createAdminEndpoints(http);
+    const input: SaveMeaningsStepInput = {
+      base_revision: 4,
+      operation_id: "op-meanings-1",
+      intent: "complete",
+      content: { sense_groups: [], pos: [] }
+    };
+    api.words.saveMeaningsStep("w-2", input);
+    expect(http.put).toHaveBeenCalledWith("/words/w-2/steps/meanings", input);
+  });
+
+  it("validateV2 → POST /words/{id}/validate 带 base_revision", () => {
+    const api = createAdminEndpoints(http);
+    api.words.validateV2("w-2", { base_revision: 5 });
+    expect(http.post).toHaveBeenCalledWith("/words/w-2/validate", {
+      base_revision: 5
+    });
+  });
+
   it("publish → POST /words/{id}/publish 无 body", () => {
     const api = createAdminEndpoints(http);
     api.words.publish("w-1");
     expect(http.post).toHaveBeenCalledWith("/words/w-1/publish");
+  });
+
+  it("publishV2 → POST /words/{id}/publish 带 revision 与幂等键", () => {
+    const api = createAdminEndpoints(http);
+    const input: PublishAdminWordV2Input = {
+      base_revision: 5,
+      idempotency_key: "op-publish-1"
+    };
+    api.words.publishV2("w-2", input);
+    expect(http.post).toHaveBeenCalledWith("/words/w-2/publish", input);
   });
 
   it("remove → DELETE /words/{id}", () => {

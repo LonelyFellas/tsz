@@ -1,13 +1,29 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { App as AntApp } from "antd";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { HomePage } from "./Home";
 import { ReviewsPage } from "./Reviews";
 import { UsersPage } from "./Users";
 import { WordListsPage } from "./WordLists";
+import { WordCreatePage } from "./WordCreate";
+import { WordWizardPage } from "./WordWizard";
 import { WordsPage } from "./Words";
+
+vi.mock("@/lib/env", () => ({
+  env: {
+    API_BASE_URL: "/api/v1",
+    WORD_CREATION_WIZARD: true,
+    ADMIN_WORDS_MOCK: false
+  }
+}));
+
+vi.mock("@/features/dictionary/word-creation/WordCreationWizard", () => ({
+  WordCreationWizard: ({ mode }: { mode: "create" | "resume" }) => (
+    <div>word-wizard-{mode}</div>
+  )
+}));
 
 // 智能词库页走真实数据层(React Query + api.words),烟雾测试只验渲染,
 // 把请求端点 mock 成稳定响应,避免触网。
@@ -26,6 +42,10 @@ vi.mock("@/lib/auth", () => ({
         page: { page: 1, page_size: 20, total: 0 }
       })
     }
+  },
+  useAuthStore: {
+    getState: () => ({ profile: null }),
+    subscribe: vi.fn(() => vi.fn())
   },
   // 用户管理页据 useIsSuperAdmin 决定写操作是否置灰；烟雾测试给个超管即可。
   useIsSuperAdmin: () => true
@@ -78,7 +98,7 @@ describe("admin 页面烟雾测试", () => {
       </MemoryRouter>
     );
     // 搜索行与角色 tab。
-    expect(screen.getByText("邮箱号码")).toBeInTheDocument();
+    expect(screen.getByText("关键词")).toBeInTheDocument();
     for (const tab of ["全部", "老师", "学生"]) {
       expect(screen.getByText(tab)).toBeInTheDocument();
     }
@@ -98,6 +118,7 @@ describe("admin 页面烟雾测试", () => {
         <QueryClientProvider client={new QueryClient()}>
           <AntApp>
             <WordsPage />
+            <LocationProbe />
           </AntApp>
         </QueryClientProvider>
       </MemoryRouter>
@@ -106,5 +127,28 @@ describe("admin 页面烟雾测试", () => {
     expect(screen.getByText("创建短语")).toBeInTheDocument();
     // 面包屑末级为「智能词库」。
     expect(screen.getAllByText("智能词库").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByText("创建单词"));
+    expect(screen.getByTestId("location")).toHaveTextContent("/words/new");
+
+    // 短语仍走 legacy modal，不被 V2 单词入口接管。
+    fireEvent.click(screen.getByText("创建短语"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it.each([
+    [WordCreatePage, "word-wizard-create"],
+    [WordWizardPage, "word-wizard-resume"]
+  ] as const)("新建单词页面入口传递正确模式", (Page, expected) => {
+    render(
+      <MemoryRouter>
+        <Page />
+      </MemoryRouter>
+    );
+    expect(screen.getByText(expected)).toBeInTheDocument();
   });
 });
+
+function LocationProbe() {
+  return <span data-testid="location">{useLocation().pathname}</span>;
+}

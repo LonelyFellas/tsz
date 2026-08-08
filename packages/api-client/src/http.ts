@@ -1,6 +1,10 @@
 // 运行环境无关的请求层。web 与 admin 各自注入 baseUrl / token。
 
-import type { ProblemDetails } from "@tsz/types";
+import type {
+  AdminWordApiErrorMeta,
+  DraftValidationIssue,
+  ProblemDetails
+} from "@tsz/types";
 
 export interface HttpClientOptions {
   baseUrl: string;
@@ -24,6 +28,13 @@ export interface HttpClientOptions {
 }
 
 export class HttpError extends Error {
+  /** 完整 RFC 9457 响应；响应不完整或畸形时为空。 */
+  public problem?: ProblemDetails;
+  /** V2 分步保存/发布的字段级问题；legacy 错误为空数组。 */
+  public field_issues: DraftValidationIssue[];
+  /** V2 冲突/影响确认的结构化上下文；legacy 错误缺省。 */
+  public meta?: AdminWordApiErrorMeta;
+
   constructor(
     public status: number,
     message: string,
@@ -34,11 +45,20 @@ export class HttpError extends Error {
      * 需要按错误码分支的全局处理据此判定,而非匹配 message。多数错误无此字段。
      */
     public code?: string,
-    /** 完整 RFC 9457 响应；响应不完整或畸形时为空。 */
-    public problem?: ProblemDetails
+    problemOrFieldIssues?: ProblemDetails | DraftValidationIssue[],
+    meta?: AdminWordApiErrorMeta,
+    problem?: ProblemDetails
   ) {
     super(message);
     this.name = "HttpError";
+    if (Array.isArray(problemOrFieldIssues)) {
+      this.field_issues = problemOrFieldIssues;
+      this.meta = meta;
+      this.problem = problem;
+    } else {
+      this.field_issues = [];
+      this.problem = problemOrFieldIssues;
+    }
   }
 }
 
@@ -54,6 +74,8 @@ interface ParsedError {
   details: string[];
   code: string | undefined;
   problem: ProblemDetails | undefined;
+  field_issues: DraftValidationIssue[];
+  meta: AdminWordApiErrorMeta | undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -70,6 +92,46 @@ function stringArray(value: unknown): string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string")
     ? value
     : [];
+}
+
+function toDraftValidationIssues(value: unknown): DraftValidationIssue[] {
+  if (!Array.isArray(value)) return [];
+  const valid = value.every(
+    (issue) =>
+      isRecord(issue) &&
+      ["basics", "forms", "meanings"].includes(String(issue.step)) &&
+      nonEmptyString(issue.node_id) !== undefined &&
+      nonEmptyString(issue.field) !== undefined &&
+      nonEmptyString(issue.code) !== undefined &&
+      nonEmptyString(issue.message) !== undefined
+  );
+  return valid ? (value as DraftValidationIssue[]) : [];
+}
+
+function toAdminWordApiErrorMeta(
+  value: unknown
+): AdminWordApiErrorMeta | undefined {
+  if (!isRecord(value)) return undefined;
+  if (
+    (value.current_revision !== undefined &&
+      (typeof value.current_revision !== "number" ||
+        !Number.isInteger(value.current_revision) ||
+        value.current_revision < 0)) ||
+    (value.word_id !== undefined &&
+      nonEmptyString(value.word_id) === undefined) ||
+    (value.max_reachable_step !== undefined &&
+      !["basics", "forms", "meanings", "preview"].includes(
+        String(value.max_reachable_step)
+      )) ||
+    (value.affected_node_ids !== undefined &&
+      (!Array.isArray(value.affected_node_ids) ||
+        !value.affected_node_ids.every(
+          (nodeId) => nonEmptyString(nodeId) !== undefined
+        )))
+  ) {
+    return undefined;
+  }
+  return value as unknown as AdminWordApiErrorMeta;
 }
 
 function toProblemDetails(
@@ -106,10 +168,15 @@ async function parseError(res: Response): Promise<ParsedError> {
     const body: unknown = await res.json();
     if (isRecord(body)) {
       return {
-        message: nonEmptyString(body.detail) ?? res.statusText,
+        message:
+          nonEmptyString(body.detail) ??
+          nonEmptyString(body.error) ??
+          res.statusText,
         details: stringArray(body.details),
         code: nonEmptyString(body.code),
-        problem: toProblemDetails(body, res.status)
+        problem: toProblemDetails(body, res.status),
+        field_issues: toDraftValidationIssues(body.field_issues),
+        meta: toAdminWordApiErrorMeta(body.meta)
       };
     }
   } catch {
@@ -119,7 +186,9 @@ async function parseError(res: Response): Promise<ParsedError> {
     message: res.statusText,
     details: [],
     code: undefined,
-    problem: undefined
+    problem: undefined,
+    field_issues: [],
+    meta: undefined
   };
 }
 
@@ -161,10 +230,19 @@ export function createHttpClient({
     }
 
     if (!res.ok) {
-      const { message, details, code, problem } = await parseError(res);
+      const { message, details, code, problem, field_issues, meta } =
+        await parseError(res);
       // 403 全局通知(如 must_change_password → 跳改密页)。只作副作用,不吞错:仍照常抛出。
       if (res.status === 403) onForbidden?.(code);
-      throw new HttpError(res.status, message, details, code, problem);
+      throw new HttpError(
+        res.status,
+        message,
+        details,
+        code,
+        field_issues,
+        meta,
+        problem
+      );
     }
 
     // 204 No Content / 202 Accepted(otp/send)等空 body:直接 res.json() 会抛

@@ -54,6 +54,8 @@ describe("HttpError", () => {
     expect(err.name).toBe("HttpError");
     expect(err.status).toBe(404);
     expect(err.message).toBe("not found");
+    expect(err.field_issues).toEqual([]);
+    expect(err.meta).toBeUndefined();
   });
 
   it("isIncompleteHttpError:仅 422 的 HttpError 命中,其余错误不命中", () => {
@@ -453,6 +455,72 @@ describe("createHttpClient", () => {
       status: 422,
       message: "word is incomplete",
       details: ["frequency is required", "pos verb: at least one sense"]
+    });
+  });
+
+  it("V2 结构化错误保留 code、field_issues 与 meta", async () => {
+    const fieldIssue = {
+      step: "meanings" as const,
+      node_id: "sense-1",
+      field: "definitions",
+      code: "native_definition_required",
+      message: "至少填写一条本语言释义"
+    };
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          error: "word step is invalid",
+          code: "validation_failed",
+          field_issues: [fieldIssue],
+          meta: {
+            current_revision: 6,
+            word_id: "w-2",
+            max_reachable_step: "meanings",
+            affected_node_ids: ["sense-1"]
+          }
+        },
+        { ok: false, status: 422 }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(
+      http.put("/words/w-2/steps/meanings", {})
+    ).rejects.toMatchObject({
+      status: 422,
+      message: "word step is invalid",
+      code: "validation_failed",
+      details: [],
+      field_issues: [fieldIssue],
+      meta: {
+        current_revision: 6,
+        word_id: "w-2",
+        max_reachable_step: "meanings",
+        affected_node_ids: ["sense-1"]
+      }
+    });
+  });
+
+  it("畸形 V2 field_issues 与 meta 安全降级，不把外部输入伪装成已校验类型", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          error: "word step is invalid",
+          code: "validation_failed",
+          field_issues: [{ step: "preview" }],
+          meta: { current_revision: -1 }
+        },
+        { ok: false, status: 422 }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/words/w-2")).rejects.toMatchObject({
+      status: 422,
+      message: "word step is invalid",
+      code: "validation_failed",
+      field_issues: [],
+      meta: undefined
     });
   });
 

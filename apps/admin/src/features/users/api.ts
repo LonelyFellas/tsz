@@ -1,5 +1,5 @@
-// 用户管理（C 端用户）数据层：React Query hooks，全部对接真实 api.users.*（@tsz/api-client）。
-// 列表 / 编辑 / 启禁用已有后端接口；删除用户后端本轮 out of scope，故 UI 上是占位（无 mutation）。
+// 用户管理（C 端用户）数据层：列表已对接真实 api.users.list（@tsz/api-client）。
+// 编辑 / 启禁用 hooks 为后续后端接口预留，当前页面不会调用。
 import type { AdminUserListResponse, AdminUserView } from "@tsz/types";
 import {
   keepPreviousData,

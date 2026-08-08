@@ -4,6 +4,10 @@ import { loadEnv } from "vite";
 // 从 vitest/config 导入 defineConfig：既是合法的 Vite 配置，又能给 `test` 字段类型，
 // 从而把测试配置并入本文件——@ 别名与 plugins 只此一处，避免三处（vite/vitest/tsconfig）漂移。
 import { defineConfig } from "vitest/config";
+import {
+  assertAdminWordsMockAllowed,
+  parseBooleanEnvFlag
+} from "./src/lib/env-flags";
 
 // dev 代理配置：把 /api/v1/* 转发到后端，保证 refresh 的 HttpOnly cookie 与请求同源。
 // 复用 web 相同的 BACKEND_API_URL（默认已含 /api/v1 前缀），行为与旧 next.config
@@ -62,6 +66,22 @@ function buildDevProxy(mode: string) {
 }
 
 export default defineConfig(({ mode, command }) => {
+  const buildEnv = loadEnv(mode, process.cwd(), "");
+  const production = command === "build" || mode === "production";
+  parseBooleanEnvFlag(
+    buildEnv.VITE_WORD_CREATION_WIZARD,
+    "VITE_WORD_CREATION_WIZARD",
+    !production
+  );
+  const adminWordsMock = parseBooleanEnvFlag(
+    buildEnv.VITE_ADMIN_WORDS_MOCK,
+    "VITE_ADMIN_WORDS_MOCK",
+    !production
+  );
+
+  // `vite build` 产物可能被直接部署，禁止把整套词库 mock 烘进任何构建产物。
+  assertAdminWordsMockAllowed(adminWordsMock, production);
+
   // dev 代理只在启动开发服务器（command === "serve"）时需要；`vite build` 产出的是纯
   // 静态包，不经这个代理，故其相关校验也不应耦合进构建成败——只在 serve 时构建代理。
   const server =

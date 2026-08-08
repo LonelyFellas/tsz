@@ -5,10 +5,6 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdminUserListQuery, AdminUserView } from "@tsz/types";
 
-// 登录管理员的 level：super_admin 时编辑/启禁用可用，admin 时置灰（gating 用例覆盖）。
-// 变量以 mock 前缀命名，满足 vitest vi.mock 工厂对外部引用的约束。
-let mockAdminLevel: "super_admin" | "admin" = "super_admin";
-
 vi.mock("@/lib/auth", () => ({
   api: {
     users: {
@@ -17,21 +13,17 @@ vi.mock("@/lib/auth", () => ({
       setStatus: vi.fn(),
       update: vi.fn()
     }
-  },
-  // UserManagement 经共享 useIsSuperAdmin 决定写操作是否置灰；直接按 mockAdminLevel 返回布尔。
-  useIsSuperAdmin: () => mockAdminLevel === "super_admin"
+  }
 }));
 
 import { api } from "@/lib/auth";
 import { UserManagement } from "./UserManagement";
 
-// 集成用例含 antd 表格/弹窗 + 异步 mutation + message 门户，覆盖率插桩下于全量并行
+// 集成用例含 antd 表格/抽屉 + message 门户，覆盖率插桩下于全量并行
 // 运行时偏慢，放宽超时抗资源竞争（与 AdminManagement.test 同理）。
 vi.setConfig({ testTimeout: 15000 });
 
 const mockList = vi.mocked(api.users.list);
-const mockSetStatus = vi.mocked(api.users.setStatus);
-const mockUpdate = vi.mocked(api.users.update);
 
 interface Spec {
   id: string;
@@ -85,7 +77,7 @@ function seed(): AdminUserView[] {
   return rows;
 }
 
-// 进程内可变态：写操作就地改，配合 React Query 失效重取生效（每例前 seed 复位）。
+// 每例复位的列表数据源。
 let users: AdminUserView[];
 
 /** 模拟后端 GET /admin/users：role/q 过滤 + 分页，形状同 AdminUserListResponse。 */
@@ -107,24 +99,18 @@ function fakeList(query: AdminUserListQuery = {}) {
   const start = (page - 1) * size;
   return {
     items: items.slice(start, start + size),
-    page: { page, page_size: size, total }
+    page: {
+      page,
+      page_size: size,
+      total,
+      total_pages: total === 0 ? 0 : Math.ceil(total / size)
+    }
   };
 }
 
 beforeEach(() => {
-  mockAdminLevel = "super_admin";
   users = seed();
   mockList.mockImplementation(async (q) => fakeList(q));
-  mockUpdate.mockImplementation(async (id, input) => {
-    const u = users.find((x) => x.id === id)!;
-    u.display_name = input.display_name;
-    return u;
-  });
-  mockSetStatus.mockImplementation(async (id, status) => {
-    const u = users.find((x) => x.id === id)!;
-    u.status = status;
-    return u;
-  });
 });
 
 function renderPage() {
@@ -174,7 +160,7 @@ describe("UserManagement", () => {
   it("按昵称搜索过滤列表", async () => {
     renderPage();
     await screen.findByText("record");
-    fireEvent.change(screen.getByPlaceholderText("请输入用户昵称"), {
+    fireEvent.change(screen.getByPlaceholderText("手机号 / 邮箱 / 用户昵称"), {
       target: { value: "screen" }
     });
     fireEvent.click(screen.getByText(/搜\s?索/));
@@ -187,7 +173,7 @@ describe("UserManagement", () => {
   it("重置按钮清空筛选恢复全部", async () => {
     renderPage();
     await screen.findByText("record");
-    fireEvent.change(screen.getByPlaceholderText("请输入用户昵称"), {
+    fireEvent.change(screen.getByPlaceholderText("手机号 / 邮箱 / 用户昵称"), {
       target: { value: "screen" }
     });
     fireEvent.click(screen.getByText(/搜\s?索/));
@@ -223,7 +209,7 @@ describe("UserManagement", () => {
         expect.objectContaining({ role: "teacher" })
       )
     );
-    fireEvent.change(screen.getByPlaceholderText("请输入用户昵称"), {
+    fireEvent.change(screen.getByPlaceholderText("手机号 / 邮箱 / 用户昵称"), {
       target: { value: "screen" }
     });
     fireEvent.click(screen.getByText(/搜\s?索/));
@@ -234,64 +220,7 @@ describe("UserManagement", () => {
     );
   });
 
-  it("编辑保存改昵称，列表刷新", async () => {
-    renderPage();
-    await screen.findByText("record");
-    clickRowButton(/编\s?辑/);
-    const input = await screen.findByDisplayValue("record");
-    fireEvent.change(input, { target: { value: "记录" } });
-    fireEvent.click(screen.getByText(/保\s?存/));
-    expect(await screen.findByText("已保存")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText("记录")).toBeInTheDocument());
-    expect(mockUpdate).toHaveBeenCalledWith("1", { display_name: "记录" });
-  });
-
-  it("编辑保存失败给出错误提示且不关闭弹窗", async () => {
-    renderPage();
-    await screen.findByText("record");
-    mockUpdate.mockRejectedValueOnce(new Error("保存炸了"));
-    clickRowButton(/编\s?辑/);
-    const input = await screen.findByDisplayValue("record");
-    fireEvent.change(input, { target: { value: "记录" } });
-    fireEvent.click(screen.getByText(/保\s?存/));
-    expect(await screen.findByText("保存炸了")).toBeInTheDocument();
-    expect(screen.getByDisplayValue("记录")).toBeInTheDocument();
-  });
-
-  it("禁用一个正常用户给出提示", async () => {
-    renderPage();
-    await screen.findByText("record"); // record（i=0）active → 操作列显示「禁用」
-    clickRowButton(/禁\s?用/);
-    expect(await screen.findByText("已禁用")).toBeInTheDocument();
-    expect(mockSetStatus).toHaveBeenCalledWith("1", "disabled");
-  });
-
-  it("启用一个被禁用用户给出提示", async () => {
-    renderPage();
-    await screen.findByText("aged"); // aged（disabled）→ 操作列显示「启用」
-    clickRowButton(/启\s?用/);
-    expect(await screen.findByText("已启用")).toBeInTheDocument();
-    expect(mockSetStatus).toHaveBeenCalledWith("4", "active");
-  });
-
-  it("启禁用失败给出错误提示", async () => {
-    renderPage();
-    await screen.findByText("record");
-    mockSetStatus.mockRejectedValueOnce(new Error("操作炸了"));
-    clickRowButton(/禁\s?用/);
-    expect(await screen.findByText("操作炸了")).toBeInTheDocument();
-  });
-
-  it("启禁用抛非 Error 时回退到「操作失败」文案", async () => {
-    renderPage();
-    await screen.findByText("record");
-    mockSetStatus.mockRejectedValueOnce("weird");
-    clickRowButton(/禁\s?用/);
-    expect(await screen.findByText("操作失败")).toBeInTheDocument();
-  });
-
-  it("非超管时编辑/启禁用置灰", async () => {
-    mockAdminLevel = "admin";
+  it("编辑和启禁用接口未实现时始终置灰", async () => {
     renderPage();
     await screen.findByText("record");
     expect(screen.getAllByText(/编\s?辑/)[0]!.closest("button")).toBeDisabled();

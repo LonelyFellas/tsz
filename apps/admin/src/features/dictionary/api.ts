@@ -12,12 +12,12 @@ import {
   useQuery,
   useQueryClient
 } from "@tanstack/react-query";
-import { api } from "@/lib/auth";
+import { adminWordsDataSource } from "./dataSource";
 
 export const wordKeys = {
   all: ["admin-words"] as const,
-  list: (query: AdminWordListQuery) =>
-    [...wordKeys.all, "list", query] as const,
+  lists: () => [...wordKeys.all, "list"] as const,
+  list: (query: AdminWordListQuery) => [...wordKeys.lists(), query] as const,
   stats: () => [...wordKeys.all, "stats"] as const,
   detail: (id: string) => [...wordKeys.all, "detail", id] as const,
   relatedSearch: (q: string) => [...wordKeys.all, "related-search", q] as const
@@ -26,7 +26,7 @@ export const wordKeys = {
 export function useWordList(query: AdminWordListQuery) {
   return useQuery({
     queryKey: wordKeys.list(query),
-    queryFn: () => api.words.list(query),
+    queryFn: () => adminWordsDataSource.list(query),
     // 翻页/改筛选时保留上一页数据渲染,避免表格闪空。
     placeholderData: keepPreviousData
   });
@@ -35,14 +35,15 @@ export function useWordList(query: AdminWordListQuery) {
 export function useWordStats() {
   return useQuery({
     queryKey: wordKeys.stats(),
-    queryFn: () => api.words.stats()
+    queryFn: () => adminWordsDataSource.stats()
   });
 }
 
-export function useWordDetail(wordId: string) {
+export function useWordDetail(wordId: string, enabled = true) {
   return useQuery({
     queryKey: wordKeys.detail(wordId),
-    queryFn: () => api.words.get(wordId),
+    queryFn: () => adminWordsDataSource.get(wordId),
+    enabled,
     // 整棵树是编辑基准(updated_at 为乐观锁 token),进入编辑页必须拿最新,不吃缓存。
     staleTime: 0,
     gcTime: 0
@@ -53,7 +54,7 @@ export function useWordDetail(wordId: string) {
 export function useRelatedSearch(q: string, open: boolean) {
   return useQuery({
     queryKey: wordKeys.relatedSearch(q),
-    queryFn: () => api.words.relatedSearch(q),
+    queryFn: () => adminWordsDataSource.relatedSearch(q),
     enabled: open && q.trim() !== ""
   });
 }
@@ -67,7 +68,8 @@ function useInvalidateWords() {
 export function useCreateWord() {
   const invalidate = useInvalidateWords();
   return useMutation({
-    mutationFn: (input: AdminWordCreateInput) => api.words.create(input),
+    mutationFn: (input: AdminWordCreateInput) =>
+      adminWordsDataSource.create(input),
     onSuccess: invalidate
   });
 }
@@ -76,7 +78,7 @@ export function useSaveWordContent() {
   const invalidate = useInvalidateWords();
   return useMutation({
     mutationFn: (vars: { wordId: string; input: AdminWordSaveInput }) =>
-      api.words.saveContent(vars.wordId, vars.input),
+      adminWordsDataSource.saveContent(vars.wordId, vars.input),
     onSuccess: invalidate
   });
 }
@@ -84,7 +86,7 @@ export function useSaveWordContent() {
 export function usePublishWord() {
   const invalidate = useInvalidateWords();
   return useMutation({
-    mutationFn: (wordId: string) => api.words.publish(wordId),
+    mutationFn: (wordId: string) => adminWordsDataSource.publish(wordId),
     onSuccess: invalidate
   });
 }
@@ -92,7 +94,7 @@ export function usePublishWord() {
 export function useDeleteWord() {
   const invalidate = useInvalidateWords();
   return useMutation({
-    mutationFn: (wordId: string) => api.words.remove(wordId),
+    mutationFn: (wordId: string) => adminWordsDataSource.remove(wordId),
     onSuccess: invalidate
   });
 }
@@ -100,7 +102,7 @@ export function useDeleteWord() {
 export function useBatchDeleteWords() {
   const invalidate = useInvalidateWords();
   return useMutation<AdminWordBatchDeleteResponse, Error, string[]>({
-    mutationFn: (ids: string[]) => api.words.batchDelete(ids),
+    mutationFn: (ids: string[]) => adminWordsDataSource.batchDelete(ids),
     onSuccess: invalidate
   });
 }

@@ -10,8 +10,10 @@ import type {
   AdminUserListResponse,
   AdminUserUpdateInput,
   AdminWordBatchDeleteResponse,
+  AdminWordAnyEnvelope,
   AdminWordCreateInput,
   AdminWordEnvelope,
+  AdminWordV2Envelope,
   AdminWordKind,
   AdminWordListQuery,
   AdminWordListResponse,
@@ -19,8 +21,15 @@ import type {
   AdminWordStats,
   AdminStatus,
   CreateAdminInput,
+  CreateAdminWordV2Input,
   CreateAdminResponse,
   CreateRoleRequest,
+  DetectWordInputV2,
+  DetectWordResponseV2,
+  DraftValidationResponse,
+  PreviewFormsImpactInputV2,
+  PreviewFormsImpactResponseV2,
+  PublishAdminWordV2Input,
   Admin,
   AdminAuthResponse,
   AdminProfile,
@@ -28,6 +37,11 @@ import type {
   RelatedSearchResponse,
   ResetPasswordResponse,
   RoleListResponse,
+  SaveFormsStepInput,
+  SaveMeaningsStepInput,
+  SuggestDialectVariantsInputV2,
+  SuggestDialectVariantsResponseV2,
+  ValidateAdminWordV2Input,
   UpdateRoleRequest
 } from "@tsz/types";
 import type { RefreshResponse } from "./endpoints";
@@ -127,23 +141,54 @@ export function createAdminEndpoints(http: HttpClient) {
         http.get<AdminWordListResponse>(`/words${qs({ ...query })}`),
       /** GET /admin/words/stats — 头部计数（累计 / 今日 / 本月，按 Asia/Shanghai）。 */
       stats: () => http.get<AdminWordStats>("/words/stats"),
+      /** POST /admin/words/detect — 创建 V2 草稿前执行内置词典与智能词库检测。 */
+      detect: (input: DetectWordInputV2) =>
+        http.post<DetectWordResponseV2>("/words/detect", input),
+      /** POST /admin/words/dialect-variants — 获取方言转换建议，不直接落盘。 */
+      suggestDialectVariants: (input: SuggestDialectVariantsInputV2) =>
+        http.post<SuggestDialectVariantsResponseV2>(
+          "/words/dialect-variants",
+          input
+        ),
       /** POST /admin/words — 创建草稿壳；409 = 同 kind 下 headword 已存在（忽略大小写）。 */
       create: (input: AdminWordCreateInput) =>
         http.post<AdminWordEnvelope>("/words", input),
-      /** GET /admin/words/{id} — 编辑页加载整棵树；记住 updated_at 作乐观锁基准。 */
-      get: (wordId: string) => http.get<AdminWordEnvelope>(`/words/${wordId}`),
+      /** POST /admin/words — 由有效 detection 幂等创建 V2 canonical 草稿。 */
+      createV2: (input: CreateAdminWordV2Input) =>
+        http.post<AdminWordV2Envelope>("/words", input),
+      /** GET /admin/words/{id} — 兼容加载 V1 legacy 与 V2 canonical 词条。 */
+      get: (wordId: string) =>
+        http.get<AdminWordAnyEnvelope>(`/words/${wordId}`),
       /**
        * PUT /admin/words/{id}/content — 保存（整树替换）。
        * 409 = 乐观锁冲突（重新加载）；422 = 已发布词条改残（details 逐条展示）。
        */
       saveContent: (wordId: string, input: AdminWordSaveInput) =>
         http.put<AdminWordEnvelope>(`/words/${wordId}/content`, input),
+      /** POST /admin/words/{id}/steps/forms/impact — 保存词形前预览下游影响。 */
+      previewFormsImpact: (wordId: string, input: PreviewFormsImpactInputV2) =>
+        http.post<PreviewFormsImpactResponseV2>(
+          `/words/${wordId}/steps/forms/impact`,
+          input
+        ),
+      /** PUT /admin/words/{id}/steps/forms — 保存或完成 V2 词形与发音步骤。 */
+      saveFormsStep: (wordId: string, input: SaveFormsStepInput) =>
+        http.put<AdminWordV2Envelope>(`/words/${wordId}/steps/forms`, input),
+      /** PUT /admin/words/{id}/steps/meanings — 保存或完成 V2 词义与例句步骤。 */
+      saveMeaningsStep: (wordId: string, input: SaveMeaningsStepInput) =>
+        http.put<AdminWordV2Envelope>(`/words/${wordId}/steps/meanings`, input),
+      /** POST /admin/words/{id}/validate — 校验指定 V2 revision 的发布完整性。 */
+      validateV2: (wordId: string, input: ValidateAdminWordV2Input) =>
+        http.post<DraftValidationResponse>(`/words/${wordId}/validate`, input),
       /**
        * POST /admin/words/{id}/publish — 提交（发布），幂等且重新触发题目生成。
        * 422 = 完整性检查未过（HttpError.details）；409 = 并发保存，重试即可。
        */
       publish: (wordId: string) =>
         http.post<AdminWordEnvelope>(`/words/${wordId}/publish`),
+      /** POST /admin/words/{id}/publish — 带 revision/idempotency key 发布 V2。 */
+      publishV2: (wordId: string, input: PublishAdminWordV2Input) =>
+        http.post<AdminWordV2Envelope>(`/words/${wordId}/publish`, input),
       /** DELETE /admin/words/{id} — 单条删除（整棵树一起删）→ 204。 */
       remove: (wordId: string) => http.del<void>(`/words/${wordId}`),
       /** POST /admin/words/batch-delete — ≤100 个，重复去重；不存在的 id 跳过。 */
@@ -161,23 +206,22 @@ export function createAdminEndpoints(http: HttpClient) {
         )
     },
     /**
-     * 用户管理：C 端用户（web 学员/教师）的后台目录。读（列表/详情）任意 admin 可见；
-     * 写（启禁用/编辑）后端限 super_admin（普通 admin 得 403 super admin required）。
-     * 删除用户后端本轮 out of scope，无对应端点。
+     * 用户管理：C 端用户（web 学员/教师）的后台目录。当前后端仅列表已落地；
+     * 详情、启禁用、编辑仍在契约 PENDING，页面不会调用。
      */
     users: {
       /** GET /admin/users — 列表页：role/关键字/注册时间筛选 + 分页。联系方式不脱敏。 */
       list: (query: AdminUserListQuery = {}) =>
         http.get<AdminUserListResponse>(`/users${qs({ ...query })}`),
-      /** GET /admin/users/{id} — 用户详情（单个 AdminUser）。 */
+      /** GET /admin/users/{id} — PENDING：用户详情（单个 AdminUser）。 */
       get: (id: string) => http.get<AdminUser>(`/users/${id}`),
       /**
-       * PATCH /admin/users/{id}/status — 启用/禁用；返回更新后的 AdminUser。
+       * PENDING：PATCH /admin/users/{id}/status — 启用/禁用；返回更新后的 AdminUser。
        * 禁用在用户下次登录/刷新时生效（一个 access-token TTL 内），不强制吊销活跃会话。
        */
       setStatus: (id: string, status: AdminUser["status"]) =>
         http.patch<AdminUser>(`/users/${id}/status`, { status }),
-      /** PATCH /admin/users/{id} — 编辑可管理字段（本轮仅昵称）；返回更新后的 AdminUser。 */
+      /** PENDING：PATCH /admin/users/{id} — 编辑可管理字段；返回更新后的 AdminUser。 */
       update: (id: string, input: AdminUserUpdateInput) =>
         http.patch<AdminUser>(`/users/${id}`, input)
     },
