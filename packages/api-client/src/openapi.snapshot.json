@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend openapi.yaml via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-06T03:29:11.090Z",
+  "_generatedAt": "2026-08-08T03:45:34.022Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -11,6 +11,7 @@
     "/admin/auth/logout": ["post"],
     "/admin/auth/refresh": ["post"],
     "/admin/profile": ["get"],
+    "/admin/users": ["get"],
     "/auth/login": ["post"],
     "/auth/login-otp": ["post"],
     "/auth/logout": ["post"],

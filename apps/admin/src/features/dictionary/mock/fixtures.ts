@@ -1,0 +1,558 @@
+import type {
+  AdminWord,
+  DetectWordInputV2,
+  DetectWordResponseV2,
+  DraftFormsStepContent,
+  DraftMeaningsStepContent,
+  EnglishTextV2,
+  RichText,
+  WordDerivedFormSlotV2,
+  WordFormGroupV2,
+  WordHeadwordsV2,
+  WordPosFormsV2,
+  WordPosMeaningsV2,
+  WordPosTag,
+  WordPronunciationV2
+} from "@tsz/types";
+
+export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 1;
+
+export function richText(text: string): RichText {
+  return { version: 1, text, spans: [], liaisons: [] };
+}
+
+function pronunciation(id: string, phonetic: string): WordPronunciationV2 {
+  return {
+    id,
+    dict_phonetic: phonetic,
+    actual_pron: phonetic,
+    style: "normal"
+  };
+}
+
+function variants(
+  prefix: string,
+  values: Array<{
+    dialect: "common" | "uk" | "us";
+    spelling: string;
+    phonetic: string;
+  }>
+) {
+  return values.map(({ dialect, spelling, phonetic }) => ({
+    id: `${prefix}-${dialect}`,
+    dialect,
+    spelling,
+    origin: "dictionary" as const,
+    pronunciations: [pronunciation(`${prefix}-${dialect}-pron`, phonetic)]
+  }));
+}
+
+function group(
+  id: string,
+  slots: WordDerivedFormSlotV2[],
+  isRegular = true
+): WordFormGroupV2 {
+  return { id, is_regular: isRegular, slots };
+}
+
+function centerForms(): DraftFormsStepContent {
+  const noun: WordPosFormsV2 = {
+    pos_id: "suggested-pos-noun",
+    pos: "noun",
+    dialect_rules: {
+      spelling_mode: "distinguish",
+      phonetic_mode: "distinguish"
+    },
+    base_form: {
+      id: "suggested-base-noun",
+      form_type: "base",
+      variants: variants("suggested-base-noun", [
+        { dialect: "uk", spelling: "centre", phonetic: "ˈsentə" },
+        { dialect: "us", spelling: "center", phonetic: "ˈsentər" }
+      ])
+    },
+    form_groups: [
+      group("suggested-group-noun-1", [
+        {
+          id: "suggested-plural-noun",
+          form_type: "plural",
+          variants: variants("suggested-plural-noun", [
+            { dialect: "uk", spelling: "centres", phonetic: "ˈsentəz" },
+            { dialect: "us", spelling: "centers", phonetic: "ˈsentərz" }
+          ])
+        }
+      ])
+    ]
+  };
+
+  const verbEntries: Array<
+    [WordDerivedFormSlotV2["form_type"], string, string, string, string]
+  > = [
+    ["third_person_singular", "centres", "centers", "ˈsentəz", "ˈsentərz"],
+    ["present_participle", "centring", "centering", "ˈsentrɪŋ", "ˈsentərɪŋ"],
+    ["past_tense", "centred", "centered", "ˈsentəd", "ˈsentərd"],
+    ["past_participle", "centred", "centered", "ˈsentəd", "ˈsentərd"]
+  ];
+  const verbSlots: WordDerivedFormSlotV2[] = verbEntries.map(
+    ([formType, uk, us, ukPhonetic, usPhonetic], index) => ({
+      id: `suggested-verb-slot-${index + 1}`,
+      form_type: formType,
+      variants: variants(`suggested-verb-slot-${index + 1}`, [
+        { dialect: "uk", spelling: uk, phonetic: ukPhonetic },
+        { dialect: "us", spelling: us, phonetic: usPhonetic }
+      ])
+    })
+  );
+
+  const verb: WordPosFormsV2 = {
+    pos_id: "suggested-pos-verb",
+    pos: "verb",
+    dialect_rules: {
+      spelling_mode: "distinguish",
+      phonetic_mode: "distinguish"
+    },
+    base_form: {
+      id: "suggested-base-verb",
+      form_type: "base",
+      variants: variants("suggested-base-verb", [
+        { dialect: "uk", spelling: "centre", phonetic: "ˈsentə" },
+        { dialect: "us", spelling: "center", phonetic: "ˈsentər" }
+      ])
+    },
+    form_groups: [group("suggested-group-verb-1", verbSlots)]
+  };
+
+  return { pos: [noun, verb] };
+}
+
+function farForms(): DraftFormsStepContent {
+  const base = (pos: WordPosTag, posId: string): WordPosFormsV2 => ({
+    pos_id: posId,
+    pos,
+    dialect_rules: {
+      spelling_mode: "unified",
+      phonetic_mode: "distinguish"
+    },
+    base_form: {
+      id: `${posId}-base`,
+      form_type: "base",
+      variants: variants(`${posId}-base`, [
+        { dialect: "uk", spelling: "far", phonetic: "fɑː" },
+        { dialect: "us", spelling: "far", phonetic: "fɑːr" }
+      ])
+    },
+    form_groups: [
+      group(`${posId}-farther`, [
+        {
+          id: `${posId}-farther-comparative`,
+          form_type: "comparative",
+          variants: variants(`${posId}-farther-comparative`, [
+            { dialect: "uk", spelling: "farther", phonetic: "ˈfɑːðə" },
+            { dialect: "us", spelling: "farther", phonetic: "ˈfɑːrðər" }
+          ])
+        },
+        {
+          id: `${posId}-farther-superlative`,
+          form_type: "superlative",
+          variants: variants(`${posId}-farther-superlative`, [
+            { dialect: "uk", spelling: "farthest", phonetic: "ˈfɑːðɪst" },
+            { dialect: "us", spelling: "farthest", phonetic: "ˈfɑːrðɪst" }
+          ])
+        }
+      ]),
+      group(
+        `${posId}-further`,
+        [
+          {
+            id: `${posId}-further-comparative`,
+            form_type: "comparative",
+            variants: variants(`${posId}-further-comparative`, [
+              { dialect: "uk", spelling: "further", phonetic: "ˈfɜːðə" },
+              { dialect: "us", spelling: "further", phonetic: "ˈfɜːrðər" }
+            ])
+          },
+          {
+            id: `${posId}-further-superlative`,
+            form_type: "superlative",
+            variants: variants(`${posId}-further-superlative`, [
+              { dialect: "uk", spelling: "furthest", phonetic: "ˈfɜːðɪst" },
+              { dialect: "us", spelling: "furthest", phonetic: "ˈfɜːrðɪst" }
+            ])
+          }
+        ],
+        false
+      )
+    ]
+  });
+
+  return {
+    pos: [
+      base("adjective", "suggested-pos-adjective"),
+      base("adverb", "suggested-pos-adverb")
+    ]
+  };
+}
+
+function genericForms(headword: string): DraftFormsStepContent {
+  return {
+    pos: [
+      {
+        pos_id: "suggested-pos-noun",
+        pos: "noun",
+        dialect_rules: {
+          spelling_mode: "unified",
+          phonetic_mode: "unified"
+        },
+        base_form: {
+          id: "suggested-base-noun",
+          form_type: "base",
+          variants: variants("suggested-base-noun", [
+            { dialect: "common", spelling: headword, phonetic: "mock" }
+          ])
+        },
+        form_groups: [group("suggested-group-noun", [])]
+      }
+    ]
+  };
+}
+
+function matchedResponse(
+  input: DetectWordInputV2,
+  detectionId: string,
+  expiresAt: string,
+  normalized: string,
+  headwords: WordHeadwordsV2,
+  suggestedForms: DraftFormsStepContent,
+  options: {
+    entryKind?: "word" | "phrase";
+    smart?: DetectWordResponseV2["smart_dictionary"];
+    matchedDialect?: "uk" | "us" | "common";
+  } = {}
+): DetectWordResponseV2 {
+  return {
+    detection_id: detectionId,
+    expires_at: expiresAt,
+    request: input,
+    normalized_headword: normalized,
+    entry_kind: options.entryKind ?? "word",
+    matched_dialect: options.matchedDialect ?? "common",
+    builtin_dictionary: {
+      status: "matched",
+      headwords,
+      suggested_forms: suggestedForms
+    },
+    smart_dictionary: options.smart ?? { status: "clear", duplicates: [] }
+  };
+}
+
+/** Contract-shaped detection fixtures consumed only by the mock data source. */
+export function createDetectionFixture(
+  input: DetectWordInputV2,
+  detectionId: string,
+  nowMs: number
+): DetectWordResponseV2 {
+  const normalized = input.headword.trim().toLocaleLowerCase("en");
+  const expiresAt = new Date(
+    normalized === "expired" ? nowMs - 1 : nowMs + 5 * 60_000
+  ).toISOString();
+  const base = {
+    detection_id: detectionId,
+    expires_at: expiresAt,
+    request: input,
+    normalized_headword: normalized,
+    entry_kind: "word" as const,
+    smart_dictionary: { status: "clear" as const, duplicates: [] as [] }
+  };
+
+  if (normalized === "not-found") {
+    return { ...base, builtin_dictionary: { status: "not_found" } };
+  }
+  if (normalized === "builtin-unavailable") {
+    return {
+      ...base,
+      builtin_dictionary: { status: "unavailable", retry_after_seconds: 3 }
+    };
+  }
+
+  if (normalized === "center") {
+    return matchedResponse(
+      input,
+      detectionId,
+      expiresAt,
+      normalized,
+      { mode: "distinguish", uk: "centre", us: "center", source_dialect: "us" },
+      centerForms(),
+      { matchedDialect: "us" }
+    );
+  }
+  if (normalized === "far") {
+    return matchedResponse(
+      input,
+      detectionId,
+      expiresAt,
+      normalized,
+      { mode: "unified", common: "far" },
+      farForms()
+    );
+  }
+  if (normalized === "in front of") {
+    return matchedResponse(
+      input,
+      detectionId,
+      expiresAt,
+      normalized,
+      { mode: "unified", common: normalized },
+      genericForms(normalized),
+      { entryKind: "phrase" }
+    );
+  }
+  if (normalized === "color" || normalized === "colour") {
+    return matchedResponse(
+      input,
+      detectionId,
+      expiresAt,
+      normalized,
+      {
+        mode: "distinguish",
+        uk: "colour",
+        us: "color",
+        source_dialect: normalized === "color" ? "us" : "uk"
+      },
+      genericForms(normalized),
+      {
+        matchedDialect: normalized === "color" ? "us" : "uk",
+        smart: {
+          status: "duplicate",
+          duplicates: [
+            { word_id: "fixture-colour", headword: "colour", dialect: "uk" },
+            { word_id: "fixture-color", headword: "color", dialect: "us" }
+          ]
+        }
+      }
+    );
+  }
+  if (normalized === "smart-unavailable") {
+    return matchedResponse(
+      input,
+      detectionId,
+      expiresAt,
+      normalized,
+      { mode: "unified", common: normalized },
+      genericForms(normalized),
+      { smart: { status: "unavailable", duplicates: [] } }
+    );
+  }
+
+  return matchedResponse(
+    input,
+    detectionId,
+    expiresAt,
+    normalized,
+    { mode: "unified", common: normalized },
+    genericForms(normalized)
+  );
+}
+
+function emptyEnglishText(headwords: WordHeadwordsV2): EnglishTextV2 {
+  if (headwords.mode === "unified") {
+    return {
+      mode: "unified",
+      common: { value: richText(""), origin: "manual" }
+    };
+  }
+  const source = {
+    state: "ready" as const,
+    variant: { value: richText(""), origin: "manual" as const }
+  };
+  return {
+    mode: "distinguish",
+    source_dialect: headwords.source_dialect,
+    uk: headwords.source_dialect === "uk" ? source : { state: "missing" },
+    us: headwords.source_dialect === "us" ? source : { state: "missing" }
+  };
+}
+
+function createInitialPosMeanings(
+  formsPos: WordPosFormsV2,
+  headwords: WordHeadwordsV2,
+  wordId: string,
+  nodeKey: string,
+  count: number,
+  large: boolean
+): WordPosMeaningsV2 {
+  const grammarId = `mock-grammar-${nodeKey}`;
+  const grammarDialects =
+    headwords.mode === "unified"
+      ? (["common"] as const)
+      : (["uk", "us"] as const);
+  return {
+    pos_id: formsPos.pos_id,
+    grammar_structures: [
+      {
+        id: grammarId,
+        variants: grammarDialects.map((dialect) => ({
+          id: `${grammarId}-${dialect}`,
+          dialect,
+          content: richText(large ? "the large fixture" : "")
+        }))
+      }
+    ],
+    senses: Array.from({ length: count }, (_, index) => {
+      const senseId = `mock-sense-${nodeKey}-${index + 1}`;
+      return {
+        id: senseId,
+        sub_pos: large
+          ? formsPos.pos === "verb"
+            ? ("V-T" as const)
+            : ("N-COUNT" as const)
+          : ("" as const),
+        level: "A1" as const,
+        frequency: large ? "1" : undefined,
+        depends_on_context: false,
+        definitions: [
+          {
+            id: `${senseId}-definition`,
+            level: "A1" as const,
+            definition_mode: "zh_definition" as const,
+            content: richText(large ? `大数据词义 ${index + 1}` : "")
+          }
+        ],
+        sentences: [
+          {
+            id: `${senseId}-sentence`,
+            level: "A1" as const,
+            en_text: large
+              ? headwords.mode === "unified"
+                ? {
+                    mode: "unified" as const,
+                    common: {
+                      value: richText(`Large fixture example ${index + 1}.`),
+                      origin: "manual" as const
+                    }
+                  }
+                : emptyEnglishText(headwords)
+              : emptyEnglishText(headwords),
+            zh_text: richText(large ? `大数据例句 ${index + 1}` : ""),
+            links: [
+              { word_id: wordId, sense_id: senseId, role: "focus" as const }
+            ]
+          }
+        ],
+        relations: []
+      };
+    })
+  };
+}
+
+/**
+ * Initialize meanings for a POS added after word creation. The POS id is the
+ * stable namespace, so its generated descendants cannot reuse positional ids
+ * already present on the word.
+ */
+export function createInitialMeaningsForAddedPos(
+  formsPos: WordPosFormsV2,
+  headwords: WordHeadwordsV2,
+  wordId: string
+): WordPosMeaningsV2 {
+  return createInitialPosMeanings(
+    formsPos,
+    headwords,
+    wordId,
+    `pos-${encodeURIComponent(formsPos.pos_id)}`,
+    1,
+    false
+  );
+}
+
+export function createInitialMeanings(
+  forms: DraftFormsStepContent,
+  headwords: WordHeadwordsV2,
+  wordId: string,
+  large = false
+): DraftMeaningsStepContent {
+  const count = large ? 38 : 1;
+  const pos = forms.pos.map((formsPos, posIndex) =>
+    createInitialPosMeanings(
+      formsPos,
+      headwords,
+      wordId,
+      String(posIndex + 1),
+      posIndex === 0 ? count : 1,
+      large
+    )
+  );
+  return { sense_groups: [], pos };
+}
+
+function createLegacyFixture(
+  id: string,
+  headword: string,
+  gloss: string,
+  dialect: "uk" | "us",
+  createdAt: string
+): AdminWord {
+  const senseId = `${id}-sense`;
+  return {
+    schema_version: 1,
+    id,
+    kind: "word",
+    headword,
+    frequency: "20.000000",
+    dialect_mode: "distinguish",
+    dialects: [dialect],
+    status: "published",
+    created_by: "fixture-admin",
+    created_at: createdAt,
+    updated_at: createdAt,
+    sense_groups: [],
+    pos: [
+      {
+        id: `${id}-noun`,
+        pos: "noun",
+        forms: [
+          {
+            id: `${id}-base`,
+            dialect,
+            form_type: "base",
+            spelling: headword,
+            pronunciations: [
+              {
+                id: `${id}-pron`,
+                dict_phonetic: "mock",
+                actual_pron: "mock",
+                style: "normal"
+              }
+            ]
+          }
+        ],
+        grammar_structures: [],
+        senses: [
+          {
+            id: senseId,
+            sub_pos: "N-COUNT",
+            level: "A1",
+            frequency: "20",
+            depends_on_context: false,
+            definitions: [
+              {
+                id: `${senseId}-definition`,
+                level: "A1",
+                def_type: "zh",
+                text: richText(gloss)
+              }
+            ],
+            sentences: [],
+            relations: []
+          }
+        ]
+      }
+    ]
+  };
+}
+
+export function createSeedLegacyWords(nowIso: string): AdminWord[] {
+  return [
+    createLegacyFixture("fixture-colour", "colour", "颜色", "uk", nowIso),
+    createLegacyFixture("fixture-color", "color", "颜色", "us", nowIso)
+  ];
+}

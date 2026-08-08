@@ -1,5 +1,5 @@
-// 「创建单词 / 创建短语」弹窗:按对接文档 §2,创建只填 headword →
-// POST /admin/words 得到草稿壳 → 跳编辑页补内容。其余字段都在编辑页里编。
+// Legacy V1「创建单词 / 创建短语」弹窗：短语始终沿用；单词仅在 V2
+// feature flag 关闭回滚入口时使用。创建后仍进入旧编辑器补齐整棵内容树。
 import { App, Form, Input, Modal } from "antd";
 import { useNavigate } from "react-router-dom";
 import type { AdminWordKind } from "@tsz/types";

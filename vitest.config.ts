@@ -51,10 +51,12 @@ export default defineConfig({
         "apps/web/src/features/placement/lib/client.ts",
         // 智能词库已接真实接口:纯逻辑层(mapping/listQuery/labels/editorConstants)
         // 纳入 90% 门槛;下面两类仍排除——
-        // ① .tsx 表单/表格装配与交互组件:由 WordEditor/pages 冒烟测试保底,
+        // ① legacy .tsx 表单/表格装配与交互组件:由 WordEditor/pages 冒烟测试保底,
         //    TODO(智能词库): 补组件级交互测试(保存冲突 409、发布 422 详情、关联词选择)后移除;
+        //    新版 word-creation 向导包含大量业务分支且已有组件测试，必须纳入 90% 门槛。
         // ② api.ts 是 React Query 薄装配(useQuery/useMutation 包 api.words.*),无业务分支。
-        "apps/admin/src/features/dictionary/**/*.tsx",
+        "apps/admin/src/features/dictionary/*.tsx",
+        "apps/admin/src/features/dictionary/word-editor/**/*.tsx",
         "apps/admin/src/features/dictionary/api.ts",
         // 首页看板图表：recharts 组装壳，无业务分支且 jsdom 量不到布局（宽高恒 0），
         // 单测价值低，由 pages 冒烟测试保底渲染不抛错。

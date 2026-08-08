@@ -63,7 +63,23 @@ export const router = createBrowserRouter([
             })
           },
           {
-            // 词条编辑页:创建(POST 得到草稿壳)与编辑存量词条都进这里,按 wordId 加载整棵树。
+            // V2 单词创建第 1 步：检测通过前不产生草稿资源。
+            path: "words/new",
+            lazy: async () => ({
+              Component: (await import("@/pages/WordCreate")).WordCreatePage
+            })
+          },
+          {
+            // V2 草稿/已发布词条共用向导壳。具体 step 的可达性、草稿恢复与
+            // published 只读归一化由 WordCreationWizard 根据详情响应处理。
+            path: "words/:wordId/wizard/:step",
+            lazy: async () => ({
+              Component: (await import("@/pages/WordWizard")).WordWizardPage
+            })
+          },
+          {
+            // legacy V1 词条编辑页。V2 ID 误入时由 WordEditor 判别并重定向向导，
+            // 不允许把 V2 数据装进旧 Form 后整树覆盖保存。
             path: "words/:wordId/edit",
             lazy: async () => ({
               Component: (await import("@/pages/WordEdit")).WordEditPage

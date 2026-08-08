@@ -10,8 +10,13 @@ import {
   Tag
 } from "antd";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
-import type { AdminWord, Dialect, DialectMode } from "@tsz/types";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
+import {
+  isAdminWordV2,
+  type AdminWord,
+  type Dialect,
+  type DialectMode
+} from "@tsz/types";
 import { HttpError, isIncompleteHttpError } from "@tsz/api-client/http";
 import { usePublishWord, useSaveWordContent, useWordDetail } from "./api";
 import { DetailsList } from "./DetailsList";
@@ -22,6 +27,7 @@ import { fromWire, toWire, type EditorFormValues } from "./word-editor/mapping";
 import { PosTabsSection } from "./word-editor/PosTabsSection";
 import { SectionTitle } from "./word-editor/SectionTitle";
 import { SenseRangesSection } from "./word-editor/SenseRangesSection";
+import { getWordRowRoute } from "./wordRouting";
 
 /** 非表单的词条元信息:headword/kind 创建后不可改;updatedAt 是乐观锁基准。 */
 interface WordMeta {
@@ -73,7 +79,9 @@ export function WordEditor() {
   // 避免保存后的缓存失效重取把用户刚开始的下一轮编辑清掉。
   useEffect(() => {
     const word = detail.data?.word;
-    if (word && word.updated_at !== meta?.updatedAt) syncFromWord(word);
+    if (word && !isAdminWordV2(word) && word.updated_at !== meta?.updatedAt) {
+      syncFromWord(word);
+    }
   }, [detail.data, meta?.updatedAt, syncFromWord]);
 
   const handleSaveError = (err: unknown) => {
@@ -161,6 +169,11 @@ export function WordEditor() {
         <Spin size="large" />
       </Flex>
     );
+  }
+
+  const loadedWord = detail.data?.word;
+  if (loadedWord && isAdminWordV2(loadedWord)) {
+    return <Navigate to={getWordRowRoute(loadedWord)} replace />;
   }
 
   if (detail.isError || !meta) {

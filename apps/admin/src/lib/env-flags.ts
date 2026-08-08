@@ -1,0 +1,31 @@
+/**
+ * Vite 环境变量均以字符串注入。显式布尔开关只接受 true / false，
+ * 避免诸如 "0"、"TRUE" 被 JavaScript 真值规则意外开启。
+ */
+export function parseBooleanEnvFlag(
+  value: string | boolean | undefined,
+  name: string,
+  defaultValue = false
+): boolean {
+  if (value === undefined || value === "") return defaultValue;
+  if (value === false || value === "false") {
+    return false;
+  }
+  if (value === true || value === "true") return true;
+
+  throw new Error(
+    `[env] ${name} 只能是 "true" 或 "false"，当前值为 ${JSON.stringify(value)}`
+  );
+}
+
+/** mock 数据源绝不能进入生产产物。运行时与 Vite 构建共用这条策略。 */
+export function assertAdminWordsMockAllowed(
+  enabled: boolean,
+  production: boolean
+): void {
+  if (enabled && production) {
+    throw new Error(
+      "[env] 生产环境禁止启用 VITE_ADMIN_WORDS_MOCK；请移除该变量或设为 false"
+    );
+  }
+}

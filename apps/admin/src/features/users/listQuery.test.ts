@@ -24,19 +24,19 @@ describe("toUserListQuery", () => {
     ).toBe("student");
   });
 
-  it("q 由昵称/手机/邮箱拼接、trim、跳过空", () => {
+  it("q trim 后透传", () => {
     const q = toUserListQuery({
-      filters: { nickname: " alice ", phone: "", email: "a@b.com" },
+      filters: { q: " alice " },
       role: "all",
       page: 1,
       pageSize: 10
     });
-    expect(q.q).toBe("alice a@b.com");
+    expect(q.q).toBe("alice");
   });
 
   it("全为空白的 filters 不带 q", () => {
     const q = toUserListQuery({
-      filters: { nickname: "  " },
+      filters: { q: "  " },
       role: "all",
       page: 1,
       pageSize: 10
@@ -64,7 +64,7 @@ describe("toUserListQuery", () => {
 
   it("无 registeredDate 时不带时间参数", () => {
     const q = toUserListQuery({
-      filters: { nickname: "alice" },
+      filters: { q: "alice" },
       role: "all",
       page: 1,
       pageSize: 10

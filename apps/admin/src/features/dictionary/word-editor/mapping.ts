@@ -27,19 +27,11 @@ import type {
   WordSubPos
 } from "@tsz/types";
 import { RELATION_GROUPS, type RelationGroupKey } from "../editorConstants";
+import { newWordNodeId, toWordRichText } from "../word-model/primitives";
 
 // crypto.randomUUID 只在安全上下文(HTTPS/localhost)存在,tshb-test 是裸 IP HTTP,
 // 必须用 getRandomValues(不受安全上下文限制)手拼 UUID v4 兜底,否则编辑页整页崩。
-export const newId = (): string => {
-  if (typeof crypto.randomUUID === "function") return crypto.randomUUID();
-  const bytes = crypto.getRandomValues(new Uint8Array(16));
-  bytes[6] = (bytes[6]! & 0x0f) | 0x40;
-  bytes[8] = (bytes[8]! & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(
-    ""
-  );
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-};
+export const newId = newWordNodeId;
 
 // —— 表单模型 ————————————————————————————————————————————————————————————————
 
@@ -195,8 +187,7 @@ export function defaultPos(
 
 /** 文本未改 → 原样保留标记;改了 → 标记清空(偏移量已失效,带回会 400)。 */
 export function toRichText(text: string, original?: RichText): RichText {
-  if (original && original.text === text) return original;
-  return { version: 1, text, spans: [], liaisons: [] };
+  return toWordRichText(text, original);
 }
 
 // —— 词频:wire 百分数字符串("0.500000") ↔ 表单 number ————————————————————————

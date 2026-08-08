@@ -26,6 +26,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { AdminWordKind, AdminWordListItem, CefrLevel } from "@tsz/types";
 import { isIncompleteHttpError } from "@tsz/api-client/http";
+import { env } from "@/lib/env";
 import {
   useBatchDeleteWords,
   useDeleteWord,
@@ -46,6 +47,7 @@ import {
   STATUS_OPTIONS
 } from "./labels";
 import { toListQuery, type WordFilterValues } from "./listQuery";
+import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 
 const { RangePicker } = DatePicker;
 
@@ -209,35 +211,40 @@ export function SmartDictionary() {
     {
       title: "操作",
       key: "action",
-      width: 160,
+      width: 180,
       fixed: "right",
-      render: (_: unknown, record: AdminWordListItem) => (
-        <Space size={4}>
-          <Button
-            type="link"
-            size="small"
-            onClick={() => navigate(`/words/${record.id}/edit`)}
-          >
-            编辑
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            disabled={record.status === "published"}
-            onClick={() => publish(record)}
-          >
-            发布
-          </Button>
-          <Button
-            type="link"
-            size="small"
-            danger
-            onClick={() => removeOne(record)}
-          >
-            删除
-          </Button>
-        </Space>
-      )
+      render: (_: unknown, record: AdminWordListItem) => {
+        const isV2 = record.schema_version === 2;
+        return (
+          <Space size={4}>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => navigate(getWordRowRoute(record))}
+            >
+              {getWordRowActionLabel(record)}
+            </Button>
+            {!isV2 && (
+              <Button
+                type="link"
+                size="small"
+                disabled={record.status === "published"}
+                onClick={() => publish(record)}
+              >
+                发布
+              </Button>
+            )}
+            <Button
+              type="link"
+              size="small"
+              danger
+              onClick={() => removeOne(record)}
+            >
+              删除
+            </Button>
+          </Space>
+        );
+      }
     }
   ];
 
@@ -337,7 +344,13 @@ export function SmartDictionary() {
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => setCreateKind("word")}
+              onClick={() => {
+                if (env.WORD_CREATION_WIZARD) {
+                  navigate("/words/new");
+                  return;
+                }
+                setCreateKind("word");
+              }}
             >
               创建单词
             </Button>

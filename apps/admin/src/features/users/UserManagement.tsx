@@ -1,6 +1,6 @@
-// 用户管理（C 端用户，师生合一）：角色 tab + 搜索行 + 表格 + 详情 + 行操作。全对接真实
-// api.users.*。读任意 admin 可见；写（编辑/启禁用）后端限 super_admin，故非超管时置灰。
-// 等级/天生币余额两列后端暂不填充（恒显示「-」）；删除用户后端本轮未做，故按钮为占位置灰。
+// 用户管理（C 端用户，师生合一）：角色 tab + 搜索行 + 表格 + 详情。列表查询对接真实
+// api.users.list；编辑/启禁用/删除的后端接口尚未实现，操作按钮统一占位置灰。
+// 等级/天生币余额两列后端暂不填充（恒显示「-」）。
 // 天生币/等级/方言管理是独立模块，本次仅占位（点击提示「功能待接入」）。
 import {
   Alert,
@@ -23,15 +23,8 @@ import { useState } from "react";
 import type { AdminUserView, Role } from "@tsz/types";
 import { CopyableText } from "@/components/CopyableText";
 import { GatedButton } from "@/components/GatedButton";
-import { useIsSuperAdmin } from "@/lib/auth";
-import { useSetUserStatus, useUserList } from "./api";
-import { EditUserModal } from "./EditUserModal";
-import {
-  ROLE_LABEL,
-  ROLE_TAG_COLOR,
-  levelColor,
-  userActionError
-} from "./labels";
+import { useUserList } from "./api";
+import { ROLE_LABEL, ROLE_TAG_COLOR, levelColor } from "./labels";
 import type { UserFilterValues, UserRoleTab } from "./listQuery";
 import { UserDetailDrawer } from "./UserDetailDrawer";
 import { UserFilters } from "./UserFilters";
@@ -44,18 +37,14 @@ const ROLE_TABS = [
 
 export function UserManagement() {
   const { message } = App.useApp();
-  // 写操作后端限 super_admin：非超管时把编辑/启禁用置灰，避免点了才吃 403。
-  const isSuperAdmin = useIsSuperAdmin();
 
   const [filters, setFilters] = useState<UserFilterValues>({});
   const [role, setRole] = useState<UserRoleTab>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [detailUser, setDetailUser] = useState<AdminUserView | null>(null);
-  const [editUser, setEditUser] = useState<AdminUserView | null>(null);
 
   const listQuery = useUserList({ filters, role, page, pageSize });
-  const setStatus = useSetUserStatus();
 
   const rows = listQuery.data?.items ?? [];
   const total = listQuery.data?.page.total ?? 0;
@@ -74,14 +63,6 @@ export function UserManagement() {
   // TODO(backend): 见 backend-todos.md #6。
   const notReady = (label: string) =>
     message.info(`${label}功能待接入，接口开发中`);
-
-  const toggleStatus = (record: AdminUserView) => {
-    const next = record.status === "active" ? "disabled" : "active";
-    setStatus
-      .mutateAsync({ id: record.id, status: next })
-      .then(() => message.success(next === "disabled" ? "已禁用" : "已启用"))
-      .catch((err: unknown) => message.error(userActionError(err, "操作失败")));
-  };
 
   const columns: TableColumnsType<AdminUserView> = [
     {
@@ -200,18 +181,16 @@ export function UserManagement() {
           <GatedButton
             type="link"
             size="small"
-            reason="需超级管理员"
-            disabled={!isSuperAdmin}
-            onClick={() => setEditUser(record)}
+            reason="编辑接口待后端实现"
+            disabled
           >
             编辑
           </GatedButton>
           <GatedButton
             type="link"
             size="small"
-            reason="需超级管理员"
-            disabled={!isSuperAdmin}
-            onClick={() => toggleStatus(record)}
+            reason="启禁用接口待后端实现"
+            disabled
           >
             {record.status === "active" ? "禁用" : "启用"}
           </GatedButton>
@@ -282,7 +261,6 @@ export function UserManagement() {
       </Card>
 
       <UserDetailDrawer user={detailUser} onClose={() => setDetailUser(null)} />
-      <EditUserModal user={editUser} onClose={() => setEditUser(null)} />
     </Flex>
   );
 }

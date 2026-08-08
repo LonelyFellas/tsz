@@ -1,4 +1,10 @@
-// 智能词库(管理后台词条创编)wire 类型 —— 1:1 镜像后端 Go JSON(snake_case)。
+import type {
+  AdminWordV2,
+  AdminWordV2Envelope,
+  WordCreationStep
+} from "./admin-word-v2";
+
+// 智能词库 V1 legacy wire 类型 —— 1:1 镜像后端 Go JSON(snake_case)。
 // 权威来源:tsz-go/docs/openapi.yaml tag `Admin (words)`;叙述性说明见
 // docs/admin-wordlist-frontend-integration.md。与 web 词表的旧 Word(./word.ts)无关。
 //
@@ -199,6 +205,8 @@ export interface WordPos {
 
 /** 词条整棵树(GET/保存/发布响应里的 word)。 */
 export interface AdminWord {
+  /** legacy 响应可缺省；存在时恒为 1。 */
+  schema_version?: 1;
   id: string;
   kind: AdminWordKind;
   headword: string;
@@ -240,6 +248,16 @@ export interface AdminWordEnvelope {
   word: AdminWord;
 }
 
+/** 同一路径 GET /admin/words/{id} 的 V1/V2 判别联合。 */
+export type AdminWordAnyEnvelope = { word: AdminWord } | AdminWordV2Envelope;
+
+/** schema_version 缺省或为 1 时视为 legacy；只有 2 才是 V2。 */
+export function isAdminWordV2(
+  word: AdminWord | AdminWordV2
+): word is AdminWordV2 {
+  return word.schema_version === 2;
+}
+
 /** GET /admin/words 查询参数(全部可选,对应列表页搜索行)。 */
 export interface AdminWordListQuery {
   page?: number;
@@ -261,6 +279,8 @@ export interface AdminWordListQuery {
 
 /** 列表行(读取时派生:gloss 取第一个词性第一个词义的第一条释义)。 */
 export interface AdminWordListItem {
+  /** legacy 行可缺省；V2 行恒为 2。 */
+  schema_version?: 1 | 2;
   id: string;
   headword: string;
   kind: AdminWordKind;
@@ -269,6 +289,8 @@ export interface AdminWordListItem {
   /** 聚合所有词义等级,升序 */
   levels: CefrLevel[];
   status: AdminWordStatus;
+  /** V2 草稿恢复向导所需；legacy 行缺省。 */
+  max_reachable_step?: WordCreationStep;
   created_by_name: string;
   created_at: string;
   updated_at: string;
