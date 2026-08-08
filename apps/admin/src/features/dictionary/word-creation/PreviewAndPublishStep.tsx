@@ -28,7 +28,6 @@ import type {
   WordDefinitionV2
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client/http";
-import dayjs from "dayjs";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DIALECT_LABEL, POS_TAG_ZH } from "../editorConstants";
@@ -40,6 +39,22 @@ import { wordDisplayHeadword } from "./model";
 interface Props {
   word: AdminWordV2;
   onPublished: (word: AdminWordV2) => void;
+}
+
+function formatPublishedAt(value: string | undefined): string {
+  if (!value) return "—";
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Shanghai",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(new Date(value));
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
 }
 
 function englishPreview(value: EnglishTextV2): string[] {
@@ -412,7 +427,7 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
           showIcon
           icon={<CheckCircleFilled />}
           title="词条已发布"
-          description={`发布于 ${word.published_at ? dayjs(word.published_at).format("YYYY-MM-DD HH:mm") : "—"}`}
+          description={`发布于 ${formatPublishedAt(word.published_at)}`}
           style={{ marginBottom: 18 }}
         />
       ) : validationError ? (

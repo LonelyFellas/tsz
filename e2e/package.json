@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "test:e2e": "playwright test",
+    "test:e2e": "pnpm test:e2e:web && pnpm test:e2e:admin",
+    "test:e2e:web": "playwright test --config=playwright.config.ts",
     "test:e2e:admin": "playwright test --config=playwright.admin.config.ts"
   },
   "devDependencies": {

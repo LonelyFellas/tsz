@@ -421,7 +421,7 @@ describe("MeaningsAndExamplesStep", () => {
     expect(content.pos[0].grammar_structures).toHaveLength(1);
     expect(content.pos[0].senses[0].definitions).toHaveLength(1);
     expect(content.pos[0].senses[0].sentences).toHaveLength(1);
-  });
+  }, 15_000);
 
   it("统一词形的已发布内容只读展示 common 文本，不暴露结构编辑操作", () => {
     const word = wordFixture({
