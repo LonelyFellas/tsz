@@ -6,6 +6,7 @@ import {
   ProfileOutlined,
   ReadOutlined,
   ScheduleOutlined,
+  SettingOutlined,
   TeamOutlined,
   UserOutlined
 } from "@ant-design/icons";
@@ -133,6 +134,18 @@ const GROUPS: Group[] = [
         label: "评论审核",
         perm: "comments.access",
         disabled: true
+      }
+    ]
+  },
+  {
+    key: "grp-settings",
+    icon: <SettingOutlined />,
+    label: "系统设置",
+    leaves: [
+      {
+        key: "/settings/parts-of-speech",
+        label: "词性配置",
+        superOnly: true
       }
     ]
   },

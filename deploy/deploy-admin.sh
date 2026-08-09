@@ -6,7 +6,10 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "==> build @tsz/admin"
-pnpm --filter @tsz/admin build
+# tshb-test 专用于验收尚未接入真实后端的 dictionary mock。显式 test mode 是
+# 唯一允许 mock 进入优化构建的通道；默认 production mode 仍由 Vite 配置 fail closed。
+VITE_WORD_CREATION_WIZARD=true VITE_ADMIN_WORDS_MOCK=true \
+  pnpm --filter @tsz/admin build --mode test
 
 echo "==> rsync dist -> tshb-test:/opt/tsz-admin/dist"
 # --delete 仅限 dist 目录：产物文件名带内容 hash，清掉旧版本避免无限堆积。
@@ -17,9 +20,9 @@ rsync -az deploy/nginx/tshb-test.conf tshb-test:/etc/nginx/conf.d/tsz.conf
 ssh tshb-test 'nginx -t && systemctl reload nginx'
 
 echo "==> smoke"
-curl -sS -m 8 -o /dev/null -w "GET  /        -> %{http_code}\n" http://47.121.142.19/
-curl -sS -m 8 -o /dev/null -w "GET  /login   -> %{http_code}\n" http://47.121.142.19/login
-code=$(curl -sS -m 8 -o /dev/null -w "%{http_code}" http://47.121.142.19/api/v1/admin/profile)
+ssh tshb-test 'curl -fsS -m 8 -o /dev/null -w "GET  /        -> %{http_code}\n" http://127.0.0.1:8081/'
+ssh tshb-test 'curl -fsS -m 8 -o /dev/null -w "GET  /login   -> %{http_code}\n" http://127.0.0.1:8081/login'
+code=$(ssh tshb-test 'curl -sS -m 8 -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/api/v1/admin/profile')
 echo "GET  /api/v1/admin/profile -> ${code} (无 token，预期 401)"
 [ "$code" = "401" ] || { echo "!! API 反代异常"; exit 1; }
 echo "✓ done"

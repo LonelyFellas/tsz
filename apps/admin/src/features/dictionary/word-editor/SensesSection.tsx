@@ -2,11 +2,20 @@ import { Form, Tabs } from "antd";
 import { defaultSense } from "./mapping";
 import { SectionTitle } from "./SectionTitle";
 import { SenseFields } from "./SenseFields";
+import type { PartOfSpeechLookup } from "../part-of-speech/catalog";
 
 // —— 多维词义：以可增删的 Tabs 展示多个「词义」，每个词义有独立的等级/词性/释义/例句。——
 // Tabs 的 key 用 Form.List 的稳定 field.key（而非位置 name），删除中间项时不会错位；
 // onEdit 删除再由 key 反查 name 交给 remove。
-export function SensesSection({ posName }: { posName: number }) {
+export function SensesSection({
+  posName,
+  partOfSpeechLookup,
+  catalogUnavailable
+}: {
+  posName: number;
+  partOfSpeechLookup: PartOfSpeechLookup;
+  catalogUnavailable: boolean;
+}) {
   const form = Form.useFormInstance();
   return (
     <>
@@ -28,7 +37,14 @@ export function SensesSection({ posName }: { posName: number }) {
               key: String(sense.key),
               label: `词义 ${idx + 1}`,
               closable: senses.length > 1,
-              children: <SenseFields posName={posName} senseName={sense.name} />
+              children: (
+                <SenseFields
+                  posName={posName}
+                  senseName={sense.name}
+                  partOfSpeechLookup={partOfSpeechLookup}
+                  catalogUnavailable={catalogUnavailable}
+                />
+              )
             }))}
           />
         )}

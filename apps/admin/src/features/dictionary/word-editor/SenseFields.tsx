@@ -11,11 +11,12 @@ import {
   Tooltip
 } from "antd";
 import { useMemo } from "react";
+import type { WordPosTag } from "@tsz/types";
+import { SENSE_LEVEL_OPTIONS, toOptions } from "../editorConstants";
 import {
-  SENSE_LEVEL_OPTIONS,
-  SUB_POS_OPTIONS,
-  toOptions
-} from "../editorConstants";
+  subPartOfSpeechOptions,
+  type PartOfSpeechLookup
+} from "../part-of-speech/catalog";
 import { DefinitionList } from "./DefinitionList";
 import { ExampleList } from "./ExampleList";
 import type { SenseRangeRow } from "./mapping";
@@ -25,10 +26,14 @@ import { RelationList } from "./RelationList";
 // posName/senseName 为该词义在嵌套 Form.List 中的字段名，用于拼子字段路径。
 export function SenseFields({
   posName,
-  senseName
+  senseName,
+  partOfSpeechLookup,
+  catalogUnavailable
 }: {
   posName: number;
   senseName: number;
+  partOfSpeechLookup: PartOfSpeechLookup;
+  catalogUnavailable: boolean;
 }) {
   // 语义区间下拉:引用词条级 sense_groups(存 id,显示名称)。空名占位行不进选项。
   // ⚠️ preserve 必须开:行内的 id 没有对应 Form.Item(隐藏簿记),默认 useWatch 只回
@@ -37,6 +42,11 @@ export function SenseFields({
     "senseRanges",
     { preserve: true }
   );
+  const posCode = Form.useWatch<WordPosTag | undefined>([
+    "posList",
+    posName,
+    "pos"
+  ]);
   // memo:每个词义都渲染一份该下拉,别让无关字段的输入反复重建选项数组。
   const rangeOptions = useMemo(
     () =>
@@ -44,6 +54,10 @@ export function SenseFields({
         .filter((g): g is SenseRangeRow => Boolean(g && g.name?.trim()))
         .map((g) => ({ value: g.id, label: g.name })),
     [senseRanges]
+  );
+  const subPosOptions = useMemo(
+    () => (posCode ? subPartOfSpeechOptions(partOfSpeechLookup, posCode) : []),
+    [partOfSpeechLookup, posCode]
   );
 
   return (
@@ -66,7 +80,11 @@ export function SenseFields({
             label="细分词性"
             rules={[{ required: true, message: "请选择细分词性" }]}
           >
-            <Select options={SUB_POS_OPTIONS} placeholder="请选择细分词性" />
+            <Select
+              options={subPosOptions}
+              placeholder="请选择细分词性"
+              disabled={catalogUnavailable || !posCode}
+            />
           </Form.Item>
         </Col>
         <Col xs={24} sm={12} xxl={8}>

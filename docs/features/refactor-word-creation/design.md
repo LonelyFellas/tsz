@@ -6,6 +6,8 @@
 
 TanStack Query 保存服务端/mock 事实，Ant Design Form 只保存当前步骤尚未提交的编辑态。真实数据源通过 `@tsz/api-client`，开发与测试 mock 实现与 `api.words` 相同的方法签名，并且同时覆盖列表、统计、草稿详情和发布结果，保证创建闭环不是“只弹成功消息”。
 
+基本词性与细分词性改为数据驱动目录：新增“系统设置 → 词性配置”管理页，所有词条页面通过 TanStack Query 读取同一份 catalog，用不可变编码保存引用、用可编辑中文名展示。后端尚未提供接口时，catalog 与 CRUD 由和词条 mock 共享状态的 typed mock 提供；真实接口提案同步维护在 `tsz-rust/docs/frontend-integration.md`。
+
 旧 `AdminWord` 明确定义为 legacy V1。新建、发布后的内容使用 `AdminWordV2`，列表通过 `schema_version` 选择编辑器；V2 数据绝不进入旧 `WordEditor` 的整树 `PUT`，防止新字段被覆盖丢失。
 
 ## 本轮复审后收敛的决定
@@ -20,6 +22,10 @@ TanStack Query 保存服务端/mock 事实，Ant Design Form 只保存当前步�
 8. 按原型“提交生效”理解为直接 `published`，暂不引入审核状态。
 9. V2 已发布词条首版提供只读查看；再次编辑 V2 已发布内容不在本需求内。列表不得把它送入 legacy 编辑器。
 10. 生产环境 mock fail-closed：生产构建检测到 mock 开关即失败，不允许静默伪发布。
+11. 基本/细分词性不再由 UI 静态枚举决定；词条 wire 保存不可变编码，名称与缩写从配置目录解析。
+12. 词性配置写操作首期仅超级管理员可用；普通管理员可读取 catalog 并继续创编词条。
+13. 已被单词、短语或词义引用的配置禁止删除，但允许修改中文名、英文名、缩写与排序；编码创建后不可修改。
+14. mock 预置现有 11 个基本词性和 19 个细分词性，保证存量 V1/V2 fixture 与新配置页面共享同一事实来源。
 
 ## 已核对的现状
 
@@ -175,7 +181,7 @@ type EnglishTextV2 = DialectValueV2<RichText>;
 
 适用白名单：词形拼写使用下文带 `origin` 的 `WordFormVariantV2[]`，英语定义/整句释义与英文例句使用 `EnglishTextV2`。语法结构明确排除，始终人工分别填写。关系词保存目标 `word_id + sense_id`，展示时读取目标词条对应方言主词，不转换只读快照。
 
-`distinguish` 的 `source_dialect` 对应人工录入或词典给出的源侧，该侧必须为 `ready`；目标侧在草稿中可以是显式 `missing`，发布前必须补为 `ready`。切换 BrE/AmE 视图只选择已经保存的 variant，不发网络请求。缺少目标 variant 时显示逐字段“生成英式/美式建议”按钮；点击后调用方言转换建议接口、展示差异预览，管理员确认后才写入。首版不批量生成。请求失败保留源文本和原目标值；已存在 `origin: manual` 的目标 variant 必须二次确认才能替换。Form 的 `dirty` 只属于本地状态，不写 wire。
+`distinguish` 的 `source_dialect` 对应人工录入或词典给出的源侧，该侧必须为 `ready`；目标侧在草稿中可以是显式 `missing`，发布前必须补为 `ready`。第 3 步使用页面级 BrE/AmE 选择器只展示当前 variant：目标已存在时纯本地切换；目标缺失时收集全部英文定义/整句释义和英文例句，以一次批量建议请求补齐。批量结果只允许写入请求发出时仍为 `missing` 的槽位，并标记 `origin: converted`；任何 `ready` 目标都不自动覆盖。缺失目标没有覆盖风险，因此自动补全成功后直接写入，不再逐字段弹确认框；请求失败或部分返回时保留原值并允许重试/手填。选择器属于本地 view state，切换本身不写 wire、不标记 dirty，实际补全或手工编辑才标记 dirty。
 
 语法结构不使用 `DialectValueV2`，但其 `GrammarVariantV2[]` 形状只能由 `headwords.mode` 派生：`unified` 恰好一条 `common`，`distinguish` 恰好各一条 `uk`、`us`。它不跟随 POS 的 `dialect_rules`，也不参与自动转换。
 
@@ -192,7 +198,7 @@ type EnglishTextV2 = DialectValueV2<RichText>;
 - 所有可排序节点使用 UUID v4，创建后跨保存不变。
 - 校验和影响提示用 `node_id + field` 定位，不使用 `pos[0].senses[0]` 这类会随排序漂移的路径。
 - 删除被释义引用的语法结构：先列出受影响 definition，确认后清空其 `grammar_structure_id`。
-- 删除被词义引用的语义区间：确认后清空对应 `sense_group_id`。
+- 语义区间至少保留一个；删除被词义引用的非末项区间时，确认后把对应 `sense_group_id` 改绑到第一个剩余区间。
 - 删除词义：同时删除其释义/例句；本草稿内指向该词义的 links/relations 先提示再清理。
 - 删除词性：必须先调用影响预览，确认后服务端原子删除对应 meanings，并把 meanings 从 `completed_steps` 移除。
 
@@ -455,12 +461,18 @@ interface WordSenseV2 {
   id: string;
   sub_pos: WordSubPos;
   level: CefrLevel;
-  sense_group_id?: string;
+  sense_group_id?: string; // wire 兼容历史草稿可空；向导 UI 始终补齐并要求有效引用
   frequency?: FixedPercent;
   depends_on_context: boolean;
   definitions: WordDefinitionV2[];
   sentences: WordSentenceV2[];
   relations: WordRelationV2[];
+}
+
+interface SenseGroupV2 {
+  id: string;
+  name_zh: string;
+  name_en: string;
 }
 
 interface WordPosMeaningsV2 {
@@ -470,7 +482,7 @@ interface WordPosMeaningsV2 {
 }
 
 interface DraftMeaningsStepContent {
-  sense_groups: SenseGroup[];
+  sense_groups: SenseGroupV2[];
   pos: WordPosMeaningsV2[];
 }
 
@@ -803,7 +815,7 @@ matched detection 中的 suggestion 节点 ID 由服务端在临时 detection re
 }
 ```
 
-`field_kind = form | definition | example`；grammar 不允许。响应逐 `client_id` 返回建议和来源版本。该接口只给建议，前端在目标 variant 已为 manual 时必须确认，不能自动落盘。
+`field_kind = form | definition | example`；grammar 不允许。响应逐 `client_id` 返回建议和来源版本。接口只给建议，不直接保存草稿；前端可以把建议自动写入本地 `missing` 目标，但目标已经是 `ready` 时不得把它加入批量请求或用响应覆盖。
 
 ### 3. 创建 V2 草稿词条
 
@@ -986,7 +998,7 @@ mock 状态使用内存 Map，并为硬刷新镜像到 `sessionStorage`：
 - `VITE_WORD_CREATION_WIZARD`：控制入口切换，支持回滚旧创建单词入口；
 - `VITE_ADMIN_WORDS_MOCK`：选择整套 dictionary mock data source。
 
-生产 mode 若 mock flag 为 true，Vite 配置直接失败；不能自动回真实 API，也不能带着 mock 产物继续构建。测试通过依赖注入选择 mock，不依赖进程级开关。
+production mode 若 mock flag 为 true，Vite 配置直接失败；不能自动回真实 API，也不能带着 mock 产物继续构建。`tshb-test` 的 admin 部署脚本使用显式 `test` mode 优化构建并开启 mock，作为后端接口未落地期间的验收通道；其他 build mode 即使设置 mock flag 也继续 fail closed。单元测试通过依赖注入选择 mock，不依赖进程级开关。
 
 ## 状态与请求流
 
@@ -1116,6 +1128,281 @@ mock 状态使用内存 Map，并为硬刷新镜像到 `sessionStorage`：
 - mock 开关与 feature flag 独立；关闭 mock 不改变真实 API endpoint 代码。
 - V2 是增量类型，回滚入口不把 V2 数据转换成 V1。
 
+## 本轮追加：系统设置 / 词性配置
+
+### 目标与边界
+
+词条页面当前依赖 `WordPosTag` / `WordSubPos` 静态联合与 `POS_TAG_ZH`、`SUB_POS_LABEL` 常量。该结构能保证编译期穷举，但无法满足运营侧新增、改名、排序和配置细分词性的要求。本轮把“可用词性与展示信息”迁移为目录数据，同时保留稳定编码作为词条引用键：
+
+- 配置目录决定“有哪些基本/细分词性、如何显示、按什么顺序出现”；
+- 词条内容只保存稳定编码，不保存中文名/英文名/缩写快照；
+- 基本词性编码在全目录唯一，细分词性编码也全目录唯一，创建后不可修改；
+- 修改展示字段会即时影响所有词条页面，但不会制造词条内容 revision；
+- 删除必须由数据源重新核对引用，不能只相信列表返回的 `usage_count`；
+- 词形类型 `WordFormType`、方言和发音方式不属于本配置范围，仍维持现有枚举。
+
+为兼容已存在的 V1/V2 mock 数据，默认种子的基本编码沿用小写 `noun`、`verb`、`adjective` 等；细分编码沿用 `N-COUNT`、`V-T` 等。`name_en` 是可编辑展示字段，例如编码 `noun` 的英文名可为 `NOUN`，二者不得混为同一个可变字段。
+
+### 配置 wire 类型
+
+以下类型放入 `@tsz/types`，字段继续 1:1 使用 snake_case：
+
+```ts
+type PartOfSpeechCode = string;
+type SubPartOfSpeechCode = string;
+
+interface PartOfSpeechCreator {
+  id: string;
+  display_name: string;
+}
+
+interface PartOfSpeechConfig {
+  id: string;
+  code: PartOfSpeechCode;
+  name_zh: string;
+  name_en: string;
+  abbreviation: string;
+  sort_order: number;
+  usage_count: number;
+  sub_part_count: number;
+  revision: number;
+  created_by: PartOfSpeechCreator;
+  created_at: string;
+  updated_by?: PartOfSpeechCreator;
+  updated_at: string;
+}
+
+interface SubPartOfSpeechConfig {
+  id: string;
+  part_of_speech_id: string;
+  code: SubPartOfSpeechCode;
+  name_zh: string;
+  name_en: string;
+  sort_order: number;
+  usage_count: number;
+  revision: number;
+  created_by: PartOfSpeechCreator;
+  created_at: string;
+  updated_by?: PartOfSpeechCreator;
+  updated_at: string;
+}
+
+interface PartOfSpeechCatalogItem {
+  id: string;
+  code: PartOfSpeechCode;
+  name_zh: string;
+  name_en: string;
+  abbreviation: string;
+  sort_order: number;
+  sub_parts: Array<{
+    id: string;
+    code: SubPartOfSpeechCode;
+    name_zh: string;
+    name_en: string;
+    sort_order: number;
+  }>;
+}
+
+interface PartOfSpeechCatalogResponse {
+  catalog_version: number;
+  items: PartOfSpeechCatalogItem[];
+}
+
+interface PartOfSpeechConfigListQuery {
+  q?: string;
+  page?: number;
+  page_size?: number;
+}
+
+interface PartOfSpeechConfigListResponse {
+  items: PartOfSpeechConfig[];
+  pagination: AdminPaginationMeta;
+}
+
+interface CreatePartOfSpeechInput {
+  code: PartOfSpeechCode;
+  name_zh: string;
+  name_en: string;
+  abbreviation: string;
+  sort_order: number;
+}
+
+interface UpdatePartOfSpeechInput {
+  base_revision: number;
+  name_zh: string;
+  name_en: string;
+  abbreviation: string;
+  sort_order: number;
+}
+
+interface CreateSubPartOfSpeechInput {
+  code: SubPartOfSpeechCode;
+  name_zh: string;
+  name_en: string;
+  sort_order: number;
+}
+
+interface UpdateSubPartOfSpeechInput {
+  base_revision: number;
+  name_zh: string;
+  name_en: string;
+  sort_order: number;
+}
+```
+
+`WordPosTag` 迁移为 `PartOfSpeechCode` 的兼容别名，`WordSubPos` 迁移为 `"" | SubPartOfSpeechCode` 的兼容别名。TypeScript 中它们最终是 string，但业务代码不得随意拼接；输入只能来自 catalog、检测响应或已加载的历史 wire。后端/mock 保存与发布时必须验证编码仍存在且细分词性属于当前基本词性。
+
+编码约束基线：基本词性 `^[a-z][a-z0-9_]{0,31}$`，细分词性 `^[A-Z][A-Z0-9_-]{0,31}$`。中文名、英文名长度 1–64，缩写长度 1–16，统一 trim；编码、同层中文名和同层英文名唯一，英文比较忽略大小写。具体上限可由后端评审调整，但 mock 与真实接口必须一致。
+
+### 后端接口提案
+
+`createAdminEndpoints` 使用 `/api/v1/admin` base URL，以下均为相对路径：
+
+| 方法   | 相对路径                                            | 使用方                     | 权限             |
+| ------ | --------------------------------------------------- | -------------------------- | ---------------- |
+| GET    | `/settings/parts-of-speech/catalog`                 | 所有词条列表、编辑器和向导 | 任意已登录 admin |
+| GET    | `/settings/parts-of-speech`                         | 配置管理列表               | `super_admin`    |
+| POST   | `/settings/parts-of-speech`                         | 新建基本词性               | `super_admin`    |
+| PATCH  | `/settings/parts-of-speech/{id}`                    | 修改基本词性展示信息/排序  | `super_admin`    |
+| DELETE | `/settings/parts-of-speech/{id}`                    | 删除未引用基本词性         | `super_admin`    |
+| GET    | `/settings/parts-of-speech/{id}/sub-parts`          | 细分词性管理列表           | `super_admin`    |
+| POST   | `/settings/parts-of-speech/{id}/sub-parts`          | 新建细分词性               | `super_admin`    |
+| PATCH  | `/settings/parts-of-speech/{id}/sub-parts/{sub_id}` | 修改细分词性               | `super_admin`    |
+| DELETE | `/settings/parts-of-speech/{id}/sub-parts/{sub_id}` | 删除未引用细分词性         | `super_admin`    |
+
+catalog 不分页，返回所有基本词性及嵌套细分词性，并按 `sort_order`、`created_at`、`id` 稳定排序。它不返回审计与 usage 字段，便于全后台复用和缓存。管理列表使用现有 `page/page_size` 信封；`q` 匹配编码、中文名、英文名和缩写。
+
+POST 成功返回 201 + 新记录；PATCH 返回 200 + 新 revision；DELETE 返回 204。创建/修改后全局 `catalog_version` 递增。PATCH 使用 `base_revision` 做乐观锁，冲突返回 409 `revision_conflict`。编码冲突/名称冲突返回 409 `part_of_speech_conflict`，并通过 Problem Details `field` 指向冲突字段。
+
+删除基本词性时，后端在同一事务内检查所有 V1/V2 草稿与已发布单词/短语引用；有引用返回 409 `part_of_speech_in_use`，`meta.usage_count` 给出数量。无引用时级联删除其细分配置。删除细分词性同理检查所有 sense，引用存在时返回 409 `sub_part_of_speech_in_use`。客户端列表中的 usage_count 只用于提前禁用/提示，不能替代事务检查。
+
+词条相关端点同步增加约束：
+
+- detection 的 `suggested_forms.pos[].pos` 必须是 catalog 中存在的基本编码；
+- create/save/publish 遇到未知基本编码返回 422 `unknown_part_of_speech`；
+- meanings 中细分编码不存在或不属于该 POS 时返回 422 `invalid_sub_part_of_speech`；
+- 配置在管理员未保存的表单期间被并发删除时，保存请求按上述 422 失败，前端保留本地值并要求重新选择；
+- 后端词典供应商自己的词性枚举必须在服务端映射到平台编码，不把供应商原始值直接透传给前端。
+
+完整契约与请求/响应样例同步写入 `../tsz-rust/docs/frontend-integration.md`；OpenAPI 真正发布前，前端 endpoint 进入 `endpoints.contract.test.ts` 的 PENDING 台账。
+
+### 前端结构与数据流
+
+新增路由 `/settings/parts-of-speech`，侧栏新增顶级分组“系统设置”和叶子“词性配置”。配置写操作属于全局高影响治理能力，菜单按 `super_admin` 显示；页面本身复用 `/admins` 的纵深守卫，普通 admin 直达时显示 403。catalog 读取不受该页面守卫限制。
+
+页面使用 antd v6：
+
+- `PartOfSpeechSettingsPage`：路由级超级管理员守卫；
+- `PartOfSpeechSettings`：Breadcrumb、搜索表单、Table、分页、加载/错误/空态；
+- `PartOfSpeechFormModal`：新增/修改基本词性，编辑态编码只读；
+- `SubPartOfSpeechPanel`：在“细分词性”Tab 内维护选中基本词性的细分词性；
+- 删除按钮在 `usage_count > 0` 时禁用并显示“已有 X 个单词或短语引用，只能修改”；提交时仍处理 409；
+- 未引用配置删除前用 Modal 二次确认，明确会同时删除其细分词性。
+
+TanStack Query key：
+
+```ts
+const partOfSpeechKeys = {
+  all: ["part-of-speech-config"] as const,
+  catalog: () => [...partOfSpeechKeys.all, "catalog"] as const,
+  lists: () => [...partOfSpeechKeys.all, "list"] as const,
+  list: (query) => [...partOfSpeechKeys.lists(), query] as const,
+  subParts: (id) => [...partOfSpeechKeys.all, "sub-parts", id] as const
+};
+```
+
+catalog `staleTime` 可设为 5 分钟；配置 mutation 成功后同步失效 catalog、管理列表和相关 sub list。词条内容只保存 code，因此 catalog 更新只改变展示，不应把正在编辑的词条 Form 标为 dirty。catalog 加载失败时：
+
+- 已存在的词条 tab/列表以原始 code 安全降级，并显示一次目录不可用 Alert；
+- “添加基本词性”和“细分词性”选择器禁用并提供重试；
+- 第 1 步检测到未知/无法解析编码时阻断创建；
+- 绝不回退到另一份隐藏的静态中文映射，否则配置页面与业务页面会再次双主。
+
+业务页面迁移：
+
+- `SmartDictionary` 列表和基本词性筛选使用 catalog 的 code/value 与 `name_zh`；
+- `CreateEntryStep` 用 catalog 解析检测建议，未知编码显示错误；
+- `FormsAndPronunciationStep` 从 catalog 计算尚未使用的基本词性 options；
+- `MeaningsAndExamplesStep` 根据当前 POS code 只展示所属 `sub_parts`；
+- `PreviewAndPublishStep`、`WordCreationWizard`、legacy `WordEditor`/`PosTabsSection` 都通过同一个 selector 解析中文名；
+- `labels.ts`/`editorConstants.ts` 不再保存业务可配置的基本/细分词性全集，只保留与配置无关的固定枚举。
+
+为避免每个深层组件重复 query，向导和 legacy 编辑器在页面壳加载一次 catalog，并通过轻量 context/props 传递只读 lookup：`by_code`、`sub_parts_by_pos_code` 和 options。列表页可独立使用 query。lookup 由纯函数构造并单测，未知 code 统一回退自身，不在组件里各写一套判断。
+
+### mock 与默认种子
+
+现有 `createAdminWordsMock` 扩展为共享的 dictionary mock runtime：words 与 part-of-speech settings 共用同一份 session state，才能准确计算引用数量和执行删除约束。外部仍保留 `adminWordsDataSource` facade，同时新增 `partOfSpeechDataSource` facade；两个 facade 延迟解析到同一个 runtime 实例，不能各建一份 Map。
+
+mock schema version 升级并增加：
+
+```ts
+interface MockPartOfSpeechState {
+  catalog_version: number;
+  parts_of_speech: PartOfSpeechConfig[];
+  sub_parts: SubPartOfSpeechConfig[];
+}
+```
+
+默认种子从当前静态常量机械迁移：11 个基本词性、19 个细分词性及所属关系。种子只存在 mock/storage adapter，不再被 UI 直接 import。首次初始化或 schema 不兼容时载入种子；同一管理员刷新保留 CRUD 结果，登出沿用现有清理规则。
+
+usage_count 从 mock 当前 V1/V2 word tree 实时派生，不持久化为第二事实源：基本词性统计草稿与已发布 word/phrase，细分词性统计 senses。删除与保存放在同一同步临界区内重算。mock 返回与真实提案同形的 Problem Details / `HttpError`，覆盖 409 in-use、409 revision、422 unknown code。
+
+Mock detection fixture 继续返回 `noun`/`verb` 等默认编码。测试可新增配置并验证第 2 步 options 动态出现；也可删除未使用配置并验证消失。若测试故意让 detection 返回未知编码，create step 必须阻断。
+
+### 代码影响范围
+
+#### `@tsz/types`
+
+- 新增 `packages/types/src/part-of-speech.ts`：配置、catalog、query、CRUD input/response 类型。
+- 修改 `packages/types/src/admin-word.ts`、`admin-word-v2.ts`：基本/细分词性改为稳定字符串编码别名；注释明确来源与服务端校验。
+- 修改 `packages/types/src/index.ts`：导出新类型。
+
+#### `@tsz/api-client`
+
+- 修改 `packages/api-client/src/admin.ts`：新增 `partOfSpeechSettings` namespace 与 9 个 endpoint。
+- 修改 `admin.test.ts`：覆盖方法、路径、query、body 和动态 id。
+- 修改 `endpoints.contract.test.ts`：把上述 endpoint 加入 PENDING；后端 OpenAPI 到位后移除。
+
+#### admin 数据与 mock
+
+- 重构 `features/dictionary/dataSource.ts`：words/config facade 共享一个 runtime 解析结果。
+- 新增 `features/dictionary/part-of-speech/api.ts`、`catalog.ts`：query hooks 与纯 lookup。
+- 修改 `features/dictionary/mock/adminWordsMock.ts`、storage、fixtures：配置种子、CRUD、引用检查和 schema migration。
+
+#### admin 菜单、路由与页面
+
+- 修改 `features/console/ConsoleSidebar.tsx`：新增 super-only “系统设置 → 词性配置”。
+- 修改 `router.tsx`：新增 `/settings/parts-of-speech` lazy route。
+- 新增 `pages/PartOfSpeechSettings.tsx` 和 `features/dictionary/part-of-speech/` 页面组件。
+- 修改 `SmartDictionary.tsx`、V1 `WordEditor` 相关组件、V2 wizard 各步骤组件：移除静态基本/细分词性标签与 options，改用 catalog lookup。
+
+#### 后端对接文档
+
+- 修改 `../tsz-rust/docs/frontend-integration.md`：新增“系统设置 / 词性配置（前端 Mock、后端待实现）”章节，记录类型、端点、错误码、权限和与词条端点的联动约束。
+- 不修改 `../tsz-rust/docs/openapi.json`；它只能由后端真实实现生成后同步。
+
+### 测试策略补充
+
+进入代码动工后先使用 `$test` skill 完成用例矩阵，再写测试：
+
+- 单元：catalog lookup、稳定排序、未知 code 回退、过滤已用 POS、细分词性按所属 POS 过滤；
+- mock：默认 11/19 种子、CRUD、唯一性、revision、引用计数、基本/细分删除约束、级联删除、storage 恢复；
+- 组件：菜单与 403、配置层级 Tab、列表搜索分页、新增/修改/删除、细分页内面板、错误/重试；
+- 集成：新增配置进入 forms selector，改名传播到列表/向导/预览，未知 detection code 阻断，配置并发删除后保存 422；
+- API contract：9 个 endpoint 的 method/path/query/body 与 PENDING；
+- E2E：超级管理员新增基本词性及细分词性 → 创建词条选择它 → 返回配置页验证删除被阻断。
+
+质量门沿用本文既有 admin/types/api-client/test/build/lint/typecheck/e2e 要求。
+
+### 风险与回滚补充
+
+- **静态联合改为动态 code**：编译器不再替后端枚举穷举。通过 catalog lookup、服务端/mock 保存校验和未知 code 明确降级补偿，禁止裸字符串由 UI 自造。
+- **配置修改影响全局展示**：这是需求预期；编码不可改、词条不保存名称快照，避免内容 revision 与配置 revision 耦合。
+- **删除竞态**：usage_count 仅提示，最终使用事务内引用检查；前端处理 409 后刷新列表。
+- **mock runtime 双实例**：words/config facade 必须共享一次 lazy factory 结果，并用测试断言跨 facade 可见同一状态。
+- **真实后端未就绪**：生产 mock 仍 fail-closed。真实数据源请求不存在时页面显示不可用，不静默使用 seed；后端落地前该配置功能仅用于开发/测试演示。
+- **紧急回滚**：隐藏系统设置菜单与路由入口，但保留 catalog 读取和 code fallback；默认种子可退回只读 catalog mock。不得恢复散落的静态 UI 映射作为第二事实源。
+
 ## 真实后端接入前仍需用户/后端确认
 
 1. 是否接受 V2 草稿与发布词条保持同一 word ID，以及 `schema_version` 的兼容方案。
@@ -1127,3 +1414,212 @@ mock 状态使用内存 Map，并为硬刷新镜像到 `sessionStorage`：
 7. create/edit/publish 的正式 permission keys。
 8. V2 published 首版只读、不能立即纠错编辑是否可接受；若不可接受，需要把 V2 发布后编辑扩入本轮并补保存语义。
 9. 服务端草稿保留期、数量/文本上限；统计基线按含 draft 的所有未删除词条计算是否接受。
+10. 词性配置写权限是否最终限定为 `super_admin`；本文与前端首版按 super-only 设计。
+11. 基本词性删除是否按本文级联删除未引用细分词性，还是要求先手动清空细分词性。
+12. 是否需要“停用”状态以禁止新引用但保留存量；原型未给出，本轮只有修改与删除。
+13. 内置词典供应商词性到平台稳定编码的映射表由哪个后端模块维护，以及未知供应商词性的处理策略。
+
+## 语义区间中英文双名与必选规则（2026-08-09 修订）
+
+### 方案结论
+
+V2 新建向导的语义区间从 legacy `SenseGroup { id, name }` 分离为 `SenseGroupV2 { id, name_zh, name_en }`。`sense_group_id` 继续只引用稳定 ID，不复制名称。V1 编辑器和既有 `/admin/words` 单树契约继续使用 `name`，本轮不做 V1 数据迁移，也不根据单名自动猜测另一语言。
+
+```ts
+interface SenseGroupV2 {
+  id: string;
+  name_zh: string;
+  name_en: string;
+}
+
+interface DraftMeaningsStepContent {
+  sense_groups: SenseGroupV2[];
+  pos: WordPosMeaningsV2[];
+}
+```
+
+选用两个明确字段而不是 `{ locale, name }[]`：当前产品只支持固定的中文和英文两种名称，固定对象能在 TypeScript 和后端校验中直接表达“两侧都存在”，不需要处理重复 locale、缺失 locale 或数组排序。也不复用 `DialectValueV2`，因为这里是语言翻译，不是 BrE/AmE 方言变体。
+
+### UI 与数据流
+
+- `MeaningsAndExamplesStep` 的每个语义区间行展示两个输入，可见标签和可访问名分别为“中文”“英文”，不显示红色必填星号；视觉序号仅在最左侧使用圆圈数字 `① / ②`，不重复“区间 N”文案。桌面宽度并列，空间不足时允许换行，不引入 Tailwind。
+- 卡片头部只保留“语义区间”和新增操作，不使用醒目的“必填”标签，也不额外显示必选说明；必选约束由默认绑定、禁用清空和完成校验表达。
+- 左侧“完成情况”在“词形变化”和“语法结构”之间增加“语义区间”行；已有 word 时至少显示默认区间的 `1`，保存后按 canonical `sense_groups.length` 显示。
+- 语法结构列表与语义区间使用同一套左侧圆圈数字序号；不重复显示“结构 N”，卡片头部不显示“英美文本独立维护”，方言差异直接由并排的英式/美式输入表达。多条语法结构通过右侧拖动手柄重排，拖放目标显示描边反馈，同时保留手柄聚焦后的上下方向键操作；不再展示独立的上移/下移按钮。每个方言输入复用上一步发音行的播放、获取语音、上传语音图标和禁用状态；真实音频接口未接入前，获取与上传只显示 Mock 提示，不伪造 `audio_url`。
+- 空草稿首次进入第 3 步即初始化 `{ id: newWordNodeId(), name_zh: "", name_en: "" }`，不显示需要先点击添加的空卡片；编辑任一名称不改变 ID，也不影响既有词义引用。
+- 词义的语义区间 `Select` 仍以 `group.id` 为 value，label 使用 `name_zh + " / " + name_en`，不提供清空入口；新增词义自动绑定第一个区间。草稿缺一侧名称时用已填名称和明确的“待填写中文名/英文名”占位，不让两个未命名区间不可区分。
+- UI 至少保留一个区间，最后一项的删除按钮禁用。删除被引用的其他区间时显示影响确认，并把引用改绑到第一个剩余区间；不制造新的未选状态。
+- “保存草稿”原样提交不完整的双语行；`intent: "complete"` 的客户端、mock 和真实后端校验两侧 trim 后均为 1–200 字符。校验 issue 使用语义区间 `id` 作为 `node_id`，`field` 分别为 `name_zh` / `name_en`。
+- `intent: "complete"` 同时要求至少一个区间以及每个词义的 `sense_group_id` 都存在且指向当前词条内的区间；mock 使用 `sense_group_required` / `sense_group_not_found` 区分缺失和悬空引用。
+- 保存成功后 canonical V2 detail 原样返回双语名称，刷新恢复不经过本地翻译或 camelCase 映射。
+
+### 代码影响范围
+
+- `packages/types/src/admin-word-v2.ts`：移除对 legacy `SenseGroup` 的复用，新增并导出 `SenseGroupV2`，把 `DraftMeaningsStepContent.sense_groups` 改为该类型；`packages/types/src/admin-word.ts` 保持不变。
+- `packages/types/src/index.ts`：导出 `SenseGroupV2`。
+- `apps/admin/src/features/dictionary/word-creation/MeaningsAndExamplesStep.tsx`：双输入、新增行、Select 双语 label、complete 客户端校验和字段定位。
+- `apps/admin/src/features/dictionary/word-creation/model.ts`、测试 helper 与 fixtures：初始化首个双语区间，并把既有/新增词义默认绑定到它。
+- `apps/admin/src/features/dictionary/mock/adminWordsMock.ts`：draft-save 原样保留；complete/validate/publish 校验双语名称及长度，引用完整性仍按 ID 判断。
+- `apps/admin/src/features/dictionary/word-creation/MeaningsAndExamplesStep.test.tsx`、`model.test.ts`、`mock/adminWordsMock.test.ts`：补双语录入、恢复、展示、缺失/超长和删除引用回归。
+- `../tsz-rust/docs/frontend-integration.md`：后端团队确认后，把 V2 meanings proposal 的 `SenseGroupV2` 与 422 issue 字段补入共享契约；当前 Rust OpenAPI 尚无 V2 meanings schema，不能把前端字段误标为已落地接口。
+
+`@tsz/api-client` 的 endpoint 和请求封装不新增方法：`saveMeaningsStep` 已按泛型透传 `DraftMeaningsStepContent`，类型变更会让现有 method/path/body 测试继续约束新 body。无需修改 legacy `word-editor/SenseRangesSection.tsx`、`mapping.ts` 或 V1 fixtures。
+
+### 风险与回滚
+
+- **真实后端尚未确认字段**：真实数据源启用前必须对齐 `name_zh` / `name_en`；后端未支持时只允许 contract-shaped mock 演示，不能在传输层静默合并回 `name` 造成英文丢失。
+- **V1/V2 同名概念不同形**：使用 `SenseGroupV2` 显式隔离，禁止扩大修改共享 `SenseGroup`，避免旧编辑器、旧 fixture 与已发布 V1 契约被连带破坏。
+- **草稿中的半成品双语行**：save 允许名称未填、complete 阻断，但区间节点和词义引用由 UI 始终保持完整；下拉显示缺失提示，避免空 label。
+- **回滚**：在后端尚未落地时可整体回退 V2 类型和步骤 UI 的本修订；稳定 ID 和 `sense_group_id` 未改变，不涉及引用迁移。
+
+## 基本词性 / 细分词性配置 Tab（2026-08-08 修订）
+
+### 方案结论
+
+“基本词性 / 细分词性”是系统设置中词性目录的两个管理视图，不是单词/短语类型。V2 新建向导继续只处理单词，不扩展 phrase wire，不增加 `expected_kind`、forms `sub_pos` 或按 kind 分流。
+
+### 页面交互
+
+- `PartOfSpeechSettings` 标题下方增加一级 `Tabs`，固定为“基本词性 / 细分词性”。
+- “基本词性”Tab 保留现有搜索、分页、增改删和引用保护。
+- “细分词性”Tab 提供所属基本词性筛选；默认选择目录中的第一个基本词性，在当前页面展示该基本词性下的细分列表及增改删操作。
+- 基本词性表格不再以“配置细分词性”抽屉作为主要入口；两个目录层级通过顶部 Tab 明确分开。
+- `FormsAndPronunciationStep` 只读取基本词性 catalog，分组、添加器和保存 wire 均为 `forms.pos[]`。
+- `MeaningsAndExamplesStep` 中每个 sense 保留“细分词性”选择器，并根据当前 forms 分组的基本 `pos` 过滤所属细分项。
+- 预览中词形分组显示基本词性中文名，词义卡片显示所选细分词性中文名。
+
+### 类型与数据模型
+
+词条 V2 模型保持原约束：`AdminWordV2.kind` 与 detection snapshot 仍固定为 `"word"`；`WordPosFormsV2` 只保存基本 `pos`，细分 `sub_pos` 只存在于 sense。配置目录继续使用稳定 code 建立归属关系：
+
+```ts
+interface WordPosFormsV2 {
+  pos_id: string;
+  pos: PartOfSpeechCode;
+  // 其余现有词形与发音字段
+}
+
+interface WordSenseV2 {
+  sub_pos: SubPartOfSpeechCode;
+  // 其余现有词义字段
+}
+```
+
+mock/后端在 meanings 保存与发布时校验 sense 的 `sub_pos` 存在且属于其 `pos_id` 对应的基本 `pos`。未知或归属错配返回 422 `invalid_sub_part_of_speech`。
+
+### 代码影响范围
+
+- `PartOfSpeechSettings.tsx`：增加配置层级 Tabs，并把细分列表作为页内视图。
+- `SubPartOfSpeechDrawer.tsx`：复用其表格与表单能力为页内细分管理组件，或拆出共享内容；不再由基本词性行按钮触发主要流程。
+- `FormsAndPronunciationStep.tsx`：移除错误的分类 Tabs/phrase 分支，只保留基本词性选择。
+- `MeaningsAndExamplesStep.tsx`：保持 sense 级细分词性选择及按所属基本词性过滤。
+- `SmartDictionary.tsx`、V2 types/mock/api：撤销错误的 phrase V2 / expected_kind 扩展，恢复原创建入口语义。
+- 同步修订测试矩阵与 `tsz-rust/docs/frontend-integration.md`。
+
+### 测试策略与风险
+
+重点覆盖配置页两个 Tab 的切换与各自操作、细分 Tab 默认/切换所属基本词性、词形步骤不出现细分词性添加器、词义步骤只显示当前基本词性所属细分项、归属错配保存被拒绝。风险主要是配置页 Tab 与创建页具体基本词性 Tab 名称相近；测试必须断言双 Tab 只存在于系统设置页。
+
+## 第 3 步全局方言选择与自动补全（2026-08-09 追加评估）
+
+### 方案概述
+
+在 `MeaningsAndExamplesStep` 增加页面级 `activeDialect: "uk" | "us"`，仅当 `word.headwords.mode === "distinguish"` 时在“语义区间”卡片上方展示 antd `Segmented`（英式 / 美式），默认值取 `headwords.source_dialect`。英文释义和例句的 `EnglishTextEditor` 从双栏改为只渲染 `activeDialect` 对应槽位；语法结构继续使用独立的 `GrammarVariantV2[]` 双栏编辑器，不接收 `activeDialect`。
+
+用户切换到目标方言时，先扫描整份 `DraftMeaningsStepContent`，只收集目标槽位为 `missing`、另一侧源槽位为 `ready` 且文本非空的英文定义/整句释义和例句。所有合格项复用现有 `POST /words/dialect-variants` 一次批量请求。响应按 `client_id + field_kind` 建立索引，只写回仍为 `missing` 且响应类型匹配的目标槽位，写入 `origin: "converted"`；不存在、重复、类型错误或切换期间已被手工填写的目标全部跳过。语法结构不会进入收集器，类型层也不允许 `field_kind: "grammar"`。
+
+不采用“每次键入立即转换”：它会产生高频请求、响应竞态和目标文本持续被重写。也不继续使用每字段双栏 + 单独生成按钮：这无法实现用户要求的统一选择和自动填充，并会让长表单宽度和操作负担继续增加。
+
+### 代码影响范围
+
+#### admin 页面与模型
+
+- `apps/admin/src/features/dictionary/word-creation/MeaningsAndExamplesStep.tsx`
+  - 新增页面级方言选择器、加载/结果提示和“重试补全当前方言”入口；选择器在所有基本词性 Tab 间共用。
+  - `EnglishTextEditor` 增加 `activeDialect`，区分模式只渲染当前槽位；`missing` 状态提供空输入以便手填，不再渲染两块方言面板和逐字段生成按钮。
+  - 切换到缺失方言时调用批量补全；请求中禁用重复切换，成功写入后调用现有 `updateContent` 标记 dirty。
+  - 只读模式只允许切换查看已保存 variant，不请求补全、不展示重试或编辑操作。
+- `apps/admin/src/features/dictionary/word-creation/model.ts`
+  - 新增纯函数 `collectMissingMeaningDialectItems(content, targetDialect)`，只返回 definition/example 项及其稳定定位信息。
+  - 新增纯函数 `applyMeaningDialectSuggestions(content, targetDialect, suggestions)`，不可变写回并返回 `{ content, applied_count, skipped_count }`。
+  - `createEnglishText`、`EnglishTextV2` 和 grammar 工厂保持原形；新增释义/例句仍按主词源方言初始化。
+- `apps/admin/src/features/dictionary/word-creation/word-creation.css`
+  - 增加方言工具条、补全状态和单方言输入布局；保持 admin antd v6，不引入 Tailwind 或 `@tsz/ui`。
+
+#### 测试文件
+
+- `MeaningsAndExamplesStep.test.tsx`：选择器显示/默认值、完整目标零请求、缺失目标单批请求、成功/部分/失败、手工保护、只读和 grammar 排除。
+- `model.test.ts`：收集范围、跨 POS/多词义顺序、响应精确匹配、重复/错误类型/竞态跳过、不可变性。
+- `mock/adminWordsMock.test.ts`：既有 endpoint 的多 item definition/example 响应和字段类型保持。
+- `wordCreation.test.helper.ts`：补充同时含英文定义、例句和混合 ready/missing 的 fixture builder。
+
+#### 无需修改
+
+- `packages/types/src/admin-word-v2.ts`：现有 `EnglishTextV2`、`SuggestDialectVariantsInputV2` 和响应已经支持批量 definition/example；不新增 UI 方言字段，不改变 snake_case wire。
+- `packages/api-client/src/admin.ts`、`word-creation/api.ts`：复用既有 `suggestDialectVariants` 和 mutation，不新增 endpoint。
+- `apps/admin/src/features/dictionary/mock/adminWordsMock.ts`：现有 mock 已按 `input.items.map` 支持多项转换；若测试发现重复 `client_id + field_kind` 处理缺口，只修正契约校验，不增加页面专用接口。
+- `PreviewAndPublishStep.tsx`：预览继续按 canonical variants 展示双方言，不跟随编辑页的临时选择器。
+- legacy V1 编辑器和 web 不受影响。
+
+### 后端对接
+
+真实 Rust OpenAPI `../tsz-rust/docs/openapi.json` 当前没有智能词库方言转换端点，`../tsz-rust/docs/frontend-integration.md` 也尚未声明本接口；因此生产能力继续由 `adminWordsDataSourceCapabilities.dialectVariantSuggestions` 关闭，不能静默使用 mock。
+
+后端落地时复用现有前端 proposal：
+
+```jsonc
+POST /api/v1/admin/words/dialect-variants
+{
+  "source_dialect": "uk",
+  "target_dialect": "us",
+  "items": [
+    {
+      "client_id": "definition-or-sentence-id",
+      "field_kind": "definition",
+      "value": { "version": 1, "text": "...", "spans": [], "liaisons": [] }
+    }
+  ]
+}
+```
+
+- `items` 必须支持同一请求混合 `definition` 与 `example`，并允许跨 POS/词义的稳定客户端 ID。
+- 响应逐项回传 `client_id`、`field_kind`、转换后的 `value` 和 `model_version`；允许部分返回，但不得返回 `grammar`。
+- 需后端确认单批最大条数、请求体大小、超时、限流、计费、审计以及单项失败表达。前端首版不自行硬编码未知上限；若后端给出上限，再在 data source/编排层透明分批。
+- 接口仍是“建议生成”，不直接保存词条；草稿保存继续走 meanings step 的 revision/operation 契约。
+
+### 复用与项目约定
+
+- canonical wire 继续使用 `@tsz/types` 的 snake_case 类型，页面不创建 camelCase 传输模型。
+- 批量收集和写回是当前 admin 向导私有纯逻辑，先放 `word-creation/model.ts`；只有出现第二个跨页面消费者时再下沉 `@tsz/shared`。
+- UI 仅使用 antd v6 `Segmented`、`Button`、`Alert`/`Typography` 等组件。
+- 真实数据源能力关闭时 fail closed：选择器可查看已有内容，但自动补全按钮禁用并说明服务未接入。
+
+### 数据流与时序
+
+1. 初次进入第 3 步：`activeDialect = headwords.source_dialect`，不发请求。
+2. 用户切换方言：先更新目标意图并锁定选择器，扫描当前最新 `content`。
+3. 无 eligible item：立即切换展示；不调用 API、不标记 dirty。
+4. 有 eligible item：发送一个 `{ source_dialect, target_dialect, items }` 请求；页面显示“正在补全美式/英式内容”。
+5. 成功：用请求快照的键集合和当前最新内容双重校验，只写仍缺失的目标；`applied_count > 0` 时生成新的 operation ID、标记 dirty 并提示结果。
+6. 部分响应：写入合法匹配项，剩余目标保持 missing，显示“已补全 N 项，M 项待手工填写/重试”。
+7. 失败：不修改 content，切换仍落在目标方言以便手填，显示失败并保留重试入口。
+8. 保存草稿/完成：沿用现有 meanings 保存和完整性校验；未补全目标仍会在 complete 时被阻断。
+
+实现时应以单次任务 token 或递增 request ID 防止过期响应写入；补全期间选择器和重试按钮禁用。即使未来放开并发，写回函数也必须再次检查目标仍为 `missing`，不能用旧响应覆盖用户刚完成的手填。
+
+### 测试策略（代码动工阶段由 test skill 落地）
+
+- 纯函数单测：统一模式无项目；英美模式只收集 missing；忽略空源、中文释义、grammar、ready 目标；跨 POS 顺序稳定；响应匹配和不可变写回。
+- 组件集成：默认源方言、全局跨 Tab 选择、单方言渲染、零请求切换、一个批次包含多 definition/example、loading 禁用、成功/部分/失败/重试、手工保护。
+- 回归：语法结构仍双栏并可拖动，现有语音操作不变；保存/刷新/完成规则不变；unified 词条和 V1 编辑器不出现选择器。
+- 数据源/契约：mock 多 item；API method/path/body 仍与 PENDING proposal 一致；真实能力关闭时无网络调用。
+- 浏览器手测：三条以上词义、多个 POS、长文本、切换后页面无宽度跳动；慢请求期间不会出现交叉写入。
+
+### 风险与回滚
+
+- **自动写入的信任边界**：只写 missing，现有 ready 永不覆盖；转换来源明确标记 `converted`，预览可辨认。
+- **批量请求过大**：后端上限未定；在契约确认前由 mock 验证全量批次，真实接入时按服务端上限在编排层分批，页面语义不变。
+- **响应乱序/部分失败**：以 `client_id + field_kind` 匹配，不依赖数组位置；未知和重复响应跳过并计入提示。
+- **源文本后改导致目标陈旧**：本轮不自动重写任何 ready 目标，这是保护手工内容的明确取舍；后续若需要“重新生成”，必须作为显式操作并展示覆盖确认。
+- **真实接口未落地**：生产只提供已有 variant 切换和手填；mock 自动补全不会伪装成生产能力。
+- **回滚**：恢复 `EnglishTextEditor` 双栏展示和逐字段按钮即可；wire、保存 DTO、已生成 variants 和语法结构数据均无需迁移。

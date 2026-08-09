@@ -22,6 +22,12 @@ vi.mock("../api", () => ({
   useDeleteWord: () => ({ mutateAsync: state.remove, isPending: false })
 }));
 
+vi.mock("../part-of-speech/api", async () => {
+  const { partOfSpeechCatalogQueryResult } =
+    await import("./partOfSpeech.test.helper");
+  return { usePartOfSpeechCatalog: partOfSpeechCatalogQueryResult };
+});
+
 vi.mock("./CreateEntryStep", () => ({
   CreateEntryStep: ({
     onHeadwordsChange,

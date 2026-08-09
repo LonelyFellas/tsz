@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AdminWordsDataSource } from "./dataSource";
+import type {
+  AdminPartOfSpeechDataSource,
+  AdminWordsDataSource
+} from "./dataSource";
 
 const METHOD_NAMES = [
   "list",
@@ -107,10 +110,74 @@ const INVOCATIONS = [
   args: readonly unknown[];
 }>;
 
+const PART_OF_SPEECH_METHOD_NAMES = [
+  "catalog",
+  "list",
+  "create",
+  "update",
+  "remove",
+  "listSubParts",
+  "createSubPart",
+  "updateSubPart",
+  "removeSubPart"
+] as const satisfies ReadonlyArray<keyof AdminPartOfSpeechDataSource>;
+
+const PART_OF_SPEECH_INVOCATIONS = [
+  { method: "catalog", args: [] },
+  { method: "list", args: [{ q: "名词", page: 2, page_size: 10 }] },
+  {
+    method: "create",
+    args: [{ code: "aux", name_zh: "助动词", name_en: "Auxiliary" }]
+  },
+  {
+    method: "update",
+    args: [
+      "pos-1",
+      {
+        base_revision: 1,
+        code: "noun",
+        name_zh: "名词",
+        name_en: "Noun"
+      }
+    ]
+  },
+  { method: "remove", args: ["pos-1"] },
+  { method: "listSubParts", args: ["pos-1"] },
+  {
+    method: "createSubPart",
+    args: [
+      "pos-1",
+      { code: "n-count", name_zh: "可数名词", name_en: "Countable noun" }
+    ]
+  },
+  {
+    method: "updateSubPart",
+    args: [
+      "pos-1",
+      "sub-1",
+      {
+        base_revision: 1,
+        code: "n-count",
+        name_zh: "可数名词",
+        name_en: "Countable noun"
+      }
+    ]
+  },
+  { method: "removeSubPart", args: ["pos-1", "sub-1"] }
+] as const satisfies ReadonlyArray<{
+  method: keyof AdminPartOfSpeechDataSource;
+  args: readonly unknown[];
+}>;
+
 interface SourceDouble {
   source: AdminWordsDataSource;
   calls: Record<keyof AdminWordsDataSource, ReturnType<typeof vi.fn>>;
   clearSession?: ReturnType<typeof vi.fn>;
+}
+
+interface PartOfSpeechSourceDouble {
+  source: AdminPartOfSpeechDataSource;
+  calls: Record<keyof AdminPartOfSpeechDataSource, ReturnType<typeof vi.fn>>;
 }
 
 function createSourceDouble(
@@ -131,6 +198,25 @@ function createSourceDouble(
   const clearSession = vi.fn();
   Object.assign(source, { clearSession });
   return { source, calls, clearSession };
+}
+
+function createPartOfSpeechSourceDouble(
+  owner: "real" | "mock"
+): PartOfSpeechSourceDouble {
+  const calls = {} as PartOfSpeechSourceDouble["calls"];
+  const entries = PART_OF_SPEECH_METHOD_NAMES.map((method) => {
+    const call = vi.fn((...args: unknown[]) =>
+      Promise.resolve({ owner, method, args })
+    );
+    calls[method] = call;
+    return [method, call] as const;
+  });
+  return {
+    source: Object.fromEntries(
+      entries
+    ) as unknown as AdminPartOfSpeechDataSource,
+    calls
+  };
 }
 
 interface AuthState {
@@ -157,18 +243,25 @@ async function loadDataSource({
   mockEnabled,
   real,
   mock,
+  realPart = createPartOfSpeechSourceDouble("real").source,
+  mockPart = createPartOfSpeechSourceDouble("mock").source,
   initialProfile = { id: "admin-1" },
-  production = false
+  production = false,
+  mode = production ? "production" : "test"
 }: {
   mockEnabled: boolean;
   real: AdminWordsDataSource;
   mock: AdminWordsDataSource;
+  realPart?: AdminPartOfSpeechDataSource;
+  mockPart?: AdminPartOfSpeechDataSource;
   initialProfile?: AuthState["profile"];
   production?: boolean;
+  mode?: string;
 }): Promise<LoadedModule> {
   vi.resetModules();
   vi.unstubAllEnvs();
   if (production) vi.stubEnv("PROD", true);
+  vi.stubEnv("MODE", mode);
 
   let profile = initialProfile;
   let listener: AuthListener | undefined;
@@ -182,7 +275,7 @@ async function loadDataSource({
   const createMock = vi.fn(
     (options: { getAdminProfile: () => AuthState["profile"] | undefined }) => {
       mockFactoryOptions = options;
-      return mock;
+      return Object.assign(mock, { partOfSpeechSettings: mockPart });
     }
   );
   const mockModuleFactory = vi.fn(() => ({
@@ -190,7 +283,7 @@ async function loadDataSource({
   }));
 
   vi.doMock("@/lib/auth", () => ({
-    api: { words: real },
+    api: { words: real, partOfSpeechSettings: realPart },
     useAuthStore: { getState, subscribe }
   }));
   vi.doMock("@/lib/env", () => ({ env: { ADMIN_WORDS_MOCK: mockEnabled } }));
@@ -221,6 +314,20 @@ async function expectFacadeDelegation(
   owner: "real" | "mock"
 ): Promise<void> {
   for (const { method, args } of INVOCATIONS) {
+    const invoke = facade[method] as unknown as (
+      ...input: unknown[]
+    ) => Promise<unknown>;
+    await expect(invoke(...args)).resolves.toEqual({ owner, method, args });
+    expect(source.calls[method]).toHaveBeenLastCalledWith(...args);
+  }
+}
+
+async function expectPartOfSpeechFacadeDelegation(
+  facade: AdminPartOfSpeechDataSource,
+  source: PartOfSpeechSourceDouble,
+  owner: "real" | "mock"
+): Promise<void> {
+  for (const { method, args } of PART_OF_SPEECH_INVOCATIONS) {
     const invoke = facade[method] as unknown as (
       ...input: unknown[]
     ) => Promise<unknown>;
@@ -263,10 +370,12 @@ describe("admin words data source selection", () => {
   it("mock 关闭时 facade 全方法透传给 real，且不加载 mock chunk", async () => {
     const real = createSourceDouble("real");
     const mock = createSourceDouble("mock", true);
+    const realPart = createPartOfSpeechSourceDouble("real");
     const loaded = await loadDataSource({
       mockEnabled: false,
       real: real.source,
-      mock: mock.source
+      mock: mock.source,
+      realPart: realPart.source
     });
 
     expect(loaded.module.realAdminWordsDataSource).toBe(real.source);
@@ -276,6 +385,11 @@ describe("admin words data source selection", () => {
     await expectFacadeDelegation(
       loaded.module.adminWordsDataSource,
       real,
+      "real"
+    );
+    await expectPartOfSpeechFacadeDelegation(
+      loaded.module.partOfSpeechDataSource,
+      realPart,
       "real"
     );
     await expect(loaded.module.adminWordsDataSource.list()).resolves.toEqual({
@@ -299,10 +413,12 @@ describe("admin words data source selection", () => {
   it("mock 开启时延迟创建一次、全方法复用，并在 logout 后清理重建", async () => {
     const real = createSourceDouble("real");
     const mock = createSourceDouble("mock", true);
+    const mockPart = createPartOfSpeechSourceDouble("mock");
     const loaded = await loadDataSource({
       mockEnabled: true,
       real: real.source,
-      mock: mock.source
+      mock: mock.source,
+      mockPart: mockPart.source
     });
 
     expect(loaded.createMock).not.toHaveBeenCalled();
@@ -312,6 +428,11 @@ describe("admin words data source selection", () => {
     await expectFacadeDelegation(
       loaded.module.adminWordsDataSource,
       mock,
+      "mock"
+    );
+    await expectPartOfSpeechFacadeDelegation(
+      loaded.module.partOfSpeechDataSource,
+      mockPart,
       "mock"
     );
     expect(loaded.mockModuleFactory).toHaveBeenCalledTimes(1);
@@ -354,10 +475,12 @@ describe("admin words data source selection", () => {
   it("production 始终使用 real，且不注册 logout 订阅或加载 mock", async () => {
     const real = createSourceDouble("real");
     const mock = createSourceDouble("mock", true);
+    const realPart = createPartOfSpeechSourceDouble("real");
     const loaded = await loadDataSource({
       mockEnabled: true,
       real: real.source,
       mock: mock.source,
+      realPart: realPart.source,
       production: true
     });
 
@@ -371,5 +494,39 @@ describe("admin words data source selection", () => {
     ).toBe(false);
     expect(loaded.auth.subscribe).not.toHaveBeenCalled();
     expect(loaded.mockModuleFactory).not.toHaveBeenCalled();
+    await expectPartOfSpeechFacadeDelegation(
+      loaded.module.partOfSpeechDataSource,
+      realPart,
+      "real"
+    );
+  });
+
+  it("优化后的 test mode 构建显式启用 mock 时仍复用 mock runtime", async () => {
+    const real = createSourceDouble("real");
+    const mock = createSourceDouble("mock", true);
+    const mockPart = createPartOfSpeechSourceDouble("mock");
+    const loaded = await loadDataSource({
+      mockEnabled: true,
+      real: real.source,
+      mock: mock.source,
+      mockPart: mockPart.source,
+      production: true,
+      mode: "test"
+    });
+
+    await expect(loaded.module.adminWordsDataSource.stats()).resolves.toEqual({
+      owner: "mock",
+      method: "stats",
+      args: []
+    });
+    await expectPartOfSpeechFacadeDelegation(
+      loaded.module.partOfSpeechDataSource,
+      mockPart,
+      "mock"
+    );
+    expect(
+      loaded.module.adminWordsDataSourceCapabilities.dialectVariantSuggestions
+    ).toBe(true);
+    expect(loaded.auth.subscribe).toHaveBeenCalledTimes(1);
   });
 });

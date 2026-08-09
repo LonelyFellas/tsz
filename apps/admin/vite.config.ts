@@ -79,8 +79,8 @@ export default defineConfig(({ mode, command }) => {
     !production
   );
 
-  // `vite build` 产物可能被直接部署，禁止把整套词库 mock 烘进任何构建产物。
-  assertAdminWordsMockAllowed(adminWordsMock, production);
+  // production mode 禁止携带 mock；仅 tshb-test 的显式 test mode 构建可用于验收。
+  assertAdminWordsMockAllowed(adminWordsMock, production, mode);
 
   // dev 代理只在启动开发服务器（command === "serve"）时需要；`vite build` 产出的是纯
   // 静态包，不经这个代理，故其相关校验也不应耦合进构建成败——只在 serve 时构建代理。

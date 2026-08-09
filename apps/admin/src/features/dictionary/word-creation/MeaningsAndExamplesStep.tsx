@@ -1,10 +1,13 @@
 import {
   DeleteOutlined,
   DownOutlined,
+  EllipsisOutlined,
   LockOutlined,
   PlusOutlined,
   SoundOutlined,
+  SyncOutlined,
   ThunderboltOutlined,
+  UploadOutlined,
   UpOutlined
 } from "@ant-design/icons";
 import {
@@ -14,15 +17,17 @@ import {
   Button,
   Card,
   Collapse,
-  Divider,
+  Dropdown,
   Flex,
   Input,
   InputNumber,
+  Segmented,
   Select,
   Space,
   Switch,
   Tabs,
   Tag,
+  Tooltip,
   Typography
 } from "antd";
 import type {
@@ -42,11 +47,25 @@ import type {
   WordSentenceV2
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client/http";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  type DragEvent,
+  type KeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { useNavigate } from "react-router-dom";
-import { DIALECT_LABEL, POS_TAG_ZH, SUB_POS_OPTIONS } from "../editorConstants";
-import { CEFR_OPTIONS, POS_TAG_ABBR, cefrColor } from "../labels";
+import { DIALECT_SHORT_LABEL } from "../editorConstants";
+import { CEFR_OPTIONS, cefrColor } from "../labels";
 import { adminWordsDataSourceCapabilities } from "../dataSource";
+import {
+  createPartOfSpeechLookup,
+  partOfSpeechLabel,
+  subPartOfSpeechLabel,
+  subPartOfSpeechOptions
+} from "../part-of-speech/catalog";
+import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { useRelatedSearch } from "../api";
 import {
   cloneWordValue,
@@ -56,11 +75,15 @@ import {
 } from "../word-model/primitives";
 import { useSaveMeaningsStep, useSuggestDialectVariants } from "./api";
 import {
+  applyMeaningDialectSuggestions,
+  collectMissingMeaningDialectItems,
+  countIncompleteMeaningDialectSlots,
   createDefinition,
   createEnglishText,
   createGrammar,
   createRelation,
   createSense,
+  createSenseGroup,
   createSentence,
   ensureMeaningsForForms,
   grammarDialects
@@ -77,7 +100,11 @@ interface Props {
   onSaved: (word: AdminWordV2) => void;
 }
 
-type EnglishFieldKind = "definition" | "example";
+type MeaningDialect = "uk" | "us";
+
+const GRAMMAR_DRAG_TYPE = "application/x-tsz-grammar-structure";
+const DEFINITION_DRAG_TYPE = "application/x-tsz-definition";
+const SENTENCE_DRAG_TYPE = "application/x-tsz-sentence";
 
 const DEFINITION_MODE_OPTIONS = [
   { value: "zh_definition", label: "中文定义释义" },
@@ -94,6 +121,160 @@ const RELATION_META: Record<
   antonym: { title: "反义词", metric: "差异度" },
   derivative: { title: "派生词", metric: "关联度" }
 };
+
+function grammarStructureOptionLabel(
+  grammar: WordPosMeaningsV2["grammar_structures"][number],
+  grammarIndex: number,
+  activeDialect: MeaningDialect
+): string {
+  const variant =
+    grammar.variants.find((item) => item.dialect === activeDialect) ??
+    grammar.variants.find((item) => item.dialect === "common") ??
+    grammar.variants[0];
+  return (
+    variant?.content.text.trim() || `语法结构 ${grammarIndex + 1}（未填写）`
+  );
+}
+
+function definitionTitleText(
+  definition: WordDefinitionV2 | undefined,
+  activeDialect: MeaningDialect
+): string {
+  if (!definition) return "待填写释义";
+  if (!definition.definition_mode.startsWith("en_")) {
+    return (definition.content as RichText).text.trim() || "待填写释义";
+  }
+  const content = definition.content as EnglishTextV2;
+  if (content.mode === "unified") {
+    return content.common.value.text.trim() || "待填写释义";
+  }
+  const slot = content[activeDialect];
+  return slot.state === "ready" && slot.variant.value.text.trim()
+    ? slot.variant.value.text.trim()
+    : "待填写释义";
+}
+
+interface SortableRowsController {
+  canReorder: boolean;
+  draggingIndex?: number;
+  dragOverIndex?: number;
+  handleDragStart: (
+    event: DragEvent<HTMLButtonElement>,
+    sourceIndex: number
+  ) => void;
+  handleDragEnd: () => void;
+  handleDragOver: (
+    event: DragEvent<HTMLDivElement>,
+    targetIndex: number
+  ) => void;
+  handleDragLeave: () => void;
+  handleDrop: (event: DragEvent<HTMLDivElement>, targetIndex: number) => void;
+  handleKeyDown: (
+    event: KeyboardEvent<HTMLButtonElement>,
+    sourceIndex: number
+  ) => void;
+}
+
+function useSortableRows<T>({
+  items,
+  scopeId,
+  dragType,
+  readOnly,
+  onChange
+}: {
+  items: T[];
+  scopeId: string;
+  dragType: string;
+  readOnly?: boolean;
+  onChange: (next: T[]) => void;
+}): SortableRowsController {
+  const [draggingIndex, setDraggingIndex] = useState<number>();
+  const [dragOverIndex, setDragOverIndex] = useState<number>();
+  const canReorder = !readOnly && items.length > 1;
+
+  const handleDragStart = (
+    event: DragEvent<HTMLButtonElement>,
+    sourceIndex: number
+  ) => {
+    if (!canReorder) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(
+      dragType,
+      JSON.stringify({ scopeId, index: sourceIndex })
+    );
+    setDraggingIndex(sourceIndex);
+  };
+
+  const handleDragOver = (
+    event: DragEvent<HTMLDivElement>,
+    targetIndex: number
+  ) => {
+    if (!canReorder || !event.dataTransfer.types.includes(dragType)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverIndex(targetIndex);
+  };
+
+  const handleDrop = (
+    event: DragEvent<HTMLDivElement>,
+    targetIndex: number
+  ) => {
+    event.preventDefault();
+    setDragOverIndex(undefined);
+    const raw = event.dataTransfer.getData(dragType);
+    if (!raw) return;
+    try {
+      const source = JSON.parse(raw) as {
+        scopeId?: string;
+        index?: number;
+      };
+      if (
+        source.scopeId === scopeId &&
+        typeof source.index === "number" &&
+        source.index >= 0 &&
+        source.index < items.length &&
+        source.index !== targetIndex
+      ) {
+        onChange(moveWordNode(items, source.index, targetIndex));
+      }
+    } catch {
+      // Ignore drag data from outside this sortable editor.
+    }
+  };
+
+  const handleKeyDown = (
+    event: KeyboardEvent<HTMLButtonElement>,
+    sourceIndex: number
+  ) => {
+    if (!canReorder) return;
+    if (event.key === "ArrowUp" && sourceIndex > 0) {
+      event.preventDefault();
+      onChange(moveWordNode(items, sourceIndex, sourceIndex - 1));
+    }
+    if (event.key === "ArrowDown" && sourceIndex < items.length - 1) {
+      event.preventDefault();
+      onChange(moveWordNode(items, sourceIndex, sourceIndex + 1));
+    }
+  };
+
+  return {
+    canReorder,
+    draggingIndex,
+    dragOverIndex,
+    handleDragStart,
+    handleDragEnd: () => {
+      setDraggingIndex(undefined);
+      setDragOverIndex(undefined);
+    },
+    handleDragOver,
+    handleDragLeave: () => setDragOverIndex(undefined),
+    handleDrop,
+    handleKeyDown
+  };
+}
 
 function setEnglishText(
   value: EnglishTextV2,
@@ -129,25 +310,15 @@ function setEnglishText(
 function EnglishTextEditor({
   value,
   clientId,
-  fieldKind,
+  activeDialect,
   readOnly,
-  generating,
-  onChange,
-  onGenerate
+  onChange
 }: {
   value: EnglishTextV2;
   clientId: string;
-  fieldKind: EnglishFieldKind;
+  activeDialect: MeaningDialect;
   readOnly?: boolean;
-  generating?: boolean;
   onChange: (next: EnglishTextV2) => void;
-  onGenerate: (
-    clientId: string,
-    fieldKind: EnglishFieldKind,
-    source: "uk" | "us",
-    target: "uk" | "us",
-    sourceValue: RichText
-  ) => Promise<RichText | undefined>;
 }) {
   if (value.mode === "unified") {
     return (
@@ -164,102 +335,34 @@ function EnglishTextEditor({
       />
     );
   }
+  const dialect = activeDialect;
+  const slot = value[dialect];
   return (
     <div
-      className="dialect-grid"
+      className={`word-meaning-dialect-panel dialect-panel-${dialect}`}
       data-word-node-id={clientId}
       data-word-field="content"
     >
-      {(["uk", "us"] as const).map((dialect) => {
-        const slot = value[dialect];
-        const source = value.source_dialect;
-        const sourceSlot = value[source];
-        return (
-          <div
-            className={`dialect-panel dialect-panel-${dialect}`}
-            key={dialect}
-          >
-            <Flex justify="space-between" align="center">
-              <Typography.Text strong>
-                {DIALECT_LABEL[dialect]} · {dialect === "uk" ? "BrE" : "AmE"}
-              </Typography.Text>
-              {dialect === source && <Tag color="blue">源文本</Tag>}
-            </Flex>
-            {slot.state === "ready" ? (
-              <>
-                <Input.TextArea
-                  aria-label={`${DIALECT_LABEL[dialect]}英语文本`}
-                  value={slot.variant.value.text}
-                  readOnly={readOnly}
-                  autoSize={{ minRows: 2, maxRows: 6 }}
-                  style={{ marginTop: 8 }}
-                  onChange={(event) =>
-                    onChange(setEnglishText(value, dialect, event.target.value))
-                  }
-                />
-                <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-                  来源：{slot.variant.origin}
-                </Typography.Text>
-              </>
-            ) : (
-              <Flex vertical gap={8} style={{ marginTop: 8 }}>
-                <Alert type="warning" showIcon title="目标方言文本尚未填写" />
-                {!readOnly && (
-                  <Space wrap>
-                    <Button
-                      size="small"
-                      icon={<ThunderboltOutlined />}
-                      loading={generating}
-                      disabled={
-                        !adminWordsDataSourceCapabilities.dialectVariantSuggestions ||
-                        sourceSlot.state !== "ready" ||
-                        sourceSlot.variant.value.text.trim() === ""
-                      }
-                      title={
-                        adminWordsDataSourceCapabilities.dialectVariantSuggestions
-                          ? undefined
-                          : "真实方言建议服务尚未接入，请手工填写"
-                      }
-                      onClick={() => {
-                        if (sourceSlot.state !== "ready") return;
-                        void onGenerate(
-                          clientId,
-                          fieldKind,
-                          source,
-                          dialect,
-                          sourceSlot.variant.value
-                        ).then((suggestion) => {
-                          if (!suggestion) return;
-                          onChange({
-                            ...value,
-                            [dialect]: {
-                              state: "ready",
-                              variant: {
-                                value: suggestion,
-                                origin: "converted"
-                              }
-                            }
-                          });
-                        });
-                      }}
-                    >
-                      生成{dialect === "uk" ? "英式" : "美式"}建议
-                    </Button>
-                    <Button
-                      size="small"
-                      onClick={() =>
-                        onChange(setEnglishText(value, dialect, ""))
-                      }
-                    >
-                      手工填写
-                    </Button>
-                  </Space>
-                )}
-              </Flex>
-            )}
-          </div>
-        );
-      })}
+      <Input.TextArea
+        aria-label={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
+        value={slot.state === "ready" ? slot.variant.value.text : ""}
+        readOnly={readOnly}
+        placeholder={
+          slot.state === "missing" ? "待自动补全，也可直接填写" : undefined
+        }
+        autoSize={{ minRows: 2, maxRows: 6 }}
+        onChange={(event) =>
+          onChange(setEnglishText(value, dialect, event.target.value))
+        }
+      />
+      <Flex justify="space-between" align="center" style={{ marginTop: 5 }}>
+        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+          {slot.state === "ready"
+            ? `来源：${slot.variant.origin}`
+            : "待补全，可直接手工填写"}
+        </Typography.Text>
+        {dialect === value.source_dialect && <Tag color="blue">源文本</Tag>}
+      </Flex>
     </div>
   );
 }
@@ -277,26 +380,84 @@ function GrammarEditor({
   readOnly?: boolean;
   onChange: (next: WordPosMeaningsV2["grammar_structures"]) => void;
 }) {
+  const { message } = App.useApp();
   const dialects = grammarDialects(headwords);
+  const [draggingIndex, setDraggingIndex] = useState<number>();
+  const [dragOverIndex, setDragOverIndex] = useState<number>();
+  const canReorder = !readOnly && value.length > 1;
+
+  const handleDragStart = (
+    event: DragEvent<HTMLButtonElement>,
+    grammarIndex: number
+  ) => {
+    if (!canReorder) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(
+      GRAMMAR_DRAG_TYPE,
+      JSON.stringify({ posId, index: grammarIndex })
+    );
+    setDraggingIndex(grammarIndex);
+  };
+
+  const handleDragOver = (
+    event: DragEvent<HTMLDivElement>,
+    grammarIndex: number
+  ) => {
+    if (!canReorder || !event.dataTransfer.types.includes(GRAMMAR_DRAG_TYPE)) {
+      return;
+    }
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverIndex(grammarIndex);
+  };
+
+  const handleDrop = (
+    event: DragEvent<HTMLDivElement>,
+    targetIndex: number
+  ) => {
+    event.preventDefault();
+    setDragOverIndex(undefined);
+    const raw = event.dataTransfer.getData(GRAMMAR_DRAG_TYPE);
+    if (!raw) return;
+    try {
+      const source = JSON.parse(raw) as { posId?: string; index?: number };
+      if (
+        source.posId === posId &&
+        typeof source.index === "number" &&
+        source.index !== targetIndex
+      ) {
+        onChange(moveWordNode(value, source.index, targetIndex));
+      }
+    } catch {
+      // Ignore drag data from outside the grammar editor.
+    }
+  };
+
   return (
     <Card
-      title="语法结构"
+      className="word-grammar-card"
+      title={<Typography.Text strong>语法结构</Typography.Text>}
       size="small"
       data-word-node-id={posId}
       data-word-field="grammar_structures"
     >
-      <Alert
-        type="info"
-        showIcon
-        title="语法结构由人工填写，不参与英美自动转换。"
-        style={{ marginBottom: 12 }}
-      />
       {value.map((grammar, grammarIndex) => (
-        <div className="word-table-row" key={grammar.id}>
-          <span className="word-number-cell">{grammarIndex + 1}</span>
-          <Typography.Text strong style={{ paddingTop: 6 }}>
-            结构 {grammarIndex + 1}
-          </Typography.Text>
+        <div
+          className={`word-table-row word-grammar-row${draggingIndex === grammarIndex ? " is-dragging" : ""}${dragOverIndex === grammarIndex ? " is-drag-over" : ""}`}
+          key={grammar.id}
+          onDragOver={(event) => handleDragOver(event, grammarIndex)}
+          onDragLeave={() => setDragOverIndex(undefined)}
+          onDrop={(event) => handleDrop(event, grammarIndex)}
+        >
+          <span
+            className="word-grammar-index"
+            aria-label={`第 ${grammarIndex + 1} 个语法结构`}
+          >
+            {grammarIndex + 1}
+          </span>
           <div className={dialects.length > 1 ? "dialect-grid" : undefined}>
             {dialects.map((dialect) => {
               const variant = grammar.variants.find(
@@ -309,12 +470,20 @@ function GrammarEditor({
                   key={variant.id}
                 >
                   <Typography.Text strong>
-                    {DIALECT_LABEL[dialect]}
+                    {DIALECT_SHORT_LABEL[dialect]}
                   </Typography.Text>
                   <Space.Compact block style={{ marginTop: 8 }}>
-                    <Button icon={<SoundOutlined />} disabled />
+                    <Tooltip title="播放语音">
+                      <Button
+                        className="word-pronunciation-play-action"
+                        icon={<SoundOutlined />}
+                        aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1} 播放语音`}
+                        disabled
+                      />
+                    </Tooltip>
                     <Input
-                      aria-label={`${DIALECT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
+                      className="word-pronunciation-phonetic-input"
+                      aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
                       data-word-node-id={grammar.id}
                       data-word-field="content"
                       value={variant.content.text}
@@ -332,6 +501,24 @@ function GrammarEditor({
                         onChange(grammars);
                       }}
                     />
+                    <Tooltip title="获取语音">
+                      <Button
+                        className="word-pronunciation-voice-action word-pronunciation-sync-action"
+                        icon={<SyncOutlined />}
+                        aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1} 获取语音`}
+                        disabled={readOnly}
+                        onClick={() => message.info("获取语音（Mock）")}
+                      />
+                    </Tooltip>
+                    <Tooltip title="上传语音">
+                      <Button
+                        className="word-pronunciation-voice-action"
+                        icon={<UploadOutlined />}
+                        aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1} 上传语音`}
+                        disabled={readOnly}
+                        onClick={() => message.info("上传语音（Mock）")}
+                      />
+                    </Tooltip>
                   </Space.Compact>
                 </div>
               );
@@ -339,24 +526,43 @@ function GrammarEditor({
           </div>
           {!readOnly && (
             <Space orientation="vertical" size={2}>
-              <Button
-                type="text"
-                icon={<UpOutlined />}
-                aria-label={`上移语法结构 ${grammarIndex + 1}`}
-                disabled={grammarIndex === 0}
-                onClick={() =>
-                  onChange(moveWordNode(value, grammarIndex, grammarIndex - 1))
+              <button
+                type="button"
+                className="word-grammar-drag-handle"
+                aria-label={`拖动语法结构 ${grammarIndex + 1}`}
+                title={
+                  canReorder
+                    ? "拖动排序，也可使用上下方向键"
+                    : "至少需要两条语法结构"
                 }
-              />
-              <Button
-                type="text"
-                icon={<DownOutlined />}
-                aria-label={`下移语法结构 ${grammarIndex + 1}`}
-                disabled={grammarIndex === value.length - 1}
-                onClick={() =>
-                  onChange(moveWordNode(value, grammarIndex, grammarIndex + 1))
-                }
-              />
+                draggable={canReorder}
+                disabled={!canReorder}
+                onDragStart={(event) => handleDragStart(event, grammarIndex)}
+                onDragEnd={() => {
+                  setDraggingIndex(undefined);
+                  setDragOverIndex(undefined);
+                }}
+                onKeyDown={(event) => {
+                  if (!canReorder) return;
+                  if (event.key === "ArrowUp" && grammarIndex > 0) {
+                    event.preventDefault();
+                    onChange(
+                      moveWordNode(value, grammarIndex, grammarIndex - 1)
+                    );
+                  }
+                  if (
+                    event.key === "ArrowDown" &&
+                    grammarIndex < value.length - 1
+                  ) {
+                    event.preventDefault();
+                    onChange(
+                      moveWordNode(value, grammarIndex, grammarIndex + 1)
+                    );
+                  }
+                }}
+              >
+                ≡
+              </button>
               <Button
                 type="text"
                 danger
@@ -373,6 +579,7 @@ function GrammarEditor({
       ))}
       {!readOnly && (
         <Button
+          className="word-grammar-add"
           type="dashed"
           block
           icon={<PlusOutlined />}
@@ -388,34 +595,35 @@ function GrammarEditor({
 function DefinitionEditor({
   value,
   index,
-  last,
   headwords,
   grammars,
+  activeDialect,
   readOnly,
-  generating,
-  onGenerate,
+  englishReadOnly,
+  sorting,
   onChange,
-  onMove,
   onRemove
 }: {
   value: WordDefinitionV2;
   index: number;
-  last: boolean;
   headwords: WordHeadwordsV2;
   grammars: WordPosMeaningsV2["grammar_structures"];
+  activeDialect: MeaningDialect;
   readOnly?: boolean;
-  generating?: boolean;
-  onGenerate: Parameters<typeof EnglishTextEditor>[0]["onGenerate"];
+  englishReadOnly?: boolean;
+  sorting: SortableRowsController;
   onChange: (next: WordDefinitionV2) => void;
-  onMove: (delta: -1 | 1) => void;
   onRemove: () => void;
 }) {
   const english = value.definition_mode.startsWith("en_");
   return (
     <div
-      className="word-table-row"
+      className={`word-table-row word-definition-row${sorting.draggingIndex === index ? " is-dragging" : ""}${sorting.dragOverIndex === index ? " is-drag-over" : ""}`}
       data-word-node-id={value.id}
       data-word-field="definition"
+      onDragOver={(event) => sorting.handleDragOver(event, index)}
+      onDragLeave={sorting.handleDragLeave}
+      onDrop={(event) => sorting.handleDrop(event, index)}
     >
       <span className="word-number-cell">{index + 1}</span>
       <Space orientation="vertical" size={8}>
@@ -472,10 +680,8 @@ function DefinitionEditor({
           <EnglishTextEditor
             value={value.content as EnglishTextV2}
             clientId={value.id}
-            fieldKind="definition"
-            readOnly={readOnly}
-            generating={generating}
-            onGenerate={onGenerate}
+            activeDialect={activeDialect}
+            readOnly={readOnly || englishReadOnly}
             onChange={(content) =>
               onChange({
                 ...value,
@@ -514,7 +720,11 @@ function DefinitionEditor({
           disabled={readOnly}
           options={grammars.map((grammar, grammarIndex) => ({
             value: grammar.id,
-            label: `语法结构 ${grammarIndex + 1}`
+            label: grammarStructureOptionLabel(
+              grammar,
+              grammarIndex,
+              activeDialect
+            )
           }))}
           onChange={(grammar_structure_id) =>
             onChange({ ...value, grammar_structure_id })
@@ -523,20 +733,23 @@ function DefinitionEditor({
       </Space>
       {!readOnly && (
         <Space orientation="vertical" size={2}>
-          <Button
-            type="text"
-            icon={<UpOutlined />}
-            aria-label={`上移释义 ${index + 1}`}
-            disabled={index === 0}
-            onClick={() => onMove(-1)}
-          />
-          <Button
-            type="text"
-            icon={<DownOutlined />}
-            aria-label={`下移释义 ${index + 1}`}
-            disabled={last}
-            onClick={() => onMove(1)}
-          />
+          <button
+            type="button"
+            className="word-grammar-drag-handle"
+            aria-label={`拖动释义 ${index + 1}`}
+            title={
+              sorting.canReorder
+                ? "拖动排序，也可使用上下方向键"
+                : "至少需要两条释义"
+            }
+            draggable={sorting.canReorder}
+            disabled={!sorting.canReorder}
+            onDragStart={(event) => sorting.handleDragStart(event, index)}
+            onDragEnd={sorting.handleDragEnd}
+            onKeyDown={(event) => sorting.handleKeyDown(event, index)}
+          >
+            ≡
+          </button>
           <Button
             type="text"
             danger
@@ -565,10 +778,11 @@ function ContextLinksEditor({
     <Space orientation="vertical" size={8} style={{ width: "100%" }}>
       <Input
         prefix={<LockOutlined />}
-        value={focus ? `当前词条 / 当前词义 · ${focus.sense_id}` : "主关联缺失"}
+        value={focus ? "已自动关联当前词义" : "主关联缺失"}
         status={focus ? undefined : "error"}
         readOnly
         aria-label="例句主关联"
+        className="word-sentence-focus-link"
       />
       {contexts.map((link, index) => (
         <Space.Compact block key={`${link.word_id}-${link.sense_id}-${index}`}>
@@ -650,29 +864,30 @@ function ContextLinksEditor({
 function SentenceEditor({
   value,
   index,
-  last,
+  activeDialect,
   readOnly,
-  generating,
-  onGenerate,
+  englishReadOnly,
+  sorting,
   onChange,
-  onMove,
   onRemove
 }: {
   value: WordSentenceV2;
   index: number;
-  last: boolean;
+  activeDialect: MeaningDialect;
   readOnly?: boolean;
-  generating?: boolean;
-  onGenerate: Parameters<typeof EnglishTextEditor>[0]["onGenerate"];
+  englishReadOnly?: boolean;
+  sorting: SortableRowsController;
   onChange: (next: WordSentenceV2) => void;
-  onMove: (delta: -1 | 1) => void;
   onRemove: () => void;
 }) {
   return (
     <div
-      className="word-table-row"
+      className={`word-table-row word-sentence-row${sorting.draggingIndex === index ? " is-dragging" : ""}${sorting.dragOverIndex === index ? " is-drag-over" : ""}`}
       data-word-node-id={value.id}
       data-word-field="sentence"
+      onDragOver={(event) => sorting.handleDragOver(event, index)}
+      onDragLeave={sorting.handleDragLeave}
+      onDrop={(event) => sorting.handleDrop(event, index)}
     >
       <span className="word-number-cell">{index + 1}</span>
       <Select
@@ -683,28 +898,34 @@ function SentenceEditor({
         onChange={(level) => onChange({ ...value, level })}
       />
       <Space orientation="vertical" size={10} style={{ width: "100%" }}>
-        <EnglishTextEditor
-          value={value.en_text}
-          clientId={value.id}
-          fieldKind="example"
-          readOnly={readOnly}
-          generating={generating}
-          onGenerate={onGenerate}
-          onChange={(en_text) => onChange({ ...value, en_text })}
-        />
-        <Input.TextArea
-          aria-label="汉语译文"
-          value={value.zh_text.text}
-          readOnly={readOnly}
-          placeholder="汉语译文"
-          autoSize={{ minRows: 2, maxRows: 5 }}
-          onChange={(event) =>
-            onChange({
-              ...value,
-              zh_text: toWordRichText(event.target.value, value.zh_text)
-            })
-          }
-        />
+        <div className="word-sentence-bilingual-grid">
+          <Space orientation="vertical" size={6} style={{ width: "100%" }}>
+            <Typography.Text strong>英文例句</Typography.Text>
+            <EnglishTextEditor
+              value={value.en_text}
+              clientId={value.id}
+              activeDialect={activeDialect}
+              readOnly={readOnly || englishReadOnly}
+              onChange={(en_text) => onChange({ ...value, en_text })}
+            />
+          </Space>
+          <Space orientation="vertical" size={6} style={{ width: "100%" }}>
+            <Typography.Text strong>汉语译文</Typography.Text>
+            <Input.TextArea
+              aria-label="汉语译文"
+              value={value.zh_text.text}
+              readOnly={readOnly}
+              placeholder="请输入汉语译文"
+              autoSize={{ minRows: 2, maxRows: 6 }}
+              onChange={(event) =>
+                onChange({
+                  ...value,
+                  zh_text: toWordRichText(event.target.value, value.zh_text)
+                })
+              }
+            />
+          </Space>
+        </div>
         <ContextLinksEditor
           sentence={value}
           readOnly={readOnly}
@@ -713,20 +934,23 @@ function SentenceEditor({
       </Space>
       {!readOnly && (
         <Space orientation="vertical" size={2}>
-          <Button
-            type="text"
-            icon={<UpOutlined />}
-            aria-label={`上移例句 ${index + 1}`}
-            disabled={index === 0}
-            onClick={() => onMove(-1)}
-          />
-          <Button
-            type="text"
-            icon={<DownOutlined />}
-            aria-label={`下移例句 ${index + 1}`}
-            disabled={last}
-            onClick={() => onMove(1)}
-          />
+          <button
+            type="button"
+            className="word-grammar-drag-handle"
+            aria-label={`拖动例句 ${index + 1}`}
+            title={
+              sorting.canReorder
+                ? "拖动排序，也可使用上下方向键"
+                : "至少需要两条例句"
+            }
+            draggable={sorting.canReorder}
+            disabled={!sorting.canReorder}
+            onDragStart={(event) => sorting.handleDragStart(event, index)}
+            onDragEnd={sorting.handleDragEnd}
+            onKeyDown={(event) => sorting.handleKeyDown(event, index)}
+          >
+            ≡
+          </button>
           <Button
             type="text"
             danger
@@ -740,67 +964,9 @@ function SentenceEditor({
   );
 }
 
-function RelatedTargetSelect({
-  value,
-  readOnly,
-  onChange
-}: {
-  value: WordRelationV2;
-  readOnly?: boolean;
-  onChange: (next: WordRelationV2) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState(value.target_headword ?? "");
-  const result = useRelatedSearch(query, open);
-  const options =
-    result.data?.results.flatMap((word) =>
-      word.senses.map((sense) => ({
-        value: `${word.word_id}::${sense.sense_id}`,
-        label: `${word.headword} · ${sense.gloss}`,
-        wordId: word.word_id,
-        senseId: sense.sense_id,
-        headword: word.headword,
-        gloss: sense.gloss
-      }))
-    ) ?? [];
-  return (
-    <AutoComplete
-      aria-label="搜索关联词并选择词义"
-      data-word-node-id={value.id}
-      data-word-field="target_word_id"
-      value={query}
-      options={options}
-      open={open}
-      disabled={readOnly}
-      placeholder="搜索关联词并选择词义"
-      onDropdownVisibleChange={setOpen}
-      onSearch={(nextQuery) => {
-        setQuery(nextQuery);
-        if (
-          nextQuery !== (value.target_headword ?? "") &&
-          (value.target_word_id || value.target_sense_id)
-        ) {
-          onChange({
-            ...value,
-            target_word_id: "",
-            target_sense_id: "",
-            target_headword: undefined,
-            target_gloss: undefined
-          });
-        }
-      }}
-      onSelect={(_, option) => {
-        setQuery(option.headword as string);
-        onChange({
-          ...value,
-          target_word_id: option.wordId as string,
-          target_sense_id: option.senseId as string,
-          target_headword: option.headword as string,
-          target_gloss: option.gloss as string
-        });
-      }}
-    />
-  );
+interface RelationSenseChoice {
+  senseId: string;
+  gloss?: string;
 }
 
 function RelationsEditor({
@@ -812,34 +978,142 @@ function RelationsEditor({
   readOnly?: boolean;
   onChange: (next: WordRelationV2[]) => void;
 }) {
+  const [searching, setSearching] = useState<{
+    relationId: string;
+    query: string;
+  } | null>(null);
+  const [senseChoices, setSenseChoices] = useState<
+    Record<string, RelationSenseChoice[]>
+  >({});
+  const [collapsed, setCollapsed] = useState<Record<WordRelationType, boolean>>(
+    {
+      synonym: false,
+      antonym: false,
+      derivative: false
+    }
+  );
+  const relatedSearch = useRelatedSearch(
+    searching?.query ?? "",
+    searching !== null
+  );
+  const searchResults = relatedSearch.data?.results ?? [];
+  const wordOptions = searchResults.map((item) => ({
+    value: item.headword,
+    label: (
+      <Flex justify="space-between" gap={8}>
+        <Typography.Text strong>{item.headword}</Typography.Text>
+        <Typography.Text
+          type="secondary"
+          className="word-relation-option-count"
+        >
+          {item.senses.length} 个词义
+        </Typography.Text>
+      </Flex>
+    )
+  }));
+
+  const updateRelation = (
+    relationId: string,
+    update: Partial<WordRelationV2>
+  ) => {
+    onChange(
+      value.map((relation) =>
+        relation.id === relationId ? { ...relation, ...update } : relation
+      )
+    );
+  };
+
+  const selectWord = (relationId: string, headword: string) => {
+    const selected = searchResults.find((item) => item.headword === headword);
+    if (!selected) return;
+    const choices = selected.senses.map((sense) => ({
+      senseId: sense.sense_id,
+      gloss: sense.gloss
+    }));
+    const firstSense = choices[0];
+    setSenseChoices((current) => ({
+      ...current,
+      [relationId]: choices
+    }));
+    updateRelation(relationId, {
+      target_word_id: selected.word_id,
+      target_headword: selected.headword,
+      target_sense_id: firstSense?.senseId ?? "",
+      target_gloss: firstSense?.gloss
+    });
+    setSearching(null);
+  };
+
   return (
-    <div className="word-inline-grid">
+    <div className="word-relations-grid">
       {(Object.keys(RELATION_META) as WordRelationType[]).map((type) => {
         const meta = RELATION_META[type];
         const relations = value.filter((item) => item.relation === type);
         return (
-          <Card size="small" title={meta.title} key={type}>
-            <Space orientation="vertical" style={{ width: "100%" }}>
+          <Card
+            size="small"
+            className={`word-relation-card${collapsed[type] ? " is-collapsed" : ""}`}
+            title={meta.title}
+            extra={
+              <Button
+                type="text"
+                size="small"
+                className="word-relation-collapse"
+                icon={collapsed[type] ? <DownOutlined /> : <UpOutlined />}
+                iconPlacement="end"
+                aria-label={`${collapsed[type] ? "展开" : "收起"}${meta.title}`}
+                onClick={() =>
+                  setCollapsed((current) => ({
+                    ...current,
+                    [type]: !current[type]
+                  }))
+                }
+              >
+                {collapsed[type] ? "展开" : "收起"}
+              </Button>
+            }
+            key={type}
+          >
+            <Space
+              className="word-relation-list"
+              orientation="vertical"
+              style={{ width: "100%" }}
+            >
+              <div className="word-relation-column-heads">
+                <span>{meta.metric}</span>
+                <span>{meta.title}</span>
+                <span>匹配词义</span>
+                <span />
+              </div>
               {relations.map((relation) => {
                 const absoluteIndex = value.findIndex(
                   (item) => item.id === relation.id
                 );
+                const resultSenses = searchResults.find(
+                  (item) => item.word_id === relation.target_word_id
+                )?.senses;
+                const availableSenses =
+                  senseChoices[relation.id] ??
+                  resultSenses?.map((sense) => ({
+                    senseId: sense.sense_id,
+                    gloss: sense.gloss
+                  })) ??
+                  (relation.target_sense_id
+                    ? [
+                        {
+                          senseId: relation.target_sense_id,
+                          gloss: relation.target_gloss
+                        }
+                      ]
+                    : []);
+                const isSearching = searching?.relationId === relation.id;
                 return (
-                  <Space.Compact
-                    block
+                  <div
+                    className="word-relation-row"
                     key={relation.id}
                     data-word-node-id={relation.id}
                     data-word-field="target_word_id"
                   >
-                    <RelatedTargetSelect
-                      value={relation}
-                      readOnly={readOnly}
-                      onChange={(next) => {
-                        const relationsValue = [...value];
-                        relationsValue[absoluteIndex] = next;
-                        onChange(relationsValue);
-                      }}
-                    />
                     <InputNumber
                       aria-label={meta.metric}
                       data-word-node-id={relation.id}
@@ -849,8 +1123,8 @@ function RelationsEditor({
                       precision={2}
                       value={Number(relation.score)}
                       disabled={readOnly}
-                      addonAfter="%"
-                      style={{ width: 125 }}
+                      suffix="%"
+                      size="small"
                       onChange={(score) => {
                         const relationsValue = [...value];
                         relationsValue[absoluteIndex] = {
@@ -860,8 +1134,76 @@ function RelationsEditor({
                         onChange(relationsValue);
                       }}
                     />
+                    <AutoComplete
+                      className="word-relation-autocomplete"
+                      value={
+                        isSearching
+                          ? searching.query
+                          : relation.target_headword || ""
+                      }
+                      options={isSearching ? wordOptions : []}
+                      disabled={readOnly}
+                      filterOption={false}
+                      popupMatchSelectWidth={260}
+                      notFoundContent={
+                        relatedSearch.isFetching
+                          ? "搜索中…"
+                          : searching?.query
+                            ? "未找到匹配词条"
+                            : "输入词汇搜索"
+                      }
+                      onFocus={() =>
+                        setSearching({
+                          relationId: relation.id,
+                          query: relation.target_headword || ""
+                        })
+                      }
+                      onSearch={(query) => {
+                        setSearching({ relationId: relation.id, query });
+                        updateRelation(relation.id, {
+                          target_word_id: "",
+                          target_sense_id: "",
+                          target_headword: query,
+                          target_gloss: undefined
+                        });
+                      }}
+                      onSelect={(headword) => selectWord(relation.id, headword)}
+                    >
+                      <Input
+                        aria-label={`${meta.title}目标词条`}
+                        className="word-relation-target"
+                        prefix={<SoundOutlined />}
+                        placeholder="搜索关联词"
+                        autoFocus={isSearching && searching.query === ""}
+                        readOnly={readOnly}
+                        size="small"
+                      />
+                    </AutoComplete>
+                    <Select
+                      aria-label={`${meta.title}目标词义`}
+                      className="word-relation-sense"
+                      value={relation.target_sense_id || undefined}
+                      options={availableSenses.map((sense) => ({
+                        value: sense.senseId,
+                        label: sense.gloss || "（无释义）"
+                      }))}
+                      placeholder="选择词义"
+                      disabled={readOnly || !relation.target_word_id}
+                      size="small"
+                      onChange={(target_sense_id) => {
+                        const selectedSense = availableSenses.find(
+                          (sense) => sense.senseId === target_sense_id
+                        );
+                        updateRelation(relation.id, {
+                          target_sense_id,
+                          target_gloss: selectedSense?.gloss
+                        });
+                      }}
+                    />
                     {!readOnly && (
                       <Button
+                        size="small"
+                        type="text"
                         danger
                         icon={<DeleteOutlined />}
                         aria-label={`删除${meta.title}`}
@@ -872,15 +1214,20 @@ function RelationsEditor({
                         }
                       />
                     )}
-                  </Space.Compact>
+                  </div>
                 );
               })}
               {!readOnly && (
                 <Button
                   type="dashed"
                   block
+                  size="small"
                   icon={<PlusOutlined />}
-                  onClick={() => onChange([...value, createRelation(type)])}
+                  onClick={() => {
+                    const relation = createRelation(type);
+                    onChange([...value, relation]);
+                    setSearching({ relationId: relation.id, query: "" });
+                  }}
                 >
                   添加{meta.title}
                 </Button>
@@ -901,10 +1248,13 @@ function SenseEditor({
   wordId,
   senseGroups,
   grammars,
+  subPosOptions,
+  subPosLabel,
+  catalogUnavailable,
+  activeDialect,
   readOnly,
-  generating,
+  englishReadOnly,
   forceOpen,
-  onGenerate,
   onChange,
   onMove,
   onRemove
@@ -916,10 +1266,13 @@ function SenseEditor({
   wordId: string;
   senseGroups: DraftMeaningsStepContent["sense_groups"];
   grammars: WordPosMeaningsV2["grammar_structures"];
+  subPosOptions: Array<{ value: string; label: string }>;
+  subPosLabel?: string;
+  catalogUnavailable: boolean;
+  activeDialect: MeaningDialect;
   readOnly?: boolean;
-  generating?: boolean;
+  englishReadOnly?: boolean;
   forceOpen?: boolean;
-  onGenerate: Parameters<typeof EnglishTextEditor>[0]["onGenerate"];
   onChange: (next: WordSenseV2) => void;
   onMove: (delta: -1 | 1) => void;
   onRemove: () => void;
@@ -929,16 +1282,28 @@ function SenseEditor({
     if (forceOpen) setExpanded(true);
   }, [forceOpen]);
 
-  const titleDefinition = value.definitions.find(
-    (definition) =>
-      definition.definition_mode.startsWith("zh_") &&
-      (definition.content as RichText).text.trim()
+  const definitionSorting = useSortableRows({
+    items: value.definitions,
+    scopeId: `${value.id}:definitions`,
+    dragType: DEFINITION_DRAG_TYPE,
+    readOnly,
+    onChange: (definitions) => onChange({ ...value, definitions })
+  });
+  const sentenceSorting = useSortableRows({
+    items: value.sentences,
+    scopeId: `${value.id}:sentences`,
+    dragType: SENTENCE_DRAG_TYPE,
+    readOnly,
+    onChange: (sentences) => onChange({ ...value, sentences })
+  });
+
+  const definitionText = definitionTitleText(
+    value.definitions[0],
+    activeDialect
   );
-  const definitionText = titleDefinition
-    ? (titleDefinition.content as RichText).text
-    : "待填写中文释义";
   return (
     <Collapse
+      className={`word-sense-editor word-sense-editor-${value.level.toLowerCase()}`}
       data-word-node-id={value.id}
       data-word-field="sense"
       activeKey={expanded ? [value.id] : []}
@@ -948,47 +1313,70 @@ function SenseEditor({
       items={[
         {
           key: value.id,
+          showArrow: false,
           label: (
-            <Space wrap>
-              <Tag color={cefrColor(value.level)}>{value.level}</Tag>
-              <Typography.Text strong>
-                {index + 1}. {definitionText}
-              </Typography.Text>
-              {value.sub_pos && <Tag color="green">{value.sub_pos}</Tag>}
-            </Space>
+            <div className="word-sense-header-label">
+              <Space wrap size={6}>
+                <Tag color={cefrColor(value.level)}>{value.level}</Tag>
+                <Typography.Text strong>
+                  {index + 1}. {definitionText}
+                </Typography.Text>
+                {subPosLabel && <Tag color="green">{subPosLabel}</Tag>}
+              </Space>
+              <span className="word-form-card-toggle-state">
+                <span>{expanded ? "收起" : "展开"}</span>
+                <DownOutlined
+                  className={`word-form-card-toggle-icon${expanded ? "" : " is-collapsed"}`}
+                />
+              </span>
+            </div>
           ),
           extra: !readOnly ? (
-            <Space onClick={(event) => event.stopPropagation()}>
+            <Dropdown
+              trigger={["click"]}
+              placement="bottomRight"
+              menu={{
+                items: [
+                  {
+                    key: "move-up",
+                    icon: <UpOutlined />,
+                    label: "上移词义",
+                    disabled: index === 0
+                  },
+                  {
+                    key: "move-down",
+                    icon: <DownOutlined />,
+                    label: "下移词义",
+                    disabled: last
+                  },
+                  { type: "divider" },
+                  {
+                    key: "delete",
+                    icon: <DeleteOutlined />,
+                    label: "删除词义",
+                    danger: true
+                  }
+                ],
+                onClick: ({ key, domEvent }) => {
+                  domEvent.stopPropagation();
+                  if (key === "move-up") onMove(-1);
+                  if (key === "move-down") onMove(1);
+                  if (key === "delete") onRemove();
+                }
+              }}
+            >
               <Button
                 type="text"
-                size="small"
-                icon={<UpOutlined />}
-                aria-label={`上移词义 ${index + 1}`}
-                disabled={index === 0}
-                onClick={() => onMove(-1)}
+                icon={<EllipsisOutlined />}
+                aria-label={`管理词义 ${index + 1}`}
+                onClick={(event) => event.stopPropagation()}
               />
-              <Button
-                type="text"
-                size="small"
-                icon={<DownOutlined />}
-                aria-label={`下移词义 ${index + 1}`}
-                disabled={last}
-                onClick={() => onMove(1)}
-              />
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                aria-label={`删除词义 ${index + 1}`}
-                onClick={onRemove}
-              />
-            </Space>
+            </Dropdown>
           ) : null,
           children: (
-            <Space orientation="vertical" size={16} style={{ width: "100%" }}>
-              <div className="word-inline-grid">
-                <div>
+            <Space orientation="vertical" size={14} style={{ width: "100%" }}>
+              <div className="word-sense-meta-grid">
+                <div className="word-sense-field">
                   <Typography.Text type="secondary">词义等级</Typography.Text>
                   <Select
                     aria-label="词义等级"
@@ -1001,17 +1389,17 @@ function SenseEditor({
                     }
                   />
                 </div>
-                <div>
+                <div className="word-sense-field word-sense-field-group">
                   <Typography.Text type="secondary">语义区间</Typography.Text>
                   <Select
                     aria-label="语义区间"
+                    aria-required="true"
                     data-word-node-id={value.id}
                     data-word-field="sense_group_id"
-                    allowClear
                     value={value.sense_group_id}
                     options={senseGroups.map((group) => ({
                       value: group.id,
-                      label: group.name || "未命名区间"
+                      label: senseGroupOptionLabel(group)
                     }))}
                     disabled={readOnly}
                     style={{ width: "100%", marginTop: 6 }}
@@ -1020,20 +1408,20 @@ function SenseEditor({
                     }
                   />
                 </div>
-                <div>
+                <div className="word-sense-field word-sense-field-pos">
                   <Typography.Text type="secondary">细分词性</Typography.Text>
                   <Select
                     aria-label="细分词性"
                     data-word-node-id={value.id}
                     data-word-field="sub_pos"
                     value={value.sub_pos || undefined}
-                    options={SUB_POS_OPTIONS}
-                    disabled={readOnly}
+                    options={subPosOptions}
+                    disabled={readOnly || catalogUnavailable}
                     style={{ width: "100%", marginTop: 6 }}
                     onChange={(sub_pos) => onChange({ ...value, sub_pos })}
                   />
                 </div>
-                <div>
+                <div className="word-sense-field word-sense-field-frequency">
                   <Typography.Text type="secondary">词频</Typography.Text>
                   <InputNumber
                     aria-label="词频"
@@ -1044,7 +1432,7 @@ function SenseEditor({
                     precision={2}
                     value={value.frequency ? Number(value.frequency) : null}
                     disabled={readOnly}
-                    addonAfter="%"
+                    suffix="%"
                     style={{ width: "100%", marginTop: 6 }}
                     onChange={(frequency) =>
                       onChange({
@@ -1055,49 +1443,48 @@ function SenseEditor({
                     }
                   />
                 </div>
-                <Flex align="center" gap={8}>
+                <div className="word-sense-context-toggle">
                   <Typography.Text type="secondary">
                     是否依赖语境
                   </Typography.Text>
-                  <Switch
-                    aria-label="是否依赖语境"
-                    checked={value.depends_on_context}
-                    disabled={readOnly}
-                    onChange={(depends_on_context) =>
-                      onChange({ ...value, depends_on_context })
-                    }
-                  />
-                </Flex>
+                  <div className="word-sense-context-control">
+                    <Switch
+                      aria-label="是否依赖语境"
+                      checked={value.depends_on_context}
+                      disabled={readOnly}
+                      onChange={(depends_on_context) =>
+                        onChange({ ...value, depends_on_context })
+                      }
+                    />
+                  </div>
+                </div>
               </div>
 
-              <div data-word-node-id={value.id} data-word-field="definitions">
-                <Divider titlePlacement="start">多维释义</Divider>
+              <section
+                className="word-sense-section"
+                data-word-node-id={value.id}
+                data-word-field="definitions"
+              >
+                <div className="word-sense-section-title">
+                  <Typography.Text strong>多维释义</Typography.Text>
+                  <Tag>{value.definitions.length} 条</Tag>
+                </div>
                 {value.definitions.map((definition, definitionIndex) => (
                   <DefinitionEditor
                     key={definition.id}
                     value={definition}
                     index={definitionIndex}
-                    last={definitionIndex === value.definitions.length - 1}
                     headwords={headwords}
                     grammars={grammars}
+                    activeDialect={activeDialect}
                     readOnly={readOnly}
-                    generating={generating}
-                    onGenerate={onGenerate}
+                    englishReadOnly={englishReadOnly}
+                    sorting={definitionSorting}
                     onChange={(nextDefinition) => {
                       const definitions = [...value.definitions];
                       definitions[definitionIndex] = nextDefinition;
                       onChange({ ...value, definitions });
                     }}
-                    onMove={(delta) =>
-                      onChange({
-                        ...value,
-                        definitions: moveWordNode(
-                          value.definitions,
-                          definitionIndex,
-                          definitionIndex + delta
-                        )
-                      })
-                    }
                     onRemove={() =>
                       onChange({
                         ...value,
@@ -1110,6 +1497,7 @@ function SenseEditor({
                 ))}
                 {!readOnly && (
                   <Button
+                    className="word-section-add-button"
                     type="dashed"
                     block
                     icon={<PlusOutlined />}
@@ -1123,68 +1511,69 @@ function SenseEditor({
                     添加释义
                   </Button>
                 )}
-              </div>
+              </section>
 
-              <Divider titlePlacement="start">多维例句</Divider>
-              {value.sentences.map((sentence, sentenceIndex) => (
-                <SentenceEditor
-                  key={sentence.id}
-                  value={sentence}
-                  index={sentenceIndex}
-                  last={sentenceIndex === value.sentences.length - 1}
+              <section className="word-sense-section">
+                <div className="word-sense-section-title">
+                  <Typography.Text strong>多维例句</Typography.Text>
+                  <Tag>{value.sentences.length} 条</Tag>
+                </div>
+                {value.sentences.map((sentence, sentenceIndex) => (
+                  <SentenceEditor
+                    key={sentence.id}
+                    value={sentence}
+                    index={sentenceIndex}
+                    activeDialect={activeDialect}
+                    readOnly={readOnly}
+                    englishReadOnly={englishReadOnly}
+                    sorting={sentenceSorting}
+                    onChange={(nextSentence) => {
+                      const sentences = [...value.sentences];
+                      sentences[sentenceIndex] = nextSentence;
+                      onChange({ ...value, sentences });
+                    }}
+                    onRemove={() =>
+                      onChange({
+                        ...value,
+                        sentences: value.sentences.filter(
+                          (_, removeIndex) => removeIndex !== sentenceIndex
+                        )
+                      })
+                    }
+                  />
+                ))}
+                {!readOnly && (
+                  <Button
+                    className="word-section-add-button"
+                    type="dashed"
+                    block
+                    icon={<PlusOutlined />}
+                    onClick={() =>
+                      onChange({
+                        ...value,
+                        sentences: [
+                          ...value.sentences,
+                          createSentence(headwords, wordId, value.id)
+                        ]
+                      })
+                    }
+                  >
+                    添加例句
+                  </Button>
+                )}
+              </section>
+
+              <section className="word-sense-section">
+                <div className="word-sense-section-title">
+                  <Typography.Text strong>关联词</Typography.Text>
+                  <Tag>{value.relations.length} 个</Tag>
+                </div>
+                <RelationsEditor
+                  value={value.relations}
                   readOnly={readOnly}
-                  generating={generating}
-                  onGenerate={onGenerate}
-                  onChange={(nextSentence) => {
-                    const sentences = [...value.sentences];
-                    sentences[sentenceIndex] = nextSentence;
-                    onChange({ ...value, sentences });
-                  }}
-                  onMove={(delta) =>
-                    onChange({
-                      ...value,
-                      sentences: moveWordNode(
-                        value.sentences,
-                        sentenceIndex,
-                        sentenceIndex + delta
-                      )
-                    })
-                  }
-                  onRemove={() =>
-                    onChange({
-                      ...value,
-                      sentences: value.sentences.filter(
-                        (_, removeIndex) => removeIndex !== sentenceIndex
-                      )
-                    })
-                  }
+                  onChange={(relations) => onChange({ ...value, relations })}
                 />
-              ))}
-              {!readOnly && (
-                <Button
-                  type="dashed"
-                  block
-                  icon={<PlusOutlined />}
-                  onClick={() =>
-                    onChange({
-                      ...value,
-                      sentences: [
-                        ...value.sentences,
-                        createSentence(headwords, wordId, value.id)
-                      ]
-                    })
-                  }
-                >
-                  添加例句
-                </Button>
-              )}
-
-              <Divider titlePlacement="start">关联词</Divider>
-              <RelationsEditor
-                value={value.relations}
-                readOnly={readOnly}
-                onChange={(relations) => onChange({ ...value, relations })}
-              />
+              </section>
             </Space>
           )
         }
@@ -1201,7 +1590,34 @@ function englishTextComplete(value: EnglishTextV2): boolean {
   });
 }
 
+function textCodePointLength(value: string): number {
+  return [...value].length;
+}
+
+function senseGroupOptionLabel(
+  group: DraftMeaningsStepContent["sense_groups"][number]
+): string {
+  const nameZh = group.name_zh.trim() || "待填写中文名";
+  const nameEn = group.name_en.trim() || "待填写英文名";
+  return `${nameZh} / ${nameEn}`;
+}
+
 function validateMeanings(content: DraftMeaningsStepContent): string | null {
+  if (content.sense_groups.length === 0) return "至少需要一个语义区间";
+  const senseGroupIds = new Set(content.sense_groups.map((group) => group.id));
+  for (const [index, group] of content.sense_groups.entries()) {
+    const names = [
+      [group.name_zh, "中文名"],
+      [group.name_en, "英文名"]
+    ] as const;
+    for (const [name, label] of names) {
+      const normalized = name.trim();
+      if (!normalized) return `请填写语义区间 ${index + 1} 的${label}`;
+      if (textCodePointLength(normalized) > 200) {
+        return `语义区间 ${index + 1} 的${label}不能超过 200 个字符`;
+      }
+    }
+  }
   for (const pos of content.pos) {
     if (pos.grammar_structures.length === 0)
       return "每个词性至少需要一条语法结构";
@@ -1214,6 +1630,9 @@ function validateMeanings(content: DraftMeaningsStepContent): string | null {
     }
     if (pos.senses.length === 0) return "每个词性至少需要一个词义";
     for (const sense of pos.senses) {
+      if (!sense.sense_group_id || !senseGroupIds.has(sense.sense_group_id)) {
+        return "请为每个词义选择语义区间";
+      }
       if (!sense.sub_pos) return "请为每个词义选择细分词性";
       const hasChinese = sense.definitions.some(
         (definition) =>
@@ -1355,12 +1774,25 @@ function removeSenseAndReferences(
 export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  const partOfSpeechCatalog = usePartOfSpeechCatalog();
+  const partOfSpeechLookup = useMemo(
+    () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
+    [partOfSpeechCatalog.data]
+  );
   const [content, setContent] = useState<DraftMeaningsStepContent>(() =>
     cloneWordValue(ensureMeaningsForForms(word))
   );
+  const contentRef = useRef(content);
   const [activePosId, setActivePosId] = useState(
     word.forms.pos[0]?.pos_id ?? ""
   );
+  const [activeDialect, setActiveDialect] = useState<MeaningDialect>(() =>
+    word.headwords.mode === "distinguish" ? word.headwords.source_dialect : "us"
+  );
+  const [fillingDialect, setFillingDialect] = useState<MeaningDialect>();
+  const [attemptedDialects, setAttemptedDialects] = useState<
+    Set<MeaningDialect>
+  >(() => new Set());
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const issueTarget = useWordValidationIssue();
@@ -1379,16 +1811,30 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   }, [content.pos, issueTarget]);
 
   useEffect(() => {
-    if (!dirty) setContent(cloneWordValue(ensureMeaningsForForms(word)));
+    if (!dirty) {
+      const next = cloneWordValue(ensureMeaningsForForms(word));
+      contentRef.current = next;
+      setContent(next);
+      if (word.headwords.mode === "distinguish") {
+        setActiveDialect(word.headwords.source_dialect);
+      }
+      setAttemptedDialects(new Set());
+    }
   }, [dirty, word, word.revision]);
 
   const updateContent = (next: DraftMeaningsStepContent) => {
     operationId.current = newWordNodeId();
+    contentRef.current = next;
     setContent(next);
     setDirty(true);
   };
 
   const removeSenseGroup = (groupId: string) => {
+    if (content.sense_groups.length <= 1) return;
+    const remainingGroups = content.sense_groups.filter(
+      (group) => group.id !== groupId
+    );
+    const fallbackGroup = remainingGroups[0]!;
     const referenceCount = content.pos.reduce(
       (count, pos) =>
         count +
@@ -1400,14 +1846,12 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
         ...posMeanings,
         senses: posMeanings.senses.map((sense) =>
           sense.sense_group_id === groupId
-            ? { ...sense, sense_group_id: undefined }
+            ? { ...sense, sense_group_id: fallbackGroup.id }
             : sense
         )
       }));
       updateContent({
-        sense_groups: content.sense_groups.filter(
-          (group) => group.id !== groupId
-        ),
+        sense_groups: remainingGroups,
         pos
       });
     };
@@ -1417,56 +1861,65 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
     }
     modal.confirm({
       title: "删除被词义引用的语义区间？",
-      content: `将清空 ${referenceCount} 个词义的语义区间引用，词义内容本身会保留。`,
-      okText: "删除并清空引用",
+      content: `将把 ${referenceCount} 个词义改绑到“${senseGroupOptionLabel(fallbackGroup)}”，词义内容本身会保留。`,
+      okText: "删除并改绑",
       okButtonProps: { danger: true },
       cancelText: "取消",
       onOk: apply
     });
   };
 
-  const generateVariant = async (
-    clientId: string,
-    fieldKind: EnglishFieldKind,
-    source: "uk" | "us",
-    target: "uk" | "us",
-    sourceValue: RichText
-  ): Promise<RichText | undefined> => {
-    if (!adminWordsDataSourceCapabilities.dialectVariantSuggestions) {
-      return undefined;
+  const fillMissingDialect = async (
+    target: MeaningDialect,
+    requestContent: DraftMeaningsStepContent = contentRef.current
+  ) => {
+    if (
+      readOnly ||
+      !adminWordsDataSourceCapabilities.dialectVariantSuggestions
+    ) {
+      return;
     }
+    const request = collectMissingMeaningDialectItems(requestContent, target);
+    if (request.items.length === 0) return;
+    setFillingDialect(target);
+    setAttemptedDialects((current) => new Set(current).add(target));
     try {
-      const response = await suggestVariants.mutateAsync({
-        source_dialect: source,
-        target_dialect: target,
-        items: [
-          { client_id: clientId, field_kind: fieldKind, value: sourceValue }
-        ]
-      });
-      const suggestion = response.suggestions[0];
-      if (!suggestion || suggestion.field_kind === "form") return undefined;
-      return await new Promise((resolve) => {
-        modal.confirm({
-          title: `确认${target === "uk" ? "英式" : "美式"}建议`,
-          content: (
-            <Space orientation="vertical" style={{ width: "100%" }}>
-              <Typography.Text type="secondary">源文本</Typography.Text>
-              <Typography.Paragraph>{sourceValue.text}</Typography.Paragraph>
-              <Typography.Text type="secondary">建议文本</Typography.Text>
-              <Typography.Paragraph strong>
-                {suggestion.value.text}
-              </Typography.Paragraph>
-            </Space>
-          ),
-          okText: "写入建议",
-          cancelText: "取消",
-          onOk: () => resolve(suggestion.value),
-          onCancel: () => resolve(undefined)
-        });
-      });
+      const response = await suggestVariants.mutateAsync(request);
+      const result = applyMeaningDialectSuggestions(
+        contentRef.current,
+        target,
+        response.suggestions
+      );
+      if (result.applied_count > 0) updateContent(result.content);
+      const remaining = collectMissingMeaningDialectItems(
+        result.content,
+        target
+      ).items.length;
+      if (remaining === 0) {
+        message.success(
+          `已补全 ${result.applied_count} 项${target === "uk" ? "英式" : "美式"}内容`
+        );
+      } else if (result.applied_count > 0) {
+        message.warning(
+          `已补全 ${result.applied_count} 项，仍有 ${remaining} 项可重试`
+        );
+      } else {
+        message.warning(`未获得可写入的内容，仍有 ${remaining} 项可重试`);
+      }
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "生成建议失败");
-      return undefined;
+      message.error(error instanceof Error ? error.message : "自动补全失败");
+    } finally {
+      setFillingDialect(undefined);
+    }
+  };
+
+  const changeActiveDialect = (target: MeaningDialect) => {
+    setActiveDialect(target);
+    if (
+      !readOnly &&
+      adminWordsDataSourceCapabilities.dialectVariantSuggestions
+    ) {
+      void fillMissingDialect(target, content);
     }
   };
 
@@ -1532,21 +1985,34 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
     () => new Map(word.forms.pos.map((pos) => [pos.pos_id, pos])),
     [word.forms.pos]
   );
+  const activeDialectEligibleCount =
+    word.headwords.mode === "distinguish"
+      ? collectMissingMeaningDialectItems(content, activeDialect).items.length
+      : 0;
+  const activeDialectMissingCount =
+    word.headwords.mode === "distinguish"
+      ? countIncompleteMeaningDialectSlots(content, activeDialect)
+      : 0;
 
   const tabs = content.pos.map((posMeanings, posIndex) => {
     const formPos = formsById.get(posMeanings.pos_id);
-    const label = formPos ? POS_TAG_ZH[formPos.pos] : "未知词性";
+    const label = formPos
+      ? partOfSpeechLabel(partOfSpeechLookup, formPos.pos)
+      : "未知词性";
     return {
       key: posMeanings.pos_id,
       label: (
         <Space>
           <strong>{label}</strong>
-          {formPos && <Tag color="blue">{POS_TAG_ABBR[formPos.pos]}</Tag>}
         </Space>
       ),
       children: (
-        <div data-word-node-id={posMeanings.pos_id} data-word-field="pos">
-          <Space orientation="vertical" size={20} style={{ width: "100%" }}>
+        <div
+          className="word-pos-editor"
+          data-word-node-id={posMeanings.pos_id}
+          data-word-field="pos"
+        >
+          <Space orientation="vertical" size={14} style={{ width: "100%" }}>
             <GrammarEditor
               value={posMeanings.grammar_structures}
               posId={posMeanings.pos_id}
@@ -1604,6 +2070,7 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
             />
 
             <div
+              className="word-sense-list"
               data-word-node-id={posMeanings.pos_id}
               data-word-field="senses"
             >
@@ -1617,14 +2084,25 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
                   wordId={word.id}
                   senseGroups={content.sense_groups}
                   grammars={posMeanings.grammar_structures}
+                  subPosOptions={
+                    formPos
+                      ? subPartOfSpeechOptions(partOfSpeechLookup, formPos.pos)
+                      : []
+                  }
+                  subPosLabel={
+                    sense.sub_pos
+                      ? subPartOfSpeechLabel(partOfSpeechLookup, sense.sub_pos)
+                      : undefined
+                  }
+                  catalogUnavailable={partOfSpeechCatalog.isError}
+                  activeDialect={activeDialect}
                   readOnly={readOnly}
-                  generating={suggestVariants.isPending}
+                  englishReadOnly={fillingDialect !== undefined}
                   forceOpen={
                     issueTarget
                       ? senseOwnsNode(sense, issueTarget.nodeId)
                       : false
                   }
-                  onGenerate={generateVariant}
                   onChange={(nextSense) => {
                     const pos = [...content.pos];
                     const senses = [...posMeanings.senses];
@@ -1679,7 +2157,11 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
                       ...posMeanings,
                       senses: [
                         ...posMeanings.senses,
-                        createSense(word.headwords, word.id)
+                        createSense(
+                          word.headwords,
+                          word.id,
+                          content.sense_groups[0]!.id
+                        )
                       ]
                     };
                     updateContent({ ...content, pos });
@@ -1716,61 +2198,167 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
         />
       )}
 
+      {partOfSpeechCatalog.isError && (
+        <Alert
+          type="warning"
+          showIcon
+          title="词性配置加载失败，暂时无法选择细分词性"
+          style={{ marginBottom: 16 }}
+        />
+      )}
+
       <fieldset
         className="word-request-lock"
         disabled={saving}
         aria-busy={saving}
       >
-        <Card size="small" title="语义区间" style={{ marginBottom: 18 }}>
-          <Space orientation="vertical" style={{ width: "100%" }}>
-            {content.sense_groups.map((group, index) => (
-              <Space.Compact block key={group.id}>
-                <Input
-                  aria-label={`语义区间 ${index + 1}`}
-                  addonBefore={index + 1}
-                  value={group.name}
-                  readOnly={readOnly}
-                  placeholder="例如 几何与物理空间核心"
-                  onChange={(event) => {
-                    const sense_groups = [...content.sense_groups];
-                    sense_groups[index] = {
-                      ...group,
-                      name: event.target.value
-                    };
-                    updateContent({ ...content, sense_groups });
-                  }}
+        {word.headwords.mode === "distinguish" && (
+          <div className="word-meaning-dialect-toolbar">
+            <Flex align="center" justify="space-between" gap={12} wrap>
+              <Space size={10} wrap>
+                <Typography.Text strong>英文内容</Typography.Text>
+                <Segmented
+                  aria-label="词义内容方言"
+                  value={activeDialect}
+                  disabled={fillingDialect !== undefined}
+                  options={[
+                    { label: "英式", value: "uk" },
+                    { label: "美式", value: "us" }
+                  ]}
+                  onChange={(value) =>
+                    changeActiveDialect(value as MeaningDialect)
+                  }
                 />
-                {!readOnly && (
-                  <Button
-                    danger
-                    icon={<DeleteOutlined />}
-                    aria-label={`删除语义区间 ${index + 1}`}
-                    onClick={() => removeSenseGroup(group.id)}
-                  />
-                )}
-              </Space.Compact>
-            ))}
-            {!readOnly && (
+                <Typography.Text type="secondary">
+                  {activeDialectMissingCount === 0
+                    ? "当前内容已完整"
+                    : !adminWordsDataSourceCapabilities.dialectVariantSuggestions
+                      ? `待填写 ${activeDialectMissingCount} 项`
+                      : activeDialectEligibleCount > 0
+                        ? `待补全 ${activeDialectEligibleCount} 项`
+                        : `待手工填写 ${activeDialectMissingCount} 项`}
+                </Typography.Text>
+              </Space>
+              {!readOnly && activeDialectEligibleCount > 0 && (
+                <Button
+                  size="small"
+                  icon={<ThunderboltOutlined />}
+                  loading={fillingDialect === activeDialect}
+                  disabled={
+                    fillingDialect !== undefined ||
+                    !adminWordsDataSourceCapabilities.dialectVariantSuggestions
+                  }
+                  title={
+                    adminWordsDataSourceCapabilities.dialectVariantSuggestions
+                      ? undefined
+                      : "真实方言建议服务尚未接入，请手工填写"
+                  }
+                  onClick={() =>
+                    void fillMissingDialect(activeDialect, content)
+                  }
+                >
+                  {`${attemptedDialects.has(activeDialect) ? "重试补全" : "自动补全"} ${activeDialectEligibleCount} 项`}
+                </Button>
+              )}
+            </Flex>
+          </div>
+        )}
+
+        <Card
+          className="word-sense-groups-card"
+          size="small"
+          title="语义区间"
+          extra={
+            !readOnly ? (
               <Button
-                type="dashed"
+                type="text"
+                size="small"
                 icon={<PlusOutlined />}
                 onClick={() =>
                   updateContent({
                     ...content,
-                    sense_groups: [
-                      ...content.sense_groups,
-                      { id: newWordNodeId(), name: "" }
-                    ]
+                    sense_groups: [...content.sense_groups, createSenseGroup()]
                   })
                 }
               >
                 添加语义区间
               </Button>
-            )}
-          </Space>
+            ) : null
+          }
+        >
+          <div className="word-sense-group-list">
+            {content.sense_groups.map((group, index) => (
+              <div className="word-sense-group-item" key={group.id}>
+                <span
+                  className="word-sense-group-index"
+                  aria-label={`第 ${index + 1} 个语义区间`}
+                >
+                  {index + 1}
+                </span>
+                <label className="word-sense-group-field">
+                  <Typography.Text type="secondary">中文</Typography.Text>
+                  <Input
+                    aria-label={`语义区间 ${index + 1} 中文`}
+                    data-word-node-id={group.id}
+                    data-word-field="name_zh"
+                    value={group.name_zh}
+                    readOnly={readOnly}
+                    placeholder="例如 几何与物理空间核心"
+                    onChange={(event) => {
+                      const sense_groups = [...content.sense_groups];
+                      sense_groups[index] = {
+                        ...group,
+                        name_zh: event.target.value
+                      };
+                      updateContent({ ...content, sense_groups });
+                    }}
+                  />
+                </label>
+                <label className="word-sense-group-field">
+                  <Typography.Text type="secondary">英文</Typography.Text>
+                  <Input
+                    aria-label={`语义区间 ${index + 1} 英文`}
+                    data-word-node-id={group.id}
+                    data-word-field="name_en"
+                    value={group.name_en}
+                    readOnly={readOnly}
+                    placeholder="例如 Core geometric and physical space"
+                    onChange={(event) => {
+                      const sense_groups = [...content.sense_groups];
+                      sense_groups[index] = {
+                        ...group,
+                        name_en: event.target.value
+                      };
+                      updateContent({ ...content, sense_groups });
+                    }}
+                  />
+                </label>
+                {!readOnly && (
+                  <Button
+                    className="word-sense-group-delete"
+                    danger
+                    icon={<DeleteOutlined />}
+                    aria-label={`删除语义区间 ${index + 1}`}
+                    disabled={content.sense_groups.length <= 1}
+                    title={
+                      content.sense_groups.length <= 1
+                        ? "至少保留一个语义区间"
+                        : "删除语义区间"
+                    }
+                    onClick={() => removeSenseGroup(group.id)}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
         </Card>
 
-        <Tabs activeKey={activePosId} onChange={setActivePosId} items={tabs} />
+        <Tabs
+          className="word-pos-tabs"
+          activeKey={activePosId}
+          onChange={setActivePosId}
+          items={tabs}
+        />
 
         {!readOnly && (
           <div className="word-step-actions">

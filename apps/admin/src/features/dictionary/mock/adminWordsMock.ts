@@ -13,6 +13,8 @@ import type {
   AdminWordStats,
   AdminWordV2,
   AdminWordV2Envelope,
+  CreatePartOfSpeechInput,
+  CreateSubPartOfSpeechInput,
   CreateAdminWordV2Input,
   DetectWordInputV2,
   DetectWordResponseV2,
@@ -21,6 +23,10 @@ import type {
   DraftValidationIssue,
   DraftValidationResponse,
   FormsImpactItemV2,
+  PartOfSpeechCatalogResponse,
+  PartOfSpeechConfig,
+  PartOfSpeechConfigListQuery,
+  PartOfSpeechConfigListResponse,
   PreviewFormsImpactInputV2,
   PreviewFormsImpactResponseV2,
   PublishAdminWordV2Input,
@@ -30,6 +36,10 @@ import type {
   SaveMeaningsStepInput,
   SuggestDialectVariantsInputV2,
   SuggestDialectVariantsResponseV2,
+  SubPartOfSpeechConfig,
+  SubPartOfSpeechListResponse,
+  UpdatePartOfSpeechInput,
+  UpdateSubPartOfSpeechInput,
   ValidateAdminWordV2Input,
   WordDefinitionV2,
   WordHeadwordsV2,
@@ -41,6 +51,7 @@ import {
   createDetectionFixture,
   createInitialMeanings,
   createInitialMeaningsForAddedPos,
+  createInitialSenseGroup,
   createSeedLegacyWords,
   richText
 } from "./fixtures";
@@ -49,6 +60,7 @@ import {
   type AdminWordsMockStorage,
   type AdminWordsMockStorageLike
 } from "./storage";
+import { createPartOfSpeechSeed } from "./partOfSpeechFixtures";
 
 type MockWord = AdminWord | AdminWordV2;
 
@@ -68,6 +80,9 @@ interface MockImpactTokenRecord {
 
 export interface AdminWordsMockPersistedState {
   sequence: number;
+  catalog_version: number;
+  parts_of_speech: Record<string, PartOfSpeechConfig>;
+  sub_parts: Record<string, SubPartOfSpeechConfig>;
   words: Record<string, MockWord>;
   detections: Record<string, DetectWordResponseV2>;
   create_idempotency: Record<string, string>;
@@ -75,6 +90,51 @@ export interface AdminWordsMockPersistedState {
   publish_idempotency: Record<string, string>;
   impact_tokens: Record<string, MockImpactTokenRecord>;
   lost_publish_responses: string[];
+}
+
+function isPartOfSpeechActor(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.display_name === "string"
+  );
+}
+
+function isPartOfSpeechConfig(value: unknown): value is PartOfSpeechConfig {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.code === "string" &&
+    typeof value.name_zh === "string" &&
+    typeof value.name_en === "string" &&
+    typeof value.abbreviation === "string" &&
+    Number.isInteger(value.sort_order) &&
+    Number.isInteger(value.usage_count) &&
+    Number.isInteger(value.sub_part_count) &&
+    Number.isInteger(value.revision) &&
+    isPartOfSpeechActor(value.created_by) &&
+    typeof value.created_at === "string" &&
+    typeof value.updated_at === "string"
+  );
+}
+
+function isSubPartOfSpeechConfig(
+  value: unknown
+): value is SubPartOfSpeechConfig {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.part_of_speech_id === "string" &&
+    typeof value.code === "string" &&
+    typeof value.name_zh === "string" &&
+    typeof value.name_en === "string" &&
+    Number.isInteger(value.sort_order) &&
+    Number.isInteger(value.usage_count) &&
+    Number.isInteger(value.revision) &&
+    isPartOfSpeechActor(value.created_by) &&
+    typeof value.created_at === "string" &&
+    typeof value.updated_at === "string"
+  );
 }
 
 type MockAdminProfile = Pick<
@@ -100,6 +160,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isSenseGroupV2(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.name_zh === "string" &&
+    typeof value.name_en === "string"
+  );
+}
+
+function isLegacySenseGroup(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string"
+  );
+}
+
 function isMockWord(value: unknown): value is MockWord {
   if (!isRecord(value)) return false;
   if (
@@ -121,13 +198,15 @@ function isMockWord(value: unknown): value is MockWord {
       Array.isArray(value.forms.pos) &&
       isRecord(value.meanings) &&
       Array.isArray(value.meanings.pos) &&
-      Array.isArray(value.meanings.sense_groups)
+      Array.isArray(value.meanings.sense_groups) &&
+      value.meanings.sense_groups.every(isSenseGroupV2)
     );
   }
   return (
     typeof value.headword === "string" &&
     Array.isArray(value.pos) &&
-    Array.isArray(value.sense_groups)
+    Array.isArray(value.sense_groups) &&
+    value.sense_groups.every(isLegacySenseGroup)
   );
 }
 
@@ -139,6 +218,11 @@ export function isAdminWordsMockPersistedState(
     Object.values(record).every((entry) => typeof entry === "string");
   if (
     !Number.isInteger(value.sequence) ||
+    !Number.isInteger(value.catalog_version) ||
+    !isRecord(value.parts_of_speech) ||
+    !Object.values(value.parts_of_speech).every(isPartOfSpeechConfig) ||
+    !isRecord(value.sub_parts) ||
+    !Object.values(value.sub_parts).every(isSubPartOfSpeechConfig) ||
     !isRecord(value.words) ||
     !Object.values(value.words).every(isMockWord) ||
     !isRecord(value.detections) ||
@@ -193,8 +277,14 @@ export function isAdminWordsMockPersistedState(
 }
 
 function makeInitialState(nowIso: string): AdminWordsMockPersistedState {
+  const seed = createPartOfSpeechSeed(nowIso);
   return {
     sequence: 0,
+    catalog_version: 1,
+    parts_of_speech: Object.fromEntries(
+      seed.partsOfSpeech.map((item) => [item.id, item])
+    ),
+    sub_parts: Object.fromEntries(seed.subParts.map((item) => [item.id, item])),
     words: Object.fromEntries(
       createSeedLegacyWords(nowIso).map((word) => [word.id, word])
     ),
@@ -357,7 +447,8 @@ function isNonEmptyEnglishText(
 
 function validateForms(
   content: DraftFormsStepContent,
-  headwords: WordHeadwordsV2
+  headwords: WordHeadwordsV2,
+  current: AdminWordsMockPersistedState
 ): DraftValidationIssue[] {
   const issues: DraftValidationIssue[] = [];
   if (content.pos.length === 0) {
@@ -370,6 +461,18 @@ function validateForms(
     });
   }
   for (const pos of content.pos) {
+    const configuredPart = Object.values(current.parts_of_speech).find(
+      (part) => part.code === pos.pos
+    );
+    if (!configuredPart) {
+      issues.push({
+        step: "forms",
+        node_id: pos.pos_id,
+        field: "pos",
+        code: "unknown_part_of_speech",
+        message: `基本词性 ${pos.pos} 未配置`
+      });
+    }
     if (pos.form_groups.length === 0) {
       issues.push({
         step: "forms",
@@ -505,6 +608,47 @@ function validateMeanings(
 ): DraftValidationIssue[] {
   const issues: DraftValidationIssue[] = [];
   const senseGroupIds = new Set(content.sense_groups.map((group) => group.id));
+  if (content.sense_groups.length === 0) {
+    issues.push({
+      step: "meanings",
+      node_id: word.id,
+      field: "sense_groups",
+      code: "sense_group_required",
+      message: "至少需要一个语义区间"
+    });
+  }
+  for (const group of content.sense_groups) {
+    const names = [
+      ["name_zh", group.name_zh],
+      ["name_en", group.name_en]
+    ] as const;
+    for (const [field, name] of names) {
+      const normalized = name.trim();
+      if (!normalized) {
+        issues.push({
+          step: "meanings",
+          node_id: group.id,
+          field,
+          code: "sense_group_name_required",
+          message:
+            field === "name_zh"
+              ? "请填写语义区间中文名"
+              : "请填写语义区间英文名"
+        });
+      } else if ([...normalized].length > 200) {
+        issues.push({
+          step: "meanings",
+          node_id: group.id,
+          field,
+          code: "sense_group_name_too_long",
+          message:
+            field === "name_zh"
+              ? "语义区间中文名不能超过 200 个字符"
+              : "语义区间英文名不能超过 200 个字符"
+        });
+      }
+    }
+  }
   const hasTargetSense = (wordId: string, senseId: string) => {
     if (wordId === word.id) {
       return content.pos.some((pos) =>
@@ -574,6 +718,26 @@ function validateMeanings(
           code: "sub_pos_required",
           message: "请选择细分词性"
         });
+      } else {
+        const configuredPart = Object.values(current.parts_of_speech).find(
+          (part) => part.code === formsPos.pos
+        );
+        const configuredSubPart = Object.values(current.sub_parts).find(
+          (subPart) => subPart.code === sense.sub_pos
+        );
+        if (
+          !configuredPart ||
+          !configuredSubPart ||
+          configuredSubPart.part_of_speech_id !== configuredPart.id
+        ) {
+          issues.push({
+            step: "meanings",
+            node_id: sense.id,
+            field: "sub_pos",
+            code: "invalid_sub_part_of_speech",
+            message: `细分词性 ${sense.sub_pos} 不属于当前基本词性`
+          });
+        }
       }
       if (!validPercent(sense.frequency)) {
         issues.push({
@@ -584,10 +748,15 @@ function validateMeanings(
           message: "词义词频必须是 0–100 且最多两位小数"
         });
       }
-      if (
-        sense.sense_group_id !== undefined &&
-        !senseGroupIds.has(sense.sense_group_id)
-      ) {
+      if (!sense.sense_group_id) {
+        issues.push({
+          step: "meanings",
+          node_id: sense.id,
+          field: "sense_group_id",
+          code: "sense_group_required",
+          message: "请选择语义区间"
+        });
+      } else if (!senseGroupIds.has(sense.sense_group_id)) {
         issues.push({
           step: "meanings",
           node_id: sense.id,
@@ -918,20 +1087,620 @@ export function createAdminWordsMock({
 
   function duplicatesFor(
     current: AdminWordsMockPersistedState,
-    values: string[]
+    values: string[],
+    kind?: MockWord["kind"]
   ) {
     const normalized = new Set(
       values.map((entry) => entry.toLocaleLowerCase("en"))
     );
-    return Object.values(current.words).flatMap((word) =>
-      allHeadwords(word)
-        .filter((entry) => normalized.has(entry.value.toLocaleLowerCase("en")))
-        .map((entry) => ({
-          word_id: word.id,
-          headword: entry.value,
-          dialect: entry.dialect
-        }))
+    return Object.values(current.words)
+      .filter((word) => !kind || word.kind === kind)
+      .flatMap((word) =>
+        allHeadwords(word)
+          .filter((entry) =>
+            normalized.has(entry.value.toLocaleLowerCase("en"))
+          )
+          .map((entry) => ({
+            word_id: word.id,
+            headword: entry.value,
+            dialect: entry.dialect
+          }))
+      );
+  }
+
+  function requireSuperAdmin(profile: MockAdminProfile): void {
+    if (profile.role === "super_admin") return;
+    throw new HttpError(
+      403,
+      "super admin required",
+      [],
+      "super_admin_required"
     );
+  }
+
+  function partUsageCount(
+    current: AdminWordsMockPersistedState,
+    code: string
+  ): number {
+    return Object.values(current.words).filter((word) =>
+      wordPos(word).includes(code)
+    ).length;
+  }
+
+  function subPartUsageCount(
+    current: AdminWordsMockPersistedState,
+    code: string
+  ): number {
+    return Object.values(current.words).reduce((total, word) => {
+      const senses = isV2(word)
+        ? word.meanings.pos.flatMap((pos) => pos.senses)
+        : word.pos.flatMap((pos) => pos.senses);
+      return total + senses.filter((sense) => sense.sub_pos === code).length;
+    }, 0);
+  }
+
+  function sortedParts(current: AdminWordsMockPersistedState) {
+    return Object.values(current.parts_of_speech).sort(
+      (left, right) =>
+        left.sort_order - right.sort_order ||
+        left.created_at.localeCompare(right.created_at) ||
+        left.id.localeCompare(right.id)
+    );
+  }
+
+  function sortedSubParts(
+    current: AdminWordsMockPersistedState,
+    partId: string
+  ) {
+    return Object.values(current.sub_parts)
+      .filter((item) => item.part_of_speech_id === partId)
+      .sort(
+        (left, right) =>
+          left.sort_order - right.sort_order ||
+          left.created_at.localeCompare(right.created_at) ||
+          left.id.localeCompare(right.id)
+      );
+  }
+
+  function materializePart(
+    current: AdminWordsMockPersistedState,
+    item: PartOfSpeechConfig
+  ): PartOfSpeechConfig {
+    return {
+      ...clone(item),
+      usage_count: partUsageCount(current, item.code),
+      sub_part_count: sortedSubParts(current, item.id).length
+    };
+  }
+
+  function materializeSubPart(
+    current: AdminWordsMockPersistedState,
+    item: SubPartOfSpeechConfig
+  ): SubPartOfSpeechConfig {
+    return {
+      ...clone(item),
+      usage_count: subPartUsageCount(current, item.code)
+    };
+  }
+
+  function assertConfiguredForms(
+    current: AdminWordsMockPersistedState,
+    content: DraftFormsStepContent
+  ): void {
+    const unknown = content.pos.find(
+      (pos) =>
+        !Object.values(current.parts_of_speech).some(
+          (part) => part.code === pos.pos
+        )
+    );
+    if (unknown) {
+      throw new HttpError(
+        422,
+        `part of speech ${unknown.pos} is not configured`,
+        [],
+        "unknown_part_of_speech",
+        [],
+        { code: unknown.pos }
+      );
+    }
+  }
+
+  function assertConfiguredMeanings(
+    current: AdminWordsMockPersistedState,
+    forms: DraftFormsStepContent,
+    meanings: DraftMeaningsStepContent
+  ): void {
+    const formById = new Map(forms.pos.map((pos) => [pos.pos_id, pos]));
+    for (const posMeanings of meanings.pos) {
+      const formPos = formById.get(posMeanings.pos_id);
+      if (!formPos) continue;
+      const configuredPart = Object.values(current.parts_of_speech).find(
+        (part) => part.code === formPos.pos
+      );
+      const invalidSense = posMeanings.senses.find((sense) => {
+        if (!sense.sub_pos) return false;
+        const subPart = Object.values(current.sub_parts).find(
+          (candidate) => candidate.code === sense.sub_pos
+        );
+        return (
+          !configuredPart ||
+          !subPart ||
+          subPart.part_of_speech_id !== configuredPart.id
+        );
+      });
+      if (invalidSense) {
+        throw new HttpError(
+          422,
+          `sub-part of speech ${invalidSense.sub_pos} is invalid for ${formPos.pos}`,
+          [],
+          "invalid_sub_part_of_speech",
+          [],
+          { code: invalidSense.sub_pos }
+        );
+      }
+    }
+  }
+
+  function assertConfiguredLegacyContent(
+    current: AdminWordsMockPersistedState,
+    posList: AdminWordSaveInput["pos"]
+  ): void {
+    const unknown = posList.find(
+      (pos) =>
+        !Object.values(current.parts_of_speech).some(
+          (part) => part.code === pos.pos
+        )
+    );
+    if (unknown) {
+      throw new HttpError(
+        422,
+        `part of speech ${unknown.pos} is not configured`,
+        [],
+        "unknown_part_of_speech",
+        [],
+        { code: unknown.pos }
+      );
+    }
+    for (const pos of posList) {
+      const part = Object.values(current.parts_of_speech).find(
+        (candidate) => candidate.code === pos.pos
+      );
+      const invalidSense = pos.senses.find((sense) => {
+        if (!sense.sub_pos) return false;
+        const subPart = Object.values(current.sub_parts).find(
+          (candidate) => candidate.code === sense.sub_pos
+        );
+        return !subPart || subPart.part_of_speech_id !== part?.id;
+      });
+      if (invalidSense) {
+        throw new HttpError(
+          422,
+          `sub-part of speech ${invalidSense.sub_pos} is invalid for ${pos.pos}`,
+          [],
+          "invalid_sub_part_of_speech",
+          [],
+          { code: invalidSense.sub_pos }
+        );
+      }
+    }
+  }
+
+  function trimPartInput<
+    T extends {
+      name_zh: string;
+      name_en: string;
+      abbreviation: string;
+      sort_order: number;
+    }
+  >(input: T): T {
+    return {
+      ...input,
+      name_zh: input.name_zh.trim(),
+      name_en: input.name_en.trim(),
+      abbreviation: input.abbreviation.trim()
+    };
+  }
+
+  function trimSubPartInput<
+    T extends {
+      name_zh: string;
+      name_en: string;
+      sort_order: number;
+    }
+  >(input: T): T {
+    return {
+      ...input,
+      name_zh: input.name_zh.trim(),
+      name_en: input.name_en.trim()
+    };
+  }
+
+  function assertPartFields(input: {
+    code?: string;
+    name_zh: string;
+    name_en: string;
+    abbreviation: string;
+    sort_order: number;
+  }): void {
+    if (input.code !== undefined && !/^[a-z][a-z0-9_]{0,31}$/.test(input.code))
+      throw new HttpError(
+        422,
+        "invalid part of speech code",
+        [],
+        "invalid_request_body"
+      );
+    if (!input.name_zh || input.name_zh.length > 64)
+      throw new HttpError(
+        422,
+        "invalid Chinese name",
+        [],
+        "invalid_request_body"
+      );
+    if (!input.name_en || input.name_en.length > 64)
+      throw new HttpError(
+        422,
+        "invalid English name",
+        [],
+        "invalid_request_body"
+      );
+    if (!input.abbreviation || input.abbreviation.length > 16)
+      throw new HttpError(
+        422,
+        "invalid abbreviation",
+        [],
+        "invalid_request_body"
+      );
+    if (!Number.isInteger(input.sort_order))
+      throw new HttpError(
+        422,
+        "invalid sort order",
+        [],
+        "invalid_request_body"
+      );
+  }
+
+  function assertSubPartFields(input: {
+    code?: string;
+    name_zh: string;
+    name_en: string;
+    sort_order: number;
+  }): void {
+    if (input.code !== undefined && !/^[A-Z][A-Z0-9_-]{0,31}$/.test(input.code))
+      throw new HttpError(
+        422,
+        "invalid sub-part code",
+        [],
+        "invalid_request_body"
+      );
+    if (!input.name_zh || input.name_zh.length > 64)
+      throw new HttpError(
+        422,
+        "invalid Chinese name",
+        [],
+        "invalid_request_body"
+      );
+    if (!input.name_en || input.name_en.length > 64)
+      throw new HttpError(
+        422,
+        "invalid English name",
+        [],
+        "invalid_request_body"
+      );
+    if (!Number.isInteger(input.sort_order))
+      throw new HttpError(
+        422,
+        "invalid sort order",
+        [],
+        "invalid_request_body"
+      );
+  }
+
+  function assertUniquePart(
+    current: AdminWordsMockPersistedState,
+    input: {
+      code?: string;
+      name_zh: string;
+      name_en: string;
+      abbreviation: string;
+    },
+    excludeId?: string
+  ): void {
+    const duplicate = Object.values(current.parts_of_speech).find(
+      (item) =>
+        item.id !== excludeId &&
+        ((input.code !== undefined && item.code === input.code) ||
+          item.name_zh === input.name_zh ||
+          item.name_en.toLocaleLowerCase("en") ===
+            input.name_en.toLocaleLowerCase("en") ||
+          item.abbreviation.toLocaleLowerCase("en") ===
+            input.abbreviation.toLocaleLowerCase("en"))
+    );
+    if (duplicate)
+      throw new HttpError(
+        409,
+        "part of speech configuration already exists",
+        [],
+        "part_of_speech_conflict"
+      );
+  }
+
+  function assertUniqueSubPart(
+    current: AdminWordsMockPersistedState,
+    partId: string,
+    input: { code?: string; name_zh: string; name_en: string },
+    excludeId?: string
+  ): void {
+    const duplicate = Object.values(current.sub_parts).find(
+      (item) =>
+        item.id !== excludeId &&
+        ((input.code !== undefined && item.code === input.code) ||
+          (item.part_of_speech_id === partId &&
+            (item.name_zh === input.name_zh ||
+              item.name_en.toLocaleLowerCase("en") ===
+                input.name_en.toLocaleLowerCase("en"))))
+    );
+    if (duplicate)
+      throw new HttpError(
+        409,
+        "sub-part of speech configuration already exists",
+        [],
+        "part_of_speech_conflict"
+      );
+  }
+
+  async function partOfSpeechCatalog(): Promise<PartOfSpeechCatalogResponse> {
+    await pause();
+    const { state: current } = context();
+    return {
+      catalog_version: current.catalog_version,
+      items: sortedParts(current).map((part) => ({
+        id: part.id,
+        code: part.code,
+        name_zh: part.name_zh,
+        name_en: part.name_en,
+        abbreviation: part.abbreviation,
+        sort_order: part.sort_order,
+        sub_parts: sortedSubParts(current, part.id).map((subPart) => ({
+          id: subPart.id,
+          code: subPart.code,
+          name_zh: subPart.name_zh,
+          name_en: subPart.name_en,
+          sort_order: subPart.sort_order
+        }))
+      }))
+    };
+  }
+
+  async function listPartOfSpeechConfigs(
+    query: PartOfSpeechConfigListQuery = {}
+  ): Promise<PartOfSpeechConfigListResponse> {
+    await pause();
+    const { profile, state: current } = context();
+    requireSuperAdmin(profile);
+    const q = query.q?.trim().toLocaleLowerCase() ?? "";
+    const filtered = sortedParts(current)
+      .filter((item) => {
+        if (!q) return true;
+        return [item.code, item.name_zh, item.name_en, item.abbreviation].some(
+          (value) => value.toLocaleLowerCase().includes(q)
+        );
+      })
+      .map((item) => materializePart(current, item));
+    const pageSize = Math.min(100, Math.max(1, query.page_size ?? 10));
+    const page = Math.max(1, query.page ?? 1);
+    const start = (page - 1) * pageSize;
+    return {
+      items: filtered.slice(start, start + pageSize),
+      pagination: {
+        page,
+        page_size: pageSize,
+        total: filtered.length,
+        total_pages: Math.ceil(filtered.length / pageSize)
+      }
+    };
+  }
+
+  async function createPartOfSpeech(
+    rawInput: CreatePartOfSpeechInput
+  ): Promise<PartOfSpeechConfig> {
+    await pause();
+    const { profile, state: current } = context();
+    requireSuperAdmin(profile);
+    const input = trimPartInput({ ...rawInput, code: rawInput.code.trim() });
+    assertPartFields(input);
+    assertUniquePart(current, input);
+    const timestamp = nextTimestamp(current);
+    const item: PartOfSpeechConfig = {
+      id: nextId(current, "pos-config"),
+      ...input,
+      usage_count: 0,
+      sub_part_count: 0,
+      revision: 1,
+      created_by: { id: profile.id, display_name: profile.display_name },
+      created_at: timestamp,
+      updated_at: timestamp
+    };
+    current.parts_of_speech[item.id] = item;
+    current.catalog_version += 1;
+    persist(current);
+    return clone(item);
+  }
+
+  async function updatePartOfSpeech(
+    id: string,
+    rawInput: UpdatePartOfSpeechInput
+  ): Promise<PartOfSpeechConfig> {
+    await pause();
+    const { profile, state: current } = context();
+    requireSuperAdmin(profile);
+    const existing = current.parts_of_speech[id];
+    if (!existing)
+      throw new HttpError(404, "part of speech not found", [], "not_found");
+    if (existing.revision !== rawInput.base_revision)
+      throw new HttpError(
+        409,
+        "configuration changed",
+        [],
+        "revision_conflict",
+        [],
+        {
+          current_revision: existing.revision,
+          part_of_speech_id: existing.id,
+          code: existing.code
+        }
+      );
+    const input = trimPartInput(rawInput);
+    assertPartFields(input);
+    assertUniquePart(current, input, id);
+    const updated: PartOfSpeechConfig = {
+      ...existing,
+      ...input,
+      revision: existing.revision + 1,
+      updated_by: { id: profile.id, display_name: profile.display_name },
+      updated_at: nextTimestamp(current)
+    };
+    current.parts_of_speech[id] = updated;
+    current.catalog_version += 1;
+    persist(current);
+    return materializePart(current, updated);
+  }
+
+  async function removePartOfSpeech(id: string): Promise<void> {
+    await pause();
+    const { profile, state: current } = context();
+    requireSuperAdmin(profile);
+    const existing = current.parts_of_speech[id];
+    if (!existing)
+      throw new HttpError(404, "part of speech not found", [], "not_found");
+    const usageCount = partUsageCount(current, existing.code);
+    if (usageCount > 0)
+      throw new HttpError(
+        409,
+        "part of speech is in use",
+        [],
+        "part_of_speech_in_use",
+        [],
+        { usage_count: usageCount, part_of_speech_id: id, code: existing.code }
+      );
+    for (const subPart of sortedSubParts(current, id)) {
+      delete current.sub_parts[subPart.id];
+    }
+    delete current.parts_of_speech[id];
+    current.catalog_version += 1;
+    persist(current);
+  }
+
+  async function listSubParts(
+    partId: string
+  ): Promise<SubPartOfSpeechListResponse> {
+    await pause();
+    const { profile, state: current } = context();
+    requireSuperAdmin(profile);
+    if (!current.parts_of_speech[partId])
+      throw new HttpError(404, "part of speech not found", [], "not_found");
+    return {
+      items: sortedSubParts(current, partId).map((item) =>
+        materializeSubPart(current, item)
+      )
+    };
+  }
+
+  async function createSubPart(
+    partId: string,
+    rawInput: CreateSubPartOfSpeechInput
+  ): Promise<SubPartOfSpeechConfig> {
+    await pause();
+    const { profile, state: current } = context();
+    requireSuperAdmin(profile);
+    if (!current.parts_of_speech[partId])
+      throw new HttpError(404, "part of speech not found", [], "not_found");
+    const input = trimSubPartInput({
+      ...rawInput,
+      code: rawInput.code.trim()
+    });
+    assertSubPartFields(input);
+    assertUniqueSubPart(current, partId, input);
+    const timestamp = nextTimestamp(current);
+    const item: SubPartOfSpeechConfig = {
+      id: nextId(current, "sub-pos-config"),
+      part_of_speech_id: partId,
+      ...input,
+      usage_count: 0,
+      revision: 1,
+      created_by: { id: profile.id, display_name: profile.display_name },
+      created_at: timestamp,
+      updated_at: timestamp
+    };
+    current.sub_parts[item.id] = item;
+    current.catalog_version += 1;
+    persist(current);
+    return clone(item);
+  }
+
+  async function updateSubPart(
+    partId: string,
+    subId: string,
+    rawInput: UpdateSubPartOfSpeechInput
+  ): Promise<SubPartOfSpeechConfig> {
+    await pause();
+    const { profile, state: current } = context();
+    requireSuperAdmin(profile);
+    const existing = current.sub_parts[subId];
+    if (!existing || existing.part_of_speech_id !== partId)
+      throw new HttpError(404, "sub-part not found", [], "not_found");
+    if (existing.revision !== rawInput.base_revision)
+      throw new HttpError(
+        409,
+        "configuration changed",
+        [],
+        "revision_conflict",
+        [],
+        {
+          current_revision: existing.revision,
+          part_of_speech_id: partId,
+          code: existing.code
+        }
+      );
+    const input = trimSubPartInput(rawInput);
+    assertSubPartFields(input);
+    assertUniqueSubPart(current, partId, input, subId);
+    const updated: SubPartOfSpeechConfig = {
+      ...existing,
+      ...input,
+      revision: existing.revision + 1,
+      updated_by: { id: profile.id, display_name: profile.display_name },
+      updated_at: nextTimestamp(current)
+    };
+    current.sub_parts[subId] = updated;
+    current.catalog_version += 1;
+    persist(current);
+    return materializeSubPart(current, updated);
+  }
+
+  async function removeSubPart(partId: string, subId: string): Promise<void> {
+    await pause();
+    const { profile, state: current } = context();
+    requireSuperAdmin(profile);
+    const existing = current.sub_parts[subId];
+    if (!existing || existing.part_of_speech_id !== partId)
+      throw new HttpError(404, "sub-part not found", [], "not_found");
+    const usageCount = subPartUsageCount(current, existing.code);
+    if (usageCount > 0)
+      throw new HttpError(
+        409,
+        "sub-part of speech is in use",
+        [],
+        "sub_part_of_speech_in_use",
+        [],
+        {
+          usage_count: usageCount,
+          part_of_speech_id: partId,
+          code: existing.code
+        }
+      );
+    delete current.sub_parts[subId];
+    current.catalog_version += 1;
+    persist(current);
   }
 
   function reconcileProgress(
@@ -941,7 +1710,8 @@ export function createAdminWordsMock({
     intent: "save" | "complete",
     priorCompleted: ReadonlySet<AdminWordV2["completed_steps"][number]>
   ): void {
-    const formsValid = validateForms(word.forms, word.headwords).length === 0;
+    const formsValid =
+      validateForms(word.forms, word.headwords, current).length === 0;
     const meaningsValid =
       formsValid && validateMeanings(word, word.meanings, current).length === 0;
     let formsCompleted = priorCompleted.has("forms") && formsValid;
@@ -985,8 +1755,7 @@ export function createAdminWordsMock({
           return false;
         if (gloss && !wordGloss(word).toLocaleLowerCase().includes(gloss))
           return false;
-        if (query.kind && (isV2(word) ? "word" : word.kind) !== query.kind)
-          return false;
+        if (query.kind && word.kind !== query.kind) return false;
         if (query.pos && !wordPos(word).includes(query.pos)) return false;
         if (query.level && !wordLevels(word).includes(query.level))
           return false;
@@ -1001,7 +1770,7 @@ export function createAdminWordsMock({
         schema_version: isV2(word) ? (2 as const) : word.schema_version,
         id: word.id,
         headword: displayHeadword(word),
-        kind: isV2(word) ? "word" : word.kind,
+        kind: word.kind,
         gloss: wordGloss(word),
         pos_list: wordPos(word),
         levels: wordLevels(word),
@@ -1078,9 +1847,11 @@ export function createAdminWordsMock({
       detectionId,
       now().getTime()
     );
-    const dynamicDuplicates = duplicatesFor(current, [
-      response.normalized_headword
-    ]);
+    const dynamicDuplicates = duplicatesFor(
+      current,
+      [response.normalized_headword],
+      response.entry_kind
+    );
     if (dynamicDuplicates.length > 0) {
       response.smart_dictionary = {
         status: "duplicate",
@@ -1146,7 +1917,7 @@ export function createAdminWordsMock({
     const kind = input.kind ?? "word";
     const duplicate = Object.values(current.words).some(
       (word) =>
-        (isV2(word) ? "word" : word.kind) === kind &&
+        word.kind === kind &&
         allHeadwords(word).some(
           (entry) =>
             entry.value.toLocaleLowerCase("en") ===
@@ -1212,8 +1983,8 @@ export function createAdminWordsMock({
       throw new HttpError(410, "detection expired", [], "detection_expired");
     }
     if (
-      detection.entry_kind !== "word" ||
       detection.builtin_dictionary.status !== "matched" ||
+      detection.entry_kind !== "word" ||
       detection.matched_dialect === undefined ||
       detection.smart_dictionary.status !== "clear" ||
       !compatibleHeadwords(
@@ -1227,7 +1998,7 @@ export function createAdminWordsMock({
           : "detection_mismatch";
       throw new HttpError(
         code === "duplicate_word" ? 409 : 422,
-        "detection cannot create a word",
+        "detection cannot create an entry",
         [],
         code
       );
@@ -1236,12 +2007,15 @@ export function createAdminWordsMock({
       input.headwords.mode === "unified"
         ? [input.headwords.common]
         : [input.headwords.uk, input.headwords.us];
-    if (duplicatesFor(current, headwordValues).length > 0) {
+    if (
+      duplicatesFor(current, headwordValues, detection.entry_kind).length > 0
+    ) {
       throw new HttpError(409, "word already exists", [], "duplicate_word");
     }
     const wordId = nextId(current, "word-v2");
     const timestamp = nextTimestamp(current);
     const forms = clone(detection.builtin_dictionary.suggested_forms);
+    assertConfiguredForms(current, forms);
     alignBaseFormSpelling(forms, input.headwords);
     const word: AdminWordV2 = {
       schema_version: 2,
@@ -1313,6 +2087,7 @@ export function createAdminWordsMock({
         "revision_conflict"
       );
     }
+    assertConfiguredLegacyContent(current, input.pos);
     const word: AdminWord = {
       ...existing,
       frequency: input.frequency || undefined,
@@ -1336,6 +2111,7 @@ export function createAdminWordsMock({
     assertPayload(input);
     const word = requireV2Draft(current, wordId);
     assertRevision(word, input.base_revision);
+    assertConfiguredForms(current, input.content);
     const affected = meaningsForRemovedPos(word, input.content);
     if (affected.length === 0) {
       return {
@@ -1385,6 +2161,7 @@ export function createAdminWordsMock({
     }
     const word = requireV2Draft(current, wordId);
     assertRevision(word, input.base_revision);
+    assertConfiguredForms(current, input.content);
     const affected = meaningsForRemovedPos(word, input.content);
     if (affected.length > 0) {
       const token = input.confirmed_impact_token
@@ -1411,7 +2188,7 @@ export function createAdminWordsMock({
         );
       }
     }
-    const issues = validateForms(input.content, word.headwords);
+    const issues = validateForms(input.content, word.headwords, current);
     if (input.intent === "complete" && issues.length > 0) {
       throw new HttpError(
         422,
@@ -1428,6 +2205,18 @@ export function createAdminWordsMock({
     }
     const priorCompleted = new Set(word.completed_steps);
     word.forms = clone(input.content);
+    if (word.meanings.sense_groups.length === 0) {
+      const defaultSenseGroup = createInitialSenseGroup(word.id);
+      word.meanings.sense_groups.push(defaultSenseGroup);
+      word.meanings.pos = word.meanings.pos.map((pos) => ({
+        ...pos,
+        senses: pos.senses.map((sense) => ({
+          ...sense,
+          sense_group_id: defaultSenseGroup.id
+        }))
+      }));
+    }
+    const defaultSenseGroupId = word.meanings.sense_groups[0]!.id;
     const remaining = new Set(word.forms.pos.map((entry) => entry.pos_id));
     word.meanings.pos = word.meanings.pos.filter((entry) =>
       remaining.has(entry.pos_id)
@@ -1437,7 +2226,12 @@ export function createAdminWordsMock({
         !word.meanings.pos.some((entry) => entry.pos_id === formsPos.pos_id)
       ) {
         word.meanings.pos.push(
-          createInitialMeaningsForAddedPos(formsPos, word.headwords, word.id)
+          createInitialMeaningsForAddedPos(
+            formsPos,
+            word.headwords,
+            word.id,
+            defaultSenseGroupId
+          )
         );
       }
     }
@@ -1480,9 +2274,10 @@ export function createAdminWordsMock({
     }
     const word = requireV2Draft(current, wordId);
     assertRevision(word, input.base_revision);
+    assertConfiguredForms(current, word.forms);
     if (
       !word.completed_steps.includes("forms") ||
-      validateForms(word.forms, word.headwords).length > 0
+      validateForms(word.forms, word.headwords, current).length > 0
     ) {
       throw new HttpError(
         409,
@@ -1497,6 +2292,7 @@ export function createAdminWordsMock({
         }
       );
     }
+    assertConfiguredMeanings(current, word.forms, input.content);
     const issues = validateMeanings(word, input.content, current);
     if (input.intent === "complete" && issues.length > 0) {
       throw new HttpError(
@@ -1539,7 +2335,7 @@ export function createAdminWordsMock({
       throw new HttpError(409, "word is legacy", [], "schema_version_mismatch");
     assertRevision(word, input.base_revision);
     const issues = [
-      ...validateForms(word.forms, word.headwords),
+      ...validateForms(word.forms, word.headwords, current),
       ...validateMeanings(word, word.meanings, current)
     ];
     return {
@@ -1561,6 +2357,7 @@ export function createAdminWordsMock({
         "schema_version_mismatch"
       );
     }
+    assertConfiguredLegacyContent(current, existing.pos);
     const details = v1PublishIssues(existing);
     if (details.length > 0) {
       throw new HttpError(
@@ -1607,8 +2404,10 @@ export function createAdminWordsMock({
     }
     const word = requireV2Draft(current, wordId);
     assertRevision(word, input.base_revision);
+    assertConfiguredForms(current, word.forms);
+    assertConfiguredMeanings(current, word.forms, word.meanings);
     const issues = [
-      ...validateForms(word.forms, word.headwords),
+      ...validateForms(word.forms, word.headwords, current),
       ...validateMeanings(word, word.meanings, current)
     ];
     if (issues.length > 0) {
@@ -1688,7 +2487,7 @@ export function createAdminWordsMock({
     const limit = Math.min(100, Math.max(1, opts?.limit ?? 20));
     const results = Object.values(current.words)
       .filter((word) => {
-        const kind = isV2(word) ? "word" : word.kind;
+        const kind = word.kind;
         return (
           word.status === "published" &&
           (!opts?.kind || kind === opts.kind) &&
@@ -1749,6 +2548,17 @@ export function createAdminWordsMock({
     remove,
     batchDelete,
     relatedSearch,
+    partOfSpeechSettings: {
+      catalog: partOfSpeechCatalog,
+      list: listPartOfSpeechConfigs,
+      create: createPartOfSpeech,
+      update: updatePartOfSpeech,
+      remove: removePartOfSpeech,
+      listSubParts,
+      createSubPart,
+      updateSubPart,
+      removeSubPart
+    },
     clearSession
   };
 }
@@ -1760,59 +2570,91 @@ export function completeMockMeanings(
   word: AdminWordV2,
   content: DraftMeaningsStepContent = clone(word.meanings)
 ): DraftMeaningsStepContent {
-  const fillPos = (pos: WordPosMeaningsV2): WordPosMeaningsV2 => ({
-    ...pos,
-    grammar_structures: pos.grammar_structures.map((grammar) => ({
-      ...grammar,
-      variants: grammar.variants.map((variant) => ({
-        ...variant,
-        content: richText(`the ${displayHeadword(word)}`)
-      }))
-    })),
-    senses: pos.senses.map((sense, index) => ({
-      ...sense,
-      sub_pos: sense.sub_pos || "N-COUNT",
-      frequency: sense.frequency ?? "10",
-      definitions: sense.definitions.map((definition) =>
-        definition.definition_mode === "zh_definition" ||
-        definition.definition_mode === "zh_sentence"
-          ? { ...definition, content: richText(`测试释义 ${index + 1}`) }
-          : definition
-      ),
-      sentences: sense.sentences.map((sentence) => ({
-        ...sentence,
-        en_text:
-          sentence.en_text.mode === "unified"
-            ? {
-                ...sentence.en_text,
-                common: {
-                  ...sentence.en_text.common,
-                  value: richText(`A ${displayHeadword(word)} example.`)
+  const senseGroups =
+    content.sense_groups.length > 0
+      ? content.sense_groups.map((group, index) => ({
+          ...group,
+          name_zh: group.name_zh.trim() || `语义区间 ${index + 1}`,
+          name_en: group.name_en.trim() || `Semantic range ${index + 1}`
+        }))
+      : [createInitialSenseGroup(word.id, true)];
+  const defaultSenseGroupId = senseGroups[0]!.id;
+  const defaultSubPart: Record<string, string> = {
+    noun: "N-COUNT",
+    pronoun: "PRON",
+    verb: "V-T",
+    adjective: "ADJ",
+    adverb: "ADV",
+    preposition: "PREP",
+    article: "ART",
+    determiner: "DET",
+    conjunction: "CONJ",
+    numeral: "NUM",
+    interjection: "INT"
+  };
+  const fillPos = (pos: WordPosMeaningsV2): WordPosMeaningsV2 => {
+    const partCode = word.forms.pos.find(
+      (formsPos) => formsPos.pos_id === pos.pos_id
+    )?.pos;
+    return {
+      ...pos,
+      grammar_structures: pos.grammar_structures.map((grammar) => ({
+        ...grammar,
+        variants: grammar.variants.map((variant) => ({
+          ...variant,
+          content: richText(`the ${displayHeadword(word)}`)
+        }))
+      })),
+      senses: pos.senses.map((sense, index) => ({
+        ...sense,
+        sense_group_id: senseGroups.some(
+          (group) => group.id === sense.sense_group_id
+        )
+          ? sense.sense_group_id
+          : defaultSenseGroupId,
+        sub_pos: sense.sub_pos || defaultSubPart[partCode ?? ""] || "",
+        frequency: sense.frequency ?? "10",
+        definitions: sense.definitions.map((definition) =>
+          definition.definition_mode === "zh_definition" ||
+          definition.definition_mode === "zh_sentence"
+            ? { ...definition, content: richText(`测试释义 ${index + 1}`) }
+            : definition
+        ),
+        sentences: sense.sentences.map((sentence) => ({
+          ...sentence,
+          en_text:
+            sentence.en_text.mode === "unified"
+              ? {
+                  ...sentence.en_text,
+                  common: {
+                    ...sentence.en_text.common,
+                    value: richText(`A ${displayHeadword(word)} example.`)
+                  }
                 }
-              }
-            : {
-                ...sentence.en_text,
-                uk: {
-                  state: "ready",
-                  variant: {
-                    value: richText(`A ${displayHeadword(word)} example.`),
-                    origin: "manual"
+              : {
+                  ...sentence.en_text,
+                  uk: {
+                    state: "ready",
+                    variant: {
+                      value: richText(`A ${displayHeadword(word)} example.`),
+                      origin: "manual"
+                    }
+                  },
+                  us: {
+                    state: "ready",
+                    variant: {
+                      value: richText(`A ${displayHeadword(word)} example.`),
+                      origin: "manual"
+                    }
                   }
                 },
-                us: {
-                  state: "ready",
-                  variant: {
-                    value: richText(`A ${displayHeadword(word)} example.`),
-                    origin: "manual"
-                  }
-                }
-              },
-        zh_text: richText("这是一个测试例句。")
+          zh_text: richText("这是一个测试例句。")
+        }))
       }))
-    }))
-  });
+    };
+  };
   return {
-    sense_groups: clone(content.sense_groups),
+    sense_groups: clone(senseGroups),
     pos: content.pos.map(fillPos)
   };
 }

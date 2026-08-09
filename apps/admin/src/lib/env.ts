@@ -14,7 +14,11 @@ const ADMIN_WORDS_MOCK = parseBooleanEnvFlag(
   !import.meta.env.PROD
 );
 
-assertAdminWordsMockAllowed(ADMIN_WORDS_MOCK, import.meta.env.PROD);
+assertAdminWordsMockAllowed(
+  ADMIN_WORDS_MOCK,
+  import.meta.env.PROD,
+  import.meta.env.MODE
+);
 
 export const env = {
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL ?? "/api/v1",

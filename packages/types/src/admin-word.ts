@@ -3,6 +3,7 @@ import type {
   AdminWordV2Envelope,
   WordCreationStep
 } from "./admin-word-v2";
+import type { PartOfSpeechCode, SubPartOfSpeechCode } from "./part-of-speech";
 
 // 智能词库 V1 legacy wire 类型 —— 1:1 镜像后端 Go JSON(snake_case)。
 // 权威来源:tsz-go/docs/openapi.yaml tag `Admin (words)`;叙述性说明见
@@ -21,19 +22,8 @@ export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 export type AdminWordKind = "word" | "phrase";
 export type AdminWordStatus = "draft" | "published";
 
-/** 基本词性(词条内不重复)。 */
-export type WordPosTag =
-  | "noun"
-  | "pronoun"
-  | "verb"
-  | "adjective"
-  | "adverb"
-  | "preposition"
-  | "article"
-  | "determiner"
-  | "conjunction"
-  | "numeral"
-  | "interjection";
+/** 基本词性稳定编码；词条内不重复，展示信息从词性配置 catalog 读取。 */
+export type WordPosTag = PartOfSpeechCode;
 
 /** 词形类别:base 每 pos+方言唯一且必有,其余类型可重复。 */
 export type WordFormType =
@@ -46,28 +36,8 @@ export type WordFormType =
   | "comparative"
   | "superlative";
 
-/** 细分词性(提交英文码,UI 显示中文)。草稿允许空串,发布必填。 */
-export type WordSubPos =
-  | ""
-  | "V-T"
-  | "V-I"
-  | "V-LINK"
-  | "AUX"
-  | "MODAL"
-  | "ADJ"
-  | "ADV"
-  | "N-COUNT"
-  | "N-UNCOUNT"
-  | "N-PROPER"
-  | "N-PLURAL"
-  | "N-SING"
-  | "PRON"
-  | "PREP"
-  | "CONJ"
-  | "DET"
-  | "ART"
-  | "NUM"
-  | "INT";
+/** 细分词性稳定编码；草稿允许空串，展示与所属关系从 catalog 读取。 */
+export type WordSubPos = "" | SubPartOfSpeechCode;
 
 export type WordRelationType = "synonym" | "antonym" | "derivative";
 export type PronunciationStyle = "normal" | "strong" | "weak";

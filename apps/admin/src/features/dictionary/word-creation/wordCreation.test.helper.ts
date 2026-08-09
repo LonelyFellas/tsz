@@ -60,8 +60,14 @@ export function completeMeanings(
   content: DraftMeaningsStepContent,
   headwords: WordHeadwordsV2
 ): DraftMeaningsStepContent {
+  const senseGroups = content.sense_groups.map((group, index) => ({
+    ...group,
+    name_zh: group.name_zh.trim() || `语义区间 ${index + 1}`,
+    name_en: group.name_en.trim() || `Semantic range ${index + 1}`
+  }));
+  const defaultSenseGroupId = senseGroups[0]!.id;
   return {
-    sense_groups: structuredClone(content.sense_groups),
+    sense_groups: structuredClone(senseGroups),
     pos: content.pos.map((pos, posIndex) => ({
       ...pos,
       grammar_structures: pos.grammar_structures.map((grammar) => ({
@@ -75,6 +81,7 @@ export function completeMeanings(
       })),
       senses: pos.senses.map((sense, senseIndex) => ({
         ...sense,
+        sense_group_id: sense.sense_group_id || defaultSenseGroupId,
         sub_pos: posIndex === 0 ? "N-COUNT" : "V-T",
         frequency: "12.5",
         definitions: sense.definitions.map((definition) => ({

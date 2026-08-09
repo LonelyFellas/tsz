@@ -147,6 +147,20 @@ describe("ConsoleSidebar", () => {
     expect(screen.queryByText("管理员管理")).toBeNull();
   });
 
+  it("词性配置仅超级管理员可见并导航到系统设置路由", () => {
+    setLevel("admin", ["words.access"]);
+    const ordinary = renderAt("/");
+    expect(screen.queryByText("系统设置")).toBeNull();
+    ordinary.unmount();
+
+    setLevel("super_admin", []);
+    renderAt("/");
+    fireEvent.click(screen.getByText("系统设置"));
+    const entry = screen.getByText("词性配置");
+    fireEvent.click(entry);
+    expect(mockNavigate).toHaveBeenCalledWith("/settings/parts-of-speech");
+  });
+
   it("分类分组默认收起，展开后已落地模块可点", () => {
     renderAt("/words");
     // 分类默认收起：子项初始不在可访问树中。

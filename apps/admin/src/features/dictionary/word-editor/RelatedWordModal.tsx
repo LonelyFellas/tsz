@@ -28,11 +28,13 @@ export interface RelatedTarget {
 export function RelatedWordModal({
   open,
   title,
+  requireSense = false,
   onSelect,
   onClose
 }: {
   open: boolean;
   title: string;
+  requireSense?: boolean;
   onSelect: (target: RelatedTarget) => void;
   onClose: () => void;
 }) {
@@ -58,6 +60,14 @@ export function RelatedWordModal({
       }}
       destroyOnHidden
     >
+      {requireSense && (
+        <Alert
+          type="info"
+          showIcon
+          title="仅搜索已发布词条，请选择该词条下的具体词义"
+          style={{ marginBottom: 12 }}
+        />
+      )}
       <Input.Search
         placeholder="输入词汇搜索(前缀命中优先)"
         allowClear
@@ -93,13 +103,15 @@ export function RelatedWordModal({
                 <Text strong>{item.headword}</Text>
                 <Tag>{KIND_LABEL[item.kind]}</Tag>
                 {/* 草稿阶段允许只选词条,发布前再补词义 */}
-                <a
-                  onClick={() =>
-                    pick({ wordId: item.word_id, headword: item.headword })
-                  }
-                >
-                  仅选词条
-                </a>
+                {!requireSense && (
+                  <a
+                    onClick={() =>
+                      pick({ wordId: item.word_id, headword: item.headword })
+                    }
+                  >
+                    仅选词条
+                  </a>
+                )}
               </Space>
               {item.senses.map((s) => (
                 <div key={s.sense_id} style={{ paddingLeft: 8 }}>

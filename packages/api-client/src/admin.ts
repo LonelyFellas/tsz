@@ -34,6 +34,10 @@ import type {
   AdminAuthResponse,
   AdminProfile,
   PermissionCatalogResponse,
+  PartOfSpeechCatalogResponse,
+  PartOfSpeechConfig,
+  PartOfSpeechConfigListQuery,
+  PartOfSpeechConfigListResponse,
   RelatedSearchResponse,
   ResetPasswordResponse,
   RoleListResponse,
@@ -41,6 +45,12 @@ import type {
   SaveMeaningsStepInput,
   SuggestDialectVariantsInputV2,
   SuggestDialectVariantsResponseV2,
+  SubPartOfSpeechConfig,
+  SubPartOfSpeechListResponse,
+  CreatePartOfSpeechInput,
+  CreateSubPartOfSpeechInput,
+  UpdatePartOfSpeechInput,
+  UpdateSubPartOfSpeechInput,
   ValidateAdminWordV2Input,
   UpdateRoleRequest
 } from "@tsz/types";
@@ -204,6 +214,57 @@ export function createAdminEndpoints(http: HttpClient) {
         http.get<RelatedSearchResponse>(
           `/words/related-search${qs({ q, kind: opts?.kind, limit: opts?.limit })}`
         )
+    },
+    /**
+     * 系统设置 → 词性配置。catalog 供全部词条页面只读消费；管理 CRUD 为
+     * super_admin 专属。后端尚未落地，当前由 admin dictionary mock 同形实现。
+     */
+    partOfSpeechSettings: {
+      /** GET /admin/settings/parts-of-speech/catalog — 完整基本/细分词性目录。 */
+      catalog: () =>
+        http.get<PartOfSpeechCatalogResponse>(
+          "/settings/parts-of-speech/catalog"
+        ),
+      /** GET /admin/settings/parts-of-speech — 配置管理分页列表。 */
+      list: (query: PartOfSpeechConfigListQuery = {}) =>
+        http.get<PartOfSpeechConfigListResponse>(
+          `/settings/parts-of-speech${qs({ ...query })}`
+        ),
+      /** POST /admin/settings/parts-of-speech — 新建基本词性。 */
+      create: (input: CreatePartOfSpeechInput) =>
+        http.post<PartOfSpeechConfig>("/settings/parts-of-speech", input),
+      /** PATCH /admin/settings/parts-of-speech/{id} — 修改展示信息与排序。 */
+      update: (id: string, input: UpdatePartOfSpeechInput) =>
+        http.patch<PartOfSpeechConfig>(
+          `/settings/parts-of-speech/${id}`,
+          input
+        ),
+      /** DELETE /admin/settings/parts-of-speech/{id} — 仅未引用配置可删。 */
+      remove: (id: string) => http.del<void>(`/settings/parts-of-speech/${id}`),
+      /** GET /admin/settings/parts-of-speech/{id}/sub-parts。 */
+      listSubParts: (id: string) =>
+        http.get<SubPartOfSpeechListResponse>(
+          `/settings/parts-of-speech/${id}/sub-parts`
+        ),
+      /** POST /admin/settings/parts-of-speech/{id}/sub-parts。 */
+      createSubPart: (id: string, input: CreateSubPartOfSpeechInput) =>
+        http.post<SubPartOfSpeechConfig>(
+          `/settings/parts-of-speech/${id}/sub-parts`,
+          input
+        ),
+      /** PATCH /admin/settings/parts-of-speech/{id}/sub-parts/{subId}。 */
+      updateSubPart: (
+        id: string,
+        subId: string,
+        input: UpdateSubPartOfSpeechInput
+      ) =>
+        http.patch<SubPartOfSpeechConfig>(
+          `/settings/parts-of-speech/${id}/sub-parts/${subId}`,
+          input
+        ),
+      /** DELETE /admin/settings/parts-of-speech/{id}/sub-parts/{subId}。 */
+      removeSubPart: (id: string, subId: string) =>
+        http.del<void>(`/settings/parts-of-speech/${id}/sub-parts/${subId}`)
     },
     /**
      * 用户管理：C 端用户（web 学员/教师）的后台目录。当前后端仅列表已落地；

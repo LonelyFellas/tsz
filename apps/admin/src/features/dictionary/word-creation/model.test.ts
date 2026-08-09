@@ -1,12 +1,18 @@
 import type {
   AdminWordV2,
+  DraftMeaningsStepContent,
+  RichText,
   WordHeadwordsV2,
+  WordDefinitionV2,
   WordPosFormsV2,
   WordPosMeaningsV2
 } from "@tsz/types";
 import { describe, expect, it } from "vitest";
 import {
   cefrRank,
+  applyMeaningDialectSuggestions,
+  collectMissingMeaningDialectItems,
+  countIncompleteMeaningDialectSlots,
   createDefinition,
   createDerivedSlot,
   createEnglishText,
@@ -38,6 +44,66 @@ const distinguishedHeadwords = {
   source_dialect: "us"
 } satisfies WordHeadwordsV2;
 
+function richText(text: string): RichText {
+  return { version: 1, text, spans: [], liaisons: [] };
+}
+
+function englishDefinition(
+  id: string,
+  text: string,
+  targetText?: string
+): WordDefinitionV2 {
+  const content = createEnglishText(distinguishedHeadwords, text);
+  if (content.mode === "distinguish" && targetText !== undefined) {
+    content.uk = {
+      state: "ready",
+      variant: { value: richText(targetText), origin: "manual" }
+    };
+  }
+  return {
+    id,
+    level: "A1",
+    definition_mode: "en_definition",
+    content
+  };
+}
+
+function dialectMeaningContent(): DraftMeaningsStepContent {
+  const noun = createPosMeanings(
+    "noun-pos",
+    distinguishedHeadwords,
+    "word-1",
+    "sense-group-1"
+  );
+  noun.grammar_structures[0]!.variants.forEach((variant) => {
+    variant.content = richText(`grammar-${variant.dialect}`);
+  });
+  noun.senses[0]!.definitions.push(
+    englishDefinition("definition-missing", "the center"),
+    englishDefinition("definition-ready", "the color", "the colour")
+  );
+  noun.senses[0]!.sentences[0]!.id = "example-missing";
+  noun.senses[0]!.sentences[0]!.en_text = createEnglishText(
+    distinguishedHeadwords,
+    "The center is closed."
+  );
+
+  const verb = createPosMeanings(
+    "verb-pos",
+    distinguishedHeadwords,
+    "word-1",
+    "sense-group-1"
+  );
+  verb.senses[0]!.definitions.push(
+    englishDefinition("definition-second-pos", "to organize")
+  );
+
+  return {
+    sense_groups: [{ id: "sense-group-1", name_zh: "测试", name_en: "Test" }],
+    pos: [noun, verb]
+  };
+}
+
 function makeWord(
   forms: WordPosFormsV2[],
   meanings: WordPosMeaningsV2[],
@@ -65,7 +131,9 @@ function makeWord(
     },
     forms: { pos: forms },
     meanings: {
-      sense_groups: [{ id: "sense-group-1", name: "空间" }],
+      sense_groups: [
+        { id: "sense-group-1", name_zh: "空间", name_en: "Space" }
+      ],
       pos: meanings
     },
     completed_steps: ["basics"],
@@ -245,11 +313,16 @@ describe("T09 EnglishText 与 grammar 方言派生", () => {
 
 describe("T10 meanings 与 focus link", () => {
   it("默认 sense 的例句恰好有一个指向当前 word/sense 的 focus link", () => {
-    const sense = createSense(distinguishedHeadwords, "word-1");
+    const sense = createSense(
+      distinguishedHeadwords,
+      "word-1",
+      "sense-group-1"
+    );
     const sentence = sense.sentences[0]!;
     const focusLinks = sentence.links.filter((link) => link.role === "focus");
 
     expect(sense.definitions).toHaveLength(1);
+    expect(sense.sense_group_id).toBe("sense-group-1");
     expect(sense.definitions[0]).toMatchObject({
       definition_mode: "zh_definition",
       level: "A1"
@@ -268,13 +341,15 @@ describe("T10 meanings 与 focus link", () => {
     const existingNoun = createPosMeanings(
       nounForms.pos_id,
       unifiedHeadwords,
-      "word-1"
+      "word-1",
+      "sense-group-1"
     );
     existingNoun.senses[0]!.sub_pos = "N-COUNT";
     const removedPos = createPosMeanings(
       "removed-pos",
       unifiedHeadwords,
-      "word-1"
+      "word-1",
+      "sense-group-1"
     );
     const word = makeWord([nounForms, verbForms], [removedPos, existingNoun]);
     const existingIds = {
@@ -317,6 +392,144 @@ describe("T10 meanings 与 focus link", () => {
       false
     );
     expect(word.meanings.pos).toEqual([removedPos, existingNoun]);
+  });
+
+  it("meanings 为空时默认创建首个语义区间，并让新增 POS 的词义自动绑定", () => {
+    const nounForms = createPosForms("noun", unifiedHeadwords);
+    const word = makeWord([nounForms], []);
+    word.meanings.sense_groups = [];
+
+    const result = ensureMeaningsForForms(word);
+
+    expect(result.sense_groups).toEqual([
+      { id: expect.any(String), name_zh: "", name_en: "" }
+    ]);
+    expect(result.pos[0]!.senses[0]!.sense_group_id).toBe(
+      result.sense_groups[0]!.id
+    );
+    expect(word.meanings.sense_groups).toEqual([]);
+  });
+});
+
+describe("T58-T59 词义内容全局方言补全", () => {
+  it("只收集目标方言缺失且源文本非空的英文释义和例句，并跨词性合并为一次请求", () => {
+    const content = dialectMeaningContent();
+
+    expect(collectMissingMeaningDialectItems(content, "uk")).toEqual({
+      source_dialect: "us",
+      target_dialect: "uk",
+      items: [
+        {
+          client_id: "definition-missing",
+          field_kind: "definition",
+          value: richText("the center")
+        },
+        {
+          client_id: "example-missing",
+          field_kind: "example",
+          value: richText("The center is closed.")
+        },
+        {
+          client_id: "definition-second-pos",
+          field_kind: "definition",
+          value: richText("to organize")
+        }
+      ]
+    });
+    expect(collectMissingMeaningDialectItems(content, "us").items).toEqual([]);
+    expect(countIncompleteMeaningDialectSlots(content, "uk")).toBe(4);
+    expect(countIncompleteMeaningDialectSlots(content, "us")).toBe(1);
+  });
+
+  it("仅写入仍缺失的匹配项，保留手填内容并忽略表单、未知和重复响应", () => {
+    const content = dialectMeaningContent();
+    const original = structuredClone(content);
+    const suggestions = [
+      {
+        client_id: "definition-missing",
+        field_kind: "definition" as const,
+        value: richText("the centre"),
+        model_version: "test-v1"
+      },
+      {
+        client_id: "example-missing",
+        field_kind: "example" as const,
+        value: richText("The centre is closed."),
+        model_version: "test-v1"
+      },
+      {
+        client_id: "definition-ready",
+        field_kind: "definition" as const,
+        value: richText("must not overwrite"),
+        model_version: "test-v1"
+      },
+      {
+        client_id: "unknown-definition",
+        field_kind: "definition" as const,
+        value: richText("unknown"),
+        model_version: "test-v1"
+      },
+      {
+        client_id: "form-1",
+        field_kind: "form" as const,
+        value: "centred",
+        model_version: "test-v1"
+      },
+      {
+        client_id: "definition-second-pos",
+        field_kind: "definition" as const,
+        value: richText("to organise"),
+        model_version: "test-v1"
+      },
+      {
+        client_id: "definition-second-pos",
+        field_kind: "definition" as const,
+        value: richText("duplicate response"),
+        model_version: "test-v1"
+      }
+    ];
+
+    const result = applyMeaningDialectSuggestions(content, "uk", suggestions);
+
+    expect(content).toEqual(original);
+    expect(result.applied_count).toBe(2);
+    expect(result.skipped_count).toBe(5);
+    expect(result.content).not.toBe(content);
+    const [noun, verb] = result.content.pos;
+    const nounDefinitions = noun!.senses[0]!.definitions;
+    const convertedDefinition = nounDefinitions.find(
+      (definition) => definition.id === "definition-missing"
+    )!;
+    const manualDefinition = nounDefinitions.find(
+      (definition) => definition.id === "definition-ready"
+    )!;
+    expect(convertedDefinition.content).toMatchObject({
+      mode: "distinguish",
+      uk: {
+        state: "ready",
+        variant: { origin: "converted", value: { text: "the centre" } }
+      }
+    });
+    expect(noun!.senses[0]!.sentences[0]!.en_text).toMatchObject({
+      uk: {
+        state: "ready",
+        variant: {
+          origin: "converted",
+          value: { text: "The centre is closed." }
+        }
+      }
+    });
+    expect(manualDefinition.content).toMatchObject({
+      uk: {
+        state: "ready",
+        variant: { origin: "manual", value: { text: "the colour" } }
+      }
+    });
+    expect(
+      verb!.senses[0]!.definitions.find(
+        (definition) => definition.id === "definition-second-pos"
+      )!.content
+    ).toMatchObject({ uk: { state: "missing" } });
   });
 });
 

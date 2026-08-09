@@ -128,7 +128,10 @@ describe("createAdminEndpoints — 智能词库 words", () => {
 
   it("detect → POST /words/detect 原样透传语言与待检测词头", () => {
     const api = createAdminEndpoints(http);
-    const input = { language: "en" as const, headword: "center" };
+    const input = {
+      language: "en" as const,
+      headword: "center"
+    };
     api.words.detect(input);
     expect(http.post).toHaveBeenCalledWith("/words/detect", input);
   });
@@ -281,6 +284,101 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(sp.get("q")).toBe("big");
     expect(sp.get("kind")).toBe("word");
     expect(sp.get("limit")).toBe("10");
+  });
+});
+
+describe("createAdminEndpoints — 系统设置词性配置", () => {
+  it("catalog/list 与基本词性 CRUD 使用稳定路径、query 和 body", () => {
+    const api = createAdminEndpoints(http);
+    api.partOfSpeechSettings.catalog();
+    api.partOfSpeechSettings.list({ q: "noun form", page: 2, page_size: 50 });
+    api.partOfSpeechSettings.create({
+      code: "particle",
+      name_zh: "小品词",
+      name_en: "PARTICLE",
+      abbreviation: "part.",
+      sort_order: 100
+    });
+    api.partOfSpeechSettings.update("pos-1", {
+      base_revision: 2,
+      name_zh: "小品词",
+      name_en: "Particle",
+      abbreviation: "ptcl.",
+      sort_order: 20
+    });
+    api.partOfSpeechSettings.remove("pos-1");
+
+    expect(http.get).toHaveBeenNthCalledWith(
+      1,
+      "/settings/parts-of-speech/catalog"
+    );
+    const listPath = http.get.mock.calls[1]![0] as string;
+    const query = new URLSearchParams(listPath.split("?")[1]);
+    expect(listPath.startsWith("/settings/parts-of-speech?")).toBe(true);
+    expect(query.get("q")).toBe("noun form");
+    expect(query.get("page")).toBe("2");
+    expect(query.get("page_size")).toBe("50");
+    expect(http.post).toHaveBeenCalledWith("/settings/parts-of-speech", {
+      code: "particle",
+      name_zh: "小品词",
+      name_en: "PARTICLE",
+      abbreviation: "part.",
+      sort_order: 100
+    });
+    expect(http.patch).toHaveBeenCalledWith("/settings/parts-of-speech/pos-1", {
+      base_revision: 2,
+      name_zh: "小品词",
+      name_en: "Particle",
+      abbreviation: "ptcl.",
+      sort_order: 20
+    });
+    expect(http.del).toHaveBeenCalledWith("/settings/parts-of-speech/pos-1");
+  });
+
+  it("list 无参不带 query，细分词性 CRUD 使用父子动态 id", () => {
+    const api = createAdminEndpoints(http);
+    api.partOfSpeechSettings.list();
+    api.partOfSpeechSettings.listSubParts("pos-1");
+    api.partOfSpeechSettings.createSubPart("pos-1", {
+      code: "N-COLLECTIVE",
+      name_zh: "集合名词",
+      name_en: "Collective noun",
+      sort_order: 10
+    });
+    api.partOfSpeechSettings.updateSubPart("pos-1", "sub-2", {
+      base_revision: 3,
+      name_zh: "集合类名词",
+      name_en: "Collective noun",
+      sort_order: 20
+    });
+    api.partOfSpeechSettings.removeSubPart("pos-1", "sub-2");
+
+    expect(http.get).toHaveBeenNthCalledWith(1, "/settings/parts-of-speech");
+    expect(http.get).toHaveBeenNthCalledWith(
+      2,
+      "/settings/parts-of-speech/pos-1/sub-parts"
+    );
+    expect(http.post).toHaveBeenCalledWith(
+      "/settings/parts-of-speech/pos-1/sub-parts",
+      {
+        code: "N-COLLECTIVE",
+        name_zh: "集合名词",
+        name_en: "Collective noun",
+        sort_order: 10
+      }
+    );
+    expect(http.patch).toHaveBeenCalledWith(
+      "/settings/parts-of-speech/pos-1/sub-parts/sub-2",
+      {
+        base_revision: 3,
+        name_zh: "集合类名词",
+        name_en: "Collective noun",
+        sort_order: 20
+      }
+    );
+    expect(http.del).toHaveBeenCalledWith(
+      "/settings/parts-of-speech/pos-1/sub-parts/sub-2"
+    );
   });
 });
 

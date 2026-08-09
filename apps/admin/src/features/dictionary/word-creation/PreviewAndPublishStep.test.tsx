@@ -22,6 +22,12 @@ vi.mock("./api", () => ({
   })
 }));
 
+vi.mock("../part-of-speech/api", async () => {
+  const { partOfSpeechCatalogQueryResult } =
+    await import("./partOfSpeech.test.helper");
+  return { usePartOfSpeechCatalog: partOfSpeechCatalogQueryResult };
+});
+
 function button(label: string): HTMLButtonElement {
   const result = screen
     .getAllByRole("button")

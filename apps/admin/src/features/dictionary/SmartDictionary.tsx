@@ -22,7 +22,7 @@ import {
 } from "antd";
 import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { AdminWordKind, AdminWordListItem, CefrLevel } from "@tsz/types";
 import { isIncompleteHttpError } from "@tsz/api-client/http";
@@ -41,11 +41,15 @@ import {
   cefrColor,
   KIND_LABEL,
   KIND_OPTIONS,
-  POS_TAG_ABBR,
-  POS_TAG_OPTIONS,
   STATUS_LABEL,
   STATUS_OPTIONS
 } from "./labels";
+import {
+  availablePartOfSpeechOptions,
+  createPartOfSpeechLookup,
+  partOfSpeechLabel
+} from "./part-of-speech/catalog";
+import { usePartOfSpeechCatalog } from "./part-of-speech/api";
 import { toListQuery, type WordFilterValues } from "./listQuery";
 import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 
@@ -68,6 +72,15 @@ export function SmartDictionary() {
   const publishWord = usePublishWord();
   const deleteWord = useDeleteWord();
   const batchDelete = useBatchDeleteWords();
+  const partOfSpeechCatalog = usePartOfSpeechCatalog();
+  const partOfSpeechLookup = useMemo(
+    () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
+    [partOfSpeechCatalog.data]
+  );
+  const partOfSpeechOptions = useMemo(
+    () => availablePartOfSpeechOptions(partOfSpeechLookup),
+    [partOfSpeechLookup]
+  );
 
   const rows = listQuery.data?.words ?? [];
   const total = listQuery.data?.page.total ?? 0;
@@ -165,7 +178,7 @@ export function SmartDictionary() {
         <Space size={[4, 4]} wrap>
           {list.map((p) => (
             <Tag key={p} style={{ margin: 0 }}>
-              {POS_TAG_ABBR[p]}
+              {partOfSpeechLabel(partOfSpeechLookup, p)}
             </Tag>
           ))}
         </Space>
@@ -285,7 +298,9 @@ export function SmartDictionary() {
           <Form.Item name="pos" label="基本词性">
             <Select
               placeholder="请选择基本词性"
-              options={POS_TAG_OPTIONS}
+              options={partOfSpeechOptions}
+              loading={partOfSpeechCatalog.isPending}
+              disabled={partOfSpeechCatalog.isError}
               allowClear
               style={{ width: 140 }}
             />
@@ -402,6 +417,24 @@ export function SmartDictionary() {
             action={
               <Button size="small" onClick={() => void listQuery.refetch()}>
                 重试
+              </Button>
+            }
+          />
+        )}
+
+        {partOfSpeechCatalog.isError && (
+          <Alert
+            type="warning"
+            showIcon
+            style={{ marginBottom: 12 }}
+            title="词性目录暂时不可用"
+            description="现有词条将回退显示稳定编码，基本词性筛选暂不可用。"
+            action={
+              <Button
+                size="small"
+                onClick={() => void partOfSpeechCatalog.refetch()}
+              >
+                重 试
               </Button>
             }
           />

@@ -9,6 +9,7 @@ export * from "./api";
 export * from "./admin";
 export * from "./admin-user";
 export * from "./admin-role";
+export * from "./part-of-speech";
 export * from "./admin-word-v2";
 export { isAdminWordV2 } from "./admin-word";
 export type {

@@ -6,7 +6,12 @@ import {
   waitFor
 } from "@testing-library/react";
 import { App as AntApp } from "antd";
-import type { AdminWordV2, WordHeadwordsV2 } from "@tsz/types";
+import { HttpError } from "@tsz/api-client/http";
+import type {
+  AdminWordV2,
+  PartOfSpeechCatalogResponse,
+  WordHeadwordsV2
+} from "@tsz/types";
 import {
   createMemoryRouter,
   RouterProvider,
@@ -26,6 +31,10 @@ const mutations = vi.hoisted(() => ({
   resetDetect: vi.fn(),
   create: vi.fn()
 }));
+const partOfSpeechCatalogState = vi.hoisted(() => ({
+  data: undefined as PartOfSpeechCatalogResponse | null | undefined,
+  isError: false
+}));
 
 vi.mock("./api", () => ({
   useDetectWordV2: () => ({
@@ -38,6 +47,21 @@ vi.mock("./api", () => ({
     isPending: false
   })
 }));
+
+vi.mock("../part-of-speech/api", async () => {
+  const { partOfSpeechCatalogFixture, partOfSpeechCatalogQueryResult } =
+    await import("./partOfSpeech.test.helper");
+  return {
+    usePartOfSpeechCatalog: () => ({
+      ...partOfSpeechCatalogQueryResult(),
+      data:
+        partOfSpeechCatalogState.data === undefined
+          ? partOfSpeechCatalogFixture
+          : (partOfSpeechCatalogState.data ?? undefined),
+      isError: partOfSpeechCatalogState.isError
+    })
+  };
+});
 
 function button(label: string): HTMLButtonElement {
   const result = screen
@@ -118,6 +142,8 @@ function renderStep() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  partOfSpeechCatalogState.data = undefined;
+  partOfSpeechCatalogState.isError = false;
   vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
@@ -160,6 +186,10 @@ describe("CreateEntryStep", () => {
       })
     );
     expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
+    expect(screen.getByText("名词", { exact: true })).toBeVisible();
+    expect(screen.getByText("动词", { exact: true })).toBeVisible();
+    expect(screen.queryByText("n.", { exact: true })).toBeNull();
+    expect(screen.queryByText("v.", { exact: true })).toBeNull();
     expect(onHeadwordsChange).toHaveBeenLastCalledWith(
       detection.builtin_dictionary.status === "matched"
         ? detection.builtin_dictionary.headwords
@@ -279,18 +309,18 @@ describe("CreateEntryStep", () => {
     expect(mutations.create).not.toHaveBeenCalled();
   });
 
-  it("短语检测引导返回旧入口", async () => {
+  it("检测为短语时提示使用短语流程并禁止创建单词草稿", async () => {
     mutations.detect.mockResolvedValue(detectionFixture("in front of"));
-    const { router } = renderStep();
-    const input = screen.getByLabelText("录入词条");
-    fireEvent.change(input, { target: { value: "in front of" } });
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "in front of" }
+    });
     fireEvent.click(button("词典检测"));
 
     expect(
       await screen.findByText("检测结果为短语，请使用创建短语流程")
     ).toBeVisible();
-    fireEvent.click(button("返回创建短语"));
-    await waitFor(() => expect(router.state.location.pathname).toBe("/words"));
+    expect(button("确认并进入词形与发音")).toBeDisabled();
   });
 
   it("检测错误保留原输入以便重试", async () => {
@@ -323,7 +353,7 @@ describe("CreateEntryStep", () => {
     const created = wordFixture({ headword: "far" });
     mutations.detect.mockResolvedValue(detection);
     mutations.create.mockResolvedValue({ word: created });
-    renderStep();
+    const { onHeadwordsChange } = renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
       target: { value: "far" }
     });
@@ -336,9 +366,51 @@ describe("CreateEntryStep", () => {
           .some((input) => input.hasAttribute("readonly"))
       ).toBe(true)
     );
+    const callsBeforeReadonlyChanges = onHeadwordsChange.mock.calls.length;
+    fireEvent.change(screen.getByLabelText("英式主词"), {
+      target: { value: "changed-uk" }
+    });
+    fireEvent.change(screen.getByLabelText("美式主词"), {
+      target: { value: "changed-us" }
+    });
+    expect(onHeadwordsChange).toHaveBeenCalledTimes(callsBeforeReadonlyChanges);
     fireEvent.click(button("确认并进入词形与发音"));
     await waitFor(() => expect(mutations.create).toHaveBeenCalledTimes(1));
     expect(await screen.findByText("forms-route")).toBeVisible();
+  });
+
+  it("检测到英美差异时开关自动开启并显示两套词形", async () => {
+    mutations.detect.mockResolvedValue(detectionFixture("center"));
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const dialectSwitch = await screen.findByRole("switch", {
+      name: "区分英美词形"
+    });
+    expect(dialectSwitch).toBeChecked();
+    expect(dialectSwitch).toBeDisabled();
+    expect(screen.getByLabelText("英式主词")).toHaveValue("centre");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("center");
+  });
+
+  it("未检测到英美差异时开关关闭禁用，英美两栏显示相同词形", async () => {
+    mutations.detect.mockResolvedValue(detectionFixture("hello"));
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "hello" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const dialectSwitch = await screen.findByRole("switch", {
+      name: "区分英美词形"
+    });
+    expect(dialectSwitch).not.toBeChecked();
+    expect(dialectSwitch).toBeDisabled();
+    expect(screen.getByLabelText("英式主词")).toHaveValue("hello");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("hello");
   });
 
   it("非 Error 检测失败使用稳定回退文案", async () => {
@@ -349,5 +421,95 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
     expect(await screen.findByText("词典检测失败")).toBeInTheDocument();
+  });
+
+  it("过期检测结果不会进入确认状态", async () => {
+    const detection = detectionFixture("center");
+    detection.expires_at = new Date(Date.now() - 1_000).toISOString();
+    mutations.detect.mockResolvedValue(detection);
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(
+      await screen.findByText("检测结果已过期，请重新检测")
+    ).toBeInTheDocument();
+    expect(button("确认并进入词形与发音")).toBeDisabled();
+  });
+
+  it("创建时检测凭证过期会清空结果并提示重新检测", async () => {
+    mutations.detect.mockResolvedValue(detectionFixture("center"));
+    mutations.create.mockRejectedValue(
+      new HttpError(410, "detection expired", [], "detection_expired")
+    );
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+    expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
+    fireEvent.click(button("确认并进入词形与发音"));
+
+    expect(
+      await screen.findByText("检测结果已过期，请重新检测")
+    ).toBeInTheDocument();
+    expect(mutations.resetDetect).toHaveBeenCalled();
+    expect(screen.getByText("等待检测")).toBeVisible();
+  });
+
+  it.each([
+    [new Error("create failed"), "create failed"],
+    ["offline", "创建草稿失败"]
+  ])("创建失败 %p 时显示稳定错误且保留检测结果", async (error, text) => {
+    mutations.detect.mockResolvedValue(detectionFixture("center"));
+    mutations.create.mockRejectedValue(error);
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+    expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
+    fireEvent.click(button("确认并进入词形与发音"));
+
+    expect(await screen.findByText(text)).toBeInTheDocument();
+    expect(screen.getByText("内置词典已找到规范词条")).toBeVisible();
+  });
+
+  it("词性目录加载失败时显示提示并阻断创建", async () => {
+    partOfSpeechCatalogState.data = null;
+    partOfSpeechCatalogState.isError = true;
+    mutations.detect.mockResolvedValue(detectionFixture("center"));
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByText("词性目录暂时不可用")).toBeVisible();
+    expect(screen.getByText("不可继续")).toBeVisible();
+    expect(button("确认并进入词形与发音")).toBeDisabled();
+  });
+
+  it("检测结果含未配置词性时显示稳定编码并阻断创建", async () => {
+    const detection = detectionFixture("center");
+    if (detection.builtin_dictionary.status !== "matched") {
+      throw new Error("fixture must be matched");
+    }
+    detection.builtin_dictionary.suggested_forms.pos[0]!.pos = "custom-pos";
+    mutations.detect.mockResolvedValue(detection);
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByText("检测结果包含未配置词性")).toBeVisible();
+    expect(screen.getAllByText("custom-pos").length).toBeGreaterThan(0);
+    expect(button("确认并进入词形与发音")).toBeDisabled();
+    expect(mutations.create).not.toHaveBeenCalled();
   });
 });
