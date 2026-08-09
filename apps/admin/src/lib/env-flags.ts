@@ -18,14 +18,15 @@ export function parseBooleanEnvFlag(
   );
 }
 
-/** mock 数据源绝不能进入生产产物。运行时与 Vite 构建共用这条策略。 */
+/** mock 数据源绝不能进入 production mode 产物。运行时与 Vite 构建共用这条策略。 */
 export function assertAdminWordsMockAllowed(
   enabled: boolean,
-  production: boolean
+  production: boolean,
+  mode = production ? "production" : "development"
 ): void {
-  if (enabled && production) {
+  if (enabled && production && mode !== "test") {
     throw new Error(
-      "[env] 生产环境禁止启用 VITE_ADMIN_WORDS_MOCK；请移除该变量或设为 false"
+      "[env] 仅开发环境或 test mode 构建允许启用 VITE_ADMIN_WORDS_MOCK；请移除该变量或设为 false"
     );
   }
 }

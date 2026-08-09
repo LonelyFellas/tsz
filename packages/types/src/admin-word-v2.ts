@@ -3,7 +3,6 @@ import type {
   Dialect,
   PronunciationStyle,
   RichText,
-  SenseGroup,
   WordFormType,
   WordPosTag,
   WordRelationType,
@@ -171,6 +170,13 @@ export interface WordSenseV2 {
   relations: WordRelationV2[];
 }
 
+/** V2 语义区间双语名称；与 legacy `SenseGroup.name` 契约隔离。 */
+export interface SenseGroupV2 {
+  id: string;
+  name_zh: string;
+  name_en: string;
+}
+
 export interface WordPosMeaningsV2 {
   pos_id: string;
   grammar_structures: GrammarStructureV2[];
@@ -178,7 +184,7 @@ export interface WordPosMeaningsV2 {
 }
 
 export interface DraftMeaningsStepContent {
-  sense_groups: SenseGroup[];
+  sense_groups: SenseGroupV2[];
   pos: WordPosMeaningsV2[];
 }
 
@@ -365,6 +371,9 @@ export interface AdminWordApiErrorMeta {
   word_id?: string;
   max_reachable_step?: WordCreationStep;
   affected_node_ids?: string[];
+  usage_count?: number;
+  part_of_speech_id?: string;
+  code?: string;
 }
 
 export interface AdminWordApiError {

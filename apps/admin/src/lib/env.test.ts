@@ -67,13 +67,24 @@ describe("admin words mock production policy", () => {
   it("生产环境开启 mock 时 fail closed", async () => {
     const { assertAdminWordsMockAllowed } = await import("./env-flags");
     expect(() => assertAdminWordsMockAllowed(true, true)).toThrow(
-      "生产环境禁止启用 VITE_ADMIN_WORDS_MOCK"
+      "仅开发环境或 test mode 构建允许启用 VITE_ADMIN_WORDS_MOCK"
     );
   });
 
-  it("非生产环境或关闭 mock 时允许启动", async () => {
+  it("非生产环境、test mode 构建或关闭 mock 时允许启动", async () => {
     const { assertAdminWordsMockAllowed } = await import("./env-flags");
     expect(() => assertAdminWordsMockAllowed(true, false)).not.toThrow();
+    expect(() => assertAdminWordsMockAllowed(true, true, "test")).not.toThrow();
     expect(() => assertAdminWordsMockAllowed(false, true)).not.toThrow();
+  });
+
+  it("优化后的 test mode 构建可显式启用 mock", async () => {
+    vi.stubEnv("PROD", true);
+    vi.stubEnv("MODE", "test");
+    vi.stubEnv("VITE_ADMIN_WORDS_MOCK", "true");
+    vi.resetModules();
+
+    const { env } = await import("./env");
+    expect(env.ADMIN_WORDS_MOCK).toBe(true);
   });
 });

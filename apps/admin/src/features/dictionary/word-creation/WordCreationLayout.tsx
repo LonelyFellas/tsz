@@ -24,7 +24,7 @@ interface Props {
 
 const STEP_SUBTITLE: Record<WordCreationStep, string> = {
   basics: "所属语言｜英美区分",
-  forms: "基本词性｜词形变化",
+  forms: "词性分类｜词形变化",
   meanings: "多维释义｜多维例句",
   preview: "字典预览｜提交生效"
 };
@@ -46,18 +46,21 @@ function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
       <div className="word-creation-summary-headword">
         <span className="dialect-dot dialect-dot-uk" />
         <strong>{headwords.uk}</strong>
-        <small>BrE</small>
+        <small>英式英语 · BrE</small>
       </div>
       <div className="word-creation-summary-headword word-creation-summary-alt">
         <span className="dialect-dot dialect-dot-us" />
         <span>{headwords.us}</span>
-        <small>AmE</small>
+        <small>美式英语 · AmE</small>
       </div>
     </Flex>
   );
 }
 
 function ProgressSummary({ word }: { word?: AdminWordV2 }) {
+  const senseGroupCount = word
+    ? Math.max(1, word.meanings.sense_groups.length)
+    : 0;
   const grammarCount =
     word?.meanings.pos.reduce(
       (sum, pos) => sum + pos.grammar_structures.length,
@@ -88,8 +91,12 @@ function ProgressSummary({ word }: { word?: AdminWordV2 }) {
   const completed = new Set(word?.completed_steps ?? []);
   const rows = [
     { label: "方言识别", value: completed.has("basics") ? "完成" : "待完成" },
-    { label: "基本词性", value: word?.forms.pos.length ?? 0 },
+    {
+      label: "基本词性",
+      value: word?.forms.pos.length ?? 0
+    },
     { label: "词形变化", value: formCount },
+    { label: "语义区间", value: senseGroupCount },
     { label: "语法结构", value: grammarCount },
     { label: "多维词义", value: senseCount },
     { label: "多维例句", value: sentenceCount }
@@ -162,6 +169,7 @@ export function WordCreationLayout({
 
       <section className="word-creation-stepper">
         <Steps
+          className="word-creation-steps"
           current={currentIndex}
           responsive={false}
           items={steps}
@@ -180,26 +188,31 @@ export function WordCreationLayout({
             返回智能词库
           </Button>
 
-          <Typography.Text type="secondary" className="word-summary-kicker">
-            当前词条
-          </Typography.Text>
-          <HeadwordSummary headwords={word?.headwords ?? draftHeadwords} />
+          <div className="word-summary-entry-card">
+            <Typography.Text type="secondary" className="word-summary-kicker">
+              当前词条
+            </Typography.Text>
+            <HeadwordSummary headwords={word?.headwords ?? draftHeadwords} />
 
-          <div className="word-summary-language">
-            <Typography.Text type="secondary">所属语言</Typography.Text>
-            <strong>English&nbsp; 英语</strong>
+            <div className="word-summary-language">
+              <Typography.Text type="secondary">所属语言</Typography.Text>
+              <strong>English&nbsp; 英语</strong>
+            </div>
+
+            {word?.status === "published" && (
+              <Tag color="success" style={{ alignSelf: "flex-start" }}>
+                已发布 · 只读
+              </Tag>
+            )}
           </div>
 
-          {word?.status === "published" && (
-            <Tag color="success" style={{ alignSelf: "flex-start" }}>
-              已发布 · 只读
-            </Tag>
-          )}
-
           <div className="word-summary-divider" />
-          <Typography.Text type="secondary" className="word-summary-kicker">
-            完成情况
-          </Typography.Text>
+          <div className="word-summary-progress-title">
+            <Typography.Text type="secondary" className="word-summary-kicker">
+              完成情况
+            </Typography.Text>
+            <Tag bordered={false}>实时</Tag>
+          </div>
           <ProgressSummary word={word} />
         </aside>
 

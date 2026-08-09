@@ -6,6 +6,7 @@ import type {
   DraftMeaningsStepContent,
   EnglishTextV2,
   RichText,
+  SenseGroupV2,
   WordDerivedFormSlotV2,
   WordFormGroupV2,
   WordHeadwordsV2,
@@ -15,7 +16,7 @@ import type {
   WordPronunciationV2
 } from "@tsz/types";
 
-export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 1;
+export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 3;
 
 export function richText(text: string): RichText {
   return { version: 1, text, spans: [], liaisons: [] };
@@ -378,7 +379,8 @@ function createInitialPosMeanings(
   wordId: string,
   nodeKey: string,
   count: number,
-  large: boolean
+  large: boolean,
+  senseGroupId: string
 ): WordPosMeaningsV2 {
   const grammarId = `mock-grammar-${nodeKey}`;
   const grammarDialects =
@@ -407,6 +409,7 @@ function createInitialPosMeanings(
             : ("N-COUNT" as const)
           : ("" as const),
         level: "A1" as const,
+        sense_group_id: senseGroupId,
         frequency: large ? "1" : undefined,
         depends_on_context: false,
         definitions: [
@@ -452,7 +455,8 @@ function createInitialPosMeanings(
 export function createInitialMeaningsForAddedPos(
   formsPos: WordPosFormsV2,
   headwords: WordHeadwordsV2,
-  wordId: string
+  wordId: string,
+  senseGroupId: string
 ): WordPosMeaningsV2 {
   return createInitialPosMeanings(
     formsPos,
@@ -460,8 +464,20 @@ export function createInitialMeaningsForAddedPos(
     wordId,
     `pos-${encodeURIComponent(formsPos.pos_id)}`,
     1,
-    false
+    false,
+    senseGroupId
   );
+}
+
+export function createInitialSenseGroup(
+  wordId: string,
+  complete = false
+): SenseGroupV2 {
+  return {
+    id: `mock-sense-group-${encodeURIComponent(wordId)}-1`,
+    name_zh: complete ? "默认语义区间" : "",
+    name_en: complete ? "Default semantic range" : ""
+  };
 }
 
 export function createInitialMeanings(
@@ -471,6 +487,7 @@ export function createInitialMeanings(
   large = false
 ): DraftMeaningsStepContent {
   const count = large ? 38 : 1;
+  const defaultSenseGroup = createInitialSenseGroup(wordId, large);
   const pos = forms.pos.map((formsPos, posIndex) =>
     createInitialPosMeanings(
       formsPos,
@@ -478,10 +495,11 @@ export function createInitialMeanings(
       wordId,
       String(posIndex + 1),
       posIndex === 0 ? count : 1,
-      large
+      large,
+      defaultSenseGroup.id
     )
   );
-  return { sense_groups: [], pos };
+  return { sense_groups: [defaultSenseGroup], pos };
 }
 
 function createLegacyFixture(

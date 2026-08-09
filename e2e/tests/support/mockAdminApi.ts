@@ -1,4 +1,5 @@
 import type { Page, Route } from "@playwright/test";
+import type { PartOfSpeechCatalogResponse } from "@tsz/types";
 
 export const ADMIN_E2E_WORD_ID = "e2e-word-center";
 
@@ -12,6 +13,29 @@ const ADMIN_PROFILE = {
 
 const NOW = "2026-08-02T03:00:00.000Z";
 const PUBLISHED_AT = "2026-08-02T03:10:00.000Z";
+
+const PART_OF_SPEECH_CATALOG: PartOfSpeechCatalogResponse = {
+  catalog_version: 1,
+  items: [
+    {
+      id: "pos-config-noun",
+      code: "noun",
+      name_zh: "名词",
+      name_en: "NOUN",
+      abbreviation: "n.",
+      sort_order: 10,
+      sub_parts: [
+        {
+          id: "sub-pos-config-n-count",
+          code: "N-COUNT",
+          name_zh: "可数名词",
+          name_en: "Countable noun",
+          sort_order: 10
+        }
+      ]
+    }
+  ]
+};
 
 const richText = (text: string) => ({
   version: 1,
@@ -89,7 +113,13 @@ const CENTER_FORMS = {
 };
 
 const CENTER_MEANINGS = {
-  sense_groups: [],
+  sense_groups: [
+    {
+      id: "sense-group-1",
+      name_zh: "几何空间",
+      name_en: "Geometric space"
+    }
+  ],
   pos: [
     {
       pos_id: "pos-noun",
@@ -107,6 +137,7 @@ const CENTER_MEANINGS = {
           id: "sense-1",
           sub_pos: "N-COUNT",
           level: "A1",
+          sense_group_id: "sense-group-1",
           frequency: "12.24",
           depends_on_context: false,
           definitions: [
@@ -323,6 +354,9 @@ export async function mockAdminApi(
     }
     if (method === "GET" && path === "/profile") {
       return json(route, 200, ADMIN_PROFILE);
+    }
+    if (method === "GET" && path === "/settings/parts-of-speech/catalog") {
+      return json(route, 200, PART_OF_SPEECH_CATALOG);
     }
     if (method === "GET" && path === "/words") {
       const words = word ? [listItem(word)] : [];

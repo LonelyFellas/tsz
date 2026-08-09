@@ -127,7 +127,14 @@ function toAdminWordApiErrorMeta(
       (!Array.isArray(value.affected_node_ids) ||
         !value.affected_node_ids.every(
           (nodeId) => nonEmptyString(nodeId) !== undefined
-        )))
+        ))) ||
+    (value.usage_count !== undefined &&
+      (typeof value.usage_count !== "number" ||
+        !Number.isInteger(value.usage_count) ||
+        value.usage_count < 0)) ||
+    (value.part_of_speech_id !== undefined &&
+      nonEmptyString(value.part_of_speech_id) === undefined) ||
+    (value.code !== undefined && nonEmptyString(value.code) === undefined)
   ) {
     return undefined;
   }

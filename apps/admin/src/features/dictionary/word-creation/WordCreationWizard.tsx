@@ -23,10 +23,14 @@ import type {
   WordHeadwordsV2
 } from "@tsz/types";
 import { isAdminWordV2 } from "@tsz/types";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { POS_TAG_ABBR } from "../labels";
 import { useDeleteWord, useWordDetail } from "../api";
+import {
+  createPartOfSpeechLookup,
+  partOfSpeechLabel
+} from "../part-of-speech/catalog";
+import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { CreateEntryStep } from "./CreateEntryStep";
 import { FormsAndPronunciationStep } from "./FormsAndPronunciationStep";
 import { MeaningsAndExamplesStep } from "./MeaningsAndExamplesStep";
@@ -45,6 +49,11 @@ function isWordCreationStep(value?: string): value is WordCreationStep {
 function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  const partOfSpeechCatalog = usePartOfSpeechCatalog();
+  const partOfSpeechLookup = useMemo(
+    () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
+    [partOfSpeechCatalog.data]
+  );
   const removeWord = useDeleteWord();
   const snapshot = word.detection_snapshot;
   const discard = () => {
@@ -83,6 +92,7 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
       </div>
 
       <Alert
+        className="word-snapshot-status"
         type="success"
         showIcon
         icon={<CheckCircleFilled />}
@@ -91,8 +101,17 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
         style={{ marginBottom: 18 }}
       />
 
-      <Card title="检测与确认快照">
-        <Descriptions column={{ xs: 1, md: 2 }}>
+      {partOfSpeechCatalog.isError && (
+        <Alert
+          type="warning"
+          showIcon
+          title="词性配置加载失败，暂以词性编码显示"
+          style={{ marginBottom: 18 }}
+        />
+      )}
+
+      <Card className="word-snapshot-card" size="small" title="检测与确认快照">
+        <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
           <Descriptions.Item label="原始输入">
             {snapshot.request.headword}
           </Descriptions.Item>
@@ -102,9 +121,9 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
           <Descriptions.Item label="词条类型">单词</Descriptions.Item>
           <Descriptions.Item label="输入命中">
             {snapshot.matched_dialect === "uk"
-              ? "British English"
+              ? "英式英语 · BrE"
               : snapshot.matched_dialect === "us"
-                ? "American English"
+                ? "美式英语 · AmE"
                 : "Common"}
           </Descriptions.Item>
           <Descriptions.Item label="确认主词" span={2}>
@@ -112,15 +131,19 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
               <Tag color="green">{snapshot.headwords.common}</Tag>
             ) : (
               <Space>
-                <Tag color="blue">BrE · {snapshot.headwords.uk}</Tag>
-                <Tag color="magenta">AmE · {snapshot.headwords.us}</Tag>
+                <Tag color="blue">英式英语 · BrE · {snapshot.headwords.uk}</Tag>
+                <Tag color="magenta">
+                  美式英语 · AmE · {snapshot.headwords.us}
+                </Tag>
               </Space>
             )}
           </Descriptions.Item>
-          <Descriptions.Item label="原建议词性" span={2}>
+          <Descriptions.Item label="原建议基本词性" span={2}>
             <Space wrap>
               {snapshot.suggested_pos.map((pos) => (
-                <Tag key={pos}>{POS_TAG_ABBR[pos]}</Tag>
+                <Tag key={pos}>
+                  {partOfSpeechLabel(partOfSpeechLookup, pos)}
+                </Tag>
               ))}
             </Space>
           </Descriptions.Item>

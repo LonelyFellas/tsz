@@ -1,11 +1,6 @@
 // 智能词库 wire 枚举 ↔ UI 标签映射。提交值一律用 @tsz/types 的英文码,
 // 中文/缩写仅用于展示(对接文档 §7 的对照表)。
-import type {
-  AdminWordKind,
-  AdminWordStatus,
-  CefrLevel,
-  WordPosTag
-} from "@tsz/types";
+import type { AdminWordKind, AdminWordStatus, CefrLevel } from "@tsz/types";
 
 /** Record<wire 码, 标签> → antd Select options(码作 value,标签作 label)。 */
 export const recordToOptions = <K extends string>(record: Record<K, string>) =>
@@ -13,23 +8,6 @@ export const recordToOptions = <K extends string>(record: Record<K, string>) =>
     value,
     label
   }));
-
-/** 基本词性 → 列表徽章缩写。 */
-export const POS_TAG_ABBR: Record<WordPosTag, string> = {
-  noun: "n.",
-  pronoun: "pron.",
-  verb: "v.",
-  adjective: "adj.",
-  adverb: "adv.",
-  preposition: "prep.",
-  article: "art.",
-  determiner: "det.",
-  conjunction: "conj.",
-  numeral: "num.",
-  interjection: "int."
-};
-
-export const POS_TAG_OPTIONS = recordToOptions(POS_TAG_ABBR);
 
 export const KIND_LABEL: Record<AdminWordKind, string> = {
   word: "单词",
@@ -56,9 +34,16 @@ export const CEFR_LEVELS: readonly CefrLevel[] = [
 
 export const CEFR_OPTIONS = CEFR_LEVELS.map((v) => ({ value: v, label: v }));
 
-/** CEFR 难度着色:A 绿、B 蓝、C 金,便于一眼分级。 */
+export const CEFR_COLOR: Record<CefrLevel, string> = {
+  A1: "#4CCB4B",
+  A2: "#00A5CC",
+  B1: "#2053FF",
+  B2: "#7E2BF8",
+  C1: "#B817CF",
+  C2: "#D22D8D"
+};
+
+/** CEFR 六档独立着色，便于一眼识别具体等级。 */
 export function cefrColor(level: CefrLevel): string {
-  if (level.startsWith("A")) return "green";
-  if (level.startsWith("B")) return "blue";
-  return "gold";
+  return CEFR_COLOR[level];
 }

@@ -1,5 +1,6 @@
 import type {
   AdminProfile,
+  AdminWord,
   AdminWordV2,
   DraftFormsStepContent,
   DraftMeaningsStepContent
@@ -182,6 +183,61 @@ describe("admin words mock", () => {
     mock = mockFor();
   });
 
+  it("补全旧空草稿时创建默认语义区间并改绑全部词义", async () => {
+    const draft = await createCenter(mock, "complete-empty-sense-groups");
+    const legacyEmpty = structuredClone(draft.word.meanings);
+    legacyEmpty.sense_groups = [];
+
+    const complete = completeMockMeanings(draft.word, legacyEmpty);
+
+    expect(complete.sense_groups).toEqual([
+      expect.objectContaining({
+        name_zh: "默认语义区间",
+        name_en: "Default semantic range"
+      })
+    ]);
+    expect(
+      complete.pos.every((pos) =>
+        pos.senses.every(
+          (sense) => sense.sense_group_id === complete.sense_groups[0]!.id
+        )
+      )
+    ).toBe(true);
+  });
+
+  it("旧空草稿再次保存 forms 时恢复默认语义区间与已有词义引用", async () => {
+    const draft = await createCenter(mock, "repair-empty-sense-groups");
+    const forms = await mock.saveFormsStep(draft.word.id, {
+      base_revision: draft.word.revision,
+      operation_id: "repair-empty-sense-groups-complete-forms",
+      intent: "complete",
+      content: draft.word.forms
+    });
+    const emptied = await mock.saveMeaningsStep(forms.word.id, {
+      base_revision: forms.word.revision,
+      operation_id: "repair-empty-sense-groups-save",
+      intent: "save",
+      content: { ...forms.word.meanings, sense_groups: [] }
+    });
+
+    const repaired = await mock.saveFormsStep(emptied.word.id, {
+      base_revision: emptied.word.revision,
+      operation_id: "repair-empty-sense-groups-resave-forms",
+      intent: "save",
+      content: emptied.word.forms
+    });
+
+    expect(repaired.word.meanings.sense_groups).toHaveLength(1);
+    expect(
+      repaired.word.meanings.pos.every((pos) =>
+        pos.senses.every(
+          (sense) =>
+            sense.sense_group_id === repaired.word.meanings.sense_groups[0]!.id
+        )
+      )
+    ).toBe(true);
+  });
+
   it("管理员切换、登出、超管旁路与延迟分支保持身份隔离", async () => {
     const storage = memoryStorage();
     let currentProfile: AdminProfile | undefined = profile();
@@ -234,6 +290,12 @@ describe("admin words mock", () => {
 
     const v2Id = draft.word.id;
     const detectionId = draft.word.detection_snapshot.detection_id;
+    (valid.words[v2Id] as AdminWordV2).meanings.sense_groups = [
+      { id: "persisted-v2-group", name_zh: "空间", name_en: "Space" }
+    ];
+    (valid.words["fixture-colour"] as AdminWord).sense_groups = [
+      { id: "persisted-v1-group", name: "颜色" }
+    ];
     valid.impact_tokens["valid-impact"] = {
       word_id: v2Id,
       base_revision: draft.word.revision,
@@ -306,6 +368,14 @@ describe("admin words mock", () => {
           })
       ],
       [
+        "v2 sense group shape",
+        (state) =>
+          Object.assign(
+            (state.words[v2Id] as AdminWordV2).meanings.sense_groups[0]!,
+            { name_en: 1 }
+          )
+      ],
+      [
         "legacy headword",
         (state) =>
           Object.assign(state.words["fixture-colour"]!, { headword: 1 })
@@ -320,6 +390,14 @@ describe("admin words mock", () => {
           Object.assign(state.words["fixture-colour"]!, {
             sense_groups: null
           })
+      ],
+      [
+        "legacy sense group shape",
+        (state) =>
+          Object.assign(
+            (state.words["fixture-colour"] as AdminWord).sense_groups[0]!,
+            { name: 1 }
+          )
       ],
       [
         "detections container",
@@ -535,7 +613,9 @@ describe("admin words mock", () => {
         center.builtin_dictionary.suggested_forms.pos.map((pos) => pos.pos)
       ).toEqual(["noun", "verb"]);
     }
-
+    if (center.builtin_dictionary.status !== "matched") {
+      throw new Error("center fixture must match");
+    }
     const far = await mock.detect({ language: "en", headword: "far" });
     if (far.builtin_dictionary.status !== "matched")
       throw new Error("far fixture");
@@ -552,9 +632,22 @@ describe("admin words mock", () => {
     await expect(
       mock.detect({ language: "en", headword: "smart-unavailable" })
     ).resolves.toMatchObject({ smart_dictionary: { status: "unavailable" } });
+    const phrase = await mock.detect({
+      language: "en",
+      headword: "in front of"
+    });
+    expect(phrase).toMatchObject({ entry_kind: "phrase" });
+    if (phrase.builtin_dictionary.status !== "matched") {
+      throw new Error("phrase fixture must match");
+    }
     await expect(
-      mock.detect({ language: "en", headword: "in front of" })
-    ).resolves.toMatchObject({ entry_kind: "phrase" });
+      mock.createV2({
+        schema_version: 2,
+        idempotency_key: "create-phrase",
+        detection_id: phrase.detection_id,
+        headwords: phrase.builtin_dictionary.headwords
+      })
+    ).rejects.toMatchObject({ status: 422, code: "detection_mismatch" });
     await expect(
       mock.detect({ language: "en", headword: "colour" })
     ).resolves.toMatchObject({ smart_dictionary: { status: "duplicate" } });
@@ -670,7 +763,6 @@ describe("admin words mock", () => {
     ).rejects.toMatchObject({ status: 422, code: "detection_mismatch" });
 
     for (const [headword, expectedCode] of [
-      ["in front of", "detection_mismatch"],
       ["not-found", "detection_mismatch"],
       ["builtin-unavailable", "detection_mismatch"],
       ["smart-unavailable", "detection_mismatch"],
@@ -938,6 +1030,48 @@ describe("admin words mock", () => {
       ])
     });
 
+    const missingAllSenseGroups = structuredClone(complete);
+    missingAllSenseGroups.sense_groups = [];
+    await expect(
+      mock.saveMeaningsStep(forms.word.id, {
+        base_revision: forms.word.revision,
+        operation_id: "missing-all-sense-groups",
+        intent: "complete",
+        content: missingAllSenseGroups
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "validation_failed",
+      field_issues: expect.arrayContaining([
+        expect.objectContaining({
+          node_id: forms.word.id,
+          field: "sense_groups",
+          code: "sense_group_required"
+        })
+      ])
+    });
+
+    const missingSenseGroup = structuredClone(complete);
+    delete missingSenseGroup.pos[0]!.senses[0]!.sense_group_id;
+    await expect(
+      mock.saveMeaningsStep(forms.word.id, {
+        base_revision: forms.word.revision,
+        operation_id: "missing-sense-group",
+        intent: "complete",
+        content: missingSenseGroup
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "validation_failed",
+      field_issues: expect.arrayContaining([
+        expect.objectContaining({
+          node_id: missingSenseGroup.pos[0]!.senses[0]!.id,
+          field: "sense_group_id",
+          code: "sense_group_required"
+        })
+      ])
+    });
+
     const invalid: DraftMeaningsStepContent = structuredClone(complete);
     const noun = invalid.pos[0]!;
     const verb = invalid.pos[1]!;
@@ -1055,6 +1189,87 @@ describe("admin words mock", () => {
       code: "validation_failed",
       field_issues: expect.arrayContaining(
         expectedCodes.map((code) => expect.objectContaining({ code }))
+      )
+    });
+  });
+
+  it("双语语义区间草稿可保留半成品，complete、validate 与 publish 精确报告名称错误", async () => {
+    const draft = await createCenter(mock, "bilingual-sense-groups");
+    const forms = await mock.saveFormsStep(draft.word.id, {
+      base_revision: draft.word.revision,
+      operation_id: "bilingual-sense-groups-forms",
+      intent: "complete",
+      content: draft.word.forms
+    });
+    const content = completeMockMeanings(forms.word);
+    content.sense_groups = [
+      { id: "missing-zh", name_zh: "  ", name_en: "Space" },
+      { id: "missing-en", name_zh: "空间", name_en: "" },
+      { id: "long-zh", name_zh: "中".repeat(201), name_en: "Space" },
+      { id: "long-en", name_zh: "空间", name_en: "e".repeat(201) }
+    ];
+
+    const saved = await mock.saveMeaningsStep(forms.word.id, {
+      base_revision: forms.word.revision,
+      operation_id: "bilingual-sense-groups-save",
+      intent: "save",
+      content
+    });
+    expect(saved.word.meanings.sense_groups).toEqual(content.sense_groups);
+    expect(saved.word.completed_steps).not.toContain("meanings");
+
+    const expectedIssues = [
+      {
+        node_id: "missing-zh",
+        field: "name_zh",
+        code: "sense_group_name_required"
+      },
+      {
+        node_id: "missing-en",
+        field: "name_en",
+        code: "sense_group_name_required"
+      },
+      {
+        node_id: "long-zh",
+        field: "name_zh",
+        code: "sense_group_name_too_long"
+      },
+      {
+        node_id: "long-en",
+        field: "name_en",
+        code: "sense_group_name_too_long"
+      }
+    ];
+    await expect(
+      mock.saveMeaningsStep(saved.word.id, {
+        base_revision: saved.word.revision,
+        operation_id: "bilingual-sense-groups-complete",
+        intent: "complete",
+        content
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      field_issues: expect.arrayContaining(
+        expectedIssues.map((issue) => expect.objectContaining(issue))
+      )
+    });
+    await expect(
+      mock.validateV2(saved.word.id, { base_revision: saved.word.revision })
+    ).resolves.toMatchObject({
+      valid: false,
+      issues: expect.arrayContaining(
+        expectedIssues.map((issue) => expect.objectContaining(issue))
+      )
+    });
+    await expect(
+      mock.publishV2(saved.word.id, {
+        base_revision: saved.word.revision,
+        idempotency_key: "bilingual-sense-groups-publish"
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      field_issues: expect.arrayContaining(
+        expectedIssues.map((issue) => expect.objectContaining(issue))
       )
     });
   });
@@ -1695,5 +1910,274 @@ describe("admin words mock", () => {
     await expect(noSession.stats()).rejects.toMatchObject({ status: 401 });
     const forbidden = mockFor(() => profile({ permissions: [] }));
     await expect(forbidden.stats()).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("part-of-speech settings mock", () => {
+  const superAdmin = () =>
+    profile({
+      role: "super_admin",
+      permissions: ["words.access"]
+    });
+
+  it("提供 11/19 默认目录、搜索分页、动态引用计数与权限保护", async () => {
+    const settingsMock = mockFor(superAdmin);
+    const catalog = await settingsMock.partOfSpeechSettings.catalog();
+    expect(catalog.items).toHaveLength(11);
+    expect(
+      catalog.items.reduce((total, item) => total + item.sub_parts.length, 0)
+    ).toBe(19);
+    expect(catalog.catalog_version).toBeGreaterThan(0);
+
+    const nounPage = await settingsMock.partOfSpeechSettings.list({
+      q: " NOUN ",
+      page: 0,
+      page_size: 200
+    });
+    expect(nounPage.pagination).toMatchObject({
+      page: 1,
+      page_size: 100,
+      total: 2,
+      total_pages: 1
+    });
+    expect(nounPage.items.find((item) => item.code === "noun")).toMatchObject({
+      code: "noun",
+      sub_part_count: 5
+    });
+    expect(
+      nounPage.items.find((item) => item.code === "noun")!.usage_count
+    ).toBeGreaterThan(0);
+
+    const ordinaryAdmin = mockFor();
+    await expect(
+      ordinaryAdmin.partOfSpeechSettings.list()
+    ).rejects.toMatchObject({ status: 403, code: "super_admin_required" });
+    await expect(
+      ordinaryAdmin.partOfSpeechSettings.catalog()
+    ).resolves.toMatchObject({ items: expect.any(Array) });
+  });
+
+  it("基本词性支持新增、修改、唯一性、revision 与未引用级联删除", async () => {
+    const settingsMock = mockFor(superAdmin);
+    const created = await settingsMock.partOfSpeechSettings.create({
+      code: " particle ",
+      name_zh: " 语气词 ",
+      name_en: " Particle ",
+      abbreviation: " part. ",
+      sort_order: 115
+    });
+    expect(created).toMatchObject({
+      code: "particle",
+      name_zh: "语气词",
+      name_en: "Particle",
+      abbreviation: "part.",
+      revision: 1
+    });
+
+    await expect(
+      settingsMock.partOfSpeechSettings.create({
+        code: "particle",
+        name_zh: "另一个名称",
+        name_en: "Another particle",
+        abbreviation: "part2.",
+        sort_order: 116
+      })
+    ).rejects.toMatchObject({ status: 409, code: "part_of_speech_conflict" });
+    await expect(
+      settingsMock.partOfSpeechSettings.create({
+        code: "INVALID",
+        name_zh: "无效",
+        name_en: "Invalid",
+        abbreviation: "inv.",
+        sort_order: 1
+      })
+    ).rejects.toMatchObject({ status: 422, code: "invalid_request_body" });
+
+    const updated = await settingsMock.partOfSpeechSettings.update(created.id, {
+      base_revision: created.revision,
+      name_zh: "语气助词",
+      name_en: "Discourse particle",
+      abbreviation: "ptcl.",
+      sort_order: 12
+    });
+    expect(updated).toMatchObject({
+      code: "particle",
+      name_zh: "语气助词",
+      revision: 2
+    });
+    await expect(
+      settingsMock.partOfSpeechSettings.update(created.id, {
+        base_revision: 1,
+        name_zh: "旧提交",
+        name_en: "Stale",
+        abbreviation: "st.",
+        sort_order: 1
+      })
+    ).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
+
+    await settingsMock.partOfSpeechSettings.createSubPart(created.id, {
+      code: "PARTICLE-GENERAL",
+      name_zh: "一般语气词",
+      name_en: "General particle",
+      sort_order: 10
+    });
+    await settingsMock.partOfSpeechSettings.remove(created.id);
+    expect(
+      (await settingsMock.partOfSpeechSettings.catalog()).items.some(
+        (item) => item.code === "particle"
+      )
+    ).toBe(false);
+    await expect(
+      settingsMock.partOfSpeechSettings.update("missing", {
+        base_revision: 1,
+        name_zh: "缺失",
+        name_en: "Missing",
+        abbreviation: "m.",
+        sort_order: 1
+      })
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      settingsMock.partOfSpeechSettings.remove("missing")
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("细分词性按所属基本词性 CRUD，并保护重复、revision 与引用删除", async () => {
+    const settingsMock = mockFor(superAdmin);
+    const catalog = await settingsMock.partOfSpeechSettings.catalog();
+    const noun = catalog.items.find((item) => item.code === "noun")!;
+    const created = await settingsMock.partOfSpeechSettings.createSubPart(
+      noun.id,
+      {
+        code: "N-COLLECTIVE",
+        name_zh: "集合名词",
+        name_en: "Collective noun",
+        sort_order: 65
+      }
+    );
+    expect(created).toMatchObject({
+      part_of_speech_id: noun.id,
+      revision: 1
+    });
+    expect(
+      (
+        await settingsMock.partOfSpeechSettings.listSubParts(noun.id)
+      ).items.some((item) => item.code === "N-COLLECTIVE")
+    ).toBe(true);
+
+    const updated = await settingsMock.partOfSpeechSettings.updateSubPart(
+      noun.id,
+      created.id,
+      {
+        base_revision: 1,
+        name_zh: "集合类名词",
+        name_en: "Collective noun",
+        sort_order: 15
+      }
+    );
+    expect(updated).toMatchObject({ name_zh: "集合类名词", revision: 2 });
+    await expect(
+      settingsMock.partOfSpeechSettings.updateSubPart(noun.id, created.id, {
+        base_revision: 1,
+        name_zh: "旧提交",
+        name_en: "Stale collective",
+        sort_order: 1
+      })
+    ).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
+    await expect(
+      settingsMock.partOfSpeechSettings.createSubPart(noun.id, {
+        code: "V-T",
+        name_zh: "重复编码",
+        name_en: "Duplicate code",
+        sort_order: 1
+      })
+    ).rejects.toMatchObject({ status: 409, code: "part_of_speech_conflict" });
+    await expect(
+      settingsMock.partOfSpeechSettings.createSubPart(noun.id, {
+        code: "lowercase",
+        name_zh: "无效",
+        name_en: "Invalid",
+        sort_order: 1
+      })
+    ).rejects.toMatchObject({ status: 422 });
+
+    await settingsMock.partOfSpeechSettings.removeSubPart(noun.id, created.id);
+    const referenced = (
+      await settingsMock.partOfSpeechSettings.listSubParts(noun.id)
+    ).items.find((item) => item.usage_count > 0)!;
+    await expect(
+      settingsMock.partOfSpeechSettings.removeSubPart(noun.id, referenced.id)
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "sub_part_of_speech_in_use",
+      meta: { usage_count: expect.any(Number) }
+    });
+    await expect(
+      settingsMock.partOfSpeechSettings.remove(noun.id)
+    ).rejects.toMatchObject({ status: 409, code: "part_of_speech_in_use" });
+    await expect(
+      settingsMock.partOfSpeechSettings.listSubParts("missing")
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
+      settingsMock.partOfSpeechSettings.removeSubPart(noun.id, "missing")
+    ).rejects.toMatchObject({ status: 404 });
+  });
+
+  it("词条 create/save 对未知基本词性和错误所属细分词性 fail closed", async () => {
+    const settingsMock = mockFor(superAdmin);
+    const draft = await createCenter(settingsMock, "config-validation");
+    const unknownForms = structuredClone(draft.word.forms);
+    unknownForms.pos[0]!.pos = "unknown-pos";
+    await expect(
+      settingsMock.saveFormsStep(draft.word.id, {
+        base_revision: draft.word.revision,
+        operation_id: "unknown-pos-save",
+        intent: "save",
+        content: unknownForms
+      })
+    ).rejects.toMatchObject({ status: 422, code: "unknown_part_of_speech" });
+
+    const forms = await settingsMock.saveFormsStep(draft.word.id, {
+      base_revision: draft.word.revision,
+      operation_id: "valid-forms-save",
+      intent: "complete",
+      content: draft.word.forms
+    });
+    const meanings = completeMockMeanings(forms.word);
+    meanings.pos[0]!.senses[0]!.sub_pos = "V-T";
+    await expect(
+      settingsMock.saveMeaningsStep(forms.word.id, {
+        base_revision: forms.word.revision,
+        operation_id: "wrong-sub-pos-save",
+        intent: "save",
+        content: meanings
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "invalid_sub_part_of_speech"
+    });
+
+    const storage = memoryStorage();
+    const first = mockFor(superAdmin, storage);
+    const detection = await first.detect({ language: "en", headword: "far" });
+    const state = readPersistedState(storage);
+    const persistedDetection = state.detections[detection.detection_id]!;
+    if (persistedDetection.builtin_dictionary.status !== "matched") {
+      throw new Error("far fixture must match");
+    }
+    persistedDetection.builtin_dictionary.suggested_forms.pos[0]!.pos =
+      "unknown-pos";
+    writePersistedState(storage, state);
+    const refreshed = mockFor(superAdmin, storage);
+    await expect(
+      refreshed.createV2({
+        schema_version: 2,
+        idempotency_key: "unknown-detection-pos",
+        detection_id: detection.detection_id,
+        headwords:
+          detection.builtin_dictionary.status === "matched"
+            ? detection.builtin_dictionary.headwords
+            : { mode: "unified", common: "far" }
+      })
+    ).rejects.toMatchObject({ status: 422, code: "unknown_part_of_speech" });
   });
 });

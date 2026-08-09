@@ -128,12 +128,13 @@ describe("admin 页面烟雾测试", () => {
     // 面包屑末级为「智能词库」。
     expect(screen.getAllByText("智能词库").length).toBeGreaterThan(0);
 
+    fireEvent.click(screen.getByText("创建短语"));
+    expect(screen.getAllByText("创建短语").length).toBeGreaterThan(1);
+    expect(screen.getByLabelText("短语")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/");
+
     fireEvent.click(screen.getByText("创建单词"));
     expect(screen.getByTestId("location")).toHaveTextContent("/words/new");
-
-    // 短语仍走 legacy modal，不被 V2 单词入口接管。
-    fireEvent.click(screen.getByText("创建短语"));
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 
   it.each([
@@ -150,5 +151,11 @@ describe("admin 页面烟雾测试", () => {
 });
 
 function LocationProbe() {
-  return <span data-testid="location">{useLocation().pathname}</span>;
+  const location = useLocation();
+  return (
+    <span data-testid="location">
+      {location.pathname}
+      {location.search}
+    </span>
+  );
 }

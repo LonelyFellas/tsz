@@ -476,7 +476,10 @@ describe("createHttpClient", () => {
             current_revision: 6,
             word_id: "w-2",
             max_reachable_step: "meanings",
-            affected_node_ids: ["sense-1"]
+            affected_node_ids: ["sense-1"],
+            usage_count: 3,
+            part_of_speech_id: "pos-noun",
+            code: "noun"
           }
         },
         { ok: false, status: 422 }
@@ -496,10 +499,37 @@ describe("createHttpClient", () => {
         current_revision: 6,
         word_id: "w-2",
         max_reachable_step: "meanings",
-        affected_node_ids: ["sense-1"]
+        affected_node_ids: ["sense-1"],
+        usage_count: 3,
+        part_of_speech_id: "pos-noun",
+        code: "noun"
       }
     });
   });
+
+  it.each([{ usage_count: -1 }, { part_of_speech_id: " " }, { code: "" }])(
+    "词性配置错误的畸形 meta 安全降级: %o",
+    async (meta) => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: "invalid configuration meta",
+            code: "part_of_speech_in_use",
+            meta
+          },
+          { ok: false, status: 409 }
+        )
+      );
+      const http = createHttpClient({ baseUrl: "" });
+
+      await expect(http.get("/settings/parts-of-speech")).rejects.toMatchObject(
+        {
+          status: 409,
+          meta: undefined
+        }
+      );
+    }
+  );
 
   it("畸形 V2 field_issues 与 meta 安全降级，不把外部输入伪装成已校验类型", async () => {
     fetchMock.mockResolvedValueOnce(

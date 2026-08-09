@@ -24,7 +24,6 @@ const mutations = vi.hoisted(() => ({
 const dataSourceCapabilities = vi.hoisted(() => ({
   dialectVariantSuggestions: true
 }));
-
 vi.mock("../dataSource", () => ({
   adminWordsDataSourceCapabilities: dataSourceCapabilities
 }));
@@ -44,6 +43,12 @@ vi.mock("./api", () => ({
   })
 }));
 
+vi.mock("../part-of-speech/api", async () => {
+  const { partOfSpeechCatalogQueryResult } =
+    await import("./partOfSpeech.test.helper");
+  return { usePartOfSpeechCatalog: partOfSpeechCatalogQueryResult };
+});
+
 function button(label: string): HTMLButtonElement {
   // A whole-tree role query is extremely slow for this large AntD editor.
   const result = screen
@@ -52,15 +57,6 @@ function button(label: string): HTMLButtonElement {
     .find((item): item is HTMLButtonElement => item !== null);
   if (!result) throw new Error(`button not found: ${label}`);
   return result as HTMLButtonElement;
-}
-
-function enabledButton(label: string): HTMLButtonElement {
-  const result = screen
-    .getAllByText(label, { exact: true })
-    .map((item) => item.closest("button"))
-    .find((item): item is HTMLButtonElement => item !== null && !item.disabled);
-  if (!result) throw new Error(`enabled button not found: ${label}`);
-  return result;
 }
 
 function LocationProbe() {
@@ -96,6 +92,10 @@ function renderStep(
       {
         path: "/words/:wordId/wizard/:step",
         element: <LocationProbe />
+      },
+      {
+        path: "/words/new",
+        element: <LocationProbe />
       }
     ],
     {
@@ -130,6 +130,105 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("FormsAndPronunciationStep", () => {
+  it("词形与发音只使用基本词性，不展示配置层级的细分词性 Tab", () => {
+    renderStep();
+
+    expect(screen.getByLabelText("添加基本词性")).toBeVisible();
+    expect(screen.queryByLabelText("添加细分词性")).toBeNull();
+    expect(screen.queryByRole("tab", { name: "细分词性" })).toBeNull();
+    expect(screen.getByText("名词", { exact: true })).toBeVisible();
+  });
+
+  it("点击词形变化组头部可收起并重新展开", () => {
+    renderStep();
+
+    const collapseButton = screen.getByRole("button", {
+      name: "收起第 1 组词形变化"
+    });
+    expect(collapseButton).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByLabelText("管理第 1 组词形变化")).toBeNull();
+    expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("播放语音").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("获取语音").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("上传语音").length).toBeGreaterThan(0);
+    expect(screen.getByText("添加一组替代词形变化")).toBeVisible();
+    expect(screen.getByText("添加派生词形")).toBeVisible();
+
+    fireEvent.click(collapseButton);
+
+    const expandButton = screen.getByRole("button", {
+      name: "展开第 1 组词形变化"
+    });
+    expect(expandButton).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryAllByLabelText("英式词形拼写")).toHaveLength(0);
+
+    fireEvent.click(expandButton);
+
+    expect(
+      screen.getByRole("button", { name: "收起第 1 组词形变化" })
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0);
+  });
+
+  it("可新增第二组词形变化并独立收起", () => {
+    renderStep();
+
+    fireEvent.click(button("添加一组替代词形变化"));
+
+    const secondGroupToggle = screen.getByRole("button", {
+      name: "收起第 2 组词形变化"
+    });
+    expect(secondGroupToggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getAllByText("添加派生词形")).toHaveLength(2);
+    fireEvent.click(secondGroupToggle);
+    expect(
+      screen.getByRole("button", { name: "展开第 2 组词形变化" })
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("可通过拖动手柄调整同一方言内的读音顺序", async () => {
+    const word = wordFixture();
+    const ukVariant = word.forms.pos[0]!.base_form.variants.find(
+      (variant) => variant.dialect === "uk"
+    )!;
+    ukVariant.pronunciations.push({
+      ...ukVariant.pronunciations[0]!,
+      id: "uk-pronunciation-2",
+      dict_phonetic: "second-dict",
+      actual_pron: "second-actual"
+    });
+    const originalIds = ukVariant.pronunciations.map((item) => item.id);
+    renderStep(word);
+    const sourceHandle = screen
+      .getAllByLabelText("拖动英式原形读音 1")
+      .find((item) => !(item as HTMLButtonElement).disabled)!;
+    const targetHandle = screen.getByLabelText("拖动英式原形读音 2");
+    const target = targetHandle.closest(".word-pronunciation-editor")!;
+    const store = new Map<string, string>();
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      types: ["application/x-tsz-pronunciation"],
+      setData: (type: string, data: string) => store.set(type, data),
+      getData: (type: string) => store.get(type) ?? ""
+    };
+
+    fireEvent.dragStart(sourceHandle, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.drop(target, { dataTransfer });
+    fireEvent.dragEnd(sourceHandle, { dataTransfer });
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const savedUk =
+      mutations.save.mock.calls[0]![0].content.pos[0].base_form.variants.find(
+        (variant: { dialect: string }) => variant.dialect === "uk"
+      );
+    expect(
+      savedUk.pronunciations.map((item: { id: string }) => item.id)
+    ).toEqual([...originalIds].reverse());
+  });
+
   it("编辑后完成保存并放行到 meanings，提交 revision、operation 与完整 content", async () => {
     const word = wordFixture();
     const saved = wordFixture({ revision: 4, max_reachable_step: "meanings" });
@@ -226,7 +325,8 @@ describe("FormsAndPronunciationStep", () => {
     );
     renderStep(word);
 
-    fireEvent.click(screen.getByLabelText("上移第 2 组词形变化"));
+    fireEvent.click(screen.getByLabelText("管理第 2 组词形变化"));
+    fireEvent.click(await screen.findByText("上移本组"));
     fireEvent.click(button("保存草稿"));
 
     await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
@@ -357,7 +457,7 @@ describe("FormsAndPronunciationStep", () => {
     });
   });
 
-  it("可组合编辑读音、派生词形和替代组，并保存结构变更", async () => {
+  it("可组合编辑读音和已有派生词形，并保存变更", async () => {
     renderStep();
 
     fireEvent.change(screen.getAllByLabelText("字典音标")[0]!, {
@@ -371,30 +471,19 @@ describe("FormsAndPronunciationStep", () => {
       target: { value: "centres-edited" }
     });
 
-    fireEvent.click(enabledButton("添加读音"));
+    const addPronunciation = screen
+      .getAllByLabelText("添加读音")
+      .find((item) => !(item as HTMLButtonElement).disabled);
+    expect(addPronunciation).toBeDefined();
+    fireEvent.click(addPronunciation!);
     await waitFor(() =>
-      expect(
-        screen.getAllByText("删除读音", { exact: true }).length
-      ).toBeGreaterThan(0)
+      expect(screen.getAllByLabelText("删除读音").length).toBeGreaterThan(0)
     );
-    fireEvent.click(enabledButton("删除读音"));
-
-    fireEvent.click(enabledButton("添加派生词形"));
-    fireEvent.click(await screen.findByLabelText("上移词形 2"));
-    fireEvent.click(enabledButton("删除词形"));
-
-    fireEvent.click(enabledButton("添加一组替代词形变化"));
-    fireEvent.click(await screen.findByLabelText("上移第 2 组词形变化"));
-    const enabledNo = Array.from(
-      document.querySelectorAll<HTMLLabelElement>("label.ant-radio-wrapper")
-    ).find(
-      (label) =>
-        label.textContent?.trim() === "否" &&
-        !label.classList.contains("ant-radio-wrapper-disabled")
-    );
-    expect(enabledNo).toBeDefined();
-    fireEvent.click(enabledNo!);
-    fireEvent.click(enabledButton("删除本组"));
+    const removePronunciation = screen
+      .getAllByLabelText("删除读音")
+      .find((item) => !(item as HTMLButtonElement).disabled);
+    expect(removePronunciation).toBeDefined();
+    fireEvent.click(removePronunciation!);
 
     fireEvent.click(button("保存草稿"));
     await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
@@ -411,14 +500,23 @@ describe("FormsAndPronunciationStep", () => {
     });
     renderStep(word, undefined, true);
 
-    expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("共用词形拼写").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("实际发音")[0]).toHaveAttribute("readonly");
     expect(screen.queryByText("添加派生词形")).toBeNull();
     expect(screen.queryByText("保存草稿")).toBeNull();
   });
 
-  it("统一主词可独立切换音标与拼写模式并归一方言变体", async () => {
+  it("拼写相同但音标不同时只显示一个词形块，并在块内区分英美发音", async () => {
     renderStep(wordFixture({ headword: "far", ready: true }));
+    expect(screen.queryByLabelText("英式词形拼写")).toBeNull();
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+    expect(screen.getAllByLabelText("共用词形拼写")[0]).toHaveValue("far");
+    expect(screen.getAllByText("英式 · BrE").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("美式 · AmE").length).toBeGreaterThan(0);
+    expect(
+      document.querySelectorAll('[data-spelling-layout="unified"]').length
+    ).toBeGreaterThan(0);
+
     const phoneticBlock = screen
       .getByText("英美音标是否有区别？")
       .closest("div")!;
@@ -430,8 +528,9 @@ describe("FormsAndPronunciationStep", () => {
     expect(phoneticNo).toBeDefined();
     fireEvent.click(phoneticNo!);
     await waitFor(() =>
-      expect(screen.getAllByLabelText("默认词形拼写").length).toBeGreaterThan(0)
+      expect(screen.getAllByLabelText("共用词形拼写").length).toBeGreaterThan(0)
     );
+    expect(screen.getAllByText("英美共用").length).toBeGreaterThan(0);
 
     const spellingBlock = screen
       .getByText("英美拼写是否有区别？")
@@ -446,6 +545,26 @@ describe("FormsAndPronunciationStep", () => {
     await waitFor(() =>
       expect(screen.getAllByLabelText("美式词形拼写").length).toBeGreaterThan(0)
     );
+    expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("far");
+    expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("far");
+    expect(screen.queryByText("英美音标是否有区别？")).toBeNull();
+  });
+
+  it("名词和动词拼写区分时隐藏音标区别选项并保持英美两栏", () => {
+    renderStep(wordFixture({ headword: "center", ready: true }));
+
+    expect(screen.queryByText("英美音标是否有区别？")).toBeNull();
+    expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("centre");
+    expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("center");
+    expect(screen.queryByLabelText("共用词形拼写")).toBeNull();
+    expect(
+      document.querySelectorAll('[data-spelling-layout="distinguish"]').length
+    ).toBeGreaterThan(1);
+
+    fireEvent.click(screen.getByText("动词", { exact: true }));
+    expect(screen.queryByText("英美音标是否有区别？")).toBeNull();
+    expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("centre");
+    expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("center");
   });
 
   it("空词性列表完成时在客户端阻断", async () => {

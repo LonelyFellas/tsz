@@ -2,7 +2,8 @@ import {
   CheckCircleFilled,
   CloseCircleFilled,
   InfoCircleOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  SearchOutlined
 } from "@ant-design/icons";
 import {
   Alert,
@@ -11,11 +12,13 @@ import {
   Card,
   Col,
   Descriptions,
+  Divider,
   Form,
   Input,
   Row,
   Select,
   Space,
+  Switch,
   Tag,
   Typography
 } from "antd";
@@ -25,9 +28,14 @@ import type {
   WordHeadwordsV2
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client/http";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { POS_TAG_ABBR } from "../labels";
+import {
+  createPartOfSpeechLookup,
+  partOfSpeechLabel,
+  type PartOfSpeechLookup
+} from "../part-of-speech/catalog";
+import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { newWordNodeId } from "../word-model/primitives";
 import { useCreateWordV2, useDetectWordV2 } from "./api";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
@@ -56,15 +64,36 @@ function StepHeading() {
   );
 }
 
-function DetectionStatus({ result }: { result: DetectWordResponseV2 }) {
+function DetectionStatus({
+  result,
+  lookup,
+  catalogLoaded,
+  catalogUnavailable
+}: {
+  result: DetectWordResponseV2;
+  lookup: PartOfSpeechLookup;
+  catalogLoaded: boolean;
+  catalogUnavailable: boolean;
+}) {
   const builtin = result.builtin_dictionary;
   const smart = result.smart_dictionary;
+  const unknownPos =
+    catalogLoaded && builtin.status === "matched"
+      ? builtin.suggested_forms.pos.filter(
+          (item) => !lookup.byCode.has(item.pos)
+        )
+      : [];
   const canContinue =
     result.entry_kind === "word" &&
     builtin.status === "matched" &&
-    smart.status === "clear";
+    smart.status === "clear" &&
+    catalogLoaded &&
+    unknownPos.length === 0 &&
+    !catalogUnavailable;
   return (
     <Card
+      className="word-detection-result-card"
+      size="small"
       title="词典检测结果"
       extra={
         <Tag color={canContinue ? "success" : "error"}>
@@ -117,13 +146,31 @@ function DetectionStatus({ result }: { result: DetectWordResponseV2 }) {
               <Space size={[4, 4]} wrap>
                 {builtin.suggested_forms.pos.map((item) => (
                   <Tag key={item.pos_id} color="blue">
-                    {POS_TAG_ABBR[item.pos]}
+                    {partOfSpeechLabel(lookup, item.pos)}
                   </Tag>
                 ))}
               </Space>
             </Descriptions.Item>
           )}
         </Descriptions>
+        {catalogUnavailable && (
+          <Alert
+            type="warning"
+            showIcon
+            title="词性目录暂时不可用"
+            description="请重试目录加载后再创建草稿。"
+          />
+        )}
+        {unknownPos.length > 0 && (
+          <Alert
+            type="error"
+            showIcon
+            title="检测结果包含未配置词性"
+            description={`请先在系统设置中配置：${unknownPos
+              .map((item) => item.pos)
+              .join("、")}`}
+          />
+        )}
       </Space>
     </Card>
   );
@@ -136,50 +183,54 @@ function HeadwordConfirmation({
   value: WordHeadwordsV2;
   onChange: (next: WordHeadwordsV2) => void;
 }) {
-  if (value.mode === "unified") {
-    return (
-      <Card size="small" title="确认主词">
-        <Form.Item label="统一词形" style={{ marginBottom: 0 }}>
-          <Input value={value.common} readOnly />
-        </Form.Item>
-      </Card>
-    );
-  }
-  const source = value.source_dialect;
+  const source =
+    value.mode === "distinguish" ? value.source_dialect : undefined;
+  const uk = value.mode === "distinguish" ? value.uk : value.common;
+  const us = value.mode === "distinguish" ? value.us : value.common;
   return (
-    <Card size="small" title="确认英美主词">
-      <Alert
-        type="info"
-        showIcon
-        icon={<SafetyCertificateOutlined />}
-        title={`${source === "uk" ? "英式" : "美式"}是本次输入命中的检测基准，保持只读；请确认另一侧。`}
-        style={{ marginBottom: 16 }}
-      />
+    <Card
+      className="word-headword-confirmation-card"
+      size="small"
+      title="确认英美主词"
+    >
+      {source && (
+        <Alert
+          type="info"
+          showIcon
+          icon={<SafetyCertificateOutlined />}
+          title={`${source === "uk" ? "英式" : "美式"}是本次输入命中的检测基准，保持只读；请确认另一侧。`}
+          style={{ marginBottom: 16 }}
+        />
+      )}
       <Row gutter={16}>
         <Col xs={24} md={12}>
           <div className="dialect-panel dialect-panel-uk">
-            <Typography.Text strong>British English · BrE</Typography.Text>
+            <Typography.Text strong>英式英语 · BrE</Typography.Text>
             <Input
               aria-label="英式主词"
-              value={value.uk}
-              readOnly={source === "uk"}
-              onChange={(event) =>
-                onChange({ ...value, uk: event.target.value })
-              }
+              value={uk}
+              readOnly={value.mode === "unified" || source === "uk"}
+              onChange={(event) => {
+                if (value.mode === "distinguish") {
+                  onChange({ ...value, uk: event.target.value });
+                }
+              }}
               style={{ marginTop: 10 }}
             />
           </div>
         </Col>
         <Col xs={24} md={12}>
           <div className="dialect-panel dialect-panel-us">
-            <Typography.Text strong>American English · AmE</Typography.Text>
+            <Typography.Text strong>美式英语 · AmE</Typography.Text>
             <Input
               aria-label="美式主词"
-              value={value.us}
-              readOnly={source === "us"}
-              onChange={(event) =>
-                onChange({ ...value, us: event.target.value })
-              }
+              value={us}
+              readOnly={value.mode === "unified" || source === "us"}
+              onChange={(event) => {
+                if (value.mode === "distinguish") {
+                  onChange({ ...value, us: event.target.value });
+                }
+              }}
               style={{ marginTop: 10 }}
             />
           </div>
@@ -195,6 +246,11 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
   const [form] = Form.useForm<BasicsFormValues>();
   const detectWord = useDetectWordV2();
   const createWord = useCreateWordV2();
+  const partOfSpeechCatalog = usePartOfSpeechCatalog();
+  const partOfSpeechLookup = useMemo(
+    () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
+    [partOfSpeechCatalog.data]
+  );
   const [result, setResult] = useState<DetectWordResponseV2>();
   const [headwords, setHeadwords] = useState<WordHeadwordsV2>();
   const [dirty, setDirty] = useState(false);
@@ -261,13 +317,30 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
   };
 
   const canCreate =
+    partOfSpeechCatalog.data !== undefined &&
     result?.entry_kind === "word" &&
     result.builtin_dictionary.status === "matched" &&
+    result.builtin_dictionary.suggested_forms.pos.every((item) =>
+      partOfSpeechLookup.byCode.has(item.pos)
+    ) &&
     result.smart_dictionary.status === "clear" &&
     headwords !== undefined &&
     (headwords.mode === "unified"
       ? headwords.common.trim() !== ""
       : headwords.uk.trim() !== "" && headwords.us.trim() !== "");
+
+  const detectedHeadwords =
+    result?.builtin_dictionary.status === "matched"
+      ? result.builtin_dictionary.headwords
+      : undefined;
+  const canDistinguish = detectedHeadwords?.mode === "distinguish";
+
+  const updateHeadwords = (next: WordHeadwordsV2) => {
+    createKey.current = newWordNodeId();
+    setDirty(true);
+    setHeadwords(next);
+    onHeadwordsChange(next);
+  };
 
   const createDraft = async () => {
     if (!result || !headwords || !canCreate || creating) return;
@@ -305,9 +378,14 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
         disabled={creating}
         aria-busy={creating}
       >
-        <Row gutter={[24, 24]} align="top">
+        <Row className="word-basics-grid" gutter={[18, 18]} align="top">
           <Col xs={24} xl={12}>
-            <Card>
+            <Card
+              className="word-basics-input-card"
+              size="small"
+              title="录入与检测"
+              extra={<Tag color="blue">仅支持英文词条</Tag>}
+            >
               <Form
                 form={form}
                 layout="vertical"
@@ -331,42 +409,65 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
                     { max: 200, message: "词条不能超过 200 个字符" }
                   ]}
                 >
-                  <Input
+                  <Input.Search
                     size="large"
                     placeholder="例如 center"
                     autoComplete="off"
-                    onPressEnter={() => void runDetection()}
+                    enterButton={
+                      <Space size={6}>
+                        <SearchOutlined />
+                        词典检测
+                      </Space>
+                    }
+                    loading={detectWord.isPending}
+                    onSearch={() => void runDetection()}
                   />
                 </Form.Item>
-                <Button
-                  type="primary"
-                  loading={detectWord.isPending}
-                  onClick={() => void runDetection()}
-                >
-                  词典检测
-                </Button>
+                <Typography.Text type="secondary" className="word-field-help">
+                  按 Enter 或点击检测，系统只查询词典，不会立即创建草稿。
+                </Typography.Text>
               </Form>
+              {headwords && (
+                <>
+                  <Divider />
+                  <div className="word-dialect-detection-row">
+                    <div>
+                      <Typography.Text strong>区分英美词形</Typography.Text>
+                      <Typography.Text type="secondary">
+                        由内置词典结果自动判断
+                      </Typography.Text>
+                    </div>
+                    <Switch
+                      aria-label="区分英美词形"
+                      checked={canDistinguish}
+                      disabled
+                      style={canDistinguish ? { opacity: 1 } : undefined}
+                      title="由内置词典检测结果自动决定"
+                    />
+                  </div>
+                </>
+              )}
             </Card>
 
             {headwords && (
-              <div style={{ marginTop: 20 }}>
+              <div className="word-headword-confirmation-wrap">
                 <HeadwordConfirmation
                   value={headwords}
-                  onChange={(next) => {
-                    createKey.current = newWordNodeId();
-                    setDirty(true);
-                    setHeadwords(next);
-                    onHeadwordsChange(next);
-                  }}
+                  onChange={updateHeadwords}
                 />
               </div>
             )}
           </Col>
           <Col xs={24} xl={12}>
             {result ? (
-              <DetectionStatus result={result} />
+              <DetectionStatus
+                result={result}
+                lookup={partOfSpeechLookup}
+                catalogLoaded={partOfSpeechCatalog.data !== undefined}
+                catalogUnavailable={partOfSpeechCatalog.isError}
+              />
             ) : (
-              <Card>
+              <Card className="word-detection-empty-card" size="small">
                 <Alert
                   type="info"
                   showIcon
@@ -375,14 +476,6 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
                   description="检测不会创建草稿。确认检测结果并进入下一步时，系统才会生成可恢复的 V2 草稿。"
                 />
               </Card>
-            )}
-            {result?.entry_kind === "phrase" && (
-              <Button
-                style={{ marginTop: 12 }}
-                onClick={() => navigate("/words")}
-              >
-                返回创建短语
-              </Button>
             )}
           </Col>
         </Row>

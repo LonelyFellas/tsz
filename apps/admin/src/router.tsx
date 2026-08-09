@@ -114,6 +114,13 @@ export const router = createBrowserRouter([
             lazy: async () => ({
               Component: (await import("@/pages/Reviews")).ReviewsPage
             })
+          },
+          {
+            path: "settings/parts-of-speech",
+            lazy: async () => ({
+              Component: (await import("@/pages/PartOfSpeechSettings"))
+                .PartOfSpeechSettingsPage
+            })
           }
         ]
       },

@@ -28,10 +28,16 @@ import type {
   WordDefinitionV2
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client/http";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { DIALECT_LABEL, POS_TAG_ZH } from "../editorConstants";
-import { POS_TAG_ABBR } from "../labels";
+import { DIALECT_LABEL } from "../editorConstants";
+import {
+  createPartOfSpeechLookup,
+  partOfSpeechLabel,
+  subPartOfSpeechLabel,
+  type PartOfSpeechLookup
+} from "../part-of-speech/catalog";
+import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { newWordNodeId } from "../word-model/primitives";
 import { usePublishWordV2, useValidateWordV2 } from "./api";
 import { wordDisplayHeadword } from "./model";
@@ -71,15 +77,21 @@ function definitionPreview(definition: WordDefinitionV2): string[] {
     : [(definition.content as { text: string }).text];
 }
 
-function FormsPreview({ word }: { word: AdminWordV2 }) {
+function FormsPreview({
+  word,
+  partOfSpeechLookup
+}: {
+  word: AdminWordV2;
+  partOfSpeechLookup: PartOfSpeechLookup;
+}) {
   return (
     <Collapse
+      className="word-preview-collapse"
       items={word.forms.pos.map((pos) => ({
         key: pos.pos_id,
         label: (
           <Space>
-            <strong>{POS_TAG_ZH[pos.pos]}</strong>
-            <Tag color="blue">{POS_TAG_ABBR[pos.pos]}</Tag>
+            <strong>{partOfSpeechLabel(partOfSpeechLookup, pos.pos)}</strong>
             <Typography.Text type="secondary">
               {pos.form_groups.length} 组词形变化
             </Typography.Text>
@@ -87,7 +99,11 @@ function FormsPreview({ word }: { word: AdminWordV2 }) {
         ),
         children: (
           <Space orientation="vertical" style={{ width: "100%" }}>
-            <Card size="small" title="共享原形">
+            <Card
+              className="word-preview-inner-card"
+              size="small"
+              title="共享原形"
+            >
               {pos.base_form.variants.map((variant) => (
                 <Flex
                   key={variant.id}
@@ -113,6 +129,7 @@ function FormsPreview({ word }: { word: AdminWordV2 }) {
             </Card>
             {pos.form_groups.map((group, groupIndex) => (
               <Card
+                className="word-preview-inner-card"
                 size="small"
                 key={group.id}
                 title={`第 ${groupIndex + 1} 组 · ${group.is_regular ? "规则变化" : "不规则变化"}`}
@@ -153,24 +170,39 @@ function FormsPreview({ word }: { word: AdminWordV2 }) {
   );
 }
 
-function MeaningsPreview({ word }: { word: AdminWordV2 }) {
+function MeaningsPreview({
+  word,
+  partOfSpeechLookup
+}: {
+  word: AdminWordV2;
+  partOfSpeechLookup: PartOfSpeechLookup;
+}) {
   const formsById = new Map(word.forms.pos.map((pos) => [pos.pos_id, pos]));
   return (
     <Collapse
+      className="word-preview-collapse"
       items={word.meanings.pos.map((pos) => {
         const forms = formsById.get(pos.pos_id);
         return {
           key: pos.pos_id,
           label: (
             <Space>
-              <strong>{forms ? POS_TAG_ZH[forms.pos] : "未知词性"}</strong>
+              <strong>
+                {forms
+                  ? partOfSpeechLabel(partOfSpeechLookup, forms.pos)
+                  : "未知词性"}
+              </strong>
               <Tag color="green">{pos.senses.length} 个词义</Tag>
               <Tag>{pos.grammar_structures.length} 条语法结构</Tag>
             </Space>
           ),
           children: (
             <Space orientation="vertical" size={14} style={{ width: "100%" }}>
-              <Card size="small" title="语法结构">
+              <Card
+                className="word-preview-inner-card"
+                size="small"
+                title="语法结构"
+              >
                 <List
                   size="small"
                   dataSource={pos.grammar_structures}
@@ -192,6 +224,7 @@ function MeaningsPreview({ word }: { word: AdminWordV2 }) {
               </Card>
               {pos.senses.map((sense, senseIndex) => (
                 <Card
+                  className="word-preview-sense-card"
                   size="small"
                   key={sense.id}
                   title={
@@ -199,7 +232,12 @@ function MeaningsPreview({ word }: { word: AdminWordV2 }) {
                       <Tag color="blue">{sense.level}</Tag>
                       <span>词义 {senseIndex + 1}</span>
                       {sense.sub_pos && (
-                        <Tag color="green">{sense.sub_pos}</Tag>
+                        <Tag color="green">
+                          {subPartOfSpeechLabel(
+                            partOfSpeechLookup,
+                            sense.sub_pos
+                          )}
+                        </Tag>
                       )}
                     </Space>
                   }
@@ -317,6 +355,11 @@ const ISSUE_STEP_LABEL: Record<Exclude<WordCreationStep, "preview">, string> = {
 export function PreviewAndPublishStep({ word, onPublished }: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  const partOfSpeechCatalog = usePartOfSpeechCatalog();
+  const partOfSpeechLookup = useMemo(
+    () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
+    [partOfSpeechCatalog.data]
+  );
   const validateWord = useValidateWordV2(word.id);
   const publishWord = usePublishWordV2(word.id);
   const [validation, setValidation] = useState<DraftValidationResponse>();
@@ -421,8 +464,18 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
         </Typography.Paragraph>
       </div>
 
+      {partOfSpeechCatalog.isError && (
+        <Alert
+          type="warning"
+          showIcon
+          title="词性配置加载失败，预览暂以词性编码显示"
+          style={{ marginBottom: 18 }}
+        />
+      )}
+
       {readOnly ? (
         <Alert
+          className="word-preview-status"
           type="success"
           showIcon
           icon={<CheckCircleFilled />}
@@ -432,6 +485,7 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
         />
       ) : validationError ? (
         <Alert
+          className="word-preview-status"
           type="error"
           showIcon
           icon={<CloseCircleFilled />}
@@ -452,6 +506,7 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
         />
       ) : validation ? (
         <Alert
+          className="word-preview-status"
           type={validation.valid ? "success" : "error"}
           showIcon
           icon={
@@ -476,6 +531,7 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
         />
       ) : (
         <Alert
+          className="word-preview-status"
           type="info"
           showIcon
           title="正在检查发布完整性"
@@ -484,7 +540,11 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
       )}
 
       {!readOnly && validation && !validation.valid && (
-        <Card title="待处理问题" style={{ marginBottom: 18 }}>
+        <Card
+          className="word-preview-issues-card"
+          size="small"
+          title="待处理问题"
+        >
           <List
             dataSource={validation.issues}
             locale={{ emptyText: <Empty description="没有问题" /> }}
@@ -514,9 +574,18 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
         </Card>
       )}
 
-      <Space orientation="vertical" size={18} style={{ width: "100%" }}>
-        <Card className="word-preview-section" title="词条概要">
-          <Descriptions column={{ xs: 1, md: 2 }}>
+      <Space
+        className="word-preview-stack"
+        orientation="vertical"
+        size={14}
+        style={{ width: "100%" }}
+      >
+        <Card
+          className="word-preview-section word-preview-overview"
+          title="词条概要"
+          extra={<Tag color="blue">结构化预览</Tag>}
+        >
+          <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
             <Descriptions.Item label="主词">
               {word.headwords.mode === "unified"
                 ? word.headwords.common
@@ -532,22 +601,43 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
             <Descriptions.Item label="检测输入">
               {word.detection_snapshot.request.headword}
             </Descriptions.Item>
-            <Descriptions.Item label="原建议词性">
+            <Descriptions.Item label="原建议基本词性">
               <Space wrap>
                 {word.detection_snapshot.suggested_pos.map((pos) => (
-                  <Tag key={pos}>{POS_TAG_ABBR[pos]}</Tag>
+                  <Tag key={pos}>
+                    {partOfSpeechLabel(partOfSpeechLookup, pos)}
+                  </Tag>
                 ))}
               </Space>
             </Descriptions.Item>
           </Descriptions>
         </Card>
 
-        <Card className="word-preview-section" title="词形与发音">
-          <FormsPreview word={word} />
+        <Card
+          className="word-preview-section"
+          title="词形与发音"
+          extra={<Tag>{word.forms.pos.length} 个基本词性</Tag>}
+        >
+          <FormsPreview word={word} partOfSpeechLookup={partOfSpeechLookup} />
         </Card>
 
-        <Card className="word-preview-section" title="词义与例句">
-          <MeaningsPreview word={word} />
+        <Card
+          className="word-preview-section"
+          title="词义与例句"
+          extra={
+            <Tag>
+              {word.meanings.pos.reduce(
+                (count, pos) => count + pos.senses.length,
+                0
+              )}{" "}
+              个词义
+            </Tag>
+          }
+        >
+          <MeaningsPreview
+            word={word}
+            partOfSpeechLookup={partOfSpeechLookup}
+          />
         </Card>
       </Space>
 

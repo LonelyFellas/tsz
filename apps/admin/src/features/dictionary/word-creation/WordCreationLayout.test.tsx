@@ -46,7 +46,7 @@ describe("WordCreationLayout", () => {
     expect(
       view.container.querySelector(".word-creation-summary")
     ).toHaveTextContent(
-      "方言识别待完成基本词性0词形变化0语法结构0多维词义0多维例句0"
+      "方言识别待完成基本词性0词形变化0语义区间0语法结构0多维词义0多维例句0"
     );
   });
 
@@ -63,6 +63,7 @@ describe("WordCreationLayout", () => {
     expect(summary).toHaveTextContent("方言识别完成");
     expect(summary).toHaveTextContent("基本词性2");
     expect(summary).toHaveTextContent("词形变化5");
+    expect(summary).toHaveTextContent("语义区间1");
     expect(summary).toHaveTextContent("语法结构2");
     expect(summary).toHaveTextContent("多维词义2");
     expect(summary).toHaveTextContent("多维例句2");
@@ -71,6 +72,15 @@ describe("WordCreationLayout", () => {
     expect(onStepChange).toHaveBeenCalledWith("meanings");
     fireEvent.click(screen.getByText("预览并生效"));
     expect(onStepChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("旧草稿尚无语义区间时，完成情况与默认首行一致显示 1", () => {
+    const word = wordFixture();
+    word.meanings.sense_groups = [];
+    const view = renderLayout({ word, currentStep: "meanings" });
+    const summary = view.container.querySelector(".word-creation-summary")!;
+
+    expect(summary).toHaveTextContent("语义区间1");
   });
 
   it("published 显示只读标识，侧栏和面包屑均可返回词库", () => {
