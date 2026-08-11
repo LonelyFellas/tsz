@@ -4,6 +4,7 @@ import { isWordCreationWorkspacePath } from "./ConsoleLayout";
 describe("isWordCreationWorkspacePath", () => {
   it.each([
     "/words/new",
+    "/words/word-center/wizard/basics",
     "/words/word-center/wizard/forms",
     "/words/word-center/wizard/meanings",
     "/words/word-center/wizard/preview"

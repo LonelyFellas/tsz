@@ -10,7 +10,19 @@ TanStack Query 保存服务端/mock 事实，Ant Design Form 只保存当前步�
 
 旧 `AdminWord` 明确定义为 legacy V1。新建、发布后的内容使用 `AdminWordV2`，列表通过 `schema_version` 选择编辑器；V2 数据绝不进入旧 `WordEditor` 的整树 `PUT`，防止新字段被覆盖丢失。
 
-## 本轮复审后收敛的决定
+## 当前状态（智能词库 Phase 2 覆盖）
+
+本文件前半部分保留第一阶段的决策脉络；当前实现以
+[`../smart-lexicon-phase-2/design.md`](../smart-lexicon-phase-2/design.md) 为后续权威补充。
+Phase 2 已覆盖以下第一阶段限制：单词与短语都走 V2；真实请求改用
+`/admin/lexicon/*` OpenAPI 契约；已发布词条可通过显式 `mode=edit` 继续编辑并再次发布；
+归档词条全程只读且只能先恢复。
+
+当前桌面布局的最终决定是：Step 2–4 在 1200px 与 1440px 都使用同一套顶部两行摘要，
+第一行展示返回入口、词条和语言，第二行展示完成情况，不再保留左侧摘要栏。Step 1 尚未创建
+词条，因此不显示摘要，但 `/words/new` 与 `/wizard/basics` 都使用同一宽工作台和主内容宽度。
+
+## 第一阶段复审后收敛的决定（历史）
 
 1. 仅重构“创建单词”；“创建短语”继续走旧入口。
 2. 第 1 步的建议词性只读展示，创建草稿后直接生成第 2 步 Tab；词性增删在第 2 步完成。
@@ -239,7 +251,7 @@ type EnglishTextV2 = DialectValueV2<RichText>;
 页面骨架：
 
 - `WordCreationWizard`：加载 V2 详情、路由守卫和步骤编排；
-- `WordCreationLayout`：顶部 Stepper、左侧摘要/完成度、主内容和底部动作；
+- `WordCreationLayout`：顶部 Stepper、顶部两行摘要/完成度、主内容和底部动作；Step 1 不显示摘要；
 - `CreateEntryStep`：无草稿时可编辑语言/词条和检测，有草稿时只读显示 detection snapshot；
 - `FormsAndPronunciationStep`：词性 Tab、词形变化组、方言列与读音；
 - `MeaningsAndExamplesStep`：按“词义 → 语法结构 → 例句”组织的语法、释义、例句和关联词；
@@ -1030,7 +1042,7 @@ production mode 若 mock flag 为 true，Vite 配置直接失败；不能自动�
 ## UI、可访问性与性能
 
 - admin 继续使用 Ant Design，不引入 web 的 `@tsz/ui`。
-- 保留 ConsoleLayout；wizard 在内容区内提供局部 Stepper 与摘要栏，1440/1920 对照原型。CSS Grid 在空间不足时单列或受控横向滚动。
+- 保留 ConsoleLayout；wizard 路由默认收起后台侧栏，在内容区内提供局部 Stepper 与顶部两行摘要。1200/1440 使用同一结构，空间不足时单列或受控横向滚动。
 - BrE 蓝与 AmE 洋红只作辅助；始终有文本标签。
 - 锁定的来源方言使用 `readOnly` 并保留提交值，不使用会从 Form 丢值的 disabled 控件。
 - Stepper 有 `aria-current`；词性为 tablist；折叠有 `aria-expanded`；检测/保存/发布结果用 `aria-live`。
@@ -1097,7 +1109,7 @@ production mode 若 mock flag 为 true，Vite 配置直接失败；不能自动�
 ### 手工与视觉
 
 - 1440px、1920px、1200px、浏览器缩放；
-- 六张原型的步骤头、摘要栏、双方言列、多个词形组和折叠长表单；
+- 六张原型的步骤头、顶部两行摘要、双方言列、多个词形组和折叠长表单；
 - 键盘、焦点、读屏标签、颜色对比、loading/disabled；
 - 38/38 大数据 fixture；
 - mock flag 关闭走真实 API，生产 mock 构建 fail-closed。
@@ -1518,7 +1530,7 @@ interface DraftMeaningsStepContent {
 
 - `MeaningsAndExamplesStep` 的每个语义区间行展示两个输入，可见标签和可访问名分别为“中文”“英文”，不显示红色必填星号；视觉序号仅在最左侧使用圆圈数字 `① / ②`，不重复“区间 N”文案。桌面宽度并列，空间不足时允许换行，不引入 Tailwind。
 - 卡片头部只保留“语义区间”和新增操作，不使用醒目的“必填”标签，也不额外显示必选说明；必选约束由默认绑定、禁用清空和完成校验表达。
-- 左侧“完成情况”在“词形变化”和“语法结构”之间增加“语义区间”行；已有 word 时至少显示默认区间的 `1`，保存后按 canonical `sense_groups.length` 显示。
+- 顶部摘要第二行“完成情况”在“词形变化”和“语法结构”之间增加“语义区间”；已有 word 时至少显示默认区间的 `1`，保存后按 canonical `sense_groups.length` 显示。
 - 语法结构列表与语义区间使用同一套左侧圆圈数字序号；不重复显示“结构 N”，卡片头部不显示“英美文本独立维护”，方言差异直接由并排的英式/美式输入表达。多条语法结构通过右侧拖动手柄重排，拖放目标显示描边反馈，同时保留手柄聚焦后的上下方向键操作；不再展示独立的上移/下移按钮。每个方言输入复用上一步发音行的播放、获取语音、上传语音图标和禁用状态；真实音频接口未接入前，获取与上传只显示 Mock 提示，不伪造 `audio_url`。
 - 空草稿首次进入第 3 步即初始化 `{ id: newWordNodeId(), name_zh: "", name_en: "" }`，不显示需要先点击添加的空卡片；编辑任一名称不改变 ID，也不影响既有词义引用。
 - 词义的语义区间 `Select` 仍以 `group.id` 为 value，label 使用 `name_zh + " / " + name_en`，不提供清空入口；新增词义自动绑定第一个区间。草稿缺一侧名称时用已填名称和明确的“待填写中文名/英文名”占位，不让两个未命名区间不可区分。

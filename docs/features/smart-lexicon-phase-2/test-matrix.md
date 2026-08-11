@@ -31,3 +31,4 @@
 | P2-26  | Frontend integration | 方言建议失败重试           | 首次网络失败、再次成功                                            | 原文保留、解除锁定、可重试并写入建议                                                | P0     |
 | P2-27  | Contract             | Problem Details 精简解析   | 400/409/422 新 code/meta                                          | HttpError 保留 code、current_revision 与 reference locations                        | P1     |
 | P2-28  | Full regression      | 第一阶段单词流程           | 现有全部 fixtures                                                 | 覆盖率门槛不降，单词创建/编辑/发布/引用测试全绿                                     | P0     |
+| P2-29  | Manual/UI            | 向导响应式摘要             | Step 1–4，1200/1440px                                             | Step 2–4 顶部两行摘要一致且无左栏；Step 1 无摘要但主内容同宽                        | P1     |

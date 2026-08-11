@@ -59,6 +59,7 @@ POST /api/v1/admin/lexicon/entries/restore-batch
 - `apps/admin/src/features/dictionary/api.ts` 与 `word-creation/api.ts`：生命周期 mutation、缓存更新/失效。
 - `SmartDictionary.tsx`：短语走 V2 向导、归档筛选/单条/批量、归档行恢复、pending 防双击。
 - `CreateEntryStep.tsx`、`WordCreationWizard.tsx`：phrase/not_found phrase、类型展示、归档只读保护。
+- `WordCreationLayout.tsx`、`word-creation.css`、`ConsoleLayout.tsx`：Step 2–4 统一为顶部两行摘要，Step 1 不显示摘要；1200/1440 使用同一宽工作台，不保留左侧摘要栏。
 
 ## 数据与状态流
 
