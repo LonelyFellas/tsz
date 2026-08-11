@@ -1,7 +1,11 @@
 // 浏览器可见的 API 基址。默认走同源 /api/v1（dev 由 vite.config 的 proxy 代理、
 // prod 由 nginx 在子域层代理到后端），保证 refresh 的 HttpOnly cookie 与请求同源。
 // Vite 仅暴露以 VITE_ 前缀的前端变量（import.meta.env.VITE_*）。
-import { assertAdminWordsMockAllowed, parseBooleanEnvFlag } from "./env-flags";
+import {
+  assertAdminTtsMockAllowed,
+  assertAdminWordsMockAllowed,
+  parseBooleanEnvFlag
+} from "./env-flags";
 
 const WORD_CREATION_WIZARD = parseBooleanEnvFlag(
   import.meta.env.VITE_WORD_CREATION_WIZARD,
@@ -13,9 +17,24 @@ const ADMIN_WORDS_MOCK = parseBooleanEnvFlag(
   "VITE_ADMIN_WORDS_MOCK",
   !import.meta.env.PROD
 );
+const VOICE_EDITOR = parseBooleanEnvFlag(
+  import.meta.env.VITE_VOICE_EDITOR,
+  "VITE_VOICE_EDITOR",
+  !import.meta.env.PROD
+);
+const ADMIN_TTS_MOCK = parseBooleanEnvFlag(
+  import.meta.env.VITE_ADMIN_TTS_MOCK,
+  "VITE_ADMIN_TTS_MOCK",
+  !import.meta.env.PROD
+);
 
 assertAdminWordsMockAllowed(
   ADMIN_WORDS_MOCK,
+  import.meta.env.PROD,
+  import.meta.env.MODE
+);
+assertAdminTtsMockAllowed(
+  ADMIN_TTS_MOCK,
   import.meta.env.PROD,
   import.meta.env.MODE
 );
@@ -23,5 +42,7 @@ assertAdminWordsMockAllowed(
 export const env = {
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL ?? "/api/v1",
   WORD_CREATION_WIZARD,
-  ADMIN_WORDS_MOCK
+  ADMIN_WORDS_MOCK,
+  VOICE_EDITOR,
+  ADMIN_TTS_MOCK
 };

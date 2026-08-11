@@ -10,6 +10,8 @@ export * from "./admin";
 export * from "./admin-user";
 export * from "./admin-role";
 export * from "./part-of-speech";
+export * from "./rich-text";
+export * from "./admin-tts";
 export * from "./admin-word-v2";
 export { isAdminWordV2 } from "./admin-word";
 export type {
@@ -35,8 +37,6 @@ export type {
   RelatedSearchResponse,
   RelatedWordResult,
   RelatedWordSense,
-  RichText,
-  RichTextSpan,
   SenseGroup,
   WordDefinition,
   WordForm,

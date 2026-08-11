@@ -4,6 +4,7 @@ import type {
   EnglishTextV2,
   RichText
 } from "@tsz/types";
+import type { VoiceRichTextEditorProps } from "@tsz/voice-editor/editor";
 import {
   act,
   fireEvent,
@@ -19,7 +20,10 @@ import {
   useLocation
 } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { MeaningsAndExamplesStep } from "./MeaningsAndExamplesStep";
+import {
+  collectPronunciationHints,
+  MeaningsAndExamplesStep
+} from "./MeaningsAndExamplesStep";
 import { createGrammar } from "./model";
 import { deferred, wordFixture } from "./wordCreation.test.helper";
 
@@ -29,6 +33,10 @@ const mutations = vi.hoisted(() => ({
 }));
 const dataSourceCapabilities = vi.hoisted(() => ({
   dialectVariantSuggestions: true
+}));
+const featureFlags = vi.hoisted(() => ({
+  VOICE_EDITOR: false,
+  ADMIN_TTS_MOCK: true
 }));
 const relatedWords = vi.hoisted(() => [
   {
@@ -48,6 +56,46 @@ const relatedWords = vi.hoisted(() => [
 vi.mock("../dataSource", () => ({
   adminWordsDataSourceCapabilities: dataSourceCapabilities
 }));
+
+vi.mock("@/lib/env", () => ({ env: featureFlags }));
+vi.mock("../voice-editor/dataSource", () => ({
+  adminVoicePreviewAdapter: {
+    listVoices: vi.fn().mockResolvedValue([]),
+    synthesize: vi.fn()
+  }
+}));
+vi.mock("@tsz/voice-editor/editor", async () => {
+  const actual = await vi.importActual<typeof import("@tsz/voice-editor/core")>(
+    "@tsz/voice-editor/core"
+  );
+  return {
+    ...actual,
+    VoiceRichTextEditor: ({
+      open,
+      value,
+      pronunciationHints,
+      onApply,
+      onCancel
+    }: VoiceRichTextEditorProps) =>
+      open ? (
+        <div
+          role="dialog"
+          aria-label="测试语音编辑器"
+          data-pronunciation-hint={pronunciationHints?.centre}
+        >
+          <button
+            type="button"
+            onClick={() => onApply(actual.toRichTextV2(value))}
+          >
+            应用
+          </button>
+          <button type="button" onClick={onCancel}>
+            取消
+          </button>
+        </div>
+      ) : null
+  };
+});
 
 vi.mock("./api", () => ({
   useSaveMeaningsStep: () => ({
@@ -169,6 +217,7 @@ function renderStep(word = wordFixture({ ready: true }), readOnly = false) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  featureFlags.VOICE_EDITOR = false;
   dataSourceCapabilities.dialectVariantSuggestions = true;
   mutations.save.mockResolvedValue({
     word: wordFixture({ ready: true, revision: 4 })
@@ -179,6 +228,80 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("MeaningsAndExamplesStep", () => {
+  it("从词形读音构造 IPA 提示，优先词典音标且不覆盖首个同名词形", () => {
+    const forms = structuredClone(wordFixture().forms);
+    const sample = forms.pos[0]!.base_form.variants[0]!;
+    forms.pos = [
+      {
+        ...forms.pos[0]!,
+        form_groups: [],
+        base_form: {
+          ...forms.pos[0]!.base_form,
+          variants: [
+            {
+              ...sample,
+              id: "actual",
+              spelling: " Word ",
+              pronunciations: [
+                {
+                  ...sample.pronunciations[0]!,
+                  id: "actual-pronunciation",
+                  dict_phonetic: "",
+                  actual_pron: "actual"
+                }
+              ]
+            },
+            {
+              ...sample,
+              id: "duplicate",
+              spelling: "word",
+              pronunciations: [
+                {
+                  ...sample.pronunciations[0]!,
+                  id: "duplicate-pronunciation",
+                  dict_phonetic: "dictionary",
+                  actual_pron: "duplicate"
+                }
+              ]
+            },
+            {
+              ...sample,
+              id: "known",
+              spelling: "known",
+              pronunciations: [
+                {
+                  ...sample.pronunciations[0]!,
+                  id: "known-pronunciation",
+                  dict_phonetic: "known-dictionary",
+                  actual_pron: "known-actual"
+                }
+              ]
+            },
+            {
+              ...sample,
+              id: "silent",
+              spelling: "silent",
+              pronunciations: [
+                {
+                  ...sample.pronunciations[0]!,
+                  id: "silent-pronunciation",
+                  dict_phonetic: "",
+                  actual_pron: ""
+                }
+              ]
+            },
+            { ...sample, id: "empty", spelling: "", pronunciations: [] }
+          ]
+        }
+      }
+    ];
+
+    expect(collectPronunciationHints(forms)).toEqual({
+      word: "actual",
+      known: "known-dictionary"
+    });
+  });
+
   it("默认展示必填语义区间，并锁定最后一项删除入口", () => {
     const word = wordFixture();
     renderStep(word);
@@ -1259,6 +1382,98 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("添加语法结构")).toBeNull();
     expect(screen.queryByText("添加词义")).toBeNull();
     expect(screen.queryByText("保存草稿")).toBeNull();
+  });
+
+  it("语音编辑器按稳定节点和当前方言回写语法、英文释义、英文例句，中文仍使用 TextArea", async () => {
+    featureFlags.VOICE_EDITOR = true;
+    const word = wordFixture({ ready: true });
+    const firstDefinition = word.meanings.pos[0]!.senses[0]!.definitions[0]!;
+    firstDefinition.definition_mode = "en_definition";
+    firstDefinition.content = {
+      mode: "distinguish",
+      source_dialect: "us",
+      uk: {
+        state: "ready",
+        variant: {
+          value: {
+            version: 1,
+            text: "British definition",
+            spans: [],
+            liaisons: []
+          },
+          origin: "manual"
+        }
+      },
+      us: {
+        state: "ready",
+        variant: {
+          value: {
+            version: 1,
+            text: "American definition",
+            spans: [],
+            liaisons: []
+          },
+          origin: "manual"
+        }
+      }
+    };
+    renderStep(word);
+
+    const applyField = async (text: string) => {
+      const field = screen
+        .getAllByTestId("voice-rich-text-field")
+        .find((candidate) => candidate.textContent?.includes(text));
+      if (!field) throw new Error(`voice field not found: ${text}`);
+      const editButton = field.querySelector("button");
+      if (!editButton) throw new Error(`edit button not found: ${text}`);
+      fireEvent.click(editButton);
+      const dialog = await screen.findByLabelText("测试语音编辑器");
+      expect(dialog).toHaveAttribute("data-pronunciation-hint", "ˈsentə");
+      const applyButton = dialog.querySelector("button");
+      if (!applyButton) throw new Error(`apply button not found: ${text}`);
+      fireEvent.click(applyButton);
+      await waitFor(() =>
+        expect(screen.queryByLabelText("测试语音编辑器")).toBeNull()
+      );
+    };
+
+    await applyField("a centre");
+    await applyField("American definition");
+    await applyField("The center is here.");
+    expect(screen.getAllByLabelText("汉语译文")[0]).toBeInstanceOf(
+      HTMLTextAreaElement
+    );
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledOnce());
+    const saved = mutations.save.mock.calls[0]![0]
+      .content as DraftMeaningsStepContent;
+    expect(
+      saved.pos[0]!.grammar_structures[0]!.variants[0]!.content.version
+    ).toBe(2);
+    const savedDefinition = saved.pos[0]!.senses[0]!.definitions[0]!;
+    expect(savedDefinition.definition_mode).toBe("en_definition");
+    const definitionContent = savedDefinition.content as EnglishTextV2;
+    if (definitionContent.mode !== "distinguish") {
+      throw new Error("definition should retain dialect structure");
+    }
+    expect(definitionContent.us.state).toBe("ready");
+    expect(
+      definitionContent.us.state === "ready"
+        ? definitionContent.us.variant.value.version
+        : undefined
+    ).toBe(2);
+    expect(
+      definitionContent.uk.state === "ready"
+        ? definitionContent.uk.variant.value.version
+        : undefined
+    ).toBe(1);
+    const sentenceText = saved.pos[0]!.senses[0]!.sentences[0]!.en_text;
+    expect(
+      sentenceText.mode === "distinguish" && sentenceText.us.state === "ready"
+        ? sentenceText.us.variant.value.version
+        : undefined
+    ).toBe(2);
   });
 
   it("主关联缺失时只读页明确标错", () => {

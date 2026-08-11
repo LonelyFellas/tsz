@@ -142,6 +142,20 @@ describe("createHttpClient", () => {
     expect(init.body).toBe(JSON.stringify({ name: "a" }));
   });
 
+  it("get/post:把 AbortSignal 原样传给 fetch", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(null))
+      .mockResolvedValueOnce(jsonResponse(null));
+    const http = createHttpClient({ baseUrl: "" });
+    const controller = new AbortController();
+
+    await http.get("/items", { signal: controller.signal });
+    await http.post("/items", { name: "a" }, { signal: controller.signal });
+
+    expect(fetchMock.mock.calls[0]![1].signal).toBe(controller.signal);
+    expect(fetchMock.mock.calls[1]![1].signal).toBe(controller.signal);
+  });
+
   it("put:method=PUT 且 body 为 JSON 字符串", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });

@@ -46,10 +46,17 @@ import type {
   WordSenseV2,
   WordSentenceV2
 } from "@tsz/types";
+import { VoiceRichTextField } from "@tsz/voice-editor/reader";
+import "@tsz/voice-editor/styles.css";
 import { HttpError } from "@tsz/api-client/http";
 import {
+  createContext,
   type DragEvent,
   type KeyboardEvent,
+  lazy,
+  type ReactNode,
+  Suspense,
+  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -59,6 +66,8 @@ import { useNavigate } from "react-router-dom";
 import { DIALECT_SHORT_LABEL } from "../editorConstants";
 import { CEFR_OPTIONS, cefrColor } from "../labels";
 import { adminWordsDataSourceCapabilities } from "../dataSource";
+import { env } from "@/lib/env";
+import { adminVoicePreviewAdapter } from "../voice-editor/dataSource";
 import {
   createPartOfSpeechLookup,
   partOfSpeechLabel,
@@ -93,6 +102,12 @@ import {
   useWordValidationIssue,
   useWordValidationIssueFocus
 } from "./useWordValidationIssueFocus";
+
+const VoiceRichTextEditor = lazy(() =>
+  import("@tsz/voice-editor/editor").then((module) => ({
+    default: module.VoiceRichTextEditor
+  }))
+);
 
 interface Props {
   word: AdminWordV2;
@@ -307,6 +322,129 @@ function setEnglishText(
   };
 }
 
+function setEnglishRichText(
+  value: EnglishTextV2,
+  dialect: Dialect,
+  content: RichText
+): EnglishTextV2 {
+  if (value.mode === "unified") {
+    return {
+      ...value,
+      common: { value: content, origin: "manual" }
+    };
+  }
+  if (dialect === "common") return value;
+  return {
+    ...value,
+    [dialect]: {
+      state: "ready",
+      variant: { value: content, origin: "manual" }
+    }
+  };
+}
+
+interface VoiceEditorTarget {
+  value: RichText;
+  contextLabel: string;
+  onApply: (value: RichText) => void;
+}
+
+interface VoiceEditorContextValue {
+  open: (target: VoiceEditorTarget) => void;
+}
+
+const VoiceEditorContext = createContext<VoiceEditorContextValue | null>(null);
+
+export function collectPronunciationHints(
+  forms: AdminWordV2["forms"]
+): Readonly<Record<string, string>> {
+  const hints: Record<string, string> = {};
+  for (const pos of forms.pos) {
+    const slots = [
+      pos.base_form,
+      ...pos.form_groups.flatMap((group) => group.slots)
+    ];
+    for (const slot of slots) {
+      for (const variant of slot.variants) {
+        const spelling = variant.spelling.trim().toLowerCase();
+        const pronunciation = variant.pronunciations.find(
+          (item) => item.dict_phonetic.trim() || item.actual_pron.trim()
+        );
+        const phoneme =
+          pronunciation?.dict_phonetic.trim() ||
+          pronunciation?.actual_pron.trim() ||
+          "";
+        if (spelling && phoneme && hints[spelling] === undefined) {
+          hints[spelling] = phoneme;
+        }
+      }
+    }
+  }
+  return hints;
+}
+
+function VoiceEditorProvider({
+  children,
+  pronunciationHints
+}: {
+  children: ReactNode;
+  pronunciationHints: Readonly<Record<string, string>>;
+}) {
+  const [target, setTarget] = useState<VoiceEditorTarget>();
+  if (!env.VOICE_EDITOR) return children;
+  return (
+    <VoiceEditorContext.Provider value={{ open: setTarget }}>
+      {children}
+      {target && (
+        <Suspense fallback={null}>
+          <VoiceRichTextEditor
+            open
+            value={target.value}
+            language="en"
+            contextLabel={target.contextLabel}
+            pronunciationHints={pronunciationHints}
+            previewAdapter={adminVoicePreviewAdapter}
+            onApply={(value) => {
+              target.onApply(value);
+              setTarget(undefined);
+            }}
+            onCancel={() => setTarget(undefined)}
+          />
+        </Suspense>
+      )}
+    </VoiceEditorContext.Provider>
+  );
+}
+
+function VoiceTextControl({
+  value,
+  contextLabel,
+  dialectLabel,
+  readOnly,
+  onChange
+}: {
+  value: RichText;
+  contextLabel: string;
+  dialectLabel?: string;
+  readOnly?: boolean;
+  onChange: (value: RichText) => void;
+}) {
+  const editor = useContext(VoiceEditorContext);
+  return (
+    <VoiceRichTextField
+      value={value}
+      contextLabel={contextLabel}
+      dialectLabel={dialectLabel}
+      readOnly={readOnly}
+      onEdit={
+        readOnly || !editor
+          ? undefined
+          : () => editor.open({ value, contextLabel, onApply: onChange })
+      }
+    />
+  );
+}
+
 function EnglishTextEditor({
   value,
   clientId,
@@ -321,6 +459,20 @@ function EnglishTextEditor({
   onChange: (next: EnglishTextV2) => void;
 }) {
   if (value.mode === "unified") {
+    if (env.VOICE_EDITOR) {
+      return (
+        <div data-word-node-id={clientId} data-word-field="content">
+          <VoiceTextControl
+            value={value.common.value}
+            contextLabel="英语文本"
+            readOnly={readOnly}
+            onChange={(content) =>
+              onChange(setEnglishRichText(value, "common", content))
+            }
+          />
+        </div>
+      );
+    }
     return (
       <Input.TextArea
         aria-label="英语文本"
@@ -337,24 +489,40 @@ function EnglishTextEditor({
   }
   const dialect = activeDialect;
   const slot = value[dialect];
+  const slotValue =
+    slot.state === "ready"
+      ? slot.variant.value
+      : ({ version: 2, text: "", annotations: [] } satisfies RichText);
   return (
     <div
       className={`word-meaning-dialect-panel dialect-panel-${dialect}`}
       data-word-node-id={clientId}
       data-word-field="content"
     >
-      <Input.TextArea
-        aria-label={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
-        value={slot.state === "ready" ? slot.variant.value.text : ""}
-        readOnly={readOnly}
-        placeholder={
-          slot.state === "missing" ? "待自动补全，也可直接填写" : undefined
-        }
-        autoSize={{ minRows: 2, maxRows: 6 }}
-        onChange={(event) =>
-          onChange(setEnglishText(value, dialect, event.target.value))
-        }
-      />
+      {env.VOICE_EDITOR ? (
+        <VoiceTextControl
+          value={slotValue}
+          contextLabel={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
+          dialectLabel={DIALECT_SHORT_LABEL[dialect]}
+          readOnly={readOnly}
+          onChange={(content) =>
+            onChange(setEnglishRichText(value, dialect, content))
+          }
+        />
+      ) : (
+        <Input.TextArea
+          aria-label={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
+          value={slot.state === "ready" ? slot.variant.value.text : ""}
+          readOnly={readOnly}
+          placeholder={
+            slot.state === "missing" ? "待自动补全，也可直接填写" : undefined
+          }
+          autoSize={{ minRows: 2, maxRows: 6 }}
+          onChange={(event) =>
+            onChange(setEnglishText(value, dialect, event.target.value))
+          }
+        />
+      )}
       <Flex justify="space-between" align="center" style={{ marginTop: 5 }}>
         <Typography.Text type="secondary" style={{ fontSize: 11 }}>
           {slot.state === "ready"
@@ -481,26 +649,49 @@ function GrammarEditor({
                         disabled
                       />
                     </Tooltip>
-                    <Input
-                      className="word-pronunciation-phonetic-input"
-                      aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
-                      data-word-node-id={grammar.id}
-                      data-word-field="content"
-                      value={variant.content.text}
-                      readOnly={readOnly}
-                      placeholder="例如 a centre / the centre"
-                      onChange={(event) => {
-                        const grammars = cloneWordValue(value);
-                        const nextVariant = grammars[
-                          grammarIndex
-                        ]!.variants.find((item) => item.id === variant.id)!;
-                        nextVariant.content = toWordRichText(
-                          event.target.value,
-                          nextVariant.content
-                        );
-                        onChange(grammars);
-                      }}
-                    />
+                    {env.VOICE_EDITOR ? (
+                      <div
+                        style={{ flex: 1 }}
+                        data-word-node-id={grammar.id}
+                        data-word-field="content"
+                      >
+                        <VoiceTextControl
+                          value={variant.content}
+                          contextLabel={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
+                          dialectLabel={DIALECT_SHORT_LABEL[dialect]}
+                          readOnly={readOnly}
+                          onChange={(content) => {
+                            const grammars = cloneWordValue(value);
+                            const nextVariant = grammars[
+                              grammarIndex
+                            ]!.variants.find((item) => item.id === variant.id)!;
+                            nextVariant.content = content;
+                            onChange(grammars);
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <Input
+                        className="word-pronunciation-phonetic-input"
+                        aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
+                        data-word-node-id={grammar.id}
+                        data-word-field="content"
+                        value={variant.content.text}
+                        readOnly={readOnly}
+                        placeholder="例如 a centre / the centre"
+                        onChange={(event) => {
+                          const grammars = cloneWordValue(value);
+                          const nextVariant = grammars[
+                            grammarIndex
+                          ]!.variants.find((item) => item.id === variant.id)!;
+                          nextVariant.content = toWordRichText(
+                            event.target.value,
+                            nextVariant.content
+                          );
+                          onChange(grammars);
+                        }}
+                      />
+                    )}
                     <Tooltip title="获取语音">
                       <Button
                         className="word-pronunciation-voice-action word-pronunciation-sync-action"
@@ -1985,6 +2176,10 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
     () => new Map(word.forms.pos.map((pos) => [pos.pos_id, pos])),
     [word.forms.pos]
   );
+  const pronunciationHints = useMemo(
+    () => collectPronunciationHints(word.forms),
+    [word.forms]
+  );
   const activeDialectEligibleCount =
     word.headwords.mode === "distinguish"
       ? collectMissingMeaningDialectItems(content, activeDialect).items.length
@@ -2178,7 +2373,7 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   });
 
   return (
-    <>
+    <VoiceEditorProvider pronunciationHints={pronunciationHints}>
       <div className="word-step-heading">
         <span className="word-step-number">STEP 03</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
@@ -2378,6 +2573,6 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
           </div>
         )}
       </fieldset>
-    </>
+    </VoiceEditorProvider>
   );
 }

@@ -50,6 +50,8 @@ const PENDING = new Set<string>([
   // 平台后台(admin):auth 一期已在 tsz-rust 落地(login/login-code/logout/refresh/
   // change-password/profile),已纳入正式校验;其余端点待对接。
   "post /admin/auth/logout-all",
+  "get /admin/tts/voices",
+  "post /admin/tts/previews",
   "get /admin/words",
   "get /admin/words/stats",
   "post /admin/words/detect",
