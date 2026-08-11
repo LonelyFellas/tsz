@@ -1,4 +1,5 @@
 import type { AdminPaginationMeta } from "./admin";
+import type { Actor } from "./api";
 
 /**
  * 可配置基本词性/细分词性的稳定 wire 编码。
@@ -9,10 +10,8 @@ import type { AdminPaginationMeta } from "./admin";
 export type PartOfSpeechCode = string;
 export type SubPartOfSpeechCode = string;
 
-export interface PartOfSpeechActor {
-  id: string;
-  display_name: string;
-}
+/** @deprecated OpenAPI 审计主体已统一为 Actor。 */
+export type PartOfSpeechActor = Actor;
 
 export interface PartOfSpeechConfig {
   id: string;
@@ -24,9 +23,9 @@ export interface PartOfSpeechConfig {
   usage_count: number;
   sub_part_count: number;
   revision: number;
-  created_by: PartOfSpeechActor;
+  created_by: Actor;
   created_at: string;
-  updated_by?: PartOfSpeechActor;
+  updated_by?: Actor;
   updated_at: string;
 }
 
@@ -39,9 +38,9 @@ export interface SubPartOfSpeechConfig {
   sort_order: number;
   usage_count: number;
   revision: number;
-  created_by: PartOfSpeechActor;
+  created_by: Actor;
   created_at: string;
-  updated_by?: PartOfSpeechActor;
+  updated_by?: Actor;
   updated_at: string;
 }
 
@@ -107,6 +106,11 @@ export interface UpdateSubPartOfSpeechInput {
   name_zh: string;
   name_en: string;
   sort_order: number;
+}
+
+/** 基本/细分 DELETE 共用的必填并发版本 query。 */
+export interface DeletePartOfSpeechQuery {
+  base_revision: number;
 }
 
 export interface SubPartOfSpeechListResponse {

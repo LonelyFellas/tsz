@@ -1,9 +1,9 @@
 // 运行环境无关的请求层。web 与 admin 各自注入 baseUrl / token。
 
 import type {
-  AdminWordApiErrorMeta,
   DraftValidationIssue,
-  ProblemDetails
+  ProblemDetails,
+  ProblemMeta
 } from "@tsz/types";
 
 export interface HttpClientOptions {
@@ -33,7 +33,7 @@ export class HttpError extends Error {
   /** V2 分步保存/发布的字段级问题；legacy 错误为空数组。 */
   public field_issues: DraftValidationIssue[];
   /** V2 冲突/影响确认的结构化上下文；legacy 错误缺省。 */
-  public meta?: AdminWordApiErrorMeta;
+  public meta?: ProblemMeta;
 
   constructor(
     public status: number,
@@ -46,7 +46,7 @@ export class HttpError extends Error {
      */
     public code?: string,
     problemOrFieldIssues?: ProblemDetails | DraftValidationIssue[],
-    meta?: AdminWordApiErrorMeta,
+    meta?: ProblemMeta,
     problem?: ProblemDetails
   ) {
     super(message);
@@ -75,7 +75,7 @@ interface ParsedError {
   code: string | undefined;
   problem: ProblemDetails | undefined;
   field_issues: DraftValidationIssue[];
-  meta: AdminWordApiErrorMeta | undefined;
+  meta: ProblemMeta | undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -108,9 +108,7 @@ function toDraftValidationIssues(value: unknown): DraftValidationIssue[] {
   return valid ? (value as DraftValidationIssue[]) : [];
 }
 
-function toAdminWordApiErrorMeta(
-  value: unknown
-): AdminWordApiErrorMeta | undefined {
+function toProblemMeta(value: unknown): ProblemMeta | undefined {
   if (!isRecord(value)) return undefined;
   if (
     (value.current_revision !== undefined &&
@@ -138,12 +136,13 @@ function toAdminWordApiErrorMeta(
   ) {
     return undefined;
   }
-  return value as unknown as AdminWordApiErrorMeta;
+  return value as ProblemMeta;
 }
 
 function toProblemDetails(
   body: Record<string, unknown>,
-  responseStatus: number
+  responseStatus: number,
+  meta: ProblemMeta | undefined
 ): ProblemDetails | undefined {
   const type = nonEmptyString(body.type);
   const title = nonEmptyString(body.title);
@@ -166,7 +165,8 @@ function toProblemDetails(
     status: responseStatus,
     detail: body.detail,
     code,
-    ...(typeof body.field === "string" ? { field: body.field } : {})
+    ...(typeof body.field === "string" ? { field: body.field } : {}),
+    ...(meta ? { meta } : {})
   };
 }
 
@@ -174,6 +174,7 @@ async function parseError(res: Response): Promise<ParsedError> {
   try {
     const body: unknown = await res.json();
     if (isRecord(body)) {
+      const meta = toProblemMeta(body.meta);
       return {
         message:
           nonEmptyString(body.detail) ??
@@ -181,9 +182,9 @@ async function parseError(res: Response): Promise<ParsedError> {
           res.statusText,
         details: stringArray(body.details),
         code: nonEmptyString(body.code),
-        problem: toProblemDetails(body, res.status),
+        problem: toProblemDetails(body, res.status, meta),
         field_issues: toDraftValidationIssues(body.field_issues),
-        meta: toAdminWordApiErrorMeta(body.meta)
+        meta
       };
     }
   } catch {

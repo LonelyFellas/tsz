@@ -11,6 +11,7 @@ describe("env", () => {
     vi.stubEnv("VITE_API_BASE_URL", undefined);
     vi.stubEnv("VITE_WORD_CREATION_WIZARD", undefined);
     vi.stubEnv("VITE_ADMIN_WORDS_MOCK", undefined);
+    vi.stubEnv("VITE_ADMIN_PART_OF_SPEECH_MOCK", undefined);
     vi.stubEnv("VITE_VOICE_EDITOR", undefined);
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.resetModules();
@@ -18,6 +19,7 @@ describe("env", () => {
     expect(env.API_BASE_URL).toBe("/api/v1");
     expect(env.WORD_CREATION_WIZARD).toBe(true);
     expect(env.ADMIN_WORDS_MOCK).toBe(true);
+    expect(env.ADMIN_PART_OF_SPEECH_MOCK).toBe(true);
     expect(env.VOICE_EDITOR).toBe(true);
     expect(env.ADMIN_TTS_MOCK).toBe(true);
   });
@@ -33,12 +35,14 @@ describe("env", () => {
     vi.stubEnv("PROD", true);
     vi.stubEnv("VITE_WORD_CREATION_WIZARD", undefined);
     vi.stubEnv("VITE_ADMIN_WORDS_MOCK", undefined);
+    vi.stubEnv("VITE_ADMIN_PART_OF_SPEECH_MOCK", undefined);
     vi.stubEnv("VITE_VOICE_EDITOR", undefined);
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.resetModules();
     const { env } = await import("./env");
     expect(env.WORD_CREATION_WIZARD).toBe(false);
     expect(env.ADMIN_WORDS_MOCK).toBe(false);
+    expect(env.ADMIN_PART_OF_SPEECH_MOCK).toBe(false);
     expect(env.VOICE_EDITOR).toBe(false);
     expect(env.ADMIN_TTS_MOCK).toBe(false);
   });
@@ -48,6 +52,8 @@ describe("env", () => {
     ["VITE_WORD_CREATION_WIZARD", "false", false],
     ["VITE_ADMIN_WORDS_MOCK", "true", true],
     ["VITE_ADMIN_WORDS_MOCK", "false", false],
+    ["VITE_ADMIN_PART_OF_SPEECH_MOCK", "true", true],
+    ["VITE_ADMIN_PART_OF_SPEECH_MOCK", "false", false],
     ["VITE_VOICE_EDITOR", "true", true],
     ["VITE_VOICE_EDITOR", "false", false],
     ["VITE_ADMIN_TTS_MOCK", "true", true],
@@ -59,6 +65,7 @@ describe("env", () => {
     const key = name.replace("VITE_", "") as
       | "WORD_CREATION_WIZARD"
       | "ADMIN_WORDS_MOCK"
+      | "ADMIN_PART_OF_SPEECH_MOCK"
       | "VOICE_EDITOR"
       | "ADMIN_TTS_MOCK";
     expect(env[key]).toBe(expected);
@@ -71,6 +78,17 @@ describe("env", () => {
       vi.resetModules();
       await expect(import("./env")).rejects.toThrow(
         "VITE_WORD_CREATION_WIZARD 只能是"
+      );
+    }
+  );
+
+  it.each(["1", "yes", "TRUE", " false "])(
+    "词性 mock 拒绝模糊布尔值 %s",
+    async (value) => {
+      vi.stubEnv("VITE_ADMIN_PART_OF_SPEECH_MOCK", value);
+      vi.resetModules();
+      await expect(import("./env")).rejects.toThrow(
+        "VITE_ADMIN_PART_OF_SPEECH_MOCK 只能是"
       );
     }
   );
@@ -99,6 +117,34 @@ describe("admin words mock production policy", () => {
 
     const { env } = await import("./env");
     expect(env.ADMIN_WORDS_MOCK).toBe(true);
+  });
+});
+
+describe("admin part-of-speech mock production policy", () => {
+  it("生产环境开启词性 mock 时 fail closed", async () => {
+    const { assertAdminPartOfSpeechMockAllowed } = await import("./env-flags");
+    expect(() => assertAdminPartOfSpeechMockAllowed(true, true)).toThrow(
+      "仅开发环境或 test mode 构建允许启用 VITE_ADMIN_PART_OF_SPEECH_MOCK"
+    );
+  });
+
+  it("非生产环境、test mode 构建或关闭词性 mock 时允许启动", async () => {
+    const { assertAdminPartOfSpeechMockAllowed } = await import("./env-flags");
+    expect(() => assertAdminPartOfSpeechMockAllowed(true, false)).not.toThrow();
+    expect(() =>
+      assertAdminPartOfSpeechMockAllowed(true, true, "test")
+    ).not.toThrow();
+    expect(() => assertAdminPartOfSpeechMockAllowed(false, true)).not.toThrow();
+  });
+
+  it("优化后的 test mode 构建可显式启用词性 mock", async () => {
+    vi.stubEnv("PROD", true);
+    vi.stubEnv("MODE", "test");
+    vi.stubEnv("VITE_ADMIN_PART_OF_SPEECH_MOCK", "true");
+    vi.resetModules();
+
+    const { env } = await import("./env");
+    expect(env.ADMIN_PART_OF_SPEECH_MOCK).toBe(true);
   });
 });
 

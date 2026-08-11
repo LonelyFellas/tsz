@@ -5,6 +5,7 @@ import { loadEnv } from "vite";
 // 从而把测试配置并入本文件——@ 别名与 plugins 只此一处，避免三处（vite/vitest/tsconfig）漂移。
 import { defineConfig } from "vitest/config";
 import {
+  assertAdminPartOfSpeechMockAllowed,
   assertAdminWordsMockAllowed,
   parseBooleanEnvFlag
 } from "./src/lib/env-flags";
@@ -78,9 +79,15 @@ export default defineConfig(({ mode, command }) => {
     "VITE_ADMIN_WORDS_MOCK",
     !production
   );
+  const adminPartOfSpeechMock = parseBooleanEnvFlag(
+    buildEnv.VITE_ADMIN_PART_OF_SPEECH_MOCK,
+    "VITE_ADMIN_PART_OF_SPEECH_MOCK",
+    !production
+  );
 
   // production mode 禁止携带 mock；仅 tshb-test 的显式 test mode 构建可用于验收。
   assertAdminWordsMockAllowed(adminWordsMock, production, mode);
+  assertAdminPartOfSpeechMockAllowed(adminPartOfSpeechMock, production, mode);
 
   // dev 代理只在启动开发服务器（command === "serve"）时需要；`vite build` 产出的是纯
   // 静态包，不经这个代理，故其相关校验也不应耦合进构建成败——只在 serve 时构建代理。

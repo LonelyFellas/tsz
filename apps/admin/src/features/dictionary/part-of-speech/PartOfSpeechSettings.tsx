@@ -38,12 +38,24 @@ import { SubPartOfSpeechPanel } from "./SubPartOfSpeechDrawer";
 function errorMessage(error: unknown): string {
   if (error instanceof HttpError) {
     if (error.code === "part_of_speech_conflict") return "词性编码或名称已存在";
+    if (error.code === "sub_part_of_speech_conflict")
+      return "细分词性编码或名称已存在";
     if (error.code === "part_of_speech_in_use")
       return "该基本词性已被单词或短语引用，只能修改";
     if (error.code === "sub_part_of_speech_in_use")
       return "该细分词性已被词义引用，只能修改";
     if (error.code === "revision_conflict")
       return "配置已被其他管理员修改，请刷新后重试";
+    if (error.code === "part_of_speech_not_found")
+      return "基本词性不存在或已被删除，请刷新后重试";
+    if (error.code === "sub_part_of_speech_not_found")
+      return "细分词性不存在或已被删除，请刷新后重试";
+    if (error.code === "invalid_part_of_speech")
+      return "词性配置字段不符合要求，请检查后重试";
+    if (error.code === "invalid_request_body")
+      return "提交内容不完整或格式错误，请检查后重试";
+    if (error.code === "invalid_query")
+      return "请求版本或查询参数无效，请刷新后重试";
   }
   return error instanceof Error ? error.message : "操作失败";
 }
@@ -80,7 +92,10 @@ export function PartOfSpeechSettings() {
       cancelText: "取 消",
       onOk: async () => {
         try {
-          await remove.mutateAsync(item.id);
+          await remove.mutateAsync({
+            id: item.id,
+            base_revision: item.revision
+          });
           message.success("基本词性已删除");
         } catch (error) {
           showError(error);

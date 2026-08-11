@@ -119,11 +119,15 @@ describe("part-of-speech mutation hooks", () => {
     await act(() =>
       update.result.current.mutateAsync({ id: "pos-1", input: updateInput })
     );
-    await act(() => remove.result.current.mutateAsync("pos-1"));
+    await act(() =>
+      remove.result.current.mutateAsync({ id: "pos-1", base_revision: 4 })
+    );
 
     expect(source.create).toHaveBeenCalledWith(createInput);
     expect(source.update).toHaveBeenCalledWith("pos-1", updateInput);
-    expect(source.remove).toHaveBeenCalledWith("pos-1");
+    expect(source.remove).toHaveBeenCalledWith("pos-1", {
+      base_revision: 4
+    });
     expect(invalidate).toHaveBeenCalledTimes(3);
     expect(invalidate).toHaveBeenLastCalledWith({
       queryKey: partOfSpeechKeys.all
@@ -160,7 +164,11 @@ describe("part-of-speech mutation hooks", () => {
       })
     );
     await act(() =>
-      remove.result.current.mutateAsync({ partId: "pos-1", subId: "sub-1" })
+      remove.result.current.mutateAsync({
+        partId: "pos-1",
+        subId: "sub-1",
+        base_revision: 5
+      })
     );
 
     expect(source.createSubPart).toHaveBeenCalledWith("pos-1", createInput);
@@ -169,7 +177,9 @@ describe("part-of-speech mutation hooks", () => {
       "sub-1",
       updateInput
     );
-    expect(source.removeSubPart).toHaveBeenCalledWith("pos-1", "sub-1");
+    expect(source.removeSubPart).toHaveBeenCalledWith("pos-1", "sub-1", {
+      base_revision: 5
+    });
     expect(invalidate).toHaveBeenCalledTimes(3);
   });
 });

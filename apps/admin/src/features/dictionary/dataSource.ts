@@ -48,8 +48,11 @@ export const realAdminPartOfSpeechDataSource: AdminPartOfSpeechDataSource =
  * 生产/真实数据源必须明确禁用建议按钮，管理员仍可手工补齐目标方言。
  */
 const adminWordsMockEnabled =
-  env.ADMIN_WORDS_MOCK &&
-  (!import.meta.env.PROD || import.meta.env.MODE === "test");
+  (!import.meta.env.PROD || import.meta.env.MODE === "test") &&
+  env.ADMIN_WORDS_MOCK;
+const adminPartOfSpeechMockEnabled =
+  (!import.meta.env.PROD || import.meta.env.MODE === "test") &&
+  env.ADMIN_PART_OF_SPEECH_MOCK;
 
 export const adminWordsDataSourceCapabilities = Object.freeze({
   dialectVariantSuggestions: adminWordsMockEnabled
@@ -72,19 +75,14 @@ type ClearableAdminWordsDataSource = AdminWordsDataSource & {
 let selectedMock: ClearableAdminWordsDataSource | undefined;
 let selectedMockPromise: Promise<ClearableAdminWordsDataSource> | undefined;
 
-async function resolveAdminWordsDataSource(): Promise<AdminWordsDataSource> {
-  // production mode 下该条件可被 Rollup 静态折叠，mock chunk 不进入正式产物；
-  // tshb-test 使用显式 test mode 构建，保留同一份 contract-shaped mock。
-  if (
-    (import.meta.env.PROD && import.meta.env.MODE !== "test") ||
-    !env.ADMIN_WORDS_MOCK
-  ) {
-    return realAdminWordsDataSource;
-  }
+async function resolveAdminWordsMockRuntime(): Promise<ClearableAdminWordsDataSource> {
   selectedMockPromise ??= import("./mock/adminWordsMock").then(
     ({ createAdminWordsMock }) => {
       selectedMock = createAdminWordsMock({
-        getAdminProfile: () => useAuthStore.getState().profile ?? undefined
+        getAdminProfile: () => useAuthStore.getState().profile ?? undefined,
+        partOfSpeechValidation: adminPartOfSpeechMockEnabled
+          ? "internal"
+          : "external"
       });
       return selectedMock;
     }
@@ -92,19 +90,21 @@ async function resolveAdminWordsDataSource(): Promise<AdminWordsDataSource> {
   return selectedMockPromise;
 }
 
+async function resolveAdminWordsDataSource(): Promise<AdminWordsDataSource> {
+  // production mode 下开关可被 Rollup 静态折叠，mock chunk 不进入正式产物；
+  // tshb-test 使用显式 test mode，仅保留尚未真实对接的 words mock。
+  return adminWordsMockEnabled
+    ? resolveAdminWordsMockRuntime()
+    : realAdminWordsDataSource;
+}
+
 async function resolveAdminPartOfSpeechDataSource(): Promise<AdminPartOfSpeechDataSource> {
-  if (
-    (import.meta.env.PROD && import.meta.env.MODE !== "test") ||
-    !env.ADMIN_WORDS_MOCK
-  ) {
-    return realAdminPartOfSpeechDataSource;
-  }
-  await resolveAdminWordsDataSource();
-  return selectedMock!.partOfSpeechSettings;
+  if (!adminPartOfSpeechMockEnabled) return realAdminPartOfSpeechDataSource;
+  return (await resolveAdminWordsMockRuntime()).partOfSpeechSettings;
 }
 
 // 登出时同步清掉当前管理员的 sessionStorage mock 草稿，避免整页跳转前来不及清理。
-if (adminWordsMockEnabled) {
+if (adminWordsMockEnabled || adminPartOfSpeechMockEnabled) {
   useAuthStore.subscribe((state, previous) => {
     if (previous.profile !== null && state.profile === null) {
       selectedMock?.clearSession?.();
@@ -115,8 +115,8 @@ if (adminWordsMockEnabled) {
 }
 
 /**
- * dictionary 全域唯一数据源 facade。mock 开启时所有 V1/V2 方法延迟加载并复用同一实例，
- * 避免“创建成功但列表仍请求真实后端”的混合状态；生产包不携带 fixture/mock chunk。
+ * words 数据源 facade。启用 mock 时所有 V1/V2 方法延迟加载并复用同一实例；
+ * 生产包不携带 fixture/mock chunk。
  */
 export const adminWordsDataSource: AdminWordsDataSource = {
   list: async (query = {}) => (await resolveAdminWordsDataSource()).list(query),
@@ -151,8 +151,8 @@ export const adminWordsDataSource: AdminWordsDataSource = {
 };
 
 /**
- * 词性配置 facade 与 words facade 共用同一个 mock runtime，确保引用计数和删除保护
- * 读取到刚创建/保存的词条，而不是另一份脱节的内存状态。
+ * 词性配置独立选择真实或 mock。两者都启用 mock 时仍共用同一 runtime；
+ * tshb-test 则保持 words mock、词性真实，真实 usage_count 不包含浏览器 mock 草稿。
  */
 export const partOfSpeechDataSource: AdminPartOfSpeechDataSource = {
   catalog: async () => (await resolveAdminPartOfSpeechDataSource()).catalog(),
@@ -162,7 +162,8 @@ export const partOfSpeechDataSource: AdminPartOfSpeechDataSource = {
     (await resolveAdminPartOfSpeechDataSource()).create(input),
   update: async (id, input) =>
     (await resolveAdminPartOfSpeechDataSource()).update(id, input),
-  remove: async (id) => (await resolveAdminPartOfSpeechDataSource()).remove(id),
+  remove: async (id, query) =>
+    (await resolveAdminPartOfSpeechDataSource()).remove(id, query),
   listSubParts: async (id) =>
     (await resolveAdminPartOfSpeechDataSource()).listSubParts(id),
   createSubPart: async (id, input) =>
@@ -173,6 +174,6 @@ export const partOfSpeechDataSource: AdminPartOfSpeechDataSource = {
       subId,
       input
     ),
-  removeSubPart: async (id, subId) =>
-    (await resolveAdminPartOfSpeechDataSource()).removeSubPart(id, subId)
+  removeSubPart: async (id, subId, query) =>
+    (await resolveAdminPartOfSpeechDataSource()).removeSubPart(id, subId, query)
 };

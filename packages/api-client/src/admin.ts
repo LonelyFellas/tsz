@@ -52,6 +52,7 @@ import type {
   SubPartOfSpeechListResponse,
   CreatePartOfSpeechInput,
   CreateSubPartOfSpeechInput,
+  DeletePartOfSpeechQuery,
   UpdatePartOfSpeechInput,
   UpdateSubPartOfSpeechInput,
   ValidateAdminWordV2Input,
@@ -232,7 +233,7 @@ export function createAdminEndpoints(http: HttpClient) {
     },
     /**
      * 系统设置 → 词性配置。catalog 供全部词条页面只读消费；管理 CRUD 为
-     * super_admin 专属。后端尚未落地，当前由 admin dictionary mock 同形实现。
+     * super_admin 专属。契约已在 tsz-rust 落地。
      */
     partOfSpeechSettings: {
       /** GET /admin/settings/parts-of-speech/catalog — 完整基本/细分词性目录。 */
@@ -255,7 +256,10 @@ export function createAdminEndpoints(http: HttpClient) {
           input
         ),
       /** DELETE /admin/settings/parts-of-speech/{id} — 仅未引用配置可删。 */
-      remove: (id: string) => http.del<void>(`/settings/parts-of-speech/${id}`),
+      remove: (id: string, query: DeletePartOfSpeechQuery) =>
+        http.del<void>(
+          `/settings/parts-of-speech/${id}${qs({ base_revision: query.base_revision })}`
+        ),
       /** GET /admin/settings/parts-of-speech/{id}/sub-parts。 */
       listSubParts: (id: string) =>
         http.get<SubPartOfSpeechListResponse>(
@@ -278,8 +282,14 @@ export function createAdminEndpoints(http: HttpClient) {
           input
         ),
       /** DELETE /admin/settings/parts-of-speech/{id}/sub-parts/{subId}。 */
-      removeSubPart: (id: string, subId: string) =>
-        http.del<void>(`/settings/parts-of-speech/${id}/sub-parts/${subId}`)
+      removeSubPart: (
+        id: string,
+        subId: string,
+        query: DeletePartOfSpeechQuery
+      ) =>
+        http.del<void>(
+          `/settings/parts-of-speech/${id}/sub-parts/${subId}${qs({ base_revision: query.base_revision })}`
+        )
     },
     /**
      * 用户管理：C 端用户（web 学员/教师）的后台目录。当前后端仅列表已落地；
