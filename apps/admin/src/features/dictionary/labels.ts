@@ -18,7 +18,8 @@ export const KIND_OPTIONS = recordToOptions(KIND_LABEL);
 
 export const STATUS_LABEL: Record<AdminWordStatus, string> = {
   draft: "草稿",
-  published: "已发布"
+  published: "已发布",
+  archived: "已归档"
 };
 
 export const STATUS_OPTIONS = recordToOptions(STATUS_LABEL);

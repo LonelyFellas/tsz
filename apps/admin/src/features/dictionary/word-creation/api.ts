@@ -12,6 +12,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminWordsDataSource } from "../dataSource";
 import { wordKeys } from "../api";
 
+type CreateWordV2Command = CreateAdminWordV2Input & {
+  idempotency_key: string;
+};
+type PublishWordV2Command = PublishAdminWordV2Input & {
+  idempotency_key: string;
+};
+
 function useWriteV2Word() {
   const queryClient = useQueryClient();
   return {
@@ -41,8 +48,8 @@ export function useSuggestDialectVariants() {
 export function useCreateWordV2() {
   const cache = useWriteV2Word();
   return useMutation({
-    mutationFn: (input: CreateAdminWordV2Input) =>
-      adminWordsDataSource.createV2(input),
+    mutationFn: ({ idempotency_key, ...input }: CreateWordV2Command) =>
+      adminWordsDataSource.createV2(idempotency_key, input),
     onSuccess: (envelope) => {
       cache.writeDetail(envelope.word.id, envelope);
       void cache.invalidateCollection();
@@ -91,8 +98,8 @@ export function useValidateWordV2(wordId: string) {
 export function usePublishWordV2(wordId: string) {
   const cache = useWriteV2Word();
   return useMutation({
-    mutationFn: (input: PublishAdminWordV2Input) =>
-      adminWordsDataSource.publishV2(wordId, input),
+    mutationFn: ({ idempotency_key, ...input }: PublishWordV2Command) =>
+      adminWordsDataSource.publishV2(wordId, idempotency_key, input),
     onSuccess: (envelope) => {
       cache.writeDetail(wordId, envelope);
       void cache.invalidateCollection();

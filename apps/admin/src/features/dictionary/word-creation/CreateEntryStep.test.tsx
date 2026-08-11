@@ -264,12 +264,12 @@ describe("CreateEntryStep", () => {
     });
     vi.mocked(window.confirm).mockReturnValue(false);
 
-    fireEvent.click(button("取消"));
+    fireEvent.click(button("返回智能词库"));
     await waitFor(() => expect(window.confirm).toHaveBeenCalledTimes(1));
     expect(router.state.location.pathname).toBe("/words/new");
 
     vi.mocked(window.confirm).mockReturnValue(true);
-    fireEvent.click(button("取消"));
+    fireEvent.click(button("返回智能词库"));
     await waitFor(() => expect(router.state.location.pathname).toBe("/words"));
   });
 
@@ -289,7 +289,7 @@ describe("CreateEntryStep", () => {
     await act(async () => pending.resolve(detectionFixture("center")));
     expect(screen.queryByText("内置词典已找到规范词条")).toBeNull();
     expect(screen.getByText("等待检测")).toBeVisible();
-    expect(button("确认并进入词形与发音")).toBeDisabled();
+    expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
   });
 
   it.each([
@@ -305,22 +305,40 @@ describe("CreateEntryStep", () => {
 
     expect(await screen.findByText(reason)).toBeVisible();
     expect(screen.getByText("不可继续")).toBeVisible();
-    expect(button("确认并进入词形与发音")).toBeDisabled();
+    expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
     expect(mutations.create).not.toHaveBeenCalled();
   });
 
-  it("检测为短语时提示使用短语流程并禁止创建单词草稿", async () => {
-    mutations.detect.mockResolvedValue(detectionFixture("in front of"));
-    renderStep();
+  it("未命中内置词典的短语可创建 V2 空白草稿", async () => {
+    const detection = detectionFixture("in front of");
+    const created = {
+      ...wordFixture(),
+      kind: "phrase" as const,
+      headwords: { mode: "unified" as const, common: "in front of" }
+    };
+    mutations.detect.mockResolvedValue(detection);
+    mutations.create.mockResolvedValue({ word: created });
+    const { onCreated } = renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
       target: { value: "in front of" }
     });
     fireEvent.click(button("词典检测"));
 
     expect(
-      await screen.findByText("检测结果为短语，请使用创建短语流程")
+      await screen.findByText("内置词典没有匹配项，将创建空白短语草稿")
     ).toBeVisible();
-    expect(button("确认并进入词形与发音")).toBeDisabled();
+    expect(screen.getByText("可创建")).toBeVisible();
+    expect(button("确认并进入词形与发音")).toBeEnabled();
+    fireEvent.click(button("确认并进入词形与发音"));
+    await waitFor(() =>
+      expect(mutations.create).toHaveBeenCalledWith({
+        schema_version: 2,
+        idempotency_key: expect.any(String),
+        detection_id: detection.detection_id,
+        headwords: { mode: "unified", common: "in front of" }
+      })
+    );
+    expect(onCreated).toHaveBeenCalledWith(created);
   });
 
   it("检测错误保留原输入以便重试", async () => {
@@ -436,7 +454,7 @@ describe("CreateEntryStep", () => {
     expect(
       await screen.findByText("检测结果已过期，请重新检测")
     ).toBeInTheDocument();
-    expect(button("确认并进入词形与发音")).toBeDisabled();
+    expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
   });
 
   it("创建时检测凭证过期会清空结果并提示重新检测", async () => {

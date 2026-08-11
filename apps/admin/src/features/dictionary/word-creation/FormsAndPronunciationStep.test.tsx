@@ -229,7 +229,7 @@ describe("FormsAndPronunciationStep", () => {
     ).toEqual([...originalIds].reverse());
   });
 
-  it("编辑后完成保存并放行到 meanings，提交 revision、operation 与完整 content", async () => {
+  it("编辑后完成保存并放行到 meanings，提交 revision 与干净 content", async () => {
     const word = wordFixture();
     const saved = wordFixture({ revision: 4, max_reachable_step: "meanings" });
     mutations.save.mockResolvedValue({ word: saved });
@@ -248,13 +248,13 @@ describe("FormsAndPronunciationStep", () => {
     expect(mutations.save).toHaveBeenCalledWith(
       expect.objectContaining({
         base_revision: word.revision,
-        operation_id: expect.any(String),
         intent: "complete",
-        confirmed_impact_token: null,
         content: expect.objectContaining({ pos: expect.any(Array) })
       })
     );
     const payload = mutations.save.mock.calls[0]![0];
+    expect(payload).not.toHaveProperty("operation_id");
+    expect(payload).not.toHaveProperty("confirmed_impact_token");
     expect(
       payload.content.pos[0].base_form.variants[0].pronunciations[0].actual_pron
     ).toBe("changed-pronunciation");
@@ -578,7 +578,7 @@ describe("FormsAndPronunciationStep", () => {
     expect(mutations.preview).not.toHaveBeenCalled();
   });
 
-  it("影响确认响应没有 token 时显式以 null 保存", async () => {
+  it("影响确认响应没有 token 时省略 confirmed_impact_token", async () => {
     mutations.preview.mockResolvedValue({
       base_revision: 3,
       requires_confirmation: true,
@@ -593,8 +593,8 @@ describe("FormsAndPronunciationStep", () => {
     ).toBeGreaterThan(0);
     fireEvent.click(button("确认并保存"));
     await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
-    expect(mutations.save).toHaveBeenCalledWith(
-      expect.objectContaining({ confirmed_impact_token: null })
+    expect(mutations.save.mock.calls[0]![0]).not.toHaveProperty(
+      "confirmed_impact_token"
     );
   });
 });

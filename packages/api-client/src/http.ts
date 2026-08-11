@@ -265,13 +265,18 @@ export function createHttpClient({
     post: <T>(
       path: string,
       data?: unknown,
-      opts?: { skipAuth?: boolean; signal?: AbortSignal }
+      opts?: {
+        skipAuth?: boolean;
+        signal?: AbortSignal;
+        headers?: HeadersInit;
+      }
     ) =>
       request<T>(
         path,
         {
           method: "POST",
           body: JSON.stringify(data),
+          ...(opts?.headers ? { headers: opts.headers } : {}),
           ...(opts?.signal ? { signal: opts.signal } : {})
         },
         false,

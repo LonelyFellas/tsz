@@ -52,21 +52,11 @@ const PENDING = new Set<string>([
   "post /admin/auth/logout-all",
   "get /admin/tts/voices",
   "post /admin/tts/previews",
-  "get /admin/words",
-  "get /admin/words/stats",
-  "post /admin/words/detect",
-  "post /admin/words/dialect-variants",
   "post /admin/words",
-  "get /admin/words/_",
   "put /admin/words/_/content",
-  "post /admin/words/_/steps/forms/impact",
-  "put /admin/words/_/steps/forms",
-  "put /admin/words/_/steps/meanings",
-  "post /admin/words/_/validate",
   "post /admin/words/_/publish",
   "delete /admin/words/_",
   "post /admin/words/batch-delete",
-  "get /admin/words/related-search",
   "get /admin/users/_",
   "patch /admin/users/_/status",
   "patch /admin/users/_",
@@ -150,6 +140,37 @@ function inSpec(method: string, path: string): boolean {
 }
 
 describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
+  it("AdminWordV2 发布与生命周期字段的 required/可选性和后端一致", () => {
+    const adminWordV2 = snapshot.schemas.AdminWordV2;
+
+    expect(adminWordV2.required).toContain("has_unpublished_changes");
+    expect(adminWordV2.required).toContain("lifecycle_revision");
+    expect(adminWordV2.required).not.toContain("published_revision");
+    expect(adminWordV2.properties.has_unpublished_changes).toEqual({
+      type: "boolean"
+    });
+    expect(adminWordV2.properties.published_revision).toEqual({
+      type: "integer",
+      format: "int64"
+    });
+    expect(adminWordV2.properties.lifecycle_revision).toEqual({
+      type: "integer",
+      format: "int64"
+    });
+    expect(snapshot.schemas.EntryLifecycleInput.required).toEqual([
+      "base_revision",
+      "base_lifecycle_revision"
+    ]);
+    expect(snapshot.schemas.EntryLifecycleBatchResponse.required).toEqual([
+      "words",
+      "affected"
+    ]);
+    expect(snapshot.schemas.SuggestDialectVariantsResponseV2.required).toEqual([
+      "provider",
+      "suggestions"
+    ]);
+  });
+
   it("每条前端端点要么命中 spec,要么在 PENDING 白名单里(无臆造端点)", () => {
     const orphans = calls
       .map(normalize)

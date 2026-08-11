@@ -1,7 +1,7 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 import { Button, Drawer, Layout, Tooltip } from "antd";
 import { useEffect, useState } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useLocation } from "react-router-dom";
 import { AdminHeader } from "@/features/auth/AdminHeader";
 import { AdminRouteGuard } from "@/features/auth/AdminRouteGuard";
 import { ConsoleSidebar } from "@/features/console/ConsoleSidebar";
@@ -16,6 +16,13 @@ const LG_BREAKPOINT = 992;
 const MD_BREAKPOINT = 768;
 
 type LayoutMode = "full" | "rail" | "drawer";
+
+export function isWordCreationWorkspacePath(pathname: string): boolean {
+  return (
+    pathname === "/words/new" ||
+    /^\/words\/[^/]+\/wizard\/(forms|meanings|preview)$/.test(pathname)
+  );
+}
 
 function modeOf(width: number): LayoutMode {
   if (width < MD_BREAKPOINT) return "drawer";
@@ -41,19 +48,23 @@ function useLayoutMode(): LayoutMode {
 // 受保护的后台壳：门禁守卫 + antd Layout（侧栏 Sider + 顶栏 Header），子路由渲染在 <Outlet/>。
 // Sider 固定不滚动，仅内容区随主体滚动；整壳撑满视口高度。仅登录的 admin 可见。
 export function ConsoleLayout() {
+  const { pathname } = useLocation();
   const mode = useLayoutMode();
   const isDrawer = mode === "drawer";
+  const isWordCreationWorkspace = isWordCreationWorkspacePath(pathname);
   // in-flow 面板收展态（full/rail 生效）：随断点自动同步、两次断点之间可手动覆盖。
-  const [collapsed, setCollapsed] = useState(mode === "rail");
+  const [collapsed, setCollapsed] = useState(
+    mode === "rail" || isWordCreationWorkspace
+  );
   // 手机抽屉开合（drawer 生效）。
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // 跨断点：非手机档把 in-flow 收展同步到该档默认（大屏展开 / 中屏图标轨）；
+  // 跨断点或进入宽编辑工作台时同步默认收展；工作台内仍允许用户手动展开。
   // 进入手机档不再关心 collapsed，离开手机档则关掉抽屉遮罩。
   useEffect(() => {
-    if (!isDrawer) setCollapsed(mode === "rail");
+    if (!isDrawer) setCollapsed(mode === "rail" || isWordCreationWorkspace);
     else setDrawerOpen(false);
-  }, [mode, isDrawer]);
+  }, [mode, isDrawer, isWordCreationWorkspace]);
 
   const toggleLabel = isDrawer
     ? drawerOpen

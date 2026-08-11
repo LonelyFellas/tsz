@@ -123,7 +123,11 @@ describe("V2 word creation React Query hooks", () => {
       await hook.result.current.mutateAsync(input);
     });
 
-    expect(dataSource.createV2).toHaveBeenCalledWith(input);
+    expect(dataSource.createV2).toHaveBeenCalledWith("create-key", {
+      schema_version: 2,
+      detection_id: "detection-center",
+      headwords: word.headwords
+    });
     expect(client.getQueryData(wordKeys.detail(word.id))).toEqual(envelope);
     await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(2));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: wordKeys.lists() });
@@ -146,14 +150,12 @@ describe("V2 word creation React Query hooks", () => {
         method === "saveFormsStep"
           ? {
               base_revision: 3,
-              operation_id: "forms-op",
               intent: "save" as const,
               content: word.forms
             }
           : method === "saveMeaningsStep"
             ? {
                 base_revision: 3,
-                operation_id: "meanings-op",
                 intent: "complete" as const,
                 content: word.meanings
               }
@@ -166,7 +168,15 @@ describe("V2 word creation React Query hooks", () => {
         await hook.result.current.mutateAsync(input as never);
       });
 
-      expect(dataSource[method]).toHaveBeenCalledWith(word.id, input);
+      if (method === "publishV2") {
+        expect(dataSource.publishV2).toHaveBeenCalledWith(
+          word.id,
+          "publish-key",
+          { base_revision: 3 }
+        );
+      } else {
+        expect(dataSource[method]).toHaveBeenCalledWith(word.id, input);
+      }
       expect(client.getQueryData(wordKeys.detail(word.id))).toEqual(envelope);
       await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(2));
       expect(invalidate).toHaveBeenCalledWith({ queryKey: wordKeys.lists() });
@@ -184,7 +194,6 @@ describe("V2 word creation React Query hooks", () => {
       await expect(
         hook.result.current.mutateAsync({
           base_revision: 3,
-          operation_id: "forms-op",
           intent: "save",
           content: { pos: [] }
         })

@@ -1,4 +1,4 @@
-// 从后端权威 spec(tsz-rust/docs/openapi.json)生成一份精简的路径快照,供契约测试对账。
+// 从后端权威 spec(tsz-rust/docs/openapi.json)生成一份精简契约快照,供契约测试对账。
 // tsz-rust 的 spec 由 utoipa 生成:后端 `cargo run --features swagger` 后
 // `curl http://localhost:8383/api-docs/openapi.json -o ../tsz-rust/docs/openapi.json`。
 // 快照只保留 path -> [methods],剥掉 /api/v1 前缀(前端 http baseURL 默认就是 /api/v1)。
@@ -26,6 +26,22 @@ const spec = load(readFileSync(source, "utf8"));
 if (!spec?.paths) {
   throw new Error(`spec 无 paths 字段: ${source}`);
 }
+const adminWordV2 = spec.components?.schemas?.AdminWordV2;
+if (!adminWordV2?.required || !adminWordV2?.properties) {
+  throw new Error(`spec 无 components.schemas.AdminWordV2: ${source}`);
+}
+const lifecycleSchemaNames = [
+  "EntryLifecycleInput",
+  "EntryLifecycleTarget",
+  "EntryLifecycleBatchInput",
+  "EntryLifecycleBatchResponse",
+  "SuggestDialectVariantsResponseV2"
+];
+for (const name of lifecycleSchemaNames) {
+  if (!spec.components?.schemas?.[name]) {
+    throw new Error(`spec 无 components.schemas.${name}: ${source}`);
+  }
+}
 
 const paths = {};
 for (const [rawPath, item] of Object.entries(spec.paths)) {
@@ -42,10 +58,27 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
 const snapshot = {
   // 仅供人读:这份快照是从哪生成的、何时。契约测试不依赖这些字段。
   _note:
-    "AUTO-GENERATED from backend openapi.yaml via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
+    "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   _source: source,
   _generatedAt: new Date().toISOString(),
-  paths
+  paths,
+  schemas: {
+    AdminWordV2: {
+      required: adminWordV2.required,
+      properties: {
+        status: adminWordV2.properties.status,
+        revision: adminWordV2.properties.revision,
+        lifecycle_revision: adminWordV2.properties.lifecycle_revision,
+        archived_at: adminWordV2.properties.archived_at,
+        archived_by: adminWordV2.properties.archived_by,
+        published_revision: adminWordV2.properties.published_revision,
+        has_unpublished_changes: adminWordV2.properties.has_unpublished_changes
+      }
+    },
+    ...Object.fromEntries(
+      lifecycleSchemaNames.map((name) => [name, spec.components.schemas[name]])
+    )
+  }
 };
 
 writeFileSync(out, await format(JSON.stringify(snapshot), { parser: "json" }));

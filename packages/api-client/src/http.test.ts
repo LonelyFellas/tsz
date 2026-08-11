@@ -639,12 +639,19 @@ describe("createHttpClient", () => {
   it("init.headers 可覆盖/追加请求头", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
-    await http.post("/x", { a: 1 });
+    await http.post(
+      "/x",
+      { a: 1 },
+      {
+        headers: { "Idempotency-Key": "command-1" }
+      }
+    );
     const headers = fetchMock.mock.calls[0]![1].headers as Record<
       string,
       string
     >;
     expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers["Idempotency-Key"]).toBe("command-1");
   });
 
   it("skipAuth 时不附加 Authorization（即使有 token）", async () => {
@@ -681,7 +688,7 @@ describe("createHttpClient", () => {
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it("401 有 token 时触发 onRefresh 并重试", async () => {
+  it("401 有 token 时触发 onRefresh，并在重试中保留幂等头", async () => {
     fetchMock
       .mockResolvedValueOnce(
         jsonResponse(
@@ -697,16 +704,33 @@ describe("createHttpClient", () => {
       )
       .mockResolvedValueOnce(jsonResponse({ id: "1" }));
 
-    const onRefresh = vi.fn().mockResolvedValue("new-token");
+    let token = "old-token";
+    const onRefresh = vi.fn().mockImplementation(async () => {
+      token = "new-token";
+      return token;
+    });
     const http = createHttpClient({
       baseUrl: "",
-      getToken: () => "old-token",
+      getToken: () => token,
       onRefresh
     });
 
-    const data = await http.get("/me");
+    const data = await http.post(
+      "/lexicon/entries",
+      { schema_version: 2 },
+      { headers: { "Idempotency-Key": "command-2" } }
+    );
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(data).toEqual({ id: "1" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [, init] of fetchMock.mock.calls) {
+      const headers = init.headers as Record<string, string>;
+      expect(headers["Idempotency-Key"]).toBe("command-2");
+    }
+    expect(
+      (fetchMock.mock.calls[1]![1].headers as Record<string, string>)
+        .Authorization
+    ).toBe("Bearer new-token");
   });
 
   it("RFC 9457 的 403 触发 onForbidden(code) 且仍抛 HttpError", async () => {

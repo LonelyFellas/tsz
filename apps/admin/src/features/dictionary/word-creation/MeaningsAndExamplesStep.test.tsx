@@ -50,6 +50,12 @@ const relatedWords = vi.hoisted(() => [
     headword: "far",
     kind: "word" as const,
     senses: [{ sense_id: "fixture-far-sense", gloss: "远的" }]
+  },
+  {
+    word_id: "fixture-blank",
+    headword: "blank",
+    kind: "word" as const,
+    senses: [{ sense_id: "fixture-blank-sense", gloss: "" }]
   }
 ]);
 
@@ -170,6 +176,22 @@ async function selectInlineRelatedWord(
   );
   if (!option)
     throw new Error(`inline related word option not found: ${headword}`);
+  fireEvent.mouseDown(option);
+  fireEvent.click(option);
+}
+
+async function selectContextTarget(
+  search: HTMLElement,
+  query: string,
+  label: string
+) {
+  fireEvent.focus(search);
+  fireEvent.change(search, { target: { value: query } });
+  const options = await screen.findAllByText(label, { exact: true });
+  const option = options.find((item) =>
+    item.closest(".ant-select-item-option")
+  );
+  if (!option) throw new Error(`context target option not found: ${label}`);
   fireEvent.mouseDown(option);
   fireEvent.click(option);
 }
@@ -371,7 +393,7 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("语法结构 1", { exact: true })).toBeNull();
   });
 
-  it("词义头部始终同步第一条释义的当前方言输入内容", () => {
+  it("词义头部同步当前方言输入，并在编辑后保留文本节点 ID", async () => {
     const word = wordFixture({ ready: true });
     if (word.headwords.mode !== "distinguish") {
       throw new Error("fixture should distinguish English dialects");
@@ -390,11 +412,19 @@ describe("MeaningsAndExamplesStep", () => {
       source_dialect: "us",
       uk: {
         state: "ready",
-        variant: { value: richText("British first"), origin: "manual" }
+        variant: {
+          id: "first-definition-uk",
+          value: richText("British first"),
+          origin: "manual"
+        }
       },
       us: {
         state: "ready",
-        variant: { value: richText("American first"), origin: "manual" }
+        variant: {
+          id: "first-definition-us",
+          value: richText("American first"),
+          origin: "manual"
+        }
       }
     } satisfies EnglishTextV2;
     renderStep(word);
@@ -417,6 +447,16 @@ describe("MeaningsAndExamplesStep", () => {
     expect(
       screen.getByText("1. British changed", { exact: true })
     ).toBeVisible();
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const savedDefinition =
+      mutations.save.mock.calls[0]![0].content.pos[0].senses[0].definitions[0];
+    expect(savedDefinition.content).toMatchObject({
+      mode: "distinguish",
+      uk: { state: "ready", variant: { id: "first-definition-uk" } },
+      us: { state: "ready", variant: { id: "first-definition-us" } }
+    });
   });
 
   it("语法结构方言输入提供获取和上传语音操作", async () => {
@@ -532,6 +572,10 @@ describe("MeaningsAndExamplesStep", () => {
         ...structuredClone(firstDefinition),
         id: "definition-drag-second",
         definition_mode: "zh_definition" as const,
+        content_id:
+          "content_id" in firstDefinition
+            ? `${firstDefinition.content_id}-second`
+            : "definition-drag-second-content",
         content: {
           version: 1,
           text: "second definition",
@@ -602,8 +646,9 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("及物动词", { exact: true })).toBeNull();
   });
 
-  it("编辑后完成保存并放行到 preview，提交 revision、operation 与完整 content", async () => {
+  it("编辑后完成保存并放行到 preview，提交 revision 与干净 content", async () => {
     const word = wordFixture({ ready: true });
+    const originalContentId = word.meanings.pos[0]!.senses[0]!.definitions[0]!;
     const saved = wordFixture({
       ready: true,
       revision: 4,
@@ -620,7 +665,6 @@ describe("MeaningsAndExamplesStep", () => {
     expect(mutations.save).toHaveBeenCalledWith(
       expect.objectContaining({
         base_revision: word.revision,
-        operation_id: expect.any(String),
         intent: "complete",
         content: expect.objectContaining({
           sense_groups: expect.any(Array),
@@ -629,8 +673,14 @@ describe("MeaningsAndExamplesStep", () => {
       })
     );
     const payload = mutations.save.mock.calls[0]![0];
+    expect(payload).not.toHaveProperty("operation_id");
     expect(payload.content.pos[0].senses[0].definitions[0].content.text).toBe(
       "用户修改后的中文释义"
+    );
+    expect(payload.content.pos[0].senses[0].definitions[0].content_id).toBe(
+      "content_id" in originalContentId
+        ? originalContentId.content_id
+        : undefined
     );
     expect(onSaved).toHaveBeenCalledWith(saved);
     await waitFor(() =>
@@ -874,14 +924,13 @@ describe("MeaningsAndExamplesStep", () => {
     await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
     const relation =
       mutations.save.mock.calls[0]![0].content.pos[0].senses[0].relations[0];
-    expect(relation).toEqual(
-      expect.objectContaining({
-        target_word_id: "fixture-far",
-        target_sense_id: "fixture-far-sense",
-        target_headword: "far",
-        target_gloss: "远的"
-      })
-    );
+    expect(relation).toEqual({
+      id: "relation-selected",
+      relation: "synonym",
+      target_word_id: "fixture-far",
+      target_sense_id: "fixture-far-sense",
+      score: "90"
+    });
   });
 
   it("完成前执行客户端完整性校验，不向后端提交不完整 meanings", async () => {
@@ -912,6 +961,59 @@ describe("MeaningsAndExamplesStep", () => {
     expect(added.sentences[0].links).toEqual([
       { word_id: word.id, sense_id: added.id, role: "focus" }
     ]);
+  });
+
+  it("上下文关联只能选择具体词义，并以完整 word_id 与 sense_id 保存", async () => {
+    renderStep(wordFixture({ ready: true }));
+
+    await selectContextTarget(
+      screen.getAllByLabelText("搜索并添加上下文关联")[0]!,
+      "colour",
+      "colour · 颜色"
+    );
+
+    expect(screen.getAllByLabelText("上下文词条 ID")[0]).toHaveValue(
+      "fixture-colour"
+    );
+    expect(screen.getAllByLabelText("上下文词义 ID")[0]).toHaveValue(
+      "fixture-colour-sense"
+    );
+
+    await selectContextTarget(
+      screen.getAllByLabelText("搜索并添加上下文关联")[0]!,
+      "colour",
+      "colour · 颜色"
+    );
+    expect(screen.getAllByLabelText("上下文词条 ID")).toHaveLength(1);
+
+    await selectContextTarget(
+      screen.getAllByLabelText("搜索并添加上下文关联")[0]!,
+      "blank",
+      "blank · （无释义）"
+    );
+    expect(screen.getAllByLabelText("上下文词条 ID")).toHaveLength(2);
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const links =
+      mutations.save.mock.calls[0]![0].content.pos[0].senses[0].sentences[0]
+        .links;
+    expect(links).toContainEqual({
+      word_id: "fixture-colour",
+      sense_id: "fixture-colour-sense",
+      role: "context"
+    });
+    expect(links).toContainEqual({
+      word_id: "fixture-blank",
+      sense_id: "fixture-blank-sense",
+      role: "context"
+    });
+    expect(links).not.toContainEqual(
+      expect.objectContaining({ word_id: "", role: "context" })
+    );
+    expect(links).not.toContainEqual(
+      expect.objectContaining({ sense_id: "", role: "context" })
+    );
   });
 
   it("T60 全局选择默认跟随源方言，只切换展示且完整目标不发请求", () => {
@@ -975,6 +1077,7 @@ describe("MeaningsAndExamplesStep", () => {
         us: {
           state: "ready",
           variant: {
+            id: "english-definition-us",
             origin: "manual",
             value: {
               version: 1,
@@ -1308,13 +1411,17 @@ describe("MeaningsAndExamplesStep", () => {
     fireEvent.change(translations.at(-1)!, {
       target: { value: "新增例句译文" }
     });
-    fireEvent.click(enabledButton("添加上下文关联"));
-    fireEvent.change(screen.getAllByLabelText("上下文词条 ID").at(-1)!, {
-      target: { value: "context-word" }
-    });
-    fireEvent.change(screen.getAllByLabelText("上下文词义 ID").at(-1)!, {
-      target: { value: "context-sense" }
-    });
+    await selectContextTarget(
+      screen.getAllByLabelText("搜索并添加上下文关联").at(-1)!,
+      "colour",
+      "colour · 颜色"
+    );
+    expect(screen.getAllByLabelText("上下文词条 ID").at(-1)).toHaveValue(
+      "fixture-colour"
+    );
+    expect(screen.getAllByLabelText("上下文词义 ID").at(-1)).toHaveValue(
+      "fixture-colour-sense"
+    );
     fireEvent.click(screen.getByLabelText("删除上下文关联 1"));
     fireEvent.keyDown(await screen.findByLabelText("拖动例句 2"), {
       key: "ArrowUp"
@@ -1395,6 +1502,7 @@ describe("MeaningsAndExamplesStep", () => {
       uk: {
         state: "ready",
         variant: {
+          id: "voice-definition-uk",
           value: {
             version: 1,
             text: "British definition",
@@ -1407,6 +1515,7 @@ describe("MeaningsAndExamplesStep", () => {
       us: {
         state: "ready",
         variant: {
+          id: "voice-definition-us",
           value: {
             version: 1,
             text: "American definition",
@@ -1557,6 +1666,7 @@ describe("MeaningsAndExamplesStep", () => {
             us: {
               state: "ready",
               variant: {
+                id: "english-definition-us",
                 origin: "manual",
                 value: {
                   version: 1,

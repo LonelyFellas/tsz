@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  EntryLifecycleBatchInput,
+  EntryLifecycleInput,
   PreviewFormsImpactInputV2,
   PublishAdminWordV2Input,
   SaveFormsStepInput,
@@ -127,10 +129,10 @@ describe("createAdminEndpoints — TTS 试听", () => {
 });
 
 describe("createAdminEndpoints — 智能词库 words", () => {
-  it("list 无参 → GET /words(不带 ?)", () => {
+  it("list 无参 → GET /lexicon/entries(不带 ?)", () => {
     const api = createAdminEndpoints(http);
     api.words.list();
-    expect(http.get).toHaveBeenCalledWith("/words");
+    expect(http.get).toHaveBeenCalledWith("/lexicon/entries");
   });
 
   it("list 带筛选 → 仅非空参数进 query,值经 URL 编码", () => {
@@ -147,7 +149,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     });
     const [path] = http.get.mock.calls[0] as [string];
     const sp = new URLSearchParams(path.split("?")[1]);
-    expect(path.startsWith("/words?")).toBe(true);
+    expect(path.startsWith("/lexicon/entries?")).toBe(true);
     expect(sp.get("page")).toBe("2");
     expect(sp.get("page_size")).toBe("50");
     expect(sp.get("q")).toBe("take off");
@@ -159,23 +161,23 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(sp.has("gloss")).toBe(false);
   });
 
-  it("stats → GET /words/stats", () => {
+  it("stats → GET /lexicon/entries/stats", () => {
     const api = createAdminEndpoints(http);
     api.words.stats();
-    expect(http.get).toHaveBeenCalledWith("/words/stats");
+    expect(http.get).toHaveBeenCalledWith("/lexicon/entries/stats");
   });
 
-  it("detect → POST /words/detect 原样透传语言与待检测词头", () => {
+  it("detect → POST /lexicon/detections 原样透传语言与待检测词头", () => {
     const api = createAdminEndpoints(http);
     const input = {
       language: "en" as const,
       headword: "center"
     };
     api.words.detect(input);
-    expect(http.post).toHaveBeenCalledWith("/words/detect", input);
+    expect(http.post).toHaveBeenCalledWith("/lexicon/detections", input);
   });
 
-  it("suggestDialectVariants → POST /words/dialect-variants 原样透传建议项", () => {
+  it("suggestDialectVariants → POST /lexicon/dialect-variant-suggestions 原样透传建议项", () => {
     const api = createAdminEndpoints(http);
     const input: SuggestDialectVariantsInputV2 = {
       source_dialect: "uk",
@@ -183,7 +185,10 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       items: [{ client_id: "form-1", field_kind: "form", value: "centre" }]
     };
     api.words.suggestDialectVariants(input);
-    expect(http.post).toHaveBeenCalledWith("/words/dialect-variants", input);
+    expect(http.post).toHaveBeenCalledWith(
+      "/lexicon/dialect-variant-suggestions",
+      input
+    );
   });
 
   it("create → POST /words 带 headword + kind", () => {
@@ -195,11 +200,10 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     });
   });
 
-  it("createV2 → POST /words 带 schema、幂等键、detection 与确认词头", () => {
+  it("createV2 → POST /lexicon/entries，幂等键只进 header", () => {
     const api = createAdminEndpoints(http);
     const input = {
       schema_version: 2 as const,
-      idempotency_key: "op-create-1",
       detection_id: "det-1",
       headwords: {
         mode: "distinguish" as const,
@@ -208,14 +212,16 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         source_dialect: "us" as const
       }
     };
-    api.words.createV2(input);
-    expect(http.post).toHaveBeenCalledWith("/words", input);
+    api.words.createV2("op-create-1", input);
+    expect(http.post).toHaveBeenCalledWith("/lexicon/entries", input, {
+      headers: { "Idempotency-Key": "op-create-1" }
+    });
   });
 
-  it("get → GET /words/{id}", () => {
+  it("get → GET /lexicon/entries/{id}", () => {
     const api = createAdminEndpoints(http);
     api.words.get("w-1");
-    expect(http.get).toHaveBeenCalledWith("/words/w-1");
+    expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-1");
   });
 
   it("saveContent → PUT /words/{id}/content 原样透传保存树", () => {
@@ -232,7 +238,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.put).toHaveBeenCalledWith("/words/w-1/content", input);
   });
 
-  it("previewFormsImpact → POST /words/{id}/steps/forms/impact", () => {
+  it("previewFormsImpact → POST /lexicon/entries/{id}/steps/forms/impact", () => {
     const api = createAdminEndpoints(http);
     const input: PreviewFormsImpactInputV2 = {
       base_revision: 3,
@@ -240,40 +246,44 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     };
     api.words.previewFormsImpact("w-2", input);
     expect(http.post).toHaveBeenCalledWith(
-      "/words/w-2/steps/forms/impact",
+      "/lexicon/entries/w-2/steps/forms/impact",
       input
     );
   });
 
-  it("saveFormsStep → PUT /words/{id}/steps/forms 原样透传分步保存输入", () => {
+  it("saveFormsStep → PUT /lexicon/entries/{id}/steps/forms 且缺省确认 token", () => {
     const api = createAdminEndpoints(http);
     const input: SaveFormsStepInput = {
       base_revision: 3,
-      operation_id: "op-forms-1",
       intent: "save",
-      confirmed_impact_token: null,
       content: { pos: [] }
     };
     api.words.saveFormsStep("w-2", input);
-    expect(http.put).toHaveBeenCalledWith("/words/w-2/steps/forms", input);
+    expect(input).not.toHaveProperty("confirmed_impact_token");
+    expect(http.put).toHaveBeenCalledWith(
+      "/lexicon/entries/w-2/steps/forms",
+      input
+    );
   });
 
-  it("saveMeaningsStep → PUT /words/{id}/steps/meanings 原样透传分步保存输入", () => {
+  it("saveMeaningsStep → PUT /lexicon/entries/{id}/steps/meanings", () => {
     const api = createAdminEndpoints(http);
     const input: SaveMeaningsStepInput = {
       base_revision: 4,
-      operation_id: "op-meanings-1",
       intent: "complete",
       content: { sense_groups: [], pos: [] }
     };
     api.words.saveMeaningsStep("w-2", input);
-    expect(http.put).toHaveBeenCalledWith("/words/w-2/steps/meanings", input);
+    expect(http.put).toHaveBeenCalledWith(
+      "/lexicon/entries/w-2/steps/meanings",
+      input
+    );
   });
 
-  it("validateV2 → POST /words/{id}/validate 带 base_revision", () => {
+  it("validateV2 → POST /lexicon/entries/{id}/validate 带 base_revision", () => {
     const api = createAdminEndpoints(http);
     api.words.validateV2("w-2", { base_revision: 5 });
-    expect(http.post).toHaveBeenCalledWith("/words/w-2/validate", {
+    expect(http.post).toHaveBeenCalledWith("/lexicon/entries/w-2/validate", {
       base_revision: 5
     });
   });
@@ -284,14 +294,46 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.post).toHaveBeenCalledWith("/words/w-1/publish");
   });
 
-  it("publishV2 → POST /words/{id}/publish 带 revision 与幂等键", () => {
+  it("publishV2 → POST /lexicon/entries/{id}/publications，幂等键只进 header", () => {
     const api = createAdminEndpoints(http);
     const input: PublishAdminWordV2Input = {
-      base_revision: 5,
-      idempotency_key: "op-publish-1"
+      base_revision: 5
     };
-    api.words.publishV2("w-2", input);
-    expect(http.post).toHaveBeenCalledWith("/words/w-2/publish", input);
+    api.words.publishV2("w-2", "op-publish-1", input);
+    expect(http.post).toHaveBeenCalledWith(
+      "/lexicon/entries/w-2/publications",
+      input,
+      { headers: { "Idempotency-Key": "op-publish-1" } }
+    );
+  });
+
+  it.each([
+    ["archive", "/lexicon/entries/w-2/archive"],
+    ["restore", "/lexicon/entries/w-2/restore"]
+  ] as const)("%s → lifecycle body 与幂等键分离", (method, path) => {
+    const api = createAdminEndpoints(http);
+    const input: EntryLifecycleInput = {
+      base_revision: 5,
+      base_lifecycle_revision: 2
+    };
+    api.words[method]("w-2", `${method}-key`, input);
+    expect(http.post).toHaveBeenCalledWith(path, input, {
+      headers: { "Idempotency-Key": `${method}-key` }
+    });
+  });
+
+  it.each([
+    ["archiveBatch", "/lexicon/entries/archive-batch"],
+    ["restoreBatch", "/lexicon/entries/restore-batch"]
+  ] as const)("%s → 原子批量 body 与幂等键分离", (method, path) => {
+    const api = createAdminEndpoints(http);
+    const input: EntryLifecycleBatchInput = {
+      entries: [{ id: "w-2", base_revision: 5, base_lifecycle_revision: 2 }]
+    };
+    api.words[method](`${method}-key`, input);
+    expect(http.post).toHaveBeenCalledWith(path, input, {
+      headers: { "Idempotency-Key": `${method}-key` }
+    });
   });
 
   it("remove → DELETE /words/{id}", () => {
@@ -311,15 +353,17 @@ describe("createAdminEndpoints — 智能词库 words", () => {
   it("relatedSearch 不带可选项 → 只有 q 进 query", () => {
     const api = createAdminEndpoints(http);
     api.words.relatedSearch("big");
-    expect(http.get).toHaveBeenCalledWith("/words/related-search?q=big");
+    expect(http.get).toHaveBeenCalledWith(
+      "/lexicon/entries/related-search?q=big"
+    );
   });
 
-  it("relatedSearch → GET /words/related-search 带 q/kind/limit", () => {
+  it("relatedSearch → GET /lexicon/entries/related-search 带 q/kind/limit", () => {
     const api = createAdminEndpoints(http);
     api.words.relatedSearch("big", { kind: "word", limit: 10 });
     const [path] = http.get.mock.calls[0] as [string];
     const sp = new URLSearchParams(path.split("?")[1]);
-    expect(path.startsWith("/words/related-search?")).toBe(true);
+    expect(path.startsWith("/lexicon/entries/related-search?")).toBe(true);
     expect(sp.get("q")).toBe("big");
     expect(sp.get("kind")).toBe("word");
     expect(sp.get("limit")).toBe("10");

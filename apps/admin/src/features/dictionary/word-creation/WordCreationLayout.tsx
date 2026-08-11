@@ -102,7 +102,7 @@ function ProgressSummary({ word }: { word?: AdminWordV2 }) {
     { label: "多维例句", value: sentenceCount }
   ];
   return (
-    <Flex vertical gap={13}>
+    <Flex vertical gap={13} className="word-creation-progress-list">
       {rows.map((row, index) => {
         const done =
           index === 0
@@ -133,6 +133,7 @@ export function WordCreationLayout({
 }: Props) {
   const navigate = useNavigate();
   const currentIndex = WORD_STEP_ORDER.indexOf(currentStep);
+  const isBasicsStep = currentStep === "basics";
   const maxReachableIndex = word
     ? WORD_STEP_ORDER.indexOf(word.max_reachable_step)
     : 0;
@@ -167,7 +168,9 @@ export function WordCreationLayout({
         ]}
       />
 
-      <section className="word-creation-stepper">
+      <section
+        className={`word-creation-stepper${isBasicsStep ? " word-creation-stepper--basics" : ""}`}
+      >
         <Steps
           className="word-creation-steps"
           current={currentIndex}
@@ -177,46 +180,54 @@ export function WordCreationLayout({
         />
       </section>
 
-      <div className="word-creation-shell">
-        <aside className="word-creation-summary">
-          <Button
-            type="text"
-            icon={<LeftOutlined />}
-            onClick={() => navigate("/words")}
-            className="word-creation-back"
-          >
-            返回智能词库
-          </Button>
+      <div
+        className={`word-creation-shell${isBasicsStep ? " word-creation-shell--basics" : ""}`}
+      >
+        {!isBasicsStep && (
+          <aside className="word-creation-summary">
+            <Button
+              type="text"
+              icon={<LeftOutlined />}
+              onClick={() => navigate("/words")}
+              className="word-creation-back"
+            >
+              返回智能词库
+            </Button>
 
-          <div className="word-summary-entry-card">
-            <Typography.Text type="secondary" className="word-summary-kicker">
-              当前词条
-            </Typography.Text>
-            <HeadwordSummary headwords={word?.headwords ?? draftHeadwords} />
+            <div className="word-summary-entry-card">
+              <Typography.Text type="secondary" className="word-summary-kicker">
+                当前词条
+              </Typography.Text>
+              <HeadwordSummary headwords={word?.headwords ?? draftHeadwords} />
 
-            <div className="word-summary-language">
-              <Typography.Text type="secondary">所属语言</Typography.Text>
-              <strong>English&nbsp; 英语</strong>
+              <div className="word-summary-language">
+                <Typography.Text type="secondary">所属语言</Typography.Text>
+                <strong>English&nbsp; 英语</strong>
+              </div>
+
+              {word?.status === "published" && (
+                <Tag color="success" style={{ alignSelf: "flex-start" }}>
+                  已发布 · 只读
+                </Tag>
+              )}
             </div>
 
-            {word?.status === "published" && (
-              <Tag color="success" style={{ alignSelf: "flex-start" }}>
-                已发布 · 只读
-              </Tag>
-            )}
-          </div>
+            <div className="word-summary-divider" />
+            <div className="word-summary-progress-title">
+              <Typography.Text type="secondary" className="word-summary-kicker">
+                完成情况
+              </Typography.Text>
+              <Tag bordered={false}>实时</Tag>
+            </div>
+            <ProgressSummary word={word} />
+          </aside>
+        )}
 
-          <div className="word-summary-divider" />
-          <div className="word-summary-progress-title">
-            <Typography.Text type="secondary" className="word-summary-kicker">
-              完成情况
-            </Typography.Text>
-            <Tag bordered={false}>实时</Tag>
-          </div>
-          <ProgressSummary word={word} />
-        </aside>
-
-        <main className="word-creation-content">{children}</main>
+        <main
+          className={`word-creation-content${isBasicsStep ? " word-creation-content--basics" : ""}`}
+        >
+          {children}
+        </main>
       </div>
     </div>
   );

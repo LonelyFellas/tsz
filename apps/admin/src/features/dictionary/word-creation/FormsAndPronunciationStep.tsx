@@ -38,14 +38,7 @@ import type {
   WordPronunciationV2
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client/http";
-import {
-  Fragment,
-  type DragEvent,
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from "react";
+import { Fragment, type DragEvent, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   DIALECT_LABEL,
@@ -75,7 +68,8 @@ import {
   createFormGroup,
   createPosForms,
   createPronunciation,
-  formDialects
+  formDialects,
+  toFormsWireContent
 } from "./model";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import {
@@ -1335,6 +1329,7 @@ function hasCompleteBase(pos: WordPosFormsV2): boolean {
 export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  const editQuery = word.status === "published" ? "?mode=edit" : "";
   const [content, setContent] = useState<DraftFormsStepContent>(() =>
     cloneWordValue(word.forms)
   );
@@ -1344,7 +1339,6 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const issueTarget = useWordValidationIssue();
-  const operationId = useRef(newWordNodeId());
   const saveForms = useSaveFormsStep(word.id);
   const previewImpact = usePreviewFormsImpact(word.id);
   const suggestVariants = useSuggestDialectVariants();
@@ -1403,7 +1397,6 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   }, [dirty, word.forms, word.revision]);
 
   const updateContent = (next: DraftFormsStepContent) => {
-    operationId.current = newWordNodeId();
     setContent(next);
     setDirty(true);
   };
@@ -1498,27 +1491,26 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
 
     setSaving(true);
     try {
+      const wireContent = toFormsWireContent(content);
       const impact = await previewImpact.mutateAsync({
         base_revision: word.revision,
-        content
+        content: wireContent
       });
-      let confirmedToken: string | null = null;
+      let confirmedToken: string | undefined;
       if (impact.requires_confirmation) {
         const confirmed = await confirmImpact(
           "本次修改会影响后续内容",
           impact.affected.map((item) => item.reason).join("；")
         );
         if (!confirmed) return;
-        confirmedToken = impact.confirmation_token ?? null;
+        confirmedToken = impact.confirmation_token;
       }
       const { word: savedWord } = await saveForms.mutateAsync({
         base_revision: word.revision,
-        operation_id: operationId.current,
         intent,
-        confirmed_impact_token: confirmedToken,
-        content
+        ...(confirmedToken ? { confirmed_impact_token: confirmedToken } : {}),
+        content: wireContent
       });
-      operationId.current = newWordNodeId();
       setDirty(false);
       onSaved(savedWord);
       message.success(
@@ -1526,7 +1518,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
       );
       if (intent === "complete") {
         allowSavedNavigation();
-        navigate(`/words/${word.id}/wizard/meanings`);
+        navigate(`/words/${word.id}/wizard/meanings${editQuery}`);
       }
     } catch (error) {
       if (error instanceof HttpError) {
@@ -1535,7 +1527,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
         );
         if (issue) {
           message.warning(issue.message);
-          navigate(`/words/${word.id}/wizard/forms`, {
+          navigate(`/words/${word.id}/wizard/forms${editQuery}`, {
             replace: true,
             state: { nodeId: issue.node_id, field: issue.field }
           });
@@ -1681,7 +1673,11 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
 
         {!readOnly && (
           <div className="word-step-actions">
-            <Button onClick={() => navigate(`/words/${word.id}/wizard/basics`)}>
+            <Button
+              onClick={() =>
+                navigate(`/words/${word.id}/wizard/basics${editQuery}`)
+              }
+            >
               上一步
             </Button>
             <Button loading={saving} onClick={() => void save("save")}>

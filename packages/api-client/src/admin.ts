@@ -30,6 +30,9 @@ import type {
   DetectWordInputV2,
   DetectWordResponseV2,
   DraftValidationResponse,
+  EntryLifecycleBatchInput,
+  EntryLifecycleBatchResponse,
+  EntryLifecycleInput,
   PreviewFormsImpactInputV2,
   PreviewFormsImpactResponseV2,
   PublishAdminWordV2Input,
@@ -162,29 +165,31 @@ export function createAdminEndpoints(http: HttpClient) {
      * 树内节点 id 由前端生成（UUID v4）且跨保存稳定，updated_at 兼作乐观锁 token。
      */
     words: {
-      /** GET /admin/words — 列表页：搜索行筛选 + 分页。 */
+      /** GET /admin/lexicon/entries — 列表页：搜索行筛选 + 分页。 */
       list: (query: AdminWordListQuery = {}) =>
-        http.get<AdminWordListResponse>(`/words${qs({ ...query })}`),
-      /** GET /admin/words/stats — 头部计数（累计 / 今日 / 本月，按 Asia/Shanghai）。 */
-      stats: () => http.get<AdminWordStats>("/words/stats"),
-      /** POST /admin/words/detect — 创建 V2 草稿前执行内置词典与智能词库检测。 */
+        http.get<AdminWordListResponse>(`/lexicon/entries${qs({ ...query })}`),
+      /** GET /admin/lexicon/entries/stats — 头部计数（累计 / 今日 / 本月）。 */
+      stats: () => http.get<AdminWordStats>("/lexicon/entries/stats"),
+      /** POST /admin/lexicon/detections — 创建 V2 草稿前执行内置词典与智能词库检测。 */
       detect: (input: DetectWordInputV2) =>
-        http.post<DetectWordResponseV2>("/words/detect", input),
-      /** POST /admin/words/dialect-variants — 获取方言转换建议，不直接落盘。 */
+        http.post<DetectWordResponseV2>("/lexicon/detections", input),
+      /** POST /admin/lexicon/dialect-variant-suggestions — 获取 evidence-backed 方言建议。 */
       suggestDialectVariants: (input: SuggestDialectVariantsInputV2) =>
         http.post<SuggestDialectVariantsResponseV2>(
-          "/words/dialect-variants",
+          "/lexicon/dialect-variant-suggestions",
           input
         ),
       /** POST /admin/words — 创建草稿壳；409 = 同 kind 下 headword 已存在（忽略大小写）。 */
       create: (input: AdminWordCreateInput) =>
         http.post<AdminWordEnvelope>("/words", input),
-      /** POST /admin/words — 由有效 detection 幂等创建 V2 canonical 草稿。 */
-      createV2: (input: CreateAdminWordV2Input) =>
-        http.post<AdminWordV2Envelope>("/words", input),
-      /** GET /admin/words/{id} — 兼容加载 V1 legacy 与 V2 canonical 词条。 */
+      /** POST /admin/lexicon/entries — 由有效 detection 幂等创建 V2 canonical 草稿。 */
+      createV2: (idempotencyKey: string, input: CreateAdminWordV2Input) =>
+        http.post<AdminWordV2Envelope>("/lexicon/entries", input, {
+          headers: { "Idempotency-Key": idempotencyKey }
+        }),
+      /** GET /admin/lexicon/entries/{id} — 加载 V2 canonical 词条。 */
       get: (wordId: string) =>
-        http.get<AdminWordAnyEnvelope>(`/words/${wordId}`),
+        http.get<AdminWordAnyEnvelope>(`/lexicon/entries/${wordId}`),
       /**
        * PUT /admin/words/{id}/content — 保存（整树替换）。
        * 409 = 乐观锁冲突（重新加载）；422 = 已发布词条改残（details 逐条展示）。
@@ -194,27 +199,80 @@ export function createAdminEndpoints(http: HttpClient) {
       /** POST /admin/words/{id}/steps/forms/impact — 保存词形前预览下游影响。 */
       previewFormsImpact: (wordId: string, input: PreviewFormsImpactInputV2) =>
         http.post<PreviewFormsImpactResponseV2>(
-          `/words/${wordId}/steps/forms/impact`,
+          `/lexicon/entries/${wordId}/steps/forms/impact`,
           input
         ),
       /** PUT /admin/words/{id}/steps/forms — 保存或完成 V2 词形与发音步骤。 */
       saveFormsStep: (wordId: string, input: SaveFormsStepInput) =>
-        http.put<AdminWordV2Envelope>(`/words/${wordId}/steps/forms`, input),
+        http.put<AdminWordV2Envelope>(
+          `/lexicon/entries/${wordId}/steps/forms`,
+          input
+        ),
       /** PUT /admin/words/{id}/steps/meanings — 保存或完成 V2 词义与例句步骤。 */
       saveMeaningsStep: (wordId: string, input: SaveMeaningsStepInput) =>
-        http.put<AdminWordV2Envelope>(`/words/${wordId}/steps/meanings`, input),
+        http.put<AdminWordV2Envelope>(
+          `/lexicon/entries/${wordId}/steps/meanings`,
+          input
+        ),
       /** POST /admin/words/{id}/validate — 校验指定 V2 revision 的发布完整性。 */
       validateV2: (wordId: string, input: ValidateAdminWordV2Input) =>
-        http.post<DraftValidationResponse>(`/words/${wordId}/validate`, input),
+        http.post<DraftValidationResponse>(
+          `/lexicon/entries/${wordId}/validate`,
+          input
+        ),
       /**
        * POST /admin/words/{id}/publish — 提交（发布），幂等且重新触发题目生成。
        * 422 = 完整性检查未过（HttpError.details）；409 = 并发保存，重试即可。
        */
       publish: (wordId: string) =>
         http.post<AdminWordEnvelope>(`/words/${wordId}/publish`),
-      /** POST /admin/words/{id}/publish — 带 revision/idempotency key 发布 V2。 */
-      publishV2: (wordId: string, input: PublishAdminWordV2Input) =>
-        http.post<AdminWordV2Envelope>(`/words/${wordId}/publish`, input),
+      /** POST /admin/lexicon/entries/{id}/publications — 带 revision 幂等发布 V2。 */
+      publishV2: (
+        wordId: string,
+        idempotencyKey: string,
+        input: PublishAdminWordV2Input
+      ) =>
+        http.post<AdminWordV2Envelope>(
+          `/lexicon/entries/${wordId}/publications`,
+          input,
+          { headers: { "Idempotency-Key": idempotencyKey } }
+        ),
+      /** POST /admin/lexicon/entries/{id}/archive — 保留 publication 的幂等归档。 */
+      archive: (
+        wordId: string,
+        idempotencyKey: string,
+        input: EntryLifecycleInput
+      ) =>
+        http.post<AdminWordV2Envelope>(
+          `/lexicon/entries/${wordId}/archive`,
+          input,
+          { headers: { "Idempotency-Key": idempotencyKey } }
+        ),
+      /** POST /admin/lexicon/entries/{id}/restore — 幂等恢复。 */
+      restore: (
+        wordId: string,
+        idempotencyKey: string,
+        input: EntryLifecycleInput
+      ) =>
+        http.post<AdminWordV2Envelope>(
+          `/lexicon/entries/${wordId}/restore`,
+          input,
+          { headers: { "Idempotency-Key": idempotencyKey } }
+        ),
+      /** POST /admin/lexicon/entries/archive-batch — 最多 100 条原子归档。 */
+      archiveBatch: (idempotencyKey: string, input: EntryLifecycleBatchInput) =>
+        http.post<EntryLifecycleBatchResponse>(
+          "/lexicon/entries/archive-batch",
+          input,
+          { headers: { "Idempotency-Key": idempotencyKey } }
+        ),
+      /** POST /admin/lexicon/entries/restore-batch — 最多 100 条原子恢复。 */
+      restoreBatch: (idempotencyKey: string, input: EntryLifecycleBatchInput) =>
+        http.post<EntryLifecycleBatchResponse>(
+          "/lexicon/entries/restore-batch",
+          input,
+          { headers: { "Idempotency-Key": idempotencyKey } }
+        ),
       /** DELETE /admin/words/{id} — 单条删除（整棵树一起删）→ 204。 */
       remove: (wordId: string) => http.del<void>(`/words/${wordId}`),
       /** POST /admin/words/batch-delete — ≤100 个，重复去重；不存在的 id 跳过。 */
@@ -222,13 +280,13 @@ export function createAdminEndpoints(http: HttpClient) {
         http.post<AdminWordBatchDeleteResponse>("/words/batch-delete", {
           ids
         }),
-      /** GET /admin/words/related-search — 「添加关联词」弹窗搜索；q 空则返回空结果。 */
+      /** GET /admin/lexicon/entries/related-search — 关联词/上下文目标搜索。 */
       relatedSearch: (
         q: string,
         opts?: { kind?: AdminWordKind; limit?: number }
       ) =>
         http.get<RelatedSearchResponse>(
-          `/words/related-search${qs({ q, kind: opts?.kind, limit: opts?.limit })}`
+          `/lexicon/entries/related-search${qs({ q, kind: opts?.kind, limit: opts?.limit })}`
         )
     },
     /**

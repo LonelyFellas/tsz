@@ -22,7 +22,7 @@ function renderLayout(
 }
 
 describe("WordCreationLayout", () => {
-  it("创建态显示检测中的双方言主词，未创建草稿前禁用后续步骤", () => {
+  it("创建态使用轻量单栏并在未创建草稿前禁用后续步骤", () => {
     const onStepChange = vi.fn();
     const view = renderLayout({
       currentStep: "basics",
@@ -35,18 +35,15 @@ describe("WordCreationLayout", () => {
       onStepChange
     });
 
-    expect(screen.getByText("centre")).toBeInTheDocument();
-    expect(screen.getByText("center")).toBeInTheDocument();
     expect(screen.getByText("step-content")).toBeInTheDocument();
     const laterStep = screen.getByText("词形与发音").closest(".ant-steps-item");
     expect(laterStep).toHaveClass("ant-steps-item-disabled");
 
     fireEvent.click(screen.getByText("词形与发音"));
     expect(onStepChange).not.toHaveBeenCalled();
-    expect(
-      view.container.querySelector(".word-creation-summary")
-    ).toHaveTextContent(
-      "方言识别待完成基本词性0词形变化0语义区间0语法结构0多维词义0多维例句0"
+    expect(view.container.querySelector(".word-creation-summary")).toBeNull();
+    expect(view.container.querySelector(".word-creation-shell")).toHaveClass(
+      "word-creation-shell--basics"
     );
   });
 

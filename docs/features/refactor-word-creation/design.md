@@ -1219,6 +1219,10 @@ interface PartOfSpeechConfigListResponse {
   pagination: AdminPaginationMeta;
 }
 
+interface SubPartOfSpeechListResponse {
+  items: SubPartOfSpeechConfig[];
+}
+
 interface CreatePartOfSpeechInput {
   code: PartOfSpeechCode;
   name_zh: string;
@@ -1250,31 +1254,89 @@ interface UpdateSubPartOfSpeechInput {
 }
 ```
 
+`created_by.id` / `updated_by.id` 的 wire 类型固定为 string：普通管理员 actor 使用 UUID 字符串，
+系统种子使用 `{ id: "system", display_name: "系统" }`。`created_by` 必须存在；尚未修改的记录
+省略 `updated_by`，不返回 `null`。所有时间为 RFC 3339。
+
 `WordPosTag` 迁移为 `PartOfSpeechCode` 的兼容别名，`WordSubPos` 迁移为 `"" | SubPartOfSpeechCode` 的兼容别名。TypeScript 中它们最终是 string，但业务代码不得随意拼接；输入只能来自 catalog、检测响应或已加载的历史 wire。后端/mock 保存与发布时必须验证编码仍存在且细分词性属于当前基本词性。
 
-编码约束基线：基本词性 `^[a-z][a-z0-9_]{0,31}$`，细分词性 `^[A-Z][A-Z0-9_-]{0,31}$`。中文名、英文名长度 1–64，缩写长度 1–16，统一 trim；编码、同层中文名和同层英文名唯一，英文比较忽略大小写。具体上限可由后端评审调整，但 mock 与真实接口必须一致。
+编码约束基线：基本词性 `^[a-z][a-z0-9_]{0,31}$`，细分词性 `^[A-Z][A-Z0-9_-]{0,31}$`。
+中文名、英文名长度 1–64，缩写长度 1–16，统一 trim；基本编码和基本中文名全局唯一，基本
+英文名、缩写忽略大小写后全局唯一；细分编码全局唯一，细分中文名和英文名只在同一基本词性
+下唯一，英文比较忽略大小写。`sort_order` 是有符号 32 位整数。mock 与真实接口必须一致。
 
 ### 后端接口提案
 
 `createAdminEndpoints` 使用 `/api/v1/admin` base URL，以下均为相对路径：
 
-| 方法   | 相对路径                                            | 使用方                     | 权限             |
-| ------ | --------------------------------------------------- | -------------------------- | ---------------- |
-| GET    | `/settings/parts-of-speech/catalog`                 | 所有词条列表、编辑器和向导 | 任意已登录 admin |
-| GET    | `/settings/parts-of-speech`                         | 配置管理列表               | `super_admin`    |
-| POST   | `/settings/parts-of-speech`                         | 新建基本词性               | `super_admin`    |
-| PATCH  | `/settings/parts-of-speech/{id}`                    | 修改基本词性展示信息/排序  | `super_admin`    |
-| DELETE | `/settings/parts-of-speech/{id}`                    | 删除未引用基本词性         | `super_admin`    |
-| GET    | `/settings/parts-of-speech/{id}/sub-parts`          | 细分词性管理列表           | `super_admin`    |
-| POST   | `/settings/parts-of-speech/{id}/sub-parts`          | 新建细分词性               | `super_admin`    |
-| PATCH  | `/settings/parts-of-speech/{id}/sub-parts/{sub_id}` | 修改细分词性               | `super_admin`    |
-| DELETE | `/settings/parts-of-speech/{id}/sub-parts/{sub_id}` | 删除未引用细分词性         | `super_admin`    |
+| 方法   | 相对路径                                                                     | 成功 | 响应                                 | 权限             |
+| ------ | ---------------------------------------------------------------------------- | ---: | ------------------------------------ | ---------------- |
+| GET    | `/settings/parts-of-speech/catalog`                                          |  200 | `{ catalog_version, items }`         | 任意已登录 admin |
+| GET    | `/settings/parts-of-speech`                                                  |  200 | `{ items, pagination }`              | `super_admin`    |
+| POST   | `/settings/parts-of-speech`                                                  |  201 | 完整 `PartOfSpeechConfig`            | `super_admin`    |
+| PATCH  | `/settings/parts-of-speech/{id}`                                             |  200 | 完整新 `PartOfSpeechConfig`          | `super_admin`    |
+| DELETE | `/settings/parts-of-speech/{id}?base_revision={revision}`                    |  204 | 无 body                              | `super_admin`    |
+| GET    | `/settings/parts-of-speech/{id}/sub-parts`                                   |  200 | `{ items: SubPartOfSpeechConfig[] }` | `super_admin`    |
+| POST   | `/settings/parts-of-speech/{id}/sub-parts`                                   |  201 | 完整 `SubPartOfSpeechConfig`         | `super_admin`    |
+| PATCH  | `/settings/parts-of-speech/{id}/sub-parts/{sub_id}`                          |  200 | 完整新 `SubPartOfSpeechConfig`       | `super_admin`    |
+| DELETE | `/settings/parts-of-speech/{id}/sub-parts/{sub_id}?base_revision={revision}` |  204 | 无 body                              | `super_admin`    |
 
-catalog 不分页，返回所有基本词性及嵌套细分词性，并按 `sort_order`、`created_at`、`id` 稳定排序。它不返回审计与 usage 字段，便于全后台复用和缓存。管理列表使用现有 `page/page_size` 信封；`q` 匹配编码、中文名、英文名和缩写。
+catalog 不分页，返回所有基本词性及嵌套细分词性，并按 `sort_order`、`created_at`、`id` 稳定排序。
+它不返回审计与 usage 字段。相同 sort_order 项必须保留服务端相对顺序，客户端不能因 DTO 缺少
+created_at 而重新按 id 覆盖服务端顺序。`catalog_version` 和 `items` 由后端在同一个数据库快照中
+读取，前端可以把整个响应当作同一代目录。
 
-POST 成功返回 201 + 新记录；PATCH 返回 200 + 新 revision；DELETE 返回 204。创建/修改后全局 `catalog_version` 递增。PATCH 使用 `base_revision` 做乐观锁，冲突返回 409 `revision_conflict`。编码冲突/名称冲突返回 409 `part_of_speech_conflict`，并通过 Problem Details `field` 指向冲突字段。
+基本管理列表使用 `{ items, pagination }`；`page` 默认 1，`page_size` 默认 10、范围 1–100，
+非法值返回 400 `invalid_query` 而非静默 clamp。`q` trim 后对编码、中文名、英文名和缩写做
+忽略大小写的字面子串匹配，`%`、`_` 不作为 SQL 通配符。细分列表不分页，但必须返回
+`{ items }`，不能返回裸数组。
 
-删除基本词性时，后端在同一事务内检查所有 V1/V2 草稿与已发布单词/短语引用；有引用返回 409 `part_of_speech_in_use`，`meta.usage_count` 给出数量。无引用时级联删除其细分配置。删除细分词性同理检查所有 sense，引用存在时返回 409 `sub_part_of_speech_in_use`。客户端列表中的 usage_count 只用于提前禁用/提示，不能替代事务检查。
+创建/修改后全局 `catalog_version` 递增。当前前端仍依靠 5 分钟 staleTime 和本机 mutation 后
+失效缓存，并未主动比较该版本；后续可基于它增加 ETag/跨管理员刷新。PATCH 使用
+正整数 `base_revision` 做乐观锁，冲突返回 409 `revision_conflict`；缺失/类型错误返回 422，
+小于 1 返回 400 `invalid_part_of_speech` 且顶层 `field=base_revision`。
+
+两个 DELETE 同样使用乐观锁，`base_revision` 是必填正整数查询参数。API client 调整为
+`remove(id, baseRevision)` / `removeSubPart(id, subId, baseRevision)`，页面从当前行读取 revision；
+后端锁行后先比较 revision，再做引用检查。过期删除返回 409 `revision_conflict`，不能删除其他
+管理员刚修改过的配置。缺失、非整数或小于 1 的 query 返回 400 `invalid_query`。
+
+所有写 DTO 必须严格拒绝未知/只读字段。PATCH 携带 `code`、`part_of_speech_id`、usage 或 actor
+等字段时返回 422 `invalid_request_body`，不能静默忽略。字段缺失/类型错误同为 422；JSON 合法、
+类型正确但值违反 code/长度/排序规则时返回 400 `invalid_part_of_speech`。
+
+唯一冲突按层级区分：基本词性返回 409 `part_of_speech_conflict`，细分词性返回 409
+`sub_part_of_speech_conflict`；具体冲突字段位于 Problem Details 顶层 `field`。
+
+删除基本词性时，后端在同一事务内检查当前草稿和所有仍保留 publication 的单词/短语引用；
+有引用返回 409 `part_of_speech_in_use`，`meta.usage_count` 给出按 entry 去重后的数量。删除细分
+词性同理检查当前草稿和 publication 中的 sense，返回 `sub_part_of_speech_in_use`，数量按稳定
+sense node 去重。publication 事务必须写带 `ON DELETE RESTRICT` catalog FK 的结构化引用表，
+不能只扫描 JSONB snapshot。客户端 usage_count 只用于提前禁用/提示，不能替代事务与 FK 检查。
+
+配置接口错误码固定为：
+
+| HTTP | code                           | 场景                                        |
+| ---: | ------------------------------ | ------------------------------------------- |
+|  400 | `invalid_json`                 | JSON 语法非法                               |
+|  400 | `invalid_query`                | 查询或分页非法                              |
+|  400 | `invalid_path_parameter`       | 路径中的基本/细分 ID 不是合法 UUID          |
+|  400 | `invalid_part_of_speech`       | 配置字段值违反业务规则                      |
+|  404 | `part_of_speech_not_found`     | 基本词性不存在                              |
+|  404 | `sub_part_of_speech_not_found` | 细分词性不存在或不属于路径中的父级          |
+|  409 | `part_of_speech_conflict`      | 基本编码、名称或缩写冲突                    |
+|  409 | `sub_part_of_speech_conflict`  | 细分编码或同父级名称冲突                    |
+|  409 | `revision_conflict`            | PATCH body 或 DELETE query 的 revision 过期 |
+|  409 | `part_of_speech_in_use`        | 基本词性被引用                              |
+|  409 | `sub_part_of_speech_in_use`    | 细分词性被引用                              |
+|  422 | `invalid_request_body`         | 字段缺失、类型错误或出现未知/只读字段       |
+
+错误继续使用 `application/problem+json`。`field` 位于 Problem Details 顶层；
+`current_revision`、`usage_count`、`part_of_speech_id` 和被引用的配置 code 位于可选 `meta`。
+`ProblemDetails.meta` 与 `HttpError.meta` 使用共享 `ProblemMeta`，原
+`AdminWordApiErrorMeta` 只保留为迁移期类型别名。正常引用检查会返回 usage_count；极端并发下
+由已知 FK `23503` 兜底的 `*_in_use` 允许省略 meta，页面错误提示不能依赖计数存在。
+客户端只能按 `status/code/field/meta` 分支，不能匹配 title/detail 文案。
 
 词条相关端点同步增加约束：
 
@@ -1284,7 +1346,10 @@ POST 成功返回 201 + 新记录；PATCH 返回 200 + 新 revision；DELETE 返
 - 配置在管理员未保存的表单期间被并发删除时，保存请求按上述 422 失败，前端保留本地值并要求重新选择；
 - 后端词典供应商自己的词性枚举必须在服务端映射到平台编码，不把供应商原始值直接透传给前端。
 
-完整契约与请求/响应样例同步写入 `../tsz-rust/docs/frontend-integration.md`；OpenAPI 真正发布前，前端 endpoint 进入 `endpoints.contract.test.ts` 的 PENDING 台账。
+完整契约与请求/响应样例同步写入 `../tsz-rust/docs/part-of-speech-config-design.md` 和
+`../tsz-rust/docs/frontend-integration.md`。后端将九个 handler/DTO 注册进 utoipa、生成
+`docs/openapi.json` 后，前端同步 `openapi.snapshot.json` 并运行 endpoint contract test；只有
+method、path、状态码、响应信封和 schema 全部一致，才移除 PENDING 台账。
 
 ### 前端结构与数据流
 
@@ -1345,7 +1410,14 @@ interface MockPartOfSpeechState {
 
 默认种子从当前静态常量机械迁移：11 个基本词性、19 个细分词性及所属关系。种子只存在 mock/storage adapter，不再被 UI 直接 import。首次初始化或 schema 不兼容时载入种子；同一管理员刷新保留 CRUD 结果，登出沿用现有清理规则。
 
-usage_count 从 mock 当前 V1/V2 word tree 实时派生，不持久化为第二事实源：基本词性统计草稿与已发布 word/phrase，细分词性统计 senses。删除与保存放在同一同步临界区内重算。mock 返回与真实提案同形的 Problem Details / `HttpError`，覆盖 409 in-use、409 revision、422 unknown code。
+usage_count 从 mock 当前 V1/V2 word tree 实时派生，不持久化为第二事实源：基本词性统计当前 mock
+持有的草稿/已发布 word/phrase，细分词性统计 senses。mock 没有多 publication 历史模型；真实
+后端额外按上述 publication 引用表保护所有仍保留版本。删除与保存放在同一同步临界区内重算。
+
+真实接口启用前必须修正 mock 的已知契约漂移：字段值校验目前仍返回 422
+`invalid_request_body`，细分唯一冲突仍错误地返回 `part_of_speech_conflict`，404 仍使用通用
+`not_found`。同时页面补充 `sub_part_of_speech_conflict` 中文提示。修正后 mock 才能继续称为与
+真实提案同形，并覆盖 409 in-use、409 revision、422 unknown code。
 
 Mock detection fixture 继续返回 `noun`/`verb` 等默认编码。测试可新增配置并验证第 2 步 options 动态出现；也可删除未使用配置并验证消失。若测试故意让 detection 返回未知编码，create step 必须阻断。
 
@@ -1386,10 +1458,12 @@ Mock detection fixture 继续返回 `noun`/`verb` 等默认编码。测试可新
 进入代码动工后先使用 `$test` skill 完成用例矩阵，再写测试：
 
 - 单元：catalog lookup、稳定排序、未知 code 回退、过滤已用 POS、细分词性按所属 POS 过滤；
-- mock：默认 11/19 种子、CRUD、唯一性、revision、引用计数、基本/细分删除约束、级联删除、storage 恢复；
+- mock：默认 11/19 种子、CRUD、唯一性、revision、引用计数、基本/细分删除约束、过期 revision
+  不删除、级联删除、storage 恢复，以及与真实契约一致的状态码/错误码；
 - 组件：菜单与 403、配置层级 Tab、列表搜索分页、新增/修改/删除、细分页内面板、错误/重试；
 - 集成：新增配置进入 forms selector，改名传播到列表/向导/预览，未知 detection code 阻断，配置并发删除后保存 422；
-- API contract：9 个 endpoint 的 method/path/query/body 与 PENDING；
+- API contract：9 个 endpoint 的 method/path/query/body（含两个 DELETE 的必填 `base_revision`）、
+  201/200/204 状态码、基本分页信封、细分 `{ items }` 信封、严格 PATCH schema 与 PENDING；
 - E2E：超级管理员新增基本词性及细分词性 → 创建词条选择它 → 返回配置页验证删除被阻断。
 
 质量门沿用本文既有 admin/types/api-client/test/build/lint/typecheck/e2e 要求。

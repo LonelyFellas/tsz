@@ -47,6 +47,7 @@ import { wordDisplayHeadword } from "./model";
 
 interface Props {
   word: AdminWordV2;
+  readOnly?: boolean;
   onPublished: (word: AdminWordV2) => void;
 }
 
@@ -366,7 +367,11 @@ const ISSUE_STEP_LABEL: Record<Exclude<WordCreationStep, "preview">, string> = {
   meanings: "词义与例句"
 };
 
-export function PreviewAndPublishStep({ word, onPublished }: Props) {
+export function PreviewAndPublishStep({
+  word,
+  readOnly = word.status === "published",
+  onPublished
+}: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
@@ -379,7 +384,8 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
   const [validation, setValidation] = useState<DraftValidationResponse>();
   const [validationError, setValidationError] = useState<string>();
   const publishKey = useRef(newWordNodeId());
-  const readOnly = word.status === "published";
+  const publishingRef = useRef(false);
+  const editQuery = word.status === "published" ? "?mode=edit" : "";
 
   const handleRequestError = (
     error: unknown,
@@ -443,15 +449,17 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
   }, [word.revision, readOnly]);
 
   const publish = async () => {
-    const result =
-      validation?.validated_revision === word.revision
-        ? validation
-        : await validate();
-    if (!result?.valid) {
-      message.warning("请先处理完整性检查中的问题");
-      return;
-    }
+    if (publishingRef.current) return;
+    publishingRef.current = true;
     try {
+      const result =
+        validation?.validated_revision === word.revision
+          ? validation
+          : await validate();
+      if (!result?.valid) {
+        message.warning("请先处理完整性检查中的问题");
+        return;
+      }
       const { word: published } = await publishWord.mutateAsync({
         base_revision: word.revision,
         idempotency_key: publishKey.current
@@ -461,6 +469,8 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
       navigate("/words", { replace: true });
     } catch (error) {
       handleRequestError(error, "发布失败");
+    } finally {
+      publishingRef.current = false;
     }
   };
 
@@ -569,9 +579,12 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
                     type="link"
                     key="locate"
                     onClick={() =>
-                      navigate(`/words/${word.id}/wizard/${issue.step}`, {
-                        state: { nodeId: issue.node_id, field: issue.field }
-                      })
+                      navigate(
+                        `/words/${word.id}/wizard/${issue.step}${editQuery}`,
+                        {
+                          state: { nodeId: issue.node_id, field: issue.field }
+                        }
+                      )
                     }
                   >
                     去处理
@@ -607,7 +620,11 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
             </Descriptions.Item>
             <Descriptions.Item label="语言">English 英语</Descriptions.Item>
             <Descriptions.Item label="状态">
-              {word.status === "published" ? "已发布" : "草稿"}
+              {word.status === "published"
+                ? word.has_unpublished_changes
+                  ? "已发布（有未发布修改）"
+                  : "已发布"
+                : "草稿"}
             </Descriptions.Item>
             <Descriptions.Item label="Revision">
               {word.revision}
@@ -657,14 +674,26 @@ export function PreviewAndPublishStep({ word, onPublished }: Props) {
 
       <div className="word-step-actions">
         {!readOnly && (
-          <Button onClick={() => navigate(`/words/${word.id}/wizard/meanings`)}>
+          <Button
+            onClick={() =>
+              navigate(`/words/${word.id}/wizard/meanings${editQuery}`)
+            }
+          >
             上一步
           </Button>
         )}
         {readOnly ? (
-          <Button type="primary" onClick={() => navigate("/words")}>
-            返回智能词库
-          </Button>
+          <Space>
+            <Button onClick={() => navigate("/words")}>返回智能词库</Button>
+            <Button
+              type="primary"
+              onClick={() =>
+                navigate(`/words/${word.id}/wizard/forms?mode=edit`)
+              }
+            >
+              继续编辑
+            </Button>
+          </Space>
         ) : (
           <Button
             type="primary"

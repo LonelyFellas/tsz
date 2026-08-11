@@ -638,18 +638,24 @@ describe("admin words mock", () => {
       language: "en",
       headword: "in front of"
     });
-    expect(phrase).toMatchObject({ entry_kind: "phrase" });
-    if (phrase.builtin_dictionary.status !== "matched") {
-      throw new Error("phrase fixture must match");
-    }
+    expect(phrase).toMatchObject({
+      entry_kind: "phrase",
+      builtin_dictionary: { status: "not_found" }
+    });
     await expect(
       mock.createV2({
         schema_version: 2,
         idempotency_key: "create-phrase",
         detection_id: phrase.detection_id,
-        headwords: phrase.builtin_dictionary.headwords
+        headwords: { mode: "unified", common: "in front of" }
       })
-    ).rejects.toMatchObject({ status: 422, code: "detection_mismatch" });
+    ).resolves.toMatchObject({
+      word: {
+        kind: "phrase",
+        lifecycle_revision: 1,
+        forms: { pos: [] }
+      }
+    });
     await expect(
       mock.detect({ language: "en", headword: "colour" })
     ).resolves.toMatchObject({ smart_dictionary: { status: "duplicate" } });
@@ -704,6 +710,158 @@ describe("admin words mock", () => {
         }
       ]
     });
+  });
+
+  it("V2 生命周期保留内容并支持幂等重放、并发保护与原子批量", async () => {
+    const center = await createCenter(mock, "lifecycle-center");
+    const archiveInput = {
+      base_revision: center.word.revision,
+      base_lifecycle_revision: center.word.lifecycle_revision
+    };
+
+    const archived = await mock.archive(
+      center.word.id,
+      "archive-center",
+      archiveInput
+    );
+    expect(archived.word).toMatchObject({
+      status: "archived",
+      revision: center.word.revision,
+      lifecycle_revision: center.word.lifecycle_revision + 1,
+      forms: center.word.forms,
+      meanings: center.word.meanings
+    });
+    await expect(
+      mock.archive(center.word.id, "archive-center", archiveInput)
+    ).resolves.toEqual(archived);
+    await expect(
+      mock.archive(center.word.id, "archive-center", {
+        ...archiveInput,
+        base_revision: archiveInput.base_revision + 1
+      })
+    ).rejects.toMatchObject({ status: 409, code: "idempotency_key_reused" });
+    await expect(
+      mock.archiveBatch("archive-empty", { entries: [] })
+    ).rejects.toMatchObject({ status: 422, code: "validation_failed" });
+    await expect(
+      mock.archiveBatch("archive-duplicate", {
+        entries: [
+          { id: center.word.id, ...archiveInput },
+          { id: center.word.id, ...archiveInput }
+        ]
+      })
+    ).rejects.toMatchObject({ status: 422, code: "validation_failed" });
+    await expect(
+      mock.archiveBatch("archive-invalid-revision", {
+        entries: [
+          {
+            id: center.word.id,
+            base_revision: 0,
+            base_lifecycle_revision: 0
+          }
+        ]
+      })
+    ).rejects.toMatchObject({ status: 422, code: "validation_failed" });
+    await expect(
+      mock.archiveBatch("archive-too-many", {
+        entries: Array.from({ length: 101 }, (_, index) => ({
+          id: `too-many-${index}`,
+          base_revision: 1,
+          base_lifecycle_revision: 1
+        }))
+      })
+    ).rejects.toMatchObject({ status: 422, code: "validation_failed" });
+    const legacy = (await mock.list({})).words.find(
+      (word) => word.schema_version !== 2
+    )!;
+    await expect(
+      mock.archive(legacy.id, "archive-legacy", {
+        base_revision: 1,
+        base_lifecycle_revision: 1
+      })
+    ).rejects.toMatchObject({ status: 409, code: "schema_version_mismatch" });
+    await expect(
+      mock.restore(center.word.id, "restore-stale-lifecycle", {
+        base_revision: archived.word.revision,
+        base_lifecycle_revision: archived.word.lifecycle_revision + 1
+      })
+    ).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
+    await expect(
+      mock.archiveBatch("archive-already-target", {
+        entries: [
+          {
+            id: archived.word.id,
+            base_revision: archived.word.revision,
+            base_lifecycle_revision: 1
+          }
+        ]
+      })
+    ).resolves.toMatchObject({ affected: 0 });
+    await expect(
+      mock.saveFormsStep(center.word.id, {
+        base_revision: center.word.revision,
+        operation_id: "archived-edit",
+        intent: "save",
+        content: center.word.forms
+      })
+    ).rejects.toMatchObject({ status: 409, code: "entry_archived" });
+
+    const restored = await mock.restore(center.word.id, "restore-center", {
+      base_revision: archived.word.revision,
+      base_lifecycle_revision: archived.word.lifecycle_revision
+    });
+    expect(restored.word).toMatchObject({
+      status: "draft",
+      revision: center.word.revision,
+      lifecycle_revision: center.word.lifecycle_revision + 2
+    });
+    await expect(
+      mock.restoreBatch("restore-already-active", {
+        entries: [
+          {
+            id: restored.word.id,
+            base_revision: restored.word.revision,
+            base_lifecycle_revision: 1
+          }
+        ]
+      })
+    ).resolves.toMatchObject({ affected: 0 });
+
+    const far = await createDetectedWord(mock, "far", "lifecycle-far");
+    const batchInput = {
+      entries: [restored.word, far.word].map((word) => ({
+        id: word.id,
+        base_revision: word.revision,
+        base_lifecycle_revision: word.lifecycle_revision
+      }))
+    };
+    const batch = await mock.archiveBatch("archive-batch", batchInput);
+    expect(batch).toMatchObject({ affected: 2 });
+    expect(batch.words.every((word) => word.status === "archived")).toBe(true);
+    await expect(
+      mock.archiveBatch("archive-batch", batchInput)
+    ).resolves.toEqual(batch);
+
+    const staleBatch = {
+      entries: batch.words.map((word, index) => ({
+        id: word.id,
+        base_revision: word.revision + (index === 0 ? 1 : 0),
+        base_lifecycle_revision: word.lifecycle_revision
+      }))
+    };
+    await expect(
+      mock.restoreBatch("restore-stale-batch", staleBatch)
+    ).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
+    const afterConflict = await Promise.all(
+      batch.words.map((word) => mock.get(word.id))
+    );
+    expect(
+      afterConflict.every(
+        (envelope) =>
+          envelope.word.schema_version === 2 &&
+          envelope.word.status === "archived"
+      )
+    ).toBe(true);
   });
 
   it("拒绝非法检测、方言组合、重复创建与超限 payload", async () => {
@@ -1100,11 +1258,19 @@ describe("admin words mock", () => {
         source_dialect: "us",
         uk: {
           state: "ready",
-          variant: { origin: "manual", value: richText("valid uk") }
+          variant: {
+            id: "bad-grammar-reference-uk",
+            origin: "manual",
+            value: richText("valid uk")
+          }
         },
         us: {
           state: "ready",
-          variant: { origin: "manual", value: richText("valid us") }
+          variant: {
+            id: "bad-grammar-reference-us",
+            origin: "manual",
+            value: richText("valid us")
+          }
         }
       }
     });
@@ -1117,7 +1283,11 @@ describe("admin words mock", () => {
     noEn.id = "sentence-no-en";
     noEn.en_text = {
       mode: "unified",
-      common: { origin: "manual", value: richText("") }
+      common: {
+        id: "sentence-no-en-common",
+        origin: "manual",
+        value: richText("")
+      }
     };
     const noFocus = structuredClone(baseSentence);
     noFocus.id = "sentence-no-focus";
@@ -1848,15 +2018,19 @@ describe("admin words mock", () => {
         base_revision: centerPublished.word.revision,
         idempotency_key: "bound-publish-key"
       })
-    ).rejects.toMatchObject({ status: 409, code: "idempotency_key_reused" });
-    await expect(
-      mock.saveFormsStep(centerReady.id, {
-        base_revision: centerPublished.word.revision,
-        operation_id: "published-word-save",
-        intent: "save",
-        content: centerReady.forms
-      })
-    ).rejects.toMatchObject({ status: 409, code: "word_already_published" });
+    ).resolves.toEqual(centerPublished);
+    const editedPublished = await mock.saveFormsStep(centerReady.id, {
+      base_revision: centerPublished.word.revision,
+      operation_id: "published-word-save",
+      intent: "save",
+      content: centerReady.forms
+    });
+    expect(editedPublished.word).toMatchObject({
+      status: "published",
+      published_revision: centerPublished.word.revision,
+      has_unpublished_changes: true,
+      revision: centerPublished.word.revision + 1
+    });
 
     const farDraft = await createDetectedWord(mock, "far", "publish-bound-far");
     const farReady = await completeDraft(mock, farDraft, "publish-bound-far");

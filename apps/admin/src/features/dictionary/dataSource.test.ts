@@ -19,6 +19,10 @@ const METHOD_NAMES = [
   "validateV2",
   "publish",
   "publishV2",
+  "archive",
+  "restore",
+  "archiveBatch",
+  "restoreBatch",
   "remove",
   "batchDelete",
   "relatedSearch"
@@ -42,9 +46,9 @@ const INVOCATIONS = [
   {
     method: "createV2",
     args: [
+      "create-key",
       {
         schema_version: 2,
-        idempotency_key: "create-key",
         detection_id: "det-1",
         headwords: { mode: "unified", common: "far" }
       }
@@ -75,7 +79,6 @@ const INVOCATIONS = [
       "word-1",
       {
         base_revision: 1,
-        operation_id: "forms-op",
         intent: "save",
         content: { pos: [] }
       }
@@ -87,7 +90,6 @@ const INVOCATIONS = [
       "word-1",
       {
         base_revision: 2,
-        operation_id: "meanings-op",
         intent: "save",
         content: { sense_groups: [], pos: [] }
       }
@@ -97,7 +99,31 @@ const INVOCATIONS = [
   { method: "publish", args: ["word-1"] },
   {
     method: "publishV2",
-    args: ["word-1", { base_revision: 2, idempotency_key: "publish-key" }]
+    args: ["word-1", "publish-key", { base_revision: 2 }]
+  },
+  {
+    method: "archive",
+    args: [
+      "word-1",
+      "archive-key",
+      { base_revision: 2, base_lifecycle_revision: 1 }
+    ]
+  },
+  {
+    method: "restore",
+    args: [
+      "word-1",
+      "restore-key",
+      { base_revision: 2, base_lifecycle_revision: 2 }
+    ]
+  },
+  {
+    method: "archiveBatch",
+    args: ["archive-batch-key", { entries: [] }]
+  },
+  {
+    method: "restoreBatch",
+    args: ["restore-batch-key", { entries: [] }]
   },
   { method: "remove", args: ["word-1"] },
   { method: "batchDelete", args: [["word-1", "word-2"]] },
@@ -400,9 +426,13 @@ describe("admin words data source selection", () => {
     });
 
     expect(loaded.module.realAdminWordsDataSource).toBe(real.source);
-    expect(
-      loaded.module.adminWordsDataSourceCapabilities.dialectVariantSuggestions
-    ).toBe(false);
+    expect(loaded.module.adminWordsDataSourceCapabilities).toEqual({
+      dialectVariantSuggestions: true,
+      legacyEntryCreation: false,
+      phraseCreation: true,
+      archive: true,
+      batchArchive: true
+    });
     await expectFacadeDelegation(
       loaded.module.adminWordsDataSource,
       real,
@@ -443,9 +473,13 @@ describe("admin words data source selection", () => {
     });
 
     expect(loaded.createMock).not.toHaveBeenCalled();
-    expect(
-      loaded.module.adminWordsDataSourceCapabilities.dialectVariantSuggestions
-    ).toBe(true);
+    expect(loaded.module.adminWordsDataSourceCapabilities).toEqual({
+      dialectVariantSuggestions: true,
+      legacyEntryCreation: true,
+      phraseCreation: true,
+      archive: true,
+      batchArchive: true
+    });
     await expectFacadeDelegation(
       loaded.module.adminWordsDataSource,
       mock,
@@ -577,7 +611,7 @@ describe("admin words data source selection", () => {
     });
     expect(
       loaded.module.adminWordsDataSourceCapabilities.dialectVariantSuggestions
-    ).toBe(false);
+    ).toBe(true);
     expect(loaded.auth.subscribe).not.toHaveBeenCalled();
     expect(loaded.mockModuleFactory).not.toHaveBeenCalled();
     await expectPartOfSpeechFacadeDelegation(

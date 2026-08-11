@@ -16,7 +16,7 @@ import type {
   WordPronunciationV2
 } from "@tsz/types";
 
-export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 3;
+export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 4;
 
 export function richText(text: string): RichText {
   return { version: 1, text, spans: [], liaisons: [] };
@@ -265,6 +265,14 @@ export function createDetectionFixture(
     smart_dictionary: { status: "clear" as const, duplicates: [] as [] }
   };
 
+  if (normalized.includes(" ")) {
+    return {
+      ...base,
+      entry_kind: "phrase",
+      builtin_dictionary: { status: "not_found" }
+    };
+  }
+
   if (normalized === "not-found") {
     return { ...base, builtin_dictionary: { status: "not_found" } };
   }
@@ -354,16 +362,27 @@ export function createDetectionFixture(
   );
 }
 
-function emptyEnglishText(headwords: WordHeadwordsV2): EnglishTextV2 {
+function emptyEnglishText(
+  headwords: WordHeadwordsV2,
+  nodeKey: string
+): EnglishTextV2 {
   if (headwords.mode === "unified") {
     return {
       mode: "unified",
-      common: { value: richText(""), origin: "manual" }
+      common: {
+        id: `${nodeKey}-en-common`,
+        value: richText(""),
+        origin: "manual"
+      }
     };
   }
   const source = {
     state: "ready" as const,
-    variant: { value: richText(""), origin: "manual" as const }
+    variant: {
+      id: `${nodeKey}-en-${headwords.source_dialect}`,
+      value: richText(""),
+      origin: "manual" as const
+    }
   };
   return {
     mode: "distinguish",
@@ -417,6 +436,7 @@ function createInitialPosMeanings(
             id: `${senseId}-definition`,
             level: "A1" as const,
             definition_mode: "zh_definition" as const,
+            content_id: `${senseId}-definition-content`,
             content: richText(large ? `大数据词义 ${index + 1}` : "")
           }
         ],
@@ -429,12 +449,14 @@ function createInitialPosMeanings(
                 ? {
                     mode: "unified" as const,
                     common: {
+                      id: `${senseId}-sentence-en-common`,
                       value: richText(`Large fixture example ${index + 1}.`),
                       origin: "manual" as const
                     }
                   }
-                : emptyEnglishText(headwords)
-              : emptyEnglishText(headwords),
+                : emptyEnglishText(headwords, `${senseId}-sentence`)
+              : emptyEnglishText(headwords, `${senseId}-sentence`),
+            zh_text_id: `${senseId}-sentence-zh`,
             zh_text: richText(large ? `大数据例句 ${index + 1}` : ""),
             links: [
               { word_id: wordId, sense_id: senseId, role: "focus" as const }

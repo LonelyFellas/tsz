@@ -23,6 +23,9 @@ import type {
   DraftValidationIssue,
   DraftValidationResponse,
   DeletePartOfSpeechQuery,
+  EntryLifecycleBatchInput,
+  EntryLifecycleBatchResponse,
+  EntryLifecycleInput,
   FormsImpactItemV2,
   PartOfSpeechCatalogResponse,
   PartOfSpeechConfig,
@@ -65,6 +68,23 @@ import { createPartOfSpeechSeed } from "./partOfSpeechFixtures";
 
 type MockWord = AdminWord | AdminWordV2;
 
+type MockCreateAdminWordV2Input = CreateAdminWordV2Input & {
+  idempotency_key: string;
+};
+type MockPublishAdminWordV2Input = PublishAdminWordV2Input & {
+  idempotency_key: string;
+};
+type MockSaveFormsStepInput = Omit<
+  SaveFormsStepInput,
+  "confirmed_impact_token"
+> & {
+  operation_id?: string;
+  confirmed_impact_token?: string | null;
+};
+type MockSaveMeaningsStepInput = SaveMeaningsStepInput & {
+  operation_id?: string;
+};
+
 interface MockOperationRecord {
   kind: "forms" | "meanings";
   word_id: string;
@@ -77,6 +97,11 @@ interface MockImpactTokenRecord {
   base_revision: number;
   content_json: string;
   affected: FormsImpactItemV2[];
+}
+
+interface MockLifecycleOperationRecord {
+  request_json: string;
+  response: EntryLifecycleBatchResponse;
 }
 
 export interface AdminWordsMockPersistedState {
@@ -189,13 +214,16 @@ function isMockWord(value: unknown): value is MockWord {
     !Number.isFinite(Date.parse(value.created_at)) ||
     typeof value.updated_at !== "string" ||
     !Number.isFinite(Date.parse(value.updated_at)) ||
-    (value.status !== "draft" && value.status !== "published")
+    (value.status !== "draft" &&
+      value.status !== "published" &&
+      value.status !== "archived")
   ) {
     return false;
   }
   if (value.schema_version === 2) {
     return (
       typeof value.revision === "number" &&
+      typeof value.lifecycle_revision === "number" &&
       Array.isArray(value.completed_steps) &&
       isRecord(value.forms) &&
       Array.isArray(value.forms.pos) &&
@@ -973,6 +1001,7 @@ export function createAdminWordsMock({
     });
   let activeProfileId: string | undefined;
   let state: AdminWordsMockPersistedState | undefined;
+  const lifecycleOperations = new Map<string, MockLifecycleOperationRecord>();
 
   async function pause(): Promise<void> {
     if (latencyMs <= 0) return;
@@ -1045,19 +1074,8 @@ export function createAdminWordsMock({
     if (!isV2(word)) {
       throw new HttpError(409, "word is legacy", [], "schema_version_mismatch");
     }
-    if (word.status === "published") {
-      throw new HttpError(
-        409,
-        "word is already published",
-        [],
-        "word_already_published",
-        [],
-        {
-          word_id: word.id,
-          current_revision: word.revision,
-          max_reachable_step: word.max_reachable_step
-        }
-      );
+    if (word.status === "archived") {
+      throw new HttpError(409, "entry is archived", [], "entry_archived");
     }
     return word;
   }
@@ -1826,6 +1844,7 @@ export function createAdminWordsMock({
         if (query.level && !wordLevels(word).includes(query.level))
           return false;
         if (query.status && word.status !== query.status) return false;
+        if (!query.status && word.status === "archived") return false;
         if (query.created_from && word.created_at < query.created_from)
           return false;
         if (query.created_to && word.created_at >= query.created_to)
@@ -1841,7 +1860,17 @@ export function createAdminWordsMock({
         pos_list: wordPos(word),
         levels: wordLevels(word),
         status: word.status,
-        ...(isV2(word) ? { max_reachable_step: word.max_reachable_step } : {}),
+        ...(isV2(word)
+          ? {
+              max_reachable_step: word.max_reachable_step,
+              revision: word.revision,
+              lifecycle_revision: word.lifecycle_revision,
+              ...(word.published_revision !== undefined
+                ? { published_revision: word.published_revision }
+                : {}),
+              has_unpublished_changes: word.has_unpublished_changes
+            }
+          : {}),
         created_by_name:
           word.created_by === profile.id
             ? profile.display_name
@@ -1862,7 +1891,9 @@ export function createAdminWordsMock({
   async function stats(): Promise<AdminWordStats> {
     await pause();
     const { state: current } = context();
-    const words = Object.values(current.words);
+    const words = Object.values(current.words).filter(
+      (word) => word.status !== "archived"
+    );
     const currentDate = dateParts(now());
     return {
       total: words.length,
@@ -1943,6 +1974,10 @@ export function createAdminWordsMock({
       );
     }
     return {
+      provider: {
+        kind: "dictionary_region_rules",
+        version: "mock-dialect-v1"
+      },
       suggestions: input.items.map((item) => {
         if (item.field_kind === "form") {
           return {
@@ -1951,8 +1986,7 @@ export function createAdminWordsMock({
               item.value,
               input.source_dialect,
               input.target_dialect
-            ),
-            model_version: "mock-dialect-v1"
+            )
           };
         }
         const converted = convertDialectText(
@@ -1965,8 +1999,7 @@ export function createAdminWordsMock({
           value:
             converted === item.value.text
               ? clone(item.value)
-              : richText(converted),
-          model_version: "mock-dialect-v1"
+              : richText(converted)
         };
       })
     };
@@ -2014,10 +2047,25 @@ export function createAdminWordsMock({
   }
 
   async function createV2(
+    input: MockCreateAdminWordV2Input
+  ): Promise<AdminWordV2Envelope>;
+  async function createV2(
+    idempotencyKey: string,
     input: CreateAdminWordV2Input
+  ): Promise<AdminWordV2Envelope>;
+  async function createV2(
+    idempotencyKeyOrInput: string | MockCreateAdminWordV2Input,
+    wireInput?: CreateAdminWordV2Input
   ): Promise<AdminWordV2Envelope> {
     await pause();
     const { profile, state: current } = context();
+    const input: MockCreateAdminWordV2Input =
+      typeof idempotencyKeyOrInput === "string"
+        ? {
+            ...wireInput!,
+            idempotency_key: idempotencyKeyOrInput
+          }
+        : idempotencyKeyOrInput;
     assertPayload(input);
     const existingWordId = current.create_idempotency[input.idempotency_key];
     if (existingWordId) {
@@ -2048,15 +2096,22 @@ export function createAdminWordsMock({
     if (new Date(detection.expires_at).getTime() <= now().getTime()) {
       throw new HttpError(410, "detection expired", [], "detection_expired");
     }
-    if (
-      detection.builtin_dictionary.status !== "matched" ||
-      detection.entry_kind !== "word" ||
-      detection.matched_dialect === undefined ||
-      detection.smart_dictionary.status !== "clear" ||
-      !compatibleHeadwords(
+    const dictionaryMatched =
+      detection.builtin_dictionary.status === "matched" &&
+      detection.matched_dialect !== undefined &&
+      compatibleHeadwords(
         detection.builtin_dictionary.headwords,
         input.headwords
-      )
+      );
+    const unmatchedPhrase =
+      detection.entry_kind === "phrase" &&
+      detection.builtin_dictionary.status === "not_found" &&
+      input.headwords.mode === "unified" &&
+      input.headwords.common.trim().toLocaleLowerCase("en") ===
+        detection.normalized_headword;
+    if (
+      detection.smart_dictionary.status !== "clear" ||
+      (!dictionaryMatched && !unmatchedPhrase)
     ) {
       const code =
         detection.smart_dictionary.status === "duplicate"
@@ -2080,26 +2135,36 @@ export function createAdminWordsMock({
     }
     const wordId = nextId(current, "word-v2");
     const timestamp = nextTimestamp(current);
-    const forms = clone(detection.builtin_dictionary.suggested_forms);
+    const forms =
+      detection.builtin_dictionary.status === "matched"
+        ? clone(detection.builtin_dictionary.suggested_forms)
+        : { pos: [] };
     assertConfiguredForms(current, forms);
     alignBaseFormSpelling(forms, input.headwords);
     const word: AdminWordV2 = {
       schema_version: 2,
       id: wordId,
       language: "en",
-      kind: "word",
+      kind: detection.entry_kind,
       status: "draft",
       revision: 1,
+      lifecycle_revision: 1,
       headwords: clone(input.headwords),
       detection_snapshot: {
         detection_id: detection.detection_id,
         request: clone(detection.request),
         normalized_headword: detection.normalized_headword,
-        entry_kind: "word",
-        matched_dialect: detection.matched_dialect,
-        builtin_dictionary_status: "matched",
+        entry_kind: detection.entry_kind,
+        matched_dialect: detection.matched_dialect ?? "common",
+        builtin_dictionary_status:
+          detection.builtin_dictionary.status === "matched"
+            ? "matched"
+            : "not_found",
         smart_dictionary_status: "clear",
-        headwords: clone(detection.builtin_dictionary.headwords),
+        headwords:
+          detection.builtin_dictionary.status === "matched"
+            ? clone(detection.builtin_dictionary.headwords)
+            : clone(input.headwords),
         suggested_pos: forms.pos.map((entry) => entry.pos),
         detected_at: timestamp
       },
@@ -2114,7 +2179,8 @@ export function createAdminWordsMock({
       max_reachable_step: "forms",
       created_by: profile.id,
       created_at: timestamp,
-      updated_at: timestamp
+      updated_at: timestamp,
+      has_unpublished_changes: false
     };
     current.words[word.id] = word;
     current.create_idempotency[input.idempotency_key] = word.id;
@@ -2204,12 +2270,13 @@ export function createAdminWordsMock({
 
   async function saveFormsStep(
     wordId: string,
-    input: SaveFormsStepInput
+    input: MockSaveFormsStepInput
   ): Promise<AdminWordV2Envelope> {
     await pause();
     const { state: current } = context();
     assertPayload(input);
-    const prior = current.operations[input.operation_id];
+    const operationId = input.operation_id;
+    const prior = operationId ? current.operations[operationId] : undefined;
     if (prior) {
       if (
         prior.kind !== "forms" ||
@@ -2309,25 +2376,29 @@ export function createAdminWordsMock({
     word.revision += 1;
     word.updated_at = nextTimestamp(current);
     reconcileProgress(word, current, "forms", input.intent, priorCompleted);
+    word.has_unpublished_changes = word.published_revision !== undefined;
     const result = { word: clone(word) };
-    current.operations[input.operation_id] = {
-      kind: "forms",
-      word_id: word.id,
-      input_json: JSON.stringify(input),
-      result: clone(result)
-    };
+    if (operationId) {
+      current.operations[operationId] = {
+        kind: "forms",
+        word_id: word.id,
+        input_json: JSON.stringify(input),
+        result: clone(result)
+      };
+    }
     persist(current);
     return result;
   }
 
   async function saveMeaningsStep(
     wordId: string,
-    input: SaveMeaningsStepInput
+    input: MockSaveMeaningsStepInput
   ): Promise<AdminWordV2Envelope> {
     await pause();
     const { state: current } = context();
     assertPayload(input);
-    const prior = current.operations[input.operation_id];
+    const operationId = input.operation_id;
+    const prior = operationId ? current.operations[operationId] : undefined;
     if (prior) {
       if (
         prior.kind !== "meanings" ||
@@ -2394,13 +2465,16 @@ export function createAdminWordsMock({
     word.revision += 1;
     word.updated_at = nextTimestamp(current);
     reconcileProgress(word, current, "meanings", input.intent, priorCompleted);
+    word.has_unpublished_changes = word.published_revision !== undefined;
     const result = { word: clone(word) };
-    current.operations[input.operation_id] = {
-      kind: "meanings",
-      word_id: word.id,
-      input_json: JSON.stringify(input),
-      result: clone(result)
-    };
+    if (operationId) {
+      current.operations[operationId] = {
+        kind: "meanings",
+        word_id: word.id,
+        input_json: JSON.stringify(input),
+        result: clone(result)
+      };
+    }
     persist(current);
     return result;
   }
@@ -2468,10 +2542,27 @@ export function createAdminWordsMock({
 
   async function publishV2(
     wordId: string,
+    input: MockPublishAdminWordV2Input
+  ): Promise<AdminWordV2Envelope>;
+  async function publishV2(
+    wordId: string,
+    idempotencyKey: string,
     input: PublishAdminWordV2Input
+  ): Promise<AdminWordV2Envelope>;
+  async function publishV2(
+    wordId: string,
+    idempotencyKeyOrInput: string | MockPublishAdminWordV2Input,
+    wireInput?: PublishAdminWordV2Input
   ): Promise<AdminWordV2Envelope> {
     await pause();
     const { state: current } = context();
+    const input: MockPublishAdminWordV2Input =
+      typeof idempotencyKeyOrInput === "string"
+        ? {
+            ...wireInput!,
+            idempotency_key: idempotencyKeyOrInput
+          }
+        : idempotencyKeyOrInput;
     const publishedWordId = current.publish_idempotency[input.idempotency_key];
     if (publishedWordId) {
       if (publishedWordId !== wordId) {
@@ -2483,7 +2574,10 @@ export function createAdminWordsMock({
         );
       }
       const published = requireWord(current, publishedWordId);
-      if (!isV2(published) || input.base_revision !== published.revision - 1) {
+      if (
+        !isV2(published) ||
+        input.base_revision !== published.published_revision
+      ) {
         throw new HttpError(
           409,
           "idempotency key reused",
@@ -2526,9 +2620,10 @@ export function createAdminWordsMock({
       );
     }
     word.status = "published";
-    word.revision += 1;
     word.updated_at = nextTimestamp(current);
     word.published_at = word.updated_at;
+    word.published_revision = word.revision;
+    word.has_unpublished_changes = false;
     current.publish_idempotency[input.idempotency_key] = word.id;
     persist(current);
 
@@ -2547,6 +2642,165 @@ export function createAdminWordsMock({
       );
     }
     return { word: clone(word) };
+  }
+
+  async function transitionLifecycle(
+    scope: "archive" | "restore" | "archive_batch" | "restore_batch",
+    target: "archived" | "active",
+    idempotencyKey: string,
+    input: EntryLifecycleBatchInput
+  ): Promise<EntryLifecycleBatchResponse> {
+    await pause();
+    const { profile, state: current } = context();
+    if (input.entries.length < 1 || input.entries.length > 100) {
+      throw new HttpError(
+        422,
+        "entries must contain between 1 and 100 values",
+        [],
+        "validation_failed"
+      );
+    }
+    const ids = new Set(input.entries.map((entry) => entry.id));
+    if (
+      ids.size !== input.entries.length ||
+      input.entries.some(
+        (entry) => entry.base_revision < 1 || entry.base_lifecycle_revision < 1
+      )
+    ) {
+      throw new HttpError(
+        422,
+        "entry ids must be unique and revisions must be positive",
+        [],
+        "validation_failed"
+      );
+    }
+
+    const operationKey = `${scope}:${idempotencyKey}`;
+    const requestJson = JSON.stringify(input);
+    const existingOperation = lifecycleOperations.get(operationKey);
+    if (existingOperation) {
+      if (existingOperation.request_json !== requestJson) {
+        throw new HttpError(
+          409,
+          "idempotency key reused",
+          [],
+          "idempotency_key_reused"
+        );
+      }
+      return clone(existingOperation.response);
+    }
+
+    const words = input.entries.map((entry) => {
+      const word = requireWord(current, entry.id);
+      if (!isV2(word)) {
+        throw new HttpError(
+          409,
+          "word is legacy",
+          [],
+          "schema_version_mismatch"
+        );
+      }
+      assertRevision(word, entry.base_revision);
+      const alreadyTarget =
+        target === "archived"
+          ? word.status === "archived"
+          : word.status !== "archived";
+      if (
+        !alreadyTarget &&
+        word.lifecycle_revision !== entry.base_lifecycle_revision
+      ) {
+        throw new HttpError(
+          409,
+          "entry lifecycle revision conflict",
+          [],
+          "revision_conflict",
+          [],
+          { current_lifecycle_revision: word.lifecycle_revision }
+        );
+      }
+      return { word, alreadyTarget };
+    });
+
+    let affected = 0;
+    for (const { word, alreadyTarget } of words) {
+      if (alreadyTarget) continue;
+      const timestamp = nextTimestamp(current);
+      word.lifecycle_revision += 1;
+      word.updated_at = timestamp;
+      if (target === "archived") {
+        word.status = "archived";
+        word.archived_at = timestamp;
+        word.archived_by = profile.id;
+      } else {
+        word.status =
+          word.published_revision === undefined ? "draft" : "published";
+        delete word.archived_at;
+        delete word.archived_by;
+      }
+      affected += 1;
+    }
+    const response: EntryLifecycleBatchResponse = {
+      words: words.map(({ word }) => clone(word)),
+      affected
+    };
+    lifecycleOperations.set(operationKey, {
+      request_json: requestJson,
+      response: clone(response)
+    });
+    if (affected > 0) persist(current);
+    return response;
+  }
+
+  async function archive(
+    wordId: string,
+    idempotencyKey: string,
+    input: EntryLifecycleInput
+  ): Promise<AdminWordV2Envelope> {
+    const response = await transitionLifecycle(
+      "archive",
+      "archived",
+      idempotencyKey,
+      { entries: [{ id: wordId, ...input }] }
+    );
+    return { word: response.words[0]! };
+  }
+
+  async function restore(
+    wordId: string,
+    idempotencyKey: string,
+    input: EntryLifecycleInput
+  ): Promise<AdminWordV2Envelope> {
+    const response = await transitionLifecycle(
+      "restore",
+      "active",
+      idempotencyKey,
+      { entries: [{ id: wordId, ...input }] }
+    );
+    return { word: response.words[0]! };
+  }
+
+  async function archiveBatch(
+    idempotencyKey: string,
+    input: EntryLifecycleBatchInput
+  ): Promise<EntryLifecycleBatchResponse> {
+    return transitionLifecycle(
+      "archive_batch",
+      "archived",
+      idempotencyKey,
+      input
+    );
+  }
+
+  async function restoreBatch(
+    idempotencyKey: string,
+    input: EntryLifecycleBatchInput
+  ): Promise<EntryLifecycleBatchResponse> {
+    return transitionLifecycle(
+      "restore_batch",
+      "active",
+      idempotencyKey,
+      input
+    );
   }
 
   async function remove(wordId: string): Promise<void> {
@@ -2617,7 +2871,7 @@ export function createAdminWordsMock({
         return {
           word_id: word.id,
           headword: displayHeadword(word),
-          kind: isV2(word) ? ("word" as const) : word.kind,
+          kind: word.kind,
           senses
         };
       })
@@ -2629,6 +2883,7 @@ export function createAdminWordsMock({
     if (activeProfileId) persistedStorage.clear(activeProfileId);
     activeProfileId = undefined;
     state = undefined;
+    lifecycleOperations.clear();
   }
 
   return {
@@ -2646,6 +2901,10 @@ export function createAdminWordsMock({
     validateV2,
     publish,
     publishV2,
+    archive,
+    restore,
+    archiveBatch,
+    restoreBatch,
     remove,
     batchDelete,
     relatedSearch,
@@ -2737,6 +2996,10 @@ export function completeMockMeanings(
                   uk: {
                     state: "ready",
                     variant: {
+                      id:
+                        sentence.en_text.uk.state === "ready"
+                          ? sentence.en_text.uk.variant.id
+                          : `${sentence.id}-en-uk`,
                       value: richText(`A ${displayHeadword(word)} example.`),
                       origin: "manual"
                     }
@@ -2744,6 +3007,10 @@ export function completeMockMeanings(
                   us: {
                     state: "ready",
                     variant: {
+                      id:
+                        sentence.en_text.us.state === "ready"
+                          ? sentence.en_text.us.variant.id
+                          : `${sentence.id}-en-us`,
                       value: richText(`A ${displayHeadword(word)} example.`),
                       origin: "manual"
                     }

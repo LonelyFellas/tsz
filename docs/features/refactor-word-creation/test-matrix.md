@@ -27,24 +27,24 @@
 
 ## 词性配置追加矩阵（2026-08-08）
 
-| ID  | 层级           | 场景                      | 输入/前置条件                                         | 预期行为                                                                     | 优先级 |
-| --- | -------------- | ------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------- | ------ |
-| T21 | unit           | catalog lookup 与稳定排序 | 基本/细分配置乱序、未知 code、重复当前词性            | 按 sort_order 稳定排序；中文解析正确；未知回退 code；新增列表排除已用项      | P0     |
-| T22 | unit/mock      | 默认目录种子              | 新管理员首次初始化 Mock                               | 11 个基本词性、19 个细分词性及所属关系完整，catalog_version 有效             | P0     |
-| T23 | unit/mock      | 基本词性 CRUD 与唯一性    | 新增、改名、排序、重复 code/中英文名、旧 revision     | 成功结果与 wire 同形；冲突分别返回 409；code 编辑态不可修改                  | P0     |
-| T24 | unit/mock      | 细分词性 CRUD 与所属关系  | 在 noun 下增改删细分词性、重复 code、旧 revision      | catalog 同步更新；细分项只属于指定基本词性；冲突/并发错误稳定                | P0     |
-| T25 | unit/mock      | 引用计数与删除保护        | V1/V2、draft/published、word/phrase、sense 引用       | 基本/细分 usage_count 实时派生；引用中返回 409；未引用基本项级联删除子项     | P0     |
-| T26 | unit/mock      | 配置持久化与会话隔离      | 刷新、坏 JSON、schema 变化、不同管理员、登出          | 修改可恢复；损坏/旧版清理；管理员隔离；不存凭据                              | P0     |
-| T27 | contract       | 词性配置 endpoint 契约    | catalog/list/基本 CRUD/细分 CRUD 共 9 个端点          | `/admin/settings/parts-of-speech` 方法、路径、snake_case body 正确且 PENDING | P0     |
-| T28 | integration/UI | 菜单、路由与权限          | super_admin、普通 admin、直达配置 URL                 | 超管看到并可进入；普通 admin 不见入口且直达显示 403                          | P0     |
-| T29 | integration/UI | 配置列表主流程            | 搜索、分页、新增、修改、删除未引用项                  | 表格与反馈正确；提交 loading；成功刷新；删除二次确认                         | P0     |
-| T30 | integration/UI | 配置列表错误路径          | catalog/list 失败、409 in-use、409 revision、500      | 保留当前数据；显示稳定错误；可重试；竞态后刷新引用数量                       | P0     |
-| T31 | integration/UI | 细分词性页内面板          | 选择 noun、增改删、已有 sense 引用                    | 仅显示 noun 子项；CRUD 正确；被引用项删除禁用且 409 可恢复                   | P0     |
-| T32 | integration/UI | 基本词性动态进入业务页面  | 新增自定义基本词性，再打开列表筛选与 forms 添加器     | 均使用最新 name_zh；保存 wire 仍是稳定 code；同词条不重复                    | P0     |
-| T33 | integration/UI | 细分词性按基本词性过滤    | noun/verb 各自配置不同细分词性                        | meanings 的 selector 只显示当前 POS 所属细分项                               | P0     |
-| T34 | integration/UI | 未知检测词性与目录失败    | detection 返回未知 code；catalog 请求失败             | 未知建议阻断建草稿；已有内容回退 code；新增/选择控件禁用并可重试             | P0     |
-| T35 | e2e            | 配置到词条的关键闭环      | 超管新增基本+细分词性 → 创建词条引用 → 返回删除       | 新配置可选；中文显示；引用后删除被阻断                                       | P1     |
-| T36 | manual         | 视觉与长列表              | 1200/1440/1920px、50 条分页、长中英文名、页内表格滚动 | antd 布局无截断/横向溢出；禁用说明和危险确认清晰                             | P1     |
+| ID  | 层级           | 场景                      | 输入/前置条件                                                       | 预期行为                                                                                 | 优先级 |
+| --- | -------------- | ------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------ |
+| T21 | unit           | catalog lookup 与稳定排序 | 基本/细分配置乱序、未知 code、重复当前词性                          | 按 sort_order 稳定排序；中文解析正确；未知回退 code；新增列表排除已用项                  | P0     |
+| T22 | unit/mock      | 默认目录种子              | 新管理员首次初始化 Mock                                             | 11 个基本词性、19 个细分词性及所属关系完整，catalog_version 有效                         | P0     |
+| T23 | unit/mock      | 基本词性 CRUD 与唯一性    | 新增、改名、排序、重复 code/中英文名、旧 revision                   | 成功结果与 wire 同形；冲突分别返回 409；code 编辑态不可修改                              | P0     |
+| T24 | unit/mock      | 细分词性 CRUD 与所属关系  | 在 noun 下增改删细分词性、重复 code、旧 revision                    | catalog 同步更新；细分项只属于指定基本词性；冲突/并发错误稳定                            | P0     |
+| T25 | unit/mock      | 引用计数与删除保护        | V1/V2、draft/published、word/phrase、sense 引用；过期 base_revision | 基本/细分 usage_count 实时派生；引用中返回 409；过期删除不落库；未引用基本项级联删除子项 | P0     |
+| T26 | unit/mock      | 配置持久化与会话隔离      | 刷新、坏 JSON、schema 变化、不同管理员、登出                        | 修改可恢复；损坏/旧版清理；管理员隔离；不存凭据                                          | P0     |
+| T27 | contract       | 词性配置 endpoint 契约    | catalog/list/基本 CRUD/细分 CRUD 共 9 个端点                        | method/path/body 正确；两个 DELETE 必填 base_revision query；契约保持 PENDING            | P0     |
+| T28 | integration/UI | 菜单、路由与权限          | super_admin、普通 admin、直达配置 URL                               | 超管看到并可进入；普通 admin 不见入口且直达显示 403                                      | P0     |
+| T29 | integration/UI | 配置列表主流程            | 搜索、分页、新增、修改、删除未引用项                                | 表格与反馈正确；提交 loading；成功刷新；删除二次确认                                     | P0     |
+| T30 | integration/UI | 配置列表错误路径          | catalog/list 失败、409 in-use、409 revision、in-use 无 meta、500    | 保留当前数据；错误提示不依赖 detail/usage_count；可重试；竞态后刷新引用数量              | P0     |
+| T31 | integration/UI | 细分词性页内面板          | 选择 noun、增改删、已有 sense 引用                                  | 仅显示 noun 子项；CRUD 正确；被引用项删除禁用且 409 可恢复                               | P0     |
+| T32 | integration/UI | 基本词性动态进入业务页面  | 新增自定义基本词性，再打开列表筛选与 forms 添加器                   | 均使用最新 name_zh；保存 wire 仍是稳定 code；同词条不重复                                | P0     |
+| T33 | integration/UI | 细分词性按基本词性过滤    | noun/verb 各自配置不同细分词性                                      | meanings 的 selector 只显示当前 POS 所属细分项                                           | P0     |
+| T34 | integration/UI | 未知检测词性与目录失败    | detection 返回未知 code；catalog 请求失败                           | 未知建议阻断建草稿；已有内容回退 code；新增/选择控件禁用并可重试                         | P0     |
+| T35 | e2e            | 配置到词条的关键闭环      | 超管新增基本+细分词性 → 创建词条引用 → 返回删除                     | 新配置可选；中文显示；引用后删除被阻断                                                   | P1     |
+| T36 | manual         | 视觉与长列表              | 1200/1440/1920px、50 条分页、长中英文名、页内表格滚动               | antd 布局无截断/横向溢出；禁用说明和危险确认清晰                                         | P1     |
 
 ## 配置页双 Tab 与创编选择层级矩阵（2026-08-08 修订）
 
@@ -130,3 +130,14 @@
 - [ ] 使用多个基本词性和多个词义切换方言，确认选择跨 Tab 共用且只发一个批量请求。
 - [ ] 模拟慢请求时反复点击选择器和重试，确认控件禁用、无重复请求、响应只写目标方言。
 - [ ] 模拟部分建议与服务失败，确认合法项保留、缺失项可手填/重试，保存草稿后刷新恢复。
+
+## 真实 lexicon 对接（2026-08-11）
+
+| 优先级 | 场景                                                                                                                                                                                             | 自动化文件                                                                                                                                                                                                                                                                                                                                 |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| P0     | 10 个 lexicon method/path、请求 body、`Idempotency-Key` header 与最终 OpenAPI；`has_unpublished_changes` 必填 boolean、`published_revision` 可省略但不可 null                                    | `packages/api-client/src/admin.test.ts`、`packages/api-client/src/http.test.ts`、`packages/api-client/src/endpoints.contract.test.ts`、`packages/api-client/src/openapi.snapshot.json`                                                                                                                                                     |
+| P0     | 文本节点稳定 ID：保留已有 `TextVariantV2.id`、`content_id`、`zh_text_id`，新增时生成；forms/meanings draft → wire 剥离音频与 relation 只读快照，过滤不完整 relation/context；缺省确认 token 省略 | `apps/admin/src/features/dictionary/word-creation/model.test.ts`、`apps/admin/src/features/dictionary/word-creation/FormsAndPronunciationStep.test.tsx`、`apps/admin/src/features/dictionary/word-creation/MeaningsAndExamplesStep.test.tsx`                                                                                               |
+| P0     | token refresh retry 后仍保留同一 `Idempotency-Key`；创建与发布命令不把幂等键混入 JSON body                                                                                                       | `packages/api-client/src/http.test.ts`、`packages/api-client/src/admin.test.ts`、`apps/admin/src/features/dictionary/word-creation/api.test.tsx`                                                                                                                                                                                           |
+| P0     | 已发布词条默认只读；显式“继续编辑”恢复未发布修改并再次发布；真实 related search 只能选取完整 `word_id + sense_id`                                                                                | `apps/admin/src/features/dictionary/SmartDictionary.routing.test.tsx`、`apps/admin/src/features/dictionary/word-creation/WordCreationWizard.test.tsx`、`apps/admin/src/features/dictionary/word-creation/PreviewAndPublishStep.test.tsx`、`apps/admin/src/features/dictionary/word-creation/MeaningsAndExamplesStep.test.tsx`              |
+| P1     | 真实模式隐藏 archive、batch archive、phrase、dialect suggestion，并阻断 legacy create/saveContent/publish/delete 的列表动作与直达编辑路由；mock 模式保留开发能力                                 | `apps/admin/src/features/dictionary/dataSource.test.ts`、`apps/admin/src/features/dictionary/SmartDictionary.routing.test.tsx`、`apps/admin/src/pages/pages.test.tsx`                                                                                                                                                                      |
+| P1     | 422 字段定位、409 revision conflict、410 detection expired 均有稳定反馈；连续双击提交只发起一次发布请求                                                                                          | `apps/admin/src/features/dictionary/word-creation/FormsAndPronunciationStep.test.tsx`、`apps/admin/src/features/dictionary/word-creation/MeaningsAndExamplesStep.test.tsx`、`apps/admin/src/features/dictionary/word-creation/PreviewAndPublishStep.test.tsx`、`apps/admin/src/features/dictionary/word-creation/CreateEntryStep.test.tsx` |

@@ -1,7 +1,8 @@
 import {
-  DeleteOutlined,
+  InboxOutlined,
   PlusOutlined,
   ReloadOutlined,
+  RollbackOutlined,
   SearchOutlined
 } from "@ant-design/icons";
 import {
@@ -22,19 +23,23 @@ import {
 } from "antd";
 import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { AdminWordKind, AdminWordListItem, CefrLevel } from "@tsz/types";
 import { isIncompleteHttpError } from "@tsz/api-client/http";
 import { env } from "@/lib/env";
 import {
-  useBatchDeleteWords,
+  useArchiveWord,
+  useArchiveWordsBatch,
   useDeleteWord,
   usePublishWord,
+  useRestoreWord,
+  useRestoreWordsBatch,
   useWordList,
   useWordStats
 } from "./api";
 import { CreateWordModal } from "./CreateWordModal";
+import { adminWordsDataSourceCapabilities } from "./dataSource";
 import { DetailsList } from "./DetailsList";
 import {
   CEFR_OPTIONS,
@@ -51,6 +56,7 @@ import {
 } from "./part-of-speech/catalog";
 import { usePartOfSpeechCatalog } from "./part-of-speech/api";
 import { toListQuery, type WordFilterValues } from "./listQuery";
+import { runLifecycleCommandOnce } from "./lifecycleCommand";
 import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 
 const { RangePicker } = DatePicker;
@@ -66,12 +72,16 @@ export function SmartDictionary() {
   const [pageSize, setPageSize] = useState(20);
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
   const [createKind, setCreateKind] = useState<AdminWordKind | null>(null);
+  const lifecycleCommandPending = useRef(false);
 
   const listQuery = useWordList(toListQuery(filters, page, pageSize));
   const stats = useWordStats();
   const publishWord = usePublishWord();
   const deleteWord = useDeleteWord();
-  const batchDelete = useBatchDeleteWords();
+  const archiveWord = useArchiveWord();
+  const restoreWord = useRestoreWord();
+  const archiveBatch = useArchiveWordsBatch();
+  const restoreBatch = useRestoreWordsBatch();
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const partOfSpeechLookup = useMemo(
     () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
@@ -81,9 +91,21 @@ export function SmartDictionary() {
     () => availablePartOfSpeechOptions(partOfSpeechLookup),
     [partOfSpeechLookup]
   );
+  const kindOptions = adminWordsDataSourceCapabilities.phraseCreation
+    ? KIND_OPTIONS
+    : KIND_OPTIONS.filter((option) => option.value === "word");
 
   const rows = listQuery.data?.words ?? [];
   const total = listQuery.data?.page.total ?? 0;
+  const selectedRows = rows.filter((row) => selectedKeys.includes(row.id));
+  const restoringSelection =
+    selectedRows.length > 0 &&
+    selectedRows.every((row) => row.status === "archived");
+  const lifecyclePending =
+    archiveWord.isPending ||
+    restoreWord.isPending ||
+    archiveBatch.isPending ||
+    restoreBatch.isPending;
 
   const applyFilters = (values: WordFilterValues) => {
     setFilters(values);
@@ -110,7 +132,7 @@ export function SmartDictionary() {
     });
   };
 
-  const removeOne = (record: AdminWordListItem) => {
+  const removeLegacy = (record: AdminWordListItem) => {
     modal.confirm({
       title: `删除「${record.headword}」?`,
       content: "整棵词条树将一并删除,不可恢复。",
@@ -130,24 +152,116 @@ export function SmartDictionary() {
     });
   };
 
-  const removeSelected = () => {
-    if (selectedKeys.length === 0) return;
+  const lifecycleInput = (record: AdminWordListItem) => {
+    if (
+      record.schema_version !== 2 ||
+      record.revision === undefined ||
+      record.lifecycle_revision === undefined
+    ) {
+      return undefined;
+    }
+    return {
+      base_revision: record.revision,
+      base_lifecycle_revision: record.lifecycle_revision
+    };
+  };
+
+  const transitionOne = (
+    record: AdminWordListItem,
+    target: "archive" | "restore"
+  ) => {
+    const input = lifecycleInput(record);
+    if (!input) {
+      message.error("词条缺少并发版本信息，请刷新列表后重试");
+      return;
+    }
+    const restoring = target === "restore";
     modal.confirm({
-      title: `删除选中的 ${selectedKeys.length} 个词条?`,
-      content: "整棵词条树将一并删除,不可恢复。",
-      okText: "删除",
-      okButtonProps: { danger: true },
+      title: `${restoring ? "恢复" : "归档"}「${record.headword}」？`,
+      content: restoring
+        ? "恢复后词条重新进入正常列表；现有发布记录保持不变。"
+        : "归档不会删除当前或历史发布记录；存在有效入站引用时服务端会安全拒绝。",
+      okText: restoring ? "恢复" : "归档",
+      okButtonProps: { danger: !restoring },
       cancelText: "取消",
       onOk: () =>
-        batchDelete
-          .mutateAsync(selectedKeys.map(String))
-          .then(({ deleted }) => {
+        runLifecycleCommandOnce(lifecycleCommandPending, async () => {
+          try {
+            const mutation = restoring ? restoreWord : archiveWord;
+            await mutation.mutateAsync({
+              wordId: record.id,
+              idempotencyKey: crypto.randomUUID(),
+              input
+            });
+            setSelectedKeys((previous) =>
+              previous.filter((key) => key !== record.id)
+            );
+            message.success(restoring ? "词条已恢复" : "词条已归档");
+          } catch (error) {
+            message.error(
+              error instanceof Error
+                ? error.message
+                : restoring
+                  ? "恢复失败"
+                  : "归档失败"
+            );
+            throw error;
+          }
+        })
+    });
+  };
+
+  const transitionSelected = () => {
+    if (selectedKeys.length === 0) return;
+    if (
+      selectedRows.length !== selectedKeys.length ||
+      selectedRows.some((row) => lifecycleInput(row) === undefined)
+    ) {
+      message.error("所选词条缺少并发版本信息，请刷新列表后重试");
+      return;
+    }
+    const hasArchived = selectedRows.some((row) => row.status === "archived");
+    const hasActive = selectedRows.some((row) => row.status !== "archived");
+    if (hasArchived && hasActive) {
+      message.warning("归档与未归档词条不能在同一批次处理");
+      return;
+    }
+    const restoring = restoringSelection;
+    const entries = selectedRows.map((record) => ({
+      id: record.id,
+      ...lifecycleInput(record)!
+    }));
+    modal.confirm({
+      title: `${restoring ? "恢复" : "归档"}选中的 ${selectedKeys.length} 个词条？`,
+      content: restoring
+        ? "该批次将原子恢复：任意一条冲突时全部保持原状。"
+        : "该批次将原子归档且保留全部发布历史：任意一条冲突时全部保持原状。",
+      okText: restoring ? "恢复" : "归档",
+      okButtonProps: { danger: !restoring },
+      cancelText: "取消",
+      onOk: () =>
+        runLifecycleCommandOnce(lifecycleCommandPending, async () => {
+          try {
+            const mutation = restoring ? restoreBatch : archiveBatch;
+            const response = await mutation.mutateAsync({
+              idempotencyKey: crypto.randomUUID(),
+              input: { entries }
+            });
             setSelectedKeys([]);
-            message.success(`已删除 ${deleted} 个词条`);
-          })
-          .catch((err: unknown) => {
-            message.error(err instanceof Error ? err.message : "删除失败");
-          })
+            message.success(
+              `已${restoring ? "恢复" : "归档"} ${response.affected} 个词条`
+            );
+          } catch (error) {
+            message.error(
+              error instanceof Error
+                ? error.message
+                : restoring
+                  ? "批量恢复失败"
+                  : "批量归档失败"
+            );
+            throw error;
+          }
+        })
     });
   };
 
@@ -209,10 +323,23 @@ export function SmartDictionary() {
       title: "状态",
       dataIndex: "status",
       width: 90,
-      render: (s: AdminWordListItem["status"]) => (
-        <Tag color={s === "published" ? "success" : "default"}>
-          {STATUS_LABEL[s]}
-        </Tag>
+      render: (s: AdminWordListItem["status"], record) => (
+        <Space size={4} wrap>
+          <Tag
+            color={
+              s === "published"
+                ? "success"
+                : s === "archived"
+                  ? "warning"
+                  : "default"
+            }
+          >
+            {STATUS_LABEL[s]}
+          </Tag>
+          {record.has_unpublished_changes && (
+            <Tag color="processing">有未发布修改</Tag>
+          )}
+        </Space>
       )
     },
     {
@@ -230,14 +357,16 @@ export function SmartDictionary() {
         const isV2 = record.schema_version === 2;
         return (
           <Space size={4}>
-            <Button
-              type="link"
-              size="small"
-              onClick={() => navigate(getWordRowRoute(record))}
-            >
-              {getWordRowActionLabel(record)}
-            </Button>
-            {!isV2 && (
+            {(isV2 || adminWordsDataSourceCapabilities.legacyEntryCreation) && (
+              <Button
+                type="link"
+                size="small"
+                onClick={() => navigate(getWordRowRoute(record))}
+              >
+                {getWordRowActionLabel(record)}
+              </Button>
+            )}
+            {!isV2 && adminWordsDataSourceCapabilities.legacyEntryCreation && (
               <Button
                 type="link"
                 size="small"
@@ -247,14 +376,38 @@ export function SmartDictionary() {
                 发布
               </Button>
             )}
-            <Button
-              type="link"
-              size="small"
-              danger
-              onClick={() => removeOne(record)}
-            >
-              删除
-            </Button>
+            {isV2 && adminWordsDataSourceCapabilities.archive && (
+              <Button
+                type="link"
+                size="small"
+                danger={record.status !== "archived"}
+                disabled={lifecycleInput(record) === undefined}
+                loading={
+                  lifecyclePending &&
+                  (archiveWord.variables?.wordId === record.id ||
+                    restoreWord.variables?.wordId === record.id)
+                }
+                onClick={() =>
+                  transitionOne(
+                    record,
+                    record.status === "archived" ? "restore" : "archive"
+                  )
+                }
+              >
+                {record.status === "archived" ? "恢复" : "归档"}
+              </Button>
+            )}
+            {!isV2 && adminWordsDataSourceCapabilities.legacyEntryCreation && (
+              <Button
+                type="link"
+                size="small"
+                danger
+                loading={deleteWord.isPending}
+                onClick={() => removeLegacy(record)}
+              >
+                删除
+              </Button>
+            )}
           </Space>
         );
       }
@@ -290,7 +443,7 @@ export function SmartDictionary() {
           <Form.Item name="kind" label="类型">
             <Select
               placeholder="请选择词汇类型"
-              options={KIND_OPTIONS}
+              options={kindOptions}
               allowClear
               style={{ width: 150 }}
             />
@@ -360,7 +513,10 @@ export function SmartDictionary() {
               type="primary"
               icon={<PlusOutlined />}
               onClick={() => {
-                if (env.WORD_CREATION_WIZARD) {
+                if (
+                  env.WORD_CREATION_WIZARD ||
+                  !adminWordsDataSourceCapabilities.legacyEntryCreation
+                ) {
                   navigate("/words/new");
                   return;
                 }
@@ -369,21 +525,28 @@ export function SmartDictionary() {
             >
               创建单词
             </Button>
-            <Button
-              icon={<PlusOutlined />}
-              onClick={() => setCreateKind("phrase")}
-            >
-              创建短语
-            </Button>
-            <Button
-              danger
-              icon={<DeleteOutlined />}
-              disabled={selectedKeys.length === 0}
-              loading={batchDelete.isPending}
-              onClick={removeSelected}
-            >
-              删除{selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
-            </Button>
+            {adminWordsDataSourceCapabilities.phraseCreation && (
+              <Button
+                icon={<PlusOutlined />}
+                onClick={() => navigate("/words/new?kind=phrase")}
+              >
+                创建短语
+              </Button>
+            )}
+            {adminWordsDataSourceCapabilities.batchArchive && (
+              <Button
+                danger={!restoringSelection}
+                icon={
+                  restoringSelection ? <RollbackOutlined /> : <InboxOutlined />
+                }
+                disabled={selectedKeys.length === 0}
+                loading={archiveBatch.isPending || restoreBatch.isPending}
+                onClick={transitionSelected}
+              >
+                {restoringSelection ? "恢复" : "归档"}
+                {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
+              </Button>
+            )}
           </Space>
           <Space size="large" wrap>
             <Typography.Text type="secondary">
@@ -447,10 +610,19 @@ export function SmartDictionary() {
           dataSource={rows}
           loading={listQuery.isPending}
           scroll={{ x: 1400 }}
-          rowSelection={{
-            selectedRowKeys: selectedKeys,
-            onChange: setSelectedKeys
-          }}
+          rowSelection={
+            adminWordsDataSourceCapabilities.batchArchive
+              ? {
+                  selectedRowKeys: selectedKeys,
+                  onChange: setSelectedKeys,
+                  getCheckboxProps: (record) => ({
+                    disabled:
+                      record.schema_version !== 2 ||
+                      lifecycleInput(record) === undefined
+                  })
+                }
+              : undefined
+          }
           pagination={{
             current: page,
             pageSize,

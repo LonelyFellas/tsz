@@ -3,6 +3,7 @@ import type {
   CefrLevel,
   Dialect,
   DialectVariantSuggestionItemV2,
+  DraftFormsStepContent,
   DraftMeaningsStepContent,
   EnglishTextV2,
   GrammarStructureV2,
@@ -141,7 +142,10 @@ export function createEnglishText(
 ): EnglishTextV2 {
   const value = toWordRichText(text);
   if (headwords.mode === "unified") {
-    return { mode: "unified", common: { value, origin: "manual" } };
+    return {
+      mode: "unified",
+      common: { id: newWordNodeId(), value, origin: "manual" }
+    };
   }
   const source = headwords.source_dialect;
   return {
@@ -149,11 +153,17 @@ export function createEnglishText(
     source_dialect: source,
     uk:
       source === "uk"
-        ? { state: "ready", variant: { value, origin: "manual" } }
+        ? {
+            state: "ready",
+            variant: { id: newWordNodeId(), value, origin: "manual" }
+          }
         : { state: "missing" },
     us:
       source === "us"
-        ? { state: "ready", variant: { value, origin: "manual" } }
+        ? {
+            state: "ready",
+            variant: { id: newWordNodeId(), value, origin: "manual" }
+          }
         : { state: "missing" }
   };
 }
@@ -314,7 +324,11 @@ export function applyMeaningDialectSuggestions(
       ...value,
       [targetDialect]: {
         state: "ready",
-        variant: { value: suggestion.value, origin: "converted" }
+        variant: {
+          id: newWordNodeId(),
+          value: suggestion.value,
+          origin: "converted"
+        }
       }
     };
   };
@@ -390,6 +404,7 @@ export function createDefinition(): WordDefinitionV2 {
     id: newWordNodeId(),
     level: "A1",
     definition_mode: "zh_definition",
+    content_id: newWordNodeId(),
     content: emptyWordRichText()
   };
 }
@@ -403,6 +418,7 @@ export function createSentence(
     id: newWordNodeId(),
     level: "A1",
     en_text: createEnglishText(headwords),
+    zh_text_id: newWordNodeId(),
     zh_text: emptyWordRichText(),
     links: [{ word_id: wordId, sense_id: senseId, role: "focus" }]
   };
@@ -490,6 +506,173 @@ export function createRelation(type: WordRelationType): WordRelationV2 {
     target_word_id: "",
     target_sense_id: "",
     score: "0"
+  };
+}
+
+function toWireEnglishText(value: EnglishTextV2): EnglishTextV2 {
+  if (value.mode === "unified") {
+    return {
+      mode: "unified",
+      common: {
+        id: value.common.id,
+        value: value.common.value,
+        origin: value.common.origin
+      }
+    };
+  }
+  const mapSlot = (slot: typeof value.uk): typeof value.uk =>
+    slot.state === "missing"
+      ? { state: "missing" }
+      : {
+          state: "ready",
+          variant: {
+            id: slot.variant.id,
+            value: slot.variant.value,
+            origin: slot.variant.origin
+          }
+        };
+  return {
+    mode: "distinguish",
+    source_dialect: value.source_dialect,
+    uk: mapSlot(value.uk),
+    us: mapSlot(value.us)
+  };
+}
+
+/**
+ * 只把后端接受的词形字段放上 wire，避免旧缓存中的只读音频字段被带回服务端。
+ */
+export function toFormsWireContent(
+  content: DraftFormsStepContent
+): DraftFormsStepContent {
+  const mapVariant = (
+    variant: WordPosFormsV2["base_form"]["variants"][number]
+  ) => ({
+    id: variant.id,
+    dialect: variant.dialect,
+    spelling: variant.spelling,
+    origin: variant.origin,
+    pronunciations: variant.pronunciations.map((pronunciation) => ({
+      id: pronunciation.id,
+      dict_phonetic: pronunciation.dict_phonetic,
+      actual_pron: pronunciation.actual_pron,
+      style: pronunciation.style
+    }))
+  });
+  return {
+    pos: content.pos.map((pos) => ({
+      pos_id: pos.pos_id,
+      pos: pos.pos,
+      dialect_rules: {
+        spelling_mode: pos.dialect_rules.spelling_mode,
+        phonetic_mode: pos.dialect_rules.phonetic_mode
+      },
+      base_form: {
+        id: pos.base_form.id,
+        form_type: "base",
+        variants: pos.base_form.variants.map(mapVariant)
+      },
+      form_groups: pos.form_groups.map((group) => ({
+        id: group.id,
+        is_regular: group.is_regular,
+        slots: group.slots.map((slot) => ({
+          id: slot.id,
+          form_type: slot.form_type,
+          variants: slot.variants.map(mapVariant)
+        }))
+      }))
+    }))
+  };
+}
+
+/**
+ * 构造词义保存请求：保留稳定文本 ID，丢弃未选完的关联目标与服务端只读快照。
+ */
+export function toMeaningsWireContent(
+  content: DraftMeaningsStepContent
+): DraftMeaningsStepContent {
+  return {
+    sense_groups: content.sense_groups.map((group) => ({
+      id: group.id,
+      name_zh: group.name_zh,
+      name_en: group.name_en
+    })),
+    pos: content.pos.map((pos) => ({
+      pos_id: pos.pos_id,
+      grammar_structures: pos.grammar_structures.map((grammar) => ({
+        id: grammar.id,
+        variants: grammar.variants.map((variant) => ({
+          id: variant.id,
+          dialect: variant.dialect,
+          content: variant.content
+        }))
+      })),
+      senses: pos.senses.map((sense) => ({
+        id: sense.id,
+        sub_pos: sense.sub_pos,
+        level: sense.level,
+        ...(sense.sense_group_id
+          ? { sense_group_id: sense.sense_group_id }
+          : {}),
+        ...(sense.frequency !== undefined
+          ? { frequency: sense.frequency }
+          : {}),
+        depends_on_context: sense.depends_on_context,
+        definitions: sense.definitions.map((definition) => {
+          const common = {
+            id: definition.id,
+            level: definition.level,
+            ...(definition.grammar_structure_id
+              ? { grammar_structure_id: definition.grammar_structure_id }
+              : {})
+          };
+          if ("content_id" in definition) {
+            return {
+              ...common,
+              definition_mode: definition.definition_mode,
+              content_id: definition.content_id,
+              content: definition.content
+            };
+          }
+          return {
+            ...common,
+            definition_mode: definition.definition_mode,
+            content: toWireEnglishText(definition.content)
+          };
+        }),
+        sentences: sense.sentences.map((sentence) => ({
+          id: sentence.id,
+          level: sentence.level,
+          en_text: toWireEnglishText(sentence.en_text),
+          zh_text_id: sentence.zh_text_id,
+          zh_text: sentence.zh_text,
+          links: sentence.links
+            .filter(
+              (link) =>
+                link.role === "focus" ||
+                Boolean(link.word_id.trim() && link.sense_id.trim())
+            )
+            .map((link) => ({
+              word_id: link.word_id,
+              sense_id: link.sense_id,
+              role: link.role
+            }))
+        })),
+        relations: sense.relations
+          .filter((relation) =>
+            Boolean(
+              relation.target_word_id.trim() && relation.target_sense_id.trim()
+            )
+          )
+          .map((relation) => ({
+            id: relation.id,
+            relation: relation.relation,
+            target_word_id: relation.target_word_id,
+            target_sense_id: relation.target_sense_id,
+            score: relation.score
+          }))
+      }))
+    }))
   };
 }
 
