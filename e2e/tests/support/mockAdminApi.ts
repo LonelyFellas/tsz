@@ -1,5 +1,11 @@
 import type { Page, Route } from "@playwright/test";
-import type { PartOfSpeechCatalogResponse } from "@tsz/types";
+import type {
+  DraftFormsStepContent,
+  DraftMeaningsStepContent,
+  PartOfSpeechCatalogResponse,
+  RichText,
+  WordPronunciationV2
+} from "@tsz/types";
 
 export const ADMIN_E2E_WORD_ID = "e2e-word-center";
 export const ADMIN_E2E_LEXICON_PATH = "/lexicon";
@@ -40,14 +46,14 @@ const PART_OF_SPEECH_CATALOG: PartOfSpeechCatalogResponse = {
   ]
 };
 
-const richText = (text: string) => ({
+const richText = (text: string): RichText => ({
   version: 1,
   text,
   spans: [],
   liaisons: []
 });
 
-const pronunciation = (id: string, phonetic: string) => ({
+const pronunciation = (id: string, phonetic: string): WordPronunciationV2 => ({
   id,
   dict_phonetic: phonetic,
   actual_pron: phonetic,
@@ -113,7 +119,7 @@ const CENTER_FORMS = {
       ]
     }
   ]
-};
+} satisfies DraftFormsStepContent;
 
 const CENTER_MEANINGS = {
   sense_groups: [
@@ -148,6 +154,7 @@ const CENTER_MEANINGS = {
               id: "definition-1",
               level: "A1",
               definition_mode: "zh_definition",
+              content_id: "definition-1-content",
               content: richText("圆心，中心")
             }
           ],
@@ -161,6 +168,7 @@ const CENTER_MEANINGS = {
                 uk: {
                   state: "ready",
                   variant: {
+                    id: "sentence-1-uk",
                     value: richText("He walked to the centre of the circle."),
                     origin: "manual"
                   }
@@ -168,11 +176,13 @@ const CENTER_MEANINGS = {
                 us: {
                   state: "ready",
                   variant: {
+                    id: "sentence-1-us",
                     value: richText("He walked to the center of the circle."),
                     origin: "manual"
                   }
                 }
               },
+              zh_text_id: "sentence-1-zh",
               zh_text: richText("他走到了圆的中心。"),
               links: [
                 {
@@ -188,7 +198,7 @@ const CENTER_MEANINGS = {
       ]
     }
   ]
-};
+} satisfies DraftMeaningsStepContent;
 
 type MockWord = Record<string, unknown> & {
   id: string;

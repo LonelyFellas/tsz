@@ -95,7 +95,7 @@ test.describe("admin 新建单词 V2", () => {
     await expect(page.getByRole("link", { name: "color (us)" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "确认并进入词形与发音" })
-    ).toBeDisabled();
+    ).toHaveCount(0);
 
     expect(api.count("POST", ADMIN_E2E_DETECTIONS_PATH)).toBe(1);
     expect(api.count("POST", ADMIN_E2E_ENTRIES_PATH)).toBe(0);
