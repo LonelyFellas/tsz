@@ -6,9 +6,11 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 echo "==> build @tsz/admin"
-# tshb-test 专用于验收尚未接入真实后端的 dictionary mock。显式 test mode 是
-# 唯一允许 mock 进入优化构建的通道；默认 production mode 仍由 Vite 配置 fail closed。
-VITE_WORD_CREATION_WIZARD=true VITE_ADMIN_WORDS_MOCK=true \
+# tshb-test 继续验收尚未接入真实后端的 words mock，但词性目录/配置已切 tsz-rust。
+# 显式 test mode 是唯一允许 mock 进入优化构建的通道；production 仍 fail closed。
+VITE_WORD_CREATION_WIZARD=true \
+  VITE_ADMIN_WORDS_MOCK=true \
+  VITE_ADMIN_PART_OF_SPEECH_MOCK=false \
   pnpm --filter @tsz/admin build --mode test
 
 echo "==> rsync dist -> tshb-test:/opt/tsz-admin/dist"

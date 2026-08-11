@@ -78,12 +78,14 @@ function writePersistedState(
 
 function mockFor(
   currentProfile: () => AdminProfile | undefined = () => profile(),
-  storage = memoryStorage()
+  storage = memoryStorage(),
+  partOfSpeechValidation: "internal" | "external" = "internal"
 ): AdminWordsMock {
   return createAdminWordsMock({
     getAdminProfile: currentProfile,
     now: () => new Date(NOW),
-    sessionStorage: storage
+    sessionStorage: storage,
+    partOfSpeechValidation
   });
 }
 
@@ -1991,7 +1993,10 @@ describe("part-of-speech settings mock", () => {
         abbreviation: "inv.",
         sort_order: 1
       })
-    ).rejects.toMatchObject({ status: 422, code: "invalid_request_body" });
+    ).rejects.toMatchObject({
+      status: 400,
+      code: "invalid_part_of_speech"
+    });
 
     const updated = await settingsMock.partOfSpeechSettings.update(created.id, {
       base_revision: created.revision,
@@ -2021,7 +2026,9 @@ describe("part-of-speech settings mock", () => {
       name_en: "General particle",
       sort_order: 10
     });
-    await settingsMock.partOfSpeechSettings.remove(created.id);
+    await settingsMock.partOfSpeechSettings.remove(created.id, {
+      base_revision: updated.revision
+    });
     expect(
       (await settingsMock.partOfSpeechSettings.catalog()).items.some(
         (item) => item.code === "particle"
@@ -2035,10 +2042,16 @@ describe("part-of-speech settings mock", () => {
         abbreviation: "m.",
         sort_order: 1
       })
-    ).rejects.toMatchObject({ status: 404 });
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "part_of_speech_not_found"
+    });
     await expect(
-      settingsMock.partOfSpeechSettings.remove("missing")
-    ).rejects.toMatchObject({ status: 404 });
+      settingsMock.partOfSpeechSettings.remove("missing", { base_revision: 1 })
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "part_of_speech_not_found"
+    });
   });
 
   it("细分词性按所属基本词性 CRUD，并保护重复、revision 与引用删除", async () => {
@@ -2090,7 +2103,10 @@ describe("part-of-speech settings mock", () => {
         name_en: "Duplicate code",
         sort_order: 1
       })
-    ).rejects.toMatchObject({ status: 409, code: "part_of_speech_conflict" });
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "sub_part_of_speech_conflict"
+    });
     await expect(
       settingsMock.partOfSpeechSettings.createSubPart(noun.id, {
         code: "lowercase",
@@ -2098,28 +2114,102 @@ describe("part-of-speech settings mock", () => {
         name_en: "Invalid",
         sort_order: 1
       })
-    ).rejects.toMatchObject({ status: 422 });
+    ).rejects.toMatchObject({
+      status: 400,
+      code: "invalid_part_of_speech"
+    });
 
-    await settingsMock.partOfSpeechSettings.removeSubPart(noun.id, created.id);
+    await settingsMock.partOfSpeechSettings.removeSubPart(noun.id, created.id, {
+      base_revision: updated.revision
+    });
     const referenced = (
       await settingsMock.partOfSpeechSettings.listSubParts(noun.id)
     ).items.find((item) => item.usage_count > 0)!;
     await expect(
-      settingsMock.partOfSpeechSettings.removeSubPart(noun.id, referenced.id)
+      settingsMock.partOfSpeechSettings.removeSubPart(noun.id, referenced.id, {
+        base_revision: referenced.revision
+      })
     ).rejects.toMatchObject({
       status: 409,
       code: "sub_part_of_speech_in_use",
       meta: { usage_count: expect.any(Number) }
     });
+    const nounConfig = (
+      await settingsMock.partOfSpeechSettings.list({ q: "noun" })
+    ).items.find((item) => item.id === noun.id)!;
     await expect(
-      settingsMock.partOfSpeechSettings.remove(noun.id)
+      settingsMock.partOfSpeechSettings.remove(noun.id, {
+        base_revision: nounConfig.revision
+      })
     ).rejects.toMatchObject({ status: 409, code: "part_of_speech_in_use" });
     await expect(
       settingsMock.partOfSpeechSettings.listSubParts("missing")
-    ).rejects.toMatchObject({ status: 404 });
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "part_of_speech_not_found"
+    });
     await expect(
-      settingsMock.partOfSpeechSettings.removeSubPart(noun.id, "missing")
-    ).rejects.toMatchObject({ status: 404 });
+      settingsMock.partOfSpeechSettings.removeSubPart(noun.id, "missing", {
+        base_revision: 1
+      })
+    ).rejects.toMatchObject({
+      status: 404,
+      code: "sub_part_of_speech_not_found"
+    });
+  });
+
+  it("DELETE 在引用检查前校验 revision，冲突时不删除配置", async () => {
+    const settingsMock = mockFor(superAdmin);
+    const created = await settingsMock.partOfSpeechSettings.create({
+      code: "particle",
+      name_zh: "小品词",
+      name_en: "Particle",
+      abbreviation: "part.",
+      sort_order: 120
+    });
+    const subPart = await settingsMock.partOfSpeechSettings.createSubPart(
+      created.id,
+      {
+        code: "PARTICLE-GENERAL",
+        name_zh: "一般小品词",
+        name_en: "General particle",
+        sort_order: 10
+      }
+    );
+
+    await expect(
+      settingsMock.partOfSpeechSettings.remove(created.id, {
+        base_revision: created.revision + 1
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "revision_conflict",
+      meta: { current_revision: created.revision }
+    });
+    await expect(
+      settingsMock.partOfSpeechSettings.removeSubPart(created.id, subPart.id, {
+        base_revision: subPart.revision + 1
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "revision_conflict",
+      meta: { current_revision: subPart.revision }
+    });
+    await expect(
+      settingsMock.partOfSpeechSettings.remove(created.id, {
+        base_revision: 0
+      })
+    ).rejects.toMatchObject({ status: 400, code: "invalid_query" });
+    await expect(
+      settingsMock.partOfSpeechSettings.removeSubPart(created.id, subPart.id, {
+        base_revision: 0
+      })
+    ).rejects.toMatchObject({ status: 400, code: "invalid_query" });
+    await expect(
+      settingsMock.partOfSpeechSettings.listSubParts(created.id)
+    ).resolves.toMatchObject({
+      items: [expect.objectContaining({ id: subPart.id })]
+    });
   });
 
   it("词条 create/save 对未知基本词性和错误所属细分词性 fail closed", async () => {
@@ -2179,5 +2269,32 @@ describe("part-of-speech settings mock", () => {
             : { mode: "unified", common: "far" }
       })
     ).rejects.toMatchObject({ status: 422, code: "unknown_part_of_speech" });
+  });
+
+  it("外部 catalog 模式不使用内部 seed 否决真实目录编码", async () => {
+    const settingsMock = mockFor(superAdmin, memoryStorage(), "external");
+    const draft = await createCenter(settingsMock, "external-catalog");
+    const externalForms = structuredClone(draft.word.forms);
+    externalForms.pos[0]!.pos = "real_custom_pos";
+
+    const forms = await settingsMock.saveFormsStep(draft.word.id, {
+      base_revision: draft.word.revision,
+      operation_id: "external-pos-save",
+      intent: "complete",
+      content: externalForms
+    });
+    expect(forms.word.forms.pos[0]!.pos).toBe("real_custom_pos");
+
+    const meanings = structuredClone(forms.word.meanings);
+    meanings.pos[0]!.senses[0]!.sub_pos = "REAL-CUSTOM-SUB";
+    const saved = await settingsMock.saveMeaningsStep(forms.word.id, {
+      base_revision: forms.word.revision,
+      operation_id: "external-sub-pos-save",
+      intent: "save",
+      content: meanings
+    });
+    expect(saved.word.meanings.pos[0]!.senses[0]!.sub_pos).toBe(
+      "REAL-CUSTOM-SUB"
+    );
   });
 });

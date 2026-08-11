@@ -279,15 +279,24 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.click(within(dialog).getByText("删 除"));
 
     await waitFor(() =>
-      expect(mock.remove).toHaveBeenCalledWith("pos-particle")
+      expect(mock.remove).toHaveBeenCalledWith({
+        id: "pos-particle",
+        base_revision: 1
+      })
     );
     expect(await screen.findByText("基本词性已删除")).toBeInTheDocument();
   });
 
   it.each([
     ["part_of_speech_conflict", "词性编码或名称已存在"],
+    ["sub_part_of_speech_conflict", "细分词性编码或名称已存在"],
     ["part_of_speech_in_use", "该基本词性已被单词或短语引用，只能修改"],
     ["sub_part_of_speech_in_use", "该细分词性已被词义引用，只能修改"],
+    ["part_of_speech_not_found", "基本词性不存在或已被删除，请刷新后重试"],
+    ["sub_part_of_speech_not_found", "细分词性不存在或已被删除，请刷新后重试"],
+    ["invalid_part_of_speech", "词性配置字段不符合要求，请检查后重试"],
+    ["invalid_request_body", "提交内容不完整或格式错误，请检查后重试"],
+    ["invalid_query", "请求版本或查询参数无效，请刷新后重试"],
     ["unexpected_code", "服务异常"]
   ])("删除失败 code=%s 时显示对应提示并刷新列表", async (code, text) => {
     mock.remove.mockRejectedValueOnce(new HttpError(409, "服务异常", [], code));

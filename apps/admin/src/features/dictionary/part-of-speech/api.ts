@@ -67,7 +67,10 @@ export function useUpdatePartOfSpeech() {
 export function useRemovePartOfSpeech() {
   const invalidate = useInvalidatePartOfSpeech();
   return useMutation({
-    mutationFn: (id: string) => partOfSpeechDataSource.remove(id),
+    mutationFn: (vars: { id: string; base_revision: number }) =>
+      partOfSpeechDataSource.remove(vars.id, {
+        base_revision: vars.base_revision
+      }),
     onSuccess: invalidate
   });
 }
@@ -97,8 +100,14 @@ export function useUpdateSubPartOfSpeech() {
 export function useRemoveSubPartOfSpeech() {
   const invalidate = useInvalidatePartOfSpeech();
   return useMutation({
-    mutationFn: (vars: { partId: string; subId: string }) =>
-      partOfSpeechDataSource.removeSubPart(vars.partId, vars.subId),
+    mutationFn: (vars: {
+      partId: string;
+      subId: string;
+      base_revision: number;
+    }) =>
+      partOfSpeechDataSource.removeSubPart(vars.partId, vars.subId, {
+        base_revision: vars.base_revision
+      }),
     onSuccess: invalidate
   });
 }

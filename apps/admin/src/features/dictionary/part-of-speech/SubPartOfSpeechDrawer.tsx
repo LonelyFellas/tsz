@@ -170,7 +170,11 @@ export function SubPartOfSpeechPanel({ parent, onSaved, onError }: Props) {
       cancelText: "取 消",
       onOk: async () => {
         try {
-          await remove.mutateAsync({ partId: parent.id, subId: item.id });
+          await remove.mutateAsync({
+            partId: parent.id,
+            subId: item.id,
+            base_revision: item.revision
+          });
           onSaved("细分词性已删除");
         } catch (error) {
           onError(error);

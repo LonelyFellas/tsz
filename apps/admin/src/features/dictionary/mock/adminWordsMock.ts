@@ -22,6 +22,7 @@ import type {
   DraftMeaningsStepContent,
   DraftValidationIssue,
   DraftValidationResponse,
+  DeletePartOfSpeechQuery,
   FormsImpactItemV2,
   PartOfSpeechCatalogResponse,
   PartOfSpeechConfig,
@@ -144,6 +145,8 @@ type MockAdminProfile = Pick<
 
 export interface CreateAdminWordsMockOptions {
   getAdminProfile: () => MockAdminProfile | undefined;
+  /** 混合模式下词性由真实 catalog 约束，mock 不再用内部 seed 二次否决。 */
+  partOfSpeechValidation?: "internal" | "external";
   now?: () => Date;
   latencyMs?: number;
   maxPayloadBytes?: number;
@@ -448,7 +451,8 @@ function isNonEmptyEnglishText(
 function validateForms(
   content: DraftFormsStepContent,
   headwords: WordHeadwordsV2,
-  current: AdminWordsMockPersistedState
+  current: AdminWordsMockPersistedState,
+  validatePartOfSpeech = true
 ): DraftValidationIssue[] {
   const issues: DraftValidationIssue[] = [];
   if (content.pos.length === 0) {
@@ -464,7 +468,7 @@ function validateForms(
     const configuredPart = Object.values(current.parts_of_speech).find(
       (part) => part.code === pos.pos
     );
-    if (!configuredPart) {
+    if (validatePartOfSpeech && !configuredPart) {
       issues.push({
         step: "forms",
         node_id: pos.pos_id,
@@ -604,7 +608,8 @@ function wordHasSense(word: MockWord, senseId: string): boolean {
 function validateMeanings(
   word: AdminWordV2,
   content: DraftMeaningsStepContent,
-  current: AdminWordsMockPersistedState
+  current: AdminWordsMockPersistedState,
+  validatePartOfSpeech = true
 ): DraftValidationIssue[] {
   const issues: DraftValidationIssue[] = [];
   const senseGroupIds = new Set(content.sense_groups.map((group) => group.id));
@@ -726,9 +731,10 @@ function validateMeanings(
           (subPart) => subPart.code === sense.sub_pos
         );
         if (
-          !configuredPart ||
-          !configuredSubPart ||
-          configuredSubPart.part_of_speech_id !== configuredPart.id
+          validatePartOfSpeech &&
+          (!configuredPart ||
+            !configuredSubPart ||
+            configuredSubPart.part_of_speech_id !== configuredPart.id)
         ) {
           issues.push({
             step: "meanings",
@@ -944,6 +950,7 @@ function convertDialectText(
 /** Stateful contract-shaped mock for the complete admin words namespace. */
 export function createAdminWordsMock({
   getAdminProfile,
+  partOfSpeechValidation = "internal",
   now = () => new Date(),
   latencyMs = 0,
   maxPayloadBytes,
@@ -951,6 +958,7 @@ export function createAdminWordsMock({
   sessionStorage: providedSessionStorage,
   warn
 }: CreateAdminWordsMockOptions) {
+  const validatesInternalPartOfSpeech = partOfSpeechValidation === "internal";
   const persistedStorage =
     storage ??
     createAdminWordsMockStorage({
@@ -1187,6 +1195,7 @@ export function createAdminWordsMock({
     current: AdminWordsMockPersistedState,
     content: DraftFormsStepContent
   ): void {
+    if (!validatesInternalPartOfSpeech) return;
     const unknown = content.pos.find(
       (pos) =>
         !Object.values(current.parts_of_speech).some(
@@ -1210,6 +1219,7 @@ export function createAdminWordsMock({
     forms: DraftFormsStepContent,
     meanings: DraftMeaningsStepContent
   ): void {
+    if (!validatesInternalPartOfSpeech) return;
     const formById = new Map(forms.pos.map((pos) => [pos.pos_id, pos]));
     for (const posMeanings of meanings.pos) {
       const formPos = formById.get(posMeanings.pos_id);
@@ -1245,6 +1255,7 @@ export function createAdminWordsMock({
     current: AdminWordsMockPersistedState,
     posList: AdminWordSaveInput["pos"]
   ): void {
+    if (!validatesInternalPartOfSpeech) return;
     const unknown = posList.find(
       (pos) =>
         !Object.values(current.parts_of_speech).some(
@@ -1323,40 +1334,15 @@ export function createAdminWordsMock({
     sort_order: number;
   }): void {
     if (input.code !== undefined && !/^[a-z][a-z0-9_]{0,31}$/.test(input.code))
-      throw new HttpError(
-        422,
-        "invalid part of speech code",
-        [],
-        "invalid_request_body"
-      );
+      throw invalidPartOfSpeech("code", "invalid part of speech code");
     if (!input.name_zh || input.name_zh.length > 64)
-      throw new HttpError(
-        422,
-        "invalid Chinese name",
-        [],
-        "invalid_request_body"
-      );
+      throw invalidPartOfSpeech("name_zh", "invalid Chinese name");
     if (!input.name_en || input.name_en.length > 64)
-      throw new HttpError(
-        422,
-        "invalid English name",
-        [],
-        "invalid_request_body"
-      );
+      throw invalidPartOfSpeech("name_en", "invalid English name");
     if (!input.abbreviation || input.abbreviation.length > 16)
-      throw new HttpError(
-        422,
-        "invalid abbreviation",
-        [],
-        "invalid_request_body"
-      );
+      throw invalidPartOfSpeech("abbreviation", "invalid abbreviation");
     if (!Number.isInteger(input.sort_order))
-      throw new HttpError(
-        422,
-        "invalid sort order",
-        [],
-        "invalid_request_body"
-      );
+      throw invalidPartOfSpeech("sort_order", "invalid sort order");
   }
 
   function assertSubPartFields(input: {
@@ -1366,33 +1352,35 @@ export function createAdminWordsMock({
     sort_order: number;
   }): void {
     if (input.code !== undefined && !/^[A-Z][A-Z0-9_-]{0,31}$/.test(input.code))
-      throw new HttpError(
-        422,
-        "invalid sub-part code",
-        [],
-        "invalid_request_body"
-      );
+      throw invalidPartOfSpeech("code", "invalid sub-part code");
     if (!input.name_zh || input.name_zh.length > 64)
-      throw new HttpError(
-        422,
-        "invalid Chinese name",
-        [],
-        "invalid_request_body"
-      );
+      throw invalidPartOfSpeech("name_zh", "invalid Chinese name");
     if (!input.name_en || input.name_en.length > 64)
-      throw new HttpError(
-        422,
-        "invalid English name",
-        [],
-        "invalid_request_body"
-      );
+      throw invalidPartOfSpeech("name_en", "invalid English name");
     if (!Number.isInteger(input.sort_order))
-      throw new HttpError(
-        422,
-        "invalid sort order",
-        [],
-        "invalid_request_body"
-      );
+      throw invalidPartOfSpeech("sort_order", "invalid sort order");
+  }
+
+  function invalidPartOfSpeech(field: string, detail: string): HttpError {
+    return new HttpError(400, detail, [], "invalid_part_of_speech", {
+      type: "urn:tsz:problem:invalid_part_of_speech",
+      title: "Invalid part of speech",
+      status: 400,
+      detail,
+      code: "invalid_part_of_speech",
+      field
+    });
+  }
+
+  function assertPositiveRevision(
+    revision: number,
+    source: "body" | "query"
+  ): void {
+    if (Number.isInteger(revision) && revision >= 1) return;
+    if (source === "body") {
+      throw invalidPartOfSpeech("base_revision", "invalid base revision");
+    }
+    throw new HttpError(400, "invalid base revision", [], "invalid_query");
   }
 
   function assertUniquePart(
@@ -1444,7 +1432,7 @@ export function createAdminWordsMock({
         409,
         "sub-part of speech configuration already exists",
         [],
-        "part_of_speech_conflict"
+        "sub_part_of_speech_conflict"
       );
   }
 
@@ -1535,7 +1523,13 @@ export function createAdminWordsMock({
     requireSuperAdmin(profile);
     const existing = current.parts_of_speech[id];
     if (!existing)
-      throw new HttpError(404, "part of speech not found", [], "not_found");
+      throw new HttpError(
+        404,
+        "part of speech not found",
+        [],
+        "part_of_speech_not_found"
+      );
+    assertPositiveRevision(rawInput.base_revision, "body");
     if (existing.revision !== rawInput.base_revision)
       throw new HttpError(
         409,
@@ -1565,13 +1559,35 @@ export function createAdminWordsMock({
     return materializePart(current, updated);
   }
 
-  async function removePartOfSpeech(id: string): Promise<void> {
+  async function removePartOfSpeech(
+    id: string,
+    query: DeletePartOfSpeechQuery
+  ): Promise<void> {
     await pause();
     const { profile, state: current } = context();
     requireSuperAdmin(profile);
     const existing = current.parts_of_speech[id];
     if (!existing)
-      throw new HttpError(404, "part of speech not found", [], "not_found");
+      throw new HttpError(
+        404,
+        "part of speech not found",
+        [],
+        "part_of_speech_not_found"
+      );
+    assertPositiveRevision(query.base_revision, "query");
+    if (existing.revision !== query.base_revision)
+      throw new HttpError(
+        409,
+        "configuration changed",
+        [],
+        "revision_conflict",
+        [],
+        {
+          current_revision: existing.revision,
+          part_of_speech_id: existing.id,
+          code: existing.code
+        }
+      );
     const usageCount = partUsageCount(current, existing.code);
     if (usageCount > 0)
       throw new HttpError(
@@ -1597,7 +1613,12 @@ export function createAdminWordsMock({
     const { profile, state: current } = context();
     requireSuperAdmin(profile);
     if (!current.parts_of_speech[partId])
-      throw new HttpError(404, "part of speech not found", [], "not_found");
+      throw new HttpError(
+        404,
+        "part of speech not found",
+        [],
+        "part_of_speech_not_found"
+      );
     return {
       items: sortedSubParts(current, partId).map((item) =>
         materializeSubPart(current, item)
@@ -1613,7 +1634,12 @@ export function createAdminWordsMock({
     const { profile, state: current } = context();
     requireSuperAdmin(profile);
     if (!current.parts_of_speech[partId])
-      throw new HttpError(404, "part of speech not found", [], "not_found");
+      throw new HttpError(
+        404,
+        "part of speech not found",
+        [],
+        "part_of_speech_not_found"
+      );
     const input = trimSubPartInput({
       ...rawInput,
       code: rawInput.code.trim()
@@ -1647,7 +1673,13 @@ export function createAdminWordsMock({
     requireSuperAdmin(profile);
     const existing = current.sub_parts[subId];
     if (!existing || existing.part_of_speech_id !== partId)
-      throw new HttpError(404, "sub-part not found", [], "not_found");
+      throw new HttpError(
+        404,
+        "sub-part not found",
+        [],
+        "sub_part_of_speech_not_found"
+      );
+    assertPositiveRevision(rawInput.base_revision, "body");
     if (existing.revision !== rawInput.base_revision)
       throw new HttpError(
         409,
@@ -1677,13 +1709,36 @@ export function createAdminWordsMock({
     return materializeSubPart(current, updated);
   }
 
-  async function removeSubPart(partId: string, subId: string): Promise<void> {
+  async function removeSubPart(
+    partId: string,
+    subId: string,
+    query: DeletePartOfSpeechQuery
+  ): Promise<void> {
     await pause();
     const { profile, state: current } = context();
     requireSuperAdmin(profile);
     const existing = current.sub_parts[subId];
     if (!existing || existing.part_of_speech_id !== partId)
-      throw new HttpError(404, "sub-part not found", [], "not_found");
+      throw new HttpError(
+        404,
+        "sub-part not found",
+        [],
+        "sub_part_of_speech_not_found"
+      );
+    assertPositiveRevision(query.base_revision, "query");
+    if (existing.revision !== query.base_revision)
+      throw new HttpError(
+        409,
+        "configuration changed",
+        [],
+        "revision_conflict",
+        [],
+        {
+          current_revision: existing.revision,
+          part_of_speech_id: partId,
+          code: existing.code
+        }
+      );
     const usageCount = subPartUsageCount(current, existing.code);
     if (usageCount > 0)
       throw new HttpError(
@@ -1711,9 +1766,20 @@ export function createAdminWordsMock({
     priorCompleted: ReadonlySet<AdminWordV2["completed_steps"][number]>
   ): void {
     const formsValid =
-      validateForms(word.forms, word.headwords, current).length === 0;
+      validateForms(
+        word.forms,
+        word.headwords,
+        current,
+        validatesInternalPartOfSpeech
+      ).length === 0;
     const meaningsValid =
-      formsValid && validateMeanings(word, word.meanings, current).length === 0;
+      formsValid &&
+      validateMeanings(
+        word,
+        word.meanings,
+        current,
+        validatesInternalPartOfSpeech
+      ).length === 0;
     let formsCompleted = priorCompleted.has("forms") && formsValid;
     let meaningsCompleted =
       formsCompleted && priorCompleted.has("meanings") && meaningsValid;
@@ -2188,7 +2254,12 @@ export function createAdminWordsMock({
         );
       }
     }
-    const issues = validateForms(input.content, word.headwords, current);
+    const issues = validateForms(
+      input.content,
+      word.headwords,
+      current,
+      validatesInternalPartOfSpeech
+    );
     if (input.intent === "complete" && issues.length > 0) {
       throw new HttpError(
         422,
@@ -2277,7 +2348,12 @@ export function createAdminWordsMock({
     assertConfiguredForms(current, word.forms);
     if (
       !word.completed_steps.includes("forms") ||
-      validateForms(word.forms, word.headwords, current).length > 0
+      validateForms(
+        word.forms,
+        word.headwords,
+        current,
+        validatesInternalPartOfSpeech
+      ).length > 0
     ) {
       throw new HttpError(
         409,
@@ -2293,7 +2369,12 @@ export function createAdminWordsMock({
       );
     }
     assertConfiguredMeanings(current, word.forms, input.content);
-    const issues = validateMeanings(word, input.content, current);
+    const issues = validateMeanings(
+      word,
+      input.content,
+      current,
+      validatesInternalPartOfSpeech
+    );
     if (input.intent === "complete" && issues.length > 0) {
       throw new HttpError(
         422,
@@ -2335,8 +2416,18 @@ export function createAdminWordsMock({
       throw new HttpError(409, "word is legacy", [], "schema_version_mismatch");
     assertRevision(word, input.base_revision);
     const issues = [
-      ...validateForms(word.forms, word.headwords, current),
-      ...validateMeanings(word, word.meanings, current)
+      ...validateForms(
+        word.forms,
+        word.headwords,
+        current,
+        validatesInternalPartOfSpeech
+      ),
+      ...validateMeanings(
+        word,
+        word.meanings,
+        current,
+        validatesInternalPartOfSpeech
+      )
     ];
     return {
       validated_revision: word.revision,
@@ -2407,8 +2498,18 @@ export function createAdminWordsMock({
     assertConfiguredForms(current, word.forms);
     assertConfiguredMeanings(current, word.forms, word.meanings);
     const issues = [
-      ...validateForms(word.forms, word.headwords, current),
-      ...validateMeanings(word, word.meanings, current)
+      ...validateForms(
+        word.forms,
+        word.headwords,
+        current,
+        validatesInternalPartOfSpeech
+      ),
+      ...validateMeanings(
+        word,
+        word.meanings,
+        current,
+        validatesInternalPartOfSpeech
+      )
     ];
     if (issues.length > 0) {
       throw new HttpError(

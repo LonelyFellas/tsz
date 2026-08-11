@@ -8,6 +8,7 @@ import type {
   WordRelationType,
   WordSubPos
 } from "./admin-word";
+import type { ProblemMeta } from "./api";
 
 /** 新建单词向导 V2 wire 类型；字段 1:1 镜像 snake_case JSON。 */
 export type AdminWordLanguageV2 = "en";
@@ -366,15 +367,8 @@ export interface PublishAdminWordV2Input {
   idempotency_key: string;
 }
 
-export interface AdminWordApiErrorMeta {
-  current_revision?: number;
-  word_id?: string;
-  max_reachable_step?: WordCreationStep;
-  affected_node_ids?: string[];
-  usage_count?: number;
-  part_of_speech_id?: string;
-  code?: string;
-}
+/** @deprecated 新代码统一使用通用 ProblemMeta。 */
+export type AdminWordApiErrorMeta = ProblemMeta;
 
 export interface AdminWordApiError {
   error: string;

@@ -210,7 +210,8 @@ describe("SubPartOfSpeechPanel", () => {
     await waitFor(() =>
       expect(api.remove).toHaveBeenCalledWith({
         partId: "pos-noun",
-        subId: "sub-collective"
+        subId: "sub-collective",
+        base_revision: 1
       })
     );
     expect(callbacks.onSaved).toHaveBeenCalledWith("细分词性已删除");

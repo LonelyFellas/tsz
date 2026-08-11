@@ -345,7 +345,7 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
       abbreviation: "ptcl.",
       sort_order: 20
     });
-    api.partOfSpeechSettings.remove("pos-1");
+    api.partOfSpeechSettings.remove("pos-1", { base_revision: 4 });
 
     expect(http.get).toHaveBeenNthCalledWith(
       1,
@@ -371,7 +371,9 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
       abbreviation: "ptcl.",
       sort_order: 20
     });
-    expect(http.del).toHaveBeenCalledWith("/settings/parts-of-speech/pos-1");
+    expect(http.del).toHaveBeenCalledWith(
+      "/settings/parts-of-speech/pos-1?base_revision=4"
+    );
   });
 
   it("list 无参不带 query，细分词性 CRUD 使用父子动态 id", () => {
@@ -390,7 +392,9 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
       name_en: "Collective noun",
       sort_order: 20
     });
-    api.partOfSpeechSettings.removeSubPart("pos-1", "sub-2");
+    api.partOfSpeechSettings.removeSubPart("pos-1", "sub-2", {
+      base_revision: 7
+    });
 
     expect(http.get).toHaveBeenNthCalledWith(1, "/settings/parts-of-speech");
     expect(http.get).toHaveBeenNthCalledWith(
@@ -416,7 +420,7 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
       }
     );
     expect(http.del).toHaveBeenCalledWith(
-      "/settings/parts-of-speech/pos-1/sub-parts/sub-2"
+      "/settings/parts-of-speech/pos-1/sub-parts/sub-2?base_revision=7"
     );
   });
 });

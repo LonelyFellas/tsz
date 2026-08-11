@@ -141,7 +141,7 @@ const PART_OF_SPEECH_INVOCATIONS = [
       }
     ]
   },
-  { method: "remove", args: ["pos-1"] },
+  { method: "remove", args: ["pos-1", { base_revision: 4 }] },
   { method: "listSubParts", args: ["pos-1"] },
   {
     method: "createSubPart",
@@ -163,7 +163,10 @@ const PART_OF_SPEECH_INVOCATIONS = [
       }
     ]
   },
-  { method: "removeSubPart", args: ["pos-1", "sub-1"] }
+  {
+    method: "removeSubPart",
+    args: ["pos-1", "sub-1", { base_revision: 5 }]
+  }
 ] as const satisfies ReadonlyArray<{
   method: keyof AdminPartOfSpeechDataSource;
   args: readonly unknown[];
@@ -236,13 +239,18 @@ interface LoadedModule {
   createMock: ReturnType<typeof vi.fn>;
   mockModuleFactory: ReturnType<typeof vi.fn>;
   getMockFactoryOptions: () =>
-    { getAdminProfile: () => AuthState["profile"] | undefined } | undefined;
+    | {
+        getAdminProfile: () => AuthState["profile"] | undefined;
+        partOfSpeechValidation: "internal" | "external";
+      }
+    | undefined;
 }
 
 async function loadDataSource({
   mockEnabled,
   real,
   mock,
+  partMockEnabled = mockEnabled,
   realPart = createPartOfSpeechSourceDouble("real").source,
   mockPart = createPartOfSpeechSourceDouble("mock").source,
   initialProfile = { id: "admin-1" },
@@ -250,6 +258,7 @@ async function loadDataSource({
   mode = production ? "production" : "test"
 }: {
   mockEnabled: boolean;
+  partMockEnabled?: boolean;
   real: AdminWordsDataSource;
   mock: AdminWordsDataSource;
   realPart?: AdminPartOfSpeechDataSource;
@@ -266,14 +275,21 @@ async function loadDataSource({
   let profile = initialProfile;
   let listener: AuthListener | undefined;
   let mockFactoryOptions:
-    { getAdminProfile: () => AuthState["profile"] | undefined } | undefined;
+    | {
+        getAdminProfile: () => AuthState["profile"] | undefined;
+        partOfSpeechValidation: "internal" | "external";
+      }
+    | undefined;
   const getState = vi.fn(() => ({ profile }));
   const subscribe = vi.fn((next: AuthListener) => {
     listener = next;
     return vi.fn();
   });
   const createMock = vi.fn(
-    (options: { getAdminProfile: () => AuthState["profile"] | undefined }) => {
+    (options: {
+      getAdminProfile: () => AuthState["profile"] | undefined;
+      partOfSpeechValidation: "internal" | "external";
+    }) => {
       mockFactoryOptions = options;
       return Object.assign(mock, { partOfSpeechSettings: mockPart });
     }
@@ -286,7 +302,12 @@ async function loadDataSource({
     api: { words: real, partOfSpeechSettings: realPart },
     useAuthStore: { getState, subscribe }
   }));
-  vi.doMock("@/lib/env", () => ({ env: { ADMIN_WORDS_MOCK: mockEnabled } }));
+  vi.doMock("@/lib/env", () => ({
+    env: {
+      ADMIN_WORDS_MOCK: mockEnabled,
+      ADMIN_PART_OF_SPEECH_MOCK: partMockEnabled
+    }
+  }));
   vi.doMock("./mock/adminWordsMock", mockModuleFactory);
 
   const module = await import("./dataSource");
@@ -439,6 +460,7 @@ describe("admin words data source selection", () => {
     expect(loaded.createMock).toHaveBeenCalledTimes(1);
 
     const options = loaded.getMockFactoryOptions();
+    expect(options?.partOfSpeechValidation).toBe("internal");
     expect(options?.getAdminProfile()).toEqual({ id: "admin-1" });
     expect(loaded.auth.getState).toHaveBeenCalledTimes(1);
     loaded.auth.setProfile(null);
@@ -470,6 +492,70 @@ describe("admin words data source selection", () => {
     loaded.auth.listener?.({ profile: null }, { profile: { id: "admin-1" } });
     await loaded.module.adminWordsDataSource.stats();
     expect(loaded.createMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("单词 mock + 词性真实时分别委派，并让 mock 信任外部 catalog", async () => {
+    const real = createSourceDouble("real");
+    const mock = createSourceDouble("mock", true);
+    const realPart = createPartOfSpeechSourceDouble("real");
+    const mockPart = createPartOfSpeechSourceDouble("mock");
+    const loaded = await loadDataSource({
+      mockEnabled: true,
+      partMockEnabled: false,
+      real: real.source,
+      mock: mock.source,
+      realPart: realPart.source,
+      mockPart: mockPart.source
+    });
+
+    await expectFacadeDelegation(
+      loaded.module.adminWordsDataSource,
+      mock,
+      "mock"
+    );
+    await expectPartOfSpeechFacadeDelegation(
+      loaded.module.partOfSpeechDataSource,
+      realPart,
+      "real"
+    );
+    expect(loaded.createMock).toHaveBeenCalledTimes(1);
+    expect(loaded.getMockFactoryOptions()?.partOfSpeechValidation).toBe(
+      "external"
+    );
+    expect(mockPart.calls.catalog).not.toHaveBeenCalled();
+    expect(loaded.auth.subscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it("单词真实 + 词性 mock 时分别委派，并复用内部 catalog 校验", async () => {
+    const real = createSourceDouble("real");
+    const mock = createSourceDouble("mock", true);
+    const realPart = createPartOfSpeechSourceDouble("real");
+    const mockPart = createPartOfSpeechSourceDouble("mock");
+    const loaded = await loadDataSource({
+      mockEnabled: false,
+      partMockEnabled: true,
+      real: real.source,
+      mock: mock.source,
+      realPart: realPart.source,
+      mockPart: mockPart.source
+    });
+
+    await expectFacadeDelegation(
+      loaded.module.adminWordsDataSource,
+      real,
+      "real"
+    );
+    await expectPartOfSpeechFacadeDelegation(
+      loaded.module.partOfSpeechDataSource,
+      mockPart,
+      "mock"
+    );
+    expect(loaded.createMock).toHaveBeenCalledTimes(1);
+    expect(loaded.getMockFactoryOptions()?.partOfSpeechValidation).toBe(
+      "internal"
+    );
+    expect(mock.calls.stats).not.toHaveBeenCalled();
+    expect(loaded.auth.subscribe).toHaveBeenCalledTimes(1);
   });
 
   it("production 始终使用 real，且不注册 logout 订阅或加载 mock", async () => {

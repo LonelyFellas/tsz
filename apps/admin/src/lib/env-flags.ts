@@ -31,6 +31,19 @@ export function assertAdminWordsMockAllowed(
   }
 }
 
+/** 词性配置 mock 采用独立开关，但沿用相同的 production fail-closed 策略。 */
+export function assertAdminPartOfSpeechMockAllowed(
+  enabled: boolean,
+  production: boolean,
+  mode = production ? "production" : "development"
+): void {
+  if (enabled && production && mode !== "test") {
+    throw new Error(
+      "[env] 仅开发环境或 test mode 构建允许启用 VITE_ADMIN_PART_OF_SPEECH_MOCK；请移除该变量或设为 false"
+    );
+  }
+}
+
 /** TTS mock 与词库 mock 采用同样的 fail-closed 策略。 */
 export function assertAdminTtsMockAllowed(
   enabled: boolean,

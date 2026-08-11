@@ -521,29 +521,97 @@ describe("createHttpClient", () => {
     });
   });
 
-  it.each([{ usage_count: -1 }, { part_of_speech_id: " " }, { code: "" }])(
-    "词性配置错误的畸形 meta 安全降级: %o",
-    async (meta) => {
-      fetchMock.mockResolvedValueOnce(
-        jsonResponse(
-          {
-            error: "invalid configuration meta",
-            code: "part_of_speech_in_use",
-            meta
-          },
-          { ok: false, status: 409 }
-        )
-      );
-      const http = createHttpClient({ baseUrl: "" });
-
-      await expect(http.get("/settings/parts-of-speech")).rejects.toMatchObject(
+  it("RFC 9457 ProblemDetails 与 HttpError 共享同一份通用 meta", async () => {
+    const meta = {
+      current_revision: 6,
+      usage_count: 3,
+      part_of_speech_id: "019f0000-0000-7000-8000-000000000001",
+      code: "noun"
+    };
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
         {
-          status: 409,
-          meta: undefined
-        }
-      );
-    }
-  );
+          ...problem({
+            type: "urn:tsz:problem:part_of_speech_in_use",
+            title: "Part of speech is in use",
+            status: 409,
+            detail: "part of speech is referenced",
+            code: "part_of_speech_in_use"
+          }),
+          meta
+        },
+        { ok: false, status: 409, contentType: "application/problem+json" }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(
+      http.del("/settings/parts-of-speech/pos-1?base_revision=5")
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "part_of_speech_in_use",
+      meta,
+      problem: { meta }
+    });
+  });
+
+  it("通用 ProblemMeta 继续保留词条错误上下文", async () => {
+    const meta = {
+      current_revision: 8,
+      word_id: "word-1",
+      max_reachable_step: "meanings",
+      affected_node_ids: ["sense-1"]
+    };
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          ...problem({
+            type: "urn:tsz:problem:revision_conflict",
+            title: "Revision conflict",
+            status: 409,
+            detail: "word changed",
+            code: "revision_conflict"
+          }),
+          meta
+        },
+        { ok: false, status: 409, contentType: "application/problem+json" }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(
+      http.put("/words/word-1/steps/forms", {})
+    ).rejects.toMatchObject({
+      meta,
+      problem: { meta }
+    });
+  });
+
+  it.each([
+    { usage_count: -1 },
+    { part_of_speech_id: " " },
+    { code: "" },
+    { word_id: "" },
+    { max_reachable_step: "done" },
+    { affected_node_ids: [""] }
+  ])("词性配置错误的畸形 meta 安全降级: %o", async (meta) => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          error: "invalid configuration meta",
+          code: "part_of_speech_in_use",
+          meta
+        },
+        { ok: false, status: 409 }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/settings/parts-of-speech")).rejects.toMatchObject({
+      status: 409,
+      meta: undefined
+    });
+  });
 
   it("畸形 V2 field_issues 与 meta 安全降级，不把外部输入伪装成已校验类型", async () => {
     fetchMock.mockResolvedValueOnce(
