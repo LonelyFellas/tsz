@@ -38,7 +38,14 @@ import type {
   WordPronunciationV2
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client/http";
-import { Fragment, type DragEvent, useEffect, useMemo, useState } from "react";
+import {
+  Fragment,
+  type DragEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { useNavigate } from "react-router-dom";
 import {
   DIALECT_LABEL,
@@ -674,7 +681,7 @@ function MissingDialectVariantCell({
     source: WordFormVariantV2,
     target: "uk" | "us",
     clientId: string
-  ) => Promise<string | undefined>;
+  ) => Promise<void>;
   onAdd: (spelling: string, origin: WordFormVariantV2["origin"]) => void;
 }) {
   return (
@@ -701,9 +708,7 @@ function MissingDialectVariantCell({
             }
             onClick={() => {
               if (!source || dialect === "common") return;
-              void onGenerate(source, dialect, slotId).then((suggestion) => {
-                if (suggestion !== undefined) onAdd(suggestion, "converted");
-              });
+              void onGenerate(source, dialect, slotId);
             }}
           >
             生成{dialect === "uk" ? "英式" : "美式"}建议
@@ -733,7 +738,7 @@ function FormGroupMatrix({
     source: WordFormVariantV2,
     target: "uk" | "us",
     clientId: string
-  ) => Promise<string | undefined>;
+  ) => Promise<void>;
   onChange: (next: WordPosFormsV2) => void;
 }) {
   const group = pos.form_groups[groupIndex];
@@ -1047,7 +1052,7 @@ function PosFormsEditor({
     source: WordFormVariantV2,
     target: "uk" | "us",
     clientId: string
-  ) => Promise<string | undefined>;
+  ) => Promise<void>;
   onChange: (next: WordPosFormsV2) => void;
 }) {
   const spellingForced = headwords.mode === "distinguish";
@@ -1333,6 +1338,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const [content, setContent] = useState<DraftFormsStepContent>(() =>
     cloneWordValue(word.forms)
   );
+  const contentRef = useRef(content);
   const [activePosId, setActivePosId] = useState(
     word.forms.pos[0]?.pos_id ?? ""
   );
@@ -1387,7 +1393,9 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
 
   useEffect(() => {
     if (!dirty) {
-      setContent(cloneWordValue(word.forms));
+      const next = cloneWordValue(word.forms);
+      contentRef.current = next;
+      setContent(next);
       setActivePosId((current) =>
         word.forms.pos.some((pos) => pos.pos_id === current)
           ? current
@@ -1397,9 +1405,84 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   }, [dirty, word.forms, word.revision]);
 
   const updateContent = (next: DraftFormsStepContent) => {
+    contentRef.current = next;
     setContent(next);
     setDirty(true);
   };
+
+  const applyGeneratedFormVariant = (
+    clientId: string,
+    target: "uk" | "us",
+    spelling: string
+  ) => {
+    setContent((current) => {
+      const pos = current.pos.map((posItem) => {
+        const appendIfMissing = <
+          T extends WordPosFormsV2["base_form"] | WordDerivedFormSlotV2
+        >(
+          slot: T
+        ): T => {
+          if (
+            slot.id !== clientId ||
+            slot.variants.some((variant) => variant.dialect === target)
+          ) {
+            return slot;
+          }
+          return {
+            ...slot,
+            variants: [
+              ...slot.variants,
+              {
+                id: newWordNodeId(),
+                dialect: target,
+                spelling,
+                origin: "converted" as const,
+                pronunciations: [createPronunciation()]
+              }
+            ]
+          } as T;
+        };
+        const baseForm = appendIfMissing(posItem.base_form);
+        const formGroups = posItem.form_groups.map((group) => ({
+          ...group,
+          slots: group.slots.map(appendIfMissing)
+        }));
+        if (
+          baseForm === posItem.base_form &&
+          formGroups.every(
+            (group, index) => group.slots === posItem.form_groups[index]?.slots
+          )
+        ) {
+          return posItem;
+        }
+        return {
+          ...posItem,
+          base_form: baseForm,
+          form_groups: formGroups
+        };
+      });
+      const next = { pos };
+      contentRef.current = next;
+      return next;
+    });
+    setDirty(true);
+  };
+
+  const hasFormVariant = (clientId: string, target: "uk" | "us") =>
+    contentRef.current.pos.some(
+      (posItem) =>
+        (posItem.base_form.id === clientId &&
+          posItem.base_form.variants.some(
+            (variant) => variant.dialect === target
+          )) ||
+        posItem.form_groups.some((group) =>
+          group.slots.some(
+            (slot) =>
+              slot.id === clientId &&
+              slot.variants.some((variant) => variant.dialect === target)
+          )
+        )
+    );
 
   const availablePos = useMemo(() => {
     const used = new Set(content.pos.map((item) => item.pos));
@@ -1428,11 +1511,11 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
     source: WordFormVariantV2,
     target: "uk" | "us",
     clientId: string
-  ): Promise<string | undefined> => {
+  ): Promise<void> => {
     if (!adminWordsDataSourceCapabilities.dialectVariantSuggestions) {
-      return undefined;
+      return;
     }
-    if (source.dialect !== "uk" && source.dialect !== "us") return undefined;
+    if (source.dialect !== "uk" && source.dialect !== "us") return;
     try {
       const response = await suggestVariants.mutateAsync({
         source_dialect: source.dialect,
@@ -1445,9 +1528,20 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
           }
         ]
       });
-      const suggestion = response.suggestions[0];
-      if (!suggestion || suggestion.field_kind !== "form") return undefined;
-      return await new Promise((resolve) => {
+      const matching = response.suggestions.filter(
+        (
+          suggestion
+        ): suggestion is Extract<
+          (typeof response.suggestions)[number],
+          { field_kind: "form" }
+        > =>
+          suggestion.client_id === clientId && suggestion.field_kind === "form"
+      );
+      if (response.suggestions.length !== 1 || matching.length !== 1) {
+        throw new Error("词形建议响应无效，请重试");
+      }
+      const suggestion = matching[0]!;
+      await new Promise<void>((resolve) => {
         modal.confirm({
           title: `确认${target === "uk" ? "英式" : "美式"}词形建议`,
           content: (
@@ -1460,8 +1554,16 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
           ),
           okText: "写入建议",
           cancelText: "取消",
-          onOk: () => resolve(suggestion.value),
-          onCancel: () => resolve(undefined)
+          onOk: () => {
+            if (hasFormVariant(clientId, target)) {
+              message.warning("目标方言已填写，未覆盖现有内容");
+              resolve();
+              return;
+            }
+            applyGeneratedFormVariant(clientId, target, suggestion.value);
+            resolve();
+          },
+          onCancel: resolve
         });
       });
     } catch (error) {

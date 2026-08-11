@@ -326,21 +326,28 @@ describe("CreateEntryStep", () => {
     );
   });
 
-  it("未命中内置词典的短语可创建 V2 空白草稿", async () => {
-    const detection = detectionFixture("in front of");
+  it("规范化回显与原输入不同时，未命中短语仍可创建 V2 空白草稿", async () => {
+    const rawHeadword = "  ＢＲＡＮＤ   NEW PHRASE  ";
+    const detection = detectionFixture(rawHeadword);
     const created = {
       ...wordFixture(),
       kind: "phrase" as const,
-      headwords: { mode: "unified" as const, common: "in front of" }
+      headwords: { mode: "unified" as const, common: "BRAND NEW PHRASE" }
     };
     mutations.detect.mockResolvedValue(detection);
     mutations.create.mockResolvedValue({ word: created });
     const { onCreated } = renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
-      target: { value: "in front of" }
+      target: { value: rawHeadword }
     });
     fireEvent.click(button("词典检测"));
 
+    await waitFor(() =>
+      expect(mutations.detect).toHaveBeenCalledWith({
+        language: "en",
+        headword: "ＢＲＡＮＤ   NEW PHRASE"
+      })
+    );
     expect(
       await screen.findByText("内置词典没有匹配项，将创建空白短语草稿")
     ).toBeVisible();
@@ -352,7 +359,7 @@ describe("CreateEntryStep", () => {
         schema_version: 2,
         idempotency_key: expect.any(String),
         detection_id: detection.detection_id,
-        headwords: { mode: "unified", common: "in front of" }
+        headwords: { mode: "unified", common: "BRAND NEW PHRASE" }
       })
     );
     expect(onCreated).toHaveBeenCalledWith(created);

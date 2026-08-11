@@ -3,7 +3,8 @@ import type {
   AdminWord,
   AdminWordV2,
   DraftFormsStepContent,
-  DraftMeaningsStepContent
+  DraftMeaningsStepContent,
+  SuggestDialectVariantsInputV2
 } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -634,9 +635,17 @@ describe("admin words mock", () => {
     await expect(
       mock.detect({ language: "en", headword: "smart-unavailable" })
     ).resolves.toMatchObject({ smart_dictionary: { status: "unavailable" } });
-    const phrase = await mock.detect({
+    const matchedPhrase = await mock.detect({
       language: "en",
       headword: "in front of"
+    });
+    expect(matchedPhrase).toMatchObject({
+      entry_kind: "phrase",
+      builtin_dictionary: { status: "matched" }
+    });
+    const phrase = await mock.detect({
+      language: "en",
+      headword: "unlisted phrase"
     });
     expect(phrase).toMatchObject({
       entry_kind: "phrase",
@@ -647,7 +656,7 @@ describe("admin words mock", () => {
         schema_version: 2,
         idempotency_key: "create-phrase",
         detection_id: phrase.detection_id,
-        headwords: { mode: "unified", common: "in front of" }
+        headwords: { mode: "unified", common: "unlisted phrase" }
       })
     ).resolves.toMatchObject({
       word: {
@@ -655,6 +664,26 @@ describe("admin words mock", () => {
         lifecycle_revision: 1,
         forms: { pos: [] }
       }
+    });
+    const normalizedPhrase = await mock.detect({
+      language: "en",
+      headword: "  It’s　Well—Known  "
+    });
+    expect(normalizedPhrase).toMatchObject({
+      request: { headword: "It’s Well—Known" },
+      normalized_headword: "it's well-known",
+      entry_kind: "phrase",
+      builtin_dictionary: { status: "not_found" }
+    });
+    await expect(
+      mock.createV2({
+        schema_version: 2,
+        idempotency_key: "create-normalized-phrase",
+        detection_id: normalizedPhrase.detection_id,
+        headwords: { mode: "unified", common: "It's Well-Known" }
+      })
+    ).resolves.toMatchObject({
+      word: { kind: "phrase", headwords: { common: "It's Well-Known" } }
     });
     await expect(
       mock.detect({ language: "en", headword: "colour" })
@@ -712,6 +741,445 @@ describe("admin words mock", () => {
     });
   });
 
+  it("方言建议仅返回有地区 evidence 的项目，并保留 provider 身份", async () => {
+    await expect(
+      mock.suggestDialectVariants({
+        source_dialect: "uk",
+        target_dialect: "us",
+        items: [
+          { client_id: "evidence-form", field_kind: "form", value: "CENTRE" },
+          {
+            client_id: "no-evidence-definition",
+            field_kind: "definition",
+            value: richText("unchanged")
+          }
+        ]
+      })
+    ).resolves.toEqual({
+      provider: { kind: "dictionary_region_rules", version: "1" },
+      suggestions: [
+        {
+          client_id: "evidence-form",
+          field_kind: "form",
+          value: "CENTER"
+        }
+      ]
+    });
+  });
+
+  it("方言建议转换后重映射 V1/V2 富文本偏移，并保护 phoneme 区间", async () => {
+    await expect(
+      mock.suggestDialectVariants({
+        source_dialect: "uk",
+        target_dialect: "us",
+        items: [
+          {
+            client_id: "v1-rich-text",
+            field_kind: "definition",
+            value: {
+              version: 1,
+              text: "Colour centre",
+              spans: [{ start: 0, end: 6, type: "bold" }],
+              liaisons: [6]
+            }
+          },
+          {
+            client_id: "v2-rich-text",
+            field_kind: "example",
+            value: {
+              version: 2,
+              text: "Colour centre",
+              annotations: [
+                { type: "emphasis", start: 0, end: 6, level: "strong" },
+                {
+                  type: "phoneme",
+                  start: 7,
+                  end: 13,
+                  alphabet: "ipa",
+                  phoneme: "sɛntə"
+                },
+                { type: "liaison", start: 0, end: 6 },
+                { type: "highlight", start: 0, end: 6, color: "blue" },
+                { type: "pause", at: 6, duration_ms: 250 }
+              ]
+            }
+          }
+        ]
+      })
+    ).resolves.toEqual({
+      provider: { kind: "dictionary_region_rules", version: "1" },
+      suggestions: [
+        {
+          client_id: "v1-rich-text",
+          field_kind: "definition",
+          value: {
+            version: 1,
+            text: "Color center",
+            spans: [{ start: 0, end: 5, type: "bold" }],
+            liaisons: [5]
+          }
+        },
+        {
+          client_id: "v2-rich-text",
+          field_kind: "example",
+          value: {
+            version: 2,
+            text: "Color centre",
+            annotations: [
+              { type: "emphasis", start: 0, end: 5, level: "strong" },
+              {
+                type: "phoneme",
+                start: 6,
+                end: 12,
+                alphabet: "ipa",
+                phoneme: "sɛntə"
+              },
+              { type: "liaison", start: 0, end: 5 },
+              { type: "highlight", start: 0, end: 5, color: "blue" },
+              { type: "pause", at: 5, duration_ms: 250 }
+            ]
+          }
+        }
+      ]
+    });
+  });
+
+  it("方言建议对语义非法、重复、超限与畸形 RichText 统一返回 422", async () => {
+    const validItem = {
+      client_id: "valid",
+      field_kind: "form" as const,
+      value: "centre"
+    };
+    const requestWithItem = (item: unknown): SuggestDialectVariantsInputV2 =>
+      ({
+        source_dialect: "uk",
+        target_dialect: "us",
+        items: [item]
+      }) as SuggestDialectVariantsInputV2;
+    const malformedRichText = (clientId: string, value: unknown) =>
+      requestWithItem({
+        client_id: clientId,
+        field_kind: "definition",
+        value
+      });
+    const invalidInputs: Array<{
+      field: string;
+      input: SuggestDialectVariantsInputV2;
+    }> = [
+      {
+        field: "target_dialect",
+        input: {
+          source_dialect: "uk",
+          target_dialect: "uk",
+          items: [validItem]
+        }
+      },
+      {
+        field: "items",
+        input: { source_dialect: "uk", target_dialect: "us", items: [] }
+      },
+      {
+        field: "items",
+        input: {
+          source_dialect: "uk",
+          target_dialect: "us",
+          items: Array.from({ length: 101 }, (_, index) => ({
+            client_id: `item-${index}`,
+            field_kind: "form" as const,
+            value: "centre"
+          }))
+        }
+      },
+      {
+        field: "items.client_id",
+        input: {
+          source_dialect: "uk",
+          target_dialect: "us",
+          items: [validItem, { ...validItem, value: "colour" }]
+        }
+      },
+      {
+        field: "items.client_id",
+        input: {
+          source_dialect: "uk",
+          target_dialect: "us",
+          items: [{ ...validItem, client_id: " ".repeat(101) }]
+        }
+      },
+      {
+        field: "items.client_id",
+        input: {
+          source_dialect: "uk",
+          target_dialect: "us",
+          items: [{ ...validItem, client_id: `x${"a".repeat(100)}` }]
+        }
+      },
+      {
+        field: "items.value",
+        input: {
+          source_dialect: "uk",
+          target_dialect: "us",
+          items: [{ ...validItem, value: "x".repeat(201) }]
+        }
+      },
+      {
+        field: "items.value",
+        input: {
+          source_dialect: "uk",
+          target_dialect: "us",
+          items: [
+            {
+              client_id: "invalid-rich-text",
+              field_kind: "definition",
+              value: {
+                version: 1,
+                text: "colour",
+                spans: [{ start: 5, end: 2, type: "bold" }],
+                liaisons: []
+              }
+            }
+          ]
+        }
+      },
+      {
+        field: "items.value",
+        input: requestWithItem({
+          ...validItem,
+          client_id: "blank-form",
+          value: " "
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("not-rich-text", null)
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("too-long-rich-text", {
+          version: 1,
+          text: "x".repeat(5001),
+          spans: [],
+          liaisons: []
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("invalid-v1-shape", {
+          version: 1,
+          text: "colour",
+          spans: null,
+          liaisons: []
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("invalid-v1-span-type", {
+          version: 1,
+          text: "colour",
+          spans: [{ start: 0, end: 6, type: "italic" }],
+          liaisons: []
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("invalid-v1-liaison", {
+          version: 1,
+          text: "colour",
+          spans: [],
+          liaisons: [6]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("invalid-v2-shape", {
+          version: 2,
+          text: "colour",
+          annotations: null
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("invalid-v2-range", {
+          version: 2,
+          text: "colour",
+          annotations: [{ type: "emphasis", start: 0, end: 7, level: "strong" }]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("invalid-v2-pause", {
+          version: 2,
+          text: "colour",
+          annotations: [{ type: "pause", at: -1, duration_ms: 250 }]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("invalid-v2-phoneme", {
+          version: 2,
+          text: "colour",
+          annotations: [
+            {
+              type: "phoneme",
+              start: 0,
+              end: 6,
+              alphabet: "arpabet",
+              phoneme: "K"
+            }
+          ]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("invalid-v2-highlight", {
+          version: 2,
+          text: "colour",
+          annotations: [
+            { type: "highlight", start: 0, end: 6, color: "purple" }
+          ]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("invalid-v1-nul", {
+          version: 1,
+          text: "colour\0center",
+          spans: [],
+          liaisons: []
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("invalid-v2-nul", {
+          version: 2,
+          text: "colour\0center",
+          annotations: []
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("zero-pause", {
+          version: 2,
+          text: "colour",
+          annotations: [{ type: "pause", at: 1, duration_ms: 0 }]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("long-pause", {
+          version: 2,
+          text: "colour",
+          annotations: [{ type: "pause", at: 1, duration_ms: 5001 }]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("long-phoneme", {
+          version: 2,
+          text: "colour",
+          annotations: [
+            {
+              type: "phoneme",
+              start: 0,
+              end: 6,
+              alphabet: "ipa",
+              phoneme: "a".repeat(201)
+            }
+          ]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("nul-phoneme", {
+          version: 2,
+          text: "colour",
+          annotations: [
+            {
+              type: "phoneme",
+              start: 0,
+              end: 6,
+              alphabet: "ipa",
+              phoneme: "k\0"
+            }
+          ]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("cross-paragraph", {
+          version: 2,
+          text: "color\ncentre",
+          annotations: [{ type: "highlight", start: 0, end: 12, color: "blue" }]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("overlapping-phonemes", {
+          version: 2,
+          text: "colour",
+          annotations: [
+            {
+              type: "phoneme",
+              start: 0,
+              end: 4,
+              alphabet: "ipa",
+              phoneme: "a"
+            },
+            {
+              type: "phoneme",
+              start: 3,
+              end: 6,
+              alphabet: "ipa",
+              phoneme: "b"
+            }
+          ]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("crossing-emphasis", {
+          version: 2,
+          text: "colour",
+          annotations: [
+            {
+              type: "phoneme",
+              start: 1,
+              end: 5,
+              alphabet: "ipa",
+              phoneme: "a"
+            },
+            { type: "emphasis", start: 0, end: 3, level: "strong" }
+          ]
+        })
+      },
+      {
+        field: "items.value",
+        input: malformedRichText("pause-inside-phoneme", {
+          version: 2,
+          text: "colour",
+          annotations: [
+            {
+              type: "phoneme",
+              start: 0,
+              end: 6,
+              alphabet: "ipa",
+              phoneme: "a"
+            },
+            { type: "pause", at: 3, duration_ms: 250 }
+          ]
+        })
+      }
+    ];
+
+    for (const { field, input } of invalidInputs) {
+      await expect(mock.suggestDialectVariants(input)).rejects.toMatchObject({
+        status: 422,
+        code: "validation_failed",
+        meta: { code: field }
+      });
+    }
+  });
+
   it("V2 生命周期保留内容并支持幂等重放、并发保护与原子批量", async () => {
     const center = await createCenter(mock, "lifecycle-center");
     const archiveInput = {
@@ -739,7 +1207,7 @@ describe("admin words mock", () => {
         ...archiveInput,
         base_revision: archiveInput.base_revision + 1
       })
-    ).rejects.toMatchObject({ status: 409, code: "idempotency_key_reused" });
+    ).rejects.toMatchObject({ status: 409, code: "idempotency_conflict" });
     await expect(
       mock.archiveBatch("archive-empty", { entries: [] })
     ).rejects.toMatchObject({ status: 422, code: "validation_failed" });
@@ -864,6 +1332,254 @@ describe("admin words mock", () => {
     ).toBe(true);
   });
 
+  it("生命周期幂等键跨端点复用时拒绝不同 scope 或 body", async () => {
+    const center = await createCenter(mock, "lifecycle-global-idempotency");
+    const input = {
+      base_revision: center.word.revision,
+      base_lifecycle_revision: center.word.lifecycle_revision
+    };
+    const archived = await mock.archive(
+      center.word.id,
+      "global-lifecycle-key",
+      input
+    );
+
+    await expect(
+      mock.restore(center.word.id, "global-lifecycle-key", {
+        base_revision: archived.word.revision,
+        base_lifecycle_revision: archived.word.lifecycle_revision
+      })
+    ).rejects.toMatchObject({ status: 409, code: "idempotency_conflict" });
+    await expect(
+      mock.archiveBatch("global-lifecycle-key", {
+        entries: [{ id: center.word.id, ...input }]
+      })
+    ).rejects.toMatchObject({ status: 409, code: "idempotency_conflict" });
+  });
+
+  it("归档拒绝当前发布版本的有效入站引用", async () => {
+    const targetDraft = await createDetectedWord(
+      mock,
+      "far",
+      "lifecycle-ref-target"
+    );
+    const targetReady = await completeDraft(
+      mock,
+      targetDraft,
+      "lifecycle-ref-target"
+    );
+    const targetPublished = await mock.publishV2(targetReady.id, {
+      base_revision: targetReady.revision,
+      idempotency_key: "lifecycle-ref-target-publish"
+    });
+    const sourceDraft = await createCenter(mock, "lifecycle-ref-source");
+    const sourceForms = await mock.saveFormsStep(sourceDraft.word.id, {
+      base_revision: sourceDraft.word.revision,
+      operation_id: "lifecycle-ref-source-forms",
+      intent: "complete",
+      content: sourceDraft.word.forms
+    });
+    const sourceMeanings = completeMockMeanings(sourceForms.word);
+    const sourceSense = sourceMeanings.pos[0]!.senses[0]!;
+    sourceSense.relations.push({
+      id: "lifecycle-relation",
+      relation: "synonym",
+      target_word_id: targetPublished.word.id,
+      target_sense_id: targetPublished.word.meanings.pos[0]!.senses[0]!.id,
+      score: "80"
+    });
+    const sourceReady = (
+      await mock.saveMeaningsStep(sourceForms.word.id, {
+        base_revision: sourceForms.word.revision,
+        operation_id: "lifecycle-ref-source-meanings",
+        intent: "complete",
+        content: sourceMeanings
+      })
+    ).word;
+    await mock.publishV2(sourceReady.id, {
+      base_revision: sourceReady.revision,
+      idempotency_key: "lifecycle-ref-source-publish"
+    });
+
+    await expect(
+      mock.archive(targetPublished.word.id, "archive-referenced-target", {
+        base_revision: targetPublished.word.revision,
+        base_lifecycle_revision: targetPublished.word.lifecycle_revision
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "entry_has_inbound_publication_refs",
+      meta: {
+        reference_locations: [
+          expect.objectContaining({
+            source_entry_id: sourceReady.id,
+            source_node_id: "lifecycle-relation"
+          })
+        ]
+      }
+    });
+  });
+
+  it("关系校验只接受未归档目标的当前发布 sense", async () => {
+    const targetDraft = await createDetectedWord(
+      mock,
+      "far",
+      "relation-publication-target"
+    );
+    const targetReady = await completeDraft(
+      mock,
+      targetDraft,
+      "relation-publication-target"
+    );
+    const targetPublished = await mock.publishV2(targetReady.id, {
+      base_revision: targetReady.revision,
+      idempotency_key: "relation-publication-target-publish"
+    });
+    const targetDraftMeanings = structuredClone(targetPublished.word.meanings);
+    targetDraftMeanings.pos[0]!.senses.push({
+      ...structuredClone(targetPublished.word.meanings.pos[0]!.senses[0]!),
+      id: "relation-unpublished-sense"
+    });
+    const targetEdited = await mock.saveMeaningsStep(targetReady.id, {
+      base_revision: targetPublished.word.revision,
+      operation_id: "relation-publication-target-edit",
+      intent: "save",
+      content: targetDraftMeanings
+    });
+
+    const sourceDraft = await createCenter(mock, "relation-publication-source");
+    const sourceForms = await mock.saveFormsStep(sourceDraft.word.id, {
+      base_revision: sourceDraft.word.revision,
+      operation_id: "relation-publication-source-forms",
+      intent: "complete",
+      content: sourceDraft.word.forms
+    });
+    const sourceMeanings = completeMockMeanings(sourceForms.word);
+    const relation = {
+      id: "relation-publication-check",
+      relation: "synonym" as const,
+      target_word_id: targetPublished.word.id,
+      target_sense_id: "relation-unpublished-sense",
+      score: "80"
+    };
+    sourceMeanings.pos[0]!.senses[0]!.relations.push(relation);
+    await expect(
+      mock.saveMeaningsStep(sourceForms.word.id, {
+        base_revision: sourceForms.word.revision,
+        operation_id: "relation-unpublished-target-sense",
+        intent: "complete",
+        content: sourceMeanings
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "validation_failed",
+      field_issues: expect.arrayContaining([
+        expect.objectContaining({ code: "relation_invalid" })
+      ])
+    });
+
+    await mock.archive(
+      targetPublished.word.id,
+      "archive-relation-validation-target",
+      {
+        base_revision: targetEdited.word.revision,
+        base_lifecycle_revision: targetEdited.word.lifecycle_revision
+      }
+    );
+    relation.target_sense_id =
+      targetPublished.word.meanings.pos[0]!.senses[0]!.id;
+    await expect(
+      mock.saveMeaningsStep(sourceForms.word.id, {
+        base_revision: sourceForms.word.revision,
+        operation_id: "relation-archived-target",
+        intent: "complete",
+        content: sourceMeanings
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "validation_failed",
+      field_issues: expect.arrayContaining([
+        expect.objectContaining({ code: "relation_invalid" })
+      ])
+    });
+  });
+
+  it("恢复拒绝发布版本指向归档目标，但同批恢复目标时允许原子通过", async () => {
+    const targetDraft = await createDetectedWord(
+      mock,
+      "far",
+      "restore-ref-target"
+    );
+    const targetReady = await completeDraft(
+      mock,
+      targetDraft,
+      "restore-ref-target"
+    );
+    const targetPublished = await mock.publishV2(targetReady.id, {
+      base_revision: targetReady.revision,
+      idempotency_key: "restore-ref-target-publish"
+    });
+    const sourceDraft = await createCenter(mock, "restore-ref-source");
+    const sourceForms = await mock.saveFormsStep(sourceDraft.word.id, {
+      base_revision: sourceDraft.word.revision,
+      operation_id: "restore-ref-source-forms",
+      intent: "complete",
+      content: sourceDraft.word.forms
+    });
+    const sourceMeanings = completeMockMeanings(sourceForms.word);
+    sourceMeanings.pos[0]!.senses[0]!.relations.push({
+      id: "restore-relation",
+      relation: "synonym",
+      target_word_id: targetPublished.word.id,
+      target_sense_id: targetPublished.word.meanings.pos[0]!.senses[0]!.id,
+      score: "80"
+    });
+    const sourceReady = (
+      await mock.saveMeaningsStep(sourceForms.word.id, {
+        base_revision: sourceForms.word.revision,
+        operation_id: "restore-ref-source-meanings",
+        intent: "complete",
+        content: sourceMeanings
+      })
+    ).word;
+    const sourcePublished = await mock.publishV2(sourceReady.id, {
+      base_revision: sourceReady.revision,
+      idempotency_key: "restore-ref-source-publish"
+    });
+    const bothArchived = await mock.archiveBatch("archive-ref-pair", {
+      entries: [targetPublished.word, sourcePublished.word].map((word) => ({
+        id: word.id,
+        base_revision: word.revision,
+        base_lifecycle_revision: word.lifecycle_revision
+      }))
+    });
+    const archivedTarget = bothArchived.words.find(
+      (word) => word.id === targetPublished.word.id
+    )!;
+    const archivedSource = bothArchived.words.find(
+      (word) => word.id === sourcePublished.word.id
+    )!;
+
+    await expect(
+      mock.restore(archivedSource.id, "restore-source-alone", {
+        base_revision: archivedSource.revision,
+        base_lifecycle_revision: archivedSource.lifecycle_revision
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "entry_has_unavailable_publication_refs"
+    });
+    await expect(
+      mock.restoreBatch("restore-ref-pair", {
+        entries: [archivedSource, archivedTarget].map((word) => ({
+          id: word.id,
+          base_revision: word.revision,
+          base_lifecycle_revision: word.lifecycle_revision
+        }))
+      })
+    ).resolves.toMatchObject({ affected: 2 });
+  });
+
   it("拒绝非法检测、方言组合、重复创建与超限 payload", async () => {
     await expect(
       mock.detect({ language: "fr" as "en", headword: "centre" })
@@ -873,7 +1589,10 @@ describe("admin words mock", () => {
     ).rejects.toMatchObject({ status: 400, code: "invalid_headword" });
     await expect(
       mock.detect({ language: "en", headword: "x".repeat(201) })
-    ).rejects.toMatchObject({ status: 422, code: "invalid_headword" });
+    ).rejects.toMatchObject({ status: 400, code: "invalid_headword" });
+    await expect(
+      mock.detect({ language: "en", headword: "line\nbreak" })
+    ).rejects.toMatchObject({ status: 400, code: "invalid_headword" });
     await expect(
       mock.detect({ language: "en", headword: "server-error" })
     ).rejects.toMatchObject({ status: 500, code: "mock_internal_error" });
@@ -882,9 +1601,11 @@ describe("admin words mock", () => {
       mock.suggestDialectVariants({
         source_dialect: "uk",
         target_dialect: "uk",
-        items: []
+        items: [
+          { client_id: "same-dialect", field_kind: "form", value: "centre" }
+        ]
       })
-    ).rejects.toMatchObject({ status: 400, code: "invalid_dialect_pair" });
+    ).rejects.toMatchObject({ status: 422, code: "validation_failed" });
     await expect(
       mock.suggestDialectVariants({
         source_dialect: "uk",
@@ -899,7 +1620,7 @@ describe("admin words mock", () => {
         ]
       })
     ).resolves.toMatchObject({
-      suggestions: [{ value: "center" }, { value: { text: "unchanged" } }]
+      suggestions: [{ value: "center" }]
     });
 
     await expect(mock.create({ headword: " " })).rejects.toMatchObject({
@@ -988,10 +1709,25 @@ describe("admin words mock", () => {
     ).rejects.toMatchObject({ status: 413, code: "payload_too_large" });
   });
 
-  it("createV2 幂等键绑定原检测与原词头，且持久化脏映射 fail closed", async () => {
+  it("createV2 幂等键重放首次响应，并绑定原检测与原词头", async () => {
     const storage = memoryStorage();
     const stateful = mockFor(() => profile(), storage);
     const center = await createCenter(stateful, "bound-create-key");
+    await stateful.saveFormsStep(center.word.id, {
+      base_revision: center.word.revision,
+      operation_id: "edit-after-create",
+      intent: "save",
+      content: center.word.forms
+    });
+    const refreshed = mockFor(() => profile(), storage);
+    await expect(
+      refreshed.createV2({
+        schema_version: 2,
+        idempotency_key: "bound-create-key",
+        detection_id: center.word.detection_snapshot.detection_id,
+        headwords: center.word.headwords
+      })
+    ).resolves.toEqual(center);
     const far = await stateful.detect({ language: "en", headword: "far" });
     if (far.builtin_dictionary.status !== "matched")
       throw new Error("far fixture must match");
@@ -1002,7 +1738,7 @@ describe("admin words mock", () => {
         detection_id: far.detection_id,
         headwords: far.builtin_dictionary.headwords
       })
-    ).rejects.toMatchObject({ status: 409, code: "idempotency_key_reused" });
+    ).rejects.toMatchObject({ status: 409, code: "idempotency_conflict" });
     if (center.word.headwords.mode !== "distinguish")
       throw new Error("center fixture must distinguish dialects");
     await expect(
@@ -1012,20 +1748,7 @@ describe("admin words mock", () => {
         detection_id: center.word.detection_snapshot.detection_id,
         headwords: { ...center.word.headwords, uk: "changed" }
       })
-    ).rejects.toMatchObject({ status: 409, code: "idempotency_key_reused" });
-
-    const persisted = readPersistedState(storage);
-    persisted.create_idempotency["legacy-create-key"] = "fixture-colour";
-    writePersistedState(storage, persisted);
-    const refreshed = mockFor(() => profile(), storage);
-    await expect(
-      refreshed.createV2({
-        schema_version: 2,
-        idempotency_key: "legacy-create-key",
-        detection_id: center.word.detection_snapshot.detection_id,
-        headwords: center.word.headwords
-      })
-    ).rejects.toMatchObject({ status: 409, code: "idempotency_key_reused" });
+    ).rejects.toMatchObject({ status: 409, code: "idempotency_conflict" });
   });
 
   it("forms complete 一次报告全部结构错误，并为新增词性初始化 meanings", async () => {
@@ -2031,7 +2754,57 @@ describe("admin words mock", () => {
       has_unpublished_changes: true,
       revision: centerPublished.word.revision + 1
     });
-
+    const republished = await mock.publishV2(centerReady.id, {
+      base_revision: editedPublished.word.revision,
+      idempotency_key: "republish-after-edit"
+    });
+    await expect(
+      mock.publishV2(centerReady.id, {
+        base_revision: centerPublished.word.revision,
+        idempotency_key: "bound-publish-key"
+      })
+    ).resolves.toEqual(centerPublished);
+    const publicationSense = republished.word.meanings.pos[0]!.senses[0]!;
+    const editedMeanings = structuredClone(republished.word.meanings);
+    editedMeanings.pos[0]!.senses[0]!.definitions.find(
+      (definition) =>
+        definition.definition_mode === "zh_definition" ||
+        definition.definition_mode === "zh_sentence"
+    )!.content = richText("仅存在于未发布草稿");
+    editedMeanings.pos[0]!.senses.push({
+      ...structuredClone(publicationSense),
+      id: "unpublished-sense"
+    });
+    const meaningsEdited = await mock.saveMeaningsStep(republished.word.id, {
+      base_revision: republished.word.revision,
+      operation_id: "published-word-meanings-save",
+      intent: "save",
+      content: editedMeanings
+    });
+    await expect(
+      mock.publishV2(centerReady.id, {
+        base_revision: centerPublished.word.revision,
+        idempotency_key: "bound-publish-key"
+      })
+    ).resolves.toEqual(centerPublished);
+    await expect(mock.relatedSearch("cent")).resolves.toMatchObject({
+      results: [
+        expect.objectContaining({
+          word_id: centerReady.id,
+          senses: expect.arrayContaining([
+            expect.objectContaining({
+              sense_id: publicationSense.id,
+              gloss: expect.not.stringContaining("未发布草稿")
+            })
+          ])
+        })
+      ]
+    });
+    expect((await mock.relatedSearch("cent")).results[0]!.senses).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ sense_id: "unpublished-sense" })
+      ])
+    );
     const farDraft = await createDetectedWord(mock, "far", "publish-bound-far");
     const farReady = await completeDraft(mock, farDraft, "publish-bound-far");
     await expect(
@@ -2039,7 +2812,7 @@ describe("admin words mock", () => {
         base_revision: farReady.revision,
         idempotency_key: "bound-publish-key"
       })
-    ).rejects.toMatchObject({ status: 409, code: "idempotency_key_reused" });
+    ).rejects.toMatchObject({ status: 409, code: "idempotency_conflict" });
 
     await expect(mock.relatedSearch("   ")).resolves.toEqual({ results: [] });
     await expect(
@@ -2067,6 +2840,20 @@ describe("admin words mock", () => {
     await expect(
       mock.batchDelete(Array.from({ length: 101 }, (_, index) => `id-${index}`))
     ).rejects.toMatchObject({ status: 413, code: "payload_too_large" });
+
+    const archivedCenter = await mock.archive(
+      centerPublished.word.id,
+      "archive-before-validate",
+      {
+        base_revision: meaningsEdited.word.revision,
+        base_lifecycle_revision: meaningsEdited.word.lifecycle_revision
+      }
+    );
+    await expect(
+      mock.validateV2(archivedCenter.word.id, {
+        base_revision: archivedCenter.word.revision
+      })
+    ).rejects.toMatchObject({ status: 409, code: "entry_archived" });
   });
 
   it("sessionStorage 可硬刷新恢复，并按权限 fail closed", async () => {

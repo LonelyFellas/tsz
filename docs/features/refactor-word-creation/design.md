@@ -1562,7 +1562,7 @@ interface DraftMeaningsStepContent {
 
 ### 方案结论
 
-“基本词性 / 细分词性”是系统设置中词性目录的两个管理视图，不是单词/短语类型。V2 新建向导继续只处理单词，不扩展 phrase wire，不增加 `expected_kind`、forms `sub_pos` 或按 kind 分流。
+“基本词性 / 细分词性”是系统设置中词性目录的两个管理视图，不是单词/短语类型。本小节实施时 V2 向导仅处理单词；该限制现已由 Phase 2 取代，当前单词与短语共用 V2 向导和既有 `EntryKind` wire，但 forms 仍只保存基本 `pos`，不增加 `expected_kind` 或 forms `sub_pos`。
 
 ### 页面交互
 
@@ -1597,9 +1597,9 @@ mock/后端在 meanings 保存与发布时校验 sense 的 `sub_pos` 存在且�
 
 - `PartOfSpeechSettings.tsx`：增加配置层级 Tabs，并把细分列表作为页内视图。
 - `SubPartOfSpeechDrawer.tsx`：复用其表格与表单能力为页内细分管理组件，或拆出共享内容；不再由基本词性行按钮触发主要流程。
-- `FormsAndPronunciationStep.tsx`：移除错误的分类 Tabs/phrase 分支，只保留基本词性选择。
+- `FormsAndPronunciationStep.tsx`：移除错误的分类 Tabs，只保留基本词性选择；单词/短语继续共享该步骤。
 - `MeaningsAndExamplesStep.tsx`：保持 sense 级细分词性选择及按所属基本词性过滤。
-- `SmartDictionary.tsx`、V2 types/mock/api：撤销错误的 phrase V2 / expected_kind 扩展，恢复原创建入口语义。
+- `SmartDictionary.tsx`、V2 types/mock/api：不以词性配置 Tab 改写 kind；Phase 2 已在独立契约下启用 phrase V2。
 - 同步修订测试矩阵与 `tsz-rust/docs/frontend-integration.md`。
 
 ### 测试策略与风险
@@ -1649,12 +1649,14 @@ mock/后端在 meanings 保存与发布时校验 sense 的 `sub_pos` 存在且�
 
 ### 后端对接
 
-真实 Rust OpenAPI `../tsz-rust/docs/openapi.json` 当前没有智能词库方言转换端点，`../tsz-rust/docs/frontend-integration.md` 也尚未声明本接口；因此生产能力继续由 `adminWordsDataSourceCapabilities.dialectVariantSuggestions` 关闭，不能静默使用 mock。
+Phase 2 已在真实 Rust OpenAPI 落地方言建议端点
+`POST /api/v1/admin/lexicon/dialect-variant-suggestions`，生产数据源能力已启用。响应包含
+`dictionary_region_rules` provider 元数据；无地区词典证据时允许少返回或不返回建议，不伪造转换结果。
 
 后端落地时复用现有前端 proposal：
 
 ```jsonc
-POST /api/v1/admin/words/dialect-variants
+POST /api/v1/admin/lexicon/dialect-variant-suggestions
 {
   "source_dialect": "uk",
   "target_dialect": "us",
@@ -1669,8 +1671,8 @@ POST /api/v1/admin/words/dialect-variants
 ```
 
 - `items` 必须支持同一请求混合 `definition` 与 `example`，并允许跨 POS/词义的稳定客户端 ID。
-- 响应逐项回传 `client_id`、`field_kind`、转换后的 `value` 和 `model_version`；允许部分返回，但不得返回 `grammar`。
-- 需后端确认单批最大条数、请求体大小、超时、限流、计费、审计以及单项失败表达。前端首版不自行硬编码未知上限；若后端给出上限，再在 data source/编排层透明分批。
+- 响应逐项回传 `client_id`、`field_kind` 和转换后的 `value`，顶层返回 provider kind/version；允许部分返回，但不得返回 `grammar`。
+- OpenAPI 规定单批最多 100 项；前端编排层按 100 项稳定分批，并以每批请求快照的 `client_id + field_kind` 集合过滤响应。
 - 接口仍是“建议生成”，不直接保存词条；草稿保存继续走 meanings step 的 revision/operation 契约。
 
 ### 复用与项目约定
@@ -1678,14 +1680,14 @@ POST /api/v1/admin/words/dialect-variants
 - canonical wire 继续使用 `@tsz/types` 的 snake_case 类型，页面不创建 camelCase 传输模型。
 - 批量收集和写回是当前 admin 向导私有纯逻辑，先放 `word-creation/model.ts`；只有出现第二个跨页面消费者时再下沉 `@tsz/shared`。
 - UI 仅使用 antd v6 `Segmented`、`Button`、`Alert`/`Typography` 等组件。
-- 真实数据源能力关闭时 fail closed：选择器可查看已有内容，但自动补全按钮禁用并说明服务未接入。
+- 能力探测 fail closed：仅服务端明确支持时启用自动补全；请求失败不写草稿并保留手填/重试入口。
 
 ### 数据流与时序
 
 1. 初次进入第 3 步：`activeDialect = headwords.source_dialect`，不发请求。
 2. 用户切换方言：先更新目标意图并锁定选择器，扫描当前最新 `content`。
 3. 无 eligible item：立即切换展示；不调用 API、不标记 dirty。
-4. 有 eligible item：发送一个 `{ source_dialect, target_dialect, items }` 请求；页面显示“正在补全美式/英式内容”。
+4. 有 eligible item：按 100 项顺序发送 `{ source_dialect, target_dialect, items }` 批次；页面显示“正在补全美式/英式内容”。
 5. 成功：用请求快照的键集合和当前最新内容双重校验，只写仍缺失的目标；`applied_count > 0` 时生成新的 operation ID、标记 dirty 并提示结果。
 6. 部分响应：写入合法匹配项，剩余目标保持 missing，显示“已补全 N 项，M 项待手工填写/重试”。
 7. 失败：不修改 content，切换仍落在目标方言以便手填，显示失败并保留重试入口。
@@ -1696,16 +1698,16 @@ POST /api/v1/admin/words/dialect-variants
 ### 测试策略（代码动工阶段由 test skill 落地）
 
 - 纯函数单测：统一模式无项目；英美模式只收集 missing；忽略空源、中文释义、grammar、ready 目标；跨 POS 顺序稳定；响应匹配和不可变写回。
-- 组件集成：默认源方言、全局跨 Tab 选择、单方言渲染、零请求切换、一个批次包含多 definition/example、loading 禁用、成功/部分/失败/重试、手工保护。
+- 组件集成：默认源方言、全局跨 Tab 选择、单方言渲染、零请求切换、跨 100 项顺序分批、loading 禁用、成功/部分/失败/重试、手工保护。
 - 回归：语法结构仍双栏并可拖动，现有语音操作不变；保存/刷新/完成规则不变；unified 词条和 V1 编辑器不出现选择器。
-- 数据源/契约：mock 多 item；API method/path/body 仍与 PENDING proposal 一致；真实能力关闭时无网络调用。
+- 数据源/契约：mock 多 item；API method/path/body 与权威 OpenAPI 一致；能力不可用时无网络调用。
 - 浏览器手测：三条以上词义、多个 POS、长文本、切换后页面无宽度跳动；慢请求期间不会出现交叉写入。
 
 ### 风险与回滚
 
 - **自动写入的信任边界**：只写 missing，现有 ready 永不覆盖；转换来源明确标记 `converted`，预览可辨认。
-- **批量请求过大**：后端上限未定；在契约确认前由 mock 验证全量批次，真实接入时按服务端上限在编排层分批，页面语义不变。
+- **批量请求过大**：按 OpenAPI 的 100 项上限在编排层顺序分批；每批只接受该请求快照中的响应键，页面语义不变。
 - **响应乱序/部分失败**：以 `client_id + field_kind` 匹配，不依赖数组位置；未知和重复响应跳过并计入提示。
 - **源文本后改导致目标陈旧**：本轮不自动重写任何 ready 目标，这是保护手工内容的明确取舍；后续若需要“重新生成”，必须作为显式操作并展示覆盖确认。
-- **真实接口未落地**：生产只提供已有 variant 切换和手填；mock 自动补全不会伪装成生产能力。
+- **真实接口不可用**：生产保留已有 variant 切换和手填；失败或无证据时不伪造转换结果。
 - **回滚**：恢复 `EnglishTextEditor` 双栏展示和逐字段按钮即可；wire、保存 DTO、已生成 variants 和语法结构数据均无需迁移。

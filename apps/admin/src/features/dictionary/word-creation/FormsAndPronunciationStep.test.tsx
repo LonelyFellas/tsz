@@ -384,6 +384,119 @@ describe("FormsAndPronunciationStep", () => {
     );
   });
 
+  it("建议响应期间手工填写目标方言，确认后保留最新手工内容", async () => {
+    const word = wordFixture();
+    const slot = word.forms.pos[0]!.form_groups[0]!.slots[0]!;
+    slot.variants = slot.variants.filter((variant) => variant.dialect === "us");
+    const pending = deferred<{
+      suggestions: Array<{
+        client_id: string;
+        field_kind: "form";
+        value: string;
+        model_version: string;
+      }>;
+    }>();
+    mutations.suggest.mockReturnValue(pending.promise);
+    renderStep(word);
+
+    fireEvent.click(button("生成英式建议"));
+    await waitFor(() => expect(mutations.suggest).toHaveBeenCalledTimes(1));
+    fireEvent.click(button("手工填写"));
+    const manualInput = screen
+      .getAllByLabelText("英式词形拼写")
+      .find((input) => (input as HTMLInputElement).value === "")!;
+    fireEvent.change(manualInput, { target: { value: "manually-entered" } });
+
+    await act(async () =>
+      pending.resolve({
+        suggestions: [
+          {
+            client_id: slot.id,
+            field_kind: "form",
+            value: "generated-too-late",
+            model_version: "mock-v1"
+          }
+        ]
+      })
+    );
+    expect(
+      (await screen.findAllByText("确认英式词形建议")).length
+    ).toBeGreaterThan(0);
+    fireEvent.click(button("写入建议"));
+
+    await waitFor(() => expect(manualInput).toHaveValue("manually-entered"));
+    expect(
+      screen
+        .getAllByLabelText("英式词形拼写")
+        .some(
+          (input) => (input as HTMLInputElement).value === "generated-too-late"
+        )
+    ).toBe(false);
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const savedSlot =
+      mutations.save.mock.calls[0]![0].content.pos[0].form_groups[0].slots[0];
+    expect(savedSlot.variants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          dialect: "uk",
+          spelling: "manually-entered",
+          origin: "manual"
+        })
+      ])
+    );
+  });
+
+  it.each([
+    {
+      label: "client_id 不匹配",
+      suggestions: [
+        {
+          client_id: "another-slot",
+          field_kind: "form",
+          value: "wrong-slot",
+          model_version: "mock-v1"
+        }
+      ]
+    },
+    {
+      label: "重复响应",
+      suggestions: [
+        {
+          client_id: "__slot__",
+          field_kind: "form",
+          value: "first",
+          model_version: "mock-v1"
+        },
+        {
+          client_id: "__slot__",
+          field_kind: "form",
+          value: "second",
+          model_version: "mock-v1"
+        }
+      ]
+    }
+  ])("拒绝$label且不打开写入确认", async ({ suggestions }) => {
+    const word = wordFixture();
+    const slot = word.forms.pos[0]!.form_groups[0]!.slots[0]!;
+    slot.variants = slot.variants.filter((variant) => variant.dialect === "us");
+    mutations.suggest.mockResolvedValue({
+      suggestions: suggestions.map((suggestion) => ({
+        ...suggestion,
+        client_id:
+          suggestion.client_id === "__slot__" ? slot.id : suggestion.client_id
+      }))
+    });
+    renderStep(word);
+
+    fireEvent.click(button("生成英式建议"));
+
+    expect(
+      await screen.findByText("词形建议响应无效，请重试")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("确认英式词形建议")).toBeNull();
+  });
+
   it("真实建议服务未接入时禁用生成按钮并保留手工填写", () => {
     dataSourceCapabilities.dialectVariantSuggestions = false;
     const word = wordFixture();

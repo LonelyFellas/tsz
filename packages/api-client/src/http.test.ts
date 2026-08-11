@@ -38,6 +38,10 @@ function problem(overrides: Partial<ProblemDetails> = {}): ProblemDetails {
   };
 }
 
+function requestHeaders(index = 0): Headers {
+  return new Headers(fetchMock.mock.calls[index]![1].headers);
+}
+
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockReset();
@@ -78,7 +82,7 @@ describe("createHttpClient", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://api.test/users/1");
-    expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
+    expect(new Headers(init.headers).get("Content-Type")).toBe(
       "application/json"
     );
   });
@@ -101,22 +105,14 @@ describe("createHttpClient", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "", getToken: () => "abc" });
     await http.get("/me");
-    const headers = fetchMock.mock.calls[0]![1].headers as Record<
-      string,
-      string
-    >;
-    expect(headers.Authorization).toBe("Bearer abc");
+    expect(requestHeaders().get("Authorization")).toBe("Bearer abc");
   });
 
   it("无 token 时不带 Authorization", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
     await http.get("/me");
-    const headers = fetchMock.mock.calls[0]![1].headers as Record<
-      string,
-      string
-    >;
-    expect(headers.Authorization).toBeUndefined();
+    expect(requestHeaders().has("Authorization")).toBe(false);
   });
 
   it("getToken 返回 Promise 会被 await", async () => {
@@ -126,11 +122,7 @@ describe("createHttpClient", () => {
       getToken: async () => "async-token"
     });
     await http.get("/me");
-    const headers = fetchMock.mock.calls[0]![1].headers as Record<
-      string,
-      string
-    >;
-    expect(headers.Authorization).toBe("Bearer async-token");
+    expect(requestHeaders().get("Authorization")).toBe("Bearer async-token");
   });
 
   it("post:method=POST 且 body 为 JSON 字符串", async () => {
@@ -692,33 +684,47 @@ describe("createHttpClient", () => {
     });
   });
 
-  it("init.headers 可覆盖/追加请求头", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(null));
-    const http = createHttpClient({ baseUrl: "" });
-    await http.post(
-      "/x",
-      { a: 1 },
+  it.each([
+    [
+      "record",
       {
-        headers: { "Idempotency-Key": "command-1" }
+        "Content-Type": "application/problem+json",
+        "Idempotency-Key": "command-1"
       }
-    );
-    const headers = fetchMock.mock.calls[0]![1].headers as Record<
-      string,
-      string
-    >;
-    expect(headers["Content-Type"]).toBe("application/json");
-    expect(headers["Idempotency-Key"]).toBe("command-1");
-  });
+    ],
+    [
+      "Headers",
+      new Headers({
+        "Content-Type": "application/problem+json",
+        "Idempotency-Key": "command-1"
+      })
+    ],
+    [
+      "tuple array",
+      [
+        ["Content-Type", "application/problem+json"],
+        ["Idempotency-Key", "command-1"]
+      ] as [string, string][]
+    ]
+  ] satisfies [string, HeadersInit][])(
+    "init.headers 支持 %s 并可覆盖/追加请求头",
+    async (_label, headers) => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(null));
+      const http = createHttpClient({ baseUrl: "" });
+      await http.post("/x", { a: 1 }, { headers });
+
+      expect(requestHeaders().get("Content-Type")).toBe(
+        "application/problem+json"
+      );
+      expect(requestHeaders().get("Idempotency-Key")).toBe("command-1");
+    }
+  );
 
   it("skipAuth 时不附加 Authorization（即使有 token）", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "", getToken: () => "stale" });
     await http.post("/auth/login", {}, { skipAuth: true });
-    const headers = fetchMock.mock.calls[0]![1].headers as Record<
-      string,
-      string
-    >;
-    expect(headers.Authorization).toBeUndefined();
+    expect(requestHeaders().has("Authorization")).toBe(false);
   });
 
   it("401 无 token 时直接抛 HttpError，不触发 onRefresh", async () => {
@@ -780,13 +786,11 @@ describe("createHttpClient", () => {
     expect(data).toEqual({ id: "1" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
     for (const [, init] of fetchMock.mock.calls) {
-      const headers = init.headers as Record<string, string>;
-      expect(headers["Idempotency-Key"]).toBe("command-2");
+      expect(new Headers(init.headers).get("Idempotency-Key")).toBe(
+        "command-2"
+      );
     }
-    expect(
-      (fetchMock.mock.calls[1]![1].headers as Record<string, string>)
-        .Authorization
-    ).toBe("Bearer new-token");
+    expect(requestHeaders(1).get("Authorization")).toBe("Bearer new-token");
   });
 
   it("RFC 9457 的 403 触发 onForbidden(code) 且仍抛 HttpError", async () => {

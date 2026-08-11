@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   cefrRank,
   applyMeaningDialectSuggestions,
+  chunkMeaningDialectSuggestionRequest,
   collectMissingMeaningDialectItems,
   countIncompleteMeaningDialectSlots,
   createDefinition,
@@ -28,6 +29,7 @@ import {
   ensureMeaningsForForms,
   formDialects,
   grammarDialects,
+  requestMeaningDialectSuggestionBatches,
   toFormsWireContent,
   toMeaningsWireContent,
   updateRichText,
@@ -552,6 +554,67 @@ describe("T58-T59 词义内容全局方言补全", () => {
         (definition) => definition.id === "definition-second-pos"
       )!.content
     ).toMatchObject({ uk: { state: "missing" } });
+  });
+
+  it("按后端 100 项上限稳定切分 0/100/101/多批请求", () => {
+    const request = (count: number) => ({
+      source_dialect: "us" as const,
+      target_dialect: "uk" as const,
+      items: Array.from({ length: count }, (_, index) => ({
+        client_id: `definition-${index}`,
+        field_kind: "definition" as const,
+        value: richText(`definition ${index}`)
+      }))
+    });
+
+    expect(chunkMeaningDialectSuggestionRequest(request(0))).toEqual([]);
+    expect(
+      chunkMeaningDialectSuggestionRequest(request(100)).map(
+        (batch) => batch.items.length
+      )
+    ).toEqual([100]);
+    expect(
+      chunkMeaningDialectSuggestionRequest(request(101)).map(
+        (batch) => batch.items.length
+      )
+    ).toEqual([100, 1]);
+    expect(
+      chunkMeaningDialectSuggestionRequest(request(205)).map(
+        (batch) => batch.items.length
+      )
+    ).toEqual([100, 100, 5]);
+  });
+
+  it("分批请求逐批交付响应，并在中途失败后停止后续批次", async () => {
+    const request = {
+      source_dialect: "us" as const,
+      target_dialect: "uk" as const,
+      items: Array.from({ length: 201 }, (_, index) => ({
+        client_id: `definition-${index}`,
+        field_kind: "definition" as const,
+        value: richText(`definition ${index}`)
+      }))
+    };
+    const sent: number[] = [];
+    const applied: string[] = [];
+
+    await expect(
+      requestMeaningDialectSuggestionBatches(
+        request,
+        async (batch) => {
+          sent.push(batch.items.length);
+          if (sent.length === 2) throw new Error("second batch failed");
+          return {
+            provider: { kind: "dictionary_region_rules", version: "1" },
+            suggestions: [batch.items[0]!, request.items[200]!]
+          };
+        },
+        (suggestions) =>
+          applied.push(...suggestions.map((suggestion) => suggestion.client_id))
+      )
+    ).rejects.toThrow("second batch failed");
+    expect(sent).toEqual([100, 100]);
+    expect(applied).toEqual(["definition-0"]);
   });
 });
 

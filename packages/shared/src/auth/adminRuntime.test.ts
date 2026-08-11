@@ -121,11 +121,8 @@ describe("createAdminAuthRuntime · 401 拦截器与 realm 隔离", () => {
     expect(fetchMock.mock.calls[1]![1].credentials).toBe("include");
 
     // 重试请求必须携带刷新后的新 token（而非旧的过期 token）。
-    const retryHeaders = fetchMock.mock.calls[2]![1].headers as Record<
-      string,
-      string
-    >;
-    expect(retryHeaders.Authorization).toBe("Bearer at-2");
+    const retryHeaders = new Headers(fetchMock.mock.calls[2]![1].headers);
+    expect(retryHeaders.get("Authorization")).toBe("Bearer at-2");
     expect(rt.tokens.getToken()).toBe("at-2");
 
     rt.tokens.setAccessToken(null); // 清排期定时器

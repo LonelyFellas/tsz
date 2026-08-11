@@ -268,6 +268,46 @@ export function collectMissingMeaningDialectItems(
   };
 }
 
+export const DIALECT_SUGGESTION_BATCH_SIZE = 100;
+
+export function chunkMeaningDialectSuggestionRequest(
+  request: SuggestDialectVariantsInputV2
+): SuggestDialectVariantsInputV2[] {
+  const batches: SuggestDialectVariantsInputV2[] = [];
+  for (
+    let offset = 0;
+    offset < request.items.length;
+    offset += DIALECT_SUGGESTION_BATCH_SIZE
+  ) {
+    batches.push({
+      source_dialect: request.source_dialect,
+      target_dialect: request.target_dialect,
+      items: request.items.slice(offset, offset + DIALECT_SUGGESTION_BATCH_SIZE)
+    });
+  }
+  return batches;
+}
+
+export async function requestMeaningDialectSuggestionBatches(
+  request: SuggestDialectVariantsInputV2,
+  send: (
+    batch: SuggestDialectVariantsInputV2
+  ) => Promise<SuggestDialectVariantsResponseV2>,
+  applyBatch: (
+    suggestions: SuggestDialectVariantsResponseV2["suggestions"]
+  ) => void
+): Promise<void> {
+  for (const batch of chunkMeaningDialectSuggestionRequest(request)) {
+    const response = await send(batch);
+    const requestedKeys = new Set(batch.items.map(meaningSuggestionKey));
+    applyBatch(
+      response.suggestions.filter((suggestion) =>
+        requestedKeys.has(meaningSuggestionKey(suggestion))
+      )
+    );
+  }
+}
+
 function meaningSuggestionKey(
   item: Pick<DialectVariantSuggestionItemV2, "client_id" | "field_kind">
 ): string {

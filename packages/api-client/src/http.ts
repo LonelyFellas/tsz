@@ -255,14 +255,17 @@ export function createHttpClient({
   ): Promise<T> {
     // 公开端点(登录/注册等)不带 access token，避免遗留的旧 token 污染请求。
     const token = skipAuth ? undefined : await getToken?.();
+    const headers = new Headers(init.headers);
+    if (!headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+    if (token && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
     const res = await fetch(`${baseUrl}${path}`, {
       credentials: "include",
       ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...init.headers
-      }
+      headers
     });
 
     // 只有携带了 access token 的请求才触发 refresh 逻辑。

@@ -493,14 +493,13 @@ export async function mockAdminApi(
       word = {
         ...word,
         status: "published",
-        revision: word.revision + 1,
-        published_revision: word.revision + 1,
+        published_revision: word.revision,
         has_unpublished_changes: false,
         max_reachable_step: "preview",
         published_at: PUBLISHED_AT,
         updated_at: PUBLISHED_AT
       };
-      return json(route, 200, { word: clone(word) });
+      return json(route, 201, { word: clone(word) });
     }
     if (
       method === "GET" &&
@@ -520,7 +519,10 @@ export async function mockAdminApi(
       method === "POST" &&
       path === `${ADMIN_E2E_LEXICON_PATH}/dialect-variant-suggestions`
     ) {
-      return json(route, 200, { suggestions: [] });
+      return json(route, 200, {
+        provider: { kind: "dictionary_region_rules", version: "1" },
+        suggestions: []
+      });
     }
     if (method === "DELETE" && path === `/words/${ADMIN_E2E_WORD_ID}`) {
       word = undefined;

@@ -205,7 +205,6 @@ export function SmartDictionary() {
                   ? "恢复失败"
                   : "归档失败"
             );
-            throw error;
           }
         })
     });
@@ -259,7 +258,6 @@ export function SmartDictionary() {
                   ? "批量恢复失败"
                   : "批量归档失败"
             );
-            throw error;
           }
         })
     });
@@ -631,6 +629,7 @@ export function SmartDictionary() {
             showTotal: (t) => `共 ${t} 条`,
             pageSizeOptions: [10, 20, 50, 100],
             onChange: (nextPage, nextSize) => {
+              setSelectedKeys([]);
               setPage(nextSize !== pageSize ? 1 : nextPage);
               setPageSize(nextSize);
             }

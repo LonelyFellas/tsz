@@ -18,6 +18,7 @@ import type {
   CreateAdminWordV2Input,
   DetectWordInputV2,
   DetectWordResponseV2,
+  DialectVariantSuggestionItemV2,
   DraftFormsStepContent,
   DraftMeaningsStepContent,
   DraftValidationIssue,
@@ -36,6 +37,7 @@ import type {
   PublishAdminWordV2Input,
   RelatedSearchResponse,
   RelatedWordSense,
+  RichText,
   SaveFormsStepInput,
   SaveMeaningsStepInput,
   SuggestDialectVariantsInputV2,
@@ -57,6 +59,7 @@ import {
   createInitialMeaningsForAddedPos,
   createInitialSenseGroup,
   createSeedLegacyWords,
+  normalizeFixtureHeadword,
   richText
 } from "./fixtures";
 import {
@@ -100,8 +103,14 @@ interface MockImpactTokenRecord {
 }
 
 interface MockLifecycleOperationRecord {
+  scope: "archive" | "restore" | "archive_batch" | "restore_batch";
   request_json: string;
   response: EntryLifecycleBatchResponse;
+}
+
+interface MockWordOperationRecord {
+  request_json: string;
+  response: AdminWordV2Envelope;
 }
 
 export interface AdminWordsMockPersistedState {
@@ -111,9 +120,11 @@ export interface AdminWordsMockPersistedState {
   sub_parts: Record<string, SubPartOfSpeechConfig>;
   words: Record<string, MockWord>;
   detections: Record<string, DetectWordResponseV2>;
-  create_idempotency: Record<string, string>;
+  create_idempotency: Record<string, MockWordOperationRecord>;
   operations: Record<string, MockOperationRecord>;
-  publish_idempotency: Record<string, string>;
+  publish_idempotency: Record<string, MockWordOperationRecord>;
+  lifecycle_operations: Record<string, MockLifecycleOperationRecord>;
+  publication_words: Record<string, AdminWordV2>;
   impact_tokens: Record<string, MockImpactTokenRecord>;
   lost_publish_responses: string[];
 }
@@ -245,8 +256,6 @@ export function isAdminWordsMockPersistedState(
   value: unknown
 ): value is AdminWordsMockPersistedState {
   if (!isRecord(value)) return false;
-  const allStringValues = (record: Record<string, unknown>) =>
-    Object.values(record).every((entry) => typeof entry === "string");
   if (
     !Number.isInteger(value.sequence) ||
     !Number.isInteger(value.catalog_version) ||
@@ -270,7 +279,14 @@ export function isAdminWordsMockPersistedState(
         isRecord(entry.smart_dictionary)
     ) ||
     !isRecord(value.create_idempotency) ||
-    !allStringValues(value.create_idempotency) ||
+    !Object.values(value.create_idempotency).every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.request_json === "string" &&
+        isRecord(entry.response) &&
+        isMockWord(entry.response.word) &&
+        isV2(entry.response.word)
+    ) ||
     !isRecord(value.operations) ||
     !Object.values(value.operations).every(
       (entry) =>
@@ -282,7 +298,32 @@ export function isAdminWordsMockPersistedState(
         isMockWord(entry.result.word)
     ) ||
     !isRecord(value.publish_idempotency) ||
-    !allStringValues(value.publish_idempotency) ||
+    !Object.values(value.publish_idempotency).every(
+      (entry) =>
+        isRecord(entry) &&
+        typeof entry.request_json === "string" &&
+        isRecord(entry.response) &&
+        isMockWord(entry.response.word) &&
+        isV2(entry.response.word)
+    ) ||
+    !isRecord(value.lifecycle_operations) ||
+    !Object.values(value.lifecycle_operations).every(
+      (entry) =>
+        isRecord(entry) &&
+        ["archive", "restore", "archive_batch", "restore_batch"].includes(
+          entry.scope as string
+        ) &&
+        typeof entry.request_json === "string" &&
+        isRecord(entry.response) &&
+        Array.isArray(entry.response.words) &&
+        entry.response.words.every(isMockWord) &&
+        Number.isInteger(entry.response.affected) &&
+        (entry.response.affected as number) >= 0
+    ) ||
+    !isRecord(value.publication_words) ||
+    !Object.values(value.publication_words).every(
+      (entry) => isMockWord(entry) && isV2(entry)
+    ) ||
     !isRecord(value.impact_tokens) ||
     !Object.values(value.impact_tokens).every(
       (entry) =>
@@ -323,6 +364,8 @@ function makeInitialState(nowIso: string): AdminWordsMockPersistedState {
     create_idempotency: {},
     operations: {},
     publish_idempotency: {},
+    lifecycle_operations: {},
+    publication_words: {},
     impact_tokens: {},
     lost_publish_responses: []
   };
@@ -425,23 +468,6 @@ function compatibleHeadwords(
     );
   }
   return false;
-}
-
-function equalHeadwords(
-  left: WordHeadwordsV2,
-  right: WordHeadwordsV2
-): boolean {
-  if (left.mode !== right.mode) return false;
-  if (left.mode === "unified" && right.mode === "unified") {
-    return left.common === right.common;
-  }
-  return (
-    left.mode === "distinguish" &&
-    right.mode === "distinguish" &&
-    left.source_dialect === right.source_dialect &&
-    left.uk === right.uk &&
-    left.us === right.us
-  );
 }
 
 function alignBaseFormSpelling(
@@ -689,7 +715,12 @@ function validateMeanings(
       );
     }
     const target = current.words[wordId];
-    return target ? wordHasSense(target, senseId) : false;
+    if (!target || target.status === "archived") return false;
+    if (!isV2(target)) {
+      return target.status === "published" && wordHasSense(target, senseId);
+    }
+    const publication = current.publication_words[wordId];
+    return publication ? wordHasSense(publication, senseId) : false;
   };
   for (const formsPos of word.forms.pos) {
     const pos = content.pos.find((entry) => entry.pos_id === formsPos.pos_id);
@@ -956,23 +987,370 @@ function v1PublishIssues(word: AdminWord): string[] {
   return issues;
 }
 
+const DIALECT_PAIRS: ReadonlyArray<readonly [string, string]> = [
+  ["centre", "center"],
+  ["colour", "color"],
+  ["organise", "organize"],
+  ["travelling", "traveling"]
+];
+
+interface ConvertedDialectText {
+  text: string;
+  boundaryMap: number[];
+}
+
+interface DialectReplacement {
+  start: number;
+  end: number;
+  value: string;
+}
+
+function preserveDialectCase(source: string, target: string): string {
+  const letters = [...source].filter((character) => /[A-Za-z]/.test(character));
+  if (
+    letters.length > 0 &&
+    letters.every((character) => character === character.toUpperCase())
+  ) {
+    return target.toUpperCase();
+  }
+  if (
+    letters[0] === letters[0]?.toUpperCase() &&
+    letters.slice(1).every((character) => character === character.toLowerCase())
+  ) {
+    return `${target[0]?.toUpperCase()}${target.slice(1)}`;
+  }
+  return target;
+}
+
 function convertDialectText(
   value: string,
   source: "uk" | "us",
+  target: "uk" | "us",
+  protectedBoundaries: ReadonlySet<number> = new Set(),
+  protectedRanges: ReadonlyArray<readonly [number, number]> = []
+): ConvertedDialectText {
+  const replacements = new Map(
+    DIALECT_PAIRS.map(([uk, us]) =>
+      source === "uk" && target === "us" ? [uk, us] : [us, uk]
+    )
+  );
+  const operations: DialectReplacement[] = [];
+  for (const match of value.matchAll(/[A-Za-z]+(?:['’\-][A-Za-z]+)*/g)) {
+    const matched = match[0];
+    const replacement = replacements.get(matched.toLowerCase());
+    if (!replacement || match.index === undefined) continue;
+    const start = [...value.slice(0, match.index)].length;
+    const end = start + [...matched].length;
+    const hasInternalBoundary = [...protectedBoundaries].some(
+      (position) => start < position && position < end
+    );
+    const overlapsProtectedRange = protectedRanges.some(
+      ([rangeStart, rangeEnd]) => start < rangeEnd && rangeStart < end
+    );
+    if (hasInternalBoundary || overlapsProtectedRange) continue;
+    operations.push({
+      start,
+      end,
+      value: preserveDialectCase(matched, replacement)
+    });
+  }
+
+  const old = [...value];
+  const boundaryMap = Array.from({ length: old.length + 1 }, () => 0);
+  const output: string[] = [];
+  let oldCursor = 0;
+  let newCursor = 0;
+  for (const operation of operations) {
+    for (let offset = 0; offset <= operation.start - oldCursor; offset += 1) {
+      boundaryMap[oldCursor + offset] = newCursor + offset;
+    }
+    output.push(old.slice(oldCursor, operation.start).join(""));
+    newCursor += operation.start - oldCursor;
+
+    const replacementLength = [...operation.value].length;
+    const oldLength = operation.end - operation.start;
+    for (let offset = 0; offset <= oldLength; offset += 1) {
+      boundaryMap[operation.start + offset] =
+        newCursor + Math.floor((offset * replacementLength) / oldLength);
+    }
+    output.push(operation.value);
+    newCursor += replacementLength;
+    oldCursor = operation.end;
+  }
+  for (let offset = 0; offset <= old.length - oldCursor; offset += 1) {
+    boundaryMap[oldCursor + offset] = newCursor + offset;
+  }
+  output.push(old.slice(oldCursor).join(""));
+  return { text: output.join(""), boundaryMap };
+}
+
+function convertDialectRichText(
+  value: RichText,
+  source: "uk" | "us",
   target: "uk" | "us"
-): string {
-  if (source === target) return value;
-  const pairs: Array<[string, string]> = [
-    ["centre", "center"],
-    ["colour", "color"],
-    ["organise", "organize"],
-    ["travelling", "traveling"]
-  ];
-  return pairs.reduce((result, [uk, us]) => {
-    const from = source === "uk" ? uk : us;
-    const to = target === "uk" ? uk : us;
-    return result.replaceAll(from, to);
-  }, value);
+): RichText {
+  const output = clone(value);
+  const protectedBoundaries = new Set<number>();
+  const protectedRanges: Array<readonly [number, number]> = [];
+  if (output.version === 1) {
+    for (const span of output.spans) {
+      protectedBoundaries.add(span.start);
+      protectedBoundaries.add(span.end);
+    }
+    for (const liaison of output.liaisons) {
+      protectedBoundaries.add(liaison);
+    }
+  } else {
+    for (const annotation of output.annotations) {
+      if (annotation.type === "pause") {
+        protectedBoundaries.add(annotation.at);
+        continue;
+      }
+      protectedBoundaries.add(annotation.start);
+      protectedBoundaries.add(annotation.end);
+      if (annotation.type === "phoneme") {
+        protectedRanges.push([annotation.start, annotation.end]);
+      }
+    }
+  }
+
+  const converted = convertDialectText(
+    output.text,
+    source,
+    target,
+    protectedBoundaries,
+    protectedRanges
+  );
+  output.text = converted.text;
+  if (output.version === 1) {
+    for (const span of output.spans) {
+      span.start = converted.boundaryMap[span.start]!;
+      span.end = converted.boundaryMap[span.end]!;
+    }
+    output.liaisons = output.liaisons.map(
+      (liaison) => converted.boundaryMap[liaison]!
+    );
+  } else {
+    for (const annotation of output.annotations) {
+      if (annotation.type === "pause") {
+        annotation.at = converted.boundaryMap[annotation.at]!;
+      } else {
+        annotation.start = converted.boundaryMap[annotation.start]!;
+        annotation.end = converted.boundaryMap[annotation.end]!;
+      }
+    }
+  }
+  return output;
+}
+
+function invalidDialectSuggestion(field: string, message: string): never {
+  throw new HttpError(422, message, [], "validation_failed", [], {
+    code: field
+  });
+}
+
+function isValidRichTextRange(
+  value: Record<string, unknown>,
+  textLength: number
+): boolean {
+  return (
+    Number.isInteger(value.start) &&
+    Number.isInteger(value.end) &&
+    Number(value.start) >= 0 &&
+    Number(value.start) < Number(value.end) &&
+    Number(value.end) <= textLength
+  );
+}
+
+function richTextRangeContainsNewline(
+  value: Record<string, unknown>,
+  text: string
+): boolean {
+  return [...text].slice(Number(value.start), Number(value.end)).includes("\n");
+}
+
+function isValidDialectSuggestionRichText(value: unknown): boolean {
+  if (!isRecord(value) || typeof value.text !== "string") return false;
+  const textLength = [...value.text].length;
+  if (textLength > 5000 || value.text.includes("\0")) return false;
+  if (value.version === 1) {
+    if (
+      !Array.isArray(value.spans) ||
+      value.spans.length > 500 ||
+      !Array.isArray(value.liaisons) ||
+      value.liaisons.length > 500
+    ) {
+      return false;
+    }
+    return (
+      value.spans.every(
+        (span) =>
+          isRecord(span) &&
+          isValidRichTextRange(span, textLength) &&
+          ["bold", "blue"].includes(String(span.type))
+      ) &&
+      value.liaisons.every(
+        (liaison) =>
+          Number.isInteger(liaison) &&
+          liaison >= 0 &&
+          Number(liaison) + 2 <= textLength
+      )
+    );
+  }
+  if (
+    value.version !== 2 ||
+    !Array.isArray(value.annotations) ||
+    value.annotations.length > 500
+  ) {
+    return false;
+  }
+  const phonemes: Array<{ start: number; end: number }> = [];
+  const emphases: Array<{ start: number; end: number }> = [];
+  const pauses: number[] = [];
+  for (const annotation of value.annotations) {
+    if (!isRecord(annotation) || typeof annotation.type !== "string") {
+      return false;
+    }
+    if (annotation.type === "pause") {
+      if (
+        !Number.isInteger(annotation.at) ||
+        Number(annotation.at) < 0 ||
+        Number(annotation.at) > textLength ||
+        !Number.isInteger(annotation.duration_ms) ||
+        Number(annotation.duration_ms) < 1 ||
+        Number(annotation.duration_ms) > 5000
+      ) {
+        return false;
+      }
+      pauses.push(Number(annotation.at));
+      continue;
+    }
+    if (
+      !isValidRichTextRange(annotation, textLength) ||
+      richTextRangeContainsNewline(annotation, value.text)
+    ) {
+      return false;
+    }
+    const range = {
+      start: Number(annotation.start),
+      end: Number(annotation.end)
+    };
+    if (annotation.type === "emphasis") {
+      if (annotation.level !== "strong") return false;
+      emphases.push(range);
+      continue;
+    }
+    if (annotation.type === "phoneme") {
+      if (
+        annotation.alphabet !== "ipa" ||
+        typeof annotation.phoneme !== "string" ||
+        annotation.phoneme.includes("\0") ||
+        annotation.phoneme.trim() === "" ||
+        [...annotation.phoneme.trim()].length > 200
+      ) {
+        return false;
+      }
+      phonemes.push(range);
+      continue;
+    }
+    if (annotation.type === "liaison") continue;
+    if (annotation.type === "highlight") {
+      if (
+        !["yellow", "green", "pink", "blue", "orange"].includes(
+          String(annotation.color)
+        )
+      ) {
+        return false;
+      }
+      continue;
+    }
+    return false;
+  }
+
+  phonemes.sort(
+    (left, right) => left.start - right.start || left.end - right.end
+  );
+  if (
+    phonemes.some(
+      (phoneme, index) => index > 0 && phoneme.start < phonemes[index - 1]!.end
+    )
+  ) {
+    return false;
+  }
+  for (const phoneme of phonemes) {
+    if (
+      emphases.some(
+        (emphasis) =>
+          emphasis.start < phoneme.end &&
+          emphasis.end > phoneme.start &&
+          (emphasis.start > phoneme.start || emphasis.end < phoneme.end)
+      ) ||
+      pauses.some((pause) => pause > phoneme.start && pause < phoneme.end)
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function validateDialectSuggestionInput(
+  input: SuggestDialectVariantsInputV2
+): void {
+  if (
+    !["uk", "us"].includes(input.source_dialect) ||
+    !["uk", "us"].includes(input.target_dialect) ||
+    input.source_dialect === input.target_dialect
+  ) {
+    invalidDialectSuggestion(
+      "target_dialect",
+      "target_dialect must differ from source_dialect"
+    );
+  }
+  if (!Array.isArray(input.items) || input.items.length === 0) {
+    invalidDialectSuggestion("items", "items must not be empty");
+  }
+  if (input.items.length > 100) {
+    invalidDialectSuggestion("items", "items must not contain over 100 values");
+  }
+  const clientIds = new Set<string>();
+  for (const item of input.items) {
+    if (
+      typeof item.client_id !== "string" ||
+      item.client_id.trim() === "" ||
+      [...item.client_id].length > 100
+    ) {
+      invalidDialectSuggestion(
+        "items.client_id",
+        "client_id must contain between 1 and 100 characters"
+      );
+    }
+    if (clientIds.has(item.client_id)) {
+      invalidDialectSuggestion(
+        "items.client_id",
+        "client_id must be unique within one request"
+      );
+    }
+    clientIds.add(item.client_id);
+    if (item.field_kind === "form") {
+      if (
+        typeof item.value !== "string" ||
+        item.value.trim() === "" ||
+        [...item.value].length > 200
+      ) {
+        invalidDialectSuggestion(
+          "items.value",
+          "form values must contain between 1 and 200 characters"
+        );
+      }
+      continue;
+    }
+    if (
+      !["definition", "example"].includes(item.field_kind) ||
+      !isValidDialectSuggestionRichText(item.value)
+    ) {
+      invalidDialectSuggestion("items.value", "rich text value is invalid");
+    }
+  }
 }
 
 /** Stateful contract-shaped mock for the complete admin words namespace. */
@@ -1001,8 +1379,6 @@ export function createAdminWordsMock({
     });
   let activeProfileId: string | undefined;
   let state: AdminWordsMockPersistedState | undefined;
-  const lifecycleOperations = new Map<string, MockLifecycleOperationRecord>();
-
   async function pause(): Promise<void> {
     if (latencyMs <= 0) return;
     await new Promise((resolve) => setTimeout(resolve, latencyMs));
@@ -1911,7 +2287,6 @@ export function createAdminWordsMock({
   ): Promise<DetectWordResponseV2> {
     await pause();
     const { state: current } = context();
-    const headword = input.headword.trim();
     if (input.language !== "en") {
       throw new HttpError(
         422,
@@ -1920,17 +2295,26 @@ export function createAdminWordsMock({
         "unsupported_language"
       );
     }
-    if (!headword)
-      throw new HttpError(400, "headword is required", [], "invalid_headword");
-    if (headword.length > 200) {
+    if (/\p{Cc}/u.test(input.headword)) {
       throw new HttpError(
-        422,
+        400,
+        "headword contains control characters",
+        [],
+        "invalid_headword"
+      );
+    }
+    const normalized = normalizeFixtureHeadword(input.headword);
+    if (!normalized.display)
+      throw new HttpError(400, "headword is required", [], "invalid_headword");
+    if ([...normalized.display].length > 200) {
+      throw new HttpError(
+        400,
         "headword cannot be normalized",
         [],
         "invalid_headword"
       );
     }
-    if (headword.toLocaleLowerCase("en") === "server-error") {
+    if (normalized.key === "server-error") {
       throw new HttpError(
         500,
         "mock internal error",
@@ -1965,43 +2349,35 @@ export function createAdminWordsMock({
   ): Promise<SuggestDialectVariantsResponseV2> {
     await pause();
     context();
-    if (input.source_dialect === input.target_dialect) {
-      throw new HttpError(
-        400,
-        "dialects must differ",
-        [],
-        "invalid_dialect_pair"
+    validateDialectSuggestionInput(input);
+    const suggestions: DialectVariantSuggestionItemV2[] = [];
+    for (const item of input.items) {
+      if (item.field_kind === "form") {
+        const converted = convertDialectText(
+          item.value,
+          input.source_dialect,
+          input.target_dialect
+        ).text;
+        if (converted !== item.value) {
+          suggestions.push({ ...item, value: converted });
+        }
+        continue;
+      }
+      const converted = convertDialectRichText(
+        item.value,
+        input.source_dialect,
+        input.target_dialect
       );
+      if (converted.text !== item.value.text) {
+        suggestions.push({ ...item, value: converted });
+      }
     }
     return {
       provider: {
         kind: "dictionary_region_rules",
-        version: "mock-dialect-v1"
+        version: "1"
       },
-      suggestions: input.items.map((item) => {
-        if (item.field_kind === "form") {
-          return {
-            ...item,
-            value: convertDialectText(
-              item.value,
-              input.source_dialect,
-              input.target_dialect
-            )
-          };
-        }
-        const converted = convertDialectText(
-          item.value.text,
-          input.source_dialect,
-          input.target_dialect
-        );
-        return {
-          ...item,
-          value:
-            converted === item.value.text
-              ? clone(item.value)
-              : richText(converted)
-        };
-      })
+      suggestions
     };
   }
 
@@ -2067,22 +2443,30 @@ export function createAdminWordsMock({
           }
         : idempotencyKeyOrInput;
     assertPayload(input);
-    const existingWordId = current.create_idempotency[input.idempotency_key];
-    if (existingWordId) {
-      const existing = requireWord(current, existingWordId);
-      if (
-        !isV2(existing) ||
-        existing.detection_snapshot.detection_id !== input.detection_id ||
-        !equalHeadwords(existing.headwords, input.headwords)
-      ) {
+    const requestJson = JSON.stringify({
+      schema_version: input.schema_version,
+      detection_id: input.detection_id,
+      headwords:
+        input.headwords.mode === "unified"
+          ? { mode: "unified", common: input.headwords.common }
+          : {
+              mode: "distinguish",
+              uk: input.headwords.uk,
+              us: input.headwords.us,
+              source_dialect: input.headwords.source_dialect
+            }
+    });
+    const existingOperation = current.create_idempotency[input.idempotency_key];
+    if (existingOperation) {
+      if (existingOperation.request_json !== requestJson) {
         throw new HttpError(
           409,
           "idempotency key reused",
           [],
-          "idempotency_key_reused"
+          "idempotency_conflict"
         );
       }
-      return { word: clone(existing) };
+      return clone(existingOperation.response);
     }
     const detection = current.detections[input.detection_id];
     if (!detection) {
@@ -2107,7 +2491,7 @@ export function createAdminWordsMock({
       detection.entry_kind === "phrase" &&
       detection.builtin_dictionary.status === "not_found" &&
       input.headwords.mode === "unified" &&
-      input.headwords.common.trim().toLocaleLowerCase("en") ===
+      normalizeFixtureHeadword(input.headwords.common).key ===
         detection.normalized_headword;
     if (
       detection.smart_dictionary.status !== "clear" ||
@@ -2182,10 +2566,14 @@ export function createAdminWordsMock({
       updated_at: timestamp,
       has_unpublished_changes: false
     };
+    const response = { word: clone(word) };
     current.words[word.id] = word;
-    current.create_idempotency[input.idempotency_key] = word.id;
+    current.create_idempotency[input.idempotency_key] = {
+      request_json: requestJson,
+      response: clone(response)
+    };
     persist(current);
-    return { word: clone(word) };
+    return response;
   }
 
   async function get(wordId: string): Promise<AdminWordAnyEnvelope> {
@@ -2488,6 +2876,9 @@ export function createAdminWordsMock({
     const word = requireWord(current, wordId);
     if (!isV2(word))
       throw new HttpError(409, "word is legacy", [], "schema_version_mismatch");
+    if (word.status === "archived") {
+      throw new HttpError(409, "entry is archived", [], "entry_archived");
+    }
     assertRevision(word, input.base_revision);
     const issues = [
       ...validateForms(
@@ -2563,29 +2954,22 @@ export function createAdminWordsMock({
             idempotency_key: idempotencyKeyOrInput
           }
         : idempotencyKeyOrInput;
-    const publishedWordId = current.publish_idempotency[input.idempotency_key];
-    if (publishedWordId) {
-      if (publishedWordId !== wordId) {
-        throw new HttpError(
-          409,
-          "idempotency key reused for another word",
-          [],
-          "idempotency_key_reused"
-        );
-      }
-      const published = requireWord(current, publishedWordId);
-      if (
-        !isV2(published) ||
-        input.base_revision !== published.published_revision
-      ) {
+    const requestJson = JSON.stringify({
+      word_id: wordId,
+      base_revision: input.base_revision
+    });
+    const existingOperation =
+      current.publish_idempotency[input.idempotency_key];
+    if (existingOperation) {
+      if (existingOperation.request_json !== requestJson) {
         throw new HttpError(
           409,
           "idempotency key reused",
           [],
-          "idempotency_key_reused"
+          "idempotency_conflict"
         );
       }
-      return { word: clone(published) };
+      return clone(existingOperation.response);
     }
     const word = requireV2Draft(current, wordId);
     assertRevision(word, input.base_revision);
@@ -2624,7 +3008,12 @@ export function createAdminWordsMock({
     word.published_at = word.updated_at;
     word.published_revision = word.revision;
     word.has_unpublished_changes = false;
-    current.publish_idempotency[input.idempotency_key] = word.id;
+    const response = { word: clone(word) };
+    current.publish_idempotency[input.idempotency_key] = {
+      request_json: requestJson,
+      response: clone(response)
+    };
+    current.publication_words[word.id] = clone(word);
     persist(current);
 
     // 可控的 response-lost fixture：状态已提交，首个响应模拟网络丢失；同 key 重试读回 canonical。
@@ -2641,7 +3030,7 @@ export function createAdminWordsMock({
         "response_lost"
       );
     }
-    return { word: clone(word) };
+    return response;
   }
 
   async function transitionLifecycle(
@@ -2675,16 +3064,18 @@ export function createAdminWordsMock({
       );
     }
 
-    const operationKey = `${scope}:${idempotencyKey}`;
     const requestJson = JSON.stringify(input);
-    const existingOperation = lifecycleOperations.get(operationKey);
+    const existingOperation = current.lifecycle_operations[idempotencyKey];
     if (existingOperation) {
-      if (existingOperation.request_json !== requestJson) {
+      if (
+        existingOperation.scope !== scope ||
+        existingOperation.request_json !== requestJson
+      ) {
         throw new HttpError(
           409,
           "idempotency key reused",
           [],
-          "idempotency_key_reused"
+          "idempotency_conflict"
         );
       }
       return clone(existingOperation.response);
@@ -2721,6 +3112,128 @@ export function createAdminWordsMock({
       return { word, alreadyTarget };
     });
 
+    const transitioningIds = new Set(
+      words
+        .filter(({ alreadyTarget }) => !alreadyTarget)
+        .map(({ word }) => word.id)
+    );
+    if (target === "archived") {
+      const references = Object.entries(current.publication_words).flatMap(
+        ([sourceEntryId, publication]) => {
+          const sourceWord = current.words[sourceEntryId];
+          if (
+            !sourceWord ||
+            !isV2(sourceWord) ||
+            sourceWord.status === "archived" ||
+            transitioningIds.has(sourceEntryId)
+          ) {
+            return [];
+          }
+          return publication.meanings.pos.flatMap((pos) =>
+            pos.senses.flatMap((sense) => [
+              ...sense.sentences.flatMap((sentence) =>
+                sentence.links
+                  .filter(
+                    (link) =>
+                      link.role === "context" &&
+                      transitioningIds.has(link.word_id)
+                  )
+                  .map((link) => ({
+                    target_sense_id: link.sense_id,
+                    source_entry_id: sourceEntryId,
+                    source_publication_id: `mock-publication-${sourceEntryId}-${sourceWord.published_revision ?? sourceWord.revision}`,
+                    source_node_id: sentence.id,
+                    reference_kind: "sentence_context"
+                  }))
+              ),
+              ...sense.relations
+                .filter((relation) =>
+                  transitioningIds.has(relation.target_word_id)
+                )
+                .map((relation) => ({
+                  target_sense_id: relation.target_sense_id,
+                  source_entry_id: sourceEntryId,
+                  source_publication_id: `mock-publication-${sourceEntryId}-${sourceWord.published_revision ?? sourceWord.revision}`,
+                  source_node_id: relation.id,
+                  reference_kind: "relation"
+                }))
+            ])
+          );
+        }
+      );
+      if (references.length > 0) {
+        throw new HttpError(
+          409,
+          "entry is referenced by another active current publication",
+          [],
+          "entry_has_inbound_publication_refs",
+          [],
+          { reference_locations: references }
+        );
+      }
+    } else {
+      const references = words.flatMap(({ word, alreadyTarget }) => {
+        if (alreadyTarget) return [];
+        const publication = current.publication_words[word.id];
+        if (!publication) return [];
+        return publication.meanings.pos.flatMap((pos) =>
+          pos.senses.flatMap((sense) => [
+            ...sense.sentences.flatMap((sentence) =>
+              sentence.links
+                .filter(
+                  (link) =>
+                    link.role === "context" &&
+                    link.word_id !== word.id &&
+                    (!current.publication_words[link.word_id] ||
+                      (current.words[link.word_id]?.status === "archived" &&
+                        !transitioningIds.has(link.word_id)) ||
+                      !wordHasSense(
+                        current.publication_words[link.word_id]!,
+                        link.sense_id
+                      ))
+                )
+                .map((link) => ({
+                  target_sense_id: link.sense_id,
+                  source_entry_id: word.id,
+                  source_publication_id: `mock-publication-${word.id}-${word.published_revision ?? word.revision}`,
+                  source_node_id: sentence.id,
+                  reference_kind: "sentence_context"
+                }))
+            ),
+            ...sense.relations
+              .filter(
+                (relation) =>
+                  !current.publication_words[relation.target_word_id] ||
+                  (current.words[relation.target_word_id]?.status ===
+                    "archived" &&
+                    !transitioningIds.has(relation.target_word_id)) ||
+                  !wordHasSense(
+                    current.publication_words[relation.target_word_id]!,
+                    relation.target_sense_id
+                  )
+              )
+              .map((relation) => ({
+                target_sense_id: relation.target_sense_id,
+                source_entry_id: word.id,
+                source_publication_id: `mock-publication-${word.id}-${word.published_revision ?? word.revision}`,
+                source_node_id: relation.id,
+                reference_kind: "relation"
+              }))
+          ])
+        );
+      });
+      if (references.length > 0) {
+        throw new HttpError(
+          409,
+          "entry current publication references an archived or unavailable target",
+          [],
+          "entry_has_unavailable_publication_refs",
+          [],
+          { reference_locations: references }
+        );
+      }
+    }
+
     let affected = 0;
     for (const { word, alreadyTarget } of words) {
       if (alreadyTarget) continue;
@@ -2743,11 +3256,12 @@ export function createAdminWordsMock({
       words: words.map(({ word }) => clone(word)),
       affected
     };
-    lifecycleOperations.set(operationKey, {
+    current.lifecycle_operations[idempotencyKey] = {
+      scope,
       request_json: requestJson,
       response: clone(response)
-    });
-    if (affected > 0) persist(current);
+    };
+    persist(current);
     return response;
   }
 
@@ -2850,8 +3364,12 @@ export function createAdminWordsMock({
         );
       })
       .map((word) => {
+        const displayedWord =
+          isV2(word) && current.publication_words[word.id]
+            ? current.publication_words[word.id]!
+            : word;
         const senses: RelatedWordSense[] = isV2(word)
-          ? word.meanings.pos.flatMap((pos) =>
+          ? (displayedWord as AdminWordV2).meanings.pos.flatMap((pos) =>
               pos.senses.map((sense) => ({
                 sense_id: sense.id,
                 gloss:
@@ -2870,7 +3388,7 @@ export function createAdminWordsMock({
             );
         return {
           word_id: word.id,
-          headword: displayHeadword(word),
+          headword: displayHeadword(displayedWord),
           kind: word.kind,
           senses
         };
@@ -2883,7 +3401,6 @@ export function createAdminWordsMock({
     if (activeProfileId) persistedStorage.clear(activeProfileId);
     activeProfileId = undefined;
     state = undefined;
-    lifecycleOperations.clear();
   }
 
   return {

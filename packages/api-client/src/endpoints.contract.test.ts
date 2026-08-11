@@ -14,6 +14,14 @@ import snapshot from "./openapi.snapshot.json";
 // (spec 有、服务器还没实现 → 仍会 404)。后者需要打真后端的冒烟测试,见 smoke。
 
 const specPaths = snapshot.paths as Record<string, string[]>;
+const IDEMPOTENT_LEXICON_OPERATIONS = [
+  "post /admin/lexicon/entries",
+  "post /admin/lexicon/entries/archive-batch",
+  "post /admin/lexicon/entries/restore-batch",
+  "post /admin/lexicon/entries/{id}/archive",
+  "post /admin/lexicon/entries/{id}/publications",
+  "post /admin/lexicon/entries/{id}/restore"
+] as const;
 
 // 已知「后端尚未提供 / 待对接」的端点白名单。每条都必须真不在 spec 里——
 // 等后端实现后,本测试会反过来要求你把它从这里删掉(见下方「台账保鲜」断言),
@@ -140,6 +148,24 @@ function inSpec(method: string, path: string): boolean {
 }
 
 describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
+  it("V2 命令端点的 Idempotency-Key 必须是必填 UUID header", () => {
+    const expectedHeader = {
+      name: "Idempotency-Key",
+      in: "header",
+      required: true,
+      schema: { type: "string", format: "uuid" }
+    };
+
+    expect(snapshot.operationHeaders).toEqual(
+      Object.fromEntries(
+        IDEMPOTENT_LEXICON_OPERATIONS.map((operation) => [
+          operation,
+          [expectedHeader]
+        ])
+      )
+    );
+  });
+
   it("AdminWordV2 发布与生命周期字段的 required/可选性和后端一致", () => {
     const adminWordV2 = snapshot.schemas.AdminWordV2;
 

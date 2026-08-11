@@ -1,8 +1,8 @@
 // 从后端权威 spec(tsz-rust/docs/openapi.json)生成一份精简契约快照,供契约测试对账。
 // tsz-rust 的 spec 由 utoipa 生成:后端 `cargo run --features swagger` 后
 // `curl http://localhost:8383/api-docs/openapi.json -o ../tsz-rust/docs/openapi.json`。
-// 快照保留 path -> [methods] 与词库对接所需的关键 schema，路径会剥掉 /api/v1 前缀
-// （前端 http baseURL 默认就是 /api/v1）。
+// 快照保留 path -> [methods]、操作级 header 参数与词库对接所需的关键 schema，
+// 路径会剥掉 /api/v1 前缀（前端 http baseURL 默认就是 /api/v1）。
 // 用法:pnpm --filter @tsz/api-client sync:openapi
 // 后端 spec 位置可用 OPENAPI_SOURCE 覆盖(CI 里 checkout 路径不同的话)。
 import { readFileSync, writeFileSync } from "node:fs";
@@ -22,6 +22,7 @@ const source =
 const out = resolve(here, "../src/openapi.snapshot.json");
 
 const API_PREFIX = "/api/v1";
+const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
 
 const spec = load(readFileSync(source, "utf8"));
 if (!spec?.paths) {
@@ -46,15 +47,40 @@ for (const name of contractSchemaNames) {
 }
 
 const paths = {};
+const operationHeaders = {};
 for (const [rawPath, item] of Object.entries(spec.paths)) {
   const path = rawPath.startsWith(API_PREFIX)
     ? rawPath.slice(API_PREFIX.length)
     : rawPath;
-  // 只取 HTTP 方法键(忽略 parameters/summary 等)。
   const methods = Object.keys(item)
-    .filter((k) => ["get", "post", "put", "patch", "delete"].includes(k))
+    .filter((key) => HTTP_METHODS.includes(key))
     .sort();
   if (methods.length) paths[path] = methods;
+
+  for (const method of methods) {
+    const operation = item[method];
+    const parameters = [
+      ...(Array.isArray(item.parameters) ? item.parameters : []),
+      ...(Array.isArray(operation?.parameters) ? operation.parameters : [])
+    ];
+    const headers = parameters
+      .filter((parameter) => parameter?.in === "header")
+      .map((parameter) => {
+        if (!parameter.name || !parameter.schema) {
+          throw new Error(`无法快照未内联的 header 参数: ${method} ${rawPath}`);
+        }
+        return {
+          name: parameter.name,
+          in: parameter.in,
+          required: parameter.required === true,
+          schema: parameter.schema
+        };
+      })
+      .sort((left, right) => left.name.localeCompare(right.name));
+    if (headers.length > 0) {
+      operationHeaders[`${method} ${path}`] = headers;
+    }
+  }
 }
 
 const snapshot = {
@@ -64,6 +90,7 @@ const snapshot = {
   _source: source,
   _generatedAt: new Date().toISOString(),
   paths,
+  operationHeaders,
   schemas: {
     AdminWordV2: {
       required: adminWordV2.required,

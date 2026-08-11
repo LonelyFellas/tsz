@@ -315,8 +315,7 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
       if (
         version !== requestVersion.current ||
         currentHeadword !== headword ||
-        next.request.language !== values.language ||
-        next.request.headword !== headword
+        next.request.language !== values.language
       ) {
         return;
       }

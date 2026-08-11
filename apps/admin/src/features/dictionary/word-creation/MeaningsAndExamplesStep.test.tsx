@@ -22,6 +22,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   collectPronunciationHints,
+  meaningDialectSuggestionBatchRunner,
   MeaningsAndExamplesStep
 } from "./MeaningsAndExamplesStep";
 import { createGrammar } from "./model";
@@ -1211,10 +1212,7 @@ describe("MeaningsAndExamplesStep", () => {
     selectMeaningDialect("英式");
     await waitFor(() => expect(mutations.suggest).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(button("重试补全 1 项")).toBeEnabled());
-    await act(async () => {
-      button("重试补全 1 项").click();
-      await Promise.resolve();
-    });
+    fireEvent.click(button("重试补全 1 项"));
     await waitFor(() => expect(mutations.suggest).toHaveBeenCalledTimes(2));
     expect(mutations.suggest.mock.calls[1]![0].items).toHaveLength(1);
     expect(mutations.suggest.mock.calls[1]![0].items[0].client_id).toBe(
@@ -1231,6 +1229,72 @@ describe("MeaningsAndExamplesStep", () => {
           )
       ).toBe(true)
     );
+  });
+
+  it("101 项分批补全全部结束前禁用保存，完成后保存全部批次结果", async () => {
+    const word = wordFixture({ ready: true });
+    const original = word.meanings.pos[0]!.senses[0]!.sentences[0]!;
+    if (original.en_text.mode !== "distinguish") {
+      throw new Error("fixture must distinguish dialects");
+    }
+    original.en_text.uk = { state: "missing" };
+    const firstBatch = deferred<void>();
+    const secondBatch = deferred<void>();
+    const realRunner = meaningDialectSuggestionBatchRunner.run;
+    vi.spyOn(meaningDialectSuggestionBatchRunner, "run").mockImplementation(
+      async (request, _send, apply) => {
+        await firstBatch.promise;
+        apply([
+          {
+            client_id: request.items[0]!.client_id,
+            field_kind: "example",
+            value: {
+              version: 1,
+              text: "British first batch",
+              spans: [],
+              liaisons: []
+            }
+          }
+        ]);
+        await secondBatch.promise;
+      }
+    );
+    renderStep(word);
+
+    selectMeaningDialect("英式");
+    await waitFor(() =>
+      expect(meaningDialectSuggestionBatchRunner.run).toHaveBeenCalledTimes(1)
+    );
+    expect(button("保存草稿")).toBeDisabled();
+    fireEvent.click(button("保存草稿"));
+    expect(mutations.save).not.toHaveBeenCalled();
+
+    await act(async () => firstBatch.resolve());
+    await waitFor(() =>
+      expect(
+        screen
+          .getAllByLabelText("英式英语文本")
+          .some(
+            (input) =>
+              (input as HTMLTextAreaElement).value === "British first batch"
+          )
+      ).toBe(true)
+    );
+    expect(button("保存草稿")).toBeDisabled();
+    fireEvent.click(button("保存草稿"));
+    expect(mutations.save).not.toHaveBeenCalled();
+
+    await act(async () => secondBatch.resolve());
+    await waitFor(() => expect(button("保存草稿")).toBeEnabled());
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const savedSentences =
+      mutations.save.mock.calls[0]![0].content.pos[0].senses[0].sentences;
+    expect(savedSentences[0].en_text.uk).toMatchObject({
+      state: "ready",
+      variant: { value: { text: "British first batch" } }
+    });
+    meaningDialectSuggestionBatchRunner.run = realRunner;
   });
 
   it("T62 补全期间锁定方言内容，请求失败后保留原文并允许重试", async () => {
@@ -1261,8 +1325,10 @@ describe("MeaningsAndExamplesStep", () => {
 
     selectMeaningDialect("英式");
     await waitFor(() => expect(mutations.suggest).toHaveBeenCalledTimes(1));
-    expect(screen.getByLabelText("词义内容方言")).toHaveClass(
-      "ant-segmented-disabled"
+    await waitFor(() =>
+      expect(screen.getByLabelText("词义内容方言")).toHaveClass(
+        "ant-segmented-disabled"
+      )
     );
     const targetInput = screen
       .getAllByLabelText("英式英语文本")

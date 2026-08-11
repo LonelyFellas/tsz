@@ -16,7 +16,7 @@ import type {
   WordPronunciationV2
 } from "@tsz/types";
 
-export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 4;
+export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 7;
 
 export function richText(text: string): RichText {
   return { version: 1, text, spans: [], liaisons: [] };
@@ -246,90 +246,102 @@ function matchedResponse(
   };
 }
 
+export function normalizeFixtureHeadword(value: string): {
+  display: string;
+  key: string;
+} {
+  const display = value.normalize("NFKC").trim().replace(/\s+/gu, " ");
+  const key = display
+    .replace(/[‘’ʼ]/gu, "'")
+    .replace(/[‐‑‒–—−]/gu, "-")
+    .toLocaleLowerCase("en");
+  return { display, key };
+}
+
 /** Contract-shaped detection fixtures consumed only by the mock data source. */
 export function createDetectionFixture(
   input: DetectWordInputV2,
   detectionId: string,
   nowMs: number
 ): DetectWordResponseV2 {
-  const normalized = input.headword.trim().toLocaleLowerCase("en");
+  const normalized = normalizeFixtureHeadword(input.headword);
+  const request = { ...input, headword: normalized.display };
   const expiresAt = new Date(
-    normalized === "expired" ? nowMs - 1 : nowMs + 5 * 60_000
+    normalized.key === "expired" ? nowMs - 1 : nowMs + 5 * 60_000
   ).toISOString();
   const base = {
     detection_id: detectionId,
     expires_at: expiresAt,
-    request: input,
-    normalized_headword: normalized,
+    request,
+    normalized_headword: normalized.key,
     entry_kind: "word" as const,
     smart_dictionary: { status: "clear" as const, duplicates: [] as [] }
   };
 
-  if (normalized.includes(" ")) {
-    return {
-      ...base,
-      entry_kind: "phrase",
-      builtin_dictionary: { status: "not_found" }
-    };
-  }
-
-  if (normalized === "not-found") {
+  if (normalized.key === "not-found") {
     return { ...base, builtin_dictionary: { status: "not_found" } };
   }
-  if (normalized === "builtin-unavailable") {
+  if (normalized.key === "builtin-unavailable") {
     return {
       ...base,
       builtin_dictionary: { status: "unavailable", retry_after_seconds: 3 }
     };
   }
 
-  if (normalized === "center") {
+  if (normalized.key === "center") {
     return matchedResponse(
-      input,
+      request,
       detectionId,
       expiresAt,
-      normalized,
+      normalized.key,
       { mode: "distinguish", uk: "centre", us: "center", source_dialect: "us" },
       centerForms(),
       { matchedDialect: "us" }
     );
   }
-  if (normalized === "far") {
+  if (normalized.key === "far") {
     return matchedResponse(
-      input,
+      request,
       detectionId,
       expiresAt,
-      normalized,
+      normalized.key,
       { mode: "unified", common: "far" },
       farForms()
     );
   }
-  if (normalized === "in front of") {
+  if (normalized.key === "in front of") {
     return matchedResponse(
-      input,
+      request,
       detectionId,
       expiresAt,
-      normalized,
-      { mode: "unified", common: normalized },
-      genericForms(normalized),
+      normalized.key,
+      { mode: "unified", common: normalized.display },
+      genericForms(normalized.display),
       { entryKind: "phrase" }
     );
   }
-  if (normalized === "color" || normalized === "colour") {
+  if (normalized.display.includes(" ")) {
+    return {
+      ...base,
+      entry_kind: "phrase",
+      builtin_dictionary: { status: "not_found" }
+    };
+  }
+  if (normalized.key === "color" || normalized.key === "colour") {
     return matchedResponse(
-      input,
+      request,
       detectionId,
       expiresAt,
-      normalized,
+      normalized.key,
       {
         mode: "distinguish",
         uk: "colour",
         us: "color",
-        source_dialect: normalized === "color" ? "us" : "uk"
+        source_dialect: normalized.key === "color" ? "us" : "uk"
       },
-      genericForms(normalized),
+      genericForms(normalized.display),
       {
-        matchedDialect: normalized === "color" ? "us" : "uk",
+        matchedDialect: normalized.key === "color" ? "us" : "uk",
         smart: {
           status: "duplicate",
           duplicates: [
@@ -340,25 +352,25 @@ export function createDetectionFixture(
       }
     );
   }
-  if (normalized === "smart-unavailable") {
+  if (normalized.key === "smart-unavailable") {
     return matchedResponse(
-      input,
+      request,
       detectionId,
       expiresAt,
-      normalized,
-      { mode: "unified", common: normalized },
-      genericForms(normalized),
+      normalized.key,
+      { mode: "unified", common: normalized.display },
+      genericForms(normalized.display),
       { smart: { status: "unavailable", duplicates: [] } }
     );
   }
 
   return matchedResponse(
-    input,
+    request,
     detectionId,
     expiresAt,
-    normalized,
-    { mode: "unified", common: normalized },
-    genericForms(normalized)
+    normalized.key,
+    { mode: "unified", common: normalized.display },
+    genericForms(normalized.display)
   );
 }
 

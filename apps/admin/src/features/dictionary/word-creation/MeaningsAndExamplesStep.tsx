@@ -86,6 +86,7 @@ import { useSaveMeaningsStep, useSuggestDialectVariants } from "./api";
 import {
   applyMeaningDialectSuggestions,
   collectMissingMeaningDialectItems,
+  requestMeaningDialectSuggestionBatches,
   countIncompleteMeaningDialectSlots,
   createDefinition,
   createEnglishText,
@@ -115,6 +116,10 @@ interface Props {
   readOnly?: boolean;
   onSaved: (word: AdminWordV2) => void;
 }
+
+export const meaningDialectSuggestionBatchRunner = {
+  run: requestMeaningDialectSuggestionBatches
+};
 
 type MeaningDialect = "uk" | "us";
 
@@ -2097,31 +2102,43 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
     if (request.items.length === 0) return;
     setFillingDialect(target);
     setAttemptedDialects((current) => new Set(current).add(target));
+    let appliedCount = 0;
     try {
-      const response = await suggestVariants.mutateAsync(request);
-      const result = applyMeaningDialectSuggestions(
-        contentRef.current,
-        target,
-        response.suggestions
+      await meaningDialectSuggestionBatchRunner.run(
+        request,
+        (batch) => suggestVariants.mutateAsync(batch),
+        (suggestions) => {
+          const result = applyMeaningDialectSuggestions(
+            contentRef.current,
+            target,
+            suggestions
+          );
+          appliedCount += result.applied_count;
+          if (result.applied_count > 0) updateContent(result.content);
+        }
       );
-      if (result.applied_count > 0) updateContent(result.content);
       const remaining = collectMissingMeaningDialectItems(
-        result.content,
+        contentRef.current,
         target
       ).items.length;
       if (remaining === 0) {
         message.success(
-          `已补全 ${result.applied_count} 项${target === "uk" ? "英式" : "美式"}内容`
+          `已补全 ${appliedCount} 项${target === "uk" ? "英式" : "美式"}内容`
         );
-      } else if (result.applied_count > 0) {
+      } else if (appliedCount > 0) {
         message.warning(
-          `已补全 ${result.applied_count} 项，仍有 ${remaining} 项可重试`
+          `已补全 ${appliedCount} 项，仍有 ${remaining} 项可重试`
         );
       } else {
         message.warning(`未获得可写入的内容，仍有 ${remaining} 项可重试`);
       }
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "自动补全失败");
+      const detail = error instanceof Error ? error.message : "自动补全失败";
+      message.error(
+        appliedCount > 0
+          ? `已补全 ${appliedCount} 项，后续批次失败：${detail}`
+          : detail
+      );
     } finally {
       setFillingDialect(undefined);
     }
@@ -2138,7 +2155,7 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   };
 
   const save = async (intent: StepSaveIntent) => {
-    if (saving) return;
+    if (saving || fillingDialect !== undefined) return;
     if (intent === "complete") {
       const validationMessage = validateMeanings(content);
       if (validationMessage) {
@@ -2589,12 +2606,17 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
             >
               上一步
             </Button>
-            <Button loading={saving} onClick={() => void save("save")}>
+            <Button
+              loading={saving}
+              disabled={fillingDialect !== undefined}
+              onClick={() => void save("save")}
+            >
               保存草稿
             </Button>
             <Button
               type="primary"
               loading={saving}
+              disabled={fillingDialect !== undefined}
               onClick={() => void save("complete")}
             >
               完成并进入预览
