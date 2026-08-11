@@ -2409,7 +2409,11 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
         <Alert
           type="info"
           showIcon
-          title="已发布词条当前为只读"
+          title={
+            word.status === "archived"
+              ? "已归档词条当前为只读"
+              : "已发布词条当前为只读"
+          }
           style={{ marginBottom: 16 }}
         />
       )}

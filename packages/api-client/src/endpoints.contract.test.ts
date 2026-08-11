@@ -157,6 +157,15 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       type: "integer",
       format: "int64"
     });
+    expect(snapshot.schemas.AdminWordListItem.required).toEqual(
+      expect.arrayContaining([
+        "schema_version",
+        "revision",
+        "lifecycle_revision",
+        "max_reachable_step",
+        "has_unpublished_changes"
+      ])
+    );
     expect(snapshot.schemas.EntryLifecycleInput.required).toEqual([
       "base_revision",
       "base_lifecycle_revision"

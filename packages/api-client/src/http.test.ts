@@ -478,7 +478,13 @@ describe("createHttpClient", () => {
       node_id: "sense-1",
       field: "definitions",
       code: "native_definition_required",
-      message: "至少填写一条本语言释义"
+      message: "至少填写一条本语言释义",
+      reference_location: {
+        source_entry_id: "source-entry-1",
+        source_publication_id: "source-publication-1",
+        source_node_id: "source-node-1",
+        reference_kind: "definition"
+      }
     };
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
@@ -488,12 +494,22 @@ describe("createHttpClient", () => {
           field_issues: [fieldIssue],
           meta: {
             current_revision: 6,
+            current_lifecycle_revision: 2,
             word_id: "w-2",
             max_reachable_step: "meanings",
             affected_node_ids: ["sense-1"],
             usage_count: 3,
             part_of_speech_id: "pos-noun",
-            code: "noun"
+            code: "noun",
+            reference_locations: [
+              {
+                target_sense_id: "target-sense-1",
+                source_entry_id: "source-entry-1",
+                source_publication_id: "source-publication-1",
+                source_node_id: "source-node-1",
+                reference_kind: "definition"
+              }
+            ]
           }
         },
         { ok: false, status: 422 }
@@ -511,12 +527,22 @@ describe("createHttpClient", () => {
       field_issues: [fieldIssue],
       meta: {
         current_revision: 6,
+        current_lifecycle_revision: 2,
         word_id: "w-2",
         max_reachable_step: "meanings",
         affected_node_ids: ["sense-1"],
         usage_count: 3,
         part_of_speech_id: "pos-noun",
-        code: "noun"
+        code: "noun",
+        reference_locations: [
+          {
+            target_sense_id: "target-sense-1",
+            source_entry_id: "source-entry-1",
+            source_publication_id: "source-publication-1",
+            source_node_id: "source-node-1",
+            reference_kind: "definition"
+          }
+        ]
       }
     });
   });
@@ -589,11 +615,13 @@ describe("createHttpClient", () => {
 
   it.each([
     { usage_count: -1 },
+    { current_lifecycle_revision: -1 },
     { part_of_speech_id: " " },
     { code: "" },
     { word_id: "" },
     { max_reachable_step: "done" },
-    { affected_node_ids: [""] }
+    { affected_node_ids: [""] },
+    { reference_locations: [{ source_entry_id: "source-entry-1" }] }
   ])("词性配置错误的畸形 meta 安全降级: %o", async (meta) => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
@@ -633,6 +661,34 @@ describe("createHttpClient", () => {
       code: "validation_failed",
       field_issues: [],
       meta: undefined
+    });
+  });
+
+  it("畸形 reference_location 会丢弃整组 field_issues", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          error: "word reference is invalid",
+          code: "validation_failed",
+          field_issues: [
+            {
+              step: "meanings",
+              node_id: "sense-1",
+              field: "definitions",
+              code: "reference_unavailable",
+              message: "引用目标不可用",
+              reference_location: { source_entry_id: "source-entry-1" }
+            }
+          ]
+        },
+        { ok: false, status: 422 }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/words/w-2")).rejects.toMatchObject({
+      status: 422,
+      field_issues: []
     });
   });
 

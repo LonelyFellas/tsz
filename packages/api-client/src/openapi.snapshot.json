@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/264f/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-11T13:02:14.626Z",
+  "_generatedAt": "2026-08-11T14:20:24.401Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -72,6 +72,50 @@
         "archived_by": { "type": "string", "format": "uuid" },
         "published_revision": { "type": "integer", "format": "int64" },
         "has_unpublished_changes": { "type": "boolean" }
+      }
+    },
+    "AdminWordListItem": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "id",
+        "headword",
+        "kind",
+        "revision",
+        "lifecycle_revision",
+        "gloss",
+        "pos_list",
+        "levels",
+        "status",
+        "has_unpublished_changes",
+        "max_reachable_step",
+        "created_by_name",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by_name": { "type": "string" },
+        "gloss": { "type": "string" },
+        "has_unpublished_changes": { "type": "boolean" },
+        "headword": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "kind": { "$ref": "#/components/schemas/EntryKind" },
+        "levels": { "type": "array", "items": { "type": "string" } },
+        "lifecycle_revision": { "type": "integer", "format": "int64" },
+        "max_reachable_step": {
+          "$ref": "#/components/schemas/WordCreationStep"
+        },
+        "pos_list": { "type": "array", "items": { "type": "string" } },
+        "published_revision": { "type": "integer", "format": "int64" },
+        "revision": { "type": "integer", "format": "int64" },
+        "schema_version": {
+          "type": "integer",
+          "format": "int32",
+          "minimum": 0
+        },
+        "status": { "$ref": "#/components/schemas/AdminWordStatus" },
+        "updated_at": { "type": "string", "format": "date-time" }
       }
     },
     "EntryLifecycleInput": {

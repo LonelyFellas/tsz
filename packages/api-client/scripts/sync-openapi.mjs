@@ -1,7 +1,8 @@
 // 从后端权威 spec(tsz-rust/docs/openapi.json)生成一份精简契约快照,供契约测试对账。
 // tsz-rust 的 spec 由 utoipa 生成:后端 `cargo run --features swagger` 后
 // `curl http://localhost:8383/api-docs/openapi.json -o ../tsz-rust/docs/openapi.json`。
-// 快照只保留 path -> [methods],剥掉 /api/v1 前缀(前端 http baseURL 默认就是 /api/v1)。
+// 快照保留 path -> [methods] 与词库对接所需的关键 schema，路径会剥掉 /api/v1 前缀
+// （前端 http baseURL 默认就是 /api/v1）。
 // 用法:pnpm --filter @tsz/api-client sync:openapi
 // 后端 spec 位置可用 OPENAPI_SOURCE 覆盖(CI 里 checkout 路径不同的话)。
 import { readFileSync, writeFileSync } from "node:fs";
@@ -30,14 +31,15 @@ const adminWordV2 = spec.components?.schemas?.AdminWordV2;
 if (!adminWordV2?.required || !adminWordV2?.properties) {
   throw new Error(`spec 无 components.schemas.AdminWordV2: ${source}`);
 }
-const lifecycleSchemaNames = [
+const contractSchemaNames = [
+  "AdminWordListItem",
   "EntryLifecycleInput",
   "EntryLifecycleTarget",
   "EntryLifecycleBatchInput",
   "EntryLifecycleBatchResponse",
   "SuggestDialectVariantsResponseV2"
 ];
-for (const name of lifecycleSchemaNames) {
+for (const name of contractSchemaNames) {
   if (!spec.components?.schemas?.[name]) {
     throw new Error(`spec 无 components.schemas.${name}: ${source}`);
   }
@@ -76,7 +78,7 @@ const snapshot = {
       }
     },
     ...Object.fromEntries(
-      lifecycleSchemaNames.map((name) => [name, spec.components.schemas[name]])
+      contractSchemaNames.map((name) => [name, spec.components.schemas[name]])
     )
   }
 };

@@ -251,7 +251,7 @@ export interface DraftValidationIssue {
   field: string;
   code: string;
   message: string;
-  reference_location?: DraftReferenceLocation;
+  reference_location?: DraftReferenceLocation | null;
 }
 
 export interface DraftReferenceLocation {

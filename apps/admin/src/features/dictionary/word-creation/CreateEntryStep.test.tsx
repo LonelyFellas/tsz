@@ -309,6 +309,23 @@ describe("CreateEntryStep", () => {
     expect(mutations.create).not.toHaveBeenCalled();
   });
 
+  it("重复词条链接进入 V2 向导，不落到真实模式已关闭的 legacy 编辑器", async () => {
+    mutations.detect.mockResolvedValue(detectionFixture("colour"));
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "colour" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const duplicate = await screen.findByRole("link", {
+      name: "colour (uk)"
+    });
+    expect(duplicate).toHaveAttribute(
+      "href",
+      "/words/fixture-colour/wizard/basics"
+    );
+  });
+
   it("未命中内置词典的短语可创建 V2 空白草稿", async () => {
     const detection = detectionFixture("in front of");
     const created = {

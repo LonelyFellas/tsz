@@ -18,6 +18,7 @@ interface Props {
   word?: AdminWordV2;
   draftHeadwords?: WordHeadwordsV2;
   currentStep: WordCreationStep;
+  readOnly?: boolean;
   onStepChange?: (step: WordCreationStep) => void;
   children: ReactNode;
 }
@@ -128,6 +129,7 @@ export function WordCreationLayout({
   word,
   draftHeadwords,
   currentStep,
+  readOnly,
   onStepChange,
   children
 }: Props) {
@@ -184,7 +186,7 @@ export function WordCreationLayout({
         className={`word-creation-shell${isBasicsStep ? " word-creation-shell--basics" : ""}`}
       >
         {!isBasicsStep && (
-          <aside className="word-creation-summary">
+          <section className="word-creation-summary" aria-label="词条摘要">
             <Button
               type="text"
               icon={<LeftOutlined />}
@@ -205,14 +207,24 @@ export function WordCreationLayout({
                 <strong>English&nbsp; 英语</strong>
               </div>
 
-              {word?.status === "published" && (
-                <Tag color="success" style={{ alignSelf: "flex-start" }}>
-                  已发布 · 只读
+              {word?.status === "archived" ? (
+                <Tag color="warning" style={{ alignSelf: "flex-start" }}>
+                  已归档 · 只读
                 </Tag>
-              )}
+              ) : word?.status === "published" ? (
+                <Tag
+                  color={readOnly ? "success" : "processing"}
+                  style={{ alignSelf: "flex-start" }}
+                >
+                  {readOnly
+                    ? "已发布 · 只读"
+                    : word.has_unpublished_changes
+                      ? "已发布 · 编辑未发布修改"
+                      : "已发布 · 编辑中"}
+                </Tag>
+              ) : null}
             </div>
 
-            <div className="word-summary-divider" />
             <div className="word-summary-progress-title">
               <Typography.Text type="secondary" className="word-summary-kicker">
                 完成情况
@@ -220,7 +232,7 @@ export function WordCreationLayout({
               <Tag bordered={false}>实时</Tag>
             </div>
             <ProgressSummary word={word} />
-          </aside>
+          </section>
         )}
 
         <main

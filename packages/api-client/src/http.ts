@@ -94,6 +94,40 @@ function stringArray(value: unknown): string[] {
     : [];
 }
 
+function nonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function hasNonEmptyStringFields(
+  value: unknown,
+  fields: readonly string[]
+): value is Record<string, string> {
+  return (
+    isRecord(value) &&
+    fields.every((field) => nonEmptyString(value[field]) !== undefined)
+  );
+}
+
+function isDraftReferenceLocation(
+  value: unknown
+): value is Record<string, string> {
+  return hasNonEmptyStringFields(value, [
+    "source_entry_id",
+    "source_publication_id",
+    "source_node_id",
+    "reference_kind"
+  ]);
+}
+
+function isProblemReferenceLocation(
+  value: unknown
+): value is Record<string, string> {
+  return (
+    isDraftReferenceLocation(value) &&
+    nonEmptyString(value.target_sense_id) !== undefined
+  );
+}
+
 function toDraftValidationIssues(value: unknown): DraftValidationIssue[] {
   if (!Array.isArray(value)) return [];
   const valid = value.every(
@@ -103,7 +137,10 @@ function toDraftValidationIssues(value: unknown): DraftValidationIssue[] {
       nonEmptyString(issue.node_id) !== undefined &&
       nonEmptyString(issue.field) !== undefined &&
       nonEmptyString(issue.code) !== undefined &&
-      nonEmptyString(issue.message) !== undefined
+      nonEmptyString(issue.message) !== undefined &&
+      (issue.reference_location === undefined ||
+        issue.reference_location === null ||
+        isDraftReferenceLocation(issue.reference_location))
   );
   return valid ? (value as DraftValidationIssue[]) : [];
 }
@@ -112,9 +149,9 @@ function toProblemMeta(value: unknown): ProblemMeta | undefined {
   if (!isRecord(value)) return undefined;
   if (
     (value.current_revision !== undefined &&
-      (typeof value.current_revision !== "number" ||
-        !Number.isInteger(value.current_revision) ||
-        value.current_revision < 0)) ||
+      !nonNegativeInteger(value.current_revision)) ||
+    (value.current_lifecycle_revision !== undefined &&
+      !nonNegativeInteger(value.current_lifecycle_revision)) ||
     (value.word_id !== undefined &&
       nonEmptyString(value.word_id) === undefined) ||
     (value.max_reachable_step !== undefined &&
@@ -132,7 +169,10 @@ function toProblemMeta(value: unknown): ProblemMeta | undefined {
         value.usage_count < 0)) ||
     (value.part_of_speech_id !== undefined &&
       nonEmptyString(value.part_of_speech_id) === undefined) ||
-    (value.code !== undefined && nonEmptyString(value.code) === undefined)
+    (value.code !== undefined && nonEmptyString(value.code) === undefined) ||
+    (value.reference_locations !== undefined &&
+      (!Array.isArray(value.reference_locations) ||
+        !value.reference_locations.every(isProblemReferenceLocation)))
   ) {
     return undefined;
   }

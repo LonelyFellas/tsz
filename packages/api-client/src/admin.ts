@@ -18,7 +18,7 @@ import type {
   AdminWordV2Envelope,
   AdminWordKind,
   AdminWordListQuery,
-  AdminWordListResponse,
+  AdminWordV2ListResponse,
   AdminWordSaveInput,
   AdminWordStats,
   AdminStatus,
@@ -167,7 +167,9 @@ export function createAdminEndpoints(http: HttpClient) {
     words: {
       /** GET /admin/lexicon/entries — 列表页：搜索行筛选 + 分页。 */
       list: (query: AdminWordListQuery = {}) =>
-        http.get<AdminWordListResponse>(`/lexicon/entries${qs({ ...query })}`),
+        http.get<AdminWordV2ListResponse>(
+          `/lexicon/entries${qs({ ...query })}`
+        ),
       /** GET /admin/lexicon/entries/stats — 头部计数（累计 / 今日 / 本月）。 */
       stats: () => http.get<AdminWordStats>("/lexicon/entries/stats"),
       /** POST /admin/lexicon/detections — 创建 V2 草稿前执行内置词典与智能词库检测。 */

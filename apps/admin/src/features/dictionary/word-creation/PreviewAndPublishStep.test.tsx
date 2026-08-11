@@ -355,6 +355,22 @@ describe("PreviewAndPublishStep", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(/^\/words\|/);
   });
 
+  it("archived 预览明确显示归档只读态，且不提供继续编辑或发布", () => {
+    const archived = wordFixture({
+      status: "archived",
+      ready: true,
+      max_reachable_step: "preview"
+    });
+    renderStep(archived, true);
+
+    expect(screen.getByText("归档词条详情")).toBeVisible();
+    expect(screen.getByText("词条已归档")).toBeVisible();
+    expect(screen.getByText("已归档", { exact: true })).toBeVisible();
+    expect(screen.queryByText("继续编辑")).toBeNull();
+    expect(screen.queryByText("提交生效")).toBeNull();
+    expect(mutations.validate).not.toHaveBeenCalled();
+  });
+
   it("published 的未发布修改在 edit 模式可重新校验并再次发布", async () => {
     const edited = wordFixture({
       status: "published",

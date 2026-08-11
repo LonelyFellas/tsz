@@ -23,7 +23,7 @@ import type {
   WordHeadwordsV2
 } from "@tsz/types";
 import { isAdminWordV2 } from "@tsz/types";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Navigate,
   useNavigate,
@@ -32,6 +32,7 @@ import {
 } from "react-router-dom";
 import { useArchiveWord, useRestoreWord, useWordDetail } from "../api";
 import { adminWordsDataSourceCapabilities } from "../dataSource";
+import { runLifecycleCommandOnce } from "../lifecycleCommand";
 import {
   createPartOfSpeechLookup,
   partOfSpeechLabel
@@ -61,6 +62,7 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
     [partOfSpeechCatalog.data]
   );
   const archiveWord = useArchiveWord();
+  const lifecycleCommandPending = useRef(false);
   const snapshot = word.detection_snapshot;
   const discard = () => {
     modal.confirm({
@@ -71,24 +73,25 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
       okText: "归档并重新创建",
       okButtonProps: { danger: true },
       cancelText: "取消",
-      onOk: async () => {
-        try {
-          await archiveWord.mutateAsync({
-            wordId: word.id,
-            idempotencyKey: crypto.randomUUID(),
-            input: {
-              base_revision: word.revision,
-              base_lifecycle_revision: word.lifecycle_revision
-            }
-          });
-          message.success("草稿已归档");
-          navigate("/words/new", { replace: true });
-        } catch (error) {
-          message.error(
-            error instanceof Error ? error.message : "归档草稿失败"
-          );
-        }
-      }
+      onOk: () =>
+        runLifecycleCommandOnce(lifecycleCommandPending, async () => {
+          try {
+            await archiveWord.mutateAsync({
+              wordId: word.id,
+              idempotencyKey: crypto.randomUUID(),
+              input: {
+                base_revision: word.revision,
+                base_lifecycle_revision: word.lifecycle_revision
+              }
+            });
+            message.success("草稿已归档");
+            navigate("/words/new", { replace: true });
+          } catch (error) {
+            message.error(
+              error instanceof Error ? error.message : "归档草稿失败"
+            );
+          }
+        })
     });
   };
   return (
@@ -216,6 +219,7 @@ export function WordCreationWizard({ mode }: Props) {
     mode === "create" ? "basics" : isWordCreationStep(step) ? step : "basics";
   const detail = useWordDetail(wordId, mode === "resume" && wordId !== "");
   const restoreWord = useRestoreWord();
+  const lifecycleCommandPending = useRef(false);
   const [word, setWord] = useState<AdminWordV2>();
   const [draftHeadwords, setDraftHeadwords] = useState<WordHeadwordsV2>();
   const explicitEditMode = searchParams.get("mode") === "edit";
@@ -330,24 +334,29 @@ export function WordCreationWizard({ mode }: Props) {
             <Button
               icon={<ReloadOutlined />}
               loading={restoreWord.isPending}
-              onClick={async () => {
-                try {
-                  const restored = await restoreWord.mutateAsync({
-                    wordId: word.id,
-                    idempotencyKey: crypto.randomUUID(),
-                    input: {
-                      base_revision: word.revision,
-                      base_lifecycle_revision: word.lifecycle_revision
+              onClick={() =>
+                void runLifecycleCommandOnce(
+                  lifecycleCommandPending,
+                  async () => {
+                    try {
+                      const restored = await restoreWord.mutateAsync({
+                        wordId: word.id,
+                        idempotencyKey: crypto.randomUUID(),
+                        input: {
+                          base_revision: word.revision,
+                          base_lifecycle_revision: word.lifecycle_revision
+                        }
+                      });
+                      setWord(restored.word);
+                      message.success("词条已恢复");
+                    } catch (error) {
+                      message.error(
+                        error instanceof Error ? error.message : "恢复失败"
+                      );
                     }
-                  });
-                  setWord(restored.word);
-                  message.success("词条已恢复");
-                } catch (error) {
-                  message.error(
-                    error instanceof Error ? error.message : "恢复失败"
-                  );
-                }
-              }}
+                  }
+                )
+              }
             >
               恢复词条
             </Button>
@@ -358,6 +367,7 @@ export function WordCreationWizard({ mode }: Props) {
       <WordCreationLayout
         word={word}
         currentStep={currentStep}
+        readOnly={readOnly}
         onStepChange={changeStep}
       >
         {currentStep === "basics" && <ReadOnlyBasicsStep word={word} />}

@@ -29,7 +29,7 @@ import type {
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client/http";
 import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   createPartOfSpeechLookup,
   partOfSpeechLabel,
@@ -136,9 +136,12 @@ function DetectionStatus({
                   已存在重复词条
                 </Space>
                 {smart.duplicates.map((item) => (
-                  <a key={item.word_id} href={`/words/${item.word_id}/edit`}>
+                  <Link
+                    key={item.word_id}
+                    to={`/words/${item.word_id}/wizard/basics`}
+                  >
                     {item.headword} ({item.dialect})
-                  </a>
+                  </Link>
                 ))}
               </Space>
             ) : (

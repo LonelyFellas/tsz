@@ -47,6 +47,22 @@ describe("WordCreationLayout", () => {
     );
   });
 
+  it("顶部摘要在缺少 canonical word 时安全展示空状态或统一草稿主词", () => {
+    const empty = renderLayout({ currentStep: "forms" });
+    expect(screen.getByText("完成检测后显示")).toBeInTheDocument();
+    expect(screen.getByText("方言识别").parentElement).toHaveTextContent(
+      "待完成"
+    );
+    expect(screen.getByText("基本词性").parentElement).toHaveTextContent("0");
+
+    empty.unmount();
+    renderLayout({
+      currentStep: "forms",
+      draftHeadwords: { mode: "unified", common: "far" }
+    });
+    expect(screen.getByText("far", { exact: true })).toBeInTheDocument();
+  });
+
   it("草稿汇总结构数量，并只允许点击 max_reachable_step 内步骤", () => {
     const onStepChange = vi.fn();
     const word = wordFixture({
@@ -80,16 +96,41 @@ describe("WordCreationLayout", () => {
     expect(summary).toHaveTextContent("语义区间1");
   });
 
-  it("published 显示只读标识，侧栏和面包屑均可返回词库", () => {
+  it("published 只读态在顶部摘要显示准确标识，并可返回词库", () => {
     const word = wordFixture({ status: "published", ready: true });
-    const view = renderLayout({ word, currentStep: "preview" });
+    const view = renderLayout({ word, currentStep: "preview", readOnly: true });
 
     expect(screen.getByText("已发布 · 只读")).toBeInTheDocument();
     expect(screen.getByText("centre · 预览并生效")).toBeInTheDocument();
-    const aside = view.container.querySelector<HTMLElement>(
+    const summary = view.container.querySelector<HTMLElement>(
       ".word-creation-summary"
     )!;
-    fireEvent.click(within(aside).getByText("返回智能词库"));
+    fireEvent.click(within(summary).getByText("返回智能词库"));
     expect(screen.getByTestId("location")).toHaveTextContent("/words");
+  });
+
+  it("published 编辑态与 archived 只读态显示各自状态，不误报只读或可编辑", () => {
+    const editing = wordFixture({
+      status: "published",
+      ready: true,
+      revision: 4,
+      published_revision: 3,
+      has_unpublished_changes: true
+    });
+    const view = renderLayout({
+      word: editing,
+      currentStep: "forms",
+      readOnly: false
+    });
+    expect(screen.getByText("已发布 · 编辑未发布修改")).toBeInTheDocument();
+    expect(screen.queryByText("已发布 · 只读")).toBeNull();
+
+    view.unmount();
+    renderLayout({
+      word: wordFixture({ status: "archived", ready: true }),
+      currentStep: "preview",
+      readOnly: true
+    });
+    expect(screen.getByText("已归档 · 只读")).toBeInTheDocument();
   });
 });

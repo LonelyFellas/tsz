@@ -1,10 +1,11 @@
 import { api, useAuthStore } from "@/lib/auth";
 import { env } from "@/lib/env";
+import type { AdminWordListQuery, AdminWordListResponse } from "@tsz/types";
 
 type AdminWordsApi = typeof api.words;
 type AdminPartOfSpeechSettingsApi = typeof api.partOfSpeechSettings;
 
-export type AdminWordsDataSource = Pick<
+type RealAdminWordsDataSource = Pick<
   AdminWordsApi,
   | "list"
   | "stats"
@@ -28,6 +29,11 @@ export type AdminWordsDataSource = Pick<
   | "batchDelete"
   | "relatedSearch"
 >;
+
+/** mock 仍可返回 legacy 行；真实 api.list 的 V2-only 响应可安全收窄到该联合。 */
+export type AdminWordsDataSource = Omit<RealAdminWordsDataSource, "list"> & {
+  list: (query?: AdminWordListQuery) => Promise<AdminWordListResponse>;
+};
 
 export const realAdminWordsDataSource: AdminWordsDataSource = api.words;
 

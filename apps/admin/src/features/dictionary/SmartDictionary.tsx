@@ -181,7 +181,7 @@ export function SmartDictionary() {
       content: restoring
         ? "恢复后词条重新进入正常列表；现有发布记录保持不变。"
         : "归档不会删除当前或历史发布记录；存在有效入站引用时服务端会安全拒绝。",
-      okText: restoring ? "恢复" : "归档",
+      okText: restoring ? "恢 复" : "归 档",
       okButtonProps: { danger: !restoring },
       cancelText: "取消",
       onOk: () =>
@@ -236,7 +236,7 @@ export function SmartDictionary() {
       content: restoring
         ? "该批次将原子恢复：任意一条冲突时全部保持原状。"
         : "该批次将原子归档且保留全部发布历史：任意一条冲突时全部保持原状。",
-      okText: restoring ? "恢复" : "归档",
+      okText: restoring ? "恢 复" : "归 档",
       okButtonProps: { danger: !restoring },
       cancelText: "取消",
       onOk: () =>
@@ -394,7 +394,7 @@ export function SmartDictionary() {
                   )
                 }
               >
-                {record.status === "archived" ? "恢复" : "归档"}
+                {record.status === "archived" ? "恢 复" : "归 档"}
               </Button>
             )}
             {!isV2 && adminWordsDataSourceCapabilities.legacyEntryCreation && (
@@ -543,7 +543,7 @@ export function SmartDictionary() {
                 loading={archiveBatch.isPending || restoreBatch.isPending}
                 onClick={transitionSelected}
               >
-                {restoringSelection ? "恢复" : "归档"}
+                {restoringSelection ? "恢 复" : "归 档"}
                 {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
               </Button>
             )}

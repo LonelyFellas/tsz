@@ -369,7 +369,7 @@ const ISSUE_STEP_LABEL: Record<Exclude<WordCreationStep, "preview">, string> = {
 
 export function PreviewAndPublishStep({
   word,
-  readOnly = word.status === "published",
+  readOnly = word.status !== "draft",
   onPublished
 }: Props) {
   const { message, modal } = App.useApp();
@@ -479,12 +479,18 @@ export function PreviewAndPublishStep({
       <div className="word-step-heading">
         <span className="word-step-number">STEP 04</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
-          {readOnly ? "词条详情" : "预览并生效"}
+          {word.status === "archived"
+            ? "归档词条详情"
+            : readOnly
+              ? "词条详情"
+              : "预览并生效"}
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
-          {readOnly
-            ? "该 V2 词条已发布，本轮提供与创建预览一致的只读查看。"
-            : "查看结构化字典预览和发布完整性结果。所有问题处理完成后可直接提交生效。"}
+          {word.status === "archived"
+            ? "该词条已归档，当前仅提供结构化只读查看；恢复后才能继续编辑或发布。"
+            : readOnly
+              ? "该 V2 词条已发布，本轮提供与创建预览一致的只读查看。"
+              : "查看结构化字典预览和发布完整性结果。所有问题处理完成后可直接提交生效。"}
         </Typography.Paragraph>
       </div>
 
@@ -497,7 +503,16 @@ export function PreviewAndPublishStep({
         />
       )}
 
-      {readOnly ? (
+      {word.status === "archived" ? (
+        <Alert
+          className="word-preview-status"
+          type="warning"
+          showIcon
+          title="词条已归档"
+          description="当前或历史发布记录仍被保留；请先恢复词条，再继续编辑或重新发布。"
+          style={{ marginBottom: 18 }}
+        />
+      ) : readOnly ? (
         <Alert
           className="word-preview-status"
           type="success"
@@ -620,11 +635,13 @@ export function PreviewAndPublishStep({
             </Descriptions.Item>
             <Descriptions.Item label="语言">English 英语</Descriptions.Item>
             <Descriptions.Item label="状态">
-              {word.status === "published"
-                ? word.has_unpublished_changes
-                  ? "已发布（有未发布修改）"
-                  : "已发布"
-                : "草稿"}
+              {word.status === "archived"
+                ? "已归档"
+                : word.status === "published"
+                  ? word.has_unpublished_changes
+                    ? "已发布（有未发布修改）"
+                    : "已发布"
+                  : "草稿"}
             </Descriptions.Item>
             <Descriptions.Item label="Revision">
               {word.revision}
@@ -685,14 +702,16 @@ export function PreviewAndPublishStep({
         {readOnly ? (
           <Space>
             <Button onClick={() => navigate("/words")}>返回智能词库</Button>
-            <Button
-              type="primary"
-              onClick={() =>
-                navigate(`/words/${word.id}/wizard/forms?mode=edit`)
-              }
-            >
-              继续编辑
-            </Button>
+            {word.status === "published" && (
+              <Button
+                type="primary"
+                onClick={() =>
+                  navigate(`/words/${word.id}/wizard/forms?mode=edit`)
+                }
+              >
+                继续编辑
+              </Button>
+            )}
           </Space>
         ) : (
           <Button

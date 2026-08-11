@@ -266,6 +266,15 @@ export interface AdminWordListItem {
   updated_at: string;
 }
 
+/** GET /admin/lexicon/entries 的真实 V2 wire 行；必填性与 OpenAPI 完全一致。 */
+export interface AdminWordV2ListItem extends AdminWordListItem {
+  schema_version: 2;
+  revision: number;
+  lifecycle_revision: number;
+  max_reachable_step: WordCreationStep;
+  has_unpublished_changes: boolean;
+}
+
 export interface AdminWordListPage {
   page: number;
   page_size: number;
@@ -274,6 +283,12 @@ export interface AdminWordListPage {
 
 export interface AdminWordListResponse {
   words: AdminWordListItem[];
+  page: AdminWordListPage;
+}
+
+/** GET /admin/lexicon/entries 的真实 V2 wire 响应。 */
+export interface AdminWordV2ListResponse {
+  words: AdminWordV2ListItem[];
   page: AdminWordListPage;
 }
 
