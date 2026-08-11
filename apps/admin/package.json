@@ -18,6 +18,7 @@
     "@tsz/api-client": "workspace:*",
     "@tsz/shared": "workspace:*",
     "@tsz/types": "workspace:*",
+    "@tsz/voice-editor": "workspace:*",
     "antd": "^6.5.0",
     "dayjs": "^1.11.21",
     "react": "^19.2.0",

@@ -7,6 +7,7 @@ export default defineConfig({
       "packages/shared",
       "packages/ui",
       "packages/api-client",
+      "packages/voice-editor",
       "apps/web",
       "apps/admin"
     ],
@@ -20,6 +21,7 @@ export default defineConfig({
         "packages/shared/src/**",
         "packages/ui/src/**",
         "packages/api-client/src/**",
+        "packages/voice-editor/src/**",
         "apps/web/src/features/auth/**",
         "apps/web/src/features/placement/**",
         "apps/web/src/lib/**",

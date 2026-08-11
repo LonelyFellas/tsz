@@ -87,6 +87,45 @@ describe("createAdminEndpoints", () => {
   });
 });
 
+describe("createAdminEndpoints — TTS 试听", () => {
+  it("voices → GET /tts/voices 带 language 与 AbortSignal", () => {
+    const api = createAdminEndpoints(http);
+    const controller = new AbortController();
+    api.tts.voices("en", controller.signal);
+    expect(http.get).toHaveBeenCalledWith("/tts/voices?language=en", {
+      signal: controller.signal
+    });
+  });
+
+  it("preview → POST /tts/previews 原样发送 snake_case wire", () => {
+    const api = createAdminEndpoints(http);
+    const controller = new AbortController();
+    const input = {
+      language: "en" as const,
+      content: {
+        version: 2 as const,
+        text: "hello",
+        annotations: [
+          {
+            type: "emphasis" as const,
+            start: 0,
+            end: 5,
+            level: "strong" as const
+          }
+        ]
+      },
+      voice_id: "ava",
+      style: "cheerful",
+      rate_percent: 5,
+      pitch_semitones: -1
+    };
+    api.tts.preview(input, controller.signal);
+    expect(http.post).toHaveBeenCalledWith("/tts/previews", input, {
+      signal: controller.signal
+    });
+  });
+});
+
 describe("createAdminEndpoints — 智能词库 words", () => {
   it("list 无参 → GET /words(不带 ?)", () => {
     const api = createAdminEndpoints(http);

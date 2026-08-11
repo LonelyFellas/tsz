@@ -11,11 +11,15 @@ describe("env", () => {
     vi.stubEnv("VITE_API_BASE_URL", undefined);
     vi.stubEnv("VITE_WORD_CREATION_WIZARD", undefined);
     vi.stubEnv("VITE_ADMIN_WORDS_MOCK", undefined);
+    vi.stubEnv("VITE_VOICE_EDITOR", undefined);
+    vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.resetModules();
     const { env } = await import("./env");
     expect(env.API_BASE_URL).toBe("/api/v1");
     expect(env.WORD_CREATION_WIZARD).toBe(true);
     expect(env.ADMIN_WORDS_MOCK).toBe(true);
+    expect(env.VOICE_EDITOR).toBe(true);
+    expect(env.ADMIN_TTS_MOCK).toBe(true);
   });
 
   it("采用配置的 API 基址", async () => {
@@ -29,25 +33,34 @@ describe("env", () => {
     vi.stubEnv("PROD", true);
     vi.stubEnv("VITE_WORD_CREATION_WIZARD", undefined);
     vi.stubEnv("VITE_ADMIN_WORDS_MOCK", undefined);
+    vi.stubEnv("VITE_VOICE_EDITOR", undefined);
+    vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.resetModules();
     const { env } = await import("./env");
     expect(env.WORD_CREATION_WIZARD).toBe(false);
     expect(env.ADMIN_WORDS_MOCK).toBe(false);
+    expect(env.VOICE_EDITOR).toBe(false);
+    expect(env.ADMIN_TTS_MOCK).toBe(false);
   });
 
   it.each([
     ["VITE_WORD_CREATION_WIZARD", "true", true],
     ["VITE_WORD_CREATION_WIZARD", "false", false],
     ["VITE_ADMIN_WORDS_MOCK", "true", true],
-    ["VITE_ADMIN_WORDS_MOCK", "false", false]
+    ["VITE_ADMIN_WORDS_MOCK", "false", false],
+    ["VITE_VOICE_EDITOR", "true", true],
+    ["VITE_VOICE_EDITOR", "false", false],
+    ["VITE_ADMIN_TTS_MOCK", "true", true],
+    ["VITE_ADMIN_TTS_MOCK", "false", false]
   ] as const)("严格解析 %s=%s", async (name, value, expected) => {
     vi.stubEnv(name, value);
     vi.resetModules();
     const { env } = await import("./env");
-    const key =
-      name === "VITE_WORD_CREATION_WIZARD"
-        ? "WORD_CREATION_WIZARD"
-        : "ADMIN_WORDS_MOCK";
+    const key = name.replace("VITE_", "") as
+      | "WORD_CREATION_WIZARD"
+      | "ADMIN_WORDS_MOCK"
+      | "VOICE_EDITOR"
+      | "ADMIN_TTS_MOCK";
     expect(env[key]).toBe(expected);
   });
 
@@ -86,5 +99,21 @@ describe("admin words mock production policy", () => {
 
     const { env } = await import("./env");
     expect(env.ADMIN_WORDS_MOCK).toBe(true);
+  });
+});
+
+describe("admin TTS mock production policy", () => {
+  it("生产环境开启 TTS mock 时 fail closed", async () => {
+    const { assertAdminTtsMockAllowed } = await import("./env-flags");
+    expect(() => assertAdminTtsMockAllowed(true, true)).toThrow(
+      "仅开发环境或 test mode 构建允许启用 VITE_ADMIN_TTS_MOCK"
+    );
+  });
+
+  it("非生产、test mode 或关闭时允许启动", async () => {
+    const { assertAdminTtsMockAllowed } = await import("./env-flags");
+    expect(() => assertAdminTtsMockAllowed(true, false)).not.toThrow();
+    expect(() => assertAdminTtsMockAllowed(true, true, "test")).not.toThrow();
+    expect(() => assertAdminTtsMockAllowed(false, true)).not.toThrow();
   });
 });

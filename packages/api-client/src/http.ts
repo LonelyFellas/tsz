@@ -259,11 +259,20 @@ export function createHttpClient({
   }
 
   return {
-    get: <T>(path: string) => request<T>(path),
-    post: <T>(path: string, data?: unknown, opts?: { skipAuth?: boolean }) =>
+    get: <T>(path: string, opts?: { signal?: AbortSignal }) =>
+      request<T>(path, opts?.signal ? { signal: opts.signal } : {}),
+    post: <T>(
+      path: string,
+      data?: unknown,
+      opts?: { skipAuth?: boolean; signal?: AbortSignal }
+    ) =>
       request<T>(
         path,
-        { method: "POST", body: JSON.stringify(data) },
+        {
+          method: "POST",
+          body: JSON.stringify(data),
+          ...(opts?.signal ? { signal: opts.signal } : {})
+        },
         false,
         opts?.skipAuth
       ),

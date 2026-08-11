@@ -4,6 +4,15 @@ import type {
   WordCreationStep
 } from "./admin-word-v2";
 import type { PartOfSpeechCode, SubPartOfSpeechCode } from "./part-of-speech";
+import type { RichText } from "./rich-text";
+export type {
+  RichText,
+  RichTextAnnotation,
+  RichTextHighlightColor,
+  RichTextSpan,
+  RichTextV1,
+  RichTextV2
+} from "./rich-text";
 
 // 智能词库 V1 legacy wire 类型 —— 1:1 镜像后端 Go JSON(snake_case)。
 // 权威来源:tsz-go/docs/openapi.yaml tag `Admin (words)`;叙述性说明见
@@ -41,23 +50,6 @@ export type WordSubPos = "" | SubPartOfSpeechCode;
 
 export type WordRelationType = "synonym" | "antonym" | "derivative";
 export type PronunciationStyle = "normal" | "strong" | "weak";
-
-/** 富文本(D7):纯文本 + 位置标记,偏移量按 Unicode 码点计(非 UTF-16 下标)。 */
-export interface RichText {
-  version: 1;
-  /** ≤ 5000 码点 */
-  text: string;
-  /** ≤ 500;加粗/蓝色区间 [start, end) */
-  spans: RichTextSpan[];
-  /** ≤ 500;连读点:i 表示码点 i 与 i+1 之间 */
-  liaisons: number[];
-}
-
-export interface RichTextSpan {
-  start: number;
-  end: number;
-  type: "bold" | "blue";
-}
 
 /** 语义区间(可选的命名分组,词义可指向它)。 */
 export interface SenseGroup {

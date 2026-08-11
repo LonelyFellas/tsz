@@ -24,9 +24,12 @@ import type {
   AdminWordV2,
   DraftValidationResponse,
   EnglishTextV2,
+  RichText,
   WordCreationStep,
   WordDefinitionV2
 } from "@tsz/types";
+import { RichTextReadOnly } from "@tsz/voice-editor/reader";
+import "@tsz/voice-editor/styles.css";
 import { HttpError } from "@tsz/api-client/http";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -63,18 +66,39 @@ function formatPublishedAt(value: string | undefined): string {
   return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
 }
 
-function englishPreview(value: EnglishTextV2): string[] {
-  if (value.mode === "unified") return [value.common.value.text];
-  return (["uk", "us"] as const).map((dialect) => {
-    const slot = value[dialect];
-    return `${DIALECT_LABEL[dialect]}：${slot.state === "ready" ? slot.variant.value.text : "未填写"}`;
-  });
+function EnglishRichTextPreview({ value }: { value: EnglishTextV2 }) {
+  if (value.mode === "unified") {
+    return <RichTextReadOnly value={value.common.value} />;
+  }
+  return (
+    <Space orientation="vertical" size={2}>
+      {(["uk", "us"] as const).map((dialect) => {
+        const slot = value[dialect];
+        return (
+          <span key={dialect}>
+            {DIALECT_LABEL[dialect]}：
+            {slot.state === "ready" ? (
+              <RichTextReadOnly value={slot.variant.value} />
+            ) : (
+              "未填写"
+            )}
+          </span>
+        );
+      })}
+    </Space>
+  );
 }
 
-function definitionPreview(definition: WordDefinitionV2): string[] {
-  return definition.definition_mode.startsWith("en_")
-    ? englishPreview(definition.content as EnglishTextV2)
-    : [(definition.content as { text: string }).text];
+function DefinitionRichTextPreview({
+  definition
+}: {
+  definition: WordDefinitionV2;
+}) {
+  return definition.definition_mode.startsWith("en_") ? (
+    <EnglishRichTextPreview value={definition.content as EnglishTextV2} />
+  ) : (
+    <RichTextReadOnly value={definition.content as RichText} />
+  );
 }
 
 function FormsPreview({
@@ -214,7 +238,7 @@ function MeaningsPreview({
                         {grammar.variants.map((variant) => (
                           <Tag key={variant.id}>
                             {DIALECT_LABEL[variant.dialect]} ·{" "}
-                            {variant.content.text || "未填写"}
+                            <RichTextReadOnly value={variant.content} />
                           </Tag>
                         ))}
                       </Space>
@@ -264,11 +288,7 @@ function MeaningsPreview({
                               {definition.definition_mode}
                             </Typography.Text>
                           </Space>
-                          {definitionPreview(definition).map((text, index) => (
-                            <Typography.Text key={index}>
-                              {text || "未填写"}
-                            </Typography.Text>
-                          ))}
+                          <DefinitionRichTextPreview definition={definition} />
                         </Space>
                       </List.Item>
                     )}
@@ -287,13 +307,7 @@ function MeaningsPreview({
                         >
                           <Space>
                             <Tag>{sentence.level}</Tag>
-                            {englishPreview(sentence.en_text).map(
-                              (text, index) => (
-                                <Typography.Text key={index}>
-                                  {text || "未填写"}
-                                </Typography.Text>
-                              )
-                            )}
+                            <EnglishRichTextPreview value={sentence.en_text} />
                           </Space>
                           <Typography.Text type="secondary">
                             {sentence.zh_text.text || "未填写汉语译文"}
