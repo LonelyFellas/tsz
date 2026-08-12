@@ -23,6 +23,7 @@ const METHOD_NAMES = [
   "restore",
   "archiveBatch",
   "restoreBatch",
+  "deleteDraft",
   "remove",
   "batchDelete",
   "relatedSearch"
@@ -124,6 +125,10 @@ const INVOCATIONS = [
   {
     method: "restoreBatch",
     args: ["restore-batch-key", { entries: [] }]
+  },
+  {
+    method: "deleteDraft",
+    args: ["word-1", { base_revision: 2, base_lifecycle_revision: 1 }]
   },
   { method: "remove", args: ["word-1"] },
   { method: "batchDelete", args: [["word-1", "word-2"]] },

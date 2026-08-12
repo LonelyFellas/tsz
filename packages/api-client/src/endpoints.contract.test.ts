@@ -196,6 +196,23 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "base_revision",
       "base_lifecycle_revision"
     ]);
+    expect(snapshot.schemas.DeleteDraftInput).toEqual({
+      type: "object",
+      required: ["base_revision", "base_lifecycle_revision"],
+      properties: {
+        base_lifecycle_revision: {
+          type: "integer",
+          format: "int64",
+          minimum: 1
+        },
+        base_revision: {
+          type: "integer",
+          format: "int64",
+          minimum: 1
+        }
+      },
+      additionalProperties: false
+    });
     expect(snapshot.schemas.EntryLifecycleBatchResponse.required).toEqual([
       "words",
       "affected"

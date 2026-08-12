@@ -961,15 +961,19 @@ function normalizeVariants(
   variants: WordFormVariantV2[],
   desired: Dialect[],
   forcedSpellings?: Partial<Record<Dialect, string>>,
-  spellingUnified = false
+  spellingUnified = false,
+  preferredDialect?: Dialect
 ): WordFormVariantV2[] {
-  const fallback = variants[0] ?? {
-    id: newWordNodeId(),
-    dialect: "common" as const,
-    spelling: "",
-    origin: "manual" as const,
-    pronunciations: [createPronunciation()]
-  };
+  const fallback = variants.find(
+    (variant) => variant.dialect === preferredDialect
+  ) ??
+    variants[0] ?? {
+      id: newWordNodeId(),
+      dialect: "common" as const,
+      spelling: "",
+      origin: "manual" as const,
+      pronunciations: [createPronunciation()]
+    };
   const commonSpelling =
     variants.find((item) => item.dialect === "common")?.spelling ??
     fallback.spelling;
@@ -990,7 +994,8 @@ function normalizeDialectRules(
   pos: WordPosFormsV2,
   headwords: AdminWordV2["headwords"],
   spellingMode: "unified" | "distinguish",
-  phoneticMode: "unified" | "distinguish"
+  phoneticMode: "unified" | "distinguish",
+  preferredDialect?: Dialect
 ): WordPosFormsV2 {
   const forcedSpellingMode =
     headwords.mode === "distinguish" ? "distinguish" : spellingMode;
@@ -1018,7 +1023,8 @@ function normalizeDialectRules(
         pos.base_form.variants,
         desired,
         forcedBaseSpellings,
-        forcedSpellingMode === "unified"
+        forcedSpellingMode === "unified",
+        preferredDialect
       )
     },
     form_groups: pos.form_groups.map((group) => ({
@@ -1029,10 +1035,78 @@ function normalizeDialectRules(
           slot.variants,
           desired,
           undefined,
-          forcedSpellingMode === "unified"
+          forcedSpellingMode === "unified",
+          preferredDialect
         )
       }))
     }))
+  };
+}
+
+function normalizeLoadedForms(word: AdminWordV2): DraftFormsStepContent {
+  const detectedHeadwords = word.detection_snapshot.headwords;
+  const matchedDialect = word.detection_snapshot.matched_dialect;
+  const preferredDialect: Dialect | undefined =
+    matchedDialect === "uk" || matchedDialect === "us"
+      ? matchedDialect
+      : detectedHeadwords.mode === "distinguish"
+        ? detectedHeadwords.source_dialect
+        : undefined;
+  return {
+    pos: cloneWordValue(word.forms).pos.map((pos) => {
+      const spellingMode =
+        word.headwords.mode === "distinguish"
+          ? "distinguish"
+          : pos.dialect_rules.spelling_mode;
+      const phoneticMode =
+        spellingMode === "distinguish"
+          ? "distinguish"
+          : pos.dialect_rules.phonetic_mode;
+      const desired: Dialect[] =
+        spellingMode === "distinguish" || phoneticMode === "distinguish"
+          ? ["uk", "us"]
+          : ["common"];
+      const normalizeUnexpected = (
+        variants: WordFormVariantV2[],
+        forcedSpellings?: Partial<Record<Dialect, string>>
+      ) =>
+        variants.some((variant) => !desired.includes(variant.dialect))
+          ? normalizeVariants(
+              variants,
+              desired,
+              forcedSpellings,
+              spellingMode === "unified",
+              preferredDialect
+            )
+          : variants;
+      const forcedBaseSpellings: Partial<Record<Dialect, string>> =
+        word.headwords.mode === "distinguish"
+          ? { uk: word.headwords.uk, us: word.headwords.us }
+          : desired.length === 1
+            ? { common: word.headwords.common }
+            : { uk: word.headwords.common, us: word.headwords.common };
+      return {
+        ...pos,
+        dialect_rules: {
+          spelling_mode: spellingMode,
+          phonetic_mode: phoneticMode
+        },
+        base_form: {
+          ...pos.base_form,
+          variants: normalizeUnexpected(
+            pos.base_form.variants,
+            forcedBaseSpellings
+          )
+        },
+        form_groups: pos.form_groups.map((group) => ({
+          ...group,
+          slots: group.slots.map((slot) => ({
+            ...slot,
+            variants: normalizeUnexpected(slot.variants)
+          }))
+        }))
+      };
+    })
   };
 }
 
@@ -1336,7 +1410,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const navigate = useNavigate();
   const editQuery = word.status === "published" ? "?mode=edit" : "";
   const [content, setContent] = useState<DraftFormsStepContent>(() =>
-    cloneWordValue(word.forms)
+    normalizeLoadedForms(word)
   );
   const contentRef = useRef(content);
   const [activePosId, setActivePosId] = useState(
@@ -1393,7 +1467,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
 
   useEffect(() => {
     if (!dirty) {
-      const next = cloneWordValue(word.forms);
+      const next = normalizeLoadedForms(word);
       contentRef.current = next;
       setContent(next);
       setActivePosId((current) =>
@@ -1402,7 +1476,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
           : (word.forms.pos[0]?.pos_id ?? "")
       );
     }
-  }, [dirty, word.forms, word.revision]);
+  }, [dirty, word]);
 
   const updateContent = (next: DraftFormsStepContent) => {
     contentRef.current = next;

@@ -166,7 +166,7 @@ describe("CreateEntryStep", () => {
     expect(mutations.detect).not.toHaveBeenCalled();
   });
 
-  it("仅点击后检测，确认可编辑目标方言并用同一结果创建草稿", async () => {
+  it("美式命中时锁定美式基准，仅编辑英式词形后创建草稿", async () => {
     const detection = detectionFixture("center", "det-center");
     const created = wordFixture();
     mutations.detect.mockResolvedValue(detection);
@@ -198,8 +198,8 @@ describe("CreateEntryStep", () => {
 
     const uk = screen.getByLabelText("英式主词");
     const us = screen.getByLabelText("美式主词");
-    expect(uk).not.toHaveAttribute("readonly");
-    expect(us).toHaveAttribute("readonly");
+    expect(uk).not.toBeDisabled();
+    expect(us).toBeDisabled();
     fireEvent.change(uk, { target: { value: "centre-alt" } });
     expect(onHeadwordsChange).toHaveBeenLastCalledWith({
       mode: "distinguish",
@@ -328,7 +328,14 @@ describe("CreateEntryStep", () => {
     expect(screen.getByText("已发布")).toBeVisible();
     expect(screen.getByText("已归档")).toBeVisible();
     expect(screen.getByText("归档词条仍占用词头")).toBeVisible();
-    expect(screen.getByText("点击词条进入详情后可恢复。")).toBeVisible();
+    expect(
+      screen.getByText(
+        "点击上方重复词条可进入详情并恢复，也可以在归档列表中定位。"
+      )
+    ).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "在归档列表查看" })
+    ).toHaveAttribute("href", "/words?keyword=colour&status=archived");
     expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
     expect(mutations.create).not.toHaveBeenCalled();
   });
@@ -397,7 +404,7 @@ describe("CreateEntryStep", () => {
     expect(button("确认并进入词形与发音")).toBeDisabled();
   });
 
-  it("统一主词检测结果可直接创建并显示 common 主词", async () => {
+  it("统一主词建议可手动切换为英美区分并分别修改", async () => {
     const detection = detectionFixture("far", "det-far");
     const created = wordFixture({ headword: "far" });
     mutations.detect.mockResolvedValue(detection);
@@ -408,29 +415,44 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    await waitFor(() =>
-      expect(
-        screen
-          .getAllByDisplayValue("far")
-          .some((input) => input.hasAttribute("readonly"))
-      ).toBe(true)
-    );
-    const callsBeforeReadonlyChanges = onHeadwordsChange.mock.calls.length;
+    const dialectSwitch = await screen.findByRole("switch", {
+      name: "区分英美词形"
+    });
+    expect(dialectSwitch).not.toBeChecked();
+    expect(dialectSwitch).not.toBeDisabled();
+    fireEvent.click(dialectSwitch);
+    expect(dialectSwitch).toBeChecked();
+    expect(screen.getByLabelText("英式主词")).not.toBeDisabled();
+    expect(screen.getByLabelText("美式主词")).toBeDisabled();
     fireEvent.change(screen.getByLabelText("英式主词"), {
-      target: { value: "changed-uk" }
+      target: { value: "far-uk" }
     });
-    fireEvent.change(screen.getByLabelText("美式主词"), {
-      target: { value: "changed-us" }
+    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
+      mode: "distinguish",
+      uk: "far-uk",
+      us: "far",
+      source_dialect: "us"
     });
-    expect(onHeadwordsChange).toHaveBeenCalledTimes(callsBeforeReadonlyChanges);
     fireEvent.click(button("确认并进入词形与发音"));
-    await waitFor(() => expect(mutations.create).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(mutations.create).toHaveBeenCalledWith({
+        schema_version: 2,
+        idempotency_key: expect.any(String),
+        detection_id: "det-far",
+        headwords: {
+          mode: "distinguish",
+          uk: "far-uk",
+          us: "far",
+          source_dialect: "us"
+        }
+      })
+    );
     expect(await screen.findByText("forms-route")).toBeVisible();
   });
 
-  it("检测到英美差异时开关自动开启并显示两套词形", async () => {
+  it("模式往返切换时保留用户编辑过的非命中侧词形", async () => {
     mutations.detect.mockResolvedValue(detectionFixture("center"));
-    renderStep();
+    const { onHeadwordsChange } = renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
       target: { value: "center" }
     });
@@ -440,14 +462,69 @@ describe("CreateEntryStep", () => {
       name: "区分英美词形"
     });
     expect(dialectSwitch).toBeChecked();
-    expect(dialectSwitch).toBeDisabled();
+    expect(dialectSwitch).not.toBeDisabled();
     expect(screen.getByLabelText("英式主词")).toHaveValue("centre");
+    expect(screen.getByLabelText("英式主词")).not.toBeDisabled();
     expect(screen.getByLabelText("美式主词")).toHaveValue("center");
+    expect(screen.getByLabelText("美式主词")).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("英式主词"), {
+      target: { value: "centre-alt" }
+    });
+    fireEvent.click(dialectSwitch);
+    expect(dialectSwitch).not.toBeChecked();
+    expect(screen.getByLabelText("英式主词")).toHaveValue("center");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("center");
+    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
+      mode: "unified",
+      common: "center"
+    });
+    fireEvent.click(dialectSwitch);
+    expect(dialectSwitch).toBeChecked();
+    expect(screen.getByLabelText("英式主词")).toHaveValue("centre-alt");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("center");
+    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
+      mode: "distinguish",
+      uk: "centre-alt",
+      us: "center",
+      source_dialect: "us"
+    });
   });
 
-  it("未检测到英美差异时开关关闭禁用，英美两栏显示相同词形", async () => {
+  it("英式命中时锁定英式基准，仅允许编辑美式词形", async () => {
+    const detection = detectionFixture("center");
+    detection.matched_dialect = "uk";
+    if (detection.builtin_dictionary.status !== "matched") {
+      throw new Error("测试夹具必须返回内置词典匹配结果");
+    }
+    detection.builtin_dictionary.headwords = {
+      mode: "distinguish",
+      uk: "centre",
+      us: "center",
+      source_dialect: "uk"
+    };
+    mutations.detect.mockResolvedValue(detection);
+    const { onHeadwordsChange } = renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "centre" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByLabelText("英式主词")).toBeDisabled();
+    expect(screen.getByLabelText("美式主词")).not.toBeDisabled();
+    fireEvent.change(screen.getByLabelText("美式主词"), {
+      target: { value: "center-alt" }
+    });
+    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
+      mode: "distinguish",
+      uk: "centre",
+      us: "center-alt",
+      source_dialect: "uk"
+    });
+  });
+
+  it("未检测到英美差异时仍可手动开启并编辑两侧词形", async () => {
     mutations.detect.mockResolvedValue(detectionFixture("hello"));
-    renderStep();
+    const { onHeadwordsChange } = renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
       target: { value: "hello" }
     });
@@ -457,9 +534,34 @@ describe("CreateEntryStep", () => {
       name: "区分英美词形"
     });
     expect(dialectSwitch).not.toBeChecked();
-    expect(dialectSwitch).toBeDisabled();
+    expect(dialectSwitch).not.toBeDisabled();
     expect(screen.getByLabelText("英式主词")).toHaveValue("hello");
     expect(screen.getByLabelText("美式主词")).toHaveValue("hello");
+    fireEvent.click(dialectSwitch);
+    fireEvent.change(screen.getByLabelText("英式主词"), {
+      target: { value: "hello-uk" }
+    });
+    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
+      mode: "distinguish",
+      uk: "hello-uk",
+      us: "hello",
+      source_dialect: "us"
+    });
+  });
+
+  it("内置词典未收录的短语保持统一模式，避免提交后端不接受的区分模式", async () => {
+    mutations.detect.mockResolvedValue(detectionFixture("BRAND NEW PHRASE"));
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "BRAND NEW PHRASE" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const dialectSwitch = await screen.findByRole("switch", {
+      name: "区分英美词形"
+    });
+    expect(dialectSwitch).not.toBeChecked();
+    expect(dialectSwitch).toBeDisabled();
   });
 
   it("非 Error 检测失败使用稳定回退文案", async () => {

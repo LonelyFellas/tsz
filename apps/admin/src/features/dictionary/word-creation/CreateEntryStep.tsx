@@ -94,6 +94,10 @@ function DetectionStatus({
   const hasArchivedDuplicate =
     smart.status === "duplicate" &&
     smart.duplicates.some((item) => item.status === "archived");
+  const firstArchivedDuplicate =
+    smart.status === "duplicate"
+      ? smart.duplicates.find((item) => item.status === "archived")
+      : undefined;
   return (
     <Card
       className="word-detection-result-card"
@@ -167,7 +171,19 @@ function DetectionStatus({
                     type="info"
                     showIcon
                     title="归档词条仍占用词头"
-                    description="点击词条进入详情后可恢复。"
+                    description="点击上方重复词条可进入详情并恢复，也可以在归档列表中定位。"
+                    action={
+                      firstArchivedDuplicate && (
+                        <Link
+                          to={`/words?${new URLSearchParams({
+                            keyword: firstArchivedDuplicate.headword,
+                            status: "archived"
+                          }).toString()}`}
+                        >
+                          在归档列表查看
+                        </Link>
+                      )
+                    }
                   />
                 )}
               </Space>
@@ -212,9 +228,15 @@ function DetectionStatus({
 
 function HeadwordConfirmation({
   value,
+  matchedDialect,
+  preservedDistinguish,
+  allowDistinguish,
   onChange
 }: {
   value: WordHeadwordsV2;
+  matchedDialect?: "common" | "uk" | "us";
+  preservedDistinguish?: Extract<WordHeadwordsV2, { mode: "distinguish" }>;
+  allowDistinguish: boolean;
   onChange: (next: WordHeadwordsV2) => void;
 }) {
   const source =
@@ -231,15 +253,34 @@ function HeadwordConfirmation({
         <div>
           <Typography.Text strong>区分英美词形</Typography.Text>
           <Typography.Text type="secondary">
-            由内置词典结果自动判断
+            命中侧作为检测基准，另一侧可按实际情况调整
           </Typography.Text>
         </div>
         <Switch
           aria-label="区分英美词形"
           checked={value.mode === "distinguish"}
-          disabled
-          style={value.mode === "distinguish" ? { opacity: 1 } : undefined}
-          title="由内置词典检测结果自动决定"
+          disabled={!allowDistinguish}
+          onChange={(checked) => {
+            if (checked && value.mode === "unified") {
+              onChange(
+                preservedDistinguish ?? {
+                  mode: "distinguish",
+                  uk: value.common,
+                  us: value.common,
+                  source_dialect:
+                    matchedDialect === "uk" || matchedDialect === "us"
+                      ? matchedDialect
+                      : "us"
+                }
+              );
+            } else if (!checked && value.mode === "distinguish") {
+              onChange({
+                mode: "unified",
+                common: value[value.source_dialect]
+              });
+            }
+          }}
+          title="手动选择是否区分英美词形"
         />
       </div>
       {source && (
@@ -247,7 +288,7 @@ function HeadwordConfirmation({
           type="info"
           showIcon
           icon={<SafetyCertificateOutlined />}
-          title={`${source === "uk" ? "英式" : "美式"}是本次输入命中的检测基准，保持只读；请确认另一侧。`}
+          title={`${source === "uk" ? "英式" : "美式"}是本次输入命中的检测基准，已锁定；请确认另一侧词形。`}
           style={{ marginBottom: 16 }}
         />
       )}
@@ -258,7 +299,7 @@ function HeadwordConfirmation({
             <Input
               aria-label="英式主词"
               value={uk}
-              readOnly={value.mode === "unified" || source === "uk"}
+              disabled={value.mode === "unified" || source === "uk"}
               onChange={(event) => {
                 if (value.mode === "distinguish") {
                   onChange({ ...value, uk: event.target.value });
@@ -274,7 +315,7 @@ function HeadwordConfirmation({
             <Input
               aria-label="美式主词"
               value={us}
-              readOnly={value.mode === "unified" || source === "us"}
+              disabled={value.mode === "unified" || source === "us"}
               onChange={(event) => {
                 if (value.mode === "distinguish") {
                   onChange({ ...value, us: event.target.value });
@@ -306,12 +347,16 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
   const [creating, setCreating] = useState(false);
   const requestVersion = useRef(0);
   const createKey = useRef(newWordNodeId());
+  const preservedDistinguish = useRef<
+    Extract<WordHeadwordsV2, { mode: "distinguish" }> | undefined
+  >(undefined);
   const allowSavedNavigation = useUnsavedWordChanges(dirty);
 
   const resetDetection = () => {
     requestVersion.current += 1;
     setResult(undefined);
     setHeadwords(undefined);
+    preservedDistinguish.current = undefined;
     onHeadwordsChange(undefined);
     createKey.current = newWordNodeId();
     detectWord.reset();
@@ -360,6 +405,8 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
             ? ({ mode: "unified", common: next.request.headword } as const)
             : undefined;
       setHeadwords(nextHeadwords);
+      preservedDistinguish.current =
+        nextHeadwords?.mode === "distinguish" ? nextHeadwords : undefined;
       onHeadwordsChange(nextHeadwords);
     } catch (error) {
       if (version === requestVersion.current) {
@@ -387,6 +434,9 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
 
   const updateHeadwords = (next: WordHeadwordsV2) => {
     createKey.current = newWordNodeId();
+    if (next.mode === "distinguish") {
+      preservedDistinguish.current = next;
+    }
     setDirty(true);
     setHeadwords(next);
     onHeadwordsChange(next);
@@ -497,6 +547,11 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
               <div className="word-headword-confirmation-wrap">
                 <HeadwordConfirmation
                   value={headwords}
+                  matchedDialect={result.matched_dialect}
+                  preservedDistinguish={preservedDistinguish.current}
+                  allowDistinguish={
+                    result.builtin_dictionary.status === "matched"
+                  }
                   onChange={updateHeadwords}
                 />
               </div>

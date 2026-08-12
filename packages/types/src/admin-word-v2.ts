@@ -380,6 +380,11 @@ export interface PublishAdminWordV2Input {
   base_revision: number;
 }
 
+export interface DeleteDraftInput {
+  base_revision: number;
+  base_lifecycle_revision: number;
+}
+
 export interface EntryLifecycleInput {
   base_revision: number;
   base_lifecycle_revision: number;

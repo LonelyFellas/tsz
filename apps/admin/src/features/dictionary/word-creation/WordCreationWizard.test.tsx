@@ -8,7 +8,7 @@ import { wordFixture } from "./wordCreation.test.helper";
 
 const state = vi.hoisted(() => ({
   detail: {} as Record<string, unknown>,
-  archive: vi.fn(),
+  deleteDraft: vi.fn(),
   restore: vi.fn(),
   refetch: vi.fn(),
   createdWord: undefined as AdminWordV2 | undefined
@@ -24,7 +24,10 @@ vi.mock("../api", () => ({
     requestedWordId: wordId,
     enabled
   })),
-  useArchiveWord: () => ({ mutateAsync: state.archive, isPending: false }),
+  useDeleteWordDraft: () => ({
+    mutateAsync: state.deleteDraft,
+    isPending: false
+  }),
   useRestoreWord: () => ({ mutateAsync: state.restore, isPending: false })
 }));
 
@@ -431,7 +434,24 @@ describe("WordCreationWizard", () => {
     ).toBeVisible();
   });
 
-  it("只读 basics 可进入 forms；归档确认后重新创建", async () => {
+  it("只读 basics 展示用户最终确认的主词，而不是词典原建议", async () => {
+    const word = wordFixture({ max_reachable_step: "forms" });
+    word.headwords = {
+      mode: "distinguish",
+      uk: "centre-alt",
+      us: "center",
+      source_dialect: "us"
+    };
+    loaded(word);
+    renderWizard("resume", `/words/${word.id}/wizard/basics`);
+
+    expect(
+      await screen.findByText("英式英语 · BrE · centre-alt")
+    ).toBeVisible();
+    expect(screen.queryByText("英式英语 · BrE · centre")).toBeNull();
+  });
+
+  it("只读 basics 可进入 forms；删除未发布草稿后重新创建", async () => {
     vi.stubGlobal("crypto", {
       randomUUID: undefined,
       getRandomValues: vi.fn((bytes: Uint8Array) => {
@@ -441,7 +461,7 @@ describe("WordCreationWizard", () => {
     });
     const word = wordFixture({ max_reachable_step: "forms" });
     loaded(word);
-    state.archive.mockResolvedValue({ word });
+    state.deleteDraft.mockResolvedValue(undefined);
     const view = renderWizard("resume", `/words/${word.id}/wizard/basics`);
 
     expect(await screen.findByText("检测与确认快照")).toBeVisible();
@@ -454,19 +474,16 @@ describe("WordCreationWizard", () => {
     view.unmount();
     loaded(word);
     renderWizard("resume", `/words/${word.id}/wizard/basics`);
-    fireEvent.click(await screen.findByText("归档并重新检测"));
+    fireEvent.click(await screen.findByText("删除草稿并重新检测"));
     expect(
-      (await screen.findAllByText("归档当前草稿并重新检测？")).length
+      (await screen.findAllByText("删除当前草稿并重新检测？")).length
     ).toBeGreaterThan(0);
-    fireEvent.click(screen.getByText("归档并重新创建"));
+    fireEvent.click(screen.getByText("删除并重新创建"));
     await waitFor(() =>
-      expect(state.archive).toHaveBeenCalledWith({
+      expect(state.deleteDraft).toHaveBeenCalledWith({
         wordId: word.id,
-        idempotencyKey: expect.any(String),
-        input: {
-          base_revision: word.revision,
-          base_lifecycle_revision: word.lifecycle_revision
-        }
+        baseRevision: word.revision,
+        baseLifecycleRevision: word.lifecycle_revision
       })
     );
     await waitFor(() =>
@@ -474,31 +491,33 @@ describe("WordCreationWizard", () => {
     );
   });
 
-  it("草稿归档失败时保持当前向导并使用稳定回退文案", async () => {
+  it("草稿删除失败时保持当前向导并使用稳定回退文案", async () => {
     const word = wordFixture({ max_reachable_step: "forms" });
     loaded(word);
-    state.archive.mockRejectedValue("offline");
+    state.deleteDraft.mockRejectedValue("offline");
     renderWizard("resume", `/words/${word.id}/wizard/basics`);
 
-    fireEvent.click(await screen.findByText("归档并重新检测"));
-    fireEvent.click(screen.getByText("归档并重新创建"));
+    fireEvent.click(await screen.findByText("删除草稿并重新检测"));
+    fireEvent.click(screen.getByText("删除并重新创建"));
 
-    expect(await screen.findByText("归档草稿失败")).toBeInTheDocument();
+    expect(await screen.findByText("删除草稿失败")).toBeInTheDocument();
     expect(screen.getByTestId("location")).toHaveTextContent(
       `/words/${word.id}/wizard/basics`
     );
   });
 
-  it("草稿归档失败时展示服务端错误信息", async () => {
+  it("草稿删除失败时展示服务端错误信息", async () => {
     const word = wordFixture({ max_reachable_step: "forms" });
     loaded(word);
-    state.archive.mockRejectedValue(new Error("revision stale"));
+    state.deleteDraft.mockRejectedValue(new Error("entry cannot be deleted"));
     renderWizard("resume", `/words/${word.id}/wizard/basics`);
 
-    fireEvent.click(await screen.findByText("归档并重新检测"));
-    fireEvent.click(screen.getByText("归档并重新创建"));
+    fireEvent.click(await screen.findByText("删除草稿并重新检测"));
+    fireEvent.click(screen.getByText("删除并重新创建"));
 
-    expect(await screen.findByText("revision stale")).toBeInTheDocument();
+    expect(
+      await screen.findByText("entry cannot be deleted")
+    ).toBeInTheDocument();
     expect(screen.getByTestId("location")).toHaveTextContent(
       `/words/${word.id}/wizard/basics`
     );

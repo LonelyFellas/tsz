@@ -27,6 +27,7 @@ import type {
   CreateAdminWordV2Input,
   CreateAdminResponse,
   CreateRoleRequest,
+  DeleteDraftInput,
   DetectWordInputV2,
   DetectWordResponseV2,
   DraftValidationResponse,
@@ -275,6 +276,9 @@ export function createAdminEndpoints(http: HttpClient) {
           input,
           { headers: { "Idempotency-Key": idempotencyKey } }
         ),
+      /** DELETE /admin/lexicon/entries/{id} — 仅永久删除从未发布的 V2 草稿。 */
+      deleteDraft: (wordId: string, input: DeleteDraftInput) =>
+        http.del<void>(`/lexicon/entries/${wordId}`, input),
       /** DELETE /admin/words/{id} — 单条删除（整棵树一起删）→ 204。 */
       remove: (wordId: string) => http.del<void>(`/words/${wordId}`),
       /** POST /admin/words/batch-delete — ≤100 个，重复去重；不存在的 id 跳过。 */

@@ -7,7 +7,7 @@ afterEach(() => {
 });
 
 describe("env", () => {
-  it("未配置时回退到 API 默认路径并在非生产默认启用 wizard/mock", async () => {
+  it("未配置时回退到 API 默认路径，词库默认连接真实后端", async () => {
     vi.stubEnv("VITE_API_BASE_URL", undefined);
     vi.stubEnv("VITE_WORD_CREATION_WIZARD", undefined);
     vi.stubEnv("VITE_ADMIN_WORDS_MOCK", undefined);
@@ -18,8 +18,8 @@ describe("env", () => {
     const { env } = await import("./env");
     expect(env.API_BASE_URL).toBe("/api/v1");
     expect(env.WORD_CREATION_WIZARD).toBe(true);
-    expect(env.ADMIN_WORDS_MOCK).toBe(true);
-    expect(env.ADMIN_PART_OF_SPEECH_MOCK).toBe(true);
+    expect(env.ADMIN_WORDS_MOCK).toBe(false);
+    expect(env.ADMIN_PART_OF_SPEECH_MOCK).toBe(false);
     expect(env.VOICE_EDITOR).toBe(true);
     expect(env.ADMIN_TTS_MOCK).toBe(true);
   });

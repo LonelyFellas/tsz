@@ -1,4 +1,5 @@
 import { HttpError } from "@tsz/api-client/http";
+import type { DraftFormsStepContent } from "@tsz/types";
 import {
   act,
   fireEvent,
@@ -13,6 +14,7 @@ import {
   useLocation
 } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createAdminWordsMock } from "../mock/adminWordsMock";
 import { FormsAndPronunciationStep } from "./FormsAndPronunciationStep";
 import { deferred, wordFixture } from "./wordCreation.test.helper";
 
@@ -678,6 +680,86 @@ describe("FormsAndPronunciationStep", () => {
     expect(screen.queryByText("英美音标是否有区别？")).toBeNull();
     expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("centre");
     expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("center");
+  });
+
+  it("加载 distinguish 转 unified 的后端草稿时归一化全部词形并可完成 Step 2", async () => {
+    const values = new Map<string, string>();
+    const mock = createAdminWordsMock({
+      getAdminProfile: () => ({
+        id: "admin-test",
+        phone: "13800000000",
+        display_name: "Mock Admin",
+        role: "admin",
+        permissions: ["words.access"]
+      }),
+      now: () => new Date("2026-08-02T03:00:00.000Z"),
+      sessionStorage: {
+        getItem: (key) => values.get(key) ?? null,
+        setItem: (key, value) => void values.set(key, value),
+        removeItem: (key) => void values.delete(key)
+      }
+    });
+    const detection = await mock.detect({ language: "en", headword: "center" });
+    if (detection.builtin_dictionary.status !== "matched") {
+      throw new Error("center fixture must match");
+    }
+    const created = await mock.createV2({
+      schema_version: 2,
+      idempotency_key: "component-distinguish-to-unified",
+      detection_id: detection.detection_id,
+      headwords: { mode: "unified", common: "center" }
+    });
+
+    renderStep(created.word);
+    expect(screen.queryByLabelText("英式词形拼写")).toBeNull();
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+
+    const completeVisibleBasePronunciations = () => {
+      for (const input of screen
+        .getAllByLabelText("字典音标")
+        .filter((item) => (item as HTMLInputElement).value === "")) {
+        fireEvent.change(input, { target: { value: "mock" } });
+      }
+      for (const input of screen
+        .getAllByLabelText("实际发音")
+        .filter((item) => (item as HTMLInputElement).value === "")) {
+        fireEvent.change(input, { target: { value: "mock" } });
+      }
+    };
+    completeVisibleBasePronunciations();
+    fireEvent.click(screen.getByText("动词", { exact: true }));
+    completeVisibleBasePronunciations();
+    fireEvent.click(button("完成并进入词义与例句"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const input = mutations.save.mock.calls[0]![0] as {
+      intent: string;
+      content: DraftFormsStepContent;
+    };
+    expect(input.intent).toBe("complete");
+    for (const pos of input.content.pos) {
+      for (const slot of [
+        pos.base_form,
+        ...pos.form_groups.flatMap((group) => group.slots)
+      ]) {
+        expect(slot.variants.map((variant) => variant.dialect)).toEqual([
+          "common"
+        ]);
+      }
+    }
+    expect(
+      input.content.pos[0]?.form_groups[0]?.slots[0]?.variants[0]?.spelling
+    ).toBe("centers");
+    await expect(
+      mock.saveFormsStep(created.word.id, {
+        base_revision: created.word.revision,
+        operation_id: "component-complete-normalized-forms",
+        intent: "complete",
+        content: input.content
+      })
+    ).resolves.toMatchObject({
+      word: { completed_steps: ["basics", "forms"] }
+    });
   });
 
   it("空词性列表完成时在客户端阻断", async () => {

@@ -6,7 +6,7 @@ import {
   waitFor
 } from "@testing-library/react";
 import { App as AntApp } from "antd";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdminWordListItem, AdminWordListQuery } from "@tsz/types";
 
@@ -82,6 +82,10 @@ function idleMutation() {
   };
 }
 
+function LocationProbe() {
+  return <span data-testid="location">{useLocation().search}</span>;
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   for (const hook of [
@@ -117,6 +121,48 @@ afterEach(() => {
 });
 
 describe("SmartDictionary", () => {
+  it("从重复检测入口进入时自动定位归档词条", () => {
+    render(
+      <MemoryRouter initialEntries={["/words?keyword=center&status=archived"]}>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(apiMocks.useWordList).toHaveBeenCalledWith({
+      page: 1,
+      page_size: 20,
+      q: "center",
+      status: "archived"
+    });
+    expect(screen.getByLabelText("关键字")).toHaveValue("center");
+    expect(screen.getByText("已归档")).toBeInTheDocument();
+  });
+
+  it("深链筛选重置后同步清空表单、查询与 URL", async () => {
+    render(
+      <MemoryRouter initialEntries={["/words?keyword=center&status=archived"]}>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /重置/ }));
+
+    await waitFor(() => {
+      expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
+        page: 1,
+        page_size: 20
+      });
+      expect(screen.getByLabelText("关键字")).toHaveValue("");
+      expect(screen.queryByText("已归档")).toBeNull();
+      expect(screen.getByTestId("location")).toHaveTextContent("");
+    });
+  });
+
   it("翻页时清空当前页的批量选择", async () => {
     const { container } = render(
       <MemoryRouter>

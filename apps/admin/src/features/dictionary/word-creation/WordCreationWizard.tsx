@@ -1,7 +1,7 @@
 import {
   CheckCircleFilled,
   ExclamationCircleOutlined,
-  InboxOutlined,
+  DeleteOutlined,
   ReloadOutlined
 } from "@ant-design/icons";
 import {
@@ -30,8 +30,7 @@ import {
   useParams,
   useSearchParams
 } from "react-router-dom";
-import { useArchiveWord, useRestoreWord, useWordDetail } from "../api";
-import { adminWordsDataSourceCapabilities } from "../dataSource";
+import { useDeleteWordDraft, useRestoreWord, useWordDetail } from "../api";
 import { runLifecycleCommandOnce } from "../lifecycleCommand";
 import { newWordNodeId } from "../word-model/primitives";
 import {
@@ -62,34 +61,31 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
     () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
     [partOfSpeechCatalog.data]
   );
-  const archiveWord = useArchiveWord();
+  const deleteDraft = useDeleteWordDraft();
   const lifecycleCommandPending = useRef(false);
   const snapshot = word.detection_snapshot;
   const discard = () => {
     modal.confirm({
-      title: "归档当前草稿并重新检测？",
+      title: "删除当前草稿并重新检测？",
       icon: <ExclamationCircleOutlined />,
       content:
-        "语言和主词是后续内容的稳定基准，不能在已有草稿中直接修改。归档会保留当前草稿及已保存步骤，之后仍可恢复。",
-      okText: "归档并重新创建",
+        "语言和主词是后续内容的稳定基准，不能在已有草稿中直接修改。删除将永久清除当前未发布草稿及已保存步骤，并释放词头。",
+      okText: "删除并重新创建",
       okButtonProps: { danger: true },
       cancelText: "取消",
       onOk: () =>
         runLifecycleCommandOnce(lifecycleCommandPending, async () => {
           try {
-            await archiveWord.mutateAsync({
+            await deleteDraft.mutateAsync({
               wordId: word.id,
-              idempotencyKey: newWordNodeId(),
-              input: {
-                base_revision: word.revision,
-                base_lifecycle_revision: word.lifecycle_revision
-              }
+              baseRevision: word.revision,
+              baseLifecycleRevision: word.lifecycle_revision
             });
-            message.success("草稿已归档");
+            message.success("草稿已删除");
             navigate("/words/new", { replace: true });
           } catch (error) {
             message.error(
-              error instanceof Error ? error.message : "归档草稿失败"
+              error instanceof Error ? error.message : "删除草稿失败"
             );
           }
         })
@@ -104,7 +100,7 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
           草稿创建后，第 1
-          步作为不可变检测基准只读保存。需要更换语言或主词时，请废弃草稿后重新检测。
+          步作为不可变检测基准只读保存。需要更换语言或主词时，请删除未发布草稿后重新检测。
         </Typography.Paragraph>
       </div>
 
@@ -156,14 +152,12 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
                 : "Common"}
           </Descriptions.Item>
           <Descriptions.Item label="确认主词" span={2}>
-            {snapshot.headwords.mode === "unified" ? (
-              <Tag color="green">{snapshot.headwords.common}</Tag>
+            {word.headwords.mode === "unified" ? (
+              <Tag color="green">{word.headwords.common}</Tag>
             ) : (
               <Space>
-                <Tag color="blue">英式英语 · BrE · {snapshot.headwords.uk}</Tag>
-                <Tag color="magenta">
-                  美式英语 · AmE · {snapshot.headwords.us}
-                </Tag>
+                <Tag color="blue">英式英语 · BrE · {word.headwords.uk}</Tag>
+                <Tag color="magenta">美式英语 · AmE · {word.headwords.us}</Tag>
               </Space>
             )}
           </Descriptions.Item>
@@ -189,16 +183,14 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
 
       {word.status === "draft" && (
         <div className="word-step-actions">
-          {adminWordsDataSourceCapabilities.archive && (
-            <Button
-              danger
-              icon={<InboxOutlined />}
-              loading={archiveWord.isPending}
-              onClick={discard}
-            >
-              归档并重新检测
-            </Button>
-          )}
+          <Button
+            danger
+            icon={<DeleteOutlined />}
+            loading={deleteDraft.isPending}
+            onClick={discard}
+          >
+            删除草稿并重新检测
+          </Button>
           <Button
             type="primary"
             onClick={() => navigate(`/words/${word.id}/wizard/forms`)}

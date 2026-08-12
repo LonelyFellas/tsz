@@ -342,6 +342,18 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.del).toHaveBeenCalledWith("/words/w-1");
   });
 
+  it("deleteDraft → DELETE /lexicon/entries/{id}", () => {
+    const api = createAdminEndpoints(http);
+    api.words.deleteDraft("w-2", {
+      base_revision: 3,
+      base_lifecycle_revision: 2
+    });
+    expect(http.del).toHaveBeenCalledWith("/lexicon/entries/w-2", {
+      base_revision: 3,
+      base_lifecycle_revision: 2
+    });
+  });
+
   it("batchDelete → POST /words/batch-delete 带 ids", () => {
     const api = createAdminEndpoints(http);
     api.words.batchDelete(["a", "b"]);
