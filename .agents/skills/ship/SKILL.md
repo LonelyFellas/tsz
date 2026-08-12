@@ -1,6 +1,6 @@
 ---
 name: ship
-description: 把当前工作区的代码改动经「审查 → 提交 → 推送 → 开 PR」安全送上远程。先跑 code-review（必要时加 security-review），停下让用户确认后再提交，绝不绕过 lefthook 的 pre-push 校验。当用户说「提交并推送」「开 PR」「ship 这个改动」「把改动推上去」等时触发。
+description: 把当前工作区的代码改动经「自检 → 用户确认 → 本地提交 → 独立 code review → 推送 → 开 PR」安全送上远程。独立审查必须针对将要推送的精确 commit，绝不绕过 lefthook 的 pre-push 校验。当用户说「提交并推送」「开 PR」「ship 这个改动」「把改动推上去」等时触发。
 ---
 
 # ship —— 改动审查并安全推送
@@ -22,6 +22,8 @@ description: 把当前工作区的代码改动经「审查 → 提交 → 推送
   跳过手段。push 报 `failed to push some refs` 时，**默认是 hook（多半 test:cov/typecheck）挂了，不是网络** ——
   去读 hook 输出、定位、修复、重推，而不是想办法绕过。
 - **绝不直接提交/推送到 `main`。** 进入流程第一件事就是检查分支。
+- **绝不 push 未通过独立 pre-push code review 的 commit。** 实现者自己的 diff 自检不算独立审查；
+  没有可用的独立 reviewer 就停下，不得降级为自审后推送。
 
 ## 流程
 
@@ -66,12 +68,12 @@ description: 把当前工作区的代码改动经「审查 → 提交 → 推送
 
 **C. 代码质量 —— 改动含代码时**
 
-- 调用 `/code-review`（默认 effort，针对当前 diff）：正确性 bug + 可读性/命名/死代码。
+- 直接检查当前 diff：正确性 bug + 可读性/命名/死代码。这里是提交前自检，不替代第 6 步的独立审查。
 - bug 默认修掉；其余建议列给用户。
 
 **D. 组件复用与拆分 —— 改动含组件/可复用逻辑时**
 
-- 调用 `/simplify` 或人工审查：是否重复造轮子、巨型组件/函数是否该拆、
+- 直接审查是否重复造轮子、巨型组件/函数是否该拆、
   props 是否过载、抽象层级是否一致。
 - 复用来源**按端区分**（两端 UI 栈已分叉，见「项目事实速查」）：
   - 通用（两端同查）：逻辑 `@tsz/shared`、类型 `@tsz/types`、请求 `@tsz/api-client`。
@@ -100,7 +102,7 @@ description: 把当前工作区的代码改动经「审查 → 提交 → 推送
 
 **G. 安全 —— diff 命中敏感面时**
 
-- **仅当** 命中以下任一才跑 `/security-review`，否则跳过并说明：
+- **仅当** 命中以下任一才执行安全审查，否则跳过并说明：
   - 鉴权/会话/权限（auth、token、cookie、guard、login、session…）
   - 请求层 / 对外 IO（lib/request、fetch、api、外部输入解析、上传）
   - 密钥、环境变量、CORS、重定向、SQL/命令拼接
@@ -145,12 +147,31 @@ A–G 是逐维度找问题，这一步把改动当**一个整体**快速扫一�
 - 按 conventional commits 生成 message（`feat:` / `fix:` / `build:` / `refactor:` …）。
 - 在 commit message 末尾以当前模型署名追加（示例）：
   ```
-  Co-Authored-By: Codex Fable 5 <noreply@anthropic.com>
+  Co-Authored-By: GPT-5 Codex <noreply@openai.com>
   ```
 - `git add` 相关文件后 `git commit`。pre-commit（prettier+eslint）与 commit-msg（commitlint）会自动跑；
   失败就修，别绕。
 
-### 6. 推送
+### 6. 独立 pre-push code review
+
+本门禁在本地 commit 完成后、第一次 push 前执行，使 reviewer 能审查将要推送的精确提交，同时不要求提交已存在于远程。
+
+1. 记录 `review_base=origin/main` 和 `review_sha=$(git rev-parse HEAD)`；要求工作区干净，并确认 feature
+   分支只包含预期提交。
+2. 在独立的新上下文中运行只读 reviewer。优先使用可调用的 Codex detached review，精确指定该 commit；
+   否则创建一个独立只读 reviewer 子任务。传入 base、精确 SHA、原始目标、项目规则和测试结果，
+   不传入实现者自己的审查结论。
+3. reviewer 检查 `review_base...review_sha`，不得修改文件；只报告可操作的正确性、回归、安全、数据完整性、
+   并发、性能、契约和测试覆盖问题，并给出严重级别、文件与行号证据。
+4. 任意 P0–P2、正确性或安全问题都阻止 push。误报必须用证据排除；不影响正确性的建议可以记录但不阻断。
+5. 修复会产生新 commit 或 amend，SHA 随之变化；重跑受影响的校验，并针对新 SHA 重新独立审查。
+   旧 SHA 的审查结论不得沿用。
+6. 只有当前 SHA 的独立 reviewer 明确报告「无阻断问题」后才允许 push；向用户报告 reviewer 任务、base、
+   SHA 和结论。若 reviewer 不可用，停止流程。
+
+GitHub Codex Automatic reviews 是 push 后 PR 上的第二层审查，不替代本地 pre-push 门禁。
+
+### 7. 推送
 
 - `git push -u origin <branch>`，**正常推，让 lefthook pre-push 跑 typecheck / test:cov**。
 - 失败处理：
@@ -158,12 +179,12 @@ A–G 是逐维度找问题，这一步把改动当**一个整体**快速扫一�
   - 修复根因 → 必要时 `git commit --amend` 或追加提交 → 重推。
   - **任何情况下都不用跳过钩子的手段。** 若确属环境问题（如本地依赖损坏）也先告知用户、由用户定夺，不擅自绕过。
 
-### 7. 开 PR
+### 8. 开 PR
 
 - `gh pr create`，标题用本次 commit 主题，正文含：改动摘要、审查结论、测试情况。
 - PR 正文末尾追加：
   ```
-  🤖 Generated with [Codex](https://Codex.com/Codex)
+  🤖 Generated with [OpenAI Codex](https://openai.com/codex/)
   ```
 - 没配 remote / 没装 gh / 没登录 → 告知用户，止步于「已推送分支」。
 - 把 PR 链接以 markdown 链接形式返回给用户。
