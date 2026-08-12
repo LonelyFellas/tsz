@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import { MemoryRouter } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AdminWordListItem, AdminWordListQuery } from "@tsz/types";
 
 const apiMocks = vi.hoisted(() => ({
@@ -112,6 +112,10 @@ beforeEach(() => {
   }));
 });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("SmartDictionary", () => {
   it("翻页时清空当前页的批量选择", async () => {
     const { container } = render(
@@ -140,7 +144,7 @@ describe("SmartDictionary", () => {
     expect(batchButton).toBeDisabled();
   });
 
-  it("单条归档连续确认只发一次，并携带双 revision 与唯一幂等键", async () => {
+  it("HTTP 环境单条归档可降级生成幂等键，连续确认只发一次", async () => {
     let resolveArchive!: (value: unknown) => void;
     const mutateAsync = vi.fn(
       () =>
@@ -152,9 +156,14 @@ describe("SmartDictionary", () => {
       ...idleMutation(),
       mutateAsync
     });
-    vi.spyOn(crypto, "randomUUID").mockReturnValue(
-      "00000000-0000-4000-8000-000000000001"
-    );
+    vi.stubGlobal("crypto", {
+      randomUUID: undefined,
+      getRandomValues: vi.fn((bytes: Uint8Array) => {
+        bytes.fill(0);
+        bytes[15] = 1;
+        return bytes;
+      })
+    });
     render(
       <MemoryRouter>
         <AntApp>
