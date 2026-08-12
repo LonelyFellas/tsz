@@ -1,6 +1,7 @@
 import type {
   CefrLevel,
   Dialect,
+  AdminWordStatus,
   PronunciationStyle,
   RichText,
   WordFormType,
@@ -271,6 +272,7 @@ export interface DuplicateWordMatchV2 {
   word_id: string;
   headword: string;
   dialect: "uk" | "us" | "common";
+  status: AdminWordStatus;
 }
 
 export interface BuiltinDictionaryMatchedV2 {

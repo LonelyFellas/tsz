@@ -94,8 +94,14 @@ test.describe("admin 新建单词 V2", () => {
     await page.getByRole("button", { name: "词典检测" }).click();
 
     await expect(page.getByText("已存在重复词条")).toBeVisible();
-    await expect(page.getByRole("link", { name: "colour (uk)" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "color (us)" })).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /colour \(uk\).*已归档/ })
+    ).toHaveAttribute("href", "/words/existing-colour/wizard/basics");
+    await expect(
+      page.getByRole("link", { name: /color \(us\).*已发布/ })
+    ).toBeVisible();
+    await expect(page.getByText("归档词条仍占用词头")).toBeVisible();
+    await expect(page.getByText("点击词条进入详情后可恢复。")).toBeVisible();
     await expect(
       page.getByRole("button", { name: "确认并进入词形与发音" })
     ).toHaveCount(0);

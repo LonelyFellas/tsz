@@ -309,7 +309,7 @@ describe("CreateEntryStep", () => {
     expect(mutations.create).not.toHaveBeenCalled();
   });
 
-  it("重复词条链接进入 V2 向导，不落到真实模式已关闭的 legacy 编辑器", async () => {
+  it("重复词条展示生命周期状态，归档项提示可恢复并继续阻断创建", async () => {
     mutations.detect.mockResolvedValue(detectionFixture("colour"));
     renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
@@ -318,12 +318,19 @@ describe("CreateEntryStep", () => {
     fireEvent.click(button("词典检测"));
 
     const duplicate = await screen.findByRole("link", {
-      name: "colour (uk)"
+      name: /colour \(uk\).*已归档/
     });
     expect(duplicate).toHaveAttribute(
       "href",
       "/words/fixture-colour/wizard/basics"
     );
+    expect(screen.queryByText("草稿")).toBeNull();
+    expect(screen.getByText("已发布")).toBeVisible();
+    expect(screen.getByText("已归档")).toBeVisible();
+    expect(screen.getByText("归档词条仍占用词头")).toBeVisible();
+    expect(screen.getByText("点击词条进入详情后可恢复。")).toBeVisible();
+    expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
+    expect(mutations.create).not.toHaveBeenCalled();
   });
 
   it("规范化回显与原输入不同时，未命中短语仍可创建 V2 空白草稿", async () => {
