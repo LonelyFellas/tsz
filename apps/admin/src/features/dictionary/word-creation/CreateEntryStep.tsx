@@ -39,6 +39,7 @@ import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { newWordNodeId } from "../word-model/primitives";
 import { useCreateWordV2, useDetectWordV2 } from "./api";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
+import { STATUS_LABEL } from "../labels";
 
 interface Props {
   onHeadwordsChange: (headwords?: WordHeadwordsV2) => void;
@@ -90,6 +91,9 @@ function DetectionStatus({
       !catalogUnavailable) ||
     (result.entry_kind === "phrase" && builtin.status === "not_found");
   const canContinue = dictionaryReady && smart.status === "clear";
+  const hasArchivedDuplicate =
+    smart.status === "duplicate" &&
+    smart.duplicates.some((item) => item.status === "archived");
   return (
     <Card
       className="word-detection-result-card"
@@ -140,9 +144,32 @@ function DetectionStatus({
                     key={item.word_id}
                     to={`/words/${item.word_id}/wizard/basics`}
                   >
-                    {item.headword} ({item.dialect})
+                    <Space size={4}>
+                      <span>
+                        {item.headword} ({item.dialect})
+                      </span>
+                      <Tag
+                        color={
+                          item.status === "published"
+                            ? "success"
+                            : item.status === "archived"
+                              ? "default"
+                              : "processing"
+                        }
+                      >
+                        {STATUS_LABEL[item.status]}
+                      </Tag>
+                    </Space>
                   </Link>
                 ))}
+                {hasArchivedDuplicate && (
+                  <Alert
+                    type="info"
+                    showIcon
+                    title="归档词条仍占用词头"
+                    description="点击词条进入详情后可恢复。"
+                  />
+                )}
               </Space>
             ) : (
               "智能词库暂时不可用"

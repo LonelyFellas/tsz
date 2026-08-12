@@ -687,7 +687,12 @@ describe("admin words mock", () => {
     });
     await expect(
       mock.detect({ language: "en", headword: "colour" })
-    ).resolves.toMatchObject({ smart_dictionary: { status: "duplicate" } });
+    ).resolves.toMatchObject({
+      smart_dictionary: {
+        status: "duplicate",
+        duplicates: [expect.objectContaining({ status: "published" })]
+      }
+    });
   });
 
   it("提供 38 词义/例句性能 fixture 与只返回建议的方言转换", async () => {

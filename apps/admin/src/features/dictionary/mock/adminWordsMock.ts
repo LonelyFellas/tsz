@@ -1505,7 +1505,8 @@ export function createAdminWordsMock({
           .map((entry) => ({
             word_id: word.id,
             headword: entry.value,
-            dialect: entry.dialect
+            dialect: entry.dialect,
+            status: word.status
           }))
       );
   }

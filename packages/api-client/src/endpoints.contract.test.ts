@@ -204,6 +204,15 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "provider",
       "suggestions"
     ]);
+    expect(snapshot.schemas.DuplicateWordMatchV2.required).toEqual([
+      "word_id",
+      "headword",
+      "dialect",
+      "status"
+    ]);
+    expect(snapshot.schemas.DuplicateWordMatchV2.properties.status).toEqual({
+      $ref: "#/components/schemas/AdminWordStatus"
+    });
   });
 
   it("每条前端端点要么命中 spec,要么在 PENDING 白名单里(无臆造端点)", () => {

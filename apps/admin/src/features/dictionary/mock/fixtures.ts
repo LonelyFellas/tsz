@@ -345,8 +345,18 @@ export function createDetectionFixture(
         smart: {
           status: "duplicate",
           duplicates: [
-            { word_id: "fixture-colour", headword: "colour", dialect: "uk" },
-            { word_id: "fixture-color", headword: "color", dialect: "us" }
+            {
+              word_id: "fixture-colour",
+              headword: "colour",
+              dialect: "uk",
+              status: "archived"
+            },
+            {
+              word_id: "fixture-color",
+              headword: "color",
+              dialect: "us",
+              status: "published"
+            }
           ]
         }
       }

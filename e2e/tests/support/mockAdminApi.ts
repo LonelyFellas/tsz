@@ -316,8 +316,18 @@ function detectionResponse(duplicate: boolean, rawHeadword: string) {
       ? {
           status: "duplicate",
           duplicates: [
-            { word_id: "existing-colour", headword: "colour", dialect: "uk" },
-            { word_id: "existing-color", headword: "color", dialect: "us" }
+            {
+              word_id: "existing-colour",
+              headword: "colour",
+              dialect: "uk",
+              status: "archived"
+            },
+            {
+              word_id: "existing-color",
+              headword: "color",
+              dialect: "us",
+              status: "published"
+            }
           ]
         }
       : { status: "clear", duplicates: [] }

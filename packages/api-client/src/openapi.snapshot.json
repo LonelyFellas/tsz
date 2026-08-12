@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/264f/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-11T15:19:36.629Z",
+  "_source": "/Users/darwish/.codex/worktrees/0d9c/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-12T07:24:11.933Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -122,6 +122,16 @@
         "archived_by": { "type": "string", "format": "uuid" },
         "published_revision": { "type": "integer", "format": "int64" },
         "has_unpublished_changes": { "type": "boolean" }
+      }
+    },
+    "DuplicateWordMatchV2": {
+      "type": "object",
+      "required": ["word_id", "headword", "dialect", "status"],
+      "properties": {
+        "dialect": { "$ref": "#/components/schemas/Dialect" },
+        "headword": { "type": "string" },
+        "status": { "$ref": "#/components/schemas/AdminWordStatus" },
+        "word_id": { "type": "string", "format": "uuid" }
       }
     },
     "AdminWordListItem": {
