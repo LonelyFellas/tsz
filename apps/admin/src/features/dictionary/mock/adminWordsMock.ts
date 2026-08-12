@@ -48,6 +48,7 @@ import type {
   UpdateSubPartOfSpeechInput,
   ValidateAdminWordV2Input,
   WordDefinitionV2,
+  WordFormVariantV2,
   WordHeadwordsV2,
   WordPosMeaningsV2,
   WordSenseV2
@@ -448,45 +449,131 @@ function dateParts(value: string | Date): { day: string; month: string } {
   return { month, day: `${month}-${get("day")}` };
 }
 
-function compatibleHeadwords(
-  detected: WordHeadwordsV2,
-  submitted: WordHeadwordsV2
-): boolean {
-  if (detected.mode !== submitted.mode) return false;
-  if (detected.mode === "unified" && submitted.mode === "unified") {
-    return (
-      submitted.common.trim() !== "" && submitted.common === detected.common
-    );
-  }
-  if (detected.mode === "distinguish" && submitted.mode === "distinguish") {
-    const source = detected.source_dialect;
-    const target = source === "uk" ? "us" : "uk";
-    return (
-      submitted.source_dialect === source &&
-      submitted[source] === detected[source] &&
-      submitted[target].trim() !== ""
-    );
-  }
-  return false;
+type MatchedDialect = "common" | "uk" | "us";
+
+function sourceHeadword(headwords: WordHeadwordsV2): string {
+  return headwords.mode === "unified"
+    ? headwords.common
+    : headwords[headwords.source_dialect];
 }
 
-function alignBaseFormSpelling(
-  forms: DraftFormsStepContent,
-  headwords: WordHeadwordsV2
-): void {
-  for (const pos of forms.pos) {
-    for (const variant of pos.base_form.variants) {
-      const spelling =
-        headwords.mode === "unified"
-          ? headwords.common
-          : variant.dialect === "uk" || variant.dialect === "us"
-            ? headwords[variant.dialect]
-            : "";
-      if (variant.spelling !== spelling) {
-        variant.spelling = spelling;
-        variant.origin = "manual";
+function sameHeadword(left: string, right: string): boolean {
+  return (
+    normalizeFixtureHeadword(left).key === normalizeFixtureHeadword(right).key
+  );
+}
+
+function compatibleHeadwords(
+  detected: WordHeadwordsV2,
+  matchedDialect: MatchedDialect,
+  submitted: WordHeadwordsV2
+): boolean {
+  const detectedSource =
+    detected.mode === "distinguish"
+      ? detected.source_dialect
+      : matchedDialect === "common"
+        ? undefined
+        : matchedDialect;
+  if (
+    detectedSource !== undefined &&
+    submitted.mode === "distinguish" &&
+    submitted.source_dialect !== detectedSource
+  ) {
+    return false;
+  }
+  return sameHeadword(sourceHeadword(detected), sourceHeadword(submitted));
+}
+
+function headwordOrigin(
+  detected: WordHeadwordsV2,
+  matchedDialect: MatchedDialect,
+  submitted: WordHeadwordsV2,
+  dialect: WordFormVariantV2["dialect"],
+  spelling: string
+): WordFormVariantV2["origin"] {
+  let dictionaryValue: string | undefined;
+  if (submitted.mode === "unified" && dialect === "common") {
+    dictionaryValue = sourceHeadword(detected);
+  } else if (submitted.mode === "distinguish") {
+    if (detected.mode === "distinguish") {
+      if (dialect === "uk" || dialect === "us") {
+        dictionaryValue = detected[dialect];
       }
+    } else {
+      const lockedDialect =
+        matchedDialect === "common" ? submitted.source_dialect : matchedDialect;
+      if (dialect === lockedDialect) dictionaryValue = detected.common;
     }
+  }
+  return dictionaryValue !== undefined &&
+    sameHeadword(dictionaryValue, spelling)
+    ? "dictionary"
+    : "manual";
+}
+
+function baseVariant(
+  createId: (prefix: string) => string,
+  dialect: WordFormVariantV2["dialect"],
+  spelling: string,
+  origin: WordFormVariantV2["origin"]
+): WordFormVariantV2 {
+  return {
+    id: createId("form-variant"),
+    dialect,
+    spelling,
+    origin,
+    pronunciations: [
+      {
+        id: createId("pronunciation"),
+        dict_phonetic: "",
+        actual_pron: "",
+        style: "normal"
+      }
+    ]
+  };
+}
+
+function alignBaseForms(
+  forms: DraftFormsStepContent,
+  detected: WordHeadwordsV2,
+  matchedDialect: MatchedDialect,
+  submitted: WordHeadwordsV2,
+  createId: (prefix: string) => string
+): void {
+  const mode = submitted.mode;
+  for (const pos of forms.pos) {
+    pos.dialect_rules.spelling_mode = mode;
+    pos.dialect_rules.phonetic_mode = mode;
+    pos.base_form.variants =
+      submitted.mode === "unified"
+        ? [
+            baseVariant(
+              createId,
+              "common",
+              submitted.common,
+              headwordOrigin(
+                detected,
+                matchedDialect,
+                submitted,
+                "common",
+                submitted.common
+              )
+            )
+          ]
+        : (["uk", "us"] as const).map((dialect) =>
+            baseVariant(
+              createId,
+              dialect,
+              submitted[dialect],
+              headwordOrigin(
+                detected,
+                matchedDialect,
+                submitted,
+                dialect,
+                submitted[dialect]
+              )
+            )
+          );
   }
 }
 
@@ -2486,6 +2573,7 @@ export function createAdminWordsMock({
       detection.matched_dialect !== undefined &&
       compatibleHeadwords(
         detection.builtin_dictionary.headwords,
+        detection.matched_dialect,
         input.headwords
       );
     const unmatchedPhrase =
@@ -2525,7 +2613,18 @@ export function createAdminWordsMock({
         ? clone(detection.builtin_dictionary.suggested_forms)
         : { pos: [] };
     assertConfiguredForms(current, forms);
-    alignBaseFormSpelling(forms, input.headwords);
+    if (
+      detection.builtin_dictionary.status === "matched" &&
+      detection.matched_dialect !== undefined
+    ) {
+      alignBaseForms(
+        forms,
+        detection.builtin_dictionary.headwords,
+        detection.matched_dialect,
+        input.headwords,
+        (prefix) => nextId(current, prefix)
+      );
+    }
     const word: AdminWordV2 = {
       schema_version: 2,
       id: wordId,
@@ -3327,6 +3426,50 @@ export function createAdminWordsMock({
     persist(current);
   }
 
+  async function deleteDraft(
+    wordId: string,
+    input: { base_revision: number; base_lifecycle_revision: number }
+  ): Promise<void> {
+    await pause();
+    const { state: current } = context();
+    const word = current.words[wordId];
+    if (!word) throw new HttpError(404, "word not found", [], "word_not_found");
+    if (!isV2(word) || current.publication_words[wordId]) {
+      throw new HttpError(
+        409,
+        "entry cannot be deleted",
+        [],
+        "entry_not_deletable"
+      );
+    }
+    if (word.revision !== input.base_revision) {
+      throw new HttpError(
+        409,
+        "entry changed since it was loaded",
+        [],
+        "revision_conflict"
+      );
+    }
+    if (word.lifecycle_revision !== input.base_lifecycle_revision) {
+      throw new HttpError(
+        409,
+        "entry lifecycle changed since it was loaded",
+        [],
+        "revision_conflict"
+      );
+    }
+    if (word.status === "archived") {
+      throw new HttpError(
+        409,
+        "entry cannot be deleted",
+        [],
+        "entry_not_deletable"
+      );
+    }
+    delete current.words[wordId];
+    persist(current);
+  }
+
   async function batchDelete(
     ids: string[]
   ): Promise<AdminWordBatchDeleteResponse> {
@@ -3423,6 +3566,7 @@ export function createAdminWordsMock({
     restore,
     archiveBatch,
     restoreBatch,
+    deleteDraft,
     remove,
     batchDelete,
     relatedSearch,

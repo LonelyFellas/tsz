@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/0d9c/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-12T07:24:11.933Z",
+  "_source": "/Users/darwish/.codex/worktrees/0a9c/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-12T13:35:40.398Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -17,7 +17,7 @@
     "/admin/lexicon/entries/related-search": ["get"],
     "/admin/lexicon/entries/restore-batch": ["post"],
     "/admin/lexicon/entries/stats": ["get"],
-    "/admin/lexicon/entries/{id}": ["get"],
+    "/admin/lexicon/entries/{id}": ["delete", "get"],
     "/admin/lexicon/entries/{id}/archive": ["post"],
     "/admin/lexicon/entries/{id}/publications": ["post"],
     "/admin/lexicon/entries/{id}/restore": ["post"],
@@ -123,6 +123,19 @@
         "published_revision": { "type": "integer", "format": "int64" },
         "has_unpublished_changes": { "type": "boolean" }
       }
+    },
+    "DeleteDraftInput": {
+      "type": "object",
+      "required": ["base_revision", "base_lifecycle_revision"],
+      "properties": {
+        "base_lifecycle_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 }
+      },
+      "additionalProperties": false
     },
     "DuplicateWordMatchV2": {
       "type": "object",

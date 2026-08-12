@@ -101,7 +101,14 @@ test.describe("admin 新建单词 V2", () => {
       page.getByRole("link", { name: /color \(us\).*已发布/ })
     ).toBeVisible();
     await expect(page.getByText("归档词条仍占用词头")).toBeVisible();
-    await expect(page.getByText("点击词条进入详情后可恢复。")).toBeVisible();
+    await expect(
+      page.getByText(
+        "点击上方重复词条可进入详情并恢复，也可以在归档列表中定位。"
+      )
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "在归档列表查看" })
+    ).toHaveAttribute("href", "/words?keyword=colour&status=archived");
     await expect(
       page.getByRole("button", { name: "确认并进入词形与发音" })
     ).toHaveCount(0);

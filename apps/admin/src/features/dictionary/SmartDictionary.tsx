@@ -24,7 +24,7 @@ import {
 import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
 import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import type { AdminWordKind, AdminWordListItem, CefrLevel } from "@tsz/types";
 import { isIncompleteHttpError } from "@tsz/api-client/http";
 import { env } from "@/lib/env";
@@ -65,10 +65,22 @@ const { RangePicker } = DatePicker;
 export function SmartDictionary() {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [form] = Form.useForm<WordFilterValues>();
 
+  const initialFilters = useMemo<WordFilterValues>(() => {
+    const keyword = searchParams.get("keyword")?.trim();
+    const status = searchParams.get("status");
+    return {
+      ...(keyword ? { keyword } : {}),
+      ...(status === "draft" || status === "published" || status === "archived"
+        ? { status }
+        : {})
+    };
+  }, [searchParams]);
+
   // 服务端分页 + 筛选:三者共同构成列表查询,任何变化都触发重取。
-  const [filters, setFilters] = useState<WordFilterValues>({});
+  const [filters, setFilters] = useState<WordFilterValues>(initialFilters);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
@@ -112,6 +124,11 @@ export function SmartDictionary() {
     setFilters(values);
     setPage(1);
     setSelectedKeys([]);
+    const nextSearchParams = new URLSearchParams();
+    const keyword = values.keyword?.trim();
+    if (keyword) nextSearchParams.set("keyword", keyword);
+    if (values.status) nextSearchParams.set("status", values.status);
+    setSearchParams(nextSearchParams, { replace: true });
   };
 
   const publish = (record: AdminWordListItem) => {
@@ -420,6 +437,7 @@ export function SmartDictionary() {
       <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
         <Form
           form={form}
+          initialValues={initialFilters}
           layout="inline"
           onFinish={applyFilters}
           style={{
@@ -489,6 +507,10 @@ export function SmartDictionary() {
                 icon={<ReloadOutlined />}
                 onClick={() => {
                   form.resetFields();
+                  form.setFieldsValue({
+                    keyword: undefined,
+                    status: undefined
+                  });
                   applyFilters({});
                 }}
               >

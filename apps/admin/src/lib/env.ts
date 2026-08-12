@@ -16,12 +16,12 @@ const WORD_CREATION_WIZARD = parseBooleanEnvFlag(
 const ADMIN_WORDS_MOCK = parseBooleanEnvFlag(
   import.meta.env.VITE_ADMIN_WORDS_MOCK,
   "VITE_ADMIN_WORDS_MOCK",
-  !import.meta.env.PROD
+  false
 );
 const ADMIN_PART_OF_SPEECH_MOCK = parseBooleanEnvFlag(
   import.meta.env.VITE_ADMIN_PART_OF_SPEECH_MOCK,
   "VITE_ADMIN_PART_OF_SPEECH_MOCK",
-  !import.meta.env.PROD
+  false
 );
 const VOICE_EDITOR = parseBooleanEnvFlag(
   import.meta.env.VITE_VOICE_EDITOR,

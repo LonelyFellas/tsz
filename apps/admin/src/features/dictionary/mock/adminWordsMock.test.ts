@@ -123,6 +123,39 @@ async function createDetectedWord(
   });
 }
 
+function withCompletePronunciations(
+  forms: DraftFormsStepContent
+): DraftFormsStepContent {
+  const completed = structuredClone(forms);
+  for (const pos of completed.pos) {
+    const slots = [
+      pos.base_form,
+      ...pos.form_groups.flatMap((group) => group.slots)
+    ];
+    for (const slot of slots) {
+      const expectedDialects =
+        pos.dialect_rules.spelling_mode === "distinguish" ||
+        pos.dialect_rules.phonetic_mode === "distinguish"
+          ? (["uk", "us"] as const)
+          : (["common"] as const);
+      if (
+        expectedDialects.length === 1 &&
+        !slot.variants.some((variant) => variant.dialect === "common")
+      ) {
+        const source = slot.variants[0];
+        if (source) slot.variants = [{ ...source, dialect: "common" }];
+      }
+      for (const variant of slot.variants) {
+        for (const pronunciation of variant.pronunciations) {
+          pronunciation.dict_phonetic ||= "mock";
+          pronunciation.actual_pron ||= "mock";
+        }
+      }
+    }
+  }
+  return completed;
+}
+
 async function completeDraft(
   mock: AdminWordsMock,
   draft: Awaited<ReturnType<typeof createCenter>>,
@@ -132,7 +165,7 @@ async function completeDraft(
     base_revision: draft.word.revision,
     operation_id: `${prefix}-forms`,
     intent: "complete",
-    content: draft.word.forms
+    content: withCompletePronunciations(draft.word.forms)
   });
   return (
     await mock.saveMeaningsStep(forms.word.id, {
@@ -150,7 +183,7 @@ async function completeCenter(mock: AdminWordsMock): Promise<AdminWordV2> {
     base_revision: draft.word.revision,
     operation_id: "complete-forms",
     intent: "complete",
-    content: draft.word.forms
+    content: withCompletePronunciations(draft.word.forms)
   });
   const meanings = await mock.saveMeaningsStep(forms.word.id, {
     base_revision: forms.word.revision,
@@ -214,7 +247,7 @@ describe("admin words mock", () => {
       base_revision: draft.word.revision,
       operation_id: "repair-empty-sense-groups-complete-forms",
       intent: "complete",
-      content: draft.word.forms
+      content: withCompletePronunciations(draft.word.forms)
     });
     const emptied = await mock.saveMeaningsStep(forms.word.id, {
       base_revision: forms.word.revision,
@@ -285,7 +318,7 @@ describe("admin words mock", () => {
       base_revision: draft.word.revision,
       operation_id: "persisted-operation",
       intent: "save",
-      content: draft.word.forms
+      content: withCompletePronunciations(draft.word.forms)
     });
     const valid = readPersistedState(storage);
     expect(isAdminWordsMockPersistedState(valid)).toBe(true);
@@ -1337,6 +1370,86 @@ describe("admin words mock", () => {
     ).toBe(true);
   });
 
+  it("仅永久删除 revision 匹配且从未发布的活动 V2 草稿", async () => {
+    const center = await createCenter(mock, "delete-draft-center");
+    const input = {
+      base_revision: center.word.revision,
+      base_lifecycle_revision: center.word.lifecycle_revision
+    };
+
+    await expect(
+      mock.deleteDraft("missing-draft", input)
+    ).rejects.toMatchObject({ status: 404, code: "word_not_found" });
+    const legacy = (await mock.list({})).words.find(
+      (word) => word.schema_version !== 2
+    )!;
+    await expect(mock.deleteDraft(legacy.id, input)).rejects.toMatchObject({
+      status: 409,
+      code: "entry_not_deletable"
+    });
+    await expect(
+      mock.deleteDraft(center.word.id, {
+        ...input,
+        base_revision: input.base_revision + 1
+      })
+    ).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
+    await expect(
+      mock.deleteDraft(center.word.id, {
+        ...input,
+        base_lifecycle_revision: input.base_lifecycle_revision + 1
+      })
+    ).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
+
+    const archivedDraft = await createDetectedWord(
+      mock,
+      "hello",
+      "delete-draft-archived"
+    );
+    const archived = await mock.archive(
+      archivedDraft.word.id,
+      "delete-draft-archive",
+      {
+        base_revision: archivedDraft.word.revision,
+        base_lifecycle_revision: archivedDraft.word.lifecycle_revision
+      }
+    );
+    await expect(
+      mock.deleteDraft(archived.word.id, {
+        base_revision: archived.word.revision,
+        base_lifecycle_revision: archived.word.lifecycle_revision
+      })
+    ).rejects.toMatchObject({ status: 409, code: "entry_not_deletable" });
+
+    const publishedDraft = await createDetectedWord(
+      mock,
+      "far",
+      "delete-draft-published"
+    );
+    const publishedReady = await completeDraft(
+      mock,
+      publishedDraft,
+      "delete-draft-published"
+    );
+    const published = await mock.publishV2(publishedReady.id, {
+      base_revision: publishedReady.revision,
+      idempotency_key: "delete-draft-published-key"
+    });
+    await expect(
+      mock.deleteDraft(published.word.id, {
+        base_revision: published.word.revision,
+        base_lifecycle_revision: published.word.lifecycle_revision
+      })
+    ).rejects.toMatchObject({ status: 409, code: "entry_not_deletable" });
+
+    await expect(
+      mock.deleteDraft(center.word.id, input)
+    ).resolves.toBeUndefined();
+    await expect(mock.get(center.word.id)).rejects.toMatchObject({
+      status: 404,
+      code: "word_not_found"
+    });
+  });
+
   it("生命周期幂等键跨端点复用时拒绝不同 scope 或 body", async () => {
     const center = await createCenter(mock, "lifecycle-global-idempotency");
     const input = {
@@ -1382,7 +1495,7 @@ describe("admin words mock", () => {
       base_revision: sourceDraft.word.revision,
       operation_id: "lifecycle-ref-source-forms",
       intent: "complete",
-      content: sourceDraft.word.forms
+      content: withCompletePronunciations(sourceDraft.word.forms)
     });
     const sourceMeanings = completeMockMeanings(sourceForms.word);
     const sourceSense = sourceMeanings.pos[0]!.senses[0]!;
@@ -1457,7 +1570,7 @@ describe("admin words mock", () => {
       base_revision: sourceDraft.word.revision,
       operation_id: "relation-publication-source-forms",
       intent: "complete",
-      content: sourceDraft.word.forms
+      content: withCompletePronunciations(sourceDraft.word.forms)
     });
     const sourceMeanings = completeMockMeanings(sourceForms.word);
     const relation = {
@@ -1529,7 +1642,7 @@ describe("admin words mock", () => {
       base_revision: sourceDraft.word.revision,
       operation_id: "restore-ref-source-forms",
       intent: "complete",
-      content: sourceDraft.word.forms
+      content: withCompletePronunciations(sourceDraft.word.forms)
     });
     const sourceMeanings = completeMockMeanings(sourceForms.word);
     sourceMeanings.pos[0]!.senses[0]!.relations.push({
@@ -1673,9 +1786,9 @@ describe("admin words mock", () => {
     await expect(
       mock.createV2({
         schema_version: 2,
-        idempotency_key: "wrong-headword-mode",
+        idempotency_key: "wrong-source-headword",
         detection_id: center.detection_id,
-        headwords: { mode: "unified", common: "center" }
+        headwords: { mode: "unified", common: "centre" }
       })
     ).rejects.toMatchObject({ status: 422, code: "detection_mismatch" });
 
@@ -1900,7 +2013,7 @@ describe("admin words mock", () => {
       base_revision: draft.word.revision,
       operation_id: "meaning-validation-forms",
       intent: "complete",
-      content: draft.word.forms
+      content: withCompletePronunciations(draft.word.forms)
     });
     const complete = completeMockMeanings(forms.word);
     await expect(
@@ -2099,7 +2212,7 @@ describe("admin words mock", () => {
       base_revision: draft.word.revision,
       operation_id: "bilingual-sense-groups-forms",
       intent: "complete",
-      content: draft.word.forms
+      content: withCompletePronunciations(draft.word.forms)
     });
     const content = completeMockMeanings(forms.word);
     content.sense_groups = [
@@ -2174,7 +2287,7 @@ describe("admin words mock", () => {
     });
   });
 
-  it("createV2 锁定 mode/source 与来源词形，同时允许修正另一方言", async () => {
+  it("createV2 锁定来源方言与来源词形，同时允许修正另一方言", async () => {
     const detection = await mock.detect({ language: "en", headword: "center" });
     if (detection.builtin_dictionary.status !== "matched") {
       throw new Error("center fixture must match");
@@ -2215,7 +2328,7 @@ describe("admin words mock", () => {
         base_revision: corrected.word.revision,
         operation_id: "complete-corrected-target-forms",
         intent: "complete",
-        content: corrected.word.forms
+        content: withCompletePronunciations(corrected.word.forms)
       })
     ).resolves.toMatchObject({
       word: { completed_steps: ["basics", "forms"] }
@@ -2244,6 +2357,124 @@ describe("admin words mock", () => {
     ).rejects.toMatchObject({ status: 422, code: "detection_mismatch" });
   });
 
+  it("createV2 支持把 unified 检测切为 distinguish 并重建 Step 2 基础词形", async () => {
+    const detection = await mock.detect({ language: "en", headword: "far" });
+    if (detection.builtin_dictionary.status !== "matched") {
+      throw new Error("far fixture must match");
+    }
+
+    const created = await mock.createV2({
+      schema_version: 2,
+      idempotency_key: "switch-unified-to-distinguish",
+      detection_id: detection.detection_id,
+      headwords: {
+        mode: "distinguish",
+        source_dialect: "us",
+        uk: "far-uk",
+        us: "far"
+      }
+    });
+
+    expect(created.word.headwords).toEqual({
+      mode: "distinguish",
+      source_dialect: "us",
+      uk: "far-uk",
+      us: "far"
+    });
+    for (const pos of created.word.forms.pos) {
+      expect(pos.dialect_rules).toEqual({
+        spelling_mode: "distinguish",
+        phonetic_mode: "distinguish"
+      });
+      expect(
+        pos.base_form.variants.map(
+          ({ dialect, spelling, origin, pronunciations }) => ({
+            dialect,
+            spelling,
+            origin,
+            pronunciations
+          })
+        )
+      ).toEqual([
+        {
+          dialect: "uk",
+          spelling: "far-uk",
+          origin: "manual",
+          pronunciations: [
+            expect.objectContaining({
+              dict_phonetic: "",
+              actual_pron: "",
+              style: "normal"
+            })
+          ]
+        },
+        {
+          dialect: "us",
+          spelling: "far",
+          origin: "dictionary",
+          pronunciations: [
+            expect.objectContaining({
+              dict_phonetic: "",
+              actual_pron: "",
+              style: "normal"
+            })
+          ]
+        }
+      ]);
+    }
+  });
+
+  it("createV2 支持把 distinguish 检测切为 unified 并重建 Step 2 基础词形", async () => {
+    const detection = await mock.detect({
+      language: "en",
+      headword: "center"
+    });
+    if (detection.builtin_dictionary.status !== "matched") {
+      throw new Error("center fixture must match");
+    }
+
+    const created = await mock.createV2({
+      schema_version: 2,
+      idempotency_key: "switch-distinguish-to-unified",
+      detection_id: detection.detection_id,
+      headwords: { mode: "unified", common: "center" }
+    });
+
+    expect(created.word.headwords).toEqual({
+      mode: "unified",
+      common: "center"
+    });
+    for (const pos of created.word.forms.pos) {
+      expect(pos.dialect_rules).toEqual({
+        spelling_mode: "unified",
+        phonetic_mode: "unified"
+      });
+      expect(
+        pos.base_form.variants.map(
+          ({ dialect, spelling, origin, pronunciations }) => ({
+            dialect,
+            spelling,
+            origin,
+            pronunciations
+          })
+        )
+      ).toEqual([
+        {
+          dialect: "common",
+          spelling: "center",
+          origin: "dictionary",
+          pronunciations: [
+            expect.objectContaining({
+              dict_phonetic: "",
+              actual_pron: "",
+              style: "normal"
+            })
+          ]
+        }
+      ]);
+    }
+  });
+
   it("只有 complete 首次推进步骤；save 仅保留或撤销既有完成态", async () => {
     const draft = await createCenter(mock);
     const savedForms = await mock.saveFormsStep(draft.word.id, {
@@ -2267,7 +2498,7 @@ describe("admin words mock", () => {
       base_revision: savedForms.word.revision,
       operation_id: "forms-complete-after-save",
       intent: "complete",
-      content: savedForms.word.forms
+      content: withCompletePronunciations(savedForms.word.forms)
     });
     const resavedForms = await mock.saveFormsStep(completedForms.word.id, {
       base_revision: completedForms.word.revision,
@@ -2341,7 +2572,7 @@ describe("admin words mock", () => {
       base_revision: draft.word.revision,
       operation_id: "forms-op",
       intent: "complete" as const,
-      content: draft.word.forms
+      content: withCompletePronunciations(draft.word.forms)
     };
     const forms = await mock.saveFormsStep(draft.word.id, formsInput);
     expect(forms.word.revision).toBe(2);
@@ -3196,7 +3427,7 @@ describe("part-of-speech settings mock", () => {
       base_revision: draft.word.revision,
       operation_id: "valid-forms-save",
       intent: "complete",
-      content: draft.word.forms
+      content: withCompletePronunciations(draft.word.forms)
     });
     const meanings = completeMockMeanings(forms.word);
     meanings.pos[0]!.senses[0]!.sub_pos = "V-T";
@@ -3247,7 +3478,7 @@ describe("part-of-speech settings mock", () => {
       base_revision: draft.word.revision,
       operation_id: "external-pos-save",
       intent: "complete",
-      content: externalForms
+      content: withCompletePronunciations(externalForms)
     });
     expect(forms.word.forms.pos[0]!.pos).toBe("real_custom_pos");
 

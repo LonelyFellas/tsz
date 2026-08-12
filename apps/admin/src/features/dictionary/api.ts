@@ -104,6 +104,34 @@ export function useDeleteWord() {
   });
 }
 
+export function useDeleteWordDraft() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      wordId,
+      baseRevision,
+      baseLifecycleRevision
+    }: {
+      wordId: string;
+      baseRevision: number;
+      baseLifecycleRevision: number;
+    }) =>
+      adminWordsDataSource.deleteDraft(wordId, {
+        base_revision: baseRevision,
+        base_lifecycle_revision: baseLifecycleRevision
+      }),
+    onSuccess: (_data, { wordId }) => {
+      // 当前 basics 页仍订阅 detail；全量 invalidate 会主动重取已删除资源并按默认策略
+      // 重试 404，阻塞 mutateAsync 后的跳转。删除该详情缓存，仅刷新集合派生数据。
+      qc.removeQueries({ queryKey: wordKeys.detail(wordId), exact: true });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: wordKeys.lists() }),
+        qc.invalidateQueries({ queryKey: wordKeys.stats() })
+      ]);
+    }
+  });
+}
+
 export function useBatchDeleteWords() {
   const invalidate = useInvalidateWords();
   return useMutation<AdminWordBatchDeleteResponse, Error, string[]>({

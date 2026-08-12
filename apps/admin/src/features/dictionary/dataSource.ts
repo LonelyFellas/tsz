@@ -25,6 +25,7 @@ type RealAdminWordsDataSource = Pick<
   | "restore"
   | "archiveBatch"
   | "restoreBatch"
+  | "deleteDraft"
   | "remove"
   | "batchDelete"
   | "relatedSearch"
@@ -175,6 +176,8 @@ export const adminWordsDataSource: AdminWordsDataSource = {
     (await resolveAdminWordsDataSource()).archiveBatch(idempotencyKey, input),
   restoreBatch: async (idempotencyKey, input) =>
     (await resolveAdminWordsDataSource()).restoreBatch(idempotencyKey, input),
+  deleteDraft: async (wordId, input) =>
+    (await resolveAdminWordsDataSource()).deleteDraft(wordId, input),
   remove: async (wordId) =>
     (await resolveAdminWordsDataSource()).remove(wordId),
   batchDelete: async (ids) =>

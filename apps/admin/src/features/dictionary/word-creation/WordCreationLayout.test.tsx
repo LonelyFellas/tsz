@@ -22,7 +22,17 @@ function renderLayout(
 }
 
 describe("WordCreationLayout", () => {
-  it("创建态使用轻量单栏并在未创建草稿前禁用后续步骤", () => {
+  it("Step 1 也展示词条摘要和完成情况", () => {
+    renderLayout({ currentStep: "basics" });
+
+    expect(
+      screen.getByRole("region", { name: "词条摘要" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("完成检测后显示")).toBeInTheDocument();
+    expect(screen.getByText("完成情况")).toBeInTheDocument();
+  });
+
+  it("创建态展示实时摘要并在未创建草稿前禁用后续步骤", () => {
     const onStepChange = vi.fn();
     const view = renderLayout({
       currentStep: "basics",
@@ -41,10 +51,12 @@ describe("WordCreationLayout", () => {
 
     fireEvent.click(screen.getByText("词形与发音"));
     expect(onStepChange).not.toHaveBeenCalled();
-    expect(view.container.querySelector(".word-creation-summary")).toBeNull();
-    expect(view.container.querySelector(".word-creation-shell")).toHaveClass(
-      "word-creation-shell--basics"
-    );
+    expect(
+      view.container.querySelector(".word-creation-summary")
+    ).not.toBeNull();
+    expect(
+      view.container.querySelector(".word-creation-shell")
+    ).not.toHaveClass("word-creation-shell--basics");
   });
 
   it("顶部摘要在缺少 canonical word 时安全展示空状态或统一草稿主词", () => {
