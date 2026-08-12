@@ -58,6 +58,7 @@ import { usePartOfSpeechCatalog } from "./part-of-speech/api";
 import { toListQuery, type WordFilterValues } from "./listQuery";
 import { runLifecycleCommandOnce } from "./lifecycleCommand";
 import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
+import { newWordNodeId } from "./word-model/primitives";
 
 const { RangePicker } = DatePicker;
 
@@ -190,7 +191,7 @@ export function SmartDictionary() {
             const mutation = restoring ? restoreWord : archiveWord;
             await mutation.mutateAsync({
               wordId: record.id,
-              idempotencyKey: crypto.randomUUID(),
+              idempotencyKey: newWordNodeId(),
               input
             });
             setSelectedKeys((previous) =>
@@ -243,7 +244,7 @@ export function SmartDictionary() {
           try {
             const mutation = restoring ? restoreBatch : archiveBatch;
             const response = await mutation.mutateAsync({
-              idempotencyKey: crypto.randomUUID(),
+              idempotencyKey: newWordNodeId(),
               input: { entries }
             });
             setSelectedKeys([]);
