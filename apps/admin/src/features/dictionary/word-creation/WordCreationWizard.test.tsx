@@ -8,7 +8,8 @@ import { wordFixture } from "./wordCreation.test.helper";
 
 const state = vi.hoisted(() => ({
   detail: {} as Record<string, unknown>,
-  remove: vi.fn(),
+  archive: vi.fn(),
+  restore: vi.fn(),
   refetch: vi.fn(),
   createdWord: undefined as AdminWordV2 | undefined
 }));
@@ -19,7 +20,8 @@ vi.mock("../api", () => ({
     requestedWordId: wordId,
     enabled
   })),
-  useDeleteWord: () => ({ mutateAsync: state.remove, isPending: false })
+  useArchiveWord: () => ({ mutateAsync: state.archive, isPending: false }),
+  useRestoreWord: () => ({ mutateAsync: state.restore, isPending: false })
 }));
 
 vi.mock("../part-of-speech/api", async () => {
@@ -52,8 +54,16 @@ vi.mock("./CreateEntryStep", () => ({
 }));
 
 vi.mock("./FormsAndPronunciationStep", () => ({
-  FormsAndPronunciationStep: ({ word }: { word: AdminWordV2 }) => (
-    <div>forms-step-revision-{word.revision}</div>
+  FormsAndPronunciationStep: ({
+    word,
+    readOnly
+  }: {
+    word: AdminWordV2;
+    readOnly?: boolean;
+  }) => (
+    <div>
+      forms-step-revision-{word.revision}-readonly-{String(readOnly)}
+    </div>
   )
 }));
 
@@ -64,8 +74,16 @@ vi.mock("./MeaningsAndExamplesStep", () => ({
 }));
 
 vi.mock("./PreviewAndPublishStep", () => ({
-  PreviewAndPublishStep: ({ word }: { word: AdminWordV2 }) => (
-    <div>preview-step-{word.status}</div>
+  PreviewAndPublishStep: ({
+    word,
+    readOnly
+  }: {
+    word: AdminWordV2;
+    readOnly?: boolean;
+  }) => (
+    <div>
+      preview-step-{word.status}-readonly-{String(readOnly)}
+    </div>
   )
 }));
 
@@ -92,7 +110,13 @@ vi.mock("./WordCreationLayout", () => ({
 }));
 
 function LocationProbe() {
-  return <span data-testid="location">{useLocation().pathname}</span>;
+  const location = useLocation();
+  return (
+    <span data-testid="location">
+      {location.pathname}
+      {location.search}
+    </span>
+  );
 }
 
 function renderWizard(mode: "create" | "resume", initialEntry: string) {
@@ -226,7 +250,15 @@ describe("WordCreationWizard", () => {
   });
 
   it("published 无论请求何步都锁定 preview", async () => {
-    loaded(wordFixture({ status: "published", ready: true }));
+    loaded(
+      wordFixture({
+        status: "published",
+        ready: true,
+        revision: 4,
+        published_revision: 3,
+        has_unpublished_changes: true
+      })
+    );
     renderWizard("resume", "/words/word-center/wizard/forms");
 
     await waitFor(() =>
@@ -234,13 +266,50 @@ describe("WordCreationWizard", () => {
         "/words/word-center/wizard/preview"
       )
     );
-    expect(screen.getByText("preview-step-published")).toBeVisible();
+    expect(
+      screen.getByText("preview-step-published-readonly-true")
+    ).toBeVisible();
+  });
+
+  it("published 只有显式 edit 模式才可编辑，未发布修改可由列表路由恢复", async () => {
+    loaded(wordFixture({ status: "published", ready: true }));
+    const view = renderWizard(
+      "resume",
+      "/words/word-center/wizard/forms?mode=edit"
+    );
+    expect(
+      await screen.findByText("forms-step-revision-3-readonly-false")
+    ).toBeVisible();
+
+    view.unmount();
+    loaded(
+      wordFixture({
+        status: "published",
+        ready: true,
+        revision: 4,
+        published_revision: 3,
+        has_unpublished_changes: true
+      })
+    );
+    renderWizard("resume", "/words/word-center/wizard/forms?mode=edit");
+    expect(
+      await screen.findByText("forms-step-revision-4-readonly-false")
+    ).toBeVisible();
+    fireEvent.click(screen.getByText("layout-preview"));
+    expect(
+      await screen.findByText("preview-step-published-readonly-false")
+    ).toBeVisible();
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/words/word-center/wizard/preview?mode=edit"
+    );
   });
 
   it("stepper 只允许进入 max_reachable_step 以内步骤", async () => {
     loaded(wordFixture({ max_reachable_step: "meanings", revision: 5 }));
     renderWizard("resume", "/words/word-center/wizard/forms");
-    expect(await screen.findByText("forms-step-revision-5")).toBeVisible();
+    expect(
+      await screen.findByText("forms-step-revision-5-readonly-false")
+    ).toBeVisible();
 
     fireEvent.click(screen.getByText("layout-preview"));
     expect(screen.getByTestId("location")).toHaveTextContent(
@@ -258,7 +327,9 @@ describe("WordCreationWizard", () => {
   it("较旧 detail 响应不会覆盖已加载的更高 revision", async () => {
     loaded(wordFixture({ revision: 9 }));
     const view = renderWizard("resume", "/words/word-center/wizard/forms");
-    expect(await screen.findByText("forms-step-revision-9")).toBeVisible();
+    expect(
+      await screen.findByText("forms-step-revision-9-readonly-false")
+    ).toBeVisible();
 
     loaded(wordFixture({ revision: 8 }));
     view.rerender(
@@ -274,14 +345,92 @@ describe("WordCreationWizard", () => {
         </AntApp>
       </MemoryRouter>
     );
-    expect(screen.getByText("forms-step-revision-9")).toBeVisible();
-    expect(screen.queryByText("forms-step-revision-8")).toBeNull();
+    expect(
+      screen.getByText("forms-step-revision-9-readonly-false")
+    ).toBeVisible();
+    expect(
+      screen.queryByText("forms-step-revision-8-readonly-false")
+    ).toBeNull();
   });
 
-  it("只读 basics 可进入 forms；废弃确认后删除并重新创建", async () => {
+  it("归档词条全程只读，恢复时提交双 revision 并解除只读", async () => {
+    const archived = wordFixture({
+      status: "archived",
+      lifecycle_revision: 4,
+      max_reachable_step: "forms"
+    });
+    const restored = {
+      ...archived,
+      status: "draft" as const,
+      lifecycle_revision: 5,
+      archived_at: undefined,
+      archived_by: undefined
+    };
+    loaded(archived);
+    state.restore.mockResolvedValue({ word: restored });
+    renderWizard("resume", `/words/${archived.id}/wizard/forms`);
+
+    expect(
+      await screen.findByText("该词条已归档，当前为只读状态")
+    ).toBeVisible();
+    expect(
+      screen.getByText(`forms-step-revision-${archived.revision}-readonly-true`)
+    ).toBeVisible();
+
+    fireEvent.click(screen.getByText("恢复词条"));
+    await waitFor(() =>
+      expect(state.restore).toHaveBeenCalledWith({
+        wordId: archived.id,
+        idempotencyKey: expect.any(String),
+        input: {
+          base_revision: archived.revision,
+          base_lifecycle_revision: archived.lifecycle_revision
+        }
+      })
+    );
+    expect(
+      await screen.findByText(
+        `forms-step-revision-${restored.revision}-readonly-false`
+      )
+    ).toBeVisible();
+  });
+
+  it("归档恢复失败时保持只读并展示服务端错误", async () => {
+    const archived = wordFixture({
+      status: "archived",
+      lifecycle_revision: 2,
+      max_reachable_step: "forms"
+    });
+    loaded(archived);
+    state.restore.mockRejectedValue(new Error("引用目标仍不可用"));
+    renderWizard("resume", `/words/${archived.id}/wizard/forms`);
+
+    fireEvent.click(await screen.findByText("恢复词条"));
+    expect(await screen.findByText("引用目标仍不可用")).toBeInTheDocument();
+    expect(
+      screen.getByText(`forms-step-revision-${archived.revision}-readonly-true`)
+    ).toBeVisible();
+  });
+
+  it("未收录短语的只读 basics 明确显示空白 V2 草稿来源", async () => {
+    const phrase = wordFixture({ max_reachable_step: "forms" });
+    phrase.kind = "phrase";
+    phrase.detection_snapshot.entry_kind = "phrase";
+    phrase.detection_snapshot.builtin_dictionary_status = "not_found";
+    loaded(phrase);
+    renderWizard("resume", `/words/${phrase.id}/wizard/basics`);
+
+    expect(await screen.findByText("短语草稿已创建")).toBeVisible();
+    expect(screen.getByText("短语", { exact: true })).toBeVisible();
+    expect(
+      screen.getByText("内置词典未收录该短语，已按规范化输入创建空白 V2 草稿。")
+    ).toBeVisible();
+  });
+
+  it("只读 basics 可进入 forms；归档确认后重新创建", async () => {
     const word = wordFixture({ max_reachable_step: "forms" });
     loaded(word);
-    state.remove.mockResolvedValue(undefined);
+    state.archive.mockResolvedValue({ word });
     const view = renderWizard("resume", `/words/${word.id}/wizard/basics`);
 
     expect(await screen.findByText("检测与确认快照")).toBeVisible();
@@ -294,14 +443,53 @@ describe("WordCreationWizard", () => {
     view.unmount();
     loaded(word);
     renderWizard("resume", `/words/${word.id}/wizard/basics`);
-    fireEvent.click(await screen.findByText("废弃并重新检测"));
+    fireEvent.click(await screen.findByText("归档并重新检测"));
     expect(
-      (await screen.findAllByText("废弃当前草稿并重新检测？")).length
+      (await screen.findAllByText("归档当前草稿并重新检测？")).length
     ).toBeGreaterThan(0);
-    fireEvent.click(screen.getByText("废弃并重新创建"));
-    await waitFor(() => expect(state.remove).toHaveBeenCalledWith(word.id));
+    fireEvent.click(screen.getByText("归档并重新创建"));
+    await waitFor(() =>
+      expect(state.archive).toHaveBeenCalledWith({
+        wordId: word.id,
+        idempotencyKey: expect.any(String),
+        input: {
+          base_revision: word.revision,
+          base_lifecycle_revision: word.lifecycle_revision
+        }
+      })
+    );
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent("/words/new")
+    );
+  });
+
+  it("草稿归档失败时保持当前向导并使用稳定回退文案", async () => {
+    const word = wordFixture({ max_reachable_step: "forms" });
+    loaded(word);
+    state.archive.mockRejectedValue("offline");
+    renderWizard("resume", `/words/${word.id}/wizard/basics`);
+
+    fireEvent.click(await screen.findByText("归档并重新检测"));
+    fireEvent.click(screen.getByText("归档并重新创建"));
+
+    expect(await screen.findByText("归档草稿失败")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      `/words/${word.id}/wizard/basics`
+    );
+  });
+
+  it("草稿归档失败时展示服务端错误信息", async () => {
+    const word = wordFixture({ max_reachable_step: "forms" });
+    loaded(word);
+    state.archive.mockRejectedValue(new Error("revision stale"));
+    renderWizard("resume", `/words/${word.id}/wizard/basics`);
+
+    fireEvent.click(await screen.findByText("归档并重新检测"));
+    fireEvent.click(screen.getByText("归档并重新创建"));
+
+    expect(await screen.findByText("revision stale")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      `/words/${word.id}/wizard/basics`
     );
   });
 });

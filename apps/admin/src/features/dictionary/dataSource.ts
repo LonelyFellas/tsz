@@ -1,10 +1,11 @@
 import { api, useAuthStore } from "@/lib/auth";
 import { env } from "@/lib/env";
+import type { AdminWordListQuery, AdminWordListResponse } from "@tsz/types";
 
 type AdminWordsApi = typeof api.words;
 type AdminPartOfSpeechSettingsApi = typeof api.partOfSpeechSettings;
 
-export type AdminWordsDataSource = Pick<
+type RealAdminWordsDataSource = Pick<
   AdminWordsApi,
   | "list"
   | "stats"
@@ -20,10 +21,19 @@ export type AdminWordsDataSource = Pick<
   | "validateV2"
   | "publish"
   | "publishV2"
+  | "archive"
+  | "restore"
+  | "archiveBatch"
+  | "restoreBatch"
   | "remove"
   | "batchDelete"
   | "relatedSearch"
 >;
+
+/** mock 仍可返回 legacy 行；真实 api.list 的 V2-only 响应可安全收窄到该联合。 */
+export type AdminWordsDataSource = Omit<RealAdminWordsDataSource, "list"> & {
+  list: (query?: AdminWordListQuery) => Promise<AdminWordListResponse>;
+};
 
 export const realAdminWordsDataSource: AdminWordsDataSource = api.words;
 
@@ -44,8 +54,7 @@ export const realAdminPartOfSpeechDataSource: AdminPartOfSpeechDataSource =
   api.partOfSpeechSettings;
 
 /**
- * 方言建议端点仍在 OpenAPI PENDING 台账中。当前只允许完整 mock 数据源演示；
- * 生产/真实数据源必须明确禁用建议按钮，管理员仍可手工补齐目标方言。
+ * legacy 创建/删除仍只允许 mock；V2 短语、生命周期与方言建议已由真实 OpenAPI 支撑。
  */
 const adminWordsMockEnabled =
   (!import.meta.env.PROD || import.meta.env.MODE === "test") &&
@@ -55,7 +64,11 @@ const adminPartOfSpeechMockEnabled =
   env.ADMIN_PART_OF_SPEECH_MOCK;
 
 export const adminWordsDataSourceCapabilities = Object.freeze({
-  dialectVariantSuggestions: adminWordsMockEnabled
+  dialectVariantSuggestions: true,
+  legacyEntryCreation: adminWordsMockEnabled,
+  phraseCreation: true,
+  archive: true,
+  batchArchive: true
 });
 
 /** 依赖注入入口：测试无需修改进程级 Vite env，也能验证真实/mock 二选一。 */
@@ -125,8 +138,8 @@ export const adminWordsDataSource: AdminWordsDataSource = {
   suggestDialectVariants: async (input) =>
     (await resolveAdminWordsDataSource()).suggestDialectVariants(input),
   create: async (input) => (await resolveAdminWordsDataSource()).create(input),
-  createV2: async (input) =>
-    (await resolveAdminWordsDataSource()).createV2(input),
+  createV2: async (idempotencyKey, input) =>
+    (await resolveAdminWordsDataSource()).createV2(idempotencyKey, input),
   get: async (wordId) => (await resolveAdminWordsDataSource()).get(wordId),
   saveContent: async (wordId, input) =>
     (await resolveAdminWordsDataSource()).saveContent(wordId, input),
@@ -140,8 +153,28 @@ export const adminWordsDataSource: AdminWordsDataSource = {
     (await resolveAdminWordsDataSource()).validateV2(wordId, input),
   publish: async (wordId) =>
     (await resolveAdminWordsDataSource()).publish(wordId),
-  publishV2: async (wordId, input) =>
-    (await resolveAdminWordsDataSource()).publishV2(wordId, input),
+  publishV2: async (wordId, idempotencyKey, input) =>
+    (await resolveAdminWordsDataSource()).publishV2(
+      wordId,
+      idempotencyKey,
+      input
+    ),
+  archive: async (wordId, idempotencyKey, input) =>
+    (await resolveAdminWordsDataSource()).archive(
+      wordId,
+      idempotencyKey,
+      input
+    ),
+  restore: async (wordId, idempotencyKey, input) =>
+    (await resolveAdminWordsDataSource()).restore(
+      wordId,
+      idempotencyKey,
+      input
+    ),
+  archiveBatch: async (idempotencyKey, input) =>
+    (await resolveAdminWordsDataSource()).archiveBatch(idempotencyKey, input),
+  restoreBatch: async (idempotencyKey, input) =>
+    (await resolveAdminWordsDataSource()).restoreBatch(idempotencyKey, input),
   remove: async (wordId) =>
     (await resolveAdminWordsDataSource()).remove(wordId),
   batchDelete: async (ids) =>

@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import {
   cefrRank,
   applyMeaningDialectSuggestions,
+  chunkMeaningDialectSuggestionRequest,
   collectMissingMeaningDialectItems,
   countIncompleteMeaningDialectSlots,
   createDefinition,
@@ -28,6 +29,9 @@ import {
   ensureMeaningsForForms,
   formDialects,
   grammarDialects,
+  requestMeaningDialectSuggestionBatches,
+  toFormsWireContent,
+  toMeaningsWireContent,
   updateRichText,
   wordDisplayHeadword
 } from "./model";
@@ -57,7 +61,11 @@ function englishDefinition(
   if (content.mode === "distinguish" && targetText !== undefined) {
     content.uk = {
       state: "ready",
-      variant: { value: richText(targetText), origin: "manual" }
+      variant: {
+        id: `${id}-uk-text`,
+        value: richText(targetText),
+        origin: "manual"
+      }
     };
   }
   return {
@@ -116,6 +124,7 @@ function makeWord(
     kind: "word",
     status: "draft",
     revision: 1,
+    lifecycle_revision: 1,
     headwords,
     detection_snapshot: {
       detection_id: "detection-1",
@@ -140,7 +149,8 @@ function makeWord(
     max_reachable_step: "forms",
     created_by: "admin-1",
     created_at: "2026-08-02T00:00:00Z",
-    updated_at: "2026-08-02T00:00:00Z"
+    updated_at: "2026-08-02T00:00:00Z",
+    has_unpublished_changes: false
   };
 }
 
@@ -246,9 +256,10 @@ describe("T05 共享 base、方言规则与多词形组", () => {
 
 describe("T09 EnglishText 与 grammar 方言派生", () => {
   it("统一文本直接生成 common/manual variant", () => {
-    expect(createEnglishText(unifiedHeadwords, "the far side")).toEqual({
+    expect(createEnglishText(unifiedHeadwords, "the far side")).toMatchObject({
       mode: "unified",
       common: {
+        id: expect.any(String),
         origin: "manual",
         value: {
           version: 1,
@@ -273,7 +284,11 @@ describe("T09 EnglishText 与 grammar 方言派生", () => {
       uk: { state: "missing" },
       us: {
         state: "ready",
-        variant: { origin: "manual", value: { text: "the center" } }
+        variant: {
+          id: expect.any(String),
+          origin: "manual",
+          value: { text: "the center" }
+        }
       }
     });
     expect(fromUk).toMatchObject({
@@ -281,7 +296,11 @@ describe("T09 EnglishText 与 grammar 方言派生", () => {
       source_dialect: "uk",
       uk: {
         state: "ready",
-        variant: { origin: "manual", value: { text: "the centre" } }
+        variant: {
+          id: expect.any(String),
+          origin: "manual",
+          value: { text: "the centre" }
+        }
       },
       us: { state: "missing" }
     });
@@ -507,13 +526,18 @@ describe("T58-T59 词义内容全局方言补全", () => {
       mode: "distinguish",
       uk: {
         state: "ready",
-        variant: { origin: "converted", value: { text: "the centre" } }
+        variant: {
+          id: expect.any(String),
+          origin: "converted",
+          value: { text: "the centre" }
+        }
       }
     });
     expect(noun!.senses[0]!.sentences[0]!.en_text).toMatchObject({
       uk: {
         state: "ready",
         variant: {
+          id: expect.any(String),
           origin: "converted",
           value: { text: "The centre is closed." }
         }
@@ -530,6 +554,67 @@ describe("T58-T59 词义内容全局方言补全", () => {
         (definition) => definition.id === "definition-second-pos"
       )!.content
     ).toMatchObject({ uk: { state: "missing" } });
+  });
+
+  it("按后端 100 项上限稳定切分 0/100/101/多批请求", () => {
+    const request = (count: number) => ({
+      source_dialect: "us" as const,
+      target_dialect: "uk" as const,
+      items: Array.from({ length: count }, (_, index) => ({
+        client_id: `definition-${index}`,
+        field_kind: "definition" as const,
+        value: richText(`definition ${index}`)
+      }))
+    });
+
+    expect(chunkMeaningDialectSuggestionRequest(request(0))).toEqual([]);
+    expect(
+      chunkMeaningDialectSuggestionRequest(request(100)).map(
+        (batch) => batch.items.length
+      )
+    ).toEqual([100]);
+    expect(
+      chunkMeaningDialectSuggestionRequest(request(101)).map(
+        (batch) => batch.items.length
+      )
+    ).toEqual([100, 1]);
+    expect(
+      chunkMeaningDialectSuggestionRequest(request(205)).map(
+        (batch) => batch.items.length
+      )
+    ).toEqual([100, 100, 5]);
+  });
+
+  it("分批请求逐批交付响应，并在中途失败后停止后续批次", async () => {
+    const request = {
+      source_dialect: "us" as const,
+      target_dialect: "uk" as const,
+      items: Array.from({ length: 201 }, (_, index) => ({
+        client_id: `definition-${index}`,
+        field_kind: "definition" as const,
+        value: richText(`definition ${index}`)
+      }))
+    };
+    const sent: number[] = [];
+    const applied: string[] = [];
+
+    await expect(
+      requestMeaningDialectSuggestionBatches(
+        request,
+        async (batch) => {
+          sent.push(batch.items.length);
+          if (sent.length === 2) throw new Error("second batch failed");
+          return {
+            provider: { kind: "dictionary_region_rules", version: "1" },
+            suggestions: [batch.items[0]!, request.items[200]!]
+          };
+        },
+        (suggestions) =>
+          applied.push(...suggestions.map((suggestion) => suggestion.client_id))
+      )
+    ).rejects.toThrow("second batch failed");
+    expect(sent).toEqual([100, 100]);
+    expect(applied).toEqual(["definition-0"]);
   });
 });
 
@@ -576,12 +661,14 @@ describe("展示、factory 默认值与边界输入", () => {
     });
     expect(definition).toMatchObject({
       id: expect.any(String),
+      content_id: expect.any(String),
       level: "A1",
       definition_mode: "zh_definition",
       content: { version: 1, text: "", spans: [], liaisons: [] }
     });
     expect(sentence).toMatchObject({
       id: expect.any(String),
+      zh_text_id: expect.any(String),
       level: "A1",
       zh_text: { text: "" },
       links: [{ word_id: "word-1", sense_id: "sense-1", role: "focus" }]
@@ -617,5 +704,95 @@ describe("展示、factory 默认值与边界输入", () => {
       (["A1", "A2", "B1", "B2", "C1", "C2"] as const).map(cefrRank)
     ).toEqual([0, 1, 2, 3, 4, 5]);
     expect(cefrRank("invalid" as never)).toBe(-1);
+  });
+});
+
+describe("真实后端 wire mapper", () => {
+  it("词形请求保留节点 ID，并移除旧缓存中的音频只读字段", () => {
+    const pos = createPosForms("noun", unifiedHeadwords);
+    const pronunciation = pos.base_form.variants[0]!.pronunciations[0]!;
+    Object.assign(pronunciation, {
+      audio_url: "https://cdn.example.test/audio.mp3",
+      audio_source: "tts"
+    });
+
+    const wire = toFormsWireContent({ pos: [pos] });
+    const wirePronunciation =
+      wire.pos[0]!.base_form.variants[0]!.pronunciations[0]!;
+
+    expect(wirePronunciation.id).toBe(pronunciation.id);
+    expect(wirePronunciation).not.toHaveProperty("audio_url");
+    expect(wirePronunciation).not.toHaveProperty("audio_source");
+    expect(pronunciation).toHaveProperty("audio_url");
+  });
+
+  it("词义请求保留文本 ID，过滤空 context/relation 并剥离 relation 快照", () => {
+    const pos = createPosMeanings(
+      "pos-1",
+      unifiedHeadwords,
+      "word-1",
+      "sense-group-1"
+    );
+    const sense = pos.senses[0]!;
+    const definition = sense.definitions[0]!;
+    const sentence = sense.sentences[0]!;
+    sentence.links.push(
+      { word_id: "", sense_id: "", role: "context" },
+      { word_id: "word-2", sense_id: "sense-2", role: "context" }
+    );
+    sense.relations = [
+      createRelation("antonym"),
+      {
+        id: "relation-2",
+        relation: "synonym",
+        target_word_id: "word-2",
+        target_sense_id: "sense-2",
+        target_headword: "other",
+        target_gloss: "另一个",
+        score: "75"
+      }
+    ];
+    Object.assign(definition, { audio_url: "legacy-definition.mp3" });
+    Object.assign(sentence, { audio_source: "legacy-tts" });
+
+    const wire = toMeaningsWireContent({
+      sense_groups: [{ id: "sense-group-1", name_zh: "测试", name_en: "Test" }],
+      pos: [pos]
+    });
+    const wireSense = wire.pos[0]!.senses[0]!;
+    const wireDefinition = wireSense.definitions[0]!;
+    const wireSentence = wireSense.sentences[0]!;
+    const sourceTextId =
+      sentence.en_text.mode === "unified"
+        ? sentence.en_text.common.id
+        : undefined;
+
+    expect(wireDefinition).toMatchObject({
+      id: definition.id,
+      content_id: "content_id" in definition ? definition.content_id : ""
+    });
+    expect(wireSentence).toMatchObject({
+      id: sentence.id,
+      zh_text_id: sentence.zh_text_id,
+      en_text: {
+        mode: "unified",
+        common: { id: sourceTextId }
+      }
+    });
+    expect(wireSentence.links).toEqual([
+      { word_id: "word-1", sense_id: sense.id, role: "focus" },
+      { word_id: "word-2", sense_id: "sense-2", role: "context" }
+    ]);
+    expect(wireSense.relations).toEqual([
+      {
+        id: "relation-2",
+        relation: "synonym",
+        target_word_id: "word-2",
+        target_sense_id: "sense-2",
+        score: "75"
+      }
+    ]);
+    expect(wireDefinition).not.toHaveProperty("audio_url");
+    expect(wireSentence).not.toHaveProperty("audio_source");
   });
 });

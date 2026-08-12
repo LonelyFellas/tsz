@@ -94,6 +94,40 @@ function stringArray(value: unknown): string[] {
     : [];
 }
 
+function nonNegativeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0;
+}
+
+function hasNonEmptyStringFields(
+  value: unknown,
+  fields: readonly string[]
+): value is Record<string, string> {
+  return (
+    isRecord(value) &&
+    fields.every((field) => nonEmptyString(value[field]) !== undefined)
+  );
+}
+
+function isDraftReferenceLocation(
+  value: unknown
+): value is Record<string, string> {
+  return hasNonEmptyStringFields(value, [
+    "source_entry_id",
+    "source_publication_id",
+    "source_node_id",
+    "reference_kind"
+  ]);
+}
+
+function isProblemReferenceLocation(
+  value: unknown
+): value is Record<string, string> {
+  return (
+    isDraftReferenceLocation(value) &&
+    nonEmptyString(value.target_sense_id) !== undefined
+  );
+}
+
 function toDraftValidationIssues(value: unknown): DraftValidationIssue[] {
   if (!Array.isArray(value)) return [];
   const valid = value.every(
@@ -103,7 +137,10 @@ function toDraftValidationIssues(value: unknown): DraftValidationIssue[] {
       nonEmptyString(issue.node_id) !== undefined &&
       nonEmptyString(issue.field) !== undefined &&
       nonEmptyString(issue.code) !== undefined &&
-      nonEmptyString(issue.message) !== undefined
+      nonEmptyString(issue.message) !== undefined &&
+      (issue.reference_location === undefined ||
+        issue.reference_location === null ||
+        isDraftReferenceLocation(issue.reference_location))
   );
   return valid ? (value as DraftValidationIssue[]) : [];
 }
@@ -112,9 +149,9 @@ function toProblemMeta(value: unknown): ProblemMeta | undefined {
   if (!isRecord(value)) return undefined;
   if (
     (value.current_revision !== undefined &&
-      (typeof value.current_revision !== "number" ||
-        !Number.isInteger(value.current_revision) ||
-        value.current_revision < 0)) ||
+      !nonNegativeInteger(value.current_revision)) ||
+    (value.current_lifecycle_revision !== undefined &&
+      !nonNegativeInteger(value.current_lifecycle_revision)) ||
     (value.word_id !== undefined &&
       nonEmptyString(value.word_id) === undefined) ||
     (value.max_reachable_step !== undefined &&
@@ -132,7 +169,10 @@ function toProblemMeta(value: unknown): ProblemMeta | undefined {
         value.usage_count < 0)) ||
     (value.part_of_speech_id !== undefined &&
       nonEmptyString(value.part_of_speech_id) === undefined) ||
-    (value.code !== undefined && nonEmptyString(value.code) === undefined)
+    (value.code !== undefined && nonEmptyString(value.code) === undefined) ||
+    (value.reference_locations !== undefined &&
+      (!Array.isArray(value.reference_locations) ||
+        !value.reference_locations.every(isProblemReferenceLocation)))
   ) {
     return undefined;
   }
@@ -215,14 +255,17 @@ export function createHttpClient({
   ): Promise<T> {
     // 公开端点(登录/注册等)不带 access token，避免遗留的旧 token 污染请求。
     const token = skipAuth ? undefined : await getToken?.();
+    const headers = new Headers(init.headers);
+    if (!headers.has("Content-Type")) {
+      headers.set("Content-Type", "application/json");
+    }
+    if (token && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${token}`);
+    }
     const res = await fetch(`${baseUrl}${path}`, {
       credentials: "include",
       ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...init.headers
-      }
+      headers
     });
 
     // 只有携带了 access token 的请求才触发 refresh 逻辑。
@@ -265,13 +308,18 @@ export function createHttpClient({
     post: <T>(
       path: string,
       data?: unknown,
-      opts?: { skipAuth?: boolean; signal?: AbortSignal }
+      opts?: {
+        skipAuth?: boolean;
+        signal?: AbortSignal;
+        headers?: HeadersInit;
+      }
     ) =>
       request<T>(
         path,
         {
           method: "POST",
           body: JSON.stringify(data),
+          ...(opts?.headers ? { headers: opts.headers } : {}),
           ...(opts?.signal ? { signal: opts.signal } : {})
         },
         false,

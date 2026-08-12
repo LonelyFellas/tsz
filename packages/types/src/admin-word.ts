@@ -29,7 +29,7 @@ export type Dialect = "uk" | "us" | "common";
 export type DialectMode = "unified" | "distinguish";
 export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 export type AdminWordKind = "word" | "phrase";
-export type AdminWordStatus = "draft" | "published";
+export type AdminWordStatus = "draft" | "published" | "archived";
 
 /** 基本词性稳定编码；词条内不重复，展示信息从词性配置 catalog 读取。 */
 export type WordPosTag = PartOfSpeechCode;
@@ -251,11 +251,28 @@ export interface AdminWordListItem {
   /** 聚合所有词义等级,升序 */
   levels: CefrLevel[];
   status: AdminWordStatus;
+  /** V2 内容 revision；legacy 行缺省。 */
+  revision?: number;
+  /** V2 生命周期 revision；legacy 行缺省。 */
+  lifecycle_revision?: number;
   /** V2 草稿恢复向导所需；legacy 行缺省。 */
   max_reachable_step?: WordCreationStep;
+  /** V2 当前线上 publication 的源 revision；legacy/未发布行缺省。 */
+  published_revision?: number;
+  /** V2 当前工作 revision 是否包含尚未发布的修改。 */
+  has_unpublished_changes?: boolean;
   created_by_name: string;
   created_at: string;
   updated_at: string;
+}
+
+/** GET /admin/lexicon/entries 的真实 V2 wire 行；必填性与 OpenAPI 完全一致。 */
+export interface AdminWordV2ListItem extends AdminWordListItem {
+  schema_version: 2;
+  revision: number;
+  lifecycle_revision: number;
+  max_reachable_step: WordCreationStep;
+  has_unpublished_changes: boolean;
 }
 
 export interface AdminWordListPage {
@@ -266,6 +283,12 @@ export interface AdminWordListPage {
 
 export interface AdminWordListResponse {
   words: AdminWordListItem[];
+  page: AdminWordListPage;
+}
+
+/** GET /admin/lexicon/entries 的真实 V2 wire 响应。 */
+export interface AdminWordV2ListResponse {
+  words: AdminWordV2ListItem[];
   page: AdminWordListPage;
 }
 

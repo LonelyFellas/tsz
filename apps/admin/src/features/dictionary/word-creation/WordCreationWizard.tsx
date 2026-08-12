@@ -1,7 +1,7 @@
 import {
   CheckCircleFilled,
-  DeleteOutlined,
   ExclamationCircleOutlined,
+  InboxOutlined,
   ReloadOutlined
 } from "@ant-design/icons";
 import {
@@ -23,9 +23,16 @@ import type {
   WordHeadwordsV2
 } from "@tsz/types";
 import { isAdminWordV2 } from "@tsz/types";
-import { useEffect, useMemo, useState } from "react";
-import { Navigate, useNavigate, useParams } from "react-router-dom";
-import { useDeleteWord, useWordDetail } from "../api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  Navigate,
+  useNavigate,
+  useParams,
+  useSearchParams
+} from "react-router-dom";
+import { useArchiveWord, useRestoreWord, useWordDetail } from "../api";
+import { adminWordsDataSourceCapabilities } from "../dataSource";
+import { runLifecycleCommandOnce } from "../lifecycleCommand";
 import {
   createPartOfSpeechLookup,
   partOfSpeechLabel
@@ -54,28 +61,37 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
     () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
     [partOfSpeechCatalog.data]
   );
-  const removeWord = useDeleteWord();
+  const archiveWord = useArchiveWord();
+  const lifecycleCommandPending = useRef(false);
   const snapshot = word.detection_snapshot;
   const discard = () => {
     modal.confirm({
-      title: "废弃当前草稿并重新检测？",
+      title: "归档当前草稿并重新检测？",
       icon: <ExclamationCircleOutlined />,
       content:
-        "语言和主词是后续内容的稳定基准，不能在已有草稿中直接修改。废弃后当前草稿及已保存步骤均不可恢复。",
-      okText: "废弃并重新创建",
+        "语言和主词是后续内容的稳定基准，不能在已有草稿中直接修改。归档会保留当前草稿及已保存步骤，之后仍可恢复。",
+      okText: "归档并重新创建",
       okButtonProps: { danger: true },
       cancelText: "取消",
-      onOk: async () => {
-        try {
-          await removeWord.mutateAsync(word.id);
-          message.success("草稿已废弃");
-          navigate("/words/new", { replace: true });
-        } catch (error) {
-          message.error(
-            error instanceof Error ? error.message : "废弃草稿失败"
-          );
-        }
-      }
+      onOk: () =>
+        runLifecycleCommandOnce(lifecycleCommandPending, async () => {
+          try {
+            await archiveWord.mutateAsync({
+              wordId: word.id,
+              idempotencyKey: crypto.randomUUID(),
+              input: {
+                base_revision: word.revision,
+                base_lifecycle_revision: word.lifecycle_revision
+              }
+            });
+            message.success("草稿已归档");
+            navigate("/words/new", { replace: true });
+          } catch (error) {
+            message.error(
+              error instanceof Error ? error.message : "归档草稿失败"
+            );
+          }
+        })
     });
   };
   return (
@@ -93,11 +109,21 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
 
       <Alert
         className="word-snapshot-status"
-        type="success"
+        type={
+          snapshot.builtin_dictionary_status === "matched" ? "success" : "info"
+        }
         showIcon
         icon={<CheckCircleFilled />}
-        title="词典检测已完成"
-        description="内置词典已匹配，智能词库创建时未发现重复项。"
+        title={
+          snapshot.builtin_dictionary_status === "matched"
+            ? "词典检测已完成"
+            : "短语草稿已创建"
+        }
+        description={
+          snapshot.builtin_dictionary_status === "matched"
+            ? "内置词典已匹配，智能词库创建时未发现重复项。"
+            : "内置词典未收录该短语，已按规范化输入创建空白 V2 草稿。"
+        }
         style={{ marginBottom: 18 }}
       />
 
@@ -118,7 +144,9 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
           <Descriptions.Item label="归一化主词">
             {snapshot.normalized_headword}
           </Descriptions.Item>
-          <Descriptions.Item label="词条类型">单词</Descriptions.Item>
+          <Descriptions.Item label="词条类型">
+            {word.kind === "phrase" ? "短语" : "单词"}
+          </Descriptions.Item>
           <Descriptions.Item label="输入命中">
             {snapshot.matched_dialect === "uk"
               ? "英式英语 · BrE"
@@ -160,14 +188,16 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
 
       {word.status === "draft" && (
         <div className="word-step-actions">
-          <Button
-            danger
-            icon={<DeleteOutlined />}
-            loading={removeWord.isPending}
-            onClick={discard}
-          >
-            废弃并重新检测
-          </Button>
+          {adminWordsDataSourceCapabilities.archive && (
+            <Button
+              danger
+              icon={<InboxOutlined />}
+              loading={archiveWord.isPending}
+              onClick={discard}
+            >
+              归档并重新检测
+            </Button>
+          )}
           <Button
             type="primary"
             onClick={() => navigate(`/words/${word.id}/wizard/forms`)}
@@ -181,13 +211,18 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
 }
 
 export function WordCreationWizard({ mode }: Props) {
+  const { message } = App.useApp();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { wordId = "", step } = useParams();
   const currentStep: WordCreationStep =
     mode === "create" ? "basics" : isWordCreationStep(step) ? step : "basics";
   const detail = useWordDetail(wordId, mode === "resume" && wordId !== "");
+  const restoreWord = useRestoreWord();
+  const lifecycleCommandPending = useRef(false);
   const [word, setWord] = useState<AdminWordV2>();
   const [draftHeadwords, setDraftHeadwords] = useState<WordHeadwordsV2>();
+  const explicitEditMode = searchParams.get("mode") === "edit";
 
   useEffect(() => {
     const loaded = detail.data?.word;
@@ -197,19 +232,29 @@ export function WordCreationWizard({ mode }: Props) {
       return;
     }
     setWord((current) =>
-      !current || loaded.revision >= current.revision ? loaded : current
+      !current ||
+      loaded.revision > current.revision ||
+      (loaded.revision === current.revision &&
+        loaded.lifecycle_revision >= current.lifecycle_revision)
+        ? loaded
+        : current
     );
   }, [detail.data, navigate]);
 
   const changeStep = (next: WordCreationStep) => {
     if (!word) return;
-    if (word.status === "published") {
+    const editingPublished = word.status === "published" && explicitEditMode;
+    if (word.status === "published" && !editingPublished) {
       navigate(`/words/${word.id}/wizard/preview`);
       return;
     }
     const nextIndex = WORD_STEP_ORDER.indexOf(next);
     const maxIndex = WORD_STEP_ORDER.indexOf(word.max_reachable_step);
-    if (nextIndex <= maxIndex) navigate(`/words/${word.id}/wizard/${next}`);
+    if (nextIndex <= maxIndex) {
+      navigate(
+        `/words/${word.id}/wizard/${next}${editingPublished ? "?mode=edit" : ""}`
+      );
+    }
   };
 
   if (mode === "create") {
@@ -256,8 +301,9 @@ export function WordCreationWizard({ mode }: Props) {
     );
   }
 
+  const editingPublished = word.status === "published" && explicitEditMode;
   const legalStep: WordCreationStep =
-    word.status === "published"
+    word.status === "published" && !editingPublished
       ? "preview"
       : !isWordCreationStep(step) ||
           WORD_STEP_ORDER.indexOf(step) >
@@ -265,34 +311,88 @@ export function WordCreationWizard({ mode }: Props) {
         ? word.max_reachable_step
         : step;
   if (step !== legalStep) {
-    return <Navigate to={`/words/${word.id}/wizard/${legalStep}`} replace />;
+    return (
+      <Navigate
+        to={`/words/${word.id}/wizard/${legalStep}${editingPublished ? "?mode=edit" : ""}`}
+        replace
+      />
+    );
   }
 
-  const readOnly = word.status === "published";
+  const readOnly =
+    word.status === "archived" ||
+    (word.status === "published" && !editingPublished);
   return (
-    <WordCreationLayout
-      word={word}
-      currentStep={currentStep}
-      onStepChange={changeStep}
-    >
-      {currentStep === "basics" && <ReadOnlyBasicsStep word={word} />}
-      {currentStep === "forms" && (
-        <FormsAndPronunciationStep
-          word={word}
-          readOnly={readOnly}
-          onSaved={setWord}
+    <>
+      {word.status === "archived" && (
+        <Alert
+          type="warning"
+          showIcon
+          title="该词条已归档，当前为只读状态"
+          description="恢复不会改写当前或历史发布记录；若线上版本引用了不可用目标，服务端会安全拒绝。"
+          action={
+            <Button
+              icon={<ReloadOutlined />}
+              loading={restoreWord.isPending}
+              onClick={() =>
+                void runLifecycleCommandOnce(
+                  lifecycleCommandPending,
+                  async () => {
+                    try {
+                      const restored = await restoreWord.mutateAsync({
+                        wordId: word.id,
+                        idempotencyKey: crypto.randomUUID(),
+                        input: {
+                          base_revision: word.revision,
+                          base_lifecycle_revision: word.lifecycle_revision
+                        }
+                      });
+                      setWord(restored.word);
+                      message.success("词条已恢复");
+                    } catch (error) {
+                      message.error(
+                        error instanceof Error ? error.message : "恢复失败"
+                      );
+                    }
+                  }
+                )
+              }
+            >
+              恢复词条
+            </Button>
+          }
+          style={{ marginBottom: 16 }}
         />
       )}
-      {currentStep === "meanings" && (
-        <MeaningsAndExamplesStep
-          word={word}
-          readOnly={readOnly}
-          onSaved={setWord}
-        />
-      )}
-      {currentStep === "preview" && (
-        <PreviewAndPublishStep word={word} onPublished={setWord} />
-      )}
-    </WordCreationLayout>
+      <WordCreationLayout
+        word={word}
+        currentStep={currentStep}
+        readOnly={readOnly}
+        onStepChange={changeStep}
+      >
+        {currentStep === "basics" && <ReadOnlyBasicsStep word={word} />}
+        {currentStep === "forms" && (
+          <FormsAndPronunciationStep
+            word={word}
+            readOnly={readOnly}
+            onSaved={setWord}
+          />
+        )}
+        {currentStep === "meanings" && (
+          <MeaningsAndExamplesStep
+            word={word}
+            readOnly={readOnly}
+            onSaved={setWord}
+          />
+        )}
+        {currentStep === "preview" && (
+          <PreviewAndPublishStep
+            word={word}
+            readOnly={readOnly}
+            onPublished={setWord}
+          />
+        )}
+      </WordCreationLayout>
+    </>
   );
 }

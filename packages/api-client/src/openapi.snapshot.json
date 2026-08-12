@@ -1,7 +1,7 @@
 {
-  "_note": "AUTO-GENERATED from backend openapi.yaml via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-11T04:56:42.420Z",
+  "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
+  "_source": "/Users/darwish/.codex/worktrees/264f/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-11T15:19:36.629Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -10,6 +10,21 @@
     "/admin/auth/login-code": ["post"],
     "/admin/auth/logout": ["post"],
     "/admin/auth/refresh": ["post"],
+    "/admin/lexicon/detections": ["post"],
+    "/admin/lexicon/dialect-variant-suggestions": ["post"],
+    "/admin/lexicon/entries": ["get", "post"],
+    "/admin/lexicon/entries/archive-batch": ["post"],
+    "/admin/lexicon/entries/related-search": ["get"],
+    "/admin/lexicon/entries/restore-batch": ["post"],
+    "/admin/lexicon/entries/stats": ["get"],
+    "/admin/lexicon/entries/{id}": ["get"],
+    "/admin/lexicon/entries/{id}/archive": ["post"],
+    "/admin/lexicon/entries/{id}/publications": ["post"],
+    "/admin/lexicon/entries/{id}/restore": ["post"],
+    "/admin/lexicon/entries/{id}/steps/forms": ["put"],
+    "/admin/lexicon/entries/{id}/steps/forms/impact": ["post"],
+    "/admin/lexicon/entries/{id}/steps/meanings": ["put"],
+    "/admin/lexicon/entries/{id}/validate": ["post"],
     "/admin/profile": ["get"],
     "/admin/settings/parts-of-speech": ["get", "post"],
     "/admin/settings/parts-of-speech/catalog": ["get"],
@@ -27,5 +42,195 @@
     "/auth/refresh": ["post"],
     "/auth/register": ["post"],
     "/otp/send": ["post"]
+  },
+  "operationHeaders": {
+    "post /admin/lexicon/entries": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/entries/archive-batch": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/entries/restore-batch": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/entries/{id}/archive": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/entries/{id}/publications": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/entries/{id}/restore": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ]
+  },
+  "schemas": {
+    "AdminWordV2": {
+      "required": [
+        "schema_version",
+        "id",
+        "language",
+        "kind",
+        "status",
+        "revision",
+        "lifecycle_revision",
+        "has_unpublished_changes",
+        "headwords",
+        "detection_snapshot",
+        "forms",
+        "meanings",
+        "completed_steps",
+        "max_reachable_step",
+        "created_by",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "status": { "$ref": "#/components/schemas/AdminWordStatus" },
+        "revision": { "type": "integer", "format": "int64" },
+        "lifecycle_revision": { "type": "integer", "format": "int64" },
+        "archived_at": { "type": "string", "format": "date-time" },
+        "archived_by": { "type": "string", "format": "uuid" },
+        "published_revision": { "type": "integer", "format": "int64" },
+        "has_unpublished_changes": { "type": "boolean" }
+      }
+    },
+    "AdminWordListItem": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "id",
+        "headword",
+        "kind",
+        "revision",
+        "lifecycle_revision",
+        "gloss",
+        "pos_list",
+        "levels",
+        "status",
+        "has_unpublished_changes",
+        "max_reachable_step",
+        "created_by_name",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by_name": { "type": "string" },
+        "gloss": { "type": "string" },
+        "has_unpublished_changes": { "type": "boolean" },
+        "headword": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "kind": { "$ref": "#/components/schemas/EntryKind" },
+        "levels": { "type": "array", "items": { "type": "string" } },
+        "lifecycle_revision": { "type": "integer", "format": "int64" },
+        "max_reachable_step": {
+          "$ref": "#/components/schemas/WordCreationStep"
+        },
+        "pos_list": { "type": "array", "items": { "type": "string" } },
+        "published_revision": { "type": "integer", "format": "int64" },
+        "revision": { "type": "integer", "format": "int64" },
+        "schema_version": {
+          "type": "integer",
+          "format": "int32",
+          "minimum": 0
+        },
+        "status": { "$ref": "#/components/schemas/AdminWordStatus" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "EntryLifecycleInput": {
+      "type": "object",
+      "required": ["base_revision", "base_lifecycle_revision"],
+      "properties": {
+        "base_lifecycle_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 }
+      },
+      "additionalProperties": false
+    },
+    "EntryLifecycleTarget": {
+      "type": "object",
+      "required": ["id", "base_revision", "base_lifecycle_revision"],
+      "properties": {
+        "base_lifecycle_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "EntryLifecycleBatchInput": {
+      "type": "object",
+      "required": ["entries"],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/EntryLifecycleTarget" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "EntryLifecycleBatchResponse": {
+      "type": "object",
+      "required": ["words", "affected"],
+      "properties": {
+        "affected": { "type": "integer", "minimum": 0 },
+        "words": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/AdminWordV2" }
+        }
+      }
+    },
+    "SuggestDialectVariantsResponseV2": {
+      "type": "object",
+      "required": ["provider", "suggestions"],
+      "properties": {
+        "provider": {
+          "$ref": "#/components/schemas/DialectSuggestionProviderV2"
+        },
+        "suggestions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/DialectVariantSuggestionItemV2"
+          }
+        }
+      }
+    }
   }
 }

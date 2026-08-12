@@ -1,6 +1,11 @@
 // 智能词库的数据层:React Query hooks 包住 api.words.*(@tsz/api-client)。
 // 列表/统计是服务端派生数据,任何写操作(增删改发布)后统一失效重取。
-import type { AdminWordBatchDeleteResponse } from "@tsz/types";
+import type {
+  AdminWordBatchDeleteResponse,
+  EntryLifecycleBatchInput,
+  EntryLifecycleBatchResponse,
+  EntryLifecycleInput
+} from "@tsz/types";
 import type {
   AdminWordCreateInput,
   AdminWordListQuery,
@@ -103,6 +108,61 @@ export function useBatchDeleteWords() {
   const invalidate = useInvalidateWords();
   return useMutation<AdminWordBatchDeleteResponse, Error, string[]>({
     mutationFn: (ids: string[]) => adminWordsDataSource.batchDelete(ids),
+    onSuccess: invalidate
+  });
+}
+
+export interface WordLifecycleCommand {
+  wordId: string;
+  idempotencyKey: string;
+  input: EntryLifecycleInput;
+}
+
+export interface WordLifecycleBatchCommand {
+  idempotencyKey: string;
+  input: EntryLifecycleBatchInput;
+}
+
+export function useArchiveWord() {
+  const invalidate = useInvalidateWords();
+  return useMutation({
+    mutationFn: ({ wordId, idempotencyKey, input }: WordLifecycleCommand) =>
+      adminWordsDataSource.archive(wordId, idempotencyKey, input),
+    onSuccess: invalidate
+  });
+}
+
+export function useRestoreWord() {
+  const invalidate = useInvalidateWords();
+  return useMutation({
+    mutationFn: ({ wordId, idempotencyKey, input }: WordLifecycleCommand) =>
+      adminWordsDataSource.restore(wordId, idempotencyKey, input),
+    onSuccess: invalidate
+  });
+}
+
+export function useArchiveWordsBatch() {
+  const invalidate = useInvalidateWords();
+  return useMutation<
+    EntryLifecycleBatchResponse,
+    Error,
+    WordLifecycleBatchCommand
+  >({
+    mutationFn: ({ idempotencyKey, input }) =>
+      adminWordsDataSource.archiveBatch(idempotencyKey, input),
+    onSuccess: invalidate
+  });
+}
+
+export function useRestoreWordsBatch() {
+  const invalidate = useInvalidateWords();
+  return useMutation<
+    EntryLifecycleBatchResponse,
+    Error,
+    WordLifecycleBatchCommand
+  >({
+    mutationFn: ({ idempotencyKey, input }) =>
+      adminWordsDataSource.restoreBatch(idempotencyKey, input),
     onSuccess: invalidate
   });
 }

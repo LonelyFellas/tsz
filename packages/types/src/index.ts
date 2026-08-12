@@ -27,6 +27,8 @@ export type {
   AdminWordListPage,
   AdminWordListQuery,
   AdminWordListResponse,
+  AdminWordV2ListItem,
+  AdminWordV2ListResponse,
   AdminWordSaveInput,
   AdminWordStats,
   AdminWordStatus,

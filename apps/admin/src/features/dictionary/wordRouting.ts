@@ -9,7 +9,11 @@ const WIZARD_STEPS: readonly WordCreationStep[] = [
 
 type WordRouteRecord = Pick<
   AdminWordListItem,
-  "id" | "schema_version" | "status" | "max_reachable_step"
+  | "id"
+  | "schema_version"
+  | "status"
+  | "max_reachable_step"
+  | "has_unpublished_changes"
 >;
 
 function isWizardStep(value: unknown): value is WordCreationStep {
@@ -19,18 +23,21 @@ function isWizardStep(value: unknown): value is WordCreationStep {
 /** 版本与状态共同决定词条唯一详情入口，列表和 legacy guard 共用。 */
 export function getWordRowRoute(record: WordRouteRecord): string {
   if (record.schema_version !== 2) return `/words/${record.id}/edit`;
-  if (record.status === "published") {
+  if (record.status === "published" && !record.has_unpublished_changes) {
     return `/words/${record.id}/wizard/preview`;
   }
   const step = isWizardStep(record.max_reachable_step)
     ? record.max_reachable_step
     : "basics";
-  return `/words/${record.id}/wizard/${step}`;
+  const route = `/words/${record.id}/wizard/${step}`;
+  return record.status === "published" ? `${route}?mode=edit` : route;
 }
 
 export function getWordRowActionLabel(
   record: WordRouteRecord
-): "编辑" | "继续创建" | "查看" {
+): "编辑" | "继续创建" | "继续编辑" | "查看" {
   if (record.schema_version !== 2) return "编辑";
-  return record.status === "published" ? "查看" : "继续创建";
+  if (record.status === "archived") return "查看";
+  if (record.status !== "published") return "继续创建";
+  return record.has_unpublished_changes ? "继续编辑" : "查看";
 }

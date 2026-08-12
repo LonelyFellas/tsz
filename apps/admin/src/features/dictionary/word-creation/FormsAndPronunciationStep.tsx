@@ -75,7 +75,8 @@ import {
   createFormGroup,
   createPosForms,
   createPronunciation,
-  formDialects
+  formDialects,
+  toFormsWireContent
 } from "./model";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import {
@@ -680,7 +681,7 @@ function MissingDialectVariantCell({
     source: WordFormVariantV2,
     target: "uk" | "us",
     clientId: string
-  ) => Promise<string | undefined>;
+  ) => Promise<void>;
   onAdd: (spelling: string, origin: WordFormVariantV2["origin"]) => void;
 }) {
   return (
@@ -707,9 +708,7 @@ function MissingDialectVariantCell({
             }
             onClick={() => {
               if (!source || dialect === "common") return;
-              void onGenerate(source, dialect, slotId).then((suggestion) => {
-                if (suggestion !== undefined) onAdd(suggestion, "converted");
-              });
+              void onGenerate(source, dialect, slotId);
             }}
           >
             生成{dialect === "uk" ? "英式" : "美式"}建议
@@ -739,7 +738,7 @@ function FormGroupMatrix({
     source: WordFormVariantV2,
     target: "uk" | "us",
     clientId: string
-  ) => Promise<string | undefined>;
+  ) => Promise<void>;
   onChange: (next: WordPosFormsV2) => void;
 }) {
   const group = pos.form_groups[groupIndex];
@@ -1053,7 +1052,7 @@ function PosFormsEditor({
     source: WordFormVariantV2,
     target: "uk" | "us",
     clientId: string
-  ) => Promise<string | undefined>;
+  ) => Promise<void>;
   onChange: (next: WordPosFormsV2) => void;
 }) {
   const spellingForced = headwords.mode === "distinguish";
@@ -1335,16 +1334,17 @@ function hasCompleteBase(pos: WordPosFormsV2): boolean {
 export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  const editQuery = word.status === "published" ? "?mode=edit" : "";
   const [content, setContent] = useState<DraftFormsStepContent>(() =>
     cloneWordValue(word.forms)
   );
+  const contentRef = useRef(content);
   const [activePosId, setActivePosId] = useState(
     word.forms.pos[0]?.pos_id ?? ""
   );
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const issueTarget = useWordValidationIssue();
-  const operationId = useRef(newWordNodeId());
   const saveForms = useSaveFormsStep(word.id);
   const previewImpact = usePreviewFormsImpact(word.id);
   const suggestVariants = useSuggestDialectVariants();
@@ -1393,7 +1393,9 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
 
   useEffect(() => {
     if (!dirty) {
-      setContent(cloneWordValue(word.forms));
+      const next = cloneWordValue(word.forms);
+      contentRef.current = next;
+      setContent(next);
       setActivePosId((current) =>
         word.forms.pos.some((pos) => pos.pos_id === current)
           ? current
@@ -1403,10 +1405,84 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   }, [dirty, word.forms, word.revision]);
 
   const updateContent = (next: DraftFormsStepContent) => {
-    operationId.current = newWordNodeId();
+    contentRef.current = next;
     setContent(next);
     setDirty(true);
   };
+
+  const applyGeneratedFormVariant = (
+    clientId: string,
+    target: "uk" | "us",
+    spelling: string
+  ) => {
+    setContent((current) => {
+      const pos = current.pos.map((posItem) => {
+        const appendIfMissing = <
+          T extends WordPosFormsV2["base_form"] | WordDerivedFormSlotV2
+        >(
+          slot: T
+        ): T => {
+          if (
+            slot.id !== clientId ||
+            slot.variants.some((variant) => variant.dialect === target)
+          ) {
+            return slot;
+          }
+          return {
+            ...slot,
+            variants: [
+              ...slot.variants,
+              {
+                id: newWordNodeId(),
+                dialect: target,
+                spelling,
+                origin: "converted" as const,
+                pronunciations: [createPronunciation()]
+              }
+            ]
+          } as T;
+        };
+        const baseForm = appendIfMissing(posItem.base_form);
+        const formGroups = posItem.form_groups.map((group) => ({
+          ...group,
+          slots: group.slots.map(appendIfMissing)
+        }));
+        if (
+          baseForm === posItem.base_form &&
+          formGroups.every(
+            (group, index) => group.slots === posItem.form_groups[index]?.slots
+          )
+        ) {
+          return posItem;
+        }
+        return {
+          ...posItem,
+          base_form: baseForm,
+          form_groups: formGroups
+        };
+      });
+      const next = { pos };
+      contentRef.current = next;
+      return next;
+    });
+    setDirty(true);
+  };
+
+  const hasFormVariant = (clientId: string, target: "uk" | "us") =>
+    contentRef.current.pos.some(
+      (posItem) =>
+        (posItem.base_form.id === clientId &&
+          posItem.base_form.variants.some(
+            (variant) => variant.dialect === target
+          )) ||
+        posItem.form_groups.some((group) =>
+          group.slots.some(
+            (slot) =>
+              slot.id === clientId &&
+              slot.variants.some((variant) => variant.dialect === target)
+          )
+        )
+    );
 
   const availablePos = useMemo(() => {
     const used = new Set(content.pos.map((item) => item.pos));
@@ -1435,11 +1511,11 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
     source: WordFormVariantV2,
     target: "uk" | "us",
     clientId: string
-  ): Promise<string | undefined> => {
+  ): Promise<void> => {
     if (!adminWordsDataSourceCapabilities.dialectVariantSuggestions) {
-      return undefined;
+      return;
     }
-    if (source.dialect !== "uk" && source.dialect !== "us") return undefined;
+    if (source.dialect !== "uk" && source.dialect !== "us") return;
     try {
       const response = await suggestVariants.mutateAsync({
         source_dialect: source.dialect,
@@ -1452,9 +1528,20 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
           }
         ]
       });
-      const suggestion = response.suggestions[0];
-      if (!suggestion || suggestion.field_kind !== "form") return undefined;
-      return await new Promise((resolve) => {
+      const matching = response.suggestions.filter(
+        (
+          suggestion
+        ): suggestion is Extract<
+          (typeof response.suggestions)[number],
+          { field_kind: "form" }
+        > =>
+          suggestion.client_id === clientId && suggestion.field_kind === "form"
+      );
+      if (response.suggestions.length !== 1 || matching.length !== 1) {
+        throw new Error("词形建议响应无效，请重试");
+      }
+      const suggestion = matching[0]!;
+      await new Promise<void>((resolve) => {
         modal.confirm({
           title: `确认${target === "uk" ? "英式" : "美式"}词形建议`,
           content: (
@@ -1467,8 +1554,16 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
           ),
           okText: "写入建议",
           cancelText: "取消",
-          onOk: () => resolve(suggestion.value),
-          onCancel: () => resolve(undefined)
+          onOk: () => {
+            if (hasFormVariant(clientId, target)) {
+              message.warning("目标方言已填写，未覆盖现有内容");
+              resolve();
+              return;
+            }
+            applyGeneratedFormVariant(clientId, target, suggestion.value);
+            resolve();
+          },
+          onCancel: resolve
         });
       });
     } catch (error) {
@@ -1498,27 +1593,26 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
 
     setSaving(true);
     try {
+      const wireContent = toFormsWireContent(content);
       const impact = await previewImpact.mutateAsync({
         base_revision: word.revision,
-        content
+        content: wireContent
       });
-      let confirmedToken: string | null = null;
+      let confirmedToken: string | undefined;
       if (impact.requires_confirmation) {
         const confirmed = await confirmImpact(
           "本次修改会影响后续内容",
           impact.affected.map((item) => item.reason).join("；")
         );
         if (!confirmed) return;
-        confirmedToken = impact.confirmation_token ?? null;
+        confirmedToken = impact.confirmation_token;
       }
       const { word: savedWord } = await saveForms.mutateAsync({
         base_revision: word.revision,
-        operation_id: operationId.current,
         intent,
-        confirmed_impact_token: confirmedToken,
-        content
+        ...(confirmedToken ? { confirmed_impact_token: confirmedToken } : {}),
+        content: wireContent
       });
-      operationId.current = newWordNodeId();
       setDirty(false);
       onSaved(savedWord);
       message.success(
@@ -1526,7 +1620,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
       );
       if (intent === "complete") {
         allowSavedNavigation();
-        navigate(`/words/${word.id}/wizard/meanings`);
+        navigate(`/words/${word.id}/wizard/meanings${editQuery}`);
       }
     } catch (error) {
       if (error instanceof HttpError) {
@@ -1535,7 +1629,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
         );
         if (issue) {
           message.warning(issue.message);
-          navigate(`/words/${word.id}/wizard/forms`, {
+          navigate(`/words/${word.id}/wizard/forms${editQuery}`, {
             replace: true,
             state: { nodeId: issue.node_id, field: issue.field }
           });
@@ -1623,7 +1717,11 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
         <Alert
           type="info"
           showIcon
-          title="已发布词条当前为只读"
+          title={
+            word.status === "archived"
+              ? "已归档词条当前为只读"
+              : "已发布词条当前为只读"
+          }
           style={{ marginBottom: 16 }}
         />
       )}
@@ -1681,7 +1779,11 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
 
         {!readOnly && (
           <div className="word-step-actions">
-            <Button onClick={() => navigate(`/words/${word.id}/wizard/basics`)}>
+            <Button
+              onClick={() =>
+                navigate(`/words/${word.id}/wizard/basics${editQuery}`)
+              }
+            >
               上一步
             </Button>
             <Button loading={saving} onClick={() => void save("save")}>

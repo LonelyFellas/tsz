@@ -1,7 +1,16 @@
 import type { Page, Route } from "@playwright/test";
-import type { PartOfSpeechCatalogResponse } from "@tsz/types";
+import type {
+  DraftFormsStepContent,
+  DraftMeaningsStepContent,
+  PartOfSpeechCatalogResponse,
+  RichText,
+  WordPronunciationV2
+} from "@tsz/types";
 
 export const ADMIN_E2E_WORD_ID = "e2e-word-center";
+export const ADMIN_E2E_LEXICON_PATH = "/lexicon";
+export const ADMIN_E2E_ENTRIES_PATH = `${ADMIN_E2E_LEXICON_PATH}/entries`;
+export const ADMIN_E2E_DETECTIONS_PATH = `${ADMIN_E2E_LEXICON_PATH}/detections`;
 
 const ADMIN_PROFILE = {
   id: "admin-e2e",
@@ -37,14 +46,14 @@ const PART_OF_SPEECH_CATALOG: PartOfSpeechCatalogResponse = {
   ]
 };
 
-const richText = (text: string) => ({
+const richText = (text: string): RichText => ({
   version: 1,
   text,
   spans: [],
   liaisons: []
 });
 
-const pronunciation = (id: string, phonetic: string) => ({
+const pronunciation = (id: string, phonetic: string): WordPronunciationV2 => ({
   id,
   dict_phonetic: phonetic,
   actual_pron: phonetic,
@@ -110,7 +119,7 @@ const CENTER_FORMS = {
       ]
     }
   ]
-};
+} satisfies DraftFormsStepContent;
 
 const CENTER_MEANINGS = {
   sense_groups: [
@@ -145,6 +154,7 @@ const CENTER_MEANINGS = {
               id: "definition-1",
               level: "A1",
               definition_mode: "zh_definition",
+              content_id: "definition-1-content",
               content: richText("圆心，中心")
             }
           ],
@@ -158,6 +168,7 @@ const CENTER_MEANINGS = {
                 uk: {
                   state: "ready",
                   variant: {
+                    id: "sentence-1-uk",
                     value: richText("He walked to the centre of the circle."),
                     origin: "manual"
                   }
@@ -165,11 +176,13 @@ const CENTER_MEANINGS = {
                 us: {
                   state: "ready",
                   variant: {
+                    id: "sentence-1-us",
                     value: richText("He walked to the center of the circle."),
                     origin: "manual"
                   }
                 }
               },
+              zh_text_id: "sentence-1-zh",
               zh_text: richText("他走到了圆的中心。"),
               links: [
                 {
@@ -185,12 +198,15 @@ const CENTER_MEANINGS = {
       ]
     }
   ]
-};
+} satisfies DraftMeaningsStepContent;
 
 type MockWord = Record<string, unknown> & {
   id: string;
   revision: number;
-  status: "draft" | "published";
+  lifecycle_revision: number;
+  status: "draft" | "published" | "archived";
+  published_revision?: number;
+  has_unpublished_changes: boolean;
   forms: typeof CENTER_FORMS;
   meanings: typeof CENTER_MEANINGS;
   completed_steps: string[];
@@ -244,6 +260,7 @@ function createDraft(headwords: unknown): MockWord {
     kind: "word",
     status: "draft",
     revision: 1,
+    lifecycle_revision: 1,
     headwords,
     detection_snapshot: {
       detection_id: "detect-center",
@@ -263,7 +280,8 @@ function createDraft(headwords: unknown): MockWord {
     max_reachable_step: "forms",
     created_by: ADMIN_PROFILE.id,
     created_at: NOW,
-    updated_at: NOW
+    updated_at: NOW,
+    has_unpublished_changes: false
   };
 }
 
@@ -316,7 +334,13 @@ function listItem(word: MockWord) {
     pos_list: ["noun"],
     levels: word.status === "published" ? ["A1"] : [],
     status: word.status,
+    revision: word.revision,
+    lifecycle_revision: word.lifecycle_revision,
     max_reachable_step: word.max_reachable_step,
+    ...(word.published_revision !== undefined
+      ? { published_revision: word.published_revision }
+      : {}),
+    has_unpublished_changes: word.has_unpublished_changes,
     created_by_name: ADMIN_PROFILE.display_name,
     created_at: NOW,
     updated_at: word.updated_at
@@ -358,18 +382,18 @@ export async function mockAdminApi(
     if (method === "GET" && path === "/settings/parts-of-speech/catalog") {
       return json(route, 200, PART_OF_SPEECH_CATALOG);
     }
-    if (method === "GET" && path === "/words") {
+    if (method === "GET" && path === ADMIN_E2E_ENTRIES_PATH) {
       const words = word ? [listItem(word)] : [];
       return json(route, 200, {
         words,
         page: { page: 1, page_size: 20, total: words.length }
       });
     }
-    if (method === "GET" && path === "/words/stats") {
+    if (method === "GET" && path === `${ADMIN_E2E_ENTRIES_PATH}/stats`) {
       const count = word ? 1 : 0;
       return json(route, 200, { total: count, today: count, month: count });
     }
-    if (method === "POST" && path === "/words/detect") {
+    if (method === "POST" && path === ADMIN_E2E_DETECTIONS_PATH) {
       const input = body as { headword?: string } | undefined;
       return json(
         route,
@@ -377,7 +401,7 @@ export async function mockAdminApi(
         detectionResponse(options.duplicate === true, input?.headword ?? "")
       );
     }
-    if (method === "POST" && path === "/words") {
+    if (method === "POST" && path === ADMIN_E2E_ENTRIES_PATH) {
       const input = body as { headwords?: unknown } | undefined;
       word ??= createDraft(
         input?.headwords ?? {
@@ -391,7 +415,8 @@ export async function mockAdminApi(
     }
     if (
       method === "POST" &&
-      path === `/words/${ADMIN_E2E_WORD_ID}/steps/forms/impact`
+      path ===
+        `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}/steps/forms/impact`
     ) {
       return json(route, 200, {
         base_revision: word?.revision ?? 1,
@@ -401,7 +426,7 @@ export async function mockAdminApi(
     }
     if (
       method === "PUT" &&
-      path === `/words/${ADMIN_E2E_WORD_ID}/steps/forms`
+      path === `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}/steps/forms`
     ) {
       if (formsFailureRemaining > 0) {
         formsFailureRemaining -= 1;
@@ -430,7 +455,7 @@ export async function mockAdminApi(
     }
     if (
       method === "PUT" &&
-      path === `/words/${ADMIN_E2E_WORD_ID}/steps/meanings`
+      path === `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}/steps/meanings`
     ) {
       const input = body as
         | { content?: typeof CENTER_MEANINGS; intent?: "save" | "complete" }
@@ -450,35 +475,54 @@ export async function mockAdminApi(
       };
       return json(route, 200, { word: clone(word) });
     }
-    if (method === "POST" && path === `/words/${ADMIN_E2E_WORD_ID}/validate`) {
+    if (
+      method === "POST" &&
+      path === `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}/validate`
+    ) {
       return json(route, 200, {
         validated_revision: word?.revision ?? 1,
         valid: true,
         issues: []
       });
     }
-    if (method === "POST" && path === `/words/${ADMIN_E2E_WORD_ID}/publish`) {
+    if (
+      method === "POST" &&
+      path === `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}/publications`
+    ) {
       if (!word) return json(route, 404, { error: "word not found" });
       word = {
         ...word,
         status: "published",
-        revision: word.revision + 1,
+        published_revision: word.revision,
+        has_unpublished_changes: false,
         max_reachable_step: "preview",
         published_at: PUBLISHED_AT,
         updated_at: PUBLISHED_AT
       };
-      return json(route, 200, { word: clone(word) });
+      return json(route, 201, { word: clone(word) });
     }
-    if (method === "GET" && path === `/words/${ADMIN_E2E_WORD_ID}`) {
+    if (
+      method === "GET" &&
+      path === `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}`
+    ) {
       return word
         ? json(route, 200, { word: clone(word) })
         : json(route, 404, { error: "word not found" });
     }
-    if (method === "GET" && path === "/words/related-search") {
+    if (
+      method === "GET" &&
+      path === `${ADMIN_E2E_ENTRIES_PATH}/related-search`
+    ) {
       return json(route, 200, { results: [] });
     }
-    if (method === "POST" && path === "/words/dialect-variants") {
-      return json(route, 200, { suggestions: [] });
+    if (
+      method === "POST" &&
+      path === `${ADMIN_E2E_LEXICON_PATH}/dialect-variant-suggestions`
+    ) {
+      return json(route, 200, {
+        provider: { kind: "dictionary_region_rules", version: "1" },
+        suggestions: []
+      });
     }
     if (method === "DELETE" && path === `/words/${ADMIN_E2E_WORD_ID}`) {
       word = undefined;

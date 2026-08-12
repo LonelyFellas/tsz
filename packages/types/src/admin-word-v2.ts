@@ -28,6 +28,8 @@ export type WordHeadwordsV2 =
     };
 
 export interface TextVariantV2<T> {
+  /** 稳定文本节点 ID；内容修改时不得更换。 */
+  id: string;
   value: T;
   origin: "dictionary" | "converted" | "manual";
 }
@@ -51,8 +53,6 @@ export interface WordPronunciationV2 {
   dict_phonetic: string;
   actual_pron: string;
   style: PronunciationStyle;
-  audio_url?: string;
-  audio_source?: string;
 }
 
 export interface WordFormVariantV2 {
@@ -102,8 +102,6 @@ export interface GrammarVariantV2 {
   id: string;
   dialect: Dialect;
   content: RichText;
-  audio_url?: string;
-  audio_source?: string;
 }
 
 export interface GrammarStructureV2 {
@@ -115,14 +113,14 @@ export interface WordDefinitionBaseV2 {
   id: string;
   level: CefrLevel;
   grammar_structure_id?: string;
-  audio_url?: string;
-  audio_source?: string;
 }
 
 export type WordDefinitionV2 = WordDefinitionBaseV2 &
   (
     | {
         definition_mode: "zh_definition" | "zh_sentence";
+        /** 中文 content 对应的稳定 text_variant 节点。 */
+        content_id: string;
         content: RichText;
       }
     | {
@@ -141,10 +139,10 @@ export interface WordSentenceV2 {
   id: string;
   level: CefrLevel;
   en_text: EnglishTextV2;
+  /** 中文译文对应的稳定 text_variant 节点。 */
+  zh_text_id: string;
   zh_text: RichText;
   links: WordSentenceLinkV2[];
-  audio_url?: string;
-  audio_source?: string;
 }
 
 export interface WordRelationV2 {
@@ -196,9 +194,9 @@ export interface WordDetectionSnapshotV2 {
     headword: string;
   };
   normalized_headword: string;
-  entry_kind: "word";
+  entry_kind: "word" | "phrase";
   matched_dialect: "uk" | "us" | "common";
-  builtin_dictionary_status: "matched";
+  builtin_dictionary_status: "matched" | "not_found";
   smart_dictionary_status: "clear";
   headwords: WordHeadwordsV2;
   suggested_pos: WordPosTag[];
@@ -209,9 +207,11 @@ export interface AdminWordV2 {
   schema_version: 2;
   id: string;
   language: AdminWordLanguageV2;
-  kind: "word";
-  status: "draft" | "published";
+  kind: "word" | "phrase";
+  status: "draft" | "published" | "archived";
   revision: number;
+  /** 独立生命周期并发 token；归档/恢复递增，内容保存不变。 */
+  lifecycle_revision: number;
   headwords: WordHeadwordsV2;
   frequency?: FixedPercent;
   detection_snapshot: WordDetectionSnapshotV2;
@@ -222,6 +222,12 @@ export interface AdminWordV2 {
   created_by: string;
   created_at: string;
   updated_at: string;
+  archived_at?: string;
+  archived_by?: string;
+  /** 当前线上 publication 的源 revision；尚未发布时省略。 */
+  published_revision?: number;
+  /** 当前工作 revision 是否晚于线上 publication。 */
+  has_unpublished_changes: boolean;
   published_at?: string;
 }
 
@@ -231,9 +237,8 @@ export interface AdminWordV2Envelope {
 
 export interface SaveWordStepInput<TContent> {
   base_revision: number;
-  operation_id: string;
   intent: StepSaveIntent;
-  confirmed_impact_token?: string | null;
+  confirmed_impact_token?: string;
   content: TContent;
 }
 
@@ -246,6 +251,14 @@ export interface DraftValidationIssue {
   field: string;
   code: string;
   message: string;
+  reference_location?: DraftReferenceLocation | null;
+}
+
+export interface DraftReferenceLocation {
+  source_entry_id: string;
+  source_publication_id: string;
+  source_node_id: string;
+  reference_kind: string;
 }
 
 export interface DraftValidationResponse {
@@ -306,7 +319,6 @@ export interface DetectWordInputV2 {
 
 export interface CreateAdminWordV2Input {
   schema_version: 2;
-  idempotency_key: string;
   detection_id: string;
   headwords: WordHeadwordsV2;
 }
@@ -330,11 +342,11 @@ export interface SuggestDialectVariantsInputV2 {
 }
 
 export interface SuggestDialectVariantsResponseV2 {
-  suggestions: Array<
-    DialectVariantSuggestionItemV2 & {
-      model_version: string;
-    }
-  >;
+  provider: {
+    kind: "dictionary_region_rules" | string;
+    version: string;
+  };
+  suggestions: DialectVariantSuggestionItemV2[];
 }
 
 export interface FormsImpactItemV2 {
@@ -364,7 +376,24 @@ export interface ValidateAdminWordV2Input {
 
 export interface PublishAdminWordV2Input {
   base_revision: number;
-  idempotency_key: string;
+}
+
+export interface EntryLifecycleInput {
+  base_revision: number;
+  base_lifecycle_revision: number;
+}
+
+export interface EntryLifecycleTarget extends EntryLifecycleInput {
+  id: string;
+}
+
+export interface EntryLifecycleBatchInput {
+  entries: EntryLifecycleTarget[];
+}
+
+export interface EntryLifecycleBatchResponse {
+  words: AdminWordV2[];
+  affected: number;
 }
 
 /** @deprecated 新代码统一使用通用 ProblemMeta。 */

@@ -28,12 +28,17 @@ export function detectionFixture(
 
 function readyEnglishText(
   headwords: WordHeadwordsV2,
-  text: string
+  text: string,
+  nodeKey: string
 ): EnglishTextV2 {
   if (headwords.mode === "unified") {
     return {
       mode: "unified",
-      common: { value: richText(text), origin: "manual" }
+      common: {
+        id: `${nodeKey}-common`,
+        value: richText(text),
+        origin: "manual"
+      }
     };
   }
   return {
@@ -42,6 +47,7 @@ function readyEnglishText(
     uk: {
       state: "ready",
       variant: {
+        id: `${nodeKey}-uk`,
         value: richText(text.replace("center", "centre")),
         origin: "manual"
       }
@@ -49,6 +55,7 @@ function readyEnglishText(
     us: {
       state: "ready",
       variant: {
+        id: `${nodeKey}-us`,
         value: richText(text.replace("centre", "center")),
         origin: "manual"
       }
@@ -85,13 +92,25 @@ export function completeMeanings(
         sub_pos: posIndex === 0 ? "N-COUNT" : "V-T",
         frequency: "12.5",
         definitions: sense.definitions.map((definition) => ({
-          ...definition,
+          id: definition.id,
+          level: definition.level,
+          ...(definition.grammar_structure_id
+            ? { grammar_structure_id: definition.grammar_structure_id }
+            : {}),
           definition_mode: "zh_definition" as const,
+          content_id:
+            "content_id" in definition
+              ? definition.content_id
+              : `${definition.id}-content`,
           content: richText(`测试释义 ${senseIndex + 1}`)
         })),
         sentences: sense.sentences.map((sentence) => ({
           ...sentence,
-          en_text: readyEnglishText(headwords, "The center is here."),
+          en_text: readyEnglishText(
+            headwords,
+            "The center is here.",
+            sentence.id
+          ),
           zh_text: richText("中心在这里。")
         }))
       }))
@@ -103,12 +122,15 @@ interface WordFixtureOptions {
   headword?: string;
   id?: string;
   revision?: number;
+  lifecycle_revision?: number;
   status?: AdminWordV2["status"];
   ready?: boolean;
   forms?: DraftFormsStepContent;
   meanings?: DraftMeaningsStepContent;
   completed_steps?: AdminWordV2["completed_steps"];
   max_reachable_step?: AdminWordV2["max_reachable_step"];
+  published_revision?: number;
+  has_unpublished_changes?: boolean;
 }
 
 export function wordFixture(options: WordFixtureOptions = {}): AdminWordV2 {
@@ -122,6 +144,7 @@ export function wordFixture(options: WordFixtureOptions = {}): AdminWordV2 {
     options.forms ?? detection.builtin_dictionary.suggested_forms
   );
   const status = options.status ?? "draft";
+  const revision = options.revision ?? 3;
   const ready = options.ready ?? status === "published";
   const initialMeanings =
     options.meanings ?? createInitialMeanings(forms, headwords, id);
@@ -135,7 +158,8 @@ export function wordFixture(options: WordFixtureOptions = {}): AdminWordV2 {
     language: "en",
     kind: "word",
     status,
-    revision: options.revision ?? 3,
+    revision,
+    lifecycle_revision: options.lifecycle_revision ?? 1,
     headwords,
     frequency: "12.5",
     detection_snapshot: {
@@ -160,8 +184,12 @@ export function wordFixture(options: WordFixtureOptions = {}): AdminWordV2 {
     created_by: "admin-test",
     created_at: "2026-08-02T03:00:00.000Z",
     updated_at: "2026-08-02T03:05:00.000Z",
+    has_unpublished_changes: options.has_unpublished_changes ?? false,
     ...(status === "published"
-      ? { published_at: "2026-08-02T03:10:00.000Z" }
+      ? {
+          published_revision: options.published_revision ?? revision,
+          published_at: "2026-08-02T03:10:00.000Z"
+        }
       : {})
   };
 }

@@ -86,6 +86,7 @@ import { useSaveMeaningsStep, useSuggestDialectVariants } from "./api";
 import {
   applyMeaningDialectSuggestions,
   collectMissingMeaningDialectItems,
+  requestMeaningDialectSuggestionBatches,
   countIncompleteMeaningDialectSlots,
   createDefinition,
   createEnglishText,
@@ -95,7 +96,8 @@ import {
   createSenseGroup,
   createSentence,
   ensureMeaningsForForms,
-  grammarDialects
+  grammarDialects,
+  toMeaningsWireContent
 } from "./model";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import {
@@ -114,6 +116,10 @@ interface Props {
   readOnly?: boolean;
   onSaved: (word: AdminWordV2) => void;
 }
+
+export const meaningDialectSuggestionBatchRunner = {
+  run: requestMeaningDialectSuggestionBatches
+};
 
 type MeaningDialect = "uk" | "us";
 
@@ -300,6 +306,7 @@ function setEnglishText(
     return {
       ...value,
       common: {
+        id: value.common.id,
         value: toWordRichText(text, value.common.value),
         origin: "manual"
       }
@@ -312,6 +319,7 @@ function setEnglishText(
     [dialect]: {
       state: "ready",
       variant: {
+        id: current.state === "ready" ? current.variant.id : newWordNodeId(),
         value: toWordRichText(
           text,
           current.state === "ready" ? current.variant.value : undefined
@@ -330,15 +338,20 @@ function setEnglishRichText(
   if (value.mode === "unified") {
     return {
       ...value,
-      common: { value: content, origin: "manual" }
+      common: { id: value.common.id, value: content, origin: "manual" }
     };
   }
   if (dialect === "common") return value;
+  const current = value[dialect];
   return {
     ...value,
     [dialect]: {
       state: "ready",
-      variant: { value: content, origin: "manual" }
+      variant: {
+        id: current.state === "ready" ? current.variant.id : newWordNodeId(),
+        value: content,
+        origin: "manual"
+      }
     }
   };
 }
@@ -840,9 +853,7 @@ function DefinitionEditor({
             const base = {
               id: value.id,
               level: value.level,
-              grammar_structure_id: value.grammar_structure_id,
-              audio_url: value.audio_url,
-              audio_source: value.audio_source
+              grammar_structure_id: value.grammar_structure_id
             };
             onChange(
               nextEnglish
@@ -858,6 +869,10 @@ function DefinitionEditor({
                     ...base,
                     definition_mode: definition_mode as
                       "zh_definition" | "zh_sentence",
+                    content_id:
+                      "content_id" in value
+                        ? value.content_id
+                        : newWordNodeId(),
                     content: english
                       ? toWordRichText("")
                       : (value.content as RichText)
@@ -895,6 +910,8 @@ function DefinitionEditor({
                 ...value,
                 definition_mode: value.definition_mode as
                   "zh_definition" | "zh_sentence",
+                content_id:
+                  "content_id" in value ? value.content_id : newWordNodeId(),
                 content: toWordRichText(
                   event.target.value,
                   value.content as RichText
@@ -963,8 +980,22 @@ function ContextLinksEditor({
   readOnly?: boolean;
   onChange: (next: WordSentenceV2) => void;
 }) {
+  const [query, setQuery] = useState("");
   const focus = sentence.links.find((link) => link.role === "focus");
   const contexts = sentence.links.filter((link) => link.role === "context");
+  const relatedSearch = useRelatedSearch(
+    query,
+    !readOnly && query.trim() !== ""
+  );
+  const targets = (relatedSearch.data?.results ?? []).flatMap((word) =>
+    word.senses.map((sense) => ({
+      key: `${word.word_id}:${sense.sense_id}`,
+      word_id: word.word_id,
+      sense_id: sense.sense_id,
+      headword: word.headword,
+      gloss: sense.gloss
+    }))
+  );
   return (
     <Space orientation="vertical" size={8} style={{ width: "100%" }}>
       <Input
@@ -980,38 +1011,14 @@ function ContextLinksEditor({
           <Input
             aria-label="上下文词条 ID"
             value={link.word_id}
-            readOnly={readOnly}
+            readOnly
             placeholder="上下文词条 ID"
-            onChange={(event) => {
-              const next = cloneWordValue(sentence);
-              const nextContexts = next.links.filter(
-                (item) => item.role === "context"
-              );
-              nextContexts[index]!.word_id = event.target.value;
-              next.links = [
-                ...next.links.filter((item) => item.role === "focus"),
-                ...nextContexts
-              ];
-              onChange(next);
-            }}
           />
           <Input
             aria-label="上下文词义 ID"
             value={link.sense_id}
-            readOnly={readOnly}
+            readOnly
             placeholder="上下文词义 ID"
-            onChange={(event) => {
-              const next = cloneWordValue(sentence);
-              const nextContexts = next.links.filter(
-                (item) => item.role === "context"
-              );
-              nextContexts[index]!.sense_id = event.target.value;
-              next.links = [
-                ...next.links.filter((item) => item.role === "focus"),
-                ...nextContexts
-              ];
-              onChange(next);
-            }}
           />
           {!readOnly && (
             <Button
@@ -1031,22 +1038,44 @@ function ContextLinksEditor({
         </Space.Compact>
       ))}
       {!readOnly && (
-        <Button
-          type="dashed"
-          block
-          icon={<PlusOutlined />}
-          onClick={() =>
-            onChange({
-              ...sentence,
-              links: [
-                ...sentence.links,
-                { word_id: "", sense_id: "", role: "context" }
-              ]
-            })
-          }
+        <AutoComplete
+          value={query}
+          options={targets.map((target) => ({
+            value: target.key,
+            label: `${target.headword} · ${target.gloss || "（无释义）"}`
+          }))}
+          filterOption={false}
+          onSearch={setQuery}
+          onSelect={(key) => {
+            const target = targets.find((item) => item.key === key);
+            if (!target) return;
+            const exists = contexts.some(
+              (link) =>
+                link.word_id === target.word_id &&
+                link.sense_id === target.sense_id
+            );
+            if (!exists) {
+              onChange({
+                ...sentence,
+                links: [
+                  ...sentence.links,
+                  {
+                    word_id: target.word_id,
+                    sense_id: target.sense_id,
+                    role: "context"
+                  }
+                ]
+              });
+            }
+            setQuery("");
+          }}
         >
-          添加上下文关联
-        </Button>
+          <Input
+            prefix={<PlusOutlined />}
+            aria-label="搜索并添加上下文关联"
+            placeholder="搜索已发布词条并选择具体词义"
+          />
+        </AutoComplete>
       )}
     </Space>
   );
@@ -1965,6 +1994,7 @@ function removeSenseAndReferences(
 export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  const editQuery = word.status === "published" ? "?mode=edit" : "";
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const partOfSpeechLookup = useMemo(
     () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
@@ -1987,7 +2017,6 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   const issueTarget = useWordValidationIssue();
-  const operationId = useRef(newWordNodeId());
   const saveMeanings = useSaveMeaningsStep(word.id);
   const suggestVariants = useSuggestDialectVariants();
   const allowSavedNavigation = useUnsavedWordChanges(dirty);
@@ -2014,7 +2043,6 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   }, [dirty, word, word.revision]);
 
   const updateContent = (next: DraftMeaningsStepContent) => {
-    operationId.current = newWordNodeId();
     contentRef.current = next;
     setContent(next);
     setDirty(true);
@@ -2074,31 +2102,43 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
     if (request.items.length === 0) return;
     setFillingDialect(target);
     setAttemptedDialects((current) => new Set(current).add(target));
+    let appliedCount = 0;
     try {
-      const response = await suggestVariants.mutateAsync(request);
-      const result = applyMeaningDialectSuggestions(
-        contentRef.current,
-        target,
-        response.suggestions
+      await meaningDialectSuggestionBatchRunner.run(
+        request,
+        (batch) => suggestVariants.mutateAsync(batch),
+        (suggestions) => {
+          const result = applyMeaningDialectSuggestions(
+            contentRef.current,
+            target,
+            suggestions
+          );
+          appliedCount += result.applied_count;
+          if (result.applied_count > 0) updateContent(result.content);
+        }
       );
-      if (result.applied_count > 0) updateContent(result.content);
       const remaining = collectMissingMeaningDialectItems(
-        result.content,
+        contentRef.current,
         target
       ).items.length;
       if (remaining === 0) {
         message.success(
-          `已补全 ${result.applied_count} 项${target === "uk" ? "英式" : "美式"}内容`
+          `已补全 ${appliedCount} 项${target === "uk" ? "英式" : "美式"}内容`
         );
-      } else if (result.applied_count > 0) {
+      } else if (appliedCount > 0) {
         message.warning(
-          `已补全 ${result.applied_count} 项，仍有 ${remaining} 项可重试`
+          `已补全 ${appliedCount} 项，仍有 ${remaining} 项可重试`
         );
       } else {
         message.warning(`未获得可写入的内容，仍有 ${remaining} 项可重试`);
       }
     } catch (error) {
-      message.error(error instanceof Error ? error.message : "自动补全失败");
+      const detail = error instanceof Error ? error.message : "自动补全失败";
+      message.error(
+        appliedCount > 0
+          ? `已补全 ${appliedCount} 项，后续批次失败：${detail}`
+          : detail
+      );
     } finally {
       setFillingDialect(undefined);
     }
@@ -2115,7 +2155,7 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   };
 
   const save = async (intent: StepSaveIntent) => {
-    if (saving) return;
+    if (saving || fillingDialect !== undefined) return;
     if (intent === "complete") {
       const validationMessage = validateMeanings(content);
       if (validationMessage) {
@@ -2127,11 +2167,9 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
     try {
       const { word: savedWord } = await saveMeanings.mutateAsync({
         base_revision: word.revision,
-        operation_id: operationId.current,
         intent,
-        content
+        content: toMeaningsWireContent(content)
       });
-      operationId.current = newWordNodeId();
       setDirty(false);
       onSaved(savedWord);
       message.success(
@@ -2139,7 +2177,7 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
       );
       if (intent === "complete") {
         allowSavedNavigation();
-        navigate(`/words/${word.id}/wizard/preview`);
+        navigate(`/words/${word.id}/wizard/preview${editQuery}`);
       }
     } catch (error) {
       if (error instanceof HttpError) {
@@ -2148,7 +2186,7 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
         );
         if (issue) {
           message.warning(issue.message);
-          navigate(`/words/${word.id}/wizard/meanings`, {
+          navigate(`/words/${word.id}/wizard/meanings${editQuery}`, {
             replace: true,
             state: { nodeId: issue.node_id, field: issue.field }
           });
@@ -2388,7 +2426,11 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
         <Alert
           type="info"
           showIcon
-          title="已发布词条当前为只读"
+          title={
+            word.status === "archived"
+              ? "已归档词条当前为只读"
+              : "已发布词条当前为只读"
+          }
           style={{ marginBottom: 16 }}
         />
       )}
@@ -2557,15 +2599,24 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
 
         {!readOnly && (
           <div className="word-step-actions">
-            <Button onClick={() => navigate(`/words/${word.id}/wizard/forms`)}>
+            <Button
+              onClick={() =>
+                navigate(`/words/${word.id}/wizard/forms${editQuery}`)
+              }
+            >
               上一步
             </Button>
-            <Button loading={saving} onClick={() => void save("save")}>
+            <Button
+              loading={saving}
+              disabled={fillingDialect !== undefined}
+              onClick={() => void save("save")}
+            >
               保存草稿
             </Button>
             <Button
               type="primary"
               loading={saving}
+              disabled={fillingDialect !== undefined}
               onClick={() => void save("complete")}
             >
               完成并进入预览

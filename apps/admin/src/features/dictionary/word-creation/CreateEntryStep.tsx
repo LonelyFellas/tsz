@@ -2,6 +2,7 @@ import {
   CheckCircleFilled,
   CloseCircleFilled,
   InfoCircleOutlined,
+  LeftOutlined,
   SafetyCertificateOutlined,
   SearchOutlined
 } from "@ant-design/icons";
@@ -12,7 +13,6 @@ import {
   Card,
   Col,
   Descriptions,
-  Divider,
   Form,
   Input,
   Row,
@@ -29,7 +29,7 @@ import type {
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client/http";
 import { useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   createPartOfSpeechLookup,
   partOfSpeechLabel,
@@ -83,13 +83,13 @@ function DetectionStatus({
           (item) => !lookup.byCode.has(item.pos)
         )
       : [];
-  const canContinue =
-    result.entry_kind === "word" &&
-    builtin.status === "matched" &&
-    smart.status === "clear" &&
-    catalogLoaded &&
-    unknownPos.length === 0 &&
-    !catalogUnavailable;
+  const dictionaryReady =
+    (builtin.status === "matched" &&
+      catalogLoaded &&
+      unknownPos.length === 0 &&
+      !catalogUnavailable) ||
+    (result.entry_kind === "phrase" && builtin.status === "not_found");
+  const canContinue = dictionaryReady && smart.status === "clear";
   return (
     <Card
       className="word-detection-result-card"
@@ -97,7 +97,11 @@ function DetectionStatus({
       title="词典检测结果"
       extra={
         <Tag color={canContinue ? "success" : "error"}>
-          {canContinue ? "已匹配" : "不可继续"}
+          {canContinue
+            ? builtin.status === "matched"
+              ? "已匹配"
+              : "可创建"
+            : "不可继续"}
         </Tag>
       }
     >
@@ -106,8 +110,8 @@ function DetectionStatus({
           type={canContinue ? "success" : "warning"}
           showIcon
           title={
-            result.entry_kind === "phrase"
-              ? "检测结果为短语，请使用创建短语流程"
+            result.entry_kind === "phrase" && builtin.status === "not_found"
+              ? "内置词典没有匹配项，将创建空白短语草稿"
               : builtin.status === "matched"
                 ? "内置词典已找到规范词条"
                 : builtin.status === "not_found"
@@ -132,9 +136,12 @@ function DetectionStatus({
                   已存在重复词条
                 </Space>
                 {smart.duplicates.map((item) => (
-                  <a key={item.word_id} href={`/words/${item.word_id}/edit`}>
+                  <Link
+                    key={item.word_id}
+                    to={`/words/${item.word_id}/wizard/basics`}
+                  >
                     {item.headword} ({item.dialect})
-                  </a>
+                  </Link>
                 ))}
               </Space>
             ) : (
@@ -153,7 +160,7 @@ function DetectionStatus({
             </Descriptions.Item>
           )}
         </Descriptions>
-        {catalogUnavailable && (
+        {catalogUnavailable && builtin.status === "matched" && (
           <Alert
             type="warning"
             showIcon
@@ -193,6 +200,21 @@ function HeadwordConfirmation({
       size="small"
       title="确认英美主词"
     >
+      <div className="word-dialect-detection-row">
+        <div>
+          <Typography.Text strong>区分英美词形</Typography.Text>
+          <Typography.Text type="secondary">
+            由内置词典结果自动判断
+          </Typography.Text>
+        </div>
+        <Switch
+          aria-label="区分英美词形"
+          checked={value.mode === "distinguish"}
+          disabled
+          style={value.mode === "distinguish" ? { opacity: 1 } : undefined}
+          title="由内置词典检测结果自动决定"
+        />
+      </div>
       {source && (
         <Alert
           type="info"
@@ -293,8 +315,7 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
       if (
         version !== requestVersion.current ||
         currentHeadword !== headword ||
-        next.request.language !== values.language ||
-        next.request.headword !== headword
+        next.request.language !== values.language
       ) {
         return;
       }
@@ -306,7 +327,11 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
       setResult(next);
       const matched = next.builtin_dictionary;
       const nextHeadwords =
-        matched.status === "matched" ? matched.headwords : undefined;
+        matched.status === "matched"
+          ? matched.headwords
+          : next.entry_kind === "phrase" && matched.status === "not_found"
+            ? ({ mode: "unified", common: next.request.headword } as const)
+            : undefined;
       setHeadwords(nextHeadwords);
       onHeadwordsChange(nextHeadwords);
     } catch (error) {
@@ -316,24 +341,22 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
     }
   };
 
-  const canCreate =
+  const matchedDictionaryReady =
+    result?.builtin_dictionary.status === "matched" &&
     partOfSpeechCatalog.data !== undefined &&
-    result?.entry_kind === "word" &&
-    result.builtin_dictionary.status === "matched" &&
     result.builtin_dictionary.suggested_forms.pos.every((item) =>
       partOfSpeechLookup.byCode.has(item.pos)
-    ) &&
+    );
+  const unmatchedPhraseReady =
+    result?.entry_kind === "phrase" &&
+    result.builtin_dictionary.status === "not_found";
+  const canCreate =
+    (matchedDictionaryReady || unmatchedPhraseReady) &&
     result.smart_dictionary.status === "clear" &&
     headwords !== undefined &&
     (headwords.mode === "unified"
       ? headwords.common.trim() !== ""
       : headwords.uk.trim() !== "" && headwords.us.trim() !== "");
-
-  const detectedHeadwords =
-    result?.builtin_dictionary.status === "matched"
-      ? result.builtin_dictionary.headwords
-      : undefined;
-  const canDistinguish = detectedHeadwords?.mode === "distinguish";
 
   const updateHeadwords = (next: WordHeadwordsV2) => {
     createKey.current = newWordNodeId();
@@ -371,84 +394,78 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
   };
 
   return (
-    <>
+    <div className={`word-basics-workflow${result ? " is-detected" : ""}`}>
+      <Button
+        type="text"
+        icon={<LeftOutlined />}
+        onClick={() => navigate("/words")}
+        className="word-entry-back"
+      >
+        返回智能词库
+      </Button>
       <StepHeading />
       <fieldset
         className="word-request-lock"
         disabled={creating}
         aria-busy={creating}
       >
-        <Row className="word-basics-grid" gutter={[18, 18]} align="top">
-          <Col xs={24} xl={12}>
-            <Card
-              className="word-basics-input-card"
-              size="small"
-              title="录入与检测"
-              extra={<Tag color="blue">仅支持英文词条</Tag>}
+        <Card
+          className="word-basics-input-card"
+          size="small"
+          title="录入与检测"
+          extra={<Tag color="blue">仅支持英文词条</Tag>}
+        >
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={{ language: "en" }}
+            onValuesChange={() => {
+              setDirty(true);
+              resetDetection();
+            }}
+          >
+            <Form.Item label="所属语言" name="language">
+              <Select
+                options={[{ value: "en", label: "English  英语" }]}
+                disabled
+              />
+            </Form.Item>
+            <Form.Item
+              label="录入词条"
+              name="headword"
+              rules={[
+                { required: true, whitespace: true, message: "请输入词条" },
+                { max: 200, message: "词条不能超过 200 个字符" }
+              ]}
             >
-              <Form
-                form={form}
-                layout="vertical"
-                initialValues={{ language: "en" }}
-                onValuesChange={() => {
-                  setDirty(true);
-                  resetDetection();
-                }}
-              >
-                <Form.Item label="所属语言" name="language">
-                  <Select
-                    options={[{ value: "en", label: "English  英语" }]}
-                    disabled
-                  />
-                </Form.Item>
-                <Form.Item
-                  label="录入词条"
-                  name="headword"
-                  rules={[
-                    { required: true, whitespace: true, message: "请输入词条" },
-                    { max: 200, message: "词条不能超过 200 个字符" }
-                  ]}
-                >
-                  <Input.Search
-                    size="large"
-                    placeholder="例如 center"
-                    autoComplete="off"
-                    enterButton={
-                      <Space size={6}>
-                        <SearchOutlined />
-                        词典检测
-                      </Space>
-                    }
-                    loading={detectWord.isPending}
-                    onSearch={() => void runDetection()}
-                  />
-                </Form.Item>
-                <Typography.Text type="secondary" className="word-field-help">
-                  按 Enter 或点击检测，系统只查询词典，不会立即创建草稿。
-                </Typography.Text>
-              </Form>
-              {headwords && (
-                <>
-                  <Divider />
-                  <div className="word-dialect-detection-row">
-                    <div>
-                      <Typography.Text strong>区分英美词形</Typography.Text>
-                      <Typography.Text type="secondary">
-                        由内置词典结果自动判断
-                      </Typography.Text>
-                    </div>
-                    <Switch
-                      aria-label="区分英美词形"
-                      checked={canDistinguish}
-                      disabled
-                      style={canDistinguish ? { opacity: 1 } : undefined}
-                      title="由内置词典检测结果自动决定"
-                    />
-                  </div>
-                </>
-              )}
-            </Card>
+              <Input.Search
+                size="large"
+                placeholder="例如 center"
+                autoComplete="off"
+                enterButton={
+                  <Space size={6}>
+                    <SearchOutlined />
+                    词典检测
+                  </Space>
+                }
+                loading={detectWord.isPending}
+                onSearch={() => void runDetection()}
+              />
+            </Form.Item>
+            <Typography.Text type="secondary" className="word-field-help">
+              按 Enter 或点击检测，系统只查询词典，不会立即创建草稿。
+            </Typography.Text>
+          </Form>
+        </Card>
 
+        {result ? (
+          <div className="word-basics-result-grid">
+            <DetectionStatus
+              result={result}
+              lookup={partOfSpeechLookup}
+              catalogLoaded={partOfSpeechCatalog.data !== undefined}
+              catalogUnavailable={partOfSpeechCatalog.isError}
+            />
             {headwords && (
               <div className="word-headword-confirmation-wrap">
                 <HeadwordConfirmation
@@ -457,41 +474,33 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
                 />
               </div>
             )}
-          </Col>
-          <Col xs={24} xl={12}>
-            {result ? (
-              <DetectionStatus
-                result={result}
-                lookup={partOfSpeechLookup}
-                catalogLoaded={partOfSpeechCatalog.data !== undefined}
-                catalogUnavailable={partOfSpeechCatalog.isError}
-              />
-            ) : (
-              <Card className="word-detection-empty-card" size="small">
-                <Alert
-                  type="info"
-                  showIcon
-                  icon={<InfoCircleOutlined />}
-                  title="等待检测"
-                  description="检测不会创建草稿。确认检测结果并进入下一步时，系统才会生成可恢复的 V2 草稿。"
-                />
-              </Card>
-            )}
-          </Col>
-        </Row>
+          </div>
+        ) : (
+          <div className="word-detection-empty-state">
+            <InfoCircleOutlined />
+            <div>
+              <Typography.Text strong>等待检测</Typography.Text>
+              <Typography.Text type="secondary">
+                输入词条后开始检测，检测不会立即创建草稿。
+              </Typography.Text>
+            </div>
+          </div>
+        )}
 
-        <div className="word-step-actions">
-          <Button onClick={() => navigate("/words")}>取消</Button>
-          <Button
-            type="primary"
-            disabled={!canCreate}
-            loading={creating}
-            onClick={() => void createDraft()}
-          >
-            确认并进入词形与发音
-          </Button>
-        </div>
+        {result?.smart_dictionary.status === "clear" && (
+          <div className="word-entry-actions">
+            <Button onClick={resetDetection}>重新检测</Button>
+            <Button
+              type="primary"
+              disabled={!canCreate}
+              loading={creating}
+              onClick={() => void createDraft()}
+            >
+              确认并进入词形与发音
+            </Button>
+          </div>
+        )}
       </fieldset>
-    </>
+    </div>
   );
 }

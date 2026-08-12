@@ -38,6 +38,10 @@ function problem(overrides: Partial<ProblemDetails> = {}): ProblemDetails {
   };
 }
 
+function requestHeaders(index = 0): Headers {
+  return new Headers(fetchMock.mock.calls[index]![1].headers);
+}
+
 beforeEach(() => {
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockReset();
@@ -78,7 +82,7 @@ describe("createHttpClient", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("https://api.test/users/1");
-    expect((init.headers as Record<string, string>)["Content-Type"]).toBe(
+    expect(new Headers(init.headers).get("Content-Type")).toBe(
       "application/json"
     );
   });
@@ -101,22 +105,14 @@ describe("createHttpClient", () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "", getToken: () => "abc" });
     await http.get("/me");
-    const headers = fetchMock.mock.calls[0]![1].headers as Record<
-      string,
-      string
-    >;
-    expect(headers.Authorization).toBe("Bearer abc");
+    expect(requestHeaders().get("Authorization")).toBe("Bearer abc");
   });
 
   it("无 token 时不带 Authorization", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });
     await http.get("/me");
-    const headers = fetchMock.mock.calls[0]![1].headers as Record<
-      string,
-      string
-    >;
-    expect(headers.Authorization).toBeUndefined();
+    expect(requestHeaders().has("Authorization")).toBe(false);
   });
 
   it("getToken 返回 Promise 会被 await", async () => {
@@ -126,11 +122,7 @@ describe("createHttpClient", () => {
       getToken: async () => "async-token"
     });
     await http.get("/me");
-    const headers = fetchMock.mock.calls[0]![1].headers as Record<
-      string,
-      string
-    >;
-    expect(headers.Authorization).toBe("Bearer async-token");
+    expect(requestHeaders().get("Authorization")).toBe("Bearer async-token");
   });
 
   it("post:method=POST 且 body 为 JSON 字符串", async () => {
@@ -478,7 +470,13 @@ describe("createHttpClient", () => {
       node_id: "sense-1",
       field: "definitions",
       code: "native_definition_required",
-      message: "至少填写一条本语言释义"
+      message: "至少填写一条本语言释义",
+      reference_location: {
+        source_entry_id: "source-entry-1",
+        source_publication_id: "source-publication-1",
+        source_node_id: "source-node-1",
+        reference_kind: "definition"
+      }
     };
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
@@ -488,12 +486,22 @@ describe("createHttpClient", () => {
           field_issues: [fieldIssue],
           meta: {
             current_revision: 6,
+            current_lifecycle_revision: 2,
             word_id: "w-2",
             max_reachable_step: "meanings",
             affected_node_ids: ["sense-1"],
             usage_count: 3,
             part_of_speech_id: "pos-noun",
-            code: "noun"
+            code: "noun",
+            reference_locations: [
+              {
+                target_sense_id: "target-sense-1",
+                source_entry_id: "source-entry-1",
+                source_publication_id: "source-publication-1",
+                source_node_id: "source-node-1",
+                reference_kind: "definition"
+              }
+            ]
           }
         },
         { ok: false, status: 422 }
@@ -511,12 +519,22 @@ describe("createHttpClient", () => {
       field_issues: [fieldIssue],
       meta: {
         current_revision: 6,
+        current_lifecycle_revision: 2,
         word_id: "w-2",
         max_reachable_step: "meanings",
         affected_node_ids: ["sense-1"],
         usage_count: 3,
         part_of_speech_id: "pos-noun",
-        code: "noun"
+        code: "noun",
+        reference_locations: [
+          {
+            target_sense_id: "target-sense-1",
+            source_entry_id: "source-entry-1",
+            source_publication_id: "source-publication-1",
+            source_node_id: "source-node-1",
+            reference_kind: "definition"
+          }
+        ]
       }
     });
   });
@@ -589,11 +607,13 @@ describe("createHttpClient", () => {
 
   it.each([
     { usage_count: -1 },
+    { current_lifecycle_revision: -1 },
     { part_of_speech_id: " " },
     { code: "" },
     { word_id: "" },
     { max_reachable_step: "done" },
-    { affected_node_ids: [""] }
+    { affected_node_ids: [""] },
+    { reference_locations: [{ source_entry_id: "source-entry-1" }] }
   ])("词性配置错误的畸形 meta 安全降级: %o", async (meta) => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
@@ -636,26 +656,75 @@ describe("createHttpClient", () => {
     });
   });
 
-  it("init.headers 可覆盖/追加请求头", async () => {
-    fetchMock.mockResolvedValueOnce(jsonResponse(null));
+  it("畸形 reference_location 会丢弃整组 field_issues", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          error: "word reference is invalid",
+          code: "validation_failed",
+          field_issues: [
+            {
+              step: "meanings",
+              node_id: "sense-1",
+              field: "definitions",
+              code: "reference_unavailable",
+              message: "引用目标不可用",
+              reference_location: { source_entry_id: "source-entry-1" }
+            }
+          ]
+        },
+        { ok: false, status: 422 }
+      )
+    );
     const http = createHttpClient({ baseUrl: "" });
-    await http.post("/x", { a: 1 });
-    const headers = fetchMock.mock.calls[0]![1].headers as Record<
-      string,
-      string
-    >;
-    expect(headers["Content-Type"]).toBe("application/json");
+
+    await expect(http.get("/words/w-2")).rejects.toMatchObject({
+      status: 422,
+      field_issues: []
+    });
   });
+
+  it.each([
+    [
+      "record",
+      {
+        "Content-Type": "application/problem+json",
+        "Idempotency-Key": "command-1"
+      }
+    ],
+    [
+      "Headers",
+      new Headers({
+        "Content-Type": "application/problem+json",
+        "Idempotency-Key": "command-1"
+      })
+    ],
+    [
+      "tuple array",
+      [
+        ["Content-Type", "application/problem+json"],
+        ["Idempotency-Key", "command-1"]
+      ] as [string, string][]
+    ]
+  ] satisfies [string, HeadersInit][])(
+    "init.headers 支持 %s 并可覆盖/追加请求头",
+    async (_label, headers) => {
+      fetchMock.mockResolvedValueOnce(jsonResponse(null));
+      const http = createHttpClient({ baseUrl: "" });
+      await http.post("/x", { a: 1 }, { headers });
+
+      expect(requestHeaders().get("Content-Type")).toBe(
+        "application/problem+json"
+      );
+      expect(requestHeaders().get("Idempotency-Key")).toBe("command-1");
+    }
+  );
 
   it("skipAuth 时不附加 Authorization（即使有 token）", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "", getToken: () => "stale" });
     await http.post("/auth/login", {}, { skipAuth: true });
-    const headers = fetchMock.mock.calls[0]![1].headers as Record<
-      string,
-      string
-    >;
-    expect(headers.Authorization).toBeUndefined();
+    expect(requestHeaders().has("Authorization")).toBe(false);
   });
 
   it("401 无 token 时直接抛 HttpError，不触发 onRefresh", async () => {
@@ -681,7 +750,7 @@ describe("createHttpClient", () => {
     expect(onRefresh).not.toHaveBeenCalled();
   });
 
-  it("401 有 token 时触发 onRefresh 并重试", async () => {
+  it("401 有 token 时触发 onRefresh，并在重试中保留幂等头", async () => {
     fetchMock
       .mockResolvedValueOnce(
         jsonResponse(
@@ -697,16 +766,31 @@ describe("createHttpClient", () => {
       )
       .mockResolvedValueOnce(jsonResponse({ id: "1" }));
 
-    const onRefresh = vi.fn().mockResolvedValue("new-token");
+    let token = "old-token";
+    const onRefresh = vi.fn().mockImplementation(async () => {
+      token = "new-token";
+      return token;
+    });
     const http = createHttpClient({
       baseUrl: "",
-      getToken: () => "old-token",
+      getToken: () => token,
       onRefresh
     });
 
-    const data = await http.get("/me");
+    const data = await http.post(
+      "/lexicon/entries",
+      { schema_version: 2 },
+      { headers: { "Idempotency-Key": "command-2" } }
+    );
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(data).toEqual({ id: "1" });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(new Headers(init.headers).get("Idempotency-Key")).toBe(
+        "command-2"
+      );
+    }
+    expect(requestHeaders(1).get("Authorization")).toBe("Bearer new-token");
   });
 
   it("RFC 9457 的 403 触发 onForbidden(code) 且仍抛 HttpError", async () => {

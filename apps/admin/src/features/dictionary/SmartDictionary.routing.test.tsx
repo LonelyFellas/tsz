@@ -58,4 +58,18 @@ describe("智能词库行入口", () => {
     expect(getWordRowActionLabel(record)).toBe("查看");
     expect(getWordRowRoute(record)).toBe("/words/w-1/wizard/preview");
   });
+
+  it("V2 已发布但有未发布修改时恢复到可达步骤继续编辑", () => {
+    const record = row({
+      schema_version: 2,
+      status: "published",
+      max_reachable_step: "meanings",
+      published_revision: 4,
+      has_unpublished_changes: true
+    });
+    expect(getWordRowActionLabel(record)).toBe("继续编辑");
+    expect(getWordRowRoute(record)).toBe(
+      "/words/w-1/wizard/meanings?mode=edit"
+    );
+  });
 });

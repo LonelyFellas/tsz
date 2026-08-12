@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  ADMIN_E2E_DETECTIONS_PATH,
+  ADMIN_E2E_ENTRIES_PATH,
   ADMIN_E2E_WORD_ID,
   mockAdminApi,
   type MockAdminApiController,
@@ -46,6 +48,7 @@ test.describe("admin 新建单词 V2", () => {
       new RegExp(`/words/${ADMIN_E2E_WORD_ID}/wizard/preview$`)
     );
     await expect(page.getByText("完整性检查通过，可以提交生效")).toBeVisible();
+    const revisionBeforePublish = api.getWord()?.revision;
 
     await page
       .locator(".word-step-actions")
@@ -71,9 +74,16 @@ test.describe("admin 新建单词 V2", () => {
     await expect(page.getByText("词条已发布", { exact: true })).toBeVisible();
 
     expect(api.getWord()?.status).toBe("published");
-    expect(api.count("POST", "/words/detect")).toBe(1);
-    expect(api.count("POST", "/words")).toBe(1);
-    expect(api.count("POST", `/words/${ADMIN_E2E_WORD_ID}/publish`)).toBe(1);
+    expect(api.getWord()?.revision).toBe(revisionBeforePublish);
+    expect(api.getWord()?.published_revision).toBe(revisionBeforePublish);
+    expect(api.count("POST", ADMIN_E2E_DETECTIONS_PATH)).toBe(1);
+    expect(api.count("POST", ADMIN_E2E_ENTRIES_PATH)).toBe(1);
+    expect(
+      api.count(
+        "POST",
+        `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}/publications`
+      )
+    ).toBe(1);
   });
 
   test("T20 duplicate 检测阻断创建且保留重复项入口", async ({ page }) => {
@@ -88,10 +98,10 @@ test.describe("admin 新建单词 V2", () => {
     await expect(page.getByRole("link", { name: "color (us)" })).toBeVisible();
     await expect(
       page.getByRole("button", { name: "确认并进入词形与发音" })
-    ).toBeDisabled();
+    ).toHaveCount(0);
 
-    expect(api.count("POST", "/words/detect")).toBe(1);
-    expect(api.count("POST", "/words")).toBe(0);
+    expect(api.count("POST", ADMIN_E2E_DETECTIONS_PATH)).toBe(1);
+    expect(api.count("POST", ADMIN_E2E_ENTRIES_PATH)).toBe(0);
     expect(api.getWord()).toBeUndefined();
   });
 
@@ -118,7 +128,7 @@ test.describe("admin 新建单词 V2", () => {
     );
     const detailReadsBeforeReload = api.count(
       "GET",
-      `/words/${ADMIN_E2E_WORD_ID}`
+      `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}`
     );
 
     await page.reload();
@@ -126,9 +136,16 @@ test.describe("admin 新建单词 V2", () => {
       page.getByRole("heading", { name: "词义与例句" })
     ).toBeVisible();
     await expect
-      .poll(() => api.count("GET", `/words/${ADMIN_E2E_WORD_ID}`))
+      .poll(() =>
+        api.count("GET", `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}`)
+      )
       .toBeGreaterThan(detailReadsBeforeReload);
-    expect(api.count("PUT", `/words/${ADMIN_E2E_WORD_ID}/steps/forms`)).toBe(2);
+    expect(
+      api.count(
+        "PUT",
+        `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}/steps/forms`
+      )
+    ).toBe(2);
     expect(api.getWord()?.max_reachable_step).toBe("meanings");
   });
 });

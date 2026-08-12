@@ -22,12 +22,22 @@ export interface Actor {
 /** RFC 9457 领域错误的通用结构化上下文。 */
 export interface ProblemMeta {
   current_revision?: number;
+  current_lifecycle_revision?: number;
   word_id?: string;
   max_reachable_step?: "basics" | "forms" | "meanings" | "preview";
   affected_node_ids?: string[];
   usage_count?: number;
   part_of_speech_id?: string;
   code?: string;
+  reference_locations?: ProblemReferenceLocation[];
+}
+
+export interface ProblemReferenceLocation {
+  target_sense_id: string;
+  source_entry_id: string;
+  source_publication_id: string;
+  source_node_id: string;
+  reference_kind: string;
 }
 
 /** RFC 9457 Problem Details 与 tsz 稳定扩展字段。 */

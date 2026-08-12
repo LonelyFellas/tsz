@@ -4,7 +4,7 @@ import { App as AntApp } from "antd";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PreviewAndPublishStep } from "./PreviewAndPublishStep";
-import { wordFixture } from "./wordCreation.test.helper";
+import { deferred, wordFixture } from "./wordCreation.test.helper";
 
 const mutations = vi.hoisted(() => ({
   validate: vi.fn(),
@@ -40,17 +40,22 @@ function LocationProbe() {
   const location = useLocation();
   return (
     <span data-testid="location">
-      {location.pathname}|{JSON.stringify(location.state)}
+      {location.pathname}
+      {location.search}|{JSON.stringify(location.state)}
     </span>
   );
 }
 
-function renderStep(word = wordFixture({ ready: true })) {
+function renderStep(word = wordFixture({ ready: true }), readOnly?: boolean) {
   const onPublished = vi.fn();
   render(
     <MemoryRouter initialEntries={[`/words/${word.id}/wizard/preview`]}>
       <AntApp>
-        <PreviewAndPublishStep word={word} onPublished={onPublished} />
+        <PreviewAndPublishStep
+          word={word}
+          readOnly={readOnly}
+          onPublished={onPublished}
+        />
         <LocationProbe />
       </AntApp>
     </MemoryRouter>
@@ -125,6 +130,36 @@ describe("PreviewAndPublishStep", () => {
     );
     expect(mutations.validate).toHaveBeenCalledTimes(1);
     expect(onPublished).toHaveBeenCalledWith(published);
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(/^\/words\|/)
+    );
+  });
+
+  it("连续双击提交只发起一次发布请求", async () => {
+    const word = wordFixture({ ready: true, revision: 8 });
+    const published = wordFixture({
+      ready: true,
+      status: "published",
+      revision: 9
+    });
+    const pendingPublish = deferred<{ word: typeof published }>();
+    mutations.validate.mockResolvedValue({
+      validated_revision: 8,
+      valid: true,
+      issues: []
+    });
+    mutations.publish.mockReturnValue(pendingPublish.promise);
+    renderStep(word);
+
+    expect(
+      await screen.findByText("完整性检查通过，可以提交生效")
+    ).toBeVisible();
+    const submit = button("提交生效");
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+
+    expect(mutations.publish).toHaveBeenCalledTimes(1);
+    pendingPublish.resolve({ word: published });
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(/^\/words\|/)
     );
@@ -311,7 +346,65 @@ describe("PreviewAndPublishStep", () => {
     expect(screen.getAllByText("共享原形").length).toBeGreaterThan(0);
     expect(screen.getAllByText("语法结构").length).toBeGreaterThan(0);
 
+    fireEvent.click(button("继续编辑"));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      `/words/${published.id}/wizard/forms?mode=edit`
+    );
+
     fireEvent.click(button("返回智能词库"));
     expect(screen.getByTestId("location")).toHaveTextContent(/^\/words\|/);
+  });
+
+  it("archived 预览明确显示归档只读态，且不提供继续编辑或发布", () => {
+    const archived = wordFixture({
+      status: "archived",
+      ready: true,
+      max_reachable_step: "preview"
+    });
+    renderStep(archived, true);
+
+    expect(screen.getByText("归档词条详情")).toBeVisible();
+    expect(screen.getByText("词条已归档")).toBeVisible();
+    expect(screen.getByText("已归档", { exact: true })).toBeVisible();
+    expect(screen.queryByText("继续编辑")).toBeNull();
+    expect(screen.queryByText("提交生效")).toBeNull();
+    expect(mutations.validate).not.toHaveBeenCalled();
+  });
+
+  it("published 的未发布修改在 edit 模式可重新校验并再次发布", async () => {
+    const edited = wordFixture({
+      status: "published",
+      ready: true,
+      revision: 4,
+      published_revision: 3,
+      has_unpublished_changes: true
+    });
+    const republished = wordFixture({
+      status: "published",
+      ready: true,
+      revision: 4,
+      published_revision: 4,
+      has_unpublished_changes: false
+    });
+    mutations.validate.mockResolvedValue({
+      validated_revision: 4,
+      valid: true,
+      issues: []
+    });
+    mutations.publish.mockResolvedValue({ word: republished });
+    const { onPublished } = renderStep(edited, false);
+
+    expect(
+      await screen.findByText("完整性检查通过，可以提交生效")
+    ).toBeVisible();
+    fireEvent.click(button("提交生效"));
+
+    await waitFor(() =>
+      expect(mutations.publish).toHaveBeenCalledWith({
+        base_revision: 4,
+        idempotency_key: expect.any(String)
+      })
+    );
+    expect(onPublished).toHaveBeenCalledWith(republished);
   });
 });
