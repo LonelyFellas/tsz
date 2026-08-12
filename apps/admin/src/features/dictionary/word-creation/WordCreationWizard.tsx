@@ -33,6 +33,7 @@ import {
 import { useArchiveWord, useRestoreWord, useWordDetail } from "../api";
 import { adminWordsDataSourceCapabilities } from "../dataSource";
 import { runLifecycleCommandOnce } from "../lifecycleCommand";
+import { newWordNodeId } from "../word-model/primitives";
 import {
   createPartOfSpeechLookup,
   partOfSpeechLabel
@@ -78,7 +79,7 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
           try {
             await archiveWord.mutateAsync({
               wordId: word.id,
-              idempotencyKey: crypto.randomUUID(),
+              idempotencyKey: newWordNodeId(),
               input: {
                 base_revision: word.revision,
                 base_lifecycle_revision: word.lifecycle_revision
@@ -341,7 +342,7 @@ export function WordCreationWizard({ mode }: Props) {
                     try {
                       const restored = await restoreWord.mutateAsync({
                         wordId: word.id,
-                        idempotencyKey: crypto.randomUUID(),
+                        idempotencyKey: newWordNodeId(),
                         input: {
                           base_revision: word.revision,
                           base_lifecycle_revision: word.lifecycle_revision

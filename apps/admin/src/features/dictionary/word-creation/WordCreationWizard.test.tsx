@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import type { AdminWord, AdminWordV2 } from "@tsz/types";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WordCreationWizard } from "./WordCreationWizard";
 import { wordFixture } from "./wordCreation.test.helper";
 
@@ -13,6 +13,10 @@ const state = vi.hoisted(() => ({
   refetch: vi.fn(),
   createdWord: undefined as AdminWordV2 | undefined
 }));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 vi.mock("../api", () => ({
   useWordDetail: vi.fn((wordId: string, enabled: boolean) => ({
@@ -428,6 +432,13 @@ describe("WordCreationWizard", () => {
   });
 
   it("只读 basics 可进入 forms；归档确认后重新创建", async () => {
+    vi.stubGlobal("crypto", {
+      randomUUID: undefined,
+      getRandomValues: vi.fn((bytes: Uint8Array) => {
+        bytes.fill(0xaa);
+        return bytes;
+      })
+    });
     const word = wordFixture({ max_reachable_step: "forms" });
     loaded(word);
     state.archive.mockResolvedValue({ word });
