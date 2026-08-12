@@ -105,7 +105,7 @@ async function resolveAdminWordsMockRuntime(): Promise<ClearableAdminWordsDataSo
 
 async function resolveAdminWordsDataSource(): Promise<AdminWordsDataSource> {
   // production mode 下开关可被 Rollup 静态折叠，mock chunk 不进入正式产物；
-  // tshb-test 使用显式 test mode，仅保留尚未真实对接的 words mock。
+  // test mode 允许独立 mock 能力入包，words 仍严格按自己的开关选择数据源。
   return adminWordsMockEnabled
     ? resolveAdminWordsMockRuntime()
     : realAdminWordsDataSource;
@@ -185,7 +185,7 @@ export const adminWordsDataSource: AdminWordsDataSource = {
 
 /**
  * 词性配置独立选择真实或 mock。两者都启用 mock 时仍共用同一 runtime；
- * tshb-test 则保持 words mock、词性真实，真实 usage_count 不包含浏览器 mock 草稿。
+ * tshb-test 已将 words 和词性都切到真实数据源。
  */
 export const partOfSpeechDataSource: AdminPartOfSpeechDataSource = {
   catalog: async () => (await resolveAdminPartOfSpeechDataSource()).catalog(),
