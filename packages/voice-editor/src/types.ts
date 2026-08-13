@@ -35,6 +35,7 @@ export interface VoicePreviewResult {
 export type VoicePreviewErrorCode =
   | "invalid_content"
   | "voice_not_found"
+  | "preview_in_progress"
   | "option_not_supported"
   | "rate_limited"
   | "quota_exceeded"
@@ -44,7 +45,8 @@ export type VoicePreviewErrorCode =
 export class VoicePreviewError extends Error {
   constructor(
     public readonly code: VoicePreviewErrorCode,
-    message: string
+    message: string,
+    public readonly retryable = false
   ) {
     super(message);
     this.name = "VoicePreviewError";

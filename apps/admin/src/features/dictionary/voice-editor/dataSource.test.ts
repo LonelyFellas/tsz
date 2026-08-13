@@ -75,7 +75,12 @@ describe("admin voice preview data source", () => {
     });
     expect(state.voices).toHaveBeenCalledWith(controller.signal);
     expect(state.preview).toHaveBeenCalledWith(
-      { content: CONTENT, voice_alias: "real-voice" },
+      {
+        content: CONTENT,
+        voice_alias: "real-voice",
+        rate_percent: 0,
+        pitch_semitones: 0
+      },
       controller.signal
     );
   });
