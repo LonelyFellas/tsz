@@ -1499,40 +1499,42 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const allowSavedNavigation = useUnsavedWordChanges(dirty);
   useWordValidationIssueFocus(activePosId);
 
-  useEffect(() => {
-    if (!issueTarget) return;
-    const owner = content.pos.find((pos) => {
-      if (pos.pos_id === issueTarget.nodeId) return true;
-      if (pos.base_form.id === issueTarget.nodeId) return true;
-      if (
-        pos.base_form.variants.some(
-          (variant) =>
-            variant.id === issueTarget.nodeId ||
-            variant.pronunciations.some(
-              (pronunciation) => pronunciation.id === issueTarget.nodeId
-            )
-        )
-      ) {
-        return true;
-      }
-      return pos.form_groups.some(
-        (group) =>
-          group.id === issueTarget.nodeId ||
-          group.slots.some(
-            (slot) =>
-              slot.id === issueTarget.nodeId ||
-              slot.variants.some(
-                (variant) =>
-                  variant.id === issueTarget.nodeId ||
-                  variant.pronunciations.some(
-                    (pronunciation) => pronunciation.id === issueTarget.nodeId
-                  )
+  const issueOwnerPosId = issueTarget
+    ? content.pos.find((pos) => {
+        if (pos.pos_id === issueTarget.nodeId) return true;
+        if (pos.base_form.id === issueTarget.nodeId) return true;
+        if (
+          pos.base_form.variants.some(
+            (variant) =>
+              variant.id === issueTarget.nodeId ||
+              variant.pronunciations.some(
+                (pronunciation) => pronunciation.id === issueTarget.nodeId
               )
           )
-      );
-    });
-    if (owner) setActivePosId(owner.pos_id);
-  }, [content.pos, issueTarget]);
+        ) {
+          return true;
+        }
+        return pos.form_groups.some(
+          (group) =>
+            group.id === issueTarget.nodeId ||
+            group.slots.some(
+              (slot) =>
+                slot.id === issueTarget.nodeId ||
+                slot.variants.some(
+                  (variant) =>
+                    variant.id === issueTarget.nodeId ||
+                    variant.pronunciations.some(
+                      (pronunciation) => pronunciation.id === issueTarget.nodeId
+                    )
+                )
+            )
+        );
+      })?.pos_id
+    : undefined;
+
+  useEffect(() => {
+    if (issueOwnerPosId) setActivePosId(issueOwnerPosId);
+  }, [issueOwnerPosId]);
 
   useEffect(() => {
     const wordChanged = loadedWordIdRef.current !== word.id;

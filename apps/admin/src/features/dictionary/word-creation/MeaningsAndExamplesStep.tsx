@@ -2072,13 +2072,14 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   const allowSavedNavigation = useUnsavedWordChanges(dirty);
   useWordValidationIssueFocus(activePosId);
 
+  const issueOwnerPosId = issueTarget
+    ? content.pos.find((pos) => meaningsPosOwnsNode(pos, issueTarget.nodeId))
+        ?.pos_id
+    : undefined;
+
   useEffect(() => {
-    if (!issueTarget) return;
-    const owner = content.pos.find((pos) =>
-      meaningsPosOwnsNode(pos, issueTarget.nodeId)
-    );
-    if (owner) setActivePosId(owner.pos_id);
-  }, [content.pos, issueTarget]);
+    if (issueOwnerPosId) setActivePosId(issueOwnerPosId);
+  }, [issueOwnerPosId]);
 
   useEffect(() => {
     const wordChanged = loadedWordIdRef.current !== word.id;

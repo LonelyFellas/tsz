@@ -206,7 +206,11 @@ function LocationProbe() {
   );
 }
 
-function renderStep(word = wordFixture({ ready: true }), readOnly = false) {
+function renderStep(
+  word = wordFixture({ ready: true }),
+  readOnly = false,
+  issueTarget?: { nodeId: string; field?: string }
+) {
   const onSaved = vi.fn();
   const router = createMemoryRouter(
     [
@@ -228,7 +232,14 @@ function renderStep(word = wordFixture({ ready: true }), readOnly = false) {
         element: <LocationProbe />
       }
     ],
-    { initialEntries: [`/words/${word.id}/wizard/meanings`] }
+    {
+      initialEntries: [
+        {
+          pathname: `/words/${word.id}/wizard/meanings`,
+          state: issueTarget
+        }
+      ]
+    }
   );
   const view = render(
     <AntApp>
@@ -1422,6 +1433,31 @@ describe("MeaningsAndExamplesStep", () => {
       expect(target).toHaveClass("word-validation-focus");
       expect(target).toContainElement(document.activeElement as HTMLElement);
     });
+  });
+
+  it("校验定位后手动切换词性，输入时不再跳回原词性", async () => {
+    renderStep(wordFixture({ ready: true }), false, {
+      nodeId: "mock-sense-1-1",
+      field: "sub_pos"
+    });
+
+    const nounTab = screen.getByRole("tab", { name: /名词/ });
+    const verbTab = screen.getByRole("tab", { name: /动词/ });
+    await waitFor(() =>
+      expect(nounTab).toHaveAttribute("aria-selected", "true")
+    );
+    fireEvent.click(verbTab);
+    await waitFor(() =>
+      expect(verbTab).toHaveAttribute("aria-selected", "true")
+    );
+
+    const visibleFrequency = screen
+      .getAllByLabelText("词频")
+      .find((input) => input.closest("[aria-hidden='true']") === null);
+    expect(visibleFrequency).toBeDefined();
+    fireEvent.change(visibleFrequency!, { target: { value: "42" } });
+
+    expect(verbTab).toHaveAttribute("aria-selected", "true");
   });
 
   it("可组合编辑语法、释义、例句、上下文关联与语义区间", async () => {
