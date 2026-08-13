@@ -17,6 +17,8 @@ export interface AuthRuntime {
   persistSession: (
     auth: Pick<AuthResponse, "access_token" | "expires_in">
   ) => void;
+  /** 清除 token、刷新排期和全部用户会话状态，不触发网络或导航。 */
+  clearSession: () => void;
 }
 
 export interface AuthRuntimeOptions {
@@ -47,6 +49,15 @@ export function createAuthRuntime({
     persistSession: (auth) => {
       tokens.setAccessToken(auth.access_token);
       tokens.scheduleRefresh(auth.expires_in);
+    },
+    clearSession: () => {
+      tokens.setAccessToken(null);
+      store.setState({
+        user: null,
+        activeRole: null,
+        onboarded: null,
+        hydrated: true
+      });
     }
   };
 }

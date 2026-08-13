@@ -194,7 +194,7 @@ describe("createEndpoints · auth", () => {
 
   it("requestDeletionCode → POST /auth/account/deletion-code 带 channel", () => {
     const api = createEndpoints(http);
-    api.auth.requestDeletionCode("phone");
+    api.auth.requestDeletionCode({ channel: "phone" });
     expect(http.post).toHaveBeenCalledWith("/auth/account/deletion-code", {
       channel: "phone"
     });
@@ -202,11 +202,12 @@ describe("createEndpoints · auth", () => {
 
   it("deleteAccount → DELETE /auth/account 带 channel + code", () => {
     const api = createEndpoints(http);
-    api.auth.deleteAccount("email", "123456");
-    expect(http.del).toHaveBeenCalledWith("/auth/account", {
-      channel: "email",
-      code: "123456"
-    });
+    api.auth.deleteAccount({ channel: "email", code: "123456" });
+    expect(http.del).toHaveBeenCalledWith(
+      "/auth/account",
+      { channel: "email", code: "123456" },
+      { retryOnUnauthorized: false }
+    );
   });
 
   it("applyTeacher → POST /auth/apply-teacher 带 { profile }", () => {

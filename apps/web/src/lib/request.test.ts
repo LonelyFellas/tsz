@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { refreshTokens, scheduleRefresh, setAccessToken } from "./request";
+import {
+  clearSession,
+  refreshTokens,
+  scheduleRefresh,
+  setAccessToken
+} from "./request";
+import { authRuntime } from "./auth";
 
 // ── fetch mock ────────────────────────────────────────────────────────────────
 
@@ -225,5 +231,33 @@ describe("setAccessToken", () => {
     setAccessToken(null);
     await vi.advanceTimersByTimeAsync(870_000);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("clearSession", () => {
+  it("通过共享 runtime 清除 token 和完整用户状态", () => {
+    setAccessToken("token");
+    authRuntime.store.setState({
+      user: {
+        id: "u1",
+        display_name: "用户",
+        avatar_url: "",
+        roles: ["student"],
+        active_role: "student"
+      },
+      activeRole: "student",
+      onboarded: true,
+      hydrated: false
+    });
+
+    clearSession();
+
+    expect(authRuntime.tokens.getToken()).toBeUndefined();
+    expect(authRuntime.store.getState()).toMatchObject({
+      user: null,
+      activeRole: null,
+      onboarded: null,
+      hydrated: true
+    });
   });
 });

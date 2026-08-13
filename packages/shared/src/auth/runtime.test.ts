@@ -20,4 +20,33 @@ describe("createAuthRuntime", () => {
     expect(rt.tokens.getToken()).toBe("at-1");
     rt.tokens.setAccessToken(null); // 清掉排期的刷新定时器，避免悬挂
   });
+
+  it("clearSession 清除 token 与全部用户会话状态", () => {
+    vi.useFakeTimers();
+    const rt = createAuthRuntime({ baseUrl: "/api/v1" });
+    rt.persistSession({ access_token: "at-1", expires_in: 900 });
+    rt.store.setState({
+      user: {
+        id: "u1",
+        display_name: "用户",
+        avatar_url: "",
+        roles: ["student"],
+        active_role: "student"
+      },
+      activeRole: "student",
+      onboarded: true,
+      hydrated: false
+    });
+
+    rt.clearSession();
+
+    expect(rt.tokens.getToken()).toBeUndefined();
+    expect(rt.store.getState()).toMatchObject({
+      user: null,
+      activeRole: null,
+      onboarded: null,
+      hydrated: true
+    });
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

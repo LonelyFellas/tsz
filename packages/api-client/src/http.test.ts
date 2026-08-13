@@ -793,6 +793,40 @@ describe("createHttpClient", () => {
     expect(requestHeaders(1).get("Authorization")).toBe("Bearer new-token");
   });
 
+  it("DELETE 可禁用 401 自动刷新，避免高风险请求被重放", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        problem({
+          type: "urn:tsz:problem:invalid_account_deletion_code",
+          title: "Invalid account deletion code",
+          status: 401,
+          detail: "invalid account deletion code",
+          code: "invalid_account_deletion_code"
+        }),
+        { ok: false, status: 401, contentType: "application/problem+json" }
+      )
+    );
+    const onRefresh = vi.fn();
+    const http = createHttpClient({
+      baseUrl: "",
+      getToken: () => "access-token",
+      onRefresh
+    });
+
+    await expect(
+      http.del(
+        "/auth/account",
+        { channel: "phone", code: "000000" },
+        { retryOnUnauthorized: false }
+      )
+    ).rejects.toMatchObject({
+      status: 401,
+      code: "invalid_account_deletion_code"
+    });
+    expect(onRefresh).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("RFC 9457 的 403 触发 onForbidden(code) 且仍抛 HttpError", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(

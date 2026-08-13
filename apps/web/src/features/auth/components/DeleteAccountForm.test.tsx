@@ -1,28 +1,20 @@
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpError } from "@tsz/api-client";
 import type { User } from "@tsz/types";
-import { DeleteAccountForm } from "./DeleteAccountForm";
 import { useUserStore } from "@/stores/user";
+import { DeleteAccountForm } from "./DeleteAccountForm";
 
 const mockBack = vi.fn();
+const mockReplace = vi.fn();
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ back: mockBack })
 }));
 
-// 注销成功用整页跳转（window.location.replace）回登录页，这里替身掉以便断言。
-const originalLocation = window.location;
-const mockLocationReplace = vi.fn();
-
 vi.mock("@/lib/request", () => ({
-  setAccessToken: vi.fn(),
+  clearSession: vi.fn(),
   api: {
     auth: {
       requestDeletionCode: vi.fn(),
@@ -31,346 +23,246 @@ vi.mock("@/lib/request", () => ({
   }
 }));
 
-import { api, setAccessToken } from "@/lib/request";
-const mockRequestCode = vi.mocked(api.auth.requestDeletionCode);
-const mockDelete = vi.mocked(api.auth.deleteAccount);
+import { api, clearSession } from "@/lib/request";
 
+const requestDeletionCode = vi.mocked(api.auth.requestDeletionCode);
+const deleteAccount = vi.mocked(api.auth.deleteAccount);
 const PHONE = "13899997777";
-const EMAIL = "fcot520@qq.com";
-const VALID_CODE = "123456";
+const EMAIL = "alice@example.com";
 
-function userWith({ phone, email }: { phone?: string; email?: string }): User {
-  return {
+function seedUser(input: { phone?: string; email?: string }) {
+  const user: User = {
     id: "u1",
-    phone,
-    email,
     display_name: "Alice",
-    roles: ["student"],
     avatar_url: "",
-    active_role: "student"
+    roles: ["student"],
+    active_role: "student",
+    ...input
   };
+  useUserStore.setState({ user });
 }
 
-function seed(u: { phone?: string; email?: string }) {
-  useUserStore.setState({ user: userWith(u) });
+function problem(status: number, code: string) {
+  return new HttpError(status, "variable detail", [], code);
+}
+
+async function requestCodeAndFill(code = "000000") {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: "获取验证码" }));
+  await user.type(screen.getByPlaceholderText("6 位数字验证码"), code);
+  return user;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockBack.mockReset();
-  mockLocationReplace.mockReset();
-  Object.defineProperty(window, "location", {
-    configurable: true,
-    value: { replace: mockLocationReplace, href: "http://localhost/" }
-  });
+  requestDeletionCode.mockResolvedValue(undefined);
+  deleteAccount.mockResolvedValue(undefined);
   useUserStore.setState({ user: null });
-});
-
-afterEach(() => {
   Object.defineProperty(window, "location", {
     configurable: true,
-    value: originalLocation
+    value: { replace: mockReplace }
   });
 });
 
-// ── 渠道展示 ──────────────────────────────────────────
-describe("DeleteAccountForm — 渠道展示", () => {
-  it("仅绑定手机 → 不显示渠道切换，展示在档手机号(只读)", () => {
-    seed({ phone: PHONE });
-    render(<DeleteAccountForm />);
+describe("DeleteAccountForm", () => {
+  it("只展示账号真实拥有的渠道，无渠道时阻止注销", () => {
+    seedUser({ email: EMAIL });
+    const { unmount } = render(<DeleteAccountForm />);
+    expect(screen.getByText("邮箱验证")).toBeInTheDocument();
+    expect(screen.queryByText("手机验证")).not.toBeInTheDocument();
+    unmount();
 
-    expect(
-      screen.queryByRole("button", { name: "邮箱" })
-    ).not.toBeInTheDocument();
-    expect(screen.getByText("手机号码")).toBeInTheDocument();
-    const input = screen.getByDisplayValue(PHONE);
-    expect(input).toHaveAttribute("readonly");
-  });
-
-  it("仅绑定邮箱 → 默认选中邮箱渠道并展示邮箱", async () => {
-    seed({ email: EMAIL });
-    render(<DeleteAccountForm />);
-
-    await waitFor(() => {
-      expect(screen.getByText("邮箱号码")).toBeInTheDocument();
-      expect(screen.getByDisplayValue(EMAIL)).toBeInTheDocument();
-    });
-  });
-
-  it("同时绑定手机+邮箱 → 显示两个渠道 tab，可切换", async () => {
-    seed({ phone: PHONE, email: EMAIL });
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    expect(screen.getByRole("button", { name: "手机" })).toBeInTheDocument();
-    expect(screen.getByDisplayValue(PHONE)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "邮箱" }));
-    expect(screen.getByText("邮箱号码")).toBeInTheDocument();
-    expect(screen.getByDisplayValue(EMAIL)).toBeInTheDocument();
-  });
-
-  it("未绑定任何渠道 → 显示无法注销兜底文案", () => {
-    seed({});
+    seedUser({});
     render(<DeleteAccountForm />);
     expect(
-      screen.getByText("当前账号未绑定可用于验证的手机号或邮箱，无法注销。")
+      screen.getByRole("heading", { name: "无法注销账号" })
     ).toBeInTheDocument();
-  });
-});
-
-// ── 按钮状态 ──────────────────────────────────────────
-describe("DeleteAccountForm — 按钮状态", () => {
-  beforeEach(() => seed({ phone: PHONE }));
-
-  it("初始 → 确认注销禁用", () => {
-    render(<DeleteAccountForm />);
-    expect(screen.getByRole("button", { name: "确认注销" })).toBeDisabled();
-  });
-
-  it("填入合法验证码 → 确认注销可用", async () => {
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
-    expect(screen.getByRole("button", { name: "确认注销" })).toBeEnabled();
-  });
-
-  it("验证码非数字/长度不符 → 确认注销禁用", async () => {
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText("请输入验证码"), "ab");
-    expect(screen.getByRole("button", { name: "确认注销" })).toBeDisabled();
-  });
-});
-
-// ── 获取验证码 ────────────────────────────────────────
-describe("DeleteAccountForm — 获取验证码", () => {
-  beforeEach(() => seed({ phone: PHONE, email: EMAIL }));
-
-  it("点击获取验证码 → 用当前渠道请求并进入倒计时", async () => {
-    mockRequestCode.mockResolvedValueOnce({ status: "sent" });
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-
-    await waitFor(() => {
-      expect(mockRequestCode).toHaveBeenCalledWith("phone");
-      expect(screen.getByRole("button", { name: /后重发/ })).toBeDisabled();
-    });
-  });
-
-  it("切到邮箱后获取验证码 → 用 email 渠道请求", async () => {
-    mockRequestCode.mockResolvedValueOnce({ status: "sent" });
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "邮箱" }));
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-
-    await waitFor(() => {
-      expect(mockRequestCode).toHaveBeenCalledWith("email");
-    });
-  });
-
-  it("发送过于频繁(429) → 显示中文文案", async () => {
-    mockRequestCode.mockRejectedValueOnce(
-      new Error("too many code requests, try again later")
-    );
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("验证码发送过于频繁，请稍后再试")
-      ).toBeInTheDocument();
-    });
-  });
-});
-
-// ── 注销流程 ──────────────────────────────────────────
-describe("DeleteAccountForm — 注销流程", () => {
-  beforeEach(() => seed({ phone: PHONE }));
-
-  it("注销成功 → 调用 deleteAccount、清 token 并整页跳转 /login?deleted=success", async () => {
-    mockDelete.mockResolvedValueOnce(undefined);
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
-    await user.click(screen.getByRole("button", { name: "确认注销" }));
-
-    await waitFor(() => {
-      expect(mockDelete).toHaveBeenCalledWith("phone", VALID_CODE);
-      expect(setAccessToken).toHaveBeenCalledWith(null);
-      expect(mockLocationReplace).toHaveBeenCalledWith(
-        "/login?deleted=success"
-      );
-    });
-  });
-
-  it("验证码错误/失效 → 显示中文提示且不跳转", async () => {
-    mockDelete.mockRejectedValueOnce(
-      new Error("invalid or expired deletion code")
-    );
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
-    await user.click(screen.getByRole("button", { name: "确认注销" }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("验证码错误或已失效，请重新获取")
-      ).toBeInTheDocument();
-    });
-    expect(mockLocationReplace).not.toHaveBeenCalled();
-  });
-
-  it("渠道不可用 → 显示中文提示", async () => {
-    mockDelete.mockRejectedValueOnce(
-      new Error("verification channel unavailable for this account")
-    );
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
-    await user.click(screen.getByRole("button", { name: "确认注销" }));
-
-    await waitFor(() => {
-      expect(
-        screen.getByText("该账号未绑定此渠道，无法用此方式注销")
-      ).toBeInTheDocument();
-    });
-  });
-
-  it("非 Error 类型异常 → 显示兜底文案", async () => {
-    mockDelete.mockRejectedValueOnce("boom");
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
-    await user.click(screen.getByRole("button", { name: "确认注销" }));
-
-    await waitFor(() => {
-      expect(screen.getByText("操作失败，请稍后重试")).toBeInTheDocument();
-    });
-  });
-});
-
-// ── 交互细节 ──────────────────────────────────────────
-describe("DeleteAccountForm — 交互细节", () => {
-  it("点击「← 返回」→ 调用 router.back()", async () => {
-    seed({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "← 返回" }));
-    expect(mockBack).toHaveBeenCalled();
-  });
-
-  it("切换渠道 → 清空已填验证码", async () => {
-    seed({ phone: PHONE, email: EMAIL });
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    const codeInput = screen.getByPlaceholderText("请输入验证码");
-    await user.type(codeInput, VALID_CODE);
-    expect(codeInput).toHaveValue(VALID_CODE);
-
-    await user.click(screen.getByRole("button", { name: "邮箱" }));
-    expect(screen.getByPlaceholderText("请输入验证码")).toHaveValue("");
-  });
-
-  it("点击已选中的渠道 → 无副作用（不清空已填验证码）", async () => {
-    seed({ phone: PHONE, email: EMAIL });
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    const codeInput = screen.getByPlaceholderText("请输入验证码");
-    await user.type(codeInput, VALID_CODE);
-
-    // 当前渠道为「手机」，再次点「手机」应被 switchChannel 早退拦下，不清空。
-    await user.click(screen.getByRole("button", { name: "手机" }));
-    expect(screen.getByPlaceholderText("请输入验证码")).toHaveValue(VALID_CODE);
-  });
-
-  it("信息不全时提交表单 → 被 canSubmit 拦下，不发起注销请求", () => {
-    seed({ phone: PHONE });
-    const { container } = render(<DeleteAccountForm />);
-
-    // 未填验证码直接提交：handleDelete 应 preventDefault 并在 canSubmit 为 false 时拦下。
-    fireEvent.submit(container.querySelector("form")!);
-    expect(mockDelete).not.toHaveBeenCalled();
-  });
-});
-
-// ── 中间态与倒计时 ────────────────────────────────────
-describe("DeleteAccountForm — 中间态与倒计时", () => {
-  it("发送验证码过程中按钮显示「发送中...」", async () => {
-    // 用挂起的 promise 留住中间态。
-    let release!: (v: { status: string }) => void;
-    mockRequestCode.mockReturnValueOnce(
-      new Promise((resolve) => {
-        release = resolve;
-      })
-    );
-    seed({ phone: PHONE });
-    render(<DeleteAccountForm />);
-    const user = userEvent.setup();
-
-    await user.click(screen.getByRole("button", { name: "获取验证码" }));
     expect(
-      await screen.findByRole("button", { name: "发送中..." })
-    ).toBeDisabled();
-    release({ status: "sent" });
+      screen.queryByRole("button", { name: "获取验证码" })
+    ).not.toBeInTheDocument();
   });
 
-  it("注销过程中按钮显示「注销中...」", async () => {
-    let release!: () => void;
-    mockDelete.mockReturnValueOnce(
+  it("双渠道可切换，切换时清除旧验证码和已申请状态", async () => {
+    seedUser({ phone: PHONE, email: EMAIL });
+    render(<DeleteAccountForm />);
+    const user = await requestCodeAndFill();
+
+    expect(requestDeletionCode).toHaveBeenCalledWith({ channel: "phone" });
+    await user.click(screen.getByLabelText(/邮箱验证/));
+
+    expect(screen.getByPlaceholderText("6 位数字验证码")).toHaveValue("");
+    expect(screen.getByRole("button", { name: "获取验证码" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "继续注销" })).toBeDisabled();
+  });
+
+  it("申请期间阻止重复请求，202 后展示成功态和倒计时", async () => {
+    let resolveRequest!: () => void;
+    requestDeletionCode.mockReturnValue(
       new Promise<void>((resolve) => {
-        release = resolve;
+        resolveRequest = resolve;
       })
     );
-    seed({ phone: PHONE });
+    seedUser({ phone: PHONE });
     render(<DeleteAccountForm />);
-    const user = userEvent.setup();
+    const button = screen.getByRole("button", { name: "获取验证码" });
 
-    await user.type(screen.getByPlaceholderText("请输入验证码"), VALID_CODE);
-    await user.click(screen.getByRole("button", { name: "确认注销" }));
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(requestDeletionCode).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "申请中…" })).toBeDisabled();
 
-    expect(
-      await screen.findByRole("button", { name: "注销中..." })
-    ).toBeDisabled();
-    release();
+    resolveRequest();
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("验证码申请已受理");
+      expect(screen.getByRole("button", { name: /60s 后重试/ })).toBeDisabled();
+    });
   });
 
-  it("获取验证码后倒计时逐秒递减", async () => {
-    vi.useFakeTimers();
-    try {
-      mockRequestCode.mockResolvedValueOnce({ status: "sent" });
-      seed({ phone: PHONE });
+  it("验证码必须先申请且为六位数字，输入过滤非数字", async () => {
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    const user = userEvent.setup();
+    const input = screen.getByPlaceholderText("6 位数字验证码");
+
+    await user.type(input, "12ab3456");
+    expect(input).toHaveValue("123456");
+    expect(screen.getByRole("button", { name: "继续注销" })).toBeDisabled();
+
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+    expect(screen.getByRole("button", { name: "继续注销" })).toBeEnabled();
+    expect(screen.getByText(/当前测试环境验证码为 000000/)).toBeInTheDocument();
+  });
+
+  it("继续注销只打开可访问确认层，取消和 Escape 均不发 DELETE", async () => {
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    const user = await requestCodeAndFill();
+    await user.click(screen.getByRole("button", { name: "继续注销" }));
+
+    const dialog = screen.getByRole("dialog", { name: /最后确认/ });
+    expect(dialog).toHaveFocus();
+    expect(screen.getByTestId("account-deletion-content")).toHaveAttribute(
+      "inert"
+    );
+    await user.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "确认永久注销" })).toHaveFocus();
+    await user.tab();
+    expect(screen.getByRole("button", { name: "取消" })).toHaveFocus();
+    await user.click(screen.getByRole("button", { name: "取消" }));
+    expect(deleteAccount).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "继续注销" })).toHaveFocus();
+
+    await user.click(screen.getByRole("button", { name: "继续注销" }));
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("最终确认只提交 channel/code，阻止重复 DELETE", async () => {
+    let resolveDelete!: () => void;
+    deleteAccount.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveDelete = resolve;
+      })
+    );
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    const user = await requestCodeAndFill();
+    await user.click(screen.getByRole("button", { name: "继续注销" }));
+    const confirm = screen.getByRole("button", { name: "确认永久注销" });
+
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(deleteAccount).toHaveBeenCalledTimes(1);
+    expect(deleteAccount).toHaveBeenCalledWith({
+      channel: "phone",
+      code: "000000"
+    });
+    expect(screen.getByRole("button", { name: "正在注销…" })).toBeDisabled();
+    resolveDelete();
+  });
+
+  it("注销成功清理完整会话并整页跳转登录页", async () => {
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    const user = await requestCodeAndFill();
+    await user.click(screen.getByRole("button", { name: "继续注销" }));
+    await user.click(screen.getByRole("button", { name: "确认永久注销" }));
+
+    await waitFor(() => {
+      expect(clearSession).toHaveBeenCalledTimes(1);
+      expect(mockReplace).toHaveBeenCalledWith("/login?deleted=success");
+    });
+  });
+
+  it.each([
+    ["invalid_account_deletion_code", 401, "验证码错误、已失效或已使用"],
+    [
+      "account_deletion_channel_unavailable",
+      409,
+      "当前账号没有可用于验证的该渠道"
+    ],
+    ["otp_rate_limited", 429, "验证码申请过于频繁"],
+    ["otp_unavailable", 503, "验证码服务暂时不可用"],
+    ["invalid_request_body", 422, "提交内容不完整"],
+    ["internal_error", 500, "服务暂时异常"]
+  ])(
+    "按 RFC 9457 code %s 显示稳定错误并恢复操作",
+    async (code, status, text) => {
+      requestDeletionCode.mockRejectedValueOnce(
+        problem(status as number, code as string)
+      );
+      seedUser({ phone: PHONE });
       render(<DeleteAccountForm />);
+      await userEvent
+        .setup()
+        .click(screen.getByRole("button", { name: "获取验证码" }));
 
-      // 用 fireEvent 触发，避免 userEvent 与假定时器耦合；act 刷新已 resolve 的发码 promise。
-      await act(async () => {
-        fireEvent.click(screen.getByRole("button", { name: "获取验证码" }));
-      });
-      expect(
-        screen.getByRole("button", { name: "60s 后重发" })
-      ).toBeInTheDocument();
-
-      await act(async () => {
-        vi.advanceTimersByTime(1000);
-      });
-      expect(
-        screen.getByRole("button", { name: "59s 后重发" })
-      ).toBeInTheDocument();
-    } finally {
-      vi.useRealTimers();
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        text as string
+      );
+      expect(screen.getByRole("button", { name: "获取验证码" })).toBeEnabled();
     }
+  );
+
+  it("invalid_token 清会话并整页跳转，不显示普通错误", async () => {
+    requestDeletionCode.mockRejectedValueOnce(problem(401, "invalid_token"));
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    await userEvent
+      .setup()
+      .click(screen.getByRole("button", { name: "获取验证码" }));
+
+    await waitFor(() => {
+      expect(clearSession).toHaveBeenCalledTimes(1);
+      expect(mockReplace).toHaveBeenCalledWith("/login?session=expired");
+    });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("DELETE 失败保留确认层并恢复按钮，可再次确认", async () => {
+    deleteAccount.mockRejectedValueOnce(
+      problem(401, "invalid_account_deletion_code")
+    );
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    const user = await requestCodeAndFill();
+    await user.click(screen.getByRole("button", { name: "继续注销" }));
+    await user.click(screen.getByRole("button", { name: "确认永久注销" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("验证码错误");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "确认永久注销" })).toBeEnabled();
+  });
+
+  it("非 HttpError 使用网络异常兜底，返回按钮调用 router.back", async () => {
+    requestDeletionCode.mockRejectedValueOnce(new Error("boom"));
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("网络异常");
+    await user.click(screen.getByRole("button", { name: "← 返回" }));
+    expect(mockBack).toHaveBeenCalledTimes(1);
   });
 });

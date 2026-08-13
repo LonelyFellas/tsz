@@ -63,6 +63,26 @@ describe("createTokenManager", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("清会话后丢弃已在途 refresh 的迟到结果", async () => {
+    vi.useFakeTimers();
+    let resolveFetch!: (response: Response) => void;
+    vi.spyOn(globalThis, "fetch").mockReturnValue(
+      new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      })
+    );
+    const tm = createTokenManager({ baseUrl: "/api/v1" });
+    tm.setAccessToken("at-old");
+
+    const refreshing = tm.refreshTokens();
+    tm.setAccessToken(null);
+    resolveFetch(jsonResponse({ access_token: "at-late", expires_in: 900 }));
+
+    await expect(refreshing).resolves.toBe("at-late");
+    expect(tm.getToken()).toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it("refresh 失败（非 2xx）抛错且不写 token", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({}, false));
     const tm = createTokenManager({ baseUrl: "/api/v1" });
