@@ -10,7 +10,8 @@ echo "==> build @tsz/admin"
 # 保留 test mode 供其他尚未接入的独立 mock 能力使用；words mock 显式关闭。
 VITE_WORD_CREATION_WIZARD=true \
   VITE_VOICE_EDITOR=true \
-  VITE_VOICE_PREVIEW=false \
+  VITE_VOICE_PREVIEW=true \
+  VITE_ADMIN_TTS_MOCK=false \
   VITE_ADMIN_WORDS_MOCK=false \
   VITE_ADMIN_PART_OF_SPEECH_MOCK=false \
   pnpm --filter @tsz/admin build --mode test
