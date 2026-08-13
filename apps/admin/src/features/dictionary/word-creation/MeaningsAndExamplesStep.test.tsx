@@ -1644,10 +1644,17 @@ describe("MeaningsAndExamplesStep", () => {
     const applyField = async (text: string) => {
       const field = screen.getByDisplayValue(text);
       if (!field) throw new Error(`voice field not found: ${text}`);
-      const editButton = field
-        .closest(".ant-space-compact")
-        ?.querySelector("button");
+      const editButton =
+        field
+          .closest(".word-voice-text-control")
+          ?.querySelector('button[aria-label$="高级语音编辑"]') ??
+        field
+          .closest(".dialect-panel")
+          ?.querySelector('button[aria-label$="高级语音编辑"]');
       if (!editButton) throw new Error(`edit button not found: ${text}`);
+      expect(editButton).toHaveClass("word-voice-editor-action");
+      expect(editButton).toHaveTextContent("高级语音编辑");
+      expect(editButton.closest(".ant-space-compact")).toBeNull();
       fireEvent.click(editButton);
       const dialog = await screen.findByLabelText("测试语音编辑器");
       expect(dialog).toHaveAttribute("data-pronunciation-hint", "ˈsentə");

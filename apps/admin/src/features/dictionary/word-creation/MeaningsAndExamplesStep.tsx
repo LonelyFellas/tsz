@@ -1,6 +1,7 @@
 import {
   DeleteOutlined,
   DownOutlined,
+  EditOutlined,
   EllipsisOutlined,
   LockOutlined,
   PlusOutlined,
@@ -28,7 +29,6 @@ import {
   Switch,
   Tabs,
   Tag,
-  Tooltip,
   Typography
 } from "antd";
 import type {
@@ -434,19 +434,28 @@ function VoiceEditorProvider({
 function VoiceTextControl({
   value,
   contextLabel,
-  dialectLabel,
   readOnly,
+  showEditorAction = true,
   onChange
 }: {
   value: RichText;
   contextLabel: string;
-  dialectLabel?: string;
   readOnly?: boolean;
+  showEditorAction?: boolean;
   onChange: (value: RichText) => void;
 }) {
-  const editor = useContext(VoiceEditorContext);
   return (
-    <Space.Compact block>
+    <div className="word-voice-text-control">
+      {showEditorAction && (
+        <div className="word-voice-text-toolbar">
+          <VoiceEditorAction
+            value={value}
+            contextLabel={contextLabel}
+            readOnly={readOnly}
+            onApply={onChange}
+          />
+        </div>
+      )}
       <Input.TextArea
         aria-label={contextLabel}
         value={value.text}
@@ -456,18 +465,34 @@ function VoiceTextControl({
           onChange(toWordRichText(event.target.value, value))
         }
       />
-      {!readOnly && editor && (
-        <Button
-          type="default"
-          onClick={() =>
-            editor.open({ value, contextLabel, onApply: onChange })
-          }
-          title={dialectLabel ? `${dialectLabel}高级语音编辑` : undefined}
-        >
-          高级语音编辑
-        </Button>
-      )}
-    </Space.Compact>
+    </div>
+  );
+}
+
+function VoiceEditorAction({
+  value,
+  contextLabel,
+  readOnly,
+  onApply
+}: {
+  value: RichText;
+  contextLabel: string;
+  readOnly?: boolean;
+  onApply: (value: RichText) => void;
+}) {
+  const editor = useContext(VoiceEditorContext);
+  if (readOnly || !editor) return null;
+  return (
+    <Button
+      className="word-voice-editor-action"
+      type="text"
+      size="small"
+      icon={<EditOutlined />}
+      aria-label={`${contextLabel} 高级语音编辑`}
+      onClick={() => editor.open({ value, contextLabel, onApply })}
+    >
+      高级语音编辑
+    </Button>
   );
 }
 
@@ -529,7 +554,6 @@ function EnglishTextEditor({
         <VoiceTextControl
           value={slotValue}
           contextLabel={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
-          dialectLabel={DIALECT_SHORT_LABEL[dialect]}
           readOnly={readOnly}
           onChange={(content) =>
             onChange(setEnglishRichText(value, dialect, content))
@@ -663,29 +687,40 @@ function GrammarEditor({
                   className={`dialect-panel dialect-panel-${dialect}`}
                   key={variant.id}
                 >
-                  <Typography.Text strong>
-                    {DIALECT_SHORT_LABEL[dialect]}
-                  </Typography.Text>
-                  <Space.Compact block style={{ marginTop: 8 }}>
-                    <Tooltip title="播放语音">
-                      <Button
-                        className="word-pronunciation-play-action"
-                        icon={<SoundOutlined />}
-                        aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1} 播放语音`}
-                        disabled
-                      />
-                    </Tooltip>
+                  <Flex
+                    className="word-dialect-panel-header"
+                    justify="space-between"
+                    align="center"
+                    gap={8}
+                  >
+                    <Typography.Text strong>
+                      {DIALECT_SHORT_LABEL[dialect]}
+                    </Typography.Text>
+                    <VoiceEditorAction
+                      value={variant.content}
+                      contextLabel={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
+                      readOnly={readOnly}
+                      onApply={(content) => {
+                        const grammars = cloneWordValue(value);
+                        const nextVariant = grammars[
+                          grammarIndex
+                        ]!.variants.find((item) => item.id === variant.id)!;
+                        nextVariant.content = content;
+                        onChange(grammars);
+                      }}
+                    />
+                  </Flex>
+                  <div className="word-grammar-text-field">
                     {env.VOICE_EDITOR ? (
                       <div
-                        style={{ flex: 1 }}
                         data-word-node-id={grammar.id}
                         data-word-field="content"
                       >
                         <VoiceTextControl
                           value={variant.content}
                           contextLabel={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
-                          dialectLabel={DIALECT_SHORT_LABEL[dialect]}
                           readOnly={readOnly}
+                          showEditorAction={false}
                           onChange={(content) => {
                             const grammars = cloneWordValue(value);
                             const nextVariant = grammars[
@@ -697,7 +732,7 @@ function GrammarEditor({
                         />
                       </div>
                     ) : (
-                      <Input
+                      <Input.TextArea
                         className="word-pronunciation-phonetic-input"
                         aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
                         data-word-node-id={grammar.id}
@@ -705,6 +740,7 @@ function GrammarEditor({
                         value={variant.content.text}
                         readOnly={readOnly}
                         placeholder="例如 a centre / the centre"
+                        autoSize={{ minRows: 2, maxRows: 6 }}
                         onChange={(event) => {
                           const grammars = cloneWordValue(value);
                           const nextVariant = grammars[
@@ -718,25 +754,46 @@ function GrammarEditor({
                         }}
                       />
                     )}
-                    <Tooltip title="获取语音">
+                  </div>
+                  <Flex
+                    className="word-grammar-voice-toolbar"
+                    justify="space-between"
+                    align="center"
+                    gap={8}
+                  >
+                    <Button
+                      type="text"
+                      size="small"
+                      className="word-pronunciation-play-action"
+                      icon={<SoundOutlined />}
+                      aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1} 播放语音`}
+                      disabled
+                    >
+                      试 听
+                    </Button>
+                    <Space size={6}>
                       <Button
+                        size="small"
                         className="word-pronunciation-voice-action word-pronunciation-sync-action"
                         icon={<SyncOutlined />}
                         aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1} 获取语音`}
                         disabled={readOnly}
                         onClick={() => message.info("获取语音（Mock）")}
-                      />
-                    </Tooltip>
-                    <Tooltip title="上传语音">
+                      >
+                        获取语音
+                      </Button>
                       <Button
+                        size="small"
                         className="word-pronunciation-voice-action"
                         icon={<UploadOutlined />}
                         aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1} 上传语音`}
                         disabled={readOnly}
                         onClick={() => message.info("上传语音（Mock）")}
-                      />
-                    </Tooltip>
-                  </Space.Compact>
+                      >
+                        上传语音
+                      </Button>
+                    </Space>
+                  </Flex>
                 </div>
               );
             })}
