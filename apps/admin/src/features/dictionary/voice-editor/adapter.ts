@@ -1,7 +1,7 @@
 import { HttpError } from "@tsz/api-client";
 import type {
-  AdminTtsPreviewResponse,
-  AdminTtsVoiceListResponse
+  AdminSpeechPreviewResponse,
+  AdminSpeechVoiceListResponse
 } from "@tsz/types";
 import {
   VoicePreviewError,
@@ -11,76 +11,84 @@ import {
   type VoicePreviewResult
 } from "@tsz/voice-editor/types";
 
-export interface AdminTtsDataSource {
-  voices(
-    language: "en",
-    signal?: AbortSignal
-  ): Promise<AdminTtsVoiceListResponse>;
+export interface AdminSpeechDataSource {
+  voices(signal?: AbortSignal): Promise<AdminSpeechVoiceListResponse>;
   preview(
     input: {
-      language: "en";
       content: Parameters<VoicePreviewAdapter["synthesize"]>[0]["content"];
-      voice_id: string;
-      style?: string;
+      voice_alias: string;
+      style?: string | null;
       rate_percent?: number;
       pitch_semitones?: number;
     },
     signal?: AbortSignal
-  ): Promise<AdminTtsPreviewResponse>;
+  ): Promise<AdminSpeechPreviewResponse>;
 }
 
 function mapVoice(
-  item: AdminTtsVoiceListResponse["items"][number]
+  item: AdminSpeechVoiceListResponse["items"][number],
+  index: number
 ): VoiceOption {
+  const gender = item.gender.toLowerCase();
+  const capabilities = item.capabilities;
   return {
-    id: item.id,
-    label: item.label,
+    id: item.alias,
+    label: `${item.alias} · ${item.locale}`,
     locale: item.locale,
-    gender: item.gender,
-    styles: [...item.styles],
-    supportsRate: item.supports_rate,
-    supportsPitch: item.supports_pitch,
-    isDefault: item.is_default
+    gender: gender === "female" || gender === "male" ? gender : "neutral",
+    styles: [...capabilities.styles],
+    supportsRate: capabilities.min_rate_percent < capabilities.max_rate_percent,
+    supportsPitch:
+      capabilities.min_pitch_semitones < capabilities.max_pitch_semitones,
+    isDefault: index === 0,
+    rateRange: {
+      min: capabilities.min_rate_percent,
+      max: capabilities.max_rate_percent
+    },
+    pitchRange: {
+      min: capabilities.min_pitch_semitones,
+      max: capabilities.max_pitch_semitones
+    }
   };
 }
 
-function mapPreview(result: AdminTtsPreviewResponse): VoicePreviewResult {
+function mapPreview(result: AdminSpeechPreviewResponse): VoicePreviewResult {
   return {
     audioUrl: result.audio_url,
     expiresAt: result.expires_at,
-    cached: result.cached,
-    ssml: result.ssml
+    cached: result.cache_status === "hit"
   };
 }
 
 function errorCode(error: HttpError): VoicePreviewErrorCode {
-  if (error.code === "tts_voice_not_found" || error.status === 404) {
+  if (error.code === "speech_voice_not_found" || error.status === 404) {
     return "voice_not_found";
   }
-  if (error.code === "tts_quota_exceeded") return "quota_exceeded";
-  if (error.code === "tts_rate_limited") return "rate_limited";
-  if (error.code === "tts_unavailable") return "unavailable";
-  if (error.code === "tts_option_not_supported") {
-    return "option_not_supported";
+  if (error.code === "speech_rate_limited") return "rate_limited";
+  if (
+    error.code === "speech_provider_unavailable" ||
+    error.code === "speech_storage_unavailable" ||
+    error.code === "speech_preview_in_progress"
+  ) {
+    return "unavailable";
   }
-  if (error.code === "invalid_speech_markup") return "invalid_content";
+  if (error.code === "invalid_speech_preview") return "invalid_content";
   if (error.status === 429) {
-    return error.code === "quota_exceeded" ? "quota_exceeded" : "rate_limited";
+    return "rate_limited";
   }
   if (error.status >= 500) return "unavailable";
-  if (error.code === "option_not_supported") return "option_not_supported";
-  if (error.status === 400 || error.status === 422) return "invalid_content";
+  if (error.status === 400) return "invalid_content";
   return "unknown";
 }
 
 export function createAdminVoicePreviewAdapter(
-  dataSource: AdminTtsDataSource
+  dataSource: AdminSpeechDataSource
 ): VoicePreviewAdapter {
   return {
     async listVoices({ language, signal }) {
       try {
         if (language !== "en") return [];
-        const response = await dataSource.voices(language, signal);
+        const response = await dataSource.voices(signal);
         return response.items.map(mapVoice);
       } catch (error) {
         if (error instanceof HttpError) {
@@ -96,9 +104,8 @@ export function createAdminVoicePreviewAdapter(
         }
         const response = await dataSource.preview(
           {
-            language: "en",
             content: input.content,
-            voice_id: input.voiceId,
+            voice_alias: input.voiceId,
             ...(input.style ? { style: input.style } : {}),
             ...(input.ratePercent !== undefined
               ? { rate_percent: input.ratePercent }

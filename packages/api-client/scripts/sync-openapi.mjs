@@ -40,7 +40,13 @@ const contractSchemaNames = [
   "EntryLifecycleTarget",
   "EntryLifecycleBatchInput",
   "EntryLifecycleBatchResponse",
-  "SuggestDialectVariantsResponseV2"
+  "SuggestDialectVariantsResponseV2",
+  "VoiceCapabilities",
+  "VoiceResponse",
+  "VoiceListResponse",
+  "CreatePreviewRequest",
+  "PreviewCacheStatus",
+  "PreviewResponse"
 ];
 for (const name of contractSchemaNames) {
   if (!spec.components?.schemas?.[name]) {

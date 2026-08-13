@@ -9,8 +9,8 @@ import type {
   AdminUserListQuery,
   AdminUserListResponse,
   AdminUserUpdateInput,
-  AdminTtsPreviewResponse,
-  AdminTtsVoiceListResponse,
+  AdminSpeechPreviewResponse,
+  AdminSpeechVoiceListResponse,
   AdminWordBatchDeleteResponse,
   AdminWordAnyEnvelope,
   AdminWordCreateInput,
@@ -23,7 +23,7 @@ import type {
   AdminWordStats,
   AdminStatus,
   CreateAdminInput,
-  CreateAdminTtsPreviewInput,
+  CreateAdminSpeechPreviewInput,
   CreateAdminWordV2Input,
   CreateAdminResponse,
   CreateRoleRequest,
@@ -149,17 +149,14 @@ export function createAdminEndpoints(http: HttpClient) {
     },
     /** GET /admin/profile — 门禁探针：200=有效 admin / 401=未登录。 */
     profile: () => http.get<AdminProfile>("/profile"),
-    /**
-     * 语音富文本试听。当前 tsz-rust 尚未落地，调用模型已固定并进入契约 PENDING 台账。
-     * 编辑器包只认 camelCase adapter，wire 映射由 admin 业务层承担。
-     */
-    tts: {
-      voices: (language: "en", signal?: AbortSignal) =>
-        http.get<AdminTtsVoiceListResponse>(`/tts/voices${qs({ language })}`, {
+    /** 语音富文本试听；wire 映射由 admin 业务层承担。 */
+    speech: {
+      voices: (signal?: AbortSignal) =>
+        http.get<AdminSpeechVoiceListResponse>("/speech/voices", { signal }),
+      preview: (input: CreateAdminSpeechPreviewInput, signal?: AbortSignal) =>
+        http.post<AdminSpeechPreviewResponse>("/speech/previews", input, {
           signal
-        }),
-      preview: (input: CreateAdminTtsPreviewInput, signal?: AbortSignal) =>
-        http.post<AdminTtsPreviewResponse>("/tts/previews", input, { signal })
+        })
     },
     /**
      * 智能词库（词条创编）。字段与状态码见 docs/admin-wordlist-frontend-integration.md；

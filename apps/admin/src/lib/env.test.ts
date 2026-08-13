@@ -13,6 +13,7 @@ describe("env", () => {
     vi.stubEnv("VITE_ADMIN_WORDS_MOCK", undefined);
     vi.stubEnv("VITE_ADMIN_PART_OF_SPEECH_MOCK", undefined);
     vi.stubEnv("VITE_VOICE_EDITOR", undefined);
+    vi.stubEnv("VITE_VOICE_PREVIEW", undefined);
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.resetModules();
     const { env } = await import("./env");
@@ -21,6 +22,7 @@ describe("env", () => {
     expect(env.ADMIN_WORDS_MOCK).toBe(false);
     expect(env.ADMIN_PART_OF_SPEECH_MOCK).toBe(false);
     expect(env.VOICE_EDITOR).toBe(true);
+    expect(env.VOICE_PREVIEW).toBe(true);
     expect(env.ADMIN_TTS_MOCK).toBe(true);
   });
 
@@ -37,6 +39,7 @@ describe("env", () => {
     vi.stubEnv("VITE_ADMIN_WORDS_MOCK", undefined);
     vi.stubEnv("VITE_ADMIN_PART_OF_SPEECH_MOCK", undefined);
     vi.stubEnv("VITE_VOICE_EDITOR", undefined);
+    vi.stubEnv("VITE_VOICE_PREVIEW", undefined);
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.resetModules();
     const { env } = await import("./env");
@@ -44,6 +47,7 @@ describe("env", () => {
     expect(env.ADMIN_WORDS_MOCK).toBe(false);
     expect(env.ADMIN_PART_OF_SPEECH_MOCK).toBe(false);
     expect(env.VOICE_EDITOR).toBe(false);
+    expect(env.VOICE_PREVIEW).toBe(false);
     expect(env.ADMIN_TTS_MOCK).toBe(false);
   });
 
@@ -56,6 +60,8 @@ describe("env", () => {
     ["VITE_ADMIN_PART_OF_SPEECH_MOCK", "false", false],
     ["VITE_VOICE_EDITOR", "true", true],
     ["VITE_VOICE_EDITOR", "false", false],
+    ["VITE_VOICE_PREVIEW", "true", true],
+    ["VITE_VOICE_PREVIEW", "false", false],
     ["VITE_ADMIN_TTS_MOCK", "true", true],
     ["VITE_ADMIN_TTS_MOCK", "false", false]
   ] as const)("严格解析 %s=%s", async (name, value, expected) => {
@@ -67,6 +73,7 @@ describe("env", () => {
       | "ADMIN_WORDS_MOCK"
       | "ADMIN_PART_OF_SPEECH_MOCK"
       | "VOICE_EDITOR"
+      | "VOICE_PREVIEW"
       | "ADMIN_TTS_MOCK";
     expect(env[key]).toBe(expected);
   });

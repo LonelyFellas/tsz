@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/0a9c/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-12T13:35:40.398Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-13T07:55:06.665Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -34,6 +34,8 @@
       "delete",
       "patch"
     ],
+    "/admin/speech/previews": ["post"],
+    "/admin/speech/voices": ["get"],
     "/admin/users": ["get"],
     "/auth/login": ["post"],
     "/auth/login-otp": ["post"],
@@ -252,6 +254,75 @@
           "items": {
             "$ref": "#/components/schemas/DialectVariantSuggestionItemV2"
           }
+        }
+      }
+    },
+    "VoiceCapabilities": {
+      "type": "object",
+      "required": [
+        "styles",
+        "min_rate_percent",
+        "max_rate_percent",
+        "min_pitch_semitones",
+        "max_pitch_semitones"
+      ],
+      "properties": {
+        "max_pitch_semitones": { "type": "integer", "format": "int32" },
+        "max_rate_percent": { "type": "integer", "format": "int32" },
+        "min_pitch_semitones": { "type": "integer", "format": "int32" },
+        "min_rate_percent": { "type": "integer", "format": "int32" },
+        "styles": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "VoiceResponse": {
+      "type": "object",
+      "required": ["alias", "locale", "gender", "capabilities"],
+      "properties": {
+        "alias": { "type": "string" },
+        "capabilities": { "$ref": "#/components/schemas/VoiceCapabilities" },
+        "gender": { "type": "string" },
+        "locale": { "type": "string" }
+      }
+    },
+    "VoiceListResponse": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/VoiceResponse" }
+        }
+      }
+    },
+    "CreatePreviewRequest": {
+      "type": "object",
+      "required": ["content", "voice_alias"],
+      "properties": {
+        "content": { "$ref": "#/components/schemas/RichTextV2" },
+        "pitch_semitones": { "type": "integer", "format": "int32" },
+        "rate_percent": { "type": "integer", "format": "int32" },
+        "style": { "type": ["string", "null"] },
+        "voice_alias": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "PreviewCacheStatus": { "type": "string", "enum": ["hit", "generated"] },
+    "PreviewResponse": {
+      "type": "object",
+      "required": [
+        "cache_status",
+        "audio_url",
+        "expires_at",
+        "url_expires_in_seconds"
+      ],
+      "properties": {
+        "audio_url": { "type": "string" },
+        "cache_status": { "$ref": "#/components/schemas/PreviewCacheStatus" },
+        "expires_at": { "type": "string", "format": "date-time" },
+        "url_expires_in_seconds": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
         }
       }
     }

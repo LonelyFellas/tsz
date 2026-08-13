@@ -24,7 +24,9 @@ const VOICES: VoiceOption[] = [
     styles: ["cheerful"],
     supportsRate: true,
     supportsPitch: true,
-    isDefault: true
+    isDefault: true,
+    rateRange: { min: -10, max: 10 },
+    pitchRange: { min: -2, max: 2 }
   },
   {
     id: "aria",
@@ -34,7 +36,9 @@ const VOICES: VoiceOption[] = [
     styles: ["cheerful"],
     supportsRate: true,
     supportsPitch: true,
-    isDefault: false
+    isDefault: false,
+    rateRange: { min: -5, max: 5 },
+    pitchRange: { min: -1, max: 1 }
   },
   {
     id: "guy",
@@ -70,7 +74,6 @@ function result(
     audioUrl: "blob:preview",
     expiresAt: new Date(Date.now() + 60_000).toISOString(),
     cached: false,
-    ssml: "<speak/>",
     ...overrides
   };
 }

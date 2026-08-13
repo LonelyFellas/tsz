@@ -37,6 +37,7 @@ const dataSourceCapabilities = vi.hoisted(() => ({
 }));
 const featureFlags = vi.hoisted(() => ({
   VOICE_EDITOR: false,
+  VOICE_PREVIEW: false,
   ADMIN_TTS_MOCK: true
 }));
 const relatedWords = vi.hoisted(() => [
@@ -81,6 +82,7 @@ vi.mock("@tsz/voice-editor/editor", async () => {
       open,
       value,
       pronunciationHints,
+      previewAdapter,
       onApply,
       onCancel
     }: VoiceRichTextEditorProps) =>
@@ -89,6 +91,7 @@ vi.mock("@tsz/voice-editor/editor", async () => {
           role="dialog"
           aria-label="测试语音编辑器"
           data-pronunciation-hint={pronunciationHints?.centre}
+          data-preview-enabled={String(Boolean(previewAdapter))}
         >
           <button
             type="button"
@@ -252,6 +255,7 @@ function renderStep(
 beforeEach(() => {
   vi.clearAllMocks();
   featureFlags.VOICE_EDITOR = false;
+  featureFlags.VOICE_PREVIEW = false;
   dataSourceCapabilities.dialectVariantSuggestions = true;
   mutations.save.mockResolvedValue({
     word: wordFixture({ ready: true, revision: 4 })
@@ -1647,6 +1651,7 @@ describe("MeaningsAndExamplesStep", () => {
       fireEvent.click(editButton);
       const dialog = await screen.findByLabelText("测试语音编辑器");
       expect(dialog).toHaveAttribute("data-pronunciation-hint", "ˈsentə");
+      expect(dialog).toHaveAttribute("data-preview-enabled", "false");
       const applyButton = dialog.querySelector("button");
       if (!applyButton) throw new Error(`apply button not found: ${text}`);
       fireEvent.click(applyButton);

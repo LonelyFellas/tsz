@@ -416,7 +416,9 @@ function VoiceEditorProvider({
             language="en"
             contextLabel={target.contextLabel}
             pronunciationHints={pronunciationHints}
-            previewAdapter={adminVoicePreviewAdapter}
+            previewAdapter={
+              env.VOICE_PREVIEW ? adminVoicePreviewAdapter : undefined
+            }
             onApply={(value) => {
               target.onApply(value);
               setTarget(undefined);

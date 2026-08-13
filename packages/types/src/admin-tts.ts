@@ -1,32 +1,35 @@
 import type { RichTextV2 } from "./rich-text";
 
-export interface AdminTtsVoice {
-  id: string;
-  label: string;
-  locale: string;
-  gender: "female" | "male" | "neutral";
+export interface AdminSpeechVoiceCapabilities {
   styles: string[];
-  supports_rate: boolean;
-  supports_pitch: boolean;
-  is_default: boolean;
+  min_rate_percent: number;
+  max_rate_percent: number;
+  min_pitch_semitones: number;
+  max_pitch_semitones: number;
 }
 
-export interface AdminTtsVoiceListResponse {
-  items: AdminTtsVoice[];
+export interface AdminSpeechVoice {
+  alias: string;
+  locale: string;
+  gender: string;
+  capabilities: AdminSpeechVoiceCapabilities;
 }
 
-export interface CreateAdminTtsPreviewInput {
-  language: "en";
+export interface AdminSpeechVoiceListResponse {
+  items: AdminSpeechVoice[];
+}
+
+export interface CreateAdminSpeechPreviewInput {
   content: RichTextV2;
-  voice_id: string;
-  style?: string;
+  voice_alias: string;
+  style?: string | null;
   rate_percent?: number;
   pitch_semitones?: number;
 }
 
-export interface AdminTtsPreviewResponse {
+export interface AdminSpeechPreviewResponse {
+  cache_status: "hit" | "generated";
   audio_url: string;
   expires_at: string;
-  cached: boolean;
-  ssml: string;
+  url_expires_in_seconds: number;
 }

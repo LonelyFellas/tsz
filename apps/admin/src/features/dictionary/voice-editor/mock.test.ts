@@ -30,7 +30,7 @@ describe("mock voice preview adapter", () => {
     ).rejects.toMatchObject({ name: "AbortError" });
   });
 
-  it("synthesizes deterministic SSML and marks the second request cached", async () => {
+  it("synthesizes deterministic audio and marks the second request cached", async () => {
     const adapter = createMockVoicePreviewAdapter();
 
     const first = await adapter.synthesize(REQUEST);
@@ -38,8 +38,7 @@ describe("mock voice preview adapter", () => {
 
     expect(first).toMatchObject({
       cached: false,
-      audioUrl: expect.stringMatching(/^data:audio\/wav;base64,/),
-      ssml: expect.stringContaining('xml:lang="en-GB"')
+      audioUrl: expect.stringMatching(/^data:audio\/wav;base64,/)
     });
     expect(Number.isFinite(Date.parse(first.expiresAt))).toBe(true);
     expect(second.cached).toBe(true);
