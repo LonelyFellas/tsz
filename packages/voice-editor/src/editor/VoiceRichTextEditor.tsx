@@ -63,14 +63,37 @@ function errorMessage(error: unknown): string {
 
 function defaultVoiceSettings(voices: VoiceOption[]): VoiceSettings {
   const voice = voices.find((item) => item.isDefault) ?? voices[0];
-  return { voiceId: voice?.id ?? "" };
+  return {
+    voiceId: voice?.id ?? "",
+    ratePercent: defaultRangeValue(voice?.rateRange),
+    pitchSemitones: defaultRangeValue(voice?.pitchRange)
+  };
+}
+
+function defaultRangeValue(
+  range: VoiceOption["rateRange"] | VoiceOption["pitchRange"]
+): number | undefined {
+  if (!range) return undefined;
+  return range.min <= 0 && 0 <= range.max ? 0 : range.min;
 }
 
 function withinRange(
-  value: number,
+  value: number | undefined,
   range: VoiceOption["rateRange"] | VoiceOption["pitchRange"]
 ): boolean {
-  return !range || (range.min <= value && value <= range.max);
+  return Boolean(
+    value !== undefined && range && range.min <= value && value <= range.max
+  );
+}
+
+function controlledOptions(
+  presets: readonly number[],
+  range: VoiceOption["rateRange"] | VoiceOption["pitchRange"]
+): number[] {
+  if (!range) return [];
+  return [...new Set([...presets, range.min, range.max])]
+    .filter((value) => Number.isInteger(value) && withinRange(value, range))
+    .sort((left, right) => left - right);
 }
 
 export function VoiceRichTextEditor({
@@ -109,6 +132,7 @@ export function VoiceRichTextEditor({
   const previewAbortRef = useRef<AbortController | null>(null);
   const previewRequestHashRef = useRef("");
   const previewResultRef = useRef<VoicePreviewResult | null>(null);
+  const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const printCleanupRef = useRef<(() => void) | null>(null);
   const initialSerializedRef = useRef(JSON.stringify(initialValue));
 
@@ -173,11 +197,24 @@ export function VoiceRichTextEditor({
     previewResultRef.current = null;
   }, []);
 
+  const clearExpiryTimer = useCallback(() => {
+    if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
+    expiryTimerRef.current = null;
+  }, []);
+
   const cleanupPreview = useCallback(() => {
     previewAbortRef.current?.abort();
     previewAbortRef.current = null;
+    clearExpiryTimer();
     stopPreviewMedia();
-  }, [stopPreviewMedia]);
+  }, [clearExpiryTimer, stopPreviewMedia]);
+
+  const discardPreviewResult = useCallback(() => {
+    clearExpiryTimer();
+    stopPreviewMedia();
+    setPreviewResult(undefined);
+    setPreviewHash("");
+  }, [clearExpiryTimer, stopPreviewMedia]);
 
   useEffect(() => {
     if (!editor) return;
@@ -187,6 +224,8 @@ export function VoiceRichTextEditor({
   useEffect(() => {
     if (open) return;
     cleanupPreview();
+    setPreviewResult(undefined);
+    setPreviewHash("");
     setPreviewBusy(false);
   }, [cleanupPreview, open]);
 
@@ -276,13 +315,26 @@ export function VoiceRichTextEditor({
 
   useEffect(() => {
     if (!previewStale && !previewExpired) return;
-    audioRef.current?.pause();
+    discardPreviewResult();
     setPreviewStatus(
       previewExpired
         ? "试听已过期，请重新生成"
         : "内容或语音参数已变化，请重新生成试听"
     );
-  }, [previewExpired, previewStale]);
+  }, [discardPreviewResult, previewExpired, previewStale]);
+
+  useEffect(() => {
+    clearExpiryTimer();
+    if (!previewResult || previewStale) return;
+    const expiresIn = Date.parse(previewResult.expiresAt) - Date.now();
+    const expire = () => {
+      discardPreviewResult();
+      setPreviewStatus("试听已过期，请重新生成");
+    };
+    if (!Number.isFinite(expiresIn) || expiresIn <= 0) expire();
+    else expiryTimerRef.current = setTimeout(expire, expiresIn);
+    return clearExpiryTimer;
+  }, [clearExpiryTimer, discardPreviewResult, previewResult, previewStale]);
 
   const hasSelection = Boolean(selectionText);
 
@@ -353,16 +405,12 @@ export function VoiceRichTextEditor({
       style: nextVoice?.styles.includes(current.style ?? "")
         ? current.style
         : undefined,
-      ratePercent:
-        nextVoice?.supportsRate &&
-        withinRange(current.ratePercent ?? 0, nextVoice.rateRange)
-          ? current.ratePercent
-          : undefined,
-      pitchSemitones:
-        nextVoice?.supportsPitch &&
-        withinRange(current.pitchSemitones ?? 0, nextVoice.pitchRange)
-          ? current.pitchSemitones
-          : undefined
+      ratePercent: withinRange(current.ratePercent, nextVoice?.rateRange)
+        ? current.ratePercent
+        : defaultRangeValue(nextVoice?.rateRange),
+      pitchSemitones: withinRange(current.pitchSemitones, nextVoice?.pitchRange)
+        ? current.pitchSemitones
+        : defaultRangeValue(nextVoice?.pitchRange)
     }));
   };
 
@@ -379,7 +427,7 @@ export function VoiceRichTextEditor({
       return;
     }
     previewAbortRef.current?.abort();
-    stopPreviewMedia();
+    discardPreviewResult();
     const controller = new AbortController();
     previewAbortRef.current = controller;
     previewRequestHashRef.current = currentHash;
@@ -406,12 +454,31 @@ export function VoiceRichTextEditor({
       setPreviewHash(currentHash);
       const audio = new Audio(result.audioUrl);
       audioRef.current = audio;
+      audio.addEventListener(
+        "error",
+        () => {
+          if (audioRef.current !== audio) return;
+          discardPreviewResult();
+          setPreviewStatus("试听音频加载失败，请重新生成");
+        },
+        { once: true }
+      );
+      audio.addEventListener(
+        "ended",
+        () => {
+          if (audioRef.current !== audio) return;
+          setPreviewStatus(result.cached ? "已生成（缓存命中）" : "已生成试听");
+        },
+        { once: true }
+      );
       try {
         await audio.play();
+        if (audioRef.current !== audio) return;
         setPreviewStatus(
           result.cached ? "播放中（缓存命中）" : "播放中（新合成）"
         );
       } catch {
+        if (audioRef.current !== audio) return;
         setPreviewStatus(result.cached ? "已生成（缓存命中）" : "已生成试听");
       }
     } catch (error) {
@@ -431,10 +498,31 @@ export function VoiceRichTextEditor({
     audioRef.current?.pause();
     const audio = new Audio(previewResult.audioUrl);
     audioRef.current = audio;
+    audio.addEventListener(
+      "error",
+      () => {
+        if (audioRef.current !== audio) return;
+        discardPreviewResult();
+        setPreviewStatus("试听音频加载失败，请重新生成");
+      },
+      { once: true }
+    );
+    audio.addEventListener(
+      "ended",
+      () => {
+        if (audioRef.current !== audio) return;
+        setPreviewStatus(
+          previewResult.cached ? "已生成（缓存命中）" : "已生成试听"
+        );
+      },
+      { once: true }
+    );
     try {
       await audio.play();
+      if (audioRef.current !== audio) return;
       setPreviewStatus("播放中");
     } catch {
+      if (audioRef.current !== audio) return;
       setPreviewStatus("浏览器阻止自动播放，请再次点击重播");
     }
   };
@@ -460,6 +548,8 @@ export function VoiceRichTextEditor({
       if (!approved) return;
     }
     cleanupPreview();
+    setPreviewResult(undefined);
+    setPreviewHash("");
     setDirty(false);
     onDirtyChange?.(false);
     onCancel();
@@ -708,10 +798,11 @@ export function VoiceRichTextEditor({
             />
             <Select
               aria-label="整体语速"
-              value={settings.ratePercent ?? 0}
+              value={settings.ratePercent}
               disabled={!activeVoice?.supportsRate || readOnly}
-              options={RATE_OPTIONS.filter((rate) =>
-                withinRange(rate, activeVoice?.rateRange)
+              options={controlledOptions(
+                RATE_OPTIONS,
+                activeVoice?.rateRange
               ).map((rate) => ({
                 value: rate,
                 label:
@@ -725,10 +816,11 @@ export function VoiceRichTextEditor({
             />
             <Select
               aria-label="整体音高"
-              value={settings.pitchSemitones ?? 0}
+              value={settings.pitchSemitones}
               disabled={!activeVoice?.supportsPitch || readOnly}
-              options={PITCH_OPTIONS.filter((pitch) =>
-                withinRange(pitch, activeVoice?.pitchRange)
+              options={controlledOptions(
+                PITCH_OPTIONS,
+                activeVoice?.pitchRange
               ).map((pitch) => ({
                 value: pitch,
                 label:
@@ -759,7 +851,7 @@ export function VoiceRichTextEditor({
             >
               重播
             </Button>
-            <Typography.Text type="secondary">
+            <Typography.Text type="secondary" aria-live="polite">
               {previewAdapter
                 ? previewStatus
                 : "TTS 后端未启用，仍可编辑和导出"}

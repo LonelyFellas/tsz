@@ -49,21 +49,49 @@ const VOICES: VoiceOption[] = [
     supportsRate: false,
     supportsPitch: false,
     isDefault: false
+  },
+  {
+    id: "edge",
+    label: "Edge · 特殊范围",
+    locale: "en-US",
+    gender: "neutral",
+    styles: [],
+    supportsRate: true,
+    supportsPitch: false,
+    isDefault: false,
+    rateRange: { min: 12, max: 20 },
+    pitchRange: { min: 3, max: 3 }
   }
 ];
 
 class AudioMock {
   static instances: AudioMock[] = [];
   static rejectedPlays = 0;
-  readonly play = vi.fn(() =>
-    AudioMock.rejectedPlays-- > 0
+  static nextPlay: Promise<void> | undefined;
+  readonly play = vi.fn(() => {
+    const nextPlay = AudioMock.nextPlay;
+    AudioMock.nextPlay = undefined;
+    if (nextPlay) return nextPlay;
+    return AudioMock.rejectedPlays-- > 0
       ? Promise.reject(new Error("autoplay blocked"))
-      : Promise.resolve()
-  );
+      : Promise.resolve();
+  });
   readonly pause = vi.fn();
+  readonly listeners = new Map<string, EventListener>();
+  readonly addEventListener = vi.fn((type: string, listener: EventListener) => {
+    this.listeners.set(type, listener);
+  });
 
   constructor(public readonly src: string) {
     AudioMock.instances.push(this);
+  }
+
+  fail() {
+    this.listeners.get("error")?.(new Event("error"));
+  }
+
+  end() {
+    this.listeners.get("ended")?.(new Event("ended"));
   }
 }
 
@@ -128,6 +156,7 @@ async function selectOption(label: string, optionText: string) {
 beforeEach(() => {
   AudioMock.instances = [];
   AudioMock.rejectedPlays = 0;
+  AudioMock.nextPlay = undefined;
   vi.stubGlobal("Audio", AudioMock);
   vi.spyOn(window, "confirm").mockReturnValue(true);
   vi.spyOn(window, "print").mockImplementation(() => undefined);
@@ -208,8 +237,29 @@ describe("VoiceRichTextEditor", () => {
       expect(screen.getByText("播放中（缓存命中）")).toBeVisible()
     );
     expect(AudioMock.instances[0]!.play).toHaveBeenCalledOnce();
+    AudioMock.instances[0]!.end();
+    await waitFor(() =>
+      expect(screen.getByText("已生成（缓存命中）")).toBeVisible()
+    );
+    expect(screen.getByText("已生成（缓存命中）")).toHaveAttribute(
+      "aria-live",
+      "polite"
+    );
     fireEvent.click(actionButton("重播"));
     expect(AudioMock.instances[1]!.play).toHaveBeenCalledOnce();
+    await waitFor(() => expect(screen.getByText("播放中")).toBeVisible());
+    AudioMock.instances[1]!.end();
+    await waitFor(() =>
+      expect(screen.getByText("已生成（缓存命中）")).toBeVisible()
+    );
+    fireEvent.click(actionButton("重播"));
+    expect(AudioMock.instances[2]!.play).toHaveBeenCalledOnce();
+    AudioMock.instances[0]!.fail();
+    AudioMock.instances[0]!.end();
+    await waitFor(() => expect(screen.getByText("播放中")).toBeVisible());
+    AudioMock.instances[1]!.fail();
+    AudioMock.instances[1]!.end();
+    await waitFor(() => expect(screen.getByText("播放中")).toBeVisible());
 
     fireEvent.click(actionButton("插入停顿"));
     await waitFor(() =>
@@ -218,6 +268,7 @@ describe("VoiceRichTextEditor", () => {
       ).toBeVisible()
     );
     expect(actionButton("重播")).toBeDisabled();
+    expect(dispose).toHaveBeenCalledOnce();
 
     view.rerender(<VoiceRichTextEditor {...props} open={false} />);
     expect(AudioMock.instances.at(-1)!.pause).toHaveBeenCalled();
@@ -319,6 +370,166 @@ describe("VoiceRichTextEditor", () => {
     expect(actionButton("重播")).toBeDisabled();
   });
 
+  it("invalidates the short-lived URL on expiry or media failure", async () => {
+    const previewAdapter = adapter(
+      vi
+        .fn()
+        .mockResolvedValue(
+          result({ expiresAt: new Date(Date.now() + 40).toISOString() })
+        )
+    );
+    render(<VoiceRichTextEditor {...editorProps({ previewAdapter })} />);
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+    fireEvent.click(actionButton("生成试听"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+    await waitFor(
+      () => expect(screen.getByText("试听已过期，请重新生成")).toBeVisible(),
+      { timeout: 1000 }
+    );
+    expect(actionButton("重播")).toBeDisabled();
+
+    vi.mocked(previewAdapter.synthesize).mockResolvedValueOnce(result());
+    fireEvent.click(actionButton("生成试听"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(2));
+    AudioMock.instances[1]!.fail();
+    await waitFor(() =>
+      expect(screen.getByText("试听音频加载失败，请重新生成")).toBeVisible()
+    );
+
+    vi.mocked(previewAdapter.synthesize).mockResolvedValueOnce(result());
+    fireEvent.click(actionButton("生成试听"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(3));
+    await waitFor(() => expect(actionButton("重播")).toBeEnabled());
+    fireEvent.click(actionButton("重播"));
+    expect(AudioMock.instances).toHaveLength(4);
+    await waitFor(() => expect(screen.getByText("播放中")).toBeVisible());
+    AudioMock.instances[3]!.fail();
+    await waitFor(() =>
+      expect(screen.getByText("试听音频加载失败，请重新生成")).toBeVisible()
+    );
+    expect(actionButton("重播")).toBeDisabled();
+  });
+
+  it("invalidates a preview when expiresAt is not parseable", async () => {
+    const previewAdapter = adapter(
+      vi.fn().mockResolvedValue(result({ expiresAt: "not-a-date" }))
+    );
+    render(<VoiceRichTextEditor {...editorProps({ previewAdapter })} />);
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+    fireEvent.click(actionButton("生成试听"));
+    await waitFor(() =>
+      expect(screen.getByText("试听已过期，请重新生成")).toBeVisible()
+    );
+    expect(actionButton("重播")).toBeDisabled();
+  });
+
+  it("does not let delayed play completion overwrite stale content", async () => {
+    const previewAdapter = adapter();
+    let resolveReplay: (() => void) | undefined;
+    render(<VoiceRichTextEditor {...editorProps({ previewAdapter })} />);
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+    fireEvent.click(actionButton("生成试听"));
+    await waitFor(() => expect(actionButton("重播")).toBeEnabled());
+
+    AudioMock.nextPlay = new Promise<void>((resolve) => {
+      resolveReplay = resolve;
+    });
+    fireEvent.click(actionButton("重播"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(2));
+    fireEvent.click(actionButton("插入停顿"));
+    await waitFor(() =>
+      expect(
+        screen.getByText("内容或语音参数已变化，请重新生成试听")
+      ).toBeVisible()
+    );
+    resolveReplay?.();
+    await waitFor(() => expect(actionButton("重播")).toBeDisabled());
+    expect(
+      screen.getByText("内容或语音参数已变化，请重新生成试听")
+    ).toBeVisible();
+  });
+
+  it("does not let delayed autoplay overwrite expiry", async () => {
+    let resolveExpiredPlay: (() => void) | undefined;
+    AudioMock.nextPlay = new Promise<void>((resolve) => {
+      resolveExpiredPlay = resolve;
+    });
+    const previewAdapter = adapter(
+      vi
+        .fn()
+        .mockResolvedValue(
+          result({ expiresAt: new Date(Date.now() + 40).toISOString() })
+        )
+    );
+    render(<VoiceRichTextEditor {...editorProps({ previewAdapter })} />);
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+    fireEvent.click(actionButton("生成试听"));
+    await waitFor(() =>
+      expect(screen.getByText("试听已过期，请重新生成")).toBeVisible()
+    );
+    resolveExpiredPlay?.();
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+    expect(screen.getByText("试听已过期，请重新生成")).toBeVisible();
+  });
+
+  it("does not let delayed autoplay overwrite media errors", async () => {
+    let rejectFailedPlay: ((error: Error) => void) | undefined;
+    AudioMock.nextPlay = new Promise<void>((_resolve, reject) => {
+      rejectFailedPlay = reject;
+    });
+    const previewAdapter = adapter();
+    render(<VoiceRichTextEditor {...editorProps({ previewAdapter })} />);
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+    fireEvent.click(actionButton("生成试听"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+    AudioMock.instances[0]!.fail();
+    await waitFor(() =>
+      expect(screen.getByText("试听音频加载失败，请重新生成")).toBeVisible()
+    );
+    rejectFailedPlay?.(new Error("late autoplay failure"));
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+    expect(screen.getByText("试听音频加载失败，请重新生成")).toBeVisible();
+  });
+
+  it("does not let delayed replay rejection overwrite media errors", async () => {
+    const previewAdapter = adapter();
+    render(<VoiceRichTextEditor {...editorProps({ previewAdapter })} />);
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+    fireEvent.click(actionButton("生成试听"));
+    await waitFor(() => expect(actionButton("重播")).toBeEnabled());
+
+    let rejectReplay: ((error: Error) => void) | undefined;
+    AudioMock.nextPlay = new Promise<void>((_resolve, reject) => {
+      rejectReplay = reject;
+    });
+    fireEvent.click(actionButton("重播"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(2));
+    AudioMock.instances[1]!.fail();
+    await waitFor(() =>
+      expect(screen.getByText("试听音频加载失败，请重新生成")).toBeVisible()
+    );
+    rejectReplay?.(new Error("late replay failure"));
+    await waitFor(() => expect(actionButton("重播")).toBeDisabled());
+    expect(screen.getByText("试听音频加载失败，请重新生成")).toBeVisible();
+  });
+
+  it("discards a valid signed URL when the editor closes", async () => {
+    const dispose = vi.fn();
+    const previewAdapter = adapter(
+      vi.fn().mockResolvedValue(result({ dispose }))
+    );
+    const props = editorProps({ previewAdapter });
+    const view = render(<VoiceRichTextEditor {...props} />);
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+    fireEvent.click(actionButton("生成试听"));
+    await waitFor(() => expect(actionButton("重播")).toBeEnabled());
+    view.rerender(<VoiceRichTextEditor {...props} open={false} />);
+    expect(dispose).toHaveBeenCalledOnce();
+    view.rerender(<VoiceRichTextEditor {...props} open />);
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+    expect(actionButton("重播")).toBeDisabled();
+  });
+
   it("suppresses a synthesis rejection after the request is aborted", async () => {
     const abortedAdapter = adapter(
       vi.fn(
@@ -374,6 +585,32 @@ describe("VoiceRichTextEditor", () => {
     expect(screen.getByLabelText("说话风格")).toBeDisabled();
     expect(screen.getByLabelText("整体语速")).toBeDisabled();
     expect(screen.getByLabelText("整体音高")).toBeDisabled();
+  });
+
+  it("uses capability boundaries when zero and fixed presets are unavailable", async () => {
+    const synthesize = vi.fn().mockResolvedValue(result());
+    render(
+      <VoiceRichTextEditor
+        {...editorProps({ previewAdapter: adapter(synthesize) })}
+      />
+    );
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+    await selectOption("发音人", "Guy · 美式男声");
+    await selectOption("发音人", "Edge · 特殊范围");
+    fireEvent.click(actionButton("生成试听"));
+    await waitFor(() => expect(synthesize).toHaveBeenCalledOnce());
+    expect(synthesize.mock.calls[0]![0]).toMatchObject({
+      voiceId: "edge",
+      ratePercent: 12,
+      pitchSemitones: 3
+    });
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+    AudioMock.instances[0]!.end();
+    await waitFor(() => expect(screen.getByText("已生成试听")).toBeVisible());
+    fireEvent.click(actionButton("重播"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(2));
+    AudioMock.instances[1]!.end();
+    await waitFor(() => expect(screen.getByText("已生成试听")).toBeVisible());
   });
 
   it("handles empty, fallback, failed, and aborted voice catalogs", async () => {
