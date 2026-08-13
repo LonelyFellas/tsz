@@ -33,6 +33,8 @@ const PART_OF_SPEECH_CATALOG: PartOfSpeechCatalogResponse = {
       name_en: "NOUN",
       abbreviation: "n.",
       sort_order: 10,
+      allowed_form_types: ["plural"],
+      default_form_types: ["plural"],
       sub_parts: [
         {
           id: "sub-pos-config-n-count",

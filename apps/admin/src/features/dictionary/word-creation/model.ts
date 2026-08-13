@@ -52,6 +52,24 @@ export const WORD_STEP_TITLE = {
   preview: "预览并生效"
 } as const;
 
+type DerivedFormType = Exclude<WordFormType, "base">;
+
+export function legalDerivedFormTypes(
+  _pos: WordPosTag,
+  configured?: readonly DerivedFormType[]
+): DerivedFormType[] {
+  return [...(configured ?? [])];
+}
+
+export function defaultDerivedFormType(
+  pos: WordPosTag,
+  existing: readonly DerivedFormType[],
+  configured?: readonly DerivedFormType[]
+): DerivedFormType | undefined {
+  const legal = legalDerivedFormTypes(pos, configured);
+  return legal.find((type) => !existing.includes(type)) ?? legal[0];
+}
+
 export function wordDisplayHeadword(word: AdminWordV2): string {
   return word.headwords.mode === "unified"
     ? word.headwords.common

@@ -16,6 +16,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminWordsMock } from "../mock/adminWordsMock";
 import { FormsAndPronunciationStep } from "./FormsAndPronunciationStep";
+import { partOfSpeechCatalogFixture } from "./partOfSpeech.test.helper";
 import { deferred, wordFixture } from "./wordCreation.test.helper";
 
 const mutations = vi.hoisted(() => ({
@@ -25,6 +26,9 @@ const mutations = vi.hoisted(() => ({
 }));
 const dataSourceCapabilities = vi.hoisted(() => ({
   dialectVariantSuggestions: true
+}));
+const catalogState = vi.hoisted(() => ({
+  data: undefined as typeof partOfSpeechCatalogFixture | undefined
 }));
 vi.mock("../dataSource", () => ({
   adminWordsDataSourceCapabilities: dataSourceCapabilities
@@ -45,10 +49,15 @@ vi.mock("./api", () => ({
   })
 }));
 
-vi.mock("../part-of-speech/api", async () => {
-  const { partOfSpeechCatalogQueryResult } =
-    await import("./partOfSpeech.test.helper");
-  return { usePartOfSpeechCatalog: partOfSpeechCatalogQueryResult };
+vi.mock("../part-of-speech/api", () => {
+  return {
+    usePartOfSpeechCatalog: () => ({
+      data: catalogState.data,
+      isError: false,
+      isPending: false,
+      isLoading: false
+    })
+  };
 });
 
 function button(label: string): HTMLButtonElement {
@@ -119,6 +128,7 @@ function renderStep(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  catalogState.data = partOfSpeechCatalogFixture;
   dataSourceCapabilities.dialectVariantSuggestions = true;
   mutations.preview.mockResolvedValue({
     base_revision: 3,
@@ -132,6 +142,32 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("FormsAndPronunciationStep", () => {
+  it("catalog 未下发词形能力时禁止新增和完成", async () => {
+    catalogState.data = {
+      ...partOfSpeechCatalogFixture,
+      items: partOfSpeechCatalogFixture.items.map(
+        ({
+          allowed_form_types: _allowed,
+          default_form_types: _defaults,
+          ...item
+        }) => item
+      )
+    };
+    renderStep();
+
+    expect(screen.getByText("词形规则未加载")).toBeVisible();
+    expect(
+      screen.getByText(
+        "现有词形仅供查看；重新加载到服务端词性能力后才能新增或完成本步骤。"
+      )
+    ).toBeVisible();
+    expect(button("添加派生词形")).toBeDisabled();
+
+    fireEvent.click(button("完成并进入词义与例句"));
+    expect(await screen.findByText("名词的词形规则未加载")).toBeVisible();
+    expect(mutations.preview).not.toHaveBeenCalled();
+  });
+
   it("词形与发音只使用基本词性，不展示配置层级的细分词性 Tab", () => {
     renderStep();
 
@@ -309,8 +345,9 @@ describe("FormsAndPronunciationStep", () => {
     fireEvent.click(button("完成并进入词义与例句"));
 
     expect(
-      await screen.findByText("请完善各词性基准原形的字典音标和实际发音")
+      await screen.findByText("名词基准原形缺少字典音标或实际发音")
     ).toBeInTheDocument();
+    expect(screen.getByText("本步骤还有 1 项待修正")).toBeInTheDocument();
     expect(mutations.preview).not.toHaveBeenCalled();
     expect(mutations.save).not.toHaveBeenCalled();
   });

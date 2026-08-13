@@ -1557,7 +1557,7 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("保存草稿")).toBeNull();
   });
 
-  it("语音编辑器按稳定节点和当前方言回写语法、英文释义、英文例句，中文仍使用 TextArea", async () => {
+  it("普通文本可直接编辑，按需打开高级语音编辑并按稳定节点回写", async () => {
     featureFlags.VOICE_EDITOR = true;
     const word = wordFixture({ ready: true });
     const firstDefinition = word.meanings.pos[0]!.senses[0]!.definitions[0]!;
@@ -1594,12 +1594,19 @@ describe("MeaningsAndExamplesStep", () => {
     };
     renderStep(word);
 
+    const plainDefinition = screen.getByDisplayValue("American definition");
+    expect(plainDefinition).toBeInstanceOf(HTMLTextAreaElement);
+    fireEvent.change(plainDefinition, {
+      target: { value: "American definition updated" }
+    });
+    expect(screen.queryByLabelText("测试语音编辑器")).toBeNull();
+
     const applyField = async (text: string) => {
-      const field = screen
-        .getAllByTestId("voice-rich-text-field")
-        .find((candidate) => candidate.textContent?.includes(text));
+      const field = screen.getByDisplayValue(text);
       if (!field) throw new Error(`voice field not found: ${text}`);
-      const editButton = field.querySelector("button");
+      const editButton = field
+        .closest(".ant-space-compact")
+        ?.querySelector("button");
       if (!editButton) throw new Error(`edit button not found: ${text}`);
       fireEvent.click(editButton);
       const dialog = await screen.findByLabelText("测试语音编辑器");
@@ -1613,7 +1620,7 @@ describe("MeaningsAndExamplesStep", () => {
     };
 
     await applyField("a centre");
-    await applyField("American definition");
+    await applyField("American definition updated");
     await applyField("The center is here.");
     expect(screen.getAllByLabelText("汉语译文")[0]).toBeInstanceOf(
       HTMLTextAreaElement

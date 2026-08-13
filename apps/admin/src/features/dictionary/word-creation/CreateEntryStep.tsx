@@ -98,6 +98,31 @@ function DetectionStatus({
     smart.status === "duplicate"
       ? smart.duplicates.find((item) => item.status === "archived")
       : undefined;
+  const suggestionCoverage =
+    builtin.status === "matched"
+      ? builtin.suggested_forms.pos.reduce(
+          (summary, pos) => {
+            const slots = [
+              pos.base_form,
+              ...pos.form_groups.flatMap((group) => group.slots)
+            ];
+            for (const slot of slots) {
+              summary.forms += slot.variants.filter((variant) =>
+                variant.spelling.trim()
+              ).length;
+              for (const variant of slot.variants) {
+                summary.pronunciations += variant.pronunciations.filter(
+                  (pronunciation) =>
+                    pronunciation.dict_phonetic.trim() &&
+                    pronunciation.actual_pron.trim()
+                ).length;
+              }
+            }
+            return summary;
+          },
+          { forms: 0, pronunciations: 0 }
+        )
+      : undefined;
   return (
     <Card
       className="word-detection-result-card"
@@ -125,6 +150,11 @@ function DetectionStatus({
                 : builtin.status === "not_found"
                   ? "内置词典没有匹配项"
                   : "内置词典暂时不可用"
+          }
+          description={
+            builtin.status === "matched"
+              ? `本次实际带出 ${suggestionCoverage?.forms ?? 0} 个词形、${suggestionCoverage?.pronunciations ?? 0} 组完整读音。释义、例句和词频若未显示，将在后续步骤明确要求人工补充。`
+              : undefined
           }
         />
         <Descriptions column={1} size="small">
