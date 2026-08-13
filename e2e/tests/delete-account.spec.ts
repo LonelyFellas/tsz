@@ -17,9 +17,12 @@ test.describe("注销账号端到端流程", () => {
 
     // 默认手机渠道：获取验证码 → 填验证码 → 确认注销。
     await page.getByRole("button", { name: "获取验证码" }).click();
-    await expect(page.getByText(/后重发/)).toBeVisible();
-    await page.getByPlaceholder("请输入验证码").fill("123456");
-    await page.getByRole("button", { name: "确认注销" }).click();
+    await expect(page.getByRole("status")).toContainText("验证码申请已受理");
+    await page.getByPlaceholder("6 位数字验证码").fill("000000");
+    await page.getByRole("button", { name: "继续注销" }).click();
+    const dialog = page.getByRole("dialog", { name: /最后确认/ });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole("button", { name: "确认永久注销" }).click();
 
     // 注销成功后跳回登录页并展示成功提示。
     await expect(page).toHaveURL(/\/login\?deleted=success/);
@@ -27,20 +30,25 @@ test.describe("注销账号端到端流程", () => {
   });
 
   test("同时绑定手机/邮箱时可切换渠道注销", async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 });
     await mockApi(page, { authenticated: true });
 
     await page.goto("/account/delete");
     await expect(page.getByRole("heading", { name: "注销账号" })).toBeVisible();
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth
+      )
+    ).toBe(true);
 
-    // 切到邮箱渠道，展示在档邮箱（只读输入）并完成注销。
-    await page.getByRole("button", { name: "邮箱" }).click();
-    await expect(page.locator("input[disabled]")).toHaveValue(
-      "alice@example.com"
-    );
+    // 切到邮箱渠道，展示在档邮箱并完成注销。
+    await page.getByLabel(/邮箱验证/).check();
+    await expect(page.getByText("alice@example.com")).toBeVisible();
 
     await page.getByRole("button", { name: "获取验证码" }).click();
-    await page.getByPlaceholder("请输入验证码").fill("123456");
-    await page.getByRole("button", { name: "确认注销" }).click();
+    await page.getByPlaceholder("6 位数字验证码").fill("000000");
+    await page.getByRole("button", { name: "继续注销" }).click();
+    await page.getByRole("button", { name: "确认永久注销" }).click();
 
     await expect(page).toHaveURL(/\/login\?deleted=success/);
   });

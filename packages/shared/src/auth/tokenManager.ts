@@ -28,15 +28,20 @@ export function createTokenManager({
   let accessToken: string | null = null;
   let refreshTimer: ReturnType<typeof setTimeout> | null = null;
   let tokenExpiresAt = 0; // Unix ms，token 过期时间，用于可见性检测
+  // 每次外部写入/清除 token 都推进代次；旧 refresh 即使随后返回，也不能
+  // 覆盖登出、注销或更新登录建立的新会话。
+  let sessionGeneration = 0;
   // 单例 Promise：多个并发请求同时触发刷新时，共享同一次网络请求，避免竞态。
   let refreshingPromise: Promise<string> | null = null;
 
   function setAccessToken(token: string | null) {
+    sessionGeneration += 1;
     accessToken = token;
     // token 清除时同步取消定时器，防止已登出后仍触发刷新。
     if (!token) {
       if (refreshTimer) clearTimeout(refreshTimer);
       refreshTimer = null;
+      tokenExpiresAt = 0;
     }
   }
 
@@ -47,6 +52,7 @@ export function createTokenManager({
 
   function refreshTokens(): Promise<string> {
     if (refreshingPromise) return refreshingPromise;
+    const requestGeneration = sessionGeneration;
 
     refreshingPromise = fetch(`${baseUrl}/auth/refresh`, {
       method: "POST",
@@ -58,6 +64,9 @@ export function createTokenManager({
           access_token: string;
           expires_in: number;
         };
+        // 请求发出后若会话已被清除或替换，丢弃旧结果。Promise 仍正常完成，
+        // 避免主动刷新调用方把“会话主动终止”误当成网络失败再次跳转。
+        if (requestGeneration !== sessionGeneration) return data.access_token;
         setAccessToken(data.access_token);
         scheduleRefresh(data.expires_in); // 用后端返回的 expires_in 重新排期
         return data.access_token;

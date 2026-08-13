@@ -39,11 +39,9 @@ const PENDING = new Set<string>([
   "put /me/learning-settings",
   "post /me/avatar/upload-url",
   "post /me/avatar",
-  // 找回密码 / 注销账号(tsz-rust 未实现)。
+  // 找回密码(tsz-rust 未实现)。
   "post /auth/password/forgot",
   "post /auth/password/reset",
-  "post /auth/account/deletion-code",
-  "delete /auth/account",
   // 教师申请:ApplyTeacherForm 在用,但后端 spec 暂无此路由。
   "post /auth/apply-teacher",
   // 词库 / 词表 / 评论 / 任务:目前全是前端 mock(useWordLists 等),后端未实现。

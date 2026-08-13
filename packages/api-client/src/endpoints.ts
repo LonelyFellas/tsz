@@ -1,7 +1,10 @@
 // 按业务域组织的接口定义(纯函数,接受 HttpClient)。
 // features/*/api.ts 负责把这些绑定到具体的 client 实例。
 import type {
+  AccountDeletionChannel,
+  AccountDeletionCodeRequest,
   Comment,
+  ConfirmAccountDeletionRequest,
   Paginated,
   Task,
   User,
@@ -63,7 +66,8 @@ export interface LearningSettingsResponse {
  * 注销账号的验证渠道：验证码始终发往账号本人「在档」的手机或邮箱（二选一），
  * 而非请求里的值——以此证明账号归属。仅绑定其中一项的账号只能用对应渠道。
  */
-export type DeletionChannel = "phone" | "email";
+/** @deprecated 请从 @tsz/types 使用 AccountDeletionChannel。 */
+export type DeletionChannel = AccountDeletionChannel;
 
 /** 头像上传的 MIME 白名单（与后端一致；被签进预签名 URL，PUT 时必须完全一致）。 */
 export const AVATAR_CONTENT_TYPES = [
@@ -192,16 +196,18 @@ export function createEndpoints(http: HttpClient) {
        * POST /auth/account/deletion-code — 请求账号注销验证码。
        * 验证码发往账号本人在档的手机/邮箱（由 channel 决定），5 分钟有效。
        */
-      requestDeletionCode: (channel: DeletionChannel) =>
-        http.post<{ status: string }>("/auth/account/deletion-code", {
-          channel
-        }),
+      requestDeletionCode: (input: AccountDeletionCodeRequest) =>
+        http.post<void>("/auth/account/deletion-code", input),
       /**
        * DELETE /auth/account — 校验验证码后永久删除当前账号。
        * 不可恢复：级联清除角色/资料/会话，用户全端登出，手机号/邮箱释放可重新注册。
        */
-      deleteAccount: (channel: DeletionChannel, code: string) =>
-        http.del<void>("/auth/account", { channel, code }),
+      deleteAccount: (input: ConfirmAccountDeletionRequest) =>
+        // 本端点的 401 既可能是验证码错误，也可能是 invalid_token；不能在
+        // http 层盲目 refresh + 重放高风险 DELETE，由调用方按稳定 code 处理。
+        http.del<void>("/auth/account", input, {
+          retryOnUnauthorized: false
+        }),
       applyTeacher: (profile: Record<string, string>) =>
         http.post<User>("/auth/apply-teacher", { profile }),
       /** PUT /me/learning-settings — 设置 CEFR 等级 + 英式/美式（新用户 onboarding 与后续修改共用） */

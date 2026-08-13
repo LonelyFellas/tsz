@@ -251,7 +251,8 @@ export function createHttpClient({
     path: string,
     init: RequestInit = {},
     retrying = false,
-    skipAuth = false
+    skipAuth = false,
+    retryOnUnauthorized = true
   ): Promise<T> {
     // 公开端点(登录/注册等)不带 access token，避免遗留的旧 token 污染请求。
     const token = skipAuth ? undefined : await getToken?.();
@@ -270,10 +271,16 @@ export function createHttpClient({
 
     // 只有携带了 access token 的请求才触发 refresh 逻辑。
     // 无 token 时(如登录接口)，401 代表凭证错误，直接抛出即可。
-    if (res.status === 401 && !retrying && token && onRefresh) {
+    if (
+      res.status === 401 &&
+      !retrying &&
+      token &&
+      onRefresh &&
+      retryOnUnauthorized
+    ) {
       try {
         await onRefresh();
-        return request<T>(path, init, true);
+        return request<T>(path, init, true, skipAuth, retryOnUnauthorized);
       } catch {
         onSessionExpired?.();
         throw new HttpError(401, "session expired");
@@ -329,12 +336,22 @@ export function createHttpClient({
       request<T>(path, { method: "PUT", body: JSON.stringify(data) }),
     patch: <T>(path: string, data?: unknown) =>
       request<T>(path, { method: "PATCH", body: JSON.stringify(data) }),
-    del: <T>(path: string, data?: unknown) =>
-      request<T>(path, {
-        method: "DELETE",
-        // 部分删除接口需要请求体（如注销账号需带 channel + code）。
-        ...(data !== undefined ? { body: JSON.stringify(data) } : {})
-      })
+    del: <T>(
+      path: string,
+      data?: unknown,
+      opts?: { retryOnUnauthorized?: boolean }
+    ) =>
+      request<T>(
+        path,
+        {
+          method: "DELETE",
+          // 部分删除接口需要请求体（如注销账号需带 channel + code）。
+          ...(data !== undefined ? { body: JSON.stringify(data) } : {})
+        },
+        false,
+        false,
+        opts?.retryOnUnauthorized ?? true
+      )
   };
 }
 

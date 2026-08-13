@@ -95,9 +95,36 @@ export async function mockApi(page: Page, opts: MockOptions = {}) {
       return route.fulfill({ status: 204, body: "" });
     }
     if (path === "/auth/account/deletion-code" && method === "POST") {
-      return json(route, 200, { status: "sent" });
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      if (
+        !["phone", "email"].includes(String(body.channel)) ||
+        Object.keys(body).sort().join(",") !== "channel"
+      ) {
+        return json(route, 422, {
+          type: "urn:tsz:problem:invalid_request_body",
+          title: "Invalid request body",
+          status: 422,
+          detail: "unexpected account deletion payload",
+          code: "invalid_request_body"
+        });
+      }
+      return route.fulfill({ status: 202, body: "" });
     }
     if (path === "/auth/account" && method === "DELETE") {
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      if (
+        !["phone", "email"].includes(String(body.channel)) ||
+        body.code !== "000000" ||
+        Object.keys(body).sort().join(",") !== "channel,code"
+      ) {
+        return json(route, 422, {
+          type: "urn:tsz:problem:invalid_request_body",
+          title: "Invalid request body",
+          status: 422,
+          detail: "unexpected account deletion payload",
+          code: "invalid_request_body"
+        });
+      }
       deleted = true;
       return route.fulfill({ status: 204, body: "" });
     }

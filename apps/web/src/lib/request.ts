@@ -12,6 +12,11 @@ export function setAccessToken(token: string | null) {
   tokens.setAccessToken(token);
 }
 
+/** 终止当前会话：清 token/刷新排期和完整用户状态；导航由调用方决定。 */
+export function clearSession() {
+  authRuntime.clearSession();
+}
+
 /** 在 expiresIn 秒后（提前 30 秒）自动刷新，形成自滚动定时器。 */
 export function scheduleRefresh(expiresIn: number) {
   tokens.scheduleRefresh(expiresIn);

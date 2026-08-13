@@ -1,224 +1,399 @@
 "use client";
 
-import type { DeletionChannel } from "@tsz/api-client";
+import { Button, Card } from "@tsz/ui";
+import type { AccountDeletionChannel } from "@tsz/types";
+import { HttpError } from "@tsz/api-client";
 import { isCode } from "@tsz/shared";
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { api, setAccessToken } from "@/lib/request";
+import { api, clearSession } from "@/lib/request";
 import { useUserStore } from "@/stores/user";
-import { AUTH_INPUT_CLASS, translateAuthError } from "../shared";
-
-// 注销账号：deletion-code 发验证码（发往账号在档手机/邮箱）→ DELETE /auth/account 校验后永久删除。
-// 错误文案对齐后端 /auth/account/*（见 api.md）。
-const DELETE_ERRORS: Record<string, string> = {
-  "too many code requests, try again later": "验证码发送过于频繁，请稍后再试",
-  "invalid or expired deletion code": "验证码错误或已失效，请重新获取",
-  "verification channel unavailable for this account":
-    "该账号未绑定此渠道，无法用此方式注销",
-  "user not found": "账号不存在或已注销"
-};
+import { AUTH_INPUT_CLASS } from "../shared";
 
 const CODE_COUNTDOWN = 60;
 
-const CHANNEL_LABEL: Record<DeletionChannel, string> = {
+const CHANNEL_LABEL: Record<AccountDeletionChannel, string> = {
   phone: "手机",
   email: "邮箱"
 };
 
-export function DeleteAccountForm() {
-  const user = useUserStore((s) => s.user);
-  const router = useRouter();
+const ERROR_BY_CODE: Record<string, string> = {
+  invalid_account_deletion_code: "验证码错误、已失效或已使用，请重新获取",
+  account_deletion_channel_unavailable:
+    "当前账号没有可用于验证的该渠道，请选择其他方式",
+  otp_rate_limited: "验证码申请过于频繁，请稍后再试",
+  otp_unavailable: "验证码服务暂时不可用，请稍后重试",
+  invalid_json: "请求格式错误，请刷新页面后重试",
+  invalid_request_body: "提交内容不完整，请检查后重试",
+  internal_error: "服务暂时异常，请稍后重试"
+};
 
-  // 仅展示账号实际绑定的渠道：只绑定其中一项时，另一种方式不显示（见原型批注）。
-  const channels = useMemo<DeletionChannel[]>(() => {
-    const list: DeletionChannel[] = [];
-    if (user?.phone) list.push("phone");
-    if (user?.email) list.push("email");
-    return list;
+function accountDeletionError(error: unknown): string {
+  if (!(error instanceof HttpError)) return "网络异常，请检查连接后重试";
+  const mapped = error.code ? ERROR_BY_CODE[error.code] : undefined;
+  if (mapped) return mapped;
+  if (error.status === 400 || error.status === 422) {
+    return "提交内容有误，请检查后重试";
+  }
+  if (error.status === 500) return "服务暂时异常，请稍后重试";
+  return "操作失败，请稍后重试";
+}
+
+export function DeleteAccountForm() {
+  const user = useUserStore((state) => state.user);
+  const router = useRouter();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogWasOpen = useRef(false);
+
+  const channels = useMemo<AccountDeletionChannel[]>(() => {
+    const available: AccountDeletionChannel[] = [];
+    if (user?.phone) available.push("phone");
+    if (user?.email) available.push("email");
+    return available;
   }, [user?.phone, user?.email]);
 
   const [selectedChannel, setSelectedChannel] =
-    useState<DeletionChannel>("phone");
+    useState<AccountDeletionChannel>("phone");
   const [code, setCode] = useState("");
   const [countdown, setCountdown] = useState(0);
+  const [codeRequested, setCodeRequested] = useState(false);
   const [sending, setSending] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  // 生效渠道由「用户选择」收敛到「账号实际可用渠道」：选择不可用时回退到第一个可用渠道。
-  // 用派生值而非 effect 同步，避免在渲染后再触发一次 setState。
-  const channel: DeletionChannel = channels.includes(selectedChannel)
+  const channel: AccountDeletionChannel = channels.includes(selectedChannel)
     ? selectedChannel
     : (channels[0] ?? "phone");
+  const canSendCode = countdown === 0 && !sending && !deleting;
+  const canContinue = codeRequested && isCode(code) && !sending && !deleting;
 
-  // 验证码倒计时（与找回密码一致）。
   useEffect(() => {
     if (countdown <= 0) return;
-    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(timer);
+    const timer = window.setTimeout(
+      () => setCountdown((current) => current - 1),
+      1000
+    );
+    return () => window.clearTimeout(timer);
   }, [countdown]);
 
-  const target = channel === "phone" ? user?.phone : user?.email;
-  const codeValid = isCode(code);
-  const canSendCode = countdown === 0 && !sending;
-  const canSubmit = codeValid && !loading;
+  useEffect(() => {
+    if (confirmOpen) {
+      dialogRef.current?.focus();
+    } else if (dialogWasOpen.current) {
+      document.getElementById("continue-account-deletion")?.focus();
+    }
+    dialogWasOpen.current = confirmOpen;
+  }, [confirmOpen]);
 
-  function switchChannel(next: DeletionChannel) {
-    if (next === channel) return;
+  function expireSession() {
+    clearSession();
+    window.location.replace("/login?session=expired");
+  }
+
+  function handleRequestError(cause: unknown) {
+    if (cause instanceof HttpError && cause.code === "invalid_token") {
+      expireSession();
+      return;
+    }
+    setError(accountDeletionError(cause));
+  }
+
+  function switchChannel(next: AccountDeletionChannel) {
+    if (next === channel || sending || deleting) return;
     setSelectedChannel(next);
     setCode("");
-    setError("");
     setCountdown(0);
-  }
-
-  function translate(e: unknown): string {
-    const msg = e instanceof Error ? e.message : "";
-    return translateAuthError(msg, DELETE_ERRORS, "操作失败，请稍后重试");
-  }
-
-  async function handleSendCode() {
-    if (!canSendCode) return;
+    setCodeRequested(false);
+    setMessage("");
     setError("");
+  }
+
+  async function requestCode() {
+    if (!canSendCode) return;
     setSending(true);
+    setMessage("");
+    setError("");
     try {
-      await api.auth.requestDeletionCode(channel);
+      await api.auth.requestDeletionCode({ channel });
+      setCodeRequested(true);
       setCountdown(CODE_COUNTDOWN);
-    } catch (e: unknown) {
-      setError(translate(e));
+      setMessage(
+        `验证码申请已受理，将发送至当前账号的${CHANNEL_LABEL[channel]}`
+      );
+    } catch (cause: unknown) {
+      handleRequestError(cause);
     } finally {
       setSending(false);
     }
   }
 
-  async function handleDelete(e: FormEvent) {
-    e.preventDefault();
-    if (!canSubmit) return;
+  function continueDeletion(event: FormEvent) {
+    event.preventDefault();
+    if (!canContinue) return;
     setError("");
-    setLoading(true);
+    setConfirmOpen(true);
+  }
+
+  async function confirmDeletion() {
+    if (deleting || !canContinue) return;
+    setDeleting(true);
+    setError("");
     try {
-      await api.auth.deleteAccount(channel, code);
-      // 账号已删除：清内存 token，并整页跳转回登录页（带成功提示）。
-      // 不调用 /auth/logout——账号已不存在，无需也无法再吊销。
-      // 用整页跳转而非 router.replace，原因有二：
-      //   1) 彻底重置前端内存状态（store / 定时器），避免残留已删账号的会话痕迹；
-      //   2) 规避竞态——若在本受保护页用 setUser(null) 清登录态，RouteGuard 会先把
-      //      当前路由重定向到 /login?redirect=...，反而盖掉成功跳转。
-      setAccessToken(null);
+      await api.auth.deleteAccount({ channel, code });
+      clearSession();
       window.location.replace("/login?deleted=success");
-    } catch (e: unknown) {
-      setError(translate(e));
-      setLoading(false);
+    } catch (cause: unknown) {
+      handleRequestError(cause);
+      setDeleting(false);
     }
   }
 
-  // 会话恢复完成（hydrated）由路由守卫保证；此处仅兜底无可用渠道的极端情况。
   if (channels.length === 0) {
     return (
-      <div className="mx-auto max-w-md py-16 text-center text-sm text-foreground-subtle">
-        当前账号未绑定可用于验证的手机号或邮箱，无法注销。
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <h1 className="text-xl font-bold text-foreground">无法注销账号</h1>
+        <p className="mt-3 text-sm leading-6 text-foreground-subtle">
+          当前账号没有已绑定的手机号或邮箱，请先联系客服处理。
+        </p>
+        <Button
+          className="mt-6"
+          variant="secondary"
+          onClick={() => router.back()}
+        >
+          返回
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="mx-auto max-w-md py-8">
-      <div className="mb-6 flex items-center gap-4">
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="text-sm text-foreground-muted transition-colors hover:text-foreground"
-        >
-          ← 返回
-        </button>
-        <h1 className="flex-1 text-center text-xl font-bold text-foreground">
-          注销账号
-        </h1>
-        {/* 占位，让标题视觉居中 */}
-        <span className="w-8" aria-hidden />
+    <main className="mx-auto w-full max-w-lg px-4 py-8 sm:py-12">
+      <div
+        data-testid="account-deletion-content"
+        inert={confirmOpen}
+        aria-hidden={confirmOpen || undefined}
+      >
+        <div className="mb-6 flex items-center gap-3">
+          <Button
+            variant="ghost"
+            className="-ml-3 px-3"
+            onClick={() => router.back()}
+          >
+            ← 返回
+          </Button>
+          <h1 className="flex-1 pr-14 text-center text-xl font-bold text-foreground">
+            注销账号
+          </h1>
+        </div>
+
+        <Card className="rounded-3xl border-danger/30 p-5 sm:p-8">
+          <section
+            aria-labelledby="deletion-warning-title"
+            className="mb-7 rounded-2xl bg-danger/10 p-4 text-danger"
+          >
+            <h2 id="deletion-warning-title" className="font-semibold">
+              注销后不可恢复
+            </h2>
+            <p className="mt-2 text-sm leading-6">
+              账号资料、学习记录及相关权益将永久清除；以后重新注册也无法找回这些数据。
+            </p>
+          </section>
+
+          <form className="space-y-6" onSubmit={continueDeletion}>
+            <fieldset disabled={sending || deleting}>
+              <legend className="mb-3 text-sm font-medium text-foreground">
+                1. 选择验证方式
+              </legend>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {channels.map((item) => (
+                  <label
+                    key={item}
+                    className={`flex cursor-pointer items-center gap-3 rounded-2xl border p-4 text-sm transition-colors ${
+                      channel === item
+                        ? "border-primary bg-primary-muted text-primary"
+                        : "border-border text-foreground-muted hover:border-primary/50"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="deletion-channel"
+                      value={item}
+                      checked={channel === item}
+                      onChange={() => switchChannel(item)}
+                    />
+                    <span className="min-w-0">
+                      <span className="block font-medium">
+                        {CHANNEL_LABEL[item]}验证
+                      </span>
+                      <span className="block truncate text-xs text-foreground-subtle">
+                        {item === "phone" ? user?.phone : user?.email}
+                      </span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+
+            <div>
+              <label
+                htmlFor="account-deletion-code"
+                className="mb-2 block text-sm font-medium"
+              >
+                2. 输入验证码
+              </label>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <input
+                  id="account-deletion-code"
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  maxLength={6}
+                  pattern="[0-9]{6}"
+                  placeholder="6 位数字验证码"
+                  value={code}
+                  aria-describedby="deletion-code-help"
+                  disabled={sending || deleting}
+                  onChange={(event) =>
+                    setCode(event.target.value.replace(/\D/g, ""))
+                  }
+                  className={`${AUTH_INPUT_CLASS} min-w-0 flex-1`}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="min-h-11 shrink-0 rounded-full"
+                  onClick={requestCode}
+                  disabled={!canSendCode}
+                >
+                  {sending
+                    ? "申请中…"
+                    : countdown > 0
+                      ? `${countdown}s 后重试`
+                      : codeRequested
+                        ? "重新获取"
+                        : "获取验证码"}
+                </Button>
+              </div>
+              <p
+                id="deletion-code-help"
+                className="mt-2 text-xs leading-5 text-foreground-subtle"
+              >
+                开发测试提示：当前测试环境验证码为
+                000000；正式验证码策略切换后无需更改此流程。
+              </p>
+            </div>
+
+            {message && (
+              <p role="status" className="text-sm text-success">
+                {message}
+              </p>
+            )}
+            {error && !confirmOpen && (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
+            )}
+
+            <Button
+              id="continue-account-deletion"
+              type="submit"
+              className="min-h-12 w-full rounded-full bg-danger text-white hover:bg-danger/90"
+              disabled={!canContinue}
+            >
+              继续注销
+            </Button>
+          </form>
+        </Card>
       </div>
 
-      <div className="rounded-2xl border border-border bg-surface px-6 py-8 shadow-xs">
-        {/* 渠道切换：仅当账号同时绑定手机与邮箱时显示 */}
-        {channels.length > 1 && (
-          <div className="mb-6 flex gap-6 border-b border-border">
-            {channels.map((c) => (
-              <button
-                key={c}
+      {confirmOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !deleting)
+              setConfirmOpen(false);
+          }}
+        >
+          <div
+            ref={dialogRef}
+            role="dialog"
+            tabIndex={-1}
+            aria-modal="true"
+            aria-labelledby="confirm-deletion-title"
+            aria-describedby="confirm-deletion-description"
+            className="w-full max-w-md rounded-3xl bg-surface p-6 shadow-xl"
+            onKeyDown={(event) => {
+              if (event.key === "Escape" && !deleting) {
+                setConfirmOpen(false);
+                return;
+              }
+              if (event.key !== "Tab") return;
+              const buttons = Array.from(
+                event.currentTarget.querySelectorAll<HTMLButtonElement>(
+                  "button:not(:disabled)"
+                )
+              );
+              const first = buttons[0];
+              const last = buttons.at(-1);
+              if (!first || !last) return;
+              if (
+                event.shiftKey &&
+                (document.activeElement === first ||
+                  document.activeElement === event.currentTarget)
+              ) {
+                event.preventDefault();
+                last.focus();
+              } else if (
+                !event.shiftKey &&
+                (document.activeElement === last ||
+                  document.activeElement === event.currentTarget)
+              ) {
+                event.preventDefault();
+                first.focus();
+              }
+            }}
+          >
+            <h2
+              id="confirm-deletion-title"
+              className="text-lg font-bold text-foreground"
+            >
+              最后确认：永久注销账号？
+            </h2>
+            <p
+              id="confirm-deletion-description"
+              className="mt-3 text-sm leading-6 text-foreground-muted"
+            >
+              此操作无法撤销。确认后账号数据会被永久删除，并立即退出当前登录状态。
+            </p>
+            {error && (
+              <p role="alert" className="mt-3 text-sm text-danger">
+                {error}
+              </p>
+            )}
+            <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+              <Button
                 type="button"
-                onClick={() => switchChannel(c)}
-                className={`pb-3 text-sm font-medium transition-colors ${
-                  channel === c
-                    ? "border-b-2 border-primary text-primary"
-                    : "text-foreground-subtle hover:text-foreground-muted"
-                }`}
+                variant="secondary"
+                className="min-h-11 rounded-full"
+                disabled={deleting}
+                onClick={() => setConfirmOpen(false)}
               >
-                {CHANNEL_LABEL[c]}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <form className="space-y-4" onSubmit={handleDelete}>
-          <div>
-            <label className="mb-1 block text-sm text-foreground-muted">
-              {channel === "phone" ? "手机号码" : "邮箱号码"}
-            </label>
-            {/* 验证码始终发往账号在档联系方式，此处只读展示，不可改 */}
-            <input
-              type="text"
-              value={target ?? ""}
-              readOnly
-              disabled
-              className={`${AUTH_INPUT_CLASS} cursor-not-allowed bg-muted text-foreground-muted`}
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm text-foreground-muted">
-              验证码
-            </label>
-            <div className="flex gap-3">
-              <input
-                type="text"
-                inputMode="numeric"
-                placeholder="请输入验证码"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                className={`${AUTH_INPUT_CLASS} min-w-0`}
-              />
-              <button
+                取消
+              </Button>
+              <Button
                 type="button"
-                onClick={handleSendCode}
-                disabled={!canSendCode}
-                className="shrink-0 rounded-full bg-primary-muted px-4 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-40"
+                className="min-h-11 rounded-full bg-danger text-white hover:bg-danger/90"
+                disabled={deleting}
+                onClick={confirmDeletion}
               >
-                {countdown > 0
-                  ? `${countdown}s 后重发`
-                  : sending
-                    ? "发送中..."
-                    : "获取验证码"}
-              </button>
+                {deleting ? "正在注销…" : "确认永久注销"}
+              </Button>
             </div>
           </div>
-
-          <div className="text-xs leading-relaxed text-danger">
-            <p className="font-medium">重要提示：</p>
-            <p>
-              注销后资产将全部清除，注册新的账号不再拥有当前账号的所有信息和资产，请慎重选择！
-            </p>
-          </div>
-
-          {error && <p className="text-sm text-danger">{error}</p>}
-
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="w-full rounded-full bg-primary py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {loading ? "注销中..." : "确认注销"}
-          </button>
-        </form>
-      </div>
-    </div>
+        </div>
+      )}
+    </main>
   );
 }
