@@ -1105,8 +1105,50 @@
   border-radius: 9px;
 }
 
-.word-grammar-card .dialect-panel .ant-space-compact {
-  margin-top: 6px !important;
+.word-voice-text-control {
+  width: 100%;
+  min-width: 0;
+}
+
+.word-voice-text-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 5px;
+}
+
+.word-voice-editor-action {
+  height: 24px;
+  padding-inline: 6px;
+  color: #5d6574;
+}
+
+.word-voice-editor-action:hover {
+  color: #0071e3 !important;
+  background: #eaf4ff !important;
+}
+
+.word-dialect-panel-header {
+  min-height: 24px;
+}
+
+.word-grammar-text-field {
+  margin-top: 8px;
+}
+
+.word-grammar-voice-toolbar {
+  margin-top: 6px;
+}
+
+.word-grammar-voice-toolbar .ant-btn {
+  height: 28px;
+}
+
+.word-grammar-voice-toolbar .word-pronunciation-play-action,
+.word-grammar-voice-toolbar .word-pronunciation-voice-action {
+  width: auto;
+  flex: none;
+  padding-inline: 8px;
+  font-size: 12px;
 }
 
 .word-grammar-drag-handle {
