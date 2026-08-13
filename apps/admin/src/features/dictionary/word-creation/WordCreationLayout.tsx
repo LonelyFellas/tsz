@@ -226,7 +226,7 @@ export function WordCreationLayout({
             <Typography.Text type="secondary" className="word-summary-kicker">
               完成情况
             </Typography.Text>
-            <Tag bordered={false}>实时</Tag>
+            <Tag variant="filled">实时</Tag>
           </div>
           <ProgressSummary word={word} />
         </section>

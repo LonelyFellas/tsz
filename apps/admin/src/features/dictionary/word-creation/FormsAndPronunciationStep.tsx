@@ -13,6 +13,7 @@ import {
 import {
   Alert,
   App,
+  Badge,
   Button,
   Card,
   Dropdown,
@@ -75,7 +76,9 @@ import {
   createFormGroup,
   createPosForms,
   createPronunciation,
+  defaultDerivedFormType,
   formDialects,
+  legalDerivedFormTypes,
   toFormsWireContent
 } from "./model";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
@@ -89,10 +92,6 @@ interface Props {
   readOnly?: boolean;
   onSaved: (word: AdminWordV2) => void;
 }
-
-const DERIVED_TYPE_OPTIONS = FORM_TYPE_OPTIONS.filter(
-  (option) => option.value !== "base"
-);
 
 const FORM_ORIGIN_LABEL: Record<WordFormVariantV2["origin"], string> = {
   dictionary: "词典",
@@ -601,6 +600,7 @@ function BaseTypeCell({ lastRow }: { lastRow: boolean }) {
 
 function DerivedTypeCell({
   slot,
+  allowedTypes,
   index,
   last,
   readOnly,
@@ -609,6 +609,7 @@ function DerivedTypeCell({
   onRemove
 }: {
   slot: WordDerivedFormSlotV2;
+  allowedTypes: WordDerivedFormSlotV2["form_type"][];
   index: number;
   last: boolean;
   readOnly?: boolean;
@@ -625,7 +626,12 @@ function DerivedTypeCell({
       <Typography.Text type="secondary">#{index + 1}</Typography.Text>
       <Select
         value={slot.form_type}
-        options={DERIVED_TYPE_OPTIONS}
+        status={allowedTypes.includes(slot.form_type) ? undefined : "error"}
+        options={FORM_TYPE_OPTIONS.filter((option) =>
+          allowedTypes.includes(
+            option.value as WordDerivedFormSlotV2["form_type"]
+          )
+        )}
         disabled={readOnly}
         style={{ width: "100%" }}
         onChange={(form_type) => onChange({ ...slot, form_type })}
@@ -724,6 +730,7 @@ function MissingDialectVariantCell({
 
 function FormGroupMatrix({
   pos,
+  allowedTypes,
   groupIndex,
   readOnly,
   generating,
@@ -731,6 +738,7 @@ function FormGroupMatrix({
   onChange
 }: {
   pos: WordPosFormsV2;
+  allowedTypes: WordDerivedFormSlotV2["form_type"][];
   groupIndex: number;
   readOnly?: boolean;
   generating?: boolean;
@@ -808,6 +816,7 @@ function FormGroupMatrix({
             <Fragment key={slot.id}>
               <DerivedTypeCell
                 slot={slot}
+                allowedTypes={allowedTypes}
                 index={slotIndex}
                 last={last}
                 readOnly={readOnly}
@@ -922,6 +931,7 @@ function FormGroupMatrix({
           <Fragment key={slot.id}>
             <DerivedTypeCell
               slot={slot}
+              allowedTypes={allowedTypes}
               index={slotIndex}
               last={last}
               readOnly={readOnly}
@@ -1112,6 +1122,8 @@ function normalizeLoadedForms(word: AdminWordV2): DraftFormsStepContent {
 
 function PosFormsEditor({
   value,
+  configuredAllowedTypes,
+  configuredDefaultTypes,
   headwords,
   readOnly,
   generating,
@@ -1119,6 +1131,8 @@ function PosFormsEditor({
   onChange
 }: {
   value: WordPosFormsV2;
+  configuredAllowedTypes?: WordDerivedFormSlotV2["form_type"][];
+  configuredDefaultTypes?: WordDerivedFormSlotV2["form_type"][];
   headwords: AdminWordV2["headwords"];
   readOnly?: boolean;
   generating?: boolean;
@@ -1129,6 +1143,12 @@ function PosFormsEditor({
   ) => Promise<void>;
   onChange: (next: WordPosFormsV2) => void;
 }) {
+  const allowedTypes = legalDerivedFormTypes(value.pos, configuredAllowedTypes);
+  const capabilityLoaded = configuredAllowedTypes !== undefined;
+  const defaultTypes = configuredDefaultTypes ?? allowedTypes;
+  const invalidSlots = value.form_groups.flatMap((group) =>
+    group.slots.filter((slot) => !allowedTypes.includes(slot.form_type))
+  );
   const spellingForced = headwords.mode === "distinguish";
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
     () => new Set()
@@ -1153,6 +1173,22 @@ function PosFormsEditor({
       data-word-field="form_groups"
     >
       <Space orientation="vertical" size={14} style={{ width: "100%" }}>
+        {!capabilityLoaded && (
+          <Alert
+            type="warning"
+            showIcon
+            title="词形规则未加载"
+            description="现有词形仅供查看；重新加载到服务端词性能力后才能新增或完成本步骤。"
+          />
+        )}
+        {invalidSlots.length > 0 && (
+          <Alert
+            type="error"
+            showIcon
+            title={`发现 ${invalidSlots.length} 个与当前基本词性不匹配的派生词形`}
+            description="请在完成本步骤前修改或删除标红词形；系统不会自动转换或丢弃已有数据。"
+          />
+        )}
         {value.form_groups.map((group, groupIndex) => {
           const collapsed = collapsedGroupIds.has(group.id);
           const bodyId = `word-form-group-${group.id}-body`;
@@ -1334,6 +1370,7 @@ function PosFormsEditor({
                   </div>
                   <FormGroupMatrix
                     pos={value}
+                    allowedTypes={allowedTypes}
                     groupIndex={groupIndex}
                     readOnly={readOnly}
                     generating={generating}
@@ -1346,13 +1383,27 @@ function PosFormsEditor({
                         type="dashed"
                         icon={<PlusOutlined />}
                         className="word-form-add-slot"
+                        disabled={allowedTypes.length === 0}
+                        title={
+                          !capabilityLoaded
+                            ? "词形规则未加载"
+                            : allowedTypes.length === 0
+                              ? "当前基本词性没有可添加的派生词形"
+                              : undefined
+                        }
                         onClick={() => {
+                          const defaultType = defaultDerivedFormType(
+                            value.pos,
+                            group.slots.map((slot) => slot.form_type),
+                            defaultTypes
+                          );
+                          if (!defaultType) return;
                           const groups = [...value.form_groups];
                           groups[groupIndex] = {
                             ...group,
                             slots: [
                               ...group.slots,
-                              createDerivedSlot("plural", value)
+                              createDerivedSlot(defaultType, value)
                             ]
                           };
                           onChange({ ...value, form_groups: groups });
@@ -1405,6 +1456,22 @@ function hasCompleteBase(pos: WordPosFormsV2): boolean {
   });
 }
 
+function countPosFormIssues(
+  pos: WordPosFormsV2,
+  allowed: readonly WordDerivedFormSlotV2["form_type"][]
+): number {
+  return (
+    (pos.form_groups.length === 0 ? 1 : 0) +
+    (hasCompleteBase(pos) ? 0 : 1) +
+    pos.form_groups.reduce(
+      (count, group) =>
+        count +
+        group.slots.filter((slot) => !allowed.includes(slot.form_type)).length,
+      0
+    )
+  );
+}
+
 export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
@@ -1413,11 +1480,13 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
     normalizeLoadedForms(word)
   );
   const contentRef = useRef(content);
+  const loadedWordIdRef = useRef(word.id);
   const [activePosId, setActivePosId] = useState(
     word.forms.pos[0]?.pos_id ?? ""
   );
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [validationMessages, setValidationMessages] = useState<string[]>([]);
   const issueTarget = useWordValidationIssue();
   const saveForms = useSaveFormsStep(word.id);
   const previewImpact = usePreviewFormsImpact(word.id);
@@ -1466,15 +1535,21 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   }, [content.pos, issueTarget]);
 
   useEffect(() => {
-    if (!dirty) {
+    const wordChanged = loadedWordIdRef.current !== word.id;
+    if (!dirty || wordChanged) {
+      loadedWordIdRef.current = word.id;
       const next = normalizeLoadedForms(word);
       contentRef.current = next;
       setContent(next);
       setActivePosId((current) =>
-        word.forms.pos.some((pos) => pos.pos_id === current)
+        !wordChanged && word.forms.pos.some((pos) => pos.pos_id === current)
           ? current
           : (word.forms.pos[0]?.pos_id ?? "")
       );
+      if (wordChanged) {
+        setDirty(false);
+        setValidationMessages([]);
+      }
     }
   }, [dirty, word]);
 
@@ -1651,16 +1726,40 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const save = async (intent: StepSaveIntent) => {
     if (saving) return;
     if (intent === "complete") {
+      const issues: string[] = [];
       if (content.pos.length === 0) {
-        message.warning("请至少保留一个基本词性");
-        return;
+        issues.push("请至少保留一个基本词性");
       }
-      if (content.pos.some((pos) => pos.form_groups.length === 0)) {
-        message.warning("每个词性至少需要一组词形变化");
-        return;
+      for (const pos of content.pos) {
+        const posLabel = partOfSpeechLabel(partOfSpeechLookup, pos.pos);
+        const configured = partOfSpeechLookup.byCode.get(pos.pos);
+        if (configured?.allowed_form_types === undefined) {
+          issues.push(`${posLabel}的词形规则未加载`);
+        }
+        const allowed = legalDerivedFormTypes(
+          pos.pos,
+          configured?.allowed_form_types
+        );
+        if (pos.form_groups.length === 0) {
+          issues.push(`${posLabel}至少需要一组词形变化`);
+        }
+        const invalidCount = pos.form_groups.reduce(
+          (count, group) =>
+            count +
+            group.slots.filter((slot) => !allowed.includes(slot.form_type))
+              .length,
+          0
+        );
+        if (invalidCount > 0) {
+          issues.push(`${posLabel}有 ${invalidCount} 个不合法的派生词形类型`);
+        }
+        if (!hasCompleteBase(pos)) {
+          issues.push(`${posLabel}基准原形缺少字典音标或实际发音`);
+        }
       }
-      if (content.pos.some((pos) => !hasCompleteBase(pos))) {
-        message.warning("请完善各词性基准原形的字典音标和实际发音");
+      setValidationMessages(issues);
+      if (issues.length > 0) {
+        message.warning(`还有 ${issues.length} 项需要完善`);
         return;
       }
     }
@@ -1698,9 +1797,11 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
       }
     } catch (error) {
       if (error instanceof HttpError) {
-        const issue = error.field_issues.find(
+        const stepIssues = error.field_issues.filter(
           (candidate) => candidate.step === "forms"
         );
+        setValidationMessages(stepIssues.map((issue) => issue.message));
+        const issue = stepIssues[0];
         if (issue) {
           message.warning(issue.message);
           navigate(`/words/${word.id}/wizard/forms${editQuery}`, {
@@ -1732,6 +1833,17 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
     label: (
       <Space size={6}>
         <strong>{classificationLabel(pos)}</strong>
+        <Badge
+          count={countPosFormIssues(
+            pos,
+            legalDerivedFormTypes(
+              pos.pos,
+              partOfSpeechLookup.byCode.get(pos.pos)?.allowed_form_types
+            )
+          )}
+          size="small"
+          title="该词性待修项"
+        />
         {!readOnly && content.pos.length > 1 && (
           <Button
             type="text"
@@ -1762,6 +1874,12 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
     children: (
       <PosFormsEditor
         value={pos}
+        configuredAllowedTypes={
+          partOfSpeechLookup.byCode.get(pos.pos)?.allowed_form_types
+        }
+        configuredDefaultTypes={
+          partOfSpeechLookup.byCode.get(pos.pos)?.default_form_types
+        }
         headwords={word.headwords}
         readOnly={readOnly}
         generating={suggestVariants.isPending}
@@ -1823,6 +1941,21 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
         disabled={saving}
         aria-busy={saving}
       >
+        {validationMessages.length > 0 && (
+          <Alert
+            type="error"
+            showIcon
+            title={`本步骤还有 ${validationMessages.length} 项待修正`}
+            description={
+              <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+                {validationMessages.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            }
+            style={{ marginBottom: 16 }}
+          />
+        )}
         <div data-word-node-id="forms" data-word-field="pos">
           <Tabs
             className="word-pos-tabs word-forms-tabs"

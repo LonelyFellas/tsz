@@ -3,6 +3,18 @@ import { createPartOfSpeechSeed } from "../mock/partOfSpeechFixtures";
 
 const seed = createPartOfSpeechSeed("2026-08-08T00:00:00.000Z");
 
+const formCapabilities = {
+  noun: ["plural"],
+  verb: [
+    "third_person_singular",
+    "present_participle",
+    "past_tense",
+    "past_participle"
+  ],
+  adjective: ["comparative", "superlative"],
+  adverb: ["comparative", "superlative"]
+} as const;
+
 export const partOfSpeechCatalogFixture: PartOfSpeechCatalogResponse = {
   catalog_version: 1,
   items: seed.partsOfSpeech.map((part) => ({
@@ -12,6 +24,12 @@ export const partOfSpeechCatalogFixture: PartOfSpeechCatalogResponse = {
     name_en: part.name_en,
     abbreviation: part.abbreviation,
     sort_order: part.sort_order,
+    allowed_form_types: [
+      ...(formCapabilities[part.code as keyof typeof formCapabilities] ?? [])
+    ],
+    default_form_types: [
+      ...(formCapabilities[part.code as keyof typeof formCapabilities] ?? [])
+    ],
     sub_parts: seed.subParts
       .filter((subPart) => subPart.part_of_speech_id === part.id)
       .map((subPart) => ({

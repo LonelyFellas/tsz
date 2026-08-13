@@ -14,6 +14,7 @@ import {
   Alert,
   App,
   AutoComplete,
+  Badge,
   Button,
   Card,
   Collapse,
@@ -46,7 +47,6 @@ import type {
   WordSenseV2,
   WordSentenceV2
 } from "@tsz/types";
-import { VoiceRichTextField } from "@tsz/voice-editor/reader";
 import "@tsz/voice-editor/styles.css";
 import { HttpError } from "@tsz/api-client/http";
 import {
@@ -444,17 +444,28 @@ function VoiceTextControl({
 }) {
   const editor = useContext(VoiceEditorContext);
   return (
-    <VoiceRichTextField
-      value={value}
-      contextLabel={contextLabel}
-      dialectLabel={dialectLabel}
-      readOnly={readOnly}
-      onEdit={
-        readOnly || !editor
-          ? undefined
-          : () => editor.open({ value, contextLabel, onApply: onChange })
-      }
-    />
+    <Space.Compact block>
+      <Input.TextArea
+        aria-label={contextLabel}
+        value={value.text}
+        readOnly={readOnly}
+        autoSize={{ minRows: 2, maxRows: 6 }}
+        onChange={(event) =>
+          onChange(toWordRichText(event.target.value, value))
+        }
+      />
+      {!readOnly && editor && (
+        <Button
+          type="default"
+          onClick={() =>
+            editor.open({ value, contextLabel, onApply: onChange })
+          }
+          title={dialectLabel ? `${dialectLabel}高级语音编辑` : undefined}
+        >
+          高级语音编辑
+        </Button>
+      )}
+    </Space.Compact>
   );
 }
 
@@ -1822,8 +1833,12 @@ function senseGroupOptionLabel(
   return `${nameZh} / ${nameEn}`;
 }
 
-function validateMeanings(content: DraftMeaningsStepContent): string | null {
-  if (content.sense_groups.length === 0) return "至少需要一个语义区间";
+export function validateMeanings(content: DraftMeaningsStepContent): string[] {
+  const issues: string[] = [];
+  const add = (message: string) => {
+    if (!issues.includes(message)) issues.push(message);
+  };
+  if (content.sense_groups.length === 0) add("至少需要一个语义区间");
   const senseGroupIds = new Set(content.sense_groups.map((group) => group.id));
   for (const [index, group] of content.sense_groups.entries()) {
     const names = [
@@ -1832,40 +1847,43 @@ function validateMeanings(content: DraftMeaningsStepContent): string | null {
     ] as const;
     for (const [name, label] of names) {
       const normalized = name.trim();
-      if (!normalized) return `请填写语义区间 ${index + 1} 的${label}`;
+      if (!normalized) add(`请填写语义区间 ${index + 1} 的${label}`);
       if (textCodePointLength(normalized) > 200) {
-        return `语义区间 ${index + 1} 的${label}不能超过 200 个字符`;
+        add(`语义区间 ${index + 1} 的${label}不能超过 200 个字符`);
       }
     }
   }
   for (const pos of content.pos) {
     if (pos.grammar_structures.length === 0)
-      return "每个词性至少需要一条语法结构";
+      add("每个词性至少需要一条语法结构");
     if (
       pos.grammar_structures.some((grammar) =>
         grammar.variants.some((variant) => !variant.content.text.trim())
       )
     ) {
-      return "请完善全部语法结构文本";
+      add("请完善全部语法结构文本");
     }
-    if (pos.senses.length === 0) return "每个词性至少需要一个词义";
+    if (pos.senses.length === 0) add("每个词性至少需要一个词义");
     for (const sense of pos.senses) {
       if (!sense.sense_group_id || !senseGroupIds.has(sense.sense_group_id)) {
-        return "请为每个词义选择语义区间";
+        add("请为每个词义选择语义区间");
       }
-      if (!sense.sub_pos) return "请为每个词义选择细分词性";
+      if (!sense.sub_pos) add("请为每个词义选择细分词性");
+      if (sense.frequency === undefined || sense.frequency.trim() === "") {
+        add("请填写每个词义的词频（0–100，最多两位小数）");
+      }
       const hasChinese = sense.definitions.some(
         (definition) =>
           definition.definition_mode.startsWith("zh_") &&
           (definition.content as RichText).text.trim() !== ""
       );
-      if (!hasChinese) return "每个词义至少需要一条中文释义";
+      if (!hasChinese) add("每个词义至少需要一条中文释义");
       for (const definition of sense.definitions) {
         if (
           definition.definition_mode.startsWith("en_") &&
           !englishTextComplete(definition.content as EnglishTextV2)
         ) {
-          return "请补齐英文释义的全部启用方言文本";
+          add("请补齐英文释义的全部启用方言文本");
         }
       }
       for (const sentence of sense.sentences) {
@@ -1873,7 +1891,7 @@ function validateMeanings(content: DraftMeaningsStepContent): string | null {
           !englishTextComplete(sentence.en_text) ||
           !sentence.zh_text.text.trim()
         ) {
-          return "请补齐例句的英文文本和汉语译文";
+          add("请补齐例句的英文文本和汉语译文");
         }
         const focusLinks = sentence.links.filter(
           (link) =>
@@ -1882,21 +1900,21 @@ function validateMeanings(content: DraftMeaningsStepContent): string | null {
             link.sense_id === sense.id
         );
         if (focusLinks.length !== 1)
-          return "每条例句必须保留唯一的当前词义主关联";
+          add("每条例句必须保留唯一的当前词义主关联");
       }
       for (const relation of sense.relations) {
         if (!relation.target_word_id || !relation.target_sense_id) {
-          return "请为每个关系词选择具体词条和词义";
+          add("请为每个关系词选择具体词条和词义");
         }
         if (
           !/^(?:100(?:\.0{1,2})?|\d{1,2}(?:\.\d{1,2})?)$/.test(relation.score)
         ) {
-          return "关系词分值必须是 0–100 且最多两位小数";
+          add("关系词分值必须是 0–100 且最多两位小数");
         }
       }
     }
   }
-  return null;
+  return issues;
 }
 
 function senseOwnsNode(sense: WordSenseV2, nodeId: string): boolean {
@@ -1920,6 +1938,36 @@ function meaningsPosOwnsNode(pos: WordPosMeaningsV2, nodeId: string): boolean {
     return true;
   }
   return pos.senses.some((sense) => senseOwnsNode(sense, nodeId));
+}
+
+function countPosMeaningIssues(
+  pos: WordPosMeaningsV2,
+  senseGroupIds: ReadonlySet<string>
+): number {
+  let count = pos.grammar_structures.length === 0 ? 1 : 0;
+  count += pos.grammar_structures.filter((grammar) =>
+    grammar.variants.some((variant) => !variant.content.text.trim())
+  ).length;
+  if (pos.senses.length === 0) count += 1;
+  for (const sense of pos.senses) {
+    if (!sense.sense_group_id || !senseGroupIds.has(sense.sense_group_id))
+      count += 1;
+    if (!sense.sub_pos) count += 1;
+    if (!sense.frequency?.trim()) count += 1;
+    if (
+      !sense.definitions.some(
+        (definition) =>
+          definition.definition_mode.startsWith("zh_") &&
+          (definition.content as RichText).text.trim()
+      )
+    )
+      count += 1;
+    count += sense.sentences.filter(
+      (sentence) =>
+        !englishTextComplete(sentence.en_text) || !sentence.zh_text.text.trim()
+    ).length;
+  }
+  return count;
 }
 
 function countSenseReferences(
@@ -2004,6 +2052,7 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
     cloneWordValue(ensureMeaningsForForms(word))
   );
   const contentRef = useRef(content);
+  const loadedWordIdRef = useRef(word.id);
   const [activePosId, setActivePosId] = useState(
     word.forms.pos[0]?.pos_id ?? ""
   );
@@ -2016,6 +2065,7 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   >(() => new Set());
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [validationMessages, setValidationMessages] = useState<string[]>([]);
   const issueTarget = useWordValidationIssue();
   const saveMeanings = useSaveMeaningsStep(word.id);
   const suggestVariants = useSuggestDialectVariants();
@@ -2031,7 +2081,9 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   }, [content.pos, issueTarget]);
 
   useEffect(() => {
-    if (!dirty) {
+    const wordChanged = loadedWordIdRef.current !== word.id;
+    if (!dirty || wordChanged) {
+      loadedWordIdRef.current = word.id;
       const next = cloneWordValue(ensureMeaningsForForms(word));
       contentRef.current = next;
       setContent(next);
@@ -2039,6 +2091,11 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
         setActiveDialect(word.headwords.source_dialect);
       }
       setAttemptedDialects(new Set());
+      if (wordChanged) {
+        setDirty(false);
+        setValidationMessages([]);
+        setActivePosId(word.forms.pos[0]?.pos_id ?? "");
+      }
     }
   }, [dirty, word, word.revision]);
 
@@ -2157,9 +2214,10 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   const save = async (intent: StepSaveIntent) => {
     if (saving || fillingDialect !== undefined) return;
     if (intent === "complete") {
-      const validationMessage = validateMeanings(content);
-      if (validationMessage) {
-        message.warning(validationMessage);
+      const issues = validateMeanings(content);
+      setValidationMessages(issues);
+      if (issues.length > 0) {
+        message.warning(`还有 ${issues.length} 项需要完善`);
         return;
       }
     }
@@ -2181,9 +2239,11 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
       }
     } catch (error) {
       if (error instanceof HttpError) {
-        const issue = error.field_issues.find(
+        const stepIssues = error.field_issues.filter(
           (candidate) => candidate.step === "meanings"
         );
+        setValidationMessages(stepIssues.map((issue) => issue.message));
+        const issue = stepIssues[0];
         if (issue) {
           message.warning(issue.message);
           navigate(`/words/${word.id}/wizard/meanings${editQuery}`, {
@@ -2232,11 +2292,16 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
     const label = formPos
       ? partOfSpeechLabel(partOfSpeechLookup, formPos.pos)
       : "未知词性";
+    const issueCount = countPosMeaningIssues(
+      posMeanings,
+      new Set(content.sense_groups.map((group) => group.id))
+    );
     return {
       key: posMeanings.pos_id,
       label: (
         <Space>
           <strong>{label}</strong>
+          <Badge count={issueCount} size="small" title="该词性待修项" />
         </Space>
       ),
       children: (
@@ -2449,6 +2514,21 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
         disabled={saving}
         aria-busy={saving}
       >
+        {validationMessages.length > 0 && (
+          <Alert
+            type="error"
+            showIcon
+            title={`本步骤还有 ${validationMessages.length} 项待修正`}
+            description={
+              <ul style={{ margin: 0, paddingInlineStart: 20 }}>
+                {validationMessages.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            }
+            style={{ marginBottom: 16 }}
+          />
+        )}
         {word.headwords.mode === "distinguish" && (
           <div className="word-meaning-dialect-toolbar">
             <Flex align="center" justify="space-between" gap={12} wrap>
