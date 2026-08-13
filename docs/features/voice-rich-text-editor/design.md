@@ -234,12 +234,15 @@ TipTap 内部使用 Document / Paragraph / Text / UndoRedo 加五个自定义扩
 
 ### 当前事实
 
-- `../docs/admin-wordlist-frontend-integration.md` §3.3、§7 明确 `audio_url / audio_source` 是服务端自有只读字段，TTS/上传接口尚未定义。
-- `../tsz-rust/docs/openapi.json` 当前没有词库和 TTS 路由。
-- `../tsz-rust/docs/frontend-integration.md` 只记录了词条/词性配置的 mock-first 提案，没有本功能需要的发音人目录与试听接口。
-- 因此本功能不能声称已有真实后端；接口先进入 api-client PENDING 台账，前端以 typed mock 完成交互，真实开关默认关闭。
+- tsz-rust OpenAPI 已提供 `GET /api/v1/admin/speech/voices` 与
+  `POST /api/v1/admin/speech/previews`，词条契约已接受 `RichTextV1 | RichTextV2`。
+- `@tsz/api-client` 已同步正式 `/speech/*` 路径、`voice_alias` 请求以及
+  `cache_status` 响应，不再使用早期 `/tts/*` PENDING 提案。
+- 测试服的 voice catalog 已可通过真实鉴权访问，但 preview 供应商/存储链路在
+  2026-08-13 冒烟时仍返回 503。因此编辑器与真实试听使用独立开关：
+  `VITE_VOICE_EDITOR` 可先开，`VITE_VOICE_PREVIEW` 必须在真实合成成功后再开。
 
-### 建议契约变更：RichText V2
+### 已落地契约：RichText V2
 
 tsz-rust 的 V2 词条 meanings 保存/读取契约需要接受 `RichTextV1 | RichTextV2`，并原样返回服务端实际保存的版本：
 
@@ -250,65 +253,69 @@ tsz-rust 的 V2 词条 meanings 保存/读取契约需要接受 `RichTextV1 | Ri
 - 后续学习端/题目生成消费者在启用 V2 写入前必须具备 V1/V2 双读能力；
 - 建议增加稳定问题码 `unsupported_rich_text_version`、`invalid_rich_text_annotation`，并用 `field` 指向具体内容节点。
 
-该变更需要后端团队更新 `../tsz-rust/docs/frontend-integration.md` 与 OpenAPI 后再解除真实接口开关；本仓只提交前端类型、mock 和 PENDING 契约，不修改 Rust 实现。
+后端已完成上述双读、校验与 OpenAPI 更新；前端以后端 spec 生成的
+`openapi.snapshot.json` 继续做契约门禁。
 
-### 建议接口 1：发音人能力目录
+### 正式接口 1：发音人能力目录
 
-`GET /api/v1/admin/tts/voices?language=en`
+`GET /api/v1/admin/speech/voices`
 
 ```ts
-export interface AdminTtsVoice {
-  id: string;
-  label: string;
+export interface AdminSpeechVoice {
+  alias: string;
   locale: string;
-  gender: "female" | "male" | "neutral";
-  styles: string[];
-  supports_rate: boolean;
-  supports_pitch: boolean;
-  is_default: boolean;
+  gender: string;
+  capabilities: {
+    styles: string[];
+    min_rate_percent: number;
+    max_rate_percent: number;
+    min_pitch_semitones: number;
+    max_pitch_semitones: number;
+  };
 }
 
-export interface AdminTtsVoiceListResponse {
-  items: AdminTtsVoice[];
+export interface AdminSpeechVoiceListResponse {
+  items: AdminSpeechVoice[];
 }
 ```
 
-`id` 是服务端稳定别名，不直接暴露供应商 key。目录可缓存，但供应商变更后无需发前端版本。
+`alias` 是服务端稳定别名，不直接暴露供应商 key。目录可缓存，但供应商变更后无需发前端版本。
 
-### 建议接口 2：临时试听
+### 正式接口 2：临时试听
 
-`POST /api/v1/admin/tts/previews`
+`POST /api/v1/admin/speech/previews`
 
 ```ts
-export interface CreateAdminTtsPreviewInput {
-  language: "en";
+export interface CreateAdminSpeechPreviewInput {
   content: RichTextV2;
-  voice_id: string;
+  voice_alias: string;
   style?: string;
   rate_percent?: number; // 建议 -50..100，前端首期只给 -10/-5/0/5/10
   pitch_semitones?: number; // 建议 -12..12，前端首期只给 -2/-1/0/1/2
 }
 
-export interface AdminTtsPreviewResponse {
+export interface AdminSpeechPreviewResponse {
+  cache_status: "hit" | "generated";
   audio_url: string;
   expires_at: string;
-  cached: boolean;
-  ssml: string;
+  url_expires_in_seconds: number;
 }
 ```
 
 服务端流程：校验 canonical RichText 和 voice capability → 生成规范 SSML → 用规范化内容 + 参数 + voice/provider version 做 hash → 命中缓存则复用，否则调用供应商 → 返回短期授权 URL。不要把供应商密钥、内部路径或永久公网 URL 下发前端。
 
-建议问题码（RFC 9457）：`invalid_speech_markup`、`tts_voice_not_found`、`tts_option_not_supported`、`tts_rate_limited`、`tts_quota_exceeded`、`tts_unavailable`。前端按 `code` 分支，不匹配 `detail` 文案。
+稳定问题码（RFC 9457）：`invalid_speech_preview`、`speech_voice_not_found`、
+`speech_preview_in_progress`、`speech_provider_unavailable`、`speech_storage_unavailable`与
+`speech_rate_limited`。前端按 `code` 分支，不匹配 `detail` 文案。
 
 试听不更新词条 revision，也不写 `audio_url`。后续永久音频资产模块应另设“生成并绑定到 node_id”的幂等接口，不复用 preview 端点偷偷落库。
 
 ### typed mock
 
-在 admin dictionary data source 旁新增 `AdminTtsDataSource`：
+在 admin dictionary data source 旁新增 `AdminSpeechDataSource`：
 
 - mock voice catalog 提供美音女/男、英音女/男和至少一个支持风格的 voice；
-- preview mock 返回稳定的短音频 fixture、`cached` 状态与服务端规范化 SSML；
+- preview mock 返回稳定的短音频 fixture 与 `cached` 状态；SSML 始终由编辑器根据 canonical 内容本地预览；
 - 生产构建禁止启用 TTS mock，与现有 admin mock 防泄漏规则一致；
 - 未启用真实 TTS 时，编辑标注和保存仍可用，生成按钮 disabled 并说明后端未就绪。
 
@@ -320,7 +327,7 @@ sequenceDiagram
     participant F as "VoiceRichTextField"
     participant D as "Editor Drawer"
     participant S as "@tsz/voice-editor core"
-    participant T as "AdminTtsDataSource"
+    participant T as "AdminSpeechDataSource"
     participant W as "现有 meanings 保存"
 
     A->>F: 点击语音编辑
@@ -330,7 +337,7 @@ sequenceDiagram
     D->>S: transaction -> canonical 工作副本 + SSML 预览
     A->>D: 生成试听
     D->>T: voice options + RichTextV2
-    T-->>D: audio_url + cached + ssml
+    T-->>D: audio_url + cache_status + expires_at
     D-->>A: 自动播放 / 可重播
     A->>D: 应用
     D->>S: normalize + validate
@@ -369,11 +376,10 @@ sequenceDiagram
 
 ### `@tsz/api-client`
 
-- 修改 `packages/api-client/src/admin.ts`：新增 `tts.voices()`、`tts.preview(input)`。
+- 修改 `packages/api-client/src/admin.ts`：新增 `speech.voices()`、`speech.preview(input)`。
 - 修改 `packages/api-client/src/admin.test.ts`：验证 method/path/query/body 和 snake_case。
-- 修改 `packages/api-client/src/endpoints.contract.test.ts`：在后端 OpenAPI 落地前加入并保鲜以下 PENDING：
-  - `get /admin/tts/voices`
-  - `post /admin/tts/previews`
+- 修改 `packages/api-client/src/endpoints.contract.test.ts`：将 `/admin/speech/voices` 与
+  `/admin/speech/previews` 纳入 OpenAPI 正式对账，不使用 PENDING 白名单。
 
 ### admin 数据边界
 
@@ -455,7 +461,8 @@ sequenceDiagram
 
 ## 风险与缓解
 
-- **后端契约缺失**：端点进入 PENDING，真实功能默认关闭；typed mock 不能在生产启用。
+- **真实试听依赖不可用**：编辑器与 preview 独立开关；provider、Redis 或
+  `speech` storage 未通过真实冒烟时只开编辑器，typed mock 不能在生产启用。
 - **RichText 升级影响旧消费者**：使用版本联合，不原地扩展 V1；V1 只在明确应用后升级；legacy 路由首期不写 V2。
 - **Unicode 偏移漂移**：所有边界集中到共享码点工具，禁止散落 `string.length/slice`；用复杂字符做往返测试。
 - **包边界被业务侵蚀**：用 ESLint/import 测试禁止包依赖 apps、api-client、router 和 query；业务 DTO 映射只放调用方。

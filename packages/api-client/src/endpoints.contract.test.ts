@@ -58,8 +58,6 @@ const PENDING = new Set<string>([
   // 平台后台(admin):auth 一期已在 tsz-rust 落地(login/login-code/logout/refresh/
   // change-password/profile),已纳入正式校验;其余端点待对接。
   "post /admin/auth/logout-all",
-  "get /admin/tts/voices",
-  "post /admin/tts/previews",
   "post /admin/words",
   "put /admin/words/_/content",
   "post /admin/words/_/publish",
@@ -230,6 +228,39 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(snapshot.schemas.DuplicateWordMatchV2.properties.status).toEqual({
       $ref: "#/components/schemas/AdminWordStatus"
     });
+  });
+
+  it("speech 目录与试听 wire 和后端一致", () => {
+    expect(snapshot.schemas.VoiceResponse.required).toEqual([
+      "alias",
+      "locale",
+      "gender",
+      "capabilities"
+    ]);
+    expect(snapshot.schemas.VoiceCapabilities.required).toEqual([
+      "styles",
+      "min_rate_percent",
+      "max_rate_percent",
+      "min_pitch_semitones",
+      "max_pitch_semitones"
+    ]);
+    expect(snapshot.schemas.CreatePreviewRequest.required).toEqual([
+      "content",
+      "voice_alias"
+    ]);
+    expect(snapshot.schemas.CreatePreviewRequest.additionalProperties).toBe(
+      false
+    );
+    expect(snapshot.schemas.PreviewCacheStatus.enum).toEqual([
+      "hit",
+      "generated"
+    ]);
+    expect(snapshot.schemas.PreviewResponse.required).toEqual([
+      "cache_status",
+      "audio_url",
+      "expires_at",
+      "url_expires_in_seconds"
+    ]);
   });
 
   it("每条前端端点要么命中 spec,要么在 PENDING 白名单里(无臆造端点)", () => {

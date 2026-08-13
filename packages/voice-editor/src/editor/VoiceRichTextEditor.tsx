@@ -66,6 +66,13 @@ function defaultVoiceSettings(voices: VoiceOption[]): VoiceSettings {
   return { voiceId: voice?.id ?? "" };
 }
 
+function withinRange(
+  value: number,
+  range: VoiceOption["rateRange"] | VoiceOption["pitchRange"]
+): boolean {
+  return !range || (range.min <= value && value <= range.max);
+}
+
 export function VoiceRichTextEditor({
   open,
   value,
@@ -346,10 +353,16 @@ export function VoiceRichTextEditor({
       style: nextVoice?.styles.includes(current.style ?? "")
         ? current.style
         : undefined,
-      ratePercent: nextVoice?.supportsRate ? current.ratePercent : undefined,
-      pitchSemitones: nextVoice?.supportsPitch
-        ? current.pitchSemitones
-        : undefined
+      ratePercent:
+        nextVoice?.supportsRate &&
+        withinRange(current.ratePercent ?? 0, nextVoice.rateRange)
+          ? current.ratePercent
+          : undefined,
+      pitchSemitones:
+        nextVoice?.supportsPitch &&
+        withinRange(current.pitchSemitones ?? 0, nextVoice.pitchRange)
+          ? current.pitchSemitones
+          : undefined
     }));
   };
 
@@ -697,7 +710,9 @@ export function VoiceRichTextEditor({
               aria-label="整体语速"
               value={settings.ratePercent ?? 0}
               disabled={!activeVoice?.supportsRate || readOnly}
-              options={RATE_OPTIONS.map((rate) => ({
+              options={RATE_OPTIONS.filter((rate) =>
+                withinRange(rate, activeVoice?.rateRange)
+              ).map((rate) => ({
                 value: rate,
                 label:
                   rate === 0
@@ -712,7 +727,9 @@ export function VoiceRichTextEditor({
               aria-label="整体音高"
               value={settings.pitchSemitones ?? 0}
               disabled={!activeVoice?.supportsPitch || readOnly}
-              options={PITCH_OPTIONS.map((pitch) => ({
+              options={PITCH_OPTIONS.filter((pitch) =>
+                withinRange(pitch, activeVoice?.pitchRange)
+              ).map((pitch) => ({
                 value: pitch,
                 label:
                   pitch === 0

@@ -9,6 +9,8 @@ export interface VoiceOption {
   supportsRate: boolean;
   supportsPitch: boolean;
   isDefault: boolean;
+  rateRange?: { min: number; max: number };
+  pitchRange?: { min: number; max: number };
 }
 
 export interface VoiceSettings {
@@ -27,7 +29,6 @@ export interface VoicePreviewResult {
   audioUrl: string;
   expiresAt: string;
   cached: boolean;
-  ssml: string;
   dispose?: () => void;
 }
 

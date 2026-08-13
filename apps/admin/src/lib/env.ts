@@ -28,6 +28,11 @@ const VOICE_EDITOR = parseBooleanEnvFlag(
   "VITE_VOICE_EDITOR",
   !import.meta.env.PROD
 );
+const VOICE_PREVIEW = parseBooleanEnvFlag(
+  import.meta.env.VITE_VOICE_PREVIEW,
+  "VITE_VOICE_PREVIEW",
+  !import.meta.env.PROD
+);
 const ADMIN_TTS_MOCK = parseBooleanEnvFlag(
   import.meta.env.VITE_ADMIN_TTS_MOCK,
   "VITE_ADMIN_TTS_MOCK",
@@ -56,5 +61,6 @@ export const env = {
   ADMIN_WORDS_MOCK,
   ADMIN_PART_OF_SPEECH_MOCK,
   VOICE_EDITOR,
+  VOICE_PREVIEW,
   ADMIN_TTS_MOCK
 };

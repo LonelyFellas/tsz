@@ -3,7 +3,7 @@ import { api } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { createAdminVoicePreviewAdapter } from "./adapter";
 
-const realAdapter = createAdminVoicePreviewAdapter(api.tts);
+const realAdapter = createAdminVoicePreviewAdapter(api.speech);
 let mockAdapterPromise: Promise<VoicePreviewAdapter> | undefined;
 
 async function resolveAdapter(): Promise<VoicePreviewAdapter> {

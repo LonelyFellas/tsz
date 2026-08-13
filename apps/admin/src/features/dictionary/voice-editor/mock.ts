@@ -1,4 +1,4 @@
-import { buildSsmlPreview, canonicalVoiceHash } from "@tsz/voice-editor/core";
+import { canonicalVoiceHash } from "@tsz/voice-editor/core";
 import type { VoiceOption, VoicePreviewAdapter } from "@tsz/voice-editor/types";
 
 const SILENT_WAV =
@@ -73,11 +73,7 @@ export function createMockVoicePreviewAdapter(): VoicePreviewAdapter {
       return {
         audioUrl: SILENT_WAV,
         expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
-        cached,
-        ssml: buildSsmlPreview(input.content, {
-          ...input,
-          locale: voice.locale
-        })
+        cached
       };
     }
   };

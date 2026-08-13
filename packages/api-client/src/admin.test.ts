@@ -89,21 +89,20 @@ describe("createAdminEndpoints", () => {
   });
 });
 
-describe("createAdminEndpoints — TTS 试听", () => {
-  it("voices → GET /tts/voices 带 language 与 AbortSignal", () => {
+describe("createAdminEndpoints — speech 试听", () => {
+  it("voices → GET /speech/voices 带 AbortSignal", () => {
     const api = createAdminEndpoints(http);
     const controller = new AbortController();
-    api.tts.voices("en", controller.signal);
-    expect(http.get).toHaveBeenCalledWith("/tts/voices?language=en", {
+    api.speech.voices(controller.signal);
+    expect(http.get).toHaveBeenCalledWith("/speech/voices", {
       signal: controller.signal
     });
   });
 
-  it("preview → POST /tts/previews 原样发送 snake_case wire", () => {
+  it("preview → POST /speech/previews 原样发送 snake_case wire", () => {
     const api = createAdminEndpoints(http);
     const controller = new AbortController();
     const input = {
-      language: "en" as const,
       content: {
         version: 2 as const,
         text: "hello",
@@ -116,13 +115,13 @@ describe("createAdminEndpoints — TTS 试听", () => {
           }
         ]
       },
-      voice_id: "ava",
+      voice_alias: "ava",
       style: "cheerful",
       rate_percent: 5,
       pitch_semitones: -1
     };
-    api.tts.preview(input, controller.signal);
-    expect(http.post).toHaveBeenCalledWith("/tts/previews", input, {
+    api.speech.preview(input, controller.signal);
+    expect(http.post).toHaveBeenCalledWith("/speech/previews", input, {
       signal: controller.signal
     });
   });

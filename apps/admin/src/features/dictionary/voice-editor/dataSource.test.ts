@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({
 
 vi.mock("@/lib/env", () => ({ env: state.env }));
 vi.mock("@/lib/auth", () => ({
-  api: { tts: { voices: state.voices, preview: state.preview } }
+  api: { speech: { voices: state.voices, preview: state.preview } }
 }));
 
 const CONTENT = { version: 2 as const, text: "hello", annotations: [] };
@@ -17,22 +17,24 @@ function stubRealSource() {
   state.voices.mockResolvedValue({
     items: [
       {
-        id: "real-voice",
-        label: "Real Voice",
+        alias: "real-voice",
         locale: "en-US",
         gender: "neutral",
-        styles: [],
-        supports_rate: false,
-        supports_pitch: false,
-        is_default: true
+        capabilities: {
+          styles: [],
+          min_rate_percent: 0,
+          max_rate_percent: 0,
+          min_pitch_semitones: 0,
+          max_pitch_semitones: 0
+        }
       }
     ]
   });
   state.preview.mockResolvedValue({
     audio_url: "https://example.test/preview.wav",
     expires_at: "2026-08-09T10:00:00Z",
-    cached: false,
-    ssml: "<speak/>"
+    cache_status: "generated",
+    url_expires_in_seconds: 300
   });
 }
 
@@ -71,9 +73,9 @@ describe("admin voice preview data source", () => {
       audioUrl: "https://example.test/preview.wav",
       cached: false
     });
-    expect(state.voices).toHaveBeenCalledWith("en", controller.signal);
+    expect(state.voices).toHaveBeenCalledWith(controller.signal);
     expect(state.preview).toHaveBeenCalledWith(
-      { language: "en", content: CONTENT, voice_id: "real-voice" },
+      { content: CONTENT, voice_alias: "real-voice" },
       controller.signal
     );
   });
