@@ -609,6 +609,30 @@ describe("FormsAndPronunciationStep", () => {
     });
   });
 
+  it("校验定位后手动切换词性，输入时不再跳回原词性", async () => {
+    renderStep(undefined, {
+      nodeId: "suggested-base-noun",
+      field: "variants.uk.spelling"
+    });
+
+    const nounTab = screen.getByRole("tab", { name: /名词/ });
+    const verbTab = screen.getByRole("tab", { name: /动词/ });
+    await waitFor(() =>
+      expect(nounTab).toHaveAttribute("aria-selected", "true")
+    );
+
+    fireEvent.click(verbTab);
+    expect(verbTab).toHaveAttribute("aria-selected", "true");
+
+    const visiblePhonetic = screen
+      .getAllByLabelText("字典音标")
+      .find((input) => input.closest("[aria-hidden='true']") === null);
+    expect(visiblePhonetic).toBeDefined();
+    fireEvent.change(visiblePhonetic!, { target: { value: "changed" } });
+
+    expect(verbTab).toHaveAttribute("aria-selected", "true");
+  });
+
   it("可组合编辑读音和已有派生词形，并保存变更", async () => {
     renderStep();
 
