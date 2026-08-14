@@ -188,7 +188,7 @@ describe("FormsAndPronunciationStep", () => {
     expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("播放语音").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("获取语音").length).toBeGreaterThan(0);
-    expect(screen.getAllByLabelText("上传语音").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("上传语音")).toBeNull();
     expect(screen.getByText("添加一组替代词形变化")).toBeVisible();
     expect(screen.getByText("添加派生词形")).toBeVisible();
 

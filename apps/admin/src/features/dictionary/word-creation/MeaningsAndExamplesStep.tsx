@@ -6,9 +6,7 @@ import {
   LockOutlined,
   PlusOutlined,
   SoundOutlined,
-  SyncOutlined,
   ThunderboltOutlined,
-  UploadOutlined,
   UpOutlined
 } from "@ant-design/icons";
 import {
@@ -48,6 +46,7 @@ import type {
   WordSentenceV2
 } from "@tsz/types";
 import "@tsz/voice-editor/styles.css";
+import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { HttpError } from "@tsz/api-client/http";
 import {
   createContext,
@@ -83,6 +82,10 @@ import {
   toWordRichText
 } from "../word-model/primitives";
 import { useSaveMeaningsStep, useSuggestDialectVariants } from "./api";
+import {
+  PronunciationPreviewControls,
+  PronunciationPreviewProvider
+} from "./PronunciationPreview";
 import {
   applyMeaningDialectSuggestions,
   collectMissingMeaningDialectItems,
@@ -398,16 +401,23 @@ export function collectPronunciationHints(
 
 function VoiceEditorProvider({
   children,
-  pronunciationHints
+  pronunciationHints,
+  readOnly
 }: {
   children: ReactNode;
   pronunciationHints: Readonly<Record<string, string>>;
+  readOnly?: boolean;
 }) {
   const [target, setTarget] = useState<VoiceEditorTarget>();
-  if (!env.VOICE_EDITOR) return children;
+  const content = (
+    <PronunciationPreviewProvider readOnly={readOnly}>
+      {children}
+    </PronunciationPreviewProvider>
+  );
+  if (!env.VOICE_EDITOR) return content;
   return (
     <VoiceEditorContext.Provider value={{ open: setTarget }}>
-      {children}
+      {content}
       {target && (
         <Suspense fallback={null}>
           <VoiceRichTextEditor
@@ -598,7 +608,6 @@ function GrammarEditor({
   readOnly?: boolean;
   onChange: (next: WordPosMeaningsV2["grammar_structures"]) => void;
 }) {
-  const { message } = App.useApp();
   const dialects = grammarDialects(headwords);
   const [draggingIndex, setDraggingIndex] = useState<number>();
   const [dragOverIndex, setDragOverIndex] = useState<number>();
@@ -761,38 +770,13 @@ function GrammarEditor({
                     align="center"
                     gap={8}
                   >
-                    <Button
-                      type="text"
-                      size="small"
-                      className="word-pronunciation-play-action"
-                      icon={<SoundOutlined />}
-                      aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1} 播放语音`}
-                      disabled
-                    >
-                      试 听
-                    </Button>
-                    <Space size={6}>
-                      <Button
-                        size="small"
-                        className="word-pronunciation-voice-action word-pronunciation-sync-action"
-                        icon={<SyncOutlined />}
-                        aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1} 获取语音`}
-                        disabled={readOnly}
-                        onClick={() => message.info("获取语音（Mock）")}
-                      >
-                        获取语音
-                      </Button>
-                      <Button
-                        size="small"
-                        className="word-pronunciation-voice-action"
-                        icon={<UploadOutlined />}
-                        aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1} 上传语音`}
-                        disabled={readOnly}
-                        onClick={() => message.info("上传语音（Mock）")}
-                      >
-                        上传语音
-                      </Button>
-                    </Space>
+                    <PronunciationPreviewControls
+                      pronunciationId={variant.id}
+                      content={toRichTextV2(variant.content)}
+                      dialect={dialect}
+                      ariaLabelPrefix={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
+                      disabled={readOnly}
+                    />
                   </Flex>
                 </div>
               );
@@ -2536,7 +2520,10 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   });
 
   return (
-    <VoiceEditorProvider pronunciationHints={pronunciationHints}>
+    <VoiceEditorProvider
+      pronunciationHints={pronunciationHints}
+      readOnly={readOnly}
+    >
       <div className="word-step-heading">
         <span className="word-step-number">STEP 03</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
