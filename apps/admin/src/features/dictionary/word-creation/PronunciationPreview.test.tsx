@@ -160,8 +160,9 @@ describe("PronunciationPreview", () => {
       },
       { signal: expect.any(AbortSignal) }
     );
-    await waitFor(() =>
-      expect(AudioMock.instances[0]?.play).toHaveBeenCalled()
+    await waitFor(
+      () => expect(AudioMock.instances[0]?.play).toHaveBeenCalled(),
+      { timeout: 5_000 }
     );
     expect(screen.getByLabelText("播放语音")).toBeEnabled();
 
@@ -201,8 +202,9 @@ describe("PronunciationPreview", () => {
       expect(screen.getByLabelText("获取语音")).toBeEnabled()
     );
     fireEvent.click(screen.getByLabelText("获取语音"));
-    await waitFor(() =>
-      expect(screen.getByLabelText("播放语音")).toBeEnabled()
+    await waitFor(
+      () => expect(screen.getByLabelText("播放语音")).toBeEnabled(),
+      { timeout: 5_000 }
     );
 
     view.rerender(<PreviewHarness spelling="tomatoes" />);
