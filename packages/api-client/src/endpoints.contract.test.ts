@@ -226,6 +226,18 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(snapshot.schemas.DuplicateWordMatchV2.properties.status).toEqual({
       $ref: "#/components/schemas/AdminWordStatus"
     });
+    expect(snapshot.schemas.FormsImpactItemV2.properties.node_type).toEqual({
+      $ref: "#/components/schemas/FormsImpactNodeType"
+    });
+    expect(snapshot.schemas.FormsImpactNodeType.enum).toEqual([
+      "pos",
+      "grammar_structure",
+      "text_variant",
+      "sense",
+      "definition",
+      "sentence",
+      "relation"
+    ]);
   });
 
   it("speech 目录与试听 wire 和后端一致", () => {

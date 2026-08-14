@@ -35,6 +35,9 @@ if (!adminWordV2?.required || !adminWordV2?.properties) {
 const contractSchemaNames = [
   "DeleteDraftInput",
   "DuplicateWordMatchV2",
+  "FormsImpactItemV2",
+  "FormsImpactNodeType",
+  "FormsImpactResponseV2",
   "AdminWordListItem",
   "EntryLifecycleInput",
   "EntryLifecycleTarget",

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-13T14:07:39.366Z",
+  "_generatedAt": "2026-08-14T06:45:40.459Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -149,6 +149,40 @@
         "headword": { "type": "string" },
         "status": { "$ref": "#/components/schemas/AdminWordStatus" },
         "word_id": { "type": "string", "format": "uuid" }
+      }
+    },
+    "FormsImpactItemV2": {
+      "type": "object",
+      "required": ["node_id", "node_type", "reason"],
+      "properties": {
+        "node_id": { "type": "string", "format": "uuid" },
+        "node_type": { "$ref": "#/components/schemas/FormsImpactNodeType" },
+        "reason": { "type": "string" }
+      }
+    },
+    "FormsImpactNodeType": {
+      "type": "string",
+      "enum": [
+        "pos",
+        "grammar_structure",
+        "text_variant",
+        "sense",
+        "definition",
+        "sentence",
+        "relation"
+      ]
+    },
+    "FormsImpactResponseV2": {
+      "type": "object",
+      "required": ["base_revision", "requires_confirmation", "affected"],
+      "properties": {
+        "affected": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/FormsImpactItemV2" }
+        },
+        "base_revision": { "type": "integer", "format": "int64" },
+        "confirmation_token": { "type": "string", "format": "uuid" },
+        "requires_confirmation": { "type": "boolean" }
       }
     },
     "AdminWordListItem": {

@@ -3,9 +3,11 @@ import type { FormsImpactItemV2 } from "@tsz/types";
 const NODE_TYPE_LABELS: Record<string, string> = {
   pos: "词性",
   grammar_structure: "语法结构",
+  text_variant: "文本内容",
   sense: "词义",
   definition: "释义",
-  sentence: "例句"
+  sentence: "例句",
+  relation: "词义关系"
 };
 
 export interface FormsImpactGroup {

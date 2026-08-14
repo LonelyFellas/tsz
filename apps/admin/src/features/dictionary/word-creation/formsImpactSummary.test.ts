@@ -68,6 +68,22 @@ describe("summarizeFormsImpact", () => {
     ]);
   });
 
+  it("识别文本内容和词义关系节点，不产生未知类型警告", () => {
+    const summary = summarizeFormsImpact([
+      item("text-1", "text_variant", "会清理文本"),
+      item("text-2", "text_variant", "会清理文本"),
+      item("relation-1", "relation", "会清理关系")
+    ]);
+
+    expect(summary.type_counts).toEqual([
+      { label: "文本内容", count: 2 },
+      { label: "词义关系", count: 1 }
+    ]);
+    expect(summary.warnings).not.toContain(
+      "响应包含未知节点类型，已归入其他类型"
+    );
+  });
+
   it("空 affected 阻止确认", () => {
     expect(summarizeFormsImpact([])).toMatchObject({
       affected_count: 0,
