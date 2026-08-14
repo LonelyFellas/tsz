@@ -82,7 +82,7 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
               baseLifecycleRevision: word.lifecycle_revision
             });
             message.success("草稿已删除");
-            navigate("/words/new", { replace: true });
+            navigate(`/words/new?kind=${word.kind}`, { replace: true });
           } catch (error) {
             message.error(
               error instanceof Error ? error.message : "删除草稿失败"
@@ -216,6 +216,11 @@ export function WordCreationWizard({ mode }: Props) {
   const [word, setWord] = useState<AdminWordV2>();
   const [draftHeadwords, setDraftHeadwords] = useState<WordHeadwordsV2>();
   const explicitEditMode = searchParams.get("mode") === "edit";
+  const requestedKind = searchParams.get("kind");
+  const entryKind =
+    requestedKind === "word" || requestedKind === "phrase"
+      ? requestedKind
+      : undefined;
 
   useEffect(() => {
     const loaded = detail.data?.word;
@@ -252,7 +257,11 @@ export function WordCreationWizard({ mode }: Props) {
 
   if (mode === "create") {
     return (
-      <WordCreationLayout currentStep="basics" draftHeadwords={draftHeadwords}>
+      <WordCreationLayout
+        entryKind={entryKind}
+        currentStep="basics"
+        draftHeadwords={draftHeadwords}
+      >
         <CreateEntryStep
           onHeadwordsChange={setDraftHeadwords}
           onCreated={(created) => {
@@ -359,6 +368,7 @@ export function WordCreationWizard({ mode }: Props) {
       )}
       <WordCreationLayout
         word={word}
+        entryKind={word.kind}
         currentStep={currentStep}
         readOnly={readOnly}
         onStepChange={changeStep}

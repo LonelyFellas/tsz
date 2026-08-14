@@ -136,7 +136,9 @@ describe("admin 页面烟雾测试", () => {
     expect(screen.getAllByText("智能词库").length).toBeGreaterThan(0);
 
     fireEvent.click(screen.getByText("创建单词"));
-    expect(screen.getByTestId("location")).toHaveTextContent("/words/new");
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/words/new?kind=word"
+    );
   });
 
   it.each([

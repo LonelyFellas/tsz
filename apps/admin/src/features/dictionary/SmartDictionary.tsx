@@ -572,7 +572,7 @@ export function SmartDictionary() {
                   env.WORD_CREATION_WIZARD ||
                   !adminWordsDataSourceCapabilities.legacyEntryCreation
                 ) {
-                  navigate("/words/new");
+                  navigate("/words/new?kind=word");
                   return;
                 }
                 setCreateKind("word");
