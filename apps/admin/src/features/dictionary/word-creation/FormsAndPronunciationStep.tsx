@@ -45,6 +45,7 @@ import { HttpError } from "@tsz/api-client/http";
 import {
   Fragment,
   type DragEvent,
+  type ReactNode,
   useEffect,
   useMemo,
   useRef,
@@ -74,6 +75,7 @@ import {
   useSaveFormsStep,
   useSuggestDialectVariants
 } from "./api";
+import { summarizeFormsImpact } from "./formsImpactSummary";
 import {
   createDerivedSlot,
   createFormGroup,
@@ -1645,14 +1647,11 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const classificationLabel = (pos: WordPosFormsV2) =>
     partOfSpeechLabel(partOfSpeechLookup, pos.pos);
 
-  const confirmImpact = (
-    title: string,
-    description: string
-  ): Promise<boolean> =>
+  const confirmImpact = (title: string, content: ReactNode): Promise<boolean> =>
     new Promise((resolve) => {
       modal.confirm({
         title,
-        content: description,
+        content,
         okText: "确认并保存",
         cancelText: "取消",
         onOk: () => resolve(true),
@@ -1785,9 +1784,46 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
       });
       let confirmedToken: string | undefined;
       if (impact.requires_confirmation) {
+        const summary = summarizeFormsImpact(impact.affected);
+        if (!summary.can_confirm) {
+          message.error("影响预览响应异常，未返回受影响节点，已阻止保存");
+          return;
+        }
+        if (!impact.confirmation_token?.trim()) {
+          message.error("影响预览响应异常，缺少确认凭证，已阻止保存");
+          return;
+        }
         const confirmed = await confirmImpact(
           "本次修改会影响后续内容",
-          impact.affected.map((item) => item.reason).join("；")
+          <Space orientation="vertical" size="small">
+            <Typography.Text>
+              共影响{" "}
+              <Typography.Text strong>{summary.affected_count}</Typography.Text>{" "}
+              个下游节点，请确认是否继续保存。
+            </Typography.Text>
+            <Typography.Text type="secondary">
+              类型：
+              {summary.type_counts
+                .map(({ label, count }) => `${label} ${count}`)
+                .join("、")}
+            </Typography.Text>
+            {summary.groups.map((group) => (
+              <Typography.Text key={group.reason}>
+                {group.reason}（{group.count} 个：
+                {group.type_counts
+                  .map(({ label, count }) => `${label} ${count}`)
+                  .join("、")}
+                ）
+              </Typography.Text>
+            ))}
+            {summary.warnings.length > 0 ? (
+              <Alert
+                type="warning"
+                showIcon
+                title={summary.warnings.join("；")}
+              />
+            ) : null}
+          </Space>
         );
         if (!confirmed) return;
         confirmedToken = impact.confirmation_token;
