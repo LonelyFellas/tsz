@@ -353,7 +353,14 @@ export interface SuggestDialectVariantsResponseV2 {
 
 export interface FormsImpactItemV2 {
   node_id: string;
-  node_type: "pos" | "grammar_structure" | "sense" | "definition" | "sentence";
+  node_type:
+    | "pos"
+    | "grammar_structure"
+    | "text_variant"
+    | "sense"
+    | "definition"
+    | "sentence"
+    | "relation";
   reason: string;
 }
 

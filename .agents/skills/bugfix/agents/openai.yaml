@@ -1,0 +1,4 @@
+interface:
+  display_name: "Bug 修复"
+  short_description: "先在本地稳定复现问题，再定位根因、修复并完成回归验证"
+  default_prompt: "使用 $bugfix 先在本地复现这个问题，复现成立后再定位根因、修复并验证。"
