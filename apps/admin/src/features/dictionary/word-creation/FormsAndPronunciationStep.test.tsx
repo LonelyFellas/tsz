@@ -653,6 +653,59 @@ describe("FormsAndPronunciationStep", () => {
     );
   });
 
+  it("取消影响确认时不保存", async () => {
+    mutations.preview.mockResolvedValue({
+      base_revision: 3,
+      requires_confirmation: true,
+      affected: [
+        { node_id: "sense-1", node_type: "sense", reason: "词义将被重建" }
+      ],
+      confirmation_token: "impact-token-cancel"
+    });
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+    await screen.findByText(/共影响/);
+    const cancelButton = document.querySelector<HTMLButtonElement>(
+      ".ant-modal-confirm-btns .ant-btn-default"
+    );
+    expect(cancelButton).not.toBeNull();
+    fireEvent.click(cancelButton!);
+
+    await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(1));
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("长影响列表按原因和节点类型聚合展示且不泄露节点 ID", async () => {
+    mutations.preview.mockResolvedValue({
+      base_revision: 3,
+      requires_confirmation: true,
+      affected: [
+        ...Array.from({ length: 12 }, (_, index) => ({
+          node_id: `sense-secret-${index}`,
+          node_type: "sense" as const,
+          reason: "相关内容需要复核"
+        })),
+        ...Array.from({ length: 8 }, (_, index) => ({
+          node_id: `sentence-secret-${index}`,
+          node_type: "sentence" as const,
+          reason: "相关内容需要复核"
+        }))
+      ],
+      confirmation_token: "impact-token-long"
+    });
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(await screen.findByText(/共影响/)).toHaveTextContent("20");
+    expect(screen.getByText("类型：词义 12、例句 8")).toBeInTheDocument();
+    expect(
+      screen.getByText("相关内容需要复核（20 个：词义 12、例句 8）")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/sense-secret/)).toBeNull();
+  });
+
   it("服务端 field issue 切换所属词性并聚焦稳定 node/field", async () => {
     const issue = {
       step: "forms" as const,
@@ -909,7 +962,7 @@ describe("FormsAndPronunciationStep", () => {
     expect(mutations.preview).not.toHaveBeenCalled();
   });
 
-  it("影响确认响应没有 token 时省略 confirmed_impact_token", async () => {
+  it("影响确认响应没有 token 时提示异常并阻止保存", async () => {
     mutations.preview.mockResolvedValue({
       base_revision: 3,
       requires_confirmation: true,
@@ -920,12 +973,24 @@ describe("FormsAndPronunciationStep", () => {
     renderStep();
     fireEvent.click(button("保存草稿"));
     expect(
-      (await screen.findAllByText("本次修改会影响后续内容")).length
-    ).toBeGreaterThan(0);
-    fireEvent.click(button("确认并保存"));
-    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
-    expect(mutations.save.mock.calls[0]![0]).not.toHaveProperty(
-      "confirmed_impact_token"
-    );
+      await screen.findByText("影响预览响应异常，缺少确认凭证，已阻止保存")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("本次修改会影响后续内容")).toBeNull();
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("影响确认响应 affected 为空时提示异常并阻止保存", async () => {
+    mutations.preview.mockResolvedValue({
+      base_revision: 3,
+      requires_confirmation: true,
+      affected: [],
+      confirmation_token: "impact-token-empty"
+    });
+    renderStep();
+    fireEvent.click(button("保存草稿"));
+    expect(
+      await screen.findByText("影响预览响应异常，未返回受影响节点，已阻止保存")
+    ).toBeInTheDocument();
+    expect(mutations.save).not.toHaveBeenCalled();
   });
 });
