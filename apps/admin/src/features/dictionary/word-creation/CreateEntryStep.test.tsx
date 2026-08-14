@@ -264,12 +264,12 @@ describe("CreateEntryStep", () => {
     });
     vi.mocked(window.confirm).mockReturnValue(false);
 
-    fireEvent.click(button("返回智能词库"));
+    await act(async () => router.navigate("/words"));
     await waitFor(() => expect(window.confirm).toHaveBeenCalledTimes(1));
     expect(router.state.location.pathname).toBe("/words/new");
 
     vi.mocked(window.confirm).mockReturnValue(true);
-    fireEvent.click(button("返回智能词库"));
+    await act(async () => router.navigate("/words"));
     await waitFor(() => expect(router.state.location.pathname).toBe("/words"));
   });
 

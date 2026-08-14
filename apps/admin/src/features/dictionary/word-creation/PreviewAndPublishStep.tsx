@@ -689,42 +689,39 @@ export function PreviewAndPublishStep({
         </Card>
       </Space>
 
-      <div className="word-step-actions">
-        {!readOnly && (
-          <Button
-            onClick={() =>
-              navigate(`/words/${word.id}/wizard/meanings${editQuery}`)
-            }
-          >
-            上一步
-          </Button>
-        )}
-        {readOnly ? (
-          <Space>
-            <Button onClick={() => navigate("/words")}>返回智能词库</Button>
-            {word.status === "published" && (
-              <Button
-                type="primary"
-                onClick={() =>
-                  navigate(`/words/${word.id}/wizard/forms?mode=edit`)
-                }
-              >
-                继续编辑
-              </Button>
-            )}
-          </Space>
-        ) : (
-          <Button
-            type="primary"
-            icon={<SendOutlined />}
-            disabled={!validation?.valid}
-            loading={publishWord.isPending || validateWord.isPending}
-            onClick={() => void publish()}
-          >
-            提交生效
-          </Button>
-        )}
-      </div>
+      {(!readOnly || word.status === "published") && (
+        <div className="word-step-actions">
+          {!readOnly && (
+            <Button
+              onClick={() =>
+                navigate(`/words/${word.id}/wizard/meanings${editQuery}`)
+              }
+            >
+              上一步
+            </Button>
+          )}
+          {readOnly ? (
+            <Button
+              type="primary"
+              onClick={() =>
+                navigate(`/words/${word.id}/wizard/forms?mode=edit`)
+              }
+            >
+              继续编辑
+            </Button>
+          ) : (
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              disabled={!validation?.valid}
+              loading={publishWord.isPending || validateWord.isPending}
+              onClick={() => void publish()}
+            >
+              提交生效
+            </Button>
+          )}
+        </div>
+      )}
     </>
   );
 }

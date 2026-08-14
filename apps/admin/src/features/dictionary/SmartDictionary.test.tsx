@@ -69,6 +69,20 @@ function word(id: string, headword: string): AdminWordListItem {
   };
 }
 
+function matchViewport(width: number) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches:
+      !query.includes("min-width") || Number(query.match(/\d+/)?.[0]) <= width,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn()
+  }));
+}
+
 function archivedWord(id: string, headword: string): AdminWordListItem {
   return { ...word(id, headword), status: "archived" };
 }
@@ -121,6 +135,63 @@ afterEach(() => {
 });
 
 describe("SmartDictionary", () => {
+  it("手机宽度只保留完整的词汇与操作列", () => {
+    matchViewport(390);
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    const headers = screen.getAllByRole("columnheader");
+    expect(headers.map((header) => header.textContent?.trim())).toEqual([
+      "",
+      "词汇",
+      "操作"
+    ]);
+    expect(screen.getByText("继续创建").closest("button")).toBeEnabled();
+    expect(
+      screen
+        .getAllByText("归 档", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => item?.classList.contains("ant-btn-link"))
+    ).toBeEnabled();
+  });
+
+  it("创建人长名称单行省略并可通过键盘触发 Tooltip，空值显示占位", () => {
+    matchViewport(1440);
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...word("long", "long-headword"),
+            created_by_name: "非常非常长的创建人名称"
+          },
+          { ...word("empty", "empty-creator"), created_by_name: "" }
+        ],
+        page: { page: 1, page_size: 20, total: 2 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    const creator = screen.getByText("非常非常长的创建人名称");
+    expect(creator).toHaveAttribute("tabindex", "0");
+    expect(creator.closest("td")).toHaveClass("ant-table-cell-ellipsis");
+    expect(screen.getByText("-")).not.toHaveAttribute("tabindex");
+  });
+
   it("从重复检测入口进入时自动定位归档词条", () => {
     render(
       <MemoryRouter initialEntries={["/words?keyword=center&status=archived"]}>

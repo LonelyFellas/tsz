@@ -19,6 +19,7 @@ import {
   Space,
   Table,
   Tag,
+  Tooltip,
   Typography
 } from "antd";
 import type { TableColumnsType } from "antd";
@@ -285,25 +286,40 @@ export function SmartDictionary() {
     {
       title: "词汇",
       dataIndex: "headword",
-      width: 140,
+      width: 120,
       fixed: "left",
-      render: (w: string) => <span style={{ fontWeight: 600 }}>{w}</span>
+      ellipsis: { showTitle: false },
+      render: (w: string) => (
+        <Tooltip title={w}>
+          <span tabIndex={0} style={{ display: "block", fontWeight: 600 }}>
+            {w}
+          </span>
+        </Tooltip>
+      )
     },
     {
       title: "类型",
       dataIndex: "kind",
       width: 80,
+      responsive: ["sm"],
       render: (k: AdminWordKind) => (
         <Tag color={k === "phrase" ? "geekblue" : "default"}>
           {KIND_LABEL[k]}
         </Tag>
       )
     },
-    { title: "释义", dataIndex: "gloss", width: 180, ellipsis: true },
+    {
+      title: "释义",
+      dataIndex: "gloss",
+      width: 180,
+      ellipsis: true,
+      responsive: ["sm"]
+    },
     {
       title: "基本词性",
       dataIndex: "pos_list",
       width: 180,
+      responsive: ["sm"],
       render: (list: AdminWordListItem["pos_list"]) => (
         <Space size={[4, 4]} wrap>
           {list.map((p) => (
@@ -318,6 +334,7 @@ export function SmartDictionary() {
       title: "难度",
       dataIndex: "levels",
       width: 170,
+      responsive: ["sm"],
       render: (levels: CefrLevel[]) => (
         <Space size={[4, 4]} wrap>
           {levels.map((lv) => (
@@ -332,13 +349,29 @@ export function SmartDictionary() {
       title: "创建时间",
       dataIndex: "created_at",
       width: 150,
+      responsive: ["sm"],
       render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
     },
-    { title: "创建人", dataIndex: "created_by_name", width: 100 },
+    {
+      title: "创建人",
+      dataIndex: "created_by_name",
+      width: 140,
+      ellipsis: { showTitle: false },
+      responsive: ["sm"],
+      render: (name?: string) => {
+        const label = name?.trim() || "-";
+        return (
+          <Tooltip title={name?.trim() || undefined}>
+            <span tabIndex={name?.trim() ? 0 : undefined}>{label}</span>
+          </Tooltip>
+        );
+      }
+    },
     {
       title: "状态",
       dataIndex: "status",
       width: 90,
+      responsive: ["sm"],
       render: (s: AdminWordListItem["status"], record) => (
         <Space size={4} wrap>
           <Tag
@@ -362,17 +395,18 @@ export function SmartDictionary() {
       title: "更新时间",
       dataIndex: "updated_at",
       width: 150,
+      responsive: ["sm"],
       render: (t: string) => dayjs(t).format("YYYY-MM-DD HH:mm")
     },
     {
       title: "操作",
       key: "action",
-      width: 180,
+      width: 160,
       fixed: "right",
       render: (_: unknown, record: AdminWordListItem) => {
         const isV2 = record.schema_version === 2;
         return (
-          <Space size={4}>
+          <Space size={0}>
             {(isV2 || adminWordsDataSourceCapabilities.legacyEntryCreation) && (
               <Button
                 type="link"
@@ -630,7 +664,7 @@ export function SmartDictionary() {
           columns={columns}
           dataSource={rows}
           loading={listQuery.isPending}
-          scroll={{ x: 1400 }}
+          scroll={{ x: "max-content" }}
           rowSelection={
             adminWordsDataSourceCapabilities.batchArchive
               ? {

@@ -2,7 +2,6 @@ import {
   CheckCircleFilled,
   CloseCircleFilled,
   InfoCircleOutlined,
-  LeftOutlined,
   SafetyCertificateOutlined,
   SearchOutlined
 } from "@ant-design/icons";
@@ -29,7 +28,7 @@ import type {
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client/http";
 import { useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import {
   createPartOfSpeechLookup,
   partOfSpeechLabel,
@@ -362,7 +361,6 @@ function HeadwordConfirmation({
 
 export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
   const { message } = App.useApp();
-  const navigate = useNavigate();
   const [form] = Form.useForm<BasicsFormValues>();
   const detectWord = useDetectWordV2();
   const createWord = useCreateWordV2();
@@ -502,14 +500,6 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
 
   return (
     <div className={`word-basics-workflow${result ? " is-detected" : ""}`}>
-      <Button
-        type="text"
-        icon={<LeftOutlined />}
-        onClick={() => navigate("/words")}
-        className="word-entry-back"
-      >
-        返回智能词库
-      </Button>
       <StepHeading />
       <fieldset
         className="word-request-lock"
