@@ -352,6 +352,81 @@ describe("FormsAndPronunciationStep", () => {
     expect(mutations.save).not.toHaveBeenCalled();
   });
 
+  it("完成前阻止真正为空的词形组，并按空组数量提示", async () => {
+    const word = wordFixture();
+    word.forms.pos[0]!.form_groups = [
+      { id: "empty-group-1", is_regular: true, slots: [] },
+      { id: "empty-group-2", is_regular: false, slots: [] }
+    ];
+    renderStep(word);
+
+    fireEvent.click(button("完成并进入词义与例句"));
+
+    expect(
+      await screen.findByText("名词有 2 组词形变化尚未添加派生词形")
+    ).toBeInTheDocument();
+    expect(mutations.preview).not.toHaveBeenCalled();
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("tomato 填入 tomatoes 后可完成，保存 wire 保留 plural slot 与 variant", async () => {
+    const word = wordFixture({ headword: "tomato" });
+    const pos = word.forms.pos[0]!;
+    const slot = {
+      id: "tomato-plural-slot",
+      form_type: "plural" as const,
+      variants: [
+        {
+          id: "tomatoes-common-variant",
+          dialect: "common" as const,
+          spelling: "tomatoes",
+          origin: "dictionary" as const,
+          pronunciations: [
+            {
+              id: "tomatoes-pronunciation",
+              dict_phonetic: "/təˈmɑːtoʊz/",
+              actual_pron: "təˈmɑːtoʊz",
+              style: "normal" as const
+            }
+          ]
+        }
+      ]
+    };
+    pos.form_groups[0]!.slots = [slot];
+    renderStep(word);
+
+    fireEvent.click(button("完成并进入词义与例句"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(mutations.save.mock.calls[0]![0]).toMatchObject({
+      intent: "complete",
+      content: {
+        pos: [
+          {
+            base_form: { form_type: "base" },
+            form_groups: [
+              {
+                slots: [
+                  {
+                    id: "tomato-plural-slot",
+                    form_type: "plural",
+                    variants: [
+                      {
+                        id: "tomatoes-common-variant",
+                        dialect: "common",
+                        spelling: "tomatoes"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    });
+  });
+
   it("可上移替代词形组，保存 payload 保留新的稳定顺序", async () => {
     const word = wordFixture();
     word.forms.pos[0]!.form_groups.push({

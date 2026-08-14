@@ -1466,6 +1466,7 @@ function countPosFormIssues(
     pos.form_groups.reduce(
       (count, group) =>
         count +
+        (group.slots.length === 0 ? 1 : 0) +
         group.slots.filter((slot) => !allowed.includes(slot.form_type)).length,
       0
     )
@@ -1744,6 +1745,14 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
         );
         if (pos.form_groups.length === 0) {
           issues.push(`${posLabel}至少需要一组词形变化`);
+        }
+        const emptyGroupCount = pos.form_groups.filter(
+          (group) => group.slots.length === 0
+        ).length;
+        if (emptyGroupCount > 0) {
+          issues.push(
+            `${posLabel}有 ${emptyGroupCount} 组词形变化尚未添加派生词形`
+          );
         }
         const invalidCount = pos.form_groups.reduce(
           (count, group) =>

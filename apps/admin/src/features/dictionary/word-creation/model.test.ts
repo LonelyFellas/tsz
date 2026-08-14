@@ -765,6 +765,48 @@ describe("展示、factory 默认值与边界输入", () => {
 });
 
 describe("真实后端 wire mapper", () => {
+  it("tomato 的 plural slot、variant 与稳定节点 ID 完整进入保存 wire", () => {
+    const pos = createPosForms("noun", {
+      mode: "unified",
+      common: "tomato"
+    });
+    const plural = createDerivedSlot("plural", pos);
+    plural.variants[0]!.spelling = "tomatoes";
+    plural.variants[0]!.pronunciations[0]!.dict_phonetic = "/təˈmɑːtoʊz/";
+    plural.variants[0]!.pronunciations[0]!.actual_pron = "təˈmɑːtoʊz";
+    pos.form_groups[0]!.slots.push(plural);
+
+    const wire = toFormsWireContent({ pos: [pos] });
+
+    expect(wire.pos[0]!.base_form).toMatchObject({
+      id: pos.base_form.id,
+      form_type: "base"
+    });
+    expect(wire.pos[0]!.form_groups[0]).toMatchObject({
+      id: pos.form_groups[0]!.id,
+      slots: [
+        {
+          id: plural.id,
+          form_type: "plural",
+          variants: [
+            {
+              id: plural.variants[0]!.id,
+              dialect: "common",
+              spelling: "tomatoes",
+              pronunciations: [
+                {
+                  id: plural.variants[0]!.pronunciations[0]!.id,
+                  dict_phonetic: "/təˈmɑːtoʊz/",
+                  actual_pron: "təˈmɑːtoʊz"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    });
+  });
+
   it("词形请求保留节点 ID，并移除旧缓存中的音频只读字段", () => {
     const pos = createPosForms("noun", unifiedHeadwords);
     const pronunciation = pos.base_form.variants[0]!.pronunciations[0]!;
