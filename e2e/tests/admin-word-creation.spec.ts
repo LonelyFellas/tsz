@@ -15,7 +15,7 @@ async function createCenterDraft(
   const api = await mockAdminApi(page, options);
   await page.goto("/words");
   await page.getByRole("button", { name: "创建单词" }).click();
-  await expect(page).toHaveURL(/\/words\/new$/);
+  await expect(page).toHaveURL(/\/words\/new\?kind=word$/);
 
   await page.getByPlaceholder("例如 center").fill("center");
   await page.getByRole("button", { name: "词典检测" }).click();
@@ -32,6 +32,43 @@ async function createCenterDraft(
 }
 
 test.describe("admin 新建单词 V2", () => {
+  test("创建入口向导显示单词、短语与中性语义", async ({ page }) => {
+    await mockAdminApi(page);
+
+    await page.goto("/words");
+    await page.getByRole("button", { name: "创建单词" }).click();
+    await expect(page).toHaveURL(/\/words\/new\?kind=word$/);
+    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
+      "创建单词"
+    );
+    await page.reload();
+    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
+      "创建单词"
+    );
+
+    await page.goBack();
+    await page.getByRole("button", { name: "创建短语" }).click();
+    await expect(page).toHaveURL(/\/words\/new\?kind=phrase$/);
+    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
+      "创建短语"
+    );
+    await page.reload();
+    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
+      "创建短语"
+    );
+    await page.goBack();
+    await expect(page).toHaveURL(/\/words$/);
+    await page.goForward();
+    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
+      "创建短语"
+    );
+
+    await page.goto("/words/new");
+    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
+      "创建词条"
+    );
+  });
+
   test("T19 center 四步发布后回列表并进入只读预览", async ({ page }) => {
     const api = await createCenterDraft(page);
 

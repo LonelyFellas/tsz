@@ -22,6 +22,19 @@ function renderLayout(
 }
 
 describe("WordCreationLayout", () => {
+  it("创建态区分单词、短语，未知意图使用中性文案", () => {
+    const neutral = renderLayout({ currentStep: "basics" });
+    expect(screen.getByText("创建词条")).toBeInTheDocument();
+
+    neutral.unmount();
+    const word = renderLayout({ currentStep: "basics", entryKind: "word" });
+    expect(screen.getByText("创建单词")).toBeInTheDocument();
+
+    word.unmount();
+    renderLayout({ currentStep: "basics", entryKind: "phrase" });
+    expect(screen.getByText("创建短语")).toBeInTheDocument();
+  });
+
   it("Step 1 也展示词条摘要和完成情况", () => {
     renderLayout({ currentStep: "basics" });
 

@@ -16,6 +16,7 @@ import "./word-creation.css";
 
 interface Props {
   word?: AdminWordV2;
+  entryKind?: AdminWordV2["kind"];
   draftHeadwords?: WordHeadwordsV2;
   currentStep: WordCreationStep;
   readOnly?: boolean;
@@ -127,6 +128,7 @@ function ProgressSummary({ word }: { word?: AdminWordV2 }) {
 
 export function WordCreationLayout({
   word,
+  entryKind,
   draftHeadwords,
   currentStep,
   readOnly,
@@ -152,6 +154,12 @@ export function WordCreationLayout({
           : ("wait" as const),
     disabled: !word || index > maxReachableIndex
   }));
+  const createTitle =
+    entryKind === "word"
+      ? "创建单词"
+      : entryKind === "phrase"
+        ? "创建短语"
+        : "创建词条";
 
   return (
     <div className="word-creation-page">
@@ -165,7 +173,7 @@ export function WordCreationLayout({
           {
             title: word
               ? `${wordDisplayHeadword(word)} · ${WORD_STEP_TITLE[currentStep]}`
-              : "创建单词"
+              : createTitle
           }
         ]}
       />

@@ -96,16 +96,19 @@ vi.mock("./PreviewAndPublishStep", () => ({
 
 vi.mock("./WordCreationLayout", () => ({
   WordCreationLayout: ({
+    entryKind,
     currentStep,
     onStepChange,
     children
   }: {
+    entryKind?: AdminWordV2["kind"];
     currentStep: string;
     onStepChange?: (step: "basics" | "forms" | "meanings" | "preview") => void;
     children: React.ReactNode;
   }) => (
     <div>
       <span>layout-{currentStep}</span>
+      <span>layout-kind-{entryKind ?? "neutral"}</span>
       <button onClick={() => onStepChange?.("forms")}>layout-forms</button>
       <button onClick={() => onStepChange?.("meanings")}>
         layout-meanings
@@ -176,6 +179,33 @@ beforeEach(() => {
 });
 
 describe("WordCreationWizard", () => {
+  it("从 query 恢复创建入口意图，未知或缺失时保持中性", () => {
+    const phrase = renderWizard("create", "/words/new?kind=phrase");
+    expect(screen.getByText("layout-kind-phrase")).toBeVisible();
+
+    phrase.unmount();
+    const word = renderWizard("create", "/words/new?kind=word");
+    expect(screen.getByText("layout-kind-word")).toBeVisible();
+
+    word.unmount();
+    const unknown = renderWizard("create", "/words/new?kind=legacy");
+    expect(screen.getByText("layout-kind-neutral")).toBeVisible();
+
+    unknown.unmount();
+    renderWizard("create", "/words/new");
+    expect(screen.getByText("layout-kind-neutral")).toBeVisible();
+  });
+
+  it("恢复已有草稿时使用后端权威 kind", async () => {
+    const phrase = wordFixture();
+    phrase.kind = "phrase";
+    phrase.detection_snapshot.entry_kind = "phrase";
+    loaded(phrase);
+    renderWizard("resume", "/words/word-center/wizard/forms?kind=word");
+
+    expect(await screen.findByText("layout-kind-phrase")).toBeVisible();
+  });
+
   it("create 模式渲染 basics，创建成功后进入该草稿 forms", () => {
     renderWizard("create", "/words/new");
     expect(screen.getByText("layout-basics")).toBeVisible();
@@ -487,7 +517,9 @@ describe("WordCreationWizard", () => {
       })
     );
     await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent("/words/new")
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "/words/new?kind=word"
+      )
     );
   });
 
