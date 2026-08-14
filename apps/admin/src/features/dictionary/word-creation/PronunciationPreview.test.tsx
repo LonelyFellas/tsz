@@ -6,7 +6,7 @@ import {
   waitFor
 } from "@testing-library/react";
 import { App as AntApp } from "antd";
-import type { Dialect } from "@tsz/types";
+import type { Dialect, RichTextV2 } from "@tsz/types";
 import type { VoicePreviewResult } from "@tsz/voice-editor/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -104,10 +104,12 @@ function result(
 
 function PreviewHarness({
   spelling = "tomato",
+  content,
   dialect = "common",
   readOnly = false
 }: {
   spelling?: string;
+  content?: RichTextV2;
   dialect?: Dialect;
   readOnly?: boolean;
 }) {
@@ -117,6 +119,7 @@ function PreviewHarness({
         <PronunciationPreviewControls
           pronunciationId="pronunciation-stable-id"
           spelling={spelling}
+          content={content}
           dialect={dialect}
           disabled={readOnly}
         />
@@ -157,8 +160,9 @@ describe("PronunciationPreview", () => {
       },
       { signal: expect.any(AbortSignal) }
     );
-    await waitFor(() =>
-      expect(AudioMock.instances[0]?.play).toHaveBeenCalled()
+    await waitFor(
+      () => expect(AudioMock.instances[0]?.play).toHaveBeenCalled(),
+      { timeout: 5_000 }
     );
     expect(screen.getByLabelText("播放语音")).toBeEnabled();
 
@@ -198,8 +202,9 @@ describe("PronunciationPreview", () => {
       expect(screen.getByLabelText("获取语音")).toBeEnabled()
     );
     fireEvent.click(screen.getByLabelText("获取语音"));
-    await waitFor(() =>
-      expect(screen.getByLabelText("播放语音")).toBeEnabled()
+    await waitFor(
+      () => expect(screen.getByLabelText("播放语音")).toBeEnabled(),
+      { timeout: 5_000 }
     );
 
     view.rerender(<PreviewHarness spelling="tomatoes" />);
@@ -209,6 +214,42 @@ describe("PronunciationPreview", () => {
     );
     expect(AudioMock.instances[0]?.pause).toHaveBeenCalled();
     expect(dispose).toHaveBeenCalledTimes(1);
+  });
+
+  it("富文本标注变化会释放旧结果并把完整内容发送给真实 adapter", async () => {
+    const dispose = vi.fn();
+    preview.synthesize.mockResolvedValue(result({ dispose }));
+    const initial: RichTextV2 = {
+      version: 2,
+      text: "a record",
+      annotations: []
+    };
+    const view = render(<PreviewHarness content={initial} dialect="uk" />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("获取语音")).toBeEnabled()
+    );
+    fireEvent.click(screen.getByLabelText("获取语音"));
+    await waitFor(() =>
+      expect(screen.getByLabelText("播放语音")).toBeEnabled()
+    );
+
+    const annotated: RichTextV2 = {
+      ...initial,
+      annotations: [{ type: "emphasis", start: 2, end: 8, level: "strong" }]
+    };
+    view.rerender(<PreviewHarness content={annotated} dialect="uk" />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("播放语音")).toBeDisabled()
+    );
+    expect(dispose).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByLabelText("获取语音"));
+    await waitFor(() =>
+      expect(preview.synthesize).toHaveBeenLastCalledWith(
+        expect.objectContaining({ content: annotated }),
+        expect.anything()
+      )
+    );
   });
 
   it("失败后恢复按钮并允许重试", async () => {

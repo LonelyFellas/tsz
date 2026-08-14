@@ -1,6 +1,6 @@
 import { SoundOutlined, SyncOutlined } from "@ant-design/icons";
 import { App, Button, Tooltip } from "antd";
-import type { Dialect } from "@tsz/types";
+import type { Dialect, RichTextV2 } from "@tsz/types";
 import type {
   VoiceOption,
   VoicePreviewAdapter,
@@ -106,13 +106,17 @@ function voiceForDialect(
 export function PronunciationPreviewControls({
   pronunciationId,
   spelling,
+  content,
   dialect,
+  ariaLabelPrefix,
   disabled = false,
   children
 }: {
   pronunciationId: string;
-  spelling: string;
+  spelling?: string;
+  content?: RichTextV2;
   dialect: Dialect;
+  ariaLabelPrefix?: string;
   disabled?: boolean;
   children?: ReactNode;
 }) {
@@ -127,7 +131,18 @@ export function PronunciationPreviewControls({
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voice = voiceForDialect(context.voices, dialect);
-  const text = spelling.trim();
+  const previewContent = useMemo<RichTextV2>(
+    () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
+    [content, spelling]
+  );
+  const contentKey = JSON.stringify(previewContent);
+  const text = previewContent.text.trim();
+  const playLabel = ariaLabelPrefix
+    ? `${ariaLabelPrefix} 播放语音`
+    : "播放语音";
+  const generateLabel = ariaLabelPrefix
+    ? `${ariaLabelPrefix} 获取语音`
+    : "获取语音";
 
   const clearExpiry = useCallback(() => {
     if (expiryTimerRef.current) clearTimeout(expiryTimerRef.current);
@@ -153,7 +168,7 @@ export function PronunciationPreviewControls({
     cleanup();
     setBusy(false);
     setStatus("");
-  }, [cleanup, pronunciationId, text, voice?.id]);
+  }, [cleanup, contentKey, pronunciationId, voice?.id]);
 
   useEffect(() => cleanup, [cleanup]);
 
@@ -191,7 +206,8 @@ export function PronunciationPreviewControls({
       context.voicesLoading ||
       !voice ||
       !text ||
-      busy
+      busy ||
+      abortRef.current
     ) {
       return;
     }
@@ -204,7 +220,7 @@ export function PronunciationPreviewControls({
       const preview = await context.adapter.synthesize(
         {
           language: "en",
-          content: { version: 2, text, annotations: [] },
+          content: previewContent,
           voiceId: voice.id
         },
         { signal: controller.signal }
@@ -284,7 +300,7 @@ export function PronunciationPreviewControls({
           className="word-pronunciation-play-action"
           icon={<SoundOutlined />}
           disabled={disabled || !context.enabled || !result}
-          aria-label="播放语音"
+          aria-label={playLabel}
           onClick={() => void replay()}
         />
       </Tooltip>
@@ -292,7 +308,7 @@ export function PronunciationPreviewControls({
       <Tooltip title={status || unavailableReason}>
         <Button
           className="word-pronunciation-voice-action word-pronunciation-sync-action"
-          aria-label="获取语音"
+          aria-label={generateLabel}
           icon={<SyncOutlined spin={busy} />}
           loading={busy}
           disabled={

@@ -6,7 +6,6 @@ import {
   PlusCircleOutlined,
   PlusOutlined,
   SoundOutlined,
-  UploadOutlined,
   UpOutlined
 } from "@ant-design/icons";
 import {
@@ -27,7 +26,6 @@ import {
   Space,
   Tabs,
   Tag,
-  Tooltip,
   Typography
 } from "antd";
 import type {
@@ -147,7 +145,6 @@ function PronunciationFields({
   onAdd?: () => void;
   onReorder?: (sourceIndex: number, targetIndex: number) => void;
 }) {
-  const { message } = App.useApp();
   const [dragging, setDragging] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const canReorder = !disabled && count > 1 && Boolean(onReorder);
@@ -286,15 +283,6 @@ function PronunciationFields({
                   }
                 />
               </PronunciationPreviewControls>
-              <Tooltip title="上传语音">
-                <Button
-                  className="word-pronunciation-voice-action"
-                  aria-label="上传语音"
-                  icon={<UploadOutlined />}
-                  disabled={disabled}
-                  onClick={() => message.info("上传语音（Mock）")}
-                />
-              </Tooltip>
             </Space.Compact>
           </div>
         </div>

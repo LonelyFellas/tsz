@@ -40,6 +40,10 @@ const featureFlags = vi.hoisted(() => ({
   VOICE_PREVIEW: false,
   ADMIN_TTS_MOCK: true
 }));
+const voicePreview = vi.hoisted(() => ({
+  listVoices: vi.fn(),
+  synthesize: vi.fn()
+}));
 const relatedWords = vi.hoisted(() => [
   {
     word_id: "fixture-colour",
@@ -67,10 +71,7 @@ vi.mock("../dataSource", () => ({
 
 vi.mock("@/lib/env", () => ({ env: featureFlags }));
 vi.mock("../voice-editor/dataSource", () => ({
-  adminVoicePreviewAdapter: {
-    listVoices: vi.fn().mockResolvedValue([]),
-    synthesize: vi.fn()
-  }
+  adminVoicePreviewAdapter: voicePreview
 }));
 vi.mock("@tsz/voice-editor/editor", async () => {
   const actual = await vi.importActual<typeof import("@tsz/voice-editor/core")>(
@@ -256,6 +257,21 @@ beforeEach(() => {
   vi.clearAllMocks();
   featureFlags.VOICE_EDITOR = false;
   featureFlags.VOICE_PREVIEW = false;
+  voicePreview.listVoices.mockResolvedValue([
+    {
+      id: "en-GB-Sonia",
+      label: "Sonia · en-GB",
+      locale: "en-GB",
+      gender: "female",
+      styles: [],
+      supportsRate: true,
+      supportsPitch: true,
+      isDefault: true,
+      rateRange: { min: -50, max: 100 },
+      pitchRange: { min: -12, max: 12 }
+    }
+  ]);
+  voicePreview.synthesize.mockReturnValue(new Promise(() => undefined));
   dataSourceCapabilities.dialectVariantSuggestions = true;
   mutations.save.mockResolvedValue({
     word: wordFixture({ ready: true, revision: 4 })
@@ -362,10 +378,10 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("英式英语")).toBeNull();
     expect(screen.queryByText("美式英语")).toBeNull();
     expect(screen.getByLabelText("英式语法结构 1 播放语音")).toBeDisabled();
-    expect(screen.getByLabelText("英式语法结构 1 获取语音")).toBeEnabled();
-    expect(screen.getByLabelText("英式语法结构 1 上传语音")).toBeEnabled();
-    expect(screen.getByLabelText("美式语法结构 1 获取语音")).toBeEnabled();
-    expect(screen.getByLabelText("美式语法结构 1 上传语音")).toBeEnabled();
+    expect(screen.getByLabelText("英式语法结构 1 获取语音")).toBeDisabled();
+    expect(screen.queryByLabelText("英式语法结构 1 上传语音")).toBeNull();
+    expect(screen.getByLabelText("美式语法结构 1 获取语音")).toBeDisabled();
+    expect(screen.queryByLabelText("美式语法结构 1 上传语音")).toBeNull();
     expect(screen.getByLabelText("拖动语法结构 1")).toBeDisabled();
     expect(screen.queryByLabelText("上移语法结构 1")).toBeNull();
     expect(screen.queryByLabelText("下移语法结构 1")).toBeNull();
@@ -475,14 +491,29 @@ describe("MeaningsAndExamplesStep", () => {
     });
   });
 
-  it("语法结构方言输入提供获取和上传语音操作", async () => {
-    renderStep();
+  it("语法结构方言输入使用真实试听且不暴露无契约的上传操作", async () => {
+    featureFlags.VOICE_PREVIEW = true;
+    const word = wordFixture({ ready: true });
+    word.meanings.pos[0]!.grammar_structures[0]!.variants[0]!.content.text =
+      "a record";
+    renderStep(word);
 
-    fireEvent.click(screen.getByLabelText("英式语法结构 1 获取语音"));
-    expect(await screen.findByText("获取语音（Mock）")).toBeInTheDocument();
+    const generate = screen.getByLabelText("英式语法结构 1 获取语音");
+    await waitFor(() => expect(generate).toBeEnabled());
+    fireEvent.click(generate);
 
-    fireEvent.click(screen.getByLabelText("英式语法结构 1 上传语音"));
-    expect(await screen.findByText("上传语音（Mock）")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(voicePreview.synthesize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          language: "en",
+          content: expect.objectContaining({ text: "a record" }),
+          voiceId: "en-GB-Sonia"
+        }),
+        expect.objectContaining({ signal: expect.any(AbortSignal) })
+      )
+    );
+    expect(screen.queryByLabelText("英式语法结构 1 上传语音")).toBeNull();
+    expect(screen.queryByText(/Mock/)).toBeNull();
   });
 
   it("语法结构拖动手柄支持上下方向键排序", () => {
@@ -1591,7 +1622,7 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.getAllByLabelText("英语文本").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("中文释义")[0]).toHaveAttribute("readonly");
     expect(screen.getByLabelText("默认语法结构 1 获取语音")).toBeDisabled();
-    expect(screen.getByLabelText("默认语法结构 1 上传语音")).toBeDisabled();
+    expect(screen.queryByLabelText("默认语法结构 1 上传语音")).toBeNull();
     expect(screen.queryByText("添加语法结构")).toBeNull();
     expect(screen.queryByText("添加词义")).toBeNull();
     expect(screen.queryByText("保存草稿")).toBeNull();
