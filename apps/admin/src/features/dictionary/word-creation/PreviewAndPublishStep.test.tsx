@@ -324,7 +324,7 @@ describe("PreviewAndPublishStep", () => {
     expect(screen.getByText(/synonym/)).toBeInTheDocument();
   });
 
-  it("published 只读详情不重复 validate，展示发布时间并返回列表", () => {
+  it("published 只读详情不重复 validate，展示发布时间并允许继续编辑", () => {
     const published = wordFixture({
       headword: "far",
       status: "published",
@@ -350,9 +350,6 @@ describe("PreviewAndPublishStep", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(
       `/words/${published.id}/wizard/forms?mode=edit`
     );
-
-    fireEvent.click(button("返回智能词库"));
-    expect(screen.getByTestId("location")).toHaveTextContent(/^\/words\|/);
   });
 
   it("archived 预览明确显示归档只读态，且不提供继续编辑或发布", () => {
@@ -368,6 +365,7 @@ describe("PreviewAndPublishStep", () => {
     expect(screen.getByText("已归档", { exact: true })).toBeVisible();
     expect(screen.queryByText("继续编辑")).toBeNull();
     expect(screen.queryByText("提交生效")).toBeNull();
+    expect(document.querySelector(".word-step-actions")).toBeNull();
     expect(mutations.validate).not.toHaveBeenCalled();
   });
 
