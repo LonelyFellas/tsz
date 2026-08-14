@@ -6,10 +6,13 @@ import {
   PlusCircleOutlined,
   PlusOutlined,
   SoundOutlined,
-  SyncOutlined,
   UploadOutlined,
   UpOutlined
 } from "@ant-design/icons";
+import {
+  PronunciationPreviewControls,
+  PronunciationPreviewProvider
+} from "./PronunciationPreview";
 import {
   Alert,
   App,
@@ -117,6 +120,8 @@ function updatePronunciation(
 
 function PronunciationFields({
   value,
+  spelling,
+  dialect,
   disabled,
   index,
   count,
@@ -128,6 +133,8 @@ function PronunciationFields({
   onReorder
 }: {
   value: WordPronunciationV2;
+  spelling: string;
+  dialect: Dialect;
   disabled?: boolean;
   index: number;
   count: number;
@@ -260,33 +267,23 @@ function PronunciationFields({
           </Typography.Text>
           <div className="word-pronunciation-phonetic-control">
             <Space.Compact block>
-              <Tooltip title="播放语音">
-                <Button
-                  className="word-pronunciation-play-action"
-                  icon={<SoundOutlined />}
-                  disabled
-                  aria-label="播放语音"
+              <PronunciationPreviewControls
+                pronunciationId={value.id}
+                spelling={spelling}
+                dialect={dialect}
+                disabled={disabled}
+              >
+                <Input
+                  className="word-pronunciation-phonetic-input"
+                  aria-label="字典音标"
+                  value={value.dict_phonetic}
+                  readOnly={disabled}
+                  placeholder="字典音标"
+                  onChange={(event) =>
+                    onChange({ ...value, dict_phonetic: event.target.value })
+                  }
                 />
-              </Tooltip>
-              <Input
-                className="word-pronunciation-phonetic-input"
-                aria-label="字典音标"
-                value={value.dict_phonetic}
-                readOnly={disabled}
-                placeholder="字典音标"
-                onChange={(event) =>
-                  onChange({ ...value, dict_phonetic: event.target.value })
-                }
-              />
-              <Tooltip title="获取语音">
-                <Button
-                  className="word-pronunciation-voice-action word-pronunciation-sync-action"
-                  aria-label="获取语音"
-                  icon={<SyncOutlined />}
-                  disabled={disabled}
-                  onClick={() => message.info("获取语音（Mock）")}
-                />
-              </Tooltip>
+              </PronunciationPreviewControls>
               <Tooltip title="上传语音">
                 <Button
                   className="word-pronunciation-voice-action"
@@ -389,6 +386,8 @@ function VariantEditor({
         <PronunciationFields
           key={pronunciation.id}
           value={pronunciation}
+          spelling={value.spelling}
+          dialect={value.dialect}
           disabled={disabledPronunciation}
           index={index}
           count={value.pronunciations.length}
@@ -528,6 +527,8 @@ function SharedSpellingVariantEditor({
               <PronunciationFields
                 key={pronunciation.id}
                 value={pronunciation}
+                spelling={variant.spelling}
+                dialect={variant.dialect}
                 disabled={disabledPronunciation}
                 index={index}
                 count={variant.pronunciations.length}
@@ -1967,33 +1968,38 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
             style={{ marginBottom: 16 }}
           />
         )}
-        <div data-word-node-id="forms" data-word-field="pos">
-          <Tabs
-            className="word-pos-tabs word-forms-tabs"
-            activeKey={activePosId}
-            onChange={setActivePosId}
-            items={items}
-            tabBarExtraContent={
-              !readOnly ? (
-                <Select<WordPosTag>
-                  aria-label="添加基本词性"
-                  placeholder="添加基本词性"
-                  value={undefined}
-                  options={availablePos}
-                  loading={partOfSpeechCatalog.isPending}
-                  disabled={partOfSpeechCatalog.isError}
-                  style={{ width: 170 }}
-                  suffixIcon={<PlusOutlined />}
-                  onChange={(classification) => {
-                    const next = createPosForms(classification, word.headwords);
-                    updateContent({ pos: [...content.pos, next] });
-                    setActivePosId(next.pos_id);
-                  }}
-                />
-              ) : null
-            }
-          />
-        </div>
+        <PronunciationPreviewProvider readOnly={readOnly}>
+          <div data-word-node-id="forms" data-word-field="pos">
+            <Tabs
+              className="word-pos-tabs word-forms-tabs"
+              activeKey={activePosId}
+              onChange={setActivePosId}
+              items={items}
+              tabBarExtraContent={
+                !readOnly ? (
+                  <Select<WordPosTag>
+                    aria-label="添加基本词性"
+                    placeholder="添加基本词性"
+                    value={undefined}
+                    options={availablePos}
+                    loading={partOfSpeechCatalog.isPending}
+                    disabled={partOfSpeechCatalog.isError}
+                    style={{ width: 170 }}
+                    suffixIcon={<PlusOutlined />}
+                    onChange={(classification) => {
+                      const next = createPosForms(
+                        classification,
+                        word.headwords
+                      );
+                      updateContent({ pos: [...content.pos, next] });
+                      setActivePosId(next.pos_id);
+                    }}
+                  />
+                ) : null
+              }
+            />
+          </div>
+        </PronunciationPreviewProvider>
 
         {!readOnly && (
           <div className="word-step-actions">
