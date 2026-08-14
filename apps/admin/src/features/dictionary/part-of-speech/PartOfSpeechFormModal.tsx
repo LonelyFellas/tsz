@@ -7,7 +7,7 @@ interface Props {
   open: boolean;
   value?: PartOfSpeechConfig;
   onClose: () => void;
-  onSaved: () => void;
+  onSaved: (id: string) => void;
   onError: (error: unknown) => void;
 }
 
@@ -41,8 +41,9 @@ export function PartOfSpeechFormModal({
 
   const submit = async (values: CreatePartOfSpeechInput) => {
     try {
+      let saved: PartOfSpeechConfig;
       if (value) {
-        await update.mutateAsync({
+        saved = await update.mutateAsync({
           id: value.id,
           input: {
             base_revision: value.revision,
@@ -53,9 +54,9 @@ export function PartOfSpeechFormModal({
           }
         });
       } else {
-        await create.mutateAsync(values);
+        saved = await create.mutateAsync(values);
       }
-      onSaved();
+      onSaved(saved.id);
       onClose();
     } catch (error) {
       onError(error);

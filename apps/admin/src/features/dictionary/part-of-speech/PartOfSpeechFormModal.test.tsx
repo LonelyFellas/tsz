@@ -89,12 +89,12 @@ describe("PartOfSpeechFormModal", () => {
         sort_order: 30
       })
     );
-    expect(callbacks.onSaved).toHaveBeenCalledTimes(1);
+    expect(callbacks.onSaved).toHaveBeenCalledWith(value.id);
     expect(callbacks.onClose).toHaveBeenCalledTimes(1);
   });
 
   it("修改时稳定编码只读，并携带当前 revision", async () => {
-    renderModal(value);
+    const callbacks = renderModal(value);
     expect(screen.getByLabelText("稳定编码")).toBeDisabled();
     expect(
       screen.getByText("编码已被词条引用，创建后不可修改。")
@@ -116,6 +116,7 @@ describe("PartOfSpeechFormModal", () => {
         }
       })
     );
+    expect(callbacks.onSaved).toHaveBeenCalledWith(value.id);
   });
 
   it("提交失败保留弹窗并交给页面显示错误", async () => {

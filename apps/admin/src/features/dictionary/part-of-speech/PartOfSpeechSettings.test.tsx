@@ -69,13 +69,39 @@ vi.mock("./PartOfSpeechFormModal", () => ({
     open: boolean;
     value?: PartOfSpeechConfig;
     onClose: () => void;
-    onSaved: () => void;
+    onSaved: (id: string) => void;
     onError: (error: unknown) => void;
   }) =>
     open ? (
       <div data-testid="part-form">
         {value ? `修改-${value.code}` : "新增基本词性表单"}
-        <button onClick={onSaved}>模拟保存基本词性</button>
+        <button
+          onClick={() => {
+            if (!value && mock.catalog.data) {
+              mock.catalog.data = {
+                ...mock.catalog.data,
+                catalog_version: mock.catalog.data.catalog_version + 1,
+                items: [
+                  ...mock.catalog.data.items,
+                  {
+                    id: "pos-created",
+                    code: "interjection",
+                    name_zh: "感叹词",
+                    name_en: "INTERJECTION",
+                    abbreviation: "int.",
+                    sort_order: 30,
+                    allowed_form_types: [],
+                    default_form_types: [],
+                    sub_parts: []
+                  }
+                ]
+              };
+            }
+            onSaved(value?.id ?? "pos-created");
+          }}
+        >
+          模拟保存基本词性
+        </button>
         <button onClick={onClose}>关闭基本词性表单</button>
         <button
           onClick={() =>
@@ -211,6 +237,38 @@ describe("PartOfSpeechSettings", () => {
     );
   });
 
+  it("父级下拉支持按基本词性中文名搜索", async () => {
+    renderSettings();
+
+    fireEvent.click(screen.getByRole("tab", { name: "细分词性" }));
+    const selector = screen.getByLabelText("所属基本词性");
+    fireEvent.mouseDown(selector);
+    fireEvent.change(selector, { target: { value: "小品" } });
+
+    const listbox = await screen.findByRole("listbox");
+    expect(
+      within(listbox).getByRole("option", { name: "小品词" })
+    ).toBeInTheDocument();
+    expect(
+      within(listbox).queryByRole("option", { name: "名词" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("新增基本词性后自动进入细分词性并选中新父级", async () => {
+    renderSettings();
+
+    fireEvent.click(screen.getByText("新增基本词性"));
+    fireEvent.click(screen.getByText("模拟保存基本词性"));
+
+    expect(
+      await screen.findByRole("tab", { name: "细分词性", selected: true })
+    ).toBeVisible();
+    expect(screen.getByText("感叹词", { exact: true })).toBeVisible();
+    expect(screen.getByTestId("sub-panel")).toHaveTextContent(
+      "细分-pos-created"
+    );
+  });
+
   it("处理基本词性与细分词性子表单的保存和错误事件", async () => {
     renderSettings();
 
@@ -224,6 +282,7 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.click(screen.getByText("关闭基本词性表单"));
     expect(screen.queryByTestId("part-form")).not.toBeInTheDocument();
 
+    fireEvent.click(screen.getByRole("tab", { name: "基本词性" }));
     const particleRow = screen.getByText("小品词").closest("tr")!;
     fireEvent.click(within(particleRow).getByText("修 改"));
     fireEvent.click(screen.getByText("模拟保存基本词性"));

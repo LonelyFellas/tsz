@@ -320,6 +320,8 @@ export function PartOfSpeechSettings() {
               <Select
                 aria-label="所属基本词性"
                 value={selectedPart?.id}
+                showSearch
+                optionFilterProp="label"
                 loading={catalog.isPending}
                 disabled={catalog.isError || !selectedPart}
                 options={(catalog.data?.items ?? []).map((item) => ({
@@ -344,9 +346,15 @@ export function PartOfSpeechSettings() {
         open={formOpen}
         value={editing}
         onClose={() => setFormOpen(false)}
-        onSaved={() =>
-          message.success(editing ? "基本词性已更新" : "基本词性已新增")
-        }
+        onSaved={(id) => {
+          if (editing) {
+            message.success("基本词性已更新");
+            return;
+          }
+          setSelectedPartId(id);
+          setActiveTab("detailed");
+          message.success("基本词性已新增");
+        }}
         onError={showError}
       />
     </Flex>
