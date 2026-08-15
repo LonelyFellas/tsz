@@ -1595,10 +1595,23 @@ describe("MeaningsAndExamplesStep", () => {
   }, 15_000);
 
   it("多维例句同时展示并保存英文例句与汉语译文", async () => {
+    featureFlags.VOICE_EDITOR = true;
     renderStep();
 
     expect(screen.getAllByText("英文例句").length).toBeGreaterThan(0);
     expect(screen.getAllByText("汉语译文").length).toBeGreaterThan(0);
+    const englishText = screen.getAllByLabelText(/英语文本/)[0]!;
+    const englishCard = englishText.closest<HTMLElement>(
+      ".word-sentence-english-card"
+    );
+    expect(englishCard).not.toBeNull();
+    expect(within(englishCard!).getByText("英文例句")).toBeInTheDocument();
+    expect(
+      within(englishCard!).getByRole("note", { name: "例句主关联" })
+    ).toHaveTextContent("已自动关联当前词义");
+    expect(
+      within(englishCard!).getByLabelText(/高级语音编辑/)
+    ).toBeInTheDocument();
     fireEvent.change(screen.getAllByLabelText("汉语译文")[0]!, {
       target: { value: "这是更新后的汉语译文。" }
     });
@@ -1741,7 +1754,9 @@ describe("MeaningsAndExamplesStep", () => {
     const word = wordFixture({ ready: true, status: "published" });
     word.meanings.pos[0]!.senses[0]!.sentences[0]!.links = [];
     renderStep(word, true);
-    expect(screen.getByLabelText("例句主关联")).toHaveValue("主关联缺失");
+    expect(screen.getByRole("note", { name: "例句主关联" })).toHaveTextContent(
+      "主关联缺失"
+    );
   });
 
   it.each([
