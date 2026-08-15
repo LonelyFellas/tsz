@@ -21,10 +21,10 @@ import {
 } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  collectPronunciationHints,
   meaningDialectSuggestionBatchRunner,
   MeaningsAndExamplesStep
 } from "./MeaningsAndExamplesStep";
+import { collectPronunciationHints } from "./meaningsAndExamples/mapping";
 import { createGrammar } from "./model";
 import { deferred, wordFixture } from "./wordCreation.test.helper";
 

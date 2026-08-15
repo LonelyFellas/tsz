@@ -80,6 +80,17 @@ test.describe("admin 新建单词 V2", () => {
       page.getByRole("heading", { name: "词义与例句" })
     ).toBeVisible();
 
+    const definition = page.getByLabel("中文释义").first();
+    const translation = page.getByLabel("汉语译文").first();
+    await definition.fill("浏览器烟测更新后的中文释义");
+    await translation.fill("浏览器烟测更新后的汉语译文。");
+    await page.getByRole("button", { name: "保存草稿" }).click();
+    await expect(page.getByText("草稿已保存")).toBeVisible();
+
+    await page.reload();
+    await expect(definition).toHaveValue("浏览器烟测更新后的中文释义");
+    await expect(translation).toHaveValue("浏览器烟测更新后的汉语译文。");
+
     await page.getByRole("button", { name: "完成并进入预览" }).click();
     await expect(page).toHaveURL(
       new RegExp(`/words/${ADMIN_E2E_WORD_ID}/wizard/preview$`)
