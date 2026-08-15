@@ -9,7 +9,6 @@ afterEach(() => {
 describe("env", () => {
   it("未配置时回退到 API 默认路径，词库默认连接真实后端", async () => {
     vi.stubEnv("VITE_API_BASE_URL", undefined);
-    vi.stubEnv("VITE_WORD_CREATION_WIZARD", undefined);
     vi.stubEnv("VITE_ADMIN_WORDS_MOCK", undefined);
     vi.stubEnv("VITE_ADMIN_PART_OF_SPEECH_MOCK", undefined);
     vi.stubEnv("VITE_VOICE_EDITOR", undefined);
@@ -18,7 +17,6 @@ describe("env", () => {
     vi.resetModules();
     const { env } = await import("./env");
     expect(env.API_BASE_URL).toBe("/api/v1");
-    expect(env.WORD_CREATION_WIZARD).toBe(true);
     expect(env.ADMIN_WORDS_MOCK).toBe(false);
     expect(env.ADMIN_PART_OF_SPEECH_MOCK).toBe(false);
     expect(env.VOICE_EDITOR).toBe(true);
@@ -33,9 +31,8 @@ describe("env", () => {
     expect(env.API_BASE_URL).toBe("https://api.example.com/api/v1");
   });
 
-  it("生产环境未配置时默认关闭尚未接入真实后端的新向导与 mock", async () => {
+  it("生产环境未配置时默认关闭 mock 与语音实验能力", async () => {
     vi.stubEnv("PROD", true);
-    vi.stubEnv("VITE_WORD_CREATION_WIZARD", undefined);
     vi.stubEnv("VITE_ADMIN_WORDS_MOCK", undefined);
     vi.stubEnv("VITE_ADMIN_PART_OF_SPEECH_MOCK", undefined);
     vi.stubEnv("VITE_VOICE_EDITOR", undefined);
@@ -43,7 +40,6 @@ describe("env", () => {
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.resetModules();
     const { env } = await import("./env");
-    expect(env.WORD_CREATION_WIZARD).toBe(false);
     expect(env.ADMIN_WORDS_MOCK).toBe(false);
     expect(env.ADMIN_PART_OF_SPEECH_MOCK).toBe(false);
     expect(env.VOICE_EDITOR).toBe(false);
@@ -52,8 +48,6 @@ describe("env", () => {
   });
 
   it.each([
-    ["VITE_WORD_CREATION_WIZARD", "true", true],
-    ["VITE_WORD_CREATION_WIZARD", "false", false],
     ["VITE_ADMIN_WORDS_MOCK", "true", true],
     ["VITE_ADMIN_WORDS_MOCK", "false", false],
     ["VITE_ADMIN_PART_OF_SPEECH_MOCK", "true", true],
@@ -69,7 +63,6 @@ describe("env", () => {
     vi.resetModules();
     const { env } = await import("./env");
     const key = name.replace("VITE_", "") as
-      | "WORD_CREATION_WIZARD"
       | "ADMIN_WORDS_MOCK"
       | "ADMIN_PART_OF_SPEECH_MOCK"
       | "VOICE_EDITOR"
@@ -77,17 +70,6 @@ describe("env", () => {
       | "ADMIN_TTS_MOCK";
     expect(env[key]).toBe(expected);
   });
-
-  it.each(["1", "yes", "TRUE", " false "])(
-    "拒绝模糊布尔值 %s",
-    async (value) => {
-      vi.stubEnv("VITE_WORD_CREATION_WIZARD", value);
-      vi.resetModules();
-      await expect(import("./env")).rejects.toThrow(
-        "VITE_WORD_CREATION_WIZARD 只能是"
-      );
-    }
-  );
 
   it.each(["1", "yes", "TRUE", " false "])(
     "词性 mock 拒绝模糊布尔值 %s",

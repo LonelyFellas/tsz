@@ -1007,7 +1007,6 @@ mock 状态使用内存 Map，并为硬刷新镜像到 `sessionStorage`：
 
 开关：
 
-- `VITE_WORD_CREATION_WIZARD`：控制入口切换，支持回滚旧创建单词入口；
 - `VITE_ADMIN_WORDS_MOCK`：选择整套 dictionary mock data source。
 
 production mode 若 mock flag 为 true，Vite 配置直接失败；不能自动回真实 API，也不能带着 mock 产物继续构建。`tshb-test` 的 admin 部署脚本使用显式 `test` mode 优化构建并开启 mock，作为后端接口未落地期间的验收通道；其他 build mode 即使设置 mock flag 也继续 fail closed。单元测试通过依赖注入选择 mock，不依赖进程级开关。

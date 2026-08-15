@@ -96,8 +96,7 @@
 
 - 修改 `deploy/deploy-admin.sh`：test mode 构建显式设置
   - `VITE_ADMIN_WORDS_MOCK=true`；
-  - `VITE_ADMIN_PART_OF_SPEECH_MOCK=false`；
-  - 保留 `VITE_WORD_CREATION_WIZARD=true`。
+  - `VITE_ADMIN_PART_OF_SPEECH_MOCK=false`。
 - 更新脚本注释，说明 tshb-test 是“单词 mock + 词性真实”，避免后续误以为整个 dictionary 都是 mock。
 - 不改 nginx：现有 `/api/v1/` 反代已经覆盖这些路径，未登录探测返回 401 证明路由和反代存在。
 

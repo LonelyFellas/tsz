@@ -20,9 +20,8 @@ function isWizardStep(value: unknown): value is WordCreationStep {
   return WIZARD_STEPS.includes(value as WordCreationStep);
 }
 
-/** 版本与状态共同决定词条唯一详情入口，列表和 legacy guard 共用。 */
+/** V2 状态决定词条唯一详情入口。 */
 export function getWordRowRoute(record: WordRouteRecord): string {
-  if (record.schema_version !== 2) return `/words/${record.id}/edit`;
   if (record.status === "published" && !record.has_unpublished_changes) {
     return `/words/${record.id}/wizard/preview`;
   }
@@ -36,7 +35,6 @@ export function getWordRowRoute(record: WordRouteRecord): string {
 export function getWordRowActionLabel(
   record: WordRouteRecord
 ): "编辑" | "继续创建" | "继续编辑" | "查看" {
-  if (record.schema_version !== 2) return "编辑";
   if (record.status === "archived") return "查看";
   if (record.status !== "published") return "继续创建";
   return record.has_unpublished_changes ? "继续编辑" : "查看";

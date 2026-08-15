@@ -22,7 +22,6 @@ import type {
   WordCreationStep,
   WordHeadwordsV2
 } from "@tsz/types";
-import { isAdminWordV2 } from "@tsz/types";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Navigate,
@@ -225,10 +224,6 @@ export function WordCreationWizard({ mode }: Props) {
   useEffect(() => {
     const loaded = detail.data?.word;
     if (!loaded) return;
-    if (!isAdminWordV2(loaded)) {
-      navigate(`/words/${loaded.id}/edit`, { replace: true });
-      return;
-    }
     setWord((current) =>
       !current ||
       loaded.revision > current.revision ||

@@ -3,12 +3,12 @@ import type {
   Dialect,
   AdminWordStatus,
   PronunciationStyle,
-  RichText,
   WordFormType,
   WordPosTag,
   WordRelationType,
   WordSubPos
 } from "./admin-word";
+import type { RichText } from "./rich-text";
 import type { ProblemMeta } from "./api";
 
 /** 新建单词向导 V2 wire 类型；字段 1:1 镜像 snake_case JSON。 */

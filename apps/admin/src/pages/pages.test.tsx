@@ -8,14 +8,12 @@ import { ReviewsPage } from "./Reviews";
 import { UsersPage } from "./Users";
 import { WordListsPage } from "./WordLists";
 import { WordCreatePage } from "./WordCreate";
-import { WordEditPage } from "./WordEdit";
 import { WordWizardPage } from "./WordWizard";
 import { WordsPage } from "./Words";
 
 vi.mock("@/lib/env", () => ({
   env: {
     API_BASE_URL: "/api/v1",
-    WORD_CREATION_WIZARD: true,
     ADMIN_WORDS_MOCK: false
   }
 }));
@@ -24,10 +22,6 @@ vi.mock("@/features/dictionary/word-creation/WordCreationWizard", () => ({
   WordCreationWizard: ({ mode }: { mode: "create" | "resume" }) => (
     <div>word-wizard-{mode}</div>
   )
-}));
-
-vi.mock("@/features/dictionary/WordEditor", () => ({
-  WordEditor: () => <div>legacy-word-editor</div>
 }));
 
 // 智能词库页走真实数据层(React Query + api.words),烟雾测试只验渲染,
@@ -151,18 +145,6 @@ describe("admin 页面烟雾测试", () => {
       </MemoryRouter>
     );
     expect(screen.getByText(expected)).toBeInTheDocument();
-  });
-
-  it("真实模式直接访问 legacy 编辑路由会返回智能词库", () => {
-    render(
-      <MemoryRouter initialEntries={["/words/legacy-1/edit"]}>
-        <WordEditPage />
-        <LocationProbe />
-      </MemoryRouter>
-    );
-
-    expect(screen.queryByText("legacy-word-editor")).toBeNull();
-    expect(screen.getByTestId("location")).toHaveTextContent("/words");
   });
 });
 

@@ -12,12 +12,10 @@ describe("isWordCreationWorkspacePath", () => {
     expect(isWordCreationWorkspacePath(pathname)).toBe(true);
   });
 
-  it.each([
-    "/words",
-    "/words/word-center/edit",
-    "/words/word-center/wizard/unknown",
-    "/users"
-  ])("%s 保持普通后台布局", (pathname) => {
-    expect(isWordCreationWorkspacePath(pathname)).toBe(false);
-  });
+  it.each(["/words", "/words/word-center/wizard/unknown", "/users"])(
+    "%s 保持普通后台布局",
+    (pathname) => {
+      expect(isWordCreationWorkspacePath(pathname)).toBe(false);
+    }
+  );
 });
