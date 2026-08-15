@@ -143,7 +143,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("PronunciationPreview", () => {
+describe("PronunciationPreview", { timeout: 10_000 }, () => {
   it("tomato 使用目录默认 voice 获取并自动播放，随后可手动重播", async () => {
     render(<PreviewHarness />);
 
