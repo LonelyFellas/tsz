@@ -7,8 +7,27 @@ import {
 } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import type { PartOfSpeechConfig, SubPartOfSpeechConfig } from "@tsz/types";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SubPartOfSpeechPanel } from "./SubPartOfSpeechDrawer";
+
+vi.mock("antd", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("antd")>();
+  return {
+    ...actual,
+    Tooltip: ({
+      title,
+      children
+    }: {
+      title?: ReactNode;
+      children: ReactNode;
+    }) => (
+      <span data-tooltip={typeof title === "string" ? title : undefined}>
+        {children}
+      </span>
+    )
+  };
+});
 
 const api = vi.hoisted(() => ({
   create: vi.fn(),
@@ -146,9 +165,22 @@ describe("SubPartOfSpeechPanel", () => {
     const visible = renderPanel();
     expect(screen.getByText("“名词”的细分词性")).toBeVisible();
     const referencedRow = screen.getByText("可数名词").closest("tr")!;
+    const referencedDelete = within(referencedRow)
+      .getByText("删 除")
+      .closest("button")!;
+    expect(referencedDelete).toBeDisabled();
+    expect(referencedDelete.parentElement).toHaveAttribute(
+      "data-tooltip",
+      "已有 4 个词义引用，只能修改"
+    );
+    const unreferencedRow = screen.getByText("集合名词").closest("tr")!;
     expect(
-      within(referencedRow).getByText("删 除").closest("button")
-    ).toBeDisabled();
+      within(unreferencedRow).getByText("删 除").closest("button")
+    ).toBeEnabled();
+    expect(
+      within(unreferencedRow).getByText("删 除").closest("button")
+        ?.parentElement
+    ).not.toHaveAttribute("data-tooltip");
     visible.unmount();
     renderPanel(null);
     expect(screen.getByText("请先选择所属基本词性")).toBeVisible();
@@ -157,6 +189,8 @@ describe("SubPartOfSpeechPanel", () => {
   it("新增细分词性提交父 id 与稳定编码", async () => {
     const callbacks = renderPanel();
     fireEvent.click(screen.getByText("新增细分词性"));
+    expect(screen.getByLabelText("稳定编码")).toBeEnabled();
+    expect(screen.queryByText("稳定编码创建后不可修改。")).toBeNull();
     fillSubForm({
       code: "N-MASS",
       nameZh: "物质名词",
@@ -179,11 +213,13 @@ describe("SubPartOfSpeechPanel", () => {
     expect(callbacks.onSaved).toHaveBeenCalledWith("细分词性已新增");
   });
 
-  it("修改细分词性时编码只读并携带 revision", async () => {
+  it("未引用细分词性修改时编码只读并说明创建后不可修改", async () => {
     renderPanel();
     const row = screen.getByText("集合名词").closest("tr")!;
     fireEvent.click(within(row).getByText("修 改"));
     expect(screen.getByLabelText("稳定编码")).toBeDisabled();
+    expect(screen.getByText("稳定编码创建后不可修改。")).toBeInTheDocument();
+    expect(screen.queryByText(/已被词条引用/)).toBeNull();
     fillSubForm({ nameZh: "集合类名词", nameEn: "Collective noun" });
     fireEvent.click(screen.getByText("保 存"));
 
@@ -199,6 +235,14 @@ describe("SubPartOfSpeechPanel", () => {
         }
       })
     );
+  });
+
+  it("已引用细分词性修改时同样显示稳定编码不可变规则", () => {
+    renderPanel();
+    const row = screen.getByText("可数名词").closest("tr")!;
+    fireEvent.click(within(row).getByText("修 改"));
+    expect(screen.getByLabelText("稳定编码")).toBeDisabled();
+    expect(screen.getByText("稳定编码创建后不可修改。")).toBeInTheDocument();
   });
 
   it("未引用细分词性二次确认后删除", async () => {

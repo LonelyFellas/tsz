@@ -5,7 +5,7 @@ const adminBaseUrl = `http://127.0.0.1:${adminPort}`;
 
 export default defineConfig({
   testDir: "./tests",
-  testMatch: "admin-word-creation.spec.ts",
+  testMatch: ["admin-word-creation.spec.ts", "admin-part-of-speech.spec.ts"],
   fullyParallel: false,
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI

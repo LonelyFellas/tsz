@@ -63,6 +63,9 @@ beforeEach(() => {
 describe("PartOfSpeechFormModal", () => {
   it("新增时校验并提交稳定编码、中文名、英文名、缩写和排序", async () => {
     const callbacks = renderModal();
+    expect(screen.getByLabelText("稳定编码")).toBeEnabled();
+    expect(screen.queryByText("稳定编码创建后不可修改。")).toBeNull();
+    expect(screen.queryByText(/已被词条引用/)).toBeNull();
     fireEvent.change(screen.getByLabelText("稳定编码"), {
       target: { value: "particle" }
     });
@@ -93,12 +96,11 @@ describe("PartOfSpeechFormModal", () => {
     expect(callbacks.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("修改时稳定编码只读，并携带当前 revision", async () => {
+  it("未引用配置修改时稳定编码只读且准确说明不可变规则", async () => {
     const callbacks = renderModal(value);
     expect(screen.getByLabelText("稳定编码")).toBeDisabled();
-    expect(
-      screen.getByText("编码已被词条引用，创建后不可修改。")
-    ).toBeInTheDocument();
+    expect(screen.getByText("稳定编码创建后不可修改。")).toBeInTheDocument();
+    expect(screen.queryByText(/已被词条引用/)).toBeNull();
     fireEvent.change(screen.getByLabelText("基本词性中文"), {
       target: { value: "语气词" }
     });
@@ -117,6 +119,13 @@ describe("PartOfSpeechFormModal", () => {
       })
     );
     expect(callbacks.onSaved).toHaveBeenCalledWith(value.id);
+  });
+
+  it("已引用配置修改时同样以创建后不可修改解释稳定编码", () => {
+    renderModal({ ...value, usage_count: 4 });
+    expect(screen.getByLabelText("稳定编码")).toBeDisabled();
+    expect(screen.getByText("稳定编码创建后不可修改。")).toBeInTheDocument();
+    expect(screen.queryByText(/已被词条引用/)).toBeNull();
   });
 
   it("提交失败保留弹窗并交给页面显示错误", async () => {
