@@ -5,7 +5,6 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
 import type { Dialect, RichTextV2 } from "@tsz/types";
 import type { VoicePreviewResult } from "@tsz/voice-editor/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,6 +18,20 @@ const preview = vi.hoisted(() => ({
   listVoices: vi.fn(),
   synthesize: vi.fn()
 }));
+
+const message = vi.hoisted(() => ({
+  error: vi.fn()
+}));
+
+vi.mock("antd", async (importOriginal) => {
+  const antd = await importOriginal<typeof import("antd")>();
+  return {
+    ...antd,
+    App: {
+      useApp: () => ({ message })
+    }
+  };
+});
 
 vi.mock("@/lib/env", () => ({
   env: {
@@ -114,17 +127,18 @@ function PreviewHarness({
   readOnly?: boolean;
 }) {
   return (
-    <AntApp>
-      <PronunciationPreviewProvider readOnly={readOnly}>
-        <PronunciationPreviewControls
-          pronunciationId="pronunciation-stable-id"
-          spelling={spelling}
-          content={content}
-          dialect={dialect}
-          disabled={readOnly}
-        />
-      </PronunciationPreviewProvider>
-    </AntApp>
+    <PronunciationPreviewProvider readOnly={readOnly}>
+      <PronunciationPreviewControls
+        pronunciationId="pronunciation-stable-id"
+        spelling={spelling}
+        content={content}
+        dialect={dialect}
+        disabled={readOnly}
+        audioFactory={(src) =>
+          new AudioMock(src) as unknown as HTMLAudioElement
+        }
+      />
+    </PronunciationPreviewProvider>
   );
 }
 
@@ -133,17 +147,16 @@ beforeEach(() => {
   preview.enabled = true;
   preview.listVoices.mockResolvedValue(voices);
   preview.synthesize.mockResolvedValue(result());
+  message.error.mockReset();
   AudioMock.instances = [];
   AudioMock.playErrors = [];
-  vi.stubGlobal("Audio", AudioMock);
 });
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.unstubAllGlobals();
 });
 
-describe("PronunciationPreview", { timeout: 10_000 }, () => {
+describe("PronunciationPreview", () => {
   it("tomato 使用目录默认 voice 获取并自动播放，随后可手动重播", async () => {
     render(<PreviewHarness />);
 
@@ -160,9 +173,8 @@ describe("PronunciationPreview", { timeout: 10_000 }, () => {
       },
       { signal: expect.any(AbortSignal) }
     );
-    await waitFor(
-      () => expect(AudioMock.instances[0]?.play).toHaveBeenCalled(),
-      { timeout: 5_000 }
+    await waitFor(() =>
+      expect(AudioMock.instances[0]?.play).toHaveBeenCalled()
     );
     expect(screen.getByLabelText("播放语音")).toBeEnabled();
 
@@ -202,9 +214,8 @@ describe("PronunciationPreview", { timeout: 10_000 }, () => {
       expect(screen.getByLabelText("获取语音")).toBeEnabled()
     );
     fireEvent.click(screen.getByLabelText("获取语音"));
-    await waitFor(
-      () => expect(screen.getByLabelText("播放语音")).toBeEnabled(),
-      { timeout: 5_000 }
+    await waitFor(() =>
+      expect(screen.getByLabelText("播放语音")).toBeEnabled()
     );
 
     view.rerender(<PreviewHarness spelling="tomatoes" />);
@@ -263,9 +274,11 @@ describe("PronunciationPreview", { timeout: 10_000 }, () => {
     await waitFor(() => expect(getButton).toBeEnabled());
 
     fireEvent.click(getButton);
-    expect(
-      await screen.findByText("语音或存储服务暂不可用，请稍后手动重试")
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(message.error).toHaveBeenCalledWith(
+        "语音或存储服务暂不可用，请稍后手动重试"
+      )
+    );
     await waitFor(() => expect(getButton).toBeEnabled());
     fireEvent.click(getButton);
 
@@ -375,9 +388,11 @@ describe("PronunciationPreview", { timeout: 10_000 }, () => {
 
     fireEvent.click(screen.getByLabelText("播放语音"));
 
-    expect(
-      await screen.findByText("播放失败，请检查浏览器音频权限后重试")
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(message.error).toHaveBeenCalledWith(
+        "播放失败，请检查浏览器音频权限后重试"
+      )
+    );
     expect(screen.getByLabelText("播放语音")).toBeEnabled();
   });
 
