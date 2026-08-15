@@ -9,23 +9,18 @@ const METHOD_NAMES = [
   "stats",
   "detect",
   "suggestDialectVariants",
-  "create",
   "createV2",
   "get",
-  "saveContent",
   "previewFormsImpact",
   "saveFormsStep",
   "saveMeaningsStep",
   "validateV2",
-  "publish",
   "publishV2",
   "archive",
   "restore",
   "archiveBatch",
   "restoreBatch",
   "deleteDraft",
-  "remove",
-  "batchDelete",
   "relatedSearch"
 ] as const satisfies ReadonlyArray<keyof AdminWordsDataSource>;
 
@@ -43,7 +38,6 @@ const INVOCATIONS = [
       }
     ]
   },
-  { method: "create", args: [{ kind: "word", headword: "legacy" }] },
   {
     method: "createV2",
     args: [
@@ -56,20 +50,6 @@ const INVOCATIONS = [
     ]
   },
   { method: "get", args: ["word-1"] },
-  {
-    method: "saveContent",
-    args: [
-      "word-1",
-      {
-        base_updated_at: "2026-08-02T00:00:00.000Z",
-        frequency: "12.5",
-        dialect_mode: "unified",
-        dialects: [],
-        sense_groups: [],
-        pos: []
-      }
-    ]
-  },
   {
     method: "previewFormsImpact",
     args: ["word-1", { base_revision: 1, content: { pos: [] } }]
@@ -97,7 +77,6 @@ const INVOCATIONS = [
     ]
   },
   { method: "validateV2", args: ["word-1", { base_revision: 2 }] },
-  { method: "publish", args: ["word-1"] },
   {
     method: "publishV2",
     args: ["word-1", "publish-key", { base_revision: 2 }]
@@ -130,8 +109,6 @@ const INVOCATIONS = [
     method: "deleteDraft",
     args: ["word-1", { base_revision: 2, base_lifecycle_revision: 1 }]
   },
-  { method: "remove", args: ["word-1"] },
-  { method: "batchDelete", args: [["word-1", "word-2"]] },
   {
     method: "relatedSearch",
     args: ["center", { kind: "word", limit: 5 }]
@@ -433,7 +410,6 @@ describe("admin words data source selection", () => {
     expect(loaded.module.realAdminWordsDataSource).toBe(real.source);
     expect(loaded.module.adminWordsDataSourceCapabilities).toEqual({
       dialectVariantSuggestions: true,
-      legacyEntryCreation: false,
       phraseCreation: true,
       archive: true,
       batchArchive: true
@@ -480,7 +456,6 @@ describe("admin words data source selection", () => {
     expect(loaded.createMock).not.toHaveBeenCalled();
     expect(loaded.module.adminWordsDataSourceCapabilities).toEqual({
       dialectVariantSuggestions: true,
-      legacyEntryCreation: true,
       phraseCreation: true,
       archive: true,
       batchArchive: true

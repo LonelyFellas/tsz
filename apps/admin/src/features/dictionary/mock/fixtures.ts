@@ -1,5 +1,4 @@
 import type {
-  AdminWord,
   DetectWordInputV2,
   DetectWordResponseV2,
   DraftFormsStepContent,
@@ -16,7 +15,7 @@ import type {
   WordPronunciationV2
 } from "@tsz/types";
 
-export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 7;
+export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 8;
 
 export function richText(text: string): RichText {
   return { version: 1, text, spans: [], liaisons: [] };
@@ -340,26 +339,7 @@ export function createDetectionFixture(
         source_dialect: normalized.key === "color" ? "us" : "uk"
       },
       genericForms(normalized.display),
-      {
-        matchedDialect: normalized.key === "color" ? "us" : "uk",
-        smart: {
-          status: "duplicate",
-          duplicates: [
-            {
-              word_id: "fixture-colour",
-              headword: "colour",
-              dialect: "uk",
-              status: "archived"
-            },
-            {
-              word_id: "fixture-color",
-              headword: "color",
-              dialect: "us",
-              status: "published"
-            }
-          ]
-        }
-      }
+      { matchedDialect: normalized.key === "color" ? "us" : "uk" }
     );
   }
   if (normalized.key === "smart-unavailable") {
@@ -544,77 +524,4 @@ export function createInitialMeanings(
     )
   );
   return { sense_groups: [defaultSenseGroup], pos };
-}
-
-function createLegacyFixture(
-  id: string,
-  headword: string,
-  gloss: string,
-  dialect: "uk" | "us",
-  createdAt: string
-): AdminWord {
-  const senseId = `${id}-sense`;
-  return {
-    schema_version: 1,
-    id,
-    kind: "word",
-    headword,
-    frequency: "20.000000",
-    dialect_mode: "distinguish",
-    dialects: [dialect],
-    status: "published",
-    created_by: "fixture-admin",
-    created_at: createdAt,
-    updated_at: createdAt,
-    sense_groups: [],
-    pos: [
-      {
-        id: `${id}-noun`,
-        pos: "noun",
-        forms: [
-          {
-            id: `${id}-base`,
-            dialect,
-            form_type: "base",
-            spelling: headword,
-            pronunciations: [
-              {
-                id: `${id}-pron`,
-                dict_phonetic: "mock",
-                actual_pron: "mock",
-                style: "normal"
-              }
-            ]
-          }
-        ],
-        grammar_structures: [],
-        senses: [
-          {
-            id: senseId,
-            sub_pos: "N-COUNT",
-            level: "A1",
-            frequency: "20",
-            depends_on_context: false,
-            definitions: [
-              {
-                id: `${senseId}-definition`,
-                level: "A1",
-                def_type: "zh",
-                text: richText(gloss)
-              }
-            ],
-            sentences: [],
-            relations: []
-          }
-        ]
-      }
-    ]
-  };
-}
-
-export function createSeedLegacyWords(nowIso: string): AdminWord[] {
-  return [
-    createLegacyFixture("fixture-colour", "colour", "颜色", "uk", nowIso),
-    createLegacyFixture("fixture-color", "color", "颜色", "us", nowIso)
-  ];
 }

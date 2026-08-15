@@ -11,15 +11,10 @@ import type {
   AdminUserUpdateInput,
   AdminSpeechPreviewResponse,
   AdminSpeechVoiceListResponse,
-  AdminWordBatchDeleteResponse,
-  AdminWordAnyEnvelope,
-  AdminWordCreateInput,
-  AdminWordEnvelope,
   AdminWordV2Envelope,
   AdminWordKind,
   AdminWordListQuery,
   AdminWordV2ListResponse,
-  AdminWordSaveInput,
   AdminWordStats,
   AdminStatus,
   CreateAdminInput,
@@ -179,9 +174,6 @@ export function createAdminEndpoints(http: HttpClient) {
           "/lexicon/dialect-variant-suggestions",
           input
         ),
-      /** POST /admin/words — 创建草稿壳；409 = 同 kind 下 headword 已存在（忽略大小写）。 */
-      create: (input: AdminWordCreateInput) =>
-        http.post<AdminWordEnvelope>("/words", input),
       /** POST /admin/lexicon/entries — 由有效 detection 幂等创建 V2 canonical 草稿。 */
       createV2: (idempotencyKey: string, input: CreateAdminWordV2Input) =>
         http.post<AdminWordV2Envelope>("/lexicon/entries", input, {
@@ -189,43 +181,31 @@ export function createAdminEndpoints(http: HttpClient) {
         }),
       /** GET /admin/lexicon/entries/{id} — 加载 V2 canonical 词条。 */
       get: (wordId: string) =>
-        http.get<AdminWordAnyEnvelope>(`/lexicon/entries/${wordId}`),
-      /**
-       * PUT /admin/words/{id}/content — 保存（整树替换）。
-       * 409 = 乐观锁冲突（重新加载）；422 = 已发布词条改残（details 逐条展示）。
-       */
-      saveContent: (wordId: string, input: AdminWordSaveInput) =>
-        http.put<AdminWordEnvelope>(`/words/${wordId}/content`, input),
-      /** POST /admin/words/{id}/steps/forms/impact — 保存词形前预览下游影响。 */
+        http.get<AdminWordV2Envelope>(`/lexicon/entries/${wordId}`),
+      /** POST /admin/lexicon/entries/{id}/steps/forms/impact。 */
       previewFormsImpact: (wordId: string, input: PreviewFormsImpactInputV2) =>
         http.post<PreviewFormsImpactResponseV2>(
           `/lexicon/entries/${wordId}/steps/forms/impact`,
           input
         ),
-      /** PUT /admin/words/{id}/steps/forms — 保存或完成 V2 词形与发音步骤。 */
+      /** PUT /admin/lexicon/entries/{id}/steps/forms。 */
       saveFormsStep: (wordId: string, input: SaveFormsStepInput) =>
         http.put<AdminWordV2Envelope>(
           `/lexicon/entries/${wordId}/steps/forms`,
           input
         ),
-      /** PUT /admin/words/{id}/steps/meanings — 保存或完成 V2 词义与例句步骤。 */
+      /** PUT /admin/lexicon/entries/{id}/steps/meanings。 */
       saveMeaningsStep: (wordId: string, input: SaveMeaningsStepInput) =>
         http.put<AdminWordV2Envelope>(
           `/lexicon/entries/${wordId}/steps/meanings`,
           input
         ),
-      /** POST /admin/words/{id}/validate — 校验指定 V2 revision 的发布完整性。 */
+      /** POST /admin/lexicon/entries/{id}/validate。 */
       validateV2: (wordId: string, input: ValidateAdminWordV2Input) =>
         http.post<DraftValidationResponse>(
           `/lexicon/entries/${wordId}/validate`,
           input
         ),
-      /**
-       * POST /admin/words/{id}/publish — 提交（发布），幂等且重新触发题目生成。
-       * 422 = 完整性检查未过（HttpError.details）；409 = 并发保存，重试即可。
-       */
-      publish: (wordId: string) =>
-        http.post<AdminWordEnvelope>(`/words/${wordId}/publish`),
       /** POST /admin/lexicon/entries/{id}/publications — 带 revision 幂等发布 V2。 */
       publishV2: (
         wordId: string,
@@ -276,13 +256,6 @@ export function createAdminEndpoints(http: HttpClient) {
       /** DELETE /admin/lexicon/entries/{id} — 仅永久删除从未发布的 V2 草稿。 */
       deleteDraft: (wordId: string, input: DeleteDraftInput) =>
         http.del<void>(`/lexicon/entries/${wordId}`, input),
-      /** DELETE /admin/words/{id} — 单条删除（整棵树一起删）→ 204。 */
-      remove: (wordId: string) => http.del<void>(`/words/${wordId}`),
-      /** POST /admin/words/batch-delete — ≤100 个，重复去重；不存在的 id 跳过。 */
-      batchDelete: (ids: string[]) =>
-        http.post<AdminWordBatchDeleteResponse>("/words/batch-delete", {
-          ids
-        }),
       /** GET /admin/lexicon/entries/related-search — 关联词/上下文目标搜索。 */
       relatedSearch: (
         q: string,

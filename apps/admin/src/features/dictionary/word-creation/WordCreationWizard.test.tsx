@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App as AntApp } from "antd";
-import type { AdminWord, AdminWordV2 } from "@tsz/types";
+import type { AdminWordV2 } from "@tsz/types";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WordCreationWizard } from "./WordCreationWizard";
@@ -142,10 +142,6 @@ function renderWizard(mode: "create" | "resume", initialEntry: string) {
             path="/words/:wordId/wizard/:step?"
             element={<WordCreationWizard mode={mode} />}
           />
-          <Route
-            path="/words/:wordId/edit"
-            element={<div>legacy-editor</div>}
-          />
           <Route path="/words" element={<div>words-list</div>} />
         </Routes>
         <LocationProbe />
@@ -154,7 +150,7 @@ function renderWizard(mode: "create" | "resume", initialEntry: string) {
   );
 }
 
-function loaded(word: AdminWord | AdminWordV2) {
+function loaded(word: AdminWordV2) {
   state.detail = {
     data: { word },
     isPending: false,
@@ -256,18 +252,6 @@ describe("WordCreationWizard", () => {
     expect(state.refetch).toHaveBeenCalled();
     fireEvent.click(screen.getByText("返回智能词库"));
     expect(screen.getByTestId("location")).toHaveTextContent("/words");
-  });
-
-  it("legacy detail 离开 V2 向导并重定向旧编辑器", async () => {
-    loaded({ id: "legacy-1", schema_version: 1 } as AdminWord);
-    renderWizard("resume", "/words/legacy-1/wizard/forms");
-
-    await waitFor(() =>
-      expect(screen.getByTestId("location")).toHaveTextContent(
-        "/words/legacy-1/edit"
-      )
-    );
-    expect(screen.getByText("legacy-editor")).toBeVisible();
   });
 
   it.each([

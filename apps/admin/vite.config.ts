@@ -27,11 +27,6 @@ function buildDevProxy(mode: string) {
 export default defineConfig(({ mode, command }) => {
   const buildEnv = loadEnv(mode, process.cwd(), "");
   const production = command === "build" || mode === "production";
-  parseBooleanEnvFlag(
-    buildEnv.VITE_WORD_CREATION_WIZARD,
-    "VITE_WORD_CREATION_WIZARD",
-    !production
-  );
   const adminWordsMock = parseBooleanEnvFlag(
     buildEnv.VITE_ADMIN_WORDS_MOCK,
     "VITE_ADMIN_WORDS_MOCK",

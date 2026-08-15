@@ -13,17 +13,10 @@ import type { AdminWordListItem, AdminWordListQuery } from "@tsz/types";
 const apiMocks = vi.hoisted(() => ({
   useArchiveWord: vi.fn(),
   useArchiveWordsBatch: vi.fn(),
-  useCreateWord: vi.fn(),
-  useDeleteWord: vi.fn(),
-  usePublishWord: vi.fn(),
   useRestoreWord: vi.fn(),
   useRestoreWordsBatch: vi.fn(),
   useWordList: vi.fn(),
   useWordStats: vi.fn()
-}));
-
-vi.mock("@/lib/env", () => ({
-  env: { WORD_CREATION_WIZARD: true }
 }));
 
 vi.mock("./api", () => apiMocks);
@@ -33,7 +26,6 @@ vi.mock("./dataSource", () => ({
     archive: true,
     batchArchive: true,
     dialectVariantSuggestions: true,
-    legacyEntryCreation: false,
     phraseCreation: true
   }
 }));
@@ -105,9 +97,6 @@ beforeEach(() => {
   for (const hook of [
     apiMocks.useArchiveWord,
     apiMocks.useArchiveWordsBatch,
-    apiMocks.useCreateWord,
-    apiMocks.useDeleteWord,
-    apiMocks.usePublishWord,
     apiMocks.useRestoreWord,
     apiMocks.useRestoreWordsBatch
   ]) {

@@ -1,16 +1,11 @@
 // 智能词库的数据层:React Query hooks 包住 api.words.*(@tsz/api-client)。
 // 列表/统计是服务端派生数据,任何写操作(增删改发布)后统一失效重取。
 import type {
-  AdminWordBatchDeleteResponse,
   EntryLifecycleBatchInput,
   EntryLifecycleBatchResponse,
   EntryLifecycleInput
 } from "@tsz/types";
-import type {
-  AdminWordCreateInput,
-  AdminWordListQuery,
-  AdminWordSaveInput
-} from "@tsz/types";
+import type { AdminWordListQuery } from "@tsz/types";
 import {
   keepPreviousData,
   useMutation,
@@ -70,40 +65,6 @@ function useInvalidateWords() {
   return () => qc.invalidateQueries({ queryKey: wordKeys.all });
 }
 
-export function useCreateWord() {
-  const invalidate = useInvalidateWords();
-  return useMutation({
-    mutationFn: (input: AdminWordCreateInput) =>
-      adminWordsDataSource.create(input),
-    onSuccess: invalidate
-  });
-}
-
-export function useSaveWordContent() {
-  const invalidate = useInvalidateWords();
-  return useMutation({
-    mutationFn: (vars: { wordId: string; input: AdminWordSaveInput }) =>
-      adminWordsDataSource.saveContent(vars.wordId, vars.input),
-    onSuccess: invalidate
-  });
-}
-
-export function usePublishWord() {
-  const invalidate = useInvalidateWords();
-  return useMutation({
-    mutationFn: (wordId: string) => adminWordsDataSource.publish(wordId),
-    onSuccess: invalidate
-  });
-}
-
-export function useDeleteWord() {
-  const invalidate = useInvalidateWords();
-  return useMutation({
-    mutationFn: (wordId: string) => adminWordsDataSource.remove(wordId),
-    onSuccess: invalidate
-  });
-}
-
 export function useDeleteWordDraft() {
   const qc = useQueryClient();
   return useMutation({
@@ -129,14 +90,6 @@ export function useDeleteWordDraft() {
         qc.invalidateQueries({ queryKey: wordKeys.stats() })
       ]);
     }
-  });
-}
-
-export function useBatchDeleteWords() {
-  const invalidate = useInvalidateWords();
-  return useMutation<AdminWordBatchDeleteResponse, Error, string[]>({
-    mutationFn: (ids: string[]) => adminWordsDataSource.batchDelete(ids),
-    onSuccess: invalidate
   });
 }
 

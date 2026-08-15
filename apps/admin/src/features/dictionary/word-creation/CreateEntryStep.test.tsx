@@ -140,6 +140,29 @@ function renderStep() {
   return { onCreated, onHeadwordsChange, router };
 }
 
+function duplicateDetectionFixture() {
+  return {
+    ...detectionFixture("colour"),
+    smart_dictionary: {
+      status: "duplicate" as const,
+      duplicates: [
+        {
+          word_id: "word-colour-archived",
+          headword: "colour",
+          dialect: "uk" as const,
+          status: "archived" as const
+        },
+        {
+          word_id: "word-color-published",
+          headword: "color",
+          dialect: "us" as const,
+          status: "published" as const
+        }
+      ]
+    }
+  };
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   partOfSpeechCatalogState.data = undefined;
@@ -296,7 +319,11 @@ describe("CreateEntryStep", () => {
     ["colour", "已存在重复词条"],
     ["smart-unavailable", "智能词库暂时不可用"]
   ])("%s 检测阻断创建并展示原因", async (headword, reason) => {
-    mutations.detect.mockResolvedValue(detectionFixture(headword));
+    mutations.detect.mockResolvedValue(
+      headword === "colour"
+        ? duplicateDetectionFixture()
+        : detectionFixture(headword)
+    );
     renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
       target: { value: headword }
@@ -310,7 +337,7 @@ describe("CreateEntryStep", () => {
   });
 
   it("重复词条展示生命周期状态，归档项提示可恢复并继续阻断创建", async () => {
-    mutations.detect.mockResolvedValue(detectionFixture("colour"));
+    mutations.detect.mockResolvedValue(duplicateDetectionFixture());
     renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
       target: { value: "colour" }
@@ -322,7 +349,7 @@ describe("CreateEntryStep", () => {
     });
     expect(duplicate).toHaveAttribute(
       "href",
-      "/words/fixture-colour/wizard/basics"
+      "/words/word-colour-archived/wizard/basics"
     );
     expect(screen.queryByText("草稿")).toBeNull();
     expect(screen.getByText("已发布")).toBeVisible();
