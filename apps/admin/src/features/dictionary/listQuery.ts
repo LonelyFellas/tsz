@@ -1,4 +1,4 @@
-// 列表页搜索行 → GET /admin/words 查询参数的纯映射(可单测)。
+// 列表页搜索行 → GET /admin/lexicon/entries 查询参数的纯映射(可单测)。
 import type {
   AdminWordKind,
   AdminWordListQuery,

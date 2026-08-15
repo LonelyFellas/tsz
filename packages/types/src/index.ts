@@ -14,43 +14,24 @@ export * from "./part-of-speech";
 export * from "./rich-text";
 export * from "./admin-tts";
 export * from "./admin-word-v2";
-export { isAdminWordV2 } from "./admin-word";
 export type {
   AdminWordKind,
   AdminWordListItem,
   CefrLevel,
-  AdminWord,
-  AdminWordBatchDeleteResponse,
-  AdminWordCreateInput,
-  AdminWordAnyEnvelope,
-  AdminWordEnvelope,
-  AdminWordIncompleteError,
   AdminWordListPage,
   AdminWordListQuery,
   AdminWordListResponse,
   AdminWordV2ListItem,
   AdminWordV2ListResponse,
-  AdminWordSaveInput,
   AdminWordStats,
   AdminWordStatus,
   Dialect,
-  DialectMode,
-  GrammarStructure,
-  GrammarVariant,
   RelatedSearchResponse,
   RelatedWordResult,
   RelatedWordSense,
-  SenseGroup,
-  WordDefinition,
-  WordForm,
   WordFormType,
-  WordPos,
   WordPosTag,
-  WordPronunciation,
-  WordRelation,
   WordRelationType,
-  WordSense,
-  WordSentence,
   WordSubPos,
   PronunciationStyle
 } from "./admin-word";

@@ -1,6 +1,5 @@
 import type {
   AdminProfile,
-  AdminWord,
   AdminWordV2,
   DraftFormsStepContent,
   DraftMeaningsStepContent,
@@ -14,11 +13,7 @@ import {
   type AdminWordsMockPersistedState,
   type AdminWordsMock
 } from "./adminWordsMock";
-import {
-  ADMIN_WORDS_MOCK_STORAGE_SCHEMA,
-  createSeedLegacyWords,
-  richText
-} from "./fixtures";
+import { ADMIN_WORDS_MOCK_STORAGE_SCHEMA, richText } from "./fixtures";
 import {
   adminWordsMockStorageKey,
   type AdminWordsMockStorageLike
@@ -283,7 +278,7 @@ describe("admin words mock", () => {
       latencyMs: 1,
       sessionStorage: storage
     });
-    const created = await stateful.create({ headword: "admin-a-only" });
+    const created = await createCenter(stateful, "admin-a-only");
     const adminAKey = adminWordsMockStorageKey(
       ADMIN_WORDS_MOCK_STORAGE_SCHEMA,
       "admin-test"
@@ -328,9 +323,6 @@ describe("admin words mock", () => {
     const detectionId = draft.word.detection_snapshot.detection_id;
     (valid.words[v2Id] as AdminWordV2).meanings.sense_groups = [
       { id: "persisted-v2-group", name_zh: "空间", name_en: "Space" }
-    ];
-    (valid.words["fixture-colour"] as AdminWord).sense_groups = [
-      { id: "persisted-v1-group", name: "颜色" }
     ];
     valid.impact_tokens["valid-impact"] = {
       word_id: v2Id,
@@ -409,30 +401,6 @@ describe("admin words mock", () => {
           Object.assign(
             (state.words[v2Id] as AdminWordV2).meanings.sense_groups[0]!,
             { name_en: 1 }
-          )
-      ],
-      [
-        "legacy headword",
-        (state) =>
-          Object.assign(state.words["fixture-colour"]!, { headword: 1 })
-      ],
-      [
-        "legacy pos",
-        (state) => Object.assign(state.words["fixture-colour"]!, { pos: null })
-      ],
-      [
-        "legacy sense groups",
-        (state) =>
-          Object.assign(state.words["fixture-colour"]!, {
-            sense_groups: null
-          })
-      ],
-      [
-        "legacy sense group shape",
-        (state) =>
-          Object.assign(
-            (state.words["fixture-colour"] as AdminWord).sense_groups[0]!,
-            { name: 1 }
           )
       ],
       [
@@ -625,7 +593,7 @@ describe("admin words mock", () => {
       sessionStorage: storage,
       warn
     });
-    await expect(refreshed.stats()).resolves.toMatchObject({ total: 2 });
+    await expect(refreshed.stats()).resolves.toMatchObject({ total: 0 });
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("已清理"),
       expect.anything()
@@ -720,12 +688,7 @@ describe("admin words mock", () => {
     });
     await expect(
       mock.detect({ language: "en", headword: "colour" })
-    ).resolves.toMatchObject({
-      smart_dictionary: {
-        status: "duplicate",
-        duplicates: [expect.objectContaining({ status: "published" })]
-      }
-    });
+    ).resolves.toMatchObject({ smart_dictionary: { status: "clear" } });
   });
 
   it("提供 38 词义/例句性能 fixture 与只返回建议的方言转换", async () => {
@@ -1277,15 +1240,6 @@ describe("admin words mock", () => {
         }))
       })
     ).rejects.toMatchObject({ status: 422, code: "validation_failed" });
-    const legacy = (await mock.list({})).words.find(
-      (word) => word.schema_version !== 2
-    )!;
-    await expect(
-      mock.archive(legacy.id, "archive-legacy", {
-        base_revision: 1,
-        base_lifecycle_revision: 1
-      })
-    ).rejects.toMatchObject({ status: 409, code: "schema_version_mismatch" });
     await expect(
       mock.restore(center.word.id, "restore-stale-lifecycle", {
         base_revision: archived.word.revision,
@@ -1380,13 +1334,6 @@ describe("admin words mock", () => {
     await expect(
       mock.deleteDraft("missing-draft", input)
     ).rejects.toMatchObject({ status: 404, code: "word_not_found" });
-    const legacy = (await mock.list({})).words.find(
-      (word) => word.schema_version !== 2
-    )!;
-    await expect(mock.deleteDraft(legacy.id, input)).rejects.toMatchObject({
-      status: 409,
-      code: "entry_not_deletable"
-    });
     await expect(
       mock.deleteDraft(center.word.id, {
         ...input,
@@ -1741,17 +1688,6 @@ describe("admin words mock", () => {
       suggestions: [{ value: "center" }]
     });
 
-    await expect(mock.create({ headword: " " })).rejects.toMatchObject({
-      status: 400,
-      code: "invalid_headword"
-    });
-    await expect(mock.create({ headword: "color" })).rejects.toMatchObject({
-      status: 409,
-      code: "duplicate_word"
-    });
-    await expect(
-      mock.create({ headword: "default-kind" })
-    ).resolves.toMatchObject({ word: { kind: "word" } });
     await expect(
       mock.createV2({
         schema_version: 2,
@@ -1764,8 +1700,7 @@ describe("admin words mock", () => {
     for (const [headword, expectedCode] of [
       ["not-found", "detection_mismatch"],
       ["builtin-unavailable", "detection_mismatch"],
-      ["smart-unavailable", "detection_mismatch"],
-      ["colour", "duplicate_word"]
+      ["smart-unavailable", "detection_mismatch"]
     ] as const) {
       const detection = await mock.detect({ language: "en", headword });
       const headwords =
@@ -1791,19 +1726,6 @@ describe("admin words mock", () => {
         headwords: { mode: "unified", common: "centre" }
       })
     ).rejects.toMatchObject({ status: 422, code: "detection_mismatch" });
-
-    const raced = await mock.detect({ language: "en", headword: "raced" });
-    await mock.create({ headword: "raced" });
-    if (raced.builtin_dictionary.status !== "matched")
-      throw new Error("raced fixture must match");
-    await expect(
-      mock.createV2({
-        schema_version: 2,
-        idempotency_key: "raced-create",
-        detection_id: raced.detection_id,
-        headwords: raced.builtin_dictionary.headwords
-      })
-    ).rejects.toMatchObject({ status: 409, code: "duplicate_word" });
 
     const limited = createAdminWordsMock({
       getAdminProfile: () => profile(),
@@ -2145,14 +2067,21 @@ describe("admin words mock", () => {
     wrongSense.links = [
       { word_id: forms.word.id, sense_id: "missing", role: "focus" }
     ];
-    const externalV1 = structuredClone(baseSentence);
-    externalV1.id = "sentence-external-v1";
-    externalV1.links.push({
-      word_id: "fixture-colour",
-      sense_id: "fixture-colour-sense",
+    const externalMissing = structuredClone(baseSentence);
+    externalMissing.id = "sentence-external-missing";
+    externalMissing.links.push({
+      word_id: "missing-external",
+      sense_id: "missing-external-sense",
       role: "context"
     });
-    sense.sentences = [noZh, noEn, noFocus, wrongWord, wrongSense, externalV1];
+    sense.sentences = [
+      noZh,
+      noEn,
+      noFocus,
+      wrongWord,
+      wrongSense,
+      externalMissing
+    ];
     sense.relations = [
       {
         id: "missing-target",
@@ -2169,10 +2098,10 @@ describe("admin words mock", () => {
         score: "100.001"
       },
       {
-        id: "valid-v1-target",
+        id: "missing-external-target",
         relation: "derivative",
-        target_word_id: "fixture-colour",
-        target_sense_id: "fixture-colour-sense",
+        target_word_id: "missing-external",
+        target_sense_id: "missing-external-sense",
         score: "0"
       }
     ];
@@ -2557,7 +2486,7 @@ describe("admin words mock", () => {
   });
 
   it("以同一实例闭环 V2 create/save/validate/publish/list/stats/get 且保持幂等", async () => {
-    expect(await mock.stats()).toMatchObject({ total: 2, today: 2, month: 2 });
+    expect(await mock.stats()).toMatchObject({ total: 0, today: 0, month: 0 });
     const draft = await createCenter(mock);
     const retryDraft = await mock.createV2({
       schema_version: 2,
@@ -2566,7 +2495,7 @@ describe("admin words mock", () => {
       headwords: draft.word.headwords
     });
     expect(retryDraft).toEqual(draft);
-    expect((await mock.stats()).total).toBe(3);
+    expect((await mock.stats()).total).toBe(1);
 
     const formsInput = {
       base_revision: draft.word.revision,
@@ -2625,7 +2554,7 @@ describe("admin words mock", () => {
     await expect(
       mock.publishV2(meanings.word.id, publishInput)
     ).resolves.toEqual(published);
-    expect((await mock.stats()).total).toBe(3);
+    expect((await mock.stats()).total).toBe(1);
     await expect(mock.get(published.word.id)).resolves.toEqual(published);
     const page = await mock.list({ q: "center" });
     expect(page.words).toEqual([
@@ -2637,18 +2566,14 @@ describe("admin words mock", () => {
     ]);
   });
 
-  it("list 覆盖默认值、全部筛选、V1/V2 映射与分页边界", async () => {
+  it("list 覆盖默认值、全部筛选、V2 映射与分页边界", async () => {
     await createCenter(mock, "list-center");
-    await mock.create({ headword: "search phrase", kind: "phrase" });
 
     const all = await mock.list();
-    expect(all.words).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ schema_version: 1, headword: "colour" }),
-        expect.objectContaining({ schema_version: 2, headword: "center" })
-      ])
-    );
-    expect(all.page).toMatchObject({ page: 1, page_size: 20, total: 4 });
+    expect(all.words).toEqual([
+      expect.objectContaining({ schema_version: 2, headword: "center" })
+    ]);
+    expect(all.page).toMatchObject({ page: 1, page_size: 20, total: 1 });
 
     await expect(mock.list({ q: "mock admin" })).resolves.toMatchObject({
       words: expect.arrayContaining([
@@ -2659,54 +2584,54 @@ describe("admin words mock", () => {
       words: []
     });
     await expect(mock.list({ gloss: "颜色" })).resolves.toMatchObject({
-      page: { total: 2 }
+      page: { total: 0 }
     });
     await expect(mock.list({ gloss: "absent" })).resolves.toMatchObject({
       words: []
     });
     await expect(mock.list({ kind: "phrase" })).resolves.toMatchObject({
-      page: { total: 1 }
+      page: { total: 0 }
     });
     await expect(mock.list({ kind: "word" })).resolves.toMatchObject({
-      page: { total: 3 }
+      page: { total: 1 }
     });
     await expect(mock.list({ pos: "noun" })).resolves.toMatchObject({
-      page: { total: 3 }
+      page: { total: 1 }
     });
     await expect(mock.list({ pos: "adjective" })).resolves.toMatchObject({
       words: []
     });
     await expect(mock.list({ level: "A1" })).resolves.toMatchObject({
-      page: { total: 3 }
+      page: { total: 1 }
     });
     await expect(mock.list({ level: "C2" })).resolves.toMatchObject({
       words: []
     });
     await expect(mock.list({ status: "draft" })).resolves.toMatchObject({
-      page: { total: 2 }
+      page: { total: 1 }
     });
     await expect(mock.list({ status: "published" })).resolves.toMatchObject({
-      page: { total: 2 }
+      page: { total: 0 }
     });
     await expect(
       mock.list({ created_from: "2027-01-01T00:00:00.000Z" })
     ).resolves.toMatchObject({ words: [] });
     await expect(
       mock.list({ created_from: "2025-01-01T00:00:00.000Z" })
-    ).resolves.toMatchObject({ page: { total: 4 } });
+    ).resolves.toMatchObject({ page: { total: 1 } });
     await expect(
       mock.list({ created_to: "2026-08-02T03:00:00.000Z" })
     ).resolves.toMatchObject({ words: [] });
     await expect(
       mock.list({ created_to: "2027-01-01T00:00:00.000Z" })
-    ).resolves.toMatchObject({ page: { total: 4 } });
+    ).resolves.toMatchObject({ page: { total: 1 } });
     await expect(mock.list({ page: -1, page_size: 0 })).resolves.toMatchObject({
-      page: { page: 1, page_size: 1, total: 4 }
+      page: { page: 1, page_size: 1, total: 1 }
     });
     await expect(mock.list({ page: 2, page_size: 200 })).resolves.toMatchObject(
       {
         words: [],
-        page: { page: 2, page_size: 100, total: 4 }
+        page: { page: 2, page_size: 100, total: 1 }
       }
     );
   });
@@ -2871,97 +2796,17 @@ describe("admin words mock", () => {
     await expect(mock.publishV2(ready.id, input)).resolves.toMatchObject({
       word: { id: ready.id, status: "published" }
     });
-    expect((await mock.stats()).total).toBe(3);
+    expect((await mock.stats()).total).toBe(1);
   });
 
-  it("支持 V1 CRUD、批量删除和关联词检索", async () => {
-    const created = await mock.create({
-      headword: "legacy demo",
-      kind: "phrase"
-    });
-    const fixture = createSeedLegacyWords(NOW.toISOString())[0]!;
-    const saved = await mock.saveContent(created.word.id, {
-      base_updated_at: created.word.updated_at,
-      frequency: "20",
-      dialect_mode: fixture.dialect_mode,
-      dialects: fixture.dialects,
-      sense_groups: fixture.sense_groups,
-      pos: fixture.pos
-    });
-    await expect(mock.publish(saved.word.id)).resolves.toMatchObject({
-      word: { status: "published" }
-    });
-    await expect(mock.relatedSearch("colo")).resolves.toMatchObject({
-      results: expect.arrayContaining([
-        expect.objectContaining({
-          headword: "colour",
-          senses: expect.any(Array)
-        })
-      ])
-    });
-    await expect(
-      mock.batchDelete([saved.word.id, saved.word.id, "missing"])
-    ).resolves.toEqual({ deleted: 1 });
-    await expect(mock.get(saved.word.id)).rejects.toMatchObject({
-      status: 404
-    });
-  });
-
-  it("覆盖 V1/V2 发布拒绝、幂等绑定、删除与关联检索边界", async () => {
+  it("覆盖 V2 发布拒绝、幂等绑定、删除与关联检索边界", async () => {
     const draft = await createCenter(mock, "publish-bound-center");
-    const fixture = createSeedLegacyWords(NOW.toISOString())[0]!;
-    const legacyInput = {
-      base_updated_at: fixture.updated_at,
-      frequency: fixture.frequency ?? "20",
-      dialect_mode: fixture.dialect_mode,
-      dialects: fixture.dialects,
-      sense_groups: fixture.sense_groups,
-      pos: fixture.pos
-    };
-    await expect(
-      mock.saveContent(draft.word.id, legacyInput)
-    ).rejects.toMatchObject({ status: 409, code: "schema_version_mismatch" });
-    await expect(
-      mock.validateV2("fixture-colour", { base_revision: 1 })
-    ).rejects.toMatchObject({ status: 409, code: "schema_version_mismatch" });
-    await expect(mock.publish(draft.word.id)).rejects.toMatchObject({
-      status: 409,
-      code: "schema_version_mismatch"
-    });
     await expect(
       mock.publishV2(draft.word.id, {
         base_revision: draft.word.revision,
         idempotency_key: "publish-incomplete"
       })
     ).rejects.toMatchObject({ status: 422, code: "validation_failed" });
-
-    const incomplete = await mock.create({ headword: "incomplete legacy" });
-    await expect(mock.publish(incomplete.word.id)).rejects.toMatchObject({
-      status: 422,
-      code: "word_incomplete",
-      details: expect.arrayContaining(["词频不能为空", "至少需要一个基本词性"])
-    });
-    await expect(
-      mock.saveContent(incomplete.word.id, {
-        ...legacyInput,
-        base_updated_at: "stale"
-      })
-    ).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
-    const withoutSenses = structuredClone(fixture.pos);
-    withoutSenses[0]!.senses = [];
-    const saved = await mock.saveContent(incomplete.word.id, {
-      ...legacyInput,
-      base_updated_at: incomplete.word.updated_at,
-      pos: withoutSenses
-    });
-    await expect(mock.publish(saved.word.id)).rejects.toMatchObject({
-      status: 422,
-      code: "word_incomplete",
-      details: expect.arrayContaining(["每个词性至少需要一个词义"])
-    });
-    await expect(mock.publish("fixture-colour")).resolves.toMatchObject({
-      word: { status: "published" }
-    });
 
     const centerReady = await completeDraft(
       mock,
@@ -3061,22 +2906,6 @@ describe("admin words mock", () => {
         expect.objectContaining({ word_id: centerReady.id, kind: "word" })
       ]
     });
-    await expect(
-      mock.relatedSearch("colo", { limit: 200 })
-    ).resolves.toMatchObject({ results: expect.any(Array) });
-
-    await expect(mock.remove("fixture-color")).resolves.toBeUndefined();
-    await expect(mock.remove("fixture-color")).rejects.toMatchObject({
-      status: 404,
-      code: "word_not_found"
-    });
-    await expect(mock.batchDelete(["missing"])).resolves.toEqual({
-      deleted: 0
-    });
-    await expect(
-      mock.batchDelete(Array.from({ length: 101 }, (_, index) => `id-${index}`))
-    ).rejects.toMatchObject({ status: 413, code: "payload_too_large" });
-
     const archivedCenter = await mock.archive(
       centerPublished.word.id,
       "archive-before-validate",
@@ -3095,7 +2924,7 @@ describe("admin words mock", () => {
   it("sessionStorage 可硬刷新恢复，并按权限 fail closed", async () => {
     const storage = memoryStorage();
     const first = mockFor(() => profile(), storage);
-    const created = await first.create({ headword: "persisted draft" });
+    const created = await createCenter(first, "persisted-draft");
     const refreshed = mockFor(() => profile(), storage);
     await expect(refreshed.get(created.word.id)).resolves.toEqual(created);
 
@@ -3121,6 +2950,7 @@ describe("part-of-speech settings mock", () => {
 
   it("提供 11/19 默认目录、搜索分页、动态引用计数与权限保护", async () => {
     const settingsMock = mockFor(superAdmin);
+    await createCenter(settingsMock, "pos-usage-center");
     const catalog = await settingsMock.partOfSpeechSettings.catalog();
     expect(catalog.items).toHaveLength(11);
     expect(
@@ -3253,6 +3083,7 @@ describe("part-of-speech settings mock", () => {
 
   it("细分词性按所属基本词性 CRUD，并保护重复、revision 与引用删除", async () => {
     const settingsMock = mockFor(superAdmin);
+    await completeCenter(settingsMock);
     const catalog = await settingsMock.partOfSpeechSettings.catalog();
     const noun = catalog.items.find((item) => item.code === "noun")!;
     const created = await settingsMock.partOfSpeechSettings.createSubPart(

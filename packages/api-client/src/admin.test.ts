@@ -190,15 +190,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     );
   });
 
-  it("create → POST /words 带 headword + kind", () => {
-    const api = createAdminEndpoints(http);
-    api.words.create({ headword: "take", kind: "word" });
-    expect(http.post).toHaveBeenCalledWith("/words", {
-      headword: "take",
-      kind: "word"
-    });
-  });
-
   it("createV2 → POST /lexicon/entries，幂等键只进 header", () => {
     const api = createAdminEndpoints(http);
     const input = {
@@ -221,20 +212,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     const api = createAdminEndpoints(http);
     api.words.get("w-1");
     expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-1");
-  });
-
-  it("saveContent → PUT /words/{id}/content 原样透传保存树", () => {
-    const api = createAdminEndpoints(http);
-    const input = {
-      base_updated_at: "2026-07-01T00:00:00Z",
-      frequency: "0.5",
-      dialect_mode: "unified" as const,
-      dialects: [],
-      sense_groups: [],
-      pos: []
-    };
-    api.words.saveContent("w-1", input);
-    expect(http.put).toHaveBeenCalledWith("/words/w-1/content", input);
   });
 
   it("previewFormsImpact → POST /lexicon/entries/{id}/steps/forms/impact", () => {
@@ -287,12 +264,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     });
   });
 
-  it("publish → POST /words/{id}/publish 无 body", () => {
-    const api = createAdminEndpoints(http);
-    api.words.publish("w-1");
-    expect(http.post).toHaveBeenCalledWith("/words/w-1/publish");
-  });
-
   it("publishV2 → POST /lexicon/entries/{id}/publications，幂等键只进 header", () => {
     const api = createAdminEndpoints(http);
     const input: PublishAdminWordV2Input = {
@@ -335,12 +306,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     });
   });
 
-  it("remove → DELETE /words/{id}", () => {
-    const api = createAdminEndpoints(http);
-    api.words.remove("w-1");
-    expect(http.del).toHaveBeenCalledWith("/words/w-1");
-  });
-
   it("deleteDraft → DELETE /lexicon/entries/{id}", () => {
     const api = createAdminEndpoints(http);
     api.words.deleteDraft("w-2", {
@@ -350,14 +315,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.del).toHaveBeenCalledWith("/lexicon/entries/w-2", {
       base_revision: 3,
       base_lifecycle_revision: 2
-    });
-  });
-
-  it("batchDelete → POST /words/batch-delete 带 ids", () => {
-    const api = createAdminEndpoints(http);
-    api.words.batchDelete(["a", "b"]);
-    expect(http.post).toHaveBeenCalledWith("/words/batch-delete", {
-      ids: ["a", "b"]
     });
   });
 

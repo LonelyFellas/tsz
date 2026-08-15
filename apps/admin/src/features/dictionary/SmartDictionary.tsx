@@ -27,21 +27,15 @@ import dayjs from "dayjs";
 import { useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import type { AdminWordKind, AdminWordListItem, CefrLevel } from "@tsz/types";
-import { isIncompleteHttpError } from "@tsz/api-client/http";
-import { env } from "@/lib/env";
 import {
   useArchiveWord,
   useArchiveWordsBatch,
-  useDeleteWord,
-  usePublishWord,
   useRestoreWord,
   useRestoreWordsBatch,
   useWordList,
   useWordStats
 } from "./api";
-import { CreateWordModal } from "./CreateWordModal";
 import { adminWordsDataSourceCapabilities } from "./dataSource";
-import { DetailsList } from "./DetailsList";
 import {
   CEFR_OPTIONS,
   cefrColor,
@@ -85,13 +79,10 @@ export function SmartDictionary() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
-  const [createKind, setCreateKind] = useState<AdminWordKind | null>(null);
   const lifecycleCommandPending = useRef(false);
 
   const listQuery = useWordList(toListQuery(filters, page, pageSize));
   const stats = useWordStats();
-  const publishWord = usePublishWord();
-  const deleteWord = useDeleteWord();
   const archiveWord = useArchiveWord();
   const restoreWord = useRestoreWord();
   const archiveBatch = useArchiveWordsBatch();
@@ -130,45 +121,6 @@ export function SmartDictionary() {
     if (keyword) nextSearchParams.set("keyword", keyword);
     if (values.status) nextSearchParams.set("status", values.status);
     setSearchParams(nextSearchParams, { replace: true });
-  };
-
-  const publish = (record: AdminWordListItem) => {
-    publishWord.mutate(record.id, {
-      onSuccess: () => message.success(`「${record.headword}」已发布`),
-      onError: (err) => {
-        // 422:发布完整性检查未过(V1–V10),details 逐条列出违规。
-        if (isIncompleteHttpError(err)) {
-          modal.warning({
-            title: `「${record.headword}」内容不完整,无法发布`,
-            content: <DetailsList details={err.details} />,
-            okText: "去完善",
-            onOk: () => navigate(`/words/${record.id}/edit`)
-          });
-          return;
-        }
-        message.error(err.message);
-      }
-    });
-  };
-
-  const removeLegacy = (record: AdminWordListItem) => {
-    modal.confirm({
-      title: `删除「${record.headword}」?`,
-      content: "整棵词条树将一并删除,不可恢复。",
-      okText: "删除",
-      okButtonProps: { danger: true },
-      cancelText: "取消",
-      onOk: () =>
-        deleteWord
-          .mutateAsync(record.id)
-          .then(() => {
-            setSelectedKeys((prev) => prev.filter((k) => k !== record.id));
-            message.success("已删除");
-          })
-          .catch((err: unknown) => {
-            message.error(err instanceof Error ? err.message : "删除失败");
-          })
-    });
   };
 
   const lifecycleInput = (record: AdminWordListItem) => {
@@ -404,29 +356,16 @@ export function SmartDictionary() {
       width: 160,
       fixed: "right",
       render: (_: unknown, record: AdminWordListItem) => {
-        const isV2 = record.schema_version === 2;
         return (
           <Space size={0}>
-            {(isV2 || adminWordsDataSourceCapabilities.legacyEntryCreation) && (
-              <Button
-                type="link"
-                size="small"
-                onClick={() => navigate(getWordRowRoute(record))}
-              >
-                {getWordRowActionLabel(record)}
-              </Button>
-            )}
-            {!isV2 && adminWordsDataSourceCapabilities.legacyEntryCreation && (
-              <Button
-                type="link"
-                size="small"
-                disabled={record.status === "published"}
-                onClick={() => publish(record)}
-              >
-                发布
-              </Button>
-            )}
-            {isV2 && adminWordsDataSourceCapabilities.archive && (
+            <Button
+              type="link"
+              size="small"
+              onClick={() => navigate(getWordRowRoute(record))}
+            >
+              {getWordRowActionLabel(record)}
+            </Button>
+            {adminWordsDataSourceCapabilities.archive && (
               <Button
                 type="link"
                 size="small"
@@ -445,17 +384,6 @@ export function SmartDictionary() {
                 }
               >
                 {record.status === "archived" ? "恢 复" : "归 档"}
-              </Button>
-            )}
-            {!isV2 && adminWordsDataSourceCapabilities.legacyEntryCreation && (
-              <Button
-                type="link"
-                size="small"
-                danger
-                loading={deleteWord.isPending}
-                onClick={() => removeLegacy(record)}
-              >
-                删除
               </Button>
             )}
           </Space>
@@ -567,16 +495,7 @@ export function SmartDictionary() {
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => {
-                if (
-                  env.WORD_CREATION_WIZARD ||
-                  !adminWordsDataSourceCapabilities.legacyEntryCreation
-                ) {
-                  navigate("/words/new?kind=word");
-                  return;
-                }
-                setCreateKind("word");
-              }}
+              onClick={() => navigate("/words/new?kind=word")}
             >
               创建单词
             </Button>
@@ -693,14 +612,6 @@ export function SmartDictionary() {
           }}
         />
       </Card>
-
-      {createKind && (
-        <CreateWordModal
-          open
-          kind={createKind}
-          onClose={() => setCreateKind(null)}
-        />
-      )}
     </Flex>
   );
 }

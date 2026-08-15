@@ -111,6 +111,7 @@ export function PronunciationPreviewControls({
   ariaLabelPrefix,
   disabled = false,
   compact = false,
+  audioFactory = (src) => new Audio(src),
   children
 }: {
   pronunciationId: string;
@@ -120,6 +121,7 @@ export function PronunciationPreviewControls({
   ariaLabelPrefix?: string;
   disabled?: boolean;
   compact?: boolean;
+  audioFactory?: (src: string) => HTMLAudioElement;
   children?: ReactNode;
 }) {
   const context = useContext(PreviewContext);
@@ -177,7 +179,7 @@ export function PronunciationPreviewControls({
   const attachAudio = useCallback(
     (preview: VoicePreviewResult): HTMLAudioElement => {
       audioRef.current?.pause();
-      const audio = new Audio(preview.audioUrl);
+      const audio = audioFactory(preview.audioUrl);
       audioRef.current = audio;
       audio.addEventListener(
         "error",
@@ -198,7 +200,7 @@ export function PronunciationPreviewControls({
       );
       return audio;
     },
-    [discardResult, message]
+    [audioFactory, discardResult, message]
   );
 
   const generate = async () => {

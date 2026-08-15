@@ -1,15 +1,9 @@
 import { HttpError } from "@tsz/api-client";
 import type {
   AdminProfile,
-  AdminWord,
-  AdminWordAnyEnvelope,
-  AdminWordBatchDeleteResponse,
-  AdminWordCreateInput,
-  AdminWordEnvelope,
   AdminWordListItem,
   AdminWordListQuery,
   AdminWordListResponse,
-  AdminWordSaveInput,
   AdminWordStats,
   AdminWordV2,
   AdminWordV2Envelope,
@@ -59,7 +53,6 @@ import {
   createInitialMeanings,
   createInitialMeaningsForAddedPos,
   createInitialSenseGroup,
-  createSeedLegacyWords,
   normalizeFixtureHeadword,
   richText
 } from "./fixtures";
@@ -70,7 +63,11 @@ import {
 } from "./storage";
 import { createPartOfSpeechSeed } from "./partOfSpeechFixtures";
 
-type MockWord = AdminWord | AdminWordV2;
+type MockWord = AdminWordV2;
+
+function isV2(word: MockWord): word is AdminWordV2 {
+  return word.schema_version === 2;
+}
 
 type MockCreateAdminWordV2Input = CreateAdminWordV2Input & {
   idempotency_key: string;
@@ -209,14 +206,6 @@ function isSenseGroupV2(value: unknown): boolean {
   );
 }
 
-function isLegacySenseGroup(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.name === "string"
-  );
-}
-
 function isMockWord(value: unknown): value is MockWord {
   if (!isRecord(value)) return false;
   if (
@@ -232,24 +221,17 @@ function isMockWord(value: unknown): value is MockWord {
   ) {
     return false;
   }
-  if (value.schema_version === 2) {
-    return (
-      typeof value.revision === "number" &&
-      typeof value.lifecycle_revision === "number" &&
-      Array.isArray(value.completed_steps) &&
-      isRecord(value.forms) &&
-      Array.isArray(value.forms.pos) &&
-      isRecord(value.meanings) &&
-      Array.isArray(value.meanings.pos) &&
-      Array.isArray(value.meanings.sense_groups) &&
-      value.meanings.sense_groups.every(isSenseGroupV2)
-    );
-  }
   return (
-    typeof value.headword === "string" &&
-    Array.isArray(value.pos) &&
-    Array.isArray(value.sense_groups) &&
-    value.sense_groups.every(isLegacySenseGroup)
+    value.schema_version === 2 &&
+    typeof value.revision === "number" &&
+    typeof value.lifecycle_revision === "number" &&
+    Array.isArray(value.completed_steps) &&
+    isRecord(value.forms) &&
+    Array.isArray(value.forms.pos) &&
+    isRecord(value.meanings) &&
+    Array.isArray(value.meanings.pos) &&
+    Array.isArray(value.meanings.sense_groups) &&
+    value.meanings.sense_groups.every(isSenseGroupV2)
   );
 }
 
@@ -358,9 +340,7 @@ function makeInitialState(nowIso: string): AdminWordsMockPersistedState {
       seed.partsOfSpeech.map((item) => [item.id, item])
     ),
     sub_parts: Object.fromEntries(seed.subParts.map((item) => [item.id, item])),
-    words: Object.fromEntries(
-      createSeedLegacyWords(nowIso).map((word) => [word.id, word])
-    ),
+    words: {},
     detections: {},
     create_idempotency: {},
     operations: {},
@@ -372,12 +352,7 @@ function makeInitialState(nowIso: string): AdminWordsMockPersistedState {
   };
 }
 
-function isV2(word: MockWord): word is AdminWordV2 {
-  return word.schema_version === 2;
-}
-
 function displayHeadword(word: MockWord): string {
-  if (!isV2(word)) return word.headword;
   if (word.headwords.mode === "unified") return word.headwords.common;
   return word.headwords[word.headwords.source_dialect];
 }
@@ -386,10 +361,6 @@ function allHeadwords(word: MockWord): Array<{
   value: string;
   dialect: "uk" | "us" | "common";
 }> {
-  if (!isV2(word)) {
-    const dialect = word.dialects.length === 1 ? word.dialects[0]! : "common";
-    return [{ value: word.headword, dialect }];
-  }
   return word.headwords.mode === "unified"
     ? [{ value: word.headwords.common, dialect: "common" }]
     : [
@@ -406,12 +377,6 @@ function v2ChineseDefinition(definition: WordDefinitionV2): string {
 }
 
 function wordGloss(word: MockWord): string {
-  if (!isV2(word)) {
-    const definition = word.pos[0]?.senses[0]?.definitions.find(
-      (entry) => entry.def_type === "zh"
-    );
-    return definition?.text.text ?? "";
-  }
   for (const pos of word.meanings.pos) {
     for (const sense of pos.senses) {
       const definition = sense.definitions.find(
@@ -424,15 +389,13 @@ function wordGloss(word: MockWord): string {
 }
 
 function wordPos(word: MockWord) {
-  return isV2(word)
-    ? word.forms.pos.map((entry) => entry.pos)
-    : word.pos.map((entry) => entry.pos);
+  return word.forms.pos.map((entry) => entry.pos);
 }
 
 function wordLevels(word: MockWord) {
-  const levels = isV2(word)
-    ? word.meanings.pos.flatMap((pos) => pos.senses.map((sense) => sense.level))
-    : word.pos.flatMap((pos) => pos.senses.map((sense) => sense.level));
+  const levels = word.meanings.pos.flatMap((pos) =>
+    pos.senses.map((sense) => sense.level)
+  );
   return [...new Set(levels)].sort();
 }
 
@@ -739,11 +702,9 @@ function validPercent(value: string | undefined): boolean {
 }
 
 function wordHasSense(word: MockWord, senseId: string): boolean {
-  return isV2(word)
-    ? word.meanings.pos.some((pos) =>
-        pos.senses.some((sense) => sense.id === senseId)
-      )
-    : word.pos.some((pos) => pos.senses.some((sense) => sense.id === senseId));
+  return word.meanings.pos.some((pos) =>
+    pos.senses.some((sense) => sense.id === senseId)
+  );
 }
 
 function validateMeanings(
@@ -803,9 +764,6 @@ function validateMeanings(
     }
     const target = current.words[wordId];
     if (!target || target.status === "archived") return false;
-    if (!isV2(target)) {
-      return target.status === "published" && wordHasSense(target, senseId);
-    }
     const publication = current.publication_words[wordId];
     return publication ? wordHasSense(publication, senseId) : false;
   };
@@ -1062,16 +1020,6 @@ function meaningsForRemovedPos(
     }
   }
   return affected;
-}
-
-function v1PublishIssues(word: AdminWord): string[] {
-  const issues: string[] = [];
-  if (!word.frequency) issues.push("词频不能为空");
-  if (word.pos.length === 0) issues.push("至少需要一个基本词性");
-  if (word.pos.some((pos) => pos.senses.length === 0)) {
-    issues.push("每个词性至少需要一个词义");
-  }
-  return issues;
 }
 
 const DIALECT_PAIRS: ReadonlyArray<readonly [string, string]> = [
@@ -1534,9 +1482,6 @@ export function createAdminWordsMock({
     wordId: string
   ): AdminWordV2 {
     const word = requireWord(current, wordId);
-    if (!isV2(word)) {
-      throw new HttpError(409, "word is legacy", [], "schema_version_mismatch");
-    }
     if (word.status === "archived") {
       throw new HttpError(409, "entry is archived", [], "entry_archived");
     }
@@ -1622,9 +1567,7 @@ export function createAdminWordsMock({
     code: string
   ): number {
     return Object.values(current.words).reduce((total, word) => {
-      const senses = isV2(word)
-        ? word.meanings.pos.flatMap((pos) => pos.senses)
-        : word.pos.flatMap((pos) => pos.senses);
+      const senses = word.meanings.pos.flatMap((pos) => pos.senses);
       return total + senses.filter((sense) => sense.sub_pos === code).length;
     }, 0);
   }
@@ -1724,51 +1667,6 @@ export function createAdminWordsMock({
         throw new HttpError(
           422,
           `sub-part of speech ${invalidSense.sub_pos} is invalid for ${formPos.pos}`,
-          [],
-          "invalid_sub_part_of_speech",
-          [],
-          { code: invalidSense.sub_pos }
-        );
-      }
-    }
-  }
-
-  function assertConfiguredLegacyContent(
-    current: AdminWordsMockPersistedState,
-    posList: AdminWordSaveInput["pos"]
-  ): void {
-    if (!validatesInternalPartOfSpeech) return;
-    const unknown = posList.find(
-      (pos) =>
-        !Object.values(current.parts_of_speech).some(
-          (part) => part.code === pos.pos
-        )
-    );
-    if (unknown) {
-      throw new HttpError(
-        422,
-        `part of speech ${unknown.pos} is not configured`,
-        [],
-        "unknown_part_of_speech",
-        [],
-        { code: unknown.pos }
-      );
-    }
-    for (const pos of posList) {
-      const part = Object.values(current.parts_of_speech).find(
-        (candidate) => candidate.code === pos.pos
-      );
-      const invalidSense = pos.senses.find((sense) => {
-        if (!sense.sub_pos) return false;
-        const subPart = Object.values(current.sub_parts).find(
-          (candidate) => candidate.code === sense.sub_pos
-        );
-        return !subPart || subPart.part_of_speech_id !== part?.id;
-      });
-      if (invalidSense) {
-        throw new HttpError(
-          422,
-          `sub-part of speech ${invalidSense.sub_pos} is invalid for ${pos.pos}`,
           [],
           "invalid_sub_part_of_speech",
           [],
@@ -2316,7 +2214,7 @@ export function createAdminWordsMock({
         return true;
       })
       .map((word) => ({
-        schema_version: isV2(word) ? (2 as const) : word.schema_version,
+        schema_version: 2 as const,
         id: word.id,
         headword: displayHeadword(word),
         kind: word.kind,
@@ -2324,17 +2222,13 @@ export function createAdminWordsMock({
         pos_list: wordPos(word),
         levels: wordLevels(word),
         status: word.status,
-        ...(isV2(word)
-          ? {
-              max_reachable_step: word.max_reachable_step,
-              revision: word.revision,
-              lifecycle_revision: word.lifecycle_revision,
-              ...(word.published_revision !== undefined
-                ? { published_revision: word.published_revision }
-                : {}),
-              has_unpublished_changes: word.has_unpublished_changes
-            }
+        max_reachable_step: word.max_reachable_step,
+        revision: word.revision,
+        lifecycle_revision: word.lifecycle_revision,
+        ...(word.published_revision !== undefined
+          ? { published_revision: word.published_revision }
           : {}),
+        has_unpublished_changes: word.has_unpublished_changes,
         created_by_name:
           word.created_by === profile.id
             ? profile.display_name
@@ -2467,47 +2361,6 @@ export function createAdminWordsMock({
       },
       suggestions
     };
-  }
-
-  async function create(
-    input: AdminWordCreateInput
-  ): Promise<AdminWordEnvelope> {
-    await pause();
-    const { profile, state: current } = context();
-    const headword = input.headword.trim();
-    if (!headword)
-      throw new HttpError(400, "headword is required", [], "invalid_headword");
-    const kind = input.kind ?? "word";
-    const duplicate = Object.values(current.words).some(
-      (word) =>
-        word.kind === kind &&
-        allHeadwords(word).some(
-          (entry) =>
-            entry.value.toLocaleLowerCase("en") ===
-            headword.toLocaleLowerCase("en")
-        )
-    );
-    if (duplicate) {
-      throw new HttpError(409, "word already exists", [], "duplicate_word");
-    }
-    const timestamp = nextTimestamp(current);
-    const word: AdminWord = {
-      schema_version: 1,
-      id: nextId(current, "legacy-word"),
-      kind,
-      headword,
-      dialect_mode: "unified",
-      dialects: [],
-      status: "draft",
-      created_by: profile.id,
-      created_at: timestamp,
-      updated_at: timestamp,
-      sense_groups: [],
-      pos: []
-    };
-    current.words[word.id] = word;
-    persist(current);
-    return { word: clone(word) };
   }
 
   async function createV2(
@@ -2676,49 +2529,10 @@ export function createAdminWordsMock({
     return response;
   }
 
-  async function get(wordId: string): Promise<AdminWordAnyEnvelope> {
+  async function get(wordId: string): Promise<AdminWordV2Envelope> {
     await pause();
     const { state: current } = context();
     const word = requireWord(current, wordId);
-    return isV2(word) ? { word: clone(word) } : { word: clone(word) };
-  }
-
-  async function saveContent(
-    wordId: string,
-    input: AdminWordSaveInput
-  ): Promise<AdminWordEnvelope> {
-    await pause();
-    const { state: current } = context();
-    assertPayload(input);
-    const existing = requireWord(current, wordId);
-    if (isV2(existing)) {
-      throw new HttpError(
-        409,
-        "V2 words use step endpoints",
-        [],
-        "schema_version_mismatch"
-      );
-    }
-    if (existing.updated_at !== input.base_updated_at) {
-      throw new HttpError(
-        409,
-        "word changed since it was loaded",
-        [],
-        "revision_conflict"
-      );
-    }
-    assertConfiguredLegacyContent(current, input.pos);
-    const word: AdminWord = {
-      ...existing,
-      frequency: input.frequency || undefined,
-      dialect_mode: input.dialect_mode,
-      dialects: clone(input.dialects),
-      sense_groups: clone(input.sense_groups),
-      pos: clone(input.pos),
-      updated_at: nextTimestamp(current)
-    };
-    current.words[word.id] = word;
-    persist(current);
     return { word: clone(word) };
   }
 
@@ -2974,8 +2788,6 @@ export function createAdminWordsMock({
     await pause();
     const { state: current } = context();
     const word = requireWord(current, wordId);
-    if (!isV2(word))
-      throw new HttpError(409, "word is legacy", [], "schema_version_mismatch");
     if (word.status === "archived") {
       throw new HttpError(409, "entry is archived", [], "entry_archived");
     }
@@ -2999,36 +2811,6 @@ export function createAdminWordsMock({
       valid: issues.length === 0,
       issues
     };
-  }
-
-  async function publish(wordId: string): Promise<AdminWordEnvelope> {
-    await pause();
-    const { state: current } = context();
-    const existing = requireWord(current, wordId);
-    if (isV2(existing)) {
-      throw new HttpError(
-        409,
-        "V2 words require revision",
-        [],
-        "schema_version_mismatch"
-      );
-    }
-    assertConfiguredLegacyContent(current, existing.pos);
-    const details = v1PublishIssues(existing);
-    if (details.length > 0) {
-      throw new HttpError(
-        422,
-        "word is incomplete",
-        details,
-        "word_incomplete"
-      );
-    }
-    if (existing.status !== "published") {
-      existing.status = "published";
-      existing.updated_at = nextTimestamp(current);
-      persist(current);
-    }
-    return { word: clone(existing) };
   }
 
   async function publishV2(
@@ -3183,14 +2965,6 @@ export function createAdminWordsMock({
 
     const words = input.entries.map((entry) => {
       const word = requireWord(current, entry.id);
-      if (!isV2(word)) {
-        throw new HttpError(
-          409,
-          "word is legacy",
-          [],
-          "schema_version_mismatch"
-        );
-      }
       assertRevision(word, entry.base_revision);
       const alreadyTarget =
         target === "archived"
@@ -3417,15 +3191,6 @@ export function createAdminWordsMock({
     );
   }
 
-  async function remove(wordId: string): Promise<void> {
-    await pause();
-    const { state: current } = context();
-    if (!current.words[wordId])
-      throw new HttpError(404, "word not found", [], "word_not_found");
-    delete current.words[wordId];
-    persist(current);
-  }
-
   async function deleteDraft(
     wordId: string,
     input: { base_revision: number; base_lifecycle_revision: number }
@@ -3434,7 +3199,7 @@ export function createAdminWordsMock({
     const { state: current } = context();
     const word = current.words[wordId];
     if (!word) throw new HttpError(404, "word not found", [], "word_not_found");
-    if (!isV2(word) || current.publication_words[wordId]) {
+    if (current.publication_words[wordId]) {
       throw new HttpError(
         409,
         "entry cannot be deleted",
@@ -3470,25 +3235,6 @@ export function createAdminWordsMock({
     persist(current);
   }
 
-  async function batchDelete(
-    ids: string[]
-  ): Promise<AdminWordBatchDeleteResponse> {
-    await pause();
-    const { state: current } = context();
-    if (ids.length > 100) {
-      throw new HttpError(413, "at most 100 word ids", [], "payload_too_large");
-    }
-    let deleted = 0;
-    for (const id of new Set(ids)) {
-      if (current.words[id]) {
-        delete current.words[id];
-        deleted += 1;
-      }
-    }
-    if (deleted > 0) persist(current);
-    return { deleted };
-  }
-
   async function relatedSearch(
     q: string,
     opts?: { kind?: "word" | "phrase"; limit?: number }
@@ -3508,28 +3254,17 @@ export function createAdminWordsMock({
         );
       })
       .map((word) => {
-        const displayedWord =
-          isV2(word) && current.publication_words[word.id]
-            ? current.publication_words[word.id]!
-            : word;
-        const senses: RelatedWordSense[] = isV2(word)
-          ? (displayedWord as AdminWordV2).meanings.pos.flatMap((pos) =>
-              pos.senses.map((sense) => ({
-                sense_id: sense.id,
-                gloss:
-                  sense.definitions
-                    .map(v2ChineseDefinition)
-                    .find((entry) => entry.trim() !== "") ?? ""
-              }))
-            )
-          : word.pos.flatMap((pos) =>
-              pos.senses.map((sense) => ({
-                sense_id: sense.id,
-                gloss:
-                  sense.definitions.find((entry) => entry.def_type === "zh")
-                    ?.text.text ?? ""
-              }))
-            );
+        const displayedWord = current.publication_words[word.id] ?? word;
+        const senses: RelatedWordSense[] = displayedWord.meanings.pos.flatMap(
+          (pos) =>
+            pos.senses.map((sense) => ({
+              sense_id: sense.id,
+              gloss:
+                sense.definitions
+                  .map(v2ChineseDefinition)
+                  .find((entry) => entry.trim() !== "") ?? ""
+            }))
+        );
         return {
           word_id: word.id,
           headword: displayHeadword(displayedWord),
@@ -3552,23 +3287,18 @@ export function createAdminWordsMock({
     stats,
     detect,
     suggestDialectVariants,
-    create,
     createV2,
     get,
-    saveContent,
     previewFormsImpact,
     saveFormsStep,
     saveMeaningsStep,
     validateV2,
-    publish,
     publishV2,
     archive,
     restore,
     archiveBatch,
     restoreBatch,
     deleteDraft,
-    remove,
-    batchDelete,
     relatedSearch,
     partOfSpeechSettings: {
       catalog: partOfSpeechCatalog,

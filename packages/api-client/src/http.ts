@@ -62,13 +62,6 @@ export class HttpError extends Error {
   }
 }
 
-/** 422 发布完整性检查:带 details 的 HttpError。 */
-export function isIncompleteHttpError(
-  err: unknown
-): err is HttpError & { details: string[] } {
-  return err instanceof HttpError && err.status === 422;
-}
-
 interface ParsedError {
   message: string;
   details: string[];

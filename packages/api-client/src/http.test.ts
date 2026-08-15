@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProblemDetails } from "@tsz/types";
-import { createHttpClient, HttpError, isIncompleteHttpError } from "./http";
+import { createHttpClient, HttpError } from "./http";
 
 const fetchMock = vi.fn();
 
@@ -60,14 +60,6 @@ describe("HttpError", () => {
     expect(err.message).toBe("not found");
     expect(err.field_issues).toEqual([]);
     expect(err.meta).toBeUndefined();
-  });
-
-  it("isIncompleteHttpError:仅 422 的 HttpError 命中,其余错误不命中", () => {
-    expect(
-      isIncompleteHttpError(new HttpError(422, "incomplete", ["v1"]))
-    ).toBe(true);
-    expect(isIncompleteHttpError(new HttpError(409, "conflict"))).toBe(false);
-    expect(isIncompleteHttpError(new Error("boom"))).toBe(false);
   });
 });
 

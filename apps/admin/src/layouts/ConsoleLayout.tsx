@@ -8,12 +8,12 @@ import { ConsoleSidebar } from "@/features/console/ConsoleSidebar";
 
 const { Header, Sider, Content } = Layout;
 
-// 侧栏三档响应式断点（业界通用：Bootstrap / antd 同款）：
-// - >= lg 992      大屏：面板展开(220)。
-// - md 768 ~ 992   中屏：面板收起为图标轨(72)。
-// - < md 768       小屏(手机)：面板脱离布局，改为抽屉(Drawer)覆盖式展开/收起，内容占满整宽。
+// 普通后台沿用 antd 的 md/lg 三档。创建向导的完整导航阈值按可用内容宽度计算：
+// 1200 内容区 + 220 完整导航 + 24 * 2 Content 边距 = 1468。
+// 未达到该宽度时使用 72px 图标轨，为复杂表单保留舒适编辑空间。
 const LG_BREAKPOINT = 992;
 const MD_BREAKPOINT = 768;
+const WORD_CREATION_FULL_BREAKPOINT = 1200 + 220 + 24 * 2;
 
 type LayoutMode = "full" | "rail" | "drawer";
 
@@ -24,24 +24,33 @@ export function isWordCreationWorkspacePath(pathname: string): boolean {
   );
 }
 
-function modeOf(width: number): LayoutMode {
+export function modeOf(
+  width: number,
+  isWordCreationWorkspace = false
+): LayoutMode {
   if (width < MD_BREAKPOINT) return "drawer";
-  if (width < LG_BREAKPOINT) return "rail";
+  const fullBreakpoint = isWordCreationWorkspace
+    ? WORD_CREATION_FULL_BREAKPOINT
+    : LG_BREAKPOINT;
+  if (width < fullBreakpoint) return "rail";
   return "full";
 }
 
 // 视口宽度 → 布局模式。用单一 resize 监听驱动三档切换（比 CSS 媒体查询更好协调
 // 「in-flow Sider ↔ Drawer」这种结构切换）。SSR 缺省按大屏，客户端挂载即校正。
-function useLayoutMode(): LayoutMode {
+function useLayoutMode(isWordCreationWorkspace: boolean): LayoutMode {
   const [mode, setMode] = useState<LayoutMode>(() =>
-    typeof window === "undefined" ? "full" : modeOf(window.innerWidth)
+    typeof window === "undefined"
+      ? "full"
+      : modeOf(window.innerWidth, isWordCreationWorkspace)
   );
   useEffect(() => {
-    const onResize = () => setMode(modeOf(window.innerWidth));
+    const onResize = () =>
+      setMode(modeOf(window.innerWidth, isWordCreationWorkspace));
     window.addEventListener("resize", onResize);
     onResize();
     return () => window.removeEventListener("resize", onResize);
-  }, []);
+  }, [isWordCreationWorkspace]);
   return mode;
 }
 
@@ -49,22 +58,20 @@ function useLayoutMode(): LayoutMode {
 // Sider 固定不滚动，仅内容区随主体滚动；整壳撑满视口高度。仅登录的 admin 可见。
 export function ConsoleLayout() {
   const { pathname } = useLocation();
-  const mode = useLayoutMode();
-  const isDrawer = mode === "drawer";
   const isWordCreationWorkspace = isWordCreationWorkspacePath(pathname);
+  const mode = useLayoutMode(isWordCreationWorkspace);
+  const isDrawer = mode === "drawer";
   // in-flow 面板收展态（full/rail 生效）：随断点自动同步、两次断点之间可手动覆盖。
-  const [collapsed, setCollapsed] = useState(
-    mode === "rail" || isWordCreationWorkspace
-  );
+  const [collapsed, setCollapsed] = useState(mode === "rail");
   // 手机抽屉开合（drawer 生效）。
   const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // 跨断点或进入宽编辑工作台时同步默认收展；工作台内仍允许用户手动展开。
+  // 跨断点时同步默认收展；同一断点内 resize 不覆盖用户手动选择。
   // 进入手机档不再关心 collapsed，离开手机档则关掉抽屉遮罩。
   useEffect(() => {
-    if (!isDrawer) setCollapsed(mode === "rail" || isWordCreationWorkspace);
+    if (!isDrawer) setCollapsed(mode === "rail");
     else setDrawerOpen(false);
-  }, [mode, isDrawer, isWordCreationWorkspace]);
+  }, [mode, isDrawer]);
 
   const toggleLabel = isDrawer
     ? drawerOpen

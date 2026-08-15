@@ -8,11 +8,6 @@ import {
   parseBooleanEnvFlag
 } from "./env-flags";
 
-const WORD_CREATION_WIZARD = parseBooleanEnvFlag(
-  import.meta.env.VITE_WORD_CREATION_WIZARD,
-  "VITE_WORD_CREATION_WIZARD",
-  !import.meta.env.PROD
-);
 const ADMIN_WORDS_MOCK = parseBooleanEnvFlag(
   import.meta.env.VITE_ADMIN_WORDS_MOCK,
   "VITE_ADMIN_WORDS_MOCK",
@@ -57,7 +52,6 @@ assertAdminTtsMockAllowed(
 
 export const env = {
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL ?? "/api/v1",
-  WORD_CREATION_WIZARD,
   ADMIN_WORDS_MOCK,
   ADMIN_PART_OF_SPEECH_MOCK,
   VOICE_EDITOR,

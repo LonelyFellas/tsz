@@ -78,14 +78,6 @@ export const router = createBrowserRouter([
             })
           },
           {
-            // legacy V1 词条编辑页。V2 ID 误入时由 WordEditor 判别并重定向向导，
-            // 不允许把 V2 数据装进旧 Form 后整树覆盖保存。
-            path: "words/:wordId/edit",
-            lazy: async () => ({
-              Component: (await import("@/pages/WordEdit")).WordEditPage
-            })
-          },
-          {
             path: "wordlists",
             lazy: async () => ({
               Component: (await import("@/pages/WordLists")).WordListsPage
