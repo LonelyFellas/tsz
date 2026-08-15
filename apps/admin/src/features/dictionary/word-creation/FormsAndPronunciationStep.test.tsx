@@ -807,7 +807,22 @@ describe("FormsAndPronunciationStep", () => {
   it("可组合编辑读音和已有派生词形，并保存变更", async () => {
     renderStep();
 
-    fireEvent.change(screen.getAllByLabelText("字典音标")[0]!, {
+    const phoneticInput = screen.getAllByLabelText("字典音标")[0]!;
+    const compactGroup = phoneticInput.closest(".ant-space-compact");
+    expect(compactGroup).not.toBeNull();
+    expect(compactGroup?.children).toHaveLength(3);
+    const [playAction, input, voiceAction] = Array.from(compactGroup!.children);
+    expect(playAction).toBeDefined();
+    expect(input).toBeDefined();
+    expect(voiceAction).toBeDefined();
+    expect(playAction!.className).toContain("compact-first-item");
+    expect(playAction!.className).not.toContain("compact-last-item");
+    expect(input!.className).not.toContain("compact-first-item");
+    expect(input!.className).not.toContain("compact-last-item");
+    expect(voiceAction!.className).toContain("compact-last-item");
+    expect(voiceAction!.className).not.toContain("compact-first-item");
+
+    fireEvent.change(phoneticInput, {
       target: { value: "/changed/" }
     });
     const editableSpelling = screen

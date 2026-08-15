@@ -265,25 +265,24 @@ function PronunciationFields({
             字典音标
           </Typography.Text>
           <div className="word-pronunciation-phonetic-control">
-            <Space.Compact block>
-              <PronunciationPreviewControls
-                pronunciationId={value.id}
-                spelling={spelling}
-                dialect={dialect}
-                disabled={disabled}
-              >
-                <Input
-                  className="word-pronunciation-phonetic-input"
-                  aria-label="字典音标"
-                  value={value.dict_phonetic}
-                  readOnly={disabled}
-                  placeholder="字典音标"
-                  onChange={(event) =>
-                    onChange({ ...value, dict_phonetic: event.target.value })
-                  }
-                />
-              </PronunciationPreviewControls>
-            </Space.Compact>
+            <PronunciationPreviewControls
+              compact
+              pronunciationId={value.id}
+              spelling={spelling}
+              dialect={dialect}
+              disabled={disabled}
+            >
+              <Input
+                className="word-pronunciation-phonetic-input"
+                aria-label="字典音标"
+                value={value.dict_phonetic}
+                readOnly={disabled}
+                placeholder="字典音标"
+                onChange={(event) =>
+                  onChange({ ...value, dict_phonetic: event.target.value })
+                }
+              />
+            </PronunciationPreviewControls>
           </div>
         </div>
         <div className="word-pronunciation-row">

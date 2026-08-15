@@ -1107,8 +1107,14 @@
 
 .word-voice-text-toolbar {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 8px;
   margin-bottom: 5px;
+}
+
+.word-voice-text-toolbar-labeled {
+  justify-content: space-between;
 }
 
 .word-voice-editor-action {
@@ -1329,9 +1335,35 @@
   border-radius: 9px;
 }
 
-.word-sentence-focus-link .ant-input {
-  color: #4f735c;
-  background: #f3faf5;
+.word-sentence-english-card {
+  min-width: 0;
+  padding: 9px 10px 7px;
+  background: #fafbfc;
+  border: 1px solid #d9dee7;
+  border-radius: 9px;
+}
+
+.word-sentence-english-toolbar {
+  margin-bottom: 5px;
+}
+
+.word-sentence-focus-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 20px;
+  margin-top: 4px;
+  color: #62806c;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.word-sentence-focus-hint.is-missing {
+  color: #c13b3b;
+}
+
+.word-sentence-focus-hint .anticon {
+  flex: none;
 }
 
 .word-relations-grid {

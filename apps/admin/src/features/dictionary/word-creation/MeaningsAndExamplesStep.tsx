@@ -427,20 +427,27 @@ function VoiceEditorProvider({
 function VoiceTextControl({
   value,
   contextLabel,
+  toolbarLabel,
   readOnly,
   showEditorAction = true,
   onChange
 }: {
   value: RichText;
   contextLabel: string;
+  toolbarLabel?: string;
   readOnly?: boolean;
   showEditorAction?: boolean;
   onChange: (value: RichText) => void;
 }) {
   return (
     <div className="word-voice-text-control">
-      {showEditorAction && (
-        <div className="word-voice-text-toolbar">
+      {(toolbarLabel || showEditorAction) && (
+        <div
+          className={`word-voice-text-toolbar${toolbarLabel ? " word-voice-text-toolbar-labeled" : ""}`}
+        >
+          {toolbarLabel && (
+            <Typography.Text strong>{toolbarLabel}</Typography.Text>
+          )}
           <VoiceEditorAction
             value={value}
             contextLabel={contextLabel}
@@ -493,12 +500,14 @@ function EnglishTextEditor({
   value,
   clientId,
   activeDialect,
+  toolbarLabel,
   readOnly,
   onChange
 }: {
   value: EnglishTextV2;
   clientId: string;
   activeDialect: MeaningDialect;
+  toolbarLabel?: string;
   readOnly?: boolean;
   onChange: (next: EnglishTextV2) => void;
 }) {
@@ -509,6 +518,7 @@ function EnglishTextEditor({
           <VoiceTextControl
             value={value.common.value}
             contextLabel="英语文本"
+            toolbarLabel={toolbarLabel}
             readOnly={readOnly}
             onChange={(content) =>
               onChange(setEnglishRichText(value, "common", content))
@@ -547,6 +557,7 @@ function EnglishTextEditor({
         <VoiceTextControl
           value={slotValue}
           contextLabel={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
+          toolbarLabel={toolbarLabel}
           readOnly={readOnly}
           onChange={(content) =>
             onChange(setEnglishRichText(value, dialect, content))
@@ -1018,7 +1029,6 @@ function ContextLinksEditor({
   onChange: (next: WordSentenceV2) => void;
 }) {
   const [query, setQuery] = useState("");
-  const focus = sentence.links.find((link) => link.role === "focus");
   const contexts = sentence.links.filter((link) => link.role === "context");
   const relatedSearch = useRelatedSearch(
     query,
@@ -1035,14 +1045,6 @@ function ContextLinksEditor({
   );
   return (
     <Space orientation="vertical" size={8} style={{ width: "100%" }}>
-      <Input
-        prefix={<LockOutlined />}
-        value={focus ? "已自动关联当前词义" : "主关联缺失"}
-        status={focus ? undefined : "error"}
-        readOnly
-        aria-label="例句主关联"
-        className="word-sentence-focus-link"
-      />
       {contexts.map((link, index) => (
         <Space.Compact block key={`${link.word_id}-${link.sense_id}-${index}`}>
           <Input
@@ -1156,16 +1158,33 @@ function SentenceEditor({
       />
       <Space orientation="vertical" size={10} style={{ width: "100%" }}>
         <div className="word-sentence-bilingual-grid">
-          <Space orientation="vertical" size={6} style={{ width: "100%" }}>
-            <Typography.Text strong>英文例句</Typography.Text>
+          <div className="word-sentence-english-card">
+            {!env.VOICE_EDITOR && (
+              <div className="word-sentence-english-toolbar">
+                <Typography.Text strong>英文例句</Typography.Text>
+              </div>
+            )}
             <EnglishTextEditor
               value={value.en_text}
               clientId={value.id}
               activeDialect={activeDialect}
+              toolbarLabel="英文例句"
               readOnly={readOnly || englishReadOnly}
               onChange={(en_text) => onChange({ ...value, en_text })}
             />
-          </Space>
+            <div
+              className={`word-sentence-focus-hint${value.links.some((link) => link.role === "focus") ? "" : " is-missing"}`}
+              role="note"
+              aria-label="例句主关联"
+            >
+              <LockOutlined aria-hidden />
+              <span>
+                {value.links.some((link) => link.role === "focus")
+                  ? "已自动关联当前词义"
+                  : "主关联缺失"}
+              </span>
+            </div>
+          </div>
           <Space orientation="vertical" size={6} style={{ width: "100%" }}>
             <Typography.Text strong>汉语译文</Typography.Text>
             <Input.TextArea

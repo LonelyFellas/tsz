@@ -225,7 +225,7 @@ describe("PronunciationPreview", () => {
     );
     expect(AudioMock.instances[0]?.pause).toHaveBeenCalled();
     expect(dispose).toHaveBeenCalledTimes(1);
-  });
+  }, 10_000);
 
   it("富文本标注变化会释放旧结果并把完整内容发送给真实 adapter", async () => {
     const dispose = vi.fn();

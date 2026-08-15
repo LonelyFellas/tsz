@@ -1,5 +1,5 @@
 import { SoundOutlined, SyncOutlined } from "@ant-design/icons";
-import { App, Button, Tooltip } from "antd";
+import { App, Button, Space, Tooltip } from "antd";
 import type { Dialect, RichTextV2 } from "@tsz/types";
 import type {
   VoiceOption,
@@ -110,6 +110,7 @@ export function PronunciationPreviewControls({
   dialect,
   ariaLabelPrefix,
   disabled = false,
+  compact = false,
   audioFactory = (src) => new Audio(src),
   children
 }: {
@@ -119,6 +120,7 @@ export function PronunciationPreviewControls({
   dialect: Dialect;
   ariaLabelPrefix?: string;
   disabled?: boolean;
+  compact?: boolean;
   audioFactory?: (src: string) => HTMLAudioElement;
   children?: ReactNode;
 }) {
@@ -295,7 +297,7 @@ export function PronunciationPreviewControls({
             ? `${localeForDialect(dialect) ?? "英语"} 暂无可用发音人`
             : "获取语音";
 
-  return (
+  const controls = (
     <>
       <Tooltip title={status || (result ? "播放语音" : "请先获取语音")}>
         <Button
@@ -326,4 +328,5 @@ export function PronunciationPreviewControls({
       </Tooltip>
     </>
   );
+  return compact ? <Space.Compact block>{controls}</Space.Compact> : controls;
 }
