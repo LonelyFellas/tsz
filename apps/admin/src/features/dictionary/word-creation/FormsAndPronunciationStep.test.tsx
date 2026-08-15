@@ -142,6 +142,49 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("FormsAndPronunciationStep", () => {
+  it("无派生词形能力的代词只校验原形并以零派生组完成", async () => {
+    const word = wordFixture();
+    const pronoun = word.forms.pos[0]!;
+    pronoun.pos = "pronoun";
+    pronoun.form_groups = [
+      { id: "legacy-empty-pronoun-group", is_regular: true, slots: [] }
+    ];
+    renderStep(word);
+
+    expect(screen.getByText("当前基本词性无需派生词形")).toBeVisible();
+    expect(screen.queryByText("添加派生词形")).toBeNull();
+    expect(screen.queryByText("添加一组替代词形变化")).toBeNull();
+    fireEvent.click(button("完成并进入词义与例句"));
+
+    await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(1));
+    expect(
+      mutations.preview.mock.calls[0]![0].content.pos[0].form_groups
+    ).toEqual([]);
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(mutations.save.mock.calls[0]![0].content.pos[0].form_groups).toEqual(
+      []
+    );
+    expect(
+      screen.queryByText(/代词有 1 组词形变化尚未添加派生词形/)
+    ).toBeNull();
+  });
+
+  it("无派生能力词性的历史非空派生数据保存草稿时不被静默清空", async () => {
+    const word = wordFixture();
+    const pronoun = word.forms.pos[0]!;
+    pronoun.pos = "pronoun";
+    const legacyGroups = structuredClone(pronoun.form_groups);
+    renderStep(word);
+
+    expect(screen.getByText("当前基本词性无需派生词形")).toBeVisible();
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(mutations.save.mock.calls[0]![0].content.pos[0].form_groups).toEqual(
+      legacyGroups
+    );
+  });
+
   it("catalog 未下发词形能力时禁止新增和完成", async () => {
     catalogState.data = {
       ...partOfSpeechCatalogFixture,

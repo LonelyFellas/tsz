@@ -1140,6 +1140,7 @@ function PosFormsEditor({
   const invalidSlots = value.form_groups.flatMap((group) =>
     group.slots.filter((slot) => !allowedTypes.includes(slot.form_type))
   );
+  const showDerivedGroups = allowedTypes.length > 0 || invalidSlots.length > 0;
   const spellingForced = headwords.mode === "distinguish";
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
     () => new Set()
@@ -1172,6 +1173,14 @@ function PosFormsEditor({
             description="现有词形仅供查看；重新加载到服务端词性能力后才能新增或完成本步骤。"
           />
         )}
+        {capabilityLoaded && allowedTypes.length === 0 && (
+          <Alert
+            type="info"
+            showIcon
+            title="当前基本词性无需派生词形"
+            description="只需完成基准原形的音标与实际发音，即可继续下一步。"
+          />
+        )}
         {invalidSlots.length > 0 && (
           <Alert
             type="error"
@@ -1180,236 +1189,238 @@ function PosFormsEditor({
             description="请在完成本步骤前修改或删除标红词形；系统不会自动转换或丢弃已有数据。"
           />
         )}
-        {value.form_groups.map((group, groupIndex) => {
-          const collapsed = collapsedGroupIds.has(group.id);
-          const bodyId = `word-form-group-${group.id}-body`;
-          const moveGroup = (nextIndex: number) =>
-            onChange({
-              ...value,
-              form_groups: moveWordNode(
-                value.form_groups,
-                groupIndex,
-                nextIndex
-              )
-            });
-          const removeGroup = () =>
-            onChange({
-              ...value,
-              form_groups: value.form_groups.filter(
-                (_, index) => index !== groupIndex
-              )
-            });
+        {showDerivedGroups &&
+          value.form_groups.map((group, groupIndex) => {
+            const collapsed = collapsedGroupIds.has(group.id);
+            const bodyId = `word-form-group-${group.id}-body`;
+            const moveGroup = (nextIndex: number) =>
+              onChange({
+                ...value,
+                form_groups: moveWordNode(
+                  value.form_groups,
+                  groupIndex,
+                  nextIndex
+                )
+              });
+            const removeGroup = () =>
+              onChange({
+                ...value,
+                form_groups: value.form_groups.filter(
+                  (_, index) => index !== groupIndex
+                )
+              });
 
-          return (
-            <Card
-              className="word-form-card"
-              key={group.id}
-              data-word-node-id={group.id}
-              data-word-field="slots"
-              onClick={(event) => {
-                const target = event.target as HTMLElement;
-                if (
-                  target.closest(".ant-card-head") &&
-                  !target.closest("button")
-                ) {
-                  toggleGroup(group.id);
-                }
-              }}
-              title={
-                <button
-                  type="button"
-                  className="word-form-card-toggle"
-                  aria-expanded={!collapsed}
-                  aria-controls={bodyId}
-                  aria-label={`${collapsed ? "展开" : "收起"}第 ${groupIndex + 1} 组词形变化`}
-                  onClick={() => toggleGroup(group.id)}
-                >
-                  <span>{`第 ${groupIndex + 1} 组 词形变化`}</span>
-                  <span className="word-form-card-toggle-state">
-                    <span>{collapsed ? "展开" : "收起"}</span>
-                    <DownOutlined
-                      className={`word-form-card-toggle-icon${collapsed ? " is-collapsed" : ""}`}
-                    />
-                  </span>
-                </button>
-              }
-              extra={
-                !readOnly && value.form_groups.length > 1 ? (
-                  <Dropdown
-                    trigger={["click"]}
-                    placement="bottomRight"
-                    menu={{
-                      items: [
-                        {
-                          key: "move-up",
-                          icon: <UpOutlined />,
-                          label: "上移本组",
-                          disabled: groupIndex === 0
-                        },
-                        {
-                          key: "move-down",
-                          icon: <DownOutlined />,
-                          label: "下移本组",
-                          disabled: groupIndex === value.form_groups.length - 1
-                        },
-                        { type: "divider" },
-                        {
-                          key: "delete",
-                          icon: <DeleteOutlined />,
-                          label: "删除本组",
-                          danger: true
-                        }
-                      ],
-                      onClick: ({ key, domEvent }) => {
-                        domEvent.stopPropagation();
-                        if (key === "move-up") moveGroup(groupIndex - 1);
-                        if (key === "move-down") moveGroup(groupIndex + 1);
-                        if (key === "delete") removeGroup();
-                      }
-                    }}
+            return (
+              <Card
+                className="word-form-card"
+                key={group.id}
+                data-word-node-id={group.id}
+                data-word-field="slots"
+                onClick={(event) => {
+                  const target = event.target as HTMLElement;
+                  if (
+                    target.closest(".ant-card-head") &&
+                    !target.closest("button")
+                  ) {
+                    toggleGroup(group.id);
+                  }
+                }}
+                title={
+                  <button
+                    type="button"
+                    className="word-form-card-toggle"
+                    aria-expanded={!collapsed}
+                    aria-controls={bodyId}
+                    aria-label={`${collapsed ? "展开" : "收起"}第 ${groupIndex + 1} 组词形变化`}
+                    onClick={() => toggleGroup(group.id)}
                   >
-                    <Button
-                      type="text"
-                      icon={<EllipsisOutlined />}
-                      aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
-                      onClick={(event) => event.stopPropagation()}
-                    />
-                  </Dropdown>
-                ) : null
-              }
-            >
-              {!collapsed && (
-                <div id={bodyId}>
-                  <div className="word-form-rules">
-                    <div className="word-form-rule-row">
-                      <Typography.Text strong>
-                        词形是否规则变化？
-                      </Typography.Text>
-                      <Radio.Group
-                        value={group.is_regular}
-                        disabled={readOnly}
-                        onChange={(event) => {
-                          const groups = [...value.form_groups];
-                          groups[groupIndex] = {
-                            ...group,
-                            is_regular: event.target.value
-                          };
-                          onChange({ ...value, form_groups: groups });
-                        }}
-                      >
-                        <Radio value>是</Radio>
-                        <Radio value={false}>否</Radio>
-                      </Radio.Group>
-                    </div>
-                    {groupIndex === 0 && (
-                      <>
-                        <div className="word-form-rule-row">
-                          <Typography.Text strong>
-                            英美拼写是否有区别？
-                          </Typography.Text>
-                          <Space wrap>
-                            <Radio.Group
-                              value={value.dialect_rules.spelling_mode}
-                              disabled={readOnly || spellingForced}
-                              onChange={(event) =>
-                                onChange(
-                                  normalizeDialectRules(
-                                    value,
-                                    headwords,
-                                    event.target.value,
-                                    value.dialect_rules.phonetic_mode
-                                  )
-                                )
-                              }
-                            >
-                              <Radio value="distinguish">是</Radio>
-                              <Radio value="unified">否</Radio>
-                            </Radio.Group>
-                            {spellingForced && (
-                              <Typography.Text type="secondary">
-                                主词已区分英美，词形保持区分
-                              </Typography.Text>
-                            )}
-                          </Space>
-                        </div>
-                        {value.dialect_rules.spelling_mode === "unified" && (
+                    <span>{`第 ${groupIndex + 1} 组 词形变化`}</span>
+                    <span className="word-form-card-toggle-state">
+                      <span>{collapsed ? "展开" : "收起"}</span>
+                      <DownOutlined
+                        className={`word-form-card-toggle-icon${collapsed ? " is-collapsed" : ""}`}
+                      />
+                    </span>
+                  </button>
+                }
+                extra={
+                  !readOnly && value.form_groups.length > 1 ? (
+                    <Dropdown
+                      trigger={["click"]}
+                      placement="bottomRight"
+                      menu={{
+                        items: [
+                          {
+                            key: "move-up",
+                            icon: <UpOutlined />,
+                            label: "上移本组",
+                            disabled: groupIndex === 0
+                          },
+                          {
+                            key: "move-down",
+                            icon: <DownOutlined />,
+                            label: "下移本组",
+                            disabled:
+                              groupIndex === value.form_groups.length - 1
+                          },
+                          { type: "divider" },
+                          {
+                            key: "delete",
+                            icon: <DeleteOutlined />,
+                            label: "删除本组",
+                            danger: true
+                          }
+                        ],
+                        onClick: ({ key, domEvent }) => {
+                          domEvent.stopPropagation();
+                          if (key === "move-up") moveGroup(groupIndex - 1);
+                          if (key === "move-down") moveGroup(groupIndex + 1);
+                          if (key === "delete") removeGroup();
+                        }
+                      }}
+                    >
+                      <Button
+                        type="text"
+                        icon={<EllipsisOutlined />}
+                        aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
+                        onClick={(event) => event.stopPropagation()}
+                      />
+                    </Dropdown>
+                  ) : null
+                }
+              >
+                {!collapsed && (
+                  <div id={bodyId}>
+                    <div className="word-form-rules">
+                      <div className="word-form-rule-row">
+                        <Typography.Text strong>
+                          词形是否规则变化？
+                        </Typography.Text>
+                        <Radio.Group
+                          value={group.is_regular}
+                          disabled={readOnly}
+                          onChange={(event) => {
+                            const groups = [...value.form_groups];
+                            groups[groupIndex] = {
+                              ...group,
+                              is_regular: event.target.value
+                            };
+                            onChange({ ...value, form_groups: groups });
+                          }}
+                        >
+                          <Radio value>是</Radio>
+                          <Radio value={false}>否</Radio>
+                        </Radio.Group>
+                      </div>
+                      {groupIndex === 0 && (
+                        <>
                           <div className="word-form-rule-row">
                             <Typography.Text strong>
-                              英美音标是否有区别？
+                              英美拼写是否有区别？
                             </Typography.Text>
-                            <Radio.Group
-                              value={value.dialect_rules.phonetic_mode}
-                              disabled={readOnly}
-                              onChange={(event) =>
-                                onChange(
-                                  normalizeDialectRules(
-                                    value,
-                                    headwords,
-                                    value.dialect_rules.spelling_mode,
-                                    event.target.value
+                            <Space wrap>
+                              <Radio.Group
+                                value={value.dialect_rules.spelling_mode}
+                                disabled={readOnly || spellingForced}
+                                onChange={(event) =>
+                                  onChange(
+                                    normalizeDialectRules(
+                                      value,
+                                      headwords,
+                                      event.target.value,
+                                      value.dialect_rules.phonetic_mode
+                                    )
                                   )
-                                )
-                              }
-                            >
-                              <Radio value="distinguish">是</Radio>
-                              <Radio value="unified">否</Radio>
-                            </Radio.Group>
+                                }
+                              >
+                                <Radio value="distinguish">是</Radio>
+                                <Radio value="unified">否</Radio>
+                              </Radio.Group>
+                              {spellingForced && (
+                                <Typography.Text type="secondary">
+                                  主词已区分英美，词形保持区分
+                                </Typography.Text>
+                              )}
+                            </Space>
                           </div>
-                        )}
-                      </>
+                          {value.dialect_rules.spelling_mode === "unified" && (
+                            <div className="word-form-rule-row">
+                              <Typography.Text strong>
+                                英美音标是否有区别？
+                              </Typography.Text>
+                              <Radio.Group
+                                value={value.dialect_rules.phonetic_mode}
+                                disabled={readOnly}
+                                onChange={(event) =>
+                                  onChange(
+                                    normalizeDialectRules(
+                                      value,
+                                      headwords,
+                                      value.dialect_rules.spelling_mode,
+                                      event.target.value
+                                    )
+                                  )
+                                }
+                              >
+                                <Radio value="distinguish">是</Radio>
+                                <Radio value="unified">否</Radio>
+                              </Radio.Group>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    <FormGroupMatrix
+                      pos={value}
+                      allowedTypes={allowedTypes}
+                      groupIndex={groupIndex}
+                      readOnly={readOnly}
+                      generating={generating}
+                      onGenerate={onGenerate}
+                      onChange={onChange}
+                    />
+                    {!readOnly && (
+                      <div className="word-form-add-slot-wrap">
+                        <Button
+                          type="dashed"
+                          icon={<PlusOutlined />}
+                          className="word-form-add-slot"
+                          disabled={allowedTypes.length === 0}
+                          title={
+                            !capabilityLoaded
+                              ? "词形规则未加载"
+                              : allowedTypes.length === 0
+                                ? "当前基本词性没有可添加的派生词形"
+                                : undefined
+                          }
+                          onClick={() => {
+                            const defaultType = defaultDerivedFormType(
+                              value.pos,
+                              group.slots.map((slot) => slot.form_type),
+                              defaultTypes
+                            );
+                            if (!defaultType) return;
+                            const groups = [...value.form_groups];
+                            groups[groupIndex] = {
+                              ...group,
+                              slots: [
+                                ...group.slots,
+                                createDerivedSlot(defaultType, value)
+                              ]
+                            };
+                            onChange({ ...value, form_groups: groups });
+                          }}
+                        >
+                          添加派生词形
+                        </Button>
+                      </div>
                     )}
                   </div>
-                  <FormGroupMatrix
-                    pos={value}
-                    allowedTypes={allowedTypes}
-                    groupIndex={groupIndex}
-                    readOnly={readOnly}
-                    generating={generating}
-                    onGenerate={onGenerate}
-                    onChange={onChange}
-                  />
-                  {!readOnly && (
-                    <div className="word-form-add-slot-wrap">
-                      <Button
-                        type="dashed"
-                        icon={<PlusOutlined />}
-                        className="word-form-add-slot"
-                        disabled={allowedTypes.length === 0}
-                        title={
-                          !capabilityLoaded
-                            ? "词形规则未加载"
-                            : allowedTypes.length === 0
-                              ? "当前基本词性没有可添加的派生词形"
-                              : undefined
-                        }
-                        onClick={() => {
-                          const defaultType = defaultDerivedFormType(
-                            value.pos,
-                            group.slots.map((slot) => slot.form_type),
-                            defaultTypes
-                          );
-                          if (!defaultType) return;
-                          const groups = [...value.form_groups];
-                          groups[groupIndex] = {
-                            ...group,
-                            slots: [
-                              ...group.slots,
-                              createDerivedSlot(defaultType, value)
-                            ]
-                          };
-                          onChange({ ...value, form_groups: groups });
-                        }}
-                      >
-                        添加派生词形
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              )}
-            </Card>
-          );
-        })}
-        {!readOnly && (
+                )}
+              </Card>
+            );
+          })}
+        {!readOnly && allowedTypes.length > 0 && (
           <Button
             type="dashed"
             block
@@ -1451,13 +1462,14 @@ function countPosFormIssues(
   pos: WordPosFormsV2,
   allowed: readonly WordDerivedFormSlotV2["form_type"][]
 ): number {
+  const requiresDerivedGroup = allowed.length > 0;
   return (
-    (pos.form_groups.length === 0 ? 1 : 0) +
+    (requiresDerivedGroup && pos.form_groups.length === 0 ? 1 : 0) +
     (hasCompleteBase(pos) ? 0 : 1) +
     pos.form_groups.reduce(
       (count, group) =>
         count +
-        (group.slots.length === 0 ? 1 : 0) +
+        (requiresDerivedGroup && group.slots.length === 0 ? 1 : 0) +
         group.slots.filter((slot) => !allowed.includes(slot.form_type)).length,
       0
     )
@@ -1731,12 +1743,13 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
           pos.pos,
           configured?.allowed_form_types
         );
-        if (pos.form_groups.length === 0) {
+        const requiresDerivedGroup = allowed.length > 0;
+        if (requiresDerivedGroup && pos.form_groups.length === 0) {
           issues.push(`${posLabel}至少需要一组词形变化`);
         }
-        const emptyGroupCount = pos.form_groups.filter(
-          (group) => group.slots.length === 0
-        ).length;
+        const emptyGroupCount = requiresDerivedGroup
+          ? pos.form_groups.filter((group) => group.slots.length === 0).length
+          : 0;
         if (emptyGroupCount > 0) {
           issues.push(
             `${posLabel}有 ${emptyGroupCount} 组词形变化尚未添加派生词形`
@@ -1765,7 +1778,18 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
 
     setSaving(true);
     try {
-      const wireContent = toFormsWireContent(content);
+      const wireContent = toFormsWireContent({
+        pos: content.pos.map((pos) => {
+          const configured = partOfSpeechLookup.byCode.get(pos.pos);
+          const onlyLegacyEmptyGroups = pos.form_groups.every(
+            (group) => group.slots.length === 0
+          );
+          return configured?.allowed_form_types?.length === 0 &&
+            onlyLegacyEmptyGroups
+            ? { ...pos, form_groups: [] }
+            : pos;
+        })
+      });
       const impact = await previewImpact.mutateAsync({
         base_revision: word.revision,
         content: wireContent
