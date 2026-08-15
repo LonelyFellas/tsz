@@ -78,7 +78,7 @@ export function PartOfSpeechFormModal({
         <Form.Item
           name="code"
           label="稳定编码"
-          extra={value ? "编码已被词条引用，创建后不可修改。" : undefined}
+          extra={value ? "稳定编码创建后不可修改。" : undefined}
           rules={[
             { required: true, message: "请输入稳定编码" },
             {

@@ -11,8 +11,27 @@ import type {
   PartOfSpeechCatalogResponse,
   PartOfSpeechConfig
 } from "@tsz/types";
+import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PartOfSpeechSettings } from "./PartOfSpeechSettings";
+
+vi.mock("antd", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("antd")>();
+  return {
+    ...actual,
+    Tooltip: ({
+      title,
+      children
+    }: {
+      title?: ReactNode;
+      children: ReactNode;
+    }) => (
+      <span data-tooltip={typeof title === "string" ? title : undefined}>
+        {children}
+      </span>
+    )
+  };
+});
 
 const mock = vi.hoisted(() => ({
   queries: [] as Array<Record<string, unknown>>,
@@ -215,12 +234,26 @@ describe("PartOfSpeechSettings", () => {
     expect(screen.getByText("名词")).toBeVisible();
     expect(screen.getByText("小品词")).toBeVisible();
     const nounRow = screen.getByText("名词").closest("tr")!;
-    expect(within(nounRow).getByText("删 除").closest("button")).toBeDisabled();
+    const referencedDelete = within(nounRow)
+      .getByText("删 除")
+      .closest("button")!;
+    expect(referencedDelete).toBeDisabled();
+    expect(referencedDelete.parentElement).toHaveAttribute(
+      "data-tooltip",
+      "已有 3 个单词或短语引用，只能修改"
+    );
+
+    const particleRow = screen.getByText("小品词").closest("tr")!;
+    expect(
+      within(particleRow).getByText("删 除").closest("button")
+    ).toBeEnabled();
+    expect(
+      within(particleRow).getByText("删 除").closest("button")?.parentElement
+    ).not.toHaveAttribute("data-tooltip");
 
     fireEvent.click(screen.getByText("新增基本词性"));
     expect(screen.getByText("新增基本词性表单")).toBeVisible();
 
-    const particleRow = screen.getByText("小品词").closest("tr")!;
     fireEvent.click(within(particleRow).getByText("修 改"));
     expect(screen.getByText("修改-particle")).toBeVisible();
   });
