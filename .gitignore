@@ -11,6 +11,7 @@ build/
 apps/admin/.env.test
 .turbo/
 coverage/
+.coverage-lock/
 *.tsbuildinfo
 
 # Next.js auto-generated
