@@ -10,6 +10,7 @@ type RealAdminWordsDataSource = Pick<
   | "list"
   | "stats"
   | "detect"
+  | "surfaceMatchSnapshotPage"
   | "suggestDialectVariants"
   | "createV2"
   | "get"
@@ -129,6 +130,12 @@ export const adminWordsDataSource: AdminWordsDataSource = {
   list: async (query = {}) => (await resolveAdminWordsDataSource()).list(query),
   stats: async () => (await resolveAdminWordsDataSource()).stats(),
   detect: async (input) => (await resolveAdminWordsDataSource()).detect(input),
+  surfaceMatchSnapshotPage: async (snapshotId, cursor, signal) =>
+    (await resolveAdminWordsDataSource()).surfaceMatchSnapshotPage(
+      snapshotId,
+      cursor,
+      signal
+    ),
   suggestDialectVariants: async (input) =>
     (await resolveAdminWordsDataSource()).suggestDialectVariants(input),
   createV2: async (idempotencyKey, input) =>

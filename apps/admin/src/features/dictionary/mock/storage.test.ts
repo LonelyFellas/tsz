@@ -48,6 +48,37 @@ describe("admin words mock storage", () => {
     );
   });
 
+  it("把已校验的旧 schema 数据迁移到当前 namespace 并清理旧 key", () => {
+    const storage = createMemoryStorage();
+    const legacyKey = adminWordsMockStorageKey(1, "admin-a");
+    const currentKey = adminWordsMockStorageKey(2, "admin-a");
+    storage.values.set(
+      legacyKey,
+      JSON.stringify({
+        schema_version: 1,
+        admin_profile_id: "admin-a",
+        state: { words: ["centre"] }
+      })
+    );
+    const migrateLegacy = vi.fn((state: unknown) =>
+      isState(state)
+        ? { words: state.words.map((word) => `${word}-migrated`) }
+        : undefined
+    );
+    const adapter = createAdminWordsMockStorage({
+      storage,
+      schemaVersion: 2,
+      legacySchemaVersions: [1],
+      isState,
+      migrateLegacy
+    });
+
+    expect(adapter.load("admin-a")).toEqual({ words: ["centre-migrated"] });
+    expect(migrateLegacy).toHaveBeenCalledWith({ words: ["centre"] }, 1);
+    expect(storage.values.has(legacyKey)).toBe(false);
+    expect(storage.values.has(currentKey)).toBe(true);
+  });
+
   it("管理员切换时清理上一身份 namespace", () => {
     const storage = createMemoryStorage();
     const adapter = createAdminWordsMockStorage({

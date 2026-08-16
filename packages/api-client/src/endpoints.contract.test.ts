@@ -235,6 +235,86 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     ]);
   });
 
+  it("surface warning/page/create/problem 契约全部来自同一 Rust snapshot", () => {
+    expect(
+      specPaths["/admin/lexicon/surface-match-snapshots/{snapshot_id}"]
+    ).toEqual(["get"]);
+    expect(snapshot.schemas.SurfaceMatchPageV2.oneOf).toHaveLength(3);
+    expect(snapshot.schemas.WordFormTypeV2.enum).toEqual([
+      "base",
+      "third_person_singular",
+      "present_participle",
+      "past_tense",
+      "past_participle",
+      "plural",
+      "comparative",
+      "superlative"
+    ]);
+    expect(
+      snapshot.schemas.SurfaceMatchPageBaseV2.properties.items
+    ).toMatchObject({
+      type: "array",
+      minItems: 1,
+      maxItems: 50
+    });
+    expect(snapshot.schemas.DuplicateWordMatchV2.deprecated).toBe(true);
+    expect(
+      snapshot.schemas.CreateAdminWordV2Input.properties
+        .confirmed_surface_match_token
+    ).toEqual({ type: "string" });
+    expect(snapshot.schemas.CreateAdminWordV2Input.required).not.toContain(
+      "confirmed_surface_match_token"
+    );
+    expect(snapshot.schemas.ProblemMeta.properties).toEqual(
+      expect.objectContaining({
+        surface_match_page: {
+          $ref: "#/components/schemas/SurfaceMatchPageV2"
+        },
+        current_policy_name: {
+          $ref: "#/components/schemas/SurfacePolicyNameV2"
+        },
+        current_policy_epoch: {
+          type: "integer",
+          format: "int64",
+          minimum: 0
+        }
+      })
+    );
+    const statuses = snapshot.schemas.SmartDictionaryResultV2.oneOf.map(
+      (branch) => branch.properties.status.enum[0]
+    );
+    expect(statuses).toEqual(["clear", "duplicate", "warning", "unavailable"]);
+
+    const snapshotBranches = snapshot.schemas.WordDetectionSnapshotV2.oneOf;
+    expect(snapshotBranches).toHaveLength(2);
+    const [clearSnapshot, warningSnapshot] = snapshotBranches;
+    if (!clearSnapshot || !warningSnapshot) {
+      throw new Error(
+        "WordDetectionSnapshotV2 必须恰好包含 clear/warning 两个分支"
+      );
+    }
+    expect(
+      snapshotBranches.map(
+        (branch) => branch.properties.smart_dictionary_status.enum[0]
+      )
+    ).toEqual(["clear", "warning"]);
+    expect(
+      snapshotBranches.every((branch) => branch.additionalProperties === false)
+    ).toBe(true);
+    expect(clearSnapshot.properties.surface_warning).toEqual({
+      type: "null"
+    });
+    expect(clearSnapshot.required).not.toContain("surface_warning");
+    expect(warningSnapshot.required).toContain("surface_warning");
+    expect(
+      snapshot.schemas.DetectionSurfaceWarningAuditV2.properties.acknowledged
+        .enum
+    ).toEqual([true]);
+    expect(
+      snapshot.schemas.DetectionSurfaceWarningAuditV2.additionalProperties
+    ).toBe(false);
+  });
+
   it("speech 目录与试听 wire 和后端一致", () => {
     expect(snapshot.schemas.VoiceResponse.required).toEqual([
       "alias",

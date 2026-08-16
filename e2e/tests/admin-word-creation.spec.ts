@@ -142,21 +142,44 @@ test.describe("admin 新建单词 V2", () => {
     await page.getByRole("button", { name: "词典检测" }).click();
 
     await expect(page.getByText("已存在重复词条")).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: /colour \(uk\).*已归档/ })
-    ).toHaveAttribute("href", "/words/existing-colour/wizard/basics");
-    await expect(
-      page.getByRole("link", { name: /color \(us\).*已发布/ })
-    ).toBeVisible();
+    const archivedEntry = page.getByRole("link", {
+      name: /colour \(uk\).*已归档/
+    });
+    await expect(archivedEntry).toHaveAttribute(
+      "href",
+      "/words/existing-colour/wizard/basics"
+    );
+    await expect(archivedEntry).toHaveAttribute("target", "_blank");
+    const publishedEntry = page.getByRole("link", {
+      name: /color \(us\).*已发布/
+    });
+    await expect(publishedEntry).toHaveAttribute("target", "_blank");
     await expect(page.getByText("归档词条仍占用词头")).toBeVisible();
     await expect(
       page.getByText(
-        "点击上方重复词条可进入详情并恢复，也可以在归档列表中定位。"
+        "点击上方重复词条会在新标签页打开详情，也可以在归档列表中定位。"
       )
     ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "在归档列表查看" })
-    ).toHaveAttribute("href", "/words?keyword=colour&status=archived");
+    const archivedList = page.getByRole("link", {
+      name: "在归档列表查看（新标签页打开）"
+    });
+    await expect(archivedList).toHaveAttribute(
+      "href",
+      "/words?keyword=colour&status=archived"
+    );
+    await expect(archivedList).toHaveAttribute("target", "_blank");
+
+    const [existingEntryPage] = await Promise.all([
+      page.waitForEvent("popup"),
+      archivedEntry.click()
+    ]);
+    await expect(existingEntryPage).toHaveURL(
+      /\/words\/existing-colour\/wizard\/basics$/
+    );
+    await expect(page).toHaveURL(/\/words\/new$/);
+    await expect(page.getByPlaceholder("例如 center")).toHaveValue("color");
+    await expect(page.getByText("已存在重复词条")).toBeVisible();
+    await existingEntryPage.close();
     await expect(
       page.getByRole("button", { name: "确认并进入词形与发音" })
     ).toHaveCount(0);
@@ -164,6 +187,100 @@ test.describe("admin 新建单词 V2", () => {
     expect(api.count("POST", ADMIN_E2E_DETECTIONS_PATH)).toBe(1);
     expect(api.count("POST", ADMIN_E2E_ENTRIES_PATH)).toBe(0);
     expect(api.getWord()).toBeUndefined();
+  });
+
+  for (const scenario of [
+    {
+      headword: "workspace",
+      matchLabel: "已存在同名主词"
+    },
+    {
+      headword: "workspaces",
+      matchLabel: "本次主词已作为已有词条的词形存在"
+    }
+  ]) {
+    test(`surface warning：${scenario.headword} 加载全部页并确认后继续创建`, async ({
+      page
+    }) => {
+      const api = await mockAdminApi(page, { surfaceWarnings: true });
+      await page.goto("/words/new");
+
+      const input = page.getByPlaceholder("例如 center");
+      await input.fill(scenario.headword);
+      await page.getByRole("button", { name: "词典检测" }).click();
+
+      await expect(
+        page.getByText("发现同名或同形词条，请确认后再继续")
+      ).toBeVisible();
+      await expect(page.getByText("已加载 3/3 条匹配来源。")).toBeVisible();
+      await expect(page.getByText(scenario.matchLabel).first()).toBeVisible();
+      const archivedLinks = page.getByRole("link", {
+        name: /existing-workspace-archived-[ab]，在新标签页打开/
+      });
+      await expect(archivedLinks).toHaveCount(2);
+
+      const [existingEntryPage] = await Promise.all([
+        page.waitForEvent("popup"),
+        archivedLinks.first().click()
+      ]);
+      await expect(existingEntryPage).toHaveURL(
+        /\/words\/existing-workspace-archived-a\/wizard\/basics$/
+      );
+      await expect(page).toHaveURL(/\/words\/new$/);
+      await expect(input).toHaveValue(scenario.headword);
+      await expect(
+        page.getByText("发现同名或同形词条，请确认后再继续")
+      ).toBeVisible();
+      await existingEntryPage.close();
+
+      await page.getByRole("button", { name: "仍继续创建" }).click();
+      await expect(page).toHaveURL(
+        new RegExp(`/words/${ADMIN_E2E_WORD_ID}/wizard/forms$`)
+      );
+      const createRequest = api.requests.find(
+        (request) =>
+          request.method === "POST" && request.path === ADMIN_E2E_ENTRIES_PATH
+      );
+      expect(createRequest?.body).toMatchObject({
+        detection_id: `detect-${scenario.headword}`,
+        confirmed_surface_match_token: `surface-token-${scenario.headword}`
+      });
+    });
+  }
+
+  test("surface warning：410 后清 token、保留输入、换新 key 并重新检测成功", async ({
+    page
+  }) => {
+    const api = await mockAdminApi(page, {
+      surfaceWarnings: true,
+      expireSurfaceSnapshotOnce: true
+    });
+    await page.goto("/words/new");
+    const input = page.getByPlaceholder("例如 center");
+    await input.fill("workspace");
+    await page.getByRole("button", { name: "词典检测" }).click();
+    await expect(page.getByText("已加载 3/3 条匹配来源。")).toBeVisible();
+
+    await page.getByRole("button", { name: "仍继续创建" }).click();
+    await expect(page.getByText("检测结果已过期，请重新检测")).toBeVisible();
+    await expect(input).toHaveValue("workspace");
+    await expect(page.getByText("等待检测")).toBeVisible();
+
+    await page.getByRole("button", { name: "词典检测" }).click();
+    await expect(page.getByText("已加载 3/3 条匹配来源。")).toBeVisible();
+    await page.getByRole("button", { name: "仍继续创建" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/words/${ADMIN_E2E_WORD_ID}/wizard/forms$`)
+    );
+
+    const attempts = api.requests.filter(
+      (request) =>
+        request.method === "POST" && request.path === ADMIN_E2E_ENTRIES_PATH
+    );
+    expect(attempts).toHaveLength(2);
+    expect(attempts[0]!.idempotencyKey).toBeTruthy();
+    expect(attempts[1]!.idempotencyKey).toBeTruthy();
+    expect(attempts[1]!.idempotencyKey).not.toBe(attempts[0]!.idempotencyKey);
   });
 
   test("T20 forms 保存失败保值，重试成功后刷新恢复 meanings", async ({

@@ -15,7 +15,7 @@ import type {
   WordPronunciationV2
 } from "@tsz/types";
 
-export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 8;
+export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 9;
 
 export function richText(text: string): RichText {
   return { version: 1, text, spans: [], liaisons: [] };

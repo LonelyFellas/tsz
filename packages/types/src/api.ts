@@ -1,5 +1,7 @@
 // 通用 API 包裹类型。
 
+import type { SurfaceMatchPageV2, SurfacePolicyNameV2 } from "./surface-match";
+
 export interface ApiResponse<T> {
   code: number;
   message: string;
@@ -30,6 +32,9 @@ export interface ProblemMeta {
   part_of_speech_id?: string;
   code?: string;
   reference_locations?: ProblemReferenceLocation[];
+  surface_match_page?: SurfaceMatchPageV2;
+  current_policy_name?: SurfacePolicyNameV2;
+  current_policy_epoch?: number;
 }
 
 export interface ProblemReferenceLocation {

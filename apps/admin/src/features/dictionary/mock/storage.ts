@@ -19,7 +19,9 @@ export interface AdminWordsMockStorage<TState> {
 export interface CreateAdminWordsMockStorageOptions<TState> {
   storage?: AdminWordsMockStorageLike;
   schemaVersion: number;
+  legacySchemaVersions?: readonly number[];
   isState: (value: unknown) => value is TState;
+  migrateLegacy?: (state: unknown, schemaVersion: number) => TState | undefined;
   warn?: (message: string, error?: unknown) => void;
 }
 
@@ -43,7 +45,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function createAdminWordsMockStorage<TState>({
   storage,
   schemaVersion,
+  legacySchemaVersions = [],
   isState,
+  migrateLegacy,
   warn = (message, error) => {
     if (import.meta.env.DEV) console.warn(message, error);
   }
@@ -53,12 +57,22 @@ export function createAdminWordsMockStorage<TState>({
   const keyFor = (profileId: string) =>
     adminWordsMockStorageKey(schemaVersion, profileId);
 
-  function remove(profileId: string): void {
+  const legacyKeyFor = (legacySchemaVersion: number, profileId: string) =>
+    adminWordsMockStorageKey(legacySchemaVersion, profileId);
+
+  function removeKey(key: string): void {
     if (!storage) return;
     try {
-      storage.removeItem(keyFor(profileId));
+      storage.removeItem(key);
     } catch (error) {
       warn("[admin words mock] 无法清理 sessionStorage", error);
+    }
+  }
+
+  function remove(profileId: string): void {
+    removeKey(keyFor(profileId));
+    for (const legacySchemaVersion of legacySchemaVersions) {
+      removeKey(legacyKeyFor(legacySchemaVersion, profileId));
     }
   }
 
@@ -85,7 +99,51 @@ export function createAdminWordsMockStorage<TState>({
         );
         return undefined;
       }
-      if (raw === null) return undefined;
+      if (raw === null) {
+        for (const legacySchemaVersion of legacySchemaVersions) {
+          const legacyKey = legacyKeyFor(legacySchemaVersion, profileId);
+          try {
+            raw = storage.getItem(legacyKey);
+          } catch (error) {
+            warn(
+              "[admin words mock] 无法读取 sessionStorage，将使用内存状态",
+              error
+            );
+            return undefined;
+          }
+          if (raw === null) continue;
+          try {
+            const parsed: unknown = JSON.parse(raw);
+            if (
+              !isRecord(parsed) ||
+              parsed.schema_version !== legacySchemaVersion ||
+              parsed.admin_profile_id !== profileId
+            ) {
+              throw new Error("legacy mock storage envelope shape mismatch");
+            }
+            const migrated = migrateLegacy?.(parsed.state, legacySchemaVersion);
+            if (!migrated || !isState(migrated)) {
+              throw new Error("legacy mock storage migration failed");
+            }
+            const envelope: PersistedEnvelope<TState> = {
+              schema_version: schemaVersion,
+              admin_profile_id: profileId,
+              state: migrated
+            };
+            storage.setItem(key, JSON.stringify(envelope));
+            removeKey(legacyKey);
+            return migrated;
+          } catch (error) {
+            removeKey(legacyKey);
+            warn(
+              "[admin words mock] sessionStorage 旧版数据损坏或迁移失败，已清理",
+              error
+            );
+            return undefined;
+          }
+        }
+        return undefined;
+      }
 
       try {
         const parsed: unknown = JSON.parse(raw);

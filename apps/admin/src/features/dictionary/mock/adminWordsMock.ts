@@ -36,6 +36,10 @@ import type {
   SaveMeaningsStepInput,
   SuggestDialectVariantsInputV2,
   SuggestDialectVariantsResponseV2,
+  SurfaceContentScopeV2,
+  SurfaceMatchPageV2,
+  LexiconSurfaceMatchV2,
+  MatchedEntryContextV2,
   SubPartOfSpeechConfig,
   SubPartOfSpeechListResponse,
   UpdatePartOfSpeechInput,
@@ -125,6 +129,19 @@ export interface AdminWordsMockPersistedState {
   publication_words: Record<string, AdminWordV2>;
   impact_tokens: Record<string, MockImpactTokenRecord>;
   lost_publish_responses: string[];
+  consumed_detection_ids: string[];
+}
+
+interface MockSurfaceSnapshot {
+  actor_id: string;
+  detection_id: string;
+  content_key: string;
+  match_ids: string[];
+  policy_name:
+    "surface_warning_acknowledgement" | "allow_new_exact_headword_entries";
+  policy_epoch: number;
+  pages: Map<string, SurfaceMatchPageV2>;
+  terminal_token?: string;
 }
 
 function isPartOfSpeechActor(value: unknown): boolean {
@@ -187,6 +204,8 @@ export interface CreateAdminWordsMockOptions {
   storage?: AdminWordsMockStorage<AdminWordsMockPersistedState>;
   sessionStorage?: AdminWordsMockStorageLike;
   warn?: (message: string, error?: unknown) => void;
+  /** Legacy reader remains available; new F4 tests opt into enabled/disabled warning semantics. */
+  surfaceWarnings?: "legacy" | "enabled" | "temporarily_disabled";
 }
 
 function clone<T>(value: T): T {
@@ -324,7 +343,9 @@ export function isAdminWordsMockPersistedState(
         )
     ) ||
     !Array.isArray(value.lost_publish_responses) ||
-    !value.lost_publish_responses.every((entry) => typeof entry === "string")
+    !value.lost_publish_responses.every((entry) => typeof entry === "string") ||
+    !Array.isArray(value.consumed_detection_ids) ||
+    !value.consumed_detection_ids.every((entry) => typeof entry === "string")
   ) {
     return false;
   }
@@ -348,7 +369,8 @@ function makeInitialState(nowIso: string): AdminWordsMockPersistedState {
     lifecycle_operations: {},
     publication_words: {},
     impact_tokens: {},
-    lost_publish_responses: []
+    lost_publish_responses: [],
+    consumed_detection_ids: []
   };
 }
 
@@ -1397,7 +1419,8 @@ export function createAdminWordsMock({
   maxPayloadBytes,
   storage,
   sessionStorage: providedSessionStorage,
-  warn
+  warn,
+  surfaceWarnings = "legacy"
 }: CreateAdminWordsMockOptions) {
   const validatesInternalPartOfSpeech = partOfSpeechValidation === "internal";
   const persistedStorage =
@@ -1409,11 +1432,28 @@ export function createAdminWordsMock({
           ? undefined
           : globalThis.sessionStorage),
       schemaVersion: ADMIN_WORDS_MOCK_STORAGE_SCHEMA,
+      legacySchemaVersions: [8],
       isState: isAdminWordsMockPersistedState,
+      migrateLegacy: (legacyState) => {
+        if (!isRecord(legacyState)) return undefined;
+        const migrated = {
+          ...legacyState,
+          consumed_detection_ids: []
+        };
+        return isAdminWordsMockPersistedState(migrated)
+          ? clone(migrated)
+          : undefined;
+      },
       warn
     });
   let activeProfileId: string | undefined;
   let state: AdminWordsMockPersistedState | undefined;
+  const surfaceSnapshotPages = new Map<string, MockSurfaceSnapshot>();
+  const surfaceTokenSnapshotIds = new Map<string, string>();
+  function clearSurfaceRuntime(): void {
+    surfaceSnapshotPages.clear();
+    surfaceTokenSnapshotIds.clear();
+  }
   async function pause(): Promise<void> {
     if (latencyMs <= 0) return;
     await new Promise((resolve) => setTimeout(resolve, latencyMs));
@@ -1428,12 +1468,14 @@ export function createAdminWordsMock({
       if (activeProfileId) persistedStorage.clear(activeProfileId);
       activeProfileId = undefined;
       state = undefined;
+      clearSurfaceRuntime();
       throw new HttpError(401, "admin session required", [], "unauthorized");
     }
     if (activeProfileId && activeProfileId !== profile.id) {
       persistedStorage.clear(activeProfileId);
       activeProfileId = undefined;
       state = undefined;
+      clearSurfaceRuntime();
     }
     if (
       profile.role !== "super_admin" &&
@@ -1541,6 +1583,344 @@ export function createAdminWordsMock({
             status: word.status
           }))
       );
+  }
+
+  function surfaceCandidates(
+    detectionId: string,
+    headwords: WordHeadwordsV2,
+    entryKind: MockWord["kind"]
+  ) {
+    return headwords.mode === "unified"
+      ? [
+          {
+            candidate_ref: `${detectionId}:headword:common`,
+            surface: headwords.common,
+            dialect: "common" as const,
+            entry_kind: entryKind
+          }
+        ]
+      : (["uk", "us"] as const).map((dialect) => ({
+          candidate_ref: `${detectionId}:headword:${dialect}`,
+          surface: headwords[dialect],
+          dialect,
+          entry_kind: entryKind
+        }));
+  }
+
+  function dialectsOverlap(
+    candidate: "common" | "uk" | "us",
+    existing: "common" | "uk" | "us"
+  ): boolean {
+    return (
+      candidate === "common" || existing === "common" || candidate === existing
+    );
+  }
+
+  function matchedEntryContext(
+    current: AdminWordsMockPersistedState,
+    word: MockWord
+  ): MatchedEntryContextV2 {
+    const gloss = wordGloss(word);
+    const inbound = Object.entries(current.publication_words)
+      .flatMap(([sourceWordId, publication]) => {
+        const sourceWord = current.words[sourceWordId];
+        if (!sourceWord || sourceWord.status === "archived") return [];
+        return publication.meanings.pos.flatMap((pos) =>
+          pos.senses.flatMap((sense) =>
+            sense.relations
+              .filter(
+                (relation) =>
+                  relation.target_word_id === word.id &&
+                  ["synonym", "antonym", "derivative"].includes(
+                    relation.relation
+                  )
+              )
+              .map((relation) => ({
+                node_id: relation.id,
+                source_word_id: sourceWordId,
+                source_headword: displayHeadword(publication),
+                relation: relation.relation as
+                  "synonym" | "antonym" | "derivative"
+              }))
+          )
+        );
+      })
+      .sort(
+        (left, right) =>
+          left.source_word_id.localeCompare(right.source_word_id) ||
+          left.relation.localeCompare(right.relation) ||
+          left.node_id.localeCompare(right.node_id)
+      );
+    const byType = { synonym: 0, antonym: 0, derivative: 0 };
+    for (const reference of inbound) byType[reference.relation] += 1;
+    const previews = inbound
+      .slice(0, 5)
+      .map(({ node_id: _, ...preview }) => preview);
+    return {
+      word_id: word.id,
+      pos_labels: wordPos(word).slice(0, 5),
+      gloss_previews: gloss ? [gloss] : [],
+      updated_at: word.updated_at,
+      inbound_relations: {
+        total: inbound.length,
+        by_type: byType,
+        previews,
+        truncated: inbound.length > previews.length
+      }
+    };
+  }
+
+  function surfaceContents(current: AdminWordsMockPersistedState): Array<{
+    entry: MockWord;
+    content: AdminWordV2;
+    content_scope: SurfaceContentScopeV2;
+    source_revision: string;
+  }> {
+    return Object.values(current.words).flatMap((entry) => {
+      const records: Array<{
+        entry: MockWord;
+        content: AdminWordV2;
+        content_scope: SurfaceContentScopeV2;
+        source_revision: string;
+      }> = [
+        {
+          entry,
+          content: entry,
+          content_scope: "draft" as const,
+          source_revision: `draft-${entry.revision}`
+        }
+      ];
+      const publication = current.publication_words[entry.id];
+      if (publication) {
+        records.push({
+          entry,
+          content: publication,
+          content_scope: "current_publication",
+          source_revision: `publication-${publication.published_revision ?? publication.revision}`
+        });
+      }
+      return records;
+    });
+  }
+
+  function currentSurfaceMatches(
+    current: AdminWordsMockPersistedState,
+    detectionId: string,
+    headwords: WordHeadwordsV2,
+    entryKind: MockWord["kind"]
+  ): { items: LexiconSurfaceMatchV2[]; contexts: MatchedEntryContextV2[] } {
+    const items: LexiconSurfaceMatchV2[] = [];
+    const contexts = new Map<string, MatchedEntryContextV2>();
+    for (const candidate of surfaceCandidates(
+      detectionId,
+      headwords,
+      entryKind
+    )) {
+      const normalizedCandidate = normalizeFixtureHeadword(
+        candidate.surface
+      ).key;
+      for (const projection of surfaceContents(current)) {
+        const {
+          entry: word,
+          content,
+          content_scope,
+          source_revision
+        } = projection;
+        for (const existing of allHeadwords(content)) {
+          if (
+            normalizeFixtureHeadword(existing.value).key !==
+              normalizedCandidate ||
+            !dialectsOverlap(candidate.dialect, existing.dialect)
+          ) {
+            continue;
+          }
+          const sourceId = `${word.id}:${source_revision}:headword:${existing.dialect}`;
+          items.push({
+            match_id: `${candidate.candidate_ref}:${sourceId}:${word.status}`,
+            match_category:
+              word.kind === candidate.entry_kind
+                ? "exact_headword"
+                : "cross_kind_headword",
+            severity: "warning",
+            attention_level:
+              word.kind === candidate.entry_kind ? "high" : "normal",
+            can_continue: true,
+            confirmation_reasons: ["unacknowledged_surface_matches"],
+            candidate: {
+              candidate_type: "headword",
+              candidate_ref: candidate.candidate_ref,
+              surface: candidate.surface,
+              normalized_surface: normalizedCandidate,
+              dialect: candidate.dialect,
+              entry_kind: candidate.entry_kind
+            },
+            existing: {
+              word_id: word.id,
+              headword: displayHeadword(content),
+              kind: word.kind,
+              status: word.status,
+              source: {
+                source_kind: "headword",
+                source_id: sourceId,
+                content_scope,
+                surface: existing.value,
+                dialect: existing.dialect
+              }
+            }
+          });
+          contexts.set(word.id, matchedEntryContext(current, word));
+        }
+        for (const pos of content.forms.pos) {
+          const slots = [
+            pos.base_form,
+            ...pos.form_groups.flatMap((group) => group.slots)
+          ];
+          for (const slot of slots) {
+            for (const variant of slot.variants) {
+              if (
+                normalizeFixtureHeadword(variant.spelling).key !==
+                  normalizedCandidate ||
+                !dialectsOverlap(candidate.dialect, variant.dialect)
+              ) {
+                continue;
+              }
+              const sourceId = `${word.id}:${source_revision}:form:${slot.id}:${variant.id}`;
+              items.push({
+                match_id: `${candidate.candidate_ref}:${sourceId}:${word.status}`,
+                match_category: "headword_form",
+                severity: "warning",
+                attention_level: "normal",
+                can_continue: true,
+                confirmation_reasons: ["unacknowledged_surface_matches"],
+                candidate: {
+                  candidate_type: "headword",
+                  candidate_ref: candidate.candidate_ref,
+                  surface: candidate.surface,
+                  normalized_surface: normalizedCandidate,
+                  dialect: candidate.dialect,
+                  entry_kind: candidate.entry_kind
+                },
+                existing: {
+                  word_id: word.id,
+                  headword: displayHeadword(content),
+                  kind: word.kind,
+                  status: word.status,
+                  source: {
+                    source_kind: "form",
+                    source_id: sourceId,
+                    source_node_id: variant.id,
+                    content_scope,
+                    surface: variant.spelling,
+                    dialect: variant.dialect,
+                    pos_id: pos.pos_id,
+                    pos: pos.pos,
+                    form_type: slot.form_type
+                  }
+                }
+              });
+              contexts.set(word.id, matchedEntryContext(current, word));
+            }
+          }
+        }
+      }
+    }
+    items.sort(
+      (left, right) =>
+        left.existing.word_id.localeCompare(right.existing.word_id) ||
+        left.match_id.localeCompare(right.match_id)
+    );
+    return { items, contexts: [...contexts.values()] };
+  }
+
+  function buildSurfaceSnapshot(
+    current: AdminWordsMockPersistedState,
+    actorId: string,
+    detectionId: string,
+    headwords: WordHeadwordsV2,
+    entryKind: MockWord["kind"]
+  ): SurfaceMatchPageV2 | undefined {
+    const { items, contexts } = currentSurfaceMatches(
+      current,
+      detectionId,
+      headwords,
+      entryKind
+    );
+    if (items.length === 0) return undefined;
+    const snapshotId = nextId(current, "surface-snapshot");
+    const policyEpoch = 1;
+    const pageSize = 2;
+    const pages = new Map<string, SurfaceMatchPageV2>();
+    const hasExactHeadword = items.some(
+      (item) => item.match_category === "exact_headword"
+    );
+    const gateDisabled =
+      surfaceWarnings === "temporarily_disabled" && hasExactHeadword;
+    const policyName = hasExactHeadword
+      ? ("allow_new_exact_headword_entries" as const)
+      : ("surface_warning_acknowledgement" as const);
+    const terminalToken = gateDisabled
+      ? undefined
+      : nextId(current, "surface-token");
+    const pageCount = Math.ceil(items.length / pageSize);
+    let firstPage: SurfaceMatchPageV2 | undefined;
+    for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+      const pageItems = items.slice(
+        pageIndex * pageSize,
+        (pageIndex + 1) * pageSize
+      );
+      const pageWordIds = new Set(
+        pageItems.map((item) => item.existing.word_id)
+      );
+      const nextCursor =
+        pageIndex + 1 < pageCount
+          ? `${snapshotId}:cursor:${pageIndex + 1}`
+          : null;
+      const base = {
+        snapshot_id: snapshotId,
+        items: clone(pageItems),
+        total: items.length,
+        matched_entry_contexts: clone(
+          contexts.filter((context) => pageWordIds.has(context.word_id))
+        ),
+        confirmation_reasons: ["unacknowledged_surface_matches" as const],
+        policy_name: policyName,
+        policy_epoch: policyEpoch
+      };
+      const page: SurfaceMatchPageV2 = gateDisabled
+        ? {
+            ...base,
+            continuation_policy: "temporarily_disabled",
+            next_cursor: nextCursor,
+            policy_block_code: "exact_headword_creation_temporarily_disabled"
+          }
+        : nextCursor
+          ? {
+              ...base,
+              continuation_policy: "enabled",
+              next_cursor: nextCursor
+            }
+          : {
+              ...base,
+              continuation_policy: "enabled",
+              next_cursor: null,
+              surface_confirmation_token: terminalToken!
+            };
+      if (pageIndex === 0) firstPage = page;
+      else pages.set(`${snapshotId}:cursor:${pageIndex}`, page);
+    }
+    const matchIds = items.map((item) => item.match_id);
+    surfaceSnapshotPages.set(snapshotId, {
+      actor_id: actorId,
+      detection_id: detectionId,
+      content_key: JSON.stringify(headwords),
+      match_ids: matchIds,
+      policy_name: policyName,
+      policy_epoch: policyEpoch,
+      pages,
+      terminal_token: terminalToken
+    });
+    if (terminalToken) surfaceTokenSnapshotIds.set(terminalToken, snapshotId);
+    return firstPage!;
   }
 
   function requireSuperAdmin(profile: MockAdminProfile): void {
@@ -2268,7 +2648,7 @@ export function createAdminWordsMock({
     input: DetectWordInputV2
   ): Promise<DetectWordResponseV2> {
     await pause();
-    const { state: current } = context();
+    const { profile, state: current } = context();
     if (input.language !== "en") {
       throw new HttpError(
         422,
@@ -2310,16 +2690,38 @@ export function createAdminWordsMock({
       detectionId,
       now().getTime()
     );
-    const dynamicDuplicates = duplicatesFor(
-      current,
-      [response.normalized_headword],
-      response.entry_kind
-    );
-    if (dynamicDuplicates.length > 0) {
-      response.smart_dictionary = {
-        status: "duplicate",
-        duplicates: dynamicDuplicates
-      };
+    if (surfaceWarnings === "legacy") {
+      const dynamicDuplicates = duplicatesFor(
+        current,
+        [response.normalized_headword],
+        response.entry_kind
+      );
+      if (dynamicDuplicates.length > 0) {
+        response.smart_dictionary = {
+          status: "duplicate",
+          duplicates: dynamicDuplicates
+        };
+      }
+    } else {
+      const candidateHeadwords =
+        response.builtin_dictionary.status === "matched"
+          ? response.builtin_dictionary.headwords
+          : ({ mode: "unified", common: response.request.headword } as const);
+      const firstPage = buildSurfaceSnapshot(
+        current,
+        profile.id,
+        detectionId,
+        candidateHeadwords,
+        response.entry_kind
+      );
+      if (firstPage) {
+        response.smart_dictionary = {
+          status: "warning",
+          duplicates: [],
+          surface_match_page: firstPage,
+          matched_entry_contexts: []
+        };
+      }
     }
     current.detections[detectionId] = clone(response);
     persist(current);
@@ -2363,6 +2765,28 @@ export function createAdminWordsMock({
     };
   }
 
+  async function surfaceMatchSnapshotPage(
+    snapshotId: string,
+    cursor: string,
+    signal?: AbortSignal
+  ): Promise<SurfaceMatchPageV2> {
+    await pause();
+    if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+    const { profile } = context();
+    const snapshot = surfaceSnapshotPages.get(snapshotId);
+    const page = snapshot?.pages.get(cursor);
+    if (!snapshot || snapshot.actor_id !== profile.id || !page) {
+      throw new HttpError(
+        410,
+        "surface match snapshot expired",
+        [],
+        "surface_match_snapshot_expired"
+      );
+    }
+    snapshot.pages.delete(cursor);
+    return clone(page);
+  }
+
   async function createV2(
     input: MockCreateAdminWordV2Input
   ): Promise<AdminWordV2Envelope>;
@@ -2395,7 +2819,8 @@ export function createAdminWordsMock({
               uk: input.headwords.uk,
               us: input.headwords.us,
               source_dialect: input.headwords.source_dialect
-            }
+            },
+      confirmed_surface_match_token: input.confirmed_surface_match_token
     });
     const existingOperation = current.create_idempotency[input.idempotency_key];
     if (existingOperation) {
@@ -2409,6 +2834,9 @@ export function createAdminWordsMock({
       }
       return clone(existingOperation.response);
     }
+    if (current.consumed_detection_ids.includes(input.detection_id)) {
+      throw new HttpError(410, "detection consumed", [], "detection_expired");
+    }
     const detection = current.detections[input.detection_id];
     if (!detection) {
       throw new HttpError(
@@ -2418,7 +2846,10 @@ export function createAdminWordsMock({
         "detection_mismatch"
       );
     }
-    if (new Date(detection.expires_at).getTime() <= now().getTime()) {
+    if (
+      surfaceWarnings === "legacy" &&
+      new Date(detection.expires_at).getTime() <= now().getTime()
+    ) {
       throw new HttpError(410, "detection expired", [], "detection_expired");
     }
     const dictionaryMatched =
@@ -2436,7 +2867,8 @@ export function createAdminWordsMock({
       normalizeFixtureHeadword(input.headwords.common).key ===
         detection.normalized_headword;
     if (
-      detection.smart_dictionary.status !== "clear" ||
+      (surfaceWarnings === "legacy" &&
+        detection.smart_dictionary.status !== "clear") ||
       (!dictionaryMatched && !unmatchedPhrase)
     ) {
       const code =
@@ -2450,11 +2882,109 @@ export function createAdminWordsMock({
         code
       );
     }
+    if (detection.smart_dictionary.status === "duplicate") {
+      throw new HttpError(409, "word already exists", [], "duplicate_word");
+    }
+    if (detection.smart_dictionary.status === "unavailable") {
+      throw new HttpError(
+        503,
+        "smart dictionary unavailable",
+        [],
+        "service_unavailable"
+      );
+    }
+    let acknowledgedSurface:
+      | {
+          snapshot: MockSurfaceSnapshot;
+          items: LexiconSurfaceMatchV2[];
+        }
+      | undefined;
+    if (surfaceWarnings !== "legacy") {
+      const currentMatches = currentSurfaceMatches(
+        current,
+        detection.detection_id,
+        input.headwords,
+        detection.entry_kind
+      );
+      if (currentMatches.items.length > 0) {
+        const freshPage = () =>
+          buildSurfaceSnapshot(
+            current,
+            profile.id,
+            detection.detection_id,
+            input.headwords,
+            detection.entry_kind
+          )!;
+        const token = input.confirmed_surface_match_token;
+        if (!token) {
+          const page = freshPage();
+          const disabled = page.continuation_policy === "temporarily_disabled";
+          throw new HttpError(
+            409,
+            disabled
+              ? "exact headword creation temporarily disabled"
+              : "surface match acknowledgement required",
+            [],
+            disabled
+              ? "exact_headword_creation_temporarily_disabled"
+              : detection.smart_dictionary.status === "clear"
+                ? "surface_matches_changed"
+                : "surface_match_acknowledgement_required",
+            [],
+            {
+              surface_match_page: page,
+              current_policy_name: page.policy_name,
+              current_policy_epoch: page.policy_epoch
+            }
+          );
+        }
+        const snapshotId = surfaceTokenSnapshotIds.get(token);
+        const snapshot = snapshotId
+          ? surfaceSnapshotPages.get(snapshotId)
+          : undefined;
+        if (!snapshot) {
+          throw new HttpError(
+            410,
+            "surface match snapshot expired",
+            [],
+            "surface_match_snapshot_expired"
+          );
+        }
+        const currentMatchIds = currentMatches.items.map(
+          (item) => item.match_id
+        );
+        const changed =
+          snapshot.actor_id !== profile.id ||
+          snapshot.detection_id !== detection.detection_id ||
+          snapshot.content_key !== JSON.stringify(input.headwords) ||
+          snapshot.match_ids.length !== currentMatchIds.length ||
+          snapshot.match_ids.some(
+            (matchId, index) => matchId !== currentMatchIds[index]
+          );
+        if (changed) {
+          const page = freshPage();
+          throw new HttpError(
+            409,
+            "surface matches changed",
+            [],
+            "surface_matches_changed",
+            [],
+            {
+              surface_match_page: page,
+              current_policy_name: page.policy_name,
+              current_policy_epoch: page.policy_epoch
+            }
+          );
+        }
+        acknowledgedSurface = { snapshot, items: currentMatches.items };
+      }
+    }
     const headwordValues =
       input.headwords.mode === "unified"
         ? [input.headwords.common]
         : [input.headwords.uk, input.headwords.us];
     if (
+      surfaceWarnings === "legacy" &&
       duplicatesFor(current, headwordValues, detection.entry_kind).length > 0
     ) {
       throw new HttpError(409, "word already exists", [], "duplicate_word");
@@ -2478,6 +3008,30 @@ export function createAdminWordsMock({
         (prefix) => nextId(current, prefix)
       );
     }
+    const smartDictionarySnapshot = acknowledgedSurface
+      ? {
+          smart_dictionary_status: "warning" as const,
+          surface_warning: {
+            total: acknowledgedSurface.snapshot.match_ids.length,
+            match_digest: `mock:${acknowledgedSurface.snapshot.match_ids.join("|")}`,
+            acknowledged: true as const,
+            acknowledged_at: timestamp,
+            acknowledged_by: profile.id,
+            policy_name: acknowledgedSurface.snapshot.policy_name,
+            policy_epoch: acknowledgedSurface.snapshot.policy_epoch,
+            preview: acknowledgedSurface.items.slice(0, 5).map((item) => ({
+              match_id: item.match_id,
+              match_category: item.match_category,
+              existing_word_id: item.existing.word_id,
+              existing_headword: item.existing.headword,
+              existing_status: item.existing.status
+            })),
+            truncated:
+              acknowledgedSurface.snapshot.match_ids.length >
+              Math.min(5, acknowledgedSurface.items.length)
+          }
+        }
+      : { smart_dictionary_status: "clear" as const };
     const word: AdminWordV2 = {
       schema_version: 2,
       id: wordId,
@@ -2497,7 +3051,7 @@ export function createAdminWordsMock({
           detection.builtin_dictionary.status === "matched"
             ? "matched"
             : "not_found",
-        smart_dictionary_status: "clear",
+        ...smartDictionarySnapshot,
         headwords:
           detection.builtin_dictionary.status === "matched"
             ? clone(detection.builtin_dictionary.headwords)
@@ -2525,6 +3079,7 @@ export function createAdminWordsMock({
       request_json: requestJson,
       response: clone(response)
     };
+    current.consumed_detection_ids.push(input.detection_id);
     persist(current);
     return response;
   }
@@ -3280,12 +3835,14 @@ export function createAdminWordsMock({
     if (activeProfileId) persistedStorage.clear(activeProfileId);
     activeProfileId = undefined;
     state = undefined;
+    clearSurfaceRuntime();
   }
 
   return {
     list,
     stats,
     detect,
+    surfaceMatchSnapshotPage,
     suggestDialectVariants,
     createV2,
     get,

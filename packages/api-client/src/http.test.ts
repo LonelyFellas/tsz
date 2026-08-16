@@ -38,6 +38,266 @@ function problem(overrides: Partial<ProblemDetails> = {}): ProblemDetails {
   };
 }
 
+function headwordCandidateFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    candidate_type: "headword",
+    candidate_ref: "candidate:headword:common",
+    candidate_word_id: "candidate-word-1",
+    surface: "workspace",
+    normalized_surface: "workspace",
+    dialect: "common",
+    entry_kind: "word",
+    ...overrides
+  };
+}
+
+function formCandidateFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    candidate_type: "form",
+    candidate_ref: "candidate:form:workspaces",
+    candidate_word_id: "candidate-word-1",
+    candidate_node_id: "candidate-form-1",
+    surface: "workspaces",
+    normalized_surface: "workspaces",
+    dialect: "us",
+    pos_id: "pos-noun",
+    pos: "noun",
+    form_type: "plural",
+    ...overrides
+  };
+}
+
+function headwordSourceFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    source_kind: "headword",
+    source_id: "existing-headword-1",
+    content_scope: "current_publication",
+    surface: "workspace",
+    dialect: "common",
+    ...overrides
+  };
+}
+
+function formSourceFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    source_kind: "form",
+    source_id: "existing-form-1",
+    source_node_id: "existing-form-node-1",
+    content_scope: "draft",
+    surface: "workspaces",
+    dialect: "uk",
+    pos_id: "pos-noun",
+    pos: "noun",
+    form_type: "plural",
+    ...overrides
+  };
+}
+
+function existingSurfaceMatchFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    word_id: "existing-word-1",
+    headword: "workspace",
+    kind: "word",
+    status: "published",
+    source: headwordSourceFixture(),
+    ...overrides
+  };
+}
+
+function lexiconSurfaceMatchFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    match_id: "match-1",
+    match_category: "exact_headword",
+    severity: "warning",
+    attention_level: "high",
+    can_continue: true,
+    confirmation_reasons: ["unacknowledged_surface_matches"],
+    candidate: headwordCandidateFixture(),
+    existing: existingSurfaceMatchFixture(),
+    ...overrides
+  };
+}
+
+function relationCountsFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    synonym: 1,
+    antonym: 0,
+    derivative: 0,
+    ...overrides
+  };
+}
+
+function relationPreviewFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    source_word_id: "related-word-1",
+    source_headword: "workplace",
+    relation: "synonym",
+    ...overrides
+  };
+}
+
+function relationSummaryFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    total: 1,
+    by_type: relationCountsFixture(),
+    previews: [relationPreviewFixture()],
+    truncated: false,
+    ...overrides
+  };
+}
+
+function matchedEntryContextFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    word_id: "existing-word-1",
+    pos_labels: ["noun"],
+    gloss_previews: ["a place to work"],
+    updated_at: "2026-08-15T10:30:00Z",
+    inbound_relations: relationSummaryFixture(),
+    ...overrides
+  };
+}
+
+function surfacePageBaseFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    snapshot_id: "snapshot-1",
+    items: [
+      lexiconSurfaceMatchFixture(),
+      lexiconSurfaceMatchFixture({
+        match_id: "match-2",
+        match_category: "form_headword",
+        attention_level: "normal",
+        can_continue: true,
+        confirmation_reasons: [
+          "unacknowledged_surface_matches",
+          "visibility_activation"
+        ],
+        candidate: formCandidateFixture(),
+        existing: existingSurfaceMatchFixture({
+          word_id: "existing-word-2",
+          headword: "workspaces",
+          kind: "phrase",
+          status: "archived",
+          source: formSourceFixture()
+        })
+      })
+    ],
+    total: 2,
+    matched_entry_contexts: [
+      matchedEntryContextFixture(),
+      matchedEntryContextFixture({
+        word_id: "existing-word-2",
+        pos_labels: [],
+        gloss_previews: [],
+        inbound_relations: relationSummaryFixture({
+          total: 0,
+          by_type: relationCountsFixture({ synonym: 0 }),
+          previews: [],
+          truncated: true
+        })
+      })
+    ],
+    confirmation_reasons: [
+      "unacknowledged_surface_matches",
+      "visibility_activation"
+    ],
+    policy_name: "allow_new_exact_headword_entries",
+    policy_epoch: 7,
+    ...overrides
+  };
+}
+
+function terminalSurfacePageFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    ...surfacePageBaseFixture(),
+    continuation_policy: "enabled",
+    next_cursor: null,
+    surface_confirmation_token: "surface-token-1",
+    impact_confirmation_token: "impact-token-1",
+    ...overrides
+  };
+}
+
+function nextSurfacePageFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    ...surfacePageBaseFixture(),
+    continuation_policy: "enabled",
+    next_cursor: "cursor-2",
+    ...overrides
+  };
+}
+
+function disabledSurfacePageFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    ...surfacePageBaseFixture(),
+    continuation_policy: "temporarily_disabled",
+    next_cursor: null,
+    policy_block_code: "exact_headword_creation_temporarily_disabled",
+    ...overrides
+  };
+}
+
+function surfacePageWithMatch(item: unknown) {
+  return terminalSurfacePageFixture({ items: [item], total: 1 });
+}
+
+function surfacePageWithContext(context: unknown) {
+  return terminalSurfacePageFixture({
+    matched_entry_contexts: [context]
+  });
+}
+
+function surfacePageWithCandidate(candidate: unknown) {
+  return surfacePageWithMatch(lexiconSurfaceMatchFixture({ candidate }));
+}
+
+function surfacePageWithExisting(existing: unknown) {
+  return surfacePageWithMatch(lexiconSurfaceMatchFixture({ existing }));
+}
+
+function surfacePageWithSource(source: unknown) {
+  return surfacePageWithExisting(existingSurfaceMatchFixture({ source }));
+}
+
+function surfacePageWithRelationSummary(inbound_relations: unknown) {
+  return surfacePageWithContext(
+    matchedEntryContextFixture({ inbound_relations })
+  );
+}
+
+function surfacePageWithRelationCounts(by_type: unknown) {
+  return surfacePageWithRelationSummary(relationSummaryFixture({ by_type }));
+}
+
+function surfacePageWithRelationPreview(preview: unknown) {
+  return surfacePageWithRelationSummary(
+    relationSummaryFixture({ previews: [preview] })
+  );
+}
+
+async function surfacePageHttpError(
+  surface_match_page: unknown
+): Promise<HttpError> {
+  fetchMock.mockResolvedValueOnce(
+    jsonResponse(
+      {
+        error: "surface match warning",
+        code: "surface_matches_changed",
+        meta: { surface_match_page }
+      },
+      { ok: false, status: 409 }
+    )
+  );
+  const http = createHttpClient({ baseUrl: "" });
+
+  try {
+    await http.post("/lexicon/entries", {});
+    throw new Error("expected request to fail");
+  } catch (error) {
+    expect(error).toBeInstanceOf(HttpError);
+    return error as HttpError;
+  }
+}
+
 function requestHeaders(index = 0): Headers {
   return new Headers(fetchMock.mock.calls[index]![1].headers);
 }
@@ -597,6 +857,508 @@ describe("createHttpClient", () => {
     });
   });
 
+  it("ProblemMeta 保留结构化 surface terminal page 与当前 policy", async () => {
+    const surface_match_page = terminalSurfacePageFixture();
+    const meta = {
+      surface_match_page,
+      current_policy_name: "allow_new_exact_headword_entries",
+      current_policy_epoch: 7
+    };
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          ...problem({
+            type: "urn:tsz:problem:surface_matches_changed",
+            title: "Surface matches changed",
+            status: 409,
+            detail: "surface matches changed",
+            code: "surface_matches_changed"
+          }),
+          meta
+        },
+        { ok: false, status: 409, contentType: "application/problem+json" }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.post("/lexicon/entries", {})).rejects.toMatchObject({
+      status: 409,
+      code: "surface_matches_changed",
+      meta,
+      problem: { meta }
+    });
+  });
+
+  it.each([
+    ["enabled 中页", nextSurfacePageFixture()],
+    [
+      "enabled 末页无可选 impact token",
+      (() => {
+        const page = terminalSurfacePageFixture();
+        Reflect.deleteProperty(page, "impact_confirmation_token");
+        return page;
+      })()
+    ],
+    ["disabled 末页", disabledSurfacePageFixture()],
+    [
+      "disabled 中页",
+      disabledSurfacePageFixture({
+        next_cursor: "cursor-2",
+        policy_block_code:
+          "multiple_active_exact_headword_publications_not_enabled"
+      })
+    ],
+    [
+      "headword candidate 无可选 word_id",
+      (() => {
+        const candidate = headwordCandidateFixture();
+        Reflect.deleteProperty(candidate, "candidate_word_id");
+        return nextSurfacePageFixture({
+          items: [lexiconSurfaceMatchFixture({ candidate })],
+          total: 1
+        });
+      })()
+    ]
+  ])("ProblemMeta 保留合法 surface page：%s", async (_name, page) => {
+    const error = await surfacePageHttpError(page);
+    expect(error.meta).toEqual({ surface_match_page: page });
+  });
+
+  it.each([
+    ["page 非对象", null],
+    ["page 多余字段", terminalSurfacePageFixture({ unexpected: true })],
+    ["snapshot_id 非空", terminalSurfacePageFixture({ snapshot_id: " " })],
+    ["items 必须为数组", terminalSurfacePageFixture({ items: "matches" })],
+    ["items minItems=1", terminalSurfacePageFixture({ items: [] })],
+    [
+      "items maxItems=50",
+      terminalSurfacePageFixture({
+        items: Array.from({ length: 51 }, () => lexiconSurfaceMatchFixture())
+      })
+    ],
+    ["items 元素完整", surfacePageWithMatch(null)],
+    ["total 非负整数", terminalSurfacePageFixture({ total: -1 })],
+    [
+      "matched_entry_contexts 必须为数组",
+      terminalSurfacePageFixture({ matched_entry_contexts: "contexts" })
+    ],
+    [
+      "matched_entry_contexts minItems=1",
+      terminalSurfacePageFixture({ matched_entry_contexts: [] })
+    ],
+    [
+      "matched_entry_contexts maxItems=50",
+      terminalSurfacePageFixture({
+        matched_entry_contexts: Array.from({ length: 51 }, () =>
+          matchedEntryContextFixture()
+        )
+      })
+    ],
+    ["matched_entry_contexts 元素完整", surfacePageWithContext(null)],
+    [
+      "page confirmation_reasons 必须为数组",
+      terminalSurfacePageFixture({ confirmation_reasons: "reason" })
+    ],
+    [
+      "page confirmation_reasons minItems=1",
+      terminalSurfacePageFixture({ confirmation_reasons: [] })
+    ],
+    [
+      "page confirmation_reasons maxItems=2",
+      terminalSurfacePageFixture({
+        confirmation_reasons: [
+          "unacknowledged_surface_matches",
+          "visibility_activation",
+          "unacknowledged_surface_matches"
+        ]
+      })
+    ],
+    [
+      "page confirmation_reasons 枚举",
+      terminalSurfacePageFixture({ confirmation_reasons: ["unknown"] })
+    ],
+    [
+      "page confirmation_reasons 去重",
+      terminalSurfacePageFixture({
+        confirmation_reasons: [
+          "unacknowledged_surface_matches",
+          "unacknowledged_surface_matches"
+        ]
+      })
+    ],
+    ["policy_name 枚举", terminalSurfacePageFixture({ policy_name: "old" })],
+    ["policy_epoch 非负整数", terminalSurfacePageFixture({ policy_epoch: -1 })],
+    [
+      "continuation_policy 枚举",
+      terminalSurfacePageFixture({ continuation_policy: "legacy" })
+    ],
+    ["enabled 中页 cursor 非空", nextSurfacePageFixture({ next_cursor: "" })],
+    [
+      "enabled 中页不能携带 terminal token",
+      nextSurfacePageFixture({ surface_confirmation_token: "token-1" })
+    ],
+    [
+      "enabled 末页 next_cursor 必须为 null",
+      terminalSurfacePageFixture({ next_cursor: 1 })
+    ],
+    [
+      "enabled 末页 surface token 非空",
+      terminalSurfacePageFixture({ surface_confirmation_token: " " })
+    ],
+    [
+      "enabled 末页 impact token 非空",
+      terminalSurfacePageFixture({ impact_confirmation_token: "" })
+    ],
+    [
+      "disabled cursor 必须为 null 或非空字符串",
+      disabledSurfacePageFixture({ next_cursor: "" })
+    ],
+    [
+      "disabled cursor 不能是其他类型",
+      disabledSurfacePageFixture({ next_cursor: 1 })
+    ],
+    [
+      "disabled policy_block_code 枚举",
+      disabledSurfacePageFixture({ policy_block_code: "legacy_block" })
+    ],
+    [
+      "disabled page 不能携带确认 token",
+      disabledSurfacePageFixture({ surface_confirmation_token: "token-1" })
+    ],
+    ["match 非对象", surfacePageWithMatch("match")],
+    [
+      "match 多余字段",
+      surfacePageWithMatch(lexiconSurfaceMatchFixture({ unexpected: true }))
+    ],
+    [
+      "match_id 非空",
+      surfacePageWithMatch(lexiconSurfaceMatchFixture({ match_id: "" }))
+    ],
+    [
+      "match_category 枚举",
+      surfacePageWithMatch(
+        lexiconSurfaceMatchFixture({ match_category: "substring" })
+      )
+    ],
+    [
+      "severity 固定 warning",
+      surfacePageWithMatch(lexiconSurfaceMatchFixture({ severity: "error" }))
+    ],
+    [
+      "attention_level 枚举",
+      surfacePageWithMatch(
+        lexiconSurfaceMatchFixture({ attention_level: "low" })
+      )
+    ],
+    [
+      "can_continue 固定为 true",
+      surfacePageWithMatch(lexiconSurfaceMatchFixture({ can_continue: false }))
+    ],
+    [
+      "match confirmation_reasons 必须为数组",
+      surfacePageWithMatch(
+        lexiconSurfaceMatchFixture({ confirmation_reasons: "reason" })
+      )
+    ],
+    [
+      "match confirmation_reasons minItems=1",
+      surfacePageWithMatch(
+        lexiconSurfaceMatchFixture({ confirmation_reasons: [] })
+      )
+    ],
+    [
+      "match confirmation_reasons maxItems=2",
+      surfacePageWithMatch(
+        lexiconSurfaceMatchFixture({
+          confirmation_reasons: [
+            "unacknowledged_surface_matches",
+            "visibility_activation",
+            "visibility_activation"
+          ]
+        })
+      )
+    ],
+    [
+      "match confirmation_reasons 枚举",
+      surfacePageWithMatch(
+        lexiconSurfaceMatchFixture({ confirmation_reasons: ["legacy"] })
+      )
+    ],
+    [
+      "match confirmation_reasons 去重",
+      surfacePageWithMatch(
+        lexiconSurfaceMatchFixture({
+          confirmation_reasons: [
+            "visibility_activation",
+            "visibility_activation"
+          ]
+        })
+      )
+    ],
+    ["candidate 非对象", surfacePageWithCandidate(null)],
+    ["candidate_type 枚举", surfacePageWithCandidate({ candidate_type: "x" })],
+    [
+      "headword candidate 多余字段",
+      surfacePageWithCandidate(headwordCandidateFixture({ unexpected: true }))
+    ],
+    ...["candidate_ref", "surface", "normalized_surface"].map(
+      (field) =>
+        [
+          `headword candidate ${field} 非空`,
+          surfacePageWithCandidate(headwordCandidateFixture({ [field]: " " }))
+        ] as const
+    ),
+    [
+      "headword candidate 可选 word_id 非空",
+      surfacePageWithCandidate(
+        headwordCandidateFixture({ candidate_word_id: "" })
+      )
+    ],
+    [
+      "headword candidate dialect 枚举",
+      surfacePageWithCandidate(headwordCandidateFixture({ dialect: "au" }))
+    ],
+    [
+      "headword candidate entry_kind 枚举",
+      surfacePageWithCandidate(
+        headwordCandidateFixture({ entry_kind: "sentence" })
+      )
+    ],
+    [
+      "form candidate 多余字段",
+      surfacePageWithCandidate(formCandidateFixture({ unexpected: true }))
+    ],
+    ...[
+      "candidate_ref",
+      "candidate_word_id",
+      "candidate_node_id",
+      "surface",
+      "normalized_surface",
+      "pos_id",
+      "pos",
+      "form_type"
+    ].map(
+      (field) =>
+        [
+          `form candidate ${field} 非空`,
+          surfacePageWithCandidate(formCandidateFixture({ [field]: "" }))
+        ] as const
+    ),
+    [
+      "form candidate dialect 枚举",
+      surfacePageWithCandidate(formCandidateFixture({ dialect: "au" }))
+    ],
+    [
+      "form candidate form_type 枚举",
+      surfacePageWithCandidate(formCandidateFixture({ form_type: "future" }))
+    ],
+    ["existing 非对象", surfacePageWithExisting(null)],
+    [
+      "existing 多余字段",
+      surfacePageWithExisting(existingSurfaceMatchFixture({ unexpected: true }))
+    ],
+    ...["word_id", "headword"].map(
+      (field) =>
+        [
+          `existing ${field} 非空`,
+          surfacePageWithExisting(existingSurfaceMatchFixture({ [field]: " " }))
+        ] as const
+    ),
+    [
+      "existing kind 枚举",
+      surfacePageWithExisting(existingSurfaceMatchFixture({ kind: "sentence" }))
+    ],
+    [
+      "existing status 枚举",
+      surfacePageWithExisting(
+        existingSurfaceMatchFixture({ status: "deleted" })
+      )
+    ],
+    ["source 非对象", surfacePageWithSource(null)],
+    ["source_kind 枚举", surfacePageWithSource({ source_kind: "legacy" })],
+    [
+      "headword source 多余字段",
+      surfacePageWithSource(headwordSourceFixture({ unexpected: true }))
+    ],
+    ...["source_id", "surface"].map(
+      (field) =>
+        [
+          `headword source ${field} 非空`,
+          surfacePageWithSource(headwordSourceFixture({ [field]: "" }))
+        ] as const
+    ),
+    [
+      "headword source content_scope 枚举",
+      surfacePageWithSource(
+        headwordSourceFixture({ content_scope: "publication" })
+      )
+    ],
+    [
+      "headword source dialect 枚举",
+      surfacePageWithSource(headwordSourceFixture({ dialect: "au" }))
+    ],
+    [
+      "form source 多余字段",
+      surfacePageWithSource(formSourceFixture({ unexpected: true }))
+    ],
+    ...[
+      "source_id",
+      "source_node_id",
+      "surface",
+      "pos_id",
+      "pos",
+      "form_type"
+    ].map(
+      (field) =>
+        [
+          `form source ${field} 非空`,
+          surfacePageWithSource(formSourceFixture({ [field]: " " }))
+        ] as const
+    ),
+    [
+      "form source content_scope 枚举",
+      surfacePageWithSource(formSourceFixture({ content_scope: "publication" }))
+    ],
+    [
+      "form source dialect 枚举",
+      surfacePageWithSource(formSourceFixture({ dialect: "au" }))
+    ],
+    [
+      "form source form_type 枚举",
+      surfacePageWithSource(formSourceFixture({ form_type: "future" }))
+    ],
+    ["context 非对象", surfacePageWithContext(null)],
+    [
+      "context 多余字段",
+      surfacePageWithContext(matchedEntryContextFixture({ unexpected: true }))
+    ],
+    [
+      "context word_id 非空",
+      surfacePageWithContext(matchedEntryContextFixture({ word_id: "" }))
+    ],
+    [
+      "pos_labels 必须为数组",
+      surfacePageWithContext(matchedEntryContextFixture({ pos_labels: "noun" }))
+    ],
+    [
+      "pos_labels maxItems=5",
+      surfacePageWithContext(
+        matchedEntryContextFixture({ pos_labels: Array(6).fill("noun") })
+      )
+    ],
+    [
+      "pos_labels 元素非空",
+      surfacePageWithContext(matchedEntryContextFixture({ pos_labels: [""] }))
+    ],
+    [
+      "gloss_previews 必须为数组",
+      surfacePageWithContext(
+        matchedEntryContextFixture({ gloss_previews: "gloss" })
+      )
+    ],
+    [
+      "gloss_previews maxItems=5",
+      surfacePageWithContext(
+        matchedEntryContextFixture({
+          gloss_previews: Array(6).fill("a place to work")
+        })
+      )
+    ],
+    [
+      "gloss_previews 元素非空",
+      surfacePageWithContext(
+        matchedEntryContextFixture({ gloss_previews: [" "] })
+      )
+    ],
+    [
+      "updated_at 非空",
+      surfacePageWithContext(matchedEntryContextFixture({ updated_at: "" }))
+    ],
+    [
+      "updated_at 符合 date-time 格式",
+      surfacePageWithContext(
+        matchedEntryContextFixture({ updated_at: "2026-08-15" })
+      )
+    ],
+    [
+      "updated_at 是有效时间",
+      surfacePageWithContext(
+        matchedEntryContextFixture({ updated_at: "2026-99-99T99:99:99Z" })
+      )
+    ],
+    ["relation summary 非对象", surfacePageWithRelationSummary(null)],
+    [
+      "relation summary 多余字段",
+      surfacePageWithRelationSummary(
+        relationSummaryFixture({ unexpected: true })
+      )
+    ],
+    [
+      "relation total 非负整数",
+      surfacePageWithRelationSummary(relationSummaryFixture({ total: -1 }))
+    ],
+    ["relation counts 非对象", surfacePageWithRelationCounts(null)],
+    [
+      "relation counts 多余字段",
+      surfacePageWithRelationCounts(relationCountsFixture({ unexpected: true }))
+    ],
+    ...["synonym", "antonym", "derivative"].map(
+      (field) =>
+        [
+          `relation counts ${field} 非负整数`,
+          surfacePageWithRelationCounts(relationCountsFixture({ [field]: -1 }))
+        ] as const
+    ),
+    [
+      "relation previews 必须为数组",
+      surfacePageWithRelationSummary(
+        relationSummaryFixture({ previews: "preview" })
+      )
+    ],
+    [
+      "relation previews maxItems=5",
+      surfacePageWithRelationSummary(
+        relationSummaryFixture({
+          previews: Array.from({ length: 6 }, () => relationPreviewFixture())
+        })
+      )
+    ],
+    ["relation preview 非对象", surfacePageWithRelationPreview(null)],
+    [
+      "relation preview 多余字段",
+      surfacePageWithRelationPreview(
+        relationPreviewFixture({ unexpected: true })
+      )
+    ],
+    ...["source_word_id", "source_headword"].map(
+      (field) =>
+        [
+          `relation preview ${field} 非空`,
+          surfacePageWithRelationPreview(
+            relationPreviewFixture({ [field]: "" })
+          )
+        ] as const
+    ),
+    [
+      "relation preview relation 枚举",
+      surfacePageWithRelationPreview(
+        relationPreviewFixture({ relation: "association" })
+      )
+    ],
+    [
+      "relation truncated 布尔值",
+      surfacePageWithRelationSummary(
+        relationSummaryFixture({ truncated: "false" })
+      )
+    ]
+  ] as ReadonlyArray<readonly [string, unknown]>)(
+    "surface page 畸形时 meta 安全降级：%s",
+    async (_name, surface_match_page) => {
+      const error = await surfacePageHttpError(surface_match_page);
+      expect(error.meta).toBeUndefined();
+    }
+  );
+
   it.each([
     { usage_count: -1 },
     { current_lifecycle_revision: -1 },
@@ -605,7 +1367,22 @@ describe("createHttpClient", () => {
     { word_id: "" },
     { max_reachable_step: "done" },
     { affected_node_ids: [""] },
-    { reference_locations: [{ source_entry_id: "source-entry-1" }] }
+    { reference_locations: [{ source_entry_id: "source-entry-1" }] },
+    { current_policy_name: "unknown_policy" },
+    { current_policy_epoch: -1 },
+    {
+      surface_match_page: {
+        snapshot_id: "snapshot-1",
+        items: [],
+        total: 0,
+        matched_entry_contexts: [],
+        confirmation_reasons: [],
+        policy_name: "allow_new_exact_headword_entries",
+        policy_epoch: 1,
+        continuation_policy: "enabled",
+        next_cursor: null
+      }
+    }
   ])("词性配置错误的畸形 meta 安全降级: %o", async (meta) => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
