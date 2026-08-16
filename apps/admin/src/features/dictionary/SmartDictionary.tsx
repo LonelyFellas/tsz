@@ -133,6 +133,7 @@ export function SmartDictionary() {
   >({});
   const [pendingRestore, setPendingRestore] = useState<PendingRestore>();
   const lifecycleCommandPending = useRef(false);
+  const restoreAttemptGeneration = useRef(0);
   const restoreSurface = useLifecycleSurfaceCommand(
     pendingRestore?.kind === "single"
       ? pendingRestore.id
@@ -177,6 +178,7 @@ export function SmartDictionary() {
     setPage(1);
     setSelectedKeys([]);
     setSelectedRecords({});
+    restoreAttemptGeneration.current += 1;
     restoreSurface.clear();
     setPendingRestore(undefined);
     const nextSearchParams = new URLSearchParams();
@@ -188,12 +190,17 @@ export function SmartDictionary() {
 
   const executeRestore = async (request: RestoreRequest, refresh = false) => {
     try {
+      let attemptGeneration = restoreAttemptGeneration.current;
       let command =
         !refresh && sameRestoreRequest(pendingRestore, request)
           ? pendingRestore
           : undefined;
       if (!command) {
-        if (pendingRestore) restoreSurface.clear();
+        if (pendingRestore) {
+          restoreAttemptGeneration.current += 1;
+          attemptGeneration = restoreAttemptGeneration.current;
+          restoreSurface.clear();
+        }
         const ids = request.kind === "single" ? [request.id] : request.ids;
         const latest = await Promise.all(
           ids.map(async (id) => {
@@ -205,6 +212,7 @@ export function SmartDictionary() {
             );
           })
         );
+        if (attemptGeneration !== restoreAttemptGeneration.current) return;
         if (latest.some((word) => !word)) {
           message.error("无法加载所选词条的最新生命周期版本，请刷新后重试");
           return;
@@ -249,6 +257,10 @@ export function SmartDictionary() {
               }
             })
       );
+      if (attemptGeneration !== restoreAttemptGeneration.current) {
+        restoreSurface.clear();
+        return;
+      }
       if (outcome.ok) {
         const affected =
           command.kind === "single"
@@ -791,6 +803,7 @@ export function SmartDictionary() {
                   selectedRowKeys: selectedKeys,
                   preserveSelectedRowKeys: true,
                   onChange: (keys, selected) => {
+                    restoreAttemptGeneration.current += 1;
                     setSelectedKeys(keys);
                     setSelectedRecords((previous) => {
                       const kept = Object.fromEntries(

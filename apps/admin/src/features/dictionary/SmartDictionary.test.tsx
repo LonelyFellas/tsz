@@ -19,11 +19,15 @@ const apiMocks = vi.hoisted(() => ({
   useWordStats: vi.fn()
 }));
 
+const dataSourceMocks = vi.hoisted(() => ({
+  get: vi.fn()
+}));
+
 vi.mock("./api", () => apiMocks);
 
 vi.mock("./dataSource", () => ({
   adminWordsDataSource: {
-    get: vi.fn(async () => undefined)
+    get: dataSourceMocks.get
   },
   adminWordsDataSourceCapabilities: {
     archive: true,
@@ -104,6 +108,7 @@ function LocationProbe() {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  dataSourceMocks.get.mockReset().mockResolvedValue(undefined);
   for (const hook of [
     apiMocks.useArchiveWord,
     apiMocks.useArchiveWordsBatch,
@@ -531,5 +536,116 @@ describe("SmartDictionary", () => {
       base_revision: 7,
       base_lifecycle_revision: 4
     });
+  });
+
+  it("批量恢复提交完整稳定 selection 与每条双 revision", async () => {
+    const first = {
+      ...archivedWord("word-1", "first"),
+      revision: 7,
+      lifecycle_revision: 3
+    };
+    const second = {
+      ...archivedWord("word-2", "second"),
+      revision: 11,
+      lifecycle_revision: 5
+    };
+    const mutateAsync = vi.fn().mockResolvedValue({
+      words: [first, second],
+      affected: 2
+    });
+    apiMocks.useRestoreWordsBatch.mockReturnValue({
+      ...idleMutation(),
+      mutateAsync
+    });
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [first, second],
+        page: { page: 1, page_size: 20, total: 2 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+    const firstCheckbox = screen
+      .getByText("first")
+      .closest("tr")!
+      .querySelector("input[type='checkbox']")!;
+    const secondCheckbox = screen
+      .getByText("second")
+      .closest("tr")!
+      .querySelector("input[type='checkbox']")!;
+    fireEvent.click(firstCheckbox);
+    await screen.findByText("恢 复(1)");
+    fireEvent.click(secondCheckbox);
+
+    fireEvent.click(await screen.findByText("恢 复(2)"));
+    fireEvent.click(
+      (await screen.findAllByText("恢 复", { exact: true }))
+        .map((item) => item.closest("button"))
+        .find((item) => item?.closest(".ant-modal"))!
+    );
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync.mock.calls[0]![0].input).toEqual({
+      entries: [
+        { id: "word-1", base_revision: 7, base_lifecycle_revision: 3 },
+        { id: "word-2", base_revision: 11, base_lifecycle_revision: 5 }
+      ]
+    });
+  });
+
+  it("批量预取期间 selection 变化会失效旧 attempt 且不发送隐藏恢复", async () => {
+    const first = archivedWord("word-1", "first");
+    let resolveGet!: (value: unknown) => void;
+    dataSourceMocks.get.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveGet = resolve;
+        })
+    );
+    const mutateAsync = vi.fn();
+    apiMocks.useRestoreWordsBatch.mockReturnValue({
+      ...idleMutation(),
+      mutateAsync
+    });
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [first],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    const { container } = render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+    const checkbox = container.querySelector("tbody input[type='checkbox']")!;
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByText("恢 复(1)"));
+    fireEvent.click(
+      (await screen.findAllByText("恢 复", { exact: true }))
+        .map((item) => item.closest("button"))
+        .find((item) => item?.closest(".ant-modal"))!
+    );
+    await waitFor(() => expect(dataSourceMocks.get).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(checkbox);
+    await act(async () => resolveGet({ word: first }));
+    await waitFor(() => expect(screen.queryByText("恢 复(1)")).toBeNull());
+    expect(mutateAsync).not.toHaveBeenCalled();
+    expect(screen.queryByText("恢复前需要确认同名公开范围")).toBeNull();
   });
 });
