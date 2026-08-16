@@ -692,6 +692,30 @@ describe("CreateEntryStep", () => {
     expect(button("仍继续创建")).toBeEnabled();
   });
 
+  it("分页期间 policy 变化会清除旧 snapshot/token 并要求重新检测", async () => {
+    const first = surfacePage([surfaceMatch("match-1", "word-1")], {
+      total: 2,
+      nextCursor: "cursor-2"
+    });
+    mutations.surfacePage.mockRejectedValue(
+      new HttpError(409, "policy changed", [], "surface_policy_changed")
+    );
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture("workspace", first)
+    );
+    renderStep();
+    const input = screen.getByLabelText("录入词条");
+    fireEvent.change(input, { target: { value: "workspace" } });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByText("匹配快照已过期")).toBeVisible();
+    expect(input).toHaveValue("workspace");
+    expect(screen.getByText("仍继续创建").closest("button")).toBeDisabled();
+    fireEvent.click(screen.getByText("重新进行词典检测"));
+    await waitFor(() => expect(screen.getByText("等待检测")).toBeVisible());
+    expect(mutations.resetDetect).toHaveBeenCalled();
+  });
+
   it("最终主词变化立即清 token，第一次重查请求不携旧确认 token", async () => {
     mutations.detect.mockResolvedValue(warningDetectionFixture());
     mutations.create.mockRejectedValue(

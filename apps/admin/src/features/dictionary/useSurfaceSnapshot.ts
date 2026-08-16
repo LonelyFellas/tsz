@@ -19,19 +19,22 @@ const defaultFetchSurfaceMatchPage: FetchSurfaceMatchPage = (
   signal
 ) => adminWordsDataSource.surfaceMatchSnapshotPage(snapshotId, cursor, signal);
 
-function isSurfaceSnapshotExpired(error: unknown): boolean {
+function isSurfaceSnapshotInvalidated(error: unknown): boolean {
   if (error instanceof HttpError) {
     return (
-      error.status === 410 && error.code === "surface_match_snapshot_expired"
+      (error.status === 410 &&
+        error.code === "surface_match_snapshot_expired") ||
+      (error.status === 409 && error.code === "surface_policy_changed")
     );
   }
   return (
     typeof error === "object" &&
     error !== null &&
     "status" in error &&
-    error.status === 410 &&
     "code" in error &&
-    error.code === "surface_match_snapshot_expired"
+    ((error.status === 410 &&
+      error.code === "surface_match_snapshot_expired") ||
+      (error.status === 409 && error.code === "surface_policy_changed"))
   );
 }
 
@@ -84,7 +87,7 @@ export function useSurfaceSnapshot(
           generation: requestedGeneration,
           requested_cursor: requestedCursor,
           error,
-          expired: isSurfaceSnapshotExpired(error)
+          expired: isSurfaceSnapshotInvalidated(error)
         });
       }
     );

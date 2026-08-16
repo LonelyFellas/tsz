@@ -72,6 +72,16 @@ describe("useSurfaceSnapshot", () => {
       { status: 410, code: "surface_match_snapshot_expired" },
       "expired"
     ],
+    [
+      "policy changed HttpError",
+      new HttpError(409, "changed", [], "surface_policy_changed"),
+      "expired"
+    ],
+    [
+      "plain policy changed problem",
+      { status: 409, code: "surface_policy_changed" },
+      "expired"
+    ],
     ["other error", new Error("network"), "error"]
   ] as const)("将 %s 分页失败归类为 %s", async (_name, error, phase) => {
     const fetchPage = vi.fn().mockRejectedValue(error);
