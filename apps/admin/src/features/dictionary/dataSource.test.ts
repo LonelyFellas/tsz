@@ -250,6 +250,7 @@ interface LoadedModule {
     | {
         getAdminProfile: () => AuthState["profile"] | undefined;
         partOfSpeechValidation: "internal" | "external";
+        surfaceWarnings: "temporarily_disabled";
       }
     | undefined;
 }
@@ -286,6 +287,7 @@ async function loadDataSource({
     | {
         getAdminProfile: () => AuthState["profile"] | undefined;
         partOfSpeechValidation: "internal" | "external";
+        surfaceWarnings: "temporarily_disabled";
       }
     | undefined;
   const getState = vi.fn(() => ({ profile }));
@@ -297,6 +299,7 @@ async function loadDataSource({
     (options: {
       getAdminProfile: () => AuthState["profile"] | undefined;
       partOfSpeechValidation: "internal" | "external";
+      surfaceWarnings: "temporarily_disabled";
     }) => {
       mockFactoryOptions = options;
       return Object.assign(mock, { partOfSpeechSettings: mockPart });
@@ -475,6 +478,7 @@ describe("admin words data source selection", () => {
 
     const options = loaded.getMockFactoryOptions();
     expect(options?.partOfSpeechValidation).toBe("internal");
+    expect(options?.surfaceWarnings).toBe("temporarily_disabled");
     expect(options?.getAdminProfile()).toEqual({ id: "admin-1" });
     expect(loaded.auth.getState).toHaveBeenCalledTimes(1);
     loaded.auth.setProfile(null);

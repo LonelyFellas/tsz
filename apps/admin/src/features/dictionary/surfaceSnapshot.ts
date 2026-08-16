@@ -22,6 +22,7 @@ export interface SurfaceSnapshotState {
   policy_epoch?: number;
   next_cursor?: string;
   surface_confirmation_token?: string;
+  impact_confirmation_token?: string;
   policy_block_code?: SurfacePolicyBlockCodeV2;
   error?: unknown;
 }
@@ -86,6 +87,10 @@ function pageState(
     page.continuation_policy === "enabled" && page.next_cursor === null
       ? page.surface_confirmation_token
       : undefined;
+  const impact_confirmation_token =
+    page.continuation_policy === "enabled" && page.next_cursor === null
+      ? page.impact_confirmation_token
+      : undefined;
 
   return {
     generation,
@@ -99,6 +104,7 @@ function pageState(
     policy_epoch: page.policy_epoch,
     ...(nextCursor ? { next_cursor: nextCursor } : {}),
     ...(surface_confirmation_token ? { surface_confirmation_token } : {}),
+    ...(impact_confirmation_token ? { impact_confirmation_token } : {}),
     ...(isDisabled ? { policy_block_code: page.policy_block_code } : {})
   };
 }
@@ -137,6 +143,7 @@ export function surfaceSnapshotReducer(
       phase: action.expired ? "expired" : "error",
       next_cursor: undefined,
       surface_confirmation_token: undefined,
+      impact_confirmation_token: undefined,
       error: action.error
     };
   }
@@ -146,6 +153,7 @@ export function surfaceSnapshotReducer(
       phase: "error",
       next_cursor: undefined,
       surface_confirmation_token: undefined,
+      impact_confirmation_token: undefined,
       error: new Error("surface snapshot page does not match its first page")
     };
   }

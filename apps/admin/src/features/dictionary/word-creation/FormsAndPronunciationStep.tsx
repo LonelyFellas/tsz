@@ -21,6 +21,7 @@ import {
   Dropdown,
   Flex,
   Input,
+  Modal,
   Radio,
   Select,
   Space,
@@ -32,6 +33,8 @@ import type {
   AdminWordV2,
   Dialect,
   DraftFormsStepContent,
+  FormsImpactResponseV2,
+  LexiconSurfaceMatchV2,
   StepSaveIntent,
   WordDerivedFormSlotV2,
   WordFormVariantV2,
@@ -43,13 +46,13 @@ import { HttpError } from "@tsz/api-client/http";
 import {
   Fragment,
   type DragEvent,
-  type ReactNode,
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   DIALECT_LABEL,
   DIALECT_SHORT_LABEL,
@@ -57,6 +60,11 @@ import {
   PRON_STYLE_OPTIONS
 } from "../editorConstants";
 import { adminWordsDataSourceCapabilities } from "../dataSource";
+import {
+  aggregateSurfaceMatchCards,
+  canAcknowledgeSurfaceSnapshot
+} from "../surfaceSnapshot";
+import { useSurfaceSnapshot } from "../useSurfaceSnapshot";
 import {
   availablePartOfSpeechOptions,
   createPartOfSpeechLookup,
@@ -1117,6 +1125,8 @@ function PosFormsEditor({
   headwords,
   readOnly,
   generating,
+  focusNodeId,
+  onFocusNodeHandled,
   onGenerate,
   onChange
 }: {
@@ -1126,6 +1136,8 @@ function PosFormsEditor({
   headwords: AdminWordV2["headwords"];
   readOnly?: boolean;
   generating?: boolean;
+  focusNodeId?: string;
+  onFocusNodeHandled?: () => void;
   onGenerate: (
     source: WordFormVariantV2,
     target: "uk" | "us",
@@ -1144,6 +1156,74 @@ function PosFormsEditor({
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
     () => new Set()
   );
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  const focusOwner = useMemo(() => {
+    if (!focusNodeId) return undefined;
+    if (
+      value.base_form.id === focusNodeId ||
+      value.base_form.variants.some((variant) => variant.id === focusNodeId)
+    ) {
+      return {
+        group: value.form_groups[0],
+        slotId: value.base_form.id
+      };
+    }
+    return value.form_groups
+      .flatMap((group) => group.slots.map((slot) => ({ group, slot })))
+      .map(({ group, slot }) =>
+        slot.id === focusNodeId ||
+        slot.variants.some((variant) => variant.id === focusNodeId)
+          ? { group, slotId: slot.id }
+          : undefined
+      )
+      .find(
+        (
+          candidate
+        ): candidate is {
+          group: WordPosFormsV2["form_groups"][number];
+          slotId: string;
+        } => Boolean(candidate)
+      );
+  }, [focusNodeId, value.base_form, value.form_groups]);
+
+  useEffect(() => {
+    const ownerGroup = focusOwner?.group;
+    if (!ownerGroup) return;
+    setCollapsedGroupIds((current) => {
+      if (!current.has(ownerGroup.id)) return current;
+      const next = new Set(current);
+      next.delete(ownerGroup.id);
+      return next;
+    });
+  }, [focusOwner]);
+
+  useEffect(() => {
+    if (!focusNodeId || !focusOwner) return;
+    const ownerGroup = focusOwner.group;
+    if (ownerGroup && collapsedGroupIds.has(ownerGroup.id)) return;
+    const candidateNodeIds = [focusNodeId, focusOwner.slotId];
+    const input = candidateNodeIds
+      .flatMap((nodeId) =>
+        Array.from(
+          editorRef.current?.querySelectorAll<HTMLElement>(
+            `[data-word-node-id="${nodeId}"]`
+          ) ?? []
+        )
+      )
+      .map((owner) =>
+        owner instanceof HTMLInputElement && owner.placeholder === "词形拼写"
+          ? owner
+          : owner.querySelector<HTMLInputElement>(
+              'input[placeholder="词形拼写"]'
+            )
+      )
+      .find((candidate): candidate is HTMLInputElement => Boolean(candidate));
+    if (!input) return;
+    input.scrollIntoView?.({ block: "center" });
+    input.focus();
+    onFocusNodeHandled?.();
+  }, [collapsedGroupIds, focusNodeId, focusOwner, onFocusNodeHandled]);
 
   const toggleGroup = (groupId: string) => {
     setCollapsedGroupIds((current) => {
@@ -1159,6 +1239,7 @@ function PosFormsEditor({
 
   return (
     <div
+      ref={editorRef}
       className="word-forms-workbench"
       data-word-node-id={value.pos_id}
       data-word-field="form_groups"
@@ -1475,6 +1556,207 @@ function countPosFormIssues(
   );
 }
 
+interface PendingFormsSave {
+  baseRevision: number;
+  intent: StepSaveIntent;
+  content: DraftFormsStepContent;
+  impact: FormsImpactResponseV2;
+}
+
+type FormSurfaceCandidate = Extract<
+  LexiconSurfaceMatchV2["candidate"],
+  { candidate_type: "form" }
+>;
+
+function formTypeLabel(value: FormSurfaceCandidate["form_type"]): string {
+  return (
+    FORM_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value
+  );
+}
+
+function ImpactConfirmationDetails({
+  impact
+}: {
+  impact: FormsImpactResponseV2;
+}) {
+  const summary = summarizeFormsImpact(impact.affected);
+  if (!impact.requires_confirmation || !summary.can_confirm) return null;
+  return (
+    <Card size="small" title="下游内容影响">
+      <Space orientation="vertical" size="small">
+        <Typography.Text>
+          共影响{" "}
+          <Typography.Text strong>{summary.affected_count}</Typography.Text>{" "}
+          个下游节点。
+        </Typography.Text>
+        <Typography.Text type="secondary">
+          类型：
+          {summary.type_counts
+            .map(({ label, count }) => `${label} ${count}`)
+            .join("、")}
+        </Typography.Text>
+        {summary.groups.map((group) => (
+          <Typography.Text key={group.reason}>
+            {group.reason}（{group.count} 个：
+            {group.type_counts
+              .map(({ label, count }) => `${label} ${count}`)
+              .join("、")}
+            ）
+          </Typography.Text>
+        ))}
+        {summary.warnings.length > 0 ? (
+          <Alert type="warning" showIcon title={summary.warnings.join("；")} />
+        ) : null}
+      </Space>
+    </Card>
+  );
+}
+
+function SurfaceConfirmationDetails({
+  snapshot,
+  checking,
+  onLocate,
+  onRetry
+}: {
+  snapshot: ReturnType<typeof useSurfaceSnapshot>;
+  checking: boolean;
+  onLocate: (candidate: FormSurfaceCandidate) => void;
+  onRetry: () => void;
+}) {
+  const cards = useMemo(
+    () =>
+      aggregateSurfaceMatchCards(
+        snapshot.items,
+        snapshot.matched_entry_contexts
+      ),
+    [snapshot.items, snapshot.matched_entry_contexts]
+  );
+  const needsRetry =
+    snapshot.phase === "error" ||
+    snapshot.phase === "expired" ||
+    snapshot.phase === "disabled";
+
+  return (
+    <Card size="small" title="同形词条提示">
+      <Space orientation="vertical" size="small" style={{ width: "100%" }}>
+        {snapshot.phase === "idle" || snapshot.phase === "loading" ? (
+          <Alert
+            type="info"
+            showIcon
+            title={`正在加载全部同形命中（${snapshot.items.length}/${snapshot.total}）`}
+            description="读取终页并取得完整确认凭证前不能继续保存。"
+          />
+        ) : null}
+        {snapshot.phase === "ready" ? (
+          <Alert
+            type="warning"
+            showIcon
+            title={`发现 ${snapshot.total} 条跨词条同形命中`}
+            description="这些命中只作提示；查看并明确确认后仍可保存。"
+          />
+        ) : null}
+        {needsRetry ? (
+          <Alert
+            type="error"
+            showIcon
+            title={
+              snapshot.phase === "disabled"
+                ? "当前策略暂不允许确认保存"
+                : "同形提示已过期或未能完整加载"
+            }
+            description="请重新执行保存前检查；当前表单内容会保留。"
+            action={
+              <Button size="small" loading={checking} onClick={onRetry}>
+                重新检查
+              </Button>
+            }
+          />
+        ) : null}
+        {cards.map((card) => {
+          const candidate = card.candidate;
+          return (
+            <Card
+              key={card.key}
+              size="small"
+              type="inner"
+              title={
+                <Space wrap>
+                  <Typography.Text strong>
+                    {candidate.surface} 已在 {card.existing.headword} 中存在
+                  </Typography.Text>
+                  <Tag>
+                    {card.existing.status === "draft"
+                      ? "草稿"
+                      : card.existing.status === "published"
+                        ? "已发布"
+                        : "已归档"}
+                  </Tag>
+                  <Tag>{card.existing.kind === "word" ? "单词" : "短语"}</Tag>
+                  <Typography.Text code copyable>
+                    {card.existing.word_id.slice(-8)}
+                  </Typography.Text>
+                </Space>
+              }
+              extra={
+                <Space>
+                  {candidate.candidate_type === "form" ? (
+                    <Button size="small" onClick={() => onLocate(candidate)}>
+                      定位词形
+                    </Button>
+                  ) : null}
+                  <Link
+                    to={`/words/${card.existing.word_id}/wizard/basics`}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`${card.existing.headword} ${card.existing.word_id}，在新标签页打开`}
+                  >
+                    查看已有词条
+                  </Link>
+                </Space>
+              }
+            >
+              <Space orientation="vertical" size={2}>
+                {candidate.candidate_type === "form" ? (
+                  <Typography.Text type="secondary">
+                    当前候选：{candidate.pos} ·{" "}
+                    {formTypeLabel(candidate.form_type)} ·{" "}
+                    {DIALECT_SHORT_LABEL[candidate.dialect]}
+                  </Typography.Text>
+                ) : null}
+                {card.matches.map((match) => (
+                  <Typography.Text key={match.match_id}>
+                    {match.existing.source.source_kind === "form"
+                      ? `${match.existing.source.pos} · ${formTypeLabel(match.existing.source.form_type)}词形`
+                      : "主词"}
+                    ：{match.existing.source.surface} ·{" "}
+                    {match.existing.source.dialect} ·{" "}
+                    {match.existing.source.content_scope === "draft"
+                      ? "草稿"
+                      : "当前发布版本"}
+                  </Typography.Text>
+                ))}
+                {card.context ? (
+                  <>
+                    <Typography.Text type="secondary">
+                      词性：{card.context.pos_labels.join("、") || "暂无"}
+                      ；释义：
+                      {card.context.gloss_previews.join("；") || "暂无"}；更新：
+                      {card.context.updated_at.slice(0, 10)}
+                    </Typography.Text>
+                    <Typography.Text type="secondary">
+                      有效入站关联：共 {card.context.inbound_relations.total} 条
+                    </Typography.Text>
+                  </>
+                ) : null}
+              </Space>
+            </Card>
+          );
+        })}
+      </Space>
+    </Card>
+  );
+}
+
 export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
@@ -1484,11 +1766,21 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   );
   const contentRef = useRef(content);
   const loadedWordIdRef = useRef(word.id);
+  const [contentBaseRevision, setContentBaseRevision] = useState(word.revision);
   const [activePosId, setActivePosId] = useState(
     word.forms.pos[0]?.pos_id ?? ""
   );
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [checkingSurface, setCheckingSurface] = useState(false);
+  const [pendingSave, setPendingSave] = useState<PendingFormsSave>();
+  const [surfaceFirstPage, setSurfaceFirstPage] =
+    useState<FormsImpactResponseV2["surface_match_page"]>();
+  const [surfaceResetVersion, setSurfaceResetVersion] = useState(0);
+  const [focusCandidateNodeId, setFocusCandidateNodeId] = useState<string>();
+  const saveFlowActiveRef = useRef(false);
+  const confirmActionRef = useRef(false);
   const [validationMessages, setValidationMessages] = useState<string[]>([]);
   const issueTarget = useWordValidationIssue();
   const saveForms = useSaveFormsStep(word.id);
@@ -1500,6 +1792,10 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
     [partOfSpeechCatalog.data]
   );
   const allowSavedNavigation = useUnsavedWordChanges(dirty);
+  const surfaceSnapshot = useSurfaceSnapshot(
+    surfaceFirstPage,
+    `${word.id}:${pendingSave?.baseRevision ?? contentBaseRevision}:${surfaceResetVersion}`
+  );
   useWordValidationIssueFocus(activePosId);
 
   const issueOwnerPosId = issueTarget
@@ -1546,6 +1842,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
       const next = normalizeLoadedForms(word);
       contentRef.current = next;
       setContent(next);
+      setContentBaseRevision(word.revision);
       setActivePosId((current) =>
         !wordChanged && word.forms.pos.some((pos) => pos.pos_id === current)
           ? current
@@ -1554,6 +1851,13 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
       if (wordChanged) {
         setDirty(false);
         setValidationMessages([]);
+        setPendingSave(undefined);
+        setSurfaceFirstPage(undefined);
+        setSaving(false);
+        setConfirming(false);
+        setCheckingSurface(false);
+        saveFlowActiveRef.current = false;
+        confirmActionRef.current = false;
       }
     }
   }, [dirty, word]);
@@ -1646,18 +1950,6 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const classificationLabel = (pos: WordPosFormsV2) =>
     partOfSpeechLabel(partOfSpeechLookup, pos.pos);
 
-  const confirmImpact = (title: string, content: ReactNode): Promise<boolean> =>
-    new Promise((resolve) => {
-      modal.confirm({
-        title,
-        content,
-        okText: "确认并保存",
-        cancelText: "取消",
-        onOk: () => resolve(true),
-        onCancel: () => resolve(false)
-      });
-    });
-
   const generateFormVariant = async (
     source: WordFormVariantV2,
     target: "uk" | "us",
@@ -1725,8 +2017,265 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
     }
   };
 
+  const finishSaveFlow = () => {
+    saveFlowActiveRef.current = false;
+    confirmActionRef.current = false;
+    setSaving(false);
+    setConfirming(false);
+    setCheckingSurface(false);
+    setPendingSave(undefined);
+    setSurfaceFirstPage(undefined);
+    setSurfaceResetVersion((current) => current + 1);
+  };
+
+  const handleSuccessfulSave = (
+    intent: StepSaveIntent,
+    savedWord: AdminWordV2
+  ) => {
+    finishSaveFlow();
+    setDirty(false);
+    onSaved(savedWord);
+    message.success(intent === "complete" ? "词形与发音已完成" : "草稿已保存");
+    if (intent === "complete") {
+      allowSavedNavigation();
+      navigate(`/words/${word.id}/wizard/meanings${editQuery}`);
+    }
+  };
+
+  const handleFormsFieldIssues = (error: HttpError): boolean => {
+    const stepIssues = error.field_issues.filter(
+      (candidate) => candidate.step === "forms"
+    );
+    setValidationMessages(stepIssues.map((issue) => issue.message));
+    const issue = stepIssues[0];
+    if (!issue) return false;
+
+    finishSaveFlow();
+    message.warning(issue.message);
+    navigate(`/words/${word.id}/wizard/forms${editQuery}`, {
+      replace: true,
+      state: { nodeId: issue.node_id, field: issue.field }
+    });
+    return true;
+  };
+
+  const showRevisionConflict = () => {
+    finishSaveFlow();
+    modal.confirm({
+      title: "草稿版本已更新",
+      content:
+        "该词条已在其他位置保存。为避免覆盖新内容，请重新加载最新草稿后再编辑。",
+      okText: "重新加载",
+      cancelText: "留在本页",
+      onOk: () => navigate(0)
+    });
+  };
+
+  const showImpactResult = async (
+    context: Omit<PendingFormsSave, "impact">,
+    impact: FormsImpactResponseV2
+  ): Promise<void> => {
+    if (
+      impact.requires_confirmation &&
+      !summarizeFormsImpact(impact.affected).can_confirm
+    ) {
+      message.error("影响预览响应异常，未返回受影响节点，已阻止保存");
+      finishSaveFlow();
+      return;
+    }
+    if (
+      impact.requires_confirmation &&
+      !impact.surface_match_page &&
+      !impact.confirmation_token?.trim()
+    ) {
+      message.error("影响预览响应异常，缺少确认凭证，已阻止保存");
+      finishSaveFlow();
+      return;
+    }
+
+    const nextPending = { ...context, impact };
+    if (impact.surface_match_page) {
+      setPendingSave(nextPending);
+      setSurfaceFirstPage(impact.surface_match_page);
+      setSurfaceResetVersion((current) => current + 1);
+      return;
+    }
+    setSurfaceFirstPage(undefined);
+    if (impact.requires_confirmation) {
+      setPendingSave(nextPending);
+      return;
+    }
+    await submitForms(nextPending);
+  };
+
+  const runImpactCheck = async (
+    context: Omit<PendingFormsSave, "impact">
+  ): Promise<void> => {
+    setCheckingSurface(true);
+    setSurfaceFirstPage(undefined);
+    setSurfaceResetVersion((current) => current + 1);
+    try {
+      const impact = await previewImpact.mutateAsync({
+        base_revision: context.baseRevision,
+        content: context.content
+      });
+      await showImpactResult(context, impact);
+    } catch (error) {
+      if (error instanceof HttpError) {
+        if (handleFormsFieldIssues(error)) return;
+        if (error.status === 409 && error.code === "revision_conflict") {
+          showRevisionConflict();
+          return;
+        }
+      }
+      finishSaveFlow();
+      message.error(error instanceof Error ? error.message : "影响检查失败");
+    } finally {
+      setCheckingSurface(false);
+    }
+  };
+
+  const handleSaveError = async (
+    error: unknown,
+    context: PendingFormsSave
+  ): Promise<void> => {
+    if (error instanceof HttpError) {
+      if (handleFormsFieldIssues(error)) return;
+
+      if (
+        error.status === 409 &&
+        (error.code === "surface_match_acknowledgement_required" ||
+          error.code === "surface_matches_changed")
+      ) {
+        const page = error.meta?.surface_match_page;
+        if (!page) {
+          finishSaveFlow();
+          message.error("同形提示响应异常，缺少最新匹配页，已阻止保存");
+          return;
+        }
+        setPendingSave({
+          ...context,
+          impact: {
+            ...context.impact,
+            confirmation_token: undefined,
+            surface_match_page: page
+          }
+        });
+        setSurfaceFirstPage(page);
+        setSurfaceResetVersion((current) => current + 1);
+        return;
+      }
+
+      if (
+        (error.status === 410 &&
+          error.code === "surface_match_snapshot_expired") ||
+        (error.status === 409 &&
+          (error.code === "surface_policy_changed" ||
+            error.code === "downstream_confirmation_required"))
+      ) {
+        await runImpactCheck({
+          baseRevision: context.baseRevision,
+          intent: context.intent,
+          content: context.content
+        });
+        return;
+      }
+
+      if (error.status === 409) {
+        showRevisionConflict();
+        return;
+      }
+    }
+    finishSaveFlow();
+    message.error(error instanceof Error ? error.message : "保存失败");
+  };
+
+  async function submitForms(
+    context: PendingFormsSave,
+    tokens: {
+      confirmed_surface_match_token?: string;
+      confirmed_impact_token?: string;
+    } = {}
+  ): Promise<void> {
+    setConfirming(true);
+    try {
+      const { word: savedWord } = await saveForms.mutateAsync({
+        base_revision: context.baseRevision,
+        intent: context.intent,
+        ...tokens,
+        content: context.content
+      });
+      handleSuccessfulSave(context.intent, savedWord);
+    } catch (error) {
+      await handleSaveError(error, context);
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  const confirmPendingSave = async (): Promise<void> => {
+    if (
+      !pendingSave ||
+      confirming ||
+      checkingSurface ||
+      confirmActionRef.current
+    ) {
+      return;
+    }
+    const needsSurface = Boolean(pendingSave.impact.surface_match_page);
+    const confirmedSurfaceToken = needsSurface
+      ? surfaceSnapshot.surface_confirmation_token?.trim()
+      : undefined;
+    const confirmedImpactToken = pendingSave.impact.requires_confirmation
+      ? needsSurface
+        ? surfaceSnapshot.impact_confirmation_token?.trim()
+        : pendingSave.impact.confirmation_token?.trim()
+      : undefined;
+    if (
+      (needsSurface &&
+        (!canAcknowledgeSurfaceSnapshot(surfaceSnapshot) ||
+          !confirmedSurfaceToken)) ||
+      (pendingSave.impact.requires_confirmation && !confirmedImpactToken)
+    ) {
+      message.error("确认信息尚未完整加载，已阻止保存");
+      return;
+    }
+    confirmActionRef.current = true;
+    try {
+      await submitForms(pendingSave, {
+        ...(confirmedSurfaceToken
+          ? { confirmed_surface_match_token: confirmedSurfaceToken }
+          : {}),
+        ...(confirmedImpactToken
+          ? { confirmed_impact_token: confirmedImpactToken }
+          : {})
+      });
+    } finally {
+      confirmActionRef.current = false;
+    }
+  };
+
+  const retryPendingImpact = () => {
+    if (!pendingSave || checkingSurface || confirming) return;
+    void runImpactCheck({
+      baseRevision: pendingSave.baseRevision,
+      intent: pendingSave.intent,
+      content: pendingSave.content
+    });
+  };
+
+  const locateFormCandidate = (candidate: FormSurfaceCandidate) => {
+    setActivePosId(candidate.pos_id);
+    setFocusCandidateNodeId(candidate.candidate_node_id);
+  };
+
+  const clearFocusedCandidate = useCallback(
+    () => setFocusCandidateNodeId(undefined),
+    []
+  );
+
   const save = async (intent: StepSaveIntent) => {
-    if (saving) return;
+    if (saveFlowActiveRef.current) return;
     if (intent === "complete") {
       const issues: string[] = [];
       if (content.pos.length === 0) {
@@ -1775,117 +2324,50 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
       }
     }
 
+    saveFlowActiveRef.current = true;
     setSaving(true);
-    try {
-      const wireContent = toFormsWireContent({
-        pos: content.pos.map((pos) => {
-          const configured = partOfSpeechLookup.byCode.get(pos.pos);
-          const onlyLegacyEmptyGroups = pos.form_groups.every(
-            (group) => group.slots.length === 0
-          );
-          return configured?.allowed_form_types?.length === 0 &&
-            onlyLegacyEmptyGroups
-            ? { ...pos, form_groups: [] }
-            : pos;
-        })
-      });
-      const impact = await previewImpact.mutateAsync({
-        base_revision: word.revision,
-        content: wireContent
-      });
-      let confirmedToken: string | undefined;
-      if (impact.requires_confirmation) {
-        const summary = summarizeFormsImpact(impact.affected);
-        if (!summary.can_confirm) {
-          message.error("影响预览响应异常，未返回受影响节点，已阻止保存");
-          return;
-        }
-        if (!impact.confirmation_token?.trim()) {
-          message.error("影响预览响应异常，缺少确认凭证，已阻止保存");
-          return;
-        }
-        const confirmed = await confirmImpact(
-          "本次修改会影响后续内容",
-          <Space orientation="vertical" size="small">
-            <Typography.Text>
-              共影响{" "}
-              <Typography.Text strong>{summary.affected_count}</Typography.Text>{" "}
-              个下游节点，请确认是否继续保存。
-            </Typography.Text>
-            <Typography.Text type="secondary">
-              类型：
-              {summary.type_counts
-                .map(({ label, count }) => `${label} ${count}`)
-                .join("、")}
-            </Typography.Text>
-            {summary.groups.map((group) => (
-              <Typography.Text key={group.reason}>
-                {group.reason}（{group.count} 个：
-                {group.type_counts
-                  .map(({ label, count }) => `${label} ${count}`)
-                  .join("、")}
-                ）
-              </Typography.Text>
-            ))}
-            {summary.warnings.length > 0 ? (
-              <Alert
-                type="warning"
-                showIcon
-                title={summary.warnings.join("；")}
-              />
-            ) : null}
-          </Space>
+    const wireContent = toFormsWireContent({
+      pos: content.pos.map((pos) => {
+        const configured = partOfSpeechLookup.byCode.get(pos.pos);
+        const onlyLegacyEmptyGroups = pos.form_groups.every(
+          (group) => group.slots.length === 0
         );
-        if (!confirmed) return;
-        confirmedToken = impact.confirmation_token;
-      }
-      const { word: savedWord } = await saveForms.mutateAsync({
-        base_revision: word.revision,
-        intent,
-        ...(confirmedToken ? { confirmed_impact_token: confirmedToken } : {}),
-        content: wireContent
-      });
-      setDirty(false);
-      onSaved(savedWord);
-      message.success(
-        intent === "complete" ? "词形与发音已完成" : "草稿已保存"
-      );
-      if (intent === "complete") {
-        allowSavedNavigation();
-        navigate(`/words/${word.id}/wizard/meanings${editQuery}`);
-      }
-    } catch (error) {
-      if (error instanceof HttpError) {
-        const stepIssues = error.field_issues.filter(
-          (candidate) => candidate.step === "forms"
-        );
-        setValidationMessages(stepIssues.map((issue) => issue.message));
-        const issue = stepIssues[0];
-        if (issue) {
-          message.warning(issue.message);
-          navigate(`/words/${word.id}/wizard/forms${editQuery}`, {
-            replace: true,
-            state: { nodeId: issue.node_id, field: issue.field }
-          });
-          return;
-        }
-        if (error.status === 409) {
-          modal.confirm({
-            title: "草稿版本已更新",
-            content:
-              "该词条已在其他位置保存。为避免覆盖新内容，请重新加载最新草稿后再编辑。",
-            okText: "重新加载",
-            cancelText: "留在本页",
-            onOk: () => navigate(0)
-          });
-          return;
-        }
-      }
-      message.error(error instanceof Error ? error.message : "保存失败");
-    } finally {
-      setSaving(false);
-    }
+        return configured?.allowed_form_types?.length === 0 &&
+          onlyLegacyEmptyGroups
+          ? { ...pos, form_groups: [] }
+          : pos;
+      })
+    });
+    await runImpactCheck({
+      baseRevision: contentBaseRevision,
+      intent,
+      content: wireContent
+    });
   };
+
+  const pendingNeedsSurface = Boolean(pendingSave?.impact.surface_match_page);
+  const surfaceConfirmationReady =
+    !pendingNeedsSurface || canAcknowledgeSurfaceSnapshot(surfaceSnapshot);
+  const impactConfirmationReady =
+    !pendingSave?.impact.requires_confirmation ||
+    Boolean(
+      (pendingNeedsSurface
+        ? surfaceSnapshot.impact_confirmation_token
+        : pendingSave.impact.confirmation_token
+      )?.trim()
+    );
+  const confirmationReady =
+    Boolean(pendingSave) &&
+    surfaceConfirmationReady &&
+    impactConfirmationReady &&
+    !checkingSurface &&
+    !confirming;
+
+  const confirmationTitle = pendingNeedsSurface
+    ? pendingSave?.impact.requires_confirmation
+      ? "保存前请确认同形提示与下游影响"
+      : "保存前请确认同形提示"
+    : "本次修改会影响后续内容";
 
   const items = content.pos.map((pos, posIndex) => ({
     key: pos.pos_id,
@@ -1940,8 +2422,12 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
           partOfSpeechLookup.byCode.get(pos.pos)?.default_form_types
         }
         headwords={word.headwords}
-        readOnly={readOnly}
+        readOnly={readOnly || Boolean(pendingSave)}
         generating={suggestVariants.isPending}
+        focusNodeId={
+          pos.pos_id === activePosId ? focusCandidateNodeId : undefined
+        }
+        onFocusNodeHandled={clearFocusedCandidate}
         onGenerate={generateFormVariant}
         onChange={(nextPos) => {
           const posItems = [...content.pos];
@@ -1963,6 +2449,36 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
           基本词性来自词典建议，可在本步增删。每个词性共享一个只读原形拼写，并可维护多组替代词形变化与双方言读音。
         </Typography.Paragraph>
       </div>
+
+      <Modal
+        open={Boolean(pendingSave)}
+        title={confirmationTitle}
+        okText="确认并保存"
+        cancelText="取消"
+        confirmLoading={confirming}
+        okButtonProps={{ disabled: !confirmationReady }}
+        cancelButtonProps={{ disabled: confirming || checkingSurface }}
+        closable={!confirming && !checkingSurface}
+        mask={{ closable: false }}
+        onOk={() => void confirmPendingSave()}
+        onCancel={() => {
+          if (!confirming && !checkingSurface) finishSaveFlow();
+        }}
+      >
+        {pendingSave ? (
+          <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
+            {pendingNeedsSurface ? (
+              <SurfaceConfirmationDetails
+                snapshot={surfaceSnapshot}
+                checking={checkingSurface}
+                onLocate={locateFormCandidate}
+                onRetry={retryPendingImpact}
+              />
+            ) : null}
+            <ImpactConfirmationDetails impact={pendingSave.impact} />
+          </Space>
+        ) : null}
+      </Modal>
 
       {readOnly && (
         <Alert
@@ -1997,7 +2513,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
 
       <fieldset
         className="word-request-lock"
-        disabled={saving}
+        disabled={saving && !pendingSave}
         aria-busy={saving}
       >
         {validationMessages.length > 0 && (

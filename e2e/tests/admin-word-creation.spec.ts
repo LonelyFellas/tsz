@@ -302,6 +302,180 @@ test.describe("admin 新建单词 V2", () => {
     expect(attempts[1]!.idempotencyKey).not.toBe(attempts[0]!.idempotencyKey);
   });
 
+  test("forms surface+impact：终页门禁、候选定位、取消保值并以双 token 保存一次", async ({
+    page
+  }) => {
+    const api = await createCenterDraft(page, {
+      formsSurfaceWarnings: true,
+      formsDownstreamImpact: true,
+      formsSurfaceTerminalDelayMs: 1_000
+    });
+    const formsPath = `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}/steps/forms`;
+    const impactPath = `${formsPath}/impact`;
+    const pluralInput = page
+      .locator('[data-word-node-id="noun-plural-us"]')
+      .getByPlaceholder("词形拼写");
+
+    await pluralInput.fill("workspaces");
+    await page.getByRole("button", { name: "保存草稿" }).click();
+
+    const confirmationTitle = page.getByText("保存前请确认同形提示与下游影响", {
+      exact: true
+    });
+    await expect(confirmationTitle).toBeVisible();
+    await expect(page.getByText("正在加载全部同形命中（1/2）")).toBeVisible();
+    const confirm = page.getByRole("button", { name: "确认并保存" });
+    await expect(confirm).toBeDisabled();
+    expect(api.count("PUT", formsPath)).toBe(0);
+
+    await expect(page.getByText("发现 2 条跨词条同形命中")).toBeVisible();
+    await expect(confirm).toBeEnabled();
+    await expect(
+      page.getByText("workspaces 已在 workspaces 中存在")
+    ).toBeVisible();
+    await expect(
+      page.getByText("workspaces 已在 workspace 中存在")
+    ).toBeVisible();
+    await expect(page.getByText("主词：workspaces")).toBeVisible();
+    await expect(page.getByText("noun · 复数词形：workspaces")).toBeVisible();
+    await expect(
+      page.getByText("当前候选：noun · 复数 · 美式").first()
+    ).toBeVisible();
+    await expect(page.getByText("共影响 1 个下游节点。")).toBeVisible();
+
+    await pluralInput.evaluate((input) => {
+      input.addEventListener(
+        "focus",
+        () => input.setAttribute("data-e2e-located", "true"),
+        { once: true }
+      );
+    });
+    await page.getByRole("button", { name: "定位词形" }).first().click();
+    await expect(pluralInput).toHaveAttribute("data-e2e-located", "true");
+    await page.getByRole("button", { name: /取\s*消/ }).click();
+    await expect(confirmationTitle).toBeHidden();
+    await expect(pluralInput).toHaveValue("workspaces");
+    expect(api.count("PUT", formsPath)).toBe(0);
+    expect(api.getWord()?.revision).toBe(1);
+
+    await page.getByRole("button", { name: "保存草稿" }).click();
+    await expect(page.getByText("发现 2 条跨词条同形命中")).toBeVisible();
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+    await expect(page.getByText("草稿已保存")).toBeVisible();
+
+    const impactAttempts = api.requests.filter(
+      (request) => request.method === "POST" && request.path === impactPath
+    );
+    expect(impactAttempts).toHaveLength(2);
+    expect(impactAttempts[0]!.body).toMatchObject({
+      base_revision: 1,
+      content: {
+        pos: [
+          {
+            pos_id: "pos-noun",
+            form_groups: [
+              {
+                slots: [
+                  {
+                    form_type: "plural",
+                    variants: [
+                      { id: "noun-plural-uk", spelling: "centres" },
+                      { id: "noun-plural-us", spelling: "workspaces" }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    });
+    const saveAttempts = api.requests.filter(
+      (request) => request.method === "PUT" && request.path === formsPath
+    );
+    expect(saveAttempts).toHaveLength(1);
+    expect(saveAttempts[0]!.body).toMatchObject({
+      base_revision: 1,
+      confirmed_surface_match_token: "forms-surface-token-v1",
+      confirmed_impact_token: "forms-impact-token-v1",
+      content: {
+        pos: [
+          {
+            form_groups: [
+              {
+                slots: [
+                  {
+                    variants: [
+                      { id: "noun-plural-uk", spelling: "centres" },
+                      { id: "noun-plural-us", spelling: "workspaces" }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    });
+    expect(api.getWord()?.revision).toBe(2);
+    expect(
+      api.getWord()?.forms.pos[0]?.form_groups[0]?.slots[0]?.variants[1]
+        ?.spelling
+    ).toBe("workspaces");
+  });
+
+  test("forms surface changed 409：保留输入并使用锁后新双 token 重确认", async ({
+    page
+  }) => {
+    const api = await createCenterDraft(page, {
+      formsSurfaceWarnings: true,
+      formsDownstreamImpact: true,
+      changeFormsSurfaceOnFirstSave: true
+    });
+    const formsPath = `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}/steps/forms`;
+    const pluralInput = page
+      .locator('[data-word-node-id="noun-plural-us"]')
+      .getByPlaceholder("词形拼写");
+    const confirm = page.getByRole("button", { name: "确认并保存" });
+
+    await pluralInput.fill("workspaces");
+    await page.getByRole("button", { name: "保存草稿" }).click();
+    await expect(page.getByText("发现 2 条跨词条同形命中")).toBeVisible();
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+
+    await expect.poll(() => api.count("PUT", formsPath)).toBe(1);
+    expect(api.getWord()?.revision).toBe(1);
+    await expect(pluralInput).toHaveValue("workspaces");
+    await expect(
+      page.getByText("workspaces 已在 workspace-updated 中存在")
+    ).toBeVisible();
+    await expect(confirm).toBeEnabled();
+    await confirm.click();
+    await expect(page.getByText("草稿已保存")).toBeVisible();
+
+    const saveAttempts = api.requests.filter(
+      (request) => request.method === "PUT" && request.path === formsPath
+    );
+    expect(saveAttempts).toHaveLength(2);
+    expect(saveAttempts[0]!.body).toMatchObject({
+      base_revision: 1,
+      confirmed_surface_match_token: "forms-surface-token-v1",
+      confirmed_impact_token: "forms-impact-token-v1"
+    });
+    expect(saveAttempts[1]!.body).toMatchObject({
+      base_revision: 1,
+      confirmed_surface_match_token: "forms-surface-token-v2",
+      confirmed_impact_token: "forms-impact-token-v2"
+    });
+    expect(api.getWord()?.revision).toBe(2);
+    expect(
+      api.getWord()?.forms.pos[0]?.form_groups[0]?.slots[0]?.variants[1]
+        ?.spelling
+    ).toBe("workspaces");
+  });
+
   test("T20 forms 保存失败保值，重试成功后刷新恢复 meanings", async ({
     page
   }) => {

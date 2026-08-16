@@ -69,7 +69,7 @@ function context(word_id: string): MatchedEntryContextV2 {
 function page(
   items: LexiconSurfaceMatchV2[],
   next_cursor: string | null,
-  options: { disabled?: boolean; token?: string } = {}
+  options: { disabled?: boolean; token?: string; impactToken?: string } = {}
 ): SurfaceMatchPageV2 {
   const base = {
     snapshot_id: "snapshot-1",
@@ -95,7 +95,10 @@ function page(
     ...base,
     continuation_policy: "enabled",
     next_cursor: null,
-    surface_confirmation_token: options.token ?? "token-1"
+    surface_confirmation_token: options.token ?? "token-1",
+    ...(options.impactToken
+      ? { impact_confirmation_token: options.impactToken }
+      : {})
   };
 }
 
@@ -117,13 +120,17 @@ describe("surfaceSnapshotReducer", () => {
       type: "page_loaded",
       generation: 1,
       requested_cursor: "cursor-2",
-      page: page([match("m2", "word-2")], null, { token: "terminal-token" })
+      page: page([match("m2", "word-2")], null, {
+        token: "terminal-token",
+        impactToken: "terminal-impact-token"
+      })
     });
     expect(terminal.items.map((item) => item.match_id)).toEqual(["m1", "m2"]);
     expect(terminal.matched_entry_contexts.map((item) => item.word_id)).toEqual(
       ["word-1", "word-2"]
     );
     expect(terminal.surface_confirmation_token).toBe("terminal-token");
+    expect(terminal.impact_confirmation_token).toBe("terminal-impact-token");
     expect(canAcknowledgeSurfaceSnapshot(terminal)).toBe(true);
   });
 
@@ -132,7 +139,9 @@ describe("surfaceSnapshotReducer", () => {
       type: "start",
       generation: 1,
       page: {
-        ...page([match("m1", "word-1"), match("m2", "word-2")], null),
+        ...page([match("m1", "word-1"), match("m2", "word-2")], null, {
+          impactToken: "old-impact-token"
+        }),
         total: 2
       }
     });
@@ -148,6 +157,7 @@ describe("surfaceSnapshotReducer", () => {
     });
     expect(late).toEqual(reset);
     expect(late.surface_confirmation_token).toBeUndefined();
+    expect(late.impact_confirmation_token).toBeUndefined();
   });
 
   it("页失败/过期、snapshot identity 变化均 fail closed 并清 token", () => {
@@ -156,24 +166,32 @@ describe("surfaceSnapshotReducer", () => {
       generation: 1,
       page: page([match("m1", "word-1")], "cursor-2")
     });
-    const failed = surfaceSnapshotReducer(first, {
-      type: "page_failed",
-      generation: 1,
-      requested_cursor: "cursor-2",
-      error: new Error("expired"),
-      expired: true
-    });
+    const failed = surfaceSnapshotReducer(
+      { ...first, impact_confirmation_token: "stale-impact-token" },
+      {
+        type: "page_failed",
+        generation: 1,
+        requested_cursor: "cursor-2",
+        error: new Error("expired"),
+        expired: true
+      }
+    );
     expect(failed.phase).toBe("expired");
+    expect(failed.impact_confirmation_token).toBeUndefined();
     expect(canAcknowledgeSurfaceSnapshot(failed)).toBe(false);
 
-    const mismatched = surfaceSnapshotReducer(first, {
-      type: "page_loaded",
-      generation: 1,
-      requested_cursor: "cursor-2",
-      page: { ...page([match("m2", "word-2")], null), policy_epoch: 5 }
-    });
+    const mismatched = surfaceSnapshotReducer(
+      { ...first, impact_confirmation_token: "stale-impact-token" },
+      {
+        type: "page_loaded",
+        generation: 1,
+        requested_cursor: "cursor-2",
+        page: { ...page([match("m2", "word-2")], null), policy_epoch: 5 }
+      }
+    );
     expect(mismatched.phase).toBe("error");
     expect(mismatched.surface_confirmation_token).toBeUndefined();
+    expect(mismatched.impact_confirmation_token).toBeUndefined();
   });
 
   it("disabled snapshot 可加载完全部页，但任何阶段都不允许确认", () => {

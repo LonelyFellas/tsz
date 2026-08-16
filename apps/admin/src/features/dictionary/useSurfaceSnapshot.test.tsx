@@ -11,7 +11,8 @@ vi.mock("./dataSource", () => ({
 
 function page(
   next_cursor: string | null,
-  token = "surface-token"
+  token = "surface-token",
+  impactToken?: string
 ): SurfaceMatchPageV2 {
   const base = {
     snapshot_id: "snapshot-1",
@@ -27,7 +28,8 @@ function page(
         ...base,
         continuation_policy: "enabled",
         next_cursor: null,
-        surface_confirmation_token: token
+        surface_confirmation_token: token,
+        ...(impactToken ? { impact_confirmation_token: impactToken } : {})
       }
     : { ...base, continuation_policy: "enabled", next_cursor };
 }
@@ -37,7 +39,7 @@ describe("useSurfaceSnapshot", () => {
 
   it("没有首页时保持 idle，收到首页后使用默认 data source 顺序加载到终页", async () => {
     vi.mocked(adminWordsDataSource.surfaceMatchSnapshotPage).mockResolvedValue(
-      page(null)
+      page(null, "surface-token", "impact-token")
     );
     const hook = renderHook(
       ({ initialPage }) => useSurfaceSnapshot(initialPage, "same-key"),
@@ -59,6 +61,7 @@ describe("useSurfaceSnapshot", () => {
     expect(hook.result.current.surface_confirmation_token).toBe(
       "surface-token"
     );
+    expect(hook.result.current.impact_confirmation_token).toBe("impact-token");
   });
 
   it.each([
@@ -92,6 +95,7 @@ describe("useSurfaceSnapshot", () => {
 
     await waitFor(() => expect(hook.result.current.phase).toBe(phase));
     expect(hook.result.current.surface_confirmation_token).toBeUndefined();
+    expect(hook.result.current.impact_confirmation_token).toBeUndefined();
   });
 
   it("retry 会重置 generation 并重新加载同一首页", async () => {

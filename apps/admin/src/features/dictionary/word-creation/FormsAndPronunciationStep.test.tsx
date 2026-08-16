@@ -1,5 +1,5 @@
 import { HttpError } from "@tsz/api-client/http";
-import type { DraftFormsStepContent } from "@tsz/types";
+import type { DraftFormsStepContent, SurfaceMatchPageV2 } from "@tsz/types";
 import {
   act,
   fireEvent,
@@ -8,6 +8,7 @@ import {
   waitFor
 } from "@testing-library/react";
 import { App as AntApp } from "antd";
+import { useState } from "react";
 import {
   createMemoryRouter,
   RouterProvider,
@@ -22,7 +23,8 @@ import { deferred, wordFixture } from "./wordCreation.test.helper";
 const mutations = vi.hoisted(() => ({
   preview: vi.fn(),
   save: vi.fn(),
-  suggest: vi.fn()
+  suggest: vi.fn(),
+  surfacePage: vi.fn()
 }));
 const dataSourceCapabilities = vi.hoisted(() => ({
   dialectVariantSuggestions: true
@@ -31,7 +33,10 @@ const catalogState = vi.hoisted(() => ({
   data: undefined as typeof partOfSpeechCatalogFixture | undefined
 }));
 vi.mock("../dataSource", () => ({
-  adminWordsDataSourceCapabilities: dataSourceCapabilities
+  adminWordsDataSourceCapabilities: dataSourceCapabilities,
+  adminWordsDataSource: {
+    surfaceMatchSnapshotPage: mutations.surfacePage
+  }
 }));
 
 vi.mock("./api", () => ({
@@ -85,20 +90,27 @@ function renderStep(
   readOnly = false
 ) {
   const onSaved = vi.fn();
+  let updateRenderedWord:
+    ((next: ReturnType<typeof wordFixture>) => void) | undefined;
+  function StepUnderTest() {
+    const [renderedWord, setRenderedWord] = useState(word);
+    updateRenderedWord = (next) => setRenderedWord(next);
+    return (
+      <>
+        <FormsAndPronunciationStep
+          word={renderedWord}
+          readOnly={readOnly}
+          onSaved={onSaved}
+        />
+        <LocationProbe />
+      </>
+    );
+  }
   const router = createMemoryRouter(
     [
       {
         path: "/words/:wordId/wizard/forms",
-        element: (
-          <>
-            <FormsAndPronunciationStep
-              word={word}
-              readOnly={readOnly}
-              onSaved={onSaved}
-            />
-            <LocationProbe />
-          </>
-        )
+        element: <StepUnderTest />
       },
       {
         path: "/words/:wordId/wizard/:step",
@@ -123,11 +135,113 @@ function renderStep(
       <RouterProvider router={router} />
     </AntApp>
   );
-  return { onSaved, router };
+  return {
+    onSaved,
+    router,
+    rerenderWord(next: ReturnType<typeof wordFixture>) {
+      if (!updateRenderedWord) throw new Error("step harness is not mounted");
+      act(() => updateRenderedWord?.(next));
+    }
+  };
+}
+
+function surfacePageFixture({
+  word = wordFixture(),
+  posIndex = 0,
+  snapshotId = "forms-snapshot-1",
+  matchId = "forms-match-1",
+  existingWordId = "word-workspaces",
+  surface = "workspaces",
+  total = 1,
+  nextCursor = null,
+  surfaceToken = "surface-token-1",
+  impactToken
+}: {
+  word?: ReturnType<typeof wordFixture>;
+  posIndex?: number;
+  snapshotId?: string;
+  matchId?: string;
+  existingWordId?: string;
+  surface?: string;
+  total?: number;
+  nextCursor?: string | null;
+  surfaceToken?: string;
+  impactToken?: string;
+} = {}): SurfaceMatchPageV2 {
+  const pos = word.forms.pos[posIndex]!;
+  const slot = pos.form_groups[0]?.slots[0] ?? pos.base_form;
+  const dialect = slot.variants[0]?.dialect ?? "common";
+  const candidateNodeId = slot.variants[0]?.id ?? slot.id;
+  const page = {
+    snapshot_id: snapshotId,
+    items: [
+      {
+        match_id: matchId,
+        match_category: "form_headword" as const,
+        severity: "warning" as const,
+        attention_level: "normal" as const,
+        can_continue: true as const,
+        confirmation_reasons: ["unacknowledged_surface_matches" as const],
+        candidate: {
+          candidate_type: "form" as const,
+          candidate_ref: `${pos.pos_id}:${slot.id}:${dialect}`,
+          candidate_word_id: word.id,
+          candidate_node_id: candidateNodeId,
+          surface,
+          normalized_surface: surface,
+          dialect,
+          pos_id: pos.pos_id,
+          pos: pos.pos,
+          form_type: slot.form_type
+        },
+        existing: {
+          word_id: existingWordId,
+          headword: surface,
+          kind: "word" as const,
+          status: "draft" as const,
+          source: {
+            source_kind: "headword" as const,
+            source_id: `${existingWordId}-headword`,
+            content_scope: "draft" as const,
+            surface,
+            dialect
+          }
+        }
+      }
+    ],
+    total,
+    matched_entry_contexts: [
+      {
+        word_id: existingWordId,
+        pos_labels: ["noun"],
+        gloss_previews: ["工作区"],
+        updated_at: "2026-08-16T00:00:00.000Z",
+        inbound_relations: {
+          total: 0,
+          by_type: { synonym: 0, antonym: 0, derivative: 0 },
+          previews: [],
+          truncated: false
+        }
+      }
+    ],
+    confirmation_reasons: ["unacknowledged_surface_matches" as const],
+    policy_name: "surface_warning_acknowledgement" as const,
+    policy_epoch: 1,
+    continuation_policy: "enabled" as const
+  };
+  return nextCursor === null
+    ? {
+        ...page,
+        next_cursor: null,
+        surface_confirmation_token: surfaceToken,
+        ...(impactToken ? { impact_confirmation_token: impactToken } : {})
+      }
+    : { ...page, next_cursor: nextCursor };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mutations.surfacePage.mockReset();
   catalogState.data = partOfSpeechCatalogFixture;
   dataSourceCapabilities.dialectVariantSuggestions = true;
   mutations.preview.mockResolvedValue({
@@ -696,6 +810,521 @@ describe("FormsAndPronunciationStep", () => {
     );
   });
 
+  it("dirty 内容遇到同 entry refetch 时仍以内容加载时的 revision 预检", async () => {
+    const word = wordFixture();
+    mutations.preview.mockRejectedValue(
+      new HttpError(409, "revision conflict", [], "revision_conflict")
+    );
+    const { rerenderWord } = renderStep(word);
+    const input = screen.getAllByLabelText("实际发音")[0]!;
+    fireEvent.change(input, { target: { value: "dirty-before-refetch" } });
+
+    rerenderWord(wordFixture({ revision: word.revision + 1 }));
+    expect(input).toHaveValue("dirty-before-refetch");
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(1));
+    expect(mutations.preview).toHaveBeenCalledWith(
+      expect.objectContaining({ base_revision: word.revision })
+    );
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("确认窗打开后同 entry refetch 不改变本次 preview 绑定的 save revision", async () => {
+    const word = wordFixture();
+    mutations.preview.mockResolvedValue({
+      base_revision: word.revision,
+      requires_confirmation: true,
+      affected: [
+        { node_id: "sense-1", node_type: "sense", reason: "词义将被重建" }
+      ],
+      confirmation_token: "impact-token-before-refetch"
+    });
+    const { rerenderWord } = renderStep(word);
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(button("确认并保存")).toBeEnabled());
+    rerenderWord(wordFixture({ revision: word.revision + 1 }));
+    fireEvent.click(button("确认并保存"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(mutations.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        base_revision: word.revision,
+        confirmed_impact_token: "impact-token-before-refetch"
+      })
+    );
+  });
+
+  it("仅有 surface warning 时加载终页并只携 surface token 保存", async () => {
+    const word = wordFixture();
+    mutations.preview.mockResolvedValue({
+      base_revision: word.revision,
+      requires_confirmation: false,
+      affected: [],
+      surface_match_page: surfacePageFixture({ word })
+    });
+    renderStep(word);
+
+    fireEvent.click(button("保存草稿"));
+    expect(await screen.findByText("保存前请确认同形提示")).toBeInTheDocument();
+    await waitFor(() => expect(button("确认并保存")).toBeEnabled());
+    fireEvent.click(button("确认并保存"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const payload = mutations.save.mock.calls[0]![0];
+    expect(payload.confirmed_surface_match_token).toBe("surface-token-1");
+    expect(payload).not.toHaveProperty("confirmed_impact_token");
+  });
+
+  it("多个同名跨 entry 命中展示精确身份、来源和新标签页入口", async () => {
+    const word = wordFixture();
+    const firstWordId = "word-workspaces-draft-0001";
+    const secondWordId = "word-workspaces-published-0002";
+    const firstPage = surfacePageFixture({
+      word,
+      existingWordId: firstWordId,
+      matchId: "forms-match-draft"
+    });
+    const secondPage = surfacePageFixture({
+      word,
+      existingWordId: secondWordId,
+      matchId: "forms-match-published"
+    });
+    const secondItem = structuredClone(secondPage.items[0]!);
+    secondItem.existing.kind = "phrase";
+    secondItem.existing.status = "published";
+    secondItem.existing.source.content_scope = "current_publication";
+    secondItem.existing.source.dialect = "us";
+    mutations.preview.mockResolvedValue({
+      base_revision: word.revision,
+      requires_confirmation: false,
+      affected: [],
+      surface_match_page: {
+        ...firstPage,
+        items: [firstPage.items[0]!, secondItem],
+        total: 2,
+        matched_entry_contexts: [
+          firstPage.matched_entry_contexts[0]!,
+          {
+            ...secondPage.matched_entry_contexts[0]!,
+            word_id: secondWordId,
+            inbound_relations: {
+              ...secondPage.matched_entry_contexts[0]!.inbound_relations,
+              total: 3
+            }
+          }
+        ]
+      }
+    });
+    renderStep(word);
+
+    fireEvent.click(button("保存草稿"));
+
+    const firstLink = await screen.findByRole("link", {
+      name: `workspaces ${firstWordId}，在新标签页打开`
+    });
+    const secondLink = screen.getByRole("link", {
+      name: `workspaces ${secondWordId}，在新标签页打开`
+    });
+    expect(firstLink).toHaveAttribute(
+      "href",
+      `/words/${firstWordId}/wizard/basics`
+    );
+    expect(secondLink).toHaveAttribute(
+      "href",
+      `/words/${secondWordId}/wizard/basics`
+    );
+    expect(firstLink).toHaveAttribute("target", "_blank");
+    expect(secondLink).toHaveAttribute("target", "_blank");
+    const secondCard = secondLink.closest(".ant-card");
+    expect(secondCard).not.toBeNull();
+    expect(secondCard).toHaveTextContent("已发布");
+    expect(secondCard).toHaveTextContent("短语");
+    expect(secondCard).toHaveTextContent(
+      /主词：workspaces · us · 当前发布版本/
+    );
+    expect(secondCard).toHaveTextContent("有效入站关联：共 3 条");
+  });
+
+  it("surface 与 impact 同时存在时在一个确认窗提交终页双 token", async () => {
+    const word = wordFixture();
+    mutations.preview.mockResolvedValue({
+      base_revision: word.revision,
+      requires_confirmation: true,
+      affected: [
+        { node_id: "sense-1", node_type: "sense", reason: "词义将被重建" }
+      ],
+      confirmation_token: "stale-impact-token",
+      surface_match_page: surfacePageFixture({
+        word,
+        surfaceToken: "surface-token-both",
+        impactToken: "impact-token-both"
+      })
+    });
+    renderStep(word);
+
+    fireEvent.click(button("保存草稿"));
+    expect(
+      await screen.findByText("保存前请确认同形提示与下游影响")
+    ).toBeInTheDocument();
+    expect(screen.getByText("同形词条提示")).toBeInTheDocument();
+    expect(screen.getByText("下游内容影响")).toBeInTheDocument();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    await waitFor(() => expect(button("确认并保存")).toBeEnabled());
+    fireEvent.click(button("确认并保存"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(mutations.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        confirmed_surface_match_token: "surface-token-both",
+        confirmed_impact_token: "impact-token-both"
+      })
+    );
+  });
+
+  it.each([
+    { label: "impact-only", withSurface: false },
+    { label: "surface+impact", withSurface: true }
+  ])(
+    "$label 保存返回 downstream_confirmation_required 时重新预览并使用新 token 确认",
+    async ({ withSurface }) => {
+      const word = wordFixture();
+      const impact = (suffix: "old" | "new") => ({
+        base_revision: word.revision,
+        requires_confirmation: true,
+        affected: [
+          { node_id: "sense-1", node_type: "sense", reason: "词义将被重建" }
+        ],
+        ...(withSurface
+          ? {
+              surface_match_page: surfacePageFixture({
+                word,
+                snapshotId: `forms-snapshot-${suffix}`,
+                matchId: `forms-match-${suffix}`,
+                surface: `workspaces-${suffix}`,
+                surfaceToken: `surface-token-${suffix}`,
+                impactToken: `impact-token-${suffix}`
+              })
+            }
+          : { confirmation_token: `impact-token-${suffix}` })
+      });
+      mutations.preview
+        .mockResolvedValueOnce(impact("old"))
+        .mockResolvedValueOnce(impact("new"));
+      mutations.save
+        .mockRejectedValueOnce(
+          new HttpError(
+            409,
+            "downstream confirmation required",
+            [],
+            "downstream_confirmation_required"
+          )
+        )
+        .mockResolvedValueOnce({ word: wordFixture({ revision: 4 }) });
+      renderStep(word);
+
+      fireEvent.click(button("保存草稿"));
+      await waitFor(() => expect(button("确认并保存")).toBeEnabled());
+      fireEvent.click(button("确认并保存"));
+
+      await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(button("确认并保存")).toBeEnabled());
+      fireEvent.click(button("确认并保存"));
+
+      await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(2));
+      expect(mutations.save.mock.calls[1]![0]).toEqual(
+        expect.objectContaining({
+          confirmed_impact_token: "impact-token-new",
+          ...(withSurface
+            ? { confirmed_surface_match_token: "surface-token-new" }
+            : {})
+        })
+      );
+      expect(screen.queryByText("草稿版本已更新")).toBeNull();
+    }
+  );
+
+  it("surface 多页读取终页前禁用确认，终页后才允许保存", async () => {
+    const word = wordFixture();
+    const pendingPage = deferred<SurfaceMatchPageV2>();
+    mutations.surfacePage.mockReturnValue(pendingPage.promise);
+    mutations.preview.mockResolvedValue({
+      base_revision: word.revision,
+      requires_confirmation: false,
+      affected: [],
+      surface_match_page: surfacePageFixture({
+        word,
+        total: 2,
+        nextCursor: "cursor-2"
+      })
+    });
+    renderStep(word);
+
+    fireEvent.click(button("保存草稿"));
+    expect(
+      await screen.findByText("正在加载全部同形命中（1/2）")
+    ).toBeInTheDocument();
+    expect(button("确认并保存")).toBeDisabled();
+    expect(mutations.save).not.toHaveBeenCalled();
+
+    await act(async () =>
+      pendingPage.resolve(
+        surfacePageFixture({
+          word,
+          matchId: "forms-match-2",
+          existingWordId: "word-workspaces-2",
+          total: 2,
+          surfaceToken: "surface-token-terminal"
+        })
+      )
+    );
+    await waitFor(() => expect(button("确认并保存")).toBeEnabled());
+    fireEvent.click(button("确认并保存"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(mutations.save.mock.calls[0]![0].confirmed_surface_match_token).toBe(
+      "surface-token-terminal"
+    );
+  });
+
+  it("同形卡可切到候选 POS 并展开候选 slot 所在词形组", async () => {
+    const word = wordFixture();
+    const targetPos = word.forms.pos[1]!;
+    const targetSlot = targetPos.form_groups[0]!.slots[0]!;
+    const targetVariant = targetSlot.variants[0]!;
+    mutations.preview.mockResolvedValue({
+      base_revision: word.revision,
+      requires_confirmation: false,
+      affected: [],
+      surface_match_page: surfacePageFixture({ word, posIndex: 1 })
+    });
+    renderStep(word);
+
+    fireEvent.click(screen.getByRole("tab", { name: /动词/ }));
+    const targetGroupToggle = document.querySelector<HTMLButtonElement>(
+      `[aria-controls="word-form-group-${targetPos.form_groups[0]!.id}-body"]`
+    );
+    expect(targetGroupToggle).not.toBeNull();
+    fireEvent.click(targetGroupToggle!);
+    expect(targetGroupToggle).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(screen.getByRole("tab", { name: /名词/ }));
+    fireEvent.click(button("保存草稿"));
+    await screen.findByText("保存前请确认同形提示");
+    fireEvent.click(button("定位词形"));
+
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: /动词/ })).toHaveAttribute(
+        "aria-selected",
+        "true"
+      )
+    );
+    await waitFor(() => {
+      expect(targetGroupToggle).toHaveAttribute("aria-expanded", "true");
+      expect(
+        Array.from(
+          document.querySelectorAll<HTMLElement>(
+            `[data-word-node-id="${targetSlot.id}"]`
+          )
+        ).some(
+          (candidate) =>
+            (candidate instanceof HTMLInputElement &&
+              candidate.placeholder === "词形拼写") ||
+            candidate.querySelector('input[placeholder="词形拼写"]') !== null
+        )
+      ).toBe(true);
+      expect(
+        document.querySelector(
+          `[data-word-node-id="${targetVariant.id}"] input[placeholder="词形拼写"]`
+        )
+      ).not.toBeNull();
+      expect(document.activeElement).toBe(
+        document.querySelector(
+          `[data-word-node-id="${targetVariant.id}"] input[placeholder="词形拼写"]`
+        )
+      );
+    });
+  });
+
+  it("save 返回 surface_matches_changed 时使用 meta 新首页重新确认", async () => {
+    const word = wordFixture();
+    const changedPage = surfacePageFixture({
+      word,
+      snapshotId: "forms-snapshot-changed",
+      matchId: "forms-match-changed",
+      surface: "workspaces-updated",
+      surfaceToken: "surface-token-changed"
+    });
+    mutations.preview.mockResolvedValue({
+      base_revision: word.revision,
+      requires_confirmation: false,
+      affected: [],
+      surface_match_page: surfacePageFixture({ word })
+    });
+    mutations.save
+      .mockRejectedValueOnce(
+        new HttpError(
+          409,
+          "surface matches changed",
+          [],
+          "surface_matches_changed",
+          [],
+          { surface_match_page: changedPage }
+        )
+      )
+      .mockResolvedValueOnce({ word: wordFixture({ revision: 4 }) });
+    renderStep(word);
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(button("确认并保存")).toBeEnabled());
+    fireEvent.click(button("确认并保存"));
+    expect(
+      await screen.findByText(
+        "workspaces-updated 已在 workspaces-updated 中存在"
+      )
+    ).toBeInTheDocument();
+    await waitFor(() => expect(button("确认并保存")).toBeEnabled());
+    fireEvent.click(button("确认并保存"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(2));
+    expect(mutations.save.mock.calls[1]![0].confirmed_surface_match_token).toBe(
+      "surface-token-changed"
+    );
+    expect(mutations.preview).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [410, "surface_match_snapshot_expired"],
+    [409, "surface_policy_changed"]
+  ] as const)(
+    "%s/%s 后重新执行 impact 并要求使用新 token 再确认",
+    async (status, code) => {
+      const word = wordFixture();
+      mutations.preview
+        .mockResolvedValueOnce({
+          base_revision: word.revision,
+          requires_confirmation: false,
+          affected: [],
+          surface_match_page: surfacePageFixture({ word })
+        })
+        .mockResolvedValueOnce({
+          base_revision: word.revision,
+          requires_confirmation: false,
+          affected: [],
+          surface_match_page: surfacePageFixture({
+            word,
+            snapshotId: `forms-snapshot-${code}`,
+            matchId: `forms-match-${code}`,
+            surface: `workspaces-${code}`,
+            surfaceToken: `surface-token-${code}`
+          })
+        });
+      mutations.save
+        .mockRejectedValueOnce(new HttpError(status, code, [], code))
+        .mockResolvedValueOnce({ word: wordFixture({ revision: 4 }) });
+      renderStep(word);
+
+      fireEvent.click(button("保存草稿"));
+      await waitFor(() => expect(button("确认并保存")).toBeEnabled());
+      fireEvent.click(button("确认并保存"));
+
+      await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(2));
+      expect(
+        await screen.findByText(
+          `workspaces-${code} 已在 workspaces-${code} 中存在`
+        )
+      ).toBeInTheDocument();
+      await waitFor(() => expect(button("确认并保存")).toBeEnabled());
+      fireEvent.click(button("确认并保存"));
+
+      await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(2));
+      expect(
+        mutations.save.mock.calls[1]![0].confirmed_surface_match_token
+      ).toBe(`surface-token-${code}`);
+    }
+  );
+
+  it("普通 409 保持草稿版本冲突行为，不进入 surface 重确认", async () => {
+    mutations.save.mockRejectedValue(
+      new HttpError(409, "revision conflict", [], "revision_conflict")
+    );
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(
+      (await screen.findAllByText("草稿版本已更新")).length
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("同形词条提示")).toBeNull();
+    expect(mutations.preview).toHaveBeenCalledTimes(1);
+  });
+
+  it("影响预览返回 revision_conflict 时复用草稿版本冲突流程", async () => {
+    mutations.preview.mockRejectedValue(
+      new HttpError(409, "revision conflict", [], "revision_conflict")
+    );
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(
+      (await screen.findAllByText("草稿版本已更新")).length
+    ).toBeGreaterThan(0);
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("影响预览返回 Forms field issue 时展示并定位稳定 node/field", async () => {
+    const issue = {
+      step: "forms" as const,
+      node_id: "suggested-verb-slot-1",
+      field: "variants.uk.spelling",
+      code: "required",
+      message: "请补齐英式词形"
+    };
+    mutations.preview.mockRejectedValue(
+      new HttpError(422, "invalid forms", [], "validation_failed", [issue])
+    );
+    const { router } = renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() =>
+      expect(router.state.location.state).toEqual({
+        nodeId: issue.node_id,
+        field: issue.field
+      })
+    );
+    expect((await screen.findAllByText(issue.message)).length).toBeGreaterThan(
+      0
+    );
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("重复点击确认仍只保存一次并只回传一次成功 revision", async () => {
+    const word = wordFixture();
+    const pending = deferred<{ word: ReturnType<typeof wordFixture> }>();
+    mutations.preview.mockResolvedValue({
+      base_revision: word.revision,
+      requires_confirmation: false,
+      affected: [],
+      surface_match_page: surfacePageFixture({ word })
+    });
+    mutations.save.mockReturnValue(pending.promise);
+    const { onSaved } = renderStep(word);
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(button("确认并保存")).toBeEnabled());
+    const confirm = button("确认并保存");
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
+    expect(mutations.save).toHaveBeenCalledTimes(1);
+
+    const saved = wordFixture({ revision: word.revision + 1 });
+    await act(async () => pending.resolve({ word: saved }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledTimes(1));
+    expect(onSaved).toHaveBeenCalledWith(saved);
+  });
+
   it("取消影响确认时不保存", async () => {
     mutations.preview.mockResolvedValue({
       base_revision: 3,
@@ -705,18 +1334,26 @@ describe("FormsAndPronunciationStep", () => {
       ],
       confirmation_token: "impact-token-cancel"
     });
-    renderStep();
+    const { onSaved } = renderStep();
+    const input = screen.getAllByLabelText("实际发音")[0]!;
+    fireEvent.change(input, { target: { value: "cancel-keeps-this" } });
 
     fireEvent.click(button("保存草稿"));
     await screen.findByText(/共影响/);
-    const cancelButton = document.querySelector<HTMLButtonElement>(
-      ".ant-modal-confirm-btns .ant-btn-default"
-    );
-    expect(cancelButton).not.toBeNull();
-    fireEvent.click(cancelButton!);
+    let cancel: HTMLButtonElement | null = null;
+    await waitFor(() => {
+      cancel = document.querySelector<HTMLButtonElement>(
+        ".ant-modal-footer .ant-btn-default"
+      );
+      expect(cancel).not.toBeNull();
+    });
+    await waitFor(() => expect(cancel).toBeEnabled());
+    fireEvent.click(cancel!);
 
     await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(1));
     expect(mutations.save).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+    expect(input).toHaveValue("cancel-keeps-this");
   });
 
   it("长影响列表按原因和节点类型聚合展示且不泄露节点 ID", async () => {
