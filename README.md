@@ -11,6 +11,12 @@
 - GitHub Actions CI、Turborepo(任务编排与缓存)
 - lefthook(Git 钩子)+ commitlint(强制 Conventional Commits)
 
+## 本地运行环境
+
+- Node.js 固定为 `22.23.1`，执行 `nvm use`（或使用支持 `.node-version` 的版本管理器）切换。
+- pnpm 固定为 `10.33.0`，由根 `package.json` 的 `packageManager` 与 Volta 配置统一管理。
+- 安装依赖前会校验 Node 版本；版本不一致时先切换运行时，不要绕过 `engine-strict`。
+
 ## 目录结构
 
 - `apps/web` —— 师生合一应用。`app/` 只放路由薄壳,逻辑沉到 `features/<域>`(`auth` / `class` / `practice` / `stats` / `task` / `wordlist`)。
