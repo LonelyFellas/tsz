@@ -449,14 +449,24 @@ export function PreviewAndPublishStep({
     }
     if (
       error instanceof HttpError &&
-      (error.status === 409 || error.status === 410) &&
-      requiresNewIdempotencyKey(error.status, error.code)
+      (error.status === 409 || error.status === 410)
     ) {
       publishKey.current = newWordNodeId();
-      if (error.meta?.surface_match_page) {
-        setSurfacePage(error.meta.surface_match_page);
+      if (requiresNewIdempotencyKey(error.status, error.code)) {
+        setSurfacePage(error.meta?.surface_match_page);
+      } else {
+        setSurfacePage(undefined);
       }
-      if (error.code === "surface_policy_changed") {
+      if (error.code === "revision_conflict") {
+        modal.confirm({
+          title: "草稿版本已更新",
+          content:
+            "该词条已在其他位置保存。为避免基于旧版本发布，请重新加载最新草稿。",
+          okText: "重新加载",
+          cancelText: "留在本页",
+          onOk: () => navigate(0)
+        });
+      } else if (error.code === "surface_policy_changed") {
         setSurfacePage(undefined);
         message.warning("公开可见性策略已变化，请重新发布以取得当前确认信息");
       } else if (error.code === "surface_match_snapshot_expired") {
@@ -469,21 +479,6 @@ export function PreviewAndPublishStep({
       } else {
         message.warning("同名公开范围已变化，请查看最新提示后重新确认");
       }
-      return true;
-    }
-    if (
-      error instanceof HttpError &&
-      error.status === 409 &&
-      error.code === "revision_conflict"
-    ) {
-      modal.confirm({
-        title: "草稿版本已更新",
-        content:
-          "该词条已在其他位置保存。为避免基于旧版本发布，请重新加载最新草稿。",
-        okText: "重新加载",
-        cancelText: "留在本页",
-        onOk: () => navigate(0)
-      });
       return true;
     }
     if (showFallbackMessage) {
@@ -636,6 +631,17 @@ export function PreviewAndPublishStep({
           </Space>
           {surfaceState.phase === "error" && (
             <Button onClick={surfaceState.retry}>重新加载确认快照</Button>
+          )}
+          {surfaceState.phase === "expired" && (
+            <Button
+              onClick={() => {
+                setSurfacePage(undefined);
+                publishKey.current = newWordNodeId();
+                void publish();
+              }}
+            >
+              重新检查发布条件
+            </Button>
           )}
         </Card>
       )}

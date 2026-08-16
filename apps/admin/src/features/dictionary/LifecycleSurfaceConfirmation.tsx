@@ -9,10 +9,12 @@ import {
 export function LifecycleSurfaceConfirmation({
   state,
   onConfirm,
+  onRestart,
   confirming
 }: {
   state: SurfaceSnapshotState & { retry: () => void };
   onConfirm: () => void;
+  onRestart: () => void;
   confirming: boolean;
 }) {
   const groups = useMemo(() => {
@@ -77,8 +79,11 @@ export function LifecycleSurfaceConfirmation({
         </section>
       ))}
       <Space>
-        {state.phase === "error" || state.phase === "expired" ? (
+        {state.phase === "error" ? (
           <Button onClick={state.retry}>重新加载确认快照</Button>
+        ) : null}
+        {state.phase === "expired" ? (
+          <Button onClick={onRestart}>重新检查恢复条件</Button>
         ) : null}
         {!disabled && (
           <Button

@@ -473,4 +473,63 @@ describe("SmartDictionary", () => {
       })
     );
   });
+
+  it("恢复响应未知时用同一 key 和精确双 revision 重试", async () => {
+    const mutateAsync = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("network result unknown"))
+      .mockResolvedValueOnce({ word: archivedWord("word-1", "first") });
+    apiMocks.useRestoreWord.mockReturnValue({
+      ...idleMutation(),
+      mutateAsync
+    });
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...archivedWord("word-1", "first"),
+            revision: 7,
+            lifecycle_revision: 4
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    const restoreOnce = async () => {
+      const rowRestore = screen
+        .getAllByText("恢 复", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => item?.classList.contains("ant-btn-link"))!;
+      fireEvent.click(rowRestore);
+      fireEvent.click(
+        (await screen.findAllByText("恢 复", { exact: true }))
+          .map((item) => item.closest("button"))
+          .find((item) => item?.closest(".ant-modal"))!
+      );
+    };
+    await restoreOnce();
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    await restoreOnce();
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(2));
+
+    expect(mutateAsync.mock.calls[1]![0]).toEqual(
+      mutateAsync.mock.calls[0]![0]
+    );
+    expect(mutateAsync.mock.calls[1]![0].input).toEqual({
+      base_revision: 7,
+      base_lifecycle_revision: 4
+    });
+  });
 });

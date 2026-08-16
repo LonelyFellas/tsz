@@ -35,12 +35,24 @@ export function useLifecycleSurfaceCommand(resetKey: string) {
       } catch (error) {
         if (
           error instanceof HttpError &&
-          (error.status === 409 || error.status === 410) &&
-          requiresNewIdempotencyKey(error.status, error.code)
+          (error.status === 409 || error.status === 410)
         ) {
           key.current = newWordNodeId();
-          setPage(error.meta?.surface_match_page);
-          return { ok: false, error, confirmationRequired: true } as const;
+          const confirmationRequired = requiresNewIdempotencyKey(
+            error.status,
+            error.code
+          );
+          const nextPage = confirmationRequired
+            ? error.meta?.surface_match_page
+            : undefined;
+          setPage(nextPage);
+          return {
+            ok: false,
+            error,
+            confirmationRequired:
+              confirmationRequired && nextPage !== undefined,
+            refreshRequired: nextPage === undefined
+          } as const;
         }
         throw error;
       }

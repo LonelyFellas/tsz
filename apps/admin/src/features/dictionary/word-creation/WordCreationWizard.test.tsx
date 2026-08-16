@@ -434,6 +434,48 @@ describe("WordCreationWizard", () => {
     ).toBeVisible();
   });
 
+  it("恢复响应未知时保留精确 body 和 Idempotency-Key 重试", async () => {
+    const archived = wordFixture({
+      status: "archived",
+      lifecycle_revision: 6,
+      max_reachable_step: "forms"
+    });
+    loaded(archived);
+    state.refetch.mockResolvedValue({ data: { word: archived } });
+    state.restore
+      .mockRejectedValueOnce(new TypeError("network result unknown"))
+      .mockResolvedValueOnce({
+        word: { ...archived, status: "draft", lifecycle_revision: 7 }
+      });
+    renderWizard("resume", `/words/${archived.id}/wizard/forms`);
+
+    fireEvent.click(await screen.findByText("恢复词条"));
+    await waitFor(() => expect(state.restore).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText("恢复词条"));
+    await waitFor(() => expect(state.restore).toHaveBeenCalledTimes(2));
+
+    expect(state.refetch).toHaveBeenCalledTimes(1);
+    expect(state.restore.mock.calls[1]![0]).toEqual(
+      state.restore.mock.calls[0]![0]
+    );
+  });
+
+  it("业务 revision 409 清理旧命令并重新加载详情", async () => {
+    const archived = wordFixture({ status: "archived", lifecycle_revision: 3 });
+    loaded(archived);
+    state.refetch.mockResolvedValue({ data: { word: archived } });
+    state.restore.mockRejectedValue(
+      new HttpError(409, "revision conflict", [], "revision_conflict")
+    );
+    renderWizard("resume", `/words/${archived.id}/wizard/forms`);
+
+    fireEvent.click(await screen.findByText("恢复词条"));
+    await waitFor(() => expect(state.refetch).toHaveBeenCalledTimes(2));
+    expect(
+      await screen.findByText("词条状态或确认策略已变化，请重新发起恢复")
+    ).toBeInTheDocument();
+  });
+
   it("非 Error 恢复失败使用稳定兜底文案", async () => {
     const archived = wordFixture({ status: "archived", lifecycle_revision: 2 });
     loaded(archived);

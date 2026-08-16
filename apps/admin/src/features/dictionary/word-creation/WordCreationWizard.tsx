@@ -311,6 +311,8 @@ export function WordCreationWizard({ mode }: Props) {
   const restoreWord = useRestoreWord();
   const restoreSurface = useLifecycleSurfaceCommand(wordId);
   const lifecycleCommandPending = useRef(false);
+  const [pendingRestoreTarget, setPendingRestoreTarget] =
+    useState<AdminWordV2>();
   const [word, setWord] = useState<AdminWordV2>();
   const [draftHeadwords, setDraftHeadwords] = useState<WordHeadwordsV2>();
   const explicitEditMode = searchParams.get("mode") === "edit";
@@ -349,17 +351,23 @@ export function WordCreationWizard({ mode }: Props) {
     }
   };
 
-  const restoreArchivedWord = () =>
+  const restoreArchivedWord = (refresh = false) =>
     runLifecycleCommandOnce(lifecycleCommandPending, async () => {
       try {
-        const latest = await detail.refetch();
-        const target = latest?.data?.word ?? detail.data?.word;
+        const latest =
+          refresh || !pendingRestoreTarget ? await detail.refetch() : undefined;
+        const target =
+          (!refresh ? pendingRestoreTarget : undefined) ??
+          latest?.data?.word ??
+          detail.data?.word;
         if (!target || target.status !== "archived") {
           restoreSurface.clear();
+          setPendingRestoreTarget(undefined);
           if (target) setWord(target);
           message.warning("词条状态已变化，已重新加载最新详情");
           return;
         }
+        setPendingRestoreTarget(target);
         const outcome = await restoreSurface.run((idempotencyKey, token) =>
           restoreWord.mutateAsync({
             wordId: target.id,
@@ -372,6 +380,7 @@ export function WordCreationWizard({ mode }: Props) {
           })
         );
         if (outcome.ok) {
+          setPendingRestoreTarget(undefined);
           setWord(outcome.result.word);
           message.success("词条已恢复");
         } else if (
@@ -379,6 +388,12 @@ export function WordCreationWizard({ mode }: Props) {
           "multiple_active_exact_headword_publications_not_enabled"
         ) {
           message.warning("学习端暂不支持多个同名公开词条");
+        } else if (outcome.refreshRequired) {
+          restoreSurface.clear();
+          setPendingRestoreTarget(undefined);
+          const refreshed = await detail.refetch();
+          if (refreshed.data?.word) setWord(refreshed.data.word);
+          message.warning("词条状态或确认策略已变化，请重新发起恢复");
         } else {
           message.warning("恢复条件已变化，请查看最新确认信息");
         }
@@ -481,6 +496,11 @@ export function WordCreationWizard({ mode }: Props) {
           state={restoreSurface.snapshot}
           confirming={restoreWord.isPending}
           onConfirm={() => void restoreArchivedWord()}
+          onRestart={() => {
+            restoreSurface.clear();
+            setPendingRestoreTarget(undefined);
+            void restoreArchivedWord(true);
+          }}
         />
       )}
       <WordCreationLayout

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/.codex/worktrees/inflection-visibility-b8/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-16T12:13:02.459Z",
+  "_generatedAt": "2026-08-16T12:43:50.353Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],

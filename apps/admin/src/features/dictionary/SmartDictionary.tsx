@@ -78,6 +78,34 @@ const DIALECT_LABEL: Record<AdminWordListItem["dialects"][number], string> = {
   common: "Common"
 };
 
+type RestoreRequest =
+  { kind: "single"; id: string } | { kind: "batch"; ids: string[] };
+
+type PendingRestore = RestoreRequest & {
+  targets: Array<{
+    id: string;
+    base_revision: number;
+    base_lifecycle_revision: number;
+  }>;
+};
+
+function sameRestoreRequest(
+  pending: PendingRestore | undefined,
+  request: RestoreRequest
+) {
+  if (!pending || pending.kind !== request.kind) return false;
+  if (pending.kind === "single" && request.kind === "single") {
+    return pending.id === request.id;
+  }
+  if (pending.kind === "batch" && request.kind === "batch") {
+    return (
+      pending.ids.length === request.ids.length &&
+      pending.ids.every((id, index) => id === request.ids[index])
+    );
+  }
+  return false;
+}
+
 export function SmartDictionary() {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
@@ -103,9 +131,7 @@ export function SmartDictionary() {
   const [selectedRecords, setSelectedRecords] = useState<
     Record<string, AdminWordListItem>
   >({});
-  const [pendingRestore, setPendingRestore] = useState<
-    { kind: "single"; id: string } | { kind: "batch"; ids: string[] }
-  >();
+  const [pendingRestore, setPendingRestore] = useState<PendingRestore>();
   const lifecycleCommandPending = useRef(false);
   const restoreSurface = useLifecycleSurfaceCommand(
     pendingRestore?.kind === "single"
@@ -151,6 +177,8 @@ export function SmartDictionary() {
     setPage(1);
     setSelectedKeys([]);
     setSelectedRecords({});
+    restoreSurface.clear();
+    setPendingRestore(undefined);
     const nextSearchParams = new URLSearchParams();
     const keyword = values.keyword?.trim();
     if (keyword) nextSearchParams.set("keyword", keyword);
@@ -158,33 +186,48 @@ export function SmartDictionary() {
     setSearchParams(nextSearchParams, { replace: true });
   };
 
-  const executeRestore = async (
-    command: { kind: "single"; id: string } | { kind: "batch"; ids: string[] }
-  ) => {
+  const executeRestore = async (request: RestoreRequest, refresh = false) => {
     try {
-      const ids = command.kind === "single" ? [command.id] : command.ids;
-      const latest = await Promise.all(
-        ids.map(async (id) => {
-          const response = await adminWordsDataSource.get(id);
-          return (
-            response?.word ??
-            selectedRecords[id] ??
-            rows.find((row) => row.id === id)
-          );
-        })
-      );
-      if (latest.some((word) => !word)) {
-        message.error("无法加载所选词条的最新生命周期版本，请刷新后重试");
-        return;
+      let command =
+        !refresh && sameRestoreRequest(pendingRestore, request)
+          ? pendingRestore
+          : undefined;
+      if (!command) {
+        if (pendingRestore) restoreSurface.clear();
+        const ids = request.kind === "single" ? [request.id] : request.ids;
+        const latest = await Promise.all(
+          ids.map(async (id) => {
+            const response = await adminWordsDataSource.get(id);
+            return (
+              response?.word ??
+              selectedRecords[id] ??
+              rows.find((row) => row.id === id)
+            );
+          })
+        );
+        if (latest.some((word) => !word)) {
+          message.error("无法加载所选词条的最新生命周期版本，请刷新后重试");
+          return;
+        }
+        const targets = latest.filter((word) => word !== undefined);
+        if (targets.some((word) => word.status !== "archived")) {
+          restoreSurface.clear();
+          setPendingRestore(undefined);
+          message.warning("所选词条状态已变化，请重新确认选择");
+          void listQuery.refetch();
+          return;
+        }
+        command = {
+          ...request,
+          targets: targets.map((word) => ({
+            id: word.id,
+            base_revision: word.revision,
+            base_lifecycle_revision: word.lifecycle_revision
+          }))
+        } as PendingRestore;
+        setPendingRestore(command);
       }
-      const targets = latest.filter((word) => word !== undefined);
-      if (targets.some((word) => word.status !== "archived")) {
-        restoreSurface.clear();
-        message.warning("所选词条状态已变化，请重新确认选择");
-        void listQuery.refetch();
-        return;
-      }
-      setPendingRestore(command);
+      const targets = command.targets;
       const outcome = await restoreSurface.run<
         AdminWordV2Envelope | EntryLifecycleBatchResponse
       >((idempotencyKey, token) =>
@@ -193,19 +236,15 @@ export function SmartDictionary() {
               wordId: targets[0]!.id,
               idempotencyKey,
               input: {
-                base_revision: targets[0]!.revision,
-                base_lifecycle_revision: targets[0]!.lifecycle_revision,
+                base_revision: targets[0]!.base_revision,
+                base_lifecycle_revision: targets[0]!.base_lifecycle_revision,
                 ...(token ? { confirmed_surface_match_token: token } : {})
               }
             })
           : restoreBatch.mutateAsync({
               idempotencyKey,
               input: {
-                entries: targets.map((word) => ({
-                  id: word.id,
-                  base_revision: word.revision,
-                  base_lifecycle_revision: word.lifecycle_revision
-                })),
+                entries: targets,
                 ...(token ? { confirmed_surface_match_token: token } : {})
               }
             })
@@ -224,6 +263,11 @@ export function SmartDictionary() {
         "multiple_active_exact_headword_publications_not_enabled"
       ) {
         message.warning("学习端暂不支持多个同名公开词条");
+      } else if (outcome.refreshRequired) {
+        restoreSurface.clear();
+        setPendingRestore(undefined);
+        void listQuery.refetch();
+        message.warning("词条状态或确认策略已变化，请重新发起恢复");
       } else {
         message.warning("恢复条件已变化，请查看最新确认信息");
       }
@@ -627,6 +671,17 @@ export function SmartDictionary() {
                   executeRestore(pendingRestore)
                 )
               }
+              onRestart={() => {
+                const request: RestoreRequest =
+                  pendingRestore.kind === "single"
+                    ? { kind: "single", id: pendingRestore.id }
+                    : { kind: "batch", ids: pendingRestore.ids };
+                restoreSurface.clear();
+                setPendingRestore(undefined);
+                void runLifecycleCommandOnce(lifecycleCommandPending, () =>
+                  executeRestore(request, true)
+                );
+              }}
             />
           </div>
         )}

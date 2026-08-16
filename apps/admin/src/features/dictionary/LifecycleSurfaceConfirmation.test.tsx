@@ -40,13 +40,18 @@ function item(
   };
 }
 
-function renderPanel(state: SurfaceSnapshotState, onConfirm = vi.fn()) {
+function renderPanel(
+  state: SurfaceSnapshotState,
+  onConfirm = vi.fn(),
+  onRestart = vi.fn()
+) {
   render(
     <App>
       <LifecycleSurfaceConfirmation
         state={{ ...state, retry: vi.fn() }}
         confirming={false}
         onConfirm={onConfirm}
+        onRestart={onRestart}
       />
     </App>
   );
@@ -94,5 +99,24 @@ describe("LifecycleSurfaceConfirmation", () => {
     expect(screen.getByLabelText("公开可见性 + 普通同形提示")).toBeVisible();
     fireEvent.click(screen.getByText("确认并恢复"));
     expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("snapshot 过期时重新发起命令而不是重试旧分页", () => {
+    const onRestart = vi.fn();
+    renderPanel(
+      {
+        generation: 1,
+        phase: "expired",
+        items: [item("expired", ["visibility_activation"])],
+        matched_entry_contexts: [],
+        total: 1,
+        confirmation_reasons: ["visibility_activation"]
+      },
+      vi.fn(),
+      onRestart
+    );
+    fireEvent.click(screen.getByText("重新检查恢复条件"));
+    expect(onRestart).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("重新加载确认快照")).toBeNull();
   });
 });
