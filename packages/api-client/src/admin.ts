@@ -12,7 +12,6 @@ import type {
   AdminSpeechPreviewResponse,
   AdminSpeechVoiceListResponse,
   AdminWordV2Envelope,
-  AdminWordKind,
   AdminWordListQuery,
   AdminWordV2ListResponse,
   AdminWordStats,
@@ -41,6 +40,7 @@ import type {
   PartOfSpeechConfigListQuery,
   PartOfSpeechConfigListResponse,
   RelatedSearchResponse,
+  RelatedSearchQuery,
   ResetPasswordResponse,
   RoleListResponse,
   SaveFormsStepInput,
@@ -268,12 +268,20 @@ export function createAdminEndpoints(http: HttpClient) {
       deleteDraft: (wordId: string, input: DeleteDraftInput) =>
         http.del<void>(`/lexicon/entries/${wordId}`, input),
       /** GET /admin/lexicon/entries/related-search — 关联词/上下文目标搜索。 */
-      relatedSearch: (
-        q: string,
-        opts?: { kind?: AdminWordKind; limit?: number }
-      ) =>
+      relatedSearch: (q: string, opts?: RelatedSearchQuery) =>
         http.get<RelatedSearchResponse>(
-          `/lexicon/entries/related-search${qs({ q, kind: opts?.kind, limit: opts?.limit })}`
+          `/lexicon/entries/related-search${qs({
+            q,
+            kind: opts?.kind,
+            match_mode: opts?.match_mode,
+            exclude_exact:
+              opts?.exclude_exact === undefined
+                ? undefined
+                : String(opts.exclude_exact),
+            page_size: opts?.page_size,
+            limit: opts?.limit,
+            cursor: opts?.cursor
+          })}`
         )
     },
     /**

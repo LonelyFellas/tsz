@@ -365,6 +365,27 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(sp.get("kind")).toBe("word");
     expect(sp.get("limit")).toBe("10");
   });
+
+  it("relatedSearch V2 透传双模式分页参数", () => {
+    const api = createAdminEndpoints(http);
+    api.words.relatedSearch("workspace", {
+      kind: "word",
+      match_mode: "contains",
+      exclude_exact: true,
+      page_size: 20,
+      cursor: "opaque-cursor"
+    });
+    const [path] = http.get.mock.calls[0] as [string];
+    const sp = new URLSearchParams(path.split("?")[1]);
+    expect(Object.fromEntries(sp)).toMatchObject({
+      q: "workspace",
+      kind: "word",
+      match_mode: "contains",
+      exclude_exact: "true",
+      page_size: "20",
+      cursor: "opaque-cursor"
+    });
+  });
 });
 
 describe("createAdminEndpoints — 系统设置词性配置", () => {

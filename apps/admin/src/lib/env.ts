@@ -33,6 +33,11 @@ const ADMIN_TTS_MOCK = parseBooleanEnvFlag(
   "VITE_ADMIN_TTS_MOCK",
   !import.meta.env.PROD
 );
+const RELATED_SEARCH_V2 = parseBooleanEnvFlag(
+  import.meta.env.VITE_RELATED_SEARCH_V2,
+  "VITE_RELATED_SEARCH_V2",
+  false
+);
 
 assertAdminWordsMockAllowed(
   ADMIN_WORDS_MOCK,
@@ -56,5 +61,6 @@ export const env = {
   ADMIN_PART_OF_SPEECH_MOCK,
   VOICE_EDITOR,
   VOICE_PREVIEW,
-  ADMIN_TTS_MOCK
+  ADMIN_TTS_MOCK,
+  RELATED_SEARCH_V2
 };

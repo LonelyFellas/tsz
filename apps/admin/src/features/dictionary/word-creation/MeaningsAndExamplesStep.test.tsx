@@ -38,7 +38,20 @@ const dataSourceCapabilities = vi.hoisted(() => ({
 const featureFlags = vi.hoisted(() => ({
   VOICE_EDITOR: false,
   VOICE_PREVIEW: false,
-  ADMIN_TTS_MOCK: true
+  ADMIN_TTS_MOCK: true,
+  RELATED_SEARCH_V2: false
+}));
+const relatedSearchV2State = vi.hoisted(() => ({
+  exactHasNextPage: false,
+  containsHasNextPage: false,
+  missingPagination: false,
+  legacyMixedResults: false,
+  exactError: false,
+  containsError: false,
+  fetchNextExactPage: vi.fn(),
+  fetchNextContainsPage: vi.fn(),
+  refetchExact: vi.fn(),
+  refetchContains: vi.fn()
 }));
 const voicePreview = vi.hoisted(() => ({
   listVoices: vi.fn(),
@@ -49,19 +62,44 @@ const relatedWords = vi.hoisted(() => [
     word_id: "fixture-colour",
     headword: "colour",
     kind: "word" as const,
+    dialects: ["common" as const],
+    pos_labels: ["noun"],
     senses: [{ sense_id: "fixture-colour-sense", gloss: "颜色" }]
   },
   {
     word_id: "fixture-far",
     headword: "far",
     kind: "word" as const,
+    dialects: ["common" as const],
+    pos_labels: ["adjective"],
     senses: [{ sense_id: "fixture-far-sense", gloss: "远的" }]
   },
   {
     word_id: "fixture-blank",
     headword: "blank",
     kind: "word" as const,
+    dialects: ["common" as const],
+    pos_labels: ["adjective"],
     senses: [{ sense_id: "fixture-blank-sense", gloss: "" }]
+  },
+  {
+    word_id: "11111111-workspace-first",
+    headword: "workspace",
+    kind: "word" as const,
+    dialects: ["common" as const],
+    pos_labels: ["noun"],
+    senses: [{ sense_id: "workspace-first-sense", gloss: "工作区甲" }]
+  },
+  {
+    word_id: "22222222-workspace-second",
+    headword: "workspace",
+    kind: "word" as const,
+    dialects: ["common" as const],
+    pos_labels: ["noun"],
+    senses: [
+      { sense_id: "workspace-second-sense-1", gloss: "工作区乙一" },
+      { sense_id: "workspace-second-sense-2", gloss: "工作区乙二" }
+    ]
   }
 ]);
 
@@ -137,7 +175,57 @@ vi.mock("../api", () => ({
     },
     isError: false,
     isFetching: false
-  })
+  }),
+  useRelatedSearchV2: (query: string, _kind: unknown, open: boolean) => {
+    const exact = relatedWords.filter(
+      (word) => word.headword === query.trim().toLowerCase()
+    );
+    const contains = relatedWords.filter(
+      (word) =>
+        word.headword.includes(query.trim().toLowerCase()) &&
+        word.headword !== query.trim().toLowerCase()
+    );
+    const legacyMixed = relatedWords.filter((word) =>
+      word.headword.includes(query.trim().toLowerCase())
+    );
+    const result = (
+      results: Array<(typeof relatedWords)[number]>,
+      isExact = false
+    ) => ({
+      data: open
+        ? {
+            pages: [
+              relatedSearchV2State.missingPagination
+                ? { results }
+                : { results, total: results.length, next_cursor: null }
+            ]
+          }
+        : undefined,
+      isFetching: false,
+      isError: isExact
+        ? relatedSearchV2State.exactError
+        : relatedSearchV2State.containsError,
+      isFetchingNextPage: false,
+      hasNextPage: isExact
+        ? relatedSearchV2State.exactHasNextPage
+        : relatedSearchV2State.containsHasNextPage,
+      fetchNextPage: isExact
+        ? relatedSearchV2State.fetchNextExactPage
+        : relatedSearchV2State.fetchNextContainsPage,
+      refetch: isExact
+        ? relatedSearchV2State.refetchExact
+        : relatedSearchV2State.refetchContains
+    });
+    return {
+      exact: result(
+        relatedSearchV2State.legacyMixedResults ? legacyMixed : exact,
+        true
+      ),
+      contains: result(
+        relatedSearchV2State.legacyMixedResults ? legacyMixed : contains
+      )
+    };
+  }
 }));
 
 function button(label: string): HTMLButtonElement {
@@ -257,6 +345,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   featureFlags.VOICE_EDITOR = false;
   featureFlags.VOICE_PREVIEW = false;
+  featureFlags.RELATED_SEARCH_V2 = false;
+  relatedSearchV2State.exactHasNextPage = false;
+  relatedSearchV2State.containsHasNextPage = false;
+  relatedSearchV2State.missingPagination = false;
+  relatedSearchV2State.legacyMixedResults = false;
+  relatedSearchV2State.exactError = false;
+  relatedSearchV2State.containsError = false;
   voicePreview.listVoices.mockResolvedValue([
     {
       id: "en-GB-Sonia",
@@ -965,7 +1060,9 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
 
     await selectInlineRelatedWord("近义词", "far", "far");
-    expect(within(relationRow).getByText("远的")).toBeInTheDocument();
+    expect(within(relationRow).getByText("选择词义")).toBeInTheDocument();
+    fireEvent.mouseDown(screen.getByLabelText("近义词目标词义"));
+    fireEvent.click(await screen.findByText("远的", { exact: true }));
     fireEvent.click(button("保存草稿"));
 
     await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
@@ -978,6 +1075,111 @@ describe("MeaningsAndExamplesStep", () => {
       target_sense_id: "fixture-far-sense",
       score: "90"
     });
+  });
+
+  it("V2 搜索保留两个同名目标并保存明确选择的第二个 word_id+sense_id", async () => {
+    featureFlags.RELATED_SEARCH_V2 = true;
+    renderStep(wordFixture({ ready: true }));
+    fireEvent.click(enabledButton("添加近义词"));
+    const search = screen.getByLabelText("近义词目标词条");
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: "workspace" } });
+
+    expect(
+      (await screen.findAllByText("完全同名", { exact: true })).length
+    ).toBe(2);
+    const firstId = await screen.findByText("word · 11111111", { exact: true });
+    const secondId = await screen.findByText("word · 22222222", {
+      exact: true
+    });
+    expect(firstId).toBeInTheDocument();
+    const secondOption = secondId.closest(".ant-select-item-option");
+    if (!secondOption) throw new Error("second workspace option not found");
+    fireEvent.mouseDown(secondOption);
+    fireEvent.click(secondOption);
+
+    fireEvent.mouseDown(screen.getByLabelText("近义词目标词义"));
+    fireEvent.click(await screen.findByText("工作区乙二", { exact: true }));
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const relations =
+      mutations.save.mock.calls[0]![0].content.pos[0].senses[0].relations;
+    expect(relations.at(-1)).toMatchObject({
+      target_word_id: "22222222-workspace-second",
+      target_sense_id: "workspace-second-sense-2"
+    });
+  });
+
+  it("V2 缺少分页字段时明确提示未取全，并允许加载 exact 下一页", async () => {
+    featureFlags.RELATED_SEARCH_V2 = true;
+    relatedSearchV2State.exactHasNextPage = true;
+    relatedSearchV2State.missingPagination = true;
+    relatedSearchV2State.legacyMixedResults = true;
+    renderStep(wordFixture({ ready: true }));
+    fireEvent.click(enabledButton("添加近义词"));
+    const search = screen.getByLabelText("近义词目标词条");
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: "work" } });
+
+    expect(
+      await screen.findByText("后端未返回完整分页信息，不能确认已取全同名词条")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("完全同名")).not.toBeInTheDocument();
+    expect(screen.queryByText("相关联想")).not.toBeInTheDocument();
+    fireEvent.click(button("加载更多同名词条"));
+    expect(relatedSearchV2State.fetchNextExactPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("V2 contains 有下一页时允许继续加载相关联想", async () => {
+    featureFlags.RELATED_SEARCH_V2 = true;
+    relatedSearchV2State.containsHasNextPage = true;
+    renderStep(wordFixture({ ready: true }));
+    fireEvent.click(enabledButton("添加近义词"));
+    const search = screen.getByLabelText("近义词目标词条");
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: "work" } });
+
+    fireEvent.click(await screen.findByText("加载更多相关联想"));
+    expect(relatedSearchV2State.fetchNextContainsPage).toHaveBeenCalledTimes(1);
+    expect(relatedSearchV2State.fetchNextExactPage).not.toHaveBeenCalled();
+  });
+
+  it("V2 exact 失败时不冒充无结果，并允许重试同名词条搜索", async () => {
+    featureFlags.RELATED_SEARCH_V2 = true;
+    relatedSearchV2State.exactError = true;
+    renderStep(wordFixture({ ready: true }));
+    fireEvent.click(enabledButton("添加近义词"));
+    const search = screen.getByLabelText("近义词目标词条");
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: "workspace" } });
+
+    expect(
+      await screen.findByText("完全同名词条搜索失败，结果可能不完整")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("未找到匹配词条")).not.toBeInTheDocument();
+    fireEvent.click(button("重 试"));
+    expect(relatedSearchV2State.refetchExact).toHaveBeenCalledTimes(1);
+  });
+
+  it("V2 contains 失败时不冒充无结果，并允许重试相关联想", async () => {
+    featureFlags.RELATED_SEARCH_V2 = true;
+    relatedSearchV2State.containsError = true;
+    renderStep(wordFixture({ ready: true }));
+    fireEvent.click(enabledButton("添加近义词"));
+    const search = screen.getByLabelText("近义词目标词条");
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: "workspace" } });
+
+    expect(
+      await screen.findByText("相关联想搜索失败，结果可能不完整")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("未找到匹配词条")).not.toBeInTheDocument();
+    const alert = screen
+      .getByText("相关联想搜索失败，结果可能不完整")
+      .closest(".ant-alert");
+    fireEvent.click(within(alert as HTMLElement).getByText("重 试"));
+    expect(relatedSearchV2State.refetchContains).toHaveBeenCalledTimes(1);
   });
 
   it("完成前执行客户端完整性校验，不向后端提交不完整 meanings", async () => {
@@ -1573,7 +1775,7 @@ describe("MeaningsAndExamplesStep", () => {
       .getByLabelText("近义词目标词条")
       .closest(".word-relation-row") as HTMLElement;
     expect(screen.getByLabelText("近义词目标词条")).toHaveValue("colour");
-    expect(within(relationRow).getByText("颜色")).toBeInTheDocument();
+    expect(within(relationRow).getByText("选择词义")).toBeInTheDocument();
     fireEvent.change(screen.getAllByLabelText("相似度").at(-1)!, {
       target: { value: "75" }
     });

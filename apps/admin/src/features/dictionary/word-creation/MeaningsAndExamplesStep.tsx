@@ -36,6 +36,8 @@ import type {
   DraftMeaningsStepContent,
   EnglishTextV2,
   RichText,
+  RelatedSearchResponse,
+  RelatedWordResult,
   StepSaveIntent,
   WordDefinitionV2,
   WordHeadwordsV2,
@@ -74,7 +76,7 @@ import {
   subPartOfSpeechOptions
 } from "../part-of-speech/catalog";
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
-import { useRelatedSearch } from "../api";
+import { useRelatedSearch, useRelatedSearchV2 } from "../api";
 import {
   cloneWordValue,
   moveWordNode,
@@ -1270,23 +1272,71 @@ function RelationsEditor({
   );
   const relatedSearch = useRelatedSearch(
     searching?.query ?? "",
-    searching !== null
+    searching !== null && !env.RELATED_SEARCH_V2
   );
-  const searchResults = relatedSearch.data?.results ?? [];
-  const wordOptions = searchResults.map((item) => ({
-    value: item.headword,
+  const relatedSearchV2 = useRelatedSearchV2(
+    searching?.query ?? "",
+    undefined,
+    searching !== null && env.RELATED_SEARCH_V2
+  );
+  const uniqueResults = (items: RelatedWordResult[]) =>
+    Array.from(new Map(items.map((item) => [item.word_id, item])).values());
+  const exactPages = relatedSearchV2.exact.data?.pages ?? [];
+  const containsPages = relatedSearchV2.contains.data?.pages ?? [];
+  const isV2Page = (page: RelatedSearchResponse) =>
+    "total" in page && typeof page.total === "number" && "next_cursor" in page;
+  const hasCompleteV2Wire =
+    exactPages.length > 0 &&
+    containsPages.length > 0 &&
+    exactPages.every(isV2Page) &&
+    containsPages.every(isV2Page);
+  const exactResults = uniqueResults(
+    exactPages.flatMap((page) => page.results)
+  );
+  const containsResults = uniqueResults(
+    containsPages.flatMap((page) => page.results)
+  ).filter(
+    (item) => !exactResults.some((exact) => exact.word_id === item.word_id)
+  );
+  const searchResults = env.RELATED_SEARCH_V2
+    ? hasCompleteV2Wire
+      ? [...exactResults, ...containsResults]
+      : uniqueResults([
+          ...exactPages.flatMap((page) => page.results),
+          ...containsPages.flatMap((page) => page.results)
+        ])
+    : (relatedSearch.data?.results ?? []);
+  const toWordOption = (
+    item: (typeof searchResults)[number],
+    group?: "完全同名" | "相关联想"
+  ) => ({
+    value: item.word_id,
     label: (
-      <Flex justify="space-between" gap={8}>
-        <Typography.Text strong>{item.headword}</Typography.Text>
-        <Typography.Text
-          type="secondary"
-          className="word-relation-option-count"
-        >
-          {item.senses.length} 个词义
+      <Space orientation="vertical" size={0}>
+        <Flex gap={8} align="center">
+          {group && (
+            <Tag color={group === "完全同名" ? "blue" : undefined}>{group}</Tag>
+          )}
+          <Typography.Text strong>{item.headword}</Typography.Text>
+          <Typography.Text type="secondary">
+            {item.kind} · {item.word_id.slice(0, 8)}
+          </Typography.Text>
+        </Flex>
+        <Typography.Text type="secondary">
+          {[...(item.dialects ?? []), ...(item.pos_labels ?? [])].join(" · ") ||
+            "未标注方言/词性"}
+          {item.senses[0]?.gloss ? ` · ${item.senses[0].gloss}` : ""}
         </Typography.Text>
-      </Flex>
+      </Space>
     )
-  }));
+  });
+  const wordOptions =
+    env.RELATED_SEARCH_V2 && hasCompleteV2Wire
+      ? [
+          ...exactResults.map((item) => toWordOption(item, "完全同名")),
+          ...containsResults.map((item) => toWordOption(item, "相关联想"))
+        ]
+      : searchResults.map((item) => toWordOption(item));
 
   const updateRelation = (
     relationId: string,
@@ -1299,14 +1349,13 @@ function RelationsEditor({
     );
   };
 
-  const selectWord = (relationId: string, headword: string) => {
-    const selected = searchResults.find((item) => item.headword === headword);
+  const selectWord = (relationId: string, wordId: string) => {
+    const selected = searchResults.find((item) => item.word_id === wordId);
     if (!selected) return;
     const choices = selected.senses.map((sense) => ({
       senseId: sense.sense_id,
       gloss: sense.gloss
     }));
-    const firstSense = choices[0];
     setSenseChoices((current) => ({
       ...current,
       [relationId]: choices
@@ -1314,8 +1363,8 @@ function RelationsEditor({
     updateRelation(relationId, {
       target_word_id: selected.word_id,
       target_headword: selected.headword,
-      target_sense_id: firstSense?.senseId ?? "",
-      target_gloss: firstSense?.gloss
+      target_sense_id: "",
+      target_gloss: undefined
     });
     setSearching(null);
   };
@@ -1422,11 +1471,19 @@ function RelationsEditor({
                       filterOption={false}
                       popupMatchSelectWidth={260}
                       notFoundContent={
-                        relatedSearch.isFetching
+                        relatedSearch.isFetching ||
+                        relatedSearchV2.exact.isFetching ||
+                        relatedSearchV2.contains.isFetching
                           ? "搜索中…"
-                          : searching?.query
-                            ? "未找到匹配词条"
-                            : "输入词汇搜索"
+                          : env.RELATED_SEARCH_V2 &&
+                              relatedSearchV2.exact.isError
+                            ? "完全同名词条搜索失败"
+                            : env.RELATED_SEARCH_V2 &&
+                                relatedSearchV2.contains.isError
+                              ? "相关联想搜索失败"
+                              : searching?.query
+                                ? "未找到匹配词条"
+                                : "输入词汇搜索"
                       }
                       onFocus={() =>
                         setSearching({
@@ -1443,7 +1500,7 @@ function RelationsEditor({
                           target_gloss: undefined
                         });
                       }}
-                      onSelect={(headword) => selectWord(relation.id, headword)}
+                      onSelect={(wordId) => selectWord(relation.id, wordId)}
                     >
                       <Input
                         aria-label={`${meta.title}目标词条`}
@@ -1455,6 +1512,80 @@ function RelationsEditor({
                         size="small"
                       />
                     </AutoComplete>
+                    {isSearching &&
+                      env.RELATED_SEARCH_V2 &&
+                      relatedSearchV2.exact.isError && (
+                        <Alert
+                          type="error"
+                          showIcon
+                          title="完全同名词条搜索失败，结果可能不完整"
+                          action={
+                            <Button
+                              size="small"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => relatedSearchV2.exact.refetch()}
+                            >
+                              重 试
+                            </Button>
+                          }
+                        />
+                      )}
+                    {isSearching &&
+                      env.RELATED_SEARCH_V2 &&
+                      relatedSearchV2.contains.isError && (
+                        <Alert
+                          type="error"
+                          showIcon
+                          title="相关联想搜索失败，结果可能不完整"
+                          action={
+                            <Button
+                              size="small"
+                              onMouseDown={(event) => event.preventDefault()}
+                              onClick={() => relatedSearchV2.contains.refetch()}
+                            >
+                              重 试
+                            </Button>
+                          }
+                        />
+                      )}
+                    {isSearching &&
+                      env.RELATED_SEARCH_V2 &&
+                      relatedSearchV2.exact.hasNextPage && (
+                        <Button
+                          size="small"
+                          loading={relatedSearchV2.exact.isFetchingNextPage}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() => relatedSearchV2.exact.fetchNextPage()}
+                        >
+                          加载更多同名词条
+                        </Button>
+                      )}
+                    {isSearching &&
+                      env.RELATED_SEARCH_V2 &&
+                      relatedSearchV2.contains.hasNextPage && (
+                        <Button
+                          size="small"
+                          loading={relatedSearchV2.contains.isFetchingNextPage}
+                          onMouseDown={(event) => event.preventDefault()}
+                          onClick={() =>
+                            relatedSearchV2.contains.fetchNextPage()
+                          }
+                        >
+                          加载更多相关联想
+                        </Button>
+                      )}
+                    {isSearching &&
+                      env.RELATED_SEARCH_V2 &&
+                      relatedSearchV2.exact.data?.pages.some(
+                        (page) =>
+                          !("total" in page) ||
+                          typeof page.total !== "number" ||
+                          !("next_cursor" in page)
+                      ) && (
+                        <Typography.Text type="warning">
+                          后端未返回完整分页信息，不能确认已取全同名词条
+                        </Typography.Text>
+                      )}
                     <Select
                       aria-label={`${meta.title}目标词义`}
                       className="word-relation-sense"
