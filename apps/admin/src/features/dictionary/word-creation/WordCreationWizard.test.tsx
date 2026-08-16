@@ -538,6 +538,65 @@ describe("WordCreationWizard", () => {
     ).toBeNull();
   });
 
+  it("warning detection snapshot 覆盖所有 match category 标签", async () => {
+    const word = wordFixture({ max_reachable_step: "forms" });
+    word.detection_snapshot = {
+      ...word.detection_snapshot,
+      smart_dictionary_status: "warning",
+      surface_warning: {
+        total: 3,
+        match_digest: "sha256:warning-category-audit",
+        acknowledged: true,
+        acknowledged_at: "2026-08-16T02:22:08.465Z",
+        acknowledged_by: "01a0085f-c222-7cc3-8eb3-158d95ffd3ec",
+        policy_name: "surface_warning_acknowledgement",
+        policy_epoch: 7,
+        preview: [
+          {
+            match_id: "match-cross-kind",
+            match_category: "cross_kind_headword",
+            existing_word_id: "01a00492-d889-71e0-a9a3-e053a0a093e8",
+            existing_headword: "workspace",
+            existing_kind: "phrase",
+            existing_status: "draft",
+            existing_dialect: "common",
+            pos_labels: ["noun"],
+            gloss_previews: ["跨类型同名"]
+          },
+          {
+            match_id: "match-form-headword",
+            match_category: "form_headword",
+            existing_word_id: "01a00492-d889-71e0-a9a3-e053a0a093e9",
+            existing_headword: "workspaces",
+            existing_kind: "word",
+            existing_status: "draft",
+            existing_dialect: "uk",
+            pos_labels: ["noun"],
+            gloss_previews: ["词形命中主词"]
+          },
+          {
+            match_id: "match-fallback",
+            match_category: "unexpected" as never,
+            existing_word_id: "01a00492-d889-71e0-a9a3-e053a0a093ea",
+            existing_headword: "workspace-x",
+            existing_kind: "word",
+            existing_status: "archived",
+            existing_dialect: "us",
+            pos_labels: ["verb"],
+            gloss_previews: ["默认兜底"]
+          }
+        ],
+        truncated: false
+      }
+    };
+    loaded(word);
+    renderWizard("resume", `/words/${word.id}/wizard/basics`);
+
+    expect(await screen.findByText("跨类型同名主词")).toBeVisible();
+    expect(screen.getByText("词形命中已有主词")).toBeVisible();
+    expect(screen.getByText("同形词形")).toBeVisible();
+  });
+
   it("只读 basics 展示用户最终确认的主词，而不是词典原建议", async () => {
     const word = wordFixture({ max_reachable_step: "forms" });
     word.headwords = {
