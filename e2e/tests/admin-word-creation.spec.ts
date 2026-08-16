@@ -134,6 +134,38 @@ test.describe("admin 新建单词 V2", () => {
     ).toBe(1);
   });
 
+  test("F8 两个同名关联目标明确选择第二个并保存其 word_id+sense_id", async ({
+    page
+  }) => {
+    const api = await createCenterDraft(page, { relatedSearchV2: true });
+    await page.getByRole("button", { name: "完成并进入词义与例句" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/words/${ADMIN_E2E_WORD_ID}/wizard/meanings$`)
+    );
+
+    await page.getByRole("button", { name: "添加近义词" }).click();
+    const target = page.getByLabel("近义词目标词条");
+    await target.fill("workspace");
+    await expect(page.getByText("完全同名", { exact: true })).toHaveCount(2);
+    await expect(
+      page.getByText("word · 11111111", { exact: true })
+    ).toBeVisible();
+    await page.getByText("word · 22222222", { exact: true }).click();
+
+    await page.getByLabel("近义词目标词义").click();
+    await page.getByText("工作区乙二", { exact: true }).click();
+    await page.getByRole("button", { name: "保存草稿" }).click();
+    await expect(page.getByText("草稿已保存")).toBeVisible();
+
+    const savedRelation = api
+      .getWord()
+      ?.meanings.pos[0]?.senses[0]?.relations.at(-1);
+    expect(savedRelation).toMatchObject({
+      target_word_id: "22222222-workspace-second",
+      target_sense_id: "workspace-second-sense-2"
+    });
+  });
+
   test("T20 duplicate 检测阻断创建且保留重复项入口", async ({ page }) => {
     const api = await mockAdminApi(page, { duplicate: true });
     await page.goto("/words/new");

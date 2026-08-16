@@ -12,6 +12,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState
@@ -131,6 +132,7 @@ export function PronunciationPreviewControls({
   const [result, setResult] = useState<VoicePreviewResult>();
   const [status, setStatus] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const generationRef = useRef<symbol | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -168,13 +170,20 @@ export function PronunciationPreviewControls({
     discardResult();
   }, [discardResult]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    generationRef.current = null;
     cleanup();
     setBusy(false);
     setStatus("");
   }, [cleanup, contentKey, pronunciationId, voice?.id]);
 
-  useEffect(() => cleanup, [cleanup]);
+  useEffect(
+    () => () => {
+      generationRef.current = null;
+      cleanup();
+    },
+    [cleanup]
+  );
 
   const attachAudio = useCallback(
     (preview: VoicePreviewResult): HTMLAudioElement => {
@@ -211,10 +220,13 @@ export function PronunciationPreviewControls({
       !voice ||
       !text ||
       busy ||
+      generationRef.current ||
       abortRef.current
     ) {
       return;
     }
+    const generation = Symbol("pronunciation-preview-generation");
+    generationRef.current = generation;
     cleanup();
     const controller = new AbortController();
     abortRef.current = controller;
@@ -264,6 +276,9 @@ export function PronunciationPreviewControls({
         void message.error(nextStatus);
       }
     } finally {
+      if (generationRef.current === generation) {
+        generationRef.current = null;
+      }
       if (abortRef.current === controller) {
         abortRef.current = null;
         setBusy(false);

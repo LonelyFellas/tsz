@@ -12,6 +12,7 @@ import {
   PronunciationPreviewControls,
   PronunciationPreviewProvider
 } from "./PronunciationPreview";
+import { deferred } from "./wordCreation.test.helper";
 
 const preview = vi.hoisted(() => ({
   enabled: true,
@@ -158,6 +159,8 @@ afterEach(() => {
 
 describe("PronunciationPreview", () => {
   it("tomato 使用目录默认 voice 获取并自动播放，随后可手动重播", async () => {
+    const pending = deferred<VoicePreviewResult>();
+    preview.synthesize.mockReturnValue(pending.promise);
     render(<PreviewHarness />);
 
     const getButton = screen.getByLabelText("获取语音");
@@ -173,9 +176,9 @@ describe("PronunciationPreview", () => {
       },
       { signal: expect.any(AbortSignal) }
     );
-    await waitFor(() =>
-      expect(AudioMock.instances[0]?.play).toHaveBeenCalled()
-    );
+    await act(async () => pending.resolve(result()));
+    expect(AudioMock.instances).toHaveLength(1);
+    expect(AudioMock.instances[0]!.play).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText("播放语音")).toBeEnabled();
 
     fireEvent.click(screen.getByLabelText("播放语音"));
@@ -264,35 +267,36 @@ describe("PronunciationPreview", () => {
   });
 
   it("失败后恢复按钮并允许重试", async () => {
+    const failed = deferred<VoicePreviewResult>();
+    const succeeded = deferred<VoicePreviewResult>();
     preview.synthesize
-      .mockRejectedValueOnce(
-        new Error("语音或存储服务暂不可用，请稍后手动重试")
-      )
-      .mockResolvedValueOnce(result());
+      .mockReturnValueOnce(failed.promise)
+      .mockReturnValueOnce(succeeded.promise);
     render(<PreviewHarness />);
     const getButton = screen.getByLabelText("获取语音");
     await waitFor(() => expect(getButton).toBeEnabled());
 
     fireEvent.click(getButton);
-    await waitFor(() =>
-      expect(message.error).toHaveBeenCalledWith(
-        "语音或存储服务暂不可用，请稍后手动重试"
-      )
+    await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(1));
+    await act(async () =>
+      failed.reject(new Error("语音或存储服务暂不可用，请稍后手动重试"))
     );
-    await waitFor(() => expect(getButton).toBeEnabled());
+    expect(message.error).toHaveBeenCalledWith(
+      "语音或存储服务暂不可用，请稍后手动重试"
+    );
+    expect(getButton).toBeEnabled();
     fireEvent.click(getButton);
 
     await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(2));
+    await act(async () => succeeded.resolve(result()));
     expect(screen.getByLabelText("播放语音")).toBeEnabled();
   });
 
   it("请求在途时阻止重复点击", async () => {
-    let resolvePreview!: (value: VoicePreviewResult) => void;
-    preview.synthesize.mockReturnValue(
-      new Promise((resolve) => {
-        resolvePreview = resolve;
-      })
-    );
+    const pending = deferred<VoicePreviewResult>();
+    preview.synthesize
+      .mockReturnValueOnce(pending.promise)
+      .mockResolvedValueOnce(result());
     render(<PreviewHarness />);
     const getButton = screen.getByLabelText("获取语音");
     await waitFor(() => expect(getButton).toBeEnabled());
@@ -301,25 +305,29 @@ describe("PronunciationPreview", () => {
 
     expect(preview.synthesize).toHaveBeenCalledTimes(1);
     expect(getButton).toBeDisabled();
-    await act(async () => resolvePreview(result()));
+    await act(async () => pending.resolve(result()));
+    expect(getButton).toBeEnabled();
+
+    fireEvent.click(getButton);
+    await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(2));
   });
 
   it("URL 到期后释放结果并禁用播放", async () => {
     vi.useFakeTimers();
     const dispose = vi.fn();
-    preview.synthesize.mockResolvedValue(
-      result({
-        expiresAt: new Date(Date.now() + 1_000).toISOString(),
-        dispose
-      })
-    );
+    const pending = deferred<VoicePreviewResult>();
+    preview.synthesize.mockReturnValue(pending.promise);
+    const previewResult = result({
+      expiresAt: new Date(Date.now() + 1_000).toISOString(),
+      dispose
+    });
     render(<PreviewHarness />);
     await act(async () => Promise.resolve());
     fireEvent.click(screen.getByLabelText("获取语音"));
-    await act(async () => Promise.resolve());
+    await act(async () => pending.resolve(previewResult));
     expect(screen.getByLabelText("播放语音")).toBeEnabled();
 
-    act(() => vi.advanceTimersByTime(1_000));
+    await act(async () => vi.advanceTimersByTimeAsync(1_000));
 
     expect(screen.getByLabelText("播放语音")).toBeDisabled();
     expect(dispose).toHaveBeenCalledTimes(1);

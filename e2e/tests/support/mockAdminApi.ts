@@ -241,6 +241,8 @@ export interface MockAdminApiOptions {
   changeFormsSurfaceOnFirstSave?: boolean;
   /** 延迟 forms surface 终页，供浏览器验证终页前确认门禁。 */
   formsSurfaceTerminalDelayMs?: number;
+  /** 为关联词 V2 搜索返回两个完全同名、ID 不同的已发布目标。 */
+  relatedSearchV2?: boolean;
 }
 
 export interface MockAdminApiController {
@@ -1044,6 +1046,49 @@ export async function mockAdminApi(
       method === "GET" &&
       path === `${ADMIN_E2E_ENTRIES_PATH}/related-search`
     ) {
+      if (options.relatedSearchV2) {
+        const matchMode = requestUrl.searchParams.get("match_mode");
+        const results =
+          matchMode === "exact"
+            ? [
+                {
+                  word_id: "11111111-workspace-first",
+                  headword: "workspace",
+                  kind: "word",
+                  dialects: ["common"],
+                  pos_labels: ["noun"],
+                  senses: [
+                    {
+                      sense_id: "workspace-first-sense",
+                      gloss: "工作区甲"
+                    }
+                  ]
+                },
+                {
+                  word_id: "22222222-workspace-second",
+                  headword: "workspace",
+                  kind: "word",
+                  dialects: ["uk", "us"],
+                  pos_labels: ["noun"],
+                  senses: [
+                    {
+                      sense_id: "workspace-second-sense-1",
+                      gloss: "工作区乙一"
+                    },
+                    {
+                      sense_id: "workspace-second-sense-2",
+                      gloss: "工作区乙二"
+                    }
+                  ]
+                }
+              ]
+            : [];
+        return json(route, 200, {
+          results,
+          total: results.length,
+          next_cursor: null
+        });
+      }
       return json(route, 200, { results: [] });
     }
     if (
