@@ -26,7 +26,13 @@ import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
 import { useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import type { AdminWordKind, AdminWordListItem, CefrLevel } from "@tsz/types";
+import type {
+  AdminWordKind,
+  AdminWordListItem,
+  AdminWordV2Envelope,
+  CefrLevel,
+  EntryLifecycleBatchResponse
+} from "@tsz/types";
 import {
   useArchiveWord,
   useArchiveWordsBatch,
@@ -35,7 +41,11 @@ import {
   useWordList,
   useWordStats
 } from "./api";
-import { adminWordsDataSourceCapabilities } from "./dataSource";
+import {
+  adminWordsDataSource,
+  adminWordsDataSourceCapabilities
+} from "./dataSource";
+import { LifecycleSurfaceConfirmation } from "./LifecycleSurfaceConfirmation";
 import {
   CEFR_OPTIONS,
   cefrColor,
@@ -52,6 +62,7 @@ import {
 import { usePartOfSpeechCatalog } from "./part-of-speech/api";
 import { toListQuery, type WordFilterValues } from "./listQuery";
 import { runLifecycleCommandOnce } from "./lifecycleCommand";
+import { useLifecycleSurfaceCommand } from "./useLifecycleSurfaceCommand";
 import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 import { newWordNodeId } from "./word-model/primitives";
 
@@ -89,7 +100,18 @@ export function SmartDictionary() {
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
+  const [selectedRecords, setSelectedRecords] = useState<
+    Record<string, AdminWordListItem>
+  >({});
+  const [pendingRestore, setPendingRestore] = useState<
+    { kind: "single"; id: string } | { kind: "batch"; ids: string[] }
+  >();
   const lifecycleCommandPending = useRef(false);
+  const restoreSurface = useLifecycleSurfaceCommand(
+    pendingRestore?.kind === "single"
+      ? pendingRestore.id
+      : (pendingRestore?.ids.slice().sort().join(":") ?? "none")
+  );
 
   const listQuery = useWordList(toListQuery(filters, page, pageSize));
   const stats = useWordStats();
@@ -112,7 +134,9 @@ export function SmartDictionary() {
 
   const rows = listQuery.data?.words ?? [];
   const total = listQuery.data?.page.total ?? 0;
-  const selectedRows = rows.filter((row) => selectedKeys.includes(row.id));
+  const selectedRows = selectedKeys.flatMap((key) =>
+    selectedRecords[String(key)] ? [selectedRecords[String(key)]!] : []
+  );
   const restoringSelection =
     selectedRows.length > 0 &&
     selectedRows.every((row) => row.status === "archived");
@@ -126,11 +150,86 @@ export function SmartDictionary() {
     setFilters(values);
     setPage(1);
     setSelectedKeys([]);
+    setSelectedRecords({});
     const nextSearchParams = new URLSearchParams();
     const keyword = values.keyword?.trim();
     if (keyword) nextSearchParams.set("keyword", keyword);
     if (values.status) nextSearchParams.set("status", values.status);
     setSearchParams(nextSearchParams, { replace: true });
+  };
+
+  const executeRestore = async (
+    command: { kind: "single"; id: string } | { kind: "batch"; ids: string[] }
+  ) => {
+    try {
+      const ids = command.kind === "single" ? [command.id] : command.ids;
+      const latest = await Promise.all(
+        ids.map(async (id) => {
+          const response = await adminWordsDataSource.get(id);
+          return (
+            response?.word ??
+            selectedRecords[id] ??
+            rows.find((row) => row.id === id)
+          );
+        })
+      );
+      if (latest.some((word) => !word)) {
+        message.error("无法加载所选词条的最新生命周期版本，请刷新后重试");
+        return;
+      }
+      const targets = latest.filter((word) => word !== undefined);
+      if (targets.some((word) => word.status !== "archived")) {
+        restoreSurface.clear();
+        message.warning("所选词条状态已变化，请重新确认选择");
+        void listQuery.refetch();
+        return;
+      }
+      setPendingRestore(command);
+      const outcome = await restoreSurface.run<
+        AdminWordV2Envelope | EntryLifecycleBatchResponse
+      >((idempotencyKey, token) =>
+        command.kind === "single"
+          ? restoreWord.mutateAsync({
+              wordId: targets[0]!.id,
+              idempotencyKey,
+              input: {
+                base_revision: targets[0]!.revision,
+                base_lifecycle_revision: targets[0]!.lifecycle_revision,
+                ...(token ? { confirmed_surface_match_token: token } : {})
+              }
+            })
+          : restoreBatch.mutateAsync({
+              idempotencyKey,
+              input: {
+                entries: targets.map((word) => ({
+                  id: word.id,
+                  base_revision: word.revision,
+                  base_lifecycle_revision: word.lifecycle_revision
+                })),
+                ...(token ? { confirmed_surface_match_token: token } : {})
+              }
+            })
+      );
+      if (outcome.ok) {
+        const affected =
+          command.kind === "single"
+            ? 1
+            : (outcome.result as EntryLifecycleBatchResponse).affected;
+        setSelectedKeys([]);
+        setSelectedRecords({});
+        setPendingRestore(undefined);
+        message.success(`已恢复 ${affected} 个词条`);
+      } else if (
+        outcome.error.code ===
+        "multiple_active_exact_headword_publications_not_enabled"
+      ) {
+        message.warning("学习端暂不支持多个同名公开词条");
+      } else {
+        message.warning("恢复条件已变化，请查看最新确认信息");
+      }
+    } catch (error) {
+      message.error(error instanceof Error ? error.message : "恢复失败");
+    }
   };
 
   const lifecycleInput = (record: AdminWordListItem) => {
@@ -168,7 +267,11 @@ export function SmartDictionary() {
       onOk: () =>
         runLifecycleCommandOnce(lifecycleCommandPending, async () => {
           try {
-            const mutation = restoring ? restoreWord : archiveWord;
+            if (restoring) {
+              await executeRestore({ kind: "single", id: record.id });
+              return;
+            }
+            const mutation = archiveWord;
             await mutation.mutateAsync({
               wordId: record.id,
               idempotencyKey: newWordNodeId(),
@@ -222,7 +325,14 @@ export function SmartDictionary() {
       onOk: () =>
         runLifecycleCommandOnce(lifecycleCommandPending, async () => {
           try {
-            const mutation = restoring ? restoreBatch : archiveBatch;
+            if (restoring) {
+              await executeRestore({
+                kind: "batch",
+                ids: selectedKeys.map(String)
+              });
+              return;
+            }
+            const mutation = archiveBatch;
             const response = await mutation.mutateAsync({
               idempotencyKey: newWordNodeId(),
               input: { entries }
@@ -507,6 +617,19 @@ export function SmartDictionary() {
       </Card>
 
       <Card size="small">
+        {restoreSurface.page && pendingRestore && (
+          <div style={{ marginBottom: 12 }}>
+            <LifecycleSurfaceConfirmation
+              state={restoreSurface.snapshot}
+              confirming={restoreWord.isPending || restoreBatch.isPending}
+              onConfirm={() =>
+                void runLifecycleCommandOnce(lifecycleCommandPending, () =>
+                  executeRestore(pendingRestore)
+                )
+              }
+            />
+          </div>
+        )}
         <Flex
           justify="space-between"
           align="center"
@@ -611,7 +734,23 @@ export function SmartDictionary() {
             adminWordsDataSourceCapabilities.batchArchive
               ? {
                   selectedRowKeys: selectedKeys,
-                  onChange: setSelectedKeys,
+                  preserveSelectedRowKeys: true,
+                  onChange: (keys, selected) => {
+                    setSelectedKeys(keys);
+                    setSelectedRecords((previous) => {
+                      const kept = Object.fromEntries(
+                        Object.entries(previous).filter(([id]) =>
+                          keys.some((key) => String(key) === id)
+                        )
+                      );
+                      for (const record of selected) kept[record.id] = record;
+                      return kept;
+                    });
+                    if (pendingRestore) {
+                      restoreSurface.clear();
+                      setPendingRestore(undefined);
+                    }
+                  },
                   getCheckboxProps: (record) => ({
                     disabled:
                       record.schema_version !== 2 ||
@@ -628,7 +767,6 @@ export function SmartDictionary() {
             showTotal: (t) => `共 ${t} 条`,
             pageSizeOptions: [10, 20, 50, 100],
             onChange: (nextPage, nextSize) => {
-              setSelectedKeys([]);
               setPage(nextSize !== pageSize ? 1 : nextPage);
               setPageSize(nextSize);
             }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
+  ActivatePublicationInput,
   EntryLifecycleBatchInput,
   EntryLifecycleInput,
   PreviewFormsImpactInputV2,
@@ -303,6 +304,21 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       "/lexicon/entries/w-2/publications",
       input,
       { headers: { "Idempotency-Key": "op-publish-1" } }
+    );
+  });
+
+  it("activatePublication → 历史 publication activation 使用独立幂等键", () => {
+    const api = createAdminEndpoints(http);
+    const input: ActivatePublicationInput = {
+      base_revision: 5,
+      base_lifecycle_revision: 2,
+      confirmed_surface_match_token: "visibility-token"
+    };
+    api.words.activatePublication("w-2", "pub-1", "activation-key", input);
+    expect(http.post).toHaveBeenCalledWith(
+      "/lexicon/entries/w-2/publications/pub-1/activate",
+      input,
+      { headers: { "Idempotency-Key": "activation-key" } }
     );
   });
 

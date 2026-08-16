@@ -90,6 +90,7 @@ const contractSchemaNames = [
   "EntryLifecycleTarget",
   "EntryLifecycleBatchInput",
   "EntryLifecycleBatchResponse",
+  "ActivatePublicationInput",
   "SuggestDialectVariantsResponseV2",
   "VoiceCapabilities",
   "VoiceResponse",

@@ -31,9 +31,10 @@ import {
   useSearchParams
 } from "react-router-dom";
 import { useDeleteWordDraft, useRestoreWord, useWordDetail } from "../api";
+import { LifecycleSurfaceConfirmation } from "../LifecycleSurfaceConfirmation";
 import { STATUS_LABEL } from "../labels";
 import { runLifecycleCommandOnce } from "../lifecycleCommand";
-import { newWordNodeId } from "../word-model/primitives";
+import { useLifecycleSurfaceCommand } from "../useLifecycleSurfaceCommand";
 import {
   createPartOfSpeechLookup,
   partOfSpeechLabel
@@ -308,6 +309,7 @@ export function WordCreationWizard({ mode }: Props) {
     mode === "create" ? "basics" : isWordCreationStep(step) ? step : "basics";
   const detail = useWordDetail(wordId, mode === "resume" && wordId !== "");
   const restoreWord = useRestoreWord();
+  const restoreSurface = useLifecycleSurfaceCommand(wordId);
   const lifecycleCommandPending = useRef(false);
   const [word, setWord] = useState<AdminWordV2>();
   const [draftHeadwords, setDraftHeadwords] = useState<WordHeadwordsV2>();
@@ -346,6 +348,44 @@ export function WordCreationWizard({ mode }: Props) {
       );
     }
   };
+
+  const restoreArchivedWord = () =>
+    runLifecycleCommandOnce(lifecycleCommandPending, async () => {
+      try {
+        const latest = await detail.refetch();
+        const target = latest?.data?.word ?? detail.data?.word;
+        if (!target || target.status !== "archived") {
+          restoreSurface.clear();
+          if (target) setWord(target);
+          message.warning("词条状态已变化，已重新加载最新详情");
+          return;
+        }
+        const outcome = await restoreSurface.run((idempotencyKey, token) =>
+          restoreWord.mutateAsync({
+            wordId: target.id,
+            idempotencyKey,
+            input: {
+              base_revision: target.revision,
+              base_lifecycle_revision: target.lifecycle_revision,
+              ...(token ? { confirmed_surface_match_token: token } : {})
+            }
+          })
+        );
+        if (outcome.ok) {
+          setWord(outcome.result.word);
+          message.success("词条已恢复");
+        } else if (
+          outcome.error.code ===
+          "multiple_active_exact_headword_publications_not_enabled"
+        ) {
+          message.warning("学习端暂不支持多个同名公开词条");
+        } else {
+          message.warning("恢复条件已变化，请查看最新确认信息");
+        }
+      } catch (error) {
+        message.error(error instanceof Error ? error.message : "恢复失败");
+      }
+    });
 
   if (mode === "create") {
     return (
@@ -428,34 +468,19 @@ export function WordCreationWizard({ mode }: Props) {
             <Button
               icon={<ReloadOutlined />}
               loading={restoreWord.isPending}
-              onClick={() =>
-                void runLifecycleCommandOnce(
-                  lifecycleCommandPending,
-                  async () => {
-                    try {
-                      const restored = await restoreWord.mutateAsync({
-                        wordId: word.id,
-                        idempotencyKey: newWordNodeId(),
-                        input: {
-                          base_revision: word.revision,
-                          base_lifecycle_revision: word.lifecycle_revision
-                        }
-                      });
-                      setWord(restored.word);
-                      message.success("词条已恢复");
-                    } catch (error) {
-                      message.error(
-                        error instanceof Error ? error.message : "恢复失败"
-                      );
-                    }
-                  }
-                )
-              }
+              onClick={() => void restoreArchivedWord()}
             >
               恢复词条
             </Button>
           }
           style={{ marginBottom: 16 }}
+        />
+      )}
+      {word.status === "archived" && restoreSurface.page && (
+        <LifecycleSurfaceConfirmation
+          state={restoreSurface.snapshot}
+          confirming={restoreWord.isPending}
+          onConfirm={() => void restoreArchivedWord()}
         />
       )}
       <WordCreationLayout

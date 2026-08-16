@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/inflection-list-audit/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-16T10:27:41.055Z",
+  "_source": "/Users/darwish/.codex/worktrees/inflection-visibility-b8/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-16T12:13:02.459Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -20,6 +20,9 @@
     "/admin/lexicon/entries/{id}": ["delete", "get"],
     "/admin/lexicon/entries/{id}/archive": ["post"],
     "/admin/lexicon/entries/{id}/publications": ["post"],
+    "/admin/lexicon/entries/{id}/publications/{publication_id}/activate": [
+      "post"
+    ],
     "/admin/lexicon/entries/{id}/restore": ["post"],
     "/admin/lexicon/entries/{id}/steps/forms": ["put"],
     "/admin/lexicon/entries/{id}/steps/forms/impact": ["post"],
@@ -82,6 +85,14 @@
       }
     ],
     "post /admin/lexicon/entries/{id}/publications": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate": [
       {
         "name": "Idempotency-Key",
         "in": "header",
@@ -1407,7 +1418,8 @@
           "format": "int64",
           "minimum": 1
         },
-        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 }
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "confirmed_surface_match_token": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -1429,6 +1441,7 @@
       "type": "object",
       "required": ["entries"],
       "properties": {
+        "confirmed_surface_match_token": { "type": "string" },
         "entries": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/EntryLifecycleTarget" }
@@ -1446,6 +1459,20 @@
           "items": { "$ref": "#/components/schemas/AdminWordV2" }
         }
       }
+    },
+    "ActivatePublicationInput": {
+      "type": "object",
+      "required": ["base_revision", "base_lifecycle_revision"],
+      "properties": {
+        "base_lifecycle_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "confirmed_surface_match_token": { "type": "string" }
+      },
+      "additionalProperties": false
     },
     "SuggestDialectVariantsResponseV2": {
       "type": "object",

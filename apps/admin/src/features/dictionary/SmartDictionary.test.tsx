@@ -22,6 +22,9 @@ const apiMocks = vi.hoisted(() => ({
 vi.mock("./api", () => apiMocks);
 
 vi.mock("./dataSource", () => ({
+  adminWordsDataSource: {
+    get: vi.fn(async () => undefined)
+  },
   adminWordsDataSourceCapabilities: {
     archive: true,
     batchArchive: true,
@@ -292,7 +295,7 @@ describe("SmartDictionary", () => {
     });
   });
 
-  it("翻页时清空当前页的批量选择", async () => {
+  it("翻页时保留完整批量选择", async () => {
     const { container } = render(
       <MemoryRouter>
         <AntApp>
@@ -314,9 +317,9 @@ describe("SmartDictionary", () => {
 
     await waitFor(() => {
       expect(screen.getByText("second")).toBeInTheDocument();
-      expect(screen.queryByText("归 档(1)")).toBeNull();
+      expect(screen.getByText("归 档(1)")).toBeInTheDocument();
     });
-    expect(batchButton).toBeDisabled();
+    expect(batchButton).not.toBeDisabled();
   });
 
   it("HTTP 环境单条归档可降级生成幂等键，连续确认只发一次", async () => {

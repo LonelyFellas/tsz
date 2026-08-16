@@ -25,6 +25,7 @@ import type {
   DraftValidationResponse,
   EnglishTextV2,
   RichText,
+  SurfaceMatchPageV2,
   WordCreationStep,
   WordDefinitionV2
 } from "@tsz/types";
@@ -34,6 +35,12 @@ import { HttpError } from "@tsz/api-client/http";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DIALECT_LABEL } from "../editorConstants";
+import {
+  aggregateSurfaceMatchCards,
+  canAcknowledgeSurfaceSnapshot,
+  requiresNewIdempotencyKey
+} from "../surfaceSnapshot";
+import { useSurfaceSnapshot } from "../useSurfaceSnapshot";
 import {
   createPartOfSpeechLookup,
   partOfSpeechLabel,
@@ -383,9 +390,48 @@ export function PreviewAndPublishStep({
   const publishWord = usePublishWordV2(word.id);
   const [validation, setValidation] = useState<DraftValidationResponse>();
   const [validationError, setValidationError] = useState<string>();
+  const [surfacePage, setSurfacePage] = useState<SurfaceMatchPageV2>();
   const publishKey = useRef(newWordNodeId());
   const publishingRef = useRef(false);
   const editQuery = word.status === "published" ? "?mode=edit" : "";
+  const surfaceState = useSurfaceSnapshot(
+    surfacePage,
+    `${word.id}:${word.revision}:${surfacePage?.snapshot_id ?? "none"}`
+  );
+  const surfaceCards = useMemo(
+    () =>
+      aggregateSurfaceMatchCards(
+        surfaceState.items,
+        surfaceState.matched_entry_contexts
+      ),
+    [surfaceState.items, surfaceState.matched_entry_contexts]
+  );
+  const surfaceCardGroups = useMemo(
+    () =>
+      [
+        {
+          key: "visibility",
+          title: "仅公开可见性",
+          cards: surfaceCards.filter((card) => card.membership === "visibility")
+        },
+        {
+          key: "ordinary",
+          title: "仅普通同形提示",
+          cards: surfaceCards.filter((card) => card.membership === "ordinary")
+        },
+        {
+          key: "composite",
+          title: "公开可见性 + 普通同形提示",
+          cards: surfaceCards.filter((card) => card.membership === "composite")
+        }
+      ].filter((group) => group.cards.length > 0),
+    [surfaceCards]
+  );
+
+  useEffect(() => {
+    setSurfacePage(undefined);
+    publishKey.current = newWordNodeId();
+  }, [word.id, word.revision]);
 
   const handleRequestError = (
     error: unknown,
@@ -401,7 +447,35 @@ export function PreviewAndPublishStep({
       message.warning("完整性检查发现待处理问题");
       return true;
     }
-    if (error instanceof HttpError && error.status === 409) {
+    if (
+      error instanceof HttpError &&
+      (error.status === 409 || error.status === 410) &&
+      requiresNewIdempotencyKey(error.status, error.code)
+    ) {
+      publishKey.current = newWordNodeId();
+      if (error.meta?.surface_match_page) {
+        setSurfacePage(error.meta.surface_match_page);
+      }
+      if (error.code === "surface_policy_changed") {
+        setSurfacePage(undefined);
+        message.warning("公开可见性策略已变化，请重新发布以取得当前确认信息");
+      } else if (error.code === "surface_match_snapshot_expired") {
+        setSurfacePage(undefined);
+        message.warning("公开确认已过期，请重新发布并确认最新结果");
+      } else if (
+        error.code === "multiple_active_exact_headword_publications_not_enabled"
+      ) {
+        message.warning("学习端暂不支持多个同名公开词条");
+      } else {
+        message.warning("同名公开范围已变化，请查看最新提示后重新确认");
+      }
+      return true;
+    }
+    if (
+      error instanceof HttpError &&
+      error.status === 409 &&
+      error.code === "revision_conflict"
+    ) {
       modal.confirm({
         title: "草稿版本已更新",
         content:
@@ -462,8 +536,15 @@ export function PreviewAndPublishStep({
       }
       const { word: published } = await publishWord.mutateAsync({
         base_revision: word.revision,
-        idempotency_key: publishKey.current
+        idempotency_key: publishKey.current,
+        ...(canAcknowledgeSurfaceSnapshot(surfaceState)
+          ? {
+              confirmed_surface_match_token:
+                surfaceState.surface_confirmation_token
+            }
+          : {})
       });
+      setSurfacePage(undefined);
       onPublished(published);
       message.success(`「${wordDisplayHeadword(published)}」已提交生效`);
       navigate("/words", { replace: true });
@@ -501,6 +582,62 @@ export function PreviewAndPublishStep({
           title="词性配置加载失败，预览暂以词性编码显示"
           style={{ marginBottom: 18 }}
         />
+      )}
+
+      {surfacePage && (
+        <Card
+          size="small"
+          title={
+            surfaceState.phase === "disabled"
+              ? "学习端暂不支持多个同名公开词条"
+              : "发布前需要确认同名公开范围"
+          }
+          style={{ marginBottom: 18 }}
+        >
+          <Alert
+            type={surfaceState.phase === "disabled" ? "error" : "warning"}
+            showIcon
+            title={`已加载 ${surfaceState.items.length}/${surfaceState.total} 条匹配来源`}
+            description={
+              surfaceState.phase === "disabled"
+                ? "当前能力开关关闭，普通同形 warning token 不能绕过此限制。草稿会保持不变。"
+                : surfaceState.phase === "loading"
+                  ? "正在加载完整且不可变的确认快照，加载完成前不能继续发布。"
+                  : "确认将绑定本次发布命令、当前策略 epoch 和完整匹配集合。"
+            }
+          />
+          <Space orientation="vertical" size={12} style={{ width: "100%" }}>
+            {surfaceCardGroups.map((group) => (
+              <section key={group.key} aria-label={group.title}>
+                <Typography.Text strong>{group.title}</Typography.Text>
+                <List
+                  size="small"
+                  dataSource={group.cards}
+                  renderItem={(card) => (
+                    <List.Item>
+                      <List.Item.Meta
+                        title={
+                          <Space wrap>
+                            <Typography.Text strong>
+                              {card.existing.headword}
+                            </Typography.Text>
+                            <Typography.Text code>
+                              {card.existing.word_id.slice(-8)}
+                            </Typography.Text>
+                          </Space>
+                        }
+                        description={`${card.matches.length} 个来源 · ${card.existing.kind === "word" ? "单词" : "短语"}`}
+                      />
+                    </List.Item>
+                  )}
+                />
+              </section>
+            ))}
+          </Space>
+          {surfaceState.phase === "error" && (
+            <Button onClick={surfaceState.retry}>重新加载确认快照</Button>
+          )}
+        </Card>
       )}
 
       {word.status === "archived" ? (
@@ -713,11 +850,17 @@ export function PreviewAndPublishStep({
             <Button
               type="primary"
               icon={<SendOutlined />}
-              disabled={!validation?.valid}
+              disabled={
+                !validation?.valid ||
+                (surfacePage !== undefined &&
+                  !canAcknowledgeSurfaceSnapshot(surfaceState))
+              }
               loading={publishWord.isPending || validateWord.isPending}
               onClick={() => void publish()}
             >
-              提交生效
+              {canAcknowledgeSurfaceSnapshot(surfaceState)
+                ? "确认同名公开范围并提交生效"
+                : "提交生效"}
             </Button>
           )}
         </div>
