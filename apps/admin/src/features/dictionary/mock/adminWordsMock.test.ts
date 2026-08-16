@@ -3,6 +3,7 @@ import type {
   AdminWordV2,
   DraftFormsStepContent,
   DraftMeaningsStepContent,
+  SurfaceMatchPageV2,
   SuggestDialectVariantsInputV2
 } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -83,6 +84,38 @@ function mockFor(
     sessionStorage: storage,
     partOfSpeechValidation
   });
+}
+
+function surfaceMock(
+  mode: "enabled" | "temporarily_disabled" = "enabled"
+): AdminWordsMock {
+  return surfaceMockWithStorage(memoryStorage(), mode);
+}
+
+function surfaceMockWithStorage(
+  storage: AdminWordsMockStorageLike,
+  mode: "enabled" | "temporarily_disabled" = "enabled"
+): AdminWordsMock {
+  return createAdminWordsMock({
+    getAdminProfile: () => profile(),
+    now: () => new Date(NOW),
+    sessionStorage: storage,
+    surfaceWarnings: mode
+  });
+}
+
+async function terminalSurfacePage(
+  mock: AdminWordsMock,
+  firstPage: SurfaceMatchPageV2
+): Promise<SurfaceMatchPageV2> {
+  let page = firstPage;
+  while (typeof page.next_cursor === "string") {
+    page = await mock.surfaceMatchSnapshotPage(
+      page.snapshot_id,
+      page.next_cursor
+    );
+  }
+  return page;
 }
 
 async function createCenter(
@@ -3324,5 +3357,506 @@ describe("part-of-speech settings mock", () => {
     expect(saved.word.meanings.pos[0]!.senses[0]!.sub_pos).toBe(
       "REAL-CUSTOM-SUB"
     );
+  });
+});
+
+describe("surface warning mock", () => {
+  it("把 schema 8 fixture 升级到 9 并保留旧词条", async () => {
+    const storage = memoryStorage();
+    const initial = mockFor(() => profile(), storage);
+    const created = await createDetectedWord(
+      initial,
+      "workspace",
+      "workspace-before-storage-upgrade"
+    );
+    const currentKey = adminWordsMockStorageKey(
+      ADMIN_WORDS_MOCK_STORAGE_SCHEMA,
+      "admin-test"
+    );
+    const legacyKey = adminWordsMockStorageKey(8, "admin-test");
+    const envelope = JSON.parse(storage.values.get(currentKey)!) as {
+      schema_version: number;
+      state: Record<string, unknown>;
+    };
+    envelope.schema_version = 8;
+    delete envelope.state.consumed_detection_ids;
+    storage.values.delete(currentKey);
+    storage.values.set(legacyKey, JSON.stringify(envelope));
+
+    const upgraded = surfaceMockWithStorage(storage);
+    await expect(upgraded.get(created.word.id)).resolves.toEqual(created);
+    expect(storage.values.has(legacyKey)).toBe(false);
+    expect(storage.values.has(currentKey)).toBe(true);
+  });
+
+  it("surface warning 必须确认后才创建，并保持 detection consumption 与幂等", async () => {
+    const warningMock = surfaceMock();
+    const first = await createDetectedWord(
+      warningMock,
+      "workspace",
+      "workspace-first"
+    );
+    const detection = await warningMock.detect({
+      language: "en",
+      headword: "workspace"
+    });
+    expect(detection.smart_dictionary.status).toBe("warning");
+    if (detection.smart_dictionary.status !== "warning") {
+      throw new Error("workspace should produce a surface warning");
+    }
+    const terminal = await terminalSurfacePage(
+      warningMock,
+      detection.smart_dictionary.surface_match_page
+    );
+    expect(terminal).toMatchObject({
+      continuation_policy: "enabled",
+      next_cursor: null
+    });
+    if (
+      terminal.continuation_policy !== "enabled" ||
+      terminal.next_cursor !== null
+    ) {
+      throw new Error("warning snapshot should finish with a token");
+    }
+
+    const input = {
+      schema_version: 2 as const,
+      detection_id: detection.detection_id,
+      headwords:
+        detection.builtin_dictionary.status === "matched"
+          ? detection.builtin_dictionary.headwords
+          : ({ mode: "unified", common: "workspace" } as const)
+    };
+    await expect(
+      warningMock.createV2({
+        ...input,
+        idempotency_key: "workspace-without-token"
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "surface_match_acknowledgement_required"
+    });
+
+    const confirmedInput = {
+      ...input,
+      idempotency_key: "workspace-confirmed",
+      confirmed_surface_match_token: terminal.surface_confirmation_token
+    };
+    const created = await warningMock.createV2(confirmedInput);
+    expect(created.word.id).not.toBe(first.word.id);
+    expect(created.word.detection_snapshot).toMatchObject({
+      smart_dictionary_status: "warning",
+      surface_warning: {
+        acknowledged: true,
+        acknowledged_by: "admin-test",
+        policy_name: "allow_new_exact_headword_entries",
+        policy_epoch: 1,
+        total: expect.any(Number),
+        match_digest: expect.any(String),
+        preview: expect.arrayContaining([
+          expect.objectContaining({ existing_word_id: first.word.id })
+        ])
+      }
+    });
+    await expect(warningMock.createV2(confirmedInput)).resolves.toEqual(
+      created
+    );
+    await expect(
+      warningMock.createV2({
+        ...confirmedInput,
+        idempotency_key: "workspace-confirmed-again"
+      })
+    ).rejects.toMatchObject({ status: 410, code: "detection_expired" });
+  });
+
+  it("硬刷新后仍原样重放同 key，并拒绝不同 key 复用已消费 detection", async () => {
+    const storage = memoryStorage();
+    const warningMock = surfaceMockWithStorage(storage);
+    await createDetectedWord(warningMock, "workspace", "workspace-seed");
+    const detection = await warningMock.detect({
+      language: "en",
+      headword: "workspace"
+    });
+    if (detection.smart_dictionary.status !== "warning") {
+      throw new Error("workspace should warn");
+    }
+    const terminal = await terminalSurfacePage(
+      warningMock,
+      detection.smart_dictionary.surface_match_page
+    );
+    if (
+      terminal.continuation_policy !== "enabled" ||
+      terminal.next_cursor !== null
+    ) {
+      throw new Error("warning snapshot should issue a token");
+    }
+    const input = {
+      schema_version: 2 as const,
+      idempotency_key: "workspace-confirm-before-refresh",
+      detection_id: detection.detection_id,
+      headwords:
+        detection.builtin_dictionary.status === "matched"
+          ? detection.builtin_dictionary.headwords
+          : ({ mode: "unified", common: "workspace" } as const),
+      confirmed_surface_match_token: terminal.surface_confirmation_token
+    };
+    const created = await warningMock.createV2(input);
+
+    const refreshed = surfaceMockWithStorage(storage);
+    await expect(refreshed.createV2(input)).resolves.toEqual(created);
+    await expect(
+      refreshed.createV2({
+        ...input,
+        idempotency_key: "workspace-new-key-after-refresh"
+      })
+    ).rejects.toMatchObject({ status: 410, code: "detection_expired" });
+  });
+
+  it("显式 plural 词形命中会 warning，并只在终页签发 token", async () => {
+    const warningMock = surfaceMock();
+    const workspace = await createDetectedWord(
+      warningMock,
+      "workspace",
+      "workspace-with-plural"
+    );
+    const forms = structuredClone(workspace.word.forms);
+    forms.pos[0]!.form_groups[0]!.slots.push({
+      id: "workspace-plural-slot",
+      form_type: "plural",
+      variants: [
+        {
+          id: "workspace-plural-variant",
+          dialect: "common",
+          spelling: "workspaces",
+          origin: "manual",
+          pronunciations: [
+            {
+              id: "published-plural-pronunciation",
+              dict_phonetic: "workspaces",
+              actual_pron: "workspaces",
+              style: "normal"
+            }
+          ]
+        }
+      ]
+    });
+    await warningMock.saveFormsStep(workspace.word.id, {
+      base_revision: workspace.word.revision,
+      operation_id: "workspace-save-plural",
+      intent: "save",
+      content: forms
+    });
+
+    const pluralDetection = await warningMock.detect({
+      language: "en",
+      headword: "workspaces"
+    });
+    expect(pluralDetection.smart_dictionary.status).toBe("warning");
+    if (pluralDetection.smart_dictionary.status !== "warning") {
+      throw new Error("workspaces should match the explicit plural form");
+    }
+    const firstPage = pluralDetection.smart_dictionary.surface_match_page;
+    expect(firstPage.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ match_category: "headword_form" })
+      ])
+    );
+    const terminal = await terminalSurfacePage(warningMock, firstPage);
+    expect(terminal).toMatchObject({
+      continuation_policy: "enabled",
+      next_cursor: null,
+      surface_confirmation_token: expect.any(String)
+    });
+  });
+
+  it("current publication 的旧 plural 在当前 draft 删除后仍参与 warning", async () => {
+    const warningMock = surfaceMock();
+    const workspace = await createDetectedWord(
+      warningMock,
+      "workspace",
+      "workspace-publication-plural"
+    );
+    const formsWithPlural = withCompletePronunciations(workspace.word.forms);
+    formsWithPlural.pos[0]!.form_groups[0]!.slots.push({
+      id: "published-plural-slot",
+      form_type: "plural",
+      variants: (["uk", "us"] as const).map((dialect) => ({
+        id: `published-plural-variant-${dialect}`,
+        dialect,
+        spelling: "workspaces",
+        origin: "manual" as const,
+        pronunciations: [
+          {
+            id: `published-plural-pronunciation-${dialect}`,
+            dict_phonetic: "workspaces",
+            actual_pron: "workspaces",
+            style: "normal" as const
+          }
+        ]
+      }))
+    });
+    const formsSaved = await warningMock.saveFormsStep(workspace.word.id, {
+      base_revision: workspace.word.revision,
+      operation_id: "workspace-publication-plural-forms",
+      intent: "save",
+      content: formsWithPlural
+    });
+    const ready = await completeDraft(
+      warningMock,
+      formsSaved,
+      "workspace-publication-plural-ready"
+    );
+    const published = await warningMock.publishV2(ready.id, {
+      base_revision: ready.revision,
+      idempotency_key: "workspace-publication-plural-publish"
+    });
+    const draftWithoutPlural = structuredClone(published.word.forms);
+    draftWithoutPlural.pos[0]!.form_groups[0]!.slots =
+      draftWithoutPlural.pos[0]!.form_groups[0]!.slots.filter(
+        (slot) => slot.id !== "published-plural-slot"
+      );
+    await warningMock.saveFormsStep(published.word.id, {
+      base_revision: published.word.revision,
+      operation_id: "workspace-remove-draft-plural",
+      intent: "save",
+      content: draftWithoutPlural
+    });
+
+    const detection = await warningMock.detect({
+      language: "en",
+      headword: "workspaces"
+    });
+    if (detection.smart_dictionary.status !== "warning") {
+      throw new Error("current publication plural should still warn");
+    }
+    const sources = detection.smart_dictionary.surface_match_page.items.map(
+      (item) => item.existing.source
+    );
+    expect(sources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          source_kind: "form",
+          content_scope: "current_publication",
+          form_type: "plural"
+        })
+      ])
+    );
+    expect(
+      sources.some(
+        (source) =>
+          source.source_kind === "form" && source.content_scope === "draft"
+      )
+    ).toBe(false);
+  });
+
+  it("warning context 从未归档 current publication 汇总 bounded 入站关系", async () => {
+    const warningMock = surfaceMock();
+    const targetDraft = await createDetectedWord(
+      warningMock,
+      "far",
+      "surface-context-target"
+    );
+    const targetReady = await completeDraft(
+      warningMock,
+      targetDraft,
+      "surface-context-target"
+    );
+    const targetPublished = await warningMock.publishV2(targetReady.id, {
+      base_revision: targetReady.revision,
+      idempotency_key: "surface-context-target-publish"
+    });
+    const sourceDraft = await createCenter(
+      warningMock,
+      "surface-context-source"
+    );
+    const sourceForms = await warningMock.saveFormsStep(sourceDraft.word.id, {
+      base_revision: sourceDraft.word.revision,
+      operation_id: "surface-context-source-forms",
+      intent: "complete",
+      content: withCompletePronunciations(sourceDraft.word.forms)
+    });
+    const sourceMeanings = completeMockMeanings(sourceForms.word);
+    sourceMeanings.pos[0]!.senses[0]!.relations.push({
+      id: "surface-context-relation",
+      relation: "synonym",
+      target_word_id: targetPublished.word.id,
+      target_sense_id: targetPublished.word.meanings.pos[0]!.senses[0]!.id,
+      score: "80"
+    });
+    const sourceReady = await warningMock.saveMeaningsStep(
+      sourceForms.word.id,
+      {
+        base_revision: sourceForms.word.revision,
+        operation_id: "surface-context-source-meanings",
+        intent: "complete",
+        content: sourceMeanings
+      }
+    );
+    await warningMock.publishV2(sourceReady.word.id, {
+      base_revision: sourceReady.word.revision,
+      idempotency_key: "surface-context-source-publish"
+    });
+
+    const detection = await warningMock.detect({
+      language: "en",
+      headword: "far"
+    });
+    if (detection.smart_dictionary.status !== "warning") {
+      throw new Error("published target should warn");
+    }
+    expect(
+      detection.smart_dictionary.surface_match_page.matched_entry_contexts
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          word_id: targetPublished.word.id,
+          inbound_relations: {
+            total: 1,
+            by_type: { synonym: 1, antonym: 0, derivative: 0 },
+            previews: [
+              expect.objectContaining({
+                source_word_id: sourceReady.word.id,
+                relation: "synonym"
+              })
+            ],
+            truncated: false
+          }
+        })
+      ])
+    );
+  });
+
+  it("快照后匹配集合变化返回新 409 页面，旧 token 不会创建", async () => {
+    const warningMock = surfaceMock();
+    await createDetectedWord(warningMock, "workspace", "workspace-seed");
+    const detectionA = await warningMock.detect({
+      language: "en",
+      headword: "workspace"
+    });
+    const detectionB = await warningMock.detect({
+      language: "en",
+      headword: "workspace"
+    });
+    if (
+      detectionA.smart_dictionary.status !== "warning" ||
+      detectionB.smart_dictionary.status !== "warning"
+    ) {
+      throw new Error("both detections should warn");
+    }
+    const terminalA = await terminalSurfacePage(
+      warningMock,
+      detectionA.smart_dictionary.surface_match_page
+    );
+    const terminalB = await terminalSurfacePage(
+      warningMock,
+      detectionB.smart_dictionary.surface_match_page
+    );
+    if (
+      terminalA.continuation_policy !== "enabled" ||
+      terminalA.next_cursor !== null ||
+      terminalB.continuation_policy !== "enabled" ||
+      terminalB.next_cursor !== null
+    ) {
+      throw new Error("both warning snapshots should issue tokens");
+    }
+    const headwords =
+      detectionA.builtin_dictionary.status === "matched"
+        ? detectionA.builtin_dictionary.headwords
+        : ({ mode: "unified", common: "workspace" } as const);
+    await warningMock.createV2({
+      schema_version: 2,
+      idempotency_key: "workspace-concurrent-a",
+      detection_id: detectionA.detection_id,
+      headwords,
+      confirmed_surface_match_token: terminalA.surface_confirmation_token
+    });
+
+    await expect(
+      warningMock.createV2({
+        schema_version: 2,
+        idempotency_key: "workspace-concurrent-b",
+        detection_id: detectionB.detection_id,
+        headwords,
+        confirmed_surface_match_token: terminalB.surface_confirmation_token
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "surface_matches_changed",
+      meta: {
+        surface_match_page: expect.objectContaining({
+          snapshot_id: expect.any(String)
+        })
+      }
+    });
+
+    const pagedDetection = await warningMock.detect({
+      language: "en",
+      headword: "workspace"
+    });
+    if (pagedDetection.smart_dictionary.status !== "warning") {
+      throw new Error("the expanded match set should still warn");
+    }
+    const firstPage = pagedDetection.smart_dictionary.surface_match_page;
+    expect(firstPage.next_cursor).toEqual(expect.any(String));
+    if (typeof firstPage.next_cursor !== "string") {
+      throw new Error("four matches should require a second page");
+    }
+    const nextPage = await warningMock.surfaceMatchSnapshotPage(
+      firstPage.snapshot_id,
+      firstPage.next_cursor
+    );
+    expect(nextPage).toMatchObject({ next_cursor: null });
+    await expect(
+      warningMock.surfaceMatchSnapshotPage(
+        firstPage.snapshot_id,
+        firstPage.next_cursor
+      )
+    ).rejects.toMatchObject({
+      status: 410,
+      code: "surface_match_snapshot_expired"
+    });
+    await expect(
+      warningMock.surfaceMatchSnapshotPage(firstPage.snapshot_id, "wrong")
+    ).rejects.toMatchObject({
+      status: 410,
+      code: "surface_match_snapshot_expired"
+    });
+  });
+
+  it("exact-headword gate 关闭时不给 token，也不能绕过创建", async () => {
+    const disabledMock = surfaceMock("temporarily_disabled");
+    await createDetectedWord(disabledMock, "workspace", "workspace-seed");
+    const detection = await disabledMock.detect({
+      language: "en",
+      headword: "workspace"
+    });
+    if (detection.smart_dictionary.status !== "warning") {
+      throw new Error("workspace should warn while the gate is closed");
+    }
+    const terminal = await terminalSurfacePage(
+      disabledMock,
+      detection.smart_dictionary.surface_match_page
+    );
+    expect(terminal).toMatchObject({
+      continuation_policy: "temporarily_disabled",
+      next_cursor: null,
+      policy_block_code: "exact_headword_creation_temporarily_disabled"
+    });
+    expect(terminal).not.toHaveProperty("surface_confirmation_token");
+
+    await expect(
+      disabledMock.createV2({
+        schema_version: 2,
+        idempotency_key: "workspace-gate-closed",
+        detection_id: detection.detection_id,
+        headwords:
+          detection.builtin_dictionary.status === "matched"
+            ? detection.builtin_dictionary.headwords
+            : { mode: "unified", common: "workspace" }
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "exact_headword_creation_temporarily_disabled"
+    });
   });
 });

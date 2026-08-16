@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-14T06:45:40.459Z",
+  "_source": "/Users/darwish/.codex/worktrees/inflection-detection-create/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-15T17:01:59.676Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -25,6 +25,7 @@
     "/admin/lexicon/entries/{id}/steps/forms/impact": ["post"],
     "/admin/lexicon/entries/{id}/steps/meanings": ["put"],
     "/admin/lexicon/entries/{id}/validate": ["post"],
+    "/admin/lexicon/surface-match-snapshots/{snapshot_id}": ["get"],
     "/admin/profile": ["get"],
     "/admin/settings/parts-of-speech": ["get", "post"],
     "/admin/settings/parts-of-speech/catalog": ["get"],
@@ -128,6 +129,17 @@
         "has_unpublished_changes": { "type": "boolean" }
       }
     },
+    "CreateAdminWordV2Input": {
+      "type": "object",
+      "required": ["schema_version", "detection_id", "headwords"],
+      "properties": {
+        "confirmed_surface_match_token": { "type": "string" },
+        "detection_id": { "type": "string", "format": "uuid" },
+        "headwords": { "$ref": "#/components/schemas/WordHeadwordsV2" },
+        "schema_version": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
     "DeleteDraftInput": {
       "type": "object",
       "required": ["base_revision", "base_lifecycle_revision"],
@@ -148,6 +160,984 @@
         "dialect": { "$ref": "#/components/schemas/Dialect" },
         "headword": { "type": "string" },
         "status": { "$ref": "#/components/schemas/AdminWordStatus" },
+        "word_id": { "type": "string", "format": "uuid" }
+      },
+      "deprecated": true
+    },
+    "SmartDictionaryResultV2": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["duplicates", "status"],
+          "properties": {
+            "duplicates": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/DuplicateWordMatchV2" },
+              "maxItems": 0
+            },
+            "status": { "type": "string", "enum": ["clear"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["duplicates", "status"],
+          "properties": {
+            "duplicates": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/DuplicateWordMatchV2" },
+              "minItems": 1
+            },
+            "status": { "type": "string", "enum": ["duplicate"] }
+          },
+          "additionalProperties": false,
+          "deprecated": true
+        },
+        {
+          "type": "object",
+          "required": [
+            "duplicates",
+            "surface_match_page",
+            "matched_entry_contexts",
+            "status"
+          ],
+          "properties": {
+            "duplicates": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/DuplicateWordMatchV2" },
+              "maxItems": 0
+            },
+            "matched_entry_contexts": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/MatchedEntryContextV2" },
+              "maxItems": 0
+            },
+            "status": { "type": "string", "enum": ["warning"] },
+            "surface_match_page": {
+              "$ref": "#/components/schemas/SurfaceMatchPageV2"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["duplicates", "status"],
+          "properties": {
+            "duplicates": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/DuplicateWordMatchV2" },
+              "maxItems": 0
+            },
+            "status": { "type": "string", "enum": ["unavailable"] }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "DictionaryProviderV2": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "DictionaryCoverageStateV2": {
+      "type": "string",
+      "enum": ["complete", "partial", "missing"]
+    },
+    "DictionaryCoverageV2": {
+      "type": "object",
+      "required": [
+        "forms",
+        "pronunciations",
+        "meanings",
+        "examples",
+        "frequency"
+      ],
+      "properties": {
+        "examples": {
+          "$ref": "#/components/schemas/DictionaryCoverageStateV2"
+        },
+        "forms": { "$ref": "#/components/schemas/DictionaryCoverageStateV2" },
+        "frequency": {
+          "$ref": "#/components/schemas/DictionaryCoverageStateV2"
+        },
+        "meanings": {
+          "$ref": "#/components/schemas/DictionaryCoverageStateV2"
+        },
+        "pronunciations": {
+          "$ref": "#/components/schemas/DictionaryCoverageStateV2"
+        }
+      }
+    },
+    "DictionaryProvenanceV2": {
+      "type": "object",
+      "properties": {
+        "examples": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/DictionaryProviderV2" }
+          ]
+        },
+        "forms": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/DictionaryProviderV2" }
+          ]
+        },
+        "frequency": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/DictionaryProviderV2" }
+          ]
+        },
+        "meanings": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/DictionaryProviderV2" }
+          ]
+        },
+        "pronunciations": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/DictionaryProviderV2" }
+          ]
+        }
+      }
+    },
+    "DetectionSurfaceMatchPreviewV2": {
+      "type": "object",
+      "required": [
+        "match_id",
+        "match_category",
+        "existing_word_id",
+        "existing_headword",
+        "existing_status"
+      ],
+      "properties": {
+        "existing_headword": { "type": "string" },
+        "existing_status": { "$ref": "#/components/schemas/AdminWordStatus" },
+        "existing_word_id": { "type": "string", "format": "uuid" },
+        "match_category": {
+          "$ref": "#/components/schemas/SurfaceMatchCategoryV2"
+        },
+        "match_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "DetectionSurfaceWarningAuditV2": {
+      "type": "object",
+      "required": [
+        "total",
+        "match_digest",
+        "acknowledged",
+        "acknowledged_at",
+        "acknowledged_by",
+        "policy_name",
+        "policy_epoch",
+        "preview",
+        "truncated"
+      ],
+      "properties": {
+        "acknowledged": { "type": "boolean", "enum": [true] },
+        "acknowledged_at": { "type": "string", "format": "date-time" },
+        "acknowledged_by": { "type": "string", "format": "uuid" },
+        "match_digest": { "type": "string" },
+        "policy_epoch": { "type": "integer", "format": "int64", "minimum": 0 },
+        "policy_name": { "$ref": "#/components/schemas/SurfacePolicyNameV2" },
+        "preview": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/DetectionSurfaceMatchPreviewV2"
+          },
+          "maxItems": 5
+        },
+        "total": { "type": "integer", "format": "int64", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "WordDetectionSnapshotSmartDictionaryV2": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["smart_dictionary_status"],
+          "properties": {
+            "smart_dictionary_status": { "type": "string", "enum": ["clear"] },
+            "surface_warning": { "type": "null" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["surface_warning", "smart_dictionary_status"],
+          "properties": {
+            "smart_dictionary_status": {
+              "type": "string",
+              "enum": ["warning"]
+            },
+            "surface_warning": {
+              "$ref": "#/components/schemas/DetectionSurfaceWarningAuditV2"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WordDetectionSnapshotV2": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "detection_id",
+            "request",
+            "normalized_headword",
+            "entry_kind",
+            "matched_dialect",
+            "builtin_dictionary_status",
+            "headwords",
+            "suggested_pos",
+            "detected_at",
+            "smart_dictionary_status"
+          ],
+          "properties": {
+            "builtin_dictionary_status": { "type": "string" },
+            "detected_at": { "type": "string", "format": "date-time" },
+            "detection_id": { "type": "string", "format": "uuid" },
+            "dictionary_coverage": {
+              "oneOf": [
+                { "type": "null" },
+                { "$ref": "#/components/schemas/DictionaryCoverageV2" }
+              ]
+            },
+            "dictionary_provenance": {
+              "oneOf": [
+                { "type": "null" },
+                { "$ref": "#/components/schemas/DictionaryProvenanceV2" }
+              ]
+            },
+            "dictionary_provider": {
+              "oneOf": [
+                { "type": "null" },
+                { "$ref": "#/components/schemas/DictionaryProviderV2" }
+              ]
+            },
+            "entry_kind": { "$ref": "#/components/schemas/EntryKind" },
+            "headwords": { "$ref": "#/components/schemas/WordHeadwordsV2" },
+            "matched_dialect": { "$ref": "#/components/schemas/Dialect" },
+            "normalized_headword": { "type": "string" },
+            "request": { "$ref": "#/components/schemas/DetectionRequestEcho" },
+            "smart_dictionary_status": { "type": "string", "enum": ["clear"] },
+            "suggested_pos": { "type": "array", "items": { "type": "string" } },
+            "surface_warning": { "type": "null" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "detection_id",
+            "request",
+            "normalized_headword",
+            "entry_kind",
+            "matched_dialect",
+            "builtin_dictionary_status",
+            "headwords",
+            "suggested_pos",
+            "detected_at",
+            "smart_dictionary_status",
+            "surface_warning"
+          ],
+          "properties": {
+            "builtin_dictionary_status": { "type": "string" },
+            "detected_at": { "type": "string", "format": "date-time" },
+            "detection_id": { "type": "string", "format": "uuid" },
+            "dictionary_coverage": {
+              "oneOf": [
+                { "type": "null" },
+                { "$ref": "#/components/schemas/DictionaryCoverageV2" }
+              ]
+            },
+            "dictionary_provenance": {
+              "oneOf": [
+                { "type": "null" },
+                { "$ref": "#/components/schemas/DictionaryProvenanceV2" }
+              ]
+            },
+            "dictionary_provider": {
+              "oneOf": [
+                { "type": "null" },
+                { "$ref": "#/components/schemas/DictionaryProviderV2" }
+              ]
+            },
+            "entry_kind": { "$ref": "#/components/schemas/EntryKind" },
+            "headwords": { "$ref": "#/components/schemas/WordHeadwordsV2" },
+            "matched_dialect": { "$ref": "#/components/schemas/Dialect" },
+            "normalized_headword": { "type": "string" },
+            "request": { "$ref": "#/components/schemas/DetectionRequestEcho" },
+            "smart_dictionary_status": {
+              "type": "string",
+              "enum": ["warning"]
+            },
+            "suggested_pos": { "type": "array", "items": { "type": "string" } },
+            "surface_warning": {
+              "$ref": "#/components/schemas/DetectionSurfaceWarningAuditV2"
+            }
+          },
+          "additionalProperties": false
+        }
+      ],
+      "discriminator": { "propertyName": "smart_dictionary_status" }
+    },
+    "SurfaceMatchCandidateV2": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "candidate_ref",
+            "surface",
+            "normalized_surface",
+            "dialect",
+            "entry_kind",
+            "candidate_type"
+          ],
+          "properties": {
+            "candidate_ref": { "type": "string" },
+            "candidate_type": { "type": "string", "enum": ["headword"] },
+            "candidate_word_id": { "type": "string", "format": "uuid" },
+            "dialect": { "$ref": "#/components/schemas/Dialect" },
+            "entry_kind": { "$ref": "#/components/schemas/EntryKind" },
+            "normalized_surface": { "type": "string" },
+            "surface": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "candidate_ref",
+            "candidate_word_id",
+            "candidate_node_id",
+            "surface",
+            "normalized_surface",
+            "dialect",
+            "pos_id",
+            "pos",
+            "form_type",
+            "candidate_type"
+          ],
+          "properties": {
+            "candidate_node_id": { "type": "string", "format": "uuid" },
+            "candidate_ref": { "type": "string" },
+            "candidate_type": { "type": "string", "enum": ["form"] },
+            "candidate_word_id": { "type": "string", "format": "uuid" },
+            "dialect": { "$ref": "#/components/schemas/Dialect" },
+            "form_type": { "$ref": "#/components/schemas/WordFormTypeV2" },
+            "normalized_surface": { "type": "string" },
+            "pos": { "type": "string" },
+            "pos_id": { "type": "string", "format": "uuid" },
+            "surface": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ExistingSurfaceSourceV2": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "source_id",
+            "content_scope",
+            "surface",
+            "dialect",
+            "source_kind"
+          ],
+          "properties": {
+            "content_scope": {
+              "$ref": "#/components/schemas/SurfaceContentScopeV2"
+            },
+            "dialect": { "$ref": "#/components/schemas/Dialect" },
+            "source_id": { "type": "string" },
+            "source_kind": { "type": "string", "enum": ["headword"] },
+            "surface": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "source_id",
+            "source_node_id",
+            "content_scope",
+            "surface",
+            "dialect",
+            "pos_id",
+            "pos",
+            "form_type",
+            "source_kind"
+          ],
+          "properties": {
+            "content_scope": {
+              "$ref": "#/components/schemas/SurfaceContentScopeV2"
+            },
+            "dialect": { "$ref": "#/components/schemas/Dialect" },
+            "form_type": { "$ref": "#/components/schemas/WordFormTypeV2" },
+            "pos": { "type": "string" },
+            "pos_id": { "type": "string", "format": "uuid" },
+            "source_id": { "type": "string" },
+            "source_kind": { "type": "string", "enum": ["form"] },
+            "source_node_id": { "type": "string", "format": "uuid" },
+            "surface": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "WordFormTypeV2": {
+      "type": "string",
+      "description": "Closed wire enum for every explicitly persisted form surface. Unlike the\ncatalog's derived-form capability enum this includes the base slot.",
+      "enum": [
+        "base",
+        "third_person_singular",
+        "present_participle",
+        "past_tense",
+        "past_participle",
+        "plural",
+        "comparative",
+        "superlative"
+      ]
+    },
+    "SurfaceContentScopeV2": {
+      "type": "string",
+      "enum": ["draft", "current_publication"]
+    },
+    "SurfaceConfirmationReasonV2": {
+      "type": "string",
+      "enum": ["unacknowledged_surface_matches", "visibility_activation"]
+    },
+    "SurfaceMatchCategoryV2": {
+      "type": "string",
+      "enum": [
+        "exact_headword",
+        "cross_kind_headword",
+        "headword_form",
+        "form_headword",
+        "form_form"
+      ]
+    },
+    "SurfaceAttentionLevelV2": { "type": "string", "enum": ["high", "normal"] },
+    "SurfaceMatchSeverityV2": { "type": "string", "enum": ["warning"] },
+    "ExistingSurfaceMatchV2": {
+      "type": "object",
+      "required": ["word_id", "headword", "kind", "status", "source"],
+      "properties": {
+        "headword": { "type": "string" },
+        "kind": { "$ref": "#/components/schemas/EntryKind" },
+        "source": { "$ref": "#/components/schemas/ExistingSurfaceSourceV2" },
+        "status": { "$ref": "#/components/schemas/AdminWordStatus" },
+        "word_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "LexiconSurfaceMatchV2": {
+      "type": "object",
+      "required": [
+        "match_id",
+        "match_category",
+        "severity",
+        "attention_level",
+        "can_continue",
+        "confirmation_reasons",
+        "candidate",
+        "existing"
+      ],
+      "properties": {
+        "attention_level": {
+          "$ref": "#/components/schemas/SurfaceAttentionLevelV2"
+        },
+        "can_continue": { "type": "boolean", "enum": [true] },
+        "candidate": { "$ref": "#/components/schemas/SurfaceMatchCandidateV2" },
+        "confirmation_reasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/SurfaceConfirmationReasonV2"
+          },
+          "maxItems": 2,
+          "minItems": 1
+        },
+        "existing": { "$ref": "#/components/schemas/ExistingSurfaceMatchV2" },
+        "match_category": {
+          "$ref": "#/components/schemas/SurfaceMatchCategoryV2"
+        },
+        "match_id": { "type": "string" },
+        "severity": { "$ref": "#/components/schemas/SurfaceMatchSeverityV2" }
+      },
+      "additionalProperties": false
+    },
+    "RelationTypeV2": {
+      "type": "string",
+      "enum": ["synonym", "antonym", "derivative"]
+    },
+    "RelationReferenceCountsV2": {
+      "type": "object",
+      "required": ["synonym", "antonym", "derivative"],
+      "properties": {
+        "antonym": { "type": "integer", "format": "int32", "minimum": 0 },
+        "derivative": { "type": "integer", "format": "int32", "minimum": 0 },
+        "synonym": { "type": "integer", "format": "int32", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "RelationReferencePreviewV2": {
+      "type": "object",
+      "required": ["source_word_id", "source_headword", "relation"],
+      "properties": {
+        "relation": { "$ref": "#/components/schemas/RelationTypeV2" },
+        "source_headword": { "type": "string" },
+        "source_word_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "RelationReferenceSummaryV2": {
+      "type": "object",
+      "required": ["total", "by_type", "previews", "truncated"],
+      "properties": {
+        "by_type": { "$ref": "#/components/schemas/RelationReferenceCountsV2" },
+        "previews": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/RelationReferencePreviewV2"
+          },
+          "maxItems": 5
+        },
+        "total": { "type": "integer", "format": "int32", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "MatchedEntryContextV2": {
+      "type": "object",
+      "required": [
+        "word_id",
+        "pos_labels",
+        "gloss_previews",
+        "updated_at",
+        "inbound_relations"
+      ],
+      "properties": {
+        "gloss_previews": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 5
+        },
+        "inbound_relations": {
+          "$ref": "#/components/schemas/RelationReferenceSummaryV2"
+        },
+        "pos_labels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 5
+        },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "word_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "SurfacePolicyNameV2": {
+      "type": "string",
+      "enum": [
+        "surface_warning_acknowledgement",
+        "allow_new_exact_headword_entries",
+        "allow_multiple_active_exact_headword_publications"
+      ]
+    },
+    "SurfacePolicyBlockCodeV2": {
+      "type": "string",
+      "enum": [
+        "exact_headword_creation_temporarily_disabled",
+        "multiple_active_exact_headword_publications_not_enabled"
+      ]
+    },
+    "SurfaceContinuationEnabledV2": { "type": "string", "enum": ["enabled"] },
+    "SurfaceContinuationDisabledV2": {
+      "type": "string",
+      "enum": ["temporarily_disabled"]
+    },
+    "SurfaceMatchPageBaseV2": {
+      "type": "object",
+      "required": [
+        "snapshot_id",
+        "items",
+        "total",
+        "matched_entry_contexts",
+        "confirmation_reasons",
+        "policy_name",
+        "policy_epoch"
+      ],
+      "properties": {
+        "confirmation_reasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/SurfaceConfirmationReasonV2"
+          },
+          "maxItems": 2,
+          "minItems": 1
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/LexiconSurfaceMatchV2" },
+          "maxItems": 50,
+          "minItems": 1
+        },
+        "matched_entry_contexts": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/MatchedEntryContextV2" },
+          "maxItems": 50,
+          "minItems": 1
+        },
+        "policy_epoch": { "type": "integer", "format": "int64", "minimum": 0 },
+        "policy_name": { "$ref": "#/components/schemas/SurfacePolicyNameV2" },
+        "snapshot_id": { "type": "string", "format": "uuid" },
+        "total": { "type": "integer", "format": "int64", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "SurfaceMatchEnabledNextPageV2": {
+      "type": "object",
+      "required": [
+        "snapshot_id",
+        "items",
+        "total",
+        "matched_entry_contexts",
+        "confirmation_reasons",
+        "policy_name",
+        "policy_epoch",
+        "continuation_policy",
+        "next_cursor"
+      ],
+      "properties": {
+        "confirmation_reasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/SurfaceConfirmationReasonV2"
+          },
+          "maxItems": 2,
+          "minItems": 1
+        },
+        "continuation_policy": {
+          "$ref": "#/components/schemas/SurfaceContinuationEnabledV2"
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/LexiconSurfaceMatchV2" },
+          "maxItems": 50,
+          "minItems": 1
+        },
+        "matched_entry_contexts": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/MatchedEntryContextV2" },
+          "maxItems": 50,
+          "minItems": 1
+        },
+        "next_cursor": { "type": "string" },
+        "policy_epoch": { "type": "integer", "format": "int64", "minimum": 0 },
+        "policy_name": { "$ref": "#/components/schemas/SurfacePolicyNameV2" },
+        "snapshot_id": { "type": "string", "format": "uuid" },
+        "total": { "type": "integer", "format": "int64", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "SurfaceMatchEnabledTerminalPageV2": {
+      "type": "object",
+      "required": [
+        "snapshot_id",
+        "items",
+        "total",
+        "matched_entry_contexts",
+        "confirmation_reasons",
+        "policy_name",
+        "policy_epoch",
+        "continuation_policy",
+        "next_cursor",
+        "surface_confirmation_token"
+      ],
+      "properties": {
+        "confirmation_reasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/SurfaceConfirmationReasonV2"
+          },
+          "maxItems": 2,
+          "minItems": 1
+        },
+        "continuation_policy": {
+          "$ref": "#/components/schemas/SurfaceContinuationEnabledV2"
+        },
+        "impact_confirmation_token": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/LexiconSurfaceMatchV2" },
+          "maxItems": 50,
+          "minItems": 1
+        },
+        "matched_entry_contexts": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/MatchedEntryContextV2" },
+          "maxItems": 50,
+          "minItems": 1
+        },
+        "next_cursor": { "type": "null" },
+        "policy_epoch": { "type": "integer", "format": "int64", "minimum": 0 },
+        "policy_name": { "$ref": "#/components/schemas/SurfacePolicyNameV2" },
+        "snapshot_id": { "type": "string", "format": "uuid" },
+        "surface_confirmation_token": { "type": "string" },
+        "total": { "type": "integer", "format": "int64", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "SurfaceMatchTemporarilyDisabledPageV2": {
+      "type": "object",
+      "required": [
+        "snapshot_id",
+        "items",
+        "total",
+        "matched_entry_contexts",
+        "confirmation_reasons",
+        "policy_name",
+        "policy_epoch",
+        "continuation_policy",
+        "next_cursor",
+        "policy_block_code"
+      ],
+      "properties": {
+        "confirmation_reasons": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/SurfaceConfirmationReasonV2"
+          },
+          "maxItems": 2,
+          "minItems": 1
+        },
+        "continuation_policy": {
+          "$ref": "#/components/schemas/SurfaceContinuationDisabledV2"
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/LexiconSurfaceMatchV2" },
+          "maxItems": 50,
+          "minItems": 1
+        },
+        "matched_entry_contexts": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/MatchedEntryContextV2" },
+          "maxItems": 50,
+          "minItems": 1
+        },
+        "next_cursor": { "type": ["string", "null"] },
+        "policy_block_code": {
+          "$ref": "#/components/schemas/SurfacePolicyBlockCodeV2"
+        },
+        "policy_epoch": { "type": "integer", "format": "int64", "minimum": 0 },
+        "policy_name": { "$ref": "#/components/schemas/SurfacePolicyNameV2" },
+        "snapshot_id": { "type": "string", "format": "uuid" },
+        "total": { "type": "integer", "format": "int64", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "SurfaceMatchPageV2": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "snapshot_id",
+            "items",
+            "total",
+            "matched_entry_contexts",
+            "confirmation_reasons",
+            "policy_name",
+            "policy_epoch",
+            "continuation_policy",
+            "next_cursor"
+          ],
+          "properties": {
+            "confirmation_reasons": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SurfaceConfirmationReasonV2"
+              },
+              "maxItems": 2,
+              "minItems": 1
+            },
+            "continuation_policy": {
+              "$ref": "#/components/schemas/SurfaceContinuationEnabledV2"
+            },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/LexiconSurfaceMatchV2" },
+              "maxItems": 50,
+              "minItems": 1
+            },
+            "matched_entry_contexts": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/MatchedEntryContextV2" },
+              "maxItems": 50,
+              "minItems": 1
+            },
+            "next_cursor": { "type": "string" },
+            "policy_epoch": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "policy_name": {
+              "$ref": "#/components/schemas/SurfacePolicyNameV2"
+            },
+            "snapshot_id": { "type": "string", "format": "uuid" },
+            "total": { "type": "integer", "format": "int64", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "snapshot_id",
+            "items",
+            "total",
+            "matched_entry_contexts",
+            "confirmation_reasons",
+            "policy_name",
+            "policy_epoch",
+            "continuation_policy",
+            "next_cursor",
+            "surface_confirmation_token"
+          ],
+          "properties": {
+            "confirmation_reasons": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SurfaceConfirmationReasonV2"
+              },
+              "maxItems": 2,
+              "minItems": 1
+            },
+            "continuation_policy": {
+              "$ref": "#/components/schemas/SurfaceContinuationEnabledV2"
+            },
+            "impact_confirmation_token": { "type": "string" },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/LexiconSurfaceMatchV2" },
+              "maxItems": 50,
+              "minItems": 1
+            },
+            "matched_entry_contexts": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/MatchedEntryContextV2" },
+              "maxItems": 50,
+              "minItems": 1
+            },
+            "next_cursor": { "type": "null" },
+            "policy_epoch": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "policy_name": {
+              "$ref": "#/components/schemas/SurfacePolicyNameV2"
+            },
+            "snapshot_id": { "type": "string", "format": "uuid" },
+            "surface_confirmation_token": { "type": "string" },
+            "total": { "type": "integer", "format": "int64", "minimum": 0 }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "snapshot_id",
+            "items",
+            "total",
+            "matched_entry_contexts",
+            "confirmation_reasons",
+            "policy_name",
+            "policy_epoch",
+            "continuation_policy",
+            "next_cursor",
+            "policy_block_code"
+          ],
+          "properties": {
+            "confirmation_reasons": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SurfaceConfirmationReasonV2"
+              },
+              "maxItems": 2,
+              "minItems": 1
+            },
+            "continuation_policy": {
+              "$ref": "#/components/schemas/SurfaceContinuationDisabledV2"
+            },
+            "items": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/LexiconSurfaceMatchV2" },
+              "maxItems": 50,
+              "minItems": 1
+            },
+            "matched_entry_contexts": {
+              "type": "array",
+              "items": { "$ref": "#/components/schemas/MatchedEntryContextV2" },
+              "maxItems": 50,
+              "minItems": 1
+            },
+            "next_cursor": { "type": ["string", "null"] },
+            "policy_block_code": {
+              "$ref": "#/components/schemas/SurfacePolicyBlockCodeV2"
+            },
+            "policy_epoch": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "policy_name": {
+              "$ref": "#/components/schemas/SurfacePolicyNameV2"
+            },
+            "snapshot_id": { "type": "string", "format": "uuid" },
+            "total": { "type": "integer", "format": "int64", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ProblemMeta": {
+      "type": "object",
+      "properties": {
+        "affected_node_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
+        "code": { "type": "string" },
+        "current_lifecycle_revision": { "type": "integer", "format": "int64" },
+        "current_policy_epoch": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 0
+        },
+        "current_policy_name": {
+          "$ref": "#/components/schemas/SurfacePolicyNameV2"
+        },
+        "current_revision": { "type": "integer", "format": "int64" },
+        "max_reachable_step": { "type": "string" },
+        "part_of_speech_id": { "type": "string", "format": "uuid" },
+        "reference_locations": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/ProblemReferenceLocation" }
+        },
+        "surface_match_page": {
+          "$ref": "#/components/schemas/SurfaceMatchPageV2"
+        },
+        "usage_count": { "type": "integer", "format": "int64" },
         "word_id": { "type": "string", "format": "uuid" }
       }
     },

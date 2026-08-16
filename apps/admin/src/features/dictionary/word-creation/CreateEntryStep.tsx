@@ -24,6 +24,7 @@ import {
 import type {
   AdminWordV2,
   DetectWordResponseV2,
+  SurfaceMatchPageV2,
   WordHeadwordsV2
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client/http";
@@ -39,6 +40,13 @@ import { newWordNodeId } from "../word-model/primitives";
 import { useCreateWordV2, useDetectWordV2 } from "./api";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import { STATUS_LABEL } from "../labels";
+import {
+  aggregateSurfaceMatchCards,
+  canAcknowledgeSurfaceSnapshot,
+  requiresNewIdempotencyKey,
+  type SurfaceSnapshotState
+} from "../surfaceSnapshot";
+import { useSurfaceSnapshot } from "../useSurfaceSnapshot";
 
 interface Props {
   onHeadwordsChange: (headwords?: WordHeadwordsV2) => void;
@@ -64,16 +72,181 @@ function StepHeading() {
   );
 }
 
+function matchCategoryLabel(category: string) {
+  switch (category) {
+    case "exact_headword":
+      return "已存在同名主词";
+    case "cross_kind_headword":
+      return "另一词条类型已有同名主词";
+    case "headword_form":
+      return "本次主词已作为已有词条的词形存在";
+    case "form_headword":
+      return "本次词形已作为已有主词存在";
+    default:
+      return "已有相同词形";
+  }
+}
+
+function relationTypeLabel(relation: "synonym" | "antonym" | "derivative") {
+  return relation === "synonym"
+    ? "同义"
+    : relation === "antonym"
+      ? "反义"
+      : "派生";
+}
+
+function SurfaceWarningMatches({
+  state,
+  onExpired
+}: {
+  state: SurfaceSnapshotState & { retry: () => void };
+  onExpired: () => void;
+}) {
+  const cards = useMemo(
+    () => aggregateSurfaceMatchCards(state.items, state.matched_entry_contexts),
+    [state.items, state.matched_entry_contexts]
+  );
+  return (
+    <Space orientation="vertical" size={12} style={{ width: "100%" }}>
+      <Alert
+        type="warning"
+        showIcon
+        title="发现同名或同形词条，请确认后再继续"
+        description={`已加载 ${state.items.length}/${state.total} 条匹配来源。这是提醒，不会把不同词义强制合并。`}
+      />
+      {cards.map((card) => (
+        <Card
+          key={card.key}
+          size="small"
+          type="inner"
+          title={
+            <Space wrap>
+              <Typography.Text strong>{card.existing.headword}</Typography.Text>
+              <Tag
+                color={
+                  card.matches.some((item) => item.attention_level === "high")
+                    ? "error"
+                    : "warning"
+                }
+              >
+                {matchCategoryLabel(card.matches[0]!.match_category)}
+              </Tag>
+              <Tag>{STATUS_LABEL[card.existing.status]}</Tag>
+              <Tag>{card.existing.kind === "word" ? "单词" : "短语"}</Tag>
+              <Typography.Text code copyable>
+                {card.existing.word_id.slice(-8)}
+              </Typography.Text>
+            </Space>
+          }
+          extra={
+            <Link
+              to={`/words/${card.existing.word_id}/wizard/basics`}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={`${card.existing.headword} ${card.existing.word_id}，在新标签页打开`}
+            >
+              查看已有词条
+            </Link>
+          }
+        >
+          <Space orientation="vertical" size={6} style={{ width: "100%" }}>
+            {card.matches.map((item) => (
+              <Typography.Text key={item.match_id} type="secondary">
+                {item.existing.source.source_kind === "headword"
+                  ? `主词 · ${item.existing.source.dialect} · ${item.existing.source.content_scope}`
+                  : `${item.existing.source.pos} · ${item.existing.source.form_type} · ${item.existing.source.dialect} · ${item.existing.source.content_scope}`}
+              </Typography.Text>
+            ))}
+            {card.context && (
+              <Space orientation="vertical" size={2}>
+                <Typography.Text type="secondary">
+                  词性：{card.context.pos_labels.join("、") || "暂无"}；释义：
+                  {card.context.gloss_previews.join("；") || "暂无"}；更新：
+                  {card.context.updated_at.slice(0, 10)}
+                </Typography.Text>
+                <Typography.Text type="secondary">
+                  有效入站关联：共 {card.context.inbound_relations.total}{" "}
+                  条（同义
+                  {card.context.inbound_relations.by_type.synonym}、反义
+                  {card.context.inbound_relations.by_type.antonym}、派生
+                  {card.context.inbound_relations.by_type.derivative}）
+                  {card.context.inbound_relations.truncated
+                    ? "，以下仅为摘要"
+                    : ""}
+                </Typography.Text>
+                {card.context.inbound_relations.previews.length > 0 && (
+                  <Space size={[8, 4]} wrap>
+                    {card.context.inbound_relations.previews.map((preview) => (
+                      <Link
+                        key={`${preview.source_word_id}:${preview.relation}`}
+                        to={`/words/${preview.source_word_id}/wizard/basics`}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`${preview.source_headword} ${preview.source_word_id}，在新标签页打开`}
+                      >
+                        {preview.source_headword} ·{" "}
+                        {relationTypeLabel(preview.relation)}
+                      </Link>
+                    ))}
+                  </Space>
+                )}
+              </Space>
+            )}
+          </Space>
+        </Card>
+      ))}
+      {state.phase === "loading" && (
+        <Alert
+          type="info"
+          showIcon
+          title="正在加载全部匹配项，加载完成前不能继续创建"
+        />
+      )}
+      {(state.phase === "error" || state.phase === "expired") && (
+        <Alert
+          type="error"
+          showIcon
+          title={
+            state.phase === "expired" ? "匹配快照已过期" : "匹配项加载失败"
+          }
+          description="旧确认信息已清除，请重新加载全部匹配项。"
+          action={
+            <Button
+              onClick={state.phase === "expired" ? onExpired : state.retry}
+            >
+              {state.phase === "expired" ? "重新进行词典检测" : "重新加载"}
+            </Button>
+          }
+        />
+      )}
+      {state.phase === "disabled" && (
+        <Alert
+          type="info"
+          showIcon
+          title="当前暂不开放创建同名主词"
+          description={`匹配项已完整展示；能力开关为 ${state.policy_block_code ?? "temporarily_disabled"}，因此不会签发继续创建 token。`}
+        />
+      )}
+    </Space>
+  );
+}
+
 function DetectionStatus({
   result,
   lookup,
   catalogLoaded,
-  catalogUnavailable
+  catalogUnavailable,
+  surfaceState,
+  surfaceNeedsRecheck,
+  onSurfaceExpired
 }: {
   result: DetectWordResponseV2;
   lookup: PartOfSpeechLookup;
   catalogLoaded: boolean;
   catalogUnavailable: boolean;
+  surfaceState: SurfaceSnapshotState & { retry: () => void };
+  surfaceNeedsRecheck: boolean;
+  onSurfaceExpired: () => void;
 }) {
   const builtin = result.builtin_dictionary;
   const smart = result.smart_dictionary;
@@ -89,7 +262,11 @@ function DetectionStatus({
       unknownPos.length === 0 &&
       !catalogUnavailable) ||
     (result.entry_kind === "phrase" && builtin.status === "not_found");
-  const canContinue = dictionaryReady && smart.status === "clear";
+  const canContinue =
+    dictionaryReady &&
+    (smart.status === "clear" ||
+      (smart.status === "warning" &&
+        (surfaceNeedsRecheck || canAcknowledgeSurfaceSnapshot(surfaceState))));
   const hasArchivedDuplicate =
     smart.status === "duplicate" &&
     smart.duplicates.some((item) => item.status === "archived");
@@ -176,6 +353,9 @@ function DetectionStatus({
                   <Link
                     key={item.word_id}
                     to={`/words/${item.word_id}/wizard/basics`}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`${item.headword} (${item.dialect}) ${STATUS_LABEL[item.status]}，在新标签页打开`}
                   >
                     <Space size={4}>
                       <span>
@@ -200,7 +380,7 @@ function DetectionStatus({
                     type="info"
                     showIcon
                     title="归档词条仍占用词头"
-                    description="点击上方重复词条可进入详情并恢复，也可以在归档列表中定位。"
+                    description="点击上方重复词条会在新标签页打开详情，也可以在归档列表中定位。"
                     action={
                       firstArchivedDuplicate && (
                         <Link
@@ -208,6 +388,9 @@ function DetectionStatus({
                             keyword: firstArchivedDuplicate.headword,
                             status: "archived"
                           }).toString()}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label="在归档列表查看（新标签页打开）"
                         >
                           在归档列表查看
                         </Link>
@@ -216,6 +399,18 @@ function DetectionStatus({
                   />
                 )}
               </Space>
+            ) : smart.status === "warning" && surfaceNeedsRecheck ? (
+              <Alert
+                type="warning"
+                showIcon
+                title="最终主词已修改，需要重新检查同名或同形词条"
+                description="旧 snapshot 与确认 token 已清除；点击“重新检查最终主词”后，服务端会按当前输入重新检测。"
+              />
+            ) : smart.status === "warning" ? (
+              <SurfaceWarningMatches
+                state={surfaceState}
+                onExpired={onSurfaceExpired}
+              />
             ) : (
               "智能词库暂时不可用"
             )}
@@ -373,17 +568,30 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
   const [headwords, setHeadwords] = useState<WordHeadwordsV2>();
   const [dirty, setDirty] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [headwordsChangedAfterDetection, setHeadwordsChangedAfterDetection] =
+    useState(false);
+  const [surfaceOverridePage, setSurfaceOverridePage] =
+    useState<SurfaceMatchPageV2>();
   const requestVersion = useRef(0);
   const createKey = useRef(newWordNodeId());
   const preservedDistinguish = useRef<
     Extract<WordHeadwordsV2, { mode: "distinguish" }> | undefined
   >(undefined);
   const allowSavedNavigation = useUnsavedWordChanges(dirty);
+  const surfaceInitialPage =
+    !headwordsChangedAfterDetection &&
+    result?.smart_dictionary.status === "warning"
+      ? (surfaceOverridePage ?? result.smart_dictionary.surface_match_page)
+      : undefined;
+  const surfaceResetKey = `${result?.detection_id ?? "none"}:${JSON.stringify(headwords)}:${headwordsChangedAfterDetection}`;
+  const surfaceState = useSurfaceSnapshot(surfaceInitialPage, surfaceResetKey);
 
   const resetDetection = () => {
     requestVersion.current += 1;
     setResult(undefined);
     setHeadwords(undefined);
+    setHeadwordsChangedAfterDetection(false);
+    setSurfaceOverridePage(undefined);
     preservedDistinguish.current = undefined;
     onHeadwordsChange(undefined);
     createKey.current = newWordNodeId();
@@ -402,6 +610,8 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
     createKey.current = newWordNodeId();
     setResult(undefined);
     setHeadwords(undefined);
+    setHeadwordsChangedAfterDetection(false);
+    setSurfaceOverridePage(undefined);
     onHeadwordsChange(undefined);
     detectWord.reset();
     try {
@@ -433,6 +643,7 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
             ? ({ mode: "unified", common: next.request.headword } as const)
             : undefined;
       setHeadwords(nextHeadwords);
+      setHeadwordsChangedAfterDetection(false);
       preservedDistinguish.current =
         nextHeadwords?.mode === "distinguish" ? nextHeadwords : undefined;
       onHeadwordsChange(nextHeadwords);
@@ -454,7 +665,10 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
     result.builtin_dictionary.status === "not_found";
   const canCreate =
     (matchedDictionaryReady || unmatchedPhraseReady) &&
-    result.smart_dictionary.status === "clear" &&
+    (result.smart_dictionary.status === "clear" ||
+      (result.smart_dictionary.status === "warning" &&
+        (headwordsChangedAfterDetection ||
+          canAcknowledgeSurfaceSnapshot(surfaceState)))) &&
     headwords !== undefined &&
     (headwords.mode === "unified"
       ? headwords.common.trim() !== ""
@@ -462,6 +676,8 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
 
   const updateHeadwords = (next: WordHeadwordsV2) => {
     createKey.current = newWordNodeId();
+    setHeadwordsChangedAfterDetection(true);
+    setSurfaceOverridePage(undefined);
     if (next.mode === "distinguish") {
       preservedDistinguish.current = next;
     }
@@ -478,7 +694,14 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
         schema_version: 2,
         idempotency_key: createKey.current,
         detection_id: result.detection_id,
-        headwords
+        headwords,
+        ...(canAcknowledgeSurfaceSnapshot(surfaceState) &&
+        !headwordsChangedAfterDetection
+          ? {
+              confirmed_surface_match_token:
+                surfaceState.surface_confirmation_token
+            }
+          : {})
       });
       message.success(
         `已创建「${word.headwords.mode === "unified" ? word.headwords.common : word.headwords[word.headwords.source_dialect]}」草稿`
@@ -487,7 +710,50 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
       allowSavedNavigation();
       onCreated(word);
     } catch (error) {
-      if (error instanceof HttpError && error.status === 410) {
+      if (
+        error instanceof HttpError &&
+        requiresNewIdempotencyKey(error.status, error.code)
+      ) {
+        createKey.current = newWordNodeId();
+      }
+      if (
+        error instanceof HttpError &&
+        [
+          "surface_match_acknowledgement_required",
+          "surface_matches_changed",
+          "surface_policy_changed",
+          "exact_headword_creation_temporarily_disabled"
+        ].includes(error.code ?? "") &&
+        error.meta?.surface_match_page
+      ) {
+        setSurfaceOverridePage(error.meta.surface_match_page);
+        setHeadwordsChangedAfterDetection(false);
+        setResult({
+          ...result,
+          smart_dictionary: {
+            status: "warning",
+            duplicates: [],
+            surface_match_page: error.meta.surface_match_page,
+            matched_entry_contexts: []
+          }
+        });
+        message.warning("匹配结果已更新，请查看全部提示后再次确认");
+        return;
+      }
+      if (
+        error instanceof HttpError &&
+        error.code === "surface_policy_changed"
+      ) {
+        resetDetection();
+        message.warning("同名创建策略已变化，请重新检测");
+        return;
+      }
+      if (
+        error instanceof HttpError &&
+        (error.code === "surface_match_snapshot_expired" ||
+          error.code === "detection_expired" ||
+          error.status === 410)
+      ) {
         resetDetection();
         message.warning("检测结果已过期，请重新检测");
         return;
@@ -562,6 +828,9 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
               lookup={partOfSpeechLookup}
               catalogLoaded={partOfSpeechCatalog.data !== undefined}
               catalogUnavailable={partOfSpeechCatalog.isError}
+              surfaceState={surfaceState}
+              surfaceNeedsRecheck={headwordsChangedAfterDetection}
+              onSurfaceExpired={resetDetection}
             />
             {headwords && (
               <div className="word-headword-confirmation-wrap">
@@ -589,17 +858,27 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
           </div>
         )}
 
-        {result?.smart_dictionary.status === "clear" && (
+        {(result?.smart_dictionary.status === "clear" ||
+          result?.smart_dictionary.status === "warning") && (
           <div className="word-entry-actions">
             <Button onClick={resetDetection}>重新检测</Button>
-            <Button
-              type="primary"
-              disabled={!canCreate}
-              loading={creating}
-              onClick={() => void createDraft()}
-            >
-              确认并进入词形与发音
-            </Button>
+            {!(
+              result.smart_dictionary.status === "warning" &&
+              surfaceState.phase === "disabled"
+            ) && (
+              <Button
+                type="primary"
+                disabled={!canCreate}
+                loading={creating}
+                onClick={() => void createDraft()}
+              >
+                {result.smart_dictionary.status === "warning"
+                  ? headwordsChangedAfterDetection
+                    ? "重新检查最终主词"
+                    : "仍继续创建"
+                  : "确认并进入词形与发音"}
+              </Button>
+            )}
           </div>
         )}
       </fieldset>

@@ -219,11 +219,16 @@ export interface AdminApiRequestLog {
   method: string;
   path: string;
   body?: unknown;
+  idempotencyKey?: string;
 }
 
 export interface MockAdminApiOptions {
   /** 让本次检测命中智能词库重复项。 */
   duplicate?: boolean;
+  /** 为 workspace/workspaces 返回可确认的 surface warning 与两页 snapshot。 */
+  surfaceWarnings?: boolean;
+  /** 第一次携 token 创建返回结构化 410，用于验证 snapshot 过期恢复。 */
+  expireSurfaceSnapshotOnce?: boolean;
   /** 第一次 forms 保存返回 500，后续重试成功。 */
   failFormsSaveOnce?: boolean;
 }
@@ -238,6 +243,14 @@ function json(route: Route, status: number, body: unknown) {
   return route.fulfill({
     status,
     contentType: "application/json",
+    body: JSON.stringify(body)
+  });
+}
+
+function problem(route: Route, status: number, body: unknown) {
+  return route.fulfill({
+    status,
+    contentType: "application/problem+json",
     body: JSON.stringify(body)
   });
 }
@@ -287,8 +300,146 @@ function createDraft(headwords: unknown): MockWord {
   };
 }
 
-function detectionResponse(duplicate: boolean, rawHeadword: string) {
+function surfaceMatchItem(
+  rawHeadword: string,
+  wordId: string,
+  status: "draft" | "published" | "archived",
+  sourceKind: "headword" | "form"
+) {
+  const plural = rawHeadword.trim().toLowerCase() === "workspaces";
+  return {
+    match_id: `${rawHeadword}:${wordId}:${sourceKind}`,
+    match_category: plural ? "headword_form" : "exact_headword",
+    severity: "warning",
+    attention_level: plural ? "normal" : "high",
+    can_continue: true,
+    confirmation_reasons: ["unacknowledged_surface_matches"],
+    candidate: {
+      candidate_type: "headword",
+      candidate_ref: `detect-${rawHeadword}:headword:common`,
+      surface: rawHeadword,
+      normalized_surface: rawHeadword.trim().toLowerCase(),
+      dialect: "common",
+      entry_kind: "word"
+    },
+    existing: {
+      word_id: wordId,
+      headword: "workspace",
+      kind: "word",
+      status,
+      source:
+        sourceKind === "headword"
+          ? {
+              source_kind: "headword",
+              source_id: `${wordId}:headword:common`,
+              content_scope: "draft",
+              surface: "workspace",
+              dialect: "common"
+            }
+          : {
+              source_kind: "form",
+              source_id: `${wordId}:form:plural`,
+              source_node_id: `${wordId}-plural`,
+              content_scope: "current_publication",
+              surface: "workspaces",
+              dialect: "common",
+              pos_id: `${wordId}-noun`,
+              pos: "noun",
+              form_type: "plural"
+            }
+    }
+  };
+}
+
+function surfacePage(rawHeadword: string, terminal: boolean) {
+  const plural = rawHeadword.trim().toLowerCase() === "workspaces";
+  const items = terminal
+    ? [
+        surfaceMatchItem(
+          rawHeadword,
+          "existing-workspace-archived-b",
+          "archived",
+          plural ? "form" : "headword"
+        )
+      ]
+    : [
+        surfaceMatchItem(
+          rawHeadword,
+          "existing-workspace-archived-a",
+          "archived",
+          plural ? "form" : "headword"
+        ),
+        surfaceMatchItem(
+          rawHeadword,
+          "existing-workspace-published",
+          "published",
+          plural ? "form" : "headword"
+        )
+      ];
+  return {
+    snapshot_id: `snapshot-${rawHeadword}`,
+    items,
+    total: 3,
+    matched_entry_contexts: items.map((item) => ({
+      word_id: item.existing.word_id,
+      pos_labels: ["noun"],
+      gloss_previews: ["工作空间"],
+      updated_at: NOW,
+      inbound_relations: {
+        total: 1,
+        by_type: { synonym: 1, antonym: 0, derivative: 0 },
+        previews: [
+          {
+            source_word_id: "relation-source-word",
+            source_headword: "space",
+            relation: "synonym"
+          }
+        ],
+        truncated: false
+      }
+    })),
+    confirmation_reasons: ["unacknowledged_surface_matches"],
+    policy_name: "allow_new_exact_headword_entries",
+    policy_epoch: 1,
+    continuation_policy: "enabled",
+    next_cursor: terminal ? null : "surface-page-2",
+    ...(terminal
+      ? { surface_confirmation_token: `surface-token-${rawHeadword}` }
+      : {})
+  };
+}
+
+function detectionResponse(
+  duplicate: boolean,
+  rawHeadword: string,
+  surfaceWarnings = false
+) {
   const isDuplicate = duplicate || rawHeadword.trim().toLowerCase() === "color";
+  const normalized = rawHeadword.trim().toLowerCase();
+  if (
+    surfaceWarnings &&
+    (normalized === "workspace" || normalized === "workspaces")
+  ) {
+    return {
+      detection_id: `detect-${normalized}`,
+      expires_at: "2099-08-02T03:05:00.000Z",
+      request: { language: "en", headword: rawHeadword },
+      normalized_headword: normalized,
+      entry_kind: "word",
+      matched_dialect: "common",
+      builtin_dictionary: {
+        status: "matched",
+        headwords: { mode: "unified", common: rawHeadword },
+        suggested_forms: clone(CENTER_FORMS)
+      },
+      smart_dictionary: {
+        status: "warning",
+        duplicates: [],
+        surface_match_page: surfacePage(rawHeadword, false),
+        matched_entry_contexts: []
+      }
+    };
+  }
   const headwords = isDuplicate
     ? {
         mode: "distinguish",
@@ -370,16 +521,22 @@ export async function mockAdminApi(
   const requests: AdminApiRequestLog[] = [];
   let word: MockWord | undefined;
   let formsFailureRemaining = options.failFormsSaveOnce ? 1 : 0;
+  let surfaceSnapshotExpiryRemaining = options.expireSurfaceSnapshotOnce
+    ? 1
+    : 0;
 
   await page.route("**/api/v1/admin/**", async (route) => {
     const request = route.request();
     const method = request.method();
-    const path = new URL(request.url()).pathname.replace(
-      /^.*\/api\/v1\/admin/,
-      ""
-    );
+    const requestUrl = new URL(request.url());
+    const path = requestUrl.pathname.replace(/^.*\/api\/v1\/admin/, "");
     const body = requestBody(route);
-    requests.push({ method, path, body });
+    requests.push({
+      method,
+      path,
+      body,
+      idempotencyKey: request.headers()["idempotency-key"]
+    });
 
     if (method === "POST" && path === "/auth/refresh") {
       return json(route, 200, {
@@ -410,11 +567,76 @@ export async function mockAdminApi(
       return json(
         route,
         200,
-        detectionResponse(options.duplicate === true, input?.headword ?? "")
+        detectionResponse(
+          options.duplicate === true,
+          input?.headword ?? "",
+          options.surfaceWarnings === true
+        )
       );
     }
+    if (
+      method === "GET" &&
+      path.startsWith(`${ADMIN_E2E_LEXICON_PATH}/surface-match-snapshots/`)
+    ) {
+      const snapshotId = path.split("/").at(-1) ?? "";
+      const rawHeadword = snapshotId.replace(/^snapshot-/, "");
+      if (
+        !["workspace", "workspaces"].includes(rawHeadword) ||
+        requestUrl.searchParams.get("cursor") !== "surface-page-2"
+      ) {
+        return problem(route, 410, {
+          type: "urn:tsz:problem:surface_match_snapshot_expired",
+          title: "Surface match snapshot expired",
+          status: 410,
+          detail: "surface match snapshot expired",
+          code: "surface_match_snapshot_expired"
+        });
+      }
+      return json(route, 200, surfacePage(rawHeadword, true));
+    }
     if (method === "POST" && path === ADMIN_E2E_ENTRIES_PATH) {
-      const input = body as { headwords?: unknown } | undefined;
+      const input = body as
+        | {
+            headwords?: unknown;
+            detection_id?: string;
+            confirmed_surface_match_token?: string;
+          }
+        | undefined;
+      if (
+        options.surfaceWarnings &&
+        input?.detection_id?.startsWith("detect-workspace") &&
+        input.confirmed_surface_match_token !==
+          `surface-token-${input.detection_id.replace(/^detect-/, "")}`
+      ) {
+        const rawHeadword = input.detection_id.replace(/^detect-/, "");
+        const page = surfacePage(rawHeadword, false);
+        return problem(route, 409, {
+          type: "urn:tsz:problem:surface_match_acknowledgement_required",
+          title: "Surface match acknowledgement required",
+          status: 409,
+          detail: "surface match acknowledgement required",
+          code: "surface_match_acknowledgement_required",
+          meta: {
+            surface_match_page: page,
+            current_policy_name: page.policy_name,
+            current_policy_epoch: page.policy_epoch
+          }
+        });
+      }
+      if (
+        options.surfaceWarnings &&
+        surfaceSnapshotExpiryRemaining > 0 &&
+        input?.detection_id?.startsWith("detect-workspace")
+      ) {
+        surfaceSnapshotExpiryRemaining -= 1;
+        return problem(route, 410, {
+          type: "urn:tsz:problem:surface_match_snapshot_expired",
+          title: "Surface match snapshot expired",
+          status: 410,
+          detail: "surface match snapshot expired",
+          code: "surface_match_snapshot_expired"
+        });
+      }
       word ??= createDraft(
         input?.headwords ?? {
           mode: "distinguish",

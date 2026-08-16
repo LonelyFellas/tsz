@@ -9,7 +9,9 @@ import { App as AntApp } from "antd";
 import { HttpError } from "@tsz/api-client/http";
 import type {
   AdminWordV2,
+  LexiconSurfaceMatchV2,
   PartOfSpeechCatalogResponse,
+  SurfaceMatchPageV2,
   WordHeadwordsV2
 } from "@tsz/types";
 import {
@@ -29,7 +31,8 @@ import {
 const mutations = vi.hoisted(() => ({
   detect: vi.fn(),
   resetDetect: vi.fn(),
-  create: vi.fn()
+  create: vi.fn(),
+  surfacePage: vi.fn()
 }));
 const partOfSpeechCatalogState = vi.hoisted(() => ({
   data: undefined as PartOfSpeechCatalogResponse | null | undefined,
@@ -46,6 +49,12 @@ vi.mock("./api", () => ({
     mutateAsync: mutations.create,
     isPending: false
   })
+}));
+
+vi.mock("../dataSource", () => ({
+  adminWordsDataSource: {
+    surfaceMatchSnapshotPage: mutations.surfacePage
+  }
 }));
 
 vi.mock("../part-of-speech/api", async () => {
@@ -161,6 +170,142 @@ function duplicateDetectionFixture() {
       ]
     }
   };
+}
+
+function surfaceMatch(
+  matchId: string,
+  wordId: string,
+  options: {
+    status?: "draft" | "published" | "archived";
+    category?: LexiconSurfaceMatchV2["match_category"];
+    sourceKind?: "headword" | "form";
+    headword?: string;
+  } = {}
+): LexiconSurfaceMatchV2 {
+  const sourceKind = options.sourceKind ?? "headword";
+  return {
+    match_id: matchId,
+    match_category: options.category ?? "exact_headword",
+    severity: "warning",
+    attention_level:
+      (options.category ?? "exact_headword") === "exact_headword"
+        ? "high"
+        : "normal",
+    can_continue: true,
+    confirmation_reasons: ["unacknowledged_surface_matches"],
+    candidate: {
+      candidate_type: "headword",
+      candidate_ref: "headword:common",
+      surface:
+        options.category === "headword_form" ? "workspaces" : "workspace",
+      normalized_surface:
+        options.category === "headword_form" ? "workspaces" : "workspace",
+      dialect: "common",
+      entry_kind: "word"
+    },
+    existing: {
+      word_id: wordId,
+      headword: options.headword ?? "workspace",
+      kind: "word",
+      status: options.status ?? "draft",
+      source:
+        sourceKind === "headword"
+          ? {
+              source_kind: "headword",
+              source_id: `${wordId}:headword:common`,
+              content_scope: "draft",
+              surface: "workspace",
+              dialect: "common"
+            }
+          : {
+              source_kind: "form",
+              source_id: `${wordId}:form:plural`,
+              source_node_id: `${wordId}-plural`,
+              content_scope: "current_publication",
+              surface: "workspaces",
+              dialect: "common",
+              pos_id: `${wordId}-noun`,
+              pos: "noun",
+              form_type: "plural"
+            }
+    }
+  };
+}
+
+function surfacePage(
+  items: LexiconSurfaceMatchV2[],
+  options: {
+    snapshotId?: string;
+    total?: number;
+    nextCursor?: string | null;
+    token?: string;
+    disabled?: boolean;
+    epoch?: number;
+  } = {}
+): SurfaceMatchPageV2 {
+  const nextCursor = options.nextCursor ?? null;
+  const base = {
+    snapshot_id: options.snapshotId ?? "snapshot-workspace",
+    items,
+    total: options.total ?? items.length,
+    matched_entry_contexts: items.map((item) => ({
+      word_id: item.existing.word_id,
+      pos_labels: ["noun"],
+      gloss_previews: ["工作空间"],
+      updated_at: "2026-08-15T00:00:00Z",
+      inbound_relations: {
+        total: 2,
+        by_type: { synonym: 1, antonym: 0, derivative: 1 },
+        previews: [
+          {
+            source_word_id: `source-${item.existing.word_id}`,
+            source_headword: "work area",
+            relation: "synonym" as const
+          }
+        ],
+        truncated: true
+      }
+    })),
+    confirmation_reasons: ["unacknowledged_surface_matches" as const],
+    policy_name: "allow_new_exact_headword_entries" as const,
+    policy_epoch: options.epoch ?? 1
+  };
+  if (options.disabled) {
+    return {
+      ...base,
+      continuation_policy: "temporarily_disabled",
+      next_cursor: nextCursor,
+      policy_block_code: "exact_headword_creation_temporarily_disabled"
+    };
+  }
+  if (nextCursor !== null) {
+    return { ...base, continuation_policy: "enabled", next_cursor: nextCursor };
+  }
+  return {
+    ...base,
+    continuation_policy: "enabled",
+    next_cursor: null,
+    surface_confirmation_token: options.token ?? "surface-token-workspace"
+  };
+}
+
+function warningDetectionFixture(
+  headword: "workspace" | "workspaces" = "workspace",
+  page = surfacePage([
+    surfaceMatch("match-workspace-1", "word-workspace-draft"),
+    surfaceMatch("match-workspace-2", "word-workspace-archived", {
+      status: "archived"
+    })
+  ])
+) {
+  const detection = detectionFixture(headword, `detection-${headword}`);
+  detection.smart_dictionary = {
+    status: "warning",
+    duplicates: [],
+    surface_match_page: page,
+    matched_entry_contexts: []
+  };
+  return detection;
 }
 
 beforeEach(() => {
@@ -351,19 +496,356 @@ describe("CreateEntryStep", () => {
       "href",
       "/words/word-colour-archived/wizard/basics"
     );
+    expect(duplicate).toHaveAttribute("target", "_blank");
+    expect(duplicate).toHaveAttribute("rel", "noreferrer");
+    expect(duplicate).toHaveAccessibleName(
+      "colour (uk) 已归档，在新标签页打开"
+    );
     expect(screen.queryByText("草稿")).toBeNull();
     expect(screen.getByText("已发布")).toBeVisible();
     expect(screen.getByText("已归档")).toBeVisible();
     expect(screen.getByText("归档词条仍占用词头")).toBeVisible();
     expect(
       screen.getByText(
-        "点击上方重复词条可进入详情并恢复，也可以在归档列表中定位。"
+        "点击上方重复词条会在新标签页打开详情，也可以在归档列表中定位。"
       )
     ).toBeVisible();
-    expect(
-      screen.getByRole("link", { name: "在归档列表查看" })
-    ).toHaveAttribute("href", "/words?keyword=colour&status=archived");
+    const archivedList = screen.getByRole("link", {
+      name: "在归档列表查看（新标签页打开）"
+    });
+    expect(archivedList).toHaveAttribute(
+      "href",
+      "/words?keyword=colour&status=archived"
+    );
+    expect(archivedList).toHaveAttribute("target", "_blank");
+    expect(archivedList).toHaveAttribute("rel", "noreferrer");
     expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
+    expect(mutations.create).not.toHaveBeenCalled();
+  });
+
+  it("多个归档重复词条都按精确 ID 在新标签页打开", async () => {
+    const detection = duplicateDetectionFixture();
+    detection.smart_dictionary.duplicates.push({
+      word_id: "word-colours-archived",
+      headword: "colours",
+      dialect: "uk",
+      status: "archived"
+    });
+    mutations.detect.mockResolvedValue(detection);
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "colour" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const links = [
+      await screen.findByRole("link", { name: /colour \(uk\).*已归档/ }),
+      screen.getByRole("link", { name: /colours \(uk\).*已归档/ })
+    ];
+    expect(links[0]).toHaveAttribute(
+      "href",
+      "/words/word-colour-archived/wizard/basics"
+    );
+    expect(links[1]).toHaveAttribute(
+      "href",
+      "/words/word-colours-archived/wizard/basics"
+    );
+    for (const link of links) {
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", "noreferrer");
+      expect(link).toHaveAccessibleName(/在新标签页打开$/);
+    }
+    expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
+    expect(mutations.create).not.toHaveBeenCalled();
+  });
+
+  it("同名 workspace 全量醒目提示，逐 ID 新标签页查看且确认后携终页 token 创建", async () => {
+    const page = surfacePage([
+      surfaceMatch("match-1", "word-workspace-draft"),
+      surfaceMatch("match-2", "word-workspace-archived-1", {
+        status: "archived"
+      }),
+      surfaceMatch("match-3", "word-workspace-archived-2", {
+        status: "archived"
+      })
+    ]);
+    const detection = warningDetectionFixture("workspace", page);
+    const created = wordFixture({
+      headword: "workspace",
+      id: "word-workspace-new"
+    });
+    mutations.detect.mockResolvedValue(detection);
+    mutations.create.mockResolvedValue({ word: created });
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(
+      await screen.findByText("发现同名或同形词条，请确认后再继续")
+    ).toBeVisible();
+    expect(screen.getAllByText("已存在同名主词")).toHaveLength(3);
+    expect(
+      screen.getAllByText(
+        /有效入站关联：共 2 条（同义1、反义0、派生1），以下仅为摘要/
+      )
+    ).toHaveLength(3);
+    expect(
+      screen.getAllByRole("link", {
+        name: /work area source-word-workspace-.*，在新标签页打开/
+      })
+    ).toHaveLength(3);
+    for (const wordId of [
+      "word-workspace-draft",
+      "word-workspace-archived-1",
+      "word-workspace-archived-2"
+    ]) {
+      const link = screen.getByRole("link", {
+        name: new RegExp(`^workspace ${wordId}，在新标签页打开$`)
+      });
+      expect(link).toHaveAttribute("href", `/words/${wordId}/wizard/basics`);
+      expect(link).toHaveAttribute("target", "_blank");
+    }
+    await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
+    fireEvent.click(button("仍继续创建"));
+    await waitFor(() =>
+      expect(mutations.create).toHaveBeenCalledWith({
+        schema_version: 2,
+        idempotency_key: expect.any(String),
+        detection_id: "detection-workspace",
+        headwords: { mode: "unified", common: "workspace" },
+        confirmed_surface_match_token: "surface-token-workspace"
+      })
+    );
+  });
+
+  it("workspaces 命中 workspace 的已保存 plural 词形时提示但允许确认继续", async () => {
+    const match = surfaceMatch("match-plural", "word-workspace", {
+      category: "headword_form",
+      sourceKind: "form"
+    });
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture(
+        "workspaces",
+        surfacePage([match], { token: "token-plural" })
+      )
+    );
+    mutations.create.mockResolvedValue({
+      word: wordFixture({ headword: "workspaces", id: "word-workspaces-new" })
+    });
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspaces" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(
+      await screen.findByText("本次主词已作为已有词条的词形存在")
+    ).toBeVisible();
+    expect(
+      screen.getByText("noun · plural · common · current_publication")
+    ).toBeVisible();
+    await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
+    fireEvent.click(button("仍继续创建"));
+    await waitFor(() =>
+      expect(mutations.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          confirmed_surface_match_token: "token-plural"
+        })
+      )
+    );
+  });
+
+  it("多页 warning 在终页前门禁，按 cursor 顺序加载完才开放继续", async () => {
+    const pending = deferred<SurfaceMatchPageV2>();
+    const first = surfacePage([surfaceMatch("match-1", "word-1")], {
+      total: 2,
+      nextCursor: "cursor-2"
+    });
+    const terminal = surfacePage([surfaceMatch("match-2", "word-2")], {
+      total: 2,
+      token: "terminal-token"
+    });
+    mutations.surfacePage.mockReturnValue(pending.promise);
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture("workspace", first)
+    );
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByText(/已加载 1\/2 条匹配来源/)).toBeVisible();
+    expect(button("仍继续创建")).toBeDisabled();
+    expect(mutations.surfacePage).toHaveBeenCalledWith(
+      "snapshot-workspace",
+      "cursor-2",
+      expect.any(AbortSignal)
+    );
+    await act(async () => pending.resolve(terminal));
+    await waitFor(() =>
+      expect(screen.getByText(/已加载 2\/2 条匹配来源/)).toBeVisible()
+    );
+    expect(button("仍继续创建")).toBeEnabled();
+  });
+
+  it("分页期间 policy 变化会清除旧 snapshot/token 并要求重新检测", async () => {
+    const first = surfacePage([surfaceMatch("match-1", "word-1")], {
+      total: 2,
+      nextCursor: "cursor-2"
+    });
+    mutations.surfacePage.mockRejectedValue(
+      new HttpError(409, "policy changed", [], "surface_policy_changed")
+    );
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture("workspace", first)
+    );
+    renderStep();
+    const input = screen.getByLabelText("录入词条");
+    fireEvent.change(input, { target: { value: "workspace" } });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByText("匹配快照已过期")).toBeVisible();
+    expect(input).toHaveValue("workspace");
+    expect(screen.getByText("仍继续创建").closest("button")).toBeDisabled();
+    fireEvent.click(screen.getByText("重新进行词典检测"));
+    await waitFor(() => expect(screen.getByText("等待检测")).toBeVisible());
+    expect(mutations.resetDetect).toHaveBeenCalled();
+  });
+
+  it("最终主词变化立即清 token，第一次重查请求不携旧确认 token", async () => {
+    mutations.detect.mockResolvedValue(warningDetectionFixture());
+    mutations.create.mockRejectedValue(
+      new HttpError(
+        409,
+        "acknowledgement required",
+        [],
+        "surface_match_acknowledgement_required"
+      )
+    );
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+    await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
+
+    fireEvent.click(screen.getByRole("switch", { name: "区分英美词形" }));
+    fireEvent.change(screen.getByLabelText("英式主词"), {
+      target: { value: "workspace-uk" }
+    });
+    expect(
+      screen.getByText("最终主词已修改，需要重新检查同名或同形词条")
+    ).toBeVisible();
+    expect(button("重新检查最终主词")).toBeEnabled();
+    fireEvent.click(button("重新检查最终主词"));
+    await waitFor(() => expect(mutations.create).toHaveBeenCalledTimes(1));
+    expect(mutations.create.mock.calls[0]![0]).not.toHaveProperty(
+      "confirmed_surface_match_token"
+    );
+  });
+
+  it("409 changed 使用结构化新首页、轮换 key 且保留表单，重新确认后成功", async () => {
+    const changedPage = surfacePage(
+      [surfaceMatch("match-new", "word-workspace-new-match")],
+      { snapshotId: "snapshot-changed", token: "token-changed", epoch: 2 }
+    );
+    const created = wordFixture({ headword: "workspace", id: "word-created" });
+    mutations.detect.mockResolvedValue(warningDetectionFixture());
+    mutations.create
+      .mockRejectedValueOnce(
+        new HttpError(
+          409,
+          "surface matches changed",
+          [],
+          "surface_matches_changed",
+          [],
+          {
+            surface_match_page: changedPage,
+            current_policy_name: "allow_new_exact_headword_entries",
+            current_policy_epoch: 2
+          }
+        )
+      )
+      .mockResolvedValueOnce({ word: created });
+    renderStep();
+    const input = screen.getByLabelText("录入词条");
+    fireEvent.change(input, { target: { value: "workspace" } });
+    fireEvent.click(button("词典检测"));
+    await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
+
+    fireEvent.click(button("仍继续创建"));
+    expect(
+      await screen.findByText("匹配结果已更新，请查看全部提示后再次确认")
+    ).toBeInTheDocument();
+    expect(input).toHaveValue("workspace");
+    expect(
+      screen.getByRole("link", {
+        name: /^workspace word-workspace-new-match，在新标签页打开$/
+      })
+    ).toBeVisible();
+    await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
+    fireEvent.click(button("仍继续创建"));
+    await waitFor(() => expect(mutations.create).toHaveBeenCalledTimes(2));
+    const first = mutations.create.mock.calls[0]![0];
+    const second = mutations.create.mock.calls[1]![0];
+    expect(second.idempotency_key).not.toBe(first.idempotency_key);
+    expect(second.confirmed_surface_match_token).toBe("token-changed");
+    expect(await screen.findByText("forms-route")).toBeVisible();
+  });
+
+  it("409 policy changed 无新首页时清除 snapshot/token 并保留输入供重新检测", async () => {
+    mutations.detect.mockResolvedValue(warningDetectionFixture());
+    mutations.create.mockRejectedValue(
+      new HttpError(
+        409,
+        "surface policy changed",
+        [],
+        "surface_policy_changed",
+        [],
+        {
+          current_policy_name: "allow_new_exact_headword_entries",
+          current_policy_epoch: 2
+        }
+      )
+    );
+    renderStep();
+    const input = screen.getByLabelText("录入词条");
+    fireEvent.change(input, { target: { value: "workspace" } });
+    fireEvent.click(button("词典检测"));
+    await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
+
+    fireEvent.click(button("仍继续创建"));
+    expect(
+      await screen.findByText("同名创建策略已变化，请重新检测")
+    ).toBeInTheDocument();
+    expect(input).toHaveValue("workspace");
+    expect(screen.getByText("等待检测")).toBeVisible();
+    expect(screen.queryByText("仍继续创建")).toBeNull();
+    expect(mutations.resetDetect).toHaveBeenCalled();
+  });
+
+  it("creation gate 关闭时完整展示 disabled warning，但不出现继续创建按钮", async () => {
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture(
+        "workspace",
+        surfacePage([surfaceMatch("match-1", "word-1")], {
+          disabled: true
+        })
+      )
+    );
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByText("当前暂不开放创建同名主词")).toBeVisible();
+    expect(screen.getByText(/已加载 1\/1 条匹配来源/)).toBeVisible();
+    expect(screen.queryByText("仍继续创建")).toBeNull();
     expect(mutations.create).not.toHaveBeenCalled();
   });
 

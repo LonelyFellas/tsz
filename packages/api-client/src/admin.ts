@@ -45,6 +45,7 @@ import type {
   RoleListResponse,
   SaveFormsStepInput,
   SaveMeaningsStepInput,
+  SurfaceMatchPageV2,
   SuggestDialectVariantsInputV2,
   SuggestDialectVariantsResponseV2,
   SubPartOfSpeechConfig,
@@ -168,6 +169,16 @@ export function createAdminEndpoints(http: HttpClient) {
       /** POST /admin/lexicon/detections — 创建 V2 草稿前执行内置词典与智能词库检测。 */
       detect: (input: DetectWordInputV2) =>
         http.post<DetectWordResponseV2>("/lexicon/detections", input),
+      /** GET /admin/lexicon/surface-match-snapshots/{id} — 顺序读取不可变 warning 页。 */
+      surfaceMatchSnapshotPage: (
+        snapshotId: string,
+        cursor: string,
+        signal?: AbortSignal
+      ) =>
+        http.get<SurfaceMatchPageV2>(
+          `/lexicon/surface-match-snapshots/${snapshotId}${qs({ cursor })}`,
+          { signal }
+        ),
       /** POST /admin/lexicon/dialect-variant-suggestions — 获取 evidence-backed 方言建议。 */
       suggestDialectVariants: (input: SuggestDialectVariantsInputV2) =>
         http.post<SuggestDialectVariantsResponseV2>(

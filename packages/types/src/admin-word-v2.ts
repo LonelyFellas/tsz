@@ -10,6 +10,12 @@ import type {
 } from "./admin-word";
 import type { RichText } from "./rich-text";
 import type { ProblemMeta } from "./api";
+import type {
+  SurfaceMatchCategoryV2,
+  MatchedEntryContextV2,
+  SurfaceMatchPageV2,
+  SurfacePolicyNameV2
+} from "./surface-match";
 
 /** 新建单词向导 V2 wire 类型；字段 1:1 镜像 snake_case JSON。 */
 export type AdminWordLanguageV2 = "en";
@@ -188,7 +194,50 @@ export interface DraftMeaningsStepContent {
   pos: WordPosMeaningsV2[];
 }
 
-export interface WordDetectionSnapshotV2 {
+export interface DictionaryProviderV2 {
+  name: string;
+  version: string;
+}
+
+export type DictionaryCoverageStateV2 = "complete" | "partial" | "missing";
+
+export interface DictionaryCoverageV2 {
+  forms: DictionaryCoverageStateV2;
+  pronunciations: DictionaryCoverageStateV2;
+  meanings: DictionaryCoverageStateV2;
+  examples: DictionaryCoverageStateV2;
+  frequency: DictionaryCoverageStateV2;
+}
+
+export interface DictionaryProvenanceV2 {
+  forms: DictionaryProviderV2 | null;
+  pronunciations: DictionaryProviderV2 | null;
+  meanings: DictionaryProviderV2 | null;
+  examples: DictionaryProviderV2 | null;
+  frequency: DictionaryProviderV2 | null;
+}
+
+export interface DetectionSurfaceMatchPreviewV2 {
+  match_id: string;
+  match_category: SurfaceMatchCategoryV2;
+  existing_word_id: string;
+  existing_headword: string;
+  existing_status: "draft" | "published" | "archived";
+}
+
+export interface DetectionSurfaceWarningAuditV2 {
+  total: number;
+  match_digest: string;
+  acknowledged: true;
+  acknowledged_at: string;
+  acknowledged_by: string;
+  policy_name: SurfacePolicyNameV2;
+  policy_epoch: number;
+  preview: DetectionSurfaceMatchPreviewV2[];
+  truncated: boolean;
+}
+
+export interface WordDetectionSnapshotBaseV2 {
   detection_id: string;
   request: {
     language: AdminWordLanguageV2;
@@ -198,11 +247,25 @@ export interface WordDetectionSnapshotV2 {
   entry_kind: "word" | "phrase";
   matched_dialect: "uk" | "us" | "common";
   builtin_dictionary_status: "matched" | "not_found";
-  smart_dictionary_status: "clear";
+  dictionary_provider?: DictionaryProviderV2 | null;
+  dictionary_coverage?: DictionaryCoverageV2 | null;
+  dictionary_provenance?: DictionaryProvenanceV2 | null;
   headwords: WordHeadwordsV2;
   suggested_pos: WordPosTag[];
   detected_at: string;
 }
+
+export type WordDetectionSnapshotV2 = WordDetectionSnapshotBaseV2 &
+  (
+    | {
+        smart_dictionary_status: "clear";
+        surface_warning?: null;
+      }
+    | {
+        smart_dictionary_status: "warning";
+        surface_warning: DetectionSurfaceWarningAuditV2;
+      }
+  );
 
 export interface AdminWordV2 {
   schema_version: 2;
@@ -291,6 +354,12 @@ export type BuiltinDictionaryResultV2 =
 export type SmartDictionaryResultV2 =
   | { status: "clear"; duplicates: [] }
   | { status: "duplicate"; duplicates: DuplicateWordMatchV2[] }
+  | {
+      status: "warning";
+      duplicates: [];
+      surface_match_page: SurfaceMatchPageV2;
+      matched_entry_contexts: MatchedEntryContextV2[];
+    }
   | { status: "unavailable"; duplicates: [] };
 
 export interface DetectWordResponseBaseV2 {
@@ -323,6 +392,7 @@ export interface CreateAdminWordV2Input {
   schema_version: 2;
   detection_id: string;
   headwords: WordHeadwordsV2;
+  confirmed_surface_match_token?: string;
 }
 
 export type DialectVariantSuggestionItemV2 =

@@ -176,6 +176,20 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.post).toHaveBeenCalledWith("/lexicon/detections", input);
   });
 
+  it("surfaceMatchSnapshotPage → GET 精确 snapshot/cursor 并透传取消信号", () => {
+    const api = createAdminEndpoints(http);
+    const controller = new AbortController();
+    api.words.surfaceMatchSnapshotPage(
+      "snapshot-1",
+      "cursor/next+1",
+      controller.signal
+    );
+    expect(http.get).toHaveBeenCalledWith(
+      "/lexicon/surface-match-snapshots/snapshot-1?cursor=cursor%2Fnext%2B1",
+      { signal: controller.signal }
+    );
+  });
+
   it("suggestDialectVariants → POST /lexicon/dialect-variant-suggestions 原样透传建议项", () => {
     const api = createAdminEndpoints(http);
     const input: SuggestDialectVariantsInputV2 = {
