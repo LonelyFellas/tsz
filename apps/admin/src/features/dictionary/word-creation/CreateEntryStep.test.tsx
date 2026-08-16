@@ -658,6 +658,42 @@ describe("CreateEntryStep", () => {
     );
   });
 
+  it("内置词典未命中但已有 plural surface warning 可继续时允许确认创建", async () => {
+    const match = surfaceMatch("match-plural", "word-workspace", {
+      category: "headword_form",
+      sourceKind: "form"
+    });
+    const detection = warningDetectionFixture(
+      "workspaces",
+      surfacePage([match], { token: "token-plural" })
+    );
+    detection.builtin_dictionary = { status: "not_found" };
+    mutations.detect.mockResolvedValue(detection);
+    mutations.create.mockResolvedValue({
+      word: wordFixture({ headword: "workspaces", id: "word-workspaces-new" })
+    });
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspaces" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(
+      await screen.findByText("本次主词已作为已有词条的词形存在")
+    ).toBeVisible();
+    await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
+    fireEvent.click(button("仍继续创建"));
+    await waitFor(() =>
+      expect(mutations.create).toHaveBeenCalledWith({
+        schema_version: 2,
+        idempotency_key: expect.any(String),
+        detection_id: "detection-workspaces",
+        headwords: { mode: "unified", common: "workspaces" },
+        confirmed_surface_match_token: "token-plural"
+      })
+    );
+  });
+
   it("多页 warning 在终页前门禁，按 cursor 顺序加载完才开放继续", async () => {
     const pending = deferred<SurfaceMatchPageV2>();
     const first = surfacePage([surfaceMatch("match-1", "word-1")], {

@@ -256,17 +256,18 @@ function DetectionStatus({
           (item) => !lookup.byCode.has(item.pos)
         )
       : [];
+  const surfaceWarningReady =
+    smart.status === "warning" &&
+    (surfaceNeedsRecheck || canAcknowledgeSurfaceSnapshot(surfaceState));
   const dictionaryReady =
     (builtin.status === "matched" &&
       catalogLoaded &&
       unknownPos.length === 0 &&
       !catalogUnavailable) ||
-    (result.entry_kind === "phrase" && builtin.status === "not_found");
+    (builtin.status === "not_found" &&
+      (result.entry_kind === "phrase" || surfaceWarningReady));
   const canContinue =
-    dictionaryReady &&
-    (smart.status === "clear" ||
-      (smart.status === "warning" &&
-        (surfaceNeedsRecheck || canAcknowledgeSurfaceSnapshot(surfaceState))));
+    dictionaryReady && (smart.status === "clear" || surfaceWarningReady);
   const hasArchivedDuplicate =
     smart.status === "duplicate" &&
     smart.duplicates.some((item) => item.status === "archived");
@@ -639,7 +640,9 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
       const nextHeadwords =
         matched.status === "matched"
           ? matched.headwords
-          : next.entry_kind === "phrase" && matched.status === "not_found"
+          : matched.status === "not_found" &&
+              (next.entry_kind === "phrase" ||
+                next.smart_dictionary.status === "warning")
             ? ({ mode: "unified", common: next.request.headword } as const)
             : undefined;
       setHeadwords(nextHeadwords);
@@ -663,8 +666,16 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
   const unmatchedPhraseReady =
     result?.entry_kind === "phrase" &&
     result.builtin_dictionary.status === "not_found";
+  const unmatchedSurfaceWordReady =
+    result?.entry_kind === "word" &&
+    result.builtin_dictionary.status === "not_found" &&
+    result.smart_dictionary.status === "warning" &&
+    (headwordsChangedAfterDetection ||
+      canAcknowledgeSurfaceSnapshot(surfaceState));
   const canCreate =
-    (matchedDictionaryReady || unmatchedPhraseReady) &&
+    (matchedDictionaryReady ||
+      unmatchedPhraseReady ||
+      unmatchedSurfaceWordReady) &&
     (result.smart_dictionary.status === "clear" ||
       (result.smart_dictionary.status === "warning" &&
         (headwordsChangedAfterDetection ||
