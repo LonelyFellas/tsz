@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App as AntApp } from "antd";
+import { HttpError } from "@tsz/api-client/http";
 import type { AdminWordV2 } from "@tsz/types";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -430,6 +431,105 @@ describe("WordCreationWizard", () => {
     expect(await screen.findByText("引用目标仍不可用")).toBeInTheDocument();
     expect(
       screen.getByText(`forms-step-revision-${archived.revision}-readonly-true`)
+    ).toBeVisible();
+  });
+
+  it("恢复响应未知时保留精确 body 和 Idempotency-Key 重试", async () => {
+    const archived = wordFixture({
+      status: "archived",
+      lifecycle_revision: 6,
+      max_reachable_step: "forms"
+    });
+    loaded(archived);
+    state.refetch.mockResolvedValue({ data: { word: archived } });
+    state.restore
+      .mockRejectedValueOnce(new TypeError("network result unknown"))
+      .mockResolvedValueOnce({
+        word: { ...archived, status: "draft", lifecycle_revision: 7 }
+      });
+    renderWizard("resume", `/words/${archived.id}/wizard/forms`);
+
+    fireEvent.click(await screen.findByText("恢复词条"));
+    await waitFor(() => expect(state.restore).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText("恢复词条"));
+    await waitFor(() => expect(state.restore).toHaveBeenCalledTimes(2));
+
+    expect(state.refetch).toHaveBeenCalledTimes(1);
+    expect(state.restore.mock.calls[1]![0]).toEqual(
+      state.restore.mock.calls[0]![0]
+    );
+  });
+
+  it("业务 revision 409 清理旧命令并重新加载详情", async () => {
+    const archived = wordFixture({ status: "archived", lifecycle_revision: 3 });
+    loaded(archived);
+    state.refetch.mockResolvedValue({ data: { word: archived } });
+    state.restore.mockRejectedValue(
+      new HttpError(409, "revision conflict", [], "revision_conflict")
+    );
+    renderWizard("resume", `/words/${archived.id}/wizard/forms`);
+
+    fireEvent.click(await screen.findByText("恢复词条"));
+    await waitFor(() => expect(state.refetch).toHaveBeenCalledTimes(2));
+    expect(
+      await screen.findByText("词条状态或确认策略已变化，请重新发起恢复")
+    ).toBeInTheDocument();
+  });
+
+  it("非 Error 恢复失败使用稳定兜底文案", async () => {
+    const archived = wordFixture({ status: "archived", lifecycle_revision: 2 });
+    loaded(archived);
+    state.restore.mockRejectedValue("transport failed");
+    renderWizard("resume", `/words/${archived.id}/wizard/forms`);
+    fireEvent.click(await screen.findByText("恢复词条"));
+    expect(await screen.findByText("恢复失败")).toBeInTheDocument();
+  });
+
+  it("gate-off 恢复稳定显示学习端能力限制并保持归档状态", async () => {
+    const archived = wordFixture({ status: "archived", lifecycle_revision: 2 });
+    loaded(archived);
+    state.restore.mockRejectedValue(
+      new HttpError(
+        409,
+        "blocked",
+        [],
+        "multiple_active_exact_headword_publications_not_enabled"
+      )
+    );
+    renderWizard("resume", `/words/${archived.id}/wizard/forms`);
+    fireEvent.click(await screen.findByText("恢复词条"));
+    expect(
+      await screen.findByText("学习端暂不支持多个同名公开词条")
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(`forms-step-revision-${archived.revision}-readonly-true`)
+    ).toBeVisible();
+  });
+
+  it("恢复前发现目标状态已变化时清旧命令并采用最新详情", async () => {
+    const archived = wordFixture({
+      status: "archived",
+      lifecycle_revision: 2,
+      max_reachable_step: "forms"
+    });
+    const concurrentlyRestored = {
+      ...archived,
+      status: "draft" as const,
+      lifecycle_revision: 3,
+      archived_at: undefined,
+      archived_by: undefined
+    };
+    loaded(archived);
+    state.refetch.mockResolvedValue({ data: { word: concurrentlyRestored } });
+    renderWizard("resume", `/words/${archived.id}/wizard/forms`);
+
+    fireEvent.click(await screen.findByText("恢复词条"));
+    await waitFor(() => expect(state.refetch).toHaveBeenCalledTimes(1));
+    expect(state.restore).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(
+        `forms-step-revision-${concurrentlyRestored.revision}-readonly-false`
+      )
     ).toBeVisible();
   });
 

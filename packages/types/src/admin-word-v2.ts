@@ -462,6 +462,13 @@ export interface ValidateAdminWordV2Input {
 
 export interface PublishAdminWordV2Input {
   base_revision: number;
+  confirmed_surface_match_token?: string;
+}
+
+export interface ActivatePublicationInput {
+  base_revision: number;
+  base_lifecycle_revision: number;
+  confirmed_surface_match_token?: string;
 }
 
 export interface DeleteDraftInput {
@@ -472,14 +479,18 @@ export interface DeleteDraftInput {
 export interface EntryLifecycleInput {
   base_revision: number;
   base_lifecycle_revision: number;
+  confirmed_surface_match_token?: string;
 }
 
-export interface EntryLifecycleTarget extends EntryLifecycleInput {
+export interface EntryLifecycleTarget {
   id: string;
+  base_revision: number;
+  base_lifecycle_revision: number;
 }
 
 export interface EntryLifecycleBatchInput {
   entries: EntryLifecycleTarget[];
+  confirmed_surface_match_token?: string;
 }
 
 export interface EntryLifecycleBatchResponse {

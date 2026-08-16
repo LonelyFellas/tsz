@@ -20,6 +20,7 @@ const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries/restore-batch",
   "post /admin/lexicon/entries/{id}/archive",
   "post /admin/lexicon/entries/{id}/publications",
+  "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate",
   "post /admin/lexicon/entries/{id}/restore"
 ] as const;
 
@@ -187,6 +188,15 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "base_revision",
       "base_lifecycle_revision"
     ]);
+    expect(snapshot.schemas.ActivatePublicationInput.required).toEqual([
+      "base_revision",
+      "base_lifecycle_revision"
+    ]);
+    expect(
+      snapshot.paths[
+        "/admin/lexicon/entries/{id}/publications/{publication_id}/activate"
+      ]
+    ).toEqual(["post"]);
     expect(snapshot.schemas.DeleteDraftInput).toEqual({
       type: "object",
       required: ["base_revision", "base_lifecycle_revision"],

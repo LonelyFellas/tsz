@@ -2,6 +2,7 @@
 // 独立登录 / 独立 token / 独立 refresh cookie（path=/api/v1/admin）。
 // 这些端点要绑定到 baseUrl=/api/v1/admin 的 HttpClient 上，路径才会落到 /api/v1/admin/*。
 import type {
+  ActivatePublicationInput,
   AdminListQuery,
   AdminListResponse,
   AdminRole,
@@ -225,6 +226,18 @@ export function createAdminEndpoints(http: HttpClient) {
       ) =>
         http.post<AdminWordV2Envelope>(
           `/lexicon/entries/${wordId}/publications`,
+          input,
+          { headers: { "Idempotency-Key": idempotencyKey } }
+        ),
+      /** POST /admin/lexicon/entries/{id}/publications/{publication_id}/activate。 */
+      activatePublication: (
+        wordId: string,
+        publicationId: string,
+        idempotencyKey: string,
+        input: ActivatePublicationInput
+      ) =>
+        http.post<AdminWordV2Envelope>(
+          `/lexicon/entries/${wordId}/publications/${publicationId}/activate`,
           input,
           { headers: { "Idempotency-Key": idempotencyKey } }
         ),
