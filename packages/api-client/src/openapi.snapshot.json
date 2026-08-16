@@ -875,7 +875,7 @@
         "continuation_policy": {
           "$ref": "#/components/schemas/SurfaceContinuationEnabledV2"
         },
-        "impact_confirmation_token": { "type": "string" },
+        "impact_confirmation_token": { "type": "string", "format": "uuid" },
         "items": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/LexiconSurfaceMatchV2" },
@@ -1025,7 +1025,7 @@
             "continuation_policy": {
               "$ref": "#/components/schemas/SurfaceContinuationEnabledV2"
             },
-            "impact_confirmation_token": { "type": "string" },
+            "impact_confirmation_token": { "type": "string", "format": "uuid" },
             "items": {
               "type": "array",
               "items": { "$ref": "#/components/schemas/LexiconSurfaceMatchV2" },
@@ -1141,6 +1141,37 @@
         "word_id": { "type": "string", "format": "uuid" }
       }
     },
+    "PreviewFormsImpactInputV2": {
+      "type": "object",
+      "required": ["base_revision", "content"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "content": { "$ref": "#/components/schemas/DraftFormsStepContent" }
+      },
+      "additionalProperties": false
+    },
+    "SaveFormsStepInput": {
+      "type": "object",
+      "required": ["base_revision", "intent", "content"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "confirmed_impact_token": { "type": "string", "format": "uuid" },
+        "confirmed_surface_match_token": { "type": "string" },
+        "content": { "$ref": "#/components/schemas/DraftFormsStepContent" },
+        "intent": { "$ref": "#/components/schemas/StepSaveIntent" }
+      },
+      "additionalProperties": false
+    },
+    "SaveMeaningsStepInput": {
+      "type": "object",
+      "required": ["base_revision", "intent", "content"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "content": { "$ref": "#/components/schemas/DraftMeaningsStepContent" },
+        "intent": { "$ref": "#/components/schemas/StepSaveIntent" }
+      },
+      "additionalProperties": false
+    },
     "FormsImpactItemV2": {
       "type": "object",
       "required": ["node_id", "node_type", "reason"],
@@ -1172,7 +1203,10 @@
         },
         "base_revision": { "type": "integer", "format": "int64" },
         "confirmation_token": { "type": "string", "format": "uuid" },
-        "requires_confirmation": { "type": "boolean" }
+        "requires_confirmation": { "type": "boolean" },
+        "surface_match_page": {
+          "$ref": "#/components/schemas/SurfaceMatchPageV2"
+        }
       }
     },
     "AdminWordListItem": {

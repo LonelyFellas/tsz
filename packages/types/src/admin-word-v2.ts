@@ -302,11 +302,13 @@ export interface AdminWordV2Envelope {
 export interface SaveWordStepInput<TContent> {
   base_revision: number;
   intent: StepSaveIntent;
-  confirmed_impact_token?: string;
   content: TContent;
 }
 
-export type SaveFormsStepInput = SaveWordStepInput<DraftFormsStepContent>;
+export interface SaveFormsStepInput extends SaveWordStepInput<DraftFormsStepContent> {
+  confirmed_impact_token?: string;
+  confirmed_surface_match_token?: string;
+}
 export type SaveMeaningsStepInput = SaveWordStepInput<DraftMeaningsStepContent>;
 
 export interface DraftValidationIssue {
@@ -444,6 +446,7 @@ export interface FormsImpactResponseV2 {
   requires_confirmation: boolean;
   affected: FormsImpactItemV2[];
   confirmation_token?: string;
+  surface_match_page?: SurfaceMatchPageV2;
 }
 
 /** Endpoint-oriented alias; wire shape is FormsImpactResponseV2. */

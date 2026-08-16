@@ -90,7 +90,10 @@ async function resolveAdminWordsMockRuntime(): Promise<ClearableAdminWordsDataSo
         getAdminProfile: () => useAuthStore.getState().profile ?? undefined,
         partOfSpeechValidation: adminPartOfSpeechMockEnabled
           ? "internal"
-          : "external"
+          : "external",
+        // Mirror the expand-phase policy: Forms warnings are active while
+        // exact-headword Create remains temporarily gated.
+        surfaceWarnings: "temporarily_disabled"
       });
       return selectedMock;
     }

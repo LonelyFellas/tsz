@@ -118,6 +118,22 @@ async function terminalSurfacePage(
   return page;
 }
 
+async function enabledTerminalSurfacePage(
+  mock: AdminWordsMock,
+  firstPage: SurfaceMatchPageV2
+): Promise<
+  Extract<
+    SurfaceMatchPageV2,
+    { continuation_policy: "enabled"; next_cursor: null }
+  >
+> {
+  const page = await terminalSurfacePage(mock, firstPage);
+  if (page.continuation_policy !== "enabled" || page.next_cursor !== null) {
+    throw new Error("fixture must reach an enabled terminal surface page");
+  }
+  return page;
+}
+
 async function createCenter(
   mock: AdminWordsMock,
   idempotencyKey = "create-center"
@@ -182,6 +198,43 @@ function withCompletePronunciations(
     }
   }
   return completed;
+}
+
+function withCommonFormSlots(
+  forms: DraftFormsStepContent,
+  spellings: string[],
+  prefix: string
+): DraftFormsStepContent {
+  const next = structuredClone(forms);
+  const firstPos = next.pos[0];
+  const firstGroup = firstPos?.form_groups[0];
+  if (!firstPos || !firstGroup) {
+    throw new Error("fixture must expose a first form group");
+  }
+  for (const [index, spelling] of spellings.entries()) {
+    const slotId = `${prefix}-slot-${index + 1}`;
+    firstGroup.slots.push({
+      id: slotId,
+      form_type: "plural",
+      variants: [
+        {
+          id: `${slotId}-variant`,
+          dialect: "common",
+          spelling,
+          origin: "manual",
+          pronunciations: [
+            {
+              id: `${slotId}-pronunciation`,
+              dict_phonetic: spelling,
+              actual_pron: spelling,
+              style: "normal"
+            }
+          ]
+        }
+      ]
+    });
+  }
+  return next;
 }
 
 async function completeDraft(
@@ -369,7 +422,18 @@ describe("admin words mock", () => {
         }
       ]
     };
+    valid.forms_surface_evidence[v2Id] = {
+      content_json: "{}",
+      match_ids: ["match-1"],
+      confirmed_revision: 2
+    };
     expect(isAdminWordsMockPersistedState(valid)).toBe(true);
+    const legacyWithoutFormsEvidence = structuredClone(valid);
+    delete (legacyWithoutFormsEvidence as Partial<AdminWordsMockPersistedState>)
+      .forms_surface_evidence;
+    expect(isAdminWordsMockPersistedState(legacyWithoutFormsEvidence)).toBe(
+      true
+    );
     const mutationCases: Array<
       [string, (state: AdminWordsMockPersistedState) => void]
     > = [
@@ -595,6 +659,35 @@ describe("admin words mock", () => {
         (state) =>
           Object.assign(state.impact_tokens["valid-impact"]!.affected[0]!, {
             reason: 1
+          })
+      ],
+      [
+        "forms surface evidence container",
+        (state) => Object.assign(state, { forms_surface_evidence: [] })
+      ],
+      [
+        "forms surface evidence",
+        (state) => Object.assign(state.forms_surface_evidence, { bad: null })
+      ],
+      [
+        "forms surface evidence content",
+        (state) =>
+          Object.assign(state.forms_surface_evidence[v2Id]!, {
+            content_json: null
+          })
+      ],
+      [
+        "forms surface evidence match ids",
+        (state) =>
+          Object.assign(state.forms_surface_evidence[v2Id]!, {
+            match_ids: [1]
+          })
+      ],
+      [
+        "forms surface evidence revision",
+        (state) =>
+          Object.assign(state.forms_surface_evidence[v2Id]!, {
+            confirmed_revision: 0
           })
       ],
       [
@@ -3380,6 +3473,7 @@ describe("surface warning mock", () => {
     };
     envelope.schema_version = 8;
     delete envelope.state.consumed_detection_ids;
+    delete envelope.state.forms_surface_evidence;
     storage.values.delete(currentKey);
     storage.values.set(legacyKey, JSON.stringify(envelope));
 
@@ -3857,6 +3951,651 @@ describe("surface warning mock", () => {
     ).rejects.toMatchObject({
       status: 409,
       code: "exact_headword_creation_temporarily_disabled"
+    });
+  });
+});
+
+describe("forms surface warning mock", () => {
+  it("只从显式 form spelling 构造候选，排除同 entry，并区分 form_headword/form_form", async () => {
+    const headwordMock = surfaceMock();
+    const headwordSource = await createDetectedWord(
+      headwordMock,
+      "workspaces",
+      "forms-headword-source"
+    );
+    const headwordSourceForms = structuredClone(headwordSource.word.forms);
+    for (const variant of headwordSourceForms.pos[0]!.base_form.variants) {
+      variant.spelling = "workspaces-source-base";
+    }
+    const headwordSourceSaved = await headwordMock.saveFormsStep(
+      headwordSource.word.id,
+      {
+        base_revision: headwordSource.word.revision,
+        operation_id: "forms-headword-source-save",
+        intent: "save",
+        content: headwordSourceForms
+      }
+    );
+    const headwordTarget = await createDetectedWord(
+      headwordMock,
+      "workspace",
+      "forms-headword-target"
+    );
+    const headwordCandidate = withCommonFormSlots(
+      headwordTarget.word.forms,
+      ["workspaces"],
+      "forms-headword-candidate"
+    );
+    const headwordImpact = await headwordMock.previewFormsImpact(
+      headwordTarget.word.id,
+      {
+        base_revision: headwordTarget.word.revision,
+        content: headwordCandidate
+      }
+    );
+    expect(headwordImpact).toMatchObject({
+      requires_confirmation: false,
+      affected: [],
+      surface_match_page: {
+        total: 1,
+        items: [
+          {
+            match_category: "form_headword",
+            candidate: {
+              candidate_type: "form",
+              candidate_word_id: headwordTarget.word.id,
+              candidate_node_id: "forms-headword-candidate-slot-1-variant",
+              pos_id: headwordTarget.word.forms.pos[0]!.pos_id,
+              form_type: "plural",
+              surface: "workspaces"
+            },
+            existing: {
+              word_id: headwordSourceSaved.word.id,
+              source: { source_kind: "headword", surface: "workspaces" }
+            }
+          }
+        ]
+      }
+    });
+
+    const formMock = surfaceMock();
+    const formSource = await createDetectedWord(
+      formMock,
+      "repository",
+      "forms-form-source"
+    );
+    const formSourceSaved = await formMock.saveFormsStep(formSource.word.id, {
+      base_revision: formSource.word.revision,
+      operation_id: "forms-form-source-save",
+      intent: "save",
+      content: withCommonFormSlots(
+        formSource.word.forms,
+        ["workspaces"],
+        "forms-form-source"
+      )
+    });
+    const formTarget = await createDetectedWord(
+      formMock,
+      "workspace",
+      "forms-form-target"
+    );
+    const unchanged = await formMock.previewFormsImpact(formTarget.word.id, {
+      base_revision: formTarget.word.revision,
+      content: formTarget.word.forms
+    });
+    expect(unchanged).not.toHaveProperty("surface_match_page");
+
+    const selfOnly = withCommonFormSlots(
+      formTarget.word.forms,
+      ["workspace", "workspace"],
+      "forms-self-only"
+    );
+    const selfImpact = await formMock.previewFormsImpact(formTarget.word.id, {
+      base_revision: formTarget.word.revision,
+      content: selfOnly
+    });
+    expect(selfImpact).not.toHaveProperty("surface_match_page");
+
+    const formCandidate = withCommonFormSlots(
+      formTarget.word.forms,
+      ["workspaces"],
+      "forms-form-candidate"
+    );
+    const formImpact = await formMock.previewFormsImpact(formTarget.word.id, {
+      base_revision: formTarget.word.revision,
+      content: formCandidate
+    });
+    expect(formImpact.surface_match_page?.items).toEqual([
+      expect.objectContaining({
+        match_category: "form_form",
+        candidate: expect.objectContaining({
+          candidate_type: "form",
+          candidate_node_id: "forms-form-candidate-slot-1-variant"
+        }),
+        existing: expect.objectContaining({
+          word_id: formSourceSaved.word.id,
+          source: expect.objectContaining({
+            source_kind: "form",
+            source_node_id: "forms-form-source-slot-1-variant",
+            form_type: "plural"
+          })
+        })
+      })
+    ]);
+  });
+
+  it("previewFormsImpact 覆盖四组合，双命中只在 surface 终页签发双 token", async () => {
+    const neitherMock = surfaceMock();
+    const neitherTarget = await createDetectedWord(
+      neitherMock,
+      "workspace",
+      "forms-neither-target"
+    );
+    await expect(
+      neitherMock.previewFormsImpact(neitherTarget.word.id, {
+        base_revision: neitherTarget.word.revision,
+        content: neitherTarget.word.forms
+      })
+    ).resolves.toEqual({
+      base_revision: neitherTarget.word.revision,
+      requires_confirmation: false,
+      affected: []
+    });
+
+    const surfaceOnlyMock = surfaceMock();
+    const surfaceOnlySource = await createDetectedWord(
+      surfaceOnlyMock,
+      "repository",
+      "forms-surface-only-source"
+    );
+    await surfaceOnlyMock.saveFormsStep(surfaceOnlySource.word.id, {
+      base_revision: surfaceOnlySource.word.revision,
+      operation_id: "forms-surface-only-source-save",
+      intent: "save",
+      content: withCommonFormSlots(
+        surfaceOnlySource.word.forms,
+        ["workspaces"],
+        "forms-surface-only-source"
+      )
+    });
+    const surfaceOnlyTarget = await createDetectedWord(
+      surfaceOnlyMock,
+      "workspace",
+      "forms-surface-only-target"
+    );
+    const surfaceOnly = await surfaceOnlyMock.previewFormsImpact(
+      surfaceOnlyTarget.word.id,
+      {
+        base_revision: surfaceOnlyTarget.word.revision,
+        content: withCommonFormSlots(
+          surfaceOnlyTarget.word.forms,
+          ["workspaces"],
+          "forms-surface-only-target"
+        )
+      }
+    );
+    expect(surfaceOnly).toMatchObject({
+      requires_confirmation: false,
+      affected: [],
+      surface_match_page: expect.any(Object)
+    });
+    expect(surfaceOnly).not.toHaveProperty("confirmation_token");
+
+    const impactOnlyMock = surfaceMock();
+    const impactOnlyTarget = await completeCenter(impactOnlyMock);
+    const impactOnlyContent: DraftFormsStepContent = {
+      pos: [impactOnlyTarget.forms.pos[0]!]
+    };
+    const impactOnly = await impactOnlyMock.previewFormsImpact(
+      impactOnlyTarget.id,
+      {
+        base_revision: impactOnlyTarget.revision,
+        content: impactOnlyContent
+      }
+    );
+    expect(impactOnly).toMatchObject({
+      requires_confirmation: true,
+      confirmation_token: expect.any(String)
+    });
+    expect(impactOnly).not.toHaveProperty("surface_match_page");
+
+    const bothMock = surfaceMock();
+    const bothTarget = await completeCenter(bothMock);
+    const bothSource = await createDetectedWord(
+      bothMock,
+      "repository",
+      "forms-both-source"
+    );
+    await bothMock.saveFormsStep(bothSource.word.id, {
+      base_revision: bothSource.word.revision,
+      operation_id: "forms-both-source-save",
+      intent: "save",
+      content: withCommonFormSlots(
+        bothSource.word.forms,
+        ["workspaces", "workspaces", "workspaces"],
+        "forms-both-source"
+      )
+    });
+    const bothContent = withCommonFormSlots(
+      { pos: [bothTarget.forms.pos[0]!] },
+      ["workspaces"],
+      "forms-both-target"
+    );
+    const both = await bothMock.previewFormsImpact(bothTarget.id, {
+      base_revision: bothTarget.revision,
+      content: bothContent
+    });
+    expect(both).toMatchObject({
+      requires_confirmation: true,
+      affected: expect.arrayContaining([
+        expect.objectContaining({ node_type: "sense" })
+      ]),
+      surface_match_page: {
+        total: 3,
+        continuation_policy: "enabled",
+        next_cursor: expect.any(String)
+      }
+    });
+    expect(both).not.toHaveProperty("confirmation_token");
+    const firstPage = both.surface_match_page;
+    if (!firstPage || typeof firstPage.next_cursor !== "string") {
+      throw new Error("dual warning must expose a non-terminal first page");
+    }
+    expect(firstPage).not.toHaveProperty("surface_confirmation_token");
+    expect(firstPage).not.toHaveProperty("impact_confirmation_token");
+    const terminal = await terminalSurfacePage(bothMock, firstPage);
+    expect(terminal).toMatchObject({
+      continuation_policy: "enabled",
+      next_cursor: null,
+      surface_confirmation_token: expect.any(String),
+      impact_confirmation_token: expect.any(String)
+    });
+  });
+
+  it("双 token 成功只推进一次 revision 并持久化 forms content evidence", async () => {
+    const storage = memoryStorage();
+    const warningMock = surfaceMockWithStorage(storage);
+    const target = await completeCenter(warningMock);
+    const source = await createDetectedWord(
+      warningMock,
+      "repository",
+      "forms-dual-save-source"
+    );
+    await warningMock.saveFormsStep(source.word.id, {
+      base_revision: source.word.revision,
+      operation_id: "forms-dual-save-source-save",
+      intent: "save",
+      content: withCommonFormSlots(
+        source.word.forms,
+        ["workspaces", "workspaces", "workspaces"],
+        "forms-dual-save-source"
+      )
+    });
+    const content = withCommonFormSlots(
+      { pos: [target.forms.pos[0]!] },
+      ["workspaces"],
+      "forms-dual-save-target"
+    );
+    const impact = await warningMock.previewFormsImpact(target.id, {
+      base_revision: target.revision,
+      content
+    });
+    if (!impact.surface_match_page) {
+      throw new Error("dual save fixture must return a surface snapshot");
+    }
+    const terminal = await terminalSurfacePage(
+      warningMock,
+      impact.surface_match_page
+    );
+    if (
+      terminal.continuation_policy !== "enabled" ||
+      terminal.next_cursor !== null ||
+      !terminal.impact_confirmation_token
+    ) {
+      throw new Error("dual save fixture must issue both terminal tokens");
+    }
+
+    await expect(
+      warningMock.saveFormsStep(target.id, {
+        base_revision: target.revision,
+        operation_id: "forms-dual-save-missing-surface",
+        intent: "save",
+        confirmed_impact_token: terminal.impact_confirmation_token,
+        content
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "surface_match_acknowledgement_required"
+    });
+    const reconfirmedImpact = await warningMock.previewFormsImpact(target.id, {
+      base_revision: target.revision,
+      content
+    });
+    if (!reconfirmedImpact.surface_match_page) {
+      throw new Error("retry must return a replacement surface snapshot");
+    }
+    const reconfirmedTerminal = await terminalSurfacePage(
+      warningMock,
+      reconfirmedImpact.surface_match_page
+    );
+    if (
+      reconfirmedTerminal.continuation_policy !== "enabled" ||
+      reconfirmedTerminal.next_cursor !== null ||
+      !reconfirmedTerminal.impact_confirmation_token
+    ) {
+      throw new Error("retry must issue a replacement dual-token bundle");
+    }
+    await expect(
+      warningMock.saveFormsStep(target.id, {
+        base_revision: target.revision,
+        operation_id: "forms-dual-save-missing-impact",
+        intent: "save",
+        confirmed_surface_match_token:
+          reconfirmedTerminal.surface_confirmation_token,
+        content
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "downstream_confirmation_required"
+    });
+    expect((await warningMock.get(target.id)).word.revision).toBe(
+      target.revision
+    );
+
+    const input = {
+      base_revision: target.revision,
+      operation_id: "forms-dual-save-confirmed",
+      intent: "save" as const,
+      confirmed_surface_match_token:
+        reconfirmedTerminal.surface_confirmation_token,
+      confirmed_impact_token: reconfirmedTerminal.impact_confirmation_token,
+      content
+    };
+    const saved = await warningMock.saveFormsStep(target.id, input);
+    expect(saved.word.revision).toBe(target.revision + 1);
+    const evidence =
+      readPersistedState(storage).forms_surface_evidence[target.id];
+    expect(evidence).toEqual({
+      content_json: JSON.stringify(content),
+      match_ids: expect.arrayContaining([
+        expect.stringContaining("forms-dual-save-target-slot-1-variant")
+      ]),
+      confirmed_revision: saved.word.revision
+    });
+
+    await expect(warningMock.saveFormsStep(target.id, input)).resolves.toEqual(
+      saved
+    );
+    expect((await warningMock.get(target.id)).word.revision).toBe(
+      saved.word.revision
+    );
+    expect(
+      readPersistedState(storage).forms_surface_evidence[target.id]
+    ).toEqual(evidence);
+    const afterUnrelatedRevision = readPersistedState(storage);
+    afterUnrelatedRevision.words[source.word.id]!.revision += 1;
+    afterUnrelatedRevision.words[source.word.id]!.updated_at = new Date(
+      NOW.getTime() + 60_000
+    ).toISOString();
+    writePersistedState(storage, afterUnrelatedRevision);
+    const refreshed = surfaceMockWithStorage(storage);
+    await expect(
+      refreshed.previewFormsImpact(target.id, {
+        base_revision: saved.word.revision,
+        content
+      })
+    ).resolves.toEqual({
+      base_revision: saved.word.revision,
+      requires_confirmation: false,
+      affected: []
+    });
+  });
+
+  it("surface token 未知返回稳定 410，锁后集合变化返回带新首页的稳定 409", async () => {
+    const warningMock = surfaceMock();
+    const source = await createDetectedWord(
+      warningMock,
+      "repository",
+      "forms-errors-source"
+    );
+    const sourceContent = withCommonFormSlots(
+      source.word.forms,
+      ["workspaces"],
+      "forms-errors-source"
+    );
+    const sourceSaved = await warningMock.saveFormsStep(source.word.id, {
+      base_revision: source.word.revision,
+      operation_id: "forms-errors-source-save",
+      intent: "save",
+      content: sourceContent
+    });
+    const target = await createDetectedWord(
+      warningMock,
+      "workspace",
+      "forms-errors-target"
+    );
+    const content = withCommonFormSlots(
+      target.word.forms,
+      ["workspaces"],
+      "forms-errors-target"
+    );
+    const impact = await warningMock.previewFormsImpact(target.word.id, {
+      base_revision: target.word.revision,
+      content
+    });
+    if (!impact.surface_match_page) {
+      throw new Error("surface error fixture must return a snapshot");
+    }
+    const terminal = await terminalSurfacePage(
+      warningMock,
+      impact.surface_match_page
+    );
+    if (
+      terminal.continuation_policy !== "enabled" ||
+      terminal.next_cursor !== null
+    ) {
+      throw new Error("surface error fixture must issue a terminal token");
+    }
+
+    await expect(
+      warningMock.saveFormsStep(target.word.id, {
+        base_revision: target.word.revision,
+        operation_id: "forms-errors-expired-token",
+        intent: "save",
+        confirmed_surface_match_token: "unknown-surface-token",
+        content
+      })
+    ).rejects.toMatchObject({
+      status: 410,
+      code: "surface_match_snapshot_expired"
+    });
+
+    await warningMock.saveFormsStep(sourceSaved.word.id, {
+      base_revision: sourceSaved.word.revision,
+      operation_id: "forms-errors-source-changed",
+      intent: "save",
+      content: withCommonFormSlots(
+        sourceContent,
+        ["workspaces"],
+        "forms-errors-source-new"
+      )
+    });
+    await expect(
+      warningMock.saveFormsStep(target.word.id, {
+        base_revision: target.word.revision,
+        operation_id: "forms-errors-changed-token",
+        intent: "save",
+        confirmed_surface_match_token: terminal.surface_confirmation_token,
+        content
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "surface_matches_changed",
+      meta: {
+        surface_match_page: expect.objectContaining({
+          snapshot_id: expect.any(String),
+          total: 2
+        })
+      }
+    });
+    expect((await warningMock.get(target.word.id)).word.revision).toBe(
+      target.word.revision
+    );
+  });
+
+  it("锁后仅有旧 match 消失时接受已确认集合的剩余子集", async () => {
+    const warningMock = surfaceMock();
+    const sources: Array<{
+      saved: AdminWordV2;
+      content: DraftFormsStepContent;
+    }> = [];
+    for (const suffix of ["one", "two"] as const) {
+      const source = await createDetectedWord(
+        warningMock,
+        `repository-${suffix}`,
+        `forms-disappeared-source-${suffix}`
+      );
+      const sourceContent = withCommonFormSlots(
+        source.word.forms,
+        ["workspaces"],
+        `forms-disappeared-source-${suffix}`
+      );
+      const sourceImpact = await warningMock.previewFormsImpact(
+        source.word.id,
+        {
+          base_revision: source.word.revision,
+          content: sourceContent
+        }
+      );
+      const sourceTerminal = sourceImpact.surface_match_page
+        ? await enabledTerminalSurfacePage(
+            warningMock,
+            sourceImpact.surface_match_page
+          )
+        : undefined;
+      const saved = await warningMock.saveFormsStep(source.word.id, {
+        base_revision: source.word.revision,
+        operation_id: `forms-disappeared-source-save-${suffix}`,
+        intent: "save",
+        confirmed_surface_match_token:
+          sourceTerminal?.surface_confirmation_token,
+        content: sourceContent
+      });
+      sources.push({ saved: saved.word, content: sourceContent });
+    }
+    const target = await createDetectedWord(
+      warningMock,
+      "workspace",
+      "forms-disappeared-target"
+    );
+    const content = withCommonFormSlots(
+      target.word.forms,
+      ["workspaces"],
+      "forms-disappeared-target"
+    );
+    const impact = await warningMock.previewFormsImpact(target.word.id, {
+      base_revision: target.word.revision,
+      content
+    });
+    expect(impact.surface_match_page?.total).toBe(2);
+    if (!impact.surface_match_page) {
+      throw new Error("disappeared-match fixture must return a snapshot");
+    }
+    const terminal = await enabledTerminalSurfacePage(
+      warningMock,
+      impact.surface_match_page
+    );
+
+    const removed = sources[0]!;
+    const removedContent = structuredClone(removed.content);
+    for (const slot of removedContent.pos.flatMap((pos) =>
+      pos.form_groups.flatMap((group) => group.slots)
+    )) {
+      for (const variant of slot.variants) {
+        if (variant.spelling === "workspaces") {
+          variant.spelling = "repositories";
+        }
+      }
+    }
+    await warningMock.saveFormsStep(removed.saved.id, {
+      base_revision: removed.saved.revision,
+      operation_id: "forms-disappeared-source-remove",
+      intent: "save",
+      content: removedContent
+    });
+
+    const saved = await warningMock.saveFormsStep(target.word.id, {
+      base_revision: target.word.revision,
+      operation_id: "forms-disappeared-target-confirmed",
+      intent: "save",
+      confirmed_surface_match_token: terminal.surface_confirmation_token,
+      content
+    });
+    expect(saved.word.revision).toBe(target.word.revision + 1);
+  });
+
+  it("同一 Forms owner 二次 preview 会淘汰首个 snapshot 与终页双 token", async () => {
+    const warningMock = surfaceMock();
+    const source = await createDetectedWord(
+      warningMock,
+      "repository",
+      "forms-replaced-source"
+    );
+    await warningMock.saveFormsStep(source.word.id, {
+      base_revision: source.word.revision,
+      operation_id: "forms-replaced-source-save",
+      intent: "save",
+      content: withCommonFormSlots(
+        source.word.forms,
+        ["workspaces"],
+        "forms-replaced-source"
+      )
+    });
+    const target = await completeCenter(warningMock);
+    const content = withCommonFormSlots(
+      { pos: [target.forms.pos[0]!] },
+      ["workspaces"],
+      "forms-replaced-target"
+    );
+    const preview = async () => {
+      const impact = await warningMock.previewFormsImpact(target.id, {
+        base_revision: target.revision,
+        content
+      });
+      if (!impact.surface_match_page) {
+        throw new Error("replacement fixture must return a surface snapshot");
+      }
+      return enabledTerminalSurfacePage(warningMock, impact.surface_match_page);
+    };
+    const first = await preview();
+    const replacement = await preview();
+    expect(first.impact_confirmation_token).toEqual(expect.any(String));
+    expect(replacement.impact_confirmation_token).toEqual(expect.any(String));
+
+    await expect(
+      warningMock.saveFormsStep(target.id, {
+        base_revision: target.revision,
+        operation_id: "forms-replaced-old-token",
+        intent: "save",
+        confirmed_surface_match_token: first.surface_confirmation_token,
+        confirmed_impact_token: first.impact_confirmation_token,
+        content
+      })
+    ).rejects.toMatchObject({
+      status: 410,
+      code: "surface_match_snapshot_expired"
+    });
+    await expect(
+      warningMock.saveFormsStep(target.id, {
+        base_revision: target.revision,
+        operation_id: "forms-replaced-current-token",
+        intent: "save",
+        confirmed_surface_match_token: replacement.surface_confirmation_token,
+        confirmed_impact_token: replacement.impact_confirmation_token,
+        content
+      })
+    ).resolves.toMatchObject({
+      word: { revision: target.revision + 1 }
     });
   });
 });

@@ -4,6 +4,7 @@ import type {
   DraftMeaningsStepContent,
   PartOfSpeechCatalogResponse,
   RichText,
+  SurfaceMatchPageV2,
   WordPronunciationV2
 } from "@tsz/types";
 
@@ -232,6 +233,14 @@ export interface MockAdminApiOptions {
   expireSurfaceSnapshotOnce?: boolean;
   /** 第一次 forms 保存返回 500，后续重试成功。 */
   failFormsSaveOnce?: boolean;
+  /** 显式 plural=workspaces 时，让 forms impact 返回两页 surface warning。 */
+  formsSurfaceWarnings?: boolean;
+  /** forms surface warning 同时携带下游影响，并由终页签发 impact token。 */
+  formsDownstreamImpact?: boolean;
+  /** 第一次携有效 token 保存时模拟锁后命中集合变化，返回结构化 409。 */
+  changeFormsSurfaceOnFirstSave?: boolean;
+  /** 延迟 forms surface 终页，供浏览器验证终页前确认门禁。 */
+  formsSurfaceTerminalDelayMs?: number;
 }
 
 export interface MockAdminApiController {
@@ -410,6 +419,150 @@ function surfacePage(rawHeadword: string, terminal: boolean) {
   };
 }
 
+const FORMS_SURFACE_CURSOR = "forms-surface-page-2";
+
+function formsSurfaceMatchItem(
+  version: number,
+  category: "form_headword" | "form_form"
+) {
+  const existingWordId =
+    category === "form_headword"
+      ? `existing-workspaces-headword-v${version}`
+      : `existing-workspace-form-v${version}`;
+  const existingHeadword =
+    category === "form_headword"
+      ? "workspaces"
+      : version === 1
+        ? "workspace"
+        : "workspace-updated";
+  return {
+    match_id: `forms-${category}-v${version}`,
+    match_category: category,
+    severity: "warning" as const,
+    attention_level: "normal" as const,
+    can_continue: true as const,
+    confirmation_reasons: ["unacknowledged_surface_matches" as const],
+    candidate: {
+      candidate_type: "form" as const,
+      candidate_ref: `${ADMIN_E2E_WORD_ID}:pos-noun:noun-plural:noun-plural-us`,
+      candidate_word_id: ADMIN_E2E_WORD_ID,
+      candidate_node_id: "noun-plural-us",
+      surface: "workspaces",
+      normalized_surface: "workspaces",
+      dialect: "us" as const,
+      pos_id: "pos-noun",
+      pos: "noun",
+      form_type: "plural" as const
+    },
+    existing: {
+      word_id: existingWordId,
+      headword: existingHeadword,
+      kind: "word" as const,
+      status:
+        category === "form_headword"
+          ? ("draft" as const)
+          : ("published" as const),
+      source:
+        category === "form_headword"
+          ? {
+              source_kind: "headword" as const,
+              source_id: `${existingWordId}:headword:common`,
+              content_scope: "draft" as const,
+              surface: "workspaces",
+              dialect: "common" as const
+            }
+          : {
+              source_kind: "form" as const,
+              source_id: `${existingWordId}:form:plural:us`,
+              source_node_id: `${existingWordId}-plural-us`,
+              content_scope: "current_publication" as const,
+              surface: "workspaces",
+              dialect: "us" as const,
+              pos_id: `${existingWordId}-noun`,
+              pos: "noun",
+              form_type: "plural" as const
+            }
+    }
+  };
+}
+
+function formsSurfacePage(
+  version: number,
+  terminal: boolean,
+  includeImpactToken: boolean
+): SurfaceMatchPageV2 {
+  const item = formsSurfaceMatchItem(
+    version,
+    terminal ? "form_form" : "form_headword"
+  );
+  const base = {
+    snapshot_id: `forms-snapshot-${version}`,
+    items: [item],
+    total: 2,
+    matched_entry_contexts: [
+      {
+        word_id: item.existing.word_id,
+        pos_labels: ["noun"],
+        gloss_previews: ["工作区"],
+        updated_at: NOW,
+        inbound_relations: {
+          total: 0,
+          by_type: { synonym: 0, antonym: 0, derivative: 0 },
+          previews: [],
+          truncated: false
+        }
+      }
+    ],
+    confirmation_reasons: ["unacknowledged_surface_matches" as const],
+    policy_name: "surface_warning_acknowledgement" as const,
+    policy_epoch: version,
+    continuation_policy: "enabled" as const
+  };
+  return terminal
+    ? {
+        ...base,
+        next_cursor: null,
+        surface_confirmation_token: `forms-surface-token-v${version}`,
+        ...(includeImpactToken
+          ? { impact_confirmation_token: `forms-impact-token-v${version}` }
+          : {})
+      }
+    : { ...base, next_cursor: FORMS_SURFACE_CURSOR };
+}
+
+function hasExplicitWorkspacePlural(body: unknown): boolean {
+  if (!body || typeof body !== "object") return false;
+  const content = Reflect.get(body, "content");
+  if (!content || typeof content !== "object") return false;
+  const posItems = Reflect.get(content, "pos");
+  if (!Array.isArray(posItems)) return false;
+  return posItems.some((pos) => {
+    if (!pos || typeof pos !== "object") return false;
+    const groups = Reflect.get(pos, "form_groups");
+    if (!Array.isArray(groups)) return false;
+    return groups.some((group) => {
+      if (!group || typeof group !== "object") return false;
+      const slots = Reflect.get(group, "slots");
+      if (!Array.isArray(slots)) return false;
+      return slots.some((slot) => {
+        if (!slot || typeof slot !== "object") return false;
+        if (Reflect.get(slot, "form_type") !== "plural") return false;
+        const variants = Reflect.get(slot, "variants");
+        return (
+          Array.isArray(variants) &&
+          variants.some(
+            (variant) =>
+              variant !== null &&
+              typeof variant === "object" &&
+              Reflect.get(variant, "id") === "noun-plural-us" &&
+              Reflect.get(variant, "spelling") === "workspaces"
+          )
+        );
+      });
+    });
+  });
+}
+
 function detectionResponse(
   duplicate: boolean,
   rawHeadword: string,
@@ -525,6 +678,10 @@ export async function mockAdminApi(
   let surfaceSnapshotExpiryRemaining = options.expireSurfaceSnapshotOnce
     ? 1
     : 0;
+  let formsSurfaceVersion = 1;
+  let formsSurfaceChangeRemaining = options.changeFormsSurfaceOnFirstSave
+    ? 1
+    : 0;
 
   await page.route("**/api/v1/admin/**", async (route) => {
     const request = route.request();
@@ -580,6 +737,31 @@ export async function mockAdminApi(
       path.startsWith(`${ADMIN_E2E_LEXICON_PATH}/surface-match-snapshots/`)
     ) {
       const snapshotId = path.split("/").at(-1) ?? "";
+      const formsSnapshotMatch = /^forms-snapshot-(\d+)$/.exec(snapshotId);
+      if (options.formsSurfaceWarnings && formsSnapshotMatch) {
+        if (requestUrl.searchParams.get("cursor") !== FORMS_SURFACE_CURSOR) {
+          return problem(route, 410, {
+            type: "urn:tsz:problem:surface_match_snapshot_expired",
+            title: "Surface match snapshot expired",
+            status: 410,
+            detail: "surface match snapshot expired",
+            code: "surface_match_snapshot_expired"
+          });
+        }
+        const delayMs = options.formsSurfaceTerminalDelayMs ?? 0;
+        if (delayMs > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
+        return json(
+          route,
+          200,
+          formsSurfacePage(
+            Number(formsSnapshotMatch[1]),
+            true,
+            options.formsDownstreamImpact === true
+          )
+        );
+      }
       const rawHeadword = snapshotId.replace(/^snapshot-/, "");
       if (
         !["workspace", "workspaces"].includes(rawHeadword) ||
@@ -692,6 +874,27 @@ export async function mockAdminApi(
       path ===
         `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}/steps/forms/impact`
     ) {
+      if (options.formsSurfaceWarnings && hasExplicitWorkspacePlural(body)) {
+        const requiresImpact = options.formsDownstreamImpact === true;
+        return json(route, 200, {
+          base_revision: word?.revision ?? 1,
+          requires_confirmation: requiresImpact,
+          affected: requiresImpact
+            ? [
+                {
+                  node_id: "sense-1",
+                  node_type: "sense",
+                  reason: "复数词形变化会影响词义引用"
+                }
+              ]
+            : [],
+          surface_match_page: formsSurfacePage(
+            formsSurfaceVersion,
+            false,
+            requiresImpact
+          )
+        });
+      }
       return json(route, 200, {
         base_revision: word?.revision ?? 1,
         requires_confirmation: false,
@@ -710,9 +913,63 @@ export async function mockAdminApi(
         });
       }
       const input = body as
-        | { content?: typeof CENTER_FORMS; intent?: "save" | "complete" }
+        | {
+            content?: typeof CENTER_FORMS;
+            intent?: "save" | "complete";
+            confirmed_surface_match_token?: string;
+            confirmed_impact_token?: string;
+          }
         | undefined;
       if (!word) return json(route, 404, { error: "word not found" });
+      if (options.formsSurfaceWarnings && hasExplicitWorkspacePlural(input)) {
+        const requiresImpact = options.formsDownstreamImpact === true;
+        const expectedSurfaceToken = `forms-surface-token-v${formsSurfaceVersion}`;
+        const expectedImpactToken = `forms-impact-token-v${formsSurfaceVersion}`;
+        const hasExpectedTokens =
+          input?.confirmed_surface_match_token === expectedSurfaceToken &&
+          (!requiresImpact ||
+            input.confirmed_impact_token === expectedImpactToken);
+        if (!hasExpectedTokens) {
+          const page = formsSurfacePage(
+            formsSurfaceVersion,
+            false,
+            requiresImpact
+          );
+          return problem(route, 409, {
+            type: "urn:tsz:problem:surface_match_acknowledgement_required",
+            title: "Surface match acknowledgement required",
+            status: 409,
+            detail: "surface match acknowledgement required",
+            code: "surface_match_acknowledgement_required",
+            meta: {
+              surface_match_page: page,
+              current_policy_name: page.policy_name,
+              current_policy_epoch: page.policy_epoch
+            }
+          });
+        }
+        if (formsSurfaceChangeRemaining > 0) {
+          formsSurfaceChangeRemaining -= 1;
+          formsSurfaceVersion += 1;
+          const page = formsSurfacePage(
+            formsSurfaceVersion,
+            false,
+            requiresImpact
+          );
+          return problem(route, 409, {
+            type: "urn:tsz:problem:surface_matches_changed",
+            title: "Surface matches changed",
+            status: 409,
+            detail: "surface matches changed after the entry lock was acquired",
+            code: "surface_matches_changed",
+            meta: {
+              surface_match_page: page,
+              current_policy_name: page.policy_name,
+              current_policy_epoch: page.policy_epoch
+            }
+          });
+        }
+      }
       word = {
         ...word,
         forms: clone(input?.content ?? CENTER_FORMS),

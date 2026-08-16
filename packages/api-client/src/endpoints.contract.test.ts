@@ -240,6 +240,10 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       specPaths["/admin/lexicon/surface-match-snapshots/{snapshot_id}"]
     ).toEqual(["get"]);
     expect(snapshot.schemas.SurfaceMatchPageV2.oneOf).toHaveLength(3);
+    expect(
+      snapshot.schemas.SurfaceMatchEnabledTerminalPageV2.properties
+        .impact_confirmation_token
+    ).toEqual({ type: "string", format: "uuid" });
     expect(snapshot.schemas.WordFormTypeV2.enum).toEqual([
       "base",
       "third_person_singular",

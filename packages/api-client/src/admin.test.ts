@@ -241,15 +241,16 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     );
   });
 
-  it("saveFormsStep → PUT /lexicon/entries/{id}/steps/forms 且缺省确认 token", () => {
+  it("saveFormsStep → PUT /lexicon/entries/{id}/steps/forms 原样透传独立双 token", () => {
     const api = createAdminEndpoints(http);
     const input: SaveFormsStepInput = {
       base_revision: 3,
       intent: "save",
+      confirmed_impact_token: "impact-token-1",
+      confirmed_surface_match_token: "surface-token-1",
       content: { pos: [] }
     };
     api.words.saveFormsStep("w-2", input);
-    expect(input).not.toHaveProperty("confirmed_impact_token");
     expect(http.put).toHaveBeenCalledWith(
       "/lexicon/entries/w-2/steps/forms",
       input
@@ -264,6 +265,20 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       content: { sense_groups: [], pos: [] }
     };
     api.words.saveMeaningsStep("w-2", input);
+    type HasSurfaceToken =
+      "confirmed_surface_match_token" extends keyof SaveMeaningsStepInput
+        ? true
+        : false;
+    type HasImpactToken =
+      "confirmed_impact_token" extends keyof SaveMeaningsStepInput
+        ? true
+        : false;
+    const hasSurfaceToken: HasSurfaceToken = false;
+    const hasImpactToken: HasImpactToken = false;
+    expect(hasSurfaceToken).toBe(false);
+    expect(hasImpactToken).toBe(false);
+    expect(input).not.toHaveProperty("confirmed_surface_match_token");
+    expect(input).not.toHaveProperty("confirmed_impact_token");
     expect(http.put).toHaveBeenCalledWith(
       "/lexicon/entries/w-2/steps/meanings",
       input
