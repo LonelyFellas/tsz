@@ -52,6 +52,7 @@ export interface AdminWordListItem {
   id: string;
   headword: string;
   kind: AdminWordKind;
+  dialects: Dialect[];
   gloss: string;
   pos_list: WordPosTag[];
   /** 聚合所有词义等级,升序 */

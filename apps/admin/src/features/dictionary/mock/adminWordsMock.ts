@@ -2817,6 +2817,9 @@ export function createAdminWordsMock({
         id: word.id,
         headword: displayHeadword(word),
         kind: word.kind,
+        dialects: (word.headwords.mode === "unified"
+          ? ["common"]
+          : ["uk", "us"]) as AdminWordListItem["dialects"],
         gloss: wordGloss(word),
         pos_list: wordPos(word),
         levels: wordLevels(word),
@@ -2835,7 +2838,11 @@ export function createAdminWordsMock({
         created_at: word.created_at,
         updated_at: word.updated_at
       }))
-      .sort((left, right) => right.created_at.localeCompare(left.created_at));
+      .sort(
+        (left, right) =>
+          right.created_at.localeCompare(left.created_at) ||
+          right.id.localeCompare(left.id)
+      );
     const pageSize = Math.min(100, Math.max(1, query.page_size ?? 20));
     const page = Math.max(1, query.page ?? 1);
     const start = (page - 1) * pageSize;
@@ -3239,13 +3246,23 @@ export function createAdminWordsMock({
             acknowledged_by: profile.id,
             policy_name: acknowledgedSurface.snapshot.policy_name,
             policy_epoch: acknowledgedSurface.snapshot.policy_epoch,
-            preview: acknowledgedSurface.items.slice(0, 5).map((item) => ({
-              match_id: item.match_id,
-              match_category: item.match_category,
-              existing_word_id: item.existing.word_id,
-              existing_headword: item.existing.headword,
-              existing_status: item.existing.status
-            })),
+            preview: acknowledgedSurface.items.slice(0, 5).map((item) => {
+              const existing = current.words[item.existing.word_id];
+              const existingDialect = item.existing.source.dialect;
+              return {
+                match_id: item.match_id,
+                match_category: item.match_category,
+                existing_word_id: item.existing.word_id,
+                existing_headword: item.existing.headword,
+                existing_kind: item.existing.kind,
+                existing_status: item.existing.status,
+                existing_dialect: existingDialect,
+                pos_labels: existing ? wordPos(existing).slice(0, 5) : [],
+                gloss_previews: existing
+                  ? [wordGloss(existing)].filter(Boolean).slice(0, 5)
+                  : []
+              };
+            }),
             truncated:
               acknowledgedSurface.snapshot.match_ids.length >
               Math.min(5, acknowledgedSurface.items.length)

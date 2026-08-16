@@ -69,6 +69,12 @@ function snapshotMatchCategoryLabel(category: string) {
   }
 }
 
+const SNAPSHOT_DIALECT_LABEL = {
+  uk: "BrE",
+  us: "AmE",
+  common: "Common"
+} as const;
+
 function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
@@ -238,6 +244,20 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
                         {snapshotMatchCategoryLabel(item.match_category)}
                       </Tag>
                       <Tag>{STATUS_LABEL[item.existing_status]}</Tag>
+                      <Tag>
+                        {item.existing_kind === "phrase" ? "短语" : "单词"}
+                      </Tag>
+                      <Tag>{SNAPSHOT_DIALECT_LABEL[item.existing_dialect]}</Tag>
+                      {item.pos_labels.map((pos) => (
+                        <Tag key={pos}>
+                          {partOfSpeechLabel(partOfSpeechLookup, pos)}
+                        </Tag>
+                      ))}
+                      {item.gloss_previews.length > 0 && (
+                        <Typography.Text type="secondary">
+                          {item.gloss_previews.join("；")}
+                        </Typography.Text>
+                      )}
                       <Typography.Text code>
                         {item.existing_word_id.slice(-8)}
                       </Typography.Text>

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/related-search-b9/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-16T07:17:11.800Z",
+  "_source": "/Users/darwish/.codex/worktrees/inflection-list-audit/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-16T10:27:41.055Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -370,16 +370,32 @@
         "match_category",
         "existing_word_id",
         "existing_headword",
-        "existing_status"
+        "existing_kind",
+        "existing_status",
+        "existing_dialect",
+        "pos_labels",
+        "gloss_previews"
       ],
       "properties": {
+        "existing_dialect": { "$ref": "#/components/schemas/Dialect" },
         "existing_headword": { "type": "string" },
+        "existing_kind": { "$ref": "#/components/schemas/EntryKind" },
         "existing_status": { "$ref": "#/components/schemas/AdminWordStatus" },
         "existing_word_id": { "type": "string", "format": "uuid" },
+        "gloss_previews": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 5
+        },
         "match_category": {
           "$ref": "#/components/schemas/SurfaceMatchCategoryV2"
         },
-        "match_id": { "type": "string" }
+        "match_id": { "type": "string" },
+        "pos_labels": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 5
+        }
       },
       "additionalProperties": false
     },
@@ -1340,6 +1356,7 @@
         "id",
         "headword",
         "kind",
+        "dialects",
         "revision",
         "lifecycle_revision",
         "gloss",
@@ -1355,6 +1372,10 @@
       "properties": {
         "created_at": { "type": "string", "format": "date-time" },
         "created_by_name": { "type": "string" },
+        "dialects": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/Dialect" }
+        },
         "gloss": { "type": "string" },
         "has_unpublished_changes": { "type": "boolean" },
         "headword": { "type": "string" },

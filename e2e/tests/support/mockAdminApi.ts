@@ -243,6 +243,8 @@ export interface MockAdminApiOptions {
   formsSurfaceTerminalDelayMs?: number;
   /** 为关联词 V2 搜索返回两个完全同名、ID 不同的已发布目标。 */
   relatedSearchV2?: boolean;
+  /** 列表返回两个完全同名、ID 与上下文不同的 workspace。 */
+  sameHeadwordList?: boolean;
 }
 
 export interface MockAdminApiController {
@@ -649,6 +651,7 @@ function listItem(word: MockWord) {
     id: word.id,
     headword: "center",
     kind: "word",
+    dialects: ["uk", "us"],
     gloss: word.status === "published" ? "圆心，中心" : "",
     pos_list: ["noun"],
     levels: word.status === "published" ? ["A1"] : [],
@@ -712,7 +715,39 @@ export async function mockAdminApi(
       return json(route, 200, PART_OF_SPEECH_CATALOG);
     }
     if (method === "GET" && path === ADMIN_E2E_ENTRIES_PATH) {
-      const words = word ? [listItem(word)] : [];
+      const words = options.sameHeadwordList
+        ? [
+            {
+              ...listItem(
+                createDraft({
+                  mode: "unified",
+                  common: "workspace"
+                })
+              ),
+              id: "workspace-entry-a1b2c3d4",
+              headword: "workspace",
+              dialects: ["common"],
+              gloss: "工作空间"
+            },
+            {
+              ...listItem(
+                createDraft({
+                  mode: "distinguish",
+                  uk: "workspace",
+                  us: "workspace",
+                  source_dialect: "uk"
+                })
+              ),
+              id: "workspace-entry-e5f6a7b8",
+              headword: "workspace",
+              kind: "phrase",
+              dialects: ["uk", "us"],
+              gloss: "协作空间"
+            }
+          ]
+        : word
+          ? [listItem(word)]
+          : [];
       return json(route, 200, {
         words,
         page: { page: 1, page_size: 20, total: words.length }
@@ -860,7 +895,11 @@ export async function mockAdminApi(
               match_category: item.match_category,
               existing_word_id: item.existing.word_id,
               existing_headword: item.existing.headword,
-              existing_status: item.existing.status
+              existing_kind: item.existing.kind,
+              existing_status: item.existing.status,
+              existing_dialect: item.existing.source.dialect,
+              pos_labels: ["noun"],
+              gloss_previews: ["工作空间"]
             })),
             truncated: false
           },
