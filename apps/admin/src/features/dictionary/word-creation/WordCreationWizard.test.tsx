@@ -448,6 +448,88 @@ describe("WordCreationWizard", () => {
     ).toBeVisible();
   });
 
+  it("clear detection snapshot 明确显示创建时未发现重复项", async () => {
+    const word = wordFixture({ max_reachable_step: "forms" });
+    loaded(word);
+    renderWizard("resume", `/words/${word.id}/wizard/basics`);
+
+    expect(await screen.findByText("词典检测已完成")).toBeVisible();
+    expect(
+      screen.getByText("内置词典已匹配，智能词库创建时未发现重复项。")
+    ).toBeVisible();
+    expect(
+      screen.queryByText("创建时发现同名或同形词条，管理员已确认继续")
+    ).toBeNull();
+  });
+
+  it("warning detection snapshot 回看确认审计和精确词条入口", async () => {
+    const word = wordFixture({ max_reachable_step: "forms" });
+    word.detection_snapshot = {
+      ...word.detection_snapshot,
+      smart_dictionary_status: "warning",
+      surface_warning: {
+        total: 3,
+        match_digest: "sha256:warning-audit",
+        acknowledged: true,
+        acknowledged_at: "2026-08-16T02:22:08.465Z",
+        acknowledged_by: "01a0085f-c222-7cc3-8eb3-158d95ffd3ec",
+        policy_name: "surface_warning_acknowledgement",
+        policy_epoch: 7,
+        preview: [
+          {
+            match_id: "match-workspace",
+            match_category: "headword_form",
+            existing_word_id: "01a00492-d889-71e0-a9a3-e053a0a093e6",
+            existing_headword: "workspace",
+            existing_status: "draft"
+          },
+          {
+            match_id: "match-archived",
+            match_category: "exact_headword",
+            existing_word_id: "01a00492-d889-71e0-a9a3-e053a0a093e7",
+            existing_headword: "workspaces",
+            existing_status: "archived"
+          }
+        ],
+        truncated: true
+      }
+    };
+    loaded(word);
+    renderWizard("resume", `/words/${word.id}/wizard/basics`);
+
+    expect(
+      await screen.findByText("创建时发现同名或同形词条，管理员已确认继续")
+    ).toBeVisible();
+    expect(
+      screen.getByText("已确认 3 条匹配，当前展示 2 条摘要。")
+    ).toBeVisible();
+    expect(
+      screen.getByText("surface_warning_acknowledgement · epoch 7")
+    ).toBeVisible();
+    expect(
+      screen.getByText("01a0085f-c222-7cc3-8eb3-158d95ffd3ec")
+    ).toBeVisible();
+    expect(screen.getByText("2026-08-16T02:22:08.465Z")).toBeVisible();
+
+    const workspaceLink = screen.getByRole("link", {
+      name: "workspace 01a00492-d889-71e0-a9a3-e053a0a093e6，在新标签页打开"
+    });
+    expect(workspaceLink).toHaveAttribute(
+      "href",
+      "/words/01a00492-d889-71e0-a9a3-e053a0a093e6/wizard/basics"
+    );
+    expect(workspaceLink).toHaveAttribute("target", "_blank");
+    expect(workspaceLink).toHaveAttribute("rel", "noreferrer");
+    expect(
+      screen.getByRole("link", {
+        name: "workspaces 01a00492-d889-71e0-a9a3-e053a0a093e7，在新标签页打开"
+      })
+    ).toBeVisible();
+    expect(
+      screen.queryByText("内置词典已匹配，智能词库创建时未发现重复项。")
+    ).toBeNull();
+  });
+
   it("只读 basics 展示用户最终确认的主词，而不是词典原建议", async () => {
     const word = wordFixture({ max_reachable_step: "forms" });
     word.headwords = {

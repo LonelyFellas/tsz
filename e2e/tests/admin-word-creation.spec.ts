@@ -245,6 +245,25 @@ test.describe("admin 新建单词 V2", () => {
         detection_id: `detect-${scenario.headword}`,
         confirmed_surface_match_token: `surface-token-${scenario.headword}`
       });
+
+      await page.goto(`/words/${ADMIN_E2E_WORD_ID}/wizard/basics`);
+      await expect(
+        page.getByText("创建时发现同名或同形词条，管理员已确认继续")
+      ).toBeVisible();
+      await expect(
+        page.getByText("已确认 3 条匹配，当前展示 3 条摘要。")
+      ).toBeVisible();
+      await expect(
+        page.getByRole("link", {
+          name: "workspace existing-workspace-archived-a，在新标签页打开"
+        })
+      ).toHaveAttribute(
+        "href",
+        "/words/existing-workspace-archived-a/wizard/basics"
+      );
+      await expect(
+        page.getByText("内置词典已匹配，智能词库创建时未发现重复项。")
+      ).toHaveCount(0);
     });
   }
 

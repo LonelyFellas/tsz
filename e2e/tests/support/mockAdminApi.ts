@@ -22,6 +22,7 @@ const ADMIN_PROFILE = {
 
 const NOW = "2026-08-02T03:00:00.000Z";
 const PUBLISHED_AT = "2026-08-02T03:10:00.000Z";
+const ADMIN_AUDIT_ID = "01900000-0000-7000-8000-000000000001";
 
 const PART_OF_SPEECH_CATALOG: PartOfSpeechCatalogResponse = {
   catalog_version: 1,
@@ -645,6 +646,45 @@ export async function mockAdminApi(
           source_dialect: "us"
         }
       );
+      if (
+        options.surfaceWarnings &&
+        input?.detection_id?.startsWith("detect-workspace")
+      ) {
+        const rawHeadword = input.detection_id.replace(/^detect-/, "");
+        const matches = [
+          ...surfacePage(rawHeadword, false).items,
+          ...surfacePage(rawHeadword, true).items
+        ];
+        word.detection_snapshot = {
+          detection_id: input.detection_id,
+          request: { language: "en", headword: rawHeadword },
+          normalized_headword: rawHeadword,
+          entry_kind: "word",
+          matched_dialect: "common",
+          builtin_dictionary_status: "matched",
+          smart_dictionary_status: "warning",
+          surface_warning: {
+            total: matches.length,
+            match_digest: `surface-digest-${rawHeadword}`,
+            acknowledged: true,
+            acknowledged_at: NOW,
+            acknowledged_by: ADMIN_AUDIT_ID,
+            policy_name: "allow_new_exact_headword_entries",
+            policy_epoch: 1,
+            preview: matches.map((item) => ({
+              match_id: item.match_id,
+              match_category: item.match_category,
+              existing_word_id: item.existing.word_id,
+              existing_headword: item.existing.headword,
+              existing_status: item.existing.status
+            })),
+            truncated: false
+          },
+          headwords: input.headwords,
+          suggested_pos: ["noun"],
+          detected_at: NOW
+        };
+      }
       return json(route, 201, { word: clone(word) });
     }
     if (

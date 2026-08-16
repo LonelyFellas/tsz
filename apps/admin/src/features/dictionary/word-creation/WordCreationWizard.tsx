@@ -25,11 +25,13 @@ import type {
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Navigate,
+  Link,
   useNavigate,
   useParams,
   useSearchParams
 } from "react-router-dom";
 import { useDeleteWordDraft, useRestoreWord, useWordDetail } from "../api";
+import { STATUS_LABEL } from "../labels";
 import { runLifecycleCommandOnce } from "../lifecycleCommand";
 import { newWordNodeId } from "../word-model/primitives";
 import {
@@ -52,6 +54,21 @@ function isWordCreationStep(value?: string): value is WordCreationStep {
   return WORD_STEP_ORDER.includes(value as WordCreationStep);
 }
 
+function snapshotMatchCategoryLabel(category: string) {
+  switch (category) {
+    case "exact_headword":
+      return "同名主词";
+    case "cross_kind_headword":
+      return "跨类型同名主词";
+    case "headword_form":
+      return "命中已有词形";
+    case "form_headword":
+      return "词形命中已有主词";
+    default:
+      return "同形词形";
+  }
+}
+
 function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
@@ -63,6 +80,10 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
   const deleteDraft = useDeleteWordDraft();
   const lifecycleCommandPending = useRef(false);
   const snapshot = word.detection_snapshot;
+  const surfaceWarning =
+    snapshot.smart_dictionary_status === "warning"
+      ? snapshot.surface_warning
+      : undefined;
   const discard = () => {
     modal.confirm({
       title: "删除当前草稿并重新检测？",
@@ -106,19 +127,29 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
       <Alert
         className="word-snapshot-status"
         type={
-          snapshot.builtin_dictionary_status === "matched" ? "success" : "info"
+          surfaceWarning
+            ? "warning"
+            : snapshot.builtin_dictionary_status === "matched"
+              ? "success"
+              : "info"
         }
         showIcon
-        icon={<CheckCircleFilled />}
+        icon={
+          surfaceWarning ? <ExclamationCircleOutlined /> : <CheckCircleFilled />
+        }
         title={
-          snapshot.builtin_dictionary_status === "matched"
-            ? "词典检测已完成"
-            : "短语草稿已创建"
+          surfaceWarning
+            ? "创建时发现同名或同形词条，管理员已确认继续"
+            : snapshot.builtin_dictionary_status === "matched"
+              ? "词典检测已完成"
+              : "短语草稿已创建"
         }
         description={
-          snapshot.builtin_dictionary_status === "matched"
-            ? "内置词典已匹配，智能词库创建时未发现重复项。"
-            : "内置词典未收录该短语，已按规范化输入创建空白 V2 草稿。"
+          surfaceWarning
+            ? `已确认 ${surfaceWarning.total} 条匹配，当前展示 ${surfaceWarning.preview.length} 条摘要。`
+            : snapshot.builtin_dictionary_status === "matched"
+              ? "内置词典已匹配，智能词库创建时未发现重复项。"
+              : "内置词典未收录该短语，已按规范化输入创建空白 V2 草稿。"
         }
         style={{ marginBottom: 18 }}
       />
@@ -177,6 +208,52 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
               {snapshot.detection_id}
             </Typography.Text>
           </Descriptions.Item>
+          {surfaceWarning && (
+            <>
+              <Descriptions.Item label="确认策略">
+                {surfaceWarning.policy_name} · epoch{" "}
+                {surfaceWarning.policy_epoch}
+              </Descriptions.Item>
+              <Descriptions.Item label="确认时间">
+                {surfaceWarning.acknowledged_at}
+              </Descriptions.Item>
+              <Descriptions.Item label="确认管理员" span={2}>
+                <Typography.Text copyable code>
+                  {surfaceWarning.acknowledged_by}
+                </Typography.Text>
+              </Descriptions.Item>
+              <Descriptions.Item label="匹配摘要" span={2}>
+                <Space orientation="vertical" size={6}>
+                  {surfaceWarning.preview.map((item) => (
+                    <Space key={item.match_id} wrap>
+                      <Link
+                        to={`/words/${item.existing_word_id}/wizard/basics`}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`${item.existing_headword} ${item.existing_word_id}，在新标签页打开`}
+                      >
+                        {item.existing_headword}
+                      </Link>
+                      <Tag>
+                        {snapshotMatchCategoryLabel(item.match_category)}
+                      </Tag>
+                      <Tag>{STATUS_LABEL[item.existing_status]}</Tag>
+                      <Typography.Text code>
+                        {item.existing_word_id.slice(-8)}
+                      </Typography.Text>
+                    </Space>
+                  ))}
+                  {surfaceWarning.truncated && (
+                    <Typography.Text type="secondary">
+                      仅展示 {surfaceWarning.preview.length}/
+                      {surfaceWarning.total}{" "}
+                      条不可变摘要；完整审计以服务端记录为准。
+                    </Typography.Text>
+                  )}
+                </Space>
+              </Descriptions.Item>
+            </>
+          )}
         </Descriptions>
       </Card>
 
