@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-天生会背 — 词汇学习平台前端 monorepo（pnpm + turbo，Node ≥ 22）。
+天生会背 — 词汇学习平台前端 monorepo（pnpm + turbo，Node = 24.19.0）。
 后端正从独立仓库 tsz-go（Go）重写迁移至 tsz-rust（Rust，同上级目录），
 前端已切到 tsz-rust 对接（当前只落地 auth 核心，其余端点见 api-client 契约测试
 PENDING 白名单）；本仓库只管前端与部署编排。

@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 
-export const EXPECTED_NODE_VERSION = "22.23.1";
+export const EXPECTED_NODE_VERSION = "24.19.0";
 
 export function assertExpectedNodeVersion(actualVersion) {
   const normalizedVersion = actualVersion.replace(/^v/, "");

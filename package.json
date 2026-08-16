@@ -26,11 +26,11 @@
     "prepare": "lefthook install || true"
   },
   "engines": {
-    "node": "22.23.1",
+    "node": "24.19.0",
     "pnpm": "10.33.0"
   },
   "volta": {
-    "node": "22.23.1",
+    "node": "24.19.0",
     "pnpm": "10.33.0"
   },
   "devDependencies": {

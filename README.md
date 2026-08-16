@@ -13,7 +13,7 @@
 
 ## 本地运行环境
 
-- Node.js 固定为 `22.23.1`，执行 `nvm use`（或使用支持 `.node-version` 的版本管理器）切换。
+- Node.js 固定为 `24.19.0`，执行 `nvm use`（或使用支持 `.node-version` 的版本管理器）切换。
 - pnpm 固定为 `10.33.0`，由根 `package.json` 的 `packageManager` 与 Volta 配置统一管理。
 - 安装依赖前会校验 Node 版本；版本不一致时先切换运行时，不要绕过 `engine-strict`。
 

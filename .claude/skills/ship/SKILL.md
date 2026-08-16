@@ -153,7 +153,7 @@ A–G 是逐维度找问题，这一步把改动当**一个整体**快速扫一�
 - 把 PR 链接以 markdown 链接形式返回给用户。
 
 ## 项目事实速查
-- pnpm + turbo monorepo；Node ≥ 22。
+- pnpm + turbo monorepo；Node = 24.19.0。
 - 钩子：pre-commit=prettier+eslint(按包)，commit-msg=commitlint(conventional)，pre-push=typecheck+test:cov。
 - e2e 很慢，本地不跑（pre-push 也不跑），交给 CI 的 e2e job 兜底；test:cov 在审查阶段跑一次用于评估。
 - 推送后若要合并，以 CI 全绿（含 e2e）为准，不以本地 hook 通过为准。
