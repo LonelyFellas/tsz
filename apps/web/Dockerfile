@@ -2,7 +2,7 @@
 # Build context MUST be the repo root (pnpm workspace needs the lockfile and all
 # workspace packages). Build from the repo root with:
 #   docker build -f apps/web/Dockerfile -t tsz-web .
-FROM node:22.23.1-alpine AS base
+FROM node:24.19.0-alpine AS base
 RUN corepack enable
 WORKDIR /app
 # China mirror for npm tarballs — big speed win on a mainland ECS. Override with

@@ -10,13 +10,13 @@ const readRepositoryFile = (path) =>
   readFile(new URL(`../${path}`, import.meta.url), "utf8");
 
 test("accepts only the pinned Node runtime", () => {
-  assert.doesNotThrow(() => assertExpectedNodeVersion("22.23.1"));
-  assert.doesNotThrow(() => assertExpectedNodeVersion("v22.23.1"));
+  assert.doesNotThrow(() => assertExpectedNodeVersion("24.19.0"));
+  assert.doesNotThrow(() => assertExpectedNodeVersion("v24.19.0"));
 
-  for (const version of ["21.7.3", "22.23.0", "22.24.0", "24.18.0", "25.9.0"]) {
+  for (const version of ["22.23.1", "24.18.1", "24.19.1", "25.9.0"]) {
     assert.throws(
       () => assertExpectedNodeVersion(version),
-      /Node\.js 22\.23\.1 is required.*Run "nvm use"/
+      /Node\.js 24\.19\.0 is required.*Run "nvm use"/
     );
   }
 });
@@ -50,14 +50,44 @@ test("package manager and install guards stay aligned", async () => {
   assert.match(packageJson.scripts["test:cov"], /^pnpm check:node && /);
 });
 
-test("CI and Docker builds use the same pinned Node runtime", async () => {
-  const [ci, adminDockerfile, webDockerfile] = await Promise.all([
+test("CI, Docker, and native deployment use the same pinned Node runtime", async () => {
+  const [
+    ci,
+    adminDockerfile,
+    webDockerfile,
+    deployWeb,
+    webService,
+    claudeInstructions,
+    agentShipSkill,
+    claudeShipSkill,
+    foundationReadme
+  ] = await Promise.all([
     readRepositoryFile(".github/workflows/ci.yml"),
     readRepositoryFile("apps/admin/Dockerfile"),
-    readRepositoryFile("apps/web/Dockerfile")
+    readRepositoryFile("apps/web/Dockerfile"),
+    readRepositoryFile("deploy/deploy-web.sh"),
+    readRepositoryFile("deploy/systemd/tsz-web.service"),
+    readRepositoryFile("CLAUDE.md"),
+    readRepositoryFile(".agents/skills/ship/SKILL.md"),
+    readRepositoryFile(".claude/skills/ship/SKILL.md"),
+    readRepositoryFile("docs/foundation/README.md")
   ]);
   assert.equal((ci.match(/node-version-file: \.nvmrc/g) ?? []).length, 3);
   assert.doesNotMatch(ci, /node-version:\s*\d+/);
-  assert.match(adminDockerfile, /^FROM node:22\.23\.1-alpine AS base/m);
-  assert.match(webDockerfile, /^FROM node:22\.23\.1-alpine AS base/m);
+  assert.match(adminDockerfile, /^FROM node:24\.19\.0-alpine AS base/m);
+  assert.match(webDockerfile, /^FROM node:24\.19\.0-alpine AS base/m);
+  assert.match(deployWeb, /required_node_version="v\$\(.*\.node-version\)"/);
+  assert.match(deployWeb, /ssh tshb-test '\/usr\/bin\/node --version'/);
+  assert.ok(
+    deployWeb.indexOf("server_node_version=") <
+      deployWeb.indexOf('echo "==> build @tsz/web')
+  );
+  assert.match(
+    webService,
+    /^ExecStart=\/usr\/bin\/node apps\/web\/server\.js/m
+  );
+  assert.match(claudeInstructions, /Node = 24\.19\.0/);
+  assert.match(agentShipSkill, /Node = 24\.19\.0/);
+  assert.match(claudeShipSkill, /Node = 24\.19\.0/);
+  assert.match(foundationReadme, /统一使用 \*\*24\.19\.0\*\*/);
 });
