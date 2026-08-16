@@ -9,6 +9,7 @@ function row(overrides: Partial<AdminWordListItem> = {}): AdminWordListItem {
     id: "w-1",
     headword: "centre",
     kind: "word",
+    dialects: ["common"],
     gloss: "中心",
     pos_list: ["noun"],
     levels: ["A1"],

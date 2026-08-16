@@ -57,6 +57,16 @@ import { newWordNodeId } from "./word-model/primitives";
 
 const { RangePicker } = DatePicker;
 
+function shortWordId(id: string) {
+  return id.slice(-8);
+}
+
+const DIALECT_LABEL: Record<AdminWordListItem["dialects"][number], string> = {
+  uk: "BrE",
+  us: "AmE",
+  common: "Common"
+};
+
 export function SmartDictionary() {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
@@ -241,10 +251,15 @@ export function SmartDictionary() {
       width: 120,
       fixed: "left",
       ellipsis: { showTitle: false },
-      render: (w: string) => (
-        <Tooltip title={w}>
-          <span tabIndex={0} style={{ display: "block", fontWeight: 600 }}>
-            {w}
+      render: (w: string, record) => (
+        <Tooltip
+          title={`${w} · ${record.id} · ${record.dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")}`}
+        >
+          <span tabIndex={0} style={{ display: "block" }}>
+            <span style={{ display: "block", fontWeight: 600 }}>{w}</span>
+            <Typography.Text type="secondary" code>
+              {shortWordId(record.id)}
+            </Typography.Text>
           </span>
         </Tooltip>
       )
@@ -259,6 +274,14 @@ export function SmartDictionary() {
           {KIND_LABEL[k]}
         </Tag>
       )
+    },
+    {
+      title: "方言",
+      dataIndex: "dialects",
+      width: 110,
+      responsive: ["sm"],
+      render: (dialects: AdminWordListItem["dialects"]) =>
+        dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")
     },
     {
       title: "释义",

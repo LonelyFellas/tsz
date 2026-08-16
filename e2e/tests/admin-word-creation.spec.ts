@@ -32,6 +32,23 @@ async function createCenterDraft(
 }
 
 test.describe("admin 新建单词 V2", () => {
+  test("同名 workspace 列表保留两行并按精确 ID 查看", async ({ page }) => {
+    await mockAdminApi(page, { sameHeadwordList: true });
+    await page.goto("/words");
+
+    await expect(page.getByText("workspace", { exact: true })).toHaveCount(2);
+    await expect(page.getByText("a1b2c3d4", { exact: true })).toBeVisible();
+    await expect(page.getByText("e5f6a7b8", { exact: true })).toBeVisible();
+    await expect(page.getByText("工作空间", { exact: true })).toBeVisible();
+    await expect(page.getByText("协作空间", { exact: true })).toBeVisible();
+
+    const secondRow = page.locator("tbody tr", { hasText: "e5f6a7b8" });
+    await secondRow.getByRole("button", { name: "继续创建" }).click();
+    await expect(page).toHaveURL(
+      /\/words\/workspace-entry-e5f6a7b8\/wizard\/forms$/
+    );
+  });
+
   test("创建入口向导显示单词、短语与中性语义", async ({ page }) => {
     await mockAdminApi(page);
 

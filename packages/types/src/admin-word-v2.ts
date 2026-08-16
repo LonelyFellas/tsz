@@ -222,7 +222,11 @@ export interface DetectionSurfaceMatchPreviewV2 {
   match_category: SurfaceMatchCategoryV2;
   existing_word_id: string;
   existing_headword: string;
+  existing_kind: "word" | "phrase";
   existing_status: "draft" | "published" | "archived";
+  existing_dialect: "uk" | "us" | "common";
+  pos_labels: string[];
+  gloss_previews: string[];
 }
 
 export interface DetectionSurfaceWarningAuditV2 {

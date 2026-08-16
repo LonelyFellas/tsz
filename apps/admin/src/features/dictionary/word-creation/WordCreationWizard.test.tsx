@@ -481,14 +481,22 @@ describe("WordCreationWizard", () => {
             match_category: "headword_form",
             existing_word_id: "01a00492-d889-71e0-a9a3-e053a0a093e6",
             existing_headword: "workspace",
-            existing_status: "draft"
+            existing_kind: "word",
+            existing_status: "draft",
+            existing_dialect: "common",
+            pos_labels: ["noun"],
+            gloss_previews: ["工作空间"]
           },
           {
             match_id: "match-archived",
             match_category: "exact_headword",
             existing_word_id: "01a00492-d889-71e0-a9a3-e053a0a093e7",
             existing_headword: "workspaces",
-            existing_status: "archived"
+            existing_kind: "word",
+            existing_status: "archived",
+            existing_dialect: "uk",
+            pos_labels: ["noun"],
+            gloss_previews: ["多个工作空间"]
           }
         ],
         truncated: true

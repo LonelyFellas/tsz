@@ -47,6 +47,7 @@ function word(id: string, headword: string): AdminWordListItem {
     id,
     headword,
     kind: "word",
+    dialects: ["common"],
     gloss: "释义",
     pos_list: ["noun"],
     levels: ["A1"],
@@ -89,7 +90,13 @@ function idleMutation() {
 }
 
 function LocationProbe() {
-  return <span data-testid="location">{useLocation().search}</span>;
+  const location = useLocation();
+  return (
+    <span data-testid="location">
+      {location.pathname}
+      {location.search}
+    </span>
+  );
 }
 
 beforeEach(() => {
@@ -124,6 +131,68 @@ afterEach(() => {
 });
 
 describe("SmartDictionary", () => {
+  it("同名词条保留两行并按各自 ID 查看和归档", async () => {
+    matchViewport(1440);
+    const first: AdminWordListItem = {
+      ...word("01a00492-d889-71e0-a9a3-e053a0a093e6", "workspace"),
+      dialects: ["common"],
+      gloss: "工作空间"
+    };
+    const second: AdminWordListItem = {
+      ...word("01a00492-d889-71e0-a9a3-e053a0a093e7", "workspace"),
+      kind: "phrase" as const,
+      dialects: ["uk"],
+      gloss: "协作空间"
+    };
+    const mutateAsync = vi.fn().mockResolvedValue({ word: second });
+    apiMocks.useArchiveWord.mockReturnValue({
+      ...idleMutation(),
+      mutateAsync
+    });
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [first, second],
+        page: { page: 1, page_size: 20, total: 2 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    expect(screen.getAllByText("workspace")).toHaveLength(2);
+    expect(screen.getByText("a0a093e6")).toBeVisible();
+    expect(screen.getByText("a0a093e7")).toBeVisible();
+    expect(screen.getByText("工作空间")).toBeVisible();
+    expect(screen.getByText("协作空间")).toBeVisible();
+    expect(screen.getByText("BrE")).toBeVisible();
+
+    const secondRow = screen.getByText("a0a093e7").closest("tr")!;
+    fireEvent.click(secondRow.querySelectorAll("td:last-child button")[1]!);
+    fireEvent.click(
+      (await screen.findAllByText("归 档", { exact: true }))
+        .map((item) => item.closest("button"))
+        .find((item) => item?.closest(".ant-modal"))!
+    );
+    await waitFor(() =>
+      expect(mutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ wordId: second.id })
+      )
+    );
+
+    const firstRow = screen.getByText("a0a093e6").closest("tr")!;
+    fireEvent.click(firstRow.querySelector("td:last-child button")!);
+    expect(screen.getByTestId("location")).toHaveTextContent(first.id);
+  });
+
   it("手机宽度只保留完整的词汇与操作列", () => {
     matchViewport(390);
     render(
@@ -219,7 +288,7 @@ describe("SmartDictionary", () => {
       });
       expect(screen.getByLabelText("关键字")).toHaveValue("");
       expect(screen.queryByText("已归档")).toBeNull();
-      expect(screen.getByTestId("location")).toHaveTextContent("");
+      expect(screen.getByTestId("location")).toHaveTextContent("/words");
     });
   });
 
