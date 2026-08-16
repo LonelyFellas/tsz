@@ -8,6 +8,7 @@ import type {
 import type { AdminWordListQuery } from "@tsz/types";
 import {
   keepPreviousData,
+  useInfiniteQuery,
   useMutation,
   useQuery,
   useQueryClient
@@ -20,7 +21,12 @@ export const wordKeys = {
   list: (query: AdminWordListQuery) => [...wordKeys.lists(), query] as const,
   stats: () => [...wordKeys.all, "stats"] as const,
   detail: (id: string) => [...wordKeys.all, "detail", id] as const,
-  relatedSearch: (q: string) => [...wordKeys.all, "related-search", q] as const
+  relatedSearch: (q: string) => [...wordKeys.all, "related-search", q] as const,
+  relatedSearchV2: (
+    q: string,
+    kind: "word" | "phrase" | undefined,
+    matchMode: "exact" | "contains"
+  ) => [...wordKeys.all, "related-search-v2", q, kind, matchMode] as const
 };
 
 export function useWordList(query: AdminWordListQuery) {
@@ -57,6 +63,45 @@ export function useRelatedSearch(q: string, open: boolean) {
     queryFn: () => adminWordsDataSource.relatedSearch(q),
     enabled: open && q.trim() !== ""
   });
+}
+
+export function useRelatedSearchV2(
+  q: string,
+  kind: "word" | "phrase" | undefined,
+  open: boolean
+) {
+  const normalizedQ = q.trim();
+  const enabled = open && normalizedQ !== "";
+  const exact = useInfiniteQuery({
+    queryKey: wordKeys.relatedSearchV2(normalizedQ, kind, "exact"),
+    queryFn: ({ pageParam }) =>
+      adminWordsDataSource.relatedSearch(normalizedQ, {
+        kind,
+        match_mode: "exact",
+        page_size: 20,
+        cursor: pageParam
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) =>
+      "next_cursor" in page ? (page.next_cursor ?? undefined) : undefined,
+    enabled
+  });
+  const contains = useInfiniteQuery({
+    queryKey: wordKeys.relatedSearchV2(normalizedQ, kind, "contains"),
+    queryFn: ({ pageParam }) =>
+      adminWordsDataSource.relatedSearch(normalizedQ, {
+        kind,
+        match_mode: "contains",
+        exclude_exact: true,
+        page_size: 20,
+        cursor: pageParam
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) =>
+      "next_cursor" in page ? (page.next_cursor ?? undefined) : undefined,
+    enabled
+  });
+  return { exact, contains };
 }
 
 /** 写操作共用:词条数据变更后,列表、统计、详情缓存全部失效。 */

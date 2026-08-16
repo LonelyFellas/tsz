@@ -235,6 +235,95 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     ]);
   });
 
+  it("关联词搜索 V2 分页字段与匹配模式来自 Rust snapshot", () => {
+    expect(
+      snapshot.operationQueryParameters[
+        "get /admin/lexicon/entries/related-search"
+      ]
+    ).toEqual([
+      {
+        name: "cursor",
+        in: "query",
+        required: false,
+        schema: { type: "string" }
+      },
+      {
+        name: "exclude_exact",
+        in: "query",
+        required: false,
+        schema: { type: "boolean" }
+      },
+      {
+        name: "kind",
+        in: "query",
+        required: false,
+        schema: { $ref: "#/components/schemas/EntryKind" }
+      },
+      {
+        name: "limit",
+        in: "query",
+        required: false,
+        schema: {
+          type: "integer",
+          format: "int32",
+          default: 20,
+          minimum: 1,
+          maximum: 100
+        }
+      },
+      {
+        name: "match_mode",
+        in: "query",
+        required: false,
+        schema: { $ref: "#/components/schemas/RelatedSearchMatchMode" }
+      },
+      {
+        name: "page_size",
+        in: "query",
+        required: false,
+        schema: {
+          type: "integer",
+          format: "int32",
+          minimum: 1,
+          maximum: 100
+        }
+      },
+      {
+        name: "q",
+        in: "query",
+        required: false,
+        schema: { type: "string" }
+      }
+    ]);
+    expect(snapshot.schemas.RelatedSearchMatchMode.enum).toEqual([
+      "exact",
+      "contains"
+    ]);
+    expect(snapshot.schemas.RelatedSearchResponse.oneOf).toEqual([
+      { $ref: "#/components/schemas/RelatedSearchLegacyResponse" },
+      { $ref: "#/components/schemas/RelatedSearchV2Response" }
+    ]);
+    expect(
+      snapshot.schemas.RelatedSearchLegacyResponse.additionalProperties
+    ).toBe(false);
+    expect(snapshot.schemas.RelatedSearchV2Response.additionalProperties).toBe(
+      false
+    );
+    expect(snapshot.schemas.RelatedSearchV2Response.required).toEqual([
+      "results",
+      "total",
+      "next_cursor"
+    ]);
+    expect(
+      snapshot.schemas.RelatedSearchV2Response.properties.next_cursor
+    ).toEqual({ type: ["string", "null"] });
+    expect(snapshot.schemas.RelatedSearchV2Response.properties.total).toEqual({
+      type: "integer",
+      format: "int64",
+      minimum: 0
+    });
+  });
+
   it("surface warning/page/create/problem 契约全部来自同一 Rust snapshot", () => {
     expect(
       specPaths["/admin/lexicon/surface-match-snapshots/{snapshot_id}"]

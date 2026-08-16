@@ -23,6 +23,9 @@ const out = resolve(here, "../src/openapi.snapshot.json");
 
 const API_PREFIX = "/api/v1";
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
+const QUERY_CONTRACT_OPERATIONS = new Set([
+  "get /admin/lexicon/entries/related-search"
+]);
 
 const spec = load(readFileSync(source, "utf8"));
 if (!spec?.paths) {
@@ -73,6 +76,12 @@ const contractSchemaNames = [
   "PreviewFormsImpactInputV2",
   "SaveFormsStepInput",
   "SaveMeaningsStepInput",
+  "RelatedWordSense",
+  "RelatedWordResult",
+  "RelatedSearchMatchMode",
+  "RelatedSearchLegacyResponse",
+  "RelatedSearchV2Response",
+  "RelatedSearchResponse",
   "FormsImpactItemV2",
   "FormsImpactNodeType",
   "FormsImpactResponseV2",
@@ -97,6 +106,7 @@ for (const name of contractSchemaNames) {
 
 const paths = {};
 const operationHeaders = {};
+const operationQueryParameters = {};
 for (const [rawPath, item] of Object.entries(spec.paths)) {
   const path = rawPath.startsWith(API_PREFIX)
     ? rawPath.slice(API_PREFIX.length)
@@ -129,6 +139,26 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
     if (headers.length > 0) {
       operationHeaders[`${method} ${path}`] = headers;
     }
+
+    const operationKey = `${method} ${path}`;
+    if (QUERY_CONTRACT_OPERATIONS.has(operationKey)) {
+      operationQueryParameters[operationKey] = parameters
+        .filter((parameter) => parameter?.in === "query")
+        .map((parameter) => {
+          if (!parameter.name || !parameter.schema) {
+            throw new Error(
+              `无法快照未内联的 query 参数: ${method} ${rawPath}`
+            );
+          }
+          return {
+            name: parameter.name,
+            in: parameter.in,
+            required: parameter.required === true,
+            schema: parameter.schema
+          };
+        })
+        .sort((left, right) => left.name.localeCompare(right.name));
+    }
   }
 }
 
@@ -140,6 +170,7 @@ const snapshot = {
   _generatedAt: new Date().toISOString(),
   paths,
   operationHeaders,
+  operationQueryParameters,
   schemas: {
     AdminWordV2: {
       required: adminWordV2.required,

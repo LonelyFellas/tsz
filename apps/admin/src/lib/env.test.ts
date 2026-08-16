@@ -14,6 +14,7 @@ describe("env", () => {
     vi.stubEnv("VITE_VOICE_EDITOR", undefined);
     vi.stubEnv("VITE_VOICE_PREVIEW", undefined);
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
+    vi.stubEnv("VITE_RELATED_SEARCH_V2", undefined);
     vi.resetModules();
     const { env } = await import("./env");
     expect(env.API_BASE_URL).toBe("/api/v1");
@@ -22,6 +23,7 @@ describe("env", () => {
     expect(env.VOICE_EDITOR).toBe(true);
     expect(env.VOICE_PREVIEW).toBe(true);
     expect(env.ADMIN_TTS_MOCK).toBe(true);
+    expect(env.RELATED_SEARCH_V2).toBe(false);
   });
 
   it("采用配置的 API 基址", async () => {
@@ -57,7 +59,9 @@ describe("env", () => {
     ["VITE_VOICE_PREVIEW", "true", true],
     ["VITE_VOICE_PREVIEW", "false", false],
     ["VITE_ADMIN_TTS_MOCK", "true", true],
-    ["VITE_ADMIN_TTS_MOCK", "false", false]
+    ["VITE_ADMIN_TTS_MOCK", "false", false],
+    ["VITE_RELATED_SEARCH_V2", "true", true],
+    ["VITE_RELATED_SEARCH_V2", "false", false]
   ] as const)("严格解析 %s=%s", async (name, value, expected) => {
     vi.stubEnv(name, value);
     vi.resetModules();
@@ -67,7 +71,8 @@ describe("env", () => {
       | "ADMIN_PART_OF_SPEECH_MOCK"
       | "VOICE_EDITOR"
       | "VOICE_PREVIEW"
-      | "ADMIN_TTS_MOCK";
+      | "ADMIN_TTS_MOCK"
+      | "RELATED_SEARCH_V2";
     expect(env[key]).toBe(expected);
   });
 

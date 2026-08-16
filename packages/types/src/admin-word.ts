@@ -101,6 +101,8 @@ export interface RelatedWordResult {
   word_id: string;
   headword: string;
   kind: AdminWordKind;
+  dialects: Dialect[];
+  pos_labels: string[];
   senses: RelatedWordSense[];
 }
 
@@ -110,6 +112,27 @@ export interface RelatedWordSense {
   gloss: string;
 }
 
-export interface RelatedSearchResponse {
+export interface RelatedSearchLegacyResponse {
   results: RelatedWordResult[];
+}
+
+export interface RelatedSearchV2Response {
+  results: RelatedWordResult[];
+  total: number;
+  next_cursor: string | null;
+}
+
+export type RelatedSearchResponse =
+  RelatedSearchLegacyResponse | RelatedSearchV2Response;
+
+export type RelatedSearchMatchMode = "exact" | "contains";
+
+export interface RelatedSearchQuery {
+  kind?: AdminWordKind;
+  match_mode?: RelatedSearchMatchMode;
+  exclude_exact?: boolean;
+  page_size?: number;
+  /** deprecated legacy alias; cannot be combined with page_size */
+  limit?: number;
+  cursor?: string;
 }

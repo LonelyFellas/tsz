@@ -12,6 +12,7 @@ import type {
   CreateAdminWordV2Input,
   DetectWordInputV2,
   DetectWordResponseV2,
+  Dialect,
   DialectVariantSuggestionItemV2,
   DraftFormsStepContent,
   DraftMeaningsStepContent,
@@ -30,6 +31,7 @@ import type {
   PreviewFormsImpactResponseV2,
   PublishAdminWordV2Input,
   RelatedSearchResponse,
+  RelatedSearchQuery,
   RelatedWordSense,
   RichText,
   SaveFormsStepInput,
@@ -4124,20 +4126,31 @@ export function createAdminWordsMock({
 
   async function relatedSearch(
     q: string,
-    opts?: { kind?: "word" | "phrase"; limit?: number }
+    opts?: RelatedSearchQuery
   ): Promise<RelatedSearchResponse> {
     await pause();
     const { state: current } = context();
     const query = q.trim().toLocaleLowerCase("en");
-    if (!query) return { results: [] };
-    const limit = Math.min(100, Math.max(1, opts?.limit ?? 20));
+    if (!query)
+      return opts?.match_mode
+        ? { results: [], total: 0, next_cursor: null }
+        : { results: [] };
+    const limit = Math.min(
+      100,
+      Math.max(1, opts?.page_size ?? opts?.limit ?? 20)
+    );
+    const offset = Math.max(0, Number(opts?.cursor ?? 0) || 0);
     const results = Object.values(current.words)
       .filter((word) => {
         const kind = word.kind;
         return (
           word.status === "published" &&
           (!opts?.kind || kind === opts.kind) &&
-          displayHeadword(word).toLocaleLowerCase("en").includes(query)
+          (opts?.match_mode === "exact"
+            ? displayHeadword(word).toLocaleLowerCase("en") === query
+            : displayHeadword(word).toLocaleLowerCase("en").includes(query)) &&
+          (!opts?.exclude_exact ||
+            displayHeadword(word).toLocaleLowerCase("en") !== query)
         );
       })
       .map((word) => {
@@ -4156,11 +4169,35 @@ export function createAdminWordsMock({
           word_id: word.id,
           headword: displayHeadword(displayedWord),
           kind: word.kind,
+          dialects:
+            displayedWord.headwords.mode === "unified"
+              ? (["common"] as Dialect[])
+              : (["uk", "us"] as Dialect[]),
+          pos_labels: displayedWord.meanings.pos.map((pos) => pos.pos_id),
           senses
         };
       })
-      .slice(0, limit);
-    return { results: clone(results) };
+      .sort((left, right) =>
+        [left.kind, left.headword.toLocaleLowerCase("en"), left.word_id]
+          .join("\0")
+          .localeCompare(
+            [
+              right.kind,
+              right.headword.toLocaleLowerCase("en"),
+              right.word_id
+            ].join("\0")
+          )
+      );
+    const page = results.slice(offset, offset + limit);
+    if (!opts?.match_mode) return { results: clone(page) };
+    return {
+      results: clone(page),
+      total: results.length,
+      next_cursor:
+        offset + page.length < results.length
+          ? String(offset + page.length)
+          : null
+    };
   }
 
   function clearSession(): void {
