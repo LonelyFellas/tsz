@@ -131,6 +131,7 @@ interface Props {
   word: AdminWordV2;
   readOnly?: boolean;
   onSaved: (word: AdminWordV2) => void;
+  onDraftChange?: (content: DraftMeaningsStepContent) => void;
 }
 
 export const meaningDialectSuggestionBatchRunner = {
@@ -517,30 +518,34 @@ function EnglishTextEditor({
     if (env.VOICE_EDITOR) {
       return (
         <div data-word-node-id={clientId} data-word-field="content">
-          <VoiceTextControl
-            value={value.common.value}
-            contextLabel="英语文本"
-            toolbarLabel={toolbarLabel}
-            readOnly={readOnly}
-            onChange={(content) =>
-              onChange(setEnglishRichText(value, "common", content))
-            }
-          />
+          <div data-word-node-id={clientId} data-word-field="content.common">
+            <VoiceTextControl
+              value={value.common.value}
+              contextLabel="英语文本"
+              toolbarLabel={toolbarLabel}
+              readOnly={readOnly}
+              onChange={(content) =>
+                onChange(setEnglishRichText(value, "common", content))
+              }
+            />
+          </div>
         </div>
       );
     }
     return (
-      <Input.TextArea
-        aria-label="英语文本"
-        data-word-node-id={clientId}
-        data-word-field="content"
-        value={value.common.value.text}
-        readOnly={readOnly}
-        autoSize={{ minRows: 2, maxRows: 6 }}
-        onChange={(event) =>
-          onChange(setEnglishText(value, "common", event.target.value))
-        }
-      />
+      <div data-word-node-id={clientId} data-word-field="content">
+        <Input.TextArea
+          aria-label="英语文本"
+          data-word-node-id={clientId}
+          data-word-field="content.common"
+          value={value.common.value.text}
+          readOnly={readOnly}
+          autoSize={{ minRows: 2, maxRows: 6 }}
+          onChange={(event) =>
+            onChange(setEnglishText(value, "common", event.target.value))
+          }
+        />
+      </div>
     );
   }
   const dialect = activeDialect;
@@ -550,43 +555,45 @@ function EnglishTextEditor({
       ? slot.variant.value
       : ({ version: 2, text: "", annotations: [] } satisfies RichText);
   return (
-    <div
-      className={`word-meaning-dialect-panel dialect-panel-${dialect}`}
-      data-word-node-id={clientId}
-      data-word-field="content"
-    >
-      {env.VOICE_EDITOR ? (
-        <VoiceTextControl
-          value={slotValue}
-          contextLabel={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
-          toolbarLabel={toolbarLabel}
-          readOnly={readOnly}
-          onChange={(content) =>
-            onChange(setEnglishRichText(value, dialect, content))
-          }
-        />
-      ) : (
-        <Input.TextArea
-          aria-label={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
-          value={slot.state === "ready" ? slot.variant.value.text : ""}
-          readOnly={readOnly}
-          placeholder={
-            slot.state === "missing" ? "待自动补全，也可直接填写" : undefined
-          }
-          autoSize={{ minRows: 2, maxRows: 6 }}
-          onChange={(event) =>
-            onChange(setEnglishText(value, dialect, event.target.value))
-          }
-        />
-      )}
-      <Flex justify="space-between" align="center" style={{ marginTop: 5 }}>
-        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-          {slot.state === "ready"
-            ? `来源：${slot.variant.origin}`
-            : "待补全，可直接手工填写"}
-        </Typography.Text>
-        {dialect === value.source_dialect && <Tag color="blue">源文本</Tag>}
-      </Flex>
+    <div data-word-node-id={clientId} data-word-field="content">
+      <div
+        className={`word-meaning-dialect-panel dialect-panel-${dialect}`}
+        data-word-node-id={clientId}
+        data-word-field={`content.${dialect}`}
+      >
+        {env.VOICE_EDITOR ? (
+          <VoiceTextControl
+            value={slotValue}
+            contextLabel={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
+            toolbarLabel={toolbarLabel}
+            readOnly={readOnly}
+            onChange={(content) =>
+              onChange(setEnglishRichText(value, dialect, content))
+            }
+          />
+        ) : (
+          <Input.TextArea
+            aria-label={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
+            value={slot.state === "ready" ? slot.variant.value.text : ""}
+            readOnly={readOnly}
+            placeholder={
+              slot.state === "missing" ? "待自动补全，也可直接填写" : undefined
+            }
+            autoSize={{ minRows: 2, maxRows: 6 }}
+            onChange={(event) =>
+              onChange(setEnglishText(value, dialect, event.target.value))
+            }
+          />
+        )}
+        <Flex justify="space-between" align="center" style={{ marginTop: 5 }}>
+          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+            {slot.state === "ready"
+              ? `来源：${slot.variant.origin}`
+              : "待补全，可直接手工填写"}
+          </Typography.Text>
+          {dialect === value.source_dialect && <Tag color="blue">源文本</Tag>}
+        </Flex>
+      </div>
     </div>
   );
 }
@@ -686,11 +693,29 @@ function GrammarEditor({
               const variant = grammar.variants.find(
                 (item) => item.dialect === dialect
               );
-              if (!variant) return null;
+              if (!variant) {
+                return (
+                  <div
+                    className={`dialect-panel dialect-panel-${dialect}`}
+                    data-word-node-id={grammar.id}
+                    data-word-field={`content.${dialect}`}
+                    key={dialect}
+                    tabIndex={0}
+                  >
+                    <Alert
+                      type="warning"
+                      showIcon
+                      title={`${DIALECT_SHORT_LABEL[dialect]}语法结构尚未填写`}
+                    />
+                  </div>
+                );
+              }
               return (
                 <div
                   className={`dialect-panel dialect-panel-${dialect}`}
                   key={variant.id}
+                  data-word-node-id={grammar.id}
+                  data-word-field="content"
                 >
                   <Flex
                     className="word-dialect-panel-header"
@@ -719,7 +744,7 @@ function GrammarEditor({
                     {env.VOICE_EDITOR ? (
                       <div
                         data-word-node-id={grammar.id}
-                        data-word-field="content"
+                        data-word-field={`content.${dialect}`}
                       >
                         <VoiceTextControl
                           value={variant.content}
@@ -741,7 +766,7 @@ function GrammarEditor({
                         className="word-pronunciation-phonetic-input"
                         aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
                         data-word-node-id={grammar.id}
-                        data-word-field="content"
+                        data-word-field={`content.${dialect}`}
                         value={variant.content.text}
                         readOnly={readOnly}
                         placeholder="例如 a centre / the centre"
@@ -883,6 +908,8 @@ function DefinitionEditor({
       <Space orientation="vertical" size={8}>
         <Select
           aria-label="释义等级"
+          data-word-node-id={value.id}
+          data-word-field="level"
           value={value.level}
           options={CEFR_OPTIONS}
           disabled={readOnly}
@@ -972,6 +999,8 @@ function DefinitionEditor({
         )}
         <Select
           aria-label="绑定语法结构"
+          data-word-node-id={value.id}
+          data-word-field="grammar_structure_id"
           allowClear
           placeholder="绑定语法结构（可选）"
           value={value.grammar_structure_id}
@@ -1153,6 +1182,8 @@ function SentenceEditor({
       <span className="word-number-cell">{index + 1}</span>
       <Select
         aria-label="例句等级"
+        data-word-node-id={value.id}
+        data-word-field="level"
         value={value.level}
         options={CEFR_OPTIONS}
         disabled={readOnly}
@@ -1191,6 +1222,8 @@ function SentenceEditor({
             <Typography.Text strong>汉语译文</Typography.Text>
             <Input.TextArea
               aria-label="汉语译文"
+              data-word-node-id={value.id}
+              data-word-field="zh_text"
               value={value.zh_text.text}
               readOnly={readOnly}
               placeholder="请输入汉语译文"
@@ -1787,6 +1820,8 @@ function SenseEditor({
                   <Typography.Text type="secondary">词义等级</Typography.Text>
                   <Select
                     aria-label="词义等级"
+                    data-word-node-id={value.id}
+                    data-word-field="level"
                     value={value.level}
                     options={CEFR_OPTIONS}
                     disabled={readOnly}
@@ -1997,7 +2032,12 @@ function senseGroupOptionLabel(
   return `${nameZh} / ${nameEn}`;
 }
 
-export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
+export function MeaningsAndExamplesStep({
+  word,
+  readOnly,
+  onSaved,
+  onDraftChange
+}: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const editQuery = word.status === "published" ? "?mode=edit" : "";
@@ -2034,6 +2074,12 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
     ? content.pos.find((pos) => meaningsPosOwnsNode(pos, issueTarget.nodeId))
         ?.pos_id
     : undefined;
+  const issueDialect: MeaningDialect | undefined =
+    issueTarget?.field === "content.uk"
+      ? "uk"
+      : issueTarget?.field === "content.us"
+        ? "us"
+        : undefined;
 
   useEffect(() => {
     if (issueOwnerPosId) setActivePosId(issueOwnerPosId);
@@ -2057,6 +2103,14 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
       }
     }
   }, [dirty, word, word.revision]);
+
+  useEffect(() => {
+    if (issueDialect) setActiveDialect(issueDialect);
+  }, [issueDialect]);
+
+  useEffect(() => {
+    onDraftChange?.(content);
+  }, [content, onDraftChange]);
 
   const updateContent = (next: DraftMeaningsStepContent) => {
     contentRef.current = next;
@@ -2173,7 +2227,12 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
   const save = async (intent: StepSaveIntent) => {
     if (saving || fillingDialect !== undefined) return;
     if (intent === "complete") {
-      const issues = validateMeanings(content);
+      const issues = validateMeanings(content, {
+        word_id: word.id,
+        headwords: word.headwords,
+        forms: word.forms,
+        partOfSpeechLookup
+      });
       setValidationMessages(issues);
       if (issues.length > 0) {
         message.warning(`还有 ${issues.length} 项需要完善`);
@@ -2545,6 +2604,8 @@ export function MeaningsAndExamplesStep({ word, readOnly, onSaved }: Props) {
 
         <Card
           className="word-sense-groups-card"
+          data-word-node-id={word.id}
+          data-word-field="sense_groups"
           size="small"
           title="语义区间"
           extra={

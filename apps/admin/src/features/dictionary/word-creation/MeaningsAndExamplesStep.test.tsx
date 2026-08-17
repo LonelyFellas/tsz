@@ -304,6 +304,7 @@ function renderStep(
   issueTarget?: { nodeId: string; field?: string }
 ) {
   const onSaved = vi.fn();
+  const onDraftChange = vi.fn();
   const router = createMemoryRouter(
     [
       {
@@ -314,6 +315,7 @@ function renderStep(
               word={word}
               readOnly={readOnly}
               onSaved={onSaved}
+              onDraftChange={onDraftChange}
             />
             <LocationProbe />
           </>
@@ -338,7 +340,7 @@ function renderStep(
       <RouterProvider router={router} />
     </AntApp>
   );
-  return { onSaved, router, ...view };
+  return { onSaved, onDraftChange, router, ...view };
 }
 
 beforeEach(() => {
@@ -377,6 +379,27 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("MeaningsAndExamplesStep", () => {
+  it("向上游持续提供当前未保存草稿用于实时完成度", async () => {
+    const { onDraftChange } = renderStep(wordFixture({ ready: true }));
+    await waitFor(() => expect(onDraftChange).toHaveBeenCalled());
+    onDraftChange.mockClear();
+
+    fireEvent.change(screen.getByLabelText("中文释义"), {
+      target: { value: "更新后的释义" }
+    });
+
+    await waitFor(() => {
+      const latest = onDraftChange.mock.lastCall?.[0] as
+        DraftMeaningsStepContent | undefined;
+      const definition = latest?.pos[0]?.senses[0]?.definitions[0];
+      expect(
+        definition && "text" in definition.content
+          ? definition.content.text
+          : undefined
+      ).toBe("更新后的释义");
+    });
+  });
+
   it("从词形读音构造 IPA 提示，优先词典音标且不覆盖首个同名词形", () => {
     const forms = structuredClone(wordFixture().forms);
     const sample = forms.pos[0]!.base_form.variants[0]!;
@@ -1669,6 +1692,53 @@ describe("MeaningsAndExamplesStep", () => {
       expect(target).not.toBeNull();
       expect(target).toHaveClass("word-validation-focus");
       expect(target).toContainElement(document.activeElement as HTMLElement);
+    });
+  });
+
+  it("空语义区间定位到集合卡片并聚焦添加按钮", async () => {
+    const word = wordFixture({ ready: true });
+    word.meanings.sense_groups = [];
+    renderStep(word, false, {
+      nodeId: word.id,
+      field: "sense_groups"
+    });
+
+    await waitFor(() => {
+      const target = document.querySelector<HTMLElement>(
+        `[data-word-node-id="${word.id}"][data-word-field="sense_groups"]`
+      );
+      expect(target).not.toBeNull();
+      expect(target).toHaveClass("word-validation-focus");
+      expect(target).toContainElement(document.activeElement as HTMLElement);
+      expect(document.activeElement).toHaveTextContent("添加语义区间");
+    });
+  });
+
+  it("定位非当前方言内容时切换方言并聚焦真实输入框", async () => {
+    const word = wordFixture({ ready: true });
+    const sentence = word.meanings.pos[0]!.senses[0]!.sentences[0]!;
+    if (sentence.en_text.mode !== "distinguish") {
+      throw new Error("fixture must distinguish dialects");
+    }
+    if (word.headwords.mode !== "distinguish") {
+      throw new Error("fixture must distinguish headwords");
+    }
+    expect(word.headwords.source_dialect).toBe("us");
+    sentence.en_text.uk = { state: "missing" };
+
+    renderStep(word, false, {
+      nodeId: sentence.id,
+      field: "content.uk"
+    });
+
+    await waitFor(() => {
+      const target = document.querySelector<HTMLElement>(
+        `[data-word-node-id="${sentence.id}"][data-word-field="content.uk"]`
+      );
+      expect(target).not.toBeNull();
+      expect(target).toHaveClass("word-validation-focus");
+      expect(target).toContainElement(document.activeElement as HTMLElement);
+      expect(document.activeElement).toHaveAccessibleName("英式英语文本");
     });
   });
 

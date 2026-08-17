@@ -11,7 +11,13 @@ import type {
 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import type { PartOfSpeechLookup } from "../part-of-speech/catalog";
 import { WORD_STEP_ORDER, WORD_STEP_TITLE, wordDisplayHeadword } from "./model";
+import {
+  buildWordReadiness,
+  type ReadinessTarget,
+  type WordReadinessDraft
+} from "./readiness";
 import "./word-creation.css";
 
 interface Props {
@@ -21,6 +27,9 @@ interface Props {
   currentStep: WordCreationStep;
   readOnly?: boolean;
   onStepChange?: (step: WordCreationStep) => void;
+  readinessDraft?: WordReadinessDraft;
+  partOfSpeechLookup?: PartOfSpeechLookup;
+  onReadinessNavigate?: (target: ReadinessTarget) => void;
   children: ReactNode;
 }
 
@@ -59,67 +68,45 @@ function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
   );
 }
 
-function ProgressSummary({ word }: { word?: AdminWordV2 }) {
-  const senseGroupCount = word
-    ? Math.max(1, word.meanings.sense_groups.length)
-    : 0;
-  const grammarCount =
-    word?.meanings.pos.reduce(
-      (sum, pos) => sum + pos.grammar_structures.length,
-      0
-    ) ?? 0;
-  const senseCount =
-    word?.meanings.pos.reduce((sum, pos) => sum + pos.senses.length, 0) ?? 0;
-  const sentenceCount =
-    word?.meanings.pos.reduce(
-      (sum, pos) =>
-        sum +
-        pos.senses.reduce(
-          (senseSum, sense) => senseSum + sense.sentences.length,
-          0
-        ),
-      0
-    ) ?? 0;
-  const formCount =
-    word?.forms.pos.reduce(
-      (sum, pos) =>
-        sum +
-        pos.form_groups.reduce(
-          (groupSum, group) => groupSum + group.slots.length,
-          0
-        ),
-      0
-    ) ?? 0;
-  const completed = new Set(word?.completed_steps ?? []);
-  const rows = [
-    { label: "方言识别", value: completed.has("basics") ? "完成" : "待完成" },
-    {
-      label: "基本词性",
-      value: word?.forms.pos.length ?? 0
-    },
-    { label: "词形变化", value: formCount },
-    { label: "语义区间", value: senseGroupCount },
-    { label: "语法结构", value: grammarCount },
-    { label: "多维词义", value: senseCount },
-    { label: "多维例句", value: sentenceCount }
-  ];
+function ProgressSummary({
+  word,
+  draft,
+  partOfSpeechLookup,
+  onNavigate
+}: {
+  word?: AdminWordV2;
+  draft?: WordReadinessDraft;
+  partOfSpeechLookup?: PartOfSpeechLookup;
+  onNavigate?: (target: ReadinessTarget) => void;
+}) {
+  const rows = buildWordReadiness(word, draft, partOfSpeechLookup);
   return (
     <Flex vertical gap={13} className="word-creation-progress-list">
-      {rows.map((row, index) => {
-        const done =
-          index === 0
-            ? completed.has("basics")
-            : typeof row.value === "number" && row.value > 0;
+      {rows.map((row) => {
+        const done = row.state === "complete";
+        const value =
+          row.key === "dialect"
+            ? done
+              ? "完成"
+              : "待完成"
+            : `${row.completed}/${row.total}`;
         return (
-          <div className="word-creation-progress-row" key={row.label}>
+          <button
+            type="button"
+            className="word-creation-progress-row"
+            data-readiness-state={row.state}
+            disabled={!row.target || !onNavigate}
+            key={row.key}
+            onClick={() => row.target && onNavigate?.(row.target)}
+          >
             {done ? (
               <CheckCircleFilled className="word-progress-done" />
             ) : (
               <ClockCircleOutlined className="word-progress-wait" />
             )}
             <span>{row.label}</span>
-            <Typography.Text type="secondary">{row.value}</Typography.Text>
-          </div>
+            <Typography.Text type="secondary">{value}</Typography.Text>
+          </button>
         );
       })}
     </Flex>
@@ -133,6 +120,9 @@ export function WordCreationLayout({
   currentStep,
   readOnly,
   onStepChange,
+  readinessDraft,
+  partOfSpeechLookup,
+  onReadinessNavigate,
   children
 }: Props) {
   const navigate = useNavigate();
@@ -236,7 +226,12 @@ export function WordCreationLayout({
             </Typography.Text>
             <Tag variant="filled">实时</Tag>
           </div>
-          <ProgressSummary word={word} />
+          <ProgressSummary
+            word={word}
+            draft={readinessDraft}
+            partOfSpeechLookup={partOfSpeechLookup}
+            onNavigate={onReadinessNavigate}
+          />
         </section>
 
         <main

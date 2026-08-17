@@ -1417,6 +1417,27 @@ describe("FormsAndPronunciationStep", () => {
     });
   });
 
+  it("readiness 读音目标聚焦到真实的首个无效叶字段", async () => {
+    const word = wordFixture({ ready: true });
+    const pronunciation =
+      word.forms.pos[0]!.base_form.variants[0]!.pronunciations[0]!;
+    pronunciation.dict_phonetic = "";
+
+    renderStep(word, {
+      nodeId: pronunciation.id,
+      field: "dict_phonetic"
+    });
+
+    await waitFor(() => {
+      const target = document.querySelector<HTMLInputElement>(
+        `[data-word-node-id="${pronunciation.id}"][data-word-field="dict_phonetic"]`
+      );
+      expect(target).not.toBeNull();
+      expect(target).toHaveClass("word-validation-focus");
+      expect(document.activeElement).toBe(target);
+    });
+  });
+
   it("校验定位后手动切换词性，输入时不再跳回原词性", async () => {
     renderStep(undefined, {
       nodeId: "suggested-base-noun",

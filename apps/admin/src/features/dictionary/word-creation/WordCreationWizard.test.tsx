@@ -100,11 +100,18 @@ vi.mock("./WordCreationLayout", () => ({
     entryKind,
     currentStep,
     onStepChange,
+    onReadinessNavigate,
     children
   }: {
     entryKind?: AdminWordV2["kind"];
     currentStep: string;
     onStepChange?: (step: "basics" | "forms" | "meanings" | "preview") => void;
+    onReadinessNavigate?: (target: {
+      step: "meanings";
+      pos_id: string;
+      node_id: string;
+      field: string;
+    }) => void;
     children: React.ReactNode;
   }) => (
     <div>
@@ -115,6 +122,18 @@ vi.mock("./WordCreationLayout", () => ({
         layout-meanings
       </button>
       <button onClick={() => onStepChange?.("preview")}>layout-preview</button>
+      <button
+        onClick={() =>
+          onReadinessNavigate?.({
+            step: "meanings",
+            pos_id: "pos-noun",
+            node_id: "grammar-noun",
+            field: "grammar_structures"
+          })
+        }
+      >
+        layout-readiness-target
+      </button>
       {children}
     </div>
   )
@@ -176,6 +195,25 @@ beforeEach(() => {
 });
 
 describe("WordCreationWizard", () => {
+  it("完成情况定位目标导航到可达步骤并保留编辑 query", async () => {
+    loaded(
+      wordFixture({
+        status: "published",
+        ready: true,
+        max_reachable_step: "preview"
+      })
+    );
+    renderWizard("resume", "/words/word-center/wizard/forms?mode=edit");
+
+    fireEvent.click(screen.getByText("layout-readiness-target"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "/words/word-center/wizard/meanings?mode=edit"
+      )
+    );
+  });
+
   it("从 query 恢复创建入口意图，未知或缺失时保持中性", () => {
     const phrase = renderWizard("create", "/words/new?kind=phrase");
     expect(screen.getByText("layout-kind-phrase")).toBeVisible();
