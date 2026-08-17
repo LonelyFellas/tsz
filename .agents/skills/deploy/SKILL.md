@@ -107,6 +107,10 @@ worktree 构建：
 ```
 
 脚本必须成功完成本地 Next standalone 构建、rsync、`tsz-web` 重启、nginx 校验/重载及 smoke。
+脚本还会再次执行 clean/exact-main/精确 CI 门禁，拒绝 Next 会读取的 ignored `.env*`，并用
+allowlist 环境构建。它对远端 web 的不可变 release 内容复算 SHA-256（严格 schema 只固定排除
+正常流量会改写的 `apps/web/.next/cache`），并只在 smoke
+成功后原子发布 `/opt/tsz-deploy-manifests/web.json`。manifest 验证失败等同部署失败。
 若重启瞬间页面返回 `502`，只读检查 `systemctl status tsz-web` 与日志，并在 30 秒内重试页面；
 只有恢复 `200` 且 API 为预期 `401` 才继续，不能因为脚本退出码为 0 就忽略错误。
 
@@ -118,7 +122,8 @@ worktree 构建：
 ./deploy/deploy-admin.sh
 ```
 
-脚本必须成功完成 Vite 构建、仅同步 `apps/admin/dist/`、nginx 校验/重载及页面/API smoke。
+脚本必须拒绝 Vite test mode 会读取的 ignored `.env*`，使用 allowlist 环境完成 Vite 构建、仅同步 `apps/admin/dist/`、nginx 校验/重载及页面/API smoke。
+脚本会独立生成并验证 `/opt/tsz-deploy-manifests/admin.json`；web manifest不能替代 admin manifest。
 失败时停止并明确说明是否已形成“web 成功、admin 失败”的部分部署。
 
 ### 6. 独立验证
@@ -131,15 +136,20 @@ curl -sS -o /dev/null -w "%{http_code}" http://47.121.142.19/api/v1/auth/me # 40
 ssh tshb-test 'curl -fsS -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/' # 200
 ssh tshb-test 'curl -sS -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/api/v1/admin/profile' # 401
 ssh tshb-test 'systemctl is-active tsz-web && nginx -t'
+ssh tshb-test '/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify --manifest /opt/tsz-deploy-manifests/web.json --artifact-root /opt/tsz-web'
+ssh tshb-test '/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify --manifest /opt/tsz-deploy-manifests/admin.json --artifact-root /opt/tsz-admin/dist'
 ```
 
 期望 web/admin 均为 `200`，未登录 API 均为 `401`，`tsz-web` 为 `active`，nginx 配置有效。
+两条 manifest verify 还必须输出与目标 SHA一致的 `git_sha`、精确 `ci_run_id`、实际
+`artifact_sha256/file_count` 和非空 `accepted_at`。不得只读取 JSON而跳过制品复算。
 
 ### 7. 汇报
 
 - CI 仍在运行时：简短说明目标 SHA、未完成的 check，以及已创建/复用监控；明确全绿后会自动继续部署。
 - 最终结束时：给出目标 SHA/subject、CI 结论、web/admin 部署结果、`tsz-web` 与 nginx 状态、
-  web/admin HTTP 状态码和两条 API 反代状态码。
+  web/admin HTTP 状态码、两条 API 反代状态码，以及两份 manifest 的 Git SHA、CI run、artifact
+  SHA-256/file_count 和 verify 结论。
 
 ## 故障排查
 
@@ -150,6 +160,8 @@ ssh tshb-test 'systemctl is-active tsz-web && nginx -t'
 | `tsz-web` 非 active         | 只读检查 `systemctl status`、`journalctl -u tsz-web`；不绕开部署脚本手工拼产物 |
 | nginx 校验失败              | 不强制 reload；保留现有运行配置并回报 `nginx -t` 输出                          |
 | web 成功但 admin 失败       | 明确报告部分部署，不声称整体成功                                               |
+| manifest 与制品摘要不一致   | 停止；该组件未验收，检查 rsync/staging，禁止手工改 JSON                        |
+| 只有旧 manifest             | 说明制品已变但来源记录未前进，按失败处理并回退或重新精确部署                   |
 | API 返回 `404`/`502`/`5xx`  | 属于 nginx/后端路由诊断；只读排查，不重启或修改 tsz-rust                       |
 | `/opt/tshb-react` 不存在    | 正常现状；该路径和服务器 Git/Docker 部署已废弃，必须使用 `deploy/deploy-*.sh`  |
 
@@ -160,3 +172,4 @@ ssh tshb-test 'systemctl is-active tsz-web && nginx -t'
 - **绝不在服务器创建/修复前端 Git checkout，也不运行废弃的根 `deploy.sh`/Docker Compose 流程**。
 - **绝不动 `/opt/tsz-rust`、后端服务、数据库或运行数据**。
 - 部署的必须是 main 的内容；不部署 feature 独有代码，不绕过仓库部署脚本的构建与验证。
+- **不得手工创建、补写或编辑正式 manifest**；只有部署脚本在远端摘要复核与 smoke成功后才能原子发布。

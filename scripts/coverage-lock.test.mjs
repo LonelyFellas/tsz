@@ -210,6 +210,6 @@ test("the canonical coverage command always enters through the locked runner", a
   );
   assert.equal(
     packageJson.scripts["test:cov"],
-    "pnpm check:node && pnpm test:node-runtime && pnpm test:coverage-lock && node scripts/run-coverage-locked.mjs"
+    "pnpm check:node && pnpm test:node-runtime && pnpm test:coverage-lock && pnpm test:deploy-provenance && node scripts/run-coverage-locked.mjs"
   );
 });
