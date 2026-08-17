@@ -65,6 +65,25 @@ run_sanitized_build() {
   env -i PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" "$@"
 }
 
+wait_for_http_status() {
+  local label="$1"
+  local url="$2"
+  local expected_status="$3"
+  local max_attempts="$4"
+  local retry_delay="$5"
+  local attempt status
+
+  for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+    status="$(curl -sS -m 8 -o /dev/null -w "%{http_code}" "$url" || true)"
+    printf '%s attempt %d/%d -> %s\n' \
+      "$label" "$attempt" "$max_attempts" "${status:-curl-error}"
+    [[ "$status" = "$expected_status" ]] && return 0
+    ((attempt == max_attempts)) || sleep "$retry_delay"
+  done
+
+  return 1
+}
+
 prepare_deploy_source() {
   local component="$1"
   command -v gh >/dev/null 2>&1 || {

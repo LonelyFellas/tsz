@@ -19,6 +19,7 @@
 | S05 | Shell 集成  | origin/run 元数据注入      | 非 GitHub origin、异常 repo/URL/run ID                          | fail closed，不执行输入                                    | P0      |
 | S06 | Shell 集成  | ignored 构建环境文件       | Next/Vite 会读取的 ignored `.env*` 存在                         | build 前 fail closed                                       | P0      |
 | S07 | Shell 集成  | build 环境 allowlist       | 父进程含未授权变量                                              | build 子进程看不到，仅显式变量保留                         | P0      |
+| S08 | Shell 集成  | web 启动窗口 smoke         | 首次 502 后恢复 200；或持续 502                                 | 限定次数内重试；成功后继续，超限仍 fail closed             | P0      |
 | P01 | Python 单元 | api manifest正常生成       | 合法 source/CI + 临时二进制                                     | 原子写正式 schema v1，sha256/file_count=1                  | P0      |
 | P02 | Python 单元 | api 篡改检测               | manifest后修改二进制                                            | verify失败                                                 | P0      |
 | P03 | Python 单元 | api schema/输入严格校验    | 缺失/额外字段、非法 SHA/URL/run/component/path                  | 全部拒绝                                                   | P0      |

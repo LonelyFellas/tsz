@@ -82,9 +82,10 @@ rsync -az deploy/nginx/tshb-test.conf tshb-test:/etc/nginx/conf.d/tsz.conf
 ssh tshb-test 'systemctl daemon-reload && systemctl restart tsz-web && nginx -t && systemctl reload nginx'
 
 echo "==> smoke"
-web_code=$(curl -sS -m 8 -o /dev/null -w "%{http_code}" http://47.121.142.19/)
-echo "GET / -> ${web_code}"
-[ "$web_code" = "200" ] || { echo "!! web 页面异常"; exit 1; }
+wait_for_http_status "GET /" "http://47.121.142.19/" 200 7 5 || {
+  echo "!! web 页面在 30 秒启动窗口内未恢复"
+  exit 1
+}
 code=$(curl -sS -m 8 -o /dev/null -w "%{http_code}" http://47.121.142.19/api/v1/auth/me)
 echo "GET /api/v1/auth/me -> ${code} (无 token，预期 401)"
 [ "$code" = "401" ] || { echo "!! API 反代异常"; exit 1; }
