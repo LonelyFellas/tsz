@@ -21,6 +21,7 @@ import {
   useCreateContentCompletionJob,
   useRetryContentCompletionJob
 } from "./api";
+import { newWordNodeId } from "../word-model/primitives";
 import { applyContentCompletion } from "./contentCompletion";
 
 const sessionKey = (wordId: string) => `word-content-completion:${wordId}`;
@@ -91,7 +92,7 @@ export function ContentCompletionPanel({
     setApplySummary(undefined);
     try {
       const response = await createJob.mutateAsync({
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: newWordNodeId(),
         base_revision: word.revision,
         scope: ["grammar_structures", "meanings", "examples"],
         fill_policy: "missing_only"
@@ -148,7 +149,7 @@ export function ContentCompletionPanel({
     baselineRef.current = JSON.stringify(content);
     try {
       await retryJob.mutateAsync({
-        idempotency_key: crypto.randomUUID(),
+        idempotency_key: newWordNodeId(),
         pos_ids: posIds
       });
     } catch (error) {

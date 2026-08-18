@@ -1,6 +1,6 @@
 import { App } from "antd";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContentCompletionJobEnvelope } from "@tsz/types";
 import { ContentCompletionPanel } from "./ContentCompletionPanel";
 import { completeMeanings, wordFixture } from "./wordCreation.test.helper";
@@ -92,6 +92,10 @@ beforeEach(() => {
   window.sessionStorage.clear();
 });
 
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
 describe("ContentCompletionPanel", () => {
   it("进入页面不自动请求，只有点击按钮才创建真实任务", async () => {
     const { word } = renderPanel();
@@ -154,6 +158,25 @@ describe("ContentCompletionPanel", () => {
       })
     );
     expect(screen.getByTitle("timed out")).toBeInTheDocument();
+  });
+
+  it("HTTP 非安全上下文缺少 randomUUID 时仍可创建和重试任务", async () => {
+    const originalCrypto = globalThis.crypto;
+    vi.stubGlobal("crypto", {
+      randomUUID: undefined,
+      getRandomValues: originalCrypto.getRandomValues.bind(originalCrypto)
+    });
+    renderPanel();
+    const failed = api.response!.job.partitions[0]!;
+    failed.status = "failed";
+    api.response!.job.status = "partial";
+
+    fireEvent.click(screen.getByRole("button", { name: "自动生成" }));
+    await waitFor(() => expect(api.create).toHaveBeenCalledTimes(1));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "重试失败词性" })
+    );
+    await waitFor(() => expect(api.retry).toHaveBeenCalledTimes(1));
   });
 
   it("全失败时不展示回填按钮并允许重新生成", async () => {
