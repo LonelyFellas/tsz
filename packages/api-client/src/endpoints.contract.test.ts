@@ -19,6 +19,8 @@ const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries/archive-batch",
   "post /admin/lexicon/entries/restore-batch",
   "post /admin/lexicon/entries/{id}/archive",
+  "post /admin/lexicon/entries/{id}/content-completion-jobs",
+  "post /admin/lexicon/entries/{id}/content-completion-jobs/{job_id}/retries",
   "post /admin/lexicon/entries/{id}/publications",
   "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate",
   "post /admin/lexicon/entries/{id}/restore"

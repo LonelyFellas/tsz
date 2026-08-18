@@ -84,6 +84,7 @@ import {
   toWordRichText
 } from "../word-model/primitives";
 import { useSaveMeaningsStep, useSuggestDialectVariants } from "./api";
+import { ContentCompletionPanel } from "./ContentCompletionPanel";
 import {
   PronunciationPreviewControls,
   PronunciationPreviewProvider
@@ -2507,6 +2508,14 @@ export function MeaningsAndExamplesStep({
           按词性维护语法结构、词义、四类释义、双语例句和关系词。例句会自动保留指向当前词义的锁定主关联。
         </Typography.Paragraph>
       </div>
+
+      <ContentCompletionPanel
+        key={word.id}
+        word={word}
+        content={content}
+        readOnly={readOnly}
+        onApply={updateContent}
+      />
 
       {readOnly && (
         <Alert

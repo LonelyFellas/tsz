@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/inflection-visibility-b8/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-16T12:43:50.353Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-18T06:29:08.456Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -19,6 +19,11 @@
     "/admin/lexicon/entries/stats": ["get"],
     "/admin/lexicon/entries/{id}": ["delete", "get"],
     "/admin/lexicon/entries/{id}/archive": ["post"],
+    "/admin/lexicon/entries/{id}/content-completion-jobs": ["post"],
+    "/admin/lexicon/entries/{id}/content-completion-jobs/{job_id}": ["get"],
+    "/admin/lexicon/entries/{id}/content-completion-jobs/{job_id}/retries": [
+      "post"
+    ],
     "/admin/lexicon/entries/{id}/publications": ["post"],
     "/admin/lexicon/entries/{id}/publications/{publication_id}/activate": [
       "post"
@@ -77,6 +82,22 @@
       }
     ],
     "post /admin/lexicon/entries/{id}/archive": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/entries/{id}/content-completion-jobs": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/entries/{id}/content-completion-jobs/{job_id}/retries": [
       {
         "name": "Idempotency-Key",
         "in": "header",
@@ -1487,6 +1508,178 @@
             "$ref": "#/components/schemas/DialectVariantSuggestionItemV2"
           }
         }
+      }
+    },
+    "ContentCompletionScope": {
+      "type": "string",
+      "enum": ["grammar_structures", "meanings", "examples"]
+    },
+    "ContentCompletionFillPolicy": {
+      "type": "string",
+      "enum": ["missing_only"]
+    },
+    "ContentCompletionJobStatus": {
+      "type": "string",
+      "enum": ["pending", "running", "completed", "partial", "failed"]
+    },
+    "ContentCompletionPartitionStatus": {
+      "type": "string",
+      "enum": ["pending", "running", "completed", "missing", "failed"]
+    },
+    "CreateContentCompletionJobInput": {
+      "type": "object",
+      "required": ["base_revision", "scope", "fill_policy"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "fill_policy": {
+          "$ref": "#/components/schemas/ContentCompletionFillPolicy"
+        },
+        "scope": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/ContentCompletionScope" },
+          "maxItems": 3,
+          "minItems": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "RetryContentCompletionJobInput": {
+      "type": "object",
+      "required": ["pos_ids"],
+      "properties": {
+        "pos_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "maxItems": 32,
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "ContentCompletionDictionaryProvenance": {
+      "type": "object",
+      "required": ["provider", "dataset_version", "source_record_keys"],
+      "properties": {
+        "dataset_version": { "type": "string" },
+        "provider": { "type": "string" },
+        "source_record_keys": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "ContentCompletionGenerationProvenance": {
+      "type": "object",
+      "required": ["provider", "model", "prompt_version"],
+      "properties": {
+        "model": { "type": "string" },
+        "prompt_version": { "type": "string" },
+        "provider": { "type": "string" }
+      }
+    },
+    "ContentCompletionEvidenceKind": {
+      "type": "string",
+      "enum": [
+        "dictionary_grounded_translation",
+        "model_inferred",
+        "model_generated"
+      ]
+    },
+    "ContentCompletionFieldOrigins": {
+      "type": "object",
+      "required": ["grammar_structures", "meanings", "examples", "cefr"],
+      "properties": {
+        "cefr": {
+          "$ref": "#/components/schemas/ContentCompletionEvidenceKind"
+        },
+        "examples": {
+          "$ref": "#/components/schemas/ContentCompletionEvidenceKind"
+        },
+        "grammar_structures": {
+          "$ref": "#/components/schemas/ContentCompletionEvidenceKind"
+        },
+        "meanings": {
+          "$ref": "#/components/schemas/ContentCompletionEvidenceKind"
+        }
+      }
+    },
+    "ContentCompletionProvenance": {
+      "type": "object",
+      "required": ["dictionary", "generation", "field_origins", "generated_at"],
+      "properties": {
+        "dictionary": {
+          "$ref": "#/components/schemas/ContentCompletionDictionaryProvenance"
+        },
+        "field_origins": {
+          "$ref": "#/components/schemas/ContentCompletionFieldOrigins"
+        },
+        "generated_at": { "type": "string", "format": "date-time" },
+        "generation": {
+          "$ref": "#/components/schemas/ContentCompletionGenerationProvenance"
+        }
+      }
+    },
+    "ContentCompletionPartition": {
+      "type": "object",
+      "required": ["pos_id", "pos", "status", "attempt"],
+      "properties": {
+        "attempt": { "type": "integer", "format": "int32" },
+        "error_code": { "type": ["string", "null"] },
+        "error_detail": { "type": ["string", "null"] },
+        "pos": { "type": "string" },
+        "pos_id": { "type": "string", "format": "uuid" },
+        "provenance": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/ContentCompletionProvenance" }
+          ]
+        },
+        "status": {
+          "$ref": "#/components/schemas/ContentCompletionPartitionStatus"
+        }
+      }
+    },
+    "ContentCompletionJob": {
+      "type": "object",
+      "required": [
+        "id",
+        "entry_id",
+        "base_revision",
+        "status",
+        "requested_scope",
+        "fill_policy",
+        "partitions",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "fill_policy": {
+          "$ref": "#/components/schemas/ContentCompletionFillPolicy"
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "partitions": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/ContentCompletionPartition" }
+        },
+        "requested_scope": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/ContentCompletionScope" }
+        },
+        "result": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/DraftMeaningsStepContent" }
+          ]
+        },
+        "status": { "$ref": "#/components/schemas/ContentCompletionJobStatus" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    },
+    "ContentCompletionJobEnvelope": {
+      "type": "object",
+      "required": ["job"],
+      "properties": {
+        "job": { "$ref": "#/components/schemas/ContentCompletionJob" }
       }
     },
     "VoiceCapabilities": {

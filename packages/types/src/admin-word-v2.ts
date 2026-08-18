@@ -194,6 +194,74 @@ export interface DraftMeaningsStepContent {
   pos: WordPosMeaningsV2[];
 }
 
+export type ContentCompletionScope =
+  "grammar_structures" | "meanings" | "examples";
+export type ContentCompletionFillPolicy = "missing_only";
+export type ContentCompletionJobStatus =
+  "pending" | "running" | "completed" | "partial" | "failed";
+export type ContentCompletionPartitionStatus =
+  "pending" | "running" | "completed" | "missing" | "failed";
+
+export interface CreateContentCompletionJobInput {
+  base_revision: number;
+  scope: ContentCompletionScope[];
+  fill_policy: ContentCompletionFillPolicy;
+}
+
+export interface RetryContentCompletionJobInput {
+  pos_ids: string[];
+}
+
+export type ContentCompletionEvidenceKind =
+  "dictionary_grounded_translation" | "model_inferred" | "model_generated";
+
+export interface ContentCompletionProvenance {
+  dictionary: {
+    provider: string;
+    dataset_version: string;
+    source_record_keys: string[];
+  };
+  generation: {
+    provider: string;
+    model: string;
+    prompt_version: string;
+  };
+  field_origins: {
+    grammar_structures: ContentCompletionEvidenceKind;
+    meanings: ContentCompletionEvidenceKind;
+    examples: ContentCompletionEvidenceKind;
+    cefr: ContentCompletionEvidenceKind;
+  };
+  generated_at: string;
+}
+
+export interface ContentCompletionPartition {
+  pos_id: string;
+  pos: string;
+  status: ContentCompletionPartitionStatus;
+  attempt: number;
+  error_code?: string;
+  error_detail?: string;
+  provenance?: ContentCompletionProvenance;
+}
+
+export interface ContentCompletionJob {
+  id: string;
+  entry_id: string;
+  base_revision: number;
+  status: ContentCompletionJobStatus;
+  requested_scope: ContentCompletionScope[];
+  fill_policy: ContentCompletionFillPolicy;
+  partitions: ContentCompletionPartition[];
+  result?: DraftMeaningsStepContent;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContentCompletionJobEnvelope {
+  job: ContentCompletionJob;
+}
+
 export interface DictionaryProviderV2 {
   name: string;
   version: string;

@@ -20,6 +20,8 @@ import type {
   CreateAdminInput,
   CreateAdminSpeechPreviewInput,
   CreateAdminWordV2Input,
+  CreateContentCompletionJobInput,
+  ContentCompletionJobEnvelope,
   CreateAdminResponse,
   CreateRoleRequest,
   DeleteDraftInput,
@@ -43,6 +45,7 @@ import type {
   RelatedSearchResponse,
   RelatedSearchQuery,
   ResetPasswordResponse,
+  RetryContentCompletionJobInput,
   RoleListResponse,
   SaveFormsStepInput,
   SaveMeaningsStepInput,
@@ -211,6 +214,34 @@ export function createAdminEndpoints(http: HttpClient) {
         http.put<AdminWordV2Envelope>(
           `/lexicon/entries/${wordId}/steps/meanings`,
           input
+        ),
+      /** POST .../content-completion-jobs — 创建真实内容生成任务。 */
+      createContentCompletionJob: (
+        wordId: string,
+        idempotencyKey: string,
+        input: CreateContentCompletionJobInput
+      ) =>
+        http.post<ContentCompletionJobEnvelope>(
+          `/lexicon/entries/${wordId}/content-completion-jobs`,
+          input,
+          { headers: { "Idempotency-Key": idempotencyKey } }
+        ),
+      /** GET .../content-completion-jobs/{jobId} — 查询任务和候选内容。 */
+      getContentCompletionJob: (wordId: string, jobId: string) =>
+        http.get<ContentCompletionJobEnvelope>(
+          `/lexicon/entries/${wordId}/content-completion-jobs/${jobId}`
+        ),
+      /** POST .../retries — 仅重试失败或缺失分区。 */
+      retryContentCompletionJob: (
+        wordId: string,
+        jobId: string,
+        idempotencyKey: string,
+        input: RetryContentCompletionJobInput
+      ) =>
+        http.post<ContentCompletionJobEnvelope>(
+          `/lexicon/entries/${wordId}/content-completion-jobs/${jobId}/retries`,
+          input,
+          { headers: { "Idempotency-Key": idempotencyKey } }
         ),
       /** POST /admin/lexicon/entries/{id}/validate。 */
       validateV2: (wordId: string, input: ValidateAdminWordV2Input) =>

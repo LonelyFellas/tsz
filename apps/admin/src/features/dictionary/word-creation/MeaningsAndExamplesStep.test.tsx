@@ -154,7 +154,24 @@ vi.mock("./api", () => ({
   useSuggestDialectVariants: () => ({
     mutateAsync: mutations.suggest,
     isPending: false
+  }),
+  useCreateContentCompletionJob: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false
+  }),
+  useContentCompletionJob: () => ({
+    data: undefined,
+    isError: false,
+    refetch: vi.fn()
+  }),
+  useRetryContentCompletionJob: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false
   })
+}));
+
+vi.mock("./ContentCompletionPanel", () => ({
+  ContentCompletionPanel: () => null
 }));
 
 vi.mock("../part-of-speech/api", async () => {
