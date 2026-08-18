@@ -4,6 +4,11 @@ import { wordFixture } from "../wordCreation.test.helper";
 import {
   countPosMeaningIssues,
   englishTextComplete,
+  englishTextIssueField,
+  grammarStructureIssueTarget,
+  wordSenseComplete,
+  wordSenseIssueTarget,
+  wordSentenceIssueTarget,
   validateMeanings
 } from "./validation";
 
@@ -56,6 +61,119 @@ describe("meanings and examples validation", () => {
 
   it("完整 fixture 无校验问题", () => {
     expect(validateMeanings(wordFixture({ ready: true }).meanings)).toEqual([]);
+  });
+
+  it("英语、语法和例句 issue target 精确到首个无效叶字段", () => {
+    const unified = {
+      mode: "unified",
+      common: {
+        id: "common",
+        origin: "manual",
+        value: { version: 1, text: "", spans: [], liaisons: [] }
+      }
+    } satisfies EnglishTextV2;
+    expect(englishTextIssueField(unified)).toBe("content.common");
+    unified.common.value.text = "complete";
+    expect(englishTextIssueField(unified)).toBeUndefined();
+
+    const word = wordFixture({ ready: true });
+    const grammar = structuredClone(
+      word.meanings.pos[0]!.grammar_structures[0]!
+    );
+    const usGrammar = grammar.variants.find(
+      (variant) => variant.dialect === "us"
+    )!;
+    grammar.variants = grammar.variants.filter(
+      (variant) => variant.dialect !== "us"
+    );
+    expect(grammarStructureIssueTarget(grammar, word.headwords)).toEqual({
+      node_id: grammar.id,
+      field: "content.us"
+    });
+    grammar.variants.push(usGrammar);
+    grammar.variants.push({ ...usGrammar, id: "duplicate-us" });
+    expect(grammarStructureIssueTarget(grammar, word.headwords)).toEqual({
+      node_id: grammar.id,
+      field: "content"
+    });
+
+    const sense = word.meanings.pos[0]!.senses[0]!;
+    const sentence = structuredClone(sense.sentences[0]!);
+    expect(
+      wordSentenceIssueTarget(sentence, sense.id, word.id)
+    ).toBeUndefined();
+
+    sentence.level = "invalid" as never;
+    expect(wordSentenceIssueTarget(sentence, sense.id, word.id)).toEqual({
+      node_id: sentence.id,
+      field: "level"
+    });
+    sentence.level = "A1";
+    if (sentence.en_text.mode !== "distinguish") {
+      throw new Error("fixture must distinguish dialects");
+    }
+    const ukText = sentence.en_text.uk;
+    sentence.en_text.uk = { state: "missing" };
+    expect(wordSentenceIssueTarget(sentence, sense.id, word.id)).toEqual({
+      node_id: sentence.id,
+      field: "content.uk"
+    });
+    sentence.en_text.uk = ukText;
+    sentence.zh_text.text = "";
+    expect(wordSentenceIssueTarget(sentence, sense.id, word.id)).toEqual({
+      node_id: sentence.id,
+      field: "zh_text"
+    });
+    sentence.zh_text.text = "完整译文";
+    sentence.links = [];
+    expect(wordSentenceIssueTarget(sentence, sense.id, word.id)).toEqual({
+      node_id: sentence.id,
+      field: "sentence"
+    });
+  });
+
+  it("词义 issue target 覆盖无效语法引用与关系词字段", () => {
+    const word = wordFixture({ ready: true });
+    const pos = word.meanings.pos[0]!;
+    const sense = structuredClone(pos.senses[0]!);
+    const senseGroupIds = new Set(
+      word.meanings.sense_groups.map((group) => group.id)
+    );
+    const grammarIds = new Set(
+      pos.grammar_structures.map((grammar) => grammar.id)
+    );
+
+    expect(wordSenseComplete(sense, senseGroupIds, grammarIds)).toBe(true);
+
+    sense.definitions[0]!.grammar_structure_id = "missing-grammar";
+    expect(wordSenseIssueTarget(sense, senseGroupIds, grammarIds)).toEqual({
+      node_id: sense.definitions[0]!.id,
+      field: "grammar_structure_id"
+    });
+    delete sense.definitions[0]!.grammar_structure_id;
+
+    sense.relations = [
+      {
+        id: "relation",
+        relation: "synonym",
+        target_word_id: "",
+        target_sense_id: "",
+        score: "50"
+      }
+    ];
+    expect(wordSenseIssueTarget(sense, senseGroupIds, grammarIds)).toEqual({
+      node_id: "relation",
+      field: "target_word_id"
+    });
+
+    sense.relations[0]!.target_word_id = "target-word";
+    sense.relations[0]!.target_sense_id = "target-sense";
+    sense.relations[0]!.score = "invalid";
+    expect(wordSenseIssueTarget(sense, senseGroupIds, grammarIds)).toEqual({
+      node_id: "relation",
+      field: "score"
+    });
+    expect(wordSenseComplete(sense, senseGroupIds, grammarIds)).toBe(false);
   });
 
   it("按稳定顺序汇总并去重语义区间、语法、词义、释义、例句与关系问题", () => {

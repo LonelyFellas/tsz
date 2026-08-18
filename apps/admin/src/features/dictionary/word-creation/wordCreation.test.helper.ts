@@ -4,7 +4,8 @@ import type {
   DraftFormsStepContent,
   DraftMeaningsStepContent,
   EnglishTextV2,
-  WordHeadwordsV2
+  WordHeadwordsV2,
+  WordSubPos
 } from "@tsz/types";
 import {
   createDetectionFixture,
@@ -65,7 +66,8 @@ function readyEnglishText(
 
 export function completeMeanings(
   content: DraftMeaningsStepContent,
-  headwords: WordHeadwordsV2
+  headwords: WordHeadwordsV2,
+  forms?: DraftFormsStepContent
 ): DraftMeaningsStepContent {
   const senseGroups = content.sense_groups.map((group, index) => ({
     ...group,
@@ -73,6 +75,22 @@ export function completeMeanings(
     name_en: group.name_en.trim() || `Semantic range ${index + 1}`
   }));
   const defaultSenseGroupId = senseGroups[0]!.id;
+  const defaultSubPos: Record<string, WordSubPos> = {
+    noun: "N-COUNT",
+    pronoun: "PRON",
+    verb: "V-T",
+    adjective: "ADJ",
+    adverb: "ADV",
+    preposition: "PREP",
+    article: "ART",
+    determiner: "DET",
+    conjunction: "CONJ",
+    numeral: "NUM",
+    interjection: "INT"
+  } as const;
+  const posCodeById = new Map(
+    forms?.pos.map((pos) => [pos.pos_id, pos.pos] as const) ?? []
+  );
   return {
     sense_groups: structuredClone(senseGroups),
     pos: content.pos.map((pos, posIndex) => ({
@@ -89,7 +107,10 @@ export function completeMeanings(
       senses: pos.senses.map((sense, senseIndex) => ({
         ...sense,
         sense_group_id: sense.sense_group_id || defaultSenseGroupId,
-        sub_pos: posIndex === 0 ? "N-COUNT" : "V-T",
+        sub_pos:
+          defaultSubPos[
+            posCodeById.get(pos.pos_id) ?? (posIndex === 0 ? "noun" : "verb")
+          ] ?? "",
         frequency: "12.5",
         definitions: sense.definitions.map((definition) => ({
           id: definition.id,
@@ -149,7 +170,7 @@ export function wordFixture(options: WordFixtureOptions = {}): AdminWordV2 {
   const initialMeanings =
     options.meanings ?? createInitialMeanings(forms, headwords, id);
   const meanings = ready
-    ? completeMeanings(initialMeanings, headwords)
+    ? completeMeanings(initialMeanings, headwords, forms)
     : structuredClone(initialMeanings);
 
   return {

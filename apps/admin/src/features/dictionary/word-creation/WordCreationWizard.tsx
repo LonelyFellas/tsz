@@ -19,10 +19,12 @@ import {
 } from "antd";
 import type {
   AdminWordV2,
+  DraftFormsStepContent,
+  DraftMeaningsStepContent,
   WordCreationStep,
   WordHeadwordsV2
 } from "@tsz/types";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Navigate,
   Link,
@@ -46,6 +48,7 @@ import { MeaningsAndExamplesStep } from "./MeaningsAndExamplesStep";
 import { PreviewAndPublishStep } from "./PreviewAndPublishStep";
 import { WordCreationLayout } from "./WordCreationLayout";
 import { WORD_STEP_ORDER } from "./model";
+import type { ReadinessTarget } from "./readiness";
 
 interface Props {
   mode: "create" | "resume";
@@ -308,6 +311,11 @@ export function WordCreationWizard({ mode }: Props) {
   const currentStep: WordCreationStep =
     mode === "create" ? "basics" : isWordCreationStep(step) ? step : "basics";
   const detail = useWordDetail(wordId, mode === "resume" && wordId !== "");
+  const readinessCatalog = usePartOfSpeechCatalog();
+  const readinessPartOfSpeechLookup = useMemo(
+    () => createPartOfSpeechLookup(readinessCatalog.data),
+    [readinessCatalog.data]
+  );
   const restoreWord = useRestoreWord();
   const restoreSurface = useLifecycleSurfaceCommand(wordId);
   const lifecycleCommandPending = useRef(false);
@@ -315,6 +323,9 @@ export function WordCreationWizard({ mode }: Props) {
     useState<AdminWordV2>();
   const [word, setWord] = useState<AdminWordV2>();
   const [draftHeadwords, setDraftHeadwords] = useState<WordHeadwordsV2>();
+  const [draftForms, setDraftForms] = useState<DraftFormsStepContent>();
+  const [draftMeanings, setDraftMeanings] =
+    useState<DraftMeaningsStepContent>();
   const explicitEditMode = searchParams.get("mode") === "edit";
   const requestedKind = searchParams.get("kind");
   const entryKind =
@@ -335,6 +346,20 @@ export function WordCreationWizard({ mode }: Props) {
     );
   }, [detail.data, navigate]);
 
+  useEffect(() => {
+    setDraftForms(undefined);
+    setDraftMeanings(undefined);
+  }, [word?.id]);
+
+  const updateDraftForms = useCallback(
+    (content: DraftFormsStepContent) => setDraftForms(content),
+    []
+  );
+  const updateDraftMeanings = useCallback(
+    (content: DraftMeaningsStepContent) => setDraftMeanings(content),
+    []
+  );
+
   const changeStep = (next: WordCreationStep) => {
     if (!word) return;
     const editingPublished = word.status === "published" && explicitEditMode;
@@ -349,6 +374,23 @@ export function WordCreationWizard({ mode }: Props) {
         `/words/${word.id}/wizard/${next}${editingPublished ? "?mode=edit" : ""}`
       );
     }
+  };
+
+  const navigateToReadinessTarget = (target: ReadinessTarget) => {
+    if (!word) return;
+    const targetIndex = WORD_STEP_ORDER.indexOf(target.step);
+    const maxIndex = WORD_STEP_ORDER.indexOf(word.max_reachable_step);
+    if (targetIndex > maxIndex) return;
+    navigate(
+      `/words/${word.id}/wizard/${target.step}${word.status === "published" && explicitEditMode ? "?mode=edit" : ""}`,
+      {
+        state: {
+          nodeId: target.node_id,
+          field: target.field,
+          ...(target.pos_id ? { posId: target.pos_id } : {})
+        }
+      }
+    );
   };
 
   const restoreArchivedWord = (refresh = false) =>
@@ -509,6 +551,15 @@ export function WordCreationWizard({ mode }: Props) {
         currentStep={currentStep}
         readOnly={readOnly}
         onStepChange={changeStep}
+        partOfSpeechLookup={readinessPartOfSpeechLookup}
+        readinessDraft={
+          currentStep === "forms"
+            ? { forms: draftForms }
+            : currentStep === "meanings"
+              ? { meanings: draftMeanings }
+              : undefined
+        }
+        onReadinessNavigate={navigateToReadinessTarget}
       >
         {currentStep === "basics" && <ReadOnlyBasicsStep word={word} />}
         {currentStep === "forms" && (
@@ -516,6 +567,7 @@ export function WordCreationWizard({ mode }: Props) {
             word={word}
             readOnly={readOnly}
             onSaved={setWord}
+            onDraftChange={updateDraftForms}
           />
         )}
         {currentStep === "meanings" && (
@@ -523,6 +575,7 @@ export function WordCreationWizard({ mode }: Props) {
             word={word}
             readOnly={readOnly}
             onSaved={setWord}
+            onDraftChange={updateDraftMeanings}
           />
         )}
         {currentStep === "preview" && (

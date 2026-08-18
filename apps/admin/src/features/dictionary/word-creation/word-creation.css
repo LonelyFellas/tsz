@@ -184,7 +184,21 @@
 
 .word-creation-progress-row {
   grid-template-columns: 18px minmax(0, 1fr) auto;
+  width: 100%;
+  padding: 0;
+  color: inherit;
   font-size: 13px;
+  text-align: start;
+  background: transparent;
+  border: 0;
+}
+
+.word-creation-progress-row:not(:disabled) {
+  cursor: pointer;
+}
+
+.word-creation-progress-row:not(:disabled):hover > span {
+  color: #1677ff;
 }
 
 .word-progress-done {

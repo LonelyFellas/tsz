@@ -81,6 +81,7 @@ import {
   useSaveFormsStep,
   useSuggestDialectVariants
 } from "./api";
+import { baseFormComplete, formSlotComplete } from "./formsValidation";
 import { summarizeFormsImpact } from "./formsImpactSummary";
 import {
   createDerivedSlot,
@@ -102,6 +103,7 @@ interface Props {
   word: AdminWordV2;
   readOnly?: boolean;
   onSaved: (word: AdminWordV2) => void;
+  onDraftChange?: (content: DraftFormsStepContent) => void;
 }
 
 const FORM_ORIGIN_LABEL: Record<WordFormVariantV2["origin"], string> = {
@@ -283,6 +285,8 @@ function PronunciationFields({
               <Input
                 className="word-pronunciation-phonetic-input"
                 aria-label="字典音标"
+                data-word-node-id={value.id}
+                data-word-field="dict_phonetic"
                 value={value.dict_phonetic}
                 readOnly={disabled}
                 placeholder="字典音标"
@@ -299,6 +303,8 @@ function PronunciationFields({
           </Typography.Text>
           <Input
             aria-label="实际发音"
+            data-word-node-id={value.id}
+            data-word-field="actual_pron"
             value={value.actual_pron}
             readOnly={disabled}
             placeholder="实际发音"
@@ -479,6 +485,8 @@ function SharedSpellingVariantEditor({
         </Flex>
         <Input
           aria-label="共用词形拼写"
+          data-word-node-id={issueNodeId}
+          data-word-field="variants.common.spelling"
           value={firstValue.spelling}
           readOnly={readOnly || base}
           placeholder="词形拼写"
@@ -691,6 +699,9 @@ function MissingDialectVariantCell({
   return (
     <div
       className={`word-form-matrix-dialect-cell word-form-matrix-dialect-cell-${dialect}${lastRow ? " word-form-matrix-last-row" : ""}`}
+      data-word-node-id={slotId}
+      data-word-field={`variants.${dialect}`}
+      tabIndex={0}
     >
       <Alert type="warning" showIcon title="该方言词形尚未填写" />
       {!readOnly && (
@@ -1522,35 +1533,24 @@ function PosFormsEditor({
   );
 }
 
-function hasCompleteBase(pos: WordPosFormsV2): boolean {
-  const expected = formDialects(pos);
-  return expected.every((dialect) => {
-    const variant = pos.base_form.variants.find(
-      (item) => item.dialect === dialect
-    );
-    return Boolean(
-      variant?.spelling.trim() &&
-      variant.pronunciations.some(
-        (pronunciation) =>
-          pronunciation.dict_phonetic.trim() && pronunciation.actual_pron.trim()
-      )
-    );
-  });
-}
-
 function countPosFormIssues(
   pos: WordPosFormsV2,
-  allowed: readonly WordDerivedFormSlotV2["form_type"][]
+  allowed: readonly WordDerivedFormSlotV2["form_type"][],
+  headwords: AdminWordV2["headwords"]
 ): number {
   const requiresDerivedGroup = allowed.length > 0;
   return (
     (requiresDerivedGroup && pos.form_groups.length === 0 ? 1 : 0) +
-    (hasCompleteBase(pos) ? 0 : 1) +
+    (baseFormComplete(pos, headwords) ? 0 : 1) +
     pos.form_groups.reduce(
       (count, group) =>
         count +
         (requiresDerivedGroup && group.slots.length === 0 ? 1 : 0) +
-        group.slots.filter((slot) => !allowed.includes(slot.form_type)).length,
+        group.slots.filter(
+          (slot) =>
+            !allowed.includes(slot.form_type) ||
+            !formSlotComplete(slot, pos.dialect_rules.spelling_mode)
+        ).length,
       0
     )
   );
@@ -1757,7 +1757,12 @@ function SurfaceConfirmationDetails({
   );
 }
 
-export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
+export function FormsAndPronunciationStep({
+  word,
+  readOnly,
+  onSaved,
+  onDraftChange
+}: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const editQuery = word.status === "published" ? "?mode=edit" : "";
@@ -1861,6 +1866,10 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
       }
     }
   }, [dirty, word]);
+
+  useEffect(() => {
+    onDraftChange?.(content);
+  }, [content, onDraftChange]);
 
   const updateContent = (next: DraftFormsStepContent) => {
     contentRef.current = next;
@@ -2313,7 +2322,22 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
         if (invalidCount > 0) {
           issues.push(`${posLabel}有 ${invalidCount} 个不合法的派生词形类型`);
         }
-        if (!hasCompleteBase(pos)) {
+        const incompleteCount = pos.form_groups.reduce(
+          (count, group) =>
+            count +
+            group.slots.filter(
+              (slot) =>
+                allowed.includes(slot.form_type) &&
+                !formSlotComplete(slot, pos.dialect_rules.spelling_mode)
+            ).length,
+          0
+        );
+        if (incompleteCount > 0) {
+          issues.push(
+            `${posLabel}有 ${incompleteCount} 个派生词形尚未填写完整`
+          );
+        }
+        if (!baseFormComplete(pos, word.headwords)) {
           issues.push(`${posLabel}基准原形缺少字典音标或实际发音`);
         }
       }
@@ -2380,7 +2404,8 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
             legalDerivedFormTypes(
               pos.pos,
               partOfSpeechLookup.byCode.get(pos.pos)?.allowed_form_types
-            )
+            ),
+            word.headwords
           )}
           size="small"
           title="该词性待修项"

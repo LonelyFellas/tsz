@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { WordCreationLayout } from "./WordCreationLayout";
-import { wordFixture } from "./wordCreation.test.helper";
+import { completeMeanings, wordFixture } from "./wordCreation.test.helper";
 
 function LocationProbe() {
   return <span data-testid="location">{useLocation().pathname}</span>;
@@ -88,7 +88,7 @@ describe("WordCreationLayout", () => {
     expect(screen.getByText("far", { exact: true })).toBeInTheDocument();
   });
 
-  it("草稿汇总结构数量，并只允许点击 max_reachable_step 内步骤", () => {
+  it("草稿汇总有效完成数，并只允许点击 max_reachable_step 内步骤", () => {
     const onStepChange = vi.fn();
     const word = wordFixture({
       ready: true,
@@ -99,12 +99,12 @@ describe("WordCreationLayout", () => {
     const summary = view.container.querySelector(".word-creation-summary")!;
 
     expect(summary).toHaveTextContent("方言识别完成");
-    expect(summary).toHaveTextContent("基本词性2");
-    expect(summary).toHaveTextContent("词形变化5");
-    expect(summary).toHaveTextContent("语义区间1");
-    expect(summary).toHaveTextContent("语法结构2");
-    expect(summary).toHaveTextContent("多维词义2");
-    expect(summary).toHaveTextContent("多维例句2");
+    expect(summary).toHaveTextContent("基本词性2/2");
+    expect(summary).toHaveTextContent("词形变化5/5");
+    expect(summary).toHaveTextContent("语义区间1/1");
+    expect(summary).toHaveTextContent("语法结构2/2");
+    expect(summary).toHaveTextContent("多维词义2/2");
+    expect(summary).toHaveTextContent("多维例句2/2");
 
     fireEvent.click(screen.getByText("词义与例句"));
     expect(onStepChange).toHaveBeenCalledWith("meanings");
@@ -112,13 +112,76 @@ describe("WordCreationLayout", () => {
     expect(onStepChange).toHaveBeenCalledTimes(1);
   });
 
-  it("旧草稿尚无语义区间时，完成情况与默认首行一致显示 1", () => {
+  it("旧草稿尚无语义区间时显示未开始，不虚构默认首行", () => {
     const word = wordFixture();
     word.meanings.sense_groups = [];
     const view = renderLayout({ word, currentStep: "meanings" });
     const summary = view.container.querySelector(".word-creation-summary")!;
 
-    expect(summary).toHaveTextContent("语义区间1");
+    expect(summary).toHaveTextContent("语义区间0/1");
+    expect(screen.getByText("语义区间").parentElement).toHaveAttribute(
+      "data-readiness-state",
+      "incomplete"
+    );
+  });
+
+  it("空白初始化节点显示 0/总数且不使用完成图标", () => {
+    const word = wordFixture({
+      completed_steps: ["basics", "forms"],
+      max_reachable_step: "meanings"
+    });
+    renderLayout({ word, currentStep: "meanings" });
+
+    for (const [label, value] of [
+      ["语义区间", "0/1"],
+      ["语法结构", "0/2"],
+      ["多维词义", "0/2"],
+      ["多维例句", "0/2"]
+    ] as const) {
+      const row = screen.getByText(label).parentElement!;
+      expect(row).toHaveTextContent(value);
+      expect(row).toHaveAttribute("data-readiness-state", "incomplete");
+      expect(row.querySelector(".word-progress-done")).toBeNull();
+    }
+  });
+
+  it("优先使用当前未保存草稿实时计算摘要", () => {
+    const word = wordFixture({
+      completed_steps: ["basics", "forms"],
+      max_reachable_step: "meanings"
+    });
+    const meanings = completeMeanings(word.meanings, word.headwords);
+    renderLayout({
+      word,
+      currentStep: "meanings",
+      readinessDraft: { meanings }
+    });
+
+    expect(screen.getByText("语义区间").parentElement).toHaveTextContent("1/1");
+    expect(screen.getByText("语法结构").parentElement).toHaveTextContent("2/2");
+    expect(screen.getByText("多维词义").parentElement).toHaveTextContent("2/2");
+    expect(screen.getByText("多维例句").parentElement).toHaveTextContent("2/2");
+  });
+
+  it("点击待完善项交出稳定定位目标", () => {
+    const word = wordFixture({
+      completed_steps: ["basics", "forms"],
+      max_reachable_step: "meanings"
+    });
+    const onReadinessNavigate = vi.fn();
+    renderLayout({
+      word,
+      currentStep: "meanings",
+      onReadinessNavigate
+    });
+
+    fireEvent.click(screen.getByText("语法结构"));
+    expect(onReadinessNavigate).toHaveBeenCalledWith({
+      step: "meanings",
+      pos_id: word.meanings.pos[0]!.pos_id,
+      node_id: word.meanings.pos[0]!.grammar_structures[0]!.id,
+      field: "content.uk"
+    });
   });
 
   it("published 只读态在顶部摘要显示准确标识，并可返回词库", () => {
