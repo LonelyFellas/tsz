@@ -38,6 +38,11 @@ const RELATED_SEARCH_V2 = parseBooleanEnvFlag(
   "VITE_RELATED_SEARCH_V2",
   false
 );
+const WORD_CONTENT_COMPLETION = parseBooleanEnvFlag(
+  import.meta.env.VITE_WORD_CONTENT_COMPLETION,
+  "VITE_WORD_CONTENT_COMPLETION",
+  false
+);
 
 assertAdminWordsMockAllowed(
   ADMIN_WORDS_MOCK,
@@ -62,5 +67,6 @@ export const env = {
   VOICE_EDITOR,
   VOICE_PREVIEW,
   ADMIN_TTS_MOCK,
-  RELATED_SEARCH_V2
+  RELATED_SEARCH_V2,
+  WORD_CONTENT_COMPLETION
 };

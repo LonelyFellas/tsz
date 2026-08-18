@@ -39,7 +39,8 @@ const featureFlags = vi.hoisted(() => ({
   VOICE_EDITOR: false,
   VOICE_PREVIEW: false,
   ADMIN_TTS_MOCK: true,
-  RELATED_SEARCH_V2: false
+  RELATED_SEARCH_V2: false,
+  WORD_CONTENT_COMPLETION: false
 }));
 const relatedSearchV2State = vi.hoisted(() => ({
   exactHasNextPage: false,
@@ -171,7 +172,7 @@ vi.mock("./api", () => ({
 }));
 
 vi.mock("./ContentCompletionPanel", () => ({
-  ContentCompletionPanel: () => null
+  ContentCompletionPanel: () => <div data-testid="content-completion-panel" />
 }));
 
 vi.mock("../part-of-speech/api", async () => {
@@ -365,6 +366,7 @@ beforeEach(() => {
   featureFlags.VOICE_EDITOR = false;
   featureFlags.VOICE_PREVIEW = false;
   featureFlags.RELATED_SEARCH_V2 = false;
+  featureFlags.WORD_CONTENT_COMPLETION = false;
   relatedSearchV2State.exactHasNextPage = false;
   relatedSearchV2State.containsHasNextPage = false;
   relatedSearchV2State.missingPagination = false;
@@ -396,6 +398,20 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("MeaningsAndExamplesStep", () => {
+  it("默认关闭词条内容自动生成与回填入口", () => {
+    renderStep();
+
+    expect(screen.queryByTestId("content-completion-panel")).toBeNull();
+  });
+
+  it("仅在显式开启开关时挂载词条内容自动生成面板", () => {
+    featureFlags.WORD_CONTENT_COMPLETION = true;
+
+    renderStep();
+
+    expect(screen.getByTestId("content-completion-panel")).toBeInTheDocument();
+  });
+
   it("向上游持续提供当前未保存草稿用于实时完成度", async () => {
     const { onDraftChange } = renderStep(wordFixture({ ready: true }));
     await waitFor(() => expect(onDraftChange).toHaveBeenCalled());

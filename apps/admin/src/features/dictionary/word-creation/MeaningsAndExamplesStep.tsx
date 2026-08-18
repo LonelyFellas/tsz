@@ -2509,13 +2509,15 @@ export function MeaningsAndExamplesStep({
         </Typography.Paragraph>
       </div>
 
-      <ContentCompletionPanel
-        key={word.id}
-        word={word}
-        content={content}
-        readOnly={readOnly}
-        onApply={updateContent}
-      />
+      {env.WORD_CONTENT_COMPLETION && (
+        <ContentCompletionPanel
+          key={word.id}
+          word={word}
+          content={content}
+          readOnly={readOnly}
+          onApply={updateContent}
+        />
+      )}
 
       {readOnly && (
         <Alert
