@@ -4224,6 +4224,18 @@ export function createAdminWordsMock({
     clearSurfaceRuntime();
   }
 
+  async function createContentCompletionJob(): Promise<never> {
+    throw new Error("自动生成只支持真实后端，不提供 mock 内容");
+  }
+
+  async function getContentCompletionJob(): Promise<never> {
+    throw new Error("自动生成只支持真实后端，不提供 mock 内容");
+  }
+
+  async function retryContentCompletionJob(): Promise<never> {
+    throw new Error("自动生成只支持真实后端，不提供 mock 内容");
+  }
+
   return {
     list,
     stats,
@@ -4235,6 +4247,9 @@ export function createAdminWordsMock({
     previewFormsImpact,
     saveFormsStep,
     saveMeaningsStep,
+    createContentCompletionJob,
+    getContentCompletionJob,
+    retryContentCompletionJob,
     validateV2,
     publishV2,
     archive,

@@ -17,6 +17,9 @@ type RealAdminWordsDataSource = Pick<
   | "previewFormsImpact"
   | "saveFormsStep"
   | "saveMeaningsStep"
+  | "createContentCompletionJob"
+  | "getContentCompletionJob"
+  | "retryContentCompletionJob"
   | "validateV2"
   | "publishV2"
   | "archive"
@@ -150,6 +153,24 @@ export const adminWordsDataSource: AdminWordsDataSource = {
     (await resolveAdminWordsDataSource()).saveFormsStep(wordId, input),
   saveMeaningsStep: async (wordId, input) =>
     (await resolveAdminWordsDataSource()).saveMeaningsStep(wordId, input),
+  createContentCompletionJob: async (wordId, idempotencyKey, input) =>
+    (await resolveAdminWordsDataSource()).createContentCompletionJob(
+      wordId,
+      idempotencyKey,
+      input
+    ),
+  getContentCompletionJob: async (wordId, jobId) =>
+    (await resolveAdminWordsDataSource()).getContentCompletionJob(
+      wordId,
+      jobId
+    ),
+  retryContentCompletionJob: async (wordId, jobId, idempotencyKey, input) =>
+    (await resolveAdminWordsDataSource()).retryContentCompletionJob(
+      wordId,
+      jobId,
+      idempotencyKey,
+      input
+    ),
   validateV2: async (wordId, input) =>
     (await resolveAdminWordsDataSource()).validateV2(wordId, input),
   publishV2: async (wordId, idempotencyKey, input) =>

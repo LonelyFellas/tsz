@@ -14,6 +14,9 @@ const METHOD_NAMES = [
   "previewFormsImpact",
   "saveFormsStep",
   "saveMeaningsStep",
+  "createContentCompletionJob",
+  "getContentCompletionJob",
+  "retryContentCompletionJob",
   "validateV2",
   "publishV2",
   "archive",
@@ -75,6 +78,26 @@ const INVOCATIONS = [
         content: { sense_groups: [], pos: [] }
       }
     ]
+  },
+  {
+    method: "createContentCompletionJob",
+    args: [
+      "word-1",
+      "completion-key",
+      {
+        base_revision: 2,
+        scope: ["grammar_structures", "meanings", "examples"],
+        fill_policy: "missing_only"
+      }
+    ]
+  },
+  {
+    method: "getContentCompletionJob",
+    args: ["word-1", "job-1"]
+  },
+  {
+    method: "retryContentCompletionJob",
+    args: ["word-1", "job-1", "retry-key", { pos_ids: ["pos-1"] }]
   },
   { method: "validateV2", args: ["word-1", { base_revision: 2 }] },
   {
