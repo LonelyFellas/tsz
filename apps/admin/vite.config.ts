@@ -6,6 +6,7 @@ import { loadEnv } from "vite";
 import { defineConfig } from "vitest/config";
 import {
   assertAdminPartOfSpeechMockAllowed,
+  assertAdminTtsMockAllowed,
   assertAdminWordsMockAllowed,
   parseBooleanEnvFlag
 } from "./src/lib/env-flags";
@@ -37,10 +38,16 @@ export default defineConfig(({ mode, command }) => {
     "VITE_ADMIN_PART_OF_SPEECH_MOCK",
     false
   );
+  const adminTtsMock = parseBooleanEnvFlag(
+    buildEnv.VITE_ADMIN_TTS_MOCK,
+    "VITE_ADMIN_TTS_MOCK",
+    false
+  );
 
   // production mode 禁止携带 mock；仅 tshb-test 的显式 test mode 构建可用于验收。
   assertAdminWordsMockAllowed(adminWordsMock, production, mode);
   assertAdminPartOfSpeechMockAllowed(adminPartOfSpeechMock, production, mode);
+  assertAdminTtsMockAllowed(adminTtsMock, production, mode);
 
   // dev 代理只在启动开发服务器（command === "serve"）时需要；`vite build` 产出的是纯
   // 静态包，不经这个代理，故其相关校验也不应耦合进构建成败——只在 serve 时构建代理。

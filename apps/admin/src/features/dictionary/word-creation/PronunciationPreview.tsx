@@ -1,5 +1,5 @@
 import { SoundOutlined, SyncOutlined } from "@ant-design/icons";
-import { App, Button, Space, Tooltip } from "antd";
+import { App, Button, Space, Tag, Tooltip } from "antd";
 import type { Dialect, RichTextV2 } from "@tsz/types";
 import type {
   VoiceOption,
@@ -18,7 +18,10 @@ import {
   useState
 } from "react";
 import { env } from "@/lib/env";
-import { adminVoicePreviewAdapter } from "../voice-editor/dataSource";
+import {
+  adminVoicePreviewAdapter,
+  voicePreviewIsMock
+} from "../voice-editor/dataSource";
 
 interface PreviewContextValue {
   enabled: boolean;
@@ -324,6 +327,18 @@ export function PronunciationPreviewControls({
         />
       </Tooltip>
       {children}
+      {voicePreviewIsMock && (
+        <Tooltip title="当前走本地 TTS mock，试听音频不是真实合成结果">
+          <Tag
+            className="word-pronunciation-mock-tag"
+            color="warning"
+            role="note"
+            aria-label="试听走本地 TTS mock，音频不是真实合成结果"
+          >
+            模拟
+          </Tag>
+        </Tooltip>
+      )}
       <Tooltip title={status || unavailableReason}>
         <Button
           className="word-pronunciation-voice-action word-pronunciation-sync-action"

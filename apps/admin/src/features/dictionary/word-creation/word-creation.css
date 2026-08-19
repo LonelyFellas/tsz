@@ -796,6 +796,13 @@
   color: #1677ff;
 }
 
+.word-pronunciation-mock-tag {
+  flex: none;
+  align-self: center;
+  margin-inline: 6px;
+  cursor: help;
+}
+
 .word-form-origin-tag {
   margin-inline-end: 0;
   padding-inline: 6px;
