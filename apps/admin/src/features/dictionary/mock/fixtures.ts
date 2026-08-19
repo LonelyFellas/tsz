@@ -1,6 +1,7 @@
 import type {
   DetectWordInputV2,
   DetectWordResponseV2,
+  DictionaryCoverageV2,
   DraftFormsStepContent,
   DraftMeaningsStepContent,
   EnglishTextV2,
@@ -15,7 +16,7 @@ import type {
   WordPronunciationV2
 } from "@tsz/types";
 
-export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 9;
+export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 10;
 
 export function richText(text: string): RichText {
   return { version: 1, text, spans: [], liaisons: [] };
@@ -227,6 +228,7 @@ function matchedResponse(
     entryKind?: "word" | "phrase";
     smart?: DetectWordResponseV2["smart_dictionary"];
     matchedDialect?: "uk" | "us" | "common";
+    coverage?: DictionaryCoverageV2;
   } = {}
 ): DetectWordResponseV2 {
   return {
@@ -239,7 +241,15 @@ function matchedResponse(
     builtin_dictionary: {
       status: "matched",
       headwords,
-      suggested_forms: suggestedForms
+      suggested_forms: suggestedForms,
+      // mock 词典命中即视为全覆盖;真实后端会按数据源返回 partial/missing。
+      coverage: options.coverage ?? {
+        forms: "complete",
+        pronunciations: "complete",
+        meanings: "complete",
+        examples: "complete",
+        frequency: "complete"
+      }
     },
     smart_dictionary: options.smart ?? { status: "clear", duplicates: [] }
   };

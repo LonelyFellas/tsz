@@ -64,7 +64,10 @@ import {
   useState
 } from "react";
 import { useNavigate } from "react-router-dom";
-import { DIALECT_SHORT_LABEL } from "../editorConstants";
+import {
+  DEFINITION_MODE_OPTIONS,
+  DIALECT_SHORT_LABEL
+} from "../editorConstants";
 import { CEFR_OPTIONS, cefrColor } from "../labels";
 import { adminWordsDataSourceCapabilities } from "../dataSource";
 import { env } from "@/lib/env";
@@ -144,13 +147,6 @@ type MeaningDialect = "uk" | "us";
 const GRAMMAR_DRAG_TYPE = "application/x-tsz-grammar-structure";
 const DEFINITION_DRAG_TYPE = "application/x-tsz-definition";
 const SENTENCE_DRAG_TYPE = "application/x-tsz-sentence";
-
-const DEFINITION_MODE_OPTIONS = [
-  { value: "zh_definition", label: "中文定义释义" },
-  { value: "en_definition", label: "英文定义释义" },
-  { value: "zh_sentence", label: "中文整句释义" },
-  { value: "en_sentence", label: "英文整句释义" }
-] as const;
 
 const RELATION_META: Record<
   WordRelationType,
@@ -919,12 +915,7 @@ function DefinitionEditor({
         <Select
           aria-label="释义方式"
           value={value.definition_mode}
-          options={
-            DEFINITION_MODE_OPTIONS as unknown as {
-              value: WordDefinitionV2["definition_mode"];
-              label: string;
-            }[]
-          }
+          options={DEFINITION_MODE_OPTIONS}
           disabled={readOnly}
           onChange={(definition_mode) => {
             const nextEnglish = definition_mode.startsWith("en_");

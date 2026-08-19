@@ -527,6 +527,11 @@ describe("PreviewAndPublishStep", () => {
     expect(screen.getByText("未知词性")).toBeVisible();
     expect(screen.getByText("没有派生词形")).toBeInTheDocument();
     expect(screen.getByText(/synonym/)).toBeInTheDocument();
+    // 释义方式展示中文标签，不把 wire 码 zh_definition/en_definition 暴露给录入者。
+    expect(screen.getAllByText("中文定义释义").length).toBeGreaterThan(0);
+    expect(screen.getByText("英文定义释义")).toBeInTheDocument();
+    expect(screen.queryByText("zh_definition")).toBeNull();
+    expect(screen.queryByText("en_definition")).toBeNull();
   });
 
   it("published 只读详情不重复 validate，展示发布时间并允许继续编辑", () => {

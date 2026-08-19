@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { wordFixture } from "./wordCreation.test.helper";
 import {
   baseFormComplete,
+  baseFormIssueMessage,
   baseFormIssueTarget,
   formSlotComplete,
   formSlotIssueTarget
@@ -76,6 +77,50 @@ describe("forms validation issue targets", () => {
       field: `variants.${pos.base_form.variants[0]!.dialect}.spelling`
     });
     expect(baseFormComplete(pos, word.headwords)).toBe(false);
+  });
+
+  it("基准原形提示按实际缺失的音标字段收窄，而不是笼统的「或」", () => {
+    const word = wordFixture({ ready: true });
+    const pos = structuredClone(word.forms.pos[0]!);
+    const pronunciation = pos.base_form.variants[0]!.pronunciations[0]!;
+
+    expect(baseFormIssueMessage(pos, word.headwords)).toBeUndefined();
+
+    pronunciation.dict_phonetic = "";
+    expect(baseFormIssueMessage(pos, word.headwords)).toBe(
+      "基准原形缺少字典音标"
+    );
+
+    pronunciation.dict_phonetic = "/ˈsentə/";
+    pronunciation.actual_pron = " ";
+    expect(baseFormIssueMessage(pos, word.headwords)).toBe(
+      "基准原形缺少实际发音"
+    );
+
+    pronunciation.dict_phonetic = "";
+    expect(baseFormIssueMessage(pos, word.headwords)).toBe(
+      "基准原形缺少字典音标与实际发音"
+    );
+
+    pos.base_form.variants[0]!.pronunciations = [];
+    expect(baseFormIssueMessage(pos, word.headwords)).toBe(
+      "基准原形还没有添加读音"
+    );
+
+    pos.base_form.variants[0]!.spelling = "";
+    expect(baseFormIssueMessage(pos, word.headwords)).toBe(
+      "基准原形拼写尚未按主词填写完整"
+    );
+  });
+
+  it("基准拼写与主词不一致时也提示拼写问题", () => {
+    const word = wordFixture({ ready: true });
+    const pos = structuredClone(word.forms.pos[0]!);
+    pos.base_form.variants[0]!.spelling = "mismatch";
+
+    expect(baseFormIssueMessage(pos, word.headwords)).toBe(
+      "基准原形拼写尚未按主词填写完整"
+    );
   });
 
   it("拼写统一但音标区分时接受拼写相同的 UK/US 方言行", () => {
