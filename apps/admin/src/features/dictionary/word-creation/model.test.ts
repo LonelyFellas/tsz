@@ -36,6 +36,7 @@ import {
   toFormsWireContent,
   toMeaningsWireContent,
   updateRichText,
+  orderedHeadwordSpellings,
   wordDisplayHeadword
 } from "./model";
 
@@ -687,7 +688,25 @@ describe("展示、factory 默认值与边界输入", () => {
     );
 
     expect(wordDisplayHeadword(unifiedWord)).toBe("far");
-    expect(wordDisplayHeadword(distinguishedWord)).toBe("centre");
+    // 检测基准侧(source_dialect)优先，与左栏「当前词条」的排序一致。
+    expect(wordDisplayHeadword(distinguishedWord)).toBe("center");
+    expect(
+      wordDisplayHeadword({
+        ...distinguishedWord,
+        headwords: { ...distinguishedHeadwords, source_dialect: "uk" }
+      })
+    ).toBe("centre");
+    expect(orderedHeadwordSpellings(unifiedHeadwords)).toEqual(["far"]);
+    expect(orderedHeadwordSpellings(distinguishedHeadwords)).toEqual([
+      "center",
+      "centre"
+    ]);
+    expect(
+      orderedHeadwordSpellings({
+        ...distinguishedHeadwords,
+        source_dialect: "uk"
+      })
+    ).toEqual(["centre", "center"]);
     expect(dialectHeadword(unifiedHeadwords, "uk")).toBe("far");
     expect(dialectHeadword(distinguishedHeadwords, "uk")).toBe("centre");
     expect(dialectHeadword(distinguishedHeadwords, "us")).toBe("center");

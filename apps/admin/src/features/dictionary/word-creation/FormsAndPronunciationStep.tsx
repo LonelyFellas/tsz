@@ -97,6 +97,7 @@ import {
   legalDerivedFormTypes,
   toFormsWireContent
 } from "./model";
+import { buildWordReadiness, pendingReadinessRows } from "./readiness";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import {
   useWordValidationIssue,
@@ -2376,7 +2377,14 @@ export function FormsAndPronunciationStep({
       }
       setValidationMessages(issues);
       if (issues.length > 0) {
-        message.warning(`还有 ${issues.length} 项需要完善`);
+        // 提示直接复述左栏「完成情况」的分数,否则拦截数与左栏数字对不上。
+        const pending = pendingReadinessRows(
+          buildWordReadiness(word, { forms: content }, partOfSpeechLookup),
+          "forms"
+        )
+          .map((row) => `${row.label} ${row.completed}/${row.total}`)
+          .join("、");
+        message.warning(`还需完善：${pending}（同左栏「完成情况」）`);
         return;
       }
     }

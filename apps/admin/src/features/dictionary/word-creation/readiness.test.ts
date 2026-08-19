@@ -2,7 +2,7 @@ import type { DraftMeaningsStepContent, EnglishTextV2 } from "@tsz/types";
 import { describe, expect, it } from "vitest";
 import { createPartOfSpeechLookup } from "../part-of-speech/catalog";
 import { partOfSpeechCatalogFixture } from "./partOfSpeech.test.helper";
-import { buildWordReadiness } from "./readiness";
+import { buildWordReadiness, pendingReadinessRows } from "./readiness";
 import { completeMeanings, wordFixture } from "./wordCreation.test.helper";
 
 function row(
@@ -162,23 +162,119 @@ describe("buildWordReadiness", () => {
     });
   });
 
-  it("基本词性缺少完整基准词形时不因 POS 节点存在而完成", () => {
+  it("基准原形缺音标只计入原形发音，不挂在基本词性名下", () => {
     const word = wordFixture({ ready: true });
-    word.forms.pos[0]!.base_form.variants[0]!.pronunciations[0]!.dict_phonetic =
-      "";
+    const pronunciation =
+      word.forms.pos[0]!.base_form.variants[0]!.pronunciations[0]!;
+    pronunciation.dict_phonetic = "";
 
     const rows = buildWordReadiness(word);
-    const partsOfSpeech = row(rows, "parts_of_speech");
 
-    expect(partsOfSpeech.completed).toBe(1);
-    expect(partsOfSpeech.total).toBe(2);
-    expect(partsOfSpeech.state).toBe("incomplete");
-    expect(partsOfSpeech.target).toMatchObject({
-      step: "forms",
-      pos_id: word.forms.pos[0]!.pos_id,
-      node_id: word.forms.pos[0]!.base_form.variants[0]!.pronunciations[0]!.id,
-      field: "dict_phonetic"
+    expect(row(rows, "parts_of_speech")).toMatchObject({
+      completed: 2,
+      total: 2,
+      state: "complete"
     });
+    expect(row(rows, "base_pronunciation")).toMatchObject({
+      completed: 1,
+      total: 2,
+      state: "incomplete",
+      target: {
+        step: "forms",
+        pos_id: word.forms.pos[0]!.pos_id,
+        node_id: pronunciation.id,
+        field: "dict_phonetic"
+      }
+    });
+  });
+
+  it("基准原形拼写与主词不一致时只计入基本词性", () => {
+    const word = wordFixture({ ready: true });
+    const baseForm = word.forms.pos[0]!.base_form;
+    baseForm.variants[0]!.spelling = "mismatch";
+
+    const rows = buildWordReadiness(word);
+
+    expect(row(rows, "parts_of_speech")).toMatchObject({
+      completed: 1,
+      total: 2,
+      state: "incomplete",
+      target: {
+        step: "forms",
+        pos_id: word.forms.pos[0]!.pos_id,
+        node_id: baseForm.id,
+        field: `variants.${baseForm.variants[0]!.dialect}.spelling`
+      }
+    });
+    expect(row(rows, "base_pronunciation").state).toBe("complete");
+  });
+
+  it("拼写为空不会掩盖同一基准原形的读音缺失", () => {
+    const word = wordFixture({ ready: true });
+    const variant = word.forms.pos[0]!.base_form.variants[0]!;
+    variant.spelling = "";
+    variant.pronunciations = [];
+
+    const rows = buildWordReadiness(word);
+
+    expect(row(rows, "parts_of_speech")).toMatchObject({
+      completed: 1,
+      total: 2,
+      state: "incomplete"
+    });
+    expect(row(rows, "base_pronunciation")).toMatchObject({
+      completed: 1,
+      total: 2,
+      state: "incomplete",
+      target: { node_id: variant.id, field: "pronunciations" }
+    });
+  });
+
+  it("尚未选择词性时基本词性待完善，原形发音保持未开始", () => {
+    const rows = buildWordReadiness(undefined, { forms: { pos: [] } });
+
+    expect(row(rows, "parts_of_speech")).toMatchObject({
+      completed: 0,
+      total: 1,
+      state: "incomplete",
+      target: { step: "forms", node_id: "forms", field: "pos" }
+    });
+    expect(row(rows, "base_pronunciation")).toMatchObject({
+      completed: 0,
+      total: 0,
+      state: "empty"
+    });
+    expect(row(rows, "base_pronunciation").target).toBeUndefined();
+    expect(pendingReadinessRows(rows, "forms").map((item) => item.key)).toEqual(
+      ["parts_of_speech"]
+    );
+  });
+
+  it("每行标注所属步骤，待完善行按步骤交出，无需填写与未开始都不催办", () => {
+    const word = wordFixture({ ready: true });
+    for (const pos of word.forms.pos) pos.form_groups = [];
+    word.forms.pos[1]!.base_form.variants[0]!.pronunciations[0]!.actual_pron =
+      "";
+    const rows = buildWordReadiness(
+      word,
+      {},
+      createPartOfSpeechLookup(partOfSpeechCatalogFixture)
+    );
+
+    expect(rows.map((item) => [item.key, item.step])).toEqual([
+      ["dialect", "basics"],
+      ["parts_of_speech", "forms"],
+      ["base_pronunciation", "forms"],
+      ["forms", "forms"],
+      ["sense_groups", "meanings"],
+      ["grammar_structures", "meanings"],
+      ["senses", "meanings"],
+      ["sentences", "meanings"]
+    ]);
+    expect(row(rows, "forms").state).toBe("not_required");
+    expect(pendingReadinessRows(rows, "forms").map((item) => item.key)).toEqual(
+      ["base_pronunciation"]
+    );
   });
 
   it("精确定位缺失的派生词形读音字段", () => {
@@ -310,7 +406,7 @@ describe("buildWordReadiness", () => {
     expect(forms.target).toBeUndefined();
   });
 
-  it("全部词性都没有派生词时将零项词形变化视为完成", () => {
+  it("全部词性都没有派生词时词形变化是无需填写，而不是完成", () => {
     const word = wordFixture({ ready: true });
     for (const pos of word.forms.pos) pos.form_groups = [];
 
@@ -323,7 +419,11 @@ describe("buildWordReadiness", () => {
       "forms"
     );
 
-    expect(forms).toMatchObject({ completed: 0, total: 0, state: "complete" });
+    expect(forms).toMatchObject({
+      completed: 0,
+      total: 0,
+      state: "not_required"
+    });
     expect(forms.target).toBeUndefined();
   });
 
