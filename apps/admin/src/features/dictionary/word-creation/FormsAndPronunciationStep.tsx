@@ -597,9 +597,6 @@ function BaseTypeCell({ lastRow }: { lastRow: boolean }) {
       className={`word-form-type-cell${lastRow ? " word-form-matrix-last-row" : ""}`}
     >
       <Tag>原形</Tag>
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-        拼写从第 1 步派生
-      </Typography.Text>
     </div>
   );
 }
@@ -607,6 +604,7 @@ function BaseTypeCell({ lastRow }: { lastRow: boolean }) {
 function DerivedTypeCell({
   slot,
   allowedTypes,
+  usedTypes,
   index,
   last,
   readOnly,
@@ -616,6 +614,7 @@ function DerivedTypeCell({
 }: {
   slot: WordDerivedFormSlotV2;
   allowedTypes: WordDerivedFormSlotV2["form_type"][];
+  usedTypes: WordDerivedFormSlotV2["form_type"][];
   index: number;
   last: boolean;
   readOnly?: boolean;
@@ -623,6 +622,7 @@ function DerivedTypeCell({
   onMove: (delta: -1 | 1) => void;
   onRemove: () => void;
 }) {
+  const duplicate = usedTypes.includes(slot.form_type);
   return (
     <div
       className={`word-form-type-cell${last ? " word-form-matrix-last-row" : ""}`}
@@ -632,16 +632,30 @@ function DerivedTypeCell({
       <Typography.Text type="secondary">#{index + 1}</Typography.Text>
       <Select
         value={slot.form_type}
-        status={allowedTypes.includes(slot.form_type) ? undefined : "error"}
+        status={
+          allowedTypes.includes(slot.form_type) && !duplicate
+            ? undefined
+            : "error"
+        }
         options={FORM_TYPE_OPTIONS.filter((option) =>
           allowedTypes.includes(
             option.value as WordDerivedFormSlotV2["form_type"]
           )
-        )}
+        ).map((option) => ({
+          ...option,
+          disabled:
+            option.value !== slot.form_type &&
+            usedTypes.includes(
+              option.value as WordDerivedFormSlotV2["form_type"]
+            )
+        }))}
         disabled={readOnly}
         style={{ width: "100%" }}
         onChange={(form_type) => onChange({ ...slot, form_type })}
       />
+      {duplicate && (
+        <Typography.Text type="danger">同组内词形类型不能重复</Typography.Text>
+      )}
       <Flex gap={2} wrap>
         <Button
           type="text"
@@ -826,6 +840,9 @@ function FormGroupMatrix({
               <DerivedTypeCell
                 slot={slot}
                 allowedTypes={allowedTypes}
+                usedTypes={group.slots
+                  .filter((_, index) => index !== slotIndex)
+                  .map((item) => item.form_type)}
                 index={slotIndex}
                 last={last}
                 readOnly={readOnly}
@@ -941,6 +958,9 @@ function FormGroupMatrix({
             <DerivedTypeCell
               slot={slot}
               allowedTypes={allowedTypes}
+              usedTypes={group.slots
+                .filter((_, index) => index !== slotIndex)
+                .map((item) => item.form_type)}
               index={slotIndex}
               last={last}
               readOnly={readOnly}
@@ -1159,6 +1179,10 @@ function PosFormsEditor({
   const allowedTypes = legalDerivedFormTypes(value.pos, configuredAllowedTypes);
   const capabilityLoaded = configuredAllowedTypes !== undefined;
   const defaultTypes = configuredDefaultTypes ?? allowedTypes;
+  const orderedTypes = [
+    ...defaultTypes,
+    ...allowedTypes.filter((type) => !defaultTypes.includes(type))
+  ];
   const invalidSlots = value.form_groups.flatMap((group) =>
     group.slots.filter((slot) => !allowedTypes.includes(slot.form_type))
   );
@@ -1284,6 +1308,11 @@ function PosFormsEditor({
           value.form_groups.map((group, groupIndex) => {
             const collapsed = collapsedGroupIds.has(group.id);
             const bodyId = `word-form-group-${group.id}-body`;
+            const nextDefaultType = defaultDerivedFormType(
+              value.pos,
+              group.slots.map((slot) => slot.form_type),
+              orderedTypes
+            );
             const moveGroup = (nextIndex: number) =>
               onChange({
                 ...value,
@@ -1476,27 +1505,24 @@ function PosFormsEditor({
                           type="dashed"
                           icon={<PlusOutlined />}
                           className="word-form-add-slot"
-                          disabled={allowedTypes.length === 0}
+                          disabled={!nextDefaultType}
                           title={
                             !capabilityLoaded
                               ? "词形规则未加载"
                               : allowedTypes.length === 0
                                 ? "当前基本词性没有可添加的派生词形"
-                                : undefined
+                                : !nextDefaultType
+                                  ? "当前组已添加全部可用词形类型"
+                                  : undefined
                           }
                           onClick={() => {
-                            const defaultType = defaultDerivedFormType(
-                              value.pos,
-                              group.slots.map((slot) => slot.form_type),
-                              defaultTypes
-                            );
-                            if (!defaultType) return;
+                            if (!nextDefaultType) return;
                             const groups = [...value.form_groups];
                             groups[groupIndex] = {
                               ...group,
                               slots: [
                                 ...group.slots,
-                                createDerivedSlot(defaultType, value)
+                                createDerivedSlot(nextDefaultType, value)
                               ]
                             };
                             onChange({ ...value, form_groups: groups });
@@ -1538,21 +1564,22 @@ function countPosFormIssues(
   allowed: readonly WordDerivedFormSlotV2["form_type"][],
   headwords: AdminWordV2["headwords"]
 ): number {
-  const requiresDerivedGroup = allowed.length > 0;
   return (
-    (requiresDerivedGroup && pos.form_groups.length === 0 ? 1 : 0) +
     (baseFormComplete(pos, headwords) ? 0 : 1) +
-    pos.form_groups.reduce(
-      (count, group) =>
+    pos.form_groups.reduce((count, group) => {
+      const duplicateCount =
+        group.slots.length -
+        new Set(group.slots.map((slot) => slot.form_type)).size;
+      return (
         count +
-        (requiresDerivedGroup && group.slots.length === 0 ? 1 : 0) +
+        duplicateCount +
         group.slots.filter(
           (slot) =>
             !allowed.includes(slot.form_type) ||
-            !formSlotComplete(slot, pos.dialect_rules.spelling_mode)
-        ).length,
-      0
-    )
+            !formSlotComplete(slot, pos.dialect_rules)
+        ).length
+      );
+    }, 0)
   );
 }
 
@@ -1875,6 +1902,7 @@ export function FormsAndPronunciationStep({
     contentRef.current = next;
     setContent(next);
     setDirty(true);
+    setValidationMessages([]);
   };
 
   const applyGeneratedFormVariant = (
@@ -1933,6 +1961,7 @@ export function FormsAndPronunciationStep({
       return next;
     });
     setDirty(true);
+    setValidationMessages([]);
   };
 
   const hasFormVariant = (clientId: string, target: "uk" | "us") =>
@@ -2043,6 +2072,7 @@ export function FormsAndPronunciationStep({
   ) => {
     finishSaveFlow();
     setDirty(false);
+    setValidationMessages([]);
     onSaved(savedWord);
     message.success(intent === "complete" ? "词形与发音已完成" : "草稿已保存");
     if (intent === "complete") {
@@ -2300,17 +2330,15 @@ export function FormsAndPronunciationStep({
           pos.pos,
           configured?.allowed_form_types
         );
-        const requiresDerivedGroup = allowed.length > 0;
-        if (requiresDerivedGroup && pos.form_groups.length === 0) {
-          issues.push(`${posLabel}至少需要一组词形变化`);
-        }
-        const emptyGroupCount = requiresDerivedGroup
-          ? pos.form_groups.filter((group) => group.slots.length === 0).length
-          : 0;
-        if (emptyGroupCount > 0) {
-          issues.push(
-            `${posLabel}有 ${emptyGroupCount} 组词形变化尚未添加派生词形`
-          );
+        const duplicateCount = pos.form_groups.reduce(
+          (count, group) =>
+            count +
+            group.slots.length -
+            new Set(group.slots.map((slot) => slot.form_type)).size,
+          0
+        );
+        if (duplicateCount > 0) {
+          issues.push(`${posLabel}有 ${duplicateCount} 个重复的派生词形类型`);
         }
         const invalidCount = pos.form_groups.reduce(
           (count, group) =>
@@ -2328,7 +2356,7 @@ export function FormsAndPronunciationStep({
             group.slots.filter(
               (slot) =>
                 allowed.includes(slot.form_type) &&
-                !formSlotComplete(slot, pos.dialect_rules.spelling_mode)
+                !formSlotComplete(slot, pos.dialect_rules)
             ).length,
           0
         );
@@ -2408,7 +2436,7 @@ export function FormsAndPronunciationStep({
             word.headwords
           )}
           size="small"
-          title="该词性待修项"
+          title="当前词性的未解决校验项"
         />
         {!readOnly && content.pos.length > 1 && (
           <Button

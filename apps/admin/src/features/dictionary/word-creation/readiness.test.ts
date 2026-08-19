@@ -292,7 +292,7 @@ describe("buildWordReadiness", () => {
     });
   });
 
-  it("必需派生词组为空时显示可定位的待完善项", () => {
+  it("支持派生词的词性也允许当前单词没有派生词", () => {
     const word = wordFixture({ ready: true });
     const firstPos = word.forms.pos[0]!;
     firstPos.form_groups = [];
@@ -306,11 +306,50 @@ describe("buildWordReadiness", () => {
       "forms"
     );
 
+    expect(forms.state).toBe("complete");
+    expect(forms.target).toBeUndefined();
+  });
+
+  it("全部词性都没有派生词时将零项词形变化视为完成", () => {
+    const word = wordFixture({ ready: true });
+    for (const pos of word.forms.pos) pos.form_groups = [];
+
+    const forms = row(
+      buildWordReadiness(
+        word,
+        {},
+        createPartOfSpeechLookup(partOfSpeechCatalogFixture)
+      ),
+      "forms"
+    );
+
+    expect(forms).toMatchObject({ completed: 0, total: 0, state: "complete" });
+    expect(forms.target).toBeUndefined();
+  });
+
+  it("词性存在但派生能力字段缺失时零派生仍保持未完成", () => {
+    const word = wordFixture({ ready: true });
+    for (const pos of word.forms.pos) pos.form_groups = [];
+    const catalogWithoutCapabilities = {
+      ...partOfSpeechCatalogFixture,
+      items: partOfSpeechCatalogFixture.items.map(
+        ({ allowed_form_types: _allowed, ...item }) => item
+      )
+    };
+
+    const forms = row(
+      buildWordReadiness(
+        word,
+        {},
+        createPartOfSpeechLookup(catalogWithoutCapabilities)
+      ),
+      "forms"
+    );
+
     expect(forms.state).toBe("incomplete");
     expect(forms.target).toMatchObject({
-      step: "forms",
-      pos_id: firstPos.pos_id,
-      node_id: firstPos.pos_id,
+      pos_id: word.forms.pos[0]!.pos_id,
+      node_id: word.forms.pos[0]!.pos_id,
       field: "form_groups"
     });
   });

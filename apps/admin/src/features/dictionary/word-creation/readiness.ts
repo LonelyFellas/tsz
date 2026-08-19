@@ -138,7 +138,7 @@ export function buildWordReadiness(
         field: "variants"
       }));
     });
-    if (partOfSpeechLookup && !configured) {
+    if (partOfSpeechLookup && configured?.allowed_form_types === undefined) {
       return [
         {
           pos,
@@ -149,17 +149,7 @@ export function buildWordReadiness(
         ...slots
       ];
     }
-    const requiresDerived = (configured?.allowed_form_types?.length ?? 0) > 0;
-    if (!requiresDerived) return slots;
-    if (pos.form_groups.length === 0) {
-      return [...slots, { pos, node_id: pos.pos_id, field: "form_groups" }];
-    }
-    return [
-      ...slots,
-      ...pos.form_groups
-        .filter((group) => group.slots.length === 0)
-        .map((group) => ({ pos, node_id: group.id, field: "slots" }))
-    ];
+    return slots;
   });
   const completeFormSlots = formRequirements.filter((requirement) => {
     if (
@@ -175,10 +165,7 @@ export function buildWordReadiness(
     return (
       (!partOfSpeechLookup ||
         Boolean(allowed?.includes(requirement.slot.form_type))) &&
-      formSlotComplete(
-        requirement.slot,
-        requirement.pos.dialect_rules.spelling_mode
-      )
+      formSlotComplete(requirement.slot, requirement.pos.dialect_rules)
     );
   }).length;
   const firstIncompleteForm = formRequirements.find((requirement) => {
@@ -194,10 +181,7 @@ export function buildWordReadiness(
     )?.allowed_form_types;
     return (
       (partOfSpeechLookup && !allowed?.includes(requirement.slot.form_type)) ||
-      !formSlotComplete(
-        requirement.slot,
-        requirement.pos.dialect_rules.spelling_mode
-      )
+      !formSlotComplete(requirement.slot, requirement.pos.dialect_rules)
     );
   });
   const firstIncompleteFormTarget = firstIncompleteForm
@@ -215,7 +199,7 @@ export function buildWordReadiness(
         : firstIncompleteForm.slot
           ? (formSlotIssueTarget(
               firstIncompleteForm.slot,
-              firstIncompleteForm.pos.dialect_rules.spelling_mode
+              firstIncompleteForm.pos.dialect_rules
             ) ?? {
               node_id: firstIncompleteForm.node_id,
               field: firstIncompleteForm.field
@@ -234,6 +218,31 @@ export function buildWordReadiness(
   const firstIncompletePartOfSpeechTarget = firstIncompletePartOfSpeech
     ? baseFormIssueTarget(firstIncompletePartOfSpeech, word?.headwords)
     : undefined;
+  const formsReadiness = row(
+    "forms",
+    "词形变化",
+    completeFormSlots,
+    formRequirements.length,
+    firstIncompleteForm && firstIncompleteFormTarget
+      ? {
+          step: "forms",
+          pos_id: firstIncompleteForm.pos.pos_id,
+          node_id: firstIncompleteFormTarget.node_id,
+          field: firstIncompleteFormTarget.field
+        }
+      : undefined
+  );
+  if (
+    formRequirements.length === 0 &&
+    forms.pos.length > 0 &&
+    partOfSpeechLookup &&
+    forms.pos.every(
+      (pos) =>
+        partOfSpeechLookup.byCode.get(pos.pos)?.allowed_form_types !== undefined
+    )
+  ) {
+    formsReadiness.state = "complete";
+  }
 
   const completeSenseGroups = meanings.sense_groups.filter(
     (group) =>
@@ -367,20 +376,7 @@ export function buildWordReadiness(
           ? { step: "forms", node_id: "forms", field: "pos" }
           : undefined
     ),
-    row(
-      "forms",
-      "词形变化",
-      completeFormSlots,
-      formRequirements.length,
-      firstIncompleteForm && firstIncompleteFormTarget
-        ? {
-            step: "forms",
-            pos_id: firstIncompleteForm.pos.pos_id,
-            node_id: firstIncompleteFormTarget.node_id,
-            field: firstIncompleteFormTarget.field
-          }
-        : undefined
-    ),
+    formsReadiness,
     row(
       "sense_groups",
       "语义区间",

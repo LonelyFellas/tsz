@@ -12,25 +12,25 @@ describe("forms validation issue targets", () => {
     const word = wordFixture({ ready: true });
     const pos = word.forms.pos[0]!;
     const slot = structuredClone(pos.base_form);
-    const spellingMode = pos.dialect_rules.spelling_mode;
+    const dialectRules = pos.dialect_rules;
     const uk = slot.variants.find((variant) => variant.dialect === "uk")!;
     const us = slot.variants.find((variant) => variant.dialect === "us")!;
 
     slot.variants = [uk];
-    expect(formSlotIssueTarget(slot, spellingMode)).toEqual({
+    expect(formSlotIssueTarget(slot, dialectRules)).toEqual({
       node_id: slot.id,
       field: "variants.us"
     });
 
     slot.variants = [uk, us, { ...uk, id: "duplicate-uk" }];
-    expect(formSlotIssueTarget(slot, spellingMode)).toEqual({
+    expect(formSlotIssueTarget(slot, dialectRules)).toEqual({
       node_id: slot.id,
       field: "variants"
     });
 
     slot.variants = [uk, us];
     uk.spelling = " center";
-    expect(formSlotIssueTarget(slot, spellingMode)).toEqual({
+    expect(formSlotIssueTarget(slot, dialectRules)).toEqual({
       node_id: slot.id,
       field: "variants.uk.spelling"
     });
@@ -38,7 +38,7 @@ describe("forms validation issue targets", () => {
     uk.spelling =
       word.headwords.mode === "distinguish" ? word.headwords.uk : "";
     uk.pronunciations = [];
-    expect(formSlotIssueTarget(slot, spellingMode)).toEqual({
+    expect(formSlotIssueTarget(slot, dialectRules)).toEqual({
       node_id: uk.id,
       field: "pronunciations"
     });
@@ -49,14 +49,14 @@ describe("forms validation issue targets", () => {
     );
     const pronunciation = uk.pronunciations[0]!;
     pronunciation.dict_phonetic = " ";
-    expect(formSlotIssueTarget(slot, spellingMode)).toEqual({
+    expect(formSlotIssueTarget(slot, dialectRules)).toEqual({
       node_id: pronunciation.id,
       field: "dict_phonetic"
     });
 
     pronunciation.dict_phonetic = "/test/";
     pronunciation.actual_pron = "";
-    expect(formSlotIssueTarget(slot, spellingMode)).toEqual({
+    expect(formSlotIssueTarget(slot, dialectRules)).toEqual({
       node_id: pronunciation.id,
       field: "actual_pron"
     });
@@ -66,9 +66,7 @@ describe("forms validation issue targets", () => {
     const word = wordFixture({ ready: true });
     const pos = word.forms.pos[0]!;
 
-    expect(
-      formSlotComplete(pos.base_form, pos.dialect_rules.spelling_mode)
-    ).toBe(true);
+    expect(formSlotComplete(pos.base_form, pos.dialect_rules)).toBe(true);
     expect(baseFormIssueTarget(pos)).toBeUndefined();
     expect(baseFormComplete(pos, word.headwords)).toBe(true);
 
@@ -78,5 +76,21 @@ describe("forms validation issue targets", () => {
       field: `variants.${pos.base_form.variants[0]!.dialect}.spelling`
     });
     expect(baseFormComplete(pos, word.headwords)).toBe(false);
+  });
+
+  it("拼写统一但音标区分时接受拼写相同的 UK/US 方言行", () => {
+    const word = wordFixture({ headword: "far", ready: true });
+
+    for (const pos of word.forms.pos) {
+      expect(pos.dialect_rules).toEqual({
+        spelling_mode: "unified",
+        phonetic_mode: "distinguish"
+      });
+      expect(formSlotComplete(pos.base_form, pos.dialect_rules)).toBe(true);
+      expect(baseFormComplete(pos, word.headwords)).toBe(true);
+      for (const slot of pos.form_groups.flatMap((group) => group.slots)) {
+        expect(formSlotComplete(slot, pos.dialect_rules)).toBe(true);
+      }
+    }
   });
 });
