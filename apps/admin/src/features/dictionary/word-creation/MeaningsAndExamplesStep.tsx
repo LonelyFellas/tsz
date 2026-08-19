@@ -71,7 +71,10 @@ import {
 import { CEFR_OPTIONS, cefrColor } from "../labels";
 import { adminWordsDataSourceCapabilities } from "../dataSource";
 import { env } from "@/lib/env";
-import { adminVoicePreviewAdapter } from "../voice-editor/dataSource";
+import {
+  adminVoicePreviewAdapter,
+  voicePreviewIsMock
+} from "../voice-editor/dataSource";
 import {
   createPartOfSpeechLookup,
   partOfSpeechLabel,
@@ -412,6 +415,7 @@ function VoiceEditorProvider({
             previewAdapter={
               env.VOICE_PREVIEW ? adminVoicePreviewAdapter : undefined
             }
+            previewIsMock={voicePreviewIsMock}
             onApply={(value) => {
               target.onApply(value);
               setTarget(undefined);

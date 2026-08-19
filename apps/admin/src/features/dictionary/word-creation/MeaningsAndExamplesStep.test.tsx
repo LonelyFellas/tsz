@@ -56,7 +56,8 @@ const relatedSearchV2State = vi.hoisted(() => ({
 }));
 const voicePreview = vi.hoisted(() => ({
   listVoices: vi.fn(),
-  synthesize: vi.fn()
+  synthesize: vi.fn(),
+  mocked: false
 }));
 const relatedWords = vi.hoisted(() => [
   {
@@ -111,8 +112,11 @@ vi.mock("../dataSource", () => ({
 vi.mock("@/lib/env", () => ({ env: featureFlags }));
 vi.mock("../voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: voicePreview,
-  // 这里注入的是本用例自己的假 adapter，不是 mock 模块，故无「模拟」标记。
-  voicePreviewIsMock: false
+  // 这里注入的是本用例自己的假 adapter，不是 mock 模块，故默认无「模拟」标记；
+  // 验证标记透传的用例把 voicePreview.mocked 置 true。
+  get voicePreviewIsMock() {
+    return voicePreview.mocked;
+  }
 }));
 vi.mock("@tsz/voice-editor/editor", async () => {
   const actual = await vi.importActual<typeof import("@tsz/voice-editor/core")>(
@@ -125,6 +129,7 @@ vi.mock("@tsz/voice-editor/editor", async () => {
       value,
       pronunciationHints,
       previewAdapter,
+      previewIsMock,
       onApply,
       onCancel
     }: VoiceRichTextEditorProps) =>
@@ -134,6 +139,7 @@ vi.mock("@tsz/voice-editor/editor", async () => {
           aria-label="测试语音编辑器"
           data-pronunciation-hint={pronunciationHints?.centre}
           data-preview-enabled={String(Boolean(previewAdapter))}
+          data-preview-mock={String(Boolean(previewIsMock))}
         >
           <button
             type="button"
@@ -367,6 +373,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   featureFlags.VOICE_EDITOR = false;
   featureFlags.VOICE_PREVIEW = false;
+  voicePreview.mocked = false;
   featureFlags.RELATED_SEARCH_V2 = false;
   featureFlags.WORD_CONTENT_COMPLETION = false;
   relatedSearchV2State.exactHasNextPage = false;
@@ -1946,6 +1953,31 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("添加语法结构")).toBeNull();
     expect(screen.queryByText("添加词义")).toBeNull();
     expect(screen.queryByText("保存草稿")).toBeNull();
+  });
+
+  it("试听走 mock 时把「模拟」标记透传给语音富文本编辑器", async () => {
+    featureFlags.VOICE_EDITOR = true;
+    featureFlags.VOICE_PREVIEW = true;
+    voicePreview.mocked = true;
+    renderStep(wordFixture({ ready: true }));
+
+    fireEvent.click(screen.getAllByLabelText(/高级语音编辑/)[0]!);
+
+    const dialog = await screen.findByLabelText("测试语音编辑器");
+    expect(dialog).toHaveAttribute("data-preview-enabled", "true");
+    expect(dialog).toHaveAttribute("data-preview-mock", "true");
+  });
+
+  it("试听走真实 TTS 时不给语音富文本编辑器打「模拟」标记", async () => {
+    featureFlags.VOICE_EDITOR = true;
+    featureFlags.VOICE_PREVIEW = true;
+    renderStep(wordFixture({ ready: true }));
+
+    fireEvent.click(screen.getAllByLabelText(/高级语音编辑/)[0]!);
+
+    const dialog = await screen.findByLabelText("测试语音编辑器");
+    expect(dialog).toHaveAttribute("data-preview-enabled", "true");
+    expect(dialog).toHaveAttribute("data-preview-mock", "false");
   });
 
   it("普通文本可直接编辑，按需打开高级语音编辑并按稳定节点回写", async () => {

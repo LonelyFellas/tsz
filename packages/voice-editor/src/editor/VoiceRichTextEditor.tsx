@@ -15,6 +15,8 @@ import {
   Select,
   Space,
   Spin,
+  Tag,
+  Tooltip,
   Typography
 } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -103,6 +105,7 @@ export function VoiceRichTextEditor({
   contextLabel = "语音富文本",
   pronunciationHints = {},
   previewAdapter,
+  previewIsMock = false,
   readOnly = false,
   onApply,
   onCancel,
@@ -832,6 +835,18 @@ export function VoiceRichTextEditor({
                 setSettings((current) => ({ ...current, pitchSemitones }))
               }
             />
+            {previewAdapter && previewIsMock && (
+              <Tooltip title="当前走本地 TTS mock，试听音频不是真实合成结果">
+                <Tag
+                  className="tsz-ve-preview-mock-tag"
+                  color="warning"
+                  role="note"
+                  aria-label="试听走本地 TTS mock，音频不是真实合成结果"
+                >
+                  模拟
+                </Tag>
+              </Tooltip>
+            )}
             <Button
               type="primary"
               loading={previewBusy}

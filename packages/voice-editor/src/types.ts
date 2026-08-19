@@ -79,6 +79,11 @@ export interface VoiceRichTextEditorProps {
   contextLabel?: string;
   pronunciationHints?: Readonly<Record<string, string>>;
   previewAdapter?: VoicePreviewAdapter;
+  /**
+   * previewAdapter 是否是「假」适配器(不发请求、返回假音频)。宿主自己判断并告知，
+   * 本包不读任何环境变量，保持对宿主环境无感。为 true 时编辑器内会标出「模拟」。
+   */
+  previewIsMock?: boolean;
   readOnly?: boolean;
   onApply: (value: RichTextV2) => void;
   onCancel: () => void;
