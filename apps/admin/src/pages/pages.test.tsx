@@ -4,6 +4,7 @@ import { App as AntApp } from "antd";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { HomePage } from "./Home";
+import { ProfileSettingsPage } from "./ProfileSettings";
 import { ReviewsPage } from "./Reviews";
 import { UsersPage } from "./Users";
 import { WordListsPage } from "./WordLists";
@@ -42,10 +43,15 @@ vi.mock("@/lib/auth", () => ({
       })
     }
   },
-  useAuthStore: {
-    getState: () => ({ profile: null }),
-    subscribe: vi.fn(() => vi.fn())
-  },
+  // 既要能当 hook 调（个人设置页取 profile.id），也要保留 getState/subscribe 静态用法。
+  useAuthStore: Object.assign(
+    (selector: (state: { profile: null }) => unknown) =>
+      selector({ profile: null }),
+    {
+      getState: () => ({ profile: null }),
+      subscribe: vi.fn(() => vi.fn())
+    }
+  ),
   // 用户管理页据 useIsSuperAdmin 决定写操作是否置灰；烟雾测试给个超管即可。
   useIsSuperAdmin: () => true
 }));
@@ -133,6 +139,20 @@ describe("admin 页面烟雾测试", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(
       "/words/new?kind=word"
     );
+  });
+
+  it("个人设置页渲染方言偏好，默认英式", () => {
+    // 依赖 antd App context（切换时用 message 反馈）。
+    render(
+      <AntApp>
+        <ProfileSettingsPage />
+      </AntApp>
+    );
+    expect(
+      screen.getByRole("heading", { name: "个人设置" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("英语方言偏好")).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "英式（BrE）" })).toBeChecked();
   });
 
   it.each([
