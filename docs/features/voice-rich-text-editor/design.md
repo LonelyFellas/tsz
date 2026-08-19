@@ -239,8 +239,10 @@ TipTap 内部使用 Document / Paragraph / Text / UndoRedo 加五个自定义扩
 - `@tsz/api-client` 已同步正式 `/speech/*` 路径、`voice_alias` 请求以及
   `cache_status` 响应，不再使用早期 `/tts/*` PENDING 提案。
 - 测试服的 voice catalog 已可通过真实鉴权访问，但 preview 供应商/存储链路在
-  2026-08-13 冒烟时仍返回 503。因此编辑器与真实试听使用独立开关：
-  `VITE_VOICE_EDITOR` 可先开，`VITE_VOICE_PREVIEW` 必须在真实合成成功后再开。
+  2026-08-13 冒烟时仍返回 503。编辑器与真实试听保留独立开关，但**试听默认走
+  真实 TTS**：`VITE_VOICE_PREVIEW` 默认开启（dev；生产默认关闭），后端未就绪
+  时由 UI 如实暴露——按钮禁用并给出「暂无可用发音人」或供应商失败提示，
+  不靠关开关、也不靠退回 mock 来掩盖。
 
 ### 已落地契约：RichText V2
 
@@ -316,7 +318,10 @@ export interface AdminSpeechPreviewResponse {
 
 - mock voice catalog 提供美音女/男、英音女/男和至少一个支持风格的 voice；
 - preview mock 返回稳定的短音频 fixture 与 `cached` 状态；SSML 始终由编辑器根据 canonical 内容本地预览；
-- 生产构建禁止启用 TTS mock，与现有 admin mock 防泄漏规则一致；
+- typed mock 默认关闭，须显式 `VITE_ADMIN_TTS_MOCK=true` 才启用；启用时试听
+  控件旁显示「模拟」标记，避免把假音频当成真实合成；
+- 生产构建禁止启用 TTS mock，由 `vite.config.ts` 在构建期 fail-closed 校验，
+  与现有 admin mock 防泄漏规则一致；
 - 未启用真实 TTS 时，编辑标注和保存仍可用，生成按钮 disabled 并说明后端未就绪。
 
 ## 数据流 / 时序
@@ -462,7 +467,9 @@ sequenceDiagram
 ## 风险与缓解
 
 - **真实试听依赖不可用**：编辑器与 preview 独立开关；provider、Redis 或
-  `speech` storage 未通过真实冒烟时只开编辑器，typed mock 不能在生产启用。
+  `speech` storage 未就绪时，试听按钮禁用并显示真实失败原因——默认不退回
+  mock，也不为此关掉试听开关；确需无后端调 UI 时才显式开 typed mock，
+  且界面会标注「模拟」。typed mock 不能在生产启用。
 - **RichText 升级影响旧消费者**：使用版本联合，不原地扩展 V1；V1 只在明确应用后升级；legacy 路由首期不写 V2。
 - **Unicode 偏移漂移**：所有边界集中到共享码点工具，禁止散落 `string.length/slice`；用复杂字符做往返测试。
 - **包边界被业务侵蚀**：用 ESLint/import 测试禁止包依赖 apps、api-client、router 和 query；业务 DTO 映射只放调用方。
