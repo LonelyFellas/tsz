@@ -4,6 +4,8 @@ import {
   baseFormComplete,
   baseFormIssueMessage,
   baseFormIssueTarget,
+  baseFormPronunciationIssues,
+  baseFormSpellingIssues,
   formSlotComplete,
   formSlotIssueTarget
 } from "./formsValidation";
@@ -121,6 +123,42 @@ describe("forms validation issue targets", () => {
     expect(baseFormIssueMessage(pos, word.headwords)).toBe(
       "基准原形拼写尚未按主词填写完整"
     );
+  });
+
+  it("拼写与读音问题分开归类，互不掩盖", () => {
+    const word = wordFixture({ ready: true });
+    const pos = structuredClone(word.forms.pos[0]!);
+    const variant = pos.base_form.variants[0]!;
+
+    expect(baseFormSpellingIssues(pos, word.headwords)).toEqual([]);
+    expect(baseFormPronunciationIssues(pos)).toEqual([]);
+
+    variant.pronunciations[0]!.actual_pron = "";
+    expect(baseFormSpellingIssues(pos, word.headwords)).toEqual([]);
+    expect(baseFormPronunciationIssues(pos)).toEqual([
+      { node_id: variant.pronunciations[0]!.id, field: "actual_pron" }
+    ]);
+
+    // 拼写非法时 formSlotIssues 会跳过该变体的读音，读音统计必须自己遍历。
+    variant.spelling = "";
+    expect(baseFormSpellingIssues(pos, word.headwords)).toEqual([
+      {
+        node_id: pos.base_form.id,
+        field: `variants.${variant.dialect}.spelling`
+      }
+    ]);
+    expect(baseFormPronunciationIssues(pos)).toEqual([
+      { node_id: variant.pronunciations[0]!.id, field: "actual_pron" }
+    ]);
+
+    // 读音缺失也不能挡住「拼写与主词不一致」的判定。
+    variant.spelling = "mismatch";
+    expect(baseFormSpellingIssues(pos, word.headwords)).toEqual([
+      {
+        node_id: pos.base_form.id,
+        field: `variants.${variant.dialect}.spelling`
+      }
+    ]);
   });
 
   it("拼写统一但音标区分时接受拼写相同的 UK/US 方言行", () => {

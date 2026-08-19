@@ -12,8 +12,8 @@ import type {
 } from "@tsz/types";
 import type { PartOfSpeechLookup } from "../part-of-speech/catalog";
 import {
-  baseFormComplete,
-  baseFormIssueTarget,
+  baseFormPronunciationIssues,
+  baseFormSpellingIssues,
   formSlotComplete,
   formSlotIssueTarget
 } from "./formsValidation";
@@ -26,13 +26,19 @@ import {
 export type ReadinessKey =
   | "dialect"
   | "parts_of_speech"
+  | "base_pronunciation"
   | "forms"
   | "sense_groups"
   | "grammar_structures"
   | "senses"
   | "sentences";
 
-export type ReadinessState = "complete" | "incomplete" | "empty";
+/**
+ * `empty` 是「还没有可统计的内容」,`not_required` 是「本词条确实不需要填」——
+ * 后者不能与 `complete` 混同,否则 0/0 会被读成已完成。
+ */
+export type ReadinessState =
+  "complete" | "incomplete" | "empty" | "not_required";
 
 export interface ReadinessTarget {
   step: WordCreationStep;
@@ -43,6 +49,8 @@ export interface ReadinessTarget {
 
 export interface ReadinessRow {
   key: ReadinessKey;
+  /** 所属步骤,便于各步骤的拦截提示引用左栏同一口径。 */
+  step: WordCreationStep;
   label: string;
   completed: number;
   total: number;
@@ -90,6 +98,7 @@ function stateFor(completed: number, total: number): ReadinessState {
 
 function row(
   key: ReadinessKey,
+  step: WordCreationStep,
   label: string,
   completed: number,
   total: number,
@@ -97,12 +106,23 @@ function row(
 ): ReadinessRow {
   return {
     key,
+    step,
     label,
     completed,
     total,
     state: stateFor(completed, total),
     ...(target ? { target } : {})
   };
+}
+
+/** 某一步骤下仍待完善的行,供该步骤的拦截提示复用左栏口径。 */
+export function pendingReadinessRows(
+  rows: readonly ReadinessRow[],
+  step: WordCreationStep
+): ReadinessRow[] {
+  return rows.filter(
+    (candidate) => candidate.step === step && candidate.state === "incomplete"
+  );
 }
 
 export function buildWordReadiness(
@@ -209,16 +229,29 @@ export function buildWordReadiness(
               field: firstIncompleteForm.field
             }
     : undefined;
-  const completePartsOfSpeech = forms.pos.filter((pos) =>
-    baseFormComplete(pos, word?.headwords)
+  // 「基本词性」只回答词性与其基准拼写,读音单列一行,否则缺音标会被读成没选词性。
+  const spellingIssuesByPos = forms.pos.map((pos) => ({
+    pos,
+    issues: baseFormSpellingIssues(pos, word?.headwords)
+  }));
+  const completePartsOfSpeech = spellingIssuesByPos.filter(
+    ({ issues }) => issues.length === 0
   ).length;
-  const firstIncompletePartOfSpeech = forms.pos.find(
-    (pos) => !baseFormComplete(pos, word?.headwords)
+  const firstIncompletePartOfSpeech = spellingIssuesByPos.find(
+    ({ issues }) => issues.length > 0
   );
-  const firstIncompletePartOfSpeechTarget = firstIncompletePartOfSpeech
-    ? baseFormIssueTarget(firstIncompletePartOfSpeech, word?.headwords)
-    : undefined;
+  const pronunciationIssuesByPos = forms.pos.map((pos) => ({
+    pos,
+    issues: baseFormPronunciationIssues(pos)
+  }));
+  const completeBasePronunciations = pronunciationIssuesByPos.filter(
+    ({ issues }) => issues.length === 0
+  ).length;
+  const firstIncompleteBasePronunciation = pronunciationIssuesByPos.find(
+    ({ issues }) => issues.length > 0
+  );
   const formsReadiness = row(
+    "forms",
     "forms",
     "词形变化",
     completeFormSlots,
@@ -241,7 +274,9 @@ export function buildWordReadiness(
         partOfSpeechLookup.byCode.get(pos.pos)?.allowed_form_types !== undefined
     )
   ) {
-    formsReadiness.state = "complete";
+    // 词性目录确认该词不需要派生词形:标成中性的「无需填写」,
+    // 不能沿用 complete——0/0 打绿勾会被读成内容已填好。
+    formsReadiness.state = "not_required";
   }
 
   const completeSenseGroups = meanings.sense_groups.filter(
@@ -355,30 +390,47 @@ export function buildWordReadiness(
     : undefined;
 
   return [
-    row("dialect", "方言识别", dialectComplete, 1, {
+    row("dialect", "basics", "方言识别", dialectComplete, 1, {
       step: "basics",
       node_id: "basics",
       field: "headwords"
     }),
     row(
       "parts_of_speech",
+      "forms",
       "基本词性",
       completePartsOfSpeech,
       Math.max(1, forms.pos.length),
-      firstIncompletePartOfSpeech && firstIncompletePartOfSpeechTarget
+      firstIncompletePartOfSpeech
         ? {
             step: "forms",
-            pos_id: firstIncompletePartOfSpeech.pos_id,
-            node_id: firstIncompletePartOfSpeechTarget.node_id,
-            field: firstIncompletePartOfSpeechTarget.field
+            pos_id: firstIncompletePartOfSpeech.pos.pos_id,
+            node_id: firstIncompletePartOfSpeech.issues[0]!.node_id,
+            field: firstIncompletePartOfSpeech.issues[0]!.field
           }
         : forms.pos.length === 0
           ? { step: "forms", node_id: "forms", field: "pos" }
           : undefined
     ),
+    row(
+      "base_pronunciation",
+      "forms",
+      "原形发音",
+      completeBasePronunciations,
+      forms.pos.length,
+      firstIncompleteBasePronunciation
+        ? {
+            step: "forms",
+            pos_id: firstIncompleteBasePronunciation.pos.pos_id,
+            node_id: firstIncompleteBasePronunciation.issues[0]!.node_id,
+            field: firstIncompleteBasePronunciation.issues[0]!.field
+          }
+        : undefined
+    ),
     formsReadiness,
     row(
       "sense_groups",
+      "meanings",
       "语义区间",
       completeSenseGroups,
       Math.max(1, meanings.sense_groups.length),
@@ -402,6 +454,7 @@ export function buildWordReadiness(
     ),
     row(
       "grammar_structures",
+      "meanings",
       "语法结构",
       completeGrammars,
       grammars.length,
@@ -424,6 +477,7 @@ export function buildWordReadiness(
     ),
     row(
       "senses",
+      "meanings",
       "多维词义",
       completeSenses,
       senses.length,
@@ -440,6 +494,7 @@ export function buildWordReadiness(
     ),
     row(
       "sentences",
+      "meanings",
       "多维例句",
       completeSentences,
       sentences.length,

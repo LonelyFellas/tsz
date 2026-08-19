@@ -1,5 +1,6 @@
 import type {
   WordFormSlotV2,
+  WordFormVariantV2,
   WordHeadwordsV2,
   WordPosFormsV2
 } from "@tsz/types";
@@ -24,6 +25,25 @@ function invalidSpelling(value: string): boolean {
 
 function invalidPronunciation(value: string): boolean {
   return value.trim().length === 0 || [...value].length > 200;
+}
+
+/** 单个方言变体的读音缺失,与拼写校验无关,可独立统计。 */
+function variantPronunciationIssues(
+  variant: WordFormVariantV2
+): FormIssueTarget[] {
+  if (variant.pronunciations.length === 0) {
+    return [{ node_id: variant.id, field: "pronunciations" }];
+  }
+  const issues: FormIssueTarget[] = [];
+  for (const pronunciation of variant.pronunciations) {
+    if (invalidPronunciation(pronunciation.dict_phonetic)) {
+      issues.push({ node_id: pronunciation.id, field: "dict_phonetic" });
+    }
+    if (invalidPronunciation(pronunciation.actual_pron)) {
+      issues.push({ node_id: pronunciation.id, field: "actual_pron" });
+    }
+  }
+  return issues;
 }
 
 /** 按方言、拼写、读音顺序收集全部无效叶字段(首项即定位用的焦点目标)。 */
@@ -58,18 +78,7 @@ export function formSlotIssues(
       });
       continue;
     }
-    if (variant.pronunciations.length === 0) {
-      issues.push({ node_id: variant.id, field: "pronunciations" });
-      continue;
-    }
-    for (const pronunciation of variant.pronunciations) {
-      if (invalidPronunciation(pronunciation.dict_phonetic)) {
-        issues.push({ node_id: pronunciation.id, field: "dict_phonetic" });
-      }
-      if (invalidPronunciation(pronunciation.actual_pron)) {
-        issues.push({ node_id: pronunciation.id, field: "actual_pron" });
-      }
-    }
+    issues.push(...variantPronunciationIssues(variant));
   }
   return issues;
 }
@@ -88,12 +97,11 @@ export function formSlotComplete(
   return !formSlotIssueTarget(slot, rules);
 }
 
-export function baseFormIssues(
+/** 基准原形拼写是否与第 1 步确认的主词一致。 */
+function headwordConsistencyIssues(
   pos: WordPosFormsV2,
   headwords?: WordHeadwordsV2
 ): FormIssueTarget[] {
-  const issues = formSlotIssues(pos.base_form, pos.dialect_rules);
-  if (issues.length > 0) return issues;
   if (!headwords) return [];
   for (const variant of pos.base_form.variants) {
     const expected =
@@ -114,6 +122,46 @@ export function baseFormIssues(
     }
   }
   return [];
+}
+
+export function baseFormIssues(
+  pos: WordPosFormsV2,
+  headwords?: WordHeadwordsV2
+): FormIssueTarget[] {
+  const issues = formSlotIssues(pos.base_form, pos.dialect_rules);
+  if (issues.length > 0) return issues;
+  return headwordConsistencyIssues(pos, headwords);
+}
+
+const PRONUNCIATION_ISSUE_FIELDS = new Set([
+  "pronunciations",
+  "dict_phonetic",
+  "actual_pron"
+]);
+
+/**
+ * 基准原形的方言与拼写问题(不含读音),供左栏「基本词性」独立计数。
+ * 不能直接过滤 `baseFormIssues`:那里读音问题会挡住主词一致性检查。
+ */
+export function baseFormSpellingIssues(
+  pos: WordPosFormsV2,
+  headwords?: WordHeadwordsV2
+): FormIssueTarget[] {
+  const issues = formSlotIssues(pos.base_form, pos.dialect_rules).filter(
+    (issue) => !PRONUNCIATION_ISSUE_FIELDS.has(issue.field)
+  );
+  if (issues.length > 0) return issues;
+  return headwordConsistencyIssues(pos, headwords);
+}
+
+/**
+ * 基准原形的读音问题,供左栏「原形发音」独立计数。直接遍历变体,
+ * 不走 `formSlotIssues` 的拼写短路,避免拼写有问题时读音缺失被隐藏为完成。
+ */
+export function baseFormPronunciationIssues(
+  pos: WordPosFormsV2
+): FormIssueTarget[] {
+  return pos.base_form.variants.flatMap(variantPronunciationIssues);
 }
 
 export function baseFormIssueTarget(

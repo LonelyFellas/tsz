@@ -1,7 +1,8 @@
 import {
   CheckCircleFilled,
   ClockCircleOutlined,
-  LeftOutlined
+  LeftOutlined,
+  MinusCircleOutlined
 } from "@ant-design/icons";
 import { Breadcrumb, Button, Flex, Steps, Tag, Typography } from "antd";
 import type {
@@ -37,7 +38,7 @@ const STEP_SUBTITLE: Record<WordCreationStep, string> = {
   basics: "所属语言｜英美区分",
   forms: "词性分类｜词形变化",
   meanings: "多维释义｜多维例句",
-  preview: "字典预览｜提交生效"
+  preview: "结构核对｜提交生效"
 };
 
 function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
@@ -97,8 +98,11 @@ function ProgressSummary({
     <Flex vertical gap={13} className="word-creation-progress-list">
       {rows.map((row) => {
         const done = row.state === "complete";
-        const value =
-          row.key === "dialect"
+        // 「无需填写」是中性态:不打勾也不催办,避免 0/0 被读成已完成。
+        const notRequired = row.state === "not_required";
+        const value = notRequired
+          ? "无需填写"
+          : row.key === "dialect"
             ? done
               ? "完成"
               : "待完成"
@@ -114,6 +118,8 @@ function ProgressSummary({
           >
             {done ? (
               <CheckCircleFilled className="word-progress-done" />
+            ) : notRequired ? (
+              <MinusCircleOutlined className="word-progress-none" />
             ) : (
               <ClockCircleOutlined className="word-progress-wait" />
             )}
