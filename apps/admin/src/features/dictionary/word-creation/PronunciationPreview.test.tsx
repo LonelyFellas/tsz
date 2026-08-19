@@ -16,6 +16,7 @@ import { deferred } from "./wordCreation.test.helper";
 
 const preview = vi.hoisted(() => ({
   enabled: true,
+  mocked: false,
   listVoices: vi.fn(),
   synthesize: vi.fn()
 }));
@@ -46,6 +47,9 @@ vi.mock("../voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {
     listVoices: preview.listVoices,
     synthesize: preview.synthesize
+  },
+  get voicePreviewIsMock() {
+    return preview.mocked;
   }
 }));
 
@@ -146,6 +150,7 @@ function PreviewHarness({
 beforeEach(() => {
   vi.clearAllMocks();
   preview.enabled = true;
+  preview.mocked = false;
   preview.listVoices.mockResolvedValue(voices);
   preview.synthesize.mockResolvedValue(result());
   message.error.mockReset();
@@ -402,6 +407,25 @@ describe("PronunciationPreview", () => {
       )
     );
     expect(screen.getByLabelText("播放语音")).toBeEnabled();
+  });
+
+  it("走真实 TTS 时不显示模拟标记", async () => {
+    render(<PreviewHarness />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("获取语音")).toBeEnabled()
+    );
+
+    expect(screen.queryByText("模拟")).toBeNull();
+  });
+
+  it("走 mock 适配器时显示模拟标记", async () => {
+    preview.mocked = true;
+    render(<PreviewHarness />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("获取语音")).toBeEnabled()
+    );
+
+    expect(screen.getByText("模拟")).toBeVisible();
   });
 
   it("目标 locale 无 voice 或 spelling 为空时不请求合成", async () => {

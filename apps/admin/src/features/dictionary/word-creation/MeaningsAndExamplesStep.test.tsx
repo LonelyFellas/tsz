@@ -110,7 +110,9 @@ vi.mock("../dataSource", () => ({
 
 vi.mock("@/lib/env", () => ({ env: featureFlags }));
 vi.mock("../voice-editor/dataSource", () => ({
-  adminVoicePreviewAdapter: voicePreview
+  adminVoicePreviewAdapter: voicePreview,
+  // 这里注入的是本用例自己的假 adapter，不是 mock 模块，故无「模拟」标记。
+  voicePreviewIsMock: false
 }));
 vi.mock("@tsz/voice-editor/editor", async () => {
   const actual = await vi.importActual<typeof import("@tsz/voice-editor/core")>(

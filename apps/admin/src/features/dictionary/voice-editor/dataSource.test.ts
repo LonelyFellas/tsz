@@ -53,8 +53,11 @@ afterEach(() => {
 describe("admin voice preview data source", () => {
   it("delegates both methods to the real API when mock is disabled", async () => {
     vi.stubEnv("PROD", false);
-    const { adminVoicePreviewAdapter } = await import("./dataSource");
+    const { adminVoicePreviewAdapter, voicePreviewIsMock } =
+      await import("./dataSource");
     const controller = new AbortController();
+
+    expect(voicePreviewIsMock).toBe(false);
 
     await expect(
       adminVoicePreviewAdapter.listVoices({
@@ -88,8 +91,10 @@ describe("admin voice preview data source", () => {
   it("loads and memoizes the development mock adapter", async () => {
     vi.stubEnv("PROD", false);
     state.env.ADMIN_TTS_MOCK = true;
-    const { adminVoicePreviewAdapter } = await import("./dataSource");
+    const { adminVoicePreviewAdapter, voicePreviewIsMock } =
+      await import("./dataSource");
 
+    expect(voicePreviewIsMock).toBe(true);
     const voices = await adminVoicePreviewAdapter.listVoices({
       language: "en"
     });
@@ -109,8 +114,10 @@ describe("admin voice preview data source", () => {
     vi.stubEnv("PROD", true);
     vi.stubEnv("MODE", "production");
     state.env.ADMIN_TTS_MOCK = true;
-    const { adminVoicePreviewAdapter } = await import("./dataSource");
+    const { adminVoicePreviewAdapter, voicePreviewIsMock } =
+      await import("./dataSource");
 
+    expect(voicePreviewIsMock).toBe(false);
     await adminVoicePreviewAdapter.listVoices({ language: "en" });
 
     expect(state.voices).toHaveBeenCalledOnce();
