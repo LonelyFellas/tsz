@@ -567,6 +567,15 @@ function hasExplicitWorkspacePlural(body: unknown): boolean {
   });
 }
 
+// 命中结果的词典覆盖度:e2e 桩按全覆盖返回,partial/missing 的呈现由单测覆盖。
+const FULL_COVERAGE = {
+  forms: "complete",
+  pronunciations: "complete",
+  meanings: "complete",
+  examples: "complete",
+  frequency: "complete"
+} as const;
+
 function detectionResponse(
   duplicate: boolean,
   rawHeadword: string,
@@ -588,7 +597,8 @@ function detectionResponse(
       builtin_dictionary: {
         status: "matched",
         headwords: { mode: "unified", common: rawHeadword },
-        suggested_forms: clone(CENTER_FORMS)
+        suggested_forms: clone(CENTER_FORMS),
+        coverage: clone(FULL_COVERAGE)
       },
       smart_dictionary: {
         status: "warning",
@@ -621,7 +631,8 @@ function detectionResponse(
     builtin_dictionary: {
       status: "matched",
       headwords,
-      suggested_forms: clone(CENTER_FORMS)
+      suggested_forms: clone(CENTER_FORMS),
+      coverage: clone(FULL_COVERAGE)
     },
     smart_dictionary: isDuplicate
       ? {

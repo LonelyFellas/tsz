@@ -52,18 +52,31 @@ function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
       </div>
     );
   }
+  // 检测基准侧排首位并保持主视觉,否则会被误读成主词被静默换成了另一侧拼写。
+  const sides = (
+    headwords.source_dialect === "uk"
+      ? (["uk", "us"] as const)
+      : (["us", "uk"] as const)
+  ).map((dialect) => ({
+    dialect,
+    spelling: dialect === "uk" ? headwords.uk : headwords.us,
+    caption: dialect === "uk" ? "英式英语 · BrE" : "美式英语 · AmE"
+  }));
   return (
     <Flex vertical gap={5}>
-      <div className="word-creation-summary-headword">
-        <span className="dialect-dot dialect-dot-uk" />
-        <strong>{headwords.uk}</strong>
-        <small>英式英语 · BrE</small>
-      </div>
-      <div className="word-creation-summary-headword word-creation-summary-alt">
-        <span className="dialect-dot dialect-dot-us" />
-        <span>{headwords.us}</span>
-        <small>美式英语 · AmE</small>
-      </div>
+      {sides.map(({ dialect, spelling, caption }, index) => (
+        <div
+          key={dialect}
+          className={`word-creation-summary-headword${index === 0 ? "" : " word-creation-summary-alt"}`}
+        >
+          <span className={`dialect-dot dialect-dot-${dialect}`} />
+          {index === 0 ? <strong>{spelling}</strong> : <span>{spelling}</span>}
+          <small>
+            {caption}
+            {index === 0 ? " · 检测基准" : ""}
+          </small>
+        </div>
+      ))}
     </Flex>
   );
 }

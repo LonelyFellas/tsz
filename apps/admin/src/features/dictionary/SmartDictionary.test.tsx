@@ -183,8 +183,18 @@ describe("SmartDictionary", () => {
     expect(screen.getByText("协作空间")).toBeVisible();
     expect(screen.getByText("BrE")).toBeVisible();
 
+    // 操作按钮在可及性树中必须能区分行:同名词条靠短 ID 分辨。
     const secondRow = screen.getByText("a0a093e7").closest("tr")!;
-    fireEvent.click(secondRow.querySelectorAll("td:last-child button")[1]!);
+    const secondActions = secondRow.querySelectorAll<HTMLButtonElement>(
+      "td:last-child button"
+    );
+    expect(secondActions[0]!.getAttribute("aria-label")).toBe(
+      "继续创建「workspace」a0a093e7"
+    );
+    expect(secondActions[1]!.getAttribute("aria-label")).toBe(
+      "归档「workspace」a0a093e7"
+    );
+    fireEvent.click(secondActions[1]!);
     fireEvent.click(
       (await screen.findAllByText("归 档", { exact: true }))
         .map((item) => item.closest("button"))
@@ -461,6 +471,13 @@ describe("SmartDictionary", () => {
       .getAllByText("恢 复", { exact: true })
       .map((item) => item.closest("button"))
       .find((item) => item?.classList.contains("ant-btn-link"))!;
+    expect(rowRestore.getAttribute("aria-label")).toBe("恢复「first」word-1");
+    expect(
+      rowRestore
+        .closest("td")!
+        .querySelector("button")!
+        .getAttribute("aria-label")
+    ).toBe("查看「first」word-1");
     fireEvent.click(rowRestore);
     await screen.findAllByText("恢复「first」？");
     fireEvent.click(
