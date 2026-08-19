@@ -629,25 +629,7 @@ function validateForms(
         message: `基本词性 ${pos.pos} 未配置`
       });
     }
-    if (pos.form_groups.length === 0) {
-      issues.push({
-        step: "forms",
-        node_id: pos.pos_id,
-        field: "form_groups",
-        code: "form_group_required",
-        message: "每个词性至少需要一组词形变化"
-      });
-    }
     for (const formGroup of pos.form_groups) {
-      if (formGroup.slots.length === 0) {
-        issues.push({
-          step: "forms",
-          node_id: formGroup.id,
-          field: "slots",
-          code: "form_slot_required",
-          message: "每组词形变化至少需要一个词形"
-        });
-      }
       if (
         new Set(formGroup.slots.map((slot) => slot.form_type)).size !==
         formGroup.slots.length

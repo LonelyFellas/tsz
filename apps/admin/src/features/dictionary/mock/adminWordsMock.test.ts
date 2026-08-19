@@ -1945,8 +1945,6 @@ describe("admin words mock", () => {
     secondUs.pronunciations[0]!.actual_pron = "";
 
     const expectedCodes = [
-      "form_group_required",
-      "form_slot_required",
       "duplicate_form_type",
       "dialect_variants_invalid",
       "spelling_required",

@@ -67,7 +67,7 @@ export function defaultDerivedFormType(
   configured?: readonly DerivedFormType[]
 ): DerivedFormType | undefined {
   const legal = legalDerivedFormTypes(pos, configured);
-  return legal.find((type) => !existing.includes(type)) ?? legal[0];
+  return legal.find((type) => !existing.includes(type));
 }
 
 export function wordDisplayHeadword(word: AdminWordV2): string {

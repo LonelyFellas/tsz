@@ -325,6 +325,21 @@ describe("FormsAndPronunciationStep", () => {
     expect(mutations.preview).not.toHaveBeenCalled();
   });
 
+  it("默认词形为空时仍可添加允许的派生词形", () => {
+    catalogState.data = {
+      ...partOfSpeechCatalogFixture,
+      items: partOfSpeechCatalogFixture.items.map((item) =>
+        item.code === "noun" ? { ...item, default_form_types: [] } : item
+      )
+    };
+    renderStep();
+
+    fireEvent.click(button("添加派生词形"));
+
+    expect(screen.getByText("复数")).toBeVisible();
+    expect(button("添加派生词形")).toBeDisabled();
+  });
+
   it("词形与发音只使用基本词性，不展示配置层级的细分词性 Tab", () => {
     renderStep();
 
@@ -509,7 +524,7 @@ describe("FormsAndPronunciationStep", () => {
     expect(mutations.save).not.toHaveBeenCalled();
   });
 
-  it("完成前阻止真正为空的词形组，并按空组数量提示", async () => {
+  it("允许支持派生词的具体单词以空词形组完成", async () => {
     const word = wordFixture();
     word.forms.pos[0]!.form_groups = [
       { id: "empty-group-1", is_regular: true, slots: [] },
@@ -519,11 +534,28 @@ describe("FormsAndPronunciationStep", () => {
 
     fireEvent.click(button("完成并进入词义与例句"));
 
+    await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/词形变化尚未添加派生词形/)).toBeNull();
+  });
+
+  it("当前组已使用全部合法类型时禁用新增，历史重复类型即时标红", () => {
+    const word = wordFixture();
+    const nounGroup = word.forms.pos[0]!.form_groups[0]!;
+    nounGroup.slots.push({
+      ...structuredClone(nounGroup.slots[0]!),
+      id: "historical-duplicate-plural"
+    });
+    renderStep(word);
+
+    expect(button("添加派生词形")).toBeDisabled();
+    expect(button("添加派生词形")).toHaveAttribute(
+      "title",
+      "当前组已添加全部可用词形类型"
+    );
     expect(
-      await screen.findByText("名词有 2 组词形变化尚未添加派生词形")
-    ).toBeInTheDocument();
-    expect(mutations.preview).not.toHaveBeenCalled();
-    expect(mutations.save).not.toHaveBeenCalled();
+      screen.getAllByText("同组内词形类型不能重复").length
+    ).toBeGreaterThan(0);
   });
 
   it("tomato 填入 tomatoes 后可完成，保存 wire 保留 plural slot 与 variant", async () => {
@@ -1415,6 +1447,19 @@ describe("FormsAndPronunciationStep", () => {
       expect(target).toHaveClass("word-validation-focus");
       expect(document.activeElement).toBe(target);
     });
+
+    const focused = document.querySelector<HTMLElement>(
+      `[data-word-node-id="${issue.node_id}"][data-word-field="${issue.field}"]`
+    )!;
+    const spellingInput =
+      focused instanceof HTMLInputElement
+        ? focused
+        : focused.querySelector<HTMLInputElement>(
+            'input[placeholder="词形拼写"]'
+          )!;
+    expect(document.querySelector(".ant-alert-error")).not.toBeNull();
+    fireEvent.change(spellingInput, { target: { value: "updated-form" } });
+    expect(document.querySelector(".ant-alert-error")).toBeNull();
   });
 
   it("readiness 读音目标聚焦到真实的首个无效叶字段", async () => {
@@ -1568,6 +1613,17 @@ describe("FormsAndPronunciationStep", () => {
     expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("far");
     expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("far");
     expect(screen.queryByText("英美音标是否有区别？")).toBeNull();
+  });
+
+  it("拼写统一但音标区分的完整词形可以完成", async () => {
+    renderStep(wordFixture({ headword: "far", ready: true }));
+
+    fireEvent.click(button("完成并进入词义与例句"));
+
+    await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/基准原形缺少/)).toBeNull();
+    expect(screen.queryByText(/派生词形尚未填写完整/)).toBeNull();
   });
 
   it("名词和动词拼写区分时隐藏音标区别选项并保持英美两栏", () => {

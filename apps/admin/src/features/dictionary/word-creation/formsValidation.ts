@@ -4,10 +4,9 @@ import type {
   WordPosFormsV2
 } from "@tsz/types";
 
-function expectedDialects(
-  spellingMode: WordPosFormsV2["dialect_rules"]["spelling_mode"]
-) {
-  return spellingMode === "distinguish"
+function expectedDialects(rules: WordPosFormsV2["dialect_rules"]) {
+  return rules.spelling_mode === "distinguish" ||
+    rules.phonetic_mode === "distinguish"
     ? (["uk", "us"] as const)
     : (["common"] as const);
 }
@@ -29,9 +28,9 @@ function invalidPronunciation(value: string): boolean {
 
 export function formSlotIssueTarget(
   slot: WordFormSlotV2,
-  spellingMode: WordPosFormsV2["dialect_rules"]["spelling_mode"]
+  rules: WordPosFormsV2["dialect_rules"]
 ): FormIssueTarget | undefined {
-  const expected = expectedDialects(spellingMode);
+  const expected = expectedDialects(rules);
   const actual = new Set(slot.variants.map((variant) => variant.dialect));
   const missingDialect = expected.find((dialect) => !actual.has(dialect));
   if (missingDialect) {
@@ -71,27 +70,22 @@ export function formSlotIssueTarget(
 
 export function formSlotComplete(
   slot: WordFormSlotV2,
-  spellingMode: WordPosFormsV2["dialect_rules"]["spelling_mode"]
+  rules: WordPosFormsV2["dialect_rules"]
 ): boolean {
-  return !formSlotIssueTarget(slot, spellingMode);
+  return !formSlotIssueTarget(slot, rules);
 }
 
 export function baseFormIssueTarget(
   pos: WordPosFormsV2,
   headwords?: WordHeadwordsV2
 ): FormIssueTarget | undefined {
-  const issue = formSlotIssueTarget(
-    pos.base_form,
-    pos.dialect_rules.spelling_mode
-  );
+  const issue = formSlotIssueTarget(pos.base_form, pos.dialect_rules);
   if (issue) return issue;
   if (!headwords) return undefined;
   for (const variant of pos.base_form.variants) {
     const expected =
       headwords.mode === "unified"
-        ? variant.dialect === "common"
-          ? headwords.common
-          : undefined
+        ? headwords.common
         : variant.dialect === "uk"
           ? headwords.uk
           : variant.dialect === "us"

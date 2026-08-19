@@ -70,7 +70,7 @@ describe("词性派生词形能力", () => {
     expect(defaultDerivedFormType("verb", [])).toBeUndefined();
   });
 
-  it("优先选择尚未录入的合法类型，全部齐全时保持第一个合法类型供替代组复用", () => {
+  it("优先选择尚未录入的合法类型，全部齐全时不再生成重复类型", () => {
     expect(
       defaultDerivedFormType(
         "verb",
@@ -89,7 +89,7 @@ describe("词性派生词形能力", () => {
         ["comparative", "superlative"],
         ["comparative", "superlative"]
       )
-    ).toBe("comparative");
+    ).toBeUndefined();
   });
 });
 
