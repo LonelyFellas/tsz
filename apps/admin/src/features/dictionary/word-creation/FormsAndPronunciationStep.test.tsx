@@ -525,6 +525,24 @@ describe("FormsAndPronunciationStep", () => {
     expect(mutations.save).not.toHaveBeenCalled();
   });
 
+  it("拦截提示复述左栏完成情况的分数，而不是另给一个对不上的总数", async () => {
+    const word = wordFixture();
+    word.forms.pos[0]!.base_form.variants[0]!.pronunciations[0]!.dict_phonetic =
+      "";
+    word.forms.pos[1]!.form_groups[0]!.slots[0]!.variants[0]!.pronunciations[0]!.actual_pron =
+      "";
+    renderStep(word);
+
+    fireEvent.click(button("完成并进入词义与例句"));
+
+    expect(
+      await screen.findByText(
+        "还需完善：原形发音 1/2、词形变化 4/5（同左栏「完成情况」）"
+      )
+    ).toBeInTheDocument();
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
   it("允许支持派生词的具体单词以空词形组完成", async () => {
     const word = wordFixture();
     word.forms.pos[0]!.form_groups = [

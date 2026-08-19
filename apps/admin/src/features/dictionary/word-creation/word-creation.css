@@ -209,6 +209,10 @@
   color: #bdc2cc;
 }
 
+.word-progress-none {
+  color: #dadee5;
+}
+
 .word-creation-progress-row > .ant-typography:last-child {
   min-width: 34px;
   margin: 0;

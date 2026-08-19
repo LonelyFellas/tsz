@@ -1,6 +1,8 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
+import { createPartOfSpeechLookup } from "../part-of-speech/catalog";
+import { partOfSpeechCatalogFixture } from "./partOfSpeech.test.helper";
 import { WordCreationLayout } from "./WordCreationLayout";
 import { completeMeanings, wordFixture } from "./wordCreation.test.helper";
 
@@ -145,6 +147,7 @@ describe("WordCreationLayout", () => {
 
     expect(summary).toHaveTextContent("方言识别完成");
     expect(summary).toHaveTextContent("基本词性2/2");
+    expect(summary).toHaveTextContent("原形发音2/2");
     expect(summary).toHaveTextContent("词形变化5/5");
     expect(summary).toHaveTextContent("语义区间1/1");
     expect(summary).toHaveTextContent("语法结构2/2");
@@ -188,6 +191,37 @@ describe("WordCreationLayout", () => {
       expect(row).toHaveAttribute("data-readiness-state", "incomplete");
       expect(row.querySelector(".word-progress-done")).toBeNull();
     }
+  });
+
+  it("缺音标只落在原形发音行，不写成基本词性未完成", () => {
+    const word = wordFixture({ ready: true });
+    word.forms.pos[0]!.base_form.variants[0]!.pronunciations[0]!.actual_pron =
+      "";
+    renderLayout({ word, currentStep: "forms" });
+
+    const partsOfSpeech = screen.getByText("基本词性").parentElement!;
+    expect(partsOfSpeech).toHaveTextContent("2/2");
+    expect(partsOfSpeech).toHaveAttribute("data-readiness-state", "complete");
+    const pronunciation = screen.getByText("原形发音").parentElement!;
+    expect(pronunciation).toHaveTextContent("1/2");
+    expect(pronunciation).toHaveAttribute("data-readiness-state", "incomplete");
+  });
+
+  it("无派生词形时词形变化显示无需填写，不打完成勾", () => {
+    const word = wordFixture({ ready: true });
+    for (const pos of word.forms.pos) pos.form_groups = [];
+    renderLayout({
+      word,
+      currentStep: "forms",
+      partOfSpeechLookup: createPartOfSpeechLookup(partOfSpeechCatalogFixture)
+    });
+
+    const forms = screen.getByText("词形变化").parentElement!;
+    expect(forms).toHaveTextContent("无需填写");
+    expect(forms).not.toHaveTextContent("0/0");
+    expect(forms).toHaveAttribute("data-readiness-state", "not_required");
+    expect(forms.querySelector(".word-progress-done")).toBeNull();
+    expect(forms.querySelector(".word-progress-none")).not.toBeNull();
   });
 
   it("优先使用当前未保存草稿实时计算摘要", () => {
@@ -234,7 +268,8 @@ describe("WordCreationLayout", () => {
     const view = renderLayout({ word, currentStep: "preview", readOnly: true });
 
     expect(screen.getByText("已发布 · 只读")).toBeInTheDocument();
-    expect(screen.getByText("centre · 预览并生效")).toBeInTheDocument();
+    // 面包屑与左栏「当前词条」一致，用检测基准侧(此处 source_dialect 为 us)。
+    expect(screen.getByText("center · 预览并生效")).toBeInTheDocument();
     const summary = view.container.querySelector<HTMLElement>(
       ".word-creation-summary"
     )!;

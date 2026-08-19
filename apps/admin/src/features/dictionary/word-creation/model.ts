@@ -70,10 +70,19 @@ export function defaultDerivedFormType(
   return legal.find((type) => !existing.includes(type));
 }
 
+/** 单值展示(面包屑、提交提示)一律用检测基准侧,与左栏「当前词条」的排序一致。 */
 export function wordDisplayHeadword(word: AdminWordV2): string {
   return word.headwords.mode === "unified"
     ? word.headwords.common
-    : word.headwords.uk;
+    : word.headwords[word.headwords.source_dialect];
+}
+
+/** 并列展示两侧拼写时的顺序:检测基准侧在前,与左栏「当前词条」一致。 */
+export function orderedHeadwordSpellings(headwords: WordHeadwordsV2): string[] {
+  if (headwords.mode === "unified") return [headwords.common];
+  return headwords.source_dialect === "uk"
+    ? [headwords.uk, headwords.us]
+    : [headwords.us, headwords.uk];
 }
 
 export function dialectHeadword(

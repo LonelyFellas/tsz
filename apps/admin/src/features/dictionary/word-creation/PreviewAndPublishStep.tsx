@@ -50,7 +50,7 @@ import {
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { newWordNodeId } from "../word-model/primitives";
 import { usePublishWordV2, useValidateWordV2 } from "./api";
-import { wordDisplayHeadword } from "./model";
+import { orderedHeadwordSpellings, wordDisplayHeadword } from "./model";
 
 interface Props {
   word: AdminWordV2;
@@ -570,7 +570,7 @@ export function PreviewAndPublishStep({
             ? "该词条已归档，当前仅提供结构化只读查看；恢复后才能继续编辑或发布。"
             : readOnly
               ? "该 V2 词条已发布，本轮提供与创建预览一致的只读查看。"
-              : "查看结构化字典预览和发布完整性结果。所有问题处理完成后可直接提交生效。"}
+              : "逐项核对结构化内容与发布完整性校验结果；本页不呈现学习端字典卡片样式。所有问题处理完成后可直接提交生效。"}
         </Typography.Paragraph>
       </div>
 
@@ -776,9 +776,7 @@ export function PreviewAndPublishStep({
         >
           <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
             <Descriptions.Item label="主词">
-              {word.headwords.mode === "unified"
-                ? word.headwords.common
-                : `${word.headwords.uk} / ${word.headwords.us}`}
+              {orderedHeadwordSpellings(word.headwords).join(" / ")}
             </Descriptions.Item>
             <Descriptions.Item label="语言">English 英语</Descriptions.Item>
             <Descriptions.Item label="状态">
