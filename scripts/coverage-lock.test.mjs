@@ -9,6 +9,7 @@ import {
   acquireSingleInstanceLock,
   withSingleInstanceLock
 } from "./coverage-lock.mjs";
+import { buildCoverageVitestArgs } from "./coverage-runner-args.mjs";
 
 async function temporaryDirectory() {
   return mkdtemp(join(tmpdir(), "tsz-coverage-lock-"));
@@ -212,4 +213,30 @@ test("the canonical coverage command always enters through the locked runner", a
     packageJson.scripts["test:cov"],
     "pnpm check:node && pnpm test:node-runtime && pnpm test:coverage-lock && pnpm test:deploy-provenance && node scripts/run-coverage-locked.mjs"
   );
+});
+
+test("the coverage runner limits worker concurrency by default", () => {
+  assert.deepEqual(buildCoverageVitestArgs([]), [
+    "run",
+    "--coverage",
+    "--maxWorkers=2"
+  ]);
+});
+
+test("the coverage runner preserves an explicit worker limit", () => {
+  assert.deepEqual(
+    buildCoverageVitestArgs(["--maxWorkers=4", "--reporter=dot"]),
+    ["run", "--coverage", "--maxWorkers=4", "--reporter=dot"]
+  );
+  assert.deepEqual(buildCoverageVitestArgs(["--maxWorkers", "4"]), [
+    "run",
+    "--coverage",
+    "--maxWorkers",
+    "4"
+  ]);
+  assert.deepEqual(buildCoverageVitestArgs(["--", "--maxWorkers=4"]), [
+    "run",
+    "--coverage",
+    "--maxWorkers=4"
+  ]);
 });
