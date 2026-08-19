@@ -4,6 +4,7 @@ import {
   availablePartOfSpeechOptions,
   createPartOfSpeechLookup,
   partOfSpeechLabel,
+  soleSubPartOfSpeechCode,
   subPartOfSpeechLabel,
   subPartOfSpeechOptions
 } from "./catalog";
@@ -47,6 +48,9 @@ describe("part-of-speech catalog", () => {
       label: "可数名词"
     });
     expect(subPartOfSpeechOptions(lookup, "unknown-pos")).toEqual([]);
+    expect(soleSubPartOfSpeechCode(lookup, "adjective")).toBe("ADJ");
+    expect(soleSubPartOfSpeechCode(lookup, "noun")).toBeUndefined();
+    expect(soleSubPartOfSpeechCode(lookup, "unknown-pos")).toBeUndefined();
     expect(createPartOfSpeechLookup(undefined).items).toEqual([]);
   });
 });
