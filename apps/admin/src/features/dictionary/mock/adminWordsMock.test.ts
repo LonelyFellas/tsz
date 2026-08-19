@@ -792,6 +792,25 @@ describe("admin words mock", () => {
         forms: { pos: [] }
       }
     });
+    const unmatchedWord = await mock.detect({
+      language: "en",
+      headword: "not-found"
+    });
+    await expect(
+      mock.createV2({
+        schema_version: 2,
+        idempotency_key: "create-unmatched-word",
+        detection_id: unmatchedWord.detection_id,
+        headwords: { mode: "unified", common: "not-found" }
+      })
+    ).resolves.toMatchObject({
+      word: {
+        kind: "word",
+        lifecycle_revision: 1,
+        headwords: { mode: "unified", common: "not-found" },
+        forms: { pos: [] }
+      }
+    });
     const normalizedPhrase = await mock.detect({
       language: "en",
       headword: "  It’s　Well—Known  "
@@ -1824,7 +1843,6 @@ describe("admin words mock", () => {
     ).rejects.toMatchObject({ status: 422, code: "detection_mismatch" });
 
     for (const [headword, expectedCode] of [
-      ["not-found", "detection_mismatch"],
       ["builtin-unavailable", "detection_mismatch"],
       ["smart-unavailable", "detection_mismatch"]
     ] as const) {

@@ -3068,8 +3068,8 @@ export function createAdminWordsMock({
         detection.matched_dialect,
         input.headwords
       );
-    const unmatchedPhrase =
-      detection.entry_kind === "phrase" &&
+    // 未命中内置词典时按管理员原输入建 unified 词条,单词与短语同一条路径。
+    const unmatchedDictionary =
       detection.builtin_dictionary.status === "not_found" &&
       input.headwords.mode === "unified" &&
       normalizeFixtureHeadword(input.headwords.common).key ===
@@ -3077,7 +3077,7 @@ export function createAdminWordsMock({
     if (
       (surfaceWarnings === "legacy" &&
         detection.smart_dictionary.status !== "clear") ||
-      (!dictionaryMatched && !unmatchedPhrase)
+      (!dictionaryMatched && !unmatchedDictionary)
     ) {
       const code =
         detection.smart_dictionary.status === "duplicate"
