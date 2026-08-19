@@ -1,4 +1,9 @@
-import { DownOutlined, LockOutlined, LogoutOutlined } from "@ant-design/icons";
+import {
+  DownOutlined,
+  LockOutlined,
+  LogoutOutlined,
+  SettingOutlined
+} from "@ant-design/icons";
 import { Button, Divider, Popover, Space, Typography } from "antd";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +28,11 @@ export function AdminHeader() {
   // 未映射的 role（后端将来新增等级、前端未跟上）回退「管理员」，不留空白角色行。
   const roleLabel = (profile && ADMIN_LEVEL_LABEL[profile.role]) || "管理员";
 
-  // 选一项后先收起 Popover，再执行动作（改密走 SPA 导航，登出走整页跳转）。
+  // 选一项后先收起 Popover，再执行动作（改密/个人设置走 SPA 导航，登出走整页跳转）。
+  const goProfileSettings = () => {
+    setOpen(false);
+    navigate("/settings/profile");
+  };
   const goChangePassword = () => {
     setOpen(false);
     navigate("/change-password");
@@ -55,6 +64,15 @@ export function AdminHeader() {
           paddingTop: 8
         }}
       >
+        <Button
+          type="text"
+          block
+          icon={<SettingOutlined />}
+          style={{ justifyContent: "flex-start" }}
+          onClick={goProfileSettings}
+        >
+          个人设置
+        </Button>
         <Button
           type="text"
           block

@@ -108,6 +108,14 @@ export const router = createBrowserRouter([
             })
           },
           {
+            // 个人设置：入口在顶栏头像菜单，不进侧栏（侧栏由后端菜单权限驱动）。
+            path: "settings/profile",
+            lazy: async () => ({
+              Component: (await import("@/pages/ProfileSettings"))
+                .ProfileSettingsPage
+            })
+          },
+          {
             path: "settings/parts-of-speech",
             lazy: async () => ({
               Component: (await import("@/pages/PartOfSpeechSettings"))

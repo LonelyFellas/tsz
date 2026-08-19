@@ -1,7 +1,11 @@
 # 英美方言偏好化改造（A1）：技术设计
 
 > 配套需求文档：[`requirements.md`](./requirements.md)。本文只讲怎么落地，
-> 产品口径一律以需求文档为准。**本阶段不动业务代码。**
+> 产品口径一律以需求文档为准。
+>
+> **实施进度**：评估已于 2026-08-19 评审通过（三层模型 + 五条结论 + PR #134 作废）。
+> **阶段 1（方言偏好内核与个人设置入口）已落地**，落地过程中对本文的三处修正
+> 已就地改写并标注理由；阶段 2 起未动。
 >
 > **核对基线**
 >
@@ -161,17 +165,23 @@ export const DEFAULT_DIALECT_PREFERENCE: AdminDialectPreference = "uk";
 export interface DialectPreferenceStore {
   read(adminProfileId: string): AdminDialectPreference;
   write(adminProfileId: string, value: AdminDialectPreference): void;
-  clear(adminProfileId?: string): void;
 }
 ```
 
 - 存储键：`tsz:admin:dialect-preference:v1:<encodeURIComponent(adminProfileId)>`，
-  沿用 `apps/admin/src/features/dictionary/mock/storage.ts` 已有的
-  「schema version + admin 命名空间 + 登出清理」模式（不复制代码，抽同形接口）。
-- 读失败（JSON 坏、存储不可用、值不在枚举内）→ 返回默认 `uk`，dev 下 warn，不抛。
-- 写失败 → 抛给调用方，由 UI 提示并回退显示值。
-- admin 侧薄壳：`apps/admin/src/features/settings/dialectPreference.ts` +
-  一个 `useDialectPreference()` hook，从 `useAuthStore(s => s.profile?.id)` 取身份。
+  沿用 `apps/admin/src/features/dictionary/mock/storage.ts` 的
+  「schema version + admin 命名空间」隔离模式（不复制代码，只取同形约定）。
+- **没有 `clear`，登出不清理**。评估初稿照搬了 mock storage 的「登出清理」，
+  落地时发现那是错的：mock 清理是为了防草稿串号，而偏好的键已按身份隔离，
+  换账号本就读不到别人的值；清理只会让偏好每次登出丢失，与用户故事 1 矛盾。
+- 读失败（存储不可用、值不在枚举内）→ 返回默认 `uk`，dev 下 warn，不抛。
+- 写失败 → 抛给调用方，由 UI 提示；显示值因未更新而自动停在原值。
+- admin 侧薄壳：`apps/admin/src/features/settings/useDialectPreference.ts`
+  （**不叫 `dialectPreference.ts`**——它与同目录的 `DialectPreference.tsx`
+  只差大小写，在 macOS / Windows 的大小写不敏感文件系统上会被解析成同一个模块，
+  实测导致组件 import 到错误的文件），从 `useAuthStore(s => s.profile?.id)` 取身份。
+  偏好要被创建向导四步、只读预览、语音发音人**跨屏读取**，因此做成
+  `useSyncExternalStore` 驱动的共享状态而非各组件 `useState`，避免两处读到不同的值。
   逻辑在 `@tsz/shared`，壳里不散落判断——与鉴权内核同一套约定。
 
 ### L3：内容收敛规则
@@ -232,11 +242,13 @@ export function collapseEnglishText(
 
 ### `apps/admin` — 偏好与设置
 
-| 文件                                          | 性质 | 内容                                      | 风险                                         |
-| --------------------------------------------- | ---- | ----------------------------------------- | -------------------------------------------- |
-| `src/features/settings/DialectPreference.tsx` | 新增 | antd `Segmented` / `Radio.Group` 两态选择 | 两字按钮文案插空格；jsdom 需 matchMedia 垫片 |
-| `src/features/settings/dialectPreference.ts`  | 新增 | 薄壳 hook，绑定当前 `profile.id`          | profile 为空时（强制改密态）不渲染入口       |
-| `src/features/auth/AdminHeader.tsx`           | 适配 | Popover 里加「个人设置」入口              | 该 Popover 有过收口历史，改动需重跑其单测    |
+| 文件                                            | 性质 | 内容                                                                                                                | 风险                                                     |
+| ----------------------------------------------- | ---- | ------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `src/features/settings/DialectPreference.tsx`   | 新增 | antd `Radio.Group` 两态选择 + 一句说明                                                                              | jsdom 需 matchMedia 垫片                                 |
+| `src/features/settings/useDialectPreference.ts` | 新增 | 薄壳 hook，绑定当前 `profile.id`，`useSyncExternalStore` 共享快照                                                   | 文件名不能与组件只差大小写（见上）；会话失效时不写无主键 |
+| `src/pages/ProfileSettings.tsx`                 | 新增 | 个人设置页外壳（`pages/**` 不纳入单测门槛，由 e2e/冒烟保底）                                                        | 低                                                       |
+| `src/router.tsx`                                | 适配 | 加 `settings/profile` 路由（懒加载，落在 `ConsoleLayout` 门禁内）                                                   | 低                                                       |
+| `src/features/auth/AdminHeader.tsx`             | 适配 | Popover 里加「个人设置」入口——**只在顶栏，不进侧栏**：侧栏可见性由后端下发的菜单权限 key 驱动，个人设置不该占权限位 | 该 Popover 有过收口历史，改动需重跑其单测                |
 
 ### `apps/admin` — 第 1 步
 
@@ -446,7 +458,7 @@ export function collapseEnglishText(
 
 | 对象                                | 覆盖点                                                                                                                                                                                                                    | 门槛                 |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
-| `@tsz/shared` 偏好内核              | 默认值、读写往返、非法值降级、存储不可用降级、admin 命名空间隔离、登出清理、schema version 不匹配                                                                                                                         | **100%**（packages） |
+| `@tsz/shared` 偏好内核              | 默认值、读写往返、非法值降级、存储读写抛错降级、admin 命名空间隔离与键转义                                                                                                                                                | **100%**（packages） |
 | `model.ts`                          | `createEnglishText` 恒 unified；`resolveEnglishText` 三态（unified / distinguish 偏好侧 ready / 偏好侧 missing）；`collapseEnglishText` 的丢弃计数；`createGrammar` 在 unified/distinguish 下的 variants 形状与 ID 稳定性 | 90%（apps）          |
 | `meaningsAndExamples/validation.ts` | 单份英文内容的空/非空判定；语法结构镜像形状与后端 `expected_dialects` 同口径                                                                                                                                              | 90%                  |
 | `formsValidation.ts`                | 提示文案含方言侧 + 字段名；AND 判定（与第 1 批 B2 修复对齐）                                                                                                                                                              | 90%                  |
