@@ -133,6 +133,10 @@
   border-radius: 4px;
 }
 
+.tsz-ve-preview-mock-tag {
+  cursor: help;
+}
+
 .tsz-ve-ssml {
   max-height: 260px;
   margin: 0;

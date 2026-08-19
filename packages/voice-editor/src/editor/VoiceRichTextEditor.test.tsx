@@ -410,6 +410,27 @@ describe("VoiceRichTextEditor", () => {
     expect(actionButton("重播")).toBeDisabled();
   });
 
+  it("marks the preview as simulated when the host reports a mock adapter", async () => {
+    render(
+      <VoiceRichTextEditor
+        {...editorProps({ previewAdapter: adapter(), previewIsMock: true })}
+      />
+    );
+    await waitFor(() => expect(actionButton("生成试听")).toBeEnabled());
+
+    const tag = screen.getByRole("note", {
+      name: "试听走本地 TTS mock，音频不是真实合成结果"
+    });
+    expect(tag).toBeVisible();
+    expect(tag).toHaveTextContent("模拟");
+  });
+
+  it("hides the simulated marker when no preview adapter is wired", () => {
+    render(<VoiceRichTextEditor {...editorProps({ previewIsMock: true })} />);
+
+    expect(screen.queryByText("模拟")).toBeNull();
+  });
+
   it("invalidates a preview when expiresAt is not parseable", async () => {
     const previewAdapter = adapter(
       vi.fn().mockResolvedValue(result({ expiresAt: "not-a-date" }))
