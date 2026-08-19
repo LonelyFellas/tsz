@@ -84,6 +84,22 @@ function LocationProbe() {
   );
 }
 
+/** 未命中内置词典时后端建出的空白草稿：unified 主词 + 零建议词性。 */
+function unmatchedWordFixture() {
+  const base = wordFixture({ forms: { pos: [] } });
+  const headwords = { mode: "unified" as const, common: "brand-new-word" };
+  return {
+    ...base,
+    headwords,
+    detection_snapshot: {
+      ...base.detection_snapshot,
+      builtin_dictionary_status: "not_found" as const,
+      headwords,
+      suggested_pos: []
+    }
+  };
+}
+
 function renderStep(
   word = wordFixture(),
   locationState?: { nodeId: string; field: string },
@@ -347,6 +363,30 @@ describe("FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText("添加细分词性")).toBeNull();
     expect(screen.queryByRole("tab", { name: "细分词性" })).toBeNull();
     expect(screen.getByText("名词", { exact: true })).toBeVisible();
+  });
+
+  it("未命中内置词典的空白草稿显示空态引导，并可从零添加第一个基本词性", async () => {
+    renderStep(unmatchedWordFixture());
+
+    expect(screen.getByText("当前还没有基本词性")).toBeVisible();
+    expect(
+      screen.getByText(/请用右上角的「添加基本词性」添加第一个词性/)
+    ).toBeVisible();
+    expect(screen.queryByLabelText("共用词形拼写")).toBeNull();
+
+    fireEvent.mouseDown(screen.getByLabelText("添加基本词性"));
+    const option = (await screen.findAllByText("名词", { exact: true })).find(
+      (item) => item.closest(".ant-select-item-option")
+    );
+    if (!option) throw new Error("基本词性选项未渲染");
+    fireEvent.click(option);
+
+    expect(screen.queryByText("当前还没有基本词性")).toBeNull();
+    // 主词是 unified,基准原形按 common 侧回填,且属于人工录入。
+    expect(screen.getByLabelText("共用词形拼写")).toHaveValue("brand-new-word");
+    expect(screen.queryByLabelText("英式词形拼写")).toBeNull();
+    expect(screen.getAllByLabelText("字典音标")[0]).toHaveValue("");
+    expect(screen.getAllByLabelText("实际发音")[0]).toHaveValue("");
   });
 
   it("点击词形变化组头部可收起并重新展开", () => {
