@@ -23,10 +23,13 @@ const VOICE_EDITOR = parseBooleanEnvFlag(
   "VITE_VOICE_EDITOR",
   !import.meta.env.PROD
 );
+// 真实试听默认关闭，须显式开启：设计文档
+// (docs/features/voice-rich-text-editor/design.md) 约定编辑器可先开，
+// 真实试听必须在 /admin/speech/previews 真实合成成功后再开。
 const VOICE_PREVIEW = parseBooleanEnvFlag(
   import.meta.env.VITE_VOICE_PREVIEW,
   "VITE_VOICE_PREVIEW",
-  !import.meta.env.PROD
+  false
 );
 // 试听默认走真实 TTS：mock 只在显式设置 VITE_ADMIN_TTS_MOCK=true 时启用，
 // 否则本地对接真实后端时会误判语音链路已接通。
