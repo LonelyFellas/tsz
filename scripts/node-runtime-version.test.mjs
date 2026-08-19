@@ -76,7 +76,9 @@ test("CI, Docker, and native deployment use the same pinned Node runtime", async
   assert.doesNotMatch(ci, /node-version:\s*\d+/);
   assert.match(adminDockerfile, /^FROM node:24\.19\.0-alpine AS base/m);
   assert.match(webDockerfile, /^FROM node:24\.19\.0-alpine AS base/m);
-  assert.match(deployWeb, /required_node_version="v\$\(.*\.node-version\)"/);
+  // 版本必须由 .node-version 推导出来（现在读的是目标 commit 里的那份），不许写死。
+  assert.match(deployWeb, /required_node_version="v\$\(.*\.node-version.*\)"/);
+  assert.doesNotMatch(deployWeb, /required_node_version="v24\./);
   assert.match(deployWeb, /ssh tshb-test '\/usr\/bin\/node --version'/);
   assert.ok(
     deployWeb.indexOf("server_node_version=") <
