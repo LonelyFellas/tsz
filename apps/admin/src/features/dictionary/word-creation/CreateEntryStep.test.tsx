@@ -1189,6 +1189,82 @@ describe("CreateEntryStep", () => {
     expect(button("确认并进入词形与发音")).toBeDisabled();
   });
 
+  it("命中且全覆盖时把原形与派生词形分开计数", async () => {
+    mutations.detect.mockResolvedValue(detectionFixture("center"));
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
+    expect(screen.getByText("已匹配")).toBeVisible();
+    expect(
+      screen.getByText(
+        "词典带回派生词形 5 个、完整读音 14 组；另有 2 个词性的原形拼写来自刚确认的主词，不计为新增词形。释义、例句和词频若未显示，将在后续步骤明确要求人工补充。"
+      )
+    ).toBeVisible();
+  });
+
+  it("覆盖不全时不呈现为完全成功，并点明派生词形为 0", async () => {
+    const detection = detectionFixture("center", "det-partial-coverage");
+    if (detection.builtin_dictionary.status !== "matched") {
+      throw new Error("fixture must be matched");
+    }
+    // 真实后端对 center 只带回原形：form_groups 全空 + coverage 非 complete。
+    for (const pos of detection.builtin_dictionary.suggested_forms.pos) {
+      pos.form_groups = pos.form_groups.map((group) => ({
+        ...group,
+        slots: []
+      }));
+    }
+    detection.builtin_dictionary.coverage = {
+      forms: "partial",
+      pronunciations: "missing",
+      meanings: "missing",
+      examples: "missing",
+      frequency: "missing"
+    };
+    mutations.detect.mockResolvedValue(detection);
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByText("内置词典只找到部分内容")).toBeVisible();
+    expect(screen.getByText("部分匹配")).toBeVisible();
+    expect(screen.queryByText("已匹配")).toBeNull();
+    expect(
+      screen.getByText(
+        "词典带回派生词形 0 个、完整读音 4 组；另有 2 个词性的原形拼写来自刚确认的主词，不计为新增词形。本次没有带回任何派生词形，需要在「词形与发音」步骤手工补录。词典覆盖不完整：词形仅部分覆盖；读音、释义、例句、词频缺失，缺口内容需要在后续步骤人工补充。"
+      )
+    ).toBeVisible();
+    // 覆盖不全只是提示，不阻断创建。
+    expect(button("确认并进入词形与发音")).not.toBeDisabled();
+  });
+
+  it("响应缺 coverage 时按无缺口降级，不让检测卡崩掉", async () => {
+    const detection = detectionFixture("center", "det-no-coverage");
+    if (detection.builtin_dictionary.status !== "matched") {
+      throw new Error("fixture must be matched");
+    }
+    // 旧后端或手写桩可能不带 coverage：它只是提示信息，不该白屏整张卡。
+    Reflect.deleteProperty(detection.builtin_dictionary, "coverage");
+    mutations.detect.mockResolvedValue(detection);
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
+    expect(screen.getByText("已匹配")).toBeVisible();
+  });
+
   it("检测结果含未配置词性时显示稳定编码并阻断创建", async () => {
     const detection = detectionFixture("center");
     if (detection.builtin_dictionary.status !== "matched") {

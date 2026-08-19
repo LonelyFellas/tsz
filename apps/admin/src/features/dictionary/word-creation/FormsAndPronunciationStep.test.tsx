@@ -508,7 +508,7 @@ describe("FormsAndPronunciationStep", () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
   });
 
-  it("完成前执行客户端基准发音校验，不请求影响预览或保存", async () => {
+  it("完成前执行客户端基准发音校验，提示按实际缺失项收窄", async () => {
     const word = wordFixture();
     word.forms.pos[0]!.base_form.variants[0]!.pronunciations[0]!.dict_phonetic =
       "";
@@ -516,8 +516,9 @@ describe("FormsAndPronunciationStep", () => {
 
     fireEvent.click(button("完成并进入词义与例句"));
 
+    // 判定是「字典音标且实际发音」的 AND，只缺字典音标时不能再提示「或实际发音」。
     expect(
-      await screen.findByText("名词基准原形缺少字典音标或实际发音")
+      await screen.findByText("名词基准原形缺少字典音标")
     ).toBeInTheDocument();
     expect(screen.getByText("本步骤还有 1 项待修正")).toBeInTheDocument();
     expect(mutations.preview).not.toHaveBeenCalled();

@@ -416,6 +416,7 @@ export interface BuiltinDictionaryMatchedV2 {
   status: "matched";
   headwords: WordHeadwordsV2;
   suggested_forms: DraftFormsStepContent;
+  coverage: DictionaryCoverageV2;
 }
 
 export type BuiltinDictionaryUnmatchedV2 =

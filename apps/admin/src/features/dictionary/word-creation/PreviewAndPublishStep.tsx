@@ -34,7 +34,7 @@ import "@tsz/voice-editor/styles.css";
 import { HttpError } from "@tsz/api-client/http";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { DIALECT_LABEL } from "../editorConstants";
+import { DEFINITION_MODE_LABEL, DIALECT_LABEL } from "../editorConstants";
 import {
   aggregateSurfaceMatchCards,
   canAcknowledgeSurfaceSnapshot,
@@ -293,7 +293,11 @@ function MeaningsPreview({
                           <Space>
                             <Tag>{definition.level}</Tag>
                             <Typography.Text type="secondary">
-                              {definition.definition_mode}
+                              {
+                                DEFINITION_MODE_LABEL[
+                                  definition.definition_mode
+                                ]
+                              }
                             </Typography.Text>
                           </Space>
                           <DefinitionRichTextPreview definition={definition} />

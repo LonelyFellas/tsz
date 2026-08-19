@@ -72,6 +72,51 @@ describe("WordCreationLayout", () => {
     ).not.toHaveClass("word-creation-shell--basics");
   });
 
+  it("英美区分时检测基准侧排首位并保持主视觉", () => {
+    const view = renderLayout({
+      currentStep: "forms",
+      draftHeadwords: {
+        mode: "distinguish",
+        uk: "centre",
+        us: "center",
+        source_dialect: "us"
+      }
+    });
+    const rows = Array.from(
+      view.container.querySelectorAll<HTMLElement>(
+        ".word-creation-summary-headword"
+      )
+    );
+
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("center");
+    expect(rows[0]).toHaveTextContent("美式英语 · AmE · 检测基准");
+    expect(rows[0]!.querySelector("strong")?.textContent).toBe("center");
+    expect(rows[0]).not.toHaveClass("word-creation-summary-alt");
+    expect(rows[1]).toHaveTextContent("centre");
+    expect(rows[1]).toHaveClass("word-creation-summary-alt");
+    expect(rows[1]!.querySelector("strong")).toBeNull();
+
+    view.unmount();
+    const ukFirst = renderLayout({
+      currentStep: "forms",
+      draftHeadwords: {
+        mode: "distinguish",
+        uk: "centre",
+        us: "center",
+        source_dialect: "uk"
+      }
+    });
+    const ukRows = Array.from(
+      ukFirst.container.querySelectorAll<HTMLElement>(
+        ".word-creation-summary-headword"
+      )
+    );
+    expect(ukRows[0]!.querySelector("strong")?.textContent).toBe("centre");
+    expect(ukRows[0]).toHaveTextContent("英式英语 · BrE · 检测基准");
+    expect(ukRows[1]).toHaveTextContent("center");
+  });
+
   it("顶部摘要在缺少 canonical word 时安全展示空状态或统一草稿主词", () => {
     const empty = renderLayout({ currentStep: "forms" });
     expect(screen.getByText("完成检测后显示")).toBeInTheDocument();
