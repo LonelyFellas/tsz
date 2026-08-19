@@ -241,18 +241,21 @@ const COVERAGE_FIELD_LABEL: Record<keyof DictionaryCoverageV2, string> = {
   frequency: "词频"
 };
 
-/** 词典未完全覆盖的部分,用于把 partial/missing 如实说给录入者。 */
+/**
+ * 词典未完全覆盖的部分,用于把 partial/missing 如实说给录入者。
+ * coverage 缺失时按无缺口处理:它只是提示信息,不该让整张检测卡崩掉。
+ */
 function coverageGapSummary(
-  coverage: DictionaryCoverageV2
+  coverage?: DictionaryCoverageV2
 ): string | undefined {
   const partial: string[] = [];
   const missing: string[] = [];
   for (const field of Object.keys(
     COVERAGE_FIELD_LABEL
   ) as (keyof DictionaryCoverageV2)[]) {
-    if (coverage[field] === "partial")
+    if (coverage?.[field] === "partial")
       partial.push(COVERAGE_FIELD_LABEL[field]);
-    if (coverage[field] === "missing")
+    if (coverage?.[field] === "missing")
       missing.push(COVERAGE_FIELD_LABEL[field]);
   }
   const clauses = [

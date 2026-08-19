@@ -1246,6 +1246,25 @@ describe("CreateEntryStep", () => {
     expect(button("确认并进入词形与发音")).not.toBeDisabled();
   });
 
+  it("响应缺 coverage 时按无缺口降级，不让检测卡崩掉", async () => {
+    const detection = detectionFixture("center", "det-no-coverage");
+    if (detection.builtin_dictionary.status !== "matched") {
+      throw new Error("fixture must be matched");
+    }
+    // 旧后端或手写桩可能不带 coverage：它只是提示信息，不该白屏整张卡。
+    Reflect.deleteProperty(detection.builtin_dictionary, "coverage");
+    mutations.detect.mockResolvedValue(detection);
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
+    expect(screen.getByText("已匹配")).toBeVisible();
+  });
+
   it("检测结果含未配置词性时显示稳定编码并阻断创建", async () => {
     const detection = detectionFixture("center");
     if (detection.builtin_dictionary.status !== "matched") {
