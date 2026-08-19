@@ -81,7 +81,11 @@ import {
   useSaveFormsStep,
   useSuggestDialectVariants
 } from "./api";
-import { baseFormComplete, formSlotComplete } from "./formsValidation";
+import {
+  baseFormComplete,
+  baseFormIssueMessage,
+  formSlotComplete
+} from "./formsValidation";
 import { summarizeFormsImpact } from "./formsImpactSummary";
 import {
   createDerivedSlot,
@@ -2365,8 +2369,9 @@ export function FormsAndPronunciationStep({
             `${posLabel}有 ${incompleteCount} 个派生词形尚未填写完整`
           );
         }
-        if (!baseFormComplete(pos, word.headwords)) {
-          issues.push(`${posLabel}基准原形缺少字典音标或实际发音`);
+        const baseIssue = baseFormIssueMessage(pos, word.headwords);
+        if (baseIssue) {
+          issues.push(`${posLabel}${baseIssue}`);
         }
       }
       setValidationMessages(issues);

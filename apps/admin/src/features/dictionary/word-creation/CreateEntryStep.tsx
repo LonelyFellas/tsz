@@ -24,6 +24,8 @@ import {
 import type {
   AdminWordV2,
   DetectWordResponseV2,
+  DictionaryCoverageV2,
+  DraftFormsStepContent,
   SurfaceMatchPageV2,
   WordHeadwordsV2
 } from "@tsz/types";
@@ -231,6 +233,78 @@ function SurfaceWarningMatches({
   );
 }
 
+const COVERAGE_FIELD_LABEL: Record<keyof DictionaryCoverageV2, string> = {
+  forms: "词形",
+  pronunciations: "读音",
+  meanings: "释义",
+  examples: "例句",
+  frequency: "词频"
+};
+
+/** 词典未完全覆盖的部分,用于把 partial/missing 如实说给录入者。 */
+function coverageGapSummary(
+  coverage: DictionaryCoverageV2
+): string | undefined {
+  const partial: string[] = [];
+  const missing: string[] = [];
+  for (const field of Object.keys(
+    COVERAGE_FIELD_LABEL
+  ) as (keyof DictionaryCoverageV2)[]) {
+    if (coverage[field] === "partial")
+      partial.push(COVERAGE_FIELD_LABEL[field]);
+    if (coverage[field] === "missing")
+      missing.push(COVERAGE_FIELD_LABEL[field]);
+  }
+  const clauses = [
+    partial.length > 0 ? `${partial.join("、")}仅部分覆盖` : undefined,
+    missing.length > 0 ? `${missing.join("、")}缺失` : undefined
+  ].filter((clause): clause is string => clause !== undefined);
+  return clauses.length > 0 ? clauses.join("；") : undefined;
+}
+
+/**
+ * 原形拼写就是录入者刚确认的主词本身,必须与词典带回的派生词形分开计数,
+ * 否则「6 个词形」会被误读成第 2 步已有 6 个可用词形。
+ */
+function suggestionCounts(forms: DraftFormsStepContent) {
+  const counts = { baseForms: 0, derivedForms: 0, pronunciations: 0 };
+  for (const pos of forms.pos) {
+    const derivedSlots = pos.form_groups.flatMap((group) => group.slots);
+    if (pos.base_form.variants.some((variant) => variant.spelling.trim())) {
+      counts.baseForms += 1;
+    }
+    counts.derivedForms += derivedSlots.filter((slot) =>
+      slot.variants.some((variant) => variant.spelling.trim())
+    ).length;
+    for (const slot of [pos.base_form, ...derivedSlots]) {
+      for (const variant of slot.variants) {
+        counts.pronunciations += variant.pronunciations.filter(
+          (pronunciation) =>
+            pronunciation.dict_phonetic.trim() &&
+            pronunciation.actual_pron.trim()
+        ).length;
+      }
+    }
+  }
+  return counts;
+}
+
+/** 命中词典后的说明文案:先讲派生词形,再交代覆盖缺口。 */
+function matchedSummary(
+  counts: ReturnType<typeof suggestionCounts>,
+  coverageGaps?: string
+): string {
+  return [
+    `词典带回派生词形 ${counts.derivedForms} 个、完整读音 ${counts.pronunciations} 组；另有 ${counts.baseForms} 个词性的原形拼写来自刚确认的主词，不计为新增词形。`,
+    counts.derivedForms === 0
+      ? "本次没有带回任何派生词形，需要在「词形与发音」步骤手工补录。"
+      : "",
+    coverageGaps
+      ? `词典覆盖不完整：${coverageGaps}，缺口内容需要在后续步骤人工补充。`
+      : "释义、例句和词频若未显示，将在后续步骤明确要求人工补充。"
+  ].join("");
+}
+
 function DetectionStatus({
   result,
   lookup,
@@ -275,41 +349,29 @@ function DetectionStatus({
     smart.status === "duplicate"
       ? smart.duplicates.find((item) => item.status === "archived")
       : undefined;
-  const suggestionCoverage =
+  const coverageGaps =
     builtin.status === "matched"
-      ? builtin.suggested_forms.pos.reduce(
-          (summary, pos) => {
-            const slots = [
-              pos.base_form,
-              ...pos.form_groups.flatMap((group) => group.slots)
-            ];
-            for (const slot of slots) {
-              summary.forms += slot.variants.filter((variant) =>
-                variant.spelling.trim()
-              ).length;
-              for (const variant of slot.variants) {
-                summary.pronunciations += variant.pronunciations.filter(
-                  (pronunciation) =>
-                    pronunciation.dict_phonetic.trim() &&
-                    pronunciation.actual_pron.trim()
-                ).length;
-              }
-            }
-            return summary;
-          },
-          { forms: 0, pronunciations: 0 }
-        )
+      ? coverageGapSummary(builtin.coverage)
       : undefined;
+  // 命中但覆盖不全时不能再呈现为「完全成功」,否则 partial 与全匹配毫无区别。
+  const dictionaryPartial =
+    builtin.status === "matched" && coverageGaps !== undefined;
   return (
     <Card
       className="word-detection-result-card"
       size="small"
       title="词典检测结果"
       extra={
-        <Tag color={canContinue ? "success" : "error"}>
+        <Tag
+          color={
+            !canContinue ? "error" : dictionaryPartial ? "warning" : "success"
+          }
+        >
           {canContinue
             ? builtin.status === "matched"
-              ? "已匹配"
+              ? dictionaryPartial
+                ? "部分匹配"
+                : "已匹配"
               : "可创建"
             : "不可继续"}
         </Tag>
@@ -317,20 +379,25 @@ function DetectionStatus({
     >
       <Space orientation="vertical" size={16} style={{ width: "100%" }}>
         <Alert
-          type={canContinue ? "success" : "warning"}
+          type={canContinue && !dictionaryPartial ? "success" : "warning"}
           showIcon
           title={
             result.entry_kind === "phrase" && builtin.status === "not_found"
               ? "内置词典没有匹配项，将创建空白短语草稿"
               : builtin.status === "matched"
-                ? "内置词典已找到规范词条"
+                ? dictionaryPartial
+                  ? "内置词典只找到部分内容"
+                  : "内置词典已找到规范词条"
                 : builtin.status === "not_found"
                   ? "内置词典没有匹配项"
                   : "内置词典暂时不可用"
           }
           description={
             builtin.status === "matched"
-              ? `本次实际带出 ${suggestionCoverage?.forms ?? 0} 个词形、${suggestionCoverage?.pronunciations ?? 0} 组完整读音。释义、例句和词频若未显示，将在后续步骤明确要求人工补充。`
+              ? matchedSummary(
+                  suggestionCounts(builtin.suggested_forms),
+                  coverageGaps
+                )
               : undefined
           }
         />
