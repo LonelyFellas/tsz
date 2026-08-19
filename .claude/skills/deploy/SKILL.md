@@ -104,7 +104,8 @@ gh api repos/{owner}/{repo}/commits/$SHA/check-runs \
 `pnpm install --frozen-lockfile`（暖 store 下约 5–10 秒），断言导出树里没有 Next 会读的
 ignored `.env*`，用 allowlist 环境构建，并在写服务器前重做一次 exact-main 校验
 （**部署过程中 main 前进了就会中止**——这时重新从第 2 步对新 HEAD 走一遍）。
-送上服务器的 `provenance.mjs`、systemd unit 和 nginx 配置也一并取自那棵导出树，不取自工作区。它对远端 web 的不可变 release 内容复算 SHA-256（严格 schema 只固定排除
+送上服务器的 `provenance.mjs`、systemd unit 和 nginx 配置也一并取自那棵导出树，不取自工作区。
+它对远端 web 的不可变 release 内容复算 SHA-256（严格 schema 只固定排除
 正常流量会改写的 `apps/web/.next/cache`），并只在 smoke 成功后原子发布
 `/opt/tsz-deploy-manifests/web.json`。**manifest 验证失败等同部署失败。**
 
