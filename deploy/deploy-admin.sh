@@ -11,8 +11,9 @@ prepare_deploy_source admin
 
 deploy_tmp="$(mktemp -d /tmp/tsz-admin-deploy.XXXXXX)"
 remote_candidate=""
+deploy_interrupted=""
 cleanup() {
-  local status=$?
+  local status="${deploy_interrupted:-$?}"
   if [[ -n "$remote_candidate" ]]; then
     ssh tshb-test "rm -f -- '$remote_candidate'" >/dev/null 2>&1 || status=1
   fi
@@ -24,8 +25,13 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT
+# bash 被 SIGINT/SIGTERM 打断时不会执行 EXIT trap（实测临时目录会直接留下）：
+# 转成一次正常 exit，让 cleanup 照常跑，同时保住非零退出码。
+trap 'deploy_interrupted=130; exit 130' INT
+trap 'deploy_interrupted=143; exit 143' TERM
 
-required_node_version="v$(tr -d '[:space:]' < .node-version)"
+# 版本要求也读目标 commit 的：工作区可能停在别的分支上，那里的 .node-version 不作数。
+required_node_version="v$(git show "$DEPLOY_GIT_SHA:.node-version" | tr -d '[:space:]')"
 local_node_version="$(node --version)"
 [ "$local_node_version" = "$required_node_version" ] || {
   echo "!! 本地 Node 版本必须是 ${required_node_version}，当前是 ${local_node_version}"
