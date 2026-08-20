@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { App, Card, Radio, Space, Typography } from "antd";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "./useDialectPreference";
@@ -8,24 +9,29 @@ const OPTION_LABEL: Record<AdminDialectPreference, string> = {
 };
 
 /**
- * 个人设置 → 英语方言偏好（A1）。切换即时生效并持久化；
- * 显示值由偏好内核驱动，保存失败时不会更新，界面自动停在原值。
+ * 个人设置 → 英语方言偏好（A1）。偏好持久化在服务端（`PATCH /admin/profile/preferences`），
+ * 因此换浏览器、换设备都还在。显示值取服务端落库后的那个值，保存失败时不更新，
+ * 界面自动停在原值——不做乐观更新，避免「看着改了其实没存」。
  */
 export function DialectPreference() {
   const { preference, savePreference } = useDialectPreference();
   const { message } = App.useApp();
+  const [saving, setSaving] = useState(false);
 
-  const change = (value: AdminDialectPreference) => {
-    if (value === preference) return;
+  const change = async (value: AdminDialectPreference) => {
+    if (value === preference || saving) return;
+    setSaving(true);
     try {
-      savePreference(value);
-      // 只说「已保存」这件真实发生的事：消费这个偏好的创建向导与预览尚未改造完成
-      // （见 design.md 阶段 2–5），此刻声称「口径已切换」会变成又一处伪造成功反馈。
+      await savePreference(value);
       message.success(`已保存英语方言偏好：${OPTION_LABEL[value]}`);
     } catch (error) {
       message.error(
-        error instanceof Error ? error.message : "方言偏好未能保存"
+        error instanceof Error
+          ? `方言偏好未能保存：${error.message}`
+          : "方言偏好未能保存"
       );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -38,9 +44,10 @@ export function DialectPreference() {
         </Typography.Text>
         <Radio.Group
           value={preference}
-          onChange={(event) =>
-            change(event.target.value as AdminDialectPreference)
-          }
+          disabled={saving}
+          onChange={(event) => {
+            void change(event.target.value as AdminDialectPreference);
+          }}
         >
           <Radio value="uk">{OPTION_LABEL.uk}</Radio>
           <Radio value="us">{OPTION_LABEL.us}</Radio>

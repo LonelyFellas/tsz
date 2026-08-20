@@ -11,7 +11,7 @@ import type {
   WordSentenceV2
 } from "@tsz/types";
 import type { AdminDialectPreference } from "@tsz/shared";
-import { DEFAULT_DIALECT_PREFERENCE } from "@tsz/shared";
+import { FALLBACK_DIALECT_PREFERENCE } from "@tsz/shared";
 import type { PartOfSpeechLookup } from "../part-of-speech/catalog";
 import { collapseMeaningsEnglishText, collapseMeaningsGrammar } from "./model";
 import {
@@ -134,7 +134,7 @@ export function buildWordReadiness(
   partOfSpeechLookup?: PartOfSpeechLookup,
   // 完成度必须按「保存后会变成什么样」来算：存量双份词条收敛后只保留偏好侧，
   // 拿未收敛的原值去判会把已经可发布的词条误报成未完成。
-  dialectPreference: AdminDialectPreference = DEFAULT_DIALECT_PREFERENCE
+  dialectPreference: AdminDialectPreference = FALLBACK_DIALECT_PREFERENCE
 ): ReadinessRow[] {
   const forms = draft.forms ?? word?.forms ?? { pos: [] };
   const rawMeanings = draft.meanings ??

@@ -75,7 +75,8 @@ function profileResponse(role: "admin" | "super_admin"): AdminProfile {
     phone: "13800138000",
     display_name: "审核员小王",
     role,
-    permissions: role === "super_admin" ? [] : ["users.access"]
+    permissions: role === "super_admin" ? [] : ["users.access"],
+    preferences: { dialect: "uk" }
   };
 }
 
@@ -369,7 +370,8 @@ describe("AdminLoginForm — 2FA", () => {
         phone: "1",
         display_name: "X",
         role: "admin",
-        permissions: []
+        permissions: [],
+        preferences: { dialect: "uk" }
       },
       role: "admin"
     });
@@ -387,7 +389,8 @@ describe("AdminLoginForm — 2FA", () => {
           phone: "1",
           display_name: "X",
           role: "admin",
-          permissions: []
+          permissions: [],
+          preferences: { dialect: "uk" }
         },
         role: "admin"
       });

@@ -44,6 +44,22 @@ export interface AdminPaginationMeta extends PageMeta {
   total_pages: number;
 }
 
+/**
+ * 管理员的英语方言偏好（英美方言偏好化 A1）：账号级个人设置。
+ * 它只决定 admin 端的录入与展示口径，**不是词条属性**——同一条词条的英美并列拼写
+ * 由 headwords 承载，不因某个管理员偏好英式就消失。
+ * **默认值只由后端持有**（从未设置过的管理员返回 `uk`），前端不再保留第二处默认。
+ */
+export type AdminDialectPreference = "uk" | "us";
+
+/**
+ * 管理员个人偏好。眼下只有方言一项，仍嵌一层对象：将来加第二项时
+ * profile 响应的形状不用再变，前端也不必区分「顶层字段」与「偏好」。
+ */
+export interface AdminPreferences {
+  dialect: AdminDialectPreference;
+}
+
 /** GET /admin/profile 的响应：登录管理员自身身份，用于门禁探针 + 顶栏「已登录为 X」+ 动态菜单。 */
 export interface AdminProfile {
   id: string;
@@ -56,6 +72,18 @@ export interface AdminProfile {
    * 零改动；恒为数组，顺序即侧栏顺序。「管理员管理」不走 key，按 role 判定。
    */
   permissions: MenuPermission[];
+  /** 个人偏好；字段恒在，从未设置过的管理员返回后端默认值。 */
+  preferences: AdminPreferences;
+}
+
+/** PATCH /admin/profile/preferences 的请求体。只带要改的偏好，改的恒是自己的。 */
+export interface UpdateAdminPreferencesInput {
+  dialect: AdminDialectPreference;
+}
+
+/** PATCH /admin/profile/preferences 的响应：落库后的完整偏好。 */
+export interface UpdateAdminPreferencesResponse {
+  preferences: AdminPreferences;
 }
 
 /** 账号管理里看到的完整 admin 对象（含状态与创建时间）。 */

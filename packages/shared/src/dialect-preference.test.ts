@@ -1,9 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  DEFAULT_DIALECT_PREFERENCE,
-  createDialectPreferenceStore,
+  FALLBACK_DIALECT_PREFERENCE,
+  createDialectPreferenceCache,
   dialectPreferenceStorageKey,
   isAdminDialectPreference,
+  resolveDialectPreference,
   type DialectPreferenceStorageLike
 } from "./dialect-preference";
 
@@ -43,24 +44,41 @@ describe("isAdminDialectPreference", () => {
   });
 });
 
-describe("createDialectPreferenceStore#read", () => {
-  it("没有存储时返回默认英式", () => {
-    expect(createDialectPreferenceStore().read("admin-1")).toBe(
-      DEFAULT_DIALECT_PREFERENCE
+describe("resolveDialectPreference", () => {
+  it("服务端给了就用服务端的，缓存不参与", () => {
+    expect(resolveDialectPreference("us", "uk")).toBe("us");
+    expect(resolveDialectPreference("uk", "us")).toBe("uk");
+  });
+
+  it("服务端值缺失或不在枚举内时退回本地缓存", () => {
+    expect(resolveDialectPreference(undefined, "us")).toBe("us");
+    expect(resolveDialectPreference("australian", "us")).toBe("us");
+    expect(resolveDialectPreference(null, "uk")).toBe("uk");
+  });
+
+  it("两边都没有时才用显示兜底值", () => {
+    expect(resolveDialectPreference(undefined, undefined)).toBe(
+      FALLBACK_DIALECT_PREFERENCE
     );
-    expect(DEFAULT_DIALECT_PREFERENCE).toBe("uk");
+    expect(FALLBACK_DIALECT_PREFERENCE).toBe("uk");
+  });
+});
+
+describe("createDialectPreferenceCache#read", () => {
+  it("没有存储时返回 undefined，交给上层回落", () => {
+    expect(createDialectPreferenceCache().read("admin-1")).toBeUndefined();
   });
 
-  it("未设置过时返回默认英式", () => {
-    const store = createDialectPreferenceStore({ storage: fakeStorage() });
-    expect(store.read("admin-1")).toBe("uk");
+  it("未缓存过时返回 undefined", () => {
+    const cache = createDialectPreferenceCache({ storage: fakeStorage() });
+    expect(cache.read("admin-1")).toBeUndefined();
   });
 
-  it("读回已保存的值", () => {
+  it("读回已缓存的值", () => {
     const storage = fakeStorage({
       [dialectPreferenceStorageKey("admin-1")]: "us"
     });
-    expect(createDialectPreferenceStore({ storage }).read("admin-1")).toBe(
+    expect(createDialectPreferenceCache({ storage }).read("admin-1")).toBe(
       "us"
     );
   });
@@ -69,24 +87,24 @@ describe("createDialectPreferenceStore#read", () => {
     const storage = fakeStorage({
       [dialectPreferenceStorageKey("admin-1")]: "us"
     });
-    const store = createDialectPreferenceStore({ storage });
-    expect(store.read("admin-1")).toBe("us");
-    expect(store.read("admin-2")).toBe("uk");
+    const cache = createDialectPreferenceCache({ storage });
+    expect(cache.read("admin-1")).toBe("us");
+    expect(cache.read("admin-2")).toBeUndefined();
   });
 
-  it("值被改坏时回落默认，不抛", () => {
+  it("值被改坏时当没缓存，不抛", () => {
     const storage = fakeStorage({
       [dialectPreferenceStorageKey("admin-1")]: "australian"
     });
-    expect(createDialectPreferenceStore({ storage }).read("admin-1")).toBe(
-      "uk"
-    );
+    expect(
+      createDialectPreferenceCache({ storage }).read("admin-1")
+    ).toBeUndefined();
   });
 
-  it("存储读取抛错时回落默认并 warn", () => {
+  it("存储读取抛错时返回 undefined 并 warn", () => {
     const failure = new Error("SecurityError");
     const warn = vi.fn();
-    const store = createDialectPreferenceStore({
+    const cache = createDialectPreferenceCache({
       storage: {
         getItem: () => {
           throw failure;
@@ -96,7 +114,7 @@ describe("createDialectPreferenceStore#read", () => {
       warn
     });
 
-    expect(store.read("admin-1")).toBe("uk");
+    expect(cache.read("admin-1")).toBeUndefined();
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("无法读取"),
       failure
@@ -104,7 +122,7 @@ describe("createDialectPreferenceStore#read", () => {
   });
 
   it("未注入 warn 时读取失败也不抛", () => {
-    const store = createDialectPreferenceStore({
+    const cache = createDialectPreferenceCache({
       storage: {
         getItem: () => {
           throw new Error("SecurityError");
@@ -113,43 +131,62 @@ describe("createDialectPreferenceStore#read", () => {
       }
     });
 
-    expect(store.read("admin-1")).toBe("uk");
+    expect(cache.read("admin-1")).toBeUndefined();
   });
 });
 
-describe("createDialectPreferenceStore#write", () => {
+describe("createDialectPreferenceCache#write", () => {
   it("写入按管理员隔离的键", () => {
     const storage = fakeStorage();
-    createDialectPreferenceStore({ storage }).write("admin-1", "us");
+    createDialectPreferenceCache({ storage }).write("admin-1", "us");
 
     expect(storage.map.get(dialectPreferenceStorageKey("admin-1"))).toBe("us");
   });
 
   it("写入后可被读回", () => {
     const storage = fakeStorage();
-    const store = createDialectPreferenceStore({ storage });
-    store.write("admin-1", "us");
+    const cache = createDialectPreferenceCache({ storage });
+    cache.write("admin-1", "us");
 
-    expect(store.read("admin-1")).toBe("us");
+    expect(cache.read("admin-1")).toBe("us");
   });
 
-  it("没有存储时抛错，不能假装保存成功", () => {
-    expect(() => createDialectPreferenceStore().write("admin-1", "us")).toThrow(
-      /未能保存/
-    );
+  it("没有存储时静默跳过：事实源在服务端，缓存不是必需品", () => {
+    expect(() =>
+      createDialectPreferenceCache().write("admin-1", "us")
+    ).not.toThrow();
   });
 
-  it("存储写入抛错时向上抛出，由调用方提示", () => {
+  it("存储写入抛错时只 warn 不抛，免得把已成功的保存报成失败", () => {
     const failure = new Error("QuotaExceededError");
-    const store = createDialectPreferenceStore({
+    const warn = vi.fn();
+    const cache = createDialectPreferenceCache({
       storage: {
         getItem: () => null,
         setItem: () => {
           throw failure;
         }
+      },
+      warn
+    });
+
+    expect(() => cache.write("admin-1", "us")).not.toThrow();
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("无法写入"),
+      failure
+    );
+  });
+
+  it("未注入 warn 时写入失败也不抛", () => {
+    const cache = createDialectPreferenceCache({
+      storage: {
+        getItem: () => null,
+        setItem: () => {
+          throw new Error("QuotaExceededError");
+        }
       }
     });
 
-    expect(() => store.write("admin-1", "us")).toThrow(failure);
+    expect(() => cache.write("admin-1", "us")).not.toThrow();
   });
 });

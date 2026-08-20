@@ -37,6 +37,8 @@ import type {
   Admin,
   AdminAuthResponse,
   AdminProfile,
+  UpdateAdminPreferencesInput,
+  UpdateAdminPreferencesResponse,
   PermissionCatalogResponse,
   PartOfSpeechCatalogResponse,
   PartOfSpeechConfig,
@@ -74,6 +76,8 @@ export type {
   AdminLevel,
   AdminListQuery,
   AdminListResponse,
+  AdminDialectPreference,
+  AdminPreferences,
   AdminProfile,
   AdminRole,
   AdminStatus,
@@ -93,6 +97,8 @@ export type {
   ResetPasswordResponse,
   RoleListResponse,
   SetAdminRoleRequest,
+  UpdateAdminPreferencesInput,
+  UpdateAdminPreferencesResponse,
   UpdateRoleRequest
 } from "@tsz/types";
 
@@ -149,6 +155,13 @@ export function createAdminEndpoints(http: HttpClient) {
     },
     /** GET /admin/profile — 门禁探针：200=有效 admin / 401=未登录。 */
     profile: () => http.get<AdminProfile>("/profile"),
+    /**
+     * PATCH /admin/profile/preferences — 改**自己的**个人偏好。
+     * 目标恒为 token subject，请求体里没有管理员 ID，改不到别人。
+     * 200 返回落库后的完整偏好；422 = dialect 不在枚举内（invalid_request_body）。
+     */
+    updateProfilePreferences: (input: UpdateAdminPreferencesInput) =>
+      http.patch<UpdateAdminPreferencesResponse>("/profile/preferences", input),
     /** 语音富文本试听；wire 映射由 admin 业务层承担。 */
     speech: {
       voices: (signal?: AbortSignal) =>

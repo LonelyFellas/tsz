@@ -89,6 +89,16 @@ describe("createAdminEndpoints", () => {
     api.profile();
     expect(http.get).toHaveBeenCalledWith("/profile");
   });
+
+  // 个人偏好挂在 profile 而不是 /admin/settings/*：后者是全局目录配置（仅超管可写），
+  // 这里改的恒是自己的，请求体里没有管理员 ID。
+  it("updateProfilePreferences → PATCH /profile/preferences 只带 dialect", () => {
+    const api = createAdminEndpoints(http);
+    api.updateProfilePreferences({ dialect: "us" });
+    expect(http.patch).toHaveBeenCalledWith("/profile/preferences", {
+      dialect: "us"
+    });
+  });
 });
 
 describe("createAdminEndpoints — speech 试听", () => {

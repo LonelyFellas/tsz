@@ -22,7 +22,7 @@ import type {
   WordSenseV2,
   WordSentenceV2
 } from "@tsz/types";
-import { DEFAULT_DIALECT_PREFERENCE } from "@tsz/shared";
+import { FALLBACK_DIALECT_PREFERENCE } from "@tsz/shared";
 import type { AdminDialectPreference } from "@tsz/shared";
 import {
   emptyWordRichText,
@@ -95,7 +95,7 @@ export function wordDisplayHeadword(
  */
 export function orderedHeadwordSpellings(
   headwords: WordHeadwordsV2,
-  preference: AdminDialectPreference = DEFAULT_DIALECT_PREFERENCE
+  preference: AdminDialectPreference = FALLBACK_DIALECT_PREFERENCE
 ): string[] {
   if (headwords.mode === "unified") return [headwords.common];
   return preference === "uk"
