@@ -2712,10 +2712,26 @@ describe("admin words mock", () => {
     await createCenter(mock, "list-center");
 
     const all = await mock.list();
+    // 列表行与真实后端同构：并列拼写拼成一个字符串，顺序为检测基准侧在前
+    // （`center` 命中 us），`dialects` 与之同序，并下发 `source_dialect`。
     expect(all.words).toEqual([
-      expect.objectContaining({ schema_version: 2, headword: "center" })
+      expect.objectContaining({
+        schema_version: 2,
+        headword: "center / centre",
+        dialects: ["us", "uk"],
+        source_dialect: "us"
+      })
     ]);
     expect(all.page).toMatchObject({ page: 1, page_size: 20, total: 1 });
+
+    // 两侧拼写都要能搜到：词汇列展示 "center / centre"，搜非基准侧的 centre
+    // 也必须命中，否则管理员搜眼前看得见的拼写却搜不到。
+    await expect(mock.list({ q: "center" })).resolves.toMatchObject({
+      page: { total: 1 }
+    });
+    await expect(mock.list({ q: "centre" })).resolves.toMatchObject({
+      page: { total: 1 }
+    });
 
     await expect(mock.list({ q: "mock admin" })).resolves.toMatchObject({
       words: expect.arrayContaining([

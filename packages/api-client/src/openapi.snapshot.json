@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-18T06:29:08.456Z",
+  "_generatedAt": "2026-08-20T01:05:08.651Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1410,7 +1410,10 @@
         },
         "gloss": { "type": "string" },
         "has_unpublished_changes": { "type": "boolean" },
-        "headword": { "type": "string" },
+        "headword": {
+          "type": "string",
+          "description": "并列拼写按检测基准侧在前拼接，与 `dialects` 同序。"
+        },
         "id": { "type": "string", "format": "uuid" },
         "kind": { "$ref": "#/components/schemas/EntryKind" },
         "levels": { "type": "array", "items": { "type": "string" } },
@@ -1425,6 +1428,10 @@
           "type": "integer",
           "format": "int32",
           "minimum": 0
+        },
+        "source_dialect": {
+          "$ref": "#/components/schemas/SourceDialect",
+          "description": "检测基准侧；`mode = unified` 的词条没有基准侧，字段整体省略。"
         },
         "status": { "$ref": "#/components/schemas/AdminWordStatus" },
         "updated_at": { "type": "string", "format": "date-time" }
