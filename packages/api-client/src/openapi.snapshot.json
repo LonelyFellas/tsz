@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-20T01:05:08.651Z",
+  "_generatedAt": "2026-08-20T13:12:27.579Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -35,6 +35,7 @@
     "/admin/lexicon/entries/{id}/validate": ["post"],
     "/admin/lexicon/surface-match-snapshots/{snapshot_id}": ["get"],
     "/admin/profile": ["get"],
+    "/admin/profile/preferences": ["patch"],
     "/admin/settings/parts-of-speech": ["get", "post"],
     "/admin/settings/parts-of-speech/catalog": ["get"],
     "/admin/settings/parts-of-speech/{id}": ["delete", "patch"],
@@ -1292,6 +1293,7 @@
         "headword",
         "kind",
         "dialects",
+        "headword_variants",
         "pos_labels",
         "senses"
       ],
@@ -1301,6 +1303,11 @@
           "items": { "$ref": "#/components/schemas/Dialect" }
         },
         "headword": { "type": "string" },
+        "headword_variants": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/HeadwordVariant" },
+          "description": "每侧拼写，与 `dialects` 同序；`headword` 即本数组按序拼接。"
+        },
         "kind": { "$ref": "#/components/schemas/EntryKind" },
         "pos_labels": { "type": "array", "items": { "type": "string" } },
         "senses": {
@@ -1389,6 +1396,7 @@
         "headword",
         "kind",
         "dialects",
+        "headword_variants",
         "revision",
         "lifecycle_revision",
         "gloss",
@@ -1413,6 +1421,11 @@
         "headword": {
           "type": "string",
           "description": "并列拼写按检测基准侧在前拼接，与 `dialects` 同序。"
+        },
+        "headword_variants": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/HeadwordVariant" },
+          "description": "每侧拼写，与 `dialects` 同序；`headword` 即本数组按序拼接。"
         },
         "id": { "type": "string", "format": "uuid" },
         "kind": { "$ref": "#/components/schemas/EntryKind" },
