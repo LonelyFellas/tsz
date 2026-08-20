@@ -166,24 +166,13 @@ const CENTER_MEANINGS = {
             {
               id: "sentence-1",
               level: "A2",
+              // 英文内容 A1 后恒为单份，口径取管理员的方言偏好（默认英式）。
               en_text: {
-                mode: "distinguish",
-                source_dialect: "us",
-                uk: {
-                  state: "ready",
-                  variant: {
-                    id: "sentence-1-uk",
-                    value: richText("He walked to the centre of the circle."),
-                    origin: "manual"
-                  }
-                },
-                us: {
-                  state: "ready",
-                  variant: {
-                    id: "sentence-1-us",
-                    value: richText("He walked to the center of the circle."),
-                    origin: "manual"
-                  }
+                mode: "unified",
+                common: {
+                  id: "sentence-1-common",
+                  value: richText("He walked to the centre of the circle."),
+                  origin: "manual"
                 }
               },
               zh_text_id: "sentence-1-zh",

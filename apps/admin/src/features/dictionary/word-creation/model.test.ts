@@ -1,3 +1,4 @@
+import type { EnglishTextV2 } from "@tsz/types";
 import type {
   AdminWordV2,
   DraftMeaningsStepContent,
@@ -11,10 +12,9 @@ import type {
 import { describe, expect, it } from "vitest";
 import {
   cefrRank,
-  applyMeaningDialectSuggestions,
-  chunkMeaningDialectSuggestionRequest,
-  collectMissingMeaningDialectItems,
-  countIncompleteMeaningDialectSlots,
+  collapseEnglishText,
+  collapseMeaningsEnglishText,
+  countDiscardedEnglishTexts,
   createDefinition,
   createDerivedSlot,
   createEnglishText,
@@ -32,12 +32,14 @@ import {
   formDialects,
   legalDerivedFormTypes,
   grammarDialects,
-  requestMeaningDialectSuggestionBatches,
+  hasDialectSplitEnglishText,
+  resolveEnglishText,
   toFormsWireContent,
   toMeaningsWireContent,
   updateRichText,
   orderedHeadwordSpellings,
-  wordDisplayHeadword
+  wordDisplayHeadword,
+  writeEnglishText
 } from "./model";
 
 describe("词性派生词形能力", () => {
@@ -110,27 +112,47 @@ function richText(text: string): RichText {
   return { version: 1, text, spans: [], liaisons: [] };
 }
 
+/** 存量（A1 改造前）的英美双份英文文本；新建流程不再产出这种形状。 */
+function legacySplitEnglishText(
+  id: string,
+  usText: string,
+  ukText?: string
+): EnglishTextV2 {
+  return {
+    mode: "distinguish",
+    source_dialect: "us",
+    us: {
+      state: "ready",
+      variant: {
+        id: `${id}-us-text`,
+        value: richText(usText),
+        origin: "manual"
+      }
+    },
+    uk:
+      ukText === undefined
+        ? { state: "missing" }
+        : {
+            state: "ready",
+            variant: {
+              id: `${id}-uk-text`,
+              value: richText(ukText),
+              origin: "manual"
+            }
+          }
+  };
+}
+
 function englishDefinition(
   id: string,
   text: string,
   targetText?: string
 ): WordDefinitionV2 {
-  const content = createEnglishText(distinguishedHeadwords, text);
-  if (content.mode === "distinguish" && targetText !== undefined) {
-    content.uk = {
-      state: "ready",
-      variant: {
-        id: `${id}-uk-text`,
-        value: richText(targetText),
-        origin: "manual"
-      }
-    };
-  }
   return {
     id,
     level: "A1",
     definition_mode: "en_definition",
-    content
+    content: legacySplitEnglishText(id, text, targetText)
   };
 }
 
@@ -149,8 +171,8 @@ function dialectMeaningContent(): DraftMeaningsStepContent {
     englishDefinition("definition-ready", "the color", "the colour")
   );
   noun.senses[0]!.sentences[0]!.id = "example-missing";
-  noun.senses[0]!.sentences[0]!.en_text = createEnglishText(
-    distinguishedHeadwords,
+  noun.senses[0]!.sentences[0]!.en_text = legacySplitEnglishText(
+    "example-missing",
     "The center is closed."
   );
 
@@ -312,9 +334,9 @@ describe("T05 共享 base、方言规则与多词形组", () => {
   });
 });
 
-describe("T09 EnglishText 与 grammar 方言派生", () => {
-  it("统一文本直接生成 common/manual variant", () => {
-    expect(createEnglishText(unifiedHeadwords, "the far side")).toMatchObject({
+describe("T09 EnglishText 单份化与 grammar 方言派生", () => {
+  it("新建的英文文本恒为单份 common/manual，不再按主词分叉", () => {
+    expect(createEnglishText("the far side")).toMatchObject({
       mode: "unified",
       common: {
         id: expect.any(String),
@@ -327,40 +349,9 @@ describe("T09 EnglishText 与 grammar 方言派生", () => {
         }
       }
     });
-  });
-
-  it("区分文本只让源侧 ready/manual，目标侧保持显式 missing", () => {
-    const fromUs = createEnglishText(distinguishedHeadwords, "the center");
-    const fromUk = createEnglishText(
-      { ...distinguishedHeadwords, source_dialect: "uk" },
-      "the centre"
-    );
-
-    expect(fromUs).toMatchObject({
-      mode: "distinguish",
-      source_dialect: "us",
-      uk: { state: "missing" },
-      us: {
-        state: "ready",
-        variant: {
-          id: expect.any(String),
-          origin: "manual",
-          value: { text: "the center" }
-        }
-      }
-    });
-    expect(fromUk).toMatchObject({
-      mode: "distinguish",
-      source_dialect: "uk",
-      uk: {
-        state: "ready",
-        variant: {
-          id: expect.any(String),
-          origin: "manual",
-          value: { text: "the centre" }
-        }
-      },
-      us: { state: "missing" }
+    expect(createEnglishText()).toMatchObject({
+      mode: "unified",
+      common: { value: { text: "" } }
     });
   });
 
@@ -390,11 +381,7 @@ describe("T09 EnglishText 与 grammar 方言派生", () => {
 
 describe("T10 meanings 与 focus link", () => {
   it("默认 sense 的例句恰好有一个指向当前 word/sense 的 focus link", () => {
-    const sense = createSense(
-      distinguishedHeadwords,
-      "word-1",
-      "sense-group-1"
-    );
+    const sense = createSense("word-1", "sense-group-1");
     const sentence = sense.sentences[0]!;
     const focusLinks = sentence.links.filter((link) => link.role === "focus");
 
@@ -488,191 +475,148 @@ describe("T10 meanings 与 focus link", () => {
   });
 });
 
-describe("T58-T59 词义内容全局方言补全", () => {
-  it("只收集目标方言缺失且源文本非空的英文释义和例句，并跨词性合并为一次请求", () => {
-    const content = dialectMeaningContent();
+describe("A1 英文内容读兼容与保存收敛", () => {
+  it("读兼容：单份取 common，存量双份取偏好侧，偏好侧缺失时为空且不搬运另一侧", () => {
+    const unified = createEnglishText("the far side");
+    const legacy = legacySplitEnglishText("d1", "the color", "the colour");
+    const onlyUs = legacySplitEnglishText("d2", "the center");
 
-    expect(collectMissingMeaningDialectItems(content, "uk")).toEqual({
-      source_dialect: "us",
-      target_dialect: "uk",
-      items: [
-        {
-          client_id: "definition-missing",
-          field_kind: "definition",
-          value: richText("the center")
-        },
-        {
-          client_id: "example-missing",
-          field_kind: "example",
-          value: richText("The center is closed.")
-        },
-        {
-          client_id: "definition-second-pos",
-          field_kind: "definition",
-          value: richText("to organize")
-        }
-      ]
-    });
-    expect(collectMissingMeaningDialectItems(content, "us").items).toEqual([]);
-    expect(countIncompleteMeaningDialectSlots(content, "uk")).toBe(4);
-    expect(countIncompleteMeaningDialectSlots(content, "us")).toBe(1);
+    expect(resolveEnglishText(unified, "uk").text).toBe("the far side");
+    expect(resolveEnglishText(unified, "us").text).toBe("the far side");
+    expect(resolveEnglishText(legacy, "uk").text).toBe("the colour");
+    expect(resolveEnglishText(legacy, "us").text).toBe("the color");
+    // 偏好英式但只有美式内容时给空框——搬运过来等于把美式内容冒充成英式的。
+    expect(resolveEnglishText(onlyUs, "uk").text).toBe("");
   });
 
-  it("仅写入仍缺失的匹配项，保留手填内容并忽略表单、未知和重复响应", () => {
-    const content = dialectMeaningContent();
-    const original = structuredClone(content);
-    const suggestions = [
-      {
-        client_id: "definition-missing",
-        field_kind: "definition" as const,
-        value: richText("the centre"),
-        model_version: "test-v1"
-      },
-      {
-        client_id: "example-missing",
-        field_kind: "example" as const,
-        value: richText("The centre is closed."),
-        model_version: "test-v1"
-      },
-      {
-        client_id: "definition-ready",
-        field_kind: "definition" as const,
-        value: richText("must not overwrite"),
-        model_version: "test-v1"
-      },
-      {
-        client_id: "unknown-definition",
-        field_kind: "definition" as const,
-        value: richText("unknown"),
-        model_version: "test-v1"
-      },
-      {
-        client_id: "form-1",
-        field_kind: "form" as const,
-        value: "centred",
-        model_version: "test-v1"
-      },
-      {
-        client_id: "definition-second-pos",
-        field_kind: "definition" as const,
-        value: richText("to organise"),
-        model_version: "test-v1"
-      },
-      {
-        client_id: "definition-second-pos",
-        field_kind: "definition" as const,
-        value: richText("duplicate response"),
-        model_version: "test-v1"
+  it("写入只改当前口径那一份，wire 形状保持不变直到保存", () => {
+    const unified = createEnglishText("old");
+    const written = writeEnglishText(unified, "uk", richText("new"));
+    expect(written).toMatchObject({
+      mode: "unified",
+      common: {
+        id: unified.common.id,
+        value: { text: "new" },
+        origin: "manual"
       }
-    ];
+    });
 
-    const result = applyMeaningDialectSuggestions(content, "uk", suggestions);
-
-    expect(content).toEqual(original);
-    expect(result.applied_count).toBe(2);
-    expect(result.skipped_count).toBe(5);
-    expect(result.content).not.toBe(content);
-    const [noun, verb] = result.content.pos;
-    const nounDefinitions = noun!.senses[0]!.definitions;
-    const convertedDefinition = nounDefinitions.find(
-      (definition) => definition.id === "definition-missing"
-    )!;
-    const manualDefinition = nounDefinitions.find(
-      (definition) => definition.id === "definition-ready"
-    )!;
-    expect(convertedDefinition.content).toMatchObject({
-      mode: "distinguish",
-      uk: {
-        state: "ready",
-        variant: {
-          id: expect.any(String),
-          origin: "converted",
-          value: { text: "the centre" }
-        }
-      }
+    const legacy = legacySplitEnglishText("d1", "the color", "the colour");
+    const edited = writeEnglishText(legacy, "uk", richText("the colour!"));
+    expect(edited.mode).toBe("distinguish");
+    if (edited.mode !== "distinguish") throw new Error("unreachable");
+    expect(edited.uk).toMatchObject({
+      state: "ready",
+      variant: { id: "d1-uk-text", value: { text: "the colour!" } }
     });
-    expect(noun!.senses[0]!.sentences[0]!.en_text).toMatchObject({
-      uk: {
-        state: "ready",
-        variant: {
-          id: expect.any(String),
-          origin: "converted",
-          value: { text: "The centre is closed." }
-        }
-      }
-    });
-    expect(manualDefinition.content).toMatchObject({
-      uk: {
-        state: "ready",
-        variant: { origin: "manual", value: { text: "the colour" } }
-      }
-    });
-    expect(
-      verb!.senses[0]!.definitions.find(
-        (definition) => definition.id === "definition-second-pos"
-      )!.content
-    ).toMatchObject({ uk: { state: "missing" } });
+    // 另一侧原样保留，好让保存前的确认框还数得出要丢几条。
+    if (legacy.mode !== "distinguish") throw new Error("unreachable");
+    expect(edited.us).toEqual(legacy.us);
   });
 
-  it("按后端 100 项上限稳定切分 0/100/101/多批请求", () => {
-    const request = (count: number) => ({
-      source_dialect: "us" as const,
-      target_dialect: "uk" as const,
-      items: Array.from({ length: count }, (_, index) => ({
-        client_id: `definition-${index}`,
-        field_kind: "definition" as const,
-        value: richText(`definition ${index}`)
-      }))
+  it("写入偏好侧缺失的存量文本时补出 ready 槽位", () => {
+    const onlyUs = legacySplitEnglishText("d2", "the center");
+    const edited = writeEnglishText(onlyUs, "uk", richText("the centre"));
+    if (edited.mode !== "distinguish") throw new Error("unreachable");
+    expect(edited.uk).toMatchObject({
+      state: "ready",
+      variant: { id: expect.any(String), value: { text: "the centre" } }
     });
-
-    expect(chunkMeaningDialectSuggestionRequest(request(0))).toEqual([]);
-    expect(
-      chunkMeaningDialectSuggestionRequest(request(100)).map(
-        (batch) => batch.items.length
-      )
-    ).toEqual([100]);
-    expect(
-      chunkMeaningDialectSuggestionRequest(request(101)).map(
-        (batch) => batch.items.length
-      )
-    ).toEqual([100, 1]);
-    expect(
-      chunkMeaningDialectSuggestionRequest(request(205)).map(
-        (batch) => batch.items.length
-      )
-    ).toEqual([100, 100, 5]);
   });
 
-  it("分批请求逐批交付响应，并在中途失败后停止后续批次", async () => {
-    const request = {
-      source_dialect: "us" as const,
-      target_dialect: "uk" as const,
-      items: Array.from({ length: 201 }, (_, index) => ({
-        client_id: `definition-${index}`,
-        field_kind: "definition" as const,
-        value: richText(`definition ${index}`)
-      }))
+  it("收敛保留偏好侧内容与其稳定节点 ID", () => {
+    const legacy = legacySplitEnglishText("d1", "the color", "the colour");
+    expect(collapseEnglishText(legacy, "uk")).toEqual({
+      mode: "unified",
+      common: {
+        id: "d1-uk-text",
+        value: richText("the colour"),
+        origin: "manual"
+      }
+    });
+    expect(collapseEnglishText(legacy, "us").common.id).toBe("d1-us-text");
+  });
+
+  it("偏好侧缺失时收敛为空文本并新起节点 ID", () => {
+    const onlyUs = legacySplitEnglishText("d2", "the center");
+    const collapsed = collapseEnglishText(onlyUs, "uk");
+    expect(collapsed.common.value.text).toBe("");
+    expect(collapsed.common.id).not.toBe("d2-us-text");
+  });
+
+  it("已是单份的文本原样返回", () => {
+    const unified = createEnglishText("kept");
+    expect(collapseEnglishText(unified, "us")).toBe(unified);
+  });
+
+  it("整页收敛：无双份内容时返回同一引用，避免每次渲染都重建", () => {
+    const clean: DraftMeaningsStepContent = {
+      sense_groups: [{ id: "g1", name_zh: "测试", name_en: "Test" }],
+      pos: [createPosMeanings("pos-1", unifiedHeadwords, "word-1", "g1")]
     };
-    const sent: number[] = [];
-    const applied: string[] = [];
+    expect(hasDialectSplitEnglishText(clean)).toBe(false);
+    expect(collapseMeaningsEnglishText(clean, "uk")).toBe(clean);
+  });
 
-    await expect(
-      requestMeaningDialectSuggestionBatches(
-        request,
-        async (batch) => {
-          sent.push(batch.items.length);
-          if (sent.length === 2) throw new Error("second batch failed");
-          return {
-            provider: { kind: "dictionary_region_rules", version: "1" },
-            suggestions: [batch.items[0]!, request.items[200]!]
-          };
-        },
-        (suggestions) =>
-          applied.push(...suggestions.map((suggestion) => suggestion.client_id))
-      )
-    ).rejects.toThrow("second batch failed");
-    expect(sent).toEqual([100, 100]);
-    expect(applied).toEqual(["definition-0"]);
+  it("整页收敛把所有英文释义与例句折成单份，中文释义不受影响", () => {
+    const content = dialectMeaningContent();
+    expect(hasDialectSplitEnglishText(content)).toBe(true);
+
+    const collapsed = collapseMeaningsEnglishText(content, "us");
+    const englishModes = collapsed.pos.flatMap((pos) =>
+      pos.senses.flatMap((sense) => [
+        ...sense.definitions
+          .filter((definition) => definition.definition_mode.startsWith("en_"))
+          .map((definition) => (definition.content as EnglishTextV2).mode),
+        ...sense.sentences.map((sentence) => sentence.en_text.mode)
+      ])
+    );
+    expect(englishModes.every((mode) => mode === "unified")).toBe(true);
+    expect(hasDialectSplitEnglishText(collapsed)).toBe(false);
+    // 中文释义仍是 RichText，不该被当成英文内容处理。
+    const zhDefinition = collapsed.pos[0]!.senses[0]!.definitions[0]!;
+    expect(zhDefinition.definition_mode).toBe("zh_definition");
+  });
+
+  it("统计将被丢弃的非偏好侧内容，空文本不计入", () => {
+    const content = dialectMeaningContent();
+    // 偏好英式：只有 definition-ready 那条有美式之外的英式内容，丢弃的是美式侧。
+    expect(countDiscardedEnglishTexts(content, "uk")).toEqual({
+      definitions: 3,
+      sentences: 1
+    });
+    // 偏好美式：只有 definition-ready 填了英式，其余英式侧都是 missing。
+    expect(countDiscardedEnglishTexts(content, "us")).toEqual({
+      definitions: 1,
+      sentences: 0
+    });
+  });
+
+  it("单份内容不产生任何丢弃", () => {
+    const clean: DraftMeaningsStepContent = {
+      sense_groups: [{ id: "g1", name_zh: "测试", name_en: "Test" }],
+      pos: [createPosMeanings("pos-1", unifiedHeadwords, "word-1", "g1")]
+    };
+    expect(countDiscardedEnglishTexts(clean, "uk")).toEqual({
+      definitions: 0,
+      sentences: 0
+    });
+  });
+
+  it("保存 wire 恒为单份，取偏好侧内容", () => {
+    const wire = toMeaningsWireContent(dialectMeaningContent(), "uk");
+    const definition = wire.pos[0]!.senses[0]!.definitions.find(
+      (item) => item.id === "definition-ready"
+    )!;
+    expect(definition.content).toEqual({
+      mode: "unified",
+      common: {
+        id: "definition-ready-uk-text",
+        value: richText("the colour"),
+        origin: "manual"
+      }
+    });
+    expect(wire.pos[0]!.senses[0]!.sentences[0]!.en_text.mode).toBe("unified");
   });
 });
 
@@ -722,11 +666,7 @@ describe("展示、factory 默认值与边界输入", () => {
   it("叶子 factory 生成独立稳定节点、空默认值与唯一 focus link", () => {
     const pronunciation = createPronunciation();
     const definition = createDefinition();
-    const sentence = createSentence(
-      distinguishedHeadwords,
-      "word-1",
-      "sense-1"
-    );
+    const sentence = createSentence("word-1", "sense-1");
     const relation = createRelation("antonym");
 
     expect(pronunciation).toMatchObject({
@@ -873,10 +813,15 @@ describe("真实后端 wire mapper", () => {
     Object.assign(definition, { audio_url: "legacy-definition.mp3" });
     Object.assign(sentence, { audio_source: "legacy-tts" });
 
-    const wire = toMeaningsWireContent({
-      sense_groups: [{ id: "sense-group-1", name_zh: "测试", name_en: "Test" }],
-      pos: [pos]
-    });
+    const wire = toMeaningsWireContent(
+      {
+        sense_groups: [
+          { id: "sense-group-1", name_zh: "测试", name_en: "Test" }
+        ],
+        pos: [pos]
+      },
+      "uk"
+    );
     const wireSense = wire.pos[0]!.senses[0]!;
     const wireDefinition = wireSense.definitions[0]!;
     const wireSentence = wireSense.sentences[0]!;

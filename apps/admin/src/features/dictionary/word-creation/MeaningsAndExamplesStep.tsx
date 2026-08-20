@@ -6,7 +6,6 @@ import {
   LockOutlined,
   PlusOutlined,
   SoundOutlined,
-  ThunderboltOutlined,
   UpOutlined
 } from "@ant-design/icons";
 import {
@@ -21,7 +20,6 @@ import {
   Flex,
   Input,
   InputNumber,
-  Segmented,
   Select,
   Space,
   Switch,
@@ -32,7 +30,6 @@ import {
 import type {
   AdminWordV2,
   CefrLevel,
-  Dialect,
   DraftMeaningsStepContent,
   EnglishTextV2,
   RichText,
@@ -69,7 +66,6 @@ import {
   DIALECT_SHORT_LABEL
 } from "../editorConstants";
 import { CEFR_OPTIONS, cefrColor } from "../labels";
-import { adminWordsDataSourceCapabilities } from "../dataSource";
 import { env } from "@/lib/env";
 import {
   adminVoicePreviewAdapter,
@@ -89,17 +85,15 @@ import {
   newWordNodeId,
   toWordRichText
 } from "../word-model/primitives";
-import { useSaveMeaningsStep, useSuggestDialectVariants } from "./api";
+import { useSaveMeaningsStep } from "./api";
 import { ContentCompletionPanel } from "./ContentCompletionPanel";
 import {
   PronunciationPreviewControls,
   PronunciationPreviewProvider
 } from "./PronunciationPreview";
 import {
-  applyMeaningDialectSuggestions,
-  collectMissingMeaningDialectItems,
-  requestMeaningDialectSuggestionBatches,
-  countIncompleteMeaningDialectSlots,
+  collapseMeaningsEnglishText,
+  countDiscardedEnglishTexts,
   createDefinition,
   createEnglishText,
   createGrammar,
@@ -109,8 +103,12 @@ import {
   createSentence,
   ensureMeaningsForForms,
   grammarDialects,
-  toMeaningsWireContent
+  resolveEnglishText,
+  toMeaningsWireContent,
+  writeEnglishText
 } from "./model";
+import type { AdminDialectPreference } from "@tsz/shared";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import {
   useWordValidationIssue,
@@ -141,11 +139,14 @@ interface Props {
   onDraftChange?: (content: DraftMeaningsStepContent) => void;
 }
 
-export const meaningDialectSuggestionBatchRunner = {
-  run: requestMeaningDialectSuggestionBatches
+const DIALECT_PREFERENCE_LABEL: Record<AdminDialectPreference, string> = {
+  uk: "英式",
+  us: "美式"
 };
-
-type MeaningDialect = "uk" | "us";
+const OTHER_DIALECT_LABEL: Record<AdminDialectPreference, string> = {
+  uk: "美式",
+  us: "英式"
+};
 
 const GRAMMAR_DRAG_TYPE = "application/x-tsz-grammar-structure";
 const DEFINITION_DRAG_TYPE = "application/x-tsz-definition";
@@ -163,10 +164,11 @@ const RELATION_META: Record<
 function grammarStructureOptionLabel(
   grammar: WordPosMeaningsV2["grammar_structures"][number],
   grammarIndex: number,
-  activeDialect: MeaningDialect
+  preference: AdminDialectPreference
 ): string {
+  // 语法结构的双份形状要到阶段 3 才收敛，这里先按偏好侧取那一份做下拉文案。
   const variant =
-    grammar.variants.find((item) => item.dialect === activeDialect) ??
+    grammar.variants.find((item) => item.dialect === preference) ??
     grammar.variants.find((item) => item.dialect === "common") ??
     grammar.variants[0];
   return (
@@ -176,20 +178,18 @@ function grammarStructureOptionLabel(
 
 function definitionTitleText(
   definition: WordDefinitionV2 | undefined,
-  activeDialect: MeaningDialect
+  preference: AdminDialectPreference
 ): string {
   if (!definition) return "待填写释义";
   if (!definition.definition_mode.startsWith("en_")) {
     return (definition.content as RichText).text.trim() || "待填写释义";
   }
-  const content = definition.content as EnglishTextV2;
-  if (content.mode === "unified") {
-    return content.common.value.text.trim() || "待填写释义";
-  }
-  const slot = content[activeDialect];
-  return slot.state === "ready" && slot.variant.value.text.trim()
-    ? slot.variant.value.text.trim()
-    : "待填写释义";
+  return (
+    resolveEnglishText(
+      definition.content as EnglishTextV2,
+      preference
+    ).text.trim() || "待填写释义"
+  );
 }
 
 interface SortableRowsController {
@@ -311,65 +311,6 @@ function useSortableRows<T>({
     handleDragLeave: () => setDragOverIndex(undefined),
     handleDrop,
     handleKeyDown
-  };
-}
-
-function setEnglishText(
-  value: EnglishTextV2,
-  dialect: Dialect,
-  text: string
-): EnglishTextV2 {
-  if (value.mode === "unified") {
-    return {
-      ...value,
-      common: {
-        id: value.common.id,
-        value: toWordRichText(text, value.common.value),
-        origin: "manual"
-      }
-    };
-  }
-  if (dialect === "common") return value;
-  const current = value[dialect];
-  return {
-    ...value,
-    [dialect]: {
-      state: "ready",
-      variant: {
-        id: current.state === "ready" ? current.variant.id : newWordNodeId(),
-        value: toWordRichText(
-          text,
-          current.state === "ready" ? current.variant.value : undefined
-        ),
-        origin: "manual"
-      }
-    }
-  };
-}
-
-function setEnglishRichText(
-  value: EnglishTextV2,
-  dialect: Dialect,
-  content: RichText
-): EnglishTextV2 {
-  if (value.mode === "unified") {
-    return {
-      ...value,
-      common: { id: value.common.id, value: content, origin: "manual" }
-    };
-  }
-  if (dialect === "common") return value;
-  const current = value[dialect];
-  return {
-    ...value,
-    [dialect]: {
-      state: "ready",
-      variant: {
-        id: current.state === "ready" ? current.variant.id : newWordNodeId(),
-        value: content,
-        origin: "manual"
-      }
-    }
   };
 }
 
@@ -503,97 +444,45 @@ function VoiceEditorAction({
 function EnglishTextEditor({
   value,
   clientId,
-  activeDialect,
   toolbarLabel,
   readOnly,
   onChange
 }: {
   value: EnglishTextV2;
   clientId: string;
-  activeDialect: MeaningDialect;
   toolbarLabel?: string;
   readOnly?: boolean;
   onChange: (next: EnglishTextV2) => void;
 }) {
-  if (value.mode === "unified") {
-    if (env.VOICE_EDITOR) {
-      return (
-        <div data-word-node-id={clientId} data-word-field="content">
-          <div data-word-node-id={clientId} data-word-field="content.common">
-            <VoiceTextControl
-              value={value.common.value}
-              contextLabel="英语文本"
-              toolbarLabel={toolbarLabel}
-              readOnly={readOnly}
-              onChange={(content) =>
-                onChange(setEnglishRichText(value, "common", content))
-              }
-            />
-          </div>
-        </div>
-      );
-    }
-    return (
-      <div data-word-node-id={clientId} data-word-field="content">
-        <Input.TextArea
-          aria-label="英语文本"
-          data-word-node-id={clientId}
-          data-word-field="content.common"
-          value={value.common.value.text}
-          readOnly={readOnly}
-          autoSize={{ minRows: 2, maxRows: 6 }}
-          onChange={(event) =>
-            onChange(setEnglishText(value, "common", event.target.value))
-          }
-        />
-      </div>
-    );
-  }
-  const dialect = activeDialect;
-  const slot = value[dialect];
-  const slotValue =
-    slot.state === "ready"
-      ? slot.variant.value
-      : ({ version: 2, text: "", annotations: [] } satisfies RichText);
+  // 第 3 步不再区分英美（A1）：无论 wire 是单份还是存量双份，这里只呈现一个输入框，
+  // 口径取当前管理员的方言偏好；存量双份的收敛发生在保存前，由确认框兜底。
+  const { preference } = useDialectPreference();
+  const text = resolveEnglishText(value, preference);
+  const write = (content: RichText) =>
+    onChange(writeEnglishText(value, preference, content));
+
   return (
     <div data-word-node-id={clientId} data-word-field="content">
-      <div
-        className={`word-meaning-dialect-panel dialect-panel-${dialect}`}
-        data-word-node-id={clientId}
-        data-word-field={`content.${dialect}`}
-      >
+      <div data-word-node-id={clientId} data-word-field="content.common">
         {env.VOICE_EDITOR ? (
           <VoiceTextControl
-            value={slotValue}
-            contextLabel={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
+            value={text}
+            contextLabel="英语文本"
             toolbarLabel={toolbarLabel}
             readOnly={readOnly}
-            onChange={(content) =>
-              onChange(setEnglishRichText(value, dialect, content))
-            }
+            onChange={write}
           />
         ) : (
           <Input.TextArea
-            aria-label={`${DIALECT_SHORT_LABEL[dialect]}英语文本`}
-            value={slot.state === "ready" ? slot.variant.value.text : ""}
+            aria-label="英语文本"
+            value={text.text}
             readOnly={readOnly}
-            placeholder={
-              slot.state === "missing" ? "待自动补全，也可直接填写" : undefined
-            }
             autoSize={{ minRows: 2, maxRows: 6 }}
             onChange={(event) =>
-              onChange(setEnglishText(value, dialect, event.target.value))
+              write(toWordRichText(event.target.value, text))
             }
           />
         )}
-        <Flex justify="space-between" align="center" style={{ marginTop: 5 }}>
-          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-            {slot.state === "ready"
-              ? `来源：${slot.variant.origin}`
-              : "待补全，可直接手工填写"}
-          </Typography.Text>
-          {dialect === value.source_dialect && <Tag color="blue">源文本</Tag>}
-        </Flex>
       </div>
     </div>
   );
@@ -875,27 +764,22 @@ function GrammarEditor({
 function DefinitionEditor({
   value,
   index,
-  headwords,
   grammars,
-  activeDialect,
   readOnly,
-  englishReadOnly,
   sorting,
   onChange,
   onRemove
 }: {
   value: WordDefinitionV2;
   index: number;
-  headwords: WordHeadwordsV2;
   grammars: WordPosMeaningsV2["grammar_structures"];
-  activeDialect: MeaningDialect;
   readOnly?: boolean;
-  englishReadOnly?: boolean;
   sorting: SortableRowsController;
   onChange: (next: WordDefinitionV2) => void;
   onRemove: () => void;
 }) {
   const english = value.definition_mode.startsWith("en_");
+  const { preference } = useDialectPreference();
   return (
     <div
       className={`word-table-row word-definition-row${sorting.draggingIndex === index ? " is-dragging" : ""}${sorting.dragOverIndex === index ? " is-drag-over" : ""}`}
@@ -936,7 +820,7 @@ function DefinitionEditor({
                       "en_definition" | "en_sentence",
                     content: english
                       ? (value.content as EnglishTextV2)
-                      : createEnglishText(headwords)
+                      : createEnglishText()
                   }
                 : {
                     ...base,
@@ -959,8 +843,7 @@ function DefinitionEditor({
           <EnglishTextEditor
             value={value.content as EnglishTextV2}
             clientId={value.id}
-            activeDialect={activeDialect}
-            readOnly={readOnly || englishReadOnly}
+            readOnly={readOnly}
             onChange={(content) =>
               onChange({
                 ...value,
@@ -1006,7 +889,7 @@ function DefinitionEditor({
             label: grammarStructureOptionLabel(
               grammar,
               grammarIndex,
-              activeDialect
+              preference
             )
           }))}
           onChange={(grammar_structure_id) =>
@@ -1150,18 +1033,14 @@ function ContextLinksEditor({
 function SentenceEditor({
   value,
   index,
-  activeDialect,
   readOnly,
-  englishReadOnly,
   sorting,
   onChange,
   onRemove
 }: {
   value: WordSentenceV2;
   index: number;
-  activeDialect: MeaningDialect;
   readOnly?: boolean;
-  englishReadOnly?: boolean;
   sorting: SortableRowsController;
   onChange: (next: WordSentenceV2) => void;
   onRemove: () => void;
@@ -1196,9 +1075,8 @@ function SentenceEditor({
             <EnglishTextEditor
               value={value.en_text}
               clientId={value.id}
-              activeDialect={activeDialect}
               toolbarLabel="英文例句"
-              readOnly={readOnly || englishReadOnly}
+              readOnly={readOnly}
               onChange={(en_text) => onChange({ ...value, en_text })}
             />
             <div
@@ -1680,16 +1558,13 @@ function SenseEditor({
   value,
   index,
   last,
-  headwords,
   wordId,
   senseGroups,
   grammars,
   subPosOptions,
   subPosLabel,
   catalogUnavailable,
-  activeDialect,
   readOnly,
-  englishReadOnly,
   forceOpen,
   onChange,
   onMove,
@@ -1698,16 +1573,13 @@ function SenseEditor({
   value: WordSenseV2;
   index: number;
   last: boolean;
-  headwords: WordHeadwordsV2;
   wordId: string;
   senseGroups: DraftMeaningsStepContent["sense_groups"];
   grammars: WordPosMeaningsV2["grammar_structures"];
   subPosOptions: Array<{ value: string; label: string }>;
   subPosLabel?: string;
   catalogUnavailable: boolean;
-  activeDialect: MeaningDialect;
   readOnly?: boolean;
-  englishReadOnly?: boolean;
   forceOpen?: boolean;
   onChange: (next: WordSenseV2) => void;
   onMove: (delta: -1 | 1) => void;
@@ -1733,10 +1605,8 @@ function SenseEditor({
     onChange: (sentences) => onChange({ ...value, sentences })
   });
 
-  const definitionText = definitionTitleText(
-    value.definitions[0],
-    activeDialect
-  );
+  const { preference } = useDialectPreference();
+  const definitionText = definitionTitleText(value.definitions[0], preference);
   return (
     <Collapse
       className={`word-sense-editor word-sense-editor-${value.level.toLowerCase()}`}
@@ -1912,11 +1782,8 @@ function SenseEditor({
                     key={definition.id}
                     value={definition}
                     index={definitionIndex}
-                    headwords={headwords}
                     grammars={grammars}
-                    activeDialect={activeDialect}
                     readOnly={readOnly}
-                    englishReadOnly={englishReadOnly}
                     sorting={definitionSorting}
                     onChange={(nextDefinition) => {
                       const definitions = [...value.definitions];
@@ -1961,9 +1828,7 @@ function SenseEditor({
                     key={sentence.id}
                     value={sentence}
                     index={sentenceIndex}
-                    activeDialect={activeDialect}
                     readOnly={readOnly}
-                    englishReadOnly={englishReadOnly}
                     sorting={sentenceSorting}
                     onChange={(nextSentence) => {
                       const sentences = [...value.sentences];
@@ -1991,7 +1856,7 @@ function SenseEditor({
                         ...value,
                         sentences: [
                           ...value.sentences,
-                          createSentence(headwords, wordId, value.id)
+                          createSentence(wordId, value.id)
                         ]
                       })
                     }
@@ -2050,19 +1915,13 @@ export function MeaningsAndExamplesStep({
   const [activePosId, setActivePosId] = useState(
     word.forms.pos[0]?.pos_id ?? ""
   );
-  const [activeDialect, setActiveDialect] = useState<MeaningDialect>(() =>
-    word.headwords.mode === "distinguish" ? word.headwords.source_dialect : "us"
-  );
-  const [fillingDialect, setFillingDialect] = useState<MeaningDialect>();
-  const [attemptedDialects, setAttemptedDialects] = useState<
-    Set<MeaningDialect>
-  >(() => new Set());
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [collapsePending, setCollapsePending] = useState(false);
   const [validationMessages, setValidationMessages] = useState<string[]>([]);
   const issueTarget = useWordValidationIssue();
   const saveMeanings = useSaveMeaningsStep(word.id);
-  const suggestVariants = useSuggestDialectVariants();
+  const { preference } = useDialectPreference();
   const allowSavedNavigation = useUnsavedWordChanges(dirty);
   useWordValidationIssueFocus(activePosId);
 
@@ -2070,13 +1929,6 @@ export function MeaningsAndExamplesStep({
     ? content.pos.find((pos) => meaningsPosOwnsNode(pos, issueTarget.nodeId))
         ?.pos_id
     : undefined;
-  const issueDialect: MeaningDialect | undefined =
-    issueTarget?.field === "content.uk"
-      ? "uk"
-      : issueTarget?.field === "content.us"
-        ? "us"
-        : undefined;
-
   useEffect(() => {
     if (issueOwnerPosId) setActivePosId(issueOwnerPosId);
   }, [issueOwnerPosId]);
@@ -2088,10 +1940,6 @@ export function MeaningsAndExamplesStep({
       const next = cloneWordValue(ensureMeaningsForForms(word));
       contentRef.current = next;
       setContent(next);
-      if (word.headwords.mode === "distinguish") {
-        setActiveDialect(word.headwords.source_dialect);
-      }
-      setAttemptedDialects(new Set());
       if (wordChanged) {
         setDirty(false);
         setValidationMessages([]);
@@ -2099,10 +1947,6 @@ export function MeaningsAndExamplesStep({
       }
     }
   }, [dirty, word, word.revision]);
-
-  useEffect(() => {
-    if (issueDialect) setActiveDialect(issueDialect);
-  }, [issueDialect]);
 
   useEffect(() => {
     onDraftChange?.(content);
@@ -2154,93 +1998,13 @@ export function MeaningsAndExamplesStep({
     });
   };
 
-  const fillMissingDialect = async (
-    target: MeaningDialect,
-    requestContent: DraftMeaningsStepContent = contentRef.current
-  ) => {
-    if (
-      readOnly ||
-      !adminWordsDataSourceCapabilities.dialectVariantSuggestions
-    ) {
-      return;
-    }
-    const request = collectMissingMeaningDialectItems(requestContent, target);
-    if (request.items.length === 0) return;
-    setFillingDialect(target);
-    setAttemptedDialects((current) => new Set(current).add(target));
-    let appliedCount = 0;
-    try {
-      await meaningDialectSuggestionBatchRunner.run(
-        request,
-        (batch) => suggestVariants.mutateAsync(batch),
-        (suggestions) => {
-          const result = applyMeaningDialectSuggestions(
-            contentRef.current,
-            target,
-            suggestions
-          );
-          appliedCount += result.applied_count;
-          if (result.applied_count > 0) updateContent(result.content);
-        }
-      );
-      const remaining = collectMissingMeaningDialectItems(
-        contentRef.current,
-        target
-      ).items.length;
-      if (remaining === 0) {
-        message.success(
-          `已补全 ${appliedCount} 项${target === "uk" ? "英式" : "美式"}内容`
-        );
-      } else if (appliedCount > 0) {
-        message.warning(
-          `已补全 ${appliedCount} 项，仍有 ${remaining} 项可重试`
-        );
-      } else {
-        message.warning(`未获得可写入的内容，仍有 ${remaining} 项可重试`);
-      }
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : "自动补全失败";
-      message.error(
-        appliedCount > 0
-          ? `已补全 ${appliedCount} 项，后续批次失败：${detail}`
-          : detail
-      );
-    } finally {
-      setFillingDialect(undefined);
-    }
-  };
-
-  const changeActiveDialect = (target: MeaningDialect) => {
-    setActiveDialect(target);
-    if (
-      !readOnly &&
-      adminWordsDataSourceCapabilities.dialectVariantSuggestions
-    ) {
-      void fillMissingDialect(target, content);
-    }
-  };
-
-  const save = async (intent: StepSaveIntent) => {
-    if (saving || fillingDialect !== undefined) return;
-    if (intent === "complete") {
-      const issues = validateMeanings(content, {
-        word_id: word.id,
-        headwords: word.headwords,
-        forms: word.forms,
-        partOfSpeechLookup
-      });
-      setValidationMessages(issues);
-      if (issues.length > 0) {
-        message.warning(`还有 ${issues.length} 项需要完善`);
-        return;
-      }
-    }
+  const performSave = async (intent: StepSaveIntent) => {
     setSaving(true);
     try {
       const { word: savedWord } = await saveMeanings.mutateAsync({
         base_revision: word.revision,
         intent,
-        content: toMeaningsWireContent(content)
+        content: toMeaningsWireContent(content, preference)
       });
       setDirty(false);
       onSaved(savedWord);
@@ -2284,6 +2048,44 @@ export function MeaningsAndExamplesStep({
     }
   };
 
+  const save = async (intent: StepSaveIntent) => {
+    // collapsePending 挡住确认框弹出期间的二次点击：此时 saving 还是 false，
+    // 连点两下会叠出两个确认框，依次确认就用同一个 base_revision 发两次保存。
+    if (saving || collapsePending) return;
+    if (intent === "complete") {
+      // 按「保存后会变成什么样」校验：英文内容收敛后只剩偏好侧那一份。
+      const issues = validateMeanings(
+        collapseMeaningsEnglishText(content, preference),
+        {
+          word_id: word.id,
+          headwords: word.headwords,
+          forms: word.forms,
+          partOfSpeechLookup
+        }
+      );
+      setValidationMessages(issues);
+      if (issues.length > 0) {
+        message.warning(`还有 ${issues.length} 项需要完善`);
+        return;
+      }
+    }
+    if (discardedTotal === 0) {
+      await performSave(intent);
+      return;
+    }
+    // 不静默截断：把「哪一侧、丢几条」讲清楚，管理员点了确认才动。
+    setCollapsePending(true);
+    modal.confirm({
+      title: "保存后这条词条只保留一份英文内容",
+      content: `${OTHER_DIALECT_LABEL[preference]}的 ${discardedItems} 将不再保留，${DIALECT_PREFERENCE_LABEL[preference]}内容成为唯一内容。语法结构不受影响。`,
+      okText: "确认保存",
+      okButtonProps: { danger: true },
+      cancelText: "取消",
+      onOk: () => performSave(intent),
+      afterClose: () => setCollapsePending(false)
+    });
+  };
+
   const formsById = useMemo(
     () => new Map(word.forms.pos.map((pos) => [pos.pos_id, pos])),
     [word.forms.pos]
@@ -2292,14 +2094,17 @@ export function MeaningsAndExamplesStep({
     () => collectPronunciationHints(word.forms),
     [word.forms]
   );
-  const activeDialectEligibleCount =
-    word.headwords.mode === "distinguish"
-      ? collectMissingMeaningDialectItems(content, activeDialect).items.length
-      : 0;
-  const activeDialectMissingCount =
-    word.headwords.mode === "distinguish"
-      ? countIncompleteMeaningDialectSlots(content, activeDialect)
-      : 0;
+  // 存量双份英文内容：进来时给一条说明，保存前再确认一次要丢弃哪些，绝不静默截断。
+  // 判据是「确实有内容会被丢弃」而不是「wire 形状是不是 distinguish」——
+  // 只填了单侧的旧草稿收敛时无物可丢，再提示「留着两份内容」只会让人去找不存在的那一份。
+  const discarded = countDiscardedEnglishTexts(content, preference);
+  const discardedTotal = discarded.definitions + discarded.sentences;
+  const discardedItems = [
+    discarded.definitions > 0 ? `英文释义 ${discarded.definitions} 条` : "",
+    discarded.sentences > 0 ? `英文例句 ${discarded.sentences} 条` : ""
+  ]
+    .filter(Boolean)
+    .join("、");
 
   const tabs = content.pos.map((posMeanings, posIndex) => {
     const formPos = formsById.get(posMeanings.pos_id);
@@ -2392,7 +2197,6 @@ export function MeaningsAndExamplesStep({
                   value={sense}
                   index={senseIndex}
                   last={senseIndex === posMeanings.senses.length - 1}
-                  headwords={word.headwords}
                   wordId={word.id}
                   senseGroups={content.sense_groups}
                   grammars={posMeanings.grammar_structures}
@@ -2407,9 +2211,7 @@ export function MeaningsAndExamplesStep({
                       : undefined
                   }
                   catalogUnavailable={partOfSpeechCatalog.isError}
-                  activeDialect={activeDialect}
                   readOnly={readOnly}
-                  englishReadOnly={fillingDialect !== undefined}
                   forceOpen={
                     issueTarget
                       ? senseOwnsNode(sense, issueTarget.nodeId)
@@ -2469,11 +2271,7 @@ export function MeaningsAndExamplesStep({
                       ...posMeanings,
                       senses: [
                         ...posMeanings.senses,
-                        createSense(
-                          word.headwords,
-                          word.id,
-                          content.sense_groups[0]!.id
-                        )
+                        createSense(word.id, content.sense_groups[0]!.id)
                       ]
                     };
                     updateContent({ ...content, pos });
@@ -2556,56 +2354,14 @@ export function MeaningsAndExamplesStep({
             style={{ marginBottom: 16 }}
           />
         )}
-        {word.headwords.mode === "distinguish" && (
-          <div className="word-meaning-dialect-toolbar">
-            <Flex align="center" justify="space-between" gap={12} wrap>
-              <Space size={10} wrap>
-                <Typography.Text strong>英文内容</Typography.Text>
-                <Segmented
-                  aria-label="词义内容方言"
-                  value={activeDialect}
-                  disabled={fillingDialect !== undefined}
-                  options={[
-                    { label: "英式", value: "uk" },
-                    { label: "美式", value: "us" }
-                  ]}
-                  onChange={(value) =>
-                    changeActiveDialect(value as MeaningDialect)
-                  }
-                />
-                <Typography.Text type="secondary">
-                  {activeDialectMissingCount === 0
-                    ? "当前内容已完整"
-                    : !adminWordsDataSourceCapabilities.dialectVariantSuggestions
-                      ? `待填写 ${activeDialectMissingCount} 项`
-                      : activeDialectEligibleCount > 0
-                        ? `待补全 ${activeDialectEligibleCount} 项`
-                        : `待手工填写 ${activeDialectMissingCount} 项`}
-                </Typography.Text>
-              </Space>
-              {!readOnly && activeDialectEligibleCount > 0 && (
-                <Button
-                  size="small"
-                  icon={<ThunderboltOutlined />}
-                  loading={fillingDialect === activeDialect}
-                  disabled={
-                    fillingDialect !== undefined ||
-                    !adminWordsDataSourceCapabilities.dialectVariantSuggestions
-                  }
-                  title={
-                    adminWordsDataSourceCapabilities.dialectVariantSuggestions
-                      ? undefined
-                      : "真实方言建议服务尚未接入，请手工填写"
-                  }
-                  onClick={() =>
-                    void fillMissingDialect(activeDialect, content)
-                  }
-                >
-                  {`${attemptedDialects.has(activeDialect) ? "重试补全" : "自动补全"} ${activeDialectEligibleCount} 项`}
-                </Button>
-              )}
-            </Flex>
-          </div>
+        {discardedTotal > 0 && (
+          <Alert
+            type="info"
+            showIcon
+            title={`这条词条还留着旧版的${OTHER_DIALECT_LABEL[preference]}英文内容`}
+            description={`现在统一按你的方言偏好（${DIALECT_PREFERENCE_LABEL[preference]}）维护一份；保存时会让你确认是否丢弃${OTHER_DIALECT_LABEL[preference]}的 ${discardedItems}。`}
+            style={{ marginBottom: 16 }}
+          />
         )}
 
         <Card
@@ -2717,7 +2473,7 @@ export function MeaningsAndExamplesStep({
             </Button>
             <Button
               loading={saving}
-              disabled={fillingDialect !== undefined}
+              disabled={collapsePending}
               onClick={() => void save("save")}
             >
               保存草稿
@@ -2725,7 +2481,7 @@ export function MeaningsAndExamplesStep({
             <Button
               type="primary"
               loading={saving}
-              disabled={fillingDialect !== undefined}
+              disabled={collapsePending}
               onClick={() => void save("complete")}
             >
               完成并进入预览

@@ -12,6 +12,7 @@ import type {
 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import type { PartOfSpeechLookup } from "../part-of-speech/catalog";
 import { WORD_STEP_ORDER, WORD_STEP_TITLE, wordDisplayHeadword } from "./model";
 import {
@@ -93,7 +94,9 @@ function ProgressSummary({
   partOfSpeechLookup?: PartOfSpeechLookup;
   onNavigate?: (target: ReadinessTarget) => void;
 }) {
-  const rows = buildWordReadiness(word, draft, partOfSpeechLookup);
+  // 完成度按偏好口径算：存量双份词条保存后只留偏好侧，未收敛的原值会误报未完成。
+  const { preference } = useDialectPreference();
+  const rows = buildWordReadiness(word, draft, partOfSpeechLookup, preference);
   return (
     <Flex vertical gap={13} className="word-creation-progress-list">
       {rows.map((row) => {

@@ -109,16 +109,17 @@ describe("meanings and examples validation", () => {
       field: "level"
     });
     sentence.level = "A1";
-    if (sentence.en_text.mode !== "distinguish") {
-      throw new Error("fixture must distinguish dialects");
+    // A1 之后英文例句恒为单份，缺失定位到 content.common。
+    if (sentence.en_text.mode !== "unified") {
+      throw new Error("fixture should carry a single English variant");
     }
-    const ukText = sentence.en_text.uk;
-    sentence.en_text.uk = { state: "missing" };
+    const englishText = sentence.en_text.common.value.text;
+    sentence.en_text.common.value.text = "";
     expect(wordSentenceIssueTarget(sentence, sense.id, word.id)).toEqual({
       node_id: sentence.id,
-      field: "content.uk"
+      field: "content.common"
     });
-    sentence.en_text.uk = ukText;
+    sentence.en_text.common.value.text = englishText;
     sentence.zh_text.text = "";
     expect(wordSentenceIssueTarget(sentence, sense.id, word.id)).toEqual({
       node_id: sentence.id,

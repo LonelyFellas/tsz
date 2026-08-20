@@ -4,8 +4,8 @@
 > 产品口径一律以需求文档为准。
 >
 > **实施进度**：评估已于 2026-08-19 评审通过（三层模型 + 五条结论 + PR #134 作废）。
-> **阶段 1（方言偏好内核与个人设置入口）已落地**，落地过程中对本文的三处修正
-> 已就地改写并标注理由；阶段 2 起未动。
+> **阶段 1（方言偏好内核与个人设置入口）、阶段 2（第 3 步释义/例句收敛）已落地**，
+> 落地过程中对本文的修正已就地改写并标注理由；阶段 3 起未动。
 >
 > **核对基线**
 >
@@ -218,6 +218,33 @@ export function collapseEnglishText(
 1. 只在 `headwords.mode === "distinguish"` 时产生，绝大多数词条不受影响；
 2. 两条 variant 的 `id` 稳定复用已有节点 ID，不每次保存重新生成（否则节点漂移）；
 3. 代码里写明 `// TODO(dialect-preference-migration 阶段 6)`，删除条件是后端 P1 落地。
+
+## 阶段 2 落地记录（2026-08-20）
+
+实现时与本文原设想不同、需要在此定案的几点：
+
+1. **收敛发生在保存时，不在编辑时**。编辑期把文本写回**偏好侧那一份**，wire 形状保持
+   `distinguish` 不变（`writeEnglishText`）；只有 `toMeaningsWireContent` 才折成单份。
+   这样「保存后会丢弃 N 条」的确认框才有东西可数——编辑时就收敛的话，第一次按键
+   就已经把另一侧删了，确认框来不及提示。
+2. **validation.ts 与 readiness 的签名基本不动**。校验不接收偏好，而是由调用方
+   **先收敛再校验**（`validateMeanings(collapseMeaningsEnglishText(content, preference), …)`）；
+   收敛后一律是 `unified`，现有的 unified 分支恰好就是新口径。
+   只有 `buildWordReadiness` 加了第 4 个参数 `dialectPreference`——它同时服务
+   draft 与服务端副本两条路径，放在调用方收敛会漏掉后者。
+3. **`EnglishTextEditor` 的 `data-word-field` 统一为 `content.common`**，
+   与 `englishTextIssueField` 收敛后的返回值天然对齐，校验定位无需改动。
+4. **修掉一处既有缺陷**：`toMeaningsWireContent` 原来按 `"content_id" in definition`
+   判断中文 / 英文释义。释义从中文改成英文后残留的 `content_id` 会让英文内容被原样
+   透传——A1 之前只是多带一个字段，A1 之后会**漏掉单份收敛**。已改为按判别字段
+   `definition_mode` 分支。
+5. **三处 fixture 必须一起改成单份**，否则「新建的词条一进第 3 步就被当成存量数据」：
+   `mock/fixtures.ts` 的 `emptyEnglishText`、`wordCreation.test.helper.ts` 的
+   `readyEnglishText`、`e2e/tests/support/mockAdminApi.ts` 的种子例句。
+   存量双份形状改由需要它的用例自行构造（`legacySplitWord` / `legacySplitEnglishText`）。
+6. **`activeDialect` 不再逐层传递**：需要口径的 `EnglishTextEditor` / `DefinitionEditor` /
+   `SenseEditor` 各自调 `useDialectPreference()`，`SentenceEditor`、`DefinitionEditor`
+   的 `headwords` 参数随之成为孤儿并删除。
 
 ## 逐文件改动影响清单
 

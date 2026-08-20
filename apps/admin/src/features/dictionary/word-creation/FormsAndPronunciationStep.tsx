@@ -97,6 +97,7 @@ import {
   legalDerivedFormTypes,
   toFormsWireContent
 } from "./model";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { buildWordReadiness, pendingReadinessRows } from "./readiness";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import {
@@ -1823,6 +1824,7 @@ export function FormsAndPronunciationStep({
   const saveForms = useSaveFormsStep(word.id);
   const previewImpact = usePreviewFormsImpact(word.id);
   const suggestVariants = useSuggestDialectVariants();
+  const { preference } = useDialectPreference();
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const partOfSpeechLookup = useMemo(
     () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
@@ -2379,7 +2381,12 @@ export function FormsAndPronunciationStep({
       if (issues.length > 0) {
         // 提示直接复述左栏「完成情况」的分数,否则拦截数与左栏数字对不上。
         const pending = pendingReadinessRows(
-          buildWordReadiness(word, { forms: content }, partOfSpeechLookup),
+          buildWordReadiness(
+            word,
+            { forms: content },
+            partOfSpeechLookup,
+            preference
+          ),
           "forms"
         )
           .map((row) => `${row.label} ${row.completed}/${row.total}`)
