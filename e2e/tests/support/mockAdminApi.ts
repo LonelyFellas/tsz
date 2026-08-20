@@ -18,7 +18,9 @@ const ADMIN_PROFILE = {
   phone: "13800138000",
   display_name: "E2E Admin",
   role: "admin",
-  permissions: ["words.access"]
+  permissions: ["words.access"],
+  // 偏好持久化在服务端（后端提案 P2）；e2e 固定英式。
+  preferences: { dialect: "uk" }
 };
 
 const NOW = "2026-08-02T03:00:00.000Z";
@@ -140,7 +142,8 @@ const CENTER_MEANINGS = {
         {
           id: "grammar-1",
           variants: [
-            // 语法结构 A1 后只维护一份：区分词条 wire 上仍是两条，但互为镜像。
+            // 存量（A1 改造前）的英美双条：编辑器只呈现偏好侧那一份，
+            // 保存时收敛为单条 `common`。留着它就是为了覆盖这条收敛路径。
             { id: "grammar-uk", dialect: "uk", content: richText("a centre") },
             { id: "grammar-us", dialect: "us", content: richText("a centre") }
           ]

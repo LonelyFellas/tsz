@@ -37,7 +37,6 @@ import type {
   RelatedWordResult,
   StepSaveIntent,
   WordDefinitionV2,
-  WordHeadwordsV2,
   WordPosMeaningsV2,
   WordRelationType,
   WordRelationV2,
@@ -91,7 +90,7 @@ import {
 import {
   collapseMeaningsEnglishText,
   countDiscardedEnglishTexts,
-  countOverwrittenGrammarVariants,
+  countDiscardedGrammarVariants,
   createDefinition,
   createEnglishText,
   createGrammar,
@@ -100,7 +99,7 @@ import {
   createSenseGroup,
   createSentence,
   ensureMeaningsForForms,
-  mirrorMeaningsGrammar,
+  collapseMeaningsGrammar,
   resolveEnglishText,
   resolveGrammarText,
   toMeaningsWireContent,
@@ -167,7 +166,7 @@ function grammarStructureOptionLabel(
   grammarIndex: number,
   preference: AdminDialectPreference
 ): string {
-  // 语法结构的双份形状要到阶段 3 才收敛，这里先按偏好侧取那一份做下拉文案。
+  // 存量词条的语法结构可能还是英美双条，这里按偏好侧取那一份做下拉文案。
   const variant =
     grammar.variants.find((item) => item.dialect === preference) ??
     grammar.variants.find((item) => item.dialect === "common") ??
@@ -492,18 +491,16 @@ function EnglishTextEditor({
 function GrammarEditor({
   value,
   posId,
-  headwords,
   readOnly,
   onChange
 }: {
   value: WordPosMeaningsV2["grammar_structures"];
   posId: string;
-  headwords: WordHeadwordsV2;
   readOnly?: boolean;
   onChange: (next: WordPosMeaningsV2["grammar_structures"]) => void;
 }) {
-  // 语法结构只维护一份（A1）：wire 里对区分词条仍写两条同值镜像，但那是保存时的事，
-  // 编辑器只呈现偏好侧那一份。
+  // 语法结构只维护一份（A1）：存量词条的 wire 上可能还留着英美双条，
+  // 编辑器只呈现偏好侧那一份，收敛发生在保存前。
   const { preference } = useDialectPreference();
   const [draggingIndex, setDraggingIndex] = useState<number>();
   const [dragOverIndex, setDragOverIndex] = useState<number>();
@@ -725,7 +722,7 @@ function GrammarEditor({
           type="dashed"
           block
           icon={<PlusOutlined />}
-          onClick={() => onChange([...value, createGrammar(headwords)])}
+          onClick={() => onChange([...value, createGrammar()])}
         >
           添加语法结构
         </Button>
@@ -2011,7 +2008,7 @@ export function MeaningsAndExamplesStep({
       const { word: savedWord } = await saveMeanings.mutateAsync({
         base_revision: word.revision,
         intent,
-        content: toMeaningsWireContent(content, word.headwords, preference)
+        content: toMeaningsWireContent(content, preference)
       });
       setDirty(false);
       onSaved(savedWord);
@@ -2101,36 +2098,34 @@ export function MeaningsAndExamplesStep({
   // 存量双份英文内容：进来时给一条说明，保存前再确认一次要丢弃哪些，绝不静默截断。
   // 判据是「确实有内容会被丢弃」而不是「wire 形状是不是 distinguish」——
   // 只填了单侧的旧草稿收敛时无物可丢，再提示「留着两份内容」只会让人去找不存在的那一份。
-  // 保存出去的形状：英文收敛为单份 + 语法结构按偏好侧镜像。
+  // 保存出去的形状：英文内容与语法结构都收敛为单份。
   // 校验、完成度与词性 Tab 的待修项计数都必须基于它，否则会出现
   // 「Tab 上挂着一个消不掉的红点，但完成校验又说没问题」这种自相矛盾。
   const normalizedContent = useMemo(
     () =>
-      mirrorMeaningsGrammar(
+      collapseMeaningsGrammar(
         collapseMeaningsEnglishText(content, preference),
-        word.headwords,
         preference
       ),
-    [content, preference, word.headwords]
+    [content, preference]
   );
   const discarded = countDiscardedEnglishTexts(content, preference);
-  // 语法结构保存时按偏好侧镜像写两条，非偏好侧写过的不同文本会被覆盖——
+  // 存量词条的语法结构还留着英美双条，保存时收敛为单条 `common`，非偏好侧那条会被删除——
   // 这同样是丢数据，必须一起说清楚，不能宣称「语法结构不受影响」。
   //
   // 注意这里数的是**载入时**的服务端副本而不是正在编辑的 content：编辑只写偏好侧那一条，
-  // 非偏好侧留着上一次的镜像值，拿 content 去比会把「你自己刚改的字」误判成
-  // 「即将被覆盖的美式内容」，于是每改一个字都弹一次确认框。
-  const overwrittenGrammar = countOverwrittenGrammarVariants(
+  // 非偏好侧留着上一次保存的旧值，拿 content 去比会把「你自己刚改的字」误判成
+  // 「即将被丢弃的美式内容」，于是每改一个字都弹一次确认框。
+  const discardedGrammar = countDiscardedGrammarVariants(
     word.meanings,
-    word.headwords,
     preference
   );
   const discardedTotal =
-    discarded.definitions + discarded.sentences + overwrittenGrammar;
+    discarded.definitions + discarded.sentences + discardedGrammar;
   const discardedItems = [
     discarded.definitions > 0 ? `英文释义 ${discarded.definitions} 条` : "",
     discarded.sentences > 0 ? `英文例句 ${discarded.sentences} 条` : "",
-    overwrittenGrammar > 0 ? `语法结构 ${overwrittenGrammar} 条` : ""
+    discardedGrammar > 0 ? `语法结构 ${discardedGrammar} 条` : ""
   ]
     .filter(Boolean)
     .join("、");
@@ -2162,7 +2157,6 @@ export function MeaningsAndExamplesStep({
             <GrammarEditor
               value={posMeanings.grammar_structures}
               posId={posMeanings.pos_id}
-              headwords={word.headwords}
               readOnly={readOnly}
               onChange={(grammar_structures) => {
                 const remaining = new Set(

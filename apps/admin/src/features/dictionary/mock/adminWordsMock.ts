@@ -829,8 +829,6 @@ function validateMeanings(
       });
       continue;
     }
-    const expectedGrammarDialects: Array<"uk" | "us" | "common"> =
-      word.headwords.mode === "unified" ? ["common"] : ["uk", "us"];
     if (pos.grammar_structures.length === 0) {
       issues.push({
         step: "meanings",
@@ -842,12 +840,17 @@ function validateMeanings(
     }
     for (const grammar of pos.grammar_structures) {
       const dialects = grammar.variants.map((variant) => variant.dialect);
+      // 与真实后端同口径（tsz-rust #35 / P1）：`unified` 只接受 `[common]`，
+      // `distinguish` 接受 `[common]`（收敛后）或 `[uk, us]`（尚未收敛的存量）。
+      const shapeValid =
+        new Set(dialects).size === dialects.length &&
+        ((dialects.length === 1 && dialects[0] === "common") ||
+          (word.headwords.mode === "distinguish" &&
+            dialects.length === 2 &&
+            dialects.includes("uk") &&
+            dialects.includes("us")));
       if (
-        dialects.length !== expectedGrammarDialects.length ||
-        new Set(dialects).size !== dialects.length ||
-        expectedGrammarDialects.some(
-          (dialect) => !dialects.includes(dialect)
-        ) ||
+        !shapeValid ||
         grammar.variants.some((variant) => variant.content.text.trim() === "")
       ) {
         issues.push({
@@ -3307,7 +3310,6 @@ export function createAdminWordsMock({
       forms,
       meanings: createInitialMeanings(
         forms,
-        input.headwords,
         wordId,
         detection.normalized_headword === "large-fixture"
       ),
@@ -3575,7 +3577,6 @@ export function createAdminWordsMock({
         word.meanings.pos.push(
           createInitialMeaningsForAddedPos(
             formsPos,
-            word.headwords,
             word.id,
             defaultSenseGroupId
           )

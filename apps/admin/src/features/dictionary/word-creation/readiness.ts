@@ -13,7 +13,7 @@ import type {
 import type { AdminDialectPreference } from "@tsz/shared";
 import { DEFAULT_DIALECT_PREFERENCE } from "@tsz/shared";
 import type { PartOfSpeechLookup } from "../part-of-speech/catalog";
-import { collapseMeaningsEnglishText, mirrorMeaningsGrammar } from "./model";
+import { collapseMeaningsEnglishText, collapseMeaningsGrammar } from "./model";
 import {
   baseFormPronunciationIssues,
   baseFormSpellingIssues,
@@ -142,10 +142,10 @@ export function buildWordReadiness(
       sense_groups: [],
       pos: []
     };
-  const collapsed = collapseMeaningsEnglishText(rawMeanings, dialectPreference);
-  const meanings = word
-    ? mirrorMeaningsGrammar(collapsed, word.headwords, dialectPreference)
-    : collapsed;
+  const meanings = collapseMeaningsGrammar(
+    collapseMeaningsEnglishText(rawMeanings, dialectPreference),
+    dialectPreference
+  );
   const completedSteps = new Set(word?.completed_steps ?? []);
   const dialectComplete = completedSteps.has("basics") ? 1 : 0;
 

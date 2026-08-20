@@ -391,7 +391,6 @@ function emptyEnglishText(nodeKey: string): EnglishTextV2 {
 
 function createInitialPosMeanings(
   formsPos: WordPosFormsV2,
-  headwords: WordHeadwordsV2,
   wordId: string,
   nodeKey: string,
   count: number,
@@ -399,20 +398,19 @@ function createInitialPosMeanings(
   senseGroupId: string
 ): WordPosMeaningsV2 {
   const grammarId = `mock-grammar-${nodeKey}`;
-  const grammarDialects =
-    headwords.mode === "unified"
-      ? (["common"] as const)
-      : (["uk", "us"] as const);
+  // 新建草稿的语法结构一律单条 `common`（A1 / 后端 P1），区分词条也不例外。
   return {
     pos_id: formsPos.pos_id,
     grammar_structures: [
       {
         id: grammarId,
-        variants: grammarDialects.map((dialect) => ({
-          id: `${grammarId}-${dialect}`,
-          dialect,
-          content: richText(large ? "the large fixture" : "")
-        }))
+        variants: [
+          {
+            id: `${grammarId}-common`,
+            dialect: "common" as const,
+            content: richText(large ? "the large fixture" : "")
+          }
+        ]
       }
     ],
     senses: Array.from({ length: count }, (_, index) => {
@@ -471,13 +469,11 @@ function createInitialPosMeanings(
  */
 export function createInitialMeaningsForAddedPos(
   formsPos: WordPosFormsV2,
-  headwords: WordHeadwordsV2,
   wordId: string,
   senseGroupId: string
 ): WordPosMeaningsV2 {
   return createInitialPosMeanings(
     formsPos,
-    headwords,
     wordId,
     `pos-${encodeURIComponent(formsPos.pos_id)}`,
     1,
@@ -499,7 +495,6 @@ export function createInitialSenseGroup(
 
 export function createInitialMeanings(
   forms: DraftFormsStepContent,
-  headwords: WordHeadwordsV2,
   wordId: string,
   large = false
 ): DraftMeaningsStepContent {
@@ -508,7 +503,6 @@ export function createInitialMeanings(
   const pos = forms.pos.map((formsPos, posIndex) =>
     createInitialPosMeanings(
       formsPos,
-      headwords,
       wordId,
       String(posIndex + 1),
       posIndex === 0 ? count : 1,

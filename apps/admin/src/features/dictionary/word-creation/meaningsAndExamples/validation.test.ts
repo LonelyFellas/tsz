@@ -63,6 +63,31 @@ describe("meanings and examples validation", () => {
     expect(validateMeanings(wordFixture({ ready: true }).meanings)).toEqual([]);
   });
 
+  it("存量双份英文内容的 issue 定位指向缺失的那一侧", () => {
+    const ready = (id: string, text: string) => ({
+      state: "ready" as const,
+      variant: {
+        id,
+        origin: "manual" as const,
+        value: { version: 1 as const, text, spans: [], liaisons: [] }
+      }
+    });
+    const split = {
+      mode: "distinguish" as const,
+      source_dialect: "us" as const,
+      uk: ready("legacy-uk", ""),
+      us: ready("legacy-us", "American")
+    } satisfies EnglishTextV2;
+
+    expect(englishTextIssueField(split)).toBe("content.uk");
+    expect(
+      englishTextIssueField({ ...split, uk: ready("legacy-uk", "British") })
+    ).toBeUndefined();
+    expect(englishTextIssueField({ ...split, us: { state: "missing" } })).toBe(
+      "content.uk"
+    );
+  });
+
   it("英语、语法和例句 issue target 精确到首个无效叶字段", () => {
     const unified = {
       mode: "unified",
@@ -80,23 +105,37 @@ describe("meanings and examples validation", () => {
     const grammar = structuredClone(
       word.meanings.pos[0]!.grammar_structures[0]!
     );
-    const usGrammar = grammar.variants.find(
-      (variant) => variant.dialect === "us"
-    )!;
-    grammar.variants = grammar.variants.filter(
-      (variant) => variant.dialect !== "us"
-    );
-    // 语法结构只有一个输入框，定位一律指向 content。
+    // 新建流程写的单条 common 是合法形状。
+    expect(
+      grammarStructureIssueTarget(grammar, word.headwords)
+    ).toBeUndefined();
+
+    const content = grammar.variants[0]!.content;
+    const ukVariant = { id: "grammar-uk", dialect: "uk" as const, content };
+    const usVariant = { id: "grammar-us", dialect: "us" as const, content };
+    // 存量未收敛的英美双条同样合法（后端 P1 之后放宽）。
+    grammar.variants = [ukVariant, usVariant];
+    expect(
+      grammarStructureIssueTarget(grammar, word.headwords)
+    ).toBeUndefined();
+
+    // 语法结构只有一个输入框，定位一律指向 content。缺一侧不合法。
+    grammar.variants = [ukVariant];
     expect(grammarStructureIssueTarget(grammar, word.headwords)).toEqual({
       node_id: grammar.id,
       field: "content"
     });
-    grammar.variants.push(usGrammar);
-    grammar.variants.push({ ...usGrammar, id: "duplicate-us" });
+    // 方言重复不合法。
+    grammar.variants = [ukVariant, usVariant, { ...usVariant, id: "dup-us" }];
     expect(grammarStructureIssueTarget(grammar, word.headwords)).toEqual({
       node_id: grammar.id,
       field: "content"
     });
+    // 统一词条只接受 common，不接受英美双条。
+    grammar.variants = [ukVariant, usVariant];
+    expect(
+      grammarStructureIssueTarget(grammar, { mode: "unified", common: "far" })
+    ).toEqual({ node_id: grammar.id, field: "content" });
 
     const sense = word.meanings.pos[0]!.senses[0]!;
     const sentence = structuredClone(sense.sentences[0]!);

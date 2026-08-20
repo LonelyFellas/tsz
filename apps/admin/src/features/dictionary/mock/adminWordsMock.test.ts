@@ -29,6 +29,7 @@ function profile(overrides: Partial<AdminProfile> = {}): AdminProfile {
     display_name: "Mock Admin",
     role: "admin",
     permissions: ["words.access"],
+    preferences: { dialect: "uk" },
     ...overrides
   };
 }
@@ -2038,10 +2039,7 @@ describe("admin words mock", () => {
       grammar_structures: [
         {
           id: "mock-grammar-pos-new-pos-id",
-          variants: [
-            { id: "mock-grammar-pos-new-pos-id-uk" },
-            { id: "mock-grammar-pos-new-pos-id-us" }
-          ]
+          variants: [{ id: "mock-grammar-pos-new-pos-id-common" }]
         }
       ],
       senses: [
@@ -2141,8 +2139,9 @@ describe("admin words mock", () => {
     const noun = invalid.pos[0]!;
     const verb = invalid.pos[1]!;
     noun.grammar_structures = [];
+    // 区分词条只写一侧方言是非法形状（后端 P1 放宽后仍然要求成对或单条 common）。
     verb.grammar_structures[0]!.variants = [
-      verb.grammar_structures[0]!.variants[0]!
+      { ...verb.grammar_structures[0]!.variants[0]!, dialect: "uk" }
     ];
     verb.senses = [];
     const sense = noun.senses[0]!;

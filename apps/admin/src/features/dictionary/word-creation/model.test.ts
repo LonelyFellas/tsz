@@ -2,6 +2,7 @@ import type { EnglishTextV2 } from "@tsz/types";
 import type {
   AdminWordV2,
   DraftMeaningsStepContent,
+  GrammarStructureV2,
   RichText,
   WordHeadwordsV2,
   WordDefinitionV2,
@@ -31,10 +32,9 @@ import {
   ensureMeaningsForForms,
   formDialects,
   legalDerivedFormTypes,
-  grammarDialects,
-  countOverwrittenGrammarVariants,
-  mirrorGrammarStructure,
-  mirrorMeaningsGrammar,
+  collapseGrammarStructure,
+  collapseMeaningsGrammar,
+  countDiscardedGrammarVariants,
   resolveGrammarText,
   writeGrammarText,
   hasDialectSplitEnglishText,
@@ -148,6 +148,21 @@ function legacySplitEnglishText(
   };
 }
 
+/** 存量（A1 改造前）的英美双条语法结构；新建流程只产出单条 `common`。 */
+function legacySplitGrammar(
+  id: string,
+  ukText: string,
+  usText: string
+): GrammarStructureV2 {
+  return {
+    id,
+    variants: [
+      { id: `${id}-uk`, dialect: "uk", content: richText(ukText) },
+      { id: `${id}-us`, dialect: "us", content: richText(usText) }
+    ]
+  };
+}
+
 function englishDefinition(
   id: string,
   text: string,
@@ -162,15 +177,10 @@ function englishDefinition(
 }
 
 function dialectMeaningContent(): DraftMeaningsStepContent {
-  const noun = createPosMeanings(
-    "noun-pos",
-    distinguishedHeadwords,
-    "word-1",
-    "sense-group-1"
-  );
-  noun.grammar_structures[0]!.variants.forEach((variant) => {
-    variant.content = richText(`grammar-${variant.dialect}`);
-  });
+  const noun = createPosMeanings("noun-pos", "word-1", "sense-group-1");
+  noun.grammar_structures = [
+    legacySplitGrammar("noun-grammar", "grammar-uk", "grammar-us")
+  ];
   noun.senses[0]!.definitions.push(
     englishDefinition("definition-missing", "the center"),
     englishDefinition("definition-ready", "the color", "the colour")
@@ -181,12 +191,7 @@ function dialectMeaningContent(): DraftMeaningsStepContent {
     "The center is closed."
   );
 
-  const verb = createPosMeanings(
-    "verb-pos",
-    distinguishedHeadwords,
-    "word-1",
-    "sense-group-1"
-  );
+  const verb = createPosMeanings("verb-pos", "word-1", "sense-group-1");
   verb.senses[0]!.definitions.push(
     englishDefinition("definition-second-pos", "to organize")
   );
@@ -361,21 +366,17 @@ describe("T09 EnglishText 单份化与 grammar 方言派生", () => {
   });
 
   it("语法结构读兼容：取偏好侧，统一词条退回 common", () => {
-    const legacy = createGrammar(distinguishedHeadwords);
-    legacy.variants[0]!.content = richText("a centre");
-    legacy.variants[1]!.content = richText("the center");
+    const legacy = legacySplitGrammar("g-1", "a centre", "the center");
     expect(resolveGrammarText(legacy, "uk").text).toBe("a centre");
     expect(resolveGrammarText(legacy, "us").text).toBe("the center");
 
-    const unified = createGrammar(unifiedHeadwords);
+    const unified = createGrammar();
     unified.variants[0]!.content = richText("the far side");
     expect(resolveGrammarText(unified, "uk").text).toBe("the far side");
   });
 
   it("语法结构写入只改当前口径那一条，形状不变", () => {
-    const legacy = createGrammar(distinguishedHeadwords);
-    legacy.variants[0]!.content = richText("a centre");
-    legacy.variants[1]!.content = richText("the center");
+    const legacy = legacySplitGrammar("g-1", "a centre", "the center");
     const next = writeGrammarText(legacy, "uk", richText("an edited centre"));
 
     expect(next.variants).toHaveLength(2);
@@ -387,94 +388,129 @@ describe("T09 EnglishText 单份化与 grammar 方言派生", () => {
     expect(next.variants[1]).toBe(legacy.variants[1]);
   });
 
-  it("保存镜像：按 headwords 补齐方言变体、复用节点 ID、内容取偏好侧", () => {
-    const legacy = createGrammar(distinguishedHeadwords);
-    legacy.variants[0]!.content = richText("a centre");
-    legacy.variants[1]!.content = richText("the center");
-    const mirrored = mirrorGrammarStructure(
-      legacy,
-      distinguishedHeadwords,
-      "uk"
-    );
+  it("语法结构读写：既无偏好侧也无 common 时退回第一条，变体全空时不炸", () => {
+    // 形状被外部改坏（只剩非偏好侧）时仍要能读能写，不能返回 undefined 或抛。
+    const onlyOther: GrammarStructureV2 = {
+      id: "g-broken",
+      variants: [
+        { id: "g-broken-us", dialect: "us", content: richText("the center") }
+      ]
+    };
+    expect(resolveGrammarText(onlyOther, "uk").text).toBe("the center");
+    expect(
+      writeGrammarText(onlyOther, "uk", richText("edited")).variants[0]
+    ).toMatchObject({ id: "g-broken-us", content: { text: "edited" } });
 
-    expect(mirrored.variants.map((variant) => variant.id)).toEqual([
-      legacy.variants[0]!.id,
-      legacy.variants[1]!.id
+    const empty: GrammarStructureV2 = { id: "g-empty", variants: [] };
+    expect(resolveGrammarText(empty, "uk").text).toBe("");
+    expect(writeGrammarText(empty, "uk", richText("fresh")).variants).toEqual([
+      { id: expect.any(String), dialect: "common", content: richText("fresh") }
     ]);
-    expect(
-      mirrored.variants.every((variant) => variant.content.text === "a centre")
-    ).toBe(true);
-
-    // 缺一条方言变体时补齐，不再算作未完成。
-    const missing = { ...legacy, variants: [legacy.variants[0]!] };
-    expect(
-      mirrorGrammarStructure(
-        missing,
-        distinguishedHeadwords,
-        "uk"
-      ).variants.map((variant) => variant.dialect)
-    ).toEqual(["uk", "us"]);
   });
 
-  it("统计会被镜像覆盖的语法结构：空的或本来就相同的不计入", () => {
-    const same = createGrammar(distinguishedHeadwords);
-    same.variants.forEach((variant) => {
-      variant.content = richText("a centre");
+  it("新建的语法结构恒为单条 common", () => {
+    const grammar = createGrammar();
+    expect(grammar.variants).toHaveLength(1);
+    expect(grammar.variants[0]).toMatchObject({
+      dialect: "common",
+      content: { text: "" }
     });
-    const differs = createGrammar(distinguishedHeadwords);
-    differs.variants[0]!.content = richText("a centre");
-    differs.variants[1]!.content = richText("the center");
-    const emptyOther = createGrammar(distinguishedHeadwords);
-    emptyOther.variants[0]!.content = richText("a centre");
+    expect(grammar.variants[0]).not.toHaveProperty("state");
+  });
+
+  it("保存收敛：存量双条折成单条 common，内容取偏好侧且节点 ID 必须新起", () => {
+    const legacy = legacySplitGrammar("g-1", "a centre", "the center");
+    const collapsed = collapseGrammarStructure(legacy, "uk");
+
+    expect(collapsed.id).toBe(legacy.id);
+    expect(collapsed.variants).toHaveLength(1);
+    expect(collapsed.variants[0]).toMatchObject({
+      dialect: "common",
+      content: { text: "a centre" }
+    });
+    // 沿用旧 uk 变体的 ID 只改 dialect 会被后端判 node_binding_changed（422）。
+    expect(collapsed.variants[0]!.id).not.toBe(legacy.variants[0]!.id);
+    expect(collapsed.variants[0]!.id).not.toBe(legacy.variants[1]!.id);
+
+    // 偏好侧是美式时留下的是美式那一份。
+    expect(collapseGrammarStructure(legacy, "us").variants[0]!.content).toEqual(
+      richText("the center")
+    );
+  });
+
+  it("已经是单条 common 的语法结构原样返回，不每次保存换新节点", () => {
+    const grammar = createGrammar();
+    grammar.variants[0]!.content = richText("a centre");
+    expect(collapseGrammarStructure(grammar, "uk")).toBe(grammar);
+  });
+
+  it("统计收敛会丢弃的语法结构：空的或本来就相同的不计入", () => {
+    const same = legacySplitGrammar("g-same", "a centre", "a centre");
+    const differs = legacySplitGrammar("g-differs", "a centre", "the center");
+    const emptyOther = legacySplitGrammar("g-empty", "a centre", "");
+    const collapsed = createGrammar();
+    collapsed.variants[0]!.content = richText("a centre");
 
     const content: DraftMeaningsStepContent = {
       sense_groups: [{ id: "g1", name_zh: "测试", name_en: "Test" }],
       pos: [
         {
           pos_id: "pos-1",
-          grammar_structures: [same, differs, emptyOther],
+          grammar_structures: [same, differs, emptyOther, collapsed],
           senses: []
         }
       ]
     };
-    expect(
-      countOverwrittenGrammarVariants(content, distinguishedHeadwords, "uk")
-    ).toBe(1);
-    // 统一词条没有第二条变体，永远不会被覆盖。
-    expect(
-      countOverwrittenGrammarVariants(content, unifiedHeadwords, "uk")
-    ).toBe(0);
+    expect(countDiscardedGrammarVariants(content, "uk")).toBe(1);
+    // 偏好侧换成美式后，emptyOther 留下的是空的美式那一份，
+    // 有内容的英式那条要被丢弃，于是多算一条。
+    expect(countDiscardedGrammarVariants(content, "us")).toBe(2);
   });
 
-  it("整页语法镜像无变化时返回同一引用", () => {
+  it("双份形状里根本没有非偏好侧那一条时不计入丢弃", () => {
+    const noOtherSide: GrammarStructureV2 = {
+      id: "g-no-us",
+      variants: [
+        { id: "g-no-us-uk", dialect: "uk", content: richText("a centre") },
+        {
+          id: "g-no-us-common",
+          dialect: "common",
+          content: richText("a centre")
+        }
+      ]
+    };
+    const content: DraftMeaningsStepContent = {
+      sense_groups: [{ id: "g1", name_zh: "测试", name_en: "Test" }],
+      pos: [{ pos_id: "pos-1", grammar_structures: [noOtherSide], senses: [] }]
+    };
+    expect(countDiscardedGrammarVariants(content, "uk")).toBe(0);
+  });
+
+  it("整页语法结构无双份形状时返回同一引用", () => {
     const clean: DraftMeaningsStepContent = {
       sense_groups: [{ id: "g1", name_zh: "测试", name_en: "Test" }],
-      pos: [createPosMeanings("pos-1", unifiedHeadwords, "word-1", "g1")]
+      pos: [createPosMeanings("pos-1", "word-1", "g1")]
     };
-    expect(mirrorMeaningsGrammar(clean, unifiedHeadwords, "uk")).toBe(clean);
+    expect(collapseMeaningsGrammar(clean, "uk")).toBe(clean);
   });
 
-  it("grammar 仅按 headwords 派生 common 或 UK/US，不复用文本 missing 状态", () => {
-    const unified = createGrammar(unifiedHeadwords);
-    const distinguished = createGrammar(distinguishedHeadwords);
+  it("整页语法结构收敛只重建含双份的那些词性", () => {
+    const legacyPos: WordPosMeaningsV2 = {
+      ...createPosMeanings("pos-1", "word-1", "g1"),
+      grammar_structures: [legacySplitGrammar("g-1", "a centre", "the center")]
+    };
+    const cleanPos = createPosMeanings("pos-2", "word-1", "g1");
+    const content: DraftMeaningsStepContent = {
+      sense_groups: [{ id: "g1", name_zh: "测试", name_en: "Test" }],
+      pos: [legacyPos, cleanPos]
+    };
+    const next = collapseMeaningsGrammar(content, "uk");
 
-    expect(grammarDialects(unifiedHeadwords)).toEqual(["common"]);
-    expect(unified.variants.map((variant) => variant.dialect)).toEqual([
-      "common"
-    ]);
-    expect(grammarDialects(distinguishedHeadwords)).toEqual(["uk", "us"]);
-    expect(distinguished.variants.map((variant) => variant.dialect)).toEqual([
-      "uk",
-      "us"
-    ]);
+    expect(next).not.toBe(content);
+    expect(next.pos[1]).toBe(cleanPos);
     expect(
-      distinguished.variants.every(
-        (variant) => variant.content.text === "" && "dialect" in variant
-      )
-    ).toBe(true);
-    expect(
-      distinguished.variants.every((variant) => !("state" in variant))
-    ).toBe(true);
+      next.pos[0]!.grammar_structures[0]!.variants.map((item) => item.dialect)
+    ).toEqual(["common"]);
   });
 });
 
@@ -503,14 +539,12 @@ describe("T10 meanings 与 focus link", () => {
     const verbForms = createPosForms("verb", unifiedHeadwords);
     const existingNoun = createPosMeanings(
       nounForms.pos_id,
-      unifiedHeadwords,
       "word-1",
       "sense-group-1"
     );
     existingNoun.senses[0]!.sub_pos = "N-COUNT";
     const removedPos = createPosMeanings(
       "removed-pos",
-      unifiedHeadwords,
       "word-1",
       "sense-group-1"
     );
@@ -655,7 +689,7 @@ describe("A1 英文内容读兼容与保存收敛", () => {
   it("整页收敛：无双份内容时返回同一引用，避免每次渲染都重建", () => {
     const clean: DraftMeaningsStepContent = {
       sense_groups: [{ id: "g1", name_zh: "测试", name_en: "Test" }],
-      pos: [createPosMeanings("pos-1", unifiedHeadwords, "word-1", "g1")]
+      pos: [createPosMeanings("pos-1", "word-1", "g1")]
     };
     expect(hasDialectSplitEnglishText(clean)).toBe(false);
     expect(collapseMeaningsEnglishText(clean, "uk")).toBe(clean);
@@ -698,7 +732,7 @@ describe("A1 英文内容读兼容与保存收敛", () => {
   it("单份内容不产生任何丢弃", () => {
     const clean: DraftMeaningsStepContent = {
       sense_groups: [{ id: "g1", name_zh: "测试", name_en: "Test" }],
-      pos: [createPosMeanings("pos-1", unifiedHeadwords, "word-1", "g1")]
+      pos: [createPosMeanings("pos-1", "word-1", "g1")]
     };
     expect(countDiscardedEnglishTexts(clean, "uk")).toEqual({
       definitions: 0,
@@ -707,11 +741,7 @@ describe("A1 英文内容读兼容与保存收敛", () => {
   });
 
   it("保存 wire 恒为单份，取偏好侧内容", () => {
-    const wire = toMeaningsWireContent(
-      dialectMeaningContent(),
-      distinguishedHeadwords,
-      "uk"
-    );
+    const wire = toMeaningsWireContent(dialectMeaningContent(), "uk");
     const definition = wire.pos[0]!.senses[0]!.definitions.find(
       (item) => item.id === "definition-ready"
     )!;
@@ -900,12 +930,7 @@ describe("真实后端 wire mapper", () => {
   });
 
   it("词义请求保留文本 ID，过滤空 context/relation 并剥离 relation 快照", () => {
-    const pos = createPosMeanings(
-      "pos-1",
-      unifiedHeadwords,
-      "word-1",
-      "sense-group-1"
-    );
+    const pos = createPosMeanings("pos-1", "word-1", "sense-group-1");
     const sense = pos.senses[0]!;
     const definition = sense.definitions[0]!;
     const sentence = sense.sentences[0]!;
@@ -935,7 +960,6 @@ describe("真实后端 wire mapper", () => {
         ],
         pos: [pos]
       },
-      unifiedHeadwords,
       "uk"
     );
     const wireSense = wire.pos[0]!.senses[0]!;

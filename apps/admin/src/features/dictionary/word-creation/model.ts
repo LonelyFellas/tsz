@@ -353,18 +353,17 @@ export function collapseMeaningsEnglishText(
   };
 }
 
-export function grammarDialects(headwords: WordHeadwordsV2): Dialect[] {
-  return headwords.mode === "distinguish" ? ["uk", "us"] : ["common"];
-}
-
-export function createGrammar(headwords: WordHeadwordsV2): GrammarStructureV2 {
+/**
+ * 语法结构一律构造为单份 `common`（A1）：后端 P1（tsz-rust #35）之后，
+ * `distinguish` 词条的变体集合同时接受 `[common]` 与 `[uk, us]`，
+ * 前端不必再为了过校验写两条同值镜像。
+ */
+export function createGrammar(): GrammarStructureV2 {
   return {
     id: newWordNodeId(),
-    variants: grammarDialects(headwords).map((dialect) => ({
-      id: newWordNodeId(),
-      dialect,
-      content: emptyWordRichText()
-    }))
+    variants: [
+      { id: newWordNodeId(), dialect: "common", content: emptyWordRichText() }
+    ]
   };
 }
 
@@ -385,7 +384,7 @@ export function resolveGrammarText(
 
 /**
  * 写：单份输入回写到当前口径那一条，**不改变 wire 形状**——与英文内容同一套节奏，
- * 镜像推迟到保存前，好让「另一侧会被覆盖」的确认框还数得出来。
+ * 收敛推迟到保存前，好让「另一侧会被丢弃」的确认框还数得出来。
  */
 export function writeGrammarText(
   grammar: GrammarStructureV2,
@@ -410,49 +409,51 @@ export function writeGrammarText(
   };
 }
 
+/** 该语法结构是否仍是旧的英美双份形状（决定要不要收敛、要不要提醒管理员）。 */
+function isDialectSplitGrammar(grammar: GrammarStructureV2): boolean {
+  return (
+    grammar.variants.length !== 1 || grammar.variants[0]!.dialect !== "common"
+  );
+}
+
 /**
- * 保存前把语法结构规整成后端要求的方言形状，内容一律取偏好侧那一份。
+ * 保存前把语法结构收敛为单条 `common`，内容取偏好侧那一份。
  *
- * TODO(dialect-preference-migration 阶段 6): 后端提案 P1（放宽 distinguish 词条的
- * 语法结构方言校验）落地后，这里改为恒写一条 `common`，镜像逻辑连同本函数一起删掉。
- * 现在后端强制 `distinguish ⇒ 恰好 uk + us 两条`，前端只能写两条同值镜像。
+ * **节点 ID 必须新起，不能复用偏好侧那条变体。** 与英文内容同一条规矩：
+ * 后端把方言编进了节点身份，同一个 ID 换到 `common` 槽位会被判
+ * `node_binding_changed` 而整个 meanings 保存 422（见 `collapseEnglishText`）。
+ * 已经是单条 `common` 的原样返回，否则每次保存都换新节点。
  */
-export function mirrorGrammarStructure(
+export function collapseGrammarStructure(
   grammar: GrammarStructureV2,
-  headwords: WordHeadwordsV2,
   preference: AdminDialectPreference
 ): GrammarStructureV2 {
-  const content = resolveGrammarText(grammar, preference);
+  if (!isDialectSplitGrammar(grammar)) return grammar;
   return {
     ...grammar,
-    variants: grammarDialects(headwords).map((dialect) => {
-      // 复用该方言已有的节点 ID，别每次保存都换一个新节点。
-      const existing = grammar.variants.find(
-        (item) => item.dialect === dialect
-      );
-      return {
-        id: existing?.id ?? newWordNodeId(),
-        dialect,
-        content
-      };
-    })
+    variants: [
+      {
+        id: newWordNodeId(),
+        dialect: "common",
+        content: resolveGrammarText(grammar, preference)
+      }
+    ]
   };
 }
 
 /**
- * 统计保存镜像时会被偏好侧覆盖掉的语法结构条数：只有非偏好侧确实写过、
+ * 统计保存收敛时会丢掉的非偏好侧语法结构条数：只有非偏好侧确实写过、
  * 且与偏好侧不同的才算，空的或本来就一样的不打扰管理员。
  */
-export function countOverwrittenGrammarVariants(
+export function countDiscardedGrammarVariants(
   content: DraftMeaningsStepContent,
-  headwords: WordHeadwordsV2,
   preference: AdminDialectPreference
 ): number {
-  if (headwords.mode !== "distinguish") return 0;
   const other = preference === "uk" ? "us" : "uk";
   let count = 0;
   for (const pos of content.pos) {
     for (const grammar of pos.grammar_structures) {
+      if (!isDialectSplitGrammar(grammar)) continue;
       const kept = resolveGrammarText(grammar, preference).text;
       const dropped = grammar.variants.find((item) => item.dialect === other);
       if (!dropped) continue;
@@ -465,35 +466,21 @@ export function countOverwrittenGrammarVariants(
 }
 
 /**
- * 把整页语法结构规整为保存形状。没有任何变化时返回同一个引用，
- * 让 readiness 这类每次渲染都会调用的路径不产生多余分配。
+ * 把整页语法结构收敛为单份。没有任何双份形状时返回同一个引用，
+ * 让 readiness 这类每次渲染都会调用的路径不产生多余分配与重渲染。
  */
-export function mirrorMeaningsGrammar(
+export function collapseMeaningsGrammar(
   content: DraftMeaningsStepContent,
-  headwords: WordHeadwordsV2,
   preference: AdminDialectPreference
 ): DraftMeaningsStepContent {
   const pos = content.pos.map((entry) => {
-    const grammar_structures = entry.grammar_structures.map((grammar) => {
-      const next = mirrorGrammarStructure(grammar, headwords, preference);
-      const same =
-        next.variants.length === grammar.variants.length &&
-        next.variants.every((variant, index) => {
-          const original = grammar.variants[index];
-          return (
-            original !== undefined &&
-            original.id === variant.id &&
-            original.dialect === variant.dialect &&
-            original.content === variant.content
-          );
-        });
-      return same ? grammar : next;
-    });
-    return grammar_structures.every(
-      (grammar, index) => grammar === entry.grammar_structures[index]
-    )
-      ? entry
-      : { ...entry, grammar_structures };
+    if (!entry.grammar_structures.some(isDialectSplitGrammar)) return entry;
+    return {
+      ...entry,
+      grammar_structures: entry.grammar_structures.map((grammar) =>
+        collapseGrammarStructure(grammar, preference)
+      )
+    };
   });
   return pos.every((entry, index) => entry === content.pos[index])
     ? content
@@ -540,13 +527,12 @@ export function createSense(wordId: string, senseGroupId: string): WordSenseV2 {
 
 export function createPosMeanings(
   posId: string,
-  headwords: WordHeadwordsV2,
   wordId: string,
   senseGroupId: string
 ): WordPosMeaningsV2 {
   return {
     pos_id: posId,
-    grammar_structures: [createGrammar(headwords)],
+    grammar_structures: [createGrammar()],
     senses: [createSense(wordId, senseGroupId)]
   };
 }
@@ -572,12 +558,7 @@ export function ensureMeaningsForForms(
     pos: word.forms.pos.map((forms) => {
       const existing = posById.get(forms.pos_id);
       if (!existing) {
-        return createPosMeanings(
-          forms.pos_id,
-          word.headwords,
-          word.id,
-          defaultSenseGroupId
-        );
+        return createPosMeanings(forms.pos_id, word.id, defaultSenseGroupId);
       }
       const senses = existing.senses.map((sense) =>
         sense.sense_group_id && senseGroupIds.has(sense.sense_group_id)
@@ -671,7 +652,6 @@ export function toFormsWireContent(
  */
 export function toMeaningsWireContent(
   content: DraftMeaningsStepContent,
-  headwords: WordHeadwordsV2,
   preference: AdminDialectPreference
 ): DraftMeaningsStepContent {
   return {
@@ -683,10 +663,10 @@ export function toMeaningsWireContent(
     pos: content.pos.map((pos) => ({
       pos_id: pos.pos_id,
       grammar_structures: pos.grammar_structures.map((grammar) => {
-        const mirrored = mirrorGrammarStructure(grammar, headwords, preference);
+        const collapsed = collapseGrammarStructure(grammar, preference);
         return {
-          id: mirrored.id,
-          variants: mirrored.variants.map((variant) => ({
+          id: collapsed.id,
+          variants: collapsed.variants.map((variant) => ({
             id: variant.id,
             dialect: variant.dialect,
             content: variant.content

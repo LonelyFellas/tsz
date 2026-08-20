@@ -352,13 +352,20 @@ describe("buildWordReadiness", () => {
     });
   });
 
-  it("只清空非偏好侧的语法结构不算未完成——保存时会被镜像覆盖回来", () => {
+  it("存量双条语法结构只有非偏好侧是空的不算未完成——保存时会随收敛一起消失", () => {
     const word = wordFixture({ ready: true });
     const meanings = structuredClone(word.meanings);
     const grammar = meanings.pos[0]!.grammar_structures[0]!;
-    const other = grammar.variants.find((variant) => variant.dialect === "us");
-    if (!other) throw new Error("fixture should carry a us grammar variant");
-    other.content.text = "";
+    const content = grammar.variants[0]!.content;
+    // 存量（A1 改造前）的英美双条，美式那一份从未填过。
+    grammar.variants = [
+      { id: `${grammar.id}-uk`, dialect: "uk", content },
+      {
+        id: `${grammar.id}-us`,
+        dialect: "us",
+        content: { ...content, text: "" }
+      }
+    ];
 
     expect(
       row(

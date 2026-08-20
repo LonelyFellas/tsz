@@ -73,8 +73,8 @@ export function completeMeanings(
     sense_groups: structuredClone(senseGroups),
     pos: content.pos.map((pos, posIndex) => ({
       ...pos,
-      // 语法结构 A1 后只维护一份：区分词条的 wire 里仍是两条，但内容互为镜像
-      // （见 design.md 阶段 3 的 shim）。需要「两侧文本不同」的存量场景由用例自造。
+      // 语法结构 A1 后只维护一份 `common`。需要「存量英美双条、两侧文本不同」
+      // 的收敛场景由用例自造。
       grammar_structures: pos.grammar_structures.map((grammar) => ({
         ...grammar,
         variants: grammar.variants.map((variant) => ({
@@ -141,8 +141,7 @@ export function wordFixture(options: WordFixtureOptions = {}): AdminWordV2 {
   const status = options.status ?? "draft";
   const revision = options.revision ?? 3;
   const ready = options.ready ?? status === "published";
-  const initialMeanings =
-    options.meanings ?? createInitialMeanings(forms, headwords, id);
+  const initialMeanings = options.meanings ?? createInitialMeanings(forms, id);
   const meanings = ready
     ? completeMeanings(initialMeanings, headwords, forms)
     : structuredClone(initialMeanings);

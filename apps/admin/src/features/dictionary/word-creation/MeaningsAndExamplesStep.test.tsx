@@ -1,5 +1,6 @@
 import { HttpError } from "@tsz/api-client/http";
 import type {
+  AdminWordV2,
   DraftMeaningsStepContent,
   EnglishTextV2,
   RichText
@@ -313,6 +314,23 @@ function legacySplitWord() {
     }
   };
   return word;
+}
+
+/**
+ * 把词条第一个语法结构换成存量（A1 改造前）的英美双条形状。
+ * 新建流程只产出单条 `common`，需要收敛场景的用例自己造。
+ */
+function withLegacySplitGrammar(
+  word: AdminWordV2,
+  ukText: string,
+  usText: string
+) {
+  const grammar = word.meanings.pos[0]!.grammar_structures[0]!;
+  grammar.variants = [
+    { id: `${grammar.id}-uk`, dialect: "uk", content: richTextOf(ukText) },
+    { id: `${grammar.id}-us`, dialect: "us", content: richTextOf(usText) }
+  ];
+  return grammar;
 }
 
 function enabledButton(label: string): HTMLButtonElement {
@@ -635,12 +653,8 @@ describe("MeaningsAndExamplesStep", () => {
     const build = () => {
       const word = wordFixture({ ready: true });
       const meanings = word.meanings.pos[0]!;
-      // 存量（A1 改造前）：英美两侧各写各的，不是镜像。
-      for (const variant of meanings.grammar_structures[0]!.variants) {
-        variant.content = richTextOf(
-          variant.dialect === "uk" ? "a centre" : "the center"
-        );
-      }
+      // 存量（A1 改造前）：英美两侧各写各的。
+      withLegacySplitGrammar(word, "a centre", "the center");
       meanings.senses[0]!.definitions[0]!.grammar_structure_id =
         meanings.grammar_structures[0]!.id;
       return word;
@@ -762,12 +776,11 @@ describe("MeaningsAndExamplesStep", () => {
 
   it("存量两侧语法文本不同时，确认框把语法结构一并计入将丢弃的内容", async () => {
     const word = wordFixture({ ready: true });
-    for (const variant of word.meanings.pos[0]!.grammar_structures[0]!
-      .variants) {
-      variant.content = richTextOf(
-        variant.dialect === "uk" ? "a centre" : "the center"
-      );
-    }
+    const legacyGrammar = withLegacySplitGrammar(
+      word,
+      "a centre",
+      "the center"
+    );
     renderStep(word);
 
     expect(
@@ -784,20 +797,19 @@ describe("MeaningsAndExamplesStep", () => {
 
     fireEvent.click(button("确认保存"));
     await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
-    // 镜像写两条同值，节点 ID 复用原有的，不每次保存换新节点。
+    // 收敛为单条 common，内容取偏好侧。
     const grammar =
       mutations.save.mock.calls[0]![0].content.pos[0].grammar_structures[0];
     expect(grammar.variants.map((v: { dialect: string }) => v.dialect)).toEqual(
-      ["uk", "us"]
+      ["common"]
     );
-    expect(
-      grammar.variants.every(
-        (v: { content: { text: string } }) => v.content.text === "a centre"
-      )
-    ).toBe(true);
+    expect(grammar.variants[0].content.text).toBe("a centre");
+    // 与英文内容同一条规矩：沿用旧方言变体的 ID 会被后端判 node_binding_changed。
+    expect(grammar.variants[0].id).not.toBe(legacyGrammar.variants[0]!.id);
+    expect(grammar.variants[0].id).not.toBe(legacyGrammar.variants[1]!.id);
   });
 
-  it("编辑镜像语法结构不会被误判成「即将覆盖美式内容」而反复弹确认框", async () => {
+  it("编辑语法结构不会被误判成「即将丢弃美式内容」而反复弹确认框", async () => {
     renderStep();
 
     fireEvent.change(screen.getAllByLabelText("语法结构 1")[0]!, {
@@ -828,10 +840,8 @@ describe("MeaningsAndExamplesStep", () => {
       },
       us: { state: "missing" }
     };
-    // 语法结构同理：非偏好侧为空，保存时会被镜像补齐。
-    const grammar = word.meanings.pos[0]!.grammar_structures[0]!;
-    grammar.variants.find((variant) => variant.dialect === "us")!.content =
-      richTextOf("");
+    // 语法结构同理：非偏好侧为空，保存时会随收敛一起消失。
+    withLegacySplitGrammar(word, "a centre", "");
     renderStep(word);
 
     // 待修项计数按「保存后会变成什么样」算：这两处收敛后都是完整的，
@@ -902,7 +912,7 @@ describe("MeaningsAndExamplesStep", () => {
     grammars[0]!.variants.forEach((variant) => {
       variant.content.text = "first grammar";
     });
-    const secondGrammar = createGrammar(word.headwords);
+    const secondGrammar = createGrammar();
     secondGrammar.variants.forEach((variant) => {
       variant.content.text = "second grammar";
     });
@@ -925,9 +935,7 @@ describe("MeaningsAndExamplesStep", () => {
 
   it("语法结构排序忽略外部、缺失和无效的拖放数据", () => {
     const word = wordFixture({ ready: true });
-    word.meanings.pos[0]!.grammar_structures.push(
-      createGrammar(word.headwords)
-    );
+    word.meanings.pos[0]!.grammar_structures.push(createGrammar());
     renderStep(word);
     const target = screen
       .getByLabelText("拖动语法结构 1")
@@ -1278,7 +1286,7 @@ describe("MeaningsAndExamplesStep", () => {
     const word = wordFixture({ ready: true });
     const meanings = word.meanings.pos[0]!;
     const firstGrammar = meanings.grammar_structures[0]!;
-    const secondGrammar = createGrammar(word.headwords);
+    const secondGrammar = createGrammar();
     meanings.grammar_structures.push(secondGrammar);
     const firstDefinition = meanings.senses[0]!.definitions[0]!;
     firstDefinition.grammar_structure_id = firstGrammar.id;
