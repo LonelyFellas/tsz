@@ -1,6 +1,8 @@
 import { SoundOutlined, SyncOutlined } from "@ant-design/icons";
 import { App, Button, Space, Tag, Tooltip } from "antd";
 import type { Dialect, RichTextV2 } from "@tsz/types";
+import type { AdminDialectPreference } from "@tsz/shared";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import type {
   VoiceOption,
   VoicePreviewAdapter,
@@ -28,6 +30,8 @@ interface PreviewContextValue {
   voices: VoiceOption[];
   voicesLoading: boolean;
   voicesError: string;
+  /** 统一内容按管理员偏好挑发音人；在 Provider 里取一次，别让每个控件各自订阅。 */
+  dialectPreference: AdminDialectPreference;
   adapter: VoicePreviewAdapter;
 }
 
@@ -45,6 +49,7 @@ export function PronunciationPreviewProvider({
   readOnly?: boolean;
 }) {
   const enabled = env.VOICE_PREVIEW && !readOnly;
+  const { preference: dialectPreference } = useDialectPreference();
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
   const [voicesError, setVoicesError] = useState("");
@@ -81,16 +86,22 @@ export function PronunciationPreviewProvider({
       voices,
       voicesLoading,
       voicesError,
+      dialectPreference,
       adapter: adminVoicePreviewAdapter
     }),
-    [enabled, voices, voicesError, voicesLoading]
+    [dialectPreference, enabled, voices, voicesError, voicesLoading]
   );
   return (
     <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>
   );
 }
 
-function localeForDialect(dialect: Dialect): string | undefined {
+function localeForDialect(
+  dialect: Dialect,
+  preference: AdminDialectPreference
+): string | undefined {
+  // 统一内容没有自己的方言，按管理员偏好挑发音人（需求：试听也按偏好选发音人）。
+  if (dialect === "common") return preference === "uk" ? "en-GB" : "en-US";
   if (dialect === "uk") return "en-GB";
   if (dialect === "us") return "en-US";
   return undefined;
@@ -98,12 +109,17 @@ function localeForDialect(dialect: Dialect): string | undefined {
 
 function voiceForDialect(
   voices: VoiceOption[],
-  dialect: Dialect
+  dialect: Dialect,
+  preference: AdminDialectPreference
 ): VoiceOption | undefined {
-  const locale = localeForDialect(dialect)?.toLowerCase();
-  if (locale) {
-    return voices.find((voice) => voice.locale.toLowerCase() === locale);
-  }
+  const locale = localeForDialect(dialect, preference)?.toLowerCase();
+  const matched = locale
+    ? voices.find((voice) => voice.locale.toLowerCase() === locale)
+    : undefined;
+  if (matched) return matched;
+  // 明确标了方言的内容找不到对应发音人时不降级——否则英式词形会用美式音朗读。
+  // 统一内容本来就没有自己的方言，偏好侧发音人缺席时回退目录默认，保持可试听。
+  if (dialect !== "common") return undefined;
   return voices.find((voice) => voice.isDefault) ?? voices[0];
 }
 
@@ -139,7 +155,11 @@ export function PronunciationPreviewControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const voice = voiceForDialect(context.voices, dialect);
+  const voice = voiceForDialect(
+    context.voices,
+    dialect,
+    context.dialectPreference
+  );
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
@@ -312,7 +332,7 @@ export function PronunciationPreviewControls({
         : !text
           ? "请先填写词形拼写"
           : !voice
-            ? `${localeForDialect(dialect) ?? "英语"} 暂无可用发音人`
+            ? `${localeForDialect(dialect, context.dialectPreference) ?? "英语"} 暂无可用发音人`
             : "获取语音";
 
   const controls = (

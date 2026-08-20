@@ -371,6 +371,8 @@ test.describe("admin 新建单词 V2", () => {
       .locator('[data-word-node-id="noun-plural-us"]')
       .getByPlaceholder("词形拼写");
 
+    // A1 阶段 5：偏好侧（缺省英式）主导，美式那一栏默认折叠，要先展开才能编辑。
+    await page.getByLabel("展开美式词形").first().click();
     await pluralInput.fill("workspaces");
     await page.getByRole("button", { name: "保存草稿" }).click();
 
@@ -494,6 +496,8 @@ test.describe("admin 新建单词 V2", () => {
       .getByPlaceholder("词形拼写");
     const confirm = page.getByRole("button", { name: "确认并保存" });
 
+    // A1 阶段 5：美式那一栏默认折叠，先展开。
+    await page.getByLabel("展开美式词形").first().click();
     await pluralInput.fill("workspaces");
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect(page.getByText("发现 2 条跨词条同形命中")).toBeVisible();

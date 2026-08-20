@@ -37,6 +37,7 @@ import type {
   LexiconSurfaceMatchV2,
   StepSaveIntent,
   WordDerivedFormSlotV2,
+  WordFormSlotV2,
   WordFormVariantV2,
   WordPosFormsV2,
   WordPosTag,
@@ -84,6 +85,8 @@ import {
 import {
   baseFormComplete,
   baseFormIssueMessage,
+  derivedFormIssueMessage,
+  dialectFormProgress,
   formSlotComplete
 } from "./formsValidation";
 import { summarizeFormsImpact } from "./formsImpactSummary";
@@ -97,6 +100,7 @@ import {
   legalDerivedFormTypes,
   toFormsWireContent
 } from "./model";
+import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { buildWordReadiness, pendingReadinessRows } from "./readiness";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
@@ -778,10 +782,41 @@ function FormGroupMatrix({
   ) => Promise<void>;
   onChange: (next: WordPosFormsV2) => void;
 }) {
+  // 偏好侧主导（A1）：偏好那一栏排首位并默认展开，另一侧折叠成一行摘要。
+  // 词形拼写与音标是词典事实，不能砍掉——后端也强制两侧齐全才能发布。
+  const { preference } = useDialectPreference();
+  const [showOtherDialect, setShowOtherDialect] = useState(false);
+  // 待完善项/服务端 field issue 指到折叠那一侧时自动展开：否则点了没反应——
+  // 目标节点根本不在 DOM 里，聚焦逻辑重试几次就静默放弃了。
+  const issueTarget = useWordValidationIssue();
   const group = pos.form_groups[groupIndex];
+  useEffect(() => {
+    if (!issueTarget || !group) return;
+    const other = otherDialectOf(pos, preference);
+    if (!other) return;
+    if (
+      slotsOfGroup(pos, group).some((slot) =>
+        slotOwnsIssue(slot, other, issueTarget.nodeId)
+      )
+    ) {
+      setShowOtherDialect(true);
+    }
+  }, [group, issueTarget, pos, preference]);
   if (!group) return null;
 
-  const dialects = formDialects(pos);
+  const allDialects = formDialects(pos);
+  const orderedDialects =
+    allDialects.length > 1
+      ? [...allDialects].sort((left, right) =>
+          left === preference ? -1 : right === preference ? 1 : 0
+        )
+      : allDialects;
+  const otherDialect = orderedDialects[1];
+  const dialects =
+    otherDialect && !showOtherDialect ? [orderedDialects[0]!] : orderedDialects;
+  const otherProgress = otherDialect
+    ? dialectFormProgress(pos, groupIndex, otherDialect)
+    : undefined;
   const editableBasePronunciation = groupIndex === 0;
   const updateBaseVariants = (variants: WordFormVariantV2[]) =>
     onChange({
@@ -812,12 +847,14 @@ function FormGroupMatrix({
     onChange({ ...pos, form_groups: formGroups });
   };
 
+  // 拼写统一的布局没有可折叠的「列」：拼写共享一格，两侧音标就在这一格里，
+  // 因此只按偏好排序，不做折叠（折叠会让表头与格内内容对不上）。
   if (pos.dialect_rules.spelling_mode === "unified") {
     return (
       <div className="word-form-matrix word-form-matrix-unified">
         <div className="word-form-matrix-type-header">词形类型</div>
         <div className="word-form-matrix-shared-header">
-          {dialects.map((dialect) => (
+          {orderedDialects.map((dialect) => (
             <span
               className={`word-form-matrix-shared-header-${dialect}`}
               key={dialect}
@@ -938,49 +975,105 @@ function FormGroupMatrix({
   };
 
   return (
-    <div className="word-form-matrix word-form-matrix-distinguish">
-      <div className="word-form-matrix-type-header">词形类型</div>
-      {dialects.map((dialect) => (
-        <div
-          className={`word-form-matrix-dialect-header word-form-matrix-dialect-header-${dialect}`}
-          key={dialect}
-        >
-          {DIALECT_SHORT_LABEL[dialect]} · {dialect === "uk" ? "BrE" : "AmE"}
+    <>
+      <div
+        className={`word-form-matrix ${dialects.length > 1 ? "word-form-matrix-distinguish" : "word-form-matrix-unified"}`}
+      >
+        <div className="word-form-matrix-type-header">词形类型</div>
+        {dialects.map((dialect) => (
+          <div
+            className={`word-form-matrix-dialect-header word-form-matrix-dialect-header-${dialect}`}
+            key={dialect}
+          >
+            {DIALECT_SHORT_LABEL[dialect]} · {dialect === "uk" ? "BrE" : "AmE"}
+          </div>
+        ))}
+        <BaseTypeCell lastRow={group.slots.length === 0} />
+        {dialects.map((dialect) =>
+          renderDialectCell(
+            pos.base_form,
+            dialect,
+            undefined,
+            group.slots.length === 0
+          )
+        )}
+        {group.slots.map((slot, slotIndex) => {
+          const last = slotIndex === group.slots.length - 1;
+          return (
+            <Fragment key={slot.id}>
+              <DerivedTypeCell
+                slot={slot}
+                allowedTypes={allowedTypes}
+                usedTypes={group.slots
+                  .filter((_, index) => index !== slotIndex)
+                  .map((item) => item.form_type)}
+                index={slotIndex}
+                last={last}
+                readOnly={readOnly}
+                onChange={(nextSlot) => updateSlot(slotIndex, nextSlot)}
+                onMove={(delta) => moveSlot(slotIndex, delta)}
+                onRemove={() => removeSlot(slotIndex)}
+              />
+              {dialects.map((dialect) =>
+                renderDialectCell(slot, dialect, slotIndex, last)
+              )}
+            </Fragment>
+          );
+        })}
+      </div>
+      {otherDialect && otherProgress && (
+        <div className="word-form-other-dialect-bar">
+          <Typography.Text type="secondary">
+            {DIALECT_SHORT_LABEL[otherDialect]}：{otherProgress.filled} 项已填
+            {otherProgress.pending > 0
+              ? ` / ${otherProgress.pending} 项待填`
+              : ""}
+          </Typography.Text>
+          <Button
+            size="small"
+            type="link"
+            aria-label={`${showOtherDialect ? "折叠" : "展开"}${DIALECT_SHORT_LABEL[otherDialect]}词形`}
+            onClick={() => setShowOtherDialect((current) => !current)}
+          >
+            {showOtherDialect ? "折 叠" : "展 开"}
+          </Button>
         </div>
-      ))}
-      <BaseTypeCell lastRow={group.slots.length === 0} />
-      {dialects.map((dialect) =>
-        renderDialectCell(
-          pos.base_form,
-          dialect,
-          undefined,
-          group.slots.length === 0
-        )
       )}
-      {group.slots.map((slot, slotIndex) => {
-        const last = slotIndex === group.slots.length - 1;
-        return (
-          <Fragment key={slot.id}>
-            <DerivedTypeCell
-              slot={slot}
-              allowedTypes={allowedTypes}
-              usedTypes={group.slots
-                .filter((_, index) => index !== slotIndex)
-                .map((item) => item.form_type)}
-              index={slotIndex}
-              last={last}
-              readOnly={readOnly}
-              onChange={(nextSlot) => updateSlot(slotIndex, nextSlot)}
-              onMove={(delta) => moveSlot(slotIndex, delta)}
-              onRemove={() => removeSlot(slotIndex)}
-            />
-            {dialects.map((dialect) =>
-              renderDialectCell(slot, dialect, slotIndex, last)
-            )}
-          </Fragment>
-        );
-      })}
-    </div>
+    </>
+  );
+}
+
+/** 该词形组参与渲染的槽位：共享基准原形 + 本组派生词形。 */
+function slotsOfGroup(
+  pos: WordPosFormsV2,
+  group: WordPosFormsV2["form_groups"][number]
+): WordFormSlotV2[] {
+  return [pos.base_form, ...group.slots];
+}
+
+function otherDialectOf(
+  pos: WordPosFormsV2,
+  preference: AdminDialectPreference
+): Dialect | undefined {
+  const dialects = formDialects(pos);
+  return dialects.length > 1
+    ? dialects.find((dialect) => dialect !== preference)
+    : undefined;
+}
+
+/** 定位目标是否落在该槽位「另一侧方言」的变体或其读音上。 */
+function slotOwnsIssue(
+  slot: WordFormSlotV2,
+  dialect: Dialect,
+  nodeId: string
+): boolean {
+  return slot.variants.some(
+    (variant) =>
+      variant.dialect === dialect &&
+      (variant.id === nodeId ||
+        variant.pronunciations.some(
+          (pronunciation) => pronunciation.id === nodeId
+        ))
   );
 }
 
@@ -2367,10 +2460,16 @@ export function FormsAndPronunciationStep({
             ).length,
           0
         );
-        if (incompleteCount > 0) {
-          issues.push(
-            `${posLabel}有 ${incompleteCount} 个派生词形尚未填写完整`
-          );
+        // 指名到「词形类型 · 方言侧 · 缺失字段」，只报一个计数管理员没法下手（手测 C4）。
+        // incompleteCount > 0 时必然找得到首个问题，所以这里不需要兜底文案。
+        const derivedIssue =
+          incompleteCount > 0 ? derivedFormIssueMessage(pos) : undefined;
+        if (derivedIssue) {
+          const more =
+            incompleteCount > 1
+              ? `（另有 ${incompleteCount - 1} 个派生词形待完善）`
+              : "";
+          issues.push(`${posLabel}${derivedIssue}${more}`);
         }
         const baseIssue = baseFormIssueMessage(pos, word.headwords);
         if (baseIssue) {

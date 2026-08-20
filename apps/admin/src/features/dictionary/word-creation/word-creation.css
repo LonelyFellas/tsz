@@ -793,6 +793,18 @@
   overflow-x: auto;
 }
 
+/* 非偏好侧折叠条（A1 阶段 5）：默认只展开偏好那一栏，另一侧留一行进度摘要。 */
+.word-form-other-dialect-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 18px 0;
+  padding: 6px 12px;
+  border: 1px dashed var(--word-line);
+  border-radius: 10px;
+}
+
 .word-form-matrix-unified {
   grid-template-columns: 128px minmax(620px, 1fr);
 }
