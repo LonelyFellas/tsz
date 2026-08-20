@@ -20,8 +20,14 @@ async function createCenterDraft(
   await page.getByPlaceholder("例如 center").fill("center");
   await page.getByRole("button", { name: "词典检测" }).click();
   await expect(page.getByText("已匹配", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("英式主词")).toHaveValue("centre");
-  await expect(page.getByLabel("美式主词")).toHaveValue("center");
+  // A1：双拼写是词典事实，第 1 步只读陈述，不再有开关与可写双输入。
+  await expect(
+    page.getByText(/两种地区拼写，两者都会记录在这条词条上/)
+  ).toBeVisible();
+  await expect(page.getByLabel("英式主词")).toHaveCount(0);
+  await expect(page.getByRole("switch", { name: "区分英美词形" })).toHaveCount(
+    0
+  );
 
   await page.getByRole("button", { name: "确认并进入词形与发音" }).click();
   await expect(page).toHaveURL(
@@ -365,6 +371,8 @@ test.describe("admin 新建单词 V2", () => {
       .locator('[data-word-node-id="noun-plural-us"]')
       .getByPlaceholder("词形拼写");
 
+    // A1 阶段 5：偏好侧（缺省英式）主导，美式那一栏默认折叠，要先展开才能编辑。
+    await page.getByLabel("展开美式词形").first().click();
     await pluralInput.fill("workspaces");
     await page.getByRole("button", { name: "保存草稿" }).click();
 
@@ -488,6 +496,8 @@ test.describe("admin 新建单词 V2", () => {
       .getByPlaceholder("词形拼写");
     const confirm = page.getByRole("button", { name: "确认并保存" });
 
+    // A1 阶段 5：美式那一栏默认折叠，先展开。
+    await page.getByLabel("展开美式词形").first().click();
     await pluralInput.fill("workspaces");
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect(page.getByText("发现 2 条跨词条同形命中")).toBeVisible();

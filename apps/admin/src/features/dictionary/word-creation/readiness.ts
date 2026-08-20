@@ -10,7 +10,10 @@ import type {
   WordSenseV2,
   WordSentenceV2
 } from "@tsz/types";
+import type { AdminDialectPreference } from "@tsz/shared";
+import { FALLBACK_DIALECT_PREFERENCE } from "@tsz/shared";
 import type { PartOfSpeechLookup } from "../part-of-speech/catalog";
+import { collapseMeaningsEnglishText, collapseMeaningsGrammar } from "./model";
 import {
   baseFormPronunciationIssues,
   baseFormSpellingIssues,
@@ -128,14 +131,21 @@ export function pendingReadinessRows(
 export function buildWordReadiness(
   word?: AdminWordV2,
   draft: WordReadinessDraft = {},
-  partOfSpeechLookup?: PartOfSpeechLookup
+  partOfSpeechLookup?: PartOfSpeechLookup,
+  // 完成度必须按「保存后会变成什么样」来算：存量双份词条收敛后只保留偏好侧，
+  // 拿未收敛的原值去判会把已经可发布的词条误报成未完成。
+  dialectPreference: AdminDialectPreference = FALLBACK_DIALECT_PREFERENCE
 ): ReadinessRow[] {
   const forms = draft.forms ?? word?.forms ?? { pos: [] };
-  const meanings = draft.meanings ??
+  const rawMeanings = draft.meanings ??
     word?.meanings ?? {
       sense_groups: [],
       pos: []
     };
+  const meanings = collapseMeaningsGrammar(
+    collapseMeaningsEnglishText(rawMeanings, dialectPreference),
+    dialectPreference
+  );
   const completedSteps = new Set(word?.completed_steps ?? []);
   const dialectComplete = completedSteps.has("basics") ? 1 : 0;
 

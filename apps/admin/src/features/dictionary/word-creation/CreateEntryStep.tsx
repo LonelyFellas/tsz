@@ -2,7 +2,6 @@ import {
   CheckCircleFilled,
   CloseCircleFilled,
   InfoCircleOutlined,
-  SafetyCertificateOutlined,
   SearchOutlined
 } from "@ant-design/icons";
 import {
@@ -10,14 +9,11 @@ import {
   App,
   Button,
   Card,
-  Col,
   Descriptions,
   Form,
   Input,
-  Row,
   Select,
   Space,
-  Switch,
   Tag,
   Typography
 } from "antd";
@@ -40,6 +36,7 @@ import {
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { newWordNodeId } from "../word-model/primitives";
 import { useCreateWordV2, useDetectWordV2 } from "./api";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import { STATUS_LABEL } from "../labels";
 import {
@@ -321,7 +318,6 @@ function DetectionStatus({
   catalogLoaded,
   catalogUnavailable,
   surfaceState,
-  surfaceNeedsRecheck,
   onSurfaceExpired
 }: {
   result: DetectWordResponseV2;
@@ -329,7 +325,6 @@ function DetectionStatus({
   catalogLoaded: boolean;
   catalogUnavailable: boolean;
   surfaceState: SurfaceSnapshotState & { retry: () => void };
-  surfaceNeedsRecheck: boolean;
   onSurfaceExpired: () => void;
 }) {
   const builtin = result.builtin_dictionary;
@@ -341,8 +336,7 @@ function DetectionStatus({
         )
       : [];
   const surfaceWarningReady =
-    smart.status === "warning" &&
-    (surfaceNeedsRecheck || canAcknowledgeSurfaceSnapshot(surfaceState));
+    smart.status === "warning" && canAcknowledgeSurfaceSnapshot(surfaceState);
   const dictionaryReady =
     (builtin.status === "matched" &&
       catalogLoaded &&
@@ -481,13 +475,6 @@ function DetectionStatus({
                   />
                 )}
               </Space>
-            ) : smart.status === "warning" && surfaceNeedsRecheck ? (
-              <Alert
-                type="warning"
-                showIcon
-                title="最终主词已修改，需要重新检查同名或同形词条"
-                description="旧 snapshot 与确认 token 已清除；点击“重新检查最终主词”后，服务端会按当前输入重新检测。"
-              />
             ) : smart.status === "warning" ? (
               <SurfaceWarningMatches
                 state={surfaceState}
@@ -532,106 +519,67 @@ function DetectionStatus({
   );
 }
 
-function HeadwordConfirmation({
+/**
+ * 第 1 步不再让管理员决定「要不要区分英美」（A1）：双拼写是内置词典给的客观事实，
+ * 检测给出什么就照收什么，这里只做只读陈述。主次顺序按管理员的方言偏好排——
+ * 原先按输入侧排会让「输入 center 却看到 centre 在前」被读成主词被静默替换（手测 C5）。
+ */
+function HeadwordFact({
   value,
-  matchedDialect,
-  preservedDistinguish,
-  allowDistinguish,
-  onChange
+  dictionaryMatched
 }: {
   value: WordHeadwordsV2;
-  matchedDialect?: "common" | "uk" | "us";
-  preservedDistinguish?: Extract<WordHeadwordsV2, { mode: "distinguish" }>;
-  allowDistinguish: boolean;
-  onChange: (next: WordHeadwordsV2) => void;
+  dictionaryMatched: boolean;
 }) {
-  const source =
-    value.mode === "distinguish" ? value.source_dialect : undefined;
-  const uk = value.mode === "distinguish" ? value.uk : value.common;
-  const us = value.mode === "distinguish" ? value.us : value.common;
-  return (
-    <Card
-      className="word-headword-confirmation-card"
-      size="small"
-      title="确认英美主词"
-    >
-      <div className="word-dialect-detection-row">
-        <div>
-          <Typography.Text strong>区分英美词形</Typography.Text>
-          <Typography.Text type="secondary">
-            命中侧作为检测基准，另一侧可按实际情况调整
-          </Typography.Text>
+  const { preference } = useDialectPreference();
+  if (value.mode === "unified") {
+    return (
+      <Card className="word-headword-fact-card" size="small" title="词条主词">
+        <div className="word-headword-fact-primary">
+          <span className="dialect-dot dialect-dot-common" />
+          <Typography.Text strong>{value.common}</Typography.Text>
         </div>
-        <Switch
-          aria-label="区分英美词形"
-          checked={value.mode === "distinguish"}
-          disabled={!allowDistinguish}
-          onChange={(checked) => {
-            if (checked && value.mode === "unified") {
-              onChange(
-                preservedDistinguish ?? {
-                  mode: "distinguish",
-                  uk: value.common,
-                  us: value.common,
-                  source_dialect:
-                    matchedDialect === "uk" || matchedDialect === "us"
-                      ? matchedDialect
-                      : "us"
-                }
-              );
-            } else if (!checked && value.mode === "distinguish") {
-              onChange({
-                mode: "unified",
-                common: value[value.source_dialect]
-              });
-            }
-          }}
-          title="手动选择是否区分英美词形"
-        />
-      </div>
-      {source && (
-        <Alert
-          type="info"
-          showIcon
-          icon={<SafetyCertificateOutlined />}
-          title={`${source === "uk" ? "英式" : "美式"}是本次输入命中的检测基准，已锁定；请确认另一侧词形。`}
-          style={{ marginBottom: 16 }}
-        />
-      )}
-      <Row gutter={16}>
-        <Col xs={24} md={12}>
-          <div className="dialect-panel dialect-panel-uk">
-            <Typography.Text strong>英式英语 · BrE</Typography.Text>
-            <Input
-              aria-label="英式主词"
-              value={uk}
-              disabled={value.mode === "unified" || source === "uk"}
-              onChange={(event) => {
-                if (value.mode === "distinguish") {
-                  onChange({ ...value, uk: event.target.value });
-                }
-              }}
-              style={{ marginTop: 10 }}
-            />
-          </div>
-        </Col>
-        <Col xs={24} md={12}>
-          <div className="dialect-panel dialect-panel-us">
-            <Typography.Text strong>美式英语 · AmE</Typography.Text>
-            <Input
-              aria-label="美式主词"
-              value={us}
-              disabled={value.mode === "unified" || source === "us"}
-              onChange={(event) => {
-                if (value.mode === "distinguish") {
-                  onChange({ ...value, us: event.target.value });
-                }
-              }}
-              style={{ marginTop: 10 }}
-            />
-          </div>
-        </Col>
-      </Row>
+        <Typography.Text type="secondary">
+          {dictionaryMatched
+            ? "内置词典未发现该词有英式 / 美式拼写差异。"
+            : "内置词典未收录该词条，按你输入的拼写建档。"}
+        </Typography.Text>
+      </Card>
+    );
+  }
+
+  const sides = (
+    preference === "uk" ? (["uk", "us"] as const) : (["us", "uk"] as const)
+  ).map((dialect) => ({
+    dialect,
+    spelling: dialect === "uk" ? value.uk : value.us,
+    label: dialect === "uk" ? "英式" : "美式"
+  }));
+
+  return (
+    <Card className="word-headword-fact-card" size="small" title="词条主词">
+      {sides.map(({ dialect, spelling, label }, index) => (
+        <div
+          key={dialect}
+          className={
+            index === 0
+              ? "word-headword-fact-primary"
+              : "word-headword-fact-secondary"
+          }
+        >
+          <span className={`dialect-dot dialect-dot-${dialect}`} />
+          {index === 0 ? (
+            <Typography.Text strong>{spelling}</Typography.Text>
+          ) : (
+            <Typography.Text>{spelling}</Typography.Text>
+          )}
+          <Typography.Text type="secondary">{label}</Typography.Text>
+        </div>
+      ))}
+      <Typography.Text type="secondary">
+        内置词典识别到该词有两种地区拼写，两者都会记录在这条词条上。
+        词义与例句只维护一份，按你的方言偏好录入。
+      </Typography.Text>
     </Card>
   );
 }
@@ -650,31 +598,23 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
   const [headwords, setHeadwords] = useState<WordHeadwordsV2>();
   const [dirty, setDirty] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [headwordsChangedAfterDetection, setHeadwordsChangedAfterDetection] =
-    useState(false);
   const [surfaceOverridePage, setSurfaceOverridePage] =
     useState<SurfaceMatchPageV2>();
   const requestVersion = useRef(0);
   const createKey = useRef(newWordNodeId());
-  const preservedDistinguish = useRef<
-    Extract<WordHeadwordsV2, { mode: "distinguish" }> | undefined
-  >(undefined);
   const allowSavedNavigation = useUnsavedWordChanges(dirty);
   const surfaceInitialPage =
-    !headwordsChangedAfterDetection &&
     result?.smart_dictionary.status === "warning"
       ? (surfaceOverridePage ?? result.smart_dictionary.surface_match_page)
       : undefined;
-  const surfaceResetKey = `${result?.detection_id ?? "none"}:${JSON.stringify(headwords)}:${headwordsChangedAfterDetection}`;
+  const surfaceResetKey = `${result?.detection_id ?? "none"}:${JSON.stringify(headwords)}`;
   const surfaceState = useSurfaceSnapshot(surfaceInitialPage, surfaceResetKey);
 
   const resetDetection = () => {
     requestVersion.current += 1;
     setResult(undefined);
     setHeadwords(undefined);
-    setHeadwordsChangedAfterDetection(false);
     setSurfaceOverridePage(undefined);
-    preservedDistinguish.current = undefined;
     onHeadwordsChange(undefined);
     createKey.current = newWordNodeId();
     detectWord.reset();
@@ -692,7 +632,6 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
     createKey.current = newWordNodeId();
     setResult(undefined);
     setHeadwords(undefined);
-    setHeadwordsChangedAfterDetection(false);
     setSurfaceOverridePage(undefined);
     onHeadwordsChange(undefined);
     detectWord.reset();
@@ -725,9 +664,6 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
             ? ({ mode: "unified", common: next.request.headword } as const)
             : undefined;
       setHeadwords(nextHeadwords);
-      setHeadwordsChangedAfterDetection(false);
-      preservedDistinguish.current =
-        nextHeadwords?.mode === "distinguish" ? nextHeadwords : undefined;
       onHeadwordsChange(nextHeadwords);
     } catch (error) {
       if (version === requestVersion.current) {
@@ -750,24 +686,11 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
     (matchedDictionaryReady || unmatchedDictionaryReady) &&
     (result.smart_dictionary.status === "clear" ||
       (result.smart_dictionary.status === "warning" &&
-        (headwordsChangedAfterDetection ||
-          canAcknowledgeSurfaceSnapshot(surfaceState)))) &&
+        canAcknowledgeSurfaceSnapshot(surfaceState))) &&
     headwords !== undefined &&
     (headwords.mode === "unified"
       ? headwords.common.trim() !== ""
       : headwords.uk.trim() !== "" && headwords.us.trim() !== "");
-
-  const updateHeadwords = (next: WordHeadwordsV2) => {
-    createKey.current = newWordNodeId();
-    setHeadwordsChangedAfterDetection(true);
-    setSurfaceOverridePage(undefined);
-    if (next.mode === "distinguish") {
-      preservedDistinguish.current = next;
-    }
-    setDirty(true);
-    setHeadwords(next);
-    onHeadwordsChange(next);
-  };
 
   const createDraft = async () => {
     if (!result || !headwords || !canCreate || creating) return;
@@ -778,8 +701,7 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
         idempotency_key: createKey.current,
         detection_id: result.detection_id,
         headwords,
-        ...(canAcknowledgeSurfaceSnapshot(surfaceState) &&
-        !headwordsChangedAfterDetection
+        ...(canAcknowledgeSurfaceSnapshot(surfaceState)
           ? {
               confirmed_surface_match_token:
                 surfaceState.surface_confirmation_token
@@ -810,7 +732,6 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
         error.meta?.surface_match_page
       ) {
         setSurfaceOverridePage(error.meta.surface_match_page);
-        setHeadwordsChangedAfterDetection(false);
         setResult({
           ...result,
           smart_dictionary: {
@@ -912,19 +833,15 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
               catalogLoaded={partOfSpeechCatalog.data !== undefined}
               catalogUnavailable={partOfSpeechCatalog.isError}
               surfaceState={surfaceState}
-              surfaceNeedsRecheck={headwordsChangedAfterDetection}
               onSurfaceExpired={resetDetection}
             />
             {headwords && (
               <div className="word-headword-confirmation-wrap">
-                <HeadwordConfirmation
+                <HeadwordFact
                   value={headwords}
-                  matchedDialect={result.matched_dialect}
-                  preservedDistinguish={preservedDistinguish.current}
-                  allowDistinguish={
+                  dictionaryMatched={
                     result.builtin_dictionary.status === "matched"
                   }
-                  onChange={updateHeadwords}
                 />
               </div>
             )}
@@ -956,9 +873,7 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
                 onClick={() => void createDraft()}
               >
                 {result.smart_dictionary.status === "warning"
-                  ? headwordsChangedAfterDetection
-                    ? "重新检查最终主词"
-                    : "仍继续创建"
+                  ? "仍继续创建"
                   : "确认并进入词形与发音"}
               </Button>
             )}

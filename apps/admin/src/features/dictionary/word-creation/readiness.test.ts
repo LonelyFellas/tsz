@@ -105,15 +105,15 @@ describe("buildWordReadiness", () => {
     });
   });
 
-  it("区分方言例句缺任一方言或 focus 关联不唯一时保持未完成", () => {
+  it("英文例句为空或 focus 关联不唯一时保持未完成", () => {
     const word = wordFixture({ ready: true });
     const meanings = structuredClone(word.meanings);
     const firstSense = meanings.pos[0]!.senses[0]!;
     const firstSentence = firstSense.sentences[0]!;
-    if (firstSentence.en_text.mode !== "distinguish") {
-      throw new Error("fixture should distinguish dialects");
+    if (firstSentence.en_text.mode !== "unified") {
+      throw new Error("fixture should carry a single English variant");
     }
-    firstSentence.en_text.uk = { state: "missing" };
+    firstSentence.en_text.common.value.text = "";
     firstSentence.links.push({
       word_id: word.id,
       sense_id: firstSense.id,
@@ -129,8 +129,36 @@ describe("buildWordReadiness", () => {
       step: "meanings",
       pos_id: meanings.pos[0]!.pos_id,
       node_id: firstSentence.id,
-      field: "content.uk"
+      field: "content.common"
     });
+  });
+
+  it("存量双份例句按方言偏好判完成：偏好侧有内容就算完成，缺失才未完成", () => {
+    const word = wordFixture({ ready: true });
+    const meanings = structuredClone(word.meanings);
+    const firstSentence = meanings.pos[0]!.senses[0]!.sentences[0]!;
+    firstSentence.en_text = {
+      mode: "distinguish",
+      source_dialect: "us",
+      uk: {
+        state: "ready",
+        variant: {
+          id: "legacy-uk",
+          value: { version: 1, text: "British only", spans: [], liaisons: [] },
+          origin: "manual"
+        }
+      },
+      us: { state: "missing" }
+    };
+
+    // 偏好英式：只有英式内容也算完成——保存后正是它成为唯一内容。
+    expect(
+      row(buildWordReadiness(word, { meanings }, undefined, "uk"), "sentences")
+    ).toMatchObject({ state: "complete" });
+    // 偏好美式：收敛后会是空的，必须判为未完成。
+    expect(
+      row(buildWordReadiness(word, { meanings }, undefined, "us"), "sentences")
+    ).toMatchObject({ state: "incomplete" });
   });
 
   it("必需集合为空时显示待完善并提供稳定定位目标", () => {
@@ -293,16 +321,17 @@ describe("buildWordReadiness", () => {
     const word = wordFixture({ ready: true });
     const meanings = structuredClone(word.meanings);
     const grammar = meanings.pos[0]!.grammar_structures[0]!;
-    grammar.variants.find((variant) => variant.dialect === "us")!.content.text =
-      "";
+    // 语法结构按偏好侧镜像保存，因此清空偏好侧才算未完成；
+    // 只清非偏好侧会在保存时被镜像覆盖回来，不该报未完成。
+    for (const variant of grammar.variants) variant.content.text = "";
     const sense = meanings.pos[0]!.senses[0]!;
     const content = structuredClone(
       sense.sentences[0]!.en_text
     ) as EnglishTextV2;
-    if (content.mode !== "distinguish") {
-      throw new Error("fixture should distinguish definition dialects");
+    if (content.mode !== "unified") {
+      throw new Error("fixture should carry a single English variant");
     }
-    content.us = { state: "missing" };
+    content.common.value.text = "";
     const definition = {
       id: "english-definition",
       level: "A1" as const,
@@ -315,12 +344,35 @@ describe("buildWordReadiness", () => {
 
     expect(row(rows, "grammar_structures").target).toMatchObject({
       node_id: grammar.id,
-      field: "content.us"
+      field: "content"
     });
     expect(row(rows, "senses").target).toMatchObject({
       node_id: definition.id,
-      field: "content.us"
+      field: "content.common"
     });
+  });
+
+  it("存量双条语法结构只有非偏好侧是空的不算未完成——保存时会随收敛一起消失", () => {
+    const word = wordFixture({ ready: true });
+    const meanings = structuredClone(word.meanings);
+    const grammar = meanings.pos[0]!.grammar_structures[0]!;
+    const content = grammar.variants[0]!.content;
+    // 存量（A1 改造前）的英美双条，美式那一份从未填过。
+    grammar.variants = [
+      { id: `${grammar.id}-uk`, dialect: "uk", content },
+      {
+        id: `${grammar.id}-us`,
+        dialect: "us",
+        content: { ...content, text: "" }
+      }
+    ];
+
+    expect(
+      row(
+        buildWordReadiness(word, { meanings }, undefined, "uk"),
+        "grammar_structures"
+      ).state
+    ).toBe("complete");
   });
 
   it("语义区间中文名超长时定位中文名", () => {
@@ -354,7 +406,10 @@ describe("buildWordReadiness", () => {
   it("语法方言集合、词频、细分词性和全部释义共同决定完成状态", () => {
     const word = wordFixture({ ready: true });
     const meanings = structuredClone(word.meanings);
-    meanings.pos[0]!.grammar_structures[0]!.variants.pop();
+    // 少一条方言变体不再算未完成——保存时镜像会补齐；清空正文才算。
+    for (const variant of meanings.pos[0]!.grammar_structures[0]!.variants) {
+      variant.content.text = "";
+    }
     const secondSense = meanings.pos[1]!.senses[0]!;
     secondSense.frequency = "abc";
     secondSense.sub_pos = "N-COUNT";

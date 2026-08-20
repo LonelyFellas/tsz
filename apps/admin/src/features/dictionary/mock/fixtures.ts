@@ -374,39 +374,23 @@ export function createDetectionFixture(
   );
 }
 
-function emptyEnglishText(
-  headwords: WordHeadwordsV2,
-  nodeKey: string
-): EnglishTextV2 {
-  if (headwords.mode === "unified") {
-    return {
-      mode: "unified",
-      common: {
-        id: `${nodeKey}-en-common`,
-        value: richText(""),
-        origin: "manual"
-      }
-    };
-  }
-  const source = {
-    state: "ready" as const,
-    variant: {
-      id: `${nodeKey}-en-${headwords.source_dialect}`,
-      value: richText(""),
-      origin: "manual" as const
-    }
-  };
+/**
+ * A1 之后英文释义与例句一律单份：新建词条不再按主词分叉，
+ * 否则刚创建的草稿一进第 3 步就会被当成需要收敛的存量数据。
+ */
+function emptyEnglishText(nodeKey: string): EnglishTextV2 {
   return {
-    mode: "distinguish",
-    source_dialect: headwords.source_dialect,
-    uk: headwords.source_dialect === "uk" ? source : { state: "missing" },
-    us: headwords.source_dialect === "us" ? source : { state: "missing" }
+    mode: "unified",
+    common: {
+      id: `${nodeKey}-en-common`,
+      value: richText(""),
+      origin: "manual"
+    }
   };
 }
 
 function createInitialPosMeanings(
   formsPos: WordPosFormsV2,
-  headwords: WordHeadwordsV2,
   wordId: string,
   nodeKey: string,
   count: number,
@@ -414,20 +398,19 @@ function createInitialPosMeanings(
   senseGroupId: string
 ): WordPosMeaningsV2 {
   const grammarId = `mock-grammar-${nodeKey}`;
-  const grammarDialects =
-    headwords.mode === "unified"
-      ? (["common"] as const)
-      : (["uk", "us"] as const);
+  // 新建草稿的语法结构一律单条 `common`（A1 / 后端 P1），区分词条也不例外。
   return {
     pos_id: formsPos.pos_id,
     grammar_structures: [
       {
         id: grammarId,
-        variants: grammarDialects.map((dialect) => ({
-          id: `${grammarId}-${dialect}`,
-          dialect,
-          content: richText(large ? "the large fixture" : "")
-        }))
+        variants: [
+          {
+            id: `${grammarId}-common`,
+            dialect: "common" as const,
+            content: richText(large ? "the large fixture" : "")
+          }
+        ]
       }
     ],
     senses: Array.from({ length: count }, (_, index) => {
@@ -457,17 +440,15 @@ function createInitialPosMeanings(
             id: `${senseId}-sentence`,
             level: "A1" as const,
             en_text: large
-              ? headwords.mode === "unified"
-                ? {
-                    mode: "unified" as const,
-                    common: {
-                      id: `${senseId}-sentence-en-common`,
-                      value: richText(`Large fixture example ${index + 1}.`),
-                      origin: "manual" as const
-                    }
+              ? {
+                  mode: "unified" as const,
+                  common: {
+                    id: `${senseId}-sentence-en-common`,
+                    value: richText(`Large fixture example ${index + 1}.`),
+                    origin: "manual" as const
                   }
-                : emptyEnglishText(headwords, `${senseId}-sentence`)
-              : emptyEnglishText(headwords, `${senseId}-sentence`),
+                }
+              : emptyEnglishText(`${senseId}-sentence`),
             zh_text_id: `${senseId}-sentence-zh`,
             zh_text: richText(large ? `大数据例句 ${index + 1}` : ""),
             links: [
@@ -488,13 +469,11 @@ function createInitialPosMeanings(
  */
 export function createInitialMeaningsForAddedPos(
   formsPos: WordPosFormsV2,
-  headwords: WordHeadwordsV2,
   wordId: string,
   senseGroupId: string
 ): WordPosMeaningsV2 {
   return createInitialPosMeanings(
     formsPos,
-    headwords,
     wordId,
     `pos-${encodeURIComponent(formsPos.pos_id)}`,
     1,
@@ -516,7 +495,6 @@ export function createInitialSenseGroup(
 
 export function createInitialMeanings(
   forms: DraftFormsStepContent,
-  headwords: WordHeadwordsV2,
   wordId: string,
   large = false
 ): DraftMeaningsStepContent {
@@ -525,7 +503,6 @@ export function createInitialMeanings(
   const pos = forms.pos.map((formsPos, posIndex) =>
     createInitialPosMeanings(
       formsPos,
-      headwords,
       wordId,
       String(posIndex + 1),
       posIndex === 0 ? count : 1,

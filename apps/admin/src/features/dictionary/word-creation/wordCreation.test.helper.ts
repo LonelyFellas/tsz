@@ -27,39 +27,17 @@ export function detectionFixture(
   );
 }
 
-function readyEnglishText(
-  headwords: WordHeadwordsV2,
-  text: string,
-  nodeKey: string
-): EnglishTextV2 {
-  if (headwords.mode === "unified") {
-    return {
-      mode: "unified",
-      common: {
-        id: `${nodeKey}-common`,
-        value: richText(text),
-        origin: "manual"
-      }
-    };
-  }
+/**
+ * A1 之后英文内容一律单份：主词是否区分英美不再决定释义/例句的形状。
+ * 存量的英美双份形状由需要它的用例自行构造（见 MeaningsAndExamplesStep 的 legacySplitWord）。
+ */
+function readyEnglishText(text: string, nodeKey: string): EnglishTextV2 {
   return {
-    mode: "distinguish",
-    source_dialect: headwords.source_dialect,
-    uk: {
-      state: "ready",
-      variant: {
-        id: `${nodeKey}-uk`,
-        value: richText(text.replace("center", "centre")),
-        origin: "manual"
-      }
-    },
-    us: {
-      state: "ready",
-      variant: {
-        id: `${nodeKey}-us`,
-        value: richText(text.replace("centre", "center")),
-        origin: "manual"
-      }
+    mode: "unified",
+    common: {
+      id: `${nodeKey}-common`,
+      value: richText(text),
+      origin: "manual"
     }
   };
 }
@@ -95,13 +73,13 @@ export function completeMeanings(
     sense_groups: structuredClone(senseGroups),
     pos: content.pos.map((pos, posIndex) => ({
       ...pos,
+      // 语法结构 A1 后只维护一份 `common`。需要「存量英美双条、两侧文本不同」
+      // 的收敛场景由用例自造。
       grammar_structures: pos.grammar_structures.map((grammar) => ({
         ...grammar,
         variants: grammar.variants.map((variant) => ({
           ...variant,
-          content: richText(
-            variant.dialect === "uk" ? "a centre" : "the center"
-          )
+          content: richText("a centre")
         }))
       })),
       senses: pos.senses.map((sense, senseIndex) => ({
@@ -127,11 +105,7 @@ export function completeMeanings(
         })),
         sentences: sense.sentences.map((sentence) => ({
           ...sentence,
-          en_text: readyEnglishText(
-            headwords,
-            "The center is here.",
-            sentence.id
-          ),
+          en_text: readyEnglishText("The center is here.", sentence.id),
           zh_text: richText("中心在这里。")
         }))
       }))
@@ -167,8 +141,7 @@ export function wordFixture(options: WordFixtureOptions = {}): AdminWordV2 {
   const status = options.status ?? "draft";
   const revision = options.revision ?? 3;
   const ready = options.ready ?? status === "published";
-  const initialMeanings =
-    options.meanings ?? createInitialMeanings(forms, headwords, id);
+  const initialMeanings = options.meanings ?? createInitialMeanings(forms, id);
   const meanings = ready
     ? completeMeanings(initialMeanings, headwords, forms)
     : structuredClone(initialMeanings);

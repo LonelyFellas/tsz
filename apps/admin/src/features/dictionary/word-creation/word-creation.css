@@ -388,23 +388,9 @@
 .word-basics-input-card,
 .word-snapshot-card,
 .word-detection-result-card,
-.word-headword-confirmation-card {
-  overflow: hidden;
-  border-color: #dfe4ea;
-  border-radius: 13px;
-  box-shadow: 0 8px 24px rgba(32, 38, 54, 0.05);
-}
-
 .word-basics-input-card > .ant-card-head,
 .word-snapshot-card > .ant-card-head,
 .word-detection-result-card > .ant-card-head,
-.word-headword-confirmation-card > .ant-card-head {
-  min-height: 44px;
-  padding-inline: 16px;
-  background: #fafbfc;
-  border-bottom-color: #e7eaf0;
-}
-
 .word-basics-input-card > .ant-card-body,
 .word-snapshot-card > .ant-card-body {
   padding: 18px;
@@ -424,42 +410,25 @@
   line-height: 1.6;
 }
 
-.word-dialect-detection-row {
+/* 第 1 步的主词事实卡（A1）：只读陈述，偏好侧在前、主视觉更重。 */
+.word-headword-fact-card .word-headword-fact-primary,
+.word-headword-fact-card .word-headword-fact-secondary {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 11px 13px;
-  background: #f6f8fa;
-  border: 1px solid #e5e9ef;
-  border-radius: 10px;
+  gap: 8px;
+  margin-bottom: 6px;
 }
 
-.word-headword-confirmation-card .word-dialect-detection-row {
-  margin-bottom: 14px;
+.word-headword-fact-card .word-headword-fact-primary {
+  font-size: 16px;
 }
 
-.word-dialect-detection-row > div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.word-dialect-detection-row .ant-typography-secondary {
-  font-size: 12px;
+.word-headword-fact-card .word-headword-fact-secondary {
+  font-size: 13px;
 }
 
 .word-headword-confirmation-wrap {
   min-width: 0;
-}
-
-.word-headword-confirmation-card .ant-alert {
-  border-radius: 9px;
-}
-
-.word-headword-confirmation-card .dialect-panel {
-  padding: 13px;
-  border-radius: 10px;
 }
 
 .word-detection-empty-state {
@@ -824,6 +793,18 @@
   overflow-x: auto;
 }
 
+/* 非偏好侧折叠条（A1 阶段 5）：默认只展开偏好那一栏，另一侧留一行进度摘要。 */
+.word-form-other-dialect-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 18px 0;
+  padding: 6px 12px;
+  border: 1px dashed var(--word-line);
+  border-radius: 10px;
+}
+
 .word-form-matrix-unified {
   grid-template-columns: 128px minmax(620px, 1fr);
 }
@@ -1116,13 +1097,13 @@
   margin-top: 6px;
 }
 
-.word-grammar-card .dialect-grid {
-  gap: 10px;
-}
-
-.word-grammar-card .dialect-panel {
+/* 语法结构只维护一份（A1）：单栏面板，不再按方言分色分栏。 */
+.word-grammar-panel {
+  min-width: 0;
   padding: 9px 11px;
+  border: 1px solid #cfe5d8;
   border-radius: 9px;
+  background: #f5faf7;
 }
 
 .word-voice-text-control {

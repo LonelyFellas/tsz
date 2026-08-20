@@ -50,6 +50,7 @@ import {
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { newWordNodeId } from "../word-model/primitives";
 import { usePublishWordV2, useValidateWordV2 } from "./api";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { orderedHeadwordSpellings, wordDisplayHeadword } from "./model";
 
 interface Props {
@@ -384,6 +385,7 @@ export function PreviewAndPublishStep({
   onPublished
 }: Props) {
   const { message, modal } = App.useApp();
+  const { preference } = useDialectPreference();
   const navigate = useNavigate();
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const partOfSpeechLookup = useMemo(
@@ -545,7 +547,9 @@ export function PreviewAndPublishStep({
       });
       setSurfacePage(undefined);
       onPublished(published);
-      message.success(`「${wordDisplayHeadword(published)}」已提交生效`);
+      message.success(
+        `「${wordDisplayHeadword(published, preference)}」已提交生效`
+      );
       navigate("/words", { replace: true });
     } catch (error) {
       handleRequestError(error, "发布失败");
@@ -776,7 +780,7 @@ export function PreviewAndPublishStep({
         >
           <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
             <Descriptions.Item label="主词">
-              {orderedHeadwordSpellings(word.headwords).join(" / ")}
+              {orderedHeadwordSpellings(word.headwords, preference).join(" / ")}
             </Descriptions.Item>
             <Descriptions.Item label="语言">English 英语</Descriptions.Item>
             <Descriptions.Item label="状态">

@@ -141,7 +141,7 @@ describe("content completion", () => {
       definition_mode: "en_definition",
       id: "empty-en-placeholder",
       level: "A1",
-      content: createEnglishText(word.headwords)
+      content: createEnglishText()
     });
     const candidate = completeMeanings(
       structuredClone(word.meanings),
@@ -152,7 +152,7 @@ describe("content completion", () => {
       definition_mode: "en_definition",
       id: "generated-en-definition",
       level: "B1",
-      content: createEnglishText(word.headwords)
+      content: createEnglishText()
     });
     const english = candidate.pos[0]!.senses[0]!.definitions[1]!;
     if ("content_id" in english) throw new Error("expected en");
@@ -448,7 +448,7 @@ describe("content completion", () => {
       definition_mode: "en_definition" as const,
       id: "empty-english-definition",
       level: "A1" as const,
-      content: createEnglishText(word.headwords)
+      content: createEnglishText()
     };
     current.pos[0]!.senses[0]!.definitions = [englishDefinition];
     const result = applyContentCompletion(

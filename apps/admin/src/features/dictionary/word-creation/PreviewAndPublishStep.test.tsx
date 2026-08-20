@@ -153,7 +153,7 @@ beforeEach(() => {
 });
 
 describe("PreviewAndPublishStep", () => {
-  it("如实说明是结构化核对，并按检测基准侧优先展示主词", async () => {
+  it("如实说明是结构化核对，并按偏好侧优先展示主词", async () => {
     const word = wordFixture({ ready: true });
     mutations.validate.mockResolvedValue({
       validated_revision: word.revision,
@@ -167,8 +167,8 @@ describe("PreviewAndPublishStep", () => {
         "逐项核对结构化内容与发布完整性校验结果；本页不呈现学习端字典卡片样式。所有问题处理完成后可直接提交生效。"
       )
     ).toBeInTheDocument();
-    // fixture 的 source_dialect 是 us，主词顺序与左栏「当前词条」一致。
-    expect(screen.getByText("center / centre")).toBeInTheDocument();
+    // 主词顺序按方言偏好(缺省英式)，与左栏「当前词条」一致。
+    expect(screen.getByText("centre / center")).toBeInTheDocument();
   });
 
   it("自动校验失败时列出可定位 issue，并禁止发布", async () => {

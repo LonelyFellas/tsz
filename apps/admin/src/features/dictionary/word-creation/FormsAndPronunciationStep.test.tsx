@@ -32,6 +32,15 @@ const dataSourceCapabilities = vi.hoisted(() => ({
 const catalogState = vi.hoisted(() => ({
   data: undefined as typeof partOfSpeechCatalogFixture | undefined
 }));
+// 第 2 步的栏序与折叠取决于管理员的方言偏好（A1 阶段 5），测试里直接注入。
+const dialectPreference = vi.hoisted(() => ({ value: "uk" as "uk" | "us" }));
+vi.mock("@/features/settings/useDialectPreference", () => ({
+  useDialectPreference: () => ({
+    preference: dialectPreference.value,
+    savePreference: vi.fn()
+  })
+}));
+
 vi.mock("../dataSource", () => ({
   adminWordsDataSourceCapabilities: dataSourceCapabilities,
   adminWordsDataSource: {
@@ -260,6 +269,7 @@ beforeEach(() => {
   mutations.surfacePage.mockReset();
   catalogState.data = partOfSpeechCatalogFixture;
   dataSourceCapabilities.dialectVariantSuggestions = true;
+  dialectPreference.value = "uk";
   mutations.preview.mockResolvedValue({
     base_revision: 3,
     requires_confirmation: false,
@@ -556,9 +566,10 @@ describe("FormsAndPronunciationStep", () => {
 
     fireEvent.click(button("完成并进入词义与例句"));
 
-    // 判定是「字典音标且实际发音」的 AND，只缺字典音标时不能再提示「或实际发音」。
+    // 判定是「字典音标且实际发音」的 AND，只缺字典音标时不能再提示「或实际发音」；
+    // 英美区分时还必须指名是哪一侧（手测 C4）。
     expect(
-      await screen.findByText("名词基准原形缺少字典音标")
+      await screen.findByText("名词基准原形 · 英式缺少字典音标")
     ).toBeInTheDocument();
     expect(screen.getByText("本步骤还有 1 项待修正")).toBeInTheDocument();
     expect(mutations.preview).not.toHaveBeenCalled();
@@ -1635,8 +1646,10 @@ describe("FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText("英式词形拼写")).toBeNull();
     expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
     expect(screen.getAllByLabelText("共用词形拼写")[0]).toHaveValue("far");
+    // 拼写统一的布局共享一格，两侧音标都在格内——没有可折叠的列，两个标签都在。
     expect(screen.getAllByText("英式 · BrE").length).toBeGreaterThan(0);
     expect(screen.getAllByText("美式 · AmE").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("展开美式词形")).toBeNull();
     expect(
       document.querySelectorAll('[data-spelling-layout="unified"]').length
     ).toBeGreaterThan(0);
@@ -1666,9 +1679,12 @@ describe("FormsAndPronunciationStep", () => {
     ).find((label) => label.textContent?.trim() === "是");
     expect(spellingYes).toBeDefined();
     fireEvent.click(spellingYes!);
+    // 切成拼写区分后进入双栏布局：偏好侧展开、对侧折叠，展开才看得到美式拼写。
     await waitFor(() =>
-      expect(screen.getAllByLabelText("美式词形拼写").length).toBeGreaterThan(0)
+      expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0)
     );
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+    fireEvent.click(screen.getAllByLabelText("展开美式词形")[0]!);
     expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("far");
     expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("far");
     expect(screen.queryByText("英美音标是否有区别？")).toBeNull();
@@ -1685,21 +1701,92 @@ describe("FormsAndPronunciationStep", () => {
     expect(screen.queryByText(/派生词形尚未填写完整/)).toBeNull();
   });
 
-  it("名词和动词拼写区分时隐藏音标区别选项并保持英美两栏", () => {
+  it("偏好切到美式后，美式那一栏排首位、英式折叠", () => {
+    dialectPreference.value = "us";
+    renderStep(wordFixture({ headword: "center", ready: true }));
+
+    expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("center");
+    expect(screen.queryByLabelText("英式词形拼写")).toBeNull();
+    expect(screen.getAllByText(/英式：\d+ 项已填/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByLabelText("展开英式词形")[0]!);
+    expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("centre");
+  });
+
+  it("多个派生词形待完善时，先指名首个问题再补一句总数", async () => {
+    const word = wordFixture({ headword: "center", ready: true });
+    const slots = word.forms.pos[0]!.form_groups[0]!.slots;
+    expect(slots.length).toBeGreaterThan(0);
+    for (const slot of slots) {
+      for (const variant of slot.variants) {
+        variant.pronunciations[0]!.dict_phonetic = "";
+      }
+    }
+    // 再造一个待完善的派生词形，凑够「另有 N 个」。
+    const extra = structuredClone(slots[0]!);
+    extra.id = "extra-slot";
+    extra.form_type = slots[0]!.form_type;
+    slots.push(extra);
+    renderStep(word);
+
+    fireEvent.click(button("完成并进入词义与例句"));
+    const alert = await screen.findByText(/名词.*缺少字典音标/);
+    expect(alert.textContent).toContain("英式");
+    expect(alert.textContent).toMatch(/另有 \d+ 个派生词形待完善/);
+  });
+
+  it("待完善项指到折叠那一侧时自动展开，否则点了没反应", async () => {
+    const word = wordFixture({ headword: "center", ready: true });
+    const usVariant = word.forms.pos[0]!.base_form.variants.find(
+      (variant) => variant.dialect === "us"
+    )!;
+    usVariant.pronunciations[0]!.actual_pron = "";
+    renderStep(word, {
+      nodeId: usVariant.pronunciations[0]!.id,
+      field: "actual_pron"
+    });
+
+    // 目标落在美式侧：那一栏必须自动展开，输入框才可能被聚焦。
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("美式词形拼写").length).toBeGreaterThan(0)
+    );
+    expect(screen.getAllByLabelText("折叠美式词形").length).toBeGreaterThan(0);
+  });
+
+  it("对侧还有待填项时，折叠摘要给出待填数量", () => {
+    const word = wordFixture({ headword: "center", ready: true });
+    // 美式基准原形缺实际发音 → 折叠摘要应报 1 项待填。
+    word.forms.pos[0]!.base_form.variants.find(
+      (variant) => variant.dialect === "us"
+    )!.pronunciations[0]!.actual_pron = "";
+    renderStep(word);
+
+    expect(
+      screen.getAllByText(/美式：\d+ 项已填 \/ 1 项待填/).length
+    ).toBeGreaterThan(0);
+  });
+
+  it("拼写区分时隐藏音标区别选项，偏好侧主导、对侧折叠可展开", () => {
     renderStep(wordFixture({ headword: "center", ready: true }));
 
     expect(screen.queryByText("英美音标是否有区别？")).toBeNull();
+    // 偏好侧（缺省英式）默认展开；美式那一栏折叠，摘要给出填写进度。
     expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("centre");
-    expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("center");
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+    expect(screen.getAllByText(/美式：\d+ 项已填/).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("共用词形拼写")).toBeNull();
     expect(
       document.querySelectorAll('[data-spelling-layout="distinguish"]').length
     ).toBeGreaterThan(1);
 
+    fireEvent.click(screen.getAllByLabelText("展开美式词形")[0]!);
+    expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("center");
+    fireEvent.click(screen.getAllByLabelText("折叠美式词形")[0]!);
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+
     fireEvent.click(screen.getByText("动词", { exact: true }));
     expect(screen.queryByText("英美音标是否有区别？")).toBeNull();
     expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("centre");
-    expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("center");
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
   });
 
   it("加载 distinguish 转 unified 的后端草稿时归一化全部词形并可完成 Step 2", async () => {

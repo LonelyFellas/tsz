@@ -66,7 +66,8 @@ describe("createAdminAuthRuntime · 装配", () => {
       phone: "1",
       display_name: "X",
       role: "admin",
-      permissions: []
+      permissions: [],
+      preferences: { dialect: "uk" }
     });
     expect(b.store.getState().profile).toBeNull();
   });

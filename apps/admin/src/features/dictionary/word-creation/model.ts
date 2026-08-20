@@ -2,15 +2,12 @@ import type {
   AdminWordV2,
   CefrLevel,
   Dialect,
-  DialectVariantSuggestionItemV2,
   DraftFormsStepContent,
   DraftMeaningsStepContent,
   EnglishTextV2,
   GrammarStructureV2,
   RichText,
   SenseGroupV2,
-  SuggestDialectVariantsInputV2,
-  SuggestDialectVariantsResponseV2,
   WordDefinitionV2,
   WordDerivedFormSlotV2,
   WordFormGroupV2,
@@ -25,11 +22,16 @@ import type {
   WordSenseV2,
   WordSentenceV2
 } from "@tsz/types";
+import { FALLBACK_DIALECT_PREFERENCE } from "@tsz/shared";
+import type { AdminDialectPreference } from "@tsz/shared";
 import {
   emptyWordRichText,
   newWordNodeId,
   toWordRichText
 } from "../word-model/primitives";
+
+/** 收敛后的英文文本恒为单份，用它把「写侧只产出 unified」写进类型里。 */
+type UnifiedEnglishTextV2 = Extract<EnglishTextV2, { mode: "unified" }>;
 
 export const WORD_STEP_ORDER = [
   "basics",
@@ -71,16 +73,32 @@ export function defaultDerivedFormType(
 }
 
 /** 单值展示(面包屑、提交提示)一律用检测基准侧,与左栏「当前词条」的排序一致。 */
-export function wordDisplayHeadword(word: AdminWordV2): string {
-  return word.headwords.mode === "unified"
-    ? word.headwords.common
-    : word.headwords[word.headwords.source_dialect];
+/**
+ * 词条在标题、消息等单行位置的显示拼写：按管理员的方言偏好取那一侧。
+ * 缺省用 `source_dialect`（即管理员当时输入的那一侧），只用于拿不到偏好的场景。
+ */
+export function wordDisplayHeadword(
+  word: AdminWordV2,
+  preference?: AdminDialectPreference
+): string {
+  if (word.headwords.mode === "unified") return word.headwords.common;
+  return word.headwords[preference ?? word.headwords.source_dialect];
 }
 
 /** 并列展示两侧拼写时的顺序:检测基准侧在前,与左栏「当前词条」一致。 */
-export function orderedHeadwordSpellings(headwords: WordHeadwordsV2): string[] {
+/**
+ * 双拼写的展示顺序：**偏好侧在前**。
+ *
+ * 原先按 `source_dialect` 排（管理员输入的那一侧在前），手测 C5 记录了它的后果：
+ * 输入 `center` 却看到 `centre` 排在前面、字号更大，会被读成「主词被静默换掉了」。
+ * 方言改成个人偏好后，排序跟着偏好走才是稳定可预期的。
+ */
+export function orderedHeadwordSpellings(
+  headwords: WordHeadwordsV2,
+  preference: AdminDialectPreference = FALLBACK_DIALECT_PREFERENCE
+): string[] {
   if (headwords.mode === "unified") return [headwords.common];
-  return headwords.source_dialect === "uk"
+  return preference === "uk"
     ? [headwords.uk, headwords.us]
     : [headwords.us, headwords.uk];
 }
@@ -163,86 +181,284 @@ export function createDerivedSlot(
   };
 }
 
-export function createEnglishText(
-  headwords: WordHeadwordsV2,
-  text = ""
-): EnglishTextV2 {
-  const value = toWordRichText(text);
-  if (headwords.mode === "unified") {
-    return {
-      mode: "unified",
-      common: { id: newWordNodeId(), value, origin: "manual" }
-    };
-  }
-  const source = headwords.source_dialect;
+/**
+ * 英文释义 / 例句一律构造为单份（A1）：方言是管理员的个人偏好，不再逐词条分叉。
+ * 存量 `distinguish` 数据仍能被读到，收敛发生在保存前，见 `collapseEnglishText`。
+ */
+export function createEnglishText(text = ""): UnifiedEnglishTextV2 {
   return {
-    mode: "distinguish",
-    source_dialect: source,
-    uk:
-      source === "uk"
-        ? {
-            state: "ready",
-            variant: { id: newWordNodeId(), value, origin: "manual" }
-          }
-        : { state: "missing" },
-    us:
-      source === "us"
-        ? {
-            state: "ready",
-            variant: { id: newWordNodeId(), value, origin: "manual" }
-          }
-        : { state: "missing" }
+    mode: "unified",
+    common: {
+      id: newWordNodeId(),
+      value: toWordRichText(text),
+      origin: "manual"
+    }
   };
 }
 
-type MeaningDialect = "uk" | "us";
-type MeaningDialectSuggestionItem = Extract<
-  DialectVariantSuggestionItemV2,
-  { field_kind: "definition" | "example" }
->;
-
-function oppositeMeaningDialect(dialect: MeaningDialect): MeaningDialect {
-  return dialect === "uk" ? "us" : "uk";
-}
-
-function sourceForMissingMeaningDialect(
+/** 读兼容：任意形状取出当前口径要显示与编辑的那一份正文。 */
+export function resolveEnglishText(
   value: EnglishTextV2,
-  targetDialect: MeaningDialect
-): RichText | undefined {
-  if (value.mode !== "distinguish") return undefined;
-  const sourceDialect = oppositeMeaningDialect(targetDialect);
-  if (value.source_dialect !== sourceDialect) return undefined;
-  if (value[targetDialect].state !== "missing") return undefined;
-  const sourceSlot = value[sourceDialect];
-  if (sourceSlot.state !== "ready") return undefined;
-  return sourceSlot.variant.value.text.trim()
-    ? sourceSlot.variant.value
-    : undefined;
+  preference: AdminDialectPreference
+): RichText {
+  if (value.mode === "unified") return value.common.value;
+  const slot = value[preference];
+  // 偏好侧缺失时就是空——刻意不搬运另一侧文本，那等于把美式内容冒充成英式的。
+  return slot.state === "ready" ? slot.variant.value : emptyWordRichText();
 }
 
-/** 统计目标方言缺失或正文为空的英文释义与例句，不要求另一侧源文本可用。 */
-export function countIncompleteMeaningDialectSlots(
-  content: DraftMeaningsStepContent,
-  targetDialect: MeaningDialect
-): number {
-  let count = 0;
+/**
+ * 写回当前口径那一份，**保持 wire 形状不变**：存量 `distinguish` 在编辑期间仍是
+ * `distinguish`，收敛推迟到保存前，好让「将丢弃 N 条」的确认框有东西可数。
+ */
+export function writeEnglishText(
+  value: EnglishTextV2,
+  preference: AdminDialectPreference,
+  content: RichText
+): EnglishTextV2 {
+  if (value.mode === "unified") {
+    return {
+      ...value,
+      common: { id: value.common.id, value: content, origin: "manual" }
+    };
+  }
+  const current = value[preference];
+  return {
+    ...value,
+    [preference]: {
+      state: "ready",
+      variant: {
+        id: current.state === "ready" ? current.variant.id : newWordNodeId(),
+        value: content,
+        origin: "manual"
+      }
+    }
+  };
+}
+
+/**
+ * 收敛为单份：保留偏好侧的**内容**，非偏好侧在此丢弃。
+ * 调用方必须先向管理员确认，见 `countDiscardedEnglishTexts`。
+ *
+ * **节点 ID 必须新起，不能复用偏好侧那条。** 后端把方言编进了节点身份
+ * （`text_variant_role(field_role, "en", dialect)`），同一个节点 ID 换到别的
+ * 方言槽位会被判 `node_binding_changed`「节点 ID 不能更换父节点或内容槽位」，
+ * 整个 meanings 保存 422。2026-08-20 在真实 tsz-rust 上实测确认。
+ */
+export function collapseEnglishText(
+  value: EnglishTextV2,
+  preference: AdminDialectPreference
+): UnifiedEnglishTextV2 {
+  if (value.mode === "unified") return value;
+  const slot = value[preference];
+  return {
+    mode: "unified",
+    common: {
+      id: newWordNodeId(),
+      value: slot.state === "ready" ? slot.variant.value : emptyWordRichText(),
+      origin: slot.state === "ready" ? slot.variant.origin : "manual"
+    }
+  };
+}
+
+/** 该 `EnglishTextV2` 是否仍是旧的英美双份形状。 */
+function isDialectSplitEnglishText(value: EnglishTextV2): boolean {
+  return value.mode === "distinguish";
+}
+
+function englishTextsOf(
+  content: DraftMeaningsStepContent
+): { kind: "definition" | "sentence"; value: EnglishTextV2 }[] {
+  const items: { kind: "definition" | "sentence"; value: EnglishTextV2 }[] = [];
   for (const pos of content.pos) {
     for (const sense of pos.senses) {
       for (const definition of sense.definitions) {
         if (!definition.definition_mode.startsWith("en_")) continue;
-        const value = definition.content as EnglishTextV2;
-        if (value.mode !== "distinguish") continue;
-        const slot = value[targetDialect];
-        if (slot.state === "missing" || !slot.variant.value.text.trim()) {
-          count += 1;
-        }
+        items.push({
+          kind: "definition",
+          value: definition.content as EnglishTextV2
+        });
       }
       for (const sentence of sense.sentences) {
-        if (sentence.en_text.mode !== "distinguish") continue;
-        const slot = sentence.en_text[targetDialect];
-        if (slot.state === "missing" || !slot.variant.value.text.trim()) {
-          count += 1;
-        }
+        items.push({ kind: "sentence", value: sentence.en_text });
+      }
+    }
+  }
+  return items;
+}
+
+/** 词义页里是否还存在旧的英美双份英文内容（决定是否显示收敛说明条）。 */
+export function hasDialectSplitEnglishText(
+  content: DraftMeaningsStepContent
+): boolean {
+  return englishTextsOf(content).some((item) =>
+    isDialectSplitEnglishText(item.value)
+  );
+}
+
+export interface DiscardedEnglishTextCount {
+  definitions: number;
+  sentences: number;
+}
+
+/** 统计保存收敛时会丢掉的非偏好侧英文内容条数；空文本不计入。 */
+export function countDiscardedEnglishTexts(
+  content: DraftMeaningsStepContent,
+  preference: AdminDialectPreference
+): DiscardedEnglishTextCount {
+  const other = preference === "uk" ? "us" : "uk";
+  const count = { definitions: 0, sentences: 0 };
+  for (const item of englishTextsOf(content)) {
+    if (item.value.mode !== "distinguish") continue;
+    const slot = item.value[other];
+    if (slot.state !== "ready" || !slot.variant.value.text.trim()) continue;
+    if (item.kind === "definition") count.definitions += 1;
+    else count.sentences += 1;
+  }
+  return count;
+}
+
+/**
+ * 把整页英文释义与例句收敛为单份。没有任何双份内容时原样返回同一个引用，
+ * 让 readiness 这类每次渲染都会调用的路径不产生多余分配与重渲染。
+ */
+export function collapseMeaningsEnglishText(
+  content: DraftMeaningsStepContent,
+  preference: AdminDialectPreference
+): DraftMeaningsStepContent {
+  if (!hasDialectSplitEnglishText(content)) return content;
+  return {
+    ...content,
+    pos: content.pos.map((pos) => ({
+      ...pos,
+      senses: pos.senses.map((sense) => ({
+        ...sense,
+        definitions: sense.definitions.map((definition) =>
+          definition.definition_mode.startsWith("en_")
+            ? ({
+                ...definition,
+                content: collapseEnglishText(
+                  definition.content as EnglishTextV2,
+                  preference
+                )
+              } as WordDefinitionV2)
+            : definition
+        ),
+        sentences: sense.sentences.map((sentence) => ({
+          ...sentence,
+          en_text: collapseEnglishText(sentence.en_text, preference)
+        }))
+      }))
+    }))
+  };
+}
+
+/**
+ * 语法结构一律构造为单份 `common`（A1）：后端 P1（tsz-rust #35）之后，
+ * `distinguish` 词条的变体集合同时接受 `[common]` 与 `[uk, us]`，
+ * 前端不必再为了过校验写两条同值镜像。
+ */
+export function createGrammar(): GrammarStructureV2 {
+  return {
+    id: newWordNodeId(),
+    variants: [
+      { id: newWordNodeId(), dialect: "common", content: emptyWordRichText() }
+    ]
+  };
+}
+
+/**
+ * 读兼容：语法结构按当前口径取那一份文本。统一词条只有 `common` 一条，
+ * 存量区分词条取偏好侧，都取不到时退回第一条，绝不返回 undefined。
+ */
+export function resolveGrammarText(
+  grammar: GrammarStructureV2,
+  preference: AdminDialectPreference
+): RichText {
+  const variant =
+    grammar.variants.find((item) => item.dialect === preference) ??
+    grammar.variants.find((item) => item.dialect === "common") ??
+    grammar.variants[0];
+  return variant?.content ?? emptyWordRichText();
+}
+
+/**
+ * 写：单份输入回写到当前口径那一条，**不改变 wire 形状**——与英文内容同一套节奏，
+ * 收敛推迟到保存前，好让「另一侧会被丢弃」的确认框还数得出来。
+ */
+export function writeGrammarText(
+  grammar: GrammarStructureV2,
+  preference: AdminDialectPreference,
+  content: RichText
+): GrammarStructureV2 {
+  const target =
+    grammar.variants.find((item) => item.dialect === preference) ??
+    grammar.variants.find((item) => item.dialect === "common") ??
+    grammar.variants[0];
+  if (!target) {
+    return {
+      ...grammar,
+      variants: [{ id: newWordNodeId(), dialect: "common", content }]
+    };
+  }
+  return {
+    ...grammar,
+    variants: grammar.variants.map((item) =>
+      item.id === target.id ? { ...item, content } : item
+    )
+  };
+}
+
+/** 该语法结构是否仍是旧的英美双份形状（决定要不要收敛、要不要提醒管理员）。 */
+function isDialectSplitGrammar(grammar: GrammarStructureV2): boolean {
+  return (
+    grammar.variants.length !== 1 || grammar.variants[0]!.dialect !== "common"
+  );
+}
+
+/**
+ * 保存前把语法结构收敛为单条 `common`，内容取偏好侧那一份。
+ *
+ * **节点 ID 必须新起，不能复用偏好侧那条变体。** 与英文内容同一条规矩：
+ * 后端把方言编进了节点身份，同一个 ID 换到 `common` 槽位会被判
+ * `node_binding_changed` 而整个 meanings 保存 422（见 `collapseEnglishText`）。
+ * 已经是单条 `common` 的原样返回，否则每次保存都换新节点。
+ */
+export function collapseGrammarStructure(
+  grammar: GrammarStructureV2,
+  preference: AdminDialectPreference
+): GrammarStructureV2 {
+  if (!isDialectSplitGrammar(grammar)) return grammar;
+  return {
+    ...grammar,
+    variants: [
+      {
+        id: newWordNodeId(),
+        dialect: "common",
+        content: resolveGrammarText(grammar, preference)
+      }
+    ]
+  };
+}
+
+/**
+ * 统计保存收敛时会丢掉的非偏好侧语法结构条数：只有非偏好侧确实写过、
+ * 且与偏好侧不同的才算，空的或本来就一样的不打扰管理员。
+ */
+export function countDiscardedGrammarVariants(
+  content: DraftMeaningsStepContent,
+  preference: AdminDialectPreference
+): number {
+  const other = preference === "uk" ? "us" : "uk";
+  let count = 0;
+  for (const pos of content.pos) {
+    for (const grammar of pos.grammar_structures) {
+      if (!isDialectSplitGrammar(grammar)) continue;
+      const kept = resolveGrammarText(grammar, preference).text;
+      const dropped = grammar.variants.find((item) => item.dialect === other);
+      if (!dropped) continue;
+      if (dropped.content.text.trim() && dropped.content.text !== kept) {
+        count += 1;
       }
     }
   }
@@ -250,220 +466,25 @@ export function countIncompleteMeaningDialectSlots(
 }
 
 /**
- * 收集词义页中可安全补全的目标方言文本。语法结构使用独立模型，刻意不在此遍历。
+ * 把整页语法结构收敛为单份。没有任何双份形状时返回同一个引用，
+ * 让 readiness 这类每次渲染都会调用的路径不产生多余分配与重渲染。
  */
-export function collectMissingMeaningDialectItems(
+export function collapseMeaningsGrammar(
   content: DraftMeaningsStepContent,
-  targetDialect: MeaningDialect
-): SuggestDialectVariantsInputV2 {
-  const items: MeaningDialectSuggestionItem[] = [];
-  for (const pos of content.pos) {
-    for (const sense of pos.senses) {
-      for (const definition of sense.definitions) {
-        if (!definition.definition_mode.startsWith("en_")) continue;
-        const value = sourceForMissingMeaningDialect(
-          definition.content as EnglishTextV2,
-          targetDialect
-        );
-        if (value) {
-          items.push({
-            client_id: definition.id,
-            field_kind: "definition",
-            value
-          });
-        }
-      }
-      for (const sentence of sense.sentences) {
-        const value = sourceForMissingMeaningDialect(
-          sentence.en_text,
-          targetDialect
-        );
-        if (value) {
-          items.push({
-            client_id: sentence.id,
-            field_kind: "example",
-            value
-          });
-        }
-      }
-    }
-  }
-  return {
-    source_dialect: oppositeMeaningDialect(targetDialect),
-    target_dialect: targetDialect,
-    items
-  };
-}
-
-export const DIALECT_SUGGESTION_BATCH_SIZE = 100;
-
-export function chunkMeaningDialectSuggestionRequest(
-  request: SuggestDialectVariantsInputV2
-): SuggestDialectVariantsInputV2[] {
-  const batches: SuggestDialectVariantsInputV2[] = [];
-  for (
-    let offset = 0;
-    offset < request.items.length;
-    offset += DIALECT_SUGGESTION_BATCH_SIZE
-  ) {
-    batches.push({
-      source_dialect: request.source_dialect,
-      target_dialect: request.target_dialect,
-      items: request.items.slice(offset, offset + DIALECT_SUGGESTION_BATCH_SIZE)
-    });
-  }
-  return batches;
-}
-
-export async function requestMeaningDialectSuggestionBatches(
-  request: SuggestDialectVariantsInputV2,
-  send: (
-    batch: SuggestDialectVariantsInputV2
-  ) => Promise<SuggestDialectVariantsResponseV2>,
-  applyBatch: (
-    suggestions: SuggestDialectVariantsResponseV2["suggestions"]
-  ) => void
-): Promise<void> {
-  for (const batch of chunkMeaningDialectSuggestionRequest(request)) {
-    const response = await send(batch);
-    const requestedKeys = new Set(batch.items.map(meaningSuggestionKey));
-    applyBatch(
-      response.suggestions.filter((suggestion) =>
-        requestedKeys.has(meaningSuggestionKey(suggestion))
-      )
-    );
-  }
-}
-
-function meaningSuggestionKey(
-  item: Pick<DialectVariantSuggestionItemV2, "client_id" | "field_kind">
-): string {
-  return `${item.field_kind}:${item.client_id}`;
-}
-
-/**
- * 把批量建议写回当前最新内容。仅 missing 槽位可写，手填或既有内容永不覆盖。
- */
-export function applyMeaningDialectSuggestions(
-  content: DraftMeaningsStepContent,
-  targetDialect: MeaningDialect,
-  suggestions: SuggestDialectVariantsResponseV2["suggestions"]
-): {
-  content: DraftMeaningsStepContent;
-  applied_count: number;
-  skipped_count: number;
-} {
-  const counts = new Map<string, number>();
-  for (const suggestion of suggestions) {
-    const key = meaningSuggestionKey(suggestion);
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-  const uniqueSuggestions = new Map<string, MeaningDialectSuggestionItem>();
-  for (const suggestion of suggestions) {
-    if (suggestion.field_kind === "form") continue;
-    const key = meaningSuggestionKey(suggestion);
-    if (counts.get(key) === 1) uniqueSuggestions.set(key, suggestion);
-  }
-
-  let appliedCount = 0;
-  const usedSuggestions = new Set<string>();
-  const applyToValue = (
-    value: EnglishTextV2,
-    clientId: string,
-    fieldKind: MeaningDialectSuggestionItem["field_kind"]
-  ): EnglishTextV2 => {
-    const key = meaningSuggestionKey({
-      client_id: clientId,
-      field_kind: fieldKind
-    });
-    const suggestion = uniqueSuggestions.get(key);
-    if (
-      !suggestion ||
-      usedSuggestions.has(key) ||
-      !suggestion.value.text.trim() ||
-      !sourceForMissingMeaningDialect(value, targetDialect)
-    ) {
-      return value;
-    }
-    usedSuggestions.add(key);
-    appliedCount += 1;
+  preference: AdminDialectPreference
+): DraftMeaningsStepContent {
+  const pos = content.pos.map((entry) => {
+    if (!entry.grammar_structures.some(isDialectSplitGrammar)) return entry;
     return {
-      ...value,
-      [targetDialect]: {
-        state: "ready",
-        variant: {
-          id: newWordNodeId(),
-          value: suggestion.value,
-          origin: "converted"
-        }
-      }
+      ...entry,
+      grammar_structures: entry.grammar_structures.map((grammar) =>
+        collapseGrammarStructure(grammar, preference)
+      )
     };
-  };
-
-  const nextPos = content.pos.map((pos) => {
-    const nextSenses = pos.senses.map((sense) => {
-      const nextDefinitions: WordDefinitionV2[] = sense.definitions.map(
-        (definition) => {
-          if (!definition.definition_mode.startsWith("en_")) return definition;
-          const nextValue = applyToValue(
-            definition.content as EnglishTextV2,
-            definition.id,
-            "definition"
-          );
-          return nextValue === definition.content
-            ? definition
-            : ({ ...definition, content: nextValue } as WordDefinitionV2);
-        }
-      );
-      const nextSentences = sense.sentences.map((sentence) => {
-        const nextValue = applyToValue(
-          sentence.en_text,
-          sentence.id,
-          "example"
-        );
-        return nextValue === sentence.en_text
-          ? sentence
-          : { ...sentence, en_text: nextValue };
-      });
-      const definitionsChanged = nextDefinitions.some(
-        (definition, index) => definition !== sense.definitions[index]
-      );
-      const sentencesChanged = nextSentences.some(
-        (sentence, index) => sentence !== sense.sentences[index]
-      );
-      return definitionsChanged || sentencesChanged
-        ? {
-            ...sense,
-            definitions: nextDefinitions,
-            sentences: nextSentences
-          }
-        : sense;
-    });
-    return nextSenses.some((sense, index) => sense !== pos.senses[index])
-      ? { ...pos, senses: nextSenses }
-      : pos;
   });
-  const changed = nextPos.some((pos, index) => pos !== content.pos[index]);
-  return {
-    content: changed ? { ...content, pos: nextPos } : content,
-    applied_count: appliedCount,
-    skipped_count: suggestions.length - appliedCount
-  };
-}
-
-export function grammarDialects(headwords: WordHeadwordsV2): Dialect[] {
-  return headwords.mode === "distinguish" ? ["uk", "us"] : ["common"];
-}
-
-export function createGrammar(headwords: WordHeadwordsV2): GrammarStructureV2 {
-  return {
-    id: newWordNodeId(),
-    variants: grammarDialects(headwords).map((dialect) => ({
-      id: newWordNodeId(),
-      dialect,
-      content: emptyWordRichText()
-    }))
-  };
+  return pos.every((entry, index) => entry === content.pos[index])
+    ? content
+    : { ...content, pos };
 }
 
 export function createDefinition(): WordDefinitionV2 {
@@ -477,25 +498,20 @@ export function createDefinition(): WordDefinitionV2 {
 }
 
 export function createSentence(
-  headwords: WordHeadwordsV2,
   wordId: string,
   senseId: string
 ): WordSentenceV2 {
   return {
     id: newWordNodeId(),
     level: "A1",
-    en_text: createEnglishText(headwords),
+    en_text: createEnglishText(),
     zh_text_id: newWordNodeId(),
     zh_text: emptyWordRichText(),
     links: [{ word_id: wordId, sense_id: senseId, role: "focus" }]
   };
 }
 
-export function createSense(
-  headwords: WordHeadwordsV2,
-  wordId: string,
-  senseGroupId: string
-): WordSenseV2 {
+export function createSense(wordId: string, senseGroupId: string): WordSenseV2 {
   const id = newWordNodeId();
   return {
     id,
@@ -504,21 +520,20 @@ export function createSense(
     sense_group_id: senseGroupId,
     depends_on_context: false,
     definitions: [createDefinition()],
-    sentences: [createSentence(headwords, wordId, id)],
+    sentences: [createSentence(wordId, id)],
     relations: []
   };
 }
 
 export function createPosMeanings(
   posId: string,
-  headwords: WordHeadwordsV2,
   wordId: string,
   senseGroupId: string
 ): WordPosMeaningsV2 {
   return {
     pos_id: posId,
-    grammar_structures: [createGrammar(headwords)],
-    senses: [createSense(headwords, wordId, senseGroupId)]
+    grammar_structures: [createGrammar()],
+    senses: [createSense(wordId, senseGroupId)]
   };
 }
 
@@ -543,12 +558,7 @@ export function ensureMeaningsForForms(
     pos: word.forms.pos.map((forms) => {
       const existing = posById.get(forms.pos_id);
       if (!existing) {
-        return createPosMeanings(
-          forms.pos_id,
-          word.headwords,
-          word.id,
-          defaultSenseGroupId
-        );
+        return createPosMeanings(forms.pos_id, word.id, defaultSenseGroupId);
       }
       const senses = existing.senses.map((sense) =>
         sense.sense_group_id && senseGroupIds.has(sense.sense_group_id)
@@ -576,33 +586,18 @@ export function createRelation(type: WordRelationType): WordRelationV2 {
   };
 }
 
-function toWireEnglishText(value: EnglishTextV2): EnglishTextV2 {
-  if (value.mode === "unified") {
-    return {
-      mode: "unified",
-      common: {
-        id: value.common.id,
-        value: value.common.value,
-        origin: value.common.origin
-      }
-    };
-  }
-  const mapSlot = (slot: typeof value.uk): typeof value.uk =>
-    slot.state === "missing"
-      ? { state: "missing" }
-      : {
-          state: "ready",
-          variant: {
-            id: slot.variant.id,
-            value: slot.variant.value,
-            origin: slot.variant.origin
-          }
-        };
+function toWireEnglishText(
+  value: EnglishTextV2,
+  preference: AdminDialectPreference
+): UnifiedEnglishTextV2 {
+  const collapsed = collapseEnglishText(value, preference);
   return {
-    mode: "distinguish",
-    source_dialect: value.source_dialect,
-    uk: mapSlot(value.uk),
-    us: mapSlot(value.us)
+    mode: "unified",
+    common: {
+      id: collapsed.common.id,
+      value: collapsed.common.value,
+      origin: collapsed.common.origin
+    }
   };
 }
 
@@ -656,7 +651,8 @@ export function toFormsWireContent(
  * 构造词义保存请求：保留稳定文本 ID，丢弃未选完的关联目标与服务端只读快照。
  */
 export function toMeaningsWireContent(
-  content: DraftMeaningsStepContent
+  content: DraftMeaningsStepContent,
+  preference: AdminDialectPreference
 ): DraftMeaningsStepContent {
   return {
     sense_groups: content.sense_groups.map((group) => ({
@@ -666,14 +662,17 @@ export function toMeaningsWireContent(
     })),
     pos: content.pos.map((pos) => ({
       pos_id: pos.pos_id,
-      grammar_structures: pos.grammar_structures.map((grammar) => ({
-        id: grammar.id,
-        variants: grammar.variants.map((variant) => ({
-          id: variant.id,
-          dialect: variant.dialect,
-          content: variant.content
-        }))
-      })),
+      grammar_structures: pos.grammar_structures.map((grammar) => {
+        const collapsed = collapseGrammarStructure(grammar, preference);
+        return {
+          id: collapsed.id,
+          variants: collapsed.variants.map((variant) => ({
+            id: variant.id,
+            dialect: variant.dialect,
+            content: variant.content
+          }))
+        };
+      }),
       senses: pos.senses.map((sense) => ({
         id: sense.id,
         sub_pos: sense.sub_pos,
@@ -693,7 +692,13 @@ export function toMeaningsWireContent(
               ? { grammar_structure_id: definition.grammar_structure_id }
               : {})
           };
-          if ("content_id" in definition) {
+          // 按判别字段 definition_mode 分支，不按 content_id 是否存在——
+          // 释义从中文改成英文后残留的 content_id 会让英文内容被原样透传，
+          // 既漏掉单份收敛，也可能把 RichText 与 EnglishTextV2 弄混。
+          if (
+            definition.definition_mode === "zh_definition" ||
+            definition.definition_mode === "zh_sentence"
+          ) {
             return {
               ...common,
               definition_mode: definition.definition_mode,
@@ -704,13 +709,16 @@ export function toMeaningsWireContent(
           return {
             ...common,
             definition_mode: definition.definition_mode,
-            content: toWireEnglishText(definition.content)
+            content: toWireEnglishText(
+              definition.content as EnglishTextV2,
+              preference
+            )
           };
         }),
         sentences: sense.sentences.map((sentence) => ({
           id: sentence.id,
           level: sentence.level,
-          en_text: toWireEnglishText(sentence.en_text),
+          en_text: toWireEnglishText(sentence.en_text, preference),
           zh_text_id: sentence.zh_text_id,
           zh_text: sentence.zh_text,
           links: sentence.links

@@ -18,7 +18,9 @@ const ADMIN_PROFILE = {
   phone: "13800138000",
   display_name: "E2E Admin",
   role: "admin",
-  permissions: ["words.access"]
+  permissions: ["words.access"],
+  // 偏好持久化在服务端（后端提案 P2）；e2e 固定英式。
+  preferences: { dialect: "uk" }
 };
 
 const NOW = "2026-08-02T03:00:00.000Z";
@@ -140,8 +142,10 @@ const CENTER_MEANINGS = {
         {
           id: "grammar-1",
           variants: [
+            // 存量（A1 改造前）的英美双条：编辑器只呈现偏好侧那一份，
+            // 保存时收敛为单条 `common`。留着它就是为了覆盖这条收敛路径。
             { id: "grammar-uk", dialect: "uk", content: richText("a centre") },
-            { id: "grammar-us", dialect: "us", content: richText("a center") }
+            { id: "grammar-us", dialect: "us", content: richText("a centre") }
           ]
         }
       ],
@@ -166,24 +170,13 @@ const CENTER_MEANINGS = {
             {
               id: "sentence-1",
               level: "A2",
+              // 英文内容 A1 后恒为单份，口径取管理员的方言偏好（默认英式）。
               en_text: {
-                mode: "distinguish",
-                source_dialect: "us",
-                uk: {
-                  state: "ready",
-                  variant: {
-                    id: "sentence-1-uk",
-                    value: richText("He walked to the centre of the circle."),
-                    origin: "manual"
-                  }
-                },
-                us: {
-                  state: "ready",
-                  variant: {
-                    id: "sentence-1-us",
-                    value: richText("He walked to the center of the circle."),
-                    origin: "manual"
-                  }
+                mode: "unified",
+                common: {
+                  id: "sentence-1-common",
+                  value: richText("He walked to the centre of the circle."),
+                  origin: "manual"
                 }
               },
               zh_text_id: "sentence-1-zh",

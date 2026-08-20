@@ -76,6 +76,15 @@ class AudioMock {
   }
 }
 
+// 统一内容的发音人按管理员方言偏好挑（A1 阶段 5），测试里直接注入。
+const dialectPreference = vi.hoisted(() => ({ value: "uk" as "uk" | "us" }));
+vi.mock("@/features/settings/useDialectPreference", () => ({
+  useDialectPreference: () => ({
+    preference: dialectPreference.value,
+    savePreference: vi.fn()
+  })
+}));
+
 const voices = [
   {
     id: "common-default",
@@ -151,6 +160,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   preview.enabled = true;
   preview.mocked = false;
+  dialectPreference.value = "uk";
   preview.listVoices.mockResolvedValue(voices);
   preview.synthesize.mockResolvedValue(result());
   message.error.mockReset();
@@ -163,7 +173,46 @@ afterEach(() => {
 });
 
 describe("PronunciationPreview", () => {
-  it("tomato 使用目录默认 voice 获取并自动播放，随后可手动重播", async () => {
+  it("偏好切到美式后，统一内容改挑 en-US 发音人", async () => {
+    dialectPreference.value = "us";
+    render(<PreviewHarness />);
+
+    const getButton = screen.getByLabelText("获取语音");
+    await waitFor(() => expect(getButton).toBeEnabled());
+    fireEvent.click(getButton);
+
+    await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(1));
+    expect(preview.synthesize.mock.calls[0]![0].voiceId).toBe("american-voice");
+  });
+
+  it("明确标了方言的内容找不到对应发音人时不降级，直接禁用并说明", async () => {
+    preview.listVoices.mockResolvedValue(
+      voices.filter((voice) => voice.locale !== "en-GB")
+    );
+    render(<PreviewHarness dialect="uk" />);
+
+    // 英式内容配不到 en-GB 发音人时保持禁用，不静默改用美式音朗读。
+    await waitFor(() => expect(preview.listVoices).toHaveBeenCalled());
+    expect(screen.getByLabelText("获取语音")).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("获取语音"));
+    expect(preview.synthesize).not.toHaveBeenCalled();
+  });
+
+  it("偏好侧发音人缺席时，统一内容回退目录默认，仍可试听", async () => {
+    preview.listVoices.mockResolvedValue(
+      voices.filter((voice) => voice.locale !== "en-GB")
+    );
+    render(<PreviewHarness />);
+
+    const getButton = screen.getByLabelText("获取语音");
+    await waitFor(() => expect(getButton).toBeEnabled());
+    fireEvent.click(getButton);
+
+    await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(1));
+    expect(preview.synthesize.mock.calls[0]![0].voiceId).toBe("common-default");
+  });
+
+  it("统一内容按方言偏好挑发音人，获取后自动播放且可手动重播", async () => {
     const pending = deferred<VoicePreviewResult>();
     preview.synthesize.mockReturnValue(pending.promise);
     render(<PreviewHarness />);
@@ -177,7 +226,8 @@ describe("PronunciationPreview", () => {
       {
         language: "en",
         content: { version: 2, text: "tomato", annotations: [] },
-        voiceId: "common-default"
+        // 统一内容没有自己的方言，按管理员偏好（缺省英式）挑 en-GB 发音人。
+        voiceId: "british-voice"
       },
       { signal: expect.any(AbortSignal) }
     );

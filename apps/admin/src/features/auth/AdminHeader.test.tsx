@@ -28,7 +28,8 @@ const PROFILE: AdminProfile = {
   phone: "13800138000",
   display_name: "审核员小王",
   role: "admin",
-  permissions: []
+  permissions: [],
+  preferences: { dialect: "uk" as const }
 };
 
 // 身份与账户操作收进头像 Popover：先点头像展开，内容才进 DOM。

@@ -334,7 +334,7 @@ describe("CreateEntryStep", () => {
     expect(mutations.detect).not.toHaveBeenCalled();
   });
 
-  it("美式命中时锁定美式基准，仅编辑英式词形后创建草稿", async () => {
+  it("命中双拼写时只读呈现两侧，创建草稿原样提交检测返回的主词", async () => {
     const detection = detectionFixture("center", "det-center");
     const created = wordFixture();
     mutations.detect.mockResolvedValue(detection);
@@ -364,19 +364,16 @@ describe("CreateEntryStep", () => {
         : undefined
     );
 
-    const uk = screen.getByLabelText("英式主词");
-    const us = screen.getByLabelText("美式主词");
-    expect(uk).not.toBeDisabled();
-    expect(us).toBeDisabled();
-    fireEvent.change(uk, { target: { value: "centre-alt" } });
-    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
-      mode: "distinguish",
-      uk: "centre-alt",
-      us: "center",
-      source_dialect: "us"
-    });
+    // A1：双拼写是词典事实，管理员不再决定要不要区分，也不再逐字确认另一侧。
+    expect(screen.queryByRole("switch", { name: "区分英美词形" })).toBeNull();
+    expect(screen.queryByLabelText("英式主词")).toBeNull();
+    expect(screen.queryByLabelText("美式主词")).toBeNull();
+    expect(
+      screen.getByText(/两种地区拼写，两者都会记录在这条词条上/)
+    ).toBeVisible();
 
     fireEvent.click(button("确认并进入词形与发音"));
+    // 关键不变量：提交的 headwords 与检测返回的逐字段相等，不得退化成 unified。
     await waitFor(() =>
       expect(mutations.create).toHaveBeenCalledWith({
         schema_version: 2,
@@ -384,7 +381,7 @@ describe("CreateEntryStep", () => {
         detection_id: "det-center",
         headwords: {
           mode: "distinguish",
-          uk: "centre-alt",
+          uk: "centre",
           us: "center",
           source_dialect: "us"
         }
@@ -414,7 +411,7 @@ describe("CreateEntryStep", () => {
     await waitFor(() => expect(mutations.create).toHaveBeenCalledTimes(1));
     await waitFor(() => {
       expect(input).toBeDisabled();
-      expect(screen.getByLabelText("英式主词")).toBeDisabled();
+      expect(button("确认并进入词形与发音")).toBeDisabled();
     });
 
     await act(async () => pending.resolve({ word: created }));
@@ -752,38 +749,6 @@ describe("CreateEntryStep", () => {
     expect(mutations.resetDetect).toHaveBeenCalled();
   });
 
-  it("最终主词变化立即清 token，第一次重查请求不携旧确认 token", async () => {
-    mutations.detect.mockResolvedValue(warningDetectionFixture());
-    mutations.create.mockRejectedValue(
-      new HttpError(
-        409,
-        "acknowledgement required",
-        [],
-        "surface_match_acknowledgement_required"
-      )
-    );
-    renderStep();
-    fireEvent.change(screen.getByLabelText("录入词条"), {
-      target: { value: "workspace" }
-    });
-    fireEvent.click(button("词典检测"));
-    await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
-
-    fireEvent.click(screen.getByRole("switch", { name: "区分英美词形" }));
-    fireEvent.change(screen.getByLabelText("英式主词"), {
-      target: { value: "workspace-uk" }
-    });
-    expect(
-      screen.getByText("最终主词已修改，需要重新检查同名或同形词条")
-    ).toBeVisible();
-    expect(button("重新检查最终主词")).toBeEnabled();
-    fireEvent.click(button("重新检查最终主词"));
-    await waitFor(() => expect(mutations.create).toHaveBeenCalledTimes(1));
-    expect(mutations.create.mock.calls[0]![0]).not.toHaveProperty(
-      "confirmed_surface_match_token"
-    );
-  });
-
   it("409 changed 使用结构化新首页、轮换 key 且保留表单，重新确认后成功", async () => {
     const changedPage = surfacePage(
       [surfaceMatch("match-new", "word-workspace-new-match")],
@@ -962,10 +927,10 @@ describe("CreateEntryStep", () => {
       mode: "unified",
       common: "not-found"
     });
-    // 无检测依据时不许手工造英美差异,开关必须保持关闭且不可用。
-    const dialectSwitch = screen.getByRole("switch", { name: "区分英美词形" });
-    expect(dialectSwitch).not.toBeChecked();
-    expect(dialectSwitch).toBeDisabled();
+    // 无检测依据时不许手工造英美差异：A1 之后连开关都不存在了。
+    expect(
+      screen.queryByRole("switch", { name: "区分英美词形" })
+    ).not.toBeInTheDocument();
 
     expect(button("确认并进入词形与发音")).toBeEnabled();
     fireEvent.click(button("确认并进入词形与发音"));
@@ -993,152 +958,7 @@ describe("CreateEntryStep", () => {
     expect(button("确认并进入词形与发音")).toBeDisabled();
   });
 
-  it("统一主词建议可手动切换为英美区分并分别修改", async () => {
-    const detection = detectionFixture("far", "det-far");
-    const created = wordFixture({ headword: "far" });
-    mutations.detect.mockResolvedValue(detection);
-    mutations.create.mockResolvedValue({ word: created });
-    const { onHeadwordsChange } = renderStep();
-    fireEvent.change(screen.getByLabelText("录入词条"), {
-      target: { value: "far" }
-    });
-    fireEvent.click(button("词典检测"));
-
-    const dialectSwitch = await screen.findByRole("switch", {
-      name: "区分英美词形"
-    });
-    expect(dialectSwitch).not.toBeChecked();
-    expect(dialectSwitch).not.toBeDisabled();
-    fireEvent.click(dialectSwitch);
-    expect(dialectSwitch).toBeChecked();
-    expect(screen.getByLabelText("英式主词")).not.toBeDisabled();
-    expect(screen.getByLabelText("美式主词")).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("英式主词"), {
-      target: { value: "far-uk" }
-    });
-    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
-      mode: "distinguish",
-      uk: "far-uk",
-      us: "far",
-      source_dialect: "us"
-    });
-    fireEvent.click(button("确认并进入词形与发音"));
-    await waitFor(() =>
-      expect(mutations.create).toHaveBeenCalledWith({
-        schema_version: 2,
-        idempotency_key: expect.any(String),
-        detection_id: "det-far",
-        headwords: {
-          mode: "distinguish",
-          uk: "far-uk",
-          us: "far",
-          source_dialect: "us"
-        }
-      })
-    );
-    expect(await screen.findByText("forms-route")).toBeVisible();
-  });
-
-  it("模式往返切换时保留用户编辑过的非命中侧词形", async () => {
-    mutations.detect.mockResolvedValue(detectionFixture("center"));
-    const { onHeadwordsChange } = renderStep();
-    fireEvent.change(screen.getByLabelText("录入词条"), {
-      target: { value: "center" }
-    });
-    fireEvent.click(button("词典检测"));
-
-    const dialectSwitch = await screen.findByRole("switch", {
-      name: "区分英美词形"
-    });
-    expect(dialectSwitch).toBeChecked();
-    expect(dialectSwitch).not.toBeDisabled();
-    expect(screen.getByLabelText("英式主词")).toHaveValue("centre");
-    expect(screen.getByLabelText("英式主词")).not.toBeDisabled();
-    expect(screen.getByLabelText("美式主词")).toHaveValue("center");
-    expect(screen.getByLabelText("美式主词")).toBeDisabled();
-    fireEvent.change(screen.getByLabelText("英式主词"), {
-      target: { value: "centre-alt" }
-    });
-    fireEvent.click(dialectSwitch);
-    expect(dialectSwitch).not.toBeChecked();
-    expect(screen.getByLabelText("英式主词")).toHaveValue("center");
-    expect(screen.getByLabelText("美式主词")).toHaveValue("center");
-    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
-      mode: "unified",
-      common: "center"
-    });
-    fireEvent.click(dialectSwitch);
-    expect(dialectSwitch).toBeChecked();
-    expect(screen.getByLabelText("英式主词")).toHaveValue("centre-alt");
-    expect(screen.getByLabelText("美式主词")).toHaveValue("center");
-    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
-      mode: "distinguish",
-      uk: "centre-alt",
-      us: "center",
-      source_dialect: "us"
-    });
-  });
-
-  it("英式命中时锁定英式基准，仅允许编辑美式词形", async () => {
-    const detection = detectionFixture("center");
-    detection.matched_dialect = "uk";
-    if (detection.builtin_dictionary.status !== "matched") {
-      throw new Error("测试夹具必须返回内置词典匹配结果");
-    }
-    detection.builtin_dictionary.headwords = {
-      mode: "distinguish",
-      uk: "centre",
-      us: "center",
-      source_dialect: "uk"
-    };
-    mutations.detect.mockResolvedValue(detection);
-    const { onHeadwordsChange } = renderStep();
-    fireEvent.change(screen.getByLabelText("录入词条"), {
-      target: { value: "centre" }
-    });
-    fireEvent.click(button("词典检测"));
-
-    expect(await screen.findByLabelText("英式主词")).toBeDisabled();
-    expect(screen.getByLabelText("美式主词")).not.toBeDisabled();
-    fireEvent.change(screen.getByLabelText("美式主词"), {
-      target: { value: "center-alt" }
-    });
-    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
-      mode: "distinguish",
-      uk: "centre",
-      us: "center-alt",
-      source_dialect: "uk"
-    });
-  });
-
-  it("未检测到英美差异时仍可手动开启并编辑两侧词形", async () => {
-    mutations.detect.mockResolvedValue(detectionFixture("hello"));
-    const { onHeadwordsChange } = renderStep();
-    fireEvent.change(screen.getByLabelText("录入词条"), {
-      target: { value: "hello" }
-    });
-    fireEvent.click(button("词典检测"));
-
-    const dialectSwitch = await screen.findByRole("switch", {
-      name: "区分英美词形"
-    });
-    expect(dialectSwitch).not.toBeChecked();
-    expect(dialectSwitch).not.toBeDisabled();
-    expect(screen.getByLabelText("英式主词")).toHaveValue("hello");
-    expect(screen.getByLabelText("美式主词")).toHaveValue("hello");
-    fireEvent.click(dialectSwitch);
-    fireEvent.change(screen.getByLabelText("英式主词"), {
-      target: { value: "hello-uk" }
-    });
-    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
-      mode: "distinguish",
-      uk: "hello-uk",
-      us: "hello",
-      source_dialect: "us"
-    });
-  });
-
-  it("内置词典未收录的短语保持统一模式，避免提交后端不接受的区分模式", async () => {
+  it("无地区差异时只呈现单一主词，界面不出现任何方言字样", async () => {
     mutations.detect.mockResolvedValue(detectionFixture("BRAND NEW PHRASE"));
     renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
@@ -1146,11 +966,28 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    const dialectSwitch = await screen.findByRole("switch", {
-      name: "区分英美词形"
+    // 词典没收录时不能说成「查过了、没有地区差异」。
+    expect(
+      await screen.findByText("内置词典未收录该词条，按你输入的拼写建档。")
+    ).toBeVisible();
+    expect(screen.queryByRole("switch", { name: "区分英美词形" })).toBeNull();
+    expect(screen.queryByText("英式")).toBeNull();
+    expect(screen.queryByText("美式")).toBeNull();
+  });
+
+  it("词典命中但无地区差异时，说明是「查过没差异」而非「未收录」", async () => {
+    mutations.detect.mockResolvedValue(detectionFixture("far"));
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "far" }
     });
-    expect(dialectSwitch).not.toBeChecked();
-    expect(dialectSwitch).toBeDisabled();
+    fireEvent.click(button("词典检测"));
+
+    expect(
+      await screen.findByText("内置词典未发现该词有英式 / 美式拼写差异。")
+    ).toBeVisible();
+    expect(screen.queryByText("英式")).toBeNull();
+    expect(screen.queryByText("美式")).toBeNull();
   });
 
   it("非 Error 检测失败使用稳定回退文案", async () => {

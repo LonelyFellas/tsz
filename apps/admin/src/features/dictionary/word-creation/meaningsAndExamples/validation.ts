@@ -61,50 +61,50 @@ export function fixedPercentComplete(value?: string): boolean {
   );
 }
 
+/**
+ * 与后端 `expected_dialects` 同口径（tsz-rust #35 / P1 之后）：
+ * `unified` 只接受 `[common]`；`distinguish` 接受 `[common]`（收敛后的形状）
+ * 或 `[uk, us]`（尚未收敛的存量）。缺一侧、多一侧、方言重复一律不合法。
+ */
+function grammarDialectShapeValid(
+  grammar: GrammarStructureV2,
+  headwords?: WordHeadwordsV2
+): boolean {
+  // 拿不到主词就判不了 `distinguish`，沿用既有语义：不判形状，只看正文。
+  if (!headwords) return true;
+  const dialects = grammar.variants.map((variant) => variant.dialect);
+  if (new Set(dialects).size !== dialects.length) return false;
+  if (dialects.length === 1 && dialects[0] === "common") return true;
+  return (
+    headwords.mode === "distinguish" &&
+    dialects.length === 2 &&
+    dialects.includes("uk") &&
+    dialects.includes("us")
+  );
+}
+
 export function grammarStructureComplete(
   grammar: GrammarStructureV2,
   headwords?: WordHeadwordsV2
 ): boolean {
-  const expected = headwords
-    ? headwords.mode === "distinguish"
-      ? (["uk", "us"] as const)
-      : (["common"] as const)
-    : undefined;
-  const dialects = new Set(grammar.variants.map((variant) => variant.dialect));
-  return Boolean(
+  return (
     grammar.variants.length > 0 &&
-    (!expected ||
-      (grammar.variants.length === expected.length &&
-        dialects.size === expected.length &&
-        expected.every((dialect) => dialects.has(dialect)))) &&
+    grammarDialectShapeValid(grammar, headwords) &&
     grammar.variants.every((variant) => variant.content.text.trim() !== "")
   );
 }
 
+/**
+ * 语法结构只维护一份（A1），编辑器里就一个输入框，定位一律指向 `content`；
+ * 区分词条 wire 上的两条镜像变体不再是可分别定位的字段。
+ */
 export function grammarStructureIssueTarget(
   grammar: GrammarStructureV2,
   headwords?: WordHeadwordsV2
 ): MeaningIssueTarget | undefined {
-  const expected = headwords
-    ? headwords.mode === "distinguish"
-      ? (["uk", "us"] as const)
-      : (["common"] as const)
-    : grammar.variants.map((variant) => variant.dialect);
-  for (const dialect of expected) {
-    const variant = grammar.variants.find((item) => item.dialect === dialect);
-    if (!variant || !variant.content.text.trim()) {
-      return { node_id: grammar.id, field: `content.${dialect}` };
-    }
-  }
-  const dialects = new Set(grammar.variants.map((variant) => variant.dialect));
-  if (
-    grammar.variants.length === 0 ||
-    grammar.variants.length !== expected.length ||
-    dialects.size !== expected.length
-  ) {
-    return { node_id: grammar.id, field: "content" };
-  }
-  return undefined;
+  return grammarStructureComplete(grammar, headwords)
+    ? undefined
+    : { node_id: grammar.id, field: "content" };
 }
 
 export function definitionComplete(
