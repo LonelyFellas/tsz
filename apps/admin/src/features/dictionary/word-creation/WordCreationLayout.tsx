@@ -43,6 +43,7 @@ const STEP_SUBTITLE: Record<WordCreationStep, string> = {
 };
 
 function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
+  const { preference } = useDialectPreference();
   if (!headwords) {
     return <Typography.Text type="secondary">完成检测后显示</Typography.Text>;
   }
@@ -54,19 +55,20 @@ function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
       </div>
     );
   }
-  // 检测基准侧排首位并保持主视觉,否则会被误读成主词被静默换成了另一侧拼写。
+  // 偏好侧排首位并保持主视觉。原先按检测基准侧排(手测 C5)：输入 center 却看到
+  // centre 在前且字号更大，会被读成主词被静默换成了另一侧拼写。
   const sides = (
-    headwords.source_dialect === "uk"
-      ? (["uk", "us"] as const)
-      : (["us", "uk"] as const)
+    preference === "uk" ? (["uk", "us"] as const) : (["us", "uk"] as const)
   ).map((dialect) => ({
     dialect,
     spelling: dialect === "uk" ? headwords.uk : headwords.us,
-    caption: dialect === "uk" ? "英式英语 · BrE" : "美式英语 · AmE"
+    caption: dialect === "uk" ? "英式英语 · BrE" : "美式英语 · AmE",
+    // 「检测基准」标在真正命中的那一侧，不再等同于首行——首行现在按偏好排。
+    detectionBasis: dialect === headwords.source_dialect
   }));
   return (
     <Flex vertical gap={5}>
-      {sides.map(({ dialect, spelling, caption }, index) => (
+      {sides.map(({ dialect, spelling, caption, detectionBasis }, index) => (
         <div
           key={dialect}
           className={`word-creation-summary-headword${index === 0 ? "" : " word-creation-summary-alt"}`}
@@ -75,7 +77,7 @@ function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
           {index === 0 ? <strong>{spelling}</strong> : <span>{spelling}</span>}
           <small>
             {caption}
-            {index === 0 ? " · 检测基准" : ""}
+            {detectionBasis ? " · 检测基准" : ""}
           </small>
         </div>
       ))}
@@ -166,6 +168,7 @@ export function WordCreationLayout({
           : ("wait" as const),
     disabled: !word || index > maxReachableIndex
   }));
+  const { preference } = useDialectPreference();
   const createTitle =
     entryKind === "word"
       ? "创建单词"
@@ -184,7 +187,7 @@ export function WordCreationLayout({
           },
           {
             title: word
-              ? `${wordDisplayHeadword(word)} · ${WORD_STEP_TITLE[currentStep]}`
+              ? `${wordDisplayHeadword(word, preference)} · ${WORD_STEP_TITLE[currentStep]}`
               : createTitle
           }
         ]}

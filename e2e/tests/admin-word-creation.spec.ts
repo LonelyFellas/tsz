@@ -20,8 +20,14 @@ async function createCenterDraft(
   await page.getByPlaceholder("例如 center").fill("center");
   await page.getByRole("button", { name: "词典检测" }).click();
   await expect(page.getByText("已匹配", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("英式主词")).toHaveValue("centre");
-  await expect(page.getByLabel("美式主词")).toHaveValue("center");
+  // A1：双拼写是词典事实，第 1 步只读陈述，不再有开关与可写双输入。
+  await expect(
+    page.getByText(/两种地区拼写，两者都会记录在这条词条上/)
+  ).toBeVisible();
+  await expect(page.getByLabel("英式主词")).toHaveCount(0);
+  await expect(page.getByRole("switch", { name: "区分英美词形" })).toHaveCount(
+    0
+  );
 
   await page.getByRole("button", { name: "确认并进入词形与发音" }).click();
   await expect(page).toHaveURL(

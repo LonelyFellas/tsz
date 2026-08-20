@@ -4,9 +4,9 @@
 > 产品口径一律以需求文档为准。
 >
 > **实施进度**：评估已于 2026-08-19 评审通过（三层模型 + 五条结论 + PR #134 作废）。
-> **阶段 1（方言偏好内核与个人设置入口）、阶段 2（第 3 步释义/例句收敛）、
-> 阶段 3（语法结构收敛 + 镜像 shim）已落地**，落地过程中对本文的修正已就地
-> 改写并标注理由；阶段 4 起未动。
+> **阶段 1–4 已落地**（偏好内核与设置入口 / 第 3 步释义例句收敛 /
+> 语法结构收敛 + 镜像 shim / 第 1 步去决策），落地过程中对本文的修正已就地
+> 改写并标注理由；阶段 5 起未动。
 >
 > **核对基线**
 >
@@ -265,6 +265,30 @@ export function collapseEnglishText(
 6. **词性 Tab 的待修项计数也必须用归一化后的内容**（code-review 发现）：
    否则存量词条会挂一个「怎么改都消不掉」的红点，而完成校验又说没问题。
    这一条同时修掉了阶段 2 遗留的同类问题（英文例句只填偏好侧时的幽灵计数）。
+
+## 阶段 4 落地记录（2026-08-20）
+
+1. **「区分英美词形」开关与两个可写主词输入整体删除**，换成只读的主词事实卡
+   `HeadwordFact`。检测返回什么就照收什么，创建请求里的 `headwords` 与检测响应
+   逐字段相等——集成测试与 e2e 都锁了这条不变量。
+2. **`headwordsChangedAfterDetection` / `preservedDistinguish` / `updateHeadwords`
+   一并删除**。它们只服务于「管理员改了主词」这个已不存在的场景；留着的话，
+   相似词面告警（surface warning）那条链路上会挂着一堆恒为 false 的分支。
+   删除后 surface 相关判断与「仍继续创建」文案同步简化。
+3. **排序改按偏好，「检测基准」标注跟着真正命中的那一侧走**。
+   原来首行既是排序首位又被标成「检测基准」，两个含义绑在一起；现在首行由偏好决定，
+   `source_dialect` 只作追溯标注，可能出现在第二行。这就是手测 C5 的正解。
+4. **`orderedHeadwordSpellings` / `wordDisplayHeadword` 增加偏好参数**，
+   缺省值直接复用 `@tsz/shared` 的 `DEFAULT_DIALECT_PREFERENCE`，不在前端立第二处默认。
+   第 4 步只读预览也接上偏好。
+5. `WordCreationWizard` 的检测快照面板保留「输入命中」（即 `matched_dialect`），
+   那正是需求要保留的追溯信息；只把「确认主词」改称「词条主词」——已经没有确认动作了。
+6. **code-review 两条已修**：① 主词事实卡的 unified 分支原本无条件说「内置词典未发现
+   该词有英式 / 美式拼写差异」，但 unified 同时也是「词典压根没收录」时的形状，
+   对未命中词条属于事实错误——改为按 `builtin_dictionary.status` 分述；
+   ② `surfaceNeedsRecheck` 恒为 false 后，`DetectionStatus` 里它的分支与
+   「最终主词已修改」提示、以及 `.word-headword-confirmation-card` /
+   `.word-dialect-detection-row` 整组 CSS 都成了不可达代码，一并删除。
 
 ## 逐文件改动影响清单
 

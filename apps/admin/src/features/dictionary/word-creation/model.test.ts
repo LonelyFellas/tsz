@@ -735,8 +735,11 @@ describe("展示、factory 默认值与边界输入", () => {
     );
 
     expect(wordDisplayHeadword(unifiedWord)).toBe("far");
-    // 检测基准侧(source_dialect)优先，与左栏「当前词条」的排序一致。
+    // 不传偏好时退回 source_dialect（管理员当时输入的那一侧）。
     expect(wordDisplayHeadword(distinguishedWord)).toBe("center");
+    // 传了偏好就按偏好取，与左栏「当前词条」的排序一致。
+    expect(wordDisplayHeadword(distinguishedWord, "uk")).toBe("centre");
+    expect(wordDisplayHeadword(distinguishedWord, "us")).toBe("center");
     expect(
       wordDisplayHeadword({
         ...distinguishedWord,
@@ -744,16 +747,22 @@ describe("展示、factory 默认值与边界输入", () => {
       })
     ).toBe("centre");
     expect(orderedHeadwordSpellings(unifiedHeadwords)).toEqual(["far"]);
+    // 按偏好排，不再按检测基准侧（手测 C5）：缺省偏好是英式。
     expect(orderedHeadwordSpellings(distinguishedHeadwords)).toEqual([
+      "centre",
+      "center"
+    ]);
+    expect(orderedHeadwordSpellings(distinguishedHeadwords, "us")).toEqual([
       "center",
       "centre"
     ]);
+    // source_dialect 不再影响顺序。
     expect(
-      orderedHeadwordSpellings({
-        ...distinguishedHeadwords,
-        source_dialect: "uk"
-      })
-    ).toEqual(["centre", "center"]);
+      orderedHeadwordSpellings(
+        { ...distinguishedHeadwords, source_dialect: "uk" },
+        "us"
+      )
+    ).toEqual(["center", "centre"]);
     expect(dialectHeadword(unifiedHeadwords, "uk")).toBe("far");
     expect(dialectHeadword(distinguishedHeadwords, "uk")).toBe("centre");
     expect(dialectHeadword(distinguishedHeadwords, "us")).toBe("center");

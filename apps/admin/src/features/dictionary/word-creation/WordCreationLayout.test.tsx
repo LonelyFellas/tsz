@@ -74,7 +74,7 @@ describe("WordCreationLayout", () => {
     ).not.toHaveClass("word-creation-shell--basics");
   });
 
-  it("英美区分时检测基准侧排首位并保持主视觉", () => {
+  it("英美区分时偏好侧排首位并保持主视觉，检测基准另行标注", () => {
     const view = renderLayout({
       currentStep: "forms",
       draftHeadwords: {
@@ -90,12 +90,16 @@ describe("WordCreationLayout", () => {
       )
     );
 
+    // 缺省偏好英式：即便本次输入命中的是美式，首行也稳定是英式那一侧。
     expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent("center");
-    expect(rows[0]).toHaveTextContent("美式英语 · AmE · 检测基准");
-    expect(rows[0]!.querySelector("strong")?.textContent).toBe("center");
+    expect(rows[0]).toHaveTextContent("centre");
+    expect(rows[0]).toHaveTextContent("英式英语 · BrE");
+    expect(rows[0]).not.toHaveTextContent("检测基准");
+    expect(rows[0]!.querySelector("strong")?.textContent).toBe("centre");
     expect(rows[0]).not.toHaveClass("word-creation-summary-alt");
-    expect(rows[1]).toHaveTextContent("centre");
+    expect(rows[1]).toHaveTextContent("center");
+    // 「检测基准」跟着真正命中的那一侧走，不再等同于首行。
+    expect(rows[1]).toHaveTextContent("美式英语 · AmE · 检测基准");
     expect(rows[1]).toHaveClass("word-creation-summary-alt");
     expect(rows[1]!.querySelector("strong")).toBeNull();
 
@@ -117,6 +121,7 @@ describe("WordCreationLayout", () => {
     expect(ukRows[0]!.querySelector("strong")?.textContent).toBe("centre");
     expect(ukRows[0]).toHaveTextContent("英式英语 · BrE · 检测基准");
     expect(ukRows[1]).toHaveTextContent("center");
+    expect(ukRows[1]).not.toHaveTextContent("检测基准");
   });
 
   it("顶部摘要在缺少 canonical word 时安全展示空状态或统一草稿主词", () => {
@@ -268,8 +273,8 @@ describe("WordCreationLayout", () => {
     const view = renderLayout({ word, currentStep: "preview", readOnly: true });
 
     expect(screen.getByText("已发布 · 只读")).toBeInTheDocument();
-    // 面包屑与左栏「当前词条」一致，用检测基准侧(此处 source_dialect 为 us)。
-    expect(screen.getByText("center · 预览并生效")).toBeInTheDocument();
+    // 面包屑与左栏「当前词条」一致，用偏好侧(缺省英式)。
+    expect(screen.getByText("centre · 预览并生效")).toBeInTheDocument();
     const summary = view.container.querySelector<HTMLElement>(
       ".word-creation-summary"
     )!;

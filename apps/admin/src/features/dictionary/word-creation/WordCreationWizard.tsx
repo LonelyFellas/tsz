@@ -191,7 +191,7 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
                 ? "美式英语 · AmE"
                 : "Common"}
           </Descriptions.Item>
-          <Descriptions.Item label="确认主词" span={2}>
+          <Descriptions.Item label="词条主词" span={2}>
             {word.headwords.mode === "unified" ? (
               <Tag color="green">{word.headwords.common}</Tag>
             ) : (

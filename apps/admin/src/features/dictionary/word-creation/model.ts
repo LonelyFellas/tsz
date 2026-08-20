@@ -22,6 +22,7 @@ import type {
   WordSenseV2,
   WordSentenceV2
 } from "@tsz/types";
+import { DEFAULT_DIALECT_PREFERENCE } from "@tsz/shared";
 import type { AdminDialectPreference } from "@tsz/shared";
 import {
   emptyWordRichText,
@@ -72,16 +73,32 @@ export function defaultDerivedFormType(
 }
 
 /** 单值展示(面包屑、提交提示)一律用检测基准侧,与左栏「当前词条」的排序一致。 */
-export function wordDisplayHeadword(word: AdminWordV2): string {
-  return word.headwords.mode === "unified"
-    ? word.headwords.common
-    : word.headwords[word.headwords.source_dialect];
+/**
+ * 词条在标题、消息等单行位置的显示拼写：按管理员的方言偏好取那一侧。
+ * 缺省用 `source_dialect`（即管理员当时输入的那一侧），只用于拿不到偏好的场景。
+ */
+export function wordDisplayHeadword(
+  word: AdminWordV2,
+  preference?: AdminDialectPreference
+): string {
+  if (word.headwords.mode === "unified") return word.headwords.common;
+  return word.headwords[preference ?? word.headwords.source_dialect];
 }
 
 /** 并列展示两侧拼写时的顺序:检测基准侧在前,与左栏「当前词条」一致。 */
-export function orderedHeadwordSpellings(headwords: WordHeadwordsV2): string[] {
+/**
+ * 双拼写的展示顺序：**偏好侧在前**。
+ *
+ * 原先按 `source_dialect` 排（管理员输入的那一侧在前），手测 C5 记录了它的后果：
+ * 输入 `center` 却看到 `centre` 排在前面、字号更大，会被读成「主词被静默换掉了」。
+ * 方言改成个人偏好后，排序跟着偏好走才是稳定可预期的。
+ */
+export function orderedHeadwordSpellings(
+  headwords: WordHeadwordsV2,
+  preference: AdminDialectPreference = DEFAULT_DIALECT_PREFERENCE
+): string[] {
   if (headwords.mode === "unified") return [headwords.common];
-  return headwords.source_dialect === "uk"
+  return preference === "uk"
     ? [headwords.uk, headwords.us]
     : [headwords.us, headwords.uk];
 }
