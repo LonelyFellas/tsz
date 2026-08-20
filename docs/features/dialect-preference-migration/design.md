@@ -428,8 +428,10 @@ export function collapseEnglishText(
 - 不需要与 `tsz-rust` 的 OpenAPI 重新对齐；
 - `pnpm --filter @tsz/api-client sync:openapi` 跑出来应当无 diff——这本身就是一条验收项。
 
-需要后端配合的部分**全部是新增能力**，不破坏现有契约。以下三条提案请转达后端，
-落点建议是 `tsz-rust/docs/frontend-integration.md`（**本 PR 不修改 tsz-rust 仓库任何内容**）。
+需要后端配合的部分**全部是新增能力**，不破坏现有契约。三条提案已整理成可直接转交的
+一页纸：[`backend-proposal.md`](./backend-proposal.md)（含现状引用、契约形状、兼容性、
+验收标准与排期建议）。落点建议是 `tsz-rust/docs/frontend-integration.md`
+（**本 PR 不修改 tsz-rust 仓库任何内容**）。下面保留提案要点以便就地对照。
 
 ### 提案 P1（阻塞阶段 6）· 放宽语法结构的方言形状校验
 
