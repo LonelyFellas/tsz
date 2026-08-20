@@ -81,30 +81,17 @@ export function grammarStructureComplete(
   );
 }
 
+/**
+ * 语法结构只维护一份（A1），编辑器里就一个输入框，定位一律指向 `content`；
+ * 区分词条 wire 上的两条镜像变体不再是可分别定位的字段。
+ */
 export function grammarStructureIssueTarget(
   grammar: GrammarStructureV2,
   headwords?: WordHeadwordsV2
 ): MeaningIssueTarget | undefined {
-  const expected = headwords
-    ? headwords.mode === "distinguish"
-      ? (["uk", "us"] as const)
-      : (["common"] as const)
-    : grammar.variants.map((variant) => variant.dialect);
-  for (const dialect of expected) {
-    const variant = grammar.variants.find((item) => item.dialect === dialect);
-    if (!variant || !variant.content.text.trim()) {
-      return { node_id: grammar.id, field: `content.${dialect}` };
-    }
-  }
-  const dialects = new Set(grammar.variants.map((variant) => variant.dialect));
-  if (
-    grammar.variants.length === 0 ||
-    grammar.variants.length !== expected.length ||
-    dialects.size !== expected.length
-  ) {
-    return { node_id: grammar.id, field: "content" };
-  }
-  return undefined;
+  return grammarStructureComplete(grammar, headwords)
+    ? undefined
+    : { node_id: grammar.id, field: "content" };
 }
 
 export function definitionComplete(

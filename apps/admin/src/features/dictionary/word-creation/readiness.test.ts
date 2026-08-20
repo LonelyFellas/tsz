@@ -321,8 +321,9 @@ describe("buildWordReadiness", () => {
     const word = wordFixture({ ready: true });
     const meanings = structuredClone(word.meanings);
     const grammar = meanings.pos[0]!.grammar_structures[0]!;
-    grammar.variants.find((variant) => variant.dialect === "us")!.content.text =
-      "";
+    // 语法结构按偏好侧镜像保存，因此清空偏好侧才算未完成；
+    // 只清非偏好侧会在保存时被镜像覆盖回来，不该报未完成。
+    for (const variant of grammar.variants) variant.content.text = "";
     const sense = meanings.pos[0]!.senses[0]!;
     const content = structuredClone(
       sense.sentences[0]!.en_text
@@ -343,12 +344,28 @@ describe("buildWordReadiness", () => {
 
     expect(row(rows, "grammar_structures").target).toMatchObject({
       node_id: grammar.id,
-      field: "content.us"
+      field: "content"
     });
     expect(row(rows, "senses").target).toMatchObject({
       node_id: definition.id,
       field: "content.common"
     });
+  });
+
+  it("只清空非偏好侧的语法结构不算未完成——保存时会被镜像覆盖回来", () => {
+    const word = wordFixture({ ready: true });
+    const meanings = structuredClone(word.meanings);
+    const grammar = meanings.pos[0]!.grammar_structures[0]!;
+    const other = grammar.variants.find((variant) => variant.dialect === "us");
+    if (!other) throw new Error("fixture should carry a us grammar variant");
+    other.content.text = "";
+
+    expect(
+      row(
+        buildWordReadiness(word, { meanings }, undefined, "uk"),
+        "grammar_structures"
+      ).state
+    ).toBe("complete");
   });
 
   it("语义区间中文名超长时定位中文名", () => {
@@ -382,7 +399,10 @@ describe("buildWordReadiness", () => {
   it("语法方言集合、词频、细分词性和全部释义共同决定完成状态", () => {
     const word = wordFixture({ ready: true });
     const meanings = structuredClone(word.meanings);
-    meanings.pos[0]!.grammar_structures[0]!.variants.pop();
+    // 少一条方言变体不再算未完成——保存时镜像会补齐；清空正文才算。
+    for (const variant of meanings.pos[0]!.grammar_structures[0]!.variants) {
+      variant.content.text = "";
+    }
     const secondSense = meanings.pos[1]!.senses[0]!;
     secondSense.frequency = "abc";
     secondSense.sub_pos = "N-COUNT";

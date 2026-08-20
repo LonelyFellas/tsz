@@ -140,8 +140,9 @@ const CENTER_MEANINGS = {
         {
           id: "grammar-1",
           variants: [
+            // 语法结构 A1 后只维护一份：区分词条 wire 上仍是两条，但互为镜像。
             { id: "grammar-uk", dialect: "uk", content: richText("a centre") },
-            { id: "grammar-us", dialect: "us", content: richText("a center") }
+            { id: "grammar-us", dialect: "us", content: richText("a centre") }
           ]
         }
       ],

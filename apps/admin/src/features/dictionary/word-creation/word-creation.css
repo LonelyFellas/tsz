@@ -1116,13 +1116,13 @@
   margin-top: 6px;
 }
 
-.word-grammar-card .dialect-grid {
-  gap: 10px;
-}
-
-.word-grammar-card .dialect-panel {
+/* 语法结构只维护一份（A1）：单栏面板，不再按方言分色分栏。 */
+.word-grammar-panel {
+  min-width: 0;
   padding: 9px 11px;
+  border: 1px solid #cfe5d8;
   border-radius: 9px;
+  background: #f5faf7;
 }
 
 .word-voice-text-control {

@@ -259,7 +259,7 @@ describe("WordCreationLayout", () => {
       step: "meanings",
       pos_id: word.meanings.pos[0]!.pos_id,
       node_id: word.meanings.pos[0]!.grammar_structures[0]!.id,
-      field: "content.uk"
+      field: "content"
     });
   });
 

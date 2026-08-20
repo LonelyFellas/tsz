@@ -32,6 +32,11 @@ import {
   formDialects,
   legalDerivedFormTypes,
   grammarDialects,
+  countOverwrittenGrammarVariants,
+  mirrorGrammarStructure,
+  mirrorMeaningsGrammar,
+  resolveGrammarText,
+  writeGrammarText,
   hasDialectSplitEnglishText,
   resolveEnglishText,
   toFormsWireContent,
@@ -355,6 +360,100 @@ describe("T09 EnglishText 单份化与 grammar 方言派生", () => {
     });
   });
 
+  it("语法结构读兼容：取偏好侧，统一词条退回 common", () => {
+    const legacy = createGrammar(distinguishedHeadwords);
+    legacy.variants[0]!.content = richText("a centre");
+    legacy.variants[1]!.content = richText("the center");
+    expect(resolveGrammarText(legacy, "uk").text).toBe("a centre");
+    expect(resolveGrammarText(legacy, "us").text).toBe("the center");
+
+    const unified = createGrammar(unifiedHeadwords);
+    unified.variants[0]!.content = richText("the far side");
+    expect(resolveGrammarText(unified, "uk").text).toBe("the far side");
+  });
+
+  it("语法结构写入只改当前口径那一条，形状不变", () => {
+    const legacy = createGrammar(distinguishedHeadwords);
+    legacy.variants[0]!.content = richText("a centre");
+    legacy.variants[1]!.content = richText("the center");
+    const next = writeGrammarText(legacy, "uk", richText("an edited centre"));
+
+    expect(next.variants).toHaveLength(2);
+    expect(next.variants[0]).toMatchObject({
+      id: legacy.variants[0]!.id,
+      dialect: "uk",
+      content: { text: "an edited centre" }
+    });
+    expect(next.variants[1]).toBe(legacy.variants[1]);
+  });
+
+  it("保存镜像：按 headwords 补齐方言变体、复用节点 ID、内容取偏好侧", () => {
+    const legacy = createGrammar(distinguishedHeadwords);
+    legacy.variants[0]!.content = richText("a centre");
+    legacy.variants[1]!.content = richText("the center");
+    const mirrored = mirrorGrammarStructure(
+      legacy,
+      distinguishedHeadwords,
+      "uk"
+    );
+
+    expect(mirrored.variants.map((variant) => variant.id)).toEqual([
+      legacy.variants[0]!.id,
+      legacy.variants[1]!.id
+    ]);
+    expect(
+      mirrored.variants.every((variant) => variant.content.text === "a centre")
+    ).toBe(true);
+
+    // 缺一条方言变体时补齐，不再算作未完成。
+    const missing = { ...legacy, variants: [legacy.variants[0]!] };
+    expect(
+      mirrorGrammarStructure(
+        missing,
+        distinguishedHeadwords,
+        "uk"
+      ).variants.map((variant) => variant.dialect)
+    ).toEqual(["uk", "us"]);
+  });
+
+  it("统计会被镜像覆盖的语法结构：空的或本来就相同的不计入", () => {
+    const same = createGrammar(distinguishedHeadwords);
+    same.variants.forEach((variant) => {
+      variant.content = richText("a centre");
+    });
+    const differs = createGrammar(distinguishedHeadwords);
+    differs.variants[0]!.content = richText("a centre");
+    differs.variants[1]!.content = richText("the center");
+    const emptyOther = createGrammar(distinguishedHeadwords);
+    emptyOther.variants[0]!.content = richText("a centre");
+
+    const content: DraftMeaningsStepContent = {
+      sense_groups: [{ id: "g1", name_zh: "测试", name_en: "Test" }],
+      pos: [
+        {
+          pos_id: "pos-1",
+          grammar_structures: [same, differs, emptyOther],
+          senses: []
+        }
+      ]
+    };
+    expect(
+      countOverwrittenGrammarVariants(content, distinguishedHeadwords, "uk")
+    ).toBe(1);
+    // 统一词条没有第二条变体，永远不会被覆盖。
+    expect(
+      countOverwrittenGrammarVariants(content, unifiedHeadwords, "uk")
+    ).toBe(0);
+  });
+
+  it("整页语法镜像无变化时返回同一引用", () => {
+    const clean: DraftMeaningsStepContent = {
+      sense_groups: [{ id: "g1", name_zh: "测试", name_en: "Test" }],
+      pos: [createPosMeanings("pos-1", unifiedHeadwords, "word-1", "g1")]
+    };
+    expect(mirrorMeaningsGrammar(clean, unifiedHeadwords, "uk")).toBe(clean);
+  });
+
   it("grammar 仅按 headwords 派生 common 或 UK/US，不复用文本 missing 状态", () => {
     const unified = createGrammar(unifiedHeadwords);
     const distinguished = createGrammar(distinguishedHeadwords);
@@ -604,7 +703,11 @@ describe("A1 英文内容读兼容与保存收敛", () => {
   });
 
   it("保存 wire 恒为单份，取偏好侧内容", () => {
-    const wire = toMeaningsWireContent(dialectMeaningContent(), "uk");
+    const wire = toMeaningsWireContent(
+      dialectMeaningContent(),
+      distinguishedHeadwords,
+      "uk"
+    );
     const definition = wire.pos[0]!.senses[0]!.definitions.find(
       (item) => item.id === "definition-ready"
     )!;
@@ -820,6 +923,7 @@ describe("真实后端 wire mapper", () => {
         ],
         pos: [pos]
       },
+      unifiedHeadwords,
       "uk"
     );
     const wireSense = wire.pos[0]!.senses[0]!;

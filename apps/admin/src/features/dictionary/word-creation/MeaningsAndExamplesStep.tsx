@@ -61,10 +61,7 @@ import {
   useState
 } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  DEFINITION_MODE_OPTIONS,
-  DIALECT_SHORT_LABEL
-} from "../editorConstants";
+import { DEFINITION_MODE_OPTIONS } from "../editorConstants";
 import { CEFR_OPTIONS, cefrColor } from "../labels";
 import { env } from "@/lib/env";
 import {
@@ -94,6 +91,7 @@ import {
 import {
   collapseMeaningsEnglishText,
   countDiscardedEnglishTexts,
+  countOverwrittenGrammarVariants,
   createDefinition,
   createEnglishText,
   createGrammar,
@@ -102,10 +100,12 @@ import {
   createSenseGroup,
   createSentence,
   ensureMeaningsForForms,
-  grammarDialects,
+  mirrorMeaningsGrammar,
   resolveEnglishText,
+  resolveGrammarText,
   toMeaningsWireContent,
-  writeEnglishText
+  writeEnglishText,
+  writeGrammarText
 } from "./model";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
@@ -501,7 +501,9 @@ function GrammarEditor({
   readOnly?: boolean;
   onChange: (next: WordPosMeaningsV2["grammar_structures"]) => void;
 }) {
-  const dialects = grammarDialects(headwords);
+  // 语法结构只维护一份（A1）：wire 里对区分词条仍写两条同值镜像，但那是保存时的事，
+  // 编辑器只呈现偏好侧那一份。
+  const { preference } = useDialectPreference();
   const [draggingIndex, setDraggingIndex] = useState<number>();
   const [dragOverIndex, setDragOverIndex] = useState<number>();
   const canReorder = !readOnly && value.length > 1;
@@ -578,120 +580,90 @@ function GrammarEditor({
           >
             {grammarIndex + 1}
           </span>
-          <div className={dialects.length > 1 ? "dialect-grid" : undefined}>
-            {dialects.map((dialect) => {
-              const variant = grammar.variants.find(
-                (item) => item.dialect === dialect
-              );
-              if (!variant) {
-                return (
-                  <div
-                    className={`dialect-panel dialect-panel-${dialect}`}
-                    data-word-node-id={grammar.id}
-                    data-word-field={`content.${dialect}`}
-                    key={dialect}
-                    tabIndex={0}
-                  >
-                    <Alert
-                      type="warning"
-                      showIcon
-                      title={`${DIALECT_SHORT_LABEL[dialect]}语法结构尚未填写`}
-                    />
-                  </div>
-                );
-              }
-              return (
-                <div
-                  className={`dialect-panel dialect-panel-${dialect}`}
-                  key={variant.id}
-                  data-word-node-id={grammar.id}
-                  data-word-field="content"
-                >
-                  <Flex
-                    className="word-dialect-panel-header"
-                    justify="space-between"
-                    align="center"
-                    gap={8}
-                  >
-                    <Typography.Text strong>
-                      {DIALECT_SHORT_LABEL[dialect]}
-                    </Typography.Text>
-                    <VoiceEditorAction
-                      value={variant.content}
-                      contextLabel={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
-                      readOnly={readOnly}
-                      onApply={(content) => {
-                        const grammars = cloneWordValue(value);
-                        const nextVariant = grammars[
-                          grammarIndex
-                        ]!.variants.find((item) => item.id === variant.id)!;
-                        nextVariant.content = content;
-                        onChange(grammars);
-                      }}
-                    />
-                  </Flex>
-                  <div className="word-grammar-text-field">
-                    {env.VOICE_EDITOR ? (
-                      <div
-                        data-word-node-id={grammar.id}
-                        data-word-field={`content.${dialect}`}
-                      >
-                        <VoiceTextControl
-                          value={variant.content}
-                          contextLabel={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
-                          readOnly={readOnly}
-                          showEditorAction={false}
-                          onChange={(content) => {
-                            const grammars = cloneWordValue(value);
-                            const nextVariant = grammars[
-                              grammarIndex
-                            ]!.variants.find((item) => item.id === variant.id)!;
-                            nextVariant.content = content;
-                            onChange(grammars);
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <Input.TextArea
-                        className="word-pronunciation-phonetic-input"
-                        aria-label={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
-                        data-word-node-id={grammar.id}
-                        data-word-field={`content.${dialect}`}
-                        value={variant.content.text}
-                        readOnly={readOnly}
-                        placeholder="例如 a centre / the centre"
-                        autoSize={{ minRows: 2, maxRows: 6 }}
-                        onChange={(event) => {
-                          const grammars = cloneWordValue(value);
-                          const nextVariant = grammars[
-                            grammarIndex
-                          ]!.variants.find((item) => item.id === variant.id)!;
-                          nextVariant.content = toWordRichText(
-                            event.target.value,
-                            nextVariant.content
-                          );
-                          onChange(grammars);
-                        }}
-                      />
-                    )}
-                  </div>
-                  <Flex
-                    className="word-grammar-voice-toolbar"
-                    justify="space-between"
-                    align="center"
-                    gap={8}
-                  >
-                    <PronunciationPreviewControls
-                      pronunciationId={variant.id}
-                      content={toRichTextV2(variant.content)}
-                      dialect={dialect}
-                      ariaLabelPrefix={`${DIALECT_SHORT_LABEL[dialect]}语法结构 ${grammarIndex + 1}`}
-                      disabled={readOnly}
-                    />
-                  </Flex>
-                </div>
-              );
-            })}
+          <div
+            className="word-grammar-panel"
+            data-word-node-id={grammar.id}
+            data-word-field="content"
+          >
+            <Flex
+              className="word-dialect-panel-header"
+              justify="flex-end"
+              align="center"
+              gap={8}
+            >
+              <VoiceEditorAction
+                value={resolveGrammarText(grammar, preference)}
+                contextLabel={`语法结构 ${grammarIndex + 1}`}
+                readOnly={readOnly}
+                onApply={(content) =>
+                  onChange(
+                    value.map((item, index) =>
+                      index === grammarIndex
+                        ? writeGrammarText(item, preference, content)
+                        : item
+                    )
+                  )
+                }
+              />
+            </Flex>
+            <div className="word-grammar-text-field">
+              {env.VOICE_EDITOR ? (
+                <VoiceTextControl
+                  value={resolveGrammarText(grammar, preference)}
+                  contextLabel={`语法结构 ${grammarIndex + 1}`}
+                  readOnly={readOnly}
+                  showEditorAction={false}
+                  onChange={(content) =>
+                    onChange(
+                      value.map((item, index) =>
+                        index === grammarIndex
+                          ? writeGrammarText(item, preference, content)
+                          : item
+                      )
+                    )
+                  }
+                />
+              ) : (
+                <Input.TextArea
+                  className="word-pronunciation-phonetic-input"
+                  aria-label={`语法结构 ${grammarIndex + 1}`}
+                  value={resolveGrammarText(grammar, preference).text}
+                  readOnly={readOnly}
+                  placeholder="例如 a centre / the centre"
+                  autoSize={{ minRows: 2, maxRows: 6 }}
+                  onChange={(event) =>
+                    onChange(
+                      value.map((item, index) =>
+                        index === grammarIndex
+                          ? writeGrammarText(
+                              item,
+                              preference,
+                              toWordRichText(
+                                event.target.value,
+                                resolveGrammarText(item, preference)
+                              )
+                            )
+                          : item
+                      )
+                    )
+                  }
+                />
+              )}
+            </div>
+            <Flex
+              className="word-grammar-voice-toolbar"
+              justify="space-between"
+              align="center"
+              gap={8}
+            >
+              <PronunciationPreviewControls
+                pronunciationId={grammar.id}
+                content={toRichTextV2(resolveGrammarText(grammar, preference))}
+                dialect={preference}
+                ariaLabelPrefix={`语法结构 ${grammarIndex + 1}`}
+                disabled={readOnly}
+              />
+            </Flex>
           </div>
           {!readOnly && (
             <Space orientation="vertical" size={2}>
@@ -2004,7 +1976,7 @@ export function MeaningsAndExamplesStep({
       const { word: savedWord } = await saveMeanings.mutateAsync({
         base_revision: word.revision,
         intent,
-        content: toMeaningsWireContent(content, preference)
+        content: toMeaningsWireContent(content, word.headwords, preference)
       });
       setDirty(false);
       onSaved(savedWord);
@@ -2054,15 +2026,12 @@ export function MeaningsAndExamplesStep({
     if (saving || collapsePending) return;
     if (intent === "complete") {
       // 按「保存后会变成什么样」校验：英文内容收敛后只剩偏好侧那一份。
-      const issues = validateMeanings(
-        collapseMeaningsEnglishText(content, preference),
-        {
-          word_id: word.id,
-          headwords: word.headwords,
-          forms: word.forms,
-          partOfSpeechLookup
-        }
-      );
+      const issues = validateMeanings(normalizedContent, {
+        word_id: word.id,
+        headwords: word.headwords,
+        forms: word.forms,
+        partOfSpeechLookup
+      });
       setValidationMessages(issues);
       if (issues.length > 0) {
         message.warning(`还有 ${issues.length} 项需要完善`);
@@ -2077,7 +2046,7 @@ export function MeaningsAndExamplesStep({
     setCollapsePending(true);
     modal.confirm({
       title: "保存后这条词条只保留一份英文内容",
-      content: `${OTHER_DIALECT_LABEL[preference]}的 ${discardedItems} 将不再保留，${DIALECT_PREFERENCE_LABEL[preference]}内容成为唯一内容。语法结构不受影响。`,
+      content: `${OTHER_DIALECT_LABEL[preference]}的 ${discardedItems} 将不再保留，${DIALECT_PREFERENCE_LABEL[preference]}内容成为唯一内容。`,
       okText: "确认保存",
       okButtonProps: { danger: true },
       cancelText: "取消",
@@ -2097,11 +2066,36 @@ export function MeaningsAndExamplesStep({
   // 存量双份英文内容：进来时给一条说明，保存前再确认一次要丢弃哪些，绝不静默截断。
   // 判据是「确实有内容会被丢弃」而不是「wire 形状是不是 distinguish」——
   // 只填了单侧的旧草稿收敛时无物可丢，再提示「留着两份内容」只会让人去找不存在的那一份。
+  // 保存出去的形状：英文收敛为单份 + 语法结构按偏好侧镜像。
+  // 校验、完成度与词性 Tab 的待修项计数都必须基于它，否则会出现
+  // 「Tab 上挂着一个消不掉的红点，但完成校验又说没问题」这种自相矛盾。
+  const normalizedContent = useMemo(
+    () =>
+      mirrorMeaningsGrammar(
+        collapseMeaningsEnglishText(content, preference),
+        word.headwords,
+        preference
+      ),
+    [content, preference, word.headwords]
+  );
   const discarded = countDiscardedEnglishTexts(content, preference);
-  const discardedTotal = discarded.definitions + discarded.sentences;
+  // 语法结构保存时按偏好侧镜像写两条，非偏好侧写过的不同文本会被覆盖——
+  // 这同样是丢数据，必须一起说清楚，不能宣称「语法结构不受影响」。
+  //
+  // 注意这里数的是**载入时**的服务端副本而不是正在编辑的 content：编辑只写偏好侧那一条，
+  // 非偏好侧留着上一次的镜像值，拿 content 去比会把「你自己刚改的字」误判成
+  // 「即将被覆盖的美式内容」，于是每改一个字都弹一次确认框。
+  const overwrittenGrammar = countOverwrittenGrammarVariants(
+    word.meanings,
+    word.headwords,
+    preference
+  );
+  const discardedTotal =
+    discarded.definitions + discarded.sentences + overwrittenGrammar;
   const discardedItems = [
     discarded.definitions > 0 ? `英文释义 ${discarded.definitions} 条` : "",
-    discarded.sentences > 0 ? `英文例句 ${discarded.sentences} 条` : ""
+    discarded.sentences > 0 ? `英文例句 ${discarded.sentences} 条` : "",
+    overwrittenGrammar > 0 ? `语法结构 ${overwrittenGrammar} 条` : ""
   ]
     .filter(Boolean)
     .join("、");
@@ -2112,7 +2106,7 @@ export function MeaningsAndExamplesStep({
       ? partOfSpeechLabel(partOfSpeechLookup, formPos.pos)
       : "未知词性";
     const issueCount = countPosMeaningIssues(
-      posMeanings,
+      normalizedContent.pos[posIndex] ?? posMeanings,
       new Set(content.sense_groups.map((group) => group.id))
     );
     return {

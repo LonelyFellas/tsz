@@ -86,9 +86,10 @@ describe("meanings and examples validation", () => {
     grammar.variants = grammar.variants.filter(
       (variant) => variant.dialect !== "us"
     );
+    // 语法结构只有一个输入框，定位一律指向 content。
     expect(grammarStructureIssueTarget(grammar, word.headwords)).toEqual({
       node_id: grammar.id,
-      field: "content.us"
+      field: "content"
     });
     grammar.variants.push(usGrammar);
     grammar.variants.push({ ...usGrammar, id: "duplicate-us" });

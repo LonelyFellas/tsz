@@ -571,15 +571,16 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.getByLabelText("第 1 个语法结构")).toHaveTextContent("1");
     expect(screen.queryByText("结构 1")).toBeNull();
     expect(screen.queryByText("英美文本独立维护")).toBeNull();
-    expect(screen.getAllByText("英式").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("美式").length).toBeGreaterThan(0);
+    // 第 3 步不再出现任何方言字样：语法结构只有一份输入与一组语音控件。
+    expect(screen.queryByText("英式")).toBeNull();
+    expect(screen.queryByText("美式")).toBeNull();
     expect(screen.queryByText("英式英语")).toBeNull();
     expect(screen.queryByText("美式英语")).toBeNull();
-    expect(screen.getByLabelText("英式语法结构 1 播放语音")).toBeDisabled();
-    expect(screen.getByLabelText("英式语法结构 1 获取语音")).toBeDisabled();
-    expect(screen.queryByLabelText("英式语法结构 1 上传语音")).toBeNull();
-    expect(screen.getByLabelText("美式语法结构 1 获取语音")).toBeDisabled();
-    expect(screen.queryByLabelText("美式语法结构 1 上传语音")).toBeNull();
+    expect(screen.getByLabelText("语法结构 1 播放语音")).toBeDisabled();
+    expect(screen.getByLabelText("语法结构 1 获取语音")).toBeDisabled();
+    expect(screen.queryByLabelText("语法结构 1 上传语音")).toBeNull();
+    expect(screen.queryByLabelText("英式语法结构 1")).toBeNull();
+    expect(screen.queryByLabelText("美式语法结构 1")).toBeNull();
     expect(screen.getByLabelText("拖动语法结构 1")).toBeDisabled();
     expect(screen.queryByLabelText("上移语法结构 1")).toBeNull();
     expect(screen.queryByLabelText("下移语法结构 1")).toBeNull();
@@ -615,20 +616,28 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("语法结构 1", { exact: true })).toBeNull();
   });
 
-  it("偏好切到美式后，绑定语法结构下拉改用美式那一份文案", () => {
-    dialectPreference.value = "us";
-    const word = wordFixture({ ready: true });
-    const meanings = word.meanings.pos[0]!;
-    meanings.senses[0]!.definitions[0]!.grammar_structure_id =
-      meanings.grammar_structures[0]!.id;
-    renderStep(word);
+  it("存量两侧文本不同的语法结构按偏好侧呈现，切偏好即换那一份", () => {
+    const build = () => {
+      const word = wordFixture({ ready: true });
+      const meanings = word.meanings.pos[0]!;
+      // 存量（A1 改造前）：英美两侧各写各的，不是镜像。
+      for (const variant of meanings.grammar_structures[0]!.variants) {
+        variant.content = richTextOf(
+          variant.dialect === "uk" ? "a centre" : "the center"
+        );
+      }
+      meanings.senses[0]!.definitions[0]!.grammar_structure_id =
+        meanings.grammar_structures[0]!.id;
+      return word;
+    };
 
-    const binding = screen.getAllByLabelText("绑定语法结构")[0]!;
-    expect(
-      within(binding.closest(".ant-select") as HTMLElement).getByText(
-        "the center"
-      )
-    ).toBeInTheDocument();
+    const { unmount } = renderStep(build());
+    expect(screen.getByLabelText("语法结构 1")).toHaveValue("a centre");
+    unmount();
+
+    dialectPreference.value = "us";
+    renderStep(build());
+    expect(screen.getByLabelText("语法结构 1")).toHaveValue("the center");
   });
 
   it("存量双份英文内容只显示偏好侧一份，编辑同步词义头部并保留该侧节点 ID", async () => {
@@ -677,7 +686,7 @@ describe("MeaningsAndExamplesStep", () => {
     expect(
       (
         await screen.findAllByText(
-          "美式的 英文释义 1 条 将不再保留，英式内容成为唯一内容。语法结构不受影响。"
+          "美式的 英文释义 1 条 将不再保留，英式内容成为唯一内容。"
         )
       ).length
     ).toBeGreaterThan(0);
@@ -729,6 +738,85 @@ describe("MeaningsAndExamplesStep", () => {
     await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
   });
 
+  it("存量两侧语法文本不同时，确认框把语法结构一并计入将丢弃的内容", async () => {
+    const word = wordFixture({ ready: true });
+    for (const variant of word.meanings.pos[0]!.grammar_structures[0]!
+      .variants) {
+      variant.content = richTextOf(
+        variant.dialect === "uk" ? "a centre" : "the center"
+      );
+    }
+    renderStep(word);
+
+    expect(
+      screen.getByText("这条词条还留着旧版的美式英文内容")
+    ).toBeInTheDocument();
+    fireEvent.click(button("保存草稿"));
+    expect(
+      (
+        await screen.findAllByText(
+          "美式的 语法结构 1 条 将不再保留，英式内容成为唯一内容。"
+        )
+      ).length
+    ).toBeGreaterThan(0);
+
+    fireEvent.click(button("确认保存"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    // 镜像写两条同值，节点 ID 复用原有的，不每次保存换新节点。
+    const grammar =
+      mutations.save.mock.calls[0]![0].content.pos[0].grammar_structures[0];
+    expect(grammar.variants.map((v: { dialect: string }) => v.dialect)).toEqual(
+      ["uk", "us"]
+    );
+    expect(
+      grammar.variants.every(
+        (v: { content: { text: string } }) => v.content.text === "a centre"
+      )
+    ).toBe(true);
+  });
+
+  it("编辑镜像语法结构不会被误判成「即将覆盖美式内容」而反复弹确认框", async () => {
+    renderStep();
+
+    fireEvent.change(screen.getAllByLabelText("语法结构 1")[0]!, {
+      target: { value: "an edited centre" }
+    });
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(
+      screen.queryAllByText("保存后这条词条只保留一份英文内容")
+    ).toHaveLength(0);
+  });
+
+  it("存量单侧内容不会在词性 Tab 上挂一个消不掉的待修项", () => {
+    const word = wordFixture({ ready: true });
+    const sense = word.meanings.pos[0]!.senses[0]!;
+    // 存量：例句只填了偏好侧，另一侧从未填过。
+    sense.sentences[0]!.en_text = {
+      mode: "distinguish",
+      source_dialect: "uk",
+      uk: {
+        state: "ready",
+        variant: {
+          id: "legacy-sentence-uk",
+          value: richTextOf("British only"),
+          origin: "manual"
+        }
+      },
+      us: { state: "missing" }
+    };
+    // 语法结构同理：非偏好侧为空，保存时会被镜像补齐。
+    const grammar = word.meanings.pos[0]!.grammar_structures[0]!;
+    grammar.variants.find((variant) => variant.dialect === "us")!.content =
+      richTextOf("");
+    renderStep(word);
+
+    // 待修项计数按「保存后会变成什么样」算：这两处收敛后都是完整的，
+    // 计数为 0 时 antd Badge 整个不渲染，因此断言它压根不出现。
+    expect(screen.queryAllByTitle("该词性待修项")).toHaveLength(0);
+  });
+
   it("取消收敛确认时不发保存请求，也不改动任何数据", async () => {
     renderStep(legacySplitWord());
 
@@ -768,7 +856,7 @@ describe("MeaningsAndExamplesStep", () => {
       "a record";
     renderStep(word);
 
-    const generate = screen.getByLabelText("英式语法结构 1 获取语音");
+    const generate = screen.getByLabelText("语法结构 1 获取语音");
     await waitFor(() => expect(generate).toBeEnabled());
     fireEvent.click(generate);
 
@@ -782,7 +870,7 @@ describe("MeaningsAndExamplesStep", () => {
         expect.objectContaining({ signal: expect.any(AbortSignal) })
       )
     );
-    expect(screen.queryByLabelText("英式语法结构 1 上传语音")).toBeNull();
+    expect(screen.queryByLabelText("语法结构 1 上传语音")).toBeNull();
     expect(screen.queryByText(/Mock/)).toBeNull();
   });
 
@@ -802,16 +890,12 @@ describe("MeaningsAndExamplesStep", () => {
     fireEvent.keyDown(screen.getByLabelText("拖动语法结构 2"), {
       key: "ArrowUp"
     });
-    expect(screen.getByLabelText("英式语法结构 1")).toHaveValue(
-      "second grammar"
-    );
+    expect(screen.getByLabelText("语法结构 1")).toHaveValue("second grammar");
 
     fireEvent.keyDown(screen.getByLabelText("拖动语法结构 1"), {
       key: "ArrowDown"
     });
-    expect(screen.getByLabelText("英式语法结构 2")).toHaveValue(
-      "second grammar"
-    );
+    expect(screen.getByLabelText("语法结构 2")).toHaveValue("second grammar");
     fireEvent.keyDown(screen.getByLabelText("拖动语法结构 1"), {
       key: "Enter"
     });
@@ -868,8 +952,8 @@ describe("MeaningsAndExamplesStep", () => {
     });
     fireEvent.dragLeave(target);
 
-    expect(screen.getByLabelText("英式语法结构 1")).toBeInTheDocument();
-    expect(screen.getByLabelText("英式语法结构 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("语法结构 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("语法结构 2")).toBeInTheDocument();
   });
 
   it("多维释义和多维例句使用拖动手柄排序", () => {
@@ -1528,11 +1612,8 @@ describe("MeaningsAndExamplesStep", () => {
   it("可组合编辑语法、释义、例句、上下文关联与语义区间", async () => {
     renderStep();
 
-    fireEvent.change(screen.getAllByLabelText("英式语法结构 1")[0]!, {
+    fireEvent.change(screen.getAllByLabelText("语法结构 1")[0]!, {
       target: { value: "an edited centre" }
-    });
-    fireEvent.change(screen.getAllByLabelText("美式语法结构 1")[0]!, {
-      target: { value: "an edited center" }
     });
     fireEvent.click(enabledButton("添加语法结构"));
     const sourceHandle = await screen.findByLabelText("拖动语法结构 2");
@@ -1664,8 +1745,8 @@ describe("MeaningsAndExamplesStep", () => {
 
     expect(screen.getAllByLabelText("英语文本").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("中文释义")[0]).toHaveAttribute("readonly");
-    expect(screen.getByLabelText("默认语法结构 1 获取语音")).toBeDisabled();
-    expect(screen.queryByLabelText("默认语法结构 1 上传语音")).toBeNull();
+    expect(screen.getByLabelText("语法结构 1 获取语音")).toBeDisabled();
+    expect(screen.queryByLabelText("语法结构 1 上传语音")).toBeNull();
     expect(screen.queryByText("添加语法结构")).toBeNull();
     expect(screen.queryByText("添加词义")).toBeNull();
     expect(screen.queryByText("保存草稿")).toBeNull();
@@ -1750,7 +1831,7 @@ describe("MeaningsAndExamplesStep", () => {
           .closest(".word-voice-text-control")
           ?.querySelector('button[aria-label$="高级语音编辑"]') ??
         field
-          .closest(".dialect-panel")
+          .closest(".word-grammar-panel")
           ?.querySelector('button[aria-label$="高级语音编辑"]');
       if (!editButton) throw new Error(`edit button not found: ${text}`);
       expect(editButton).toHaveClass("word-voice-editor-action");

@@ -349,6 +349,138 @@ export function createGrammar(headwords: WordHeadwordsV2): GrammarStructureV2 {
   };
 }
 
+/**
+ * 读兼容：语法结构按当前口径取那一份文本。统一词条只有 `common` 一条，
+ * 存量区分词条取偏好侧，都取不到时退回第一条，绝不返回 undefined。
+ */
+export function resolveGrammarText(
+  grammar: GrammarStructureV2,
+  preference: AdminDialectPreference
+): RichText {
+  const variant =
+    grammar.variants.find((item) => item.dialect === preference) ??
+    grammar.variants.find((item) => item.dialect === "common") ??
+    grammar.variants[0];
+  return variant?.content ?? emptyWordRichText();
+}
+
+/**
+ * 写：单份输入回写到当前口径那一条，**不改变 wire 形状**——与英文内容同一套节奏，
+ * 镜像推迟到保存前，好让「另一侧会被覆盖」的确认框还数得出来。
+ */
+export function writeGrammarText(
+  grammar: GrammarStructureV2,
+  preference: AdminDialectPreference,
+  content: RichText
+): GrammarStructureV2 {
+  const target =
+    grammar.variants.find((item) => item.dialect === preference) ??
+    grammar.variants.find((item) => item.dialect === "common") ??
+    grammar.variants[0];
+  if (!target) {
+    return {
+      ...grammar,
+      variants: [{ id: newWordNodeId(), dialect: "common", content }]
+    };
+  }
+  return {
+    ...grammar,
+    variants: grammar.variants.map((item) =>
+      item.id === target.id ? { ...item, content } : item
+    )
+  };
+}
+
+/**
+ * 保存前把语法结构规整成后端要求的方言形状，内容一律取偏好侧那一份。
+ *
+ * TODO(dialect-preference-migration 阶段 6): 后端提案 P1（放宽 distinguish 词条的
+ * 语法结构方言校验）落地后，这里改为恒写一条 `common`，镜像逻辑连同本函数一起删掉。
+ * 现在后端强制 `distinguish ⇒ 恰好 uk + us 两条`，前端只能写两条同值镜像。
+ */
+export function mirrorGrammarStructure(
+  grammar: GrammarStructureV2,
+  headwords: WordHeadwordsV2,
+  preference: AdminDialectPreference
+): GrammarStructureV2 {
+  const content = resolveGrammarText(grammar, preference);
+  return {
+    ...grammar,
+    variants: grammarDialects(headwords).map((dialect) => {
+      // 复用该方言已有的节点 ID，别每次保存都换一个新节点。
+      const existing = grammar.variants.find(
+        (item) => item.dialect === dialect
+      );
+      return {
+        id: existing?.id ?? newWordNodeId(),
+        dialect,
+        content
+      };
+    })
+  };
+}
+
+/**
+ * 统计保存镜像时会被偏好侧覆盖掉的语法结构条数：只有非偏好侧确实写过、
+ * 且与偏好侧不同的才算，空的或本来就一样的不打扰管理员。
+ */
+export function countOverwrittenGrammarVariants(
+  content: DraftMeaningsStepContent,
+  headwords: WordHeadwordsV2,
+  preference: AdminDialectPreference
+): number {
+  if (headwords.mode !== "distinguish") return 0;
+  const other = preference === "uk" ? "us" : "uk";
+  let count = 0;
+  for (const pos of content.pos) {
+    for (const grammar of pos.grammar_structures) {
+      const kept = resolveGrammarText(grammar, preference).text;
+      const dropped = grammar.variants.find((item) => item.dialect === other);
+      if (!dropped) continue;
+      if (dropped.content.text.trim() && dropped.content.text !== kept) {
+        count += 1;
+      }
+    }
+  }
+  return count;
+}
+
+/**
+ * 把整页语法结构规整为保存形状。没有任何变化时返回同一个引用，
+ * 让 readiness 这类每次渲染都会调用的路径不产生多余分配。
+ */
+export function mirrorMeaningsGrammar(
+  content: DraftMeaningsStepContent,
+  headwords: WordHeadwordsV2,
+  preference: AdminDialectPreference
+): DraftMeaningsStepContent {
+  const pos = content.pos.map((entry) => {
+    const grammar_structures = entry.grammar_structures.map((grammar) => {
+      const next = mirrorGrammarStructure(grammar, headwords, preference);
+      const same =
+        next.variants.length === grammar.variants.length &&
+        next.variants.every((variant, index) => {
+          const original = grammar.variants[index];
+          return (
+            original !== undefined &&
+            original.id === variant.id &&
+            original.dialect === variant.dialect &&
+            original.content === variant.content
+          );
+        });
+      return same ? grammar : next;
+    });
+    return grammar_structures.every(
+      (grammar, index) => grammar === entry.grammar_structures[index]
+    )
+      ? entry
+      : { ...entry, grammar_structures };
+  });
+  return pos.every((entry, index) => entry === content.pos[index])
+    ? content
+    : { ...content, pos };
+}
+
 export function createDefinition(): WordDefinitionV2 {
   return {
     id: newWordNodeId(),
@@ -520,6 +652,7 @@ export function toFormsWireContent(
  */
 export function toMeaningsWireContent(
   content: DraftMeaningsStepContent,
+  headwords: WordHeadwordsV2,
   preference: AdminDialectPreference
 ): DraftMeaningsStepContent {
   return {
@@ -530,14 +663,17 @@ export function toMeaningsWireContent(
     })),
     pos: content.pos.map((pos) => ({
       pos_id: pos.pos_id,
-      grammar_structures: pos.grammar_structures.map((grammar) => ({
-        id: grammar.id,
-        variants: grammar.variants.map((variant) => ({
-          id: variant.id,
-          dialect: variant.dialect,
-          content: variant.content
-        }))
-      })),
+      grammar_structures: pos.grammar_structures.map((grammar) => {
+        const mirrored = mirrorGrammarStructure(grammar, headwords, preference);
+        return {
+          id: mirrored.id,
+          variants: mirrored.variants.map((variant) => ({
+            id: variant.id,
+            dialect: variant.dialect,
+            content: variant.content
+          }))
+        };
+      }),
       senses: pos.senses.map((sense) => ({
         id: sense.id,
         sub_pos: sense.sub_pos,
