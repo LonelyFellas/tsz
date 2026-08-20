@@ -2703,6 +2703,19 @@ export function FormsAndPronunciationStep({
             style={{ marginBottom: 16 }}
           />
         )}
+        {content.pos.length === 0 && (
+          <Alert
+            type="info"
+            showIcon
+            title="当前还没有基本词性"
+            description={
+              readOnly
+                ? "该词条没有记录任何基本词性。"
+                : "内置词典未命中或没有带回建议词性时，本步骤从空白开始。请用右上角的「添加基本词性」添加第一个词性，再逐个补录词形、字典音标与实际发音。"
+            }
+            style={{ marginBottom: 16 }}
+          />
+        )}
         <PronunciationPreviewProvider readOnly={readOnly}>
           <div data-word-node-id="forms" data-word-field="pos">
             <Tabs

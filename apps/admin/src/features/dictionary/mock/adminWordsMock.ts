@@ -405,6 +405,26 @@ function displayHeadword(word: MockWord): string {
   return word.headwords[word.headwords.source_dialect];
 }
 
+/**
+ * 列表行的词汇列：真实后端用 `string_agg` 把并列拼写拼成一个字符串下发，
+ * 顺序为 `common` → 检测基准侧 → 另一侧。mock 必须同构，否则开 mock 时看到的
+ * 词汇列与真实后端不一致。注意这与 `displayHeadword` 不同——后者取单个主词，
+ * 用于搜索匹配与例句文案，不能混用。
+ */
+function listHeadword(word: MockWord): string {
+  if (word.headwords.mode === "unified") return word.headwords.common;
+  const { source_dialect } = word.headwords;
+  const other = source_dialect === "uk" ? "us" : "uk";
+  return `${word.headwords[source_dialect]} / ${word.headwords[other]}`;
+}
+
+/** 与 `listHeadword` 同序，供列表行的方言列使用。 */
+function listDialects(word: MockWord): AdminWordListItem["dialects"] {
+  if (word.headwords.mode === "unified") return ["common"];
+  const { source_dialect } = word.headwords;
+  return [source_dialect, source_dialect === "uk" ? "us" : "uk"];
+}
+
 function allHeadwords(word: MockWord): Array<{
   value: string;
   dialect: "uk" | "us" | "common";
@@ -2769,14 +2789,19 @@ export function createAdminWordsMock({
     const gloss = query.gloss?.trim().toLocaleLowerCase() ?? "";
     const items: AdminWordListItem[] = Object.values(current.words)
       .filter((word) => {
-        const headword = displayHeadword(word).toLocaleLowerCase("en");
+        // 两侧拼写都要能搜到：列表词汇列展示的是并列拼写，只匹配基准侧会让
+        // 管理员搜自己眼前看得见的另一侧拼写却搜不到。真实后端对词头键表匹配，
+        // 两侧同样都能命中。
+        const headwords = allHeadwords(word).map((item) =>
+          item.value.toLocaleLowerCase("en")
+        );
         const createdBy =
           word.created_by === profile.id
             ? profile.display_name
             : word.created_by;
         if (
           q &&
-          !headword.includes(q) &&
+          !headwords.some((headword) => headword.includes(q)) &&
           !createdBy.toLocaleLowerCase().includes(q)
         )
           return false;
@@ -2797,11 +2822,12 @@ export function createAdminWordsMock({
       .map((word) => ({
         schema_version: 2 as const,
         id: word.id,
-        headword: displayHeadword(word),
+        headword: listHeadword(word),
         kind: word.kind,
-        dialects: (word.headwords.mode === "unified"
-          ? ["common"]
-          : ["uk", "us"]) as AdminWordListItem["dialects"],
+        dialects: listDialects(word),
+        ...(word.headwords.mode === "distinguish"
+          ? { source_dialect: word.headwords.source_dialect }
+          : {}),
         gloss: wordGloss(word),
         pos_list: wordPos(word),
         levels: wordLevels(word),
@@ -3068,8 +3094,8 @@ export function createAdminWordsMock({
         detection.matched_dialect,
         input.headwords
       );
-    const unmatchedPhrase =
-      detection.entry_kind === "phrase" &&
+    // 未命中内置词典时按管理员原输入建 unified 词条,单词与短语同一条路径。
+    const unmatchedDictionary =
       detection.builtin_dictionary.status === "not_found" &&
       input.headwords.mode === "unified" &&
       normalizeFixtureHeadword(input.headwords.common).key ===
@@ -3077,7 +3103,7 @@ export function createAdminWordsMock({
     if (
       (surfaceWarnings === "legacy" &&
         detection.smart_dictionary.status !== "clear") ||
-      (!dictionaryMatched && !unmatchedPhrase)
+      (!dictionaryMatched && !unmatchedDictionary)
     ) {
       const code =
         detection.smart_dictionary.status === "duplicate"

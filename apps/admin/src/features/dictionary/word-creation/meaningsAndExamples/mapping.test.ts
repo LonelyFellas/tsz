@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { createPartOfSpeechLookup } from "../../part-of-speech/catalog";
+import { partOfSpeechCatalogFixture } from "../partOfSpeech.test.helper";
 import { wordFixture } from "../wordCreation.test.helper";
 import {
+  applySoleSubPartOfSpeech,
   collectPronunciationHints,
   countSenseReferences,
   meaningsPosOwnsNode,
@@ -110,5 +113,42 @@ describe("meanings and examples mapping", () => {
       expect.objectContaining({ id: "other-relation" })
     ]);
     expect(content.pos[0]!.senses).toHaveLength(2);
+  });
+
+  it("基本词性只有一个细分项时回填空值，已有取值与多选项场景保持原样", () => {
+    const lookup = createPartOfSpeechLookup(partOfSpeechCatalogFixture);
+    // far = 形容词 + 副词，两者在目录里都只配置了一个细分项。
+    const word = wordFixture({ headword: "far" });
+    word.meanings.pos[1]!.senses[0]!.sub_pos = "V-T";
+
+    const filled = applySoleSubPartOfSpeech(word.meanings, word.forms, lookup);
+
+    expect(filled.pos[0]!.senses[0]!.sub_pos).toBe("ADJ");
+    // 与当前基本词性不符的存量编码不被改写，留给校验拒绝保存。
+    expect(filled.pos[1]!.senses[0]!.sub_pos).toBe("V-T");
+    expect(word.meanings.pos[0]!.senses[0]!.sub_pos).toBe("");
+    // 已无可回填项时返回同一引用，effect 才能收敛。
+    expect(applySoleSubPartOfSpeech(filled, word.forms, lookup)).toBe(filled);
+  });
+
+  it("细分项多于一个、词性未知或目录不可用时都不回填", () => {
+    const lookup = createPartOfSpeechLookup(partOfSpeechCatalogFixture);
+    // center = 名词 + 动词，两者各有多个细分项。
+    const multi = wordFixture();
+    expect(applySoleSubPartOfSpeech(multi.meanings, multi.forms, lookup)).toBe(
+      multi.meanings
+    );
+
+    const sole = wordFixture({ headword: "far" });
+    expect(applySoleSubPartOfSpeech(sole.meanings, { pos: [] }, lookup)).toBe(
+      sole.meanings
+    );
+    expect(
+      applySoleSubPartOfSpeech(
+        sole.meanings,
+        sole.forms,
+        createPartOfSpeechLookup(undefined)
+      )
+    ).toBe(sole.meanings);
   });
 });

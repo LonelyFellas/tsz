@@ -115,6 +115,7 @@ import {
   useWordValidationIssueFocus
 } from "./useWordValidationIssueFocus";
 import {
+  applySoleSubPartOfSpeech,
   collectPronunciationHints,
   countSenseReferences,
   meaningsPosOwnsNode,
@@ -1562,6 +1563,14 @@ function SenseEditor({
     if (forceOpen) setExpanded(true);
   }, [forceOpen]);
 
+  // 只有一个可选细分项时选择器没有决策价值：改为只读展示，取值由上层回填。
+  // 存量取值与该唯一项不符时仍保留选择器，让管理员能把非法编码改回来。
+  const onlyOption = subPosOptions.length === 1 ? subPosOptions[0]! : undefined;
+  const soleSubPos =
+    onlyOption && (!value.sub_pos || value.sub_pos === onlyOption.value)
+      ? onlyOption
+      : undefined;
+
   const definitionSorting = useSortableRows({
     items: value.definitions,
     scopeId: `${value.id}:definitions`,
@@ -1690,16 +1699,26 @@ function SenseEditor({
                 </div>
                 <div className="word-sense-field word-sense-field-pos">
                   <Typography.Text type="secondary">细分词性</Typography.Text>
-                  <Select
-                    aria-label="细分词性"
-                    data-word-node-id={value.id}
-                    data-word-field="sub_pos"
-                    value={value.sub_pos || undefined}
-                    options={subPosOptions}
-                    disabled={readOnly || catalogUnavailable}
-                    style={{ width: "100%", marginTop: 6 }}
-                    onChange={(sub_pos) => onChange({ ...value, sub_pos })}
-                  />
+                  {soleSubPos ? (
+                    <div
+                      className="word-sense-fixed-value"
+                      data-word-node-id={value.id}
+                      data-word-field="sub_pos"
+                    >
+                      <Tag>{soleSubPos.label}</Tag>
+                    </div>
+                  ) : (
+                    <Select
+                      aria-label="细分词性"
+                      data-word-node-id={value.id}
+                      data-word-field="sub_pos"
+                      value={value.sub_pos || undefined}
+                      options={subPosOptions}
+                      disabled={readOnly || catalogUnavailable}
+                      style={{ width: "100%", marginTop: 6 }}
+                      onChange={(sub_pos) => onChange({ ...value, sub_pos })}
+                    />
+                  )}
                 </div>
                 <div className="word-sense-field word-sense-field-frequency">
                   <Typography.Text type="secondary">词频</Typography.Text>
@@ -1919,6 +1938,22 @@ export function MeaningsAndExamplesStep({
       }
     }
   }, [dirty, word, word.revision]);
+
+  // 目录是异步到达的，回填要等它就位；辅助函数无可回填项时原样返回，
+  // 因此这个 effect 会在一次回填后自然收敛。读 contentRef 而不是闭包里的
+  // content：同一次提交里 word 变更可能已经写过更新的内容，
+  // 用闭包快照回填会把它们覆盖掉；content 仍留在依赖里，新增词义后才会重跑。
+  useEffect(() => {
+    const current = contentRef.current;
+    const next = applySoleSubPartOfSpeech(
+      current,
+      word.forms,
+      partOfSpeechLookup
+    );
+    if (next === current) return;
+    contentRef.current = next;
+    setContent(next);
+  }, [content, partOfSpeechLookup, word.forms]);
 
   useEffect(() => {
     onDraftChange?.(content);

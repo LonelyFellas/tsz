@@ -289,6 +289,13 @@ function suggestionCounts(forms: DraftFormsStepContent) {
   return counts;
 }
 
+/**
+ * 未命中词典时没有任何建议数据,必须如实说清后续每个字段都要人工录入,
+ * 否则「可创建」会被误读成「词典已经带回了内容」。
+ */
+const NOT_FOUND_SUMMARY =
+  "内置词典对该词条没有任何依据：基本词性、词形、字典音标与实际发音、释义和例句都需要在后续步骤按平台教学口径自行录入。";
+
 /** 命中词典后的说明文案:先讲派生词形,再交代覆盖缺口。 */
 function matchedSummary(
   counts: ReturnType<typeof suggestionCounts>,
@@ -335,8 +342,7 @@ function DetectionStatus({
       catalogLoaded &&
       unknownPos.length === 0 &&
       !catalogUnavailable) ||
-    (builtin.status === "not_found" &&
-      (result.entry_kind === "phrase" || surfaceWarningReady));
+    builtin.status === "not_found";
   const canContinue =
     dictionaryReady && (smart.status === "clear" || surfaceWarningReady);
   const hasArchivedDuplicate =
@@ -376,18 +382,21 @@ function DetectionStatus({
     >
       <Space orientation="vertical" size={16} style={{ width: "100%" }}>
         <Alert
-          type={canContinue && !dictionaryPartial ? "success" : "warning"}
+          // 未命中虽可继续,但没有任何词典依据,不能用绿色成功态淡化。
+          type={
+            canContinue && !dictionaryPartial && builtin.status === "matched"
+              ? "success"
+              : "warning"
+          }
           showIcon
           title={
-            result.entry_kind === "phrase" && builtin.status === "not_found"
-              ? "内置词典没有匹配项，将创建空白短语草稿"
-              : builtin.status === "matched"
-                ? dictionaryPartial
-                  ? "内置词典只找到部分内容"
-                  : "内置词典已找到规范词条"
-                : builtin.status === "not_found"
-                  ? "内置词典没有匹配项"
-                  : "内置词典暂时不可用"
+            builtin.status === "matched"
+              ? dictionaryPartial
+                ? "内置词典只找到部分内容"
+                : "内置词典已找到规范词条"
+              : builtin.status === "not_found"
+                ? `内置词典没有匹配项，将创建空白${result.entry_kind === "phrase" ? "短语" : "单词"}草稿`
+                : "内置词典暂时不可用"
           }
           description={
             builtin.status === "matched"
@@ -395,7 +404,9 @@ function DetectionStatus({
                   suggestionCounts(builtin.suggested_forms),
                   coverageGaps
                 )
-              : undefined
+              : builtin.status === "not_found"
+                ? NOT_FOUND_SUMMARY
+                : undefined
           }
         />
         <Descriptions column={1} size="small">
@@ -649,9 +660,7 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
       const nextHeadwords =
         matched.status === "matched"
           ? matched.headwords
-          : matched.status === "not_found" &&
-              (next.entry_kind === "phrase" ||
-                next.smart_dictionary.status === "warning")
+          : matched.status === "not_found"
             ? ({ mode: "unified", common: next.request.headword } as const)
             : undefined;
       setHeadwords(nextHeadwords);
@@ -669,18 +678,12 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
     result.builtin_dictionary.suggested_forms.pos.every((item) =>
       partOfSpeechLookup.byCode.has(item.pos)
     );
-  const unmatchedPhraseReady =
-    result?.entry_kind === "phrase" &&
-    result.builtin_dictionary.status === "not_found";
-  const unmatchedSurfaceWordReady =
-    result?.entry_kind === "word" &&
-    result.builtin_dictionary.status === "not_found" &&
-    result.smart_dictionary.status === "warning" &&
-    canAcknowledgeSurfaceSnapshot(surfaceState);
+  // 未命中时后端以管理员原输入建 Unified 词条,单词与短语走同一条路径:
+  // 内置词典是静态快照,新造词、品牌名、缩写和行业术语本来就不该被它挡住。
+  const unmatchedDictionaryReady =
+    result?.builtin_dictionary.status === "not_found";
   const canCreate =
-    (matchedDictionaryReady ||
-      unmatchedPhraseReady ||
-      unmatchedSurfaceWordReady) &&
+    (matchedDictionaryReady || unmatchedDictionaryReady) &&
     (result.smart_dictionary.status === "clear" ||
       (result.smart_dictionary.status === "warning" &&
         canAcknowledgeSurfaceSnapshot(surfaceState))) &&

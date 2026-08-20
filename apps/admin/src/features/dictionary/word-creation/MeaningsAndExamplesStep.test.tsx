@@ -40,6 +40,7 @@ vi.mock("@/features/settings/useDialectPreference", () => ({
     savePreference: vi.fn()
   })
 }));
+const catalogState = vi.hoisted(() => ({ unavailable: false }));
 const featureFlags = vi.hoisted(() => ({
   VOICE_EDITOR: false,
   VOICE_PREVIEW: false,
@@ -191,7 +192,12 @@ vi.mock("./ContentCompletionPanel", () => ({
 vi.mock("../part-of-speech/api", async () => {
   const { partOfSpeechCatalogQueryResult } =
     await import("./partOfSpeech.test.helper");
-  return { usePartOfSpeechCatalog: partOfSpeechCatalogQueryResult };
+  return {
+    usePartOfSpeechCatalog: () =>
+      catalogState.unavailable
+        ? { data: undefined, isError: true, isPending: false, isLoading: false }
+        : partOfSpeechCatalogQueryResult()
+  };
 });
 
 vi.mock("../api", () => ({
@@ -352,6 +358,14 @@ async function selectContextTarget(
   fireEvent.click(option);
 }
 
+function latestDraft(
+  onDraftChange: ReturnType<typeof vi.fn>
+): DraftMeaningsStepContent {
+  const calls = onDraftChange.mock.calls;
+  if (calls.length === 0) throw new Error("onDraftChange was never called");
+  return calls.at(-1)![0] as DraftMeaningsStepContent;
+}
+
 function LocationProbe() {
   const location = useLocation();
   return (
@@ -408,6 +422,7 @@ function renderStep(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  catalogState.unavailable = false;
   featureFlags.VOICE_EDITOR = false;
   featureFlags.VOICE_PREVIEW = false;
   voicePreview.mocked = false;
@@ -1052,6 +1067,83 @@ describe("MeaningsAndExamplesStep", () => {
       (await screen.findAllByText("可数名词", { exact: true })).length
     ).toBeGreaterThan(0);
     expect(screen.queryByText("及物动词", { exact: true })).toBeNull();
+  });
+
+  it("基本词性下只有一个细分项时自动选中并隐藏选择器", async () => {
+    // far 的形容词/副词在目录里各只配置了一个细分项。
+    const word = wordFixture({ headword: "far" });
+    const { container, onDraftChange } = renderStep(word);
+
+    const field = container.querySelector<HTMLElement>(
+      '[data-word-field="sub_pos"]'
+    )!;
+    expect(field.querySelector(".ant-select")).toBeNull();
+    expect(field.classList.contains("ant-select")).toBe(false);
+    expect(field.textContent).toBe("形容词");
+    expect(screen.queryByLabelText("细分词性")).toBeNull();
+
+    await waitFor(() =>
+      expect(latestDraft(onDraftChange).pos[0]!.senses[0]!.sub_pos).toBe("ADJ")
+    );
+
+    // 回填必须真的进入提交内容，否则保存出去的仍是空细分词性。
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(
+      mutations.save.mock.calls[0]![0].content.pos[0].senses[0].sub_pos
+    ).toBe("ADJ");
+  });
+
+  it("细分项多于一个时保持下拉选择且不自动填值", () => {
+    // center 的名词/动词各有多个细分项。
+    const { container, onDraftChange } = renderStep(wordFixture());
+
+    const field = container.querySelector<HTMLElement>(
+      '[data-word-field="sub_pos"]'
+    )!;
+    expect(field.classList.contains("ant-select")).toBe(true);
+    expect(latestDraft(onDraftChange).pos[0]!.senses[0]!.sub_pos).toBe("");
+  });
+
+  it("词性目录不可用时不自动填值，细分词性选择器保持禁用", () => {
+    catalogState.unavailable = true;
+    const { container, onDraftChange } = renderStep(
+      wordFixture({ headword: "far" })
+    );
+
+    const field = container.querySelector<HTMLElement>(
+      '[data-word-field="sub_pos"]'
+    )!;
+    expect(field.classList.contains("ant-select")).toBe(true);
+    expect(field.classList.contains("ant-select-disabled")).toBe(true);
+    expect(latestDraft(onDraftChange).pos[0]!.senses[0]!.sub_pos).toBe("");
+  });
+
+  it("已发布词条只读查看时唯一细分项照常只读展示", () => {
+    const word = wordFixture({
+      headword: "far",
+      status: "published",
+      ready: true
+    });
+    const { container } = renderStep(word, true);
+
+    const field = container.querySelector<HTMLElement>(
+      '[data-word-field="sub_pos"]'
+    )!;
+    expect(field.querySelector(".ant-select")).toBeNull();
+    expect(field.textContent).toBe("形容词");
+  });
+
+  it("存量细分编码不属于当前基本词性时保留选择器且不改写", () => {
+    const word = wordFixture({ headword: "far" });
+    word.meanings.pos[0]!.senses[0]!.sub_pos = "V-T";
+    const { container, onDraftChange } = renderStep(word);
+
+    const field = container.querySelector<HTMLElement>(
+      '[data-word-field="sub_pos"]'
+    )!;
+    expect(field.classList.contains("ant-select")).toBe(true);
+    expect(latestDraft(onDraftChange).pos[0]!.senses[0]!.sub_pos).toBe("V-T");
   });
 
   it("编辑后完成保存并放行到 preview，提交 revision 与干净 content", async () => {

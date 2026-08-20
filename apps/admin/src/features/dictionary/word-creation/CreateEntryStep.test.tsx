@@ -899,18 +899,62 @@ describe("CreateEntryStep", () => {
     expect(input).toHaveValue("center");
   });
 
-  it.each([
-    ["not-found", "内置词典没有匹配项"],
-    ["builtin-unavailable", "内置词典暂时不可用"]
-  ])("%s 检测结果明确阻断人工创建", async (headword, reason) => {
-    mutations.detect.mockResolvedValue(detectionFixture(headword));
-    renderStep();
+  it("未命中内置词典的全新单词仍可创建空白草稿并如实提示无词典依据", async () => {
+    const detection = detectionFixture("not-found");
+    const created = {
+      ...wordFixture({ id: "word-brand-new" }),
+      headwords: { mode: "unified" as const, common: "not-found" },
+      forms: { pos: [] }
+    };
+    mutations.detect.mockResolvedValue(detection);
+    mutations.create.mockResolvedValue({ word: created });
+    const { onCreated, onHeadwordsChange } = renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
-      target: { value: headword }
+      target: { value: "not-found" }
     });
     fireEvent.click(button("词典检测"));
 
-    expect(await screen.findByText(reason)).toBeVisible();
+    expect(
+      await screen.findByText("内置词典没有匹配项，将创建空白单词草稿")
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "内置词典对该词条没有任何依据：基本词性、词形、字典音标与实际发音、释义和例句都需要在后续步骤按平台教学口径自行录入。"
+      )
+    ).toBeVisible();
+    expect(screen.getByText("可创建")).toBeVisible();
+    expect(onHeadwordsChange).toHaveBeenLastCalledWith({
+      mode: "unified",
+      common: "not-found"
+    });
+    // 无检测依据时不许手工造英美差异：A1 之后连开关都不存在了。
+    expect(
+      screen.queryByRole("switch", { name: "区分英美词形" })
+    ).not.toBeInTheDocument();
+
+    expect(button("确认并进入词形与发音")).toBeEnabled();
+    fireEvent.click(button("确认并进入词形与发音"));
+    await waitFor(() =>
+      expect(mutations.create).toHaveBeenCalledWith({
+        schema_version: 2,
+        idempotency_key: expect.any(String),
+        detection_id: detection.detection_id,
+        headwords: { mode: "unified", common: "not-found" }
+      })
+    );
+    expect(onCreated).toHaveBeenCalledWith(created);
+  });
+
+  it("内置词典暂时不可用时仍阻断人工创建", async () => {
+    mutations.detect.mockResolvedValue(detectionFixture("builtin-unavailable"));
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "builtin-unavailable" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    expect(await screen.findByText("内置词典暂时不可用")).toBeVisible();
+    expect(screen.getByText("不可继续")).toBeVisible();
     expect(button("确认并进入词形与发音")).toBeDisabled();
   });
 
