@@ -640,7 +640,7 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.getByLabelText("语法结构 1")).toHaveValue("the center");
   });
 
-  it("存量双份英文内容只显示偏好侧一份，编辑同步词义头部并保留该侧节点 ID", async () => {
+  it("存量双份英文内容只显示偏好侧一份，编辑同步词义头部并按新节点保存", async () => {
     const word = legacySplitWord();
     renderStep(word);
 
@@ -665,14 +665,17 @@ describe("MeaningsAndExamplesStep", () => {
     await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
     const savedDefinition =
       mutations.save.mock.calls[0]![0].content.pos[0].senses[0].definitions[0];
-    expect(savedDefinition.content).toEqual({
+    expect(savedDefinition.content).toMatchObject({
       mode: "unified",
       common: {
-        id: "first-definition-uk",
         value: expect.objectContaining({ text: "British changed" }),
         origin: "manual"
       }
     });
+    // 收敛必须换新节点：后端把方言编进节点身份，沿用 uk 那条的 ID 会被判
+    // node_binding_changed，整个 meanings 保存 422（2026-08-20 真机实测）。
+    expect(savedDefinition.content.common.id).not.toBe("first-definition-uk");
+    expect(savedDefinition.content.common.id).not.toBe("first-definition-us");
   });
 
   it("存量词条给出收敛说明，确认框写明丢弃的方言侧与条数", async () => {
@@ -718,10 +721,14 @@ describe("MeaningsAndExamplesStep", () => {
 
     await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
     // 形状照样收敛为单份，只是没有内容被丢弃，不必打扰管理员。
-    expect(
+    const collapsed =
       mutations.save.mock.calls[0]![0].content.pos[0].senses[0].definitions[0]
-        .content
-    ).toMatchObject({ mode: "unified", common: { id: "first-definition-uk" } });
+        .content;
+    expect(collapsed).toMatchObject({
+      mode: "unified",
+      common: { value: expect.objectContaining({ text: "British only" }) }
+    });
+    expect(collapsed.common.id).not.toBe("first-definition-uk");
   });
 
   it("确认框弹出期间锁定保存按钮，避免连点叠出两次保存", async () => {
@@ -1871,8 +1878,8 @@ describe("MeaningsAndExamplesStep", () => {
     if (definitionContent.mode !== "unified") {
       throw new Error("definition should collapse to a single variant");
     }
-    // 保留偏好侧的稳定节点 ID，富文本经语音编辑器回写后升到 v2。
-    expect(definitionContent.common.id).toBe("voice-definition-uk");
+    // 收敛换新节点（方言槽位变了），富文本经语音编辑器回写后升到 v2。
+    expect(definitionContent.common.id).not.toBe("voice-definition-uk");
     expect(definitionContent.common.value.version).toBe(2);
     const sentenceText = saved.pos[0]!.senses[0]!.sentences[0]!.en_text;
     expect(

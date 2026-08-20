@@ -237,8 +237,13 @@ export function writeEnglishText(
 }
 
 /**
- * 收敛为单份：保留偏好侧内容与其稳定节点 ID，非偏好侧在此丢弃。
+ * 收敛为单份：保留偏好侧的**内容**，非偏好侧在此丢弃。
  * 调用方必须先向管理员确认，见 `countDiscardedEnglishTexts`。
+ *
+ * **节点 ID 必须新起，不能复用偏好侧那条。** 后端把方言编进了节点身份
+ * （`text_variant_role(field_role, "en", dialect)`），同一个节点 ID 换到别的
+ * 方言槽位会被判 `node_binding_changed`「节点 ID 不能更换父节点或内容槽位」，
+ * 整个 meanings 保存 422。2026-08-20 在真实 tsz-rust 上实测确认。
  */
 export function collapseEnglishText(
   value: EnglishTextV2,
@@ -248,14 +253,11 @@ export function collapseEnglishText(
   const slot = value[preference];
   return {
     mode: "unified",
-    common:
-      slot.state === "ready"
-        ? {
-            id: slot.variant.id,
-            value: slot.variant.value,
-            origin: slot.variant.origin
-          }
-        : { id: newWordNodeId(), value: emptyWordRichText(), origin: "manual" }
+    common: {
+      id: newWordNodeId(),
+      value: slot.state === "ready" ? slot.variant.value : emptyWordRichText(),
+      origin: slot.state === "ready" ? slot.variant.origin : "manual"
+    }
   };
 }
 

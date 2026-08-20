@@ -623,17 +623,21 @@ describe("A1 英文内容读兼容与保存收敛", () => {
     });
   });
 
-  it("收敛保留偏好侧内容与其稳定节点 ID", () => {
+  it("收敛保留偏好侧内容，但节点 ID 必须新起", () => {
     const legacy = legacySplitEnglishText("d1", "the color", "the colour");
-    expect(collapseEnglishText(legacy, "uk")).toEqual({
+    const collapsed = collapseEnglishText(legacy, "uk");
+
+    expect(collapsed).toMatchObject({
       mode: "unified",
-      common: {
-        id: "d1-uk-text",
-        value: richText("the colour"),
-        origin: "manual"
-      }
+      common: { value: richText("the colour"), origin: "manual" }
     });
-    expect(collapseEnglishText(legacy, "us").common.id).toBe("d1-us-text");
+    // 后端把方言编进节点身份：复用 uk 那条的 ID 会被判 node_binding_changed，
+    // 「节点 ID 不能更换父节点或内容槽位」，整个 meanings 保存 422。
+    expect(collapsed.common.id).not.toBe("d1-uk-text");
+    expect(collapsed.common.id).not.toBe("d1-us-text");
+    expect(collapseEnglishText(legacy, "us").common.value).toEqual(
+      richText("the color")
+    );
   });
 
   it("偏好侧缺失时收敛为空文本并新起节点 ID", () => {
@@ -711,14 +715,13 @@ describe("A1 英文内容读兼容与保存收敛", () => {
     const definition = wire.pos[0]!.senses[0]!.definitions.find(
       (item) => item.id === "definition-ready"
     )!;
-    expect(definition.content).toEqual({
+    expect(definition.content).toMatchObject({
       mode: "unified",
-      common: {
-        id: "definition-ready-uk-text",
-        value: richText("the colour"),
-        origin: "manual"
-      }
+      common: { value: richText("the colour"), origin: "manual" }
     });
+    expect(
+      (definition.content as { common: { id: string } }).common.id
+    ).not.toBe("definition-ready-uk-text");
     expect(wire.pos[0]!.senses[0]!.sentences[0]!.en_text.mode).toBe("unified");
   });
 });

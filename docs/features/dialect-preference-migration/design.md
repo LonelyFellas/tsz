@@ -220,6 +220,32 @@ export function collapseEnglishText(
 2. 两条 variant 的 `id` 稳定复用已有节点 ID，不每次保存重新生成（否则节点漂移）；
 3. 代码里写明 `// TODO(dialect-preference-migration 阶段 6)`，删除条件是后端 P1 落地。
 
+## 真机验证结论（2026-08-20，本地真实 `tsz-rust`）
+
+阶段 2/3 一直挂着的验证缺口已封口，**并且真机跑出了单测与 e2e mock 都发现不了的一个真 bug**。
+
+**发现的 bug**：`collapseEnglishText` 原本复用偏好侧 `text_variant` 的节点 ID。
+后端把方言编进了节点身份——`node_role = text_variant_role(field_role, "en", dialect)`
+（`src/lexicon/validation/structure.rs`）——同一个节点 ID 从 `uk` 槽挪到 `common` 槽
+会被判 `node_binding_changed`「节点 ID 不能更换父节点或内容槽位」，**整个 meanings 保存 422**。
+`centre / center` 那条存量词条实测报了 3 条（3 条英文例句各一条）。
+
+**修法**：收敛时**新起节点 ID**，不再沿用偏好侧那条。旧的 uk/us 节点随保存删除，
+新建一条 `common`。文本节点身份在这次迁移中不连续是必然的——槽位本身变了。
+语法结构的镜像不受影响：它保持每条变体各自的方言，槽位没动。
+
+**教训**：mock 与 e2e mock 都没有实现这条节点绑定不变量，所以这类「后端拿身份做约束」
+的规则只能靠真机手测发现。后续阶段凡是改动节点 ID 归属的，必须真机验收一次。
+
+**封口证据**（收敛保存返回 200 后查库）：
+
+| 项                       | 收敛前                  | 收敛后                                            |
+| ------------------------ | ----------------------- | ------------------------------------------------- |
+| `text_variants` 方言分布 | common 6 / uk 6 / us 6  | **common 9 / uk 3 / us 3**                        |
+| 英文例句                 | uk 3 + us 3             | **common 3**，内容为英式（偏好侧）                |
+| 语法结构                 | uk 3 + us 3（内容不同） | uk 3 + us 3，**逐对同值镜像**（阶段 3 shim 生效） |
+| entry                    | revision 5              | revision 6，仍「已发布 + 有未发布修改」           |
+
 ## 阶段 2 落地记录（2026-08-20）
 
 实现时与本文原设想不同、需要在此定案的几点：
