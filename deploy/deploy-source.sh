@@ -107,6 +107,134 @@ wait_for_http_status() {
   return 1
 }
 
+# 本地 boot 闸起的子进程句柄：verify_standalone_boot 起服务前写入，收进程只走
+# stop_standalone_boot 一条路径（deploy-web.sh 的 EXIT trap 里再兜一次）。
+DEPLOY_BOOT_PID=""
+
+stop_standalone_boot() {
+  local pid="${DEPLOY_BOOT_PID:-}"
+  [[ -n "$pid" ]] || return 0
+  DEPLOY_BOOT_PID=""
+  # 整段包起来重定向 stderr：被 kill 的后台任务，bash 会在下一个命令边界（这里是轮询用的
+  # sleep）往 stderr 打一行 "Terminated: 15"，只重定向 wait 挡不住，部署日志里看着像出事了。
+  local tick
+  {
+    kill "$pid" 2>/dev/null || true
+    # 先给 SIGTERM 两秒收尾，赖着不走再 SIGKILL：trap 里绝不能无限 wait。
+    for ((tick = 0; tick < 20; tick++)); do
+      kill -0 "$pid" 2>/dev/null || break
+      sleep 0.1
+    done
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -9 "$pid" 2>/dev/null || true
+    fi
+    wait "$pid" || true
+  } 2>/dev/null
+  return 0
+}
+
+# 用 node 自己绑一次来判端口空不空：本机不一定有 lsof/ss，而 node 是部署脚本的硬前置。
+port_is_free() {
+  node -e 'const s = require("net").createServer();
+s.once("error", () => process.exit(1));
+s.listen(Number(process.argv[1]), "127.0.0.1", () => s.close(() => process.exit(0)));' "$1" 2>/dev/null
+}
+
+# 把 staged 产物在本地真起一次，再决定要不要 rsync。CI 只跑 pnpm build，e2e 的 webServer
+# 用 next start（走完整 workspace node_modules），两条流水线都不碰裁剪后的 standalone 产物：
+# 2026-08-21 @swc/helpers 0.5.23 的 exports 新增 module-sync 条件，require() 命中未被 file
+# tracing 追到的 esm/，产物启动即 MODULE_NOT_FOUND，就是这样一路全绿到服务器上才炸的。
+# 而 rsync --delete 一旦跑完，服务器上原本能用的那份已被覆盖，脚本又只认 origin/main、
+# 退不回去，站点只能一直 502——所以这道闸必须在写服务器之前。
+verify_standalone_boot() {
+  local artifact_root="${1%/}"
+  local entry="$2"
+  [[ -n "$artifact_root" && -n "$entry" ]] || {
+    deploy_source_error "artifact root and entry are required"
+    return 1
+  }
+  [[ -f "$artifact_root/$entry" ]] || {
+    deploy_source_error "staged standalone entry is missing: $artifact_root/$entry"
+    return 1
+  }
+
+  local attempt port url deadline
+  local status="" boot_alive="" boot_started=""
+  # 日志落在产物目录「旁边」而不是 /tmp 里：产物目录归调用方的 trap 清理，中途被 Ctrl-C
+  # 打断也不会留垃圾；同时绝不能落进产物内部，那会被 rsync 送上服务器。
+  local log="${artifact_root}.boot.log"
+
+  for ((attempt = 1; attempt <= 3; attempt++)); do
+    # 高位随机端口 + 换端口重试：本机可能正跑着 dev server 或上一次部署的残留。
+    port=$((40000 + RANDOM % 20000))
+    url="http://127.0.0.1:${port}/"
+    # 起之前先自己绑一次探真空：端口上若已有人，对方的 200 会被误记成产物起来了。
+    if ! port_is_free "$port"; then
+      deploy_source_warn "本地 boot 端口 ${port} 被占用，换端口重试"
+      continue
+    fi
+    : >"$log"
+    # 只绑回环，且与构建一样跑在干净 env 里：产物起不起得来只能取决于产物自身，
+    # 不能取决于跑脚本这台机器的环境变量。
+    (
+      cd "$artifact_root" || exit 1
+      exec env -i PATH="$PATH" TMPDIR="${TMPDIR:-/tmp}" \
+        NODE_ENV=production HOSTNAME=127.0.0.1 PORT="$port" node "$entry"
+    ) >"$log" 2>&1 &
+    DEPLOY_BOOT_PID=$!
+    boot_started=1
+
+    status=""
+    boot_alive=1
+    # 墙钟上限（默认 45s，测试可调短），且进程一死立刻收工：
+    # 起不来的产物不该把部署挂在这里。
+    deadline=$((SECONDS + ${DEPLOY_BOOT_TIMEOUT_SECONDS:-45}))
+    while ((SECONDS < deadline)); do
+      if ! kill -0 "$DEPLOY_BOOT_PID" 2>/dev/null; then
+        boot_alive=""
+        break
+      fi
+      status="$(curl -sS -m 5 -o /dev/null -w '%{http_code}' "$url" 2>/dev/null || true)"
+      if [[ "$status" = 200 ]]; then
+        # 收下这个 200 之前再确认产物进程还活着：探真空到起服务之间端口仍可能被别人抢走，
+        # 那样应答的就不是产物，这个 200 不能算数。
+        kill -0 "$DEPLOY_BOOT_PID" 2>/dev/null || boot_alive=""
+        break
+      fi
+      sleep 0.5
+    done
+    stop_standalone_boot
+
+    if [[ "$status" = 200 && -n "$boot_alive" ]]; then
+      rm -f -- "$log"
+      printf '==> staged standalone boot: GET / -> 200 (127.0.0.1:%s)\n' "$port"
+      return 0
+    fi
+    if grep -q EADDRINUSE "$log"; then
+      deploy_source_warn "本地 boot 端口 ${port} 被占用，换端口重试"
+      continue
+    fi
+    break
+  done
+
+  if [[ -z "$boot_started" ]]; then
+    rm -f -- "$log"
+    deploy_source_error "no free local port for the boot check after 3 tries; artifact unverified"
+    return 1
+  fi
+
+  printf '%s\n' '---- staged standalone boot log ----' >&2
+  tail -n 40 -- "$log" >&2 || true
+  rm -f -- "$log"
+  # curl 连不上时 %{http_code} 是 000，照抄进结论里反而费解；产物进程已经死了的话，
+  # 拿到的状态码也不是它应答的，同样不该写进结论。
+  local outcome="${status:-no-response}"
+  [[ "$outcome" != 000 ]] || outcome="no-response"
+  [[ -n "$boot_alive" ]] || outcome="process exited"
+  deploy_source_error "staged standalone artifact failed to boot locally (GET / -> ${outcome})"
+  return 1
+}
+
 prepare_deploy_source() {
   local component="$1"
   case "$component" in

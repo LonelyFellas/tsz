@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # C 端 web（Next standalone）部署到 tshb-test：从 origin/main 导出干净源码到临时目录构建
-# -> rsync 三件套 -> 重启服务。
+# -> 本地起一次 staged 产物验活 -> rsync 三件套 -> 重启服务。
 # 前置：ssh 别名 tshb-test 可用（root）；服务器 /usr/bin/node 与 .node-version 精确一致，
 # 且已安装 systemd unit tsz-web
 # （首次搭建：deploy/systemd/tsz-web.service -> /etc/systemd/system/ 后 daemon-reload enable）。
@@ -16,6 +16,7 @@ remote_candidate=""
 deploy_interrupted=""
 cleanup() {
   local status="${deploy_interrupted:-$?}"
+  stop_standalone_boot
   if [[ -n "$remote_candidate" ]]; then
     ssh tshb-test "rm -f -- '$remote_candidate'" >/dev/null 2>&1 || status=1
   fi
@@ -67,6 +68,11 @@ artifact_stage="$deploy_tmp/artifact"
 mkdir -p "$artifact_stage/apps/web/.next/static"
 rsync -a "$DEPLOY_BUILD_ROOT/apps/web/.next/standalone/" "$artifact_stage/"
 rsync -a "$DEPLOY_BUILD_ROOT/apps/web/.next/static/" "$artifact_stage/apps/web/.next/static/"
+
+echo "==> boot staged standalone artifact locally"
+# 坏产物必须在 rsync --delete 覆盖掉服务器上那份能用的之前被挡下（原因见 deploy-source.sh）。
+verify_standalone_boot "$artifact_stage" apps/web/server.js
+
 candidate_manifest="$deploy_tmp/web.json"
 # 送上服务器的东西一律取自构建树（= 目标 commit），不取自工作区。
 node "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" create-candidate \
