@@ -371,6 +371,30 @@ export interface AdminWordV2Envelope {
   word: AdminWordV2;
 }
 
+/**
+ * 一个已退役但仍被永久占用的稳定槽位身份。
+ *
+ * 稳定槽位的键是 `(entry_id, parent_node_id, node_role)`，方言编在 `node_role`
+ * 里（`forms.form_variant:common`）。这个键一旦保存过就永久绑定同一个节点 ID：
+ * 节点从草稿里消失只是被标记退役，重新出现时必须沿用原 ID，否则报
+ * `stable_node_id_changed`。
+ */
+export interface RetiredStableSlotV2 {
+  id: string;
+  parent_node_id: string;
+  node_role: string;
+}
+
+/**
+ * `GET /entries/{id}` 的响应：草稿本体 + 重建编辑态所需的节点身份信息。
+ *
+ * 命令类接口仍返回 {@link AdminWordV2Envelope}；退役身份是编辑器恢复用的元数据，
+ * 不属于词条内容，也不会进入不可变的 publication 快照。
+ */
+export interface AdminWordDraftV2Envelope extends AdminWordV2Envelope {
+  retired_stable_slots: RetiredStableSlotV2[];
+}
+
 export interface SaveWordStepInput<TContent> {
   base_revision: number;
   intent: StepSaveIntent;

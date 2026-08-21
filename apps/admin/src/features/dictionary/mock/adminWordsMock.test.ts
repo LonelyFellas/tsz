@@ -301,6 +301,95 @@ describe("admin words mock", () => {
     mock = mockFor();
   });
 
+  it("稳定槽位身份永久绑定：退役的 common 只能沿用原 ID 复活", async () => {
+    // 与后端 lexicon.nodes 的唯一索引同口径。mock 不实现这条的话，
+    // 英美拆分再合并会本地全绿、真机 422。
+    const draft = await createDetectedWord(
+      mock,
+      "deployability",
+      "retire-slots"
+    );
+    const unified = withCompletePronunciations(draft.word.forms);
+    const baseSlotId = unified.pos[0]!.base_form.id;
+    const originalCommonId = unified.pos[0]!.base_form.variants[0]!.id;
+
+    const saved = await mock.saveFormsStep(draft.word.id, {
+      base_revision: draft.word.revision,
+      operation_id: "retire-slots-unified",
+      intent: "save",
+      content: unified
+    });
+
+    // 拆成英美两条：common 退役。
+    const split = structuredClone(unified);
+    split.pos[0]!.dialect_rules = {
+      spelling_mode: "distinguish",
+      phonetic_mode: "distinguish"
+    };
+    split.pos[0]!.base_form.variants = (["uk", "us"] as const).map(
+      (dialect) => ({
+        ...structuredClone(unified.pos[0]!.base_form.variants[0]!),
+        id: `${dialect}-variant`,
+        dialect,
+        pronunciations: [
+          {
+            id: `${dialect}-pronunciation`,
+            dict_phonetic: "x",
+            actual_pron: "x",
+            style: "normal" as const
+          }
+        ]
+      })
+    );
+    const splitSaved = await mock.saveFormsStep(draft.word.id, {
+      base_revision: saved.word.revision,
+      operation_id: "retire-slots-split",
+      intent: "save",
+      content: split
+    });
+
+    expect((await mock.get(draft.word.id)).retired_stable_slots).toEqual([
+      {
+        id: originalCommonId,
+        parent_node_id: baseSlotId,
+        node_role: "forms.form_variant:common"
+      }
+    ]);
+
+    // 合并回共用时换新 ID 会被拒。
+    const mergedWithNewId = structuredClone(unified);
+    mergedWithNewId.pos[0]!.base_form.variants[0]!.id = "brand-new-common";
+    await expect(
+      mock.saveFormsStep(draft.word.id, {
+        base_revision: splitSaved.word.revision,
+        operation_id: "retire-slots-merge-new-id",
+        intent: "save",
+        content: mergedWithNewId
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      field_issues: [
+        expect.objectContaining({ code: "stable_node_id_changed" })
+      ]
+    });
+
+    // 沿用退役身份就能复活，uk / us 转为退役。
+    const revived = await mock.saveFormsStep(draft.word.id, {
+      base_revision: splitSaved.word.revision,
+      operation_id: "retire-slots-merge-original-id",
+      intent: "save",
+      content: unified
+    });
+    expect(revived.word.forms.pos[0]!.base_form.variants[0]!.id).toBe(
+      originalCommonId
+    );
+    expect(
+      (await mock.get(draft.word.id)).retired_stable_slots.map(
+        (slot) => slot.node_role
+      )
+    ).toEqual(["forms.form_variant:uk", "forms.form_variant:us"]);
+  });
+
   it("补全旧空草稿时创建默认语义区间并改绑全部词义", async () => {
     const draft = await createCenter(mock, "complete-empty-sense-groups");
     const legacyEmpty = structuredClone(draft.word.meanings);
@@ -2696,7 +2785,10 @@ describe("admin words mock", () => {
       mock.publishV2(meanings.word.id, publishInput)
     ).resolves.toEqual(published);
     expect((await mock.stats()).total).toBe(1);
-    await expect(mock.get(published.word.id)).resolves.toEqual(published);
+    await expect(mock.get(published.word.id)).resolves.toEqual({
+      ...published,
+      retired_stable_slots: []
+    });
     const page = await mock.list({ q: "center" });
     expect(page.words).toEqual([
       expect.objectContaining({
@@ -3083,7 +3175,10 @@ describe("admin words mock", () => {
     const first = mockFor(() => profile(), storage);
     const created = await createCenter(first, "persisted-draft");
     const refreshed = mockFor(() => profile(), storage);
-    await expect(refreshed.get(created.word.id)).resolves.toEqual(created);
+    await expect(refreshed.get(created.word.id)).resolves.toEqual({
+      ...created,
+      retired_stable_slots: []
+    });
 
     first.clearSession();
     const afterLogout = mockFor(() => profile(), storage);
@@ -3509,7 +3604,10 @@ describe("surface warning mock", () => {
     storage.values.set(legacyKey, JSON.stringify(envelope));
 
     const upgraded = surfaceMockWithStorage(storage);
-    await expect(upgraded.get(created.word.id)).resolves.toEqual(created);
+    await expect(upgraded.get(created.word.id)).resolves.toEqual({
+      ...created,
+      retired_stable_slots: []
+    });
     expect(storage.values.has(legacyKey)).toBe(false);
     expect(storage.values.has(currentKey)).toBe(true);
   });

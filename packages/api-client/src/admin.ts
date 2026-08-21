@@ -12,6 +12,7 @@ import type {
   AdminUserUpdateInput,
   AdminSpeechPreviewResponse,
   AdminSpeechVoiceListResponse,
+  AdminWordDraftV2Envelope,
   AdminWordV2Envelope,
   AdminWordListQuery,
   AdminWordV2ListResponse,
@@ -207,9 +208,14 @@ export function createAdminEndpoints(http: HttpClient) {
         http.post<AdminWordV2Envelope>("/lexicon/entries", input, {
           headers: { "Idempotency-Key": idempotencyKey }
         }),
-      /** GET /admin/lexicon/entries/{id} — 加载 V2 canonical 词条。 */
+      /**
+       * GET /admin/lexicon/entries/{id} — 加载 V2 canonical 词条。
+       *
+       * 只有这个接口带 `retired_stable_slots`：命令类接口的调用方自己就知道刚
+       * 退役了什么，需要服务端补身份的只有「刷新」和「换设备」。
+       */
       get: (wordId: string) =>
-        http.get<AdminWordV2Envelope>(`/lexicon/entries/${wordId}`),
+        http.get<AdminWordDraftV2Envelope>(`/lexicon/entries/${wordId}`),
       /** POST /admin/lexicon/entries/{id}/steps/forms/impact。 */
       previewFormsImpact: (wordId: string, input: PreviewFormsImpactInputV2) =>
         http.post<PreviewFormsImpactResponseV2>(

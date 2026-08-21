@@ -2,7 +2,8 @@ import type { DraftFormsStepContent, WordFormVariantV2 } from "@tsz/types";
 import { describe, expect, it } from "vitest";
 import {
   applyFormVariantIdentities,
-  createFormVariantIdentityLedger
+  createFormVariantIdentityLedger,
+  rememberRetiredStableSlots
 } from "./formVariantIdentity";
 
 function variant(
@@ -173,5 +174,64 @@ describe("applyFormVariantIdentities", () => {
     });
     expect(merged.pos[0]!.base_form.variants[0]!.id).toBe("base-common");
     expect(merged.pos[1]!.base_form.variants[0]!.id).toBe("verb-base-common");
+  });
+});
+
+describe("rememberRetiredStableSlots", () => {
+  it("退役的 common 身份补进账本后，重建的槽位沿用原 ID", () => {
+    const ledger = createFormVariantIdentityLedger();
+    // 刷新后的草稿只剩英美两条，账本一开始是空的。
+    applyFormVariantIdentities(
+      ledger,
+      content([variant("uk-id", "uk"), variant("us-id", "us")])
+    );
+    rememberRetiredStableSlots(ledger, [
+      {
+        id: "retired-common",
+        parent_node_id: "slot-base",
+        node_role: "forms.form_variant:common"
+      }
+    ]);
+
+    const merged = applyFormVariantIdentities(
+      ledger,
+      content([variant("freshly-minted", "common")])
+    );
+    expect(merged.pos[0]!.base_form.variants[0]!.id).toBe("retired-common");
+  });
+
+  it("只认词形变体角色，其他稳定槽位不进本账本", () => {
+    const ledger = createFormVariantIdentityLedger();
+    rememberRetiredStableSlots(ledger, [
+      {
+        id: "meaning-text",
+        parent_node_id: "slot-base",
+        node_role: "meanings.content:en:common"
+      }
+    ]);
+
+    const next = content([variant("minted", "common")]);
+    expect(applyFormVariantIdentities(ledger, next)).toBe(next);
+  });
+
+  it("账本已有的键不会被退役清单覆盖", () => {
+    const ledger = createFormVariantIdentityLedger();
+    applyFormVariantIdentities(
+      ledger,
+      content([variant("live-common", "common")])
+    );
+    rememberRetiredStableSlots(ledger, [
+      {
+        id: "stale-common",
+        parent_node_id: "slot-base",
+        node_role: "forms.form_variant:common"
+      }
+    ]);
+
+    const merged = applyFormVariantIdentities(
+      ledger,
+      content([variant("minted", "common")])
+    );
+    expect(merged.pos[0]!.base_form.variants[0]!.id).toBe("live-common");
   });
 });
