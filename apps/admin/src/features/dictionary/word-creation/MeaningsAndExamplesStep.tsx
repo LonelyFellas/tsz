@@ -2514,6 +2514,32 @@ export function MeaningsAndExamplesStep({
           </div>
         </Card>
 
+        {content.pos.length === 0 && (
+          <Alert
+            type="info"
+            showIcon
+            title="当前还没有基本词性"
+            description={
+              readOnly
+                ? "该词条没有记录任何基本词性，因此没有可维护的词义。"
+                : "词义按基本词性组织。请先在「词形与发音」添加第一个基本词性，再回到这里录入语法结构、词义与例句。"
+            }
+            action={
+              !readOnly ? (
+                <Button
+                  size="small"
+                  onClick={() =>
+                    navigate(`/words/${word.id}/wizard/forms${editQuery}`)
+                  }
+                >
+                  去词形与发音
+                </Button>
+              ) : null
+            }
+            style={{ marginBottom: 16 }}
+          />
+        )}
+
         <Tabs
           className="word-pos-tabs"
           activeKey={activePosId}

@@ -140,7 +140,7 @@ describe("WordCreationLayout", () => {
     expect(screen.getByText("far", { exact: true })).toBeInTheDocument();
   });
 
-  it("草稿汇总有效完成数，并只允许点击 max_reachable_step 内步骤", () => {
+  it("草稿汇总有效完成数，四步都可点击不受完成进度限制", () => {
     const onStepChange = vi.fn();
     const word = wordFixture({
       ready: true,
@@ -160,9 +160,46 @@ describe("WordCreationLayout", () => {
     expect(summary).toHaveTextContent("多维例句2/2");
 
     fireEvent.click(screen.getByText("词义与例句"));
-    expect(onStepChange).toHaveBeenCalledWith("meanings");
+    expect(onStepChange).toHaveBeenNthCalledWith(1, "meanings");
+    // 进度只到 meanings，preview 越过当前进度——门禁取消后照样点得动。
     fireEvent.click(screen.getByText("预览并生效"));
-    expect(onStepChange).toHaveBeenCalledTimes(1);
+    expect(onStepChange).toHaveBeenNthCalledWith(2, "preview");
+  });
+
+  it("词形未完成的新草稿也能直接点进后续步骤", () => {
+    const onStepChange = vi.fn();
+    // 最保守的进度：只完成第 1 步，后面三步都还没做。
+    const word = wordFixture({
+      completed_steps: ["basics"],
+      max_reachable_step: "forms"
+    });
+    const view = renderLayout({ word, currentStep: "forms", onStepChange });
+
+    expect(
+      view.container.querySelectorAll(".ant-steps-item-disabled")
+    ).toHaveLength(0);
+    fireEvent.click(screen.getByText("词义与例句"));
+    expect(onStepChange).toHaveBeenNthCalledWith(1, "meanings");
+    fireEvent.click(screen.getByText("预览并生效"));
+    expect(onStepChange).toHaveBeenNthCalledWith(2, "preview");
+  });
+
+  it("越步进入靠后步骤时，跳过的步骤不画成已完成", () => {
+    // 门禁取消后能直接跳到第 4 步；此时第 2、3 步排在当前步之前但并未完成，
+    // 步骤条只能按 completed_steps 如实显示，不能凭位置推断成绿勾。
+    const word = wordFixture({
+      completed_steps: ["basics"],
+      max_reachable_step: "forms"
+    });
+    renderLayout({ word, currentStep: "preview" });
+
+    const statusOf = (title: string) =>
+      screen.getByText(title).closest(".ant-steps-item")!.className;
+
+    expect(statusOf("创建新词条")).toContain("ant-steps-item-finish");
+    expect(statusOf("词形与发音")).toContain("ant-steps-item-wait");
+    expect(statusOf("词义与例句")).toContain("ant-steps-item-wait");
+    expect(statusOf("预览并生效")).toContain("ant-steps-item-process");
   });
 
   it("旧草稿尚无语义区间时显示未开始，不虚构默认首行", () => {
