@@ -453,6 +453,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     ]);
   });
 
+  it("错误码枚举含 payload_too_large(413 分支的契约依据)", () => {
+    // 词条整步保存的请求体上限是 8,192,000 字节;超限后端固定回 413 +
+    // payload_too_large,不再伪装成 422 invalid_request_body。前端据此分支给出
+    // 「内容过大,请拆分」而不是「格式错误」,所以这个码必须真在契约里。
+    expect(snapshot.schemas.ErrorCode.enum).toContain("payload_too_large");
+    expect(snapshot.schemas.ErrorCode.enum).toContain("invalid_request_body");
+  });
+
   it("每条前端端点要么命中 spec,要么在 PENDING 白名单里(无臆造端点)", () => {
     const orphans = calls
       .map(normalize)

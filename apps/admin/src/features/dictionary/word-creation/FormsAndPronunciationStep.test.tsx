@@ -1912,3 +1912,51 @@ describe("FormsAndPronunciationStep", () => {
     expect(mutations.save).not.toHaveBeenCalled();
   });
 });
+
+describe("内容体积上限（对接文档 §13）", () => {
+  it("影响预览返回 413 时提示内容过大而不是格式错误", async () => {
+    mutations.preview.mockRejectedValueOnce(
+      new HttpError(413, "payload too large", [], "payload_too_large")
+    );
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(
+      (await screen.findAllByText("内容过大，请拆分后分次保存")).length
+    ).toBeGreaterThan(0);
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("整步保存返回 413 时同样落到内容过大分支", async () => {
+    mutations.save.mockRejectedValueOnce(
+      new HttpError(413, "payload too large", [], "payload_too_large")
+    );
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(
+      (await screen.findAllByText("内容过大，请拆分后分次保存")).length
+    ).toBeGreaterThan(0);
+  });
+
+  it("节点数超出 2000 时保存前就地拦下，不发影响预览请求", async () => {
+    const word = wordFixture();
+    // 节点数按 forms + meanings 合计判定（后端 validate_node_limit 的实际口径）。
+    word.meanings.sense_groups = Array.from({ length: 2001 }, (_, index) => ({
+      id: `group-${index}`,
+      name_zh: "",
+      name_en: ""
+    }));
+    renderStep(word);
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(
+      (await screen.findAllByText(/超出单个词条上限 2000/)).length
+    ).toBeGreaterThan(0);
+    expect(mutations.preview).not.toHaveBeenCalled();
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+});

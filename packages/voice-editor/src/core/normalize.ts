@@ -10,10 +10,14 @@ import {
   codePointRangeContainsNewline,
   codePointSlice
 } from "./codepoints";
-
-export const MAX_RICH_TEXT_CODE_POINTS = 5000;
-export const MAX_RICH_TEXT_ANNOTATIONS = 500;
-export const MAX_PAUSE_MS = 5000;
+// 上限常量的唯一来源在 ./limits（同时供保存路径的预检复用）。
+import {
+  MAX_PAUSE_MS,
+  MAX_PHONEME_CODE_POINTS,
+  MAX_RICH_TEXT_ANNOTATIONS,
+  MAX_RICH_TEXT_CODE_POINTS,
+  MIN_PAUSE_MS
+} from "./limits";
 
 export interface RichTextValidationIssue {
   code:
@@ -92,13 +96,13 @@ export function validateRichTextV2(
         annotation.at < 0 ||
         annotation.at > length ||
         !Number.isInteger(annotation.duration_ms) ||
-        annotation.duration_ms < 1 ||
+        annotation.duration_ms < MIN_PAUSE_MS ||
         annotation.duration_ms > MAX_PAUSE_MS
       ) {
         issues.push({
           code: "invalid_pause",
           path,
-          message: `停顿位置必须合法，时长必须是 1–${MAX_PAUSE_MS}ms 的整数`
+          message: `停顿位置必须合法，时长必须是 ${MIN_PAUSE_MS}–${MAX_PAUSE_MS}ms 的整数`
         });
       }
       return;
@@ -134,12 +138,12 @@ export function validateRichTextV2(
     if (
       annotation.type === "phoneme" &&
       (!annotation.phoneme.trim() ||
-        codePointLength(annotation.phoneme.trim()) > 200)
+        codePointLength(annotation.phoneme.trim()) > MAX_PHONEME_CODE_POINTS)
     ) {
       issues.push({
         code: "invalid_phoneme",
         path,
-        message: "IPA 不能为空且不能超过 200 个码点"
+        message: `IPA 不能为空且不能超过 ${MAX_PHONEME_CODE_POINTS} 个码点`
       });
     }
   });

@@ -82,6 +82,12 @@ import {
   toWordRichText
 } from "../word-model/primitives";
 import { useSaveMeaningsStep } from "./api";
+import {
+  entryContentNodeIssue,
+  meaningsContentLimitIssues,
+  payloadTooLargeMessage,
+  stepContentBodyIssue
+} from "./contentLimits";
 import { ContentCompletionPanel } from "./ContentCompletionPanel";
 import {
   PronunciationPreviewControls,
@@ -2003,13 +2009,36 @@ export function MeaningsAndExamplesStep({
   };
 
   const performSave = async (intent: StepSaveIntent) => {
+    // 体积与长度预检必须在保存路径上，而不是只在编辑器里提示：粘贴、自动补全和
+    // 存量草稿都能绕过编辑器，把超限内容直接带进 payload（对接文档 §13）。
+    // 草稿保存(save)同样要拦——后端两个 intent 走的是同一条校验。
+    const wireContent = toMeaningsWireContent(content, preference);
+    const limitIssues = meaningsContentLimitIssues(wireContent);
+    const payload = {
+      base_revision: word.revision,
+      intent,
+      content: wireContent
+    };
+    const blocking = [
+      ...limitIssues.map((issue) => issue.message),
+      entryContentNodeIssue(word.forms, wireContent),
+      stepContentBodyIssue(payload)
+    ].filter((item): item is string => item !== undefined);
+    if (blocking.length > 0) {
+      setValidationMessages(blocking);
+      message.warning(blocking[0]!);
+      const first = limitIssues[0];
+      if (first) {
+        navigate(`/words/${word.id}/wizard/meanings${editQuery}`, {
+          replace: true,
+          state: { nodeId: first.node_id, field: first.field }
+        });
+      }
+      return;
+    }
     setSaving(true);
     try {
-      const { word: savedWord } = await saveMeanings.mutateAsync({
-        base_revision: word.revision,
-        intent,
-        content: toMeaningsWireContent(content, preference)
-      });
+      const { word: savedWord } = await saveMeanings.mutateAsync(payload);
       setDirty(false);
       onSaved(savedWord);
       message.success(
@@ -2021,6 +2050,13 @@ export function MeaningsAndExamplesStep({
       }
     } catch (error) {
       if (error instanceof HttpError) {
+        // 413 是「内容过大」，不是「格式错误」：处置动作是拆分内容而不是检查格式。
+        const tooLarge = payloadTooLargeMessage(error);
+        if (tooLarge) {
+          setValidationMessages([tooLarge]);
+          message.error(tooLarge);
+          return;
+        }
         const stepIssues = error.field_issues.filter(
           (candidate) => candidate.step === "meanings"
         );

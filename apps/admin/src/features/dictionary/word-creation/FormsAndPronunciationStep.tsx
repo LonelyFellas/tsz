@@ -83,6 +83,11 @@ import {
   useSuggestDialectVariants
 } from "./api";
 import {
+  entryContentNodeIssue,
+  payloadTooLargeMessage,
+  stepContentBodyIssue
+} from "./contentLimits";
+import {
   baseFormComplete,
   baseFormIssueMessage,
   derivedFormIssueMessage,
@@ -2181,6 +2186,16 @@ export function FormsAndPronunciationStep({
     }
   };
 
+  // 413 是「内容过大」，不是「格式错误」：处置动作是拆分内容而不是检查格式。
+  const handlePayloadTooLarge = (error: HttpError): boolean => {
+    const tooLarge = payloadTooLargeMessage(error);
+    if (!tooLarge) return false;
+    finishSaveFlow();
+    setValidationMessages([tooLarge]);
+    message.error(tooLarge);
+    return true;
+  };
+
   const handleFormsFieldIssues = (error: HttpError): boolean => {
     const stepIssues = error.field_issues.filter(
       (candidate) => candidate.step === "forms"
@@ -2261,6 +2276,7 @@ export function FormsAndPronunciationStep({
       await showImpactResult(context, impact);
     } catch (error) {
       if (error instanceof HttpError) {
+        if (handlePayloadTooLarge(error)) return;
         if (handleFormsFieldIssues(error)) return;
         if (error.status === 409 && error.code === "revision_conflict") {
           showRevisionConflict();
@@ -2279,6 +2295,7 @@ export function FormsAndPronunciationStep({
     context: PendingFormsSave
   ): Promise<void> => {
     if (error instanceof HttpError) {
+      if (handlePayloadTooLarge(error)) return;
       if (handleFormsFieldIssues(error)) return;
 
       if (
@@ -2495,8 +2512,6 @@ export function FormsAndPronunciationStep({
       }
     }
 
-    saveFlowActiveRef.current = true;
-    setSaving(true);
     const wireContent = toFormsWireContent({
       pos: content.pos.map((pos) => {
         const configured = partOfSpeechLookup.byCode.get(pos.pos);
@@ -2509,6 +2524,25 @@ export function FormsAndPronunciationStep({
           : pos;
       })
     });
+    // 体积预检放在发请求之前：影响预览与整步保存共用同一个请求体上限，
+    // 超了就地提示，不发出去等 413（对接文档 §13.2）。节点数按 forms + meanings
+    // 合计判定，词义侧取服务端当前副本。
+    const blocking = [
+      entryContentNodeIssue(wireContent, word.meanings),
+      stepContentBodyIssue({
+        base_revision: contentBaseRevision,
+        intent,
+        content: wireContent
+      })
+    ].filter((item): item is string => item !== undefined);
+    if (blocking.length > 0) {
+      setValidationMessages(blocking);
+      message.warning(blocking[0]!);
+      return;
+    }
+
+    saveFlowActiveRef.current = true;
+    setSaving(true);
     await runImpactCheck({
       baseRevision: contentBaseRevision,
       intent,
