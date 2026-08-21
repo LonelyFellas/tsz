@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { withSingleInstanceLock } from "./coverage-lock.mjs";
+import { buildCoverageVitestArgs } from "./coverage-runner-args.mjs";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -46,7 +47,7 @@ async function runCoverage() {
       );
       const child = spawn(
         process.execPath,
-        [vitestCli, "run", "--coverage", ...process.argv.slice(2)],
+        [vitestCli, ...buildCoverageVitestArgs(process.argv.slice(2))],
         {
           cwd: repositoryRoot,
           env: process.env,

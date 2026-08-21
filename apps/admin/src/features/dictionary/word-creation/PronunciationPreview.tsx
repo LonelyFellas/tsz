@@ -1,6 +1,8 @@
 import { SoundOutlined, SyncOutlined } from "@ant-design/icons";
-import { App, Button, Space, Tooltip } from "antd";
+import { App, Button, Space, Tag, Tooltip } from "antd";
 import type { Dialect, RichTextV2 } from "@tsz/types";
+import type { AdminDialectPreference } from "@tsz/shared";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import type {
   VoiceOption,
   VoicePreviewAdapter,
@@ -18,13 +20,19 @@ import {
   useState
 } from "react";
 import { env } from "@/lib/env";
-import { adminVoicePreviewAdapter } from "../voice-editor/dataSource";
+import { DIALECT_SHORT_LABEL } from "../editorConstants";
+import {
+  adminVoicePreviewAdapter,
+  voicePreviewIsMock
+} from "../voice-editor/dataSource";
 
 interface PreviewContextValue {
   enabled: boolean;
   voices: VoiceOption[];
   voicesLoading: boolean;
   voicesError: string;
+  /** 统一内容按管理员偏好挑发音人；在 Provider 里取一次，别让每个控件各自订阅。 */
+  dialectPreference: AdminDialectPreference;
   adapter: VoicePreviewAdapter;
 }
 
@@ -42,6 +50,7 @@ export function PronunciationPreviewProvider({
   readOnly?: boolean;
 }) {
   const enabled = env.VOICE_PREVIEW && !readOnly;
+  const { preference: dialectPreference } = useDialectPreference();
   const [voices, setVoices] = useState<VoiceOption[]>([]);
   const [voicesLoading, setVoicesLoading] = useState(false);
   const [voicesError, setVoicesError] = useState("");
@@ -78,16 +87,22 @@ export function PronunciationPreviewProvider({
       voices,
       voicesLoading,
       voicesError,
+      dialectPreference,
       adapter: adminVoicePreviewAdapter
     }),
-    [enabled, voices, voicesError, voicesLoading]
+    [dialectPreference, enabled, voices, voicesError, voicesLoading]
   );
   return (
     <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>
   );
 }
 
-function localeForDialect(dialect: Dialect): string | undefined {
+function localeForDialect(
+  dialect: Dialect,
+  preference: AdminDialectPreference
+): string | undefined {
+  // 统一内容没有自己的方言，按管理员偏好挑发音人（需求：试听也按偏好选发音人）。
+  if (dialect === "common") return preference === "uk" ? "en-GB" : "en-US";
   if (dialect === "uk") return "en-GB";
   if (dialect === "us") return "en-US";
   return undefined;
@@ -95,13 +110,44 @@ function localeForDialect(dialect: Dialect): string | undefined {
 
 function voiceForDialect(
   voices: VoiceOption[],
-  dialect: Dialect
+  dialect: Dialect,
+  preference: AdminDialectPreference
 ): VoiceOption | undefined {
-  const locale = localeForDialect(dialect)?.toLowerCase();
-  if (locale) {
-    return voices.find((voice) => voice.locale.toLowerCase() === locale);
-  }
+  const locale = localeForDialect(dialect, preference)?.toLowerCase();
+  const matched = locale
+    ? voices.find((voice) => voice.locale.toLowerCase() === locale)
+    : undefined;
+  if (matched) return matched;
+  // 明确标了方言的内容找不到对应发音人时不降级——否则英式词形会用美式音朗读。
+  // 统一内容本来就没有自己的方言，偏好侧发音人缺席时回退目录默认，保持可试听。
+  if (dialect !== "common") return undefined;
   return voices.find((voice) => voice.isDefault) ?? voices[0];
+}
+
+/**
+ * 当前页面缺少哪一侧发音人的常驻说明。
+ *
+ * 目录里没有匹配 locale 的 voice 时「获取语音」只会禁用，原因过去只挂在悬停
+ * Tooltip 上，用户不悬停就看不到；这里给页面一句可直接读到的说明。
+ */
+export function usePronunciationVoiceNotice(
+  dialects: readonly Dialect[]
+): string | undefined {
+  const context = useContext(PreviewContext);
+  if (!context?.enabled || context.voicesLoading) return undefined;
+  if (context.voicesError) return context.voicesError;
+  const preference = context.dialectPreference;
+  const missing = dialects.filter(
+    (dialect) => !voiceForDialect(context.voices, dialect, preference)
+  );
+  if (missing.length === 0) return undefined;
+  const labels = missing
+    .map(
+      (dialect) =>
+        `${DIALECT_SHORT_LABEL[dialect]}（${localeForDialect(dialect, preference) ?? "英语"}）`
+    )
+    .join("、");
+  return `${labels}暂无可用发音人，对应的「获取语音」已禁用`;
 }
 
 export function PronunciationPreviewControls({
@@ -136,7 +182,11 @@ export function PronunciationPreviewControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const voice = voiceForDialect(context.voices, dialect);
+  const voice = voiceForDialect(
+    context.voices,
+    dialect,
+    context.dialectPreference
+  );
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
@@ -309,7 +359,7 @@ export function PronunciationPreviewControls({
         : !text
           ? "请先填写词形拼写"
           : !voice
-            ? `${localeForDialect(dialect) ?? "英语"} 暂无可用发音人`
+            ? `${localeForDialect(dialect, context.dialectPreference) ?? "英语"} 暂无可用发音人`
             : "获取语音";
 
   const controls = (
@@ -324,6 +374,18 @@ export function PronunciationPreviewControls({
         />
       </Tooltip>
       {children}
+      {voicePreviewIsMock && (
+        <Tooltip title="当前走本地 TTS mock，试听音频不是真实合成结果">
+          <Tag
+            className="word-pronunciation-mock-tag"
+            color="warning"
+            role="note"
+            aria-label="试听走本地 TTS mock，音频不是真实合成结果"
+          >
+            模拟
+          </Tag>
+        </Tooltip>
+      )}
       <Tooltip title={status || unavailableReason}>
         <Button
           className="word-pronunciation-voice-action word-pronunciation-sync-action"

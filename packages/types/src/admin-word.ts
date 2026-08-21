@@ -3,6 +3,8 @@ import type { PartOfSpeechCode, SubPartOfSpeechCode } from "./part-of-speech";
 // 智能词库 V2 列表、筛选与共享枚举；wire 字段 1:1 镜像 Rust OpenAPI。
 
 export type Dialect = "uk" | "us" | "common";
+/** 检测基准侧：管理员当初输入、命中内置词典的那一侧；不可能是 `common`。 */
+export type SourceDialect = "uk" | "us";
 export type CefrLevel = "A1" | "A2" | "B1" | "B2" | "C1" | "C2";
 export type AdminWordKind = "word" | "phrase";
 export type AdminWordStatus = "draft" | "published" | "archived";
@@ -50,9 +52,13 @@ export interface AdminWordListQuery {
 export interface AdminWordListItem {
   schema_version: 2;
   id: string;
+  /** 并列拼写按检测基准侧在前拼接，与 `dialects` 同序。 */
   headword: string;
   kind: AdminWordKind;
+  /** 与 `headword` 同序：`common` → 检测基准侧 → 另一侧。 */
   dialects: Dialect[];
+  /** 检测基准侧；`mode = unified` 的词条没有基准侧，字段整体省略。 */
+  source_dialect?: SourceDialect;
   gloss: string;
   pos_list: WordPosTag[];
   /** 聚合所有词义等级,升序 */

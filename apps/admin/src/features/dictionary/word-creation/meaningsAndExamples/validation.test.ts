@@ -4,6 +4,11 @@ import { wordFixture } from "../wordCreation.test.helper";
 import {
   countPosMeaningIssues,
   englishTextComplete,
+  englishTextIssueField,
+  grammarStructureIssueTarget,
+  wordSenseComplete,
+  wordSenseIssueTarget,
+  wordSentenceIssueTarget,
   validateMeanings
 } from "./validation";
 
@@ -56,6 +61,160 @@ describe("meanings and examples validation", () => {
 
   it("完整 fixture 无校验问题", () => {
     expect(validateMeanings(wordFixture({ ready: true }).meanings)).toEqual([]);
+  });
+
+  it("存量双份英文内容的 issue 定位指向缺失的那一侧", () => {
+    const ready = (id: string, text: string) => ({
+      state: "ready" as const,
+      variant: {
+        id,
+        origin: "manual" as const,
+        value: { version: 1 as const, text, spans: [], liaisons: [] }
+      }
+    });
+    const split = {
+      mode: "distinguish" as const,
+      source_dialect: "us" as const,
+      uk: ready("legacy-uk", ""),
+      us: ready("legacy-us", "American")
+    } satisfies EnglishTextV2;
+
+    expect(englishTextIssueField(split)).toBe("content.uk");
+    expect(
+      englishTextIssueField({ ...split, uk: ready("legacy-uk", "British") })
+    ).toBeUndefined();
+    expect(englishTextIssueField({ ...split, us: { state: "missing" } })).toBe(
+      "content.uk"
+    );
+  });
+
+  it("英语、语法和例句 issue target 精确到首个无效叶字段", () => {
+    const unified = {
+      mode: "unified",
+      common: {
+        id: "common",
+        origin: "manual",
+        value: { version: 1, text: "", spans: [], liaisons: [] }
+      }
+    } satisfies EnglishTextV2;
+    expect(englishTextIssueField(unified)).toBe("content.common");
+    unified.common.value.text = "complete";
+    expect(englishTextIssueField(unified)).toBeUndefined();
+
+    const word = wordFixture({ ready: true });
+    const grammar = structuredClone(
+      word.meanings.pos[0]!.grammar_structures[0]!
+    );
+    // 新建流程写的单条 common 是合法形状。
+    expect(
+      grammarStructureIssueTarget(grammar, word.headwords)
+    ).toBeUndefined();
+
+    const content = grammar.variants[0]!.content;
+    const ukVariant = { id: "grammar-uk", dialect: "uk" as const, content };
+    const usVariant = { id: "grammar-us", dialect: "us" as const, content };
+    // 存量未收敛的英美双条同样合法（后端 P1 之后放宽）。
+    grammar.variants = [ukVariant, usVariant];
+    expect(
+      grammarStructureIssueTarget(grammar, word.headwords)
+    ).toBeUndefined();
+
+    // 语法结构只有一个输入框，定位一律指向 content。缺一侧不合法。
+    grammar.variants = [ukVariant];
+    expect(grammarStructureIssueTarget(grammar, word.headwords)).toEqual({
+      node_id: grammar.id,
+      field: "content"
+    });
+    // 方言重复不合法。
+    grammar.variants = [ukVariant, usVariant, { ...usVariant, id: "dup-us" }];
+    expect(grammarStructureIssueTarget(grammar, word.headwords)).toEqual({
+      node_id: grammar.id,
+      field: "content"
+    });
+    // 统一词条只接受 common，不接受英美双条。
+    grammar.variants = [ukVariant, usVariant];
+    expect(
+      grammarStructureIssueTarget(grammar, { mode: "unified", common: "far" })
+    ).toEqual({ node_id: grammar.id, field: "content" });
+
+    const sense = word.meanings.pos[0]!.senses[0]!;
+    const sentence = structuredClone(sense.sentences[0]!);
+    expect(
+      wordSentenceIssueTarget(sentence, sense.id, word.id)
+    ).toBeUndefined();
+
+    sentence.level = "invalid" as never;
+    expect(wordSentenceIssueTarget(sentence, sense.id, word.id)).toEqual({
+      node_id: sentence.id,
+      field: "level"
+    });
+    sentence.level = "A1";
+    // A1 之后英文例句恒为单份，缺失定位到 content.common。
+    if (sentence.en_text.mode !== "unified") {
+      throw new Error("fixture should carry a single English variant");
+    }
+    const englishText = sentence.en_text.common.value.text;
+    sentence.en_text.common.value.text = "";
+    expect(wordSentenceIssueTarget(sentence, sense.id, word.id)).toEqual({
+      node_id: sentence.id,
+      field: "content.common"
+    });
+    sentence.en_text.common.value.text = englishText;
+    sentence.zh_text.text = "";
+    expect(wordSentenceIssueTarget(sentence, sense.id, word.id)).toEqual({
+      node_id: sentence.id,
+      field: "zh_text"
+    });
+    sentence.zh_text.text = "完整译文";
+    sentence.links = [];
+    expect(wordSentenceIssueTarget(sentence, sense.id, word.id)).toEqual({
+      node_id: sentence.id,
+      field: "sentence"
+    });
+  });
+
+  it("词义 issue target 覆盖无效语法引用与关系词字段", () => {
+    const word = wordFixture({ ready: true });
+    const pos = word.meanings.pos[0]!;
+    const sense = structuredClone(pos.senses[0]!);
+    const senseGroupIds = new Set(
+      word.meanings.sense_groups.map((group) => group.id)
+    );
+    const grammarIds = new Set(
+      pos.grammar_structures.map((grammar) => grammar.id)
+    );
+
+    expect(wordSenseComplete(sense, senseGroupIds, grammarIds)).toBe(true);
+
+    sense.definitions[0]!.grammar_structure_id = "missing-grammar";
+    expect(wordSenseIssueTarget(sense, senseGroupIds, grammarIds)).toEqual({
+      node_id: sense.definitions[0]!.id,
+      field: "grammar_structure_id"
+    });
+    delete sense.definitions[0]!.grammar_structure_id;
+
+    sense.relations = [
+      {
+        id: "relation",
+        relation: "synonym",
+        target_word_id: "",
+        target_sense_id: "",
+        score: "50"
+      }
+    ];
+    expect(wordSenseIssueTarget(sense, senseGroupIds, grammarIds)).toEqual({
+      node_id: "relation",
+      field: "target_word_id"
+    });
+
+    sense.relations[0]!.target_word_id = "target-word";
+    sense.relations[0]!.target_sense_id = "target-sense";
+    sense.relations[0]!.score = "invalid";
+    expect(wordSenseIssueTarget(sense, senseGroupIds, grammarIds)).toEqual({
+      node_id: "relation",
+      field: "score"
+    });
+    expect(wordSenseComplete(sense, senseGroupIds, grammarIds)).toBe(false);
   });
 
   it("按稳定顺序汇总并去重语义区间、语法、词义、释义、例句与关系问题", () => {

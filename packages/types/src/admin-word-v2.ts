@@ -194,6 +194,74 @@ export interface DraftMeaningsStepContent {
   pos: WordPosMeaningsV2[];
 }
 
+export type ContentCompletionScope =
+  "grammar_structures" | "meanings" | "examples";
+export type ContentCompletionFillPolicy = "missing_only";
+export type ContentCompletionJobStatus =
+  "pending" | "running" | "completed" | "partial" | "failed";
+export type ContentCompletionPartitionStatus =
+  "pending" | "running" | "completed" | "missing" | "failed";
+
+export interface CreateContentCompletionJobInput {
+  base_revision: number;
+  scope: ContentCompletionScope[];
+  fill_policy: ContentCompletionFillPolicy;
+}
+
+export interface RetryContentCompletionJobInput {
+  pos_ids: string[];
+}
+
+export type ContentCompletionEvidenceKind =
+  "dictionary_grounded_translation" | "model_inferred" | "model_generated";
+
+export interface ContentCompletionProvenance {
+  dictionary: {
+    provider: string;
+    dataset_version: string;
+    source_record_keys: string[];
+  };
+  generation: {
+    provider: string;
+    model: string;
+    prompt_version: string;
+  };
+  field_origins: {
+    grammar_structures: ContentCompletionEvidenceKind;
+    meanings: ContentCompletionEvidenceKind;
+    examples: ContentCompletionEvidenceKind;
+    cefr: ContentCompletionEvidenceKind;
+  };
+  generated_at: string;
+}
+
+export interface ContentCompletionPartition {
+  pos_id: string;
+  pos: string;
+  status: ContentCompletionPartitionStatus;
+  attempt: number;
+  error_code?: string;
+  error_detail?: string;
+  provenance?: ContentCompletionProvenance;
+}
+
+export interface ContentCompletionJob {
+  id: string;
+  entry_id: string;
+  base_revision: number;
+  status: ContentCompletionJobStatus;
+  requested_scope: ContentCompletionScope[];
+  fill_policy: ContentCompletionFillPolicy;
+  partitions: ContentCompletionPartition[];
+  result?: DraftMeaningsStepContent;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContentCompletionJobEnvelope {
+  job: ContentCompletionJob;
+}
+
 export interface DictionaryProviderV2 {
   name: string;
   version: string;
@@ -303,6 +371,30 @@ export interface AdminWordV2Envelope {
   word: AdminWordV2;
 }
 
+/**
+ * 一个已退役但仍被永久占用的稳定槽位身份。
+ *
+ * 稳定槽位的键是 `(entry_id, parent_node_id, node_role)`，方言编在 `node_role`
+ * 里（`forms.form_variant:common`）。这个键一旦保存过就永久绑定同一个节点 ID：
+ * 节点从草稿里消失只是被标记退役，重新出现时必须沿用原 ID，否则报
+ * `stable_node_id_changed`。
+ */
+export interface RetiredStableSlotV2 {
+  id: string;
+  parent_node_id: string;
+  node_role: string;
+}
+
+/**
+ * `GET /entries/{id}` 的响应：草稿本体 + 重建编辑态所需的节点身份信息。
+ *
+ * 命令类接口仍返回 {@link AdminWordV2Envelope}；退役身份是编辑器恢复用的元数据，
+ * 不属于词条内容，也不会进入不可变的 publication 快照。
+ */
+export interface AdminWordDraftV2Envelope extends AdminWordV2Envelope {
+  retired_stable_slots: RetiredStableSlotV2[];
+}
+
 export interface SaveWordStepInput<TContent> {
   base_revision: number;
   intent: StepSaveIntent;
@@ -348,6 +440,7 @@ export interface BuiltinDictionaryMatchedV2 {
   status: "matched";
   headwords: WordHeadwordsV2;
   suggested_forms: DraftFormsStepContent;
+  coverage: DictionaryCoverageV2;
 }
 
 export type BuiltinDictionaryUnmatchedV2 =

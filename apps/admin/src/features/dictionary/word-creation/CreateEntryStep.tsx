@@ -2,7 +2,6 @@ import {
   CheckCircleFilled,
   CloseCircleFilled,
   InfoCircleOutlined,
-  SafetyCertificateOutlined,
   SearchOutlined
 } from "@ant-design/icons";
 import {
@@ -10,20 +9,19 @@ import {
   App,
   Button,
   Card,
-  Col,
   Descriptions,
   Form,
   Input,
-  Row,
   Select,
   Space,
-  Switch,
   Tag,
   Typography
 } from "antd";
 import type {
   AdminWordV2,
   DetectWordResponseV2,
+  DictionaryCoverageV2,
+  DraftFormsStepContent,
   SurfaceMatchPageV2,
   WordHeadwordsV2
 } from "@tsz/types";
@@ -38,6 +36,7 @@ import {
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { newWordNodeId } from "../word-model/primitives";
 import { useCreateWordV2, useDetectWordV2 } from "./api";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import { STATUS_LABEL } from "../labels";
 import {
@@ -231,13 +230,94 @@ function SurfaceWarningMatches({
   );
 }
 
+const COVERAGE_FIELD_LABEL: Record<keyof DictionaryCoverageV2, string> = {
+  forms: "词形",
+  pronunciations: "读音",
+  meanings: "释义",
+  examples: "例句",
+  frequency: "词频"
+};
+
+/**
+ * 词典未完全覆盖的部分,用于把 partial/missing 如实说给录入者。
+ * coverage 缺失时按无缺口处理:它只是提示信息,不该让整张检测卡崩掉。
+ */
+function coverageGapSummary(
+  coverage?: DictionaryCoverageV2
+): string | undefined {
+  const partial: string[] = [];
+  const missing: string[] = [];
+  for (const field of Object.keys(
+    COVERAGE_FIELD_LABEL
+  ) as (keyof DictionaryCoverageV2)[]) {
+    if (coverage?.[field] === "partial")
+      partial.push(COVERAGE_FIELD_LABEL[field]);
+    if (coverage?.[field] === "missing")
+      missing.push(COVERAGE_FIELD_LABEL[field]);
+  }
+  const clauses = [
+    partial.length > 0 ? `${partial.join("、")}仅部分覆盖` : undefined,
+    missing.length > 0 ? `${missing.join("、")}缺失` : undefined
+  ].filter((clause): clause is string => clause !== undefined);
+  return clauses.length > 0 ? clauses.join("；") : undefined;
+}
+
+/**
+ * 原形拼写就是录入者刚确认的主词本身,必须与词典带回的派生词形分开计数,
+ * 否则「6 个词形」会被误读成第 2 步已有 6 个可用词形。
+ */
+function suggestionCounts(forms: DraftFormsStepContent) {
+  const counts = { baseForms: 0, derivedForms: 0, pronunciations: 0 };
+  for (const pos of forms.pos) {
+    const derivedSlots = pos.form_groups.flatMap((group) => group.slots);
+    if (pos.base_form.variants.some((variant) => variant.spelling.trim())) {
+      counts.baseForms += 1;
+    }
+    counts.derivedForms += derivedSlots.filter((slot) =>
+      slot.variants.some((variant) => variant.spelling.trim())
+    ).length;
+    for (const slot of [pos.base_form, ...derivedSlots]) {
+      for (const variant of slot.variants) {
+        counts.pronunciations += variant.pronunciations.filter(
+          (pronunciation) =>
+            pronunciation.dict_phonetic.trim() &&
+            pronunciation.actual_pron.trim()
+        ).length;
+      }
+    }
+  }
+  return counts;
+}
+
+/**
+ * 未命中词典时没有任何建议数据,必须如实说清后续每个字段都要人工录入,
+ * 否则「可创建」会被误读成「词典已经带回了内容」。
+ */
+const NOT_FOUND_SUMMARY =
+  "内置词典对该词条没有任何依据：基本词性、词形、字典音标与实际发音、释义和例句都需要在后续步骤按平台教学口径自行录入。";
+
+/** 命中词典后的说明文案:先讲派生词形,再交代覆盖缺口。 */
+function matchedSummary(
+  counts: ReturnType<typeof suggestionCounts>,
+  coverageGaps?: string
+): string {
+  return [
+    `词典带回派生词形 ${counts.derivedForms} 个、完整读音 ${counts.pronunciations} 组；另有 ${counts.baseForms} 个词性的原形拼写来自刚确认的主词，不计为新增词形。`,
+    counts.derivedForms === 0
+      ? "本次没有带回任何派生词形，需要在「词形与发音」步骤手工补录。"
+      : "",
+    coverageGaps
+      ? `词典覆盖不完整：${coverageGaps}，缺口内容需要在后续步骤人工补充。`
+      : "释义、例句和词频若未显示，将在后续步骤明确要求人工补充。"
+  ].join("");
+}
+
 function DetectionStatus({
   result,
   lookup,
   catalogLoaded,
   catalogUnavailable,
   surfaceState,
-  surfaceNeedsRecheck,
   onSurfaceExpired
 }: {
   result: DetectWordResponseV2;
@@ -245,7 +325,6 @@ function DetectionStatus({
   catalogLoaded: boolean;
   catalogUnavailable: boolean;
   surfaceState: SurfaceSnapshotState & { retry: () => void };
-  surfaceNeedsRecheck: boolean;
   onSurfaceExpired: () => void;
 }) {
   const builtin = result.builtin_dictionary;
@@ -257,15 +336,13 @@ function DetectionStatus({
         )
       : [];
   const surfaceWarningReady =
-    smart.status === "warning" &&
-    (surfaceNeedsRecheck || canAcknowledgeSurfaceSnapshot(surfaceState));
+    smart.status === "warning" && canAcknowledgeSurfaceSnapshot(surfaceState);
   const dictionaryReady =
     (builtin.status === "matched" &&
       catalogLoaded &&
       unknownPos.length === 0 &&
       !catalogUnavailable) ||
-    (builtin.status === "not_found" &&
-      (result.entry_kind === "phrase" || surfaceWarningReady));
+    builtin.status === "not_found";
   const canContinue =
     dictionaryReady && (smart.status === "clear" || surfaceWarningReady);
   const hasArchivedDuplicate =
@@ -275,41 +352,29 @@ function DetectionStatus({
     smart.status === "duplicate"
       ? smart.duplicates.find((item) => item.status === "archived")
       : undefined;
-  const suggestionCoverage =
+  const coverageGaps =
     builtin.status === "matched"
-      ? builtin.suggested_forms.pos.reduce(
-          (summary, pos) => {
-            const slots = [
-              pos.base_form,
-              ...pos.form_groups.flatMap((group) => group.slots)
-            ];
-            for (const slot of slots) {
-              summary.forms += slot.variants.filter((variant) =>
-                variant.spelling.trim()
-              ).length;
-              for (const variant of slot.variants) {
-                summary.pronunciations += variant.pronunciations.filter(
-                  (pronunciation) =>
-                    pronunciation.dict_phonetic.trim() &&
-                    pronunciation.actual_pron.trim()
-                ).length;
-              }
-            }
-            return summary;
-          },
-          { forms: 0, pronunciations: 0 }
-        )
+      ? coverageGapSummary(builtin.coverage)
       : undefined;
+  // 命中但覆盖不全时不能再呈现为「完全成功」,否则 partial 与全匹配毫无区别。
+  const dictionaryPartial =
+    builtin.status === "matched" && coverageGaps !== undefined;
   return (
     <Card
       className="word-detection-result-card"
       size="small"
       title="词典检测结果"
       extra={
-        <Tag color={canContinue ? "success" : "error"}>
+        <Tag
+          color={
+            !canContinue ? "error" : dictionaryPartial ? "warning" : "success"
+          }
+        >
           {canContinue
             ? builtin.status === "matched"
-              ? "已匹配"
+              ? dictionaryPartial
+                ? "部分匹配"
+                : "已匹配"
               : "可创建"
             : "不可继续"}
         </Tag>
@@ -317,21 +382,31 @@ function DetectionStatus({
     >
       <Space orientation="vertical" size={16} style={{ width: "100%" }}>
         <Alert
-          type={canContinue ? "success" : "warning"}
+          // 未命中虽可继续,但没有任何词典依据,不能用绿色成功态淡化。
+          type={
+            canContinue && !dictionaryPartial && builtin.status === "matched"
+              ? "success"
+              : "warning"
+          }
           showIcon
           title={
-            result.entry_kind === "phrase" && builtin.status === "not_found"
-              ? "内置词典没有匹配项，将创建空白短语草稿"
-              : builtin.status === "matched"
-                ? "内置词典已找到规范词条"
-                : builtin.status === "not_found"
-                  ? "内置词典没有匹配项"
-                  : "内置词典暂时不可用"
+            builtin.status === "matched"
+              ? dictionaryPartial
+                ? "内置词典只找到部分内容"
+                : "内置词典已找到规范词条"
+              : builtin.status === "not_found"
+                ? `内置词典没有匹配项，将创建空白${result.entry_kind === "phrase" ? "短语" : "单词"}草稿`
+                : "内置词典暂时不可用"
           }
           description={
             builtin.status === "matched"
-              ? `本次实际带出 ${suggestionCoverage?.forms ?? 0} 个词形、${suggestionCoverage?.pronunciations ?? 0} 组完整读音。释义、例句和词频若未显示，将在后续步骤明确要求人工补充。`
-              : undefined
+              ? matchedSummary(
+                  suggestionCounts(builtin.suggested_forms),
+                  coverageGaps
+                )
+              : builtin.status === "not_found"
+                ? NOT_FOUND_SUMMARY
+                : undefined
           }
         />
         <Descriptions column={1} size="small">
@@ -400,13 +475,6 @@ function DetectionStatus({
                   />
                 )}
               </Space>
-            ) : smart.status === "warning" && surfaceNeedsRecheck ? (
-              <Alert
-                type="warning"
-                showIcon
-                title="最终主词已修改，需要重新检查同名或同形词条"
-                description="旧 snapshot 与确认 token 已清除；点击“重新检查最终主词”后，服务端会按当前输入重新检测。"
-              />
             ) : smart.status === "warning" ? (
               <SurfaceWarningMatches
                 state={surfaceState}
@@ -451,106 +519,67 @@ function DetectionStatus({
   );
 }
 
-function HeadwordConfirmation({
+/**
+ * 第 1 步不再让管理员决定「要不要区分英美」（A1）：双拼写是内置词典给的客观事实，
+ * 检测给出什么就照收什么，这里只做只读陈述。主次顺序按管理员的方言偏好排——
+ * 原先按输入侧排会让「输入 center 却看到 centre 在前」被读成主词被静默替换（手测 C5）。
+ */
+function HeadwordFact({
   value,
-  matchedDialect,
-  preservedDistinguish,
-  allowDistinguish,
-  onChange
+  dictionaryMatched
 }: {
   value: WordHeadwordsV2;
-  matchedDialect?: "common" | "uk" | "us";
-  preservedDistinguish?: Extract<WordHeadwordsV2, { mode: "distinguish" }>;
-  allowDistinguish: boolean;
-  onChange: (next: WordHeadwordsV2) => void;
+  dictionaryMatched: boolean;
 }) {
-  const source =
-    value.mode === "distinguish" ? value.source_dialect : undefined;
-  const uk = value.mode === "distinguish" ? value.uk : value.common;
-  const us = value.mode === "distinguish" ? value.us : value.common;
-  return (
-    <Card
-      className="word-headword-confirmation-card"
-      size="small"
-      title="确认英美主词"
-    >
-      <div className="word-dialect-detection-row">
-        <div>
-          <Typography.Text strong>区分英美词形</Typography.Text>
-          <Typography.Text type="secondary">
-            命中侧作为检测基准，另一侧可按实际情况调整
-          </Typography.Text>
+  const { preference } = useDialectPreference();
+  if (value.mode === "unified") {
+    return (
+      <Card className="word-headword-fact-card" size="small" title="词条主词">
+        <div className="word-headword-fact-primary">
+          <span className="dialect-dot dialect-dot-common" />
+          <Typography.Text strong>{value.common}</Typography.Text>
         </div>
-        <Switch
-          aria-label="区分英美词形"
-          checked={value.mode === "distinguish"}
-          disabled={!allowDistinguish}
-          onChange={(checked) => {
-            if (checked && value.mode === "unified") {
-              onChange(
-                preservedDistinguish ?? {
-                  mode: "distinguish",
-                  uk: value.common,
-                  us: value.common,
-                  source_dialect:
-                    matchedDialect === "uk" || matchedDialect === "us"
-                      ? matchedDialect
-                      : "us"
-                }
-              );
-            } else if (!checked && value.mode === "distinguish") {
-              onChange({
-                mode: "unified",
-                common: value[value.source_dialect]
-              });
-            }
-          }}
-          title="手动选择是否区分英美词形"
-        />
-      </div>
-      {source && (
-        <Alert
-          type="info"
-          showIcon
-          icon={<SafetyCertificateOutlined />}
-          title={`${source === "uk" ? "英式" : "美式"}是本次输入命中的检测基准，已锁定；请确认另一侧词形。`}
-          style={{ marginBottom: 16 }}
-        />
-      )}
-      <Row gutter={16}>
-        <Col xs={24} md={12}>
-          <div className="dialect-panel dialect-panel-uk">
-            <Typography.Text strong>英式英语 · BrE</Typography.Text>
-            <Input
-              aria-label="英式主词"
-              value={uk}
-              disabled={value.mode === "unified" || source === "uk"}
-              onChange={(event) => {
-                if (value.mode === "distinguish") {
-                  onChange({ ...value, uk: event.target.value });
-                }
-              }}
-              style={{ marginTop: 10 }}
-            />
-          </div>
-        </Col>
-        <Col xs={24} md={12}>
-          <div className="dialect-panel dialect-panel-us">
-            <Typography.Text strong>美式英语 · AmE</Typography.Text>
-            <Input
-              aria-label="美式主词"
-              value={us}
-              disabled={value.mode === "unified" || source === "us"}
-              onChange={(event) => {
-                if (value.mode === "distinguish") {
-                  onChange({ ...value, us: event.target.value });
-                }
-              }}
-              style={{ marginTop: 10 }}
-            />
-          </div>
-        </Col>
-      </Row>
+        <Typography.Text type="secondary">
+          {dictionaryMatched
+            ? "内置词典未发现该词有英式 / 美式拼写差异。"
+            : "内置词典未收录该词条，按你输入的拼写建档。"}
+        </Typography.Text>
+      </Card>
+    );
+  }
+
+  const sides = (
+    preference === "uk" ? (["uk", "us"] as const) : (["us", "uk"] as const)
+  ).map((dialect) => ({
+    dialect,
+    spelling: dialect === "uk" ? value.uk : value.us,
+    label: dialect === "uk" ? "英式" : "美式"
+  }));
+
+  return (
+    <Card className="word-headword-fact-card" size="small" title="词条主词">
+      {sides.map(({ dialect, spelling, label }, index) => (
+        <div
+          key={dialect}
+          className={
+            index === 0
+              ? "word-headword-fact-primary"
+              : "word-headword-fact-secondary"
+          }
+        >
+          <span className={`dialect-dot dialect-dot-${dialect}`} />
+          {index === 0 ? (
+            <Typography.Text strong>{spelling}</Typography.Text>
+          ) : (
+            <Typography.Text>{spelling}</Typography.Text>
+          )}
+          <Typography.Text type="secondary">{label}</Typography.Text>
+        </div>
+      ))}
+      <Typography.Text type="secondary">
+        内置词典识别到该词有两种地区拼写，两者都会记录在这条词条上。
+        词义与例句只维护一份，按你的方言偏好录入。
+      </Typography.Text>
     </Card>
   );
 }
@@ -569,31 +598,23 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
   const [headwords, setHeadwords] = useState<WordHeadwordsV2>();
   const [dirty, setDirty] = useState(false);
   const [creating, setCreating] = useState(false);
-  const [headwordsChangedAfterDetection, setHeadwordsChangedAfterDetection] =
-    useState(false);
   const [surfaceOverridePage, setSurfaceOverridePage] =
     useState<SurfaceMatchPageV2>();
   const requestVersion = useRef(0);
   const createKey = useRef(newWordNodeId());
-  const preservedDistinguish = useRef<
-    Extract<WordHeadwordsV2, { mode: "distinguish" }> | undefined
-  >(undefined);
   const allowSavedNavigation = useUnsavedWordChanges(dirty);
   const surfaceInitialPage =
-    !headwordsChangedAfterDetection &&
     result?.smart_dictionary.status === "warning"
       ? (surfaceOverridePage ?? result.smart_dictionary.surface_match_page)
       : undefined;
-  const surfaceResetKey = `${result?.detection_id ?? "none"}:${JSON.stringify(headwords)}:${headwordsChangedAfterDetection}`;
+  const surfaceResetKey = `${result?.detection_id ?? "none"}:${JSON.stringify(headwords)}`;
   const surfaceState = useSurfaceSnapshot(surfaceInitialPage, surfaceResetKey);
 
   const resetDetection = () => {
     requestVersion.current += 1;
     setResult(undefined);
     setHeadwords(undefined);
-    setHeadwordsChangedAfterDetection(false);
     setSurfaceOverridePage(undefined);
-    preservedDistinguish.current = undefined;
     onHeadwordsChange(undefined);
     createKey.current = newWordNodeId();
     detectWord.reset();
@@ -611,7 +632,6 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
     createKey.current = newWordNodeId();
     setResult(undefined);
     setHeadwords(undefined);
-    setHeadwordsChangedAfterDetection(false);
     setSurfaceOverridePage(undefined);
     onHeadwordsChange(undefined);
     detectWord.reset();
@@ -640,15 +660,10 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
       const nextHeadwords =
         matched.status === "matched"
           ? matched.headwords
-          : matched.status === "not_found" &&
-              (next.entry_kind === "phrase" ||
-                next.smart_dictionary.status === "warning")
+          : matched.status === "not_found"
             ? ({ mode: "unified", common: next.request.headword } as const)
             : undefined;
       setHeadwords(nextHeadwords);
-      setHeadwordsChangedAfterDetection(false);
-      preservedDistinguish.current =
-        nextHeadwords?.mode === "distinguish" ? nextHeadwords : undefined;
       onHeadwordsChange(nextHeadwords);
     } catch (error) {
       if (version === requestVersion.current) {
@@ -663,39 +678,19 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
     result.builtin_dictionary.suggested_forms.pos.every((item) =>
       partOfSpeechLookup.byCode.has(item.pos)
     );
-  const unmatchedPhraseReady =
-    result?.entry_kind === "phrase" &&
-    result.builtin_dictionary.status === "not_found";
-  const unmatchedSurfaceWordReady =
-    result?.entry_kind === "word" &&
-    result.builtin_dictionary.status === "not_found" &&
-    result.smart_dictionary.status === "warning" &&
-    (headwordsChangedAfterDetection ||
-      canAcknowledgeSurfaceSnapshot(surfaceState));
+  // 未命中时后端以管理员原输入建 Unified 词条,单词与短语走同一条路径:
+  // 内置词典是静态快照,新造词、品牌名、缩写和行业术语本来就不该被它挡住。
+  const unmatchedDictionaryReady =
+    result?.builtin_dictionary.status === "not_found";
   const canCreate =
-    (matchedDictionaryReady ||
-      unmatchedPhraseReady ||
-      unmatchedSurfaceWordReady) &&
+    (matchedDictionaryReady || unmatchedDictionaryReady) &&
     (result.smart_dictionary.status === "clear" ||
       (result.smart_dictionary.status === "warning" &&
-        (headwordsChangedAfterDetection ||
-          canAcknowledgeSurfaceSnapshot(surfaceState)))) &&
+        canAcknowledgeSurfaceSnapshot(surfaceState))) &&
     headwords !== undefined &&
     (headwords.mode === "unified"
       ? headwords.common.trim() !== ""
       : headwords.uk.trim() !== "" && headwords.us.trim() !== "");
-
-  const updateHeadwords = (next: WordHeadwordsV2) => {
-    createKey.current = newWordNodeId();
-    setHeadwordsChangedAfterDetection(true);
-    setSurfaceOverridePage(undefined);
-    if (next.mode === "distinguish") {
-      preservedDistinguish.current = next;
-    }
-    setDirty(true);
-    setHeadwords(next);
-    onHeadwordsChange(next);
-  };
 
   const createDraft = async () => {
     if (!result || !headwords || !canCreate || creating) return;
@@ -706,8 +701,7 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
         idempotency_key: createKey.current,
         detection_id: result.detection_id,
         headwords,
-        ...(canAcknowledgeSurfaceSnapshot(surfaceState) &&
-        !headwordsChangedAfterDetection
+        ...(canAcknowledgeSurfaceSnapshot(surfaceState)
           ? {
               confirmed_surface_match_token:
                 surfaceState.surface_confirmation_token
@@ -738,7 +732,6 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
         error.meta?.surface_match_page
       ) {
         setSurfaceOverridePage(error.meta.surface_match_page);
-        setHeadwordsChangedAfterDetection(false);
         setResult({
           ...result,
           smart_dictionary: {
@@ -840,19 +833,15 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
               catalogLoaded={partOfSpeechCatalog.data !== undefined}
               catalogUnavailable={partOfSpeechCatalog.isError}
               surfaceState={surfaceState}
-              surfaceNeedsRecheck={headwordsChangedAfterDetection}
               onSurfaceExpired={resetDetection}
             />
             {headwords && (
               <div className="word-headword-confirmation-wrap">
-                <HeadwordConfirmation
+                <HeadwordFact
                   value={headwords}
-                  matchedDialect={result.matched_dialect}
-                  preservedDistinguish={preservedDistinguish.current}
-                  allowDistinguish={
+                  dictionaryMatched={
                     result.builtin_dictionary.status === "matched"
                   }
-                  onChange={updateHeadwords}
                 />
               </div>
             )}
@@ -884,9 +873,7 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
                 onClick={() => void createDraft()}
               >
                 {result.smart_dictionary.status === "warning"
-                  ? headwordsChangedAfterDetection
-                    ? "重新检查最终主词"
-                    : "仍继续创建"
+                  ? "仍继续创建"
                   : "确认并进入词形与发音"}
               </Button>
             )}

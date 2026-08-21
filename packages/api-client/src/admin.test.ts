@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ActivatePublicationInput,
+  CreateContentCompletionJobInput,
   EntryLifecycleBatchInput,
   EntryLifecycleInput,
   PreviewFormsImpactInputV2,
@@ -87,6 +88,16 @@ describe("createAdminEndpoints", () => {
     const api = createAdminEndpoints(http);
     api.profile();
     expect(http.get).toHaveBeenCalledWith("/profile");
+  });
+
+  // 个人偏好挂在 profile 而不是 /admin/settings/*：后者是全局目录配置（仅超管可写），
+  // 这里改的恒是自己的，请求体里没有管理员 ID。
+  it("updateProfilePreferences → PATCH /profile/preferences 只带 dialect", () => {
+    const api = createAdminEndpoints(http);
+    api.updateProfilePreferences({ dialect: "us" });
+    expect(http.patch).toHaveBeenCalledWith("/profile/preferences", {
+      dialect: "us"
+    });
   });
 });
 
@@ -283,6 +294,35 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.put).toHaveBeenCalledWith(
       "/lexicon/entries/w-2/steps/meanings",
       input
+    );
+  });
+
+  it("content completion create/get/retry 使用权威路径和独立幂等 header", () => {
+    const api = createAdminEndpoints(http);
+    const input: CreateContentCompletionJobInput = {
+      base_revision: 4,
+      scope: ["grammar_structures", "meanings", "examples"],
+      fill_policy: "missing_only"
+    };
+    api.words.createContentCompletionJob("w-2", "generate-key", input);
+    api.words.getContentCompletionJob("w-2", "job-1");
+    api.words.retryContentCompletionJob("w-2", "job-1", "retry-key", {
+      pos_ids: ["pos-1"]
+    });
+    expect(http.post).toHaveBeenNthCalledWith(
+      1,
+      "/lexicon/entries/w-2/content-completion-jobs",
+      input,
+      { headers: { "Idempotency-Key": "generate-key" } }
+    );
+    expect(http.get).toHaveBeenCalledWith(
+      "/lexicon/entries/w-2/content-completion-jobs/job-1"
+    );
+    expect(http.post).toHaveBeenNthCalledWith(
+      2,
+      "/lexicon/entries/w-2/content-completion-jobs/job-1/retries",
+      { pos_ids: ["pos-1"] },
+      { headers: { "Idempotency-Key": "retry-key" } }
     );
   });
 

@@ -7,7 +7,8 @@ const PROFILE: AdminProfile = {
   phone: "13800138000",
   display_name: "Administrator",
   role: "super_admin",
-  permissions: []
+  permissions: [],
+  preferences: { dialect: "uk" }
 };
 
 describe("createAdminAuthStore", () => {

@@ -17,6 +17,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminWordsMock } from "../mock/adminWordsMock";
 import { FormsAndPronunciationStep } from "./FormsAndPronunciationStep";
+import { createFormVariantIdentityLedger } from "./formVariantIdentity";
 import { partOfSpeechCatalogFixture } from "./partOfSpeech.test.helper";
 import { deferred, wordFixture } from "./wordCreation.test.helper";
 
@@ -32,6 +33,15 @@ const dataSourceCapabilities = vi.hoisted(() => ({
 const catalogState = vi.hoisted(() => ({
   data: undefined as typeof partOfSpeechCatalogFixture | undefined
 }));
+// 第 2 步的栏序与折叠取决于管理员的方言偏好（A1 阶段 5），测试里直接注入。
+const dialectPreference = vi.hoisted(() => ({ value: "uk" as "uk" | "us" }));
+vi.mock("@/features/settings/useDialectPreference", () => ({
+  useDialectPreference: () => ({
+    preference: dialectPreference.value,
+    savePreference: vi.fn()
+  })
+}));
+
 vi.mock("../dataSource", () => ({
   adminWordsDataSourceCapabilities: dataSourceCapabilities,
   adminWordsDataSource: {
@@ -84,10 +94,27 @@ function LocationProbe() {
   );
 }
 
+/** 未命中内置词典时后端建出的空白草稿：unified 主词 + 零建议词性。 */
+function unmatchedWordFixture() {
+  const base = wordFixture({ forms: { pos: [] } });
+  const headwords = { mode: "unified" as const, common: "brand-new-word" };
+  return {
+    ...base,
+    headwords,
+    detection_snapshot: {
+      ...base.detection_snapshot,
+      builtin_dictionary_status: "not_found" as const,
+      headwords,
+      suggested_pos: []
+    }
+  };
+}
+
 function renderStep(
   word = wordFixture(),
   locationState?: { nodeId: string; field: string },
-  readOnly = false
+  readOnly = false,
+  identityLedger = createFormVariantIdentityLedger()
 ) {
   const onSaved = vi.fn();
   let updateRenderedWord:
@@ -101,6 +128,7 @@ function renderStep(
           word={renderedWord}
           readOnly={readOnly}
           onSaved={onSaved}
+          identityLedger={identityLedger}
         />
         <LocationProbe />
       </>
@@ -130,7 +158,7 @@ function renderStep(
       ]
     }
   );
-  render(
+  const view = render(
     <AntApp>
       <RouterProvider router={router} />
     </AntApp>
@@ -138,6 +166,8 @@ function renderStep(
   return {
     onSaved,
     router,
+    identityLedger,
+    unmount: view.unmount,
     rerenderWord(next: ReturnType<typeof wordFixture>) {
       if (!updateRenderedWord) throw new Error("step harness is not mounted");
       act(() => updateRenderedWord?.(next));
@@ -244,6 +274,7 @@ beforeEach(() => {
   mutations.surfacePage.mockReset();
   catalogState.data = partOfSpeechCatalogFixture;
   dataSourceCapabilities.dialectVariantSuggestions = true;
+  dialectPreference.value = "uk";
   mutations.preview.mockResolvedValue({
     base_revision: 3,
     requires_confirmation: false,
@@ -325,6 +356,21 @@ describe("FormsAndPronunciationStep", () => {
     expect(mutations.preview).not.toHaveBeenCalled();
   });
 
+  it("默认词形为空时仍可添加允许的派生词形", () => {
+    catalogState.data = {
+      ...partOfSpeechCatalogFixture,
+      items: partOfSpeechCatalogFixture.items.map((item) =>
+        item.code === "noun" ? { ...item, default_form_types: [] } : item
+      )
+    };
+    renderStep();
+
+    fireEvent.click(button("添加派生词形"));
+
+    expect(screen.getByText("复数")).toBeVisible();
+    expect(button("添加派生词形")).toBeDisabled();
+  });
+
   it("词形与发音只使用基本词性，不展示配置层级的细分词性 Tab", () => {
     renderStep();
 
@@ -332,6 +378,30 @@ describe("FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText("添加细分词性")).toBeNull();
     expect(screen.queryByRole("tab", { name: "细分词性" })).toBeNull();
     expect(screen.getByText("名词", { exact: true })).toBeVisible();
+  });
+
+  it("未命中内置词典的空白草稿显示空态引导，并可从零添加第一个基本词性", async () => {
+    renderStep(unmatchedWordFixture());
+
+    expect(screen.getByText("当前还没有基本词性")).toBeVisible();
+    expect(
+      screen.getByText(/请用右上角的「添加基本词性」添加第一个词性/)
+    ).toBeVisible();
+    expect(screen.queryByLabelText("共用词形拼写")).toBeNull();
+
+    fireEvent.mouseDown(screen.getByLabelText("添加基本词性"));
+    const option = (await screen.findAllByText("名词", { exact: true })).find(
+      (item) => item.closest(".ant-select-item-option")
+    );
+    if (!option) throw new Error("基本词性选项未渲染");
+    fireEvent.click(option);
+
+    expect(screen.queryByText("当前还没有基本词性")).toBeNull();
+    // 主词是 unified,基准原形按 common 侧回填,且属于人工录入。
+    expect(screen.getByLabelText("共用词形拼写")).toHaveValue("brand-new-word");
+    expect(screen.queryByLabelText("英式词形拼写")).toBeNull();
+    expect(screen.getAllByLabelText("字典音标")[0]).toHaveValue("");
+    expect(screen.getAllByLabelText("实际发音")[0]).toHaveValue("");
   });
 
   it("点击词形变化组头部可收起并重新展开", () => {
@@ -493,7 +563,7 @@ describe("FormsAndPronunciationStep", () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
   });
 
-  it("完成前执行客户端基准发音校验，不请求影响预览或保存", async () => {
+  it("完成前执行客户端基准发音校验，提示按实际缺失项收窄", async () => {
     const word = wordFixture();
     word.forms.pos[0]!.base_form.variants[0]!.pronunciations[0]!.dict_phonetic =
       "";
@@ -501,15 +571,35 @@ describe("FormsAndPronunciationStep", () => {
 
     fireEvent.click(button("完成并进入词义与例句"));
 
+    // 判定是「字典音标且实际发音」的 AND，只缺字典音标时不能再提示「或实际发音」；
+    // 英美区分时还必须指名是哪一侧（手测 C4）。
     expect(
-      await screen.findByText("名词基准原形缺少字典音标或实际发音")
+      await screen.findByText("名词基准原形 · 英式缺少字典音标")
     ).toBeInTheDocument();
     expect(screen.getByText("本步骤还有 1 项待修正")).toBeInTheDocument();
     expect(mutations.preview).not.toHaveBeenCalled();
     expect(mutations.save).not.toHaveBeenCalled();
   });
 
-  it("完成前阻止真正为空的词形组，并按空组数量提示", async () => {
+  it("拦截提示复述左栏完成情况的分数，而不是另给一个对不上的总数", async () => {
+    const word = wordFixture();
+    word.forms.pos[0]!.base_form.variants[0]!.pronunciations[0]!.dict_phonetic =
+      "";
+    word.forms.pos[1]!.form_groups[0]!.slots[0]!.variants[0]!.pronunciations[0]!.actual_pron =
+      "";
+    renderStep(word);
+
+    fireEvent.click(button("完成并进入词义与例句"));
+
+    expect(
+      await screen.findByText(
+        "还需完善：原形发音 1/2、词形变化 4/5（同左栏「完成情况」）"
+      )
+    ).toBeInTheDocument();
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("允许支持派生词的具体单词以空词形组完成", async () => {
     const word = wordFixture();
     word.forms.pos[0]!.form_groups = [
       { id: "empty-group-1", is_regular: true, slots: [] },
@@ -519,11 +609,28 @@ describe("FormsAndPronunciationStep", () => {
 
     fireEvent.click(button("完成并进入词义与例句"));
 
+    await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/词形变化尚未添加派生词形/)).toBeNull();
+  });
+
+  it("当前组已使用全部合法类型时禁用新增，历史重复类型即时标红", () => {
+    const word = wordFixture();
+    const nounGroup = word.forms.pos[0]!.form_groups[0]!;
+    nounGroup.slots.push({
+      ...structuredClone(nounGroup.slots[0]!),
+      id: "historical-duplicate-plural"
+    });
+    renderStep(word);
+
+    expect(button("添加派生词形")).toBeDisabled();
+    expect(button("添加派生词形")).toHaveAttribute(
+      "title",
+      "当前组已添加全部可用词形类型"
+    );
     expect(
-      await screen.findByText("名词有 2 组词形变化尚未添加派生词形")
-    ).toBeInTheDocument();
-    expect(mutations.preview).not.toHaveBeenCalled();
-    expect(mutations.save).not.toHaveBeenCalled();
+      screen.getAllByText("同组内词形类型不能重复").length
+    ).toBeGreaterThan(0);
   });
 
   it("tomato 填入 tomatoes 后可完成，保存 wire 保留 plural slot 与 variant", async () => {
@@ -1415,6 +1522,40 @@ describe("FormsAndPronunciationStep", () => {
       expect(target).toHaveClass("word-validation-focus");
       expect(document.activeElement).toBe(target);
     });
+
+    const focused = document.querySelector<HTMLElement>(
+      `[data-word-node-id="${issue.node_id}"][data-word-field="${issue.field}"]`
+    )!;
+    const spellingInput =
+      focused instanceof HTMLInputElement
+        ? focused
+        : focused.querySelector<HTMLInputElement>(
+            'input[placeholder="词形拼写"]'
+          )!;
+    expect(document.querySelector(".ant-alert-error")).not.toBeNull();
+    fireEvent.change(spellingInput, { target: { value: "updated-form" } });
+    expect(document.querySelector(".ant-alert-error")).toBeNull();
+  });
+
+  it("readiness 读音目标聚焦到真实的首个无效叶字段", async () => {
+    const word = wordFixture({ ready: true });
+    const pronunciation =
+      word.forms.pos[0]!.base_form.variants[0]!.pronunciations[0]!;
+    pronunciation.dict_phonetic = "";
+
+    renderStep(word, {
+      nodeId: pronunciation.id,
+      field: "dict_phonetic"
+    });
+
+    await waitFor(() => {
+      const target = document.querySelector<HTMLInputElement>(
+        `[data-word-node-id="${pronunciation.id}"][data-word-field="dict_phonetic"]`
+      );
+      expect(target).not.toBeNull();
+      expect(target).toHaveClass("word-validation-focus");
+      expect(document.activeElement).toBe(target);
+    });
   });
 
   it("校验定位后手动切换词性，输入时不再跳回原词性", async () => {
@@ -1505,13 +1646,206 @@ describe("FormsAndPronunciationStep", () => {
     expect(screen.queryByText("保存草稿")).toBeNull();
   });
 
+  /** 词形拼写/音标模式的英美开关：切换后按钮文案固定，取到就点。 */
+  function switchDialectRule(question: string, answer: "是" | "否") {
+    const block = screen.getByText(question).closest(".word-form-rule-row")!;
+    const option = Array.from(
+      block.querySelectorAll<HTMLLabelElement>("label.ant-radio-wrapper")
+    ).find((label) => label.textContent?.trim() === answer);
+    expect(option).toBeDefined();
+    fireEvent.click(option!);
+  }
+
+  it("英美拆分再合并后已有词形槽位沿用原节点 ID", async () => {
+    // 后端把方言编进 node_role，(槽位, 方言) 的节点 ID 永久绑定：
+    // 来回切换后重新生成 ID 会被判 stable_node_id_changed 并阻断下一步。
+    const word = wordFixture({ headword: "testability" });
+    word.forms.pos[0]!.form_groups[0]!.slots = [
+      {
+        id: "suggested-slot-plural",
+        form_type: "plural",
+        variants: [
+          {
+            id: "suggested-slot-plural-common",
+            dialect: "common",
+            spelling: "testabilities",
+            origin: "manual",
+            pronunciations: [
+              {
+                id: "suggested-slot-plural-common-pron",
+                dict_phonetic: "mock",
+                actual_pron: "mock",
+                style: "normal"
+              }
+            ]
+          }
+        ]
+      }
+    ];
+    renderStep(word);
+
+    switchDialectRule("英美拼写是否有区别？", "是");
+    // A1 之后偏好侧（英式）展开、另一侧折叠，但两侧变体都已在状态里。
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0)
+    );
+    switchDialectRule("英美拼写是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("共用词形拼写").length).toBeGreaterThan(0)
+    );
+    switchDialectRule("英美音标是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByText("英美共用").length).toBeGreaterThan(0)
+    );
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const savedPos = mutations.save.mock.calls[0]![0].content.pos[0];
+    expect(
+      savedPos.base_form.variants.map((item: { id: string }) => item.id)
+    ).toEqual(["suggested-base-noun-common"]);
+    expect(
+      savedPos.form_groups[0].slots[0].variants.map(
+        (item: { id: string }) => item.id
+      )
+    ).toEqual(["suggested-slot-plural-common"]);
+  });
+
+  it("英美音标合并再拆分后沿用原有的英式、美式节点 ID", async () => {
+    renderStep(wordFixture({ headword: "far", ready: true }));
+
+    switchDialectRule("英美音标是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByText("英美共用").length).toBeGreaterThan(0)
+    );
+    switchDialectRule("英美音标是否有区别？", "是");
+    await waitFor(() =>
+      expect(screen.getAllByText("英式 · BrE").length).toBeGreaterThan(0)
+    );
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const savedPos = mutations.save.mock.calls[0]![0].content.pos[0];
+    expect(
+      savedPos.base_form.variants.map((item: { id: string }) => item.id)
+    ).toEqual([
+      "suggested-pos-adjective-base-uk",
+      "suggested-pos-adjective-base-us"
+    ]);
+  });
+
+  it("在拆分状态下保存后回灌草稿，合并回共用仍沿用原节点 ID", async () => {
+    const word = wordFixture({ headword: "testability" });
+    const { rerenderWord } = renderStep(word);
+
+    switchDialectRule("英美拼写是否有区别？", "是");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0)
+    );
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+
+    // 后端把拆分后的草稿回灌：此时响应里已经没有 common 变体了。
+    const splitForms = mutations.save.mock.calls[0]![0].content;
+    rerenderWord({ ...word, forms: splitForms, revision: 4 });
+
+    switchDialectRule("英美拼写是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("共用词形拼写").length).toBeGreaterThan(0)
+    );
+    switchDialectRule("英美音标是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByText("英美共用").length).toBeGreaterThan(0)
+    );
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(2));
+    const savedPos = mutations.save.mock.calls[1]![0].content.pos[0];
+    expect(
+      savedPos.base_form.variants.map((item: { id: string }) => item.id)
+    ).toEqual(["suggested-base-noun-common"]);
+  });
+
+  it("离开词形步再回来后合并回共用，仍沿用原节点 ID", async () => {
+    // 账本由向导持有，本步骤卸载重挂不该丢掉已退役的 common 节点身份。
+    const word = wordFixture({ headword: "testability" });
+    const first = renderStep(word);
+
+    switchDialectRule("英美拼写是否有区别？", "是");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0)
+    );
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const splitForms = mutations.save.mock.calls[0]![0].content;
+    first.unmount();
+
+    renderStep(
+      { ...word, forms: splitForms, revision: 4 },
+      undefined,
+      false,
+      first.identityLedger
+    );
+    switchDialectRule("英美拼写是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("共用词形拼写").length).toBeGreaterThan(0)
+    );
+    switchDialectRule("英美音标是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByText("英美共用").length).toBeGreaterThan(0)
+    );
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(2));
+    const savedPos = mutations.save.mock.calls[1]![0].content.pos[0];
+    expect(
+      savedPos.base_form.variants.map((item: { id: string }) => item.id)
+    ).toEqual(["suggested-base-noun-common"]);
+  });
+
+  it("草稿规则与变体不一致时，账本记的是后端那两个方言 ID", async () => {
+    // dialect_rules 说 unified、变体却还是英美两条：归一化会先铸一个新的
+    // common ID，账本必须先用 word.forms 播种，才不会把后端的 uk/us 忘掉。
+    const word = wordFixture({ headword: "testability" });
+    const pos = word.forms.pos[0]!;
+    pos.base_form.variants = [
+      {
+        id: "server-base-uk",
+        dialect: "uk",
+        spelling: "testability",
+        origin: "manual",
+        pronunciations: []
+      },
+      {
+        id: "server-base-us",
+        dialect: "us",
+        spelling: "testability",
+        origin: "manual",
+        pronunciations: []
+      }
+    ];
+    renderStep(word);
+
+    switchDialectRule("英美拼写是否有区别？", "是");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0)
+    );
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const savedPos = mutations.save.mock.calls[0]![0].content.pos[0];
+    expect(
+      savedPos.base_form.variants.map((item: { id: string }) => item.id)
+    ).toEqual(["server-base-uk", "server-base-us"]);
+  });
+
   it("拼写相同但音标不同时只显示一个词形块，并在块内区分英美发音", async () => {
     renderStep(wordFixture({ headword: "far", ready: true }));
     expect(screen.queryByLabelText("英式词形拼写")).toBeNull();
     expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
     expect(screen.getAllByLabelText("共用词形拼写")[0]).toHaveValue("far");
+    // 拼写统一的布局共享一格，两侧音标都在格内——没有可折叠的列，两个标签都在。
     expect(screen.getAllByText("英式 · BrE").length).toBeGreaterThan(0);
     expect(screen.getAllByText("美式 · AmE").length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText("展开美式词形")).toBeNull();
     expect(
       document.querySelectorAll('[data-spelling-layout="unified"]').length
     ).toBeGreaterThan(0);
@@ -1541,29 +1875,114 @@ describe("FormsAndPronunciationStep", () => {
     ).find((label) => label.textContent?.trim() === "是");
     expect(spellingYes).toBeDefined();
     fireEvent.click(spellingYes!);
+    // 切成拼写区分后进入双栏布局：偏好侧展开、对侧折叠，展开才看得到美式拼写。
     await waitFor(() =>
-      expect(screen.getAllByLabelText("美式词形拼写").length).toBeGreaterThan(0)
+      expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0)
     );
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+    fireEvent.click(screen.getAllByLabelText("展开美式词形")[0]!);
     expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("far");
     expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("far");
     expect(screen.queryByText("英美音标是否有区别？")).toBeNull();
   });
 
-  it("名词和动词拼写区分时隐藏音标区别选项并保持英美两栏", () => {
+  it("拼写统一但音标区分的完整词形可以完成", async () => {
+    renderStep(wordFixture({ headword: "far", ready: true }));
+
+    fireEvent.click(button("完成并进入词义与例句"));
+
+    await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/基准原形缺少/)).toBeNull();
+    expect(screen.queryByText(/派生词形尚未填写完整/)).toBeNull();
+  });
+
+  it("偏好切到美式后，美式那一栏排首位、英式折叠", () => {
+    dialectPreference.value = "us";
+    renderStep(wordFixture({ headword: "center", ready: true }));
+
+    expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("center");
+    expect(screen.queryByLabelText("英式词形拼写")).toBeNull();
+    expect(screen.getAllByText(/英式：\d+ 项已填/).length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByLabelText("展开英式词形")[0]!);
+    expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("centre");
+  });
+
+  it("多个派生词形待完善时，先指名首个问题再补一句总数", async () => {
+    const word = wordFixture({ headword: "center", ready: true });
+    const slots = word.forms.pos[0]!.form_groups[0]!.slots;
+    expect(slots.length).toBeGreaterThan(0);
+    for (const slot of slots) {
+      for (const variant of slot.variants) {
+        variant.pronunciations[0]!.dict_phonetic = "";
+      }
+    }
+    // 再造一个待完善的派生词形，凑够「另有 N 个」。
+    const extra = structuredClone(slots[0]!);
+    extra.id = "extra-slot";
+    extra.form_type = slots[0]!.form_type;
+    slots.push(extra);
+    renderStep(word);
+
+    fireEvent.click(button("完成并进入词义与例句"));
+    const alert = await screen.findByText(/名词.*缺少字典音标/);
+    expect(alert.textContent).toContain("英式");
+    expect(alert.textContent).toMatch(/另有 \d+ 个派生词形待完善/);
+  });
+
+  it("待完善项指到折叠那一侧时自动展开，否则点了没反应", async () => {
+    const word = wordFixture({ headword: "center", ready: true });
+    const usVariant = word.forms.pos[0]!.base_form.variants.find(
+      (variant) => variant.dialect === "us"
+    )!;
+    usVariant.pronunciations[0]!.actual_pron = "";
+    renderStep(word, {
+      nodeId: usVariant.pronunciations[0]!.id,
+      field: "actual_pron"
+    });
+
+    // 目标落在美式侧：那一栏必须自动展开，输入框才可能被聚焦。
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("美式词形拼写").length).toBeGreaterThan(0)
+    );
+    expect(screen.getAllByLabelText("折叠美式词形").length).toBeGreaterThan(0);
+  });
+
+  it("对侧还有待填项时，折叠摘要给出待填数量", () => {
+    const word = wordFixture({ headword: "center", ready: true });
+    // 美式基准原形缺实际发音 → 折叠摘要应报 1 项待填。
+    word.forms.pos[0]!.base_form.variants.find(
+      (variant) => variant.dialect === "us"
+    )!.pronunciations[0]!.actual_pron = "";
+    renderStep(word);
+
+    expect(
+      screen.getAllByText(/美式：\d+ 项已填 \/ 1 项待填/).length
+    ).toBeGreaterThan(0);
+  });
+
+  it("拼写区分时隐藏音标区别选项，偏好侧主导、对侧折叠可展开", () => {
     renderStep(wordFixture({ headword: "center", ready: true }));
 
     expect(screen.queryByText("英美音标是否有区别？")).toBeNull();
+    // 偏好侧（缺省英式）默认展开；美式那一栏折叠，摘要给出填写进度。
     expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("centre");
-    expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("center");
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+    expect(screen.getAllByText(/美式：\d+ 项已填/).length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("共用词形拼写")).toBeNull();
     expect(
       document.querySelectorAll('[data-spelling-layout="distinguish"]').length
     ).toBeGreaterThan(1);
 
+    fireEvent.click(screen.getAllByLabelText("展开美式词形")[0]!);
+    expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("center");
+    fireEvent.click(screen.getAllByLabelText("折叠美式词形")[0]!);
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+
     fireEvent.click(screen.getByText("动词", { exact: true }));
     expect(screen.queryByText("英美音标是否有区别？")).toBeNull();
     expect(screen.getAllByLabelText("英式词形拼写")[0]).toHaveValue("centre");
-    expect(screen.getAllByLabelText("美式词形拼写")[0]).toHaveValue("center");
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
   });
 
   it("加载 distinguish 转 unified 的后端草稿时归一化全部词形并可完成 Step 2", async () => {
@@ -1686,6 +2105,54 @@ describe("FormsAndPronunciationStep", () => {
     expect(
       await screen.findByText("影响预览响应异常，未返回受影响节点，已阻止保存")
     ).toBeInTheDocument();
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("内容体积上限（对接文档 §13）", () => {
+  it("影响预览返回 413 时提示内容过大而不是格式错误", async () => {
+    mutations.preview.mockRejectedValueOnce(
+      new HttpError(413, "payload too large", [], "payload_too_large")
+    );
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(
+      (await screen.findAllByText("内容过大，请拆分后分次保存")).length
+    ).toBeGreaterThan(0);
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("整步保存返回 413 时同样落到内容过大分支", async () => {
+    mutations.save.mockRejectedValueOnce(
+      new HttpError(413, "payload too large", [], "payload_too_large")
+    );
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(
+      (await screen.findAllByText("内容过大，请拆分后分次保存")).length
+    ).toBeGreaterThan(0);
+  });
+
+  it("节点数超出 2000 时保存前就地拦下，不发影响预览请求", async () => {
+    const word = wordFixture();
+    // 节点数按 forms + meanings 合计判定（后端 validate_node_limit 的实际口径）。
+    word.meanings.sense_groups = Array.from({ length: 2001 }, (_, index) => ({
+      id: `group-${index}`,
+      name_zh: "",
+      name_en: ""
+    }));
+    renderStep(word);
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(
+      (await screen.findAllByText(/超出单个词条上限 2000/)).length
+    ).toBeGreaterThan(0);
+    expect(mutations.preview).not.toHaveBeenCalled();
     expect(mutations.save).not.toHaveBeenCalled();
   });
 });

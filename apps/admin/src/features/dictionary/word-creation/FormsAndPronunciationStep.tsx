@@ -10,7 +10,8 @@ import {
 } from "@ant-design/icons";
 import {
   PronunciationPreviewControls,
-  PronunciationPreviewProvider
+  PronunciationPreviewProvider,
+  usePronunciationVoiceNotice
 } from "./PronunciationPreview";
 import {
   Alert,
@@ -37,6 +38,7 @@ import type {
   LexiconSurfaceMatchV2,
   StepSaveIntent,
   WordDerivedFormSlotV2,
+  WordFormSlotV2,
   WordFormVariantV2,
   WordPosFormsV2,
   WordPosTag,
@@ -81,6 +83,22 @@ import {
   useSaveFormsStep,
   useSuggestDialectVariants
 } from "./api";
+import {
+  entryContentNodeIssue,
+  payloadTooLargeMessage,
+  stepContentBodyIssue
+} from "./contentLimits";
+import {
+  applyFormVariantIdentities,
+  type FormVariantIdentityLedger
+} from "./formVariantIdentity";
+import {
+  baseFormComplete,
+  baseFormIssueMessage,
+  derivedFormIssueMessage,
+  dialectFormProgress,
+  formSlotComplete
+} from "./formsValidation";
 import { summarizeFormsImpact } from "./formsImpactSummary";
 import {
   createDerivedSlot,
@@ -92,6 +110,9 @@ import {
   legalDerivedFormTypes,
   toFormsWireContent
 } from "./model";
+import type { AdminDialectPreference } from "@tsz/shared";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
+import { buildWordReadiness, pendingReadinessRows } from "./readiness";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import {
   useWordValidationIssue,
@@ -102,6 +123,12 @@ interface Props {
   word: AdminWordV2;
   readOnly?: boolean;
   onSaved: (word: AdminWordV2) => void;
+  onDraftChange?: (content: DraftFormsStepContent) => void;
+  /**
+   * 词形变体节点身份账本，由向导持有：本步骤离开再回来会重新挂载，
+   * 账本放在这里会连同已退役的方言节点 ID 一起丢掉。
+   */
+  identityLedger: FormVariantIdentityLedger;
 }
 
 const FORM_ORIGIN_LABEL: Record<WordFormVariantV2["origin"], string> = {
@@ -283,6 +310,8 @@ function PronunciationFields({
               <Input
                 className="word-pronunciation-phonetic-input"
                 aria-label="字典音标"
+                data-word-node-id={value.id}
+                data-word-field="dict_phonetic"
                 value={value.dict_phonetic}
                 readOnly={disabled}
                 placeholder="字典音标"
@@ -299,6 +328,8 @@ function PronunciationFields({
           </Typography.Text>
           <Input
             aria-label="实际发音"
+            data-word-node-id={value.id}
+            data-word-field="actual_pron"
             value={value.actual_pron}
             readOnly={disabled}
             placeholder="实际发音"
@@ -479,6 +510,8 @@ function SharedSpellingVariantEditor({
         </Flex>
         <Input
           aria-label="共用词形拼写"
+          data-word-node-id={issueNodeId}
+          data-word-field="variants.common.spelling"
           value={firstValue.spelling}
           readOnly={readOnly || base}
           placeholder="词形拼写"
@@ -589,9 +622,6 @@ function BaseTypeCell({ lastRow }: { lastRow: boolean }) {
       className={`word-form-type-cell${lastRow ? " word-form-matrix-last-row" : ""}`}
     >
       <Tag>原形</Tag>
-      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-        拼写从第 1 步派生
-      </Typography.Text>
     </div>
   );
 }
@@ -599,6 +629,7 @@ function BaseTypeCell({ lastRow }: { lastRow: boolean }) {
 function DerivedTypeCell({
   slot,
   allowedTypes,
+  usedTypes,
   index,
   last,
   readOnly,
@@ -608,6 +639,7 @@ function DerivedTypeCell({
 }: {
   slot: WordDerivedFormSlotV2;
   allowedTypes: WordDerivedFormSlotV2["form_type"][];
+  usedTypes: WordDerivedFormSlotV2["form_type"][];
   index: number;
   last: boolean;
   readOnly?: boolean;
@@ -615,6 +647,7 @@ function DerivedTypeCell({
   onMove: (delta: -1 | 1) => void;
   onRemove: () => void;
 }) {
+  const duplicate = usedTypes.includes(slot.form_type);
   return (
     <div
       className={`word-form-type-cell${last ? " word-form-matrix-last-row" : ""}`}
@@ -624,16 +657,30 @@ function DerivedTypeCell({
       <Typography.Text type="secondary">#{index + 1}</Typography.Text>
       <Select
         value={slot.form_type}
-        status={allowedTypes.includes(slot.form_type) ? undefined : "error"}
+        status={
+          allowedTypes.includes(slot.form_type) && !duplicate
+            ? undefined
+            : "error"
+        }
         options={FORM_TYPE_OPTIONS.filter((option) =>
           allowedTypes.includes(
             option.value as WordDerivedFormSlotV2["form_type"]
           )
-        )}
+        ).map((option) => ({
+          ...option,
+          disabled:
+            option.value !== slot.form_type &&
+            usedTypes.includes(
+              option.value as WordDerivedFormSlotV2["form_type"]
+            )
+        }))}
         disabled={readOnly}
         style={{ width: "100%" }}
         onChange={(form_type) => onChange({ ...slot, form_type })}
       />
+      {duplicate && (
+        <Typography.Text type="danger">同组内词形类型不能重复</Typography.Text>
+      )}
       <Flex gap={2} wrap>
         <Button
           type="text"
@@ -691,6 +738,9 @@ function MissingDialectVariantCell({
   return (
     <div
       className={`word-form-matrix-dialect-cell word-form-matrix-dialect-cell-${dialect}${lastRow ? " word-form-matrix-last-row" : ""}`}
+      data-word-node-id={slotId}
+      data-word-field={`variants.${dialect}`}
+      tabIndex={0}
     >
       <Alert type="warning" showIcon title="该方言词形尚未填写" />
       {!readOnly && (
@@ -747,10 +797,41 @@ function FormGroupMatrix({
   ) => Promise<void>;
   onChange: (next: WordPosFormsV2) => void;
 }) {
+  // 偏好侧主导（A1）：偏好那一栏排首位并默认展开，另一侧折叠成一行摘要。
+  // 词形拼写与音标是词典事实，不能砍掉——后端也强制两侧齐全才能发布。
+  const { preference } = useDialectPreference();
+  const [showOtherDialect, setShowOtherDialect] = useState(false);
+  // 待完善项/服务端 field issue 指到折叠那一侧时自动展开：否则点了没反应——
+  // 目标节点根本不在 DOM 里，聚焦逻辑重试几次就静默放弃了。
+  const issueTarget = useWordValidationIssue();
   const group = pos.form_groups[groupIndex];
+  useEffect(() => {
+    if (!issueTarget || !group) return;
+    const other = otherDialectOf(pos, preference);
+    if (!other) return;
+    if (
+      slotsOfGroup(pos, group).some((slot) =>
+        slotOwnsIssue(slot, other, issueTarget.nodeId)
+      )
+    ) {
+      setShowOtherDialect(true);
+    }
+  }, [group, issueTarget, pos, preference]);
   if (!group) return null;
 
-  const dialects = formDialects(pos);
+  const allDialects = formDialects(pos);
+  const orderedDialects =
+    allDialects.length > 1
+      ? [...allDialects].sort((left, right) =>
+          left === preference ? -1 : right === preference ? 1 : 0
+        )
+      : allDialects;
+  const otherDialect = orderedDialects[1];
+  const dialects =
+    otherDialect && !showOtherDialect ? [orderedDialects[0]!] : orderedDialects;
+  const otherProgress = otherDialect
+    ? dialectFormProgress(pos, groupIndex, otherDialect)
+    : undefined;
   const editableBasePronunciation = groupIndex === 0;
   const updateBaseVariants = (variants: WordFormVariantV2[]) =>
     onChange({
@@ -781,12 +862,14 @@ function FormGroupMatrix({
     onChange({ ...pos, form_groups: formGroups });
   };
 
+  // 拼写统一的布局没有可折叠的「列」：拼写共享一格，两侧音标就在这一格里，
+  // 因此只按偏好排序，不做折叠（折叠会让表头与格内内容对不上）。
   if (pos.dialect_rules.spelling_mode === "unified") {
     return (
       <div className="word-form-matrix word-form-matrix-unified">
         <div className="word-form-matrix-type-header">词形类型</div>
         <div className="word-form-matrix-shared-header">
-          {dialects.map((dialect) => (
+          {orderedDialects.map((dialect) => (
             <span
               className={`word-form-matrix-shared-header-${dialect}`}
               key={dialect}
@@ -815,6 +898,9 @@ function FormGroupMatrix({
               <DerivedTypeCell
                 slot={slot}
                 allowedTypes={allowedTypes}
+                usedTypes={group.slots
+                  .filter((_, index) => index !== slotIndex)
+                  .map((item) => item.form_type)}
                 index={slotIndex}
                 last={last}
                 readOnly={readOnly}
@@ -904,46 +990,105 @@ function FormGroupMatrix({
   };
 
   return (
-    <div className="word-form-matrix word-form-matrix-distinguish">
-      <div className="word-form-matrix-type-header">词形类型</div>
-      {dialects.map((dialect) => (
-        <div
-          className={`word-form-matrix-dialect-header word-form-matrix-dialect-header-${dialect}`}
-          key={dialect}
-        >
-          {DIALECT_SHORT_LABEL[dialect]} · {dialect === "uk" ? "BrE" : "AmE"}
+    <>
+      <div
+        className={`word-form-matrix ${dialects.length > 1 ? "word-form-matrix-distinguish" : "word-form-matrix-unified"}`}
+      >
+        <div className="word-form-matrix-type-header">词形类型</div>
+        {dialects.map((dialect) => (
+          <div
+            className={`word-form-matrix-dialect-header word-form-matrix-dialect-header-${dialect}`}
+            key={dialect}
+          >
+            {DIALECT_SHORT_LABEL[dialect]} · {dialect === "uk" ? "BrE" : "AmE"}
+          </div>
+        ))}
+        <BaseTypeCell lastRow={group.slots.length === 0} />
+        {dialects.map((dialect) =>
+          renderDialectCell(
+            pos.base_form,
+            dialect,
+            undefined,
+            group.slots.length === 0
+          )
+        )}
+        {group.slots.map((slot, slotIndex) => {
+          const last = slotIndex === group.slots.length - 1;
+          return (
+            <Fragment key={slot.id}>
+              <DerivedTypeCell
+                slot={slot}
+                allowedTypes={allowedTypes}
+                usedTypes={group.slots
+                  .filter((_, index) => index !== slotIndex)
+                  .map((item) => item.form_type)}
+                index={slotIndex}
+                last={last}
+                readOnly={readOnly}
+                onChange={(nextSlot) => updateSlot(slotIndex, nextSlot)}
+                onMove={(delta) => moveSlot(slotIndex, delta)}
+                onRemove={() => removeSlot(slotIndex)}
+              />
+              {dialects.map((dialect) =>
+                renderDialectCell(slot, dialect, slotIndex, last)
+              )}
+            </Fragment>
+          );
+        })}
+      </div>
+      {otherDialect && otherProgress && (
+        <div className="word-form-other-dialect-bar">
+          <Typography.Text type="secondary">
+            {DIALECT_SHORT_LABEL[otherDialect]}：{otherProgress.filled} 项已填
+            {otherProgress.pending > 0
+              ? ` / ${otherProgress.pending} 项待填`
+              : ""}
+          </Typography.Text>
+          <Button
+            size="small"
+            type="link"
+            aria-label={`${showOtherDialect ? "折叠" : "展开"}${DIALECT_SHORT_LABEL[otherDialect]}词形`}
+            onClick={() => setShowOtherDialect((current) => !current)}
+          >
+            {showOtherDialect ? "折 叠" : "展 开"}
+          </Button>
         </div>
-      ))}
-      <BaseTypeCell lastRow={group.slots.length === 0} />
-      {dialects.map((dialect) =>
-        renderDialectCell(
-          pos.base_form,
-          dialect,
-          undefined,
-          group.slots.length === 0
-        )
       )}
-      {group.slots.map((slot, slotIndex) => {
-        const last = slotIndex === group.slots.length - 1;
-        return (
-          <Fragment key={slot.id}>
-            <DerivedTypeCell
-              slot={slot}
-              allowedTypes={allowedTypes}
-              index={slotIndex}
-              last={last}
-              readOnly={readOnly}
-              onChange={(nextSlot) => updateSlot(slotIndex, nextSlot)}
-              onMove={(delta) => moveSlot(slotIndex, delta)}
-              onRemove={() => removeSlot(slotIndex)}
-            />
-            {dialects.map((dialect) =>
-              renderDialectCell(slot, dialect, slotIndex, last)
-            )}
-          </Fragment>
-        );
-      })}
-    </div>
+    </>
+  );
+}
+
+/** 该词形组参与渲染的槽位：共享基准原形 + 本组派生词形。 */
+function slotsOfGroup(
+  pos: WordPosFormsV2,
+  group: WordPosFormsV2["form_groups"][number]
+): WordFormSlotV2[] {
+  return [pos.base_form, ...group.slots];
+}
+
+function otherDialectOf(
+  pos: WordPosFormsV2,
+  preference: AdminDialectPreference
+): Dialect | undefined {
+  const dialects = formDialects(pos);
+  return dialects.length > 1
+    ? dialects.find((dialect) => dialect !== preference)
+    : undefined;
+}
+
+/** 定位目标是否落在该槽位「另一侧方言」的变体或其读音上。 */
+function slotOwnsIssue(
+  slot: WordFormSlotV2,
+  dialect: Dialect,
+  nodeId: string
+): boolean {
+  return slot.variants.some(
+    (variant) =>
+      variant.dialect === dialect &&
+      (variant.id === nodeId ||
+        variant.pronunciations.some(
+          (pronunciation) => pronunciation.id === nodeId
+        ))
   );
 }
 
@@ -1118,6 +1263,21 @@ function normalizeLoadedForms(word: AdminWordV2): DraftFormsStepContent {
   };
 }
 
+/**
+ * 载入草稿并把词形变体的节点身份对齐到账本。
+ *
+ * 先用服务端保存的 `word.forms` 播种：normalizeLoadedForms 遇到超出当前
+ * dialect_rules 的变体会先铸新 ID，播种在前才能让后端认的那个 ID 优先。
+ */
+function loadFormsWithIdentities(
+  ledger: FormVariantIdentityLedger,
+  word: AdminWordV2
+): DraftFormsStepContent {
+  // 只取播种这一个副作用，返回的对齐结果由下面那次调用给出。
+  applyFormVariantIdentities(ledger, word.forms);
+  return applyFormVariantIdentities(ledger, normalizeLoadedForms(word));
+}
+
 function PosFormsEditor({
   value,
   configuredAllowedTypes,
@@ -1148,11 +1308,16 @@ function PosFormsEditor({
   const allowedTypes = legalDerivedFormTypes(value.pos, configuredAllowedTypes);
   const capabilityLoaded = configuredAllowedTypes !== undefined;
   const defaultTypes = configuredDefaultTypes ?? allowedTypes;
+  const orderedTypes = [
+    ...defaultTypes,
+    ...allowedTypes.filter((type) => !defaultTypes.includes(type))
+  ];
   const invalidSlots = value.form_groups.flatMap((group) =>
     group.slots.filter((slot) => !allowedTypes.includes(slot.form_type))
   );
   const showDerivedGroups = allowedTypes.length > 0 || invalidSlots.length > 0;
   const spellingForced = headwords.mode === "distinguish";
+  const voiceNotice = usePronunciationVoiceNotice(formDialects(value));
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -1261,6 +1426,14 @@ function PosFormsEditor({
             description="只需完成基准原形的音标与实际发音，即可继续下一步。"
           />
         )}
+        {voiceNotice && (
+          <Alert
+            type="warning"
+            showIcon
+            title={voiceNotice}
+            description="音标与实际发音仍可正常填写和保存；试听语音需要平台先配置对应方言的发音人。"
+          />
+        )}
         {invalidSlots.length > 0 && (
           <Alert
             type="error"
@@ -1273,6 +1446,11 @@ function PosFormsEditor({
           value.form_groups.map((group, groupIndex) => {
             const collapsed = collapsedGroupIds.has(group.id);
             const bodyId = `word-form-group-${group.id}-body`;
+            const nextDefaultType = defaultDerivedFormType(
+              value.pos,
+              group.slots.map((slot) => slot.form_type),
+              orderedTypes
+            );
             const moveGroup = (nextIndex: number) =>
               onChange({
                 ...value,
@@ -1465,27 +1643,24 @@ function PosFormsEditor({
                           type="dashed"
                           icon={<PlusOutlined />}
                           className="word-form-add-slot"
-                          disabled={allowedTypes.length === 0}
+                          disabled={!nextDefaultType}
                           title={
                             !capabilityLoaded
                               ? "词形规则未加载"
                               : allowedTypes.length === 0
                                 ? "当前基本词性没有可添加的派生词形"
-                                : undefined
+                                : !nextDefaultType
+                                  ? "当前组已添加全部可用词形类型"
+                                  : undefined
                           }
                           onClick={() => {
-                            const defaultType = defaultDerivedFormType(
-                              value.pos,
-                              group.slots.map((slot) => slot.form_type),
-                              defaultTypes
-                            );
-                            if (!defaultType) return;
+                            if (!nextDefaultType) return;
                             const groups = [...value.form_groups];
                             groups[groupIndex] = {
                               ...group,
                               slots: [
                                 ...group.slots,
-                                createDerivedSlot(defaultType, value)
+                                createDerivedSlot(nextDefaultType, value)
                               ]
                             };
                             onChange({ ...value, form_groups: groups });
@@ -1522,37 +1697,27 @@ function PosFormsEditor({
   );
 }
 
-function hasCompleteBase(pos: WordPosFormsV2): boolean {
-  const expected = formDialects(pos);
-  return expected.every((dialect) => {
-    const variant = pos.base_form.variants.find(
-      (item) => item.dialect === dialect
-    );
-    return Boolean(
-      variant?.spelling.trim() &&
-      variant.pronunciations.some(
-        (pronunciation) =>
-          pronunciation.dict_phonetic.trim() && pronunciation.actual_pron.trim()
-      )
-    );
-  });
-}
-
 function countPosFormIssues(
   pos: WordPosFormsV2,
-  allowed: readonly WordDerivedFormSlotV2["form_type"][]
+  allowed: readonly WordDerivedFormSlotV2["form_type"][],
+  headwords: AdminWordV2["headwords"]
 ): number {
-  const requiresDerivedGroup = allowed.length > 0;
   return (
-    (requiresDerivedGroup && pos.form_groups.length === 0 ? 1 : 0) +
-    (hasCompleteBase(pos) ? 0 : 1) +
-    pos.form_groups.reduce(
-      (count, group) =>
+    (baseFormComplete(pos, headwords) ? 0 : 1) +
+    pos.form_groups.reduce((count, group) => {
+      const duplicateCount =
+        group.slots.length -
+        new Set(group.slots.map((slot) => slot.form_type)).size;
+      return (
         count +
-        (requiresDerivedGroup && group.slots.length === 0 ? 1 : 0) +
-        group.slots.filter((slot) => !allowed.includes(slot.form_type)).length,
-      0
-    )
+        duplicateCount +
+        group.slots.filter(
+          (slot) =>
+            !allowed.includes(slot.form_type) ||
+            !formSlotComplete(slot, pos.dialect_rules)
+        ).length
+      );
+    }, 0)
   );
 }
 
@@ -1757,12 +1922,18 @@ function SurfaceConfirmationDetails({
   );
 }
 
-export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
+export function FormsAndPronunciationStep({
+  word,
+  readOnly,
+  onSaved,
+  onDraftChange,
+  identityLedger
+}: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const editQuery = word.status === "published" ? "?mode=edit" : "";
   const [content, setContent] = useState<DraftFormsStepContent>(() =>
-    normalizeLoadedForms(word)
+    loadFormsWithIdentities(identityLedger, word)
   );
   const contentRef = useRef(content);
   const loadedWordIdRef = useRef(word.id);
@@ -1786,6 +1957,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   const saveForms = useSaveFormsStep(word.id);
   const previewImpact = usePreviewFormsImpact(word.id);
   const suggestVariants = useSuggestDialectVariants();
+  const { preference } = useDialectPreference();
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const partOfSpeechLookup = useMemo(
     () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
@@ -1839,7 +2011,8 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
     const wordChanged = loadedWordIdRef.current !== word.id;
     if (!dirty || wordChanged) {
       loadedWordIdRef.current = word.id;
-      const next = normalizeLoadedForms(word);
+      if (wordChanged) identityLedger.clear();
+      const next = loadFormsWithIdentities(identityLedger, word);
       contentRef.current = next;
       setContent(next);
       setContentBaseRevision(word.revision);
@@ -1860,12 +2033,18 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
         confirmActionRef.current = false;
       }
     }
-  }, [dirty, word]);
+  }, [dirty, identityLedger, word]);
+
+  useEffect(() => {
+    onDraftChange?.(content);
+  }, [content, onDraftChange]);
 
   const updateContent = (next: DraftFormsStepContent) => {
-    contentRef.current = next;
-    setContent(next);
+    const aligned = applyFormVariantIdentities(identityLedger, next);
+    contentRef.current = aligned;
+    setContent(aligned);
     setDirty(true);
+    setValidationMessages([]);
   };
 
   const applyGeneratedFormVariant = (
@@ -1919,11 +2098,12 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
           form_groups: formGroups
         };
       });
-      const next = { pos };
+      const next = applyFormVariantIdentities(identityLedger, { pos });
       contentRef.current = next;
       return next;
     });
     setDirty(true);
+    setValidationMessages([]);
   };
 
   const hasFormVariant = (clientId: string, target: "uk" | "us") =>
@@ -2034,12 +2214,23 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
   ) => {
     finishSaveFlow();
     setDirty(false);
+    setValidationMessages([]);
     onSaved(savedWord);
     message.success(intent === "complete" ? "词形与发音已完成" : "草稿已保存");
     if (intent === "complete") {
       allowSavedNavigation();
       navigate(`/words/${word.id}/wizard/meanings${editQuery}`);
     }
+  };
+
+  // 413 是「内容过大」，不是「格式错误」：处置动作是拆分内容而不是检查格式。
+  const handlePayloadTooLarge = (error: HttpError): boolean => {
+    const tooLarge = payloadTooLargeMessage(error);
+    if (!tooLarge) return false;
+    finishSaveFlow();
+    setValidationMessages([tooLarge]);
+    message.error(tooLarge);
+    return true;
   };
 
   const handleFormsFieldIssues = (error: HttpError): boolean => {
@@ -2122,6 +2313,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
       await showImpactResult(context, impact);
     } catch (error) {
       if (error instanceof HttpError) {
+        if (handlePayloadTooLarge(error)) return;
         if (handleFormsFieldIssues(error)) return;
         if (error.status === 409 && error.code === "revision_conflict") {
           showRevisionConflict();
@@ -2140,6 +2332,7 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
     context: PendingFormsSave
   ): Promise<void> => {
     if (error instanceof HttpError) {
+      if (handlePayloadTooLarge(error)) return;
       if (handleFormsFieldIssues(error)) return;
 
       if (
@@ -2291,17 +2484,15 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
           pos.pos,
           configured?.allowed_form_types
         );
-        const requiresDerivedGroup = allowed.length > 0;
-        if (requiresDerivedGroup && pos.form_groups.length === 0) {
-          issues.push(`${posLabel}至少需要一组词形变化`);
-        }
-        const emptyGroupCount = requiresDerivedGroup
-          ? pos.form_groups.filter((group) => group.slots.length === 0).length
-          : 0;
-        if (emptyGroupCount > 0) {
-          issues.push(
-            `${posLabel}有 ${emptyGroupCount} 组词形变化尚未添加派生词形`
-          );
+        const duplicateCount = pos.form_groups.reduce(
+          (count, group) =>
+            count +
+            group.slots.length -
+            new Set(group.slots.map((slot) => slot.form_type)).size,
+          0
+        );
+        if (duplicateCount > 0) {
+          issues.push(`${posLabel}有 ${duplicateCount} 个重复的派生词形类型`);
         }
         const invalidCount = pos.form_groups.reduce(
           (count, group) =>
@@ -2313,19 +2504,51 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
         if (invalidCount > 0) {
           issues.push(`${posLabel}有 ${invalidCount} 个不合法的派生词形类型`);
         }
-        if (!hasCompleteBase(pos)) {
-          issues.push(`${posLabel}基准原形缺少字典音标或实际发音`);
+        const incompleteCount = pos.form_groups.reduce(
+          (count, group) =>
+            count +
+            group.slots.filter(
+              (slot) =>
+                allowed.includes(slot.form_type) &&
+                !formSlotComplete(slot, pos.dialect_rules)
+            ).length,
+          0
+        );
+        // 指名到「词形类型 · 方言侧 · 缺失字段」，只报一个计数管理员没法下手（手测 C4）。
+        // incompleteCount > 0 时必然找得到首个问题，所以这里不需要兜底文案。
+        const derivedIssue =
+          incompleteCount > 0 ? derivedFormIssueMessage(pos) : undefined;
+        if (derivedIssue) {
+          const more =
+            incompleteCount > 1
+              ? `（另有 ${incompleteCount - 1} 个派生词形待完善）`
+              : "";
+          issues.push(`${posLabel}${derivedIssue}${more}`);
+        }
+        const baseIssue = baseFormIssueMessage(pos, word.headwords);
+        if (baseIssue) {
+          issues.push(`${posLabel}${baseIssue}`);
         }
       }
       setValidationMessages(issues);
       if (issues.length > 0) {
-        message.warning(`还有 ${issues.length} 项需要完善`);
+        // 提示直接复述左栏「完成情况」的分数,否则拦截数与左栏数字对不上。
+        const pending = pendingReadinessRows(
+          buildWordReadiness(
+            word,
+            { forms: content },
+            partOfSpeechLookup,
+            preference
+          ),
+          "forms"
+        )
+          .map((row) => `${row.label} ${row.completed}/${row.total}`)
+          .join("、");
+        message.warning(`还需完善：${pending}（同左栏「完成情况」）`);
         return;
       }
     }
 
-    saveFlowActiveRef.current = true;
-    setSaving(true);
     const wireContent = toFormsWireContent({
       pos: content.pos.map((pos) => {
         const configured = partOfSpeechLookup.byCode.get(pos.pos);
@@ -2338,6 +2561,25 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
           : pos;
       })
     });
+    // 体积预检放在发请求之前：影响预览与整步保存共用同一个请求体上限，
+    // 超了就地提示，不发出去等 413（对接文档 §13.2）。节点数按 forms + meanings
+    // 合计判定，词义侧取服务端当前副本。
+    const blocking = [
+      entryContentNodeIssue(wireContent, word.meanings),
+      stepContentBodyIssue({
+        base_revision: contentBaseRevision,
+        intent,
+        content: wireContent
+      })
+    ].filter((item): item is string => item !== undefined);
+    if (blocking.length > 0) {
+      setValidationMessages(blocking);
+      message.warning(blocking[0]!);
+      return;
+    }
+
+    saveFlowActiveRef.current = true;
+    setSaving(true);
     await runImpactCheck({
       baseRevision: contentBaseRevision,
       intent,
@@ -2380,10 +2622,11 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
             legalDerivedFormTypes(
               pos.pos,
               partOfSpeechLookup.byCode.get(pos.pos)?.allowed_form_types
-            )
+            ),
+            word.headwords
           )}
           size="small"
-          title="该词性待修项"
+          title="当前词性的未解决校验项"
         />
         {!readOnly && content.pos.length > 1 && (
           <Button
@@ -2527,6 +2770,19 @@ export function FormsAndPronunciationStep({ word, readOnly, onSaved }: Props) {
                   <li key={item}>{item}</li>
                 ))}
               </ul>
+            }
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        {content.pos.length === 0 && (
+          <Alert
+            type="info"
+            showIcon
+            title="当前还没有基本词性"
+            description={
+              readOnly
+                ? "该词条没有记录任何基本词性。"
+                : "内置词典未命中或没有带回建议词性时，本步骤从空白开始。请用右上角的「添加基本词性」添加第一个词性，再逐个补录词形、字典音标与实际发音。"
             }
             style={{ marginBottom: 16 }}
           />

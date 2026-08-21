@@ -4,12 +4,16 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { wordKeys } from "../api";
 import {
+  contentCompletionPollInterval,
   useCreateWordV2,
+  useCreateContentCompletionJob,
+  useContentCompletionJob,
   useDetectWordV2,
   usePreviewFormsImpact,
   usePublishWordV2,
   useSaveFormsStep,
   useSaveMeaningsStep,
+  useRetryContentCompletionJob,
   useSuggestDialectVariants,
   useValidateWordV2
 } from "./api";
@@ -22,6 +26,9 @@ const dataSource = vi.hoisted(() => ({
   previewFormsImpact: vi.fn(),
   saveFormsStep: vi.fn(),
   saveMeaningsStep: vi.fn(),
+  createContentCompletionJob: vi.fn(),
+  getContentCompletionJob: vi.fn(),
+  retryContentCompletionJob: vi.fn(),
   validateV2: vi.fn(),
   publishV2: vi.fn()
 }));
@@ -132,6 +139,84 @@ describe("V2 word creation React Query hooks", () => {
     await waitFor(() => expect(invalidate).toHaveBeenCalledTimes(2));
     expect(invalidate).toHaveBeenCalledWith({ queryKey: wordKeys.lists() });
     expect(invalidate).toHaveBeenCalledWith({ queryKey: wordKeys.stats() });
+  });
+
+  it("内容生成 create/get/retry 透传 word、job、幂等键和 snake_case 输入", async () => {
+    const word = wordFixture();
+    const envelope = {
+      job: {
+        id: "job-1",
+        entry_id: word.id,
+        base_revision: word.revision,
+        status: "failed" as const,
+        requested_scope: ["grammar_structures" as const],
+        fill_policy: "missing_only" as const,
+        partitions: [
+          {
+            pos_id: word.forms.pos[0]!.pos_id,
+            pos: word.forms.pos[0]!.pos,
+            status: "failed" as const,
+            attempt: 1
+          }
+        ],
+        created_at: "2026-08-18T00:00:00Z",
+        updated_at: "2026-08-18T00:00:01Z"
+      }
+    };
+    dataSource.createContentCompletionJob.mockResolvedValue(envelope);
+    dataSource.getContentCompletionJob.mockResolvedValue(envelope);
+    dataSource.retryContentCompletionJob.mockResolvedValue(envelope);
+    const { wrapper } = setup();
+    const create = renderHook(() => useCreateContentCompletionJob(word.id), {
+      wrapper
+    });
+    await act(async () => {
+      await create.result.current.mutateAsync({
+        idempotency_key: "generate-key",
+        base_revision: word.revision,
+        scope: ["grammar_structures"],
+        fill_policy: "missing_only"
+      });
+    });
+    renderHook(() => useContentCompletionJob(word.id, "job-1"), { wrapper });
+    await waitFor(() =>
+      expect(dataSource.getContentCompletionJob).toHaveBeenCalledWith(
+        word.id,
+        "job-1"
+      )
+    );
+    const retry = renderHook(
+      () => useRetryContentCompletionJob(word.id, "job-1"),
+      { wrapper }
+    );
+    await act(async () => {
+      await retry.result.current.mutateAsync({
+        idempotency_key: "retry-key",
+        pos_ids: [word.forms.pos[0]!.pos_id]
+      });
+    });
+    expect(dataSource.createContentCompletionJob).toHaveBeenCalledWith(
+      word.id,
+      "generate-key",
+      {
+        base_revision: word.revision,
+        scope: ["grammar_structures"],
+        fill_policy: "missing_only"
+      }
+    );
+    expect(dataSource.retryContentCompletionJob).toHaveBeenCalledWith(
+      word.id,
+      "job-1",
+      "retry-key",
+      { pos_ids: [word.forms.pos[0]!.pos_id] }
+    );
+  });
+
+  it("内容生成只在 pending/running 状态轮询", () => {
+    expect(contentCompletionPollInterval("pending")).toBe(1000);
+    expect(contentCompletionPollInterval("running")).toBe(1000);
+    expect(contentCompletionPollInterval("completed")).toBe(false);
+    expect(contentCompletionPollInterval()).toBe(false);
   });
 
   it.each([

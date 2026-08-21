@@ -1,7 +1,8 @@
 import {
   CheckCircleFilled,
   ClockCircleOutlined,
-  LeftOutlined
+  LeftOutlined,
+  MinusCircleOutlined
 } from "@ant-design/icons";
 import { Breadcrumb, Button, Flex, Steps, Tag, Typography } from "antd";
 import type {
@@ -11,7 +12,14 @@ import type {
 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
+import type { PartOfSpeechLookup } from "../part-of-speech/catalog";
 import { WORD_STEP_ORDER, WORD_STEP_TITLE, wordDisplayHeadword } from "./model";
+import {
+  buildWordReadiness,
+  type ReadinessTarget,
+  type WordReadinessDraft
+} from "./readiness";
 import "./word-creation.css";
 
 interface Props {
@@ -21,6 +29,9 @@ interface Props {
   currentStep: WordCreationStep;
   readOnly?: boolean;
   onStepChange?: (step: WordCreationStep) => void;
+  readinessDraft?: WordReadinessDraft;
+  partOfSpeechLookup?: PartOfSpeechLookup;
+  onReadinessNavigate?: (target: ReadinessTarget) => void;
   children: ReactNode;
 }
 
@@ -28,10 +39,11 @@ const STEP_SUBTITLE: Record<WordCreationStep, string> = {
   basics: "所属语言｜英美区分",
   forms: "词性分类｜词形变化",
   meanings: "多维释义｜多维例句",
-  preview: "字典预览｜提交生效"
+  preview: "结构核对｜提交生效"
 };
 
 function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
+  const { preference } = useDialectPreference();
   if (!headwords) {
     return <Typography.Text type="secondary">完成检测后显示</Typography.Text>;
   }
@@ -43,83 +55,82 @@ function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
       </div>
     );
   }
+  // 偏好侧排首位并保持主视觉。原先按检测基准侧排(手测 C5)：输入 center 却看到
+  // centre 在前且字号更大，会被读成主词被静默换成了另一侧拼写。
+  const sides = (
+    preference === "uk" ? (["uk", "us"] as const) : (["us", "uk"] as const)
+  ).map((dialect) => ({
+    dialect,
+    spelling: dialect === "uk" ? headwords.uk : headwords.us,
+    caption: dialect === "uk" ? "英式英语 · BrE" : "美式英语 · AmE",
+    // 「检测基准」标在真正命中的那一侧，不再等同于首行——首行现在按偏好排。
+    detectionBasis: dialect === headwords.source_dialect
+  }));
   return (
     <Flex vertical gap={5}>
-      <div className="word-creation-summary-headword">
-        <span className="dialect-dot dialect-dot-uk" />
-        <strong>{headwords.uk}</strong>
-        <small>英式英语 · BrE</small>
-      </div>
-      <div className="word-creation-summary-headword word-creation-summary-alt">
-        <span className="dialect-dot dialect-dot-us" />
-        <span>{headwords.us}</span>
-        <small>美式英语 · AmE</small>
-      </div>
+      {sides.map(({ dialect, spelling, caption, detectionBasis }, index) => (
+        <div
+          key={dialect}
+          className={`word-creation-summary-headword${index === 0 ? "" : " word-creation-summary-alt"}`}
+        >
+          <span className={`dialect-dot dialect-dot-${dialect}`} />
+          {index === 0 ? <strong>{spelling}</strong> : <span>{spelling}</span>}
+          <small>
+            {caption}
+            {detectionBasis ? " · 检测基准" : ""}
+          </small>
+        </div>
+      ))}
     </Flex>
   );
 }
 
-function ProgressSummary({ word }: { word?: AdminWordV2 }) {
-  const senseGroupCount = word
-    ? Math.max(1, word.meanings.sense_groups.length)
-    : 0;
-  const grammarCount =
-    word?.meanings.pos.reduce(
-      (sum, pos) => sum + pos.grammar_structures.length,
-      0
-    ) ?? 0;
-  const senseCount =
-    word?.meanings.pos.reduce((sum, pos) => sum + pos.senses.length, 0) ?? 0;
-  const sentenceCount =
-    word?.meanings.pos.reduce(
-      (sum, pos) =>
-        sum +
-        pos.senses.reduce(
-          (senseSum, sense) => senseSum + sense.sentences.length,
-          0
-        ),
-      0
-    ) ?? 0;
-  const formCount =
-    word?.forms.pos.reduce(
-      (sum, pos) =>
-        sum +
-        pos.form_groups.reduce(
-          (groupSum, group) => groupSum + group.slots.length,
-          0
-        ),
-      0
-    ) ?? 0;
-  const completed = new Set(word?.completed_steps ?? []);
-  const rows = [
-    { label: "方言识别", value: completed.has("basics") ? "完成" : "待完成" },
-    {
-      label: "基本词性",
-      value: word?.forms.pos.length ?? 0
-    },
-    { label: "词形变化", value: formCount },
-    { label: "语义区间", value: senseGroupCount },
-    { label: "语法结构", value: grammarCount },
-    { label: "多维词义", value: senseCount },
-    { label: "多维例句", value: sentenceCount }
-  ];
+function ProgressSummary({
+  word,
+  draft,
+  partOfSpeechLookup,
+  onNavigate
+}: {
+  word?: AdminWordV2;
+  draft?: WordReadinessDraft;
+  partOfSpeechLookup?: PartOfSpeechLookup;
+  onNavigate?: (target: ReadinessTarget) => void;
+}) {
+  // 完成度按偏好口径算：存量双份词条保存后只留偏好侧，未收敛的原值会误报未完成。
+  const { preference } = useDialectPreference();
+  const rows = buildWordReadiness(word, draft, partOfSpeechLookup, preference);
   return (
     <Flex vertical gap={13} className="word-creation-progress-list">
-      {rows.map((row, index) => {
-        const done =
-          index === 0
-            ? completed.has("basics")
-            : typeof row.value === "number" && row.value > 0;
+      {rows.map((row) => {
+        const done = row.state === "complete";
+        // 「无需填写」是中性态:不打勾也不催办,避免 0/0 被读成已完成。
+        const notRequired = row.state === "not_required";
+        const value = notRequired
+          ? "无需填写"
+          : row.key === "dialect"
+            ? done
+              ? "完成"
+              : "待完成"
+            : `${row.completed}/${row.total}`;
         return (
-          <div className="word-creation-progress-row" key={row.label}>
+          <button
+            type="button"
+            className="word-creation-progress-row"
+            data-readiness-state={row.state}
+            disabled={!row.target || !onNavigate}
+            key={row.key}
+            onClick={() => row.target && onNavigate?.(row.target)}
+          >
             {done ? (
               <CheckCircleFilled className="word-progress-done" />
+            ) : notRequired ? (
+              <MinusCircleOutlined className="word-progress-none" />
             ) : (
               <ClockCircleOutlined className="word-progress-wait" />
             )}
             <span>{row.label}</span>
-            <Typography.Text type="secondary">{row.value}</Typography.Text>
-          </div>
+            <Typography.Text type="secondary">{value}</Typography.Text>
+          </button>
         );
       })}
     </Flex>
@@ -133,6 +144,9 @@ export function WordCreationLayout({
   currentStep,
   readOnly,
   onStepChange,
+  readinessDraft,
+  partOfSpeechLookup,
+  onReadinessNavigate,
   children
 }: Props) {
   const navigate = useNavigate();
@@ -154,6 +168,7 @@ export function WordCreationLayout({
           : ("wait" as const),
     disabled: !word || index > maxReachableIndex
   }));
+  const { preference } = useDialectPreference();
   const createTitle =
     entryKind === "word"
       ? "创建单词"
@@ -172,7 +187,7 @@ export function WordCreationLayout({
           },
           {
             title: word
-              ? `${wordDisplayHeadword(word)} · ${WORD_STEP_TITLE[currentStep]}`
+              ? `${wordDisplayHeadword(word, preference)} · ${WORD_STEP_TITLE[currentStep]}`
               : createTitle
           }
         ]}
@@ -236,7 +251,12 @@ export function WordCreationLayout({
             </Typography.Text>
             <Tag variant="filled">实时</Tag>
           </div>
-          <ProgressSummary word={word} />
+          <ProgressSummary
+            word={word}
+            draft={readinessDraft}
+            partOfSpeechLookup={partOfSpeechLookup}
+            onNavigate={onReadinessNavigate}
+          />
         </section>
 
         <main

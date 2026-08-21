@@ -114,15 +114,28 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
 
-      # 命中缓存:浏览器已在,只补系统依赖(apt 包不随缓存走)。
-      - name: Install Playwright system deps
-        if: steps.pw-cache.outputs.cache-hit == 'true'
-        run: pnpm --filter @tsz/e2e exec playwright install-deps chromium
-
-      # 未命中缓存:连浏览器带系统依赖一起装。
+      # 未命中缓存才装浏览器二进制;不带 --with-deps,系统依赖统一由下一步处理,
+      # 避免 apt 故障把「浏览器没装上」和「系统库没补上」两种失败混成一个。
       - name: Install Playwright browsers
         if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: pnpm --filter @tsz/e2e exec playwright install --with-deps chromium
+        run: pnpm --filter @tsz/e2e exec playwright install chromium
+
+      # 系统依赖走 apt,不随缓存走,每次都要重新拉 Ubuntu 源。该源偶发不可达时
+      # install-deps 会一直卡住,直到吃满 job 的 timeout-minutes 被 cancel——
+      # 表现为「跑了 20 分钟然后取消」,一个用例都没执行,极易被误判成用例挂了。
+      # 因此:单次 4 分钟封顶 + 最多三次重试;三次都失败也不阻断,继续执行 e2e——
+      # runner 镜像通常已含所需库,真缺库时让 e2e 以真实报错失败,比留下一个
+      # 「超时取消」更好排查。
+      - name: Install Playwright system deps
+        run: |
+          for i in 1 2 3; do
+            if timeout 240 pnpm --filter @tsz/e2e exec playwright install-deps chromium; then
+              exit 0
+            fi
+            echo "::warning::playwright install-deps 第 $i 次失败或超时,15 秒后重试"
+            sleep 15
+          done
+          echo "::warning::playwright install-deps 三次均失败,继续执行 e2e(runner 镜像通常已含所需库)"
 
       - name: E2E (smoke)
         run: pnpm test:e2e

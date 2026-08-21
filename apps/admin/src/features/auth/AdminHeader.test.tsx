@@ -28,7 +28,8 @@ const PROFILE: AdminProfile = {
   phone: "13800138000",
   display_name: "审核员小王",
   role: "admin",
-  permissions: []
+  permissions: [],
+  preferences: { dialect: "uk" as const }
 };
 
 // 身份与账户操作收进头像 Popover：先点头像展开，内容才进 DOM。
@@ -96,6 +97,14 @@ describe("AdminHeader", () => {
     await openAccountMenu();
     // 名称与角色文案双双回退到「管理员」。
     expect(screen.getAllByText("管理员")).toHaveLength(2);
+  });
+
+  it("点「个人设置」跳个人设置页（方言偏好等账号级设置的唯一入口）", async () => {
+    useAuthStore.setState({ profile: PROFILE, role: PROFILE.role });
+    render(<AdminHeader />);
+    await openAccountMenu();
+    fireEvent.click(screen.getByRole("button", { name: /个人设置/ }));
+    expect(mockNavigate).toHaveBeenCalledWith("/settings/profile");
   });
 
   it("点「修改密码」跳改密页（自助改密入口）", async () => {

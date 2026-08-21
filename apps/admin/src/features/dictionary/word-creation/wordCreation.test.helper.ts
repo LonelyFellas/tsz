@@ -4,7 +4,8 @@ import type {
   DraftFormsStepContent,
   DraftMeaningsStepContent,
   EnglishTextV2,
-  WordHeadwordsV2
+  WordHeadwordsV2,
+  WordSubPos
 } from "@tsz/types";
 import {
   createDetectionFixture,
@@ -26,46 +27,25 @@ export function detectionFixture(
   );
 }
 
-function readyEnglishText(
-  headwords: WordHeadwordsV2,
-  text: string,
-  nodeKey: string
-): EnglishTextV2 {
-  if (headwords.mode === "unified") {
-    return {
-      mode: "unified",
-      common: {
-        id: `${nodeKey}-common`,
-        value: richText(text),
-        origin: "manual"
-      }
-    };
-  }
+/**
+ * A1 之后英文内容一律单份：主词是否区分英美不再决定释义/例句的形状。
+ * 存量的英美双份形状由需要它的用例自行构造（见 MeaningsAndExamplesStep 的 legacySplitWord）。
+ */
+function readyEnglishText(text: string, nodeKey: string): EnglishTextV2 {
   return {
-    mode: "distinguish",
-    source_dialect: headwords.source_dialect,
-    uk: {
-      state: "ready",
-      variant: {
-        id: `${nodeKey}-uk`,
-        value: richText(text.replace("center", "centre")),
-        origin: "manual"
-      }
-    },
-    us: {
-      state: "ready",
-      variant: {
-        id: `${nodeKey}-us`,
-        value: richText(text.replace("centre", "center")),
-        origin: "manual"
-      }
+    mode: "unified",
+    common: {
+      id: `${nodeKey}-common`,
+      value: richText(text),
+      origin: "manual"
     }
   };
 }
 
 export function completeMeanings(
   content: DraftMeaningsStepContent,
-  headwords: WordHeadwordsV2
+  headwords: WordHeadwordsV2,
+  forms?: DraftFormsStepContent
 ): DraftMeaningsStepContent {
   const senseGroups = content.sense_groups.map((group, index) => ({
     ...group,
@@ -73,23 +53,42 @@ export function completeMeanings(
     name_en: group.name_en.trim() || `Semantic range ${index + 1}`
   }));
   const defaultSenseGroupId = senseGroups[0]!.id;
+  const defaultSubPos: Record<string, WordSubPos> = {
+    noun: "N-COUNT",
+    pronoun: "PRON",
+    verb: "V-T",
+    adjective: "ADJ",
+    adverb: "ADV",
+    preposition: "PREP",
+    article: "ART",
+    determiner: "DET",
+    conjunction: "CONJ",
+    numeral: "NUM",
+    interjection: "INT"
+  } as const;
+  const posCodeById = new Map(
+    forms?.pos.map((pos) => [pos.pos_id, pos.pos] as const) ?? []
+  );
   return {
     sense_groups: structuredClone(senseGroups),
     pos: content.pos.map((pos, posIndex) => ({
       ...pos,
+      // 语法结构 A1 后只维护一份 `common`。需要「存量英美双条、两侧文本不同」
+      // 的收敛场景由用例自造。
       grammar_structures: pos.grammar_structures.map((grammar) => ({
         ...grammar,
         variants: grammar.variants.map((variant) => ({
           ...variant,
-          content: richText(
-            variant.dialect === "uk" ? "a centre" : "the center"
-          )
+          content: richText("a centre")
         }))
       })),
       senses: pos.senses.map((sense, senseIndex) => ({
         ...sense,
         sense_group_id: sense.sense_group_id || defaultSenseGroupId,
-        sub_pos: posIndex === 0 ? "N-COUNT" : "V-T",
+        sub_pos:
+          defaultSubPos[
+            posCodeById.get(pos.pos_id) ?? (posIndex === 0 ? "noun" : "verb")
+          ] ?? "",
         frequency: "12.5",
         definitions: sense.definitions.map((definition) => ({
           id: definition.id,
@@ -106,11 +105,7 @@ export function completeMeanings(
         })),
         sentences: sense.sentences.map((sentence) => ({
           ...sentence,
-          en_text: readyEnglishText(
-            headwords,
-            "The center is here.",
-            sentence.id
-          ),
+          en_text: readyEnglishText("The center is here.", sentence.id),
           zh_text: richText("中心在这里。")
         }))
       }))
@@ -146,10 +141,9 @@ export function wordFixture(options: WordFixtureOptions = {}): AdminWordV2 {
   const status = options.status ?? "draft";
   const revision = options.revision ?? 3;
   const ready = options.ready ?? status === "published";
-  const initialMeanings =
-    options.meanings ?? createInitialMeanings(forms, headwords, id);
+  const initialMeanings = options.meanings ?? createInitialMeanings(forms, id);
   const meanings = ready
-    ? completeMeanings(initialMeanings, headwords)
+    ? completeMeanings(initialMeanings, headwords, forms)
     : structuredClone(initialMeanings);
 
   return {

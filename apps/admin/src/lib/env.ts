@@ -28,14 +28,21 @@ const VOICE_PREVIEW = parseBooleanEnvFlag(
   "VITE_VOICE_PREVIEW",
   !import.meta.env.PROD
 );
+// 试听默认走真实 TTS：mock 只在显式设置 VITE_ADMIN_TTS_MOCK=true 时启用，
+// 否则本地对接真实后端时会误判语音链路已接通。
 const ADMIN_TTS_MOCK = parseBooleanEnvFlag(
   import.meta.env.VITE_ADMIN_TTS_MOCK,
   "VITE_ADMIN_TTS_MOCK",
-  !import.meta.env.PROD
+  false
 );
 const RELATED_SEARCH_V2 = parseBooleanEnvFlag(
   import.meta.env.VITE_RELATED_SEARCH_V2,
   "VITE_RELATED_SEARCH_V2",
+  false
+);
+const WORD_CONTENT_COMPLETION = parseBooleanEnvFlag(
+  import.meta.env.VITE_WORD_CONTENT_COMPLETION,
+  "VITE_WORD_CONTENT_COMPLETION",
   false
 );
 
@@ -62,5 +69,6 @@ export const env = {
   VOICE_EDITOR,
   VOICE_PREVIEW,
   ADMIN_TTS_MOCK,
-  RELATED_SEARCH_V2
+  RELATED_SEARCH_V2,
+  WORD_CONTENT_COMPLETION
 };

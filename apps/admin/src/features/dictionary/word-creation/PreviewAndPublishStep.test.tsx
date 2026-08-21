@@ -153,6 +153,24 @@ beforeEach(() => {
 });
 
 describe("PreviewAndPublishStep", () => {
+  it("如实说明是结构化核对，并按偏好侧优先展示主词", async () => {
+    const word = wordFixture({ ready: true });
+    mutations.validate.mockResolvedValue({
+      validated_revision: word.revision,
+      valid: true,
+      issues: []
+    });
+    renderStep(word);
+
+    expect(
+      await screen.findByText(
+        "逐项核对结构化内容与发布完整性校验结果；本页不呈现学习端字典卡片样式。所有问题处理完成后可直接提交生效。"
+      )
+    ).toBeInTheDocument();
+    // 主词顺序按方言偏好(缺省英式)，与左栏「当前词条」一致。
+    expect(screen.getByText("centre / center")).toBeInTheDocument();
+  });
+
   it("自动校验失败时列出可定位 issue，并禁止发布", async () => {
     const word = wordFixture({ ready: true, revision: 7 });
     mutations.validate.mockResolvedValue({
@@ -527,6 +545,11 @@ describe("PreviewAndPublishStep", () => {
     expect(screen.getByText("未知词性")).toBeVisible();
     expect(screen.getByText("没有派生词形")).toBeInTheDocument();
     expect(screen.getByText(/synonym/)).toBeInTheDocument();
+    // 释义方式展示中文标签，不把 wire 码 zh_definition/en_definition 暴露给录入者。
+    expect(screen.getAllByText("中文定义释义").length).toBeGreaterThan(0);
+    expect(screen.getByText("英文定义释义")).toBeInTheDocument();
+    expect(screen.queryByText("zh_definition")).toBeNull();
+    expect(screen.queryByText("en_definition")).toBeNull();
   });
 
   it("published 只读详情不重复 validate，展示发布时间并允许继续编辑", () => {

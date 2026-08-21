@@ -1,6 +1,11 @@
 // 词条编辑器的下拉/枚举选项:值一律用 @tsz/types 的 wire 英文码,中文仅作展示标签
 // (对接文档 §7 的对照表)。表单里存英文码,保存时无需再做值转换。
-import type { Dialect, PronunciationStyle, WordFormType } from "@tsz/types";
+import type {
+  Dialect,
+  PronunciationStyle,
+  WordDefinitionV2,
+  WordFormType
+} from "@tsz/types";
 import { CEFR_LEVELS, recordToOptions } from "./labels";
 
 // 方言类型(可多选,动态展示英式/美式两套词形)。common 是「无需分方言」的兜底块。
@@ -49,6 +54,20 @@ export const PRON_STYLE_OPTIONS: {
   { value: "strong", label: "强读" },
   { value: "weak", label: "弱读" }
 ];
+
+// 释义方式(多维释义每行可切换):wire 码 ↔ 中文标签,预览页与编辑器共用同一份映射,
+// 避免预览把 zh_definition 这类技术标识符直接暴露给录入者。
+export const DEFINITION_MODE_LABEL: Record<
+  WordDefinitionV2["definition_mode"],
+  string
+> = {
+  zh_definition: "中文定义释义",
+  en_definition: "英文定义释义",
+  zh_sentence: "中文整句释义",
+  en_sentence: "英文整句释义"
+};
+
+export const DEFINITION_MODE_OPTIONS = recordToOptions(DEFINITION_MODE_LABEL);
 
 // 释义类型(多维释义每行可切换)。
 export const DEF_TYPE_OPTIONS = [

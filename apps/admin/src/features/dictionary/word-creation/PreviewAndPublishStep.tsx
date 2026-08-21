@@ -34,7 +34,7 @@ import "@tsz/voice-editor/styles.css";
 import { HttpError } from "@tsz/api-client/http";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { DIALECT_LABEL } from "../editorConstants";
+import { DEFINITION_MODE_LABEL, DIALECT_LABEL } from "../editorConstants";
 import {
   aggregateSurfaceMatchCards,
   canAcknowledgeSurfaceSnapshot,
@@ -50,7 +50,8 @@ import {
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { newWordNodeId } from "../word-model/primitives";
 import { usePublishWordV2, useValidateWordV2 } from "./api";
-import { wordDisplayHeadword } from "./model";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
+import { orderedHeadwordSpellings, wordDisplayHeadword } from "./model";
 
 interface Props {
   word: AdminWordV2;
@@ -293,7 +294,11 @@ function MeaningsPreview({
                           <Space>
                             <Tag>{definition.level}</Tag>
                             <Typography.Text type="secondary">
-                              {definition.definition_mode}
+                              {
+                                DEFINITION_MODE_LABEL[
+                                  definition.definition_mode
+                                ]
+                              }
                             </Typography.Text>
                           </Space>
                           <DefinitionRichTextPreview definition={definition} />
@@ -380,6 +385,7 @@ export function PreviewAndPublishStep({
   onPublished
 }: Props) {
   const { message, modal } = App.useApp();
+  const { preference } = useDialectPreference();
   const navigate = useNavigate();
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const partOfSpeechLookup = useMemo(
@@ -541,7 +547,9 @@ export function PreviewAndPublishStep({
       });
       setSurfacePage(undefined);
       onPublished(published);
-      message.success(`「${wordDisplayHeadword(published)}」已提交生效`);
+      message.success(
+        `「${wordDisplayHeadword(published, preference)}」已提交生效`
+      );
       navigate("/words", { replace: true });
     } catch (error) {
       handleRequestError(error, "发布失败");
@@ -566,7 +574,7 @@ export function PreviewAndPublishStep({
             ? "该词条已归档，当前仅提供结构化只读查看；恢复后才能继续编辑或发布。"
             : readOnly
               ? "该 V2 词条已发布，本轮提供与创建预览一致的只读查看。"
-              : "查看结构化字典预览和发布完整性结果。所有问题处理完成后可直接提交生效。"}
+              : "逐项核对结构化内容与发布完整性校验结果；本页不呈现学习端字典卡片样式。所有问题处理完成后可直接提交生效。"}
         </Typography.Paragraph>
       </div>
 
@@ -772,9 +780,7 @@ export function PreviewAndPublishStep({
         >
           <Descriptions bordered size="small" column={{ xs: 1, md: 2 }}>
             <Descriptions.Item label="主词">
-              {word.headwords.mode === "unified"
-                ? word.headwords.common
-                : `${word.headwords.uk} / ${word.headwords.us}`}
+              {orderedHeadwordSpellings(word.headwords, preference).join(" / ")}
             </Descriptions.Item>
             <Descriptions.Item label="语言">English 英语</Descriptions.Item>
             <Descriptions.Item label="状态">

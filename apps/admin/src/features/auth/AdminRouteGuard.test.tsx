@@ -26,7 +26,8 @@ const PROFILE: AdminProfile = {
   phone: "13800138000",
   display_name: "Admin",
   role: "super_admin",
-  permissions: []
+  permissions: [],
+  preferences: { dialect: "uk" as const }
 };
 
 function setState(s: Partial<ReturnType<typeof useAuthStore.getState>>) {

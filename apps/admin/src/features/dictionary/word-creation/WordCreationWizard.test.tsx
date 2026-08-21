@@ -1,10 +1,12 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import { HttpError } from "@tsz/api-client/http";
-import type { AdminWordV2 } from "@tsz/types";
+import type { AdminWordV2, RetiredStableSlotV2 } from "@tsz/types";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { WordCreationWizard } from "./WordCreationWizard";
+import { applyFormVariantIdentities } from "./formVariantIdentity";
+import type { FormVariantIdentityLedger } from "./formVariantIdentity";
 import { wordFixture } from "./wordCreation.test.helper";
 
 const state = vi.hoisted(() => ({
@@ -61,18 +63,27 @@ vi.mock("./CreateEntryStep", () => ({
   )
 }));
 
+const formsStep = vi.hoisted(() => ({
+  identityLedger: undefined as FormVariantIdentityLedger | undefined
+}));
+
 vi.mock("./FormsAndPronunciationStep", () => ({
   FormsAndPronunciationStep: ({
     word,
-    readOnly
+    readOnly,
+    identityLedger
   }: {
     word: AdminWordV2;
     readOnly?: boolean;
-  }) => (
-    <div>
-      forms-step-revision-{word.revision}-readonly-{String(readOnly)}
-    </div>
-  )
+    identityLedger: FormVariantIdentityLedger;
+  }) => {
+    formsStep.identityLedger = identityLedger;
+    return (
+      <div>
+        forms-step-revision-{word.revision}-readonly-{String(readOnly)}
+      </div>
+    );
+  }
 }));
 
 vi.mock("./MeaningsAndExamplesStep", () => ({
@@ -100,11 +111,18 @@ vi.mock("./WordCreationLayout", () => ({
     entryKind,
     currentStep,
     onStepChange,
+    onReadinessNavigate,
     children
   }: {
     entryKind?: AdminWordV2["kind"];
     currentStep: string;
     onStepChange?: (step: "basics" | "forms" | "meanings" | "preview") => void;
+    onReadinessNavigate?: (target: {
+      step: "meanings";
+      pos_id: string;
+      node_id: string;
+      field: string;
+    }) => void;
     children: React.ReactNode;
   }) => (
     <div>
@@ -115,6 +133,18 @@ vi.mock("./WordCreationLayout", () => ({
         layout-meanings
       </button>
       <button onClick={() => onStepChange?.("preview")}>layout-preview</button>
+      <button
+        onClick={() =>
+          onReadinessNavigate?.({
+            step: "meanings",
+            pos_id: "pos-noun",
+            node_id: "grammar-noun",
+            field: "grammar_structures"
+          })
+        }
+      >
+        layout-readiness-target
+      </button>
       {children}
     </div>
   )
@@ -151,9 +181,12 @@ function renderWizard(mode: "create" | "resume", initialEntry: string) {
   );
 }
 
-function loaded(word: AdminWordV2) {
+function loaded(
+  word: AdminWordV2,
+  retiredStableSlots: RetiredStableSlotV2[] = []
+) {
   state.detail = {
-    data: { word },
+    data: { word, retired_stable_slots: retiredStableSlots },
     isPending: false,
     isFetching: false,
     isError: false,
@@ -176,6 +209,66 @@ beforeEach(() => {
 });
 
 describe("WordCreationWizard", () => {
+  it("草稿响应里的退役槽位身份在编辑开始前就补进账本", async () => {
+    // 刷新或换设备后账本是空的，退役身份只有这个响应带得回来：
+    // 少了这一步，拆分态保存后再合并回共用会重新铸 ID 而被后端判身份换槽位。
+    const word = wordFixture({ headword: "testability" });
+    const baseSlotId = word.forms.pos[0]!.base_form.id;
+    loaded(word, [
+      {
+        id: "retired-common-id",
+        parent_node_id: baseSlotId,
+        node_role: "forms.form_variant:common"
+      }
+    ]);
+
+    renderWizard("resume", `/words/${word.id}/wizard/forms`);
+    await screen.findByText(/forms-step-revision/);
+
+    const ledger = formsStep.identityLedger;
+    expect(ledger).toBeDefined();
+    // 用账本跑一遍「合并回共用时新铸了 ID」的场景，断言它被换回退役身份。
+    const merged = applyFormVariantIdentities(ledger!, {
+      pos: [
+        {
+          ...word.forms.pos[0]!,
+          base_form: {
+            ...word.forms.pos[0]!.base_form,
+            variants: [
+              {
+                id: "freshly-minted",
+                dialect: "common",
+                spelling: "testability",
+                origin: "manual",
+                pronunciations: []
+              }
+            ]
+          }
+        }
+      ]
+    });
+    expect(merged.pos[0]!.base_form.variants[0]!.id).toBe("retired-common-id");
+  });
+
+  it("完成情况定位目标导航到可达步骤并保留编辑 query", async () => {
+    loaded(
+      wordFixture({
+        status: "published",
+        ready: true,
+        max_reachable_step: "preview"
+      })
+    );
+    renderWizard("resume", "/words/word-center/wizard/forms?mode=edit");
+
+    fireEvent.click(screen.getByText("layout-readiness-target"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "/words/word-center/wizard/meanings?mode=edit"
+      )
+    );
+  });
+
   it("从 query 恢复创建入口意图，未知或缺失时保持中性", () => {
     const phrase = renderWizard("create", "/words/new?kind=phrase");
     expect(screen.getByText("layout-kind-phrase")).toBeVisible();
@@ -441,7 +534,9 @@ describe("WordCreationWizard", () => {
       max_reachable_step: "forms"
     });
     loaded(archived);
-    state.refetch.mockResolvedValue({ data: { word: archived } });
+    state.refetch.mockResolvedValue({
+      data: { word: archived, retired_stable_slots: [] }
+    });
     state.restore
       .mockRejectedValueOnce(new TypeError("network result unknown"))
       .mockResolvedValueOnce({
@@ -463,7 +558,9 @@ describe("WordCreationWizard", () => {
   it("业务 revision 409 清理旧命令并重新加载详情", async () => {
     const archived = wordFixture({ status: "archived", lifecycle_revision: 3 });
     loaded(archived);
-    state.refetch.mockResolvedValue({ data: { word: archived } });
+    state.refetch.mockResolvedValue({
+      data: { word: archived, retired_stable_slots: [] }
+    });
     state.restore.mockRejectedValue(
       new HttpError(409, "revision conflict", [], "revision_conflict")
     );
@@ -520,7 +617,9 @@ describe("WordCreationWizard", () => {
       archived_by: undefined
     };
     loaded(archived);
-    state.refetch.mockResolvedValue({ data: { word: concurrentlyRestored } });
+    state.refetch.mockResolvedValue({
+      data: { word: concurrentlyRestored, retired_stable_slots: [] }
+    });
     renderWizard("resume", `/words/${archived.id}/wizard/forms`);
 
     fireEvent.click(await screen.findByText("恢复词条"));

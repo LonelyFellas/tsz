@@ -18,7 +18,8 @@ function stateWith(level: AdminProfile["role"] | null): AdminAuthState {
           phone: "13800138000",
           display_name: "管理员",
           role: level,
-          permissions: []
+          permissions: [],
+          preferences: { dialect: "uk" as const }
         }
       : null,
     role: level,

@@ -12,6 +12,7 @@ import type {
   AdminUserUpdateInput,
   AdminSpeechPreviewResponse,
   AdminSpeechVoiceListResponse,
+  AdminWordDraftV2Envelope,
   AdminWordV2Envelope,
   AdminWordListQuery,
   AdminWordV2ListResponse,
@@ -20,6 +21,8 @@ import type {
   CreateAdminInput,
   CreateAdminSpeechPreviewInput,
   CreateAdminWordV2Input,
+  CreateContentCompletionJobInput,
+  ContentCompletionJobEnvelope,
   CreateAdminResponse,
   CreateRoleRequest,
   DeleteDraftInput,
@@ -35,6 +38,8 @@ import type {
   Admin,
   AdminAuthResponse,
   AdminProfile,
+  UpdateAdminPreferencesInput,
+  UpdateAdminPreferencesResponse,
   PermissionCatalogResponse,
   PartOfSpeechCatalogResponse,
   PartOfSpeechConfig,
@@ -43,6 +48,7 @@ import type {
   RelatedSearchResponse,
   RelatedSearchQuery,
   ResetPasswordResponse,
+  RetryContentCompletionJobInput,
   RoleListResponse,
   SaveFormsStepInput,
   SaveMeaningsStepInput,
@@ -71,6 +77,8 @@ export type {
   AdminLevel,
   AdminListQuery,
   AdminListResponse,
+  AdminDialectPreference,
+  AdminPreferences,
   AdminProfile,
   AdminRole,
   AdminStatus,
@@ -90,6 +98,8 @@ export type {
   ResetPasswordResponse,
   RoleListResponse,
   SetAdminRoleRequest,
+  UpdateAdminPreferencesInput,
+  UpdateAdminPreferencesResponse,
   UpdateRoleRequest
 } from "@tsz/types";
 
@@ -146,6 +156,13 @@ export function createAdminEndpoints(http: HttpClient) {
     },
     /** GET /admin/profile — 门禁探针：200=有效 admin / 401=未登录。 */
     profile: () => http.get<AdminProfile>("/profile"),
+    /**
+     * PATCH /admin/profile/preferences — 改**自己的**个人偏好。
+     * 目标恒为 token subject，请求体里没有管理员 ID，改不到别人。
+     * 200 返回落库后的完整偏好；422 = dialect 不在枚举内（invalid_request_body）。
+     */
+    updateProfilePreferences: (input: UpdateAdminPreferencesInput) =>
+      http.patch<UpdateAdminPreferencesResponse>("/profile/preferences", input),
     /** 语音富文本试听；wire 映射由 admin 业务层承担。 */
     speech: {
       voices: (signal?: AbortSignal) =>
@@ -191,9 +208,14 @@ export function createAdminEndpoints(http: HttpClient) {
         http.post<AdminWordV2Envelope>("/lexicon/entries", input, {
           headers: { "Idempotency-Key": idempotencyKey }
         }),
-      /** GET /admin/lexicon/entries/{id} — 加载 V2 canonical 词条。 */
+      /**
+       * GET /admin/lexicon/entries/{id} — 加载 V2 canonical 词条。
+       *
+       * 只有这个接口带 `retired_stable_slots`：命令类接口的调用方自己就知道刚
+       * 退役了什么，需要服务端补身份的只有「刷新」和「换设备」。
+       */
       get: (wordId: string) =>
-        http.get<AdminWordV2Envelope>(`/lexicon/entries/${wordId}`),
+        http.get<AdminWordDraftV2Envelope>(`/lexicon/entries/${wordId}`),
       /** POST /admin/lexicon/entries/{id}/steps/forms/impact。 */
       previewFormsImpact: (wordId: string, input: PreviewFormsImpactInputV2) =>
         http.post<PreviewFormsImpactResponseV2>(
@@ -211,6 +233,34 @@ export function createAdminEndpoints(http: HttpClient) {
         http.put<AdminWordV2Envelope>(
           `/lexicon/entries/${wordId}/steps/meanings`,
           input
+        ),
+      /** POST .../content-completion-jobs — 创建真实内容生成任务。 */
+      createContentCompletionJob: (
+        wordId: string,
+        idempotencyKey: string,
+        input: CreateContentCompletionJobInput
+      ) =>
+        http.post<ContentCompletionJobEnvelope>(
+          `/lexicon/entries/${wordId}/content-completion-jobs`,
+          input,
+          { headers: { "Idempotency-Key": idempotencyKey } }
+        ),
+      /** GET .../content-completion-jobs/{jobId} — 查询任务和候选内容。 */
+      getContentCompletionJob: (wordId: string, jobId: string) =>
+        http.get<ContentCompletionJobEnvelope>(
+          `/lexicon/entries/${wordId}/content-completion-jobs/${jobId}`
+        ),
+      /** POST .../retries — 仅重试失败或缺失分区。 */
+      retryContentCompletionJob: (
+        wordId: string,
+        jobId: string,
+        idempotencyKey: string,
+        input: RetryContentCompletionJobInput
+      ) =>
+        http.post<ContentCompletionJobEnvelope>(
+          `/lexicon/entries/${wordId}/content-completion-jobs/${jobId}/retries`,
+          input,
+          { headers: { "Idempotency-Key": idempotencyKey } }
         ),
       /** POST /admin/lexicon/entries/{id}/validate。 */
       validateV2: (wordId: string, input: ValidateAdminWordV2Input) =>

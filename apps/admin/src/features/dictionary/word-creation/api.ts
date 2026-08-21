@@ -1,14 +1,17 @@
 import type {
   CreateAdminWordV2Input,
+  ContentCompletionJobEnvelope,
+  CreateContentCompletionJobInput,
   DetectWordInputV2,
   PreviewFormsImpactInputV2,
   PublishAdminWordV2Input,
   SaveFormsStepInput,
   SaveMeaningsStepInput,
+  RetryContentCompletionJobInput,
   SuggestDialectVariantsInputV2,
   ValidateAdminWordV2Input
 } from "@tsz/types";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { adminWordsDataSource } from "../dataSource";
 import { wordKeys } from "../api";
 
@@ -16,6 +19,12 @@ type CreateWordV2Command = CreateAdminWordV2Input & {
   idempotency_key: string;
 };
 type PublishWordV2Command = PublishAdminWordV2Input & {
+  idempotency_key: string;
+};
+type CreateCompletionCommand = CreateContentCompletionJobInput & {
+  idempotency_key: string;
+};
+type RetryCompletionCommand = RetryContentCompletionJobInput & {
   idempotency_key: string;
 };
 
@@ -84,6 +93,54 @@ export function useSaveMeaningsStep(wordId: string) {
     onSuccess: (envelope) => {
       cache.writeDetail(wordId, envelope);
       void cache.invalidateCollection();
+    }
+  });
+}
+
+export function useCreateContentCompletionJob(wordId: string) {
+  return useMutation({
+    mutationFn: ({ idempotency_key, ...input }: CreateCompletionCommand) =>
+      adminWordsDataSource.createContentCompletionJob(
+        wordId,
+        idempotency_key,
+        input
+      )
+  });
+}
+
+export function contentCompletionPollInterval(
+  status?: ContentCompletionJobEnvelope["job"]["status"]
+) {
+  return status === "pending" || status === "running" ? 1000 : false;
+}
+
+export function useContentCompletionJob(wordId: string, jobId?: string) {
+  return useQuery({
+    queryKey: ["admin-word-content-completion", wordId, jobId],
+    queryFn: () => adminWordsDataSource.getContentCompletionJob(wordId, jobId!),
+    enabled: Boolean(jobId),
+    refetchInterval: (query) => {
+      const status = query.state.data?.job.status;
+      return contentCompletionPollInterval(status);
+    }
+  });
+}
+
+export function useRetryContentCompletionJob(wordId: string, jobId?: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ idempotency_key, ...input }: RetryCompletionCommand) =>
+      adminWordsDataSource.retryContentCompletionJob(
+        wordId,
+        jobId!,
+        idempotency_key,
+        input
+      ),
+    onSuccess: (value) => {
+      queryClient.setQueryData(
+        ["admin-word-content-completion", wordId, jobId],
+        value
+      );
     }
   });
 }

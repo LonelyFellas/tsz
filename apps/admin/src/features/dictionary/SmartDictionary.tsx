@@ -545,11 +545,14 @@ export function SmartDictionary() {
       width: 160,
       fixed: "right",
       render: (_: unknown, record: AdminWordListItem) => {
+        // 同名词条可以并存,可及名带上词汇与短 ID 才能区分是哪一行。
+        const rowName = `「${record.headword}」${shortWordId(record.id)}`;
         return (
           <Space size={0}>
             <Button
               type="link"
               size="small"
+              aria-label={`${getWordRowActionLabel(record)}${rowName}`}
               onClick={() => navigate(getWordRowRoute(record))}
             >
               {getWordRowActionLabel(record)}
@@ -559,6 +562,7 @@ export function SmartDictionary() {
                 type="link"
                 size="small"
                 danger={record.status !== "archived"}
+                aria-label={`${record.status === "archived" ? "恢复" : "归档"}${rowName}`}
                 disabled={lifecycleInput(record) === undefined}
                 loading={
                   lifecyclePending &&

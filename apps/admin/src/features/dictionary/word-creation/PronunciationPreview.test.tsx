@@ -10,12 +10,14 @@ import type { VoicePreviewResult } from "@tsz/voice-editor/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PronunciationPreviewControls,
-  PronunciationPreviewProvider
+  PronunciationPreviewProvider,
+  usePronunciationVoiceNotice
 } from "./PronunciationPreview";
 import { deferred } from "./wordCreation.test.helper";
 
 const preview = vi.hoisted(() => ({
   enabled: true,
+  mocked: false,
   listVoices: vi.fn(),
   synthesize: vi.fn()
 }));
@@ -46,6 +48,9 @@ vi.mock("../voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {
     listVoices: preview.listVoices,
     synthesize: preview.synthesize
+  },
+  get voicePreviewIsMock() {
+    return preview.mocked;
   }
 }));
 
@@ -71,6 +76,15 @@ class AudioMock {
     this.listeners.get(type)?.();
   }
 }
+
+// 统一内容的发音人按管理员方言偏好挑（A1 阶段 5），测试里直接注入。
+const dialectPreference = vi.hoisted(() => ({ value: "uk" as "uk" | "us" }));
+vi.mock("@/features/settings/useDialectPreference", () => ({
+  useDialectPreference: () => ({
+    preference: dialectPreference.value,
+    savePreference: vi.fn()
+  })
+}));
 
 const voices = [
   {
@@ -143,9 +157,28 @@ function PreviewHarness({
   );
 }
 
+function VoiceNotice({ dialects }: { dialects: Dialect[] }) {
+  const notice = usePronunciationVoiceNotice(dialects);
+  return <span data-testid="voice-notice">{notice ?? "无提示"}</span>;
+}
+
+function NoticeHarness({
+  dialects = ["uk", "us"] as Dialect[]
+}: {
+  dialects?: Dialect[];
+}) {
+  return (
+    <PronunciationPreviewProvider>
+      <VoiceNotice dialects={dialects} />
+    </PronunciationPreviewProvider>
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   preview.enabled = true;
+  preview.mocked = false;
+  dialectPreference.value = "uk";
   preview.listVoices.mockResolvedValue(voices);
   preview.synthesize.mockResolvedValue(result());
   message.error.mockReset();
@@ -158,7 +191,46 @@ afterEach(() => {
 });
 
 describe("PronunciationPreview", () => {
-  it("tomato 使用目录默认 voice 获取并自动播放，随后可手动重播", async () => {
+  it("偏好切到美式后，统一内容改挑 en-US 发音人", async () => {
+    dialectPreference.value = "us";
+    render(<PreviewHarness />);
+
+    const getButton = screen.getByLabelText("获取语音");
+    await waitFor(() => expect(getButton).toBeEnabled());
+    fireEvent.click(getButton);
+
+    await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(1));
+    expect(preview.synthesize.mock.calls[0]![0].voiceId).toBe("american-voice");
+  });
+
+  it("明确标了方言的内容找不到对应发音人时不降级，直接禁用并说明", async () => {
+    preview.listVoices.mockResolvedValue(
+      voices.filter((voice) => voice.locale !== "en-GB")
+    );
+    render(<PreviewHarness dialect="uk" />);
+
+    // 英式内容配不到 en-GB 发音人时保持禁用，不静默改用美式音朗读。
+    await waitFor(() => expect(preview.listVoices).toHaveBeenCalled());
+    expect(screen.getByLabelText("获取语音")).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("获取语音"));
+    expect(preview.synthesize).not.toHaveBeenCalled();
+  });
+
+  it("偏好侧发音人缺席时，统一内容回退目录默认，仍可试听", async () => {
+    preview.listVoices.mockResolvedValue(
+      voices.filter((voice) => voice.locale !== "en-GB")
+    );
+    render(<PreviewHarness />);
+
+    const getButton = screen.getByLabelText("获取语音");
+    await waitFor(() => expect(getButton).toBeEnabled());
+    fireEvent.click(getButton);
+
+    await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(1));
+    expect(preview.synthesize.mock.calls[0]![0].voiceId).toBe("common-default");
+  });
+
+  it("统一内容按方言偏好挑发音人，获取后自动播放且可手动重播", async () => {
     const pending = deferred<VoicePreviewResult>();
     preview.synthesize.mockReturnValue(pending.promise);
     render(<PreviewHarness />);
@@ -172,7 +244,8 @@ describe("PronunciationPreview", () => {
       {
         language: "en",
         content: { version: 2, text: "tomato", annotations: [] },
-        voiceId: "common-default"
+        // 统一内容没有自己的方言，按管理员偏好（缺省英式）挑 en-GB 发音人。
+        voiceId: "british-voice"
       },
       { signal: expect.any(AbortSignal) }
     );
@@ -402,6 +475,73 @@ describe("PronunciationPreview", () => {
       )
     );
     expect(screen.getByLabelText("播放语音")).toBeEnabled();
+  });
+
+  it("走真实 TTS 时不显示模拟标记", async () => {
+    render(<PreviewHarness />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("获取语音")).toBeEnabled()
+    );
+
+    expect(screen.queryByText("模拟")).toBeNull();
+  });
+
+  it("走 mock 适配器时显示模拟标记", async () => {
+    preview.mocked = true;
+    render(<PreviewHarness />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("获取语音")).toBeEnabled()
+    );
+
+    expect(screen.getByText("模拟")).toBeVisible();
+  });
+
+  it("缺少某侧发音人时给出无需悬停的常驻说明", async () => {
+    preview.listVoices.mockResolvedValue([voices[0], voices[2]]);
+    render(<NoticeHarness />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("voice-notice")).toHaveTextContent(
+        "英式（en-GB）暂无可用发音人，对应的「获取语音」已禁用"
+      )
+    );
+  });
+
+  it("两侧发音人齐全时不显示常驻说明", async () => {
+    render(<NoticeHarness />);
+
+    await waitFor(() => expect(preview.listVoices).toHaveBeenCalled());
+    expect(screen.getByTestId("voice-notice")).toHaveTextContent("无提示");
+  });
+
+  it("试听功能关闭时不显示常驻说明", () => {
+    preview.enabled = false;
+    render(<NoticeHarness />);
+
+    expect(screen.getByTestId("voice-notice")).toHaveTextContent("无提示");
+    expect(preview.listVoices).not.toHaveBeenCalled();
+  });
+
+  it("发音人目录为空时透出目录层面的原因", async () => {
+    preview.listVoices.mockResolvedValue([]);
+    render(<NoticeHarness />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("voice-notice")).toHaveTextContent(
+        "暂无可用发音人"
+      )
+    );
+  });
+
+  it("发音人目录加载失败时透出加载错误", async () => {
+    preview.listVoices.mockRejectedValue(new Error("目录服务不可用"));
+    render(<NoticeHarness />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("voice-notice")).toHaveTextContent(
+        "目录服务不可用"
+      )
+    );
   });
 
   it("目标 locale 无 voice 或 spelling 为空时不请求合成", async () => {

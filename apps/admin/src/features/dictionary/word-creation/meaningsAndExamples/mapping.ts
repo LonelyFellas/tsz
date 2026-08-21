@@ -4,6 +4,10 @@ import type {
   WordPosMeaningsV2,
   WordSenseV2
 } from "@tsz/types";
+import {
+  soleSubPartOfSpeechCode,
+  type PartOfSpeechLookup
+} from "../../part-of-speech/catalog";
 
 export function collectPronunciationHints(
   forms: AdminWordV2["forms"]
@@ -126,4 +130,34 @@ export function removeSenseAndReferences(
         }))
     }))
   };
+}
+
+/**
+ * 基本词性下只有一个细分词性时自动回填：管理员没有可选空间，留空只会
+ * 变成无信息量的必填动作。只回填空值——已有取值（含与当前目录不符的存量
+ * 编码）一律保留，交由校验拒绝保存，避免把非法值静默洗成合法值。
+ */
+export function applySoleSubPartOfSpeech(
+  content: DraftMeaningsStepContent,
+  forms: AdminWordV2["forms"],
+  lookup: PartOfSpeechLookup
+): DraftMeaningsStepContent {
+  const posCodeById = new Map(forms.pos.map((pos) => [pos.pos_id, pos.pos]));
+  let changed = false;
+  const pos = content.pos.map((posMeanings) => {
+    const posCode = posCodeById.get(posMeanings.pos_id);
+    const soleSubPos = posCode
+      ? soleSubPartOfSpeechCode(lookup, posCode)
+      : undefined;
+    if (soleSubPos === undefined) return posMeanings;
+    if (posMeanings.senses.every((sense) => sense.sub_pos)) return posMeanings;
+    changed = true;
+    return {
+      ...posMeanings,
+      senses: posMeanings.senses.map((sense) =>
+        sense.sub_pos ? sense : { ...sense, sub_pos: soleSubPos }
+      )
+    };
+  });
+  return changed ? { ...content, pos } : content;
 }

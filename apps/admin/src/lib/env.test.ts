@@ -7,7 +7,7 @@ afterEach(() => {
 });
 
 describe("env", () => {
-  it("未配置时回退到 API 默认路径，词库默认连接真实后端", async () => {
+  it("未配置时回退到 API 默认路径，词库与试听默认连接真实后端", async () => {
     vi.stubEnv("VITE_API_BASE_URL", undefined);
     vi.stubEnv("VITE_ADMIN_WORDS_MOCK", undefined);
     vi.stubEnv("VITE_ADMIN_PART_OF_SPEECH_MOCK", undefined);
@@ -15,6 +15,7 @@ describe("env", () => {
     vi.stubEnv("VITE_VOICE_PREVIEW", undefined);
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.stubEnv("VITE_RELATED_SEARCH_V2", undefined);
+    vi.stubEnv("VITE_WORD_CONTENT_COMPLETION", undefined);
     vi.resetModules();
     const { env } = await import("./env");
     expect(env.API_BASE_URL).toBe("/api/v1");
@@ -22,8 +23,9 @@ describe("env", () => {
     expect(env.ADMIN_PART_OF_SPEECH_MOCK).toBe(false);
     expect(env.VOICE_EDITOR).toBe(true);
     expect(env.VOICE_PREVIEW).toBe(true);
-    expect(env.ADMIN_TTS_MOCK).toBe(true);
+    expect(env.ADMIN_TTS_MOCK).toBe(false);
     expect(env.RELATED_SEARCH_V2).toBe(false);
+    expect(env.WORD_CONTENT_COMPLETION).toBe(false);
   });
 
   it("采用配置的 API 基址", async () => {
@@ -61,7 +63,9 @@ describe("env", () => {
     ["VITE_ADMIN_TTS_MOCK", "true", true],
     ["VITE_ADMIN_TTS_MOCK", "false", false],
     ["VITE_RELATED_SEARCH_V2", "true", true],
-    ["VITE_RELATED_SEARCH_V2", "false", false]
+    ["VITE_RELATED_SEARCH_V2", "false", false],
+    ["VITE_WORD_CONTENT_COMPLETION", "true", true],
+    ["VITE_WORD_CONTENT_COMPLETION", "false", false]
   ] as const)("严格解析 %s=%s", async (name, value, expected) => {
     vi.stubEnv(name, value);
     vi.resetModules();
@@ -72,7 +76,8 @@ describe("env", () => {
       | "VOICE_EDITOR"
       | "VOICE_PREVIEW"
       | "ADMIN_TTS_MOCK"
-      | "RELATED_SEARCH_V2";
+      | "RELATED_SEARCH_V2"
+      | "WORD_CONTENT_COMPLETION";
     expect(env[key]).toBe(expected);
   });
 

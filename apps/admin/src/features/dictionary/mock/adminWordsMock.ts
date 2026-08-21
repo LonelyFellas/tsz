@@ -6,6 +6,8 @@ import type {
   AdminWordListResponse,
   AdminWordStats,
   AdminWordV2,
+  AdminWordDraftV2Envelope,
+  RetiredStableSlotV2,
   AdminWordV2Envelope,
   CreatePartOfSpeechInput,
   CreateSubPartOfSpeechInput,
@@ -130,6 +132,8 @@ export interface AdminWordsMockPersistedState {
   parts_of_speech: Record<string, PartOfSpeechConfig>;
   sub_parts: Record<string, SubPartOfSpeechConfig>;
   words: Record<string, MockWord>;
+  /** 词条 -> 已退役但仍被永久占用的稳定槽位身份，与后端 lexicon.nodes 同口径。 */
+  retired_stable_slots: Record<string, RetiredStableSlotV2[]>;
   detections: Record<string, DetectWordResponseV2>;
   create_idempotency: Record<string, MockWordOperationRecord>;
   operations: Record<string, MockOperationRecord>;
@@ -281,6 +285,18 @@ export function isAdminWordsMockPersistedState(
     !Object.values(value.sub_parts).every(isSubPartOfSpeechConfig) ||
     !isRecord(value.words) ||
     !Object.values(value.words).every(isMockWord) ||
+    !isRecord(value.retired_stable_slots) ||
+    !Object.values(value.retired_stable_slots).every(
+      (entry) =>
+        Array.isArray(entry) &&
+        entry.every(
+          (slot) =>
+            isRecord(slot) &&
+            typeof slot.id === "string" &&
+            typeof slot.parent_node_id === "string" &&
+            typeof slot.node_role === "string"
+        )
+    ) ||
     !isRecord(value.detections) ||
     !Object.values(value.detections).every(
       (entry) =>
@@ -387,6 +403,7 @@ function makeInitialState(nowIso: string): AdminWordsMockPersistedState {
     ),
     sub_parts: Object.fromEntries(seed.subParts.map((item) => [item.id, item])),
     words: {},
+    retired_stable_slots: {},
     detections: {},
     create_idempotency: {},
     operations: {},
@@ -403,6 +420,26 @@ function makeInitialState(nowIso: string): AdminWordsMockPersistedState {
 function displayHeadword(word: MockWord): string {
   if (word.headwords.mode === "unified") return word.headwords.common;
   return word.headwords[word.headwords.source_dialect];
+}
+
+/**
+ * 列表行的词汇列：真实后端用 `string_agg` 把并列拼写拼成一个字符串下发，
+ * 顺序为 `common` → 检测基准侧 → 另一侧。mock 必须同构，否则开 mock 时看到的
+ * 词汇列与真实后端不一致。注意这与 `displayHeadword` 不同——后者取单个主词，
+ * 用于搜索匹配与例句文案，不能混用。
+ */
+function listHeadword(word: MockWord): string {
+  if (word.headwords.mode === "unified") return word.headwords.common;
+  const { source_dialect } = word.headwords;
+  const other = source_dialect === "uk" ? "us" : "uk";
+  return `${word.headwords[source_dialect]} / ${word.headwords[other]}`;
+}
+
+/** 与 `listHeadword` 同序，供列表行的方言列使用。 */
+function listDialects(word: MockWord): AdminWordListItem["dialects"] {
+  if (word.headwords.mode === "unified") return ["common"];
+  const { source_dialect } = word.headwords;
+  return [source_dialect, source_dialect === "uk" ? "us" : "uk"];
 }
 
 function allHeadwords(word: MockWord): Array<{
@@ -461,6 +498,32 @@ function dateParts(value: string | Date): { day: string; month: string } {
 }
 
 type MatchedDialect = "common" | "uk" | "us";
+
+/**
+ * 词形变体的稳定槽位身份，键是 (父槽位, 角色)，方言编在角色里 ——
+ * 与后端 `forms.form_variant:<dialect>` 同口径。
+ *
+ * 这个键一旦保存过就永久绑定同一个节点 ID：mock 也必须照此校验，
+ * 否则本地永远绿、真机 422。
+ */
+function formVariantStableSlots(
+  content: DraftFormsStepContent
+): RetiredStableSlotV2[] {
+  return content.pos.flatMap((pos) =>
+    [pos.base_form, ...pos.form_groups.flatMap((group) => group.slots)].flatMap(
+      (slot) =>
+        slot.variants.map((variant) => ({
+          id: variant.id,
+          parent_node_id: slot.id,
+          node_role: `forms.form_variant:${variant.dialect}`
+        }))
+    )
+  );
+}
+
+function stableSlotKey(slot: RetiredStableSlotV2): string {
+  return `${slot.parent_node_id}:${slot.node_role}`;
+}
 
 function sourceHeadword(headwords: WordHeadwordsV2): string {
   return headwords.mode === "unified"
@@ -629,25 +692,7 @@ function validateForms(
         message: `基本词性 ${pos.pos} 未配置`
       });
     }
-    if (pos.form_groups.length === 0) {
-      issues.push({
-        step: "forms",
-        node_id: pos.pos_id,
-        field: "form_groups",
-        code: "form_group_required",
-        message: "每个词性至少需要一组词形变化"
-      });
-    }
     for (const formGroup of pos.form_groups) {
-      if (formGroup.slots.length === 0) {
-        issues.push({
-          step: "forms",
-          node_id: formGroup.id,
-          field: "slots",
-          code: "form_slot_required",
-          message: "每组词形变化至少需要一个词形"
-        });
-      }
       if (
         new Set(formGroup.slots.map((slot) => slot.form_type)).size !==
         formGroup.slots.length
@@ -827,8 +872,6 @@ function validateMeanings(
       });
       continue;
     }
-    const expectedGrammarDialects: Array<"uk" | "us" | "common"> =
-      word.headwords.mode === "unified" ? ["common"] : ["uk", "us"];
     if (pos.grammar_structures.length === 0) {
       issues.push({
         step: "meanings",
@@ -840,12 +883,17 @@ function validateMeanings(
     }
     for (const grammar of pos.grammar_structures) {
       const dialects = grammar.variants.map((variant) => variant.dialect);
+      // 与真实后端同口径（tsz-rust #35 / P1）：`unified` 只接受 `[common]`，
+      // `distinguish` 接受 `[common]`（收敛后）或 `[uk, us]`（尚未收敛的存量）。
+      const shapeValid =
+        new Set(dialects).size === dialects.length &&
+        ((dialects.length === 1 && dialects[0] === "common") ||
+          (word.headwords.mode === "distinguish" &&
+            dialects.length === 2 &&
+            dialects.includes("uk") &&
+            dialects.includes("us")));
       if (
-        dialects.length !== expectedGrammarDialects.length ||
-        new Set(dialects).size !== dialects.length ||
-        expectedGrammarDialects.some(
-          (dialect) => !dialects.includes(dialect)
-        ) ||
+        !shapeValid ||
         grammar.variants.some((variant) => variant.content.text.trim() === "")
       ) {
         issues.push({
@@ -1458,14 +1506,21 @@ export function createAdminWordsMock({
           ? undefined
           : globalThis.sessionStorage),
       schemaVersion: ADMIN_WORDS_MOCK_STORAGE_SCHEMA,
-      legacySchemaVersions: [8],
+      // 10 -> 11 只是新增 retired_stable_slots，migrateLegacy 会补空对象，
+      // 没必要让正在用 mock 的人丢掉本地已录的词条。
+      legacySchemaVersions: [8, 10],
       isState: isAdminWordsMockPersistedState,
       migrateLegacy: (legacyState) => {
         if (!isRecord(legacyState)) return undefined;
+        // 默认值放在 spread 之前：只补旧版本缺的字段，已有值一律保留。
+        // v8 三个字段都不存在，补空正确；v10 只缺 retired_stable_slots，
+        // 若反过来无条件覆盖会把它已有的 consumed_detection_ids
+        // 与 forms_surface_evidence 一并清空。
         const migrated = {
-          ...legacyState,
+          retired_stable_slots: {},
           consumed_detection_ids: [],
-          forms_surface_evidence: {}
+          forms_surface_evidence: {},
+          ...legacyState
         };
         return isAdminWordsMockPersistedState(migrated)
           ? clone(migrated)
@@ -2787,14 +2842,19 @@ export function createAdminWordsMock({
     const gloss = query.gloss?.trim().toLocaleLowerCase() ?? "";
     const items: AdminWordListItem[] = Object.values(current.words)
       .filter((word) => {
-        const headword = displayHeadword(word).toLocaleLowerCase("en");
+        // 两侧拼写都要能搜到：列表词汇列展示的是并列拼写，只匹配基准侧会让
+        // 管理员搜自己眼前看得见的另一侧拼写却搜不到。真实后端对词头键表匹配，
+        // 两侧同样都能命中。
+        const headwords = allHeadwords(word).map((item) =>
+          item.value.toLocaleLowerCase("en")
+        );
         const createdBy =
           word.created_by === profile.id
             ? profile.display_name
             : word.created_by;
         if (
           q &&
-          !headword.includes(q) &&
+          !headwords.some((headword) => headword.includes(q)) &&
           !createdBy.toLocaleLowerCase().includes(q)
         )
           return false;
@@ -2815,11 +2875,12 @@ export function createAdminWordsMock({
       .map((word) => ({
         schema_version: 2 as const,
         id: word.id,
-        headword: displayHeadword(word),
+        headword: listHeadword(word),
         kind: word.kind,
-        dialects: (word.headwords.mode === "unified"
-          ? ["common"]
-          : ["uk", "us"]) as AdminWordListItem["dialects"],
+        dialects: listDialects(word),
+        ...(word.headwords.mode === "distinguish"
+          ? { source_dialect: word.headwords.source_dialect }
+          : {}),
         gloss: wordGloss(word),
         pos_list: wordPos(word),
         levels: wordLevels(word),
@@ -3086,8 +3147,8 @@ export function createAdminWordsMock({
         detection.matched_dialect,
         input.headwords
       );
-    const unmatchedPhrase =
-      detection.entry_kind === "phrase" &&
+    // 未命中内置词典时按管理员原输入建 unified 词条,单词与短语同一条路径。
+    const unmatchedDictionary =
       detection.builtin_dictionary.status === "not_found" &&
       input.headwords.mode === "unified" &&
       normalizeFixtureHeadword(input.headwords.common).key ===
@@ -3095,7 +3156,7 @@ export function createAdminWordsMock({
     if (
       (surfaceWarnings === "legacy" &&
         detection.smart_dictionary.status !== "clear") ||
-      (!dictionaryMatched && !unmatchedPhrase)
+      (!dictionaryMatched && !unmatchedDictionary)
     ) {
       const code =
         detection.smart_dictionary.status === "duplicate"
@@ -3299,7 +3360,6 @@ export function createAdminWordsMock({
       forms,
       meanings: createInitialMeanings(
         forms,
-        input.headwords,
         wordId,
         detection.normalized_headword === "large-fixture"
       ),
@@ -3321,11 +3381,14 @@ export function createAdminWordsMock({
     return response;
   }
 
-  async function get(wordId: string): Promise<AdminWordV2Envelope> {
+  async function get(wordId: string): Promise<AdminWordDraftV2Envelope> {
     await pause();
     const { state: current } = context();
     const word = requireWord(current, wordId);
-    return { word: clone(word) };
+    return {
+      word: clone(word),
+      retired_stable_slots: clone(current.retired_stable_slots[wordId] ?? [])
+    };
   }
 
   async function previewFormsImpact(
@@ -3542,6 +3605,47 @@ export function createAdminWordsMock({
         }
       );
     }
+    // 稳定槽位身份：(父槽位, 方言) 一经保存就永久绑定同一个节点 ID，
+    // 退役节点也照样占着槽位。真实后端在 lexicon.nodes 上是唯一索引，这里同口径校验。
+    const retiredSlots = current.retired_stable_slots[word.id] ?? [];
+    const proposedSlots = formVariantStableSlots(input.content);
+    const boundSlots = new Map(
+      [...formVariantStableSlots(word.forms), ...retiredSlots].map((slot) => [
+        stableSlotKey(slot),
+        slot
+      ])
+    );
+    const identityIssues = proposedSlots
+      .filter((slot) => {
+        const bound = boundSlots.get(stableSlotKey(slot));
+        return bound !== undefined && bound.id !== slot.id;
+      })
+      .map((slot) => ({
+        step: "forms" as const,
+        node_id: slot.id,
+        field: "id",
+        code: "stable_node_id_changed",
+        message: "已有内容槽位必须保留原节点 ID"
+      }));
+    if (identityIssues.length > 0) {
+      throw new HttpError(
+        422,
+        "draft validation failed",
+        [],
+        "validation_failed",
+        identityIssues,
+        {
+          word_id: word.id,
+          current_revision: word.revision,
+          max_reachable_step: word.max_reachable_step
+        }
+      );
+    }
+    const liveSlotKeys = new Set(proposedSlots.map(stableSlotKey));
+    current.retired_stable_slots[word.id] = [...boundSlots.values()]
+      .filter((slot) => !liveSlotKeys.has(stableSlotKey(slot)))
+      .sort((a, b) => stableSlotKey(a).localeCompare(stableSlotKey(b)));
+
     const priorCompleted = new Set(word.completed_steps);
     word.forms = clone(input.content);
     if (word.meanings.sense_groups.length === 0) {
@@ -3567,7 +3671,6 @@ export function createAdminWordsMock({
         word.meanings.pos.push(
           createInitialMeaningsForAddedPos(
             formsPos,
-            word.headwords,
             word.id,
             defaultSenseGroupId
           )
@@ -4138,6 +4241,7 @@ export function createAdminWordsMock({
       );
     }
     delete current.words[wordId];
+    delete current.retired_stable_slots[wordId];
     persist(current);
   }
 
@@ -4224,6 +4328,18 @@ export function createAdminWordsMock({
     clearSurfaceRuntime();
   }
 
+  async function createContentCompletionJob(): Promise<never> {
+    throw new Error("自动生成只支持真实后端，不提供 mock 内容");
+  }
+
+  async function getContentCompletionJob(): Promise<never> {
+    throw new Error("自动生成只支持真实后端，不提供 mock 内容");
+  }
+
+  async function retryContentCompletionJob(): Promise<never> {
+    throw new Error("自动生成只支持真实后端，不提供 mock 内容");
+  }
+
   return {
     list,
     stats,
@@ -4235,6 +4351,9 @@ export function createAdminWordsMock({
     previewFormsImpact,
     saveFormsStep,
     saveMeaningsStep,
+    createContentCompletionJob,
+    getContentCompletionJob,
+    retryContentCompletionJob,
     validateV2,
     publishV2,
     archive,

@@ -1,5 +1,6 @@
 import { HttpError } from "@tsz/api-client/http";
 import type {
+  AdminWordV2,
   DraftMeaningsStepContent,
   EnglishTextV2,
   RichText
@@ -20,10 +21,7 @@ import {
   useLocation
 } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  meaningDialectSuggestionBatchRunner,
-  MeaningsAndExamplesStep
-} from "./MeaningsAndExamplesStep";
+import { MeaningsAndExamplesStep } from "./MeaningsAndExamplesStep";
 import { collectPronunciationHints } from "./meaningsAndExamples/mapping";
 import { createGrammar } from "./model";
 import { deferred, wordFixture } from "./wordCreation.test.helper";
@@ -35,11 +33,21 @@ const mutations = vi.hoisted(() => ({
 const dataSourceCapabilities = vi.hoisted(() => ({
   dialectVariantSuggestions: true
 }));
+// 第 3 步的英文口径来自管理员的方言偏好（A1），测试里直接注入，不依赖本地存储。
+const dialectPreference = vi.hoisted(() => ({ value: "uk" as "uk" | "us" }));
+vi.mock("@/features/settings/useDialectPreference", () => ({
+  useDialectPreference: () => ({
+    preference: dialectPreference.value,
+    savePreference: vi.fn()
+  })
+}));
+const catalogState = vi.hoisted(() => ({ unavailable: false }));
 const featureFlags = vi.hoisted(() => ({
   VOICE_EDITOR: false,
   VOICE_PREVIEW: false,
   ADMIN_TTS_MOCK: true,
-  RELATED_SEARCH_V2: false
+  RELATED_SEARCH_V2: false,
+  WORD_CONTENT_COMPLETION: false
 }));
 const relatedSearchV2State = vi.hoisted(() => ({
   exactHasNextPage: false,
@@ -55,7 +63,8 @@ const relatedSearchV2State = vi.hoisted(() => ({
 }));
 const voicePreview = vi.hoisted(() => ({
   listVoices: vi.fn(),
-  synthesize: vi.fn()
+  synthesize: vi.fn(),
+  mocked: false
 }));
 const relatedWords = vi.hoisted(() => [
   {
@@ -109,7 +118,12 @@ vi.mock("../dataSource", () => ({
 
 vi.mock("@/lib/env", () => ({ env: featureFlags }));
 vi.mock("../voice-editor/dataSource", () => ({
-  adminVoicePreviewAdapter: voicePreview
+  adminVoicePreviewAdapter: voicePreview,
+  // 这里注入的是本用例自己的假 adapter，不是 mock 模块，故默认无「模拟」标记；
+  // 验证标记透传的用例把 voicePreview.mocked 置 true。
+  get voicePreviewIsMock() {
+    return voicePreview.mocked;
+  }
 }));
 vi.mock("@tsz/voice-editor/editor", async () => {
   const actual = await vi.importActual<typeof import("@tsz/voice-editor/core")>(
@@ -122,6 +136,7 @@ vi.mock("@tsz/voice-editor/editor", async () => {
       value,
       pronunciationHints,
       previewAdapter,
+      previewIsMock,
       onApply,
       onCancel
     }: VoiceRichTextEditorProps) =>
@@ -131,6 +146,7 @@ vi.mock("@tsz/voice-editor/editor", async () => {
           aria-label="测试语音编辑器"
           data-pronunciation-hint={pronunciationHints?.centre}
           data-preview-enabled={String(Boolean(previewAdapter))}
+          data-preview-mock={String(Boolean(previewIsMock))}
         >
           <button
             type="button"
@@ -154,13 +170,35 @@ vi.mock("./api", () => ({
   useSuggestDialectVariants: () => ({
     mutateAsync: mutations.suggest,
     isPending: false
+  }),
+  useCreateContentCompletionJob: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false
+  }),
+  useContentCompletionJob: () => ({
+    data: undefined,
+    isError: false,
+    refetch: vi.fn()
+  }),
+  useRetryContentCompletionJob: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false
   })
+}));
+
+vi.mock("./ContentCompletionPanel", () => ({
+  ContentCompletionPanel: () => <div data-testid="content-completion-panel" />
 }));
 
 vi.mock("../part-of-speech/api", async () => {
   const { partOfSpeechCatalogQueryResult } =
     await import("./partOfSpeech.test.helper");
-  return { usePartOfSpeechCatalog: partOfSpeechCatalogQueryResult };
+  return {
+    usePartOfSpeechCatalog: () =>
+      catalogState.unavailable
+        ? { data: undefined, isError: true, isPending: false, isLoading: false }
+        : partOfSpeechCatalogQueryResult()
+  };
 });
 
 vi.mock("../api", () => ({
@@ -238,6 +276,63 @@ function button(label: string): HTMLButtonElement {
   return result as HTMLButtonElement;
 }
 
+function richTextOf(text: string): RichText {
+  return { version: 1, text, spans: [], liaisons: [] };
+}
+
+/**
+ * 存量词条：整体已是单份，只有第一条英文释义还留着 A1 改造前的英美双份内容。
+ * 用统一主词的 fixture 打底，让「要丢弃几条」是确定的一条，便于断言确认框文案。
+ */
+function legacySplitWord() {
+  const word = wordFixture({ headword: "far", ready: true });
+  const definition = word.meanings.pos[0]!.senses[0]!.definitions[0]! as {
+    definition_mode: string;
+    content: EnglishTextV2;
+    content_id?: string;
+  };
+  definition.definition_mode = "en_definition";
+  delete definition.content_id;
+  definition.content = {
+    mode: "distinguish",
+    source_dialect: "us",
+    uk: {
+      state: "ready",
+      variant: {
+        id: "first-definition-uk",
+        value: richTextOf("British first"),
+        origin: "manual"
+      }
+    },
+    us: {
+      state: "ready",
+      variant: {
+        id: "first-definition-us",
+        value: richTextOf("American first"),
+        origin: "manual"
+      }
+    }
+  };
+  return word;
+}
+
+/**
+ * 把词条第一个语法结构换成存量（A1 改造前）的英美双条形状。
+ * 新建流程只产出单条 `common`，需要收敛场景的用例自己造。
+ */
+function withLegacySplitGrammar(
+  word: AdminWordV2,
+  ukText: string,
+  usText: string
+) {
+  const grammar = word.meanings.pos[0]!.grammar_structures[0]!;
+  grammar.variants = [
+    { id: `${grammar.id}-uk`, dialect: "uk", content: richTextOf(ukText) },
+    { id: `${grammar.id}-us`, dialect: "us", content: richTextOf(usText) }
+  ];
+  return grammar;
+}
+
 function enabledButton(label: string): HTMLButtonElement {
   const result = screen
     .getAllByText(label, { exact: true })
@@ -245,14 +340,6 @@ function enabledButton(label: string): HTMLButtonElement {
     .find((item): item is HTMLButtonElement => item !== null && !item.disabled);
   if (!result) throw new Error(`enabled button not found: ${label}`);
   return result;
-}
-
-function selectMeaningDialect(label: "英式" | "美式") {
-  fireEvent.click(
-    within(screen.getByLabelText("词义内容方言")).getByText(label, {
-      exact: true
-    })
-  );
 }
 
 async function selectInlineRelatedWord(
@@ -289,6 +376,14 @@ async function selectContextTarget(
   fireEvent.click(option);
 }
 
+function latestDraft(
+  onDraftChange: ReturnType<typeof vi.fn>
+): DraftMeaningsStepContent {
+  const calls = onDraftChange.mock.calls;
+  if (calls.length === 0) throw new Error("onDraftChange was never called");
+  return calls.at(-1)![0] as DraftMeaningsStepContent;
+}
+
 function LocationProbe() {
   const location = useLocation();
   return (
@@ -304,6 +399,7 @@ function renderStep(
   issueTarget?: { nodeId: string; field?: string }
 ) {
   const onSaved = vi.fn();
+  const onDraftChange = vi.fn();
   const router = createMemoryRouter(
     [
       {
@@ -314,6 +410,7 @@ function renderStep(
               word={word}
               readOnly={readOnly}
               onSaved={onSaved}
+              onDraftChange={onDraftChange}
             />
             <LocationProbe />
           </>
@@ -338,14 +435,17 @@ function renderStep(
       <RouterProvider router={router} />
     </AntApp>
   );
-  return { onSaved, router, ...view };
+  return { onSaved, onDraftChange, router, ...view };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  catalogState.unavailable = false;
   featureFlags.VOICE_EDITOR = false;
   featureFlags.VOICE_PREVIEW = false;
+  voicePreview.mocked = false;
   featureFlags.RELATED_SEARCH_V2 = false;
+  featureFlags.WORD_CONTENT_COMPLETION = false;
   relatedSearchV2State.exactHasNextPage = false;
   relatedSearchV2State.containsHasNextPage = false;
   relatedSearchV2State.missingPagination = false;
@@ -368,6 +468,7 @@ beforeEach(() => {
   ]);
   voicePreview.synthesize.mockReturnValue(new Promise(() => undefined));
   dataSourceCapabilities.dialectVariantSuggestions = true;
+  dialectPreference.value = "uk";
   mutations.save.mockResolvedValue({
     word: wordFixture({ ready: true, revision: 4 })
   });
@@ -377,6 +478,41 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("MeaningsAndExamplesStep", () => {
+  it("默认关闭词条内容自动生成与回填入口", () => {
+    renderStep();
+
+    expect(screen.queryByTestId("content-completion-panel")).toBeNull();
+  });
+
+  it("仅在显式开启开关时挂载词条内容自动生成面板", () => {
+    featureFlags.WORD_CONTENT_COMPLETION = true;
+
+    renderStep();
+
+    expect(screen.getByTestId("content-completion-panel")).toBeInTheDocument();
+  });
+
+  it("向上游持续提供当前未保存草稿用于实时完成度", async () => {
+    const { onDraftChange } = renderStep(wordFixture({ ready: true }));
+    await waitFor(() => expect(onDraftChange).toHaveBeenCalled());
+    onDraftChange.mockClear();
+
+    fireEvent.change(screen.getByLabelText("中文释义"), {
+      target: { value: "更新后的释义" }
+    });
+
+    await waitFor(() => {
+      const latest = onDraftChange.mock.lastCall?.[0] as
+        DraftMeaningsStepContent | undefined;
+      const definition = latest?.pos[0]?.senses[0]?.definitions[0];
+      expect(
+        definition && "text" in definition.content
+          ? definition.content.text
+          : undefined
+      ).toBe("更新后的释义");
+    });
+  });
+
   it("从词形读音构造 IPA 提示，优先词典音标且不覆盖首个同名词形", () => {
     const forms = structuredClone(wordFixture().forms);
     const sample = forms.pos[0]!.base_form.variants[0]!;
@@ -468,15 +604,16 @@ describe("MeaningsAndExamplesStep", () => {
     expect(screen.getByLabelText("第 1 个语法结构")).toHaveTextContent("1");
     expect(screen.queryByText("结构 1")).toBeNull();
     expect(screen.queryByText("英美文本独立维护")).toBeNull();
-    expect(screen.getAllByText("英式").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("美式").length).toBeGreaterThan(0);
+    // 第 3 步不再出现任何方言字样：语法结构只有一份输入与一组语音控件。
+    expect(screen.queryByText("英式")).toBeNull();
+    expect(screen.queryByText("美式")).toBeNull();
     expect(screen.queryByText("英式英语")).toBeNull();
     expect(screen.queryByText("美式英语")).toBeNull();
-    expect(screen.getByLabelText("英式语法结构 1 播放语音")).toBeDisabled();
-    expect(screen.getByLabelText("英式语法结构 1 获取语音")).toBeDisabled();
-    expect(screen.queryByLabelText("英式语法结构 1 上传语音")).toBeNull();
-    expect(screen.getByLabelText("美式语法结构 1 获取语音")).toBeDisabled();
-    expect(screen.queryByLabelText("美式语法结构 1 上传语音")).toBeNull();
+    expect(screen.getByLabelText("语法结构 1 播放语音")).toBeDisabled();
+    expect(screen.getByLabelText("语法结构 1 获取语音")).toBeDisabled();
+    expect(screen.queryByLabelText("语法结构 1 上传语音")).toBeNull();
+    expect(screen.queryByLabelText("英式语法结构 1")).toBeNull();
+    expect(screen.queryByLabelText("美式语法结构 1")).toBeNull();
     expect(screen.getByLabelText("拖动语法结构 1")).toBeDisabled();
     expect(screen.queryByLabelText("上移语法结构 1")).toBeNull();
     expect(screen.queryByLabelText("下移语法结构 1")).toBeNull();
@@ -492,7 +629,7 @@ describe("MeaningsAndExamplesStep", () => {
     );
   });
 
-  it("绑定语法结构的选项和已选值直接展示当前方言内容", async () => {
+  it("绑定语法结构的选项按方言偏好取那一份文案", async () => {
     const word = wordFixture({ ready: true });
     const meanings = word.meanings.pos[0]!;
     meanings.senses[0]!.definitions[0]!.grammar_structure_id =
@@ -502,88 +639,246 @@ describe("MeaningsAndExamplesStep", () => {
 
     expect(
       within(binding.closest(".ant-select") as HTMLElement).getByText(
-        "the center"
+        "a centre"
       )
     ).toBeInTheDocument();
     fireEvent.mouseDown(binding);
     expect(
-      await screen.findByRole("option", { name: "the center" })
-    ).toBeInTheDocument();
-
-    selectMeaningDialect("英式");
-    const britishBinding = screen.getAllByLabelText("绑定语法结构")[0]!;
-    expect(
-      within(britishBinding.closest(".ant-select") as HTMLElement).getByText(
-        "a centre"
-      )
+      await screen.findByRole("option", { name: "a centre" })
     ).toBeInTheDocument();
     expect(screen.queryByText("语法结构 1", { exact: true })).toBeNull();
   });
 
-  it("词义头部同步当前方言输入，并在编辑后保留文本节点 ID", async () => {
-    const word = wordFixture({ ready: true });
-    if (word.headwords.mode !== "distinguish") {
-      throw new Error("fixture should distinguish English dialects");
-    }
-    word.headwords.source_dialect = "us";
-    const firstDefinition = word.meanings.pos[0]!.senses[0]!.definitions[0]!;
-    const richText = (text: string): RichText => ({
-      version: 1,
-      text,
-      spans: [],
-      liaisons: []
-    });
-    firstDefinition.definition_mode = "en_definition";
-    firstDefinition.content = {
-      mode: "distinguish",
-      source_dialect: "us",
-      uk: {
-        state: "ready",
-        variant: {
-          id: "first-definition-uk",
-          value: richText("British first"),
-          origin: "manual"
-        }
-      },
-      us: {
-        state: "ready",
-        variant: {
-          id: "first-definition-us",
-          value: richText("American first"),
-          origin: "manual"
-        }
-      }
-    } satisfies EnglishTextV2;
+  it("存量两侧文本不同的语法结构按偏好侧呈现，切偏好即换那一份", () => {
+    const build = () => {
+      const word = wordFixture({ ready: true });
+      const meanings = word.meanings.pos[0]!;
+      // 存量（A1 改造前）：英美两侧各写各的。
+      withLegacySplitGrammar(word, "a centre", "the center");
+      meanings.senses[0]!.definitions[0]!.grammar_structure_id =
+        meanings.grammar_structures[0]!.id;
+      return word;
+    };
+
+    const { unmount } = renderStep(build());
+    expect(screen.getByLabelText("语法结构 1")).toHaveValue("a centre");
+    unmount();
+
+    dialectPreference.value = "us";
+    renderStep(build());
+    expect(screen.getByLabelText("语法结构 1")).toHaveValue("the center");
+  });
+
+  it("存量双份英文内容只显示偏好侧一份，编辑同步词义头部并按新节点保存", async () => {
+    const word = legacySplitWord();
     renderStep(word);
 
-    expect(
-      screen.getByText("1. American first", { exact: true })
-    ).toBeVisible();
-    fireEvent.change(screen.getAllByLabelText("美式英语文本")[0]!, {
-      target: { value: "American changed" }
-    });
-    expect(
-      screen.getByText("1. American changed", { exact: true })
-    ).toBeVisible();
+    // 只有一个英文输入框，且没有任何方言选择器。
+    expect(screen.queryByLabelText("词义内容方言")).toBeNull();
+    expect(screen.queryAllByLabelText("英式英语文本")).toHaveLength(0);
+    expect(screen.queryAllByLabelText("美式英语文本")).toHaveLength(0);
+    expect(screen.getByText("1. British first")).toBeVisible();
 
-    selectMeaningDialect("英式");
-    expect(screen.getByText("1. British first", { exact: true })).toBeVisible();
-    fireEvent.change(screen.getAllByLabelText("英式英语文本")[0]!, {
+    fireEvent.change(screen.getAllByLabelText("英语文本")[0]!, {
       target: { value: "British changed" }
     });
-    expect(
-      screen.getByText("1. British changed", { exact: true })
-    ).toBeVisible();
+    expect(screen.getByText("1. British changed")).toBeVisible();
 
     fireEvent.click(button("保存草稿"));
+    // 会丢弃美式内容，必须先确认。
+    expect(
+      (await screen.findAllByText("保存后这条词条只保留一份英文内容")).length
+    ).toBeGreaterThan(0);
+    fireEvent.click(button("确认保存"));
+
     await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
     const savedDefinition =
       mutations.save.mock.calls[0]![0].content.pos[0].senses[0].definitions[0];
     expect(savedDefinition.content).toMatchObject({
-      mode: "distinguish",
-      uk: { state: "ready", variant: { id: "first-definition-uk" } },
-      us: { state: "ready", variant: { id: "first-definition-us" } }
+      mode: "unified",
+      common: {
+        value: expect.objectContaining({ text: "British changed" }),
+        origin: "manual"
+      }
     });
+    // 收敛必须换新节点：后端把方言编进节点身份，沿用 uk 那条的 ID 会被判
+    // node_binding_changed，整个 meanings 保存 422（2026-08-20 真机实测）。
+    expect(savedDefinition.content.common.id).not.toBe("first-definition-uk");
+    expect(savedDefinition.content.common.id).not.toBe("first-definition-us");
+  });
+
+  it("存量词条给出收敛说明，确认框写明丢弃的方言侧与条数", async () => {
+    renderStep(legacySplitWord());
+
+    expect(
+      screen.getByText("这条词条还留着旧版的美式英文内容")
+    ).toBeInTheDocument();
+
+    fireEvent.click(button("保存草稿"));
+    expect(
+      (
+        await screen.findAllByText(
+          "美式的 英文释义 1 条 将不再保留，英式内容成为唯一内容。"
+        )
+      ).length
+    ).toBeGreaterThan(0);
+  });
+
+  it("只填了单侧的旧草稿无物可丢：不提示两份内容，也不弹确认框", async () => {
+    const word = legacySplitWord();
+    const definition = word.meanings.pos[0]!.senses[0]!.definitions[0]! as {
+      content: EnglishTextV2;
+    };
+    // 只留偏好侧那一份，另一侧从未填过。
+    definition.content = {
+      mode: "distinguish",
+      source_dialect: "uk",
+      uk: {
+        state: "ready",
+        variant: {
+          id: "first-definition-uk",
+          value: richTextOf("British only"),
+          origin: "manual"
+        }
+      },
+      us: { state: "missing" }
+    };
+    renderStep(word);
+
+    expect(screen.queryByText("这条词条还留着旧版的美式英文内容")).toBeNull();
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    // 形状照样收敛为单份，只是没有内容被丢弃，不必打扰管理员。
+    const collapsed =
+      mutations.save.mock.calls[0]![0].content.pos[0].senses[0].definitions[0]
+        .content;
+    expect(collapsed).toMatchObject({
+      mode: "unified",
+      common: { value: expect.objectContaining({ text: "British only" }) }
+    });
+    expect(collapsed.common.id).not.toBe("first-definition-uk");
+  });
+
+  it("确认框弹出期间锁定保存按钮，避免连点叠出两次保存", async () => {
+    renderStep(legacySplitWord());
+
+    fireEvent.click(button("保存草稿"));
+    expect(
+      (await screen.findAllByText("保存后这条词条只保留一份英文内容")).length
+    ).toBeGreaterThan(0);
+    expect(button("保存草稿")).toBeDisabled();
+    expect(button("完成并进入预览")).toBeDisabled();
+
+    fireEvent.click(button("确认保存"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+  });
+
+  it("存量两侧语法文本不同时，确认框把语法结构一并计入将丢弃的内容", async () => {
+    const word = wordFixture({ ready: true });
+    const legacyGrammar = withLegacySplitGrammar(
+      word,
+      "a centre",
+      "the center"
+    );
+    renderStep(word);
+
+    expect(
+      screen.getByText("这条词条还留着旧版的美式英文内容")
+    ).toBeInTheDocument();
+    fireEvent.click(button("保存草稿"));
+    expect(
+      (
+        await screen.findAllByText(
+          "美式的 语法结构 1 条 将不再保留，英式内容成为唯一内容。"
+        )
+      ).length
+    ).toBeGreaterThan(0);
+
+    fireEvent.click(button("确认保存"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    // 收敛为单条 common，内容取偏好侧。
+    const grammar =
+      mutations.save.mock.calls[0]![0].content.pos[0].grammar_structures[0];
+    expect(grammar.variants.map((v: { dialect: string }) => v.dialect)).toEqual(
+      ["common"]
+    );
+    expect(grammar.variants[0].content.text).toBe("a centre");
+    // 与英文内容同一条规矩：沿用旧方言变体的 ID 会被后端判 node_binding_changed。
+    expect(grammar.variants[0].id).not.toBe(legacyGrammar.variants[0]!.id);
+    expect(grammar.variants[0].id).not.toBe(legacyGrammar.variants[1]!.id);
+  });
+
+  it("编辑语法结构不会被误判成「即将丢弃美式内容」而反复弹确认框", async () => {
+    renderStep();
+
+    fireEvent.change(screen.getAllByLabelText("语法结构 1")[0]!, {
+      target: { value: "an edited centre" }
+    });
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(
+      screen.queryAllByText("保存后这条词条只保留一份英文内容")
+    ).toHaveLength(0);
+  });
+
+  it("存量单侧内容不会在词性 Tab 上挂一个消不掉的待修项", () => {
+    const word = wordFixture({ ready: true });
+    const sense = word.meanings.pos[0]!.senses[0]!;
+    // 存量：例句只填了偏好侧，另一侧从未填过。
+    sense.sentences[0]!.en_text = {
+      mode: "distinguish",
+      source_dialect: "uk",
+      uk: {
+        state: "ready",
+        variant: {
+          id: "legacy-sentence-uk",
+          value: richTextOf("British only"),
+          origin: "manual"
+        }
+      },
+      us: { state: "missing" }
+    };
+    // 语法结构同理：非偏好侧为空，保存时会随收敛一起消失。
+    withLegacySplitGrammar(word, "a centre", "");
+    renderStep(word);
+
+    // 待修项计数按「保存后会变成什么样」算：这两处收敛后都是完整的，
+    // 计数为 0 时 antd Badge 整个不渲染，因此断言它压根不出现。
+    expect(screen.queryAllByTitle("该词性待修项")).toHaveLength(0);
+  });
+
+  it("取消收敛确认时不发保存请求，也不改动任何数据", async () => {
+    renderStep(legacySplitWord());
+
+    fireEvent.click(button("保存草稿"));
+    expect(
+      (await screen.findAllByText("保存后这条词条只保留一份英文内容")).length
+    ).toBeGreaterThan(0);
+    fireEvent.click(button("取 消"));
+
+    await waitFor(() =>
+      expect(
+        screen
+          .queryAllByText("保存后这条词条只保留一份英文内容")
+          .every((node) => !node.checkVisibility?.())
+      ).toBe(true)
+    );
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("单份英文内容保存时不弹收敛确认", async () => {
+    const word = wordFixture({ ready: true });
+    renderStep(word);
+
+    expect(screen.queryByText("这条词条留着旧版的英美两份英文内容")).toBeNull();
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(
+      screen.queryAllByText("保存后这条词条只保留一份英文内容")
+    ).toHaveLength(0);
   });
 
   it("语法结构方言输入使用真实试听且不暴露无契约的上传操作", async () => {
@@ -593,7 +888,7 @@ describe("MeaningsAndExamplesStep", () => {
       "a record";
     renderStep(word);
 
-    const generate = screen.getByLabelText("英式语法结构 1 获取语音");
+    const generate = screen.getByLabelText("语法结构 1 获取语音");
     await waitFor(() => expect(generate).toBeEnabled());
     fireEvent.click(generate);
 
@@ -607,7 +902,7 @@ describe("MeaningsAndExamplesStep", () => {
         expect.objectContaining({ signal: expect.any(AbortSignal) })
       )
     );
-    expect(screen.queryByLabelText("英式语法结构 1 上传语音")).toBeNull();
+    expect(screen.queryByLabelText("语法结构 1 上传语音")).toBeNull();
     expect(screen.queryByText(/Mock/)).toBeNull();
   });
 
@@ -617,7 +912,7 @@ describe("MeaningsAndExamplesStep", () => {
     grammars[0]!.variants.forEach((variant) => {
       variant.content.text = "first grammar";
     });
-    const secondGrammar = createGrammar(word.headwords);
+    const secondGrammar = createGrammar();
     secondGrammar.variants.forEach((variant) => {
       variant.content.text = "second grammar";
     });
@@ -627,16 +922,12 @@ describe("MeaningsAndExamplesStep", () => {
     fireEvent.keyDown(screen.getByLabelText("拖动语法结构 2"), {
       key: "ArrowUp"
     });
-    expect(screen.getByLabelText("英式语法结构 1")).toHaveValue(
-      "second grammar"
-    );
+    expect(screen.getByLabelText("语法结构 1")).toHaveValue("second grammar");
 
     fireEvent.keyDown(screen.getByLabelText("拖动语法结构 1"), {
       key: "ArrowDown"
     });
-    expect(screen.getByLabelText("英式语法结构 2")).toHaveValue(
-      "second grammar"
-    );
+    expect(screen.getByLabelText("语法结构 2")).toHaveValue("second grammar");
     fireEvent.keyDown(screen.getByLabelText("拖动语法结构 1"), {
       key: "Enter"
     });
@@ -644,9 +935,7 @@ describe("MeaningsAndExamplesStep", () => {
 
   it("语法结构排序忽略外部、缺失和无效的拖放数据", () => {
     const word = wordFixture({ ready: true });
-    word.meanings.pos[0]!.grammar_structures.push(
-      createGrammar(word.headwords)
-    );
+    word.meanings.pos[0]!.grammar_structures.push(createGrammar());
     renderStep(word);
     const target = screen
       .getByLabelText("拖动语法结构 1")
@@ -693,8 +982,8 @@ describe("MeaningsAndExamplesStep", () => {
     });
     fireEvent.dragLeave(target);
 
-    expect(screen.getByLabelText("英式语法结构 1")).toBeInTheDocument();
-    expect(screen.getByLabelText("英式语法结构 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("语法结构 1")).toBeInTheDocument();
+    expect(screen.getByLabelText("语法结构 2")).toBeInTheDocument();
   });
 
   it("多维释义和多维例句使用拖动手柄排序", () => {
@@ -786,6 +1075,83 @@ describe("MeaningsAndExamplesStep", () => {
       (await screen.findAllByText("可数名词", { exact: true })).length
     ).toBeGreaterThan(0);
     expect(screen.queryByText("及物动词", { exact: true })).toBeNull();
+  });
+
+  it("基本词性下只有一个细分项时自动选中并隐藏选择器", async () => {
+    // far 的形容词/副词在目录里各只配置了一个细分项。
+    const word = wordFixture({ headword: "far" });
+    const { container, onDraftChange } = renderStep(word);
+
+    const field = container.querySelector<HTMLElement>(
+      '[data-word-field="sub_pos"]'
+    )!;
+    expect(field.querySelector(".ant-select")).toBeNull();
+    expect(field.classList.contains("ant-select")).toBe(false);
+    expect(field.textContent).toBe("形容词");
+    expect(screen.queryByLabelText("细分词性")).toBeNull();
+
+    await waitFor(() =>
+      expect(latestDraft(onDraftChange).pos[0]!.senses[0]!.sub_pos).toBe("ADJ")
+    );
+
+    // 回填必须真的进入提交内容，否则保存出去的仍是空细分词性。
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    expect(
+      mutations.save.mock.calls[0]![0].content.pos[0].senses[0].sub_pos
+    ).toBe("ADJ");
+  });
+
+  it("细分项多于一个时保持下拉选择且不自动填值", () => {
+    // center 的名词/动词各有多个细分项。
+    const { container, onDraftChange } = renderStep(wordFixture());
+
+    const field = container.querySelector<HTMLElement>(
+      '[data-word-field="sub_pos"]'
+    )!;
+    expect(field.classList.contains("ant-select")).toBe(true);
+    expect(latestDraft(onDraftChange).pos[0]!.senses[0]!.sub_pos).toBe("");
+  });
+
+  it("词性目录不可用时不自动填值，细分词性选择器保持禁用", () => {
+    catalogState.unavailable = true;
+    const { container, onDraftChange } = renderStep(
+      wordFixture({ headword: "far" })
+    );
+
+    const field = container.querySelector<HTMLElement>(
+      '[data-word-field="sub_pos"]'
+    )!;
+    expect(field.classList.contains("ant-select")).toBe(true);
+    expect(field.classList.contains("ant-select-disabled")).toBe(true);
+    expect(latestDraft(onDraftChange).pos[0]!.senses[0]!.sub_pos).toBe("");
+  });
+
+  it("已发布词条只读查看时唯一细分项照常只读展示", () => {
+    const word = wordFixture({
+      headword: "far",
+      status: "published",
+      ready: true
+    });
+    const { container } = renderStep(word, true);
+
+    const field = container.querySelector<HTMLElement>(
+      '[data-word-field="sub_pos"]'
+    )!;
+    expect(field.querySelector(".ant-select")).toBeNull();
+    expect(field.textContent).toBe("形容词");
+  });
+
+  it("存量细分编码不属于当前基本词性时保留选择器且不改写", () => {
+    const word = wordFixture({ headword: "far" });
+    word.meanings.pos[0]!.senses[0]!.sub_pos = "V-T";
+    const { container, onDraftChange } = renderStep(word);
+
+    const field = container.querySelector<HTMLElement>(
+      '[data-word-field="sub_pos"]'
+    )!;
+    expect(field.classList.contains("ant-select")).toBe(true);
+    expect(latestDraft(onDraftChange).pos[0]!.senses[0]!.sub_pos).toBe("V-T");
   });
 
   it("编辑后完成保存并放行到 preview，提交 revision 与干净 content", async () => {
@@ -920,7 +1286,7 @@ describe("MeaningsAndExamplesStep", () => {
     const word = wordFixture({ ready: true });
     const meanings = word.meanings.pos[0]!;
     const firstGrammar = meanings.grammar_structures[0]!;
-    const secondGrammar = createGrammar(word.headwords);
+    const secondGrammar = createGrammar();
     meanings.grammar_structures.push(secondGrammar);
     const firstDefinition = meanings.senses[0]!.definitions[0]!;
     firstDefinition.grammar_structure_id = firstGrammar.id;
@@ -1265,346 +1631,6 @@ describe("MeaningsAndExamplesStep", () => {
     );
   });
 
-  it("T60 全局选择默认跟随源方言，只切换展示且完整目标不发请求", () => {
-    renderStep(wordFixture({ ready: true }));
-
-    const dialectControl = screen.getByLabelText("词义内容方言");
-    const toolbar = dialectControl.closest(".word-meaning-dialect-toolbar")!;
-    const senseGroups = document.querySelector(".word-sense-groups-card")!;
-    expect(
-      toolbar.compareDocumentPosition(senseGroups) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
-    expect(screen.getAllByLabelText("美式英语文本").length).toBeGreaterThan(0);
-    expect(screen.queryAllByLabelText("英式英语文本")).toHaveLength(0);
-
-    selectMeaningDialect("英式");
-
-    expect(screen.getAllByLabelText("英式英语文本").length).toBeGreaterThan(0);
-    expect(screen.queryAllByLabelText("美式英语文本")).toHaveLength(0);
-    expect(mutations.suggest).not.toHaveBeenCalled();
-    expect(screen.getByLabelText("英式语法结构 1")).toBeInTheDocument();
-    expect(screen.getByLabelText("美式语法结构 1")).toBeInTheDocument();
-  });
-
-  it("T60 统一拼写不展示选择器；只读状态可切换既有内容但不自动补全", () => {
-    const unifiedView = renderStep(
-      wordFixture({ headword: "far", ready: true })
-    );
-    expect(screen.queryByLabelText("词义内容方言")).toBeNull();
-    unifiedView.unmount();
-    unifiedView.router.dispose();
-
-    const word = wordFixture({ ready: true });
-    const sentence = word.meanings.pos[0]!.senses[0]!.sentences[0]!;
-    if (sentence.en_text.mode !== "distinguish") {
-      throw new Error("fixture must distinguish dialects");
-    }
-    sentence.en_text.uk = { state: "missing" };
-    renderStep(word, true);
-
-    selectMeaningDialect("英式");
-    expect(screen.getAllByLabelText("英式英语文本").length).toBeGreaterThan(0);
-    expect(mutations.suggest).not.toHaveBeenCalled();
-  });
-
-  it("T61 切换到缺失方言时跨释义和例句只发一次批量请求，语法结构不参与", async () => {
-    const word = wordFixture({ ready: true });
-    const sentence = word.meanings.pos[0]!.senses[0]!.sentences[0]!;
-    if (sentence.en_text.mode !== "distinguish") {
-      throw new Error("fixture must distinguish dialects");
-    }
-    sentence.en_text.uk = { state: "missing" };
-    word.meanings.pos[0]!.senses[0]!.definitions.push({
-      id: "english-definition",
-      level: "A1",
-      definition_mode: "en_definition",
-      content: {
-        mode: "distinguish",
-        source_dialect: "us",
-        uk: { state: "missing" },
-        us: {
-          state: "ready",
-          variant: {
-            id: "english-definition-us",
-            origin: "manual",
-            value: {
-              version: 1,
-              text: "the center",
-              spans: [],
-              liaisons: []
-            }
-          }
-        }
-      }
-    });
-    mutations.suggest.mockResolvedValue({
-      suggestions: [
-        {
-          client_id: sentence.id,
-          field_kind: "example",
-          value: {
-            version: 1,
-            text: "The generated British example.",
-            spans: [],
-            liaisons: []
-          },
-          model_version: "mock-v1"
-        },
-        {
-          client_id: "english-definition",
-          field_kind: "definition",
-          value: {
-            version: 1,
-            text: "the centre",
-            spans: [],
-            liaisons: []
-          },
-          model_version: "mock-v1"
-        }
-      ]
-    });
-    renderStep(word);
-
-    selectMeaningDialect("英式");
-
-    await waitFor(() => expect(mutations.suggest).toHaveBeenCalledTimes(1));
-    expect(mutations.suggest).toHaveBeenCalledWith({
-      source_dialect: "us",
-      target_dialect: "uk",
-      items: expect.arrayContaining([
-        expect.objectContaining({
-          client_id: sentence.id,
-          field_kind: "example"
-        }),
-        expect.objectContaining({
-          client_id: "english-definition",
-          field_kind: "definition"
-        })
-      ])
-    });
-    expect(mutations.suggest.mock.calls[0]![0].items).toHaveLength(2);
-    await waitFor(() =>
-      expect(
-        screen
-          .getAllByLabelText("英式英语文本")
-          .some(
-            (input) =>
-              (input as HTMLTextAreaElement).value ===
-              "The generated British example."
-          )
-      ).toBe(true)
-    );
-    expect(
-      screen
-        .getAllByLabelText("英式英语文本")
-        .some((input) => (input as HTMLTextAreaElement).value === "the centre")
-    ).toBe(true);
-    fireEvent.click(button("保存草稿"));
-    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
-    expect(
-      mutations.save.mock.calls[0]![0].content.pos[0].senses[0].sentences[0]
-        .en_text.uk
-    ).toMatchObject({
-      state: "ready",
-      variant: { origin: "converted" }
-    });
-  });
-
-  it("T62 部分返回后保留缺失项并可一键重试", async () => {
-    const word = wordFixture({ ready: true });
-    const sentence = word.meanings.pos[0]!.senses[0]!.sentences[0]!;
-    if (sentence.en_text.mode !== "distinguish") {
-      throw new Error("fixture must distinguish dialects");
-    }
-    sentence.en_text.uk = { state: "missing" };
-    const secondSentence = structuredClone(sentence);
-    secondSentence.id = "second-example";
-    if (secondSentence.en_text.mode !== "distinguish") {
-      throw new Error("fixture must distinguish dialects");
-    }
-    secondSentence.en_text.uk = { state: "missing" };
-    word.meanings.pos[0]!.senses[0]!.sentences.push(secondSentence);
-    mutations.suggest.mockResolvedValueOnce({
-      suggestions: [
-        {
-          client_id: sentence.id,
-          field_kind: "example",
-          value: {
-            version: 1,
-            text: "The first British example.",
-            spans: [],
-            liaisons: []
-          },
-          model_version: "mock-v1"
-        }
-      ]
-    });
-    mutations.suggest.mockResolvedValueOnce({
-      suggestions: [
-        {
-          client_id: secondSentence.id,
-          field_kind: "example",
-          value: {
-            version: 1,
-            text: "The second British example.",
-            spans: [],
-            liaisons: []
-          },
-          model_version: "mock-v1"
-        }
-      ]
-    });
-    renderStep(word);
-
-    selectMeaningDialect("英式");
-    await waitFor(() => expect(mutations.suggest).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(button("重试补全 1 项")).toBeEnabled());
-    fireEvent.click(button("重试补全 1 项"));
-    await waitFor(() => expect(mutations.suggest).toHaveBeenCalledTimes(2));
-    expect(mutations.suggest.mock.calls[1]![0].items).toHaveLength(1);
-    expect(mutations.suggest.mock.calls[1]![0].items[0].client_id).toBe(
-      secondSentence.id
-    );
-    await waitFor(() =>
-      expect(
-        screen
-          .getAllByLabelText("英式英语文本")
-          .some(
-            (input) =>
-              (input as HTMLTextAreaElement).value ===
-              "The second British example."
-          )
-      ).toBe(true)
-    );
-  });
-
-  it("101 项分批补全全部结束前禁用保存，完成后保存全部批次结果", async () => {
-    const word = wordFixture({ ready: true });
-    const original = word.meanings.pos[0]!.senses[0]!.sentences[0]!;
-    if (original.en_text.mode !== "distinguish") {
-      throw new Error("fixture must distinguish dialects");
-    }
-    original.en_text.uk = { state: "missing" };
-    const firstBatch = deferred<void>();
-    const secondBatch = deferred<void>();
-    const realRunner = meaningDialectSuggestionBatchRunner.run;
-    vi.spyOn(meaningDialectSuggestionBatchRunner, "run").mockImplementation(
-      async (request, _send, apply) => {
-        await firstBatch.promise;
-        apply([
-          {
-            client_id: request.items[0]!.client_id,
-            field_kind: "example",
-            value: {
-              version: 1,
-              text: "British first batch",
-              spans: [],
-              liaisons: []
-            }
-          }
-        ]);
-        await secondBatch.promise;
-      }
-    );
-    renderStep(word);
-
-    selectMeaningDialect("英式");
-    await waitFor(() =>
-      expect(meaningDialectSuggestionBatchRunner.run).toHaveBeenCalledTimes(1)
-    );
-    expect(button("保存草稿")).toBeDisabled();
-    fireEvent.click(button("保存草稿"));
-    expect(mutations.save).not.toHaveBeenCalled();
-
-    await act(async () => firstBatch.resolve());
-    await waitFor(() =>
-      expect(
-        screen
-          .getAllByLabelText("英式英语文本")
-          .some(
-            (input) =>
-              (input as HTMLTextAreaElement).value === "British first batch"
-          )
-      ).toBe(true)
-    );
-    expect(button("保存草稿")).toBeDisabled();
-    fireEvent.click(button("保存草稿"));
-    expect(mutations.save).not.toHaveBeenCalled();
-
-    await act(async () => secondBatch.resolve());
-    await waitFor(() => expect(button("保存草稿")).toBeEnabled());
-    fireEvent.click(button("保存草稿"));
-    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
-    const savedSentences =
-      mutations.save.mock.calls[0]![0].content.pos[0].senses[0].sentences;
-    expect(savedSentences[0].en_text.uk).toMatchObject({
-      state: "ready",
-      variant: { value: { text: "British first batch" } }
-    });
-    meaningDialectSuggestionBatchRunner.run = realRunner;
-  });
-
-  it("T62 补全期间锁定方言内容，请求失败后保留原文并允许重试", async () => {
-    const word = wordFixture({ ready: true });
-    const sentence = word.meanings.pos[0]!.senses[0]!.sentences[0]!;
-    if (sentence.en_text.mode !== "distinguish") {
-      throw new Error("fixture must distinguish dialects");
-    }
-    sentence.en_text.uk = { state: "missing" };
-    const pending = deferred<never>();
-    mutations.suggest.mockReturnValueOnce(pending.promise);
-    mutations.suggest.mockResolvedValueOnce({
-      suggestions: [
-        {
-          client_id: sentence.id,
-          field_kind: "example",
-          value: {
-            version: 1,
-            text: "The British retry succeeded.",
-            spans: [],
-            liaisons: []
-          },
-          model_version: "mock-v1"
-        }
-      ]
-    });
-    renderStep(word);
-
-    selectMeaningDialect("英式");
-    await waitFor(() => expect(mutations.suggest).toHaveBeenCalledTimes(1));
-    await waitFor(() =>
-      expect(screen.getByLabelText("词义内容方言")).toHaveClass(
-        "ant-segmented-disabled"
-      )
-    );
-    const targetInput = screen
-      .getAllByLabelText("英式英语文本")
-      .find((input) => (input as HTMLTextAreaElement).value === "")!;
-    expect(targetInput).toHaveAttribute("readonly");
-
-    await act(async () => pending.reject(new Error("服务暂不可用")));
-
-    expect(await screen.findByText("服务暂不可用")).toBeInTheDocument();
-    expect(targetInput).toHaveValue("");
-    await act(async () => {
-      button("重试补全 1 项").click();
-      await Promise.resolve();
-    });
-    await waitFor(() => expect(mutations.suggest).toHaveBeenCalledTimes(2));
-    await waitFor(() =>
-      expect(
-        screen
-          .getAllByLabelText("英式英语文本")
-          .some(
-            (input) =>
-              (input as HTMLTextAreaElement).value ===
-              "The British retry succeeded."
-          )
-      ).toBe(true)
-    );
-  });
-
   it("统一英语文本通过完整性校验并可完成 meanings", async () => {
     const word = wordFixture({ headword: "far", ready: true });
     renderStep(word);
@@ -1613,32 +1639,6 @@ describe("MeaningsAndExamplesStep", () => {
 
     await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
     expect(mutations.save.mock.calls[0]![0].intent).toBe("complete");
-  });
-
-  it("T62-T63 服务未接入时仍可切换和手填，但全局补全入口禁用且不发请求", () => {
-    dataSourceCapabilities.dialectVariantSuggestions = false;
-    const word = wordFixture({ ready: true });
-    const sentence = word.meanings.pos[0]!.senses[0]!.sentences[0]!;
-    if (sentence.en_text.mode !== "distinguish") {
-      throw new Error("fixture must distinguish dialects");
-    }
-    sentence.en_text.uk = { state: "missing" };
-    renderStep(word);
-
-    selectMeaningDialect("英式");
-    expect(button("自动补全 1 项")).toBeDisabled();
-    expect(button("自动补全 1 项")).toHaveAttribute(
-      "title",
-      "真实方言建议服务尚未接入，请手工填写"
-    );
-    const manualInput = screen
-      .getAllByLabelText("英式英语文本")
-      .find((input) => (input as HTMLTextAreaElement).value === "")!;
-    fireEvent.change(manualInput, {
-      target: { value: "Manual British text" }
-    });
-    expect(manualInput).toHaveValue("Manual British text");
-    expect(mutations.suggest).not.toHaveBeenCalled();
   });
 
   it("服务端 field issue 切换所属词性并聚焦稳定 node/field", async () => {
@@ -1672,6 +1672,25 @@ describe("MeaningsAndExamplesStep", () => {
     });
   });
 
+  it("空语义区间定位到集合卡片并聚焦添加按钮", async () => {
+    const word = wordFixture({ ready: true });
+    word.meanings.sense_groups = [];
+    renderStep(word, false, {
+      nodeId: word.id,
+      field: "sense_groups"
+    });
+
+    await waitFor(() => {
+      const target = document.querySelector<HTMLElement>(
+        `[data-word-node-id="${word.id}"][data-word-field="sense_groups"]`
+      );
+      expect(target).not.toBeNull();
+      expect(target).toHaveClass("word-validation-focus");
+      expect(target).toContainElement(document.activeElement as HTMLElement);
+      expect(document.activeElement).toHaveTextContent("添加语义区间");
+    });
+  });
+
   it("校验定位后手动切换词性，输入时不再跳回原词性", async () => {
     renderStep(wordFixture({ ready: true }), false, {
       nodeId: "mock-sense-1-1",
@@ -1700,11 +1719,8 @@ describe("MeaningsAndExamplesStep", () => {
   it("可组合编辑语法、释义、例句、上下文关联与语义区间", async () => {
     renderStep();
 
-    fireEvent.change(screen.getAllByLabelText("英式语法结构 1")[0]!, {
+    fireEvent.change(screen.getAllByLabelText("语法结构 1")[0]!, {
       target: { value: "an edited centre" }
-    });
-    fireEvent.change(screen.getAllByLabelText("美式语法结构 1")[0]!, {
-      target: { value: "an edited center" }
     });
     fireEvent.click(enabledButton("添加语法结构"));
     const sourceHandle = await screen.findByLabelText("拖动语法结构 2");
@@ -1836,11 +1852,36 @@ describe("MeaningsAndExamplesStep", () => {
 
     expect(screen.getAllByLabelText("英语文本").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("中文释义")[0]).toHaveAttribute("readonly");
-    expect(screen.getByLabelText("默认语法结构 1 获取语音")).toBeDisabled();
-    expect(screen.queryByLabelText("默认语法结构 1 上传语音")).toBeNull();
+    expect(screen.getByLabelText("语法结构 1 获取语音")).toBeDisabled();
+    expect(screen.queryByLabelText("语法结构 1 上传语音")).toBeNull();
     expect(screen.queryByText("添加语法结构")).toBeNull();
     expect(screen.queryByText("添加词义")).toBeNull();
     expect(screen.queryByText("保存草稿")).toBeNull();
+  });
+
+  it("试听走 mock 时把「模拟」标记透传给语音富文本编辑器", async () => {
+    featureFlags.VOICE_EDITOR = true;
+    featureFlags.VOICE_PREVIEW = true;
+    voicePreview.mocked = true;
+    renderStep(wordFixture({ ready: true }));
+
+    fireEvent.click(screen.getAllByLabelText(/高级语音编辑/)[0]!);
+
+    const dialog = await screen.findByLabelText("测试语音编辑器");
+    expect(dialog).toHaveAttribute("data-preview-enabled", "true");
+    expect(dialog).toHaveAttribute("data-preview-mock", "true");
+  });
+
+  it("试听走真实 TTS 时不给语音富文本编辑器打「模拟」标记", async () => {
+    featureFlags.VOICE_EDITOR = true;
+    featureFlags.VOICE_PREVIEW = true;
+    renderStep(wordFixture({ ready: true }));
+
+    fireEvent.click(screen.getAllByLabelText(/高级语音编辑/)[0]!);
+
+    const dialog = await screen.findByLabelText("测试语音编辑器");
+    expect(dialog).toHaveAttribute("data-preview-enabled", "true");
+    expect(dialog).toHaveAttribute("data-preview-mock", "false");
   });
 
   it("普通文本可直接编辑，按需打开高级语音编辑并按稳定节点回写", async () => {
@@ -1880,10 +1921,12 @@ describe("MeaningsAndExamplesStep", () => {
     };
     renderStep(word);
 
-    const plainDefinition = screen.getByDisplayValue("American definition");
+    // 存量双份内容只呈现偏好侧（英式）那一份。
+    const plainDefinition = screen.getByDisplayValue("British definition");
     expect(plainDefinition).toBeInstanceOf(HTMLTextAreaElement);
+    expect(screen.queryByDisplayValue("American definition")).toBeNull();
     fireEvent.change(plainDefinition, {
-      target: { value: "American definition updated" }
+      target: { value: "British definition updated" }
     });
     expect(screen.queryByLabelText("测试语音编辑器")).toBeNull();
 
@@ -1895,7 +1938,7 @@ describe("MeaningsAndExamplesStep", () => {
           .closest(".word-voice-text-control")
           ?.querySelector('button[aria-label$="高级语音编辑"]') ??
         field
-          .closest(".dialect-panel")
+          .closest(".word-grammar-panel")
           ?.querySelector('button[aria-label$="高级语音编辑"]');
       if (!editButton) throw new Error(`edit button not found: ${text}`);
       expect(editButton).toHaveClass("word-voice-editor-action");
@@ -1914,13 +1957,15 @@ describe("MeaningsAndExamplesStep", () => {
     };
 
     await applyField("a centre");
-    await applyField("American definition updated");
+    await applyField("British definition updated");
     await applyField("The center is here.");
     expect(screen.getAllByLabelText("汉语译文")[0]).toBeInstanceOf(
       HTMLTextAreaElement
     );
 
     fireEvent.click(button("保存草稿"));
+    // 存量美式内容会被丢弃，先确认。
+    fireEvent.click(await screen.findByText("确认保存"));
     await waitFor(() => expect(mutations.save).toHaveBeenCalledOnce());
     const saved = mutations.save.mock.calls[0]![0]
       .content as DraftMeaningsStepContent;
@@ -1930,24 +1975,16 @@ describe("MeaningsAndExamplesStep", () => {
     const savedDefinition = saved.pos[0]!.senses[0]!.definitions[0]!;
     expect(savedDefinition.definition_mode).toBe("en_definition");
     const definitionContent = savedDefinition.content as EnglishTextV2;
-    if (definitionContent.mode !== "distinguish") {
-      throw new Error("definition should retain dialect structure");
+    if (definitionContent.mode !== "unified") {
+      throw new Error("definition should collapse to a single variant");
     }
-    expect(definitionContent.us.state).toBe("ready");
-    expect(
-      definitionContent.us.state === "ready"
-        ? definitionContent.us.variant.value.version
-        : undefined
-    ).toBe(2);
-    expect(
-      definitionContent.uk.state === "ready"
-        ? definitionContent.uk.variant.value.version
-        : undefined
-    ).toBe(1);
+    // 收敛换新节点（方言槽位变了），富文本经语音编辑器回写后升到 v2。
+    expect(definitionContent.common.id).not.toBe("voice-definition-uk");
+    expect(definitionContent.common.value.version).toBe(2);
     const sentenceText = saved.pos[0]!.senses[0]!.sentences[0]!.en_text;
     expect(
-      sentenceText.mode === "distinguish" && sentenceText.us.state === "ready"
-        ? sentenceText.us.variant.value.version
+      sentenceText.mode === "unified"
+        ? sentenceText.common.value.version
         : undefined
     ).toBe(2);
   });
@@ -2097,5 +2134,52 @@ describe("MeaningsAndExamplesStep", () => {
     fireEvent.click(button("完成并进入预览"));
     expect(await screen.findByText(expected)).toBeInTheDocument();
     expect(mutations.save).not.toHaveBeenCalled();
+  });
+});
+
+describe("内容体积与长度上限（对接文档 §13）", () => {
+  function withLongDefinition(text: string) {
+    const word = wordFixture({ ready: true });
+    const definition = word.meanings.pos[0]!.senses[0]!.definitions.find(
+      (candidate) => candidate.definition_mode.startsWith("zh_")
+    )!;
+    (definition.content as RichText).text = text;
+    return word;
+  }
+
+  it("正文超出 5000 码点时保存路径就地拦下，且不发请求", async () => {
+    renderStep(withLongDefinition("x".repeat(5001)));
+
+    fireEvent.click(button("保存草稿"));
+
+    // 位置前缀带词性序号（fixture 有多个基本词性），断言锚在「超了什么、超了多少」上。
+    expect(
+      await screen.findAllByText(
+        /释义 1：正文 5001 个字符，超出上限 5000，请删减 1 个字符/
+      )
+    ).not.toHaveLength(0);
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("码点而非 UTF-16 length：5000 个 BMP 外字符照常保存", async () => {
+    // .length 是 10000,按 UTF-16 长度预检会把这条合法内容误拦。
+    renderStep(withLongDefinition("😀".repeat(5000)));
+
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+  });
+
+  it("413 提示内容过大而不是格式错误", async () => {
+    mutations.save.mockRejectedValueOnce(
+      new HttpError(413, "payload too large", [], "payload_too_large")
+    );
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(
+      (await screen.findAllByText("内容过大，请拆分后分次保存")).length
+    ).toBeGreaterThan(0);
   });
 });
