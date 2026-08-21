@@ -414,6 +414,34 @@ export interface DraftValidationIssue {
   code: string;
   message: string;
   reference_location?: DraftReferenceLocation | null;
+  /**
+   * 仅节点身份类问题（`stable_node_id_changed` / `node_binding_changed` /
+   * `node_binding_unknown`）带这个子对象，其余 issue 整体省略。
+   */
+  node_location?: DraftNodeLocation | null;
+}
+
+/**
+ * 把节点身份类问题还原到界面位置用的定位信息。
+ *
+ * 所有字段都取自**本次提交的内容**，不含任何服务端存量节点 ID——旧 ID / 新 ID
+ * 的对照只写服务端日志。`message` 面向实现，展示文案由前端按这里的字段自行拼装。
+ */
+export interface DraftNodeLocation {
+  /** 出问题节点的角色，方言编在冒号之后，例如 `forms.form_variant:common`。 */
+  node_role: string;
+  /** 从词条根到直接父节点的祖先链，全部是本次提交里的节点 ID。 */
+  ancestor_node_ids: string[];
+  /** 所属基本词性编码（`verb` / `noun` …）；不挂在基本词性下的节点省略。 */
+  pos?: WordPosTag;
+  /** 所属基本词性的节点 ID。 */
+  pos_id?: string;
+  /** 所在词形组在 `pos.form_groups` 中的序号（从 0 开始）；共享原形不属于任何组，省略。 */
+  form_group_index?: number;
+  /** 所在词形槽位的类型；`base` 表示共享原形。词形之外的节点省略。 */
+  form_type?: WordFormType;
+  /** 方言侧；节点角色不带方言时省略。 */
+  dialect?: Dialect;
 }
 
 export interface DraftReferenceLocation {

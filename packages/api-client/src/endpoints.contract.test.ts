@@ -243,6 +243,32 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     ]);
   });
 
+  it("节点身份类问题的定位字段与 Rust snapshot 对齐", () => {
+    // admin 的 nodeIssueMessage 靠这些字段把内部规则文案改写成可定位的中文提示，
+    // 字段改名或 form_type / dialect 换枚举都必须在这里先炸出来。
+    const location = snapshot.schemas.DraftNodeLocation;
+    expect(location.required).toEqual(["node_role", "ancestor_node_ids"]);
+    expect(Object.keys(location.properties).sort()).toEqual([
+      "ancestor_node_ids",
+      "dialect",
+      "form_group_index",
+      "form_type",
+      "node_role",
+      "pos",
+      "pos_id"
+    ]);
+    expect(location.properties.form_type.$ref).toBe(
+      "#/components/schemas/WordFormTypeV2"
+    );
+    expect(location.properties.dialect.$ref).toBe(
+      "#/components/schemas/Dialect"
+    );
+    expect(location.properties.form_group_index).toMatchObject({
+      type: "integer",
+      minimum: 0
+    });
+  });
+
   it("关联词搜索 V2 分页字段与匹配模式来自 Rust snapshot", () => {
     expect(
       snapshot.operationQueryParameters[
