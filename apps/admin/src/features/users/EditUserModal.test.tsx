@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpError } from "@tsz/api-client";
 import type { AdminUserView } from "@tsz/types";
 
 vi.mock("@/lib/auth", () => ({
@@ -71,6 +72,31 @@ describe("EditUserModal", () => {
     expect(await screen.findByText("请输入用户昵称")).toBeInTheDocument();
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("昵称含 < >：本地预检拦截，不发请求（挡掉后端 400 的往返）", async () => {
+    const onClose = renderModal();
+    const input = await screen.findByDisplayValue("Frank");
+    fireEvent.change(input, { target: { value: "<script>" } });
+    fireEvent.click(screen.getByText(/保\s?存/));
+    expect(
+      await screen.findByText("昵称不能包含 < > 或控制字符")
+    ).toBeInTheDocument();
+    expect(mockUpdate).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("保存失败（HttpError 400 invalid_display_name）：展示中文昵称规则", async () => {
+    renderModal();
+    mockUpdate.mockRejectedValueOnce(
+      new HttpError(400, "invalid display name", [], "invalid_display_name")
+    );
+    const input = await screen.findByDisplayValue("Frank");
+    fireEvent.change(input, { target: { value: "阿强" } });
+    fireEvent.click(screen.getByText(/保\s?存/));
+    expect(
+      await screen.findByText("昵称需 1–50 字符，且不能包含 < > 或控制字符")
+    ).toBeInTheDocument();
   });
 
   it("保存失败（Error）：透传后端消息，不关闭弹窗", async () => {

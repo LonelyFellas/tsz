@@ -21,38 +21,62 @@ describe("admins labels", () => {
 });
 
 describe("adminActionError", () => {
-  it("409 → 禁用最后一个超管的中文提示", () => {
+  it("403 按操作分文案：启禁用说不能启禁用超管", () => {
     expect(
       adminActionError(
-        new HttpError(409, "cannot disable the last super admin"),
+        new HttpError(403, "cannot change a super admin"),
+        "status",
         "操作失败"
       )
-    ).toBe("不能禁用最后一个超级管理员");
+    ).toBe("不能启禁用超级管理员");
   });
 
-  it("403 → 不能重置超管的中文提示", () => {
+  it("403 按操作分文案：重置密码说不能重置超管密码", () => {
     expect(
       adminActionError(
         new HttpError(403, "cannot reset a super admin"),
+        "reset",
         "重置失败"
       )
     ).toBe("不能重置超级管理员的密码");
   });
 
+  it("404 → 目标管理员不存在", () => {
+    expect(
+      adminActionError(
+        new HttpError(404, "admin not found"),
+        "status",
+        "操作失败"
+      )
+    ).toBe("该管理员不存在，可能已被删除");
+  });
+
+  it("422 → 参数不合法", () => {
+    expect(
+      adminActionError(
+        new HttpError(422, "invalid_request_body"),
+        "status",
+        "操作失败"
+      )
+    ).toBe("请求参数不合法");
+  });
+
   it("其它 HttpError 回退到后端原文", () => {
-    expect(adminActionError(new HttpError(500, "boom"), "操作失败")).toBe(
-      "boom"
-    );
+    expect(
+      adminActionError(new HttpError(500, "boom"), "reset", "操作失败")
+    ).toBe("boom");
   });
 
   it("普通 Error 用 message", () => {
-    expect(adminActionError(new Error("网络断了"), "操作失败")).toBe(
+    expect(adminActionError(new Error("网络断了"), "status", "操作失败")).toBe(
       "网络断了"
     );
   });
 
   it("非 Error / 空 message 用 fallback", () => {
-    expect(adminActionError({}, "操作失败")).toBe("操作失败");
-    expect(adminActionError(new Error(""), "操作失败")).toBe("操作失败");
+    expect(adminActionError({}, "status", "操作失败")).toBe("操作失败");
+    expect(adminActionError(new Error(""), "reset", "操作失败")).toBe(
+      "操作失败"
+    );
   });
 });

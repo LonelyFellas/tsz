@@ -35,6 +35,27 @@ describe("userActionError", () => {
     ).toBe("需超级管理员权限");
   });
 
+  it("400 invalid_display_name → 昵称规则中文说明（按 code 判定，不匹配 message）", () => {
+    expect(
+      userActionError(
+        new HttpError(400, "invalid display name", [], "invalid_display_name"),
+        "保存失败"
+      )
+    ).toBe("昵称需 1–50 字符，且不能包含 < > 或控制字符");
+  });
+
+  it("404 → 用户不存在", () => {
+    expect(
+      userActionError(new HttpError(404, "user not found"), "操作失败")
+    ).toBe("该用户不存在，可能已被删除");
+  });
+
+  it("422 → 参数不合法", () => {
+    expect(
+      userActionError(new HttpError(422, "invalid_request_body"), "操作失败")
+    ).toBe("请求参数不合法");
+  });
+
   it("其它 HttpError 回退到后端原文", () => {
     expect(userActionError(new HttpError(500, "boom"), "操作失败")).toBe(
       "boom"
