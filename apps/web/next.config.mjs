@@ -18,7 +18,18 @@ const nextConfig = {
   ...(isBuild
     ? {
         output: "standalone",
-        outputFileTracingRoot: path.join(__dirname, "../../")
+        outputFileTracingRoot: path.join(__dirname, "../../"),
+        // @swc/helpers 的 exports 带 module-sync 条件时指向 esm/，Node 的 require()
+        // 会优先命中该条件；而 Next 的 file tracing 只按 require 语义追到 cjs/，
+        // esm/ 整个目录不会进 standalone → next/dist/server/require-hook.js 启动即
+        // MODULE_NOT_FOUND，服务根本起不来。这条只在 standalone 产物上复现：
+        // next dev / next start 走的是完整 workspace node_modules，e2e 与 CI 都测不出。
+        // 故显式把 esm/ 纳入产物。
+        outputFileTracingIncludes: {
+          "/**": [
+            "../../node_modules/.pnpm/@swc+helpers@*/node_modules/@swc/helpers/esm/**"
+          ]
+        }
       }
     : {}),
   transpilePackages: [
