@@ -100,6 +100,7 @@ import {
   formSlotComplete
 } from "./formsValidation";
 import { summarizeFormsImpact } from "./formsImpactSummary";
+import { wordValidationIssueMessage } from "./nodeIssueMessage";
 import {
   createDerivedSlot,
   createFormGroup,
@@ -2237,12 +2238,17 @@ export function FormsAndPronunciationStep({
     const stepIssues = error.field_issues.filter(
       (candidate) => candidate.step === "forms"
     );
-    setValidationMessages(stepIssues.map((issue) => issue.message));
+    // 后端 message 面向实现（「已有内容槽位必须保留原节点 ID」），节点身份类问题
+    // 按 node_location 改写成带定位的中文文案。
+    const messages = stepIssues.map((candidate) =>
+      wordValidationIssueMessage(candidate, partOfSpeechLookup)
+    );
+    setValidationMessages(messages);
     const issue = stepIssues[0];
     if (!issue) return false;
 
     finishSaveFlow();
-    message.warning(issue.message);
+    message.warning(messages[0]!);
     navigate(`/words/${word.id}/wizard/forms${editQuery}`, {
       replace: true,
       state: { nodeId: issue.node_id, field: issue.field }

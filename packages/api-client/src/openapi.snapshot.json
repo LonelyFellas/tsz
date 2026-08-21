@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-21T08:41:03.193Z",
+  "_generatedAt": "2026-08-21T12:16:01.957Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1490,6 +1490,45 @@
         }
       },
       "additionalProperties": false
+    },
+    "DraftNodeLocation": {
+      "type": "object",
+      "description": "把节点身份类问题还原到界面位置用的定位信息。\n\n所有字段都取自**本次提交的内容**，不含任何服务端存量节点 ID——旧 ID / 新 ID\n的对照只写服务端日志。`message` 面向实现，展示文案由前端按这里的字段自行拼装。",
+      "required": ["node_role", "ancestor_node_ids"],
+      "properties": {
+        "ancestor_node_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "description": "从词条根到直接父节点的祖先链，全部是本次提交里的节点 ID。"
+        },
+        "dialect": {
+          "$ref": "#/components/schemas/Dialect",
+          "description": "方言侧；节点角色不带方言时省略。"
+        },
+        "form_group_index": {
+          "type": "integer",
+          "format": "int32",
+          "description": "所在词形组在 `pos.form_groups` 中的序号（从 0 开始）；共享原形不属于任何组，省略。",
+          "minimum": 0
+        },
+        "form_type": {
+          "$ref": "#/components/schemas/WordFormTypeV2",
+          "description": "所在词形槽位的类型；`base` 表示共享原形。词形之外的节点省略。"
+        },
+        "node_role": {
+          "type": "string",
+          "description": "出问题节点的角色，方言编在冒号之后，例如 `forms.form_variant:common`。"
+        },
+        "pos": {
+          "type": "string",
+          "description": "所属基本词性编码（`verb` / `noun` …）；不挂在基本词性下的节点省略。"
+        },
+        "pos_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "所属基本词性的节点 ID。"
+        }
+      }
     },
     "AdminWordDraftV2Envelope": {
       "type": "object",
