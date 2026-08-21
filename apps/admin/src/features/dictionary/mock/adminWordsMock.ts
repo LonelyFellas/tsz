@@ -1512,11 +1512,15 @@ export function createAdminWordsMock({
       isState: isAdminWordsMockPersistedState,
       migrateLegacy: (legacyState) => {
         if (!isRecord(legacyState)) return undefined;
+        // 默认值放在 spread 之前：只补旧版本缺的字段，已有值一律保留。
+        // v8 三个字段都不存在，补空正确；v10 只缺 retired_stable_slots，
+        // 若反过来无条件覆盖会把它已有的 consumed_detection_ids
+        // 与 forms_surface_evidence 一并清空。
         const migrated = {
-          ...legacyState,
           retired_stable_slots: {},
           consumed_detection_ids: [],
-          forms_surface_evidence: {}
+          forms_surface_evidence: {},
+          ...legacyState
         };
         return isAdminWordsMockPersistedState(migrated)
           ? clone(migrated)

@@ -3580,6 +3580,62 @@ describe("part-of-speech settings mock", () => {
 });
 
 describe("surface warning mock", () => {
+  it("把 schema 10 fixture 升级到 11 时不清空 v10 已有的字段", async () => {
+    // legacySchemaVersions 加了 10 之后，v10 状态会走 migrateLegacy；
+    // 默认值若放在 spread 之后会把 v10 本来就有值的两个字段一并清空。
+    const storage = memoryStorage();
+    const initial = mockFor(() => profile(), storage);
+    const created = await createDetectedWord(
+      initial,
+      "workspace",
+      "workspace-before-v10-upgrade"
+    );
+    const currentKey = adminWordsMockStorageKey(
+      ADMIN_WORDS_MOCK_STORAGE_SCHEMA,
+      "admin-test"
+    );
+    const legacyKey = adminWordsMockStorageKey(10, "admin-test");
+    const envelope = JSON.parse(storage.values.get(currentKey)!) as {
+      schema_version: number;
+      state: Record<string, unknown>;
+    };
+    envelope.schema_version = 10;
+    // v10 的形状：没有 retired_stable_slots，但另两个字段有真实值。
+    delete envelope.state.retired_stable_slots;
+    envelope.state.consumed_detection_ids = ["detection-already-consumed"];
+    envelope.state.forms_surface_evidence = {
+      "evidence-key": {
+        content_json: "{}",
+        match_ids: ["match-1"],
+        confirmed_revision: 1
+      }
+    };
+    storage.values.delete(currentKey);
+    storage.values.set(legacyKey, JSON.stringify(envelope));
+
+    const upgraded = surfaceMockWithStorage(storage);
+    await expect(upgraded.get(created.word.id)).resolves.toEqual({
+      ...created,
+      retired_stable_slots: []
+    });
+
+    const migrated = JSON.parse(storage.values.get(currentKey)!) as {
+      state: Record<string, unknown>;
+    };
+    expect(migrated.state.consumed_detection_ids).toEqual([
+      "detection-already-consumed"
+    ]);
+    expect(migrated.state.forms_surface_evidence).toEqual({
+      "evidence-key": {
+        content_json: "{}",
+        match_ids: ["match-1"],
+        confirmed_revision: 1
+      }
+    });
+    expect(migrated.state.retired_stable_slots).toEqual({});
+    expect(storage.values.has(legacyKey)).toBe(false);
+  });
+
   it("把 schema 8 fixture 升级到 9 并保留旧词条", async () => {
     const storage = memoryStorage();
     const initial = mockFor(() => profile(), storage);
