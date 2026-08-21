@@ -17,6 +17,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminWordsMock } from "../mock/adminWordsMock";
 import { FormsAndPronunciationStep } from "./FormsAndPronunciationStep";
+import { createFormVariantIdentityLedger } from "./formVariantIdentity";
 import { partOfSpeechCatalogFixture } from "./partOfSpeech.test.helper";
 import { deferred, wordFixture } from "./wordCreation.test.helper";
 
@@ -112,7 +113,8 @@ function unmatchedWordFixture() {
 function renderStep(
   word = wordFixture(),
   locationState?: { nodeId: string; field: string },
-  readOnly = false
+  readOnly = false,
+  identityLedger = createFormVariantIdentityLedger()
 ) {
   const onSaved = vi.fn();
   let updateRenderedWord:
@@ -126,6 +128,7 @@ function renderStep(
           word={renderedWord}
           readOnly={readOnly}
           onSaved={onSaved}
+          identityLedger={identityLedger}
         />
         <LocationProbe />
       </>
@@ -155,7 +158,7 @@ function renderStep(
       ]
     }
   );
-  render(
+  const view = render(
     <AntApp>
       <RouterProvider router={router} />
     </AntApp>
@@ -163,6 +166,8 @@ function renderStep(
   return {
     onSaved,
     router,
+    identityLedger,
+    unmount: view.unmount,
     rerenderWord(next: ReturnType<typeof wordFixture>) {
       if (!updateRenderedWord) throw new Error("step harness is not mounted");
       act(() => updateRenderedWord?.(next));
@@ -1639,6 +1644,197 @@ describe("FormsAndPronunciationStep", () => {
     expect(screen.getAllByLabelText("实际发音")[0]).toHaveAttribute("readonly");
     expect(screen.queryByText("添加派生词形")).toBeNull();
     expect(screen.queryByText("保存草稿")).toBeNull();
+  });
+
+  /** 词形拼写/音标模式的英美开关：切换后按钮文案固定，取到就点。 */
+  function switchDialectRule(question: string, answer: "是" | "否") {
+    const block = screen.getByText(question).closest(".word-form-rule-row")!;
+    const option = Array.from(
+      block.querySelectorAll<HTMLLabelElement>("label.ant-radio-wrapper")
+    ).find((label) => label.textContent?.trim() === answer);
+    expect(option).toBeDefined();
+    fireEvent.click(option!);
+  }
+
+  it("英美拆分再合并后已有词形槽位沿用原节点 ID", async () => {
+    // 后端把方言编进 node_role，(槽位, 方言) 的节点 ID 永久绑定：
+    // 来回切换后重新生成 ID 会被判 stable_node_id_changed 并阻断下一步。
+    const word = wordFixture({ headword: "testability" });
+    word.forms.pos[0]!.form_groups[0]!.slots = [
+      {
+        id: "suggested-slot-plural",
+        form_type: "plural",
+        variants: [
+          {
+            id: "suggested-slot-plural-common",
+            dialect: "common",
+            spelling: "testabilities",
+            origin: "manual",
+            pronunciations: [
+              {
+                id: "suggested-slot-plural-common-pron",
+                dict_phonetic: "mock",
+                actual_pron: "mock",
+                style: "normal"
+              }
+            ]
+          }
+        ]
+      }
+    ];
+    renderStep(word);
+
+    switchDialectRule("英美拼写是否有区别？", "是");
+    // A1 之后偏好侧（英式）展开、另一侧折叠，但两侧变体都已在状态里。
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0)
+    );
+    switchDialectRule("英美拼写是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("共用词形拼写").length).toBeGreaterThan(0)
+    );
+    switchDialectRule("英美音标是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByText("英美共用").length).toBeGreaterThan(0)
+    );
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const savedPos = mutations.save.mock.calls[0]![0].content.pos[0];
+    expect(
+      savedPos.base_form.variants.map((item: { id: string }) => item.id)
+    ).toEqual(["suggested-base-noun-common"]);
+    expect(
+      savedPos.form_groups[0].slots[0].variants.map(
+        (item: { id: string }) => item.id
+      )
+    ).toEqual(["suggested-slot-plural-common"]);
+  });
+
+  it("英美音标合并再拆分后沿用原有的英式、美式节点 ID", async () => {
+    renderStep(wordFixture({ headword: "far", ready: true }));
+
+    switchDialectRule("英美音标是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByText("英美共用").length).toBeGreaterThan(0)
+    );
+    switchDialectRule("英美音标是否有区别？", "是");
+    await waitFor(() =>
+      expect(screen.getAllByText("英式 · BrE").length).toBeGreaterThan(0)
+    );
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const savedPos = mutations.save.mock.calls[0]![0].content.pos[0];
+    expect(
+      savedPos.base_form.variants.map((item: { id: string }) => item.id)
+    ).toEqual([
+      "suggested-pos-adjective-base-uk",
+      "suggested-pos-adjective-base-us"
+    ]);
+  });
+
+  it("在拆分状态下保存后回灌草稿，合并回共用仍沿用原节点 ID", async () => {
+    const word = wordFixture({ headword: "testability" });
+    const { rerenderWord } = renderStep(word);
+
+    switchDialectRule("英美拼写是否有区别？", "是");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0)
+    );
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+
+    // 后端把拆分后的草稿回灌：此时响应里已经没有 common 变体了。
+    const splitForms = mutations.save.mock.calls[0]![0].content;
+    rerenderWord({ ...word, forms: splitForms, revision: 4 });
+
+    switchDialectRule("英美拼写是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("共用词形拼写").length).toBeGreaterThan(0)
+    );
+    switchDialectRule("英美音标是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByText("英美共用").length).toBeGreaterThan(0)
+    );
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(2));
+    const savedPos = mutations.save.mock.calls[1]![0].content.pos[0];
+    expect(
+      savedPos.base_form.variants.map((item: { id: string }) => item.id)
+    ).toEqual(["suggested-base-noun-common"]);
+  });
+
+  it("离开词形步再回来后合并回共用，仍沿用原节点 ID", async () => {
+    // 账本由向导持有，本步骤卸载重挂不该丢掉已退役的 common 节点身份。
+    const word = wordFixture({ headword: "testability" });
+    const first = renderStep(word);
+
+    switchDialectRule("英美拼写是否有区别？", "是");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0)
+    );
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const splitForms = mutations.save.mock.calls[0]![0].content;
+    first.unmount();
+
+    renderStep(
+      { ...word, forms: splitForms, revision: 4 },
+      undefined,
+      false,
+      first.identityLedger
+    );
+    switchDialectRule("英美拼写是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("共用词形拼写").length).toBeGreaterThan(0)
+    );
+    switchDialectRule("英美音标是否有区别？", "否");
+    await waitFor(() =>
+      expect(screen.getAllByText("英美共用").length).toBeGreaterThan(0)
+    );
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(2));
+    const savedPos = mutations.save.mock.calls[1]![0].content.pos[0];
+    expect(
+      savedPos.base_form.variants.map((item: { id: string }) => item.id)
+    ).toEqual(["suggested-base-noun-common"]);
+  });
+
+  it("草稿规则与变体不一致时，账本记的是后端那两个方言 ID", async () => {
+    // dialect_rules 说 unified、变体却还是英美两条：归一化会先铸一个新的
+    // common ID，账本必须先用 word.forms 播种，才不会把后端的 uk/us 忘掉。
+    const word = wordFixture({ headword: "testability" });
+    const pos = word.forms.pos[0]!;
+    pos.base_form.variants = [
+      {
+        id: "server-base-uk",
+        dialect: "uk",
+        spelling: "testability",
+        origin: "manual",
+        pronunciations: []
+      },
+      {
+        id: "server-base-us",
+        dialect: "us",
+        spelling: "testability",
+        origin: "manual",
+        pronunciations: []
+      }
+    ];
+    renderStep(word);
+
+    switchDialectRule("英美拼写是否有区别？", "是");
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0)
+    );
+
+    fireEvent.click(button("保存草稿"));
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const savedPos = mutations.save.mock.calls[0]![0].content.pos[0];
+    expect(
+      savedPos.base_form.variants.map((item: { id: string }) => item.id)
+    ).toEqual(["server-base-uk", "server-base-us"]);
   });
 
   it("拼写相同但音标不同时只显示一个词形块，并在块内区分英美发音", async () => {

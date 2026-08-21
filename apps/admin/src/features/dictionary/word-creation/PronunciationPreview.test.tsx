@@ -10,7 +10,8 @@ import type { VoicePreviewResult } from "@tsz/voice-editor/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PronunciationPreviewControls,
-  PronunciationPreviewProvider
+  PronunciationPreviewProvider,
+  usePronunciationVoiceNotice
 } from "./PronunciationPreview";
 import { deferred } from "./wordCreation.test.helper";
 
@@ -152,6 +153,23 @@ function PreviewHarness({
           new AudioMock(src) as unknown as HTMLAudioElement
         }
       />
+    </PronunciationPreviewProvider>
+  );
+}
+
+function VoiceNotice({ dialects }: { dialects: Dialect[] }) {
+  const notice = usePronunciationVoiceNotice(dialects);
+  return <span data-testid="voice-notice">{notice ?? "无提示"}</span>;
+}
+
+function NoticeHarness({
+  dialects = ["uk", "us"] as Dialect[]
+}: {
+  dialects?: Dialect[];
+}) {
+  return (
+    <PronunciationPreviewProvider>
+      <VoiceNotice dialects={dialects} />
     </PronunciationPreviewProvider>
   );
 }
@@ -476,6 +494,54 @@ describe("PronunciationPreview", () => {
     );
 
     expect(screen.getByText("模拟")).toBeVisible();
+  });
+
+  it("缺少某侧发音人时给出无需悬停的常驻说明", async () => {
+    preview.listVoices.mockResolvedValue([voices[0], voices[2]]);
+    render(<NoticeHarness />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("voice-notice")).toHaveTextContent(
+        "英式（en-GB）暂无可用发音人，对应的「获取语音」已禁用"
+      )
+    );
+  });
+
+  it("两侧发音人齐全时不显示常驻说明", async () => {
+    render(<NoticeHarness />);
+
+    await waitFor(() => expect(preview.listVoices).toHaveBeenCalled());
+    expect(screen.getByTestId("voice-notice")).toHaveTextContent("无提示");
+  });
+
+  it("试听功能关闭时不显示常驻说明", () => {
+    preview.enabled = false;
+    render(<NoticeHarness />);
+
+    expect(screen.getByTestId("voice-notice")).toHaveTextContent("无提示");
+    expect(preview.listVoices).not.toHaveBeenCalled();
+  });
+
+  it("发音人目录为空时透出目录层面的原因", async () => {
+    preview.listVoices.mockResolvedValue([]);
+    render(<NoticeHarness />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("voice-notice")).toHaveTextContent(
+        "暂无可用发音人"
+      )
+    );
+  });
+
+  it("发音人目录加载失败时透出加载错误", async () => {
+    preview.listVoices.mockRejectedValue(new Error("目录服务不可用"));
+    render(<NoticeHarness />);
+
+    await waitFor(() =>
+      expect(screen.getByTestId("voice-notice")).toHaveTextContent(
+        "目录服务不可用"
+      )
+    );
   });
 
   it("目标 locale 无 voice 或 spelling 为空时不请求合成", async () => {

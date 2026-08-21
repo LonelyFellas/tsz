@@ -10,7 +10,8 @@ import {
 } from "@ant-design/icons";
 import {
   PronunciationPreviewControls,
-  PronunciationPreviewProvider
+  PronunciationPreviewProvider,
+  usePronunciationVoiceNotice
 } from "./PronunciationPreview";
 import {
   Alert,
@@ -88,6 +89,10 @@ import {
   stepContentBodyIssue
 } from "./contentLimits";
 import {
+  applyFormVariantIdentities,
+  type FormVariantIdentityLedger
+} from "./formVariantIdentity";
+import {
   baseFormComplete,
   baseFormIssueMessage,
   derivedFormIssueMessage,
@@ -119,6 +124,11 @@ interface Props {
   readOnly?: boolean;
   onSaved: (word: AdminWordV2) => void;
   onDraftChange?: (content: DraftFormsStepContent) => void;
+  /**
+   * 词形变体节点身份账本，由向导持有：本步骤离开再回来会重新挂载，
+   * 账本放在这里会连同已退役的方言节点 ID 一起丢掉。
+   */
+  identityLedger: FormVariantIdentityLedger;
 }
 
 const FORM_ORIGIN_LABEL: Record<WordFormVariantV2["origin"], string> = {
@@ -1253,6 +1263,21 @@ function normalizeLoadedForms(word: AdminWordV2): DraftFormsStepContent {
   };
 }
 
+/**
+ * 载入草稿并把词形变体的节点身份对齐到账本。
+ *
+ * 先用服务端保存的 `word.forms` 播种：normalizeLoadedForms 遇到超出当前
+ * dialect_rules 的变体会先铸新 ID，播种在前才能让后端认的那个 ID 优先。
+ */
+function loadFormsWithIdentities(
+  ledger: FormVariantIdentityLedger,
+  word: AdminWordV2
+): DraftFormsStepContent {
+  // 只取播种这一个副作用，返回的对齐结果由下面那次调用给出。
+  applyFormVariantIdentities(ledger, word.forms);
+  return applyFormVariantIdentities(ledger, normalizeLoadedForms(word));
+}
+
 function PosFormsEditor({
   value,
   configuredAllowedTypes,
@@ -1292,6 +1317,7 @@ function PosFormsEditor({
   );
   const showDerivedGroups = allowedTypes.length > 0 || invalidSlots.length > 0;
   const spellingForced = headwords.mode === "distinguish";
+  const voiceNotice = usePronunciationVoiceNotice(formDialects(value));
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
     () => new Set()
   );
@@ -1398,6 +1424,14 @@ function PosFormsEditor({
             showIcon
             title="当前基本词性无需派生词形"
             description="只需完成基准原形的音标与实际发音，即可继续下一步。"
+          />
+        )}
+        {voiceNotice && (
+          <Alert
+            type="warning"
+            showIcon
+            title={voiceNotice}
+            description="音标与实际发音仍可正常填写和保存；试听语音需要平台先配置对应方言的发音人。"
           />
         )}
         {invalidSlots.length > 0 && (
@@ -1892,13 +1926,14 @@ export function FormsAndPronunciationStep({
   word,
   readOnly,
   onSaved,
-  onDraftChange
+  onDraftChange,
+  identityLedger
 }: Props) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const editQuery = word.status === "published" ? "?mode=edit" : "";
   const [content, setContent] = useState<DraftFormsStepContent>(() =>
-    normalizeLoadedForms(word)
+    loadFormsWithIdentities(identityLedger, word)
   );
   const contentRef = useRef(content);
   const loadedWordIdRef = useRef(word.id);
@@ -1976,7 +2011,8 @@ export function FormsAndPronunciationStep({
     const wordChanged = loadedWordIdRef.current !== word.id;
     if (!dirty || wordChanged) {
       loadedWordIdRef.current = word.id;
-      const next = normalizeLoadedForms(word);
+      if (wordChanged) identityLedger.clear();
+      const next = loadFormsWithIdentities(identityLedger, word);
       contentRef.current = next;
       setContent(next);
       setContentBaseRevision(word.revision);
@@ -1997,15 +2033,16 @@ export function FormsAndPronunciationStep({
         confirmActionRef.current = false;
       }
     }
-  }, [dirty, word]);
+  }, [dirty, identityLedger, word]);
 
   useEffect(() => {
     onDraftChange?.(content);
   }, [content, onDraftChange]);
 
   const updateContent = (next: DraftFormsStepContent) => {
-    contentRef.current = next;
-    setContent(next);
+    const aligned = applyFormVariantIdentities(identityLedger, next);
+    contentRef.current = aligned;
+    setContent(aligned);
     setDirty(true);
     setValidationMessages([]);
   };
@@ -2061,7 +2098,7 @@ export function FormsAndPronunciationStep({
           form_groups: formGroups
         };
       });
-      const next = { pos };
+      const next = applyFormVariantIdentities(identityLedger, { pos });
       contentRef.current = next;
       return next;
     });

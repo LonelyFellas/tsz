@@ -20,6 +20,7 @@ import {
   useState
 } from "react";
 import { env } from "@/lib/env";
+import { DIALECT_SHORT_LABEL } from "../editorConstants";
 import {
   adminVoicePreviewAdapter,
   voicePreviewIsMock
@@ -121,6 +122,32 @@ function voiceForDialect(
   // 统一内容本来就没有自己的方言，偏好侧发音人缺席时回退目录默认，保持可试听。
   if (dialect !== "common") return undefined;
   return voices.find((voice) => voice.isDefault) ?? voices[0];
+}
+
+/**
+ * 当前页面缺少哪一侧发音人的常驻说明。
+ *
+ * 目录里没有匹配 locale 的 voice 时「获取语音」只会禁用，原因过去只挂在悬停
+ * Tooltip 上，用户不悬停就看不到；这里给页面一句可直接读到的说明。
+ */
+export function usePronunciationVoiceNotice(
+  dialects: readonly Dialect[]
+): string | undefined {
+  const context = useContext(PreviewContext);
+  if (!context?.enabled || context.voicesLoading) return undefined;
+  if (context.voicesError) return context.voicesError;
+  const preference = context.dialectPreference;
+  const missing = dialects.filter(
+    (dialect) => !voiceForDialect(context.voices, dialect, preference)
+  );
+  if (missing.length === 0) return undefined;
+  const labels = missing
+    .map(
+      (dialect) =>
+        `${DIALECT_SHORT_LABEL[dialect]}（${localeForDialect(dialect, preference) ?? "英语"}）`
+    )
+    .join("、");
+  return `${labels}暂无可用发音人，对应的「获取语音」已禁用`;
 }
 
 export function PronunciationPreviewControls({
