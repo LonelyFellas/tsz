@@ -378,20 +378,13 @@ export function WordCreationWizard({ mode }: Props) {
       navigate(`/words/${word.id}/wizard/preview`);
       return;
     }
-    const nextIndex = WORD_STEP_ORDER.indexOf(next);
-    const maxIndex = WORD_STEP_ORDER.indexOf(word.max_reachable_step);
-    if (nextIndex <= maxIndex) {
-      navigate(
-        `/words/${word.id}/wizard/${next}${editingPublished ? "?mode=edit" : ""}`
-      );
-    }
+    navigate(
+      `/words/${word.id}/wizard/${next}${editingPublished ? "?mode=edit" : ""}`
+    );
   };
 
   const navigateToReadinessTarget = (target: ReadinessTarget) => {
     if (!word) return;
-    const targetIndex = WORD_STEP_ORDER.indexOf(target.step);
-    const maxIndex = WORD_STEP_ORDER.indexOf(word.max_reachable_step);
-    if (targetIndex > maxIndex) return;
     navigate(
       `/words/${word.id}/wizard/${target.step}${word.status === "published" && explicitEditMode ? "?mode=edit" : ""}`,
       {
@@ -504,14 +497,13 @@ export function WordCreationWizard({ mode }: Props) {
   }
 
   const editingPublished = word.status === "published" && explicitEditMode;
+  // 只归一「非法 step 名」与「已发布锁 preview」两种；进度不再限制可进入的步骤。
   const legalStep: WordCreationStep =
     word.status === "published" && !editingPublished
       ? "preview"
-      : !isWordCreationStep(step) ||
-          WORD_STEP_ORDER.indexOf(step) >
-            WORD_STEP_ORDER.indexOf(word.max_reachable_step)
-        ? word.max_reachable_step
-        : step;
+      : isWordCreationStep(step)
+        ? step
+        : word.max_reachable_step;
   if (step !== legalStep) {
     return (
       <Navigate

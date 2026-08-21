@@ -205,6 +205,29 @@ describe("PreviewAndPublishStep", () => {
     expect(mutations.publish).not.toHaveBeenCalled();
   });
 
+  it("尚未录入的新草稿越步进入预览时安全降级，并由完整性检查拦住发布", async () => {
+    // 步骤顺序门禁取消后，第 4 步在草稿刚创建时就点得进来。
+    const word = wordFixture({ revision: 2 });
+    mutations.validate.mockResolvedValue({
+      validated_revision: 2,
+      valid: false,
+      issues: [
+        {
+          step: "forms",
+          node_id: word.forms.pos[0]!.base_form.id,
+          field: "actual_pron",
+          code: "actual_pron_required",
+          message: "请补齐原形实际发音"
+        }
+      ]
+    });
+    renderStep(word);
+
+    expect(await screen.findByText("发现 1 个待处理问题")).toBeVisible();
+    expect(screen.getByText("词形与发音 · 请补齐原形实际发音")).toBeVisible();
+    expect(button("提交生效")).toBeDisabled();
+  });
+
   it("同 revision 校验通过后发布，回写 published word 并返回列表", async () => {
     const word = wordFixture({ ready: true, revision: 8 });
     const published = wordFixture({

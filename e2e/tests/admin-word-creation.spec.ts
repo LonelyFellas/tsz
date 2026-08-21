@@ -157,6 +157,42 @@ test.describe("admin 新建单词 V2", () => {
     ).toBe(1);
   });
 
+  test("词形未完成也能先录词义：越步保存草稿后两步内容都在", async ({
+    page
+  }) => {
+    const api = await createCenterDraft(page);
+    const stepper = page.locator(".word-creation-steps");
+
+    // 不点「完成并进入词义与例句」，直接从步骤条跳到尚未可达的第 3 步。
+    await stepper.getByText("词义与例句").click();
+    await expect(page).toHaveURL(
+      new RegExp(`/words/${ADMIN_E2E_WORD_ID}/wizard/meanings$`)
+    );
+    expect(api.getWord()?.max_reachable_step).toBe("forms");
+
+    const definition = page.getByLabel("中文释义").first();
+    await definition.fill("词形还没做完就先录的中文释义");
+    await page.getByRole("button", { name: "保存草稿" }).click();
+    await expect(page.getByText("草稿已保存")).toBeVisible();
+    // 保存草稿不推进完成度：完成情况面板仍如实显示词形未完成。
+    expect(api.getWord()?.completed_steps).toEqual(["basics"]);
+    expect(api.getWord()?.max_reachable_step).toBe("forms");
+
+    await stepper.getByText("词形与发音").click();
+    await expect(page).toHaveURL(
+      new RegExp(`/words/${ADMIN_E2E_WORD_ID}/wizard/forms$`)
+    );
+    await expect(page.getByLabel("英式词形拼写").first()).toHaveValue("centre");
+
+    await stepper.getByText("词义与例句").click();
+    await expect(page).toHaveURL(
+      new RegExp(`/words/${ADMIN_E2E_WORD_ID}/wizard/meanings$`)
+    );
+    await expect(page.getByLabel("中文释义").first()).toHaveValue(
+      "词形还没做完就先录的中文释义"
+    );
+  });
+
   test("F8 两个同名关联目标明确选择第二个并保存其 word_id+sense_id", async ({
     page
   }) => {
