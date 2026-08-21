@@ -56,14 +56,10 @@ const PENDING = new Set<string>([
   "post /comments",
   "get /tasks",
   "post /tasks",
-  // 平台后台(admin):auth 一期已在 tsz-rust 落地(login/login-code/logout/refresh/
-  // change-password/profile),已纳入正式校验;其余端点待对接。
-  "post /admin/auth/logout-all",
-  "get /admin/users/_",
-  "patch /admin/users/_/status",
-  "patch /admin/users/_",
-  "patch /admin/admins/_/status",
-  "post /admin/admins/_/reset-password",
+  // 平台后台(admin)RBAC:产品已定案不做(见 tsz-rust admin-design Q10),后端不会实现,
+  // 因此这几条不是「待实现」而是「已取消」。createEndpoints 目前仍会发出它们(Roles 页面在用),
+  // 白名单条目必须保留,否则「无臆造端点」断言会红。待前端下架 Roles 页面后,
+  // 连同 admin.ts 里对应的方法一起删。
   "patch /admin/admins/_/role",
   "get /admin/permissions",
   "get /admin/roles",
