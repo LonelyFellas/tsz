@@ -36,6 +36,7 @@ if (!adminWordV2?.required || !adminWordV2?.properties) {
   throw new Error(`spec 无 components.schemas.AdminWordV2: ${source}`);
 }
 const contractSchemaNames = [
+  "ErrorCode",
   "CreateAdminWordV2Input",
   "DeleteDraftInput",
   "DuplicateWordMatchV2",

@@ -2136,3 +2136,50 @@ describe("MeaningsAndExamplesStep", () => {
     expect(mutations.save).not.toHaveBeenCalled();
   });
 });
+
+describe("内容体积与长度上限（对接文档 §13）", () => {
+  function withLongDefinition(text: string) {
+    const word = wordFixture({ ready: true });
+    const definition = word.meanings.pos[0]!.senses[0]!.definitions.find(
+      (candidate) => candidate.definition_mode.startsWith("zh_")
+    )!;
+    (definition.content as RichText).text = text;
+    return word;
+  }
+
+  it("正文超出 5000 码点时保存路径就地拦下，且不发请求", async () => {
+    renderStep(withLongDefinition("x".repeat(5001)));
+
+    fireEvent.click(button("保存草稿"));
+
+    // 位置前缀带词性序号（fixture 有多个基本词性），断言锚在「超了什么、超了多少」上。
+    expect(
+      await screen.findAllByText(
+        /释义 1：正文 5001 个字符，超出上限 5000，请删减 1 个字符/
+      )
+    ).not.toHaveLength(0);
+    expect(mutations.save).not.toHaveBeenCalled();
+  });
+
+  it("码点而非 UTF-16 length：5000 个 BMP 外字符照常保存", async () => {
+    // .length 是 10000,按 UTF-16 长度预检会把这条合法内容误拦。
+    renderStep(withLongDefinition("😀".repeat(5000)));
+
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+  });
+
+  it("413 提示内容过大而不是格式错误", async () => {
+    mutations.save.mockRejectedValueOnce(
+      new HttpError(413, "payload too large", [], "payload_too_large")
+    );
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(
+      (await screen.findAllByText("内容过大，请拆分后分次保存")).length
+    ).toBeGreaterThan(0);
+  });
+});
