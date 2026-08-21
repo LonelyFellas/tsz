@@ -35,13 +35,40 @@
 
 照搬第 2 步已有的写法（`FormsAndPronunciationStep.tsx:2777`）：在 Tabs 之上加 `Alert type="info" showIcon`，只读/可写两套文案，并额外给一个跳回第 2 步的按钮（门禁拿掉后跳转可行，让用户就地闭环）。
 
+**动工时补记（2026-08-21）：第 4 步同样是新可达路径，但无需改代码。**
+
+上表只点了第 3 步的零词性空态，漏掉了「第 4 步预览并生效在草稿刚创建时也点得进来了」这条同类路径。
+实测确认它已经安全，不需要新增空态：
+
+- 结构渲染对空值安全降级（`PreviewAndPublishStep` 既有用例「只读预览对空值、未知词性、空词形组与关系词安全降级」已钉住）；
+- 进入即自动 `validate`，把缺什么逐条列出来并给「去处理」定位入口，「提交生效」保持置灰。
+
+也就是说第 4 步天然就是设计里说的「真正的守门人」形态，越步进入反而比第 3 步更早暴露缺项。
+已补一条回归用例（「尚未录入的新草稿越步进入预览时安全降级，并由完整性检查拦住发布」）钉死这条新可达路径，不额外写空态代码。
+
+**动工时补记（2026-08-21）：步骤条的完成态判定要一起改，否则越步会画出假绿勾。**
+
+`WordCreationLayout.tsx` 的步骤 `status` 原本是
+`completed.has(step) || index < currentIndex ? "finish" : "wait"`——
+「排在当前步之前就算完成」这条兜底**只在顺序门禁存在时才成立**：门禁保证了你不可能站在进度之前。
+门禁一拿掉就不成立了：实测新建草稿（`completed_steps: ["basics"]`）直接点第 4 步，
+第 2、3 步都被渲染成 `ant-steps-item-finish` 绿勾，而这两步一个字都没录。
+
+这正好撞上需求验收项「完成情况如实呈现，不因为进入了后面的步骤而变绿」——
+左栏面板是诚实的（`buildWordReadiness` 按内容算），但顶部步骤条会撒谎。
+
+**改法**：去掉 `|| index < currentIndex`，只认后端记的 `completed_steps`。
+正常顺序录入下显示完全不变（排在前面的步骤本来就在 `completed_steps` 里），
+只有「越步进入」这条新路径的显示被纠正。已补回归用例
+「越步进入靠后步骤时，跳过的步骤不画成已完成」。
+
 ### 受影响的现有测试
 
 这些用例断言的正是要拿掉的行为，必须改写成新口径（不是删掉，是反过来断言「可进入」）：
 
 - `WordCreationLayout.test.tsx:143`「草稿汇总有效完成数，并只允许点击 max_reachable_step 内步骤」
 - `WordCreationWizard.test.tsx:422`「stepper 只允许进入 max_reachable_step 以内步骤」
-- `WordCreationWizard.test.tsx` 的「不可达路径 `/wizard/not-a-step` 归一到 meanings」「不可达路径 `/wizard/preview` 归一到 forms」——前者（非法 step 名）保留，后者（越界）要改。
+- `WordCreationWizard.test.tsx` 的「不可达路径 `/wizard/not-a-step` 归一到 meanings」「不可达路径 `/wizard/preview` 归一到 forms」——原本是一条 `it.each`，动工时拆成两条：前者（非法 step 名）保留原口径，后者（越界）反过来断言「停在 preview 不重定向」。
 - `WordCreationWizard.test.tsx:253`「完成情况定位目标导航到可达步骤」——扩成也能导航到越界步骤。
 - `WordCreationWizard.test.tsx:367`「published 无论请求何步都锁定 preview」——**保持不变**，本次不动已发布规则。
 

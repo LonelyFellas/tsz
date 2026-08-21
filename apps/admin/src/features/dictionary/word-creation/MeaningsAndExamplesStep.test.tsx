@@ -478,6 +478,42 @@ beforeEach(() => {
 afterEach(() => vi.restoreAllMocks());
 
 describe("MeaningsAndExamplesStep", () => {
+  it("没有基本词性时给出空态说明并可跳回词形与发音", async () => {
+    // 步骤顺序门禁取消后，词形步还没添加任何词性就能进第 3 步：
+    // 词义按词性组织，没有词性时这里原本渲染成一个空白页。
+    const word = wordFixture();
+    word.forms.pos = [];
+    renderStep(word);
+
+    expect(screen.getByText("当前还没有基本词性")).toBeInTheDocument();
+    expect(screen.getByText(/词义按基本词性组织/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "去词形与发音" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        `/words/${word.id}/wizard/forms`
+      )
+    );
+  });
+
+  it("只读态零词性只陈述事实，不催办也不给跳转入口", () => {
+    const word = wordFixture({ status: "archived" });
+    word.forms.pos = [];
+    renderStep(word, true);
+
+    expect(
+      screen.getByText("该词条没有记录任何基本词性，因此没有可维护的词义。")
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/词义按基本词性组织/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "去词形与发音" })).toBeNull();
+  });
+
+  it("已有基本词性时不出现零词性空态", () => {
+    renderStep();
+
+    expect(screen.queryByText("当前还没有基本词性")).toBeNull();
+  });
+
   it("默认关闭词条内容自动生成与回填入口", () => {
     renderStep();
 

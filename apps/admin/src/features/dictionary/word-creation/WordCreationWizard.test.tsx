@@ -250,7 +250,7 @@ describe("WordCreationWizard", () => {
     expect(merged.pos[0]!.base_form.variants[0]!.id).toBe("retired-common-id");
   });
 
-  it("完成情况定位目标导航到可达步骤并保留编辑 query", async () => {
+  it("完成情况定位目标导航并保留编辑 query", async () => {
     loaded(
       wordFixture({
         status: "published",
@@ -265,6 +265,21 @@ describe("WordCreationWizard", () => {
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
         "/words/word-center/wizard/meanings?mode=edit"
+      )
+    );
+  });
+
+  it("完成情况定位目标也能跳到越过当前进度的步骤", async () => {
+    // 进度停在 forms，面板点「语法结构」指向 meanings：越界不再静默失效。
+    loaded(wordFixture({ max_reachable_step: "forms" }));
+    renderWizard("resume", "/words/word-center/wizard/forms");
+    await screen.findByText(/forms-step-revision/);
+
+    fireEvent.click(screen.getByText("layout-readiness-target"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "/words/word-center/wizard/meanings"
       )
     );
   });
@@ -348,19 +363,27 @@ describe("WordCreationWizard", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("/words");
   });
 
-  it.each([
-    ["/words/word-center/wizard/not-a-step", "meanings"],
-    ["/words/word-center/wizard/preview", "forms"]
-  ])("不可达路径 %s 归一到 %s", async (path, reachable) => {
-    loaded(
-      wordFixture({ max_reachable_step: reachable as "forms" | "meanings" })
-    );
-    renderWizard("resume", path);
+  it("非法 step 名归一到 max_reachable_step", async () => {
+    loaded(wordFixture({ max_reachable_step: "meanings" }));
+    renderWizard("resume", "/words/word-center/wizard/not-a-step");
 
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
-        `/words/word-center/wizard/${reachable}`
+        "/words/word-center/wizard/meanings"
       )
+    );
+  });
+
+  it("越过当前进度的 URL 不再被弹回，直接停在目标步骤", async () => {
+    // 进度只到 forms，地址栏直接输 preview：门禁取消后不再重定向。
+    loaded(wordFixture({ max_reachable_step: "forms" }));
+    renderWizard("resume", "/words/word-center/wizard/preview");
+
+    expect(
+      await screen.findByText("preview-step-draft-readonly-false")
+    ).toBeVisible();
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/words/word-center/wizard/preview"
     );
   });
 
@@ -419,17 +442,14 @@ describe("WordCreationWizard", () => {
     );
   });
 
-  it("stepper 只允许进入 max_reachable_step 以内步骤", async () => {
-    loaded(wordFixture({ max_reachable_step: "meanings", revision: 5 }));
+  it("stepper 可直接进入尚未完成的步骤", async () => {
+    // 只完成第 1 步的草稿：meanings 与 preview 都越过当前进度。
+    loaded(wordFixture({ max_reachable_step: "forms", revision: 5 }));
     renderWizard("resume", "/words/word-center/wizard/forms");
     expect(
       await screen.findByText("forms-step-revision-5-readonly-false")
     ).toBeVisible();
 
-    fireEvent.click(screen.getByText("layout-preview"));
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "/words/word-center/wizard/forms"
-    );
     fireEvent.click(screen.getByText("layout-meanings"));
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
@@ -437,6 +457,14 @@ describe("WordCreationWizard", () => {
       )
     );
     expect(screen.getByText("meanings-step-revision-5")).toBeVisible();
+
+    fireEvent.click(screen.getByText("layout-preview"));
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "/words/word-center/wizard/preview"
+      )
+    );
+    expect(screen.getByText("preview-step-draft-readonly-false")).toBeVisible();
   });
 
   it("较旧 detail 响应不会覆盖已加载的更高 revision", async () => {
