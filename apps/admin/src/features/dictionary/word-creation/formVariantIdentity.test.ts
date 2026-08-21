@@ -1,4 +1,8 @@
-import type { DraftFormsStepContent, WordFormVariantV2 } from "@tsz/types";
+import type {
+  DraftFormsStepContent,
+  RetiredStableSlotV2,
+  WordFormVariantV2
+} from "@tsz/types";
 import { describe, expect, it } from "vitest";
 import {
   applyFormVariantIdentities,
@@ -198,6 +202,20 @@ describe("rememberRetiredStableSlots", () => {
       content([variant("freshly-minted", "common")])
     );
     expect(merged.pos[0]!.base_form.variants[0]!.id).toBe("retired-common");
+  });
+
+  it("退役清单缺失时退化成「不知道任何退役身份」，不抛错", () => {
+    // 契约上恒在，但它只是恢复辅助信息：拿不到时不该让整个向导渲染不出来。
+    const ledger = createFormVariantIdentityLedger();
+    expect(() =>
+      rememberRetiredStableSlots(
+        ledger,
+        undefined as unknown as RetiredStableSlotV2[]
+      )
+    ).not.toThrow();
+
+    const next = content([variant("minted", "common")]);
+    expect(applyFormVariantIdentities(ledger, next)).toBe(next);
   });
 
   it("只认词形变体角色，其他稳定槽位不进本账本", () => {

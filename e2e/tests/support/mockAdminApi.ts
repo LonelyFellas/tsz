@@ -1082,7 +1082,11 @@ export async function mockAdminApi(
       path === `${ADMIN_E2E_ENTRIES_PATH}/${ADMIN_E2E_WORD_ID}`
     ) {
       return word
-        ? json(route, 200, { word: clone(word) })
+        ? json(route, 200, {
+            word: clone(word),
+            // 契约要求恒在：编辑器靠它找回已退役的稳定槽位身份。
+            retired_stable_slots: []
+          })
         : json(route, 404, { error: "word not found" });
     }
     if (

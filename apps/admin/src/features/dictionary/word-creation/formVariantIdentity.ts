@@ -87,11 +87,16 @@ const FORM_VARIANT_ROLE_PREFIX = "forms.form_variant:";
  * 只认词形变体那部分角色；其余稳定槽位（释义、例句文本等）不归本账本管。
  * 已登记的键不覆盖——账本里的来源要么同样是服务端身份，要么是本次会话刚退役的，
  * 两者一致。
+ *
+ * 契约上这个数组恒在，但这里仍然容忍缺失：它只是身份恢复的辅助信息，拿不到时
+ * 退化成「不知道任何退役身份」（即后端补上读取渠道之前的行为），不该让整个
+ * 创建向导渲染不出来、连编辑都进不去。
  */
 export function rememberRetiredStableSlots(
   ledger: FormVariantIdentityLedger,
-  slots: readonly RetiredStableSlotV2[]
+  slots: readonly RetiredStableSlotV2[] | undefined
 ): void {
+  if (!Array.isArray(slots)) return;
   for (const slot of slots) {
     if (!slot.node_role.startsWith(FORM_VARIANT_ROLE_PREFIX)) continue;
     const dialect = slot.node_role.slice(FORM_VARIANT_ROLE_PREFIX.length);
