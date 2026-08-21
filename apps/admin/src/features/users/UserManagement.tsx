@@ -1,6 +1,7 @@
-// 用户管理（C 端用户，师生合一）：角色 tab + 搜索行 + 表格 + 详情。列表查询对接真实
-// api.users.list；编辑/启禁用/删除的后端接口尚未实现，操作按钮统一占位置灰。
-// 等级/天生币余额两列后端暂不填充（恒显示「-」）。
+// 用户管理（C 端用户，师生合一）：角色 tab + 搜索行 + 表格 + 详情 + 行操作。
+// 列表 / 编辑昵称 / 启禁用 均已对接真实接口；后两者后端限 super_admin，非超管整行置灰
+//（403 仍会在这里落成中文提示，前端门禁不是唯一防线）。删除后端无接口，恒置灰。
+// 等级/天生币余额两列后端不返回（恒显示「-」）。
 // 天生币/等级/方言管理是独立模块，本次仅占位（点击提示「功能待接入」）。
 import {
   Alert,
@@ -23,8 +24,15 @@ import { useState } from "react";
 import type { AdminUserView, Role } from "@tsz/types";
 import { CopyableText } from "@/components/CopyableText";
 import { GatedButton } from "@/components/GatedButton";
-import { useUserList } from "./api";
-import { ROLE_LABEL, ROLE_TAG_COLOR, levelColor } from "./labels";
+import { useIsSuperAdmin } from "@/lib/auth";
+import { useSetUserStatus, useUserList } from "./api";
+import { EditUserModal } from "./EditUserModal";
+import {
+  ROLE_LABEL,
+  ROLE_TAG_COLOR,
+  levelColor,
+  userActionError
+} from "./labels";
 import type { UserFilterValues, UserRoleTab } from "./listQuery";
 import { UserDetailDrawer } from "./UserDetailDrawer";
 import { UserFilters } from "./UserFilters";
@@ -36,15 +44,19 @@ const ROLE_TABS = [
 ];
 
 export function UserManagement() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
+  // 编辑 / 启禁用后端限 super_admin：普通 admin 整行置灰，不让点了才吃 403。
+  const isSuperAdmin = useIsSuperAdmin();
 
   const [filters, setFilters] = useState<UserFilterValues>({});
   const [role, setRole] = useState<UserRoleTab>("all");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [detailUser, setDetailUser] = useState<AdminUserView | null>(null);
+  const [editingUser, setEditingUser] = useState<AdminUserView | null>(null);
 
   const listQuery = useUserList({ filters, role, page, pageSize });
+  const setStatus = useSetUserStatus();
 
   const rows = listQuery.data?.items ?? [];
   const total = listQuery.data?.page.total ?? 0;
@@ -63,6 +75,32 @@ export function UserManagement() {
   // TODO(backend): 见 backend-todos.md #6。
   const notReady = (label: string) =>
     message.info(`${label}功能待接入，接口开发中`);
+
+  // 启禁用是有后果的动作，二次确认。禁用不即时踢线（后端接受一个 access-token TTL
+  // 的延迟），文案据实说明，别承诺「立即下线」。
+  const confirmToggleStatus = (record: AdminUserView) => {
+    const next = record.status === "active" ? "disabled" : "active";
+    const verb = next === "disabled" ? "禁用" : "启用";
+    modal.confirm({
+      title: `${verb}用户「${record.display_name}」`,
+      content:
+        next === "disabled"
+          ? "禁用后该用户无法再登录；已登录的会话不会立即断开，最长在一个访问令牌有效期内失效。确认禁用？"
+          : "启用后该用户可以重新登录。确认启用？",
+      okText: verb,
+      okButtonProps: { danger: next === "disabled" },
+      cancelText: "取消",
+      onOk: () =>
+        setStatus
+          .mutateAsync({ id: record.id, status: next })
+          .then(() =>
+            message.success(next === "disabled" ? "已禁用" : "已启用")
+          )
+          .catch((err: unknown) =>
+            message.error(userActionError(err, "操作失败"))
+          )
+    });
+  };
 
   const columns: TableColumnsType<AdminUserView> = [
     {
@@ -181,16 +219,23 @@ export function UserManagement() {
           <GatedButton
             type="link"
             size="small"
-            reason="编辑接口待后端实现"
-            disabled
+            reason="需超级管理员权限"
+            disabled={!isSuperAdmin}
+            onClick={() => setEditingUser(record)}
           >
             编辑
           </GatedButton>
           <GatedButton
             type="link"
             size="small"
-            reason="启禁用接口待后端实现"
-            disabled
+            // 禁用是破坏性动作，置红警示；启用是恢复性动作，保持常规蓝。
+            danger={record.status === "active"}
+            reason="需超级管理员权限"
+            disabled={!isSuperAdmin}
+            loading={
+              setStatus.isPending && setStatus.variables?.id === record.id
+            }
+            onClick={() => confirmToggleStatus(record)}
           >
             {record.status === "active" ? "禁用" : "启用"}
           </GatedButton>
@@ -261,6 +306,7 @@ export function UserManagement() {
       </Card>
 
       <UserDetailDrawer user={detailUser} onClose={() => setDetailUser(null)} />
+      <EditUserModal user={editingUser} onClose={() => setEditingUser(null)} />
     </Flex>
   );
 }
