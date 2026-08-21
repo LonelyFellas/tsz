@@ -1,16 +1,17 @@
 import {
+  DisconnectOutlined,
   DownOutlined,
   LockOutlined,
   LogoutOutlined,
   SettingOutlined
 } from "@ant-design/icons";
-import { Button, Divider, Popover, Space, Typography } from "antd";
+import { App, Button, Divider, Popover, Space, Typography } from "antd";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ADMIN_LEVEL_LABEL } from "@/features/admins/labels";
 import { useAuthStore } from "@/lib/auth";
 import { AdminAvatar } from "./adminAvatar";
-import { useAdminLogout } from "./useAdminLogout";
+import { useAdminLogout, useAdminLogoutAll } from "./useAdminLogout";
 
 /**
  * 后台顶栏内容：把身份与账户操作收进头像 Popover——顶栏只留一个头像，
@@ -19,8 +20,10 @@ import { useAdminLogout } from "./useAdminLogout";
  * 守卫保证进到这里时 profile 必有值，无需再单独探一次 /admin/profile。
  */
 export function AdminHeader() {
+  const { modal } = App.useApp();
   const profile = useAuthStore((s) => s.profile);
   const logout = useAdminLogout();
+  const logoutAll = useAdminLogoutAll();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
@@ -40,6 +43,19 @@ export function AdminHeader() {
   const doLogout = () => {
     setOpen(false);
     void logout();
+  };
+  // 「退出所有设备」会把当前这台一起踢下线，误点代价高：二次确认。
+  const doLogoutAll = () => {
+    setOpen(false);
+    modal.confirm({
+      title: "退出所有设备",
+      content:
+        "将吊销你在全部设备上的登录会话，包括当前这台——确认后需要重新登录。确认退出？",
+      okText: "全部退出",
+      okButtonProps: { danger: true },
+      cancelText: "取消",
+      onOk: () => logoutAll()
+    });
   };
 
   const menu = (
@@ -91,6 +107,16 @@ export function AdminHeader() {
           onClick={doLogout}
         >
           退出登录
+        </Button>
+        <Button
+          type="text"
+          block
+          danger
+          icon={<DisconnectOutlined />}
+          style={{ justifyContent: "flex-start" }}
+          onClick={doLogoutAll}
+        >
+          退出所有设备
         </Button>
       </div>
     </div>
