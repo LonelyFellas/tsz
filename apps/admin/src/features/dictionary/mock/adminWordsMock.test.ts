@@ -301,6 +301,95 @@ describe("admin words mock", () => {
     mock = mockFor();
   });
 
+  it("稳定槽位身份永久绑定：退役的 common 只能沿用原 ID 复活", async () => {
+    // 与后端 lexicon.nodes 的唯一索引同口径。mock 不实现这条的话，
+    // 英美拆分再合并会本地全绿、真机 422。
+    const draft = await createDetectedWord(
+      mock,
+      "deployability",
+      "retire-slots"
+    );
+    const unified = withCompletePronunciations(draft.word.forms);
+    const baseSlotId = unified.pos[0]!.base_form.id;
+    const originalCommonId = unified.pos[0]!.base_form.variants[0]!.id;
+
+    const saved = await mock.saveFormsStep(draft.word.id, {
+      base_revision: draft.word.revision,
+      operation_id: "retire-slots-unified",
+      intent: "save",
+      content: unified
+    });
+
+    // 拆成英美两条：common 退役。
+    const split = structuredClone(unified);
+    split.pos[0]!.dialect_rules = {
+      spelling_mode: "distinguish",
+      phonetic_mode: "distinguish"
+    };
+    split.pos[0]!.base_form.variants = (["uk", "us"] as const).map(
+      (dialect) => ({
+        ...structuredClone(unified.pos[0]!.base_form.variants[0]!),
+        id: `${dialect}-variant`,
+        dialect,
+        pronunciations: [
+          {
+            id: `${dialect}-pronunciation`,
+            dict_phonetic: "x",
+            actual_pron: "x",
+            style: "normal" as const
+          }
+        ]
+      })
+    );
+    const splitSaved = await mock.saveFormsStep(draft.word.id, {
+      base_revision: saved.word.revision,
+      operation_id: "retire-slots-split",
+      intent: "save",
+      content: split
+    });
+
+    expect((await mock.get(draft.word.id)).retired_stable_slots).toEqual([
+      {
+        id: originalCommonId,
+        parent_node_id: baseSlotId,
+        node_role: "forms.form_variant:common"
+      }
+    ]);
+
+    // 合并回共用时换新 ID 会被拒。
+    const mergedWithNewId = structuredClone(unified);
+    mergedWithNewId.pos[0]!.base_form.variants[0]!.id = "brand-new-common";
+    await expect(
+      mock.saveFormsStep(draft.word.id, {
+        base_revision: splitSaved.word.revision,
+        operation_id: "retire-slots-merge-new-id",
+        intent: "save",
+        content: mergedWithNewId
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      field_issues: [
+        expect.objectContaining({ code: "stable_node_id_changed" })
+      ]
+    });
+
+    // 沿用退役身份就能复活，uk / us 转为退役。
+    const revived = await mock.saveFormsStep(draft.word.id, {
+      base_revision: splitSaved.word.revision,
+      operation_id: "retire-slots-merge-original-id",
+      intent: "save",
+      content: unified
+    });
+    expect(revived.word.forms.pos[0]!.base_form.variants[0]!.id).toBe(
+      originalCommonId
+    );
+    expect(
+      (await mock.get(draft.word.id)).retired_stable_slots.map(
+        (slot) => slot.node_role
+      )
+    ).toEqual(["forms.form_variant:uk", "forms.form_variant:us"]);
+  });
+
   it("补全旧空草稿时创建默认语义区间并改绑全部词义", async () => {
     const draft = await createCenter(mock, "complete-empty-sense-groups");
     const legacyEmpty = structuredClone(draft.word.meanings);
@@ -2696,7 +2785,10 @@ describe("admin words mock", () => {
       mock.publishV2(meanings.word.id, publishInput)
     ).resolves.toEqual(published);
     expect((await mock.stats()).total).toBe(1);
-    await expect(mock.get(published.word.id)).resolves.toEqual(published);
+    await expect(mock.get(published.word.id)).resolves.toEqual({
+      ...published,
+      retired_stable_slots: []
+    });
     const page = await mock.list({ q: "center" });
     expect(page.words).toEqual([
       expect.objectContaining({
@@ -3083,7 +3175,10 @@ describe("admin words mock", () => {
     const first = mockFor(() => profile(), storage);
     const created = await createCenter(first, "persisted-draft");
     const refreshed = mockFor(() => profile(), storage);
-    await expect(refreshed.get(created.word.id)).resolves.toEqual(created);
+    await expect(refreshed.get(created.word.id)).resolves.toEqual({
+      ...created,
+      retired_stable_slots: []
+    });
 
     first.clearSession();
     const afterLogout = mockFor(() => profile(), storage);
@@ -3485,6 +3580,62 @@ describe("part-of-speech settings mock", () => {
 });
 
 describe("surface warning mock", () => {
+  it("把 schema 10 fixture 升级到 11 时不清空 v10 已有的字段", async () => {
+    // legacySchemaVersions 加了 10 之后，v10 状态会走 migrateLegacy；
+    // 默认值若放在 spread 之后会把 v10 本来就有值的两个字段一并清空。
+    const storage = memoryStorage();
+    const initial = mockFor(() => profile(), storage);
+    const created = await createDetectedWord(
+      initial,
+      "workspace",
+      "workspace-before-v10-upgrade"
+    );
+    const currentKey = adminWordsMockStorageKey(
+      ADMIN_WORDS_MOCK_STORAGE_SCHEMA,
+      "admin-test"
+    );
+    const legacyKey = adminWordsMockStorageKey(10, "admin-test");
+    const envelope = JSON.parse(storage.values.get(currentKey)!) as {
+      schema_version: number;
+      state: Record<string, unknown>;
+    };
+    envelope.schema_version = 10;
+    // v10 的形状：没有 retired_stable_slots，但另两个字段有真实值。
+    delete envelope.state.retired_stable_slots;
+    envelope.state.consumed_detection_ids = ["detection-already-consumed"];
+    envelope.state.forms_surface_evidence = {
+      "evidence-key": {
+        content_json: "{}",
+        match_ids: ["match-1"],
+        confirmed_revision: 1
+      }
+    };
+    storage.values.delete(currentKey);
+    storage.values.set(legacyKey, JSON.stringify(envelope));
+
+    const upgraded = surfaceMockWithStorage(storage);
+    await expect(upgraded.get(created.word.id)).resolves.toEqual({
+      ...created,
+      retired_stable_slots: []
+    });
+
+    const migrated = JSON.parse(storage.values.get(currentKey)!) as {
+      state: Record<string, unknown>;
+    };
+    expect(migrated.state.consumed_detection_ids).toEqual([
+      "detection-already-consumed"
+    ]);
+    expect(migrated.state.forms_surface_evidence).toEqual({
+      "evidence-key": {
+        content_json: "{}",
+        match_ids: ["match-1"],
+        confirmed_revision: 1
+      }
+    });
+    expect(migrated.state.retired_stable_slots).toEqual({});
+    expect(storage.values.has(legacyKey)).toBe(false);
+  });
+
   it("把 schema 8 fixture 升级到 9 并保留旧词条", async () => {
     const storage = memoryStorage();
     const initial = mockFor(() => profile(), storage);
@@ -3509,7 +3660,10 @@ describe("surface warning mock", () => {
     storage.values.set(legacyKey, JSON.stringify(envelope));
 
     const upgraded = surfaceMockWithStorage(storage);
-    await expect(upgraded.get(created.word.id)).resolves.toEqual(created);
+    await expect(upgraded.get(created.word.id)).resolves.toEqual({
+      ...created,
+      retired_stable_slots: []
+    });
     expect(storage.values.has(legacyKey)).toBe(false);
     expect(storage.values.has(currentKey)).toBe(true);
   });

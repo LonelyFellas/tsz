@@ -1,5 +1,6 @@
 import type {
   DraftFormsStepContent,
+  RetiredStableSlotV2,
   WordDerivedFormSlotV2,
   WordFormVariantV2,
   WordPosFormsV2
@@ -13,12 +14,8 @@ import type {
  * 绑定。英美拆分会让 `common` 变体暂时从表单里消失，合并回来时若重新生成 ID，
  * 提交会被判 `stable_node_id_changed`，整步都进不去。
  *
- * 账本记下每个槽位出现过的方言节点，槽位重新出现时沿用最初的 ID。
- *
- * 边界：账本只活在当前向导实例里。若在拆分状态下保存后刷新页面（或换设备），
- * 已退役的 `common` 节点 ID 既不在草稿响应里、也不在账本里，合并回共用仍会被
- * 判 `stable_node_id_changed`。要彻底收口需要后端在草稿响应里暴露已退役的稳定
- * 槽位身份，见 tsz-rust `docs/frontend-integration.md` §10.3。
+ * 账本记下每个槽位出现过的方言节点，槽位重新出现时沿用最初的 ID。刷新或换设备后
+ * 账本是空的，靠草稿响应的 `retired_stable_slots` 把退役身份补回来。
  */
 export type FormVariantIdentityLedger = Map<string, string>;
 
@@ -79,4 +76,31 @@ export function applyFormVariantIdentities(
     return { ...item, base_form: baseForm, form_groups: formGroups };
   });
   return changed ? { pos } : content;
+}
+
+/** 词形变体节点角色的前缀，冒号之后是方言。 */
+const FORM_VARIANT_ROLE_PREFIX = "forms.form_variant:";
+
+/**
+ * 把草稿响应里的退役稳定槽位登记进账本。
+ *
+ * 只认词形变体那部分角色；其余稳定槽位（释义、例句文本等）不归本账本管。
+ * 已登记的键不覆盖——账本里的来源要么同样是服务端身份，要么是本次会话刚退役的，
+ * 两者一致。
+ *
+ * 契约上这个数组恒在，但这里仍然容忍缺失：它只是身份恢复的辅助信息，拿不到时
+ * 退化成「不知道任何退役身份」（即后端补上读取渠道之前的行为），不该让整个
+ * 创建向导渲染不出来、连编辑都进不去。
+ */
+export function rememberRetiredStableSlots(
+  ledger: FormVariantIdentityLedger,
+  slots: readonly RetiredStableSlotV2[] | undefined
+): void {
+  if (!Array.isArray(slots)) return;
+  for (const slot of slots) {
+    if (!slot.node_role.startsWith(FORM_VARIANT_ROLE_PREFIX)) continue;
+    const dialect = slot.node_role.slice(FORM_VARIANT_ROLE_PREFIX.length);
+    const key = `${slot.parent_node_id}:${dialect}`;
+    if (!ledger.has(key)) ledger.set(key, slot.id);
+  }
 }

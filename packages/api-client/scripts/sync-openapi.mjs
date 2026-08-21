@@ -86,6 +86,8 @@ const contractSchemaNames = [
   "FormsImpactItemV2",
   "FormsImpactNodeType",
   "FormsImpactResponseV2",
+  "RetiredStableSlotV2",
+  "AdminWordDraftV2Envelope",
   "AdminWordListItem",
   "EntryLifecycleInput",
   "EntryLifecycleTarget",

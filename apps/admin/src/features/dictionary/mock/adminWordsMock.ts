@@ -6,6 +6,8 @@ import type {
   AdminWordListResponse,
   AdminWordStats,
   AdminWordV2,
+  AdminWordDraftV2Envelope,
+  RetiredStableSlotV2,
   AdminWordV2Envelope,
   CreatePartOfSpeechInput,
   CreateSubPartOfSpeechInput,
@@ -130,6 +132,8 @@ export interface AdminWordsMockPersistedState {
   parts_of_speech: Record<string, PartOfSpeechConfig>;
   sub_parts: Record<string, SubPartOfSpeechConfig>;
   words: Record<string, MockWord>;
+  /** 词条 -> 已退役但仍被永久占用的稳定槽位身份，与后端 lexicon.nodes 同口径。 */
+  retired_stable_slots: Record<string, RetiredStableSlotV2[]>;
   detections: Record<string, DetectWordResponseV2>;
   create_idempotency: Record<string, MockWordOperationRecord>;
   operations: Record<string, MockOperationRecord>;
@@ -281,6 +285,18 @@ export function isAdminWordsMockPersistedState(
     !Object.values(value.sub_parts).every(isSubPartOfSpeechConfig) ||
     !isRecord(value.words) ||
     !Object.values(value.words).every(isMockWord) ||
+    !isRecord(value.retired_stable_slots) ||
+    !Object.values(value.retired_stable_slots).every(
+      (entry) =>
+        Array.isArray(entry) &&
+        entry.every(
+          (slot) =>
+            isRecord(slot) &&
+            typeof slot.id === "string" &&
+            typeof slot.parent_node_id === "string" &&
+            typeof slot.node_role === "string"
+        )
+    ) ||
     !isRecord(value.detections) ||
     !Object.values(value.detections).every(
       (entry) =>
@@ -387,6 +403,7 @@ function makeInitialState(nowIso: string): AdminWordsMockPersistedState {
     ),
     sub_parts: Object.fromEntries(seed.subParts.map((item) => [item.id, item])),
     words: {},
+    retired_stable_slots: {},
     detections: {},
     create_idempotency: {},
     operations: {},
@@ -481,6 +498,32 @@ function dateParts(value: string | Date): { day: string; month: string } {
 }
 
 type MatchedDialect = "common" | "uk" | "us";
+
+/**
+ * 词形变体的稳定槽位身份，键是 (父槽位, 角色)，方言编在角色里 ——
+ * 与后端 `forms.form_variant:<dialect>` 同口径。
+ *
+ * 这个键一旦保存过就永久绑定同一个节点 ID：mock 也必须照此校验，
+ * 否则本地永远绿、真机 422。
+ */
+function formVariantStableSlots(
+  content: DraftFormsStepContent
+): RetiredStableSlotV2[] {
+  return content.pos.flatMap((pos) =>
+    [pos.base_form, ...pos.form_groups.flatMap((group) => group.slots)].flatMap(
+      (slot) =>
+        slot.variants.map((variant) => ({
+          id: variant.id,
+          parent_node_id: slot.id,
+          node_role: `forms.form_variant:${variant.dialect}`
+        }))
+    )
+  );
+}
+
+function stableSlotKey(slot: RetiredStableSlotV2): string {
+  return `${slot.parent_node_id}:${slot.node_role}`;
+}
 
 function sourceHeadword(headwords: WordHeadwordsV2): string {
   return headwords.mode === "unified"
@@ -1463,14 +1506,21 @@ export function createAdminWordsMock({
           ? undefined
           : globalThis.sessionStorage),
       schemaVersion: ADMIN_WORDS_MOCK_STORAGE_SCHEMA,
-      legacySchemaVersions: [8],
+      // 10 -> 11 只是新增 retired_stable_slots，migrateLegacy 会补空对象，
+      // 没必要让正在用 mock 的人丢掉本地已录的词条。
+      legacySchemaVersions: [8, 10],
       isState: isAdminWordsMockPersistedState,
       migrateLegacy: (legacyState) => {
         if (!isRecord(legacyState)) return undefined;
+        // 默认值放在 spread 之前：只补旧版本缺的字段，已有值一律保留。
+        // v8 三个字段都不存在，补空正确；v10 只缺 retired_stable_slots，
+        // 若反过来无条件覆盖会把它已有的 consumed_detection_ids
+        // 与 forms_surface_evidence 一并清空。
         const migrated = {
-          ...legacyState,
+          retired_stable_slots: {},
           consumed_detection_ids: [],
-          forms_surface_evidence: {}
+          forms_surface_evidence: {},
+          ...legacyState
         };
         return isAdminWordsMockPersistedState(migrated)
           ? clone(migrated)
@@ -3331,11 +3381,14 @@ export function createAdminWordsMock({
     return response;
   }
 
-  async function get(wordId: string): Promise<AdminWordV2Envelope> {
+  async function get(wordId: string): Promise<AdminWordDraftV2Envelope> {
     await pause();
     const { state: current } = context();
     const word = requireWord(current, wordId);
-    return { word: clone(word) };
+    return {
+      word: clone(word),
+      retired_stable_slots: clone(current.retired_stable_slots[wordId] ?? [])
+    };
   }
 
   async function previewFormsImpact(
@@ -3552,6 +3605,47 @@ export function createAdminWordsMock({
         }
       );
     }
+    // 稳定槽位身份：(父槽位, 方言) 一经保存就永久绑定同一个节点 ID，
+    // 退役节点也照样占着槽位。真实后端在 lexicon.nodes 上是唯一索引，这里同口径校验。
+    const retiredSlots = current.retired_stable_slots[word.id] ?? [];
+    const proposedSlots = formVariantStableSlots(input.content);
+    const boundSlots = new Map(
+      [...formVariantStableSlots(word.forms), ...retiredSlots].map((slot) => [
+        stableSlotKey(slot),
+        slot
+      ])
+    );
+    const identityIssues = proposedSlots
+      .filter((slot) => {
+        const bound = boundSlots.get(stableSlotKey(slot));
+        return bound !== undefined && bound.id !== slot.id;
+      })
+      .map((slot) => ({
+        step: "forms" as const,
+        node_id: slot.id,
+        field: "id",
+        code: "stable_node_id_changed",
+        message: "已有内容槽位必须保留原节点 ID"
+      }));
+    if (identityIssues.length > 0) {
+      throw new HttpError(
+        422,
+        "draft validation failed",
+        [],
+        "validation_failed",
+        identityIssues,
+        {
+          word_id: word.id,
+          current_revision: word.revision,
+          max_reachable_step: word.max_reachable_step
+        }
+      );
+    }
+    const liveSlotKeys = new Set(proposedSlots.map(stableSlotKey));
+    current.retired_stable_slots[word.id] = [...boundSlots.values()]
+      .filter((slot) => !liveSlotKeys.has(stableSlotKey(slot)))
+      .sort((a, b) => stableSlotKey(a).localeCompare(stableSlotKey(b)));
+
     const priorCompleted = new Set(word.completed_steps);
     word.forms = clone(input.content);
     if (word.meanings.sense_groups.length === 0) {
@@ -4147,6 +4241,7 @@ export function createAdminWordsMock({
       );
     }
     delete current.words[wordId];
+    delete current.retired_stable_slots[wordId];
     persist(current);
   }
 

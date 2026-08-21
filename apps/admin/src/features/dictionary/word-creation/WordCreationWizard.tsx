@@ -44,7 +44,10 @@ import {
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { CreateEntryStep } from "./CreateEntryStep";
 import { FormsAndPronunciationStep } from "./FormsAndPronunciationStep";
-import { createFormVariantIdentityLedger } from "./formVariantIdentity";
+import {
+  createFormVariantIdentityLedger,
+  rememberRetiredStableSlots
+} from "./formVariantIdentity";
 import { MeaningsAndExamplesStep } from "./MeaningsAndExamplesStep";
 import { PreviewAndPublishStep } from "./PreviewAndPublishStep";
 import { WordCreationLayout } from "./WordCreationLayout";
@@ -338,8 +341,12 @@ export function WordCreationWizard({ mode }: Props) {
       : undefined;
 
   useEffect(() => {
-    const loaded = detail.data?.word;
-    if (!loaded) return;
+    const draft = detail.data;
+    const loaded = draft?.word;
+    if (!draft || !loaded) return;
+    // 刷新或换设备后账本是空的：退役身份只有草稿响应带得回来，必须在任何一步
+    // 开始编辑之前先补进账本，否则合并回共用会重新铸 ID 而被判身份换槽位。
+    rememberRetiredStableSlots(identityLedger, draft.retired_stable_slots);
     setWord((current) =>
       !current ||
       loaded.revision > current.revision ||
@@ -348,7 +355,7 @@ export function WordCreationWizard({ mode }: Props) {
         ? loaded
         : current
     );
-  }, [detail.data, navigate]);
+  }, [detail.data, identityLedger, navigate]);
 
   useEffect(() => {
     setDraftForms(undefined);
