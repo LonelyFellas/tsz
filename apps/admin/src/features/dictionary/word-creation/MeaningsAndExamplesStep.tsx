@@ -89,6 +89,7 @@ import {
   stepContentBodyIssue
 } from "./contentLimits";
 import { ContentCompletionPanel } from "./ContentCompletionPanel";
+import { wordValidationIssueMessage } from "./nodeIssueMessage";
 import {
   PronunciationPreviewControls,
   PronunciationPreviewProvider
@@ -2060,10 +2061,14 @@ export function MeaningsAndExamplesStep({
         const stepIssues = error.field_issues.filter(
           (candidate) => candidate.step === "meanings"
         );
-        setValidationMessages(stepIssues.map((issue) => issue.message));
+        // 后端 message 面向实现，节点身份类问题按 node_location 改写成带定位的中文文案。
+        const messages = stepIssues.map((candidate) =>
+          wordValidationIssueMessage(candidate, partOfSpeechLookup)
+        );
+        setValidationMessages(messages);
         const issue = stepIssues[0];
         if (issue) {
-          message.warning(issue.message);
+          message.warning(messages[0]!);
           navigate(`/words/${word.id}/wizard/meanings${editQuery}`, {
             replace: true,
             state: { nodeId: issue.node_id, field: issue.field }

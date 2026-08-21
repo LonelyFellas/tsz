@@ -1537,6 +1537,49 @@ describe("FormsAndPronunciationStep", () => {
     expect(document.querySelector(".ant-alert-error")).toBeNull();
   });
 
+  it("节点身份类 field issue 按 node_location 拼成可定位的中文提示", async () => {
+    // 2026-08-20 测试报告：两条 stable_node_id_changed 只显示两遍「已有内容槽位
+    // 必须保留原节点 ID」，既看不出是哪个词形，也不知道该怎么办。
+    const identityIssue = (dialect: "uk" | "us") => ({
+      step: "forms" as const,
+      node_id: `suggested-verb-slot-1-${dialect}`,
+      field: "id",
+      code: "stable_node_id_changed",
+      message: "已有内容槽位必须保留原节点 ID",
+      node_location: {
+        node_role: `forms.form_variant:${dialect}`,
+        ancestor_node_ids: ["pos-verb", "group-1", "suggested-verb-slot-1"],
+        pos: "verb",
+        pos_id: "pos-verb",
+        form_group_index: 0,
+        form_type: "third_person_singular" as const,
+        dialect
+      }
+    });
+    mutations.save.mockRejectedValue(
+      new HttpError(422, "draft validation failed", [], "validation_failed", [
+        identityIssue("uk"),
+        identityIssue("us")
+      ])
+    );
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    expect(
+      (await screen.findAllByText(/动词 · 第 1 组 · 第三人称单数 · 英式：/))
+        .length
+    ).toBeGreaterThan(0);
+    // 两条问题落在不同方言侧，展示文案必须互不相同（原先是两遍同一句内部规则）。
+    const listed = Array.from(
+      document.querySelectorAll(".ant-alert-error li")
+    ).map((item) => item.textContent);
+    expect(listed).toHaveLength(2);
+    expect(new Set(listed).size).toBe(2);
+    expect(listed[1]).toMatch(/^动词 · 第 1 组 · 第三人称单数 · 美式：/);
+    expect(screen.queryByText(/已有内容槽位必须保留原节点 ID/)).toBeNull();
+  });
+
   it("readiness 读音目标聚焦到真实的首个无效叶字段", async () => {
     const word = wordFixture({ ready: true });
     const pronunciation =

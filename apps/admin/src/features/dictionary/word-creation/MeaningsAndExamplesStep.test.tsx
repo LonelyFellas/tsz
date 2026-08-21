@@ -1708,6 +1708,41 @@ describe("MeaningsAndExamplesStep", () => {
     });
   });
 
+  it("节点身份类 field issue 按 node_location 拼成可定位的中文提示", async () => {
+    mutations.save.mockRejectedValue(
+      new HttpError(422, "draft validation failed", [], "validation_failed", [
+        {
+          step: "meanings" as const,
+          node_id: "mock-sentence-1-zh",
+          field: "id",
+          code: "node_binding_changed",
+          message: "节点 ID 不能更换父节点或内容槽位",
+          node_location: {
+            node_role: "meanings.zh_text:zh:common",
+            ancestor_node_ids: [
+              "mock-pos-1",
+              "mock-sense-1",
+              "mock-sentence-1"
+            ],
+            pos: "noun",
+            pos_id: "mock-pos-1",
+            dialect: "common" as const
+          }
+        }
+      ])
+    );
+    renderStep();
+
+    fireEvent.click(button("保存草稿"));
+
+    // 词形之外的节点拿不到词形类型，定位退到词性一级，但仍不暴露内部规则文案。
+    expect(
+      (await screen.findAllByText(/^名词：这处内容被挪到了别的词性或槽位上/))
+        .length
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText(/节点 ID 不能更换父节点或内容槽位/)).toBeNull();
+  });
+
   it("空语义区间定位到集合卡片并聚焦添加按钮", async () => {
     const word = wordFixture({ ready: true });
     word.meanings.sense_groups = [];
