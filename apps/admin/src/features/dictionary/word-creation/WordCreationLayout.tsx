@@ -152,21 +152,20 @@ export function WordCreationLayout({
   const navigate = useNavigate();
   const currentIndex = WORD_STEP_ORDER.indexOf(currentStep);
   const isBasicsStep = currentStep === "basics";
-  const maxReachableIndex = word
-    ? WORD_STEP_ORDER.indexOf(word.max_reachable_step)
-    : 0;
   const completed = new Set(word?.completed_steps ?? []);
-  const steps = WORD_STEP_ORDER.map((step, index) => ({
+  const steps = WORD_STEP_ORDER.map((step) => ({
     title: WORD_STEP_TITLE[step],
     content: STEP_SUBTITLE[step],
+    // 只认后端记的 completed_steps。原先「排在当前步之前就算完成」是靠顺序门禁
+    // 兜底才成立的；门禁取消后可以越步进入，再用位置推断会把没做完的步骤画成绿勾。
     status:
       currentStep === step
         ? ("process" as const)
-        : completed.has(step as "basics" | "forms" | "meanings") ||
-            index < currentIndex
+        : completed.has(step as "basics" | "forms" | "meanings")
           ? ("finish" as const)
           : ("wait" as const),
-    disabled: !word || index > maxReachableIndex
+    // 只有「草稿还没创建」才禁用：完成度不再决定导航权限，四步随时可进。
+    disabled: !word
   }));
   const { preference } = useDialectPreference();
   const createTitle =
