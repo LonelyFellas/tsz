@@ -20,7 +20,7 @@
     "test:watch": "vitest",
     "test:node-runtime": "node --test scripts/node-runtime-version.test.mjs",
     "test:coverage-lock": "node --test scripts/coverage-lock.test.mjs",
-    "test:deploy-provenance": "node --test deploy/provenance.test.mjs && bash deploy/deploy-source.test.sh && bash deploy/deploy-smoke.test.sh",
+    "test:deploy-provenance": "node --test deploy/provenance.test.mjs && bash deploy/deploy-source.test.sh && bash deploy/deploy-smoke.test.sh && bash deploy/deploy-boot.test.sh",
     "test:cov": "pnpm check:node && pnpm test:node-runtime && pnpm test:coverage-lock && pnpm test:deploy-provenance && node scripts/run-coverage-locked.mjs",
     "test:e2e": "pnpm --filter @tsz/e2e test:e2e",
     "test:e2e:admin": "pnpm --filter @tsz/e2e test:e2e:admin",
