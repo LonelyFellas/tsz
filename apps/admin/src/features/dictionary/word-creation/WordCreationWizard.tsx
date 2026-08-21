@@ -44,6 +44,7 @@ import {
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { CreateEntryStep } from "./CreateEntryStep";
 import { FormsAndPronunciationStep } from "./FormsAndPronunciationStep";
+import { createFormVariantIdentityLedger } from "./formVariantIdentity";
 import { MeaningsAndExamplesStep } from "./MeaningsAndExamplesStep";
 import { PreviewAndPublishStep } from "./PreviewAndPublishStep";
 import { WordCreationLayout } from "./WordCreationLayout";
@@ -316,6 +317,9 @@ export function WordCreationWizard({ mode }: Props) {
     () => createPartOfSpeechLookup(readinessCatalog.data),
     [readinessCatalog.data]
   );
+  // 词形变体的节点身份账本挂在向导上：步骤组件切走会卸载，账本跟着卸载就会
+  // 丢掉已退役的方言节点 ID，返回词形步再合并英美就会被后端判 ID 换槽位。
+  const identityLedger = useRef(createFormVariantIdentityLedger()).current;
   const restoreWord = useRestoreWord();
   const restoreSurface = useLifecycleSurfaceCommand(wordId);
   const lifecycleCommandPending = useRef(false);
@@ -568,6 +572,7 @@ export function WordCreationWizard({ mode }: Props) {
             readOnly={readOnly}
             onSaved={setWord}
             onDraftChange={updateDraftForms}
+            identityLedger={identityLedger}
           />
         )}
         {currentStep === "meanings" && (
