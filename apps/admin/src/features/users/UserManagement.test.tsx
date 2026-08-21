@@ -1,9 +1,19 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { App as AntApp } from "antd";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HttpError } from "@tsz/api-client";
 import type { AdminUserListQuery, AdminUserView } from "@tsz/types";
+
+// 编辑 / 启禁用按后台身份置灰：逐例可切超管与普通 admin 两种身份。
+const auth = vi.hoisted(() => ({ isSuperAdmin: true }));
 
 vi.mock("@/lib/auth", () => ({
   api: {
@@ -13,7 +23,8 @@ vi.mock("@/lib/auth", () => ({
       setStatus: vi.fn(),
       update: vi.fn()
     }
-  }
+  },
+  useIsSuperAdmin: () => auth.isSuperAdmin
 }));
 
 import { api } from "@/lib/auth";
@@ -24,6 +35,8 @@ import { UserManagement } from "./UserManagement";
 vi.setConfig({ testTimeout: 15000 });
 
 const mockList = vi.mocked(api.users.list);
+const mockSetStatus = vi.mocked(api.users.setStatus);
+const mockUpdate = vi.mocked(api.users.update);
 
 interface Spec {
   id: string;
@@ -109,9 +122,29 @@ function fakeList(query: AdminUserListQuery = {}) {
 }
 
 beforeEach(() => {
+  auth.isSuperAdmin = true;
   users = seed();
   mockList.mockImplementation(async (q) => fakeList(q));
+  // 写操作落回本地数据源：mutation 成功后列表失效重取，能看到状态/昵称真的变了。
+  mockSetStatus.mockReset();
+  mockSetStatus.mockImplementation(async (id, status) => {
+    const row = users.find((u) => u.id === id)!;
+    row.status = status;
+    return row;
+  });
+  mockUpdate.mockReset();
+  mockUpdate.mockImplementation(async (id, input) => {
+    const row = users.find((u) => u.id === id)!;
+    row.display_name = input.display_name;
+    return row;
+  });
 });
+
+/** 点确认弹窗里的主按钮（.ant-modal-confirm-btns 内，按可见文案定位）。 */
+function clickConfirmOk(label: RegExp) {
+  const btns = document.querySelector(".ant-modal-confirm-btns")!;
+  fireEvent.click(within(btns as HTMLElement).getByText(label));
+}
 
 function renderPage() {
   // 关掉 query 重试：错误路径要能立刻看到失败态，而非等重试。
@@ -220,11 +253,83 @@ describe("UserManagement", () => {
     );
   });
 
-  it("编辑和启禁用接口未实现时始终置灰", async () => {
+  it("非超级管理员：编辑与启禁用置灰（写操作后端限超管）", async () => {
+    auth.isSuperAdmin = false;
     renderPage();
     await screen.findByText("record");
-    expect(screen.getAllByText(/编\s?辑/)[0]!.closest("button")).toBeDisabled();
-    expect(screen.getAllByText(/禁\s?用/)[0]!.closest("button")).toBeDisabled();
+    expect(
+      screen.getAllByText(/^编\s?辑$/)[0]!.closest("button")
+    ).toBeDisabled();
+    expect(
+      screen.getAllByText(/^禁\s?用$/)[0]!.closest("button")
+    ).toBeDisabled();
+  });
+
+  it("超级管理员：编辑与启禁用可点", async () => {
+    renderPage();
+    await screen.findByText("record");
+    expect(
+      screen.getAllByText(/^编\s?辑$/)[0]!.closest("button")
+    ).not.toBeDisabled();
+    expect(
+      screen.getAllByText(/^禁\s?用$/)[0]!.closest("button")
+    ).not.toBeDisabled();
+  });
+
+  it("点编辑打开弹窗，改昵称保存成功后列表刷新", async () => {
+    renderPage();
+    await screen.findByText("record");
+    clickRowButton(/^编\s?辑$/);
+    const input = await screen.findByDisplayValue("record");
+    fireEvent.change(input, { target: { value: "记录员" } });
+    fireEvent.click(screen.getByText(/^保\s?存$/));
+    await waitFor(() =>
+      expect(mockUpdate).toHaveBeenCalledWith("1", { display_name: "记录员" })
+    );
+    expect(await screen.findByText("记录员")).toBeInTheDocument();
+  });
+
+  it("禁用：二次确认后调用接口，行状态翻成启用", async () => {
+    renderPage();
+    await screen.findByText("record");
+    clickRowButton(/^禁\s?用$/);
+    // 文案不承诺「立即下线」：禁用有一个 access-token TTL 的延迟。
+    expect(
+      await screen.findByText(/最长在一个访问令牌有效期内失效/)
+    ).toBeInTheDocument();
+    clickConfirmOk(/^禁\s?用$/);
+    await waitFor(() =>
+      expect(mockSetStatus).toHaveBeenCalledWith("1", "disabled")
+    );
+    // 列表失效重取后首行翻成禁用态，行操作按钮变「启用」（aged 那行本就是启用，故 2 个）。
+    await waitFor(() =>
+      expect(screen.getAllByText(/^启\s?用$/)).toHaveLength(2)
+    );
+  });
+
+  it("启用：确认文案与按钮走启用分支", async () => {
+    // aged（第 4 行）初始为 disabled，行操作按钮是「启用」。
+    renderPage();
+    await screen.findByText("aged");
+    clickRowButton(/^启\s?用$/);
+    expect(
+      await screen.findByText("启用后该用户可以重新登录。确认启用？")
+    ).toBeInTheDocument();
+    clickConfirmOk(/^启\s?用$/);
+    await waitFor(() =>
+      expect(mockSetStatus).toHaveBeenCalledWith("4", "active")
+    );
+    expect(await screen.findByText("已启用")).toBeInTheDocument();
+  });
+
+  it("启禁用 403：提示需超级管理员权限（后端是第二道防线）", async () => {
+    mockSetStatus.mockRejectedValue(new HttpError(403, "super admin required"));
+    renderPage();
+    await screen.findByText("record");
+    clickRowButton(/^禁\s?用$/);
+    await screen.findByText(/最长在一个访问令牌有效期内失效/);
+    clickConfirmOk(/^禁\s?用$/);
+    expect(await screen.findByText("需超级管理员权限")).toBeInTheDocument();
   });
 
   it("删除按钮为占位、始终置灰（后端本轮无删除接口）", async () => {
