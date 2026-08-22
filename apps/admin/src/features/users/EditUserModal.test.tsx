@@ -34,14 +34,14 @@ beforeEach(() => {
   }));
 });
 
-function renderModal(onClose = vi.fn()) {
+function renderModal(onClose = vi.fn(), target: AdminUserView | null = user) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   });
   render(
     <QueryClientProvider client={client}>
       <AntApp>
-        <EditUserModal user={user} onClose={onClose} />
+        <EditUserModal user={target} onClose={onClose} />
       </AntApp>
     </QueryClientProvider>
   );
@@ -116,5 +116,11 @@ describe("EditUserModal", () => {
     fireEvent.change(input, { target: { value: "阿强" } });
     fireEvent.click(screen.getByText(/保\s?存/));
     expect(await screen.findByText("保存失败")).toBeInTheDocument();
+  });
+
+  it("没有选中用户时不渲染弹窗，也不去预填昵称", () => {
+    renderModal(vi.fn(), null);
+    expect(screen.queryByText("编辑用户")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("Frank")).not.toBeInTheDocument();
   });
 });

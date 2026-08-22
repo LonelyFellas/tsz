@@ -255,6 +255,73 @@ describe("DeleteAccountForm", () => {
     expect(screen.getByRole("button", { name: "确认永久注销" })).toBeEnabled();
   });
 
+  it("400/422 提示提交内容有误（后端 detail 文案不直接外露）", async () => {
+    requestDeletionCode.mockRejectedValueOnce(new HttpError(422, "bad input"));
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "提交内容有误，请检查后重试"
+    );
+  });
+
+  it("500 提示服务暂时异常", async () => {
+    requestDeletionCode.mockRejectedValueOnce(new HttpError(500, "boom"));
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "服务暂时异常，请稍后重试"
+    );
+  });
+
+  it("其它状态码回落到通用失败文案", async () => {
+    requestDeletionCode.mockRejectedValueOnce(new HttpError(403, "forbidden"));
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "操作失败，请稍后重试"
+    );
+  });
+
+  it("无可用渠道页的返回按钮回到上一页", async () => {
+    seedUser({});
+    render(<DeleteAccountForm />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "返回" }));
+    expect(mockBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("点确认层遮罩关闭弹层，不发 DELETE", async () => {
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    const user = await requestCodeAndFill();
+    await user.click(screen.getByRole("button", { name: "继续注销" }));
+
+    const overlay = screen.getByRole("dialog").parentElement as HTMLElement;
+    fireEvent.mouseDown(overlay);
+
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument()
+    );
+    expect(deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("点确认层内部不会误关弹层", async () => {
+    seedUser({ phone: PHONE });
+    render(<DeleteAccountForm />);
+    const user = await requestCodeAndFill();
+    await user.click(screen.getByRole("button", { name: "继续注销" }));
+
+    fireEvent.mouseDown(screen.getByRole("dialog"));
+
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
   it("非 HttpError 使用网络异常兜底，返回按钮调用 router.back", async () => {
     requestDeletionCode.mockRejectedValueOnce(new Error("boom"));
     seedUser({ phone: PHONE });

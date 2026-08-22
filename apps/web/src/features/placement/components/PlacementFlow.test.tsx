@@ -155,6 +155,18 @@ describe("PlacementFlow — 欢迎屏与开测", () => {
       screen.getByText("测试机会已用完 · 以最后一次结果为准")
     ).toBeInTheDocument();
   });
+
+  it("欢迎屏跳过 → 直接去手动选等级，不开测也不消耗次数", async () => {
+    renderWithProviders(<PlacementFlow />);
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "跳过，手动选择等级" })
+    );
+
+    expect(mockPush).toHaveBeenCalledWith("/onboarding");
+    expect(mockStart).not.toHaveBeenCalled();
+  });
 });
 
 describe("PlacementFlow — 答题与块提交", () => {
@@ -373,6 +385,19 @@ describe("PlacementFlow — 退出测试", () => {
 
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(screen.getByText("block1-word0")).toBeInTheDocument();
+  });
+
+  it("确认弹窗只认 Esc：按其它键不误关", async () => {
+    renderWithProviders(<PlacementFlow />);
+    const user = userEvent.setup();
+    await enterQuiz(user);
+
+    await user.click(screen.getByRole("button", { name: "退出测试" }));
+    expect(screen.getByRole("dialog", { name: "退出测试？" })).toBeVisible();
+
+    fireEvent.keyDown(window, { key: "Enter" });
+
+    expect(screen.getByRole("dialog", { name: "退出测试？" })).toBeVisible();
   });
 
   it("Esc 与点遮罩均可关闭确认弹窗", async () => {

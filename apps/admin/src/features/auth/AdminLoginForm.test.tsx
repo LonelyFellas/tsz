@@ -360,6 +360,59 @@ describe("AdminLoginForm — 2FA", () => {
     expect(primaryButton(container)).toBeEnabled();
   });
 
+  it("锁定后改手机号同样解除置灰并清掉锁定提示", async () => {
+    mockLogin.mockRejectedValue(new HttpError(423, "account locked"));
+    const { container } = render(<AdminLoginForm />);
+    fillAndSubmit();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("账号已被锁定，请约 15 分钟后再试")
+      ).toBeInTheDocument()
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("请输入手机号"), {
+      target: { value: "13900139000" }
+    });
+
+    expect(
+      screen.queryByText("账号已被锁定，请约 15 分钟后再试")
+    ).not.toBeInTheDocument();
+    expect(primaryButton(container)).toBeEnabled();
+  });
+
+  it("锁定后重填验证码同样解除置灰并清掉锁定提示", async () => {
+    mockLogin.mockRejectedValue(new HttpError(423, "account locked"));
+    const { container } = render(<AdminLoginForm />);
+    fillAndSubmit();
+
+    await waitFor(() =>
+      expect(
+        screen.getByText("账号已被锁定，请约 15 分钟后再试")
+      ).toBeInTheDocument()
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("请输入验证码"), {
+      target: { value: "654321" }
+    });
+
+    expect(
+      screen.queryByText("账号已被锁定，请约 15 分钟后再试")
+    ).not.toBeInTheDocument();
+    expect(primaryButton(container)).toBeEnabled();
+  });
+
+  it("登录被非 Error 拒绝：回落到通用失败文案", async () => {
+    mockLogin.mockRejectedValue("boom");
+    render(<AdminLoginForm />);
+    fillAndSubmit();
+
+    await waitFor(() =>
+      expect(screen.getByText("登录失败，请稍后重试")).toBeInTheDocument()
+    );
+    expect(mockNavigate).not.toHaveBeenCalled();
+  });
+
   // ============================== 已登录重定向守卫 ==============================
 
   it("已登录访问登录页：直接 replace 到目标页", () => {

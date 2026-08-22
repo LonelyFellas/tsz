@@ -198,4 +198,35 @@ describe("CreateAdminModal", () => {
     fireEvent.click(screen.getByRole("button", { name: CREATE }));
     expect(await screen.findByText("创建失败")).toBeInTheDocument();
   });
+
+  it("发码限流 429：提示稍后再试，不套用通用错误文案", async () => {
+    mockRequestCode.mockRejectedValue(new HttpError(429, "too many requests"));
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "获取验证码" }));
+    expect(
+      await screen.findByText("请求过于频繁，请稍后再试")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("too many requests")).not.toBeInTheDocument();
+  });
+
+  it("发码失败（其它 HttpError）：透传后端消息", async () => {
+    mockRequestCode.mockRejectedValue(new HttpError(500, "短信通道故障"));
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "获取验证码" }));
+    expect(await screen.findByText("短信通道故障")).toBeInTheDocument();
+  });
+
+  it("发码失败（非 Error）：回退到通用文案「验证码发送失败」", async () => {
+    mockRequestCode.mockRejectedValue("boom");
+    renderModal();
+    fireEvent.click(screen.getByRole("button", { name: "获取验证码" }));
+    expect(await screen.findByText("验证码发送失败")).toBeInTheDocument();
+  });
+
+  it("空闲时点取消：关闭弹窗且不建号", async () => {
+    const { onClose } = renderModal();
+    fireEvent.click(screen.getByRole("button", { name: /取\s*消/ }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(mockCreate).not.toHaveBeenCalled();
+  });
 });
