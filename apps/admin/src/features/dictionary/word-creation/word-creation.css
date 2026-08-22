@@ -507,6 +507,11 @@
   cursor: pointer;
 }
 
+/* 基准原形卡不可折叠(它是完成本步的硬要求,任何时候都得能改)。 */
+.word-form-base-card > .ant-card-head {
+  cursor: default;
+}
+
 .word-form-card > .ant-card-head .ant-card-head-title {
   min-width: 0;
 }
@@ -550,8 +555,19 @@
   padding: 0;
 }
 
+/* 词形组卡的底部留白来自组内的「添加派生词形」行,基准原形卡没有那一行,
+   自己补上,否则矩阵/折叠条会直接压在卡片底边上。必须排在上面那条
+   padding:0 之后——同特异性,靠顺序取胜。 */
+.word-form-base-card > .ant-card-body {
+  padding-bottom: 16px;
+}
+
 .word-form-rules {
   padding-inline: 18px;
+}
+
+.word-form-group-empty {
+  padding: 14px 18px 0;
 }
 
 .word-form-rule-row {
