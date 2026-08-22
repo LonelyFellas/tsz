@@ -2087,6 +2087,65 @@ describe("FormsAndPronunciationStep", () => {
     );
   });
 
+  it("展开非偏好侧一次，基准原形与词形组一起展开", () => {
+    const { container } = renderStep(
+      wordFixture({ headword: "center", ready: true })
+    );
+
+    const baseCard = container.querySelector<HTMLElement>(
+      ".word-form-base-card"
+    )!;
+    const groupCard = container.querySelector<HTMLElement>(
+      '[data-word-field="slots"]'
+    )!;
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+
+    // 折叠是「我现在要不要看另一侧方言」的词性级意图：在基准原形卡上展开一次，
+    // 词形组那边不该还要再点一次。
+    fireEvent.click(within(baseCard).getByLabelText("展开美式词形"));
+
+    expect(within(baseCard).getByLabelText("美式词形拼写")).toHaveValue(
+      "center"
+    );
+    expect(within(groupCard).getByLabelText("美式词形拼写")).toHaveValue(
+      "centers"
+    );
+
+    // 反向同理：在词形组卡上折叠，基准原形卡跟着收起。
+    fireEvent.click(within(groupCard).getByLabelText("折叠美式词形"));
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+  });
+
+  it("展开状态按词性各记一份，切到别的词性不跟着展开", () => {
+    const word = wordFixture({ headword: "center", ready: true });
+    const [noun, verb] = word.forms.pos;
+    const { container } = renderStep(word);
+    // 切走的词性面板仍留在 DOM 里（antd Tabs 不销毁），所以按 pos_id 定位到各自那块，
+    // 而不是全页查询。
+    const panel = (posId: string) =>
+      container.querySelector<HTMLElement>(
+        `[data-word-field="form_groups"][data-word-node-id="${posId}"]`
+      )!;
+
+    // 名词面板里有两条折叠条（原形卡 + 词形组卡），点任意一条都该覆盖整个词性。
+    fireEvent.click(
+      within(panel(noun!.pos_id)).getAllByLabelText("展开美式词形")[0]!
+    );
+    expect(
+      within(panel(noun!.pos_id)).getAllByLabelText("美式词形拼写").length
+    ).toBeGreaterThan(0);
+
+    // 「要看另一侧方言」是针对当前词性说的：动词不继承名词的展开状态，
+    // 而名词那边也不因为切走就被重置。
+    fireEvent.click(screen.getByText("动词", { exact: true }));
+    expect(
+      within(panel(verb!.pos_id)).queryByLabelText("美式词形拼写")
+    ).toBeNull();
+    expect(
+      within(panel(noun!.pos_id)).getAllByLabelText("美式词形拼写").length
+    ).toBeGreaterThan(0);
+  });
+
   it("对侧还有待填项时，折叠摘要给出待填数量", () => {
     const word = wordFixture({ headword: "center", ready: true });
     // 美式基准原形缺实际发音 → 折叠摘要应报 1 项待填。
