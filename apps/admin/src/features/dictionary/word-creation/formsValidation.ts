@@ -279,20 +279,19 @@ export function baseFormComplete(
 }
 
 /**
- * 某一侧方言在该词形组内的填写进度，供第 2 步折叠摘要显示
- * （"美式：3 项已填 / 1 项待填"）。基准原形与该组派生词形各算一项。
+ * 某一侧方言在给定词形集合内的填写进度，供第 2 步折叠摘要显示
+ * （"美式：3 项已填 / 1 项待填"）。每个词形算一项，按区块（基准原形、
+ * 某个派生词形组）由调用方传入自己的槽位——基准原形独立于派生词形组渲染。
  */
-export function dialectFormProgress(
-  pos: WordPosFormsV2,
-  groupIndex: number,
+export function dialectSlotsProgress(
+  slots: readonly WordFormSlotV2[],
+  rules: WordPosFormsV2["dialect_rules"],
   dialect: Dialect
 ): { filled: number; pending: number } {
-  const group = pos.form_groups[groupIndex];
-  const slots = [pos.base_form, ...(group?.slots ?? [])];
   let filled = 0;
   let pending = 0;
   for (const slot of slots) {
-    const blocked = formSlotIssues(slot, pos.dialect_rules).some(
+    const blocked = formSlotIssues(slot, rules).some(
       (issue) => issue.dialect === dialect
     );
     if (blocked) pending += 1;

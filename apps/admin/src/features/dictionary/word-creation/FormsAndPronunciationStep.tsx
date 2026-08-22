@@ -48,6 +48,7 @@ import { HttpError } from "@tsz/api-client/http";
 import {
   Fragment,
   type DragEvent,
+  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -96,7 +97,7 @@ import {
   baseFormComplete,
   baseFormIssueMessage,
   derivedFormIssueMessage,
-  dialectFormProgress,
+  dialectSlotsProgress,
   formSlotComplete
 } from "./formsValidation";
 import { summarizeFormsImpact } from "./formsImpactSummary";
@@ -347,7 +348,6 @@ function PronunciationFields({
 function VariantEditor({
   value,
   base,
-  baseReadOnly,
   readOnly,
   matrix,
   lastRow,
@@ -356,14 +356,12 @@ function VariantEditor({
 }: {
   value: WordFormVariantV2;
   base?: boolean;
-  baseReadOnly?: boolean;
   readOnly?: boolean;
   matrix?: boolean;
   lastRow?: boolean;
   issueNodeId: string;
   onChange: (next: WordFormVariantV2) => void;
 }) {
-  const disabledPronunciation = readOnly || baseReadOnly;
   return (
     <div
       className={
@@ -417,7 +415,7 @@ function VariantEditor({
           value={pronunciation}
           spelling={value.spelling}
           dialect={value.dialect}
-          disabled={disabledPronunciation}
+          disabled={readOnly}
           index={index}
           count={value.pronunciations.length}
           dragScope={value.id}
@@ -435,7 +433,7 @@ function VariantEditor({
               : undefined
           }
           onAdd={
-            !disabledPronunciation
+            !readOnly
               ? () =>
                   onChange({
                     ...value,
@@ -447,7 +445,7 @@ function VariantEditor({
               : undefined
           }
           onReorder={
-            !disabledPronunciation && value.pronunciations.length > 1
+            !readOnly && value.pronunciations.length > 1
               ? (sourceIndex, targetIndex) =>
                   onChange({
                     ...value,
@@ -468,7 +466,6 @@ function VariantEditor({
 function SharedSpellingVariantEditor({
   values,
   base,
-  baseReadOnly,
   readOnly,
   matrix,
   lastRow,
@@ -477,7 +474,6 @@ function SharedSpellingVariantEditor({
 }: {
   values: WordFormVariantV2[];
   base?: boolean;
-  baseReadOnly?: boolean;
   readOnly?: boolean;
   matrix?: boolean;
   lastRow?: boolean;
@@ -487,7 +483,6 @@ function SharedSpellingVariantEditor({
   const firstValue = values[0];
   if (!firstValue) return null;
 
-  const disabledPronunciation = readOnly || baseReadOnly;
   const updateVariant = (
     index: number,
     nextVariant: WordFormVariantV2
@@ -560,7 +555,7 @@ function SharedSpellingVariantEditor({
                 value={pronunciation}
                 spelling={variant.spelling}
                 dialect={variant.dialect}
-                disabled={disabledPronunciation}
+                disabled={readOnly}
                 index={index}
                 count={variant.pronunciations.length}
                 dragScope={variant.id}
@@ -584,7 +579,7 @@ function SharedSpellingVariantEditor({
                     : undefined
                 }
                 onAdd={
-                  !disabledPronunciation
+                  !readOnly
                     ? () =>
                         updateVariant(variantIndex, {
                           ...variant,
@@ -596,7 +591,7 @@ function SharedSpellingVariantEditor({
                     : undefined
                 }
                 onReorder={
-                  !disabledPronunciation && variant.pronunciations.length > 1
+                  !readOnly && variant.pronunciations.length > 1
                     ? (sourceIndex, targetIndex) =>
                         updateVariant(variantIndex, {
                           ...variant,
@@ -777,18 +772,27 @@ function MissingDialectVariantCell({
   );
 }
 
-function FormGroupMatrix({
+/**
+ * 词形矩阵的一行：基准原形与派生词形共用同一套方言分栏与折叠规则，
+ * 差异只在「类型格怎么画」和「变体写回哪里」。
+ */
+interface FormMatrixRow {
+  slot: WordFormSlotV2;
+  /** 基准原形行：拼写只读（跟随第 1 步的主词），只能改读音。 */
+  base?: boolean;
+  typeCell: (lastRow: boolean) => ReactNode;
+  onVariantsChange: (variants: WordFormVariantV2[]) => void;
+}
+
+function FormMatrix({
   pos,
-  allowedTypes,
-  groupIndex,
+  rows,
   readOnly,
   generating,
-  onGenerate,
-  onChange
+  onGenerate
 }: {
   pos: WordPosFormsV2;
-  allowedTypes: WordDerivedFormSlotV2["form_type"][];
-  groupIndex: number;
+  rows: FormMatrixRow[];
   readOnly?: boolean;
   generating?: boolean;
   onGenerate: (
@@ -796,7 +800,6 @@ function FormGroupMatrix({
     target: "uk" | "us",
     clientId: string
   ) => Promise<void>;
-  onChange: (next: WordPosFormsV2) => void;
 }) {
   // 偏好侧主导（A1）：偏好那一栏排首位并默认展开，另一侧折叠成一行摘要。
   // 词形拼写与音标是词典事实，不能砍掉——后端也强制两侧齐全才能发布。
@@ -804,21 +807,28 @@ function FormGroupMatrix({
   const [showOtherDialect, setShowOtherDialect] = useState(false);
   // 待完善项/服务端 field issue 指到折叠那一侧时自动展开：否则点了没反应——
   // 目标节点根本不在 DOM 里，聚焦逻辑重试几次就静默放弃了。
+  //
+  // 依赖必须跟着「本次定位事件」(issueTarget 的身份，每次带 state 的 navigate 都换新)：
+  // ① 压成「目标是否在折叠侧」的布尔量会把同侧的第二次定位吃掉——布尔一直是 true，
+  //    effect 不再触发，用户手动折起来之后就再也展不开；
+  // ② 反过来把每次渲染都换身份的 rows 放进依赖，又会让手动折叠被下一次渲染立刻推翻。
+  // 所以依赖只放稳定的 issueTarget/pos/preference，槽位从 ref 读最新的。
   const issueTarget = useWordValidationIssue();
-  const group = pos.form_groups[groupIndex];
+  const rowSlots = rows.map((row) => row.slot);
+  const watchedSlotsRef = useRef<WordFormSlotV2[]>([]);
+  watchedSlotsRef.current = rowSlots;
   useEffect(() => {
-    if (!issueTarget || !group) return;
+    if (!issueTarget) return;
     const other = otherDialectOf(pos, preference);
     if (!other) return;
     if (
-      slotsOfGroup(pos, group).some((slot) =>
+      watchedSlotsRef.current.some((slot) =>
         slotOwnsIssue(slot, other, issueTarget.nodeId)
       )
     ) {
       setShowOtherDialect(true);
     }
-  }, [group, issueTarget, pos, preference]);
-  if (!group) return null;
+  }, [issueTarget, pos, preference]);
 
   const allDialects = formDialects(pos);
   const orderedDialects =
@@ -827,41 +837,6 @@ function FormGroupMatrix({
           left === preference ? -1 : right === preference ? 1 : 0
         )
       : allDialects;
-  const otherDialect = orderedDialects[1];
-  const dialects =
-    otherDialect && !showOtherDialect ? [orderedDialects[0]!] : orderedDialects;
-  const otherProgress = otherDialect
-    ? dialectFormProgress(pos, groupIndex, otherDialect)
-    : undefined;
-  const editableBasePronunciation = groupIndex === 0;
-  const updateBaseVariants = (variants: WordFormVariantV2[]) =>
-    onChange({
-      ...pos,
-      base_form: { ...pos.base_form, variants }
-    });
-  const updateSlot = (slotIndex: number, nextSlot: WordDerivedFormSlotV2) => {
-    const formGroups = [...pos.form_groups];
-    const slots = [...group.slots];
-    slots[slotIndex] = nextSlot;
-    formGroups[groupIndex] = { ...group, slots };
-    onChange({ ...pos, form_groups: formGroups });
-  };
-  const moveSlot = (slotIndex: number, delta: -1 | 1) => {
-    const formGroups = [...pos.form_groups];
-    formGroups[groupIndex] = {
-      ...group,
-      slots: moveWordNode(group.slots, slotIndex, slotIndex + delta)
-    };
-    onChange({ ...pos, form_groups: formGroups });
-  };
-  const removeSlot = (slotIndex: number) => {
-    const formGroups = [...pos.form_groups];
-    formGroups[groupIndex] = {
-      ...group,
-      slots: group.slots.filter((_, index) => index !== slotIndex)
-    };
-    onChange({ ...pos, form_groups: formGroups });
-  };
 
   // 拼写统一的布局没有可折叠的「列」：拼写共享一格，两侧音标就在这一格里，
   // 因此只按偏好排序，不做折叠（折叠会让表头与格内内容对不上）。
@@ -881,43 +856,19 @@ function FormGroupMatrix({
             </span>
           ))}
         </div>
-        <BaseTypeCell lastRow={group.slots.length === 0} />
-        <SharedSpellingVariantEditor
-          values={pos.base_form.variants}
-          base
-          baseReadOnly={!editableBasePronunciation}
-          readOnly={readOnly}
-          matrix
-          lastRow={group.slots.length === 0}
-          issueNodeId={pos.base_form.id}
-          onChange={updateBaseVariants}
-        />
-        {group.slots.map((slot, slotIndex) => {
-          const last = slotIndex === group.slots.length - 1;
+        {rows.map((row, rowIndex) => {
+          const lastRow = rowIndex === rows.length - 1;
           return (
-            <Fragment key={slot.id}>
-              <DerivedTypeCell
-                slot={slot}
-                allowedTypes={allowedTypes}
-                usedTypes={group.slots
-                  .filter((_, index) => index !== slotIndex)
-                  .map((item) => item.form_type)}
-                index={slotIndex}
-                last={last}
-                readOnly={readOnly}
-                onChange={(nextSlot) => updateSlot(slotIndex, nextSlot)}
-                onMove={(delta) => moveSlot(slotIndex, delta)}
-                onRemove={() => removeSlot(slotIndex)}
-              />
+            <Fragment key={row.slot.id}>
+              {row.typeCell(lastRow)}
               <SharedSpellingVariantEditor
-                values={slot.variants}
+                values={row.slot.variants}
+                base={row.base}
                 readOnly={readOnly}
                 matrix
-                lastRow={last}
-                issueNodeId={slot.id}
-                onChange={(variants) =>
-                  updateSlot(slotIndex, { ...slot, variants })
-                }
+                lastRow={lastRow}
+                issueNodeId={row.slot.id}
+                onChange={row.onVariantsChange}
               />
             </Fragment>
           );
@@ -926,57 +877,54 @@ function FormGroupMatrix({
     );
   }
 
+  const otherDialect = orderedDialects[1];
+  const dialects =
+    otherDialect && !showOtherDialect ? [orderedDialects[0]!] : orderedDialects;
+  const otherProgress = otherDialect
+    ? dialectSlotsProgress(rowSlots, pos.dialect_rules, otherDialect)
+    : undefined;
+
   const renderDialectCell = (
-    slot: WordPosFormsV2["base_form"] | WordDerivedFormSlotV2,
+    row: FormMatrixRow,
     dialect: Dialect,
-    slotIndex: number | undefined,
     lastRow: boolean
   ) => {
-    const variantIndex = slot.variants.findIndex(
+    const variantIndex = row.slot.variants.findIndex(
       (variant) => variant.dialect === dialect
     );
-    const variant = slot.variants[variantIndex];
-    const applyVariants = (variants: WordFormVariantV2[]) => {
-      if (slotIndex === undefined) updateBaseVariants(variants);
-      else
-        updateSlot(slotIndex, {
-          ...(slot as WordDerivedFormSlotV2),
-          variants
-        });
-    };
+    const variant = row.slot.variants[variantIndex];
     if (variant) {
       return (
         <VariantEditor
           key={dialect}
           value={variant}
-          base={slotIndex === undefined}
-          baseReadOnly={slotIndex === undefined && !editableBasePronunciation}
+          base={row.base}
           readOnly={readOnly}
           matrix
           lastRow={lastRow}
-          issueNodeId={slot.id}
+          issueNodeId={row.slot.id}
           onChange={(nextVariant) => {
-            const variants = [...slot.variants];
+            const variants = [...row.slot.variants];
             variants[variantIndex] = nextVariant;
-            applyVariants(variants);
+            row.onVariantsChange(variants);
           }}
         />
       );
     }
-    const source = slot.variants.find((item) => item.dialect !== dialect);
+    const source = row.slot.variants.find((item) => item.dialect !== dialect);
     return (
       <MissingDialectVariantCell
         key={dialect}
         dialect={dialect}
         source={source}
-        slotId={slot.id}
+        slotId={row.slot.id}
         lastRow={lastRow}
         readOnly={readOnly}
         generating={generating}
         onGenerate={onGenerate}
         onAdd={(spelling, origin) =>
-          applyVariants([
-            ...slot.variants,
+          row.onVariantsChange([
+            ...row.slot.variants,
             {
               id: newWordNodeId(),
               dialect,
@@ -1004,34 +952,13 @@ function FormGroupMatrix({
             {DIALECT_SHORT_LABEL[dialect]} · {dialect === "uk" ? "BrE" : "AmE"}
           </div>
         ))}
-        <BaseTypeCell lastRow={group.slots.length === 0} />
-        {dialects.map((dialect) =>
-          renderDialectCell(
-            pos.base_form,
-            dialect,
-            undefined,
-            group.slots.length === 0
-          )
-        )}
-        {group.slots.map((slot, slotIndex) => {
-          const last = slotIndex === group.slots.length - 1;
+        {rows.map((row, rowIndex) => {
+          const lastRow = rowIndex === rows.length - 1;
           return (
-            <Fragment key={slot.id}>
-              <DerivedTypeCell
-                slot={slot}
-                allowedTypes={allowedTypes}
-                usedTypes={group.slots
-                  .filter((_, index) => index !== slotIndex)
-                  .map((item) => item.form_type)}
-                index={slotIndex}
-                last={last}
-                readOnly={readOnly}
-                onChange={(nextSlot) => updateSlot(slotIndex, nextSlot)}
-                onMove={(delta) => moveSlot(slotIndex, delta)}
-                onRemove={() => removeSlot(slotIndex)}
-              />
+            <Fragment key={row.slot.id}>
+              {row.typeCell(lastRow)}
               {dialects.map((dialect) =>
-                renderDialectCell(slot, dialect, slotIndex, last)
+                renderDialectCell(row, dialect, lastRow)
               )}
             </Fragment>
           );
@@ -1059,12 +986,131 @@ function FormGroupMatrix({
   );
 }
 
-/** 该词形组参与渲染的槽位：共享基准原形 + 本组派生词形。 */
-function slotsOfGroup(
-  pos: WordPosFormsV2,
-  group: WordPosFormsV2["form_groups"][number]
-): WordFormSlotV2[] {
-  return [pos.base_form, ...group.slots];
+/**
+ * 基准原形矩阵。它独立于派生词形组渲染：无派生能力的词性（感叹词等）后端
+ * 只回 `base_form` 与空 `form_groups`，而原形发音仍是完成本步的硬要求——
+ * 把它嵌在派生区里，一旦派生区被隐藏就没有地方补音标了。
+ */
+function BaseFormMatrix({
+  pos,
+  readOnly,
+  generating,
+  onGenerate,
+  onChange
+}: {
+  pos: WordPosFormsV2;
+  readOnly?: boolean;
+  generating?: boolean;
+  onGenerate: (
+    source: WordFormVariantV2,
+    target: "uk" | "us",
+    clientId: string
+  ) => Promise<void>;
+  onChange: (next: WordPosFormsV2) => void;
+}) {
+  return (
+    <FormMatrix
+      pos={pos}
+      rows={[
+        {
+          slot: pos.base_form,
+          base: true,
+          typeCell: (lastRow) => <BaseTypeCell lastRow={lastRow} />,
+          onVariantsChange: (variants) =>
+            onChange({ ...pos, base_form: { ...pos.base_form, variants } })
+        }
+      ]}
+      readOnly={readOnly}
+      generating={generating}
+      onGenerate={onGenerate}
+    />
+  );
+}
+
+function FormGroupMatrix({
+  pos,
+  allowedTypes,
+  groupIndex,
+  readOnly,
+  generating,
+  onGenerate,
+  onChange
+}: {
+  pos: WordPosFormsV2;
+  allowedTypes: WordDerivedFormSlotV2["form_type"][];
+  groupIndex: number;
+  readOnly?: boolean;
+  generating?: boolean;
+  onGenerate: (
+    source: WordFormVariantV2,
+    target: "uk" | "us",
+    clientId: string
+  ) => Promise<void>;
+  onChange: (next: WordPosFormsV2) => void;
+}) {
+  const group = pos.form_groups[groupIndex];
+  if (!group) return null;
+  // 空组不画只有表头的空网格：基准原形已独立成卡，不再借它来撑这一行。
+  if (group.slots.length === 0) {
+    return (
+      <div className="word-form-group-empty">
+        <Typography.Text type="secondary">本组还没有派生词形</Typography.Text>
+      </div>
+    );
+  }
+
+  const updateSlot = (slotIndex: number, nextSlot: WordDerivedFormSlotV2) => {
+    const formGroups = [...pos.form_groups];
+    const slots = [...group.slots];
+    slots[slotIndex] = nextSlot;
+    formGroups[groupIndex] = { ...group, slots };
+    onChange({ ...pos, form_groups: formGroups });
+  };
+  const moveSlot = (slotIndex: number, delta: -1 | 1) => {
+    const formGroups = [...pos.form_groups];
+    formGroups[groupIndex] = {
+      ...group,
+      slots: moveWordNode(group.slots, slotIndex, slotIndex + delta)
+    };
+    onChange({ ...pos, form_groups: formGroups });
+  };
+  const removeSlot = (slotIndex: number) => {
+    const formGroups = [...pos.form_groups];
+    formGroups[groupIndex] = {
+      ...group,
+      slots: group.slots.filter((_, index) => index !== slotIndex)
+    };
+    onChange({ ...pos, form_groups: formGroups });
+  };
+
+  return (
+    <FormMatrix
+      pos={pos}
+      rows={group.slots.map((slot, slotIndex) => ({
+        slot,
+        typeCell: (lastRow: boolean) => (
+          <DerivedTypeCell
+            slot={slot}
+            allowedTypes={allowedTypes}
+            usedTypes={group.slots
+              .filter((_, index) => index !== slotIndex)
+              .map((item) => item.form_type)}
+            index={slotIndex}
+            last={lastRow}
+            readOnly={readOnly}
+            onChange={(nextSlot) => updateSlot(slotIndex, nextSlot)}
+            onMove={(delta) => moveSlot(slotIndex, delta)}
+            onRemove={() => removeSlot(slotIndex)}
+          />
+        ),
+        onVariantsChange: (variants: WordFormVariantV2[]) =>
+          updateSlot(slotIndex, { ...slot, variants })
+      }))}
+      readOnly={readOnly}
+      generating={generating}
+      onGenerate={onGenerate}
+    />
+  );
 }
 
 function otherDialectOf(
@@ -1324,16 +1370,17 @@ function PosFormsEditor({
   );
   const editorRef = useRef<HTMLDivElement>(null);
 
-  const focusOwner = useMemo(() => {
+  const focusOwner = useMemo(():
+    | { group?: WordPosFormsV2["form_groups"][number]; slotId: string }
+    | undefined => {
     if (!focusNodeId) return undefined;
+    // 基准原形不挂在任何派生词形组下，定位只认它自己那一行，
+    // 不能借第一组来展开——零派生组的词性根本没有第一组。
     if (
       value.base_form.id === focusNodeId ||
       value.base_form.variants.some((variant) => variant.id === focusNodeId)
     ) {
-      return {
-        group: value.form_groups[0],
-        slotId: value.base_form.id
-      };
+      return { slotId: value.base_form.id };
     }
     return value.form_groups
       .flatMap((group) => group.slots.map((slot) => ({ group, slot })))
@@ -1443,6 +1490,69 @@ function PosFormsEditor({
             description="请在完成本步骤前修改或删除标红词形；系统不会自动转换或丢弃已有数据。"
           />
         )}
+        <Card
+          className="word-form-card word-form-base-card"
+          title="基准原形与发音"
+        >
+          <div className="word-form-rules">
+            <div className="word-form-rule-row">
+              <Typography.Text strong>英美拼写是否有区别？</Typography.Text>
+              <Space wrap>
+                <Radio.Group
+                  value={value.dialect_rules.spelling_mode}
+                  disabled={readOnly || spellingForced}
+                  onChange={(event) =>
+                    onChange(
+                      normalizeDialectRules(
+                        value,
+                        headwords,
+                        event.target.value,
+                        value.dialect_rules.phonetic_mode
+                      )
+                    )
+                  }
+                >
+                  <Radio value="distinguish">是</Radio>
+                  <Radio value="unified">否</Radio>
+                </Radio.Group>
+                {spellingForced && (
+                  <Typography.Text type="secondary">
+                    主词已区分英美，词形保持区分
+                  </Typography.Text>
+                )}
+              </Space>
+            </div>
+            {value.dialect_rules.spelling_mode === "unified" && (
+              <div className="word-form-rule-row">
+                <Typography.Text strong>英美音标是否有区别？</Typography.Text>
+                <Radio.Group
+                  value={value.dialect_rules.phonetic_mode}
+                  disabled={readOnly}
+                  onChange={(event) =>
+                    onChange(
+                      normalizeDialectRules(
+                        value,
+                        headwords,
+                        value.dialect_rules.spelling_mode,
+                        event.target.value
+                      )
+                    )
+                  }
+                >
+                  <Radio value="distinguish">是</Radio>
+                  <Radio value="unified">否</Radio>
+                </Radio.Group>
+              </div>
+            )}
+          </div>
+          <BaseFormMatrix
+            pos={value}
+            readOnly={readOnly}
+            generating={generating}
+            onGenerate={onGenerate}
+            onChange={onChange}
+          />
+        </Card>
         {showDerivedGroups &&
           value.form_groups.map((group, groupIndex) => {
             const collapsed = collapsedGroupIds.has(group.id);
@@ -1571,63 +1681,6 @@ function PosFormsEditor({
                           <Radio value={false}>否</Radio>
                         </Radio.Group>
                       </div>
-                      {groupIndex === 0 && (
-                        <>
-                          <div className="word-form-rule-row">
-                            <Typography.Text strong>
-                              英美拼写是否有区别？
-                            </Typography.Text>
-                            <Space wrap>
-                              <Radio.Group
-                                value={value.dialect_rules.spelling_mode}
-                                disabled={readOnly || spellingForced}
-                                onChange={(event) =>
-                                  onChange(
-                                    normalizeDialectRules(
-                                      value,
-                                      headwords,
-                                      event.target.value,
-                                      value.dialect_rules.phonetic_mode
-                                    )
-                                  )
-                                }
-                              >
-                                <Radio value="distinguish">是</Radio>
-                                <Radio value="unified">否</Radio>
-                              </Radio.Group>
-                              {spellingForced && (
-                                <Typography.Text type="secondary">
-                                  主词已区分英美，词形保持区分
-                                </Typography.Text>
-                              )}
-                            </Space>
-                          </div>
-                          {value.dialect_rules.spelling_mode === "unified" && (
-                            <div className="word-form-rule-row">
-                              <Typography.Text strong>
-                                英美音标是否有区别？
-                              </Typography.Text>
-                              <Radio.Group
-                                value={value.dialect_rules.phonetic_mode}
-                                disabled={readOnly}
-                                onChange={(event) =>
-                                  onChange(
-                                    normalizeDialectRules(
-                                      value,
-                                      headwords,
-                                      value.dialect_rules.spelling_mode,
-                                      event.target.value
-                                    )
-                                  )
-                                }
-                              >
-                                <Radio value="distinguish">是</Radio>
-                                <Radio value="unified">否</Radio>
-                              </Radio.Group>
-                            </div>
-                          )}
-                        </>
-                      )}
                     </div>
                     <FormGroupMatrix
                       pos={value}
