@@ -789,12 +789,18 @@ function FormMatrix({
   rows,
   readOnly,
   generating,
+  showOtherDialect,
+  onShowOtherDialect,
   onGenerate
 }: {
   pos: WordPosFormsV2;
   rows: FormMatrixRow[];
   readOnly?: boolean;
   generating?: boolean;
+  /** 非偏好侧是否展开。状态由词性持有：展开是「我现在要看另一侧方言」的意图，
+   *  作用于该词性的基准原形与全部词形组，不该每张卡各记一份。 */
+  showOtherDialect: boolean;
+  onShowOtherDialect: (next: boolean) => void;
   onGenerate: (
     source: WordFormVariantV2,
     target: "uk" | "us",
@@ -804,7 +810,6 @@ function FormMatrix({
   // 偏好侧主导（A1）：偏好那一栏排首位并默认展开，另一侧折叠成一行摘要。
   // 词形拼写与音标是词典事实，不能砍掉——后端也强制两侧齐全才能发布。
   const { preference } = useDialectPreference();
-  const [showOtherDialect, setShowOtherDialect] = useState(false);
   // 待完善项/服务端 field issue 指到折叠那一侧时自动展开：否则点了没反应——
   // 目标节点根本不在 DOM 里，聚焦逻辑重试几次就静默放弃了。
   //
@@ -812,11 +817,15 @@ function FormMatrix({
   // ① 压成「目标是否在折叠侧」的布尔量会把同侧的第二次定位吃掉——布尔一直是 true，
   //    effect 不再触发，用户手动折起来之后就再也展不开；
   // ② 反过来把每次渲染都换身份的 rows 放进依赖，又会让手动折叠被下一次渲染立刻推翻。
-  // 所以依赖只放稳定的 issueTarget/pos/preference，槽位从 ref 读最新的。
+  // 所以依赖只放稳定的 issueTarget/pos/preference，槽位与回调都从 ref 读最新的
+  // （onShowOtherDialect 是「怎么做」而不是「何时做」，让它进依赖等于把重跑时机
+  //  交给调用方的引用稳定性——传个内联箭头就会退回上面 ② 那条回归）。
   const issueTarget = useWordValidationIssue();
   const rowSlots = rows.map((row) => row.slot);
   const watchedSlotsRef = useRef<WordFormSlotV2[]>([]);
   watchedSlotsRef.current = rowSlots;
+  const onShowOtherDialectRef = useRef(onShowOtherDialect);
+  onShowOtherDialectRef.current = onShowOtherDialect;
   useEffect(() => {
     if (!issueTarget) return;
     const other = otherDialectOf(pos, preference);
@@ -826,7 +835,7 @@ function FormMatrix({
         slotOwnsIssue(slot, other, issueTarget.nodeId)
       )
     ) {
-      setShowOtherDialect(true);
+      onShowOtherDialectRef.current(true);
     }
   }, [issueTarget, pos, preference]);
 
@@ -976,7 +985,7 @@ function FormMatrix({
             size="small"
             type="link"
             aria-label={`${showOtherDialect ? "折叠" : "展开"}${DIALECT_SHORT_LABEL[otherDialect]}词形`}
-            onClick={() => setShowOtherDialect((current) => !current)}
+            onClick={() => onShowOtherDialect(!showOtherDialect)}
           >
             {showOtherDialect ? "折 叠" : "展 开"}
           </Button>
@@ -995,12 +1004,16 @@ function BaseFormMatrix({
   pos,
   readOnly,
   generating,
+  showOtherDialect,
+  onShowOtherDialect,
   onGenerate,
   onChange
 }: {
   pos: WordPosFormsV2;
   readOnly?: boolean;
   generating?: boolean;
+  showOtherDialect: boolean;
+  onShowOtherDialect: (next: boolean) => void;
   onGenerate: (
     source: WordFormVariantV2,
     target: "uk" | "us",
@@ -1022,6 +1035,8 @@ function BaseFormMatrix({
       ]}
       readOnly={readOnly}
       generating={generating}
+      showOtherDialect={showOtherDialect}
+      onShowOtherDialect={onShowOtherDialect}
       onGenerate={onGenerate}
     />
   );
@@ -1033,6 +1048,8 @@ function FormGroupMatrix({
   groupIndex,
   readOnly,
   generating,
+  showOtherDialect,
+  onShowOtherDialect,
   onGenerate,
   onChange
 }: {
@@ -1041,6 +1058,8 @@ function FormGroupMatrix({
   groupIndex: number;
   readOnly?: boolean;
   generating?: boolean;
+  showOtherDialect: boolean;
+  onShowOtherDialect: (next: boolean) => void;
   onGenerate: (
     source: WordFormVariantV2,
     target: "uk" | "us",
@@ -1108,6 +1127,8 @@ function FormGroupMatrix({
       }))}
       readOnly={readOnly}
       generating={generating}
+      showOtherDialect={showOtherDialect}
+      onShowOtherDialect={onShowOtherDialect}
       onGenerate={onGenerate}
     />
   );
@@ -1368,6 +1389,9 @@ function PosFormsEditor({
   const [collapsedGroupIds, setCollapsedGroupIds] = useState<Set<string>>(
     () => new Set()
   );
+  // 非偏好侧展开与否按词性记：管理员要补的是「这个词性的美式内容」，
+  // 不该在基准原形卡和每个词形组卡上各点一次。
+  const [showOtherDialect, setShowOtherDialect] = useState(false);
   const editorRef = useRef<HTMLDivElement>(null);
 
   const focusOwner = useMemo(():
@@ -1495,6 +1519,11 @@ function PosFormsEditor({
           title="基准原形与发音"
         >
           <div className="word-form-rules">
+            <div className="word-form-rule-hint">
+              <Typography.Text type="secondary">
+                英美区分作用于该词性下的全部词形（含派生词形），不只基准原形。
+              </Typography.Text>
+            </div>
             <div className="word-form-rule-row">
               <Typography.Text strong>英美拼写是否有区别？</Typography.Text>
               <Space wrap>
@@ -1549,6 +1578,8 @@ function PosFormsEditor({
             pos={value}
             readOnly={readOnly}
             generating={generating}
+            showOtherDialect={showOtherDialect}
+            onShowOtherDialect={setShowOtherDialect}
             onGenerate={onGenerate}
             onChange={onChange}
           />
@@ -1688,6 +1719,8 @@ function PosFormsEditor({
                       groupIndex={groupIndex}
                       readOnly={readOnly}
                       generating={generating}
+                      showOtherDialect={showOtherDialect}
+                      onShowOtherDialect={setShowOtherDialect}
                       onGenerate={onGenerate}
                       onChange={onChange}
                     />

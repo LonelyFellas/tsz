@@ -566,6 +566,12 @@
   padding-inline: 18px;
 }
 
+/* 词性级设置的作用域说明:开关写的是 pos.dialect_rules,管的是整个词性,
+   卡片标题只提「基准原形」容易被读窄。 */
+.word-form-rule-hint {
+  padding-block: 10px 2px;
+}
+
 .word-form-group-empty {
   padding: 14px 18px 0;
 }
