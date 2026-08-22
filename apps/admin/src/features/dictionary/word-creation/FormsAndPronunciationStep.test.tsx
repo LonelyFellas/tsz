@@ -389,7 +389,7 @@ describe("FormsAndPronunciationStep", () => {
     );
   });
 
-  it("catalog 未下发词形能力时禁止新增和完成", async () => {
+  it("catalog 未下发词形能力时保持安静并允许完成已有词形", async () => {
     catalogState.data = {
       ...partOfSpeechCatalogFixture,
       items: partOfSpeechCatalogFixture.items.map(
@@ -402,17 +402,13 @@ describe("FormsAndPronunciationStep", () => {
     };
     renderStep();
 
-    expect(screen.getByText("词形规则未加载")).toBeVisible();
-    expect(
-      screen.getByText(
-        "现有词形仅供查看；重新加载到服务端词性能力后才能新增或完成本步骤。"
-      )
-    ).toBeVisible();
-    expect(button("添加派生词形")).toBeDisabled();
+    expect(screen.queryByText("词形规则未加载")).not.toBeInTheDocument();
+    expect(screen.queryByText("添加派生词形")).not.toBeInTheDocument();
+    expect(screen.queryByText(/与当前基本词性不匹配/)).not.toBeInTheDocument();
 
     fireEvent.click(button("完成并进入词义与例句"));
-    expect(await screen.findByText("名词的词形规则未加载")).toBeVisible();
-    expect(mutations.preview).not.toHaveBeenCalled();
+    await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/词形规则未加载/)).not.toBeInTheDocument();
   });
 
   it("默认词形为空时仍可添加允许的派生词形", () => {
@@ -442,9 +438,9 @@ describe("FormsAndPronunciationStep", () => {
   it("未命中内置词典的空白草稿显示空态引导，并可从零添加第一个基本词性", async () => {
     renderStep(unmatchedWordFixture());
 
-    expect(screen.getByText("当前还没有基本词性")).toBeVisible();
+    expect(screen.getByText("暂无基本词性")).toBeVisible();
     expect(
-      screen.getByText(/请用右上角的「添加基本词性」添加第一个词性/)
+      screen.getByText("内置词典未检测到词性建议，请从右上角添加基本词性。")
     ).toBeVisible();
     expect(screen.queryByLabelText("共用词形拼写")).toBeNull();
 
@@ -455,7 +451,7 @@ describe("FormsAndPronunciationStep", () => {
     if (!option) throw new Error("基本词性选项未渲染");
     fireEvent.click(option);
 
-    expect(screen.queryByText("当前还没有基本词性")).toBeNull();
+    expect(screen.queryByText("暂无基本词性")).toBeNull();
     // 主词是 unified,基准原形按 common 侧回填,且属于人工录入。
     expect(screen.getByLabelText("共用词形拼写")).toHaveValue("brand-new-word");
     expect(screen.queryByLabelText("英式词形拼写")).toBeNull();

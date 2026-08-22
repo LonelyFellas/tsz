@@ -19,6 +19,10 @@ import {
   adminWordsMockStorageKey,
   type AdminWordsMockStorageLike
 } from "./storage";
+import {
+  sentenceAssociationMeanings,
+  type DraftMeaningsWithSentenceAssociations
+} from "../word-creation/meaningsAndExamples/sentenceAssociationTypes";
 
 const NOW = new Date("2026-08-02T03:00:00.000Z");
 
@@ -3190,6 +3194,310 @@ describe("admin words mock", () => {
     await expect(noSession.stats()).rejects.toMatchObject({ status: 401 });
     const forbidden = mockFor(() => profile({ permissions: [] }));
     await expect(forbidden.stats()).rejects.toMatchObject({ status: 403 });
+  });
+});
+
+describe("admin words mock — 多维例句契约就绪边界", () => {
+  it("只允许当前草稿作为新例句的自关联解析目标", async () => {
+    const mock = mockFor();
+    const ready = await completeCenter(mock);
+    const sense = ready.meanings.pos[0]!.senses[0]!;
+    const input = {
+      en_text: richText("Center it."),
+      source_range: { start: 0, end: 6, surface: "Center" },
+      target_word_id: ready.id,
+      target_sense_id: sense.id
+    };
+
+    await expect(mock.sentenceAssociations.resolve(input)).resolves.toEqual({
+      resolution: "unmatched",
+      candidates: []
+    });
+    await expect(
+      mock.sentenceAssociations.resolve({
+        ...input,
+        current_word_id: ready.id
+      })
+    ).resolves.toMatchObject({ resolution: "resolved" });
+  });
+
+  it("complete 会拒绝空共享例句", async () => {
+    const mock = mockFor();
+    const ready = await completeCenter(mock);
+    await expect(
+      mock.saveMeaningsStep(ready.id, {
+        base_revision: ready.revision,
+        operation_id: "sentence-invalid-shared",
+        intent: "complete",
+        content: {
+          ...ready.meanings,
+          shared_sentences: [
+            {
+              id: "shared-invalid",
+              level: "A1",
+              en_text_id: "shared-invalid-en",
+              en_text: richText("Center it."),
+              zh_text_id: "shared-invalid-zh",
+              zh_text: richText("把它放中间。"),
+              associations: []
+            }
+          ]
+        } as DraftMeaningsWithSentenceAssociations
+      })
+    ).rejects.toMatchObject({
+      status: 422,
+      code: "validation_failed",
+      field_issues: [
+        expect.objectContaining({
+          node_id: "shared-invalid",
+          code: "shared_sentence_invalid"
+        })
+      ]
+    });
+  });
+
+  it("resolver 只读取已发布词形，并返回唯一或不匹配", async () => {
+    const mock = mockFor();
+    const ready = await completeCenter(mock);
+    const draftSenseId = ready.meanings.pos[0]!.senses[0]!.id;
+    await expect(
+      mock.sentenceAssociations.resolve({
+        en_text: richText("center it."),
+        source_range: { start: 0, end: 6, surface: "center" },
+        target_word_id: ready.id,
+        target_sense_id: draftSenseId
+      })
+    ).resolves.toEqual({ resolution: "unmatched", candidates: [] });
+    const published = await mock.publishV2(ready.id, {
+      base_revision: ready.revision,
+      idempotency_key: "sentence-resolver-publish"
+    });
+    const senseId = published.word.meanings.pos[0]!.senses[0]!.id;
+    const surface =
+      published.word.forms.pos[0]!.base_form.variants[0]!.spelling;
+    const resolved = await mock.sentenceAssociations.resolve({
+      en_text: richText(`${surface} it.`),
+      source_range: {
+        start: 0,
+        end: Array.from(surface).length,
+        surface
+      },
+      target_word_id: published.word.id,
+      target_sense_id: senseId
+    });
+    expect(resolved).toMatchObject({
+      resolution: "resolved",
+      candidate: {
+        form_slot_id: published.word.forms.pos[0]!.base_form.id,
+        form_type: "base"
+      }
+    });
+    await expect(
+      mock.sentenceAssociations.resolve({
+        en_text: richText("unknown it."),
+        source_range: { start: 0, end: 7, surface: "unknown" },
+        target_word_id: published.word.id,
+        target_sense_id: senseId
+      })
+    ).resolves.toEqual({ resolution: "unmatched", candidates: [] });
+  });
+
+  it("resolver 在同一词性的多个合法词形槽命中时返回真实歧义", async () => {
+    const mock = mockFor();
+    const draft = await createCenter(mock, "sentence-resolver-ambiguous");
+    const forms = withCompletePronunciations(draft.word.forms);
+    const noun = forms.pos.find((pos) => pos.pos === "noun")!;
+    const plural = noun.form_groups.flatMap((group) => group.slots)[0]!;
+    const baseSpellings = new Map(
+      noun.base_form.variants.map((variant) => [
+        variant.dialect,
+        variant.spelling
+      ])
+    );
+    plural.variants = plural.variants.map((variant) => ({
+      ...variant,
+      spelling: baseSpellings.get(variant.dialect)!
+    }));
+    const savedForms = await mock.saveFormsStep(draft.word.id, {
+      base_revision: draft.word.revision,
+      operation_id: "sentence-resolver-ambiguous-forms",
+      intent: "complete",
+      content: forms
+    });
+    const savedMeanings = await mock.saveMeaningsStep(savedForms.word.id, {
+      base_revision: savedForms.word.revision,
+      operation_id: "sentence-resolver-ambiguous-meanings",
+      intent: "complete",
+      content: completeMockMeanings(savedForms.word)
+    });
+    const published = await mock.publishV2(savedMeanings.word.id, {
+      base_revision: savedMeanings.word.revision,
+      idempotency_key: "sentence-resolver-ambiguous-publish"
+    });
+    const senseId = published.word.meanings.pos.find(
+      (pos) => pos.pos_id === noun.pos_id
+    )!.senses[0]!.id;
+
+    await expect(
+      mock.sentenceAssociations.resolve({
+        en_text: richText("center it."),
+        source_range: { start: 0, end: 6, surface: "center" },
+        target_word_id: published.word.id,
+        target_sense_id: senseId
+      })
+    ).resolves.toMatchObject({
+      resolution: "ambiguous",
+      candidates: [
+        { form_slot_id: noun.base_form.id },
+        { form_slot_id: plural.id }
+      ]
+    });
+  });
+
+  it("mock 保存按业务键去重 pending，并支持反向查询与原子认领", async () => {
+    const mock = mockFor();
+    const targetReady = await completeCenter(mock);
+    const target = await mock.publishV2(targetReady.id, {
+      base_revision: targetReady.revision,
+      idempotency_key: "sentence-claim-target-publish"
+    });
+    const ownerDraft = await createDetectedWord(
+      mock,
+      "far",
+      "sentence-claim-owner"
+    );
+    const ownerReady = await completeDraft(
+      mock,
+      ownerDraft,
+      "sentence-claim-owner"
+    );
+    const pendingAssociation = {
+      id: "pending-center",
+      state: "pending" as const,
+      source_range: { start: 0, end: 6, surface: "Center" },
+      pending_word: " Center "
+    };
+    const saved = await mock.saveMeaningsStep(ownerReady.id, {
+      base_revision: ownerReady.revision,
+      operation_id: "sentence-claim-owner-shared",
+      intent: "save",
+      content: {
+        ...ownerReady.meanings,
+        shared_sentences: [
+          {
+            id: "shared-center",
+            level: "A1",
+            en_text_id: "shared-center-en",
+            en_text: richText("Center the picture."),
+            zh_text_id: "shared-center-zh",
+            zh_text: richText("把画放在中间。"),
+            associations: [
+              pendingAssociation,
+              { ...pendingAssociation, id: "pending-center-duplicate" },
+              {
+                id: "linked-center-conflict",
+                state: "linked",
+                source_range: pendingAssociation.source_range,
+                target_word_id: target.word.id,
+                target_sense_id: target.word.meanings.pos[0]!.senses[0]!.id,
+                form_slot_id: target.word.forms.pos[0]!.base_form.id,
+                sort_order: 0
+              }
+            ]
+          }
+        ]
+      } as DraftMeaningsWithSentenceAssociations
+    });
+    expect(
+      sentenceAssociationMeanings(saved.word.meanings).shared_sentences?.[0]
+        ?.associations
+    ).toMatchObject([
+      {
+        id: "pending-center",
+        state: "pending",
+        normalized_pending_word: "center"
+      }
+    ]);
+
+    const ownerPublished = await mock.publishV2(saved.word.id, {
+      base_revision: saved.word.revision,
+      idempotency_key: "sentence-claim-owner-publish"
+    });
+    await expect(
+      mock.sentenceAssociations.listPending(ownerPublished.word.id)
+    ).resolves.toMatchObject({ total: 0, results: [] });
+
+    const page = await mock.sentenceAssociations.listPending(target.word.id);
+    expect(page).toMatchObject({
+      total: 1,
+      results: [
+        {
+          association_id: "pending-center",
+          sentence_id: "shared-center",
+          owner_entry_id: ownerReady.id,
+          owner_entry_revision: saved.word.revision
+        }
+      ]
+    });
+
+    const targetSenseId = target.word.meanings.pos[0]!.senses[0]!.id;
+    const resolution = await mock.sentenceAssociations.resolve({
+      en_text: page.results[0]!.en_text,
+      source_range: page.results[0]!.source_range,
+      target_word_id: target.word.id,
+      target_sense_id: targetSenseId
+    });
+    if (resolution.resolution !== "resolved") {
+      throw new Error("center fixture must resolve to one form slot");
+    }
+    const claimInput = {
+      target_word_id: target.word.id,
+      target_sense_id: targetSenseId,
+      form_slot_id: resolution.candidate.form_slot_id,
+      base_owner_entry_revision: saved.word.revision
+    };
+    await expect(
+      mock.sentenceAssociations.claim(
+        "pending-center",
+        "sentence-claim-stale-key",
+        { ...claimInput, base_owner_entry_revision: saved.word.revision - 1 }
+      )
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "entry_revision_conflict"
+    });
+    const claimed = await mock.sentenceAssociations.claim(
+      "pending-center",
+      "sentence-claim-key",
+      claimInput
+    );
+    expect(claimed).toMatchObject({
+      association: {
+        id: "pending-center",
+        state: "linked",
+        target_word_id: target.word.id,
+        target_sense_id: targetSenseId
+      },
+      owner_entry_id: ownerReady.id,
+      owner_entry_revision: saved.word.revision + 1
+    });
+    await expect(
+      mock.sentenceAssociations.claim(
+        "pending-center",
+        "sentence-claim-key",
+        claimInput
+      )
+    ).resolves.toEqual(claimed);
+    await expect(
+      mock.sentenceAssociations.claim(
+        "pending-center",
+        "sentence-claim-second-key",
+        claimInput
+      )
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "pending_sentence_association_claimed"
+    });
   });
 });
 

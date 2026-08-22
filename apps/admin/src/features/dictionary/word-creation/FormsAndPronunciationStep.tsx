@@ -20,6 +20,7 @@ import {
   Button,
   Card,
   Dropdown,
+  Empty,
   Flex,
   Input,
   Modal,
@@ -1373,16 +1374,30 @@ function PosFormsEditor({
   ) => Promise<void>;
   onChange: (next: WordPosFormsV2) => void;
 }) {
-  const allowedTypes = legalDerivedFormTypes(value.pos, configuredAllowedTypes);
   const capabilityLoaded = configuredAllowedTypes !== undefined;
-  const defaultTypes = configuredDefaultTypes ?? allowedTypes;
+  const existingTypes = Array.from(
+    new Set(
+      value.form_groups.flatMap((group) =>
+        group.slots.map((slot) => slot.form_type)
+      )
+    )
+  );
+  const allowedTypes = legalDerivedFormTypes(
+    value.pos,
+    configuredAllowedTypes ?? existingTypes
+  );
+  const defaultTypes = capabilityLoaded
+    ? (configuredDefaultTypes ?? allowedTypes)
+    : [];
   const orderedTypes = [
     ...defaultTypes,
     ...allowedTypes.filter((type) => !defaultTypes.includes(type))
   ];
-  const invalidSlots = value.form_groups.flatMap((group) =>
-    group.slots.filter((slot) => !allowedTypes.includes(slot.form_type))
-  );
+  const invalidSlots = capabilityLoaded
+    ? value.form_groups.flatMap((group) =>
+        group.slots.filter((slot) => !allowedTypes.includes(slot.form_type))
+      )
+    : [];
   const showDerivedGroups = allowedTypes.length > 0 || invalidSlots.length > 0;
   const spellingForced = headwords.mode === "distinguish";
   const voiceNotice = usePronunciationVoiceNotice(formDialects(value));
@@ -1482,14 +1497,6 @@ function PosFormsEditor({
       data-word-field="form_groups"
     >
       <Space orientation="vertical" size={14} style={{ width: "100%" }}>
-        {!capabilityLoaded && (
-          <Alert
-            type="warning"
-            showIcon
-            title="词形规则未加载"
-            description="现有词形仅供查看；重新加载到服务端词性能力后才能新增或完成本步骤。"
-          />
-        )}
         {capabilityLoaded && allowedTypes.length === 0 && (
           <Alert
             type="info"
@@ -1724,7 +1731,7 @@ function PosFormsEditor({
                       onGenerate={onGenerate}
                       onChange={onChange}
                     />
-                    {!readOnly && (
+                    {!readOnly && capabilityLoaded && (
                       <div className="word-form-add-slot-wrap">
                         <Button
                           type="dashed"
@@ -1732,13 +1739,11 @@ function PosFormsEditor({
                           className="word-form-add-slot"
                           disabled={!nextDefaultType}
                           title={
-                            !capabilityLoaded
-                              ? "词形规则未加载"
-                              : allowedTypes.length === 0
-                                ? "当前基本词性没有可添加的派生词形"
-                                : !nextDefaultType
-                                  ? "当前组已添加全部可用词形类型"
-                                  : undefined
+                            allowedTypes.length === 0
+                              ? "当前基本词性没有可添加的派生词形"
+                              : !nextDefaultType
+                                ? "当前组已添加全部可用词形类型"
+                                : undefined
                           }
                           onClick={() => {
                             if (!nextDefaultType) return;
@@ -1762,7 +1767,7 @@ function PosFormsEditor({
               </Card>
             );
           })}
-        {!readOnly && allowedTypes.length > 0 && (
+        {!readOnly && capabilityLoaded && allowedTypes.length > 0 && (
           <Button
             type="dashed"
             block
@@ -1786,7 +1791,7 @@ function PosFormsEditor({
 
 function countPosFormIssues(
   pos: WordPosFormsV2,
-  allowed: readonly WordDerivedFormSlotV2["form_type"][],
+  allowed: readonly WordDerivedFormSlotV2["form_type"][] | undefined,
   headwords: AdminWordV2["headwords"]
 ): number {
   return (
@@ -1800,7 +1805,7 @@ function countPosFormIssues(
         duplicateCount +
         group.slots.filter(
           (slot) =>
-            !allowed.includes(slot.form_type) ||
+            (allowed !== undefined && !allowed.includes(slot.form_type)) ||
             !formSlotComplete(slot, pos.dialect_rules)
         ).length
       );
@@ -2569,13 +2574,8 @@ export function FormsAndPronunciationStep({
       for (const pos of content.pos) {
         const posLabel = partOfSpeechLabel(partOfSpeechLookup, pos.pos);
         const configured = partOfSpeechLookup.byCode.get(pos.pos);
-        if (configured?.allowed_form_types === undefined) {
-          issues.push(`${posLabel}的词形规则未加载`);
-        }
-        const allowed = legalDerivedFormTypes(
-          pos.pos,
-          configured?.allowed_form_types
-        );
+        const configuredAllowedTypes = configured?.allowed_form_types;
+        const allowed = legalDerivedFormTypes(pos.pos, configuredAllowedTypes);
         const duplicateCount = pos.form_groups.reduce(
           (count, group) =>
             count +
@@ -2586,13 +2586,17 @@ export function FormsAndPronunciationStep({
         if (duplicateCount > 0) {
           issues.push(`${posLabel}有 ${duplicateCount} 个重复的派生词形类型`);
         }
-        const invalidCount = pos.form_groups.reduce(
-          (count, group) =>
-            count +
-            group.slots.filter((slot) => !allowed.includes(slot.form_type))
-              .length,
-          0
-        );
+        const invalidCount =
+          configuredAllowedTypes === undefined
+            ? 0
+            : pos.form_groups.reduce(
+                (count, group) =>
+                  count +
+                  group.slots.filter(
+                    (slot) => !allowed.includes(slot.form_type)
+                  ).length,
+                0
+              );
         if (invalidCount > 0) {
           issues.push(`${posLabel}有 ${invalidCount} 个不合法的派生词形类型`);
         }
@@ -2601,7 +2605,8 @@ export function FormsAndPronunciationStep({
             count +
             group.slots.filter(
               (slot) =>
-                allowed.includes(slot.form_type) &&
+                (configuredAllowedTypes === undefined ||
+                  allowed.includes(slot.form_type)) &&
                 !formSlotComplete(slot, pos.dialect_rules)
             ).length,
           0
@@ -2711,10 +2716,7 @@ export function FormsAndPronunciationStep({
         <Badge
           count={countPosFormIssues(
             pos,
-            legalDerivedFormTypes(
-              pos.pos,
-              partOfSpeechLookup.byCode.get(pos.pos)?.allowed_form_types
-            ),
+            partOfSpeechLookup.byCode.get(pos.pos)?.allowed_form_types,
             word.headwords
           )}
           size="small"
@@ -2772,6 +2774,56 @@ export function FormsAndPronunciationStep({
       />
     )
   }));
+
+  const addBasicPos = (classification: WordPosTag) => {
+    const next = createPosForms(classification, word.headwords);
+    updateContent({ pos: [...content.pos, next] });
+    setActivePosId(next.pos_id);
+  };
+
+  const addBasicPosSelect = !readOnly ? (
+    <Select<WordPosTag>
+      className="word-add-basic-pos-select"
+      aria-label="添加基本词性"
+      placeholder="添加基本词性"
+      value={undefined}
+      options={availablePos}
+      loading={partOfSpeechCatalog.isPending}
+      disabled={partOfSpeechCatalog.isError}
+      style={{ width: 190 }}
+      suffixIcon={<PlusOutlined />}
+      onChange={addBasicPos}
+    />
+  ) : null;
+
+  const tabItems =
+    content.pos.length === 0
+      ? [
+          {
+            key: "empty",
+            label: "基本词性",
+            disabled: true,
+            children: (
+              <div className="word-forms-tabs-empty">
+                <Empty
+                  className="word-forms-tabs-empty-content"
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={
+                    <Space orientation="vertical" size={4}>
+                      <Typography.Text strong>暂无基本词性</Typography.Text>
+                      <Typography.Text type="secondary">
+                        {readOnly
+                          ? "该词条没有记录任何基本词性。"
+                          : "内置词典未检测到词性建议，请从右上角添加基本词性。"}
+                      </Typography.Text>
+                    </Space>
+                  }
+                />
+              </div>
+            )
+          }
+        ]
+      : items;
 
   return (
     <>
@@ -2866,48 +2918,14 @@ export function FormsAndPronunciationStep({
             style={{ marginBottom: 16 }}
           />
         )}
-        {content.pos.length === 0 && (
-          <Alert
-            type="info"
-            showIcon
-            title="当前还没有基本词性"
-            description={
-              readOnly
-                ? "该词条没有记录任何基本词性。"
-                : "内置词典未命中或没有带回建议词性时，本步骤从空白开始。请用右上角的「添加基本词性」添加第一个词性，再逐个补录词形、字典音标与实际发音。"
-            }
-            style={{ marginBottom: 16 }}
-          />
-        )}
         <PronunciationPreviewProvider readOnly={readOnly}>
           <div data-word-node-id="forms" data-word-field="pos">
             <Tabs
               className="word-pos-tabs word-forms-tabs"
-              activeKey={activePosId}
+              activeKey={content.pos.length === 0 ? "empty" : activePosId}
               onChange={setActivePosId}
-              items={items}
-              tabBarExtraContent={
-                !readOnly ? (
-                  <Select<WordPosTag>
-                    aria-label="添加基本词性"
-                    placeholder="添加基本词性"
-                    value={undefined}
-                    options={availablePos}
-                    loading={partOfSpeechCatalog.isPending}
-                    disabled={partOfSpeechCatalog.isError}
-                    style={{ width: 170 }}
-                    suffixIcon={<PlusOutlined />}
-                    onChange={(classification) => {
-                      const next = createPosForms(
-                        classification,
-                        word.headwords
-                      );
-                      updateContent({ pos: [...content.pos, next] });
-                      setActivePosId(next.pos_id);
-                    }}
-                  />
-                ) : null
-              }
+              items={tabItems}
+              tabBarExtraContent={addBasicPosSelect}
             />
           </div>
         </PronunciationPreviewProvider>

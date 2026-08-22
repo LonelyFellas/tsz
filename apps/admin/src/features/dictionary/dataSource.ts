@@ -1,6 +1,13 @@
 import { api, useAuthStore } from "@/lib/auth";
 import { env } from "@/lib/env";
 import type { AdminWordListQuery, AdminWordListResponse } from "@tsz/types";
+import type {
+  ClaimPendingSentenceAssociationInput,
+  ClaimPendingSentenceAssociationResponse,
+  PendingSentenceAssociationPageV1,
+  ResolveSentenceAssociationInput,
+  ResolveSentenceAssociationResponse
+} from "./word-creation/meaningsAndExamples/sentenceAssociationTypes";
 
 type AdminWordsApi = typeof api.words;
 type AdminPartOfSpeechSettingsApi = typeof api.partOfSpeechSettings;
@@ -33,6 +40,22 @@ type RealAdminWordsDataSource = Pick<
 export type AdminWordsDataSource = Omit<RealAdminWordsDataSource, "list"> & {
   list: (query?: AdminWordListQuery) => Promise<AdminWordListResponse>;
 };
+
+export interface SentenceAssociationsDataSource {
+  readonly available: boolean;
+  resolve: (
+    input: ResolveSentenceAssociationInput
+  ) => Promise<ResolveSentenceAssociationResponse>;
+  listPending: (
+    targetWordId: string,
+    query?: { page_size?: number; cursor?: string }
+  ) => Promise<PendingSentenceAssociationPageV1>;
+  claim: (
+    associationId: string,
+    idempotencyKey: string,
+    input: ClaimPendingSentenceAssociationInput
+  ) => Promise<ClaimPendingSentenceAssociationResponse>;
+}
 
 export const realAdminWordsDataSource: AdminWordsDataSource = api.words;
 
@@ -79,6 +102,7 @@ export function selectAdminWordsDataSource(
 }
 
 type ClearableAdminWordsDataSource = AdminWordsDataSource & {
+  sentenceAssociations: Omit<SentenceAssociationsDataSource, "available">;
   partOfSpeechSettings: AdminPartOfSpeechDataSource;
   clearSession?: () => void;
 };
@@ -199,6 +223,33 @@ export const adminWordsDataSource: AdminWordsDataSource = {
     (await resolveAdminWordsDataSource()).deleteDraft(wordId, input),
   relatedSearch: async (q, opts) =>
     (await resolveAdminWordsDataSource()).relatedSearch(q, opts)
+};
+
+async function requireSentenceAssociationMock(): Promise<
+  ClearableAdminWordsDataSource["sentenceAssociations"]
+> {
+  if (!adminWordsMockEnabled) {
+    throw new Error("多维例句关联等待 tsz-rust 正式 OpenAPI 契约");
+  }
+  return (await resolveAdminWordsMockRuntime()).sentenceAssociations;
+}
+
+/**
+ * 契约就绪边界：当前仅开发/mock 数据源可用。真实数据源不会拼接或调用尚不存在
+ * 的 URL，也不会把 shared_sentences 提前发送给 meanings 端点。
+ */
+export const sentenceAssociationsDataSource: SentenceAssociationsDataSource = {
+  available: adminWordsMockEnabled,
+  resolve: async (input) =>
+    (await requireSentenceAssociationMock()).resolve(input),
+  listPending: async (targetWordId, query) =>
+    (await requireSentenceAssociationMock()).listPending(targetWordId, query),
+  claim: async (associationId, idempotencyKey, input) =>
+    (await requireSentenceAssociationMock()).claim(
+      associationId,
+      idempotencyKey,
+      input
+    )
 };
 
 /**

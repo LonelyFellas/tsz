@@ -6,11 +6,13 @@ import {
   englishTextComplete,
   englishTextIssueField,
   grammarStructureIssueTarget,
+  sharedSentenceIssueTarget,
   wordSenseComplete,
   wordSenseIssueTarget,
   wordSentenceIssueTarget,
   validateMeanings
 } from "./validation";
+import { sentenceAssociationMeanings } from "./sentenceAssociationTypes";
 
 describe("meanings and examples validation", () => {
   it("接受完整 unified 与双方言英语文本，拒绝空白或 missing 方言", () => {
@@ -61,6 +63,49 @@ describe("meanings and examples validation", () => {
 
   it("完整 fixture 无校验问题", () => {
     expect(validateMeanings(wordFixture({ ready: true }).meanings)).toEqual([]);
+  });
+
+  it("共享例句允许合法 pending，空关联会阻断完整性并定位根节点", () => {
+    const meanings = structuredClone(
+      sentenceAssociationMeanings(wordFixture({ ready: true }).meanings)
+    );
+    meanings.shared_sentences = [
+      {
+        id: "shared-validation",
+        level: "A1",
+        en_text_id: "shared-validation-en",
+        en_text: {
+          version: 1,
+          text: "Center it.",
+          spans: [],
+          liaisons: []
+        },
+        zh_text_id: "shared-validation-zh",
+        zh_text: {
+          version: 1,
+          text: "把它放中间。",
+          spans: [],
+          liaisons: []
+        },
+        associations: [
+          {
+            id: "pending-validation",
+            state: "pending",
+            source_range: { start: 0, end: 6, surface: "Center" },
+            pending_word: "Center"
+          }
+        ]
+      }
+    ];
+    expect(validateMeanings(meanings)).toEqual([]);
+    meanings.shared_sentences[0]!.associations = [];
+    expect(sharedSentenceIssueTarget(meanings.shared_sentences[0]!)).toEqual({
+      node_id: "shared-validation",
+      field: "associations"
+    });
+    expect(validateMeanings(meanings)).toContain(
+      "请补齐多维例句正文、译文和有效位置关联"
+    );
   });
 
   it("存量双份英文内容的 issue 定位指向缺失的那一侧", () => {

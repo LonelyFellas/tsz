@@ -7,6 +7,7 @@ import type {
   RichTextV2
 } from "@tsz/types";
 import { HttpError } from "@tsz/api-client/http";
+import type { DraftMeaningsWithSentenceAssociations } from "./meaningsAndExamples/sentenceAssociationTypes";
 import {
   MAX_ENTRY_CONTENT_NODES,
   PAYLOAD_TOO_LARGE_MESSAGE,
@@ -51,7 +52,7 @@ const LONG = "x".repeat(5001);
 function meanings(
   overrides: Partial<DraftMeaningsStepContent["pos"][number]> = {},
   posCount = 1
-): DraftMeaningsStepContent {
+): DraftMeaningsWithSentenceAssociations {
   return {
     sense_groups: [{ id: "g1", name_zh: "区间", name_en: "Range" }],
     pos: Array.from({ length: posCount }, (_, index) => ({
@@ -181,6 +182,54 @@ describe("meaningsContentLimitIssues", () => {
         field: "zh_text",
         message:
           "词义 1 · 例句 1汉语译文：正文 5001 个字符，超出上限 5000，请删减 1 个字符"
+      }
+    ]);
+  });
+
+  it("共享例句正文只校验一次，不随关联词义数量重复", () => {
+    const content = meanings();
+    content.shared_sentences = [
+      {
+        id: "shared-1",
+        level: "A1",
+        en_text_id: "shared-1-en",
+        en_text: rt(LONG),
+        zh_text_id: "shared-1-zh",
+        zh_text: rt(LONG),
+        associations: [
+          {
+            id: "linked-1",
+            state: "linked",
+            source_range: { start: 0, end: 1, surface: "x" },
+            target_word_id: "word-1",
+            target_sense_id: "sense-1",
+            form_slot_id: "slot-1",
+            sort_order: 0
+          },
+          {
+            id: "linked-2",
+            state: "linked",
+            source_range: { start: 1, end: 2, surface: "x" },
+            target_word_id: "word-2",
+            target_sense_id: "sense-2",
+            form_slot_id: "slot-2",
+            sort_order: 0
+          }
+        ]
+      }
+    ];
+    expect(meaningsContentLimitIssues(content)).toEqual([
+      {
+        node_id: "shared-1",
+        field: "sentence",
+        message:
+          "多维例句 1英文：正文 5001 个字符，超出上限 5000，请删减 1 个字符"
+      },
+      {
+        node_id: "shared-1",
+        field: "zh_text",
+        message:
+          "多维例句 1汉语译文：正文 5001 个字符，超出上限 5000，请删减 1 个字符"
       }
     ]);
   });
@@ -385,6 +434,36 @@ describe("节点数", () => {
     });
     // 区间 1 + 语法 2 + 词义 1 + 关系 1 + 释义 2+2 + 例句 3
     expect(meaningsContentNodeCount(content)).toBe(12);
+  });
+
+  it("共享例句正文只计一次，位置关联按稳定身份计数", () => {
+    const content = meanings();
+    content.shared_sentences = [
+      {
+        id: "shared-1",
+        level: "A1",
+        en_text_id: "shared-1-en",
+        en_text: rt("one sentence"),
+        zh_text_id: "shared-1-zh",
+        zh_text: rt("一个例句"),
+        associations: [
+          {
+            id: "pending-1",
+            state: "pending",
+            source_range: { start: 0, end: 3, surface: "one" },
+            pending_word: "one"
+          },
+          {
+            id: "pending-2",
+            state: "pending",
+            source_range: { start: 4, end: 12, surface: "sentence" },
+            pending_word: "sentence"
+          }
+        ]
+      }
+    ];
+    // 语义区间 1 + shared sentence/en/zh 3 + association 2。
+    expect(meaningsContentNodeCount(content)).toBe(6);
   });
 
   it("按 forms + meanings 合计判定，恰好等于上限放行", () => {

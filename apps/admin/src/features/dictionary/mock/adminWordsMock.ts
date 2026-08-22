@@ -56,6 +56,21 @@ import type {
   WordPosMeaningsV2,
   WordSenseV2
 } from "@tsz/types";
+import type {
+  ClaimPendingSentenceAssociationInput,
+  ClaimPendingSentenceAssociationResponse,
+  DraftMeaningsWithSentenceAssociations,
+  PendingSentenceAssociationPageV1,
+  ResolveSentenceAssociationInput,
+  ResolveSentenceAssociationResponse
+} from "../word-creation/meaningsAndExamples/sentenceAssociationTypes";
+import { sentenceAssociationMeanings } from "../word-creation/meaningsAndExamples/sentenceAssociationTypes";
+import {
+  normalizePendingWord,
+  normalizeSentenceAssociations,
+  resolveSentenceAssociationFromWord,
+  sharedSentenceIssueField
+} from "../word-creation/meaningsAndExamples/sentenceAssociationModel";
 import {
   ADMIN_WORDS_MOCK_STORAGE_SCHEMA,
   createDetectionFixture,
@@ -802,7 +817,7 @@ function wordHasSense(word: MockWord, senseId: string): boolean {
 
 function validateMeanings(
   word: AdminWordV2,
-  content: DraftMeaningsStepContent,
+  content: DraftMeaningsWithSentenceAssociations,
   current: AdminWordsMockPersistedState,
   validatePartOfSpeech = true
 ): DraftValidationIssue[] {
@@ -816,6 +831,18 @@ function validateMeanings(
       code: "sense_group_required",
       message: "至少需要一个语义区间"
     });
+  }
+  for (const sentence of content.shared_sentences ?? []) {
+    const field = sharedSentenceIssueField(sentence);
+    if (field) {
+      issues.push({
+        step: "meanings",
+        node_id: sentence.id,
+        field,
+        code: "shared_sentence_invalid",
+        message: "请补齐多维例句正文、译文和有效位置关联"
+      });
+    }
   }
   for (const group of content.sense_groups) {
     const names = [
@@ -1533,6 +1560,13 @@ export function createAdminWordsMock({
   const surfaceSnapshotPages = new Map<string, MockSurfaceSnapshot>();
   const surfaceTokenSnapshotIds = new Map<string, string>();
   const activeFormsSurfaceSnapshotIds = new Map<string, string>();
+  const sentenceClaimIdempotency = new Map<
+    string,
+    {
+      request_json: string;
+      response: ClaimPendingSentenceAssociationResponse;
+    }
+  >();
   function clearSurfaceRuntime(): void {
     surfaceSnapshotPages.clear();
     surfaceTokenSnapshotIds.clear();
@@ -3750,10 +3784,11 @@ export function createAdminWordsMock({
         }
       );
     }
-    assertConfiguredMeanings(current, word.forms, input.content);
+    const localContent = sentenceAssociationMeanings(input.content);
+    assertConfiguredMeanings(current, word.forms, localContent);
     const issues = validateMeanings(
       word,
-      input.content,
+      localContent,
       current,
       validatesInternalPartOfSpeech
     );
@@ -3772,7 +3807,21 @@ export function createAdminWordsMock({
       );
     }
     const priorCompleted = new Set(word.completed_steps);
-    word.meanings = clone(input.content);
+    const normalizedContent: DraftMeaningsWithSentenceAssociations = {
+      ...localContent,
+      ...(localContent.shared_sentences
+        ? {
+            shared_sentences: localContent.shared_sentences.map((sentence) => ({
+              ...sentence,
+              associations: normalizeSentenceAssociations(
+                sentence.id,
+                sentence.associations
+              )
+            }))
+          }
+        : {})
+    };
+    word.meanings = clone(normalizedContent);
     word.revision += 1;
     word.updated_at = nextTimestamp(current);
     reconcileProgress(word, current, "meanings", input.intent, priorCompleted);
@@ -4321,11 +4370,254 @@ export function createAdminWordsMock({
     };
   }
 
+  async function resolveSentenceAssociation(
+    input: ResolveSentenceAssociationInput
+  ): Promise<ResolveSentenceAssociationResponse> {
+    await pause();
+    const { state: current } = context();
+    const published = current.publication_words[input.target_word_id];
+    const currentDraft =
+      input.current_word_id === input.target_word_id
+        ? current.words[input.target_word_id]
+        : undefined;
+    const target = published ?? currentDraft;
+    if (!target) return { resolution: "unmatched", candidates: [] };
+    return clone(
+      resolveSentenceAssociationFromWord(input, target, {
+        allowDraft: target.status === "draft" && target === currentDraft
+      })
+    );
+  }
+
+  function publishedSurfaces(word: AdminWordV2): Set<string> {
+    const surfaces = new Set<string>();
+    if (word.headwords.mode === "unified") {
+      surfaces.add(normalizePendingWord(word.headwords.common));
+    } else {
+      surfaces.add(normalizePendingWord(word.headwords.uk));
+      surfaces.add(normalizePendingWord(word.headwords.us));
+    }
+    for (const pos of word.forms.pos) {
+      for (const slot of [
+        pos.base_form,
+        ...pos.form_groups.flatMap((group) => group.slots)
+      ]) {
+        for (const variant of slot.variants) {
+          surfaces.add(normalizePendingWord(variant.spelling));
+        }
+      }
+    }
+    return surfaces;
+  }
+
+  async function listPendingSentenceAssociations(
+    targetWordId: string,
+    query: { page_size?: number; cursor?: string } = {}
+  ): Promise<PendingSentenceAssociationPageV1> {
+    await pause();
+    const { state: current } = context();
+    const target = current.publication_words[targetWordId];
+    if (!target) return { results: [], total: 0, next_cursor: null };
+    const surfaces = publishedSurfaces(target);
+    const results = Object.values(current.words)
+      .flatMap((owner) =>
+        (
+          sentenceAssociationMeanings(owner.meanings).shared_sentences ?? []
+        ).flatMap((sentence) =>
+          sentence.associations.flatMap((association) => {
+            if (
+              association.state !== "pending" ||
+              !surfaces.has(
+                association.normalized_pending_word ??
+                  normalizePendingWord(association.pending_word)
+              )
+            ) {
+              return [];
+            }
+            return [
+              {
+                association_id: association.id,
+                sentence_id: sentence.id,
+                owner_entry_id: owner.id,
+                owner_entry_revision: owner.revision,
+                en_text: sentence.en_text,
+                zh_text: sentence.zh_text,
+                source_range: association.source_range,
+                pending_word: association.pending_word,
+                created_at: association.created_at ?? owner.updated_at
+              }
+            ];
+          })
+        )
+      )
+      .sort((left, right) =>
+        [left.created_at, left.association_id]
+          .join("\0")
+          .localeCompare([right.created_at, right.association_id].join("\0"))
+      );
+    const limit = Math.min(100, Math.max(1, query.page_size ?? 20));
+    const offset = Math.max(0, Number(query.cursor ?? 0) || 0);
+    const page = results.slice(offset, offset + limit);
+    return {
+      results: clone(page),
+      total: results.length,
+      next_cursor:
+        offset + page.length < results.length
+          ? String(offset + page.length)
+          : null
+    };
+  }
+
+  async function claimPendingSentenceAssociation(
+    associationId: string,
+    idempotencyKey: string,
+    input: ClaimPendingSentenceAssociationInput
+  ): Promise<ClaimPendingSentenceAssociationResponse> {
+    await pause();
+    const { state: current } = context();
+    const requestJson = JSON.stringify({ associationId, input });
+    const prior = sentenceClaimIdempotency.get(idempotencyKey);
+    if (prior) {
+      if (prior.request_json !== requestJson) {
+        throw new HttpError(
+          409,
+          "idempotency key reused",
+          [],
+          "idempotency_key_conflict"
+        );
+      }
+      return clone(prior.response);
+    }
+
+    let owner: AdminWordV2 | undefined;
+    let sentenceIndex = -1;
+    let associationIndex = -1;
+    for (const candidate of Object.values(current.words)) {
+      const sentences =
+        sentenceAssociationMeanings(candidate.meanings).shared_sentences ?? [];
+      for (
+        let currentSentenceIndex = 0;
+        currentSentenceIndex < sentences.length;
+        currentSentenceIndex += 1
+      ) {
+        const currentAssociationIndex = sentences[
+          currentSentenceIndex
+        ]!.associations.findIndex((item) => item.id === associationId);
+        if (currentAssociationIndex >= 0) {
+          owner = candidate;
+          sentenceIndex = currentSentenceIndex;
+          associationIndex = currentAssociationIndex;
+          break;
+        }
+      }
+      if (owner) break;
+    }
+    const sentence = owner
+      ? sentenceAssociationMeanings(owner.meanings).shared_sentences?.[
+          sentenceIndex
+        ]
+      : undefined;
+    const pending = sentence?.associations[associationIndex];
+    if (!owner || !sentence || !pending || pending.state !== "pending") {
+      throw new HttpError(
+        409,
+        "pending association already claimed",
+        [],
+        "pending_sentence_association_claimed"
+      );
+    }
+    if (owner.revision !== input.base_owner_entry_revision) {
+      throw new HttpError(
+        409,
+        "owner entry revision changed",
+        [],
+        "entry_revision_conflict"
+      );
+    }
+    const target = current.publication_words[input.target_word_id];
+    const resolution = target
+      ? resolveSentenceAssociationFromWord(
+          {
+            en_text: sentence.en_text,
+            source_range: pending.source_range,
+            target_word_id: input.target_word_id,
+            target_sense_id: input.target_sense_id
+          },
+          target
+        )
+      : { resolution: "unmatched" as const, candidates: [] as const };
+    const candidates =
+      resolution.resolution === "resolved"
+        ? [resolution.candidate]
+        : resolution.candidates;
+    const form = candidates.find(
+      (candidate) => candidate.form_slot_id === input.form_slot_id
+    );
+    if (!target || !form) {
+      throw new HttpError(
+        422,
+        "sentence form unmatched",
+        [],
+        "sentence_form_unmatched"
+      );
+    }
+    const targetSense = target.meanings.pos
+      .flatMap((pos) => pos.senses)
+      .find((sense) => sense.id === input.target_sense_id);
+    const sortOrder =
+      Math.max(
+        -1,
+        ...(
+          sentenceAssociationMeanings(owner.meanings).shared_sentences ?? []
+        ).flatMap((item) =>
+          item.associations.flatMap((association) =>
+            association.state === "linked" &&
+            association.target_sense_id === input.target_sense_id
+              ? [association.sort_order]
+              : []
+          )
+        )
+      ) + 1;
+    const linked = {
+      id: pending.id,
+      state: "linked" as const,
+      source_range: pending.source_range,
+      target_word_id: input.target_word_id,
+      target_sense_id: input.target_sense_id,
+      form_slot_id: form.form_slot_id,
+      sort_order: sortOrder,
+      resolved_pos: form.pos,
+      resolved_form_type: form.form_type,
+      target_headword: displayHeadword(target),
+      target_gloss:
+        targetSense?.definitions
+          .map(v2ChineseDefinition)
+          .find((value) => value.trim() !== "") ?? "",
+      form_variants: form.variants
+    };
+    sentence.associations[associationIndex] = linked;
+    owner.revision += 1;
+    owner.updated_at = nextTimestamp(current);
+    owner.has_unpublished_changes = owner.published_revision !== undefined;
+    const response = {
+      association: clone(linked),
+      owner_entry_id: owner.id,
+      owner_entry_revision: owner.revision
+    };
+    sentenceClaimIdempotency.set(idempotencyKey, {
+      request_json: requestJson,
+      response: clone(response)
+    });
+    persist(current);
+    return response;
+  }
+
   function clearSession(): void {
     if (activeProfileId) persistedStorage.clear(activeProfileId);
     activeProfileId = undefined;
     state = undefined;
     clearSurfaceRuntime();
+    sentenceClaimIdempotency.clear();
   }
 
   async function createContentCompletionJob(): Promise<never> {
@@ -4362,6 +4654,11 @@ export function createAdminWordsMock({
     restoreBatch,
     deleteDraft,
     relatedSearch,
+    sentenceAssociations: {
+      resolve: resolveSentenceAssociation,
+      listPending: listPendingSentenceAssociations,
+      claim: claimPendingSentenceAssociation
+    },
     partOfSpeechSettings: {
       catalog: partOfSpeechCatalog,
       list: listPartOfSpeechConfigs,
@@ -4382,8 +4679,10 @@ export type AdminWordsMock = ReturnType<typeof createAdminWordsMock>;
 /** Test helper for making the generated empty meanings publishable without UI mapping. */
 export function completeMockMeanings(
   word: AdminWordV2,
-  content: DraftMeaningsStepContent = clone(word.meanings)
-): DraftMeaningsStepContent {
+  content: DraftMeaningsWithSentenceAssociations = clone(
+    sentenceAssociationMeanings(word.meanings)
+  )
+): DraftMeaningsWithSentenceAssociations {
   const senseGroups =
     content.sense_groups.length > 0
       ? content.sense_groups.map((group, index) => ({
@@ -4477,6 +4776,9 @@ export function completeMockMeanings(
   };
   return {
     sense_groups: clone(senseGroups),
+    ...(content.shared_sentences
+      ? { shared_sentences: clone(content.shared_sentences) }
+      : {}),
     pos: content.pos.map(fillPos)
   };
 }

@@ -6,6 +6,7 @@ import {
   shouldPollContentCompletion
 } from "./contentCompletion";
 import { createEnglishText } from "./model";
+import { sentenceAssociationMeanings } from "./meaningsAndExamples/sentenceAssociationTypes";
 
 function job(
   word = wordFixture(),
@@ -89,7 +90,7 @@ describe("content completion", () => {
 
   it("保留人工释义并补齐同词义缺失的例句", () => {
     const word = wordFixture();
-    const current = structuredClone(word.meanings);
+    const current = structuredClone(sentenceAssociationMeanings(word.meanings));
     const sense = current.pos[0]!.senses[0]!;
     const manualDefinition = sense.definitions[0]!;
     if (!("content_id" in manualDefinition)) throw new Error("expected zh");
@@ -390,6 +391,44 @@ describe("content completion", () => {
       content: word.meanings,
       report: []
     });
+  });
+
+  it("内容补全不会覆盖根级共享例句及其位置关联", () => {
+    const word = wordFixture();
+    const current = structuredClone(sentenceAssociationMeanings(word.meanings));
+    current.shared_sentences = [
+      {
+        id: "shared-content-completion",
+        level: "A1",
+        en_text_id: "shared-content-completion-en",
+        en_text: {
+          version: 1,
+          text: "Center it.",
+          spans: [],
+          liaisons: []
+        },
+        zh_text_id: "shared-content-completion-zh",
+        zh_text: {
+          version: 1,
+          text: "把它放中间。",
+          spans: [],
+          liaisons: []
+        },
+        associations: [
+          {
+            id: "shared-content-completion-link",
+            state: "pending",
+            source_range: { start: 0, end: 6, surface: "Center" },
+            pending_word: "center"
+          }
+        ]
+      }
+    ];
+
+    const result = applyContentCompletion(word, current, job(word), false);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.content.shared_sentences).toEqual(current.shared_sentences);
   });
 
   it("输出只包含候选存在的词性并允许当前空占位没有 sense group", () => {

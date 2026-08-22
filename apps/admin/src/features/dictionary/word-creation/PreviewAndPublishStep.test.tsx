@@ -5,6 +5,7 @@ import { App as AntApp } from "antd";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PreviewAndPublishStep } from "./PreviewAndPublishStep";
+import { sentenceAssociationMeanings } from "./meaningsAndExamples/sentenceAssociationTypes";
 import { deferred, wordFixture } from "./wordCreation.test.helper";
 
 const mutations = vi.hoisted(() => ({
@@ -169,6 +170,58 @@ describe("PreviewAndPublishStep", () => {
     ).toBeInTheDocument();
     // 主词顺序按方言偏好(缺省英式)，与左栏「当前词条」一致。
     expect(screen.getByText("centre / center")).toBeInTheDocument();
+  });
+
+  it("共享例句只预览一次，并按现有方言偏好替换已关联词形", async () => {
+    const word = wordFixture({ ready: true });
+    sentenceAssociationMeanings(word.meanings).shared_sentences = [
+      {
+        id: "shared-preview",
+        level: "A1",
+        en_text_id: "shared-preview-en",
+        en_text: {
+          version: 1,
+          text: "Center the picture.",
+          spans: [],
+          liaisons: []
+        },
+        zh_text_id: "shared-preview-zh",
+        zh_text: {
+          version: 1,
+          text: "把图片放在中央。",
+          spans: [],
+          liaisons: []
+        },
+        associations: [
+          {
+            id: "shared-preview-link",
+            state: "linked",
+            source_range: { start: 0, end: 6, surface: "Center" },
+            target_word_id: "word-center",
+            target_sense_id: word.meanings.pos[0]!.senses[0]!.id,
+            form_slot_id: "slot-center",
+            sort_order: 0,
+            form_variants: [
+              { dialect: "uk", spelling: "Centre" },
+              { dialect: "us", spelling: "Center" }
+            ]
+          }
+        ]
+      }
+    ];
+    mutations.validate.mockResolvedValue({
+      validated_revision: word.revision,
+      valid: true,
+      issues: []
+    });
+
+    renderStep(word);
+
+    expect(await screen.findByText("多维例句与位置关联")).toBeVisible();
+    expect(screen.queryByText(/共享例句/)).not.toBeInTheDocument();
+    expect(screen.getByText("Centre the picture.")).toBeVisible();
+    expect(screen.getAllByText("把图片放在中央。")).toHaveLength(1);
+    expect(screen.getByText("正式关联 1")).toBeVisible();
   });
 
   it("自动校验失败时列出可定位 issue，并禁止发布", async () => {

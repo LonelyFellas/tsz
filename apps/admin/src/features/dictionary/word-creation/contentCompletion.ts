@@ -6,6 +6,7 @@ import type {
   WordDefinitionV2,
   WordPosMeaningsV2
 } from "@tsz/types";
+import type { DraftMeaningsWithSentenceAssociations } from "./meaningsAndExamples/sentenceAssociationTypes";
 
 export interface ContentCompletionApplyReportItem {
   pos_id: string;
@@ -17,7 +18,7 @@ export type ContentCompletionApplyResult =
   | { ok: false; reason: "revision_changed" | "local_changes_after_generation" }
   | {
       ok: true;
-      content: DraftMeaningsStepContent;
+      content: DraftMeaningsWithSentenceAssociations;
       report: ContentCompletionApplyReportItem[];
     };
 
@@ -29,7 +30,7 @@ export function shouldPollContentCompletion(
 
 export function applyContentCompletion(
   word: AdminWordV2,
-  current: DraftMeaningsStepContent,
+  current: DraftMeaningsWithSentenceAssociations,
   job: ContentCompletionJob,
   locallyChangedAfterGeneration: boolean
 ): ContentCompletionApplyResult {
@@ -88,6 +89,7 @@ export function applyContentCompletion(
   return {
     ok: true,
     content: {
+      ...current,
       sense_groups: groups,
       pos: word.forms.pos.flatMap((formsPos) => {
         const pos = nextByPos.get(formsPos.pos_id);
@@ -101,7 +103,7 @@ export function applyContentCompletion(
 function mergeCandidatePos(
   existing: WordPosMeaningsV2,
   candidate: WordPosMeaningsV2,
-  current: DraftMeaningsStepContent,
+  current: DraftMeaningsWithSentenceAssociations,
   candidateGroups: Map<string, DraftMeaningsStepContent["sense_groups"][number]>
 ) {
   if (isPlaceholderPos(existing, current)) {

@@ -33,6 +33,12 @@ const mutations = vi.hoisted(() => ({
 const dataSourceCapabilities = vi.hoisted(() => ({
   dialectVariantSuggestions: true
 }));
+const sentenceAssociations = vi.hoisted(() => ({
+  available: false,
+  resolve: vi.fn(),
+  listPending: vi.fn(),
+  claim: vi.fn()
+}));
 // 第 3 步的英文口径来自管理员的方言偏好（A1），测试里直接注入，不依赖本地存储。
 const dialectPreference = vi.hoisted(() => ({ value: "uk" as "uk" | "us" }));
 vi.mock("@/features/settings/useDialectPreference", () => ({
@@ -113,7 +119,8 @@ const relatedWords = vi.hoisted(() => [
 ]);
 
 vi.mock("../dataSource", () => ({
-  adminWordsDataSourceCapabilities: dataSourceCapabilities
+  adminWordsDataSourceCapabilities: dataSourceCapabilities,
+  sentenceAssociationsDataSource: sentenceAssociations
 }));
 
 vi.mock("@/lib/env", () => ({ env: featureFlags }));
@@ -468,6 +475,14 @@ beforeEach(() => {
   ]);
   voicePreview.synthesize.mockReturnValue(new Promise(() => undefined));
   dataSourceCapabilities.dialectVariantSuggestions = true;
+  sentenceAssociations.available = false;
+  sentenceAssociations.resolve.mockReset();
+  sentenceAssociations.listPending.mockReset().mockResolvedValue({
+    results: [],
+    total: 0,
+    next_cursor: null
+  });
+  sentenceAssociations.claim.mockReset();
   dialectPreference.value = "uk";
   mutations.save.mockResolvedValue({
     word: wordFixture({ ready: true, revision: 4 })
