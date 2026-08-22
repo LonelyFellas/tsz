@@ -98,6 +98,63 @@ describe("ProfileHub — 渲染", () => {
     ).toBeInTheDocument();
   });
 
+  it("没有手机号时联系方式退到邮箱", async () => {
+    mockMe.mockResolvedValue(
+      meResponse({
+        user: userWith({ phone: undefined, email: "along@example.com" })
+      })
+    );
+    render(<ProfileHub />);
+
+    expect(await screen.findByText("along@example.com")).toBeInTheDocument();
+  });
+
+  it("手机与邮箱都没有时不渲染联系方式，页面照常可用", async () => {
+    mockMe.mockResolvedValue(
+      meResponse({ user: userWith({ phone: undefined, email: undefined }) })
+    );
+    render(<ProfileHub />);
+
+    expect(await screen.findByText("Along")).toBeInTheDocument();
+    expect(screen.queryByText("18266668888")).not.toBeInTheDocument();
+  });
+
+  // ⚠️ 下面两条锁定的是「卸载后 settle 不炸」：成功路径不抛错，失败路径不会变成
+  // 未处理拒绝(vitest 会把它判为失败)。源码里的 `if (alive)` 守卫本身在 React 18 下
+  // 从外部不可观测(卸载后 setState 是 no-op 且不再告警)——删掉守卫这两条依旧全绿,
+  // 别把它们当成守卫的回归防线。
+  it("组件卸载后响应才到达：不抛错", async () => {
+    let settle!: (value: MeResponse) => void;
+    mockMe.mockReturnValue(
+      new Promise<MeResponse>((resolve) => {
+        settle = resolve;
+      })
+    );
+    const { unmount } = render(<ProfileHub />);
+    unmount();
+    settle(meResponse());
+
+    await waitFor(() => expect(mockMe).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("Along")).not.toBeInTheDocument();
+  });
+
+  it("组件卸载后请求才失败：不留下未处理拒绝", async () => {
+    let fail!: (reason: unknown) => void;
+    mockMe.mockReturnValue(
+      new Promise<MeResponse>((_, reject) => {
+        fail = reject;
+      })
+    );
+    const { unmount } = render(<ProfileHub />);
+    unmount();
+    fail(new Error("boom"));
+
+    await waitFor(() => expect(mockMe).toHaveBeenCalledTimes(1));
+    expect(
+      screen.queryByText("资料加载失败,请刷新重试。")
+    ).not.toBeInTheDocument();
+  });
+
   it("有头像 → 渲染图片;加载失败 → 回退昵称首字母", async () => {
     mockMe.mockResolvedValue(
       meResponse({

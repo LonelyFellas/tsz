@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   MAX_TESTS,
   readQuota,
@@ -83,6 +83,20 @@ describe("recordResult / resetQuota", () => {
     expect(readQuota().last?.band).toBe("C1");
     resetQuota();
     expect(readQuota()).toEqual({ used: 0, last: null });
+  });
+});
+
+// 服务端渲染时没有 window,默认存储必须直接判空——碰一下 window.localStorage 就会抛。
+describe("默认存储在 SSR 下的降级", () => {
+  it("没有 window → 读到空态、写入静默跳过", () => {
+    vi.stubGlobal("window", undefined);
+    try {
+      expect(readQuota()).toEqual({ used: 0, last: null });
+      expect(() => recordResult("B2", "t")).not.toThrow();
+      expect(() => resetQuota()).not.toThrow();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });
 

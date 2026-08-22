@@ -144,6 +144,17 @@ describe("DialectPreference", () => {
     ).toBeNull();
   });
 
+  it("保存被非 Error 拒绝时回退到通用文案（不拼出 undefined）", async () => {
+    signIn("admin-weird-error", "uk");
+    updateProfilePreferences.mockRejectedValue("boom");
+    renderSetting();
+
+    fireEvent.click(usRadio());
+
+    expect(await screen.findByText("方言偏好未能保存")).toBeInTheDocument();
+    expect(ukRadio()).toBeChecked();
+  });
+
   it("缓存写不进去不影响保存成功——事实源已经在服务端了", async () => {
     signIn("admin-quota", "uk");
     vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {

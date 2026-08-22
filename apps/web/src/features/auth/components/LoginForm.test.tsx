@@ -418,6 +418,118 @@ describe("LoginForm — 验证码登录", () => {
   });
 });
 
+// 回车提交是与按钮并行的一条入口：按钮 disabled 挡不住键盘，故 handleLogin /
+// handleCodeLogin 里的 canSubmit 兜底必须在回车路径上验证。
+describe("LoginForm — 回车提交", () => {
+  const AUTH_OK = {
+    user: ME_USER,
+    access_token: "at",
+    active_role: "student",
+    expires_in: 900,
+    refresh_token_expires_at: 9999999999
+  };
+
+  it("密码框回车即登录", async () => {
+    const user = userEvent.setup();
+    mockLogin.mockResolvedValueOnce(AUTH_OK as never);
+    renderWithProviders(<LoginForm />);
+
+    await user.type(
+      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
+      "13800138000"
+    );
+    await user.type(screen.getByPlaceholderText("请输入登录密码"), "abc123");
+    await user.type(screen.getByPlaceholderText("请输入登录密码"), "{Enter}");
+
+    await waitFor(() =>
+      expect(mockLogin).toHaveBeenCalledWith("13800138000", "ABC123")
+    );
+  });
+
+  it("未填完整时密码框回车不发登录请求（键盘绕不过 canSubmit）", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await user.type(screen.getByPlaceholderText("请输入登录密码"), "abc123");
+    await user.type(screen.getByPlaceholderText("请输入登录密码"), "{Enter}");
+
+    expect(mockLogin).not.toHaveBeenCalled();
+  });
+
+  it("验证码框回车即登录", async () => {
+    const user = userEvent.setup();
+    mockLoginWithCode.mockResolvedValueOnce(AUTH_OK as never);
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "手机验证" }));
+    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
+    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
+    await user.type(screen.getByPlaceholderText("请输入验证码"), "{Enter}");
+
+    await waitFor(() =>
+      expect(mockLoginWithCode).toHaveBeenCalledWith("13800138000", "123456")
+    );
+  });
+
+  it("验证码不足六位时回车不发请求", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "手机验证" }));
+    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
+    await user.type(screen.getByPlaceholderText("请输入验证码"), "123");
+    await user.type(screen.getByPlaceholderText("请输入验证码"), "{Enter}");
+
+    expect(mockLoginWithCode).not.toHaveBeenCalled();
+  });
+});
+
+// 三条请求路径都用 `e instanceof Error ? e.message : ""` 取文案，
+// 非 Error 拒绝（如后端层抛出字符串）必须落到各自的兜底文案而不是空白提示。
+describe("LoginForm — 非 Error 拒绝的兜底文案", () => {
+  it("密码登录：登录失败，请稍后重试", async () => {
+    const user = userEvent.setup();
+    mockLogin.mockRejectedValueOnce("boom");
+    renderWithProviders(<LoginForm />);
+
+    await user.type(
+      screen.getByPlaceholderText("请输入手机号/邮箱号码"),
+      "13800138000"
+    );
+    await user.type(screen.getByPlaceholderText("请输入登录密码"), "abc123");
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+
+    expect(await screen.findByText("登录失败，请稍后重试")).toBeInTheDocument();
+  });
+
+  it("发码：验证码发送失败，请稍后重试", async () => {
+    const user = userEvent.setup();
+    mockSendCode.mockRejectedValueOnce("boom");
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "手机验证" }));
+    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
+    await user.click(screen.getByRole("button", { name: "获取验证码" }));
+
+    expect(
+      await screen.findByText("验证码发送失败，请稍后重试")
+    ).toBeInTheDocument();
+  });
+
+  it("验证码登录：登录失败，请稍后重试", async () => {
+    const user = userEvent.setup();
+    mockLoginWithCode.mockRejectedValueOnce("boom");
+    renderWithProviders(<LoginForm />);
+
+    await user.click(screen.getByRole("button", { name: "手机验证" }));
+    await user.type(screen.getByPlaceholderText("请输入手机号"), "13800138000");
+    await user.type(screen.getByPlaceholderText("请输入验证码"), "123456");
+    await user.click(screen.getByRole("button", { name: "立即登录" }));
+
+    expect(await screen.findByText("登录失败，请稍后重试")).toBeInTheDocument();
+  });
+});
+
 // ── 交互细节 ──────────────────────────────────────────
 describe("LoginForm — 交互细节", () => {
   it("点击眼睛图标 → 切换密码明文/密文", async () => {

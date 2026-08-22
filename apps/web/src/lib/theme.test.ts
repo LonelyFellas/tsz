@@ -102,6 +102,18 @@ describe("applyResolvedTheme / getResolvedFromDom", () => {
   });
 });
 
+describe("getResolvedFromDom:服务端", () => {
+  it("没有 document 时回退 light,由水合后的客户端校正", () => {
+    // 该函数会在 RSC/SSR 渲染路径上被调用,此处模拟服务端没有 document 的环境。
+    vi.stubGlobal("document", undefined);
+    try {
+      expect(getResolvedFromDom()).toBe("light");
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
 describe("setTheme", () => {
   it("写入显式选择并更新 <html>", () => {
     setTheme("dark");
