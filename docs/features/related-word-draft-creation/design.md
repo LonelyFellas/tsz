@@ -1,5 +1,22 @@
 # 关联词不存在时创建草稿并关联：技术设计文档
 
+> ## ⚠️ 本文档方案已作废（2026-08-23）
+>
+> 下文的「就地创建草稿并关联」方案，以及它依赖的 `target_state`、
+> `confirmed_unresolved_relations_token`、`unresolved_relations` 三个契约，
+> **后端从未实现**（tsz-rust `docs/openapi.json` 里均为 0 处）。
+>
+> 实际落地的是**待物化**形态：`WordRelationV2.pending_target_headword` 承载词面，
+> `target_word_id` / `target_sense_id` 转为可选且与之互斥（库层
+> `lexicon_relations_target_shape_check`）；待物化只允许存在于草稿，发布时后端
+> 建出 `status=Draft`、默认词性 `noun` 的占位词条并回填 target，与发布同事务。
+> 见 tsz-rust `ce3d351` / PR #59 与 `src/lexicon/service/publishing.rs`。
+>
+> **保留价值**：下方「后端核验结论（2026-08-22）」里关于学习端读取路径、
+> outbox 不投递、发布快照无需剔除未解析关联的四条核验，依然是有效的事实记录。
+>
+> 前端跟进见分支 `feat/relation-pending-target`。
+
 ## 后端核验结论（2026-08-22）
 
 后端已按本文档「后端对接建议」逐条核验并答复，评估文档见 tsz-rust 仓库

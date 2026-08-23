@@ -1494,6 +1494,99 @@ describe("MeaningsAndExamplesStep", () => {
     });
   });
 
+  it("库中没有的关联词给出常驻待建条提示，失焦后不消失", async () => {
+    renderStep(wordFixture({ ready: true }));
+    fireEvent.click(enabledButton("添加近义词"));
+    const search = screen.getByLabelText("近义词目标词条");
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: "reddish" } });
+
+    expect(
+      screen.getByRole("note", { name: "近义词待建条" })
+    ).toHaveTextContent("库中暂无该词，发布时会自动建成草稿词条");
+
+    // notFoundContent 那条是随下拉一起消失的浮层；待建条是对「保存后会发生什么」
+    // 的承诺，必须常驻行内，失焦后仍要看得见。
+    fireEvent.blur(search);
+    expect(
+      screen.getByRole("note", { name: "近义词待建条" })
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText("近义词目标词条")).toHaveValue("reddish");
+  });
+
+  it("待物化关联词以 pending_target_headword 上行，不带空的 target_*", async () => {
+    renderStep(wordFixture({ ready: true }));
+    fireEvent.click(enabledButton("添加近义词"));
+    const search = screen.getByLabelText("近义词目标词条");
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: "reddish" } });
+
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const relation =
+      mutations.save.mock.calls[0]![0].content.pos[0].senses[0].relations.at(
+        -1
+      )!;
+    // 词面以前被写进只读快照 target_headword，提交时整条被丢掉：界面「看着存住了」
+    // 全是假象，所以这里断的是真实 payload 而不是输入框。
+    expect(relation).toEqual({
+      id: expect.any(String),
+      relation: "synonym",
+      pending_target_headword: "reddish",
+      score: "0"
+    });
+    // 两形态在库层 CHECK 里互斥，空串占位会被后端当成非法形状。
+    expect(relation).not.toHaveProperty("target_word_id");
+    expect(relation).not.toHaveProperty("target_sense_id");
+  });
+
+  it("待物化词面被真实词条取代后提示消失，payload 回到已绑定形态", async () => {
+    renderStep(wordFixture({ ready: true }));
+    fireEvent.click(enabledButton("添加近义词"));
+    const search = screen.getByLabelText("近义词目标词条");
+    fireEvent.focus(search);
+    fireEvent.change(search, { target: { value: "reddish" } });
+    expect(
+      screen.getByRole("note", { name: "近义词待建条" })
+    ).toBeInTheDocument();
+
+    await selectInlineRelatedWord("近义词", "far", "far");
+    fireEvent.mouseDown(screen.getByLabelText("近义词目标词义"));
+    fireEvent.click(await screen.findByText("远的", { exact: true }));
+
+    expect(screen.queryByRole("note", { name: "近义词待建条" })).toBeNull();
+
+    fireEvent.click(button("保存草稿"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const relation =
+      mutations.save.mock.calls[0]![0].content.pos[0].senses[0].relations.at(
+        -1
+      )!;
+    expect(relation).toMatchObject({
+      target_word_id: "fixture-far",
+      target_sense_id: "fixture-far-sense"
+    });
+    expect(relation).not.toHaveProperty("pending_target_headword");
+  });
+
+  it("只读态回填待物化词面，且不再提示已经无法处理的建条", () => {
+    const word = wordFixture({ ready: true });
+    // 待物化形态只存在于草稿；只读态是历史版本/归档视图，词面只能来自
+    // pending_target_headword——回退链断了这里就是一个空框。
+    word.meanings.pos[0]!.senses[0]!.relations.push({
+      id: "relation-pending-readonly",
+      relation: "synonym",
+      pending_target_headword: "reddish",
+      score: "80"
+    });
+    renderStep(word, true);
+
+    expect(screen.getByLabelText("近义词目标词条")).toHaveValue("reddish");
+    expect(screen.queryByRole("note", { name: /待建条/ })).toBeNull();
+  });
+
   it("V2 搜索保留两个同名目标并保存明确选择的第二个 word_id+sense_id", async () => {
     featureFlags.RELATED_SEARCH_V2 = true;
     renderStep(wordFixture({ ready: true }));

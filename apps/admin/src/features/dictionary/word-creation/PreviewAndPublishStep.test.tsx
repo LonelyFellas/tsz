@@ -628,6 +628,70 @@ describe("PreviewAndPublishStep", () => {
     expect(screen.queryByText("en_definition")).toBeNull();
   });
 
+  it("待物化关联词在预览里显示录入词面与「发布时新建」，不退化成未选择", async () => {
+    const word = wordFixture({ ready: true, revision: 3 });
+    // 待物化形态：后端 skip_serializing_if 让两个 target_* 键整个缺席，
+    // 只有管理员录入的词面。
+    word.meanings.pos[0]!.senses[0]!.relations.push({
+      id: "relation-pending",
+      relation: "synonym",
+      pending_target_headword: "hub",
+      score: "80"
+    });
+    mutations.validate.mockResolvedValue({
+      validated_revision: 3,
+      valid: true,
+      issues: []
+    });
+    renderStep(word);
+
+    expect(
+      await screen.findByText("完整性检查通过，可以提交生效")
+    ).toBeVisible();
+    const previews = Array.from(
+      document.querySelectorAll<HTMLElement>(".ant-collapse-header")
+    );
+    previews.forEach((header) => fireEvent.click(header));
+
+    // Tag 文案是一串平铺文本节点，默认 matcher 只拼接直接文本子节点。
+    const tag = screen.getByText(/synonym/);
+    expect(tag).toHaveTextContent("synonym · hub · 80% · 发布时新建");
+    expect(tag).not.toHaveTextContent("未选择");
+    expect(tag.className).toContain("warning");
+  });
+
+  it("已绑定关联词的预览 Tag 不带「发布时新建」标记", async () => {
+    const word = wordFixture({ ready: true, revision: 3 });
+    word.meanings.pos[0]!.senses[0]!.relations.push({
+      id: "relation-bound",
+      relation: "antonym",
+      target_word_id: "word-edge",
+      target_sense_id: "sense-edge",
+      target_headword: "edge",
+      score: "60"
+    });
+    mutations.validate.mockResolvedValue({
+      validated_revision: 3,
+      valid: true,
+      issues: []
+    });
+    renderStep(word);
+
+    expect(
+      await screen.findByText("完整性检查通过，可以提交生效")
+    ).toBeVisible();
+    const previews = Array.from(
+      document.querySelectorAll<HTMLElement>(".ant-collapse-header")
+    );
+    previews.forEach((header) => fireEvent.click(header));
+
+    const tag = screen.getByText(/antonym/);
+    expect(tag).toHaveTextContent("antonym · edge · 60%");
+    expect(tag.textContent).not.toContain("发布时新建");
+    expect(tag.className).not.toContain("warning");
+    expect(screen.queryByText(/发布时新建/)).toBeNull();
+  });
+
   it("published 只读详情不重复 validate，展示发布时间并允许继续编辑", () => {
     const published = wordFixture({
       headword: "far",

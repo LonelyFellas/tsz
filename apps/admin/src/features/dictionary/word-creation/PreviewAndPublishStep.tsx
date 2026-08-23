@@ -353,15 +353,29 @@ function MeaningsPreview({
                     <>
                       <Divider titlePlacement="start">关联词</Divider>
                       <Space wrap>
-                        {sense.relations.map((relation) => (
-                          <Tag key={relation.id}>
-                            {relation.relation} ·{" "}
-                            {relation.target_headword ||
-                              relation.target_word_id ||
-                              "未选择"}{" "}
-                            · {relation.score}%
-                          </Tag>
-                        ))}
+                        {sense.relations.map((relation) => {
+                          const pending = (
+                            relation.pending_target_headword ?? ""
+                          ).trim();
+                          // 待物化的目标此刻还没有词条，只有词面；不标出来会在
+                          // 发布前最后一道人眼确认处退化成「未选择」。
+                          const isPending =
+                            !relation.target_word_id && pending !== "";
+                          return (
+                            <Tag
+                              key={relation.id}
+                              color={isPending ? "warning" : undefined}
+                            >
+                              {relation.relation} ·{" "}
+                              {relation.target_headword ||
+                                pending ||
+                                relation.target_word_id ||
+                                "未选择"}{" "}
+                              · {relation.score}%
+                              {isPending ? " · 发布时新建" : ""}
+                            </Tag>
+                          );
+                        })}
                       </Space>
                     </>
                   )}

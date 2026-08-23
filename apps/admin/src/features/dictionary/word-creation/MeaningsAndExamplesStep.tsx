@@ -1252,7 +1252,8 @@ function RelationsEditor({
       target_word_id: selected.word_id,
       target_headword: selected.headword,
       target_sense_id: "",
-      target_gloss: undefined
+      target_gloss: undefined,
+      pending_target_headword: undefined
     });
     setSearching(null);
   };
@@ -1352,7 +1353,9 @@ function RelationsEditor({
                       value={
                         isSearching
                           ? searching.query
-                          : relation.target_headword || ""
+                          : relation.target_headword ||
+                            relation.pending_target_headword ||
+                            ""
                       }
                       options={isSearching ? wordOptions : []}
                       disabled={readOnly}
@@ -1376,16 +1379,22 @@ function RelationsEditor({
                       onFocus={() =>
                         setSearching({
                           relationId: relation.id,
-                          query: relation.target_headword || ""
+                          query:
+                            relation.target_headword ||
+                            relation.pending_target_headword ||
+                            ""
                         })
                       }
                       onSearch={(query) => {
                         setSearching({ relationId: relation.id, query });
+                        // 词面进 pending_target_headword：target_headword 是服务端
+                        // 只读快照，提交时不上行，往里写等于把管理员输入丢掉。
                         updateRelation(relation.id, {
                           target_word_id: "",
                           target_sense_id: "",
-                          target_headword: query,
-                          target_gloss: undefined
+                          target_headword: undefined,
+                          target_gloss: undefined,
+                          pending_target_headword: query
                         });
                       }}
                       onSelect={(wordId) => selectWord(relation.id, wordId)}
@@ -1473,6 +1482,19 @@ function RelationsEditor({
                         <Typography.Text type="warning">
                           后端未返回完整分页信息，不能确认已取全同名词条
                         </Typography.Text>
+                      )}
+                    {!readOnly &&
+                      !relation.target_word_id &&
+                      (relation.pending_target_headword ?? "").trim() !==
+                        "" && (
+                        <div
+                          className="word-relation-pending-hint"
+                          role="note"
+                          aria-label={`${meta.title}待建条`}
+                        >
+                          <PlusOutlined aria-hidden />
+                          <span>库中暂无该词，发布时会自动建成草稿词条</span>
+                        </div>
                       )}
                     <Select
                       aria-label={`${meta.title}目标词义`}

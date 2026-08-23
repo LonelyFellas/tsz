@@ -8,9 +8,11 @@ import type {
   WordHeadwordsV2,
   WordPosMeaningsV2,
   WordPosTag,
+  WordRelationV2,
   WordSenseV2,
   WordSentenceV2
 } from "@tsz/types";
+import { headwordIssue } from "../headwordValidation";
 import type { PartOfSpeechLookup } from "../../part-of-speech/catalog";
 import { sharedSentenceIssueField } from "./sentenceAssociationModel";
 import type {
@@ -30,6 +32,33 @@ export interface MeaningsValidationContext {
 export interface MeaningIssueTarget {
   node_id: string;
   field: string;
+}
+
+/**
+ * 关联词的两种合法形态，库层 `lexicon_relations_target_shape_check` 保证互斥：
+ *
+ * - `bound`：`target_word_id` + `target_sense_id` 指向真实义项。
+ * - `pending`：目标词还没建条，只有管理员录入的词面；发布时后端建条并回填 target。
+ *
+ * 其余（整行空着、只选了词条没选词义）都是 `incomplete`，仍要拦。
+ * 提交层 `wordMeaningsRequest` 依赖同一判定，别在两处各写一遍。
+ */
+export type RelationTargetShape =
+  | { kind: "bound"; wordId: string; senseId: string }
+  | { kind: "pending"; headword: string }
+  | { kind: "incomplete" };
+
+export function relationTargetShape(
+  relation: WordRelationV2
+): RelationTargetShape {
+  const wordId = relation.target_word_id?.trim() ?? "";
+  const senseId = relation.target_sense_id?.trim() ?? "";
+  if (wordId && senseId) return { kind: "bound", wordId, senseId };
+  const headword = relation.pending_target_headword?.trim() ?? "";
+  if (!wordId && !senseId && headword !== "") {
+    return { kind: "pending", headword };
+  }
+  return { kind: "incomplete" };
 }
 
 export function englishTextComplete(value: EnglishTextV2): boolean {
@@ -181,7 +210,12 @@ export function wordSenseIssueTarget(
     }
   }
   for (const relation of sense.relations) {
-    if (!relation.target_word_id || !relation.target_sense_id) {
+    const shape = relationTargetShape(relation);
+    if (shape.kind === "pending") {
+      if (headwordIssue(shape.headword)) {
+        return { node_id: relation.id, field: "pending_target_headword" };
+      }
+    } else if (shape.kind === "incomplete") {
       return { node_id: relation.id, field: "target_word_id" };
     }
     if (!fixedPercentComplete(relation.score)) {
@@ -369,7 +403,13 @@ export function validateMeanings(
           add("每条例句必须保留唯一的当前词义主关联");
       }
       for (const relation of sense.relations) {
-        if (!relation.target_word_id || !relation.target_sense_id) {
+        const shape = relationTargetShape(relation);
+        if (shape.kind === "pending") {
+          // 词面要过与后端 NormalizedHeadword::parse 同口径的字符集预检，
+          // 否则草稿保存才吃 422，管理员白填一趟。
+          const issue = headwordIssue(shape.headword);
+          if (issue) add(`关联词${issue}`);
+        } else if (shape.kind === "incomplete") {
           add("请为每个关系词选择具体词条和词义");
         }
         if (

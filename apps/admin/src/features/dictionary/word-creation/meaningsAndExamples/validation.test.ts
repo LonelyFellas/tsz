@@ -1,11 +1,16 @@
-import type { EnglishTextV2 } from "@tsz/types";
+import type { EnglishTextV2, WordRelationV2 } from "@tsz/types";
 import { describe, expect, it } from "vitest";
 import { wordFixture } from "../wordCreation.test.helper";
+import {
+  HEADWORD_CHARSET_MESSAGE,
+  HEADWORD_NO_LETTER_MESSAGE
+} from "../headwordValidation";
 import {
   countPosMeaningIssues,
   englishTextComplete,
   englishTextIssueField,
   grammarStructureIssueTarget,
+  relationTargetShape,
   sharedSentenceIssueTarget,
   wordSenseComplete,
   wordSenseIssueTarget,
@@ -345,5 +350,204 @@ describe("meanings and examples validation", () => {
     expect(
       countPosMeaningIssues({ ...pos, senses: [] }, new Set(["group-other"]))
     ).toBe(2);
+  });
+
+  /**
+   * 关联词待物化形态（tsz-rust #59）：目标词还没建条时只有词面，发布时后端补建。
+   *
+   * 形态判定收敛在 `relationTargetShape`，完成校验（`validateMeanings`）与 Tab 红点
+   * 定位（`wordSenseIssueTarget`）共用，所以每个场景都两侧各断言一次——只测一处会漏掉
+   * 「完成校验说没问题、红点却消不掉」这类不一致。
+   */
+  const relationScene = (relation: WordRelationV2) => {
+    const content = structuredClone(wordFixture({ ready: true }).meanings);
+    const pos = content.pos[0]!;
+    const sense = pos.senses[0]!;
+    sense.relations = [relation];
+    return {
+      content,
+      sense,
+      senseGroupIds: new Set(content.sense_groups.map((group) => group.id)),
+      grammarIds: new Set(pos.grammar_structures.map((grammar) => grammar.id))
+    };
+  };
+
+  it("只有词面的待物化关联词在完成校验与红点定位两侧都放行", () => {
+    const { content, sense, senseGroupIds, grammarIds } = relationScene({
+      id: "relation-pending",
+      relation: "synonym",
+      pending_target_headword: "freshness",
+      score: "50"
+    });
+
+    expect(validateMeanings(content)).toEqual([]);
+    expect(
+      wordSenseIssueTarget(sense, senseGroupIds, grammarIds)
+    ).toBeUndefined();
+    expect(wordSenseComplete(sense, senseGroupIds, grammarIds)).toBe(true);
+  });
+
+  it("待物化词面走主词字符集预检，中文报字符集文案并定位到 pending 字段", () => {
+    const { content, sense, senseGroupIds, grammarIds } = relationScene({
+      id: "relation-cjk",
+      relation: "synonym",
+      pending_target_headword: "红色",
+      score: "50"
+    });
+
+    const issues = validateMeanings(content);
+    expect(issues).toContain(`关联词${HEADWORD_CHARSET_MESSAGE}`);
+    // 已判成待物化，就不该再退回旧的「没选词条」文案。
+    expect(issues).not.toContain("请为每个关系词选择具体词条和词义");
+    expect(wordSenseIssueTarget(sense, senseGroupIds, grammarIds)).toEqual({
+      node_id: "relation-cjk",
+      field: "pending_target_headword"
+    });
+  });
+
+  it("待物化词面没有英文字母时报「至少一个英文字母」", () => {
+    const { content, sense, senseGroupIds, grammarIds } = relationScene({
+      id: "relation-digits",
+      relation: "synonym",
+      pending_target_headword: "12345",
+      score: "50"
+    });
+
+    expect(validateMeanings(content)).toEqual([
+      `关联词${HEADWORD_NO_LETTER_MESSAGE}`
+    ]);
+    expect(wordSenseIssueTarget(sense, senseGroupIds, grammarIds)).toEqual({
+      node_id: "relation-digits",
+      field: "pending_target_headword"
+    });
+  });
+
+  it("只选了词条没选词义仍按未完成拦截，定位回 target_word_id", () => {
+    const { content, sense, senseGroupIds, grammarIds } = relationScene({
+      id: "relation-half",
+      relation: "antonym",
+      target_word_id: "target-word",
+      score: "50"
+    });
+
+    expect(validateMeanings(content)).toEqual([
+      "请为每个关系词选择具体词条和词义"
+    ]);
+    expect(wordSenseIssueTarget(sense, senseGroupIds, grammarIds)).toEqual({
+      node_id: "relation-half",
+      field: "target_word_id"
+    });
+  });
+
+  it("形态判定与分值是并列分支，词面非法时两条问题同时报出", () => {
+    const { content, sense, senseGroupIds, grammarIds } = relationScene({
+      id: "relation-both",
+      relation: "synonym",
+      pending_target_headword: "红色",
+      score: "101"
+    });
+
+    expect(validateMeanings(content)).toEqual([
+      `关联词${HEADWORD_CHARSET_MESSAGE}`,
+      "关系词分值必须是 0–100 且最多两位小数"
+    ]);
+    // 定位先给词面，改完才轮到分值。
+    expect(wordSenseIssueTarget(sense, senseGroupIds, grammarIds)).toEqual({
+      node_id: "relation-both",
+      field: "pending_target_headword"
+    });
+  });
+
+  it("词面合法但分值非法时照常报分值问题", () => {
+    const { content, sense, senseGroupIds, grammarIds } = relationScene({
+      id: "relation-score",
+      relation: "synonym",
+      pending_target_headword: "fresh",
+      score: "100.001"
+    });
+
+    expect(validateMeanings(content)).toEqual([
+      "关系词分值必须是 0–100 且最多两位小数"
+    ]);
+    expect(wordSenseIssueTarget(sense, senseGroupIds, grammarIds)).toEqual({
+      node_id: "relation-score",
+      field: "score"
+    });
+  });
+
+  it("待物化词面按 trim 后判定，首尾空格不算问题", () => {
+    const { content, sense, senseGroupIds, grammarIds } = relationScene({
+      id: "relation-padded",
+      relation: "synonym",
+      pending_target_headword: "  fresh  ",
+      score: "50"
+    });
+
+    expect(validateMeanings(content)).toEqual([]);
+    expect(
+      wordSenseIssueTarget(sense, senseGroupIds, grammarIds)
+    ).toBeUndefined();
+  });
+
+  it("relationTargetShape 判定三种形态，两件套齐全时优先算已绑定", () => {
+    const base: WordRelationV2 = {
+      id: "relation",
+      relation: "synonym",
+      score: "50"
+    };
+
+    expect(
+      relationTargetShape({
+        ...base,
+        target_word_id: " target-word ",
+        target_sense_id: " target-sense "
+      })
+    ).toEqual({
+      kind: "bound",
+      wordId: "target-word",
+      senseId: "target-sense"
+    });
+    // pending 是选中真实词条前的残留，两件套齐全时一律按已绑定走。
+    expect(
+      relationTargetShape({
+        ...base,
+        target_word_id: "target-word",
+        target_sense_id: "target-sense",
+        pending_target_headword: "fresh"
+      })
+    ).toEqual({
+      kind: "bound",
+      wordId: "target-word",
+      senseId: "target-sense"
+    });
+
+    // 两个 id 键整个缺席（后端 skip_serializing_if 的形状）与前端留的空串等价。
+    expect(
+      relationTargetShape({ ...base, pending_target_headword: "  fresh  " })
+    ).toEqual({ kind: "pending", headword: "fresh" });
+    expect(
+      relationTargetShape({
+        ...base,
+        target_word_id: "",
+        target_sense_id: "",
+        pending_target_headword: "fresh"
+      })
+    ).toEqual({ kind: "pending", headword: "fresh" });
+
+    expect(relationTargetShape(base)).toEqual({ kind: "incomplete" });
+    expect(
+      relationTargetShape({ ...base, pending_target_headword: "   " })
+    ).toEqual({ kind: "incomplete" });
+    expect(
+      relationTargetShape({ ...base, target_word_id: "target-word" })
+    ).toEqual({ kind: "incomplete" });
+    // 半边 id 配词面是库层 CHECK 会拒的混合形状，不能当待物化放行。
+    expect(
+      relationTargetShape({
+        ...base,
+        target_sense_id: "target-sense",
+        pending_target_headword: "fresh"
+      })
+    ).toEqual({ kind: "incomplete" });
   });
 });
