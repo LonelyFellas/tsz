@@ -1,13 +1,9 @@
-import type {
-  AdminWordV2,
-  DraftMeaningsStepContent,
-  WordPosMeaningsV2,
-  WordSenseV2
-} from "@tsz/types";
+import type { AdminWordV2, WordPosMeaningsV2, WordSenseV2 } from "@tsz/types";
 import {
   soleSubPartOfSpeechCode,
   type PartOfSpeechLookup
 } from "../../part-of-speech/catalog";
+import type { DraftMeaningsWithSentenceAssociations } from "./sentenceAssociationTypes";
 
 export function collectPronunciationHints(
   forms: AdminWordV2["forms"]
@@ -64,11 +60,11 @@ export function meaningsPosOwnsNode(
 }
 
 export function countSenseReferences(
-  content: DraftMeaningsStepContent,
+  content: DraftMeaningsWithSentenceAssociations,
   wordId: string,
   senseId: string
 ): number {
-  return content.pos.reduce(
+  const legacyReferences = content.pos.reduce(
     (count, pos) =>
       count +
       pos.senses.reduce(
@@ -94,15 +90,42 @@ export function countSenseReferences(
       ),
     0
   );
+  const sharedReferences = (content.shared_sentences ?? []).reduce(
+    (count, sentence) =>
+      count +
+      sentence.associations.filter(
+        (association) =>
+          association.state !== "pending" &&
+          association.target_word_id === wordId &&
+          association.target_sense_id === senseId
+      ).length,
+    0
+  );
+  return legacyReferences + sharedReferences;
 }
 
 export function removeSenseAndReferences(
-  content: DraftMeaningsStepContent,
+  content: DraftMeaningsWithSentenceAssociations,
   wordId: string,
   senseId: string
-): DraftMeaningsStepContent {
+): DraftMeaningsWithSentenceAssociations {
   return {
     ...content,
+    ...(content.shared_sentences
+      ? {
+          shared_sentences: content.shared_sentences
+            .map((sentence) => ({
+              ...sentence,
+              associations: sentence.associations.filter(
+                (association) =>
+                  association.state === "pending" ||
+                  association.target_word_id !== wordId ||
+                  association.target_sense_id !== senseId
+              )
+            }))
+            .filter((sentence) => sentence.associations.length > 0)
+        }
+      : {}),
     pos: content.pos.map((pos) => ({
       ...pos,
       senses: pos.senses
@@ -138,10 +161,10 @@ export function removeSenseAndReferences(
  * 编码）一律保留，交由校验拒绝保存，避免把非法值静默洗成合法值。
  */
 export function applySoleSubPartOfSpeech(
-  content: DraftMeaningsStepContent,
+  content: DraftMeaningsWithSentenceAssociations,
   forms: AdminWordV2["forms"],
   lookup: PartOfSpeechLookup
-): DraftMeaningsStepContent {
+): DraftMeaningsWithSentenceAssociations {
   const posCodeById = new Map(forms.pos.map((pos) => [pos.pos_id, pos.pos]));
   let changed = false;
   const pos = content.pos.map((posMeanings) => {

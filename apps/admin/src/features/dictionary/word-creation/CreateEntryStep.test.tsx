@@ -3,7 +3,8 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import { HttpError } from "@tsz/api-client/http";
@@ -22,6 +23,11 @@ import {
 } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateEntryStep } from "./CreateEntryStep";
+import { MATCH_CATEGORY_LABEL } from "../labels";
+import {
+  HEADWORD_CHARSET_MESSAGE,
+  HEADWORD_NO_LETTER_MESSAGE
+} from "./headwordValidation";
 import {
   deferred,
   detectionFixture,
@@ -32,7 +38,8 @@ const mutations = vi.hoisted(() => ({
   detect: vi.fn(),
   resetDetect: vi.fn(),
   create: vi.fn(),
-  surfacePage: vi.fn()
+  surfacePage: vi.fn(),
+  getWord: vi.fn()
 }));
 const partOfSpeechCatalogState = vi.hoisted(() => ({
   data: undefined as PartOfSpeechCatalogResponse | null | undefined,
@@ -53,7 +60,8 @@ vi.mock("./api", () => ({
 
 vi.mock("../dataSource", () => ({
   adminWordsDataSource: {
-    surfaceMatchSnapshotPage: mutations.surfacePage
+    surfaceMatchSnapshotPage: mutations.surfacePage,
+    get: mutations.getWord
   }
 }));
 
@@ -78,6 +86,30 @@ function button(label: string): HTMLButtonElement {
     .find((item) => item.textContent?.replaceAll(/\s/g, "") === label);
   if (!result) throw new Error(`button not found: ${label}`);
   return result as HTMLButtonElement;
+}
+
+async function expectSourceResult(
+  testId: "builtin-dictionary-result" | "smart-dictionary-result",
+  source: "内置词典" | "智能词库",
+  status: "已匹配" | "未匹配" | "不可继续"
+) {
+  const result = await screen.findByTestId(testId);
+  const cardStatus = document.querySelector(
+    ".word-detection-result-card .ant-card-extra"
+  );
+  if (testId === "smart-dictionary-result") {
+    expect(result).toHaveTextContent(
+      status === "已匹配"
+        ? "已发现"
+        : status === "未匹配"
+          ? "未发现"
+          : "暂时不可用"
+    );
+  }
+  if (testId === "builtin-dictionary-result") {
+    expect(cardStatus).toHaveTextContent(status);
+  }
+  return result;
 }
 
 function LocationProbe() {
@@ -106,7 +138,7 @@ function StepHarness({
   );
 }
 
-function renderStep() {
+function renderStep(initialEntry = "/words/new") {
   const onHeadwordsChange = vi.fn();
   const onCreated = vi.fn();
   const router = createMemoryRouter(
@@ -139,7 +171,7 @@ function renderStep() {
         )
       }
     ],
-    { initialEntries: ["/words/new"] }
+    { initialEntries: [initialEntry] }
   );
   render(
     <AntApp>
@@ -334,7 +366,55 @@ describe("CreateEntryStep", () => {
     expect(mutations.detect).not.toHaveBeenCalled();
   });
 
-  it("命中双拼写时只读呈现两侧，创建草稿原样提交检测返回的主词", async () => {
+  it("非英文或不含字母的词条只显示本地校验且不发检测请求", async () => {
+    renderStep();
+    const input = screen.getByLabelText("录入词条");
+
+    fireEvent.change(input, { target: { value: "苹果" } });
+    fireEvent.click(button("词典检测"));
+    expect(
+      await screen.findByText(HEADWORD_CHARSET_MESSAGE)
+    ).toBeInTheDocument();
+    expect(mutations.detect).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: "give　up" } });
+    fireEvent.click(button("词典检测"));
+    expect(
+      await screen.findByText(HEADWORD_CHARSET_MESSAGE)
+    ).toBeInTheDocument();
+    expect(mutations.detect).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: "123456" } });
+    fireEvent.click(button("词典检测"));
+    expect(
+      await screen.findByText(HEADWORD_NO_LETTER_MESSAGE)
+    ).toBeInTheDocument();
+    expect(mutations.detect).not.toHaveBeenCalled();
+  });
+
+  it("检测之后把英美主词改成非英文时标红并禁止建草稿", async () => {
+    const detection = detectionFixture("center", "det-center");
+    mutations.detect.mockResolvedValue(detection);
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+    const usInput = await screen.findByLabelText("美式主词");
+    expect(button("确认并进入词形与发音")).toBeEnabled();
+
+    fireEvent.change(usInput, { target: { value: "苹果" } });
+    expect(await screen.findByText(HEADWORD_CHARSET_MESSAGE)).toBeVisible();
+    expect(button("确认并进入词形与发音")).toBeDisabled();
+    fireEvent.click(button("确认并进入词形与发音"));
+    expect(mutations.create).not.toHaveBeenCalled();
+
+    fireEvent.change(usInput, { target: { value: "center" } });
+    await waitFor(() => expect(button("确认并进入词形与发音")).toBeEnabled());
+  });
+
+  it("命中双拼写时恢复英美开关与双主词输入，并可手动切换", async () => {
     const detection = detectionFixture("center", "det-center");
     const created = wordFixture();
     mutations.detect.mockResolvedValue(detection);
@@ -353,24 +433,41 @@ describe("CreateEntryStep", () => {
         headword: "center"
       })
     );
-    expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
-    expect(screen.getByText("名词", { exact: true })).toBeVisible();
-    expect(screen.getByText("动词", { exact: true })).toBeVisible();
-    expect(screen.queryByText("n.", { exact: true })).toBeNull();
-    expect(screen.queryByText("v.", { exact: true })).toBeNull();
+    await expectSourceResult("builtin-dictionary-result", "内置词典", "已匹配");
+    await expectSourceResult("smart-dictionary-result", "智能词库", "未匹配");
     expect(onHeadwordsChange).toHaveBeenLastCalledWith(
       detection.builtin_dictionary.status === "matched"
         ? detection.builtin_dictionary.headwords
         : undefined
     );
 
-    // A1：双拼写是词典事实，管理员不再决定要不要区分，也不再逐字确认另一侧。
-    expect(screen.queryByRole("switch", { name: "区分英美词形" })).toBeNull();
-    expect(screen.queryByLabelText("英式主词")).toBeNull();
-    expect(screen.queryByLabelText("美式主词")).toBeNull();
+    const dialectSwitch = screen.getByRole("switch", {
+      name: "区分英美词形"
+    });
+    const ukInput = screen.getByLabelText("英式主词");
+    const usInput = screen.getByLabelText("美式主词");
+    expect(dialectSwitch).toBeChecked();
+    expect(ukInput).toHaveValue("centre");
+    expect(ukInput).toBeEnabled();
+    expect(usInput).toHaveValue("center");
+    expect(usInput).toBeDisabled();
     expect(
-      screen.getByText(/两种地区拼写，两者都会记录在这条词条上/)
+      screen.getByText(
+        "美式主词来自本次输入，暂不可修改。请确认英式主词；如无差异，保持相同即可。"
+      )
     ).toBeVisible();
+
+    fireEvent.click(dialectSwitch);
+    expect(dialectSwitch).not.toBeChecked();
+    expect(ukInput).toHaveValue("center");
+    expect(usInput).toHaveValue("center");
+    expect(ukInput).toBeDisabled();
+    expect(usInput).toBeDisabled();
+
+    fireEvent.click(dialectSwitch);
+    expect(dialectSwitch).toBeChecked();
+    expect(ukInput).toHaveValue("centre");
+    expect(usInput).toHaveValue("center");
 
     fireEvent.click(button("确认并进入词形与发音"));
     // 关键不变量：提交的 headwords 与检测返回的逐字段相等，不得退化成 unified。
@@ -405,7 +502,7 @@ describe("CreateEntryStep", () => {
     const input = screen.getByLabelText("录入词条");
     fireEvent.change(input, { target: { value: "center" } });
     fireEvent.click(button("词典检测"));
-    expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
+    await expectSourceResult("builtin-dictionary-result", "内置词典", "已匹配");
 
     fireEvent.click(button("确认并进入词形与发音"));
     await waitFor(() => expect(mutations.create).toHaveBeenCalledTimes(1));
@@ -452,15 +549,15 @@ describe("CreateEntryStep", () => {
     expect(onHeadwordsChange).toHaveBeenLastCalledWith(undefined);
 
     await act(async () => pending.resolve(detectionFixture("center")));
-    expect(screen.queryByText("内置词典已找到规范词条")).toBeNull();
+    expect(screen.queryByTestId("builtin-dictionary-result")).toBeNull();
     expect(screen.getByText("等待检测")).toBeVisible();
     expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
   });
 
   it.each([
-    ["colour", "已存在重复词条"],
-    ["smart-unavailable", "智能词库暂时不可用"]
-  ])("%s 检测阻断创建并展示原因", async (headword, reason) => {
+    ["colour", "已匹配"],
+    ["smart-unavailable", "不可继续"]
+  ] as const)("%s 检测阻断创建并只展示来源状态", async (headword, status) => {
     mutations.detect.mockResolvedValue(
       headword === "colour"
         ? duplicateDetectionFixture()
@@ -472,55 +569,103 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    expect(await screen.findByText(reason)).toBeVisible();
-    expect(screen.getByText("不可继续")).toBeVisible();
+    await expectSourceResult("smart-dictionary-result", "智能词库", status);
     expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
     expect(mutations.create).not.toHaveBeenCalled();
   });
 
-  it("重复词条展示生命周期状态，归档项提示可恢复并继续阻断创建", async () => {
+  it("重复词条只展示词头与生命周期状态，不展开内部详情", async () => {
     mutations.detect.mockResolvedValue(duplicateDetectionFixture());
+    mutations.getWord.mockResolvedValue({
+      word: wordFixture({
+        id: "word-colour-archived",
+        status: "archived",
+        ready: true
+      })
+    });
     renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
       target: { value: "colour" }
     });
     fireEvent.click(button("词典检测"));
 
-    const duplicate = await screen.findByRole("link", {
-      name: /colour \(uk\).*已归档/
-    });
-    expect(duplicate).toHaveAttribute(
-      "href",
-      "/words/word-colour-archived/wizard/basics"
-    );
-    expect(duplicate).toHaveAttribute("target", "_blank");
-    expect(duplicate).toHaveAttribute("rel", "noreferrer");
-    expect(duplicate).toHaveAccessibleName(
-      "colour (uk) 已归档，在新标签页打开"
-    );
-    expect(screen.queryByText("草稿")).toBeNull();
+    await expectSourceResult("smart-dictionary-result", "智能词库", "已匹配");
+    expect(screen.queryByText(/colour \(uk\)/)).toBeNull();
+    expect(screen.getByText("colour")).toBeVisible();
+    expect(screen.getByText("color")).toBeVisible();
     expect(screen.getByText("已发布")).toBeVisible();
     expect(screen.getByText("已归档")).toBeVisible();
-    expect(screen.getByText("归档词条仍占用词头")).toBeVisible();
     expect(
-      screen.getByText(
-        "点击上方重复词条会在新标签页打开详情，也可以在归档列表中定位。"
-      )
-    ).toBeVisible();
-    const archivedList = screen.getByRole("link", {
-      name: "在归档列表查看（新标签页打开）"
-    });
-    expect(archivedList).toHaveAttribute(
-      "href",
-      "/words?keyword=colour&status=archived"
+      screen.getAllByRole("button", { name: /查看重复词条/ })
+    ).toHaveLength(2);
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /查看重复词条/ })[0]!
     );
-    expect(archivedList).toHaveAttribute("target", "_blank");
-    expect(archivedList).toHaveAttribute("rel", "noreferrer");
+    expect(await screen.findByText("重复词条详情")).toBeInTheDocument();
+    expect(mutations.getWord).toHaveBeenCalledWith("word-colour-archived");
+    const dialog = screen.getByRole("dialog");
+    expect(within(dialog).getByText("主词")).toBeInTheDocument();
+    expect(within(dialog).getByText("状态")).toBeInTheDocument();
+    expect(within(dialog).getByText("词条类型")).toBeInTheDocument();
+    expect(within(dialog).getByText("基本词性")).toBeInTheDocument();
+    expect(within(dialog).getByText("释义预览")).toBeInTheDocument();
+    expect(within(dialog).getByText("已归档")).toBeInTheDocument();
+    expect(within(dialog).getByText("单词")).toBeInTheDocument();
+    expect(screen.getByTestId("location")).toHaveTextContent("/words/new");
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    expect(screen.getByRole("dialog")).toHaveClass("ant-zoom-leave");
+    expect(screen.getByTestId("smart-dictionary-result")).toHaveTextContent(
+      "已发现"
+    );
     expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
     expect(mutations.create).not.toHaveBeenCalled();
   });
 
-  it("多个归档重复词条都按精确 ID 在新标签页打开", async () => {
+  it("同一已有词条合并英美主词，共用主词只显示一个", async () => {
+    const detection = detectionFixture("center");
+    detection.smart_dictionary = {
+      status: "duplicate",
+      duplicates: [
+        {
+          word_id: "word-center",
+          headword: "center",
+          dialect: "us",
+          status: "published"
+        },
+        {
+          word_id: "word-center",
+          headword: "centre",
+          dialect: "uk",
+          status: "published"
+        },
+        {
+          word_id: "word-garden",
+          headword: "garden",
+          dialect: "common",
+          status: "draft"
+        }
+      ]
+    };
+    mutations.detect.mockResolvedValue(detection);
+    renderStep();
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const entries = await screen.findAllByTestId("smart-dictionary-entry");
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toHaveTextContent("center / centre");
+    expect(entries[0]).toHaveTextContent("已发布");
+    expect(entries[1]).toHaveTextContent("garden");
+    expect(entries[1]).not.toHaveTextContent("/");
+    expect(entries[1]).toHaveTextContent("草稿");
+    expect(
+      screen.getAllByRole("button", { name: /查看重复词条/ })
+    ).toHaveLength(2);
+  });
+
+  it("多个归档重复词条仍只汇总为一条智能词库状态", async () => {
     const detection = duplicateDetectionFixture();
     detection.smart_dictionary.duplicates.push({
       word_id: "word-colours-archived",
@@ -535,28 +680,17 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    const links = [
-      await screen.findByRole("link", { name: /colour \(uk\).*已归档/ }),
-      screen.getByRole("link", { name: /colours \(uk\).*已归档/ })
-    ];
-    expect(links[0]).toHaveAttribute(
-      "href",
-      "/words/word-colour-archived/wizard/basics"
-    );
-    expect(links[1]).toHaveAttribute(
-      "href",
-      "/words/word-colours-archived/wizard/basics"
-    );
-    for (const link of links) {
-      expect(link).toHaveAttribute("target", "_blank");
-      expect(link).toHaveAttribute("rel", "noreferrer");
-      expect(link).toHaveAccessibleName(/在新标签页打开$/);
-    }
+    await expectSourceResult("smart-dictionary-result", "智能词库", "已匹配");
+    expect(screen.getAllByTestId("smart-dictionary-result")).toHaveLength(1);
+    expect(screen.queryByText(/colours \(uk\)/)).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: /查看重复词条/ })
+    ).toHaveLength(3);
     expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
     expect(mutations.create).not.toHaveBeenCalled();
   });
 
-  it("同名 workspace 全量醒目提示，逐 ID 新标签页查看且确认后携终页 token 创建", async () => {
+  it("同名 workspace 展示重复状态与关联来源，确认后仍携终页 token 创建", async () => {
     const page = surfacePage([
       surfaceMatch("match-1", "word-workspace-draft"),
       surfaceMatch("match-2", "word-workspace-archived-1", {
@@ -580,31 +714,13 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
+    await expectSourceResult("smart-dictionary-result", "智能词库", "已匹配");
+    expect(screen.queryByText("可创建")).toBeNull();
+    expect(screen.queryByText("已存在同名主词")).toBeNull();
+    expect(screen.queryByText(/关联词/)).toBeNull();
     expect(
-      await screen.findByText("发现同名或同形词条，请确认后再继续")
-    ).toBeVisible();
-    expect(screen.getAllByText("已存在同名主词")).toHaveLength(3);
-    expect(
-      screen.getAllByText(
-        /有效入站关联：共 2 条（同义1、反义0、派生1），以下仅为摘要/
-      )
+      screen.getAllByRole("button", { name: /查看重复词条/ })
     ).toHaveLength(3);
-    expect(
-      screen.getAllByRole("link", {
-        name: /work area source-word-workspace-.*，在新标签页打开/
-      })
-    ).toHaveLength(3);
-    for (const wordId of [
-      "word-workspace-draft",
-      "word-workspace-archived-1",
-      "word-workspace-archived-2"
-    ]) {
-      const link = screen.getByRole("link", {
-        name: new RegExp(`^workspace ${wordId}，在新标签页打开$`)
-      });
-      expect(link).toHaveAttribute("href", `/words/${wordId}/wizard/basics`);
-      expect(link).toHaveAttribute("target", "_blank");
-    }
     await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
     fireEvent.click(button("仍继续创建"));
     await waitFor(() =>
@@ -616,7 +732,154 @@ describe("CreateEntryStep", () => {
         confirmed_surface_match_token: "surface-token-workspace"
       })
     );
-  });
+  }, 10_000);
+
+  it("重复词条标出命中原因，同一词条命中多类时按主词优先并列", async () => {
+    // 同一个 word_id 既主词相同、又撞上它的词形，两个原因都要标出来
+    const page = surfacePage([
+      surfaceMatch("match-form", "word-workspace", {
+        category: "headword_form"
+      }),
+      surfaceMatch("match-exact", "word-workspace", {
+        category: "exact_headword"
+      }),
+      surfaceMatch("match-other", "word-workspace-2", {
+        category: "form_form"
+      })
+    ]);
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture("workspace", page)
+    );
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const entries = await screen.findAllByTestId("smart-dictionary-entry");
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toHaveTextContent(MATCH_CATEGORY_LABEL.exact_headword);
+    expect(entries[0]).toHaveTextContent(MATCH_CATEGORY_LABEL.headword_form);
+    // 入参把 form 放在前面，呈现仍按 MATCH_CATEGORY_ORDER 让主词层面的排前
+    const text = entries[0]?.textContent ?? "";
+    expect(text.indexOf(MATCH_CATEGORY_LABEL.exact_headword)).toBeLessThan(
+      text.indexOf(MATCH_CATEGORY_LABEL.headword_form)
+    );
+    expect(entries[1]).toHaveTextContent(MATCH_CATEGORY_LABEL.form_form);
+    expect(entries[1]).not.toHaveTextContent(
+      MATCH_CATEGORY_LABEL.exact_headword
+    );
+  }, 10_000);
+
+  it("五类命中原因各自的文案都能标出来", async () => {
+    // Record 只保证编译期穷举，保证不了文案写对——form_headword 与 headword_form
+    // 只差词序，极易搞反，逐个钉住。
+    const categories = [
+      "exact_headword",
+      "cross_kind_headword",
+      "form_headword",
+      "headword_form",
+      "form_form"
+    ] as const;
+    const page = surfacePage(
+      categories.map((category, index) =>
+        surfaceMatch(`match-${category}`, `word-${index}`, { category })
+      )
+    );
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture("workspace", page)
+    );
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const entries = await screen.findAllByTestId("smart-dictionary-entry");
+    expect(entries).toHaveLength(categories.length);
+    categories.forEach((category, index) => {
+      expect(entries[index]).toHaveTextContent(MATCH_CATEGORY_LABEL[category]);
+    });
+  }, 10_000);
+
+  it("词条没有入站关联词时，词性与释义照常展示", async () => {
+    const page = surfacePage([surfaceMatch("match-1", "word-workspace")]);
+    // 这条词条一条关联都没有；旧实现在 total === 0 时连词性/释义一起藏掉
+    page.matched_entry_contexts = page.matched_entry_contexts.map(
+      (context) => ({
+        ...context,
+        inbound_relations: {
+          total: 0,
+          by_type: { synonym: 0, antonym: 0, derivative: 0 },
+          previews: [],
+          truncated: false
+        }
+      })
+    );
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture("workspace", page)
+    );
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const meta = await waitFor(() => {
+      const node = document.querySelector(".word-smart-match-context-meta");
+      expect(node).not.toBeNull();
+      return node as HTMLElement;
+    });
+    expect(meta).toHaveTextContent("词性：名词");
+  }, 10_000);
+
+  it("duplicate 分支拿不到命中原因，不显示任何原因标识", async () => {
+    // DuplicateWordMatchV2 只有 word_id/headword/dialect/status，后端不给 match_category
+    mutations.detect.mockResolvedValue(duplicateDetectionFixture());
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "colour" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const entries = await screen.findAllByTestId("smart-dictionary-entry");
+    expect(entries).toHaveLength(2);
+    for (const entry of entries) {
+      for (const label of Object.values(MATCH_CATEGORY_LABEL)) {
+        expect(entry).not.toHaveTextContent(label);
+      }
+    }
+  }, 10_000);
+
+  it("命中的是词条本身时只展示词条与词性，不展示它自己的关联词", async () => {
+    const page = surfacePage([surfaceMatch("match-1", "word-workspace-draft")]);
+    const detection = warningDetectionFixture("workspace", page);
+    mutations.detect.mockResolvedValue(detection);
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    // 标签与值分处两个 span（各自一档灰），文本跨元素，只能按容器断言
+    const meta = await waitFor(() => {
+      const node = document.querySelector(".word-smart-match-context-meta");
+      expect(node).not.toBeNull();
+      return node as HTMLElement;
+    });
+    // 词性走 partOfSpeechLabel 映射成中文，不是后端快照里的 pos code
+    expect(meta).toHaveTextContent("词性：名词");
+    expect(meta).toHaveTextContent("释义：工作空间");
+    // fixture 里这条词条自己挂着 2 条入站关联，但那不是本次命中的原因，不该出现
+    expect(screen.queryByText(/关联词/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "work area" })).toBeNull();
+    expect(screen.queryByText("同义词")).toBeNull();
+  }, 10_000);
 
   it("workspaces 命中 workspace 的已保存 plural 词形时提示但允许确认继续", async () => {
     const match = surfaceMatch("match-plural", "word-workspace", {
@@ -638,12 +901,10 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
+    await expectSourceResult("smart-dictionary-result", "智能词库", "已匹配");
     expect(
-      await screen.findByText("本次主词已作为已有词条的词形存在")
-    ).toBeVisible();
-    expect(
-      screen.getByText("noun · plural · common · current_publication")
-    ).toBeVisible();
+      screen.queryByText("noun · plural · common · current_publication")
+    ).toBeNull();
     await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
     fireEvent.click(button("仍继续创建"));
     await waitFor(() =>
@@ -675,9 +936,8 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    expect(
-      await screen.findByText("本次主词已作为已有词条的词形存在")
-    ).toBeVisible();
+    await expectSourceResult("builtin-dictionary-result", "内置词典", "未匹配");
+    await expectSourceResult("smart-dictionary-result", "智能词库", "已匹配");
     await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
     fireEvent.click(button("仍继续创建"));
     await waitFor(() =>
@@ -711,7 +971,8 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    expect(await screen.findByText(/已加载 1\/2 条匹配来源/)).toBeVisible();
+    await expectSourceResult("smart-dictionary-result", "智能词库", "已匹配");
+    expect(screen.queryByText(/匹配来源/)).toBeNull();
     expect(button("仍继续创建")).toBeDisabled();
     expect(mutations.surfacePage).toHaveBeenCalledWith(
       "snapshot-workspace",
@@ -719,10 +980,7 @@ describe("CreateEntryStep", () => {
       expect.any(AbortSignal)
     );
     await act(async () => pending.resolve(terminal));
-    await waitFor(() =>
-      expect(screen.getByText(/已加载 2\/2 条匹配来源/)).toBeVisible()
-    );
-    expect(button("仍继续创建")).toBeEnabled();
+    await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
   });
 
   it("分页期间 policy 变化会清除旧 snapshot/token 并要求重新检测", async () => {
@@ -783,9 +1041,12 @@ describe("CreateEntryStep", () => {
       await screen.findByText("匹配结果已更新，请查看全部提示后再次确认")
     ).toBeInTheDocument();
     expect(input).toHaveValue("workspace");
+    expect(screen.getByTestId("smart-dictionary-result")).toHaveTextContent(
+      "已发现"
+    );
     expect(
-      screen.getByRole("link", {
-        name: /^workspace word-workspace-new-match，在新标签页打开$/
+      screen.getByRole("button", {
+        name: /workspace.*查看重复词条/
       })
     ).toBeVisible();
     await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
@@ -796,7 +1057,7 @@ describe("CreateEntryStep", () => {
     expect(second.idempotency_key).not.toBe(first.idempotency_key);
     expect(second.confirmed_surface_match_token).toBe("token-changed");
     expect(await screen.findByText("forms-route")).toBeVisible();
-  });
+  }, 10_000);
 
   it("409 policy changed 无新首页时清除 snapshot/token 并保留输入供重新检测", async () => {
     mutations.detect.mockResolvedValue(warningDetectionFixture());
@@ -829,7 +1090,7 @@ describe("CreateEntryStep", () => {
     expect(mutations.resetDetect).toHaveBeenCalled();
   });
 
-  it("creation gate 关闭时完整展示 disabled warning，但不出现继续创建按钮", async () => {
+  it("creation gate 关闭时展示必要阻断提示，但不展开匹配详情", async () => {
     mutations.detect.mockResolvedValue(
       warningDetectionFixture(
         "workspace",
@@ -845,7 +1106,8 @@ describe("CreateEntryStep", () => {
     fireEvent.click(button("词典检测"));
 
     expect(await screen.findByText("当前暂不开放创建同名主词")).toBeVisible();
-    expect(screen.getByText(/已加载 1\/1 条匹配来源/)).toBeVisible();
+    await expectSourceResult("smart-dictionary-result", "智能词库", "已匹配");
+    expect(screen.queryByText(/匹配来源/)).toBeNull();
     expect(screen.queryByText("仍继续创建")).toBeNull();
     expect(mutations.create).not.toHaveBeenCalled();
   });
@@ -872,10 +1134,16 @@ describe("CreateEntryStep", () => {
         headword: "ＢＲＡＮＤ   NEW PHRASE"
       })
     );
+    await expectSourceResult("builtin-dictionary-result", "内置词典", "未匹配");
     expect(
-      await screen.findByText("内置词典没有匹配项，将创建空白短语草稿")
-    ).toBeVisible();
-    expect(screen.getByText("可创建")).toBeVisible();
+      document.querySelector(
+        ".word-detection-result-card .ant-card-extra .ant-tag"
+      )
+    ).toHaveClass("ant-tag-error");
+    expect(
+      screen.queryByText("内置词典没有匹配项，将创建空白短语草稿")
+    ).toBeNull();
+    expect(screen.queryByText("可创建")).toBeNull();
     expect(button("确认并进入词形与发音")).toBeEnabled();
     fireEvent.click(button("确认并进入词形与发音"));
     await waitFor(() =>
@@ -899,7 +1167,7 @@ describe("CreateEntryStep", () => {
     expect(input).toHaveValue("center");
   });
 
-  it("未命中内置词典的全新单词仍可创建空白草稿并如实提示无词典依据", async () => {
+  it("未命中内置词典的全新单词显示未匹配且仍可创建空白草稿", async () => {
     const detection = detectionFixture("not-found");
     const created = {
       ...wordFixture({ id: "word-brand-new" }),
@@ -914,23 +1182,28 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
+    await expectSourceResult("builtin-dictionary-result", "内置词典", "未匹配");
     expect(
-      await screen.findByText("内置词典没有匹配项，将创建空白单词草稿")
-    ).toBeVisible();
+      document.querySelector(
+        ".word-detection-result-card .ant-card-extra .ant-tag"
+      )
+    ).toHaveClass("ant-tag-error");
     expect(
-      screen.getByText(
+      screen.queryByText(
         "内置词典对该词条没有任何依据：基本词性、词形、字典音标与实际发音、释义和例句都需要在后续步骤按平台教学口径自行录入。"
       )
-    ).toBeVisible();
-    expect(screen.getByText("可创建")).toBeVisible();
+    ).toBeNull();
+    expect(screen.queryByText("可创建")).toBeNull();
     expect(onHeadwordsChange).toHaveBeenLastCalledWith({
       mode: "unified",
       common: "not-found"
     });
-    // 无检测依据时不许手工造英美差异：A1 之后连开关都不存在了。
-    expect(
-      screen.queryByRole("switch", { name: "区分英美词形" })
-    ).not.toBeInTheDocument();
+    // 无检测依据时保留统一的确认框架，但不开放人工拆分。
+    expect(screen.getByRole("switch", { name: "区分英美词形" })).toBeDisabled();
+    expect(screen.getByLabelText("英式主词")).toHaveValue("not-found");
+    expect(screen.getByLabelText("英式主词")).toBeDisabled();
+    expect(screen.getByLabelText("美式主词")).toHaveValue("not-found");
+    expect(screen.getByLabelText("美式主词")).toBeDisabled();
 
     expect(button("确认并进入词形与发音")).toBeEnabled();
     fireEvent.click(button("确认并进入词形与发音"));
@@ -953,12 +1226,15 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    expect(await screen.findByText("内置词典暂时不可用")).toBeVisible();
-    expect(screen.getByText("不可继续")).toBeVisible();
+    await expectSourceResult(
+      "builtin-dictionary-result",
+      "内置词典",
+      "不可继续"
+    );
     expect(button("确认并进入词形与发音")).toBeDisabled();
   });
 
-  it("无地区差异时只呈现单一主词，界面不出现任何方言字样", async () => {
+  it("词典未命中时保留英美确认框架但禁用拆分", async () => {
     mutations.detect.mockResolvedValue(detectionFixture("BRAND NEW PHRASE"));
     renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
@@ -966,16 +1242,15 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    // 词典没收录时不能说成「查过了、没有地区差异」。
-    expect(
-      await screen.findByText("内置词典未收录该词条，按你输入的拼写建档。")
-    ).toBeVisible();
-    expect(screen.queryByRole("switch", { name: "区分英美词形" })).toBeNull();
-    expect(screen.queryByText("英式")).toBeNull();
-    expect(screen.queryByText("美式")).toBeNull();
+    const dialectSwitch = await screen.findByRole("switch", {
+      name: "区分英美词形"
+    });
+    expect(dialectSwitch).toBeDisabled();
+    expect(screen.getByLabelText("英式主词")).toHaveValue("BRAND NEW PHRASE");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("BRAND NEW PHRASE");
   });
 
-  it("词典命中但无地区差异时，说明是「查过没差异」而非「未收录」", async () => {
+  it("词典命中但无地区差异时允许管理员开启英美拆分", async () => {
     mutations.detect.mockResolvedValue(detectionFixture("far"));
     renderStep();
     fireEvent.change(screen.getByLabelText("录入词条"), {
@@ -983,11 +1258,18 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    expect(
-      await screen.findByText("内置词典未发现该词有英式 / 美式拼写差异。")
-    ).toBeVisible();
-    expect(screen.queryByText("英式")).toBeNull();
-    expect(screen.queryByText("美式")).toBeNull();
+    const dialectSwitch = await screen.findByRole("switch", {
+      name: "区分英美词形"
+    });
+    expect(dialectSwitch).toBeEnabled();
+    expect(dialectSwitch).not.toBeChecked();
+    expect(screen.getByLabelText("英式主词")).toHaveValue("far");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("far");
+
+    fireEvent.click(dialectSwitch);
+    expect(dialectSwitch).toBeChecked();
+    expect(screen.getByLabelText("英式主词")).toBeEnabled();
+    expect(screen.getByLabelText("美式主词")).toBeDisabled();
   });
 
   it("非 Error 检测失败使用稳定回退文案", async () => {
@@ -1026,7 +1308,7 @@ describe("CreateEntryStep", () => {
       target: { value: "center" }
     });
     fireEvent.click(button("词典检测"));
-    expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
+    await expectSourceResult("builtin-dictionary-result", "内置词典", "已匹配");
     fireEvent.click(button("确认并进入词形与发音"));
 
     expect(
@@ -1047,11 +1329,11 @@ describe("CreateEntryStep", () => {
       target: { value: "center" }
     });
     fireEvent.click(button("词典检测"));
-    expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
+    await expectSourceResult("builtin-dictionary-result", "内置词典", "已匹配");
     fireEvent.click(button("确认并进入词形与发音"));
 
     expect(await screen.findByText(text)).toBeInTheDocument();
-    expect(screen.getByText("内置词典已找到规范词条")).toBeVisible();
+    await expectSourceResult("builtin-dictionary-result", "内置词典", "已匹配");
   });
 
   it("词性目录加载失败时显示提示并阻断创建", async () => {
@@ -1066,11 +1348,15 @@ describe("CreateEntryStep", () => {
     fireEvent.click(button("词典检测"));
 
     expect(await screen.findByText("词性目录暂时不可用")).toBeVisible();
-    expect(screen.getByText("不可继续")).toBeVisible();
+    await expectSourceResult(
+      "builtin-dictionary-result",
+      "内置词典",
+      "不可继续"
+    );
     expect(button("确认并进入词形与发音")).toBeDisabled();
   });
 
-  it("命中且全覆盖时把原形与派生词形分开计数", async () => {
+  it("命中且全覆盖时只展示两条来源状态，不展示内容计数", async () => {
     mutations.detect.mockResolvedValue(detectionFixture("center"));
     renderStep();
 
@@ -1079,16 +1365,13 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
-    expect(screen.getByText("已匹配")).toBeVisible();
-    expect(
-      screen.getByText(
-        "词典带回派生词形 5 个、完整读音 14 组；另有 2 个词性的原形拼写来自刚确认的主词，不计为新增词形。释义、例句和词频若未显示，将在后续步骤明确要求人工补充。"
-      )
-    ).toBeVisible();
+    await expectSourceResult("builtin-dictionary-result", "内置词典", "已匹配");
+    await expectSourceResult("smart-dictionary-result", "智能词库", "未匹配");
+    expect(screen.queryByText(/派生词形 5 个/)).toBeNull();
+    expect(screen.queryByText(/完整读音 14 组/)).toBeNull();
   });
 
-  it("覆盖不全时不呈现为完全成功，并点明派生词形为 0", async () => {
+  it("覆盖不全时仍只展示来源状态且不显示覆盖详情", async () => {
     const detection = detectionFixture("center", "det-partial-coverage");
     if (detection.builtin_dictionary.status !== "matched") {
       throw new Error("fixture must be matched");
@@ -1115,14 +1398,14 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    expect(await screen.findByText("内置词典只找到部分内容")).toBeVisible();
-    expect(screen.getByText("部分匹配")).toBeVisible();
-    expect(screen.queryByText("已匹配")).toBeNull();
+    expect(screen.queryByText("识别了 2 个词性")).toBeNull();
+    await expectSourceResult("builtin-dictionary-result", "内置词典", "已匹配");
+    expect(screen.queryByText("部分匹配")).toBeNull();
     expect(
-      screen.getByText(
-        "词典带回派生词形 0 个、完整读音 4 组；另有 2 个词性的原形拼写来自刚确认的主词，不计为新增词形。本次没有带回任何派生词形，需要在「词形与发音」步骤手工补录。词典覆盖不完整：词形仅部分覆盖；读音、释义、例句、词频缺失，缺口内容需要在后续步骤人工补充。"
+      screen.queryByText(
+        "词形、读音、释义和例句等内容不完整，请在后续步骤补充。"
       )
-    ).toBeVisible();
+    ).toBeNull();
     // 覆盖不全只是提示，不阻断创建。
     expect(button("确认并进入词形与发音")).not.toBeDisabled();
   });
@@ -1142,8 +1425,7 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    expect(await screen.findByText("内置词典已找到规范词条")).toBeVisible();
-    expect(screen.getByText("已匹配")).toBeVisible();
+    await expectSourceResult("builtin-dictionary-result", "内置词典", "已匹配");
   });
 
   it("检测结果含未配置词性时显示稳定编码并阻断创建", async () => {
@@ -1161,7 +1443,7 @@ describe("CreateEntryStep", () => {
     fireEvent.click(button("词典检测"));
 
     expect(await screen.findByText("检测结果包含未配置词性")).toBeVisible();
-    expect(screen.getAllByText("custom-pos").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/custom-pos/)).toHaveLength(2);
     expect(button("确认并进入词形与发音")).toBeDisabled();
     expect(mutations.create).not.toHaveBeenCalled();
   });

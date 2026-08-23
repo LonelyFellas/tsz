@@ -14,20 +14,23 @@ async function createCenterDraft(
 ): Promise<MockAdminApiController> {
   const api = await mockAdminApi(page, options);
   await page.goto("/words");
-  await page.getByRole("button", { name: "创建单词" }).click();
-  await expect(page).toHaveURL(/\/words\/new\?kind=word$/);
+  await page.getByRole("button", { name: "创建词条" }).click();
+  await expect(page).toHaveURL(/\/words\/new$/);
 
   await page.getByPlaceholder("例如 center").fill("center");
   await page.getByRole("button", { name: "词典检测" }).click();
   await expect(page.getByText("已匹配", { exact: true })).toBeVisible();
-  // A1：双拼写是词典事实，第 1 步只读陈述，不再有开关与可写双输入。
+  // 输入侧由检测凭证锁定，管理员只确认另一侧；两侧会原样进入创建请求。
   await expect(
-    page.getByText(/两种地区拼写，两者都会记录在这条词条上/)
+    page.getByText(/美式主词来自本次输入，暂不可修改/)
   ).toBeVisible();
-  await expect(page.getByLabel("英式主词")).toHaveCount(0);
-  await expect(page.getByRole("switch", { name: "区分英美词形" })).toHaveCount(
-    0
-  );
+  await expect(
+    page.getByRole("switch", { name: "区分英美词形" })
+  ).toBeChecked();
+  await expect(page.getByLabel("英式主词")).toHaveValue("centre");
+  await expect(page.getByLabel("英式主词")).toBeEnabled();
+  await expect(page.getByLabel("美式主词")).toHaveValue("center");
+  await expect(page.getByLabel("美式主词")).toBeDisabled();
 
   await page.getByRole("button", { name: "确认并进入词形与发音" }).click();
   await expect(page).toHaveURL(
@@ -55,40 +58,30 @@ test.describe("admin 新建单词 V2", () => {
     );
   });
 
-  test("创建入口向导显示单词、短语与中性语义", async ({ page }) => {
+  test("创建入口统一为词条，并保留单词、短语直达兼容语义", async ({ page }) => {
     await mockAdminApi(page);
 
     await page.goto("/words");
-    await page.getByRole("button", { name: "创建单词" }).click();
-    await expect(page).toHaveURL(/\/words\/new\?kind=word$/);
-    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
-      "创建单词"
-    );
-    await page.reload();
-    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
-      "创建单词"
-    );
-
-    await page.goBack();
-    await page.getByRole("button", { name: "创建短语" }).click();
-    await expect(page).toHaveURL(/\/words\/new\?kind=phrase$/);
-    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
-      "创建短语"
-    );
-    await page.reload();
-    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
-      "创建短语"
-    );
-    await page.goBack();
-    await expect(page).toHaveURL(/\/words$/);
-    await page.goForward();
-    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
-      "创建短语"
-    );
-
-    await page.goto("/words/new");
+    await expect(page.getByRole("button", { name: "创建词条" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "创建单词" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "创建短语" })).toHaveCount(0);
+    await page.getByRole("button", { name: "创建词条" }).click();
+    await expect(page).toHaveURL(/\/words\/new$/);
     await expect(page.locator(".word-creation-breadcrumb")).toContainText(
       "创建词条"
+    );
+    await page.reload();
+    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
+      "创建词条"
+    );
+
+    await page.goto("/words/new?kind=word");
+    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
+      "创建单词"
+    );
+    await page.goto("/words/new?kind=phrase");
+    await expect(page.locator(".word-creation-breadcrumb")).toContainText(
+      "创建短语"
     );
   });
 
@@ -232,45 +225,30 @@ test.describe("admin 新建单词 V2", () => {
     await page.getByPlaceholder("例如 center").fill("color");
     await page.getByRole("button", { name: "词典检测" }).click();
 
-    await expect(page.getByText("已存在重复词条")).toBeVisible();
-    const archivedEntry = page.getByRole("link", {
-      name: /colour \(uk\).*已归档/
-    });
-    await expect(archivedEntry).toHaveAttribute(
-      "href",
-      "/words/existing-colour/wizard/basics"
+    await expect(page.getByTestId("smart-dictionary-result")).toHaveText(
+      "已发现"
     );
-    await expect(archivedEntry).toHaveAttribute("target", "_blank");
-    const publishedEntry = page.getByRole("link", {
-      name: /color \(us\).*已发布/
+    const duplicateButtons = page.getByRole("button", {
+      name: /查看重复词条/
     });
-    await expect(publishedEntry).toHaveAttribute("target", "_blank");
-    await expect(page.getByText("归档词条仍占用词头")).toBeVisible();
-    await expect(
-      page.getByText(
-        "点击上方重复词条会在新标签页打开详情，也可以在归档列表中定位。"
-      )
-    ).toBeVisible();
-    const archivedList = page.getByRole("link", {
-      name: "在归档列表查看（新标签页打开）"
-    });
-    await expect(archivedList).toHaveAttribute(
-      "href",
-      "/words?keyword=colour&status=archived"
-    );
-    await expect(archivedList).toHaveAttribute("target", "_blank");
-
-    const [existingEntryPage] = await Promise.all([
-      page.waitForEvent("popup"),
-      archivedEntry.click()
-    ]);
-    await expect(existingEntryPage).toHaveURL(
-      /\/words\/existing-colour\/wizard\/basics$/
-    );
+    await expect(duplicateButtons).toHaveCount(2);
+    await duplicateButtons.first().click();
+    const detailDialog = page.getByRole("dialog");
+    await expect(detailDialog.getByText("重复词条详情")).toBeVisible();
+    await expect(detailDialog.getByText("主词")).toBeVisible();
+    await expect(detailDialog.getByText("状态")).toBeVisible();
+    await expect(detailDialog.getByText("词条类型")).toBeVisible();
+    await expect(detailDialog.getByText("基本词性")).toBeVisible();
+    await expect(detailDialog.getByText("释义预览")).toBeVisible();
+    await expect(detailDialog.getByText("colour")).toBeVisible();
+    await expect(detailDialog.getByText("已归档")).toBeVisible();
     await expect(page).toHaveURL(/\/words\/new$/);
     await expect(page.getByPlaceholder("例如 center")).toHaveValue("color");
-    await expect(page.getByText("已存在重复词条")).toBeVisible();
-    await existingEntryPage.close();
+    await detailDialog.getByRole("button", { name: "关闭" }).click();
+    await expect(detailDialog).toHaveCount(0);
+    await expect(page.getByTestId("smart-dictionary-result")).toHaveText(
+      "已发现"
+    );
     await expect(
       page.getByRole("button", { name: "确认并进入词形与发音" })
     ).toHaveCount(0);
@@ -282,12 +260,10 @@ test.describe("admin 新建单词 V2", () => {
 
   for (const scenario of [
     {
-      headword: "workspace",
-      matchLabel: "已存在同名主词"
+      headword: "workspace"
     },
     {
-      headword: "workspaces",
-      matchLabel: "本次主词已作为已有词条的词形存在"
+      headword: "workspaces"
     }
   ]) {
     test(`surface warning：${scenario.headword} 加载全部页并确认后继续创建`, async ({
@@ -300,29 +276,28 @@ test.describe("admin 新建单词 V2", () => {
       await input.fill(scenario.headword);
       await page.getByRole("button", { name: "词典检测" }).click();
 
-      await expect(
-        page.getByText("发现同名或同形词条，请确认后再继续")
-      ).toBeVisible();
-      await expect(page.getByText("已加载 3/3 条匹配来源。")).toBeVisible();
-      await expect(page.getByText(scenario.matchLabel).first()).toBeVisible();
-      const archivedLinks = page.getByRole("link", {
-        name: /existing-workspace-archived-[ab]，在新标签页打开/
-      });
-      await expect(archivedLinks).toHaveCount(2);
-
-      const [existingEntryPage] = await Promise.all([
-        page.waitForEvent("popup"),
-        archivedLinks.first().click()
-      ]);
-      await expect(existingEntryPage).toHaveURL(
-        /\/words\/existing-workspace-archived-a\/wizard\/basics$/
+      await expect(page.getByTestId("smart-dictionary-result")).toHaveText(
+        "已发现"
       );
+      const archivedButtons = page.getByRole("button", {
+        name: /workspace，查看重复词条/
+      });
+      await expect(archivedButtons).toHaveCount(3);
+      await expect(
+        page.getByRole("button", { name: "仍继续创建" })
+      ).toBeEnabled();
+      await archivedButtons.first().click();
+      const detailDialog = page.getByRole("dialog");
+      await expect(detailDialog.getByText("重复词条详情")).toBeVisible();
+      await expect(detailDialog.getByText("workspace")).toBeVisible();
+      await expect(detailDialog.getByText("已归档")).toBeVisible();
       await expect(page).toHaveURL(/\/words\/new$/);
       await expect(input).toHaveValue(scenario.headword);
-      await expect(
-        page.getByText("发现同名或同形词条，请确认后再继续")
-      ).toBeVisible();
-      await existingEntryPage.close();
+      await detailDialog.getByRole("button", { name: "关闭" }).click();
+      await expect(detailDialog).toHaveCount(0);
+      await expect(page.getByTestId("smart-dictionary-result")).toHaveText(
+        "已发现"
+      );
 
       await page.getByRole("button", { name: "仍继续创建" }).click();
       await expect(page).toHaveURL(
@@ -369,7 +344,12 @@ test.describe("admin 新建单词 V2", () => {
     const input = page.getByPlaceholder("例如 center");
     await input.fill("workspace");
     await page.getByRole("button", { name: "词典检测" }).click();
-    await expect(page.getByText("已加载 3/3 条匹配来源。")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /workspace，查看重复词条/ })
+    ).toHaveCount(3);
+    await expect(
+      page.getByRole("button", { name: "仍继续创建" })
+    ).toBeEnabled();
 
     await page.getByRole("button", { name: "仍继续创建" }).click();
     await expect(page.getByText("检测结果已过期，请重新检测")).toBeVisible();
@@ -377,7 +357,12 @@ test.describe("admin 新建单词 V2", () => {
     await expect(page.getByText("等待检测")).toBeVisible();
 
     await page.getByRole("button", { name: "词典检测" }).click();
-    await expect(page.getByText("已加载 3/3 条匹配来源。")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /workspace，查看重复词条/ })
+    ).toHaveCount(3);
+    await expect(
+      page.getByRole("button", { name: "仍继续创建" })
+    ).toBeEnabled();
     await page.getByRole("button", { name: "仍继续创建" }).click();
     await expect(page).toHaveURL(
       new RegExp(`/words/${ADMIN_E2E_WORD_ID}/wizard/forms$`)
@@ -408,7 +393,11 @@ test.describe("admin 新建单词 V2", () => {
       .getByPlaceholder("词形拼写");
 
     // A1 阶段 5：偏好侧（缺省英式）主导，美式那一栏默认折叠，要先展开才能编辑。
-    await page.getByLabel("展开美式词形").first().click();
+    // 基准原形与派生词形各有一条折叠条，这里要展开的是派生词形组那一条。
+    await page
+      .locator('[data-word-field="slots"]')
+      .getByLabel("展开美式词形")
+      .click();
     await pluralInput.fill("workspaces");
     await page.getByRole("button", { name: "保存草稿" }).click();
 
@@ -532,8 +521,11 @@ test.describe("admin 新建单词 V2", () => {
       .getByPlaceholder("词形拼写");
     const confirm = page.getByRole("button", { name: "确认并保存" });
 
-    // A1 阶段 5：美式那一栏默认折叠，先展开。
-    await page.getByLabel("展开美式词形").first().click();
+    // A1 阶段 5：美式那一栏默认折叠，先展开派生词形组那一条。
+    await page
+      .locator('[data-word-field="slots"]')
+      .getByLabel("展开美式词形")
+      .click();
     await pluralInput.fill("workspaces");
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect(page.getByText("发现 2 条跨词条同形命中")).toBeVisible();

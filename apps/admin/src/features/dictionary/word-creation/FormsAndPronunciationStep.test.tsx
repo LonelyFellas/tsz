@@ -5,7 +5,8 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import { useState } from "react";
@@ -167,6 +168,7 @@ function renderStep(
     onSaved,
     router,
     identityLedger,
+    container: view.container,
     unmount: view.unmount,
     rerenderWord(next: ReturnType<typeof wordFixture>) {
       if (!updateRenderedWord) throw new Error("step harness is not mounted");
@@ -330,7 +332,64 @@ describe("FormsAndPronunciationStep", () => {
     );
   });
 
-  it("catalog 未下发词形能力时禁止新增和完成", async () => {
+  it("零派生能力词性缺基准发音时仍能就地补齐并完成", async () => {
+    const word = wordFixture({ headword: "potato" });
+    const interjection = word.forms.pos[0]!;
+    interjection.pos = "interjection";
+    // 后端对无派生能力的词性回空 form_groups，只回独立的 base_form。
+    interjection.form_groups = [];
+    for (const variant of interjection.base_form.variants) {
+      variant.pronunciations = [
+        { ...variant.pronunciations[0]!, dict_phonetic: "", actual_pron: "" }
+      ];
+    }
+    renderStep(word);
+
+    expect(screen.getByText("当前基本词性无需派生词形")).toBeVisible();
+    // 「无派生词」只关派生区域：基准原形与发音入口必须还在，否则完成校验
+    // 拦下的缺失项在页面上根本没有地方补（回归：无派生词性缺原形发音入口）。
+    expect(screen.getByLabelText("共用词形拼写")).toHaveValue("potato");
+    fireEvent.change(screen.getByLabelText("字典音标"), {
+      target: { value: "pəˈteɪtəʊ" }
+    });
+    fireEvent.change(screen.getByLabelText("实际发音"), {
+      target: { value: "pəˈteɪtəʊ" }
+    });
+    fireEvent.click(button("完成并进入词义与例句"));
+
+    await waitFor(() => expect(mutations.save).toHaveBeenCalledTimes(1));
+    const savedBase =
+      mutations.save.mock.calls[0]![0].content.pos[0].base_form.variants[0];
+    expect(savedBase.pronunciations[0].dict_phonetic).toBe("pəˈteɪtəʊ");
+    expect(savedBase.pronunciations[0].actual_pron).toBe("pəˈteɪtəʊ");
+  });
+
+  it("零派生组的词性仍显示基准原形与英美区分设置", () => {
+    const word = wordFixture({ headword: "potato" });
+    word.forms.pos[0]!.form_groups = [];
+    renderStep(word);
+
+    expect(screen.getByLabelText("共用词形拼写")).toHaveValue("potato");
+    expect(screen.getByText("英美拼写是否有区别？")).toBeVisible();
+    expect(screen.getByText("添加一组替代词形变化")).toBeVisible();
+  });
+
+  it("零派生组时原形发音的校验定位仍能聚焦到缺失字段", async () => {
+    const word = wordFixture({ headword: "potato" });
+    const interjection = word.forms.pos[0]!;
+    interjection.pos = "interjection";
+    interjection.form_groups = [];
+    const pronunciation =
+      interjection.base_form.variants[0]!.pronunciations[0]!;
+    pronunciation.dict_phonetic = "";
+    renderStep(word, { nodeId: pronunciation.id, field: "dict_phonetic" });
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("字典音标")).toHaveFocus()
+    );
+  });
+
+  it("catalog 未下发词形能力时保持安静并允许完成已有词形", async () => {
     catalogState.data = {
       ...partOfSpeechCatalogFixture,
       items: partOfSpeechCatalogFixture.items.map(
@@ -343,17 +402,13 @@ describe("FormsAndPronunciationStep", () => {
     };
     renderStep();
 
-    expect(screen.getByText("词形规则未加载")).toBeVisible();
-    expect(
-      screen.getByText(
-        "现有词形仅供查看；重新加载到服务端词性能力后才能新增或完成本步骤。"
-      )
-    ).toBeVisible();
-    expect(button("添加派生词形")).toBeDisabled();
+    expect(screen.queryByText("词形规则未加载")).not.toBeInTheDocument();
+    expect(screen.queryByText("添加派生词形")).not.toBeInTheDocument();
+    expect(screen.queryByText(/与当前基本词性不匹配/)).not.toBeInTheDocument();
 
     fireEvent.click(button("完成并进入词义与例句"));
-    expect(await screen.findByText("名词的词形规则未加载")).toBeVisible();
-    expect(mutations.preview).not.toHaveBeenCalled();
+    await waitFor(() => expect(mutations.preview).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/词形规则未加载/)).not.toBeInTheDocument();
   });
 
   it("默认词形为空时仍可添加允许的派生词形", () => {
@@ -383,9 +438,9 @@ describe("FormsAndPronunciationStep", () => {
   it("未命中内置词典的空白草稿显示空态引导，并可从零添加第一个基本词性", async () => {
     renderStep(unmatchedWordFixture());
 
-    expect(screen.getByText("当前还没有基本词性")).toBeVisible();
+    expect(screen.getByText("暂无基本词性")).toBeVisible();
     expect(
-      screen.getByText(/请用右上角的「添加基本词性」添加第一个词性/)
+      screen.getByText("内置词典未检测到词性建议，请从右上角添加基本词性。")
     ).toBeVisible();
     expect(screen.queryByLabelText("共用词形拼写")).toBeNull();
 
@@ -396,7 +451,7 @@ describe("FormsAndPronunciationStep", () => {
     if (!option) throw new Error("基本词性选项未渲染");
     fireEvent.click(option);
 
-    expect(screen.queryByText("当前还没有基本词性")).toBeNull();
+    expect(screen.queryByText("暂无基本词性")).toBeNull();
     // 主词是 unified,基准原形按 common 侧回填,且属于人工录入。
     expect(screen.getByLabelText("共用词形拼写")).toHaveValue("brand-new-word");
     expect(screen.queryByLabelText("英式词形拼写")).toBeNull();
@@ -412,7 +467,7 @@ describe("FormsAndPronunciationStep", () => {
     });
     expect(collapseButton).toHaveAttribute("aria-expanded", "true");
     expect(screen.queryByLabelText("管理第 1 组词形变化")).toBeNull();
-    expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("英式词形拼写")).toHaveLength(2);
     expect(screen.getAllByLabelText("播放语音").length).toBeGreaterThan(0);
     expect(screen.getAllByLabelText("获取语音").length).toBeGreaterThan(0);
     expect(screen.queryByLabelText("上传语音")).toBeNull();
@@ -425,14 +480,17 @@ describe("FormsAndPronunciationStep", () => {
       name: "展开第 1 组词形变化"
     });
     expect(expandButton).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryAllByLabelText("英式词形拼写")).toHaveLength(0);
+    // 收起的只是派生词形组：基准原形独立成卡，任何时候都留在页面上。
+    const afterCollapse = screen.getAllByLabelText("英式词形拼写");
+    expect(afterCollapse).toHaveLength(1);
+    expect(afterCollapse[0]).toHaveValue("centre");
 
     fireEvent.click(expandButton);
 
     expect(
       screen.getByRole("button", { name: "收起第 1 组词形变化" })
     ).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getAllByLabelText("英式词形拼写").length).toBeGreaterThan(0);
+    expect(screen.getAllByLabelText("英式词形拼写")).toHaveLength(2);
   });
 
   it("可新增第二组词形变化并独立收起", () => {
@@ -445,6 +503,9 @@ describe("FormsAndPronunciationStep", () => {
     });
     expect(secondGroupToggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getAllByText("添加派生词形")).toHaveLength(2);
+    // 基准原形独立成卡：多加几组也只有一份原形编辑器（1 份原形 + 第 1 组的复数）。
+    expect(screen.getAllByLabelText("英式词形拼写")).toHaveLength(2);
+    expect(screen.getByText("本组还没有派生词形")).toBeVisible();
     fireEvent.click(secondGroupToggle);
     expect(
       screen.getByRole("button", { name: "展开第 2 组词形变化" })
@@ -1991,17 +2052,116 @@ describe("FormsAndPronunciationStep", () => {
     expect(screen.getAllByLabelText("折叠美式词形").length).toBeGreaterThan(0);
   });
 
+  it("手动折叠后再次定位到同一侧的其他节点仍自动展开", async () => {
+    const word = wordFixture({ headword: "center", ready: true });
+    const usVariant = word.forms.pos[0]!.base_form.variants.find(
+      (variant) => variant.dialect === "us"
+    )!;
+    usVariant.pronunciations[0]!.actual_pron = "";
+    const { router } = renderStep(word, {
+      nodeId: usVariant.pronunciations[0]!.id,
+      field: "actual_pron"
+    });
+
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("美式词形拼写").length).toBeGreaterThan(0)
+    );
+    // 用户看完又手动折起来，这一步不能被下一次渲染立刻推翻。
+    fireEvent.click(screen.getAllByLabelText("折叠美式词形")[0]!);
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+
+    // 再点左栏「去完善」定位到同一折叠侧的另一个节点：这是一次新的定位事件，
+    // 必须重新展开——自动展开的依赖若压成布尔量，这次事件会被吃掉（点了没反应）。
+    await act(async () => {
+      await router.navigate(`/words/${word.id}/wizard/forms`, {
+        state: { nodeId: usVariant.id, field: "pronunciations" }
+      });
+    });
+
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("美式词形拼写").length).toBeGreaterThan(0)
+    );
+  });
+
+  it("展开非偏好侧一次，基准原形与词形组一起展开", () => {
+    const { container } = renderStep(
+      wordFixture({ headword: "center", ready: true })
+    );
+
+    const baseCard = container.querySelector<HTMLElement>(
+      ".word-form-base-card"
+    )!;
+    const groupCard = container.querySelector<HTMLElement>(
+      '[data-word-field="slots"]'
+    )!;
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+
+    // 折叠是「我现在要不要看另一侧方言」的词性级意图：在基准原形卡上展开一次，
+    // 词形组那边不该还要再点一次。
+    fireEvent.click(within(baseCard).getByLabelText("展开美式词形"));
+
+    expect(within(baseCard).getByLabelText("美式词形拼写")).toHaveValue(
+      "center"
+    );
+    expect(within(groupCard).getByLabelText("美式词形拼写")).toHaveValue(
+      "centers"
+    );
+
+    // 反向同理：在词形组卡上折叠，基准原形卡跟着收起。
+    fireEvent.click(within(groupCard).getByLabelText("折叠美式词形"));
+    expect(screen.queryByLabelText("美式词形拼写")).toBeNull();
+  });
+
+  it("展开状态按词性各记一份，切到别的词性不跟着展开", () => {
+    const word = wordFixture({ headword: "center", ready: true });
+    const [noun, verb] = word.forms.pos;
+    const { container } = renderStep(word);
+    // 切走的词性面板仍留在 DOM 里（antd Tabs 不销毁），所以按 pos_id 定位到各自那块，
+    // 而不是全页查询。
+    const panel = (posId: string) =>
+      container.querySelector<HTMLElement>(
+        `[data-word-field="form_groups"][data-word-node-id="${posId}"]`
+      )!;
+
+    // 名词面板里有两条折叠条（原形卡 + 词形组卡），点任意一条都该覆盖整个词性。
+    fireEvent.click(
+      within(panel(noun!.pos_id)).getAllByLabelText("展开美式词形")[0]!
+    );
+    expect(
+      within(panel(noun!.pos_id)).getAllByLabelText("美式词形拼写").length
+    ).toBeGreaterThan(0);
+
+    // 「要看另一侧方言」是针对当前词性说的：动词不继承名词的展开状态，
+    // 而名词那边也不因为切走就被重置。
+    fireEvent.click(screen.getByText("动词", { exact: true }));
+    expect(
+      within(panel(verb!.pos_id)).queryByLabelText("美式词形拼写")
+    ).toBeNull();
+    expect(
+      within(panel(noun!.pos_id)).getAllByLabelText("美式词形拼写").length
+    ).toBeGreaterThan(0);
+  });
+
   it("对侧还有待填项时，折叠摘要给出待填数量", () => {
     const word = wordFixture({ headword: "center", ready: true });
     // 美式基准原形缺实际发音 → 折叠摘要应报 1 项待填。
     word.forms.pos[0]!.base_form.variants.find(
       (variant) => variant.dialect === "us"
     )!.pronunciations[0]!.actual_pron = "";
-    renderStep(word);
+    const { container } = renderStep(word);
 
+    // 断言必须指到具体卡片：两张卡各有一条摘要，全页正则匹配会让语义漂移无人察觉。
+    const baseCard = container.querySelector<HTMLElement>(
+      ".word-form-base-card"
+    )!;
     expect(
-      screen.getAllByText(/美式：\d+ 项已填 \/ 1 项待填/).length
-    ).toBeGreaterThan(0);
+      within(baseCard).getByText("美式：0 项已填 / 1 项待填")
+    ).toBeVisible();
+    // 基准原形独立成卡后，词形组的摘要只统计本组派生词形，不再把原形算进来。
+    const groupCard = container.querySelector<HTMLElement>(
+      '[data-word-field="slots"]'
+    )!;
+    expect(within(groupCard).getByText("美式：1 项已填")).toBeVisible();
   });
 
   it("拼写区分时隐藏音标区别选项，偏好侧主导、对侧折叠可展开", () => {

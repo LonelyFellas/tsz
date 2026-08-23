@@ -410,25 +410,107 @@
   line-height: 1.6;
 }
 
-/* 第 1 步的主词事实卡（A1）：只读陈述，偏好侧在前、主视觉更重。 */
-.word-headword-fact-card .word-headword-fact-primary,
-.word-headword-fact-card .word-headword-fact-secondary {
+/* 第 1 步英美主词确认：复用原有地区面板，保留检测结果区的轻量层级。 */
+.word-headword-confirmation-card {
+  overflow: hidden;
+  border-color: #dfe4ea;
+  border-radius: 13px;
+  box-shadow: 0 8px 24px rgba(32, 38, 54, 0.05);
+}
+
+.word-headword-confirmation-card > .ant-card-head {
+  min-height: 44px;
+  padding-inline: 16px;
+  background: #fafbfc;
+  border-bottom-color: #e7eaf0;
+}
+
+.word-dialect-detection-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 6px;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 11px 13px;
+  background: #f6f8fa;
+  border: 1px solid #e5e9ef;
+  border-radius: 10px;
 }
 
-.word-headword-fact-card .word-headword-fact-primary {
-  font-size: 16px;
+.word-headword-confirmation-card .word-dialect-detection-row {
+  margin-bottom: 14px;
 }
 
-.word-headword-fact-card .word-headword-fact-secondary {
-  font-size: 13px;
+.word-dialect-detection-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.word-dialect-detection-row .ant-typography-secondary {
+  font-size: 12px;
+}
+
+.word-headword-confirmation-card .ant-alert {
+  border-radius: 9px;
+}
+
+.word-headword-confirmation-card .dialect-panel {
+  padding: 13px;
+  border-radius: 10px;
 }
 
 .word-headword-confirmation-wrap {
   min-width: 0;
+}
+
+/* 两级分隔：与「建议词性」之间是区块级，用深一档；条目之间是行级，用浅一档。 */
+.word-smart-match-summary {
+  display: grid;
+  padding-top: 2px;
+  border-top: 1px solid #e5e9ef;
+}
+
+/* 条目之间靠分隔线断开，内部靠紧凑间距聚拢——
+   原先内外都是 8px 的 gap，两条重复词条会糊成一片看不出分组。 */
+.word-smart-match-summary-entry {
+  padding: 10px 0;
+}
+
+.word-smart-match-summary-entry + .word-smart-match-summary-entry {
+  border-top: 1px solid #f0f2f5;
+}
+
+.word-smart-match-summary-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.word-smart-match-summary-row .ant-tag {
+  margin-inline-end: 0;
+}
+
+/* 「查看重复词条」是次要动作，去掉 antd 链接按钮的默认内边距，
+   让它与主词在同一条基线上收边，不额外撑高整行。 */
+.word-smart-match-summary-row .ant-btn-link {
+  height: auto;
+  padding: 0;
+}
+
+.word-smart-match-context-meta {
+  margin-top: 6px;
+  color: #667085;
+  font-size: 13px;
+}
+
+/* 标签比值更淡一档，扫视时先落在值上。 */
+.word-smart-match-context-meta-label {
+  color: #98a2b3;
+}
+
+.word-smart-match-context-meta .ant-tag {
+  margin-inline-end: 0;
 }
 
 .word-detection-empty-state {
@@ -457,6 +539,9 @@
 .word-basics-result-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  /* 两列时各自按内容取高：grid 默认 stretch 会把「词典检测结果」
+     拉到与「确认英美主词」等高，命中项少时底部拖出一大块空白。 */
+  align-items: start;
   gap: 14px;
   margin-top: 14px;
 }
@@ -507,6 +592,11 @@
   cursor: pointer;
 }
 
+/* 基准原形卡不可折叠(它是完成本步的硬要求,任何时候都得能改)。 */
+.word-form-base-card > .ant-card-head {
+  cursor: default;
+}
+
 .word-form-card > .ant-card-head .ant-card-head-title {
   min-width: 0;
 }
@@ -550,8 +640,25 @@
   padding: 0;
 }
 
+/* 词形组卡的底部留白来自组内的「添加派生词形」行,基准原形卡没有那一行,
+   自己补上,否则矩阵/折叠条会直接压在卡片底边上。必须排在上面那条
+   padding:0 之后——同特异性,靠顺序取胜。 */
+.word-form-base-card > .ant-card-body {
+  padding-bottom: 16px;
+}
+
 .word-form-rules {
   padding-inline: 18px;
+}
+
+/* 词性级设置的作用域说明:开关写的是 pos.dialect_rules,管的是整个词性,
+   卡片标题只提「基准原形」容易被读窄。 */
+.word-form-rule-hint {
+  padding-block: 10px 2px;
+}
+
+.word-form-group-empty {
+  padding: 14px 18px 0;
 }
 
 .word-form-rule-row {
@@ -1354,6 +1461,63 @@
   background: #fafbfc;
   border: 1px solid #d9dee7;
   border-radius: 9px;
+}
+
+.word-sentence-drawer-trigger {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.word-sentence-drawer-trigger:hover,
+.word-sentence-drawer-trigger:focus-visible {
+  border-color: #1677ff;
+  outline: none;
+}
+
+.word-sentence-drawer-trigger .ant-typography,
+.word-sentence-translation-preview .ant-typography {
+  margin-block: 4px 0;
+}
+
+.word-sentence-translation-preview {
+  min-width: 0;
+  padding: 9px 10px 7px;
+}
+
+.word-forms-tabs-empty {
+  display: grid;
+  min-height: 210px;
+  background: transparent;
+  place-items: center;
+}
+
+.word-forms-tabs-empty .ant-empty-description {
+  color: inherit;
+}
+
+.word-forms-tabs-empty .ant-empty-description strong {
+  color: #262626;
+}
+
+.word-add-basic-pos-select .ant-select-selector {
+  background: #f5faff !important;
+  border-color: #91caff !important;
+}
+
+.word-add-basic-pos-select .ant-select-selection-placeholder,
+.word-add-basic-pos-select .ant-select-arrow {
+  color: #1677ff !important;
+}
+
+.word-add-basic-pos-select .ant-select-selection-placeholder {
+  font-weight: 500;
+}
+
+.word-add-basic-pos-select:not(.ant-select-disabled):hover
+  .ant-select-selector {
+  border-color: #4096ff !important;
 }
 
 .word-sentence-english-toolbar {

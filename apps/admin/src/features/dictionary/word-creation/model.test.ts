@@ -73,7 +73,7 @@ describe("词性派生词形能力", () => {
     }
   );
 
-  it("catalog 未下发能力时 fail closed", () => {
+  it("catalog 未下发候选时返回空集合", () => {
     expect(legalDerivedFormTypes("noun")).toEqual([]);
     expect(defaultDerivedFormType("verb", [])).toBeUndefined();
   });

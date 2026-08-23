@@ -52,6 +52,8 @@ import { newWordNodeId } from "../word-model/primitives";
 import { usePublishWordV2, useValidateWordV2 } from "./api";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { orderedHeadwordSpellings, wordDisplayHeadword } from "./model";
+import { renderSharedSentence } from "./meaningsAndExamples/sentenceAssociationModel";
+import { sentenceAssociationMeanings } from "./meaningsAndExamples/sentenceAssociationTypes";
 
 interface Props {
   word: AdminWordV2;
@@ -370,6 +372,62 @@ function MeaningsPreview({
         };
       })}
     />
+  );
+}
+
+function SharedSentencesPreview({
+  word,
+  preference
+}: {
+  word: AdminWordV2;
+  preference: "uk" | "us";
+}) {
+  const sentences =
+    sentenceAssociationMeanings(word.meanings).shared_sentences ?? [];
+  if (sentences.length === 0) return null;
+  return (
+    <Card
+      className="word-preview-inner-card"
+      size="small"
+      title="多维例句与位置关联"
+      style={{ marginBottom: 14 }}
+    >
+      <List
+        size="small"
+        dataSource={sentences}
+        renderItem={(sentence) => {
+          const preview = renderSharedSentence(sentence, preference);
+          const linked = sentence.associations.filter(
+            (association) => association.state === "linked"
+          ).length;
+          const pending = sentence.associations.filter(
+            (association) => association.state === "pending"
+          ).length;
+          return (
+            <List.Item>
+              <Space orientation="vertical" size={2} style={{ width: "100%" }}>
+                <Space wrap>
+                  <Tag>{sentence.level}</Tag>
+                  <Typography.Text>{preview.text}</Typography.Text>
+                </Space>
+                <Typography.Text type="secondary">
+                  {sentence.zh_text.text || "未填写汉语译文"}
+                </Typography.Text>
+                <Space wrap>
+                  <Tag color="green">正式关联 {linked}</Tag>
+                  <Tag color="orange">预关联 {pending}</Tag>
+                  {preview.missing_association_ids.length > 0 && (
+                    <Tag color="red">
+                      缺少方言词形 {preview.missing_association_ids.length}
+                    </Tag>
+                  )}
+                </Space>
+              </Space>
+            </List.Item>
+          );
+        }}
+      />
+    </Card>
   );
 }
 
@@ -831,6 +889,7 @@ export function PreviewAndPublishStep({
             </Tag>
           }
         >
+          <SharedSentencesPreview word={word} preference={preference} />
           <MeaningsPreview
             word={word}
             partOfSpeechLookup={partOfSpeechLookup}

@@ -7,7 +7,7 @@ import {
   baseFormPronunciationIssues,
   baseFormSpellingIssues,
   derivedFormIssueMessage,
-  dialectFormProgress,
+  dialectSlotsProgress,
   formSlotComplete,
   formSlotIssueTarget
 } from "./formsValidation";
@@ -289,7 +289,7 @@ describe("方言指名与折叠摘要（A1 阶段 5）", () => {
     expect(derivedFormIssueMessage(complete)).toBeUndefined();
   });
 
-  it("折叠摘要按侧统计已填 / 待填，基准原形与派生词形各算一项", () => {
+  it("折叠摘要按侧统计已填 / 待填，传入的每个词形各算一项", () => {
     const pos = distinguishPos();
     pos.form_groups[0]!.slots = [
       {
@@ -305,13 +305,18 @@ describe("方言指名与折叠摘要（A1 阶段 5）", () => {
       }
     ];
 
-    expect(dialectFormProgress(pos, 0, "uk")).toEqual({
+    const slots = [pos.base_form, ...pos.form_groups[0]!.slots];
+    expect(dialectSlotsProgress(slots, pos.dialect_rules, "uk")).toEqual({
       filled: 2,
       pending: 0
     });
-    expect(dialectFormProgress(pos, 0, "us")).toEqual({
+    expect(dialectSlotsProgress(slots, pos.dialect_rules, "us")).toEqual({
       filled: 1,
       pending: 1
     });
+    // 基准原形独立成区后，词形组那一区只统计自己的派生词形。
+    expect(
+      dialectSlotsProgress(pos.form_groups[0]!.slots, pos.dialect_rules, "us")
+    ).toEqual({ filled: 0, pending: 1 });
   });
 });

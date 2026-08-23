@@ -2,7 +2,6 @@ import type {
   AdminWordV2,
   DetectWordResponseV2,
   DraftFormsStepContent,
-  DraftMeaningsStepContent,
   EnglishTextV2,
   WordHeadwordsV2,
   WordSubPos
@@ -12,6 +11,7 @@ import {
   createInitialMeanings,
   richText
 } from "../mock/fixtures";
+import type { DraftMeaningsWithSentenceAssociations } from "./meaningsAndExamples/sentenceAssociationTypes";
 
 export function detectionFixture(
   headword = "center",
@@ -43,10 +43,10 @@ function readyEnglishText(text: string, nodeKey: string): EnglishTextV2 {
 }
 
 export function completeMeanings(
-  content: DraftMeaningsStepContent,
+  content: DraftMeaningsWithSentenceAssociations,
   headwords: WordHeadwordsV2,
   forms?: DraftFormsStepContent
-): DraftMeaningsStepContent {
+): DraftMeaningsWithSentenceAssociations {
   const senseGroups = content.sense_groups.map((group, index) => ({
     ...group,
     name_zh: group.name_zh.trim() || `语义区间 ${index + 1}`,
@@ -71,6 +71,9 @@ export function completeMeanings(
   );
   return {
     sense_groups: structuredClone(senseGroups),
+    ...(content.shared_sentences
+      ? { shared_sentences: structuredClone(content.shared_sentences) }
+      : {}),
     pos: content.pos.map((pos, posIndex) => ({
       ...pos,
       // 语法结构 A1 后只维护一份 `common`。需要「存量英美双条、两侧文本不同」
@@ -121,7 +124,7 @@ interface WordFixtureOptions {
   status?: AdminWordV2["status"];
   ready?: boolean;
   forms?: DraftFormsStepContent;
-  meanings?: DraftMeaningsStepContent;
+  meanings?: DraftMeaningsWithSentenceAssociations;
   completed_steps?: AdminWordV2["completed_steps"];
   max_reachable_step?: AdminWordV2["max_reachable_step"];
   published_revision?: number;

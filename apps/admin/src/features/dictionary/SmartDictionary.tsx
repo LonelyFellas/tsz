@@ -712,18 +712,10 @@ export function SmartDictionary() {
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => navigate("/words/new?kind=word")}
+              onClick={() => navigate("/words/new")}
             >
-              创建单词
+              创建词条
             </Button>
-            {adminWordsDataSourceCapabilities.phraseCreation && (
-              <Button
-                icon={<PlusOutlined />}
-                onClick={() => navigate("/words/new?kind=phrase")}
-              >
-                创建短语
-              </Button>
-            )}
             {adminWordsDataSourceCapabilities.batchArchive && (
               <Button
                 danger={!restoringSelection}

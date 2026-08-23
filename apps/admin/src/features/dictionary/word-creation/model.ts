@@ -22,6 +22,11 @@ import type {
   WordSenseV2,
   WordSentenceV2
 } from "@tsz/types";
+import { canonicalSharedSentences } from "./meaningsAndExamples/sentenceAssociationModel";
+import {
+  sentenceAssociationMeanings,
+  type DraftMeaningsWithSentenceAssociations
+} from "./meaningsAndExamples/sentenceAssociationTypes";
 import { FALLBACK_DIALECT_PREFERENCE } from "@tsz/shared";
 import type { AdminDialectPreference } from "@tsz/shared";
 import {
@@ -543,18 +548,22 @@ export function createSenseGroup(): SenseGroupV2 {
 
 export function ensureMeaningsForForms(
   word: AdminWordV2
-): DraftMeaningsStepContent {
+): DraftMeaningsWithSentenceAssociations {
+  const wordMeanings = sentenceAssociationMeanings(word.meanings);
   const senseGroups =
-    word.meanings.sense_groups.length > 0
-      ? word.meanings.sense_groups
+    wordMeanings.sense_groups.length > 0
+      ? wordMeanings.sense_groups
       : [createSenseGroup()];
   const senseGroupIds = new Set(senseGroups.map((group) => group.id));
   const defaultSenseGroupId = senseGroups[0]!.id;
   const posById = new Map(
-    word.meanings.pos.map((entry) => [entry.pos_id, entry])
+    wordMeanings.pos.map((entry) => [entry.pos_id, entry])
   );
   return {
     sense_groups: senseGroups,
+    ...(wordMeanings.shared_sentences
+      ? { shared_sentences: wordMeanings.shared_sentences }
+      : {}),
     pos: word.forms.pos.map((forms) => {
       const existing = posById.get(forms.pos_id);
       if (!existing) {
@@ -651,15 +660,19 @@ export function toFormsWireContent(
  * 构造词义保存请求：保留稳定文本 ID，丢弃未选完的关联目标与服务端只读快照。
  */
 export function toMeaningsWireContent(
-  content: DraftMeaningsStepContent,
-  preference: AdminDialectPreference
+  content: DraftMeaningsWithSentenceAssociations,
+  preference: AdminDialectPreference,
+  includeSharedSentences = false
 ): DraftMeaningsStepContent {
-  return {
+  const wire: DraftMeaningsWithSentenceAssociations = {
     sense_groups: content.sense_groups.map((group) => ({
       id: group.id,
       name_zh: group.name_zh,
       name_en: group.name_en
     })),
+    ...(includeSharedSentences && content.shared_sentences
+      ? { shared_sentences: canonicalSharedSentences(content.shared_sentences) }
+      : {}),
     pos: content.pos.map((pos) => ({
       pos_id: pos.pos_id,
       grammar_structures: pos.grammar_structures.map((grammar) => {
@@ -749,6 +762,7 @@ export function toMeaningsWireContent(
       }))
     }))
   };
+  return wire;
 }
 
 export function cefrRank(level: CefrLevel): number {

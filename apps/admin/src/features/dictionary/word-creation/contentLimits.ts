@@ -9,7 +9,6 @@
 import type {
   Dialect,
   DraftFormsStepContent,
-  DraftMeaningsStepContent,
   EnglishTextV2,
   RichText,
   WordFormVariantV2
@@ -17,6 +16,7 @@ import type {
 import { HttpError } from "@tsz/api-client/http";
 import { richTextLimitIssues } from "@tsz/voice-editor/core";
 import { DIALECT_SHORT_LABEL } from "../editorConstants";
+import type { DraftMeaningsWithSentenceAssociations } from "./meaningsAndExamples/sentenceAssociationTypes";
 
 /**
  * 承载整步草稿内容的请求体上限（后端 `MAX_STEP_CONTENT_BODY_BYTES`）：
@@ -64,7 +64,7 @@ function englishTextEntries(value: EnglishTextV2): [Dialect, RichText][] {
  * 第 2 步的拼写与音标是纯字符串，已由 `formsValidation` 按 200 码点拦。
  */
 export function meaningsContentLimitIssues(
-  content: DraftMeaningsStepContent
+  content: DraftMeaningsWithSentenceAssociations
 ): ContentLimitIssue[] {
   const issues: ContentLimitIssue[] = [];
   const collect = (
@@ -129,6 +129,11 @@ export function meaningsContentLimitIssues(
       });
     });
   });
+  content.shared_sentences?.forEach((sentence, sentenceIndex) => {
+    const where = `多维例句 ${sentenceIndex + 1}`;
+    collect(sentence.id, "sentence", `${where}英文`, sentence.en_text);
+    collect(sentence.id, "zh_text", `${where}汉语译文`, sentence.zh_text);
+  });
   return issues;
 }
 
@@ -158,7 +163,7 @@ export function formsContentNodeCount(forms: DraftFormsStepContent): number {
 
 /** 镜像后端 `proposed_nodes` 的 meanings 侧；meanings 的 pos 本身不是节点。 */
 export function meaningsContentNodeCount(
-  meanings: DraftMeaningsStepContent
+  meanings: DraftMeaningsWithSentenceAssociations
 ): number {
   let count = meanings.sense_groups.length;
   for (const pos of meanings.pos) {
@@ -179,12 +184,16 @@ export function meaningsContentNodeCount(
       }
     }
   }
+  for (const sentence of meanings.shared_sentences ?? []) {
+    // 共享正文只计一次；每个位置关联有独立稳定身份，也各计一个节点。
+    count += 3 + sentence.associations.length;
+  }
   return count;
 }
 
 export function entryContentNodeIssue(
   forms: DraftFormsStepContent,
-  meanings: DraftMeaningsStepContent
+  meanings: DraftMeaningsWithSentenceAssociations
 ): string | undefined {
   const formsNodes = formsContentNodeCount(forms);
   const meaningsNodes = meaningsContentNodeCount(meanings);
