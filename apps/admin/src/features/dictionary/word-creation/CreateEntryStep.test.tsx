@@ -717,7 +717,7 @@ describe("CreateEntryStep", () => {
     await expectSourceResult("smart-dictionary-result", "智能词库", "已匹配");
     expect(screen.queryByText("可创建")).toBeNull();
     expect(screen.queryByText("已存在同名主词")).toBeNull();
-    expect(screen.queryByText(/关联词/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "查看关联来源" })).toBeNull();
     expect(
       screen.getAllByRole("button", { name: /查看重复词条/ })
     ).toHaveLength(3);
@@ -757,7 +757,10 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    const entries = await screen.findAllByTestId("smart-dictionary-entry");
+    await screen.findAllByTestId("smart-dictionary-entry");
+    const entries = [
+      ...document.querySelectorAll(".word-smart-match-summary-entry")
+    ];
     expect(entries).toHaveLength(2);
     expect(entries[0]).toHaveTextContent(MATCH_CATEGORY_LABEL.exact_headword);
     expect(entries[0]).toHaveTextContent(MATCH_CATEGORY_LABEL.headword_form);
@@ -797,7 +800,10 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    const entries = await screen.findAllByTestId("smart-dictionary-entry");
+    await screen.findAllByTestId("smart-dictionary-entry");
+    const entries = [
+      ...document.querySelectorAll(".word-smart-match-summary-entry")
+    ];
     expect(entries).toHaveLength(categories.length);
     categories.forEach((category, index) => {
       expect(entries[index]).toHaveTextContent(MATCH_CATEGORY_LABEL[category]);
@@ -836,6 +842,77 @@ describe("CreateEntryStep", () => {
     expect(meta).toHaveTextContent("词性：名词");
   }, 10_000);
 
+  it("命中词条被别的词条引用为关联词时，在该行标出来源", async () => {
+    // 关联词录入时若不在库中会被自动建成词条，所以这条命中的可能只是别人的
+    // 近义词带出来的空壳，必须让管理员当场区分于「有人已经建过这个词」
+    const page = surfacePage([surfaceMatch("match-1", "word-workspace")]);
+    page.matched_entry_contexts = page.matched_entry_contexts.map(
+      (context) => ({
+        ...context,
+        inbound_relations: {
+          total: 1,
+          by_type: { synonym: 1, antonym: 0, derivative: 0 },
+          previews: [
+            {
+              source_word_id: "word-clear",
+              source_headword: "clear",
+              relation: "synonym" as const
+            }
+          ],
+          truncated: false
+        }
+      })
+    );
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture("workspace", page)
+    );
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const meta = await waitFor(() => {
+      const node = document.querySelector(".word-smart-match-context-meta");
+      expect(node).not.toBeNull();
+      return node as HTMLElement;
+    });
+    expect(meta).toHaveTextContent("被引用：clear 的同义词");
+  }, 10_000);
+
+  it("无人引用的命中词条不出「被引用」这一项", async () => {
+    const page = surfacePage([surfaceMatch("match-1", "word-workspace")]);
+    page.matched_entry_contexts = page.matched_entry_contexts.map(
+      (context) => ({
+        ...context,
+        inbound_relations: {
+          total: 0,
+          by_type: { synonym: 0, antonym: 0, derivative: 0 },
+          previews: [],
+          truncated: false
+        }
+      })
+    );
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture("workspace", page)
+    );
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const meta = await waitFor(() => {
+      const node = document.querySelector(".word-smart-match-context-meta");
+      expect(node).not.toBeNull();
+      return node as HTMLElement;
+    });
+    expect(meta).not.toHaveTextContent("被引用");
+    expect(meta).toHaveTextContent("词性：名词");
+  }, 10_000);
+
   it("duplicate 分支拿不到命中原因，不显示任何原因标识", async () => {
     // DuplicateWordMatchV2 只有 word_id/headword/dialect/status，后端不给 match_category
     mutations.detect.mockResolvedValue(duplicateDetectionFixture());
@@ -846,7 +923,10 @@ describe("CreateEntryStep", () => {
     });
     fireEvent.click(button("词典检测"));
 
-    const entries = await screen.findAllByTestId("smart-dictionary-entry");
+    await screen.findAllByTestId("smart-dictionary-entry");
+    const entries = [
+      ...document.querySelectorAll(".word-smart-match-summary-entry")
+    ];
     expect(entries).toHaveLength(2);
     for (const entry of entries) {
       for (const label of Object.values(MATCH_CATEGORY_LABEL)) {
@@ -875,10 +955,11 @@ describe("CreateEntryStep", () => {
     // 词性走 partOfSpeechLabel 映射成中文，不是后端快照里的 pos code
     expect(meta).toHaveTextContent("词性：名词");
     expect(meta).toHaveTextContent("释义：工作空间");
-    // fixture 里这条词条自己挂着 2 条入站关联，但那不是本次命中的原因，不该出现
-    expect(screen.queryByText(/关联词/)).toBeNull();
+    // fixture 里这条词条自己挂着 2 条入站关联，清单不该出现——
+    // 清单的标志是逐条列出来源词并各带一颗「查看关联来源」按钮
+    expect(screen.queryByRole("button", { name: "查看关联来源" })).toBeNull();
     expect(screen.queryByRole("button", { name: "work area" })).toBeNull();
-    expect(screen.queryByText("同义词")).toBeNull();
+    expect(document.querySelector(".word-smart-match-relations")).toBeNull();
   }, 10_000);
 
   it("workspaces 命中 workspace 的已保存 plural 词形时提示但允许确认继续", async () => {
