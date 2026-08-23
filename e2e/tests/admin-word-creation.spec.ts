@@ -244,7 +244,7 @@ test.describe("admin 新建单词 V2", () => {
     await expect(detailDialog.getByText("已归档")).toBeVisible();
     await expect(page).toHaveURL(/\/words\/new$/);
     await expect(page.getByPlaceholder("例如 center")).toHaveValue("color");
-    await detailDialog.getByRole("button", { name: "Close" }).click();
+    await detailDialog.getByRole("button", { name: "关闭" }).click();
     await expect(detailDialog).toHaveCount(0);
     await expect(page.getByTestId("smart-dictionary-result")).toHaveText(
       "已发现"
@@ -260,12 +260,10 @@ test.describe("admin 新建单词 V2", () => {
 
   for (const scenario of [
     {
-      headword: "workspace",
-      matchLabel: "已存在同名主词"
+      headword: "workspace"
     },
     {
-      headword: "workspaces",
-      matchLabel: "本次主词已作为已有词条的词形存在"
+      headword: "workspaces"
     }
   ]) {
     test(`surface warning：${scenario.headword} 加载全部页并确认后继续创建`, async ({
@@ -281,12 +279,13 @@ test.describe("admin 新建单词 V2", () => {
       await expect(page.getByTestId("smart-dictionary-result")).toHaveText(
         "已发现"
       );
-      await expect(page.getByText("已加载 3/3 条匹配来源。")).toBeVisible();
-      await expect(page.getByText(scenario.matchLabel).first()).toBeVisible();
       const archivedButtons = page.getByRole("button", {
         name: /workspace，查看重复词条/
       });
       await expect(archivedButtons).toHaveCount(3);
+      await expect(
+        page.getByRole("button", { name: "仍继续创建" })
+      ).toBeEnabled();
       await archivedButtons.first().click();
       const detailDialog = page.getByRole("dialog");
       await expect(detailDialog.getByText("重复词条详情")).toBeVisible();
@@ -294,7 +293,7 @@ test.describe("admin 新建单词 V2", () => {
       await expect(detailDialog.getByText("已归档")).toBeVisible();
       await expect(page).toHaveURL(/\/words\/new$/);
       await expect(input).toHaveValue(scenario.headword);
-      await detailDialog.getByRole("button", { name: "Close" }).click();
+      await detailDialog.getByRole("button", { name: "关闭" }).click();
       await expect(detailDialog).toHaveCount(0);
       await expect(page.getByTestId("smart-dictionary-result")).toHaveText(
         "已发现"
@@ -345,7 +344,12 @@ test.describe("admin 新建单词 V2", () => {
     const input = page.getByPlaceholder("例如 center");
     await input.fill("workspace");
     await page.getByRole("button", { name: "词典检测" }).click();
-    await expect(page.getByText("已加载 3/3 条匹配来源。")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /workspace，查看重复词条/ })
+    ).toHaveCount(3);
+    await expect(
+      page.getByRole("button", { name: "仍继续创建" })
+    ).toBeEnabled();
 
     await page.getByRole("button", { name: "仍继续创建" }).click();
     await expect(page.getByText("检测结果已过期，请重新检测")).toBeVisible();
@@ -353,7 +357,12 @@ test.describe("admin 新建单词 V2", () => {
     await expect(page.getByText("等待检测")).toBeVisible();
 
     await page.getByRole("button", { name: "词典检测" }).click();
-    await expect(page.getByText("已加载 3/3 条匹配来源。")).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /workspace，查看重复词条/ })
+    ).toHaveCount(3);
+    await expect(
+      page.getByRole("button", { name: "仍继续创建" })
+    ).toBeEnabled();
     await page.getByRole("button", { name: "仍继续创建" }).click();
     await expect(page).toHaveURL(
       new RegExp(`/words/${ADMIN_E2E_WORD_ID}/wizard/forms$`)

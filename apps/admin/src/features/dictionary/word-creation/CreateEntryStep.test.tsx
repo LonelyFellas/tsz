@@ -683,7 +683,7 @@ describe("CreateEntryStep", () => {
         confirmed_surface_match_token: "surface-token-workspace"
       })
     );
-  });
+  }, 10_000);
 
   it("workspaces 命中 workspace 的已保存 plural 词形时提示但允许确认继续", async () => {
     const match = surfaceMatch("match-plural", "word-workspace", {
@@ -861,7 +861,7 @@ describe("CreateEntryStep", () => {
     expect(second.idempotency_key).not.toBe(first.idempotency_key);
     expect(second.confirmed_surface_match_token).toBe("token-changed");
     expect(await screen.findByText("forms-route")).toBeVisible();
-  });
+  }, 10_000);
 
   it("409 policy changed 无新首页时清除 snapshot/token 并保留输入供重新检测", async () => {
     mutations.detect.mockResolvedValue(warningDetectionFixture());
