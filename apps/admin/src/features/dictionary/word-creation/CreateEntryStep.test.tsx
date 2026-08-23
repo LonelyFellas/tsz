@@ -23,6 +23,7 @@ import {
 } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateEntryStep } from "./CreateEntryStep";
+import { MATCH_CATEGORY_LABEL } from "../labels";
 import {
   HEADWORD_CHARSET_MESSAGE,
   HEADWORD_NO_LETTER_MESSAGE
@@ -716,14 +717,10 @@ describe("CreateEntryStep", () => {
     await expectSourceResult("smart-dictionary-result", "智能词库", "已匹配");
     expect(screen.queryByText("可创建")).toBeNull();
     expect(screen.queryByText("已存在同名主词")).toBeNull();
-    expect(screen.getAllByText("关联词")).toHaveLength(3);
+    expect(screen.queryByText(/关联词/)).toBeNull();
     expect(
       screen.getAllByRole("button", { name: /查看重复词条/ })
     ).toHaveLength(3);
-    const relationLinks = screen.getAllByRole("button", {
-      name: "查看关联来源"
-    });
-    expect(relationLinks).toHaveLength(3);
     await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
     fireEvent.click(button("仍继续创建"));
     await waitFor(() =>
@@ -735,6 +732,153 @@ describe("CreateEntryStep", () => {
         confirmed_surface_match_token: "surface-token-workspace"
       })
     );
+  }, 10_000);
+
+  it("重复词条标出命中原因，同一词条命中多类时按主词优先并列", async () => {
+    // 同一个 word_id 既主词相同、又撞上它的词形，两个原因都要标出来
+    const page = surfacePage([
+      surfaceMatch("match-form", "word-workspace", {
+        category: "headword_form"
+      }),
+      surfaceMatch("match-exact", "word-workspace", {
+        category: "exact_headword"
+      }),
+      surfaceMatch("match-other", "word-workspace-2", {
+        category: "form_form"
+      })
+    ]);
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture("workspace", page)
+    );
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const entries = await screen.findAllByTestId("smart-dictionary-entry");
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toHaveTextContent(MATCH_CATEGORY_LABEL.exact_headword);
+    expect(entries[0]).toHaveTextContent(MATCH_CATEGORY_LABEL.headword_form);
+    // 入参把 form 放在前面，呈现仍按 MATCH_CATEGORY_ORDER 让主词层面的排前
+    const text = entries[0]?.textContent ?? "";
+    expect(text.indexOf(MATCH_CATEGORY_LABEL.exact_headword)).toBeLessThan(
+      text.indexOf(MATCH_CATEGORY_LABEL.headword_form)
+    );
+    expect(entries[1]).toHaveTextContent(MATCH_CATEGORY_LABEL.form_form);
+    expect(entries[1]).not.toHaveTextContent(
+      MATCH_CATEGORY_LABEL.exact_headword
+    );
+  }, 10_000);
+
+  it("五类命中原因各自的文案都能标出来", async () => {
+    // Record 只保证编译期穷举，保证不了文案写对——form_headword 与 headword_form
+    // 只差词序，极易搞反，逐个钉住。
+    const categories = [
+      "exact_headword",
+      "cross_kind_headword",
+      "form_headword",
+      "headword_form",
+      "form_form"
+    ] as const;
+    const page = surfacePage(
+      categories.map((category, index) =>
+        surfaceMatch(`match-${category}`, `word-${index}`, { category })
+      )
+    );
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture("workspace", page)
+    );
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const entries = await screen.findAllByTestId("smart-dictionary-entry");
+    expect(entries).toHaveLength(categories.length);
+    categories.forEach((category, index) => {
+      expect(entries[index]).toHaveTextContent(MATCH_CATEGORY_LABEL[category]);
+    });
+  }, 10_000);
+
+  it("词条没有入站关联词时，词性与释义照常展示", async () => {
+    const page = surfacePage([surfaceMatch("match-1", "word-workspace")]);
+    // 这条词条一条关联都没有；旧实现在 total === 0 时连词性/释义一起藏掉
+    page.matched_entry_contexts = page.matched_entry_contexts.map(
+      (context) => ({
+        ...context,
+        inbound_relations: {
+          total: 0,
+          by_type: { synonym: 0, antonym: 0, derivative: 0 },
+          previews: [],
+          truncated: false
+        }
+      })
+    );
+    mutations.detect.mockResolvedValue(
+      warningDetectionFixture("workspace", page)
+    );
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const meta = await waitFor(() => {
+      const node = document.querySelector(".word-smart-match-context-meta");
+      expect(node).not.toBeNull();
+      return node as HTMLElement;
+    });
+    expect(meta).toHaveTextContent("词性：名词");
+  }, 10_000);
+
+  it("duplicate 分支拿不到命中原因，不显示任何原因标识", async () => {
+    // DuplicateWordMatchV2 只有 word_id/headword/dialect/status，后端不给 match_category
+    mutations.detect.mockResolvedValue(duplicateDetectionFixture());
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "colour" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    const entries = await screen.findAllByTestId("smart-dictionary-entry");
+    expect(entries).toHaveLength(2);
+    for (const entry of entries) {
+      for (const label of Object.values(MATCH_CATEGORY_LABEL)) {
+        expect(entry).not.toHaveTextContent(label);
+      }
+    }
+  }, 10_000);
+
+  it("命中的是词条本身时只展示词条与词性，不展示它自己的关联词", async () => {
+    const page = surfacePage([surfaceMatch("match-1", "word-workspace-draft")]);
+    const detection = warningDetectionFixture("workspace", page);
+    mutations.detect.mockResolvedValue(detection);
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "workspace" }
+    });
+    fireEvent.click(button("词典检测"));
+
+    // 标签与值分处两个 span（各自一档灰），文本跨元素，只能按容器断言
+    const meta = await waitFor(() => {
+      const node = document.querySelector(".word-smart-match-context-meta");
+      expect(node).not.toBeNull();
+      return node as HTMLElement;
+    });
+    // 词性走 partOfSpeechLabel 映射成中文，不是后端快照里的 pos code
+    expect(meta).toHaveTextContent("词性：名词");
+    expect(meta).toHaveTextContent("释义：工作空间");
+    // fixture 里这条词条自己挂着 2 条入站关联，但那不是本次命中的原因，不该出现
+    expect(screen.queryByText(/关联词/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "work area" })).toBeNull();
+    expect(screen.queryByText("同义词")).toBeNull();
   }, 10_000);
 
   it("workspaces 命中 workspace 的已保存 plural 词形时提示但允许确认继续", async () => {
