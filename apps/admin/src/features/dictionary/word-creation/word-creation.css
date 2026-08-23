@@ -463,11 +463,21 @@
   min-width: 0;
 }
 
+/* 两级分隔：与「建议词性」之间是区块级，用深一档；条目之间是行级，用浅一档。 */
 .word-smart-match-summary {
   display: grid;
-  gap: 8px;
-  padding-top: 12px;
+  padding-top: 2px;
   border-top: 1px solid #e5e9ef;
+}
+
+/* 条目之间靠分隔线断开，内部靠紧凑间距聚拢——
+   原先内外都是 8px 的 gap，两条重复词条会糊成一片看不出分组。 */
+.word-smart-match-summary-entry {
+  padding: 10px 0;
+}
+
+.word-smart-match-summary-entry + .word-smart-match-summary-entry {
+  border-top: 1px solid #f0f2f5;
 }
 
 .word-smart-match-summary-row {
@@ -475,49 +485,31 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 7px 0;
 }
 
 .word-smart-match-summary-row .ant-tag {
   margin-inline-end: 0;
 }
 
-.word-smart-match-context {
-  display: grid;
-  gap: 10px;
-  padding: 4px 0 7px;
+/* 「查看重复词条」是次要动作，去掉 antd 链接按钮的默认内边距，
+   让它与主词在同一条基线上收边，不额外撑高整行。 */
+.word-smart-match-summary-row .ant-btn-link {
+  height: auto;
+  padding: 0;
+}
+
+.word-smart-match-context-meta {
+  margin-top: 6px;
+  color: #667085;
+  font-size: 13px;
+}
+
+/* 标签比值更淡一档，扫视时先落在值上。 */
+.word-smart-match-context-meta-label {
+  color: #98a2b3;
 }
 
 .word-smart-match-context-meta .ant-tag {
-  margin-inline-end: 0;
-}
-
-.word-smart-match-context-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding-top: 10px;
-  border-top: 1px solid #eef0f3;
-}
-
-.word-smart-match-relations {
-  display: grid;
-  gap: 8px;
-}
-
-.word-smart-match-relation-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 10px 12px;
-  background: #fff;
-  border: 1px solid #e4e7ec;
-  border-radius: 8px;
-}
-
-.word-smart-match-relation-row .ant-tag {
   margin-inline-end: 0;
 }
 
@@ -547,6 +539,9 @@
 .word-basics-result-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
+  /* 两列时各自按内容取高：grid 默认 stretch 会把「词典检测结果」
+     拉到与「确认英美主词」等高，命中项少时底部拖出一大块空白。 */
+  align-items: start;
   gap: 14px;
   margin-top: 14px;
 }

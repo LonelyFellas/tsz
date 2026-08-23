@@ -25,6 +25,7 @@ import type {
   AdminWordV2,
   DetectWordResponseV2,
   MatchedEntryContextV2,
+  SurfaceMatchCategoryV2,
   SurfaceMatchPageV2,
   WordHeadwordsV2
 } from "@tsz/types";
@@ -36,7 +37,11 @@ import {
   type PartOfSpeechLookup
 } from "../part-of-speech/catalog";
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
-import { STATUS_LABEL } from "../labels";
+import {
+  MATCH_CATEGORY_ORDER,
+  matchCategoryLabel,
+  STATUS_LABEL
+} from "../labels";
 import { newWordNodeId } from "../word-model/primitives";
 import { useCreateWordV2, useDetectWordV2 } from "./api";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
@@ -58,70 +63,37 @@ interface BasicsFormValues {
   headword: string;
 }
 
-function relationTypeLabel(relation: "synonym" | "antonym" | "derivative") {
-  return relation === "synonym"
-    ? "同义"
-    : relation === "antonym"
-      ? "反义"
-      : "派生";
-}
-
 function SmartMatchContext({
   context,
-  targetHeadword,
-  onPreview
+  lookup
 }: {
   context: MatchedEntryContextV2;
-  targetHeadword: string;
-  onPreview: (wordId: string, title: string) => void;
+  lookup: PartOfSpeechLookup;
 }) {
-  const inbound = context.inbound_relations;
-  if (inbound.total === 0) return null;
+  // 草稿词条常常还没写释义，逐条打印「释义：暂无」只是噪音，空值整项略去。
+  const fields = [
+    {
+      label: "词性",
+      value: context.pos_labels
+        .map((pos) => partOfSpeechLabel(lookup, pos))
+        .join("、")
+    },
+    { label: "释义", value: context.gloss_previews.join("；") }
+  ].filter((field) => field.value !== "");
+
+  if (fields.length === 0) return null;
 
   return (
-    <div className="word-smart-match-context">
-      <Space size={[16, 4]} wrap className="word-smart-match-context-meta">
-        <Typography.Text type="secondary">
-          词性：{context.pos_labels.join("、") || "暂无"}
-        </Typography.Text>
-        <Typography.Text type="secondary">
-          释义：{context.gloss_previews.join("；") || "暂无"}
-        </Typography.Text>
-      </Space>
-      <div className="word-smart-match-context-heading">
-        <Typography.Text strong>关联词</Typography.Text>
-        <Typography.Text type="secondary">
-          共 {inbound.total} 条
-        </Typography.Text>
-      </div>
-      <div className="word-smart-match-relations">
-        {inbound.previews.map((relation, index) => (
-          <div
-            className="word-smart-match-relation-row"
-            key={`${relation.source_word_id}:${relation.relation}:${index}`}
-          >
-            <Space size={8} wrap>
-              <Typography.Text strong>
-                {relation.source_headword}
-              </Typography.Text>
-              <Tag color="blue">{relationTypeLabel(relation.relation)}词</Tag>
-              <Typography.Text type="secondary">
-                关联到 {targetHeadword}
-              </Typography.Text>
-            </Space>
-            <Button
-              type="link"
-              onClick={() => onPreview(relation.source_word_id, "关联来源详情")}
-            >
-              查看关联来源
-            </Button>
-          </div>
-        ))}
-      </div>
-      {inbound.truncated && (
-        <Typography.Text type="secondary">仅展示部分关联词</Typography.Text>
-      )}
-    </div>
+    <Space size={[16, 4]} wrap className="word-smart-match-context-meta">
+      {fields.map((field) => (
+        <span key={field.label}>
+          <span className="word-smart-match-context-meta-label">
+            {field.label}：
+          </span>
+          {field.value}
+        </span>
+      ))}
+    </Space>
   );
 }
 
@@ -340,18 +312,27 @@ function DetectionStatus({
       {
         status: "draft" | "published" | "archived";
         spellings: Set<string>;
+        categories: Set<SurfaceMatchCategoryV2>;
       }
     >();
     const add = (
       wordId: string,
       status: "draft" | "published" | "archived",
-      spellings: string[]
+      spellings: string[],
+      category?: SurfaceMatchCategoryV2
     ) => {
-      const entry = entries.get(wordId) ?? { status, spellings: new Set() };
+      const entry = entries.get(wordId) ?? {
+        status,
+        spellings: new Set<string>(),
+        categories: new Set<SurfaceMatchCategoryV2>()
+      };
       for (const spelling of spellings) {
         const trimmed = spelling.trim();
         if (trimmed) entry.spellings.add(trimmed);
       }
+      // duplicate 分支的 DuplicateWordMatchV2 不带 match_category，
+      // 拿不到命中原因，这一路只能不标。
+      if (category) entry.categories.add(category);
       entries.set(wordId, entry);
     };
     if (smart.status === "duplicate") {
@@ -361,10 +342,12 @@ function DetectionStatus({
     }
     if (smart.status === "warning") {
       for (const item of surfaceState.items) {
-        add(item.existing.word_id, item.existing.status, [
-          item.existing.headword,
-          item.existing.source.surface
-        ]);
+        add(
+          item.existing.word_id,
+          item.existing.status,
+          [item.existing.headword, item.existing.source.surface],
+          item.match_category
+        );
       }
     }
     const input = result.request.headword.toLocaleLowerCase();
@@ -375,6 +358,14 @@ function DetectionStatus({
       wordId,
       status: entry.status,
       context: contexts.get(wordId),
+      categories: [
+        ...MATCH_CATEGORY_ORDER.filter((category) =>
+          entry.categories.has(category)
+        ),
+        ...[...entry.categories].filter(
+          (category) => !MATCH_CATEGORY_ORDER.includes(category)
+        )
+      ],
       spellings: [...entry.spellings].sort((left, right) => {
         const leftIsInput = left.toLocaleLowerCase() === input;
         const rightIsInput = right.toLocaleLowerCase() === input;
@@ -471,7 +462,7 @@ function DetectionStatus({
                   className="word-smart-match-summary-row"
                   data-testid="smart-dictionary-entry"
                 >
-                  <Space size={8}>
+                  <Space size={8} wrap>
                     <Typography.Text strong>
                       {entry.spellings.join(" / ")}
                     </Typography.Text>
@@ -486,6 +477,11 @@ function DetectionStatus({
                     >
                       {STATUS_LABEL[entry.status]}
                     </Tag>
+                    {entry.categories.map((category) => (
+                      <Tag key={category} color="warning">
+                        {matchCategoryLabel(category)}
+                      </Tag>
+                    ))}
                   </Space>
                   <Button
                     type="link"
@@ -501,11 +497,7 @@ function DetectionStatus({
                   </Button>
                 </div>
                 {entry.context && (
-                  <SmartMatchContext
-                    context={entry.context}
-                    targetHeadword={entry.spellings.join(" / ")}
-                    onPreview={(wordId, title) => setPreview({ wordId, title })}
-                  />
+                  <SmartMatchContext context={entry.context} lookup={lookup} />
                 )}
               </div>
             ))}
