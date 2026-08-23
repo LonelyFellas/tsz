@@ -75,6 +75,7 @@ import {
 } from "../part-of-speech/catalog";
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { useRelatedSearch, useRelatedSearchV2 } from "../api";
+import { sentenceAssociationsDataSource } from "../dataSource";
 import {
   cloneWordValue,
   moveWordNode,
@@ -132,6 +133,9 @@ import {
   countPosMeaningIssues,
   validateMeanings
 } from "./meaningsAndExamples/validation";
+import { MultidimensionalSentencesEditor } from "./meaningsAndExamples/SentenceAssociationEditor";
+import { deriveSharedSentencesForSense } from "./meaningsAndExamples/sentenceAssociationModel";
+import type { DraftMeaningsWithSentenceAssociations } from "./meaningsAndExamples/sentenceAssociationTypes";
 
 const VoiceRichTextEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((module) => ({
@@ -1535,7 +1539,9 @@ function SenseEditor({
   value,
   index,
   last,
-  wordId,
+  word,
+  sharedSentences,
+  showPendingClaims,
   senseGroups,
   grammars,
   subPosOptions,
@@ -1544,13 +1550,18 @@ function SenseEditor({
   readOnly,
   forceOpen,
   onChange,
+  onMultidimensionalChange,
   onMove,
   onRemove
 }: {
   value: WordSenseV2;
   index: number;
   last: boolean;
-  wordId: string;
+  word: AdminWordV2;
+  sharedSentences: NonNullable<
+    DraftMeaningsWithSentenceAssociations["shared_sentences"]
+  >;
+  showPendingClaims: boolean;
   senseGroups: DraftMeaningsStepContent["sense_groups"];
   grammars: WordPosMeaningsV2["grammar_structures"];
   subPosOptions: Array<{ value: string; label: string }>;
@@ -1559,10 +1570,20 @@ function SenseEditor({
   readOnly?: boolean;
   forceOpen?: boolean;
   onChange: (next: WordSenseV2) => void;
+  onMultidimensionalChange: (
+    sharedSentences: NonNullable<
+      DraftMeaningsWithSentenceAssociations["shared_sentences"]
+    >,
+    legacySentences: WordSentenceV2[]
+  ) => void;
   onMove: (delta: -1 | 1) => void;
   onRemove: () => void;
 }) {
   const [expanded, setExpanded] = useState(index === 0 || forceOpen === true);
+  const positionedSentences = deriveSharedSentencesForSense(
+    sharedSentences,
+    value.id
+  );
   useEffect(() => {
     if (forceOpen) setExpanded(true);
   }, [forceOpen]);
@@ -1816,48 +1837,63 @@ function SenseEditor({
               <section className="word-sense-section">
                 <div className="word-sense-section-title">
                   <Typography.Text strong>多维例句</Typography.Text>
-                  <Tag>{value.sentences.length} 条</Tag>
+                  <Tag>
+                    {value.sentences.length + positionedSentences.length} 条
+                  </Tag>
                 </div>
-                {value.sentences.map((sentence, sentenceIndex) => (
-                  <SentenceEditor
-                    key={sentence.id}
-                    value={sentence}
-                    index={sentenceIndex}
+                {sentenceAssociationsDataSource.available ? (
+                  <MultidimensionalSentencesEditor
+                    word={word}
+                    sense={value}
+                    value={sharedSentences}
                     readOnly={readOnly}
-                    sorting={sentenceSorting}
-                    onChange={(nextSentence) => {
-                      const sentences = [...value.sentences];
-                      sentences[sentenceIndex] = nextSentence;
-                      onChange({ ...value, sentences });
-                    }}
-                    onRemove={() =>
-                      onChange({
-                        ...value,
-                        sentences: value.sentences.filter(
-                          (_, removeIndex) => removeIndex !== sentenceIndex
-                        )
-                      })
-                    }
+                    showPendingClaims={showPendingClaims}
+                    onChange={onMultidimensionalChange}
                   />
-                ))}
-                {!readOnly && (
-                  <Button
-                    className="word-section-add-button"
-                    type="dashed"
-                    block
-                    icon={<PlusOutlined />}
-                    onClick={() =>
-                      onChange({
-                        ...value,
-                        sentences: [
-                          ...value.sentences,
-                          createSentence(wordId, value.id)
-                        ]
-                      })
-                    }
-                  >
-                    添加例句
-                  </Button>
+                ) : (
+                  <>
+                    {value.sentences.map((sentence, sentenceIndex) => (
+                      <SentenceEditor
+                        key={sentence.id}
+                        value={sentence}
+                        index={sentenceIndex}
+                        readOnly={readOnly}
+                        sorting={sentenceSorting}
+                        onChange={(nextSentence) => {
+                          const sentences = [...value.sentences];
+                          sentences[sentenceIndex] = nextSentence;
+                          onChange({ ...value, sentences });
+                        }}
+                        onRemove={() =>
+                          onChange({
+                            ...value,
+                            sentences: value.sentences.filter(
+                              (_, removeIndex) => removeIndex !== sentenceIndex
+                            )
+                          })
+                        }
+                      />
+                    ))}
+                    {!readOnly && (
+                      <Button
+                        className="word-section-add-button"
+                        type="dashed"
+                        block
+                        icon={<PlusOutlined />}
+                        onClick={() =>
+                          onChange({
+                            ...value,
+                            sentences: [
+                              ...value.sentences,
+                              createSentence(word.id, value.id)
+                            ]
+                          })
+                        }
+                      >
+                        添加例句
+                      </Button>
+                    )}
+                  </>
                 )}
               </section>
 
@@ -1902,8 +1938,8 @@ export function MeaningsAndExamplesStep({
     () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
     [partOfSpeechCatalog.data]
   );
-  const [content, setContent] = useState<DraftMeaningsStepContent>(() =>
-    cloneWordValue(ensureMeaningsForForms(word))
+  const [content, setContent] = useState<DraftMeaningsWithSentenceAssociations>(
+    () => cloneWordValue(ensureMeaningsForForms(word))
   );
   const contentRef = useRef(content);
   const loadedWordIdRef = useRef(word.id);
@@ -1963,7 +1999,7 @@ export function MeaningsAndExamplesStep({
     onDraftChange?.(content);
   }, [content, onDraftChange]);
 
-  const updateContent = (next: DraftMeaningsStepContent) => {
+  const updateContent = (next: DraftMeaningsWithSentenceAssociations) => {
     contentRef.current = next;
     setContent(next);
     setDirty(true);
@@ -1991,6 +2027,7 @@ export function MeaningsAndExamplesStep({
         )
       }));
       updateContent({
+        ...content,
         sense_groups: remainingGroups,
         pos
       });
@@ -2013,7 +2050,11 @@ export function MeaningsAndExamplesStep({
     // 体积与长度预检必须在保存路径上，而不是只在编辑器里提示：粘贴、自动补全和
     // 存量草稿都能绕过编辑器，把超限内容直接带进 payload（对接文档 §13）。
     // 草稿保存(save)同样要拦——后端两个 intent 走的是同一条校验。
-    const wireContent = toMeaningsWireContent(content, preference);
+    const wireContent = toMeaningsWireContent(
+      content,
+      preference,
+      sentenceAssociationsDataSource.available
+    );
     const limitIssues = meaningsContentLimitIssues(wireContent);
     const payload = {
       base_revision: word.revision,
@@ -2261,7 +2302,9 @@ export function MeaningsAndExamplesStep({
                   value={sense}
                   index={senseIndex}
                   last={senseIndex === posMeanings.senses.length - 1}
-                  wordId={word.id}
+                  word={{ ...word, meanings: content }}
+                  sharedSentences={content.shared_sentences ?? []}
+                  showPendingClaims={posIndex === 0 && senseIndex === 0}
                   senseGroups={content.sense_groups}
                   grammars={posMeanings.grammar_structures}
                   subPosOptions={
@@ -2287,6 +2330,19 @@ export function MeaningsAndExamplesStep({
                     senses[senseIndex] = nextSense;
                     pos[posIndex] = { ...posMeanings, senses };
                     updateContent({ ...content, pos });
+                  }}
+                  onMultidimensionalChange={(
+                    shared_sentences,
+                    legacySentences
+                  ) => {
+                    const pos = [...content.pos];
+                    const senses = [...posMeanings.senses];
+                    senses[senseIndex] = {
+                      ...sense,
+                      sentences: legacySentences
+                    };
+                    pos[posIndex] = { ...posMeanings, senses };
+                    updateContent({ ...content, pos, shared_sentences });
                   }}
                   onMove={(delta) => {
                     const pos = [...content.pos];

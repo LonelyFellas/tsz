@@ -1,7 +1,6 @@
 import type {
   CefrLevel,
   DraftFormsStepContent,
-  DraftMeaningsStepContent,
   EnglishTextV2,
   GrammarStructureV2,
   RichText,
@@ -13,6 +12,11 @@ import type {
   WordSentenceV2
 } from "@tsz/types";
 import type { PartOfSpeechLookup } from "../../part-of-speech/catalog";
+import { sharedSentenceIssueField } from "./sentenceAssociationModel";
+import type {
+  DraftMeaningsWithSentenceAssociations,
+  SharedWordSentenceV1
+} from "./sentenceAssociationTypes";
 
 const CEFR_LEVELS = new Set<CefrLevel>(["A1", "A2", "B1", "B2", "C1", "C2"]);
 
@@ -243,12 +247,19 @@ export function wordSentenceIssueTarget(
     : { node_id: sentence.id, field: "sentence" };
 }
 
+export function sharedSentenceIssueTarget(
+  sentence: SharedWordSentenceV1
+): MeaningIssueTarget | undefined {
+  const field = sharedSentenceIssueField(sentence);
+  return field ? { node_id: sentence.id, field } : undefined;
+}
+
 function textCodePointLength(value: string): number {
   return [...value].length;
 }
 
 export function validateMeanings(
-  content: DraftMeaningsStepContent,
+  content: DraftMeaningsWithSentenceAssociations,
   context: MeaningsValidationContext = {}
 ): string[] {
   const issues: string[] = [];
@@ -272,6 +283,13 @@ export function validateMeanings(
         add(`语义区间 ${index + 1} 的${label}不能超过 200 个字符`);
       }
     }
+  }
+  if (
+    content.shared_sentences?.some((sentence) =>
+      Boolean(sharedSentenceIssueTarget(sentence))
+    )
+  ) {
+    add("请补齐多维例句正文、译文和有效位置关联");
   }
   for (const pos of content.pos) {
     if (pos.grammar_structures.length === 0)

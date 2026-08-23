@@ -307,6 +307,30 @@ function createDraft(headwords: unknown): MockWord {
   };
 }
 
+function existingEntryDetail(wordId: string): MockWord | undefined {
+  const headword = wordId.includes("colour")
+    ? "colour"
+    : wordId.includes("color")
+      ? "color"
+      : wordId.startsWith("existing-workspace")
+        ? "workspace"
+        : undefined;
+  if (!headword) return undefined;
+  const word = createDraft({ mode: "unified", common: headword });
+  const status =
+    wordId.includes("published") || wordId === "existing-color"
+      ? "published"
+      : "archived";
+  return {
+    ...word,
+    id: wordId,
+    status,
+    completed_steps: ["basics", "forms", "meanings"],
+    max_reachable_step: "preview",
+    ...(status === "published" ? { published_revision: word.revision } : {})
+  };
+}
+
 function surfaceMatchItem(
   rawHeadword: string,
   wordId: string,
@@ -1088,6 +1112,20 @@ export async function mockAdminApi(
             retired_stable_slots: []
           })
         : json(route, 404, { error: "word not found" });
+    }
+    if (method === "GET") {
+      const detailMatch = new RegExp(
+        `^${ADMIN_E2E_ENTRIES_PATH}/([^/]+)$`
+      ).exec(path);
+      const detail = detailMatch
+        ? existingEntryDetail(detailMatch[1] ?? "")
+        : undefined;
+      if (detail) {
+        return json(route, 200, {
+          word: clone(detail),
+          retired_stable_slots: []
+        });
+      }
     }
     if (
       method === "GET" &&

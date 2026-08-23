@@ -60,7 +60,7 @@ export interface PartOfSpeechCatalogItem {
   name_en: string;
   abbreviation: string;
   sort_order: number;
-  /** 词条创编允许的派生词形；缺省时客户端 fail closed，禁止新增或完成。 */
+  /** 词条创编允许的派生词形；缺省时客户端保留已有数据，不提供新增候选。 */
   allowed_form_types?: Exclude<WordFormType, "base">[];
   /** “添加派生词形”的默认补齐顺序，必须是 allowed_form_types 子集。 */
   default_form_types?: Exclude<WordFormType, "base">[];

@@ -4,6 +4,7 @@ import { createPartOfSpeechLookup } from "../part-of-speech/catalog";
 import { partOfSpeechCatalogFixture } from "./partOfSpeech.test.helper";
 import { buildWordReadiness, pendingReadinessRows } from "./readiness";
 import { completeMeanings, wordFixture } from "./wordCreation.test.helper";
+import { sentenceAssociationMeanings } from "./meaningsAndExamples/sentenceAssociationTypes";
 
 function row(
   rows: ReturnType<typeof buildWordReadiness>,
@@ -65,6 +66,72 @@ describe("buildWordReadiness", () => {
       completed: 2,
       total: 2,
       state: "complete"
+    });
+  });
+
+  it("共享例句纳入多维例句完成度，pending 合法但空关联不完整", () => {
+    const word = wordFixture({ ready: true });
+    const meanings = structuredClone(
+      sentenceAssociationMeanings(word.meanings)
+    );
+    meanings.shared_sentences = [
+      {
+        id: "shared-ready",
+        level: "A1",
+        en_text_id: "shared-ready-en",
+        en_text: {
+          version: 1,
+          text: "Center it.",
+          spans: [],
+          liaisons: []
+        },
+        zh_text_id: "shared-ready-zh",
+        zh_text: {
+          version: 1,
+          text: "把它放中间。",
+          spans: [],
+          liaisons: []
+        },
+        associations: [
+          {
+            id: "pending-ready",
+            state: "pending",
+            source_range: { start: 0, end: 6, surface: "Center" },
+            pending_word: "Center"
+          }
+        ]
+      },
+      {
+        id: "shared-incomplete",
+        level: "A1",
+        en_text_id: "shared-incomplete-en",
+        en_text: {
+          version: 1,
+          text: "Wall.",
+          spans: [],
+          liaisons: []
+        },
+        zh_text_id: "shared-incomplete-zh",
+        zh_text: {
+          version: 1,
+          text: "墙。",
+          spans: [],
+          liaisons: []
+        },
+        associations: []
+      }
+    ];
+
+    expect(
+      row(buildWordReadiness(word, { meanings }), "sentences")
+    ).toMatchObject({
+      completed: 3,
+      total: 4,
+      state: "incomplete",
+      target: {
+        node_id: "shared-incomplete",
+        field: "associations"
+      }
     });
   });
 
@@ -482,7 +549,7 @@ describe("buildWordReadiness", () => {
     expect(forms.target).toBeUndefined();
   });
 
-  it("词性存在但派生能力字段缺失时零派生仍保持未完成", () => {
+  it("词性存在但派生能力字段缺失时零派生保持无需填写", () => {
     const word = wordFixture({ ready: true });
     for (const pos of word.forms.pos) pos.form_groups = [];
     const catalogWithoutCapabilities = {
@@ -501,12 +568,12 @@ describe("buildWordReadiness", () => {
       "forms"
     );
 
-    expect(forms.state).toBe("incomplete");
-    expect(forms.target).toMatchObject({
-      pos_id: word.forms.pos[0]!.pos_id,
-      node_id: word.forms.pos[0]!.pos_id,
-      field: "form_groups"
+    expect(forms).toMatchObject({
+      completed: 0,
+      total: 0,
+      state: "not_required"
     });
+    expect(forms.target).toBeUndefined();
   });
 
   it("同组派生词形类型重复时定位到该组 slots", () => {
@@ -530,18 +597,14 @@ describe("buildWordReadiness", () => {
     });
   });
 
-  it("词性目录未加载时不把派生词形判为完成", () => {
+  it("词性目录未加载时按已有派生词形自身完整性判断", () => {
     const word = wordFixture({ ready: true });
     const forms = row(
       buildWordReadiness(word, {}, createPartOfSpeechLookup(undefined)),
       "forms"
     );
 
-    expect(forms.state).toBe("incomplete");
-    expect(forms.target).toMatchObject({
-      pos_id: word.forms.pos[0]!.pos_id,
-      node_id: word.forms.pos[0]!.pos_id,
-      field: "form_groups"
-    });
+    expect(forms.state).toBe("complete");
+    expect(forms.target).toBeUndefined();
   });
 });

@@ -10,6 +10,7 @@ import {
   removeSenseAndReferences,
   senseOwnsNode
 } from "./mapping";
+import { sentenceAssociationMeanings } from "./sentenceAssociationTypes";
 
 describe("meanings and examples mapping", () => {
   it("按规范化 spelling 生成首次有效发音提示，空值与重复项不覆盖", () => {
@@ -64,7 +65,9 @@ describe("meanings and examples mapping", () => {
   });
 
   it("计数并删除目标词义及跨节点引用，同时保持顺序、非目标引用和原输入", () => {
-    const content = structuredClone(wordFixture().meanings);
+    const content = structuredClone(
+      sentenceAssociationMeanings(wordFixture().meanings)
+    );
     const pos = content.pos[0]!;
     const target = pos.senses[0]!;
     const survivor = structuredClone(target);
@@ -99,8 +102,35 @@ describe("meanings and examples mapping", () => {
       }
     ];
     pos.senses.push(survivor);
+    content.shared_sentences = [
+      {
+        id: "shared-1",
+        level: "A1",
+        en_text_id: "shared-1-en",
+        en_text: { version: 1, text: "Center it.", spans: [], liaisons: [] },
+        zh_text_id: "shared-1-zh",
+        zh_text: { version: 1, text: "把它放中间。", spans: [], liaisons: [] },
+        associations: [
+          {
+            id: "shared-target",
+            state: "linked",
+            source_range: { start: 0, end: 6, surface: "Center" },
+            target_word_id: "word-center",
+            target_sense_id: target.id,
+            form_slot_id: "slot-center",
+            sort_order: 0
+          },
+          {
+            id: "shared-pending",
+            state: "pending",
+            source_range: { start: 7, end: 9, surface: "it" },
+            pending_word: "it"
+          }
+        ]
+      }
+    ];
 
-    expect(countSenseReferences(content, "word-center", target.id)).toBe(2);
+    expect(countSenseReferences(content, "word-center", target.id)).toBe(3);
     const cleaned = removeSenseAndReferences(content, "word-center", target.id);
 
     expect(cleaned.pos[0]!.senses.map((sense) => sense.id)).toEqual([
@@ -112,7 +142,54 @@ describe("meanings and examples mapping", () => {
     expect(cleaned.pos[0]!.senses[0]!.relations).toEqual([
       expect.objectContaining({ id: "other-relation" })
     ]);
+    expect(cleaned.shared_sentences).toEqual([
+      expect.objectContaining({
+        id: "shared-1",
+        associations: [expect.objectContaining({ id: "shared-pending" })]
+      })
+    ]);
     expect(content.pos[0]!.senses).toHaveLength(2);
+  });
+
+  it("删除词义时同步清理关联归零且无法从 sense UI 访问的根例句", () => {
+    const content = structuredClone(
+      sentenceAssociationMeanings(wordFixture().meanings)
+    );
+    const target = content.pos[0]!.senses[0]!;
+    content.shared_sentences = [
+      {
+        id: "shared-orphan",
+        level: "A1",
+        en_text_id: "shared-orphan-en",
+        en_text: {
+          version: 1,
+          text: "Center it.",
+          spans: [],
+          liaisons: []
+        },
+        zh_text_id: "shared-orphan-zh",
+        zh_text: {
+          version: 1,
+          text: "把它放中间。",
+          spans: [],
+          liaisons: []
+        },
+        associations: [
+          {
+            id: "shared-orphan-owner",
+            state: "legacy_unpositioned",
+            target_word_id: "word-center",
+            target_sense_id: target.id,
+            legacy_role: "focus",
+            sort_order: 0
+          }
+        ]
+      }
+    ];
+
+    const cleaned = removeSenseAndReferences(content, "word-center", target.id);
+
+    expect(cleaned.shared_sentences).toEqual([]);
   });
 
   it("基本词性只有一个细分项时回填空值，已有取值与多选项场景保持原样", () => {

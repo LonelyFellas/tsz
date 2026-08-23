@@ -7,14 +7,21 @@ import { WordCreationLayout } from "./WordCreationLayout";
 import { completeMeanings, wordFixture } from "./wordCreation.test.helper";
 
 function LocationProbe() {
-  return <span data-testid="location">{useLocation().pathname}</span>;
+  const location = useLocation();
+  return (
+    <span data-testid="location">
+      {location.pathname}
+      {location.search}
+    </span>
+  );
 }
 
 function renderLayout(
-  props: Omit<Parameters<typeof WordCreationLayout>[0], "children">
+  props: Omit<Parameters<typeof WordCreationLayout>[0], "children">,
+  initialEntry = "/words/word-center/wizard/forms"
 ) {
   return render(
-    <MemoryRouter initialEntries={["/words/word-center/wizard/forms"]}>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <WordCreationLayout {...props}>
         <div>step-content</div>
       </WordCreationLayout>

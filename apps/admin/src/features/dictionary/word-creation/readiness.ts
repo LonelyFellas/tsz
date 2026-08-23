@@ -1,7 +1,6 @@
 import type {
   AdminWordV2,
   DraftFormsStepContent,
-  DraftMeaningsStepContent,
   GrammarStructureV2,
   WordDerivedFormSlotV2,
   WordCreationStep,
@@ -22,9 +21,14 @@ import {
 } from "./formsValidation";
 import {
   grammarStructureIssueTarget,
+  sharedSentenceIssueTarget,
   wordSenseIssueTarget,
   wordSentenceIssueTarget
 } from "./meaningsAndExamples/validation";
+import {
+  sentenceAssociationMeanings,
+  type DraftMeaningsWithSentenceAssociations
+} from "./meaningsAndExamples/sentenceAssociationTypes";
 
 export type ReadinessKey =
   | "dialect"
@@ -63,7 +67,7 @@ export interface ReadinessRow {
 
 export interface WordReadinessDraft {
   forms?: DraftFormsStepContent;
-  meanings?: DraftMeaningsStepContent;
+  meanings?: DraftMeaningsWithSentenceAssociations;
 }
 
 interface FormRequirement {
@@ -71,7 +75,6 @@ interface FormRequirement {
   slot?: WordDerivedFormSlotV2;
   group_id?: string;
   duplicate?: boolean;
-  catalog_missing?: boolean;
   node_id: string;
   field: string;
 }
@@ -142,16 +145,17 @@ export function buildWordReadiness(
       sense_groups: [],
       pos: []
     };
-  const meanings = collapseMeaningsGrammar(
-    collapseMeaningsEnglishText(rawMeanings, dialectPreference),
-    dialectPreference
+  const meanings = sentenceAssociationMeanings(
+    collapseMeaningsGrammar(
+      collapseMeaningsEnglishText(rawMeanings, dialectPreference),
+      dialectPreference
+    )
   );
   const completedSteps = new Set(word?.completed_steps ?? []);
   const dialectComplete = completedSteps.has("basics") ? 1 : 0;
 
   const formRequirements = forms.pos.flatMap<FormRequirement>((pos) => {
-    const configured = partOfSpeechLookup?.byCode.get(pos.pos);
-    const slots = pos.form_groups.flatMap((group) => {
+    return pos.form_groups.flatMap((group) => {
       const typeCounts = new Map<string, number>();
       for (const slot of group.slots) {
         typeCounts.set(
@@ -168,25 +172,9 @@ export function buildWordReadiness(
         field: "variants"
       }));
     });
-    if (partOfSpeechLookup && configured?.allowed_form_types === undefined) {
-      return [
-        {
-          pos,
-          catalog_missing: true,
-          node_id: pos.pos_id,
-          field: "form_groups"
-        },
-        ...slots
-      ];
-    }
-    return slots;
   });
   const completeFormSlots = formRequirements.filter((requirement) => {
-    if (
-      !requirement.slot ||
-      requirement.duplicate ||
-      requirement.catalog_missing
-    ) {
+    if (!requirement.slot || requirement.duplicate) {
       return false;
     }
     const allowed = partOfSpeechLookup?.byCode.get(
@@ -194,23 +182,22 @@ export function buildWordReadiness(
     )?.allowed_form_types;
     return (
       (!partOfSpeechLookup ||
+        allowed === undefined ||
         Boolean(allowed?.includes(requirement.slot.form_type))) &&
       formSlotComplete(requirement.slot, requirement.pos.dialect_rules)
     );
   }).length;
   const firstIncompleteForm = formRequirements.find((requirement) => {
-    if (
-      !requirement.slot ||
-      requirement.duplicate ||
-      requirement.catalog_missing
-    ) {
+    if (!requirement.slot || requirement.duplicate) {
       return true;
     }
     const allowed = partOfSpeechLookup?.byCode.get(
       requirement.pos.pos
     )?.allowed_form_types;
     return (
-      (partOfSpeechLookup && !allowed?.includes(requirement.slot.form_type)) ||
+      (partOfSpeechLookup &&
+        allowed !== undefined &&
+        !allowed.includes(requirement.slot.form_type)) ||
       !formSlotComplete(requirement.slot, requirement.pos.dialect_rules)
     );
   });
@@ -222,9 +209,11 @@ export function buildWordReadiness(
         }
       : firstIncompleteForm.slot &&
           partOfSpeechLookup &&
+          partOfSpeechLookup.byCode.get(firstIncompleteForm.pos.pos)
+            ?.allowed_form_types !== undefined &&
           !partOfSpeechLookup.byCode
-            .get(firstIncompleteForm.pos.pos)
-            ?.allowed_form_types?.includes(firstIncompleteForm.slot.form_type)
+            .get(firstIncompleteForm.pos.pos)!
+            .allowed_form_types!.includes(firstIncompleteForm.slot.form_type)
         ? { node_id: firstIncompleteForm.slot.id, field: "form_type" }
         : firstIncompleteForm.slot
           ? (formSlotIssueTarget(
@@ -275,16 +264,8 @@ export function buildWordReadiness(
         }
       : undefined
   );
-  if (
-    formRequirements.length === 0 &&
-    forms.pos.length > 0 &&
-    partOfSpeechLookup &&
-    forms.pos.every(
-      (pos) =>
-        partOfSpeechLookup.byCode.get(pos.pos)?.allowed_form_types !== undefined
-    )
-  ) {
-    // 词性目录确认该词不需要派生词形:标成中性的「无需填写」,
+  if (formRequirements.length === 0 && forms.pos.length > 0) {
+    // 当前没有派生词形需要填写:标成中性的「无需填写」,
     // 不能沿用 complete——0/0 打绿勾会被读成内容已填好。
     formsReadiness.state = "not_required";
   }
@@ -388,8 +369,15 @@ export function buildWordReadiness(
     ({ sense, sentence }) =>
       !wordSentenceIssueTarget(sentence, sense.id, word?.id)
   ).length;
+  const sharedSentences = meanings.shared_sentences ?? [];
+  const completeSharedSentences = sharedSentences.filter(
+    (sentence) => !sharedSentenceIssueTarget(sentence)
+  ).length;
   const firstIncompleteSentence = sentences.find(({ sense, sentence }) =>
     Boolean(wordSentenceIssueTarget(sentence, sense.id, word?.id))
+  );
+  const firstIncompleteSharedSentence = sharedSentences.find((sentence) =>
+    Boolean(sharedSentenceIssueTarget(sentence))
   );
   const firstIncompleteSentenceTarget = firstIncompleteSentence
     ? wordSentenceIssueTarget(
@@ -397,7 +385,9 @@ export function buildWordReadiness(
         firstIncompleteSentence.sense.id,
         word?.id
       )
-    : undefined;
+    : firstIncompleteSharedSentence
+      ? sharedSentenceIssueTarget(firstIncompleteSharedSentence)
+      : undefined;
 
   return [
     row("dialect", "basics", "方言识别", dialectComplete, 1, {
@@ -506,14 +496,14 @@ export function buildWordReadiness(
       "sentences",
       "meanings",
       "多维例句",
-      completeSentences,
-      sentences.length,
-      firstIncompleteSentence && firstIncompleteSentenceTarget
+      completeSentences + completeSharedSentences,
+      sentences.length + sharedSentences.length,
+      firstIncompleteSentenceTarget
         ? {
             step: "meanings",
             pos_id:
-              firstIncompleteSentence.formPos?.pos_id ??
-              firstIncompleteSentence.meaningsPos?.pos_id,
+              firstIncompleteSentence?.formPos?.pos_id ??
+              firstIncompleteSentence?.meaningsPos?.pos_id,
             node_id: firstIncompleteSentenceTarget.node_id,
             field: firstIncompleteSentenceTarget.field
           }
