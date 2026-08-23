@@ -1194,6 +1194,11 @@ function RelationsEditor({
           ...containsPages.flatMap((page) => page.results)
         ])
     : (relatedSearch.data?.results ?? []);
+  /** 三路搜索都停下来了，结果才是可信的「没有」，而不是「还没回来」。 */
+  const searchSettled =
+    !relatedSearch.isFetching &&
+    !relatedSearchV2.exact.isFetching &&
+    !relatedSearchV2.contains.isFetching;
   const toWordOption = (
     item: (typeof searchResults)[number],
     group?: "完全同名" | "相关联想"
@@ -1321,6 +1326,16 @@ function RelationsEditor({
                       ]
                     : []);
                 const isSearching = searching?.relationId === relation.id;
+                // 只在「这一行确实没匹配上」时提示：正在搜的那一行要等搜完且无命中，
+                // 否则会跟下拉里正列着的同名词条自相矛盾——而管理员一旦信了提示不去
+                // 点选，后端 BindExisting 会把它绑到那个同名词条的第一个义项，
+                // 是他从没选过的。已保存的待物化行不在搜索中，直接提示。
+                const showPendingHint =
+                  !readOnly &&
+                  !relation.target_word_id &&
+                  (relation.pending_target_headword ?? "").trim() !== "" &&
+                  (!isSearching ||
+                    (searchSettled && searchResults.length === 0));
                 return (
                   <div
                     className="word-relation-row"
@@ -1387,6 +1402,17 @@ function RelationsEditor({
                       }
                       onSearch={(query) => {
                         setSearching({ relationId: relation.id, query });
+                        // 重新键入等于放弃上一次选中的词条，它带出来的词义列表也随之
+                        // 作废。不清掉的话：本次保存后端会按词面 BindExisting 绑到
+                        // 另一个词条并回填 target_sense_id，而 availableSenses 仍优先
+                        // 取这份陈旧缓存，新 id 不在 options 里，antd 会把裸 UUID
+                        // 渲染进「匹配词义」框。
+                        setSenseChoices((current) => {
+                          if (!(relation.id in current)) return current;
+                          const next = { ...current };
+                          delete next[relation.id];
+                          return next;
+                        });
                         // 词面进 pending_target_headword：target_headword 是服务端
                         // 只读快照，提交时不上行，往里写等于把管理员输入丢掉。
                         updateRelation(relation.id, {
@@ -1483,19 +1509,6 @@ function RelationsEditor({
                           后端未返回完整分页信息，不能确认已取全同名词条
                         </Typography.Text>
                       )}
-                    {!readOnly &&
-                      !relation.target_word_id &&
-                      (relation.pending_target_headword ?? "").trim() !==
-                        "" && (
-                        <div
-                          className="word-relation-pending-hint"
-                          role="note"
-                          aria-label={`${meta.title}待建条`}
-                        >
-                          <PlusOutlined aria-hidden />
-                          <span>库中暂无该词，发布时会自动建成草稿词条</span>
-                        </div>
-                      )}
                     <Select
                       aria-label={`${meta.title}目标词义`}
                       className="word-relation-sense"
@@ -1517,6 +1530,16 @@ function RelationsEditor({
                         });
                       }}
                     />
+                    {showPendingHint && (
+                      <div
+                        className="word-relation-pending-hint"
+                        role="note"
+                        aria-label={`${meta.title}待建条`}
+                      >
+                        <PlusOutlined aria-hidden />
+                        <span>未选定词条，发布时会自动匹配同名词条或建条</span>
+                      </div>
+                    )}
                     {!readOnly && (
                       <Button
                         size="small"

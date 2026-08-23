@@ -1503,7 +1503,7 @@ describe("MeaningsAndExamplesStep", () => {
 
     expect(
       screen.getByRole("note", { name: "近义词待建条" })
-    ).toHaveTextContent("库中暂无该词，发布时会自动建成草稿词条");
+    ).toHaveTextContent("未选定词条，发布时会自动匹配同名词条或建条");
 
     // notFoundContent 那条是随下拉一起消失的浮层；待建条是对「保存后会发生什么」
     // 的承诺，必须常驻行内，失焦后仍要看得见。
@@ -1512,6 +1512,29 @@ describe("MeaningsAndExamplesStep", () => {
       screen.getByRole("note", { name: "近义词待建条" })
     ).toBeInTheDocument();
     expect(screen.getByLabelText("近义词目标词条")).toHaveValue("reddish");
+  });
+
+  it("库中已有同名词条时不出待建条提示，避免与下拉结果自相矛盾", async () => {
+    renderStep(wordFixture({ ready: true }));
+    fireEvent.click(enabledButton("添加近义词"));
+    const search = screen.getByLabelText("近义词目标词条");
+    fireEvent.focus(search);
+    // far 在搜索 fixture 里真实存在。此时下拉正列着它，若还提示「会自动建条」，
+    // 管理员据此不点选就保存，后端 BindExisting 会把它绑到 far 的第一个义项——
+    // 一个他从没选过的义项，且根本没有建条。
+    fireEvent.change(search, { target: { value: "far" } });
+
+    // 等下拉真的把 far 列出来，证明搜索已落地且有命中（沿用 selectInlineRelatedWord
+    // 的定位方式：antd v6 下按选项文案回溯 .ant-select-item-option）。
+    await waitFor(() => {
+      const hit = screen
+        .getAllByText("far", { exact: true })
+        .find((item) => item.closest(".ant-select-item-option"));
+      expect(hit).toBeTruthy();
+    });
+    expect(
+      screen.queryByRole("note", { name: "近义词待建条" })
+    ).not.toBeInTheDocument();
   });
 
   it("待物化关联词以 pending_target_headword 上行，不带空的 target_*", async () => {

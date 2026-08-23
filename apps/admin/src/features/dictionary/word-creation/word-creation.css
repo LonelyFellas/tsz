@@ -1655,9 +1655,13 @@
 }
 
 /*
- * 待建条提示要独占一整行：.word-relation-row 是固定 3 列 grid，在流子项正好
- * 3 个（删除按钮 position:absolute 脱流）。不写 grid-column 会掉进隐式第二行
- * 第 1 列——那列只有 minmax(54px, .58fr)，提示会被压成竖排。
+ * 待建条提示要独占一整行：.word-relation-row 是固定 3 列 grid（删除按钮
+ * position:absolute 脱流）。不写 grid-column 会掉进隐式第二行第 1 列——那列
+ * 只有 minmax(54px, .58fr)，提示会被压成竖排。
+ *
+ * 提示在 DOM 里必须排在「匹配词义」Select **之后**：跨满行的项塞不进第一行，
+ * 会另起一行并把放置游标推到行尾，排在它后面的自动项只能落到第三行第 1 列。
+ * 早先把它放在 Select 前，就把 Select 挤进了那条 54px 的窄列。
  */
 .word-relation-pending-hint {
   grid-column: 1 / -1;
