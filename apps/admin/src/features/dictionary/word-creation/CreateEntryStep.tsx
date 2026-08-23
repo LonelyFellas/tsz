@@ -38,6 +38,7 @@ import {
 } from "../part-of-speech/catalog";
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import {
+  inboundRelationSummary,
   MATCH_CATEGORY_ORDER,
   matchCategoryLabel,
   STATUS_LABEL
@@ -68,22 +69,38 @@ interface BasicsFormValues {
   headword: string;
 }
 
-function SmartMatchContext({
+function SmartMatchEntryMeta({
+  categories,
   context,
   lookup
 }: {
-  context: MatchedEntryContextV2;
+  categories: readonly SurfaceMatchCategoryV2[];
+  context?: MatchedEntryContextV2;
   lookup: PartOfSpeechLookup;
 }) {
+  // 命中原因排在最前：它回答的是「为什么这条会拦下我」，比词条自身属性更该先读到。
+  // 放在这行而非主词行，是因为主词行同时挂状态标签时，多个原因标签会把主词淹掉。
   // 草稿词条常常还没写释义，逐条打印「释义：暂无」只是噪音，空值整项略去。
   const fields = [
     {
+      // 用「原因」而非「命中」：labels 里 headword_form 本身就叫「命中其词形」，
+      // 前缀再用「命中」会读成「命中：命中其词形」。
+      label: "原因",
+      value: categories
+        .map((category) => matchCategoryLabel(category))
+        .join(" · ")
+    },
+    {
+      label: "被引用",
+      value: inboundRelationSummary(context?.inbound_relations) ?? ""
+    },
+    {
       label: "词性",
-      value: context.pos_labels
+      value: (context?.pos_labels ?? [])
         .map((pos) => partOfSpeechLabel(lookup, pos))
         .join("、")
     },
-    { label: "释义", value: context.gloss_previews.join("；") }
+    { label: "释义", value: (context?.gloss_previews ?? []).join("；") }
   ].filter((field) => field.value !== "");
 
   if (fields.length === 0) return null;
@@ -482,11 +499,6 @@ function DetectionStatus({
                     >
                       {STATUS_LABEL[entry.status]}
                     </Tag>
-                    {entry.categories.map((category) => (
-                      <Tag key={category} color="warning">
-                        {matchCategoryLabel(category)}
-                      </Tag>
-                    ))}
                   </Space>
                   <Button
                     type="link"
@@ -501,9 +513,11 @@ function DetectionStatus({
                     查看重复词条
                   </Button>
                 </div>
-                {entry.context && (
-                  <SmartMatchContext context={entry.context} lookup={lookup} />
-                )}
+                <SmartMatchEntryMeta
+                  categories={entry.categories}
+                  context={entry.context}
+                  lookup={lookup}
+                />
               </div>
             ))}
           </div>

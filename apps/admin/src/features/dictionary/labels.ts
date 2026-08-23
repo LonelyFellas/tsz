@@ -4,6 +4,7 @@ import type {
   AdminWordKind,
   AdminWordStatus,
   CefrLevel,
+  RelationReferenceSummaryV2,
   SurfaceMatchCategoryV2
 } from "@tsz/types";
 
@@ -57,6 +58,48 @@ export const MATCH_CATEGORY_LABEL: Record<SurfaceMatchCategoryV2, string> = {
  */
 export function matchCategoryLabel(category: SurfaceMatchCategoryV2): string {
   return MATCH_CATEGORY_LABEL[category] ?? category;
+}
+
+type RelationType = RelationReferenceSummaryV2["previews"][number]["relation"];
+
+/** 关联类型。词面统一带「词」字：「同义词」而非「同义」。 */
+export const RELATION_TYPE_LABEL: Record<RelationType, string> = {
+  synonym: "同义词",
+  antonym: "反义词",
+  derivative: "派生词"
+};
+
+/** 同 `matchCategoryLabel`：wire 先于前端新增取值时原样透出，别渲染出 undefined。 */
+export function relationTypeLabel(relation: RelationType): string {
+  return RELATION_TYPE_LABEL[relation] ?? relation;
+}
+
+/**
+ * 命中词条被哪些词条引用为关联词。
+ *
+ * 关联词在录入时若不在库中会被自动建成词条，因此下次录入同名词必然以 `exact_headword`
+ * 命中它——但那条词条可能只是别人的近义词带出来的空壳，与管理员手工建的同名词条
+ * 含义完全不同，必须让人当场看出来，否则会误判成「有人已经建过这个词了」。
+ *
+ * 计数取 `total`（全量），词面取 `previews`（后端截到 5 条的样本），
+ * 所以只在恰好一条时才敢写出具体来源和类型。
+ */
+export function inboundRelationSummary(
+  inbound?: RelationReferenceSummaryV2
+): string | undefined {
+  if (!inbound || inbound.total === 0) return undefined;
+  const first = inbound.previews[0];
+  // 恰好一条且样本齐全时才敢写具体来源与类型；样本多于一条说明 total 与样本不同步，
+  // 按多条处理，宁可只报数量也不要以偏概全。
+  if (inbound.total === 1 && first && inbound.previews.length === 1) {
+    return `${first.source_headword} 的${relationTypeLabel(first.relation)}`;
+  }
+  // 措辞刻意避开「关联词」三字：主语是本词条（被别人引用），
+  // 说成「N 个词条的关联词」会与「词条自身的关联词清单」混淆，那是两回事。
+  if (first) {
+    return `${first.source_headword} 等 ${inbound.total} 个词条`;
+  }
+  return `${inbound.total} 个词条`;
 }
 
 export const CEFR_LEVELS: readonly CefrLevel[] = [
