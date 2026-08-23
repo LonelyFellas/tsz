@@ -24,6 +24,10 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CreateEntryStep } from "./CreateEntryStep";
 import {
+  HEADWORD_CHARSET_MESSAGE,
+  HEADWORD_NO_LETTER_MESSAGE
+} from "./headwordValidation";
+import {
   deferred,
   detectionFixture,
   wordFixture
@@ -359,6 +363,54 @@ describe("CreateEntryStep", () => {
       await screen.findByText("词条不能超过 200 个字符")
     ).toBeInTheDocument();
     expect(mutations.detect).not.toHaveBeenCalled();
+  });
+
+  it("非英文或不含字母的词条只显示本地校验且不发检测请求", async () => {
+    renderStep();
+    const input = screen.getByLabelText("录入词条");
+
+    fireEvent.change(input, { target: { value: "苹果" } });
+    fireEvent.click(button("词典检测"));
+    expect(
+      await screen.findByText(HEADWORD_CHARSET_MESSAGE)
+    ).toBeInTheDocument();
+    expect(mutations.detect).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: "give　up" } });
+    fireEvent.click(button("词典检测"));
+    expect(
+      await screen.findByText(HEADWORD_CHARSET_MESSAGE)
+    ).toBeInTheDocument();
+    expect(mutations.detect).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: "123456" } });
+    fireEvent.click(button("词典检测"));
+    expect(
+      await screen.findByText(HEADWORD_NO_LETTER_MESSAGE)
+    ).toBeInTheDocument();
+    expect(mutations.detect).not.toHaveBeenCalled();
+  });
+
+  it("检测之后把英美主词改成非英文时标红并禁止建草稿", async () => {
+    const detection = detectionFixture("center", "det-center");
+    mutations.detect.mockResolvedValue(detection);
+    renderStep();
+
+    fireEvent.change(screen.getByLabelText("录入词条"), {
+      target: { value: "center" }
+    });
+    fireEvent.click(button("词典检测"));
+    const usInput = await screen.findByLabelText("美式主词");
+    expect(button("确认并进入词形与发音")).toBeEnabled();
+
+    fireEvent.change(usInput, { target: { value: "苹果" } });
+    expect(await screen.findByText(HEADWORD_CHARSET_MESSAGE)).toBeVisible();
+    expect(button("确认并进入词形与发音")).toBeDisabled();
+    fireEvent.click(button("确认并进入词形与发音"));
+    expect(mutations.create).not.toHaveBeenCalled();
+
+    fireEvent.change(usInput, { target: { value: "center" } });
+    await waitFor(() => expect(button("确认并进入词形与发音")).toBeEnabled());
   });
 
   it("命中双拼写时恢复英美开关与双主词输入，并可手动切换", async () => {

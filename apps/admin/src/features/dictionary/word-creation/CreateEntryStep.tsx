@@ -39,6 +39,11 @@ import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import { STATUS_LABEL } from "../labels";
 import { newWordNodeId } from "../word-model/primitives";
 import { useCreateWordV2, useDetectWordV2 } from "./api";
+import {
+  hasHeadwordsIssue,
+  headwordIssue,
+  headwordsIssues
+} from "./headwordValidation";
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import {
   canAcknowledgeSurfaceSnapshot,
@@ -545,6 +550,7 @@ function HeadwordConfirmation({
     value.mode === "distinguish" ? value.source_dialect : undefined;
   const uk = value.mode === "distinguish" ? value.uk : value.common;
   const us = value.mode === "distinguish" ? value.us : value.common;
+  const issues = headwordsIssues(value);
 
   return (
     <Card
@@ -602,6 +608,7 @@ function HeadwordConfirmation({
             <Input
               aria-label="英式主词"
               value={uk}
+              status={issues.uk ? "error" : undefined}
               disabled={value.mode === "unified" || source === "uk"}
               onChange={(event) => {
                 if (value.mode === "distinguish") {
@@ -610,6 +617,9 @@ function HeadwordConfirmation({
               }}
               style={{ marginTop: 10 }}
             />
+            {issues.uk && (
+              <Typography.Text type="danger">{issues.uk}</Typography.Text>
+            )}
           </div>
         </Col>
         <Col xs={24} md={12}>
@@ -618,6 +628,7 @@ function HeadwordConfirmation({
             <Input
               aria-label="美式主词"
               value={us}
+              status={issues.us ? "error" : undefined}
               disabled={value.mode === "unified" || source === "us"}
               onChange={(event) => {
                 if (value.mode === "distinguish") {
@@ -626,6 +637,9 @@ function HeadwordConfirmation({
               }}
               style={{ marginTop: 10 }}
             />
+            {issues.us && (
+              <Typography.Text type="danger">{issues.us}</Typography.Text>
+            )}
           </div>
         </Col>
       </Row>
@@ -756,7 +770,9 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
     headwords !== undefined &&
     (headwords.mode === "unified"
       ? headwords.common.trim() !== ""
-      : headwords.uk.trim() !== "" && headwords.us.trim() !== "");
+      : headwords.uk.trim() !== "" && headwords.us.trim() !== "") &&
+    // 录入框的规则只管检测入口，主词在「确认英美主词」里还能被改成任意内容。
+    !hasHeadwordsIssue(headwords);
 
   const createDraft = async () => {
     if (!result || !headwords || !canCreate || creating) return;
@@ -868,7 +884,15 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
               name="headword"
               rules={[
                 { required: true, whitespace: true, message: "请输入词条" },
-                { max: 200, message: "词条不能超过 200 个字符" }
+                { max: 200, message: "词条不能超过 200 个字符" },
+                {
+                  validator: (_rule, value: string | undefined) => {
+                    const issue = headwordIssue(value ?? "");
+                    return issue
+                      ? Promise.reject(new Error(issue))
+                      : Promise.resolve();
+                  }
+                }
               ]}
             >
               <Input.Search
