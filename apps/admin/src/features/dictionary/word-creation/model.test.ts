@@ -8,6 +8,7 @@ import type {
   WordDefinitionV2,
   WordPosFormsV2,
   WordPosMeaningsV2,
+  WordRelationV2,
   WordFormType
 } from "@tsz/types";
 import { describe, expect, it } from "vitest";
@@ -997,5 +998,111 @@ describe("真实后端 wire mapper", () => {
     ]);
     expect(wireDefinition).not.toHaveProperty("audio_url");
     expect(wireSentence).not.toHaveProperty("audio_source");
+  });
+
+  /**
+   * 复用上面那条用例的构造口径，只把 relations 换成待测形态，
+   * 返回上行 wire 里该义项的 relations。
+   */
+  function wireRelations(relations: WordRelationV2[]) {
+    const pos = createPosMeanings("pos-1", "word-1", "sense-group-1");
+    pos.senses[0]!.relations = relations;
+    const wire = toMeaningsWireContent(
+      {
+        sense_groups: [
+          { id: "sense-group-1", name_zh: "测试", name_en: "Test" }
+        ],
+        pos: [pos]
+      },
+      "uk"
+    );
+    return wire.pos[0]!.senses[0]!.relations;
+  }
+
+  it("待物化关联词只上行 trim 后的词面，不夹带 target 两件套", () => {
+    const relation = createRelation("synonym");
+    relation.pending_target_headword = "  freshword  ";
+    relation.score = "60";
+
+    const wired = wireRelations([relation]);
+
+    expect(wired).toHaveLength(1);
+    // 词面必须前端 trim：后端 canonicalize 不遍历 relations，首尾空格会直撞
+    // `pending = btrim(pending)` 的库层 CHECK，那是 500 不是 422。
+    expect(wired[0]!).toEqual({
+      id: relation.id,
+      relation: "synonym",
+      pending_target_headword: "freshword",
+      score: "60"
+    });
+    // toEqual 忽略值为 undefined 的键，两形态互斥只有 not.toHaveProperty 测得住：
+    // 带上空串 target 会被库层 shape CHECK 判成非法形状。
+    expect(wired[0]!).not.toHaveProperty("target_word_id");
+    expect(wired[0]!).not.toHaveProperty("target_sense_id");
+  });
+
+  it("同时带 target 两件套与 pending 词面时只上行已绑定形态", () => {
+    const relation = createRelation("antonym");
+    relation.target_word_id = "word-2";
+    relation.target_sense_id = "sense-2";
+    // 先键入词面又回头选中真实词条时的残留，绝不能跟着 target 一起发出去。
+    relation.pending_target_headword = "freshword";
+    relation.score = "80";
+
+    const wired = wireRelations([relation]);
+
+    expect(wired).toHaveLength(1);
+    expect(wired[0]!).toEqual({
+      id: relation.id,
+      relation: "antonym",
+      target_word_id: "word-2",
+      target_sense_id: "sense-2",
+      score: "80"
+    });
+    expect(wired[0]!).not.toHaveProperty("pending_target_headword");
+  });
+
+  it("目标与词面都不完整的关联词整条丢弃，不发空串占位", () => {
+    const blank = createRelation("synonym");
+    const halfSelected = createRelation("antonym");
+    halfSelected.target_word_id = "word-2";
+    const blankPending = createRelation("synonym");
+    blankPending.pending_target_headword = "   ";
+    const kept = createRelation("derivative");
+    kept.target_word_id = "word-3";
+    kept.target_sense_id = "sense-3";
+    kept.score = "50";
+
+    expect(wireRelations([blank, halfSelected, blankPending, kept])).toEqual([
+      {
+        id: kept.id,
+        relation: "derivative",
+        target_word_id: "word-3",
+        target_sense_id: "sense-3",
+        score: "50"
+      }
+    ]);
+  });
+
+  it("已绑定关联词上行仍是五键，不夹带 pending 字段与只读快照", () => {
+    const relation = createRelation("synonym");
+    relation.target_word_id = "word-2";
+    relation.target_sense_id = "sense-2";
+    relation.target_headword = "other";
+    relation.target_gloss = "另一个";
+    relation.score = "75";
+
+    const wired = wireRelations([relation]);
+
+    expect(wired).toHaveLength(1);
+    // 按键名断言：toEqual 放过值为 undefined 的键，键集才能证明没夹带。
+    expect(Object.keys(wired[0]!).sort()).toEqual([
+      "id",
+      "relation",
+      "score",
+      "target_sense_id",
+      "target_word_id"
+    ]);
+    expect(wired[0]!).not.toHaveProperty("pending_target_headword");
   });
 });

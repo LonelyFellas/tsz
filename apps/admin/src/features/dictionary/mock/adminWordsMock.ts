@@ -1063,10 +1063,16 @@ function validateMeanings(
         }
       }
       for (const relation of sense.relations) {
-        if (
-          !hasTargetSense(relation.target_word_id, relation.target_sense_id) ||
-          !validPercent(relation.score)
-        ) {
+        const targetWordId = relation.target_word_id ?? "";
+        const targetSenseId = relation.target_sense_id ?? "";
+        const pending = (relation.pending_target_headword ?? "").trim();
+        // 待物化形态（只有词面）在真后端是合法的，mock 也得放行，
+        // 否则会出现「mock 拦、真机放行」的反向不一致。
+        const shapeOk =
+          targetWordId && targetSenseId
+            ? hasTargetSense(targetWordId, targetSenseId)
+            : !targetWordId && !targetSenseId && pending !== "";
+        if (!shapeOk || !validPercent(relation.score)) {
           issues.push({
             step: "meanings",
             node_id: relation.id,
@@ -4078,17 +4084,24 @@ export function createAdminWordsMock({
                     reference_kind: "sentence_context"
                   }))
               ),
-              ...sense.relations
-                .filter((relation) =>
-                  transitioningIds.has(relation.target_word_id)
-                )
-                .map((relation) => ({
-                  target_sense_id: relation.target_sense_id,
-                  source_entry_id: sourceEntryId,
-                  source_publication_id: `mock-publication-${sourceEntryId}-${sourceWord.published_revision ?? sourceWord.revision}`,
-                  source_node_id: relation.id,
-                  reference_kind: "relation"
-                }))
+              // 待物化关联词还没有目标词条，构不成引用；flatMap 顺带窄化可选属性。
+              ...sense.relations.flatMap((relation) => {
+                const targetWordId = relation.target_word_id;
+                const targetSenseId = relation.target_sense_id;
+                if (targetWordId === undefined || targetSenseId === undefined) {
+                  return [];
+                }
+                if (!transitioningIds.has(targetWordId)) return [];
+                return [
+                  {
+                    target_sense_id: targetSenseId,
+                    source_entry_id: sourceEntryId,
+                    source_publication_id: `mock-publication-${sourceEntryId}-${sourceWord.published_revision ?? sourceWord.revision}`,
+                    source_node_id: relation.id,
+                    reference_kind: "relation"
+                  }
+                ];
+              })
             ])
           );
         }
@@ -4132,25 +4145,30 @@ export function createAdminWordsMock({
                   reference_kind: "sentence_context"
                 }))
             ),
-            ...sense.relations
-              .filter(
-                (relation) =>
-                  !current.publication_words[relation.target_word_id] ||
-                  (current.words[relation.target_word_id]?.status ===
-                    "archived" &&
-                    !transitioningIds.has(relation.target_word_id)) ||
-                  !wordHasSense(
-                    current.publication_words[relation.target_word_id]!,
-                    relation.target_sense_id
-                  )
-              )
-              .map((relation) => ({
-                target_sense_id: relation.target_sense_id,
-                source_entry_id: word.id,
-                source_publication_id: `mock-publication-${word.id}-${word.published_revision ?? word.revision}`,
-                source_node_id: relation.id,
-                reference_kind: "relation"
-              }))
+            // 待物化关联词没有目标可查，不参与「引用了已归档/不可用目标」的判定。
+            ...sense.relations.flatMap((relation) => {
+              const targetWordId = relation.target_word_id;
+              const targetSenseId = relation.target_sense_id;
+              if (targetWordId === undefined || targetSenseId === undefined) {
+                return [];
+              }
+              const publication = current.publication_words[targetWordId];
+              const unavailable =
+                !publication ||
+                (current.words[targetWordId]?.status === "archived" &&
+                  !transitioningIds.has(targetWordId)) ||
+                !wordHasSense(publication, targetSenseId);
+              if (!unavailable) return [];
+              return [
+                {
+                  target_sense_id: targetSenseId,
+                  source_entry_id: word.id,
+                  source_publication_id: `mock-publication-${word.id}-${word.published_revision ?? word.revision}`,
+                  source_node_id: relation.id,
+                  reference_kind: "relation"
+                }
+              ];
+            })
           ])
         );
       });

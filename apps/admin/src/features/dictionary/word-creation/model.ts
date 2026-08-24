@@ -23,6 +23,7 @@ import type {
   WordSentenceV2
 } from "@tsz/types";
 import { canonicalSharedSentences } from "./meaningsAndExamples/sentenceAssociationModel";
+import { relationTargetShape } from "./meaningsAndExamples/validation";
 import {
   sentenceAssociationMeanings,
   type DraftMeaningsWithSentenceAssociations
@@ -747,18 +748,32 @@ export function toMeaningsWireContent(
             }))
         })),
         relations: sense.relations
-          .filter((relation) =>
-            Boolean(
-              relation.target_word_id.trim() && relation.target_sense_id.trim()
-            )
+          .map((relation): WordRelationV2 | undefined => {
+            const common = {
+              id: relation.id,
+              relation: relation.relation,
+              score: relation.score
+            };
+            const shape = relationTargetShape(relation);
+            // 两形态在库层 CHECK 里互斥，只能二选一上行：同时带、或把空串
+            // 当占位发出去，都会被后端当成非法形状。
+            if (shape.kind === "bound") {
+              return {
+                ...common,
+                target_word_id: shape.wordId,
+                target_sense_id: shape.senseId
+              };
+            }
+            // 词面必须 trim 后再发：后端 canonicalize 不遍历 relations，首尾空格
+            // 会直撞 `pending = btrim(pending)` 的 CHECK，那是 500 不是 422。
+            if (shape.kind === "pending") {
+              return { ...common, pending_target_headword: shape.headword };
+            }
+            return undefined;
+          })
+          .filter(
+            (relation): relation is WordRelationV2 => relation !== undefined
           )
-          .map((relation) => ({
-            id: relation.id,
-            relation: relation.relation,
-            target_word_id: relation.target_word_id,
-            target_sense_id: relation.target_sense_id,
-            score: relation.score
-          }))
       }))
     }))
   };

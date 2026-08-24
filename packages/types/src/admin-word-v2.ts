@@ -155,8 +155,19 @@ export interface WordSentenceV2 {
 export interface WordRelationV2 {
   id: string;
   relation: WordRelationType;
-  target_word_id: string;
-  target_sense_id: string;
+  /**
+   * 已绑定形态：与 target_sense_id 成对指向真实义项。
+   *
+   * 待物化形态下后端 `skip_serializing_if` 让这两个键**整个缺席**（不是 null），
+   * 所以必须可选——按必填读会在 `.trim()` 处炸 TypeError。
+   */
+  target_word_id?: string;
+  target_sense_id?: string;
+  /**
+   * 待物化形态：目标词还没建条，只承载管理员录入的词面，发布时后端建条并回填
+   * target_*。与 target_* 严格互斥，由库层 lexicon_relations_target_shape_check 保证。
+   */
+  pending_target_headword?: string;
   /** 服务端只读快照。 */
   target_headword?: string;
   /** 服务端只读快照。 */
