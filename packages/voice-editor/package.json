@@ -19,13 +19,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@tiptap/core": "^3.30.1",
-    "@tiptap/extension-document": "^3.30.1",
-    "@tiptap/extension-paragraph": "^3.30.1",
-    "@tiptap/extension-text": "^3.30.1",
-    "@tiptap/extensions": "^3.30.1",
-    "@tiptap/pm": "^3.30.1",
-    "@tiptap/react": "^3.30.1",
+    "@tiptap/core": "^3.30.2",
+    "@tiptap/extension-document": "^3.30.2",
+    "@tiptap/extension-paragraph": "^3.30.2",
+    "@tiptap/extension-text": "^3.30.2",
+    "@tiptap/extensions": "^3.30.2",
+    "@tiptap/pm": "^3.30.2",
+    "@tiptap/react": "^3.30.2",
     "@tsz/types": "workspace:*"
   },
   "peerDependencies": {
@@ -45,14 +45,14 @@
     "@tsz/config": "workspace:*",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
-    "@vitejs/plugin-react": "^6.0.5",
+    "@vitejs/plugin-react": "^6.1.0",
     "antd": "^6.6.1",
     "eslint": "^9.39.0",
     "jsdom": "^30.0.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "typescript": "^6.0.3",
-    "vite": "^8.2.1",
-    "vitest": "^4.1.10"
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   }
 }
