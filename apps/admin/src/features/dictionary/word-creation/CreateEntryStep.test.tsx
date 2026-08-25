@@ -277,6 +277,7 @@ function surfacePage(
 ): SurfaceMatchPageV2 {
   const nextCursor = options.nextCursor ?? null;
   const base = {
+    schema_version: 2 as const,
     snapshot_id: options.snapshotId ?? "snapshot-workspace",
     items,
     total: options.total ?? items.length,

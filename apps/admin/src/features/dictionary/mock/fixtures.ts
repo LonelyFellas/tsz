@@ -232,6 +232,7 @@ function matchedResponse(
   } = {}
 ): DetectWordResponseV2 {
   return {
+    schema_version: 2,
     detection_id: detectionId,
     expires_at: expiresAt,
     request: input,
@@ -279,6 +280,7 @@ export function createDetectionFixture(
     normalized.key === "expired" ? nowMs - 1 : nowMs + 5 * 60_000
   ).toISOString();
   const base = {
+    schema_version: 2 as const,
     detection_id: detectionId,
     expires_at: expiresAt,
     request,

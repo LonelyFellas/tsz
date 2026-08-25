@@ -1,5 +1,10 @@
 import { Spin, Typography } from "antd";
-import { createBrowserRouter } from "react-router-dom";
+import {
+  createBrowserRouter,
+  redirect,
+  type LoaderFunctionArgs,
+  type RouteObject
+} from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { RouteErrorPage } from "@/pages/RouteError";
 import { RootProviders } from "./providers";
@@ -15,6 +20,47 @@ function BootFallback() {
     </FullscreenCenter>
   );
 }
+
+/** `/words/new` only remains as the explicit V2 phrase compatibility entry. */
+export function legacyWordCreateLoader({ request }: LoaderFunctionArgs) {
+  const kind = new URL(request.url).searchParams.get("kind");
+  return kind === "phrase" ? null : redirect("/words/new/v3");
+}
+
+/** Shared by browser routing and MemoryRouter contract tests. */
+export const wordRoutes: RouteObject[] = [
+  {
+    path: "words",
+    lazy: async () => ({
+      Component: (await import("@/pages/Words")).WordsPage
+    })
+  },
+  {
+    path: "words/new/v3",
+    lazy: async () => ({
+      Component: (await import("@/pages/WordCreateV3")).WordCreateV3Page
+    })
+  },
+  {
+    path: "words/new",
+    loader: legacyWordCreateLoader,
+    lazy: async () => ({
+      Component: (await import("@/pages/WordCreate")).WordCreatePage
+    })
+  },
+  {
+    path: "words/:wordId/wizard/:step",
+    lazy: async () => ({
+      Component: (await import("@/pages/WordWizard")).WordWizardPage
+    })
+  },
+  {
+    path: "words/:wordId/v3/wizard/:step",
+    lazy: async () => ({
+      Component: (await import("@/pages/WordWizardV3")).WordWizardV3Page
+    })
+  }
+];
 
 // 路由树：RootProviders（Query + 会话恢复）为根 layout，包住登录页与受保护后台壳。
 // (console) 分组 → ConsoleLayout 这个 pathless layout route（门禁 + 侧栏 + 顶栏）。
@@ -56,27 +102,7 @@ export const router = createBrowserRouter([
               Component: (await import("@/pages/Home")).HomePage
             })
           },
-          {
-            path: "words",
-            lazy: async () => ({
-              Component: (await import("@/pages/Words")).WordsPage
-            })
-          },
-          {
-            // V2 单词创建第 1 步：检测通过前不产生草稿资源。
-            path: "words/new",
-            lazy: async () => ({
-              Component: (await import("@/pages/WordCreate")).WordCreatePage
-            })
-          },
-          {
-            // V2 草稿/已发布词条共用向导壳。具体 step 的可达性、草稿恢复与
-            // published 只读归一化由 WordCreationWizard 根据详情响应处理。
-            path: "words/:wordId/wizard/:step",
-            lazy: async () => ({
-              Component: (await import("@/pages/WordWizard")).WordWizardPage
-            })
-          },
+          ...wordRoutes,
           {
             path: "wordlists",
             lazy: async () => ({

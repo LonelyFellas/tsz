@@ -8,6 +8,8 @@
     "test:e2e:admin": "playwright test --config=playwright.admin.config.ts"
   },
   "devDependencies": {
-    "@playwright/test": "^1.62.1"
+    "@playwright/test": "^1.62.1",
+    "@tsz/api-client": "workspace:*",
+    "@tsz/types": "workspace:*"
   }
 }

@@ -205,6 +205,7 @@ function surfacePageFixture({
   const dialect = slot.variants[0]?.dialect ?? "common";
   const candidateNodeId = slot.variants[0]?.id ?? slot.id;
   const page = {
+    schema_version: 2 as const,
     snapshot_id: snapshotId,
     items: [
       {
@@ -278,6 +279,7 @@ beforeEach(() => {
   dataSourceCapabilities.dialectVariantSuggestions = true;
   dialectPreference.value = "uk";
   mutations.preview.mockResolvedValue({
+    schema_version: 2,
     base_revision: 3,
     requires_confirmation: false,
     affected: []
@@ -956,6 +958,7 @@ describe("FormsAndPronunciationStep", () => {
   it("影响预览要求确认时，只有确认后才携 token 保存", async () => {
     const word = wordFixture();
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: word.revision,
       requires_confirmation: true,
       affected: [
@@ -1001,6 +1004,7 @@ describe("FormsAndPronunciationStep", () => {
   it("确认窗打开后同 entry refetch 不改变本次 preview 绑定的 save revision", async () => {
     const word = wordFixture();
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: word.revision,
       requires_confirmation: true,
       affected: [
@@ -1027,6 +1031,7 @@ describe("FormsAndPronunciationStep", () => {
   it("仅有 surface warning 时加载终页并只携 surface token 保存", async () => {
     const word = wordFixture();
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: word.revision,
       requires_confirmation: false,
       affected: [],
@@ -1065,6 +1070,7 @@ describe("FormsAndPronunciationStep", () => {
     secondItem.existing.source.content_scope = "current_publication";
     secondItem.existing.source.dialect = "us";
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: word.revision,
       requires_confirmation: false,
       affected: [],
@@ -1118,6 +1124,7 @@ describe("FormsAndPronunciationStep", () => {
   it("surface 与 impact 同时存在时在一个确认窗提交终页双 token", async () => {
     const word = wordFixture();
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: word.revision,
       requires_confirmation: true,
       affected: [
@@ -1159,6 +1166,7 @@ describe("FormsAndPronunciationStep", () => {
     async ({ withSurface }) => {
       const word = wordFixture();
       const impact = (suffix: "old" | "new") => ({
+        schema_version: 2,
         base_revision: word.revision,
         requires_confirmation: true,
         affected: [
@@ -1218,6 +1226,7 @@ describe("FormsAndPronunciationStep", () => {
     const pendingPage = deferred<SurfaceMatchPageV2>();
     mutations.surfacePage.mockReturnValue(pendingPage.promise);
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: word.revision,
       requires_confirmation: false,
       affected: [],
@@ -1262,6 +1271,7 @@ describe("FormsAndPronunciationStep", () => {
     const targetSlot = targetPos.form_groups[0]!.slots[0]!;
     const targetVariant = targetSlot.variants[0]!;
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: word.revision,
       requires_confirmation: false,
       affected: [],
@@ -1324,6 +1334,7 @@ describe("FormsAndPronunciationStep", () => {
       surfaceToken: "surface-token-changed"
     });
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: word.revision,
       requires_confirmation: false,
       affected: [],
@@ -1370,12 +1381,14 @@ describe("FormsAndPronunciationStep", () => {
       const word = wordFixture();
       mutations.preview
         .mockResolvedValueOnce({
+          schema_version: 2,
           base_revision: word.revision,
           requires_confirmation: false,
           affected: [],
           surface_match_page: surfacePageFixture({ word })
         })
         .mockResolvedValueOnce({
+          schema_version: 2,
           base_revision: word.revision,
           requires_confirmation: false,
           affected: [],
@@ -1443,6 +1456,7 @@ describe("FormsAndPronunciationStep", () => {
 
   it("影响预览返回 Forms field issue 时展示并定位稳定 node/field", async () => {
     const issue = {
+      schema_version: 2 as const,
       step: "forms" as const,
       node_id: "suggested-verb-slot-1",
       field: "variants.uk.spelling",
@@ -1472,6 +1486,7 @@ describe("FormsAndPronunciationStep", () => {
     const word = wordFixture();
     const pending = deferred<{ word: ReturnType<typeof wordFixture> }>();
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: word.revision,
       requires_confirmation: false,
       affected: [],
@@ -1495,6 +1510,7 @@ describe("FormsAndPronunciationStep", () => {
 
   it("取消影响确认时不保存", async () => {
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: 3,
       requires_confirmation: true,
       affected: [
@@ -1526,6 +1542,7 @@ describe("FormsAndPronunciationStep", () => {
 
   it("长影响列表按原因和节点类型聚合展示且不泄露节点 ID", async () => {
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: 3,
       requires_confirmation: true,
       affected: [
@@ -1556,6 +1573,7 @@ describe("FormsAndPronunciationStep", () => {
 
   it("服务端 field issue 切换所属词性并聚焦稳定 node/field", async () => {
     const issue = {
+      schema_version: 2 as const,
       step: "forms" as const,
       node_id: "suggested-verb-slot-1",
       field: "variants.uk.spelling",
@@ -1602,6 +1620,7 @@ describe("FormsAndPronunciationStep", () => {
     // 2026-08-20 测试报告：两条 stable_node_id_changed 只显示两遍「已有内容槽位
     // 必须保留原节点 ID」，既看不出是哪个词形，也不知道该怎么办。
     const identityIssue = (dialect: "uk" | "us") => ({
+      schema_version: 2 as const,
       step: "forms" as const,
       node_id: `suggested-verb-slot-1-${dialect}`,
       field: "id",
@@ -2281,6 +2300,7 @@ describe("FormsAndPronunciationStep", () => {
 
   it("影响确认响应没有 token 时提示异常并阻止保存", async () => {
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: 3,
       requires_confirmation: true,
       affected: [
@@ -2298,6 +2318,7 @@ describe("FormsAndPronunciationStep", () => {
 
   it("影响确认响应 affected 为空时提示异常并阻止保存", async () => {
     mutations.preview.mockResolvedValue({
+      schema_version: 2,
       base_revision: 3,
       requires_confirmation: true,
       affected: [],

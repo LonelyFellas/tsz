@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { App } from "antd";
 import { describe, expect, it, vi } from "vitest";
-import type { LexiconSurfaceMatchV2 } from "@tsz/types";
+import type { LexiconSurfaceMatchV2, SurfaceMatchPageAny } from "@tsz/types";
 import { LifecycleSurfaceConfirmation } from "./LifecycleSurfaceConfirmation";
 import type { SurfaceSnapshotState } from "./surfaceSnapshot";
 
@@ -41,15 +41,17 @@ function item(
 }
 
 function renderPanel(
-  state: SurfaceSnapshotState,
+  state: SurfaceSnapshotState<SurfaceMatchPageAny>,
   onConfirm = vi.fn(),
-  onRestart = vi.fn()
+  onRestart = vi.fn(),
+  action: "restore" | "activate" = "restore"
 ) {
   render(
     <App>
       <LifecycleSurfaceConfirmation
         state={{ ...state, retry: vi.fn() }}
         confirming={false}
+        action={action}
         onConfirm={onConfirm}
         onRestart={onRestart}
       />
@@ -59,6 +61,60 @@ function renderPanel(
 }
 
 describe("LifecycleSurfaceConfirmation", () => {
+  it("V3 confirmation 忠实展示服务端 presentation 与 form source", () => {
+    const state: SurfaceSnapshotState<SurfaceMatchPageAny> = {
+      generation: 1,
+      schema_version: 3,
+      phase: "ready",
+      items: [
+        {
+          match_kind: "form_variant_v3",
+          match: {
+            source_schema_version: 3,
+            entry_id: "v3-entry-12345678",
+            status: "published",
+            content_scope: "current_publication",
+            pos_id: "pos-1",
+            group_ids: [],
+            form_id: "form-1",
+            variant_id: "variant-1",
+            form_type: "base",
+            dialect: "common",
+            spelling: "colour"
+          }
+        }
+      ],
+      matched_entry_contexts: [
+        {
+          entry_id: "v3-entry-12345678",
+          presentation: {
+            label: "colour · color",
+            matched_surfaces: ["colour", "color"],
+            strategy_version: "surface_summary_v1"
+          },
+          pos_labels: ["noun"],
+          gloss_previews: ["颜色"],
+          updated_at: "2026-08-25T00:00:00Z",
+          inbound_relations: {
+            total: 0,
+            by_type: { synonym: 0, antonym: 0, derivative: 0 },
+            previews: [],
+            truncated: false
+          }
+        }
+      ],
+      total: 1,
+      confirmation_reasons: ["visibility_activation"],
+      surface_confirmation_token: "v3-token"
+    };
+
+    renderPanel(state);
+    expect(screen.getByText("colour · color")).toBeVisible();
+    expect(screen.getByText("V3 词形 · colour · base · common")).toBeVisible();
+    expect(screen.getByText("恢复前需要确认同名公开范围")).toBeVisible();
+    expect(screen.getByText(/确认绑定本次恢复命令/)).toBeInTheDocument();
+    expect(screen.getByText("确认并恢复")).toBeEnabled();
+  });
   it("disabled gate 展示能力限制且不提供确认入口", () => {
     renderPanel({
       generation: 1,
@@ -71,6 +127,7 @@ describe("LifecycleSurfaceConfirmation", () => {
         "multiple_active_exact_headword_publications_not_enabled"
     });
     expect(screen.getByText("学习端暂不支持多个同名公开词条")).toBeVisible();
+    expect(screen.getByText(/不能替代恢复命令确认/)).toBeInTheDocument();
     expect(screen.queryByText("确认并恢复")).toBeNull();
   });
 
@@ -118,5 +175,72 @@ describe("LifecycleSurfaceConfirmation", () => {
     fireEvent.click(screen.getByText("重新检查恢复条件"));
     expect(onRestart).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("重新加载确认快照")).toBeNull();
+  });
+
+  it("activate 模式使用激活语义且保持确认回调", () => {
+    const onConfirm = vi.fn();
+    renderPanel(
+      {
+        generation: 1,
+        phase: "ready",
+        items: [item("activate", ["visibility_activation"])],
+        matched_entry_contexts: [],
+        total: 1,
+        confirmation_reasons: ["visibility_activation"],
+        surface_confirmation_token: "activate-token"
+      },
+      onConfirm,
+      vi.fn(),
+      "activate"
+    );
+
+    expect(screen.getByText("激活前需要确认同名公开范围")).toBeVisible();
+    expect(screen.getByText(/确认绑定本次激活命令/)).toBeInTheDocument();
+    expect(screen.queryByText(/恢复/)).toBeNull();
+    fireEvent.click(screen.getByText("确认并激活"));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("activate 模式的过期快照要求重新检查激活条件", () => {
+    const onRestart = vi.fn();
+    renderPanel(
+      {
+        generation: 1,
+        phase: "expired",
+        items: [item("expired-activate", ["visibility_activation"])],
+        matched_entry_contexts: [],
+        total: 1,
+        confirmation_reasons: ["visibility_activation"]
+      },
+      vi.fn(),
+      onRestart,
+      "activate"
+    );
+
+    fireEvent.click(screen.getByText("重新检查激活条件"));
+    expect(onRestart).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/恢复/)).toBeNull();
+  });
+
+  it("activate 模式的 disabled gate 不泄漏恢复语义", () => {
+    renderPanel(
+      {
+        generation: 1,
+        phase: "disabled",
+        items: [item("disabled-activate", ["visibility_activation"])],
+        matched_entry_contexts: [],
+        total: 1,
+        confirmation_reasons: ["visibility_activation"],
+        policy_block_code:
+          "multiple_active_exact_headword_publications_not_enabled"
+      },
+      vi.fn(),
+      vi.fn(),
+      "activate"
+    );
+
+    expect(screen.getByText(/不能替代激活命令确认/)).toBeInTheDocument();
+    expect(screen.queryByText(/恢复/)).toBeNull();
+    expect(screen.queryByText("确认并激活")).toBeNull();
   });
 });

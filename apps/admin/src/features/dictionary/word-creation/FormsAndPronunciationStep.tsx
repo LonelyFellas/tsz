@@ -66,7 +66,8 @@ import {
 import { adminWordsDataSourceCapabilities } from "../dataSource";
 import {
   aggregateSurfaceMatchCards,
-  canAcknowledgeSurfaceSnapshot
+  canAcknowledgeSurfaceSnapshot,
+  isSurfaceMatchPageV2
 } from "../surfaceSnapshot";
 import { useSurfaceSnapshot } from "../useSurfaceSnapshot";
 import {
@@ -102,7 +103,10 @@ import {
   formSlotComplete
 } from "./formsValidation";
 import { summarizeFormsImpact } from "./formsImpactSummary";
-import { wordValidationIssueMessage } from "./nodeIssueMessage";
+import {
+  v2ProblemFieldIssues,
+  wordValidationIssueMessage
+} from "./nodeIssueMessage";
 import {
   createDerivedSlot,
   createFormGroup,
@@ -2326,7 +2330,9 @@ export function FormsAndPronunciationStep({
   };
 
   const handleFormsFieldIssues = (error: HttpError): boolean => {
-    const stepIssues = error.field_issues.filter(
+    const fieldIssues = v2ProblemFieldIssues(error.field_issues);
+    if (fieldIssues === undefined) return false;
+    const stepIssues = fieldIssues.filter(
       (candidate) => candidate.step === "forms"
     );
     // 后端 message 面向实现（「已有内容槽位必须保留原节点 ID」），节点身份类问题
@@ -2438,7 +2444,7 @@ export function FormsAndPronunciationStep({
           error.code === "surface_matches_changed")
       ) {
         const page = error.meta?.surface_match_page;
-        if (!page) {
+        if (!isSurfaceMatchPageV2(page)) {
           finishSaveFlow();
           message.error("同形提示响应异常，缺少最新匹配页，已阻止保存");
           return;

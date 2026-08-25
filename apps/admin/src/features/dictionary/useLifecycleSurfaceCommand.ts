@@ -1,19 +1,27 @@
 import { HttpError } from "@tsz/api-client/http";
-import type { SurfaceMatchPageV2 } from "@tsz/types";
+import type { SurfaceMatchPageAny } from "@tsz/types";
 import { useCallback, useRef, useState } from "react";
 import { newWordNodeId } from "./word-model/primitives";
 import {
   canAcknowledgeSurfaceSnapshot,
+  isSurfaceMatchPageAny,
   requiresNewIdempotencyKey
 } from "./surfaceSnapshot";
-import { useSurfaceSnapshot } from "./useSurfaceSnapshot";
+import {
+  type FetchSurfaceMatchPage,
+  useSurfaceSnapshotAny
+} from "./useSurfaceSnapshot";
 
-export function useLifecycleSurfaceCommand(resetKey: string) {
-  const [page, setPage] = useState<SurfaceMatchPageV2>();
+export function useLifecycleSurfaceCommand(
+  resetKey: string,
+  fetchPage?: FetchSurfaceMatchPage<SurfaceMatchPageAny>
+) {
+  const [page, setPage] = useState<SurfaceMatchPageAny>();
   const key = useRef(newWordNodeId());
-  const snapshot = useSurfaceSnapshot(
+  const snapshot = useSurfaceSnapshotAny(
     page,
-    `${resetKey}:${page?.snapshot_id ?? "none"}`
+    `${resetKey}:${page?.schema_version ?? "none"}:${page?.snapshot_id ?? "none"}`,
+    fetchPage
   );
 
   const clear = useCallback(() => {
@@ -42,9 +50,11 @@ export function useLifecycleSurfaceCommand(resetKey: string) {
             error.status,
             error.code
           );
-          const nextPage = confirmationRequired
-            ? error.meta?.surface_match_page
-            : undefined;
+          const candidatePage = error.meta?.surface_match_page;
+          const nextPage =
+            confirmationRequired && isSurfaceMatchPageAny(candidatePage)
+              ? candidatePage
+              : undefined;
           setPage(nextPage);
           return {
             ok: false,

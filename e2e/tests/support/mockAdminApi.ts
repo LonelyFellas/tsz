@@ -1,4 +1,5 @@
 import type { Page, Route } from "@playwright/test";
+import { validateRuntimeSchema, type RuntimeSchemaRoot } from "@tsz/api-client";
 import type {
   DraftFormsStepContent,
   DraftMeaningsStepContent,
@@ -8,7 +9,20 @@ import type {
   WordPronunciationV2
 } from "@tsz/types";
 
-export const ADMIN_E2E_WORD_ID = "e2e-word-center";
+export const ADMIN_E2E_WORD_ID = "10000000-0000-4000-8000-000000000001";
+export const ADMIN_E2E_POS_ID = "50000000-0000-4000-8000-000000000001";
+export const ADMIN_E2E_PLURAL_UK_ID = "50000000-0000-4000-8000-000000000002";
+export const ADMIN_E2E_PLURAL_US_ID = "50000000-0000-4000-8000-000000000003";
+export const ADMIN_E2E_SURFACE_ARCHIVED_ID =
+  "61000000-0000-4000-8000-000000000001";
+const ADMIN_E2E_SURFACE_ARCHIVED_SECOND_ID =
+  "61000000-0000-4000-8000-000000000002";
+const ADMIN_E2E_SURFACE_PUBLISHED_ID = "61000000-0000-4000-8000-000000000003";
+const ADMIN_E2E_SURFACE_SNAPSHOT_IDS = {
+  workspace: "64000000-0000-4000-8000-000000000001",
+  workspaces: "64000000-0000-4000-8000-000000000002"
+} as const;
+const ADMIN_E2E_RELATION_SOURCE_ID = "65000000-0000-4000-8000-000000000001";
 export const ADMIN_E2E_LEXICON_PATH = "/lexicon";
 export const ADMIN_E2E_ENTRIES_PATH = `${ADMIN_E2E_LEXICON_PATH}/entries`;
 export const ADMIN_E2E_DETECTIONS_PATH = `${ADMIN_E2E_LEXICON_PATH}/detections`;
@@ -69,7 +83,7 @@ const pronunciation = (id: string, phonetic: string): WordPronunciationV2 => ({
 const CENTER_FORMS = {
   pos: [
     {
-      pos_id: "pos-noun",
+      pos_id: ADMIN_E2E_POS_ID,
       pos: "noun",
       dialect_rules: {
         spelling_mode: "distinguish",
@@ -105,14 +119,14 @@ const CENTER_FORMS = {
               form_type: "plural",
               variants: [
                 {
-                  id: "noun-plural-uk",
+                  id: ADMIN_E2E_PLURAL_UK_ID,
                   dialect: "uk",
                   spelling: "centres",
                   origin: "dictionary",
                   pronunciations: [pronunciation("pron-plural-uk", "ˈsentəz")]
                 },
                 {
-                  id: "noun-plural-us",
+                  id: ADMIN_E2E_PLURAL_US_ID,
                   dialect: "us",
                   spelling: "centers",
                   origin: "dictionary",
@@ -137,7 +151,7 @@ const CENTER_MEANINGS = {
   ],
   pos: [
     {
-      pos_id: "pos-noun",
+      pos_id: ADMIN_E2E_POS_ID,
       grammar_structures: [
         {
           id: "grammar-1",
@@ -218,6 +232,10 @@ export interface AdminApiRequestLog {
 }
 
 export interface MockAdminApiOptions {
+  /** 直接提供一条既有 V2 word 草稿，供 V2 editor 回归使用。 */
+  seedDraft?: boolean;
+  /** V2 创建入口当前仅对 phrase 开放；mock 回显服务端权威 kind。 */
+  entryKind?: "word" | "phrase";
   /** 让本次检测命中智能词库重复项。 */
   duplicate?: boolean;
   /** 为 workspace/workspaces 返回可确认的 surface warning 与两页 snapshot。 */
@@ -262,6 +280,15 @@ function problem(route: Route, status: number, body: unknown) {
   });
 }
 
+function assertRuntimeFixture(root: RuntimeSchemaRoot, value: unknown) {
+  const result = validateRuntimeSchema(root, value);
+  if (!result.valid) {
+    throw new Error(
+      `${root} mock fixture invalid at ${result.path}: ${result.reason}`
+    );
+  }
+}
+
 function clone<T>(value: T): T {
   return structuredClone(value);
 }
@@ -274,12 +301,15 @@ function requestBody(route: Route): unknown {
   }
 }
 
-function createDraft(headwords: unknown): MockWord {
+function createDraft(
+  headwords: unknown,
+  kind: "word" | "phrase" = "word"
+): MockWord {
   return {
     schema_version: 2,
     id: ADMIN_E2E_WORD_ID,
     language: "en",
-    kind: "word",
+    kind,
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
@@ -288,7 +318,7 @@ function createDraft(headwords: unknown): MockWord {
       detection_id: "detect-center",
       request: { language: "en", headword: "center" },
       normalized_headword: "center",
-      entry_kind: "word",
+      entry_kind: kind,
       matched_dialect: "us",
       builtin_dictionary_status: "matched",
       smart_dictionary_status: "clear",
@@ -308,17 +338,22 @@ function createDraft(headwords: unknown): MockWord {
 }
 
 function existingEntryDetail(wordId: string): MockWord | undefined {
+  const isWorkspaceEntry = [
+    ADMIN_E2E_SURFACE_ARCHIVED_ID,
+    ADMIN_E2E_SURFACE_ARCHIVED_SECOND_ID,
+    ADMIN_E2E_SURFACE_PUBLISHED_ID
+  ].includes(wordId);
   const headword = wordId.includes("colour")
     ? "colour"
     : wordId.includes("color")
       ? "color"
-      : wordId.startsWith("existing-workspace")
+      : isWorkspaceEntry
         ? "workspace"
         : undefined;
   if (!headword) return undefined;
   const word = createDraft({ mode: "unified", common: headword });
   const status =
-    wordId.includes("published") || wordId === "existing-color"
+    wordId === ADMIN_E2E_SURFACE_PUBLISHED_ID || wordId === "existing-color"
       ? "published"
       : "archived";
   return {
@@ -335,7 +370,8 @@ function surfaceMatchItem(
   rawHeadword: string,
   wordId: string,
   status: "draft" | "published" | "archived",
-  sourceKind: "headword" | "form"
+  sourceKind: "headword" | "form",
+  entryKind: "word" | "phrase"
 ) {
   const plural = rawHeadword.trim().toLowerCase() === "workspaces";
   return {
@@ -351,7 +387,7 @@ function surfaceMatchItem(
       surface: rawHeadword,
       normalized_surface: rawHeadword.trim().toLowerCase(),
       dialect: "common",
-      entry_kind: "word"
+      entry_kind: entryKind
     },
     existing: {
       word_id: wordId,
@@ -370,11 +406,11 @@ function surfaceMatchItem(
           : {
               source_kind: "form",
               source_id: `${wordId}:form:plural`,
-              source_node_id: `${wordId}-plural`,
+              source_node_id: wordId.replace(/^61/, "62"),
               content_scope: "current_publication",
               surface: "workspaces",
               dialect: "common",
-              pos_id: `${wordId}-noun`,
+              pos_id: wordId.replace(/^61/, "63"),
               pos: "noun",
               form_type: "plural"
             }
@@ -382,33 +418,43 @@ function surfaceMatchItem(
   };
 }
 
-function surfacePage(rawHeadword: string, terminal: boolean) {
+function surfacePage(
+  rawHeadword: string,
+  terminal: boolean,
+  entryKind: "word" | "phrase" = "word"
+): SurfaceMatchPageV2 {
   const plural = rawHeadword.trim().toLowerCase() === "workspaces";
   const items = terminal
     ? [
         surfaceMatchItem(
           rawHeadword,
-          "existing-workspace-archived-b",
+          ADMIN_E2E_SURFACE_ARCHIVED_SECOND_ID,
           "archived",
-          plural ? "form" : "headword"
+          plural ? "form" : "headword",
+          entryKind
         )
       ]
     : [
         surfaceMatchItem(
           rawHeadword,
-          "existing-workspace-archived-a",
+          ADMIN_E2E_SURFACE_ARCHIVED_ID,
           "archived",
-          plural ? "form" : "headword"
+          plural ? "form" : "headword",
+          entryKind
         ),
         surfaceMatchItem(
           rawHeadword,
-          "existing-workspace-published",
+          ADMIN_E2E_SURFACE_PUBLISHED_ID,
           "published",
-          plural ? "form" : "headword"
+          plural ? "form" : "headword",
+          entryKind
         )
       ];
-  return {
-    snapshot_id: `snapshot-${rawHeadword}`,
+  const page: SurfaceMatchPageV2 = {
+    schema_version: 2 as const,
+    snapshot_id: plural
+      ? ADMIN_E2E_SURFACE_SNAPSHOT_IDS.workspaces
+      : ADMIN_E2E_SURFACE_SNAPSHOT_IDS.workspace,
     items,
     total: 3,
     matched_entry_contexts: items.map((item) => ({
@@ -421,9 +467,10 @@ function surfacePage(rawHeadword: string, terminal: boolean) {
         by_type: { synonym: 1, antonym: 0, derivative: 0 },
         previews: [
           {
-            source_word_id: "relation-source-word",
+            source_word_id: ADMIN_E2E_RELATION_SOURCE_ID,
             source_headword: "space",
-            relation: "synonym"
+            relation: "synonym",
+            source_status: "published"
           }
         ],
         truncated: false
@@ -438,9 +485,15 @@ function surfacePage(rawHeadword: string, terminal: boolean) {
       ? { surface_confirmation_token: `surface-token-${rawHeadword}` }
       : {})
   };
+  assertRuntimeFixture("SurfaceMatchPageAny", page);
+  return page;
 }
 
 const FORMS_SURFACE_CURSOR = "forms-surface-page-2";
+
+function formsImpactToken(version: number): string {
+  return `66000000-0000-4000-8000-00000000000${version}`;
+}
 
 function formsSurfaceMatchItem(
   version: number,
@@ -448,8 +501,8 @@ function formsSurfaceMatchItem(
 ) {
   const existingWordId =
     category === "form_headword"
-      ? `existing-workspaces-headword-v${version}`
-      : `existing-workspace-form-v${version}`;
+      ? `60000000-0000-4000-8000-00000000000${version}`
+      : `60000000-0000-4000-8000-00000000001${version}`;
   const existingHeadword =
     category === "form_headword"
       ? "workspaces"
@@ -465,13 +518,13 @@ function formsSurfaceMatchItem(
     confirmation_reasons: ["unacknowledged_surface_matches" as const],
     candidate: {
       candidate_type: "form" as const,
-      candidate_ref: `${ADMIN_E2E_WORD_ID}:pos-noun:noun-plural:noun-plural-us`,
+      candidate_ref: `${ADMIN_E2E_WORD_ID}:${ADMIN_E2E_POS_ID}:noun-plural:${ADMIN_E2E_PLURAL_US_ID}`,
       candidate_word_id: ADMIN_E2E_WORD_ID,
-      candidate_node_id: "noun-plural-us",
+      candidate_node_id: ADMIN_E2E_PLURAL_US_ID,
       surface: "workspaces",
       normalized_surface: "workspaces",
       dialect: "us" as const,
-      pos_id: "pos-noun",
+      pos_id: ADMIN_E2E_POS_ID,
       pos: "noun",
       form_type: "plural" as const
     },
@@ -495,11 +548,11 @@ function formsSurfaceMatchItem(
           : {
               source_kind: "form" as const,
               source_id: `${existingWordId}:form:plural:us`,
-              source_node_id: `${existingWordId}-plural-us`,
+              source_node_id: `70000000-0000-4000-8000-00000000000${version}`,
               content_scope: "current_publication" as const,
               surface: "workspaces",
               dialect: "us" as const,
-              pos_id: `${existingWordId}-noun`,
+              pos_id: `80000000-0000-4000-8000-00000000000${version}`,
               pos: "noun",
               form_type: "plural" as const
             }
@@ -517,7 +570,8 @@ function formsSurfacePage(
     terminal ? "form_form" : "form_headword"
   );
   const base = {
-    snapshot_id: `forms-snapshot-${version}`,
+    schema_version: 2 as const,
+    snapshot_id: `40000000-0000-4000-8000-00000000000${version}`,
     items: [item],
     total: 2,
     matched_entry_contexts: [
@@ -539,16 +593,18 @@ function formsSurfacePage(
     policy_epoch: version,
     continuation_policy: "enabled" as const
   };
-  return terminal
+  const page: SurfaceMatchPageV2 = terminal
     ? {
         ...base,
         next_cursor: null,
         surface_confirmation_token: `forms-surface-token-v${version}`,
         ...(includeImpactToken
-          ? { impact_confirmation_token: `forms-impact-token-v${version}` }
+          ? { impact_confirmation_token: formsImpactToken(version) }
           : {})
       }
     : { ...base, next_cursor: FORMS_SURFACE_CURSOR };
+  assertRuntimeFixture("SurfaceMatchPageAny", page);
+  return page;
 }
 
 function hasExplicitWorkspacePlural(body: unknown): boolean {
@@ -575,7 +631,7 @@ function hasExplicitWorkspacePlural(body: unknown): boolean {
             (variant) =>
               variant !== null &&
               typeof variant === "object" &&
-              Reflect.get(variant, "id") === "noun-plural-us" &&
+              Reflect.get(variant, "id") === ADMIN_E2E_PLURAL_US_ID &&
               Reflect.get(variant, "spelling") === "workspaces"
           )
         );
@@ -596,7 +652,8 @@ const FULL_COVERAGE = {
 function detectionResponse(
   duplicate: boolean,
   rawHeadword: string,
-  surfaceWarnings = false
+  surfaceWarnings = false,
+  entryKind: "word" | "phrase" = "word"
 ) {
   const isDuplicate = duplicate || rawHeadword.trim().toLowerCase() === "color";
   const normalized = rawHeadword.trim().toLowerCase();
@@ -609,7 +666,7 @@ function detectionResponse(
       expires_at: "2099-08-02T03:05:00.000Z",
       request: { language: "en", headword: rawHeadword },
       normalized_headword: normalized,
-      entry_kind: "word",
+      entry_kind: entryKind,
       matched_dialect: "common",
       builtin_dictionary: {
         status: "matched",
@@ -620,7 +677,7 @@ function detectionResponse(
       smart_dictionary: {
         status: "warning",
         duplicates: [],
-        surface_match_page: surfacePage(rawHeadword, false),
+        surface_match_page: surfacePage(rawHeadword, false, entryKind),
         matched_entry_contexts: []
       }
     };
@@ -643,7 +700,7 @@ function detectionResponse(
     expires_at: "2099-08-02T03:05:00.000Z",
     request: { language: "en", headword: rawHeadword },
     normalized_headword: rawHeadword.trim().toLowerCase(),
-    entry_kind: "word",
+    entry_kind: entryKind,
     matched_dialect: "us",
     builtin_dictionary: {
       status: "matched",
@@ -674,12 +731,55 @@ function detectionResponse(
 }
 
 function listItem(word: MockWord) {
+  const headwords = word.headwords;
+  if (!headwords || typeof headwords !== "object") {
+    throw new Error("Admin E2E word fixture is missing headwords");
+  }
+  const mode = Reflect.get(headwords, "mode");
+  const sourceDialect = Reflect.get(headwords, "source_dialect");
+  const presentation =
+    mode === "unified"
+      ? {
+          headword: String(Reflect.get(headwords, "common")),
+          dialects: ["common"] as const,
+          headword_variants: [
+            {
+              dialect: "common" as const,
+              headword: String(Reflect.get(headwords, "common"))
+            }
+          ]
+        }
+      : sourceDialect === "uk" || sourceDialect === "us"
+        ? {
+            headword: `${String(Reflect.get(headwords, sourceDialect))} / ${String(Reflect.get(headwords, sourceDialect === "uk" ? "us" : "uk"))}`,
+            dialects: [
+              sourceDialect,
+              sourceDialect === "uk" ? ("us" as const) : ("uk" as const)
+            ],
+            source_dialect: sourceDialect,
+            headword_variants: [
+              {
+                dialect: sourceDialect,
+                headword: String(Reflect.get(headwords, sourceDialect))
+              },
+              {
+                dialect:
+                  sourceDialect === "uk" ? ("us" as const) : ("uk" as const),
+                headword: String(
+                  Reflect.get(headwords, sourceDialect === "uk" ? "us" : "uk")
+                )
+              }
+            ]
+          }
+        : undefined;
+  if (!presentation) {
+    throw new Error("Admin E2E word fixture has invalid headwords");
+  }
   return {
     schema_version: 2,
     id: word.id,
-    headword: "center",
-    kind: "word",
-    dialects: ["uk", "us"],
+    ...presentation,
+    kind: word.kind === "phrase" ? "phrase" : "word",
     gloss: word.status === "published" ? "圆心，中心" : "",
     pos_list: ["noun"],
     levels: word.status === "published" ? ["A1"] : [],
@@ -706,7 +806,17 @@ export async function mockAdminApi(
   options: MockAdminApiOptions = {}
 ): Promise<MockAdminApiController> {
   const requests: AdminApiRequestLog[] = [];
-  let word: MockWord | undefined;
+  let word = options.seedDraft
+    ? createDraft(
+        {
+          mode: "distinguish",
+          uk: "centre",
+          us: "center",
+          source_dialect: "us"
+        },
+        "word"
+      )
+    : undefined;
   let formsFailureRemaining = options.failFormsSaveOnce ? 1 : 0;
   let surfaceSnapshotExpiryRemaining = options.expireSurfaceSnapshotOnce
     ? 1
@@ -752,34 +862,34 @@ export async function mockAdminApi(
                   common: "workspace"
                 })
               ),
-              id: "workspace-entry-a1b2c3d4",
-              headword: "workspace",
-              dialects: ["common"],
+              id: "10000000-0000-4000-8000-0000a1b2c3d4",
               gloss: "工作空间"
             },
             {
               ...listItem(
-                createDraft({
-                  mode: "distinguish",
-                  uk: "workspace",
-                  us: "workspace",
-                  source_dialect: "uk"
-                })
+                createDraft(
+                  {
+                    mode: "distinguish",
+                    uk: "workspace",
+                    us: "workspace",
+                    source_dialect: "uk"
+                  },
+                  "phrase"
+                )
               ),
-              id: "workspace-entry-e5f6a7b8",
-              headword: "workspace",
-              kind: "phrase",
-              dialects: ["uk", "us"],
+              id: "10000000-0000-4000-8000-0000e5f6a7b8",
               gloss: "协作空间"
             }
           ]
         : word
           ? [listItem(word)]
           : [];
-      return json(route, 200, {
+      const response = {
         words,
         page: { page: 1, page_size: 20, total: words.length }
-      });
+      };
+      assertRuntimeFixture("AdminWordListResponse", response);
+      return json(route, 200, response);
     }
     if (method === "GET" && path === `${ADMIN_E2E_ENTRIES_PATH}/stats`) {
       const count = word ? 1 : 0;
@@ -793,7 +903,8 @@ export async function mockAdminApi(
         detectionResponse(
           options.duplicate === true,
           input?.headword ?? "",
-          options.surfaceWarnings === true
+          options.surfaceWarnings === true,
+          options.entryKind
         )
       );
     }
@@ -802,7 +913,8 @@ export async function mockAdminApi(
       path.startsWith(`${ADMIN_E2E_LEXICON_PATH}/surface-match-snapshots/`)
     ) {
       const snapshotId = path.split("/").at(-1) ?? "";
-      const formsSnapshotMatch = /^forms-snapshot-(\d+)$/.exec(snapshotId);
+      const formsSnapshotMatch =
+        /^40000000-0000-4000-8000-00000000000(\d)$/.exec(snapshotId);
       if (options.formsSurfaceWarnings && formsSnapshotMatch) {
         if (requestUrl.searchParams.get("cursor") !== FORMS_SURFACE_CURSOR) {
           return problem(route, 410, {
@@ -827,9 +939,11 @@ export async function mockAdminApi(
           )
         );
       }
-      const rawHeadword = snapshotId.replace(/^snapshot-/, "");
+      const rawHeadword = Object.entries(ADMIN_E2E_SURFACE_SNAPSHOT_IDS).find(
+        ([, id]) => id === snapshotId
+      )?.[0];
       if (
-        !["workspace", "workspaces"].includes(rawHeadword) ||
+        rawHeadword === undefined ||
         requestUrl.searchParams.get("cursor") !== "surface-page-2"
       ) {
         return problem(route, 410, {
@@ -840,7 +954,11 @@ export async function mockAdminApi(
           code: "surface_match_snapshot_expired"
         });
       }
-      return json(route, 200, surfacePage(rawHeadword, true));
+      return json(
+        route,
+        200,
+        surfacePage(rawHeadword, true, options.entryKind)
+      );
     }
     if (method === "POST" && path === ADMIN_E2E_ENTRIES_PATH) {
       const input = body as
@@ -857,7 +975,7 @@ export async function mockAdminApi(
           `surface-token-${input.detection_id.replace(/^detect-/, "")}`
       ) {
         const rawHeadword = input.detection_id.replace(/^detect-/, "");
-        const page = surfacePage(rawHeadword, false);
+        const page = surfacePage(rawHeadword, false, options.entryKind);
         return problem(route, 409, {
           type: "urn:tsz:problem:surface_match_acknowledgement_required",
           title: "Surface match acknowledgement required",
@@ -891,7 +1009,8 @@ export async function mockAdminApi(
           uk: "centre",
           us: "center",
           source_dialect: "us"
-        }
+        },
+        options.entryKind
       );
       if (
         options.surfaceWarnings &&
@@ -899,14 +1018,14 @@ export async function mockAdminApi(
       ) {
         const rawHeadword = input.detection_id.replace(/^detect-/, "");
         const matches = [
-          ...surfacePage(rawHeadword, false).items,
-          ...surfacePage(rawHeadword, true).items
+          ...surfacePage(rawHeadword, false, options.entryKind).items,
+          ...surfacePage(rawHeadword, true, options.entryKind).items
         ];
         word.detection_snapshot = {
           detection_id: input.detection_id,
           request: { language: "en", headword: rawHeadword },
           normalized_headword: rawHeadword,
-          entry_kind: "word",
+          entry_kind: word.kind === "phrase" ? "phrase" : "word",
           matched_dialect: "common",
           builtin_dictionary_status: "matched",
           smart_dictionary_status: "warning",
@@ -993,7 +1112,7 @@ export async function mockAdminApi(
       if (options.formsSurfaceWarnings && hasExplicitWorkspacePlural(input)) {
         const requiresImpact = options.formsDownstreamImpact === true;
         const expectedSurfaceToken = `forms-surface-token-v${formsSurfaceVersion}`;
-        const expectedImpactToken = `forms-impact-token-v${formsSurfaceVersion}`;
+        const expectedImpactToken = formsImpactToken(formsSurfaceVersion);
         const hasExpectedTokens =
           input?.confirmed_surface_match_token === expectedSurfaceToken &&
           (!requiresImpact ||
@@ -1137,44 +1256,57 @@ export async function mockAdminApi(
           matchMode === "exact"
             ? [
                 {
-                  word_id: "11111111-workspace-first",
+                  schema_version: 2,
+                  word_id: "11111111-0000-4000-8000-000000000001",
                   headword: "workspace",
                   kind: "word",
                   dialects: ["common"],
+                  headword_variants: [
+                    { dialect: "common", headword: "workspace" }
+                  ],
                   pos_labels: ["noun"],
                   senses: [
                     {
-                      sense_id: "workspace-first-sense",
+                      sense_id: "30000000-0000-4000-8000-000000000001",
                       gloss: "工作区甲"
                     }
                   ]
                 },
                 {
-                  word_id: "22222222-workspace-second",
+                  schema_version: 2,
+                  word_id: "22222222-0000-4000-8000-000000000002",
                   headword: "workspace",
                   kind: "word",
                   dialects: ["uk", "us"],
+                  headword_variants: [
+                    { dialect: "uk", headword: "workspace" },
+                    { dialect: "us", headword: "workspace" }
+                  ],
                   pos_labels: ["noun"],
                   senses: [
                     {
-                      sense_id: "workspace-second-sense-1",
+                      sense_id: "30000000-0000-4000-8000-000000000002",
                       gloss: "工作区乙一"
                     },
                     {
-                      sense_id: "workspace-second-sense-2",
+                      sense_id: "30000000-0000-4000-8000-000000000003",
                       gloss: "工作区乙二"
                     }
                   ]
                 }
               ]
             : [];
-        return json(route, 200, {
+        const response = {
           results,
           total: results.length,
           next_cursor: null
-        });
+        };
+        assertRuntimeFixture("RelatedSearchResponse", response);
+        return json(route, 200, response);
       }
-      return json(route, 200, { results: [] });
+      const response = { results: [] };
+      assertRuntimeFixture("RelatedSearchResponse", response);
+      return json(route, 200, response);
     }
     if (
       method === "POST" &&

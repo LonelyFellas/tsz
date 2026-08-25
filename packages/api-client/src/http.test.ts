@@ -4,6 +4,21 @@ import { createHttpClient, HttpError } from "./http";
 
 const fetchMock = vi.fn();
 
+const UUIDS = {
+  snapshot: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab01",
+  entry: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab02",
+  sourceEntry: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab03",
+  publication: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab04",
+  pos: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab05",
+  group: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab06",
+  membership: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab07",
+  form: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab08",
+  variant: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab09",
+  pronunciation: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab0a",
+  sense: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab0b",
+  impactToken: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab0c"
+} as const;
+
 // 构造一个最小的 Response 桩。
 function jsonResponse(
   body: unknown,
@@ -42,7 +57,7 @@ function headwordCandidateFixture(overrides: Record<string, unknown> = {}) {
   return {
     candidate_type: "headword",
     candidate_ref: "candidate:headword:common",
-    candidate_word_id: "candidate-word-1",
+    candidate_word_id: UUIDS.entry,
     surface: "workspace",
     normalized_surface: "workspace",
     dialect: "common",
@@ -55,12 +70,12 @@ function formCandidateFixture(overrides: Record<string, unknown> = {}) {
   return {
     candidate_type: "form",
     candidate_ref: "candidate:form:workspaces",
-    candidate_word_id: "candidate-word-1",
-    candidate_node_id: "candidate-form-1",
+    candidate_word_id: UUIDS.entry,
+    candidate_node_id: UUIDS.form,
     surface: "workspaces",
     normalized_surface: "workspaces",
     dialect: "us",
-    pos_id: "pos-noun",
+    pos_id: UUIDS.pos,
     pos: "noun",
     form_type: "plural",
     ...overrides
@@ -82,20 +97,36 @@ function formSourceFixture(overrides: Record<string, unknown> = {}) {
   return {
     source_kind: "form",
     source_id: "existing-form-1",
-    source_node_id: "existing-form-node-1",
+    source_node_id: UUIDS.form,
     content_scope: "draft",
     surface: "workspaces",
     dialect: "uk",
-    pos_id: "pos-noun",
+    pos_id: UUIDS.pos,
     pos: "noun",
     form_type: "plural",
     ...overrides
   };
 }
 
+function relationSourceFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    source_kind: "relation",
+    source_id: "existing-relation-1",
+    source_node_id: UUIDS.sense,
+    content_scope: "current_publication",
+    surface: "workspace",
+    dialect: "common",
+    relation_type: "synonym",
+    referencing_word_id: UUIDS.sourceEntry,
+    referencing_headword: "workplace",
+    referencing_status: "published",
+    ...overrides
+  };
+}
+
 function existingSurfaceMatchFixture(overrides: Record<string, unknown> = {}) {
   return {
-    word_id: "existing-word-1",
+    word_id: UUIDS.entry,
     headword: "workspace",
     kind: "word",
     status: "published",
@@ -129,8 +160,9 @@ function relationCountsFixture(overrides: Record<string, unknown> = {}) {
 
 function relationPreviewFixture(overrides: Record<string, unknown> = {}) {
   return {
-    source_word_id: "related-word-1",
+    source_word_id: UUIDS.sourceEntry,
     source_headword: "workplace",
+    source_status: "published",
     relation: "synonym",
     ...overrides
   };
@@ -148,7 +180,7 @@ function relationSummaryFixture(overrides: Record<string, unknown> = {}) {
 
 function matchedEntryContextFixture(overrides: Record<string, unknown> = {}) {
   return {
-    word_id: "existing-word-1",
+    word_id: UUIDS.entry,
     pos_labels: ["noun"],
     gloss_previews: ["a place to work"],
     updated_at: "2026-08-15T10:30:00Z",
@@ -159,7 +191,8 @@ function matchedEntryContextFixture(overrides: Record<string, unknown> = {}) {
 
 function surfacePageBaseFixture(overrides: Record<string, unknown> = {}) {
   return {
-    snapshot_id: "snapshot-1",
+    schema_version: 2,
+    snapshot_id: UUIDS.snapshot,
     items: [
       lexiconSurfaceMatchFixture(),
       lexiconSurfaceMatchFixture({
@@ -173,7 +206,7 @@ function surfacePageBaseFixture(overrides: Record<string, unknown> = {}) {
         ],
         candidate: formCandidateFixture(),
         existing: existingSurfaceMatchFixture({
-          word_id: "existing-word-2",
+          word_id: UUIDS.sourceEntry,
           headword: "workspaces",
           kind: "phrase",
           status: "archived",
@@ -185,7 +218,7 @@ function surfacePageBaseFixture(overrides: Record<string, unknown> = {}) {
     matched_entry_contexts: [
       matchedEntryContextFixture(),
       matchedEntryContextFixture({
-        word_id: "existing-word-2",
+        word_id: UUIDS.sourceEntry,
         pos_labels: [],
         gloss_previews: [],
         inbound_relations: relationSummaryFixture({
@@ -212,7 +245,7 @@ function terminalSurfacePageFixture(overrides: Record<string, unknown> = {}) {
     continuation_policy: "enabled",
     next_cursor: null,
     surface_confirmation_token: "surface-token-1",
-    impact_confirmation_token: "impact-token-1",
+    impact_confirmation_token: UUIDS.impactToken,
     ...overrides
   };
 }
@@ -232,6 +265,70 @@ function disabledSurfacePageFixture(overrides: Record<string, unknown> = {}) {
     continuation_policy: "temporarily_disabled",
     next_cursor: null,
     policy_block_code: "exact_headword_creation_temporarily_disabled",
+    ...overrides
+  };
+}
+
+function v3SurfacePageFixture(overrides: Record<string, unknown> = {}) {
+  return {
+    schema_version: 3,
+    snapshot_id: UUIDS.snapshot,
+    items: [
+      {
+        match_kind: "form_variant_v3",
+        match: {
+          source_schema_version: 3,
+          entry_id: UUIDS.entry,
+          status: "published",
+          content_scope: "current_publication",
+          pos_id: UUIDS.pos,
+          group_ids: [UUIDS.group],
+          form_id: UUIDS.form,
+          variant_id: UUIDS.variant,
+          form_type: "base",
+          dialect: "common",
+          spelling: "run",
+          publication_id: UUIDS.publication
+        }
+      }
+    ],
+    total: 1,
+    matched_entry_contexts: [
+      {
+        entry_id: UUIDS.entry,
+        presentation: {
+          label: "run",
+          matched_surfaces: ["run"],
+          strategy_version: "surface-v3"
+        },
+        pos_labels: ["verb"],
+        gloss_previews: ["move quickly"],
+        updated_at: "2026-08-24T17:30:00Z",
+        inbound_relations: {
+          total: 1,
+          by_type: { synonym: 1, antonym: 0, derivative: 0 },
+          previews: [
+            {
+              source_entry_id: UUIDS.sourceEntry,
+              source_presentation: {
+                label: "sprint",
+                matched_surfaces: ["sprint"],
+                strategy_version: "surface-v3"
+              },
+              source_status: "published",
+              relation: "synonym"
+            }
+          ],
+          truncated: false
+        }
+      }
+    ],
+    confirmation_reasons: ["unacknowledged_surface_matches"],
+    policy_name: "surface_warning_acknowledgement",
+    policy_epoch: 7,
+    continuation_policy: "enabled",
+    next_cursor: null,
+    surface_confirmation_token: "surface-token-v3",
     ...overrides
   };
 }
@@ -470,7 +567,7 @@ describe("createHttpClient", () => {
     });
   });
 
-  it("RFC 9457 响应读取 detail,并保留完整 Problem 元数据", async () => {
+  it("RFC 9457 响应有顶层 extra key 时保留安全摘要但拒绝完整 Problem", async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
         {
@@ -491,14 +588,43 @@ describe("createHttpClient", () => {
       status: 400,
       message: "phone is invalid",
       code: "invalid_phone",
-      problem: {
-        type: "urn:tsz:problem:invalid_phone",
-        title: "Invalid phone",
-        status: 400,
-        detail: "phone is invalid",
-        code: "invalid_phone",
-        field: "phone"
-      }
+      problem: undefined
+    });
+  });
+
+  it("RFC 9457 响应的 code 不在正式 ErrorCode 时拒绝完整 Problem", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          ...problem({ status: 400 }),
+          code: "future_unreviewed_code"
+        },
+        { ok: false, status: 400, contentType: "application/problem+json" }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/x")).rejects.toMatchObject({
+      status: 400,
+      code: "future_unreviewed_code",
+      problem: undefined
+    });
+  });
+
+  it("ProblemDetails.field 接受并保留契约允许的 explicit null", async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          ...problem({ status: 400 }),
+          field: null
+        },
+        { ok: false, status: 400, contentType: "application/problem+json" }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.get("/x")).rejects.toMatchObject({
+      problem: { field: null }
     });
   });
 
@@ -718,15 +844,16 @@ describe("createHttpClient", () => {
 
   it("V2 结构化错误保留 code、field_issues 与 meta", async () => {
     const fieldIssue = {
+      schema_version: 2 as const,
       step: "meanings" as const,
-      node_id: "sense-1",
+      node_id: UUIDS.sense,
       field: "definitions",
       code: "native_definition_required",
       message: "至少填写一条本语言释义",
       reference_location: {
-        source_entry_id: "source-entry-1",
-        source_publication_id: "source-publication-1",
-        source_node_id: "source-node-1",
+        source_entry_id: UUIDS.sourceEntry,
+        source_publication_id: UUIDS.publication,
+        source_node_id: UUIDS.form,
         reference_kind: "definition"
       }
     };
@@ -739,18 +866,18 @@ describe("createHttpClient", () => {
           meta: {
             current_revision: 6,
             current_lifecycle_revision: 2,
-            word_id: "w-2",
+            word_id: UUIDS.entry,
             max_reachable_step: "meanings",
-            affected_node_ids: ["sense-1"],
+            affected_node_ids: [UUIDS.sense],
             usage_count: 3,
-            part_of_speech_id: "pos-noun",
+            part_of_speech_id: UUIDS.pos,
             code: "noun",
             reference_locations: [
               {
-                target_sense_id: "target-sense-1",
-                source_entry_id: "source-entry-1",
-                source_publication_id: "source-publication-1",
-                source_node_id: "source-node-1",
+                target_sense_id: UUIDS.sense,
+                source_entry_id: UUIDS.sourceEntry,
+                source_publication_id: UUIDS.publication,
+                source_node_id: UUIDS.form,
                 reference_kind: "definition"
               }
             ]
@@ -772,24 +899,129 @@ describe("createHttpClient", () => {
       meta: {
         current_revision: 6,
         current_lifecycle_revision: 2,
-        word_id: "w-2",
+        word_id: UUIDS.entry,
         max_reachable_step: "meanings",
-        affected_node_ids: ["sense-1"],
+        affected_node_ids: [UUIDS.sense],
         usage_count: 3,
-        part_of_speech_id: "pos-noun",
+        part_of_speech_id: UUIDS.pos,
         code: "noun",
         reference_locations: [
           {
-            target_sense_id: "target-sense-1",
-            source_entry_id: "source-entry-1",
-            source_publication_id: "source-publication-1",
-            source_node_id: "source-node-1",
+            target_sense_id: UUIDS.sense,
+            source_entry_id: UUIDS.sourceEntry,
+            source_publication_id: UUIDS.publication,
+            source_node_id: UUIDS.form,
             reference_kind: "definition"
           }
         ]
       }
     });
   });
+
+  it("ProblemDetails.field_issues 按 schema_version 保留 V2/V3 可判别联合", async () => {
+    const field_issues = [
+      {
+        schema_version: 2,
+        step: "meanings",
+        node_id: UUIDS.sense,
+        field: "definitions",
+        code: "native_definition_required",
+        message: "至少填写一条本语言释义"
+      },
+      {
+        schema_version: 3,
+        step: "forms",
+        node_id: UUIDS.pronunciation,
+        field: "style",
+        code: "pronunciation_required",
+        message: "请选择发音方式",
+        node_location: {
+          node_role: "forms.pronunciation:common",
+          ancestor_node_ids: [
+            UUIDS.entry,
+            UUIDS.pos,
+            UUIDS.form,
+            UUIDS.variant
+          ],
+          pos_id: UUIDS.pos,
+          form_group_id: UUIDS.group,
+          membership_id: UUIDS.membership,
+          form_id: UUIDS.form,
+          variant_id: UUIDS.variant,
+          pronunciation_id: UUIDS.pronunciation,
+          form_type: "base",
+          dialect: "common"
+        }
+      }
+    ];
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          ...problem({
+            type: "urn:tsz:problem:validation_failed",
+            title: "Validation failed",
+            status: 422,
+            detail: "word is incomplete",
+            code: "validation_failed"
+          }),
+          field_issues
+        },
+        { ok: false, status: 422, contentType: "application/problem+json" }
+      )
+    );
+    const http = createHttpClient({ baseUrl: "" });
+
+    await expect(http.post("/lexicon/entries", {})).rejects.toMatchObject({
+      field_issues,
+      problem: { field_issues }
+    });
+  });
+
+  it.each([1, 4, null, "3"])(
+    "field issue schema_version=%o 时整组 fail closed",
+    async (schema_version) => {
+      fetchMock.mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: "word step is invalid",
+            code: "validation_failed",
+            field_issues: [
+              {
+                schema_version,
+                step: "forms",
+                node_id: UUIDS.form,
+                field: "forms",
+                code: "orphan_form",
+                message: "sensitive user spelling must not escape",
+                node_location: {
+                  node_role: "forms.form",
+                  ancestor_node_ids: [UUIDS.entry, UUIDS.pos],
+                  pos_id: UUIDS.pos,
+                  form_id: UUIDS.form,
+                  form_type: "base"
+                }
+              }
+            ]
+          },
+          { ok: false, status: 422 }
+        )
+      );
+      const http = createHttpClient({ baseUrl: "" });
+
+      try {
+        await http.post("/lexicon/entries", {});
+        throw new Error("expected request to fail");
+      } catch (error) {
+        expect(error).toMatchObject({
+          message: "word step is invalid",
+          field_issues: []
+        });
+        expect(JSON.stringify(error)).not.toContain(
+          "sensitive user spelling must not escape"
+        );
+      }
+    }
+  );
 
   it("RFC 9457 ProblemDetails 与 HttpError 共享同一份通用 meta", async () => {
     const meta = {
@@ -828,9 +1060,9 @@ describe("createHttpClient", () => {
   it("通用 ProblemMeta 继续保留词条错误上下文", async () => {
     const meta = {
       current_revision: 8,
-      word_id: "word-1",
+      word_id: UUIDS.entry,
       max_reachable_step: "meanings",
-      affected_node_ids: ["sense-1"]
+      affected_node_ids: [UUIDS.sense]
     };
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
@@ -889,6 +1121,82 @@ describe("createHttpClient", () => {
     });
   });
 
+  it("ProblemMeta.surface_match_page 支持 V3 form surface 与服务端 presentation", async () => {
+    const surface_match_page = v3SurfacePageFixture();
+    const error = await surfacePageHttpError(surface_match_page);
+
+    expect(error.meta).toEqual({ surface_match_page });
+  });
+
+  it("ProblemMeta.surface_match_page 支持 V3 中显式保留的 legacy V2 命中", async () => {
+    const surface_match_page = v3SurfacePageFixture({
+      items: [
+        {
+          match_kind: "legacy_v2",
+          match: {
+            source_schema_version: 2,
+            existing: existingSurfaceMatchFixture(),
+            publication_id: UUIDS.publication
+          }
+        }
+      ]
+    });
+    const error = await surfacePageHttpError(surface_match_page);
+
+    expect(error.meta).toEqual({ surface_match_page });
+  });
+
+  it("V3 surface page 拒绝 C1 旧版裸 FormSurfaceMatchV3 item", async () => {
+    const surface_match_page = v3SurfacePageFixture({
+      items: [
+        {
+          entry_id: UUIDS.entry,
+          pos_id: UUIDS.pos,
+          group_ids: [UUIDS.group],
+          form_id: UUIDS.form,
+          variant_id: UUIDS.variant,
+          form_type: "base",
+          dialect: "common",
+          spelling: "run"
+        }
+      ]
+    });
+    const error = await surfacePageHttpError(surface_match_page);
+
+    expect(error.meta).toBeUndefined();
+  });
+
+  it("V2 surface page 接受 schema_version、source_status、headword_relation 与 relation source", async () => {
+    const page = terminalSurfacePageFixture({
+      items: [
+        lexiconSurfaceMatchFixture({
+          match_category: "headword_relation",
+          existing: existingSurfaceMatchFixture({
+            source: relationSourceFixture()
+          })
+        })
+      ],
+      total: 1
+    });
+    const error = await surfacePageHttpError(page);
+
+    expect(error.meta).toEqual({ surface_match_page: page });
+  });
+
+  it("畸形 surface 子树 fail closed，错误对象不泄露原始正文", async () => {
+    const page = v3SurfacePageFixture();
+    Object.assign(page.items[0]!, {
+      unexpected: "sensitive surface spelling must not escape"
+    });
+
+    const error = await surfacePageHttpError(page);
+
+    expect(error.meta).toBeUndefined();
+    expect(JSON.stringify(error)).not.toContain(
+      "sensitive surface spelling must not escape"
+    );
+  });
+
   it.each([
     ["enabled 中页", nextSurfacePageFixture()],
     [
@@ -926,6 +1234,10 @@ describe("createHttpClient", () => {
 
   it.each([
     ["page 非对象", null],
+    [
+      "schema_version 必须是已知 literal",
+      terminalSurfacePageFixture({ schema_version: 4 })
+    ],
     ["page 多余字段", terminalSurfacePageFixture({ unexpected: true })],
     ["snapshot_id 非空", terminalSurfacePageFixture({ snapshot_id: " " })],
     ["items 必须为数组", terminalSurfacePageFixture({ items: "matches" })],
@@ -977,22 +1289,12 @@ describe("createHttpClient", () => {
       "page confirmation_reasons 枚举",
       terminalSurfacePageFixture({ confirmation_reasons: ["unknown"] })
     ],
-    [
-      "page confirmation_reasons 去重",
-      terminalSurfacePageFixture({
-        confirmation_reasons: [
-          "unacknowledged_surface_matches",
-          "unacknowledged_surface_matches"
-        ]
-      })
-    ],
     ["policy_name 枚举", terminalSurfacePageFixture({ policy_name: "old" })],
     ["policy_epoch 非负整数", terminalSurfacePageFixture({ policy_epoch: -1 })],
     [
       "continuation_policy 枚举",
       terminalSurfacePageFixture({ continuation_policy: "legacy" })
     ],
-    ["enabled 中页 cursor 非空", nextSurfacePageFixture({ next_cursor: "" })],
     [
       "enabled 中页不能携带 terminal token",
       nextSurfacePageFixture({ surface_confirmation_token: "token-1" })
@@ -1002,16 +1304,8 @@ describe("createHttpClient", () => {
       terminalSurfacePageFixture({ next_cursor: 1 })
     ],
     [
-      "enabled 末页 surface token 非空",
-      terminalSurfacePageFixture({ surface_confirmation_token: " " })
-    ],
-    [
       "enabled 末页 impact token 非空",
       terminalSurfacePageFixture({ impact_confirmation_token: "" })
-    ],
-    [
-      "disabled cursor 必须为 null 或非空字符串",
-      disabledSurfacePageFixture({ next_cursor: "" })
     ],
     [
       "disabled cursor 不能是其他类型",
@@ -1029,10 +1323,6 @@ describe("createHttpClient", () => {
     [
       "match 多余字段",
       surfacePageWithMatch(lexiconSurfaceMatchFixture({ unexpected: true }))
-    ],
-    [
-      "match_id 非空",
-      surfacePageWithMatch(lexiconSurfaceMatchFixture({ match_id: "" }))
     ],
     [
       "match_category 枚举",
@@ -1084,30 +1374,12 @@ describe("createHttpClient", () => {
         lexiconSurfaceMatchFixture({ confirmation_reasons: ["legacy"] })
       )
     ],
-    [
-      "match confirmation_reasons 去重",
-      surfacePageWithMatch(
-        lexiconSurfaceMatchFixture({
-          confirmation_reasons: [
-            "visibility_activation",
-            "visibility_activation"
-          ]
-        })
-      )
-    ],
     ["candidate 非对象", surfacePageWithCandidate(null)],
     ["candidate_type 枚举", surfacePageWithCandidate({ candidate_type: "x" })],
     [
       "headword candidate 多余字段",
       surfacePageWithCandidate(headwordCandidateFixture({ unexpected: true }))
     ],
-    ...["candidate_ref", "surface", "normalized_surface"].map(
-      (field) =>
-        [
-          `headword candidate ${field} 非空`,
-          surfacePageWithCandidate(headwordCandidateFixture({ [field]: " " }))
-        ] as const
-    ),
     [
       "headword candidate 可选 word_id 非空",
       surfacePageWithCandidate(
@@ -1128,19 +1400,10 @@ describe("createHttpClient", () => {
       "form candidate 多余字段",
       surfacePageWithCandidate(formCandidateFixture({ unexpected: true }))
     ],
-    ...[
-      "candidate_ref",
-      "candidate_word_id",
-      "candidate_node_id",
-      "surface",
-      "normalized_surface",
-      "pos_id",
-      "pos",
-      "form_type"
-    ].map(
+    ...["candidate_word_id", "candidate_node_id", "pos_id", "form_type"].map(
       (field) =>
         [
-          `form candidate ${field} 非空`,
+          `form candidate ${field} 非法`,
           surfacePageWithCandidate(formCandidateFixture({ [field]: "" }))
         ] as const
     ),
@@ -1157,13 +1420,10 @@ describe("createHttpClient", () => {
       "existing 多余字段",
       surfacePageWithExisting(existingSurfaceMatchFixture({ unexpected: true }))
     ],
-    ...["word_id", "headword"].map(
-      (field) =>
-        [
-          `existing ${field} 非空`,
-          surfacePageWithExisting(existingSurfaceMatchFixture({ [field]: " " }))
-        ] as const
-    ),
+    [
+      "existing word_id 非法",
+      surfacePageWithExisting(existingSurfaceMatchFixture({ word_id: " " }))
+    ],
     [
       "existing kind 枚举",
       surfacePageWithExisting(existingSurfaceMatchFixture({ kind: "sentence" }))
@@ -1180,13 +1440,6 @@ describe("createHttpClient", () => {
       "headword source 多余字段",
       surfacePageWithSource(headwordSourceFixture({ unexpected: true }))
     ],
-    ...["source_id", "surface"].map(
-      (field) =>
-        [
-          `headword source ${field} 非空`,
-          surfacePageWithSource(headwordSourceFixture({ [field]: "" }))
-        ] as const
-    ),
     [
       "headword source content_scope 枚举",
       surfacePageWithSource(
@@ -1201,17 +1454,10 @@ describe("createHttpClient", () => {
       "form source 多余字段",
       surfacePageWithSource(formSourceFixture({ unexpected: true }))
     ],
-    ...[
-      "source_id",
-      "source_node_id",
-      "surface",
-      "pos_id",
-      "pos",
-      "form_type"
-    ].map(
+    ...["source_node_id", "pos_id", "form_type"].map(
       (field) =>
         [
-          `form source ${field} 非空`,
+          `form source ${field} 非法`,
           surfacePageWithSource(formSourceFixture({ [field]: " " }))
         ] as const
     ),
@@ -1247,10 +1493,6 @@ describe("createHttpClient", () => {
       )
     ],
     [
-      "pos_labels 元素非空",
-      surfacePageWithContext(matchedEntryContextFixture({ pos_labels: [""] }))
-    ],
-    [
       "gloss_previews 必须为数组",
       surfacePageWithContext(
         matchedEntryContextFixture({ gloss_previews: "gloss" })
@@ -1262,12 +1504,6 @@ describe("createHttpClient", () => {
         matchedEntryContextFixture({
           gloss_previews: Array(6).fill("a place to work")
         })
-      )
-    ],
-    [
-      "gloss_previews 元素非空",
-      surfacePageWithContext(
-        matchedEntryContextFixture({ gloss_previews: [" "] })
       )
     ],
     [
@@ -1330,15 +1566,18 @@ describe("createHttpClient", () => {
         relationPreviewFixture({ unexpected: true })
       )
     ],
-    ...["source_word_id", "source_headword"].map(
-      (field) =>
-        [
-          `relation preview ${field} 非空`,
-          surfacePageWithRelationPreview(
-            relationPreviewFixture({ [field]: "" })
-          )
-        ] as const
-    ),
+    [
+      "relation preview source_word_id 非法",
+      surfacePageWithRelationPreview(
+        relationPreviewFixture({ source_word_id: "" })
+      )
+    ],
+    [
+      "relation preview source_status 枚举",
+      surfacePageWithRelationPreview(
+        relationPreviewFixture({ source_status: "deleted" })
+      )
+    ],
     [
       "relation preview relation 枚举",
       surfacePageWithRelationPreview(
@@ -1360,12 +1599,12 @@ describe("createHttpClient", () => {
   );
 
   it.each([
-    { usage_count: -1 },
-    { current_lifecycle_revision: -1 },
+    { usage_count: 1.5 },
+    { current_lifecycle_revision: 1.5 },
     { part_of_speech_id: " " },
-    { code: "" },
+    { code: 1 },
     { word_id: "" },
-    { max_reachable_step: "done" },
+    { max_reachable_step: 1 },
     { affected_node_ids: [""] },
     { reference_locations: [{ source_entry_id: "source-entry-1" }] },
     { current_policy_name: "unknown_policy" },
@@ -1409,7 +1648,7 @@ describe("createHttpClient", () => {
           error: "word step is invalid",
           code: "validation_failed",
           field_issues: [{ step: "preview" }],
-          meta: { current_revision: -1 }
+          meta: { current_revision: 1.5 }
         },
         { ok: false, status: 422 }
       )
@@ -1433,8 +1672,9 @@ describe("createHttpClient", () => {
           code: "validation_failed",
           field_issues: [
             {
+              schema_version: 2,
               step: "meanings",
-              node_id: "sense-1",
+              node_id: UUIDS.sense,
               field: "definitions",
               code: "reference_unavailable",
               message: "引用目标不可用",

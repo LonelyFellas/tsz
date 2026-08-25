@@ -1,11 +1,12 @@
-import { act, renderHook } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
 import { HttpError } from "@tsz/api-client/http";
-import type { SurfaceMatchPageV2 } from "@tsz/types";
+import type { SurfaceMatchPageAny, SurfaceMatchPageV2 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import { useLifecycleSurfaceCommand } from "./useLifecycleSurfaceCommand";
 
 describe("useLifecycleSurfaceCommand", () => {
   const page: SurfaceMatchPageV2 = {
+    schema_version: 2,
     snapshot_id: "019c0000-0000-7000-8000-000000000001",
     items: [],
     total: 0,
@@ -103,6 +104,63 @@ describe("useLifecycleSurfaceCommand", () => {
       refreshRequired: false
     });
     expect(result.current.page).toBe(page);
+  });
+
+  it("V3 restore warning 顺序加载终页并携 token 重试原命令", async () => {
+    const firstPage: SurfaceMatchPageAny = {
+      schema_version: 3,
+      snapshot_id: "v3-restore-snapshot",
+      items: [],
+      total: 0,
+      matched_entry_contexts: [],
+      confirmation_reasons: ["visibility_activation"],
+      policy_name: "allow_multiple_active_exact_headword_publications",
+      policy_epoch: 4,
+      continuation_policy: "enabled",
+      next_cursor: "v3-next"
+    };
+    const terminalPage: SurfaceMatchPageAny = {
+      ...firstPage,
+      continuation_policy: "enabled",
+      next_cursor: null,
+      surface_confirmation_token: "v3-restore-token"
+    };
+    const fetchPage = vi.fn().mockResolvedValue(terminalPage);
+    const execute = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new HttpError(
+          409,
+          "confirmation required",
+          [],
+          "surface_match_acknowledgement_required",
+          [],
+          { surface_match_page: firstPage }
+        )
+      )
+      .mockResolvedValueOnce("restored");
+    const hook = renderHook(() =>
+      useLifecycleSurfaceCommand("v3-word", fetchPage)
+    );
+
+    await act(async () => {
+      await hook.result.current.run(execute);
+    });
+    await waitFor(() =>
+      expect(hook.result.current.snapshot.phase).toBe("ready")
+    );
+    expect(hook.result.current.page?.schema_version).toBe(3);
+    expect(fetchPage).toHaveBeenCalledWith(
+      "v3-restore-snapshot",
+      "v3-next",
+      expect.any(AbortSignal)
+    );
+
+    await act(async () => {
+      await hook.result.current.run(execute);
+    });
+    expect(execute.mock.calls[1]![1]).toBe("v3-restore-token");
+    expect(hook.result.current.page).toBeUndefined();
   });
 
   it("非 409/410 的 HTTP 错误不轮换精确重试 key", async () => {

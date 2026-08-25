@@ -1,6 +1,10 @@
 import { api, useAuthStore } from "@/lib/auth";
 import { env } from "@/lib/env";
-import type { AdminWordListQuery, AdminWordListResponse } from "@tsz/types";
+import type {
+  AdminWordListQuery,
+  AdminWordListResponse,
+  AdminWordListResponseAny
+} from "@tsz/types";
 import type {
   ClaimPendingSentenceAssociationInput,
   ClaimPendingSentenceAssociationResponse,
@@ -41,6 +45,24 @@ export type AdminWordsDataSource = Omit<RealAdminWordsDataSource, "list"> & {
   list: (query?: AdminWordListQuery) => Promise<AdminWordListResponse>;
 };
 
+type RealAdminWordsAnyDataSource = Pick<
+  AdminWordsApi,
+  | "listAny"
+  | "getAny"
+  | "surfaceMatchSnapshotPageAny"
+  | "archiveAny"
+  | "restoreAny"
+  | "archiveBatchAny"
+  | "restoreBatchAny"
+>;
+
+export type AdminWordsAnyDataSource = Omit<
+  RealAdminWordsAnyDataSource,
+  "listAny"
+> & {
+  listAny: (query?: AdminWordListQuery) => Promise<AdminWordListResponseAny>;
+};
+
 export interface SentenceAssociationsDataSource {
   readonly available: boolean;
   resolve: (
@@ -58,6 +80,7 @@ export interface SentenceAssociationsDataSource {
 }
 
 export const realAdminWordsDataSource: AdminWordsDataSource = api.words;
+export const realAdminWordsAnyDataSource: AdminWordsAnyDataSource = api.words;
 
 export type AdminPartOfSpeechDataSource = Pick<
   AdminPartOfSpeechSettingsApi,
@@ -134,6 +157,25 @@ async function resolveAdminWordsDataSource(): Promise<AdminWordsDataSource> {
   return adminWordsMockEnabled
     ? resolveAdminWordsMockRuntime()
     : realAdminWordsDataSource;
+}
+
+async function resolveAdminWordsAnyDataSource(): Promise<AdminWordsAnyDataSource> {
+  if (!adminWordsMockEnabled) return realAdminWordsAnyDataSource;
+  const source = await resolveAdminWordsDataSource();
+  return {
+    listAny: (query = {}) => source.list(query),
+    getAny: (wordId) => source.get(wordId),
+    surfaceMatchSnapshotPageAny: (snapshotId, cursor, signal) =>
+      source.surfaceMatchSnapshotPage(snapshotId, cursor, signal),
+    archiveAny: (wordId, idempotencyKey, input) =>
+      source.archive(wordId, idempotencyKey, input),
+    restoreAny: (wordId, idempotencyKey, input) =>
+      source.restore(wordId, idempotencyKey, input),
+    archiveBatchAny: (idempotencyKey, input) =>
+      source.archiveBatch(idempotencyKey, input),
+    restoreBatchAny: (idempotencyKey, input) =>
+      source.restoreBatch(idempotencyKey, input)
+  };
 }
 
 async function resolveAdminPartOfSpeechDataSource(): Promise<AdminPartOfSpeechDataSource> {
@@ -223,6 +265,45 @@ export const adminWordsDataSource: AdminWordsDataSource = {
     (await resolveAdminWordsDataSource()).deleteDraft(wordId, input),
   relatedSearch: async (q, opts) =>
     (await resolveAdminWordsDataSource()).relatedSearch(q, opts)
+};
+
+/**
+ * 混合 V2/V3 facade。真实环境使用 schema-aware decoder；现有 mock 仅显式适配
+ * V2 方法，不伪造 V3 fixture 或 V3 后端能力。
+ */
+export const adminWordsAnyDataSource: AdminWordsAnyDataSource = {
+  listAny: async (query = {}) =>
+    (await resolveAdminWordsAnyDataSource()).listAny(query),
+  getAny: async (wordId) =>
+    (await resolveAdminWordsAnyDataSource()).getAny(wordId),
+  surfaceMatchSnapshotPageAny: async (snapshotId, cursor, signal) =>
+    (await resolveAdminWordsAnyDataSource()).surfaceMatchSnapshotPageAny(
+      snapshotId,
+      cursor,
+      signal
+    ),
+  archiveAny: async (wordId, idempotencyKey, input) =>
+    (await resolveAdminWordsAnyDataSource()).archiveAny(
+      wordId,
+      idempotencyKey,
+      input
+    ),
+  restoreAny: async (wordId, idempotencyKey, input) =>
+    (await resolveAdminWordsAnyDataSource()).restoreAny(
+      wordId,
+      idempotencyKey,
+      input
+    ),
+  archiveBatchAny: async (idempotencyKey, input) =>
+    (await resolveAdminWordsAnyDataSource()).archiveBatchAny(
+      idempotencyKey,
+      input
+    ),
+  restoreBatchAny: async (idempotencyKey, input) =>
+    (await resolveAdminWordsAnyDataSource()).restoreBatchAny(
+      idempotencyKey,
+      input
+    )
 };
 
 async function requireSentenceAssociationMock(): Promise<

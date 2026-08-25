@@ -2774,6 +2774,7 @@ describe("admin words mock", () => {
         base_revision: meanings.word.revision
       })
     ).resolves.toEqual({
+      schema_version: 2,
       validated_revision: meanings.word.revision,
       valid: true,
       issues: []
@@ -2814,6 +2815,10 @@ describe("admin words mock", () => {
         schema_version: 2,
         headword: "center / centre",
         dialects: ["us", "uk"],
+        headword_variants: [
+          { dialect: "us", headword: "center" },
+          { dialect: "uk", headword: "centre" }
+        ],
         source_dialect: "us"
       })
     ]);
@@ -2943,6 +2948,7 @@ describe("admin words mock", () => {
         content: withoutVerb
       })
     ).resolves.toEqual({
+      schema_version: 2,
       base_revision: 1,
       requires_confirmation: false,
       affected: []
@@ -4590,6 +4596,7 @@ describe("forms surface warning mock", () => {
         content: neitherTarget.word.forms
       })
     ).resolves.toEqual({
+      schema_version: 2,
       base_revision: neitherTarget.word.revision,
       requires_confirmation: false,
       affected: []
@@ -4838,6 +4845,7 @@ describe("forms surface warning mock", () => {
         content
       })
     ).resolves.toEqual({
+      schema_version: 2,
       base_revision: saved.word.revision,
       requires_confirmation: false,
       affected: []

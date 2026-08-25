@@ -6,7 +6,11 @@ const webBaseUrl = `http://127.0.0.1:${webPort}`;
 export default defineConfig({
   testDir: "./tests",
   // admin 使用独立构建与 baseURL，由 playwright.admin.config.ts 单独执行。
-  testIgnore: ["admin-word-creation.spec.ts", "admin-part-of-speech.spec.ts"],
+  testIgnore: [
+    "admin-word-creation.spec.ts",
+    "admin-word-v3.spec.ts",
+    "admin-part-of-speech.spec.ts"
+  ],
   // CI 上失败重试一次,本地不重试。
   retries: process.env.CI ? 1 : 0,
   // 控制台用 list 看进度;同时产出 HTML 报告供 CI 失败时上传排查。

@@ -1,4 +1,5 @@
 import type { AdminWordStatus, Dialect, WordFormType } from "./admin-word";
+import type { EntryPresentationV3, WordFormTypeV3 } from "./admin-word-v3";
 
 /** Surface warning wire types; 1:1 mirror of the Rust OpenAPI schemas. */
 export type SurfaceContentScopeV2 = "draft" | "current_publication";
@@ -62,6 +63,14 @@ export type ExistingSurfaceSourceV2 =
       form_type: WordFormType;
     };
 
+export interface ExistingSurfaceMatchV2 {
+  word_id: string;
+  headword: string;
+  kind: "word" | "phrase";
+  status: AdminWordStatus;
+  source: ExistingSurfaceSourceV2;
+}
+
 export interface LexiconSurfaceMatchV2 {
   match_id: string;
   match_category: SurfaceMatchCategoryV2;
@@ -70,13 +79,7 @@ export interface LexiconSurfaceMatchV2 {
   can_continue: true;
   confirmation_reasons: SurfaceConfirmationReasonV2[];
   candidate: SurfaceMatchCandidateV2;
-  existing: {
-    word_id: string;
-    headword: string;
-    kind: "word" | "phrase";
-    status: AdminWordStatus;
-    source: ExistingSurfaceSourceV2;
-  };
+  existing: ExistingSurfaceMatchV2;
 }
 
 export interface RelationReferenceSummaryV2 {
@@ -103,6 +106,7 @@ export interface MatchedEntryContextV2 {
 }
 
 export interface SurfaceMatchPageBaseV2 {
+  schema_version: 2;
   snapshot_id: string;
   items: LexiconSurfaceMatchV2[];
   total: number;
@@ -130,3 +134,91 @@ export type SurfaceMatchPageV2 = SurfaceMatchPageBaseV2 &
         policy_block_code: SurfacePolicyBlockCodeV2;
       }
   );
+
+export interface FormSurfaceMatchV3 {
+  source_schema_version: 3;
+  entry_id: string;
+  status: AdminWordStatus;
+  content_scope: SurfaceContentScopeV2;
+  pos_id: string;
+  group_ids: string[];
+  form_id: string;
+  variant_id: string;
+  form_type: WordFormTypeV3;
+  dialect: Dialect;
+  spelling: string;
+  publication_id?: string;
+}
+
+export interface LegacySurfaceMatchV3 {
+  source_schema_version: 2;
+  existing: ExistingSurfaceMatchV2;
+  publication_id?: string;
+}
+
+export type SurfaceMatchItemV3 =
+  | { match_kind: "legacy_v2"; match: LegacySurfaceMatchV3 }
+  | { match_kind: "form_variant_v3"; match: FormSurfaceMatchV3 };
+
+export interface RelationReferencePreviewV3 {
+  source_entry_id: string;
+  source_presentation: EntryPresentationV3;
+  source_status: AdminWordStatus;
+  relation: "synonym" | "antonym" | "derivative";
+}
+
+export interface RelationReferenceSummaryV3 {
+  total: number;
+  by_type: {
+    synonym: number;
+    antonym: number;
+    derivative: number;
+  };
+  previews: RelationReferencePreviewV3[];
+  truncated: boolean;
+}
+
+export interface MatchedEntryContextV3 {
+  entry_id: string;
+  presentation: EntryPresentationV3;
+  pos_labels: string[];
+  gloss_previews: string[];
+  updated_at: string;
+  inbound_relations: RelationReferenceSummaryV3;
+}
+
+export interface SurfaceMatchPageBaseV3 {
+  schema_version: 3;
+  snapshot_id: string;
+  items: SurfaceMatchItemV3[];
+  total: number;
+  matched_entry_contexts: MatchedEntryContextV3[];
+  confirmation_reasons: SurfaceConfirmationReasonV2[];
+  policy_name: SurfacePolicyNameV2;
+  policy_epoch: number;
+}
+
+export type SurfaceMatchEnabledNextPageV3 = SurfaceMatchPageBaseV3 & {
+  continuation_policy: "enabled";
+  next_cursor: string;
+};
+
+export type SurfaceMatchEnabledTerminalPageV3 = SurfaceMatchPageBaseV3 & {
+  continuation_policy: "enabled";
+  next_cursor: null;
+  surface_confirmation_token: string;
+  impact_confirmation_token?: string;
+};
+
+export type SurfaceMatchTemporarilyDisabledPageV3 = SurfaceMatchPageBaseV3 & {
+  continuation_policy: "temporarily_disabled";
+  next_cursor: string | null;
+  policy_block_code: SurfacePolicyBlockCodeV2;
+};
+
+export type SurfaceMatchPageV3 =
+  | SurfaceMatchEnabledNextPageV3
+  | SurfaceMatchEnabledTerminalPageV3
+  | SurfaceMatchTemporarilyDisabledPageV3;
+
+export type SurfaceMatchPageAny = SurfaceMatchPageV2 | SurfaceMatchPageV3;

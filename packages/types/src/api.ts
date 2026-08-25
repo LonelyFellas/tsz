@@ -1,6 +1,7 @@
 // 通用 API 包裹类型。
 
-import type { SurfaceMatchPageV2, SurfacePolicyNameV2 } from "./surface-match";
+import type { DraftValidationIssueAny } from "./admin-word-v3";
+import type { SurfaceMatchPageAny, SurfacePolicyNameV2 } from "./surface-match";
 
 export interface ApiResponse<T> {
   code: number;
@@ -26,13 +27,13 @@ export interface ProblemMeta {
   current_revision?: number;
   current_lifecycle_revision?: number;
   word_id?: string;
-  max_reachable_step?: "basics" | "forms" | "meanings" | "preview";
+  max_reachable_step?: string;
   affected_node_ids?: string[];
   usage_count?: number;
   part_of_speech_id?: string;
   code?: string;
   reference_locations?: ProblemReferenceLocation[];
-  surface_match_page?: SurfaceMatchPageV2;
+  surface_match_page?: SurfaceMatchPageAny;
   current_policy_name?: SurfacePolicyNameV2;
   current_policy_epoch?: number;
 }
@@ -58,7 +59,9 @@ export interface ProblemDetails {
   /** 稳定机器错误码；客户端业务分支只读取此字段。 */
   code: string;
   /** 单字段错误对应的请求字段。 */
-  field?: string;
+  field?: string | null;
+  /** 复杂表单按 schema_version 判别的节点校验问题。 */
+  field_issues?: DraftValidationIssueAny[];
   /** 领域错误的结构化上下文；客户端不得解析 detail 文案。 */
   meta?: ProblemMeta;
 }

@@ -3,6 +3,7 @@
 // 这些端点要绑定到 baseUrl=/api/v1/admin 的 HttpClient 上，路径才会落到 /api/v1/admin/*。
 import type {
   ActivatePublicationInput,
+  ActivatePublicationV3Input,
   AdminListQuery,
   AdminListResponse,
   AdminRole,
@@ -12,15 +13,13 @@ import type {
   AdminUserUpdateInput,
   AdminSpeechPreviewResponse,
   AdminSpeechVoiceListResponse,
-  AdminWordDraftV2Envelope,
-  AdminWordV2Envelope,
   AdminWordListQuery,
-  AdminWordV2ListResponse,
   AdminWordStats,
   AdminStatus,
   CreateAdminInput,
   CreateAdminSpeechPreviewInput,
   CreateAdminWordV2Input,
+  CreateAdminWordV3Input,
   CreateContentCompletionJobInput,
   ContentCompletionJobEnvelope,
   CreateAdminResponse,
@@ -28,13 +27,15 @@ import type {
   DeleteDraftInput,
   DetectWordInputV2,
   DetectWordResponseV2,
+  DetectLexiconSurfaceV3Input,
   DraftValidationResponse,
   EntryLifecycleBatchInput,
-  EntryLifecycleBatchResponse,
   EntryLifecycleInput,
   PreviewFormsImpactInputV2,
   PreviewFormsImpactResponseV2,
+  PreviewFormsImpactInputV3,
   PublishAdminWordV2Input,
+  PublishAdminWordV3Input,
   Admin,
   AdminAuthResponse,
   AdminProfile,
@@ -46,12 +47,16 @@ import type {
   PartOfSpeechConfigListQuery,
   PartOfSpeechConfigListResponse,
   RelatedSearchResponse,
+  RelatedSearchResponseAny,
   RelatedSearchQuery,
+  RelatedWordResult,
   ResetPasswordResponse,
   RetryContentCompletionJobInput,
   RoleListResponse,
   SaveFormsStepInput,
+  SaveFormsStepInputV3,
   SaveMeaningsStepInput,
+  SaveMeaningsStepInputV3,
   SurfaceMatchPageV2,
   SuggestDialectVariantsInputV2,
   SuggestDialectVariantsResponseV2,
@@ -63,10 +68,42 @@ import type {
   UpdatePartOfSpeechInput,
   UpdateSubPartOfSpeechInput,
   ValidateAdminWordV2Input,
+  ValidateAdminWordV3Input,
   UpdateRoleRequest
 } from "@tsz/types";
 import type { RefreshResponse } from "./endpoints";
+import {
+  decodeAdminWordAnyEnvelope,
+  decodeAdminWordAnyListResponse,
+  decodeAdminWordDraftV2Envelope,
+  decodeAdminWordDraftAnyEnvelope,
+  decodeAdminWordPublicationEnvelope,
+  decodeAdminWordPublicationListResponse,
+  decodeAdminWordV3Envelope,
+  decodeAdminWordV2Envelope,
+  decodeAdminWordV2ListResponse,
+  decodeDetectLexiconResponseV3,
+  decodeDraftValidationResponseV3,
+  decodeEntryLifecycleBatchAnyResponse,
+  decodeFormsImpactResponseV3,
+  InvalidAdminWordResponseError,
+  decodeRelatedSearchResponseAny,
+  decodeSurfaceMatchPageAny,
+  decodeSurfaceMatchPageV3,
+  decodeEntryLifecycleBatchV2Response
+} from "./admin-word-schema";
 import type { HttpClient } from "./http";
+
+function toLegacyRelatedSearchResponse(
+  response: RelatedSearchResponseAny
+): RelatedSearchResponse {
+  return {
+    ...response,
+    results: response.results.filter(
+      (result): result is RelatedWordResult => result.schema_version === 2
+    )
+  };
+}
 
 // admin 账号体系的 wire 类型已收敛到 @tsz/types（wire 类型唯一家）。此处 re-export，
 // 保持既有 `import { AdminProfile, ... } from "@tsz/api-client"` 的消费方不破。
@@ -111,6 +148,57 @@ function qs(params: Record<string, string | number | undefined>): string {
   }
   const s = sp.toString();
   return s ? `?${s}` : "";
+}
+
+function requireWordPathIdentity<T extends { word: { id: string } }>(
+  response: T,
+  wordId: string,
+  responsePath: string
+): T {
+  if (response.word.id !== wordId) {
+    throw new InvalidAdminWordResponseError(
+      responsePath,
+      "enum_mismatch",
+      "string"
+    );
+  }
+  return response;
+}
+
+function requireLifecycleBatchIdentity<
+  T extends { words: Array<{ id: string }>; affected: number }
+>(response: T, input: EntryLifecycleBatchInput, responsePath: string): T {
+  if (response.words.length !== input.entries.length) {
+    throw new InvalidAdminWordResponseError(
+      `${responsePath}.words`,
+      response.words.length < input.entries.length
+        ? "too_few_items"
+        : "too_many_items",
+      "array"
+    );
+  }
+
+  const requestedIds = new Set(input.entries.map((entry) => entry.id));
+  const responseIds = new Set<string>();
+  response.words.forEach((word, index) => {
+    if (!requestedIds.has(word.id) || responseIds.has(word.id)) {
+      throw new InvalidAdminWordResponseError(
+        `${responsePath}.words[${index}].id`,
+        "enum_mismatch",
+        "string"
+      );
+    }
+    responseIds.add(word.id);
+  });
+
+  if (response.affected > input.entries.length) {
+    throw new InvalidAdminWordResponseError(
+      `${responsePath}.affected`,
+      "above_maximum",
+      "number"
+    );
+  }
+  return response;
 }
 
 /**
@@ -179,14 +267,24 @@ export function createAdminEndpoints(http: HttpClient) {
     words: {
       /** GET /admin/lexicon/entries — 列表页：搜索行筛选 + 分页。 */
       list: (query: AdminWordListQuery = {}) =>
-        http.get<AdminWordV2ListResponse>(
-          `/lexicon/entries${qs({ ...query })}`
-        ),
+        http
+          .get<unknown>(`/lexicon/entries${qs({ ...query })}`)
+          .then(decodeAdminWordV2ListResponse),
+      /** Mixed V2/V3 list；供 schema-aware consumer 使用，不替换现有 V2 UI。 */
+      listAny: (query: AdminWordListQuery = {}) =>
+        http
+          .get<unknown>(`/lexicon/entries${qs({ ...query })}`)
+          .then(decodeAdminWordAnyListResponse),
       /** GET /admin/lexicon/entries/stats — 头部计数（累计 / 今日 / 本月）。 */
       stats: () => http.get<AdminWordStats>("/lexicon/entries/stats"),
       /** POST /admin/lexicon/detections — 创建 V2 草稿前执行内置词典与智能词库检测。 */
       detect: (input: DetectWordInputV2) =>
         http.post<DetectWordResponseV2>("/lexicon/detections", input),
+      /** V3 surface detection；C1 后端 capability 未开放时会稳定返回 503。 */
+      detectV3: (input: DetectLexiconSurfaceV3Input) =>
+        http
+          .post<unknown>("/lexicon/detections", input)
+          .then(decodeDetectLexiconResponseV3),
       /** GET /admin/lexicon/surface-match-snapshots/{id} — 顺序读取不可变 warning 页。 */
       surfaceMatchSnapshotPage: (
         snapshotId: string,
@@ -197,6 +295,30 @@ export function createAdminEndpoints(http: HttpClient) {
           `/lexicon/surface-match-snapshots/${snapshotId}${qs({ cursor })}`,
           { signal }
         ),
+      /** Mixed V2/V3 immutable warning page。 */
+      surfaceMatchSnapshotPageAny: (
+        snapshotId: string,
+        cursor: string,
+        signal?: AbortSignal
+      ) =>
+        http
+          .get<unknown>(
+            `/lexicon/surface-match-snapshots/${snapshotId}${qs({ cursor })}`,
+            { signal }
+          )
+          .then(decodeSurfaceMatchPageAny),
+      /** V3-only warning page decoder；V2/未知版本均 fail closed。 */
+      surfaceMatchSnapshotPageV3: (
+        snapshotId: string,
+        cursor: string,
+        signal?: AbortSignal
+      ) =>
+        http
+          .get<unknown>(
+            `/lexicon/surface-match-snapshots/${snapshotId}${qs({ cursor })}`,
+            { signal }
+          )
+          .then(decodeSurfaceMatchPageV3),
       /** POST /admin/lexicon/dialect-variant-suggestions — 获取 evidence-backed 方言建议。 */
       suggestDialectVariants: (input: SuggestDialectVariantsInputV2) =>
         http.post<SuggestDialectVariantsResponseV2>(
@@ -205,9 +327,18 @@ export function createAdminEndpoints(http: HttpClient) {
         ),
       /** POST /admin/lexicon/entries — 由有效 detection 幂等创建 V2 canonical 草稿。 */
       createV2: (idempotencyKey: string, input: CreateAdminWordV2Input) =>
-        http.post<AdminWordV2Envelope>("/lexicon/entries", input, {
-          headers: { "Idempotency-Key": idempotencyKey }
-        }),
+        http
+          .post<unknown>("/lexicon/entries", input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeAdminWordV2Envelope),
+      /** 显式 V3 create；绝不把 V2 成功响应强制断言成 V3。 */
+      createV3: (idempotencyKey: string, input: CreateAdminWordV3Input) =>
+        http
+          .post<unknown>("/lexicon/entries", input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeAdminWordV3Envelope),
       /**
        * GET /admin/lexicon/entries/{id} — 加载 V2 canonical 词条。
        *
@@ -215,25 +346,48 @@ export function createAdminEndpoints(http: HttpClient) {
        * 退役了什么，需要服务端补身份的只有「刷新」和「换设备」。
        */
       get: (wordId: string) =>
-        http.get<AdminWordDraftV2Envelope>(`/lexicon/entries/${wordId}`),
+        http
+          .get<unknown>(`/lexicon/entries/${wordId}`)
+          .then(decodeAdminWordDraftV2Envelope),
+      /** Schema-aware detail；按正式 discriminator 返回 V2/V3 联合。 */
+      getAny: (wordId: string) =>
+        http
+          .get<unknown>(`/lexicon/entries/${wordId}`)
+          .then(decodeAdminWordDraftAnyEnvelope)
+          .then((response) =>
+            requireWordPathIdentity(response, wordId, "get.word.id")
+          ),
       /** POST /admin/lexicon/entries/{id}/steps/forms/impact。 */
       previewFormsImpact: (wordId: string, input: PreviewFormsImpactInputV2) =>
         http.post<PreviewFormsImpactResponseV2>(
           `/lexicon/entries/${wordId}/steps/forms/impact`,
           input
         ),
+      previewFormsImpactV3: (
+        wordId: string,
+        input: PreviewFormsImpactInputV3
+      ) =>
+        http
+          .post<unknown>(`/lexicon/entries/${wordId}/steps/forms/impact`, input)
+          .then(decodeFormsImpactResponseV3),
       /** PUT /admin/lexicon/entries/{id}/steps/forms。 */
       saveFormsStep: (wordId: string, input: SaveFormsStepInput) =>
-        http.put<AdminWordV2Envelope>(
-          `/lexicon/entries/${wordId}/steps/forms`,
-          input
-        ),
+        http
+          .put<unknown>(`/lexicon/entries/${wordId}/steps/forms`, input)
+          .then(decodeAdminWordV2Envelope),
+      saveFormsStepV3: (wordId: string, input: SaveFormsStepInputV3) =>
+        http
+          .put<unknown>(`/lexicon/entries/${wordId}/steps/forms`, input)
+          .then(decodeAdminWordV3Envelope),
       /** PUT /admin/lexicon/entries/{id}/steps/meanings。 */
       saveMeaningsStep: (wordId: string, input: SaveMeaningsStepInput) =>
-        http.put<AdminWordV2Envelope>(
-          `/lexicon/entries/${wordId}/steps/meanings`,
-          input
-        ),
+        http
+          .put<unknown>(`/lexicon/entries/${wordId}/steps/meanings`, input)
+          .then(decodeAdminWordV2Envelope),
+      saveMeaningsStepV3: (wordId: string, input: SaveMeaningsStepInputV3) =>
+        http
+          .put<unknown>(`/lexicon/entries/${wordId}/steps/meanings`, input)
+          .then(decodeAdminWordV3Envelope),
       /** POST .../content-completion-jobs — 创建真实内容生成任务。 */
       createContentCompletionJob: (
         wordId: string,
@@ -268,17 +422,43 @@ export function createAdminEndpoints(http: HttpClient) {
           `/lexicon/entries/${wordId}/validate`,
           input
         ),
+      validateV3: (wordId: string, input: ValidateAdminWordV3Input) =>
+        http
+          .post<unknown>(`/lexicon/entries/${wordId}/validate`, input)
+          .then(decodeDraftValidationResponseV3),
+      /** 历史 publication 双版本只读列表。 */
+      listPublications: (wordId: string) =>
+        http
+          .get<unknown>(`/lexicon/entries/${wordId}/publications`)
+          .then(decodeAdminWordPublicationListResponse),
+      /** 历史 publication 双版本只读详情。 */
+      getPublication: (wordId: string, publicationId: string) =>
+        http
+          .get<unknown>(
+            `/lexicon/entries/${wordId}/publications/${publicationId}`
+          )
+          .then(decodeAdminWordPublicationEnvelope),
       /** POST /admin/lexicon/entries/{id}/publications — 带 revision 幂等发布 V2。 */
       publishV2: (
         wordId: string,
         idempotencyKey: string,
         input: PublishAdminWordV2Input
       ) =>
-        http.post<AdminWordV2Envelope>(
-          `/lexicon/entries/${wordId}/publications`,
-          input,
-          { headers: { "Idempotency-Key": idempotencyKey } }
-        ),
+        http
+          .post<unknown>(`/lexicon/entries/${wordId}/publications`, input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeAdminWordV2Envelope),
+      publishV3: (
+        wordId: string,
+        idempotencyKey: string,
+        input: PublishAdminWordV3Input
+      ) =>
+        http
+          .post<unknown>(`/lexicon/entries/${wordId}/publications`, input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeAdminWordV3Envelope),
       /** POST /admin/lexicon/entries/{id}/publications/{publication_id}/activate。 */
       activatePublication: (
         wordId: string,
@@ -286,66 +466,152 @@ export function createAdminEndpoints(http: HttpClient) {
         idempotencyKey: string,
         input: ActivatePublicationInput
       ) =>
-        http.post<AdminWordV2Envelope>(
-          `/lexicon/entries/${wordId}/publications/${publicationId}/activate`,
-          input,
-          { headers: { "Idempotency-Key": idempotencyKey } }
-        ),
+        http
+          .post<unknown>(
+            `/lexicon/entries/${wordId}/publications/${publicationId}/activate`,
+            input,
+            { headers: { "Idempotency-Key": idempotencyKey } }
+          )
+          .then(decodeAdminWordV2Envelope),
+      activatePublicationV3: (
+        wordId: string,
+        publicationId: string,
+        idempotencyKey: string,
+        input: ActivatePublicationV3Input
+      ) =>
+        http
+          .post<unknown>(
+            `/lexicon/entries/${wordId}/publications/${publicationId}/activate`,
+            input,
+            { headers: { "Idempotency-Key": idempotencyKey } }
+          )
+          .then(decodeAdminWordV3Envelope),
       /** POST /admin/lexicon/entries/{id}/archive — 保留 publication 的幂等归档。 */
       archive: (
         wordId: string,
         idempotencyKey: string,
         input: EntryLifecycleInput
       ) =>
-        http.post<AdminWordV2Envelope>(
-          `/lexicon/entries/${wordId}/archive`,
-          input,
-          { headers: { "Idempotency-Key": idempotencyKey } }
-        ),
+        http
+          .post<unknown>(`/lexicon/entries/${wordId}/archive`, input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeAdminWordV2Envelope),
+      archiveAny: (
+        wordId: string,
+        idempotencyKey: string,
+        input: EntryLifecycleInput
+      ) =>
+        http
+          .post<unknown>(`/lexicon/entries/${wordId}/archive`, input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeAdminWordAnyEnvelope)
+          .then((response) =>
+            requireWordPathIdentity(response, wordId, "archive.word.id")
+          ),
       /** POST /admin/lexicon/entries/{id}/restore — 幂等恢复。 */
       restore: (
         wordId: string,
         idempotencyKey: string,
         input: EntryLifecycleInput
       ) =>
-        http.post<AdminWordV2Envelope>(
-          `/lexicon/entries/${wordId}/restore`,
-          input,
-          { headers: { "Idempotency-Key": idempotencyKey } }
-        ),
+        http
+          .post<unknown>(`/lexicon/entries/${wordId}/restore`, input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeAdminWordV2Envelope),
+      restoreAny: (
+        wordId: string,
+        idempotencyKey: string,
+        input: EntryLifecycleInput
+      ) =>
+        http
+          .post<unknown>(`/lexicon/entries/${wordId}/restore`, input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeAdminWordAnyEnvelope)
+          .then((response) =>
+            requireWordPathIdentity(response, wordId, "restore.word.id")
+          ),
       /** POST /admin/lexicon/entries/archive-batch — 最多 100 条原子归档。 */
       archiveBatch: (idempotencyKey: string, input: EntryLifecycleBatchInput) =>
-        http.post<EntryLifecycleBatchResponse>(
-          "/lexicon/entries/archive-batch",
-          input,
-          { headers: { "Idempotency-Key": idempotencyKey } }
-        ),
+        http
+          .post<unknown>("/lexicon/entries/archive-batch", input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeEntryLifecycleBatchV2Response),
+      archiveBatchAny: (
+        idempotencyKey: string,
+        input: EntryLifecycleBatchInput
+      ) =>
+        http
+          .post<unknown>("/lexicon/entries/archive-batch", input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeEntryLifecycleBatchAnyResponse)
+          .then((response) =>
+            requireLifecycleBatchIdentity(response, input, "archive_batch")
+          ),
       /** POST /admin/lexicon/entries/restore-batch — 最多 100 条原子恢复。 */
       restoreBatch: (idempotencyKey: string, input: EntryLifecycleBatchInput) =>
-        http.post<EntryLifecycleBatchResponse>(
-          "/lexicon/entries/restore-batch",
-          input,
-          { headers: { "Idempotency-Key": idempotencyKey } }
-        ),
+        http
+          .post<unknown>("/lexicon/entries/restore-batch", input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeEntryLifecycleBatchV2Response),
+      restoreBatchAny: (
+        idempotencyKey: string,
+        input: EntryLifecycleBatchInput
+      ) =>
+        http
+          .post<unknown>("/lexicon/entries/restore-batch", input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeEntryLifecycleBatchAnyResponse)
+          .then((response) =>
+            requireLifecycleBatchIdentity(response, input, "restore_batch")
+          ),
       /** DELETE /admin/lexicon/entries/{id} — 仅永久删除从未发布的 V2 草稿。 */
       deleteDraft: (wordId: string, input: DeleteDraftInput) =>
         http.del<void>(`/lexicon/entries/${wordId}`, input),
       /** GET /admin/lexicon/entries/related-search — 关联词/上下文目标搜索。 */
       relatedSearch: (q: string, opts?: RelatedSearchQuery) =>
-        http.get<RelatedSearchResponse>(
-          `/lexicon/entries/related-search${qs({
-            q,
-            kind: opts?.kind,
-            match_mode: opts?.match_mode,
-            exclude_exact:
-              opts?.exclude_exact === undefined
-                ? undefined
-                : String(opts.exclude_exact),
-            page_size: opts?.page_size,
-            limit: opts?.limit,
-            cursor: opts?.cursor
-          })}`
-        )
+        http
+          .get<unknown>(
+            `/lexicon/entries/related-search${qs({
+              q,
+              kind: opts?.kind,
+              match_mode: opts?.match_mode,
+              exclude_exact:
+                opts?.exclude_exact === undefined
+                  ? undefined
+                  : String(opts.exclude_exact),
+              page_size: opts?.page_size,
+              limit: opts?.limit,
+              cursor: opts?.cursor
+            })}`
+          )
+          .then(decodeRelatedSearchResponseAny)
+          .then(toLegacyRelatedSearchResponse),
+      /** Mixed V2/V3 related-search；结果项按 schema_version 判别。 */
+      relatedSearchAny: (q: string, opts?: RelatedSearchQuery) =>
+        http
+          .get<unknown>(
+            `/lexicon/entries/related-search${qs({
+              q,
+              kind: opts?.kind,
+              match_mode: opts?.match_mode,
+              exclude_exact:
+                opts?.exclude_exact === undefined
+                  ? undefined
+                  : String(opts.exclude_exact),
+              page_size: opts?.page_size,
+              limit: opts?.limit,
+              cursor: opts?.cursor
+            })}`
+          )
+          .then(decodeRelatedSearchResponseAny)
     },
     /**
      * 系统设置 → 词性配置。catalog 供全部词条页面只读消费；管理 CRUD 为

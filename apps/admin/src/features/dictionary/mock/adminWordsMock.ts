@@ -19,6 +19,7 @@ import type {
   DraftFormsStepContent,
   DraftMeaningsStepContent,
   DraftValidationIssue,
+  DraftValidationIssueV2,
   DraftValidationResponse,
   DeletePartOfSpeechQuery,
   EntryLifecycleBatchInput,
@@ -455,6 +456,24 @@ function listDialects(word: MockWord): AdminWordListItem["dialects"] {
   if (word.headwords.mode === "unified") return ["common"];
   const { source_dialect } = word.headwords;
   return [source_dialect, source_dialect === "uk" ? "us" : "uk"];
+}
+
+/** 与 `listHeadword` / `listDialects` 同序，镜像后端必填的逐侧拼写。 */
+function listHeadwordVariants(
+  word: MockWord
+): AdminWordListItem["headword_variants"] {
+  if (word.headwords.mode === "unified") {
+    return [{ dialect: "common", headword: word.headwords.common }];
+  }
+  const { source_dialect } = word.headwords;
+  const other = source_dialect === "uk" ? "us" : "uk";
+  return [
+    {
+      dialect: source_dialect,
+      headword: word.headwords[source_dialect]
+    },
+    { dialect: other, headword: word.headwords[other] }
+  ];
 }
 
 function allHeadwords(word: MockWord): Array<{
@@ -1085,6 +1104,23 @@ function validateMeanings(
     }
   }
   return issues;
+}
+
+function v2ProblemIssues(
+  issues: DraftValidationIssue[]
+): DraftValidationIssueV2[] {
+  return issues.map(
+    ({
+      reference_location,
+      node_location,
+      ...issue
+    }): DraftValidationIssueV2 => ({
+      schema_version: 2,
+      ...issue,
+      ...(reference_location == null ? {} : { reference_location }),
+      ...(node_location == null ? {} : { node_location })
+    })
+  );
 }
 
 function meaningsForRemovedPos(
@@ -2081,6 +2117,7 @@ export function createAdminWordsMock({
           ? `${snapshotId}:cursor:${pageIndex + 1}`
           : null;
       const base = {
+        schema_version: 2 as const,
         snapshot_id: snapshotId,
         items: clone(pageItems),
         total: items.length,
@@ -2192,6 +2229,7 @@ export function createAdminWordsMock({
           ? `${snapshotId}:cursor:${pageIndex + 1}`
           : null;
       const base = {
+        schema_version: 2 as const,
         snapshot_id: snapshotId,
         items: clone(pageItems),
         total: items.length,
@@ -2918,6 +2956,7 @@ export function createAdminWordsMock({
         headword: listHeadword(word),
         kind: word.kind,
         dialects: listDialects(word),
+        headword_variants: listHeadwordVariants(word),
         ...(word.headwords.mode === "distinguish"
           ? { source_dialect: word.headwords.source_dialect }
           : {}),
@@ -3459,6 +3498,7 @@ export function createAdminWordsMock({
       if (surfaceMatchPage) {
         persist(current);
         return {
+          schema_version: 2,
           base_revision: word.revision,
           requires_confirmation: affected.length > 0,
           affected: clone(affected),
@@ -3468,6 +3508,7 @@ export function createAdminWordsMock({
     }
     if (affected.length === 0) {
       return {
+        schema_version: 2,
         base_revision: word.revision,
         requires_confirmation: false,
         affected: []
@@ -3476,6 +3517,7 @@ export function createAdminWordsMock({
     const token = issueImpactToken(current, word, input.content, affected);
     persist(current);
     return {
+      schema_version: 2,
       base_revision: word.revision,
       requires_confirmation: true,
       affected: clone(affected),
@@ -3637,7 +3679,7 @@ export function createAdminWordsMock({
         "forms are incomplete",
         [],
         "validation_failed",
-        issues,
+        v2ProblemIssues(issues),
         {
           word_id: word.id,
           current_revision: word.revision,
@@ -3673,7 +3715,7 @@ export function createAdminWordsMock({
         "draft validation failed",
         [],
         "validation_failed",
-        identityIssues,
+        v2ProblemIssues(identityIssues),
         {
           word_id: word.id,
           current_revision: word.revision,
@@ -3804,7 +3846,7 @@ export function createAdminWordsMock({
         "meanings are incomplete",
         [],
         "validation_failed",
-        issues,
+        v2ProblemIssues(issues),
         {
           word_id: word.id,
           current_revision: word.revision,
@@ -3871,6 +3913,7 @@ export function createAdminWordsMock({
       )
     ];
     return {
+      schema_version: 2,
       validated_revision: word.revision,
       valid: issues.length === 0,
       issues
@@ -3941,7 +3984,7 @@ export function createAdminWordsMock({
         "word is incomplete",
         [],
         "validation_failed",
-        issues,
+        v2ProblemIssues(issues),
         {
           word_id: word.id,
           current_revision: word.revision,
@@ -4353,14 +4396,32 @@ export function createAdminWordsMock({
                   .find((entry) => entry.trim() !== "") ?? ""
             }))
         );
+        const dialects =
+          displayedWord.headwords.mode === "unified"
+            ? (["common"] as Dialect[])
+            : (["uk", "us"] as Dialect[]);
+        const headwordVariants =
+          displayedWord.headwords.mode === "unified"
+            ? [
+                {
+                  dialect: "common" as const,
+                  headword: displayedWord.headwords.common
+                }
+              ]
+            : [
+                {
+                  dialect: "uk" as const,
+                  headword: displayedWord.headwords.uk
+                },
+                { dialect: "us" as const, headword: displayedWord.headwords.us }
+              ];
         return {
+          schema_version: 2 as const,
           word_id: word.id,
           headword: displayHeadword(displayedWord),
           kind: word.kind,
-          dialects:
-            displayedWord.headwords.mode === "unified"
-              ? (["common"] as Dialect[])
-              : (["uk", "us"] as Dialect[]),
+          dialects,
+          headword_variants: headwordVariants,
           pos_labels: displayedWord.meanings.pos.map((pos) => pos.pos_id),
           senses
         };

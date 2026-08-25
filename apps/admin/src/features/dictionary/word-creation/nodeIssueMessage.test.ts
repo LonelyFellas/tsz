@@ -1,7 +1,15 @@
-import type { DraftNodeLocation, DraftValidationIssue } from "@tsz/types";
+import type {
+  DraftNodeLocation,
+  DraftValidationIssue,
+  DraftValidationIssueAny,
+  DraftValidationIssueV2
+} from "@tsz/types";
 import { describe, expect, it } from "vitest";
 import { createPartOfSpeechLookup } from "../part-of-speech/catalog";
-import { wordValidationIssueMessage } from "./nodeIssueMessage";
+import {
+  v2ProblemFieldIssues,
+  wordValidationIssueMessage
+} from "./nodeIssueMessage";
 import { partOfSpeechCatalogFixture } from "./partOfSpeech.test.helper";
 
 const lookup = createPartOfSpeechLookup(partOfSpeechCatalogFixture);
@@ -211,5 +219,39 @@ describe("wordValidationIssueMessage", () => {
     );
 
     expect(new Set(messages).size).toBe(2);
+  });
+});
+
+describe("v2ProblemFieldIssues", () => {
+  const v2Issue: DraftValidationIssueV2 = {
+    schema_version: 2,
+    step: "forms",
+    node_id: "node-1",
+    field: "id",
+    code: "stable_node_id_changed",
+    message: "已有内容槽位必须保留原节点 ID"
+  };
+  const v3Issue: DraftValidationIssueAny = {
+    schema_version: 3,
+    step: "forms",
+    node_id: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab08",
+    field: "style",
+    code: "pronunciation_required",
+    message: "请选择发音方式",
+    node_location: {
+      node_role: "forms.pronunciation:common",
+      ancestor_node_ids: ["7a4fcb34-2f9b-4b20-8f7c-01bb5361ab02"],
+      form_id: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab08"
+    }
+  };
+
+  it("全部为 schema 2 时原样返回，空数组也合法", () => {
+    expect(v2ProblemFieldIssues([v2Issue])).toEqual([v2Issue]);
+    expect(v2ProblemFieldIssues([])).toEqual([]);
+  });
+
+  it("只要含 schema 3 就整组 fail closed，不部分消费", () => {
+    expect(v2ProblemFieldIssues([v3Issue])).toBeUndefined();
+    expect(v2ProblemFieldIssues([v2Issue, v3Issue])).toBeUndefined();
   });
 });

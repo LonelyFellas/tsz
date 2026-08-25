@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AdminPartOfSpeechDataSource,
+  AdminWordsAnyDataSource,
   AdminWordsDataSource
 } from "./dataSource";
 
@@ -8,6 +9,7 @@ const METHOD_NAMES = [
   "list",
   "stats",
   "detect",
+  "surfaceMatchSnapshotPage",
   "suggestDialectVariants",
   "createV2",
   "get",
@@ -31,6 +33,10 @@ const INVOCATIONS = [
   { method: "list", args: [{ q: "center", page: 2, page_size: 10 }] },
   { method: "stats", args: [] },
   { method: "detect", args: [{ language: "en", headword: "center" }] },
+  {
+    method: "surfaceMatchSnapshotPage",
+    args: ["snapshot-v2", "cursor-v2", undefined]
+  },
   {
     method: "suggestDialectVariants",
     args: [
@@ -141,6 +147,48 @@ const INVOCATIONS = [
   args: readonly unknown[];
 }>;
 
+const ANY_INVOCATIONS = [
+  { method: "listAny", fallback: "list", args: [{ q: "mixed" }] },
+  { method: "getAny", fallback: "get", args: ["word-v3"] },
+  {
+    method: "surfaceMatchSnapshotPageAny",
+    fallback: "surfaceMatchSnapshotPage",
+    args: ["snapshot-any", "cursor-any", undefined]
+  },
+  {
+    method: "archiveAny",
+    fallback: "archive",
+    args: [
+      "word-v3",
+      "archive-any-key",
+      { base_revision: 3, base_lifecycle_revision: 2 }
+    ]
+  },
+  {
+    method: "restoreAny",
+    fallback: "restore",
+    args: [
+      "word-v3",
+      "restore-any-key",
+      { base_revision: 3, base_lifecycle_revision: 3 }
+    ]
+  },
+  {
+    method: "archiveBatchAny",
+    fallback: "archiveBatch",
+    args: ["archive-batch-any-key", { entries: [] }]
+  },
+  {
+    method: "restoreBatchAny",
+    fallback: "restoreBatch",
+    args: ["restore-batch-any-key", { entries: [] }]
+  }
+] as const satisfies ReadonlyArray<{
+  method: keyof AdminWordsAnyDataSource;
+  fallback: keyof AdminWordsDataSource;
+  args: readonly unknown[];
+}>;
+
 const PART_OF_SPEECH_METHOD_NAMES = [
   "catalog",
   "list",
@@ -209,6 +257,11 @@ interface SourceDouble {
   clearSession?: ReturnType<typeof vi.fn>;
 }
 
+interface AnySourceDouble extends SourceDouble {
+  source: AdminWordsDataSource & AdminWordsAnyDataSource;
+  anyCalls: Record<keyof AdminWordsAnyDataSource, ReturnType<typeof vi.fn>>;
+}
+
 interface PartOfSpeechSourceDouble {
   source: AdminPartOfSpeechDataSource;
   calls: Record<keyof AdminPartOfSpeechDataSource, ReturnType<typeof vi.fn>>;
@@ -232,6 +285,24 @@ function createSourceDouble(
   const clearSession = vi.fn();
   Object.assign(source, { clearSession });
   return { source, calls, clearSession };
+}
+
+function createAnySourceDouble(owner: "real" | "mock"): AnySourceDouble {
+  const base = createSourceDouble(owner);
+  const anyCalls = {} as AnySourceDouble["anyCalls"];
+  const entries = ANY_INVOCATIONS.map(({ method }) => {
+    const call = vi.fn((...args: unknown[]) =>
+      Promise.resolve({ owner, method, args })
+    );
+    anyCalls[method] = call;
+    return [method, call] as const;
+  });
+  Object.assign(base.source, Object.fromEntries(entries));
+  return {
+    ...base,
+    source: base.source as AdminWordsDataSource & AdminWordsAnyDataSource,
+    anyCalls
+  };
 }
 
 function createPartOfSpeechSourceDouble(
@@ -377,6 +448,37 @@ async function expectFacadeDelegation(
   }
 }
 
+async function expectAnyFacadeDelegation(
+  facade: AdminWordsAnyDataSource,
+  source: AnySourceDouble,
+  owner: "real" | "mock"
+): Promise<void> {
+  for (const { method, args } of ANY_INVOCATIONS) {
+    const invoke = facade[method] as unknown as (
+      ...input: unknown[]
+    ) => Promise<unknown>;
+    await expect(invoke(...args)).resolves.toEqual({ owner, method, args });
+    expect(source.anyCalls[method]).toHaveBeenLastCalledWith(...args);
+  }
+}
+
+async function expectAnyMockFallbackDelegation(
+  facade: AdminWordsAnyDataSource,
+  source: SourceDouble
+): Promise<void> {
+  for (const { method, fallback, args } of ANY_INVOCATIONS) {
+    const invoke = facade[method] as unknown as (
+      ...input: unknown[]
+    ) => Promise<unknown>;
+    await expect(invoke(...args)).resolves.toEqual({
+      owner: "mock",
+      method: fallback,
+      args
+    });
+    expect(source.calls[fallback]).toHaveBeenLastCalledWith(...args);
+  }
+}
+
 async function expectPartOfSpeechFacadeDelegation(
   facade: AdminPartOfSpeechDataSource,
   source: PartOfSpeechSourceDouble,
@@ -402,6 +504,42 @@ afterEach(() => {
 });
 
 describe("admin words data source selection", () => {
+  it("real mixed facade 全量委派 Any API，未知 schema 由 api-client 解码器 fail closed", async () => {
+    const real = createAnySourceDouble("real");
+    const mock = createSourceDouble("mock");
+    const loaded = await loadDataSource({
+      mockEnabled: false,
+      real: real.source,
+      mock: mock.source
+    });
+
+    expect(loaded.module.realAdminWordsAnyDataSource).toBe(real.source);
+    await expectAnyFacadeDelegation(
+      loaded.module.adminWordsAnyDataSource,
+      real,
+      "real"
+    );
+    expect(loaded.mockModuleFactory).not.toHaveBeenCalled();
+  });
+
+  it("现有 V2 mock 显式适配 Any facade，且不伪造 V3 数据能力", async () => {
+    const real = createAnySourceDouble("real");
+    const mock = createSourceDouble("mock");
+    const loaded = await loadDataSource({
+      mockEnabled: true,
+      real: real.source,
+      mock: mock.source
+    });
+
+    await expectAnyMockFallbackDelegation(
+      loaded.module.adminWordsAnyDataSource,
+      mock
+    );
+    for (const { method } of ANY_INVOCATIONS) {
+      expect(real.anyCalls[method]).not.toHaveBeenCalled();
+    }
+  });
+
   it("select helper 在 real/mock 分支只构造被选择的数据源", async () => {
     const real = createSourceDouble("real");
     const mock = createSourceDouble("mock");
