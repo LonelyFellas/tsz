@@ -1810,6 +1810,7 @@ describe("MeaningsAndExamplesStep", () => {
 
   it("服务端 field issue 切换所属词性并聚焦稳定 node/field", async () => {
     const issue = {
+      schema_version: 2 as const,
       step: "meanings" as const,
       node_id: "mock-sense-2-1",
       field: "sub_pos",
@@ -1843,6 +1844,7 @@ describe("MeaningsAndExamplesStep", () => {
     mutations.save.mockRejectedValue(
       new HttpError(422, "draft validation failed", [], "validation_failed", [
         {
+          schema_version: 2 as const,
           step: "meanings" as const,
           node_id: "mock-sentence-1-zh",
           field: "id",

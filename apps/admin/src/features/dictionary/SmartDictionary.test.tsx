@@ -8,7 +8,11 @@ import {
 import { App as AntApp } from "antd";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AdminWordListItem, AdminWordListQuery } from "@tsz/types";
+import type {
+  AdminWordListItemAny,
+  AdminWordListQuery,
+  AdminWordListItemV3
+} from "@tsz/types";
 
 const apiMocks = vi.hoisted(() => ({
   useArchiveWord: vi.fn(),
@@ -20,14 +24,20 @@ const apiMocks = vi.hoisted(() => ({
 }));
 
 const dataSourceMocks = vi.hoisted(() => ({
-  get: vi.fn()
+  getAny: vi.fn()
 }));
 
-vi.mock("./api", () => apiMocks);
+vi.mock("./api", () => ({
+  ...apiMocks,
+  useArchiveWordAny: apiMocks.useArchiveWord,
+  useArchiveWordsBatchAny: apiMocks.useArchiveWordsBatch,
+  useRestoreWordAny: apiMocks.useRestoreWord,
+  useRestoreWordsBatchAny: apiMocks.useRestoreWordsBatch
+}));
 
 vi.mock("./dataSource", () => ({
-  adminWordsDataSource: {
-    get: dataSourceMocks.get
+  adminWordsAnyDataSource: {
+    getAny: dataSourceMocks.getAny
   },
   adminWordsDataSourceCapabilities: {
     archive: true,
@@ -48,13 +58,17 @@ vi.mock("./part-of-speech/api", () => ({
 
 import { SmartDictionary } from "./SmartDictionary";
 
-function word(id: string, headword: string): AdminWordListItem {
+function word(
+  id: string,
+  headword: string
+): Extract<AdminWordListItemAny, { schema_version: 2 }> {
   return {
     schema_version: 2,
     id,
     headword,
     kind: "word",
     dialects: ["common"],
+    headword_variants: [{ dialect: "common", headword }],
     gloss: "释义",
     pos_list: ["noun"],
     levels: ["A1"],
@@ -66,6 +80,30 @@ function word(id: string, headword: string): AdminWordListItem {
     created_by_name: "Admin",
     created_at: "2026-08-01T00:00:00Z",
     updated_at: "2026-08-01T00:00:00Z"
+  };
+}
+
+function v3Word(id: string, label: string): AdminWordListItemV3 {
+  return {
+    schema_version: 3,
+    id,
+    kind: "word",
+    presentation: {
+      label,
+      matched_surfaces: ["surface-not-used-as-label"],
+      strategy_version: "future_strategy_9"
+    },
+    gloss: "V3 释义",
+    pos_list: ["noun"],
+    levels: ["X9"],
+    status: "draft",
+    revision: 3,
+    lifecycle_revision: 2,
+    max_reachable_step: "forms",
+    has_unpublished_changes: false,
+    created_by_name: "Admin",
+    created_at: "2026-08-25T00:00:00Z",
+    updated_at: "2026-08-25T00:00:00Z"
   };
 }
 
@@ -83,7 +121,10 @@ function matchViewport(width: number) {
   }));
 }
 
-function archivedWord(id: string, headword: string): AdminWordListItem {
+function archivedWord(
+  id: string,
+  headword: string
+): Extract<AdminWordListItemAny, { schema_version: 2 }> {
   return { ...word(id, headword), status: "archived" };
 }
 
@@ -108,7 +149,7 @@ function LocationProbe() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  dataSourceMocks.get.mockReset().mockResolvedValue(undefined);
+  dataSourceMocks.getAny.mockReset().mockResolvedValue(undefined);
   for (const hook of [
     apiMocks.useArchiveWord,
     apiMocks.useArchiveWordsBatch,
@@ -139,14 +180,86 @@ afterEach(() => {
 });
 
 describe("SmartDictionary", () => {
+  it("同页混合展示 V2 phrase 与 V3，V3 只使用 presentation.label 且可进入独立路由", () => {
+    matchViewport(1440);
+    const legacy = {
+      ...word("v2-phrase", "legacy phrase"),
+      kind: "phrase" as const,
+      dialects: ["uk" as const]
+    };
+    const current = v3Word("v3-entry-12345678", "服务端 V3 展示名");
+    const reportUnknownPresentationStrategy = vi.fn();
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [legacy, current],
+        page: { page: 1, page_size: 20, total: 2 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary
+            reportUnknownPresentationStrategy={
+              reportUnknownPresentationStrategy
+            }
+          />
+        </AntApp>
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("legacy phrase")).toBeVisible();
+    expect(screen.getByText("BrE")).toBeVisible();
+    expect(screen.getByText("服务端 V3 展示名")).toBeVisible();
+    expect(screen.queryByText("surface-not-used-as-label")).toBeNull();
+    expect(reportUnknownPresentationStrategy).toHaveBeenCalledTimes(1);
+    expect(reportUnknownPresentationStrategy).toHaveBeenCalledWith({
+      entry_id: "v3-entry-12345678",
+      strategy_version: "future_strategy_9"
+    });
+    const v3Row = screen.getByText("服务端 V3 展示名").closest("tr")!;
+    expect(v3Row.querySelectorAll("td")[3]).toHaveTextContent("-");
+    expect(v3Row).toHaveTextContent("X9");
+    fireEvent.click(v3Row.querySelector("td:last-child button")!);
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/words/v3-entry-12345678/v3/wizard/forms"
+    );
+  });
+
+  it("unknown schema 解码失败时 fail closed 显示列表错误，不渲染猜测数据", () => {
+    const refetch = vi.fn();
+    apiMocks.useWordList.mockReturnValue({
+      data: undefined,
+      error: new Error("unsupported schema_version: 9"),
+      isError: true,
+      isPending: false,
+      refetch
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("词条列表加载失败")).toBeVisible();
+    expect(screen.getByText("unsupported schema_version: 9")).toBeVisible();
+    expect(screen.queryByText("服务端 V3 展示名")).toBeNull();
+  });
+
   it("同名词条保留两行并按各自 ID 查看和归档", async () => {
     matchViewport(1440);
-    const first: AdminWordListItem = {
+    const first: AdminWordListItemAny = {
       ...word("01a00492-d889-71e0-a9a3-e053a0a093e6", "workspace"),
       dialects: ["common"],
       gloss: "工作空间"
     };
-    const second: AdminWordListItem = {
+    const second: AdminWordListItemAny = {
       ...word("01a00492-d889-71e0-a9a3-e053a0a093e7", "workspace"),
       kind: "phrase" as const,
       dialects: ["uk"],
@@ -496,6 +609,53 @@ describe("SmartDictionary", () => {
     );
   });
 
+  it("恢复 A 的 getAny 返回 B 时 fail closed 且不调用 restoreAny", async () => {
+    const mutateAsync = vi.fn();
+    apiMocks.useRestoreWord.mockReturnValue({
+      ...idleMutation(),
+      mutateAsync
+    });
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [archivedWord("word-1", "first")],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    dataSourceMocks.getAny.mockResolvedValueOnce({
+      word: archivedWord("word-2", "second")
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    const rowRestore = screen
+      .getAllByText("恢 复", { exact: true })
+      .map((item) => item.closest("button"))
+      .find((item) => item?.classList.contains("ant-btn-link"))!;
+    fireEvent.click(rowRestore);
+    await screen.findAllByText("恢复「first」？");
+    fireEvent.click(
+      screen
+        .getAllByText("恢 复", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => item?.closest(".ant-modal"))!
+    );
+
+    expect(
+      await screen.findByText("词条响应格式与当前客户端契约不一致，请稍后重试")
+    ).toBeInTheDocument();
+    expect(dataSourceMocks.getAny).toHaveBeenCalledWith("word-1");
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
   it("恢复响应未知时用同一 key 和精确双 revision 重试", async () => {
     const mutateAsync = vi
       .fn()
@@ -621,7 +781,7 @@ describe("SmartDictionary", () => {
   it("批量预取期间 selection 变化会失效旧 attempt 且不发送隐藏恢复", async () => {
     const first = archivedWord("word-1", "first");
     let resolveGet!: (value: unknown) => void;
-    dataSourceMocks.get.mockImplementationOnce(
+    dataSourceMocks.getAny.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           resolveGet = resolve;
@@ -657,7 +817,9 @@ describe("SmartDictionary", () => {
         .map((item) => item.closest("button"))
         .find((item) => item?.closest(".ant-modal"))!
     );
-    await waitFor(() => expect(dataSourceMocks.get).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(dataSourceMocks.getAny).toHaveBeenCalledTimes(1)
+    );
 
     fireEvent.click(checkbox);
     await act(async () => resolveGet({ word: first }));

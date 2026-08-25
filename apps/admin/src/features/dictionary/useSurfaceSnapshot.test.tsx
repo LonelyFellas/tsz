@@ -1,12 +1,16 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { HttpError } from "@tsz/api-client/http";
-import type { SurfaceMatchPageV2 } from "@tsz/types";
+import type { SurfaceMatchPageAny, SurfaceMatchPageV2 } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { adminWordsDataSource } from "./dataSource";
-import { useSurfaceSnapshot } from "./useSurfaceSnapshot";
+import { adminWordsAnyDataSource, adminWordsDataSource } from "./dataSource";
+import {
+  useSurfaceSnapshot,
+  useSurfaceSnapshotAny
+} from "./useSurfaceSnapshot";
 
 vi.mock("./dataSource", () => ({
-  adminWordsDataSource: { surfaceMatchSnapshotPage: vi.fn() }
+  adminWordsDataSource: { surfaceMatchSnapshotPage: vi.fn() },
+  adminWordsAnyDataSource: { surfaceMatchSnapshotPageAny: vi.fn() }
 }));
 
 function page(
@@ -15,6 +19,7 @@ function page(
   impactToken?: string
 ): SurfaceMatchPageV2 {
   const base = {
+    schema_version: 2 as const,
     snapshot_id: "snapshot-1",
     items: [],
     total: 0,
@@ -62,6 +67,42 @@ describe("useSurfaceSnapshot", () => {
       "surface-token"
     );
     expect(hook.result.current.impact_confirmation_token).toBe("impact-token");
+  });
+
+  it("Any loader 保留 V3 schema 并顺序取得 V3 终页 token", async () => {
+    const first: SurfaceMatchPageAny = {
+      schema_version: 3,
+      snapshot_id: "v3-snapshot",
+      items: [],
+      total: 0,
+      matched_entry_contexts: [],
+      confirmation_reasons: ["visibility_activation"],
+      policy_name: "allow_multiple_active_exact_headword_publications",
+      policy_epoch: 2,
+      continuation_policy: "enabled",
+      next_cursor: "v3-cursor-2"
+    };
+    const terminal: SurfaceMatchPageAny = {
+      ...first,
+      continuation_policy: "enabled",
+      next_cursor: null,
+      surface_confirmation_token: "v3-token"
+    };
+    vi.mocked(
+      adminWordsAnyDataSource.surfaceMatchSnapshotPageAny
+    ).mockResolvedValue(terminal);
+    const hook = renderHook(() => useSurfaceSnapshotAny(first, "v3-key"));
+
+    await waitFor(() => expect(hook.result.current.phase).toBe("ready"));
+    expect(
+      adminWordsAnyDataSource.surfaceMatchSnapshotPageAny
+    ).toHaveBeenCalledWith(
+      "v3-snapshot",
+      "v3-cursor-2",
+      expect.any(AbortSignal)
+    );
+    expect(hook.result.current.schema_version).toBe(3);
+    expect(hook.result.current.surface_confirmation_token).toBe("v3-token");
   });
 
   it.each([

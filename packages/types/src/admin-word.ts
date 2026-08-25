@@ -57,6 +57,8 @@ export interface AdminWordListItem {
   kind: AdminWordKind;
   /** 与 `headword` 同序：`common` → 检测基准侧 → 另一侧。 */
   dialects: Dialect[];
+  /** 每侧拼写，与 `dialects` 同序；`headword` 即本数组按序拼接。 */
+  headword_variants: HeadwordVariant[];
   /** 检测基准侧；`mode = unified` 的词条没有基准侧，字段整体省略。 */
   source_dialect?: SourceDialect;
   gloss: string;
@@ -85,6 +87,7 @@ export interface AdminWordListPage {
   total: number;
 }
 
+/** 现有 V2 Admin UI 的兼容视图；mixed wire 使用 AdminWordListResponseAny。 */
 export interface AdminWordListResponse {
   words: AdminWordListItem[];
   page: AdminWordListPage;
@@ -104,11 +107,19 @@ export interface AdminWordStats {
 }
 
 /** GET /admin/lexicon/entries/related-search 结果项。 */
+export interface HeadwordVariant {
+  dialect: Dialect;
+  headword: string;
+}
+
 export interface RelatedWordResult {
+  schema_version: 2;
   word_id: string;
   headword: string;
   kind: AdminWordKind;
   dialects: Dialect[];
+  /** 与 dialects 同序；展示时不得拆分 headword 文本。 */
+  headword_variants: HeadwordVariant[];
   pos_labels: string[];
   senses: RelatedWordSense[];
 }
@@ -129,6 +140,7 @@ export interface RelatedSearchV2Response {
   next_cursor: string | null;
 }
 
+/** 现有 V2 编辑器兼容视图；mixed wire 使用 RelatedSearchResponseAny。 */
 export type RelatedSearchResponse =
   RelatedSearchLegacyResponse | RelatedSearchV2Response;
 

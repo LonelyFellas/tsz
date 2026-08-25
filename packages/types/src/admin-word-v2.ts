@@ -432,6 +432,13 @@ export interface DraftValidationIssue {
   node_location?: DraftNodeLocation | null;
 }
 
+/** ProblemDetails.field_issues 中可判别的 V2 分支。 */
+export interface DraftValidationIssueV2 extends DraftValidationIssue {
+  schema_version: 2;
+  reference_location?: DraftReferenceLocation;
+  node_location?: DraftNodeLocation;
+}
+
 /**
  * 把节点身份类问题还原到界面位置用的定位信息。
  *
@@ -449,10 +456,20 @@ export interface DraftNodeLocation {
   pos_id?: string;
   /** 所在词形组在 `pos.form_groups` 中的序号（从 0 开始）；共享原形不属于任何组，省略。 */
   form_group_index?: number;
+  /** V3 词形组稳定 ID；V2 issue 省略。 */
+  form_group_id?: string;
+  /** V3 group membership 稳定 ID；V2 issue 省略。 */
+  membership_id?: string;
+  /** V3 concrete form 稳定 ID；V2 issue 省略。 */
+  form_id?: string;
   /** 所在词形槽位的类型；`base` 表示共享原形。词形之外的节点省略。 */
   form_type?: WordFormType;
+  /** V3 regional variant 稳定 ID；V2 issue 省略。 */
+  variant_id?: string;
   /** 方言侧；节点角色不带方言时省略。 */
   dialect?: Dialect;
+  /** V3 pronunciation 稳定 ID；V2 issue 省略。 */
+  pronunciation_id?: string;
 }
 
 export interface DraftReferenceLocation {
@@ -463,6 +480,7 @@ export interface DraftReferenceLocation {
 }
 
 export interface DraftValidationResponse {
+  schema_version: 2;
   validated_revision: number;
   valid: boolean;
   issues: DraftValidationIssue[];
@@ -501,6 +519,7 @@ export type SmartDictionaryResultV2 =
   | { status: "unavailable"; duplicates: [] };
 
 export interface DetectWordResponseBaseV2 {
+  schema_version: 2;
   detection_id: string;
   expires_at: string;
   request: { language: AdminWordLanguageV2; headword: string };
@@ -578,6 +597,7 @@ export interface PreviewFormsImpactInputV2 {
 }
 
 export interface FormsImpactResponseV2 {
+  schema_version: 2;
   base_revision: number;
   requires_confirmation: boolean;
   affected: FormsImpactItemV2[];

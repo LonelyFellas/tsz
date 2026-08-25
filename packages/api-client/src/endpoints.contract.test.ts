@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import { V3_VALIDATION_ISSUE_CODES } from "@tsz/types";
+import type { AdminWordV2ListItem } from "@tsz/types";
 import { createAdminEndpoints } from "./admin";
+import runtimeSchemaBundle from "./admin-word-v3.runtime-schema.json";
 import { createEndpoints } from "./endpoints";
 import snapshot from "./openapi.snapshot.json";
 
@@ -23,7 +26,8 @@ const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries/{id}/content-completion-jobs/{job_id}/retries",
   "post /admin/lexicon/entries/{id}/publications",
   "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate",
-  "post /admin/lexicon/entries/{id}/restore"
+  "post /admin/lexicon/entries/{id}/restore",
+  "put /admin/lexicon/entries/{id}/sentences/{sentence_id}/associations"
 ] as const;
 
 // 已知「后端尚未提供 / 待对接」的端点白名单。每条都必须真不在 spec 里——
@@ -137,7 +141,468 @@ function inSpec(method: string, path: string): boolean {
   return matchers.some((m) => m.methods.has(method) && m.re.test(path));
 }
 
+function collectComponentSchemaRefs(value: unknown): Set<string> {
+  const prefix = "#/components/schemas/";
+  const pending = [value];
+  const refs = new Set<string>();
+
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (Array.isArray(current)) {
+      pending.push(...current);
+      continue;
+    }
+    if (current === null || typeof current !== "object") continue;
+    for (const [key, item] of Object.entries(current)) {
+      if (key === "$ref" && typeof item === "string") {
+        expect(item.startsWith(prefix), item).toBe(true);
+        refs.add(item.slice(prefix.length));
+      } else {
+        pending.push(item);
+      }
+    }
+  }
+
+  return refs;
+}
+
+type IsRequiredKey<T, K extends keyof T> =
+  Pick<T, K> extends Required<Pick<T, K>> ? true : false;
+
 describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
+  it("Admin Lexicon 每个非空 request root 的完整 schema closure 都已入快照", () => {
+    const operationSchemas = snapshot.operationSchemas as Record<
+      string,
+      { request: unknown }
+    >;
+    const schemas = snapshot.schemas as Record<string, unknown>;
+    let requestCount = 0;
+
+    for (const [operation, contract] of Object.entries(operationSchemas)) {
+      if (contract.request === null) continue;
+      requestCount += 1;
+      const pending = [...collectComponentSchemaRefs(contract.request)];
+      const visited = new Set<string>();
+
+      while (pending.length > 0) {
+        const schemaName = pending.pop();
+        if (schemaName === undefined || visited.has(schemaName)) continue;
+        visited.add(schemaName);
+        expect(
+          schemas[schemaName],
+          `${operation} request closure 缺 components.schemas.${schemaName}`
+        ).toBeDefined();
+        pending.push(...collectComponentSchemaRefs(schemas[schemaName]));
+      }
+    }
+
+    expect(requestCount).toBeGreaterThan(0);
+  });
+
+  it("C1 词库操作的 request/success/problem roots 全部来自最终 OpenAPI", () => {
+    const operationSchemas = snapshot.operationSchemas as Record<
+      string,
+      {
+        request: { $ref: string } | null;
+        responses: Record<string, { $ref: string } | null>;
+      }
+    >;
+    const cases = [
+      [
+        "post /admin/lexicon/detections",
+        "DetectLexiconInputAny",
+        "200",
+        "DetectLexiconResponseAny"
+      ],
+      ["get /admin/lexicon/entries", null, "200", "AdminWordListResponse"],
+      [
+        "post /admin/lexicon/entries",
+        "CreateAdminWordAnyInput",
+        "201",
+        "AdminWordAnyEnvelope"
+      ],
+      [
+        "get /admin/lexicon/entries/{id}",
+        null,
+        "200",
+        "AdminWordDraftAnyEnvelope"
+      ],
+      [
+        "post /admin/lexicon/entries/{id}/steps/forms/impact",
+        "PreviewFormsImpactInputAny",
+        "200",
+        "FormsImpactResponseAny"
+      ],
+      [
+        "put /admin/lexicon/entries/{id}/steps/forms",
+        "SaveFormsStepInputAny",
+        "200",
+        "AdminWordAnyEnvelope"
+      ],
+      [
+        "put /admin/lexicon/entries/{id}/steps/meanings",
+        "SaveMeaningsStepInputAny",
+        "200",
+        "AdminWordAnyEnvelope"
+      ],
+      [
+        "post /admin/lexicon/entries/{id}/validate",
+        "ValidateAdminWordAnyInput",
+        "200",
+        "DraftValidationResponseAny"
+      ],
+      [
+        "get /admin/lexicon/entries/{id}/publications",
+        null,
+        "200",
+        "AdminWordPublicationListResponse"
+      ],
+      [
+        "post /admin/lexicon/entries/{id}/publications",
+        "PublishAdminWordAnyInput",
+        "201",
+        "AdminWordAnyEnvelope"
+      ],
+      [
+        "get /admin/lexicon/entries/{id}/publications/{publication_id}",
+        null,
+        "200",
+        "AdminWordPublicationEnvelope"
+      ],
+      [
+        "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate",
+        "ActivatePublicationAnyInput",
+        "200",
+        "AdminWordAnyEnvelope"
+      ],
+      [
+        "get /admin/lexicon/surface-match-snapshots/{snapshot_id}",
+        null,
+        "200",
+        "SurfaceMatchPageAny"
+      ],
+      [
+        "get /admin/lexicon/entries/related-search",
+        null,
+        "200",
+        "RelatedSearchResponse"
+      ],
+      [
+        "post /admin/lexicon/entries/archive-batch",
+        "EntryLifecycleBatchInput",
+        "200",
+        "EntryLifecycleBatchResponseAny"
+      ],
+      [
+        "post /admin/lexicon/entries/restore-batch",
+        "EntryLifecycleBatchInput",
+        "200",
+        "EntryLifecycleBatchResponseAny"
+      ],
+      [
+        "post /admin/lexicon/entries/{id}/archive",
+        "EntryLifecycleInput",
+        "200",
+        "AdminWordAnyEnvelope"
+      ],
+      [
+        "post /admin/lexicon/entries/{id}/restore",
+        "EntryLifecycleInput",
+        "200",
+        "AdminWordAnyEnvelope"
+      ]
+    ] as const;
+
+    type C1Operation = (typeof cases)[number][0];
+    const problemStatuses: Record<C1Operation, readonly string[]> = {
+      "post /admin/lexicon/detections": ["400", "401", "403", "422", "503"],
+      "get /admin/lexicon/entries": ["400", "401", "403", "422", "500"],
+      "post /admin/lexicon/entries": [
+        "400",
+        "401",
+        "403",
+        "409",
+        "410",
+        "422",
+        "503"
+      ],
+      "get /admin/lexicon/entries/{id}": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "422",
+        "500"
+      ],
+      "post /admin/lexicon/entries/{id}/steps/forms/impact": [
+        "401",
+        "403",
+        "404",
+        "409",
+        "413",
+        "422",
+        "503"
+      ],
+      "put /admin/lexicon/entries/{id}/steps/forms": [
+        "401",
+        "403",
+        "404",
+        "409",
+        "410",
+        "413",
+        "422",
+        "503"
+      ],
+      "put /admin/lexicon/entries/{id}/steps/meanings": [
+        "401",
+        "403",
+        "404",
+        "409",
+        "413",
+        "422",
+        "503"
+      ],
+      "post /admin/lexicon/entries/{id}/validate": [
+        "401",
+        "403",
+        "404",
+        "409",
+        "422",
+        "503"
+      ],
+      "get /admin/lexicon/entries/{id}/publications": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "422",
+        "500"
+      ],
+      "post /admin/lexicon/entries/{id}/publications": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "410",
+        "422",
+        "503"
+      ],
+      "get /admin/lexicon/entries/{id}/publications/{publication_id}": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "422",
+        "500",
+        "503"
+      ],
+      "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate":
+        ["400", "401", "403", "404", "409", "410", "422", "503"],
+      "get /admin/lexicon/surface-match-snapshots/{snapshot_id}": [
+        "400",
+        "401",
+        "403",
+        "409",
+        "410",
+        "503"
+      ],
+      "get /admin/lexicon/entries/related-search": [
+        "400",
+        "401",
+        "403",
+        "422",
+        "500"
+      ],
+      "post /admin/lexicon/entries/archive-batch": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422"
+      ],
+      "post /admin/lexicon/entries/restore-batch": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "410",
+        "422",
+        "503"
+      ],
+      "post /admin/lexicon/entries/{id}/archive": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422"
+      ],
+      "post /admin/lexicon/entries/{id}/restore": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "410",
+        "422",
+        "503"
+      ]
+    };
+
+    for (const [operation, requestName, status, responseName] of cases) {
+      const contract = operationSchemas[operation];
+      expect(contract, operation).toBeDefined();
+      expect(contract?.request).toEqual(
+        requestName === null
+          ? null
+          : { $ref: `#/components/schemas/${requestName}` }
+      );
+      expect(contract?.responses[status]).toEqual({
+        $ref: `#/components/schemas/${responseName}`
+      });
+      const expectedProblemStatuses = problemStatuses[operation];
+      expect(Object.keys(contract?.responses ?? {}).sort(), operation).toEqual(
+        [status, ...expectedProblemStatuses].sort()
+      );
+      for (const problemStatus of expectedProblemStatuses) {
+        expect(
+          contract?.responses[problemStatus],
+          `${operation} ${problemStatus}`
+        ).toEqual({
+          $ref: "#/components/schemas/ProblemDetails"
+        });
+      }
+    }
+  });
+
+  it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
+    expect(runtimeSchemaBundle._source_sha256).toBe(
+      "460535d2de2d9335fb1680ce86d65978085e42d5b50aea74f16431612e44c3e0"
+    );
+    expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
+    expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
+    expect(runtimeSchemaBundle.roots).toContain("ProblemMeta");
+    expect(runtimeSchemaBundle.roots).toContain("ProblemDetails");
+
+    const defs = runtimeSchemaBundle.$defs;
+    expect(defs.AdminWordAny.oneOf).toEqual([
+      { $ref: "#/$defs/AdminWordV2" },
+      { $ref: "#/$defs/AdminWordV3" }
+    ]);
+    expect(defs.AdminWordV3.properties.schema_version.enum).toEqual([3]);
+    expect(Object.keys(defs.AdminWordV3.properties)).not.toContain("headwords");
+    expect(defs.WordPosFormsV3.required).toEqual([
+      "pos_id",
+      "pos",
+      "forms",
+      "form_groups"
+    ]);
+    expect(defs.WordConcreteFormV3.required).toEqual([
+      "id",
+      "form_type",
+      "regional_variants"
+    ]);
+    expect(Object.keys(defs.WordConcreteFormV3.properties)).toEqual([
+      "form_type",
+      "id",
+      "regional_variants"
+    ]);
+    expect(defs.WordFormGroupV3.required).toEqual([
+      "id",
+      "is_regular",
+      "members"
+    ]);
+    expect(defs.WordFormGroupMemberV3.required).toEqual(["id", "form_id"]);
+    expect(
+      defs.WordRegionalVariantsV3.oneOf.map((branch) => ({
+        mode: branch.properties.mode.enum[0],
+        required: branch.required
+      }))
+    ).toEqual([
+      { mode: "common", required: ["common", "mode"] },
+      { mode: "uk_us", required: ["uk", "us", "mode"] }
+    ]);
+    expect(defs.WordFormTypeV3.enum).toEqual([
+      "base",
+      "third_person_singular",
+      "present_participle",
+      "past_tense",
+      "past_participle",
+      "plural",
+      "comparative",
+      "superlative"
+    ]);
+    expect(defs.WordPronunciationV3.required).toEqual([
+      "id",
+      "dict_phonetic",
+      "actual_pron"
+    ]);
+    const serializedV3 = JSON.stringify(defs.AdminWordV3);
+    expect(serializedV3).not.toContain("base_form");
+    expect(serializedV3).not.toContain("parent_form_id");
+    expect(serializedV3).not.toContain("derived_from_form_id");
+    expect(serializedV3).not.toContain("sort_order");
+  });
+
+  it("V3 meanings 写 DTO、surface 判别联合与 validation code 对齐当前 OpenAPI", () => {
+    const schemas = snapshot.schemas;
+
+    expect(schemas.SaveMeaningsStepInputAny.oneOf).toEqual([
+      { $ref: "#/components/schemas/SaveMeaningsStepInput" },
+      { $ref: "#/components/schemas/SaveMeaningsStepInputV3" }
+    ]);
+    expect(schemas.SaveMeaningsStepInputV3.properties.content).toEqual({
+      $ref: "#/components/schemas/DraftMeaningsStepContentWritableV3"
+    });
+    expect(schemas.WordSenseWritableV3.properties.sentences.items).toEqual({
+      $ref: "#/components/schemas/WordSentenceWritableV3"
+    });
+    expect(schemas.WordSenseWritableV3.properties.relations.items).toEqual({
+      $ref: "#/components/schemas/WordRelationWritableV3"
+    });
+    expect(
+      Object.keys(schemas.WordSentenceWritableV3.properties)
+    ).not.toContain("associations");
+    expect(
+      Object.keys(schemas.WordRelationWritableV3.properties)
+    ).not.toContain("target_headword");
+
+    expect(
+      schemas.SurfaceMatchItemV3.oneOf.map((branch) => ({
+        kind: branch.properties.match_kind.enum[0],
+        match: branch.properties.match.$ref
+      }))
+    ).toEqual([
+      {
+        kind: "legacy_v2",
+        match: "#/components/schemas/LegacySurfaceMatchV3"
+      },
+      {
+        kind: "form_variant_v3",
+        match: "#/components/schemas/FormSurfaceMatchV3"
+      }
+    ]);
+    expect(schemas.FormSurfaceMatchV3.required).toEqual([
+      "source_schema_version",
+      "entry_id",
+      "status",
+      "content_scope",
+      "pos_id",
+      "group_ids",
+      "form_id",
+      "variant_id",
+      "form_type",
+      "dialect",
+      "spelling"
+    ]);
+    expect(schemas.V3ValidationIssueCode.enum).toEqual(
+      V3_VALIDATION_ISSUE_CODES
+    );
+  });
+
   it("V2 命令端点的 Idempotency-Key 必须是必填 UUID header", () => {
     const expectedHeader = {
       name: "Idempotency-Key",
@@ -179,9 +644,13 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "revision",
         "lifecycle_revision",
         "max_reachable_step",
-        "has_unpublished_changes"
+        "has_unpublished_changes",
+        "headword_variants"
       ])
     );
+    expectTypeOf<
+      IsRequiredKey<AdminWordV2ListItem, "headword_variants">
+    >().toEqualTypeOf<true>();
     expect(snapshot.schemas.EntryLifecycleInput.required).toEqual([
       "base_revision",
       "base_lifecycle_revision"
@@ -224,7 +693,9 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "word_id",
       "headword",
       "dialect",
-      "status"
+      "status",
+      "match_category",
+      "inbound_relations"
     ]);
     expect(snapshot.schemas.DuplicateWordMatchV2.properties.status).toEqual({
       $ref: "#/components/schemas/AdminWordStatus"
@@ -251,11 +722,16 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(Object.keys(location.properties).sort()).toEqual([
       "ancestor_node_ids",
       "dialect",
+      "form_group_id",
       "form_group_index",
+      "form_id",
       "form_type",
+      "membership_id",
       "node_role",
       "pos",
-      "pos_id"
+      "pos_id",
+      "pronunciation_id",
+      "variant_id"
     ]);
     expect(location.properties.form_type.$ref).toBe(
       "#/components/schemas/WordFormTypeV2"
@@ -395,7 +871,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(snapshot.schemas.ProblemMeta.properties).toEqual(
       expect.objectContaining({
         surface_match_page: {
-          $ref: "#/components/schemas/SurfaceMatchPageV2"
+          $ref: "#/components/schemas/SurfaceMatchPageAny"
         },
         current_policy_name: {
           $ref: "#/components/schemas/SurfacePolicyNameV2"

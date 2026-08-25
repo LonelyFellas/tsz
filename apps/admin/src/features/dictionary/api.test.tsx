@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
+import type { AdminWordDraftV3Envelope, AdminWordListItemV3 } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { wordFixture } from "./word-creation/wordCreation.test.helper";
 
@@ -10,11 +11,29 @@ const dataSource = vi.hoisted(() => ({
   relatedSearch: vi.fn()
 }));
 
-vi.mock("./dataSource", () => ({ adminWordsDataSource: dataSource }));
+const anyDataSource = vi.hoisted(() => ({
+  archiveAny: vi.fn(),
+  archiveBatchAny: vi.fn(),
+  getAny: vi.fn(),
+  listAny: vi.fn(),
+  restoreAny: vi.fn(),
+  restoreBatchAny: vi.fn()
+}));
+
+vi.mock("./dataSource", () => ({
+  adminWordsDataSource: dataSource,
+  adminWordsAnyDataSource: anyDataSource
+}));
 
 import {
+  useArchiveWordAny,
+  useArchiveWordsBatchAny,
   useDeleteWordDraft,
   useRelatedSearchV2,
+  useRestoreWordAny,
+  useRestoreWordsBatchAny,
+  useWordDetailAny,
+  useWordList,
   useWordDetail,
   wordKeys
 } from "./api";
@@ -56,6 +75,132 @@ beforeEach(() => {
 });
 
 describe("dictionary React Query hooks", () => {
+  it("mixed 列表与 Any 详情只调用 schema-aware facade", async () => {
+    const listItem = {
+      schema_version: 3,
+      id: "v3-1",
+      kind: "word",
+      presentation: {
+        label: "centre · center",
+        matched_surfaces: ["centre", "center"],
+        strategy_version: "surface_summary_v1"
+      },
+      revision: 2,
+      lifecycle_revision: 1,
+      gloss: "中心",
+      pos_list: ["noun"],
+      levels: ["A1"],
+      status: "draft",
+      has_unpublished_changes: false,
+      max_reachable_step: "forms",
+      created_by_name: "Admin",
+      created_at: "2026-08-25T00:00:00Z",
+      updated_at: "2026-08-25T00:00:00Z"
+    } satisfies AdminWordListItemV3;
+    const list = {
+      words: [listItem],
+      page: { page: 1, page_size: 20, total: 1 }
+    };
+    const detail: AdminWordDraftV3Envelope = {
+      word: {
+        ...listItem,
+        language: "en" as const,
+        capabilities: {
+          publication: {
+            mode: "shadow_only" as const,
+            blocked_code: "phase2_consumers_not_ready" as const
+          },
+          pronunciation_normalization_version: "nfkc_trim_lower_v1" as const
+        },
+        forms: { pos: [] },
+        meanings: { sense_groups: [], pos: [] },
+        completed_steps: [] as const,
+        created_by: "admin-1"
+      },
+      retired_stable_nodes: []
+    };
+    anyDataSource.listAny.mockResolvedValue(list);
+    anyDataSource.getAny.mockResolvedValue(detail);
+    const { wrapper } = queryWrapper();
+    const hook = renderHook(
+      () => ({
+        list: useWordList({ page: 1, page_size: 20 }),
+        detail: useWordDetailAny("v3-1")
+      }),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(hook.result.current.list.isSuccess).toBe(true);
+      expect(hook.result.current.detail.isSuccess).toBe(true);
+    });
+    expect(anyDataSource.listAny).toHaveBeenCalledWith({
+      page: 1,
+      page_size: 20
+    });
+    expect(anyDataSource.getAny).toHaveBeenCalledWith("v3-1");
+    expect(hook.result.current.list.data).toEqual(list);
+    expect(hook.result.current.detail.data).toEqual(detail);
+  });
+
+  it("单条与批量生命周期写入全部调用 Any facade", async () => {
+    anyDataSource.archiveAny.mockResolvedValue({ word: {} });
+    anyDataSource.restoreAny.mockResolvedValue({ word: {} });
+    anyDataSource.archiveBatchAny.mockResolvedValue({ words: [], affected: 1 });
+    anyDataSource.restoreBatchAny.mockResolvedValue({ words: [], affected: 1 });
+    const { wrapper } = queryWrapper();
+    const hook = renderHook(
+      () => ({
+        archive: useArchiveWordAny(),
+        restore: useRestoreWordAny(),
+        archiveBatch: useArchiveWordsBatchAny(),
+        restoreBatch: useRestoreWordsBatchAny()
+      }),
+      { wrapper }
+    );
+    const input = { base_revision: 2, base_lifecycle_revision: 1 };
+
+    await act(async () => {
+      await hook.result.current.archive.mutateAsync({
+        wordId: "v3-1",
+        idempotencyKey: "archive-key",
+        input
+      });
+      await hook.result.current.restore.mutateAsync({
+        wordId: "v3-1",
+        idempotencyKey: "restore-key",
+        input
+      });
+      await hook.result.current.archiveBatch.mutateAsync({
+        idempotencyKey: "archive-batch-key",
+        input: { entries: [{ id: "v3-1", ...input }] }
+      });
+      await hook.result.current.restoreBatch.mutateAsync({
+        idempotencyKey: "restore-batch-key",
+        input: { entries: [{ id: "v3-1", ...input }] }
+      });
+    });
+
+    expect(anyDataSource.archiveAny).toHaveBeenCalledWith(
+      "v3-1",
+      "archive-key",
+      input
+    );
+    expect(anyDataSource.restoreAny).toHaveBeenCalledWith(
+      "v3-1",
+      "restore-key",
+      input
+    );
+    expect(anyDataSource.archiveBatchAny).toHaveBeenCalledWith(
+      "archive-batch-key",
+      { entries: [{ id: "v3-1", ...input }] }
+    );
+    expect(anyDataSource.restoreBatchAny).toHaveBeenCalledWith(
+      "restore-batch-key",
+      { entries: [{ id: "v3-1", ...input }] }
+    );
+  });
+
   it("V2 exact 与 contains 独立请求，并分别按 cursor 累积全部页", async () => {
     const firstExact = relatedWord("workspace-1", "workspace");
     const secondExact = relatedWord("workspace-2", "workspace");

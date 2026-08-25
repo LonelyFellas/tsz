@@ -53,6 +53,7 @@ import {
 import { useUnsavedWordChanges } from "./useUnsavedWordChanges";
 import {
   canAcknowledgeSurfaceSnapshot,
+  isSurfaceMatchPageV2,
   requiresNewIdempotencyKey,
   type SurfaceSnapshotState
 } from "../surfaceSnapshot";
@@ -803,6 +804,11 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
       allowSavedNavigation();
       onCreated(word);
     } catch (error) {
+      const errorSurfacePage =
+        error instanceof HttpError &&
+        isSurfaceMatchPageV2(error.meta?.surface_match_page)
+          ? error.meta.surface_match_page
+          : undefined;
       if (
         error instanceof HttpError &&
         requiresNewIdempotencyKey(error.status, error.code)
@@ -817,15 +823,15 @@ export function CreateEntryStep({ onHeadwordsChange, onCreated }: Props) {
           "surface_policy_changed",
           "exact_headword_creation_temporarily_disabled"
         ].includes(error.code ?? "") &&
-        error.meta?.surface_match_page
+        errorSurfacePage
       ) {
-        setSurfaceOverridePage(error.meta.surface_match_page);
+        setSurfaceOverridePage(errorSurfacePage);
         setResult({
           ...result,
           smart_dictionary: {
             status: "warning",
             duplicates: [],
-            surface_match_page: error.meta.surface_match_page,
+            surface_match_page: errorSurfacePage,
             matched_entry_contexts: []
           }
         });

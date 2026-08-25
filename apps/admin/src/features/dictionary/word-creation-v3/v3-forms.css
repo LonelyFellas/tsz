@@ -1,0 +1,46 @@
+.v3-forms-step {
+  width: 100%;
+}
+
+.v3-issue-list {
+  margin: 0;
+  padding-inline-start: 20px;
+}
+
+.v3-form-group-card,
+.v3-concrete-form-row,
+.v3-variant-card {
+  width: 100%;
+}
+
+.v3-membership-row {
+  display: grid;
+  gap: 8px;
+}
+
+.v3-membership-actions {
+  min-height: 32px;
+}
+
+.v3-variant-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.v3-variant-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.v3-pronunciation-row {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) minmax(120px, 1fr) 112px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 960px) {
+  .v3-variant-grid-2,
+  .v3-pronunciation-row {
+    grid-template-columns: 1fr;
+  }
+}

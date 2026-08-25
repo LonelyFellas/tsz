@@ -24,25 +24,27 @@ import {
 } from "antd";
 import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
   AdminWordKind,
-  AdminWordListItem,
-  AdminWordV2Envelope,
+  AdminWordAnyEnvelope,
+  AdminWordListItemAny,
   CefrLevel,
-  EntryLifecycleBatchResponse
+  Dialect,
+  EntryLifecycleBatchResponseAny
 } from "@tsz/types";
 import {
-  useArchiveWord,
-  useArchiveWordsBatch,
-  useRestoreWord,
-  useRestoreWordsBatch,
+  useArchiveWordAny as useArchiveWord,
+  useArchiveWordsBatchAny as useArchiveWordsBatch,
+  useRestoreWordAny as useRestoreWord,
+  useRestoreWordsBatchAny as useRestoreWordsBatch,
   useWordList,
   useWordStats
 } from "./api";
 import {
-  adminWordsDataSource,
+  adminWordsAnyDataSource,
   adminWordsDataSourceCapabilities
 } from "./dataSource";
 import { LifecycleSurfaceConfirmation } from "./LifecycleSurfaceConfirmation";
@@ -62,6 +64,12 @@ import {
 import { usePartOfSpeechCatalog } from "./part-of-speech/api";
 import { toListQuery, type WordFilterValues } from "./listQuery";
 import { runLifecycleCommandOnce } from "./lifecycleCommand";
+import {
+  observeWordListPresentation,
+  type PresentationStrategyReporter,
+  wordListDialects,
+  wordListLabel
+} from "./presentation";
 import { useLifecycleSurfaceCommand } from "./useLifecycleSurfaceCommand";
 import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 import { newWordNodeId } from "./word-model/primitives";
@@ -72,11 +80,19 @@ function shortWordId(id: string) {
   return id.slice(-8);
 }
 
-const DIALECT_LABEL: Record<AdminWordListItem["dialects"][number], string> = {
+const DIALECT_LABEL: Record<Dialect, string> = {
   uk: "BrE",
   us: "AmE",
   common: "Common"
 };
+
+const CEFR_LEVELS = new Set<CefrLevel>(["A1", "A2", "B1", "B2", "C1", "C2"]);
+
+function cefrLevelColor(level: string) {
+  return CEFR_LEVELS.has(level as CefrLevel)
+    ? cefrColor(level as CefrLevel)
+    : undefined;
+}
 
 type RestoreRequest =
   { kind: "single"; id: string } | { kind: "batch"; ids: string[] };
@@ -106,7 +122,11 @@ function sameRestoreRequest(
   return false;
 }
 
-export function SmartDictionary() {
+export function SmartDictionary({
+  reportUnknownPresentationStrategy
+}: {
+  reportUnknownPresentationStrategy?: PresentationStrategyReporter;
+} = {}) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -129,7 +149,7 @@ export function SmartDictionary() {
   const [pageSize, setPageSize] = useState(20);
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
   const [selectedRecords, setSelectedRecords] = useState<
-    Record<string, AdminWordListItem>
+    Record<string, AdminWordListItemAny>
   >({});
   const [pendingRestore, setPendingRestore] = useState<PendingRestore>();
   const lifecycleCommandPending = useRef(false);
@@ -159,7 +179,22 @@ export function SmartDictionary() {
     ? KIND_OPTIONS
     : KIND_OPTIONS.filter((option) => option.value === "word");
 
-  const rows = listQuery.data?.words ?? [];
+  const rows = useMemo(
+    () => listQuery.data?.words ?? [],
+    [listQuery.data?.words]
+  );
+  const observedPresentationStrategies = useRef(new Set<string>());
+  useEffect(() => {
+    if (!reportUnknownPresentationStrategy) return;
+    for (const row of rows) {
+      observeWordListPresentation(row, (observation) => {
+        const key = `${observation.entry_id}:${observation.strategy_version}`;
+        if (observedPresentationStrategies.current.has(key)) return;
+        observedPresentationStrategies.current.add(key);
+        reportUnknownPresentationStrategy(observation);
+      });
+    }
+  }, [reportUnknownPresentationStrategy, rows]);
   const total = listQuery.data?.page.total ?? 0;
   const selectedRows = selectedKeys.flatMap((key) =>
     selectedRecords[String(key)] ? [selectedRecords[String(key)]!] : []
@@ -204,7 +239,14 @@ export function SmartDictionary() {
         const ids = request.kind === "single" ? [request.id] : request.ids;
         const latest = await Promise.all(
           ids.map(async (id) => {
-            const response = await adminWordsDataSource.get(id);
+            const response = await adminWordsAnyDataSource.getAny(id);
+            if (response?.word && response.word.id !== id) {
+              throw new InvalidAdminWordResponseError(
+                "get.word.id",
+                "enum_mismatch",
+                "string"
+              );
+            }
             return (
               response?.word ??
               selectedRecords[id] ??
@@ -237,7 +279,7 @@ export function SmartDictionary() {
       }
       const targets = command.targets;
       const outcome = await restoreSurface.run<
-        AdminWordV2Envelope | EntryLifecycleBatchResponse
+        AdminWordAnyEnvelope | EntryLifecycleBatchResponseAny
       >((idempotencyKey, token) =>
         command.kind === "single"
           ? restoreWord.mutateAsync({
@@ -265,7 +307,7 @@ export function SmartDictionary() {
         const affected =
           command.kind === "single"
             ? 1
-            : (outcome.result as EntryLifecycleBatchResponse).affected;
+            : (outcome.result as EntryLifecycleBatchResponseAny).affected;
         setSelectedKeys([]);
         setSelectedRecords({});
         setPendingRestore(undefined);
@@ -288,9 +330,8 @@ export function SmartDictionary() {
     }
   };
 
-  const lifecycleInput = (record: AdminWordListItem) => {
+  const lifecycleInput = (record: AdminWordListItemAny) => {
     if (
-      record.schema_version !== 2 ||
       record.revision === undefined ||
       record.lifecycle_revision === undefined
     ) {
@@ -303,7 +344,7 @@ export function SmartDictionary() {
   };
 
   const transitionOne = (
-    record: AdminWordListItem,
+    record: AdminWordListItemAny,
     target: "archive" | "restore"
   ) => {
     const input = lifecycleInput(record);
@@ -312,8 +353,9 @@ export function SmartDictionary() {
       return;
     }
     const restoring = target === "restore";
+    const label = wordListLabel(record);
     modal.confirm({
-      title: `${restoring ? "恢复" : "归档"}「${record.headword}」？`,
+      title: `${restoring ? "恢复" : "归档"}「${label}」？`,
       content: restoring
         ? "恢复后词条重新进入正常列表；现有发布记录保持不变。"
         : "归档不会删除当前或历史发布记录；存在有效入站引用时服务端会安全拒绝。",
@@ -410,25 +452,33 @@ export function SmartDictionary() {
     });
   };
 
-  const columns: TableColumnsType<AdminWordListItem> = [
+  const columns: TableColumnsType<AdminWordListItemAny> = [
     {
       title: "词汇",
-      dataIndex: "headword",
+      key: "label",
       width: 120,
       fixed: "left",
       ellipsis: { showTitle: false },
-      render: (w: string, record) => (
-        <Tooltip
-          title={`${w} · ${record.id} · ${record.dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")}`}
-        >
-          <span tabIndex={0} style={{ display: "block" }}>
-            <span style={{ display: "block", fontWeight: 600 }}>{w}</span>
-            <Typography.Text type="secondary" code>
-              {shortWordId(record.id)}
-            </Typography.Text>
-          </span>
-        </Tooltip>
-      )
+      render: (_: unknown, record) => {
+        const label = wordListLabel(record);
+        const dialects = wordListDialects(record);
+        const context =
+          dialects.length > 0
+            ? dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")
+            : "";
+        return (
+          <Tooltip
+            title={[label, record.id, context].filter(Boolean).join(" · ")}
+          >
+            <span tabIndex={0} style={{ display: "block" }}>
+              <span style={{ display: "block", fontWeight: 600 }}>{label}</span>
+              <Typography.Text type="secondary" code>
+                {shortWordId(record.id)}
+              </Typography.Text>
+            </span>
+          </Tooltip>
+        );
+      }
     },
     {
       title: "类型",
@@ -443,11 +493,15 @@ export function SmartDictionary() {
     },
     {
       title: "方言",
-      dataIndex: "dialects",
+      key: "dialects",
       width: 110,
       responsive: ["sm"],
-      render: (dialects: AdminWordListItem["dialects"]) =>
-        dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")
+      render: (_: unknown, record) => {
+        const dialects = wordListDialects(record);
+        return dialects.length > 0
+          ? dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")
+          : "-";
+      }
     },
     {
       title: "释义",
@@ -461,7 +515,7 @@ export function SmartDictionary() {
       dataIndex: "pos_list",
       width: 180,
       responsive: ["sm"],
-      render: (list: AdminWordListItem["pos_list"]) => (
+      render: (list: AdminWordListItemAny["pos_list"]) => (
         <Space size={[4, 4]} wrap>
           {list.map((p) => (
             <Tag key={p} style={{ margin: 0 }}>
@@ -476,10 +530,10 @@ export function SmartDictionary() {
       dataIndex: "levels",
       width: 170,
       responsive: ["sm"],
-      render: (levels: CefrLevel[]) => (
+      render: (levels: string[]) => (
         <Space size={[4, 4]} wrap>
           {levels.map((lv) => (
-            <Tag key={lv} color={cefrColor(lv)} style={{ margin: 0 }}>
+            <Tag key={lv} color={cefrLevelColor(lv)} style={{ margin: 0 }}>
               {lv}
             </Tag>
           ))}
@@ -513,7 +567,7 @@ export function SmartDictionary() {
       dataIndex: "status",
       width: 90,
       responsive: ["sm"],
-      render: (s: AdminWordListItem["status"], record) => (
+      render: (s: AdminWordListItemAny["status"], record) => (
         <Space size={4} wrap>
           <Tag
             color={
@@ -544,9 +598,9 @@ export function SmartDictionary() {
       key: "action",
       width: 160,
       fixed: "right",
-      render: (_: unknown, record: AdminWordListItem) => {
+      render: (_: unknown, record: AdminWordListItemAny) => {
         // 同名词条可以并存,可及名带上词汇与短 ID 才能区分是哪一行。
-        const rowName = `「${record.headword}」${shortWordId(record.id)}`;
+        const rowName = `「${wordListLabel(record)}」${shortWordId(record.id)}`;
         return (
           <Space size={0}>
             <Button
@@ -712,9 +766,15 @@ export function SmartDictionary() {
             <Button
               type="primary"
               icon={<PlusOutlined />}
-              onClick={() => navigate("/words/new")}
+              onClick={() => navigate("/words/new/v3")}
             >
-              创建词条
+              创建单词
+            </Button>
+            <Button
+              icon={<PlusOutlined />}
+              onClick={() => navigate("/words/new?kind=phrase")}
+            >
+              创建短语
             </Button>
             {adminWordsDataSourceCapabilities.batchArchive && (
               <Button
@@ -786,7 +846,7 @@ export function SmartDictionary() {
           />
         )}
 
-        <Table<AdminWordListItem>
+        <Table<AdminWordListItemAny>
           rowKey="id"
           size="middle"
           columns={columns}
@@ -816,9 +876,7 @@ export function SmartDictionary() {
                     }
                   },
                   getCheckboxProps: (record) => ({
-                    disabled:
-                      record.schema_version !== 2 ||
-                      lifecycleInput(record) === undefined
+                    disabled: lifecycleInput(record) === undefined
                   })
                 }
               : undefined

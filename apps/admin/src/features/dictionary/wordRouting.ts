@@ -1,4 +1,4 @@
-import type { AdminWordListItem, WordCreationStep } from "@tsz/types";
+import type { AdminWordListItemAny, WordCreationStep } from "@tsz/types";
 
 const WIZARD_STEPS: readonly WordCreationStep[] = [
   "basics",
@@ -8,7 +8,7 @@ const WIZARD_STEPS: readonly WordCreationStep[] = [
 ];
 
 type WordRouteRecord = Pick<
-  AdminWordListItem,
+  AdminWordListItemAny,
   | "id"
   | "schema_version"
   | "status"
@@ -20,15 +20,24 @@ function isWizardStep(value: unknown): value is WordCreationStep {
   return WIZARD_STEPS.includes(value as WordCreationStep);
 }
 
-/** V2 状态决定词条唯一详情入口。 */
+/** schema 与状态共同决定既有词条的唯一详情入口。 */
 export function getWordRowRoute(record: WordRouteRecord): string {
+  if (record.schema_version !== 2 && record.schema_version !== 3) {
+    throw new Error(
+      `unsupported schema_version: ${String(record.schema_version)}`
+    );
+  }
+  const wizardPrefix =
+    record.schema_version === 3
+      ? `/words/${record.id}/v3/wizard`
+      : `/words/${record.id}/wizard`;
   if (record.status === "published" && !record.has_unpublished_changes) {
-    return `/words/${record.id}/wizard/preview`;
+    return `${wizardPrefix}/preview`;
   }
   const step = isWizardStep(record.max_reachable_step)
     ? record.max_reachable_step
     : "basics";
-  const route = `/words/${record.id}/wizard/${step}`;
+  const route = `${wizardPrefix}/${step}`;
   return record.status === "published" ? `${route}?mode=edit` : route;
 }
 

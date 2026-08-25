@@ -1,7 +1,10 @@
 import type {
   LexiconSurfaceMatchV2,
   MatchedEntryContextV2,
+  MatchedEntryContextV3,
   SurfaceConfirmationReasonV2,
+  SurfaceMatchItemV3,
+  SurfaceMatchPageAny,
   SurfaceMatchPageV2,
   SurfacePolicyBlockCodeV2,
   SurfacePolicyNameV2
@@ -10,12 +13,20 @@ import type {
 export type SurfaceSnapshotPhase =
   "idle" | "loading" | "ready" | "disabled" | "error" | "expired";
 
-export interface SurfaceSnapshotState {
+type SurfaceSnapshotItems<TPage extends SurfaceMatchPageAny> =
+  TPage extends SurfaceMatchPageAny ? TPage["items"] : never;
+type SurfaceSnapshotContexts<TPage extends SurfaceMatchPageAny> =
+  TPage extends SurfaceMatchPageAny ? TPage["matched_entry_contexts"] : never;
+
+export interface SurfaceSnapshotState<
+  TPage extends SurfaceMatchPageAny = SurfaceMatchPageV2
+> {
   generation: number;
+  schema_version?: TPage["schema_version"];
   phase: SurfaceSnapshotPhase;
   snapshot_id?: string;
-  items: LexiconSurfaceMatchV2[];
-  matched_entry_contexts: MatchedEntryContextV2[];
+  items: SurfaceSnapshotItems<TPage>;
+  matched_entry_contexts: SurfaceSnapshotContexts<TPage>;
   total: number;
   confirmation_reasons: SurfaceConfirmationReasonV2[];
   policy_name?: SurfacePolicyNameV2;
@@ -27,14 +38,33 @@ export interface SurfaceSnapshotState {
   error?: unknown;
 }
 
-export type SurfaceSnapshotAction =
+export function isSurfaceMatchPageV2(
+  page: SurfaceMatchPageAny | null | undefined
+): page is SurfaceMatchPageV2 {
+  return page?.schema_version === 2;
+}
+
+export function isSurfaceMatchPageAny(
+  page: unknown
+): page is SurfaceMatchPageAny {
+  return (
+    typeof page === "object" &&
+    page !== null &&
+    "schema_version" in page &&
+    (page.schema_version === 2 || page.schema_version === 3)
+  );
+}
+
+export type SurfaceSnapshotAction<
+  TPage extends SurfaceMatchPageAny = SurfaceMatchPageV2
+> =
   | { type: "reset"; generation: number }
-  | { type: "start"; generation: number; page: SurfaceMatchPageV2 }
+  | { type: "start"; generation: number; page: TPage }
   | {
       type: "page_loaded";
       generation: number;
       requested_cursor: string;
-      page: SurfaceMatchPageV2;
+      page: TPage;
     }
   | {
       type: "page_failed";
@@ -53,6 +83,12 @@ export const EMPTY_SURFACE_SNAPSHOT_STATE: SurfaceSnapshotState = {
   confirmation_reasons: []
 };
 
+export function createEmptySurfaceSnapshotState<
+  TPage extends SurfaceMatchPageAny = SurfaceMatchPageV2
+>(): SurfaceSnapshotState<TPage> {
+  return { ...EMPTY_SURFACE_SNAPSHOT_STATE } as SurfaceSnapshotState<TPage>;
+}
+
 function uniqueBy<T>(values: T[], key: (value: T) => string): T[] {
   const seen = new Set<string>();
   return values.filter((value) => {
@@ -63,21 +99,73 @@ function uniqueBy<T>(values: T[], key: (value: T) => string): T[] {
   });
 }
 
-function pageState(
+type SurfaceSnapshotItemAny = LexiconSurfaceMatchV2 | SurfaceMatchItemV3;
+type SurfaceSnapshotContextAny = MatchedEntryContextV2 | MatchedEntryContextV3;
+
+function surfaceItemKey(item: SurfaceSnapshotItemAny): string {
+  if ("match_id" in item) return `v2:${item.match_id}`;
+  if (item.match_kind === "form_variant_v3") {
+    const match = item.match;
+    return JSON.stringify([
+      "form_variant_v3",
+      match.source_schema_version,
+      match.entry_id,
+      match.status,
+      match.content_scope,
+      match.pos_id,
+      [...match.group_ids].sort(),
+      match.form_id,
+      match.variant_id,
+      match.form_type,
+      match.dialect,
+      match.spelling,
+      match.publication_id ?? null
+    ]);
+  }
+  const match = item.match;
+  const source = match.existing.source;
+  return JSON.stringify([
+    "legacy_v2",
+    match.source_schema_version,
+    match.existing.word_id,
+    match.existing.headword,
+    match.existing.kind,
+    match.existing.status,
+    source.source_kind,
+    source.source_id,
+    source.content_scope,
+    source.surface,
+    source.dialect,
+    ...(source.source_kind === "form"
+      ? [source.source_node_id, source.pos_id, source.pos, source.form_type]
+      : []),
+    match.publication_id ?? null
+  ]);
+}
+
+function surfaceContextKey(context: SurfaceSnapshotContextAny): string {
+  return "word_id" in context ? context.word_id : context.entry_id;
+}
+
+function pageState<TPage extends SurfaceMatchPageAny>(
   generation: number,
-  page: SurfaceMatchPageV2,
-  previous?: SurfaceSnapshotState
-): SurfaceSnapshotState {
+  page: TPage,
+  previous?: SurfaceSnapshotState<TPage>
+): SurfaceSnapshotState<TPage> {
   const items = uniqueBy(
-    [...(previous?.items ?? []), ...page.items],
-    (item) => item.match_id
+    [
+      ...((previous?.items ?? []) as SurfaceSnapshotItemAny[]),
+      ...(page.items as SurfaceSnapshotItemAny[])
+    ],
+    surfaceItemKey
   );
   const matched_entry_contexts = uniqueBy(
     [
-      ...(previous?.matched_entry_contexts ?? []),
-      ...page.matched_entry_contexts
+      ...((previous?.matched_entry_contexts ??
+        []) as SurfaceSnapshotContextAny[]),
+      ...(page.matched_entry_contexts as SurfaceSnapshotContextAny[])
     ],
-    (context) => context.word_id
+    surfaceContextKey
   );
   const nextCursor =
     typeof page.next_cursor === "string" ? page.next_cursor : undefined;
@@ -94,10 +182,12 @@ function pageState(
 
   return {
     generation,
+    schema_version: page.schema_version,
     phase: hasNext ? "loading" : isDisabled ? "disabled" : "ready",
     snapshot_id: page.snapshot_id,
-    items,
-    matched_entry_contexts,
+    items: items as SurfaceSnapshotItems<TPage>,
+    matched_entry_contexts:
+      matched_entry_contexts as SurfaceSnapshotContexts<TPage>,
     total: page.total,
     confirmation_reasons: page.confirmation_reasons,
     policy_name: page.policy_name,
@@ -109,11 +199,12 @@ function pageState(
   };
 }
 
-function sameSnapshot(
-  state: SurfaceSnapshotState,
-  page: SurfaceMatchPageV2
+function sameSnapshot<TPage extends SurfaceMatchPageAny>(
+  state: SurfaceSnapshotState<TPage>,
+  page: TPage
 ): boolean {
   return (
+    state.schema_version === page.schema_version &&
     state.snapshot_id === page.snapshot_id &&
     state.policy_name === page.policy_name &&
     state.policy_epoch === page.policy_epoch &&
@@ -121,12 +212,15 @@ function sameSnapshot(
   );
 }
 
-export function surfaceSnapshotReducer(
-  state: SurfaceSnapshotState,
-  action: SurfaceSnapshotAction
-): SurfaceSnapshotState {
+export function surfaceSnapshotReducer<TPage extends SurfaceMatchPageAny>(
+  state: SurfaceSnapshotState<TPage>,
+  action: SurfaceSnapshotAction<TPage>
+): SurfaceSnapshotState<TPage> {
   if (action.type === "reset") {
-    return { ...EMPTY_SURFACE_SNAPSHOT_STATE, generation: action.generation };
+    return {
+      ...createEmptySurfaceSnapshotState<TPage>(),
+      generation: action.generation
+    };
   }
   if (action.type === "start") {
     return pageState(action.generation, action.page);
@@ -160,9 +254,13 @@ export function surfaceSnapshotReducer(
   return pageState(state.generation, action.page, state);
 }
 
-export function canAcknowledgeSurfaceSnapshot(
-  state: SurfaceSnapshotState
-): state is SurfaceSnapshotState & { surface_confirmation_token: string } {
+export function canAcknowledgeSurfaceSnapshot<
+  TPage extends SurfaceMatchPageAny
+>(
+  state: SurfaceSnapshotState<TPage>
+): state is SurfaceSnapshotState<TPage> & {
+  surface_confirmation_token: string;
+} {
   return (
     state.phase === "ready" &&
     typeof state.surface_confirmation_token === "string" &&
@@ -225,6 +323,77 @@ export function aggregateSurfaceMatchCards(
     });
   }
   return [...cards.values()];
+}
+
+export interface LifecycleSurfaceMatchCard {
+  key: string;
+  entry_id: string;
+  label: string;
+  status: "draft" | "published" | "archived";
+  match_count: number;
+  membership: SurfaceMatchMembership;
+  source_labels: string[];
+}
+
+/** Lifecycle confirmation uses each schema's real source and presentation fields. */
+export function aggregateLifecycleSurfaceMatchCards(
+  state: SurfaceSnapshotState<SurfaceMatchPageAny>
+): LifecycleSurfaceMatchCard[] {
+  if (state.schema_version !== 3) {
+    return aggregateSurfaceMatchCards(
+      state.items as LexiconSurfaceMatchV2[],
+      state.matched_entry_contexts as MatchedEntryContextV2[]
+    ).map((card) => ({
+      key: card.key,
+      entry_id: card.existing.word_id,
+      label: card.existing.headword,
+      status: card.existing.status,
+      match_count: card.matches.length,
+      membership: card.membership,
+      source_labels: card.matches.map((match) => {
+        const source = match.existing.source;
+        return source.source_kind === "form"
+          ? `${source.pos} · ${source.form_type} · ${source.surface} · ${source.dialect}`
+          : `主词 · ${source.surface} · ${source.dialect}`;
+      })
+    }));
+  }
+
+  const contexts = new Map(
+    (state.matched_entry_contexts as MatchedEntryContextV3[]).map((context) => [
+      context.entry_id,
+      context
+    ])
+  );
+  return (state.items as SurfaceMatchItemV3[]).map((item) => {
+    if (item.match_kind === "form_variant_v3") {
+      const context = contexts.get(item.match.entry_id);
+      return {
+        key: surfaceItemKey(item),
+        entry_id: item.match.entry_id,
+        label: context?.presentation.label ?? item.match.spelling,
+        status: item.match.status,
+        match_count: 1,
+        membership: membership(state.confirmation_reasons),
+        source_labels: [
+          `V3 词形 · ${item.match.spelling} · ${item.match.form_type} · ${item.match.dialect}`
+        ]
+      };
+    }
+    const context = contexts.get(item.match.existing.word_id);
+    const source = item.match.existing.source;
+    return {
+      key: surfaceItemKey(item),
+      entry_id: item.match.existing.word_id,
+      label: context?.presentation.label ?? item.match.existing.headword,
+      status: item.match.existing.status,
+      match_count: 1,
+      membership: membership(state.confirmation_reasons),
+      source_labels: [
+        `V3 兼容来源 · ${source.source_kind === "form" ? "词形" : "主词"} · ${source.surface} · ${source.dialect}`
+      ]
+    };
+  });
 }
 
 const SURFACE_BUSINESS_RETRY_CODES = new Set([

@@ -112,6 +112,7 @@ function visibilityPage(
     }
   }));
   const base = {
+    schema_version: 2 as const,
     snapshot_id: "019b0000-0000-7000-8000-000000000010",
     items,
     total: items.length,
@@ -157,6 +158,7 @@ describe("PreviewAndPublishStep", () => {
   it("如实说明是结构化核对，并按偏好侧优先展示主词", async () => {
     const word = wordFixture({ ready: true });
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: word.revision,
       valid: true,
       issues: []
@@ -210,6 +212,7 @@ describe("PreviewAndPublishStep", () => {
       }
     ];
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: word.revision,
       valid: true,
       issues: []
@@ -227,6 +230,7 @@ describe("PreviewAndPublishStep", () => {
   it("自动校验失败时列出可定位 issue，并禁止发布", async () => {
     const word = wordFixture({ ready: true, revision: 7 });
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: 7,
       valid: false,
       issues: [
@@ -262,6 +266,7 @@ describe("PreviewAndPublishStep", () => {
     // 步骤顺序门禁取消后，第 4 步在草稿刚创建时就点得进来。
     const word = wordFixture({ revision: 2 });
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: 2,
       valid: false,
       issues: [
@@ -289,6 +294,7 @@ describe("PreviewAndPublishStep", () => {
       revision: 9
     });
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: 8,
       valid: true,
       issues: []
@@ -323,6 +329,7 @@ describe("PreviewAndPublishStep", () => {
     });
     const pendingPublish = deferred<{ word: typeof published }>();
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: 8,
       valid: true,
       issues: []
@@ -347,6 +354,7 @@ describe("PreviewAndPublishStep", () => {
   it("gate-off 的 1→2 显示稳定能力提示且普通 token 不能继续发布", async () => {
     const word = wordFixture({ ready: true, revision: 8 });
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: 8,
       valid: true,
       issues: []
@@ -380,6 +388,7 @@ describe("PreviewAndPublishStep", () => {
       revision: 8
     });
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: 8,
       valid: true,
       issues: []
@@ -431,6 +440,7 @@ describe("PreviewAndPublishStep", () => {
       revision: 8
     });
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: 8,
       valid: true,
       issues: []
@@ -483,6 +493,7 @@ describe("PreviewAndPublishStep", () => {
     mutations.validate
       .mockRejectedValueOnce(new Error("validation offline"))
       .mockResolvedValueOnce({
+        schema_version: 2,
         validated_revision: 6,
         valid: true,
         issues: []
@@ -503,6 +514,7 @@ describe("PreviewAndPublishStep", () => {
   it("发布失败显示错误且不离开当前预览", async () => {
     const word = wordFixture({ ready: true, revision: 5 });
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: 5,
       valid: true,
       issues: []
@@ -521,6 +533,7 @@ describe("PreviewAndPublishStep", () => {
 
   it("validate 返回字段级问题时直接展示可定位问题", async () => {
     const issue = {
+      schema_version: 2 as const,
       step: "forms" as const,
       node_id: "form-1",
       field: "spelling",
@@ -535,6 +548,32 @@ describe("PreviewAndPublishStep", () => {
     expect(await screen.findByText("发现 1 个待处理问题")).toBeVisible();
     expect(screen.getByText("词形与发音 · 请填写词形")).toBeVisible();
     expect(button("提交生效")).toBeDisabled();
+  });
+
+  it("validate 返回 V3 field issue 时不包装成 V2 validation", async () => {
+    const v3Issue = {
+      schema_version: 3 as const,
+      step: "forms" as const,
+      node_id: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab08",
+      field: "style",
+      code: "pronunciation_required" as const,
+      message: "V3 pronunciation must not enter V2 UI",
+      node_location: {
+        node_role: "forms.pronunciation:common",
+        ancestor_node_ids: ["7a4fcb34-2f9b-4b20-8f7c-01bb5361ab02"],
+        form_id: "7a4fcb34-2f9b-4b20-8f7c-01bb5361ab08"
+      }
+    };
+    mutations.validate.mockRejectedValue(
+      new HttpError(422, "V3 response rejected", [], "validation_failed", [
+        v3Issue
+      ])
+    );
+    renderStep();
+
+    expect(await screen.findByText("V3 response rejected")).toBeVisible();
+    expect(screen.queryByText("发现 1 个待处理问题")).toBeNull();
+    expect(screen.queryByText(v3Issue.message)).toBeNull();
   });
 
   it("validate revision 冲突时提示重新加载并保留失败态", async () => {
@@ -557,8 +596,14 @@ describe("PreviewAndPublishStep", () => {
       revision: 9
     });
     mutations.validate
-      .mockResolvedValueOnce({ validated_revision: 7, valid: true, issues: [] })
       .mockResolvedValueOnce({
+        schema_version: 2,
+        validated_revision: 7,
+        valid: true,
+        issues: []
+      })
+      .mockResolvedValueOnce({
+        schema_version: 2,
         validated_revision: 8,
         valid: true,
         issues: []
@@ -639,6 +684,7 @@ describe("PreviewAndPublishStep", () => {
       score: "80"
     });
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: 3,
       valid: true,
       issues: []
@@ -671,6 +717,7 @@ describe("PreviewAndPublishStep", () => {
       score: "60"
     });
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: 3,
       valid: true,
       issues: []
@@ -753,6 +800,7 @@ describe("PreviewAndPublishStep", () => {
       has_unpublished_changes: false
     });
     mutations.validate.mockResolvedValue({
+      schema_version: 2,
       validated_revision: 4,
       valid: true,
       issues: []

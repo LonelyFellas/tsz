@@ -128,16 +128,20 @@ describe("admin 页面烟雾测试", () => {
         </QueryClientProvider>
       </MemoryRouter>
     );
-    expect(screen.getByText("创建词条")).toBeInTheDocument();
-    expect(screen.queryByText("创建单词")).toBeNull();
-    expect(screen.queryByText("创建短语")).toBeNull();
+    expect(screen.queryByText("创建词条")).toBeNull();
+    expect(screen.getByText("创建单词")).toBeInTheDocument();
+    expect(screen.getByText("创建短语")).toBeInTheDocument();
     expect(screen.getByText("归 档")).toBeInTheDocument();
     expect(screen.queryByText(/^删除/)).toBeNull();
     // 面包屑末级为「智能词库」。
     expect(screen.getAllByText("智能词库").length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByText("创建词条"));
-    expect(screen.getByTestId("location")).toHaveTextContent("/words/new");
+    fireEvent.click(screen.getByText("创建单词"));
+    expect(screen.getByTestId("location")).toHaveTextContent("/words/new/v3");
+    fireEvent.click(screen.getByText("创建短语"));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/words/new?kind=phrase"
+    );
   });
 
   it("个人设置页渲染方言偏好，默认英式", () => {

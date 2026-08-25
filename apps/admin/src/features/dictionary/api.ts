@@ -3,6 +3,7 @@
 import type {
   EntryLifecycleBatchInput,
   EntryLifecycleBatchResponse,
+  EntryLifecycleBatchResponseAny,
   EntryLifecycleInput
 } from "@tsz/types";
 import type { AdminWordListQuery } from "@tsz/types";
@@ -13,7 +14,7 @@ import {
   useQuery,
   useQueryClient
 } from "@tanstack/react-query";
-import { adminWordsDataSource } from "./dataSource";
+import { adminWordsAnyDataSource, adminWordsDataSource } from "./dataSource";
 
 export const wordKeys = {
   all: ["admin-words"] as const,
@@ -21,6 +22,7 @@ export const wordKeys = {
   list: (query: AdminWordListQuery) => [...wordKeys.lists(), query] as const,
   stats: () => [...wordKeys.all, "stats"] as const,
   detail: (id: string) => [...wordKeys.all, "detail", id] as const,
+  detailAny: (id: string) => [...wordKeys.all, "detail-any", id] as const,
   relatedSearch: (q: string) => [...wordKeys.all, "related-search", q] as const,
   relatedSearchV2: (
     q: string,
@@ -32,9 +34,19 @@ export const wordKeys = {
 export function useWordList(query: AdminWordListQuery) {
   return useQuery({
     queryKey: wordKeys.list(query),
-    queryFn: () => adminWordsDataSource.list(query),
+    queryFn: () => adminWordsAnyDataSource.listAny(query),
     // 翻页/改筛选时保留上一页数据渲染,避免表格闪空。
     placeholderData: keepPreviousData
+  });
+}
+
+export function useWordDetailAny(wordId: string, enabled = true) {
+  return useQuery({
+    queryKey: wordKeys.detailAny(wordId),
+    queryFn: () => adminWordsAnyDataSource.getAny(wordId),
+    enabled,
+    staleTime: 0,
+    gcTime: 0
   });
 }
 
@@ -189,6 +201,50 @@ export function useRestoreWordsBatch() {
   >({
     mutationFn: ({ idempotencyKey, input }) =>
       adminWordsDataSource.restoreBatch(idempotencyKey, input),
+    onSuccess: invalidate
+  });
+}
+
+export function useArchiveWordAny() {
+  const invalidate = useInvalidateWords();
+  return useMutation({
+    mutationFn: ({ wordId, idempotencyKey, input }: WordLifecycleCommand) =>
+      adminWordsAnyDataSource.archiveAny(wordId, idempotencyKey, input),
+    onSuccess: invalidate
+  });
+}
+
+export function useRestoreWordAny() {
+  const invalidate = useInvalidateWords();
+  return useMutation({
+    mutationFn: ({ wordId, idempotencyKey, input }: WordLifecycleCommand) =>
+      adminWordsAnyDataSource.restoreAny(wordId, idempotencyKey, input),
+    onSuccess: invalidate
+  });
+}
+
+export function useArchiveWordsBatchAny() {
+  const invalidate = useInvalidateWords();
+  return useMutation<
+    EntryLifecycleBatchResponseAny,
+    Error,
+    WordLifecycleBatchCommand
+  >({
+    mutationFn: ({ idempotencyKey, input }) =>
+      adminWordsAnyDataSource.archiveBatchAny(idempotencyKey, input),
+    onSuccess: invalidate
+  });
+}
+
+export function useRestoreWordsBatchAny() {
+  const invalidate = useInvalidateWords();
+  return useMutation<
+    EntryLifecycleBatchResponseAny,
+    Error,
+    WordLifecycleBatchCommand
+  >({
+    mutationFn: ({ idempotencyKey, input }) =>
+      adminWordsAnyDataSource.restoreBatchAny(idempotencyKey, input),
     onSuccess: invalidate
   });
 }

@@ -1,4 +1,9 @@
-import type { DraftNodeLocation, DraftValidationIssue } from "@tsz/types";
+import type {
+  DraftNodeLocation,
+  DraftValidationIssue,
+  DraftValidationIssueAny,
+  DraftValidationIssueV2
+} from "@tsz/types";
 import { DIALECT_SHORT_LABEL, FORM_TYPE_LABEL } from "../editorConstants";
 import {
   partOfSpeechLabel,
@@ -73,4 +78,15 @@ export function wordValidationIssueMessage(
     ? locationLabel(issue.node_location, lookup)
     : "";
   return label === "" ? explanation : `${label}：${explanation}`;
+}
+
+/** V2 编辑器只能消费完整的 schema 2 issue 集；混入 V3 时整组拒绝。 */
+export function v2ProblemFieldIssues(
+  issues: DraftValidationIssueAny[]
+): DraftValidationIssueV2[] | undefined {
+  return issues.every(
+    (issue): issue is DraftValidationIssueV2 => issue.schema_version === 2
+  )
+    ? issues
+    : undefined;
 }

@@ -90,7 +90,10 @@ import {
   stepContentBodyIssue
 } from "./contentLimits";
 import { ContentCompletionPanel } from "./ContentCompletionPanel";
-import { wordValidationIssueMessage } from "./nodeIssueMessage";
+import {
+  v2ProblemFieldIssues,
+  wordValidationIssueMessage
+} from "./nodeIssueMessage";
 import {
   PronunciationPreviewControls,
   PronunciationPreviewProvider
@@ -2144,9 +2147,10 @@ export function MeaningsAndExamplesStep({
           message.error(tooLarge);
           return;
         }
-        const stepIssues = error.field_issues.filter(
-          (candidate) => candidate.step === "meanings"
-        );
+        const fieldIssues = v2ProblemFieldIssues(error.field_issues);
+        const stepIssues =
+          fieldIssues?.filter((candidate) => candidate.step === "meanings") ??
+          [];
         // 后端 message 面向实现，节点身份类问题按 node_location 改写成带定位的中文文案。
         const messages = stepIssues.map((candidate) =>
           wordValidationIssueMessage(candidate, partOfSpeechLookup)

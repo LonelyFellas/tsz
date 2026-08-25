@@ -1,0 +1,582 @@
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Alert, Button, Card, Flex, Result, Spin, Tag, Typography } from "antd";
+import type {
+  AdminWordDraftV3Envelope,
+  AdminWordV3,
+  StepSaveIntent,
+  SurfaceMatchEnabledTerminalPageV3,
+  SurfaceMatchPageAny,
+  SurfaceMatchPageV3,
+  WordCreationStep
+} from "@tsz/types";
+import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Navigate,
+  useLocation,
+  useNavigate,
+  useParams,
+  useSearchParams
+} from "react-router-dom";
+import {
+  createV3WordRequests,
+  type V3WordRequests
+} from "@/features/dictionary/word-creation-v3/api";
+import {
+  canAcknowledgeSurfaceSnapshot,
+  type SurfaceSnapshotState
+} from "@/features/dictionary/surfaceSnapshot";
+import { useSurfaceSnapshotAny } from "@/features/dictionary/useSurfaceSnapshot";
+import { V3FormsAndPronunciationStep } from "@/features/dictionary/word-creation-v3/components/V3FormsAndPronunciationStep";
+import { V3MeaningsAndExamplesStep } from "@/features/dictionary/word-creation-v3/V3MeaningsAndExamplesStep";
+import { V3PreviewAndPublishStep } from "@/features/dictionary/word-creation-v3/V3PreviewAndPublishStep";
+import { V3PublicationHistory } from "@/features/dictionary/word-creation-v3/V3PublicationHistory";
+import {
+  V3WordCreationWizard,
+  type V3WizardSlotContext
+} from "@/features/dictionary/word-creation-v3/V3WordCreationWizard";
+
+const STEPS = new Set<WordCreationStep>([
+  "basics",
+  "forms",
+  "meanings",
+  "preview"
+]);
+
+export type V3MeaningsStepRenderer = (
+  context: V3WizardSlotContext
+) => ReactNode;
+
+function isStep(value: unknown): value is WordCreationStep {
+  return STEPS.has(value as WordCreationStep);
+}
+
+function terminalSurfacePage(
+  state: SurfaceSnapshotState<SurfaceMatchPageAny>
+): SurfaceMatchEnabledTerminalPageV3 | undefined {
+  if (
+    state.schema_version !== 3 ||
+    !canAcknowledgeSurfaceSnapshot(state) ||
+    !state.snapshot_id ||
+    !state.policy_name ||
+    state.policy_epoch === undefined ||
+    !state.surface_confirmation_token
+  ) {
+    return undefined;
+  }
+  return {
+    schema_version: 3,
+    snapshot_id: state.snapshot_id,
+    items: state.items as SurfaceMatchPageV3["items"],
+    total: state.total,
+    matched_entry_contexts:
+      state.matched_entry_contexts as SurfaceMatchPageV3["matched_entry_contexts"],
+    confirmation_reasons: state.confirmation_reasons,
+    policy_name: state.policy_name,
+    policy_epoch: state.policy_epoch,
+    continuation_policy: "enabled",
+    next_cursor: null,
+    surface_confirmation_token: state.surface_confirmation_token,
+    ...(state.impact_confirmation_token
+      ? { impact_confirmation_token: state.impact_confirmation_token }
+      : {})
+  };
+}
+
+function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
+  const [pendingIntent, setPendingIntent] = useState<StepSaveIntent>();
+  const preparingRef = useRef(false);
+  const impactPage = context.impactSurfacePage;
+  const snapshot = useSurfaceSnapshotAny(
+    impactPage,
+    `${context.word.id}:${context.word.revision}:forms-impact:${impactPage?.snapshot_id ?? "none"}`,
+    context.actions.fetchSurfacePage
+  );
+  const terminalPage = terminalSurfacePage(snapshot);
+  const requiresConfirmation = Boolean(
+    context.impact &&
+    (context.impact.requires_confirmation || context.impactSurfacePage)
+  );
+  const busy = context.isPending("impact") || context.isPending("save_forms");
+
+  const prepareSave = async (intent: StepSaveIntent) => {
+    if (preparingRef.current) return;
+    preparingRef.current = true;
+    setPendingIntent(intent);
+    try {
+      const impact = await context.actions.previewFormsSaveImpact();
+      if (!impact) {
+        setPendingIntent(undefined);
+        return;
+      }
+      if (!impact.requires_confirmation && !impact.surface_match_page) {
+        setPendingIntent(undefined);
+        await context.actions.saveForms(intent);
+      }
+    } finally {
+      preparingRef.current = false;
+    }
+  };
+
+  const confirmAndSave = async () => {
+    if (!pendingIntent) return;
+    let confirmed = false;
+    let confirmationContext:
+      | {
+          snapshot_id: string;
+          policy_name: SurfaceMatchPageV3["policy_name"];
+          policy_epoch: number;
+        }
+      | undefined;
+    if (impactPage) {
+      if (!terminalPage) return;
+      confirmed = context.actions.confirmImpactSurface(terminalPage);
+      confirmationContext = {
+        snapshot_id: terminalPage.snapshot_id,
+        policy_name: terminalPage.policy_name,
+        policy_epoch: terminalPage.policy_epoch
+      };
+    } else {
+      confirmed = context.actions.confirmImpact();
+    }
+    if (!confirmed) return;
+    const intent = pendingIntent;
+    setPendingIntent(undefined);
+    await context.actions.saveForms(intent, confirmationContext);
+  };
+
+  const resetConfirmation = () => setPendingIntent(undefined);
+  return (
+    <Flex vertical gap="middle">
+      <V3FormsAndPronunciationStep
+        activePosId={context.activePosId}
+        issues={context.issues.filter((issue) => issue.step === "forms")}
+        onActivePosChange={(posId) => {
+          resetConfirmation();
+          context.setActivePosId(posId);
+        }}
+        onChange={(content) => {
+          resetConfirmation();
+          context.setDraftForms(content);
+        }}
+        value={context.draftForms}
+      />
+      {pendingIntent && context.impact && requiresConfirmation ? (
+        <Alert
+          showIcon
+          type="warning"
+          title="保存前请确认影响"
+          description={
+            <Flex vertical gap={4}>
+              <span>
+                {impactPage
+                  ? `正在核对同形匹配：已加载 ${snapshot.items.length}/${snapshot.total}`
+                  : `本次变更影响 ${context.impact.affected.length} 个引用节点。`}
+              </span>
+              {context.impact.affected.map((item) => (
+                <Typography.Text
+                  key={`${item.node_type}:${item.node_id}:${item.reason}`}
+                  type="secondary"
+                >
+                  {item.node_type} · {item.node_id} · {item.reason}
+                </Typography.Text>
+              ))}
+            </Flex>
+          }
+          action={
+            <Flex gap="small">
+              {impactPage &&
+              (snapshot.phase === "error" || snapshot.phase === "expired") ? (
+                <Button onClick={snapshot.retry}>重新加载影响</Button>
+              ) : null}
+              <Button onClick={resetConfirmation}>取消</Button>
+              <Button
+                disabled={Boolean(impactPage) && !terminalPage}
+                loading={snapshot.phase === "loading"}
+                onClick={() => void confirmAndSave()}
+              >
+                {pendingIntent === "complete"
+                  ? "确认影响并完成词形"
+                  : "确认影响并保存草稿"}
+              </Button>
+            </Flex>
+          }
+        />
+      ) : null}
+      <Flex justify="end" gap="small">
+        <Button
+          disabled={Boolean(pendingIntent)}
+          loading={busy && pendingIntent === "save"}
+          onClick={() => void prepareSave("save")}
+        >
+          保存草稿
+        </Button>
+        <Button
+          type="primary"
+          disabled={Boolean(pendingIntent)}
+          loading={busy && pendingIntent === "complete"}
+          onClick={() => void prepareSave("complete")}
+        >
+          完成词形
+        </Button>
+      </Flex>
+    </Flex>
+  );
+}
+
+function V3BasicsSlot({ context }: { context: V3WizardSlotContext }) {
+  return (
+    <Card title="V3 基础信息">
+      <Typography.Paragraph>
+        词面由创建时的检测快照确定；具体词形均在“词形与发音”中以平级 form 维护。
+      </Typography.Paragraph>
+      <Typography.Text code>{context.word.presentation.label}</Typography.Text>
+    </Card>
+  );
+}
+
+function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
+  return (
+    <V3MeaningsAndExamplesStep
+      activePosId={context.activePosId}
+      issues={context.issues.filter((issue) => issue.step === "meanings")}
+      onActivePosChange={context.setActivePosId}
+      onChange={context.setDraftMeanings}
+      onSave={context.actions.saveMeanings}
+      saving={context.isPending("save_meanings")}
+      value={context.draftMeanings}
+    />
+  );
+}
+
+function V3ReadOnlyPreview({ word }: { word: AdminWordV3 }) {
+  const bridge = word.compatibility?.legacy_headwords;
+  return (
+    <Flex vertical gap="middle">
+      <Alert showIcon type="info" title="当前词条为只读查看" />
+      <Card title={word.presentation.label}>
+        <Flex vertical gap="small">
+          <Typography.Text type="secondary">
+            展示策略：{word.presentation.strategy_version}
+          </Typography.Text>
+          {bridge ? (
+            <Typography.Text type="secondary">
+              兼容桥（只读）：
+              {bridge.mode === "unified"
+                ? bridge.common
+                : `UK ${bridge.uk} / US ${bridge.us}`}
+            </Typography.Text>
+          ) : null}
+        </Flex>
+      </Card>
+      {word.forms.pos.map((pos) => (
+        <Card key={pos.pos_id} size="small" title={pos.pos}>
+          <Flex vertical gap="small">
+            <Typography.Text strong>变化组与成员顺序</Typography.Text>
+            {pos.form_groups.length > 0 ? (
+              pos.form_groups.map((group, groupIndex) => (
+                <Flex
+                  key={group.id}
+                  vertical
+                  gap={4}
+                  data-testid={`readonly-group-${group.id}`}
+                >
+                  <Flex gap={4} wrap>
+                    <Tag>变化组 {groupIndex + 1}</Tag>
+                    <Typography.Text type="secondary">
+                      {group.is_regular ? "规则组" : "非规则组"}
+                    </Typography.Text>
+                  </Flex>
+                  <Flex gap={4} wrap>
+                    {group.members.map((member, memberIndex) => {
+                      const form = pos.forms.find(
+                        (candidate) => candidate.id === member.form_id
+                      );
+                      const variant =
+                        form?.regional_variants.mode === "common"
+                          ? form.regional_variants.common
+                          : form?.regional_variants.uk;
+                      return (
+                        <Tag
+                          key={member.id}
+                          data-testid={`readonly-membership-${member.id}`}
+                        >
+                          {memberIndex + 1}. {form?.form_type ?? "未知词形"}
+                          {variant ? ` · ${variant.spelling}` : ""}
+                        </Tag>
+                      );
+                    })}
+                  </Flex>
+                </Flex>
+              ))
+            ) : (
+              <Typography.Text type="secondary">暂无变化组</Typography.Text>
+            )}
+            <Typography.Text strong>具体词形与发音</Typography.Text>
+            {pos.forms.map((form) => {
+              const variants =
+                form.regional_variants.mode === "common"
+                  ? [form.regional_variants.common]
+                  : [form.regional_variants.uk, form.regional_variants.us];
+              return (
+                <Flex
+                  key={form.id}
+                  vertical
+                  gap={4}
+                  data-testid={`readonly-form-${form.id}`}
+                >
+                  <Tag>{form.form_type}</Tag>
+                  {variants.map((variant) => (
+                    <Flex key={variant.id} vertical gap={2}>
+                      <Flex gap={4}>
+                        <Tag>{variant.dialect}</Tag>
+                        <Typography.Text strong>
+                          {variant.spelling}
+                        </Typography.Text>
+                      </Flex>
+                      {variant.pronunciations.length > 0 ? (
+                        variant.pronunciations.map((pronunciation) => (
+                          <Typography.Text
+                            key={pronunciation.id}
+                            type="secondary"
+                            data-testid={`readonly-pronunciation-${pronunciation.id}`}
+                          >
+                            {pronunciation.style ?? "未选择风格"} ·{" "}
+                            {pronunciation.dict_phonetic} ·{" "}
+                            {pronunciation.actual_pron}
+                          </Typography.Text>
+                        ))
+                      ) : (
+                        <Typography.Text type="secondary">
+                          暂无发音
+                        </Typography.Text>
+                      )}
+                    </Flex>
+                  ))}
+                </Flex>
+              );
+            })}
+          </Flex>
+        </Card>
+      ))}
+    </Flex>
+  );
+}
+
+function V3PreviewSlot({ context }: { context: V3WizardSlotContext }) {
+  if (context.hasUnsavedChanges) {
+    return (
+      <Alert
+        showIcon
+        type="warning"
+        title="请先保存未保存的草稿"
+        description="当前预览只基于服务端 canonical revision。请先返回对应步骤保存草稿，再重新检查发布条件。"
+      />
+    );
+  }
+  const controller = {
+    ...(context.validation ? { validation: context.validation } : {}),
+    ...(context.impact ? { impact: context.impact } : {}),
+    impactConfirmed: context.impactConfirmed,
+    issues: context.issues,
+    ...(context.problem ? { problem: context.problem } : {}),
+    isPending: (command: "validate" | "impact" | "publish") =>
+      context.isPending(command),
+    actions: {
+      validate: context.actions.validate,
+      previewFormsImpact: context.actions.previewFormsImpact,
+      publish: context.actions.publish,
+      confirmImpact: context.actions.confirmImpact,
+      confirmImpactSurface: context.actions.confirmImpactSurface,
+      fetchSurfacePage: context.actions.fetchSurfacePage
+    }
+  };
+  return (
+    <V3PreviewAndPublishStep word={context.word} controller={controller} />
+  );
+}
+
+function V3WizardSlots({
+  context,
+  wordId,
+  renderMeaningsStep,
+  requests,
+  onActivated
+}: {
+  context: V3WizardSlotContext;
+  wordId: string;
+  renderMeaningsStep?: V3MeaningsStepRenderer;
+  requests: V3WordRequests;
+  onActivated: (word: AdminWordV3) => void;
+}) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  useEffect(() => {
+    if (context.readOnly) return;
+    const pathname = `/words/${wordId}/v3/wizard/${context.activeStep}`;
+    if (location.pathname !== pathname) {
+      navigate(`${pathname}${location.search}`, { replace: true });
+    }
+  }, [
+    context.activeStep,
+    context.readOnly,
+    location.pathname,
+    location.search,
+    navigate,
+    wordId
+  ]);
+
+  if (context.readOnly) {
+    return (
+      <Flex vertical gap="middle">
+        {context.word.status === "published" ? (
+          <Button
+            type="primary"
+            onClick={() =>
+              navigate(`/words/${context.word.id}/v3/wizard/forms?mode=edit`)
+            }
+          >
+            继续编辑
+          </Button>
+        ) : null}
+        <V3ReadOnlyPreview word={context.word} />
+        <V3PublicationHistory
+          currentWord={context.word}
+          onActivated={onActivated}
+          onCanonicalRefreshed={onActivated}
+          requests={requests}
+        />
+      </Flex>
+    );
+  }
+
+  switch (context.activeStep) {
+    case "basics":
+      return <V3BasicsSlot context={context} />;
+    case "forms":
+      return <V3FormsSlot context={context} />;
+    case "meanings":
+      return (
+        renderMeaningsStep?.(context) ?? <V3MeaningsSlot context={context} />
+      );
+    case "preview":
+      return (
+        <Flex vertical gap="middle">
+          <V3PreviewSlot context={context} />
+          <V3PublicationHistory
+            activationBlockedByUnsavedChanges={context.hasUnsavedChanges}
+            currentWord={context.word}
+            onActivated={onActivated}
+            onCanonicalRefreshed={onActivated}
+            requests={requests}
+          />
+        </Flex>
+      );
+  }
+}
+
+export function WordWizardV3Page({
+  requests: suppliedRequests,
+  renderMeaningsStep
+}: {
+  requests?: V3WordRequests;
+  renderMeaningsStep?: V3MeaningsStepRenderer;
+} = {}) {
+  const { wordId = "", step } = useParams();
+  const [searchParams] = useSearchParams();
+  const [activationGeneration, setActivationGeneration] = useState(0);
+  const queryClient = useQueryClient();
+  const requests = useMemo(
+    () => suppliedRequests ?? createV3WordRequests(),
+    [suppliedRequests]
+  );
+  const queryKey = useMemo(
+    () => ["admin-words", "detail-v3", wordId] as const,
+    [wordId]
+  );
+  const replaceCanonical = useCallback(
+    (word: AdminWordV3) => {
+      queryClient.setQueryData<AdminWordDraftV3Envelope>(queryKey, (current) =>
+        current ? { ...current, word } : current
+      );
+    },
+    [queryClient, queryKey]
+  );
+  const replaceActivatedCanonical = useCallback(
+    (word: AdminWordV3) => {
+      replaceCanonical(word);
+      setActivationGeneration((generation) => generation + 1);
+    },
+    [replaceCanonical]
+  );
+  const detail = useQuery({
+    queryKey,
+    queryFn: () => requests.get(wordId),
+    enabled: wordId !== "",
+    staleTime: 0,
+    gcTime: 0
+  });
+
+  if (detail.isPending) {
+    return (
+      <Flex justify="center" align="center" style={{ minHeight: 420 }}>
+        <Spin size="large" description="正在加载 V3 词条" />
+      </Flex>
+    );
+  }
+  if (detail.isError || !detail.data) {
+    return (
+      <Result
+        status="error"
+        title="无法打开 V3 词条"
+        subTitle={detail.error?.message ?? "词条不存在或响应格式无效"}
+        extra={
+          <Button type="primary" onClick={() => void detail.refetch()}>
+            重试
+          </Button>
+        }
+      />
+    );
+  }
+
+  const word = detail.data.word;
+  const editingPublished =
+    word.status === "published" && searchParams.get("mode") === "edit";
+  const forcePreview =
+    word.status === "archived" ||
+    (word.status === "published" && !editingPublished);
+  const legalStep = forcePreview
+    ? "preview"
+    : isStep(step)
+      ? step
+      : word.max_reachable_step;
+  if (step !== legalStep) {
+    return (
+      <Navigate
+        replace
+        to={`/words/${word.id}/v3/wizard/${legalStep}${editingPublished ? "?mode=edit" : ""}`}
+      />
+    );
+  }
+
+  return (
+    <V3WordCreationWizard
+      key={`${word.id}:activation-${activationGeneration}:${editingPublished ? "edit" : "read"}`}
+      allowPublishedEditing={editingPublished}
+      initialStep={legalStep}
+      initialWord={word}
+      readOnly={forcePreview}
+      requests={requests}
+      onWordChange={replaceCanonical}
+      renderStep={(context) => (
+        <V3WizardSlots
+          context={context}
+          onActivated={replaceActivatedCanonical}
+          renderMeaningsStep={renderMeaningsStep}
+          requests={requests}
+          wordId={word.id}
+        />
+      )}
+    />
+  );
+}

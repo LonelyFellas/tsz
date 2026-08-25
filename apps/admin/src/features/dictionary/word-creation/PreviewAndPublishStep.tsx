@@ -38,9 +38,11 @@ import { DEFINITION_MODE_LABEL, DIALECT_LABEL } from "../editorConstants";
 import {
   aggregateSurfaceMatchCards,
   canAcknowledgeSurfaceSnapshot,
+  isSurfaceMatchPageV2,
   requiresNewIdempotencyKey
 } from "../surfaceSnapshot";
 import { useSurfaceSnapshot } from "../useSurfaceSnapshot";
+import { v2ProblemFieldIssues } from "./nodeIssueMessage";
 import {
   createPartOfSpeechLookup,
   partOfSpeechLabel,
@@ -516,11 +518,16 @@ export function PreviewAndPublishStep({
     fallback: string,
     showFallbackMessage = true
   ): boolean => {
-    if (error instanceof HttpError && error.field_issues.length > 0) {
+    const fieldIssues =
+      error instanceof HttpError
+        ? v2ProblemFieldIssues(error.field_issues)
+        : undefined;
+    if (fieldIssues && fieldIssues.length > 0) {
       setValidation({
+        schema_version: 2,
         validated_revision: word.revision,
         valid: false,
-        issues: error.field_issues
+        issues: fieldIssues
       });
       message.warning("完整性检查发现待处理问题");
       return true;
@@ -531,7 +538,8 @@ export function PreviewAndPublishStep({
     ) {
       publishKey.current = newWordNodeId();
       if (requiresNewIdempotencyKey(error.status, error.code)) {
-        setSurfacePage(error.meta?.surface_match_page);
+        const page = error.meta?.surface_match_page;
+        setSurfacePage(isSurfaceMatchPageV2(page) ? page : undefined);
       } else {
         setSurfacePage(undefined);
       }
@@ -575,8 +583,12 @@ export function PreviewAndPublishStep({
       setValidation(result);
       return result;
     } catch (error) {
+      const fieldIssues =
+        error instanceof HttpError
+          ? v2ProblemFieldIssues(error.field_issues)
+          : undefined;
       const hasFieldIssues =
-        error instanceof HttpError && error.field_issues.length > 0;
+        fieldIssues !== undefined && fieldIssues.length > 0;
       handleRequestError(error, "完整性检查失败", false);
       if (!hasFieldIssues) {
         setValidationError(

@@ -14,6 +14,7 @@ export * from "./part-of-speech";
 export * from "./rich-text";
 export * from "./admin-tts";
 export * from "./admin-word-v2";
+export * from "./admin-word-v3";
 export * from "./surface-match";
 export type {
   AdminWordKind,
@@ -27,6 +28,7 @@ export type {
   AdminWordStats,
   AdminWordStatus,
   Dialect,
+  HeadwordVariant,
   RelatedSearchResponse,
   RelatedSearchQuery,
   RelatedSearchMatchMode,
@@ -34,6 +36,7 @@ export type {
   RelatedSearchV2Response,
   RelatedWordResult,
   RelatedWordSense,
+  SourceDialect,
   WordFormType,
   WordPosTag,
   WordRelationType,

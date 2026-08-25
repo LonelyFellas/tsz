@@ -1,11 +1,11 @@
 // 运行环境无关的请求层。web 与 admin 各自注入 baseUrl / token。
 
 import type {
-  DraftValidationIssue,
+  DraftValidationIssueAny,
   ProblemDetails,
-  ProblemMeta,
-  SurfaceMatchPageV2
+  ProblemMeta
 } from "@tsz/types";
+import { validateRuntimeSchema } from "./runtime-schema";
 
 export interface HttpClientOptions {
   baseUrl: string;
@@ -31,9 +31,9 @@ export interface HttpClientOptions {
 export class HttpError extends Error {
   /** 完整 RFC 9457 响应；响应不完整或畸形时为空。 */
   public problem?: ProblemDetails;
-  /** V2 分步保存/发布的字段级问题；legacy 错误为空数组。 */
-  public field_issues: DraftValidationIssue[];
-  /** V2 冲突/影响确认的结构化上下文；legacy 错误缺省。 */
+  /** V2/V3 分步保存/发布的字段级问题；legacy 错误为空数组。 */
+  public field_issues: DraftValidationIssueAny[];
+  /** 版本化冲突/影响确认的结构化上下文；legacy 错误缺省。 */
   public meta?: ProblemMeta;
 
   constructor(
@@ -46,7 +46,7 @@ export class HttpError extends Error {
      * 需要按错误码分支的全局处理据此判定,而非匹配 message。多数错误无此字段。
      */
     public code?: string,
-    problemOrFieldIssues?: ProblemDetails | DraftValidationIssue[],
+    problemOrFieldIssues?: ProblemDetails | DraftValidationIssueAny[],
     meta?: ProblemMeta,
     problem?: ProblemDetails
   ) {
@@ -68,7 +68,7 @@ interface ParsedError {
   details: string[];
   code: string | undefined;
   problem: ProblemDetails | undefined;
-  field_issues: DraftValidationIssue[];
+  field_issues: DraftValidationIssueAny[];
   meta: ProblemMeta | undefined;
 }
 
@@ -88,503 +88,38 @@ function stringArray(value: unknown): string[] {
     : [];
 }
 
-function nonNegativeInteger(value: unknown): value is number {
-  return typeof value === "number" && Number.isInteger(value) && value >= 0;
-}
-
-function hasNonEmptyStringFields(
-  value: unknown,
-  fields: readonly string[]
-): value is Record<string, string> {
-  return (
-    isRecord(value) &&
-    fields.every((field) => nonEmptyString(value[field]) !== undefined)
-  );
-}
-
-function isDraftReferenceLocation(
+function toDraftValidationIssues(
   value: unknown
-): value is Record<string, string> {
-  return hasNonEmptyStringFields(value, [
-    "source_entry_id",
-    "source_publication_id",
-    "source_node_id",
-    "reference_kind"
-  ]);
-}
-
-function isProblemReferenceLocation(
-  value: unknown
-): value is Record<string, string> {
-  return (
-    isDraftReferenceLocation(value) &&
-    nonEmptyString(value.target_sense_id) !== undefined
-  );
-}
-
-const SURFACE_POLICY_NAMES = [
-  "surface_warning_acknowledgement",
-  "allow_new_exact_headword_entries",
-  "allow_multiple_active_exact_headword_publications"
-] as const;
-
-const SURFACE_CONFIRMATION_REASONS = [
-  "unacknowledged_surface_matches",
-  "visibility_activation"
-] as const;
-const SURFACE_MATCH_CATEGORIES = [
-  "exact_headword",
-  "cross_kind_headword",
-  "headword_form",
-  "form_headword",
-  "form_form"
-] as const;
-const SURFACE_ATTENTION_LEVELS = ["high", "normal"] as const;
-const SURFACE_POLICY_BLOCK_CODES = [
-  "exact_headword_creation_temporarily_disabled",
-  "multiple_active_exact_headword_publications_not_enabled"
-] as const;
-const DIALECTS = ["common", "uk", "us"] as const;
-const ENTRY_KINDS = ["word", "phrase"] as const;
-const WORD_STATUSES = ["draft", "published", "archived"] as const;
-const WORD_FORM_TYPES = [
-  "base",
-  "present_participle",
-  "past_tense",
-  "past_participle",
-  "third_person_singular",
-  "plural",
-  "comparative",
-  "superlative"
-] as const;
-const SURFACE_CONTENT_SCOPES = ["draft", "current_publication"] as const;
-const RELATION_TYPES = ["synonym", "antonym", "derivative"] as const;
-
-const HEADWORD_CANDIDATE_KEYS = [
-  "candidate_type",
-  "candidate_ref",
-  "candidate_word_id",
-  "surface",
-  "normalized_surface",
-  "dialect",
-  "entry_kind"
-] as const;
-const FORM_CANDIDATE_KEYS = [
-  "candidate_type",
-  "candidate_ref",
-  "candidate_word_id",
-  "candidate_node_id",
-  "surface",
-  "normalized_surface",
-  "dialect",
-  "pos_id",
-  "pos",
-  "form_type"
-] as const;
-const HEADWORD_SOURCE_KEYS = [
-  "source_kind",
-  "source_id",
-  "content_scope",
-  "surface",
-  "dialect"
-] as const;
-const FORM_SOURCE_KEYS = [
-  "source_kind",
-  "source_id",
-  "source_node_id",
-  "content_scope",
-  "surface",
-  "dialect",
-  "pos_id",
-  "pos",
-  "form_type"
-] as const;
-const EXISTING_MATCH_KEYS = [
-  "word_id",
-  "headword",
-  "kind",
-  "status",
-  "source"
-] as const;
-const SURFACE_MATCH_KEYS = [
-  "match_id",
-  "match_category",
-  "severity",
-  "attention_level",
-  "can_continue",
-  "confirmation_reasons",
-  "candidate",
-  "existing"
-] as const;
-const RELATION_COUNTS_KEYS = ["synonym", "antonym", "derivative"] as const;
-const RELATION_PREVIEW_KEYS = [
-  "source_word_id",
-  "source_headword",
-  "relation"
-] as const;
-const RELATION_SUMMARY_KEYS = [
-  "total",
-  "by_type",
-  "previews",
-  "truncated"
-] as const;
-const MATCHED_ENTRY_CONTEXT_KEYS = [
-  "word_id",
-  "pos_labels",
-  "gloss_previews",
-  "updated_at",
-  "inbound_relations"
-] as const;
-const SURFACE_PAGE_BASE_KEYS = [
-  "snapshot_id",
-  "items",
-  "total",
-  "matched_entry_contexts",
-  "confirmation_reasons",
-  "policy_name",
-  "policy_epoch"
-] as const;
-const SURFACE_ENABLED_NEXT_PAGE_KEYS = [
-  ...SURFACE_PAGE_BASE_KEYS,
-  "continuation_policy",
-  "next_cursor"
-] as const;
-const SURFACE_ENABLED_TERMINAL_PAGE_KEYS = [
-  ...SURFACE_ENABLED_NEXT_PAGE_KEYS,
-  "surface_confirmation_token",
-  "impact_confirmation_token"
-] as const;
-const SURFACE_DISABLED_PAGE_KEYS = [
-  ...SURFACE_ENABLED_NEXT_PAGE_KEYS,
-  "policy_block_code"
-] as const;
-
-const RFC_3339_DATE_TIME =
-  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
-
-function isOneOf<T extends string>(
-  value: unknown,
-  allowed: readonly T[]
-): value is T {
-  return typeof value === "string" && allowed.includes(value as T);
-}
-
-function hasOnlyKeys(
-  value: Record<string, unknown>,
-  allowed: readonly string[]
-): boolean {
-  return Object.keys(value).every((key) => allowed.includes(key));
-}
-
-function isBoundedArray(
-  value: unknown,
-  minItems: number,
-  maxItems: number,
-  isItem: (item: unknown) => boolean
-): value is unknown[] {
-  return (
-    Array.isArray(value) &&
-    value.length >= minItems &&
-    value.length <= maxItems &&
-    value.every(isItem)
-  );
-}
-
-function isConfirmationReasonArray(value: unknown): value is string[] {
+): DraftValidationIssueAny[] | undefined {
+  if (value === undefined) return undefined;
   if (
-    !isBoundedArray(value, 1, 2, (item) =>
-      isOneOf(item, SURFACE_CONFIRMATION_REASONS)
+    !Array.isArray(value) ||
+    !value.every(
+      (issue) => validateRuntimeSchema("DraftValidationIssueAny", issue).valid
     )
-  ) {
-    return false;
-  }
-  return new Set(value).size === value.length;
-}
-
-function isNonEmptyStringArray(value: unknown, maxItems: number): boolean {
-  return isBoundedArray(
-    value,
-    0,
-    maxItems,
-    (item) => nonEmptyString(item) !== undefined
-  );
-}
-
-function isDateTime(value: unknown): boolean {
-  const stringValue = nonEmptyString(value);
-  return (
-    stringValue !== undefined &&
-    RFC_3339_DATE_TIME.test(stringValue) &&
-    !Number.isNaN(Date.parse(stringValue))
-  );
-}
-
-function isSurfaceMatchCandidate(value: unknown): boolean {
-  if (!isRecord(value)) return false;
-
-  if (value.candidate_type === "headword") {
-    return (
-      hasOnlyKeys(value, HEADWORD_CANDIDATE_KEYS) &&
-      hasNonEmptyStringFields(value, [
-        "candidate_ref",
-        "surface",
-        "normalized_surface"
-      ]) &&
-      (value.candidate_word_id === undefined ||
-        nonEmptyString(value.candidate_word_id) !== undefined) &&
-      isOneOf(value.dialect, DIALECTS) &&
-      isOneOf(value.entry_kind, ENTRY_KINDS)
-    );
-  }
-
-  return (
-    value.candidate_type === "form" &&
-    hasOnlyKeys(value, FORM_CANDIDATE_KEYS) &&
-    hasNonEmptyStringFields(value, [
-      "candidate_ref",
-      "candidate_word_id",
-      "candidate_node_id",
-      "surface",
-      "normalized_surface",
-      "pos_id",
-      "pos",
-      "form_type"
-    ]) &&
-    isOneOf(value.dialect, DIALECTS) &&
-    isOneOf(value.form_type, WORD_FORM_TYPES)
-  );
-}
-
-function isExistingSurfaceSource(value: unknown): boolean {
-  if (!isRecord(value)) return false;
-
-  if (value.source_kind === "headword") {
-    return (
-      hasOnlyKeys(value, HEADWORD_SOURCE_KEYS) &&
-      hasNonEmptyStringFields(value, ["source_id", "surface"]) &&
-      isOneOf(value.content_scope, SURFACE_CONTENT_SCOPES) &&
-      isOneOf(value.dialect, DIALECTS)
-    );
-  }
-
-  return (
-    value.source_kind === "form" &&
-    hasOnlyKeys(value, FORM_SOURCE_KEYS) &&
-    hasNonEmptyStringFields(value, [
-      "source_id",
-      "source_node_id",
-      "surface",
-      "pos_id",
-      "pos",
-      "form_type"
-    ]) &&
-    isOneOf(value.content_scope, SURFACE_CONTENT_SCOPES) &&
-    isOneOf(value.dialect, DIALECTS) &&
-    isOneOf(value.form_type, WORD_FORM_TYPES)
-  );
-}
-
-function isExistingSurfaceMatch(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    hasOnlyKeys(value, EXISTING_MATCH_KEYS) &&
-    hasNonEmptyStringFields(value, ["word_id", "headword"]) &&
-    isOneOf(value.kind, ENTRY_KINDS) &&
-    isOneOf(value.status, WORD_STATUSES) &&
-    isExistingSurfaceSource(value.source)
-  );
-}
-
-function isLexiconSurfaceMatch(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    hasOnlyKeys(value, SURFACE_MATCH_KEYS) &&
-    nonEmptyString(value.match_id) !== undefined &&
-    isOneOf(value.match_category, SURFACE_MATCH_CATEGORIES) &&
-    value.severity === "warning" &&
-    isOneOf(value.attention_level, SURFACE_ATTENTION_LEVELS) &&
-    value.can_continue === true &&
-    isConfirmationReasonArray(value.confirmation_reasons) &&
-    isSurfaceMatchCandidate(value.candidate) &&
-    isExistingSurfaceMatch(value.existing)
-  );
-}
-
-function isRelationReferenceCounts(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    hasOnlyKeys(value, RELATION_COUNTS_KEYS) &&
-    nonNegativeInteger(value.synonym) &&
-    nonNegativeInteger(value.antonym) &&
-    nonNegativeInteger(value.derivative)
-  );
-}
-
-function isRelationReferencePreview(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    hasOnlyKeys(value, RELATION_PREVIEW_KEYS) &&
-    hasNonEmptyStringFields(value, ["source_word_id", "source_headword"]) &&
-    isOneOf(value.relation, RELATION_TYPES)
-  );
-}
-
-function isRelationReferenceSummary(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    hasOnlyKeys(value, RELATION_SUMMARY_KEYS) &&
-    nonNegativeInteger(value.total) &&
-    isRelationReferenceCounts(value.by_type) &&
-    isBoundedArray(value.previews, 0, 5, isRelationReferencePreview) &&
-    typeof value.truncated === "boolean"
-  );
-}
-
-function isMatchedEntryContext(value: unknown): boolean {
-  return (
-    isRecord(value) &&
-    hasOnlyKeys(value, MATCHED_ENTRY_CONTEXT_KEYS) &&
-    nonEmptyString(value.word_id) !== undefined &&
-    isNonEmptyStringArray(value.pos_labels, 5) &&
-    isNonEmptyStringArray(value.gloss_previews, 5) &&
-    isDateTime(value.updated_at) &&
-    isRelationReferenceSummary(value.inbound_relations)
-  );
-}
-
-function hasValidSurfacePageBase(value: Record<string, unknown>): boolean {
-  return (
-    nonEmptyString(value.snapshot_id) !== undefined &&
-    isBoundedArray(value.items, 1, 50, isLexiconSurfaceMatch) &&
-    nonNegativeInteger(value.total) &&
-    isBoundedArray(
-      value.matched_entry_contexts,
-      1,
-      50,
-      isMatchedEntryContext
-    ) &&
-    isConfirmationReasonArray(value.confirmation_reasons) &&
-    isOneOf(value.policy_name, SURFACE_POLICY_NAMES) &&
-    nonNegativeInteger(value.policy_epoch)
-  );
-}
-
-function isSurfaceMatchPage(value: unknown): value is SurfaceMatchPageV2 {
-  if (!isRecord(value) || !hasValidSurfacePageBase(value)) return false;
-
-  if (value.continuation_policy === "enabled") {
-    if (typeof value.next_cursor === "string") {
-      return (
-        hasOnlyKeys(value, SURFACE_ENABLED_NEXT_PAGE_KEYS) &&
-        nonEmptyString(value.next_cursor) !== undefined
-      );
-    }
-    return (
-      value.next_cursor === null &&
-      hasOnlyKeys(value, SURFACE_ENABLED_TERMINAL_PAGE_KEYS) &&
-      nonEmptyString(value.surface_confirmation_token) !== undefined &&
-      (value.impact_confirmation_token === undefined ||
-        nonEmptyString(value.impact_confirmation_token) !== undefined)
-    );
-  }
-
-  return (
-    value.continuation_policy === "temporarily_disabled" &&
-    hasOnlyKeys(value, SURFACE_DISABLED_PAGE_KEYS) &&
-    (value.next_cursor === null ||
-      nonEmptyString(value.next_cursor) !== undefined) &&
-    isOneOf(value.policy_block_code, SURFACE_POLICY_BLOCK_CODES)
-  );
-}
-
-function toDraftValidationIssues(value: unknown): DraftValidationIssue[] {
-  if (!Array.isArray(value)) return [];
-  const valid = value.every(
-    (issue) =>
-      isRecord(issue) &&
-      ["basics", "forms", "meanings"].includes(String(issue.step)) &&
-      nonEmptyString(issue.node_id) !== undefined &&
-      nonEmptyString(issue.field) !== undefined &&
-      nonEmptyString(issue.code) !== undefined &&
-      nonEmptyString(issue.message) !== undefined &&
-      (issue.reference_location === undefined ||
-        issue.reference_location === null ||
-        isDraftReferenceLocation(issue.reference_location))
-  );
-  return valid ? (value as DraftValidationIssue[]) : [];
-}
-
-function toProblemMeta(value: unknown): ProblemMeta | undefined {
-  if (!isRecord(value)) return undefined;
-  if (
-    (value.current_revision !== undefined &&
-      !nonNegativeInteger(value.current_revision)) ||
-    (value.current_lifecycle_revision !== undefined &&
-      !nonNegativeInteger(value.current_lifecycle_revision)) ||
-    (value.word_id !== undefined &&
-      nonEmptyString(value.word_id) === undefined) ||
-    (value.max_reachable_step !== undefined &&
-      !["basics", "forms", "meanings", "preview"].includes(
-        String(value.max_reachable_step)
-      )) ||
-    (value.affected_node_ids !== undefined &&
-      (!Array.isArray(value.affected_node_ids) ||
-        !value.affected_node_ids.every(
-          (nodeId) => nonEmptyString(nodeId) !== undefined
-        ))) ||
-    (value.usage_count !== undefined &&
-      (typeof value.usage_count !== "number" ||
-        !Number.isInteger(value.usage_count) ||
-        value.usage_count < 0)) ||
-    (value.part_of_speech_id !== undefined &&
-      nonEmptyString(value.part_of_speech_id) === undefined) ||
-    (value.code !== undefined && nonEmptyString(value.code) === undefined) ||
-    (value.reference_locations !== undefined &&
-      (!Array.isArray(value.reference_locations) ||
-        !value.reference_locations.every(isProblemReferenceLocation))) ||
-    (value.surface_match_page !== undefined &&
-      !isSurfaceMatchPage(value.surface_match_page)) ||
-    (value.current_policy_name !== undefined &&
-      !SURFACE_POLICY_NAMES.includes(
-        value.current_policy_name as (typeof SURFACE_POLICY_NAMES)[number]
-      )) ||
-    (value.current_policy_epoch !== undefined &&
-      !nonNegativeInteger(value.current_policy_epoch))
   ) {
     return undefined;
   }
-  return value as ProblemMeta;
+  return value as DraftValidationIssueAny[];
+}
+function toProblemMeta(value: unknown): ProblemMeta | undefined {
+  if (value === undefined) return undefined;
+  return validateRuntimeSchema("ProblemMeta", value).valid
+    ? (value as ProblemMeta)
+    : undefined;
 }
 
 function toProblemDetails(
   body: Record<string, unknown>,
-  responseStatus: number,
-  meta: ProblemMeta | undefined
+  responseStatus: number
 ): ProblemDetails | undefined {
-  const type = nonEmptyString(body.type);
-  const title = nonEmptyString(body.title);
-  const code = nonEmptyString(body.code);
   if (
-    type === undefined ||
-    title === undefined ||
-    !Number.isInteger(body.status) ||
     body.status !== responseStatus ||
-    typeof body.detail !== "string" ||
-    code === undefined ||
-    (body.field !== undefined && nonEmptyString(body.field) === undefined)
+    !validateRuntimeSchema("ProblemDetails", body).valid
   ) {
     return undefined;
   }
-
-  return {
-    type,
-    title,
-    status: responseStatus,
-    detail: body.detail,
-    code,
-    ...(typeof body.field === "string" ? { field: body.field } : {}),
-    ...(meta ? { meta } : {})
-  };
+  return body as unknown as ProblemDetails;
 }
 
 async function parseError(res: Response): Promise<ParsedError> {
@@ -592,6 +127,7 @@ async function parseError(res: Response): Promise<ParsedError> {
     const body: unknown = await res.json();
     if (isRecord(body)) {
       const meta = toProblemMeta(body.meta);
+      const fieldIssues = toDraftValidationIssues(body.field_issues);
       return {
         message:
           nonEmptyString(body.detail) ??
@@ -599,8 +135,8 @@ async function parseError(res: Response): Promise<ParsedError> {
           res.statusText,
         details: stringArray(body.details),
         code: nonEmptyString(body.code),
-        problem: toProblemDetails(body, res.status, meta),
-        field_issues: toDraftValidationIssues(body.field_issues),
+        problem: toProblemDetails(body, res.status),
+        field_issues: fieldIssues ?? [],
         meta
       };
     }

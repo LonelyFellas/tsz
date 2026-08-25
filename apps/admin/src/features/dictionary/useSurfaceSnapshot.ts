@@ -1,23 +1,32 @@
 import { HttpError } from "@tsz/api-client/http";
-import type { SurfaceMatchPageV2 } from "@tsz/types";
+import type { SurfaceMatchPageAny, SurfaceMatchPageV2 } from "@tsz/types";
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
-import { adminWordsDataSource } from "./dataSource";
+import { adminWordsAnyDataSource, adminWordsDataSource } from "./dataSource";
 import {
-  EMPTY_SURFACE_SNAPSHOT_STATE,
+  createEmptySurfaceSnapshotState,
+  type SurfaceSnapshotAction,
+  type SurfaceSnapshotState,
   surfaceSnapshotReducer
 } from "./surfaceSnapshot";
 
-export type FetchSurfaceMatchPage = (
-  snapshotId: string,
-  cursor: string,
-  signal: AbortSignal
-) => Promise<SurfaceMatchPageV2>;
+export type FetchSurfaceMatchPage<
+  TPage extends SurfaceMatchPageAny = SurfaceMatchPageV2
+> = (snapshotId: string, cursor: string, signal: AbortSignal) => Promise<TPage>;
 
 const defaultFetchSurfaceMatchPage: FetchSurfaceMatchPage = (
   snapshotId,
   cursor,
   signal
 ) => adminWordsDataSource.surfaceMatchSnapshotPage(snapshotId, cursor, signal);
+
+const defaultFetchSurfaceMatchPageAny: FetchSurfaceMatchPage<
+  SurfaceMatchPageAny
+> = (snapshotId, cursor, signal) =>
+  adminWordsAnyDataSource.surfaceMatchSnapshotPageAny(
+    snapshotId,
+    cursor,
+    signal
+  );
 
 function isSurfaceSnapshotInvalidated(error: unknown): boolean {
   if (error instanceof HttpError) {
@@ -39,16 +48,19 @@ function isSurfaceSnapshotInvalidated(error: unknown): boolean {
 }
 
 /** Shared sequential loader used by Create/Forms/Publish/Restore warning flows. */
-export function useSurfaceSnapshot(
-  initialPage: SurfaceMatchPageV2 | undefined,
+function useSurfaceSnapshotState<TPage extends SurfaceMatchPageAny>(
+  initialPage: TPage | undefined,
   resetKey: string,
-  fetchPage: FetchSurfaceMatchPage = defaultFetchSurfaceMatchPage
+  fetchPage: FetchSurfaceMatchPage<TPage>
 ) {
   const generation = useRef(0);
   const [retryVersion, setRetryVersion] = useState(0);
   const [state, dispatch] = useReducer(
-    surfaceSnapshotReducer,
-    EMPTY_SURFACE_SNAPSHOT_STATE
+    (
+      current: SurfaceSnapshotState<TPage>,
+      action: SurfaceSnapshotAction<TPage>
+    ) => surfaceSnapshotReducer(current, action),
+    createEmptySurfaceSnapshotState<TPage>()
   );
 
   useEffect(() => {
@@ -102,4 +114,22 @@ export function useSurfaceSnapshot(
 
   const retry = useCallback(() => setRetryVersion((value) => value + 1), []);
   return { ...state, retry };
+}
+
+/** Existing V2 creation/editor flow keeps its V2-only data source and types. */
+export function useSurfaceSnapshot(
+  initialPage: SurfaceMatchPageV2 | undefined,
+  resetKey: string,
+  fetchPage: FetchSurfaceMatchPage<SurfaceMatchPageV2> = defaultFetchSurfaceMatchPage
+) {
+  return useSurfaceSnapshotState(initialPage, resetKey, fetchPage);
+}
+
+/** Mixed lifecycle flow follows the response discriminator across every page. */
+export function useSurfaceSnapshotAny(
+  initialPage: SurfaceMatchPageAny | undefined,
+  resetKey: string,
+  fetchPage: FetchSurfaceMatchPage<SurfaceMatchPageAny> = defaultFetchSurfaceMatchPageAny
+) {
+  return useSurfaceSnapshotState(initialPage, resetKey, fetchPage);
 }
