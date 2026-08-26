@@ -11,6 +11,7 @@ import type {
 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { newWordNodeId } from "../word-model/primitives";
 import type { V3WordRequests } from "./api";
 import {
   navigateToV3Issue,
@@ -100,7 +101,7 @@ export interface V3WordCreationWizardProps {
 }
 
 function defaultIdempotencyKey() {
-  return globalThis.crypto.randomUUID();
+  return newWordNodeId();
 }
 
 interface PublishAttempt {

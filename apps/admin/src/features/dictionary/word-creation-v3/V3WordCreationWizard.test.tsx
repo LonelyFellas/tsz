@@ -246,6 +246,39 @@ function impactSurfacePage(nextCursor: string | null): SurfaceMatchPageV3 {
 }
 
 describe("V3WordCreationWizard", () => {
+  it("publishes with a compatible idempotency key when HTTP lacks randomUUID", async () => {
+    const getRandomValues = vi.fn((bytes: Uint8Array) => {
+      bytes.fill(0xff);
+      return bytes;
+    });
+    vi.stubGlobal("crypto", { getRandomValues });
+    const publish = vi.fn(async () => envelope(2, "published over HTTP"));
+
+    try {
+      renderWizard(requests({ publish }), {
+        renderStep: (context) => (
+          <button type="button" onClick={() => void context.actions.publish()}>
+            HTTP 发布
+          </button>
+        )
+      });
+
+      fireEvent.click(screen.getByText("HTTP 发布"));
+      await waitFor(() => expect(publish).toHaveBeenCalledTimes(1));
+      expect(publish).toHaveBeenCalledWith(
+        "word-1",
+        "ffffffff-ffff-4fff-bfff-ffffffffffff",
+        {
+          schema_version: 3,
+          base_revision: 1
+        }
+      );
+      expect(getRandomValues).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("applies save, prepare, and publish canonicals after StrictMode replays lifecycle effects", async () => {
     const strictWord = (revision: number, spelling: string): AdminWordV3 => {
       const value = word(revision, spelling);
