@@ -29,7 +29,7 @@
   },
   "devDependencies": {
     "@tsz/config": "workspace:*",
-    "eslint": "^9.39.0",
+    "eslint": "^10.9.0",
     "js-yaml": "5.3.0",
     "prettier": "^3.9.6",
     "typescript": "^6.0.3",

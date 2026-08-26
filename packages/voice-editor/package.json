@@ -47,7 +47,7 @@
     "@types/react-dom": "^19.2.4",
     "@vitejs/plugin-react": "^6.1.0",
     "antd": "^6.6.1",
-    "eslint": "^9.39.0",
+    "eslint": "^10.9.0",
     "jsdom": "^30.0.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
