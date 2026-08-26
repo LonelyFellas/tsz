@@ -72,7 +72,13 @@ test("CI, Docker, and native deployment use the same pinned Node runtime", async
     readRepositoryFile(".claude/skills/ship/SKILL.md"),
     readRepositoryFile("docs/foundation/README.md")
   ]);
-  assert.equal((ci.match(/node-version-file: \.nvmrc/g) ?? []).length, 3);
+  const setupNodeSteps = (ci.match(/uses: actions\/setup-node@v7/g) ?? [])
+    .length;
+  assert.equal(setupNodeSteps, 7);
+  assert.equal(
+    (ci.match(/node-version-file: \.nvmrc/g) ?? []).length,
+    setupNodeSteps
+  );
   assert.doesNotMatch(ci, /node-version:\s*\d+/);
   assert.match(adminDockerfile, /^FROM node:24\.19\.0-alpine AS base/m);
   assert.match(webDockerfile, /^FROM node:24\.19\.0-alpine AS base/m);

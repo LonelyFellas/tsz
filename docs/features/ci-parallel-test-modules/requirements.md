@@ -41,10 +41,10 @@ GitHub Runner 排队或依赖下载异常，则单独记录，不把外部排队
 ## 用户故事 / 使用场景
 
 1. 作为开发者，我希望提交 PR 后 packages、web、admin 测试并行开始，以便更快获得失败反馈。
-2. 作为开发者，我希望 admin 大型测试集内部继续分片，避免一个 75 文件的 Job 抵消并行收益。
+2. 作为开发者，我希望 admin 大型测试集内部继续分片，避免评估基线中 75 文件的 Job 抵消并行收益。
 3. 作为评审者，我希望失败 Job 名能直接指出是 packages、web、admin 某个分片、覆盖率合并还是
    E2E 失败，而不是等待一个总 Job 结束后再翻完整日志。
-4. 作为质量负责人，我希望拆分后仍执行全部 133 个现有 Vitest 文件，并在合并后的完整覆盖率上
+4. 作为质量负责人，我希望拆分后仍执行全部现有 Vitest 文件，并在合并后的完整覆盖率上
    继续执行 packages 100%、web/admin 90% 的原有门槛。
 5. 作为仓库维护者，我希望新增测试文件自动进入相应 project，并且分片范围缺失、重叠、报告
    缺失或合并失败时 CI fail closed。
@@ -82,6 +82,8 @@ GitHub Runner 排队或依赖下载异常，则单独记录，不把外部排队
 - 使用 Vitest 已锁定版本提供的分片、blob 报告和 coverage merge 能力；
 - 增加 shard 专用 coverage 配置：与完整配置共享 provider/include/exclude，但 shard 阶段不执行
   局部 thresholds，完整 thresholds 只在 merge 阶段裁决；
+- packages、web、admin 以仓库相对路径过滤测试文件，不用 `--project` 裁掉其他 Vitest project 上下文，
+  保留应用测试对共享包的补充覆盖；
 - packages、web、admin 的单测并行，其中 admin 再拆成多个互补分片；
 - web/admin Playwright E2E 并行；
 - 增加必要的 CI 模块清单、参数校验和 workflow 结构回归测试；
@@ -109,11 +111,14 @@ GitHub Runner 排队或依赖下载异常，则单独记录，不把外部排队
 - 测试结果必须先合并，再以当前根配置执行覆盖率阈值检查；不得在分片上用局部阈值冒充全局门禁。
 - shard 配置不得复制一份会独立漂移的 coverage policy；provider/include/exclude 与完整配置必须来自
   同一导出，只有 thresholds/reporter 在 shard 与 merge 阶段有意不同。
+- 模块选择必须使用受控的仓库相对路径过滤器，同时保留根配置的全部 6 个 projects；不能用
+  `--project` 替代，因为 packages 100% 门槛依赖 web/admin 对共享鉴权逻辑的真实补充覆盖。
 - 五个模块均必须保留现有 coverage runner 的 `--maxWorkers=2` 默认稳定性控制；允许调用方显式覆盖的
   既有行为不得改变。
 - 实施时以 `vitest list --filesOnly --json` 动态生成完整权威清单，并由实际 shard run 的 reporter
   从 `TestModule[]` 产出各模块真实执行 inventory；不得假设 `vitest list` 会应用 `--shard`。merge 按
-  `(projectName, repository-relative filepath)` 精确集合对账；当前 133 只是验收基线，不是写死常量。
+  `(projectName, repository-relative filepath)` 精确集合对账；评估基线为 133，实施快照为 156，均不是
+  写死常量。
   缺失、额外或重复 tuple 均 fail closed，新增测试文件由 project include 自动纳入。
 
 ### 兼容性
@@ -155,14 +160,17 @@ GitHub Runner 排队或依赖下载异常，则单独记录，不把外部排队
       拆成可并行 Job。
 - [ ] Vitest 至少形成 packages、web、admin 三个语义模块，admin 使用三个完整互补分片。
 - [ ] 现有 6 个 Vitest projects 和实施时全部测试文件恰好被执行一次；无遗漏、无重复。
-- [ ] shard 使用无 thresholds 的专用配置收集 coverage，provider/include/exclude 与根完整配置单一来源；
-      `coverage.reporter` 显式为 `[]`，任何 shard 不因其他模块未覆盖或重复生成最终报告而提前失败。
+- [ ] shard 使用无 thresholds 的专用配置收集 coverage，provider/include/exclude 与根完整配置单一
+      来源；`coverage.reporter` 显式为 `[]`，任何 shard 不因其他模块未覆盖或重复生成最终报告而
+      提前失败。
+- [ ] 模块用 packages、apps/web、apps/admin 路径过滤测试文件，不传 `--project`；合并覆盖率与原生
+      单机结果一致，packages 仍达到 100%。
 - [ ] 所有分片 blob 合并成功，并在合并结果上继续执行当前 packages 100%、web/admin 90% 门槛。
 - [ ] 五个模块执行均默认 `--maxWorkers=2`，并有参数回归证明没有绕过既有稳定性限制。
 - [ ] merge 前以动态 full inventory 对实际 shard reporter 产出的五份 module inventory 做 tuple 集合
       对账，删除一份、重复一份、module 名错配或同文件跨模块重复均失败。
 - [ ] lint、typecheck、format、build、Node runtime、coverage-lock、部署工具测试均未丢失。
-- [ ] web 23 个、admin 13 个现有 Playwright 场景分别运行并并行启动；任一失败均令最终 `e2e` 失败。
+- [ ] web 23 个、admin 16 个现有 Playwright 场景分别运行并并行启动；任一失败均令最终 `e2e` 失败。
 - [ ] 单测矩阵和 E2E 子任务均关闭 fail-fast 或具备等价的“另一模块继续运行”行为。
 - [ ] required check 上下文仍为 `verify`、`commitlint`、`e2e`，GitHub ruleset 无需改动。
 - [ ] PR 与 main push 的成功/失败/取消路径均经过 workflow 结构测试和至少一次真实 Actions 验证。
