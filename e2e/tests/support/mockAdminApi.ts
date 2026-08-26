@@ -657,10 +657,7 @@ function detectionResponse(
 ) {
   const isDuplicate = duplicate || rawHeadword.trim().toLowerCase() === "color";
   const normalized = rawHeadword.trim().toLowerCase();
-  if (
-    surfaceWarnings &&
-    (normalized === "workspace" || normalized === "workspaces")
-  ) {
+  if (surfaceWarnings && /^workspaces?(?:\s|$)/.test(normalized)) {
     return {
       detection_id: `detect-${normalized}`,
       expires_at: "2099-08-02T03:05:00.000Z",
@@ -825,6 +822,11 @@ export async function mockAdminApi(
   let formsSurfaceChangeRemaining = options.changeFormsSurfaceOnFirstSave
     ? 1
     : 0;
+  const surfaceHeadwordBySnapshot = new Map(
+    Object.entries(ADMIN_E2E_SURFACE_SNAPSHOT_IDS).map(
+      ([headword, snapshot]) => [snapshot, headword]
+    )
+  );
 
   await page.route("**/api/v1/admin/**", async (route) => {
     const request = route.request();
@@ -897,12 +899,17 @@ export async function mockAdminApi(
     }
     if (method === "POST" && path === ADMIN_E2E_DETECTIONS_PATH) {
       const input = body as { headword?: string } | undefined;
+      const headword = input?.headword ?? "";
+      if (options.surfaceWarnings) {
+        const firstPage = surfacePage(headword, false, options.entryKind);
+        surfaceHeadwordBySnapshot.set(firstPage.snapshot_id, headword);
+      }
       return json(
         route,
         200,
         detectionResponse(
           options.duplicate === true,
-          input?.headword ?? "",
+          headword,
           options.surfaceWarnings === true,
           options.entryKind
         )
@@ -939,9 +946,7 @@ export async function mockAdminApi(
           )
         );
       }
-      const rawHeadword = Object.entries(ADMIN_E2E_SURFACE_SNAPSHOT_IDS).find(
-        ([, id]) => id === snapshotId
-      )?.[0];
+      const rawHeadword = surfaceHeadwordBySnapshot.get(snapshotId);
       if (
         rawHeadword === undefined ||
         requestUrl.searchParams.get("cursor") !== "surface-page-2"

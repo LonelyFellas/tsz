@@ -1,4 +1,4 @@
-import { Alert, Button, Flex, Steps, Tag, Typography } from "antd";
+import { Alert, Button, Card, Flex, Steps, Tag, Typography } from "antd";
 import type {
   AdminWordV3,
   DraftMeaningsStepContentWritableV3,
@@ -8,6 +8,7 @@ import type {
 import type { ReactNode } from "react";
 import type { V3Problem } from "./problem";
 import type { V3ReadinessSummary } from "./readiness";
+import { wordStatusLabel } from "./presentation";
 import "./v3-layout.css";
 
 const STEP_ORDER: WordCreationStep[] = [
@@ -115,110 +116,133 @@ export function V3WordCreationLayout({
             {word.presentation.label}
           </Typography.Title>
           <Typography.Text type="secondary">
-            Smart Lexicon V3 · revision {word.revision}
+            {word.has_unpublished_changes
+              ? "包含尚未发布的修改"
+              : "当前内容已保存"}
           </Typography.Text>
         </div>
         <Tag color={word.status === "draft" ? "processing" : "default"}>
-          {word.status}
+          {wordStatusLabel(word.status)}
         </Tag>
       </header>
 
-      <Steps
-        current={STEP_ORDER.indexOf(activeStep)}
-        responsive={false}
-        items={STEP_ORDER.map((step) => ({
-          title: STEP_TITLE[step],
-          disabled: readOnly,
-          status:
-            step === activeStep
-              ? "process"
-              : completed.has(step as "basics" | "forms" | "meanings")
-                ? "finish"
-                : "wait"
-        }))}
-        onChange={
-          readOnly ? undefined : (index) => onStepChange(STEP_ORDER[index]!)
-        }
-      />
+      <div className="v3-word-creation__shell">
+        <aside className="v3-word-creation__sidebar" aria-label="创编进度">
+          <Card size="small" title="创编进度">
+            <Steps
+              current={STEP_ORDER.indexOf(activeStep)}
+              direction="vertical"
+              responsive={false}
+              size="small"
+              items={STEP_ORDER.map((step) => ({
+                title: STEP_TITLE[step],
+                description:
+                  step === "forms" && dirtySteps.forms
+                    ? "未保存"
+                    : step === "meanings" && dirtySteps.meanings
+                      ? "未保存"
+                      : completed.has(step as "basics" | "forms" | "meanings")
+                        ? "已完成"
+                        : undefined,
+                disabled: readOnly,
+                status:
+                  step === activeStep
+                    ? "process"
+                    : completed.has(step as "basics" | "forms" | "meanings")
+                      ? "finish"
+                      : "wait"
+              }))}
+              onChange={
+                readOnly
+                  ? undefined
+                  : (index) => onStepChange(STEP_ORDER[index]!)
+              }
+            />
+            <Typography.Text type="secondary">
+              {readiness.issue_count > 0
+                ? `还有 ${readiness.issue_count} 项待完成`
+                : "当前没有待处理问题"}
+            </Typography.Text>
+          </Card>
+        </aside>
 
-      {!readOnly && (dirtySteps.forms || dirtySteps.meanings) ? (
-        <Alert
-          showIcon
-          type="warning"
-          title="有未保存的草稿"
-          description={`切换步骤不会丢失当前输入；请先保存${[
-            dirtySteps.forms ? "词形与发音" : undefined,
-            dirtySteps.meanings ? "释义与例句" : undefined
-          ]
-            .filter(Boolean)
-            .join("、")}草稿，再检查或发布。`}
-        />
-      ) : null}
+        <section className="v3-word-creation__main">
+          {!readOnly && (dirtySteps.forms || dirtySteps.meanings) ? (
+            <Alert
+              showIcon
+              type="warning"
+              title="有未保存的草稿"
+              description={`切换步骤不会丢失当前输入；请先保存${[
+                dirtySteps.forms ? "词形与发音" : undefined,
+                dirtySteps.meanings ? "释义与例句" : undefined
+              ]
+                .filter(Boolean)
+                .join("、")}草稿，再检查或发布。`}
+            />
+          ) : null}
 
-      {problem && (
-        <Alert
-          showIcon
-          type={problem.kind === "validation" ? "warning" : "error"}
-          title={problemTitle(problem)}
-          description={
-            conflict ? (
-              <Flex vertical gap={4}>
-                <span>
-                  <strong>
-                    {conflict.step === "forms"
-                      ? "词形与发音冲突"
-                      : "释义与例句冲突"}
-                  </strong>
-                  ：本地基于 revision {conflict.baseRevision} 的输入仍已保留。
-                </span>
-                {conflict.serverWord && (
-                  <span>
-                    服务端最新 revision：
-                    <strong data-testid="server-revision">
-                      {conflict.serverWord.revision}
-                    </strong>
-                  </span>
-                )}
+          {problem && (
+            <Alert
+              showIcon
+              type={problem.kind === "validation" ? "warning" : "error"}
+              title={problemTitle(problem)}
+              description={
+                conflict ? (
+                  <Flex vertical gap={4}>
+                    <span>
+                      <strong>
+                        {conflict.step === "forms"
+                          ? "词形与发音冲突"
+                          : "释义与例句冲突"}
+                      </strong>
+                      ：本地输入仍已保留。
+                    </span>
+                    {conflict.serverWord && <span>已获取服务端最新内容。</span>}
+                  </Flex>
+                ) : undefined
+              }
+              action={
+                problem.kind === "revision_conflict" &&
+                conflict &&
+                onRefreshConflict ? (
+                  <Button
+                    loading={refreshingConflict}
+                    onClick={onRefreshConflict}
+                  >
+                    刷新并比较
+                  </Button>
+                ) : problem.retryable && onRetry ? (
+                  <Button loading={retrying} onClick={onRetry}>
+                    重试
+                  </Button>
+                ) : undefined
+              }
+            />
+          )}
+
+          {readiness.issue_count > 0 && (
+            <section className="v3-word-creation__issues" aria-label="待完成项">
+              <Typography.Text strong>
+                待完成 {readiness.issue_count} 项
+              </Typography.Text>
+              <Flex vertical gap={6}>
+                {displayedIssues.map((issue) => (
+                  <Button
+                    type="text"
+                    className="v3-word-creation__issue"
+                    key={`${issue.step}:${issue.node_id}:${issue.field}:${issue.code}`}
+                    onClick={() => onIssueNavigate(issue)}
+                  >
+                    {issue.message}
+                  </Button>
+                ))}
               </Flex>
-            ) : undefined
-          }
-          action={
-            problem.kind === "revision_conflict" &&
-            conflict &&
-            onRefreshConflict ? (
-              <Button loading={refreshingConflict} onClick={onRefreshConflict}>
-                刷新并比较
-              </Button>
-            ) : problem.retryable && onRetry ? (
-              <Button loading={retrying} onClick={onRetry}>
-                重试
-              </Button>
-            ) : undefined
-          }
-        />
-      )}
+            </section>
+          )}
 
-      {readiness.issue_count > 0 && (
-        <section className="v3-word-creation__issues" aria-label="待完成项">
-          <Typography.Text strong>
-            待完成 {readiness.issue_count} 项
-          </Typography.Text>
-          <Flex vertical gap={6}>
-            {displayedIssues.map((issue) => (
-              <Button
-                type="text"
-                className="v3-word-creation__issue"
-                key={`${issue.step}:${issue.node_id}:${issue.field}:${issue.code}`}
-                onClick={() => onIssueNavigate(issue)}
-              >
-                {issue.message}
-              </Button>
-            ))}
-          </Flex>
+          <main className="v3-word-creation__content">{children}</main>
         </section>
-      )}
-
-      <main className="v3-word-creation__content">{children}</main>
+      </div>
     </div>
   );
 }

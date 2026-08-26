@@ -1,12 +1,69 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import type {
+  DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3,
+  PartOfSpeechCatalogResponse,
   V3DraftValidationIssue
 } from "@tsz/types";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { V3MeaningsAndExamplesStep } from "./V3MeaningsAndExamplesStep";
+
+const relatedSearchAny = vi.hoisted(() =>
+  vi.fn(() => ({
+    exact: {
+      data: {
+        pages: [
+          {
+            results: [
+              {
+                schema_version: 2 as const,
+                word_id: "external-word-1",
+                headword: "outside",
+                kind: "phrase" as const,
+                dialects: ["common" as const],
+                headword_variants: [],
+                pos_labels: ["名词"],
+                senses: [{ sense_id: "external-sense-1", gloss: "外部词义一" }]
+              }
+            ],
+            total: 1,
+            next_cursor: null
+          }
+        ]
+      },
+      isFetching: false
+    },
+    contains: {
+      data: {
+        pages: [
+          {
+            results: [
+              {
+                schema_version: 3 as const,
+                entry_id: "external-word-2",
+                kind: "word" as const,
+                presentation: {
+                  label: "beyond",
+                  matched_surfaces: ["beyond"],
+                  strategy_version: "surface_summary_v1"
+                },
+                matches: [],
+                senses: [{ sense_id: "external-sense-2", gloss: "外部词义二" }]
+              }
+            ],
+            total: 1,
+            next_cursor: null
+          }
+        ]
+      },
+      isFetching: false
+    }
+  }))
+);
+
+vi.mock("../api", () => ({ useRelatedSearchAny: relatedSearchAny }));
 
 const meaningsFixture: DraftMeaningsStepContentWritableV3 = {
   sense_groups: [{ id: "sense-group-1", name_zh: "核心", name_en: "Core" }],
@@ -83,7 +140,10 @@ function Harness({
   initial = structuredClone(meaningsFixture),
   issues = [],
   onSave = vi.fn().mockResolvedValue(undefined),
-  idFactory
+  idFactory,
+  forms,
+  partOfSpeechCatalog,
+  wordId
 }: {
   initial?: DraftMeaningsStepContentWritableV3;
   issues?: V3DraftValidationIssue[];
@@ -92,17 +152,23 @@ function Harness({
     intent: "save" | "complete"
   ) => Promise<void>;
   idFactory?: () => string;
+  forms?: DraftFormsStepContentV3;
+  partOfSpeechCatalog?: PartOfSpeechCatalogResponse;
+  wordId?: string;
 }) {
   const [value, setValue] = useState(initial);
   return (
     <AntApp>
       <V3MeaningsAndExamplesStep
         activePosId="pos-1"
+        forms={forms}
         idFactory={idFactory}
         issues={issues}
         onChange={setValue}
         onSave={onSave}
+        partOfSpeechCatalog={partOfSpeechCatalog}
         value={value}
+        wordId={wordId}
       />
       <output data-testid="meanings-value">{JSON.stringify(value)}</output>
     </AntApp>
@@ -131,16 +197,17 @@ describe("V3MeaningsAndExamplesStep", () => {
       <Harness
         idFactory={() => ids.shift()!}
         initial={{ sense_groups: [], pos: [] }}
+        wordId="entry-new"
       />
     );
 
     fireEvent.click(screen.getByRole("button", { name: "新增释义组" }));
     fireEvent.click(screen.getByRole("button", { name: "添加当前词性释义" }));
-    fireEvent.click(screen.getByRole("button", { name: "新增语法结构 pos-1" }));
-    fireEvent.click(screen.getByRole("button", { name: "新增释义 pos-1" }));
-    fireEvent.click(screen.getByRole("button", { name: "新增定义 sense-new" }));
-    fireEvent.click(screen.getByRole("button", { name: "新增例句 sense-new" }));
-    fireEvent.click(screen.getByRole("button", { name: "新增关联 sense-new" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增语法结构" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增释义" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增定义" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增例句" }));
+    fireEvent.click(screen.getByRole("button", { name: "新增关联" }));
 
     expect(value()).toMatchObject({
       sense_groups: [{ id: "sense-group-new" }],
@@ -166,7 +233,14 @@ describe("V3MeaningsAndExamplesStep", () => {
                 {
                   id: "sentence-new",
                   en_text: { common: { id: "sentence-en-new" } },
-                  zh_text_id: "sentence-zh-new"
+                  zh_text_id: "sentence-zh-new",
+                  links: [
+                    {
+                      word_id: "entry-new",
+                      sense_id: "sense-new",
+                      role: "focus"
+                    }
+                  ]
                 }
               ],
               relations: [{ id: "relation-new" }]
@@ -175,6 +249,85 @@ describe("V3MeaningsAndExamplesStep", () => {
         }
       ]
     });
+  });
+
+  it("错误或重复主关联可归一，并可搜索短语新增、切换、去重外部上下文词义", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.sentences[0]!.links = [
+      { word_id: "wrong-word", sense_id: "wrong-sense", role: "focus" },
+      { word_id: "entry-1", sense_id: "sense-1", role: "head" },
+      {
+        word_id: "existing-context-word",
+        sense_id: "existing-context-sense",
+        role: "context"
+      }
+    ];
+    const { container } = render(
+      <Harness initial={initial} wordId="entry-1" />
+    );
+
+    fireEvent.click(screen.getByText("修复主关联"));
+    expect(value().pos[0]!.senses[0]!.sentences[0]!.links).toEqual([
+      { word_id: "entry-1", sense_id: "sense-1", role: "focus" },
+      {
+        word_id: "existing-context-word",
+        sense_id: "existing-context-sense",
+        role: "context"
+      }
+    ]);
+
+    const addTarget = screen.getByLabelText("为例句 1 新增上下文关联");
+    fireEvent.change(addTarget, { target: { value: "outside" } });
+    expect(relatedSearchAny).toHaveBeenLastCalledWith(
+      "outside",
+      undefined,
+      true
+    );
+    fireEvent.click(screen.getByText("outside · 外部词义一"));
+    expect(value().pos[0]!.senses[0]!.sentences[0]!.links[2]).toEqual({
+      word_id: "external-word-1",
+      sense_id: "external-sense-1",
+      role: "context"
+    });
+
+    fireEvent.change(addTarget, { target: { value: "outside" } });
+    expect(screen.queryAllByText("outside · 外部词义一")).toHaveLength(1);
+
+    const editTarget = screen.getByLabelText("例句 1 上下文关联 3 目标");
+    fireEvent.change(editTarget, { target: { value: "beyond" } });
+    fireEvent.click(screen.getByText("beyond · 外部词义二"));
+    expect(value().pos[0]!.senses[0]!.sentences[0]!.links[2]).toEqual({
+      word_id: "external-word-2",
+      sense_id: "external-sense-2",
+      role: "context"
+    });
+    expect(
+      container.querySelector<HTMLInputElement>(
+        'input[aria-label="例句 1 上下文关联 3 目标"]'
+      )?.value
+    ).toBe("beyond · 外部词义二");
+  });
+
+  it("单个 head 与当前词义 context 都可归一为唯一 focus", () => {
+    const headDraft = structuredClone(meaningsFixture);
+    const { unmount } = render(
+      <Harness initial={headDraft} wordId="entry-1" />
+    );
+    fireEvent.click(screen.getByText("修复主关联"));
+    expect(value().pos[0]!.senses[0]!.sentences[0]!.links).toEqual([
+      { word_id: "entry-1", sense_id: "sense-1", role: "focus" }
+    ]);
+    unmount();
+
+    const contextDraft = structuredClone(meaningsFixture);
+    contextDraft.pos[0]!.senses[0]!.sentences[0]!.links = [
+      { word_id: "entry-1", sense_id: "sense-1", role: "context" }
+    ];
+    render(<Harness initial={contextDraft} wordId="entry-1" />);
+    fireEvent.click(screen.getByText("补充主关联"));
+    expect(value().pos[0]!.senses[0]!.sentences[0]!.links).toEqual([
+      { word_id: "entry-1", sense_id: "sense-1", role: "focus" }
+    ]);
   });
 
   it("各 meanings 列表可重排并删除，删除释义组会解除 sense 引用", () => {
@@ -237,12 +390,12 @@ describe("V3MeaningsAndExamplesStep", () => {
     };
 
     for (const name of [
-      "下移释义组 sense-group-1",
-      "下移语法结构 grammar-1",
-      "下移释义 sense-1",
-      "下移定义 definition-1",
-      "下移例句 sentence-1",
-      "下移关联 relation-1"
+      "下移释义组 1",
+      "下移语法结构 1",
+      "下移释义 1",
+      "下移定义 1",
+      "下移例句 1",
+      "下移关联 1"
     ]) {
       clickAction(name);
     }
@@ -269,11 +422,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       "relation-1"
     ]);
 
-    for (const name of [
-      "删除定义 definition-1",
-      "删除例句 sentence-1",
-      "删除关联 relation-1"
-    ]) {
+    for (const name of ["删除定义 2", "删除例句 2", "删除关联 2"]) {
       clickAction(name);
     }
     const reducedSense = value().pos[0]!.senses[1]!;
@@ -287,13 +436,13 @@ describe("V3MeaningsAndExamplesStep", () => {
       "relation-2"
     ]);
 
-    clickAction("删除释义组 sense-group-1");
+    clickAction("删除释义组 2");
     expect(value().pos[0]!.senses[1]).not.toHaveProperty("sense_group_id");
-    clickAction("删除语法结构 grammar-1");
+    clickAction("删除语法结构 2");
     expect(value().pos[0]!.senses[1]!.definitions[0]).not.toHaveProperty(
       "grammar_structure_id"
     );
-    clickAction("删除释义 sense-1");
+    clickAction("删除释义 2");
     expect(value().sense_groups.map((item) => item.id)).toEqual([
       "sense-group-2"
     ]);
@@ -334,22 +483,22 @@ describe("V3MeaningsAndExamplesStep", () => {
   it("controlled 编辑 frequency/grammar/definition/examples/relation 且稳定 UUID 不变", () => {
     render(<Harness />);
 
-    fireEvent.change(screen.getByLabelText("频率 sense-1"), {
+    fireEvent.change(screen.getByLabelText("释义 1 频率"), {
       target: { value: "medium" }
     });
-    fireEvent.change(screen.getByLabelText("语法 grammar-variant-1"), {
+    fireEvent.change(screen.getByLabelText("语法结构 1 内容 1"), {
       target: { value: "updated grammar" }
     });
-    fireEvent.change(screen.getByLabelText("释义 definition-1"), {
+    fireEvent.change(screen.getByLabelText("定义 1 内容"), {
       target: { value: "更新后的中心" }
     });
-    fireEvent.change(screen.getByLabelText("英文例句 sentence-1 common"), {
+    fireEvent.change(screen.getByLabelText("例句 1 通用英文"), {
       target: { value: "Updated example." }
     });
-    fireEvent.change(screen.getByLabelText("中文例句 sentence-1"), {
+    fireEvent.change(screen.getByLabelText("例句 1 中文"), {
       target: { value: "更新后的例句。" }
     });
-    fireEvent.change(screen.getByLabelText("关联分数 relation-1"), {
+    fireEvent.change(screen.getByLabelText("关联 1 分数"), {
       target: { value: "0.9" }
     });
 
@@ -377,8 +526,39 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
   });
 
-  it("可选字段可清空再恢复，并受控编辑 checkbox、link 与基础字段", () => {
-    const { container } = render(<Harness />);
+  it("可选字段可清空再恢复，并锁定主关联、维护上下文关联与基础字段", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.sense_groups.push({
+      id: "sense-group-2",
+      name_zh: "次要",
+      name_en: "Secondary"
+    });
+    initial.pos[0]!.grammar_structures.push({
+      id: "grammar-2",
+      variants: []
+    });
+    initial.pos[0]!.senses.push({
+      id: "sense-2",
+      sub_pos: "countable",
+      level: "A2",
+      depends_on_context: false,
+      definitions: [],
+      sentences: [],
+      relations: []
+    });
+    initial.pos[0]!.senses.push({
+      id: "sense-3",
+      sub_pos: "countable",
+      level: "B1",
+      depends_on_context: false,
+      definitions: [],
+      sentences: [],
+      relations: []
+    });
+    const { container } = render(
+      <Harness initial={initial} wordId="entry-1" />
+    );
+    fireEvent.click(screen.getByText("修复主关联"));
     const change = (label: string, nextValue: string) => {
       const input = container.querySelector<
         HTMLInputElement | HTMLTextAreaElement
@@ -386,49 +566,39 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(input).not.toBeNull();
       fireEvent.change(input!, { target: { value: nextValue } });
     };
+    const select = (label: string, option: string) => {
+      fireEvent.mouseDown(screen.getByLabelText(label));
+      fireEvent.click(screen.getAllByText(option).at(-1)!);
+    };
 
-    for (const label of [
-      "释义组 sense-1",
-      "频率 sense-1",
-      "释义语法 definition-1",
-      "目标词条 relation-1",
-      "目标释义 relation-1"
-    ]) {
-      change(label, "");
-    }
-    change("待解析词头 relation-1", "pending-headword");
+    select("释义 1 所属释义组", "不归入释义组");
+    change("释义 1 频率", "");
+    select("定义 1 语法结构", "不指定语法结构");
     expect(value().pos[0]!.senses[0]).not.toHaveProperty("sense_group_id");
     expect(value().pos[0]!.senses[0]).not.toHaveProperty("frequency");
     expect(value().pos[0]!.senses[0]!.definitions[0]).not.toHaveProperty(
       "grammar_structure_id"
     );
-    expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
-      pending_target_headword: "pending-headword"
-    });
-    expect(value().pos[0]!.senses[0]!.relations[0]).not.toHaveProperty(
-      "target_word_id"
-    );
-    expect(value().pos[0]!.senses[0]!.relations[0]).not.toHaveProperty(
-      "target_sense_id"
-    );
+    expect(screen.getByText("已选择关联目标")).toBeInTheDocument();
 
-    change("释义组 sense-1", "sense-group-2");
-    change("频率 sense-1", "medium");
-    change("释义语法 definition-1", "grammar-2");
-    change("待解析词头 relation-1", "");
-    change("子词性 sense-1", "mass noun");
-    change("级别 sense-1", "B1");
-    change("释义级别 definition-1", "B2");
-    change("例句级别 sentence-1", "C1");
-    change("关联类型 relation-1", "antonym");
-    change("例句关联 sentence-1 word_id", "word-updated");
-    change("例句关联 sentence-1 sense_id", "sense-updated");
-    change("例句关联 sentence-1 role", "context");
+    select("释义 1 所属释义组", "次要");
+    change("释义 1 频率", "medium");
+    select("定义 1 语法结构", "语法结构 2");
+    change("释义 1 等级", "B1");
+    change("定义 1 等级", "B2");
+    change("例句 1 等级", "C1");
+    fireEvent.mouseDown(screen.getByLabelText("关联 1 类型"));
+    fireEvent.click(screen.getByText("派生词"));
     fireEvent.click(container.querySelector('input[type="checkbox"]')!);
+
+    expect(screen.queryByLabelText("例句 1 关联 1 类型")).toBeNull();
+    expect(screen.queryByLabelText("删除例句 1 的关联 1")).toBeNull();
+    fireEvent.mouseDown(screen.getByLabelText("为例句 1 新增上下文关联"));
+    fireEvent.click(screen.getByText("词性 1 · 释义 2"));
 
     const sense = value().pos[0]!.senses[0]!;
     expect(sense).toMatchObject({
-      sub_pos: "mass noun",
+      sub_pos: "countable",
       level: "B1",
       sense_group_id: "sense-group-2",
       frequency: "medium",
@@ -444,27 +614,83 @@ describe("V3MeaningsAndExamplesStep", () => {
           level: "C1",
           links: [
             {
-              word_id: "word-updated",
-              sense_id: "sense-updated",
+              word_id: "entry-1",
+              sense_id: "sense-1",
+              role: "focus"
+            },
+            {
+              word_id: "entry-1",
+              sense_id: "sense-2",
               role: "context"
             }
           ]
         })
       ],
-      relations: [expect.objectContaining({ relation: "antonym" })]
+      relations: [expect.objectContaining({ relation: "derivative" })]
     });
-    expect(sense.relations[0]).not.toHaveProperty("pending_target_headword");
-
-    fireEvent.click(screen.getByText("新增例句关联 sentence-1"));
-    expect(value().pos[0]!.senses[0]!.sentences[0]!.links).toHaveLength(2);
+    fireEvent.mouseDown(screen.getByLabelText("例句 1 上下文关联 2 目标"));
+    fireEvent.click(screen.getByText("词性 1 · 释义 3"));
+    expect(value().pos[0]!.senses[0]!.sentences[0]!.links[1]).toEqual({
+      word_id: "entry-1",
+      sense_id: "sense-3",
+      role: "context"
+    });
     fireEvent.click(
       container.querySelector<HTMLButtonElement>(
-        'button[aria-label="删除例句关联 sentence-1 1"]'
+        'button[aria-label="删除例句 1 的上下文关联 2"]'
       )!
     );
     expect(value().pos[0]!.senses[0]!.sentences[0]!.links).toEqual([
-      { word_id: "", sense_id: "sense-1", role: "focus" }
+      { word_id: "entry-1", sense_id: "sense-1", role: "focus" }
     ]);
+  });
+
+  it("用中文业务标签呈现词性和引用选择，不暴露内部代码或 ID", () => {
+    const forms: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "noun",
+          forms: [],
+          form_groups: []
+        }
+      ]
+    };
+    const partOfSpeechCatalog: PartOfSpeechCatalogResponse = {
+      catalog_version: 1,
+      items: [
+        {
+          id: "catalog-noun",
+          code: "noun",
+          name_zh: "名词",
+          name_en: "Noun",
+          abbreviation: "n.",
+          sort_order: 1,
+          allowed_form_types: [],
+          default_form_types: [],
+          sub_parts: [
+            {
+              id: "catalog-countable",
+              code: "countable",
+              name_zh: "可数名词",
+              name_en: "Countable noun",
+              sort_order: 1
+            }
+          ]
+        }
+      ]
+    };
+    render(<Harness forms={forms} partOfSpeechCatalog={partOfSpeechCatalog} />);
+    const editor = screen.getByTestId("meanings-value").previousElementSibling;
+
+    expect(screen.getByRole("tab", { name: "名词" })).toBeInTheDocument();
+    expect(screen.getByText("可数名词")).toBeInTheDocument();
+    expect(screen.getByText("核心")).toBeInTheDocument();
+    expect(screen.getAllByText("语法结构 1")).toHaveLength(2);
+    expect(editor).not.toHaveTextContent("pos-1");
+    expect(editor).not.toHaveTextContent("sense-group-1");
+    expect(editor).not.toHaveTextContent("grammar-1");
+    expect(editor).not.toHaveTextContent("countable");
   });
 
   it("zh_sentence 与 distinguish EnglishText 暴露各自 locator 并保持方言 UUID", () => {
@@ -556,18 +782,18 @@ describe("V3MeaningsAndExamplesStep", () => {
   it("单项列表移动按钮禁用，删除末个 POS 不错误切换，保存态禁用提交", () => {
     const { container } = render(<Harness />);
     for (const label of [
-      "上移释义组 sense-group-1",
-      "下移释义组 sense-group-1",
-      "上移语法结构 grammar-1",
-      "下移语法结构 grammar-1",
-      "上移释义 sense-1",
-      "下移释义 sense-1",
-      "上移定义 definition-1",
-      "下移定义 definition-1",
-      "上移例句 sentence-1",
-      "下移例句 sentence-1",
-      "上移关联 relation-1",
-      "下移关联 relation-1"
+      "上移释义组 1",
+      "下移释义组 1",
+      "上移语法结构 1",
+      "下移语法结构 1",
+      "上移释义 1",
+      "下移释义 1",
+      "上移定义 1",
+      "下移定义 1",
+      "上移例句 1",
+      "下移例句 1",
+      "上移关联 1",
+      "下移关联 1"
     ]) {
       expect(
         container.querySelector<HTMLButtonElement>(
@@ -577,7 +803,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     }
     fireEvent.click(
       container.querySelector<HTMLButtonElement>(
-        'button[aria-label="删除词性释义 pos-1"]'
+        'button[aria-label="删除词性 1的释义"]'
       )!
     );
     expect(value().pos).toEqual([]);
@@ -623,7 +849,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     const { container } = render(
       <Harness idFactory={() => "sense-without-group"} initial={emptyNested} />
     );
-    fireEvent.click(screen.getByText("新增释义 pos-1"));
+    fireEvent.click(screen.getByText("新增释义"));
     expect(value().pos[0]!.senses[0]).toMatchObject({
       id: "sense-without-group",
       definitions: [],
@@ -651,7 +877,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     );
     fireEvent.click(
       twoPosContainer.querySelector<HTMLButtonElement>(
-        'button[aria-label="删除词性释义 pos-1"]'
+        'button[aria-label="删除词性 1的释义"]'
       )!
     );
     expect(onChange).toHaveBeenCalledWith(
@@ -667,7 +893,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     async (intent) => {
       const onSave = vi.fn().mockResolvedValue(undefined);
       render(<Harness onSave={onSave} />);
-      fireEvent.change(screen.getByLabelText("频率 sense-1"), {
+      fireEvent.change(screen.getByLabelText("释义 1 频率"), {
         target: { value: "low" }
       });
 
@@ -694,7 +920,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     const failed = vi.fn().mockRejectedValue(new Error("network"));
     const initial = structuredClone(meaningsFixture);
     const { rerender } = render(<Harness initial={initial} onSave={failed} />);
-    fireEvent.change(screen.getByLabelText("频率 sense-1"), {
+    fireEvent.change(screen.getByLabelText("释义 1 频率"), {
       target: { value: "local-unsaved" }
     });
     fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
@@ -713,7 +939,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         />
       </AntApp>
     );
-    expect(screen.getByLabelText("频率 sense-1")).toHaveValue(
+    expect(screen.getByLabelText("释义 1 频率")).toHaveValue(
       "server-canonical"
     );
   });

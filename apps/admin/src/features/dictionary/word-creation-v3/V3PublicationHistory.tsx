@@ -4,6 +4,8 @@ import type {
   AdminWordPublicationEnvelope,
   AdminWordPublicationListResponse,
   AdminWordV3,
+  EnglishTextV2,
+  EnglishTextV3,
   SurfaceMatchPageAny,
   WordDefinitionV2,
   WordDefinitionV3,
@@ -22,6 +24,15 @@ import {
   useSurfaceSnapshotAny
 } from "../useSurfaceSnapshot";
 import { createV3WordRequests, type V3WordRequests } from "./api";
+import {
+  definitionModeLabel,
+  dialectLabel,
+  formTypeLabel,
+  partOfSpeechLabel,
+  pronunciationStyleLabel,
+  relationLabel,
+  sentenceLinkRoleLabel
+} from "./presentation";
 
 type PublicationRequests = Pick<
   V3WordRequests,
@@ -50,7 +61,7 @@ const defaultRequests = createV3WordRequests();
 function v2Headword(headwords: WordHeadwordsV2): string {
   return headwords.mode === "unified"
     ? headwords.common
-    : `UK ${headwords.uk} / US ${headwords.us}`;
+    : `英式 ${headwords.uk} / 美式 ${headwords.us}`;
 }
 
 function publicationLabel(publication: AdminWordPublicationAny): string {
@@ -80,6 +91,84 @@ interface SnapshotMeaningLine {
   text: string;
 }
 
+interface SnapshotGrammarLine {
+  id: string;
+  pos: string;
+  dialect: string;
+  text: string;
+}
+
+interface SnapshotSentenceLine {
+  id: string;
+  pos: string;
+  level: string;
+  english: Array<{ id: string; dialect: string; text: string }>;
+  chinese: string;
+  roles: string[];
+  associations: Array<{ id: string; target: string; gloss?: string }>;
+}
+
+interface SnapshotRelationLine {
+  id: string;
+  pos: string;
+  relation: string;
+  target: string;
+  gloss?: string;
+}
+
+interface SnapshotSenseGroupLine {
+  id: string;
+  label: string;
+}
+
+function v2EnglishRows(value: EnglishTextV2) {
+  if (value.mode === "unified") {
+    return [
+      {
+        id: value.common.id,
+        dialect: "common",
+        text: value.common.value.text
+      }
+    ];
+  }
+  return (["uk", "us"] as const).flatMap((dialect) => {
+    const slot = value[dialect];
+    return slot.state === "ready"
+      ? [
+          {
+            id: slot.variant.id,
+            dialect,
+            text: slot.variant.value.text
+          }
+        ]
+      : [];
+  });
+}
+
+function v3EnglishRows(value: EnglishTextV3) {
+  if (value.mode === "unified") {
+    return [
+      {
+        id: value.common.id,
+        dialect: "common",
+        text: value.common.value.text
+      }
+    ];
+  }
+  return (["uk", "us"] as const).flatMap((dialect) => {
+    const slot = value[dialect];
+    return slot.state === "ready"
+      ? [
+          {
+            id: slot.variant.id,
+            dialect,
+            text: slot.variant.value.text
+          }
+        ]
+      : [];
+  });
+}
+
 function v2DefinitionTexts(definition: WordDefinitionV2): string[] {
   if ("content_id" in definition) {
     return [definition.content.text];
@@ -107,6 +196,10 @@ function v3DefinitionTexts(definition: WordDefinitionV3): string[] {
 function snapshotBody(publication: AdminWordPublicationAny): {
   forms: SnapshotFormLine[];
   meanings: SnapshotMeaningLine[];
+  senseGroups: SnapshotSenseGroupLine[];
+  grammar: SnapshotGrammarLine[];
+  sentences: SnapshotSentenceLine[];
+  relations: SnapshotRelationLine[];
 } {
   if (publication.schema_version === 2) {
     const posById = new Map(
@@ -143,6 +236,49 @@ function snapshotBody(publication: AdminWordPublicationAny): {
               text
             }))
           )
+        )
+      ),
+      senseGroups: publication.word.meanings.sense_groups.map((group) => ({
+        id: group.id,
+        label: [group.name_zh, group.name_en].filter(Boolean).join(" / ")
+      })),
+      grammar: publication.word.meanings.pos.flatMap((pos) =>
+        pos.grammar_structures.flatMap((structure) =>
+          structure.variants.map((variant) => ({
+            id: variant.id,
+            pos: posById.get(pos.pos_id) ?? pos.pos_id,
+            dialect: variant.dialect,
+            text: variant.content.text
+          }))
+        )
+      ),
+      sentences: publication.word.meanings.pos.flatMap((pos) =>
+        pos.senses.flatMap((sense) =>
+          sense.sentences.map((sentence) => ({
+            id: sentence.id,
+            pos: posById.get(pos.pos_id) ?? pos.pos_id,
+            level: sentence.level,
+            english: v2EnglishRows(sentence.en_text),
+            chinese: sentence.zh_text.text,
+            roles: sentence.links.map((link) =>
+              sentenceLinkRoleLabel(link.role)
+            ),
+            associations: []
+          }))
+        )
+      ),
+      relations: publication.word.meanings.pos.flatMap((pos) =>
+        pos.senses.flatMap((sense) =>
+          sense.relations.map((relation) => ({
+            id: relation.id,
+            pos: posById.get(pos.pos_id) ?? pos.pos_id,
+            relation: relation.relation,
+            target:
+              relation.target_headword ??
+              relation.pending_target_headword ??
+              "待补充目标词条",
+            ...(relation.target_gloss ? { gloss: relation.target_gloss } : {})
+          }))
         )
       )
     };
@@ -184,6 +320,53 @@ function snapshotBody(publication: AdminWordPublicationAny): {
           }))
         )
       )
+    ),
+    senseGroups: publication.word.meanings.sense_groups.map((group) => ({
+      id: group.id,
+      label: [group.name_zh, group.name_en].filter(Boolean).join(" / ")
+    })),
+    grammar: publication.word.meanings.pos.flatMap((pos) =>
+      pos.grammar_structures.flatMap((structure) =>
+        structure.variants.map((variant) => ({
+          id: variant.id,
+          pos: posById.get(pos.pos_id) ?? pos.pos_id,
+          dialect: variant.dialect,
+          text: variant.content.text
+        }))
+      )
+    ),
+    sentences: publication.word.meanings.pos.flatMap((pos) =>
+      pos.senses.flatMap((sense) =>
+        sense.sentences.map((sentence) => ({
+          id: sentence.id,
+          pos: posById.get(pos.pos_id) ?? pos.pos_id,
+          level: sentence.level,
+          english: v3EnglishRows(sentence.en_text),
+          chinese: sentence.zh_text.text,
+          roles: sentence.links.map((link) => sentenceLinkRoleLabel(link.role)),
+          associations: sentence.associations.map((association) => ({
+            id: association.id,
+            target: association.target_headword,
+            ...(association.target_gloss
+              ? { gloss: association.target_gloss }
+              : {})
+          }))
+        }))
+      )
+    ),
+    relations: publication.word.meanings.pos.flatMap((pos) =>
+      pos.senses.flatMap((sense) =>
+        sense.relations.map((relation) => ({
+          id: relation.id,
+          pos: posById.get(pos.pos_id) ?? pos.pos_id,
+          relation: relation.relation,
+          target:
+            relation.target_headword ??
+            relation.pending_target_headword ??
+            "待补充目标词条",
+          ...(relation.target_gloss ? { gloss: relation.target_gloss } : {})
+        }))
+      )
     )
   };
 }
@@ -205,9 +388,9 @@ function PublicationSnapshotBody({
             snapshot.forms.map((form) => (
               <Flex key={form.id} vertical gap={2}>
                 <Flex align="center" gap="small" wrap>
-                  <Tag>{form.pos}</Tag>
-                  <Tag>{form.formType}</Tag>
-                  <Tag>{form.dialect}</Tag>
+                  <Tag>{partOfSpeechLabel(form.pos)}</Tag>
+                  <Tag>{formTypeLabel(form.formType as never)}</Tag>
+                  <Tag>{dialectLabel(form.dialect as never)}</Tag>
                   <Typography.Text>{form.spelling}</Typography.Text>
                 </Flex>
                 {form.pronunciations.length === 0 ? (
@@ -215,8 +398,11 @@ function PublicationSnapshotBody({
                 ) : (
                   form.pronunciations.map((pronunciation) => (
                     <Typography.Text key={pronunciation.id} type="secondary">
-                      {pronunciation.dictPhonetic} → {pronunciation.actualPron}{" "}
-                      · {pronunciation.style ?? "未标注"}
+                      词典音标 {pronunciation.dictPhonetic} · 实际发音{" "}
+                      {pronunciation.actualPron}
+                      {pronunciation.style
+                        ? ` · ${pronunciationStyleLabel(pronunciation.style as never)}`
+                        : ""}
                     </Typography.Text>
                   ))
                 )}
@@ -231,9 +417,82 @@ function PublicationSnapshotBody({
           ) : (
             snapshot.meanings.map((meaning) => (
               <Flex key={meaning.id} align="center" gap="small" wrap>
-                <Tag>{meaning.pos}</Tag>
-                <Tag>{meaning.mode}</Tag>
+                <Tag>{partOfSpeechLabel(meaning.pos)}</Tag>
+                <Tag>{definitionModeLabel(meaning.mode)}</Tag>
                 <Typography.Text>{meaning.text}</Typography.Text>
+              </Flex>
+            ))
+          )}
+        </Flex>
+        {snapshot.senseGroups.length > 0 ? (
+          <Flex vertical gap="small">
+            <Typography.Text strong>释义组</Typography.Text>
+            <Flex gap="small" wrap>
+              {snapshot.senseGroups.map((group, index) => (
+                <Tag key={group.id}>
+                  释义组 {index + 1}：{group.label}
+                </Tag>
+              ))}
+            </Flex>
+          </Flex>
+        ) : null}
+        {snapshot.grammar.length > 0 ? (
+          <Flex vertical gap="small">
+            <Typography.Text strong>语法结构</Typography.Text>
+            {snapshot.grammar.map((grammar) => (
+              <Flex key={grammar.id} gap="small" wrap>
+                <Tag>{partOfSpeechLabel(grammar.pos)}</Tag>
+                <Tag>{dialectLabel(grammar.dialect as never)}</Tag>
+                <Typography.Text>{grammar.text}</Typography.Text>
+              </Flex>
+            ))}
+          </Flex>
+        ) : null}
+        <Flex vertical gap="small">
+          <Typography.Text strong>例句</Typography.Text>
+          {snapshot.sentences.length === 0 ? (
+            <Typography.Text type="secondary">无例句快照</Typography.Text>
+          ) : (
+            snapshot.sentences.map((sentence) => (
+              <Card key={sentence.id} size="small">
+                <Flex vertical gap={4}>
+                  <Flex gap="small" wrap>
+                    <Tag>{partOfSpeechLabel(sentence.pos)}</Tag>
+                    {sentence.level ? <Tag>{sentence.level}</Tag> : null}
+                    {sentence.roles.map((role, index) => (
+                      <Tag key={`${sentence.id}-role-${index}`}>{role}</Tag>
+                    ))}
+                  </Flex>
+                  {sentence.english.map((row) => (
+                    <Typography.Text key={row.id}>
+                      {dialectLabel(row.dialect as never)}：{row.text}
+                    </Typography.Text>
+                  ))}
+                  <Typography.Text>中文：{sentence.chinese}</Typography.Text>
+                  {sentence.associations.map((association) => (
+                    <Typography.Text key={association.id}>
+                      上下文关联：{association.target}
+                      {association.gloss ? ` · ${association.gloss}` : ""}
+                    </Typography.Text>
+                  ))}
+                </Flex>
+              </Card>
+            ))
+          )}
+        </Flex>
+        <Flex vertical gap="small">
+          <Typography.Text strong>关系词</Typography.Text>
+          {snapshot.relations.length === 0 ? (
+            <Typography.Text type="secondary">无关系词快照</Typography.Text>
+          ) : (
+            snapshot.relations.map((relation) => (
+              <Flex key={relation.id} gap="small" wrap>
+                <Tag>{partOfSpeechLabel(relation.pos)}</Tag>
+                <Tag>{relationLabel(relation.relation)}</Tag>
+                <Typography.Text>
+                  {relation.target}
+                  {relation.gloss ? ` · ${relation.gloss}` : ""}
+                </Typography.Text>
               </Flex>
             ))
           )}
@@ -249,55 +508,16 @@ function PublicationMetadata({
   publication: AdminWordPublicationAny;
 }) {
   return (
-    <Card size="small" title="发布元数据" data-testid="publication-metadata">
+    <Card size="small" title="发布信息" data-testid="publication-metadata">
       <Flex vertical gap={2}>
         <Typography.Text>
-          schema_version: {publication.schema_version}
+          发布批次：第 {publication.publication_number} 次
         </Typography.Text>
+        <Typography.Text>发布时间：{publication.published_at}</Typography.Text>
         <Typography.Text>
-          publication_id: {publication.publication_id}
-        </Typography.Text>
-        <Typography.Text>entry_id: {publication.entry_id}</Typography.Text>
-        <Typography.Text>
-          publication_number: {publication.publication_number}
-        </Typography.Text>
-        <Typography.Text>
-          source_revision: {publication.source_revision}
-        </Typography.Text>
-        <Typography.Text>
-          published_by_admin_id: {publication.published_by_admin_id}
-        </Typography.Text>
-        <Typography.Text>
-          published_at: {publication.published_at}
-        </Typography.Text>
-        <Typography.Text>
-          is_current: {publication.is_current ? "true" : "false"}
+          当前状态：{publication.is_current ? "当前线上版本" : "历史版本"}
         </Typography.Text>
       </Flex>
-    </Card>
-  );
-}
-
-function PublicationStructureSnapshot({
-  publication
-}: {
-  publication: AdminWordPublicationAny;
-}) {
-  return (
-    <Card size="small" title="完整发布结构快照">
-      <pre
-        aria-label="完整发布结构快照"
-        data-testid="publication-structure-snapshot"
-        style={{
-          margin: 0,
-          maxHeight: 320,
-          overflow: "auto",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word"
-        }}
-      >
-        {JSON.stringify(publication, null, 2)}
-      </pre>
     </Card>
   );
 }
@@ -351,7 +571,7 @@ function activationErrorMessage(error: unknown): string {
       case 422:
         return "激活请求校验未通过。";
       case 503:
-        return "V3 发布服务暂不可用，请稍后重试。";
+        return "发布服务暂不可用，请稍后重试。";
       default:
         return "激活发布版本失败，请稍后重试。";
     }
@@ -702,7 +922,7 @@ export function V3PublicationHistory({
           description={
             recovery.phase === "error"
               ? "旧发布详情与确认已失效。刷新成功并重新打开发布详情前，不会再次发送激活请求。"
-              : "旧发布详情与确认已失效，正在获取最新 canonical revision 和发布历史。"
+              : "旧发布详情与确认已失效，正在获取最新词条和发布历史。"
           }
           action={
             recovery.phase === "error" ? (
@@ -728,19 +948,11 @@ export function V3PublicationHistory({
               >
                 <Flex vertical gap={2}>
                   <Flex align="center" gap="small" wrap>
-                    <Tag
-                      color={
-                        publication.schema_version === 3 ? "blue" : undefined
-                      }
-                    >
-                      V{publication.schema_version}
-                    </Tag>
                     <Typography.Text strong>
                       {publicationLabel(publication)}
                     </Typography.Text>
                     <Typography.Text type="secondary">
-                      #{publication.publication_number} · revision{" "}
-                      {publication.source_revision}
+                      第 {publication.publication_number} 次发布
                     </Typography.Text>
                     {publication.is_current ? (
                       <Tag color="green">当前</Tag>
@@ -751,7 +963,7 @@ export function V3PublicationHistory({
                   </Typography.Text>
                 </Flex>
                 <Button
-                  aria-label={`查看发布 #${publication.publication_number}`}
+                  aria-label={`查看第 ${publication.publication_number} 次发布`}
                   disabled={recovery !== undefined}
                   onClick={() => openDetail(publication.publication_id)}
                 >
@@ -765,7 +977,7 @@ export function V3PublicationHistory({
       <Modal
         footer={null}
         open={selectedPublicationId !== undefined}
-        title="不可变发布详情"
+        title="发布详情"
         onCancel={closeDetail}
       >
         <Flex vertical gap="middle" data-testid="publication-detail">
@@ -776,28 +988,16 @@ export function V3PublicationHistory({
           {detail ? (
             <>
               <Flex align="center" gap="small" wrap>
-                <Tag color={detail.schema_version === 3 ? "blue" : undefined}>
-                  V{detail.schema_version}
-                </Tag>
                 <Typography.Title level={5} style={{ margin: 0 }}>
                   {publicationLabel(detail)}
                 </Typography.Title>
                 <Typography.Text type="secondary">
-                  revision {detail.source_revision}
+                  第 {detail.publication_number} 次发布
                 </Typography.Text>
               </Flex>
-              <Alert
-                showIcon
-                type="info"
-                title={
-                  detail.schema_version === 2
-                    ? "历史 V2 快照永久只读"
-                    : "正在查看不可变 V3 发布快照"
-                }
-              />
+              <Alert showIcon type="info" title="正在查看只读的历史发布快照" />
               <PublicationMetadata publication={detail} />
               <PublicationSnapshotBody publication={detail} />
-              <PublicationStructureSnapshot publication={detail} />
               {surfacePage ? (
                 <LifecycleSurfaceConfirmation
                   action="activate"

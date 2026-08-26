@@ -584,7 +584,7 @@ function detection(surface: string): DetectLexiconSurfaceResponseV3 {
   return {
     schema_version: 3,
     detection_id: nodeId(301),
-    expires_at: "2026-08-25T03:00:00.000Z",
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
     request: { language: "en", kind: "word", surface },
     normalized_surface: surface.trim().toLowerCase(),
     builtin_dictionary: {

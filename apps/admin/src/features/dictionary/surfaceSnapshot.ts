@@ -9,6 +9,7 @@ import type {
   SurfacePolicyBlockCodeV2,
   SurfacePolicyNameV2
 } from "@tsz/types";
+import { dialectLabel, formTypeLabel } from "./word-creation-v3/presentation";
 
 export type SurfaceSnapshotPhase =
   "idle" | "loading" | "ready" | "disabled" | "error" | "expired";
@@ -329,10 +330,64 @@ export interface LifecycleSurfaceMatchCard {
   key: string;
   entry_id: string;
   label: string;
+  kind: "word" | "phrase";
   status: "draft" | "published" | "archived";
   match_count: number;
   membership: SurfaceMatchMembership;
   source_labels: string[];
+  pos_labels: string[];
+  gloss_previews: string[];
+}
+
+function mergeMembership(
+  left: SurfaceMatchMembership,
+  right: SurfaceMatchMembership
+): SurfaceMatchMembership {
+  return left === right ? left : "composite";
+}
+
+const POS_LABELS: Record<string, string> = {
+  noun: "名词",
+  pronoun: "代词",
+  verb: "动词",
+  adjective: "形容词",
+  adverb: "副词",
+  preposition: "介词",
+  article: "冠词",
+  determiner: "限定词",
+  conjunction: "连词",
+  numeral: "数词",
+  interjection: "感叹词"
+};
+
+function productPosLabels(values: string[]): string[] {
+  return uniqueBy(
+    values.map((value) =>
+      POS_LABELS[value]
+        ? POS_LABELS[value]
+        : /[\u3400-\u9fff]/u.test(value)
+          ? value
+          : "其他词性"
+    ),
+    (value) => value
+  );
+}
+
+function v2SourceLabel(item: LexiconSurfaceMatchV2): string {
+  const source = item.existing.source;
+  return source.source_kind === "form"
+    ? `词形 · ${source.surface} · ${formTypeLabel(source.form_type)} · ${dialectLabel(source.dialect)}`
+    : `主词 · ${source.surface} · ${dialectLabel(source.dialect)}`;
+}
+
+function v3SourceLabel(item: SurfaceMatchItemV3): string {
+  if (item.match_kind === "form_variant_v3") {
+    return `词形 · ${item.match.spelling} · ${formTypeLabel(item.match.form_type)} · ${dialectLabel(item.match.dialect)}`;
+  }
+  const source = item.match.existing.source;
+  return source.source_kind === "form"
+    ? `词形 · ${source.surface} · ${formTypeLabel(source.form_type)} · ${dialectLabel(source.dialect)}`
+    : `主词 · ${source.surface} · ${dialectLabel(source.dialect)}`;
 }
 
 /** Lifecycle confirmation uses each schema's real source and presentation fields. */
@@ -340,23 +395,41 @@ export function aggregateLifecycleSurfaceMatchCards(
   state: SurfaceSnapshotState<SurfaceMatchPageAny>
 ): LifecycleSurfaceMatchCard[] {
   if (state.schema_version !== 3) {
-    return aggregateSurfaceMatchCards(
+    const aggregated = aggregateSurfaceMatchCards(
       state.items as LexiconSurfaceMatchV2[],
       state.matched_entry_contexts as MatchedEntryContextV2[]
-    ).map((card) => ({
-      key: card.key,
-      entry_id: card.existing.word_id,
-      label: card.existing.headword,
-      status: card.existing.status,
-      match_count: card.matches.length,
-      membership: card.membership,
-      source_labels: card.matches.map((match) => {
-        const source = match.existing.source;
-        return source.source_kind === "form"
-          ? `${source.pos} · ${source.form_type} · ${source.surface} · ${source.dialect}`
-          : `主词 · ${source.surface} · ${source.dialect}`;
-      })
-    }));
+    );
+    const cards = new Map<string, LifecycleSurfaceMatchCard>();
+    for (const card of aggregated) {
+      const entryId = card.existing.word_id;
+      const existing = cards.get(entryId);
+      const sourceLabels = card.matches.map(v2SourceLabel);
+      if (existing) {
+        existing.match_count += card.matches.length;
+        existing.membership = mergeMembership(
+          existing.membership,
+          card.membership
+        );
+        existing.source_labels = uniqueBy(
+          [...existing.source_labels, ...sourceLabels],
+          (value) => value
+        );
+        continue;
+      }
+      cards.set(entryId, {
+        key: entryId,
+        entry_id: entryId,
+        label: card.existing.headword,
+        kind: card.existing.kind,
+        status: card.existing.status,
+        match_count: card.matches.length,
+        membership: card.membership,
+        source_labels: uniqueBy(sourceLabels, (value) => value),
+        pos_labels: productPosLabels(card.context?.pos_labels ?? []),
+        gloss_previews: card.context?.gloss_previews ?? []
+      });
+    }
+    return [...cards.values()];
   }
 
   const contexts = new Map(
@@ -365,35 +438,48 @@ export function aggregateLifecycleSurfaceMatchCards(
       context
     ])
   );
-  return (state.items as SurfaceMatchItemV3[]).map((item) => {
-    if (item.match_kind === "form_variant_v3") {
-      const context = contexts.get(item.match.entry_id);
-      return {
-        key: surfaceItemKey(item),
-        entry_id: item.match.entry_id,
-        label: context?.presentation.label ?? item.match.spelling,
-        status: item.match.status,
-        match_count: 1,
-        membership: membership(state.confirmation_reasons),
-        source_labels: [
-          `V3 词形 · ${item.match.spelling} · ${item.match.form_type} · ${item.match.dialect}`
-        ]
-      };
+  const cards = new Map<string, LifecycleSurfaceMatchCard>();
+  for (const item of state.items as SurfaceMatchItemV3[]) {
+    const entryId =
+      item.match_kind === "form_variant_v3"
+        ? item.match.entry_id
+        : item.match.existing.word_id;
+    const context = contexts.get(entryId);
+    const label =
+      context?.presentation.label ??
+      (item.match_kind === "form_variant_v3"
+        ? item.match.spelling
+        : item.match.existing.headword);
+    const status =
+      item.match_kind === "form_variant_v3"
+        ? item.match.status
+        : item.match.existing.status;
+    const kind =
+      item.match_kind === "legacy_v2" ? item.match.existing.kind : "word";
+    const sourceLabel = v3SourceLabel(item);
+    const existing = cards.get(entryId);
+    if (existing) {
+      existing.match_count += 1;
+      existing.source_labels = uniqueBy(
+        [...existing.source_labels, sourceLabel],
+        (value) => value
+      );
+      continue;
     }
-    const context = contexts.get(item.match.existing.word_id);
-    const source = item.match.existing.source;
-    return {
-      key: surfaceItemKey(item),
-      entry_id: item.match.existing.word_id,
-      label: context?.presentation.label ?? item.match.existing.headword,
-      status: item.match.existing.status,
+    cards.set(entryId, {
+      key: entryId,
+      entry_id: entryId,
+      label,
+      kind,
+      status,
       match_count: 1,
       membership: membership(state.confirmation_reasons),
-      source_labels: [
-        `V3 兼容来源 · ${source.source_kind === "form" ? "词形" : "主词"} · ${source.surface} · ${source.dialect}`
-      ]
-    };
-  });
+      source_labels: [sourceLabel],
+      pos_labels: productPosLabels(context?.pos_labels ?? []),
+      gloss_previews: context?.gloss_previews ?? []
+    });
+  }
+  return [...cards.values()];
 }
 
 const SURFACE_BUSINESS_RETRY_CODES = new Set([

@@ -1,5 +1,6 @@
 import {
   Alert,
+  AutoComplete,
   Button,
   Card,
   Checkbox,
@@ -8,14 +9,18 @@ import {
   Input,
   Select,
   Space,
+  Tag,
   Tabs,
   Typography
 } from "antd";
 import type {
   Dialect,
+  DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   EnglishTextV3,
   GrammarStructureV3,
+  PartOfSpeechCatalogResponse,
+  RelatedWordResultAny,
   StepSaveIntent,
   V3DraftValidationIssue,
   WordDefinitionV3,
@@ -23,12 +28,19 @@ import type {
   WordSentenceWritableV3,
   WordSenseWritableV3
 } from "@tsz/types";
+import { useState } from "react";
+import { useRelatedSearchAny } from "../api";
 import { newWordNodeId } from "../word-model/primitives";
 import {
   editableEnglishText,
   replaceEnglishText,
   replaceRichText
 } from "./meaningsModel";
+import {
+  definitionModeLabel,
+  dialectLabel,
+  partOfSpeechLabel
+} from "./presentation";
 
 export interface V3MeaningsAndExamplesStepProps {
   value: DraftMeaningsStepContentWritableV3;
@@ -40,6 +52,9 @@ export interface V3MeaningsAndExamplesStepProps {
   saving?: boolean;
   issues?: readonly V3DraftValidationIssue[];
   activePosId?: string;
+  wordId?: string;
+  forms?: DraftFormsStepContentV3;
+  partOfSpeechCatalog?: PartOfSpeechCatalogResponse;
   onActivePosChange?: (posId: string) => void;
   idFactory?: () => string;
 }
@@ -134,7 +149,11 @@ function newDefinition(idFactory: () => string): WordDefinitionV3 {
   };
 }
 
-function newSentence(idFactory: () => string): WordSentenceWritableV3 {
+function newSentence(
+  idFactory: () => string,
+  wordId: string,
+  senseId: string
+): WordSentenceWritableV3 {
   return {
     id: idFactory(),
     level: "A1",
@@ -148,8 +167,50 @@ function newSentence(idFactory: () => string): WordSentenceWritableV3 {
     },
     zh_text_id: idFactory(),
     zh_text: { version: 2, text: "", annotations: [] },
-    links: []
+    links: [{ word_id: wordId, sense_id: senseId, role: "focus" }]
   };
+}
+
+interface ContextTarget {
+  key: string;
+  label: string;
+  word_id: string;
+  sense_id: string;
+}
+
+function relatedContextTargets(results: RelatedWordResultAny[]) {
+  return results.flatMap((result): ContextTarget[] => {
+    const wordId =
+      result.schema_version === 3 ? result.entry_id : result.word_id;
+    const headword =
+      result.schema_version === 3 ? result.presentation.label : result.headword;
+    return result.senses.map((sense) => ({
+      key: `${wordId}:${sense.sense_id}`,
+      label: `${headword} · ${sense.gloss || "暂无释义"}`,
+      word_id: wordId,
+      sense_id: sense.sense_id
+    }));
+  });
+}
+
+function primaryLinkState(
+  sentence: WordSentenceWritableV3,
+  wordId: string | undefined,
+  senseId: string
+): "missing" | "valid" | "invalid" {
+  const primaryLinks = sentence.links.filter(
+    (link) => link.role === "focus" || link.role === "head"
+  );
+  if (primaryLinks.length === 0) return "missing";
+  if (
+    primaryLinks.length === 1 &&
+    primaryLinks[0]!.role === "focus" &&
+    primaryLinks[0]!.word_id === wordId &&
+    primaryLinks[0]!.sense_id === senseId
+  ) {
+    return "valid";
+  }
+  return "invalid";
 }
 
 function newRelation(idFactory: () => string): WordRelationWritableV3 {
@@ -158,6 +219,12 @@ function newRelation(idFactory: () => string): WordRelationWritableV3 {
     relation: "synonym",
     score: "0"
   };
+}
+
+function sentenceLinkRoleLabel(role: string): string {
+  if (role === "focus" || role === "head") return "主关联";
+  if (role === "context") return "上下文关联";
+  return "其他关联";
 }
 
 function OptionalInput({
@@ -191,14 +258,65 @@ export function V3MeaningsAndExamplesStep({
   saving = false,
   issues = [],
   activePosId,
+  wordId,
+  forms,
+  partOfSpeechCatalog,
   onActivePosChange,
   idFactory = newWordNodeId
 }: V3MeaningsAndExamplesStepProps) {
+  const [contextSearch, setContextSearch] = useState<{
+    sentenceId: string;
+    linkIndex?: number;
+    query: string;
+  }>();
+  const [knownContextTargets, setKnownContextTargets] = useState<
+    Record<string, ContextTarget>
+  >({});
   const change = (mutation: DraftMutation) => {
     const next = structuredClone(value);
     mutation(next);
     onChange(next);
   };
+
+  const formPosById = new Map(
+    (forms?.pos ?? []).map((pos) => [pos.pos_id, pos.pos] as const)
+  );
+  const catalogByCode = new Map(
+    (partOfSpeechCatalog?.items ?? []).map((item) => [item.code, item] as const)
+  );
+  const visiblePosLabel = (posId: string, index: number) => {
+    const code = formPosById.get(posId);
+    if (!code) return `词性 ${index + 1}`;
+    return catalogByCode.get(code)?.name_zh ?? partOfSpeechLabel(code);
+  };
+  const localContextTargets = value.pos.flatMap((pos, posIndex) =>
+    pos.senses.map((sense, senseIndex) => ({
+      key: `${wordId ?? ""}:${sense.id}`,
+      label: `${visiblePosLabel(pos.pos_id, posIndex)} · 释义 ${senseIndex + 1}`,
+      word_id: wordId ?? "",
+      sense_id: sense.id
+    }))
+  );
+  const relatedSearch = useRelatedSearchAny(
+    contextSearch?.query ?? "",
+    undefined,
+    Boolean(contextSearch?.query.trim())
+  );
+  const remoteContextTargets = relatedContextTargets(
+    [
+      ...(relatedSearch.exact.data?.pages ?? []),
+      ...(relatedSearch.contains.data?.pages ?? [])
+    ].flatMap((page) => page.results)
+  );
+  const contextTargets = Array.from(
+    new Map(
+      [
+        ...localContextTargets,
+        ...Object.values(knownContextTargets),
+        ...remoteContextTargets
+      ].map((target) => [target.key, target])
+    ).values()
+  );
 
   const save = async (intent: StepSaveIntent) => {
     if (!onSave) return;
@@ -239,7 +357,7 @@ export function V3MeaningsAndExamplesStep({
             value.sense_groups.map((group, groupIndex) => (
               <Flex data-v3-node-id={group.id} gap="small" key={group.id} wrap>
                 <Input
-                  aria-label={`释义组中文 ${group.id}`}
+                  aria-label={`释义组 ${groupIndex + 1} 中文名称`}
                   data-v3-field="name_zh"
                   data-v3-node-id={group.id}
                   onChange={(event) =>
@@ -251,7 +369,7 @@ export function V3MeaningsAndExamplesStep({
                   value={group.name_zh}
                 />
                 <Input
-                  aria-label={`释义组英文 ${group.id}`}
+                  aria-label={`释义组 ${groupIndex + 1} 英文名称`}
                   data-v3-field="name_en"
                   data-v3-node-id={group.id}
                   onChange={(event) =>
@@ -264,7 +382,7 @@ export function V3MeaningsAndExamplesStep({
                 />
                 <ListActions
                   index={groupIndex}
-                  label={`释义组 ${group.id}`}
+                  label={`释义组 ${groupIndex + 1}`}
                   length={value.sense_groups.length}
                   onDelete={() =>
                     change((draft) => {
@@ -329,7 +447,7 @@ export function V3MeaningsAndExamplesStep({
           defaultActiveKey={value.pos[0]?.pos_id}
           items={value.pos.map((pos, posIndex) => ({
             key: pos.pos_id,
-            label: `词性 ${posIndex + 1}`,
+            label: visiblePosLabel(pos.pos_id, posIndex),
             children: (
               <Flex
                 data-v3-field="senses"
@@ -339,7 +457,7 @@ export function V3MeaningsAndExamplesStep({
                 gap="middle"
               >
                 <Button
-                  aria-label={`删除词性释义 ${pos.pos_id}`}
+                  aria-label={`删除${visiblePosLabel(pos.pos_id, posIndex)}的释义`}
                   danger
                   onClick={() =>
                     change((draft) => {
@@ -366,7 +484,7 @@ export function V3MeaningsAndExamplesStep({
                             extra={
                               <ListActions
                                 index={structureIndex}
-                                label={`语法结构 ${structure.id}`}
+                                label={`语法结构 ${structureIndex + 1}`}
                                 length={pos.grammar_structures.length}
                                 onDelete={() =>
                                   change((draft) => {
@@ -412,7 +530,7 @@ export function V3MeaningsAndExamplesStep({
                                 key={variant.id}
                               >
                                 <Select
-                                  aria-label={`语法方言 ${variant.id}`}
+                                  aria-label={`语法结构 ${structureIndex + 1} 地区 ${variantIndex + 1}`}
                                   onChange={(dialect: Dialect) =>
                                     change((draft) => {
                                       draft.pos[posIndex]!.grammar_structures[
@@ -429,7 +547,7 @@ export function V3MeaningsAndExamplesStep({
                                   value={variant.dialect}
                                 />
                                 <Input
-                                  aria-label={`语法 ${variant.id}`}
+                                  aria-label={`语法结构 ${structureIndex + 1} 内容 ${variantIndex + 1}`}
                                   data-v3-field="content"
                                   data-v3-node-id={variant.id}
                                   onChange={(event) =>
@@ -462,7 +580,7 @@ export function V3MeaningsAndExamplesStep({
                       })
                     }
                   >
-                    新增语法结构 {pos.pos_id}
+                    新增语法结构
                   </Button>
                 </Card>
 
@@ -472,7 +590,7 @@ export function V3MeaningsAndExamplesStep({
                     extra={
                       <ListActions
                         index={senseIndex}
-                        label={`释义 ${sense.id}`}
+                        label={`释义 ${senseIndex + 1}`}
                         length={pos.senses.length}
                         onDelete={() =>
                           change((draft) => {
@@ -496,20 +614,44 @@ export function V3MeaningsAndExamplesStep({
                   >
                     <Flex vertical gap="small">
                       <Space wrap>
-                        <Input
-                          aria-label={`子词性 ${sense.id}`}
+                        <Select
+                          aria-label={`释义 ${senseIndex + 1} 子词性`}
                           data-v3-field="sub_pos"
                           data-v3-node-id={sense.id}
-                          onChange={(event) =>
+                          onChange={(subPos) =>
                             change((draft) => {
                               draft.pos[posIndex]!.senses[senseIndex]!.sub_pos =
-                                event.target.value;
+                                subPos;
                             })
                           }
+                          options={(() => {
+                            const code = formPosById.get(pos.pos_id);
+                            const configured = code
+                              ? (catalogByCode.get(code)?.sub_parts ?? [])
+                              : [];
+                            const known = configured.some(
+                              (item) => item.code === sense.sub_pos
+                            );
+                            return [
+                              { label: "不指定子词性", value: "" },
+                              ...(!sense.sub_pos || known
+                                ? []
+                                : [
+                                    {
+                                      label: "未配置子词性",
+                                      value: sense.sub_pos
+                                    }
+                                  ]),
+                              ...configured.map((item) => ({
+                                label: item.name_zh,
+                                value: item.code
+                              }))
+                            ];
+                          })()}
                           value={sense.sub_pos}
                         />
                         <Input
-                          aria-label={`级别 ${sense.id}`}
+                          aria-label={`释义 ${senseIndex + 1} 等级`}
                           data-v3-field="level"
                           data-v3-node-id={sense.id}
                           onChange={(event) =>
@@ -520,24 +662,34 @@ export function V3MeaningsAndExamplesStep({
                           }
                           value={sense.level}
                         />
-                        <OptionalInput
-                          field="sense_group_id"
-                          label={`释义组 ${sense.id}`}
-                          nodeId={sense.id}
-                          onChange={(nextValue) =>
+                        <Select
+                          aria-label={`释义 ${senseIndex + 1} 所属释义组`}
+                          data-v3-field="sense_group_id"
+                          data-v3-node-id={sense.id}
+                          onChange={(nextValue: string) =>
                             change((draft) => {
                               const target =
                                 draft.pos[posIndex]!.senses[senseIndex]!;
-                              if (nextValue === undefined)
-                                delete target.sense_group_id;
+                              if (!nextValue) delete target.sense_group_id;
                               else target.sense_group_id = nextValue;
                             })
                           }
+                          options={[
+                            { label: "不归入释义组", value: "" },
+                            ...value.sense_groups.map((group, groupIndex) => ({
+                              label:
+                                group.name_zh ||
+                                group.name_en ||
+                                `释义组 ${groupIndex + 1}`,
+                              value: group.id
+                            }))
+                          ]}
+                          placeholder="选择释义组"
                           value={sense.sense_group_id}
                         />
                         <OptionalInput
                           field="frequency"
-                          label={`频率 ${sense.id}`}
+                          label={`释义 ${senseIndex + 1} 频率`}
                           nodeId={sense.id}
                           onChange={(nextValue) =>
                             change((draft) => {
@@ -570,7 +722,7 @@ export function V3MeaningsAndExamplesStep({
                           extra={
                             <ListActions
                               index={definitionIndex}
-                              label={`定义 ${definition.id}`}
+                              label={`定义 ${definitionIndex + 1}`}
                               length={sense.definitions.length}
                               onDelete={() =>
                                 change((draft) => {
@@ -593,11 +745,11 @@ export function V3MeaningsAndExamplesStep({
                           }
                           key={definition.id}
                           size="small"
-                          title={definition.definition_mode}
+                          title={`${definitionModeLabel(definition.definition_mode)} ${definitionIndex + 1}`}
                         >
                           <Space direction="vertical" style={{ width: "100%" }}>
                             <Input
-                              aria-label={`释义级别 ${definition.id}`}
+                              aria-label={`定义 ${definitionIndex + 1} 等级`}
                               data-v3-field="level"
                               data-v3-node-id={definition.id}
                               onChange={(event) =>
@@ -610,26 +762,48 @@ export function V3MeaningsAndExamplesStep({
                               }
                               value={definition.level}
                             />
-                            <OptionalInput
-                              field="grammar_structure_id"
-                              label={`释义语法 ${definition.id}`}
-                              nodeId={definition.id}
-                              onChange={(nextValue) =>
+                            <Select
+                              aria-label={`定义 ${definitionIndex + 1} 语法结构`}
+                              data-v3-field="grammar_structure_id"
+                              data-v3-node-id={definition.id}
+                              onChange={(nextValue: string) =>
                                 change((draft) => {
                                   const target =
                                     draft.pos[posIndex]!.senses[senseIndex]!
                                       .definitions[definitionIndex]!;
-                                  if (nextValue === undefined)
+                                  if (!nextValue)
                                     delete target.grammar_structure_id;
                                   else target.grammar_structure_id = nextValue;
                                 })
                               }
+                              options={[
+                                { label: "不指定语法结构", value: "" },
+                                ...(definition.grammar_structure_id &&
+                                !pos.grammar_structures.some(
+                                  (item) =>
+                                    item.id === definition.grammar_structure_id
+                                )
+                                  ? [
+                                      {
+                                        label: "未找到的语法结构",
+                                        value: definition.grammar_structure_id
+                                      }
+                                    ]
+                                  : []),
+                                ...pos.grammar_structures.map(
+                                  (structure, structureIndex) => ({
+                                    label: `语法结构 ${structureIndex + 1}`,
+                                    value: structure.id
+                                  })
+                                )
+                              ]}
+                              placeholder="选择语法结构"
                               value={definition.grammar_structure_id}
                             />
                             {definition.definition_mode === "zh_definition" ||
                             definition.definition_mode === "zh_sentence" ? (
                               <Input.TextArea
-                                aria-label={`释义 ${definition.id}`}
+                                aria-label={`定义 ${definitionIndex + 1} 内容`}
                                 data-v3-field="content"
                                 data-v3-node-id={definition.id}
                                 onChange={(event) =>
@@ -656,7 +830,7 @@ export function V3MeaningsAndExamplesStep({
                                 definition.content as EnglishTextV3
                               ).map((row) => (
                                 <Input.TextArea
-                                  aria-label={`释义 ${definition.id} ${row.dialect}`}
+                                  aria-label={`定义 ${definitionIndex + 1} ${dialectLabel(row.dialect)}内容`}
                                   data-v3-field="value"
                                   data-v3-node-id={row.variant_id}
                                   key={row.variant_id}
@@ -694,7 +868,7 @@ export function V3MeaningsAndExamplesStep({
                           })
                         }
                       >
-                        新增定义 {sense.id}
+                        新增定义
                       </Button>
 
                       {sense.sentences.map((sentence, sentenceIndex) => (
@@ -704,7 +878,7 @@ export function V3MeaningsAndExamplesStep({
                           extra={
                             <ListActions
                               index={sentenceIndex}
-                              label={`例句 ${sentence.id}`}
+                              label={`例句 ${sentenceIndex + 1}`}
                               length={sense.sentences.length}
                               onDelete={() =>
                                 change((draft) => {
@@ -732,7 +906,7 @@ export function V3MeaningsAndExamplesStep({
                         >
                           <Space direction="vertical" style={{ width: "100%" }}>
                             <Input
-                              aria-label={`例句级别 ${sentence.id}`}
+                              aria-label={`例句 ${sentenceIndex + 1} 等级`}
                               data-v3-field="level"
                               data-v3-node-id={sentence.id}
                               onChange={(event) =>
@@ -748,7 +922,7 @@ export function V3MeaningsAndExamplesStep({
                             {editableEnglishText(sentence.en_text).map(
                               (row) => (
                                 <Input.TextArea
-                                  aria-label={`英文例句 ${sentence.id} ${row.dialect}`}
+                                  aria-label={`例句 ${sentenceIndex + 1} ${dialectLabel(row.dialect)}英文`}
                                   data-v3-field="value"
                                   data-v3-node-id={row.variant_id}
                                   key={row.variant_id}
@@ -769,7 +943,7 @@ export function V3MeaningsAndExamplesStep({
                               )
                             )}
                             <Input.TextArea
-                              aria-label={`中文例句 ${sentence.id}`}
+                              aria-label={`例句 ${sentenceIndex + 1} 中文`}
                               data-v3-field="zh_text"
                               data-v3-node-id={sentence.zh_text_id}
                               onChange={(event) =>
@@ -785,81 +959,224 @@ export function V3MeaningsAndExamplesStep({
                               }
                               value={sentence.zh_text.text}
                             />
-                            {sentence.links.map((link, linkIndex) => (
-                              <Flex
-                                gap="small"
-                                key={`${link.word_id}:${link.sense_id}:${linkIndex}`}
-                              >
-                                {(["word_id", "sense_id", "role"] as const).map(
-                                  (field) => (
-                                    <Input
-                                      aria-label={`例句关联 ${sentence.id} ${field}`}
-                                      {...(field === "role"
-                                        ? {
-                                            "data-v3-field": "links",
-                                            "data-v3-node-id": sentence.id
-                                          }
-                                        : {})}
-                                      key={field}
-                                      onChange={(event) =>
-                                        change((draft) => {
-                                          draft.pos[posIndex]!.senses[
-                                            senseIndex
-                                          ]!.sentences[sentenceIndex]!.links[
-                                            linkIndex
-                                          ]![field] = event.target.value;
-                                        })
-                                      }
-                                      value={link[field]}
-                                    />
+                            {sentence.links.map((link, linkIndex) => {
+                              const isPrimary =
+                                link.role === "focus" || link.role === "head";
+                              const targetKey = `${link.word_id}:${link.sense_id}`;
+                              const availableTargets = contextTargets.filter(
+                                (target) =>
+                                  target.key === targetKey ||
+                                  !sentence.links.some(
+                                    (otherLink, otherIndex) =>
+                                      otherIndex !== linkIndex &&
+                                      otherLink.word_id === target.word_id &&
+                                      otherLink.sense_id === target.sense_id
                                   )
-                                )}
-                                <Button
-                                  aria-label={`删除例句关联 ${sentence.id} ${linkIndex + 1}`}
-                                  danger
-                                  onClick={() =>
-                                    change((draft) => {
-                                      draft.pos[posIndex]!.senses[
-                                        senseIndex
-                                      ]!.sentences[sentenceIndex]!.links.splice(
-                                        linkIndex,
-                                        1
-                                      );
-                                    })
-                                  }
+                              );
+                              const targetOptions = availableTargets.some(
+                                (target) => target.key === targetKey
+                              )
+                                ? availableTargets
+                                : [
+                                    ...availableTargets,
+                                    {
+                                      key: targetKey,
+                                      label: "已关联其他词义",
+                                      word_id: link.word_id,
+                                      sense_id: link.sense_id
+                                    }
+                                  ];
+                              return (
+                                <Flex
+                                  align="center"
+                                  data-v3-field="links"
+                                  data-v3-node-id={sentence.id}
+                                  gap="small"
+                                  key={`${targetKey}:${linkIndex}`}
+                                  wrap
                                 >
-                                  删除关联
-                                </Button>
-                              </Flex>
-                            ))}
-                            <Button
-                              onClick={() =>
+                                  <Tag color={isPrimary ? "blue" : undefined}>
+                                    {sentenceLinkRoleLabel(link.role)}
+                                  </Tag>
+                                  <Typography.Text>
+                                    {wordId &&
+                                    link.word_id === wordId &&
+                                    link.sense_id === sense.id
+                                      ? "当前词义"
+                                      : "已关联其他词义"}
+                                  </Typography.Text>
+                                  {!isPrimary ? (
+                                    <>
+                                      <AutoComplete
+                                        aria-label={`例句 ${sentenceIndex + 1} 上下文关联 ${linkIndex + 1} 目标`}
+                                        filterOption={false}
+                                        onSearch={(query) =>
+                                          setContextSearch({
+                                            sentenceId: sentence.id,
+                                            linkIndex,
+                                            query
+                                          })
+                                        }
+                                        onSelect={(nextKey) => {
+                                          const target = targetOptions.find(
+                                            (option) => option.key === nextKey
+                                          );
+                                          if (!target) return;
+                                          change((draft) => {
+                                            const draftLink =
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!.sentences[sentenceIndex]!
+                                                .links[linkIndex]!;
+                                            draftLink.word_id = target.word_id;
+                                            draftLink.sense_id =
+                                              target.sense_id;
+                                          });
+                                          setKnownContextTargets((current) => ({
+                                            ...current,
+                                            [target.key]: target
+                                          }));
+                                          setContextSearch(undefined);
+                                        }}
+                                        options={targetOptions.map(
+                                          (target) => ({
+                                            label: target.label,
+                                            value: target.key
+                                          })
+                                        )}
+                                        placeholder="搜索已发布词条并选择具体词义"
+                                        value={
+                                          contextSearch?.sentenceId ===
+                                            sentence.id &&
+                                          contextSearch.linkIndex === linkIndex
+                                            ? contextSearch.query
+                                            : targetOptions.find(
+                                                (target) =>
+                                                  target.key === targetKey
+                                              )?.label
+                                        }
+                                      />
+                                      <Button
+                                        aria-label={`删除例句 ${sentenceIndex + 1} 的上下文关联 ${linkIndex + 1}`}
+                                        danger
+                                        onClick={() =>
+                                          change((draft) => {
+                                            draft.pos[posIndex]!.senses[
+                                              senseIndex
+                                            ]!.sentences[
+                                              sentenceIndex
+                                            ]!.links.splice(linkIndex, 1);
+                                          })
+                                        }
+                                      >
+                                        删除关联
+                                      </Button>
+                                    </>
+                                  ) : null}
+                                </Flex>
+                              );
+                            })}
+                            {primaryLinkState(sentence, wordId, sense.id) !==
+                              "valid" && wordId ? (
+                              <Button
+                                onClick={() =>
+                                  change((draft) => {
+                                    const draftSentence =
+                                      draft.pos[posIndex]!.senses[senseIndex]!
+                                        .sentences[sentenceIndex]!;
+                                    draftSentence.links = [
+                                      {
+                                        word_id: wordId,
+                                        sense_id: sense.id,
+                                        role: "focus"
+                                      },
+                                      ...draftSentence.links.filter(
+                                        (link) =>
+                                          link.role !== "focus" &&
+                                          link.role !== "head" &&
+                                          (link.word_id !== wordId ||
+                                            link.sense_id !== sense.id)
+                                      )
+                                    ];
+                                  })
+                                }
+                              >
+                                {primaryLinkState(
+                                  sentence,
+                                  wordId,
+                                  sense.id
+                                ) === "missing"
+                                  ? "补充主关联"
+                                  : "修复主关联"}
+                              </Button>
+                            ) : null}
+                            <AutoComplete
+                              aria-label={`为例句 ${sentenceIndex + 1} 新增上下文关联`}
+                              filterOption={false}
+                              onSearch={(query) =>
+                                setContextSearch({
+                                  sentenceId: sentence.id,
+                                  query
+                                })
+                              }
+                              onSelect={(targetKey) => {
+                                const target = contextTargets.find(
+                                  (option) => option.key === targetKey
+                                );
+                                if (!target) return;
                                 change((draft) => {
                                   draft.pos[posIndex]!.senses[
                                     senseIndex
                                   ]!.sentences[sentenceIndex]!.links.push({
-                                    word_id: "",
-                                    sense_id: sense.id,
-                                    role: "focus"
+                                    word_id: target.word_id,
+                                    sense_id: target.sense_id,
+                                    role: "context"
                                   });
-                                })
+                                });
+                                setKnownContextTargets((current) => ({
+                                  ...current,
+                                  [target.key]: target
+                                }));
+                                setContextSearch(undefined);
+                              }}
+                              options={contextTargets
+                                .filter(
+                                  (target) =>
+                                    !sentence.links.some(
+                                      (link) =>
+                                        link.word_id === target.word_id &&
+                                        link.sense_id === target.sense_id
+                                    )
+                                )
+                                .map((target) => ({
+                                  label: target.label,
+                                  value: target.key
+                                }))}
+                              placeholder="搜索已发布词条并选择具体词义"
+                              value={
+                                contextSearch?.sentenceId === sentence.id &&
+                                contextSearch.linkIndex === undefined
+                                  ? contextSearch.query
+                                  : ""
                               }
-                            >
-                              新增例句关联 {sentence.id}
-                            </Button>
+                            />
                           </Space>
                         </Card>
                       ))}
                       <Button
+                        disabled={!wordId}
                         onClick={() =>
                           change((draft) => {
+                            if (!wordId) return;
                             draft.pos[posIndex]!.senses[
                               senseIndex
-                            ]!.sentences.push(newSentence(idFactory));
+                            ]!.sentences.push(
+                              newSentence(idFactory, wordId, sense.id)
+                            );
                           })
                         }
                       >
-                        新增例句 {sense.id}
+                        新增例句
                       </Button>
 
                       {sense.relations.map((relation, relationIndex) => (
@@ -868,7 +1185,7 @@ export function V3MeaningsAndExamplesStep({
                           extra={
                             <ListActions
                               index={relationIndex}
-                              label={`关联 ${relation.id}`}
+                              label={`关联 ${relationIndex + 1}`}
                               length={sense.relations.length}
                               onDelete={() =>
                                 change((draft) => {
@@ -894,31 +1211,32 @@ export function V3MeaningsAndExamplesStep({
                           title={`关联 ${relationIndex + 1}`}
                         >
                           <Flex gap="small" wrap>
-                            <Input
-                              aria-label={`关联类型 ${relation.id}`}
+                            <Select
+                              aria-label={`关联 ${relationIndex + 1} 类型`}
                               data-v3-field="relation"
                               data-v3-node-id={relation.id}
-                              onChange={(event) =>
+                              onChange={(relationType) =>
                                 change((draft) => {
                                   draft.pos[posIndex]!.senses[
                                     senseIndex
                                   ]!.relations[relationIndex]!.relation =
-                                    event.target.value;
+                                    relationType;
                                 })
                               }
+                              options={[
+                                { label: "近义词", value: "synonym" },
+                                { label: "反义词", value: "antonym" },
+                                { label: "派生词", value: "derivative" }
+                              ]}
                               value={relation.relation}
                             />
-                            {(
-                              [
-                                ["target_word_id", "目标词条"],
-                                ["target_sense_id", "目标释义"],
-                                ["pending_target_headword", "待解析词头"]
-                              ] as const
-                            ).map(([field, label]) => (
+                            {relation.target_word_id ||
+                            relation.target_sense_id ? (
+                              <Tag color="green">已选择关联目标</Tag>
+                            ) : (
                               <OptionalInput
-                                field={field}
-                                key={field}
-                                label={`${label} ${relation.id}`}
+                                field="pending_target_headword"
+                                label={`关联 ${relationIndex + 1} 待关联词条`}
                                 nodeId={relation.id}
                                 onChange={(nextValue) =>
                                   change((draft) => {
@@ -926,15 +1244,17 @@ export function V3MeaningsAndExamplesStep({
                                       draft.pos[posIndex]!.senses[senseIndex]!
                                         .relations[relationIndex]!;
                                     if (nextValue === undefined)
-                                      delete target[field];
-                                    else target[field] = nextValue;
+                                      delete target.pending_target_headword;
+                                    else
+                                      target.pending_target_headword =
+                                        nextValue;
                                   })
                                 }
-                                value={relation[field]}
+                                value={relation.pending_target_headword}
                               />
-                            ))}
+                            )}
                             <Input
-                              aria-label={`关联分数 ${relation.id}`}
+                              aria-label={`关联 ${relationIndex + 1} 分数`}
                               data-v3-field="score"
                               data-v3-node-id={relation.id}
                               onChange={(event) =>
@@ -959,7 +1279,7 @@ export function V3MeaningsAndExamplesStep({
                           })
                         }
                       >
-                        新增关联 {sense.id}
+                        新增关联
                       </Button>
                     </Flex>
                   </Card>
@@ -973,7 +1293,7 @@ export function V3MeaningsAndExamplesStep({
                     })
                   }
                 >
-                  新增释义 {pos.pos_id}
+                  新增释义
                 </Button>
               </Flex>
             )

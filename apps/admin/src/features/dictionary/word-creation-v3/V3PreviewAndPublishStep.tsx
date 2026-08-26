@@ -7,16 +7,7 @@ import type {
   SurfaceMatchPageV3,
   V3DraftValidationIssue
 } from "@tsz/types";
-import {
-  Alert,
-  Button,
-  Card,
-  Descriptions,
-  List,
-  Space,
-  Tag,
-  Typography
-} from "antd";
+import { Alert, Button, Card, List, Space, Tag, Typography } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   canAcknowledgeSurfaceSnapshot,
@@ -27,7 +18,17 @@ import { newWordNodeId } from "../word-model/primitives";
 import { createV3WordRequests, type V3WordRequests } from "./api";
 import { classifyV3Problem } from "./problem";
 import type { V3Problem } from "./problem";
+import {
+  dialectLabel,
+  formTypeLabel,
+  impactReasonLabel,
+  impactTypeLabel,
+  partOfSpeechLabel,
+  pronunciationStyleLabel,
+  publicationBlockMessage
+} from "./presentation";
 import { createV3SaveFlow, type V3SaveFlow } from "./saveFlow";
+import { V3MeaningsPreview } from "./V3MeaningsPreview";
 
 type PublishRequests = Pick<
   V3WordRequests,
@@ -113,50 +114,38 @@ function requestErrorMessage(error: unknown): string {
   if (problem.kind === "authentication") return "登录已失效，请重新登录。";
   if (problem.kind === "authorization") return "当前账号没有发布权限。";
   if (problem.kind === "service_unavailable") {
-    return "V3 发布服务暂不可用，请稍后重试。";
+    return "发布服务暂不可用，请稍后重试。";
   }
   if (problem.kind === "validation") return "发布校验未通过。";
-  return "发布失败，请按稳定错误码处理后重试。";
+  return "发布失败，请检查当前内容后重试。";
 }
 
-function bridgeLabel(word: AdminWordV3): string | undefined {
-  const bridge = word.compatibility?.legacy_headwords;
-  if (!bridge) return undefined;
-  return bridge.mode === "unified"
-    ? bridge.common
-    : `UK ${bridge.uk} / US ${bridge.us}`;
-}
-
-function publicationBlockCode(word: AdminWordV3): string | undefined {
-  if (word.status === "archived") return "entry_archived";
+function publicationUnavailableMessage(word: AdminWordV3): string | undefined {
+  if (word.status === "archived") return "已归档词条不能发布。";
   const capability = word.capabilities.publication;
-  if (capability.mode === "shadow_only") return capability.blocked_code;
+  if (capability.mode === "shadow_only") {
+    return publicationBlockMessage(capability.blocked_code);
+  }
   if (capability.mode === "migration_canary" && !capability.whitelisted) {
-    return capability.blocked_code ?? "migration_canary_not_whitelisted";
+    return publicationBlockMessage(
+      capability.blocked_code ?? "migration_canary_not_whitelisted"
+    );
   }
   return undefined;
 }
 
 function V3WordPreview({ word }: { word: AdminWordV3 }) {
-  const bridge = bridgeLabel(word);
   return (
     <>
       <Card title={word.presentation.label}>
-        <Descriptions size="small" column={1}>
-          <Descriptions.Item label="展示策略">
-            {word.presentation.strategy_version}
-          </Descriptions.Item>
-          {bridge ? (
-            <Descriptions.Item label="兼容桥（只读）">
-              {bridge}
-            </Descriptions.Item>
-          ) : null}
-        </Descriptions>
+        <Typography.Text type="secondary">
+          以下内容来自当前已保存版本，将作为本次发布依据。
+        </Typography.Text>
       </Card>
       {word.forms.pos.map((pos) => (
-        <Card key={pos.pos_id} size="small" title={pos.pos}>
+        <Card key={pos.pos_id} size="small" title={partOfSpeechLabel(pos.pos)}>
           <Space orientation="vertical" size="small" style={{ width: "100%" }}>
-            <Typography.Text strong>变化组与成员顺序</Typography.Text>
+            <Typography.Text strong>词形变化组</Typography.Text>
             {pos.form_groups.length > 0 ? (
               <List
                 size="small"
@@ -187,7 +176,10 @@ function V3WordPreview({ word }: { word: AdminWordV3 }) {
                               key={member.id}
                               data-testid={`preview-membership-${member.id}`}
                             >
-                              {memberIndex + 1}. {form?.form_type ?? "未知词形"}
+                              {memberIndex + 1}.{" "}
+                              {form
+                                ? formTypeLabel(form.form_type)
+                                : "未知词形"}
                               {variant ? ` · ${variant.spelling}` : ""}
                             </Tag>
                           );
@@ -200,7 +192,7 @@ function V3WordPreview({ word }: { word: AdminWordV3 }) {
             ) : (
               <Typography.Text type="secondary">暂无变化组</Typography.Text>
             )}
-            <Typography.Text strong>具体词形与发音</Typography.Text>
+            <Typography.Text strong>词形与发音</Typography.Text>
             <List
               size="small"
               dataSource={pos.forms}
@@ -215,11 +207,11 @@ function V3WordPreview({ word }: { word: AdminWordV3 }) {
                     data-testid={`preview-form-${form.id}`}
                   >
                     <Space orientation="vertical" size={4}>
-                      <Tag>{form.form_type}</Tag>
+                      <Tag>{formTypeLabel(form.form_type)}</Tag>
                       {variants.map((variant) => (
                         <Space key={variant.id} orientation="vertical" size={2}>
                           <Space size={4}>
-                            <Tag>{variant.dialect}</Tag>
+                            <Tag>{dialectLabel(variant.dialect)}</Tag>
                             <Typography.Text strong>
                               {variant.spelling}
                             </Typography.Text>
@@ -231,9 +223,15 @@ function V3WordPreview({ word }: { word: AdminWordV3 }) {
                                 type="secondary"
                                 data-testid={`preview-pronunciation-${pronunciation.id}`}
                               >
-                                {pronunciation.style ?? "未选择风格"} ·{" "}
-                                {pronunciation.dict_phonetic} ·{" "}
-                                {pronunciation.actual_pron}
+                                {pronunciation.style
+                                  ? pronunciationStyleLabel(pronunciation.style)
+                                  : "未选择发音方式"}
+                                {pronunciation.dict_phonetic
+                                  ? ` · 词典音标 ${pronunciation.dict_phonetic}`
+                                  : ""}
+                                {pronunciation.actual_pron
+                                  ? ` · 实际发音 ${pronunciation.actual_pron}`
+                                  : ""}
                               </Typography.Text>
                             ))
                           ) : (
@@ -251,6 +249,7 @@ function V3WordPreview({ word }: { word: AdminWordV3 }) {
           </Space>
         </Card>
       ))}
+      <V3MeaningsPreview word={word} />
     </>
   );
 }
@@ -275,9 +274,10 @@ function ImpactDescription({
               data-testid={`impact-item-${item.node_type}-${item.node_id}`}
             >
               <Space wrap size={4}>
-                <Tag>{item.node_type}</Tag>
-                <Typography.Text code>{item.node_id}</Typography.Text>
-                <Typography.Text>{item.reason}</Typography.Text>
+                <Tag>{impactTypeLabel(item.node_type)}</Tag>
+                <Typography.Text>
+                  {impactReasonLabel(item.reason)}
+                </Typography.Text>
               </Space>
             </List.Item>
           )}
@@ -315,12 +315,12 @@ function ControlledV3PreviewAndPublishStep({
     `${word.id}:${word.revision}:controlled-publish:${publishPage?.snapshot_id ?? "none"}`,
     fetchPage ?? unavailablePage
   );
-  const blockedCode = publicationBlockCode(word);
+  const unavailableMessage = publicationUnavailableMessage(word);
   const requiresImpactConfirmation = Boolean(
     controller.impact && (controller.impact.requires_confirmation || impactPage)
   );
   const readyToPublish = Boolean(
-    !blockedCode &&
+    !unavailableMessage &&
     controller.validation?.valid &&
     controller.impact &&
     (!requiresImpactConfirmation || controller.impactConfirmed)
@@ -355,15 +355,15 @@ function ControlledV3PreviewAndPublishStep({
   return (
     <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
       <V3WordPreview word={word} />
-      {blockedCode ? (
+      {unavailableMessage ? (
         <Alert
           showIcon
           type="warning"
-          title="当前 V3 词条不可发布"
-          description={<Typography.Text code>{blockedCode}</Typography.Text>}
+          title="当前词条不可发布"
+          description={unavailableMessage}
         />
       ) : (
-        <Card size="small" title="V3 发布检查">
+        <Card size="small" title="发布检查">
           <Space orientation="vertical" style={{ width: "100%" }}>
             <Button
               loading={
@@ -380,7 +380,11 @@ function ControlledV3PreviewAndPublishStep({
                 type="error"
                 title="发布校验未通过"
                 description={controller.issues
-                  .map((issue) => `${issue.code} · ${issue.message}`)
+                  .map((issue, index) =>
+                    /[\u3400-\u9fff]/u.test(issue.message)
+                      ? issue.message
+                      : `第 ${index + 1} 项内容需要返回对应步骤检查。`
+                  )
                   .join("；")}
               />
             ) : null}
@@ -422,7 +426,7 @@ function ControlledV3PreviewAndPublishStep({
                 loading={controller.isPending("publish")}
                 onClick={() => void publish()}
               >
-                发布 V3 词条
+                发布词条
               </Button>
             ) : null}
           </Space>
@@ -487,7 +491,7 @@ function StandaloneV3PreviewAndPublishStep({
     `${currentWord.id}:${currentWord.revision}:publish:${publishSurfacePage?.snapshot_id ?? "none"}`,
     requests.surfacePage
   );
-  const blockedCode = publicationBlockCode(currentWord);
+  const unavailableMessage = publicationUnavailableMessage(currentWord);
   const needsImpactAcknowledgement = Boolean(
     impact && (impact.requires_confirmation || impact.surface_match_page)
   );
@@ -617,8 +621,10 @@ function StandaloneV3PreviewAndPublishStep({
       if (!validation.accepted) return;
       if (!validation.value.valid) {
         setValidationIssues(
-          validation.value.issues.map(
-            (issue) => `${issue.code} · ${issue.message}`
+          validation.value.issues.map((issue, index) =>
+            /[\u3400-\u9fff]/u.test(issue.message)
+              ? issue.message
+              : `第 ${index + 1} 项内容需要返回对应步骤检查。`
           )
         );
         return;
@@ -763,15 +769,15 @@ function StandaloneV3PreviewAndPublishStep({
   return (
     <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
       <V3WordPreview word={currentWord} />
-      {blockedCode ? (
+      {unavailableMessage ? (
         <Alert
           showIcon
           type="warning"
-          title="当前 V3 词条不可发布"
-          description={<Typography.Text code>{blockedCode}</Typography.Text>}
+          title="当前词条不可发布"
+          description={unavailableMessage}
         />
       ) : (
-        <Card size="small" title="V3 发布检查">
+        <Card size="small" title="发布检查">
           <Space orientation="vertical" style={{ width: "100%" }}>
             <Button
               disabled={reconciliationRequired}
@@ -824,7 +830,7 @@ function StandaloneV3PreviewAndPublishStep({
                 loading={publishing}
                 onClick={() => void runPublish()}
               >
-                发布 V3 词条
+                发布词条
               </Button>
             ) : null}
           </Space>

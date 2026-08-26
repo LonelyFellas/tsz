@@ -1,4 +1,13 @@
-import { Alert, Button, Card, List, Space, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Collapse,
+  List,
+  Space,
+  Tag,
+  Typography
+} from "antd";
 import {
   aggregateLifecycleSurfaceMatchCards,
   canAcknowledgeSurfaceSnapshot,
@@ -33,6 +42,11 @@ export function LifecycleSurfaceConfirmation({
     .filter((group) => group.cards.length > 0);
   const disabled = state.phase === "disabled";
   const isActivation = action === "activate";
+  const statusLabel = {
+    draft: "草稿",
+    published: "已发布",
+    archived: "已归档"
+  } as const;
   return (
     <Card
       size="small"
@@ -50,8 +64,8 @@ export function LifecycleSurfaceConfirmation({
         title={`已加载 ${state.items.length}/${state.total} 条匹配来源`}
         description={
           disabled
-            ? `能力 gate 当前关闭，普通创建或词形确认不能替代${isActivation ? "激活" : "恢复"}命令确认。选择与词条状态均已保留。`
-            : `确认绑定本次${isActivation ? "激活" : "恢复"}命令、完整选择、生命周期版本、策略 epoch 和完整匹配集合。`
+            ? `当前不能继续${isActivation ? "激活" : "恢复"}。已保留当前选择和词条状态，请稍后重试。`
+            : `请核对全部匹配词条；确认后将按当前结果继续${isActivation ? "激活" : "恢复"}。`
         }
       />
       {groups.map((group) => (
@@ -64,18 +78,42 @@ export function LifecycleSurfaceConfirmation({
               <List.Item>
                 <Space wrap>
                   <Typography.Text strong>{card.label}</Typography.Text>
-                  <Typography.Text code>
-                    {card.entry_id.slice(-8)}
-                  </Typography.Text>
+                  <Tag>{card.kind === "word" ? "单词" : "短语"}</Tag>
+                  <Tag>{statusLabel[card.status]}</Tag>
                   <Typography.Text type="secondary">
                     {card.match_count} 个来源
                   </Typography.Text>
                 </Space>
-                {card.source_labels.map((source) => (
-                  <Typography.Text key={source} type="secondary">
-                    {source}
-                  </Typography.Text>
-                ))}
+                <Collapse
+                  size="small"
+                  items={[
+                    {
+                      key: "details",
+                      label: "查看候选详情",
+                      children: (
+                        <Space orientation="vertical" size="small">
+                          {card.source_labels.map((source) => (
+                            <Typography.Text key={source} type="secondary">
+                              {source}
+                            </Typography.Text>
+                          ))}
+                          {card.pos_labels.length > 0 ? (
+                            <Space wrap>
+                              {card.pos_labels.map((label) => (
+                                <Tag key={label}>{label}</Tag>
+                              ))}
+                            </Space>
+                          ) : null}
+                          {card.gloss_previews.map((gloss) => (
+                            <Typography.Text key={gloss}>
+                              释义：{gloss}
+                            </Typography.Text>
+                          ))}
+                        </Space>
+                      )
+                    }
+                  ]}
+                />
               </List.Item>
             )}
           />

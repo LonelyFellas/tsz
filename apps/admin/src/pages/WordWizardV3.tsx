@@ -29,8 +29,22 @@ import {
 import { useSurfaceSnapshotAny } from "@/features/dictionary/useSurfaceSnapshot";
 import { V3FormsAndPronunciationStep } from "@/features/dictionary/word-creation-v3/components/V3FormsAndPronunciationStep";
 import { V3MeaningsAndExamplesStep } from "@/features/dictionary/word-creation-v3/V3MeaningsAndExamplesStep";
+import { V3MeaningsPreview } from "@/features/dictionary/word-creation-v3/V3MeaningsPreview";
 import { V3PreviewAndPublishStep } from "@/features/dictionary/word-creation-v3/V3PreviewAndPublishStep";
 import { V3PublicationHistory } from "@/features/dictionary/word-creation-v3/V3PublicationHistory";
+import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
+import {
+  dialectLabel,
+  formTypeLabel,
+  impactReasonLabel,
+  impactTypeLabel,
+  partOfSpeechLabel,
+  pronunciationStyleLabel
+} from "@/features/dictionary/word-creation-v3/presentation";
+import {
+  CreationSourceNotice,
+  creationSourceFromState
+} from "@/features/dictionary/word-creation/CreationSourceNotice";
 import {
   V3WordCreationWizard,
   type V3WizardSlotContext
@@ -178,7 +192,8 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
                   key={`${item.node_type}:${item.node_id}:${item.reason}`}
                   type="secondary"
                 >
-                  {item.node_type} · {item.node_id} · {item.reason}
+                  {impactTypeLabel(item.node_type)}：
+                  {impactReasonLabel(item.reason)}
                 </Typography.Text>
               ))}
             </Flex>
@@ -226,53 +241,48 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
 
 function V3BasicsSlot({ context }: { context: V3WizardSlotContext }) {
   return (
-    <Card title="V3 基础信息">
+    <Card title="创建信息">
       <Typography.Paragraph>
-        词面由创建时的检测快照确定；具体词形均在“词形与发音”中以平级 form 维护。
+        词条名称来自创建时的词典建议。请在“词形与发音”中核对并完善各词性下的词形和发音。
       </Typography.Paragraph>
-      <Typography.Text code>{context.word.presentation.label}</Typography.Text>
+      <Typography.Text strong>
+        {context.word.presentation.label}
+      </Typography.Text>
     </Card>
   );
 }
 
 function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
+  const partOfSpeechCatalog = usePartOfSpeechCatalog();
   return (
     <V3MeaningsAndExamplesStep
       activePosId={context.activePosId}
+      forms={context.draftForms}
       issues={context.issues.filter((issue) => issue.step === "meanings")}
       onActivePosChange={context.setActivePosId}
       onChange={context.setDraftMeanings}
       onSave={context.actions.saveMeanings}
+      partOfSpeechCatalog={partOfSpeechCatalog.data}
       saving={context.isPending("save_meanings")}
       value={context.draftMeanings}
+      wordId={context.word.id}
     />
   );
 }
 
 function V3ReadOnlyPreview({ word }: { word: AdminWordV3 }) {
-  const bridge = word.compatibility?.legacy_headwords;
   return (
     <Flex vertical gap="middle">
       <Alert showIcon type="info" title="当前词条为只读查看" />
       <Card title={word.presentation.label}>
-        <Flex vertical gap="small">
-          <Typography.Text type="secondary">
-            展示策略：{word.presentation.strategy_version}
-          </Typography.Text>
-          {bridge ? (
-            <Typography.Text type="secondary">
-              兼容桥（只读）：
-              {bridge.mode === "unified"
-                ? bridge.common
-                : `UK ${bridge.uk} / US ${bridge.us}`}
-            </Typography.Text>
-          ) : null}
-        </Flex>
+        <Typography.Text type="secondary">
+          以下内容来自当前已保存版本。
+        </Typography.Text>
       </Card>
       {word.forms.pos.map((pos) => (
-        <Card key={pos.pos_id} size="small" title={pos.pos}>
+        <Card key={pos.pos_id} size="small" title={partOfSpeechLabel(pos.pos)}>
           <Flex vertical gap="small">
-            <Typography.Text strong>变化组与成员顺序</Typography.Text>
+            <Typography.Text strong>词形变化组</Typography.Text>
             {pos.form_groups.length > 0 ? (
               pos.form_groups.map((group, groupIndex) => (
                 <Flex
@@ -301,7 +311,8 @@ function V3ReadOnlyPreview({ word }: { word: AdminWordV3 }) {
                           key={member.id}
                           data-testid={`readonly-membership-${member.id}`}
                         >
-                          {memberIndex + 1}. {form?.form_type ?? "未知词形"}
+                          {memberIndex + 1}.{" "}
+                          {form ? formTypeLabel(form.form_type) : "未知词形"}
                           {variant ? ` · ${variant.spelling}` : ""}
                         </Tag>
                       );
@@ -312,7 +323,7 @@ function V3ReadOnlyPreview({ word }: { word: AdminWordV3 }) {
             ) : (
               <Typography.Text type="secondary">暂无变化组</Typography.Text>
             )}
-            <Typography.Text strong>具体词形与发音</Typography.Text>
+            <Typography.Text strong>词形与发音</Typography.Text>
             {pos.forms.map((form) => {
               const variants =
                 form.regional_variants.mode === "common"
@@ -325,11 +336,11 @@ function V3ReadOnlyPreview({ word }: { word: AdminWordV3 }) {
                   gap={4}
                   data-testid={`readonly-form-${form.id}`}
                 >
-                  <Tag>{form.form_type}</Tag>
+                  <Tag>{formTypeLabel(form.form_type)}</Tag>
                   {variants.map((variant) => (
                     <Flex key={variant.id} vertical gap={2}>
                       <Flex gap={4}>
-                        <Tag>{variant.dialect}</Tag>
+                        <Tag>{dialectLabel(variant.dialect)}</Tag>
                         <Typography.Text strong>
                           {variant.spelling}
                         </Typography.Text>
@@ -341,9 +352,15 @@ function V3ReadOnlyPreview({ word }: { word: AdminWordV3 }) {
                             type="secondary"
                             data-testid={`readonly-pronunciation-${pronunciation.id}`}
                           >
-                            {pronunciation.style ?? "未选择风格"} ·{" "}
-                            {pronunciation.dict_phonetic} ·{" "}
-                            {pronunciation.actual_pron}
+                            {pronunciation.style
+                              ? pronunciationStyleLabel(pronunciation.style)
+                              : "未选择发音方式"}
+                            {pronunciation.dict_phonetic
+                              ? ` · 词典音标 ${pronunciation.dict_phonetic}`
+                              : ""}
+                            {pronunciation.actual_pron
+                              ? ` · 实际发音 ${pronunciation.actual_pron}`
+                              : ""}
                           </Typography.Text>
                         ))
                       ) : (
@@ -359,6 +376,7 @@ function V3ReadOnlyPreview({ word }: { word: AdminWordV3 }) {
           </Flex>
         </Card>
       ))}
+      <V3MeaningsPreview word={word} />
     </Flex>
   );
 }
@@ -370,7 +388,7 @@ function V3PreviewSlot({ context }: { context: V3WizardSlotContext }) {
         showIcon
         type="warning"
         title="请先保存未保存的草稿"
-        description="当前预览只基于服务端 canonical revision。请先返回对应步骤保存草稿，再重新检查发布条件。"
+        description="当前预览只显示最近一次已保存内容。请先返回对应步骤保存草稿，再重新检查发布条件。"
       />
     );
   }
@@ -483,6 +501,7 @@ export function WordWizardV3Page({
   renderMeaningsStep?: V3MeaningsStepRenderer;
 } = {}) {
   const { wordId = "", step } = useParams();
+  const location = useLocation();
   const [searchParams] = useSearchParams();
   const [activationGeneration, setActivationGeneration] = useState(0);
   const queryClient = useQueryClient();
@@ -520,7 +539,7 @@ export function WordWizardV3Page({
   if (detail.isPending) {
     return (
       <Flex justify="center" align="center" style={{ minHeight: 420 }}>
-        <Spin size="large" description="正在加载 V3 词条" />
+        <Spin size="large" description="正在加载词条" />
       </Flex>
     );
   }
@@ -528,7 +547,7 @@ export function WordWizardV3Page({
     return (
       <Result
         status="error"
-        title="无法打开 V3 词条"
+        title="无法打开词条"
         subTitle={detail.error?.message ?? "词条不存在或响应格式无效"}
         extra={
           <Button type="primary" onClick={() => void detail.refetch()}>
@@ -560,23 +579,26 @@ export function WordWizardV3Page({
   }
 
   return (
-    <V3WordCreationWizard
-      key={`${word.id}:activation-${activationGeneration}:${editingPublished ? "edit" : "read"}`}
-      allowPublishedEditing={editingPublished}
-      initialStep={legalStep}
-      initialWord={word}
-      readOnly={forcePreview}
-      requests={requests}
-      onWordChange={replaceCanonical}
-      renderStep={(context) => (
-        <V3WizardSlots
-          context={context}
-          onActivated={replaceActivatedCanonical}
-          renderMeaningsStep={renderMeaningsStep}
-          requests={requests}
-          wordId={word.id}
-        />
-      )}
-    />
+    <Flex vertical gap="middle">
+      <CreationSourceNotice source={creationSourceFromState(location.state)} />
+      <V3WordCreationWizard
+        key={`${word.id}:activation-${activationGeneration}:${editingPublished ? "edit" : "read"}`}
+        allowPublishedEditing={editingPublished}
+        initialStep={legalStep}
+        initialWord={word}
+        readOnly={forcePreview}
+        requests={requests}
+        onWordChange={replaceCanonical}
+        renderStep={(context) => (
+          <V3WizardSlots
+            context={context}
+            onActivated={replaceActivatedCanonical}
+            renderMeaningsStep={renderMeaningsStep}
+            requests={requests}
+            wordId={word.id}
+          />
+        )}
+      />
+    </Flex>
   );
 }

@@ -132,7 +132,11 @@ function page(
   };
 }
 
-function v3Item(entryId: string, variantId: string): SurfaceMatchItemV3 {
+function v3Item(
+  entryId: string,
+  variantId: string,
+  spelling = `surface-${entryId}`
+): SurfaceMatchItemV3 {
   return {
     match_kind: "form_variant_v3",
     match: {
@@ -146,7 +150,7 @@ function v3Item(entryId: string, variantId: string): SurfaceMatchItemV3 {
       variant_id: variantId,
       form_type: "base",
       dialect: "common",
-      spelling: `surface-${entryId}`
+      spelling
     }
   };
 }
@@ -389,41 +393,40 @@ describe("surfaceSnapshotReducer", () => {
 });
 
 describe("surface snapshot selectors", () => {
-  it("V3 lifecycle 卡片忠实使用 match_kind/source 与服务端 presentation", () => {
+  it("V3 lifecycle 卡片按 entry 归并并只返回产品化候选详情", () => {
     const state = surfaceSnapshotReducer(
       createEmptySurfaceSnapshotState<SurfaceMatchPageAny>(),
       {
         type: "start",
         generation: 1,
         page: {
-          ...v3Page([v3Item("entry-1", "variant-1")], null),
-          total: 1
+          ...v3Page(
+            [
+              v3Item("entry-1", "variant-1"),
+              v3Item("entry-1", "variant-2", "second-surface")
+            ],
+            null
+          ),
+          total: 2
         }
       }
     );
 
     expect(aggregateLifecycleSurfaceMatchCards(state)).toEqual([
       expect.objectContaining({
-        key: JSON.stringify([
-          "form_variant_v3",
-          3,
-          "entry-1",
-          "published",
-          "current_publication",
-          "pos-entry-1",
-          [],
-          "form-entry-1",
-          "variant-1",
-          "base",
-          "common",
-          "surface-entry-1",
-          null
-        ]),
+        key: "entry-1",
         entry_id: "entry-1",
         label: "V3 entry-1",
+        kind: "word",
         status: "published",
+        match_count: 2,
         membership: "visibility",
-        source_labels: ["V3 词形 · surface-entry-1 · base · common"]
+        source_labels: [
+          "词形 · surface-entry-1 · 原形 · 通用",
+          "词形 · second-surface · 原形 · 通用"
+        ],
+        pos_labels: ["名词"],
+        gloss_previews: ["释义"]
       })
     ]);
   });
@@ -445,6 +448,85 @@ describe("surface snapshot selectors", () => {
     expect(cards[0]!.matches.map((item) => item.match_id)).toEqual([
       "m1",
       "m2"
+    ]);
+  });
+
+  it("兼容历史词条候选、缺失摘要与词形来源并使用产品回退", () => {
+    const formSource = match("form-match", "legacy-word");
+    formSource.existing.source = {
+      source_kind: "form",
+      source_id: "legacy-form",
+      source_node_id: "legacy-form-node",
+      content_scope: "draft",
+      surface: "workspaces",
+      dialect: "common",
+      form_type: "plural",
+      pos_id: "legacy-pos",
+      pos: "noun"
+    };
+    const v2State = surfaceSnapshotReducer(
+      createEmptySurfaceSnapshotState<SurfaceMatchPageAny>(),
+      {
+        type: "start",
+        generation: 1,
+        page: {
+          ...page([formSource], null),
+          total: 1,
+          matched_entry_contexts: [
+            {
+              ...context("legacy-word"),
+              pos_labels: ["自定义词性", "future-pos"]
+            }
+          ]
+        }
+      }
+    );
+    expect(aggregateLifecycleSurfaceMatchCards(v2State)[0]).toMatchObject({
+      source_labels: ["词形 · workspaces · 复数 · 通用"],
+      pos_labels: ["自定义词性", "其他词性"]
+    });
+
+    const legacyItem: SurfaceMatchItemV3 = {
+      match_kind: "legacy_v2",
+      match: {
+        source_schema_version: 2,
+        existing: {
+          ...formSource.existing,
+          headword: "legacy phrase",
+          kind: "phrase",
+          status: "archived"
+        }
+      }
+    };
+    const withoutContext = surfaceSnapshotReducer(
+      createEmptySurfaceSnapshotState<SurfaceMatchPageAny>(),
+      {
+        type: "start",
+        generation: 2,
+        page: {
+          ...v3Page(
+            [v3Item("no-context", "variant-no-context"), legacyItem],
+            null,
+            "fallback-token",
+            2
+          ),
+          matched_entry_contexts: []
+        }
+      }
+    );
+    expect(aggregateLifecycleSurfaceMatchCards(withoutContext)).toEqual([
+      expect.objectContaining({
+        label: "surface-no-context",
+        kind: "word",
+        pos_labels: [],
+        gloss_previews: []
+      }),
+      expect.objectContaining({
+        label: "legacy phrase",
+        kind: "phrase",
+        status: "archived",
+        source_labels: ["词形 · workspaces · 复数 · 通用"]
+      })
     ]);
   });
 

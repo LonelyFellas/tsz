@@ -116,6 +116,48 @@ export function useRelatedSearchV2(
   return { exact, contains };
 }
 
+export function useRelatedSearchAny(
+  q: string,
+  kind: "word" | "phrase" | undefined,
+  open: boolean
+) {
+  const normalizedQ = q.trim();
+  const enabled = open && normalizedQ !== "";
+  const exact = useInfiniteQuery({
+    queryKey: [...wordKeys.relatedSearchV2(normalizedQ, kind, "exact"), "any"],
+    queryFn: ({ pageParam }) =>
+      adminWordsAnyDataSource.relatedSearchAny(normalizedQ, {
+        kind,
+        match_mode: "exact",
+        page_size: 20,
+        cursor: pageParam
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) =>
+      "next_cursor" in page ? (page.next_cursor ?? undefined) : undefined,
+    enabled
+  });
+  const contains = useInfiniteQuery({
+    queryKey: [
+      ...wordKeys.relatedSearchV2(normalizedQ, kind, "contains"),
+      "any"
+    ],
+    queryFn: ({ pageParam }) =>
+      adminWordsAnyDataSource.relatedSearchAny(normalizedQ, {
+        kind,
+        match_mode: "contains",
+        exclude_exact: true,
+        page_size: 20,
+        cursor: pageParam
+      }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (page) =>
+      "next_cursor" in page ? (page.next_cursor ?? undefined) : undefined,
+    enabled
+  });
+  return { exact, contains };
+}
+
 /** 写操作共用:词条数据变更后,列表、统计、详情缓存全部失效。 */
 function useInvalidateWords() {
   const qc = useQueryClient();

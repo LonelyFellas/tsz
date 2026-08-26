@@ -29,6 +29,7 @@ import {
   updatePronunciation,
   type V3IdFactory
 } from "../operations";
+import { pronunciationStyleLabel } from "../presentation";
 
 function updateVariantPronunciations(
   content: DraftFormsStepContentV3,
@@ -103,7 +104,7 @@ export function V3PronunciationList({
                       aria-invalid={rowIssues.some(
                         (item) => item.field === "dict_phonetic"
                       )}
-                      aria-label={`字典音标 ${pronunciation.id}`}
+                      aria-label={`第 ${index + 1} 条发音的字典音标`}
                       data-v3-field="dict_phonetic"
                       data-v3-node-id={pronunciation.id}
                       onChange={(event) =>
@@ -121,7 +122,7 @@ export function V3PronunciationList({
                       aria-invalid={rowIssues.some(
                         (item) => item.field === "actual_pron"
                       )}
-                      aria-label={`实际发音 ${pronunciation.id}`}
+                      aria-label={`第 ${index + 1} 条发音的实际发音`}
                       data-v3-field="actual_pron"
                       data-v3-node-id={pronunciation.id}
                       onChange={(event) =>
@@ -136,7 +137,7 @@ export function V3PronunciationList({
                   </Form.Item>
                   <Form.Item name={[field.name, "style"]} noStyle>
                     <Select
-                      aria-label={`发音风格 ${pronunciation.id}`}
+                      aria-label={`第 ${index + 1} 条发音的发音方式`}
                       data-v3-field="style"
                       data-v3-node-id={pronunciation.id}
                       onChange={(style) =>
@@ -147,16 +148,25 @@ export function V3PronunciationList({
                         )
                       }
                       options={[
-                        { value: "normal", label: "normal" },
-                        { value: "strong", label: "strong" },
-                        { value: "weak", label: "weak" }
+                        {
+                          value: "normal",
+                          label: pronunciationStyleLabel("normal")
+                        },
+                        {
+                          value: "strong",
+                          label: pronunciationStyleLabel("strong")
+                        },
+                        {
+                          value: "weak",
+                          label: pronunciationStyleLabel("weak")
+                        }
                       ]}
                       placeholder="风格"
                     />
                   </Form.Item>
                   <Space.Compact>
                     <Button
-                      aria-label={`上移发音 ${pronunciation.id}`}
+                      aria-label={`上移第 ${index + 1} 条发音`}
                       disabled={index === 0}
                       icon={<ArrowUpOutlined />}
                       onClick={() => {
@@ -174,7 +184,7 @@ export function V3PronunciationList({
                       }}
                     />
                     <Button
-                      aria-label={`下移发音 ${pronunciation.id}`}
+                      aria-label={`下移第 ${index + 1} 条发音`}
                       disabled={index === fields.length - 1}
                       icon={<ArrowDownOutlined />}
                       onClick={() => {
@@ -192,7 +202,7 @@ export function V3PronunciationList({
                       }}
                     />
                     <Button
-                      aria-label={`删除发音 ${pronunciation.id}`}
+                      aria-label={`删除第 ${index + 1} 条发音`}
                       danger
                       icon={<DeleteOutlined />}
                       onClick={() => {
@@ -217,7 +227,7 @@ export function V3PronunciationList({
               <Typography.Text type="secondary">暂无发音</Typography.Text>
             )}
             <Button
-              aria-label={`新增发音 ${variant.id}`}
+              aria-label="新增发音"
               icon={<PlusOutlined />}
               onClick={() => {
                 const pronunciation: WordPronunciationV3 = {

@@ -54,6 +54,7 @@ type RealAdminWordsAnyDataSource = Pick<
   | "restoreAny"
   | "archiveBatchAny"
   | "restoreBatchAny"
+  | "relatedSearchAny"
 >;
 
 export type AdminWordsAnyDataSource = Omit<
@@ -174,7 +175,8 @@ async function resolveAdminWordsAnyDataSource(): Promise<AdminWordsAnyDataSource
     archiveBatchAny: (idempotencyKey, input) =>
       source.archiveBatch(idempotencyKey, input),
     restoreBatchAny: (idempotencyKey, input) =>
-      source.restoreBatch(idempotencyKey, input)
+      source.restoreBatch(idempotencyKey, input),
+    relatedSearchAny: (q, opts) => source.relatedSearch(q, opts)
   };
 }
 
@@ -303,7 +305,9 @@ export const adminWordsAnyDataSource: AdminWordsAnyDataSource = {
     (await resolveAdminWordsAnyDataSource()).restoreBatchAny(
       idempotencyKey,
       input
-    )
+    ),
+  relatedSearchAny: async (q, opts) =>
+    (await resolveAdminWordsAnyDataSource()).relatedSearchAny(q, opts)
 };
 
 async function requireSentenceAssociationMock(): Promise<
