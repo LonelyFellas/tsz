@@ -6,11 +6,13 @@
 
 - 静态质量/构建、工程工具测试、Vitest coverage、web E2E、admin E2E 并行启动；
 - Vitest coverage 分为 packages、web、admin 三个语义模块；packages 和 web 各一个任务，admin
-  基于当前 75 个文件再使用 `1/3`、`2/3`、`3/3` 三个原生 Vitest shard；
+  基于实施快照的 96 个文件再使用 `1/3`、`2/3`、`3/3` 三个原生 Vitest shard；
 - 五个 coverage 任务均使用 Vitest blob reporter 并上传报告；后置任务下载并用
   `vitest --merge-reports --coverage` 合并，在完整数据上执行现有覆盖率门槛；
 - shard 使用专用 coverage config，只收集 coverage、不执行局部 thresholds；完整配置与 shard 配置
   共享同一份 provider/include/exclude，避免策略漂移；
+- 语义模块通过 packages、apps/web、apps/admin 仓库路径过滤测试文件，但保留全部 Vitest projects
+  的转换上下文，使应用测试对共享包的补覆盖仍能进入合并结果；
 - 每个模块先生成带 projectName 的动态测试 inventory，merge 前与完整 inventory 做精确集合对账；
 - `verify` 与 `e2e` 变为 fail-closed 汇总 Job，保留 GitHub ruleset 当前要求的稳定 check 名；
 - 本地 `pnpm test:cov` 和 pre-push 不拆分，继续作为单机完整门禁。
@@ -155,7 +157,7 @@ admin 及依赖包，不改 Turbo task 图。
 | admin-2     | admin                                | 2/3   |
 | admin-3     | admin                                | 3/3   |
 
-每项使用 `vitest.ci-shard.config.ts`，只改变 `--project` 和可选 `--shard`。该配置与根
+每项使用 `vitest.ci-shard.config.ts`，只改变仓库相对路径过滤器和可选 `--shard`。该配置与根
 `vitest.config.ts` 复用同一份 projects、coverage provider/include/exclude，但有意不配置 thresholds，
 并把 `coverage.reporter` 显式设为 `[]`；仅省略 reporter 会触发 Vitest 默认的
 text/html/clover/json，仍会让五个 shard 重复生成最终报告。否则 packages 或任一 admin shard 还会
@@ -164,12 +166,14 @@ text/html/clover/json，仍会让五个 shard 重复生成最终报告。否则 
 ```text
 vitest run --config=vitest.ci-shard.config.ts --coverage --maxWorkers=2 \
   --reporter=blob --reporter=./scripts/ci-test-inventory-reporter.mjs \
-  --project=<project> [--shard=i/3]
+  <packages/|apps/web/|apps/admin/> [--shard=i/3]
 ```
 
-packages 项对四个 package projects 使用重复 `--project` 选项。`scripts/ci-test-modules.mjs` 复用
-现有 `buildCoverageVitestArgs()` 生成 `run --coverage --maxWorkers=2`，再追加受控 module 参数；不能
-直接拼一条绕过 worker 上限的新 Vitest 命令。既有显式 `--maxWorkers` 覆盖能力保持不变并补参数测试。
+不能使用 `--project` 选择语义模块：仓库的 packages 100% 覆盖依赖 web/admin 测试触达共享鉴权逻辑；
+只解析 package projects 时这些补覆盖会消失。路径过滤仅选择测试规格，根配置仍解析全部 6 个 projects。
+`scripts/ci-test-modules.mjs` 复用现有 `buildCoverageVitestArgs()` 生成
+`run --coverage --maxWorkers=2`，再追加受控 module 参数；不能直接拼一条绕过 worker 上限的新 Vitest
+命令。既有显式 `--maxWorkers` 覆盖能力保持不变并补参数测试。
 
 Vitest 4.1.11 的 `vitest list --filesOnly --json` 不应用 `--shard`，因此不能用三次 list 结果代表
 admin 三个实际分片。每项同时启用 blob reporter 与仓库内的
@@ -214,7 +218,17 @@ workflow 调用脚本获取受控参数或让脚本直接 spawn Vitest，避免�
 
 Vitest blob 包含测试结果和 coverage 数据，merge 阶段由 coverage provider 合并。阈值只在完整结果上
 作最终裁决；shard config 明确移除 thresholds，单个 shard 的职责仅是测试执行与 coverage 收集。
-当前 133 仅作为本轮对照数据，脚本不得把它写死为未来门槛。
+评估时的 133 与实施快照的 156 均只作为对照数据，脚本不得把测试文件数写死为未来门槛。
+
+实施原型使用 `--project` 选择 packages/web/admin 时，inventory 虽然以 156 个测试文件恰好对账，
+但 packages blob 只有 statements 99.68%、branches 99.27%、functions 99.5%、lines 99.65%；同一代码
+的原生全量运行则满足 100%。根因是 `--project` 裁掉了应用 project 上下文，web 对共享 token/store 的
+补覆盖没有进入 blob。最终方案改用路径过滤测试规格，并继续以原生全量 coverage 结果作等价对照。
+
+最终本地原型的 inventory 为 packages 30、web 30、admin 三片各 32，合计 156 且恰好一次；blob
+执行时间分别为 19.83、37.37、42.85、55.30、37.34 秒，单个 4.2–4.5 MB。merge 后 2350 个测试通过，
+总覆盖率 statements 95.74%、branches 91.31%、functions 96.25%、lines 96.85%，并继续满足 packages
+100%、web/admin 90%。这些数据证明本地等价性和分片均衡，不替代真实 Actions 的 warm-cache 指标。
 
 若任一测试失败，分片仍在未取消时上传 blob；merge 可输出统一失败结果。即使 merge 因缺 artifact
 无法执行，最终 `verify` 仍同时检查 matrix 与 merge 的结果，不会因下游 skipped 而误绿。
@@ -276,9 +290,11 @@ cache、system deps 限时重试、trace/screenshot 和失败报告语义保持�
   - 模块枚举、project 完整性、admin shard 连续性、worker 参数、inventory 集合、未知模块、唯一
     artifact 等单测。
 - `vitest.shared-config.ts`
-  - 单一来源导出 projects、coverage provider/include/exclude，以及仅完整门使用的 reporters/thresholds。
+  - 单一来源导出 projects、coverage provider/include/exclude，以及仅完整门使用的
+    reporters/thresholds。
 - `vitest.ci-shard.config.ts`
-  - 复用共享 projects 与 coverage 收集策略，不配置 thresholds，并显式设置 `coverage.reporter: []`。
+  - 复用共享 projects 与 coverage 收集策略，不配置 thresholds，并显式设置
+    `coverage.reporter: []`。
 - `scripts/ci-workflow.test.mjs`
   - 对 workflow 的稳定 Job、依赖图、fail-fast、artifact、coverage merge、触发器和权限做结构回归。
 
@@ -330,10 +346,11 @@ sequenceDiagram
 | M02 | Node 单元     | admin `1/3..3/3`                          | 分母一致、索引连续                            |
 | M03 | Node 单元     | project 重复、缺失、未知 module           | fail closed                                   |
 | M04 | Node 单元     | artifact/blob 名称                        | 全部唯一且无路径穿越                          |
-| M05 | Node 单元     | coverage module 参数                      | 默认包含 `--maxWorkers=2`                     |
+| M05 | Node 单元     | coverage module 参数                      | worker 上限和路径过滤，不含 `--project`       |
 | M06 | Node 单元     | shard 与 root coverage config             | 同源；shard 无 thresholds 且 reporter 为 `[]` |
 | M07 | Node 单元     | 实际 shard reporter inventory             | tuple 来自 `TestModule[]`，不是 pre-run list  |
 | M08 | Node 单元     | full/module inventory 集合                | tuple 无遗漏、额外或重复                      |
+| M09 | Node 单元     | inventory/blob 文件集合                   | 五份文件均精确存在，无遗漏或额外文件          |
 | W01 | workflow 结构 | workflow 名、PR/main trigger、permissions | 与现状一致                                    |
 | W02 | workflow 结构 | matrix `fail-fast: false`                 | 所有模块可继续运行                            |
 | W03 | workflow 结构 | coverage merge 依赖完整 matrix            | 缺报告不能成功                                |
@@ -341,14 +358,14 @@ sequenceDiagram
 | W05 | workflow 结构 | `e2e-web`、`e2e-admin`、`e2e` summary     | 双端并行且失败收敛                            |
 | W06 | workflow 结构 | `commitlint` PR-only                      | 行为不变                                      |
 | C01 | 本地集成      | 五个 coverage module 依次运行             | 局部阈值不误杀；测试通过并产 blob/inventory   |
-| C02 | 本地集成      | 合并五个 blobs                            | 动态 full inventory 无遗漏/重复；本轮为 133   |
+| C02 | 本地集成      | 合并五个 blobs                            | 动态 full inventory 无遗漏/重复；实施快照 156 |
 | C03 | 覆盖率        | 合并后执行根阈值                          | packages 100%、web/admin 90%                  |
 | C04 | 负向集成      | 删除/重复/错配 blob 或 inventory          | tuple 集合对账或 merge 失败                   |
-| C05 | 本地集成      | admin 三个实际 shard inventories          | 三者互斥，并集等于完整 75 文件                |
+| C05 | 本地集成      | admin 三个实际 shard inventories          | 三者互斥，并集等于实施快照的 96 文件          |
 | Q01 | 原生质量门    | `pnpm test:cov`                           | 原单机完整门仍通过                            |
 | Q02 | 原生质量门    | lint/typecheck/format/build               | 全部通过                                      |
 | E01 | Playwright    | web suite                                 | 当前 23 场景通过                              |
-| E02 | Playwright    | admin suite                               | 当前 13 场景通过                              |
+| E02 | Playwright    | admin suite                               | 当前 16 场景通过                              |
 | G01 | 真实 PR CI    | 所有内部 Job 与 required summaries        | checks 正确、无 pending 死锁                  |
 | G02 | 真实失败演练  | 临时测试分支制造一个模块失败              | 该模块失败，其他模块继续，summary 失败        |
 | G03 | 真实 main CI  | 合并后的 exact SHA                        | workflow completed/success，部署门可识别      |
@@ -360,7 +377,7 @@ sequenceDiagram
 
 ### 方案 A：仅拆 packages / web / admin
 
-优点是最简单；缺点是 admin 75 个文件、累计日志耗时 331.51 秒，仍接近现有 298.5 秒覆盖率步骤，
+优点是最简单；缺点是评估基线中 admin 75 个文件、累计日志耗时 331.51 秒，仍接近现有 298.5 秒覆盖率步骤，
 预期加速很小。否决。
 
 ### 方案 B：全套测试任意四等分
@@ -380,20 +397,20 @@ web、admin 失败混在同一 shard，维护者定位成本更高，也不符�
 
 ## 风险与缓解
 
-| 风险                                        | 影响                              | 缓解                                                                |
-| ------------------------------------------- | --------------------------------- | ------------------------------------------------------------------- |
-| shard 局部 thresholds 或默认 reporter       | 矩阵误红或重复报告                | 无 thresholds 且 `coverage.reporter: []`；merge 才报告；M06/C01     |
-| coverage blob 合并与当前 project 配置不兼容 | 阈值错误或报告缺失                | 先做本地五 blob→merge 原型；锁定 Vitest 版本；C01–C04 回归          |
-| 新执行器遗漏 worker 上限                    | 渲染密集测试抖动                  | 复用 `buildCoverageVitestArgs()`；M05 固定 `--maxWorkers=2`         |
-| pre-run list 不应用 shard                   | 三个 admin inventory 全量重复     | 实际 run 的 custom reporter 产 inventory；M07/C05                   |
-| blob 数量正确但内容重复                     | 漏测仍可能假绿                    | 动态 full inventory 与五份 module tuple 集合精确对账；M08/C04       |
-| admin 原生 shard 不均衡                     | 仍有长尾                          | 先用 3 shard；以真实 Actions 时长调整，不维护静态文件清单           |
-| matrix 某项失败导致 merge skipped           | required check 假绿或永久 pending | `if: !cancelled()` + 最终 `verify if: always()` 双重 fail closed    |
-| required check 改名                         | ruleset 阻止合并                  | 保留 `verify`/`commitlint`/`e2e` 汇总 Job；真实 PR 核对 contexts    |
-| artifact 名冲突或隐藏文件未上传             | merge 缺报告                      | 唯一名校验、`include-hidden-files: true`、数量校验                  |
-| 并行增加 Runner 总时长                      | 资源成本上升                      | packages 合并为一项；同时记录 wall-clock 与总 Job 时间              |
-| E2E 重复安装/系统依赖波动                   | 总 Runner 时间增加                | 保留 cache 和限时重试；不把外部 apt 故障算作测试变慢                |
-| 本地与 CI 命令漂移                          | 本地绿、CI 红                     | 保留 `pnpm test:cov` canonical gate；模块脚本有单测和全量等价性回归 |
+| 风险                                        | 影响                              | 缓解                                                                  |
+| ------------------------------------------- | --------------------------------- | --------------------------------------------------------------------- |
+| shard 局部 thresholds 或默认 reporter       | 矩阵误红或重复报告                | 无 thresholds 且 `coverage.reporter: []`；merge 才报告；M06/C01       |
+| coverage blob 合并与当前 project 配置不兼容 | 阈值错误或报告缺失                | 先做本地五 blob→merge 原型；锁定 Vitest 版本；C01–C04 回归            |
+| 新执行器遗漏 worker 上限                    | 渲染密集测试抖动                  | 复用 `buildCoverageVitestArgs()`；M05 固定 `--maxWorkers=2`           |
+| pre-run list 不应用 shard                   | 三个 admin inventory 全量重复     | 实际 run 的 custom reporter 产 inventory；M07/C05                     |
+| blob 数量正确但内容重复                     | 漏测仍可能假绿                    | 动态 full inventory 与五份 module tuple 集合精确对账；M08/C04         |
+| admin 原生 shard 不均衡                     | 仍有长尾                          | 先用 3 shard；以真实 Actions 时长调整，不维护静态文件清单             |
+| matrix 某项失败导致 merge skipped           | required check 假绿或永久 pending | `if: !cancelled()` + 最终 `verify if: always()` 双重 fail closed      |
+| required check 改名                         | ruleset 阻止合并                  | 保留 `verify`/`commitlint`/`e2e` 汇总 Job；真实 PR 核对 contexts      |
+| artifact 名冲突或隐藏文件未上传             | merge 缺报告                      | 唯一名校验、`include-hidden-files: true`、blob/inventory 精确集合校验 |
+| 并行增加 Runner 总时长                      | 资源成本上升                      | packages 合并为一项；同时记录 wall-clock 与总 Job 时间                |
+| E2E 重复安装/系统依赖波动                   | 总 Runner 时间增加                | 保留 cache 和限时重试；不把外部 apt 故障算作测试变慢                  |
+| 本地与 CI 命令漂移                          | 本地绿、CI 红                     | 保留 `pnpm test:cov` canonical gate；模块脚本有单测和全量等价性回归   |
 
 ## 发布、回滚与观察
 

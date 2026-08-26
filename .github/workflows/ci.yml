@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  verify:
+  quality:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -50,13 +50,145 @@ jobs:
       - name: Format check
         run: pnpm format:check
 
-      - name: Unit tests (with coverage thresholds)
-        run: pnpm test:cov
-
       - name: Build
         run: pnpm build
 
-  # 校验本次 PR 内所有提交是否符合 conventional commits(兜底本地 commit-msg 钩子被 --no-verify 绕过的情况)。
+  tooling-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Check Node runtime
+        run: pnpm check:node
+
+      - name: Test Node runtime guard
+        run: pnpm test:node-runtime
+
+      - name: Test coverage lock
+        run: pnpm test:coverage-lock
+
+      - name: Test CI modules and workflow
+        run: pnpm test:ci-modules
+
+      - name: Test deploy provenance
+        run: pnpm test:deploy-provenance
+
+  unit-coverage:
+    name: unit-coverage (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - module: packages
+          - module: web
+          - module: admin-1
+          - module: admin-2
+          - module: admin-3
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Run coverage module
+        run: pnpm ci:test-module ${{ matrix.module }} .ci-artifacts/${{ matrix.module }}
+
+      - name: Upload blob and actual-run inventory
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: vitest-blob-${{ matrix.module }}
+          path: |
+            .ci-artifacts/${{ matrix.module }}/.vitest-reports/
+            .ci-artifacts/${{ matrix.module }}/.ci-inventories/
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 1
+
+  coverage-merge:
+    needs: unit-coverage
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Download coverage modules
+        uses: actions/download-artifact@v7
+        with:
+          pattern: vitest-blob-*
+          path: .ci-artifacts
+          merge-multiple: true
+
+      - name: Generate full test inventory
+        run: pnpm exec vitest list --filesOnly --json > .ci-full-inventory.json
+
+      - name: Verify every test file ran exactly once
+        run: pnpm ci:validate-test-inventories .ci-full-inventory.json .ci-artifacts/.ci-inventories .ci-artifacts/.vitest-reports
+
+      - name: Merge coverage and enforce thresholds
+        run: pnpm exec vitest --config=vitest.config.ts --merge-reports=.ci-artifacts/.vitest-reports --coverage
+
+      - name: Upload failed coverage report
+        if: ${{ !cancelled() && failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  verify:
+    needs: [quality, tooling-tests, unit-coverage, coverage-merge]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every verification dependency
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+          TOOLING_RESULT: ${{ needs['tooling-tests'].result }}
+          UNIT_COVERAGE_RESULT: ${{ needs['unit-coverage'].result }}
+          COVERAGE_MERGE_RESULT: ${{ needs['coverage-merge'].result }}
+        run: |
+          for result in "$QUALITY_RESULT" "$TOOLING_RESULT" "$UNIT_COVERAGE_RESULT" "$COVERAGE_MERGE_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "verification dependency finished with: $result"
+              exit 1
+            fi
+          done
+
+  # 校验本次 PR 内所有提交是否符合 conventional commits(兜底本地 commit-msg 钩子被绕过的情况)。
   commitlint:
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -85,8 +217,8 @@ jobs:
           --to ${{ github.event.pull_request.head.sha }}
           --verbose
 
-  # E2E 较慢,独立 job 不阻塞单测反馈。
-  e2e:
+  # web/admin E2E 独立执行，互不阻塞；最终由稳定的 e2e required check 汇总。
+  e2e-web:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -137,14 +269,85 @@ jobs:
           done
           echo "::warning::playwright install-deps 三次均失败,继续执行 e2e(runner 镜像通常已含所需库)"
 
-      - name: E2E (smoke)
-        run: pnpm test:e2e
+      - name: Web E2E
+        run: pnpm --filter @tsz/e2e test:e2e:web
 
       # 失败时上传报告,便于排查 flaky 用例。
-      - name: Upload Playwright report
+      - name: Upload web Playwright report
         if: ${{ !cancelled() && failure() }}
         uses: actions/upload-artifact@v7
         with:
-          name: playwright-report
+          name: playwright-report-web
           path: e2e/playwright-report/
           retention-days: 7
+
+  e2e-admin:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Resolve Playwright version
+        id: pw
+        run: echo "version=$(pnpm --filter @tsz/e2e exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        id: pw-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+
+      - name: Install Playwright browsers
+        if: steps.pw-cache.outputs.cache-hit != 'true'
+        run: pnpm --filter @tsz/e2e exec playwright install chromium
+
+      - name: Install Playwright system deps
+        run: |
+          for i in 1 2 3; do
+            if timeout 240 pnpm --filter @tsz/e2e exec playwright install-deps chromium; then
+              exit 0
+            fi
+            echo "::warning::playwright install-deps 第 $i 次失败或超时,15 秒后重试"
+            sleep 15
+          done
+          echo "::warning::playwright install-deps 三次均失败,继续执行 e2e(runner 镜像通常已含所需库)"
+
+      - name: Admin E2E
+        run: pnpm --filter @tsz/e2e test:e2e:admin
+
+      - name: Upload admin Playwright report
+        if: ${{ !cancelled() && failure() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report-admin
+          path: e2e/playwright-report-admin/
+          retention-days: 7
+
+  e2e:
+    needs: [e2e-web, e2e-admin]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require both E2E suites
+        env:
+          WEB_E2E_RESULT: ${{ needs['e2e-web'].result }}
+          ADMIN_E2E_RESULT: ${{ needs['e2e-admin'].result }}
+        run: |
+          for result in "$WEB_E2E_RESULT" "$ADMIN_E2E_RESULT"; do
+            if [ "$result" != "success" ]; then
+              echo "E2E dependency finished with: $result"
+              exit 1
+            fi
+          done

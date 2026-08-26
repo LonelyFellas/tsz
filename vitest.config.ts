@@ -1,92 +1,10 @@
 import { defineConfig } from "vitest/config";
+import { fullCoverageConfig, vitestProjects } from "./vitest.shared-config";
 
 // monorepo 聚合配置:各子项目有自己的 vitest.config.ts,这里统一编排 + 汇总覆盖率。
 export default defineConfig({
   test: {
-    projects: [
-      "packages/shared",
-      "packages/ui",
-      "packages/api-client",
-      "packages/voice-editor",
-      "apps/web",
-      "apps/admin"
-    ],
-    coverage: {
-      provider: "v8",
-      reporter: ["text", "html"],
-      reportsDirectory: "./coverage",
-      // 覆盖率聚焦运行时逻辑：各 package + web 的鉴权/状态/请求层。
-      // app 路由文件(page/layout)与纯静态/装配代码以 e2e 与集成测试为主，不纳入单测门槛。
-      include: [
-        "packages/shared/src/**",
-        "packages/ui/src/**",
-        "packages/api-client/src/**",
-        "packages/voice-editor/src/**",
-        "apps/web/src/features/auth/**",
-        "apps/web/src/features/placement/**",
-        "apps/web/src/lib/**",
-        "apps/web/src/stores/**",
-        // 与 web 对称：只纳入业务逻辑层（features/lib/components），app 路由壳由集成/e2e 覆盖。
-        "apps/admin/src/features/**",
-        "apps/admin/src/lib/**",
-        "apps/admin/src/components/**"
-      ],
-      exclude: [
-        "**/index.ts",
-        "**/*.d.ts",
-        "**/*.test.*",
-        // 纯静态展示 / 装配代码，无逻辑分支，由集成与 e2e 覆盖。
-        "apps/web/src/features/auth/components/AuthBranding.tsx",
-        "apps/web/src/lib/query-client.ts",
-        "apps/web/src/lib/constants.ts",
-        // SEO 常量单一来源，纯文案对象无逻辑分支，与 constants.ts 同类。
-        "apps/web/src/lib/site.ts",
-        // 根布局渲染 <html>/<body> 装配壳，不纳入单测。
-        "apps/admin/src/app/layout.tsx",
-        // 定级测试(placement):流程编排(PlacementFlow)与各屏组件已有 jsdom
-        // 集成测试(PlacementFlow.test.tsx,经注入的假 client 驱动全部分支);
-        // 仅 SwipeCard 依赖 PointerEvent 手势/pointer capture/WAAPI 动画,
-        // jsdom 无法有效驱动(按钮/键盘路径已随流程测试覆盖),由 e2e 保底。
-        // TODO(定级): Playwright 补真实滑卡手势用例后评估是否移除本行。
-        "apps/web/src/features/placement/components/SwipeCard.tsx",
-        // mock↔http 装配点,单行无逻辑分支(同 query-client.ts)。
-        "apps/web/src/features/placement/lib/client.ts",
-        // 智能词库已接真实接口:纯逻辑层(mapping/listQuery/labels/editorConstants)
-        // 纳入 90% 门槛;下面两类仍排除——
-        // ① legacy .tsx 表单/表格装配与交互组件:由 WordEditor/pages 冒烟测试保底,
-        //    TODO(智能词库): 补组件级交互测试(保存冲突 409、发布 422 详情、关联词选择)后移除;
-        //    新版 word-creation 向导包含大量业务分支且已有组件测试，必须纳入 90% 门槛。
-        // ② api.ts 是 React Query 薄装配(useQuery/useMutation 包 api.words.*),无业务分支。
-        "apps/admin/src/features/dictionary/*.tsx",
-        "apps/admin/src/features/dictionary/word-editor/**/*.tsx",
-        "apps/admin/src/features/dictionary/api.ts",
-        // 首页看板图表：recharts 组装壳，无业务分支且 jsdom 量不到布局（宽高恒 0），
-        // 单测价值低，由 pages 冒烟测试保底渲染不抛错。
-        // TODO(看板): 接 /admin 统计接口后，为数据映射/空态/加载态补组件测试并移除本行。
-        // KpiCard 有 delta 涨跌逻辑，已在 KpiCard.test.tsx 覆盖，不在此列。
-        "apps/admin/src/features/dashboard/DashboardCharts.tsx"
-      ],
-      // 按目录分别设门槛：包内逻辑 100%；应用业务逻辑层 90%。
-      thresholds: {
-        "packages/**": {
-          statements: 100,
-          branches: 100,
-          functions: 100,
-          lines: 100
-        },
-        "apps/web/src/**": {
-          statements: 90,
-          branches: 90,
-          functions: 90,
-          lines: 90
-        },
-        "apps/admin/src/**": {
-          statements: 90,
-          branches: 90,
-          functions: 90,
-          lines: 90
-        }
-      }
-    }
+    projects: vitestProjects,
+    coverage: fullCoverageConfig
   }
 });
