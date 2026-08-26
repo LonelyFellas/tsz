@@ -453,7 +453,7 @@ describe("V3PreviewAndPublishStep", () => {
     }
   });
 
-  it("shows publish controls only for a whitelisted migration canary", () => {
+  it("shows publish controls for native or a whitelisted migration canary", () => {
     const { rerender } = render(
       <V3PreviewAndPublishStep
         word={word({
@@ -475,6 +475,17 @@ describe("V3PreviewAndPublishStep", () => {
     rerender(
       <V3PreviewAndPublishStep
         word={word({ mode: "migration_canary", whitelisted: true })}
+        requests={allowedRequests()}
+        onPublished={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole("button", { name: "检查发布条件" })
+    ).toBeInTheDocument();
+
+    rerender(
+      <V3PreviewAndPublishStep
+        word={word({ mode: "native" })}
         requests={allowedRequests()}
         onPublished={vi.fn()}
       />

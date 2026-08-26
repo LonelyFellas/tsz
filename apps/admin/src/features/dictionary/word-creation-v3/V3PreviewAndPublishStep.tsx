@@ -131,7 +131,7 @@ function publicationBlockCode(word: AdminWordV3): string | undefined {
   if (word.status === "archived") return "entry_archived";
   const capability = word.capabilities.publication;
   if (capability.mode === "shadow_only") return capability.blocked_code;
-  if (!capability.whitelisted) {
+  if (capability.mode === "migration_canary" && !capability.whitelisted) {
     return capability.blocked_code ?? "migration_canary_not_whitelisted";
   }
   return undefined;

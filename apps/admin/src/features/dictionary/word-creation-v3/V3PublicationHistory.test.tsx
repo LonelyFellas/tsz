@@ -949,7 +949,7 @@ describe("V3PublicationHistory", () => {
     expect(snapshot.getByText("无释义快照")).toBeInTheDocument();
   });
 
-  it("uses only the current V3 canary capability to activate non-current V2 or V3 publications", async () => {
+  it("uses the current native capability to activate non-current V2 or V3 publications", async () => {
     const api = requests();
     const legacy = v2Publication();
     const historicalShadow = v3Publication({
@@ -986,7 +986,12 @@ describe("V3PublicationHistory", () => {
 
     render(
       <V3PublicationHistory
-        currentWord={v3Word()}
+        currentWord={v3Word({
+          capabilities: {
+            publication: { mode: "native" },
+            pronunciation_normalization_version: "nfkc_trim_lower_v1"
+          }
+        })}
         onActivated={vi.fn()}
         requests={api}
       />

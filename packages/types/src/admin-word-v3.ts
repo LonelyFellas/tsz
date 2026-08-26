@@ -332,6 +332,7 @@ export type V3PublicationBlockCode =
   "phase2_consumers_not_ready" | "migration_canary_not_whitelisted";
 
 export type V3PublicationCapability =
+  | { mode: "native" }
   | {
       mode: "shadow_only";
       blocked_code: V3PublicationBlockCode;
