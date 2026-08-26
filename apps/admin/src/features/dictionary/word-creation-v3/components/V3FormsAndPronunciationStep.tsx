@@ -23,6 +23,7 @@ import {
   type V3IdFactory
 } from "../operations";
 import { V3PosTab } from "./V3PosTab";
+import { partOfSpeechLabel } from "../presentation";
 import "../v3-forms.css";
 
 export interface V3FormsAndPronunciationStepProps {
@@ -145,8 +146,7 @@ export function V3FormsAndPronunciationStep({
       ) : (
         <>
           <Typography.Paragraph type="secondary">
-            concrete form 均为平级实体；同一 form 可通过 membership
-            在多个组中共享。
+            每个词性可以有多个变化组；同一个词形也可以在多个变化组中复用。
           </Typography.Paragraph>
           <Tabs
             activeKey={activePosId}
@@ -154,7 +154,9 @@ export function V3FormsAndPronunciationStep({
             onChange={onActivePosChange}
             items={value.pos.map((pos) => ({
               key: pos.pos_id,
-              label: pos.pos,
+              label:
+                catalog.data?.items.find((item) => item.code === pos.pos)
+                  ?.name_zh ?? partOfSpeechLabel(pos.pos),
               children: (
                 <V3PosTab
                   content={value}

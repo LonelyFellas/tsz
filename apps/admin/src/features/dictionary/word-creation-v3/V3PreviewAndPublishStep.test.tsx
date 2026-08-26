@@ -214,7 +214,7 @@ describe("V3PreviewAndPublishStep", () => {
     expect(directRequests.impact).not.toHaveBeenCalled();
     expect(createFlow).not.toHaveBeenCalled();
 
-    const publishButton = screen.getByRole("button", { name: "发布 V3 词条" });
+    const publishButton = screen.getByRole("button", { name: "发布词条" });
     fireEvent.click(publishButton);
     fireEvent.click(publishButton);
     expect(publish).toHaveBeenCalledTimes(1);
@@ -234,9 +234,12 @@ describe("V3PreviewAndPublishStep", () => {
 
     expect(screen.getByText("learn")).toBeInTheDocument();
     expect(screen.getByText("learnt")).toBeInTheDocument();
-    expect(screen.getAllByText("base")).toHaveLength(2);
+    expect(screen.getAllByText("原形")).toHaveLength(2);
     expect(screen.queryByText(/主词|主形|主原形/)).not.toBeInTheDocument();
-    expect(screen.getByText("phase2_consumers_not_ready")).toBeInTheDocument();
+    expect(
+      screen.getByText("学习端尚未完成该词条结构的发布准备。")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("phase2_consumers_not_ready")).toBeNull();
     expect(
       screen.queryByRole("button", { name: /发布/ })
     ).not.toBeInTheDocument();
@@ -318,29 +321,29 @@ describe("V3PreviewAndPublishStep", () => {
     ).toHaveTextContent("变化组 2");
     expect(
       screen.getByTestId(`preview-membership-${UUIDS.membership}`)
-    ).toHaveTextContent("1. base · centre");
+    ).toHaveTextContent("1. 原形 · centre");
     expect(
       screen.getByTestId(`preview-membership-${UUIDS.membership_3}`)
-    ).toHaveTextContent("1. base · centre");
+    ).toHaveTextContent("1. 原形 · centre");
     expect(screen.getAllByTestId(`preview-form-${shared.id}`)).toHaveLength(1);
     expect(screen.getByTestId(`preview-form-${regional.id}`)).toHaveTextContent(
-      "uk"
+      "英式"
     );
     expect(screen.getByTestId(`preview-form-${regional.id}`)).toHaveTextContent(
-      "us"
+      "美式"
     );
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation}`)
-    ).toHaveTextContent("normal · sen-tre · centre");
+    ).toHaveTextContent("常规 · 词典音标 sen-tre · 实际发音 centre");
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_2}`)
-    ).toHaveTextContent("strong · sen-tr · centr");
+    ).toHaveTextContent("强读 · 词典音标 sen-tr · 实际发音 centr");
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_3}`)
-    ).toHaveTextContent("weak · sen-ter · center");
+    ).toHaveTextContent("弱读 · 词典音标 sen-ter · 实际发音 center");
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(904)}`)
-    ).toHaveTextContent("normal · sen-tre-uk · centre-uk");
+    ).toHaveTextContent("常规 · 词典音标 sen-tre-uk · 实际发音 centre-uk");
   });
 
   it("keeps an empty group list and an empty pronunciation list explicit", () => {
@@ -378,10 +381,10 @@ describe("V3PreviewAndPublishStep", () => {
     expect(screen.getByText("暂无变化组")).toBeInTheDocument();
     expect(
       screen.getByTestId(`preview-form-${formWithoutPronunciation.id}`)
-    ).toHaveTextContent("base");
+    ).toHaveTextContent("原形");
     expect(
       screen.getByTestId(`preview-form-${formWithoutPronunciation.id}`)
-    ).toHaveTextContent("common");
+    ).toHaveTextContent("通用");
     expect(
       screen.getByTestId(`preview-form-${formWithoutPronunciation.id}`)
     ).toHaveTextContent("plain");
@@ -389,8 +392,72 @@ describe("V3PreviewAndPublishStep", () => {
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(905)}`)
     ).toHaveTextContent(
-      "未选择风格 · pending-phonetic · pending-pronunciation"
+      "未选择发音方式 · 词典音标 pending-phonetic · 实际发音 pending-pronunciation"
     );
+  });
+
+  it("缺失成员、空音标与未入灰度能力使用产品回退", () => {
+    const current = word({ mode: "migration_canary", whitelisted: false });
+    const form = commonFormFixture({
+      pronunciations: [
+        pronunciationFixture({
+          id: uuidFromInt(906),
+          style: "normal",
+          dict_phonetic: "",
+          actual_pron: ""
+        })
+      ]
+    });
+    current.forms = formsFixture({
+      forms: [form],
+      groups: [
+        {
+          id: uuidFromInt(907),
+          is_regular: false,
+          members: [{ id: uuidFromInt(908), form_id: "missing-form-id" }]
+        }
+      ]
+    });
+
+    render(<V3PreviewAndPublishStep word={current} onPublished={vi.fn()} />);
+
+    expect(
+      screen.getByTestId(`preview-membership-${uuidFromInt(908)}`)
+    ).toHaveTextContent("1. 未知词形");
+    expect(
+      screen.getByTestId(`preview-pronunciation-${uuidFromInt(906)}`)
+    ).toHaveTextContent("常规");
+    expect(
+      screen.getByText("该词条暂未进入允许发布的迁移范围。")
+    ).toBeVisible();
+  });
+
+  it("受控校验问题优先展示中文消息并隐藏内部代码", () => {
+    const controller: V3PreviewPublishController = {
+      issues: [
+        { ...validationIssue(), message: "词形内容需要修正" },
+        { ...validationIssue(), node_id: UUIDS.form_2 }
+      ],
+      isPending: () => false,
+      actions: {
+        validate: vi.fn(),
+        previewFormsImpact: vi.fn(),
+        publish: vi.fn()
+      }
+    };
+    render(
+      <V3PreviewAndPublishStep
+        word={word({ mode: "migration_canary", whitelisted: true })}
+        controller={controller}
+      />
+    );
+
+    expect(screen.getByText("发布校验未通过")).toBeVisible();
+    expect(screen.getByText(/词形内容需要修正/)).toBeVisible();
+    expect(screen.getByText(/第 2 项内容需要返回对应步骤检查/)).toBeVisible();
+    expect(
+      screen.queryByText("invalid_form_type_for_part_of_speech")
+    ).toBeNull();
   });
 
   it("shows every concrete impact item instead of only the affected count", () => {
@@ -447,9 +514,11 @@ describe("V3PreviewAndPublishStep", () => {
     );
 
     for (const item of affected) {
-      expect(
-        screen.getByTestId(`impact-item-${item.node_type}-${item.node_id}`)
-      ).toHaveTextContent(`${item.node_type}${item.node_id}${item.reason}`);
+      const impactItem = screen.getByTestId(
+        `impact-item-${item.node_type}-${item.node_id}`
+      );
+      expect(impactItem).toHaveTextContent(item.reason);
+      expect(impactItem).not.toHaveTextContent(item.node_id);
     }
   });
 
@@ -466,8 +535,9 @@ describe("V3PreviewAndPublishStep", () => {
       />
     );
     expect(
-      screen.getByText("migration_canary_not_whitelisted")
+      screen.getByText("该词条暂未进入允许发布的迁移范围。")
     ).toBeInTheDocument();
+    expect(screen.queryByText("migration_canary_not_whitelisted")).toBeNull();
     expect(
       screen.queryByRole("button", { name: /发布/ })
     ).not.toBeInTheDocument();
@@ -548,7 +618,7 @@ describe("V3PreviewAndPublishStep", () => {
         impact_confirmation_token: "impact-2"
       })
     );
-    expect(screen.getByRole("button", { name: "发布 V3 词条" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "发布词条" })).toBeEnabled();
   });
 
   it("keeps compatibility read-only, omits it from publish, and single-flights a double click", async () => {
@@ -575,15 +645,15 @@ describe("V3PreviewAndPublishStep", () => {
         />
       </StrictMode>
     );
-    expect(screen.getByText("legacy-learn")).toBeInTheDocument();
-    expect(screen.getByText("兼容桥（只读）")).toBeInTheDocument();
+    expect(screen.queryByText("legacy-learn")).toBeNull();
+    expect(screen.queryByText("兼容桥（只读）")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     expect(await screen.findByText("影响预览：0 项")).toBeInTheDocument();
     expect(screen.getByText("未发现需要确认的影响。")).toBeInTheDocument();
     expect(screen.queryByTestId(/^impact-item-/)).toBeNull();
     const publishButton = await screen.findByRole("button", {
-      name: "发布 V3 词条"
+      name: "发布词条"
     });
     fireEvent.click(publishButton);
     fireEvent.click(publishButton);
@@ -622,7 +692,7 @@ describe("V3PreviewAndPublishStep", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     const publishButton = await screen.findByRole("button", {
-      name: "发布 V3 词条"
+      name: "发布词条"
     });
     fireEvent.click(publishButton);
     expect(
@@ -657,7 +727,7 @@ describe("V3PreviewAndPublishStep", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     const publishButton = await screen.findByRole("button", {
-      name: "发布 V3 词条"
+      name: "发布词条"
     });
     fireEvent.click(publishButton);
     await waitFor(() => expect(onPublished).toHaveBeenCalledTimes(1));
@@ -702,9 +772,7 @@ describe("V3PreviewAndPublishStep", () => {
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "发布 V3 词条" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
 
     const retry = await screen.findByRole("button", {
       name: "确认同形提示并重试发布"
@@ -721,7 +789,7 @@ describe("V3PreviewAndPublishStep", () => {
       await screen.findByText("网络异常，发布失败，可原样重试。")
     ).toBeInTheDocument();
     expect(screen.getByText("learn / learnt")).toBeInTheDocument();
-    expect(screen.getByText("legacy-learn")).toBeInTheDocument();
+    expect(screen.queryByText("legacy-learn")).toBeNull();
   });
 
   it("renders a distinguish bridge and UK/US variants without deriving either into a request", () => {
@@ -766,7 +834,7 @@ describe("V3PreviewAndPublishStep", () => {
         onPublished={vi.fn()}
       />
     );
-    expect(screen.getByText("UK legacy-uk / US legacy-us")).toBeInTheDocument();
+    expect(screen.queryByText("UK legacy-uk / US legacy-us")).toBeNull();
     expect(screen.getByText("colour")).toBeInTheDocument();
     expect(screen.getByText("color")).toBeInTheDocument();
   });
@@ -790,9 +858,7 @@ describe("V3PreviewAndPublishStep", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     expect(
-      await screen.findByText(
-        "invalid_form_type_for_part_of_speech · form type is not allowed"
-      )
+      await screen.findByText("第 1 项内容需要返回对应步骤检查。")
     ).toBeInTheDocument();
     expect(requests.impact).not.toHaveBeenCalled();
   });
@@ -823,11 +889,12 @@ describe("V3PreviewAndPublishStep", () => {
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     expect(
       await screen.findByTestId(`impact-item-form-${UUIDS.form}`)
-    ).toHaveTextContent(`form${UUIDS.form}referenced`);
+    ).toHaveTextContent("词形关联内容将随本次调整受到影响。");
+    expect(screen.queryByText(UUIDS.form)).toBeNull();
     fireEvent.click(
       await screen.findByRole("button", { name: "确认影响并允许发布" })
     );
-    fireEvent.click(screen.getByRole("button", { name: "发布 V3 词条" }));
+    fireEvent.click(screen.getByRole("button", { name: "发布词条" }));
     await waitFor(() => expect(onPublished).toHaveBeenCalledWith(published));
     expect(requests.publish.mock.calls[0]?.[2]).toEqual({
       schema_version: 3,
@@ -838,7 +905,7 @@ describe("V3PreviewAndPublishStep", () => {
   it.each([
     [new HttpError(401, "expired"), "登录已失效，请重新登录。"],
     [new HttpError(403, "forbidden"), "当前账号没有发布权限。"],
-    [new HttpError(503, "off"), "V3 发布服务暂不可用，请稍后重试。"]
+    [new HttpError(503, "off"), "发布服务暂不可用，请稍后重试。"]
   ])(
     "maps preparation errors without dropping the preview",
     async (failure, message) => {
@@ -920,7 +987,7 @@ describe("V3PreviewAndPublishStep", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     const publishButton = await screen.findByRole("button", {
-      name: "发布 V3 词条"
+      name: "发布词条"
     });
     fireEvent.click(publishButton);
     await waitFor(() => expect(get).toHaveBeenCalledWith("word-v3"));
@@ -931,16 +998,14 @@ describe("V3PreviewAndPublishStep", () => {
       resolveGet({ word: refreshed, retired_stable_nodes: [] })
     );
     expect(await screen.findByText("refreshed canonical")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "发布 V3 词条" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
 
     const prepareAfterRefresh = screen
       .getByText("检查发布条件")
       .closest("button")!;
     await waitFor(() => expect(prepareAfterRefresh).toBeEnabled());
     fireEvent.click(prepareAfterRefresh);
-    fireEvent.click(
-      await screen.findByRole("button", { name: "发布 V3 词条" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
     const confirmSurface = await screen.findByRole("button", {
       name: "确认同形提示并重试发布"
     });
@@ -1004,7 +1069,7 @@ describe("V3PreviewAndPublishStep", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     const stalePublishButton = await screen.findByRole("button", {
-      name: "发布 V3 词条"
+      name: "发布词条"
     });
     fireEvent.click(stalePublishButton);
     await waitFor(() => expect(get).toHaveBeenCalledWith("word-v3"));
@@ -1015,16 +1080,14 @@ describe("V3PreviewAndPublishStep", () => {
       resolveGet({ word: refreshed, retired_stable_nodes: [] })
     );
     expect(await screen.findByText("revision reconciled")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "发布 V3 词条" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
 
     const prepareAfterRevisionRefresh = screen
       .getByText("检查发布条件")
       .closest("button")!;
     await waitFor(() => expect(prepareAfterRevisionRefresh).toBeEnabled());
     fireEvent.click(prepareAfterRevisionRefresh);
-    fireEvent.click(
-      await screen.findByRole("button", { name: "发布 V3 词条" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
     await waitFor(() => expect(publish).toHaveBeenCalledTimes(2));
     expect(publish.mock.calls[1]?.[1]).not.toBe(publish.mock.calls[0]?.[1]);
     expect(publish.mock.calls[1]?.[2]).toEqual({
@@ -1053,7 +1116,7 @@ describe("V3PreviewAndPublishStep", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     const stalePublishButton = await screen.findByRole("button", {
-      name: "发布 V3 词条"
+      name: "发布词条"
     });
     fireEvent.click(stalePublishButton);
     expect(
@@ -1065,7 +1128,7 @@ describe("V3PreviewAndPublishStep", () => {
     fireEvent.click(screen.getByRole("button", { name: "重新刷新最新词条" }));
     await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
     expect(publish).toHaveBeenCalledTimes(1);
-    expect(screen.queryByRole("button", { name: "发布 V3 词条" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
   });
 
   it("does not apply a late revision reconciliation after the word prop changes", async () => {
@@ -1105,9 +1168,7 @@ describe("V3PreviewAndPublishStep", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "发布 V3 词条" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
     await waitFor(() => expect(requests.get).toHaveBeenCalledTimes(1));
     view.rerender(
       <V3PreviewAndPublishStep
@@ -1157,9 +1218,7 @@ describe("V3PreviewAndPublishStep", () => {
     );
 
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
-    fireEvent.click(
-      await screen.findByRole("button", { name: "发布 V3 词条" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
     await waitFor(() => expect(requests.get).toHaveBeenCalledTimes(1));
     const flowCreationsBeforeUnmount = createFlow.mock.calls.length;
     view.unmount();
@@ -1198,7 +1257,7 @@ describe("V3PreviewAndPublishStep", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     const publishButton = await screen.findByRole("button", {
-      name: "发布 V3 词条"
+      name: "发布词条"
     });
     fireEvent.click(publishButton);
     expect(
@@ -1256,7 +1315,7 @@ describe("V3PreviewAndPublishStep", () => {
       fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
       if (command === "publish") {
         fireEvent.click(
-          await screen.findByRole("button", { name: "发布 V3 词条" })
+          await screen.findByRole("button", { name: "发布词条" })
         );
       }
 
@@ -1267,8 +1326,9 @@ describe("V3PreviewAndPublishStep", () => {
       expect(rejected).toHaveBeenCalledTimes(1);
       expect(onPublished).not.toHaveBeenCalled();
       expect(screen.queryByRole("button", { name: "检查发布条件" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "发布 V3 词条" })).toBeNull();
-      expect(screen.getByText("entry_archived")).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
+      expect(screen.getByText("已归档词条不能发布。")).toBeInTheDocument();
+      expect(screen.queryByText("entry_archived")).toBeNull();
     }
   );
 

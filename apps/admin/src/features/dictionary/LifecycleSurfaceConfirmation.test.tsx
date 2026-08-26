@@ -110,9 +110,15 @@ describe("LifecycleSurfaceConfirmation", () => {
 
     renderPanel(state);
     expect(screen.getByText("colour · color")).toBeVisible();
-    expect(screen.getByText("V3 词形 · colour · base · common")).toBeVisible();
+    expect(screen.getByText("单词")).toBeVisible();
+    expect(screen.getByText("已发布")).toBeVisible();
+    fireEvent.click(screen.getByText("查看候选详情"));
+    expect(screen.getByText("词形 · colour · 原形 · 通用")).toBeInTheDocument();
+    expect(screen.getByText("名词")).toBeInTheDocument();
+    expect(screen.getByText("释义：颜色")).toBeInTheDocument();
+    expect(screen.queryByText("12345678")).toBeNull();
     expect(screen.getByText("恢复前需要确认同名公开范围")).toBeVisible();
-    expect(screen.getByText(/确认绑定本次恢复命令/)).toBeInTheDocument();
+    expect(screen.getByText(/确认后将按当前结果继续恢复/)).toBeInTheDocument();
     expect(screen.getByText("确认并恢复")).toBeEnabled();
   });
   it("disabled gate 展示能力限制且不提供确认入口", () => {
@@ -127,7 +133,7 @@ describe("LifecycleSurfaceConfirmation", () => {
         "multiple_active_exact_headword_publications_not_enabled"
     });
     expect(screen.getByText("学习端暂不支持多个同名公开词条")).toBeVisible();
-    expect(screen.getByText(/不能替代恢复命令确认/)).toBeInTheDocument();
+    expect(screen.getByText(/当前不能继续恢复/)).toBeInTheDocument();
     expect(screen.queryByText("确认并恢复")).toBeNull();
   });
 
@@ -195,7 +201,7 @@ describe("LifecycleSurfaceConfirmation", () => {
     );
 
     expect(screen.getByText("激活前需要确认同名公开范围")).toBeVisible();
-    expect(screen.getByText(/确认绑定本次激活命令/)).toBeInTheDocument();
+    expect(screen.getByText(/确认后将按当前结果继续激活/)).toBeInTheDocument();
     expect(screen.queryByText(/恢复/)).toBeNull();
     fireEvent.click(screen.getByText("确认并激活"));
     expect(onConfirm).toHaveBeenCalledTimes(1);
@@ -239,7 +245,7 @@ describe("LifecycleSurfaceConfirmation", () => {
       "activate"
     );
 
-    expect(screen.getByText(/不能替代激活命令确认/)).toBeInTheDocument();
+    expect(screen.getByText(/当前不能继续激活/)).toBeInTheDocument();
     expect(screen.queryByText(/恢复/)).toBeNull();
     expect(screen.queryByText("确认并激活")).toBeNull();
   });

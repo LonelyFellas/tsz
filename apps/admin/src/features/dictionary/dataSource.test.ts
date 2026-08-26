@@ -182,6 +182,11 @@ const ANY_INVOCATIONS = [
     method: "restoreBatchAny",
     fallback: "restoreBatch",
     args: ["restore-batch-any-key", { entries: [] }]
+  },
+  {
+    method: "relatedSearchAny",
+    fallback: "relatedSearch",
+    args: ["mixed", { kind: "word", match_mode: "contains" }]
   }
 ] as const satisfies ReadonlyArray<{
   method: keyof AdminWordsAnyDataSource;

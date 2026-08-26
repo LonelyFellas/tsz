@@ -15,6 +15,7 @@ import {
 } from "../operations";
 import { useState } from "react";
 import { V3FormGroupCard } from "./V3FormGroupCard";
+import { partOfSpeechLabel } from "../presentation";
 
 export interface V3PosTabProps {
   content: DraftFormsStepContentV3;
@@ -40,6 +41,7 @@ export function V3PosTab({
     formIds: string[];
     changed: boolean;
   }>();
+  const posLabel = posCatalog?.name_zh ?? partOfSpeechLabel(pos.pos);
   const membershipCounts = new Map<string, number>();
   for (const group of pos.form_groups) {
     for (const member of group.members) {
@@ -113,14 +115,14 @@ export function V3PosTab({
     >
       <Flex justify="space-between" gap="small" wrap>
         <Button
-          aria-label={`新增变化组 ${pos.pos_id}`}
+          aria-label={`新增${posLabel}变化组`}
           icon={<PlusOutlined />}
           onClick={addGroup}
         >
           新增变化组
         </Button>
         <Button
-          aria-label={`删除词性 ${pos.pos_id}`}
+          aria-label={`删除词性${posLabel}`}
           danger
           disabled={!onDeletePos}
           icon={<DeleteOutlined />}
@@ -138,14 +140,14 @@ export function V3PosTab({
               </Button>
               <Button danger onClick={confirmGroupDeletion}>
                 删除变化组并同时删除 {pendingGroupDeletion.formIds.length}{" "}
-                个具体词形
+                个不再被其他变化组使用的词形
               </Button>
             </Space>
           }
           description={
             <ul>
-              {pendingGroupDeletion.formIds.map((formId) => (
-                <li key={formId}>{formId}</li>
+              {pendingGroupDeletion.formIds.map((formId, index) => (
+                <li key={formId}>受影响词形 {index + 1}</li>
               ))}
             </ul>
           }

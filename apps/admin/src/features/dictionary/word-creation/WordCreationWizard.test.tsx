@@ -671,7 +671,7 @@ describe("WordCreationWizard", () => {
     expect(await screen.findByText("短语草稿已创建")).toBeVisible();
     expect(screen.getByText("短语", { exact: true })).toBeVisible();
     expect(
-      screen.getByText("内置词典未收录该短语，已按规范化输入创建空白 V2 草稿。")
+      screen.getByText("内置词典未收录该短语，已按规范化输入创建空白短语草稿。")
     ).toBeVisible();
   });
 

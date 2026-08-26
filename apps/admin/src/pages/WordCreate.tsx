@@ -1,6 +1,25 @@
-import { WordCreationWizard } from "@/features/dictionary/word-creation/WordCreationWizard";
+import { useNavigate } from "react-router-dom";
+import {
+  UnifiedCreateEntryStep,
+  type UnifiedCreateRequests
+} from "@/features/dictionary/word-creation/UnifiedCreateEntryStep";
 
-// 智能词库 → 创建词条：检测通过前没有 wordId，由向导负责第 1 步状态。
-export function WordCreatePage() {
-  return <WordCreationWizard mode="create" />;
+export function WordCreatePage({
+  requests
+}: {
+  requests?: UnifiedCreateRequests;
+} = {}) {
+  const navigate = useNavigate();
+  return (
+    <UnifiedCreateEntryStep
+      requests={requests}
+      onCreated={(word, state) => {
+        const route =
+          word.schema_version === 3
+            ? `/words/${word.id}/v3/wizard/forms`
+            : `/words/${word.id}/wizard/forms`;
+        navigate(route, { replace: true, state });
+      }}
+    />
+  );
 }

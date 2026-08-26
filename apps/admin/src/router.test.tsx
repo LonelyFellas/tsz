@@ -11,13 +11,10 @@ vi.mock("@/pages/Words", () => ({
   WordsPage: () => <div>words-page</div>
 }));
 vi.mock("@/pages/WordCreate", () => ({
-  WordCreatePage: () => <div>v2-create-page</div>
+  WordCreatePage: () => <div>unified-create-page</div>
 }));
 vi.mock("@/pages/WordWizard", () => ({
   WordWizardPage: () => <div>v2-wizard-page</div>
-}));
-vi.mock("@/pages/WordCreateV3", () => ({
-  WordCreateV3Page: () => <div>v3-create-page</div>
 }));
 vi.mock("@/pages/WordWizardV3", () => ({
   WordWizardV3Page: () => <div>v3-wizard-page</div>
@@ -60,26 +57,25 @@ function renderRoute(initialEntry: string) {
 }
 
 describe("word route parsing", () => {
-  it.each(["/words/new", "/words/new?kind=word"])(
-    "redirects the legacy word creation entry %s to V3",
+  it.each(["/words/new", "/words/new?kind=word", "/words/new?kind=phrase"])(
+    "keeps every product creation entry on the unified page: %s",
     async (entry) => {
       const router = renderRoute(entry);
 
-      expect(await screen.findByText("v3-create-page")).toBeInTheDocument();
-      await waitFor(() =>
-        expect(router.state.location.pathname).toBe("/words/new/v3")
-      );
+      expect(
+        await screen.findByText("unified-create-page")
+      ).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/words/new");
     }
   );
 
-  it("keeps phrase creation on the existing V2 route", async () => {
-    const router = renderRoute("/words/new?kind=phrase");
+  it("redirects the old V3 creation deep link to the unified page", async () => {
+    const router = renderRoute("/words/new/v3");
 
-    expect(await screen.findByText("v2-create-page")).toBeInTheDocument();
-    expect(router.state.location).toMatchObject({
-      pathname: "/words/new",
-      search: "?kind=phrase"
-    });
+    expect(await screen.findByText("unified-create-page")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/words/new")
+    );
   });
 
   it.each([
