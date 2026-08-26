@@ -19,6 +19,14 @@ import {
 import type { ReactNode } from "react";
 import { StrictMode, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+
+vi.mock("../api", () => ({
+  useRelatedSearchAny: () => ({
+    exact: { data: undefined, isFetching: false },
+    contains: { data: undefined, isFetching: false }
+  })
+}));
+
 import type { V3WordRequests } from "./api";
 import { V3FormsAndPronunciationStep } from "./components/V3FormsAndPronunciationStep";
 import { V3MeaningsAndExamplesStep } from "./V3MeaningsAndExamplesStep";
@@ -469,7 +477,7 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "刷新并比较" }));
 
     await waitFor(() =>
-      expect(screen.getByTestId("server-revision")).toHaveTextContent("4")
+      expect(screen.getByTestId("revision")).toHaveTextContent("4")
     );
     expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
     expect(screen.getByTestId("revision")).toHaveTextContent("4");
@@ -541,7 +549,9 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "刷新并比较" }));
 
     await waitFor(() =>
-      expect(screen.getByTestId("server-revision")).toHaveTextContent("4")
+      expect(
+        screen.getByTestId("meanings-conflict-revision")
+      ).toHaveTextContent("4")
     );
     expect(screen.getByTestId("meanings-conflict-revision")).toHaveTextContent(
       "4"
@@ -577,6 +587,9 @@ describe("V3WordCreationWizard", () => {
       {
         renderStep: (context) => (
           <>
+            <output data-testid="meanings-retry-revision">
+              {context.word.revision}
+            </output>
             <output data-testid="meanings-retry-local">
               {context.draftMeanings.sense_groups[0]?.name_zh ?? "none"}
             </output>
@@ -613,7 +626,9 @@ describe("V3WordCreationWizard", () => {
     await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
     await waitFor(
       () =>
-        expect(screen.getByTestId("server-revision")).toHaveTextContent("5"),
+        expect(screen.getByTestId("meanings-retry-revision")).toHaveTextContent(
+          "5"
+        ),
       { timeout: 3000 }
     );
     expect(screen.getByTestId("meanings-retry-local")).toHaveTextContent(
@@ -695,7 +710,6 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("meanings-stale-local")).toHaveTextContent(
       "刷新中再编辑"
     );
-    expect(screen.queryByTestId("server-revision")).toBeNull();
     expect(screen.queryByText("版本冲突")).toBeNull();
   });
 
@@ -791,7 +805,7 @@ describe("V3WordCreationWizard", () => {
         throw new HttpError(422, "invalid", [], "validation_failed", [issue]);
       })
     });
-    renderWizard(source, {
+    const { container } = renderWizard(source, {
       initialWord,
       renderStep: (context) => (
         <>
@@ -814,11 +828,15 @@ describe("V3WordCreationWizard", () => {
 
     fireEvent.click(screen.getByText("保存 T4"));
 
-    const target = await screen.findByLabelText(
-      `实际发音 ${UUIDS.pronunciation_2}`
-    );
+    const target = await waitFor(() => {
+      const element = container.querySelector<HTMLInputElement>(
+        `input[data-v3-node-id="${UUIDS.pronunciation_2}"][data-v3-field="actual_pron"]`
+      );
+      expect(element).not.toBeNull();
+      return element!;
+    });
     await waitFor(() => expect(target).toHaveFocus());
-    expect(screen.getByRole("tab", { name: "verb" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "动词" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
@@ -886,9 +904,7 @@ describe("V3WordCreationWizard", () => {
 
     fireEvent.click(screen.getByText("保存共享词形"));
 
-    const matches = await screen.findAllByLabelText(
-      `实际发音 ${pronunciation.id}`
-    );
+    const matches = await screen.findAllByLabelText("第 1 条发音的实际发音");
     expect(matches).toHaveLength(2);
     await waitFor(() => expect(matches[1]).toHaveFocus());
     expect(matches[0]).not.toHaveFocus();
@@ -977,7 +993,7 @@ describe("V3WordCreationWizard", () => {
       renderStep: (context) => <MeaningsSlot context={context} />
     });
     fireEvent.click(screen.getByRole("tab", { name: "词性 2" }));
-    fireEvent.change(screen.getByLabelText("释义 definition-en-2 common"), {
+    fireEvent.change(screen.getByLabelText("定义 1 通用内容"), {
       target: { value: "local unsaved" }
     });
     fireEvent.click(screen.getByRole("tab", { name: "词性 1" }));
@@ -985,13 +1001,13 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByRole("button", { name: "完成此步" }));
 
     await waitFor(() =>
-      expect(screen.getByLabelText("释义 definition-en-2 common")).toHaveFocus()
+      expect(screen.getByLabelText("定义 1 通用内容")).toHaveFocus()
     );
     expect(screen.getByRole("tab", { name: "词性 2" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
-    expect(screen.getByLabelText("释义 definition-en-2 common")).toHaveValue(
+    expect(screen.getByLabelText("定义 1 通用内容")).toHaveValue(
       "local unsaved"
     );
     expect(source.saveMeanings).toHaveBeenCalledTimes(1);
@@ -1097,7 +1113,7 @@ describe("V3WordCreationWizard", () => {
       })
     );
     expect(
-      await screen.findByRole("button", { name: "发布 V3 词条" })
+      await screen.findByRole("button", { name: "发布词条" })
     ).toBeEnabled();
 
     fireEvent.click(screen.getByText("双击保存已确认影响"));
@@ -1159,7 +1175,7 @@ describe("V3WordCreationWizard", () => {
     );
 
     expect(
-      await screen.findByRole("button", { name: "发布 V3 词条" })
+      await screen.findByRole("button", { name: "发布词条" })
     ).toBeEnabled();
   });
 
@@ -1366,7 +1382,7 @@ describe("V3WordCreationWizard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     const publishButton = await screen.findByRole("button", {
-      name: "发布 V3 词条"
+      name: "发布词条"
     });
     fireEvent.click(publishButton);
     await waitFor(() => expect(get).toHaveBeenCalledWith("word-1"));
@@ -1379,16 +1395,14 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("publish-refresh-revision")).toHaveTextContent(
       "8"
     );
-    expect(screen.queryByRole("button", { name: "发布 V3 词条" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
 
     const prepareAfterRefresh = screen
       .getByText("检查发布条件")
       .closest("button")!;
     await waitFor(() => expect(prepareAfterRefresh).toBeEnabled());
     fireEvent.click(prepareAfterRefresh);
-    fireEvent.click(
-      await screen.findByRole("button", { name: "发布 V3 词条" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
     const confirmSurface = await screen.findByRole("button", {
       name: "确认同形提示并重试发布"
     });
@@ -1489,7 +1503,7 @@ describe("V3WordCreationWizard", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     const stalePublishButton = await screen.findByRole("button", {
-      name: "发布 V3 词条"
+      name: "发布词条"
     });
     fireEvent.click(stalePublishButton);
     await waitFor(() => expect(get).toHaveBeenCalledWith("word-1"));
@@ -1502,16 +1516,14 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("revision-conflict-revision")).toHaveTextContent(
       "9"
     );
-    expect(screen.queryByRole("button", { name: "发布 V3 词条" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
 
     const prepareAfterRevisionRefresh = screen
       .getByText("检查发布条件")
       .closest("button")!;
     await waitFor(() => expect(prepareAfterRevisionRefresh).toBeEnabled());
     fireEvent.click(prepareAfterRevisionRefresh);
-    fireEvent.click(
-      await screen.findByRole("button", { name: "发布 V3 词条" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
     await waitFor(() => expect(publish).toHaveBeenCalledTimes(2));
     expect(validate.mock.calls[1]?.[1]).toEqual({
       schema_version: 3,
@@ -2390,7 +2402,7 @@ describe("V3WordCreationWizard", () => {
 
     await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
     await act(async () => resolveGet(draftEnvelope(4, "server latest")));
-    expect(screen.getByTestId("server-revision")).toHaveTextContent("4");
+    expect(screen.getByTestId("revision")).toHaveTextContent("4");
   });
 
   it("ignores a conflict refresh superseded before its response", async () => {
@@ -2417,7 +2429,7 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByText("切换词性"));
     await act(async () => resolveGet(draftEnvelope(4, "stale server")));
 
-    expect(screen.queryByTestId("server-revision")).not.toBeInTheDocument();
+    expect(screen.getByTestId("revision")).toHaveTextContent("1");
     expect(onWordChange).not.toHaveBeenCalled();
   });
 

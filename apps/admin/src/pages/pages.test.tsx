@@ -24,6 +24,9 @@ vi.mock("@/features/dictionary/word-creation/WordCreationWizard", () => ({
     <div>word-wizard-{mode}</div>
   )
 }));
+vi.mock("@/features/dictionary/word-creation/UnifiedCreateEntryStep", () => ({
+  UnifiedCreateEntryStep: () => <div>unified-create-entry</div>
+}));
 
 // 智能词库页走真实数据层(React Query + api.words),烟雾测试只验渲染,
 // 把请求端点 mock 成稳定响应,避免触网。
@@ -128,20 +131,16 @@ describe("admin 页面烟雾测试", () => {
         </QueryClientProvider>
       </MemoryRouter>
     );
-    expect(screen.queryByText("创建词条")).toBeNull();
-    expect(screen.getByText("创建单词")).toBeInTheDocument();
-    expect(screen.getByText("创建短语")).toBeInTheDocument();
+    expect(screen.getByText("创建词条")).toBeInTheDocument();
+    expect(screen.queryByText("创建单词")).toBeNull();
+    expect(screen.queryByText("创建短语")).toBeNull();
     expect(screen.getByText("归 档")).toBeInTheDocument();
     expect(screen.queryByText(/^删除/)).toBeNull();
     // 面包屑末级为「智能词库」。
     expect(screen.getAllByText("智能词库").length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByText("创建单词"));
-    expect(screen.getByTestId("location")).toHaveTextContent("/words/new/v3");
-    fireEvent.click(screen.getByText("创建短语"));
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      "/words/new?kind=phrase"
-    );
+    fireEvent.click(screen.getByText("创建词条"));
+    expect(screen.getByTestId("location")).toHaveTextContent("/words/new");
   });
 
   it("个人设置页渲染方言偏好，默认英式", () => {
@@ -159,9 +158,9 @@ describe("admin 页面烟雾测试", () => {
   });
 
   it.each([
-    [WordCreatePage, "word-wizard-create"],
+    [WordCreatePage, "unified-create-entry"],
     [WordWizardPage, "word-wizard-resume"]
-  ] as const)("新建单词页面入口传递正确模式", (Page, expected) => {
+  ] as const)("词条页面入口挂载正确流程", (Page, expected) => {
     render(
       <MemoryRouter>
         <Page />

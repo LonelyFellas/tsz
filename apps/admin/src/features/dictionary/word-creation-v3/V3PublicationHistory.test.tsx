@@ -511,14 +511,14 @@ describe("V3PublicationHistory", () => {
       await screen.findByText("strict history loaded")
     ).toBeInTheDocument();
     expect(api.listPublications).toHaveBeenCalledTimes(2);
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     const detailView = await screen.findByTestId("publication-detail");
     expect(
       within(detailView).getByText("historical-v3-spelling")
     ).toBeInTheDocument();
     expect(
       within(detailView).getByText(
-        "historical-v3-dict → historical-v3-actual · strong"
+        "词典音标 historical-v3-dict · 实际发音 historical-v3-actual · 强读"
       )
     ).toBeInTheDocument();
     expect(
@@ -560,7 +560,7 @@ describe("V3PublicationHistory", () => {
 
     expect(await screen.findByText("historical-v2")).toBeInTheDocument();
     expect(screen.getByText("list-only-label")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #1" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
     const detail = await screen.findByTestId("publication-detail");
     expect(within(detail).getByText("immutable-v2-detail")).toBeInTheDocument();
     expect(
@@ -568,7 +568,7 @@ describe("V3PublicationHistory", () => {
     ).toBeInTheDocument();
     expect(
       within(detail).getByText(
-        "historical-v2-dict → historical-v2-actual · weak"
+        "词典音标 historical-v2-dict · 实际发音 historical-v2-actual · 弱读"
       )
     ).toBeInTheDocument();
     expect(
@@ -582,7 +582,7 @@ describe("V3PublicationHistory", () => {
     expect(api.getPublication).toHaveBeenCalledWith("word-mixed", "pub-v2");
 
     fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     const v3Detail = await screen.findByTestId("publication-detail");
     expect(
       within(v3Detail).getByText("immutable-v3-detail")
@@ -592,7 +592,7 @@ describe("V3PublicationHistory", () => {
     ).toBeInTheDocument();
     expect(
       within(v3Detail).getByText(
-        "historical-v3-dict → historical-v3-actual · strong"
+        "词典音标 historical-v3-dict · 实际发音 historical-v3-actual · 强读"
       )
     ).toBeInTheDocument();
     expect(
@@ -603,7 +603,7 @@ describe("V3PublicationHistory", () => {
     expect(api.getPublication).toHaveBeenCalledWith("word-mixed", "pub-v3");
   });
 
-  it("preserves complete V2 and V3 publication structures and version metadata", async () => {
+  it("productizes V2 and V3 publication details without exposing wire metadata", async () => {
     const api = requests();
     const detailV2 = complexV2Publication();
     const detailV3 = complexV3Publication();
@@ -626,80 +626,129 @@ describe("V3PublicationHistory", () => {
     );
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "查看发布 #21" })
+      await screen.findByRole("button", { name: "查看第 21 次发布" })
     );
     let detail = within(await screen.findByTestId("publication-detail"));
     expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
-      "published_by_admin_id: v2-publisher-admin"
+      "发布批次：第 21 次"
     );
     expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
-      "publication_number: 21"
-    );
-    expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
-      "source_revision: 31"
+      "当前状态：历史版本"
     );
     expect(detail.getByText("shared-summary-spelling")).toBeInTheDocument();
     expect(detail.getByText("shared-summary-meaning")).toBeInTheDocument();
     expect(
-      detail.getByTestId("publication-structure-snapshot").textContent
-    ).toBe(JSON.stringify(detailV2, null, 2));
-    expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).toHaveTextContent("v2-ordered-slot-first");
-    expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).toHaveTextContent("v2-sense-group-only");
-    expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).toHaveTextContent("v2-grammar-structure-only");
-    expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).toHaveTextContent("v2-sentence-only");
-    expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).toHaveTextContent("v2-relation-only");
-    expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).not.toHaveTextContent("v3-membership-first");
+      detail.getByText("释义组 1：V2 结构组 / V2 structure group")
+    ).toBeInTheDocument();
+    expect(detail.getByText("V2 grammar only")).toBeInTheDocument();
+    expect(detail.getByText("通用：V2 sentence only.")).toBeInTheDocument();
+    expect(detail.getByText("中文：仅 V2 例句")).toBeInTheDocument();
+    expect(detail.getByText("主关联")).toBeInTheDocument();
+    expect(detail.getByText("近义词")).toBeInTheDocument();
+    expect(detail.getByText("v2-related-only")).toBeInTheDocument();
+    expect(detail.queryByText(/v2-sentence-only|v2-relation-only/)).toBeNull();
+    expect(detail.queryByText("v2-publisher-admin")).toBeNull();
+    expect(detail.queryByText(/source_revision|schema_version/)).toBeNull();
+    expect(detail.queryByTestId("publication-structure-snapshot")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #22" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 22 次发布" }));
     detail = within(await screen.findByTestId("publication-detail"));
     expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
-      "published_by_admin_id: v3-publisher-admin"
+      "发布批次：第 22 次"
     );
     expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
-      "publication_number: 22"
-    );
-    expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
-      "source_revision: 32"
+      "当前状态：历史版本"
     );
     expect(detail.getByText("shared-summary-spelling")).toBeInTheDocument();
     expect(detail.getByText("shared-summary-meaning")).toBeInTheDocument();
     expect(
-      detail.getByTestId("publication-structure-snapshot").textContent
-    ).toBe(JSON.stringify(detailV3, null, 2));
+      detail.getByText("释义组 1：V3 结构组 / V3 structure group")
+    ).toBeInTheDocument();
+    expect(detail.getByText("V3 grammar only")).toBeInTheDocument();
+    expect(detail.getByText("通用：V3 sentence only.")).toBeInTheDocument();
+    expect(detail.getByText("中文：仅 V3 例句")).toBeInTheDocument();
+    expect(detail.getByText("主关联")).toBeInTheDocument();
     expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).toHaveTextContent("v3-membership-first");
+      detail.getByText("上下文关联：v3-associated-only · V3 association")
+    ).toBeInTheDocument();
+    expect(detail.getByText("近义词")).toBeInTheDocument();
+    expect(detail.getByText("v3-related-only")).toBeInTheDocument();
     expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).toHaveTextContent("v3-form-group-second");
+      detail.queryByText(
+        /v3-sentence-only|v3-relation-only|v3-association-only/
+      )
+    ).toBeNull();
+    expect(detail.queryByText("v3-publisher-admin")).toBeNull();
+    expect(detail.queryByText(/source_revision|schema_version/)).toBeNull();
+    expect(detail.queryByTestId("publication-structure-snapshot")).toBeNull();
+  });
+
+  it("缺失词性映射、等级与关联摘要时使用只读快照回退", async () => {
+    const api = requests();
+    const detailV2 = complexV2Publication();
+    const detailV3 = complexV3Publication();
+    detailV2.is_current = true;
+    detailV3.is_current = true;
+
+    const v2Pos = detailV2.word.meanings.pos[0]!;
+    v2Pos.pos_id = "orphan-v2-pos";
+    v2Pos.senses[0]!.sentences[0]!.level = undefined as never;
+    const v2Relation = v2Pos.senses[0]!.relations[0]!;
+    delete v2Relation.pending_target_headword;
+    v2Relation.target_gloss = "V2 待补充释义";
+
+    const v3Pos = detailV3.word.meanings.pos[0]!;
+    v3Pos.pos_id = "orphan-v3-pos";
+    v3Pos.senses[0]!.sentences[0]!.level = "";
+    v3Pos.senses[0]!.sentences[0]!.associations[0]!.target_gloss = "";
+    const v3Relation = v3Pos.senses[0]!.relations[0]!;
+    delete v3Relation.pending_target_headword;
+    v3Relation.target_gloss = "V3 待补充释义";
+
+    api.listPublications.mockResolvedValue({
+      publications: [detailV2, detailV3]
+    });
+    api.getPublication.mockImplementation(
+      async (_wordId: string, publicationId: string) => ({
+        publication:
+          publicationId === detailV2.publication_id ? detailV2 : detailV3
+      })
+    );
+
+    render(
+      <V3PublicationHistory
+        currentWord={v3Word()}
+        onActivated={vi.fn()}
+        requests={api}
+      />
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 21 次发布" })
+    );
+    let detail = within(await screen.findByTestId("publication-detail"));
+    expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
+      "当前状态：当前线上版本"
+    );
     expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).toHaveTextContent("v3-sense-group-only");
+      detail.getByText("待补充目标词条 · V2 待补充释义")
+    ).toBeInTheDocument();
+    expect(detail.getAllByText("其他词性").length).toBeGreaterThan(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 22 次发布" }));
+    detail = within(await screen.findByTestId("publication-detail"));
+    expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
+      "当前状态：当前线上版本"
+    );
     expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).toHaveTextContent("v3-grammar-structure-only");
+      detail.getByText("上下文关联：v3-associated-only")
+    ).toBeInTheDocument();
     expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).toHaveTextContent("v3-sentence-only");
-    expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).toHaveTextContent("v3-relation-only");
-    expect(
-      detail.getByTestId("publication-structure-snapshot")
-    ).not.toHaveTextContent("v2-ordered-slot-first");
+      detail.getByText("待补充目标词条 · V3 待补充释义")
+    ).toBeInTheDocument();
+    expect(detail.getAllByText("其他词性").length).toBeGreaterThan(0);
   });
 
   it("renders V2 common and UK/US forms plus unified and split English definitions", async () => {
@@ -781,7 +830,9 @@ describe("V3PublicationHistory", () => {
         requests={api}
       />
     );
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #1" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 1 次发布" })
+    );
     const snapshot = within(
       await screen.findByTestId("publication-snapshot-body")
     );
@@ -792,7 +843,7 @@ describe("V3PublicationHistory", () => {
     expect(snapshot.getByText("无发音")).toBeInTheDocument();
     expect(
       snapshot.getByText(
-        "historical-v2-us-dict → historical-v2-us-actual · strong"
+        "词典音标 historical-v2-us-dict · 实际发音 historical-v2-us-actual · 强读"
       )
     ).toBeInTheDocument();
     expect(
@@ -877,7 +928,9 @@ describe("V3PublicationHistory", () => {
         requests={api}
       />
     );
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     const snapshot = within(
       await screen.findByTestId("publication-snapshot-body")
     );
@@ -888,7 +941,7 @@ describe("V3PublicationHistory", () => {
     expect(snapshot.getByText("无发音")).toBeInTheDocument();
     expect(
       snapshot.getByText(
-        "historical-v3-us-dict → historical-v3-us-actual · 未标注"
+        "词典音标 historical-v3-us-dict · 实际发音 historical-v3-us-actual"
       )
     ).toBeInTheDocument();
     expect(
@@ -935,18 +988,24 @@ describe("V3PublicationHistory", () => {
         requests={api}
       />
     );
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #1" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 1 次发布" })
+    );
     let snapshot = within(
       await screen.findByTestId("publication-snapshot-body")
     );
     expect(snapshot.getByText("无词形快照")).toBeInTheDocument();
     expect(snapshot.getByText("无释义快照")).toBeInTheDocument();
+    expect(snapshot.getByText("无例句快照")).toBeInTheDocument();
+    expect(snapshot.getByText("无关系词快照")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     snapshot = within(await screen.findByTestId("publication-snapshot-body"));
     expect(snapshot.getByText("无词形快照")).toBeInTheDocument();
     expect(snapshot.getByText("无释义快照")).toBeInTheDocument();
+    expect(snapshot.getByText("无例句快照")).toBeInTheDocument();
+    expect(snapshot.getByText("无关系词快照")).toBeInTheDocument();
   });
 
   it("uses the current native capability to activate non-current V2 or V3 publications", async () => {
@@ -1000,7 +1059,7 @@ describe("V3PublicationHistory", () => {
     for (const publicationNumber of [1, 2]) {
       fireEvent.click(
         await screen.findByRole("button", {
-          name: `查看发布 #${publicationNumber}`
+          name: `查看第 ${publicationNumber} 次发布`
         })
       );
       expect(
@@ -1008,7 +1067,7 @@ describe("V3PublicationHistory", () => {
       ).toBeEnabled();
       fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
     }
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #3" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 3 次发布" }));
     expect(screen.queryByRole("button", { name: "激活此发布版本" })).toBeNull();
   });
 
@@ -1038,7 +1097,7 @@ describe("V3PublicationHistory", () => {
     for (const publicationNumber of [1, 2]) {
       fireEvent.click(
         await screen.findByRole("button", {
-          name: `查看发布 #${publicationNumber}`
+          name: `查看第 ${publicationNumber} 次发布`
         })
       );
       expect(
@@ -1101,17 +1160,25 @@ describe("V3PublicationHistory", () => {
         />
       </StrictMode>
     );
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #1" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 1 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
     fireEvent.click(screen.getByRole("button", { name: "确认激活" }));
 
+    await screen.findByText("terminal-source");
+    for (const detailsButton of await screen.findAllByRole("button", {
+      name: "查看候选详情"
+    })) {
+      fireEvent.click(detailsButton);
+    }
     expect(
-      await screen.findByText("V3 词形 · first-source · base · common")
+      await screen.findByText("词形 · first-source · 原形 · 通用")
     ).toBeInTheDocument();
     expect(
-      await screen.findByText("V3 词形 · terminal-source · base · common")
+      await screen.findByText("词形 · terminal-source · 原形 · 通用")
     ).toBeInTheDocument();
     expect(fetchSurfacePage).toHaveBeenCalledWith(
       "activation-snapshot",
@@ -1196,19 +1263,25 @@ describe("V3PublicationHistory", () => {
         requests={api}
       />
     );
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
     fireEvent.click(screen.getByRole("button", { name: "确认激活" }));
     fireEvent.click(await screen.findByRole("button", { name: "确认并激活" }));
 
+    await screen.findByText("replacement-source");
+    for (const detailsButton of await screen.findAllByRole("button", {
+      name: "查看候选详情"
+    })) {
+      fireEvent.click(detailsButton);
+    }
     expect(
-      await screen.findByText("V3 词形 · replacement-source · base · common")
+      await screen.findByText("词形 · replacement-source · 原形 · 通用")
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText("V3 词形 · old-source · base · common")
-    ).toBeNull();
+    expect(screen.queryByText("词形 · old-source · 原形 · 通用")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /确认并激活/ }));
     await waitFor(() =>
       expect(api.activatePublication).toHaveBeenCalledTimes(3)
@@ -1289,7 +1362,7 @@ describe("V3PublicationHistory", () => {
         />
       );
       fireEvent.click(
-        await screen.findByRole("button", { name: "查看发布 #2" })
+        await screen.findByRole("button", { name: "查看第 2 次发布" })
       );
       fireEvent.click(
         await screen.findByRole("button", { name: "激活此发布版本" })
@@ -1359,7 +1432,9 @@ describe("V3PublicationHistory", () => {
         requests={api}
       />
     );
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
@@ -1421,7 +1496,7 @@ describe("V3PublicationHistory", () => {
         />
       );
       fireEvent.click(
-        await screen.findByRole("button", { name: "查看发布 #1" })
+        await screen.findByRole("button", { name: "查看第 1 次发布" })
       );
       fireEvent.click(
         await screen.findByRole("button", { name: "激活此发布版本" })
@@ -1469,13 +1544,18 @@ describe("V3PublicationHistory", () => {
         requests={api}
       />
     );
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
     fireEvent.click(screen.getByRole("button", { name: "确认激活" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看候选详情" })
+    );
     expect(
-      await screen.findByText("V3 词形 · dirty-source · base · common")
+      await screen.findByText("词形 · dirty-source · 原形 · 通用")
     ).toBeInTheDocument();
 
     view.rerender(
@@ -1510,7 +1590,9 @@ describe("V3PublicationHistory", () => {
       />
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
@@ -1554,9 +1636,11 @@ describe("V3PublicationHistory", () => {
       />
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     expect(
-      await screen.findByText("正在查看不可变 V3 发布快照")
+      await screen.findByText("正在查看只读的历史发布快照")
     ).toBeInTheDocument();
     expect(screen.getByText("请先保存或放弃未保存的草稿")).toBeInTheDocument();
     const blocked = screen.getByRole("button", { name: "激活此发布版本" });
@@ -1603,7 +1687,9 @@ describe("V3PublicationHistory", () => {
       />
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     view.rerender(
       <V3PublicationHistory
         activationBlockedByUnsavedChanges
@@ -1614,7 +1700,7 @@ describe("V3PublicationHistory", () => {
       />
     );
     await waitFor(() => expect(api.listPublications).toHaveBeenCalledTimes(2));
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     const blocked = await screen.findByRole("button", {
       name: "激活此发布版本"
     });
@@ -1636,7 +1722,7 @@ describe("V3PublicationHistory", () => {
     [403, "当前账号没有激活发布版本的权限。"],
     [422, "激活请求校验未通过。"],
     [500, "激活发布版本失败，请稍后重试。"],
-    [503, "V3 发布服务暂不可用，请稍后重试。"]
+    [503, "发布服务暂不可用，请稍后重试。"]
   ])(
     "classifies activate HTTP %s and preserves immutable detail",
     async (status, message) => {
@@ -1657,7 +1743,7 @@ describe("V3PublicationHistory", () => {
       );
 
       fireEvent.click(
-        await screen.findByRole("button", { name: "查看发布 #1" })
+        await screen.findByRole("button", { name: "查看第 1 次发布" })
       );
       fireEvent.click(
         await screen.findByRole("button", { name: "激活此发布版本" })
@@ -1728,7 +1814,7 @@ describe("V3PublicationHistory", () => {
       ).rerender;
 
       fireEvent.click(
-        await screen.findByRole("button", { name: "查看发布 #2" })
+        await screen.findByRole("button", { name: "查看第 2 次发布" })
       );
       fireEvent.click(
         await screen.findByRole("button", { name: "激活此发布版本" })
@@ -1746,7 +1832,7 @@ describe("V3PublicationHistory", () => {
       expect(keyFactory).toHaveBeenCalledTimes(1);
 
       fireEvent.click(
-        await screen.findByRole("button", { name: "查看发布 #3" })
+        await screen.findByRole("button", { name: "查看第 3 次发布" })
       );
       fireEvent.click(
         await screen.findByRole("button", { name: "激活此发布版本" })
@@ -1810,7 +1896,9 @@ describe("V3PublicationHistory", () => {
       />
     ).rerender;
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
@@ -1859,7 +1947,9 @@ describe("V3PublicationHistory", () => {
       />
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
@@ -1881,7 +1971,7 @@ describe("V3PublicationHistory", () => {
     expect(api.listPublications).toHaveBeenCalledTimes(3);
     expect(api.activatePublication).toHaveBeenCalledTimes(1);
     expect(
-      await screen.findByRole("button", { name: "查看发布 #4" })
+      await screen.findByRole("button", { name: "查看第 4 次发布" })
     ).toBeInTheDocument();
   });
 
@@ -1912,7 +2002,9 @@ describe("V3PublicationHistory", () => {
       />
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
@@ -1954,7 +2046,9 @@ describe("V3PublicationHistory", () => {
       />
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
@@ -1999,7 +2093,9 @@ describe("V3PublicationHistory", () => {
       />
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
@@ -2058,11 +2154,11 @@ describe("V3PublicationHistory", () => {
     );
 
     expect(
-      await screen.findByText("UK centre / US center")
+      await screen.findByText("英式 centre / 美式 center")
     ).toBeInTheDocument();
 
     for (const callCount of [1, 2, 3]) {
-      fireEvent.click(screen.getByRole("button", { name: "查看发布 #1" }));
+      fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
       await waitFor(() =>
         expect(api.getPublication).toHaveBeenCalledTimes(callCount)
       );
@@ -2098,7 +2194,7 @@ describe("V3PublicationHistory", () => {
       );
 
       fireEvent.click(
-        await screen.findByRole("button", { name: "查看发布 #2" })
+        await screen.findByRole("button", { name: "查看第 2 次发布" })
       );
       fireEvent.click(
         await screen.findByRole("button", { name: "激活此发布版本" })
@@ -2165,10 +2261,10 @@ describe("V3PublicationHistory", () => {
       );
 
       fireEvent.click(
-        await screen.findByRole("button", { name: "查看发布 #2" })
+        await screen.findByRole("button", { name: "查看第 2 次发布" })
       );
       expect(
-        await screen.findByText("正在查看不可变 V3 发布快照")
+        await screen.findByText("正在查看只读的历史发布快照")
       ).toBeInTheDocument();
       expect(
         screen.queryByRole("button", { name: "激活此发布版本" })
@@ -2254,9 +2350,11 @@ describe("V3PublicationHistory", () => {
       />
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #1" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 1 次发布" })
+    );
     fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
     expect(
       await screen.findByText("server V3 presentation")
     ).toBeInTheDocument();

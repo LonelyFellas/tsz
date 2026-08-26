@@ -14,6 +14,7 @@ import {
   updateVariantSpelling,
   type V3IdFactory
 } from "../operations";
+import { dialectLabel, formTypeLabel } from "../presentation";
 import { V3PronunciationList } from "./V3PronunciationList";
 
 interface MappingSide {
@@ -99,6 +100,7 @@ function mappingComplete(mapping: MappingDraft) {
 export interface V3ConcreteFormRowProps {
   content: DraftFormsStepContentV3;
   form: WordConcreteFormV3;
+  formLabel?: string;
   issues: readonly V3DraftValidationIssue[];
   membershipCount: number;
   idFactory: V3IdFactory;
@@ -108,6 +110,7 @@ export interface V3ConcreteFormRowProps {
 export function V3ConcreteFormRow({
   content,
   form,
+  formLabel = "词形",
   issues,
   membershipCount,
   idFactory,
@@ -193,18 +196,18 @@ export function V3ConcreteFormRow({
             data-v3-node-id={form.id}
             tabIndex={-1}
           >
-            <Tag color="blue">{form.form_type}</Tag>
+            <Typography.Text strong>{formLabel}</Typography.Text>
+            <Tag color="blue">{formTypeLabel(form.form_type)}</Tag>
           </span>
-          <Typography.Text code>{form.id.slice(-8)}</Typography.Text>
           {membershipCount > 1 && (
-            <Tag color="purple">共享于 {membershipCount} 个组</Tag>
+            <Tag color="purple">已在 {membershipCount} 个变化组中使用</Tag>
           )}
         </Space>
       }
       extra={
         form.regional_variants.mode === "common" ? (
           <Button
-            aria-label={`切换为 UK/US ${form.id}`}
+            aria-label={`${formLabel}切换为英式和美式`}
             onClick={() =>
               setMapping({
                 mode: "uk_us",
@@ -213,16 +216,16 @@ export function V3ConcreteFormRow({
               })
             }
           >
-            切换为 UK/US
+            区分英式与美式
           </Button>
         ) : (
           <Button
-            aria-label={`切换为 common ${form.id}`}
+            aria-label={`${formLabel}切换为通用拼写`}
             onClick={() =>
               setMapping({ mode: "common", common: { ...EMPTY_SIDE } })
             }
           >
-            切换为 common
+            合并为通用拼写
           </Button>
         )
       }
@@ -240,12 +243,12 @@ export function V3ConcreteFormRow({
               data-v3-node-id={variant.id}
               key={variant.id}
               size="small"
-              title={variant.dialect.toUpperCase()}
+              title={`${dialectLabel(variant.dialect)}拼写`}
             >
               <Flex vertical gap="small">
                 <Input
                   aria-invalid={spellingInvalid}
-                  aria-label={`${variant.dialect} 拼写 ${form.id}`}
+                  aria-label={`${formLabel}${dialectLabel(variant.dialect)}拼写`}
                   data-v3-field="spelling"
                   data-v3-node-id={variant.id}
                   onChange={(event) =>
@@ -288,19 +291,19 @@ export function V3ConcreteFormRow({
           {mapping?.mode === "uk_us" ? (
             <>
               <MappingFields
-                label="UK"
+                label="英式"
                 onChange={(uk) => setMapping({ ...mapping, uk })}
                 side={mapping.uk}
               />
               <MappingFields
-                label="US"
+                label="美式"
                 onChange={(us) => setMapping({ ...mapping, us })}
                 side={mapping.us}
               />
             </>
           ) : mapping?.mode === "common" ? (
             <MappingFields
-              label="common"
+              label="通用"
               onChange={(common) => setMapping({ ...mapping, common })}
               side={mapping.common}
             />

@@ -163,7 +163,7 @@ function ReadOnlyBasicsStep({ word }: { word: AdminWordV2 }) {
             ? `已确认 ${surfaceWarning.total} 条匹配，当前展示 ${surfaceWarning.preview.length} 条摘要。`
             : snapshot.builtin_dictionary_status === "matched"
               ? "内置词典已匹配，智能词库创建时未发现重复项。"
-              : "内置词典未收录该短语，已按规范化输入创建空白 V2 草稿。"
+              : "内置词典未收录该短语，已按规范化输入创建空白短语草稿。"
         }
         style={{ marginBottom: 18 }}
       />

@@ -2,6 +2,10 @@
   width: 100%;
 }
 
+.v3-forms-step > .ant-tabs .ant-tabs-content-holder {
+  min-width: 0;
+}
+
 .v3-issue-list {
   margin: 0;
   padding-inline-start: 20px;
@@ -11,6 +15,21 @@
 .v3-concrete-form-row,
 .v3-variant-card {
   width: 100%;
+}
+
+.v3-form-group-card {
+  border-color: #d9e8f7;
+  background: #f8fbff;
+}
+
+.v3-concrete-form-row {
+  border-color: #e8e8e8;
+  background: #fff;
+}
+
+.v3-form-group-card > .ant-card-head,
+.v3-concrete-form-row > .ant-card-head {
+  min-height: 48px;
 }
 
 .v3-membership-row {
@@ -38,9 +57,47 @@
   align-items: center;
 }
 
-@media (max-width: 960px) {
-  .v3-variant-grid-2,
+.v3-variant-grid-2 .v3-pronunciation-row {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 1199px) {
   .v3-pronunciation-row {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 960px) {
+  .v3-variant-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 767px) {
+  .v3-form-group-card > .ant-card-head,
+  .v3-concrete-form-row > .ant-card-head {
+    align-items: flex-start;
+  }
+
+  .v3-form-group-card > .ant-card-head .ant-card-extra,
+  .v3-concrete-form-row > .ant-card-head .ant-card-extra {
+    margin-inline-start: 8px;
+  }
+
+  .v3-membership-actions {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 479px) {
+  .v3-form-group-card > .ant-card-body,
+  .v3-concrete-form-row > .ant-card-body,
+  .v3-variant-card > .ant-card-body {
+    padding: 12px;
+  }
+
+  .v3-membership-actions > .ant-space,
+  .v3-membership-actions .ant-select {
+    width: 100%;
   }
 }

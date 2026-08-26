@@ -657,7 +657,7 @@ export function PreviewAndPublishStep({
           {word.status === "archived"
             ? "该词条已归档，当前仅提供结构化只读查看；恢复后才能继续编辑或发布。"
             : readOnly
-              ? "该 V2 词条已发布，本轮提供与创建预览一致的只读查看。"
+              ? "该词条已发布，本轮提供与创建预览一致的只读查看。"
               : "逐项核对结构化内容与发布完整性校验结果；本页不呈现学习端字典卡片样式。所有问题处理完成后可直接提交生效。"}
         </Typography.Paragraph>
       </div>

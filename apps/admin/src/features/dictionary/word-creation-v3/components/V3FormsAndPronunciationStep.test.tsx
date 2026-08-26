@@ -156,12 +156,12 @@ function formById(content: DraftFormsStepContentV3, formId: string) {
 
 function fillUkUsMapping() {
   for (const [label, value] of [
-    ["UK 映射拼写", "centre"],
-    ["UK 映射字典音标", "ˈsentə"],
-    ["UK 映射实际发音", "sentə"],
-    ["US 映射拼写", "center"],
-    ["US 映射字典音标", "ˈsentər"],
-    ["US 映射实际发音", "sentər"]
+    ["英式 映射拼写", "centre"],
+    ["英式 映射字典音标", "ˈsentə"],
+    ["英式 映射实际发音", "sentə"],
+    ["美式 映射拼写", "center"],
+    ["美式 映射字典音标", "ˈsentər"],
+    ["美式 映射实际发音", "sentər"]
   ] as const) {
     fireEvent.change(screen.getByLabelText(label), {
       target: { value }
@@ -187,7 +187,7 @@ describe("V3FormsAndPronunciationStep", () => {
     catalogState.pending = undefined;
   });
 
-  it("I02 完整显示多 POS/多组/同类型多行，共享 form 同步编辑但不复制", () => {
+  it("I02 完整显示多 POS/多组/同类型多行，共享 form 同步编辑但不复制", async () => {
     const content = multiPosFixture();
     const sharedId = content.pos[0]!.forms[0]!.id;
     const secondId = content.pos[0]!.forms[1]!.id;
@@ -201,29 +201,25 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toHaveLength(1);
     expect(
       [...container.querySelectorAll(".v3-concrete-form-row .ant-tag")].filter(
-        (tag) => tag.textContent === "base"
+        (tag) => tag.textContent === "原形"
       )
     ).toHaveLength(3);
-    expect(screen.getByText("noun")).toBeInTheDocument();
-    expect(screen.getByText("verb")).toBeInTheDocument();
+    expect(await screen.findByText("名词")).toBeInTheDocument();
+    expect(screen.getByText("动词")).toBeInTheDocument();
 
-    const sharedInputs = screen.getAllByLabelText(`common 拼写 ${sharedId}`);
+    const sharedInputs = screen.getAllByLabelText("词形 1通用拼写");
     fireEvent.change(sharedInputs[0]!, { target: { value: "shared-edited" } });
 
     expect(
       screen
-        .getAllByLabelText<HTMLInputElement>(`common 拼写 ${sharedId}`)
+        .getAllByLabelText<HTMLInputElement>("词形 1通用拼写")
         .every((input) => input.value === "shared-edited")
     ).toBe(true);
-    expect(screen.getByLabelText(`common 拼写 ${secondId}`)).toHaveValue(
-      "second-base"
-    );
+    expect(screen.getByLabelText("词形 2通用拼写")).toHaveValue("second-base");
     expect(content.pos[0]!.forms).toHaveLength(2);
     expect(canonicalValue().pos[0]!.forms).toHaveLength(2);
 
-    fireEvent.click(
-      screen.getByLabelText(`移除 membership ${uuidFromInt(23)}`)
-    );
+    fireEvent.click(screen.getByLabelText("从变化组 2 移除词形 1"));
     expect(canonicalValue().pos[0]!.forms).toHaveLength(2);
     expect(canonicalValue().pos[0]!.form_groups[1]!.members).toEqual([]);
   });
@@ -233,11 +229,11 @@ describe("V3FormsAndPronunciationStep", () => {
     const formId = content.pos[0]!.forms[0]!.id;
     const groupId = content.pos[0]!.form_groups[0]!.id;
     const { container } = render(<Harness initial={content} />);
-    const target = screen.getAllByLabelText(`common 拼写 ${formId}`)[0]!;
+    const target = screen.getAllByLabelText("词形 1通用拼写")[0]!;
     target.focus();
     const row = target.closest(`[data-form-id="${formId}"]`);
 
-    fireEvent.click(screen.getByLabelText(`下移词形 ${formId} 于 ${groupId}`));
+    fireEvent.click(screen.getByLabelText("下移变化组 1 的词形 1"));
 
     expect(document.activeElement).toBe(target);
     expect(target.closest(`[data-form-id="${formId}"]`)).toBe(row);
@@ -262,30 +258,30 @@ describe("V3FormsAndPronunciationStep", () => {
       />
     );
 
-    fireEvent.click(screen.getByLabelText(`切换为 UK/US ${form.id}`));
+    fireEvent.click(screen.getByLabelText("词形 1切换为英式和美式"));
     expect(screen.getByText(/现有 2 条发音不会被静默复制/)).toBeInTheDocument();
     fireEvent.click(screen.getByText("取 消"));
     expect(formById(canonicalValue(), form.id).regional_variants.mode).toBe(
       "common"
     );
 
-    fireEvent.click(screen.getByLabelText(`切换为 UK/US ${form.id}`));
-    fireEvent.change(screen.getByLabelText("UK 映射拼写"), {
+    fireEvent.click(screen.getByLabelText("词形 1切换为英式和美式"));
+    fireEvent.change(screen.getByLabelText("英式 映射拼写"), {
       target: { value: "centre" }
     });
-    fireEvent.change(screen.getByLabelText("UK 映射字典音标"), {
+    fireEvent.change(screen.getByLabelText("英式 映射字典音标"), {
       target: { value: "ˈsentə" }
     });
-    fireEvent.change(screen.getByLabelText("UK 映射实际发音"), {
+    fireEvent.change(screen.getByLabelText("英式 映射实际发音"), {
       target: { value: "sentə" }
     });
-    fireEvent.change(screen.getByLabelText("US 映射拼写"), {
+    fireEvent.change(screen.getByLabelText("美式 映射拼写"), {
       target: { value: "center" }
     });
-    fireEvent.change(screen.getByLabelText("US 映射字典音标"), {
+    fireEvent.change(screen.getByLabelText("美式 映射字典音标"), {
       target: { value: "ˈsentər" }
     });
-    fireEvent.change(screen.getByLabelText("US 映射实际发音"), {
+    fireEvent.change(screen.getByLabelText("美式 映射实际发音"), {
       target: { value: "sentər" }
     });
     fireEvent.click(screen.getByText("确认转换"));
@@ -306,14 +302,14 @@ describe("V3FormsAndPronunciationStep", () => {
       }
     });
 
-    fireEvent.click(screen.getByLabelText(`切换为 common ${form.id}`));
-    fireEvent.change(screen.getByLabelText("common 映射拼写"), {
+    fireEvent.click(screen.getByLabelText("词形 1切换为通用拼写"));
+    fireEvent.change(screen.getByLabelText("通用 映射拼写"), {
       target: { value: "centre-center" }
     });
-    fireEvent.change(screen.getByLabelText("common 映射字典音标"), {
+    fireEvent.change(screen.getByLabelText("通用 映射字典音标"), {
       target: { value: "ˈsentə" }
     });
-    fireEvent.change(screen.getByLabelText("common 映射实际发音"), {
+    fireEvent.change(screen.getByLabelText("通用 映射实际发音"), {
       target: { value: "sentə" }
     });
     fireEvent.click(screen.getByText("确认转换"));
@@ -336,14 +332,8 @@ describe("V3FormsAndPronunciationStep", () => {
     const content = formsFixture({ forms: [form] });
     render(<Harness initial={content} />);
 
-    fireEvent.click(
-      screen.getByLabelText(
-        `移除 membership ${content.pos[0]!.form_groups[0]!.members[0]!.id}`
-      )
-    );
-    expect(
-      screen.getByText(/这是该词形最后一个 membership/)
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 1"));
+    expect(screen.getByText(/这是该词形最后一个使用位置/)).toBeInTheDocument();
     expect(formById(canonicalValue(), form.id)).toBeDefined();
 
     fireEvent.click(screen.getByRole("button", { name: "删除整个词形" }));
@@ -383,7 +373,7 @@ describe("V3FormsAndPronunciationStep", () => {
       ].map((row) => [row.dataset.pronunciationId!, row.dataset.fieldKey!])
     );
 
-    fireEvent.click(screen.getByLabelText(`下移发音 ${pronunciations[0]!.id}`));
+    fireEvent.click(screen.getByLabelText("下移第 1 条发音"));
     const rows = [
       ...container.querySelectorAll<HTMLElement>("[data-pronunciation-id]")
     ];
@@ -398,17 +388,12 @@ describe("V3FormsAndPronunciationStep", () => {
       )
     ).toEqual(beforeKeys);
 
-    fireEvent.change(
-      screen.getByLabelText(`实际发音 ${pronunciations[0]!.id}`),
-      {
-        target: { value: "one-edited" }
-      }
-    );
-    fireEvent.click(
-      screen.getByLabelText(`新增发音 ${form.regional_variants.common.id}`)
-    );
-    expect(screen.getByLabelText(`实际发音 ${addedId}`)).toHaveValue("");
-    fireEvent.click(screen.getByLabelText(`删除发音 ${pronunciations[2]!.id}`));
+    fireEvent.change(screen.getByLabelText("第 2 条发音的实际发音"), {
+      target: { value: "one-edited" }
+    });
+    fireEvent.click(screen.getByLabelText("新增发音"));
+    expect(screen.getByLabelText("第 4 条发音的实际发音")).toHaveValue("");
+    fireEvent.click(screen.getByLabelText("删除第 3 条发音"));
 
     const variant = formById(canonicalValue(), form.id).regional_variants;
     if (variant.mode !== "common") throw new Error("expected common");
@@ -462,9 +447,10 @@ describe("V3FormsAndPronunciationStep", () => {
     for (const issue of issues) {
       expect(screen.getByText(issue.message)).toBeInTheDocument();
     }
-    expect(
-      screen.getByLabelText(`common 拼写 ${incomplete.pos[0]!.forms[0]!.id}`)
-    ).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByLabelText("词形 1通用拼写")).toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
   });
 
   it("I08 跨非当前 POS 的深层 issue 可逐层定位并 focus 精确 pronunciation 字段", () => {
@@ -508,9 +494,9 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.getByTestId("active-pos-id")).toHaveTextContent(
       content.pos[0]!.pos_id
     );
-    fireEvent.click(screen.getByText("verb"));
+    fireEvent.click(screen.getByText("动词"));
     expect(screen.getByTestId("active-pos-id")).toHaveTextContent(pos.pos_id);
-    fireEvent.click(screen.getByText("noun"));
+    fireEvent.click(screen.getByText("名词"));
     expect(screen.getByTestId("active-pos-id")).toHaveTextContent(
       content.pos[0]!.pos_id
     );
@@ -546,7 +532,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     expect(screen.getByText("草稿可暂时不添加变化组")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("noun"));
+    fireEvent.click(screen.getByText("名词"));
     expect(onChange).not.toHaveBeenCalled();
 
     const missingFormId = uuidFromInt(980);
@@ -581,8 +567,10 @@ describe("V3FormsAndPronunciationStep", () => {
 
     expect(screen.getByText("草稿可暂时保留空变化组")).toBeInTheDocument();
     expect(
-      screen.getByText(`membership ${uuidFromInt(983)} 引用了不存在的 form`)
+      screen.getByText("该变化组引用的词形不存在，已停止编辑。")
     ).toBeInTheDocument();
+    expect(screen.getByLabelText("新增名词变化组")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/noun/)).toBeNull();
     expect(screen.queryByText("规则组")).toBeNull();
   });
 
@@ -617,17 +605,11 @@ describe("V3FormsAndPronunciationStep", () => {
       </AntApp>
     );
 
-    expect(
-      screen.getByLabelText(`上移词形 ${forms[0]!.id} 于 ${formGroup.id}`)
-    ).toBeDisabled();
-    expect(
-      screen.getByLabelText(`下移词形 ${forms[2]!.id} 于 ${formGroup.id}`)
-    ).toBeDisabled();
+    expect(screen.getByLabelText("上移变化组 1 的词形 1")).toBeDisabled();
+    expect(screen.getByLabelText("下移变化组 1 的词形 3")).toBeDisabled();
     expect(screen.queryByText(/共享于/)).toBeNull();
 
-    fireEvent.click(
-      screen.getByLabelText(`上移词形 ${forms[2]!.id} 于 ${formGroup.id}`)
-    );
+    fireEvent.click(screen.getByLabelText("上移变化组 1 的词形 3"));
     const next = onChange.mock.calls[0]![0] as DraftFormsStepContentV3;
     expect(
       next.pos[0]!.form_groups[0]!.members.map((item) => item.form_id)
@@ -655,9 +637,7 @@ describe("V3FormsAndPronunciationStep", () => {
       </AntApp>
     );
 
-    fireEvent.click(
-      screen.getByLabelText(`移除 membership ${displayedGroup.members[0]!.id}`)
-    );
+    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 1"));
     expect(onChange).not.toHaveBeenCalled();
     expect(screen.queryByText("不能留下孤立词形")).toBeNull();
 
@@ -675,9 +655,7 @@ describe("V3FormsAndPronunciationStep", () => {
         />
       </AntApp>
     );
-    fireEvent.click(
-      screen.getByLabelText(`移除 membership ${displayedGroup.members[0]!.id}`)
-    );
+    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 1"));
     expect(screen.getByText("不能留下孤立词形")).toBeInTheDocument();
 
     const missingForm = formsFixture({ forms: [], groups: [] });
@@ -713,9 +691,7 @@ describe("V3FormsAndPronunciationStep", () => {
         />
       </AntApp>
     );
-    fireEvent.click(
-      screen.getByLabelText(`移除 membership ${displayedGroup.members[0]!.id}`)
-    );
+    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 1"));
     fireEvent.click(container.querySelector(".ant-alert-close-icon")!);
     expect(screen.queryByText("不能留下孤立词形")).toBeNull();
   });
@@ -753,15 +729,15 @@ describe("V3FormsAndPronunciationStep", () => {
       </AntApp>
     );
 
-    expect(screen.getByLabelText(`uk 拼写 ${form.id}`)).toHaveAttribute(
+    expect(screen.getByLabelText("词形英式拼写")).toHaveAttribute(
       "aria-invalid",
       "true"
     );
-    expect(screen.getByLabelText(`us 拼写 ${form.id}`)).toHaveAttribute(
+    expect(screen.getByLabelText("词形美式拼写")).toHaveAttribute(
       "aria-invalid",
       "false"
     );
-    fireEvent.change(screen.getByLabelText(`us 拼写 ${form.id}`), {
+    fireEvent.change(screen.getByLabelText("词形美式拼写"), {
       target: { value: "centered" }
     });
     expect(onChange).toHaveBeenCalledTimes(1);
@@ -780,7 +756,7 @@ describe("V3FormsAndPronunciationStep", () => {
         />
       </AntApp>
     );
-    fireEvent.click(screen.getByLabelText(`切换为 UK/US ${form.id}`));
+    fireEvent.click(screen.getByLabelText("词形切换为英式和美式"));
     fillUkUsMapping();
 
     rerender(
@@ -852,31 +828,29 @@ describe("V3FormsAndPronunciationStep", () => {
       </AntApp>
     );
 
-    expect(screen.getByLabelText(`上移发音 ${first.id}`)).toBeDisabled();
-    expect(screen.getByLabelText(`下移发音 ${second.id}`)).toBeDisabled();
-    expect(screen.getByLabelText(`实际发音 ${first.id}`)).toHaveAttribute(
+    expect(screen.getByLabelText("上移第 1 条发音")).toBeDisabled();
+    expect(screen.getByLabelText("下移第 2 条发音")).toBeDisabled();
+    expect(screen.getByLabelText("第 1 条发音的实际发音")).toHaveAttribute(
       "aria-invalid",
       "true"
     );
-    expect(screen.getByLabelText(`字典音标 ${first.id}`)).toHaveAttribute(
+    expect(screen.getByLabelText("第 1 条发音的字典音标")).toHaveAttribute(
       "aria-invalid",
       "false"
     );
-    expect(screen.getByLabelText(`发音风格 ${first.id}`)).toHaveValue("");
+    expect(screen.getByLabelText("第 1 条发音的发音方式")).toHaveValue("");
 
-    fireEvent.click(screen.getByLabelText(`上移发音 ${second.id}`));
-    fireEvent.change(screen.getByLabelText(`字典音标 ${first.id}`), {
+    fireEvent.click(screen.getByLabelText("上移第 2 条发音"));
+    fireEvent.change(screen.getByLabelText("第 2 条发音的字典音标"), {
       target: { value: "edited-dict" }
     });
-    fireEvent.change(screen.getByLabelText(`实际发音 ${first.id}`), {
+    fireEvent.change(screen.getByLabelText("第 2 条发音的实际发音"), {
       target: { value: "edited-actual" }
     });
-    fireEvent.mouseDown(screen.getByLabelText(`发音风格 ${first.id}`));
-    fireEvent.click(screen.getAllByText("weak").at(-1)!);
-    fireEvent.click(
-      screen.getByLabelText(`新增发音 ${form.regional_variants.uk.id}`)
-    );
-    fireEvent.click(screen.getByLabelText(`删除发音 ${second.id}`));
+    fireEvent.mouseDown(screen.getByLabelText("第 2 条发音的发音方式"));
+    fireEvent.click(screen.getAllByText("弱读").at(-1)!);
+    fireEvent.click(screen.getByLabelText("新增发音"));
+    fireEvent.click(screen.getByLabelText("删除第 2 条发音"));
 
     expect(onChange).toHaveBeenCalledTimes(6);
     const added = onChange.mock.calls[4]![0] as DraftFormsStepContentV3;
@@ -916,9 +890,7 @@ describe("V3FormsAndPronunciationStep", () => {
         />
       </AntApp>
     );
-    expect(
-      screen.getByLabelText(`实际发音 ${pronunciation.id}`)
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText("第 1 条发音的实际发音")).toBeInTheDocument();
 
     const emptyForm = commonFormFixture({
       id: form.id,
@@ -939,7 +911,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     expect(screen.getByText("暂无发音")).toBeInTheDocument();
-    expect(screen.queryByLabelText(`实际发音 ${pronunciation.id}`)).toBeNull();
+    expect(screen.queryByLabelText("第 1 条发音的实际发音")).toBeNull();
   });
 
   it("P1-1 从空 skeleton 经 catalog UI 构建多 POS/组/重复 base/共享与移动 membership", async () => {
@@ -960,41 +932,33 @@ describe("V3FormsAndPronunciationStep", () => {
       form_groups: []
     });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: `新增变化组 ${ids[0]}` })
-    );
+    fireEvent.click(screen.getByRole("button", { name: "新增名词变化组" }));
     const firstGroupId = ids[1]!;
     fireEvent.click(
       screen.getByRole("button", {
-        name: `新增 concrete form ${firstGroupId}`
+        name: "变化组 1 新增词形"
       })
     );
     fireEvent.click(
       screen.getByRole("button", {
-        name: `新增 concrete form ${firstGroupId}`
+        name: "变化组 1 新增词形"
       })
     );
     const firstFormId = ids[2]!;
     const firstMembershipId = ids[4]!;
     const secondFormId = ids[5]!;
-    const secondMembershipId = ids[7]!;
     expect(
       canonicalValue().pos[0]!.forms.map((item) => item.form_type)
     ).toEqual(["base", "base"]);
 
-    fireEvent.click(
-      screen.getByRole("button", { name: `新增变化组 ${ids[0]}` })
-    );
+    fireEvent.click(screen.getByRole("button", { name: "新增名词变化组" }));
     const secondGroupId = ids[8]!;
-    chooseOption(
-      `添加已有词形到 ${secondGroupId}`,
-      `base · ${firstFormId.slice(-8)}`
-    );
+    chooseOption("变化组 2 选择已有词形", "原形 · 未填写拼写");
     fireEvent.click(
-      screen.getByRole("button", { name: `添加 membership ${secondGroupId}` })
+      screen.getByRole("button", { name: "变化组 2 复用已有词形" })
     );
 
-    chooseOption(`移动 membership ${secondMembershipId} 到变化组`, "变化组 2");
+    chooseOption("移动词形 2 到其他变化组", "变化组 2");
     const noun = canonicalValue().pos[0]!;
     expect(noun.forms).toHaveLength(2);
     expect(noun.form_groups[0]!.members.map((item) => item.form_id)).toEqual([
@@ -1006,16 +970,16 @@ describe("V3FormsAndPronunciationStep", () => {
     ]);
     expect(noun.form_groups[0]!.members[0]!.id).toBe(firstMembershipId);
 
-    const sharedInputs = screen.getAllByLabelText(`common 拼写 ${firstFormId}`);
+    const sharedInputs = screen.getAllByLabelText("词形 1通用拼写");
     expect(sharedInputs).toHaveLength(2);
     fireEvent.change(sharedInputs[0]!, { target: { value: "orbit" } });
     expect(
       screen
-        .getAllByLabelText<HTMLInputElement>(`common 拼写 ${firstFormId}`)
+        .getAllByLabelText<HTMLInputElement>("词形 1通用拼写")
         .every((input) => input.value === "orbit")
     ).toBe(true);
 
-    fireEvent.click(screen.getByLabelText(`切换为 UK/US ${secondFormId}`));
+    fireEvent.click(screen.getByLabelText("词形 2切换为英式和美式"));
     fillUkUsMapping();
     fireEvent.click(screen.getByRole("button", { name: "确认转换" }));
     expect(formById(canonicalValue(), secondFormId)).toMatchObject({
@@ -1023,9 +987,7 @@ describe("V3FormsAndPronunciationStep", () => {
       regional_variants: { mode: "uk_us" }
     });
 
-    fireEvent.click(
-      screen.getByRole("button", { name: `上移变化组 ${secondGroupId}` })
-    );
+    fireEvent.click(screen.getByRole("button", { name: "上移变化组 2" }));
     expect(canonicalValue().pos[0]!.form_groups.map((item) => item.id)).toEqual(
       [secondGroupId, firstGroupId]
     );
@@ -1062,20 +1024,18 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     await waitFor(() =>
-      expect(
-        screen.getByLabelText(`新增词形类型 ${uuidFromInt(1_100)}`)
-      ).not.toBeDisabled()
+      expect(screen.getByLabelText("变化组 1 新增词形类型")).not.toBeDisabled()
     );
-    chooseOption(`新增词形类型 ${uuidFromInt(1_100)}`, "comparative");
+    chooseOption("变化组 1 新增词形类型", "比较级");
     fireEvent.click(
       screen.getByRole("button", {
-        name: `新增 concrete form ${uuidFromInt(1_100)}`
+        name: "变化组 1 新增词形"
       })
     );
     expect(canonicalValue().pos[0]!.forms).toMatchObject([
       { form_type: "comparative" }
     ]);
-    expect(screen.queryByText("plural", { exact: true })).toBeNull();
+    expect(screen.queryByText("复数", { exact: true })).toBeNull();
   });
 
   it("P1-3 普通删除组遇 orphan form 时先列出影响并等待明确确认", async () => {
@@ -1095,11 +1055,11 @@ describe("V3FormsAndPronunciationStep", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: `删除变化组 ${content.pos[0]!.form_groups[0]!.id}`
+        name: "删除变化组 1"
       })
     );
     expect(screen.getByText("删除变化组需要额外确认")).toBeInTheDocument();
-    expect(screen.getByText(form.id)).toBeInTheDocument();
+    expect(screen.getByText("受影响词形 1")).toBeInTheDocument();
     expect(canonicalValue().pos[0]).toMatchObject({
       forms: content.pos[0]!.forms,
       form_groups: content.pos[0]!.form_groups
@@ -1114,38 +1074,31 @@ describe("V3FormsAndPronunciationStep", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: `删除变化组 ${content.pos[0]!.form_groups[0]!.id}`
+        name: "删除变化组 1"
       })
     );
     await waitFor(() =>
-      expect(
-        screen.getByLabelText(
-          `新增词形类型 ${content.pos[0]!.form_groups[0]!.id}`
-        )
-      ).not.toBeDisabled()
+      expect(screen.getByLabelText("变化组 1 新增词形类型")).not.toBeDisabled()
     );
-    chooseOption(
-      `新增词形类型 ${content.pos[0]!.form_groups[0]!.id}`,
-      "plural"
-    );
+    chooseOption("变化组 1 新增词形类型", "复数");
     fireEvent.click(
       screen.getByRole("button", {
-        name: `新增 concrete form ${content.pos[0]!.form_groups[0]!.id}`
+        name: "变化组 1 新增词形"
       })
     );
     expect(canonicalValue().pos[0]!.forms).toHaveLength(2);
     fireEvent.click(
       screen.getByRole("button", {
-        name: "删除变化组并同时删除 1 个具体词形"
+        name: "删除变化组并同时删除 1 个不再被其他变化组使用的词形"
       })
     );
     expect(screen.getByText("删除影响已变化，请重新确认")).toBeInTheDocument();
-    expect(screen.getByText(addedFormId)).toBeInTheDocument();
+    expect(screen.getByText("受影响词形 2")).toBeInTheDocument();
     expect(canonicalValue().pos[0]!.forms).toHaveLength(2);
     expect(canonicalValue().pos[0]!.form_groups).toHaveLength(1);
     fireEvent.click(
       screen.getByRole("button", {
-        name: "删除变化组并同时删除 2 个具体词形"
+        name: "删除变化组并同时删除 2 个不再被其他变化组使用的词形"
       })
     );
     expect(canonicalValue().pos[0]).toMatchObject({
@@ -1187,7 +1140,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: `删除变化组 ${firstGroup.id}`
+        name: "删除变化组 1"
       })
     );
 
@@ -1249,7 +1202,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: `删除词性 ${initial.pos[0]!.pos_id}`
+        name: "删除词性名词"
       })
     );
     expect(screen.getByTestId("controlled-active-pos")).toHaveTextContent(
@@ -1259,7 +1212,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     fireEvent.click(
       screen.getByRole("button", {
-        name: `删除词性 ${initial.pos[1]!.pos_id}`
+        name: "删除词性动词"
       })
     );
     expect(screen.getByTestId("controlled-pos-count")).toHaveTextContent("0");

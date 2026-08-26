@@ -16,6 +16,7 @@ const anyDataSource = vi.hoisted(() => ({
   archiveBatchAny: vi.fn(),
   getAny: vi.fn(),
   listAny: vi.fn(),
+  relatedSearchAny: vi.fn(),
   restoreAny: vi.fn(),
   restoreBatchAny: vi.fn()
 }));
@@ -29,6 +30,7 @@ import {
   useArchiveWordAny,
   useArchiveWordsBatchAny,
   useDeleteWordDraft,
+  useRelatedSearchAny,
   useRelatedSearchV2,
   useRestoreWordAny,
   useRestoreWordsBatchAny,
@@ -75,6 +77,53 @@ beforeEach(() => {
 });
 
 describe("dictionary React Query hooks", () => {
+  it("mixed 关联搜索通过 schema-aware facade 并保留精确/包含分页", async () => {
+    anyDataSource.relatedSearchAny.mockImplementation(
+      async (_q: string, query: Record<string, unknown>) => ({
+        results: [],
+        total: 0,
+        next_cursor:
+          query.cursor === undefined ? `${query.match_mode}-next` : null
+      })
+    );
+    const { wrapper } = queryWrapper();
+    const hook = renderHook(
+      () => useRelatedSearchAny("  outside  ", "word", true),
+      { wrapper }
+    );
+
+    await waitFor(() => {
+      expect(hook.result.current.exact.isSuccess).toBe(true);
+      expect(hook.result.current.contains.isSuccess).toBe(true);
+    });
+    expect(anyDataSource.relatedSearchAny).toHaveBeenCalledWith("outside", {
+      kind: "word",
+      match_mode: "exact",
+      page_size: 20,
+      cursor: undefined
+    });
+    expect(anyDataSource.relatedSearchAny).toHaveBeenCalledWith("outside", {
+      kind: "word",
+      match_mode: "contains",
+      exclude_exact: true,
+      page_size: 20,
+      cursor: undefined
+    });
+
+    await act(async () => {
+      await hook.result.current.exact.fetchNextPage();
+      await hook.result.current.contains.fetchNextPage();
+    });
+    expect(anyDataSource.relatedSearchAny).toHaveBeenCalledWith(
+      "outside",
+      expect.objectContaining({ cursor: "exact-next" })
+    );
+    expect(anyDataSource.relatedSearchAny).toHaveBeenCalledWith(
+      "outside",
+      expect.objectContaining({ cursor: "contains-next" })
+    );
+  });
+
   it("mixed 列表与 Any 详情只调用 schema-aware facade", async () => {
     const listItem = {
       schema_version: 3,

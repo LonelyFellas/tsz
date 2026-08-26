@@ -171,7 +171,7 @@ describe("WordWizardV3Page", () => {
     );
 
     expect(await screen.findByText("centre")).toBeInTheDocument();
-    expect(screen.getByText("noun")).toBeInTheDocument();
+    expect(screen.getByText("名词")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "保存草稿" })
     ).toBeInTheDocument();
@@ -224,7 +224,7 @@ describe("WordWizardV3Page", () => {
       )
     );
     expect(
-      screen.getByText(/referenced by an existing sense/)
+      screen.getByText(/关联内容将随本次调整受到影响。/)
     ).toBeInTheDocument();
     expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
 
@@ -354,7 +354,7 @@ describe("WordWizardV3Page", () => {
     fireEvent.click(await screen.findByText("保存草稿"));
     expect(await screen.findByText("确认影响并保存草稿")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(`common 拼写 ${formId}`), {
+    fireEvent.change(screen.getByLabelText(`词形 1通用拼写`), {
       target: { value: "center-updated" }
     });
     await waitFor(() =>
@@ -382,7 +382,7 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    expect(await screen.findByText("无法打开 V3 词条")).toBeInTheDocument();
+    expect(await screen.findByText("无法打开词条")).toBeInTheDocument();
     expect(
       screen.getByText("当前前端不支持该词条数据版本，请升级后重试")
     ).toBeInTheDocument();
@@ -426,7 +426,6 @@ describe("WordWizardV3Page", () => {
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
-    const formId = current.forms.pos[0]!.forms[0]!.id;
     const endpoints = source({ word: current, retired_stable_nodes: [] });
     const historical = publication(current);
     vi.mocked(endpoints.listPublications).mockResolvedValue({
@@ -440,13 +439,13 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.change(await screen.findByLabelText(`common 拼写 ${formId}`), {
+    fireEvent.change(await screen.findByLabelText(`词形 1通用拼写`), {
       target: { value: "centre-local-draft" }
     });
     fireEvent.click(screen.getByText("释义与例句"));
     expect(await screen.findByText("释义组")).toBeInTheDocument();
     fireEvent.click(screen.getByText("词形与发音"));
-    expect(await screen.findByLabelText(`common 拼写 ${formId}`)).toHaveValue(
+    expect(await screen.findByLabelText(`词形 1通用拼写`)).toHaveValue(
       "centre-local-draft"
     );
 
@@ -457,7 +456,7 @@ describe("WordWizardV3Page", () => {
     expect(endpoints.validateV3).not.toHaveBeenCalled();
     expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
     expect(endpoints.publishV3).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #1" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
     expect(
       await screen.findByText("请先保存或放弃未保存的草稿")
     ).toBeInTheDocument();
@@ -477,7 +476,6 @@ describe("WordWizardV3Page", () => {
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
-    const formId = current.forms.pos[0]!.forms[0]!.id;
     const endpoints = source({ word: current, retired_stable_nodes: [] });
     const historical = publication(current);
     vi.mocked(endpoints.listPublications).mockResolvedValue({
@@ -492,14 +490,12 @@ describe("WordWizardV3Page", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "新增释义组" }));
-    const groupName = await screen.findByLabelText(/释义组中文/);
+    const groupName = await screen.findByLabelText("释义组 1 中文名称");
     fireEvent.change(groupName, { target: { value: "本地释义组" } });
     fireEvent.click(screen.getByText("词形与发音"));
-    expect(
-      await screen.findByLabelText(`common 拼写 ${formId}`)
-    ).toBeInTheDocument();
+    expect(await screen.findByLabelText(`词形 1通用拼写`)).toBeInTheDocument();
     fireEvent.click(screen.getByText("释义与例句"));
-    expect(await screen.findByLabelText(/释义组中文/)).toHaveValue(
+    expect(await screen.findByLabelText("释义组 1 中文名称")).toHaveValue(
       "本地释义组"
     );
 
@@ -510,7 +506,7 @@ describe("WordWizardV3Page", () => {
     expect(endpoints.validateV3).not.toHaveBeenCalled();
     expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
     expect(endpoints.publishV3).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #1" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
     expect(
       await screen.findByText("请先保存或放弃未保存的草稿")
     ).toBeInTheDocument();
@@ -525,7 +521,6 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview"
     });
-    const formId = current.forms.pos[0]!.forms[0]!.id;
     const endpoints = source({ word: current, retired_stable_nodes: [] });
     vi.mocked(endpoints.saveFormsStepV3).mockImplementationOnce(
       async (_wordId, input) => ({
@@ -538,20 +533,20 @@ describe("WordWizardV3Page", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "新增释义组" }));
-    fireEvent.change(await screen.findByLabelText(/释义组中文/), {
+    fireEvent.change(await screen.findByLabelText("释义组 1 中文名称"), {
       target: { value: "词形保存后仍保留" }
     });
     fireEvent.click(screen.getByText("词形与发音"));
-    fireEvent.change(await screen.findByLabelText(`common 拼写 ${formId}`), {
+    fireEvent.change(await screen.findByLabelText(`词形 1通用拼写`), {
       target: { value: "centre-forms-saved" }
     });
     fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
 
     await waitFor(() =>
-      expect(screen.getByText(/revision 2/)).toBeInTheDocument()
+      expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1)
     );
     fireEvent.click(screen.getByText("释义与例句"));
-    expect(await screen.findByLabelText(/释义组中文/)).toHaveValue(
+    expect(await screen.findByLabelText("释义组 1 中文名称")).toHaveValue(
       "词形保存后仍保留"
     );
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
@@ -562,7 +557,6 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview"
     });
-    const formId = current.forms.pos[0]!.forms[0]!.id;
     const endpoints = source({ word: current, retired_stable_nodes: [] });
     vi.mocked(endpoints.saveMeaningsStepV3).mockImplementationOnce(
       async (_wordId, input) => ({
@@ -578,21 +572,21 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.change(await screen.findByLabelText(`common 拼写 ${formId}`), {
+    fireEvent.change(await screen.findByLabelText(`词形 1通用拼写`), {
       target: { value: "centre-unsaved-forms" }
     });
     fireEvent.click(screen.getByText("释义与例句"));
     fireEvent.click(await screen.findByRole("button", { name: "新增释义组" }));
-    fireEvent.change(await screen.findByLabelText(/释义组中文/), {
+    fireEvent.change(await screen.findByLabelText("释义组 1 中文名称"), {
       target: { value: "已保存释义" }
     });
     fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
 
     await waitFor(() =>
-      expect(screen.getByText(/revision 2/)).toBeInTheDocument()
+      expect(endpoints.saveMeaningsStepV3).toHaveBeenCalledTimes(1)
     );
     fireEvent.click(screen.getByText("词形与发音"));
-    expect(await screen.findByLabelText(`common 拼写 ${formId}`)).toHaveValue(
+    expect(await screen.findByLabelText(`词形 1通用拼写`)).toHaveValue(
       "centre-unsaved-forms"
     );
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
@@ -624,9 +618,7 @@ describe("WordWizardV3Page", () => {
     fireEvent.click(
       await screen.findByRole("button", { name: "检查发布条件" })
     );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "发布 V3 词条" })
-    );
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
 
     await waitFor(() => expect(endpoints.publishV3).toHaveBeenCalledTimes(1));
     await waitFor(() =>
@@ -670,7 +662,7 @@ describe("WordWizardV3Page", () => {
     );
 
     expect(await screen.findByText("发布历史")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #1" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
     expect(
       await screen.findByText("immutable history detail")
     ).toBeInTheDocument();
@@ -724,7 +716,9 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #1" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 1 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
@@ -814,9 +808,9 @@ describe("WordWizardV3Page", () => {
       await screen.findByRole("button", { name: "检查发布条件" })
     );
     expect(
-      await screen.findByRole("button", { name: "发布 V3 词条" })
+      await screen.findByRole("button", { name: "发布词条" })
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #1" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
@@ -826,10 +820,12 @@ describe("WordWizardV3Page", () => {
     expect(
       await screen.findByRole("button", { name: "检查发布条件" })
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "发布 V3 词条" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
     expect(screen.queryByRole("button", { name: "确认激活" })).toBeNull();
 
-    fireEvent.click(await screen.findByRole("button", { name: "查看发布 #2" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看第 2 次发布" })
+    );
     fireEvent.click(
       await screen.findByRole("button", { name: "激活此发布版本" })
     );
@@ -869,10 +865,10 @@ describe("WordWizardV3Page", () => {
 
       expect((await screen.findAllByText("centre")).length).toBeGreaterThan(0);
       expect(screen.queryByRole("button", { name: "检查发布条件" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "发布 V3 词条" })).toBeNull();
+      expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
       expect(screen.queryByRole("button", { name: "保存草稿" })).toBeNull();
       expect(
-        screen.getByText("词形与发音").closest(".ant-steps-item")
+        screen.getAllByText("词形与发音")[0]?.closest(".ant-steps-item")
       ).toHaveClass("ant-steps-item-disabled");
       expect(endpoints.validateV3).not.toHaveBeenCalled();
       expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
@@ -997,26 +993,26 @@ describe("WordWizardV3Page", () => {
     ).toHaveTextContent("变化组 2");
     expect(
       screen.getByTestId(`readonly-membership-${UUIDS.membership_3}`)
-    ).toHaveTextContent("1. base · centre");
+    ).toHaveTextContent("1. 原形 · centre");
     expect(screen.getAllByTestId(`readonly-form-${shared.id}`)).toHaveLength(1);
     expect(
       screen.getByTestId(`readonly-form-${regional.id}`)
-    ).toHaveTextContent("uk");
+    ).toHaveTextContent("英式");
     expect(
       screen.getByTestId(`readonly-form-${regional.id}`)
-    ).toHaveTextContent("us");
+    ).toHaveTextContent("美式");
     expect(
       screen.getByTestId(`readonly-pronunciation-${UUIDS.pronunciation}`)
-    ).toHaveTextContent("normal · sen-tre · centre");
+    ).toHaveTextContent("常规 · 词典音标 sen-tre · 实际发音 centre");
     expect(
       screen.getByTestId(`readonly-pronunciation-${UUIDS.pronunciation_2}`)
-    ).toHaveTextContent("strong · sen-tr · centr");
+    ).toHaveTextContent("强读 · 词典音标 sen-tr · 实际发音 centr");
     expect(
       screen.getByTestId(`readonly-pronunciation-${UUIDS.pronunciation_3}`)
-    ).toHaveTextContent("weak · sen-ter · center");
+    ).toHaveTextContent("弱读 · 词典音标 sen-ter · 实际发音 center");
     expect(
       screen.getByTestId(`readonly-pronunciation-${uuidFromInt(904)}`)
-    ).toHaveTextContent("normal · sen-tre-uk · centre-uk");
+    ).toHaveTextContent("常规 · 词典音标 sen-tre-uk · 实际发音 centre-uk");
   });
 
   it("keeps empty read-only groups and pronunciations visible", async () => {
@@ -1038,7 +1034,7 @@ describe("WordWizardV3Page", () => {
 
     expect(await screen.findByText("暂无变化组")).toBeInTheDocument();
     expect(screen.getByTestId(`readonly-form-${form.id}`)).toHaveTextContent(
-      "common"
+      "通用"
     );
     expect(screen.getByTestId(`readonly-form-${form.id}`)).toHaveTextContent(
       "plain-readonly"
@@ -1111,7 +1107,7 @@ describe("WordWizardV3Page", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "新增释义组" }));
-    fireEvent.change(await screen.findByLabelText(/释义组中文/), {
+    fireEvent.change(await screen.findByLabelText("释义组 1 中文名称"), {
       target: { value: "已保存释义组" }
     });
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
@@ -1135,14 +1131,14 @@ describe("WordWizardV3Page", () => {
       })
     );
     await waitFor(() =>
-      expect(screen.getByText(/revision 2/)).toBeInTheDocument()
+      expect(screen.queryByText("有未保存的草稿")).toBeNull()
     );
     expect(screen.queryByText("有未保存的草稿")).toBeNull();
     fireEvent.click(screen.getByText("核对与发布"));
     expect(
       await screen.findByRole("button", { name: "检查发布条件" })
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "查看发布 #1" }));
+    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
     expect(
       await screen.findByRole("button", { name: "激活此发布版本" })
     ).toBeEnabled();
@@ -1167,17 +1163,19 @@ describe("WordWizardV3Page", () => {
     );
 
     fireEvent.click(await screen.findByRole("button", { name: "新增释义组" }));
-    fireEvent.change(await screen.findByLabelText(/释义组中文/), {
+    fireEvent.change(await screen.findByLabelText("释义组 1 中文名称"), {
       target: { value: "失败后仍保留" }
     });
     fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
 
     expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
-    expect(screen.getByLabelText(/释义组中文/)).toHaveValue("失败后仍保留");
+    expect(screen.getByLabelText("释义组 1 中文名称")).toHaveValue(
+      "失败后仍保留"
+    );
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
     fireEvent.click(screen.getByText("词形与发音"));
     fireEvent.click(screen.getByText("释义与例句"));
-    expect(await screen.findByLabelText(/释义组中文/)).toHaveValue(
+    expect(await screen.findByLabelText("释义组 1 中文名称")).toHaveValue(
       "失败后仍保留"
     );
     fireEvent.click(screen.getByText("核对与发布"));

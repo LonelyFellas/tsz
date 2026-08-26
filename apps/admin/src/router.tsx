@@ -2,7 +2,6 @@ import { Spin, Typography } from "antd";
 import {
   createBrowserRouter,
   redirect,
-  type LoaderFunctionArgs,
   type RouteObject
 } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
@@ -21,12 +20,6 @@ function BootFallback() {
   );
 }
 
-/** `/words/new` only remains as the explicit V2 phrase compatibility entry. */
-export function legacyWordCreateLoader({ request }: LoaderFunctionArgs) {
-  const kind = new URL(request.url).searchParams.get("kind");
-  return kind === "phrase" ? null : redirect("/words/new/v3");
-}
-
 /** Shared by browser routing and MemoryRouter contract tests. */
 export const wordRoutes: RouteObject[] = [
   {
@@ -37,13 +30,10 @@ export const wordRoutes: RouteObject[] = [
   },
   {
     path: "words/new/v3",
-    lazy: async () => ({
-      Component: (await import("@/pages/WordCreateV3")).WordCreateV3Page
-    })
+    loader: () => redirect("/words/new")
   },
   {
     path: "words/new",
-    loader: legacyWordCreateLoader,
     lazy: async () => ({
       Component: (await import("@/pages/WordCreate")).WordCreatePage
     })

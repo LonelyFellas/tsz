@@ -8,19 +8,17 @@ import {
   mockAdminV3Api
 } from "./support/mockAdminV3Api";
 
-test.describe("Smart Lexicon V3 Mock E2E（非真实后端联调）", () => {
-  test("E01a Mock：新建复杂 V3、保存刷新、422 定位及 shadow 发布阻断", async ({
+test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () => {
+  test("E01a Mock：统一入口新建复杂单词、保存刷新、422 定位及发布阻断", async ({
     page
   }) => {
     const api = await mockAdminV3Api(page);
     await page.goto("/words");
 
-    await page.getByRole("button", { name: "创建单词" }).click();
-    await expect(page).toHaveURL(/\/words\/new\/v3$/);
-    await page.getByLabel("待创建词面").fill("orbit");
-    await page.getByRole("button", { name: "检测 V3 词面" }).click();
-    await expect(page.getByText("检测有效：orbit")).toBeVisible();
-    await page.getByRole("button", { name: "创建 V3 草稿" }).click();
+    await page.getByRole("button", { name: "创建词条" }).click();
+    await expect(page).toHaveURL(/\/words\/new$/);
+    await page.getByPlaceholder("例如 center 或 give up").fill("orbit");
+    await page.getByRole("button", { name: "继续创建" }).click();
 
     await expect(page).toHaveURL(
       new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/forms$`)
@@ -33,65 +31,65 @@ test.describe("Smart Lexicon V3 Mock E2E（非真实后端联调）", () => {
       .getByText("名词", { exact: true })
       .click();
     await page.getByRole("button", { name: "新增词性" }).click();
-    await expect(page.getByRole("tab", { name: "noun" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "名词" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
 
-    await page.getByRole("button", { name: /新增变化组/ }).click();
+    await page.getByRole("button", { name: "新增名词变化组" }).click();
     const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
     const firstGroup = nounGroups.nth(0);
-    await firstGroup
-      .getByRole("button", { name: /新增 concrete form/ })
-      .click();
-    await firstGroup
-      .getByRole("button", { name: /新增 concrete form/ })
-      .click();
+    await firstGroup.getByRole("button", { name: "变化组 1 新增词形" }).click();
+    await firstGroup.getByRole("button", { name: "变化组 1 新增词形" }).click();
     const firstForm = firstGroup.locator(".v3-concrete-form-row").nth(0);
     const secondForm = firstGroup.locator(".v3-concrete-form-row").nth(1);
-    await firstForm.getByLabel(/^common 拼写 /).fill("orbit-common");
+    await firstForm.getByLabel("词形 1通用拼写").fill("orbit-common");
     await firstForm.getByRole("button", { name: /新增发音/ }).click();
     await firstForm.getByRole("button", { name: /新增发音/ }).click();
     await firstForm
-      .getByLabel(/^字典音标 /)
+      .getByLabel(/第 \d+ 条发音的字典音标/)
       .nth(0)
       .fill("ˈɔːbɪt");
     await firstForm
-      .getByLabel(/^实际发音 /)
+      .getByLabel(/第 \d+ 条发音的实际发音/)
       .nth(0)
       .fill("orbit");
     await firstForm
-      .getByLabel(/^字典音标 /)
+      .getByLabel(/第 \d+ 条发音的字典音标/)
       .nth(1)
       .fill("ˈɔrbɪt");
     await firstForm
-      .getByLabel(/^实际发音 /)
+      .getByLabel(/第 \d+ 条发音的实际发音/)
       .nth(1)
       .fill("orbit-us");
 
-    await secondForm.getByLabel(/^common 拼写 /).fill("orbit-regional");
-    await secondForm.getByRole("button", { name: /切换为 UK\/US/ }).click();
-    await page.getByLabel("UK 映射拼写").fill("orbit-centre");
-    await page.getByLabel("UK 映射字典音标").fill("ˈɔːbɪt");
-    await page.getByLabel("UK 映射实际发音").fill("orbit-uk");
-    await page.getByLabel("US 映射拼写").fill("orbit-center");
-    await page.getByLabel("US 映射字典音标").fill("ˈɔrbɪt");
-    await page.getByLabel("US 映射实际发音").fill("orbit-us");
+    await secondForm.getByLabel("词形 2通用拼写").fill("orbit-regional");
+    await secondForm
+      .getByRole("button", { name: "词形 2切换为英式和美式" })
+      .click();
+    await page.getByLabel("英式 映射拼写").fill("orbit-centre");
+    await page.getByLabel("英式 映射字典音标").fill("ˈɔːbɪt");
+    await page.getByLabel("英式 映射实际发音").fill("orbit-uk");
+    await page.getByLabel("美式 映射拼写").fill("orbit-center");
+    await page.getByLabel("美式 映射字典音标").fill("ˈɔrbɪt");
+    await page.getByLabel("美式 映射实际发音").fill("orbit-us");
     await page.getByRole("button", { name: "确认转换" }).click();
 
-    await page.getByRole("button", { name: /新增变化组/ }).click();
+    await page.getByRole("button", { name: "新增名词变化组" }).click();
     const secondGroup = nounGroups.nth(1);
-    await secondGroup.getByLabel(/添加已有词形到/).click();
+    await secondGroup.getByLabel("变化组 2 选择已有词形").click();
     await page
       .locator(".ant-select-dropdown:visible")
       .locator(".ant-select-item-option")
       .first()
       .click();
-    await secondGroup.getByRole("button", { name: /添加 membership/ }).click();
+    await secondGroup
+      .getByRole("button", { name: "变化组 2 复用已有词形" })
+      .click();
     await firstGroup
       .locator(".v3-membership-row")
       .nth(1)
-      .getByLabel(/移动 membership .* 到变化组/)
+      .getByLabel("移动词形 2 到其他变化组")
       .click();
     await page
       .locator(".ant-select-dropdown:visible")
@@ -106,18 +104,18 @@ test.describe("Smart Lexicon V3 Mock E2E（非真实后端联调）", () => {
       .getByText("动词", { exact: true })
       .click();
     await page.getByRole("button", { name: "新增词性" }).click();
-    await expect(page.getByRole("tab", { name: "verb" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "动词" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
-    await page.getByRole("button", { name: /新增变化组/ }).click();
+    await page.getByRole("button", { name: "新增动词变化组" }).click();
     const verbGroup = page.locator("[data-pos-id] .v3-form-group-card").first();
-    await verbGroup.getByRole("button", { name: /新增 concrete form/ }).click();
+    await verbGroup.getByRole("button", { name: "变化组 1 新增词形" }).click();
     const verbForm = verbGroup.locator(".v3-concrete-form-row");
-    await verbForm.getByLabel(/^common 拼写 /).fill("orbit-verb");
+    await verbForm.getByLabel("词形 1通用拼写").fill("orbit-verb");
     await verbForm.getByRole("button", { name: /新增发音/ }).click();
-    await verbForm.getByLabel(/^字典音标 /).fill("ˈɔːbɪt");
-    await verbForm.getByLabel(/^实际发音 /).fill("orbit-verb");
+    await verbForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
+    await verbForm.getByLabel("第 1 条发音的实际发音").fill("orbit-verb");
 
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect.poll(() => api.getWord().revision).toBe(2);
@@ -136,23 +134,22 @@ test.describe("Smart Lexicon V3 Mock E2E（非真实后端联调）", () => {
     if (errorPronunciation?.regional_variants.mode !== "common") {
       throw new Error("Mock E01a expected a common verb form");
     }
-    const errorPronunciationId =
-      errorPronunciation.regional_variants.common.pronunciations[0]!.id;
-
     await page.reload();
-    await expect(page.getByRole("tab", { name: "noun" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "verb" })).toBeVisible();
-    await page.getByRole("tab", { name: "noun" }).click();
+    await expect(page.getByRole("tab", { name: "名词" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "动词" })).toBeVisible();
+    await page.getByRole("tab", { name: "名词" }).click();
     await expect(page.locator('input[value="orbit-common"]')).toHaveCount(2);
-    await expect(page.getByText("UK", { exact: true })).toBeVisible();
-    await expect(page.getByText("US", { exact: true })).toBeVisible();
+    await expect(page.getByText("英式拼写", { exact: true })).toBeVisible();
+    await expect(page.getByText("美式拼写", { exact: true })).toBeVisible();
 
     await page.getByRole("button", { name: "完成词形" }).click();
-    await expect(page.getByRole("tab", { name: "verb" })).toHaveAttribute(
+    await expect(page.getByRole("tab", { name: "动词" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
-    const issueTarget = page.getByLabel(`实际发音 ${errorPronunciationId}`);
+    const issueTarget = page
+      .getByRole("tabpanel", { name: "动词" })
+      .getByLabel("第 1 条发音的实际发音");
     await expect(issueTarget).toBeFocused();
     await expect(
       page
@@ -165,13 +162,11 @@ test.describe("Smart Lexicon V3 Mock E2E（非真实后端联调）", () => {
     await expect(page).toHaveURL(
       new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/preview$`)
     );
-    await expect(page.getByText("当前 V3 词条不可发布")).toBeVisible();
+    await expect(page.getByText("当前词条不可发布")).toBeVisible();
     await expect(
-      page.getByText("phase2_consumers_not_ready", { exact: true })
+      page.getByText("学习端尚未完成该词条结构的发布准备。")
     ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "发布 V3 词条" })
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "发布词条" })).toHaveCount(0);
 
     expect(api.count("POST", ADMIN_V3_DETECTIONS_PATH)).toBe(1);
     expect(api.count("POST", ADMIN_V3_ENTRIES_PATH)).toBe(1);
@@ -183,29 +178,26 @@ test.describe("Smart Lexicon V3 Mock E2E（非真实后端联调）", () => {
     ).toBe(2);
   });
 
-  test("E01b Mock：migrated bridge canary 发布且 V2 历史快照保持不变", async ({
-    page
-  }) => {
+  test("E01b Mock：迁移词条发布且旧历史快照保持不变", async ({ page }) => {
     const api = await mockAdminV3Api(page, { initial: "canary" });
     const legacyBefore = api.getPublications()[0];
 
     await page.goto(`/words/${ADMIN_V3_CANARY_WORD_ID}/v3/wizard/preview`);
-    await expect(page.getByText("兼容桥（只读）")).toBeVisible();
     await expect(
       page.getByText("legacy-orbit", { exact: true }).first()
     ).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "查看发布 #1" })
+      page.getByRole("button", { name: "查看第 1 次发布" })
     ).toBeVisible();
     await expect(page.getByText("发布历史加载失败")).toHaveCount(0);
-    await page.getByRole("button", { name: "查看发布 #1" }).click();
+    await page.getByRole("button", { name: "查看第 1 次发布" }).click();
     const legacyDetail = page.getByTestId("publication-detail");
     const legacySnapshot = legacyDetail.getByTestId(
       "publication-snapshot-body"
     );
     await expect(legacySnapshot.getByText("legacy-orbit")).toBeVisible();
     await expect(
-      legacySnapshot.getByText("ˈɔːbɪt → ˈɔːbɪt · normal")
+      legacySnapshot.getByText("词典音标 ˈɔːbɪt · 实际发音 ˈɔːbɪt · 常规")
     ).toBeVisible();
     await expect(legacySnapshot.getByText("历史旧版轨道释义")).toBeVisible();
     await expect(legacySnapshot.getByText("orbital centre")).toHaveCount(0);
@@ -213,10 +205,10 @@ test.describe("Smart Lexicon V3 Mock E2E（非真实后端联调）", () => {
     await legacyDetail.getByRole("button", { name: "关闭发布详情" }).click();
     await page.getByRole("button", { name: "检查发布条件" }).click();
     await expect(page.getByText("影响预览：0 项")).toBeVisible();
-    await page.getByRole("button", { name: "发布 V3 词条" }).click();
-    await expect(page.getByText("published", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "发布词条" }).click();
+    await expect(page.getByText("已发布", { exact: true })).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "查看发布 #1" })
+      page.getByRole("button", { name: "查看第 1 次发布" })
     ).toBeVisible();
     await expect(page.getByText("发布历史加载失败")).toHaveCount(0);
 
@@ -250,7 +242,7 @@ test.describe("Smart Lexicon V3 Mock E2E（非真实后端联调）", () => {
     ).toBe(1);
   });
 
-  test("E02 Mock：mixed V2/V3 列表展示各自投影并路由到各自向导", async ({
+  test("E02 Mock：混合词条列表展示各自投影并路由到原生向导", async ({
     page
   }) => {
     await mockAdminV3Api(page);

@@ -22,6 +22,7 @@ import {
   reorderMemberships,
   type V3IdFactory
 } from "../operations";
+import { formTypeLabel } from "../presentation";
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
 
 export interface V3FormGroupCardProps {
@@ -66,7 +67,13 @@ export function V3FormGroupCard({
     )
     .map((form) => ({
       value: form.id,
-      label: `${form.form_type} · ${form.id.slice(-8)}`
+      label: `${formTypeLabel(form.form_type)} · ${
+        form.regional_variants.mode === "common"
+          ? form.regional_variants.common.spelling || "未填写拼写"
+          : `${form.regional_variants.uk.spelling || "未填写英式"} / ${
+              form.regional_variants.us.spelling || "未填写美式"
+            }`
+      }`
     }));
 
   const addForm = () => {
@@ -110,19 +117,19 @@ export function V3FormGroupCard({
       extra={
         <Space.Compact>
           <Button
-            aria-label={`上移变化组 ${group.id}`}
+            aria-label={`上移变化组 ${groupIndex + 1}`}
             disabled={groupIndex === 0 || !onMove}
             icon={<ArrowUpOutlined />}
             onClick={() => onMove?.(-1)}
           />
           <Button
-            aria-label={`下移变化组 ${group.id}`}
+            aria-label={`下移变化组 ${groupIndex + 1}`}
             disabled={groupIndex === groupCount - 1 || !onMove}
             icon={<ArrowDownOutlined />}
             onClick={() => onMove?.(1)}
           />
           <Button
-            aria-label={`删除变化组 ${group.id}`}
+            aria-label={`删除变化组 ${groupIndex + 1}`}
             danger
             disabled={!onDelete}
             icon={<DeleteOutlined />}
@@ -134,21 +141,24 @@ export function V3FormGroupCard({
       <Flex vertical gap="middle">
         <Flex gap="small" wrap>
           <Select
-            aria-label={`新增词形类型 ${group.id}`}
+            aria-label={`变化组 ${groupIndex + 1} 新增词形类型`}
             disabled={!posCatalog}
             onChange={setFormType}
-            options={formTypeOptions.map((value) => ({ value, label: value }))}
+            options={formTypeOptions.map((value) => ({
+              value,
+              label: formTypeLabel(value)
+            }))}
             value={formType}
           />
           <Button
-            aria-label={`新增 concrete form ${group.id}`}
+            aria-label={`变化组 ${groupIndex + 1} 新增词形`}
             disabled={!posCatalog}
             onClick={addForm}
           >
-            新增 concrete form
+            新增词形
           </Button>
           <Select
-            aria-label={`添加已有词形到 ${group.id}`}
+            aria-label={`变化组 ${groupIndex + 1} 选择已有词形`}
             disabled={existingFormOptions.length === 0}
             onChange={setExistingFormId}
             options={existingFormOptions}
@@ -156,11 +166,11 @@ export function V3FormGroupCard({
             value={existingFormId}
           />
           <Button
-            aria-label={`添加 membership ${group.id}`}
+            aria-label={`变化组 ${groupIndex + 1} 复用已有词形`}
             disabled={!existingFormId}
             onClick={attachExistingForm}
           >
-            添加 membership
+            复用已有词形
           </Button>
         </Flex>
         {blockedFormId && (
@@ -183,7 +193,7 @@ export function V3FormGroupCard({
               </Button>
             }
             closable
-            description="这是该词形最后一个 membership。普通移除已拒绝；如需继续，请显式删除整个词形及其全部 membership。"
+            description="这是该词形最后一个使用位置。普通移除已停止；如需继续，请明确删除该词形及其全部使用位置。"
             onClose={() => setBlockedFormId(undefined)}
             showIcon
             title="不能留下孤立词形"
@@ -202,7 +212,7 @@ export function V3FormGroupCard({
             return (
               <Alert
                 key={member.id}
-                title={`membership ${member.id} 引用了不存在的 form`}
+                title="该变化组引用的词形不存在，已停止编辑。"
                 type="error"
               />
             );
@@ -230,7 +240,7 @@ export function V3FormGroupCard({
               <Flex className="v3-membership-actions" justify="end">
                 <Space>
                   <Select
-                    aria-label={`移动 membership ${member.id} 到变化组`}
+                    aria-label={`移动词形 ${index + 1} 到其他变化组`}
                     disabled={moveTargets.length === 0}
                     onChange={(targetGroupId) => {
                       const target = pos.form_groups.find(
@@ -250,7 +260,7 @@ export function V3FormGroupCard({
                   />
                   <Space.Compact>
                     <Button
-                      aria-label={`上移词形 ${form.id} 于 ${group.id}`}
+                      aria-label={`上移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
                       disabled={index === 0}
                       icon={<ArrowUpOutlined />}
                       onClick={() => {
@@ -265,7 +275,7 @@ export function V3FormGroupCard({
                       }}
                     />
                     <Button
-                      aria-label={`下移词形 ${form.id} 于 ${group.id}`}
+                      aria-label={`下移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
                       disabled={index === group.members.length - 1}
                       icon={<ArrowDownOutlined />}
                       onClick={() => {
@@ -280,7 +290,7 @@ export function V3FormGroupCard({
                       }}
                     />
                     <Button
-                      aria-label={`移除 membership ${member.id}`}
+                      aria-label={`从变化组 ${groupIndex + 1} 移除词形 ${index + 1}`}
                       danger
                       icon={<DeleteOutlined />}
                       onClick={() => {
@@ -303,6 +313,7 @@ export function V3FormGroupCard({
               <V3ConcreteFormRow
                 content={content}
                 form={form}
+                formLabel={`词形 ${index + 1}`}
                 idFactory={idFactory}
                 issues={issues}
                 membershipCount={membershipCounts.get(form.id) ?? 0}
