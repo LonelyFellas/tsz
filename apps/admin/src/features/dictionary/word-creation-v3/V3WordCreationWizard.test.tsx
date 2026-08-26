@@ -2329,10 +2329,16 @@ describe("V3WordCreationWizard", () => {
   });
 
   it("retries a failed conflict refresh without discarding the local comparison", async () => {
+    let resolveGet!: (value: AdminWordDraftV3Envelope) => void;
     const get = vi
       .fn()
       .mockRejectedValueOnce(new HttpError(500, "get failed"))
-      .mockResolvedValueOnce(draftEnvelope(4, "server latest"));
+      .mockImplementationOnce(
+        () =>
+          new Promise<AdminWordDraftV3Envelope>((resolve) => {
+            resolveGet = resolve;
+          })
+      );
     renderWizard(
       requests({
         saveForms: vi.fn(async () => {
@@ -2345,12 +2351,13 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByText("保存"));
     fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
     expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("重 试").closest("button")!);
+    const retryButton = screen.getByText("重 试").closest("button")!;
+    await waitFor(() => expect(retryButton).not.toHaveClass("ant-btn-loading"));
+    fireEvent.click(retryButton);
 
-    await waitFor(() =>
-      expect(screen.getByTestId("server-revision")).toHaveTextContent("4")
-    );
-    expect(get).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+    await act(async () => resolveGet(draftEnvelope(4, "server latest")));
+    expect(screen.getByTestId("server-revision")).toHaveTextContent("4");
   });
 
   it("ignores a conflict refresh superseded before its response", async () => {

@@ -311,8 +311,9 @@ function canActivateV3Publication(
   }
   const currentCapability = currentWord.capabilities.publication;
   return (
-    currentCapability.mode === "migration_canary" &&
-    currentCapability.whitelisted
+    currentCapability.mode === "native" ||
+    (currentCapability.mode === "migration_canary" &&
+      currentCapability.whitelisted)
   );
 }
 

@@ -155,10 +155,7 @@ function validAdminWordV3() {
       strategy_version: "surface_summary_v1"
     },
     capabilities: {
-      publication: {
-        mode: "shadow_only",
-        blocked_code: "phase2_consumers_not_ready"
-      },
+      publication: { mode: "native" },
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
     forms: {
@@ -567,6 +564,17 @@ describe("admin word V3/Any runtime decoder", () => {
       },
       path: "$.word",
       reason: "unexpected_property"
+    },
+    {
+      name: "未知 publication capability",
+      mutate: (word: Record<string, unknown>) => {
+        const capabilities = word.capabilities as {
+          publication: { mode: string };
+        };
+        capabilities.publication.mode = "future_mode";
+      },
+      path: "$.word.capabilities.publication",
+      reason: "no_union_match"
     }
   ])("$name 按完整 OpenAPI shape fail closed", ({ mutate, path, reason }) => {
     const word = validAdminWordV3() as Record<string, unknown>;
