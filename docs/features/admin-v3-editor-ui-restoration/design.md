@@ -108,8 +108,8 @@ V3 额外受稳定槽位身份约束：`AdminWordDraftV3Envelope.retired_stable_
 - **已被取代（2026-08-29）：**原“来源发布事务禁止自动物化、必须先选择已发布目标”的设计不再
   生效。当前批准方案允许 `pending_target_headword` + 可选 `pending_target_gloss` 在发布事务中
   自动匹配或物化目标草稿；成功后必须同步 canonical editor JSON 与关系投影并清除 pending。
-- 新 migration 收紧 `entry_publication_sense_refs` 为 publication-only 前，先统计现有 `target_content_scope='draft'` 行。非零时迁移 fail closed 并输出审计清单或执行经确认的数据修复；不得猜测目标 publication/sense。
-- 删除或改写“publication relation can target draft”的旧集成测试，新增保存、校验、发布、并发换版和历史数据迁移回归。后端代码、migration、OpenAPI snapshot 与前端翻译必须作为一个可回退的独立交付单元。
+- **已被取代（2026-08-29）：**原 publication-only migration 及删除“publication relation can target draft”测试的行动项不再执行；pending 发布时物化允许来源 publication 指向新建目标草稿的正式义项。
+- 当前迁移与测试规则覆盖 pending 保存不建条、发布事务自动匹配或物化、canonical editor JSON 与关系投影同步清除 pending，以及发布后 GET、再次保存和重复发布；OpenAPI 与前端中文映射保持同一合同。
 
 该产品决定已完成评审与前后端实现，不再处于“等待批准/等待 OpenAPI”状态；后续以
 `pending-relation-predefined-gloss` 文档、当前 Rust OpenAPI 与回归测试为权威。
