@@ -27,11 +27,20 @@ interface Props {
   entryKind?: AdminWordV2["kind"];
   draftHeadwords?: WordHeadwordsV2;
   currentStep: WordCreationStep;
+  reachableSteps?: ReadonlySet<WordCreationStep>;
   readOnly?: boolean;
   onStepChange?: (step: WordCreationStep) => void;
   readinessDraft?: WordReadinessDraft;
   partOfSpeechLookup?: PartOfSpeechLookup;
   onReadinessNavigate?: (target: ReadinessTarget) => void;
+  presentation?: {
+    wordExists: boolean;
+    breadcrumbTitle: ReactNode;
+    completedSteps: readonly WordCreationStep[];
+    summaryHeadword: ReactNode;
+    status?: ReactNode;
+    progress: ReactNode;
+  };
   children: ReactNode;
 }
 
@@ -45,7 +54,11 @@ const STEP_SUBTITLE: Record<WordCreationStep, string> = {
 function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
   const { preference } = useDialectPreference();
   if (!headwords) {
-    return <Typography.Text type="secondary">完成检测后显示</Typography.Text>;
+    return (
+      <Typography.Text className="word-summary-pending-detection">
+        待检测
+      </Typography.Text>
+    );
   }
   if (headwords.mode === "unified") {
     return (
@@ -142,17 +155,22 @@ export function WordCreationLayout({
   entryKind,
   draftHeadwords,
   currentStep,
+  reachableSteps,
   readOnly,
   onStepChange,
   readinessDraft,
   partOfSpeechLookup,
   onReadinessNavigate,
+  presentation,
   children
 }: Props) {
   const navigate = useNavigate();
   const currentIndex = WORD_STEP_ORDER.indexOf(currentStep);
   const isBasicsStep = currentStep === "basics";
-  const completed = new Set(word?.completed_steps ?? []);
+  const completed = new Set(
+    presentation?.completedSteps ?? word?.completed_steps ?? []
+  );
+  const wordExists = presentation?.wordExists ?? Boolean(word);
   const steps = WORD_STEP_ORDER.map((step) => ({
     title: WORD_STEP_TITLE[step],
     content: STEP_SUBTITLE[step],
@@ -165,7 +183,10 @@ export function WordCreationLayout({
           ? ("finish" as const)
           : ("wait" as const),
     // 只有「草稿还没创建」才禁用：完成度不再决定导航权限，四步随时可进。
-    disabled: !word
+    disabled:
+      !wordExists ||
+      Boolean(readOnly) ||
+      Boolean(reachableSteps && !reachableSteps.has(step))
   }));
   const { preference } = useDialectPreference();
   const createTitle =
@@ -185,9 +206,11 @@ export function WordCreationLayout({
             title: <Link to="/words">智能词库</Link>
           },
           {
-            title: word
-              ? `${wordDisplayHeadword(word, preference)} · ${WORD_STEP_TITLE[currentStep]}`
-              : createTitle
+            title: presentation
+              ? presentation.breadcrumbTitle
+              : word
+                ? `${wordDisplayHeadword(word, preference)} · ${WORD_STEP_TITLE[currentStep]}`
+                : createTitle
           }
         ]}
       />
@@ -219,29 +242,32 @@ export function WordCreationLayout({
             <Typography.Text type="secondary" className="word-summary-kicker">
               当前词条
             </Typography.Text>
-            <HeadwordSummary headwords={word?.headwords ?? draftHeadwords} />
+            {presentation?.summaryHeadword ?? (
+              <HeadwordSummary headwords={word?.headwords ?? draftHeadwords} />
+            )}
 
             <div className="word-summary-language">
               <Typography.Text type="secondary">所属语言</Typography.Text>
               <strong>English&nbsp; 英语</strong>
             </div>
 
-            {word?.status === "archived" ? (
-              <Tag color="warning" style={{ alignSelf: "flex-start" }}>
-                已归档 · 只读
-              </Tag>
-            ) : word?.status === "published" ? (
-              <Tag
-                color={readOnly ? "success" : "processing"}
-                style={{ alignSelf: "flex-start" }}
-              >
-                {readOnly
-                  ? "已发布 · 只读"
-                  : word.has_unpublished_changes
-                    ? "已发布 · 编辑未发布修改"
-                    : "已发布 · 编辑中"}
-              </Tag>
-            ) : null}
+            {presentation?.status ??
+              (word?.status === "archived" ? (
+                <Tag color="warning" style={{ alignSelf: "flex-start" }}>
+                  垃圾桶 · 只读
+                </Tag>
+              ) : word?.status === "published" ? (
+                <Tag
+                  color={readOnly ? "success" : "processing"}
+                  style={{ alignSelf: "flex-start" }}
+                >
+                  {readOnly
+                    ? "已发布 · 只读"
+                    : word.has_unpublished_changes
+                      ? "已发布 · 编辑未发布修改"
+                      : "已发布 · 编辑中"}
+                </Tag>
+              ) : null)}
           </div>
 
           <div className="word-summary-progress-title">
@@ -250,12 +276,14 @@ export function WordCreationLayout({
             </Typography.Text>
             <Tag variant="filled">实时</Tag>
           </div>
-          <ProgressSummary
-            word={word}
-            draft={readinessDraft}
-            partOfSpeechLookup={partOfSpeechLookup}
-            onNavigate={onReadinessNavigate}
-          />
+          {presentation?.progress ?? (
+            <ProgressSummary
+              word={word}
+              draft={readinessDraft}
+              partOfSpeechLookup={partOfSpeechLookup}
+              onNavigate={onReadinessNavigate}
+            />
+          )}
         </section>
 
         <main

@@ -49,6 +49,7 @@ function detectionResponse(
     request,
     normalized_surface: "colour",
     builtin_dictionary: { status: "not_found" },
+    suggested_pos: [],
     matches: [],
     requires_acknowledgement: false
   };

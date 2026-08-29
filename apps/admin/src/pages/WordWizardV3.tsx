@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Alert, Button, Card, Flex, Result, Spin, Tag, Typography } from "antd";
+import { Alert, Button, Flex, Result, Spin, Typography } from "antd";
 import type {
   AdminWordDraftV3Envelope,
   AdminWordV3,
@@ -28,18 +28,20 @@ import {
 } from "@/features/dictionary/surfaceSnapshot";
 import { useSurfaceSnapshotAny } from "@/features/dictionary/useSurfaceSnapshot";
 import { V3FormsAndPronunciationStep } from "@/features/dictionary/word-creation-v3/components/V3FormsAndPronunciationStep";
+import { V3BasicsStep } from "@/features/dictionary/word-creation-v3/V3BasicsStep";
 import { V3MeaningsAndExamplesStep } from "@/features/dictionary/word-creation-v3/V3MeaningsAndExamplesStep";
-import { V3MeaningsPreview } from "@/features/dictionary/word-creation-v3/V3MeaningsPreview";
 import { V3PreviewAndPublishStep } from "@/features/dictionary/word-creation-v3/V3PreviewAndPublishStep";
 import { V3PublicationHistory } from "@/features/dictionary/word-creation-v3/V3PublicationHistory";
+import { V3ReviewContent } from "@/features/dictionary/word-creation-v3/V3ReviewContent";
+import {
+  presentV3DetailError,
+  shouldRetryV3Detail
+} from "@/features/dictionary/word-creation-v3/presentationErrors";
+import { resolveV3StepAccess } from "@/features/dictionary/word-creation-v3/stepAccess";
 import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
 import {
-  dialectLabel,
-  formTypeLabel,
   impactReasonLabel,
-  impactTypeLabel,
-  partOfSpeechLabel,
-  pronunciationStyleLabel
+  impactTypeLabel
 } from "@/features/dictionary/word-creation-v3/presentation";
 import {
   CreationSourceNotice,
@@ -173,6 +175,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
           resetConfirmation();
           context.setDraftForms(content);
         }}
+        stableVariantIds={context.stableVariantIds}
         value={context.draftForms}
       />
       {pendingIntent && context.impact && requiresConfirmation ? (
@@ -218,7 +221,13 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
           }
         />
       ) : null}
-      <Flex justify="end" gap="small">
+      <div className="word-step-actions">
+        <Button
+          disabled={Boolean(pendingIntent)}
+          onClick={() => context.setActiveStep("basics")}
+        >
+          上一步
+        </Button>
         <Button
           disabled={Boolean(pendingIntent)}
           loading={busy && pendingIntent === "save"}
@@ -229,26 +238,25 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         <Button
           type="primary"
           disabled={Boolean(pendingIntent)}
-          loading={busy && pendingIntent === "complete"}
-          onClick={() => void prepareSave("complete")}
+          onClick={() => {
+            resetConfirmation();
+            context.setActiveStep("meanings");
+          }}
         >
-          完成词形
+          进入词义与例句
         </Button>
-      </Flex>
+      </div>
     </Flex>
   );
 }
 
 function V3BasicsSlot({ context }: { context: V3WizardSlotContext }) {
   return (
-    <Card title="创建信息">
-      <Typography.Paragraph>
-        词条名称来自创建时的词典建议。请在“词形与发音”中核对并完善各词性下的词形和发音。
-      </Typography.Paragraph>
-      <Typography.Text strong>
-        {context.word.presentation.label}
-      </Typography.Text>
-    </Card>
+    <V3BasicsStep
+      word={context.word}
+      onContinue={() => context.setActiveStep("forms")}
+      onStepChange={context.setActiveStep}
+    />
   );
 }
 
@@ -261,123 +269,39 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
       issues={context.issues.filter((issue) => issue.step === "meanings")}
       onActivePosChange={context.setActivePosId}
       onChange={context.setDraftMeanings}
+      onFormsChange={context.setDraftForms}
+      onPrevious={() => context.setActiveStep("forms")}
       onSave={context.actions.saveMeanings}
       partOfSpeechCatalog={partOfSpeechCatalog.data}
-      saving={context.isPending("save_meanings")}
+      partOfSpeechCatalogError={partOfSpeechCatalog.isError}
+      partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
+      saving={
+        context.isPending("save_forms") || context.isPending("save_meanings")
+      }
       value={context.draftMeanings}
       wordId={context.word.id}
     />
   );
 }
 
-function V3ReadOnlyPreview({ word }: { word: AdminWordV3 }) {
+function V3ReadOnlyPreview({
+  word,
+  onEdit
+}: {
+  word: AdminWordV3;
+  onEdit?: () => void;
+}) {
   return (
-    <Flex vertical gap="middle">
-      <Alert showIcon type="info" title="当前词条为只读查看" />
-      <Card title={word.presentation.label}>
-        <Typography.Text type="secondary">
-          以下内容来自当前已保存版本。
-        </Typography.Text>
-      </Card>
-      {word.forms.pos.map((pos) => (
-        <Card key={pos.pos_id} size="small" title={partOfSpeechLabel(pos.pos)}>
-          <Flex vertical gap="small">
-            <Typography.Text strong>词形变化组</Typography.Text>
-            {pos.form_groups.length > 0 ? (
-              pos.form_groups.map((group, groupIndex) => (
-                <Flex
-                  key={group.id}
-                  vertical
-                  gap={4}
-                  data-testid={`readonly-group-${group.id}`}
-                >
-                  <Flex gap={4} wrap>
-                    <Tag>变化组 {groupIndex + 1}</Tag>
-                    <Typography.Text type="secondary">
-                      {group.is_regular ? "规则组" : "非规则组"}
-                    </Typography.Text>
-                  </Flex>
-                  <Flex gap={4} wrap>
-                    {group.members.map((member, memberIndex) => {
-                      const form = pos.forms.find(
-                        (candidate) => candidate.id === member.form_id
-                      );
-                      const variant =
-                        form?.regional_variants.mode === "common"
-                          ? form.regional_variants.common
-                          : form?.regional_variants.uk;
-                      return (
-                        <Tag
-                          key={member.id}
-                          data-testid={`readonly-membership-${member.id}`}
-                        >
-                          {memberIndex + 1}.{" "}
-                          {form ? formTypeLabel(form.form_type) : "未知词形"}
-                          {variant ? ` · ${variant.spelling}` : ""}
-                        </Tag>
-                      );
-                    })}
-                  </Flex>
-                </Flex>
-              ))
-            ) : (
-              <Typography.Text type="secondary">暂无变化组</Typography.Text>
-            )}
-            <Typography.Text strong>词形与发音</Typography.Text>
-            {pos.forms.map((form) => {
-              const variants =
-                form.regional_variants.mode === "common"
-                  ? [form.regional_variants.common]
-                  : [form.regional_variants.uk, form.regional_variants.us];
-              return (
-                <Flex
-                  key={form.id}
-                  vertical
-                  gap={4}
-                  data-testid={`readonly-form-${form.id}`}
-                >
-                  <Tag>{formTypeLabel(form.form_type)}</Tag>
-                  {variants.map((variant) => (
-                    <Flex key={variant.id} vertical gap={2}>
-                      <Flex gap={4}>
-                        <Tag>{dialectLabel(variant.dialect)}</Tag>
-                        <Typography.Text strong>
-                          {variant.spelling}
-                        </Typography.Text>
-                      </Flex>
-                      {variant.pronunciations.length > 0 ? (
-                        variant.pronunciations.map((pronunciation) => (
-                          <Typography.Text
-                            key={pronunciation.id}
-                            type="secondary"
-                            data-testid={`readonly-pronunciation-${pronunciation.id}`}
-                          >
-                            {pronunciation.style
-                              ? pronunciationStyleLabel(pronunciation.style)
-                              : "未选择发音方式"}
-                            {pronunciation.dict_phonetic
-                              ? ` · 词典音标 ${pronunciation.dict_phonetic}`
-                              : ""}
-                            {pronunciation.actual_pron
-                              ? ` · 实际发音 ${pronunciation.actual_pron}`
-                              : ""}
-                          </Typography.Text>
-                        ))
-                      ) : (
-                        <Typography.Text type="secondary">
-                          暂无发音
-                        </Typography.Text>
-                      )}
-                    </Flex>
-                  ))}
-                </Flex>
-              );
-            })}
-          </Flex>
-        </Card>
-      ))}
-      <V3MeaningsPreview word={word} />
-    </Flex>
+    <V3ReviewContent
+      actions={
+        onEdit ? (
+          <Button type="primary" onClick={onEdit}>
+            继续编辑
+          </Button>
+        ) : undefined
+      }
+      word={word}
+    />
   );
 }
 
@@ -447,17 +371,17 @@ function V3WizardSlots({
   if (context.readOnly) {
     return (
       <Flex vertical gap="middle">
-        {context.word.status === "published" ? (
-          <Button
-            type="primary"
-            onClick={() =>
-              navigate(`/words/${context.word.id}/v3/wizard/forms?mode=edit`)
-            }
-          >
-            继续编辑
-          </Button>
-        ) : null}
-        <V3ReadOnlyPreview word={context.word} />
+        <V3ReadOnlyPreview
+          word={context.word}
+          onEdit={
+            context.word.status === "published"
+              ? () =>
+                  navigate(
+                    `/words/${context.word.id}/v3/wizard/forms?mode=edit`
+                  )
+              : undefined
+          }
+        />
         <V3PublicationHistory
           currentWord={context.word}
           onActivated={onActivated}
@@ -533,7 +457,8 @@ export function WordWizardV3Page({
     queryFn: () => requests.get(wordId),
     enabled: wordId !== "",
     staleTime: 0,
-    gcTime: 0
+    gcTime: 0,
+    retry: shouldRetryV3Detail
   });
 
   if (detail.isPending) {
@@ -544,15 +469,18 @@ export function WordWizardV3Page({
     );
   }
   if (detail.isError || !detail.data) {
+    const presentation = presentV3DetailError(detail.error);
     return (
       <Result
         status="error"
-        title="无法打开词条"
-        subTitle={detail.error?.message ?? "词条不存在或响应格式无效"}
+        title={presentation.title}
+        subTitle={presentation.description}
         extra={
-          <Button type="primary" onClick={() => void detail.refetch()}>
-            重试
-          </Button>
+          presentation.retryable ? (
+            <Button type="primary" onClick={() => void detail.refetch()}>
+              重试
+            </Button>
+          ) : undefined
         }
       />
     );
@@ -561,14 +489,10 @@ export function WordWizardV3Page({
   const word = detail.data.word;
   const editingPublished =
     word.status === "published" && searchParams.get("mode") === "edit";
-  const forcePreview =
-    word.status === "archived" ||
-    (word.status === "published" && !editingPublished);
-  const legalStep = forcePreview
-    ? "preview"
-    : isStep(step)
-      ? step
-      : word.max_reachable_step;
+  const requestedStep = isStep(step) ? step : word.max_reachable_step;
+  const stepAccess = resolveV3StepAccess(word, requestedStep, editingPublished);
+  const forcePreview = stepAccess.readOnly;
+  const legalStep = stepAccess.effective;
   if (step !== legalStep) {
     return (
       <Navigate
@@ -586,6 +510,7 @@ export function WordWizardV3Page({
         allowPublishedEditing={editingPublished}
         initialStep={legalStep}
         initialWord={word}
+        retiredStableNodes={detail.data.retired_stable_nodes}
         readOnly={forcePreview}
         requests={requests}
         onWordChange={replaceCanonical}

@@ -20,7 +20,9 @@ type LayoutMode = "full" | "rail" | "drawer";
 export function isWordCreationWorkspacePath(pathname: string): boolean {
   return (
     pathname === "/words/new" ||
-    /^\/words\/[^/]+\/wizard\/(basics|forms|meanings|preview)$/.test(pathname)
+    /^\/words\/[^/]+\/(?:v3\/)?wizard\/(basics|forms|meanings|preview)$/.test(
+      pathname
+    )
   );
 }
 

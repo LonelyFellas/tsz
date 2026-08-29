@@ -522,7 +522,7 @@ export function WordCreationWizard({ mode }: Props) {
         <Alert
           type="warning"
           showIcon
-          title="该词条已归档，当前为只读状态"
+          title="该词条已在垃圾桶中，当前为只读状态"
           description="恢复不会改写当前或历史发布记录；若线上版本引用了不可用目标，服务端会安全拒绝。"
           action={
             <Button

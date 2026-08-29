@@ -50,7 +50,9 @@ describe("WordCreationLayout", () => {
     expect(
       screen.getByRole("region", { name: "词条摘要" })
     ).toBeInTheDocument();
-    expect(screen.getByText("完成检测后显示")).toBeInTheDocument();
+    expect(screen.getByText("待检测")).toHaveClass(
+      "word-summary-pending-detection"
+    );
     expect(screen.getByText("完成情况")).toBeInTheDocument();
   });
 
@@ -133,7 +135,9 @@ describe("WordCreationLayout", () => {
 
   it("顶部摘要在缺少 canonical word 时安全展示空状态或统一草稿主词", () => {
     const empty = renderLayout({ currentStep: "forms" });
-    expect(screen.getByText("完成检测后显示")).toBeInTheDocument();
+    expect(screen.getByText("待检测")).toHaveClass(
+      "word-summary-pending-detection"
+    );
     expect(screen.getByText("方言识别").parentElement).toHaveTextContent(
       "待完成"
     );
@@ -348,6 +352,6 @@ describe("WordCreationLayout", () => {
       currentStep: "preview",
       readOnly: true
     });
-    expect(screen.getByText("已归档 · 只读")).toBeInTheDocument();
+    expect(screen.getByText("垃圾桶 · 只读")).toBeInTheDocument();
   });
 });

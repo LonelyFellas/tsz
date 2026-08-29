@@ -1,27 +1,25 @@
-import { Alert, Button, Card, Flex, Steps, Tag, Typography } from "antd";
+import { CheckCircleFilled } from "@ant-design/icons";
+import { Alert, Button, Flex, Tag, Typography } from "antd";
 import type {
   AdminWordV3,
+  DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   V3DraftValidationIssue,
   WordCreationStep
 } from "@tsz/types";
 import type { ReactNode } from "react";
+import { WordCreationLayout } from "../word-creation/WordCreationLayout";
+import type { V3IssueNavigationTarget } from "./issueNavigation";
 import type { V3Problem } from "./problem";
-import type { V3ReadinessSummary } from "./readiness";
+import { v3IssueMessage } from "./presentationErrors";
+import { buildV3ProductProgress, type V3ReadinessSummary } from "./readiness";
 import { wordStatusLabel } from "./presentation";
 import "./v3-layout.css";
-
-const STEP_ORDER: WordCreationStep[] = [
-  "basics",
-  "forms",
-  "meanings",
-  "preview"
-];
 
 const STEP_TITLE: Record<WordCreationStep, string> = {
   basics: "基础信息",
   forms: "词形与发音",
-  meanings: "释义与例句",
+  meanings: "词义与例句",
   preview: "核对与发布"
 };
 
@@ -41,8 +39,11 @@ export type V3ConflictComparison = (
 interface Props {
   word: AdminWordV3;
   activeStep: WordCreationStep;
+  reachableSteps?: ReadonlySet<WordCreationStep>;
   readOnly?: boolean;
   dirtySteps?: Readonly<{ forms: boolean; meanings: boolean }>;
+  draftForms?: DraftFormsStepContentV3;
+  draftMeanings?: DraftMeaningsStepContentWritableV3;
   readiness: V3ReadinessSummary;
   issues: readonly V3DraftValidationIssue[];
   problem?: V3Problem;
@@ -50,6 +51,7 @@ interface Props {
   retrying?: boolean;
   refreshingConflict?: boolean;
   onStepChange: (step: WordCreationStep) => void;
+  onProgressNavigate?: (target: V3IssueNavigationTarget) => void;
   onIssueNavigate: (issue: V3DraftValidationIssue) => void;
   onRetry?: () => void;
   onRefreshConflict?: () => void;
@@ -61,7 +63,7 @@ function problemTitle(problem: V3Problem) {
     case "revision_conflict":
       return "版本冲突";
     case "entry_archived":
-      return "词条已归档";
+      return "词条已在垃圾桶中";
     case "validation":
       return "仍有内容需要完成";
     case "network":
@@ -80,11 +82,32 @@ function problemTitle(problem: V3Problem) {
   }
 }
 
+function firstBaseFormLabel(word: AdminWordV3): string | undefined {
+  for (const pos of word.forms.pos) {
+    const base = pos.forms.find((form) => form.form_type === "base");
+    if (!base) continue;
+    if (base.regional_variants.mode === "common") {
+      return base.regional_variants.common.spelling.trim() || undefined;
+    }
+    const spellings = [
+      base.regional_variants.uk.spelling.trim(),
+      base.regional_variants.us.spelling.trim()
+    ].filter((spelling, index, values) =>
+      spelling ? values.indexOf(spelling) === index : false
+    );
+    return spellings.length > 0 ? spellings.join(" / ") : undefined;
+  }
+  return undefined;
+}
+
 export function V3WordCreationLayout({
   word,
   activeStep,
+  reachableSteps,
   readOnly = false,
   dirtySteps = { forms: false, meanings: false },
+  draftForms,
+  draftMeanings,
   readiness,
   issues,
   problem,
@@ -92,12 +115,22 @@ export function V3WordCreationLayout({
   retrying,
   refreshingConflict,
   onStepChange,
+  onProgressNavigate,
   onIssueNavigate,
   onRetry,
   onRefreshConflict,
   children
 }: Props) {
-  const completed = new Set(word.completed_steps);
+  const presentationLabel = word.presentation.label.trim();
+  const visibleLabel =
+    firstBaseFormLabel(word) ??
+    (presentationLabel && !/^未命名词条(?:\s*·.*)?$/u.test(presentationLabel)
+      ? presentationLabel
+      : (word.presentation.matched_surfaces.find(
+          (surface) =>
+            surface.trim() !== "" &&
+            !/^未命名词条(?:\s*·.*)?$/u.test(surface.trim())
+        ) ?? "新词条"));
   const displayedIssues = issues.filter(
     (issue, index) =>
       issues.findIndex(
@@ -108,141 +141,165 @@ export function V3WordCreationLayout({
           candidate.code === issue.code
       ) === index
   );
+  const progressRows = buildV3ProductProgress({
+    wordId: word.id,
+    completedSteps: word.completed_steps,
+    forms: draftForms ?? word.forms,
+    meanings: draftMeanings ?? word.meanings,
+    issues
+  });
+  const currentProgressKey = progressRows.find(
+    (row) => row.target.step === activeStep && !row.completed
+  )?.key;
   return (
-    <div className="v3-word-creation">
-      <header className="v3-word-creation__header">
-        <div>
-          <Typography.Title level={3}>
-            {word.presentation.label}
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            {word.has_unpublished_changes
-              ? "包含尚未发布的修改"
-              : "当前内容已保存"}
-          </Typography.Text>
-        </div>
-        <Tag color={word.status === "draft" ? "processing" : "default"}>
-          {wordStatusLabel(word.status)}
-        </Tag>
-      </header>
+    <WordCreationLayout
+      currentStep={activeStep}
+      reachableSteps={reachableSteps}
+      entryKind={word.kind}
+      onStepChange={readOnly ? undefined : onStepChange}
+      presentation={{
+        wordExists: true,
+        breadcrumbTitle: `${visibleLabel} · ${STEP_TITLE[activeStep]}`,
+        completedSteps: word.completed_steps,
+        summaryHeadword: (
+          <div className="word-creation-summary-headword">
+            <span className="dialect-dot dialect-dot-common" />
+            <strong>{visibleLabel}</strong>
+          </div>
+        ),
+        ...(activeStep === "preview"
+          ? {}
+          : {
+              status: (
+                <Tag
+                  color={word.status === "draft" ? "processing" : "default"}
+                  style={{ alignSelf: "flex-start" }}
+                >
+                  {wordStatusLabel(word.status)}
+                  {word.has_unpublished_changes ? " · 有未发布修改" : ""}
+                </Tag>
+              )
+            }),
+        progress: (
+          <Flex
+            vertical
+            gap={13}
+            className="word-creation-progress-list v3-product-progress-list"
+          >
+            {progressRows.map((row) => (
+              <button
+                type="button"
+                className="word-creation-progress-row"
+                data-readiness-state={row.completed ? "complete" : "incomplete"}
+                disabled={readOnly}
+                key={row.key}
+                aria-current={
+                  row.key === currentProgressKey ? "step" : undefined
+                }
+                onClick={() => {
+                  if (onProgressNavigate) {
+                    onProgressNavigate(row.target);
+                  } else {
+                    onStepChange(row.target.step);
+                  }
+                }}
+              >
+                {row.completed ? (
+                  <CheckCircleFilled
+                    aria-label={`${row.label}已完成`}
+                    className="word-progress-done"
+                  />
+                ) : (
+                  <span aria-hidden="true" className="word-progress-index">
+                    {row.index}
+                  </span>
+                )}
+                <span className="word-progress-label">{row.label}</span>
+                <Typography.Text type="secondary">
+                  {row.value ?? row.count}
+                </Typography.Text>
+              </button>
+            ))}
+          </Flex>
+        )
+      }}
+      readOnly={readOnly}
+    >
+      <Flex vertical gap="middle">
+        {!readOnly && (dirtySteps.forms || dirtySteps.meanings) ? (
+          <Alert
+            showIcon
+            type="warning"
+            title="有未保存的草稿"
+            description={`切换步骤不会丢失当前输入；请先保存${[
+              dirtySteps.forms ? "词形与发音" : undefined,
+              dirtySteps.meanings ? "词义与例句" : undefined
+            ]
+              .filter(Boolean)
+              .join("、")}草稿，再检查或发布。`}
+          />
+        ) : null}
 
-      <div className="v3-word-creation__shell">
-        <aside className="v3-word-creation__sidebar" aria-label="创编进度">
-          <Card size="small" title="创编进度">
-            <Steps
-              current={STEP_ORDER.indexOf(activeStep)}
-              direction="vertical"
-              responsive={false}
-              size="small"
-              items={STEP_ORDER.map((step) => ({
-                title: STEP_TITLE[step],
-                description:
-                  step === "forms" && dirtySteps.forms
-                    ? "未保存"
-                    : step === "meanings" && dirtySteps.meanings
-                      ? "未保存"
-                      : completed.has(step as "basics" | "forms" | "meanings")
-                        ? "已完成"
-                        : undefined,
-                disabled: readOnly,
-                status:
-                  step === activeStep
-                    ? "process"
-                    : completed.has(step as "basics" | "forms" | "meanings")
-                      ? "finish"
-                      : "wait"
-              }))}
-              onChange={
-                readOnly
-                  ? undefined
-                  : (index) => onStepChange(STEP_ORDER[index]!)
-              }
-            />
-            <Typography.Text type="secondary">
-              {readiness.issue_count > 0
-                ? `还有 ${readiness.issue_count} 项待完成`
-                : "当前没有待处理问题"}
+        {problem && (
+          <Alert
+            showIcon
+            type={problem.kind === "validation" ? "warning" : "error"}
+            title={problemTitle(problem)}
+            description={
+              conflict ? (
+                <Flex vertical gap={4}>
+                  <span>
+                    <strong>
+                      {conflict.step === "forms"
+                        ? "词形与发音冲突"
+                        : "词义与例句冲突"}
+                    </strong>
+                    ：本地输入仍已保留。
+                  </span>
+                  {conflict.serverWord && <span>已获取服务端最新内容。</span>}
+                </Flex>
+              ) : undefined
+            }
+            action={
+              problem.kind === "revision_conflict" &&
+              conflict &&
+              onRefreshConflict ? (
+                <Button
+                  loading={refreshingConflict}
+                  onClick={onRefreshConflict}
+                >
+                  刷新并比较
+                </Button>
+              ) : problem.retryable && onRetry ? (
+                <Button loading={retrying} onClick={onRetry}>
+                  重试
+                </Button>
+              ) : undefined
+            }
+          />
+        )}
+
+        {readiness.issue_count > 0 && (
+          <section className="v3-word-creation__issues" aria-label="待完成项">
+            <Typography.Text strong>
+              待完成 {readiness.issue_count} 项
             </Typography.Text>
-          </Card>
-        </aside>
-
-        <section className="v3-word-creation__main">
-          {!readOnly && (dirtySteps.forms || dirtySteps.meanings) ? (
-            <Alert
-              showIcon
-              type="warning"
-              title="有未保存的草稿"
-              description={`切换步骤不会丢失当前输入；请先保存${[
-                dirtySteps.forms ? "词形与发音" : undefined,
-                dirtySteps.meanings ? "释义与例句" : undefined
-              ]
-                .filter(Boolean)
-                .join("、")}草稿，再检查或发布。`}
-            />
-          ) : null}
-
-          {problem && (
-            <Alert
-              showIcon
-              type={problem.kind === "validation" ? "warning" : "error"}
-              title={problemTitle(problem)}
-              description={
-                conflict ? (
-                  <Flex vertical gap={4}>
-                    <span>
-                      <strong>
-                        {conflict.step === "forms"
-                          ? "词形与发音冲突"
-                          : "释义与例句冲突"}
-                      </strong>
-                      ：本地输入仍已保留。
-                    </span>
-                    {conflict.serverWord && <span>已获取服务端最新内容。</span>}
-                  </Flex>
-                ) : undefined
-              }
-              action={
-                problem.kind === "revision_conflict" &&
-                conflict &&
-                onRefreshConflict ? (
-                  <Button
-                    loading={refreshingConflict}
-                    onClick={onRefreshConflict}
-                  >
-                    刷新并比较
-                  </Button>
-                ) : problem.retryable && onRetry ? (
-                  <Button loading={retrying} onClick={onRetry}>
-                    重试
-                  </Button>
-                ) : undefined
-              }
-            />
-          )}
-
-          {readiness.issue_count > 0 && (
-            <section className="v3-word-creation__issues" aria-label="待完成项">
-              <Typography.Text strong>
-                待完成 {readiness.issue_count} 项
-              </Typography.Text>
-              <Flex vertical gap={6}>
-                {displayedIssues.map((issue) => (
-                  <Button
-                    type="text"
-                    className="v3-word-creation__issue"
-                    key={`${issue.step}:${issue.node_id}:${issue.field}:${issue.code}`}
-                    onClick={() => onIssueNavigate(issue)}
-                  >
-                    {issue.message}
-                  </Button>
-                ))}
-              </Flex>
-            </section>
-          )}
-
-          <main className="v3-word-creation__content">{children}</main>
-        </section>
-      </div>
-    </div>
+            <Flex vertical gap={6}>
+              {displayedIssues.map((issue) => (
+                <Button
+                  type="text"
+                  className="v3-word-creation__issue"
+                  key={`${issue.step}:${issue.node_id}:${issue.field}:${issue.code}`}
+                  onClick={() => onIssueNavigate(issue)}
+                >
+                  {v3IssueMessage(issue)}
+                </Button>
+              ))}
+            </Flex>
+          </section>
+        )}
+        {children}
+      </Flex>
+    </WordCreationLayout>
   );
 }

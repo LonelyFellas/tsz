@@ -18,6 +18,7 @@ import {
 } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { StrictMode, useState } from "react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", () => ({
@@ -29,6 +30,7 @@ vi.mock("../api", () => ({
 
 import type { V3WordRequests } from "./api";
 import { V3FormsAndPronunciationStep } from "./components/V3FormsAndPronunciationStep";
+import { toWritableMeanings } from "./meaningsModel";
 import { V3MeaningsAndExamplesStep } from "./V3MeaningsAndExamplesStep";
 import {
   commonFormFixture,
@@ -44,6 +46,79 @@ import {
   V3WordCreationWizard,
   type V3WizardSlotContext
 } from "./V3WordCreationWizard";
+
+function canonicalMeanings(posId: string): AdminWordV3["meanings"] {
+  return {
+    sense_groups: [
+      { id: "sense-group-canonical", name_zh: "核心", name_en: "Core" }
+    ],
+    pos: [
+      {
+        pos_id: posId,
+        grammar_structures: [
+          {
+            id: "grammar-canonical",
+            variants: [
+              {
+                id: "grammar-variant-canonical",
+                dialect: "common",
+                content: { version: 2, text: "grammar", annotations: [] }
+              }
+            ]
+          }
+        ],
+        senses: [
+          {
+            id: "sense-canonical",
+            sub_pos: "countable",
+            level: "A1",
+            sense_group_id: "sense-group-canonical",
+            depends_on_context: false,
+            definitions: [
+              {
+                id: "definition-canonical",
+                level: "A1",
+                definition_mode: "zh_definition",
+                content_id: "definition-content-canonical",
+                content: { version: 2, text: "中心", annotations: [] }
+              }
+            ],
+            sentences: [
+              {
+                id: "sentence-canonical",
+                level: "A1",
+                en_text: {
+                  mode: "unified",
+                  common: {
+                    id: "sentence-en-canonical",
+                    origin: "manual",
+                    value: {
+                      version: 2,
+                      text: "A centre.",
+                      annotations: []
+                    }
+                  }
+                },
+                zh_text_id: "sentence-zh-canonical",
+                zh_text: { version: 2, text: "一个中心。", annotations: [] },
+                links: [
+                  {
+                    word_id: "word-1",
+                    sense_id: "sense-canonical",
+                    role: "focus"
+                  }
+                ],
+                associations: [],
+                associations_state: "resolved"
+              }
+            ],
+            relations: []
+          }
+        ]
+      }
+    ]
+  };
+}
 
 function word(revision = 1, spelling = "centre"): AdminWordV3 {
   const forms = formsFixture();
@@ -71,7 +146,7 @@ function word(revision = 1, spelling = "centre"): AdminWordV3 {
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
     forms,
-    meanings: { sense_groups: [], pos: [] },
+    meanings: canonicalMeanings(forms.pos[0]!.pos_id),
     completed_steps: ["basics"],
     max_reachable_step: "forms",
     created_by: "admin-1",
@@ -181,6 +256,10 @@ function Slot({ context }: { context: V3WizardSlotContext }) {
   );
 }
 
+function inRouter(node: ReactNode) {
+  return <MemoryRouter>{node}</MemoryRouter>;
+}
+
 function renderWizard(
   source: V3WordRequests,
   options: {
@@ -193,22 +272,28 @@ function renderWizard(
     readOnly?: boolean;
     allowPublishedEditing?: boolean;
     renderStep?: (context: V3WizardSlotContext) => ReactNode;
+    retiredStableNodes?: Parameters<
+      typeof V3WordCreationWizard
+    >[0]["retiredStableNodes"];
   } = {}
 ) {
   return render(
-    <V3WordCreationWizard
-      initialWord={options.initialWord ?? word()}
-      requests={source}
-      initialStep={options.initialStep}
-      readOnly={options.readOnly}
-      allowPublishedEditing={options.allowPublishedEditing}
-      navigationAdapter={options.navigationAdapter}
-      onWordChange={options.onWordChange}
-      renderStep={
-        options.renderStep ??
-        ((context): ReactNode => <Slot context={context} />)
-      }
-    />
+    inRouter(
+      <V3WordCreationWizard
+        initialWord={options.initialWord ?? word()}
+        requests={source}
+        initialStep={options.initialStep}
+        readOnly={options.readOnly}
+        allowPublishedEditing={options.allowPublishedEditing}
+        navigationAdapter={options.navigationAdapter}
+        onWordChange={options.onWordChange}
+        retiredStableNodes={options.retiredStableNodes}
+        renderStep={
+          options.renderStep ??
+          ((context): ReactNode => <Slot context={context} />)
+        }
+      />
+    )
   );
 }
 
@@ -254,6 +339,309 @@ function impactSurfacePage(nextCursor: string | null): SurfaceMatchPageV3 {
 }
 
 describe("V3WordCreationWizard", () => {
+  it("initializes empty meanings once per session and preserves every generated UUID across step changes and rerenders", () => {
+    const initial = word();
+    initial.forms = {
+      pos: [
+        formsFixture({ pos_id: "pos-1" }).pos[0]!,
+        formsFixture({ pos_id: "pos-2", pos: "verb" }).pos[0]!
+      ]
+    };
+    initial.meanings = { sense_groups: [], pos: [] };
+    const source = requests();
+    const renderStep = (context: V3WizardSlotContext) => {
+      const nodeIds = [
+        ...context.draftMeanings.sense_groups.map((group) => group.id),
+        ...context.draftMeanings.pos.flatMap((pos) => [
+          ...pos.grammar_structures.flatMap((grammar) => [
+            grammar.id,
+            ...grammar.variants.map((variant) => variant.id)
+          ]),
+          ...pos.senses.flatMap((sense) => [
+            sense.id,
+            ...sense.definitions.flatMap((definition) => [
+              definition.id,
+              ...(definition.definition_mode === "zh_definition" ||
+              definition.definition_mode === "zh_sentence"
+                ? [definition.content_id]
+                : [])
+            ]),
+            ...sense.sentences.flatMap((sentence) => [
+              sentence.id,
+              sentence.en_text.mode === "unified"
+                ? sentence.en_text.common.id
+                : "",
+              sentence.zh_text_id
+            ])
+          ])
+        ])
+      ];
+      return (
+        <div>
+          <output data-testid="initialized-counts">
+            {[
+              context.draftMeanings.sense_groups.length,
+              context.draftMeanings.pos.length,
+              context.draftMeanings.pos.reduce(
+                (sum, pos) => sum + pos.grammar_structures.length,
+                0
+              ),
+              context.draftMeanings.pos.reduce(
+                (sum, pos) => sum + pos.senses.length,
+                0
+              ),
+              context.draftMeanings.pos.reduce(
+                (sum, pos) =>
+                  sum +
+                  pos.senses.reduce(
+                    (senseSum, sense) => senseSum + sense.sentences.length,
+                    0
+                  ),
+                0
+              )
+            ].join("/")}
+          </output>
+          <output data-testid="initialized-node-ids">
+            {nodeIds.join(",")}
+          </output>
+          <output data-testid="initialized-dirty">
+            {String(context.dirtySteps.meanings)}/
+            {String(context.hasUnsavedChanges)}
+          </output>
+          <button
+            type="button"
+            onClick={() =>
+              context.setActiveStep(
+                context.activeStep === "forms" ? "meanings" : "forms"
+              )
+            }
+          >
+            切换步骤
+          </button>
+        </div>
+      );
+    };
+    const wizard = (
+      <V3WordCreationWizard
+        initialWord={initial}
+        requests={source}
+        renderStep={renderStep}
+      />
+    );
+    const view = render(inRouter(wizard));
+
+    expect(screen.getByTestId("initialized-counts")).toHaveTextContent(
+      "2/2/2/2/2"
+    );
+    expect(screen.getByTestId("initialized-dirty")).toHaveTextContent(
+      "true/true"
+    );
+    const initialIds = screen.getByTestId("initialized-node-ids").textContent;
+    expect(initialIds?.split(",")).toHaveLength(18);
+    expect(new Set(initialIds?.split(",")).size).toBe(18);
+
+    fireEvent.click(screen.getByText("切换步骤"));
+    fireEvent.click(screen.getByText("切换步骤"));
+    expect(screen.getByTestId("initialized-node-ids")).toHaveTextContent(
+      initialIds ?? ""
+    );
+
+    view.rerender(inRouter(wizard));
+    expect(screen.getByTestId("initialized-node-ids")).toHaveTextContent(
+      initialIds ?? ""
+    );
+  });
+
+  it("adds one native meanings template for a newly added forms POS without rebuilding existing nodes", () => {
+    const initial = word();
+    initial.meanings = { sense_groups: [], pos: [] };
+    renderWizard(requests(), {
+      initialWord: initial,
+      renderStep: (context) => (
+        <div>
+          <output data-testid="pos-template-ids">
+            {context.draftMeanings.pos
+              .map(
+                (pos) =>
+                  `${pos.pos_id}:${pos.grammar_structures[0]?.id}:${pos.senses[0]?.id}:${pos.senses[0]?.sentences[0]?.id}`
+              )
+              .join("|")}
+          </output>
+          <output data-testid="template-dirty-steps">
+            {String(context.dirtySteps.forms)}/
+            {String(context.dirtySteps.meanings)}
+          </output>
+          <button
+            type="button"
+            onClick={() => {
+              const next = structuredClone(context.draftForms);
+              if (next.pos.length === 1) {
+                next.pos.push(
+                  formsFixture({ pos_id: "pos-2", pos: "verb" }).pos[0]!
+                );
+              } else {
+                next.pos[0]!.pos = "noun";
+              }
+              context.setDraftForms(next);
+            }}
+          >
+            更新词形
+          </button>
+        </div>
+      )
+    });
+
+    const firstPosTemplate = screen.getByTestId("pos-template-ids").textContent;
+    expect(firstPosTemplate).toMatch(new RegExp(`^${UUIDS.pos}:`, "u"));
+    expect(screen.getByText("基本词性").parentElement).toHaveTextContent("1");
+    expect(screen.getByText("词形变化").parentElement).toHaveTextContent("0");
+    expect(screen.getByText("语法结构").parentElement).toHaveTextContent("1");
+    expect(screen.getByText("多维词义").parentElement).toHaveTextContent("1");
+    expect(screen.getByText("多维例句").parentElement).toHaveTextContent("1");
+
+    fireEvent.click(screen.getByText("更新词形"));
+    const withSecondPos = screen.getByTestId("pos-template-ids").textContent;
+    expect(withSecondPos?.split("|")).toHaveLength(2);
+    expect(withSecondPos?.split("|")[0]).toBe(firstPosTemplate);
+    expect(screen.getByTestId("template-dirty-steps")).toHaveTextContent(
+      "true/true"
+    );
+    expect(screen.getByText("基本词性").parentElement).toHaveTextContent("2");
+    expect(screen.getByText("语法结构").parentElement).toHaveTextContent("2");
+    expect(screen.getByText("多维词义").parentElement).toHaveTextContent("2");
+    expect(screen.getByText("多维例句").parentElement).toHaveTextContent("2");
+
+    fireEvent.click(screen.getByText("更新词形"));
+    expect(screen.getByTestId("pos-template-ids")).toHaveTextContent(
+      withSecondPos ?? ""
+    );
+  });
+
+  it("initializes a newer empty canonical response once when the current meanings draft is clean", async () => {
+    const initial = word();
+    const newer = word(2, "newer canonical");
+    newer.meanings = { sense_groups: [], pos: [] };
+    const source = requests();
+    const renderStep = (context: V3WizardSlotContext) => (
+      <output data-testid="newer-canonical-template">
+        {context.word.revision}/{context.draftMeanings.sense_groups.length}/
+        {context.draftMeanings.pos.length}/{String(context.dirtySteps.meanings)}
+      </output>
+    );
+    const view = render(
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={initial}
+          requests={source}
+          renderStep={renderStep}
+        />
+      )
+    );
+
+    view.rerender(
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={newer}
+          requests={source}
+          renderStep={renderStep}
+        />
+      )
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("newer-canonical-template")).toHaveTextContent(
+        "2/1/1/true"
+      )
+    );
+  });
+
+  it("enters Step 3 with editable default content and none of the manual-start empty states", () => {
+    const initial = word();
+    initial.meanings = { sense_groups: [], pos: [] };
+    renderWizard(requests(), {
+      initialWord: initial,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <V3MeaningsAndExamplesStep
+          activePosId={context.activePosId}
+          forms={context.draftForms}
+          issues={context.issues}
+          onActivePosChange={context.setActivePosId}
+          onChange={context.setDraftMeanings}
+          value={context.draftMeanings}
+          wordId={context.word.id}
+        />
+      )
+    });
+
+    expect(screen.getByText("语义区间 1")).toBeVisible();
+    expect(screen.getAllByText("语法结构").length).toBeGreaterThan(0);
+    expect(screen.getByText("多维释义")).toBeVisible();
+    expect(screen.getAllByText("多维例句").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/暂无语义区间/u)).toBeNull();
+    expect(screen.queryByText("当前词性还没有词义内容")).toBeNull();
+    expect(screen.queryByRole("button", { name: "开始录入词义" })).toBeNull();
+  });
+
+  it.each([
+    ["方言识别", "basics"],
+    ["基本词性", "forms"],
+    ["词形变化", "forms"],
+    ["语法结构", "meanings"],
+    ["多维词义", "meanings"],
+    ["多维例句", "meanings"]
+  ] as const)("maps %s to the %s V3 step", (label, expectedStep) => {
+    const initialWord = word();
+    initialWord.completed_steps = ["basics", "forms", "meanings"];
+    initialWord.max_reachable_step = "preview";
+    renderWizard(requests(), {
+      initialWord,
+      renderStep: (context) => (
+        <output data-testid="progress-active-step">{context.activeStep}</output>
+      )
+    });
+
+    fireEvent.click(screen.getByText(label));
+
+    expect(screen.getByTestId("progress-active-step")).toHaveTextContent(
+      expectedStep
+    );
+  });
+
+  it("用 GET 的退役节点播种并保留 variant 身份账本", () => {
+    const retiredUk = "00000000-0000-4000-8000-000000000901";
+    const retiredUs = "00000000-0000-4000-8000-000000000902";
+    renderWizard(requests(), {
+      retiredStableNodes: [
+        {
+          id: retiredUk,
+          node_role: "uk_variant",
+          parent_node_id: UUIDS.form,
+          retired_at: "2026-08-27T00:00:00Z"
+        },
+        {
+          id: retiredUs,
+          node_role: "us_variant",
+          parent_node_id: UUIDS.form,
+          retired_at: "2026-08-27T00:00:01Z"
+        }
+      ],
+      renderStep: (context) => (
+        <output data-testid="stable-variant-ids">
+          {[
+            context.stableVariantIds(UUIDS.form, "common_variant"),
+            context.stableVariantIds(UUIDS.form, "uk_variant"),
+            context.stableVariantIds(UUIDS.form, "us_variant")
+          ].join(":")}
+        </output>
+      )
+    });
+
+    expect(screen.getByTestId("stable-variant-ids")).toHaveTextContent(
+      `${UUIDS.common_variant}:${retiredUk}:${retiredUs}`
+    );
+  });
+
   it("publishes with a compatible idempotency key when HTTP lacks randomUUID", async () => {
     const getRandomValues = vi.fn((bytes: Uint8Array) => {
       bytes.fill(0xff);
@@ -323,58 +711,60 @@ describe("V3WordCreationWizard", () => {
     const source = requests({ saveForms, validate, impact, publish });
     const onWordChange = vi.fn();
     render(
-      <StrictMode>
-        <V3WordCreationWizard
-          initialWord={strictWord(1, "centre")}
-          requests={source}
-          idempotencyKeyFactory={() => "strict-publish-key"}
-          onWordChange={onWordChange}
-          renderStep={(context) => (
-            <>
-              <output data-testid="strict-wizard-revision">
-                {context.word.revision}
-              </output>
-              <output data-testid="strict-wizard-spelling">
-                {spellingOf(context)}
-              </output>
-              <output data-testid="strict-wizard-status">
-                {context.word.status}
-              </output>
-              <output data-testid="strict-wizard-validation">
-                {context.validation?.validated_revision ?? "none"}
-              </output>
-              <output data-testid="strict-wizard-impact">
-                {context.impact?.base_revision ?? "none"}
-              </output>
-              <button
-                type="button"
-                onClick={() => void context.actions.saveForms("save")}
-              >
-                StrictMode 保存
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  void context.actions.validate().then((validation) => {
-                    if (validation?.valid) {
-                      return context.actions.previewFormsImpact();
-                    }
-                  });
-                }}
-              >
-                StrictMode 检查发布条件
-              </button>
-              <button
-                type="button"
-                disabled={!context.validation?.valid || !context.impact}
-                onClick={() => void context.actions.publish()}
-              >
-                StrictMode 发布
-              </button>
-            </>
-          )}
-        />
-      </StrictMode>
+      inRouter(
+        <StrictMode>
+          <V3WordCreationWizard
+            initialWord={strictWord(1, "centre")}
+            requests={source}
+            idempotencyKeyFactory={() => "strict-publish-key"}
+            onWordChange={onWordChange}
+            renderStep={(context) => (
+              <>
+                <output data-testid="strict-wizard-revision">
+                  {context.word.revision}
+                </output>
+                <output data-testid="strict-wizard-spelling">
+                  {spellingOf(context)}
+                </output>
+                <output data-testid="strict-wizard-status">
+                  {context.word.status}
+                </output>
+                <output data-testid="strict-wizard-validation">
+                  {context.validation?.validated_revision ?? "none"}
+                </output>
+                <output data-testid="strict-wizard-impact">
+                  {context.impact?.base_revision ?? "none"}
+                </output>
+                <button
+                  type="button"
+                  onClick={() => void context.actions.saveForms("save")}
+                >
+                  StrictMode 保存
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void context.actions.validate().then((validation) => {
+                      if (validation?.valid) {
+                        return context.actions.previewFormsImpact();
+                      }
+                    });
+                  }}
+                >
+                  StrictMode 检查发布条件
+                </button>
+                <button
+                  type="button"
+                  disabled={!context.validation?.valid || !context.impact}
+                  onClick={() => void context.actions.publish()}
+                >
+                  StrictMode 发布
+                </button>
+              </>
+            )}
+          />
+        </StrictMode>
+      )
     );
 
     fireEvent.click(screen.getByText("StrictMode 保存"));
@@ -484,7 +874,7 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
   });
 
-  it("refreshes a meanings 409 for comparison without losing the writable draft", async () => {
+  it("refreshes a meanings 409 after forms save without losing the writable meanings draft", async () => {
     const localMeanings: DraftMeaningsStepContentWritableV3 = {
       sense_groups: [
         { id: "local-group", name_zh: "本地释义", name_en: "Local" }
@@ -499,6 +889,9 @@ describe("V3WordCreationWizard", () => {
       pos: []
     };
     const source = requests({
+      saveForms: vi.fn(async (_wordId, input) => ({
+        word: { ...word(2, "local edit"), forms: input.content }
+      })),
       saveMeanings: vi.fn(async () => {
         throw new HttpError(409, "stale", [], "revision_conflict", [], {
           current_revision: 4
@@ -560,10 +953,18 @@ describe("V3WordCreationWizard", () => {
       "本地释义"
     );
     expect(screen.getByTestId("meanings-conflict-forms")).toHaveTextContent(
-      "local edit"
+      "server latest"
     );
-    expect(screen.getByText("释义与例句冲突")).toBeInTheDocument();
-    expect(screen.getByText(/词形与发音、释义与例句/)).toBeInTheDocument();
+    expect(source.saveForms).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(source.saveForms).mock.calls[0]![1]).toMatchObject({
+      base_revision: 1,
+      intent: "save"
+    });
+    expect(vi.mocked(source.saveMeanings).mock.calls[0]![1].base_revision).toBe(
+      2
+    );
+    expect(screen.getByText("词义与例句冲突")).toBeInTheDocument();
+    expect(screen.queryByText(/词形与发音、词义与例句/)).toBeNull();
   });
 
   it("retries a failed meanings conflict refresh while preserving local input", async () => {
@@ -753,7 +1154,9 @@ describe("V3WordCreationWizard", () => {
       ])
     );
     expect(screen.getByTestId("active-pos")).toHaveTextContent("pos-2");
-    expect(screen.getByText("invalid pronunciation")).toBeInTheDocument();
+    expect(
+      screen.getByText("内容来源无法确认，请刷新后重试")
+    ).toBeInTheDocument();
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
   });
 
@@ -835,11 +1238,13 @@ describe("V3WordCreationWizard", () => {
       expect(element).not.toBeNull();
       return element!;
     });
-    await waitFor(() => expect(target).toHaveFocus());
-    expect(screen.getByRole("tab", { name: "动词" })).toHaveAttribute(
-      "aria-selected",
-      "true"
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: /动词/ })).toHaveAttribute(
+        "aria-selected",
+        "true"
+      )
     );
+    await waitFor(() => expect(target).toHaveFocus());
   });
 
   it("focuses a shared form issue inside the exact membership group", async () => {
@@ -988,29 +1393,460 @@ describe("V3WordCreationWizard", () => {
       );
     }
 
-    renderWizard(source, {
+    const { container } = renderWizard(source, {
       initialWord,
       renderStep: (context) => <MeaningsSlot context={context} />
     });
-    fireEvent.click(screen.getByRole("tab", { name: "词性 2" }));
+    const secondTab = container.querySelector<HTMLElement>(
+      `.ant-tabs-tab[data-node-key="${secondPosId}"] .ant-tabs-tab-btn`
+    );
+    expect(secondTab).not.toBeNull();
+    fireEvent.click(secondTab!);
     fireEvent.change(screen.getByLabelText("定义 1 通用内容"), {
       target: { value: "local unsaved" }
     });
-    fireEvent.click(screen.getByRole("tab", { name: "词性 1" }));
+    const firstTab = container.querySelector<HTMLElement>(
+      `.ant-tabs-tab[data-node-key="${UUIDS.pos}"] .ant-tabs-tab-btn`
+    );
+    expect(firstTab).not.toBeNull();
+    fireEvent.click(firstTab!);
 
-    fireEvent.click(screen.getByRole("button", { name: "完成此步" }));
+    fireEvent.click(screen.getByText("完成并进入预览").closest("button")!);
 
     await waitFor(() =>
       expect(screen.getByLabelText("定义 1 通用内容")).toHaveFocus()
     );
-    expect(screen.getByRole("tab", { name: "词性 2" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+    expect(secondTab).toHaveAttribute("aria-selected", "true");
     expect(screen.getByLabelText("定义 1 通用内容")).toHaveValue(
       "local unsaved"
     );
     expect(source.saveMeanings).toHaveBeenCalledTimes(1);
+  });
+
+  it("completes forms before meanings with the accepted canonical revision and exact live drafts", async () => {
+    const initialWord = word();
+    const requestOrder: string[] = [];
+    let formsCanonical: AdminWordV3 | undefined;
+    let expectedForms = structuredClone(initialWord.forms);
+    let expectedMeanings = toWritableMeanings(initialWord.meanings);
+    const saveForms = vi.fn(
+      async (
+        _wordId: string,
+        input: Parameters<V3WordRequests["saveForms"]>[1]
+      ) => {
+        requestOrder.push(`forms:${input.base_revision}:${input.intent}`);
+        formsCanonical = {
+          ...initialWord,
+          revision: 2,
+          forms: input.content,
+          completed_steps: ["basics", "forms"],
+          max_reachable_step: "meanings"
+        };
+        return { word: formsCanonical };
+      }
+    );
+    const saveMeanings = vi.fn(
+      async (
+        _wordId: string,
+        input: Parameters<V3WordRequests["saveMeanings"]>[1]
+      ) => {
+        requestOrder.push(`meanings:${input.base_revision}:${input.intent}`);
+        const nextWord: AdminWordV3 = {
+          ...formsCanonical!,
+          revision: 3,
+          meanings: {
+            ...initialWord.meanings,
+            sense_groups: input.content.sense_groups
+          },
+          completed_steps: ["basics", "forms", "meanings"],
+          max_reachable_step: "preview"
+        };
+        return { word: nextWord };
+      }
+    );
+    const onWordChange = vi.fn();
+    renderWizard(requests({ saveForms, saveMeanings }), {
+      initialWord,
+      onWordChange,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <>
+          <output data-testid="complete-step">{context.activeStep}</output>
+          <output data-testid="complete-revision">
+            {context.word.revision}
+          </output>
+          <output data-testid="complete-dirty">
+            {String(context.dirtySteps.forms)}/
+            {String(context.dirtySteps.meanings)}
+          </output>
+          <button
+            type="button"
+            onClick={() => {
+              const forms = structuredClone(context.draftForms);
+              const variants = forms.pos[0]!.forms[0]!.regional_variants;
+              if (variants.mode === "common") {
+                variants.common.spelling = "preview-boundary-form";
+              }
+              const meanings = structuredClone(context.draftMeanings);
+              meanings.sense_groups[0]!.name_zh = "预览边界词义";
+              context.setDraftForms(forms);
+              context.setDraftMeanings(meanings);
+            }}
+          >
+            编辑两步完成草稿
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              expectedForms = structuredClone(context.draftForms);
+              expectedMeanings = structuredClone(context.draftMeanings);
+              void context.actions.saveMeanings(
+                context.draftMeanings,
+                "complete"
+              );
+            }}
+          >
+            完成两步并预览
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("编辑两步完成草稿"));
+    expect(screen.getByTestId("complete-dirty")).toHaveTextContent("true/true");
+    fireEvent.click(screen.getByText("完成两步并预览"));
+
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(1));
+    expect(requestOrder).toEqual(["forms:1:complete", "meanings:2:complete"]);
+    expect(saveForms.mock.calls[0]![1].content).toEqual(expectedForms);
+    expect(saveMeanings.mock.calls[0]![1].content).toEqual(expectedMeanings);
+    expect(screen.getByTestId("complete-revision")).toHaveTextContent("3");
+    expect(screen.getByTestId("complete-dirty")).toHaveTextContent(
+      "false/false"
+    );
+    expect(screen.getByTestId("complete-step")).toHaveTextContent("preview");
+    expect(onWordChange.mock.calls.map(([next]) => next.revision)).toEqual([
+      2, 3
+    ]);
+  });
+
+  it("stops at the exact forms issue when preview-boundary completion returns 422", async () => {
+    const issue = validationIssue();
+    const calls: string[] = [];
+    const navigationAdapter = {
+      expandGroup: vi.fn(async () => {
+        calls.push("group");
+      }),
+      revealForm: vi.fn(async () => {
+        calls.push("form");
+      }),
+      revealVariant: vi.fn(async () => {
+        calls.push("variant");
+      }),
+      revealPronunciation: vi.fn(async () => {
+        calls.push("pronunciation");
+      }),
+      focusField: vi.fn(async () => {
+        calls.push("focus");
+      })
+    };
+    const saveForms = vi.fn(
+      async (
+        _wordId: string,
+        _input: Parameters<V3WordRequests["saveForms"]>[1]
+      ) => {
+        throw new HttpError(422, "invalid", [], "validation_failed", [issue]);
+      }
+    );
+    const saveMeanings = vi.fn(async () => envelope(2, "must not save"));
+    renderWizard(requests({ saveForms, saveMeanings }), {
+      initialStep: "meanings",
+      navigationAdapter,
+      renderStep: (context) => (
+        <>
+          <output data-testid="forms-error-step">{context.activeStep}</output>
+          <output data-testid="forms-error-pos">{context.activePosId}</output>
+          <output data-testid="forms-error-revision">
+            {context.word.revision}
+          </output>
+          <button
+            type="button"
+            onClick={() => {
+              context.setDraftForms(editedForms(context));
+              const meanings = structuredClone(context.draftMeanings);
+              meanings.sense_groups[0]!.name_zh = "仍需保留";
+              context.setDraftMeanings(meanings);
+            }}
+          >
+            编辑失败草稿
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              void context.actions.saveMeanings(
+                context.draftMeanings,
+                "complete"
+              )
+            }
+          >
+            触发词形完成校验
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("编辑失败草稿"));
+    fireEvent.click(screen.getByText("触发词形完成校验"));
+
+    await waitFor(() =>
+      expect(calls).toEqual([
+        "group",
+        "form",
+        "variant",
+        "pronunciation",
+        "focus"
+      ])
+    );
+    expect(saveForms).toHaveBeenCalledTimes(1);
+    expect(saveForms.mock.calls[0]![1]).toMatchObject({
+      base_revision: 1,
+      intent: "complete"
+    });
+    expect(saveMeanings).not.toHaveBeenCalled();
+    expect(screen.getByTestId("forms-error-step")).toHaveTextContent("forms");
+    expect(screen.getByTestId("forms-error-pos")).toHaveTextContent("pos-2");
+    expect(screen.getByTestId("forms-error-revision")).toHaveTextContent("1");
+    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+  });
+
+  it("keeps one forms and one meanings request under same-tick complete calls", async () => {
+    const initialWord = word();
+    const saveForms = vi.fn(
+      async (
+        _wordId: string,
+        input: Parameters<V3WordRequests["saveForms"]>[1]
+      ) => {
+        const nextWord: AdminWordV3 = {
+          ...initialWord,
+          revision: 2,
+          forms: input.content,
+          completed_steps: ["basics", "forms"],
+          max_reachable_step: "meanings"
+        };
+        return { word: nextWord };
+      }
+    );
+    const saveMeanings = vi.fn(
+      async (
+        _wordId: string,
+        _input: Parameters<V3WordRequests["saveMeanings"]>[1]
+      ) => {
+        const nextWord: AdminWordV3 = {
+          ...initialWord,
+          revision: 3,
+          completed_steps: ["basics", "forms", "meanings"],
+          max_reachable_step: "preview"
+        };
+        return { word: nextWord };
+      }
+    );
+    renderWizard(requests({ saveForms, saveMeanings }), {
+      initialWord,
+      renderStep: (context) => (
+        <button
+          type="button"
+          onClick={() => {
+            void context.actions.saveMeanings(
+              context.draftMeanings,
+              "complete"
+            );
+            void context.actions.saveMeanings(
+              context.draftMeanings,
+              "complete"
+            );
+          }}
+        >
+          同 tick 完成两步
+        </button>
+      )
+    });
+
+    fireEvent.click(screen.getByText("同 tick 完成两步"));
+
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(1));
+    expect(saveForms).toHaveBeenCalledTimes(1);
+    expect(saveForms.mock.calls[0]![1].base_revision).toBe(1);
+    expect(saveMeanings.mock.calls[0]![1].base_revision).toBe(2);
+  });
+
+  it("stops before meanings and keeps both drafts when preview-boundary forms completion conflicts", async () => {
+    const saveForms = vi.fn(
+      async (
+        _wordId: string,
+        _input: Parameters<V3WordRequests["saveForms"]>[1]
+      ) => {
+        throw new HttpError(409, "stale", [], "revision_conflict");
+      }
+    );
+    const saveMeanings = vi.fn(async () => envelope(2, "must not save"));
+    renderWizard(requests({ saveForms, saveMeanings }), {
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <>
+          <output data-testid="forms-conflict-step">
+            {context.activeStep}
+          </output>
+          <output data-testid="forms-conflict-revision">
+            {context.word.revision}
+          </output>
+          <output data-testid="forms-conflict-dirty">
+            {String(context.dirtySteps.forms)}/
+            {String(context.dirtySteps.meanings)}
+          </output>
+          <button
+            type="button"
+            onClick={() => {
+              context.setDraftForms(editedForms(context));
+              const meanings = structuredClone(context.draftMeanings);
+              meanings.sense_groups[0]!.name_zh = "冲突本地词义";
+              context.setDraftMeanings(meanings);
+            }}
+          >
+            编辑冲突草稿
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              void context.actions.saveMeanings(
+                context.draftMeanings,
+                "complete"
+              )
+            }
+          >
+            触发词形 revision 冲突
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("编辑冲突草稿"));
+    fireEvent.click(screen.getByText("触发词形 revision 冲突"));
+
+    expect(
+      await screen.findByRole("button", { name: "刷新并比较" })
+    ).toBeInTheDocument();
+    expect(saveForms).toHaveBeenCalledTimes(1);
+    expect(saveMeanings).not.toHaveBeenCalled();
+    expect(screen.getByTestId("forms-conflict-step")).toHaveTextContent(
+      "meanings"
+    );
+    expect(screen.getByTestId("forms-conflict-revision")).toHaveTextContent(
+      "1"
+    );
+    expect(screen.getByTestId("forms-conflict-dirty")).toHaveTextContent(
+      "true/true"
+    );
+  });
+
+  it("keeps the accepted forms canonical when the following meanings complete fails", async () => {
+    const initialWord = word();
+    const meaningsIssue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "meanings",
+      node_id: "sense-canonical",
+      field: "level",
+      code: "definition_invalid",
+      message: "词义仍不完整",
+      node_location: {
+        node_role: "sense",
+        ancestor_node_ids: [UUIDS.pos],
+        pos_id: UUIDS.pos
+      }
+    };
+    const saveForms = vi.fn(
+      async (
+        _wordId: string,
+        input: Parameters<V3WordRequests["saveForms"]>[1]
+      ) => {
+        const nextWord: AdminWordV3 = {
+          ...initialWord,
+          revision: 2,
+          forms: input.content,
+          completed_steps: ["basics", "forms"],
+          max_reachable_step: "meanings"
+        };
+        return { word: nextWord };
+      }
+    );
+    const saveMeanings = vi.fn(
+      async (
+        _wordId: string,
+        _input: Parameters<V3WordRequests["saveMeanings"]>[1]
+      ) => {
+        throw new HttpError(422, "invalid", [], "validation_failed", [
+          meaningsIssue
+        ]);
+      }
+    );
+    renderWizard(requests({ saveForms, saveMeanings }), {
+      initialWord,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <>
+          <output data-testid="partial-complete-step">
+            {context.activeStep}
+          </output>
+          <output data-testid="partial-complete-revision">
+            {context.word.revision}
+          </output>
+          <output data-testid="partial-complete-dirty">
+            {String(context.dirtySteps.forms)}/
+            {String(context.dirtySteps.meanings)}
+          </output>
+          <button
+            type="button"
+            onClick={() => {
+              context.setDraftForms(editedForms(context));
+              const meanings = structuredClone(context.draftMeanings);
+              meanings.sense_groups[0]!.name_zh = "待修正词义";
+              context.setDraftMeanings(meanings);
+            }}
+          >
+            编辑分步草稿
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              void context.actions.saveMeanings(
+                context.draftMeanings,
+                "complete"
+              )
+            }
+          >
+            完成后续失败
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("编辑分步草稿"));
+    fireEvent.click(screen.getByText("完成后续失败"));
+
+    expect(
+      await screen.findByText("请完整填写释义并选择语法结构")
+    ).toBeInTheDocument();
+    expect(saveForms).toHaveBeenCalledTimes(1);
+    expect(saveMeanings).toHaveBeenCalledTimes(1);
+    expect(saveMeanings.mock.calls[0]![1].base_revision).toBe(2);
+    expect(screen.getByTestId("partial-complete-revision")).toHaveTextContent(
+      "2"
+    );
+    expect(screen.getByTestId("partial-complete-dirty")).toHaveTextContent(
+      "false/true"
+    );
+    expect(screen.getByTestId("partial-complete-step")).toHaveTextContent(
+      "meanings"
+    );
   });
 
   it("maps its live context directly to T5B and returns paged terminal tokens to the one save flow", async () => {
@@ -1380,10 +2216,10 @@ describe("V3WordCreationWizard", () => {
       }
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
-    const publishButton = await screen.findByRole("button", {
-      name: "发布词条"
-    });
+    fireEvent.click(screen.getByText("检查发布条件").closest("button")!);
+    const publishButton = (await screen.findByText("发布词条")).closest(
+      "button"
+    )!;
     fireEvent.click(publishButton);
     await waitFor(() => expect(get).toHaveBeenCalledWith("word-1"));
     fireEvent.click(publishButton);
@@ -1395,17 +2231,17 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("publish-refresh-revision")).toHaveTextContent(
       "8"
     );
-    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
+    expect(screen.queryByText("发布词条")).toBeNull();
 
     const prepareAfterRefresh = screen
       .getByText("检查发布条件")
       .closest("button")!;
     await waitFor(() => expect(prepareAfterRefresh).toBeEnabled());
     fireEvent.click(prepareAfterRefresh);
-    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
-    const confirmSurface = await screen.findByRole("button", {
-      name: "确认同形提示并重试发布"
-    });
+    fireEvent.click((await screen.findByText("发布词条")).closest("button")!);
+    const confirmSurface = (
+      await screen.findByText("确认同形提示并重试发布")
+    ).closest("button")!;
     await waitFor(() => expect(confirmSurface).toBeEnabled());
     fireEvent.click(confirmSurface);
     await waitFor(() => expect(publish).toHaveBeenCalledTimes(3));
@@ -1747,23 +2583,27 @@ describe("V3WordCreationWizard", () => {
       </>
     );
     const view = render(
-      <V3WordCreationWizard
-        initialWord={initialWord}
-        requests={source}
-        onWordChange={onWordChange}
-        renderStep={renderStep}
-      />
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={initialWord}
+          requests={source}
+          onWordChange={onWordChange}
+          renderStep={renderStep}
+        />
+      )
     );
 
     fireEvent.click(screen.getByText("发布并切换路由"));
     await waitFor(() => expect(source.get).toHaveBeenCalledWith("word-1"));
     view.rerender(
-      <V3WordCreationWizard
-        initialWord={nextWord}
-        requests={source}
-        onWordChange={onWordChange}
-        renderStep={renderStep}
-      />
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={nextWord}
+          requests={source}
+          onWordChange={onWordChange}
+          renderStep={renderStep}
+        />
+      )
     );
     expect(screen.getByTestId("route-scope-label")).toHaveTextContent(
       "next route scope"
@@ -1825,24 +2665,28 @@ describe("V3WordCreationWizard", () => {
         </>
       );
       const view = render(
-        <V3WordCreationWizard
-          initialWord={initialWord}
-          requests={source}
-          onWordChange={onWordChange}
-          renderStep={renderStep}
-        />
+        inRouter(
+          <V3WordCreationWizard
+            initialWord={initialWord}
+            requests={source}
+            onWordChange={onWordChange}
+            renderStep={renderStep}
+          />
+        )
       );
 
       fireEvent.click(screen.getByText("发布后 refetch"));
       await waitFor(() => expect(source.get).toHaveBeenCalledTimes(1));
       fireEvent.click(screen.getByText("在 GET pending 时编辑"));
       view.rerender(
-        <V3WordCreationWizard
-          initialWord={newerWord}
-          requests={source}
-          onWordChange={onWordChange}
-          renderStep={renderStep}
-        />
+        inRouter(
+          <V3WordCreationWizard
+            initialWord={newerWord}
+            requests={source}
+            onWordChange={onWordChange}
+            renderStep={renderStep}
+          />
+        )
       );
 
       await waitFor(() =>
@@ -2522,7 +3366,9 @@ describe("V3WordCreationWizard", () => {
             type="button"
             onClick={() => {
               context.setDraftForms(structuredClone(context.word.forms));
-              context.setDraftMeanings({ sense_groups: [], pos: [] });
+              context.setDraftMeanings(
+                toWritableMeanings(context.word.meanings)
+              );
             }}
           >
             还原 canonical
@@ -2548,23 +3394,20 @@ describe("V3WordCreationWizard", () => {
 
   it("syncs canonical meanings projected by a forms save when meanings are clean", async () => {
     const initialWord = word();
-    initialWord.meanings = {
-      sense_groups: [
-        { id: "initial-group", name_zh: "旧释义", name_en: "Old" }
-      ],
-      pos: []
+    initialWord.meanings = canonicalMeanings(initialWord.forms.pos[0]!.pos_id);
+    initialWord.meanings.sense_groups[0] = {
+      id: "initial-group",
+      name_zh: "旧释义",
+      name_en: "Old"
     };
+    initialWord.meanings.pos[0]!.senses[0]!.sense_group_id = "initial-group";
     const canonical = word(2, "forms normalized");
-    canonical.meanings = {
-      sense_groups: [
-        {
-          id: "projected-group",
-          name_zh: "服务端投影释义",
-          name_en: "Projected"
-        }
-      ],
-      pos: []
+    canonical.meanings.sense_groups[0] = {
+      id: "projected-group",
+      name_zh: "服务端投影释义",
+      name_en: "Projected"
     };
+    canonical.meanings.pos[0]!.senses[0]!.sense_group_id = "projected-group";
     renderWizard(
       requests({ saveForms: vi.fn(async () => ({ word: canonical })) }),
       {
@@ -2622,16 +3465,12 @@ describe("V3WordCreationWizard", () => {
       pos: []
     };
     const canonical = word(2, "服务端投影词形");
-    canonical.meanings = {
-      sense_groups: [
-        {
-          id: "normalized-group",
-          name_zh: "服务端规范释义",
-          name_en: "Normalized"
-        }
-      ],
-      pos: []
+    canonical.meanings.sense_groups[0] = {
+      id: "normalized-group",
+      name_zh: "服务端规范释义",
+      name_en: "Normalized"
     };
+    canonical.meanings.pos[0]!.senses[0]!.sense_group_id = "normalized-group";
     renderWizard(
       requests({ saveMeanings: vi.fn(async () => ({ word: canonical })) }),
       {
@@ -2696,10 +3535,8 @@ describe("V3WordCreationWizard", () => {
       pos: []
     };
     const savedMeanings = word(3, "forms saved");
-    savedMeanings.meanings = {
-      sense_groups: localMeanings.sense_groups,
-      pos: []
-    };
+    savedMeanings.meanings.sense_groups = localMeanings.sense_groups;
+    savedMeanings.meanings.pos[0]!.senses[0]!.sense_group_id = "local-group";
     const validate = vi.fn(async () => ({
       schema_version: 3 as const,
       validated_revision: 3,
@@ -2794,68 +3631,93 @@ describe("V3WordCreationWizard", () => {
     await waitFor(() => expect(validate).toHaveBeenCalledTimes(1));
   });
 
-  it("retains dirty forms while a meanings save syncs its canonical source step", async () => {
+  it("saves dirty forms before an ordinary meanings save and uses the accepted revision", async () => {
     const localMeanings: DraftMeaningsStepContentWritableV3 = {
       sense_groups: [
         { id: "local-group", name_zh: "待规范释义", name_en: "Local" }
       ],
       pos: []
     };
-    const canonical = word(2, "不应覆盖本地词形");
-    canonical.meanings = {
-      sense_groups: [
-        { id: "normalized-group", name_zh: "规范后释义", name_en: "Normalized" }
-      ],
-      pos: []
-    };
-    renderWizard(
-      requests({ saveMeanings: vi.fn(async () => ({ word: canonical })) }),
-      {
-        renderStep: (context) => (
-          <>
-            <output data-testid="dirty-form-after-meanings-save">
-              {spellingOf(context)}
-            </output>
-            <output data-testid="normalized-meaning-after-save">
-              {context.draftMeanings.sense_groups[0]?.name_zh ?? "none"}
-            </output>
-            <output data-testid="dirty-form-after-save-state">
-              {String(context.dirtySteps.forms)}/
-              {String(context.dirtySteps.meanings)}
-            </output>
-            <output data-testid="dirty-form-save-revision">
-              {context.word.revision}
-            </output>
-            <button
-              type="button"
-              onClick={() => {
-                context.setDraftForms(editedForms(context));
-                context.setDraftMeanings(localMeanings);
-              }}
-            >
-              编辑词形和释义
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                void context.actions.saveMeanings(context.draftMeanings, "save")
-              }
-            >
-              仅保存并规范释义
-            </button>
-          </>
-        )
+    const initialWord = word();
+    const requestOrder: string[] = [];
+    let formsCanonical: AdminWordV3 | undefined;
+    const saveForms = vi.fn(
+      async (
+        _wordId: string,
+        input: Parameters<V3WordRequests["saveForms"]>[1]
+      ) => {
+        requestOrder.push(`forms:${input.base_revision}:${input.intent}`);
+        formsCanonical = {
+          ...initialWord,
+          revision: 2,
+          forms: input.content
+        };
+        return { word: formsCanonical };
       }
     );
+    const canonical = word(3, "已顺序保存两步");
+    canonical.meanings.sense_groups[0] = {
+      id: "normalized-group",
+      name_zh: "规范后释义",
+      name_en: "Normalized"
+    };
+    canonical.meanings.pos[0]!.senses[0]!.sense_group_id = "normalized-group";
+    const saveMeanings = vi.fn(
+      async (
+        _wordId: string,
+        input: Parameters<V3WordRequests["saveMeanings"]>[1]
+      ) => {
+        requestOrder.push(`meanings:${input.base_revision}:${input.intent}`);
+        return { word: { ...canonical, forms: formsCanonical!.forms } };
+      }
+    );
+    renderWizard(requests({ saveForms, saveMeanings }), {
+      renderStep: (context) => (
+        <>
+          <output data-testid="dirty-form-after-meanings-save">
+            {spellingOf(context)}
+          </output>
+          <output data-testid="normalized-meaning-after-save">
+            {context.draftMeanings.sense_groups[0]?.name_zh ?? "none"}
+          </output>
+          <output data-testid="dirty-form-after-save-state">
+            {String(context.dirtySteps.forms)}/
+            {String(context.dirtySteps.meanings)}
+          </output>
+          <output data-testid="dirty-form-save-revision">
+            {context.word.revision}
+          </output>
+          <button
+            type="button"
+            onClick={() => {
+              context.setDraftForms(editedForms(context));
+              context.setDraftMeanings(localMeanings);
+            }}
+          >
+            编辑词形和释义
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              void context.actions.saveMeanings(context.draftMeanings, "save")
+            }
+          >
+            顺序保存词形和释义
+          </button>
+        </>
+      )
+    });
 
     fireEvent.click(screen.getByText("编辑词形和释义"));
-    fireEvent.click(screen.getByText("仅保存并规范释义"));
+    fireEvent.click(screen.getByText("顺序保存词形和释义"));
 
     await waitFor(() =>
       expect(screen.getByTestId("dirty-form-save-revision")).toHaveTextContent(
-        "2"
+        "3"
       )
     );
+    expect(requestOrder).toEqual(["forms:1:save", "meanings:2:save"]);
+    expect(saveMeanings.mock.calls[0]![1].content).toEqual(localMeanings);
     expect(
       screen.getByTestId("dirty-form-after-meanings-save")
     ).toHaveTextContent("local edit");
@@ -2863,7 +3725,68 @@ describe("V3WordCreationWizard", () => {
       screen.getByTestId("normalized-meaning-after-save")
     ).toHaveTextContent("规范后释义");
     expect(screen.getByTestId("dirty-form-after-save-state")).toHaveTextContent(
-      "true/false"
+      "false/false"
+    );
+  });
+
+  it("stops an ordinary meanings save when dirty forms fail and preserves both drafts", async () => {
+    const saveForms = vi.fn(
+      async (
+        _wordId: string,
+        _input: Parameters<V3WordRequests["saveForms"]>[1]
+      ) => {
+        throw new HttpError(409, "stale", [], "revision_conflict");
+      }
+    );
+    const saveMeanings = vi.fn(async () => envelope(2, "must not save"));
+    renderWizard(requests({ saveForms, saveMeanings }), {
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <>
+          <output data-testid="ordinary-failure-dirty">
+            {String(context.dirtySteps.forms)}/
+            {String(context.dirtySteps.meanings)}
+          </output>
+          <output data-testid="ordinary-failure-spelling">
+            {spellingOf(context)}
+          </output>
+          <button
+            type="button"
+            onClick={() => {
+              context.setDraftForms(editedForms(context));
+              const meanings = structuredClone(context.draftMeanings);
+              meanings.sense_groups[0]!.name_zh = "普通保存仍需保留";
+              context.setDraftMeanings(meanings);
+            }}
+          >
+            编辑普通保存草稿
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              void context.actions.saveMeanings(context.draftMeanings, "save")
+            }
+          >
+            普通保存失败
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("编辑普通保存草稿"));
+    fireEvent.click(screen.getByText("普通保存失败"));
+
+    expect(
+      await screen.findByRole("button", { name: "刷新并比较" })
+    ).toBeInTheDocument();
+    expect(saveForms).toHaveBeenCalledTimes(1);
+    expect(saveForms.mock.calls[0]![1].intent).toBe("save");
+    expect(saveMeanings).not.toHaveBeenCalled();
+    expect(screen.getByTestId("ordinary-failure-dirty")).toHaveTextContent(
+      "true/true"
+    );
+    expect(screen.getByTestId("ordinary-failure-spelling")).toHaveTextContent(
+      "local edit"
     );
   });
 

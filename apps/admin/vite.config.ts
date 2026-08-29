@@ -9,8 +9,8 @@ import {
   assertAdminTtsMockAllowed,
   assertAdminWordsMockAllowed,
   parseBooleanEnvFlag
-} from "./src/lib/env-flags";
-import { buildAdminDevProxy } from "./src/lib/dev-proxy";
+} from "./src/lib/env-flags.js";
+import { buildAdminDevProxy } from "./src/lib/dev-proxy.js";
 
 // dev 代理配置：把 /api/v1/* 转发到后端，保证 refresh 的 HttpOnly cookie 与请求同源。
 // 复用 web 相同的 BACKEND_API_URL（默认已含 /api/v1 前缀），行为与旧 next.config

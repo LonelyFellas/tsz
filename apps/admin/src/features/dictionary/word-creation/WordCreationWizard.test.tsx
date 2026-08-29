@@ -514,7 +514,7 @@ describe("WordCreationWizard", () => {
     renderWizard("resume", `/words/${archived.id}/wizard/forms`);
 
     expect(
-      await screen.findByText("该词条已归档，当前为只读状态")
+      await screen.findByText("该词条已在垃圾桶中，当前为只读状态")
     ).toBeVisible();
     expect(
       screen.getByText(`forms-step-revision-${archived.revision}-readonly-true`)
