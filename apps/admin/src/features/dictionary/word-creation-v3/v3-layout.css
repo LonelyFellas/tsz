@@ -56,6 +56,113 @@
   min-width: 0;
 }
 
+.v3-meanings-v2 {
+  min-width: 0;
+}
+
+.v3-meanings-v2 .word-list-actions {
+  align-self: center;
+}
+
+.v3-meanings-v2 .word-list-actions .ant-btn {
+  width: 28px;
+  min-width: 28px;
+  padding-inline: 0;
+  color: #6f7785;
+}
+
+.v3-meanings-v2 .word-sense-meta-grid :where(.ant-input, .ant-select) {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.v3-meanings-v2 .word-sense-context-toggle .ant-switch {
+  margin-top: 12px;
+}
+
+.v3-meanings-v2 .word-grammar-panel {
+  display: block;
+}
+
+.v3-meanings-v2 .word-table-row {
+  border-bottom: 1px solid #eceff3;
+}
+
+.v3-meanings-v2 .word-table-row:last-of-type {
+  border-bottom: 0;
+}
+
+.v3-meanings-v2 .word-definition-row > .ant-space,
+.v3-meanings-v2 .word-sentence-row > .ant-space {
+  min-width: 0;
+}
+
+.v3-meanings-v2 .word-sentence-bilingual-grid textarea {
+  margin-top: 6px;
+}
+
+.v3-meanings-v2 .word-relation-card .ant-select,
+.v3-meanings-v2 .word-relation-card .ant-input {
+  width: 100%;
+}
+
+.v3-product-progress-list .word-progress-done {
+  color: #252c3c;
+  font-size: 18px;
+}
+
+.v3-product-progress-list .word-progress-index {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  color: #8b9099;
+  font-weight: 600;
+  font-size: 11px;
+  line-height: 1;
+  place-items: center;
+  border: 1.5px solid #c6c9cf;
+  border-radius: 50%;
+}
+
+.v3-product-progress-list .word-progress-label {
+  color: #273043;
+  font-weight: 600;
+}
+
+.v3-product-progress-list
+  .word-creation-progress-row
+  > .ant-typography:last-child {
+  min-width: 0;
+  padding: 0;
+  color: #8b9099;
+  background: transparent;
+  border-radius: 0;
+}
+
+@container word-creation-page (max-width: 1199px) {
+  .word-creation-shell .v3-product-progress-list {
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+  }
+}
+
+@container word-creation-page (max-width: 1100px) {
+  .word-creation-shell .v3-product-progress-list {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@container word-creation-page (max-width: 820px) {
+  .word-creation-shell .v3-product-progress-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container word-creation-page (max-width: 420px) {
+  .word-creation-shell .v3-product-progress-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 991px) {
   .v3-word-creation__shell {
     grid-template-columns: 1fr;

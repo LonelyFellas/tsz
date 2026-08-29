@@ -12,6 +12,7 @@ import type {
   WordHeadwordsV2
 } from "@tsz/types";
 import { Alert, Button, Card, Flex, Modal, Spin, Tag, Typography } from "antd";
+import dayjs from "dayjs";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { LifecycleSurfaceConfirmation } from "../LifecycleSurfaceConfirmation";
 import {
@@ -277,7 +278,11 @@ function snapshotBody(publication: AdminWordPublicationAny): {
               relation.target_headword ??
               relation.pending_target_headword ??
               "待补充目标词条",
-            ...(relation.target_gloss ? { gloss: relation.target_gloss } : {})
+            ...((relation.target_gloss ?? relation.pending_target_gloss)
+              ? {
+                  gloss: relation.target_gloss ?? relation.pending_target_gloss
+                }
+              : {})
           }))
         )
       )
@@ -364,7 +369,9 @@ function snapshotBody(publication: AdminWordPublicationAny): {
             relation.target_headword ??
             relation.pending_target_headword ??
             "待补充目标词条",
-          ...(relation.target_gloss ? { gloss: relation.target_gloss } : {})
+          ...((relation.target_gloss ?? relation.pending_target_gloss)
+            ? { gloss: relation.target_gloss ?? relation.pending_target_gloss }
+            : {})
         }))
       )
     )
@@ -378,7 +385,12 @@ function PublicationSnapshotBody({
 }) {
   const snapshot = snapshotBody(publication);
   return (
-    <Card size="small" title="快照正文" data-testid="publication-snapshot-body">
+    <Card
+      className="v3-publication-modal-content"
+      size="small"
+      title="快照正文"
+      data-testid="publication-snapshot-body"
+    >
       <Flex vertical gap="middle">
         <Flex vertical gap="small">
           <Typography.Text strong>词形与发音</Typography.Text>
@@ -508,12 +520,19 @@ function PublicationMetadata({
   publication: AdminWordPublicationAny;
 }) {
   return (
-    <Card size="small" title="发布信息" data-testid="publication-metadata">
+    <Card
+      className="v3-publication-modal-metadata"
+      size="small"
+      title="发布信息"
+      data-testid="publication-metadata"
+    >
       <Flex vertical gap={2}>
         <Typography.Text>
           发布批次：第 {publication.publication_number} 次
         </Typography.Text>
-        <Typography.Text>发布时间：{publication.published_at}</Typography.Text>
+        <Typography.Text>
+          发布时间：{dayjs(publication.published_at).format("YYYY-MM-DD HH:mm")}
+        </Typography.Text>
         <Typography.Text>
           当前状态：{publication.is_current ? "当前线上版本" : "历史版本"}
         </Typography.Text>
@@ -933,7 +952,7 @@ export function V3PublicationHistory({
           }
         />
       ) : null}
-      <Card title="发布历史">
+      <Card className="v3-publication-history" title="发布历史">
         {publications.length === 0 ? (
           <Typography.Text type="secondary">暂无发布记录</Typography.Text>
         ) : (
@@ -959,7 +978,7 @@ export function V3PublicationHistory({
                     ) : null}
                   </Flex>
                   <Typography.Text type="secondary">
-                    {publication.published_at}
+                    {dayjs(publication.published_at).format("YYYY-MM-DD HH:mm")}
                   </Typography.Text>
                 </Flex>
                 <Button
@@ -975,9 +994,11 @@ export function V3PublicationHistory({
         )}
       </Card>
       <Modal
+        className="v3-publication-modal"
         footer={null}
         open={selectedPublicationId !== undefined}
         title="发布详情"
+        width={920}
         onCancel={closeDetail}
       >
         <Flex vertical gap="middle" data-testid="publication-detail">
@@ -1036,22 +1057,32 @@ export function V3PublicationHistory({
                         </Button>
                       }
                     />
-                  ) : (
-                    <Button
-                      type="primary"
-                      disabled={activationBlockedByUnsavedChanges}
-                      onClick={() => beginActivation()}
-                    >
-                      激活此发布版本
-                    </Button>
-                  )}
+                  ) : null}
                 </>
               ) : null}
             </>
           ) : null}
-          <Button aria-label="关闭发布详情" onClick={closeDetail}>
-            关 闭
-          </Button>
+          <Flex
+            className="v3-publication-modal-actions"
+            justify="flex-end"
+            gap="small"
+          >
+            <Button aria-label="关闭发布详情" onClick={closeDetail}>
+              关 闭
+            </Button>
+            {detail &&
+            canActivateV3Publication(detail, currentWord) &&
+            !surfacePage &&
+            !confirming ? (
+              <Button
+                type="primary"
+                disabled={activationBlockedByUnsavedChanges}
+                onClick={() => beginActivation()}
+              >
+                激活此发布版本
+              </Button>
+            ) : null}
+          </Flex>
         </Flex>
       </Modal>
     </>

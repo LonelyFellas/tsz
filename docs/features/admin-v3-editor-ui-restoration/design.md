@@ -2,7 +2,156 @@
 
 ## 方案概述
 
-本方案保留现有 V2/V3 契约与两套草稿编辑器，在创建前增加一个统一的前端编排层：`/words/new` 接收一次输入，按固定空白规则归一化并分类；单词调用现有 V3 detect/create，短语调用现有 V2 detect/create。检测返回后先把内置词典建议映射成产品摘要，并用同一 detection 触发后端预填创建；只有智能词库重复、surface 匹配或后端策略要求确认时停留在创建页，无冲突则不增加第二次点击，自动创建并跳转到对应原生编辑器。
+本方案保留现有 V2/V3 契约与两套草稿编辑器，在创建前增加一个统一的两阶段编排层：`/words/new` 的 Step 1 接收一次输入，按固定空白规则归一化并分类，只调用对应 V3/V2 detection，稳定展示内置词典建议、重复项与 surface 决策，不创建草稿。只有管理员点击“创建并进入词形与发音”（需要确认时为“确认并创建，进入词形与发音”），才使用当前有效的同一 detection 调用 create，并跳转到对应原生编辑器 Step 2。
+
+该时序是 2026-08-26 产品调整后的权威方案，替代本文早期版本的“无冲突自动 detect → create → navigate”；不要求后端、OpenAPI 或 wire contract 变化。
+
+### 2026-08-27 Step 2 三行规则契约增量（待本次评审）
+
+#### 现状与缺口
+
+V2 `WordPosFormsV2` 已持久化 `dialect_rules.spelling_mode` 与 `dialect_rules.phonetic_mode`，并支持产品图中的三种有效组合。当前 V3 `WordPosFormsV3` 只有 `forms[]`、`form_groups[]`；每个 form 的 `regional_variants.mode` 只能表达 `common` 或完整 `uk_us` 形状，不能持久化“拼写是否区分”和“音标是否区分”两个独立的管理员意图。
+
+不能从内容相等性反推规则：管理员可能已选择“区分”，但两侧尚未填写或当前恰好相同；若前端按文本比较，刷新后会错误切回“不区分”。因此当前单一“本词性是否区分英式与美式？”只是一种降级，不满足最新产品图。
+
+#### 选定方案：V3 POS 增加显式方言规则
+
+在 V3 `WordPosFormsV3` 增加必填 `dialect_rules`，JSON 形状与成熟 V2 规则一致，但在 OpenAPI 中定义为 V3 正式契约，不把 V3 DTO 引用到 V2 组件或 wire 类型：
+
+```json
+{
+  "pos_id": "<uuid>",
+  "pos": "adjective",
+  "dialect_rules": {
+    "spelling_mode": "unified",
+    "phonetic_mode": "distinguish"
+  },
+  "forms": [],
+  "form_groups": []
+}
+```
+
+枚举继续使用 `unified | distinguish`。合法组合及地区结构约束如下：
+
+| `spelling_mode` | `phonetic_mode` | form 地区结构 | 约束                             |
+| --------------- | --------------- | ------------- | -------------------------------- |
+| `unified`       | `unified`       | `common`      | 一个通用拼写与通用发音集合       |
+| `unified`       | `distinguish`   | `uk_us`       | UK/US 拼写必须相同，发音分别维护 |
+| `distinguish`   | `distinguish`   | `uk_us`       | UK/US 拼写与发音分别维护         |
+| `distinguish`   | `unified`       | 非法          | 后端 fail closed，不保存         |
+
+规则属于 POS，不属于 form group。后端保存、完成、校验、发布和历史激活前必须同时验证：
+
+1. 规则组合合法；
+2. 同一 POS 下所有 concrete form 的 `regional_variants` 形状与规则一致；
+3. `spelling_mode=unified + phonetic_mode=distinguish` 时每个 form 的 UK/US 拼写一致；
+4. 共享 membership 不重复校验或转换同一个 form；
+5. issue 定位到 `pos_id`，必要时同时带冲突 `form_id`，字段使用 `dialect_rules` 或 `regional_variants`，不暴露数据库结构。
+
+现有“同一 POS 所有 form 必须使用同一 `regional_variants.mode`”校验继续保留，并升级为上述规则与形状联合校验。
+
+#### 创建、存量草稿与迁移
+
+- V3 detection/create 生成新 POS 时必须显式写入 `dialect_rules`；内置词典只有 common 证据时为 `unified/unified`，存在地区发音差异但拼写相同时为 `unified/distinguish`，拼写存在地区差异时为 `distinguish/distinguish`。
+- 已存在但缺少字段的 V3 JSON 草稿不能由前端临时猜测并写回。后端迁移按现有 canonical 内容一次性补齐：`common → unified/unified`；`uk_us` 且 UK/US 拼写不同 → `distinguish/distinguish`；`uk_us` 且拼写相同 → `unified/distinguish`。这是旧数据没有显式意图时唯一可审计的确定性默认。
+- 迁移不改变 form、variant、pronunciation、group 或 membership UUID，不重排数组，也不合并文本相同的地区节点。
+- OpenAPI、Rust DTO/validation、前端 `@tsz/types`、api-client snapshot、fixtures 和契约测试必须同批更新；禁止手改生成快照。
+
+#### 前端交互与代码影响
+
+- `V3PosTab.tsx`：以 POS 的 `dialect_rules` 为受控值；首个可见变化组显示两行英美规则，后续组不重复。
+- `V3FormGroupCard.tsx`：保留每组自己的“词形是否规则变化？”；接受首组的词性级规则区作为产品展示，不把规则写进 group。
+- `V3ConcreteFormRow.tsx` / `operations.ts`：把现有单一 common↔uk_us 转换扩展为 POS 级三态原子转换；不弹逐 form Modal；共享 form 只处理一次；稳定 variant UUID 由身份账本提供。
+- `V3WordCreationWizard.tsx` / `WordWizardV3.tsx`：保留 GET envelope 的 `retired_stable_nodes`，建立并向 forms editor 传递 variant 身份账本；canonical save 响应不带 retired 列表时不得清空本会话账本。
+- `V3FormsAndPronunciationStep.tsx` / `V3PronunciationList.tsx`：直接复用 V2 `PronunciationPreviewProvider`、`PronunciationPreviewControls` 与 voice notice；Provider 只包一次 forms step，单条发音不重复加载语音目录。V3 variant 原生提供 spelling/dialect/pronunciation UUID，不做 V2 DTO 转换。
+- `model.ts` / `readiness.ts`：校验本地规则、地区形状和未完成映射；服务端 issue 仍为最终权威并定位回两行规则或具体 form。
+- `presentation.ts` / UI：只显示“英美拼写是否有区别？”“英美音标是否有区别？”以及“是/否”，不显示 wire 枚举、V3 或内部 ID。
+
+交互状态机：
+
+1. `unified/unified → unified/distinguish`：一次性把每个 common variant 复制为 UK/US；两侧初始拼写、音标和实际发音相同，新建 variant/pronunciation UUID，form UUID 不变。
+2. `unified/distinguish → distinguish/distinguish`：保留两侧 variant/pronunciation UUID，只解锁英美拼写分别编辑；无需重建发音。
+3. `distinguish/distinguish → unified/distinguish`：按管理员英美偏好侧的拼写覆盖为两侧共用拼写，保留两侧 variant/pronunciation UUID。
+4. 任意分栏状态 → `unified/unified`：按管理员英美偏好侧选择完整 variant 作为通用内容，新建 common variant/pronunciation UUID；form UUID 不变。
+5. 选择“拼写有区别”时前端同步设置音标为“有区别”；音标“否”禁用。整个 POS 在一次本地状态更新中完成转换并更新规则，不产生中间 mixed payload，也不显示转换 Modal。
+
+该自动转换行为直接复刻 `82203e0` 的 V2 `normalizeDialectRules()`：拆分时复制 fallback variant，收敛时优先选择管理员偏好侧。规则切换不属于风险确认；真正保存时若后端 impact 要求确认，继续显示现有“确认影响并保存”产品流程。
+
+V3 额外受稳定槽位身份约束：`AdminWordDraftV3Envelope.retired_stable_nodes` 是模式往返时的身份事实源。Wizard 载入时建立 `(form_id, common_variant|uk_variant|us_variant) → UUID` 账本，同时播种当前 active variants 与 retired variants；本会话新建的 variant ID 也立即写入账本。common↔uk/us 再次出现时必须复用账本 ID，不能重新调用随机 UUID。pronunciation 在后端不是 stable slot，复制时仍生成新 UUID。
+
+#### 不选方案
+
+- **按 UK/US 文本是否相等推导两个开关**：无法保存用户意图，空白或暂时相同内容会在刷新后变状态。
+- **继续使用一个总开关**：不能表达“拼写相同、音标区分”，与产品图和 V2 已验证能力不一致。
+- **只加前端本地字段**：保存、刷新、历史和另一管理员会话均丢失，不是领域能力。
+- **把 V3 forms 转成 V2 `WordPosFormsV2`**：破坏多个 base、同类型多条、共享 membership 和稳定 V3 身份，继续禁止。
+
+#### 测试与验收增量
+
+文档批准后，写测试代码前先用 test skill 扩展测试矩阵，至少覆盖：三种有效组合、非法组合、四条转换路径、取消/脏状态、共享 form、多个 base、多发音、保存读取回显、历史草稿迁移、服务端 issue 定位，以及 390/768/1024/1440 和键盘操作。
+
+本节是对原设计“完全不改后端/OpenAPI/wire”的明确例外。未经本次评审批准，不修改 V3 DTO、OpenAPI、后端实现或前端业务/测试代码；批准后先由后端落正式契约并导出 OpenAPI，前端再同步类型与实现。
+
+### 2026-08-26 原形与关联词数据边界补充（已批准并实现）
+
+只读核对 `tsz-rust` 当前实现后，数据边界分为“已经满足”和“需要后端改造”两部分：
+
+1. `LexiconRepository::surface_sources` 已同时读取 draft 与 current publication surface，并由 source 自身携带 `pos` / `form_type`；查询没有要求目标已发布，也没有限制与输入相同词性。前端 presenter 继续只筛 `form_type=base`，接受草稿和其他词性候选，不新增状态或词性过滤。
+2. `LexiconRepository::related_search` 已从 `entry.current_publication_id` 连接 publication snapshot，并排除 archived entry，因此关联词搜索候选已经只返回未归档的当前发布词条；这一查询约束必须保留并补契约回归。
+3. 当前保存/发布校验仍通过 `resolve_relation_targets(_for_publish)` 左连接 current publication；目标 sense 不在 publication 时会回退读取 draft meanings。migration `20260822150000_allow_publication_relations_to_draft_targets` 还允许 `entry_publication_sense_refs.target_content_scope='draft'`，集成测试明确保证“已发布来源可以指向草稿目标”。这与最新产品规则冲突，必须在后端修正，前端隐藏候选不能替代服务端权威校验。
+
+后端改造建议作为独立阶段实施：
+
+- related-search 查询与响应结构保持不变；继续只返回 current publication 中的 sense。
+- 保存绑定关联时只接受 target current publication 中存在的 sense；草稿、已归档或不在 current publication 的目标返回产品化 validation issue。复用现有 issue 结构，新增明确 code 时同步 Rust DTO、OpenAPI 和前端中文映射，禁止返回内部 SQL/UUID 细节。
+- 发布时在同一事务和锁边界重新读取 target current publication，防止候选选择后目标撤回发布、归档或换版造成 TOCTOU；目标变化则 fail closed，不写 publication reference。
+- `pending_target_headword` 仍可保存为未完成草稿文本，但不再在来源发布事务里自动物化为可被正式引用的目标草稿。完成/发布前必须由管理员选择已发布目标及义项。
+- 新 migration 收紧 `entry_publication_sense_refs` 为 publication-only 前，先统计现有 `target_content_scope='draft'` 行。非零时迁移 fail closed 并输出审计清单或执行经确认的数据修复；不得猜测目标 publication/sense。
+- 删除或改写“publication relation can target draft”的旧集成测试，新增保存、校验、发布、并发换版和历史数据迁移回归。后端代码、migration、OpenAPI snapshot 与前端翻译必须作为一个可回退的独立交付单元。
+
+该阶段会实质改变既有后端语义，不能并入当前已完成的 Step 1 UI 小修而不评审。用户批准本节后，才在 `tsz-rust` 的独立 exact-main 分支按 feature/test 流程实施。
+
+### 2026-08-26 原形优先展示修订（最新口径）
+
+本节覆盖本文所有与之冲突的 Step 1 建议卡设计。统一入口不再把 `BuiltinDictionaryEvidenceV3` / `BuiltinDictionaryMatchedV2` 展开成词性、词形和发音建议矩阵，而是建立以下 schema-aware 只读展示模型：
+
+实现参考固定为 `d707328` 的 `CreateEntryStep.tsx` 与同提交 `word-creation.css`，不是当前 `HEAD` 后续调整后的相似实现：
+
+- 外层继续使用 `word-basics-result-grid`；沿用原提交的单列默认布局与 `@container word-creation-content (min-width: 1080px)` 左 `0.82fr` / 右 `1.18fr` 双栏规则。
+- 左侧直接复用 `word-detection-result-card`、`Descriptions` 字段顺序、`word-smart-match-summary(-entry/-row)`、生命周期 Tag、“查看重复词条”和上下文详情结构；base form presenter 只负责筛选/分组数据，不另造视觉组件。
+- 右侧直接复用 `word-headword-confirmation-card`、`word-dialect-detection-row`、`dialect-panel-uk/us` 和 BrE/AmE 内容层级。V2 保留正式 headwords 编辑能力；V3 使用相同静态层级展示 base form variants，但不复用 V2 wire 类型，也不渲染无法持久化的交互控件。
+- 删除统一入口当前自创的 `DictionarySuggestionCard` 详情矩阵；不再显示“确认英美主词与词形”“已找到内置词典建议”、逐词性 form cards、音标或发音 style。
+
+```ts
+type DetectedBaseForm = {
+  key: string;
+  schemaVersion: 2 | 3;
+  entryId: string;
+  formId: string;
+  entryLabel: string;
+  status: "draft" | "published" | "archived";
+  matchedSpellings: string[];
+};
+
+type RegionalBaseForm = {
+  source: "database" | "builtin_dictionary";
+  uk?: string;
+  us?: string;
+  common?: string;
+};
+```
+
+数据流如下：
+
+1. detection 仍走现有 V3 word / V2 phrase 契约，并使用 `useSurfaceSnapshotAny` 顺序加载完整 snapshot；不新增数据库直连、OpenAPI 字段或后端查询端点。
+2. 从 snapshot items 中只提取现有 source 为 form/form variant 且 `form_type=base` 的记录；V3 用 `entry_id + form_id`、V2 用 `word_id + source_node_id` 去重，保留首次出现顺序。headword、非 base form 和 relation-derived 项不进入原形列表。
+3. 左栏按旧版重复词条摘要结构渲染全部 `DetectedBaseForm`，不显示 `entry_id`、`form_id`、schema version 或原始枚举；可见内容为命中拼写、生命周期状态、“查看重复词条”和旧版上下文信息。顶部 Descriptions 仍按 `d707328` 显示词条类型、重复检测与响应可提供的建议词性。
+4. 候选非空时取第一项，不增加候选选择器。通过既有 admin word detail 请求读取该词条 canonical 数据，并以候选自己的稳定 form id 定位原形：V3 读取该 concrete form 的全部地区 variants；V2 读取对应 base form variants。右栏按旧版 BrE/AmE 地区面板显示英式/美式（或通用）拼写，不展示其他词形、音标或发音建议。
+5. 候选为空时不发详情请求，右栏回退内置词典：V2 从 `headwords` 取值；V3 从 response-order 第一条 `form_type=base` 建议的 regional variants 取值。`common` 同时填充英式和美式展示。
+6. 存在候选但详情请求失败或稳定 form id 无法定位时 fail closed：保留左栏，右栏显示产品化错误与重试操作，创建按钮禁用；不得回退内置词典掩盖数据库证据不完整。
+7. 智能词库 duplicate、surface acknowledgement、snapshot expiry、detection expiry 与幂等创建规则保持不变。确认创建继续提交原生 detection/token，展示模型从不参与 create body。
+
+该方案复用现有 surface snapshot 与详情接口，不修改后端、OpenAPI 或 wire contract，也不把 V3 数据转换成 V2 组件/DTO。代价是命中数据库原形时增加一次详情读取；这是获得同一原形完整英美 variants 所必需的，因为现有 surface item 只保证携带命中的单个 variant。
 
 V3 编辑器不复用 V2 数据组件，也不做 V3 → V2 转换。改造集中在 V3 的呈现层和布局层：保留现有 `model.ts`、`operations.ts`、`saveFlow.ts`、`readiness.ts`、API identity guard、稳定 UUID 和请求时序；通过中文展示映射、分层卡片、摘要侧栏、统一操作区、响应式 CSS 和可访问名称，让 V3 原生组件使用已经在 V2 Admin 中验证过的产品语言。
 
@@ -10,7 +159,7 @@ V3 编辑器不复用 V2 数据组件，也不做 V3 → V2 转换。改造集�
 
 - **继续保留两个创建按钮**：仍会把版本分流暴露给管理员，违背唯一入口目标。
 - **在统一页先让用户选择单词/短语**：只是把两个按钮换成选择器，没有解决产品问题。
-- **先进入检测页，再显示“继续创建”**：无警告场景仍产生不必要的第二次确认，违背一次提交自动继续。词典建议会自动展示和应用，但不是新的审批步骤。
+- **检测完成后自动创建并跳转**：建议卡只短暂闪现，新路由还会经过 detail loading，管理员无法在创建前稳定核对建议，也会产生明显页面闪动。Step 1 应保持为创建前检测区，Step 2 才代表词条已经建立。
 - **只显示内置词典 matched/not_found**：丢失英美主词、基本词性、词形和音标建议，是明确的产品能力退化。
 - **将 V3 映射成 V2 wizard**：无法无损表达多 base、一形多组、同类型多词形、多发音和稳定 membership，明确禁止。
 - **重做一套 V3 状态模型**：现有 V3 save/dirty/conflict/impact/publish 状态机已有完整覆盖；本次只改呈现与创建编排，避免扩大风险。
@@ -54,16 +203,19 @@ flowchart TD
   normalize --> classify{"归一化后是否含空格"}
   classify -->|否| v3detect["V3 word detection"]
   classify -->|是| v2detect["V2 phrase detection"]
-  v3detect --> v3suggest["展示并应用内置词典建议"]
-  v2detect --> v2suggest["展示并应用内置词典建议"]
+  v3detect --> v3suggest["Step 1 稳定展示内置词典建议"]
+  v2detect --> v2suggest["Step 1 稳定展示内置词典建议"]
   v3suggest --> v3decision{"智能词库 / surface 需要确认？"}
   v2suggest --> v2decision{"智能词库 / surface 需要确认？"}
-  v3decision -->|否| v3create["幂等创建预填 V3 word 草稿"]
-  v2decision -->|否| v2create["幂等创建预填 V2 phrase 草稿"]
+  v3decision -->|否| ready["显示：创建并进入词形与发音"]
+  v2decision -->|否| ready
   v3decision -->|是| confirm["产品化重复项 / surface 确认"]
   v2decision -->|是| confirm
-  confirm -->|确认 V3| v3create
-  confirm -->|确认 V2| v2create
+  ready -->|管理员明确点击| branch{"检测分支"}
+  branch -->|V3 word| v3create["幂等创建预填 V3 word 草稿"]
+  branch -->|V2 phrase| v2create["幂等创建预填 V2 phrase 草稿"]
+  confirm -->|确认并创建 V3| v3create
+  confirm -->|确认并创建 V2| v2create
   v3create --> v3editor["/words/:id/v3/wizard/forms\nV3 原生编辑器"]
   v2create --> v2editor["/words/:id/wizard/forms\nV2 phrase 编辑器"]
 ```
@@ -119,7 +271,7 @@ export function classifyEntryInput(raw: string): ClassifiedEntryInput {
 type UnifiedCreateState =
   | { phase: "editing" }
   | { phase: "checking"; request_id: symbol; kind: "word" | "phrase" }
-  | { phase: "preparing"; branch: V2Preparation | V3Preparation }
+  | { phase: "ready"; branch: V2Preparation | V3Preparation }
   | { phase: "confirming"; branch: V2Confirmation | V3Confirmation }
   | { phase: "creating"; kind: "word" | "phrase" }
   | { phase: "error"; recovery: "retry" | "edit" | "reload" };
@@ -130,12 +282,12 @@ type UnifiedCreateState =
 状态规则：
 
 - 修改输入：递增 generation，清空 detection、surface snapshot、确认和创建 key，回到 `editing`。
-- 首次提交：生成该次 detection 对应的创建幂等键，进入 `checking`。
-- detection 完成：进入 `preparing`，立即渲染产品化建议摘要；matched 使用同一 detection 预填，not_found 明确说明将创建空白草稿，unavailable 或建议无法安全解释则停止。
-- 无智能词库/surface 警告：在同一用户提交链中从 `preparing` 自动进入 `creating`，不插入可点击的“检测完成”状态，也不为了延长展示时间引入人为延迟。
+- 首次提交：只建立 detection generation，进入 `checking`；此时不生成 create 请求，也不导航。
+- detection 完成：进入 `ready`，稳定渲染产品化建议摘要；matched 说明创建后将采用的建议，not_found 明确说明将创建空白草稿，unavailable 或建议无法安全解释则停止。
+- 无智能词库/surface 警告：停留在 `ready`，显示“创建并进入词形与发音”。只有用户明确点击后才生成/复用创建幂等键并进入 `creating`。
 - 有警告：进入 `confirming`；完整 snapshot 到达且可确认前禁用主操作。
-- 确认：复用当前 detection 和终页 token 创建，不重复发送无意义检测。
-- detection/snapshot 过期或 policy changed：旧确认失效，重新执行检查并展示“匹配结果已更新，请重新确认”；不得自动创建。
+- 确认：用户点击“确认并创建，进入词形与发音”后，复用当前 detection 和终页 token 创建，不重复发送无意义检测。
+- detection/snapshot 过期或 policy changed：旧结果和创建主操作失效，回到需要重新检测的状态；不得静默重新检测后直接创建。
 - 网络未知结果：保留现有幂等 key 进行原样重试；只有正式错误要求新 key 时才更换。
 - 创建成功：立即按响应中的 `schema_version/kind/id` 导航，不从输入猜测目标详情路由。
 
@@ -147,8 +299,8 @@ type UnifiedCreateState =
 2. 校验 response echo 与本次 normalized input；
 3. `builtin_dictionary.status=matched` 时从 `suggested_pos` 和 `suggested_forms` 构造只读产品摘要：从 base form 的地区变体展示英式/美式“建议拼写”，按词性目录展示基本词性，按业务标签展示词形/地区，并汇总词典音标、实际发音与发音方式；不显示 provider、provenance、coverage 原始结构或枚举值，也不把建议拼写生成领域唯一主词或 legacy compatibility；
 4. `not_found` 时展示“未找到词典建议，将创建空白草稿”；`unavailable` 时阻断并提供重试，不把不可用当未命中；
-5. `requires_acknowledgement=false` 时自动 `createV3(idempotencyKey, { schema_version: 3, detection_id, kind: "word" })`，由后端使用该 detection 生成 canonical 预填 forms；前端不把建议翻译成 V2 或自行拼装 V3 write DTO；
-6. 需要确认时继续使用 `useSurfaceSnapshotAny` 顺序加载完整 V3 snapshot，只在终页 token 有效时提交 `confirmed_surface_match_token`；确认页同时保留建议摘要，但两者分别标记为“将预填内容”和“已有词条提醒”；
+5. `requires_acknowledgement=false` 时只进入可创建状态；点击“创建并进入词形与发音”后才调用 `createV3(idempotencyKey, { schema_version: 3, detection_id, kind: "word" })`，由后端使用该 detection 生成 canonical 预填 forms；前端不把建议翻译成 V2 或自行拼装 V3 write DTO；
+6. 需要确认时继续使用 `useSurfaceSnapshotAny` 顺序加载完整 V3 snapshot，只在终页 token 有效且用户点击最终主操作时提交 `confirmed_surface_match_token`；确认页同时保留建议摘要，但两者分别标记为“将预填内容”和“已有词条提醒”；
 7. 创建成功只接受 V3 envelope，并进入 V3 forms；导航 state 只携不含 ID 的来源提示，编辑器以 response canonical forms 为事实源，显示“已根据内置词典预填，请核对”；
 8. 继续保留 idempotency conflict、surface confirmation、snapshot expired、policy changed、503 和 runtime schema 错误的现有安全处理。
 
@@ -161,21 +313,21 @@ type UnifiedCreateState =
 3. `builtin_dictionary.status=matched` 时使用后端返回的 headwords 与建议，不再要求用户重复输入；`not_found` 时使用 `{ mode: "unified", common: normalized }`；
 4. matched 时使用与 V3 相同的信息层级展示英美主词、词性、词形和发音建议；不显示 V2、原始状态或内部 ID；
 5. 保留现有词性目录完整性校验，检测建议引用未知词性时不得自动创建；
-6. `smart_dictionary.status=clear` 时自动创建 V2 phrase；warning 时完整加载 V2 surface snapshot 后显示统一确认；blocked 时说明不能继续；
+6. `smart_dictionary.status=clear` 时允许创建 V2 phrase 但停留在 Step 1 等待明确点击；warning 时完整加载 V2 surface snapshot 后显示统一确认；blocked 时说明不能继续；
 7. 创建输入仍只提交正式的 `detection_id`、确认后的 `headwords` 和可选 surface token，不新增前端契约；suggested forms 继续由后端按 detection 应用；
 8. 成功后进入 V2 phrase forms，并通过导航 state 展示不含 ID 的“已根据内置词典预填，请核对”提示；后续 editor 完全沿用现状。
 
-统一入口取消的是无警告场景的重复点击，不取消 V2/V3 后端建议、建议摘要、词性约束、surface 策略或创建幂等。
+统一入口保留一次明确的“进入 Step 2”动作；该动作同时是创建边界，不取消 V2/V3 后端建议、建议摘要、词性约束、surface 策略或创建幂等。
 
 ### 自动检测、建议预填与冲突确认的边界
 
 三类状态不得折叠成一个“检测结果”：
 
-1. **自动检测**负责取得后端权威的 normalized input、内置词典建议、智能词库匹配和 surface 决策。它由唯一主提交触发，不提供独立按钮。
+1. **词典检测**负责取得后端权威的 normalized input、内置词典建议、智能词库匹配和 surface 决策。它由输入框内“词典检测”或 Enter 触发，只读不写。
 2. **建议预填**回答“新草稿会带入什么”。`matched` 对 V2 展示正式英美主词，对 V3 展示 base form 地区建议拼写，并共同展示词性、词形和发音；`not_found` 说明为空白草稿；展示模型只读且 schema-aware，创建仍只提交正式 detection 引用，由后端生成 canonical 草稿。
-3. **冲突确认**回答“已有相同/相似词条时是否继续新建”。智能词库 duplicate 按现有规则阻断，warning/surface acknowledgement 加载完整快照并等待明确确认，clear 不停留。普通词典命中不是冲突，不产生确认按钮。
+3. **冲突确认**回答“已有相同/相似词条时是否继续新建”。智能词库 duplicate 按现有规则阻断，warning/surface acknowledgement 加载完整快照并等待明确确认，clear 进入普通可创建状态。普通词典命中不是冲突，不产生风险确认。
 
-建议卡在 detection 返回后立即渲染，并贯穿 `preparing`、`creating` 和 `confirming`；不设置人为最短停留时间。创建成功后，目标编辑器用一次性 navigation state 显示来源提示，而实际预填内容以创建响应中的 canonical forms/headwords 为准。刷新后即使提示消失，字段内容仍完整保留；不得把 navigation state 当成保存依据。
+建议卡在 detection 返回后立即渲染，并稳定保持在 `ready` / `confirming`；创建请求期间继续保留原页面结构并锁定操作，不切换成临时结果页。创建成功后，目标编辑器用一次性 navigation state 显示来源提示，而实际预填内容以创建响应中的 canonical forms/headwords 为准。刷新后即使提示消失，字段内容仍完整保留；不得把 navigation state 当成保存依据。
 
 ### 产品化确认视图
 
@@ -331,12 +483,13 @@ snapshot ID、cursor、token、policy name/epoch、schema version、word/sense/f
 ### 统一创建
 
 1. 用户编辑 raw input；本地只保留输入，不预请求。
-2. submit：归一化 → 校验 → 分类 → 建立 generation 与 idempotency key。
+2. 检测提交：归一化 → 校验 → 分类 → 建立 detection generation；不生成草稿、不切路由。
 3. 按 kind 调用对应 detection；校验 response echo/discriminator，并把内置词典 evidence 映射成不含工程字段的建议摘要。
 4. matched/not_found 且可安全继续时展示建议摘要；unavailable、未知必需词性或契约异常停止并反馈。
-5. 智能词库 clear/无需 surface 确认：立即创建；warning：在保留建议摘要的同时加载完整 immutable snapshot 并等待确认；duplicate/blocked/error：停止并反馈。
-6. 创建成功使用 response canonical word 决定路由，并传递仅用于来源提示的 navigation state；导航前释放离开保护。
-7. 组件卸载或输入改变后，所有旧 promise 结果因 generation 不匹配被丢弃。
+5. 智能词库 clear/无需 surface 确认：显示“创建并进入词形与发音”；warning：在保留建议摘要的同时加载完整 immutable snapshot 并显示确认创建操作；duplicate/blocked/error：停止并反馈。
+6. 用户点击进入 Step 2：确认 detection/snapshot 仍有效，建立或复用 idempotency key，调用对应 create。若已过期则停在 Step 1 并要求重新检测。
+7. 创建成功使用 response canonical word 决定路由，并传递仅用于来源提示的 navigation state；导航前释放离开保护。
+8. 组件卸载或输入改变后，所有旧 promise 结果因 generation 不匹配被丢弃。
 
 ### V3 编辑与保存
 
@@ -373,7 +526,7 @@ snapshot ID、cursor、token、policy name/epoch、schema version、word/sense/f
 - 新增 `apps/admin/src/features/dictionary/word-creation/entryClassification.ts`
   - 归一化、分类与纯函数边界。
 - 新增 `apps/admin/src/features/dictionary/word-creation/UnifiedCreateEntryStep.tsx`
-  - 统一编排 V2/V3 detection、建议摘要、自动预填创建、智能词库/surface 确认和幂等恢复；展示模型按 schema 分支构造，不修改 wire。
+  - 统一编排 V2/V3 detection、Step 1 稳定建议摘要、显式进入 Step 2 时的预填创建、智能词库/surface 确认和幂等恢复；展示模型按 schema 分支构造，不修改 wire。
 - `apps/admin/src/features/dictionary/word-creation/CreateEntryStep.tsx`
   - 保留为 V2 既有能力参考；若统一入口落地后无调用方，不扩大本次范围做无关重构。
 - `apps/admin/src/features/dictionary/word-creation/WordCreationWizard.tsx`
@@ -459,8 +612,8 @@ snapshot ID、cursor、token、policy name/epoch、schema version、word/sense/f
 ### 统一创建组件与路由
 
 - 列表唯一按钮和 canonical/兼容路由；
-- V3 word 无警告自动 detect → create → navigate；
-- V2 phrase 无警告自动 detect → create → navigate；
+- V3 word 无警告 detect → 稳定展示建议且 create 为 0 次 → 点击进入 Step 2 → create → navigate；
+- V2 phrase 无警告 detect → 稳定展示建议且 create 为 0 次 → 点击进入 Step 2 → create → navigate；
 - V2/V3 matched 建议摘要覆盖主词、词性、词形和发音，create 使用同一 detection，目标编辑器显示来源提示且 canonical 字段已预填；
 - V2/V3 not_found、unavailable、未知词性分别验证空白继续、安全阻断和可重试，不能只断言状态字符串；
 - matched fixture 必须至少含两个基本词性、英美地区建议拼写、多词形和多条发音，断言中文标签与具体建议值，禁止仅断言“已匹配”或 `status`；同时断言 V3 没有生成 legacy 主词/compatibility 写入；
@@ -468,7 +621,8 @@ snapshot ID、cursor、token、policy name/epoch、schema version、word/sense/f
 - V2/V3 warning 完整 snapshot、确认、过期、policy change、disabled；
 - 双击、输入变化、旧响应、卸载、网络未知结果和 idempotency conflict；
 - response echo/kind/schema 不一致 fail closed；
-- 不出现选择器、检测按钮或二次无意义确认。
+- 不出现类型选择器；“词典检测”只检测，“创建并进入词形与发音”才创建，两者职责清楚且键盘行为可验证。
+- 检测完成但未点击进入 Step 2 时，刷新/离开不会留下草稿；detection 过期、输入修改与策略变化都会使创建操作失效。
 
 ### V3 组件语义回归
 
@@ -503,17 +657,17 @@ snapshot ID、cursor、token、policy name/epoch、schema version、word/sense/f
 
 ## 风险与缓解
 
-### 自动继续放大误创建风险
+### 检测完成后结果过期
 
-无警告后不再有第二次点击，因此分类、回显、幂等和 stale response 必须同时成立。使用单一 normalized value、discriminated state、同步 in-flight lock、generation 丢弃和响应 identity guard；任何分支不一致都 fail closed。
+Step 1 与显式创建之间存在阅读时间，detection 或 surface snapshot 可能过期。创建前检查现有过期时间和确认上下文；过期时清空创建资格并要求重新检测，不静默重检、不自动创建。使用单一 normalized value、discriminated state、同步 in-flight lock、generation 丢弃和响应 identity guard；任何分支不一致都 fail closed。
 
-### V2 matched phrase 的 headwords 不再人工二次确认
+### V2 matched phrase 的 headwords 与检测摘要漂移
 
-一次输入与无警告自动继续意味着使用 detection 返回的正式 headwords。测试覆盖 matched/not_found、区分方言建议、未知词性与 warning；后端要求确认的 surface 场景仍停下，不把“词典匹配”误当作冲突。
+Step 1 展示 detection 返回的正式 headwords，用户明确进入 Step 2 后仍必须复用同一 detection。测试覆盖 matched/not_found、区分方言建议、未知词性、输入修改与 warning；后端要求确认的 surface 场景继续阻断普通创建，不把“词典匹配”误当作冲突。
 
-### 自动继续导致建议摘要显示时间过短
+### Step 1 与 Step 2 切换产生页面闪动
 
-不通过固定延时拖慢创建。建议摘要在 detection 返回后立即进入可感知区域，并在创建请求期间持续显示；导航后编辑器顶部保留一次性来源提示，canonical 预填字段继续提供完整核对面。组件测试使用可控 promise 验证摘要先于创建完成出现，e2e 验证进入编辑器后仍能看到来源提示和预填数据。
+检测完成后停在稳定的 V2 Step 1 结构，不挂载临时建议页、不自动导航。创建请求期间保持检测结果与页面尺寸，只锁定操作并显示 loading；成功后一次性进入 Step 2。组件测试使用可控 promise 验证检测不会调用 create，e2e 验证按 Enter 只更新 Step 1，点击进入 Step 2 后才发生路由切换。
 
 ### V3 建议展示与实际预填漂移
 
