@@ -1,6 +1,7 @@
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
-import { Alert, Button, Empty, Flex, Space } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
+import { Alert, Button, Empty, Flex, Radio, Space, Typography } from "antd";
 import type {
+  DialectRulesV3,
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
@@ -10,12 +11,29 @@ import {
   addFormGroup,
   deleteFormGroup,
   deleteGroupAndOrphanForms,
+  normalizePosDialectRules,
   reorderFormGroups,
-  type V3IdFactory
+  type V3IdFactory,
+  type V3StableVariantIdFactory
 } from "../operations";
 import { useState } from "react";
 import { V3FormGroupCard } from "./V3FormGroupCard";
 import { partOfSpeechLabel } from "../presentation";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
+
+function formMatchesDialectRules(
+  form: WordPosFormsV3["forms"][number],
+  rules: DialectRulesV3
+) {
+  if (rules.spelling_mode === "unified" && rules.phonetic_mode === "unified") {
+    return form.regional_variants.mode === "common";
+  }
+  if (form.regional_variants.mode !== "uk_us") return false;
+  if (rules.spelling_mode === "distinguish") return true;
+  return (
+    form.regional_variants.uk.spelling === form.regional_variants.us.spelling
+  );
+}
 
 export interface V3PosTabProps {
   content: DraftFormsStepContentV3;
@@ -23,8 +41,8 @@ export interface V3PosTabProps {
   issues: readonly V3DraftValidationIssue[];
   idFactory: V3IdFactory;
   onChange: (next: DraftFormsStepContentV3) => void;
-  onDeletePos?: () => void;
   posCatalog?: PartOfSpeechCatalogItem;
+  stableVariantIds?: V3StableVariantIdFactory;
 }
 
 export function V3PosTab({
@@ -33,8 +51,8 @@ export function V3PosTab({
   issues,
   idFactory,
   onChange,
-  onDeletePos,
-  posCatalog
+  posCatalog,
+  stableVariantIds
 }: V3PosTabProps) {
   const [pendingGroupDeletion, setPendingGroupDeletion] = useState<{
     groupId: string;
@@ -42,6 +60,8 @@ export function V3PosTab({
     changed: boolean;
   }>();
   const posLabel = posCatalog?.name_zh ?? partOfSpeechLabel(pos.pos);
+  const { preference } = useDialectPreference();
+  const allowedDerivedTypes = posCatalog?.allowed_form_types ?? [];
   const membershipCounts = new Map<string, number>();
   for (const group of pos.form_groups) {
     for (const member of group.members) {
@@ -51,6 +71,99 @@ export function V3PosTab({
       );
     }
   }
+  const visibleGroups = pos.form_groups.filter(
+    (group) =>
+      !posCatalog ||
+      allowedDerivedTypes.length > 0 ||
+      group.members.some((member) => {
+        const form = pos.forms.find(
+          (candidate) => candidate.id === member.form_id
+        );
+        return form && form.form_type !== "base";
+      })
+  );
+  const dialectRulesConsistent = pos.forms.every((form) =>
+    formMatchesDialectRules(form, pos.dialect_rules)
+  );
+  const applyDialectRules = (rules: DialectRulesV3) => {
+    const result = normalizePosDialectRules(
+      content,
+      pos.pos_id,
+      rules,
+      preference,
+      idFactory,
+      stableVariantIds
+    );
+    if (result.ok) onChange(result.value);
+  };
+  const dialectControl = (
+    <div
+      className="v3-pos-dialect-control"
+      data-v3-field="dialect_rules"
+      data-v3-node-id={pos.pos_id}
+      tabIndex={-1}
+    >
+      <div
+        className="word-form-rule-row v3-pos-dialect-rule"
+        data-v3-field="spelling_mode"
+        data-v3-node-id={pos.pos_id}
+        tabIndex={-1}
+      >
+        <Typography.Text strong>英美拼写是否有区别？</Typography.Text>
+        <Radio.Group
+          onChange={(event) =>
+            applyDialectRules(
+              event.target.value === "distinguish"
+                ? {
+                    spelling_mode: "distinguish",
+                    phonetic_mode: "distinguish"
+                  }
+                : {
+                    spelling_mode: "unified",
+                    phonetic_mode: "distinguish"
+                  }
+            )
+          }
+          value={pos.dialect_rules.spelling_mode}
+        >
+          <Radio aria-label="英美拼写有区别" value="distinguish">
+            是
+          </Radio>
+          <Radio aria-label="英美拼写无区别" value="unified">
+            否
+          </Radio>
+        </Radio.Group>
+      </div>
+      <div
+        className="word-form-rule-row v3-pos-dialect-rule"
+        data-v3-field="phonetic_mode"
+        data-v3-node-id={pos.pos_id}
+        tabIndex={-1}
+      >
+        <Typography.Text strong>英美音标是否有区别？</Typography.Text>
+        <Radio.Group
+          onChange={(event) =>
+            applyDialectRules({
+              spelling_mode: pos.dialect_rules.spelling_mode,
+              phonetic_mode: event.target.value
+            })
+          }
+          value={pos.dialect_rules.phonetic_mode}
+        >
+          <Radio aria-label="英美音标有区别" value="distinguish">
+            是
+          </Radio>
+          <Radio
+            aria-label="英美音标无区别"
+            disabled={pos.dialect_rules.spelling_mode === "distinguish"}
+            value="unified"
+          >
+            否
+          </Radio>
+        </Radio.Group>
+      </div>
+    </div>
+  );
 
   const addGroup = () => {
     const result = addFormGroup(content, pos.pos_id, idFactory);
@@ -106,31 +219,44 @@ export function V3PosTab({
     onChange(reorderFormGroups(content, pos.pos_id, ordered));
   };
 
+  const deletingGroupRemovesLastForm = (groupId: string) => {
+    const group = pos.form_groups.find((item) => item.id === groupId);
+    if (!group) return false;
+    const removedFormIds = new Set(
+      group.members.map((member) => member.form_id)
+    );
+    const stillReferenced = new Set(
+      pos.form_groups
+        .filter((item) => item.id !== groupId)
+        .flatMap((item) => item.members.map((member) => member.form_id))
+    );
+    const orphanCount = pos.forms.filter(
+      (form) => removedFormIds.has(form.id) && !stillReferenced.has(form.id)
+    ).length;
+    return pos.forms.length - orphanCount < 1;
+  };
+
   return (
     <Flex
+      className="v3-pos-tab word-pos-editor"
       data-pos-id={pos.pos_id}
       data-v3-node-id={pos.pos_id}
       vertical
       gap="middle"
     >
-      <Flex justify="space-between" gap="small" wrap>
-        <Button
-          aria-label={`新增${posLabel}变化组`}
-          icon={<PlusOutlined />}
-          onClick={addGroup}
-        >
-          新增变化组
-        </Button>
-        <Button
-          aria-label={`删除词性${posLabel}`}
-          danger
-          disabled={!onDeletePos}
-          icon={<DeleteOutlined />}
-          onClick={onDeletePos}
-        >
-          删除词性
-        </Button>
-      </Flex>
+      {visibleGroups.length === 0 ? (
+        <div className="word-form-rules v3-pos-dialect-rules">
+          {dialectControl}
+        </div>
+      ) : null}
+      {!dialectRulesConsistent ? (
+        <Alert
+          description="请选择统一目标；系统会按唯一词形逐条要求显式映射，不会静默复制或丢弃发音。"
+          showIcon
+          title="当前词性的英美结构待统一"
+          type="warning"
+        />
+      ) : null}
       {pendingGroupDeletion ? (
         <Alert
           action={
@@ -160,15 +286,23 @@ export function V3PosTab({
           type="warning"
         />
       ) : null}
-      {pos.form_groups.length === 0 ? (
-        <Empty description="草稿可暂时不添加变化组" />
+      {visibleGroups.length === 0 ? (
+        !posCatalog || allowedDerivedTypes.length > 0 ? (
+          <Empty description="草稿可暂时不添加变化组" />
+        ) : null
       ) : (
-        <Space orientation="vertical" size="middle">
-          {pos.form_groups.map((group, index) => (
+        <Space
+          className="v3-form-group-list"
+          orientation="vertical"
+          size="middle"
+        >
+          {visibleGroups.map((group, index) => (
             <V3FormGroupCard
               content={content}
+              deleteDisabled={deletingGroupRemovesLastForm(group.id)}
+              dialectControl={index === 0 ? dialectControl : undefined}
               group={group}
-              groupCount={pos.form_groups.length}
+              groupCount={visibleGroups.length}
               groupIndex={index}
               idFactory={idFactory}
               issues={issues}
@@ -183,6 +317,19 @@ export function V3PosTab({
           ))}
         </Space>
       )}
+      {!posCatalog || allowedDerivedTypes.length > 0 ? (
+        <Button
+          aria-label={`新增${posLabel}变化组`}
+          block
+          className="word-form-add-group"
+          icon={<PlusOutlined />}
+          onClick={addGroup}
+          size="large"
+          type="dashed"
+        >
+          增加一组词性变化
+        </Button>
+      ) : null}
     </Flex>
   );
 }

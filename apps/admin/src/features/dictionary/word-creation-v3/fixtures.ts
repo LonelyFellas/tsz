@@ -1,4 +1,5 @@
 import type {
+  DialectRulesV3,
   DraftFormsStepContentV3,
   TextOriginV3,
   WordCommonFormVariantV3,
@@ -173,6 +174,7 @@ export function formsFixture(
     groups?: WordFormGroupV3[];
     pos_id?: string;
     pos?: string;
+    dialect_rules?: DialectRulesV3;
   } = {}
 ): DraftFormsStepContentV3 {
   const forms = options.forms ?? [commonFormFixture()];
@@ -181,6 +183,14 @@ export function formsFixture(
       {
         pos_id: options.pos_id ?? UUIDS.pos,
         pos: options.pos ?? "noun",
+        dialect_rules:
+          options.dialect_rules ??
+          (forms.some((form) => form.regional_variants.mode === "uk_us")
+            ? {
+                spelling_mode: "distinguish",
+                phonetic_mode: "distinguish"
+              }
+            : { spelling_mode: "unified", phonetic_mode: "unified" }),
         forms,
         form_groups: options.groups ?? defaultGroups(forms)
       }
