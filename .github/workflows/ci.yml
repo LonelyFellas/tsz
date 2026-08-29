@@ -21,37 +21,82 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # pnpm 版本读取根 package.json 的 packageManager 字段。
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
+      - name: Setup Node and restore pnpm cache
+        id: node-pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: >-
+          node scripts/ci-metrics.mjs run install --
+          pnpm install --frozen-lockfile
 
-      # 二次运行时恢复 turbo 缓存:未改动的包的 lint/typecheck/build 直接命中跳过。
+      - name: Resolve turbo cache key
+        id: turbo-key
+        env:
+          CACHE_KEY: turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('package.json') }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.sha }}
+        run: echo "value=$CACHE_KEY" >> "$GITHUB_OUTPUT"
+
+      # 仅恢复可信 main 保存的 Turbo archive；任务级命中仍由 Turbo 自身内容 hash 判定。
       - name: Restore turbo cache
-        uses: actions/cache@v6
+        id: turbo-cache
+        continue-on-error: true
+        uses: actions/cache/restore@v6
         with:
           path: .turbo
-          key: turbo-${{ github.sha }}
+          key: ${{ steps.turbo-key.outputs.value }}
           restore-keys: |
-            turbo-
+            turbo-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('package.json') }}-${{ hashFiles('pnpm-lock.yaml') }}-
+
+      - name: Record turbo cache
+        run: >-
+          node scripts/ci-metrics.mjs cache turbo
+          "${{ steps.turbo-key.outputs.value }}"
+          "${{ steps.turbo-cache.outputs.cache-matched-key }}"
+          "${{ steps.turbo-cache.outputs.cache-hit }}"
+          "${{ steps.turbo-cache.outcome }}"
+
+      - name: Reset incomplete turbo restore
+        if: steps.turbo-cache.outcome == 'failure'
+        run: >-
+          node -e 'require("node:fs").rmSync(".turbo", { recursive: true, force: true })'
 
       - name: Lint
-        run: pnpm lint
+        run: node scripts/ci-metrics.mjs run lint -- pnpm lint
 
       - name: Typecheck
-        run: pnpm typecheck
+        run: node scripts/ci-metrics.mjs run typecheck -- pnpm typecheck
 
       - name: Format check
-        run: pnpm format:check
+        run: node scripts/ci-metrics.mjs run format -- pnpm format:check
 
       - name: Build
-        run: pnpm build
+        run: node scripts/ci-metrics.mjs run build -- pnpm build
+
+      - name: Save pnpm cache from trusted main
+        if: >-
+          success() &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          github.repository == 'LonelyFellas/tsz' &&
+          steps.node-pnpm.outputs.restore-outcome == 'success' &&
+          steps.node-pnpm.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ${{ steps.node-pnpm.outputs.store-path }}
+          key: ${{ steps.node-pnpm.outputs.cache-key }}
+
+      - name: Save turbo cache from trusted main
+        if: >-
+          success() &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          github.repository == 'LonelyFellas/tsz' &&
+          steps.turbo-cache.outcome == 'success' &&
+          steps.turbo-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .turbo
+          key: ${{ steps.turbo-key.outputs.value }}
 
   tooling-tests:
     runs-on: ubuntu-latest
@@ -59,30 +104,37 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
+      - name: Setup Node and restore pnpm cache
+        id: node-pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: >-
+          node scripts/ci-metrics.mjs run install --
+          pnpm install --frozen-lockfile
 
       - name: Check Node runtime
-        run: pnpm check:node
+        run: node scripts/ci-metrics.mjs run check-node -- pnpm check:node
 
       - name: Test Node runtime guard
-        run: pnpm test:node-runtime
+        run: >-
+          node scripts/ci-metrics.mjs run test-node-runtime --
+          pnpm test:node-runtime
 
       - name: Test coverage lock
-        run: pnpm test:coverage-lock
+        run: >-
+          node scripts/ci-metrics.mjs run test-coverage-lock --
+          pnpm test:coverage-lock
 
       - name: Test CI modules and workflow
-        run: pnpm test:ci-modules
+        run: >-
+          node scripts/ci-metrics.mjs run test-ci-modules --
+          pnpm test:ci-modules
 
       - name: Test deploy provenance
-        run: pnpm test:deploy-provenance
+        run: >-
+          node scripts/ci-metrics.mjs run test-deploy-provenance --
+          pnpm test:deploy-provenance
 
   unit-coverage:
     name: unit-coverage (${{ matrix.module }})
@@ -100,18 +152,28 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
+      - name: Setup Node and restore pnpm cache
+        id: node-pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: >-
+          node scripts/ci-metrics.mjs run install --
+          pnpm install --frozen-lockfile
 
       - name: Run coverage module
-        run: pnpm ci:test-module ${{ matrix.module }} .ci-artifacts/${{ matrix.module }}
+        run: >-
+          node scripts/ci-metrics.mjs run coverage-${{ matrix.module }} --
+          pnpm ci:test-module ${{ matrix.module }}
+          .ci-artifacts/${{ matrix.module }}
+
+      - name: Measure coverage module artifact
+        if: ${{ !cancelled() }}
+        run: >-
+          node scripts/ci-metrics.mjs artifact
+          coverage-${{ matrix.module }} required
+          .ci-artifacts/${{ matrix.module }}/.vitest-reports
+          .ci-artifacts/${{ matrix.module }}/.ci-inventories
 
       - name: Upload blob and actual-run inventory
         if: ${{ !cancelled() }}
@@ -133,15 +195,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
+      - name: Setup Node and restore pnpm cache
+        id: node-pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: >-
+          node scripts/ci-metrics.mjs run install --
+          pnpm install --frozen-lockfile
 
       - name: Download coverage modules
         uses: actions/download-artifact@v7
@@ -151,13 +212,26 @@ jobs:
           merge-multiple: true
 
       - name: Generate full test inventory
-        run: pnpm exec vitest list --filesOnly --json > .ci-full-inventory.json
+        run: >-
+          node scripts/ci-metrics.mjs run full-test-inventory --
+          sh -c 'pnpm exec vitest list --filesOnly --json > .ci-full-inventory.json'
 
       - name: Verify every test file ran exactly once
-        run: pnpm ci:validate-test-inventories .ci-full-inventory.json .ci-artifacts/.ci-inventories .ci-artifacts/.vitest-reports
+        run: >-
+          node scripts/ci-metrics.mjs run validate-test-inventories --
+          pnpm ci:validate-test-inventories .ci-full-inventory.json
+          .ci-artifacts/.ci-inventories .ci-artifacts/.vitest-reports
 
       - name: Merge coverage and enforce thresholds
-        run: pnpm exec vitest --config=vitest.config.ts --merge-reports=.ci-artifacts/.vitest-reports --coverage
+        run: >-
+          node scripts/ci-metrics.mjs run merge-coverage --
+          pnpm exec vitest --config=vitest.config.ts
+          --merge-reports=.ci-artifacts/.vitest-reports --coverage
+
+      - name: Measure failed coverage report
+        if: ${{ !cancelled() && failure() }}
+        run: >-
+          node scripts/ci-metrics.mjs artifact coverage-report optional coverage/
 
       - name: Upload failed coverage report
         if: ${{ !cancelled() && failure() }}
@@ -200,19 +274,18 @@ jobs:
           # commitlint 需要 base..head 之间的完整提交历史。
           fetch-depth: 0
 
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
+      - name: Setup Node and restore pnpm cache
+        id: node-pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: >-
+          node scripts/ci-metrics.mjs run install --
+          pnpm install --frozen-lockfile
 
       - name: Lint commit messages
         run: >
-          pnpm commitlint
+          node scripts/ci-metrics.mjs run commitlint -- pnpm commitlint
           --from ${{ github.event.pull_request.base.sha }}
           --to ${{ github.event.pull_request.head.sha }}
           --verbose
@@ -224,33 +297,51 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
+      - name: Setup Node and restore pnpm cache
+        id: node-pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: >-
+          node scripts/ci-metrics.mjs run install --
+          pnpm install --frozen-lockfile
 
       # 缓存 Playwright 浏览器二进制(按 Playwright 版本),避免每次跑都重新下载。
       - name: Resolve Playwright version
         id: pw
         run: echo "version=$(pnpm --filter @tsz/e2e exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve Playwright cache key
+        id: pw-key
+        env:
+          CACHE_KEY: playwright-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.pw.outputs.version }}
+        run: echo "value=$CACHE_KEY" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         id: pw-cache
-        uses: actions/cache@v6
+        continue-on-error: true
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+          key: ${{ steps.pw-key.outputs.value }}
 
-      # 未命中缓存才装浏览器二进制;不带 --with-deps,系统依赖统一由下一步处理,
-      # 避免 apt 故障把「浏览器没装上」和「系统库没补上」两种失败混成一个。
-      - name: Install Playwright browsers
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: pnpm --filter @tsz/e2e exec playwright install chromium
+      - name: Record Playwright cache
+        run: >-
+          node scripts/ci-metrics.mjs cache playwright-web
+          "${{ steps.pw-key.outputs.value }}"
+          "${{ steps.pw-cache.outputs.cache-matched-key }}"
+          "${{ steps.pw-cache.outputs.cache-hit }}"
+          "${{ steps.pw-cache.outcome }}"
+
+      - name: Isolate failed Playwright restore
+        if: steps.pw-cache.outcome == 'failure'
+        run: echo "PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/ms-playwright-fallback" >> "$GITHUB_ENV"
+
+      # install 是幂等的：命中时只确认浏览器存在，miss/不完整缓存会补齐下载。
+      - name: Ensure Playwright browsers
+        run: >-
+          node scripts/ci-metrics.mjs run playwright-browser --
+          pnpm --filter @tsz/e2e exec playwright install chromium
 
       # 系统依赖走 apt,不随缓存走,每次都要重新拉 Ubuntu 源。该源偶发不可达时
       # install-deps 会一直卡住,直到吃满 job 的 timeout-minutes 被 cancel——
@@ -270,7 +361,15 @@ jobs:
           echo "::warning::playwright install-deps 三次均失败,继续执行 e2e(runner 镜像通常已含所需库)"
 
       - name: Web E2E
-        run: pnpm --filter @tsz/e2e test:e2e:web
+        run: >-
+          node scripts/ci-metrics.mjs run e2e-web --
+          pnpm --filter @tsz/e2e test:e2e:web
+
+      - name: Measure failed web Playwright report
+        if: ${{ !cancelled() && failure() }}
+        run: >-
+          node scripts/ci-metrics.mjs artifact playwright-report-web optional
+          e2e/playwright-report/
 
       # 失败时上传报告,便于排查 flaky 用例。
       - name: Upload web Playwright report
@@ -281,36 +380,68 @@ jobs:
           path: e2e/playwright-report/
           retention-days: 7
 
+      - name: Save Playwright cache from trusted main
+        if: >-
+          success() &&
+          github.event_name == 'push' &&
+          github.ref == 'refs/heads/main' &&
+          github.repository == 'LonelyFellas/tsz' &&
+          steps.pw-cache.outcome == 'success' &&
+          steps.pw-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.pw-key.outputs.value }}
+
   e2e-admin:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
+      - name: Setup Node and restore pnpm cache
+        id: node-pnpm
+        uses: ./.github/actions/setup-node-pnpm
 
       - name: Install
-        run: pnpm install --frozen-lockfile
+        run: >-
+          node scripts/ci-metrics.mjs run install --
+          pnpm install --frozen-lockfile
 
       - name: Resolve Playwright version
         id: pw
         run: echo "version=$(pnpm --filter @tsz/e2e exec playwright --version | awk '{print $2}')" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve Playwright cache key
+        id: pw-key
+        env:
+          CACHE_KEY: playwright-v2-${{ runner.os }}-${{ runner.arch }}-${{ steps.pw.outputs.version }}
+        run: echo "value=$CACHE_KEY" >> "$GITHUB_OUTPUT"
+
       - name: Cache Playwright browsers
         id: pw-cache
-        uses: actions/cache@v6
+        continue-on-error: true
+        uses: actions/cache/restore@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw.outputs.version }}
+          key: ${{ steps.pw-key.outputs.value }}
 
-      - name: Install Playwright browsers
-        if: steps.pw-cache.outputs.cache-hit != 'true'
-        run: pnpm --filter @tsz/e2e exec playwright install chromium
+      - name: Record Playwright cache
+        run: >-
+          node scripts/ci-metrics.mjs cache playwright-admin
+          "${{ steps.pw-key.outputs.value }}"
+          "${{ steps.pw-cache.outputs.cache-matched-key }}"
+          "${{ steps.pw-cache.outputs.cache-hit }}"
+          "${{ steps.pw-cache.outcome }}"
+
+      - name: Isolate failed Playwright restore
+        if: steps.pw-cache.outcome == 'failure'
+        run: echo "PLAYWRIGHT_BROWSERS_PATH=$RUNNER_TEMP/ms-playwright-fallback" >> "$GITHUB_ENV"
+
+      - name: Ensure Playwright browsers
+        run: >-
+          node scripts/ci-metrics.mjs run playwright-browser --
+          pnpm --filter @tsz/e2e exec playwright install chromium
 
       - name: Install Playwright system deps
         run: |
@@ -324,7 +455,15 @@ jobs:
           echo "::warning::playwright install-deps 三次均失败,继续执行 e2e(runner 镜像通常已含所需库)"
 
       - name: Admin E2E
-        run: pnpm --filter @tsz/e2e test:e2e:admin
+        run: >-
+          node scripts/ci-metrics.mjs run e2e-admin --
+          pnpm --filter @tsz/e2e test:e2e:admin
+
+      - name: Measure failed admin Playwright report
+        if: ${{ !cancelled() && failure() }}
+        run: >-
+          node scripts/ci-metrics.mjs artifact playwright-report-admin optional
+          e2e/playwright-report-admin/
 
       - name: Upload admin Playwright report
         if: ${{ !cancelled() && failure() }}
