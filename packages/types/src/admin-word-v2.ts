@@ -168,6 +168,8 @@ export interface WordRelationV2 {
    * target_*。与 target_* 严格互斥，由库层 lexicon_relations_target_shape_check 保证。
    */
   pending_target_headword?: string;
+  /** 待物化目标创建时预填到默认中文释义；绑定后由服务端清空。 */
+  pending_target_gloss?: string;
   /** 服务端只读快照。 */
   target_headword?: string;
   /** 服务端只读快照。 */

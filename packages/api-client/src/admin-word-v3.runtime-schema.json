@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "ef4550b27210566d8e71ac1189e0d0a01fd0297adb8f45c32b24639708f9dd02",
+  "_source": "/Users/darwish/.codex/worktrees/47a5/tsz-rust/docs/openapi.json",
+  "_source_sha256": "d6e2ea57b87c7f4c05bbf770136c44cb41d84ef22d6aea1d3579eb72370a8bc0",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -564,6 +564,7 @@
         "request",
         "normalized_surface",
         "builtin_dictionary",
+        "suggested_pos",
         "matches",
         "requires_acknowledgement"
       ],
@@ -579,6 +580,11 @@
         "request": { "$ref": "#/$defs/DetectionSurfaceRequestEchoV3" },
         "requires_acknowledgement": { "type": "boolean" },
         "schema_version": { "type": "integer", "enum": [3] },
+        "suggested_pos": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 2000
+        },
         "surface_match_page": { "$ref": "#/$defs/SurfaceMatchPageV3" }
       },
       "additionalProperties": false
@@ -608,6 +614,7 @@
       }
     },
     "Dialect": { "type": "string", "enum": ["common", "uk", "us"] },
+    "DialectModeV3": { "type": "string", "enum": ["unified", "distinguish"] },
     "DialectRulesV2": {
       "type": "object",
       "required": ["spelling_mode", "phonetic_mode"],
@@ -615,6 +622,15 @@
         "phonetic_mode": { "type": "string" },
         "spelling_mode": { "type": "string" }
       }
+    },
+    "DialectRulesV3": {
+      "type": "object",
+      "required": ["spelling_mode", "phonetic_mode"],
+      "properties": {
+        "phonetic_mode": { "$ref": "#/$defs/DialectModeV3" },
+        "spelling_mode": { "$ref": "#/$defs/DialectModeV3" }
+      },
+      "additionalProperties": false
     },
     "DialectVariantRichTextSlotV3": {
       "oneOf": [
@@ -1298,6 +1314,7 @@
       "required": [
         "source_schema_version",
         "entry_id",
+        "entry_kind",
         "status",
         "content_scope",
         "pos_id",
@@ -1312,6 +1329,7 @@
         "content_scope": { "$ref": "#/$defs/SurfaceContentScopeV2" },
         "dialect": { "$ref": "#/$defs/Dialect" },
         "entry_id": { "type": "string", "format": "uuid" },
+        "entry_kind": { "$ref": "#/$defs/WordEntryKindV3" },
         "form_id": { "type": "string", "format": "uuid" },
         "form_type": { "$ref": "#/$defs/WordFormTypeV3" },
         "group_ids": {
@@ -2711,6 +2729,7 @@
       "type": "string",
       "enum": [
         "invalid_regional_variant_shape",
+        "dialect_rules_invalid",
         "invalid_form_type_for_part_of_speech",
         "forbidden_v3_field",
         "duplicate_node_id",
@@ -2754,6 +2773,11 @@
         "relation_target_stale",
         "sentence_context_target_unavailable",
         "relation_pending_headword_invalid",
+        "relation_target_shape_invalid",
+        "relation_pending_gloss_without_headword",
+        "relation_pending_gloss_invalid",
+        "relation_pending_gloss_conflict",
+        "relation_pending_gloss_target_exists",
         "node_id_reused",
         "node_binding_unknown",
         "node_binding_changed",
@@ -3060,7 +3084,7 @@
         }
       ]
     },
-    "WordEntryKindV3": { "type": "string", "enum": ["word"] },
+    "WordEntryKindV3": { "type": "string", "enum": ["word", "phrase"] },
     "WordFormGroupMemberV3": {
       "type": "object",
       "required": ["id", "form_id"],
@@ -3180,8 +3204,9 @@
     },
     "WordPosFormsV3": {
       "type": "object",
-      "required": ["pos_id", "pos", "forms", "form_groups"],
+      "required": ["pos_id", "pos", "dialect_rules", "forms", "form_groups"],
       "properties": {
+        "dialect_rules": { "$ref": "#/$defs/DialectRulesV3" },
         "form_groups": {
           "type": "array",
           "items": { "$ref": "#/$defs/WordFormGroupV3" },
@@ -3279,6 +3304,7 @@
       "required": ["id", "relation", "score"],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
+        "pending_target_gloss": { "type": "string", "maxLength": 5000 },
         "pending_target_headword": { "type": "string" },
         "relation": { "type": "string" },
         "score": { "type": "string" },
@@ -3293,6 +3319,7 @@
       "required": ["id", "relation", "score"],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
+        "pending_target_gloss": { "type": "string", "maxLength": 5000 },
         "pending_target_headword": { "type": "string" },
         "relation": { "type": "string" },
         "score": { "type": "string" },

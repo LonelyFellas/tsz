@@ -329,6 +329,7 @@ export function aggregateSurfaceMatchCards(
 export interface LifecycleSurfaceMatchCard {
   key: string;
   entry_id: string;
+  schema_version: 2 | 3;
   label: string;
   kind: "word" | "phrase";
   status: "draft" | "published" | "archived";
@@ -419,6 +420,7 @@ export function aggregateLifecycleSurfaceMatchCards(
       cards.set(entryId, {
         key: entryId,
         entry_id: entryId,
+        schema_version: 2,
         label: card.existing.headword,
         kind: card.existing.kind,
         status: card.existing.status,
@@ -454,6 +456,7 @@ export function aggregateLifecycleSurfaceMatchCards(
       item.match_kind === "form_variant_v3"
         ? item.match.status
         : item.match.existing.status;
+    const schemaVersion = item.match_kind === "form_variant_v3" ? 3 : 2;
     const kind =
       item.match_kind === "legacy_v2" ? item.match.existing.kind : "word";
     const sourceLabel = v3SourceLabel(item);
@@ -469,6 +472,7 @@ export function aggregateLifecycleSurfaceMatchCards(
     cards.set(entryId, {
       key: entryId,
       entry_id: entryId,
+      schema_version: schemaVersion,
       label,
       kind,
       status,

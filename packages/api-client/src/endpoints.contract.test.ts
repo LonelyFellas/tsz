@@ -480,7 +480,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "ef4550b27210566d8e71ac1189e0d0a01fd0297adb8f45c32b24639708f9dd02"
+      "d6e2ea57b87c7f4c05bbf770136c44cb41d84ef22d6aea1d3579eb72370a8bc0"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -493,10 +493,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       { $ref: "#/$defs/AdminWordV3" }
     ]);
     expect(defs.AdminWordV3.properties.schema_version.enum).toEqual([3]);
+    expect(defs.WordEntryKindV3.enum).toEqual(["word", "phrase"]);
+    expect(defs.WordPosFormsV3.required).toContain("dialect_rules");
+    expect(defs.DialectModeV3.enum).toEqual(["unified", "distinguish"]);
     expect(Object.keys(defs.AdminWordV3.properties)).not.toContain("headwords");
     expect(defs.WordPosFormsV3.required).toEqual([
       "pos_id",
       "pos",
+      "dialect_rules",
       "forms",
       "form_groups"
     ]);
@@ -569,6 +573,17 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(
       Object.keys(schemas.WordRelationWritableV3.properties)
     ).not.toContain("target_headword");
+    const relationSchemas = [
+      schemas.WordRelationV2,
+      schemas.WordRelationWritableV3,
+      runtimeSchemaBundle.$defs.WordRelationV3
+    ] as Array<{ properties: Record<string, unknown> }>;
+    for (const schema of relationSchemas) {
+      expect(schema.properties.pending_target_gloss).toEqual({
+        type: "string",
+        maxLength: 5000
+      });
+    }
 
     expect(
       schemas.SurfaceMatchItemV3.oneOf.map((branch) => ({
@@ -585,9 +600,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         match: "#/components/schemas/FormSurfaceMatchV3"
       }
     ]);
+    expect(schemas.FormSurfaceMatchV3.required).toContain("entry_kind");
+    expect(schemas.FormSurfaceMatchV3.properties.entry_kind).toEqual({
+      $ref: "#/components/schemas/WordEntryKindV3"
+    });
     expect(schemas.FormSurfaceMatchV3.required).toEqual([
       "source_schema_version",
       "entry_id",
+      "entry_kind",
       "status",
       "content_scope",
       "pos_id",
