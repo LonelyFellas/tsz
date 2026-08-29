@@ -343,6 +343,40 @@ describe("V3 meanings writable model", () => {
     });
   });
 
+  it("只读关系快照区分无展示值、仅词面与仅词义", () => {
+    const canonical = structuredClone(meaningsCanonicalFixture);
+    canonical.pos[0]!.senses[0]!.relations = [
+      {
+        id: "relation-without-display",
+        relation: "synonym",
+        target_word_id: "target-1",
+        target_sense_id: "sense-1",
+        score: "10"
+      },
+      {
+        id: "relation-headword-only",
+        relation: "antonym",
+        target_word_id: "target-2",
+        target_sense_id: "sense-2",
+        target_headword: "outside",
+        score: "20"
+      },
+      {
+        id: "relation-gloss-only",
+        relation: "derivative",
+        target_word_id: "target-3",
+        target_sense_id: "sense-3",
+        target_gloss: "外部词义",
+        score: "30"
+      }
+    ];
+
+    expect(relationDisplaySnapshots(canonical)).toEqual({
+      "relation-headword-only": { headword: "outside" },
+      "relation-gloss-only": { gloss: "外部词义" }
+    });
+  });
+
   it("sense 仅归属 POS，不产生 group/form/variant ownership 字段", () => {
     const writable = toWritableMeanings(meaningsCanonicalFixture);
     expect(Object.keys(writable.pos[0]!.senses[0]!).sort()).toEqual([

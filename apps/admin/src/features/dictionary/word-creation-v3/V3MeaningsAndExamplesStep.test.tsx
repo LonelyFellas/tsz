@@ -822,6 +822,88 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(retryExact).toHaveBeenCalledTimes(1);
   });
 
+  it("exact 已完成但 contains 有后页时从 contains 加载更多", () => {
+    const fetchExactNextPage = vi.fn().mockResolvedValue(undefined);
+    const fetchContainsNextPage = vi.fn().mockResolvedValue(undefined);
+    relatedSearchAny.mockImplementation((query, kind, open) =>
+      query === "containsmore"
+        ? ({
+            exact: {
+              data: { pages: [{ results: [], total: 0, next_cursor: null }] },
+              isFetching: false,
+              isError: false,
+              hasNextPage: false,
+              fetchNextPage: fetchExactNextPage,
+              refetch: vi.fn()
+            },
+            contains: {
+              data: {
+                pages: [{ results: [], total: 1, next_cursor: "contains-next" }]
+              },
+              isFetching: false,
+              isError: false,
+              hasNextPage: true,
+              fetchNextPage: fetchContainsNextPage,
+              refetch: vi.fn()
+            }
+          } as never)
+        : defaultRelatedSearchImplementation(query, kind, open)
+    );
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [];
+    render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByText("添加近义词").closest("button")!);
+    fireEvent.change(screen.getByLabelText("近义词目标词条"), {
+      target: { value: "containsmore" }
+    });
+
+    const loadMore = screen.getByLabelText("加载更多关联词结果");
+    fireEvent.mouseDown(loadMore);
+    fireEvent.click(loadMore);
+    expect(fetchExactNextPage).not.toHaveBeenCalled();
+    expect(fetchContainsNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("仅 contains 搜索失败时只重试 contains", () => {
+    const retryExact = vi.fn().mockResolvedValue(undefined);
+    const retryContains = vi.fn().mockResolvedValue(undefined);
+    relatedSearchAny.mockImplementation((query, kind, open) =>
+      query === "containsfail"
+        ? ({
+            exact: {
+              data: { pages: [] },
+              isFetching: false,
+              isError: false,
+              hasNextPage: false,
+              fetchNextPage: vi.fn(),
+              refetch: retryExact
+            },
+            contains: {
+              data: { pages: [] },
+              isFetching: false,
+              isError: true,
+              hasNextPage: false,
+              fetchNextPage: vi.fn(),
+              refetch: retryContains
+            }
+          } as never)
+        : defaultRelatedSearchImplementation(query, kind, open)
+    );
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [];
+    render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByText("添加近义词").closest("button")!);
+    fireEvent.change(screen.getByLabelText("近义词目标词条"), {
+      target: { value: "containsfail" }
+    });
+
+    const retry = screen.getByLabelText("重试关联词搜索");
+    fireEvent.mouseDown(retry);
+    fireEvent.click(retry);
+    expect(retryExact).not.toHaveBeenCalled();
+    expect(retryContains).toHaveBeenCalledTimes(1);
+  });
+
   it("canonical 已绑定关系进入 Step 3 时显示真实目标词面和词义快照", () => {
     const canonical = structuredClone(
       meaningsFixture
