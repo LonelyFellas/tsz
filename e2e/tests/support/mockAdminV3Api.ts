@@ -9,6 +9,7 @@ import type {
   DraftFormsStepContentV3,
   DraftMeaningsStepContentV3,
   PartOfSpeechCatalogResponse,
+  SurfaceMatchPageV3,
   V3DraftValidationIssue
 } from "@tsz/types";
 
@@ -21,6 +22,10 @@ export const ADMIN_V2_LEGACY_WORD_ID = "01990000-0000-7000-8000-000000000004";
 export const ADMIN_V3_SECOND_POS_ID = "01990000-0000-7000-8000-000000000012";
 export const ADMIN_V3_ERROR_PRONUNCIATION_ID =
   "01990000-0000-7000-8000-000000000042";
+const ADMIN_V3_SURFACE_ARCHIVED_ID = "01990000-0000-7000-8000-000000000401";
+const ADMIN_V3_SURFACE_PUBLISHED_ID = "01990000-0000-7000-8000-000000000402";
+const ADMIN_V3_SURFACE_SECOND_ID = "01990000-0000-7000-8000-000000000403";
+const ADMIN_V3_SURFACE_SNAPSHOT_ID = "01990000-0000-7000-8000-000000000450";
 
 const NOW = "2026-08-25T02:00:00.000Z";
 const ACTOR_ID = "01990000-0000-7000-8000-000000000099";
@@ -113,6 +118,10 @@ const FORMS: DraftFormsStepContentV3 = {
     {
       pos_id: nodeId(11),
       pos: "noun",
+      dialect_rules: {
+        spelling_mode: "unified",
+        phonetic_mode: "unified"
+      },
       forms: [
         {
           id: nodeId(21),
@@ -135,20 +144,13 @@ const FORMS: DraftFormsStepContentV3 = {
           id: nodeId(22),
           form_type: "base",
           regional_variants: {
-            mode: "uk_us",
-            uk: {
+            mode: "common",
+            common: {
               id: nodeId(32),
-              dialect: "uk",
+              dialect: "common",
               spelling: "orbital centre",
               origin: "manual",
               pronunciations: [pronunciation(nodeId(44), "ˈɔːbɪtl ˈsentə")]
-            },
-            us: {
-              id: nodeId(33),
-              dialect: "us",
-              spelling: "orbital center",
-              origin: "manual",
-              pronunciations: [pronunciation(nodeId(45), "ˈɔrbɪtl ˈsentər")]
             }
           }
         },
@@ -189,6 +191,10 @@ const FORMS: DraftFormsStepContentV3 = {
     {
       pos_id: ADMIN_V3_SECOND_POS_ID,
       pos: "verb",
+      dialect_rules: {
+        spelling_mode: "unified",
+        phonetic_mode: "unified"
+      },
       forms: [
         {
           id: nodeId(24),
@@ -220,7 +226,8 @@ const FORMS: DraftFormsStepContentV3 = {
 
 const MEANINGS: DraftMeaningsStepContentV3 = {
   sense_groups: [
-    { id: nodeId(71), name_zh: "轨道运动", name_en: "Orbital motion" }
+    { id: nodeId(71), name_zh: "轨道运动", name_en: "Orbital motion" },
+    { id: nodeId(81), name_zh: "环绕运动", name_en: "Orbiting motion" }
   ],
   pos: FORMS.pos.map((pos, index) => ({
     pos_id: pos.pos_id,
@@ -241,7 +248,7 @@ const MEANINGS: DraftMeaningsStepContentV3 = {
         id: nodeId(74 + index * 10),
         sub_pos: index === 0 ? "N-COUNT" : "V-I",
         level: "B1",
-        sense_group_id: nodeId(71),
+        sense_group_id: nodeId(71 + index * 10),
         frequency: "42.00",
         depends_on_context: false,
         definitions: [
@@ -496,6 +503,10 @@ export interface MockAdminV3ApiController {
 
 export interface MockAdminV3ApiOptions {
   initial?: "mixed" | "canary";
+  duplicate?: boolean;
+  entryKind?: "word" | "phrase";
+  expireSurfaceSnapshotOnce?: boolean;
+  surfaceWarnings?: boolean;
 }
 
 function clone<T>(value: T): T {
@@ -580,12 +591,125 @@ function validationProblem(route: Route, word: AdminWordV3) {
   });
 }
 
-function detection(surface: string): DetectLexiconSurfaceResponseV3 {
+function surfaceMatchItem(
+  entryId: string,
+  status: "published" | "archived",
+  spelling: string,
+  kind: "word" | "phrase"
+) {
+  return {
+    match_kind: "form_variant_v3" as const,
+    match: {
+      source_schema_version: 3 as const,
+      entry_id: entryId,
+      entry_kind: kind,
+      status,
+      content_scope: "current_publication" as const,
+      pos_id: nodeId(11),
+      group_ids: [nodeId(51)],
+      form_id: nodeId(21),
+      variant_id: nodeId(31),
+      form_type: "base" as const,
+      dialect: "common" as const,
+      spelling
+    }
+  };
+}
+
+function surfaceMatchPage(
+  surface: string,
+  kind: "word" | "phrase",
+  terminal: boolean,
+  duplicate: boolean
+): SurfaceMatchPageV3 {
+  const entries = duplicate
+    ? ([
+        [ADMIN_V3_SURFACE_ARCHIVED_ID, "archived", "colour"],
+        [ADMIN_V3_SURFACE_PUBLISHED_ID, "published", "color"]
+      ] as const)
+    : terminal
+      ? ([[ADMIN_V3_SURFACE_SECOND_ID, "archived", "workspace"]] as const)
+      : ([
+          [ADMIN_V3_SURFACE_ARCHIVED_ID, "archived", "workspace"],
+          [ADMIN_V3_SURFACE_PUBLISHED_ID, "published", "workspace"]
+        ] as const);
+  const items = entries.map(([entryId, status, spelling]) =>
+    surfaceMatchItem(entryId, status, spelling, kind)
+  );
+  const page: SurfaceMatchPageV3 = {
+    schema_version: 3,
+    snapshot_id: ADMIN_V3_SURFACE_SNAPSHOT_ID,
+    items,
+    total: duplicate ? 2 : 3,
+    matched_entry_contexts: entries.map(([entryId, , spelling]) => ({
+      entry_id: entryId,
+      presentation: {
+        label: spelling,
+        matched_surfaces: [spelling],
+        strategy_version: "mock-surface-v3"
+      },
+      pos_labels: ["noun"],
+      gloss_previews: ["测试候选释义"],
+      updated_at: NOW,
+      inbound_relations: {
+        total: 0,
+        by_type: { synonym: 0, antonym: 0, derivative: 0 },
+        previews: [],
+        truncated: false
+      }
+    })),
+    confirmation_reasons: ["unacknowledged_surface_matches"],
+    policy_name: "surface_warning_acknowledgement",
+    policy_epoch: 1,
+    continuation_policy: "enabled",
+    next_cursor: terminal || duplicate ? null : "surface-page-2",
+    ...(terminal || duplicate
+      ? { surface_confirmation_token: `surface-token-${surface}` }
+      : {})
+  };
+  assertRuntimeFixture("SurfaceMatchPageAny", page);
+  return page;
+}
+
+function surfaceCandidateWord(
+  entryId: string,
+  spelling: string,
+  status: "published" | "archived",
+  kind: "word" | "phrase"
+): AdminWordV3 {
+  const candidate = v3Word(entryId, spelling, {
+    mode: "shadow_only",
+    blocked_code: "phase2_consumers_not_ready"
+  });
+  candidate.kind = kind;
+  candidate.status = status;
+  candidate.presentation = {
+    label: spelling,
+    matched_surfaces: [spelling],
+    strategy_version: "mock-surface-v3"
+  };
+  for (const pos of candidate.forms.pos) {
+    for (const form of pos.forms) {
+      if (form.regional_variants.mode === "common") {
+        form.regional_variants.common.spelling = spelling;
+      }
+    }
+  }
+  return candidate;
+}
+
+function detection(
+  surface: string,
+  kind: "word" | "phrase",
+  options: Pick<MockAdminV3ApiOptions, "duplicate" | "surfaceWarnings">
+): DetectLexiconSurfaceResponseV3 {
+  const requiresAcknowledgement =
+    options.duplicate === true || options.surfaceWarnings === true;
   return {
     schema_version: 3,
     detection_id: nodeId(301),
     expires_at: new Date(Date.now() + 60_000).toISOString(),
-    request: { language: "en", kind: "word", surface },
+    request: { language: "en", kind, surface },
     normalized_surface: surface.trim().toLowerCase(),
     builtin_dictionary: {
       status: "matched",
@@ -626,8 +750,19 @@ function detection(surface: string): DetectLexiconSurfaceResponseV3 {
         frequency: { name: "mock-dictionary", version: "e01a" }
       }
     },
+    suggested_pos: ["noun", "verb"],
     matches: [],
-    requires_acknowledgement: false
+    requires_acknowledgement: requiresAcknowledgement,
+    ...(requiresAcknowledgement
+      ? {
+          surface_match_page: surfaceMatchPage(
+            surface,
+            kind,
+            options.duplicate === true,
+            options.duplicate === true
+          )
+        }
+      : {})
   };
 }
 
@@ -651,7 +786,20 @@ export async function mockAdminV3Api(
         });
   const requests: MockAdminV3Request[] = [];
   const publications: AdminWordPublicationAny[] = [clone(LEGACY_PUBLICATION)];
-  let completeFailurePending = true;
+  let formsFailurePending = true;
+  let surfaceSnapshotExpiryRemaining = options.expireSurfaceSnapshotOnce
+    ? 1
+    : 0;
+  let lastDetectedSurface = "orbit";
+  const surfaceKind = options.entryKind ?? "word";
+  const surfaceCandidates = new Map<
+    string,
+    { spelling: string; status: "published" | "archived" }
+  >([
+    [ADMIN_V3_SURFACE_ARCHIVED_ID, { spelling: "colour", status: "archived" }],
+    [ADMIN_V3_SURFACE_PUBLISHED_ID, { spelling: "color", status: "published" }],
+    [ADMIN_V3_SURFACE_SECOND_ID, { spelling: "workspace", status: "archived" }]
+  ]);
   assertRuntimeFixture("AdminWordV3", word);
 
   await page.route("**/api/v1/admin/**", async (route) => {
@@ -693,17 +841,104 @@ export async function mockAdminV3Api(
       return json(route, 200, response);
     }
     if (method === "POST" && path === ADMIN_V3_DETECTIONS_PATH) {
-      const input = requestBody as { surface?: string } | undefined;
-      const response = detection(input?.surface ?? "");
+      const input = requestBody as
+        { kind?: "word" | "phrase"; surface?: string } | undefined;
+      lastDetectedSurface = input?.surface ?? "";
+      if (options.duplicate) {
+        surfaceCandidates.set(ADMIN_V3_SURFACE_ARCHIVED_ID, {
+          spelling: "colour",
+          status: "archived"
+        });
+        surfaceCandidates.set(ADMIN_V3_SURFACE_PUBLISHED_ID, {
+          spelling: "color",
+          status: "published"
+        });
+      } else if (options.surfaceWarnings) {
+        for (const entryId of [
+          ADMIN_V3_SURFACE_ARCHIVED_ID,
+          ADMIN_V3_SURFACE_PUBLISHED_ID,
+          ADMIN_V3_SURFACE_SECOND_ID
+        ]) {
+          surfaceCandidates.set(entryId, {
+            spelling: "workspace",
+            status:
+              entryId === ADMIN_V3_SURFACE_PUBLISHED_ID
+                ? "published"
+                : "archived"
+          });
+        }
+      }
+      const response = detection(input?.surface ?? "", input?.kind ?? "word", {
+        duplicate: options.duplicate,
+        surfaceWarnings: options.surfaceWarnings
+      });
       assertRuntimeFixture("DetectLexiconResponseAny", response);
       return json(route, 200, response);
     }
+    if (
+      method === "GET" &&
+      path.startsWith("/lexicon/surface-match-snapshots/")
+    ) {
+      if (url.searchParams.get("cursor") !== "surface-page-2") {
+        return json(route, 410, {
+          type: "urn:tsz:problem:surface_match_snapshot_expired",
+          title: "Surface match snapshot expired",
+          status: 410,
+          detail: "surface match snapshot expired",
+          code: "surface_match_snapshot_expired"
+        });
+      }
+      return json(
+        route,
+        200,
+        surfaceMatchPage(lastDetectedSurface, surfaceKind, true, false)
+      );
+    }
     if (method === "POST" && path === ADMIN_V3_ENTRIES_PATH) {
+      const input = requestBody as
+        | {
+            confirmed_surface_match_token?: string;
+            detection_id?: string;
+            kind?: "word" | "phrase";
+          }
+        | undefined;
+      const surface = lastDetectedSurface;
+      if (
+        (options.duplicate || options.surfaceWarnings) &&
+        input?.confirmed_surface_match_token !== `surface-token-${surface}`
+      ) {
+        return json(route, 409, {
+          type: "urn:tsz:problem:surface_match_acknowledgement_required",
+          title: "Surface match acknowledgement required",
+          status: 409,
+          detail: "surface match acknowledgement required",
+          code: "surface_match_acknowledgement_required",
+          meta: {
+            surface_match_page: surfaceMatchPage(
+              surface,
+              input?.kind ?? surfaceKind,
+              options.duplicate === true,
+              options.duplicate === true
+            )
+          }
+        });
+      }
+      if (surfaceSnapshotExpiryRemaining > 0) {
+        surfaceSnapshotExpiryRemaining -= 1;
+        return json(route, 410, {
+          type: "urn:tsz:problem:surface_match_snapshot_expired",
+          title: "Surface match snapshot expired",
+          status: 410,
+          detail: "surface match snapshot expired",
+          code: "surface_match_snapshot_expired"
+        });
+      }
       word = {
-        ...v3Word(ADMIN_V3_NEW_WORD_ID, "orbit", {
+        ...v3Word(ADMIN_V3_NEW_WORD_ID, surface, {
           mode: "shadow_only",
           blocked_code: "phase2_consumers_not_ready"
         }),
+        kind: input?.kind ?? surfaceKind,
         forms: { pos: [] },
         meanings: { sense_groups: [], pos: [] },
         completed_steps: ["basics"],
@@ -721,6 +956,25 @@ export async function mockAdminV3Api(
         retired_stable_slots: []
       });
     }
+    if (method === "GET") {
+      const candidate = surfaceCandidates.get(
+        path.replace(`${ADMIN_V3_ENTRIES_PATH}/`, "")
+      );
+      if (candidate) {
+        const candidateWord = surfaceCandidateWord(
+          path.replace(`${ADMIN_V3_ENTRIES_PATH}/`, ""),
+          candidate.spelling,
+          candidate.status,
+          surfaceKind
+        );
+        const response = {
+          word: candidateWord,
+          retired_stable_nodes: []
+        };
+        assertRuntimeFixture("AdminWordDraftAnyEnvelope", response);
+        return json(route, 200, response);
+      }
+    }
     if (method === "GET" && path === `${ADMIN_V3_ENTRIES_PATH}/${word.id}`) {
       const response = { word: clone(word), retired_stable_nodes: [] };
       assertRuntimeFixture("AdminWordDraftAnyEnvelope", response);
@@ -736,9 +990,12 @@ export async function mockAdminV3Api(
             content?: DraftFormsStepContentV3;
           }
         | undefined;
-      if (input?.intent === "complete" && completeFailurePending) {
-        completeFailurePending = false;
-        return validationProblem(route, word);
+      if (formsFailurePending) {
+        formsFailurePending = false;
+        return validationProblem(route, {
+          ...word,
+          forms: clone(input?.content ?? word.forms)
+        });
       }
       if (input?.content) word.forms = clone(input.content);
       word = {
