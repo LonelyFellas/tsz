@@ -53,6 +53,7 @@ test("package manager and install guards stay aligned", async () => {
 test("CI, Docker, and native deployment use the same pinned Node runtime", async () => {
   const [
     ci,
+    setupNodePnpmAction,
     adminDockerfile,
     webDockerfile,
     deployWeb,
@@ -63,6 +64,7 @@ test("CI, Docker, and native deployment use the same pinned Node runtime", async
     foundationReadme
   ] = await Promise.all([
     readRepositoryFile(".github/workflows/ci.yml"),
+    readRepositoryFile(".github/actions/setup-node-pnpm/action.yml"),
     readRepositoryFile("apps/admin/Dockerfile"),
     readRepositoryFile("apps/web/Dockerfile"),
     readRepositoryFile("deploy/deploy-web.sh"),
@@ -72,14 +74,18 @@ test("CI, Docker, and native deployment use the same pinned Node runtime", async
     readRepositoryFile(".claude/skills/ship/SKILL.md"),
     readRepositoryFile("docs/foundation/README.md")
   ]);
-  const setupNodeSteps = (ci.match(/uses: actions\/setup-node@v7/g) ?? [])
-    .length;
-  assert.equal(setupNodeSteps, 7);
+  const setupActionSteps = (
+    ci.match(/uses: \.\/\.github\/actions\/setup-node-pnpm/g) ?? []
+  ).length;
+  assert.equal(setupActionSteps, 7);
+  assert.equal((ci.match(/uses: actions\/setup-node@v7/g) ?? []).length, 0);
   assert.equal(
-    (ci.match(/node-version-file: \.nvmrc/g) ?? []).length,
-    setupNodeSteps
+    (setupNodePnpmAction.match(/uses: actions\/setup-node@v7/g) ?? []).length,
+    1
   );
+  assert.match(setupNodePnpmAction, /node-version-file: \.nvmrc/);
   assert.doesNotMatch(ci, /node-version:\s*\d+/);
+  assert.doesNotMatch(setupNodePnpmAction, /node-version:\s*\d+/);
   assert.match(adminDockerfile, /^FROM node:24\.19\.0-alpine AS base/m);
   assert.match(webDockerfile, /^FROM node:24\.19\.0-alpine AS base/m);
   // 版本必须由 .node-version 推导出来（现在读的是目标 commit 里的那份），不许写死。

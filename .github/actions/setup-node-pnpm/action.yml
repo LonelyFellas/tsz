@@ -1,0 +1,65 @@
+name: Setup Node and restore pnpm cache
+description: Install the pinned toolchain and restore the content-addressed pnpm store
+
+outputs:
+  cache-hit:
+    description: Whether the primary pnpm cache key matched exactly
+    value: ${{ steps.cache.outputs.cache-hit }}
+  cache-key:
+    description: Primary pnpm cache key
+    value: ${{ steps.cache-key.outputs.value }}
+  cache-matched-key:
+    description: Cache key that was restored, including partial matches
+    value: ${{ steps.cache.outputs.cache-matched-key }}
+  restore-outcome:
+    description: Outcome of the pnpm cache restore action
+    value: ${{ steps.cache.outcome }}
+  store-path:
+    description: pnpm content-addressed store path
+    value: ${{ steps.store.outputs.path }}
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v7
+      with:
+        node-version-file: .nvmrc
+
+    - name: Resolve pnpm store
+      id: store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: Resolve pnpm cache key
+      id: cache-key
+      shell: bash
+      env:
+        CACHE_KEY: pnpm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('package.json') }}-${{ hashFiles('pnpm-lock.yaml') }}
+      run: echo "value=$CACHE_KEY" >> "$GITHUB_OUTPUT"
+
+    - name: Restore pnpm store
+      id: cache
+      continue-on-error: true
+      uses: actions/cache/restore@v6
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: ${{ steps.cache-key.outputs.value }}
+        restore-keys: |
+          pnpm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-${{ hashFiles('package.json') }}-
+          pnpm-v2-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.nvmrc') }}-
+
+    - name: Isolate failed pnpm restore
+      if: steps.cache.outcome == 'failure'
+      shell: bash
+      run: echo "npm_config_store_dir=$RUNNER_TEMP/pnpm-store-fallback" >> "$GITHUB_ENV"
+
+    - name: Record pnpm cache
+      shell: bash
+      run: >-
+        node "$GITHUB_WORKSPACE/scripts/ci-metrics.mjs" cache pnpm
+        "${{ steps.cache-key.outputs.value }}"
+        "${{ steps.cache.outputs.cache-matched-key }}"
+        "${{ steps.cache.outputs.cache-hit }}"
+        "${{ steps.cache.outcome }}"
