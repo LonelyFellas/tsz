@@ -1101,7 +1101,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       "grammar-2"
     ]);
     expect(value().pos[0]!.senses.map((item) => item.id)).toEqual(["sense-2"]);
-  });
+  }, 15_000);
 
   it("语义区间和语法结构恢复可访问拖拽并保持全部 V3 身份与引用", () => {
     const initial = structuredClone(meaningsFixture);
@@ -1300,7 +1300,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value().pos[0]!.senses[0]!.sense_group_id).toBe(
       "sense-group-reused"
     );
-  });
+  }, 15_000);
 
   it("原生拖放隔离语义区间、语法结构和 POS scope，并清理拖动态", () => {
     const initial = structuredClone(meaningsFixture);

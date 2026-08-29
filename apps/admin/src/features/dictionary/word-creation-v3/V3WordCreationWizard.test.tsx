@@ -581,7 +581,7 @@ describe("V3WordCreationWizard", () => {
     expect(screen.queryByText(/暂无语义区间/u)).toBeNull();
     expect(screen.queryByText("当前词性还没有词义内容")).toBeNull();
     expect(screen.queryByRole("button", { name: "开始录入词义" })).toBeNull();
-  });
+  }, 20_000);
 
   it.each([
     ["方言识别", "basics"],

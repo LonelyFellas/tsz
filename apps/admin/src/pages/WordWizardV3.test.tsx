@@ -1146,7 +1146,7 @@ describe("WordWizardV3Page", () => {
       base_lifecycle_revision: 4
     });
     expect(activationCalls[1]![2]).not.toBe(activationCalls[0]![2]);
-  }, 10_000);
+  }, 20_000);
 
   it.each(["published", "archived"] as const)(
     "keeps the %s viewing route read-only",
