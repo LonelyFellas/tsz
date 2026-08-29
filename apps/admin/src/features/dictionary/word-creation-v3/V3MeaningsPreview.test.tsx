@@ -162,6 +162,7 @@ describe("V3MeaningsPreview", () => {
                       id: "internal-relation-id",
                       relation: "synonym",
                       pending_target_headword: "midpoint",
+                      pending_target_gloss: "中点",
                       score: "80"
                     }
                   ]
@@ -186,7 +187,7 @@ describe("V3MeaningsPreview", () => {
     expect(screen.getByText("其他关联")).toBeVisible();
     expect(screen.getByText("上下文关联：middle · 中间")).toBeVisible();
     expect(screen.getByText("近义词")).toBeVisible();
-    expect(screen.getByText("midpoint")).toBeVisible();
+    expect(screen.getByText("midpoint · 中点")).toBeVisible();
     expect(
       screen.queryByText(/internal-|future-role|N-COUNT|synonym/)
     ).toBeNull();
@@ -194,7 +195,7 @@ describe("V3MeaningsPreview", () => {
 
   it("空内容显示明确空状态", () => {
     render(<V3MeaningsPreview word={word({ sense_groups: [], pos: [] })} />);
-    expect(screen.getByText("暂无释义与例句")).toBeVisible();
+    expect(screen.getByText("暂无词义与例句")).toBeVisible();
   });
 
   it("缺省字段使用产品化回退并保持空分区明确", () => {
