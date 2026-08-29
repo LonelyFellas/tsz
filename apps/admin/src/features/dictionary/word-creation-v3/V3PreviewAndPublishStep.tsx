@@ -7,7 +7,8 @@ import type {
   SurfaceMatchPageV3,
   V3DraftValidationIssue
 } from "@tsz/types";
-import { Alert, Button, Card, List, Space, Tag, Typography } from "antd";
+import { Alert, Button, Card, Space, Tag, Typography } from "antd";
+import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   canAcknowledgeSurfaceSnapshot,
@@ -19,16 +20,13 @@ import { createV3WordRequests, type V3WordRequests } from "./api";
 import { classifyV3Problem } from "./problem";
 import type { V3Problem } from "./problem";
 import {
-  dialectLabel,
-  formTypeLabel,
   impactReasonLabel,
   impactTypeLabel,
-  partOfSpeechLabel,
-  pronunciationStyleLabel,
   publicationBlockMessage
 } from "./presentation";
 import { createV3SaveFlow, type V3SaveFlow } from "./saveFlow";
-import { V3MeaningsPreview } from "./V3MeaningsPreview";
+import { v3IssueMessages } from "./presentationErrors";
+import { V3ReviewContent } from "./V3ReviewContent";
 
 type PublishRequests = Pick<
   V3WordRequests,
@@ -121,7 +119,7 @@ function requestErrorMessage(error: unknown): string {
 }
 
 function publicationUnavailableMessage(word: AdminWordV3): string | undefined {
-  if (word.status === "archived") return "已归档词条不能发布。";
+  if (word.status === "archived") return "垃圾桶中的词条不能发布。";
   const capability = word.capabilities.publication;
   if (capability.mode === "shadow_only") {
     return publicationBlockMessage(capability.blocked_code);
@@ -134,124 +132,14 @@ function publicationUnavailableMessage(word: AdminWordV3): string | undefined {
   return undefined;
 }
 
-function V3WordPreview({ word }: { word: AdminWordV3 }) {
-  return (
-    <>
-      <Card title={word.presentation.label}>
-        <Typography.Text type="secondary">
-          以下内容来自当前已保存版本，将作为本次发布依据。
-        </Typography.Text>
-      </Card>
-      {word.forms.pos.map((pos) => (
-        <Card key={pos.pos_id} size="small" title={partOfSpeechLabel(pos.pos)}>
-          <Space orientation="vertical" size="small" style={{ width: "100%" }}>
-            <Typography.Text strong>词形变化组</Typography.Text>
-            {pos.form_groups.length > 0 ? (
-              <List
-                size="small"
-                dataSource={pos.form_groups}
-                renderItem={(group, groupIndex) => (
-                  <List.Item
-                    key={group.id}
-                    data-testid={`preview-group-${group.id}`}
-                  >
-                    <Space orientation="vertical" size={2}>
-                      <Space wrap size={4}>
-                        <Tag>变化组 {groupIndex + 1}</Tag>
-                        <Typography.Text type="secondary">
-                          {group.is_regular ? "规则组" : "非规则组"}
-                        </Typography.Text>
-                      </Space>
-                      <Space wrap size={4}>
-                        {group.members.map((member, memberIndex) => {
-                          const form = pos.forms.find(
-                            (candidate) => candidate.id === member.form_id
-                          );
-                          const variant =
-                            form?.regional_variants.mode === "common"
-                              ? form.regional_variants.common
-                              : form?.regional_variants.uk;
-                          return (
-                            <Tag
-                              key={member.id}
-                              data-testid={`preview-membership-${member.id}`}
-                            >
-                              {memberIndex + 1}.{" "}
-                              {form
-                                ? formTypeLabel(form.form_type)
-                                : "未知词形"}
-                              {variant ? ` · ${variant.spelling}` : ""}
-                            </Tag>
-                          );
-                        })}
-                      </Space>
-                    </Space>
-                  </List.Item>
-                )}
-              />
-            ) : (
-              <Typography.Text type="secondary">暂无变化组</Typography.Text>
-            )}
-            <Typography.Text strong>词形与发音</Typography.Text>
-            <List
-              size="small"
-              dataSource={pos.forms}
-              renderItem={(form) => {
-                const variants =
-                  form.regional_variants.mode === "common"
-                    ? [form.regional_variants.common]
-                    : [form.regional_variants.uk, form.regional_variants.us];
-                return (
-                  <List.Item
-                    key={form.id}
-                    data-testid={`preview-form-${form.id}`}
-                  >
-                    <Space orientation="vertical" size={4}>
-                      <Tag>{formTypeLabel(form.form_type)}</Tag>
-                      {variants.map((variant) => (
-                        <Space key={variant.id} orientation="vertical" size={2}>
-                          <Space size={4}>
-                            <Tag>{dialectLabel(variant.dialect)}</Tag>
-                            <Typography.Text strong>
-                              {variant.spelling}
-                            </Typography.Text>
-                          </Space>
-                          {variant.pronunciations.length > 0 ? (
-                            variant.pronunciations.map((pronunciation) => (
-                              <Typography.Text
-                                key={pronunciation.id}
-                                type="secondary"
-                                data-testid={`preview-pronunciation-${pronunciation.id}`}
-                              >
-                                {pronunciation.style
-                                  ? pronunciationStyleLabel(pronunciation.style)
-                                  : "未选择发音方式"}
-                                {pronunciation.dict_phonetic
-                                  ? ` · 词典音标 ${pronunciation.dict_phonetic}`
-                                  : ""}
-                                {pronunciation.actual_pron
-                                  ? ` · 实际发音 ${pronunciation.actual_pron}`
-                                  : ""}
-                              </Typography.Text>
-                            ))
-                          ) : (
-                            <Typography.Text type="secondary">
-                              暂无发音
-                            </Typography.Text>
-                          )}
-                        </Space>
-                      ))}
-                    </Space>
-                  </List.Item>
-                );
-              }}
-            />
-          </Space>
-        </Card>
-      ))}
-      <V3MeaningsPreview word={word} />
-    </>
-  );
+function V3WordPreview({
+  word,
+  readiness
+}: {
+  word: AdminWordV3;
+  readiness?: ReactNode;
+}) {
+  return <V3ReviewContent readiness={readiness} word={word} />;
 }
 
 function ImpactDescription({
@@ -265,11 +153,10 @@ function ImpactDescription({
     <Space orientation="vertical" size={4} style={{ width: "100%" }}>
       <Typography.Text>{summary}</Typography.Text>
       {impact.affected.length > 0 ? (
-        <List
-          size="small"
-          dataSource={impact.affected}
-          renderItem={(item) => (
-            <List.Item
+        <ul className="v3-review-list">
+          {impact.affected.map((item) => (
+            <li
+              className="v3-review-impact-item"
               key={`${item.node_type}:${item.node_id}`}
               data-testid={`impact-item-${item.node_type}-${item.node_id}`}
             >
@@ -279,9 +166,9 @@ function ImpactDescription({
                   {impactReasonLabel(item.reason)}
                 </Typography.Text>
               </Space>
-            </List.Item>
-          )}
-        />
+            </li>
+          ))}
+        </ul>
       ) : null}
     </Space>
   );
@@ -354,7 +241,24 @@ function ControlledV3PreviewAndPublishStep({
 
   return (
     <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
-      <V3WordPreview word={word} />
+      <V3WordPreview
+        readiness={
+          unavailableMessage ? (
+            <Typography.Text type="secondary">当前词条不可发布</Typography.Text>
+          ) : controller.issues.length > 0 ? (
+            <Typography.Text type="danger">
+              待完成 {v3IssueMessages(controller.issues).length} 项
+            </Typography.Text>
+          ) : controller.validation?.valid ? (
+            <Typography.Text type="success">
+              当前内容已通过发布检查
+            </Typography.Text>
+          ) : (
+            <Typography.Text type="secondary">尚未检查发布条件</Typography.Text>
+          )
+        }
+        word={word}
+      />
       {unavailableMessage ? (
         <Alert
           showIcon
@@ -379,13 +283,7 @@ function ControlledV3PreviewAndPublishStep({
                 showIcon
                 type="error"
                 title="发布校验未通过"
-                description={controller.issues
-                  .map((issue, index) =>
-                    /[\u3400-\u9fff]/u.test(issue.message)
-                      ? issue.message
-                      : `第 ${index + 1} 项内容需要返回对应步骤检查。`
-                  )
-                  .join("；")}
+                description={v3IssueMessages(controller.issues).join("；")}
               />
             ) : null}
             {controller.impact ? (
@@ -620,13 +518,7 @@ function StandaloneV3PreviewAndPublishStep({
       );
       if (!validation.accepted) return;
       if (!validation.value.valid) {
-        setValidationIssues(
-          validation.value.issues.map((issue, index) =>
-            /[\u3400-\u9fff]/u.test(issue.message)
-              ? issue.message
-              : `第 ${index + 1} 项内容需要返回对应步骤检查。`
-          )
-        );
+        setValidationIssues(v3IssueMessages(validation.value.issues));
         return;
       }
       const preview = await flowRef.current.runRequest("impact", () =>
@@ -768,7 +660,24 @@ function StandaloneV3PreviewAndPublishStep({
 
   return (
     <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
-      <V3WordPreview word={currentWord} />
+      <V3WordPreview
+        readiness={
+          unavailableMessage ? (
+            <Typography.Text type="secondary">当前词条不可发布</Typography.Text>
+          ) : validationIssues.length > 0 ? (
+            <Typography.Text type="danger">
+              待完成 {validationIssues.length} 项
+            </Typography.Text>
+          ) : impact ? (
+            <Typography.Text type="success">
+              当前内容已通过发布检查
+            </Typography.Text>
+          ) : (
+            <Typography.Text type="secondary">尚未检查发布条件</Typography.Text>
+          )
+        }
+        word={currentWord}
+      />
       {unavailableMessage ? (
         <Alert
           showIcon

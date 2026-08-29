@@ -163,6 +163,10 @@ function validAdminWordV3() {
         {
           pos_id: IDS.pos,
           pos: "adjective",
+          dialect_rules: {
+            spelling_mode: "distinguish",
+            phonetic_mode: "distinguish"
+          },
           forms: [
             {
               id: IDS.form1,
@@ -654,6 +658,38 @@ describe("admin word V3/Any runtime decoder", () => {
   ] as const)("%s decoder 接受生成闭包构造的合法响应", (_name, def, decode) => {
     const value = validRuntimeDefinition(def);
     expect(decode(value)).toBe(value);
+  });
+
+  it.each([
+    ["缺失", undefined],
+    ["null", null],
+    ["元素非字符串", ["noun", 1]]
+  ] as const)(
+    "V3 detection 顶层 suggested_pos %s 时 fail closed",
+    (_label, suggestedPos) => {
+      const value = validRuntimeDefinition(
+        "DetectLexiconSurfaceResponseV3"
+      ) as Record<string, unknown>;
+      if (suggestedPos === undefined) delete value.suggested_pos;
+      else value.suggested_pos = suggestedPos;
+
+      const error = captureInvalid(() => decodeDetectLexiconResponseV3(value));
+      expect(error).toMatchObject({
+        response_path: "$",
+        reason: "no_union_match",
+        received_type: "object"
+      });
+    }
+  );
+
+  it("V3 detection runtime schema 将顶层 suggested_pos 固定为必填字符串数组", () => {
+    const schema = runtimeFixtureBundle.$defs.DetectLexiconSurfaceResponseV3!;
+    expect(schema.required).toContain("suggested_pos");
+    expect(schema.properties?.suggested_pos).toEqual({
+      type: "array",
+      items: { type: "string" },
+      maxItems: 2000
+    });
   });
 
   it("V3 surface decoder 接受两种正式 match_kind，并拒绝旧裸 item", () => {

@@ -1,7 +1,9 @@
 import type {
+  DialectRulesV3,
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
   PronunciationStyle,
+  RetiredStableNodeV3,
   TextOriginV3,
   WordConcreteFormV3,
   WordFormTypeV3,
@@ -10,6 +12,17 @@ import type {
 import { newWordNodeId } from "../word-model/primitives";
 
 export type V3IdFactory = () => string;
+export type V3StableVariantRole =
+  "common_variant" | "uk_variant" | "us_variant";
+export type V3StableVariantIdFactory = ((
+  formId: string,
+  role: V3StableVariantRole
+) => string) & {
+  seed: (
+    content: DraftFormsStepContentV3,
+    retiredNodes: readonly RetiredStableNodeV3[]
+  ) => void;
+};
 
 type OperationFailureReason =
   | "pos_not_found"
@@ -20,6 +33,9 @@ type OperationFailureReason =
   | "cross_pos_membership"
   | "duplicate_group_membership"
   | "explicit_mapping_required"
+  | "invalid_dialect_rules"
+  | "last_form_required"
+  | "last_pos_required"
   | "wrong_regional_mode";
 
 export type OperationResult<T> =
@@ -93,7 +109,7 @@ function nextUuid(factory: V3IdFactory, allocated: Set<string>): string {
   return id;
 }
 
-function clone(content: DraftFormsStepContentV3): DraftFormsStepContentV3 {
+function clone<T>(content: T): T {
   return structuredClone(content);
 }
 
@@ -142,6 +158,57 @@ function allNodeIds(content: DraftFormsStepContentV3): Set<string> {
       ])
     ])
   );
+}
+
+export function createStableVariantIdFactory(
+  content: DraftFormsStepContentV3,
+  retiredNodes: readonly RetiredStableNodeV3[],
+  fallback: V3IdFactory = defaultIdFactory
+): V3StableVariantIdFactory {
+  const ids = new Map<string, string>();
+  const key = (formId: string, role: V3StableVariantRole) =>
+    `${formId}:${role}`;
+  const seed = (
+    seedContent: DraftFormsStepContentV3,
+    seedRetiredNodes: readonly RetiredStableNodeV3[]
+  ) => {
+    for (const pos of seedContent.pos) {
+      for (const form of pos.forms) {
+        if (form.regional_variants.mode === "common") {
+          ids.set(
+            key(form.id, "common_variant"),
+            form.regional_variants.common.id
+          );
+        } else {
+          ids.set(key(form.id, "uk_variant"), form.regional_variants.uk.id);
+          ids.set(key(form.id, "us_variant"), form.regional_variants.us.id);
+        }
+      }
+    }
+    for (const node of seedRetiredNodes) {
+      if (
+        !node.parent_node_id ||
+        (node.node_role !== "common_variant" &&
+          node.node_role !== "uk_variant" &&
+          node.node_role !== "us_variant")
+      ) {
+        continue;
+      }
+      const slot = key(node.parent_node_id, node.node_role);
+      if (!ids.has(slot)) ids.set(slot, node.id);
+    }
+  };
+  seed(content, retiredNodes);
+  const factory = ((formId: string, role: V3StableVariantRole) => {
+    const slot = key(formId, role);
+    const existing = ids.get(slot);
+    if (existing) return existing;
+    const id = fallback();
+    ids.set(slot, id);
+    return id;
+  }) as V3StableVariantIdFactory;
+  factory.seed = seed;
+  return factory;
 }
 
 function mappedPronunciations(
@@ -248,6 +315,154 @@ export function convertUkUsToCommon(
   };
 }
 
+function validDialectRules(rules: DialectRulesV3) {
+  return !(
+    rules.spelling_mode === "distinguish" &&
+    rules.phonetic_mode !== "distinguish"
+  );
+}
+
+export function updatePosDialectRules(
+  content: DraftFormsStepContentV3,
+  posId: string,
+  rules: DialectRulesV3
+): OperationResult<DraftFormsStepContentV3> {
+  if (!validDialectRules(rules)) {
+    return { ok: false, reason: "invalid_dialect_rules" };
+  }
+  const next = clone(content);
+  const pos = next.pos.find((item) => item.pos_id === posId);
+  if (!pos) return { ok: false, reason: "pos_not_found" };
+  pos.dialect_rules = { ...rules };
+  return { ok: true, value: next };
+}
+
+function variantMappingFrom(
+  variant:
+    | Extract<
+        WordConcreteFormV3["regional_variants"],
+        { mode: "common" }
+      >["common"]
+    | Extract<WordConcreteFormV3["regional_variants"], { mode: "uk_us" }>["uk"]
+    | Extract<WordConcreteFormV3["regional_variants"], { mode: "uk_us" }>["us"]
+): VariantMapping {
+  return {
+    spelling: variant.spelling,
+    origin: variant.origin,
+    pronunciations: variant.pronunciations.map((pronunciation) => ({
+      dict_phonetic: pronunciation.dict_phonetic,
+      actual_pron: pronunciation.actual_pron,
+      ...(pronunciation.style === undefined
+        ? {}
+        : { style: pronunciation.style })
+    }))
+  };
+}
+
+export function normalizePosDialectRules(
+  content: DraftFormsStepContentV3,
+  posId: string,
+  rules: DialectRulesV3,
+  preferredDialect: "uk" | "us" = "us",
+  idFactory: V3IdFactory = defaultIdFactory,
+  stableVariantIds?: V3StableVariantIdFactory
+): OperationResult<DraftFormsStepContentV3> {
+  if (!validDialectRules(rules)) {
+    return { ok: false, reason: "invalid_dialect_rules" };
+  }
+  const next = clone(content);
+  const pos = next.pos.find((item) => item.pos_id === posId);
+  if (!pos) return { ok: false, reason: "pos_not_found" };
+  const allocated = allNodeIds(next);
+  const batchIdFactory = () => nextUuid(idFactory, allocated);
+  const stableVariantId = (formId: string, role: V3StableVariantRole) => {
+    if (!stableVariantIds) return batchIdFactory();
+    const id = stableVariantIds(formId, role);
+    if (!UUID_PATTERN.test(id)) {
+      throw new Error("stable variant ID factory returned an invalid UUID");
+    }
+    if (allocated.has(id)) {
+      throw new Error("stable variant ID factory returned a duplicate UUID");
+    }
+    allocated.add(id);
+    return id;
+  };
+
+  for (let index = 0; index < pos.forms.length; index += 1) {
+    const form = pos.forms[index]!;
+    if (
+      rules.spelling_mode === "unified" &&
+      rules.phonetic_mode === "unified"
+    ) {
+      if (form.regional_variants.mode === "common") continue;
+      const source = form.regional_variants[preferredDialect];
+      let mergeIdIndex = 0;
+      const converted = convertUkUsToCommon(
+        form,
+        { confirmed: true, common: variantMappingFrom(source) },
+        () =>
+          mergeIdIndex++ === 0
+            ? stableVariantId(form.id, "common_variant")
+            : batchIdFactory()
+      );
+      if (!converted.ok) return converted;
+      pos.forms[index] = converted.value;
+      continue;
+    }
+
+    if (form.regional_variants.mode === "common") {
+      const source = variantMappingFrom(form.regional_variants.common);
+      const pronunciationCount = source.pronunciations.length;
+      let splitIdIndex = 0;
+      const converted = convertCommonToUkUs(
+        form,
+        { confirmed: true, uk: source, us: source },
+        () => {
+          const currentIndex = splitIdIndex++;
+          if (currentIndex === 0) {
+            return stableVariantId(form.id, "uk_variant");
+          }
+          if (currentIndex === pronunciationCount + 1) {
+            return stableVariantId(form.id, "us_variant");
+          }
+          return batchIdFactory();
+        }
+      );
+      if (!converted.ok) return converted;
+      pos.forms[index] = converted.value;
+      continue;
+    }
+
+    if (rules.spelling_mode === "unified") {
+      const spelling = form.regional_variants[preferredDialect].spelling;
+      const converted = unifyUkUsSpelling(form, spelling);
+      if (!converted.ok) return converted;
+      pos.forms[index] = converted.value;
+    }
+  }
+
+  pos.dialect_rules = { ...rules };
+  return { ok: true, value: next };
+}
+
+export function unifyUkUsSpelling(
+  form: WordConcreteFormV3,
+  spelling: string
+): OperationResult<WordConcreteFormV3> {
+  if (form.regional_variants.mode !== "uk_us") {
+    return { ok: false, reason: "wrong_regional_mode" };
+  }
+  const regionalVariants = clone(form.regional_variants);
+  regionalVariants.uk.spelling = spelling;
+  regionalVariants.uk.origin = "manual";
+  regionalVariants.us.spelling = spelling;
+  regionalVariants.us.origin = "manual";
+  return {
+    ok: true,
+    value: { ...form, regional_variants: regionalVariants }
+  };
+}
+
 export function updateVariantSpelling(
   content: DraftFormsStepContentV3,
   variantId: string,
@@ -268,6 +483,22 @@ export function updateVariantSpelling(
     }
   }
   throw new Error(`variant not found: ${variantId}`);
+}
+
+export function updateConcreteFormType(
+  content: DraftFormsStepContentV3,
+  formId: string,
+  formType: WordFormTypeV3
+): DraftFormsStepContentV3 {
+  const next = clone(content);
+  for (const pos of next.pos) {
+    const form = pos.forms.find((item) => item.id === formId);
+    if (form) {
+      form.form_type = formType;
+      return next;
+    }
+  }
+  throw new Error(`form not found: ${formId}`);
 }
 
 export function updatePronunciation(
@@ -304,13 +535,102 @@ export function addPartOfSpeech(
   if (content.pos.some((item) => item.pos === catalogItem.code)) {
     return { ok: false, reason: "duplicate_pos_code" };
   }
-  const posId = nextUuid(idFactory, allNodeIds(content));
+  const templateOwner = content.pos.find((pos) =>
+    pos.forms.some((form) => form.form_type === "base")
+  );
+  const template = templateOwner?.forms.find(
+    (form) => form.form_type === "base"
+  );
+  const dialectRules = templateOwner
+    ? { ...templateOwner.dialect_rules }
+    : {
+        spelling_mode: "unified" as const,
+        phonetic_mode: "unified" as const
+      };
+  const commonDialect =
+    dialectRules.spelling_mode === "unified" &&
+    dialectRules.phonetic_mode === "unified";
+  const commonSpelling = template
+    ? template.regional_variants.mode === "common"
+      ? template.regional_variants.common.spelling
+      : template.regional_variants.uk.spelling
+    : "";
+  const ukSpelling = template
+    ? template.regional_variants.mode === "uk_us"
+      ? template.regional_variants.uk.spelling
+      : template.regional_variants.common.spelling
+    : "";
+  const usSpelling = template
+    ? template.regional_variants.mode === "uk_us"
+      ? template.regional_variants.us.spelling
+      : template.regional_variants.common.spelling
+    : "";
+  const allocated = allNodeIds(content);
+  const posId = nextUuid(idFactory, allocated);
+  const groupId = nextUuid(idFactory, allocated);
+  const formId = nextUuid(idFactory, allocated);
+  const firstVariantId = nextUuid(idFactory, allocated);
+  const secondVariantId = commonDialect
+    ? undefined
+    : nextUuid(idFactory, allocated);
+  const membershipId = nextUuid(idFactory, allocated);
+  const firstPronunciationId = nextUuid(idFactory, allocated);
+  const secondPronunciationId = commonDialect
+    ? undefined
+    : nextUuid(idFactory, allocated);
+  const pronunciation = (id: string): WordPronunciationV3 => ({
+    id,
+    dict_phonetic: "",
+    actual_pron: "",
+    style: "normal"
+  });
+  const regionalVariants = commonDialect
+    ? {
+        mode: "common" as const,
+        common: {
+          id: firstVariantId,
+          dialect: "common" as const,
+          spelling: commonSpelling,
+          origin: "manual" as const,
+          pronunciations: [pronunciation(firstPronunciationId)]
+        }
+      }
+    : {
+        mode: "uk_us" as const,
+        uk: {
+          id: firstVariantId,
+          dialect: "uk" as const,
+          spelling: ukSpelling,
+          origin: "manual" as const,
+          pronunciations: [pronunciation(firstPronunciationId)]
+        },
+        us: {
+          id: secondVariantId!,
+          dialect: "us" as const,
+          spelling: usSpelling,
+          origin: "manual" as const,
+          pronunciations: [pronunciation(secondPronunciationId!)]
+        }
+      };
   const next = clone(content);
   next.pos.push({
     pos_id: posId,
     pos: catalogItem.code,
-    forms: [],
-    form_groups: []
+    dialect_rules: dialectRules,
+    forms: [
+      {
+        id: formId,
+        form_type: "base",
+        regional_variants: regionalVariants
+      }
+    ],
+    form_groups: [
+      {
+        id: groupId,
+        is_regular: true,
+        members: [{ id: membershipId, form_id: formId }]
+      }
+    ]
   });
   return { ok: true, value: next };
 }
@@ -321,6 +641,9 @@ export function deletePartOfSpeech(
 ): OperationResult<DraftFormsStepContentV3> {
   if (!content.pos.some((item) => item.pos_id === posId)) {
     return { ok: false, reason: "pos_not_found" };
+  }
+  if (content.pos.length <= 1) {
+    return { ok: false, reason: "last_pos_required" };
   }
   const next = clone(content);
   next.pos = next.pos.filter((item) => item.pos_id !== posId);
@@ -417,6 +740,9 @@ export function deleteGroupAndOrphanForms(
       form_ids: orphanFormIds
     };
   }
+  if (pos.forms.length - orphanFormIds.length < 1) {
+    return { ok: false, reason: "last_form_required" };
+  }
   const orphanFormIdSet = new Set(orphanFormIds);
   const next = clone(content);
   const target = next.pos.find((item) => item.pos_id === posId)!;
@@ -440,28 +766,106 @@ export function addConcreteForm(
 
   const allocated = allNodeIds(content);
   const formId = nextUuid(idFactory, allocated);
-  const variantId = nextUuid(idFactory, allocated);
+  const commonDialect =
+    pos.dialect_rules.spelling_mode === "unified" &&
+    pos.dialect_rules.phonetic_mode === "unified";
+  const firstVariantId = nextUuid(idFactory, allocated);
+  const secondVariantId = commonDialect
+    ? undefined
+    : nextUuid(idFactory, allocated);
   const membershipId = nextUuid(idFactory, allocated);
+  const firstPronunciationId = nextUuid(idFactory, allocated);
+  const secondPronunciationId = commonDialect
+    ? undefined
+    : nextUuid(idFactory, allocated);
+  const pronunciation = (id: string): WordPronunciationV3 => ({
+    id,
+    dict_phonetic: "",
+    actual_pron: "",
+    style: "normal"
+  });
+  const regionalVariants = commonDialect
+    ? {
+        mode: "common" as const,
+        common: {
+          id: firstVariantId,
+          dialect: "common" as const,
+          spelling: "",
+          origin: "manual" as const,
+          pronunciations: [pronunciation(firstPronunciationId)]
+        }
+      }
+    : {
+        mode: "uk_us" as const,
+        uk: {
+          id: firstVariantId,
+          dialect: "uk" as const,
+          spelling: "",
+          origin: "manual" as const,
+          pronunciations: [pronunciation(firstPronunciationId)]
+        },
+        us: {
+          id: secondVariantId!,
+          dialect: "us" as const,
+          spelling: "",
+          origin: "manual" as const,
+          pronunciations: [pronunciation(secondPronunciationId!)]
+        }
+      };
   const next = clone(content);
   const target = next.pos.find((item) => item.pos_id === posId)!;
   target.forms.push({
     id: formId,
     form_type: formType,
-    regional_variants: {
-      mode: "common",
-      common: {
-        id: variantId,
-        dialect: "common",
-        spelling: "",
-        origin: "manual",
-        pronunciations: []
-      }
-    }
+    regional_variants: regionalVariants
   });
   target.form_groups
     .find((item) => item.id === groupId)!
     .members.push({ id: membershipId, form_id: formId });
   return { ok: true, value: next };
+}
+
+export function addConcreteFormAfterMembership(
+  content: DraftFormsStepContentV3,
+  posId: string,
+  groupId: string,
+  sourceMembershipId: string,
+  idFactory: V3IdFactory = defaultIdFactory
+): OperationResult<DraftFormsStepContentV3> {
+  const pos = content.pos.find((item) => item.pos_id === posId);
+  if (!pos) return { ok: false, reason: "pos_not_found" };
+  const group = pos.form_groups.find((item) => item.id === groupId);
+  if (!group) return { ok: false, reason: "group_not_found" };
+  const sourceMembershipIndex = group.members.findIndex(
+    (member) => member.id === sourceMembershipId
+  );
+  if (sourceMembershipIndex < 0) {
+    return { ok: false, reason: "membership_not_found" };
+  }
+  const sourceFormId = group.members[sourceMembershipIndex]!.form_id;
+  const sourceFormIndex = pos.forms.findIndex(
+    (form) => form.id === sourceFormId
+  );
+  if (sourceFormIndex < 0) return { ok: false, reason: "form_not_found" };
+
+  const added = addConcreteForm(
+    content,
+    posId,
+    groupId,
+    pos.forms[sourceFormIndex]!.form_type,
+    idFactory
+  );
+  if (!added.ok) return added;
+
+  const targetPos = added.value.pos.find((item) => item.pos_id === posId)!;
+  const targetGroup = targetPos.form_groups.find(
+    (item) => item.id === groupId
+  )!;
+  const newForm = targetPos.forms.pop()!;
+  const newMembership = targetGroup.members.pop()!;
+  targetPos.forms.splice(sourceFormIndex + 1, 0, newForm);
+  targetGroup.members.splice(sourceMembershipIndex + 1, 0, newMembership);
+  return added;
 }
 
 export function addMembership(
@@ -543,6 +947,9 @@ export function deleteConcreteForm(
   if (!pos) return { ok: false, reason: "pos_not_found" };
   if (!pos.forms.some((form) => form.id === formId)) {
     return { ok: false, reason: "form_not_found" };
+  }
+  if (pos.forms.length <= 1) {
+    return { ok: false, reason: "last_form_required" };
   }
   const next = clone(content);
   const target = next.pos.find((item) => item.pos_id === posId)!;

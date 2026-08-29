@@ -45,7 +45,7 @@ export function LifecycleSurfaceConfirmation({
   const statusLabel = {
     draft: "草稿",
     published: "已发布",
-    archived: "已归档"
+    archived: "垃圾桶"
   } as const;
   return (
     <Card

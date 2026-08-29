@@ -2,6 +2,7 @@ import { HttpError } from "@tsz/api-client";
 import type {
   AdminWordV3,
   AdminWordV3Envelope,
+  DraftFormsStepContentV3,
   FormsImpactResponseV3,
   SurfaceMatchPageV3
 } from "@tsz/types";
@@ -321,8 +322,19 @@ describe("createV3SaveFlow", () => {
 
   it("binds paginated terminal surface and impact tokens to the original preview content", () => {
     const flow = createV3SaveFlow(word(8));
-    const previewContent = {
-      pos: [{ pos_id: "pos-1", pos: "noun", forms: [], form_groups: [] }]
+    const previewContent: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "noun",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
+          forms: [],
+          form_groups: []
+        }
+      ]
     };
     const impact: FormsImpactResponseV3 = {
       schema_version: 3,
@@ -354,11 +366,33 @@ describe("createV3SaveFlow", () => {
 
   it("does not reuse a surface token for changed forms content", () => {
     const flow = createV3SaveFlow(word(8));
-    const previewContent = {
-      pos: [{ pos_id: "pos-1", pos: "noun", forms: [], form_groups: [] }]
+    const previewContent: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "noun",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
+          forms: [],
+          form_groups: []
+        }
+      ]
     };
-    const changedContent = {
-      pos: [{ pos_id: "pos-1", pos: "verb", forms: [], form_groups: [] }]
+    const changedContent: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "verb",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
+          forms: [],
+          form_groups: []
+        }
+      ]
     };
 
     expect(
@@ -401,14 +435,47 @@ describe("createV3SaveFlow", () => {
 
   it("uses a stable content digest and never reuses an impact token after content changes", () => {
     const flow = createV3SaveFlow(word(8));
-    const previewContent = {
-      pos: [{ pos_id: "pos-1", pos: "noun", forms: [], form_groups: [] }]
+    const previewContent: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "noun",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
+          forms: [],
+          form_groups: []
+        }
+      ]
     };
-    const sameContentDifferentKeyOrder = {
-      pos: [{ form_groups: [], forms: [], pos: "noun", pos_id: "pos-1" }]
+    const sameContentDifferentKeyOrder: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          form_groups: [],
+          forms: [],
+          dialect_rules: {
+            phonetic_mode: "unified",
+            spelling_mode: "unified"
+          },
+          pos: "noun",
+          pos_id: "pos-1"
+        }
+      ]
     };
-    const changedContent = {
-      pos: [{ pos_id: "pos-1", pos: "verb", forms: [], form_groups: [] }]
+    const changedContent: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "verb",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
+          forms: [],
+          form_groups: []
+        }
+      ]
     };
     const impact: FormsImpactResponseV3 = {
       schema_version: 3,

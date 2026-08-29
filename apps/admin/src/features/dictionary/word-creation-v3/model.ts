@@ -1,5 +1,6 @@
 import type {
   Dialect,
+  DialectRulesV3,
   DraftFormsStepContentV3,
   TextOriginV3,
   V3DraftNodeLocation,
@@ -202,6 +203,41 @@ function isRegionalShapeValid(value: unknown): value is WordRegionalVariantsV3 {
     );
   }
   return false;
+}
+
+function isDialectRulesValid(value: unknown): value is DialectRulesV3 {
+  if (
+    !isObject(value) ||
+    !ownKeysAre(value, ["phonetic_mode", "spelling_mode"])
+  ) {
+    return false;
+  }
+  const spellingValid =
+    value.spelling_mode === "unified" || value.spelling_mode === "distinguish";
+  const phoneticValid =
+    value.phonetic_mode === "unified" || value.phonetic_mode === "distinguish";
+  return (
+    spellingValid &&
+    phoneticValid &&
+    !(
+      value.spelling_mode === "distinguish" &&
+      value.phonetic_mode !== "distinguish"
+    )
+  );
+}
+
+function regionalVariantsMatchRules(
+  variants: WordRegionalVariantsV3,
+  rules: DialectRulesV3
+) {
+  if (rules.spelling_mode === "unified" && rules.phonetic_mode === "unified") {
+    return variants.mode === "common";
+  }
+  if (variants.mode !== "uk_us") return false;
+  return (
+    rules.spelling_mode === "distinguish" ||
+    variants.uk.spelling === variants.us.spelling
+  );
 }
 
 function containerShapeIssue(
@@ -496,6 +532,18 @@ export function validateFormsContent(
   for (const pos of content.pos) {
     const posLocation = location("forms.pos", { pos_id: pos.pos_id });
     registerNode(pos.pos_id, "forms.pos", posLocation);
+    const dialectRulesValid = isDialectRulesValid(pos.dialect_rules);
+    if (!dialectRulesValid) {
+      issues.push(
+        issue(
+          "dialect_rules_invalid",
+          "dialect_rules",
+          pos.pos_id,
+          "英美拼写与音标规则组合无效",
+          posLocation
+        )
+      );
+    }
     if (posCodes.has(pos.pos)) {
       issues.push(
         issue(
@@ -566,6 +614,20 @@ export function validateFormsContent(
           )
         );
         continue;
+      }
+      if (
+        dialectRulesValid &&
+        !regionalVariantsMatchRules(form.regional_variants, pos.dialect_rules)
+      ) {
+        issues.push(
+          issue(
+            "invalid_regional_variant_shape",
+            "regional_variants",
+            form.id,
+            "词形地区结构与当前词性的英美规则不一致",
+            formLocation
+          )
+        );
       }
       for (const variant of variantsOf(form)) {
         variantIssues(variant, pos.pos_id, form, intent, registerNode, issues);
@@ -702,6 +764,7 @@ export function toFormsWire(
     pos: content.pos.map((pos) => ({
       pos_id: pos.pos_id,
       pos: pos.pos,
+      dialect_rules: { ...pos.dialect_rules },
       forms: pos.forms.map((form) => ({
         id: form.id,
         form_type: form.form_type,

@@ -3,6 +3,7 @@ import {
   UnifiedCreateEntryStep,
   type UnifiedCreateRequests
 } from "@/features/dictionary/word-creation/UnifiedCreateEntryStep";
+import { WordCreationLayout } from "@/features/dictionary/word-creation/WordCreationLayout";
 
 export function WordCreatePage({
   requests
@@ -11,15 +12,16 @@ export function WordCreatePage({
 } = {}) {
   const navigate = useNavigate();
   return (
-    <UnifiedCreateEntryStep
-      requests={requests}
-      onCreated={(word, state) => {
-        const route =
-          word.schema_version === 3
-            ? `/words/${word.id}/v3/wizard/forms`
-            : `/words/${word.id}/wizard/forms`;
-        navigate(route, { replace: true, state });
-      }}
-    />
+    <WordCreationLayout currentStep="basics">
+      <UnifiedCreateEntryStep
+        requests={requests}
+        onCreated={(word, state) => {
+          navigate(`/words/${word.id}/v3/wizard/forms`, {
+            replace: true,
+            state
+          });
+        }}
+      />
+    </WordCreationLayout>
   );
 }

@@ -446,6 +446,7 @@ function activationSurfacePage(
         match: {
           source_schema_version: 3 as const,
           entry_id: `entry-${spelling}`,
+          entry_kind: "word" as const,
           status: "published" as const,
           content_scope: "current_publication" as const,
           pos_id: `pos-${spelling}`,

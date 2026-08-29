@@ -1,5 +1,9 @@
 import type { AdminWordStatus, Dialect, WordFormType } from "./admin-word";
-import type { EntryPresentationV3, WordFormTypeV3 } from "./admin-word-v3";
+import type {
+  EntryPresentationV3,
+  WordEntryKindV3,
+  WordFormTypeV3
+} from "./admin-word-v3";
 
 /** Surface warning wire types; 1:1 mirror of the Rust OpenAPI schemas. */
 export type SurfaceContentScopeV2 = "draft" | "current_publication";
@@ -138,6 +142,7 @@ export type SurfaceMatchPageV2 = SurfaceMatchPageBaseV2 &
 export interface FormSurfaceMatchV3 {
   source_schema_version: 3;
   entry_id: string;
+  entry_kind: WordEntryKindV3;
   status: AdminWordStatus;
   content_scope: SurfaceContentScopeV2;
   pos_id: string;

@@ -1,12 +1,43 @@
 import type {
   Dialect,
+  DraftFormsStepContentV3,
   DraftMeaningsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   EnglishTextV3,
   RichTextV3,
   RichTextVariantV3,
-  WordDefinitionV3
+  WordDefinitionV3,
+  WordPosMeaningsWritableV3
 } from "@tsz/types";
+
+export interface RelationDisplaySnapshot {
+  headword?: string;
+  gloss?: string;
+}
+
+export type RelationDisplaySnapshots = Readonly<
+  Record<string, RelationDisplaySnapshot>
+>;
+
+export function relationDisplaySnapshots(
+  canonical: DraftMeaningsStepContentV3
+): RelationDisplaySnapshots {
+  const snapshots: Record<string, RelationDisplaySnapshot> = {};
+  for (const pos of canonical.pos) {
+    for (const sense of pos.senses) {
+      for (const relation of sense.relations) {
+        if (!relation.target_headword && !relation.target_gloss) continue;
+        snapshots[relation.id] = {
+          ...(relation.target_headword
+            ? { headword: relation.target_headword }
+            : {}),
+          ...(relation.target_gloss ? { gloss: relation.target_gloss } : {})
+        };
+      }
+    }
+  }
+  return snapshots;
+}
 
 export interface EditableEnglishTextV3 {
   dialect: Dialect;
@@ -130,23 +161,182 @@ export function toWritableMeanings(
             role: link.role
           }))
         })),
-        relations: sense.relations.map((relation) => ({
-          id: relation.id,
-          relation: relation.relation,
-          ...(relation.target_word_id === undefined
-            ? {}
-            : { target_word_id: relation.target_word_id }),
-          ...(relation.target_sense_id === undefined
-            ? {}
-            : { target_sense_id: relation.target_sense_id }),
-          ...(relation.pending_target_headword === undefined
-            ? {}
-            : { pending_target_headword: relation.pending_target_headword }),
-          score: relation.score
-        }))
+        relations: sense.relations.map((relation) => {
+          const bound = Boolean(
+            relation.target_word_id && relation.target_sense_id
+          );
+          const pendingHeadword = relation.pending_target_headword?.trim();
+          const pendingGloss = relation.pending_target_gloss?.trim();
+          return {
+            id: relation.id,
+            relation: relation.relation,
+            ...(bound
+              ? {
+                  target_word_id: relation.target_word_id,
+                  target_sense_id: relation.target_sense_id
+                }
+              : {
+                  ...(pendingHeadword
+                    ? { pending_target_headword: pendingHeadword }
+                    : {}),
+                  ...(pendingHeadword && pendingGloss
+                    ? { pending_target_gloss: pendingGloss }
+                    : {})
+                }),
+            score: relation.score
+          };
+        })
       }))
     }))
   };
+}
+
+function createDefaultPosMeanings(
+  posId: string,
+  wordId: string,
+  senseGroupId: string,
+  idFactory: () => string
+): WordPosMeaningsWritableV3 {
+  const senseId = idFactory();
+  return {
+    pos_id: posId,
+    grammar_structures: [
+      {
+        id: idFactory(),
+        variants: [
+          {
+            id: idFactory(),
+            dialect: "common",
+            content: { version: 2, text: "", annotations: [] }
+          }
+        ]
+      }
+    ],
+    senses: [
+      {
+        id: senseId,
+        sub_pos: "",
+        level: "A1",
+        sense_group_id: senseGroupId,
+        depends_on_context: false,
+        definitions: [
+          {
+            id: idFactory(),
+            level: "A1",
+            definition_mode: "zh_definition",
+            content_id: idFactory(),
+            content: { version: 2, text: "", annotations: [] }
+          }
+        ],
+        sentences: [
+          {
+            id: idFactory(),
+            level: "A1",
+            en_text: {
+              mode: "unified",
+              common: {
+                id: idFactory(),
+                origin: "manual",
+                value: { version: 2, text: "", annotations: [] }
+              }
+            },
+            zh_text_id: idFactory(),
+            zh_text: { version: 2, text: "", annotations: [] },
+            links: [{ word_id: wordId, sense_id: senseId, role: "focus" }]
+          }
+        ],
+        relations: []
+      }
+    ]
+  };
+}
+
+/**
+ * Adds the product defaults directly to a writable V3 draft and maintains the
+ * UI invariant that one sense group belongs to only one POS. The wire remains
+ * unchanged: ownership is derived from `sense_group_id` references.
+ */
+export function ensureV3MeaningsForForms(
+  wordId: string,
+  forms: DraftFormsStepContentV3,
+  meanings: DraftMeaningsStepContentWritableV3,
+  idFactory: () => string
+): DraftMeaningsStepContentWritableV3 {
+  let nextGroups = meanings.sense_groups;
+  let nextPos = meanings.pos;
+  let changed = false;
+  const groupById = new Map(nextGroups.map((group) => [group.id, group]));
+  const groupOwner = new Map<string, string>();
+  const appendGroup = (
+    group: DraftMeaningsStepContentWritableV3["sense_groups"][number]
+  ) => {
+    if (nextGroups === meanings.sense_groups) nextGroups = [...nextGroups];
+    nextGroups.push(group);
+    groupById.set(group.id, group);
+    changed = true;
+  };
+  const replacePos = (
+    index: number,
+    pos: DraftMeaningsStepContentWritableV3["pos"][number]
+  ) => {
+    if (nextPos === meanings.pos) nextPos = [...nextPos];
+    nextPos[index] = pos;
+    changed = true;
+  };
+
+  for (const [posIndex, pos] of meanings.pos.entries()) {
+    const referencedGroupIds = Array.from(
+      new Set(
+        pos.senses.flatMap((sense) =>
+          sense.sense_group_id ? [sense.sense_group_id] : []
+        )
+      )
+    );
+    let currentPos = pos;
+    for (const groupId of referencedGroupIds) {
+      let group = groupById.get(groupId);
+      if (!group) {
+        group = { id: groupId, name_zh: "", name_en: "" };
+        appendGroup(group);
+      }
+      const owner = groupOwner.get(groupId);
+      if (!owner || owner === pos.pos_id) {
+        groupOwner.set(groupId, pos.pos_id);
+        continue;
+      }
+      const clonedGroup = { ...group, id: idFactory() };
+      appendGroup(clonedGroup);
+      groupOwner.set(clonedGroup.id, pos.pos_id);
+      currentPos = {
+        ...currentPos,
+        senses: currentPos.senses.map((sense) =>
+          sense.sense_group_id === groupId
+            ? { ...sense, sense_group_id: clonedGroup.id }
+            : sense
+        )
+      };
+    }
+    if (currentPos !== pos) replacePos(posIndex, currentPos);
+  }
+
+  const existingPosIds = new Set(nextPos.map((pos) => pos.pos_id));
+  const missingPosIds: string[] = [];
+  for (const pos of forms.pos) {
+    if (existingPosIds.has(pos.pos_id)) continue;
+    existingPosIds.add(pos.pos_id);
+    missingPosIds.push(pos.pos_id);
+  }
+  for (const posId of missingPosIds) {
+    const senseGroup = { id: idFactory(), name_zh: "", name_en: "" };
+    appendGroup(senseGroup);
+    if (nextPos === meanings.pos) nextPos = [...nextPos];
+    nextPos.push(
+      createDefaultPosMeanings(posId, wordId, senseGroup.id, idFactory)
+    );
+    changed = true;
+  }
+
+  return changed ? { sense_groups: nextGroups, pos: nextPos } : meanings;
 }
 
 export function replaceRichText(value: RichTextV3, text: string): RichTextV3 {

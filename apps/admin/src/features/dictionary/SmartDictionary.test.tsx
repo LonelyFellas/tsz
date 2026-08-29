@@ -6,7 +6,7 @@ import {
   waitFor
 } from "@testing-library/react";
 import { App as AntApp } from "antd";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, useLocation, useNavigate } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   AdminWordListItemAny,
@@ -83,7 +83,11 @@ function word(
   };
 }
 
-function v3Word(id: string, label: string): AdminWordListItemV3 {
+function v3Word(
+  id: string,
+  label: string,
+  strategyVersion = "future_strategy_9"
+): AdminWordListItemV3 {
   return {
     schema_version: 3,
     id,
@@ -91,7 +95,7 @@ function v3Word(id: string, label: string): AdminWordListItemV3 {
     presentation: {
       label,
       matched_surfaces: ["surface-not-used-as-label"],
-      strategy_version: "future_strategy_9"
+      strategy_version: strategyVersion
     },
     gloss: "V3 释义",
     pos_list: ["noun"],
@@ -144,6 +148,15 @@ function LocationProbe() {
       {location.pathname}
       {location.search}
     </span>
+  );
+}
+
+function HistoryProbe() {
+  const navigate = useNavigate();
+  return (
+    <button data-testid="history-back" onClick={() => navigate(-1)}>
+      back
+    </button>
   );
 }
 
@@ -252,7 +265,122 @@ describe("SmartDictionary", () => {
     expect(screen.queryByText("服务端 V3 展示名")).toBeNull();
   });
 
-  it("同名词条保留两行并按各自 ID 查看和归档", async () => {
+  it("五条 V2/V3 列表显示服务端 label 与统计并按 schema 路由，不暴露内部 ID 或 strategy code", () => {
+    matchViewport(1440);
+    const legacyWord = word(
+      "01a042f8-6c7d-7401-beca-ac149624e7a1",
+      "legacy word"
+    );
+    const legacyPhrase = {
+      ...word("01a042f8-6c7d-7401-beca-ac149624e7a2", "legacy phrase"),
+      kind: "phrase" as const
+    };
+    const emptyV3 = v3Word(
+      "01a042f8-6c7d-7401-beca-ac149624e7b1",
+      "未命名词条 · 01a042f8",
+      "short_uuid_v1"
+    );
+    const nativeV3 = v3Word(
+      "01a042f8-6c7d-7401-beca-ac149624e7b2",
+      "native surface",
+      "surface_summary_v1"
+    );
+    const migratedV3 = v3Word(
+      "01a042f8-6c7d-7401-beca-ac149624e7b3",
+      "legacy bridge",
+      "legacy_headwords_v1"
+    );
+    const rows = [legacyWord, legacyPhrase, emptyV3, nativeV3, migratedV3];
+    const reportUnknownPresentationStrategy = vi.fn();
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: rows,
+        page: { page: 1, page_size: 20, total: 5 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    apiMocks.useWordStats.mockReturnValue({
+      data: { total: 5, today: 2, month: 4 }
+    });
+
+    const { container } = render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary
+            reportUnknownPresentationStrategy={
+              reportUnknownPresentationStrategy
+            }
+          />
+        </AntApp>
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    expect(
+      container.querySelectorAll(".ant-table-tbody > tr.ant-table-row")
+    ).toHaveLength(5);
+    expect(screen.getByText("累计智能词汇:").parentElement).toHaveTextContent(
+      "累计智能词汇:5"
+    );
+    expect(screen.getByText("今日创编:").parentElement).toHaveTextContent(
+      "今日创编:2"
+    );
+    expect(screen.getByText("本月创编:").parentElement).toHaveTextContent(
+      "本月创编:4"
+    );
+    for (const label of [
+      "legacy word",
+      "legacy phrase",
+      "未命名词条 · 01a042f8",
+      "native surface",
+      "legacy bridge"
+    ]) {
+      expect(screen.getByText(label)).toBeVisible();
+    }
+    expect(reportUnknownPresentationStrategy).not.toHaveBeenCalled();
+    const userFacingAttributes = Array.from(
+      container.querySelectorAll<HTMLElement>("[aria-label], [title]")
+    )
+      .flatMap((element) => [
+        element.getAttribute("aria-label"),
+        element.getAttribute("title")
+      ])
+      .filter((value): value is string => value !== null)
+      .join(" ");
+    for (const row of rows) {
+      expect(container).not.toHaveTextContent(row.id);
+      expect(container).not.toHaveTextContent(row.id.slice(-8));
+      expect(userFacingAttributes).not.toContain(row.id);
+      expect(userFacingAttributes).not.toContain(row.id.slice(-8));
+    }
+    expect(container.innerHTML).not.toContain("short_uuid_v1");
+    expect(container.innerHTML).not.toContain("surface_summary_v1");
+    expect(container.innerHTML).not.toContain("legacy_headwords_v1");
+
+    fireEvent.click(
+      screen
+        .getByText("legacy word")
+        .closest("tr")!
+        .querySelector("td:last-child button")!
+    );
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      `/words/${legacyWord.id}/wizard/basics`
+    );
+    fireEvent.click(
+      screen
+        .getByText("未命名词条 · 01a042f8")
+        .closest("tr")!
+        .querySelector("td:last-child button")!
+    );
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      `/words/${emptyV3.id}/v3/wizard/forms`
+    );
+  });
+
+  it("同名词条保留两行并按内部 ID 操作，但可见内容与可访问名称不暴露 ID", async () => {
     matchViewport(1440);
     const first: AdminWordListItemAny = {
       ...word("01a00492-d889-71e0-a9a3-e053a0a093e6", "workspace"),
@@ -290,26 +418,26 @@ describe("SmartDictionary", () => {
     );
 
     expect(screen.getAllByText("workspace")).toHaveLength(2);
-    expect(screen.getByText("a0a093e6")).toBeVisible();
-    expect(screen.getByText("a0a093e7")).toBeVisible();
+    expect(screen.queryByText("a0a093e6")).toBeNull();
+    expect(screen.queryByText("a0a093e7")).toBeNull();
     expect(screen.getByText("工作空间")).toBeVisible();
     expect(screen.getByText("协作空间")).toBeVisible();
     expect(screen.getByText("BrE")).toBeVisible();
 
-    // 操作按钮在可及性树中必须能区分行:同名词条靠短 ID 分辨。
-    const secondRow = screen.getByText("a0a093e7").closest("tr")!;
+    const secondRow = screen.getByText("协作空间").closest("tr")!;
     const secondActions = secondRow.querySelectorAll<HTMLButtonElement>(
       "td:last-child button"
     );
     expect(secondActions[0]!.getAttribute("aria-label")).toBe(
-      "继续创建「workspace」a0a093e7"
+      "继续创建「workspace」"
     );
     expect(secondActions[1]!.getAttribute("aria-label")).toBe(
-      "归档「workspace」a0a093e7"
+      "移入垃圾桶「workspace」"
     );
+    expect(secondActions[1]!.querySelector(".anticon-delete")).not.toBeNull();
     fireEvent.click(secondActions[1]!);
     fireEvent.click(
-      (await screen.findAllByText("归 档", { exact: true }))
+      (await screen.findAllByText("移入垃圾桶", { exact: true }))
         .map((item) => item.closest("button"))
         .find((item) => item?.closest(".ant-modal"))!
     );
@@ -319,7 +447,7 @@ describe("SmartDictionary", () => {
       )
     );
 
-    const firstRow = screen.getByText("a0a093e6").closest("tr")!;
+    const firstRow = screen.getByText("工作空间").closest("tr")!;
     fireEvent.click(firstRow.querySelector("td:last-child button")!);
     expect(screen.getByTestId("location")).toHaveTextContent(first.id);
   });
@@ -343,7 +471,7 @@ describe("SmartDictionary", () => {
     expect(screen.getByText("继续创建").closest("button")).toBeEnabled();
     expect(
       screen
-        .getAllByText("归 档", { exact: true })
+        .getAllByText("移入垃圾桶", { exact: true })
         .map((item) => item.closest("button"))
         .find((item) => item?.classList.contains("ant-btn-link"))
     ).toBeEnabled();
@@ -397,7 +525,125 @@ describe("SmartDictionary", () => {
       status: "archived"
     });
     expect(screen.getByLabelText("关键字")).toHaveValue("center");
-    expect(screen.getByText("已归档")).toBeInTheDocument();
+    expect(screen.getByText("垃圾桶")).toBeInTheDocument();
+  });
+
+  it("从深链恢复准确页码、每页数量和筛选查询", () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          "/words?keyword=center&status=published&page=3&page_size=50"
+        ]}
+      >
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    expect(apiMocks.useWordList).toHaveBeenCalledWith({
+      page: 3,
+      page_size: 50,
+      q: "center",
+      status: "published"
+    });
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      "/words?keyword=center&status=published&page=3&page_size=50"
+    );
+  });
+
+  it("用户分页与修改每页数量会写入 URL", async () => {
+    apiMocks.useWordList.mockImplementation((query: AdminWordListQuery) => ({
+      data: {
+        words: [word("word-1", "first")],
+        page: {
+          page: query.page ?? 1,
+          page_size: query.page_size ?? 20,
+          total: 101
+        }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    }));
+    const { container } = render(
+      <MemoryRouter initialEntries={["/words?keyword=center"]}>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+        <LocationProbe />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(container.querySelector(".ant-pagination-item-2")!);
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "/words?keyword=center&page=2"
+      )
+    );
+
+    fireEvent.mouseDown(screen.getByRole("combobox", { name: "Page Size" }));
+    const sizeOptions = await screen.findAllByRole("option");
+    fireEvent.click(
+      sizeOptions.find((option) => option.textContent?.includes("50"))!
+    );
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "/words?keyword=center&page_size=50"
+      );
+      expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
+        page: 1,
+        page_size: 50,
+        q: "center"
+      });
+    });
+  });
+
+  it("用户连续修改筛选后，后退逐步恢复上一筛选状态", async () => {
+    render(
+      <MemoryRouter initialEntries={["/words"]}>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+        <LocationProbe />
+        <HistoryProbe />
+      </MemoryRouter>
+    );
+
+    let keyword = screen.getByLabelText("关键字");
+    fireEvent.change(keyword, { target: { value: "center" } });
+    fireEvent.submit(keyword.closest("form")!);
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "/words?keyword=center"
+      )
+    );
+    keyword = screen.getByLabelText("关键字");
+    await waitFor(() => expect(keyword).toHaveValue("center"));
+
+    fireEvent.change(keyword, { target: { value: "harbour" } });
+    expect(keyword).toHaveValue("harbour");
+    fireEvent.submit(keyword.closest("form")!);
+    await waitFor(() =>
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "/words?keyword=harbour"
+      )
+    );
+
+    fireEvent.click(screen.getByTestId("history-back"));
+    await waitFor(() => {
+      expect(screen.getByTestId("location")).toHaveTextContent(
+        "/words?keyword=center"
+      );
+      expect(screen.getByLabelText("关键字")).toHaveValue("center");
+      expect(apiMocks.useWordList).toHaveBeenLastCalledWith({
+        page: 1,
+        page_size: 20,
+        q: "center"
+      });
+    });
   });
 
   it("深链筛选重置后同步清空表单、查询与 URL", async () => {
@@ -418,7 +664,7 @@ describe("SmartDictionary", () => {
         page_size: 20
       });
       expect(screen.getByLabelText("关键字")).toHaveValue("");
-      expect(screen.queryByText("已归档")).toBeNull();
+      expect(screen.queryByText("垃圾桶")).toBeNull();
       expect(screen.getByTestId("location")).toHaveTextContent("/words");
     });
   });
@@ -438,14 +684,15 @@ describe("SmartDictionary", () => {
     );
     expect(firstRowCheckbox).not.toBeNull();
     fireEvent.click(firstRowCheckbox!);
-    const batchButton = screen.getByText("归 档(1)").closest("button");
+    const batchButton = screen.getByText("移入垃圾桶(1)").closest("button");
     expect(batchButton).not.toBeNull();
+    expect(batchButton!.querySelector(".anticon-delete")).not.toBeNull();
 
     fireEvent.click(container.querySelector(".ant-pagination-item-2")!);
 
     await waitFor(() => {
       expect(screen.getByText("second")).toBeInTheDocument();
-      expect(screen.getByText("归 档(1)")).toBeInTheDocument();
+      expect(screen.getByText("移入垃圾桶(1)")).toBeInTheDocument();
     });
     expect(batchButton).not.toBeDisabled();
   });
@@ -479,13 +726,13 @@ describe("SmartDictionary", () => {
     );
 
     const rowArchive = screen
-      .getAllByText("归 档", { exact: true })
+      .getAllByText("移入垃圾桶", { exact: true })
       .map((item) => item.closest("button"))
       .find((item) => item?.classList.contains("ant-btn-link"))!;
     fireEvent.click(rowArchive);
-    await screen.findAllByText("归档「first」？");
+    await screen.findAllByText("移入垃圾桶「first」？");
     const confirm = screen
-      .getAllByText("归 档", { exact: true })
+      .getAllByText("移入垃圾桶", { exact: true })
       .map((item) => item.closest("button"))
       .find((item) => item?.closest(".ant-modal"))!;
     fireEvent.click(confirm);
@@ -520,18 +767,18 @@ describe("SmartDictionary", () => {
       container.querySelector("tbody input[type='checkbox']") as Element
     );
 
-    fireEvent.click(screen.getByText("归 档(1)"));
+    fireEvent.click(screen.getByText("移入垃圾桶(1)"));
     fireEvent.click(
-      (await screen.findAllByText("归 档", { exact: true }))
+      (await screen.findAllByText("移入垃圾桶", { exact: true }))
         .map((item) => item.closest("button"))
         .find((item) => item?.closest(".ant-modal"))!
     );
     expect(await screen.findByText("引用冲突")).toBeInTheDocument();
-    expect(screen.getByText("归 档(1)")).toBeInTheDocument();
+    expect(screen.getByText("移入垃圾桶(1)")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("归 档(1)"));
+    fireEvent.click(screen.getByText("移入垃圾桶(1)"));
     fireEvent.click(
-      (await screen.findAllByText("归 档", { exact: true }))
+      (await screen.findAllByText("移入垃圾桶", { exact: true }))
         .map((item) => item.closest("button"))
         .find((item) => item?.closest(".ant-modal"))!
     );
@@ -545,7 +792,7 @@ describe("SmartDictionary", () => {
         }
       ]
     });
-    await waitFor(() => expect(screen.queryByText("归 档(1)")).toBeNull());
+    await waitFor(() => expect(screen.queryByText("移入垃圾桶(1)")).toBeNull());
   });
 
   it("archived 筛选结果仅提供恢复操作，单条恢复携带双 revision", async () => {
@@ -576,7 +823,7 @@ describe("SmartDictionary", () => {
 
     expect(
       screen
-        .queryAllByText("归 档", { exact: true })
+        .queryAllByText("移入垃圾桶", { exact: true })
         .map((item) => item.closest("button"))
         .some((item) => item?.classList.contains("ant-btn-link"))
     ).toBe(false);
@@ -584,13 +831,13 @@ describe("SmartDictionary", () => {
       .getAllByText("恢 复", { exact: true })
       .map((item) => item.closest("button"))
       .find((item) => item?.classList.contains("ant-btn-link"))!;
-    expect(rowRestore.getAttribute("aria-label")).toBe("恢复「first」word-1");
+    expect(rowRestore.getAttribute("aria-label")).toBe("恢复「first」");
     expect(
       rowRestore
         .closest("td")!
         .querySelector("button")!
         .getAttribute("aria-label")
-    ).toBe("查看「first」word-1");
+    ).toBe("查看「first」");
     fireEvent.click(rowRestore);
     await screen.findAllByText("恢复「first」？");
     fireEvent.click(

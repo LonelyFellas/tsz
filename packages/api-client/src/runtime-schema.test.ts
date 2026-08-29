@@ -149,6 +149,20 @@ beforeAll(async () => {
 });
 
 describe("OpenAPI generated runtime schema", () => {
+  it("冻结 V3 词性级英美拼写与音标规则", () => {
+    const pos = runtimeSchemaBundle.$defs.WordPosFormsV3!;
+    const rules = runtimeSchemaBundle.$defs.DialectRulesV3!;
+    const mode = runtimeSchemaBundle.$defs.DialectModeV3!;
+
+    expect(pos.required).toContain("dialect_rules");
+    expect(pos.properties?.dialect_rules).toEqual({
+      $ref: "#/$defs/DialectRulesV3"
+    });
+    expect(rules.required).toEqual(["spelling_mode", "phonetic_mode"]);
+    expect(rules.additionalProperties).toBe(false);
+    expect(mode.enum).toEqual(["unified", "distinguish"]);
+  });
+
   it("只打包冻结的 response/error roots，且所有 $ref 均落在最小 $defs 闭包内", () => {
     expect(runtimeSchemaBundle.roots).toEqual(ROOTS);
 

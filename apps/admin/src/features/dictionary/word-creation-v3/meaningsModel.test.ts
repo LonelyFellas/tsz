@@ -1,7 +1,14 @@
-import type { DraftMeaningsStepContentV3, EnglishTextV3 } from "@tsz/types";
-import { describe, expect, it } from "vitest";
+import type {
+  DraftFormsStepContentV3,
+  DraftMeaningsStepContentV3,
+  EnglishTextV3
+} from "@tsz/types";
+import { describe, expect, it, vi } from "vitest";
+import { formsFixture } from "./fixtures";
 import {
   editableEnglishText,
+  ensureV3MeaningsForForms,
+  relationDisplaySnapshots,
   replaceEnglishText,
   replaceRichText,
   toWritableMeanings
@@ -99,8 +106,222 @@ const meaningsCanonicalFixture: DraftMeaningsStepContentV3 = {
 };
 
 describe("V3 meanings writable model", () => {
+  it("initializes one native V3 template per POS for an empty canonical draft", () => {
+    let nextId = 0;
+    const idFactory = vi.fn(() => `new-node-${++nextId}`);
+    const first = formsFixture({ pos_id: "pos-1" }).pos[0]!;
+    const second = formsFixture({ pos_id: "pos-2", pos: "verb" }).pos[0]!;
+    const forms: DraftFormsStepContentV3 = { pos: [first, second] };
+
+    const result = ensureV3MeaningsForForms(
+      "word-1",
+      forms,
+      { sense_groups: [], pos: [] },
+      idFactory
+    );
+
+    expect(result.sense_groups).toHaveLength(2);
+    expect(result.sense_groups[0]).toEqual({
+      id: "new-node-1",
+      name_zh: "",
+      name_en: ""
+    });
+    expect(result.sense_groups[1]).toEqual({
+      id: expect.any(String),
+      name_zh: "",
+      name_en: ""
+    });
+    expect(result.sense_groups[1]!.id).not.toBe(result.sense_groups[0]!.id);
+    expect(result.pos.map((pos) => pos.pos_id)).toEqual(["pos-1", "pos-2"]);
+    for (const [index, pos] of result.pos.entries()) {
+      expect(pos.grammar_structures).toEqual([
+        {
+          id: expect.any(String),
+          variants: [
+            {
+              id: expect.any(String),
+              dialect: "common",
+              content: { version: 2, text: "", annotations: [] }
+            }
+          ]
+        }
+      ]);
+      expect(pos.senses).toHaveLength(1);
+      const sense = pos.senses[0]!;
+      expect(sense).toMatchObject({
+        id: expect.any(String),
+        sub_pos: "",
+        level: "A1",
+        sense_group_id: result.sense_groups[index]!.id,
+        depends_on_context: false,
+        relations: []
+      });
+      expect(sense.definitions).toEqual([
+        {
+          id: expect.any(String),
+          level: "A1",
+          definition_mode: "zh_definition",
+          content_id: expect.any(String),
+          content: { version: 2, text: "", annotations: [] }
+        }
+      ]);
+      expect(sense.sentences).toEqual([
+        {
+          id: expect.any(String),
+          level: "A1",
+          en_text: {
+            mode: "unified",
+            common: {
+              id: expect.any(String),
+              origin: "manual",
+              value: { version: 2, text: "", annotations: [] }
+            }
+          },
+          zh_text_id: expect.any(String),
+          zh_text: { version: 2, text: "", annotations: [] },
+          links: [{ word_id: "word-1", sense_id: sense.id, role: "focus" }]
+        }
+      ]);
+    }
+    expect(
+      new Set(idFactory.mock.results.map((entry) => entry.value)).size
+    ).toBe(idFactory.mock.calls.length);
+  });
+
+  it("preserves every existing meanings node and only appends missing POS templates", () => {
+    let nextId = 0;
+    const idFactory = vi.fn(() => `missing-node-${++nextId}`);
+    const existing = toWritableMeanings(meaningsCanonicalFixture);
+    const existingJson = JSON.stringify(existing);
+    const existingPos = existing.pos[0]!;
+    const forms: DraftFormsStepContentV3 = {
+      pos: [
+        formsFixture({ pos_id: "pos-1" }).pos[0]!,
+        formsFixture({ pos_id: "pos-2", pos: "verb" }).pos[0]!
+      ]
+    };
+
+    const result = ensureV3MeaningsForForms(
+      "entry-1",
+      forms,
+      existing,
+      idFactory
+    );
+
+    expect(result).not.toBe(existing);
+    expect(result.sense_groups).not.toBe(existing.sense_groups);
+    expect(result.sense_groups[0]).toBe(existing.sense_groups[0]);
+    expect(result.sense_groups).toHaveLength(2);
+    expect(result.pos[0]).toBe(existingPos);
+    expect(JSON.stringify(existing)).toBe(existingJson);
+    expect(result.pos.map((pos) => pos.pos_id)).toEqual(["pos-1", "pos-2"]);
+    expect(result.pos[1]!.senses[0]!.sentences[0]!.links).toEqual([
+      {
+        word_id: "entry-1",
+        sense_id: result.pos[1]!.senses[0]!.id,
+        role: "focus"
+      }
+    ]);
+    expect(result.pos[1]!.senses[0]!.sense_group_id).toBe(
+      result.sense_groups[1]!.id
+    );
+    expect(result.pos[1]!.senses[0]!.sense_group_id).not.toBe(
+      result.pos[0]!.senses[0]!.sense_group_id
+    );
+  });
+
+  it("is idempotent and does not spend new UUIDs after the first initialization", () => {
+    let nextId = 0;
+    const idFactory = vi.fn(() => `stable-node-${++nextId}`);
+    const forms = formsFixture({ pos_id: "pos-1" });
+    const first = ensureV3MeaningsForForms(
+      "word-1",
+      forms,
+      { sense_groups: [], pos: [] },
+      idFactory
+    );
+    const callCount = idFactory.mock.calls.length;
+    const firstJson = JSON.stringify(first);
+
+    const second = ensureV3MeaningsForForms("word-1", forms, first, idFactory);
+
+    expect(second).toBe(first);
+    expect(JSON.stringify(second)).toBe(firstJson);
+    expect(idFactory).toHaveBeenCalledTimes(callCount);
+  });
+
+  it("restores a missing referenced group with the same UUID when every forms POS already has meanings", () => {
+    const existing = toWritableMeanings(meaningsCanonicalFixture);
+    existing.sense_groups = [];
+    const existingPos = existing.pos;
+    const idFactory = vi.fn(() => "new-default-group");
+
+    const result = ensureV3MeaningsForForms(
+      "entry-1",
+      formsFixture({ pos_id: "pos-1" }),
+      existing,
+      idFactory
+    );
+
+    expect(result.sense_groups).toEqual([
+      { id: "sense-group-1", name_zh: "", name_en: "" }
+    ]);
+    expect(result.pos).toBe(existingPos);
+    expect(idFactory).not.toHaveBeenCalled();
+  });
+
+  it("splits a historical cross-POS group once while preserving every existing node", () => {
+    const existing = toWritableMeanings(meaningsCanonicalFixture);
+    const secondPos = structuredClone(existing.pos[0]!);
+    secondPos.pos_id = "pos-2";
+    secondPos.senses[0]!.id = "sense-2";
+    secondPos.senses[0]!.definitions[0]!.id = "definition-2";
+    secondPos.senses[0]!.sentences[0]!.id = "sentence-2";
+    existing.pos.push(secondPos);
+    const before = structuredClone(existing);
+    const idFactory = vi.fn(() => "split-group-pos-2");
+    const forms: DraftFormsStepContentV3 = {
+      pos: [
+        formsFixture({ pos_id: "pos-1" }).pos[0]!,
+        formsFixture({ pos_id: "pos-2", pos: "verb" }).pos[0]!
+      ]
+    };
+
+    const result = ensureV3MeaningsForForms(
+      "entry-1",
+      forms,
+      existing,
+      idFactory
+    );
+
+    expect(result.sense_groups).toEqual([
+      before.sense_groups[0],
+      { ...before.sense_groups[0], id: "split-group-pos-2" }
+    ]);
+    expect(result.pos[0]).toBe(existing.pos[0]);
+    expect(result.pos[0]!.senses[0]!.sense_group_id).toBe("sense-group-1");
+    expect(result.pos[1]!.senses[0]).toEqual({
+      ...before.pos[1]!.senses[0],
+      sense_group_id: "split-group-pos-2"
+    });
+    expect(result.pos[1]!.senses[0]!.definitions[0]!.id).toBe("definition-2");
+    expect(result.pos[1]!.senses[0]!.sentences[0]!.id).toBe("sentence-2");
+    expect(existing).toEqual(before);
+
+    const calls = idFactory.mock.calls.length;
+    const repeated = ensureV3MeaningsForForms(
+      "entry-1",
+      forms,
+      result,
+      idFactory
+    );
+    expect(repeated).toBe(result);
+    expect(idFactory).toHaveBeenCalledTimes(calls);
+  });
+
   it("深投影排除只读 association/target snapshots，保留全部 writable UUID 与顺序", () => {
     const writable = toWritableMeanings(meaningsCanonicalFixture);
+    const snapshots = relationDisplaySnapshots(meaningsCanonicalFixture);
     const sense = writable.pos[0]!.senses[0]!;
 
     expect(writable.sense_groups[0]!.id).toBe("sense-group-1");
@@ -115,6 +336,44 @@ describe("V3 meanings writable model", () => {
       id: "relation-1",
       target_word_id: "target-entry",
       target_sense_id: "target-sense"
+    });
+    expect(snapshots["relation-1"]).toEqual({
+      headword: "middle",
+      gloss: "中部"
+    });
+  });
+
+  it("只读关系快照区分无展示值、仅词面与仅词义", () => {
+    const canonical = structuredClone(meaningsCanonicalFixture);
+    canonical.pos[0]!.senses[0]!.relations = [
+      {
+        id: "relation-without-display",
+        relation: "synonym",
+        target_word_id: "target-1",
+        target_sense_id: "sense-1",
+        score: "10"
+      },
+      {
+        id: "relation-headword-only",
+        relation: "antonym",
+        target_word_id: "target-2",
+        target_sense_id: "sense-2",
+        target_headword: "outside",
+        score: "20"
+      },
+      {
+        id: "relation-gloss-only",
+        relation: "derivative",
+        target_word_id: "target-3",
+        target_sense_id: "sense-3",
+        target_gloss: "外部词义",
+        score: "30"
+      }
+    ];
+
+    expect(relationDisplaySnapshots(canonical)).toEqual({
+      "relation-headword-only": { headword: "outside" },
+      "relation-gloss-only": { gloss: "外部词义" }
     });
   });
 
@@ -400,6 +659,7 @@ describe("V3 meanings writable model", () => {
         id: "relation-pending",
         relation: "synonym",
         pending_target_headword: "centre",
+        pending_target_gloss: "中心点",
         target_headword: "read-only",
         target_gloss: "只读",
         score: "0"
@@ -441,6 +701,7 @@ describe("V3 meanings writable model", () => {
       id: "relation-pending",
       relation: "synonym",
       pending_target_headword: "centre",
+      pending_target_gloss: "中心点",
       score: "0"
     });
   });

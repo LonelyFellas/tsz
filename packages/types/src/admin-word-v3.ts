@@ -30,12 +30,18 @@ import type { SurfaceMatchItemV3, SurfaceMatchPageV3 } from "./surface-match";
 
 /** Smart Lexicon V3 wire types; all fields mirror the generated OpenAPI snake_case JSON. */
 export type EnglishLanguageV3 = "en";
-export type WordEntryKindV3 = "word";
+export type WordEntryKindV3 = "word" | "phrase";
 export type TextOriginV3 = "dictionary" | "converted" | "manual";
 export type PronunciationNormalizationVersionV3 = "nfkc_trim_lower_v1";
 export type CommonDialectV3 = "common";
 export type UkDialectV3 = "uk";
 export type UsDialectV3 = "us";
+export type DialectModeV3 = "unified" | "distinguish";
+
+export interface DialectRulesV3 {
+  spelling_mode: DialectModeV3;
+  phonetic_mode: DialectModeV3;
+}
 
 /** `base` is a peer form type. It is neither unique nor a parent of other forms. */
 export type WordFormTypeV3 =
@@ -94,6 +100,7 @@ export interface WordFormGroupV3 {
 export interface WordPosFormsV3 {
   pos_id: string;
   pos: string;
+  dialect_rules: DialectRulesV3;
   forms: WordConcreteFormV3[];
   form_groups: WordFormGroupV3[];
 }
@@ -251,6 +258,7 @@ export interface WordRelationV3 {
   target_word_id?: string;
   target_sense_id?: string;
   pending_target_headword?: string;
+  pending_target_gloss?: string;
   target_headword?: string;
   target_gloss?: string;
   score: string;
@@ -296,6 +304,7 @@ export interface WordRelationWritableV3 {
   target_word_id?: string;
   target_sense_id?: string;
   pending_target_headword?: string;
+  pending_target_gloss?: string;
   score: string;
 }
 
@@ -492,6 +501,7 @@ export type ActivatePublicationAnyInput =
 
 export const V3_VALIDATION_ISSUE_CODES = [
   "invalid_regional_variant_shape",
+  "dialect_rules_invalid",
   "invalid_form_type_for_part_of_speech",
   "forbidden_v3_field",
   "duplicate_node_id",
@@ -535,6 +545,11 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "relation_target_stale",
   "sentence_context_target_unavailable",
   "relation_pending_headword_invalid",
+  "relation_target_shape_invalid",
+  "relation_pending_gloss_without_headword",
+  "relation_pending_gloss_invalid",
+  "relation_pending_gloss_conflict",
+  "relation_pending_gloss_target_exists",
   "node_id_reused",
   "node_binding_unknown",
   "node_binding_changed",
@@ -705,6 +720,8 @@ export interface DetectLexiconSurfaceResponseV3 {
   request: DetectionSurfaceRequestEchoV3;
   normalized_surface: string;
   builtin_dictionary: BuiltinDictionaryEvidenceV3;
+  /** Server-authoritative union of builtin and same-surface existing-entry POS suggestions. */
+  suggested_pos: string[];
   matches: SurfaceMatchItemV3[];
   requires_acknowledgement: boolean;
   surface_match_page?: SurfaceMatchPageV3;

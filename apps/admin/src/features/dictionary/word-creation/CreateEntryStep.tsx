@@ -246,7 +246,7 @@ function StepHeading() {
         创建新词条
       </Typography.Title>
       <Typography.Paragraph className="word-step-description">
-        录入词条后，系统将判断词条类型、检查智能词库重复项，并从内置词典带出英美主词、基本词性、词形和音标建议。
+        录入词条，系统将判断词条类型，检测智能词库中的已有原形，并从内置词典匹配英美词形和建议词性。
       </Typography.Paragraph>
     </div>
   );
@@ -446,7 +446,7 @@ function DetectionStatus({
             <Descriptions.Item label="词条类型">
               {result.entry_kind === "word" ? "单词" : "短语"}
             </Descriptions.Item>
-            <Descriptions.Item label="重复检测">
+            <Descriptions.Item label="原形检测">
               <span data-testid="smart-dictionary-result">
                 {smart.status === "clear" ? (
                   <Space>
@@ -503,7 +503,7 @@ function DetectionStatus({
                   </Space>
                   <Button
                     type="link"
-                    aria-label={`${entry.spellings.join(" / ")}，查看重复词条`}
+                    aria-label={`${entry.spellings.join(" / ")}，查看已有原形`}
                     onClick={() =>
                       setPreview({
                         wordId: entry.wordId,
@@ -511,7 +511,7 @@ function DetectionStatus({
                       })
                     }
                   >
-                    查看重复词条
+                    查看已有原形
                   </Button>
                 </div>
                 <SmartMatchEntryMeta

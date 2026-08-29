@@ -1022,6 +1022,7 @@ describe("真实后端 wire mapper", () => {
   it("待物化关联词只上行 trim 后的词面，不夹带 target 两件套", () => {
     const relation = createRelation("synonym");
     relation.pending_target_headword = "  freshword  ";
+    relation.pending_target_gloss = "  预定义词义  ";
     relation.score = "60";
 
     const wired = wireRelations([relation]);
@@ -1033,6 +1034,7 @@ describe("真实后端 wire mapper", () => {
       id: relation.id,
       relation: "synonym",
       pending_target_headword: "freshword",
+      pending_target_gloss: "预定义词义",
       score: "60"
     });
     // toEqual 忽略值为 undefined 的键，两形态互斥只有 not.toHaveProperty 测得住：
@@ -1047,6 +1049,7 @@ describe("真实后端 wire mapper", () => {
     relation.target_sense_id = "sense-2";
     // 先键入词面又回头选中真实词条时的残留，绝不能跟着 target 一起发出去。
     relation.pending_target_headword = "freshword";
+    relation.pending_target_gloss = "不得随已绑定形态上行";
     relation.score = "80";
 
     const wired = wireRelations([relation]);
@@ -1060,6 +1063,7 @@ describe("真实后端 wire mapper", () => {
       score: "80"
     });
     expect(wired[0]!).not.toHaveProperty("pending_target_headword");
+    expect(wired[0]!).not.toHaveProperty("pending_target_gloss");
   });
 
   it("目标与词面都不完整的关联词整条丢弃，不发空串占位", () => {

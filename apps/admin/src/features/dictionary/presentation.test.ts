@@ -83,7 +83,7 @@ describe("mixed word list presentation", () => {
     });
   });
 
-  it.each(["legacy_headwords_v1", "surface_summary_v1", ""])(
+  it.each(["legacy_headwords_v1", "surface_summary_v1", "short_uuid_v1", ""])(
     "已知或空 strategy %s 不误报",
     (strategyVersion) => {
       const report = vi.fn();

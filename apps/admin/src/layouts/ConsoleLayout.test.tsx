@@ -44,7 +44,11 @@ describe("isWordCreationWorkspacePath", () => {
     "/words/word-center/wizard/basics",
     "/words/word-center/wizard/forms",
     "/words/word-center/wizard/meanings",
-    "/words/word-center/wizard/preview"
+    "/words/word-center/wizard/preview",
+    "/words/word-center/v3/wizard/basics",
+    "/words/word-center/v3/wizard/forms",
+    "/words/word-center/v3/wizard/meanings",
+    "/words/word-center/v3/wizard/preview"
   ])("%s 使用宽编辑工作台", (pathname) => {
     expect(isWordCreationWorkspacePath(pathname)).toBe(true);
   });

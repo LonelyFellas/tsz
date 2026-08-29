@@ -374,6 +374,10 @@ function MeaningsPreview({
                                 relation.target_word_id ||
                                 "未选择"}{" "}
                               · {relation.score}%
+                              {(relation.target_gloss ??
+                              relation.pending_target_gloss)
+                                ? ` · ${relation.target_gloss ?? relation.pending_target_gloss}`
+                                : ""}
                               {isPending ? " · 发布时新建" : ""}
                             </Tag>
                           );
@@ -648,14 +652,14 @@ export function PreviewAndPublishStep({
         <span className="word-step-number">STEP 04</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
           {word.status === "archived"
-            ? "归档词条详情"
+            ? "垃圾桶词条详情"
             : readOnly
               ? "词条详情"
               : "预览并生效"}
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
           {word.status === "archived"
-            ? "该词条已归档，当前仅提供结构化只读查看；恢复后才能继续编辑或发布。"
+            ? "该词条已在垃圾桶中，当前仅提供结构化只读查看；恢复后才能继续编辑或发布。"
             : readOnly
               ? "该词条已发布，本轮提供与创建预览一致的只读查看。"
               : "逐项核对结构化内容与发布完整性校验结果；本页不呈现学习端字典卡片样式。所有问题处理完成后可直接提交生效。"}
@@ -743,7 +747,7 @@ export function PreviewAndPublishStep({
           className="word-preview-status"
           type="warning"
           showIcon
-          title="词条已归档"
+          title="词条已在垃圾桶中"
           description="当前或历史发布记录仍被保留；请先恢复词条，再继续编辑或重新发布。"
           style={{ marginBottom: 18 }}
         />
@@ -869,7 +873,7 @@ export function PreviewAndPublishStep({
             <Descriptions.Item label="语言">English 英语</Descriptions.Item>
             <Descriptions.Item label="状态">
               {word.status === "archived"
-                ? "已归档"
+                ? "垃圾桶"
                 : word.status === "published"
                   ? word.has_unpublished_changes
                     ? "已发布（有未发布修改）"

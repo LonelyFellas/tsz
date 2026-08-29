@@ -36,14 +36,19 @@ describe("V3 forms model", () => {
   it("U01/U02 common 与完整 uk_us 无损保留 form/variant/pronunciation 身份", () => {
     const common = commonFormFixture();
     const regional = ukUsFormFixture();
-    const content = formsFixture({ forms: [common, regional] });
+    const commonContent = formsFixture({ forms: [common] });
+    const regionalContent = formsFixture({ forms: [regional] });
 
-    expect(validateFormsContent(content, "complete")).toEqual([]);
-    expect(toFormsWire(content)).toEqual(content);
-    expect(toFormsWire(content).pos[0]!.forms.map((form) => form.id)).toEqual([
-      common.id,
-      regional.id
-    ]);
+    expect(validateFormsContent(commonContent, "complete")).toEqual([]);
+    expect(validateFormsContent(regionalContent, "complete")).toEqual([]);
+    expect(toFormsWire(commonContent)).toEqual(commonContent);
+    expect(toFormsWire(regionalContent)).toEqual(regionalContent);
+    expect(
+      toFormsWire(commonContent).pos[0]!.forms.map((form) => form.id)
+    ).toEqual([common.id]);
+    expect(
+      toFormsWire(regionalContent).pos[0]!.forms.map((form) => form.id)
+    ).toEqual([regional.id]);
     expect(regional.regional_variants).toMatchObject({
       mode: "uk_us",
       uk: { id: UUIDS.uk_variant },
@@ -95,6 +100,63 @@ describe("V3 forms model", () => {
         node_location: expect.objectContaining({ form_id: malformed.id })
       })
     ]);
+  });
+
+  it("词性级 dialect_rules 只接受 UU、UD、DD 并约束所有 form 地区形状", () => {
+    const illegal = formsFixture({
+      dialect_rules: {
+        spelling_mode: "distinguish",
+        phonetic_mode: "unified"
+      }
+    });
+    expect(validateFormsContent(illegal, "save")).toContainEqual(
+      expect.objectContaining({
+        code: "dialect_rules_invalid",
+        field: "dialect_rules",
+        node_id: UUIDS.pos,
+        node_location: expect.objectContaining({ pos_id: UUIDS.pos })
+      })
+    );
+
+    const regional = ukUsFormFixture({
+      uk: { spelling: "center" },
+      us: { spelling: "center" }
+    });
+    const ud = formsFixture({
+      dialect_rules: {
+        spelling_mode: "unified",
+        phonetic_mode: "distinguish"
+      },
+      forms: [regional]
+    });
+    expect(validateFormsContent(ud, "save")).toEqual([]);
+
+    const mismatchedUd = structuredClone(ud);
+    const mismatchedForm = mismatchedUd.pos[0]!.forms[0]!;
+    if (mismatchedForm.regional_variants.mode !== "uk_us")
+      throw new Error("fixture");
+    mismatchedForm.regional_variants.uk.spelling = "centre";
+    expect(validateFormsContent(mismatchedUd, "save")).toContainEqual(
+      expect.objectContaining({
+        code: "invalid_regional_variant_shape",
+        field: "regional_variants",
+        node_id: regional.id
+      })
+    );
+
+    const uuWithRegional = formsFixture({
+      dialect_rules: {
+        spelling_mode: "unified",
+        phonetic_mode: "unified"
+      },
+      forms: [regional]
+    });
+    expect(validateFormsContent(uuWithRegional, "save")).toContainEqual(
+      expect.objectContaining({
+        code: "invalid_regional_variant_shape",
+        node_id: regional.id
+      })
+    );
   });
 
   it("U04 同组多个 base 与 comparative 合法且不去重", () => {
@@ -303,6 +365,10 @@ describe("V3 forms model", () => {
     crossPos.pos.push({
       pos_id: UUIDS.pos_2,
       pos: "verb",
+      dialect_rules: {
+        spelling_mode: "unified",
+        phonetic_mode: "unified"
+      },
       forms: [secondPosForm],
       form_groups: [
         {
@@ -333,7 +399,18 @@ describe("V3 forms model", () => {
     expect(codes(orphan, "save")).toContain("orphan_form");
 
     const zeroGroups: DraftFormsStepContentV3 = {
-      pos: [{ pos_id: UUIDS.pos, pos: "noun", forms: [], form_groups: [] }]
+      pos: [
+        {
+          pos_id: UUIDS.pos,
+          pos: "noun",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
+          forms: [],
+          form_groups: []
+        }
+      ]
     };
     expect(validateFormsContent(zeroGroups, "save")).toEqual([]);
     expect(codes(zeroGroups, "complete")).toContain("form_group_required");
@@ -343,6 +420,10 @@ describe("V3 forms model", () => {
         {
           pos_id: UUIDS.pos,
           pos: "noun",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
           forms: [],
           form_groups: [{ id: UUIDS.group, is_regular: false, members: [] }]
         }

@@ -432,7 +432,7 @@ describe("V3PreviewAndPublishStep", () => {
     ).toBeVisible();
   });
 
-  it("受控校验问题优先展示中文消息并隐藏内部代码", () => {
+  it("受控校验问题统一按稳定 code 展示中文并隐藏内部代码", () => {
     const controller: V3PreviewPublishController = {
       issues: [
         { ...validationIssue(), message: "词形内容需要修正" },
@@ -453,8 +453,8 @@ describe("V3PreviewAndPublishStep", () => {
     );
 
     expect(screen.getByText("发布校验未通过")).toBeVisible();
-    expect(screen.getByText(/词形内容需要修正/)).toBeVisible();
-    expect(screen.getByText(/第 2 项内容需要返回对应步骤检查/)).toBeVisible();
+    expect(screen.getByText("当前词性不支持该词形类型")).toBeVisible();
+    expect(screen.queryByText(/词形内容需要修正/)).toBeNull();
     expect(
       screen.queryByText("invalid_form_type_for_part_of_speech")
     ).toBeNull();
@@ -858,7 +858,7 @@ describe("V3PreviewAndPublishStep", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     expect(
-      await screen.findByText("第 1 项内容需要返回对应步骤检查。")
+      await screen.findByText("当前词性不支持该词形类型")
     ).toBeInTheDocument();
     expect(requests.impact).not.toHaveBeenCalled();
   });
@@ -1327,7 +1327,7 @@ describe("V3PreviewAndPublishStep", () => {
       expect(onPublished).not.toHaveBeenCalled();
       expect(screen.queryByRole("button", { name: "检查发布条件" })).toBeNull();
       expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
-      expect(screen.getByText("已归档词条不能发布。")).toBeInTheDocument();
+      expect(screen.getByText("垃圾桶中的词条不能发布。")).toBeInTheDocument();
       expect(screen.queryByText("entry_archived")).toBeNull();
     }
   );

@@ -142,6 +142,7 @@ function v3Item(
     match: {
       source_schema_version: 3,
       entry_id: entryId,
+      entry_kind: "word",
       status: "published",
       content_scope: "current_publication",
       pos_id: `pos-${entryId}`,

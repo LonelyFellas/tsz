@@ -767,7 +767,12 @@ export function toMeaningsWireContent(
             // 词面必须 trim 后再发：后端 canonicalize 不遍历 relations，首尾空格
             // 会直撞 `pending = btrim(pending)` 的 CHECK，那是 500 不是 422。
             if (shape.kind === "pending") {
-              return { ...common, pending_target_headword: shape.headword };
+              const pendingGloss = relation.pending_target_gloss?.trim();
+              return {
+                ...common,
+                pending_target_headword: shape.headword,
+                ...(pendingGloss ? { pending_target_gloss: pendingGloss } : {})
+              };
             }
             return undefined;
           })

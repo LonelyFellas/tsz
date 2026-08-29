@@ -18,33 +18,30 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.getByRole("button", { name: "创建词条" }).click();
     await expect(page).toHaveURL(/\/words\/new$/);
     await page.getByPlaceholder("例如 center 或 give up").fill("orbit");
-    await page.getByRole("button", { name: "继续创建" }).click();
+    await page.getByRole("button", { name: "词典检测" }).click();
+    await page.getByRole("button", { name: "创建并进入词形与发音" }).click();
 
     await expect(page).toHaveURL(
       new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/forms$`)
     );
     await expect(page.getByText("草稿可暂时不添加词性")).toBeVisible();
 
-    await page.getByLabel("待新增词性").click();
+    await page.getByLabel("添加基本词性").click();
     await page
       .locator(".ant-select-dropdown:visible")
       .getByText("名词", { exact: true })
       .click();
-    await page.getByRole("button", { name: "新增词性" }).click();
     await expect(page.getByRole("tab", { name: "名词" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
 
-    await page.getByRole("button", { name: "新增名词变化组" }).click();
     const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
     const firstGroup = nounGroups.nth(0);
-    await firstGroup.getByRole("button", { name: "变化组 1 新增词形" }).click();
-    await firstGroup.getByRole("button", { name: "变化组 1 新增词形" }).click();
+    await firstGroup.getByLabel("在原形 1 下方添加同类型词形").click();
     const firstForm = firstGroup.locator(".v3-concrete-form-row").nth(0);
     const secondForm = firstGroup.locator(".v3-concrete-form-row").nth(1);
-    await firstForm.getByLabel("词形 1通用拼写").fill("orbit-common");
-    await firstForm.getByRole("button", { name: /新增发音/ }).click();
+    await firstForm.getByLabel("原形 1通用拼写").fill("orbit-common");
     await firstForm.getByRole("button", { name: /新增发音/ }).click();
     await firstForm
       .getByLabel(/第 \d+ 条发音的字典音标/)
@@ -63,59 +60,71 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .nth(1)
       .fill("orbit-us");
 
-    await secondForm.getByLabel("词形 2通用拼写").fill("orbit-regional");
-    await secondForm
-      .getByRole("button", { name: "词形 2切换为英式和美式" })
-      .click();
-    await page.getByLabel("英式 映射拼写").fill("orbit-centre");
-    await page.getByLabel("英式 映射字典音标").fill("ˈɔːbɪt");
-    await page.getByLabel("英式 映射实际发音").fill("orbit-uk");
-    await page.getByLabel("美式 映射拼写").fill("orbit-center");
-    await page.getByLabel("美式 映射字典音标").fill("ˈɔrbɪt");
-    await page.getByLabel("美式 映射实际发音").fill("orbit-us");
-    await page.getByRole("button", { name: "确认转换" }).click();
-
     await page.getByRole("button", { name: "新增名词变化组" }).click();
     const secondGroup = nounGroups.nth(1);
-    await secondGroup.getByLabel("变化组 2 选择已有词形").click();
-    await page
-      .locator(".ant-select-dropdown:visible")
-      .locator(".ant-select-item-option")
-      .first()
-      .click();
-    await secondGroup
-      .getByRole("button", { name: "变化组 2 复用已有词形" })
-      .click();
-    await firstGroup
-      .locator(".v3-membership-row")
-      .nth(1)
-      .getByLabel("移动词形 2 到其他变化组")
-      .click();
+    const secondMembership = firstGroup.locator(".v3-membership-row").nth(1);
+    await secondMembership.getByText("移动到其他组", { exact: true }).click();
+    await secondMembership.getByLabel("移动词形 2 到其他变化组").click();
     await page
       .locator(".ant-select-dropdown:visible")
       .getByText("变化组 2", { exact: true })
       .click();
     await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(1);
-    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
 
-    await page.getByLabel("待新增词性").click();
+    await page.getByLabel("英美拼写有区别").click();
+    const ukSecondForm = secondGroup.locator(
+      ".v3-dialect-panel-uk .v3-dialect-form-cell"
+    );
+    const usSecondForm = secondGroup.locator(
+      ".v3-dialect-panel-us .v3-dialect-form-cell"
+    );
+    await ukSecondForm.getByLabel("原形英式拼写").fill("orbit-centre");
+    await ukSecondForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
+    await ukSecondForm.getByLabel("第 1 条发音的实际发音").fill("orbit-uk");
+    await usSecondForm.getByLabel("原形美式拼写").fill("orbit-center");
+    await usSecondForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔrbɪt");
+    await usSecondForm.getByLabel("第 1 条发音的实际发音").fill("orbit-us");
+
+    await page.getByLabel("添加基本词性").click();
     await page
       .locator(".ant-select-dropdown:visible")
       .getByText("动词", { exact: true })
       .click();
-    await page.getByRole("button", { name: "新增词性" }).click();
     await expect(page.getByRole("tab", { name: "动词" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
-    await page.getByRole("button", { name: "新增动词变化组" }).click();
-    const verbGroup = page.locator("[data-pos-id] .v3-form-group-card").first();
-    await verbGroup.getByRole("button", { name: "变化组 1 新增词形" }).click();
-    const verbForm = verbGroup.locator(".v3-concrete-form-row");
-    await verbForm.getByLabel("词形 1通用拼写").fill("orbit-verb");
-    await verbForm.getByRole("button", { name: /新增发音/ }).click();
-    await verbForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
-    await verbForm.getByLabel("第 1 条发音的实际发音").fill("orbit-verb");
+    const verbPanel = page.getByRole("tabpanel", { name: /动词/ });
+    const ukVerb = verbPanel.locator(
+      ".v3-dialect-panel-uk .v3-dialect-form-cell"
+    );
+    const usVerb = verbPanel.locator(
+      ".v3-dialect-panel-us .v3-dialect-form-cell"
+    );
+    await ukVerb.getByLabel("原形英式拼写").fill("orbit-verb-uk");
+    await ukVerb.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
+    await ukVerb.getByLabel("第 1 条发音的实际发音").fill("orbit-verb-uk");
+    await usVerb.getByLabel("原形美式拼写").fill("orbit-verb-us");
+    await usVerb.getByLabel("第 1 条发音的字典音标").fill("ˈɔrbɪt");
+    await usVerb.getByLabel("第 1 条发音的实际发音").fill("orbit-verb-us");
+
+    await page.getByRole("button", { name: "保存草稿" }).click();
+    await expect(page.getByRole("tab", { name: "动词" })).toHaveAttribute(
+      "aria-selected",
+      "true"
+    );
+    const issueTarget = page
+      .getByRole("tabpanel", { name: /动词/ })
+      .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
+      .getByLabel("第 1 条发音的实际发音");
+    await expect(issueTarget).toBeFocused();
+    await expect(
+      page
+        .getByRole("alert")
+        .filter({ hasText: "词形与发音尚未完成" })
+        .getByText("请完整填写发音方式、字典音标和实际发音")
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect.poll(() => api.getWord().revision).toBe(2);
@@ -127,45 +136,29 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     ]);
     expect(savedForms.pos[0]?.form_groups).toHaveLength(2);
     expect(savedForms.pos[0]?.form_groups[0]?.members).toHaveLength(1);
-    expect(savedForms.pos[0]?.form_groups[1]?.members).toHaveLength(2);
-    expect(savedForms.pos[0]?.forms[0]?.regional_variants.mode).toBe("common");
+    expect(savedForms.pos[0]?.form_groups[1]?.members).toHaveLength(1);
+    expect(savedForms.pos[0]?.dialect_rules).toEqual({
+      spelling_mode: "distinguish",
+      phonetic_mode: "distinguish"
+    });
+    expect(savedForms.pos[0]?.forms[0]?.regional_variants.mode).toBe("uk_us");
     expect(savedForms.pos[0]?.forms[1]?.regional_variants.mode).toBe("uk_us");
     const errorPronunciation = savedForms.pos[1]?.forms[0];
-    if (errorPronunciation?.regional_variants.mode !== "common") {
-      throw new Error("Mock E01a expected a common verb form");
+    if (errorPronunciation?.regional_variants.mode !== "uk_us") {
+      throw new Error("Mock E01a expected a regional verb form");
     }
     await page.reload();
     await expect(page.getByRole("tab", { name: "名词" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "动词" })).toBeVisible();
     await page.getByRole("tab", { name: "名词" }).click();
     await expect(page.locator('input[value="orbit-common"]')).toHaveCount(2);
-    await expect(page.getByText("英式拼写", { exact: true })).toBeVisible();
-    await expect(page.getByText("美式拼写", { exact: true })).toBeVisible();
+    await expect(page.getByText("英式拼写", { exact: true })).toHaveCount(2);
+    await expect(page.getByText("美式拼写", { exact: true })).toHaveCount(2);
 
-    await page.getByRole("button", { name: "完成词形" }).click();
-    await expect(page.getByRole("tab", { name: "动词" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
-    const issueTarget = page
-      .getByRole("tabpanel", { name: "动词" })
-      .getByLabel("第 1 条发音的实际发音");
-    await expect(issueTarget).toBeFocused();
-    await expect(
-      page
-        .getByRole("alert")
-        .filter({ hasText: "词形与发音尚未完成" })
-        .getByText("Mock：第二词性的实际发音需要确认")
-    ).toBeVisible();
-
-    await page.getByText("核对与发布", { exact: true }).click();
+    await page.getByText("预览并生效", { exact: true }).click();
     await expect(page).toHaveURL(
-      new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/preview$`)
+      new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/forms$`)
     );
-    await expect(page.getByText("当前词条不可发布")).toBeVisible();
-    await expect(
-      page.getByText("学习端尚未完成该词条结构的发布准备。")
-    ).toBeVisible();
     await expect(page.getByRole("button", { name: "发布词条" })).toHaveCount(0);
 
     expect(api.count("POST", ADMIN_V3_DETECTIONS_PATH)).toBe(1);

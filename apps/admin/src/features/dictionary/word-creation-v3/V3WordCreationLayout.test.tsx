@@ -1,8 +1,21 @@
-import type { AdminWordV3, V3DraftValidationIssue } from "@tsz/types";
-import { fireEvent, render, screen } from "@testing-library/react";
+import type {
+  AdminWordV3,
+  DraftFormsStepContentV3,
+  DraftMeaningsStepContentWritableV3,
+  V3DraftValidationIssue,
+  WordCreationStep
+} from "@tsz/types";
+import { fireEvent, render, screen, within } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
-import { formsFixture } from "./fixtures";
+import {
+  commonFormFixture,
+  formsFixture,
+  ukUsFormFixture,
+  uuidFromInt
+} from "./fixtures";
 import type { V3Problem } from "./problem";
+import type { V3IssueNavigationTarget } from "./issueNavigation";
 import {
   V3WordCreationLayout,
   type V3ConflictComparison
@@ -64,37 +77,317 @@ function renderLayout(
     readOnly?: boolean;
     dirtySteps?: { forms: boolean; meanings: boolean };
     conflict?: V3ConflictComparison;
-    onStepChange?: (step: "forms" | "meanings") => void;
+    activeStep?: WordCreationStep;
+    draftForms?: DraftFormsStepContentV3;
+    draftMeanings?: DraftMeaningsStepContentWritableV3;
+    onStepChange?: (step: WordCreationStep) => void;
+    onProgressNavigate?: (target: V3IssueNavigationTarget) => void;
     onIssueNavigate?: (issue: V3DraftValidationIssue) => void;
     onRefreshConflict?: () => void;
+    word?: AdminWordV3;
   } = {}
 ) {
   const issues = options.issues ?? [];
   return render(
-    <V3WordCreationLayout
-      word={word()}
-      activeStep="forms"
-      readOnly={options.readOnly}
-      dirtySteps={options.dirtySteps}
-      readiness={{
-        issue_count: issues.length,
-        positions: []
-      }}
-      issues={issues}
-      problem={options.problem}
-      conflict={options.conflict}
-      onStepChange={(step) =>
-        options.onStepChange?.(step as "forms" | "meanings")
-      }
-      onIssueNavigate={(value) => options.onIssueNavigate?.(value)}
-      onRefreshConflict={options.onRefreshConflict}
-    >
-      <div>step body</div>
-    </V3WordCreationLayout>
+    <MemoryRouter>
+      <V3WordCreationLayout
+        word={options.word ?? word()}
+        activeStep={options.activeStep ?? "forms"}
+        draftForms={options.draftForms}
+        draftMeanings={options.draftMeanings}
+        readOnly={options.readOnly}
+        dirtySteps={options.dirtySteps}
+        readiness={{
+          issue_count: issues.length,
+          positions: []
+        }}
+        issues={issues}
+        problem={options.problem}
+        conflict={options.conflict}
+        onStepChange={(step) => options.onStepChange?.(step)}
+        onProgressNavigate={(target) => options.onProgressNavigate?.(target)}
+        onIssueNavigate={(value) => options.onIssueNavigate?.(value)}
+        onRefreshConflict={options.onRefreshConflict}
+      >
+        <div>step body</div>
+      </V3WordCreationLayout>
+    </MemoryRouter>
   );
 }
 
 describe("V3WordCreationLayout", () => {
+  it("shows the seven product completion rows without engineering step copy", () => {
+    const current = word();
+    current.completed_steps = ["basics", "forms"];
+    current.forms = formsFixture({
+      forms: [
+        commonFormFixture(),
+        commonFormFixture({
+          id: uuidFromInt(903),
+          form_type: "plural",
+          spelling: "centres"
+        })
+      ]
+    });
+    current.meanings = {
+      sense_groups: [
+        { id: uuidFromInt(909), name_zh: "位置", name_en: "Position" }
+      ],
+      pos: [
+        {
+          pos_id: current.forms.pos[0]!.pos_id,
+          grammar_structures: [{ id: uuidFromInt(904), variants: [] }],
+          senses: [
+            {
+              id: uuidFromInt(905),
+              sub_pos: "countable",
+              level: "A1",
+              sense_group_id: uuidFromInt(909),
+              depends_on_context: false,
+              definitions: [],
+              sentences: [
+                {
+                  id: uuidFromInt(906),
+                  level: "A1",
+                  en_text: {
+                    mode: "unified",
+                    common: {
+                      id: uuidFromInt(907),
+                      value: { version: 2, text: "A centre.", annotations: [] },
+                      origin: "manual"
+                    }
+                  },
+                  zh_text_id: uuidFromInt(908),
+                  zh_text: { version: 2, text: "一个中心。", annotations: [] },
+                  links: [],
+                  associations: [],
+                  associations_state: "resolved"
+                }
+              ],
+              relations: []
+            }
+          ]
+        }
+      ]
+    };
+
+    const view = renderLayout({ word: current });
+    const rows = Array.from(
+      view.container.querySelectorAll<HTMLElement>(
+        ".word-creation-progress-row"
+      )
+    );
+
+    expect(
+      rows.map((row) => row.querySelector(".word-progress-label")?.textContent)
+    ).toEqual([
+      "方言识别",
+      "基本词性",
+      "词形变化",
+      "语义区间",
+      "语法结构",
+      "多维词义",
+      "多维例句"
+    ]);
+    expect(rows.map((row) => row.textContent)).toEqual([
+      "方言识别完成",
+      "基本词性1",
+      "词形变化1",
+      "4语义区间1",
+      "5语法结构1",
+      "6多维词义1",
+      "7多维例句1"
+    ]);
+    expect(
+      rows.slice(0, 3).every((row) => row.dataset.readinessState === "complete")
+    ).toBe(true);
+    expect(
+      rows.slice(3).every((row) => row.dataset.readinessState === "incomplete")
+    ).toBe(true);
+    expect(
+      rows.slice(0, 3).every((row) => row.querySelector(".word-progress-done"))
+    ).toBe(true);
+    expect(
+      rows
+        .slice(3)
+        .map((row) => row.querySelector(".word-progress-index")?.textContent)
+    ).toEqual(["4", "5", "6", "7"]);
+
+    const progressText = rows.map((row) => row.textContent).join(" ");
+    for (const forbidden of [
+      "基础信息",
+      "词形编辑",
+      "词义编辑",
+      "发布检查",
+      "原形发音",
+      "待完成",
+      "未保存",
+      "待核对"
+    ]) {
+      expect(progressText).not.toContain(forbidden);
+    }
+    expect(progressText).not.toMatch(/\d+\/\d+/u);
+  });
+
+  it("routes all seven completion questions to native V3 steps and stable nodes", () => {
+    const current = word();
+    current.forms = formsFixture({
+      forms: [
+        commonFormFixture(),
+        commonFormFixture({
+          id: uuidFromInt(921),
+          form_type: "plural"
+        })
+      ]
+    });
+    current.meanings = {
+      sense_groups: [
+        { id: uuidFromInt(924), name_zh: "位置", name_en: "Position" }
+      ],
+      pos: [
+        {
+          pos_id: current.forms.pos[0]!.pos_id,
+          grammar_structures: [{ id: uuidFromInt(922), variants: [] }],
+          senses: [
+            {
+              id: uuidFromInt(923),
+              sub_pos: "countable",
+              level: "A1",
+              sense_group_id: uuidFromInt(924),
+              depends_on_context: false,
+              definitions: [],
+              sentences: [],
+              relations: []
+            }
+          ]
+        }
+      ]
+    };
+    const onProgressNavigate = vi.fn();
+    renderLayout({ word: current, onProgressNavigate });
+
+    for (const label of [
+      "方言识别",
+      "基本词性",
+      "词形变化",
+      "语义区间",
+      "语法结构",
+      "多维词义",
+      "多维例句"
+    ]) {
+      fireEvent.click(screen.getByText(label));
+    }
+
+    expect(
+      onProgressNavigate.mock.calls.map(
+        (call) => (call[0] as V3IssueNavigationTarget).step
+      )
+    ).toEqual([
+      "basics",
+      "forms",
+      "forms",
+      "meanings",
+      "meanings",
+      "meanings",
+      "meanings"
+    ]);
+    expect(onProgressNavigate.mock.calls[2]![0]).toMatchObject({
+      form_id: uuidFromInt(921),
+      node_id: uuidFromInt(921),
+      field: "form_type"
+    });
+    expect(onProgressNavigate.mock.calls[3]![0]).toMatchObject({
+      node_id: uuidFromInt(924),
+      field: "name_zh"
+    });
+    expect(onProgressNavigate.mock.calls[4]![0]).toMatchObject({
+      node_id: uuidFromInt(922),
+      field: "variants"
+    });
+    expect(onProgressNavigate.mock.calls[5]![0]).toMatchObject({
+      node_id: uuidFromInt(923),
+      field: "sense"
+    });
+  });
+
+  it("当前词条只展示第一个原形，不拼接后续原形或其他词形", () => {
+    const current = word();
+    current.presentation.label = "center / centers";
+    current.presentation.matched_surfaces = ["center", "centers"];
+    current.forms = formsFixture({
+      forms: [
+        commonFormFixture({ spelling: "center" }),
+        commonFormFixture({
+          id: uuidFromInt(901),
+          spelling: "alternate-base"
+        }),
+        commonFormFixture({
+          id: uuidFromInt(902),
+          form_type: "plural",
+          spelling: "centers"
+        })
+      ]
+    });
+
+    renderLayout({ word: current });
+
+    const summary = within(screen.getByRole("region", { name: "词条摘要" }));
+    expect(summary.getByText("center", { exact: true })).toBeVisible();
+    expect(summary.queryByText("center / centers")).toBeNull();
+    expect(summary.queryByText("alternate-base")).toBeNull();
+    expect(summary.queryByText("centers", { exact: true })).toBeNull();
+  });
+
+  it("第一个原形为同拼写英美结构时摘要只显示一次", () => {
+    const current = word();
+    current.forms = formsFixture({
+      dialect_rules: {
+        spelling_mode: "unified",
+        phonetic_mode: "distinguish"
+      },
+      forms: [
+        ukUsFormFixture({
+          uk: { spelling: "center" },
+          us: { spelling: "center" }
+        })
+      ]
+    });
+
+    renderLayout({ word: current });
+
+    const summary = within(screen.getByRole("region", { name: "词条摘要" }));
+    expect(summary.getByText("center", { exact: true })).toBeVisible();
+    expect(summary.queryByText("center / center")).toBeNull();
+  });
+
+  it("没有原形时回退后端 presentation label", () => {
+    const current = word();
+    current.presentation.label = "fallback-label";
+    current.forms = formsFixture({
+      forms: [commonFormFixture({ form_type: "plural" })]
+    });
+
+    renderLayout({ word: current });
+
+    const summary = within(screen.getByRole("region", { name: "词条摘要" }));
+    expect(summary.getByText("fallback-label", { exact: true })).toBeVisible();
+  });
+
+  it("第一个原形为空白时回退后端 presentation label", () => {
+    const current = word();
+    current.presentation.label = "fallback-for-blank-base";
+    current.forms = formsFixture({
+      forms: [commonFormFixture({ spelling: "  " })]
+    });
+
+    renderLayout({ word: current });
+
+    const summary = within(screen.getByRole("region", { name: "词条摘要" }));
+    expect(
+      summary.getByText("fallback-for-blank-base", { exact: true })
+    ).toBeVisible();
+  });
+
   it.each([
     [
       { kind: "network", error: new TypeError("offline"), retryable: true },
@@ -139,9 +432,11 @@ describe("V3WordCreationLayout", () => {
       onIssueNavigate
     });
 
-    fireEvent.click(screen.getByText("释义与例句"));
+    fireEvent.click(screen.getByText("词义与例句"));
     fireEvent.click(
-      screen.getByRole("button", { name: "spelling is invalid" })
+      screen.getByRole("button", {
+        name: "内容来源无法确认，请刷新后重试"
+      })
     );
 
     expect(onStepChange).toHaveBeenCalledWith("meanings");
@@ -153,7 +448,7 @@ describe("V3WordCreationLayout", () => {
     const writable = renderLayout({ dirtySteps });
 
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
-    expect(screen.getByText(/词形与发音、释义与例句/)).toBeInTheDocument();
+    expect(screen.getByText(/词形与发音、词义与例句/)).toBeInTheDocument();
 
     writable.unmount();
     renderLayout({ dirtySteps, readOnly: true });
@@ -187,7 +482,7 @@ describe("V3WordCreationLayout", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "刷新并比较" }));
 
-    expect(screen.getByText("释义与例句冲突")).toBeInTheDocument();
+    expect(screen.getByText("词义与例句冲突")).toBeInTheDocument();
     expect(onRefreshConflict).toHaveBeenCalledTimes(1);
   });
 });

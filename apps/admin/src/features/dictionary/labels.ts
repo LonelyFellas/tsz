@@ -25,13 +25,13 @@ export const KIND_OPTIONS = recordToOptions(KIND_LABEL);
 export const STATUS_LABEL: Record<AdminWordStatus, string> = {
   draft: "草稿",
   published: "已发布",
-  archived: "已归档"
+  archived: "垃圾桶"
 };
 
 export const STATUS_OPTIONS = recordToOptions(STATUS_LABEL);
 
 /**
- * 重复检测的命中原因。呈现次序固定为主词层面在前、词形层面在后——
+ * 原形检测的命中原因。呈现次序固定为主词层面在前、词形层面在后——
  * 后端按匹配分数排序，混着看不出冲突的严重程度。
  */
 export const MATCH_CATEGORY_ORDER: readonly SurfaceMatchCategoryV2[] = [

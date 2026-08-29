@@ -1,10 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { App as AntApp } from "antd";
 import type {
   AdminWordPublicationV3,
   AdminWordV3,
+  DraftMeaningsStepContentWritableV3,
   SurfaceMatchPageV3
 } from "@tsz/types";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
@@ -26,7 +33,34 @@ import { WordWizardV3Page, type V3MeaningsStepRenderer } from "./WordWizardV3";
 
 const WORD_ID = "019d2c55-1f9e-7f88-a189-a2b8a07153fb";
 
+function cleanMeanings(posId?: string): AdminWordV3["meanings"] {
+  return {
+    sense_groups: [{ id: uuidFromInt(299), name_zh: "", name_en: "" }],
+    pos: posId ? [{ pos_id: posId, grammar_structures: [], senses: [] }] : []
+  };
+}
+
+function canonicalMeaningsFromWritable(
+  content: DraftMeaningsStepContentWritableV3
+): AdminWordV3["meanings"] {
+  return {
+    sense_groups: content.sense_groups,
+    pos: content.pos.map((pos) => ({
+      ...pos,
+      senses: pos.senses.map((sense) => ({
+        ...sense,
+        sentences: sense.sentences.map((sentence) => ({
+          ...sentence,
+          associations: [],
+          associations_state: "unresolved"
+        }))
+      }))
+    }))
+  };
+}
+
 function word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
+  const forms = overrides.forms ?? formsFixture();
   return {
     schema_version: 3,
     id: WORD_ID,
@@ -48,8 +82,8 @@ function word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
       },
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
-    forms: formsFixture(),
-    meanings: { sense_groups: [], pos: [] },
+    forms,
+    meanings: overrides.meanings ?? cleanMeanings(forms.pos[0]?.pos_id),
     completed_steps: ["basics"],
     max_reachable_step: "forms",
     created_by: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
@@ -162,6 +196,234 @@ function renderPage(
 }
 
 describe("WordWizardV3Page", () => {
+  it("renders the V3 basics route with the established V2 first-step structure instead of a placeholder card", async () => {
+    const current = word();
+    const api = source({ word: current, retired_stable_nodes: [] });
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/basics`,
+      createV3WordRequests(api)
+    );
+
+    expect(await screen.findByText("STEP 01")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 2, name: "创建新词条" })
+    ).toBeInTheDocument();
+    expect(screen.getByText("所属语言｜英美区分")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /返回智能词库/ })).toBeVisible();
+    expect(screen.getByText("当前词条")).toBeVisible();
+    expect(screen.getByText("完成情况")).toBeVisible();
+    expect(screen.getByText("方言识别")).toBeVisible();
+    expect(screen.getByText("录入与检测")).toBeInTheDocument();
+    expect(screen.getByText("词典检测结果")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "进入词形与发音" })
+    ).toBeInTheDocument();
+    expect(screen.queryByText("创建信息")).toBeNull();
+    expect(screen.getByLabelText("录入词条")).toHaveValue("centre");
+    expect(screen.getByLabelText("录入词条")).toHaveAttribute("readonly");
+
+    fireEvent.click(screen.getByRole("button", { name: "进入词形与发音" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/words/${WORD_ID}/v3/wizard/forms`
+      )
+    );
+    expect(api.detectV3).not.toHaveBeenCalled();
+    expect(api.createV3).not.toHaveBeenCalled();
+    expect(api.saveFormsStepV3).not.toHaveBeenCalled();
+  });
+
+  it("presents all canonical dictionary suggestions without exposing stable IDs or internal names", async () => {
+    const firstPos = formsFixture({
+      pos: "noun",
+      forms: [
+        commonFormFixture({
+          id: uuidFromInt(301),
+          spelling: "centre",
+          pronunciations: [
+            pronunciationFixture({
+              id: uuidFromInt(401),
+              dict_phonetic: "/ˈsen.tər/",
+              actual_pron: "SEN-tuh"
+            }),
+            pronunciationFixture({
+              id: uuidFromInt(402),
+              dict_phonetic: "/ˈsen.trə/",
+              actual_pron: "SEN-truh",
+              style: "weak"
+            })
+          ]
+        }),
+        ukUsFormFixture({
+          id: uuidFromInt(302),
+          form_type: "plural",
+          uk: { spelling: "centres" },
+          us: { spelling: "centers" }
+        })
+      ]
+    }).pos[0]!;
+    const secondPos = formsFixture({
+      pos: "verb",
+      pos_id: uuidFromInt(303),
+      forms: [
+        commonFormFixture({
+          id: uuidFromInt(304),
+          spelling: "centre"
+        })
+      ]
+    }).pos[0]!;
+    const current = word({ forms: { pos: [firstPos, secondPos] } });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/basics`,
+      createV3WordRequests(source({ word: current, retired_stable_nodes: [] }))
+    );
+
+    expect(await screen.findByText("确认英美主词与词形")).toBeVisible();
+    expect(screen.getAllByText("名词").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("动词").length).toBeGreaterThan(0);
+    expect(screen.getByText("英式英语 · BrE")).toBeVisible();
+    expect(screen.getByText("美式英语 · AmE")).toBeVisible();
+    expect(screen.getByDisplayValue("centres")).toHaveAttribute("readonly");
+    expect(screen.getByDisplayValue("centers")).toHaveAttribute("readonly");
+    expect(screen.getByText("词典音标：/ˈsen.tər/")).toBeVisible();
+    expect(screen.getByText("实际发音：SEN-truh")).toBeVisible();
+    expect(screen.queryByText(uuidFromInt(301))).toBeNull();
+    expect(screen.queryByText("membership")).toBeNull();
+    expect(screen.queryByText("form_type")).toBeNull();
+  });
+
+  it("uses a product empty state instead of the internal unnamed placeholder", async () => {
+    const current = word({
+      presentation: {
+        label: "未命名词条 · 01a03e0c",
+        matched_surfaces: ["未命名词条 · 01a03e0c"],
+        strategy_version: "v3"
+      },
+      forms: { pos: [] }
+    });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/basics`,
+      createV3WordRequests(source({ word: current, retired_stable_nodes: [] }))
+    );
+
+    expect(await screen.findByText("完成检测后显示")).toBeVisible();
+    expect(screen.getByText("未找到内置词典建议")).toBeVisible();
+    expect(screen.queryByText(/未命名词条/)).toBeNull();
+    expect(screen.getByLabelText("录入词条")).toHaveValue("");
+  });
+
+  it("reports meaning progress without bypassing the server max reachable step", async () => {
+    const current = word({
+      presentation: {
+        label: "未命名词条 · 01a03e0c",
+        matched_surfaces: ["未命名词条", "surface fallback"],
+        strategy_version: "v3"
+      },
+      forms: { pos: [] },
+      meanings: {
+        sense_groups: [
+          { id: uuidFromInt(501), name_zh: "动作", name_en: "action" }
+        ],
+        pos: [
+          {
+            pos_id: uuidFromInt(502),
+            grammar_structures: [{ id: uuidFromInt(503), variants: [] }],
+            senses: [
+              {
+                id: uuidFromInt(504),
+                sub_pos: "",
+                level: "A1",
+                depends_on_context: false,
+                definitions: [],
+                sentences: [
+                  {
+                    id: uuidFromInt(505),
+                    level: "A1",
+                    en_text: {
+                      mode: "unified",
+                      common: {
+                        id: uuidFromInt(506),
+                        origin: "manual",
+                        value: {
+                          version: 1,
+                          text: "Example.",
+                          spans: [],
+                          liaisons: []
+                        }
+                      }
+                    },
+                    zh_text_id: uuidFromInt(507),
+                    zh_text: {
+                      version: 1,
+                      text: "例句。",
+                      spans: [],
+                      liaisons: []
+                    },
+                    links: [],
+                    associations: [],
+                    associations_state: "resolved"
+                  }
+                ],
+                relations: []
+              }
+            ]
+          }
+        ]
+      }
+    });
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/basics`,
+      createV3WordRequests(source({ word: current, retired_stable_nodes: [] }))
+    );
+
+    expect(await screen.findByLabelText("录入词条")).toHaveValue(
+      "surface fallback"
+    );
+    expect(screen.getByRole("button", { name: /语义区间1\/1/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /语法结构1\/1/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /多维词义1\/1/ })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /多维例句1\/1/ }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/words/${WORD_ID}/v3/wizard/forms`
+      )
+    );
+  });
+
+  it("falls back to a regional canonical spelling and presents missing pronunciation safely", async () => {
+    const regional = ukUsFormFixture({
+      id: uuidFromInt(601),
+      uk: { spelling: "", pronunciations: [] },
+      us: {
+        spelling: "color",
+        pronunciations: [
+          {
+            id: uuidFromInt(602),
+            dict_phonetic: "",
+            actual_pron: ""
+          }
+        ]
+      }
+    });
+    const current = word({
+      presentation: {
+        label: " ",
+        matched_surfaces: ["未命名词条"],
+        strategy_version: "v3"
+      },
+      forms: formsFixture({ forms: [regional] })
+    });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/basics`,
+      createV3WordRequests(source({ word: current, retired_stable_nodes: [] }))
+    );
+
+    expect(await screen.findByLabelText("录入词条")).toHaveValue("color");
+    expect(screen.getByText("暂无词典发音建议")).toBeVisible();
+    expect(screen.queryByText(/词典音标：/)).toBeNull();
+    expect(screen.queryByText(/实际发音：/)).toBeNull();
+  });
+
   it("loads through getAny, narrows V3 and wires the controlled T4 forms slot", async () => {
     const current = word();
     const endpoints = source({ word: current, retired_stable_nodes: [] });
@@ -171,10 +433,18 @@ describe("WordWizardV3Page", () => {
     );
 
     expect(await screen.findByText("centre")).toBeInTheDocument();
+    expect(screen.getByText("STEP 02")).toBeVisible();
+    expect(screen.getByText("当前词条")).toBeVisible();
+    expect(screen.getByText("完成情况")).toBeVisible();
+    expect(document.querySelector(".word-creation-page")).not.toBeNull();
+    expect(document.querySelector(".word-creation-stepper")).not.toBeNull();
+    expect(document.querySelector(".word-creation-summary")).not.toBeNull();
     expect(screen.getByText("名词")).toBeInTheDocument();
+    expect(screen.getByText("上一步").closest("button")).toBeVisible();
     expect(
       screen.getByRole("button", { name: "保存草稿" })
     ).toBeInTheDocument();
+    expect(screen.getByText("进入词义与例句").closest("button")).toBeVisible();
     expect(endpoints.getAny).toHaveBeenCalledWith(WORD_ID);
   });
 
@@ -278,45 +548,56 @@ describe("WordWizardV3Page", () => {
     );
   });
 
-  it("requires an explicit acknowledgement before completing a token-only impact", async () => {
-    const current = word();
+  it("#136 不完整词形不能越过服务端最大可达步骤", async () => {
+    const current = word({ meanings: { sense_groups: [], pos: [] } });
     const endpoints = source({ word: current, retired_stable_nodes: [] });
-    vi.mocked(endpoints.previewFormsImpactV3).mockResolvedValueOnce({
-      schema_version: 3,
-      base_revision: 1,
-      requires_confirmation: true,
-      confirmation_token: "impact-token",
-      affected: [
-        {
-          node_id: current.forms.pos[0]!.forms[0]!.id,
-          node_type: "form",
-          reason: "referenced by an existing relation"
-        }
-      ]
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints)
+    );
+
+    fireEvent.click(await screen.findByText("进入词义与例句"));
+
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/words/${WORD_ID}/v3/wizard/forms`
+      )
+    );
+    expect(screen.queryByLabelText("语义区间 1 中文")).toBeNull();
+    expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
+    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+    expect(endpoints.saveMeaningsStepV3).not.toHaveBeenCalled();
+  }, 20_000);
+
+  it("#137 未保存词形草稿跨步骤导航后仍保留", async () => {
+    const current = word({
+      meanings: { sense_groups: [], pos: [] },
+      completed_steps: ["basics", "forms"],
+      max_reachable_step: "meanings"
     });
-    vi.mocked(endpoints.saveFormsStepV3).mockResolvedValueOnce({
-      word: { ...current, revision: 2 }
-    });
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
     renderPage(
       `/words/${WORD_ID}/v3/wizard/forms`,
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.click(await screen.findByText("完成词形"));
+    fireEvent.change(await screen.findByLabelText("原形通用拼写"), {
+      target: { value: "center-unsaved" }
+    });
+    fireEvent.click(screen.getByText("进入词义与例句"));
+    expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue("");
 
-    expect(await screen.findByText("确认影响并完成词形")).toBeInTheDocument();
-    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("确认影响并完成词形"));
+    const formsStep = screen
+      .getAllByText("词形与发音")
+      .find((item) => item.closest('[role="button"]'));
+    if (!formsStep) throw new Error("forms step navigation not found");
+    fireEvent.click(formsStep);
 
-    await waitFor(() =>
-      expect(endpoints.saveFormsStepV3).toHaveBeenCalledWith(WORD_ID, {
-        schema_version: 3,
-        base_revision: 1,
-        intent: "complete",
-        content: current.forms,
-        confirmed_impact_token: "impact-token"
-      })
+    expect(await screen.findByLabelText("原形通用拼写")).toHaveValue(
+      "center-unsaved"
     );
+    expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
+    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
   });
 
   it("invalidates a prepared confirmation when the exact forms draft changes", async () => {
@@ -354,7 +635,7 @@ describe("WordWizardV3Page", () => {
     fireEvent.click(await screen.findByText("保存草稿"));
     expect(await screen.findByText("确认影响并保存草稿")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText(`词形 1通用拼写`), {
+    fireEvent.change(screen.getByLabelText(`原形通用拼写`), {
       target: { value: "center-updated" }
     });
     await waitFor(() =>
@@ -439,17 +720,20 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.change(await screen.findByLabelText(`词形 1通用拼写`), {
+    fireEvent.change(await screen.findByLabelText(`原形通用拼写`), {
       target: { value: "centre-local-draft" }
     });
-    fireEvent.click(screen.getByText("释义与例句"));
-    expect(await screen.findByText("释义组")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("词义与例句"));
+    await screen.findAllByRole("main");
+    expect(
+      within(screen.getAllByRole("main").at(-1)!).getByText("语义区间")
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByText("词形与发音"));
-    expect(await screen.findByLabelText(`词形 1通用拼写`)).toHaveValue(
+    expect(await screen.findByLabelText(`原形通用拼写`)).toHaveValue(
       "centre-local-draft"
     );
 
-    fireEvent.click(screen.getByText("核对与发布"));
+    fireEvent.click(screen.getByText("预览并生效"));
 
     expect(await screen.findByText("请先保存未保存的草稿")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "检查发布条件" })).toBeNull();
@@ -489,17 +773,19 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "新增释义组" }));
-    const groupName = await screen.findByLabelText("释义组 1 中文名称");
+    fireEvent.click(
+      (await screen.findByText("添加语义区间")).closest("button")!
+    );
+    const groupName = await screen.findByLabelText("语义区间 1 中文");
     fireEvent.change(groupName, { target: { value: "本地释义组" } });
     fireEvent.click(screen.getByText("词形与发音"));
-    expect(await screen.findByLabelText(`词形 1通用拼写`)).toBeInTheDocument();
-    fireEvent.click(screen.getByText("释义与例句"));
-    expect(await screen.findByLabelText("释义组 1 中文名称")).toHaveValue(
+    expect(await screen.findByLabelText(`原形通用拼写`)).toBeInTheDocument();
+    fireEvent.click(screen.getByText("词义与例句"));
+    expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue(
       "本地释义组"
     );
 
-    fireEvent.click(screen.getByText("核对与发布"));
+    fireEvent.click(screen.getByText("预览并生效"));
 
     expect(await screen.findByText("请先保存未保存的草稿")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "检查发布条件" })).toBeNull();
@@ -532,38 +818,47 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "新增释义组" }));
-    fireEvent.change(await screen.findByLabelText("释义组 1 中文名称"), {
+    fireEvent.click(
+      (await screen.findByText("添加语义区间")).closest("button")!
+    );
+    fireEvent.change(await screen.findByLabelText("语义区间 1 中文"), {
       target: { value: "词形保存后仍保留" }
     });
     fireEvent.click(screen.getByText("词形与发音"));
-    fireEvent.change(await screen.findByLabelText(`词形 1通用拼写`), {
+    fireEvent.change(await screen.findByLabelText(`原形通用拼写`), {
       target: { value: "centre-forms-saved" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
+    fireEvent.click(screen.getByText("保存草稿").closest("button")!);
 
     await waitFor(() =>
       expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1)
     );
-    fireEvent.click(screen.getByText("释义与例句"));
-    expect(await screen.findByLabelText("释义组 1 中文名称")).toHaveValue(
+    fireEvent.click(screen.getByText("词义与例句"));
+    expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue(
       "词形保存后仍保留"
     );
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
   });
 
-  it("retains an unsaved forms draft when saving meanings advances canonical revision", async () => {
+  it("saves an unsaved forms draft before meanings and keeps the accepted form", async () => {
     const current = word({
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview"
     });
     const endpoints = source({ word: current, retired_stable_nodes: [] });
+    let formsCanonical: AdminWordV3 | undefined;
+    vi.mocked(endpoints.saveFormsStepV3).mockImplementationOnce(
+      async (_wordId, input) => {
+        formsCanonical = { ...current, revision: 2, forms: input.content };
+        return { word: formsCanonical };
+      }
+    );
     vi.mocked(endpoints.saveMeaningsStepV3).mockImplementationOnce(
       async (_wordId, input) => ({
         word: {
-          ...current,
-          revision: 2,
-          meanings: { sense_groups: input.content.sense_groups, pos: [] }
+          ...formsCanonical!,
+          revision: 3,
+          meanings: canonicalMeaningsFromWritable(input.content)
         }
       })
     );
@@ -572,24 +867,33 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.change(await screen.findByLabelText(`词形 1通用拼写`), {
+    fireEvent.change(await screen.findByLabelText(`原形通用拼写`), {
       target: { value: "centre-unsaved-forms" }
     });
-    fireEvent.click(screen.getByText("释义与例句"));
-    fireEvent.click(await screen.findByRole("button", { name: "新增释义组" }));
-    fireEvent.change(await screen.findByLabelText("释义组 1 中文名称"), {
+    fireEvent.click(screen.getByText("词义与例句"));
+    fireEvent.click(
+      (await screen.findByText("添加语义区间")).closest("button")!
+    );
+    fireEvent.change(await screen.findByLabelText("语义区间 1 中文"), {
       target: { value: "已保存释义" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
+    fireEvent.click(screen.getByText("保存草稿").closest("button")!);
 
     await waitFor(() =>
       expect(endpoints.saveMeaningsStepV3).toHaveBeenCalledTimes(1)
     );
+    expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1);
+    expect(
+      vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1]
+    ).toMatchObject({ base_revision: 1, intent: "save" });
+    expect(
+      vi.mocked(endpoints.saveMeaningsStepV3).mock.calls[0]![1].base_revision
+    ).toBe(2);
     fireEvent.click(screen.getByText("词形与发音"));
-    expect(await screen.findByLabelText(`词形 1通用拼写`)).toHaveValue(
+    expect(await screen.findByLabelText(`原形通用拼写`)).toHaveValue(
       "centre-unsaved-forms"
     );
-    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+    expect(screen.queryByText("有未保存的草稿")).toBeNull();
   });
 
   it("publishes an eligible draft and immediately transitions the live page to read-only", async () => {
@@ -842,7 +1146,7 @@ describe("WordWizardV3Page", () => {
       base_lifecycle_revision: 4
     });
     expect(activationCalls[1]![2]).not.toBe(activationCalls[0]![2]);
-  }, 10_000);
+  }, 20_000);
 
   it.each(["published", "archived"] as const)(
     "keeps the %s viewing route read-only",
@@ -986,32 +1290,32 @@ describe("WordWizardV3Page", () => {
     );
 
     expect(
-      await screen.findByTestId(`readonly-group-${UUIDS.group}`)
+      await screen.findByTestId(`preview-group-${UUIDS.group}`)
     ).toHaveTextContent("变化组 1");
     expect(
-      screen.getByTestId(`readonly-group-${UUIDS.group_2}`)
+      screen.getByTestId(`preview-group-${UUIDS.group_2}`)
     ).toHaveTextContent("变化组 2");
     expect(
-      screen.getByTestId(`readonly-membership-${UUIDS.membership_3}`)
+      screen.getByTestId(`preview-membership-${UUIDS.membership_3}`)
     ).toHaveTextContent("1. 原形 · centre");
-    expect(screen.getAllByTestId(`readonly-form-${shared.id}`)).toHaveLength(1);
+    expect(screen.getAllByTestId(`preview-form-${shared.id}`)).toHaveLength(1);
+    expect(screen.getByTestId(`preview-form-${regional.id}`)).toHaveTextContent(
+      "英式"
+    );
+    expect(screen.getByTestId(`preview-form-${regional.id}`)).toHaveTextContent(
+      "美式"
+    );
     expect(
-      screen.getByTestId(`readonly-form-${regional.id}`)
-    ).toHaveTextContent("英式");
-    expect(
-      screen.getByTestId(`readonly-form-${regional.id}`)
-    ).toHaveTextContent("美式");
-    expect(
-      screen.getByTestId(`readonly-pronunciation-${UUIDS.pronunciation}`)
+      screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation}`)
     ).toHaveTextContent("常规 · 词典音标 sen-tre · 实际发音 centre");
     expect(
-      screen.getByTestId(`readonly-pronunciation-${UUIDS.pronunciation_2}`)
+      screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_2}`)
     ).toHaveTextContent("强读 · 词典音标 sen-tr · 实际发音 centr");
     expect(
-      screen.getByTestId(`readonly-pronunciation-${UUIDS.pronunciation_3}`)
+      screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_3}`)
     ).toHaveTextContent("弱读 · 词典音标 sen-ter · 实际发音 center");
     expect(
-      screen.getByTestId(`readonly-pronunciation-${uuidFromInt(904)}`)
+      screen.getByTestId(`preview-pronunciation-${uuidFromInt(904)}`)
     ).toHaveTextContent("常规 · 词典音标 sen-tre-uk · 实际发音 centre-uk");
   });
 
@@ -1033,10 +1337,10 @@ describe("WordWizardV3Page", () => {
     );
 
     expect(await screen.findByText("暂无变化组")).toBeInTheDocument();
-    expect(screen.getByTestId(`readonly-form-${form.id}`)).toHaveTextContent(
+    expect(screen.getByTestId(`preview-form-${form.id}`)).toHaveTextContent(
       "通用"
     );
-    expect(screen.getByTestId(`readonly-form-${form.id}`)).toHaveTextContent(
+    expect(screen.getByTestId(`preview-form-${form.id}`)).toHaveTextContent(
       "plain-readonly"
     );
     expect(screen.getByText("暂无发音")).toBeInTheDocument();
@@ -1055,7 +1359,10 @@ describe("WordWizardV3Page", () => {
 
     expect(await screen.findByText("保存草稿")).toBeInTheDocument();
     expect(
-      screen.getByText("词形与发音").closest(".ant-steps-item")
+      screen
+        .getAllByText("词形与发音")
+        .find((element) => element.closest(".ant-steps-item"))
+        ?.closest(".ant-steps-item")
     ).not.toHaveClass("ant-steps-item-disabled");
   });
 
@@ -1077,6 +1384,7 @@ describe("WordWizardV3Page", () => {
   it("wires the real T5C editor to the wizard's single save flow", async () => {
     const current = word({
       status: "published",
+      meanings: { sense_groups: [], pos: [] },
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
@@ -1097,7 +1405,7 @@ describe("WordWizardV3Page", () => {
         word: {
           ...current,
           revision: 2,
-          meanings: { sense_groups: input.content.sense_groups, pos: [] }
+          meanings: canonicalMeaningsFromWritable(input.content)
         }
       })
     );
@@ -1106,12 +1414,11 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "新增释义组" }));
-    fireEvent.change(await screen.findByLabelText("释义组 1 中文名称"), {
+    fireEvent.change(await screen.findByLabelText("语义区间 1 中文"), {
       target: { value: "已保存释义组" }
     });
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
+    fireEvent.click(screen.getByText("保存草稿").closest("button")!);
 
     await waitFor(() =>
       expect(endpoints.saveMeaningsStepV3).toHaveBeenCalledWith(WORD_ID, {
@@ -1126,7 +1433,45 @@ describe("WordWizardV3Page", () => {
               name_en: ""
             }
           ],
-          pos: []
+          pos: [
+            expect.objectContaining({
+              pos_id: current.forms.pos[0]!.pos_id,
+              grammar_structures: [
+                expect.objectContaining({
+                  id: expect.any(String),
+                  variants: [
+                    expect.objectContaining({
+                      id: expect.any(String),
+                      dialect: "common"
+                    })
+                  ]
+                })
+              ],
+              senses: [
+                expect.objectContaining({
+                  id: expect.any(String),
+                  level: "A1",
+                  sense_group_id: expect.any(String),
+                  definitions: [
+                    expect.objectContaining({
+                      definition_mode: "zh_definition"
+                    })
+                  ],
+                  sentences: [
+                    expect.objectContaining({
+                      links: [
+                        expect.objectContaining({
+                          word_id: WORD_ID,
+                          role: "focus"
+                        })
+                      ]
+                    })
+                  ],
+                  relations: []
+                })
+              ]
+            })
+          ]
         }
       })
     );
@@ -1134,7 +1479,7 @@ describe("WordWizardV3Page", () => {
       expect(screen.queryByText("有未保存的草稿")).toBeNull()
     );
     expect(screen.queryByText("有未保存的草稿")).toBeNull();
-    fireEvent.click(screen.getByText("核对与发布"));
+    fireEvent.click(screen.getByText("预览并生效"));
     expect(
       await screen.findByRole("button", { name: "检查发布条件" })
     ).toBeInTheDocument();
@@ -1142,6 +1487,64 @@ describe("WordWizardV3Page", () => {
     expect(
       await screen.findByRole("button", { name: "激活此发布版本" })
     ).toBeEnabled();
+  }, 20_000);
+
+  it("#140 completes Step 3 and enters preview only after the V3 save is accepted", async () => {
+    const current = word({
+      completed_steps: ["basics", "forms"],
+      max_reachable_step: "meanings"
+    });
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.saveMeaningsStepV3).mockResolvedValue({
+      word: {
+        ...current,
+        revision: 2,
+        completed_steps: ["basics", "forms", "meanings"],
+        max_reachable_step: "preview"
+      }
+    });
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/meanings`,
+      createV3WordRequests(endpoints)
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "完成并进入预览" })
+    );
+
+    await waitFor(() =>
+      expect(endpoints.saveMeaningsStepV3).toHaveBeenCalledWith(
+        WORD_ID,
+        expect.objectContaining({ base_revision: 1, intent: "complete" })
+      )
+    );
+    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/words/${WORD_ID}/v3/wizard/preview`
+      )
+    );
+  });
+
+  it("#140 keeps Step 3 open when the complete save fails", async () => {
+    const current = word({ max_reachable_step: "meanings" });
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.saveMeaningsStepV3).mockRejectedValue(
+      new HttpError(500, "save failed")
+    );
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/meanings`,
+      createV3WordRequests(endpoints)
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "完成并进入预览" })
+    );
+
+    expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe(
+      `/words/${WORD_ID}/v3/wizard/meanings`
+    );
   });
 
   it("retains a dirty meanings draft and save gate after a failed save", async () => {
@@ -1162,23 +1565,25 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "新增释义组" }));
-    fireEvent.change(await screen.findByLabelText("释义组 1 中文名称"), {
+    fireEvent.click(
+      (await screen.findByText("添加语义区间")).closest("button")!
+    );
+    fireEvent.change(await screen.findByLabelText("语义区间 1 中文"), {
       target: { value: "失败后仍保留" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
+    fireEvent.click(screen.getByText("保存草稿").closest("button")!);
 
     expect(await screen.findByText("服务暂时不可用")).toBeInTheDocument();
-    expect(screen.getByLabelText("释义组 1 中文名称")).toHaveValue(
+    expect(screen.getByLabelText("语义区间 1 中文")).toHaveValue(
       "失败后仍保留"
     );
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
     fireEvent.click(screen.getByText("词形与发音"));
-    fireEvent.click(screen.getByText("释义与例句"));
-    expect(await screen.findByLabelText("释义组 1 中文名称")).toHaveValue(
+    fireEvent.click(screen.getByText("词义与例句"));
+    expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue(
       "失败后仍保留"
     );
-    fireEvent.click(screen.getByText("核对与发布"));
+    fireEvent.click(screen.getByText("预览并生效"));
     expect(await screen.findByText("请先保存未保存的草稿")).toBeInTheDocument();
     expect(endpoints.validateV3).not.toHaveBeenCalled();
     expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
@@ -1197,5 +1602,30 @@ describe("WordWizardV3Page", () => {
         `/words/${WORD_ID}/v3/wizard/forms`
       )
     );
+  });
+
+  it("#140 renders the historical V2 Step 3 frame inside the native V3 wizard", async () => {
+    const current = word({
+      max_reachable_step: "meanings",
+      completed_steps: ["basics", "forms"]
+    });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/meanings`,
+      createV3WordRequests(source({ word: current, retired_stable_nodes: [] }))
+    );
+
+    expect(await screen.findByText("STEP 03")).toBeVisible();
+    expect(document.querySelector(".word-step-heading h2")).toHaveTextContent(
+      "词义与例句"
+    );
+    expect(
+      document.querySelector(".v3-meanings-v2 > .word-sense-groups-card")
+    ).toBeNull();
+    expect(
+      document.querySelector(".word-pos-editor .word-sense-groups-card")
+    ).not.toBeNull();
+    expect(screen.getByText("上一步").closest("button")).toBeVisible();
+    expect(screen.getByText("保存草稿").closest("button")).toBeVisible();
+    expect(screen.getByText("完成并进入预览").closest("button")).toBeVisible();
   });
 });

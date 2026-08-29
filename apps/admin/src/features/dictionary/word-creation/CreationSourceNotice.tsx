@@ -1,6 +1,6 @@
 import { Alert } from "antd";
 
-export type CreationSource = "dictionary" | "blank";
+export type CreationSource = "dictionary" | "dictionary-empty" | "blank";
 
 export interface CreationNavigationState {
   creationSource: CreationSource;
@@ -17,17 +17,31 @@ export function creationSourceFromState(
     return undefined;
   }
   const source = state.creationSource;
-  return source === "dictionary" || source === "blank" ? source : undefined;
+  return source === "dictionary" ||
+    source === "dictionary-empty" ||
+    source === "blank"
+    ? source
+    : undefined;
 }
 
 export function CreationSourceNotice({ source }: { source?: CreationSource }) {
   if (!source) return null;
-  return source === "dictionary" ? (
+  if (source === "dictionary") {
+    return (
+      <Alert
+        showIcon
+        type="success"
+        title="已根据内置词典预填，请核对"
+        description="词性、词形和发音以当前草稿内容为准，可继续完善后保存。"
+      />
+    );
+  }
+  return source === "dictionary-empty" ? (
     <Alert
       showIcon
-      type="success"
-      title="已根据内置词典预填，请核对"
-      description="词性、词形和发音以当前草稿内容为准，可继续完善后保存。"
+      type="warning"
+      title="词性建议尚未写入，请手动补充"
+      description="当前草稿没有词性或词形，请从右上角添加词性；系统未复制重复词条的既有内容。"
     />
   ) : (
     <Alert

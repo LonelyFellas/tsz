@@ -775,9 +775,9 @@ describe("PreviewAndPublishStep", () => {
     });
     renderStep(archived, true);
 
-    expect(screen.getByText("归档词条详情")).toBeVisible();
-    expect(screen.getByText("词条已归档")).toBeVisible();
-    expect(screen.getByText("已归档", { exact: true })).toBeVisible();
+    expect(screen.getByText("垃圾桶词条详情")).toBeVisible();
+    expect(screen.getByText("词条已在垃圾桶中")).toBeVisible();
+    expect(screen.getByText("垃圾桶", { exact: true })).toBeVisible();
     expect(screen.queryByText("继续编辑")).toBeNull();
     expect(screen.queryByText("提交生效")).toBeNull();
     expect(document.querySelector(".word-step-actions")).toBeNull();

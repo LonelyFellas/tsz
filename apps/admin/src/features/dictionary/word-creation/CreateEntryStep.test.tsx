@@ -595,12 +595,12 @@ describe("CreateEntryStep", () => {
     expect(screen.getByText("colour")).toBeVisible();
     expect(screen.getByText("color")).toBeVisible();
     expect(screen.getByText("已发布")).toBeVisible();
-    expect(screen.getByText("已归档")).toBeVisible();
+    expect(screen.getByText("垃圾桶")).toBeVisible();
     expect(
-      screen.getAllByRole("button", { name: /查看重复词条/ })
+      screen.getAllByRole("button", { name: /查看已有原形/ })
     ).toHaveLength(2);
     fireEvent.click(
-      screen.getAllByRole("button", { name: /查看重复词条/ })[0]!
+      screen.getAllByRole("button", { name: /查看已有原形/ })[0]!
     );
     expect(await screen.findByText("重复词条详情")).toBeInTheDocument();
     expect(mutations.getWord).toHaveBeenCalledWith("word-colour-archived");
@@ -610,7 +610,7 @@ describe("CreateEntryStep", () => {
     expect(within(dialog).getByText("词条类型")).toBeInTheDocument();
     expect(within(dialog).getByText("基本词性")).toBeInTheDocument();
     expect(within(dialog).getByText("释义预览")).toBeInTheDocument();
-    expect(within(dialog).getByText("已归档")).toBeInTheDocument();
+    expect(within(dialog).getByText("垃圾桶")).toBeInTheDocument();
     expect(within(dialog).getByText("单词")).toBeInTheDocument();
     expect(screen.getByTestId("location")).toHaveTextContent("/words/new");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
@@ -662,7 +662,7 @@ describe("CreateEntryStep", () => {
     expect(entries[1]).not.toHaveTextContent("/");
     expect(entries[1]).toHaveTextContent("草稿");
     expect(
-      screen.getAllByRole("button", { name: /查看重复词条/ })
+      screen.getAllByRole("button", { name: /查看已有原形/ })
     ).toHaveLength(2);
   });
 
@@ -685,7 +685,7 @@ describe("CreateEntryStep", () => {
     expect(screen.getAllByTestId("smart-dictionary-result")).toHaveLength(1);
     expect(screen.queryByText(/colours \(uk\)/)).toBeNull();
     expect(
-      screen.getAllByRole("button", { name: /查看重复词条/ })
+      screen.getAllByRole("button", { name: /查看已有原形/ })
     ).toHaveLength(3);
     expect(screen.queryByText("确认并进入词形与发音")).toBeNull();
     expect(mutations.create).not.toHaveBeenCalled();
@@ -720,7 +720,7 @@ describe("CreateEntryStep", () => {
     expect(screen.queryByText("已存在同名主词")).toBeNull();
     expect(screen.queryByRole("button", { name: "查看关联来源" })).toBeNull();
     expect(
-      screen.getAllByRole("button", { name: /查看重复词条/ })
+      screen.getAllByRole("button", { name: /查看已有原形/ })
     ).toHaveLength(3);
     await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
     fireEvent.click(button("仍继续创建"));
@@ -1128,7 +1128,7 @@ describe("CreateEntryStep", () => {
     );
     expect(
       screen.getByRole("button", {
-        name: /workspace.*查看重复词条/
+        name: /workspace.*查看已有原形/
       })
     ).toBeVisible();
     await waitFor(() => expect(button("仍继续创建")).toBeEnabled());
