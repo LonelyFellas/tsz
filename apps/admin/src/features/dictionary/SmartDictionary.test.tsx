@@ -620,8 +620,10 @@ describe("SmartDictionary", () => {
         "/words?keyword=center"
       )
     );
+    await waitFor(() =>
+      expect(screen.getByLabelText("关键字")).toHaveValue("center")
+    );
     keyword = screen.getByLabelText("关键字");
-    await waitFor(() => expect(keyword).toHaveValue("center"));
 
     fireEvent.change(keyword, { target: { value: "harbour" } });
     expect(keyword).toHaveValue("harbour");
