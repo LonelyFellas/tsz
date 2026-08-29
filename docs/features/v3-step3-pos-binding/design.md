@@ -12,7 +12,7 @@
 - `operations.ts::addPartOfSpeech` 已定义稳定 POS、form group、base form、地区 variant 和 pronunciation 骨架的唯一创建规则。
 - `V3WordCreationWizard.tsx::setDraftForms` 已调用 `ensureV3MeaningsForForms`，Step 2 → Step 3 的新增同步已经存在。
 - `meaningsModel.ts::ensureV3MeaningsForForms` 会为 forms 中缺失的 POS 建立默认 meanings 模板，并维护 sense-group 所有权。
-- 当前 `saveMeanings` 仅在 `intent=complete` 且 canonical forms 尚未完成时保存 forms；普通保存和“forms 已完成但本地又变更”尚未覆盖。
+- 当前 `saveMeanings` 已覆盖所有 forms dirty 场景：无论普通保存还是完成保存，也无论 canonical forms 是否已完成，都会先保存最新 forms canonical，再使用新 revision 保存 meanings。
 
 ## 代码影响范围
 
