@@ -94,7 +94,7 @@ export function wordStatusLabel(status: AdminWordStatus): string {
   return {
     draft: "草稿",
     published: "已发布",
-    archived: "已归档"
+    archived: "垃圾桶"
   }[status];
 }
 

@@ -1950,7 +1950,7 @@ function SurfaceConfirmationDetails({
                       ? "草稿"
                       : card.existing.status === "published"
                         ? "已发布"
-                        : "已归档"}
+                        : "垃圾桶"}
                   </Tag>
                   <Tag>{card.existing.kind === "word" ? "单词" : "短语"}</Tag>
                   <Typography.Text code copyable>
@@ -2879,7 +2879,7 @@ export function FormsAndPronunciationStep({
           showIcon
           title={
             word.status === "archived"
-              ? "已归档词条当前为只读"
+              ? "垃圾桶中的词条当前为只读"
               : "已发布词条当前为只读"
           }
           style={{ marginBottom: 16 }}

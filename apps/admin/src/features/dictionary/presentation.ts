@@ -3,7 +3,8 @@ import { reportClientError } from "@/lib/telemetry";
 
 const KNOWN_PRESENTATION_STRATEGIES = new Set([
   "legacy_headwords_v1",
-  "surface_summary_v1"
+  "surface_summary_v1",
+  "short_uuid_v1"
 ]);
 
 export interface UnknownPresentationStrategyObservation {

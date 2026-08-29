@@ -1,5 +1,5 @@
 import {
-  InboxOutlined,
+  DeleteOutlined,
   PlusOutlined,
   ReloadOutlined,
   RollbackOutlined,
@@ -63,6 +63,10 @@ import {
 } from "./part-of-speech/catalog";
 import { usePartOfSpeechCatalog } from "./part-of-speech/api";
 import { toListQuery, type WordFilterValues } from "./listQuery";
+import {
+  parseWordListSearchParams,
+  serializeWordListSearchParams
+} from "./listSearchParams";
 import { runLifecycleCommandOnce } from "./lifecycleCommand";
 import {
   observeWordListPresentation,
@@ -75,10 +79,6 @@ import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 import { newWordNodeId } from "./word-model/primitives";
 
 const { RangePicker } = DatePicker;
-
-function shortWordId(id: string) {
-  return id.slice(-8);
-}
 
 const DIALECT_LABEL: Record<Dialect, string> = {
   uk: "BrE",
@@ -131,22 +131,16 @@ export function SmartDictionary({
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [form] = Form.useForm<WordFilterValues>();
+  const serializedSearchParams = searchParams.toString();
 
-  const initialFilters = useMemo<WordFilterValues>(() => {
-    const keyword = searchParams.get("keyword")?.trim();
-    const status = searchParams.get("status");
-    return {
-      ...(keyword ? { keyword } : {}),
-      ...(status === "draft" || status === "published" || status === "archived"
-        ? { status }
-        : {})
-    };
-  }, [searchParams]);
+  const listSearch = useMemo(
+    () =>
+      parseWordListSearchParams(new URLSearchParams(serializedSearchParams)),
+    [serializedSearchParams]
+  );
+  const { filters, page, pageSize } = listSearch;
 
   // 服务端分页 + 筛选:三者共同构成列表查询,任何变化都触发重取。
-  const [filters, setFilters] = useState<WordFilterValues>(initialFilters);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
   const [selectedRecords, setSelectedRecords] = useState<
     Record<string, AdminWordListItemAny>
@@ -159,6 +153,11 @@ export function SmartDictionary({
       ? pendingRestore.id
       : (pendingRestore?.ids.slice().sort().join(":") ?? "none")
   );
+
+  useEffect(() => {
+    form.resetFields();
+    form.setFieldsValue(filters);
+  }, [filters, form]);
 
   const listQuery = useWordList(toListQuery(filters, page, pageSize));
   const stats = useWordStats();
@@ -209,18 +208,12 @@ export function SmartDictionary({
     restoreBatch.isPending;
 
   const applyFilters = (values: WordFilterValues) => {
-    setFilters(values);
-    setPage(1);
     setSelectedKeys([]);
     setSelectedRecords({});
     restoreAttemptGeneration.current += 1;
     restoreSurface.clear();
     setPendingRestore(undefined);
-    const nextSearchParams = new URLSearchParams();
-    const keyword = values.keyword?.trim();
-    if (keyword) nextSearchParams.set("keyword", keyword);
-    if (values.status) nextSearchParams.set("status", values.status);
-    setSearchParams(nextSearchParams, { replace: true });
+    setSearchParams(serializeWordListSearchParams(values, 1, pageSize));
   };
 
   const executeRestore = async (request: RestoreRequest, refresh = false) => {
@@ -355,11 +348,11 @@ export function SmartDictionary({
     const restoring = target === "restore";
     const label = wordListLabel(record);
     modal.confirm({
-      title: `${restoring ? "恢复" : "归档"}「${label}」？`,
+      title: `${restoring ? "恢复" : "移入垃圾桶"}「${label}」？`,
       content: restoring
         ? "恢复后词条重新进入正常列表；现有发布记录保持不变。"
-        : "归档不会删除当前或历史发布记录；存在有效入站引用时服务端会安全拒绝。",
-      okText: restoring ? "恢 复" : "归 档",
+        : "移入垃圾桶不会删除当前或历史发布记录；存在有效入站引用时服务端会安全拒绝。",
+      okText: restoring ? "恢 复" : "移入垃圾桶",
       okButtonProps: { danger: !restoring },
       cancelText: "取消",
       onOk: () =>
@@ -378,14 +371,14 @@ export function SmartDictionary({
             setSelectedKeys((previous) =>
               previous.filter((key) => key !== record.id)
             );
-            message.success(restoring ? "词条已恢复" : "词条已归档");
+            message.success(restoring ? "词条已恢复" : "词条已移入垃圾桶");
           } catch (error) {
             message.error(
               error instanceof Error
                 ? error.message
                 : restoring
                   ? "恢复失败"
-                  : "归档失败"
+                  : "移入垃圾桶失败"
             );
           }
         })
@@ -404,7 +397,7 @@ export function SmartDictionary({
     const hasArchived = selectedRows.some((row) => row.status === "archived");
     const hasActive = selectedRows.some((row) => row.status !== "archived");
     if (hasArchived && hasActive) {
-      message.warning("归档与未归档词条不能在同一批次处理");
+      message.warning("垃圾桶与正常词条不能在同一批次处理");
       return;
     }
     const restoring = restoringSelection;
@@ -413,11 +406,13 @@ export function SmartDictionary({
       ...lifecycleInput(record)!
     }));
     modal.confirm({
-      title: `${restoring ? "恢复" : "归档"}选中的 ${selectedKeys.length} 个词条？`,
+      title: restoring
+        ? `恢复选中的 ${selectedKeys.length} 个词条？`
+        : `将选中的 ${selectedKeys.length} 个词条移入垃圾桶？`,
       content: restoring
         ? "该批次将原子恢复：任意一条冲突时全部保持原状。"
-        : "该批次将原子归档且保留全部发布历史：任意一条冲突时全部保持原状。",
-      okText: restoring ? "恢 复" : "归 档",
+        : "该批次将原子移入垃圾桶且保留全部发布历史：任意一条冲突时全部保持原状。",
+      okText: restoring ? "恢 复" : "移入垃圾桶",
       okButtonProps: { danger: !restoring },
       cancelText: "取消",
       onOk: () =>
@@ -437,7 +432,9 @@ export function SmartDictionary({
             });
             setSelectedKeys([]);
             message.success(
-              `已${restoring ? "恢复" : "归档"} ${response.affected} 个词条`
+              restoring
+                ? `已恢复 ${response.affected} 个词条`
+                : `已将 ${response.affected} 个词条移入垃圾桶`
             );
           } catch (error) {
             message.error(
@@ -445,7 +442,7 @@ export function SmartDictionary({
                 ? error.message
                 : restoring
                   ? "批量恢复失败"
-                  : "批量归档失败"
+                  : "批量移入垃圾桶失败"
             );
           }
         })
@@ -467,14 +464,9 @@ export function SmartDictionary({
             ? dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")
             : "";
         return (
-          <Tooltip
-            title={[label, record.id, context].filter(Boolean).join(" · ")}
-          >
+          <Tooltip title={[label, context].filter(Boolean).join(" · ")}>
             <span tabIndex={0} style={{ display: "block" }}>
               <span style={{ display: "block", fontWeight: 600 }}>{label}</span>
-              <Typography.Text type="secondary" code>
-                {shortWordId(record.id)}
-              </Typography.Text>
             </span>
           </Tooltip>
         );
@@ -599,8 +591,7 @@ export function SmartDictionary({
       width: 160,
       fixed: "right",
       render: (_: unknown, record: AdminWordListItemAny) => {
-        // 同名词条可以并存,可及名带上词汇与短 ID 才能区分是哪一行。
-        const rowName = `「${wordListLabel(record)}」${shortWordId(record.id)}`;
+        const rowName = `「${wordListLabel(record)}」`;
         return (
           <Space size={0}>
             <Button
@@ -616,7 +607,14 @@ export function SmartDictionary({
                 type="link"
                 size="small"
                 danger={record.status !== "archived"}
-                aria-label={`${record.status === "archived" ? "恢复" : "归档"}${rowName}`}
+                aria-label={`${record.status === "archived" ? "恢复" : "移入垃圾桶"}${rowName}`}
+                icon={
+                  record.status === "archived" ? (
+                    <RollbackOutlined />
+                  ) : (
+                    <DeleteOutlined />
+                  )
+                }
                 disabled={lifecycleInput(record) === undefined}
                 loading={
                   lifecyclePending &&
@@ -630,7 +628,7 @@ export function SmartDictionary({
                   )
                 }
               >
-                {record.status === "archived" ? "恢 复" : "归 档"}
+                {record.status === "archived" ? "恢 复" : "移入垃圾桶"}
               </Button>
             )}
           </Space>
@@ -646,7 +644,7 @@ export function SmartDictionary({
       <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
         <Form
           form={form}
-          initialValues={initialFilters}
+          initialValues={filters}
           layout="inline"
           onFinish={applyFilters}
           style={{
@@ -774,13 +772,13 @@ export function SmartDictionary({
               <Button
                 danger={!restoringSelection}
                 icon={
-                  restoringSelection ? <RollbackOutlined /> : <InboxOutlined />
+                  restoringSelection ? <RollbackOutlined /> : <DeleteOutlined />
                 }
                 disabled={selectedKeys.length === 0}
                 loading={archiveBatch.isPending || restoreBatch.isPending}
                 onClick={transitionSelected}
               >
-                {restoringSelection ? "恢 复" : "归 档"}
+                {restoringSelection ? "恢 复" : "移入垃圾桶"}
                 {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
               </Button>
             )}
@@ -883,8 +881,13 @@ export function SmartDictionary({
             showTotal: (t) => `共 ${t} 条`,
             pageSizeOptions: [10, 20, 50, 100],
             onChange: (nextPage, nextSize) => {
-              setPage(nextSize !== pageSize ? 1 : nextPage);
-              setPageSize(nextSize);
+              setSearchParams(
+                serializeWordListSearchParams(
+                  filters,
+                  nextSize !== pageSize ? 1 : nextPage,
+                  nextSize
+                )
+              );
             }
           }}
         />
