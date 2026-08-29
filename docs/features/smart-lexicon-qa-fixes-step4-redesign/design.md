@@ -409,7 +409,8 @@ type V3ReviewModel = {
 5. **P1 step access**：纯函数→页面/导航接入→真实草稿回归。
 6. **P1 workspace + 自动化用例修复**：恢复 Admin 定向全绿。
 7. **P2 Vite import + filter URL**：独立低风险提交。
-8. **Step 4 视觉方案评审**：低保真 IA + 390/768/1024/1440；用户批准后才写组件。
+8. **Step 4 视觉方案与实现**：低保真 IA 与 390/768/1024/1440 方案已获批准，组件重排和本地
+   视觉验收均已完成。
 9. **Step 4 实现**：review model→状态头/readiness/summary→内容分组→history→移除 deprecated List。
 10. **完整回归**：自动化、真实 API、真实浏览器、控制台/网络、现有 QA 数据。
 

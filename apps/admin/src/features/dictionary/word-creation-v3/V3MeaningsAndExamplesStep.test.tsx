@@ -9,8 +9,8 @@ import type {
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { useState } from "react";
-import { describe, expect, it, vi } from "vitest";
-import { ensureV3MeaningsForForms } from "./meaningsModel";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ensureV3MeaningsForForms, toWritableMeanings } from "./meaningsModel";
 import { V3MeaningsAndExamplesStep } from "./V3MeaningsAndExamplesStep";
 import { uuidFromInt, uuidSequence } from "./fixtures";
 
@@ -35,59 +35,75 @@ const v3LayoutCss = readFileSync(
 );
 
 const relatedSearchAny = vi.hoisted(() =>
-  vi.fn(() => ({
-    exact: {
-      data: {
-        pages: [
-          {
-            results: [
-              {
-                schema_version: 2 as const,
-                word_id: "external-word-1",
-                headword: "outside",
-                kind: "phrase" as const,
-                dialects: ["common" as const],
-                headword_variants: [],
-                pos_labels: ["名词"],
-                senses: [{ sense_id: "external-sense-1", gloss: "外部词义一" }]
-              }
-            ],
-            total: 1,
-            next_cursor: null
-          }
-        ]
+  vi.fn(
+    (_query: string, _kind: "word" | "phrase" | undefined, _open: boolean) => ({
+      exact: {
+        data: {
+          pages: [
+            {
+              results: [
+                {
+                  schema_version: 2 as const,
+                  word_id: "external-word-1",
+                  headword: "outside",
+                  kind: "phrase" as const,
+                  dialects: ["common" as const],
+                  headword_variants: [],
+                  pos_labels: ["名词"],
+                  senses: [
+                    { sense_id: "external-sense-1", gloss: "外部词义一" }
+                  ]
+                }
+              ],
+              total: 1,
+              next_cursor: null
+            }
+          ]
+        },
+        isFetching: false,
+        isError: false,
+        hasNextPage: false,
+        fetchNextPage: vi.fn(),
+        refetch: vi.fn()
       },
-      isFetching: false
-    },
-    contains: {
-      data: {
-        pages: [
-          {
-            results: [
-              {
-                schema_version: 3 as const,
-                entry_id: "external-word-2",
-                kind: "word" as const,
-                presentation: {
-                  label: "beyond",
-                  matched_surfaces: ["beyond"],
-                  strategy_version: "surface_summary_v1"
-                },
-                matches: [],
-                senses: [{ sense_id: "external-sense-2", gloss: "外部词义二" }]
-              }
-            ],
-            total: 1,
-            next_cursor: null
-          }
-        ]
-      },
-      isFetching: false
-    }
-  }))
+      contains: {
+        data: {
+          pages: [
+            {
+              results: [
+                {
+                  schema_version: 3 as const,
+                  entry_id: "external-word-2",
+                  kind: "word" as const,
+                  presentation: {
+                    label: "beyond",
+                    matched_surfaces: ["beyond"],
+                    strategy_version: "surface_summary_v1"
+                  },
+                  matches: [],
+                  senses: [
+                    { sense_id: "external-sense-2", gloss: "外部词义二" }
+                  ]
+                }
+              ],
+              total: 1,
+              next_cursor: null
+            }
+          ]
+        },
+        isFetching: false,
+        isError: false,
+        hasNextPage: false,
+        fetchNextPage: vi.fn(),
+        refetch: vi.fn()
+      }
+    })
+  )
 );
 
 vi.mock("../api", () => ({ useRelatedSearchAny: relatedSearchAny }));
+const defaultRelatedSearchImplementation =
+  relatedSearchAny.getMockImplementation()!;
 
 const meaningsFixture: DraftMeaningsStepContentWritableV3 = {
   sense_groups: [{ id: "sense-group-1", name_zh: "核心", name_en: "Core" }],
@@ -170,7 +186,8 @@ function Harness({
   partOfSpeechCatalog,
   partOfSpeechCatalogError,
   partOfSpeechCatalogPending,
-  wordId
+  wordId,
+  relationSnapshots
 }: {
   initial?: DraftMeaningsStepContentWritableV3;
   issues?: V3DraftValidationIssue[];
@@ -185,6 +202,9 @@ function Harness({
   partOfSpeechCatalogError?: boolean;
   partOfSpeechCatalogPending?: boolean;
   wordId?: string;
+  relationSnapshots?: Readonly<
+    Record<string, { headword?: string; gloss?: string }>
+  >;
 }) {
   const [value, setValue] = useState(initial);
   const [formsValue, setFormsValue] = useState(forms);
@@ -208,6 +228,7 @@ function Harness({
         partOfSpeechCatalog={partOfSpeechCatalog}
         partOfSpeechCatalogError={partOfSpeechCatalogError}
         partOfSpeechCatalogPending={partOfSpeechCatalogPending}
+        relationDisplaySnapshots={relationSnapshots}
         value={value}
         wordId={wordId}
       />
@@ -222,6 +243,9 @@ function value(): DraftMeaningsStepContentWritableV3 {
 }
 
 describe("V3MeaningsAndExamplesStep", () => {
+  beforeEach(() => {
+    relatedSearchAny.mockImplementation(defaultRelatedSearchImplementation);
+  });
   it("Step 3 仅列出未添加词性，并复用 forms 创建规则后切换到新 POS", () => {
     const forms: DraftFormsStepContentV3 = {
       pos: [
@@ -713,6 +737,118 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(synonymCard.querySelector(".anticon-caret-down")).not.toBeNull();
     expect(meaningsCss).toMatch(
       /\.word-relations-grid\s*\{[^}]*align-items:\s*start;/su
+    );
+  });
+
+  it("关联词搜索有后页时提供加载入口，未完成 exact 前不宣称无匹配", () => {
+    const fetchExactNextPage = vi.fn().mockResolvedValue(undefined);
+    relatedSearchAny.mockImplementation((query, kind, open) =>
+      query === "laterexact"
+        ? ({
+            exact: {
+              data: {
+                pages: [{ results: [], total: 1, next_cursor: "exact-next" }]
+              },
+              isFetching: false,
+              isError: false,
+              hasNextPage: true,
+              fetchNextPage: fetchExactNextPage,
+              refetch: vi.fn()
+            },
+            contains: {
+              data: {
+                pages: [{ results: [], total: 0, next_cursor: null }]
+              },
+              isFetching: false,
+              isError: false,
+              hasNextPage: false,
+              fetchNextPage: vi.fn(),
+              refetch: vi.fn()
+            }
+          } as never)
+        : defaultRelatedSearchImplementation(query, kind, open)
+    );
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [];
+    render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByText("添加近义词").closest("button")!);
+    fireEvent.change(screen.getByLabelText("近义词目标词条"), {
+      target: { value: "laterexact" }
+    });
+
+    expect(screen.queryByText("未找到匹配词条")).toBeNull();
+    const loadMore = screen.getByLabelText("加载更多关联词结果");
+    expect(loadMore).toBeVisible();
+    fireEvent.click(loadMore);
+    expect(fetchExactNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it("关联词搜索失败显示错误和重试，不伪装成未找到", () => {
+    const retryExact = vi.fn().mockResolvedValue(undefined);
+    relatedSearchAny.mockImplementation((query, kind, open) =>
+      query === "networkfail"
+        ? ({
+            exact: {
+              data: { pages: [] },
+              isFetching: false,
+              isError: true,
+              hasNextPage: false,
+              fetchNextPage: vi.fn(),
+              refetch: retryExact
+            },
+            contains: {
+              data: { pages: [] },
+              isFetching: false,
+              isError: false,
+              hasNextPage: false,
+              fetchNextPage: vi.fn(),
+              refetch: vi.fn()
+            }
+          } as never)
+        : defaultRelatedSearchImplementation(query, kind, open)
+    );
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [];
+    render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByText("添加近义词").closest("button")!);
+    fireEvent.change(screen.getByLabelText("近义词目标词条"), {
+      target: { value: "networkfail" }
+    });
+
+    expect(screen.queryByText("未找到匹配词条")).toBeNull();
+    const retry = screen.getByLabelText("重试关联词搜索");
+    expect(retry).toHaveTextContent("搜索失败，重试");
+    fireEvent.click(retry);
+    expect(retryExact).toHaveBeenCalledTimes(1);
+  });
+
+  it("canonical 已绑定关系进入 Step 3 时显示真实目标词面和词义快照", () => {
+    const canonical = structuredClone(
+      meaningsFixture
+    ) as unknown as import("@tsz/types").DraftMeaningsStepContentV3;
+    const relation = canonical.pos[0]!.senses[0]!.relations[0]!;
+    relation.target_headword = "outside";
+    relation.target_gloss = "外部词义一";
+    const writable = toWritableMeanings(canonical);
+    render(
+      <Harness
+        initial={writable}
+        relationSnapshots={{
+          [relation.id]: {
+            headword: relation.target_headword,
+            gloss: relation.target_gloss
+          }
+        }}
+      />
+    );
+
+    expect(screen.getByLabelText("近义词目标词条")).toHaveValue("outside");
+    expect(screen.getByText("外部词义一")).toBeVisible();
+    expect(writable.pos[0]!.senses[0]!.relations[0]).not.toHaveProperty(
+      "target_headword"
+    );
+    expect(writable.pos[0]!.senses[0]!.relations[0]).not.toHaveProperty(
+      "target_gloss"
     );
   });
 

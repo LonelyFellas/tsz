@@ -51,6 +51,7 @@ import { newWordNodeId } from "../word-model/primitives";
 import { addPartOfSpeech } from "./operations";
 import {
   editableEnglishText,
+  type RelationDisplaySnapshots,
   replaceEnglishText,
   replaceRichText
 } from "./meaningsModel";
@@ -77,6 +78,7 @@ export interface V3MeaningsAndExamplesStepProps {
   onFormsChange?: (next: DraftFormsStepContentV3) => void;
   onActivePosChange?: (posId: string) => void;
   idFactory?: () => string;
+  relationDisplaySnapshots?: RelationDisplaySnapshots;
 }
 
 type DraftMutation = (draft: DraftMeaningsStepContentWritableV3) => void;
@@ -958,13 +960,15 @@ function RelationsGrid({
   posIndex,
   senseIndex,
   change,
-  idFactory
+  idFactory,
+  relationDisplaySnapshots
 }: {
   sense: WordSenseWritableV3;
   posIndex: number;
   senseIndex: number;
   change: (mutation: DraftMutation) => void;
   idFactory: () => string;
+  relationDisplaySnapshots?: RelationDisplaySnapshots;
 }) {
   const [collapsed, setCollapsed] = useState<Record<RelationType, boolean>>({
     synonym: false,
@@ -990,6 +994,27 @@ function RelationsGrid({
       ...(relatedSearch.contains.data?.pages ?? [])
     ].flatMap((page) => page.results)
   );
+  const searchFailed =
+    relatedSearch.exact.isError || relatedSearch.contains.isError;
+  const searchHasNextPage = Boolean(
+    relatedSearch.exact.hasNextPage || relatedSearch.contains.hasNextPage
+  );
+  const loadMoreSearchResults = async () => {
+    if (relatedSearch.exact.hasNextPage) {
+      await relatedSearch.exact.fetchNextPage();
+      return;
+    }
+    if (relatedSearch.contains.hasNextPage) {
+      await relatedSearch.contains.fetchNextPage();
+    }
+  };
+  const retryRelatedSearch = () =>
+    Promise.all([
+      ...(relatedSearch.exact.isError ? [relatedSearch.exact.refetch()] : []),
+      ...(relatedSearch.contains.isError
+        ? [relatedSearch.contains.refetch()]
+        : [])
+    ]);
   const relationInputIssue = (relation: WordRelationWritableV3) => {
     const raw =
       searching?.relationId === relation.id
@@ -1081,9 +1106,13 @@ function RelationsGrid({
                         relatedSearch.exact.isFetching ||
                         relatedSearch.contains.isFetching
                           ? "搜索中…"
-                          : searching?.query
-                            ? "未找到匹配词条"
-                            : "输入词汇搜索"
+                          : searchFailed
+                            ? "搜索失败，请重试"
+                            : searchHasNextPage
+                              ? "仍有结果未加载"
+                              : searching?.query
+                                ? "未找到匹配词条"
+                                : "输入词汇搜索"
                       }
                       onFocus={() => {
                         if (searching?.relationId === relation.id) return;
@@ -1091,6 +1120,10 @@ function RelationsGrid({
                           relationId: relation.id,
                           query:
                             knownWords[relation.id]?.headword ??
+                            (relation.target_word_id
+                              ? relationDisplaySnapshots?.[relation.id]
+                                  ?.headword
+                              : undefined) ??
                             relation.pending_target_headword ??
                             ""
                         });
@@ -1157,6 +1190,10 @@ function RelationsGrid({
                         searching?.relationId === relation.id
                           ? searching.query
                           : (knownWords[relation.id]?.headword ??
+                            (relation.target_word_id
+                              ? relationDisplaySnapshots?.[relation.id]
+                                  ?.headword
+                              : undefined) ??
                             relation.pending_target_headword ??
                             (relation.target_word_id ? "已选择关联词" : ""))
                       }
@@ -1165,6 +1202,31 @@ function RelationsGrid({
                         aria-label={`${relationLabel(relationType)}目标词条`}
                         className="word-relation-target"
                         prefix={<SoundOutlined />}
+                        suffix={
+                          searching?.relationId === relation.id &&
+                          searchFailed ? (
+                            <Button
+                              aria-label="重试关联词搜索"
+                              onClick={() => void retryRelatedSearch()}
+                              onMouseDown={(event) => event.preventDefault()}
+                              size="small"
+                              type="link"
+                            >
+                              搜索失败，重试
+                            </Button>
+                          ) : searching?.relationId === relation.id &&
+                            searchHasNextPage ? (
+                            <Button
+                              aria-label="加载更多关联词结果"
+                              onClick={() => void loadMoreSearchResults()}
+                              onMouseDown={(event) => event.preventDefault()}
+                              size="small"
+                              type="link"
+                            >
+                              加载更多
+                            </Button>
+                          ) : null
+                        }
                         placeholder="搜索关联词"
                         size="small"
                       />
@@ -1211,7 +1273,9 @@ function RelationsGrid({
                             ? [
                                 {
                                   sense_id: relation.target_sense_id,
-                                  gloss: "已匹配词义"
+                                  gloss:
+                                    relationDisplaySnapshots?.[relation.id]
+                                      ?.gloss ?? "已匹配词义"
                                 }
                               ]
                             : [])
@@ -1303,7 +1367,8 @@ export function V3MeaningsAndExamplesStep({
   partOfSpeechCatalogPending = false,
   onFormsChange,
   onActivePosChange,
-  idFactory = newWordNodeId
+  idFactory = newWordNodeId,
+  relationDisplaySnapshots
 }: V3MeaningsAndExamplesStepProps) {
   const [contextSearch, setContextSearch] = useState<{
     sentenceId: string;
@@ -2652,6 +2717,9 @@ export function V3MeaningsAndExamplesStep({
                                     posIndex={posIndex}
                                     sense={sense}
                                     senseIndex={senseIndex}
+                                    relationDisplaySnapshots={
+                                      relationDisplaySnapshots
+                                    }
                                   />
                                 ) : null}
                               </section>

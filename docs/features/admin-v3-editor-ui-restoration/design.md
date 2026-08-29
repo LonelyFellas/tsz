@@ -105,11 +105,14 @@ V3 额外受稳定槽位身份约束：`AdminWordDraftV3Envelope.retired_stable_
 - related-search 查询与响应结构保持不变；继续只返回 current publication 中的 sense。
 - 保存绑定关联时只接受 target current publication 中存在的 sense；草稿、已归档或不在 current publication 的目标返回产品化 validation issue。复用现有 issue 结构，新增明确 code 时同步 Rust DTO、OpenAPI 和前端中文映射，禁止返回内部 SQL/UUID 细节。
 - 发布时在同一事务和锁边界重新读取 target current publication，防止候选选择后目标撤回发布、归档或换版造成 TOCTOU；目标变化则 fail closed，不写 publication reference。
-- `pending_target_headword` 仍可保存为未完成草稿文本，但不再在来源发布事务里自动物化为可被正式引用的目标草稿。完成/发布前必须由管理员选择已发布目标及义项。
+- **已被取代（2026-08-29）：**原“来源发布事务禁止自动物化、必须先选择已发布目标”的设计不再
+  生效。当前批准方案允许 `pending_target_headword` + 可选 `pending_target_gloss` 在发布事务中
+  自动匹配或物化目标草稿；成功后必须同步 canonical editor JSON 与关系投影并清除 pending。
 - 新 migration 收紧 `entry_publication_sense_refs` 为 publication-only 前，先统计现有 `target_content_scope='draft'` 行。非零时迁移 fail closed 并输出审计清单或执行经确认的数据修复；不得猜测目标 publication/sense。
 - 删除或改写“publication relation can target draft”的旧集成测试，新增保存、校验、发布、并发换版和历史数据迁移回归。后端代码、migration、OpenAPI snapshot 与前端翻译必须作为一个可回退的独立交付单元。
 
-该阶段会实质改变既有后端语义，不能并入当前已完成的 Step 1 UI 小修而不评审。用户批准本节后，才在 `tsz-rust` 的独立 exact-main 分支按 feature/test 流程实施。
+该产品决定已完成评审与前后端实现，不再处于“等待批准/等待 OpenAPI”状态；后续以
+`pending-relation-predefined-gloss` 文档、当前 Rust OpenAPI 与回归测试为权威。
 
 ### 2026-08-26 原形优先展示修订（最新口径）
 

@@ -10,6 +10,35 @@ import type {
   WordPosMeaningsWritableV3
 } from "@tsz/types";
 
+export interface RelationDisplaySnapshot {
+  headword?: string;
+  gloss?: string;
+}
+
+export type RelationDisplaySnapshots = Readonly<
+  Record<string, RelationDisplaySnapshot>
+>;
+
+export function relationDisplaySnapshots(
+  canonical: DraftMeaningsStepContentV3
+): RelationDisplaySnapshots {
+  const snapshots: Record<string, RelationDisplaySnapshot> = {};
+  for (const pos of canonical.pos) {
+    for (const sense of pos.senses) {
+      for (const relation of sense.relations) {
+        if (!relation.target_headword && !relation.target_gloss) continue;
+        snapshots[relation.id] = {
+          ...(relation.target_headword
+            ? { headword: relation.target_headword }
+            : {}),
+          ...(relation.target_gloss ? { gloss: relation.target_gloss } : {})
+        };
+      }
+    }
+  }
+  return snapshots;
+}
+
 export interface EditableEnglishTextV3 {
   dialect: Dialect;
   variant_id: string;

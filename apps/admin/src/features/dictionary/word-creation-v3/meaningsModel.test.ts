@@ -8,6 +8,7 @@ import { formsFixture } from "./fixtures";
 import {
   editableEnglishText,
   ensureV3MeaningsForForms,
+  relationDisplaySnapshots,
   replaceEnglishText,
   replaceRichText,
   toWritableMeanings
@@ -320,6 +321,7 @@ describe("V3 meanings writable model", () => {
 
   it("深投影排除只读 association/target snapshots，保留全部 writable UUID 与顺序", () => {
     const writable = toWritableMeanings(meaningsCanonicalFixture);
+    const snapshots = relationDisplaySnapshots(meaningsCanonicalFixture);
     const sense = writable.pos[0]!.senses[0]!;
 
     expect(writable.sense_groups[0]!.id).toBe("sense-group-1");
@@ -334,6 +336,10 @@ describe("V3 meanings writable model", () => {
       id: "relation-1",
       target_word_id: "target-entry",
       target_sense_id: "target-sense"
+    });
+    expect(snapshots["relation-1"]).toEqual({
+      headword: "middle",
+      gloss: "中部"
     });
   });
 
