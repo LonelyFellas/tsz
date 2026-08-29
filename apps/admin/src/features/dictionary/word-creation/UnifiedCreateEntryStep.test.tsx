@@ -618,20 +618,26 @@ describe("UnifiedCreateEntryStep", () => {
 
   it("完整检测到数据库原形时按 d707328 布局展示全部原形，并用首个原形填充右侧英美式", async () => {
     const supplied = requests();
+    const detail = deferred<{ word: AdminWordV3 }>();
     const detection = matchedV3Detection();
     vi.mocked(supplied.detectV3).mockResolvedValue({
       ...detection,
       requires_acknowledgement: true,
       surface_match_page: v3BaseFormPage()
     });
-    vi.mocked(supplied.getWord).mockResolvedValue({ word: existingV3Word() });
+    vi.mocked(supplied.getWord).mockReturnValue(detail.promise);
     renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
 
     expect(await screen.findByText("确认英美主词")).toBeVisible();
-    expect(screen.getByText("区分英美词形")).toBeVisible();
+    expect(screen.getByText("正在加载原形…")).toBeVisible();
+    expect(screen.queryByText("区分英美词形")).toBeNull();
+
+    await act(async () => detail.resolve({ word: existingV3Word() }));
+
+    expect(await screen.findByText("区分英美词形")).toBeVisible();
     expect(screen.getByText("英式英语 · BrE")).toBeVisible();
     expect(screen.getByText("美式英语 · AmE")).toBeVisible();
     expect(screen.getByLabelText("英式主词")).toHaveValue("centre");
