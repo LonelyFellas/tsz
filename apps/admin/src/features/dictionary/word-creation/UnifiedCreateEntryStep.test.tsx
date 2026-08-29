@@ -3,22 +3,18 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import { HttpError } from "@tsz/api-client/http";
 import type {
   AdminWordV3,
   DetectLexiconSurfaceResponseV3,
-  SurfaceMatchPageV2,
   SurfaceMatchPageV3
 } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  deferred,
-  detectionFixture,
-  wordFixture
-} from "./wordCreation.test.helper";
+import { deferred } from "./wordCreation.test.helper";
 
 vi.mock("../part-of-speech/api", async () => {
   const { partOfSpeechCatalogFixture } =
@@ -66,6 +62,57 @@ function v3Word(): AdminWordV3 {
   };
 }
 
+function v3PhraseWord(surface = "give up"): AdminWordV3 {
+  return {
+    ...v3Word(),
+    id: "phrase-v3",
+    kind: "phrase",
+    presentation: {
+      label: surface,
+      matched_surfaces: [surface],
+      strategy_version: "surface_summary_v1"
+    }
+  };
+}
+
+function v3PrefilledWord(): AdminWordV3 {
+  const word = v3Word();
+  word.forms.pos = [
+    {
+      pos_id: "prefilled-pos",
+      pos: "noun",
+      dialect_rules: {
+        spelling_mode: "unified",
+        phonetic_mode: "unified"
+      },
+      forms: [
+        {
+          id: "prefilled-form",
+          form_type: "base",
+          regional_variants: {
+            mode: "common",
+            common: {
+              id: "prefilled-variant",
+              dialect: "common",
+              spelling: "center",
+              origin: "dictionary",
+              pronunciations: []
+            }
+          }
+        }
+      ],
+      form_groups: [
+        {
+          id: "prefilled-group",
+          is_regular: true,
+          members: [{ id: "prefilled-membership", form_id: "prefilled-form" }]
+        }
+      ]
+    }
+  ];
+  return word;
+}
+
 function v3Detection(
   surface = "center",
   overrides: Partial<DetectLexiconSurfaceResponseV3> = {}
@@ -77,10 +124,21 @@ function v3Detection(
     request: { language: "en", kind: "word", surface },
     normalized_surface: surface,
     builtin_dictionary: { status: "not_found" },
+    suggested_pos: [],
     matches: [],
     requires_acknowledgement: false,
     ...overrides
   };
+}
+
+function v3PhraseDetection(
+  surface = "give up",
+  overrides: Partial<DetectLexiconSurfaceResponseV3> = {}
+): DetectLexiconSurfaceResponseV3 {
+  return v3Detection(surface, {
+    request: { language: "en", kind: "phrase", surface },
+    ...overrides
+  });
 }
 
 function terminalV3Page(): SurfaceMatchPageV3 {
@@ -99,17 +157,121 @@ function terminalV3Page(): SurfaceMatchPageV3 {
   };
 }
 
-function v2SurfacePage(
+function v3BaseFormPage(): SurfaceMatchPageV3 {
+  return {
+    ...terminalV3Page(),
+    total: 2,
+    items: [
+      {
+        match_kind: "form_variant_v3",
+        match: {
+          source_schema_version: 3,
+          entry_id: "existing-v3",
+          entry_kind: "word",
+          status: "published",
+          content_scope: "current_publication",
+          pos_id: "existing-pos",
+          group_ids: [],
+          form_id: "existing-base",
+          variant_id: "existing-uk",
+          form_type: "base",
+          dialect: "uk",
+          spelling: "centre"
+        }
+      },
+      {
+        match_kind: "form_variant_v3",
+        match: {
+          source_schema_version: 3,
+          entry_id: "existing-v3",
+          entry_kind: "word",
+          status: "published",
+          content_scope: "current_publication",
+          pos_id: "existing-pos",
+          group_ids: [],
+          form_id: "existing-base",
+          variant_id: "existing-us",
+          form_type: "base",
+          dialect: "us",
+          spelling: "center"
+        }
+      }
+    ],
+    matched_entry_contexts: [
+      {
+        entry_id: "existing-v3",
+        presentation: {
+          label: "centre / center",
+          matched_surfaces: ["centre", "center"],
+          strategy_version: "surface_summary_v1"
+        },
+        pos_labels: ["noun"],
+        gloss_previews: ["中心"],
+        updated_at: "2026-08-26T00:00:00Z",
+        inbound_relations: {
+          total: 0,
+          by_type: { synonym: 0, antonym: 0, derivative: 0 },
+          previews: [],
+          truncated: false
+        }
+      }
+    ]
+  };
+}
+
+function existingV3Word(): AdminWordV3 {
+  const word = v3Word();
+  word.id = "existing-v3";
+  word.status = "published";
+  word.presentation.label = "centre / center";
+  word.forms.pos = [
+    {
+      pos_id: "existing-pos",
+      pos: "noun",
+      dialect_rules: {
+        spelling_mode: "distinguish",
+        phonetic_mode: "distinguish"
+      },
+      forms: [
+        {
+          id: "existing-base",
+          form_type: "base",
+          regional_variants: {
+            mode: "uk_us",
+            uk: {
+              id: "existing-uk",
+              dialect: "uk",
+              spelling: "centre",
+              origin: "dictionary",
+              pronunciations: []
+            },
+            us: {
+              id: "existing-us",
+              dialect: "us",
+              spelling: "center",
+              origin: "dictionary",
+              pronunciations: []
+            }
+          }
+        }
+      ],
+      form_groups: []
+    }
+  ];
+  return word;
+}
+
+function v3SurfacePage(
   mode: "terminal" | "disabled" | "loading"
-): SurfaceMatchPageV2 {
+): SurfaceMatchPageV3 {
   const base = {
-    schema_version: 2 as const,
-    snapshot_id: `snapshot-v2-${mode}`,
+    schema_version: 3 as const,
+    snapshot_id: `snapshot-v3-${mode}`,
     items: [],
     total: 0,
     matched_entry_contexts: [],
     confirmation_reasons: ["unacknowledged_surface_matches" as const],
-    policy_name: "allow_new_exact_headword_entries" as const,
+    policy_name: "surface_warning_acknowledgement" as const,
     policy_epoch: 1
   };
   if (mode === "disabled") {
@@ -131,7 +293,7 @@ function v2SurfacePage(
     ...base,
     continuation_policy: "enabled",
     next_cursor: null,
-    surface_confirmation_token: "surface-token-v2"
+    surface_confirmation_token: "surface-token-v3"
   };
 }
 
@@ -139,6 +301,7 @@ function matchedV3Detection(
   surface = "center"
 ): DetectLexiconSurfaceResponseV3 {
   return v3Detection(surface, {
+    suggested_pos: ["noun", "verb"],
     builtin_dictionary: {
       status: "matched",
       provider: { name: "fixture-dictionary", version: "1" },
@@ -215,10 +378,9 @@ function matchedV3Detection(
 
 function requests(): UnifiedCreateRequests {
   return {
-    detectV2: vi.fn(),
-    createV2: vi.fn(),
     detectV3: vi.fn(),
     createV3: vi.fn(),
+    getWord: vi.fn(),
     surfacePage: vi.fn()
   };
 }
@@ -239,95 +401,340 @@ function input() {
 beforeEach(() => vi.clearAllMocks());
 
 describe("UnifiedCreateEntryStep", () => {
-  it("单词一次提交后自动检测、创建并返回 V3 canonical word", async () => {
+  it("统一入口复用旧版第一步结构和中文文案", () => {
+    renderStep(requests());
+
+    expect(screen.getByText("STEP 01")).toBeVisible();
+    expect(screen.getByText("创建新词条")).toBeVisible();
+    expect(screen.getByText("录入与检测")).toBeVisible();
+    expect(screen.getByText("录入词条")).toBeVisible();
+    expect(screen.getByRole("button", { name: /词典检测/ })).toBeVisible();
+    expect(screen.queryByText("输入要创建的英文词条")).toBeNull();
+    expect(screen.queryByText("词条信息")).toBeNull();
+  });
+
+  it("单词先检测且不创建，明确进入 Step 2 后才返回 V3 canonical word", async () => {
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection("can't"));
     vi.mocked(supplied.createV3).mockResolvedValue({ word: v3Word() });
     const onCreated = renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "  can't  " } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
 
-    await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(supplied.detectV3).toHaveBeenCalledTimes(1));
     expect(supplied.detectV3).toHaveBeenCalledWith({
       schema_version: 3,
       language: "en",
       kind: "word",
       surface: "can't"
     });
-    expect(supplied.detectV2).not.toHaveBeenCalled();
+    expect(supplied.createV3).not.toHaveBeenCalled();
+    expect(onCreated).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+
+    await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
     expect(onCreated).toHaveBeenCalledWith(v3Word(), {
       creationSource: "blank"
     });
     expect(screen.queryByText(/检测 V3|创建 V3|schema|revision/)).toBeNull();
   });
 
-  it("输入框按 Enter 触发同一条自动检测与创建链路", async () => {
+  it("#131 matched 但创建响应 forms 为空时不谎报词典预填", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(matchedV3Detection());
+    vi.mocked(supplied.createV3).mockResolvedValue({ word: v3Word() });
+    const onCreated = renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
+
+    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+    expect(onCreated).toHaveBeenCalledWith(v3Word(), {
+      creationSource: "dictionary-empty"
+    });
+  });
+
+  it.each([
+    ["实际预填", v3PrefilledWord(), "dictionary"],
+    ["异常空 forms", v3Word(), "dictionary-empty"]
+  ])(
+    "#132 重复确认后按创建响应区分 $0",
+    async (_scenario, createdWord, expectedSource) => {
+      const supplied = requests();
+      vi.mocked(supplied.detectV3).mockResolvedValue({
+        ...matchedV3Detection(),
+        requires_acknowledgement: true,
+        surface_match_page: terminalV3Page()
+      });
+      vi.mocked(supplied.createV3).mockResolvedValue({ word: createdWord });
+      const onCreated = renderStep(supplied);
+
+      fireEvent.change(input(), { target: { value: "center" } });
+      fireEvent.click(screen.getByText("词典检测"));
+      fireEvent.click(await screen.findByText("确认并创建，进入词形与发音"));
+
+      await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
+      expect(onCreated).toHaveBeenCalledWith(createdWord, {
+        creationSource: expectedSource
+      });
+    }
+  );
+
+  it("输入框按 Enter 只触发检测并停留在 Step 1", async () => {
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection("center"));
     vi.mocked(supplied.createV3).mockResolvedValue({ word: v3Word() });
     const onCreated = renderStep(supplied);
 
+    expect(
+      screen.getByText("STEP 01").closest(".word-basics-workflow")
+    ).not.toHaveClass("is-detected");
+
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.keyDown(input(), { key: "Enter", code: "Enter" });
 
-    await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
-    expect(onCreated).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(supplied.detectV3).toHaveBeenCalledTimes(1));
+    expect(supplied.createV3).not.toHaveBeenCalled();
+    expect(onCreated).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "创建并进入词形与发音" })
+    ).toBeVisible();
+    expect(
+      screen.getByText("STEP 01").closest(".word-basics-workflow")
+    ).toHaveClass("is-detected");
   });
 
-  it("短语折叠空白后自动使用 V2 phrase 链路", async () => {
+  it("检测请求进行中重复提交只发送一次", async () => {
     const supplied = requests();
-    const detection = detectionFixture("give up");
-    expect(detection.entry_kind).toBe("phrase");
-    vi.mocked(supplied.detectV2).mockResolvedValue(detection);
-    const phraseWord = {
-      ...wordFixture({ headword: "center", id: "phrase-give-up" }),
-      kind: "phrase" as const
-    };
-    vi.mocked(supplied.createV2).mockResolvedValue({ word: phraseWord });
+    const detection = deferred<DetectLexiconSurfaceResponseV3>();
+    vi.mocked(supplied.detectV3).mockReturnValue(detection.promise);
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    fireEvent.click(screen.getByText("词典检测"));
+
+    expect(supplied.detectV3).toHaveBeenCalledTimes(1);
+    expect(supplied.createV3).not.toHaveBeenCalled();
+    await act(async () => detection.resolve(v3Detection("center")));
+  });
+
+  it("短语折叠空白后通过 V3 检测与创建进入同一套 Step 2", async () => {
+    const supplied = requests();
+    const detection = v3PhraseDetection("give up");
+    const phraseWord = v3PhraseWord("give up");
+    vi.mocked(supplied.detectV3).mockResolvedValue(detection);
+    vi.mocked(supplied.createV3).mockResolvedValue({ word: phraseWord });
     const onCreated = renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: " give\t\nup " } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
 
-    await waitFor(() => expect(supplied.createV2).toHaveBeenCalledTimes(1));
-    expect(supplied.detectV2).toHaveBeenCalledWith({
+    await waitFor(() => expect(supplied.detectV3).toHaveBeenCalledTimes(1));
+    expect(supplied.detectV3).toHaveBeenCalledWith({
+      schema_version: 3,
       language: "en",
-      headword: "give up"
+      kind: "phrase",
+      surface: "give up"
     });
-    expect(supplied.detectV3).not.toHaveBeenCalled();
+    expect(supplied.createV3).not.toHaveBeenCalled();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "创建并进入词形与发音" })
+    );
+
+    await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
+    expect(supplied.createV3).toHaveBeenCalledWith(expect.any(String), {
+      schema_version: 3,
+      detection_id: detection.detection_id,
+      kind: "phrase"
+    });
     expect(onCreated).toHaveBeenCalledWith(phraseWord, {
       creationSource: "blank"
     });
   });
 
-  it("V3 matched 在自动创建期间展示地区建议拼写、词性、词形与发音", async () => {
+  it("V3 matched 无数据库原形时沿用 d707328 双面板展示内置词典英美式", async () => {
     const supplied = requests();
     const creation = deferred<{ word: AdminWordV3 }>();
     vi.mocked(supplied.detectV3).mockResolvedValue(matchedV3Detection());
     vi.mocked(supplied.createV3).mockReturnValue(creation.promise);
-    renderStep(supplied);
+    const onCreated = renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
 
-    expect(await screen.findByText("已找到内置词典建议")).toBeVisible();
-    expect(screen.getByText("英式建议拼写：centre")).toBeVisible();
-    expect(screen.getByText("美式建议拼写：center")).toBeVisible();
+    expect(await screen.findByText("确认英美主词")).toBeVisible();
+    expect(screen.getByLabelText("英式主词")).toHaveValue("centre");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("center");
     expect(screen.getAllByText("名词").length).toBeGreaterThan(0);
     expect(screen.getAllByText("动词").length).toBeGreaterThan(0);
-    expect(screen.getByText("复数")).toBeVisible();
-    expect(screen.getByText("词典音标：ˈsentə")).toBeVisible();
-    expect(screen.getByText(/实际发音：ˈsen\(t\)ər/)).toBeVisible();
-    expect(screen.getByText("弱读")).toBeVisible();
+    expect(screen.getByText("来源：内置词典")).toBeVisible();
+    expect(screen.queryByText("复数")).toBeNull();
+    expect(screen.queryByText("词典音标：ˈsentə")).toBeNull();
+    expect(screen.queryByText(/实际发音/)).toBeNull();
+    expect(screen.queryByText("弱读")).toBeNull();
     expect(screen.queryByText("matched")).toBeNull();
     expect(screen.queryByText("fixture-dictionary")).toBeNull();
+    expect(supplied.createV3).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
     expect(supplied.createV3).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ detection_id: "detection-v3" })
     );
+    const prefilled = v3PrefilledWord();
+    await act(async () => creation.resolve({ word: prefilled }));
+    expect(onCreated).toHaveBeenCalledWith(prefilled, {
+      creationSource: "dictionary"
+    });
+  });
 
-    await act(async () => creation.resolve({ word: v3Word() }));
+  it.each([
+    ["missing", "发音：词典未提供"],
+    ["partial", "发音：部分覆盖"]
+  ] as const)(
+    "V3 matched 将 partial/%s coverage 显示为中文产品提示",
+    async (pronunciations, expectedPronunciation) => {
+      const supplied = requests();
+      const detection = matchedV3Detection("child");
+      if (detection.builtin_dictionary.status !== "matched") {
+        throw new Error("expected matched dictionary fixture");
+      }
+      detection.builtin_dictionary.coverage.forms = "partial";
+      detection.builtin_dictionary.coverage.pronunciations = pronunciations;
+      vi.mocked(supplied.detectV3).mockResolvedValue(detection);
+      renderStep(supplied);
+
+      fireEvent.change(input(), { target: { value: "child" } });
+      fireEvent.click(screen.getByText("词典检测"));
+
+      expect(await screen.findByText("词形：部分覆盖")).toBeVisible();
+      expect(screen.getByText(expectedPronunciation)).toBeVisible();
+      expect(screen.queryByText(/^partial$|^missing$/u)).toBeNull();
+      expect(screen.queryByText(/detection-v3|fixture-dictionary/u)).toBeNull();
+    }
+  );
+
+  it("完整检测到数据库原形时按 d707328 布局展示全部原形，并用首个原形填充右侧英美式", async () => {
+    const supplied = requests();
+    const detection = matchedV3Detection();
+    vi.mocked(supplied.detectV3).mockResolvedValue({
+      ...detection,
+      requires_acknowledgement: true,
+      surface_match_page: v3BaseFormPage()
+    });
+    vi.mocked(supplied.getWord).mockResolvedValue({ word: existingV3Word() });
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+
+    expect(await screen.findByText("确认英美主词")).toBeVisible();
+    expect(screen.getByText("区分英美词形")).toBeVisible();
+    expect(screen.getByText("英式英语 · BrE")).toBeVisible();
+    expect(screen.getByText("美式英语 · AmE")).toBeVisible();
+    expect(screen.getByLabelText("英式主词")).toHaveValue("centre");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("center");
+    expect(screen.getByText("centre / center")).toBeVisible();
+    expect(screen.getByText("已发布")).toBeVisible();
+    expect(screen.getByText("来源：智能词库原形")).toBeVisible();
+    expect(supplied.getWord).toHaveBeenCalledWith("existing-v3");
+    expect(screen.queryByText("确认英美主词与词形")).toBeNull();
+    expect(screen.queryByText("已找到内置词典建议")).toBeNull();
+    expect(screen.queryByText("词典音标：ˈsentə")).toBeNull();
+  });
+
+  it("命中已有原形时二次确认后才创建新的独立词条", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue({
+      ...matchedV3Detection(),
+      requires_acknowledgement: true,
+      surface_match_page: v3BaseFormPage()
+    });
+    vi.mocked(supplied.getWord).mockResolvedValue({ word: existingV3Word() });
+    vi.mocked(supplied.createV3).mockResolvedValue({ word: v3Word() });
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    await screen.findByLabelText("英式主词");
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "确认并创建，进入词形与发音"
+      })
+    );
+    expect(supplied.createV3).not.toHaveBeenCalled();
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).getAllByText("确认创建新的独立词条？").length
+    ).toBeGreaterThan(0);
+    expect(
+      within(dialog).getByText(
+        "检测到智能词库已有相同原形。继续后将创建一个新的独立词条，不会修改已有词条。"
+      )
+    ).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "继续创建" }));
+    await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
+  });
+
+  it("命中草稿原形时提供四字继续创建入口并路由到对应 schema", async () => {
+    const supplied = requests();
+    const page = v3BaseFormPage();
+    for (const item of page.items) {
+      if (item.match_kind === "form_variant_v3") {
+        item.match.status = "draft";
+        item.match.content_scope = "draft";
+      }
+    }
+    vi.mocked(supplied.detectV3).mockResolvedValue({
+      ...matchedV3Detection(),
+      requires_acknowledgement: true,
+      surface_match_page: page
+    });
+    const draft = existingV3Word();
+    draft.status = "draft";
+    vi.mocked(supplied.getWord).mockResolvedValue({ word: draft });
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+
+    const link = await screen.findByRole("link", { name: "继续创建" });
+    expect(link).toHaveAttribute("href", "/words/existing-v3/v3/wizard/forms");
+    expect(link).toHaveTextContent("继续创建");
+  });
+
+  it("首个数据库原形详情加载失败时阻断创建，重试成功后才允许继续", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue({
+      ...matchedV3Detection(),
+      requires_acknowledgement: true,
+      surface_match_page: v3BaseFormPage()
+    });
+    vi.mocked(supplied.getWord)
+      .mockRejectedValueOnce(new Error("detail unavailable"))
+      .mockResolvedValueOnce({ word: existingV3Word() });
+    vi.mocked(supplied.createV3).mockResolvedValue({ word: v3Word() });
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+
+    expect(await screen.findByText("原形详情加载失败")).toBeVisible();
+    const create = screen.getByRole("button", {
+      name: "确认并创建，进入词形与发音"
+    });
+    expect(create.querySelector('[data-icon="plus"]')).not.toBeNull();
+    expect(create).toBeDisabled();
+    expect(supplied.createV3).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "重新加载" }));
+    await waitFor(() => expect(supplied.getWord).toHaveBeenCalledTimes(2));
+    expect(await screen.findByLabelText("英式主词")).toHaveValue("centre");
+    expect(create).toBeEnabled();
   });
 
   it("V3 matched 即使建议词性没有对应词形也会独立展示", async () => {
@@ -345,82 +752,96 @@ describe("UnifiedCreateEntryStep", () => {
     renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
 
-    expect(await screen.findByText("已找到内置词典建议")).toBeVisible();
+    expect(await screen.findByText("确认英美主词")).toBeVisible();
     expect(screen.getAllByText("名词").length).toBeGreaterThan(0);
     expect(screen.getAllByText("动词").length).toBeGreaterThan(0);
   });
 
-  it("V2 matched phrase 在自动创建期间展示正式英美主词与具体建议", async () => {
+  it("#133 只展示顶层权威合并 suggested_pos 并去重", async () => {
     const supplied = requests();
-    const detection = detectionFixture("center");
-    detection.request.headword = "in front of";
-    detection.normalized_headword = "in front of";
-    detection.entry_kind = "phrase";
-    const phraseWord = {
-      ...wordFixture({ id: "phrase-matched" }),
-      kind: "phrase" as const
-    };
-    const creation = deferred<{ word: typeof phraseWord }>();
-    vi.mocked(supplied.detectV2).mockResolvedValue(detection);
-    vi.mocked(supplied.createV2).mockReturnValue(creation.promise);
-    renderStep(supplied);
-
-    fireEvent.change(input(), { target: { value: "in front of" } });
-    fireEvent.click(screen.getByText("继续创建"));
-
-    expect(await screen.findByText("已找到内置词典建议")).toBeVisible();
-    expect(screen.getByText("英式主词：centre")).toBeVisible();
-    expect(screen.getByText("美式主词：center")).toBeVisible();
-    expect(screen.getAllByText("名词").length).toBeGreaterThan(0);
-    expect(screen.getByText("现在分词")).toBeVisible();
-    expect(screen.getByText(/词典音标：ˈsentərɪŋ/)).toBeVisible();
-    expect(supplied.createV2).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        detection_id: detection.detection_id,
-        headwords:
-          detection.builtin_dictionary.status === "matched"
-            ? detection.builtin_dictionary.headwords
-            : undefined
-      })
-    );
-
-    await act(async () => creation.resolve({ word: phraseWord }));
-  });
-
-  it("V2 通用建议与未知词性使用产品化回退", async () => {
-    const supplied = requests();
-    const detection = detectionFixture("center");
-    detection.request.headword = "in common";
-    detection.normalized_headword = "in common";
-    detection.entry_kind = "phrase";
+    const detection = matchedV3Detection();
     if (detection.builtin_dictionary.status !== "matched") {
       throw new Error("expected matched dictionary fixture");
     }
-    detection.builtin_dictionary.headwords = {
-      mode: "unified",
-      common: "in common"
-    };
-    const phraseWord = {
-      ...wordFixture({ id: "phrase-unified" }),
-      kind: "phrase" as const
-    };
-    const creation = deferred<{ word: typeof phraseWord }>();
-    vi.mocked(supplied.detectV2).mockResolvedValue(detection);
-    vi.mocked(supplied.createV2).mockReturnValue(creation.promise);
+    Object.assign(detection, {
+      suggested_pos: ["noun", "verb", "adjective", "noun"]
+    });
+    vi.mocked(supplied.detectV3).mockResolvedValue(detection);
     renderStep(supplied);
 
-    fireEvent.change(input(), { target: { value: "in common" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
 
-    expect(await screen.findByText("通用主词：in common")).toBeVisible();
+    const card = (await screen.findByText("词典检测结果")).closest(
+      ".word-detection-result-card"
+    );
+    if (!(card instanceof HTMLElement)) throw new Error("detection card");
+    const builtinRow = within(card)
+      .getByText("内置：")
+      .closest<HTMLElement>(".word-pos-source-row");
+    const smartRow = within(card)
+      .getByText("智能：")
+      .closest<HTMLElement>(".word-pos-source-row");
+    expect(builtinRow).not.toBeNull();
+    expect(smartRow).not.toBeNull();
+    expect(within(builtinRow!).getByText("名词")).toBeVisible();
+    expect(within(builtinRow!).getByText("动词")).toBeVisible();
+    expect(within(smartRow!).getByText("形容词")).toBeVisible();
+    expect(within(card).queryByText("· 内置词典")).toBeNull();
+    expect(within(card).queryByText("· 已有词条")).toBeNull();
+  });
+
+  it("V3 matched phrase 与单词共用英美主词展示和创建载荷", async () => {
+    const supplied = requests();
+    const detection = matchedV3Detection("in front of");
+    detection.request.kind = "phrase";
+    const phraseWord = v3PhraseWord("in front of");
+    const creation = deferred<{ word: AdminWordV3 }>();
+    vi.mocked(supplied.detectV3).mockResolvedValue(detection);
+    vi.mocked(supplied.createV3).mockReturnValue(creation.promise);
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "in front of" } });
+    fireEvent.click(screen.getByText("词典检测"));
+
+    expect(await screen.findByText("确认英美主词")).toBeVisible();
+    expect(screen.getByLabelText("英式主词")).toHaveValue("centre");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("center");
     expect(screen.getAllByText("名词").length).toBeGreaterThan(0);
+    expect(screen.queryByText("现在分词")).toBeNull();
+    expect(screen.queryByText(/词典音标/)).toBeNull();
+    expect(screen.getByText("来源：内置词典")).toBeVisible();
+    expect(screen.getByLabelText("区分英美词形")).toBeDisabled();
+    expect(supplied.createV3).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+    expect(supplied.createV3).toHaveBeenCalledWith(expect.any(String), {
+      schema_version: 3,
+      detection_id: detection.detection_id,
+      kind: "phrase"
+    });
+
     await act(async () => creation.resolve({ word: phraseWord }));
   });
 
-  it("not_found 明确说明空白草稿并自动继续，unavailable 则阻断", async () => {
+  it("V3 phrase not_found 使用本次输入填充与单词相同的双面板", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(
+      v3PhraseDetection("in common")
+    );
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "in common" } });
+    fireEvent.click(screen.getByText("词典检测"));
+
+    expect(await screen.findByLabelText("英式主词")).toHaveValue("in common");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("in common");
+    expect(screen.getByText("短语词条")).toBeVisible();
+    expect(screen.getByText("来源：本次输入")).toBeVisible();
+  });
+
+  it("not_found 使用本次输入填充双面板并等待确认，unavailable 则阻断", async () => {
     const notFoundRequests = requests();
     const creation = deferred<{ word: AdminWordV3 }>();
     vi.mocked(notFoundRequests.detectV3).mockResolvedValue(
@@ -437,12 +858,12 @@ describe("UnifiedCreateEntryStep", () => {
     );
 
     fireEvent.change(input(), { target: { value: "invented" } });
-    fireEvent.click(screen.getByText("继续创建"));
-    expect(await screen.findByText("未找到内置词典建议")).toBeVisible();
-    expect(
-      screen.getByText("将创建空白草稿，请在编辑器中补充内容。")
-    ).toBeVisible();
-    expect(notFoundRequests.createV3).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByText("词典检测"));
+    expect(await screen.findByText("确认英美主词")).toBeVisible();
+    expect(screen.getByLabelText("英式主词")).toHaveValue("invented");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("invented");
+    expect(screen.getByText("来源：本次输入")).toBeVisible();
+    expect(notFoundRequests.createV3).not.toHaveBeenCalled();
     unmount();
 
     const unavailableRequests = requests();
@@ -453,7 +874,7 @@ describe("UnifiedCreateEntryStep", () => {
     );
     renderStep(unavailableRequests);
     fireEvent.change(input(), { target: { value: "unavailable" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
 
     expect(
       await screen.findByText("内置词典暂时不可用，请稍后重试。")
@@ -474,12 +895,15 @@ describe("UnifiedCreateEntryStep", () => {
     renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
 
-    expect(await screen.findByText("发现可能重复的词条")).toBeInTheDocument();
+    await screen.findByText("确认并创建，进入词形与发音");
+    expect(screen.getByRole("button", { name: "重新检测" })).toBeVisible();
+    expect(screen.queryByText("发现可能重复的词条")).toBeNull();
+    expect(screen.queryByText(/继续创建只会新增草稿/)).not.toBeInTheDocument();
     expect(screen.queryByText("snapshot-v3")).toBeNull();
     expect(screen.queryByText("surface-token")).toBeNull();
-    fireEvent.click(screen.getByText("确认并继续创建"));
+    fireEvent.click(screen.getByText("确认并创建，进入词形与发音"));
 
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
     expect(supplied.createV3).toHaveBeenCalledWith(
@@ -504,12 +928,13 @@ describe("UnifiedCreateEntryStep", () => {
     const onCreated = renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
+    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
     expect(
       await screen.findByText("网络异常，创建结果未知。请原样重试。")
     ).toBeVisible();
 
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(2));
 
     expect(supplied.detectV3).toHaveBeenCalledTimes(1);
@@ -531,29 +956,22 @@ describe("UnifiedCreateEntryStep", () => {
     renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
+    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
 
     expect(await screen.findByText("创建失败，请稍后重试。")).toBeVisible();
     expect(screen.queryByText("secret")).toBeNull();
   });
 
-  it("V2 警告确认携带 token，禁用与分页失败状态保持阻断", async () => {
+  it("V3 phrase 警告确认携带 token，禁用与分页失败状态保持阻断", async () => {
     const terminalRequests = requests();
-    const terminalDetection = detectionFixture("give up");
-    terminalDetection.entry_kind = "phrase";
-    terminalDetection.smart_dictionary = {
-      status: "warning",
-      duplicates: [],
-      surface_match_page: v2SurfacePage("terminal"),
-      matched_entry_contexts: []
-    };
-    const phraseWord = {
-      ...wordFixture({ id: "phrase-warning" }),
-      kind: "phrase" as const
-    };
-    vi.mocked(terminalRequests.detectV2).mockResolvedValue(terminalDetection);
-    vi.mocked(terminalRequests.createV2).mockResolvedValue({
-      word: phraseWord
+    const terminalDetection = v3PhraseDetection("give up", {
+      requires_acknowledgement: true,
+      surface_match_page: v3SurfacePage("terminal")
+    });
+    vi.mocked(terminalRequests.detectV3).mockResolvedValue(terminalDetection);
+    vi.mocked(terminalRequests.createV3).mockResolvedValue({
+      word: v3PhraseWord()
     });
     const terminalView = render(
       <AntApp>
@@ -564,27 +982,24 @@ describe("UnifiedCreateEntryStep", () => {
       </AntApp>
     );
     fireEvent.change(input(), { target: { value: "give up" } });
-    fireEvent.click(screen.getByText("继续创建"));
-    fireEvent.click(await screen.findByText("确认并继续创建"));
-    await waitFor(() => expect(terminalRequests.createV2).toHaveBeenCalled());
-    expect(terminalRequests.createV2).toHaveBeenCalledWith(
+    fireEvent.click(screen.getByText("词典检测"));
+    fireEvent.click(await screen.findByText("确认并创建，进入词形与发音"));
+    await waitFor(() => expect(terminalRequests.createV3).toHaveBeenCalled());
+    expect(terminalRequests.createV3).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({
-        confirmed_surface_match_token: "surface-token-v2"
+        kind: "phrase",
+        confirmed_surface_match_token: "surface-token-v3"
       })
     );
     terminalView.unmount();
 
     const disabledRequests = requests();
-    const disabledDetection = detectionFixture("give up");
-    disabledDetection.entry_kind = "phrase";
-    disabledDetection.smart_dictionary = {
-      status: "warning",
-      duplicates: [],
-      surface_match_page: v2SurfacePage("disabled"),
-      matched_entry_contexts: []
-    };
-    vi.mocked(disabledRequests.detectV2).mockResolvedValue(disabledDetection);
+    const disabledDetection = v3PhraseDetection("give up", {
+      requires_acknowledgement: true,
+      surface_match_page: v3SurfacePage("disabled")
+    });
+    vi.mocked(disabledRequests.detectV3).mockResolvedValue(disabledDetection);
     const disabledView = render(
       <AntApp>
         <UnifiedCreateEntryStep
@@ -594,32 +1009,38 @@ describe("UnifiedCreateEntryStep", () => {
       </AntApp>
     );
     fireEvent.change(input(), { target: { value: "give up" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
     expect(
       await screen.findByText("当前策略暂不允许继续创建该词条。")
     ).toBeVisible();
+    expect(screen.getByText("原形检测")).toBeVisible();
+    expect(screen.queryByText("重复检测")).toBeNull();
+    expect(screen.queryByText("原形详情加载失败")).toBeNull();
+    expect(screen.queryByRole("button", { name: "重新加载" })).toBeNull();
+    expect(disabledRequests.getWord).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", {
+        name: "确认并创建，进入词形与发音"
+      })
+    ).toBeDisabled();
     disabledView.unmount();
 
     const failedRequests = requests();
-    const failedDetection = detectionFixture("give up");
-    failedDetection.entry_kind = "phrase";
-    failedDetection.smart_dictionary = {
-      status: "warning",
-      duplicates: [],
-      surface_match_page: v2SurfacePage("loading"),
-      matched_entry_contexts: []
-    };
-    vi.mocked(failedRequests.detectV2).mockResolvedValue(failedDetection);
+    const failedDetection = v3PhraseDetection("give up", {
+      requires_acknowledgement: true,
+      surface_match_page: v3SurfacePage("loading")
+    });
+    vi.mocked(failedRequests.detectV3).mockResolvedValue(failedDetection);
     vi.mocked(failedRequests.surfacePage).mockRejectedValue(
       new Error("page failed")
     );
     renderStep(failedRequests);
     fireEvent.change(input(), { target: { value: "give up" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
     expect(
       await screen.findByText("匹配结果已失效，请返回修改后重新提交。")
     ).toBeVisible();
-    expect(failedRequests.createV2).not.toHaveBeenCalled();
+    expect(failedRequests.createV3).not.toHaveBeenCalled();
   });
 
   it("创建时匹配结果变化会轮换幂等键并要求重新确认", async () => {
@@ -644,12 +1065,13 @@ describe("UnifiedCreateEntryStep", () => {
     renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
+    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
 
     expect(
       await screen.findByText("匹配结果已更新，请重新确认后继续创建。")
     ).toBeVisible();
-    fireEvent.click(screen.getByText("确认并继续创建"));
+    fireEvent.click(screen.getByText("确认并创建，进入词形与发音"));
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(2));
 
     const calls = vi.mocked(supplied.createV3).mock.calls;
@@ -671,17 +1093,67 @@ describe("UnifiedCreateEntryStep", () => {
     renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
     fireEvent.change(input(), { target: { value: "centers" } });
     await act(async () => oldDetection.resolve(v3Detection("center")));
 
     expect(supplied.createV3).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
+    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
     expect(supplied.createV3).toHaveBeenCalledWith(
       expect.any(String),
       expect.objectContaining({ detection_id: "detection-centers" })
     );
+  });
+
+  it("检测完成后修改输入会立即清除旧结果和创建入口", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection("center"));
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    expect(
+      await screen.findByRole("button", { name: "创建并进入词形与发音" })
+    ).toBeVisible();
+
+    fireEvent.change(input(), { target: { value: "centers" } });
+
+    expect(
+      screen.queryByRole("button", { name: "创建并进入词形与发音" })
+    ).toBeNull();
+    expect(screen.queryByText("词典检测结果")).toBeNull();
+    expect(supplied.createV3).not.toHaveBeenCalled();
+  });
+
+  it("检测结果在创建前过期时要求重新检测且不发送创建请求", async () => {
+    const supplied = requests();
+    const now = Date.parse("2026-08-26T12:00:00Z");
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(now);
+    vi.mocked(supplied.detectV3).mockResolvedValue(
+      v3Detection("center", {
+        expires_at: new Date(now + 1_000).toISOString()
+      })
+    );
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    const createButton = await screen.findByRole("button", {
+      name: "创建并进入词形与发音"
+    });
+    nowSpy.mockReturnValue(now + 2_000);
+    fireEvent.click(createButton);
+
+    expect(
+      await screen.findByText("检查结果已过期，请重新检测。")
+    ).toBeVisible();
+    expect(supplied.createV3).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "创建并进入词形与发音" })
+    ).toBeNull();
+    nowSpy.mockRestore();
   });
 
   it("创建请求进行中锁定输入和提交，且成功只处理一次", async () => {
@@ -692,12 +1164,15 @@ describe("UnifiedCreateEntryStep", () => {
     const onCreated = renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
+    const createButton = await screen.findByText("创建并进入词形与发音");
+    fireEvent.click(createButton);
+    fireEvent.click(createButton);
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
 
     expect(input()).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: /正在检查并创建/ })
+      screen.getByRole("button", { name: /创建并进入词形与发音/ })
     ).toBeDisabled();
     await act(async () => creation.resolve({ word: v3Word() }));
     expect(onCreated).toHaveBeenCalledTimes(1);
@@ -719,7 +1194,7 @@ describe("UnifiedCreateEntryStep", () => {
       </AntApp>
     );
     fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
     detectView.unmount();
     await act(async () => pendingDetection.resolve(v3Detection()));
     expect(detectRequests.createV3).not.toHaveBeenCalled();
@@ -738,7 +1213,8 @@ describe("UnifiedCreateEntryStep", () => {
       </AntApp>
     );
     fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
+    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
     await waitFor(() => expect(createRequests.createV3).toHaveBeenCalled());
     createView.unmount();
     await act(async () => pendingCreation.resolve({ word: v3Word() }));
@@ -755,6 +1231,7 @@ describe("UnifiedCreateEntryStep", () => {
         match: {
           source_schema_version: 3 as const,
           entry_id: "internal-entry-id",
+          entry_kind: "word" as const,
           status: "published" as const,
           content_scope: "current_publication" as const,
           pos_id: "internal-pos-id",
@@ -792,78 +1269,94 @@ describe("UnifiedCreateEntryStep", () => {
       requires_acknowledgement: true,
       surface_match_page: page
     });
+    const existing = existingV3Word();
+    existing.id = "internal-entry-id";
+    existing.forms.pos[0]!.forms[0]!.id = "internal-form-0";
+    existing.forms.pos[0]!.forms[0]!.regional_variants = {
+      mode: "common",
+      common: {
+        id: "internal-common",
+        dialect: "common",
+        spelling: "first",
+        origin: "dictionary",
+        pronunciations: []
+      }
+    };
+    vi.mocked(supplied.getWord).mockResolvedValue({ word: existing });
     vi.mocked(supplied.createV3).mockResolvedValue({ word: v3Word() });
     renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
 
-    expect(await screen.findByText("existing entry")).toBeVisible();
-    expect(screen.getByText("命中 2 处")).toBeVisible();
-    expect(screen.getByText("单词")).toBeVisible();
-    fireEvent.click(screen.getByText("查看候选详情"));
-    expect(
-      await screen.findByText("词形 · first · 原形 · 英式")
-    ).toBeInTheDocument();
-    expect(screen.getByText("词形 · second · 复数 · 美式")).toBeInTheDocument();
-    expect(screen.getAllByText("名词").length).toBeGreaterThan(1);
+    const summaryRow = (await screen.findByText("first")).closest<HTMLElement>(
+      ".word-smart-match-summary-row"
+    );
+    expect(summaryRow).not.toBeNull();
+    expect(within(summaryRow!).getByText("名词")).toBeVisible();
+    fireEvent.click(screen.getByText("查看已有原形"));
+    expect(await screen.findByText("原形：first")).toBeInTheDocument();
+    expect(screen.queryByText("原形：second")).toBeNull();
+    expect(screen.getAllByText("名词").length).toBeGreaterThan(0);
     expect(screen.getByText("释义：已有释义")).toBeInTheDocument();
     expect(
       screen.queryByText(/internal-entry-id|internal-form|surface_summary/)
     ).toBeNull();
   });
 
-  it("V2 duplicate 保留建议摘要并展示已有候选，且不创建", async () => {
+  it("V3 phrase 原形命中时不阻断创建，并复用独立词条二次确认", async () => {
     const supplied = requests();
-    const detection = detectionFixture("center");
-    detection.request.headword = "in front of";
-    detection.normalized_headword = "in front of";
-    detection.entry_kind = "phrase";
-    detection.smart_dictionary = {
-      status: "duplicate",
-      duplicates: [
-        {
-          word_id: "internal-duplicate-id",
-          headword: "in front of",
-          dialect: "common",
-          status: "draft"
-        }
-      ]
-    };
-    vi.mocked(supplied.detectV2).mockResolvedValue(detection);
+    const page = v3BaseFormPage();
+    for (const item of page.items) {
+      if (item.match_kind === "form_variant_v3") {
+        item.match.entry_kind = "phrase";
+      }
+    }
+    vi.mocked(supplied.detectV3).mockResolvedValue(
+      v3PhraseDetection("in front of", {
+        requires_acknowledgement: true,
+        surface_match_page: page
+      })
+    );
+    const existing = existingV3Word();
+    existing.kind = "phrase";
+    vi.mocked(supplied.getWord).mockResolvedValue({ word: existing });
+    vi.mocked(supplied.createV3).mockResolvedValue({
+      word: v3PhraseWord("in front of")
+    });
     renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "in front of" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
 
-    expect(await screen.findByText("已找到内置词典建议")).toBeVisible();
-    expect(screen.getByText("智能词库中已有相同词条")).toBeVisible();
-    expect(screen.getByText("in front of")).toBeVisible();
-    expect(screen.getByText("短语")).toBeVisible();
-    expect(screen.getByText("草稿")).toBeVisible();
-    fireEvent.click(screen.getByText("查看候选详情"));
-    expect(
-      await screen.findByText("命中原因：已有相同主词 · 通用")
-    ).toBeInTheDocument();
-    expect(screen.queryByText("internal-duplicate-id")).toBeNull();
-    expect(supplied.createV2).not.toHaveBeenCalled();
+    expect(await screen.findByText("确认英美主词")).toBeVisible();
+    expect(screen.getByText("短语词条")).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "确认并创建，进入词形与发音"
+      })
+    );
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "继续创建" }));
+    await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
+    expect(supplied.createV3).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ kind: "phrase" })
+    );
   });
 
   it("分类回显不一致时 fail closed", async () => {
     const supplied = requests();
-    vi.mocked(supplied.detectV2).mockResolvedValue({
-      ...detectionFixture("give up"),
-      entry_kind: "word"
-    });
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection("give up"));
     renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "give up" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
 
     expect(
       await screen.findByText("词条检查结果不一致，请刷新后重试。")
     ).toBeInTheDocument();
-    expect(supplied.createV2).not.toHaveBeenCalled();
+    expect(supplied.createV3).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -880,20 +1373,20 @@ describe("UnifiedCreateEntryStep", () => {
           })
         );
       } else {
-        const detection = detectionFixture(value);
-        detection.entry_kind = "phrase";
-        detection.expires_at = new Date(Date.now() - 1_000).toISOString();
-        vi.mocked(supplied.detectV2).mockResolvedValue(detection);
+        vi.mocked(supplied.detectV3).mockResolvedValue(
+          v3PhraseDetection(value, {
+            expires_at: new Date(Date.now() - 1_000).toISOString()
+          })
+        );
       }
       renderStep(supplied);
 
       fireEvent.change(input(), { target: { value } });
-      fireEvent.click(screen.getByText("继续创建"));
+      fireEvent.click(screen.getByText("词典检测"));
 
       expect(
         await screen.findByText("检查结果已过期，请重新提交。")
       ).toBeInTheDocument();
-      expect(supplied.createV2).not.toHaveBeenCalled();
       expect(supplied.createV3).not.toHaveBeenCalled();
     }
   );
@@ -903,10 +1396,11 @@ describe("UnifiedCreateEntryStep", () => {
     renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "中文" } });
-    fireEvent.click(screen.getByText("继续创建"));
+    fireEvent.click(screen.getByText("词典检测"));
 
-    expect(await screen.findByText(/仅支持英文词条/)).toBeInTheDocument();
-    expect(supplied.detectV2).not.toHaveBeenCalled();
+    expect(
+      await screen.findByText(/^仅支持英文词条，只能包含/)
+    ).toBeInTheDocument();
     expect(supplied.detectV3).not.toHaveBeenCalled();
   });
 });

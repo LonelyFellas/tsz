@@ -1,36 +1,39 @@
 import { HttpError } from "@tsz/api-client/http";
 import type {
-  AdminWordV2,
-  AdminWordV2Envelope,
+  AdminWordAnyEnvelope,
   AdminWordV3,
   AdminWordV3Envelope,
-  CreateAdminWordV2Input,
   CreateAdminWordV3Input,
   DetectLexiconSurfaceResponseV3,
   DetectLexiconSurfaceV3Input,
-  DetectWordInputV2,
-  DetectWordResponseV2,
-  Dialect,
-  DuplicateWordMatchV2,
   PartOfSpeechCatalogResponse,
-  PronunciationStyle,
   SurfaceMatchPageAny,
-  WordFormTypeV3,
   WordHeadwordsV2
 } from "@tsz/types";
 import {
+  CheckCircleFilled,
+  ExclamationCircleOutlined,
+  PlusOutlined,
+  SearchOutlined
+} from "@ant-design/icons";
+import {
   Alert,
+  App,
   Button,
   Card,
-  Collapse,
+  Col,
+  Descriptions,
   Form,
   Input,
+  Row,
+  Select,
   Space,
+  Switch,
   Tag,
   Typography
 } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { adminWordsAnyDataSource, adminWordsDataSource } from "../dataSource";
+import { adminWordsAnyDataSource } from "../dataSource";
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import {
   aggregateLifecycleSurfaceMatchCards,
@@ -40,22 +43,17 @@ import {
 } from "../surfaceSnapshot";
 import { useSurfaceSnapshotAny } from "../useSurfaceSnapshot";
 import { createV3WordRequests } from "../word-creation-v3/api";
-import {
-  dialectLabel,
-  formTypeLabel,
-  pronunciationStyleLabel
-} from "../word-creation-v3/presentation";
 import { newWordNodeId } from "../word-model/primitives";
-import { classifyEntryInput } from "./entryClassification";
+import {
+  extractDetectedBaseForms,
+  resolveDetectedBaseForm,
+  type DetectedBaseForm
+} from "./baseFormDetection";
+import { classifyEntryInput, validateEntryInput } from "./entryClassification";
 import type { CreationNavigationState } from "./CreationSourceNotice";
-import { headwordIssue } from "./headwordValidation";
+import "./word-creation.css";
 
 export interface UnifiedCreateRequests {
-  detectV2: (input: DetectWordInputV2) => Promise<DetectWordResponseV2>;
-  createV2: (
-    idempotencyKey: string,
-    input: CreateAdminWordV2Input
-  ) => Promise<AdminWordV2Envelope>;
   detectV3: (
     input: DetectLexiconSurfaceV3Input
   ) => Promise<DetectLexiconSurfaceResponseV3>;
@@ -63,6 +61,7 @@ export interface UnifiedCreateRequests {
     idempotencyKey: string,
     input: CreateAdminWordV3Input
   ) => Promise<AdminWordV3Envelope>;
+  getWord: (wordId: string) => Promise<AdminWordAnyEnvelope>;
   surfacePage: (
     snapshotId: string,
     cursor: string,
@@ -70,73 +69,37 @@ export interface UnifiedCreateRequests {
   ) => Promise<SurfaceMatchPageAny>;
 }
 
-type PendingCreation =
-  | {
-      kind: "word";
-      detection: DetectLexiconSurfaceResponseV3;
-      idempotencyKey: string;
-    }
-  | {
-      kind: "phrase";
-      detection: DetectWordResponseV2;
-      headwords: WordHeadwordsV2;
-      idempotencyKey: string;
-    };
-
-interface ExactCreationAttempt {
-  normalized: string;
-  target: PendingCreation;
-  confirmedSurfaceToken?: string;
-}
+type PendingCreation = {
+  kind: "word" | "phrase";
+  detection: DetectLexiconSurfaceResponseV3;
+  idempotencyKey: string;
+};
 
 interface Props {
   requests?: UnifiedCreateRequests;
   onCreated: (
-    word: AdminWordV2 | AdminWordV3,
+    word: AdminWordV3,
     navigationState: CreationNavigationState
   ) => void;
 }
 
-interface SuggestionPronunciation {
-  key: string;
-  dictPhonetic: string;
-  actualPron?: string;
-  style?: PronunciationStyle;
-}
-
-interface SuggestionVariant {
-  key: string;
-  dialect: Dialect;
-  spelling: string;
-  pronunciations: SuggestionPronunciation[];
-}
-
-interface SuggestionForm {
-  key: string;
-  formType: WordFormTypeV3;
-  variants: SuggestionVariant[];
-}
-
-interface SuggestionSection {
-  key: string;
-  posLabel: string;
-  forms: SuggestionForm[];
-}
-
-interface SuggestionSummary {
-  status: "matched" | "not_found";
-  headwords: Array<{ label: string; value: string }>;
-  sections: SuggestionSection[];
-}
+type RegionalDisplayState =
+  | { status: "idle" }
+  | { status: "loading" }
+  | { status: "error" }
+  | {
+      status: "ready";
+      source: "database" | "builtin" | "input";
+      value: WordHeadwordsV2;
+    };
 
 class ProductError extends Error {}
 
 const v3Requests = createV3WordRequests();
 const defaultRequests: UnifiedCreateRequests = {
-  detectV2: (input) => adminWordsDataSource.detect(input),
-  createV2: (key, input) => adminWordsDataSource.createV2(key, input),
   detectV3: v3Requests.detect,
   createV3: v3Requests.create,
+  getWord: (wordId) => adminWordsAnyDataSource.getAny(wordId),
   surfacePage: (snapshotId, cursor, signal) =>
     adminWordsAnyDataSource.surfaceMatchSnapshotPageAny(
       snapshotId,
@@ -148,7 +111,7 @@ const defaultRequests: UnifiedCreateRequests = {
 const STATUS_LABEL = {
   draft: "草稿",
   published: "已发布",
-  archived: "已归档"
+  archived: "垃圾桶"
 } as const;
 
 const KIND_LABEL = {
@@ -156,20 +119,8 @@ const KIND_LABEL = {
   phrase: "短语"
 } as const;
 
-const MATCH_REASON_LABEL = {
-  ordinary: "词面或词形相似",
-  visibility: "公开范围存在同名词条",
-  composite: "词面相似且公开范围存在同名词条"
-} as const;
-
 function initialSurfacePage(pending?: PendingCreation) {
-  if (!pending) return undefined;
-  if (pending.kind === "word") {
-    return pending.detection.surface_match_page;
-  }
-  return pending.detection.smart_dictionary.status === "warning"
-    ? pending.detection.smart_dictionary.surface_match_page
-    : undefined;
+  return pending?.detection.surface_match_page;
 }
 
 function errorMessage(error: unknown): string {
@@ -196,6 +147,18 @@ function partOfSpeechLabel(
   );
 }
 
+function dictionaryCoverageLabel(
+  category: "词形" | "发音",
+  state: "complete" | "partial" | "missing"
+) {
+  const status = {
+    complete: "完整覆盖",
+    partial: "部分覆盖",
+    missing: "词典未提供"
+  }[state];
+  return `${category}：${status}`;
+}
+
 function assertFreshDetection(expiresAt: string) {
   const expiry = Date.parse(expiresAt);
   if (!Number.isFinite(expiry) || expiry <= Date.now()) {
@@ -203,312 +166,429 @@ function assertFreshDetection(expiresAt: string) {
   }
 }
 
-function v2SuggestionSummary(
-  pending: Extract<PendingCreation, { kind: "phrase" }>,
-  catalog?: PartOfSpeechCatalogResponse
-): SuggestionSummary {
+function hasV3PrefilledForms(word: AdminWordV3): boolean {
+  return word.forms.pos.some(
+    (pos) => pos.forms.length > 0 && pos.form_groups.length > 0
+  );
+}
+
+function builtinRegionalValue(pending: PendingCreation): {
+  source: "builtin" | "input";
+  value: WordHeadwordsV2;
+} {
   const builtin = pending.detection.builtin_dictionary;
-  if (builtin.status !== "matched") {
-    return { status: "not_found", headwords: [], sections: [] };
+  if (builtin.status === "matched") {
+    const base = builtin.suggested_forms.find(
+      (form) => form.form_type === "base"
+    );
+    if (base?.regional_variants.mode === "common") {
+      return {
+        source: "builtin",
+        value: {
+          mode: "unified",
+          common: base.regional_variants.common.spelling
+        }
+      };
+    }
+    if (base?.regional_variants.mode === "uk_us") {
+      return {
+        source: "builtin",
+        value: {
+          mode: "distinguish",
+          uk: base.regional_variants.uk.spelling,
+          us: base.regional_variants.us.spelling,
+          source_dialect: "us"
+        }
+      };
+    }
   }
-  const headwords =
-    builtin.headwords.mode === "unified"
-      ? [{ label: "通用主词", value: builtin.headwords.common }]
-      : [
-          { label: "英式主词", value: builtin.headwords.uk },
-          { label: "美式主词", value: builtin.headwords.us }
-        ];
   return {
-    status: "matched",
-    headwords,
-    sections: builtin.suggested_forms.pos.map((pos) => ({
-      key: pos.pos_id,
-      posLabel: partOfSpeechLabel(pos.pos, catalog),
-      forms: [
-        pos.base_form,
-        ...pos.form_groups.flatMap((group) => group.slots)
-      ].map((form) => ({
-        key: form.id,
-        formType: form.form_type,
-        variants: form.variants.map((variant) => ({
-          key: variant.id,
-          dialect: variant.dialect,
-          spelling: variant.spelling,
-          pronunciations: variant.pronunciations.map((pronunciation) => ({
-            key: pronunciation.id,
-            dictPhonetic: pronunciation.dict_phonetic,
-            actualPron: pronunciation.actual_pron,
-            style: pronunciation.style
-          }))
-        }))
-      }))
-    }))
+    source: "input",
+    value: { mode: "unified", common: pending.detection.normalized_surface }
   };
 }
 
-function v3SuggestionSummary(
-  pending: Extract<PendingCreation, { kind: "word" }>,
-  catalog?: PartOfSpeechCatalogResponse
-): SuggestionSummary {
-  const builtin = pending.detection.builtin_dictionary;
-  if (builtin.status !== "matched") {
-    return { status: "not_found", headwords: [], sections: [] };
-  }
-  const sections = new Map<string, SuggestionSection>();
-  for (const pos of builtin.suggested_pos) {
-    sections.set(pos, {
-      key: pos,
-      posLabel: partOfSpeechLabel(pos, catalog),
-      forms: []
-    });
-  }
-  for (const form of builtin.suggested_forms) {
-    const section = sections.get(form.pos) ?? {
-      key: form.pos,
-      posLabel: partOfSpeechLabel(form.pos, catalog),
-      forms: []
-    };
-    const variants =
-      form.regional_variants.mode === "common"
-        ? [form.regional_variants.common]
-        : [form.regional_variants.uk, form.regional_variants.us];
-    section.forms.push({
-      key: `${form.pos}:${form.form_type}:${section.forms.length}`,
-      formType: form.form_type,
-      variants: variants.map((variant, variantIndex) => ({
-        key: `${form.pos}:${form.form_type}:${variant.dialect}:${variantIndex}`,
-        dialect: variant.dialect,
-        spelling: variant.spelling,
-        pronunciations: variant.pronunciations.map(
-          (pronunciation, pronunciationIndex) => ({
-            key: `${form.pos}:${form.form_type}:${variant.dialect}:${pronunciationIndex}`,
-            dictPhonetic: pronunciation.dict_phonetic,
-            ...(pronunciation.actual_pron
-              ? { actualPron: pronunciation.actual_pron }
-              : {}),
-            ...(pronunciation.style ? { style: pronunciation.style } : {})
-          })
-        )
-      }))
-    });
-    sections.set(form.pos, section);
-  }
-  return {
-    status: "matched",
-    headwords: [],
-    sections: [...sections.values()]
-  };
-}
-
-function DictionarySuggestionCard({
+function DetectionPresentationCard({
   pending,
-  catalog
+  catalog,
+  baseCandidates,
+  surfaceCards,
+  snapshot
 }: {
   pending: PendingCreation;
   catalog?: PartOfSpeechCatalogResponse;
+  baseCandidates: DetectedBaseForm[];
+  surfaceCards: ReturnType<typeof aggregateLifecycleSurfaceMatchCards>;
+  snapshot: ReturnType<typeof useSurfaceSnapshotAny>;
 }) {
-  const summary =
-    pending.kind === "word"
-      ? v3SuggestionSummary(pending, catalog)
-      : v2SuggestionSummary(pending, catalog);
-  if (summary.status === "not_found") {
-    return (
-      <Alert
-        showIcon
-        type="info"
-        title="未找到内置词典建议"
-        description="将创建空白草稿，请在编辑器中补充内容。"
-      />
-    );
+  const [expanded, setExpanded] = useState<string>();
+  const builtinStatus = pending.detection.builtin_dictionary.status;
+  const builtinCoverage =
+    pending.detection.builtin_dictionary.status === "matched"
+      ? pending.detection.builtin_dictionary.coverage
+      : undefined;
+  let posCodes: string[] = [];
+  let builtinPosCodes = new Set<string>();
+  if (pending.detection.builtin_dictionary.status === "matched") {
+    posCodes = [...new Set(pending.detection.suggested_pos)];
+    builtinPosCodes = new Set([
+      ...pending.detection.builtin_dictionary.suggested_pos,
+      ...pending.detection.builtin_dictionary.suggested_forms.map(
+        (form) => form.pos
+      )
+    ]);
   }
+  const hasMatches = baseCandidates.length > 0 || surfaceCards.length > 0;
+  const baseEntryIds = new Set(
+    baseCandidates.map((candidate) => candidate.entryId)
+  );
+  const displayEntries = [
+    ...baseCandidates.map((candidate) => ({
+      key: candidate.key,
+      entryId: candidate.entryId,
+      schemaVersion: candidate.schemaVersion,
+      label: candidate.spellings.join(" / ") || candidate.label,
+      status: candidate.status,
+      baseSpellings: candidate.spellings,
+      otherMatches: [] as string[],
+      posLabels: candidate.posLabels.map((pos) =>
+        partOfSpeechLabel(pos, catalog)
+      ),
+      glossPreviews: candidate.glossPreviews
+    })),
+    ...surfaceCards
+      .filter((card) => !baseEntryIds.has(card.entry_id))
+      .map((card) => ({
+        key: card.key,
+        entryId: card.entry_id,
+        schemaVersion: card.schema_version,
+        label: card.label,
+        status: card.status,
+        baseSpellings: [] as string[],
+        otherMatches: card.source_labels,
+        posLabels: card.pos_labels,
+        glossPreviews: card.gloss_previews
+      }))
+  ];
+  const builtinPosLabels = [
+    ...new Set(
+      [...builtinPosCodes].map((pos) => partOfSpeechLabel(pos, catalog))
+    )
+  ];
+  const smartPosLabels = [
+    ...new Set([
+      ...posCodes
+        .filter((pos) => !builtinPosCodes.has(pos))
+        .map((pos) => partOfSpeechLabel(pos, catalog)),
+      ...displayEntries.flatMap((entry) => entry.posLabels)
+    ])
+  ];
+
   return (
     <Card
-      className="word-detection-result-card word-dictionary-suggestion-card"
+      className="word-detection-result-card"
       size="small"
-      title="已找到内置词典建议"
+      title="词典检测结果"
+      extra={
+        <Tag color={builtinStatus === "matched" ? "success" : "default"}>
+          {builtinStatus === "matched" ? "已匹配" : "未匹配"}
+        </Tag>
+      }
     >
-      <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
-        <Alert
-          showIcon
-          type="success"
-          title="正在把以下建议应用到草稿"
-          description="进入编辑器后请按平台教学口径核对并完善。"
-        />
-        {summary.headwords.length > 0 ? (
-          <Space wrap>
-            {summary.headwords.map((headword) => (
-              <Typography.Text key={headword.label} strong>
-                {headword.label}：{headword.value}
-              </Typography.Text>
-            ))}
-          </Space>
-        ) : null}
-        {summary.sections.map((section) => (
-          <Card key={section.key} size="small" title={section.posLabel}>
-            <Space
-              orientation="vertical"
-              size="small"
-              style={{ width: "100%" }}
-            >
-              {section.forms.map((form) => (
-                <div key={form.key} className="word-dictionary-suggestion-form">
-                  <Tag color="blue">{formTypeLabel(form.formType)}</Tag>
-                  <Space orientation="vertical" size={4}>
-                    {form.variants.map((variant) => (
-                      <div key={variant.key}>
-                        <Typography.Text>
-                          {pending.kind === "word" && form.formType === "base"
-                            ? `${dialectLabel(variant.dialect)}建议拼写`
-                            : dialectLabel(variant.dialect)}
-                          ：{variant.spelling}
-                        </Typography.Text>
-                        {variant.pronunciations.map((pronunciation) => (
-                          <Space key={pronunciation.key} wrap size="small">
-                            <Typography.Text type="secondary">
-                              词典音标：{pronunciation.dictPhonetic}
-                            </Typography.Text>
-                            {pronunciation.actualPron ? (
-                              <Typography.Text type="secondary">
-                                实际发音：{pronunciation.actualPron}
-                              </Typography.Text>
-                            ) : null}
-                            {pronunciation.style ? (
-                              <Tag>
-                                {pronunciationStyleLabel(pronunciation.style)}
-                              </Tag>
-                            ) : null}
-                          </Space>
-                        ))}
-                      </div>
-                    ))}
-                  </Space>
-                </div>
-              ))}
-            </Space>
-          </Card>
-        ))}
-      </Space>
-    </Card>
-  );
-}
-
-function SurfaceCandidateDetails({
-  card
-}: {
-  card: ReturnType<typeof aggregateLifecycleSurfaceMatchCards>[number];
-}) {
-  return (
-    <Card size="small">
-      <Space orientation="vertical" size="small" style={{ width: "100%" }}>
-        <Space wrap>
-          <Typography.Text strong>{card.label}</Typography.Text>
-          <Tag>{KIND_LABEL[card.kind]}</Tag>
-          <Tag>{STATUS_LABEL[card.status]}</Tag>
-          <Typography.Text type="secondary">
-            命中 {card.match_count} 处
-          </Typography.Text>
-        </Space>
-        <Collapse
-          size="small"
-          items={[
-            {
-              key: "details",
-              label: "查看候选详情",
-              children: (
-                <Space
-                  orientation="vertical"
-                  size="small"
-                  style={{ width: "100%" }}
-                >
-                  <Typography.Text>
-                    命中原因：{MATCH_REASON_LABEL[card.membership]}
-                  </Typography.Text>
-                  {card.source_labels.map((source) => (
-                    <Typography.Text key={source} type="secondary">
-                      {source}
-                    </Typography.Text>
-                  ))}
-                  {card.pos_labels.length > 0 ? (
-                    <Space wrap aria-label="已有词性">
-                      {card.pos_labels.map((label) => (
-                        <Tag key={label}>{label}</Tag>
+      <Space orientation="vertical" size={16} style={{ width: "100%" }}>
+        <Descriptions column={1} size="small">
+          <Descriptions.Item label="词条类型">
+            {KIND_LABEL[pending.kind]}词条
+          </Descriptions.Item>
+          <Descriptions.Item label="原形检测">
+            {hasMatches ? (
+              "已发现"
+            ) : (
+              <Space>
+                <CheckCircleFilled style={{ color: "#22a06b" }} />
+                未发现
+              </Space>
+            )}
+          </Descriptions.Item>
+          {builtinPosLabels.length > 0 || smartPosLabels.length > 0 ? (
+            <Descriptions.Item label="建议词性">
+              <div className="word-pos-sources">
+                {builtinPosLabels.length > 0 ? (
+                  <div className="word-pos-source-row">
+                    <Typography.Text type="secondary">内置：</Typography.Text>
+                    <Space size={[4, 4]} wrap>
+                      {builtinPosLabels.map((label) => (
+                        <Tag key={label} color="blue">
+                          {label}
+                        </Tag>
                       ))}
                     </Space>
-                  ) : null}
-                  {card.gloss_previews.map((gloss) => (
-                    <Typography.Text key={gloss}>释义：{gloss}</Typography.Text>
-                  ))}
-                </Space>
-              )
-            }
-          ]}
-        />
+                  </div>
+                ) : null}
+                {smartPosLabels.length > 0 ? (
+                  <div className="word-pos-source-row">
+                    <Typography.Text type="secondary">智能：</Typography.Text>
+                    <Space size={[4, 4]} wrap>
+                      {smartPosLabels.map((label) => (
+                        <Tag key={label} color="cyan">
+                          {label}
+                        </Tag>
+                      ))}
+                    </Space>
+                  </div>
+                ) : null}
+              </div>
+            </Descriptions.Item>
+          ) : null}
+          {builtinCoverage ? (
+            <Descriptions.Item label="词典覆盖">
+              <Space size={[4, 4]} wrap>
+                <Tag
+                  color={
+                    builtinCoverage.forms === "missing" ? "default" : "blue"
+                  }
+                >
+                  {dictionaryCoverageLabel("词形", builtinCoverage.forms)}
+                </Tag>
+                <Tag
+                  color={
+                    builtinCoverage.pronunciations === "missing"
+                      ? "default"
+                      : "cyan"
+                  }
+                >
+                  {dictionaryCoverageLabel(
+                    "发音",
+                    builtinCoverage.pronunciations
+                  )}
+                </Tag>
+              </Space>
+            </Descriptions.Item>
+          ) : null}
+        </Descriptions>
+
+        {displayEntries.length > 0 ? (
+          <div className="word-smart-match-summary">
+            {displayEntries.map((entry) => (
+              <div className="word-smart-match-summary-entry" key={entry.key}>
+                <div className="word-smart-match-summary-row">
+                  <Space size={8} wrap>
+                    <Typography.Text strong>{entry.label}</Typography.Text>
+                    <Tag
+                      color={
+                        entry.status === "published"
+                          ? "success"
+                          : entry.status === "draft"
+                            ? "processing"
+                            : "default"
+                      }
+                    >
+                      {STATUS_LABEL[entry.status]}
+                    </Tag>
+                    {entry.posLabels.map((label) => (
+                      <Tag key={label}>{label}</Tag>
+                    ))}
+                  </Space>
+                  {entry.status === "draft" ? (
+                    <Button
+                      type="link"
+                      href={
+                        entry.schemaVersion === 3
+                          ? `/words/${entry.entryId}/v3/wizard/forms`
+                          : `/words/${entry.entryId}/wizard/forms`
+                      }
+                    >
+                      继续创建
+                    </Button>
+                  ) : (
+                    <Button
+                      type="link"
+                      onClick={() =>
+                        setExpanded(
+                          expanded === entry.key ? undefined : entry.key
+                        )
+                      }
+                    >
+                      查看已有原形
+                    </Button>
+                  )}
+                </div>
+                {expanded === entry.key ? (
+                  <div className="word-smart-match-context-meta">
+                    {entry.baseSpellings.map((spelling) => (
+                      <div key={spelling}>原形：{spelling}</div>
+                    ))}
+                    {entry.baseSpellings.length === 0
+                      ? entry.otherMatches.map((match) => (
+                          <div key={match}>命中：{match}</div>
+                        ))
+                      : null}
+                    {entry.posLabels.length > 0 ? (
+                      <Space size={[4, 4]} wrap>
+                        <span className="word-smart-match-context-meta-label">
+                          基本词性：
+                        </span>
+                        {entry.posLabels.map((label) => (
+                          <Tag key={label}>{label}</Tag>
+                        ))}
+                      </Space>
+                    ) : null}
+                    {entry.glossPreviews.map((gloss) => (
+                      <div key={gloss}>释义：{gloss}</div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : null}
+
+        {snapshot.phase === "error" || snapshot.phase === "expired" ? (
+          <Alert
+            showIcon
+            type="error"
+            title="匹配结果已失效，请返回修改后重新提交。"
+          />
+        ) : null}
+        {snapshot.phase === "disabled" ? (
+          <Alert
+            showIcon
+            type="error"
+            title="当前策略暂不允许继续创建该词条。"
+          />
+        ) : null}
       </Space>
     </Card>
   );
 }
 
-function DuplicateCandidateDetails({
-  duplicate,
-  kind
+function HeadwordConfirmationCard({
+  state,
+  editable,
+  onChange,
+  onRetry
 }: {
-  duplicate: DuplicateWordMatchV2;
-  kind: "word" | "phrase";
+  state: RegionalDisplayState;
+  editable: boolean;
+  onChange: (value: WordHeadwordsV2) => void;
+  onRetry: () => void;
 }) {
-  return (
-    <Card size="small">
-      <Space orientation="vertical" size="small" style={{ width: "100%" }}>
-        <Space wrap>
-          <Typography.Text strong>{duplicate.headword}</Typography.Text>
-          <Tag>{KIND_LABEL[kind]}</Tag>
-          <Tag>{STATUS_LABEL[duplicate.status]}</Tag>
-        </Space>
-        <Collapse
-          size="small"
-          items={[
-            {
-              key: "details",
-              label: "查看候选详情",
-              children: (
-                <Typography.Text type="secondary">
-                  命中原因：已有相同主词 · {dialectLabel(duplicate.dialect)}
-                </Typography.Text>
-              )
-            }
-          ]}
+  if (state.status === "loading" || state.status === "idle") {
+    return (
+      <Card
+        className="word-headword-confirmation-card"
+        size="small"
+        title="确认英美主词"
+      >
+        <Typography.Text type="secondary">正在加载原形…</Typography.Text>
+      </Card>
+    );
+  }
+  if (state.status === "error") {
+    return (
+      <Card
+        className="word-headword-confirmation-card"
+        size="small"
+        title="确认英美主词"
+      >
+        <Alert
+          showIcon
+          type="error"
+          title="原形详情加载失败"
+          description="无法确认首个数据库原形，已停止创建。"
+          action={<Button onClick={onRetry}>重新加载</Button>}
         />
-      </Space>
+      </Card>
+    );
+  }
+  const value = state.value;
+  const uk = value.mode === "distinguish" ? value.uk : value.common;
+  const us = value.mode === "distinguish" ? value.us : value.common;
+  return (
+    <Card
+      className="word-headword-confirmation-card"
+      size="small"
+      title="确认英美主词"
+    >
+      <div className="word-dialect-detection-row">
+        <div>
+          <Typography.Text strong>区分英美词形</Typography.Text>
+          <Typography.Text type="secondary">
+            开启后可分别确认英式与美式主词
+          </Typography.Text>
+        </div>
+        <Switch
+          aria-label="区分英美词形"
+          checked={value.mode === "distinguish"}
+          disabled={!editable}
+          onChange={(checked) => {
+            onChange(
+              checked
+                ? {
+                    mode: "distinguish",
+                    uk,
+                    us,
+                    source_dialect: "us"
+                  }
+                : { mode: "unified", common: us }
+            );
+          }}
+        />
+      </div>
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <div className="dialect-panel dialect-panel-uk">
+            <Typography.Text strong>英式英语 · BrE</Typography.Text>
+            <Input
+              aria-label="英式主词"
+              value={uk}
+              disabled={!editable || value.mode === "unified"}
+              onChange={(event) => {
+                if (value.mode === "distinguish") {
+                  onChange({ ...value, uk: event.target.value });
+                }
+              }}
+              style={{ marginTop: 10 }}
+            />
+          </div>
+        </Col>
+        <Col xs={24} md={12}>
+          <div className="dialect-panel dialect-panel-us">
+            <Typography.Text strong>美式英语 · AmE</Typography.Text>
+            <Input
+              aria-label="美式主词"
+              value={us}
+              disabled={!editable || value.mode === "unified"}
+              onChange={(event) => {
+                if (value.mode === "distinguish") {
+                  onChange({ ...value, us: event.target.value });
+                }
+              }}
+              style={{ marginTop: 10 }}
+            />
+          </div>
+        </Col>
+      </Row>
+      <Typography.Text
+        type="secondary"
+        className="word-field-help word-headword-source"
+      >
+        来源：
+        {state.source === "database"
+          ? "智能词库原形"
+          : state.source === "builtin"
+            ? "内置词典"
+            : "本次输入"}
+      </Typography.Text>
     </Card>
   );
-}
-
-function phraseHeadwords(
-  detection: DetectWordResponseV2,
-  normalized: string,
-  catalog?: PartOfSpeechCatalogResponse
-): WordHeadwordsV2 {
-  if (detection.builtin_dictionary.status === "unavailable") {
-    throw new ProductError("内置词典暂时不可用，请稍后重试。");
-  }
-  if (detection.builtin_dictionary.status === "not_found") {
-    return { mode: "unified", common: normalized };
-  }
-  const availablePos = new Set(catalog?.items.map((item) => item.code));
-  if (
-    !catalog ||
-    detection.builtin_dictionary.suggested_forms.pos.some(
-      (item) => !availablePos.has(item.pos)
-    )
-  ) {
-    throw new ProductError("词性配置尚未就绪，暂时不能创建该短语。");
-  }
-  return detection.builtin_dictionary.headwords;
 }
 
 export function UnifiedCreateEntryStep({
   requests = defaultRequests,
   onCreated
 }: Props) {
+  const { modal } = App.useApp();
   const catalog = usePartOfSpeechCatalog();
   const [value, setValue] = useState("");
   const [fieldError, setFieldError] = useState<string>();
@@ -516,16 +596,16 @@ export function UnifiedCreateEntryStep({
   const [busy, setBusy] = useState<"checking" | "creating">();
   const [pending, setPending] = useState<PendingCreation>();
   const [prepared, setPrepared] = useState<PendingCreation>();
-  const [blockedDuplicates, setBlockedDuplicates] = useState<
-    DuplicateWordMatchV2[]
-  >([]);
+  const [regionalDisplay, setRegionalDisplay] = useState<RegionalDisplayState>({
+    status: "idle"
+  });
+  const [detailRetry, setDetailRetry] = useState(0);
   const generation = useRef(0);
   const mounted = useRef(true);
   const locked = useRef(false);
   const retryKey = useRef<{ normalized: string; key: string } | undefined>(
     undefined
   );
-  const exactRetry = useRef<ExactCreationAttempt | undefined>(undefined);
 
   useEffect(() => {
     mounted.current = true;
@@ -551,17 +631,84 @@ export function UnifiedCreateEntryStep({
     () => aggregateLifecycleSurfaceMatchCards(snapshot),
     [snapshot]
   );
+  const baseCandidates = useMemo(() => {
+    if (!prepared) return [];
+    if (page) {
+      if (!snapshot.schema_version) return [];
+      return extractDetectedBaseForms(
+        snapshot.schema_version,
+        snapshot.items,
+        snapshot.matched_entry_contexts
+      );
+    }
+    return extractDetectedBaseForms(3, prepared.detection.matches, []);
+  }, [
+    page,
+    prepared,
+    snapshot.items,
+    snapshot.matched_entry_contexts,
+    snapshot.schema_version
+  ]);
+  const candidateDiscoveryReady =
+    prepared !== undefined && (!page || snapshot.phase === "ready");
+
+  useEffect(() => {
+    if (!prepared) {
+      setRegionalDisplay({ status: "idle" });
+      return;
+    }
+    if (!candidateDiscoveryReady) {
+      setRegionalDisplay(
+        snapshot.phase === "disabled"
+          ? { status: "idle" }
+          : snapshot.phase === "error" || snapshot.phase === "expired"
+            ? { status: "error" }
+            : { status: "loading" }
+      );
+      return;
+    }
+    const first = baseCandidates[0];
+    if (!first) {
+      const fallback = builtinRegionalValue(prepared);
+      setRegionalDisplay({ status: "ready", ...fallback });
+      return;
+    }
+    let active = true;
+    setRegionalDisplay({ status: "loading" });
+    void Promise.resolve(requests.getWord(first.entryId))
+      .then((response) => {
+        if (!active) return;
+        const value = resolveDetectedBaseForm(response.word, first);
+        setRegionalDisplay(
+          value
+            ? { status: "ready", source: "database", value }
+            : { status: "error" }
+        );
+      })
+      .catch(() => {
+        if (active) setRegionalDisplay({ status: "error" });
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    baseCandidates,
+    candidateDiscoveryReady,
+    detailRetry,
+    prepared,
+    requests,
+    snapshot.phase
+  ]);
 
   const changeValue = (next: string) => {
     generation.current += 1;
     retryKey.current = undefined;
-    exactRetry.current = undefined;
     setValue(next);
     setFieldError(undefined);
     setError(undefined);
     setPending(undefined);
     setPrepared(undefined);
-    setBlockedDuplicates([]);
+    setRegionalDisplay({ status: "idle" });
   };
 
   const createPending = async (
@@ -572,37 +719,23 @@ export function UnifiedCreateEntryStep({
     locked.current = true;
     setBusy("creating");
     setError(undefined);
-    const attempt: ExactCreationAttempt = {
-      normalized: classifyEntryInput(value).normalized,
-      target,
-      ...(confirmedSurfaceToken ? { confirmedSurfaceToken } : {})
-    };
     try {
-      const response =
-        target.kind === "word"
-          ? await requests.createV3(target.idempotencyKey, {
-              schema_version: 3,
-              detection_id: target.detection.detection_id,
-              kind: "word",
-              ...(confirmedSurfaceToken
-                ? { confirmed_surface_match_token: confirmedSurfaceToken }
-                : {})
-            })
-          : await requests.createV2(target.idempotencyKey, {
-              schema_version: 2,
-              detection_id: target.detection.detection_id,
-              headwords: target.headwords,
-              ...(confirmedSurfaceToken
-                ? { confirmed_surface_match_token: confirmedSurfaceToken }
-                : {})
-            });
+      const response = await requests.createV3(target.idempotencyKey, {
+        schema_version: 3,
+        detection_id: target.detection.detection_id,
+        kind: target.kind,
+        ...(confirmedSurfaceToken
+          ? { confirmed_surface_match_token: confirmedSurfaceToken }
+          : {})
+      });
       if (!mounted.current) return;
       retryKey.current = undefined;
-      exactRetry.current = undefined;
       onCreated(response.word, {
         creationSource:
           target.detection.builtin_dictionary.status === "matched"
-            ? "dictionary"
+            ? !hasV3PrefilledForms(response.word)
+              ? "dictionary-empty"
+              : "dictionary"
             : "blank"
       });
     } catch (requestError) {
@@ -611,14 +744,12 @@ export function UnifiedCreateEntryStep({
         requestError instanceof HttpError &&
         requiresNewIdempotencyKey(requestError.status, requestError.code)
       ) {
-        exactRetry.current = undefined;
         const replacementPage = requestError.meta?.surface_match_page;
         retryKey.current = {
           normalized: classifyEntryInput(value).normalized,
           key: newWordNodeId()
         };
         if (
-          target.kind === "word" &&
           isSurfaceMatchPageAny(replacementPage) &&
           replacementPage.schema_version === 3
         ) {
@@ -643,11 +774,10 @@ export function UnifiedCreateEntryStep({
           setError("匹配结果已更新，请重新确认后继续创建。");
         } else {
           setPending(undefined);
+          setPrepared(undefined);
           setError("检查结果已变化，请重新提交。");
         }
       } else {
-        exactRetry.current =
-          requestError instanceof TypeError ? attempt : undefined;
         setError(errorMessage(requestError));
       }
     } finally {
@@ -658,24 +788,9 @@ export function UnifiedCreateEntryStep({
 
   const submit = async () => {
     if (locked.current) return;
-    const { normalized, kind } = classifyEntryInput(value);
-    if (!normalized) {
-      setFieldError("请输入词条");
-      return;
-    }
-    const issue = headwordIssue(normalized);
+    const { normalized, kind, issue } = validateEntryInput(value);
     if (issue) {
       setFieldError(issue);
-      return;
-    }
-    if (normalized.length > 200) {
-      setFieldError("词条不能超过 200 个字符");
-      return;
-    }
-
-    if (exactRetry.current?.normalized === normalized) {
-      const attempt = exactRetry.current;
-      await createPending(attempt.target, attempt.confirmedSurfaceToken);
       return;
     }
 
@@ -689,100 +804,61 @@ export function UnifiedCreateEntryStep({
     setValue(normalized);
     setPending(undefined);
     setPrepared(undefined);
-    setBlockedDuplicates([]);
     setError(undefined);
     setFieldError(undefined);
     setBusy("checking");
     try {
-      if (kind === "word") {
-        const detection = await requests.detectV3({
-          schema_version: 3,
-          language: "en",
-          kind: "word",
-          surface: normalized
-        });
-        if (!mounted.current || generation.current !== currentGeneration) {
-          return;
-        }
-        if (
-          detection.request.language !== "en" ||
-          detection.request.kind !== "word" ||
-          detection.request.surface !== normalized
-        ) {
-          throw new ProductError("词条检查结果不一致，请刷新后重试。");
-        }
-        assertFreshDetection(detection.expires_at);
-        if (detection.builtin_dictionary.status === "unavailable") {
-          throw new ProductError("内置词典暂时不可用，请稍后重试。");
-        }
-        if (detection.builtin_dictionary.status === "matched") {
-          const configuredPos = new Set(
-            catalog.data?.items.map((item) => item.code)
-          );
-          const suggestedPos = new Set([
-            ...detection.builtin_dictionary.suggested_pos,
-            ...detection.builtin_dictionary.suggested_forms.map(
-              (form) => form.pos
-            )
-          ]);
-          if (
-            !catalog.data ||
-            [...suggestedPos].some((pos) => !configuredPos.has(pos))
-          ) {
-            throw new ProductError("词性配置尚未就绪，暂时不能创建该单词。");
-          }
-        }
-        const target: PendingCreation = {
-          kind: "word",
-          detection,
-          idempotencyKey: keyState.key
-        };
-        setPrepared(target);
-        if (detection.requires_acknowledgement) {
-          if (!detection.surface_match_page) {
-            throw new ProductError("匹配信息不完整，已停止创建。");
-          }
-          setPending(target);
-          return;
-        }
-        locked.current = false;
-        await createPending(target);
+      const detection = await requests.detectV3({
+        schema_version: 3,
+        language: "en",
+        kind,
+        surface: normalized
+      });
+      if (!mounted.current || generation.current !== currentGeneration) {
         return;
       }
-
-      const detection = await requests.detectV2({
-        language: "en",
-        headword: normalized
-      });
-      if (!mounted.current || generation.current !== currentGeneration) return;
       if (
         detection.request.language !== "en" ||
-        detection.request.headword !== normalized ||
-        detection.entry_kind !== "phrase"
+        detection.request.kind !== kind ||
+        detection.request.surface !== normalized
       ) {
         throw new ProductError("词条检查结果不一致，请刷新后重试。");
       }
       assertFreshDetection(detection.expires_at);
-      if (detection.smart_dictionary.status === "unavailable") {
-        throw new ProductError("智能词库检查暂时不可用，请稍后重试。");
+      if (detection.builtin_dictionary.status === "unavailable") {
+        throw new ProductError("内置词典暂时不可用，请稍后重试。");
+      }
+      if (detection.builtin_dictionary.status === "matched") {
+        const configuredPos = new Set(
+          catalog.data?.items.map((item) => item.code)
+        );
+        const suggestedPos = new Set([
+          ...detection.builtin_dictionary.suggested_pos,
+          ...detection.builtin_dictionary.suggested_forms.map(
+            (form) => form.pos
+          )
+        ]);
+        if (
+          !catalog.data ||
+          [...suggestedPos].some((pos) => !configuredPos.has(pos))
+        ) {
+          throw new ProductError(
+            `词性配置尚未就绪，暂时不能创建该${KIND_LABEL[kind]}。`
+          );
+        }
       }
       const target: PendingCreation = {
-        kind: "phrase",
+        kind,
         detection,
-        headwords: phraseHeadwords(detection, normalized, catalog.data),
         idempotencyKey: keyState.key
       };
       setPrepared(target);
-      if (detection.smart_dictionary.status === "duplicate") {
-        setBlockedDuplicates(detection.smart_dictionary.duplicates);
-        return;
-      }
-      if (detection.smart_dictionary.status === "warning") {
+      if (detection.requires_acknowledgement) {
+        if (!detection.surface_match_page) {
+          throw new ProductError("匹配信息不完整，已停止创建。");
+        }
         setPending(target);
-        return;
       }
-      locked.current = false;
-      await createPending(target);
     } catch (requestError) {
       if (mounted.current && generation.current === currentGeneration) {
         setError(errorMessage(requestError));
@@ -793,129 +869,146 @@ export function UnifiedCreateEntryStep({
     }
   };
 
+  const beginCreation = (
+    target: PendingCreation,
+    confirmedSurfaceToken?: string
+  ) => {
+    if (regionalDisplay.status !== "ready") {
+      setError("请先完成原形确认后再创建。");
+      return;
+    }
+    try {
+      assertFreshDetection(target.detection.expires_at);
+    } catch {
+      setPending(undefined);
+      setPrepared(undefined);
+      setError("检查结果已过期，请重新检测。");
+      return;
+    }
+    void createPending(target, confirmedSurfaceToken);
+  };
+
   const confirm = () => {
     if (!pending || !canAcknowledgeSurfaceSnapshot(snapshot)) return;
-    void createPending(pending, snapshot.surface_confirmation_token);
+    const create = () =>
+      beginCreation(pending, snapshot.surface_confirmation_token);
+    if (baseCandidates.length === 0) {
+      create();
+      return;
+    }
+    modal.confirm({
+      title: "确认创建新的独立词条？",
+      icon: <ExclamationCircleOutlined />,
+      content:
+        "检测到智能词库已有相同原形。继续后将创建一个新的独立词条，不会修改已有词条。",
+      okText: "继续创建",
+      cancelText: "取消",
+      onOk: create
+    });
   };
 
   return (
-    <div className="word-basics-workflow unified-entry-creation">
+    <div
+      className={`word-basics-workflow unified-entry-creation${prepared ? " is-detected" : ""}`}
+    >
       <div className="word-step-heading">
-        <span className="word-step-number">创建词条</span>
+        <span className="word-step-number">STEP 01</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
-          输入要创建的英文词条
+          创建新词条
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
-          系统会自动识别单词或短语，并检查词典与现有词条。
+          录入词条，系统将判断词条类型，检测智能词库中的已有原形，并从内置词典匹配英美词形和建议词性。
         </Typography.Paragraph>
       </div>
 
-      <Card
-        className="word-basics-input-card"
-        size="small"
-        title="词条信息"
-        extra={<Tag color="blue">仅支持英文词条</Tag>}
-      >
-        <Form layout="vertical" onFinish={() => void submit()}>
+      <Card className="word-basics-input-card" size="small" title="录入与检测">
+        <Form layout="vertical" initialValues={{ language: "en" }}>
+          <Form.Item label="所属语言" name="language">
+            <Select
+              options={[{ value: "en", label: "English  英语" }]}
+              disabled
+            />
+          </Form.Item>
           <Form.Item
-            label="词条"
+            label="录入词条"
             validateStatus={fieldError ? "error" : undefined}
             help={fieldError}
           >
-            <Input
+            <Input.Search
               autoComplete="off"
               autoFocus
-              disabled={busy === "creating"}
+              disabled={busy !== undefined || pending !== undefined}
+              enterButton={
+                <Space size={6}>
+                  <SearchOutlined />
+                  词典检测
+                </Space>
+              }
+              loading={busy === "checking"}
               placeholder="例如 center 或 give up"
               size="large"
               value={value}
               onChange={(event) => changeValue(event.target.value)}
-              onPressEnter={(event) => {
-                event.preventDefault();
-                void submit();
-              }}
+              onSearch={() => void submit()}
             />
           </Form.Item>
-          <Button
-            type="primary"
-            htmlType="submit"
-            loading={busy !== undefined}
-            disabled={busy !== undefined || pending !== undefined}
-          >
-            {busy ? "正在检查并创建" : "继续创建"}
-          </Button>
+          <Typography.Text type="secondary" className="word-field-help">
+            按 Enter 或点击检测，只查询词典；确认结果后再创建并进入下一步。
+          </Typography.Text>
         </Form>
       </Card>
 
       {prepared ? (
-        <div aria-live="polite">
-          <DictionarySuggestionCard pending={prepared} catalog={catalog.data} />
+        <div className="word-basics-result-grid" aria-live="polite">
+          <DetectionPresentationCard
+            pending={prepared}
+            catalog={catalog.data}
+            baseCandidates={baseCandidates}
+            surfaceCards={cards}
+            snapshot={snapshot}
+          />
+          {snapshot.phase !== "disabled" ? (
+            <div className="word-headword-confirmation-wrap">
+              <HeadwordConfirmationCard
+                state={regionalDisplay}
+                editable={false}
+                onChange={() => undefined}
+                onRetry={() => setDetailRetry((retry) => retry + 1)}
+              />
+            </div>
+          ) : null}
         </div>
       ) : null}
 
       {pending ? (
-        <Card className="word-detection-result-card" title="发现可能重复的词条">
-          <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
-            <Alert
-              showIcon
-              type="warning"
-              title={`已加载 ${snapshot.items.length}/${snapshot.total} 条匹配`}
-              description="继续创建只会新增草稿，不会修改已有词条。请查看完整结果后确认。"
-            />
-            {cards.map((card) => (
-              <SurfaceCandidateDetails key={card.key} card={card} />
-            ))}
-            {snapshot.phase === "error" || snapshot.phase === "expired" ? (
-              <Alert
-                showIcon
-                type="error"
-                title="匹配结果已失效，请返回修改后重新提交。"
-              />
-            ) : null}
-            {snapshot.phase === "disabled" ? (
-              <Alert
-                showIcon
-                type="error"
-                title="当前策略暂不允许继续创建该词条。"
-              />
-            ) : null}
-            <Space wrap>
-              <Button onClick={() => changeValue(value)}>返回修改</Button>
-              <Button
-                type="primary"
-                loading={busy === "creating"}
-                disabled={!canAcknowledgeSurfaceSnapshot(snapshot)}
-                onClick={confirm}
-              >
-                确认并继续创建
-              </Button>
-            </Space>
-          </Space>
-        </Card>
+        <div className="word-entry-actions">
+          <Button onClick={() => changeValue(value)}>重新检测</Button>
+          <Button
+            type="primary"
+            icon={<PlusOutlined aria-hidden />}
+            loading={busy === "creating"}
+            disabled={
+              !canAcknowledgeSurfaceSnapshot(snapshot) ||
+              regionalDisplay.status !== "ready"
+            }
+            onClick={confirm}
+          >
+            确认并创建，进入词形与发音
+          </Button>
+        </div>
       ) : null}
 
-      {blockedDuplicates.length > 0 ? (
-        <Card
-          className="word-detection-result-card"
-          title="智能词库中已有相同词条"
-        >
-          <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
-            <Alert
-              showIcon
-              type="error"
-              title="不能重复创建"
-              description="请查看现有词条，或返回修改本次输入。"
-            />
-            {blockedDuplicates.map((duplicate) => (
-              <DuplicateCandidateDetails
-                key={duplicate.word_id}
-                duplicate={duplicate}
-                kind="phrase"
-              />
-            ))}
-            <Button onClick={() => changeValue(value)}>返回修改</Button>
-          </Space>
-        </Card>
+      {prepared && !pending ? (
+        <div className="word-entry-actions">
+          <Button
+            type="primary"
+            loading={busy === "creating"}
+            disabled={busy !== undefined || regionalDisplay.status !== "ready"}
+            onClick={() => beginCreation(prepared)}
+          >
+            创建并进入词形与发音
+          </Button>
+        </div>
       ) : null}
 
       {error ? <Alert showIcon type="error" title={error} /> : null}

@@ -32,8 +32,9 @@ vi.mock("@/features/dictionary/word-creation/UnifiedCreateEntryStep", () => ({
           onClick={() =>
             props.onCreated(
               {
-                schema_version: 2,
-                id: "created-v2"
+                schema_version: 3,
+                id: "created-phrase-v3",
+                kind: "phrase"
               } as never,
               { creationSource: "blank" }
             )
@@ -70,7 +71,7 @@ describe("WordCreatePage", () => {
     ],
     [
       "完成短语创建",
-      '/words/created-v2/wizard/forms|{"creationSource":"blank"}'
+      '/words/created-phrase-v3/v3/wizard/forms|{"creationSource":"blank"}'
     ]
   ])("按 canonical schema 进入对应原生编辑器", (action, expected) => {
     const requests = {} as UnifiedCreateRequests;
