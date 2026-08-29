@@ -858,7 +858,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
 
     const loadMore = screen.getByLabelText("加载更多关联词结果");
-    fireEvent.mouseDown(loadMore);
+    expect(fireEvent.mouseDown(loadMore)).toBe(false);
     fireEvent.click(loadMore);
     expect(fetchExactNextPage).not.toHaveBeenCalled();
     expect(fetchContainsNextPage).toHaveBeenCalledTimes(1);
@@ -898,7 +898,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
 
     const retry = screen.getByLabelText("重试关联词搜索");
-    fireEvent.mouseDown(retry);
+    expect(fireEvent.mouseDown(retry)).toBe(false);
     fireEvent.click(retry);
     expect(retryExact).not.toHaveBeenCalled();
     expect(retryContains).toHaveBeenCalledTimes(1);
