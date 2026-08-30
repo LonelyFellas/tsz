@@ -166,7 +166,8 @@ function impactSurfacePage(nextCursor: string | null): SurfaceMatchPageV3 {
 function renderPage(
   entry: string,
   requests: V3WordRequests,
-  renderMeaningsStep?: V3MeaningsStepRenderer
+  renderMeaningsStep?: V3MeaningsStepRenderer,
+  state?: unknown
 ) {
   const router = createMemoryRouter(
     [
@@ -180,7 +181,9 @@ function renderPage(
         )
       }
     ],
-    { initialEntries: [entry] }
+    {
+      initialEntries: [state === undefined ? entry : { pathname: entry, state }]
+    }
   );
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
@@ -196,6 +199,34 @@ function renderPage(
 }
 
 describe("WordWizardV3Page", () => {
+  it("目标创建向导在任意步骤保留 Pending 返回来源入口", async () => {
+    const current = word();
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(source({ word: current, retired_stable_nodes: [] })),
+      undefined,
+      {
+        pendingSentenceTarget: {
+          associationId: "association-1",
+          headword: "center of the wall",
+          gloss: "墙的中心位置",
+          returnTo: "/words/source/v3/wizard/meanings?mode=edit"
+        }
+      }
+    );
+
+    expect(
+      await screen.findByText("正在为 Pending 创建目标：center of the wall")
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "返回来源例句" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        "/words/source/v3/wizard/meanings"
+      )
+    );
+    expect(router.state.location.search).toBe("?mode=edit");
+  });
+
   it("renders the V3 basics route with the established V2 first-step structure instead of a placeholder card", async () => {
     const current = word();
     const api = source({ word: current, retired_stable_nodes: [] });
@@ -359,6 +390,18 @@ describe("WordWizardV3Page", () => {
                       spans: [],
                       liaisons: []
                     },
+                    zh_translations: [
+                      {
+                        id: uuidFromInt(507),
+                        band: "a1_a2",
+                        content: {
+                          version: 1,
+                          text: "例句。",
+                          spans: [],
+                          liaisons: []
+                        }
+                      }
+                    ],
                     links: [],
                     associations: [],
                     associations_state: "resolved"

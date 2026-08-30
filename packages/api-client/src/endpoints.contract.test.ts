@@ -27,6 +27,7 @@ const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries/{id}/publications",
   "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate",
   "post /admin/lexicon/entries/{id}/restore",
+  "post /admin/lexicon/pending-sentence-associations/{association_id}/claim",
   "put /admin/lexicon/entries/{id}/sentences/{sentence_id}/associations"
 ] as const;
 
@@ -480,7 +481,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "ef48ed00ab93d77ef475fe9a2f38b9a8df8907e720ea97b679bfac1bc7414e38"
+      "8673ef3aa3a468d042c5d5afbc1cd52ba5afac41777aaa14b98f734ab88350f6"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");

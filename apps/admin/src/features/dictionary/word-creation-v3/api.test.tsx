@@ -23,6 +23,9 @@ function endpointDoubles(): V3WordsApi {
     previewFormsImpactV3: vi.fn(),
     saveFormsStepV3: vi.fn(),
     saveMeaningsStepV3: vi.fn(),
+    replaceSentenceAssociations: vi.fn(),
+    listPendingSentenceAssociations: vi.fn(),
+    claimPendingSentenceAssociation: vi.fn(),
     validateV3: vi.fn(),
     publishV3: vi.fn(),
     listPublications: vi.fn(),
@@ -124,6 +127,83 @@ function v3Publication(
 }
 
 describe("createV3WordRequests", () => {
+  it("例句关联请求保持 snake_case、分页与 owner response identity", async () => {
+    const endpoints = endpointDoubles();
+    const requests = createV3WordRequests(endpoints);
+    const canonical: AdminWordV3Envelope = { word: v3Draft().word };
+    vi.mocked(endpoints.replaceSentenceAssociations).mockResolvedValue(
+      canonical
+    );
+    vi.mocked(endpoints.listPendingSentenceAssociations).mockResolvedValue({
+      results: [],
+      total: 0,
+      next_cursor: null
+    });
+    vi.mocked(endpoints.claimPendingSentenceAssociation).mockResolvedValue(
+      canonical
+    );
+    const replaceInput = {
+      association_schema_version: 3 as const,
+      base_revision: 7,
+      base_lifecycle_revision: 3,
+      associations: [
+        {
+          id: "association-1",
+          source_dialect: "common" as const,
+          source_segments: [
+            {
+              start: 22,
+              end: 40,
+              surface: "center of the wall"
+            }
+          ],
+          pending_target_kind: "phrase" as const,
+          pending_target_headword: "center of the wall",
+          pending_target_gloss: "墙的中心位置"
+        }
+      ]
+    };
+    const claimInput = {
+      target_word_id: "target-entry",
+      target_sense_id: "target-sense",
+      base_owner_entry_revision: 7,
+      base_owner_lifecycle_revision: 4
+    };
+
+    await requests.replaceSentenceAssociations(
+      WORD_ID,
+      "sentence-1",
+      "replace-key",
+      replaceInput
+    );
+    await requests.listPendingSentenceAssociations("target-entry", {
+      page_size: 20,
+      cursor: "cursor-1"
+    });
+    await requests.claimPendingSentenceAssociation(
+      WORD_ID,
+      "association-1",
+      "claim-key",
+      claimInput
+    );
+
+    expect(endpoints.replaceSentenceAssociations).toHaveBeenCalledWith(
+      WORD_ID,
+      "sentence-1",
+      "replace-key",
+      replaceInput
+    );
+    expect(endpoints.listPendingSentenceAssociations).toHaveBeenCalledWith(
+      "target-entry",
+      { page_size: 20, cursor: "cursor-1" }
+    );
+    expect(endpoints.claimPendingSentenceAssociation).toHaveBeenCalledWith(
+      "association-1",
+      "claim-key",
+      claimInput
+    );
+  });
+
   it("forwards every V3 wire request without translating snake_case fields", async () => {
     const endpoints = endpointDoubles();
     const requests = createV3WordRequests(endpoints);

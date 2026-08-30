@@ -6,8 +6,10 @@ import type {
   DraftMeaningsStepContentWritableV3,
   DraftValidationResponseV3,
   FormsImpactResponseV3,
+  SentenceAssociationInputV3,
   SurfaceMatchPageV3,
-  V3DraftValidationIssue
+  V3DraftValidationIssue,
+  WordSentenceWritableV3
 } from "@tsz/types";
 import {
   act,
@@ -186,6 +188,13 @@ function requests(overrides: Partial<V3WordRequests> = {}): V3WordRequests {
     })),
     saveForms: vi.fn(async () => envelope(2, "centre")),
     saveMeanings: vi.fn(async () => envelope(2, "centre")),
+    replaceSentenceAssociations: vi.fn(async () => envelope(2, "centre")),
+    listPendingSentenceAssociations: vi.fn(async () => ({
+      results: [],
+      total: 0,
+      next_cursor: null
+    })),
+    claimPendingSentenceAssociation: vi.fn(async () => envelope(2, "centre")),
     validate: vi.fn(async () => validation),
     publish: vi.fn(async () => envelope(2, "centre")),
     ...overrides
@@ -339,6 +348,320 @@ function impactSurfacePage(nextCursor: string | null): SurfaceMatchPageV3 {
 }
 
 describe("V3WordCreationWizard", () => {
+  it("新增多维例句先保存 meanings，再用新 revision 整组保存 Pending 关联", async () => {
+    const initial = word();
+    initial.completed_steps = ["basics", "forms"];
+    initial.max_reachable_step = "meanings";
+    const saved = word(2);
+    saved.completed_steps = ["basics", "forms"];
+    saved.max_reachable_step = "meanings";
+    const associated = structuredClone(saved);
+    associated.lifecycle_revision = 2;
+    const saveMeanings = vi.fn(async () => ({ word: saved }));
+    const replaceSentenceAssociations = vi.fn(async () => ({
+      word: associated
+    }));
+    const source = requests({
+      saveMeanings,
+      replaceSentenceAssociations
+    });
+    const sentence: WordSentenceWritableV3 = {
+      id: "sentence-new",
+      level: "B1",
+      en_text: {
+        mode: "unified",
+        common: {
+          id: "sentence-new-en",
+          origin: "manual",
+          value: {
+            version: 2,
+            text: "It is centered on the center of the wall.",
+            annotations: []
+          }
+        }
+      },
+      zh_text_id: "sentence-new-zh",
+      zh_text: { version: 2, text: "它位于墙的中央。", annotations: [] },
+      zh_translations: [
+        {
+          id: "sentence-new-zh",
+          band: "b1_b2",
+          content: {
+            version: 2,
+            text: "它位于墙的中央。",
+            annotations: []
+          }
+        }
+      ],
+      links: [{ word_id: "word-1", sense_id: "sense-canonical", role: "head" }]
+    };
+    const associations: SentenceAssociationInputV3[] = [
+      {
+        id: "association-new",
+        source_dialect: "common",
+        source_segments: [
+          {
+            start: 22,
+            end: 40,
+            surface: "center of the wall"
+          }
+        ],
+        pending_target_kind: "phrase",
+        pending_target_headword: "center of the wall",
+        pending_target_gloss: "墙的中心位置"
+      }
+    ];
+
+    renderWizard(source, {
+      initialWord: initial,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <button
+          onClick={() =>
+            void context.actions.saveMultidimensionalSentence(
+              UUIDS.pos,
+              "sense-canonical",
+              sentence,
+              associations
+            )
+          }
+          type="button"
+        >
+          保存多维例句
+        </button>
+      )
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存多维例句" }));
+
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(1));
+    expect(saveMeanings).toHaveBeenCalledWith(
+      "word-1",
+      expect.objectContaining({
+        schema_version: 3,
+        base_revision: 1,
+        intent: "save",
+        content: expect.objectContaining({
+          pos: [
+            expect.objectContaining({
+              senses: [
+                expect.objectContaining({
+                  sentences: expect.arrayContaining([
+                    expect.objectContaining({ id: "sentence-new" })
+                  ])
+                })
+              ]
+            })
+          ]
+        })
+      })
+    );
+    await waitFor(() =>
+      expect(replaceSentenceAssociations).toHaveBeenCalledTimes(1)
+    );
+    expect(replaceSentenceAssociations).toHaveBeenCalledWith(
+      "word-1",
+      "sentence-new",
+      expect.any(String),
+      {
+        association_schema_version: 3,
+        base_revision: 2,
+        base_lifecycle_revision: 1,
+        associations
+      }
+    );
+  });
+
+  it("新增例句 meanings 保存失败时不发整组关联请求且父级不变", async () => {
+    const initial = word();
+    const saveMeanings = vi
+      .fn()
+      .mockRejectedValue(new Error("meanings failed"));
+    const replaceSentenceAssociations = vi.fn();
+    const onWordChange = vi.fn();
+    const sentence = structuredClone(
+      toWritableMeanings(initial.meanings).pos[0]!.senses[0]!.sentences[0]!
+    );
+    sentence.id = "sentence-unsaved";
+    sentence.en_text = {
+      mode: "unified",
+      common: {
+        id: "sentence-unsaved-en",
+        origin: "manual",
+        value: { version: 2, text: "A new sentence.", annotations: [] }
+      }
+    };
+    const associations: SentenceAssociationInputV3[] = [
+      {
+        id: "association-unsaved",
+        source_dialect: "common",
+        source_segments: [{ start: 2, end: 5, surface: "new" }],
+        pending_target_kind: "word",
+        pending_target_headword: "new"
+      }
+    ];
+    renderWizard(requests({ saveMeanings, replaceSentenceAssociations }), {
+      initialWord: initial,
+      initialStep: "meanings",
+      onWordChange,
+      renderStep: (context) => (
+        <button
+          onClick={() =>
+            void context.actions
+              .saveMultidimensionalSentence(
+                UUIDS.pos,
+                "sense-canonical",
+                sentence,
+                associations
+              )
+              .catch(() => undefined)
+          }
+          type="button"
+        >
+          保存未落库例句
+        </button>
+      )
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存未落库例句" }));
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(1));
+    expect(replaceSentenceAssociations).not.toHaveBeenCalled();
+    expect(onWordChange).not.toHaveBeenCalled();
+  });
+
+  it("已有例句只改关联时直接使用当前 revision，不重复保存 meanings", async () => {
+    const initial = word();
+    initial.completed_steps = ["basics", "forms"];
+    initial.max_reachable_step = "meanings";
+    const associated = structuredClone(initial);
+    associated.lifecycle_revision = 2;
+    const saveMeanings = vi.fn(async () => ({ word: word(2) }));
+    const replaceSentenceAssociations = vi.fn(async () => ({
+      word: associated
+    }));
+    const source = requests({ saveMeanings, replaceSentenceAssociations });
+    const sentence = toWritableMeanings(initial.meanings).pos[0]!.senses[0]!
+      .sentences[0]!;
+    const associations: SentenceAssociationInputV3[] = [
+      {
+        id: "association-existing",
+        source_dialect: "common",
+        source_segments: [{ start: 2, end: 8, surface: "centre" }],
+        pending_target_kind: "word",
+        pending_target_headword: "centre"
+      }
+    ];
+
+    renderWizard(source, {
+      initialWord: initial,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <button
+          onClick={() =>
+            void context.actions.saveMultidimensionalSentence(
+              UUIDS.pos,
+              "sense-canonical",
+              sentence,
+              associations
+            )
+          }
+          type="button"
+        >
+          更新已有例句关联
+        </button>
+      )
+    });
+    fireEvent.click(screen.getByRole("button", { name: "更新已有例句关联" }));
+
+    await waitFor(() =>
+      expect(replaceSentenceAssociations).toHaveBeenCalledTimes(1)
+    );
+    expect(saveMeanings).not.toHaveBeenCalled();
+    expect(replaceSentenceAssociations).toHaveBeenCalledWith(
+      "word-1",
+      "sentence-canonical",
+      expect.any(String),
+      {
+        association_schema_version: 3,
+        base_revision: 1,
+        base_lifecycle_revision: 1,
+        associations
+      }
+    );
+  });
+
+  it("整组关联保存失败时不替换父级 canonical 或丢失已存关联", async () => {
+    const initial = word();
+    const storedAssociation = {
+      id: "association-legacy",
+      association_schema_version: 3 as const,
+      source_dialect: "common" as const,
+      source_segments: [{ start: 2, end: 8, surface: "centre" }],
+      origin: "manual" as const,
+      state: "linked" as const,
+      target_word_id: "target-word",
+      target_sense_id: "target-sense",
+      target_component_usages: [],
+      target_headword: "centre",
+      target_gloss: "中心",
+      resolved_pos: "noun"
+    };
+    initial.meanings.pos[0]!.senses[0]!.sentences[0]!.associations = [
+      storedAssociation
+    ];
+    const sentence = toWritableMeanings(initial.meanings).pos[0]!.senses[0]!
+      .sentences[0]!;
+    const associations: SentenceAssociationInputV3[] = [
+      {
+        id: storedAssociation.id,
+        source_dialect: storedAssociation.source_dialect,
+        source_segments: storedAssociation.source_segments,
+        target_word_id: storedAssociation.target_word_id,
+        target_sense_id: storedAssociation.target_sense_id
+      }
+    ];
+    const replaceSentenceAssociations = vi
+      .fn()
+      .mockRejectedValue(new Error("association replace failed"));
+    const onWordChange = vi.fn();
+
+    renderWizard(requests({ replaceSentenceAssociations }), {
+      initialWord: initial,
+      initialStep: "meanings",
+      onWordChange,
+      renderStep: (context) => (
+        <div>
+          <output data-testid="association-count">
+            {
+              context.word.meanings.pos[0]!.senses[0]!.sentences[0]!
+                .associations.length
+            }
+          </output>
+          <button
+            onClick={() =>
+              void context.actions
+                .saveMultidimensionalSentence(
+                  UUIDS.pos,
+                  "sense-canonical",
+                  sentence,
+                  associations
+                )
+                .catch(() => undefined)
+            }
+            type="button"
+          >
+            保存失败关联
+          </button>
+        </div>
+      )
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "保存失败关联" }));
+    await waitFor(() =>
+      expect(replaceSentenceAssociations).toHaveBeenCalledTimes(1)
+    );
+    expect(screen.getByTestId("association-count")).toHaveTextContent("1");
+    expect(onWordChange).not.toHaveBeenCalled();
+  });
+
   it("initializes empty meanings once per session and preserves every generated UUID across step changes and rerenders", () => {
     const initial = word();
     initial.forms = {

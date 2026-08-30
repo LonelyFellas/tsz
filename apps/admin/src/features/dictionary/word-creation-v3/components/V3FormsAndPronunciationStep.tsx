@@ -5,7 +5,8 @@ import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
   PartOfSpeechCatalogResponse,
-  V3DraftValidationIssue
+  V3DraftValidationIssue,
+  WordEntryKindV3
 } from "@tsz/types";
 import { useEffect, useState } from "react";
 import { partOfSpeechDataSource } from "../../dataSource";
@@ -34,6 +35,8 @@ export interface V3FormsAndPronunciationStepProps {
   issues?: readonly V3DraftValidationIssue[];
   idFactory?: V3IdFactory;
   stableVariantIds?: V3StableVariantIdFactory;
+  entryKind?: WordEntryKindV3;
+  sentenceTargetDiscoveryEnabled?: boolean;
 }
 
 function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
@@ -69,7 +72,9 @@ export function V3FormsAndPronunciationStep({
   onActivePosChange,
   issues = [],
   idFactory = newWordNodeId,
-  stableVariantIds
+  stableVariantIds,
+  entryKind = "word",
+  sentenceTargetDiscoveryEnabled = true
 }: V3FormsAndPronunciationStepProps) {
   const { modal } = App.useApp();
   const [catalog, setCatalog] = useState<{
@@ -187,6 +192,8 @@ export function V3FormsAndPronunciationStep({
                 issues={issues}
                 onChange={onChange}
                 pos={pos}
+                entryKind={entryKind}
+                sentenceTargetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
                 stableVariantIds={stableVariantIds}
                 posCatalog={catalog.data?.items.find(
                   (item) => item.code === pos.pos

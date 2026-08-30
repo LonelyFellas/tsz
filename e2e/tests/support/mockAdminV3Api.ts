@@ -136,7 +136,8 @@ const FORMS: DraftFormsStepContentV3 = {
               pronunciations: [
                 pronunciation(nodeId(41), "ˈɔːbɪt"),
                 pronunciation(nodeId(43), "ˈɔrbɪt", "weak")
-              ]
+              ],
+              component_usages: []
             }
           }
         },
@@ -150,7 +151,8 @@ const FORMS: DraftFormsStepContentV3 = {
               dialect: "common",
               spelling: "orbital centre",
               origin: "manual",
-              pronunciations: [pronunciation(nodeId(44), "ˈɔːbɪtl ˈsentə")]
+              pronunciations: [pronunciation(nodeId(44), "ˈɔːbɪtl ˈsentə")],
+              component_usages: []
             }
           }
         },
@@ -164,7 +166,8 @@ const FORMS: DraftFormsStepContentV3 = {
               dialect: "common",
               spelling: "orbits",
               origin: "dictionary",
-              pronunciations: [pronunciation(nodeId(46), "ˈɔːbɪts")]
+              pronunciations: [pronunciation(nodeId(46), "ˈɔːbɪts")],
+              component_usages: []
             }
           }
         }
@@ -208,7 +211,8 @@ const FORMS: DraftFormsStepContentV3 = {
               origin: "dictionary",
               pronunciations: [
                 pronunciation(ADMIN_V3_ERROR_PRONUNCIATION_ID, "ˈɔːbɪt")
-              ]
+              ],
+              component_usages: []
             }
           }
         }
@@ -280,6 +284,15 @@ const MEANINGS: DraftMeaningsStepContentV3 = {
             zh_text: richText(
               index === 0 ? "卫星进入了轨道。" : "卫星环绕地球运行。"
             ),
+            zh_translations: [
+              {
+                id: nodeId(79 + index * 10),
+                band: "b1_b2",
+                content: richText(
+                  index === 0 ? "卫星进入了轨道。" : "卫星环绕地球运行。"
+                )
+              }
+            ],
             links: [],
             associations: [],
             associations_state: "resolved"
@@ -997,7 +1010,19 @@ export async function mockAdminV3Api(
           forms: clone(input?.content ?? word.forms)
         });
       }
-      if (input?.content) word.forms = clone(input.content);
+      if (input?.content) {
+        word.forms = clone(input.content);
+        for (const pos of word.forms.pos) {
+          for (const form of pos.forms) {
+            if (form.regional_variants.mode === "common") {
+              form.regional_variants.common.component_usages ??= [];
+            } else {
+              form.regional_variants.uk.component_usages ??= [];
+              form.regional_variants.us.component_usages ??= [];
+            }
+          }
+        }
+      }
       word = {
         ...word,
         revision: word.revision + 1,

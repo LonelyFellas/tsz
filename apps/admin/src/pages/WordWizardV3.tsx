@@ -7,7 +7,8 @@ import type {
   SurfaceMatchEnabledTerminalPageV3,
   SurfaceMatchPageAny,
   SurfaceMatchPageV3,
-  WordCreationStep
+  WordCreationStep,
+  WordSentenceAssociationV3
 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -28,9 +29,11 @@ import {
 } from "@/features/dictionary/surfaceSnapshot";
 import { useSurfaceSnapshotAny } from "@/features/dictionary/useSurfaceSnapshot";
 import { V3FormsAndPronunciationStep } from "@/features/dictionary/word-creation-v3/components/V3FormsAndPronunciationStep";
+import { V3PendingSentenceAssociationsPanel } from "@/features/dictionary/word-creation-v3/components/V3PendingSentenceAssociationsPanel";
 import { V3BasicsStep } from "@/features/dictionary/word-creation-v3/V3BasicsStep";
 import { V3MeaningsAndExamplesStep } from "@/features/dictionary/word-creation-v3/V3MeaningsAndExamplesStep";
 import { relationDisplaySnapshots } from "@/features/dictionary/word-creation-v3/meaningsModel";
+import { pendingSentenceTargetFromState } from "@/features/dictionary/word-creation-v3/pendingSentenceTargetNavigation";
 import { V3PreviewAndPublishStep } from "@/features/dictionary/word-creation-v3/V3PreviewAndPublishStep";
 import { V3PublicationHistory } from "@/features/dictionary/word-creation-v3/V3PublicationHistory";
 import { V3ReviewContent } from "@/features/dictionary/word-creation-v3/V3ReviewContent";
@@ -66,6 +69,18 @@ export type V3MeaningsStepRenderer = (
 
 function isStep(value: unknown): value is WordCreationStep {
   return STEPS.has(value as WordCreationStep);
+}
+
+function sentenceAssociationSnapshots(
+  word: AdminWordV3
+): Record<string, WordSentenceAssociationV3[]> {
+  return Object.fromEntries(
+    word.meanings.pos.flatMap((pos) =>
+      pos.senses.flatMap((sense) =>
+        sense.sentences.map((sentence) => [sentence.id, sentence.associations])
+      )
+    )
+  );
 }
 
 function terminalSurfacePage(
@@ -167,6 +182,10 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
     <Flex vertical gap="middle">
       <V3FormsAndPronunciationStep
         activePosId={context.activePosId}
+        entryKind={context.word.kind}
+        sentenceTargetDiscoveryEnabled={
+          context.word.capabilities.sentence_target_discovery === true
+        }
         issues={context.issues.filter((issue) => issue.step === "forms")}
         onActivePosChange={(posId) => {
           resetConfirmation();
@@ -261,28 +280,113 @@ function V3BasicsSlot({ context }: { context: V3WizardSlotContext }) {
   );
 }
 
-function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
+function V3MeaningsSlot({
+  context,
+  requests
+}: {
+  context: V3WizardSlotContext;
+  requests: V3WordRequests;
+}) {
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const pendingTarget = pendingSentenceTargetFromState(location.state);
+  const prefillApplied = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (
+      !pendingTarget?.gloss ||
+      prefillApplied.current === pendingTarget.associationId
+    )
+      return;
+    const next = structuredClone(context.draftMeanings);
+    const definition = next.pos
+      .flatMap((pos) => pos.senses)
+      .flatMap((sense) => sense.definitions)
+      .find((item) => "content_id" in item && item.content.text.trim() === "");
+    if (!definition || !("content_id" in definition)) return;
+    definition.content = {
+      version: 2,
+      text: pendingTarget.gloss,
+      annotations: []
+    };
+    prefillApplied.current = pendingTarget.associationId;
+    context.setDraftMeanings(next);
+  }, [context, pendingTarget]);
+  const sentenceAssociationCapability =
+    context.word.capabilities.sentence_associations;
+  const sentenceAssociationsEnabled =
+    sentenceAssociationCapability === true ||
+    (sentenceAssociationCapability === undefined && import.meta.env.DEV);
+  const sentenceTargetDiscoveryCapability =
+    context.word.capabilities.sentence_target_discovery;
+  const sentenceTargetDiscoveryEnabled =
+    sentenceTargetDiscoveryCapability === true ||
+    (sentenceTargetDiscoveryCapability === undefined && import.meta.env.DEV);
   return (
-    <V3MeaningsAndExamplesStep
-      activePosId={context.activePosId}
-      forms={context.draftForms}
-      issues={context.issues.filter((issue) => issue.step === "meanings")}
-      onActivePosChange={context.setActivePosId}
-      onChange={context.setDraftMeanings}
-      onFormsChange={context.setDraftForms}
-      onPrevious={() => context.setActiveStep("forms")}
-      onSave={context.actions.saveMeanings}
-      partOfSpeechCatalog={partOfSpeechCatalog.data}
-      partOfSpeechCatalogError={partOfSpeechCatalog.isError}
-      partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
-      relationDisplaySnapshots={relationDisplaySnapshots(context.word.meanings)}
-      saving={
-        context.isPending("save_forms") || context.isPending("save_meanings")
-      }
-      value={context.draftMeanings}
-      wordId={context.word.id}
-    />
+    <Flex vertical gap="middle">
+      {sentenceAssociationsEnabled ? (
+        <V3PendingSentenceAssociationsPanel
+          requests={requests}
+          word={context.word}
+        />
+      ) : null}
+      <V3MeaningsAndExamplesStep
+        activePosId={context.activePosId}
+        forms={context.draftForms}
+        issues={context.issues.filter((issue) => issue.step === "meanings")}
+        onActivePosChange={context.setActivePosId}
+        onChange={context.setDraftMeanings}
+        onFormsChange={context.setDraftForms}
+        onPrevious={() => context.setActiveStep("forms")}
+        onSave={context.actions.saveMeanings}
+        onSaveMultidimensionalSentence={
+          sentenceAssociationsEnabled
+            ? (posId, senseId, draft) =>
+                context.actions.saveMultidimensionalSentence(
+                  posId,
+                  senseId,
+                  draft.sentence,
+                  draft.associations,
+                  draft.idempotencyKey
+                )
+            : undefined
+        }
+        onCreatePendingSentenceTarget={(association) => {
+          if (
+            "target_word_id" in association ||
+            !association.pending_target_headword
+          )
+            return;
+          navigate("/words/create", {
+            state: {
+              pendingSentenceTarget: {
+                associationId: association.id,
+                headword: association.pending_target_headword,
+                ...(association.pending_target_gloss
+                  ? { gloss: association.pending_target_gloss }
+                  : {}),
+                returnTo: `${location.pathname}${location.search}`
+              }
+            }
+          });
+        }}
+        partOfSpeechCatalog={partOfSpeechCatalog.data}
+        partOfSpeechCatalogError={partOfSpeechCatalog.isError}
+        partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
+        relationDisplaySnapshots={relationDisplaySnapshots(
+          context.word.meanings
+        )}
+        sentenceAssociations={sentenceAssociationSnapshots(context.word)}
+        sentenceTargetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
+        saving={
+          context.isPending("save_forms") ||
+          context.isPending("save_meanings") ||
+          context.isPending("save_sentence_associations")
+        }
+        value={context.draftMeanings}
+        wordId={context.word.id}
+      />
+    </Flex>
   );
 }
 
@@ -359,13 +463,17 @@ function V3WizardSlots({
     if (context.readOnly) return;
     const pathname = `/words/${wordId}/v3/wizard/${context.activeStep}`;
     if (location.pathname !== pathname) {
-      navigate(`${pathname}${location.search}`, { replace: true });
+      navigate(`${pathname}${location.search}`, {
+        replace: true,
+        state: location.state
+      });
     }
   }, [
     context.activeStep,
     context.readOnly,
     location.pathname,
     location.search,
+    location.state,
     navigate,
     wordId
   ]);
@@ -401,7 +509,9 @@ function V3WizardSlots({
       return <V3FormsSlot context={context} />;
     case "meanings":
       return (
-        renderMeaningsStep?.(context) ?? <V3MeaningsSlot context={context} />
+        renderMeaningsStep?.(context) ?? (
+          <V3MeaningsSlot context={context} requests={requests} />
+        )
       );
     case "preview":
       return (
@@ -428,6 +538,8 @@ export function WordWizardV3Page({
 } = {}) {
   const { wordId = "", step } = useParams();
   const location = useLocation();
+  const navigate = useNavigate();
+  const pendingTarget = pendingSentenceTargetFromState(location.state);
   const [searchParams] = useSearchParams();
   const [activationGeneration, setActivationGeneration] = useState(0);
   const queryClient = useQueryClient();
@@ -507,6 +619,23 @@ export function WordWizardV3Page({
   return (
     <Flex vertical gap="middle">
       <CreationSourceNotice source={creationSourceFromState(location.state)} />
+      {pendingTarget ? (
+        <Alert
+          action={
+            <Button onClick={() => navigate(pendingTarget.returnTo)}>
+              返回来源例句
+            </Button>
+          }
+          description={
+            pendingTarget.gloss
+              ? `预填词义建议：${pendingTarget.gloss}`
+              : "该 Pending 没有预填词义，请完成目标词义后再认领。"
+          }
+          showIcon
+          title={`正在为 Pending 创建目标：${pendingTarget.headword}`}
+          type="info"
+        />
+      ) : null}
       <V3WordCreationWizard
         key={`${word.id}:activation-${activationGeneration}:${editingPublished ? "edit" : "read"}`}
         allowPublishedEditing={editingPublished}

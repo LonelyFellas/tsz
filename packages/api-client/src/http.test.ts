@@ -507,6 +507,25 @@ describe("createHttpClient", () => {
     expect(init.body).toBe(JSON.stringify({ name: "b" }));
   });
 
+  it("put:把自定义 header 与 AbortSignal 原样传给 fetch", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse(null));
+    const http = createHttpClient({ baseUrl: "" });
+    const controller = new AbortController();
+
+    await http.put(
+      "/items/1",
+      { name: "b" },
+      {
+        signal: controller.signal,
+        headers: { "Idempotency-Key": "key-1" }
+      }
+    );
+
+    const init = fetchMock.mock.calls[0]![1];
+    expect(init.signal).toBe(controller.signal);
+    expect(new Headers(init.headers).get("Idempotency-Key")).toBe("key-1");
+  });
+
   it("patch:method=PATCH 且 body 为 JSON 字符串", async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse(null));
     const http = createHttpClient({ baseUrl: "" });

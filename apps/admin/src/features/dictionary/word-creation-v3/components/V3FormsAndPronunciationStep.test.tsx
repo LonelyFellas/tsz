@@ -49,6 +49,7 @@ const catalogState = vi.hoisted(() => ({
   isError: false,
   pending: undefined as Promise<typeof partOfSpeechCatalogFixture> | undefined
 }));
+const componentLookupState = vi.hoisted(() => ({ resolve: vi.fn() }));
 
 vi.mock("../../dataSource", () => ({
   partOfSpeechDataSource: {
@@ -60,6 +61,12 @@ vi.mock("../../dataSource", () => ({
             catalogState.data ?? { catalog_version: 1, items: [] }
           ))
   }
+}));
+
+vi.mock("../api", () => ({
+  createV3WordRequests: () => ({
+    resolveSentenceTargets: componentLookupState.resolve
+  })
 }));
 
 function group(
@@ -199,6 +206,14 @@ describe("V3FormsAndPronunciationStep", () => {
     catalogState.data = partOfSpeechCatalogFixture;
     catalogState.isError = false;
     catalogState.pending = undefined;
+    componentLookupState.resolve.mockReset();
+    componentLookupState.resolve.mockResolvedValue({
+      schema_version: 3,
+      sentence_hash: "hash",
+      discovery_generation: 1,
+      completeness: "complete",
+      range_results: []
+    });
   });
 
   it("使用 V2 Step 2 的标题、词性页签与英美词形矩阵结构", async () => {
@@ -1292,6 +1307,25 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(screen.queryByLabelText(/noun/)).toBeNull();
     expect(screen.queryByText("规则组")).toBeNull();
+
+    const catalogWithoutDerived = {
+      ...partOfSpeechCatalogFixture.items[0]!,
+      allowed_form_types: []
+    };
+    rerender(
+      <AntApp>
+        <V3PosTab
+          content={emptyGroups}
+          idFactory={() => uuidFromInt(985)}
+          issues={[]}
+          onChange={onChange}
+          pos={emptyGroups.pos[0]!}
+          posCatalog={catalogWithoutDerived}
+        />
+      </AntApp>
+    );
+    expect(screen.queryByText("草稿可暂时不添加变化组")).toBeNull();
+    expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
   });
 
   it("目录没有额外词形时仍保留并显示历史词形变化组", () => {
@@ -1526,6 +1560,455 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
+  it("短语词形分别维护英式与美式成分用词", () => {
+    const form = ukUsFormFixture({ id: uuidFromInt(850) });
+    const content = formsFixture({ forms: [form] });
+    const onChange = vi.fn();
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={content}
+            dialectRules={{
+              spelling_mode: "distinguish",
+              phonetic_mode: "distinguish"
+            }}
+            entryKind="phrase"
+            form={form}
+            idFactory={() => uuidFromInt(851)}
+            issues={[]}
+            membershipCount={0}
+            onChange={onChange}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    expect(screen.getAllByText("成分用词")).toHaveLength(2);
+    fireEvent.click(screen.getByLabelText("为centre添加成分用词"));
+    const next = onChange.mock.calls[0]![0] as DraftFormsStepContentV3;
+    const regional = next.pos[0]!.forms[0]!.regional_variants;
+    expect(regional.mode).toBe("uk_us");
+    if (regional.mode !== "uk_us") throw new Error("expected uk/us variants");
+    expect(regional.uk.component_usages).toEqual([
+      { state: "unresolved", id: uuidFromInt(851), literal: "" }
+    ]);
+    expect(regional.us.component_usages).toEqual([]);
+  });
+
+  it("短语成分可查询并选择已发布词义，完整写入目标快照", async () => {
+    const componentId = uuidFromInt(860);
+    const form = ukUsFormFixture({
+      id: uuidFromInt(861),
+      uk: {
+        component_usages: [
+          { state: "unresolved", id: componentId, literal: "centre" },
+          {
+            state: "unresolved",
+            id: uuidFromInt(8760),
+            literal: "other"
+          }
+        ]
+      }
+    });
+    componentLookupState.resolve.mockResolvedValue({
+      schema_version: 3,
+      sentence_hash: "hash",
+      discovery_generation: 2,
+      completeness: "complete",
+      range_results: [
+        {
+          source_segments: [{ start: 0, end: 6, surface: "centre" }],
+          segments_fingerprint: "segment",
+          normalized_surface: "centre",
+          published_total: 1,
+          draft_matches: [],
+          published_matches: [
+            {
+              entry_id: uuidFromInt(862),
+              publication_id: uuidFromInt(863),
+              pos_id: uuidFromInt(864),
+              base_form_id: uuidFromInt(865),
+              headword: "centre",
+              pos: "noun",
+              matched_form_id: uuidFromInt(866),
+              matched_variant_id: uuidFromInt(867),
+              matched_dialect: "uk",
+              matched_form_type: "base",
+              component_usages: [],
+              matches: [],
+              senses: [
+                {
+                  sense_id: uuidFromInt(868),
+                  publication_id: uuidFromInt(863),
+                  pos_id: uuidFromInt(864),
+                  base_form_id: uuidFromInt(865),
+                  level: "A2",
+                  gloss: "中心"
+                },
+                {
+                  sense_id: uuidFromInt(8680),
+                  publication_id: uuidFromInt(863),
+                  pos_id: uuidFromInt(864),
+                  base_form_id: uuidFromInt(865),
+                  level: "A2",
+                  gloss: ""
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    });
+    const onChange = vi.fn();
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={formsFixture({ forms: [form] })}
+            dialectRules={{
+              spelling_mode: "distinguish",
+              phonetic_mode: "distinguish"
+            }}
+            entryKind="phrase"
+            form={form}
+            idFactory={() => uuidFromInt(869)}
+            issues={[]}
+            membershipCount={0}
+            onChange={onChange}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "查找词义" })[0]!);
+    const select = await screen.findByLabelText("选择第1个成分的词义");
+    fireEvent.mouseDown(select);
+    fireEvent.click(await screen.findByText(/centre · 中心/));
+    const next = onChange.mock.calls[0]![0] as DraftFormsStepContentV3;
+    const regional = next.pos[0]!.forms[0]!.regional_variants;
+    if (regional.mode !== "uk_us") throw new Error("expected uk/us variants");
+    expect(regional.uk.component_usages?.[0]).toMatchObject({
+      state: "resolved",
+      id: componentId,
+      literal: "centre",
+      target_word_id: uuidFromInt(862),
+      target_publication_id: uuidFromInt(863),
+      target_sense_id: uuidFromInt(868),
+      target_variant_id: uuidFromInt(867),
+      target_headword: "centre",
+      target_gloss: "中心"
+    });
+    expect(regional.uk.component_usages?.[1]).toEqual({
+      state: "unresolved",
+      id: uuidFromInt(8760),
+      literal: "other"
+    });
+  });
+
+  it("短语成分无匹配或查询失败时保留输入，并支持编辑与删除", async () => {
+    const componentId = uuidFromInt(870);
+    const form = commonFormFixture({
+      id: uuidFromInt(871),
+      spelling: "center phrase"
+    });
+    form.regional_variants.common.component_usages = [
+      { state: "unresolved", id: componentId, literal: "center" }
+    ];
+    const onChange = vi.fn();
+    const view = render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={formsFixture({ forms: [form] })}
+            dialectRules={{
+              spelling_mode: "unified",
+              phonetic_mode: "unified"
+            }}
+            entryKind="phrase"
+            form={form}
+            idFactory={() => uuidFromInt(872)}
+            issues={[]}
+            membershipCount={0}
+            onChange={onChange}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "查找词义" }));
+    expect(
+      await screen.findByText(
+        "未找到可关联的已发布词义；当前成分将继续保留为待选择状态。"
+      )
+    ).toBeVisible();
+    fireEvent.change(screen.getByLabelText("第1个成分用词"), {
+      target: { value: "central" }
+    });
+    expect(
+      (onChange.mock.calls.at(-1)![0] as DraftFormsStepContentV3).pos[0]!
+        .forms[0]!.regional_variants
+    ).toMatchObject({
+      common: {
+        component_usages: [
+          { state: "unresolved", id: componentId, literal: "central" }
+        ]
+      }
+    });
+    fireEvent.click(screen.getByLabelText("删除第1个成分用词"));
+    expect(
+      (onChange.mock.calls.at(-1)![0] as DraftFormsStepContentV3).pos[0]!
+        .forms[0]!.regional_variants
+    ).toMatchObject({ common: { component_usages: [] } });
+    view.unmount();
+
+    componentLookupState.resolve.mockRejectedValueOnce(new Error("offline"));
+    const failedForm = commonFormFixture({ id: uuidFromInt(873) });
+    failedForm.regional_variants.common.component_usages = [
+      { state: "unresolved", id: uuidFromInt(874), literal: "center" }
+    ];
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={formsFixture({ forms: [failedForm] })}
+            dialectRules={{
+              spelling_mode: "unified",
+              phonetic_mode: "unified"
+            }}
+            entryKind="phrase"
+            form={failedForm}
+            idFactory={() => uuidFromInt(875)}
+            issues={[]}
+            membershipCount={0}
+            onChange={vi.fn()}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "查找词义" }));
+    expect(
+      await screen.findByText("词义查询失败，请稍后重试；当前编辑内容未丢失。")
+    ).toBeVisible();
+  });
+
+  it("已解析成分展示完整快照，修改词面后回到待选择状态", () => {
+    const form = commonFormFixture({ id: uuidFromInt(876) });
+    form.regional_variants.common.component_usages = [
+      {
+        state: "resolved",
+        id: uuidFromInt(877),
+        literal: "center",
+        target_word_id: uuidFromInt(878),
+        target_publication_id: uuidFromInt(879),
+        target_pos_id: uuidFromInt(880),
+        target_base_form_id: uuidFromInt(881),
+        target_sense_id: uuidFromInt(882),
+        target_form_id: uuidFromInt(883),
+        target_variant_id: uuidFromInt(884),
+        target_dialect: "us",
+        target_form_type: "base",
+        target_headword: "center",
+        target_gloss: "中心"
+      }
+    ];
+    const onChange = vi.fn();
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={formsFixture({ forms: [form] })}
+            dialectRules={{
+              spelling_mode: "unified",
+              phonetic_mode: "unified"
+            }}
+            entryKind="phrase"
+            form={form}
+            idFactory={() => uuidFromInt(885)}
+            issues={[]}
+            membershipCount={0}
+            onChange={onChange}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    expect(screen.getByText("已关联词义")).toBeVisible();
+    expect(screen.getByText(/center · 中心 · 美式 · 原形/u)).toBeVisible();
+    expect(screen.getByRole("button", { name: "更换词义" })).toBeVisible();
+    fireEvent.change(screen.getByLabelText("第1个成分用词"), {
+      target: { value: "central" }
+    });
+    expect(
+      (onChange.mock.calls[0]![0] as DraftFormsStepContentV3).pos[0]!.forms[0]!
+        .regional_variants
+    ).toMatchObject({
+      common: {
+        component_usages: [
+          { state: "unresolved", id: uuidFromInt(877), literal: "central" }
+        ]
+      }
+    });
+  });
+
+  it("统一拼写双侧仍各自维护组件，空词面与不完整候选不会伪关联", async () => {
+    const form = ukUsFormFixture({
+      id: uuidFromInt(886),
+      uk: { spelling: "" },
+      us: { spelling: "" }
+    });
+    delete form.regional_variants.uk.component_usages;
+    form.regional_variants.us.component_usages = [
+      { state: "unresolved", id: uuidFromInt(887), literal: "center" }
+    ];
+    componentLookupState.resolve.mockResolvedValueOnce({
+      schema_version: 3,
+      sentence_hash: "hash",
+      discovery_generation: 1,
+      completeness: "complete",
+      range_results: [
+        {
+          source_segments: [{ start: 0, end: 6, surface: "center" }],
+          segments_fingerprint: "center",
+          normalized_surface: "center",
+          published_total: 1,
+          draft_matches: [],
+          published_matches: [
+            {
+              entry_id: uuidFromInt(888),
+              publication_id: uuidFromInt(889),
+              pos_id: uuidFromInt(890),
+              base_form_id: uuidFromInt(891),
+              headword: "center",
+              pos: "noun",
+              matches: [],
+              component_usages: [],
+              senses: []
+            }
+          ]
+        }
+      ]
+    });
+    const onChange = vi.fn();
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={formsFixture({ forms: [form] })}
+            dialectRules={{
+              spelling_mode: "unified",
+              phonetic_mode: "distinguish"
+            }}
+            entryKind="phrase"
+            form={form}
+            idFactory={() => uuidFromInt(892)}
+            issues={[]}
+            membershipCount={0}
+            onChange={onChange}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    expect(screen.getByText("英美共用")).toBeVisible();
+    expect(screen.getAllByText("成分用词")).toHaveLength(2);
+    fireEvent.change(screen.getByLabelText("词形英美共用拼写"), {
+      target: { value: "center phrase" }
+    });
+    expect(onChange).toHaveBeenCalled();
+    fireEvent.click(screen.getAllByLabelText("为当前词形添加成分用词")[0]!);
+    expect(onChange).toHaveBeenCalled();
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "查找词义" }).at(-1)!
+    );
+    expect(
+      await screen.findByText(
+        "未找到可关联的已发布词义；当前成分将继续保留为待选择状态。"
+      )
+    ).toBeVisible();
+  });
+
+  it("英美两侧已有独立成分时 UI 明确阻止静默合并并可关闭提示", () => {
+    const form = ukUsFormFixture({ id: uuidFromInt(893) });
+    form.regional_variants.uk.component_usages = [
+      { state: "unresolved", id: uuidFromInt(894), literal: "centre" }
+    ];
+    form.regional_variants.us.component_usages = [
+      { state: "unresolved", id: uuidFromInt(895), literal: "center" }
+    ];
+    const content = formsFixture({ forms: [form] });
+    content.pos[0]!.dialect_rules = {
+      spelling_mode: "unified",
+      phonetic_mode: "distinguish"
+    };
+    const onChange = vi.fn();
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3PosTab
+            content={content}
+            entryKind="phrase"
+            idFactory={() => uuidFromInt(896)}
+            issues={[]}
+            onChange={onChange}
+            pos={content.pos[0]!}
+            posCatalog={partOfSpeechCatalogFixture.items[0]}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    fireEvent.click(screen.getByLabelText("英美音标无区别"));
+    expect(screen.getByText("暂不能合并英美成分配置")).toBeVisible();
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "close" }));
+    expect(screen.queryByText("暂不能合并英美成分配置")).toBeNull();
+  });
+
+  it("发现 capability 关闭时禁用成分查询但保留 unresolved 手工编辑", () => {
+    const form = commonFormFixture({ id: uuidFromInt(897) });
+    form.regional_variants.common.component_usages = [
+      { state: "unresolved", id: uuidFromInt(898), literal: "center" }
+    ];
+    const content = formsFixture({ forms: [form] });
+    const onChange = vi.fn();
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={content}
+            dialectRules={{
+              spelling_mode: "unified",
+              phonetic_mode: "unified"
+            }}
+            entryKind="phrase"
+            form={form}
+            idFactory={() => uuidFromInt(899)}
+            issues={[]}
+            membershipCount={0}
+            onChange={onChange}
+            sentenceTargetDiscoveryEnabled={false}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    expect(
+      screen.getByText("当前未开启词义查询，仍可手工维护成分用词并保存。")
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "查找词义" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("第1个成分用词"), {
+      target: { value: "central" }
+    });
+    const next = onChange.mock.calls.at(-1)![0] as DraftFormsStepContentV3;
+    const regional = next.pos[0]!.forms[0]!.regional_variants;
+    if (regional.mode !== "common") throw new Error("expected common variant");
+    expect(regional.common.component_usages).toEqual([
+      { state: "unresolved", id: uuidFromInt(898), literal: "central" }
+    ]);
+    expect(componentLookupState.resolve).not.toHaveBeenCalled();
+  });
+
   it("覆盖 UK 发音缺省 style、字段编辑、增删与 issue", () => {
     const first = pronunciationFixture({
       id: uuidFromInt(901),
@@ -1674,12 +2157,17 @@ describe("V3FormsAndPronunciationStep", () => {
       dropEffect: "none",
       types: ["application/x-tsz-pronunciation"],
       setData: (type: string, data: string) => store.set(type, data),
-      getData: (type: string) => store.get(type) ?? ""
+      getData: (type: string) => store.get(type) ?? "",
+      setDragImage: vi.fn()
     };
     const target = handles[1]!.closest(".word-pronunciation-editor")!;
     fireEvent.dragStart(handles[0]!, { dataTransfer });
+    expect(dataTransfer.setDragImage).toHaveBeenCalled();
     fireEvent.dragOver(target, { dataTransfer });
     expect(target).toHaveClass("is-drag-over-after");
+    fireEvent.dragLeave(target, { dataTransfer });
+    expect(target).not.toHaveClass("is-drag-over-after");
+    fireEvent.dragOver(target, { dataTransfer });
     fireEvent.drop(target, { dataTransfer });
     fireEvent.dragEnd(handles[0]!, { dataTransfer });
 
@@ -1691,6 +2179,60 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       reorderedForm.regional_variants.uk.pronunciations.map((item) => item.id)
     ).toEqual([second.id, first.id]);
+
+    const callsAfterDrag = onChange.mock.calls.length;
+    const keyboardHandles = screen.getAllByLabelText(/拖动第 \d+ 条发音/);
+    fireEvent.keyDown(keyboardHandles[0]!, {
+      key: "ArrowDown",
+      code: "ArrowDown"
+    });
+    fireEvent.keyDown(keyboardHandles[1]!, {
+      key: "ArrowUp",
+      code: "ArrowUp"
+    });
+    expect(onChange.mock.calls.length).toBeGreaterThan(callsAfterDrag);
+    fireEvent.keyDown(keyboardHandles[0]!, { key: "ArrowUp", code: "ArrowUp" });
+    fireEvent.keyDown(keyboardHandles[1]!, {
+      key: "ArrowDown",
+      code: "ArrowDown"
+    });
+    expect(onChange.mock.calls.length).toBeGreaterThan(callsAfterDrag);
+    const callsAfterKeyboard = onChange.mock.calls.length;
+
+    const firstRow = keyboardHandles[0]!.closest(".word-pronunciation-editor")!;
+    const secondRow = keyboardHandles[1]!.closest(
+      ".word-pronunciation-editor"
+    )!;
+    fireEvent.dragStart(keyboardHandles[1]!, { dataTransfer });
+    fireEvent.dragOver(firstRow, { dataTransfer });
+    expect(firstRow).toHaveClass("is-drag-over-before");
+    fireEvent.dragLeave(firstRow, { dataTransfer });
+    fireEvent.dragEnd(keyboardHandles[1]!, { dataTransfer });
+    expect(secondRow).not.toHaveClass("is-dragging");
+    fireEvent.dragOver(firstRow, {
+      dataTransfer: { ...dataTransfer, types: ["text/plain"] }
+    });
+    expect(firstRow).not.toHaveClass("is-drag-over");
+    fireEvent.drop(firstRow, {
+      dataTransfer: { ...dataTransfer, getData: () => "not-json" }
+    });
+    fireEvent.drop(firstRow, {
+      dataTransfer: { ...dataTransfer, getData: () => "" }
+    });
+    fireEvent.drop(firstRow, {
+      dataTransfer: {
+        ...dataTransfer,
+        getData: () => JSON.stringify({ scope: "other", index: 1 })
+      }
+    });
+    fireEvent.drop(firstRow, {
+      dataTransfer: {
+        ...dataTransfer,
+        getData: () =>
+          JSON.stringify({ scope: form.regional_variants.uk.id, index: -1 })
+      }
+    });
+    expect(onChange.mock.calls.length).toBe(callsAfterKeyboard);
   });
 
   it("覆盖 canonical rerender 时发音列表瞬态缺失与空态", () => {
@@ -1736,6 +2278,20 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.getByText("暂无发音")).toBeInTheDocument();
     expect(screen.queryByLabelText("第 1 条发音的实际发音")).toBeNull();
     expect(screen.getByLabelText("新增发音")).toBeVisible();
+    fireEvent.click(screen.getByLabelText("新增发音"));
+    const next = onChange.mock.calls.at(-1)![0] as DraftFormsStepContentV3;
+    const nextForm = next.pos[0]!.forms[0]!;
+    if (nextForm.regional_variants.mode !== "common") {
+      throw new Error("fixture");
+    }
+    expect(nextForm.regional_variants.common.pronunciations).toEqual([
+      {
+        id: uuidFromInt(952),
+        dict_phonetic: "",
+        actual_pron: "",
+        style: "normal"
+      }
+    ]);
   });
 
   it("#128 受控向导中连续编辑英美音标不会被 Form.List 回写旧值", () => {

@@ -245,8 +245,17 @@ export function createHttpClient({
         false,
         opts?.skipAuth
       ),
-    put: <T>(path: string, data?: unknown) =>
-      request<T>(path, { method: "PUT", body: JSON.stringify(data) }),
+    put: <T>(
+      path: string,
+      data?: unknown,
+      opts?: { signal?: AbortSignal; headers?: HeadersInit }
+    ) =>
+      request<T>(path, {
+        method: "PUT",
+        body: JSON.stringify(data),
+        ...(opts?.headers ? { headers: opts.headers } : {}),
+        ...(opts?.signal ? { signal: opts.signal } : {})
+      }),
     patch: <T>(path: string, data?: unknown) =>
       request<T>(path, { method: "PATCH", body: JSON.stringify(data) }),
     del: <T>(

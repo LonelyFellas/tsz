@@ -1,6 +1,6 @@
 import type { AdminWordV3, EnglishTextV3, WordDefinitionV3 } from "@tsz/types";
 import { Card, Empty, Flex, Space, Tag, Typography } from "antd";
-import { editableEnglishText } from "./meaningsModel";
+import { editableEnglishText, sentenceTranslationsV3 } from "./meaningsModel";
 import {
   definitionModeLabel,
   dialectLabel,
@@ -27,6 +27,12 @@ function DefinitionText({ definition }: { definition: WordDefinitionV3 }) {
       ))}
     </Flex>
   );
+}
+
+function translationBandLabel(band: "a1_a2" | "b1_b2" | "c1_c2") {
+  if (band === "c1_c2") return "初";
+  if (band === "b1_b2") return "中";
+  return "高";
 }
 
 export function V3MeaningsPreview({
@@ -141,9 +147,16 @@ export function V3MeaningsPreview({
                                   </Typography.Text>
                                 )
                               )}
-                              <Typography.Text>
-                                中文：{sentence.zh_text.text}
-                              </Typography.Text>
+                              {sentenceTranslationsV3(sentence).map(
+                                (translation) => (
+                                  <Typography.Text key={translation.id}>
+                                    <Tag>
+                                      {translationBandLabel(translation.band)}
+                                    </Tag>
+                                    {translation.content.text}
+                                  </Typography.Text>
+                                )
+                              )}
                               {sentence.links.length > 0 ? (
                                 <Space wrap>
                                   {sentence.links.map((link, linkIndex) => (
@@ -155,14 +168,30 @@ export function V3MeaningsPreview({
                                   ))}
                                 </Space>
                               ) : null}
-                              {sentence.associations.map((association) => (
-                                <Typography.Text key={association.id}>
-                                  上下文关联：{association.target_headword}
-                                  {association.target_gloss
-                                    ? ` · ${association.target_gloss}`
-                                    : ""}
-                                </Typography.Text>
-                              ))}
+                              {sentence.associations.map((association) => {
+                                const pending = association.state === "pending";
+                                const headword = pending
+                                  ? association.pending_target_headword
+                                  : association.target_headword;
+                                const gloss = pending
+                                  ? association.pending_target_gloss
+                                  : association.target_gloss;
+                                return (
+                                  <Space key={association.id} size={4} wrap>
+                                    <Tag color={pending ? "orange" : "green"}>
+                                      {pending ? "待关联" : "已关联"}
+                                    </Tag>
+                                    <Typography.Text>
+                                      {pending ? "待关联词条" : "上下文关联"}：
+                                      {headword ??
+                                        association.source_segments
+                                          .map((segment) => segment.surface)
+                                          .join(" … ")}
+                                      {gloss ? ` · ${gloss}` : ""}
+                                    </Typography.Text>
+                                  </Space>
+                                );
+                              })}
                             </Flex>
                           </Card>
                         ))}

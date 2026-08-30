@@ -2,6 +2,7 @@ import type {
   Dialect,
   DialectRulesV3,
   DraftFormsStepContentV3,
+  PhraseComponentUsageV3,
   TextOriginV3,
   V3DraftNodeLocation,
   V3DraftValidationIssue,
@@ -124,6 +125,9 @@ export function countFormsNodes(content: DraftFormsStepContentV3): number {
               1 +
               (Array.isArray(candidate.pronunciations)
                 ? candidate.pronunciations.length
+                : 0) +
+              (Array.isArray(candidate.component_usages)
+                ? candidate.component_usages.length
                 : 0)
             );
           }, 0)
@@ -169,13 +173,18 @@ function isVariantShape(
 } {
   return (
     isObject(value) &&
-    ownKeysAre(value, [
-      "dialect",
-      "id",
-      "origin",
-      "pronunciations",
-      "spelling"
-    ]) &&
+    Object.keys(value).every((key) =>
+      [
+        "component_usages",
+        "dialect",
+        "id",
+        "origin",
+        "pronunciations",
+        "spelling"
+      ].includes(key)
+    ) &&
+    Object.keys(value).length >= 5 &&
+    Object.keys(value).length <= 6 &&
     typeof value.id === "string" &&
     value.dialect === dialect &&
     typeof value.spelling === "string" &&
@@ -183,7 +192,58 @@ function isVariantShape(
       value.origin === "converted" ||
       value.origin === "manual") &&
     Array.isArray(value.pronunciations) &&
-    value.pronunciations.every(isPronunciationShape)
+    value.pronunciations.every(isPronunciationShape) &&
+    (value.component_usages === undefined ||
+      (Array.isArray(value.component_usages) &&
+        value.component_usages.every(isPhraseComponentUsageShape)))
+  );
+}
+
+function isPhraseComponentUsageShape(
+  value: unknown
+): value is PhraseComponentUsageV3 {
+  if (!isObject(value)) return false;
+  if (value.state === "unresolved") {
+    return (
+      ownKeysAre(value, ["id", "literal", "state"]) &&
+      typeof value.id === "string" &&
+      typeof value.literal === "string"
+    );
+  }
+  return (
+    value.state === "resolved" &&
+    ownKeysAre(value, [
+      "id",
+      "literal",
+      "state",
+      "target_base_form_id",
+      "target_dialect",
+      "target_form_id",
+      "target_form_type",
+      "target_gloss",
+      "target_headword",
+      "target_pos_id",
+      "target_publication_id",
+      "target_sense_id",
+      "target_variant_id",
+      "target_word_id"
+    ]) &&
+    typeof value.id === "string" &&
+    typeof value.literal === "string" &&
+    typeof value.target_word_id === "string" &&
+    typeof value.target_publication_id === "string" &&
+    typeof value.target_pos_id === "string" &&
+    typeof value.target_base_form_id === "string" &&
+    typeof value.target_sense_id === "string" &&
+    typeof value.target_form_id === "string" &&
+    typeof value.target_variant_id === "string" &&
+    (value.target_dialect === "common" ||
+      value.target_dialect === "uk" ||
+      value.target_dialect === "us") &&
+    typeof value.target_form_type === "string" &&
+    FORM_TYPES.has(value.target_form_type as WordFormTypeV3) &&
+    typeof value.target_headword === "string" &&
+    typeof value.target_gloss === "string"
   );
 }
 
@@ -746,13 +806,15 @@ function variantWire<TDialect extends Dialect>(variant: {
   spelling: string;
   origin: TextOriginV3;
   pronunciations: WordPronunciationV3[];
+  component_usages?: PhraseComponentUsageV3[];
 }) {
   return {
     id: variant.id,
     dialect: variant.dialect,
     spelling: variant.spelling,
     origin: variant.origin,
-    pronunciations: variant.pronunciations.map(pronunciationWire)
+    pronunciations: variant.pronunciations.map(pronunciationWire),
+    component_usages: structuredClone(variant.component_usages ?? [])
   };
 }
 

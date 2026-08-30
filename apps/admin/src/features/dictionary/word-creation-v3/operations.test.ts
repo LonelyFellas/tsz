@@ -157,6 +157,7 @@ describe("V3 forms operations", () => {
         dialect: "uk",
         spelling: "centre",
         origin: "manual",
+        component_usages: [],
         pronunciations: [
           {
             id: UUIDS.pronunciation_2,
@@ -171,6 +172,7 @@ describe("V3 forms operations", () => {
         dialect: "us",
         spelling: "center",
         origin: "dictionary",
+        component_usages: [],
         pronunciations: [
           {
             id: UUIDS.pronunciation_3,
@@ -204,6 +206,54 @@ describe("V3 forms operations", () => {
         }
       }
     });
+  });
+
+  it("common 成分拆分后生成独立 ID，已有 UK/US 成分时拒绝静默合并", () => {
+    const common = commonFormFixture();
+    common.regional_variants.common.component_usages = [
+      { state: "unresolved", id: uuidFromInt(710), literal: "centre" }
+    ];
+    const converted = convertCommonToUkUs(
+      common,
+      {
+        confirmed: true,
+        uk: {
+          spelling: "centre",
+          origin: "manual",
+          pronunciations: []
+        },
+        us: {
+          spelling: "center",
+          origin: "manual",
+          pronunciations: []
+        }
+      },
+      uuidSequence(
+        uuidFromInt(711),
+        uuidFromInt(712),
+        uuidFromInt(713),
+        uuidFromInt(714)
+      )
+    );
+    expect(converted.ok).toBe(true);
+    if (!converted.ok || converted.value.regional_variants.mode !== "uk_us")
+      return;
+    const { uk, us } = converted.value.regional_variants;
+    expect(uk.component_usages?.[0]?.id).not.toBe(us.component_usages?.[0]?.id);
+    expect(
+      convertUkUsToCommon(
+        converted.value,
+        {
+          confirmed: true,
+          common: {
+            spelling: "center",
+            origin: "manual",
+            pronunciations: []
+          }
+        },
+        () => uuidFromInt(715)
+      )
+    ).toEqual({ ok: false, reason: "component_merge_required" });
   });
 
   it("词性级规则只接受 UU、UD、DD，并保留全部节点", () => {

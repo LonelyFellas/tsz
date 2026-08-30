@@ -43,6 +43,13 @@ function sentence(id: string): WordSentenceWritableV3 {
     },
     zh_text_id: uuidFromInt(Number.parseInt(id.slice(-4), 16) + 20_000),
     zh_text: { version: 2, text: "一个中心。", annotations: [] },
+    zh_translations: [
+      {
+        id: uuidFromInt(Number.parseInt(id.slice(-4), 16) + 20_000),
+        band: "a1_a2",
+        content: { version: 2, text: "一个中心。", annotations: [] }
+      }
+    ],
     links: []
   };
 }
