@@ -27,6 +27,7 @@ const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries/{id}/publications",
   "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate",
   "post /admin/lexicon/entries/{id}/restore",
+  "post /admin/lexicon/pending-sentence-associations/{association_id}/claim",
   "put /admin/lexicon/entries/{id}/sentences/{sentence_id}/associations"
 ] as const;
 
@@ -480,7 +481,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "d6e2ea57b87c7f4c05bbf770136c44cb41d84ef22d6aea1d3579eb72370a8bc0"
+      "4f6c17a2277ff2606b2c538e4fd3f0a1287cad078614d42db2ea80dbf0d2a4e3"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -888,6 +889,15 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(snapshot.schemas.CreateAdminWordV2Input.required).not.toContain(
       "confirmed_surface_match_token"
     );
+    expect(snapshot.schemas.CreateAdminWordV3Input.required).toContain(
+      "headwords"
+    );
+    expect(
+      snapshot.schemas.CreateAdminWordV3Input.properties.headwords
+    ).toEqual({
+      $ref: "#/components/schemas/WordHeadwordsV2",
+      description: "管理员在 Step 1 最终确认的主词；检测结果只提供初始建议。"
+    });
     expect(snapshot.schemas.ProblemMeta.properties).toEqual(
       expect.objectContaining({
         surface_match_page: {

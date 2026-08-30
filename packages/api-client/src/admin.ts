@@ -4,6 +4,7 @@
 import type {
   ActivatePublicationInput,
   ActivatePublicationV3Input,
+  ClaimPendingSentenceAssociationInputV3,
   AdminListQuery,
   AdminListResponse,
   AdminRole,
@@ -36,6 +37,8 @@ import type {
   PreviewFormsImpactInputV3,
   PublishAdminWordV2Input,
   PublishAdminWordV3Input,
+  ReplaceSentenceAssociationsInputV3,
+  ResolveSentenceTargetsV3Input,
   Admin,
   AdminAuthResponse,
   AdminProfile,
@@ -46,6 +49,7 @@ import type {
   PartOfSpeechConfig,
   PartOfSpeechConfigListQuery,
   PartOfSpeechConfigListResponse,
+  PendingSentenceAssociationListQueryV3,
   RelatedSearchResponse,
   RelatedSearchResponseAny,
   RelatedSearchQuery,
@@ -86,6 +90,8 @@ import {
   decodeDraftValidationResponseV3,
   decodeEntryLifecycleBatchAnyResponse,
   decodeFormsImpactResponseV3,
+  decodePendingSentenceAssociationListResponse,
+  decodeResolveSentenceTargetsV3Response,
   InvalidAdminWordResponseError,
   decodeRelatedSearchResponseAny,
   decodeSurfaceMatchPageAny,
@@ -388,6 +394,69 @@ export function createAdminEndpoints(http: HttpClient) {
         http
           .put<unknown>(`/lexicon/entries/${wordId}/steps/meanings`, input)
           .then(decodeAdminWordV3Envelope),
+      /** 独立整组保存例句 linked/Pending 关联；不进入 meanings wire。 */
+      replaceSentenceAssociations: (
+        wordId: string,
+        sentenceId: string,
+        idempotencyKey: string,
+        input: ReplaceSentenceAssociationsInputV3
+      ) =>
+        http
+          .put<unknown>(
+            `/lexicon/entries/${wordId}/sentences/${sentenceId}/associations`,
+            input,
+            { headers: { "Idempotency-Key": idempotencyKey } }
+          )
+          .then(decodeAdminWordAnyEnvelope)
+          .then((response) =>
+            requireWordPathIdentity(
+              response,
+              wordId,
+              "replace_sentence_associations.word.id"
+            )
+          ),
+      /** 一次发现句中的已发布单词、短语；手选模式可同时查看草稿。 */
+      resolveSentenceTargetsV3: (
+        input: ResolveSentenceTargetsV3Input,
+        signal?: AbortSignal
+      ) =>
+        signal
+          ? http
+              .post<unknown>(
+                "/lexicon/entries/sentence-targets/resolve",
+                input,
+                { signal }
+              )
+              .then(decodeResolveSentenceTargetsV3Response)
+          : http
+              .post<unknown>("/lexicon/entries/sentence-targets/resolve", input)
+              .then(decodeResolveSentenceTargetsV3Response),
+      /** 当前目标词条可认领的 Pending 例句关联。 */
+      listPendingSentenceAssociations: (
+        wordId: string,
+        query: PendingSentenceAssociationListQueryV3 = {}
+      ) =>
+        http
+          .get<unknown>(
+            `/lexicon/entries/${wordId}/pending-sentence-associations${qs({
+              page_size: query.page_size,
+              cursor: query.cursor
+            })}`
+          )
+          .then(decodePendingSentenceAssociationListResponse),
+      /** 选择具体目标词义，原地把 Pending 转成 linked。 */
+      claimPendingSentenceAssociation: (
+        associationId: string,
+        idempotencyKey: string,
+        input: ClaimPendingSentenceAssociationInputV3
+      ) =>
+        http
+          .post<unknown>(
+            `/lexicon/pending-sentence-associations/${associationId}/claim`,
+            input,
+            { headers: { "Idempotency-Key": idempotencyKey } }
+          )
+          .then(decodeAdminWordAnyEnvelope),
       /** POST .../content-completion-jobs — 创建真实内容生成任务。 */
       createContentCompletionJob: (
         wordId: string,

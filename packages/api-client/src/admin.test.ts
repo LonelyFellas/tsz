@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ActivatePublicationInput,
   AdminWordV2,
+  ClaimPendingSentenceAssociationInputV3,
   CreateContentCompletionJobInput,
   EntryLifecycleBatchInput,
   EntryLifecycleInput,
   PreviewFormsImpactInputV2,
   PublishAdminWordV2Input,
+  ReplaceSentenceAssociationsInputV3,
   SaveFormsStepInput,
   SaveMeaningsStepInput,
   WordRelationWritableV3,
@@ -490,6 +492,90 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     );
   });
 
+  it("正式例句关联 replace/list/claim 使用独立路径、分页与幂等 header", () => {
+    const pending = new Promise<never>(() => {});
+    http.get.mockReturnValue(pending);
+    http.post.mockReturnValue(pending);
+    http.put.mockReturnValue(pending);
+    const api = createAdminEndpoints(http);
+    const replaceInput: ReplaceSentenceAssociationsInputV3 = {
+      association_schema_version: 3,
+      base_revision: 7,
+      base_lifecycle_revision: 3,
+      associations: [
+        {
+          id: "association-1",
+          source_dialect: "common",
+          source_segments: [
+            {
+              start: 22,
+              end: 40,
+              surface: "center of the wall"
+            }
+          ],
+          pending_target_kind: "phrase",
+          pending_target_headword: "center of the wall",
+          pending_target_gloss: "墙的中心位置"
+        }
+      ]
+    };
+    const claimInput: ClaimPendingSentenceAssociationInputV3 = {
+      target_word_id: "target-entry",
+      target_sense_id: "target-sense",
+      base_owner_entry_revision: 7,
+      base_owner_lifecycle_revision: 4
+    };
+
+    api.words.replaceSentenceAssociations(
+      "owner-entry",
+      "sentence-1",
+      "replace-key",
+      replaceInput
+    );
+    api.words.listPendingSentenceAssociations("target-entry", {
+      page_size: 20,
+      cursor: "cursor-1"
+    });
+    api.words.claimPendingSentenceAssociation(
+      "association-1",
+      "claim-key",
+      claimInput
+    );
+
+    expect(http.put).toHaveBeenCalledWith(
+      "/lexicon/entries/owner-entry/sentences/sentence-1/associations",
+      replaceInput,
+      { headers: { "Idempotency-Key": "replace-key" } }
+    );
+    expect(http.get).toHaveBeenCalledWith(
+      "/lexicon/entries/target-entry/pending-sentence-associations?page_size=20&cursor=cursor-1"
+    );
+    expect(http.post).toHaveBeenCalledWith(
+      "/lexicon/pending-sentence-associations/association-1/claim",
+      claimInput,
+      { headers: { "Idempotency-Key": "claim-key" } }
+    );
+  });
+
+  it("正式例句关联 replace 解码响应并校验路径词条身份", async () => {
+    http.put.mockResolvedValue({ word: lifecycleWord(LIFECYCLE_WORD_A) });
+    const api = createAdminEndpoints(http);
+
+    const response = await api.words.replaceSentenceAssociations(
+      LIFECYCLE_WORD_A,
+      "018f47b8-e3c1-7bd1-9f0a-123456789ac1",
+      "018f47b8-e3c1-7bd1-9f0a-123456789ac2",
+      {
+        association_schema_version: 3,
+        base_revision: 1,
+        base_lifecycle_revision: 1,
+        associations: []
+      }
+    );
+
+    expect(response.word.id).toBe(LIFECYCLE_WORD_A);
+  });
+
   it("content completion create/get/retry 使用权威路径和独立幂等 header", () => {
     const api = createAdminEndpoints(http);
     const input: CreateContentCompletionJobInput = {
@@ -763,7 +849,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     api.words.createV3("create-v3-key", {
       schema_version: 3,
       detection_id: "detection-3",
-      kind: "word"
+      kind: "word",
+      headwords: { mode: "unified", common: "bright" }
     });
     api.words.getAny("w-3");
     api.words.previewFormsImpactV3("w-3", {
@@ -819,7 +906,12 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     );
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries",
-      { schema_version: 3, detection_id: "detection-3", kind: "word" },
+      {
+        schema_version: 3,
+        detection_id: "detection-3",
+        kind: "word",
+        headwords: { mode: "unified", common: "bright" }
+      },
       { headers: { "Idempotency-Key": "create-v3-key" } }
     );
     expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-3");
@@ -903,7 +995,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       api.words.createV3("create-v3-key", {
         schema_version: 3,
         detection_id: "detection-3",
-        kind: "word"
+        kind: "word",
+        headwords: { mode: "unified", common: "bright" }
       })
     ).rejects.toMatchObject({
       name: "UnsupportedAdminWordSchemaVersionError",

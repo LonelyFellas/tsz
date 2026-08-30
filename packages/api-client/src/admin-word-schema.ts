@@ -17,6 +17,8 @@ import type {
   EntryLifecycleBatchResponseAny,
   FormsImpactResponseAny,
   FormsImpactResponseV3,
+  PendingSentenceAssociationListResponseV3,
+  ResolveSentenceTargetsV3Response,
   RelatedSearchResponseAny,
   SurfaceMatchPageAny,
   SurfaceMatchPageV3
@@ -368,6 +370,20 @@ export function decodeRelatedSearchResponseAny(
   }
   assertRuntimeContract("RelatedSearchResponse", value);
   return value as RelatedSearchResponseAny;
+}
+
+export function decodePendingSentenceAssociationListResponse(
+  value: unknown
+): PendingSentenceAssociationListResponseV3 {
+  assertRuntimeContract("PendingSentenceAssociationListResponse", value);
+  return value as PendingSentenceAssociationListResponseV3;
+}
+
+export function decodeResolveSentenceTargetsV3Response(
+  value: unknown
+): ResolveSentenceTargetsV3Response {
+  assertRuntimeContract("ResolveSentenceTargetsV3Response", value);
+  return value as ResolveSentenceTargetsV3Response;
 }
 
 export function decodeAdminWordPublicationListResponse(

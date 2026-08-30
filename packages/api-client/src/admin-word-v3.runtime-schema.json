@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/47a5/tsz-rust/docs/openapi.json",
-  "_source_sha256": "d6e2ea57b87c7f4c05bbf770136c44cb41d84ef22d6aea1d3579eb72370a8bc0",
+  "_source": "/Users/darwish/.codex/worktrees/multidimensional-example-linking/tsz-rust/docs/openapi.json",
+  "_source_sha256": "4f6c17a2277ff2606b2c538e4fd3f0a1287cad078614d42db2ea80dbf0d2a4e3",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -13,6 +13,8 @@
     "SurfaceMatchPageAny",
     "RelatedSearchResponse",
     "DetectLexiconResponseAny",
+    "PendingSentenceAssociationListResponse",
+    "ResolveSentenceTargetsV3Response",
     "AdminWordPublicationListResponse",
     "AdminWordPublicationEnvelope",
     "DraftValidationIssueAny",
@@ -361,7 +363,8 @@
         "pronunciation_normalization_version": {
           "$ref": "#/$defs/PronunciationNormalizationVersionV3"
         },
-        "publication": { "$ref": "#/$defs/V3PublicationCapability" }
+        "publication": { "$ref": "#/$defs/V3PublicationCapability" },
+        "sentence_associations": { "type": "boolean" }
       },
       "additionalProperties": false
     },
@@ -871,6 +874,24 @@
       },
       "additionalProperties": false
     },
+    "DraftSentenceTargetCandidateV3": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "entry_revision",
+        "headword",
+        "target_state",
+        "linkability"
+      ],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "entry_revision": { "type": "integer" },
+        "headword": { "type": "string" },
+        "linkability": { "$ref": "#/$defs/SentenceTargetDraftLinkabilityV3" },
+        "target_state": { "$ref": "#/$defs/SentenceTargetDraftStateV3" }
+      },
+      "additionalProperties": false
+    },
     "DraftValidationIssue": {
       "type": "object",
       "required": ["step", "node_id", "field", "code", "message"],
@@ -1111,6 +1132,9 @@
         "word_not_found",
         "sentence_not_found",
         "sentence_associations_unresolved",
+        "sentence_association_client_upgrade_required",
+        "pending_sentence_association_not_found",
+        "pending_sentence_association_claimed",
         "publication_not_found",
         "part_of_speech_in_use",
         "sub_part_of_speech_in_use",
@@ -1252,6 +1276,7 @@
         "form",
         "variant",
         "pronunciation",
+        "phrase_component_usage",
         "surface",
         "publication",
         "grammar_structure",
@@ -1513,9 +1538,106 @@
       },
       "additionalProperties": false
     },
+    "PendingSentenceAssociationItemV3": {
+      "type": "object",
+      "required": [
+        "association_id",
+        "owner_entry_id",
+        "owner_entry_revision",
+        "owner_lifecycle_revision",
+        "sentence_id",
+        "source_dialect",
+        "source_segments",
+        "sentence_text",
+        "pending_target_kind",
+        "pending_target_headword"
+      ],
+      "properties": {
+        "association_id": { "type": "string", "format": "uuid" },
+        "owner_entry_id": { "type": "string", "format": "uuid" },
+        "owner_entry_revision": { "type": "integer" },
+        "owner_lifecycle_revision": { "type": "integer" },
+        "pending_target_gloss": { "type": "string" },
+        "pending_target_headword": { "type": "string" },
+        "pending_target_kind": { "$ref": "#/$defs/EntryKind" },
+        "sentence_id": { "type": "string", "format": "uuid" },
+        "sentence_text": { "type": "string" },
+        "source_dialect": { "$ref": "#/$defs/Dialect" },
+        "source_segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+          "maxItems": 20,
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "PendingSentenceAssociationListResponse": {
+      "type": "object",
+      "required": ["results", "total", "next_cursor"],
+      "properties": {
+        "next_cursor": { "type": ["string", "null"] },
+        "results": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PendingSentenceAssociationItemV3" }
+        },
+        "total": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
     "PersistedWordStep": {
       "type": "string",
       "enum": ["basics", "forms", "meanings"]
+    },
+    "PhraseComponentUsageV3": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["id", "literal", "state"],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "literal": { "type": "string", "maxLength": 200 },
+            "state": { "type": "string", "enum": ["unresolved"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "literal",
+            "target_word_id",
+            "target_publication_id",
+            "target_pos_id",
+            "target_base_form_id",
+            "target_sense_id",
+            "target_form_id",
+            "target_variant_id",
+            "target_dialect",
+            "target_form_type",
+            "target_headword",
+            "target_gloss",
+            "state"
+          ],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "literal": { "type": "string", "maxLength": 200 },
+            "state": { "type": "string", "enum": ["resolved"] },
+            "target_base_form_id": { "type": "string", "format": "uuid" },
+            "target_dialect": { "$ref": "#/$defs/Dialect" },
+            "target_form_id": { "type": "string", "format": "uuid" },
+            "target_form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+            "target_gloss": { "type": "string", "maxLength": 5000 },
+            "target_headword": { "type": "string", "maxLength": 500 },
+            "target_pos_id": { "type": "string", "format": "uuid" },
+            "target_publication_id": { "type": "string", "format": "uuid" },
+            "target_sense_id": { "type": "string", "format": "uuid" },
+            "target_variant_id": { "type": "string", "format": "uuid" },
+            "target_word_id": { "type": "string", "format": "uuid" }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "ProblemDetails": {
       "type": "object",
@@ -1584,6 +1706,50 @@
     "PronunciationStyle": {
       "type": "string",
       "enum": ["normal", "strong", "weak"]
+    },
+    "PublishedSentenceTargetCandidateV3": {
+      "type": "object",
+      "required": [
+        "entry_id",
+        "publication_id",
+        "pos_id",
+        "base_form_id",
+        "headword",
+        "pos",
+        "matched_form_id",
+        "matched_variant_id",
+        "matched_dialect",
+        "matched_form_type",
+        "component_usages",
+        "matches",
+        "senses"
+      ],
+      "properties": {
+        "base_form_id": { "type": "string", "format": "uuid" },
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PhraseComponentUsageV3" },
+          "maxItems": 100
+        },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "headword": { "type": "string" },
+        "matched_dialect": { "$ref": "#/$defs/Dialect" },
+        "matched_form_id": { "type": "string", "format": "uuid" },
+        "matched_form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+        "matched_variant_id": { "type": "string", "format": "uuid" },
+        "matches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceTargetMatchEvidenceV3" }
+        },
+        "pos": { "type": "string" },
+        "pos_id": { "type": "string", "format": "uuid" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceTargetSenseV3" }
+        }
+      },
+      "additionalProperties": false
     },
     "RelatedSearchLegacyResponse": {
       "type": "object",
@@ -1788,6 +1954,29 @@
     "RelationTypeV2": {
       "type": "string",
       "enum": ["synonym", "antonym", "derivative"]
+    },
+    "ResolveSentenceTargetsV3Response": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "sentence_hash",
+        "discovery_generation",
+        "completeness",
+        "range_results"
+      ],
+      "properties": {
+        "completeness": {
+          "$ref": "#/$defs/SentenceTargetDiscoveryCompletenessV3"
+        },
+        "discovery_generation": { "type": "integer" },
+        "range_results": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceTargetRangeResultV3" }
+        },
+        "schema_version": { "type": "integer", "enum": [3] },
+        "sentence_hash": { "type": "string" }
+      },
+      "additionalProperties": false
     },
     "RetiredStableNodeV3": {
       "type": "object",
@@ -2060,6 +2249,10 @@
       "type": "string",
       "enum": ["unresolved", "resolved"]
     },
+    "SentenceAssociationStateV1": {
+      "type": "string",
+      "enum": ["linked", "pending"]
+    },
     "SentenceSourceRangeV1": {
       "type": "object",
       "required": ["start", "end", "surface"],
@@ -2069,6 +2262,84 @@
         "surface": { "type": "string" }
       },
       "additionalProperties": false
+    },
+    "SentenceTargetDiscoveryCompletenessV3": {
+      "type": "string",
+      "enum": ["complete", "overloaded"]
+    },
+    "SentenceTargetDraftLinkabilityV3": {
+      "type": "string",
+      "enum": ["pending_only"]
+    },
+    "SentenceTargetDraftStateV3": { "type": "string", "enum": ["draft"] },
+    "SentenceTargetMatchEvidenceV3": {
+      "type": "object",
+      "required": ["surface", "normalized_surface", "match_kind"],
+      "properties": {
+        "match_kind": { "$ref": "#/$defs/SentenceTargetMatchKindV3" },
+        "normalized_surface": { "type": "string" },
+        "surface": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "SentenceTargetMatchKindV3": {
+      "type": "string",
+      "enum": ["word", "contiguous_phrase", "separable_phrase"]
+    },
+    "SentenceTargetRangeResultV3": {
+      "type": "object",
+      "required": [
+        "source_segments",
+        "segments_fingerprint",
+        "normalized_surface",
+        "published_total",
+        "published_matches",
+        "draft_matches"
+      ],
+      "properties": {
+        "draft_matches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DraftSentenceTargetCandidateV3" }
+        },
+        "normalized_surface": { "type": "string" },
+        "published_matches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PublishedSentenceTargetCandidateV3" }
+        },
+        "published_total": { "type": "integer", "minimum": 0 },
+        "segments_fingerprint": { "type": "string" },
+        "source_segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+          "maxItems": 20,
+          "minItems": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "SentenceTargetSenseV3": {
+      "type": "object",
+      "required": [
+        "sense_id",
+        "publication_id",
+        "pos_id",
+        "base_form_id",
+        "level",
+        "gloss"
+      ],
+      "properties": {
+        "base_form_id": { "type": "string", "format": "uuid" },
+        "gloss": { "type": "string" },
+        "level": { "type": "string" },
+        "pos_id": { "type": "string", "format": "uuid" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "sense_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "SentenceTranslationBandV3": {
+      "type": "string",
+      "enum": ["a1_a2", "b1_b2", "c1_c2"]
     },
     "SmartDictionaryResultV2": {
       "oneOf": [
@@ -2722,7 +2993,8 @@
         "common_variant",
         "uk_variant",
         "us_variant",
-        "pronunciation"
+        "pronunciation",
+        "phrase_component_usage"
       ]
     },
     "V3ValidationIssueCode": {
@@ -2762,6 +3034,9 @@
         "native_definition_required",
         "sentence_level_invalid",
         "sentence_incomplete",
+        "sentence_translation_required",
+        "sentence_translation_invalid",
+        "duplicate_sentence_translation_band",
         "sentence_link_role_invalid",
         "duplicate_sentence_link",
         "relation_score_invalid",
@@ -2802,6 +3077,11 @@
       "type": "object",
       "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PhraseComponentUsageV3" },
+          "maxItems": 100
+        },
         "dialect": { "$ref": "#/$defs/CommonDialectV3" },
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
@@ -3168,7 +3448,8 @@
           "properties": {
             "common": { "type": "string" },
             "mode": { "type": "string", "enum": ["unified"] }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -3178,7 +3459,8 @@
             "source_dialect": { "$ref": "#/$defs/SourceDialect" },
             "uk": { "type": "string" },
             "us": { "type": "string" }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -3400,26 +3682,24 @@
     },
     "WordSentenceAssociationV2": {
       "type": "object",
-      "required": [
-        "id",
-        "source_dialect",
-        "source_range",
-        "target_word_id",
-        "target_sense_id",
-        "origin",
-        "target_headword",
-        "target_gloss",
-        "resolved_pos"
-      ],
+      "required": ["id", "source_dialect", "source_range", "state", "origin"],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
+        "normalized_pending_target_headword": {
+          "type": "string",
+          "maxLength": 200
+        },
         "origin": { "$ref": "#/$defs/SentenceAssociationOriginV2" },
+        "pending_target_gloss": { "type": "string", "maxLength": 5000 },
+        "pending_target_headword": { "type": "string", "maxLength": 200 },
+        "pending_target_kind": { "$ref": "#/$defs/EntryKind" },
         "resolved_form_type": { "type": "string" },
-        "resolved_pos": { "type": "string" },
+        "resolved_pos": { "type": ["string", "null"] },
         "source_dialect": { "$ref": "#/$defs/Dialect" },
         "source_range": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+        "state": { "$ref": "#/$defs/SentenceAssociationStateV1" },
         "target_form_slot_id": { "type": "string", "format": "uuid" },
-        "target_gloss": { "type": "string" },
+        "target_gloss": { "type": ["string", "null"] },
         "target_headword": { "type": "string" },
         "target_sense_id": { "type": "string", "format": "uuid" },
         "target_word_id": { "type": "string", "format": "uuid" }
@@ -3429,22 +3709,33 @@
       "type": "object",
       "required": [
         "id",
+        "association_schema_version",
         "source_dialect",
-        "source_range",
-        "target_word_id",
-        "target_sense_id",
-        "origin",
-        "target_headword",
-        "target_gloss",
-        "resolved_pos"
+        "source_segments",
+        "state",
+        "origin"
       ],
       "properties": {
+        "association_schema_version": { "type": "integer", "enum": [3] },
         "id": { "type": "string", "format": "uuid" },
+        "normalized_pending_target_headword": {
+          "type": "string",
+          "maxLength": 200
+        },
         "origin": { "$ref": "#/$defs/SentenceAssociationOriginV2" },
+        "pending_target_gloss": { "type": "string", "maxLength": 5000 },
+        "pending_target_headword": { "type": "string", "maxLength": 200 },
+        "pending_target_kind": { "$ref": "#/$defs/EntryKind" },
         "resolved_form_type": { "type": "string" },
         "resolved_pos": { "type": "string" },
         "source_dialect": { "$ref": "#/$defs/Dialect" },
-        "source_range": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+        "source_segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+          "maxItems": 20,
+          "minItems": 1
+        },
+        "state": { "$ref": "#/$defs/SentenceAssociationStateV1" },
         "target_form_slot_id": { "type": "string", "format": "uuid" },
         "target_gloss": { "type": "string" },
         "target_headword": { "type": "string" },
@@ -3469,6 +3760,16 @@
         "role": { "type": "string" },
         "sense_id": { "type": "string", "format": "uuid" },
         "word_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordSentenceTranslationV3": {
+      "type": "object",
+      "required": ["id", "band", "content"],
+      "properties": {
+        "band": { "$ref": "#/$defs/SentenceTranslationBandV3" },
+        "content": { "$ref": "#/$defs/RichTextV3" },
+        "id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -3529,7 +3830,12 @@
           "maxItems": 2000
         },
         "zh_text": { "$ref": "#/$defs/RichTextV3" },
-        "zh_text_id": { "type": "string", "format": "uuid" }
+        "zh_text_id": { "type": "string", "format": "uuid" },
+        "zh_translations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordSentenceTranslationV3" },
+          "maxItems": 3
+        }
       },
       "additionalProperties": false
     },
@@ -3537,6 +3843,11 @@
       "type": "object",
       "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PhraseComponentUsageV3" },
+          "maxItems": 100
+        },
         "dialect": { "$ref": "#/$defs/UkDialectV3" },
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
@@ -3553,6 +3864,11 @@
       "type": "object",
       "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PhraseComponentUsageV3" },
+          "maxItems": 100
+        },
         "dialect": { "$ref": "#/$defs/UsDialectV3" },
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/$defs/TextOrigin" },

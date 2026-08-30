@@ -24,6 +24,7 @@ import {
   decodeEntryLifecycleBatchV2Response,
   decodeFormsImpactResponseAny,
   decodeFormsImpactResponseV3,
+  decodePendingSentenceAssociationListResponse,
   decodeRelatedSearchResponseAny,
   decodeSurfaceMatchPageAny,
   decodeSurfaceMatchPageV3
@@ -460,6 +461,44 @@ describe("admin word V2 response schema guard", () => {
 });
 
 describe("admin word V3/Any runtime decoder", () => {
+  it("Pending 例句关联列表按完整 runtime schema 接受合法 wire 并拒绝缺字段", () => {
+    const response = {
+      results: [
+        {
+          association_id: IDS.form1,
+          owner_entry_id: IDS.entry,
+          owner_entry_revision: 7,
+          owner_lifecycle_revision: 3,
+          sentence_id: IDS.form2,
+          source_dialect: "common",
+          source_segments: [
+            {
+              start: 22,
+              end: 40,
+              surface: "center of the wall"
+            }
+          ],
+          sentence_text: "It is centered on the center of the wall.",
+          pending_target_kind: "phrase",
+          pending_target_headword: "center of the wall",
+          pending_target_gloss: "墙的中心位置"
+        }
+      ],
+      total: 1,
+      next_cursor: null
+    };
+
+    expect(decodePendingSentenceAssociationListResponse(response)).toEqual(
+      response
+    );
+    const invalid = structuredClone(response);
+    delete (invalid.results[0] as Partial<(typeof invalid.results)[number]>)
+      .pending_target_kind;
+    expect(() => decodePendingSentenceAssociationListResponse(invalid)).toThrow(
+      InvalidAdminWordResponseError
+    );
+  });
+
   it("接受复杂 V3、V2/V3 混合列表和生命周期批量响应，并保留原引用", () => {
     const v3Word = validAdminWordV3();
     const v3Envelope = { word: v3Word };
