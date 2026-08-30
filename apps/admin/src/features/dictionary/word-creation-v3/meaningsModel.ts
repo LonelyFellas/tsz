@@ -6,8 +6,10 @@ import type {
   EnglishTextV3,
   RichTextV3,
   RichTextVariantV3,
+  SentenceTranslationBandV3,
   WordDefinitionV3,
-  WordPosMeaningsWritableV3
+  WordPosMeaningsWritableV3,
+  WordSentenceTranslationV3
 } from "@tsz/types";
 
 export interface RelationDisplaySnapshot {
@@ -18,6 +20,37 @@ export interface RelationDisplaySnapshot {
 export type RelationDisplaySnapshots = Readonly<
   Record<string, RelationDisplaySnapshot>
 >;
+
+export function sentenceTranslationBand(
+  level: string
+): SentenceTranslationBandV3 {
+  if (level === "C1" || level === "C2") return "c1_c2";
+  if (level === "A1" || level === "A2") return "a1_a2";
+  return "b1_b2";
+}
+
+export function sentenceTranslationsV3(sentence: {
+  level: string;
+  zh_text_id: string;
+  zh_text: RichTextV3;
+  zh_translations?: WordSentenceTranslationV3[];
+}): WordSentenceTranslationV3[] {
+  const translations =
+    sentence.zh_translations && sentence.zh_translations.length > 0
+      ? sentence.zh_translations
+      : [
+          {
+            id: sentence.zh_text_id,
+            band: sentenceTranslationBand(sentence.level),
+            content: sentence.zh_text
+          }
+        ];
+  return translations.map((translation) => ({
+    id: translation.id,
+    band: translation.band,
+    content: cloneRichText(translation.content)
+  }));
+}
 
 export function relationDisplaySnapshots(
   canonical: DraftMeaningsStepContentV3
@@ -155,6 +188,7 @@ export function toWritableMeanings(
           en_text: cloneEnglishText(sentence.en_text),
           zh_text_id: sentence.zh_text_id,
           zh_text: cloneRichText(sentence.zh_text),
+          zh_translations: sentenceTranslationsV3(sentence),
           links: sentence.links.map((link) => ({
             word_id: link.word_id,
             sense_id: link.sense_id,
@@ -198,6 +232,7 @@ function createDefaultPosMeanings(
   idFactory: () => string
 ): WordPosMeaningsWritableV3 {
   const senseId = idFactory();
+  const translationId = idFactory();
   return {
     pos_id: posId,
     grammar_structures: [
@@ -240,8 +275,15 @@ function createDefaultPosMeanings(
                 value: { version: 2, text: "", annotations: [] }
               }
             },
-            zh_text_id: idFactory(),
+            zh_text_id: translationId,
             zh_text: { version: 2, text: "", annotations: [] },
+            zh_translations: [
+              {
+                id: translationId,
+                band: "a1_a2",
+                content: { version: 2, text: "", annotations: [] }
+              }
+            ],
             links: [{ word_id: wordId, sense_id: senseId, role: "focus" }]
           }
         ],

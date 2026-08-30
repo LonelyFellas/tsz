@@ -28,6 +28,7 @@ export type V3ProblemOperation =
   | "impact"
   | "save_forms"
   | "save_meanings"
+  | "save_sentence_associations"
   | "validate"
   | "publish"
   | "activate";
@@ -35,6 +36,7 @@ export type V3ProblemOperation =
 function hasIdempotencyKey(operation?: V3ProblemOperation): boolean {
   return (
     operation === "create" ||
+    operation === "save_sentence_associations" ||
     operation === "publish" ||
     operation === "activate"
   );

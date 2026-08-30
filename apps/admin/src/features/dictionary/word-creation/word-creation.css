@@ -1619,10 +1619,48 @@
   border-bottom: 1px solid #e3e7ed;
 }
 
+.word-sense-section-title.is-interactive {
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.word-sense-section-title.is-interactive:hover {
+  color: #0067ce;
+  background: #edf5ff;
+}
+
+.word-sense-section-title.is-interactive:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #0071e3;
+  outline-offset: -2px;
+}
+
 .word-sense-section-title .ant-tag {
   margin-inline-end: 0;
   color: #737b89;
   background: #fff;
+}
+
+.word-sense-section-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 220ms ease,
+    opacity 160ms ease;
+}
+
+.word-sense-section-body.is-collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.word-sense-section-body-inner {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .word-sense-section.is-collapsed {
@@ -1713,6 +1751,30 @@
 
 .word-sentence-sound-icon {
   color: #1677ff;
+}
+
+.word-sentence-translation-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #0071e3;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.word-sentence-translation-tier strong {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  color: #fff;
+  font-size: 12px;
+  background: #0071e3;
+  border-radius: 6px;
+  place-items: center;
+}
+
+.word-sentence-translation-list {
+  width: 100%;
 }
 
 .word-sentence-row .dialect-grid,

@@ -73,11 +73,14 @@ const meaningsCanonicalFixture: DraftMeaningsStepContentV3 = {
               associations: [
                 {
                   id: "association-read-only",
+                  association_schema_version: 3,
                   source_dialect: "common",
-                  source_range: { start: 4, end: 10, surface: "center" },
+                  source_segments: [{ start: 4, end: 10, surface: "center" }],
                   target_word_id: "target-entry",
                   target_sense_id: "target-sense",
                   target_form_slot_id: "legacy-slot",
+                  state: "linked",
+                  target_component_usages: [],
                   origin: "auto",
                   target_headword: "center",
                   target_gloss: "中心",
@@ -179,9 +182,19 @@ describe("V3 meanings writable model", () => {
           },
           zh_text_id: expect.any(String),
           zh_text: { version: 2, text: "", annotations: [] },
+          zh_translations: [
+            {
+              id: expect.any(String),
+              band: "a1_a2",
+              content: { version: 2, text: "", annotations: [] }
+            }
+          ],
           links: [{ word_id: "word-1", sense_id: sense.id, role: "focus" }]
         }
       ]);
+      expect(sense.sentences[0]!.zh_translations[0]!.id).toBe(
+        sense.sentences[0]!.zh_text_id
+      );
     }
     expect(
       new Set(idFactory.mock.results.map((entry) => entry.value)).size
@@ -704,5 +717,12 @@ describe("V3 meanings writable model", () => {
       pending_target_gloss: "中心点",
       score: "0"
     });
+    expect(projectedSense.sentences[0]!.zh_translations).toEqual([
+      {
+        id: projectedSense.sentences[0]!.zh_text_id,
+        band: "a1_a2",
+        content: projectedSense.sentences[0]!.zh_text
+      }
+    ]);
   });
 });

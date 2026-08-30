@@ -2,11 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ActivatePublicationInput,
   AdminWordV2,
+  ClaimPendingSentenceAssociationInputV3,
   CreateContentCompletionJobInput,
   EntryLifecycleBatchInput,
   EntryLifecycleInput,
   PreviewFormsImpactInputV2,
   PublishAdminWordV2Input,
+  ReplaceSentenceAssociationsInputV3,
+  ResolveSentenceTargetsV3Input,
   SaveFormsStepInput,
   SaveMeaningsStepInput,
   WordRelationWritableV3,
@@ -488,6 +491,107 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       "/lexicon/entries/w-2/steps/meanings",
       input
     );
+  });
+
+  it("正式例句 resolve/replace/list/claim 使用权威路径、分页与幂等 header", () => {
+    const pending = new Promise<never>(() => {});
+    http.get.mockReturnValue(pending);
+    http.post.mockReturnValue(pending);
+    http.put.mockReturnValue(pending);
+    const api = createAdminEndpoints(http);
+    const resolveInput: ResolveSentenceTargetsV3Input = {
+      schema_version: 3,
+      sentence_text: "It is centered on the center of the wall.",
+      source_dialect: "common",
+      mode: "selected_segments",
+      selected_segments: [
+        { start: 22, end: 40, surface: "center of the wall" }
+      ],
+      include_drafts: true,
+      page_size_per_range: 20,
+      cursor: "resolve-cursor"
+    };
+    const replaceInput: ReplaceSentenceAssociationsInputV3 = {
+      association_schema_version: 3,
+      base_revision: 7,
+      base_lifecycle_revision: 3,
+      associations: [
+        {
+          id: "association-1",
+          source_dialect: "common",
+          source_segments: [
+            { start: 22, end: 40, surface: "center of the wall" }
+          ],
+          pending_target_kind: "phrase",
+          pending_target_headword: "center of the wall",
+          pending_target_gloss: "墙的中心位置"
+        }
+      ]
+    };
+    const claimInput: ClaimPendingSentenceAssociationInputV3 = {
+      target_word_id: "target-entry",
+      target_sense_id: "target-sense",
+      target_publication_id: "target-publication",
+      target_form_variant_id: "target-variant",
+      base_owner_entry_revision: 7,
+      base_owner_lifecycle_revision: 4
+    };
+
+    api.words.resolveSentenceTargetsV3(resolveInput);
+    api.words.replaceSentenceAssociations(
+      "owner-entry",
+      "sentence-1",
+      "replace-key",
+      replaceInput
+    );
+    api.words.listPendingSentenceAssociations("target-entry", {
+      page_size: 20,
+      cursor: "pending-cursor"
+    });
+    api.words.claimPendingSentenceAssociation(
+      "association-1",
+      "claim-key",
+      claimInput
+    );
+
+    expect(http.post).toHaveBeenNthCalledWith(
+      1,
+      "/lexicon/entries/sentence-targets/resolve",
+      resolveInput
+    );
+    expect(http.put).toHaveBeenCalledWith(
+      "/lexicon/entries/owner-entry/sentences/sentence-1/associations",
+      replaceInput,
+      { headers: { "Idempotency-Key": "replace-key" } }
+    );
+    expect(http.get).toHaveBeenCalledWith(
+      "/lexicon/entries/target-entry/pending-sentence-associations?page_size=20&cursor=pending-cursor"
+    );
+    expect(http.post).toHaveBeenNthCalledWith(
+      2,
+      "/lexicon/pending-sentence-associations/association-1/claim",
+      claimInput,
+      { headers: { "Idempotency-Key": "claim-key" } }
+    );
+  });
+
+  it("replace 解码响应并校验 owner path identity", async () => {
+    http.put.mockResolvedValue({ word: lifecycleWord(LIFECYCLE_WORD_A) });
+    const api = createAdminEndpoints(http);
+
+    const response = await api.words.replaceSentenceAssociations(
+      LIFECYCLE_WORD_A,
+      "018f47b8-e3c1-7bd1-9f0a-123456789ac1",
+      "018f47b8-e3c1-7bd1-9f0a-123456789ac2",
+      {
+        association_schema_version: 3,
+        base_revision: 1,
+        base_lifecycle_revision: 1,
+        associations: []
+      }
+    );
+
+    expect(response.word.id).toBe(LIFECYCLE_WORD_A);
   });
 
   it("content completion create/get/retry 使用权威路径和独立幂等 header", () => {

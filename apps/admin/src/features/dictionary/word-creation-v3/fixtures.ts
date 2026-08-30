@@ -103,6 +103,7 @@ export function commonFormFixture(
         dialect: "common",
         spelling: overrides.spelling ?? "centre",
         origin: overrides.origin ?? "dictionary",
+        component_usages: [],
         pronunciations: overrides.pronunciations ?? [
           pronunciationFixture({
             id: isDefault ? UUIDS.pronunciation : derivedUuid(id, 51)
@@ -140,6 +141,7 @@ export function ukUsFormFixture(
         dialect: "uk",
         spelling: "centre",
         origin: "dictionary",
+        component_usages: [],
         pronunciations: [pronunciationFixture({ id: UUIDS.pronunciation_2 })],
         ...overrides.uk
       },
@@ -148,6 +150,7 @@ export function ukUsFormFixture(
         dialect: "us",
         spelling: "center",
         origin: "dictionary",
+        component_usages: [],
         pronunciations: [pronunciationFixture({ id: UUIDS.pronunciation_3 })],
         ...overrides.us
       }

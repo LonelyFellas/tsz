@@ -31,7 +31,8 @@ const API_PREFIX = "/api/v1";
 const ADMIN_LEXICON_PREFIX = `${API_PREFIX}/admin/lexicon`;
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
 const QUERY_CONTRACT_OPERATIONS = new Set([
-  "get /admin/lexicon/entries/related-search"
+  "get /admin/lexicon/entries/related-search",
+  "get /admin/lexicon/entries/{id}/pending-sentence-associations"
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
@@ -45,6 +46,8 @@ const RUNTIME_SCHEMA_ROOTS = [
   "SurfaceMatchPageAny",
   "RelatedSearchResponse",
   "DetectLexiconResponseAny",
+  "PendingSentenceAssociationListResponse",
+  "ResolveSentenceTargetsV3Response",
   "AdminWordPublicationListResponse",
   "AdminWordPublicationEnvelope",
   "DraftValidationIssueAny",
@@ -158,6 +161,27 @@ const contractSchemaNames = [
   "ContentCompletionPartition",
   "ContentCompletionJob",
   "ContentCompletionJobEnvelope",
+  "SentenceAssociationStateV1",
+  "SentenceAssociationInputV2",
+  "SentenceAssociationInputV3",
+  "ReplaceSentenceAssociationsInputV2",
+  "ReplaceSentenceAssociationsInputV3",
+  "ReplaceSentenceAssociationsInput",
+  "PendingSentenceAssociationItemV1",
+  "PendingSentenceAssociationItemV3",
+  "PendingSentenceAssociationListResponse",
+  "ClaimPendingSentenceAssociationInput",
+  "ResolveSentenceTargetsV3Input",
+  "ResolveSentenceTargetsV3Response",
+  "SentenceTargetDiscoveryCompletenessV3",
+  "SentenceTargetMatchKindV3",
+  "SentenceTargetMatchEvidenceV3",
+  "SentenceTargetSenseV3",
+  "PublishedSentenceTargetCandidateV3",
+  "SentenceTargetDraftStateV3",
+  "SentenceTargetDraftLinkabilityV3",
+  "DraftSentenceTargetCandidateV3",
+  "SentenceTargetRangeResultV3",
   "VoiceCapabilities",
   "VoiceResponse",
   "VoiceListResponse",

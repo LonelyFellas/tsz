@@ -25,6 +25,7 @@ import {
   useSurfaceSnapshotAny
 } from "../useSurfaceSnapshot";
 import { createV3WordRequests, type V3WordRequests } from "./api";
+import { sentenceTranslationsV3 } from "./meaningsModel";
 import {
   definitionModeLabel,
   dialectLabel,
@@ -104,7 +105,7 @@ interface SnapshotSentenceLine {
   pos: string;
   level: string;
   english: Array<{ id: string; dialect: string; text: string }>;
-  chinese: string;
+  chinese: Array<{ id: string; label?: string; text: string }>;
   roles: string[];
   associations: Array<{ id: string; target: string; gloss?: string }>;
 }
@@ -260,7 +261,12 @@ function snapshotBody(publication: AdminWordPublicationAny): {
             pos: posById.get(pos.pos_id) ?? pos.pos_id,
             level: sentence.level,
             english: v2EnglishRows(sentence.en_text),
-            chinese: sentence.zh_text.text,
+            chinese: [
+              {
+                id: sentence.zh_text_id,
+                text: sentence.zh_text.text
+              }
+            ],
             roles: sentence.links.map((link) =>
               sentenceLinkRoleLabel(link.role)
             ),
@@ -347,15 +353,37 @@ function snapshotBody(publication: AdminWordPublicationAny): {
           pos: posById.get(pos.pos_id) ?? pos.pos_id,
           level: sentence.level,
           english: v3EnglishRows(sentence.en_text),
-          chinese: sentence.zh_text.text,
+          chinese: sentenceTranslationsV3(sentence).map((translation) => ({
+            id: translation.id,
+            label:
+              translation.band === "c1_c2"
+                ? "初"
+                : translation.band === "b1_b2"
+                  ? "中"
+                  : "高",
+            text: translation.content.text
+          })),
           roles: sentence.links.map((link) => sentenceLinkRoleLabel(link.role)),
-          associations: sentence.associations.map((association) => ({
-            id: association.id,
-            target: association.target_headword,
-            ...(association.target_gloss
-              ? { gloss: association.target_gloss }
-              : {})
-          }))
+          associations: sentence.associations.map((association) => {
+            const fallback = association.source_segments
+              .map((segment) => segment.surface)
+              .join(" … ");
+            return association.state === "linked"
+              ? {
+                  id: association.id,
+                  target: association.target_headword || fallback,
+                  ...(association.target_gloss
+                    ? { gloss: association.target_gloss }
+                    : {})
+                }
+              : {
+                  id: association.id,
+                  target: association.pending_target_headword || fallback,
+                  ...(association.pending_target_gloss
+                    ? { gloss: association.pending_target_gloss }
+                    : {})
+                };
+          })
         }))
       )
     ),
@@ -480,7 +508,16 @@ function PublicationSnapshotBody({
                       {dialectLabel(row.dialect as never)}：{row.text}
                     </Typography.Text>
                   ))}
-                  <Typography.Text>中文：{sentence.chinese}</Typography.Text>
+                  {sentence.chinese.map((translation) => (
+                    <Typography.Text key={translation.id}>
+                      {translation.label ? (
+                        <Tag>{translation.label}</Tag>
+                      ) : (
+                        "中文："
+                      )}
+                      {translation.text}
+                    </Typography.Text>
+                  ))}
                   {sentence.associations.map((association) => (
                     <Typography.Text key={association.id}>
                       上下文关联：{association.target}

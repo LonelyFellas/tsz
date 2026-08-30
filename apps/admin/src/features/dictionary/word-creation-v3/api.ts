@@ -5,8 +5,10 @@ import {
   type AdminEndpoints
 } from "@tsz/api-client";
 import type {
+  AdminWordAnyEnvelope,
   AdminWordDraftV3Envelope,
-  AdminWordPublicationAny
+  AdminWordPublicationAny,
+  AdminWordV3Envelope
 } from "@tsz/types";
 import { api } from "@/lib/auth";
 
@@ -19,6 +21,10 @@ export type V3WordsApi = Pick<
   | "previewFormsImpactV3"
   | "saveFormsStepV3"
   | "saveMeaningsStepV3"
+  | "replaceSentenceAssociations"
+  | "resolveSentenceTargetsV3"
+  | "listPendingSentenceAssociations"
+  | "claimPendingSentenceAssociation"
   | "validateV3"
   | "publishV3"
   | "listPublications"
@@ -60,6 +66,20 @@ function requireWordIdentity<T extends { word: { id: string } }>(
 ): T {
   requireIdentity(envelope.word.id, wordId, responsePath);
   return envelope;
+}
+
+function requireV3Envelope(
+  envelope: AdminWordAnyEnvelope,
+  responsePath: string
+): AdminWordV3Envelope {
+  if (envelope.word.schema_version !== 3) {
+    throw new UnsupportedAdminWordSchemaVersionError(
+      envelope.word.schema_version,
+      responsePath,
+      [3]
+    );
+  }
+  return envelope as AdminWordV3Envelope;
 }
 
 function requirePublicationIdentity(
@@ -145,6 +165,56 @@ export function createV3WordRequests(source: V3WordsApi = api.words) {
         .saveMeaningsStepV3(wordId, input)
         .then((response) =>
           requireWordIdentity(response, wordId, "save_meanings.word.id")
+        ),
+    replaceSentenceAssociations: (
+      wordId: string,
+      sentenceId: string,
+      idempotencyKey: string,
+      input: Parameters<V3WordsApi["replaceSentenceAssociations"]>[3]
+    ) =>
+      source
+        .replaceSentenceAssociations(wordId, sentenceId, idempotencyKey, input)
+        .then((response) =>
+          requireWordIdentity(
+            response,
+            wordId,
+            "replace_sentence_associations.word.id"
+          )
+        )
+        .then((response) =>
+          requireV3Envelope(
+            response,
+            "replace_sentence_associations.word.schema_version"
+          )
+        ),
+    resolveSentenceTargets: (
+      input: Parameters<V3WordsApi["resolveSentenceTargetsV3"]>[0],
+      signal?: AbortSignal
+    ) => source.resolveSentenceTargetsV3(input, signal),
+    listPendingSentenceAssociations: (
+      targetWordId: string,
+      query?: Parameters<V3WordsApi["listPendingSentenceAssociations"]>[1]
+    ) => source.listPendingSentenceAssociations(targetWordId, query),
+    claimPendingSentenceAssociation: (
+      ownerWordId: string,
+      associationId: string,
+      idempotencyKey: string,
+      input: Parameters<V3WordsApi["claimPendingSentenceAssociation"]>[2]
+    ) =>
+      source
+        .claimPendingSentenceAssociation(associationId, idempotencyKey, input)
+        .then((response) =>
+          requireWordIdentity(
+            response,
+            ownerWordId,
+            "claim_pending_sentence_association.word.id"
+          )
+        )
+        .then((response) =>
+          requireV3Envelope(
+            response,
+            "claim_pending_sentence_association.word.schema_version"
+          )
         ),
     validate: (
       wordId: string,
