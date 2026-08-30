@@ -11,9 +11,9 @@ import type { ReactNode } from "react";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import type { V3IssueNavigationTarget } from "./issueNavigation";
 import type { V3Problem } from "./problem";
-import { v3IssueMessage } from "./presentationErrors";
-import { buildV3ProductProgress, type V3ReadinessSummary } from "./readiness";
+import { buildV3ProductProgress } from "./readiness";
 import { wordStatusLabel } from "./presentation";
+import { v3IssueMessages } from "./presentationErrors";
 import "./v3-layout.css";
 
 const STEP_TITLE: Record<WordCreationStep, string> = {
@@ -44,7 +44,6 @@ interface Props {
   dirtySteps?: Readonly<{ forms: boolean; meanings: boolean }>;
   draftForms?: DraftFormsStepContentV3;
   draftMeanings?: DraftMeaningsStepContentWritableV3;
-  readiness: V3ReadinessSummary;
   issues: readonly V3DraftValidationIssue[];
   problem?: V3Problem;
   conflict?: V3ConflictComparison;
@@ -52,7 +51,7 @@ interface Props {
   refreshingConflict?: boolean;
   onStepChange: (step: WordCreationStep) => void;
   onProgressNavigate?: (target: V3IssueNavigationTarget) => void;
-  onIssueNavigate: (issue: V3DraftValidationIssue) => void;
+  onIssueNavigate?: (issue: V3DraftValidationIssue) => void;
   onRetry?: () => void;
   onRefreshConflict?: () => void;
   children: ReactNode;
@@ -108,7 +107,6 @@ export function V3WordCreationLayout({
   dirtySteps = { forms: false, meanings: false },
   draftForms,
   draftMeanings,
-  readiness,
   issues,
   problem,
   conflict,
@@ -131,16 +129,6 @@ export function V3WordCreationLayout({
             surface.trim() !== "" &&
             !/^未命名词条(?:\s*·.*)?$/u.test(surface.trim())
         ) ?? "新词条"));
-  const displayedIssues = issues.filter(
-    (issue, index) =>
-      issues.findIndex(
-        (candidate) =>
-          candidate.step === issue.step &&
-          candidate.node_id === issue.node_id &&
-          candidate.field === issue.field &&
-          candidate.code === issue.code
-      ) === index
-  );
   const progressRows = buildV3ProductProgress({
     wordId: word.id,
     completedSteps: word.completed_steps,
@@ -151,6 +139,12 @@ export function V3WordCreationLayout({
   const currentProgressKey = progressRows.find(
     (row) => row.target.step === activeStep && !row.completed
   )?.key;
+  const operationValidationIssues =
+    problem?.kind === "validation" &&
+    problem.operation !== "validate" &&
+    problem.operation !== "publish"
+      ? problem.issues
+      : [];
   return (
     <WordCreationLayout
       currentStep={activeStep}
@@ -258,6 +252,12 @@ export function V3WordCreationLayout({
                   </span>
                   {conflict.serverWord && <span>已获取服务端最新内容。</span>}
                 </Flex>
+              ) : operationValidationIssues.length > 0 ? (
+                <Flex vertical gap={4}>
+                  {v3IssueMessages(operationValidationIssues).map((message) => (
+                    <span key={message}>{message}</span>
+                  ))}
+                </Flex>
               ) : undefined
             }
             action={
@@ -270,6 +270,12 @@ export function V3WordCreationLayout({
                 >
                   刷新并比较
                 </Button>
+              ) : operationValidationIssues[0] && onIssueNavigate ? (
+                <Button
+                  onClick={() => onIssueNavigate(operationValidationIssues[0]!)}
+                >
+                  去处理首项
+                </Button>
               ) : problem.retryable && onRetry ? (
                 <Button loading={retrying} onClick={onRetry}>
                   重试
@@ -279,25 +285,6 @@ export function V3WordCreationLayout({
           />
         )}
 
-        {readiness.issue_count > 0 && (
-          <section className="v3-word-creation__issues" aria-label="待完成项">
-            <Typography.Text strong>
-              待完成 {readiness.issue_count} 项
-            </Typography.Text>
-            <Flex vertical gap={6}>
-              {displayedIssues.map((issue) => (
-                <Button
-                  type="text"
-                  className="v3-word-creation__issue"
-                  key={`${issue.step}:${issue.node_id}:${issue.field}:${issue.code}`}
-                  onClick={() => onIssueNavigate(issue)}
-                >
-                  {v3IssueMessage(issue)}
-                </Button>
-              ))}
-            </Flex>
-          </section>
-        )}
         {children}
       </Flex>
     </WordCreationLayout>

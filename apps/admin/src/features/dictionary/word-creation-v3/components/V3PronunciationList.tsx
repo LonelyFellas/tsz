@@ -21,9 +21,20 @@ import {
 } from "../operations";
 import { pronunciationStyleLabel } from "../presentation";
 import { dialectLabel } from "../presentation";
+import { v3IssueMessage } from "../presentationErrors";
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 
 const PRONUNCIATION_DRAG_TYPE = "application/x-tsz-pronunciation";
+
+function pronunciationFieldMessage(
+  issue: V3DraftValidationIssue,
+  field: "style" | "dict_phonetic" | "actual_pron"
+) {
+  if (issue.code !== "pronunciation_required") return v3IssueMessage(issue);
+  if (field === "style") return "请选择发音方式";
+  if (field === "dict_phonetic") return "请填写字典音标";
+  return "请填写实际发音";
+}
 
 function updateVariantPronunciations(
   content: DraftFormsStepContentV3,
@@ -105,6 +116,15 @@ export function V3PronunciationList({
                 const rowIssues = issuesForPronunciation(
                   issues,
                   pronunciation.id
+                );
+                const styleIssue = rowIssues.find(
+                  (item) => item.field === "style"
+                );
+                const dictPhoneticIssue = rowIssues.find(
+                  (item) => item.field === "dict_phonetic"
+                );
+                const actualPronIssue = rowIssues.find(
+                  (item) => item.field === "actual_pron"
                 );
                 return (
                   <div
@@ -284,9 +304,18 @@ export function V3PronunciationList({
                               }
                             ]}
                             placeholder="风格"
+                            status={styleIssue ? "error" : undefined}
                             value={pronunciation.style}
                           />
                         </Form.Item>
+                        {styleIssue ? (
+                          <Typography.Text
+                            className="word-field-help"
+                            type="danger"
+                          >
+                            {pronunciationFieldMessage(styleIssue, "style")}
+                          </Typography.Text>
+                        ) : null}
                       </label>
                       <div className="word-pronunciation-row">
                         <Typography.Text className="word-pronunciation-label">
@@ -321,10 +350,22 @@ export function V3PronunciationList({
                                   )
                                 }
                                 placeholder="字典音标"
+                                status={dictPhoneticIssue ? "error" : undefined}
                                 value={pronunciation.dict_phonetic}
                               />
                             </Form.Item>
                           </PronunciationPreviewControls>
+                          {dictPhoneticIssue ? (
+                            <Typography.Text
+                              className="word-field-help"
+                              type="danger"
+                            >
+                              {pronunciationFieldMessage(
+                                dictPhoneticIssue,
+                                "dict_phonetic"
+                              )}
+                            </Typography.Text>
+                          ) : null}
                         </div>
                       </div>
                       <label className="word-pronunciation-row">
@@ -347,9 +388,21 @@ export function V3PronunciationList({
                               )
                             }
                             placeholder="实际发音"
+                            status={actualPronIssue ? "error" : undefined}
                             value={pronunciation.actual_pron}
                           />
                         </Form.Item>
+                        {actualPronIssue ? (
+                          <Typography.Text
+                            className="word-field-help"
+                            type="danger"
+                          >
+                            {pronunciationFieldMessage(
+                              actualPronIssue,
+                              "actual_pron"
+                            )}
+                          </Typography.Text>
+                        ) : null}
                       </label>
                     </div>
                   </div>

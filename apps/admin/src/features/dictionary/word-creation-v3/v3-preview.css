@@ -238,6 +238,75 @@
   background: #f6f8fb;
 }
 
+.v3-validation-summary {
+  overflow: hidden;
+  border: 1px solid #ffccc7;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.v3-validation-summary__overview {
+  padding: 18px 20px;
+  background: linear-gradient(135deg, #fff1f0, #fff 72%);
+}
+
+.v3-validation-summary__overview .ant-typography {
+  margin: 0;
+}
+
+.v3-validation-summary__overview h3.ant-typography {
+  margin-top: 2px;
+  color: #1f2937;
+}
+
+.v3-validation-summary__positions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid #fff1f0;
+}
+
+.v3-validation-summary__position,
+.v3-validation-summary__type {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.v3-validation-summary__position {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #eef0f3;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.v3-validation-summary__position > div,
+.v3-validation-summary__type-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.v3-validation-summary__types {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid #eef0f3;
+}
+
+.v3-validation-summary__type {
+  padding: 8px 0;
+}
+
+.v3-validation-summary__type + .v3-validation-summary__type {
+  border-top: 1px solid #f0f0f0;
+}
+
 @media (max-width: 1199px) {
   .v3-review-overview {
     grid-template-columns: 1fr;
@@ -264,5 +333,16 @@
   .v3-review-variant + .v3-review-variant {
     border-top: 1px solid #eef0f3;
     border-left: 0;
+  }
+
+  .v3-validation-summary__overview,
+  .v3-validation-summary__positions,
+  .v3-validation-summary__types {
+    padding-right: 14px;
+    padding-left: 14px;
+  }
+
+  .v3-validation-summary__positions {
+    grid-template-columns: 1fr;
   }
 }

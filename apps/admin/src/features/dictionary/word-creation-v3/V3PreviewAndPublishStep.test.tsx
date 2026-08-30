@@ -12,7 +12,8 @@ import {
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -460,6 +461,145 @@ describe("V3PreviewAndPublishStep", () => {
     ).toBeNull();
   });
 
+  it("按原始总数、基本词性和问题类型汇总重复校验项并定位首项", () => {
+    const current = word({ mode: "migration_canary", whitelisted: true });
+    const positions = [
+      { code: "adjective", id: uuidFromInt(1001), count: 8 },
+      { code: "noun", id: uuidFromInt(1002), count: 10 },
+      { code: "verb", id: uuidFromInt(1003), count: 11 }
+    ];
+    current.forms = {
+      pos: positions.map(({ code, id }) => ({
+        ...formsFixture({ pos: code, pos_id: id }).pos[0]!,
+        pos: code,
+        pos_id: id
+      }))
+    };
+    const issues = positions.flatMap(({ id, count }, positionIndex) =>
+      Array.from({ length: count }, (_, issueIndex) => {
+        const pronunciationId = uuidFromInt(
+          1100 + positionIndex * 20 + issueIndex
+        );
+        return {
+          schema_version: 3,
+          step: "forms",
+          node_id: pronunciationId,
+          field: "actual_pron",
+          code: "pronunciation_required",
+          message: "actual pronunciation is missing",
+          node_location: {
+            node_role: "pronunciation",
+            ancestor_node_ids: [id],
+            pos_id: id,
+            form_id: current.forms.pos[positionIndex]!.forms[0]!.id,
+            form_type: "base",
+            pronunciation_id: pronunciationId
+          }
+        } satisfies V3DraftValidationIssue;
+      })
+    );
+    const navigateIssue = vi.fn();
+    const controller: V3PreviewPublishController = {
+      issues,
+      isPending: () => false,
+      actions: {
+        validate: vi.fn(),
+        previewFormsImpact: vi.fn(),
+        publish: vi.fn(),
+        navigateIssue
+      }
+    };
+
+    render(<V3PreviewAndPublishStep word={current} controller={controller} />);
+
+    const summary = screen.getByRole("region", {
+      name: "发布待完成摘要"
+    });
+    expect(
+      within(summary).getByRole("heading", { name: "还有 29 项待完成" })
+    ).toBeVisible();
+    expect(
+      within(summary).getByTestId("issue-pos-adjective")
+    ).toHaveTextContent("形容词8 项待完成");
+    expect(within(summary).getByTestId("issue-pos-noun")).toHaveTextContent(
+      "名词10 项待完成"
+    );
+    expect(within(summary).getByTestId("issue-pos-verb")).toHaveTextContent(
+      "动词11 项待完成"
+    );
+    expect(
+      within(summary).getAllByText("请完整填写发音方式、字典音标和实际发音", {
+        exact: true
+      })
+    ).toHaveLength(1);
+
+    fireEvent.click(
+      within(summary).getByRole("button", { name: "填写形容词未完成项" })
+    );
+    expect(navigateIssue).toHaveBeenCalledWith(issues[0]);
+  });
+
+  it("passes an inferred non-current POS to publication issue navigation", () => {
+    const current = word({ mode: "migration_canary", whitelisted: true });
+    const verbPosId = uuidFromInt(1301);
+    current.forms.pos.push(
+      formsFixture({ pos: "verb", pos_id: verbPosId }).pos[0]!
+    );
+    current.meanings.pos = [
+      {
+        pos_id: verbPosId,
+        grammar_structures: [],
+        senses: [
+          {
+            id: uuidFromInt(1302),
+            sub_pos: "transitive",
+            level: "A1",
+            depends_on_context: false,
+            definitions: [],
+            sentences: [],
+            relations: []
+          }
+        ]
+      }
+    ];
+    const issue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "meanings",
+      node_id: uuidFromInt(1302),
+      field: "definitions",
+      code: "definition_required",
+      message: "definition is required",
+      node_location: {
+        node_role: "sense",
+        ancestor_node_ids: []
+      }
+    };
+    const navigateIssue = vi.fn();
+
+    render(
+      <V3PreviewAndPublishStep
+        word={current}
+        controller={{
+          issues: [issue],
+          isPending: () => false,
+          actions: {
+            validate: vi.fn(),
+            previewFormsImpact: vi.fn(),
+            publish: vi.fn(),
+            navigateIssue
+          }
+        }}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "填写动词未完成项" }));
+    expect(navigateIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        node_location: expect.objectContaining({ pos_id: verbPosId })
+      })
+    );
+  });
+
   it("shows every concrete impact item instead of only the affected count", () => {
     const affected: FormsImpactResponseV3["affected"] = [
       { node_type: "sense", node_id: "sense-1", reason: "词义仍引用词形" },
@@ -771,7 +911,7 @@ describe("V3PreviewAndPublishStep", () => {
         onPublished={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
+    fireEvent.click(screen.getByRole("button", { name: /检查发布条件/ }));
     fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
 
     const retry = await screen.findByRole("button", {
@@ -856,11 +996,43 @@ describe("V3PreviewAndPublishStep", () => {
         onPublished={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
+    fireEvent.click(screen.getByRole("button", { name: /检查发布条件/ }));
     expect(
       await screen.findByText("当前词性不支持该词形类型")
     ).toBeInTheDocument();
     expect(requests.impact).not.toHaveBeenCalled();
+  });
+
+  it("clears a standalone publish attempt and prepared state after a 422", async () => {
+    const current = word({ mode: "migration_canary", whitelisted: true });
+    const issue = validationIssue();
+    const publish = vi
+      .fn()
+      .mockRejectedValueOnce(
+        new HttpError(422, "invalid", [], "validation_failed", [issue])
+      )
+      .mockResolvedValueOnce({
+        word: { ...current, revision: 8, status: "published" }
+      });
+    const requests = allowedRequests({ publish });
+
+    render(
+      <V3PreviewAndPublishStep
+        word={current}
+        requests={requests}
+        onPublished={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
+    expect(await screen.findByText("当前词性不支持该词形类型")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: /检查发布条件/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
+    await waitFor(() => expect(publish).toHaveBeenCalledTimes(2));
+    expect(publish.mock.calls[1]![1]).not.toBe(publish.mock.calls[0]![1]);
   });
 
   it("accepts a top-level impact token before publishing the canonical response", async () => {

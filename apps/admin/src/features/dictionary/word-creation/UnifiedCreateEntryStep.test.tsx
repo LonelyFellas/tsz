@@ -16,6 +16,17 @@ import type {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { deferred } from "./wordCreation.test.helper";
 
+const dialectPreference = vi.hoisted(() => ({
+  value: "us" as "uk" | "us"
+}));
+
+vi.mock("../../settings/useDialectPreference", () => ({
+  useDialectPreference: () => ({
+    preference: dialectPreference.value,
+    savePreference: vi.fn()
+  })
+}));
+
 vi.mock("../part-of-speech/api", async () => {
   const { partOfSpeechCatalogFixture } =
     await import("./partOfSpeech.test.helper");
@@ -398,9 +409,119 @@ function input() {
   return screen.getByPlaceholderText("例如 center 或 give up");
 }
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  dialectPreference.value = "us";
+});
 
 describe("UnifiedCreateEntryStep", () => {
+  it("美式偏好锁定美式侧并把编辑后的英式最终值提交给 V3 create", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(matchedV3Detection());
+    vi.mocked(supplied.createV3).mockResolvedValue({ word: v3PrefilledWord() });
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+
+    const uk = await screen.findByLabelText("英式主词");
+    const us = screen.getByLabelText("美式主词");
+    expect(uk).toBeEnabled();
+    expect(us).toBeDisabled();
+    expect(screen.getByText(/按个人偏好锁定美式主词/)).toBeVisible();
+
+    fireEvent.change(uk, { target: { value: "centre-edited" } });
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+
+    await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
+    expect(supplied.createV3).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headwords: {
+          mode: "distinguish",
+          uk: "centre-edited",
+          us: "center",
+          source_dialect: "us"
+        }
+      })
+    );
+  });
+
+  it("英式偏好锁定英式侧，模式往返保留确认值并提交英式 source_dialect", async () => {
+    dialectPreference.value = "uk";
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(matchedV3Detection());
+    vi.mocked(supplied.createV3).mockResolvedValue({ word: v3PrefilledWord() });
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+
+    expect(await screen.findByLabelText("英式主词")).toBeDisabled();
+    expect(screen.getByLabelText("美式主词")).toBeEnabled();
+    fireEvent.click(screen.getByLabelText("区分英美词形"));
+    const common = screen.getByLabelText("统一主词");
+    expect(common).toHaveValue("centre");
+    fireEvent.change(common, { target: { value: "central" } });
+    fireEvent.click(screen.getByLabelText("区分英美词形"));
+    expect(screen.getByLabelText("英式主词")).toHaveValue("central");
+    expect(screen.getByLabelText("美式主词")).toHaveValue("central");
+    fireEvent.change(screen.getByLabelText("美式主词"), {
+      target: { value: "center-final" }
+    });
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+
+    await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
+    expect(supplied.createV3).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headwords: {
+          mode: "distinguish",
+          uk: "central",
+          us: "center-final",
+          source_dialect: "uk"
+        }
+      })
+    );
+  });
+
+  it("词典未命中时统一主词仍可编辑并作为最终创建值", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection("novel-term"));
+    vi.mocked(supplied.createV3).mockResolvedValue({ word: v3Word() });
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "novel-term" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    const common = await screen.findByLabelText("统一主词");
+    fireEvent.change(common, { target: { value: "novel-final" } });
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+
+    await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
+    expect(supplied.createV3).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headwords: { mode: "unified", common: "novel-final" }
+      })
+    );
+  });
+
+  it("编辑后的最终主词非法时不发送创建请求", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection("novel-term"));
+    renderStep(supplied);
+
+    fireEvent.change(input(), { target: { value: "novel-term" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    fireEvent.change(await screen.findByLabelText("统一主词"), {
+      target: { value: "苹果" }
+    });
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+
+    expect(supplied.createV3).not.toHaveBeenCalled();
+    expect(screen.getByText("请先填写合法的英文主词后再创建。")).toBeVisible();
+  });
+
   it("Pending 创建入口预填目标词头并把完整导航状态交还创建页", async () => {
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue(
@@ -581,7 +702,8 @@ describe("UnifiedCreateEntryStep", () => {
     expect(supplied.createV3).toHaveBeenCalledWith(expect.any(String), {
       schema_version: 3,
       detection_id: detection.detection_id,
-      kind: "phrase"
+      kind: "phrase",
+      headwords: { mode: "unified", common: "give up" }
     });
     expect(onCreated).toHaveBeenCalledWith(phraseWord, {
       creationSource: "blank"
@@ -852,19 +974,25 @@ describe("UnifiedCreateEntryStep", () => {
     expect(screen.queryByText("现在分词")).toBeNull();
     expect(screen.queryByText(/词典音标/)).toBeNull();
     expect(screen.getByText("来源：内置词典")).toBeVisible();
-    expect(screen.getByLabelText("区分英美词形")).toBeDisabled();
+    expect(screen.getByLabelText("区分英美词形")).toBeEnabled();
     expect(supplied.createV3).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
     expect(supplied.createV3).toHaveBeenCalledWith(expect.any(String), {
       schema_version: 3,
       detection_id: detection.detection_id,
-      kind: "phrase"
+      kind: "phrase",
+      headwords: {
+        mode: "distinguish",
+        uk: "centre",
+        us: "center",
+        source_dialect: "us"
+      }
     });
 
     await act(async () => creation.resolve({ word: phraseWord }));
   });
 
-  it("V3 phrase not_found 使用本次输入填充与单词相同的双面板", async () => {
+  it("V3 phrase not_found 使用本次输入填充统一主词", async () => {
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue(
       v3PhraseDetection("in common")
@@ -874,13 +1002,12 @@ describe("UnifiedCreateEntryStep", () => {
     fireEvent.change(input(), { target: { value: "in common" } });
     fireEvent.click(screen.getByText("词典检测"));
 
-    expect(await screen.findByLabelText("英式主词")).toHaveValue("in common");
-    expect(screen.getByLabelText("美式主词")).toHaveValue("in common");
+    expect(await screen.findByLabelText("统一主词")).toHaveValue("in common");
     expect(screen.getByText("短语词条")).toBeVisible();
     expect(screen.getByText("来源：本次输入")).toBeVisible();
   });
 
-  it("not_found 使用本次输入填充双面板并等待确认，unavailable 则阻断", async () => {
+  it("not_found 使用本次输入填充统一主词并等待确认，unavailable 则阻断", async () => {
     const notFoundRequests = requests();
     const creation = deferred<{ word: AdminWordV3 }>();
     vi.mocked(notFoundRequests.detectV3).mockResolvedValue(
@@ -899,8 +1026,7 @@ describe("UnifiedCreateEntryStep", () => {
     fireEvent.change(input(), { target: { value: "invented" } });
     fireEvent.click(screen.getByText("词典检测"));
     expect(await screen.findByText("确认英美主词")).toBeVisible();
-    expect(screen.getByLabelText("英式主词")).toHaveValue("invented");
-    expect(screen.getByLabelText("美式主词")).toHaveValue("invented");
+    expect(screen.getByLabelText("统一主词")).toHaveValue("invented");
     expect(screen.getByText("来源：本次输入")).toBeVisible();
     expect(notFoundRequests.createV3).not.toHaveBeenCalled();
     unmount();
@@ -956,6 +1082,8 @@ describe("UnifiedCreateEntryStep", () => {
   it("创建结果未知时保留同一幂等键供原样重试", async () => {
     const supplied = requests();
     const firstDetection = v3Detection();
+    const detectedAt = Date.now();
+    firstDetection.expires_at = new Date(detectedAt + 60_000).toISOString();
     const changedDetection = v3Detection();
     changedDetection.detection_id = "changed-detection-v3";
     vi.mocked(supplied.detectV3)
@@ -973,8 +1101,15 @@ describe("UnifiedCreateEntryStep", () => {
       await screen.findByText("网络异常，创建结果未知。请原样重试。")
     ).toBeVisible();
 
-    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+    const frozenHeadword = screen.getByLabelText("统一主词");
+    expect(frozenHeadword).toBeDisabled();
+    expect(screen.getByRole("switch", { name: "区分英美词形" })).toBeDisabled();
+    expect(input()).toBeDisabled();
+
+    const now = vi.spyOn(Date, "now").mockReturnValue(detectedAt + 120_000);
+    fireEvent.click(screen.getByText("原样重试创建"));
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(2));
+    now.mockRestore();
 
     expect(supplied.detectV3).toHaveBeenCalledTimes(1);
     expect(vi.mocked(supplied.createV3).mock.calls[1]?.[0]).toBe(
@@ -988,18 +1123,28 @@ describe("UnifiedCreateEntryStep", () => {
     });
   });
 
-  it("未知异常只展示安全的产品错误", async () => {
+  it("响应解析异常也冻结完整创建载荷并只允许同键原样重试", async () => {
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
-    vi.mocked(supplied.createV3).mockRejectedValue({ internal: "secret" });
-    renderStep(supplied);
+    vi.mocked(supplied.createV3)
+      .mockRejectedValueOnce(new SyntaxError("invalid response payload"))
+      .mockResolvedValueOnce({ word: v3Word() });
+    const onCreated = renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
     fireEvent.click(await screen.findByText("创建并进入词形与发音"));
 
-    expect(await screen.findByText("创建失败，请稍后重试。")).toBeVisible();
-    expect(screen.queryByText("secret")).toBeNull();
+    expect(
+      await screen.findByText("响应异常，创建结果未知。请原样重试。")
+    ).toBeVisible();
+    expect(screen.getByLabelText("统一主词")).toBeDisabled();
+    fireEvent.click(screen.getByText("原样重试创建"));
+    await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(supplied.createV3).mock.calls[1]).toEqual(
+      vi.mocked(supplied.createV3).mock.calls[0]
+    );
+    expect(onCreated).toHaveBeenCalledTimes(1);
   });
 
   it("V3 phrase 警告确认携带 token，禁用与分页失败状态保持阻断", async () => {

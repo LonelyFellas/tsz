@@ -45,12 +45,14 @@ import { useSurfaceSnapshotAny } from "../useSurfaceSnapshot";
 import { createV3WordRequests } from "../word-creation-v3/api";
 import type { PendingSentenceTargetNavigation } from "../word-creation-v3/pendingSentenceTargetNavigation";
 import { newWordNodeId } from "../word-model/primitives";
+import { useDialectPreference } from "../../settings/useDialectPreference";
 import {
   extractDetectedBaseForms,
   resolveDetectedBaseForm,
   type DetectedBaseForm
 } from "./baseFormDetection";
-import { classifyEntryInput, validateEntryInput } from "./entryClassification";
+import { validateEntryInput } from "./entryClassification";
+import { hasHeadwordsIssue, headwordsIssues } from "./headwordValidation";
 import type { CreationNavigationState } from "./CreationSourceNotice";
 import "./word-creation.css";
 
@@ -74,6 +76,11 @@ type PendingCreation = {
   kind: "word" | "phrase";
   detection: DetectLexiconSurfaceResponseV3;
   idempotencyKey: string;
+};
+
+type CreateAttempt = {
+  target: PendingCreation;
+  input: CreateAdminWordV3Input;
 };
 
 interface Props {
@@ -138,6 +145,16 @@ function errorMessage(error: unknown): string {
   return error instanceof ProductError
     ? error.message
     : "创建失败，请稍后重试。";
+}
+
+function createErrorMessage(error: unknown): string {
+  if (error instanceof TypeError) {
+    return "网络异常，创建结果未知。请原样重试。";
+  }
+  if (!(error instanceof HttpError)) {
+    return "响应异常，创建结果未知。请原样重试。";
+  }
+  return errorMessage(error);
 }
 
 function partOfSpeechLabel(
@@ -466,12 +483,14 @@ function DetectionPresentationCard({
 
 function HeadwordConfirmationCard({
   state,
-  editable,
+  preference,
+  disabled,
   onChange,
   onRetry
 }: {
   state: RegionalDisplayState;
-  editable: boolean;
+  preference: "uk" | "us";
+  disabled?: boolean;
   onChange: (value: WordHeadwordsV2) => void;
   onRetry: () => void;
 }) {
@@ -504,8 +523,8 @@ function HeadwordConfirmationCard({
     );
   }
   const value = state.value;
-  const uk = value.mode === "distinguish" ? value.uk : value.common;
-  const us = value.mode === "distinguish" ? value.us : value.common;
+  const issues = headwordsIssues(value);
+  const lockedLabel = preference === "uk" ? "英式" : "美式";
   return (
     <Card
       className="word-headword-confirmation-card"
@@ -516,61 +535,104 @@ function HeadwordConfirmationCard({
         <div>
           <Typography.Text strong>区分英美词形</Typography.Text>
           <Typography.Text type="secondary">
-            开启后可分别确认英式与美式主词
+            开启后按个人方言偏好锁定一侧，另一侧可编辑
           </Typography.Text>
         </div>
         <Switch
           aria-label="区分英美词形"
           checked={value.mode === "distinguish"}
-          disabled={!editable}
+          disabled={disabled}
           onChange={(checked) => {
+            const confirmed =
+              value.mode === "distinguish" ? value[preference] : value.common;
             onChange(
               checked
                 ? {
                     mode: "distinguish",
-                    uk,
-                    us,
-                    source_dialect: "us"
+                    uk: confirmed,
+                    us: confirmed,
+                    source_dialect: preference
                   }
-                : { mode: "unified", common: us }
+                : { mode: "unified", common: confirmed }
             );
           }}
         />
       </div>
-      <Row gutter={16}>
-        <Col xs={24} md={12}>
-          <div className="dialect-panel dialect-panel-uk">
-            <Typography.Text strong>英式英语 · BrE</Typography.Text>
+      {value.mode === "unified" ? (
+        <div className="dialect-panel">
+          <Form.Item
+            label="统一主词"
+            required
+            validateStatus={
+              value.common.trim() === "" || issues.uk ? "error" : undefined
+            }
+            help={value.common.trim() === "" ? "请输入统一主词" : issues.uk}
+          >
             <Input
-              aria-label="英式主词"
-              value={uk}
-              disabled={!editable || value.mode === "unified"}
-              onChange={(event) => {
-                if (value.mode === "distinguish") {
-                  onChange({ ...value, uk: event.target.value });
-                }
-              }}
-              style={{ marginTop: 10 }}
+              aria-label="统一主词"
+              disabled={disabled}
+              value={value.common}
+              onChange={(event) =>
+                onChange({ mode: "unified", common: event.target.value })
+              }
             />
-          </div>
-        </Col>
-        <Col xs={24} md={12}>
-          <div className="dialect-panel dialect-panel-us">
-            <Typography.Text strong>美式英语 · AmE</Typography.Text>
-            <Input
-              aria-label="美式主词"
-              value={us}
-              disabled={!editable || value.mode === "unified"}
-              onChange={(event) => {
-                if (value.mode === "distinguish") {
-                  onChange({ ...value, us: event.target.value });
-                }
-              }}
-              style={{ marginTop: 10 }}
-            />
-          </div>
-        </Col>
-      </Row>
+          </Form.Item>
+        </div>
+      ) : (
+        <>
+          <Typography.Text
+            type="secondary"
+            className="word-field-help word-headword-lock-note"
+          >
+            按个人偏好锁定{lockedLabel}
+            主词；如需调整锁定侧，请先修改个人方言偏好。
+          </Typography.Text>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <div className="dialect-panel dialect-panel-uk">
+                <Typography.Text strong>英式英语 · BrE</Typography.Text>
+                <Form.Item
+                  required
+                  validateStatus={
+                    value.uk.trim() === "" || issues.uk ? "error" : undefined
+                  }
+                  help={value.uk.trim() === "" ? "请输入英式主词" : issues.uk}
+                >
+                  <Input
+                    aria-label="英式主词"
+                    value={value.uk}
+                    disabled={disabled || preference === "uk"}
+                    onChange={(event) =>
+                      onChange({ ...value, uk: event.target.value })
+                    }
+                  />
+                </Form.Item>
+              </div>
+            </Col>
+            <Col xs={24} md={12}>
+              <div className="dialect-panel dialect-panel-us">
+                <Typography.Text strong>美式英语 · AmE</Typography.Text>
+                <Form.Item
+                  required
+                  validateStatus={
+                    value.us.trim() === "" || issues.us ? "error" : undefined
+                  }
+                  help={value.us.trim() === "" ? "请输入美式主词" : issues.us}
+                >
+                  <Input
+                    aria-label="美式主词"
+                    value={value.us}
+                    disabled={disabled || preference === "us"}
+                    onChange={(event) =>
+                      onChange({ ...value, us: event.target.value })
+                    }
+                  />
+                </Form.Item>
+              </div>
+            </Col>
+          </Row>
+        </>
+      )}
       <Typography.Text
         type="secondary"
         className="word-field-help word-headword-source"
@@ -593,12 +655,14 @@ export function UnifiedCreateEntryStep({
 }: Props) {
   const { modal } = App.useApp();
   const catalog = usePartOfSpeechCatalog();
+  const { preference } = useDialectPreference();
   const [value, setValue] = useState(initialPendingTarget?.headword ?? "");
   const [fieldError, setFieldError] = useState<string>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState<"checking" | "creating">();
   const [pending, setPending] = useState<PendingCreation>();
   const [prepared, setPrepared] = useState<PendingCreation>();
+  const [createAttempt, setCreateAttempt] = useState<CreateAttempt>();
   const [regionalDisplay, setRegionalDisplay] = useState<RegionalDisplayState>({
     status: "idle"
   });
@@ -609,6 +673,9 @@ export function UnifiedCreateEntryStep({
   const retryKey = useRef<{ normalized: string; key: string } | undefined>(
     undefined
   );
+  const preservedRegionalDisplay = useRef<
+    Extract<RegionalDisplayState, { status: "ready" }> | undefined
+  >(undefined);
 
   useEffect(() => {
     mounted.current = true;
@@ -670,10 +737,21 @@ export function UnifiedCreateEntryStep({
       );
       return;
     }
+    if (preservedRegionalDisplay.current) {
+      setRegionalDisplay(preservedRegionalDisplay.current);
+      return;
+    }
     const first = baseCandidates[0];
     if (!first) {
       const fallback = builtinRegionalValue(prepared);
-      setRegionalDisplay({ status: "ready", ...fallback });
+      setRegionalDisplay({
+        status: "ready",
+        ...fallback,
+        value:
+          fallback.value.mode === "distinguish"
+            ? { ...fallback.value, source_dialect: preference }
+            : fallback.value
+      });
       return;
     }
     let active = true;
@@ -684,7 +762,14 @@ export function UnifiedCreateEntryStep({
         const value = resolveDetectedBaseForm(response.word, first);
         setRegionalDisplay(
           value
-            ? { status: "ready", source: "database", value }
+            ? {
+                status: "ready",
+                source: "database",
+                value:
+                  value.mode === "distinguish"
+                    ? { ...value, source_dialect: preference }
+                    : value
+              }
             : { status: "error" }
         );
       })
@@ -699,6 +784,7 @@ export function UnifiedCreateEntryStep({
     candidateDiscoveryReady,
     detailRetry,
     prepared,
+    preference,
     requests,
     snapshot.phase
   ]);
@@ -706,33 +792,27 @@ export function UnifiedCreateEntryStep({
   const changeValue = (next: string) => {
     generation.current += 1;
     retryKey.current = undefined;
+    preservedRegionalDisplay.current = undefined;
     setValue(next);
     setFieldError(undefined);
     setError(undefined);
     setPending(undefined);
     setPrepared(undefined);
+    setCreateAttempt(undefined);
     setRegionalDisplay({ status: "idle" });
   };
 
-  const createPending = async (
-    target: PendingCreation,
-    confirmedSurfaceToken?: string
-  ) => {
+  const createPending = async (attempt: CreateAttempt) => {
     if (locked.current) return;
+    const { target, input } = attempt;
     locked.current = true;
     setBusy("creating");
     setError(undefined);
     try {
-      const response = await requests.createV3(target.idempotencyKey, {
-        schema_version: 3,
-        detection_id: target.detection.detection_id,
-        kind: target.kind,
-        ...(confirmedSurfaceToken
-          ? { confirmed_surface_match_token: confirmedSurfaceToken }
-          : {})
-      });
+      const response = await requests.createV3(target.idempotencyKey, input);
       if (!mounted.current) return;
       retryKey.current = undefined;
+      setCreateAttempt(undefined);
       onCreated(response.word, {
         creationSource:
           target.detection.builtin_dictionary.status === "matched"
@@ -751,8 +831,9 @@ export function UnifiedCreateEntryStep({
         requiresNewIdempotencyKey(requestError.status, requestError.code)
       ) {
         const replacementPage = requestError.meta?.surface_match_page;
+        setCreateAttempt(undefined);
         retryKey.current = {
-          normalized: classifyEntryInput(value).normalized,
+          normalized: target.detection.normalized_surface,
           key: newWordNodeId()
         };
         if (
@@ -784,7 +865,10 @@ export function UnifiedCreateEntryStep({
           setError("检查结果已变化，请重新提交。");
         }
       } else {
-        setError(errorMessage(requestError));
+        if (requestError instanceof HttpError && requestError.status < 500) {
+          setCreateAttempt(undefined);
+        }
+        setError(createErrorMessage(requestError));
       }
     } finally {
       locked.current = false;
@@ -810,6 +894,7 @@ export function UnifiedCreateEntryStep({
     setValue(normalized);
     setPending(undefined);
     setPrepared(undefined);
+    setCreateAttempt(undefined);
     setError(undefined);
     setFieldError(undefined);
     setBusy("checking");
@@ -879,8 +964,27 @@ export function UnifiedCreateEntryStep({
     target: PendingCreation,
     confirmedSurfaceToken?: string
   ) => {
+    const frozenAttempt =
+      createAttempt?.target.idempotencyKey === target.idempotencyKey
+        ? createAttempt
+        : undefined;
+    if (frozenAttempt) {
+      setError(undefined);
+      void createPending(frozenAttempt);
+      return;
+    }
     if (regionalDisplay.status !== "ready") {
       setError("请先完成原形确认后再创建。");
+      return;
+    }
+    const headwords = regionalDisplay.value;
+    preservedRegionalDisplay.current = regionalDisplay;
+    const hasEmptyHeadword =
+      headwords.mode === "unified"
+        ? headwords.common.trim() === ""
+        : headwords.uk.trim() === "" || headwords.us.trim() === "";
+    if (hasEmptyHeadword || hasHeadwordsIssue(headwords)) {
+      setError("请先填写合法的英文主词后再创建。");
       return;
     }
     try {
@@ -891,7 +995,22 @@ export function UnifiedCreateEntryStep({
       setError("检查结果已过期，请重新检测。");
       return;
     }
-    void createPending(target, confirmedSurfaceToken);
+    const attempt: CreateAttempt = {
+      target,
+      input: {
+        schema_version: 3,
+        detection_id: target.detection.detection_id,
+        kind: target.kind,
+        headwords,
+        ...(confirmedSurfaceToken
+          ? {
+              confirmed_surface_match_token: confirmedSurfaceToken
+            }
+          : {})
+      }
+    };
+    setCreateAttempt(attempt);
+    void createPending(attempt);
   };
 
   const confirm = () => {
@@ -943,7 +1062,11 @@ export function UnifiedCreateEntryStep({
             <Input.Search
               autoComplete="off"
               autoFocus
-              disabled={busy !== undefined || pending !== undefined}
+              disabled={
+                busy !== undefined ||
+                pending !== undefined ||
+                createAttempt !== undefined
+              }
               enterButton={
                 <Space size={6}>
                   <SearchOutlined />
@@ -977,8 +1100,17 @@ export function UnifiedCreateEntryStep({
             <div className="word-headword-confirmation-wrap">
               <HeadwordConfirmationCard
                 state={regionalDisplay}
-                editable={false}
-                onChange={() => undefined}
+                preference={preference}
+                disabled={busy === "creating" || createAttempt !== undefined}
+                onChange={(next) => {
+                  setError(undefined);
+                  setRegionalDisplay((current) => {
+                    if (current.status !== "ready") return current;
+                    const updated = { ...current, value: next };
+                    preservedRegionalDisplay.current = updated;
+                    return updated;
+                  });
+                }}
                 onRetry={() => setDetailRetry((retry) => retry + 1)}
               />
             </div>
@@ -1006,13 +1138,18 @@ export function UnifiedCreateEntryStep({
 
       {prepared && !pending ? (
         <div className="word-entry-actions">
+          {createAttempt ? (
+            <Button onClick={() => changeValue(value)}>重新检测</Button>
+          ) : null}
           <Button
             type="primary"
             loading={busy === "creating"}
             disabled={busy !== undefined || regionalDisplay.status !== "ready"}
             onClick={() => beginCreation(prepared)}
           >
-            创建并进入词形与发音
+            {createAttempt && busy !== "creating"
+              ? "原样重试创建"
+              : "创建并进入词形与发音"}
           </Button>
         </div>
       ) : null}

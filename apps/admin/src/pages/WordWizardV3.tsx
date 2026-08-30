@@ -434,6 +434,7 @@ function V3PreviewSlot({ context }: { context: V3WizardSlotContext }) {
       validate: context.actions.validate,
       previewFormsImpact: context.actions.previewFormsImpact,
       publish: context.actions.publish,
+      navigateIssue: context.actions.navigateIssue,
       confirmImpact: context.actions.confirmImpact,
       confirmImpactSurface: context.actions.confirmImpactSurface,
       fetchSurfacePage: context.actions.fetchSurfacePage

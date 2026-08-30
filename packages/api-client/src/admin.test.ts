@@ -867,7 +867,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     api.words.createV3("create-v3-key", {
       schema_version: 3,
       detection_id: "detection-3",
-      kind: "word"
+      kind: "word",
+      headwords: { mode: "unified", common: "center" }
     });
     api.words.getAny("w-3");
     api.words.previewFormsImpactV3("w-3", {
@@ -923,7 +924,12 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     );
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries",
-      { schema_version: 3, detection_id: "detection-3", kind: "word" },
+      {
+        schema_version: 3,
+        detection_id: "detection-3",
+        kind: "word",
+        headwords: { mode: "unified", common: "center" }
+      },
       { headers: { "Idempotency-Key": "create-v3-key" } }
     );
     expect(http.get).toHaveBeenCalledWith("/lexicon/entries/w-3");
