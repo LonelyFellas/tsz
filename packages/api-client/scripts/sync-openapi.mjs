@@ -25,6 +25,7 @@ const runtimeSchemaOut = resolve(
   here,
   "../src/admin-word-v3.runtime-schema.json"
 );
+const runtimeOnly = process.env.SYNC_OPENAPI_RUNTIME_ONLY === "1";
 
 const API_PREFIX = "/api/v1";
 const ADMIN_LEXICON_PREFIX = `${API_PREFIX}/admin/lexicon`;
@@ -553,11 +554,16 @@ const snapshot = {
   ...snapshotContent
 };
 
-writeFileSync(out, await format(JSON.stringify(snapshot), { parser: "json" }));
+if (!runtimeOnly) {
+  writeFileSync(
+    out,
+    await format(JSON.stringify(snapshot), { parser: "json" })
+  );
+}
 writeFileSync(
   runtimeSchemaOut,
   await format(JSON.stringify(runtimeSchemaBundle), { parser: "json" })
 );
 console.log(
-  `✅ 写入 ${out}\n   共 ${Object.keys(paths).length} 条路径\n✅ 写入 ${runtimeSchemaOut}\n   共 ${Object.keys(runtimeSchemaBundle.$defs).length} 个最小 schema`
+  `${runtimeOnly ? "⏭️ 保留现有 OpenAPI endpoint 快照" : `✅ 写入 ${out}\n   共 ${Object.keys(paths).length} 条路径`}\n✅ 写入 ${runtimeSchemaOut}\n   共 ${Object.keys(runtimeSchemaBundle.$defs).length} 个最小 schema`
 );

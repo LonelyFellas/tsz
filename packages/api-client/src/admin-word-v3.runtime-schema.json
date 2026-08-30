@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/47a5/tsz-rust/docs/openapi.json",
-  "_source_sha256": "d6e2ea57b87c7f4c05bbf770136c44cb41d84ef22d6aea1d3579eb72370a8bc0",
+  "_source": "/Users/darwish/.codex/worktrees/multidimensional-example-linking/tsz-rust/docs/openapi.json",
+  "_source_sha256": "ef48ed00ab93d77ef475fe9a2f38b9a8df8907e720ea97b679bfac1bc7414e38",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -361,7 +361,9 @@
         "pronunciation_normalization_version": {
           "$ref": "#/$defs/PronunciationNormalizationVersionV3"
         },
-        "publication": { "$ref": "#/$defs/V3PublicationCapability" }
+        "publication": { "$ref": "#/$defs/V3PublicationCapability" },
+        "sentence_associations": { "type": "boolean" },
+        "sentence_target_discovery": { "type": "boolean" }
       },
       "additionalProperties": false
     },
@@ -1111,6 +1113,9 @@
         "word_not_found",
         "sentence_not_found",
         "sentence_associations_unresolved",
+        "sentence_association_client_upgrade_required",
+        "pending_sentence_association_not_found",
+        "pending_sentence_association_claimed",
         "publication_not_found",
         "part_of_speech_in_use",
         "sub_part_of_speech_in_use",
@@ -1252,6 +1257,7 @@
         "form",
         "variant",
         "pronunciation",
+        "phrase_component_usage",
         "surface",
         "publication",
         "grammar_structure",
@@ -1516,6 +1522,56 @@
     "PersistedWordStep": {
       "type": "string",
       "enum": ["basics", "forms", "meanings"]
+    },
+    "PhraseComponentUsageV3": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["id", "literal", "state"],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "literal": { "type": "string", "maxLength": 200 },
+            "state": { "type": "string", "enum": ["unresolved"] }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "literal",
+            "target_word_id",
+            "target_publication_id",
+            "target_pos_id",
+            "target_base_form_id",
+            "target_sense_id",
+            "target_form_id",
+            "target_variant_id",
+            "target_dialect",
+            "target_form_type",
+            "target_headword",
+            "target_gloss",
+            "state"
+          ],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "literal": { "type": "string", "maxLength": 200 },
+            "state": { "type": "string", "enum": ["resolved"] },
+            "target_base_form_id": { "type": "string", "format": "uuid" },
+            "target_dialect": { "$ref": "#/$defs/Dialect" },
+            "target_form_id": { "type": "string", "format": "uuid" },
+            "target_form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+            "target_gloss": { "type": "string", "maxLength": 5000 },
+            "target_headword": { "type": "string", "maxLength": 500 },
+            "target_pos_id": { "type": "string", "format": "uuid" },
+            "target_publication_id": { "type": "string", "format": "uuid" },
+            "target_sense_id": { "type": "string", "format": "uuid" },
+            "target_variant_id": { "type": "string", "format": "uuid" },
+            "target_word_id": { "type": "string", "format": "uuid" }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "ProblemDetails": {
       "type": "object",
@@ -2069,6 +2125,10 @@
         "surface": { "type": "string" }
       },
       "additionalProperties": false
+    },
+    "SentenceTranslationBandV3": {
+      "type": "string",
+      "enum": ["a1_a2", "b1_b2", "c1_c2"]
     },
     "SmartDictionaryResultV2": {
       "oneOf": [
@@ -2722,7 +2782,8 @@
         "common_variant",
         "uk_variant",
         "us_variant",
-        "pronunciation"
+        "pronunciation",
+        "phrase_component_usage"
       ]
     },
     "V3ValidationIssueCode": {
@@ -2762,6 +2823,9 @@
         "native_definition_required",
         "sentence_level_invalid",
         "sentence_incomplete",
+        "sentence_translation_required",
+        "sentence_translation_invalid",
+        "duplicate_sentence_translation_band",
         "sentence_link_role_invalid",
         "duplicate_sentence_link",
         "relation_score_invalid",
@@ -2802,6 +2866,11 @@
       "type": "object",
       "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PhraseComponentUsageV3" },
+          "maxItems": 100
+        },
         "dialect": { "$ref": "#/$defs/CommonDialectV3" },
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
@@ -3168,7 +3237,8 @@
           "properties": {
             "common": { "type": "string" },
             "mode": { "type": "string", "enum": ["unified"] }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -3178,7 +3248,8 @@
             "source_dialect": { "$ref": "#/$defs/SourceDialect" },
             "uk": { "type": "string" },
             "us": { "type": "string" }
-          }
+          },
+          "additionalProperties": false
         }
       ]
     },
@@ -3399,59 +3470,149 @@
       "additionalProperties": false
     },
     "WordSentenceAssociationV2": {
-      "type": "object",
-      "required": [
-        "id",
-        "source_dialect",
-        "source_range",
-        "target_word_id",
-        "target_sense_id",
-        "origin",
-        "target_headword",
-        "target_gloss",
-        "resolved_pos"
-      ],
-      "properties": {
-        "id": { "type": "string", "format": "uuid" },
-        "origin": { "$ref": "#/$defs/SentenceAssociationOriginV2" },
-        "resolved_form_type": { "type": "string" },
-        "resolved_pos": { "type": "string" },
-        "source_dialect": { "$ref": "#/$defs/Dialect" },
-        "source_range": { "$ref": "#/$defs/SentenceSourceRangeV1" },
-        "target_form_slot_id": { "type": "string", "format": "uuid" },
-        "target_gloss": { "type": "string" },
-        "target_headword": { "type": "string" },
-        "target_sense_id": { "type": "string", "format": "uuid" },
-        "target_word_id": { "type": "string", "format": "uuid" }
-      }
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "source_dialect",
+            "source_range",
+            "target_word_id",
+            "target_sense_id",
+            "origin",
+            "target_headword",
+            "target_gloss",
+            "resolved_pos",
+            "state"
+          ],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "origin": { "$ref": "#/$defs/SentenceAssociationOriginV2" },
+            "resolved_form_type": { "type": "string" },
+            "resolved_pos": { "type": "string" },
+            "source_dialect": { "$ref": "#/$defs/Dialect" },
+            "source_range": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+            "state": { "type": "string", "enum": ["linked"] },
+            "target_form_slot_id": { "type": "string", "format": "uuid" },
+            "target_gloss": { "type": "string" },
+            "target_headword": { "type": "string" },
+            "target_sense_id": { "type": "string", "format": "uuid" },
+            "target_word_id": { "type": "string", "format": "uuid" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "source_dialect",
+            "source_range",
+            "origin",
+            "pending_target_kind",
+            "pending_target_headword",
+            "normalized_pending_target_headword",
+            "state"
+          ],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "normalized_pending_target_headword": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "origin": { "$ref": "#/$defs/SentenceAssociationOriginV2" },
+            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
+            "pending_target_headword": { "type": "string", "maxLength": 200 },
+            "pending_target_kind": { "$ref": "#/$defs/EntryKind" },
+            "source_dialect": { "$ref": "#/$defs/Dialect" },
+            "source_range": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+            "state": { "type": "string", "enum": ["pending"] }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "WordSentenceAssociationV3": {
-      "type": "object",
-      "required": [
-        "id",
-        "source_dialect",
-        "source_range",
-        "target_word_id",
-        "target_sense_id",
-        "origin",
-        "target_headword",
-        "target_gloss",
-        "resolved_pos"
-      ],
-      "properties": {
-        "id": { "type": "string", "format": "uuid" },
-        "origin": { "$ref": "#/$defs/SentenceAssociationOriginV2" },
-        "resolved_form_type": { "type": "string" },
-        "resolved_pos": { "type": "string" },
-        "source_dialect": { "$ref": "#/$defs/Dialect" },
-        "source_range": { "$ref": "#/$defs/SentenceSourceRangeV1" },
-        "target_form_slot_id": { "type": "string", "format": "uuid" },
-        "target_gloss": { "type": "string" },
-        "target_headword": { "type": "string" },
-        "target_sense_id": { "type": "string", "format": "uuid" },
-        "target_word_id": { "type": "string", "format": "uuid" }
-      },
-      "additionalProperties": false
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "association_schema_version",
+            "source_dialect",
+            "source_segments",
+            "target_word_id",
+            "target_sense_id",
+            "target_component_usages",
+            "origin",
+            "target_headword",
+            "target_gloss",
+            "resolved_pos",
+            "state"
+          ],
+          "properties": {
+            "association_schema_version": { "type": "integer", "enum": [3] },
+            "id": { "type": "string", "format": "uuid" },
+            "origin": { "$ref": "#/$defs/SentenceAssociationOriginV2" },
+            "resolved_form_type": { "type": "string" },
+            "resolved_pos": { "type": "string" },
+            "source_dialect": { "$ref": "#/$defs/Dialect" },
+            "source_segments": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+              "maxItems": 20,
+              "minItems": 1
+            },
+            "state": { "type": "string", "enum": ["linked"] },
+            "target_component_usages": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/PhraseComponentUsageV3" },
+              "maxItems": 100
+            },
+            "target_form_slot_id": { "type": "string", "format": "uuid" },
+            "target_form_variant_id": { "type": "string", "format": "uuid" },
+            "target_gloss": { "type": "string" },
+            "target_headword": { "type": "string" },
+            "target_publication_id": { "type": "string", "format": "uuid" },
+            "target_sense_id": { "type": "string", "format": "uuid" },
+            "target_word_id": { "type": "string", "format": "uuid" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "association_schema_version",
+            "source_dialect",
+            "source_segments",
+            "origin",
+            "pending_target_kind",
+            "pending_target_headword",
+            "state"
+          ],
+          "properties": {
+            "association_schema_version": { "type": "integer", "enum": [3] },
+            "id": { "type": "string", "format": "uuid" },
+            "normalized_pending_target_headword": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "origin": { "$ref": "#/$defs/SentenceAssociationOriginV2" },
+            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
+            "pending_target_headword": { "type": "string", "maxLength": 200 },
+            "pending_target_kind": { "$ref": "#/$defs/EntryKind" },
+            "source_dialect": { "$ref": "#/$defs/Dialect" },
+            "source_segments": {
+              "type": "array",
+              "items": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+              "maxItems": 20,
+              "minItems": 1
+            },
+            "state": { "type": "string", "enum": ["pending"] }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "WordSentenceLinkV2": {
       "type": "object",
@@ -3469,6 +3630,16 @@
         "role": { "type": "string" },
         "sense_id": { "type": "string", "format": "uuid" },
         "word_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "WordSentenceTranslationV3": {
+      "type": "object",
+      "required": ["id", "band", "content"],
+      "properties": {
+        "band": { "$ref": "#/$defs/SentenceTranslationBandV3" },
+        "content": { "$ref": "#/$defs/RichTextV3" },
+        "id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -3529,7 +3700,12 @@
           "maxItems": 2000
         },
         "zh_text": { "$ref": "#/$defs/RichTextV3" },
-        "zh_text_id": { "type": "string", "format": "uuid" }
+        "zh_text_id": { "type": "string", "format": "uuid" },
+        "zh_translations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordSentenceTranslationV3" },
+          "maxItems": 3
+        }
       },
       "additionalProperties": false
     },
@@ -3537,6 +3713,11 @@
       "type": "object",
       "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PhraseComponentUsageV3" },
+          "maxItems": 100
+        },
         "dialect": { "$ref": "#/$defs/UkDialectV3" },
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
@@ -3553,6 +3734,11 @@
       "type": "object",
       "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PhraseComponentUsageV3" },
+          "maxItems": 100
+        },
         "dialect": { "$ref": "#/$defs/UsDialectV3" },
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/$defs/TextOrigin" },

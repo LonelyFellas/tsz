@@ -278,6 +278,41 @@ function validAdminWordV2() {
   };
 }
 
+function setV2Associations(
+  container: Record<string, unknown>,
+  associations: unknown[]
+) {
+  const pos = buildRuntimeFixture(
+    runtimeFixtureBundle.$defs.WordPosMeaningsV2!
+  ) as Record<string, unknown>;
+  const sense = buildRuntimeFixture(
+    runtimeFixtureBundle.$defs.WordSenseV2!
+  ) as Record<string, unknown>;
+  const sentence = buildRuntimeFixture(
+    runtimeFixtureBundle.$defs.WordSentenceV2!
+  ) as Record<string, unknown>;
+  sentence.associations = associations;
+  sense.sentences = [sentence];
+  pos.senses = [sense];
+  container.meanings = { sense_groups: [], pos: [pos] };
+}
+
+function addLegacyV2Association(container: Record<string, unknown>) {
+  const association = buildRuntimeFixture(
+    runtimeFixtureBundle.$defs.WordSentenceAssociationV2!
+  ) as Record<string, unknown>;
+  delete association.state;
+  Object.assign(association, {
+    target_word_id: IDS.entry,
+    target_sense_id: IDS.member2,
+    target_headword: "center",
+    target_gloss: "中心",
+    resolved_pos: "noun"
+  });
+  setV2Associations(container, [association]);
+  return association;
+}
+
 function validAdminWordListItemV2() {
   return {
     schema_version: 2,
@@ -483,6 +518,268 @@ describe("admin word V3/Any runtime decoder", () => {
     expect(Object.isFrozen(SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS)).toBe(true);
     expect(Object.isFrozen(SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS)).toBe(
       true
+    );
+  });
+
+  it("同时接受旧 source_range 和新 source_segments，并为旧消费者补 range alias", () => {
+    const legacyWord = validAdminWordV3() as unknown as Record<string, unknown>;
+    const pos = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordPosMeaningsV3!
+    ) as Record<string, unknown>;
+    const sense = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordSenseV3!
+    ) as Record<string, unknown>;
+    const sentence = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordSentenceV3!
+    ) as Record<string, unknown>;
+    sentence.associations = [
+      {
+        id: IDS.member1,
+        source_dialect: "common",
+        source_range: { start: 0, end: 6, surface: "center" },
+        target_word_id: IDS.entry,
+        target_sense_id: IDS.member2,
+        origin: "manual",
+        target_headword: "center",
+        target_gloss: "中心",
+        resolved_pos: "noun"
+      }
+    ];
+    sense.sentences = [sentence];
+    pos.senses = [sense];
+    legacyWord.meanings = { sense_groups: [], pos: [pos] };
+    const legacyEnvelope = { word: legacyWord };
+    expect(decodeAdminWordV3Envelope(legacyEnvelope)).toBe(legacyEnvelope);
+
+    const currentWord = validAdminWordV3() as unknown as Record<
+      string,
+      unknown
+    >;
+    const currentPos = structuredClone(pos);
+    const currentSentence = (
+      (currentPos.senses as Array<Record<string, unknown>>)[0]!
+        .sentences as Array<Record<string, unknown>>
+    )[0]!;
+    currentSentence.associations = [
+      {
+        id: IDS.member1,
+        association_schema_version: 3,
+        source_dialect: "common",
+        source_segments: [{ start: 0, end: 6, surface: "center" }],
+        state: "linked",
+        target_word_id: IDS.entry,
+        target_sense_id: IDS.member2,
+        target_component_usages: [],
+        origin: "manual",
+        target_headword: "center",
+        target_gloss: "中心",
+        resolved_pos: "noun"
+      }
+    ];
+    currentWord.meanings = { sense_groups: [], pos: [currentPos] };
+    const currentEnvelope = { word: currentWord };
+    expect(decodeAdminWordV3Envelope(currentEnvelope)).toBe(currentEnvelope);
+    expect(
+      (
+        (currentPos.senses as Array<Record<string, unknown>>)[0]!
+          .sentences as Array<Record<string, unknown>>
+      )[0]!.associations as unknown
+    ).toEqual([
+      expect.objectContaining({
+        source_range: { start: 0, end: 6, surface: "center" },
+        source_segments: [{ start: 0, end: 6, surface: "center" }]
+      })
+    ]);
+    expect(decodeAdminWordV3Envelope(currentEnvelope)).toBe(currentEnvelope);
+  });
+
+  it("V2 含关联时保留 source_range，不误改写为 V3", () => {
+    const word = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.AdminWordV2!
+    ) as Record<string, unknown>;
+    const association = addLegacyV2Association(word);
+    const envelope = { word };
+
+    expect(decodeAdminWordAnyEnvelope(envelope)).toBe(envelope);
+    expect(association).toHaveProperty("source_range");
+    expect(association).not.toHaveProperty("source_segments");
+    expect(association).not.toHaveProperty("state");
+  });
+
+  it("V2 含旧关联的批量生命周期与发布响应继续可解码", () => {
+    const word = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.AdminWordV2!
+    ) as Record<string, unknown>;
+    addLegacyV2Association(word);
+    expect(
+      decodeEntryLifecycleBatchAnyResponse({ words: [word], affected: 1 })
+    ).toEqual({ words: [word], affected: 1 });
+
+    const publication = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.AdminWordPublicationV2!
+    ) as Record<string, unknown>;
+    addLegacyV2Association(publication.word as Record<string, unknown>);
+    expect(decodeAdminWordPublicationEnvelope({ publication })).toEqual({
+      publication
+    });
+    expect(
+      decodeAdminWordPublicationListResponse({ publications: [publication] })
+    ).toEqual({ publications: [publication] });
+  });
+
+  it.each([
+    ["linked 缺目标", "linked"],
+    ["pending 缺词头", "pending"]
+  ] as const)("V2 %s 的畸形响应 fail closed", (_name, state) => {
+    const word = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.AdminWordV2!
+    ) as Record<string, unknown>;
+    const common = {
+      id: IDS.member1,
+      source_dialect: "common",
+      source_range: { start: 0, end: 6, surface: "center" },
+      origin: "manual",
+      state
+    };
+    setV2Associations(
+      word,
+      state === "linked"
+        ? [common]
+        : [
+            {
+              ...common,
+              pending_target_kind: "phrase",
+              normalized_pending_target_headword: "center of"
+            }
+          ]
+    );
+
+    expect(() => decodeAdminWordAnyEnvelope({ word })).toThrow(
+      InvalidAdminWordResponseError
+    );
+  });
+
+  it("接受新能力、分层译文、成分用词与待关联响应", () => {
+    const word = validAdminWordV3() as unknown as Record<string, unknown>;
+    const capabilities = word.capabilities as Record<string, unknown>;
+    capabilities.sentence_associations = true;
+    capabilities.sentence_target_discovery = true;
+    const posForms = (
+      (word.forms as Record<string, unknown>).pos as Array<
+        Record<string, unknown>
+      >
+    )[0]!;
+    const form = (posForms.forms as Array<Record<string, unknown>>)[0]!;
+    const common = (form.regional_variants as Record<string, unknown>)
+      .common as Record<string, unknown>;
+    common.component_usages = [
+      buildRuntimeFixture(runtimeFixtureBundle.$defs.PhraseComponentUsageV3!)
+    ];
+
+    const pos = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordPosMeaningsV3!
+    ) as Record<string, unknown>;
+    const sense = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordSenseV3!
+    ) as Record<string, unknown>;
+    const sentence = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordSentenceV3!
+    ) as Record<string, unknown>;
+    sentence.zh_translations = [
+      buildRuntimeFixture(runtimeFixtureBundle.$defs.WordSentenceTranslationV3!)
+    ];
+    sentence.associations = [
+      {
+        id: IDS.member1,
+        association_schema_version: 3,
+        source_dialect: "common",
+        source_segments: [{ start: 0, end: 6, surface: "center" }],
+        origin: "manual",
+        pending_target_kind: "phrase",
+        pending_target_headword: "center of",
+        state: "pending"
+      }
+    ];
+    sense.sentences = [sentence];
+    pos.senses = [sense];
+    word.meanings = { sense_groups: [], pos: [pos] };
+
+    expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+  });
+
+  it.each([
+    ["future schema", { association_schema_version: 4 }],
+    ["invalid segments", { source_segments: "center" }],
+    ["invalid state", { state: "unknown" }],
+    ["invalid components", { target_component_usages: "center" }]
+  ] as const)("旧 V3 兼容不会覆盖 %s", (_name, extraFields) => {
+    const word = validAdminWordV3() as unknown as Record<string, unknown>;
+    const pos = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordPosMeaningsV3!
+    ) as Record<string, unknown>;
+    const sense = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordSenseV3!
+    ) as Record<string, unknown>;
+    const sentence = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordSentenceV3!
+    ) as Record<string, unknown>;
+    sentence.associations = [
+      {
+        id: IDS.member1,
+        source_dialect: "common",
+        source_range: { start: 0, end: 6, surface: "center" },
+        target_word_id: IDS.entry,
+        target_sense_id: IDS.member2,
+        origin: "manual",
+        target_headword: "center",
+        target_gloss: "中心",
+        resolved_pos: "noun",
+        ...extraFields
+      }
+    ];
+    sense.sentences = [sentence];
+    pos.senses = [sense];
+    word.meanings = { sense_groups: [], pos: [pos] };
+
+    expect(() => decodeAdminWordV3Envelope({ word })).toThrow(
+      InvalidAdminWordResponseError
+    );
+  });
+
+  it("新旧位置同时存在但不一致时 fail closed", () => {
+    const word = validAdminWordV3() as unknown as Record<string, unknown>;
+    const pos = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordPosMeaningsV3!
+    ) as Record<string, unknown>;
+    const sense = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordSenseV3!
+    ) as Record<string, unknown>;
+    const sentence = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.WordSentenceV3!
+    ) as Record<string, unknown>;
+    sentence.associations = [
+      {
+        id: IDS.member1,
+        association_schema_version: 3,
+        source_dialect: "common",
+        source_range: { start: 1, end: 6, surface: "enter" },
+        source_segments: [{ start: 0, end: 6, surface: "center" }],
+        state: "linked",
+        target_word_id: IDS.entry,
+        target_sense_id: IDS.member2,
+        target_component_usages: [],
+        origin: "manual",
+        target_headword: "center",
+        target_gloss: "中心",
+        resolved_pos: "noun"
+      }
+    ];
+    sense.sentences = [sentence];
+    pos.senses = [sense];
+    word.meanings = { sense_groups: [], pos: [pos] };
+
+    expect(() => decodeAdminWordV3Envelope({ word })).toThrow(
+      InvalidAdminWordResponseError
     );
   });
 

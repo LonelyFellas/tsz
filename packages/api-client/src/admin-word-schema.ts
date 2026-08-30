@@ -116,6 +116,96 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function isMatchingSourceRangeAlias(
+  sourceRange: Record<string, unknown>,
+  sourceSegments: unknown[]
+): boolean {
+  const firstSegment = sourceSegments[0];
+  return (
+    Object.keys(sourceRange).length === 3 &&
+    isRecord(firstSegment) &&
+    sourceRange.start === firstSegment.start &&
+    sourceRange.end === firstSegment.end &&
+    sourceRange.surface === firstSegment.surface
+  );
+}
+
+function runtimeCompatibilityValue(
+  value: unknown,
+  withinV3Word = false
+): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => runtimeCompatibilityValue(item, withinV3Word));
+  }
+  if (!isRecord(value)) return value;
+  const nextWithinV3Word = withinV3Word || value.schema_version === 3;
+  const mapped = Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      runtimeCompatibilityValue(item, nextWithinV3Word)
+    ])
+  );
+  if (
+    nextWithinV3Word &&
+    isRecord(mapped.source_range) &&
+    Array.isArray(mapped.source_segments) &&
+    isMatchingSourceRangeAlias(mapped.source_range, mapped.source_segments)
+  ) {
+    const { source_range: _legacyAlias, ...association } = mapped;
+    return association;
+  }
+  if (
+    nextWithinV3Word &&
+    isRecord(mapped.source_range) &&
+    !Object.hasOwn(mapped, "source_segments") &&
+    !Object.hasOwn(mapped, "association_schema_version") &&
+    !Object.hasOwn(mapped, "state") &&
+    !Object.hasOwn(mapped, "target_component_usages") &&
+    typeof mapped.id === "string" &&
+    typeof mapped.source_dialect === "string" &&
+    typeof mapped.target_word_id === "string" &&
+    typeof mapped.target_sense_id === "string"
+  ) {
+    const { source_range, ...association } = mapped;
+    return {
+      ...association,
+      association_schema_version: 3,
+      source_segments: [source_range],
+      state: "linked",
+      target_component_usages: []
+    };
+  }
+  if (
+    !nextWithinV3Word &&
+    isRecord(mapped.source_range) &&
+    typeof mapped.id === "string" &&
+    typeof mapped.source_dialect === "string" &&
+    typeof mapped.target_word_id === "string" &&
+    typeof mapped.target_sense_id === "string" &&
+    !Object.hasOwn(mapped, "state")
+  ) {
+    return { ...mapped, state: "linked" };
+  }
+  return mapped;
+}
+
+function addLegacyAssociationAliases(value: unknown): void {
+  if (Array.isArray(value)) {
+    value.forEach(addLegacyAssociationAliases);
+    return;
+  }
+  if (!isRecord(value)) return;
+  if (
+    value.association_schema_version === 3 &&
+    Array.isArray(value.source_segments) &&
+    value.source_segments.length > 0 &&
+    !Object.hasOwn(value, "source_range")
+  ) {
+    value.source_range = value.source_segments[0];
+  }
+  Object.values(value).forEach(addLegacyAssociationAliases);
+}
+
 function assertSupportedSchemaVersion(
   value: unknown,
   responsePath: string,
@@ -162,7 +252,10 @@ function assertRuntimeContract(
   value: unknown,
   pathPrefix = "$"
 ): void {
-  const result = validateRuntimeSchema(rootName, value);
+  const result = validateRuntimeSchema(
+    rootName,
+    runtimeCompatibilityValue(value)
+  );
   if (!result.valid) {
     const responsePath =
       pathPrefix === "$"
@@ -174,6 +267,7 @@ function assertRuntimeContract(
       result.received_type
     );
   }
+  addLegacyAssociationAliases(value);
 }
 
 /** 旧 Admin UI 保持 V2-only；这里只增加版本防火墙，不改变既有 wire 消费。 */
