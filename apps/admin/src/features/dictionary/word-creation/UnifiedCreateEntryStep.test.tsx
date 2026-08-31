@@ -710,14 +710,15 @@ describe("UnifiedCreateEntryStep", () => {
     });
   });
 
-  it("V3 matched 无数据库原形时沿用 d707328 双面板展示内置词典英美式", async () => {
+  it("V3 matched 无数据库原形时沿用内置词典英美式并按输入判定来源方言", async () => {
     const supplied = requests();
     const creation = deferred<{ word: AdminWordV3 }>();
-    vi.mocked(supplied.detectV3).mockResolvedValue(matchedV3Detection());
+    const detection = matchedV3Detection("centre");
+    vi.mocked(supplied.detectV3).mockResolvedValue(detection);
     vi.mocked(supplied.createV3).mockReturnValue(creation.promise);
     const onCreated = renderStep(supplied);
 
-    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.change(input(), { target: { value: "centre" } });
     fireEvent.click(screen.getByText("词典检测"));
 
     expect(await screen.findByText("确认英美主词")).toBeVisible();
@@ -734,10 +735,17 @@ describe("UnifiedCreateEntryStep", () => {
     expect(screen.queryByText("fixture-dictionary")).toBeNull();
     expect(supplied.createV3).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
-    expect(supplied.createV3).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({ detection_id: "detection-v3" })
-    );
+    expect(supplied.createV3).toHaveBeenCalledWith(expect.any(String), {
+      schema_version: 3,
+      detection_id: detection.detection_id,
+      kind: "word",
+      headwords: {
+        mode: "distinguish",
+        uk: "centre",
+        us: "center",
+        source_dialect: "uk"
+      }
+    });
     const prefilled = v3PrefilledWord();
     await act(async () => creation.resolve({ word: prefilled }));
     expect(onCreated).toHaveBeenCalledWith(prefilled, {
@@ -771,27 +779,20 @@ describe("UnifiedCreateEntryStep", () => {
     }
   );
 
-  it("完整检测到数据库原形时按 d707328 布局展示全部原形，并用首个原形填充右侧英美式", async () => {
+  it("内置词典提供英美式时优先于已有原形填充右侧主词", async () => {
     const supplied = requests();
-    const detail = deferred<{ word: AdminWordV3 }>();
     const detection = matchedV3Detection();
     vi.mocked(supplied.detectV3).mockResolvedValue({
       ...detection,
       requires_acknowledgement: true,
       surface_match_page: v3BaseFormPage()
     });
-    vi.mocked(supplied.getWord).mockReturnValue(detail.promise);
     renderStep(supplied);
 
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
 
     expect(await screen.findByText("确认英美主词")).toBeVisible();
-    expect(screen.getByText("正在加载原形…")).toBeVisible();
-    expect(screen.queryByText("区分英美词形")).toBeNull();
-
-    await act(async () => detail.resolve({ word: existingV3Word() }));
-
     expect(await screen.findByText("区分英美词形")).toBeVisible();
     expect(screen.getByText("英式英语 · BrE")).toBeVisible();
     expect(screen.getByText("美式英语 · AmE")).toBeVisible();
@@ -799,8 +800,8 @@ describe("UnifiedCreateEntryStep", () => {
     expect(screen.getByLabelText("美式主词")).toHaveValue("center");
     expect(screen.getByText("centre / center")).toBeVisible();
     expect(screen.getByText("已发布")).toBeVisible();
-    expect(screen.getByText("来源：智能词库原形")).toBeVisible();
-    expect(supplied.getWord).toHaveBeenCalledWith("existing-v3");
+    expect(screen.getByText("来源：内置词典")).toBeVisible();
+    expect(supplied.getWord).not.toHaveBeenCalled();
     expect(screen.queryByText("确认英美主词与词形")).toBeNull();
     expect(screen.queryByText("已找到内置词典建议")).toBeNull();
     expect(screen.queryByText("词典音标：ˈsentə")).toBeNull();
@@ -870,8 +871,20 @@ describe("UnifiedCreateEntryStep", () => {
 
   it("首个数据库原形详情加载失败时阻断创建，重试成功后才允许继续", async () => {
     const supplied = requests();
+    const detection = matchedV3Detection();
+    if (detection.builtin_dictionary.status !== "matched") {
+      throw new Error("expected matched dictionary fixture");
+    }
+    detection.builtin_dictionary.suggested_forms[0]!.regional_variants = {
+      mode: "common",
+      common: {
+        dialect: "common",
+        spelling: "center",
+        pronunciations: []
+      }
+    };
     vi.mocked(supplied.detectV3).mockResolvedValue({
-      ...matchedV3Detection(),
+      ...detection,
       requires_acknowledgement: true,
       surface_match_page: v3BaseFormPage()
     });
