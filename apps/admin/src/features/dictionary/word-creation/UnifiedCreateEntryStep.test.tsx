@@ -726,7 +726,9 @@ describe("UnifiedCreateEntryStep", () => {
     expect(screen.getByLabelText("美式主词")).toHaveValue("center");
     expect(screen.getAllByText("名词").length).toBeGreaterThan(0);
     expect(screen.getAllByText("动词").length).toBeGreaterThan(0);
-    expect(screen.getByText("来源：内置词典")).toBeVisible();
+    expect(document.querySelector(".word-headword-source")).toHaveTextContent(
+      "来源：内置词典"
+    );
     expect(screen.queryByText("复数")).toBeNull();
     expect(screen.queryByText("词典音标：ˈsentə")).toBeNull();
     expect(screen.queryByText(/实际发音/)).toBeNull();
@@ -952,17 +954,11 @@ describe("UnifiedCreateEntryStep", () => {
       ".word-detection-result-card"
     );
     if (!(card instanceof HTMLElement)) throw new Error("detection card");
-    const builtinRow = within(card)
-      .getByText("内置：")
-      .closest<HTMLElement>(".word-pos-source-row");
-    const smartRow = within(card)
-      .getByText("智能：")
-      .closest<HTMLElement>(".word-pos-source-row");
-    expect(builtinRow).not.toBeNull();
-    expect(smartRow).not.toBeNull();
-    expect(within(builtinRow!).getByText("名词")).toBeVisible();
-    expect(within(builtinRow!).getByText("动词")).toBeVisible();
-    expect(within(smartRow!).getByText("形容词")).toBeVisible();
+    expect(within(card).getByText("来源：内置词典")).toBeVisible();
+    expect(within(card).queryByText("来源：智能词库")).toBeNull();
+    expect(within(card).queryByText("形容词")).toBeNull();
+    expect(within(card).getByText("名词")).toBeVisible();
+    expect(within(card).getByText("动词")).toBeVisible();
     expect(within(card).queryByText("· 内置词典")).toBeNull();
     expect(within(card).queryByText("· 已有词条")).toBeNull();
   });
@@ -986,7 +982,9 @@ describe("UnifiedCreateEntryStep", () => {
     expect(screen.getAllByText("名词").length).toBeGreaterThan(0);
     expect(screen.queryByText("现在分词")).toBeNull();
     expect(screen.queryByText(/词典音标/)).toBeNull();
-    expect(screen.getByText("来源：内置词典")).toBeVisible();
+    expect(document.querySelector(".word-headword-source")).toHaveTextContent(
+      "来源：内置词典"
+    );
     expect(screen.getByLabelText("区分英美词形")).toBeEnabled();
     expect(supplied.createV3).not.toHaveBeenCalled();
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
