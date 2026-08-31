@@ -332,6 +332,49 @@ describe("V3 meanings writable model", () => {
     expect(idFactory).toHaveBeenCalledTimes(calls);
   });
 
+  it("prunes a removed forms POS and only its exclusively owned sense groups", () => {
+    const existing = toWritableMeanings(meaningsCanonicalFixture);
+    const secondPos = structuredClone(existing.pos[0]!);
+    secondPos.pos_id = "pos-2";
+    secondPos.senses[0]!.id = "sense-2";
+    secondPos.senses[0]!.sense_group_id = "sense-group-2";
+    existing.pos.push(secondPos);
+    existing.sense_groups.push({
+      id: "sense-group-2",
+      name_zh: "第二词性",
+      name_en: "Second"
+    });
+    existing.pos[0]!.senses[0]!.sentences[0]!.links.push({
+      word_id: "entry-1",
+      sense_id: "sense-2",
+      role: "context"
+    });
+    existing.pos[0]!.senses[0]!.relations.push({
+      id: "relation-to-removed-sense",
+      relation: "synonym",
+      target_word_id: "entry-1",
+      target_sense_id: "sense-2",
+      score: "80"
+    });
+
+    const result = ensureV3MeaningsForForms(
+      "entry-1",
+      formsFixture({ pos_id: "pos-1" }),
+      existing,
+      vi.fn()
+    );
+
+    expect(result.pos).toHaveLength(1);
+    expect(result.pos[0]!.pos_id).toBe("pos-1");
+    expect(result.sense_groups).toEqual([existing.sense_groups[0]]);
+    expect(result.pos[0]!.senses[0]!.sentences[0]!.links).not.toContainEqual(
+      expect.objectContaining({ sense_id: "sense-2" })
+    );
+    expect(result.pos[0]!.senses[0]!.relations).not.toContainEqual(
+      expect.objectContaining({ target_sense_id: "sense-2" })
+    );
+  });
+
   it("深投影排除只读 association/target snapshots，保留全部 writable UUID 与顺序", () => {
     const writable = toWritableMeanings(meaningsCanonicalFixture);
     const snapshots = relationDisplaySnapshots(meaningsCanonicalFixture);

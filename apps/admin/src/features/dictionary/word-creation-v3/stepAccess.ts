@@ -36,6 +36,17 @@ export function resolveV3StepAccess(
     };
   }
 
+  if (word.status === "draft") {
+    const reachable = new Set(STEP_ORDER);
+    return {
+      requested,
+      effective: requested,
+      requestedReachable: true,
+      reachable,
+      readOnly
+    };
+  }
+
   const maxIndex = Math.max(0, STEP_ORDER.indexOf(word.max_reachable_step));
   const reachable = new Set(STEP_ORDER.slice(0, maxIndex + 1));
   const requestedReachable = reachable.has(requested);

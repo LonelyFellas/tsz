@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/multidimensional-sentence-backend-safe/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-30T11:14:31.423Z",
+  "_source": "/Users/darwish/.codex/worktrees/61f0/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-30T14:49:09.735Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -3082,6 +3082,10 @@
           "description": "检测阶段 surface warning 的服务端签名确认 token；用于确认匹配集合没有漂移。"
         },
         "detection_id": { "type": "string", "format": "uuid" },
+        "headwords": {
+          "$ref": "#/components/schemas/WordHeadwordsV2",
+          "description": "Step 1 最终确认值；兼容窗口内旧客户端可省略，由服务端按旧检测规则补齐。"
+        },
         "kind": { "$ref": "#/components/schemas/WordEntryKindV3" },
         "schema_version": { "type": "integer", "enum": [3] }
       },
@@ -4118,7 +4122,8 @@
           "properties": {
             "common": { "type": "string" },
             "mode": { "type": "string", "enum": ["unified"] }
-          }
+          },
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -4131,10 +4136,12 @@
             },
             "uk": { "type": "string" },
             "us": { "type": "string" }
-          }
+          },
+          "additionalProperties": false
         }
       ],
-      "description": "英美主词。检测响应中的值是建议；创建 matched 草稿时，管理员可选择任一模式并编辑\n各侧拼写。服务端仍会规范化并拒绝空值或非法结构。"
+      "description": "英美主词。检测响应中的值是建议；创建 matched 草稿时，管理员可选择任一模式并编辑\n各侧拼写。服务端仍会规范化并拒绝空值或非法结构。",
+      "discriminator": { "propertyName": "mode" }
     },
     "WordPosFormsV2": {
       "type": "object",

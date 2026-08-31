@@ -302,11 +302,77 @@ export function ensureV3MeaningsForForms(
   wordId: string,
   forms: DraftFormsStepContentV3,
   meanings: DraftMeaningsStepContentWritableV3,
-  idFactory: () => string
+  idFactory: () => string,
+  missingPosTemplates?: DraftMeaningsStepContentWritableV3
 ): DraftMeaningsStepContentWritableV3 {
-  let nextGroups = meanings.sense_groups;
-  let nextPos = meanings.pos;
-  let changed = false;
+  const formPosIds = new Set(forms.pos.map((pos) => pos.pos_id));
+  const remainingPos = meanings.pos.filter((pos) => formPosIds.has(pos.pos_id));
+  const removedPos = meanings.pos.filter((pos) => !formPosIds.has(pos.pos_id));
+  const removedSenseIds = new Set(
+    removedPos.flatMap((pos) => pos.senses.map((sense) => sense.id))
+  );
+  let crossReferencesChanged = false;
+  const keptPos = remainingPos.map((pos) => {
+    let posChanged = false;
+    const senses = pos.senses.map((sense) => {
+      const relations = sense.relations.filter(
+        (relation) =>
+          !(
+            relation.target_word_id === wordId &&
+            relation.target_sense_id &&
+            removedSenseIds.has(relation.target_sense_id)
+          )
+      );
+      const sentences = sense.sentences.map((sentence) => {
+        const links = sentence.links.filter(
+          (link) =>
+            !(link.word_id === wordId && removedSenseIds.has(link.sense_id))
+        );
+        if (links.length === sentence.links.length) return sentence;
+        posChanged = true;
+        return { ...sentence, links };
+      });
+      if (
+        relations.length === sense.relations.length &&
+        sentences.every(
+          (sentence, index) => sentence === sense.sentences[index]
+        )
+      ) {
+        return sense;
+      }
+      posChanged = true;
+      return { ...sense, relations, sentences };
+    });
+    if (!posChanged) return pos;
+    crossReferencesChanged = true;
+    return { ...pos, senses };
+  });
+  const keptGroupIds = new Set(
+    keptPos.flatMap((pos) =>
+      pos.senses.flatMap((sense) =>
+        sense.sense_group_id ? [sense.sense_group_id] : []
+      )
+    )
+  );
+  const removedOnlyGroupIds = new Set(
+    removedPos.flatMap((pos) =>
+      pos.senses.flatMap((sense) =>
+        sense.sense_group_id && !keptGroupIds.has(sense.sense_group_id)
+          ? [sense.sense_group_id]
+          : []
+      )
+    )
+  );
+  let nextGroups =
+    removedOnlyGroupIds.size === 0
+      ? meanings.sense_groups
+      : meanings.sense_groups.filter(
+          (group) => !removedOnlyGroupIds.has(group.id)
+        );
+  let nextPos =
+    removedPos.length === 0 && !crossReferencesChanged ? meanings.pos : keptPos;
+  let changed =
+    nextGroups !== meanings.sense_groups || nextPos !== meanings.pos;
   const groupById = new Map(nextGroups.map((group) => [group.id, group]));
   const groupOwner = new Map<string, string>();
   const appendGroup = (
@@ -326,7 +392,7 @@ export function ensureV3MeaningsForForms(
     changed = true;
   };
 
-  for (const [posIndex, pos] of meanings.pos.entries()) {
+  for (const [posIndex, pos] of nextPos.entries()) {
     const referencedGroupIds = Array.from(
       new Set(
         pos.senses.flatMap((sense) =>
@@ -369,6 +435,26 @@ export function ensureV3MeaningsForForms(
     missingPosIds.push(pos.pos_id);
   }
   for (const posId of missingPosIds) {
+    const templateGroups = missingPosTemplates?.sense_groups ?? [];
+    const template = missingPosTemplates?.pos.find(
+      (candidate) => candidate.pos_id === posId
+    );
+    if (template) {
+      const templateGroupIds = new Set(
+        template.senses.flatMap((sense) =>
+          sense.sense_group_id ? [sense.sense_group_id] : []
+        )
+      );
+      for (const group of templateGroups) {
+        if (templateGroupIds.has(group.id) && !groupById.has(group.id)) {
+          appendGroup(group);
+        }
+      }
+      if (nextPos === meanings.pos) nextPos = [...nextPos];
+      nextPos.push(template);
+      changed = true;
+      continue;
+    }
     const senseGroup = { id: idFactory(), name_zh: "", name_en: "" };
     appendGroup(senseGroup);
     if (nextPos === meanings.pos) nextPos = [...nextPos];

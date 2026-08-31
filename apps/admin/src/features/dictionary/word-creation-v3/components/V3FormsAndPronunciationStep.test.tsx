@@ -25,7 +25,6 @@ import {
   uuidSequence
 } from "../fixtures";
 import { validateFormsContent } from "../model";
-import { v3IssueMessage } from "../presentationErrors";
 import { partOfSpeechCatalogFixture } from "../../word-creation/partOfSpeech.test.helper";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
@@ -202,6 +201,30 @@ async function chooseGroupAction(groupIndex: number, action: string) {
 }
 
 describe("V3FormsAndPronunciationStep", () => {
+  it("基本词性徽标按本地词形草稿实时递减且不依赖发布问题", () => {
+    const initial = formsFixture({
+      forms: [
+        commonFormFixture({
+          pronunciations: [pronunciationFixture({ actual_pron: "" })]
+        })
+      ]
+    });
+    render(<Harness initial={initial} issues={[]} />);
+
+    expect(screen.getByTitle("该词性未填项")).toHaveTextContent("1");
+    fireEvent.change(screen.getByLabelText("第 1 条发音的实际发音"), {
+      target: { value: "centre" }
+    });
+    expect(screen.getByTitle("该词性未填项")).toHaveAttribute(
+      "data-show",
+      "false"
+    );
+    expect(screen.getByLabelText("第 1 条发音的实际发音")).not.toHaveAttribute(
+      "aria-invalid",
+      "true"
+    );
+  });
+
   beforeEach(() => {
     catalogState.data = partOfSpeechCatalogFixture;
     catalogState.isError = false;
@@ -1138,7 +1161,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(variant.common.pronunciations[1]!.actual_pron).toBe("two-edited");
   });
 
-  it("I08 draft 空态可编辑但不误报完成；complete issues 展示权威定位", () => {
+  it("I08 draft 空态可编辑但不误报完成；发布问题只显示简短状态", () => {
     const { rerender } = render(
       <AntApp>
         <V3FormsAndPronunciationStep
@@ -1160,7 +1183,11 @@ describe("V3FormsAndPronunciationStep", () => {
         />
       </AntApp>
     );
-    expect(screen.getByText("请至少添加一个词性")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "已按最近一次发布检查结果标出对应字段；修改后请重新检查以更新状态。"
+      )
+    ).toBeInTheDocument();
 
     const incomplete = formsFixture({
       forms: [commonFormFixture({ spelling: "", pronunciations: [] })]
@@ -1177,9 +1204,6 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     expect(screen.getByText("词形与发音尚未完成")).toBeInTheDocument();
-    for (const issue of issues) {
-      expect(screen.getByText(v3IssueMessage(issue))).toBeInTheDocument();
-    }
     expect(screen.getByLabelText("原形通用拼写")).toHaveAttribute(
       "aria-invalid",
       "true"
@@ -2107,6 +2131,74 @@ describe("V3FormsAndPronunciationStep", () => {
         (item) => item.id === second.id
       )
     ).toBe(false);
+  });
+
+  it("把发布检查的发音方式与字典音标问题映射为各自短帮助文案", () => {
+    const pronunciation = pronunciationFixture({
+      id: uuidFromInt(905),
+      dict_phonetic: "",
+      style: undefined
+    });
+    const form = commonFormFixture({ pronunciations: [pronunciation] });
+    const content = formsFixture({ forms: [form] });
+    if (form.regional_variants.mode !== "common") throw new Error("fixture");
+    const issues: V3DraftValidationIssue[] = [
+      {
+        schema_version: 3,
+        step: "forms",
+        node_id: pronunciation.id,
+        field: "style",
+        code: "pronunciation_required",
+        message: "pronunciation is incomplete",
+        node_location: {
+          node_role: "pronunciation",
+          ancestor_node_ids: [content.pos[0]!.pos_id, form.id],
+          pos_id: content.pos[0]!.pos_id,
+          form_id: form.id,
+          variant_id: form.regional_variants.common.id,
+          pronunciation_id: pronunciation.id
+        }
+      },
+      {
+        schema_version: 3,
+        step: "forms",
+        node_id: pronunciation.id,
+        field: "dict_phonetic",
+        code: "pronunciation_required",
+        message: "pronunciation is incomplete",
+        node_location: {
+          node_role: "pronunciation",
+          ancestor_node_ids: [content.pos[0]!.pos_id, form.id],
+          pos_id: content.pos[0]!.pos_id,
+          form_id: form.id,
+          variant_id: form.regional_variants.common.id,
+          pronunciation_id: pronunciation.id
+        }
+      }
+    ];
+
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3PronunciationList
+            content={content}
+            idFactory={() => uuidFromInt(906)}
+            issues={issues}
+            onChange={() => undefined}
+            variant={form.regional_variants.common}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    expect(
+      screen.getByLabelText("第 1 条发音的发音方式").closest(".ant-select")
+    ).toHaveClass("ant-select-status-error");
+    expect(screen.getByText("请选择发音方式")).toBeVisible();
+    expect(screen.getByLabelText("第 1 条发音的字典音标")).toHaveClass(
+      "ant-input-status-error"
+    );
+    expect(screen.getByText("请填写字典音标")).toBeVisible();
   });
 
   it("#109 多发音显示拖动手柄并按拖放结果更新 wire 顺序", () => {

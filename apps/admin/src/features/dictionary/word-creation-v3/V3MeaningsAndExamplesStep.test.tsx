@@ -243,6 +243,11 @@ function Harness({
         onActivePosChange={setActivePosId}
         onFormsChange={(next) => {
           setFormsValue(next);
+          setValue((current) =>
+            ensureV3MeaningsForForms(wordId ?? "word-1", next, current, () =>
+              crypto.randomUUID()
+            )
+          );
           onFormsChange?.(next);
         }}
         onSave={onSave}
@@ -270,6 +275,24 @@ function formsValue(): DraftFormsStepContentV3 {
 }
 
 describe("V3MeaningsAndExamplesStep", () => {
+  it("基本词性徽标按本地词义草稿实时递减且不产生字段错误", () => {
+    const initial = structuredClone(meaningsFixture);
+    delete initial.pos[0]!.senses[0]!.frequency;
+    render(<Harness initial={initial} issues={[]} />);
+
+    expect(screen.getByTitle("该词性未填项")).toHaveTextContent("1");
+    fireEvent.change(screen.getByLabelText("释义 1 频率"), {
+      target: { value: "50" }
+    });
+    expect(screen.getByTitle("该词性未填项")).toHaveAttribute(
+      "data-show",
+      "false"
+    );
+    expect(
+      screen.getByLabelText("释义 1 频率").closest(".ant-input-number")
+    ).not.toHaveClass("ant-input-number-status-error");
+  });
+
   beforeEach(() => {
     relatedSearchAny.mockImplementation(defaultRelatedSearchImplementation);
   });
@@ -442,6 +465,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       "sense-group-2"
     ]);
     expect(value().pos[0]!.senses[0]!.relations).toEqual([]);
+    expect(
+      value().pos[0]!.senses[0]!.sentences.flatMap((sentence) => sentence.links)
+    ).not.toContainEqual(expect.objectContaining({ sense_id: "sense-1" }));
   });
 
   it("词义步骤仅有一个基本词性时不提供删除入口", () => {
@@ -706,14 +732,73 @@ describe("V3MeaningsAndExamplesStep", () => {
     rerender(<Harness initial={initial} issues={[issue]} />);
     expect(
       screen.getByLabelText("定义 1 语法结构").closest(".ant-select")
-    ).not.toHaveClass("ant-select-status-error");
-    expect(
-      within(screen.getByRole("alert")).getByText(
-        "请完整填写释义并选择语法结构"
-      )
-    ).toBeVisible();
+    ).toHaveClass("ant-select-status-error");
+    expect(screen.getByText("请完整填写释义并选择语法结构")).toBeVisible();
     expect(actions).toHaveClass("word-sort-actions", "ant-space-vertical");
     expect(meaningsCss).toContain(".word-table-row.word-definition-row {");
+  });
+
+  it("仅在传入发布问题后把词频和必选项映射到字段，输入时不主动清除", () => {
+    const issues: V3DraftValidationIssue[] = [
+      {
+        schema_version: 3,
+        step: "meanings",
+        node_id: "sense-1",
+        field: "sub_pos",
+        code: "sub_pos_required",
+        message: "请选择细分词性",
+        node_location: {
+          node_role: "meanings.sense",
+          ancestor_node_ids: ["pos-1"],
+          pos_id: "pos-1"
+        }
+      },
+      {
+        schema_version: 3,
+        step: "meanings",
+        node_id: "sense-1",
+        field: "frequency",
+        code: "frequency_invalid",
+        message: "词义词频必须是 0–100 且最多两位小数",
+        node_location: {
+          node_role: "meanings.sense",
+          ancestor_node_ids: ["pos-1"],
+          pos_id: "pos-1"
+        }
+      }
+    ];
+    const view = render(<Harness initial={meaningsFixture} />);
+
+    expect(
+      screen.getByLabelText("释义 1 子词性").closest(".ant-select")
+    ).not.toHaveClass("ant-select-status-error");
+    expect(
+      screen.getByLabelText("释义 1 频率").closest(".ant-input-number")
+    ).not.toHaveClass("ant-input-number-status-error");
+
+    view.rerender(<Harness initial={meaningsFixture} issues={issues} />);
+    expect(
+      screen.getByLabelText("释义 1 子词性").closest(".ant-select")
+    ).toHaveClass("ant-select-status-error");
+    expect(
+      screen.getByLabelText("释义 1 频率").closest(".ant-input-number")
+    ).toHaveClass("ant-input-number-status-error");
+    expect(screen.getByText("请选择细分词性")).toBeVisible();
+    expect(
+      screen.getByText("词频必须为 0–100，且最多保留两位小数")
+    ).toBeVisible();
+
+    fireEvent.change(screen.getByLabelText("释义 1 频率"), {
+      target: { value: "25" }
+    });
+    expect(
+      screen.getByText("词频必须为 0–100，且最多保留两位小数")
+    ).toBeVisible();
+
+    view.rerender(<Harness initial={meaningsFixture} issues={[]} />);
+    expect(
+      screen.queryByText("词频必须为 0–100，且最多保留两位小数")
+    ).toBeNull();
   });
 
   it("多维例句表头与等级、英中内容和操作列对齐", () => {

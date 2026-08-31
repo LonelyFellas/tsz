@@ -481,7 +481,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "8673ef3aa3a468d042c5d5afbc1cd52ba5afac41777aaa14b98f734ab88350f6"
+      "da5da94acc1898e39d2ba7c5f041f61412dbe377f0f1088308befd4517a0b847"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -498,6 +498,16 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(defs.WordPosFormsV3.required).toContain("dialect_rules");
     expect(defs.DialectModeV3.enum).toEqual(["unified", "distinguish"]);
     expect(Object.keys(defs.AdminWordV3.properties)).not.toContain("headwords");
+    expect(
+      snapshot.schemas.CreateAdminWordV3Input.properties.headwords
+    ).toEqual({
+      $ref: "#/components/schemas/WordHeadwordsV2",
+      description:
+        "Step 1 最终确认值；兼容窗口内旧客户端可省略，由服务端按旧检测规则补齐。"
+    });
+    expect(snapshot.schemas.CreateAdminWordV3Input.required).not.toContain(
+      "headwords"
+    );
     expect(defs.WordPosFormsV3.required).toEqual([
       "pos_id",
       "pos",

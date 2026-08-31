@@ -244,6 +244,12 @@ describe("createV3WordRequests", () => {
       schema_version: 3,
       detection_id: "detection-1",
       kind: "word",
+      headwords: {
+        mode: "distinguish",
+        uk: "colour",
+        us: "color",
+        source_dialect: "uk"
+      },
       confirmed_surface_match_token: "surface-token"
     };
     const formsInput: SaveFormsStepInputV3 = {

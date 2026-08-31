@@ -8,6 +8,7 @@ export interface V3IssueNavigationTarget {
   step: PersistedWordStep;
   node_id: string;
   field: string;
+  ancestor_node_ids?: string[];
   pos_id?: string;
   form_group_id?: string;
   membership_id?: string;
@@ -47,6 +48,7 @@ export function v3IssueNavigationTarget(
     step: issue.step,
     node_id,
     field: issue.field,
+    ancestor_node_ids: [...location.ancestor_node_ids],
     ...(location.pos_id ? { pos_id: location.pos_id } : {}),
     ...(location.form_group_id
       ? { form_group_id: location.form_group_id }

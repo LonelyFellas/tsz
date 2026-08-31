@@ -24,7 +24,8 @@ import type {
   SaveMeaningsStepInput,
   StepSaveIntent,
   ValidateAdminWordV2Input,
-  WordCreationStep
+  WordCreationStep,
+  WordHeadwordsV2
 } from "./admin-word-v2";
 import type { SurfaceMatchItemV3, SurfaceMatchPageV3 } from "./surface-match";
 
@@ -643,6 +644,8 @@ export interface CreateAdminWordV3Input {
   schema_version: 3;
   detection_id: string;
   kind: WordEntryKindV3;
+  /** Step 1 最终确认值；兼容窗口内旧客户端可省略。 */
+  headwords?: WordHeadwordsV2;
   confirmed_surface_match_token?: string;
 }
 

@@ -97,16 +97,12 @@ function renderLayout(
         draftMeanings={options.draftMeanings}
         readOnly={options.readOnly}
         dirtySteps={options.dirtySteps}
-        readiness={{
-          issue_count: issues.length,
-          positions: []
-        }}
         issues={issues}
         problem={options.problem}
         conflict={options.conflict}
         onStepChange={(step) => options.onStepChange?.(step)}
         onProgressNavigate={(target) => options.onProgressNavigate?.(target)}
-        onIssueNavigate={(value) => options.onIssueNavigate?.(value)}
+        onIssueNavigate={(issue) => options.onIssueNavigate?.(issue)}
         onRefreshConflict={options.onRefreshConflict}
       >
         <div>step body</div>
@@ -116,6 +112,35 @@ function renderLayout(
 }
 
 describe("V3WordCreationLayout", () => {
+  it("does not repeat publication issues in the wizard layout", () => {
+    renderLayout({ activeStep: "forms", issues: [issue()] });
+
+    expect(screen.queryByRole("region", { name: "待完成项" })).toBeNull();
+    expect(screen.getByText("step body")).toBeVisible();
+  });
+
+  it("shows stable completion validation guidance and navigates its first issue", () => {
+    const currentIssue = issue();
+    const onIssueNavigate = vi.fn();
+    renderLayout({
+      problem: {
+        kind: "validation",
+        status: 422,
+        code: "validation_failed",
+        issues: [currentIssue],
+        operation: "save_meanings",
+        retryable: false
+      },
+      onIssueNavigate
+    });
+
+    expect(screen.getByText("仍有内容需要完成")).toBeVisible();
+    expect(screen.getByText("内容来源无法确认，请刷新后重试")).toBeVisible();
+    expect(screen.queryByText("spelling is invalid")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "去处理首项" }));
+    expect(onIssueNavigate).toHaveBeenCalledWith(currentIssue);
+  });
+
   it("shows the seven product completion rows without engineering step copy", () => {
     const current = word();
     current.completed_steps = ["basics", "forms"];
@@ -422,25 +447,16 @@ describe("V3WordCreationLayout", () => {
     expect(screen.getByText(title)).toBeInTheDocument();
   });
 
-  it("routes writable step and issue clicks to their handlers", () => {
+  it("routes writable step clicks to their handlers", () => {
     const onStepChange = vi.fn();
-    const onIssueNavigate = vi.fn();
-    const validationIssue = issue();
     renderLayout({
-      issues: [validationIssue],
-      onStepChange,
-      onIssueNavigate
+      issues: [issue()],
+      onStepChange
     });
 
     fireEvent.click(screen.getByText("词义与例句"));
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "内容来源无法确认，请刷新后重试"
-      })
-    );
 
     expect(onStepChange).toHaveBeenCalledWith("meanings");
-    expect(onIssueNavigate).toHaveBeenCalledWith(validationIssue);
   });
 
   it("shows dirty steps only for writable sessions", () => {

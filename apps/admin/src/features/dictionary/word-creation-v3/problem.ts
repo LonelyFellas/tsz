@@ -77,6 +77,7 @@ export type V3Problem =
       kind: "validation";
       status: 422;
       issues: V3DraftValidationIssue[];
+      operation?: V3ProblemOperation;
     })
   | (HttpProblemBase & { kind: "service_unavailable" })
   | (HttpProblemBase & { kind: "server" })
@@ -223,6 +224,7 @@ export function classifyV3Problem(
         kind: "validation",
         status: 422,
         issues,
+        ...(operation ? { operation } : {}),
         retryable: false
       };
     }

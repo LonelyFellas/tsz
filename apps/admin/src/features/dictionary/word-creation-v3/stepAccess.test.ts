@@ -12,20 +12,24 @@ function word(
 }
 
 describe("resolveV3StepAccess", () => {
-  it("clamps draft navigation to the server-authoritative max step", () => {
+  it("allows draft navigation to every step regardless of the resume hint", () => {
+    for (const requested of [
+      "basics",
+      "forms",
+      "meanings",
+      "preview"
+    ] as const) {
+      expect(
+        resolveV3StepAccess(word("draft", "forms"), requested, false)
+      ).toMatchObject({
+        requested,
+        effective: requested,
+        requestedReachable: true
+      });
+    }
     expect(
-      resolveV3StepAccess(word("draft", "forms"), "meanings", false)
-    ).toMatchObject({
-      requested: "meanings",
-      effective: "forms",
-      requestedReachable: false
-    });
-    expect(
-      resolveV3StepAccess(word("draft", "forms"), "basics", false)
-    ).toMatchObject({
-      effective: "basics",
-      requestedReachable: true
-    });
+      resolveV3StepAccess(word("draft", "forms"), "preview", false).reachable
+    ).toEqual(new Set(["basics", "forms", "meanings", "preview"]));
   });
 
   it("forces archived and published read-only entries to preview", () => {

@@ -57,6 +57,13 @@ describe("V3 issue navigation", () => {
       step: "forms",
       node_id: "pron-2",
       field: "actual_pron",
+      ancestor_node_ids: [
+        "pos-2",
+        "group-2",
+        "membership-2",
+        "form-2",
+        "variant-us"
+      ],
       pos_id: "pos-2",
       form_group_id: "group-2",
       membership_id: "membership-2",

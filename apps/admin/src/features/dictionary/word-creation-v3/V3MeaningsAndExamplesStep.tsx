@@ -15,6 +15,7 @@ import {
   Alert,
   App,
   AutoComplete,
+  Badge,
   Button,
   Card,
   Collapse,
@@ -64,6 +65,7 @@ import {
 } from "./meaningsModel";
 import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import { v3IssueMessage } from "./presentationErrors";
+import { countV3PosMeaningIncomplete } from "./posCompletion";
 import { V3AddBasicPosSelect } from "./components/V3AddBasicPosSelect";
 import {
   V3MultidimensionalSentenceDrawer,
@@ -102,6 +104,41 @@ export interface V3MeaningsAndExamplesStepProps {
     association: SentenceAssociationInputV3
   ) => void;
   sentenceTargetDiscoveryEnabled?: boolean;
+}
+
+function fieldIssue(
+  issues: readonly V3DraftValidationIssue[],
+  nodeId: string,
+  field: string
+) {
+  return issues.find(
+    (issue) => issue.node_id === nodeId && issue.field === field
+  );
+}
+
+function FieldIssueHelp({ issue }: { issue?: V3DraftValidationIssue }) {
+  return issue ? (
+    <Typography.Text className="word-field-help" type="danger">
+      {v3IssueMessage(issue)}
+    </Typography.Text>
+  ) : null;
+}
+
+function definitionContentIssue(
+  issues: readonly V3DraftValidationIssue[],
+  definition: WordDefinitionV3
+) {
+  if (
+    definition.definition_mode === "zh_definition" ||
+    definition.definition_mode === "zh_sentence"
+  ) {
+    return fieldIssue(issues, definition.id, "content");
+  }
+  for (const row of editableEnglishText(definition.content as EnglishTextV3)) {
+    const issue = fieldIssue(issues, row.variant_id, "value");
+    if (issue) return issue;
+  }
+  return undefined;
 }
 
 type DraftMutation = (draft: DraftMeaningsStepContentWritableV3) => void;
@@ -1601,37 +1638,7 @@ export function V3MeaningsAndExamplesStep({
     if (!forms || !onFormsChange || forms.pos.length <= 1) return;
     const formsResult = deletePartOfSpeech(forms, posId);
     if (!formsResult.ok) return;
-    const removedSenseIds = new Set(
-      value.pos
-        .find((pos) => pos.pos_id === posId)
-        ?.senses.map((sense) => sense.id) ?? []
-    );
-    const nextPos = value.pos.filter((pos) => pos.pos_id !== posId);
-    const referencedGroupIds = new Set(
-      nextPos.flatMap((pos) =>
-        pos.senses.flatMap((sense) =>
-          sense.sense_group_id ? [sense.sense_group_id] : []
-        )
-      )
-    );
     onFormsChange(formsResult.value);
-    onChange({
-      ...value,
-      sense_groups: value.sense_groups.filter((group) =>
-        referencedGroupIds.has(group.id)
-      ),
-      pos: nextPos.map((pos) => ({
-        ...pos,
-        senses: pos.senses.map((sense) => ({
-          ...sense,
-          relations: sense.relations.filter(
-            (relation) =>
-              relation.target_word_id !== wordId ||
-              !removedSenseIds.has(relation.target_sense_id ?? "")
-          )
-        }))
-      }))
-    });
     if (activePosId === posId) {
       const nextActivePosId = formsResult.value.pos[0]?.pos_id;
       if (nextActivePosId) onActivePosChange?.(nextActivePosId);
@@ -1653,15 +1660,7 @@ export function V3MeaningsAndExamplesStep({
 
       {issues.length > 0 && (
         <Alert
-          description={
-            <ul>
-              {issues.map((issue) => (
-                <li key={`${issue.node_id}:${issue.field}:${issue.code}`}>
-                  {v3IssueMessage(issue)}
-                </li>
-              ))}
-            </ul>
-          }
+          description="已按最近一次发布检查结果标出对应字段；修改后请重新检查以更新状态。"
           showIcon
           title="词义与例句尚未完成"
           type="warning"
@@ -1690,6 +1689,13 @@ export function V3MeaningsAndExamplesStep({
               label: (
                 <Space size={6}>
                   <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
+                  {pos ? (
+                    <Badge
+                      count={countV3PosMeaningIncomplete(pos, value)}
+                      size="small"
+                      title="该词性未填项"
+                    />
+                  ) : null}
                   {forms &&
                   forms.pos.length > 1 &&
                   forms.pos.some((formPos) => formPos.pos_id === posId) &&
@@ -1745,6 +1751,19 @@ export function V3MeaningsAndExamplesStep({
                       data-v3-node-id={pos.pos_id}
                     >
                       {pos.senses.map((sense, senseIndex) => {
+                        const senseIssues = issues.filter(
+                          (issue) => issue.node_id === sense.id
+                        );
+                        const subPosIssue = fieldIssue(
+                          senseIssues,
+                          sense.id,
+                          "sub_pos"
+                        );
+                        const frequencyIssue = fieldIssue(
+                          senseIssues,
+                          sense.id,
+                          "frequency"
+                        );
                         const configuredSubParts =
                           catalogByCode.get(formPosById.get(pos.pos_id) ?? "")
                             ?.sub_parts ?? [];
@@ -1885,8 +1904,10 @@ export function V3MeaningsAndExamplesStep({
                                         }))
                                       ];
                                     })()}
+                                    status={subPosIssue ? "error" : undefined}
                                     value={sense.sub_pos}
                                   />
+                                  <FieldIssueHelp issue={subPosIssue} />
                                 </label>
                                 <label className="word-sense-field word-sense-field-frequency">
                                   <Typography.Text type="secondary">
@@ -1913,12 +1934,16 @@ export function V3MeaningsAndExamplesStep({
                                     precision={2}
                                     step={0.01}
                                     suffix="%"
+                                    status={
+                                      frequencyIssue ? "error" : undefined
+                                    }
                                     value={
                                       sense.frequency === undefined
                                         ? null
                                         : Number(sense.frequency)
                                     }
                                   />
+                                  <FieldIssueHelp issue={frequencyIssue} />
                                 </label>
                                 <div className="word-sense-context-toggle">
                                   <Typography.Text type="secondary">
@@ -2120,6 +2145,15 @@ export function V3MeaningsAndExamplesStep({
                                                         }
                                                       })
                                                     }
+                                                    status={
+                                                      fieldIssue(
+                                                        issues,
+                                                        definition.id,
+                                                        "content"
+                                                      )
+                                                        ? "error"
+                                                        : undefined
+                                                    }
                                                     value={
                                                       definition.content.text
                                                     }
@@ -2160,10 +2194,25 @@ export function V3MeaningsAndExamplesStep({
                                                           }
                                                         })
                                                       }
+                                                      status={
+                                                        fieldIssue(
+                                                          issues,
+                                                          row.variant_id,
+                                                          "value"
+                                                        )
+                                                          ? "error"
+                                                          : undefined
+                                                      }
                                                       value={row.text}
                                                     />
                                                   ))
                                                 )}
+                                                <FieldIssueHelp
+                                                  issue={definitionContentIssue(
+                                                    issues,
+                                                    definition
+                                                  )}
+                                                />
                                               </div>
                                               <div className="word-field-with-help">
                                                 <Select
@@ -2214,9 +2263,25 @@ export function V3MeaningsAndExamplesStep({
                                                     )
                                                   ]}
                                                   placeholder="请选择语法结构"
+                                                  status={
+                                                    fieldIssue(
+                                                      issues,
+                                                      definition.id,
+                                                      "grammar_structure_id"
+                                                    )
+                                                      ? "error"
+                                                      : undefined
+                                                  }
                                                   value={
                                                     definition.grammar_structure_id
                                                   }
+                                                />
+                                                <FieldIssueHelp
+                                                  issue={fieldIssue(
+                                                    issues,
+                                                    definition.id,
+                                                    "grammar_structure_id"
+                                                  )}
                                                 />
                                               </div>
                                               <Space

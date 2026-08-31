@@ -27,7 +27,6 @@ import {
 } from "./issueNavigation";
 import { ensureV3MeaningsForForms, toWritableMeanings } from "./meaningsModel";
 import { classifyV3Problem, type V3Problem } from "./problem";
-import { buildV3Readiness } from "./readiness";
 import {
   createV3SaveFlow,
   type V3ConfirmationContext,
@@ -132,7 +131,7 @@ function initializedMeanings(
     canonical,
     newWordNodeId
   );
-  return { draft, generated: draft !== canonical };
+  return { draft };
 }
 
 interface PublishAttempt {
@@ -146,30 +145,63 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
     const nodes = [
       ...document.querySelectorAll<HTMLElement>("[data-v3-node-id]")
     ];
-    const scope = target.membership_id
+    const groupCards = [
+      ...document.querySelectorAll<HTMLElement>("[data-group-id]")
+    ];
+    const targetNodeIds = new Set([
+      target.node_id,
+      ...(target.ancestor_node_ids ?? []),
+      target.form_group_id,
+      target.form_id,
+      target.membership_id
+    ]);
+    const collapsedToggles = new Set<HTMLElement>();
+    for (const node of [...nodes, ...groupCards]) {
+      if (!targetNodeIds.has(node.dataset.v3NodeId ?? node.dataset.groupId)) {
+        continue;
+      }
+      const toggles = node.querySelectorAll<HTMLElement>(
+        '[role="button"].ant-collapse-header[aria-expanded="false"], [role="button"].word-sense-section-title[aria-expanded="false"], button[aria-expanded="false"][aria-label^="展开"]'
+      );
+      for (const toggle of toggles) collapsedToggles.add(toggle);
+    }
+    for (const toggle of collapsedToggles) toggle.click();
+    const membershipScope = target.membership_id
       ? nodes.find(
           (candidate) => candidate.dataset.v3NodeId === target.membership_id
         )
-      : target.form_group_id
-        ? nodes.find(
-            (candidate) => candidate.dataset.v3NodeId === target.form_group_id
-          )
-        : undefined;
+      : undefined;
+    const groupScope = target.form_group_id
+      ? (nodes.find(
+          (candidate) => candidate.dataset.v3NodeId === target.form_group_id
+        ) ??
+        groupCards.find(
+          (candidate) => candidate.dataset.groupId === target.form_group_id
+        ))
+      : undefined;
+    const scope = membershipScope ?? groupScope;
     const candidates = scope
       ? [scope, ...scope.querySelectorAll<HTMLElement>("[data-v3-node-id]")]
       : nodes;
     const matchesVisibleTarget = (candidate: HTMLElement) =>
       candidate.dataset.v3NodeId === target.node_id &&
       candidate.dataset.v3Field === target.field &&
-      !candidate.closest(".ant-tabs-tabpane-hidden");
-    const scopedElement = [...candidates].find(matchesVisibleTarget);
-    const element =
-      scopedElement ??
-      nodes.find((candidate) => matchesVisibleTarget(candidate));
+      !candidate.closest(
+        '.ant-tabs-tabpane-hidden, .ant-collapse-content-hidden, [aria-hidden="true"], [inert]'
+      );
+    const scopedElement = scope
+      ? [...candidates].find(matchesVisibleTarget)
+      : undefined;
+    const globalMatches = nodes.filter(matchesVisibleTarget);
+    const uniqueGlobalFallback =
+      globalMatches.length === 1 && collapsedToggles.size === 0
+        ? globalMatches[0]
+        : undefined;
+    const element = scopedElement ?? uniqueGlobalFallback;
     if (element) {
       element.scrollIntoView?.({ block: "center" });
       element.focus();
-      return;
+      if (document.activeElement === element) return;
     }
     await new Promise<void>((resolve) => setTimeout(resolve, 0));
   }
@@ -215,9 +247,10 @@ function V3WordCreationSession({
   if (!initialMeaningsRef.current) {
     initialMeaningsRef.current = initializedMeanings(initialWord);
   }
+  const cleanMeaningsRef = useRef(initialMeaningsRef.current.draft);
   const dirtyRef = useRef({
     forms: false,
-    meanings: initialMeaningsRef.current.generated
+    meanings: false
   });
   const [word, setWord] = useState(initialWord);
   const [draftForms, setDraftFormsState] = useState(initialWord.forms);
@@ -226,13 +259,15 @@ function V3WordCreationSession({
   );
   const [dirtySteps, setDirtySteps] = useState({
     forms: false,
-    meanings: initialMeaningsRef.current.generated
+    meanings: false
   });
   const [activeStep, setActiveStepState] = useState(initialStep);
   const [activePosId, setActivePosIdState] = useState(
     initialWord.forms.pos[0]?.pos_id
   );
-  const [issues, setIssues] = useState<V3DraftValidationIssue[]>([]);
+  const [publicationIssues, setPublicationIssues] = useState<
+    V3DraftValidationIssue[]
+  >([]);
   const [validation, setValidation] = useState<DraftValidationResponseV3>();
   const [impact, setImpact] = useState<FormsImpactResponseV3>();
   const [impactConfirmed, setImpactConfirmed] = useState(false);
@@ -338,10 +373,21 @@ function V3WordCreationSession({
         draftMeanings,
         newWordNodeId
       );
+      const nextCleanMeanings = ensureV3MeaningsForForms(
+        word.id,
+        content,
+        cleanMeaningsRef.current,
+        newWordNodeId,
+        nextMeanings
+      );
+      cleanMeaningsRef.current = nextCleanMeanings;
       if (nextMeanings !== draftMeanings) {
         setDraftMeaningsState(nextMeanings);
-        updateDirty("meanings", true);
       }
+      updateDirty(
+        "meanings",
+        JSON.stringify(nextMeanings) !== JSON.stringify(nextCleanMeanings)
+      );
       updateDirty(
         "forms",
         JSON.stringify(content) !==
@@ -360,10 +406,7 @@ function V3WordCreationSession({
       setDraftMeaningsState(content);
       updateDirty(
         "meanings",
-        JSON.stringify(content) !==
-          JSON.stringify(
-            toWritableMeanings(flowRef.current.canonical().meanings)
-          )
+        JSON.stringify(content) !== JSON.stringify(cleanMeaningsRef.current)
       );
       if (!publishReconciliationRequiredRef.current) setProblem(undefined);
       setConflict(undefined);
@@ -464,12 +507,12 @@ function V3WordCreationSession({
     }
     if (!dirtyRef.current.meanings) {
       const nextMeanings = initializedMeanings(initialWord);
+      cleanMeaningsRef.current = nextMeanings.draft;
       setDraftMeaningsState(nextMeanings.draft);
-      updateDirty("meanings", nextMeanings.generated);
+      updateDirty("meanings", false);
     }
     setProblem(undefined);
     setConflict(undefined);
-    setIssues([]);
     clearPreviewState();
   }, [clearPreviewState, initialWord, supersede, updateDirty]);
 
@@ -497,17 +540,16 @@ function V3WordCreationSession({
         );
       }
       if (nextMeanings) {
+        cleanMeaningsRef.current = nextMeanings.draft;
         setDraftMeaningsState(nextMeanings.draft);
       }
       clearDirty(syncForms && syncMeanings ? "all" : replacement);
-      if (nextMeanings?.generated) updateDirty("meanings", true);
       setProblem(undefined);
       setConflict(undefined);
-      setIssues([]);
       clearPreviewState();
       onWordChange?.(canonical);
     },
-    [clearDirty, clearPreviewState, onWordChange, updateDirty]
+    [clearDirty, clearPreviewState, onWordChange]
   );
 
   const handleError = useCallback(
@@ -524,13 +566,15 @@ function V3WordCreationSession({
       if (nextProblem.kind === "revision_conflict" && localConflict) {
         setConflict(localConflict);
       }
-      if (nextProblem.kind === "validation") {
-        setIssues(nextProblem.issues);
-        const first = nextProblem.issues[0];
-        if (first) await navigateIssue(first);
+      if (
+        nextProblem.kind === "validation" &&
+        (operation === "validate" || operation === "publish")
+      ) {
+        setPublicationIssues(nextProblem.issues);
+        if (operation === "publish") clearPreviewState();
       }
     },
-    [navigateIssue]
+    [clearPreviewState]
   );
 
   const reconcileArchivedCanonical = useCallback(async () => {
@@ -571,12 +615,12 @@ function V3WordCreationSession({
       }
       if (!dirtyRef.current.meanings) {
         const nextMeanings = initializedMeanings(latest.word);
+        cleanMeaningsRef.current = nextMeanings.draft;
         setDraftMeaningsState(nextMeanings.draft);
-        updateDirty("meanings", nextMeanings.generated);
+        updateDirty("meanings", false);
       }
       setProblem(undefined);
       setConflict(undefined);
-      setIssues([]);
       clearPreviewState();
       onWordChange?.(latest.word);
     } catch (error) {
@@ -615,7 +659,6 @@ function V3WordCreationSession({
       supersede();
       clearPreviewState();
       setConflict(undefined);
-      setIssues([]);
       setProblem(classifyV3Problem(error, "get"));
       retryRef.current = reconcileArchivedCanonical;
       await reconcileArchivedCanonical();
@@ -923,13 +966,11 @@ function V3WordCreationSession({
       if (!result.accepted || scope !== scopeRef.current) return undefined;
       setProblem(undefined);
       setValidation(result.value);
-      setIssues(result.value.issues);
+      setPublicationIssues(result.value.issues);
       if (!result.value.valid) {
         setImpact(undefined);
         setImpactConfirmed(false);
       }
-      const first = result.value.issues[0];
-      if (first) await navigateIssue(first);
       return result.value;
     } catch (error) {
       if (classifyV3Problem(error, "validate").kind === "entry_archived") {
@@ -941,7 +982,7 @@ function V3WordCreationSession({
     } finally {
       done();
     }
-  }, [handleEntryArchived, handleError, markPending, navigateIssue, requests]);
+  }, [handleEntryArchived, handleError, markPending, requests]);
 
   const confirmImpactSurface = useCallback(
     (page: SurfaceMatchPageV3) => {
@@ -1033,12 +1074,12 @@ function V3WordCreationSession({
       }
       if (!dirtyRef.current.meanings) {
         const nextMeanings = initializedMeanings(latest.word);
+        cleanMeaningsRef.current = nextMeanings.draft;
         setDraftMeaningsState(nextMeanings.draft);
-        updateDirty("meanings", nextMeanings.generated);
+        updateDirty("meanings", false);
       }
       setProblem(undefined);
       setConflict(undefined);
-      setIssues([]);
       clearPreviewState();
       onWordChange?.(latest.word);
     } catch (error) {
@@ -1084,6 +1125,7 @@ function V3WordCreationSession({
         );
         finishAttempt();
         if (result.accepted && scope === scopeRef.current) {
+          setPublicationIssues([]);
           applyCanonical(result.value.word, "all");
         }
       } catch (error) {
@@ -1102,8 +1144,9 @@ function V3WordCreationSession({
             await reconcilePublishConflict();
           } else {
             if (
-              nextProblem.kind === "surface_confirmation" &&
-              nextProblem.requires_new_idempotency_key
+              (nextProblem.kind === "surface_confirmation" &&
+                nextProblem.requires_new_idempotency_key) ||
+              nextProblem.kind === "validation"
             ) {
               finishAttempt();
             }
@@ -1166,7 +1209,6 @@ function V3WordCreationSession({
           : dirtyRef.current.forms
             ? draftForms
             : latest.word.forms;
-      let generatedMeanings = false;
       const localMeanings =
         localConflict.step === "meanings"
           ? localConflict.localMeanings
@@ -1174,13 +1216,25 @@ function V3WordCreationSession({
             ? draftMeanings
             : (() => {
                 const next = initializedMeanings(latest.word, localForms);
-                generatedMeanings = next.generated;
                 return next.draft;
               })();
       setWord(latest.word);
       setDraftFormsState(localForms);
+      cleanMeaningsRef.current = dirtyRef.current.meanings
+        ? ensureV3MeaningsForForms(
+            latest.word.id,
+            localForms,
+            cleanMeaningsRef.current,
+            newWordNodeId,
+            localMeanings
+          )
+        : localMeanings;
       setDraftMeaningsState(localMeanings);
-      if (generatedMeanings) updateDirty("meanings", true);
+      updateDirty(
+        "meanings",
+        JSON.stringify(localMeanings) !==
+          JSON.stringify(cleanMeaningsRef.current)
+      );
       setActivePosIdState((current) =>
         current && localForms.pos.some((pos) => pos.pos_id === current)
           ? current
@@ -1250,10 +1304,6 @@ function V3WordCreationSession({
     ]
   );
 
-  const readiness = useMemo(
-    () => buildV3Readiness(issues, draftForms),
-    [draftForms, issues]
-  );
   const reachableSteps = useMemo(
     () =>
       resolveV3StepAccess(word, activeStep, allowPublishedEditing).reachable,
@@ -1273,7 +1323,7 @@ function V3WordCreationSession({
     setActiveStep,
     ...(activePosId ? { activePosId } : {}),
     setActivePosId,
-    issues,
+    issues: publicationIssues,
     ...(validation ? { validation } : {}),
     ...(impact ? { impact } : {}),
     impactConfirmed,
@@ -1303,8 +1353,7 @@ function V3WordCreationSession({
       dirtySteps={dirtySteps}
       draftForms={draftForms}
       draftMeanings={draftMeanings}
-      readiness={readiness}
-      issues={issues}
+      issues={publicationIssues}
       problem={problem}
       conflict={conflict}
       retrying={pending.size > 0}
