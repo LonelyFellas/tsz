@@ -15,6 +15,7 @@ import {
   Flex,
   Form,
   Input,
+  Popover,
   Select,
   Space,
   Table,
@@ -26,6 +27,7 @@ import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuthStore } from "@/lib/auth";
 import { InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
   AdminWordKind,
@@ -33,11 +35,14 @@ import type {
   AdminWordListItemAny,
   CefrLevel,
   Dialect,
-  EntryLifecycleBatchResponseAny
+  EntryLifecycleBatchResponseAny,
+  EntryReferenceKind
 } from "@tsz/types";
 import {
   useArchiveWordAny as useArchiveWord,
   useArchiveWordsBatchAny as useArchiveWordsBatch,
+  useDeleteWordBatch,
+  useDeleteWordDraft,
   useRestoreWordAny as useRestoreWord,
   useRestoreWordsBatchAny as useRestoreWordsBatch,
   useWordList,
@@ -47,6 +52,11 @@ import {
   adminWordsAnyDataSource,
   adminWordsDataSourceCapabilities
 } from "./dataSource";
+import {
+  DELETE_BLOCK_REASON_TEXT,
+  evaluateDeleteEligibility,
+  partitionDeletableRows
+} from "./deletePermission";
 import { LifecycleSurfaceConfirmation } from "./LifecycleSurfaceConfirmation";
 import {
   CEFR_OPTIONS,
@@ -79,6 +89,15 @@ import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 import { newWordNodeId } from "./word-model/primitives";
 
 const { RangePicker } = DatePicker;
+
+const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, string> = {
+  relation: "关联词",
+  relation_prebound: "关联词待物化",
+  sentence_link: "例句关联",
+  publication_sense_ref: "已发布引用",
+  sentence_association: "例句关联待认领",
+  phrase_component: "短语成分"
+};
 
 const DIALECT_LABEL: Record<Dialect, string> = {
   uk: "BrE",
@@ -122,13 +141,28 @@ function sameRestoreRequest(
   return false;
 }
 
+/**
+ * `library` = 智能词库全量列表；`trash` = 词库管理下的独立垃圾桶页。
+ * 两者共用同一套表格、生命周期与权限判定，只在入口语境上分叉：
+ * 垃圾桶固定归档、不提供状态筛选与创建入口。
+ */
+export type SmartDictionaryMode = "library" | "trash";
+
 export function SmartDictionary({
-  reportUnknownPresentationStrategy
+  reportUnknownPresentationStrategy,
+  mode = "library"
 }: {
   reportUnknownPresentationStrategy?: PresentationStrategyReporter;
+  mode?: SmartDictionaryMode;
 } = {}) {
+  const trashMode = mode === "trash";
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  // 归属判定所需；门禁保证受保护页内 profile 必有值，缺失时判定一律不放行。
+  const profile = useAuthStore((s) => s.profile);
+  const deleteActor = profile
+    ? { id: profile.id, role: profile.role }
+    : undefined;
   const [searchParams, setSearchParams] = useSearchParams();
   const [form] = Form.useForm<WordFilterValues>();
   const serializedSearchParams = searchParams.toString();
@@ -159,12 +193,19 @@ export function SmartDictionary({
     form.setFieldsValue(filters);
   }, [filters, form]);
 
-  const listQuery = useWordList(toListQuery(filters, page, pageSize));
+  // 垃圾桶页固定只看归档，不受 URL 上残留的 status 影响。
+  const effectiveFilters = useMemo(
+    () => (trashMode ? { ...filters, status: "archived" as const } : filters),
+    [filters, trashMode]
+  );
+  const listQuery = useWordList(toListQuery(effectiveFilters, page, pageSize));
   const stats = useWordStats();
   const archiveWord = useArchiveWord();
   const restoreWord = useRestoreWord();
   const archiveBatch = useArchiveWordsBatch();
   const restoreBatch = useRestoreWordsBatch();
+  const deleteWord = useDeleteWordDraft();
+  const deleteBatch = useDeleteWordBatch();
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const partOfSpeechLookup = useMemo(
     () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
@@ -201,6 +242,8 @@ export function SmartDictionary({
   const restoringSelection =
     selectedRows.length > 0 &&
     selectedRows.every((row) => row.status === "archived");
+  // 垃圾桶页里全是归档词条，批量动作恒为恢复——未选中时也不该显示「移入垃圾桶」。
+  const showRestoreAction = restoringSelection || trashMode;
   const lifecyclePending =
     archiveWord.isPending ||
     restoreWord.isPending ||
@@ -334,6 +377,119 @@ export function SmartDictionary({
       base_revision: record.revision,
       base_lifecycle_revision: record.lifecycle_revision
     };
+  };
+
+  // 永久删除的错误分流：403(越权)、409(本身不可删/版本冲突) 对管理员意味完全不同，
+  // 统一提示会让人以为是同一类问题。
+  const describeDeleteFailure = (error: unknown): string => {
+    const code = (error as { code?: string } | undefined)?.code;
+    if (code === "entry_delete_forbidden") {
+      return "只能永久删除自己创建的词条";
+    }
+    if (code === "entry_not_deletable") {
+      return "该词条已发布过或仍被其他草稿引用，不能永久删除";
+    }
+    if (code === "entry_has_inbound_prebound_relations") {
+      return "该词条被其他草稿的关联词选中，请先解除后再删除";
+    }
+    if (code === "revision_conflict") {
+      return "词条已被他人改动，请刷新列表后重试";
+    }
+    if (code === "word_not_found") {
+      return "词条已不存在，请刷新列表";
+    }
+    return error instanceof Error ? error.message : "永久删除失败";
+  };
+
+  const deleteOne = (record: AdminWordListItemAny) => {
+    const eligibility = evaluateDeleteEligibility(deleteActor, record);
+    if (!eligibility.deletable) {
+      message.warning(DELETE_BLOCK_REASON_TEXT[eligibility.reason!]);
+      return;
+    }
+    const label = wordListLabel(record);
+    modal.confirm({
+      title: `永久删除「${label}」？`,
+      content:
+        "此操作不可恢复：词条及其草稿内容会被彻底清除，占用的词头随之释放（之后可用同名重新创建）。",
+      okText: "永久删除",
+      okButtonProps: { danger: true },
+      cancelText: "取消",
+      onOk: () =>
+        runLifecycleCommandOnce(lifecycleCommandPending, async () => {
+          try {
+            await deleteWord.mutateAsync({
+              wordId: record.id,
+              baseRevision: record.revision,
+              baseLifecycleRevision: record.lifecycle_revision
+            });
+            setSelectedKeys((keys) =>
+              keys.filter((key) => String(key) !== record.id)
+            );
+            message.success("词条已永久删除");
+          } catch (error) {
+            message.error(describeDeleteFailure(error));
+            void listQuery.refetch();
+          }
+        })
+    });
+  };
+
+  const deleteSelected = () => {
+    if (selectedRows.length !== selectedKeys.length) {
+      message.error("所选词条缺少并发版本信息，请刷新列表后重试");
+      return;
+    }
+    const { deletable, blocked } = partitionDeletableRows(
+      deleteActor,
+      selectedRows
+    );
+    // 永久删除不可逆，后端也是整批原子的：与其部分成功，不如提交前就把不合格的挑明。
+    if (blocked.length > 0) {
+      const detail = blocked
+        .slice(0, 3)
+        .map(
+          ({ row, reason }) =>
+            `「${wordListLabel(row)}」${DELETE_BLOCK_REASON_TEXT[reason]}`
+        )
+        .join("；");
+      message.warning(
+        blocked.length > 3
+          ? `${detail}；另有 ${blocked.length - 3} 条不可删除`
+          : detail
+      );
+      return;
+    }
+    if (deletable.length === 0) return;
+    modal.confirm({
+      title: `永久删除选中的 ${deletable.length} 个词条？`,
+      content:
+        "此操作不可恢复，且整批原子执行：任意一条不满足条件时全部保持原状。词条彻底清除后，占用的词头随之释放。",
+      okText: "永久删除",
+      okButtonProps: { danger: true },
+      cancelText: "取消",
+      onOk: () =>
+        runLifecycleCommandOnce(lifecycleCommandPending, async () => {
+          try {
+            const response = await deleteBatch.mutateAsync({
+              idempotencyKey: newWordNodeId(),
+              input: {
+                entries: deletable.map((row) => ({
+                  id: row.id,
+                  base_revision: row.revision,
+                  base_lifecycle_revision: row.lifecycle_revision
+                }))
+              }
+            });
+            setSelectedKeys([]);
+            setSelectedRecords({});
+            message.success(`已永久删除 ${response.affected} 个词条`);
+          } catch (error) {
+            message.error(describeDeleteFailure(error));
+            void listQuery.refetch();
+          }
+        })
+    });
   };
 
   const transitionOne = (
@@ -555,6 +711,48 @@ export function SmartDictionary({
       }
     },
     {
+      title: "引用",
+      key: "references",
+      width: 80,
+      responsive: ["sm"],
+      render: (_: unknown, record) => {
+        const summary = record.reference_summary;
+        const total = summary?.total ?? 0;
+        if (total === 0) {
+          return <Typography.Text type="secondary">-</Typography.Text>;
+        }
+        // 展开前 5 条「被谁引用」：管理员看到数字后的下一个问题永远是「谁」。
+        const content = (
+          <Space direction="vertical" size={2}>
+            {summary.previews.map((preview) => (
+              <Typography.Text key={preview.source_word_id}>
+                {preview.source_headword || preview.source_word_id}
+                <Typography.Text type="secondary">
+                  {` · ${ENTRY_REFERENCE_KIND_LABEL[preview.source_kind]}`}
+                </Typography.Text>
+              </Typography.Text>
+            ))}
+            {summary.truncated && (
+              <Typography.Text type="secondary">
+                {`…共 ${total} 条，仅显示前 ${summary.previews.length} 条`}
+              </Typography.Text>
+            )}
+          </Space>
+        );
+        return (
+          <Popover content={content} title="被以下内容引用" trigger="click">
+            <Button
+              type="link"
+              size="small"
+              aria-label={`查看「${wordListLabel(record)}」的 ${total} 条引用`}
+            >
+              {total}
+            </Button>
+          </Popover>
+        );
+      }
+    },
+    {
       title: "状态",
       dataIndex: "status",
       width: 90,
@@ -631,6 +829,41 @@ export function SmartDictionary({
                 {record.status === "archived" ? "恢 复" : "移入垃圾桶"}
               </Button>
             )}
+            {adminWordsDataSourceCapabilities.permanentDelete &&
+              record.status === "archived" &&
+              (() => {
+                const eligibility = evaluateDeleteEligibility(
+                  deleteActor,
+                  record
+                );
+                const button = (
+                  <Button
+                    type="link"
+                    size="small"
+                    danger
+                    aria-label={`永久删除${rowName}`}
+                    icon={<DeleteOutlined />}
+                    disabled={!eligibility.deletable}
+                    loading={
+                      deleteWord.isPending &&
+                      deleteWord.variables?.wordId === record.id
+                    }
+                    onClick={() => deleteOne(record)}
+                  >
+                    永久删除
+                  </Button>
+                );
+                // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
+                return eligibility.deletable ? (
+                  button
+                ) : (
+                  <Tooltip
+                    title={DELETE_BLOCK_REASON_TEXT[eligibility.reason!]}
+                  >
+                    <span>{button}</span>
+                  </Tooltip>
+                );
+              })()}
           </Space>
         );
       }
@@ -639,7 +872,12 @@ export function SmartDictionary({
 
   return (
     <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "词库管理" }, { title: "智能词库" }]} />
+      <Breadcrumb
+        items={[
+          { title: "词库管理" },
+          { title: trashMode ? "垃圾桶" : "智能词库" }
+        ]}
+      />
 
       <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
         <Form
@@ -690,14 +928,16 @@ export function SmartDictionary({
               style={{ width: 120 }}
             />
           </Form.Item>
-          <Form.Item name="status" label="状态">
-            <Select
-              placeholder="请选择状态"
-              options={STATUS_OPTIONS}
-              allowClear
-              style={{ width: 120 }}
-            />
-          </Form.Item>
+          {!trashMode && (
+            <Form.Item name="status" label="状态">
+              <Select
+                placeholder="请选择状态"
+                options={STATUS_OPTIONS}
+                allowClear
+                style={{ width: 120 }}
+              />
+            </Form.Item>
+          )}
           <Form.Item name="range" label="创建时间">
             <RangePicker />
           </Form.Item>
@@ -761,27 +1001,42 @@ export function SmartDictionary({
           style={{ marginBottom: 12 }}
         >
           <Space wrap>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate("/words/new")}
-            >
-              创建词条
-            </Button>
+            {!trashMode && (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => navigate("/words/new")}
+              >
+                创建词条
+              </Button>
+            )}
             {adminWordsDataSourceCapabilities.batchArchive && (
               <Button
-                danger={!restoringSelection}
+                danger={!showRestoreAction}
                 icon={
-                  restoringSelection ? <RollbackOutlined /> : <DeleteOutlined />
+                  showRestoreAction ? <RollbackOutlined /> : <DeleteOutlined />
                 }
                 disabled={selectedKeys.length === 0}
                 loading={archiveBatch.isPending || restoreBatch.isPending}
                 onClick={transitionSelected}
               >
-                {restoringSelection ? "恢 复" : "移入垃圾桶"}
+                {showRestoreAction ? "恢 复" : "移入垃圾桶"}
                 {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
               </Button>
             )}
+            {adminWordsDataSourceCapabilities.batchPermanentDelete &&
+              restoringSelection && (
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  disabled={selectedKeys.length === 0}
+                  loading={deleteBatch.isPending}
+                  onClick={deleteSelected}
+                >
+                  永久删除
+                  {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
+                </Button>
+              )}
           </Space>
           <Space size="large" wrap>
             <Typography.Text type="secondary">

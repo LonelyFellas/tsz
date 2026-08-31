@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/draft-relation-prebinding-clean/tsz-rust/docs/openapi.json",
-  "_source_sha256": "5f6466e94776cf2e9cb4b34b5eb9ccf910741a6e4570bc8ad033af859a71ebbc",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
+  "_source_sha256": "48d9a5d7d753f72232d3fdc86f26d6fa04b030e0d0a951ae4ac1d6fb1111006c",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -81,11 +81,14 @@
         "has_unpublished_changes",
         "max_reachable_step",
         "created_by_name",
+        "created_by",
+        "reference_summary",
         "created_at",
         "updated_at"
       ],
       "properties": {
         "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "type": "string", "format": "uuid" },
         "created_by_name": { "type": "string" },
         "dialects": { "type": "array", "items": { "$ref": "#/$defs/Dialect" } },
         "gloss": { "type": "string" },
@@ -102,6 +105,7 @@
         "max_reachable_step": { "$ref": "#/$defs/WordCreationStep" },
         "pos_list": { "type": "array", "items": { "type": "string" } },
         "published_revision": { "type": "integer" },
+        "reference_summary": { "$ref": "#/$defs/EntryReferenceSummary" },
         "revision": { "type": "integer" },
         "schema_version": { "type": "integer", "enum": [2] },
         "source_dialect": { "$ref": "#/$defs/SourceDialect" },
@@ -131,11 +135,14 @@
         "has_unpublished_changes",
         "max_reachable_step",
         "created_by_name",
+        "created_by",
+        "reference_summary",
         "created_at",
         "updated_at"
       ],
       "properties": {
         "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "type": "string", "format": "uuid" },
         "created_by_name": { "type": "string" },
         "gloss": { "type": "string" },
         "has_unpublished_changes": { "type": "boolean" },
@@ -147,6 +154,7 @@
         "pos_list": { "type": "array", "items": { "type": "string" } },
         "presentation": { "$ref": "#/$defs/EntryPresentationV3" },
         "published_revision": { "type": "integer" },
+        "reference_summary": { "$ref": "#/$defs/EntryReferenceSummary" },
         "revision": { "type": "integer" },
         "schema_version": { "type": "integer", "enum": [3] },
         "status": { "$ref": "#/$defs/AdminWordStatus" },
@@ -1064,6 +1072,45 @@
       },
       "additionalProperties": false
     },
+    "EntryReferenceKind": {
+      "type": "string",
+      "enum": [
+        "relation",
+        "relation_prebound",
+        "sentence_link",
+        "publication_sense_ref",
+        "sentence_association",
+        "phrase_component"
+      ]
+    },
+    "EntryReferencePreview": {
+      "type": "object",
+      "required": [
+        "source_word_id",
+        "source_headword",
+        "source_status",
+        "source_kind"
+      ],
+      "properties": {
+        "source_headword": { "type": "string" },
+        "source_kind": { "$ref": "#/$defs/EntryReferenceKind" },
+        "source_status": { "$ref": "#/$defs/AdminWordStatus" },
+        "source_word_id": { "type": "string", "format": "uuid" }
+      }
+    },
+    "EntryReferenceSummary": {
+      "type": "object",
+      "required": ["total", "previews", "truncated"],
+      "properties": {
+        "previews": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EntryReferencePreview" },
+          "maxItems": 5
+        },
+        "total": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      }
+    },
     "ErrorCode": {
       "type": "string",
       "enum": [
@@ -1130,6 +1177,7 @@
         "downstream_confirmation_required",
         "entry_archived",
         "entry_not_deletable",
+        "entry_delete_forbidden",
         "entry_has_inbound_prebound_relations",
         "entry_has_inbound_publication_refs",
         "entry_has_unavailable_publication_refs",

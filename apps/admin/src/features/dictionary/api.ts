@@ -1,6 +1,7 @@
 // 智能词库的数据层:React Query hooks 包住 api.words.*(@tsz/api-client)。
 // 列表/统计是服务端派生数据,任何写操作(增删改发布)后统一失效重取。
 import type {
+  EntryDeleteBatchInput,
   EntryLifecycleBatchInput,
   EntryLifecycleBatchResponse,
   EntryLifecycleBatchResponseAny,
@@ -199,6 +200,30 @@ export function useDeleteWordDraft() {
       // 当前 basics 页仍订阅 detail；全量 invalidate 会主动重取已删除资源并按默认策略
       // 重试 404，阻塞 mutateAsync 后的跳转。删除该详情缓存，仅刷新集合派生数据。
       qc.removeQueries({ queryKey: wordKeys.detail(wordId), exact: true });
+      return Promise.all([
+        qc.invalidateQueries({ queryKey: wordKeys.lists() }),
+        qc.invalidateQueries({ queryKey: wordKeys.stats() })
+      ]);
+    }
+  });
+}
+
+export function useDeleteWordBatch() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      idempotencyKey,
+      input
+    }: {
+      idempotencyKey: string;
+      input: EntryDeleteBatchInput;
+    }) => adminWordsDataSource.deleteBatch(idempotencyKey, input),
+    onSuccess: (_data, { input }) => {
+      // 与单条删除同因：详情缓存必须先移除，否则全量 invalidate 会重取已删资源
+      // 并按默认策略重试 404。
+      for (const entry of input.entries) {
+        qc.removeQueries({ queryKey: wordKeys.detail(entry.id), exact: true });
+      }
       return Promise.all([
         qc.invalidateQueries({ queryKey: wordKeys.lists() }),
         qc.invalidateQueries({ queryKey: wordKeys.stats() })

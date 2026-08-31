@@ -652,6 +652,43 @@ export interface EntryLifecycleBatchResponse {
   affected: number;
 }
 
+/** 引用来源分类；计数不按类型拆分，但预览项标明来源便于管理员判断。 */
+export type EntryReferenceKind =
+  | "relation"
+  | "relation_prebound"
+  | "sentence_link"
+  | "publication_sense_ref"
+  | "sentence_association"
+  | "phrase_component";
+
+/** 「被谁引用」的预览项。 */
+export interface EntryReferencePreview {
+  source_word_id: string;
+  source_headword: string;
+  source_status: AdminWordStatus;
+  source_kind: EntryReferenceKind;
+}
+
+/**
+ * 词条被引用汇总。`total` 按引用方词条去重，口径与后端删除拦截一致——
+ * total 为 0 即可安全清理，大于 0 则删除必被拒。
+ */
+export interface EntryReferenceSummary {
+  total: number;
+  previews: EntryReferencePreview[];
+  truncated: boolean;
+}
+
+/** POST /admin/lexicon/entries/delete-batch 入参；删除不涉及同表面确认，故无 token。 */
+export interface EntryDeleteBatchInput {
+  entries: EntryLifecycleTarget[];
+}
+
+/** 批量永久删除出参；词条已不存在，只回受影响条数。 */
+export interface EntryDeleteBatchResponse {
+  affected: number;
+}
+
 /** @deprecated 新代码统一使用通用 ProblemMeta。 */
 export type AdminWordApiErrorMeta = ProblemMeta;
 

@@ -38,6 +38,7 @@ type RealAdminWordsDataSource = Pick<
   | "archiveBatch"
   | "restoreBatch"
   | "deleteDraft"
+  | "deleteBatch"
   | "relatedSearch"
 >;
 
@@ -113,7 +114,9 @@ export const adminWordsDataSourceCapabilities = Object.freeze({
   dialectVariantSuggestions: true,
   phraseCreation: true,
   archive: true,
-  batchArchive: true
+  batchArchive: true,
+  permanentDelete: true,
+  batchPermanentDelete: true
 });
 
 /** 依赖注入入口：测试无需修改进程级 Vite env，也能验证真实/mock 二选一。 */
@@ -265,6 +268,8 @@ export const adminWordsDataSource: AdminWordsDataSource = {
     (await resolveAdminWordsDataSource()).restoreBatch(idempotencyKey, input),
   deleteDraft: async (wordId, input) =>
     (await resolveAdminWordsDataSource()).deleteDraft(wordId, input),
+  deleteBatch: async (idempotencyKey, input) =>
+    (await resolveAdminWordsDataSource()).deleteBatch(idempotencyKey, input),
   relatedSearch: async (q, opts) =>
     (await resolveAdminWordsDataSource()).relatedSearch(q, opts)
 };

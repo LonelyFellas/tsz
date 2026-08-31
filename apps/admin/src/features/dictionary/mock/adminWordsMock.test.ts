@@ -1563,7 +1563,7 @@ describe("admin words mock", () => {
     ).toBe(true);
   });
 
-  it("仅永久删除 revision 匹配且从未发布的活动 V2 草稿", async () => {
+  it("仅永久删除 revision 匹配且从未发布的 V2 草稿，含垃圾桶中的", async () => {
     const center = await createCenter(mock, "delete-draft-center");
     const input = {
       base_revision: center.word.revision,
@@ -1599,12 +1599,17 @@ describe("admin words mock", () => {
         base_lifecycle_revision: archivedDraft.word.lifecycle_revision
       }
     );
+    // 垃圾桶清理：归档只是软删除中间站，从未发布过的归档草稿可永久删除。
     await expect(
       mock.deleteDraft(archived.word.id, {
         base_revision: archived.word.revision,
         base_lifecycle_revision: archived.word.lifecycle_revision
       })
-    ).rejects.toMatchObject({ status: 409, code: "entry_not_deletable" });
+    ).resolves.toBeUndefined();
+    await expect(mock.get(archived.word.id)).rejects.toMatchObject({
+      status: 404,
+      code: "word_not_found"
+    });
 
     const publishedDraft = await createDetectedWord(
       mock,

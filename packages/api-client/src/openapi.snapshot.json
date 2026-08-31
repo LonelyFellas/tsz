@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/draft-relation-prebinding-clean/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-31T03:26:02.779Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-31T06:55:45.927Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -17,6 +17,7 @@
     "/admin/lexicon/dialect-variant-suggestions": ["post"],
     "/admin/lexicon/entries": ["get", "post"],
     "/admin/lexicon/entries/archive-batch": ["post"],
+    "/admin/lexicon/entries/delete-batch": ["post"],
     "/admin/lexicon/entries/related-search": ["get"],
     "/admin/lexicon/entries/restore-batch": ["post"],
     "/admin/lexicon/entries/sentence-targets/resolve": ["post"],
@@ -79,6 +80,14 @@
       }
     ],
     "post /admin/lexicon/entries/archive-batch": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/entries/delete-batch": [
       {
         "name": "Idempotency-Key",
         "in": "header",
@@ -292,6 +301,18 @@
         "200": {
           "$ref": "#/components/schemas/EntryLifecycleBatchResponseAny"
         },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/entries/delete-batch": {
+      "request": { "$ref": "#/components/schemas/EntryDeleteBatchInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/EntryDeleteBatchResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -701,6 +722,7 @@
         "downstream_confirmation_required",
         "entry_archived",
         "entry_not_deletable",
+        "entry_delete_forbidden",
         "entry_has_inbound_prebound_relations",
         "entry_has_inbound_publication_refs",
         "entry_has_unavailable_publication_refs",
@@ -2235,11 +2257,18 @@
         "has_unpublished_changes",
         "max_reachable_step",
         "created_by_name",
+        "created_by",
+        "reference_summary",
         "created_at",
         "updated_at"
       ],
       "properties": {
         "created_at": { "type": "string", "format": "date-time" },
+        "created_by": {
+          "type": "string",
+          "format": "uuid",
+          "description": "创建人 admin id；前端按「仅本人可删」判定归属时使用。"
+        },
         "created_by_name": { "type": "string" },
         "dialects": {
           "type": "array",
@@ -2265,6 +2294,10 @@
         },
         "pos_list": { "type": "array", "items": { "type": "string" } },
         "published_revision": { "type": "integer", "format": "int64" },
+        "reference_summary": {
+          "$ref": "#/components/schemas/EntryReferenceSummary",
+          "description": "被引用汇总；`total = 0` 即无人引用，可安全清理。"
+        },
         "revision": { "type": "integer", "format": "int64" },
         "schema_version": { "type": "integer", "enum": [2] },
         "source_dialect": {
@@ -2323,6 +2356,69 @@
         "words": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/AdminWordV2" }
+        }
+      }
+    },
+    "EntryDeleteBatchInput": {
+      "type": "object",
+      "description": "批量永久删除入参；不带 confirmed_surface_match_token——\n删除只撤除 surface 贡献、不新增占位，不存在需要确认的同表面冲突。",
+      "required": ["entries"],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/EntryLifecycleTarget" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "EntryDeleteBatchResponse": {
+      "type": "object",
+      "description": "批量永久删除出参；词条已不存在，故不回实体，只回受影响条数。",
+      "required": ["affected"],
+      "properties": { "affected": { "type": "integer", "minimum": 0 } }
+    },
+    "EntryReferenceKind": {
+      "type": "string",
+      "description": "引用来源分类。计数本身不按类型拆分（管理员的下一个问题是「谁」而非「哪类」），\n但预览项里标明来源类型几乎零成本且信息量高。",
+      "enum": [
+        "relation",
+        "relation_prebound",
+        "sentence_link",
+        "publication_sense_ref",
+        "sentence_association",
+        "phrase_component"
+      ]
+    },
+    "EntryReferencePreview": {
+      "type": "object",
+      "description": "一条词条被谁引用的预览项。`source_kind` 说明引用来自哪一类内容，\n让管理员看到「被短语 X 当成分」与「被词条 Y 设为近义词」的区别。",
+      "required": [
+        "source_word_id",
+        "source_headword",
+        "source_status",
+        "source_kind"
+      ],
+      "properties": {
+        "source_headword": { "type": "string" },
+        "source_kind": { "$ref": "#/components/schemas/EntryReferenceKind" },
+        "source_status": { "$ref": "#/components/schemas/AdminWordStatus" },
+        "source_word_id": { "type": "string", "format": "uuid" }
+      }
+    },
+    "EntryReferenceSummary": {
+      "type": "object",
+      "description": "词条被引用汇总。`total` 按**引用方词条去重**计数（同一词条多处引用只算 1），\n口径与删除时的入站引用拦截完全一致——否则会出现「显示 0 却删不掉」。",
+      "required": ["total", "previews", "truncated"],
+      "properties": {
+        "previews": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/EntryReferencePreview" },
+          "maxItems": 5
+        },
+        "total": { "type": "integer", "format": "int32", "minimum": 0 },
+        "truncated": {
+          "type": "boolean",
+          "description": "total 超过 previews 长度时为 true。"
         }
       }
     },

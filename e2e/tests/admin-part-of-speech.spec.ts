@@ -4,7 +4,10 @@ import type {
   PartOfSpeechConfigListResponse
 } from "@tsz/types";
 
-const actor = { id: "admin-e2e", display_name: "E2E Admin" };
+const actor = {
+  id: "01990000-0000-7000-8000-0000000000e2",
+  display_name: "E2E Admin"
+};
 const unreferencedPart = {
   id: "pos-particle",
   code: "particle",

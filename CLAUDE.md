@@ -16,7 +16,7 @@ PENDING 白名单）；本仓库只管前端与部署编排。
 ## 常用命令
 
 - `pnpm dev`（web）/ `pnpm dev:admin` / `pnpm dev:all`
-- `pnpm test` / `pnpm test:cov`（带覆盖率门槛，与 CI 一致）/ `pnpm test:e2e`
+- `pnpm test` / `pnpm test:cov`（出覆盖率报告，不设百分比门槛）/ `pnpm test:e2e`
 - `pnpm typecheck` / `pnpm lint` / `pnpm format`
 - **本地验收 web 用 `pnpm build` + `next start`，不要用 `next dev`**（Turbopack 内存暴涨会拖死机器）。
 
@@ -58,9 +58,10 @@ PENDING 白名单）；本仓库只管前端与部署编排。
   （conventional commits），pre-push = typecheck + test:cov。e2e 由 CI 兜底。
 - **绝不绕过钩子**（`LEFTHOOK=0`、`--no-verify` 一律禁止）。push 报
   `failed to push some refs` 时默认是 hook 挂了，不是网络——读输出、修根因、重推。
-- 覆盖率门槛（根 `vitest.config.ts`）：`packages/**` 100%；`apps/*/src` 业务逻辑层
-  （features/lib/stores）90%。纯装配/mock/静态展示文件按约定加 coverage exclude
-  并附 TODO 注释说明补测条件；有逻辑分支的必须补测，不许 exclude。
+- **覆盖率不设百分比门槛**（2026-08-31 起）：`pnpm test:cov` 照常出报告，但不再因
+  数字不达标而失败。报告用来找盲区，测试是否够由 review 判断——盯的是「边界与错误
+  路径有没有被真断言覆盖」，而不是行数百分比。历史上 `packages/**` 要求 100%，
+  实际促成的是为凑数补弱断言。
 - 默认分支 `main`，一律走 PR；绝不直接提交/推送 main。
 
 ## API 文档

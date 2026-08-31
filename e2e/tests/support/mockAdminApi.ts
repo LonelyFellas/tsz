@@ -28,7 +28,9 @@ export const ADMIN_E2E_ENTRIES_PATH = `${ADMIN_E2E_LEXICON_PATH}/entries`;
 export const ADMIN_E2E_DETECTIONS_PATH = `${ADMIN_E2E_LEXICON_PATH}/detections`;
 
 const ADMIN_PROFILE = {
-  id: "admin-e2e",
+  // 真实后端的 admin id 是 UUID，列表行的 created_by 也按 uuid 校验，
+  // 这里必须给合法 UUID，否则 runtime schema 会拒掉整个列表响应。
+  id: "01990000-0000-7000-8000-0000000000e2",
   phone: "13800138000",
   display_name: "E2E Admin",
   role: "admin",
@@ -789,6 +791,8 @@ function listItem(word: MockWord) {
       : {}),
     has_unpublished_changes: word.has_unpublished_changes,
     created_by_name: ADMIN_PROFILE.display_name,
+    created_by: ADMIN_PROFILE.id,
+    reference_summary: { total: 0, previews: [], truncated: false },
     created_at: NOW,
     updated_at: word.updated_at
   };

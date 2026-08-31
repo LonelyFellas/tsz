@@ -17,6 +17,8 @@ import type {
 const apiMocks = vi.hoisted(() => ({
   useArchiveWord: vi.fn(),
   useArchiveWordsBatch: vi.fn(),
+  useDeleteWordDraft: vi.fn(),
+  useDeleteWordBatch: vi.fn(),
   useRestoreWord: vi.fn(),
   useRestoreWordsBatch: vi.fn(),
   useWordList: vi.fn(),
@@ -25,6 +27,15 @@ const apiMocks = vi.hoisted(() => ({
 
 const dataSourceMocks = vi.hoisted(() => ({
   getAny: vi.fn()
+}));
+
+// 默认登录者 = fixture 里词条的 created_by，使「仅本人可删」默认放行；
+// 需要验证越权时在单测里改 authMocks.profile。
+const authMocks = vi.hoisted(() => ({
+  profile: { id: "admin-1", role: "admin" } as {
+    id: string;
+    role: string;
+  } | null
 }));
 
 vi.mock("./api", () => ({
@@ -42,9 +53,16 @@ vi.mock("./dataSource", () => ({
   adminWordsDataSourceCapabilities: {
     archive: true,
     batchArchive: true,
+    permanentDelete: true,
+    batchPermanentDelete: true,
     dialectVariantSuggestions: true,
     phraseCreation: true
   }
+}));
+
+vi.mock("@/lib/auth", () => ({
+  useAuthStore: (selector: (state: unknown) => unknown) =>
+    selector({ profile: authMocks.profile })
 }));
 
 vi.mock("./part-of-speech/api", () => ({
@@ -78,6 +96,8 @@ function word(
     max_reachable_step: "basics",
     has_unpublished_changes: false,
     created_by_name: "Admin",
+    created_by: "admin-1",
+    reference_summary: { total: 0, previews: [], truncated: false },
     created_at: "2026-08-01T00:00:00Z",
     updated_at: "2026-08-01T00:00:00Z"
   };
@@ -106,6 +126,8 @@ function v3Word(
     max_reachable_step: "forms",
     has_unpublished_changes: false,
     created_by_name: "Admin",
+    created_by: "admin-1",
+    reference_summary: { total: 0, previews: [], truncated: false },
     created_at: "2026-08-25T00:00:00Z",
     updated_at: "2026-08-25T00:00:00Z"
   };
@@ -163,9 +185,12 @@ function HistoryProbe() {
 beforeEach(() => {
   vi.clearAllMocks();
   dataSourceMocks.getAny.mockReset().mockResolvedValue(undefined);
+  authMocks.profile = { id: "admin-1", role: "admin" };
   for (const hook of [
     apiMocks.useArchiveWord,
     apiMocks.useArchiveWordsBatch,
+    apiMocks.useDeleteWordDraft,
+    apiMocks.useDeleteWordBatch,
     apiMocks.useRestoreWord,
     apiMocks.useRestoreWordsBatch
   ]) {
@@ -506,7 +531,11 @@ describe("SmartDictionary", () => {
     const creator = screen.getByText("非常非常长的创建人名称");
     expect(creator).toHaveAttribute("tabindex", "0");
     expect(creator.closest("td")).toHaveClass("ant-table-cell-ellipsis");
-    expect(screen.getByText("-")).not.toHaveAttribute("tabindex");
+    // 引用列在无引用时也渲染 "-"，这里只针对创建人列那一个占位断言。
+    const creatorPlaceholder = screen
+      .getAllByText("-")
+      .find((node) => !node.classList.contains("ant-typography"))!;
+    expect(creatorPlaceholder).not.toHaveAttribute("tabindex");
   });
 
   it("从重复检测入口进入时自动定位归档词条", () => {
@@ -856,6 +885,448 @@ describe("SmartDictionary", () => {
         input: { base_revision: 1, base_lifecycle_revision: 1 }
       })
     );
+  });
+
+  it("引用列显示计数，点击展开被谁引用", async () => {
+    matchViewport(1440);
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...archivedWord("word-1", "referenced"),
+            reference_summary: {
+              total: 7,
+              previews: [
+                {
+                  source_word_id: "src-1",
+                  source_headword: "holiday",
+                  source_status: "published",
+                  source_kind: "relation"
+                },
+                {
+                  source_word_id: "src-2",
+                  source_headword: "take off",
+                  source_status: "draft",
+                  source_kind: "phrase_component"
+                }
+              ],
+              truncated: true
+            }
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    const trigger = screen.getByLabelText("查看「referenced」的 7 条引用");
+    fireEvent.click(trigger);
+
+    await screen.findByText("被以下内容引用");
+    expect(screen.getByText("holiday")).toBeInTheDocument();
+    expect(screen.getByText("take off")).toBeInTheDocument();
+    // 来源类型要能区分「被短语当成分」和「被设为关联词」。
+    expect(screen.getByText(/关联词/)).toBeInTheDocument();
+    expect(screen.getByText(/短语成分/)).toBeInTheDocument();
+    expect(screen.getByText(/共 7 条，仅显示前 2 条/)).toBeInTheDocument();
+  });
+
+  it("被引用的词条不可永久删除，且说明原因", () => {
+    matchViewport(1440);
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...archivedWord("word-1", "referenced"),
+            reference_summary: {
+              total: 1,
+              previews: [
+                {
+                  source_word_id: "src-1",
+                  source_headword: "holiday",
+                  source_status: "draft",
+                  source_kind: "relation"
+                }
+              ],
+              truncated: false
+            }
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(
+      screen
+        .getAllByText("永久删除", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => item?.classList.contains("ant-btn-link"))
+    ).toBeDisabled();
+  });
+
+  it("垃圾桶模式固定归档、去掉状态筛选与创建入口", () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [archivedWord("word-1", "first")],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary mode="trash" />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("垃圾桶")).toBeInTheDocument();
+    expect(screen.queryByText("状态")).toBeNull();
+    expect(screen.queryByText("创建词条")).toBeNull();
+    // 垃圾桶里全是归档词条，批量动作恒为恢复，不该出现「移入垃圾桶」。
+    expect(screen.queryByText("移入垃圾桶")).toBeNull();
+    expect(
+      screen
+        .getAllByText("恢 复", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => !item?.classList.contains("ant-btn-link"))
+    ).toBeTruthy();
+    // 即使 URL 上没带 status，也必须只查归档。
+    expect(apiMocks.useWordList).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "archived" })
+    );
+  });
+
+  it("垃圾桶模式忽略 URL 上残留的其他状态", () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: { words: [], page: { page: 1, page_size: 20, total: 0 } },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter initialEntries={["/words/trash?status=draft"]}>
+        <AntApp>
+          <SmartDictionary mode="trash" />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(apiMocks.useWordList).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "archived" })
+    );
+  });
+
+  it("默认模式保留状态筛选与创建入口", () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [word("word-1", "first")],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("智能词库")).toBeInTheDocument();
+    expect(screen.getByText("状态")).toBeInTheDocument();
+    expect(screen.getByText("创建词条")).toBeInTheDocument();
+  });
+
+  it("垃圾桶行提供永久删除，确认后携带双 revision 调用", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue(undefined);
+    apiMocks.useDeleteWordDraft.mockReturnValue({
+      ...idleMutation(),
+      mutateAsync
+    });
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [archivedWord("word-1", "first")],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    const rowDelete = screen
+      .getAllByText("永久删除", { exact: true })
+      .map((item) => item.closest("button"))
+      .find((item) => item?.classList.contains("ant-btn-link"))!;
+    expect(rowDelete.getAttribute("aria-label")).toBe("永久删除「first」");
+    expect(rowDelete).toBeEnabled();
+    fireEvent.click(rowDelete);
+
+    await screen.findAllByText("永久删除「first」？");
+    fireEvent.click(
+      screen
+        .getAllByText("永久删除", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => item?.closest(".ant-modal"))!
+    );
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync).toHaveBeenCalledWith({
+      wordId: "word-1",
+      baseRevision: 1,
+      baseLifecycleRevision: 1
+    });
+  });
+
+  it("非垃圾桶行不出现永久删除入口", () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [word("word-1", "first")],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(screen.queryByText("永久删除", { exact: true })).toBeNull();
+  });
+
+  it("他人创建的垃圾桶词条置灰永久删除且点击不发请求", async () => {
+    const mutateAsync = vi.fn();
+    apiMocks.useDeleteWordDraft.mockReturnValue({
+      ...idleMutation(),
+      mutateAsync
+    });
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [{ ...archivedWord("word-1", "first"), created_by: "admin-2" }],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    const rowDelete = screen
+      .getAllByText("永久删除", { exact: true })
+      .map((item) => item.closest("button"))
+      .find((item) => item?.classList.contains("ant-btn-link"))!;
+    expect(rowDelete).toBeDisabled();
+    fireEvent.click(rowDelete);
+    await waitFor(() => expect(mutateAsync).not.toHaveBeenCalled());
+  });
+
+  it("超管可以永久删除他人创建的垃圾桶词条", () => {
+    authMocks.profile = { id: "admin-9", role: "super_admin" };
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [{ ...archivedWord("word-1", "first"), created_by: "admin-2" }],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(
+      screen
+        .getAllByText("永久删除", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => item?.classList.contains("ant-btn-link"))
+    ).toBeEnabled();
+  });
+
+  it("批量永久删除提交每条双 revision，成功后清空选择", async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({ affected: 2 });
+    apiMocks.useDeleteWordBatch.mockReturnValue({
+      ...idleMutation(),
+      mutateAsync
+    });
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          archivedWord("word-1", "first"),
+          archivedWord("word-2", "second")
+        ],
+        page: { page: 1, page_size: 20, total: 2 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    const { container } = render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    // 表头全选：逐个点行内 checkbox 时，第二次点击拿到的仍是未 flush 的受控 selectedRowKeys。
+    fireEvent.click(container.querySelector("thead input[type='checkbox']")!);
+    fireEvent.click(screen.getByText("永久删除(2)").closest("button")!);
+    await screen.findAllByText("永久删除选中的 2 个词条？");
+    fireEvent.click(
+      screen
+        .getAllByText("永久删除", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => item?.closest(".ant-modal"))!
+    );
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1));
+    expect(mutateAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        input: {
+          entries: [
+            { id: "word-1", base_revision: 1, base_lifecycle_revision: 1 },
+            { id: "word-2", base_revision: 1, base_lifecycle_revision: 1 }
+          ]
+        }
+      })
+    );
+    await waitFor(() => expect(screen.queryByText("永久删除(2)")).toBeNull());
+  });
+
+  it("批量选择混入他人创建的词条时提交前拦截，不发请求", async () => {
+    const mutateAsync = vi.fn();
+    apiMocks.useDeleteWordBatch.mockReturnValue({
+      ...idleMutation(),
+      mutateAsync
+    });
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          archivedWord("word-1", "first"),
+          { ...archivedWord("word-2", "second"), created_by: "admin-2" }
+        ],
+        page: { page: 1, page_size: 20, total: 2 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    const { container } = render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    // 表头全选：逐个点行内 checkbox 时，第二次点击拿到的仍是未 flush 的受控 selectedRowKeys。
+    fireEvent.click(container.querySelector("thead input[type='checkbox']")!);
+    fireEvent.click(screen.getByText("永久删除(2)").closest("button")!);
+
+    await screen.findByText(/只能永久删除自己创建的词条/);
+    expect(mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it("后端拒绝越权时给出与「不可删」不同的提示", async () => {
+    const mutateAsync = vi.fn().mockRejectedValue(
+      Object.assign(new Error("forbidden"), {
+        code: "entry_delete_forbidden"
+      })
+    );
+    apiMocks.useDeleteWordDraft.mockReturnValue({
+      ...idleMutation(),
+      mutateAsync
+    });
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [archivedWord("word-1", "first")],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    fireEvent.click(
+      screen
+        .getAllByText("永久删除", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => item?.classList.contains("ant-btn-link"))!
+    );
+    await screen.findAllByText("永久删除「first」？");
+    fireEvent.click(
+      screen
+        .getAllByText("永久删除", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => item?.closest(".ant-modal"))!
+    );
+
+    await screen.findByText("只能永久删除自己创建的词条");
   });
 
   it("恢复 A 的 getAny 返回 B 时 fail closed 且不调用 restoreAny", async () => {
