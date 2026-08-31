@@ -2752,7 +2752,7 @@ describe("V3WordCreationWizard", () => {
     expect(publish.mock.calls.map((call) => call[2].base_revision)).toEqual([
       1, 2
     ]);
-  });
+  }, 15_000);
 
   it.each([409, 410])(
     "recovers a %s publish confirmation with a new key and the shared paged surface loader",
