@@ -75,11 +75,17 @@ UI 确认弹窗、列表刷新、草稿行无删除入口。
 
 ### 批次 C —— 引用计数与「被谁引用」（前后端）
 
-- [ ] 后端：6 类去重聚合，一次 `LATERAL`/批量聚合，**不要逐行标量子查询**
-- [ ] 后端：列表行输出 `reference_summary { total, previews[≤5], truncated }`
-- [ ] 前端：垃圾桶页 + 智能词库列表加「引用」列
-- [ ] 前端：点数字弹出前 5 条引用方（词条名 + 状态）
-- [ ] 前端：`total > 0` 时删除按钮置灰并说明"被 N 条引用"
+- [x] 后端：6 类去重聚合，一次批量查询（`entry_reference_rows`），非逐行标量子查询
+- [x] 后端：列表行输出 `reference_summary { total, previews[≤5], truncated }`
+- [x] 前端：列表加「引用」列（垃圾桶页与智能词库共用同一组件，两处都有）
+- [x] 前端：点数字弹出前 5 条引用方（词头 + 来源类型）
+- [x] 前端：`total > 0` 时删除按钮置灰并说明原因
+- ✅ **已完成** tsz-rust `dev` `f3e8ca4` / tsz `dev` `6b1c817`
+
+真机联调验证：造 `vacationsource --近义词--> holidaytarget` 后，
+垃圾桶列表 `holidaytarget` 引用列显示 1、永久删除置灰、
+点开显示「被以下内容引用：vacationsource · 关联词」；
+后端 DELETE 返回 409——计数与拦截口径一致。
 
 **性能要点**（已实测执行计划）：第 1 类必须直接用
 `relations.target_entry_id`，不要 JOIN `nodes` 取 `entry_id`——JOIN 写法退化为
