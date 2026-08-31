@@ -399,6 +399,68 @@ describe("V3 meanings writable model", () => {
     });
   });
 
+  it("预绑定保留隐藏稳定目标 ID，并只把服务端状态留在展示快照", () => {
+    const canonical = structuredClone(meaningsCanonicalFixture);
+    const relation = canonical.pos[0]!.senses[0]!.relations[0]!;
+    delete relation.target_word_id;
+    delete relation.target_sense_id;
+    Object.assign(relation, {
+      prebound_target_word_id: "draft-target-entry",
+      pending_target_headword: "reliability",
+      pending_target_gloss: "可靠性",
+      prebinding_state: "target_sense_deleted",
+      target_status: "archived"
+    });
+
+    const writable = toWritableMeanings(canonical);
+    expect(writable.pos[0]!.senses[0]!.relations[0]).toEqual({
+      id: "relation-1",
+      relation: "synonym",
+      prebound_target_word_id: "draft-target-entry",
+      pending_target_headword: "reliability",
+      pending_target_gloss: "可靠性",
+      score: "0.8"
+    });
+    expect(relationDisplaySnapshots(canonical)["relation-1"]).toEqual({
+      headword: "middle",
+      gloss: "中部",
+      prebinding_state: "target_sense_deleted",
+      target_status: "archived"
+    });
+  });
+
+  it("关联词 canonical 缺字段或混合目标时 fail closed，不静默选一支", () => {
+    for (const malformed of [
+      { prebound_target_word_id: "draft-target-entry" },
+      {
+        target_word_id: "target-entry",
+        target_sense_id: "target-sense",
+        prebound_target_word_id: "draft-target-entry",
+        pending_target_headword: "reliability",
+        prebinding_state: "waiting_first_sense" as const
+      },
+      { prebinding_state: "target_sense_deleted" as const }
+    ]) {
+      const canonical = structuredClone(meaningsCanonicalFixture);
+      const relation = canonical.pos[0]!.senses[0]!.relations[0]!;
+      for (const field of [
+        "target_word_id",
+        "target_sense_id",
+        "pending_target_headword",
+        "pending_target_gloss",
+        "prebound_target_word_id",
+        "prebinding_state",
+        "target_status"
+      ] as const) {
+        delete relation[field];
+      }
+      Object.assign(relation, malformed);
+      expect(() => toWritableMeanings(canonical)).toThrow(
+        `invalid relation target shape: ${relation.id}`
+      );
+    }
+  });
+
   it("只读关系快照区分无展示值、仅词面与仅词义", () => {
     const canonical = structuredClone(meaningsCanonicalFixture);
     canonical.pos[0]!.senses[0]!.relations = [

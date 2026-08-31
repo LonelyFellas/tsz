@@ -332,6 +332,9 @@ function V3MeaningsSlot({
       ) : null}
       <V3MeaningsAndExamplesStep
         activePosId={context.activePosId}
+        draftRelationPrebindingEnabled={
+          context.word.capabilities.draft_relation_prebinding === true
+        }
         forms={context.draftForms}
         issues={context.issues.filter((issue) => issue.step === "meanings")}
         onActivePosChange={context.setActivePosId}

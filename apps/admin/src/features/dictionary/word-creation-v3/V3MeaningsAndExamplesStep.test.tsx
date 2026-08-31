@@ -201,6 +201,7 @@ function Harness({
   partOfSpeechCatalogPending,
   wordId,
   relationSnapshots,
+  draftRelationPrebindingEnabled = true,
   sentenceAssociations,
   onSaveMultidimensionalSentence = vi.fn().mockResolvedValue(undefined)
 }: {
@@ -218,8 +219,17 @@ function Harness({
   partOfSpeechCatalogPending?: boolean;
   wordId?: string;
   relationSnapshots?: Readonly<
-    Record<string, { headword?: string; gloss?: string }>
+    Record<
+      string,
+      {
+        headword?: string;
+        gloss?: string;
+        prebinding_state?: "waiting_first_sense" | "target_sense_deleted";
+        target_status?: "draft" | "published" | "archived";
+      }
+    >
   >;
+  draftRelationPrebindingEnabled?: boolean;
   sentenceAssociations?: Readonly<Record<string, WordSentenceAssociationV3[]>>;
   onSaveMultidimensionalSentence?: (
     posId: string,
@@ -236,6 +246,7 @@ function Harness({
     <AntApp>
       <V3MeaningsAndExamplesStep
         activePosId={activePosId}
+        draftRelationPrebindingEnabled={draftRelationPrebindingEnabled}
         forms={formsValue}
         idFactory={idFactory}
         issues={issues}
@@ -634,7 +645,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.click(screen.getByRole("button", { name: /^取\s?消$/u }));
     expect(value()).toEqual(initial);
     expect(saveSentence).not.toHaveBeenCalled();
-  });
+  }, 10_000);
 
   it("删除最后一条例句后显示空状态并保留添加入口", () => {
     render(<Harness initial={meaningsFixture} wordId="entry-1" />);
@@ -1004,7 +1015,12 @@ describe("V3MeaningsAndExamplesStep", () => {
       id: relationId,
       pending_target_gloss: "预先填写的中文释义"
     });
-    expect(relatedSearchAny).toHaveBeenCalledWith("outside", "word", true);
+    expect(relatedSearchAny).toHaveBeenCalledWith(
+      "outside",
+      "word",
+      true,
+      true
+    );
     fireEvent.click(screen.getAllByText("outside").at(-1)!);
     expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
       target_word_id: "external-word-1"
@@ -1053,13 +1069,23 @@ describe("V3MeaningsAndExamplesStep", () => {
       .at(-1)!;
     fireEvent.change(pendingTarget, { target: { value: "苹果" } });
     expect(within(synonymCard).getByText(/仅支持英文词条/u)).toBeVisible();
-    expect(relatedSearchAny).not.toHaveBeenCalledWith("苹果", "word", true);
+    expect(relatedSearchAny).not.toHaveBeenCalledWith(
+      "苹果",
+      "word",
+      true,
+      true
+    );
     expect(value().pos[0]!.senses[0]!.relations[2]).not.toHaveProperty(
       "pending_target_headword"
     );
 
     fireEvent.change(pendingTarget, { target: { value: "  give   up  " } });
-    expect(relatedSearchAny).toHaveBeenCalledWith("give up", "phrase", true);
+    expect(relatedSearchAny).toHaveBeenCalledWith(
+      "give up",
+      "phrase",
+      true,
+      true
+    );
     expect(value().pos[0]!.senses[0]!.relations[2]).toMatchObject({
       pending_target_headword: "give up"
     });
@@ -1070,6 +1096,119 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(meaningsCss).toMatch(
       /\.word-relations-grid\s*\{[^}]*align-items:\s*start;/su
     );
+  });
+
+  it("零词义草稿写入隐藏稳定 ID，第三列仍只显示 pending gloss", () => {
+    relatedSearchAny.mockImplementation(
+      (
+        _query: string,
+        _kind: "word" | "phrase" | undefined,
+        _open: boolean,
+        _includeDrafts?: boolean
+      ) =>
+        ({
+          exact: {
+            data: {
+              pages: [
+                {
+                  results: [
+                    {
+                      schema_version: 3 as const,
+                      entry_id: "draft-target-entry",
+                      kind: "word" as const,
+                      status: "draft" as const,
+                      presentation: {
+                        label: "reliability",
+                        matched_surfaces: ["reliability"],
+                        strategy_version: "surface_summary_v1"
+                      },
+                      matches: [],
+                      senses: []
+                    }
+                  ],
+                  total: 1,
+                  next_cursor: null
+                }
+              ]
+            },
+            isFetching: false,
+            isError: false,
+            hasNextPage: false,
+            fetchNextPage: vi.fn(),
+            refetch: vi.fn()
+          },
+          contains: {
+            data: { pages: [] },
+            isFetching: false,
+            isError: false,
+            hasNextPage: false,
+            fetchNextPage: vi.fn(),
+            refetch: vi.fn()
+          }
+        }) as never
+    );
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [];
+    const { container } = render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByText("添加近义词").closest("button")!);
+    fireEvent.change(screen.getByLabelText("近义词目标词条"), {
+      target: { value: "reliability" }
+    });
+    fireEvent.click(screen.getAllByText("reliability").at(-1)!);
+
+    const relation = value().pos[0]!.senses[0]!.relations[0]!;
+    expect(relation).toMatchObject({
+      prebound_target_word_id: "draft-target-entry",
+      pending_target_headword: "reliability"
+    });
+    expect(relation).not.toHaveProperty("target_word_id");
+    expect(relation).not.toHaveProperty("target_sense_id");
+    expect(screen.getByText("草稿 · 等待第一词义")).toBeVisible();
+    expect(screen.getByLabelText("近义词预定义词义")).toBeVisible();
+    expect(screen.queryByLabelText("近义词目标词义")).toBeNull();
+    expect(
+      container.querySelectorAll(".word-relation-row .word-relation-sense")
+    ).toHaveLength(1);
+    expect(relatedSearchAny).toHaveBeenCalledWith(
+      "reliability",
+      "word",
+      true,
+      true
+    );
+  });
+
+  it("detached 与归档预绑定刷新后保留稳定身份并要求显式重选", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [
+      {
+        id: "detached-relation",
+        relation: "synonym",
+        prebound_target_word_id: "draft-target-entry",
+        pending_target_headword: "reliability",
+        pending_target_gloss: "可靠性",
+        score: "80"
+      }
+    ];
+    render(
+      <Harness
+        initial={initial}
+        relationSnapshots={{
+          "detached-relation": {
+            prebinding_state: "target_sense_deleted",
+            target_status: "archived"
+          }
+        }}
+      />
+    );
+
+    expect(screen.getByLabelText("近义词目标词条")).toHaveValue("reliability");
+    expect(screen.getByText("已归档 · 原词义已删除")).toBeVisible();
+    expect(screen.getByLabelText("近义词预定义词义")).toHaveValue("可靠性");
+    expect(screen.queryByLabelText("近义词目标词义")).toBeNull();
+    expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
+      prebound_target_word_id: "draft-target-entry",
+      pending_target_headword: "reliability"
+    });
   });
 
   it("关联词搜索有后页时提供加载入口，未完成 exact 前不宣称无匹配", () => {

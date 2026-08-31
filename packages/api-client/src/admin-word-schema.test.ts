@@ -567,6 +567,75 @@ describe("admin word V3/Any runtime decoder", () => {
     );
   });
 
+  it("关联词运行时 schema 接受四态并拒绝缺字段或混合目标", () => {
+    const word = validAdminWordV3() as unknown as Record<string, unknown>;
+    const pos = validRuntimeDefinition("WordPosMeaningsV3") as Record<
+      string,
+      unknown
+    >;
+    const sense = validRuntimeDefinition("WordSenseV3") as Record<
+      string,
+      unknown
+    >;
+    const base = {
+      id: IDS.member1,
+      relation: "synonym",
+      score: "80"
+    };
+    const validRelations = [
+      {
+        ...base,
+        target_word_id: IDS.entry,
+        target_sense_id: IDS.member2,
+        target_headword: "reliability",
+        target_gloss: "可靠性"
+      },
+      {
+        ...base,
+        pending_target_headword: "reliability",
+        pending_target_gloss: "可靠性"
+      },
+      {
+        ...base,
+        prebound_target_word_id: IDS.entry,
+        pending_target_headword: "reliability",
+        prebinding_state: "waiting_first_sense"
+      },
+      {
+        ...base,
+        prebound_target_word_id: IDS.entry,
+        pending_target_headword: "reliability",
+        prebinding_state: "target_sense_deleted"
+      }
+    ];
+    sense.relations = validRelations;
+    pos.senses = [sense];
+    word.meanings = { sense_groups: [], pos: [pos] };
+    expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+
+    for (const invalidRelation of [
+      { ...base, prebound_target_word_id: IDS.entry },
+      {
+        ...validRelations[0],
+        prebound_target_word_id: IDS.entry,
+        pending_target_headword: "reliability",
+        prebinding_state: "waiting_first_sense"
+      },
+      { ...base, prebinding_state: "target_sense_deleted" }
+    ]) {
+      const invalid = structuredClone(word);
+      const invalidSense = (
+        invalid.meanings as {
+          pos: Array<{ senses: Record<string, unknown>[] }>;
+        }
+      ).pos[0]!.senses[0]!;
+      invalidSense.relations = [invalidRelation];
+      expect(() => decodeAdminWordV3Envelope({ word: invalid })).toThrow(
+        InvalidAdminWordResponseError
+      );
+    }
+  });
+
   it("同时接受旧 source_range 和新 source_segments，并为旧消费者补 range alias", () => {
     const legacyWord = validAdminWordV3() as unknown as Record<string, unknown>;
     const pos = buildRuntimeFixture(

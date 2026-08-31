@@ -481,7 +481,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "da5da94acc1898e39d2ba7c5f041f61412dbe377f0f1088308befd4517a0b847"
+      "5f6466e94776cf2e9cb4b34b5eb9ccf910741a6e4570bc8ad033af859a71ebbc"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -581,19 +581,64 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(
       Object.keys(schemas.WordSentenceWritableV3.properties)
     ).not.toContain("associations");
+    const writableRelationBranches = schemas.WordRelationWritableV3
+      .oneOf as Array<{
+      additionalProperties: boolean;
+      required: string[];
+      properties: Record<string, unknown>;
+    }>;
+    const responseRelationBranches = runtimeSchemaBundle.$defs.WordRelationV3
+      .oneOf as unknown as Array<{
+      additionalProperties: boolean;
+      required: string[];
+      properties: Record<string, { enum?: string[] }>;
+    }>;
+    expect(writableRelationBranches).toHaveLength(3);
+    expect(responseRelationBranches).toHaveLength(4);
     expect(
-      Object.keys(schemas.WordRelationWritableV3.properties)
-    ).not.toContain("target_headword");
-    const relationSchemas = [
-      schemas.WordRelationV2,
-      schemas.WordRelationWritableV3,
-      runtimeSchemaBundle.$defs.WordRelationV3
-    ] as Array<{ properties: Record<string, unknown> }>;
-    for (const schema of relationSchemas) {
-      expect(schema.properties.pending_target_gloss).toEqual({
-        type: "string",
-        maxLength: 5000
-      });
+      writableRelationBranches.every(
+        (branch) =>
+          branch.additionalProperties === false &&
+          !("target_headword" in branch.properties)
+      )
+    ).toBe(true);
+    expect(
+      writableRelationBranches.some(
+        (branch) =>
+          "prebound_target_word_id" in branch.properties &&
+          branch.required.includes("pending_target_headword")
+      )
+    ).toBe(true);
+    expect(
+      responseRelationBranches
+        .flatMap((branch) => branch.properties.prebinding_state?.enum ?? [])
+        .sort()
+    ).toEqual(["target_sense_deleted", "waiting_first_sense"]);
+    expect(
+      snapshot.operationQueryParameters[
+        "get /admin/lexicon/entries/related-search"
+      ].map((parameter) => parameter.name)
+    ).toContain("include_drafts");
+    expect(
+      runtimeSchemaBundle.$defs.RelatedWordResultV3.properties.status
+    ).toEqual({
+      $ref: "#/$defs/RelatedWordStatusV3"
+    });
+    expect(runtimeSchemaBundle.$defs.RelatedWordStatusV3.enum).toEqual([
+      "draft",
+      "published"
+    ]);
+    expect(schemas.WordRelationV2.properties.pending_target_gloss).toEqual({
+      type: "string",
+      maxLength: 5000
+    });
+    for (const branches of [
+      writableRelationBranches,
+      responseRelationBranches
+    ]) {
+      expect(
+        branches.some((branch) => "pending_target_gloss" in branch.properties)
+      ).toBe(true);
     }
 
     expect(
@@ -790,6 +835,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       },
       {
         name: "exclude_exact",
+        in: "query",
+        required: false,
+        schema: { type: "boolean" }
+      },
+      {
+        name: "include_drafts",
         in: "query",
         required: false,
         schema: { type: "boolean" }

@@ -150,6 +150,7 @@ export interface RelatedSearchQuery {
   kind?: AdminWordKind;
   match_mode?: RelatedSearchMatchMode;
   exclude_exact?: boolean;
+  include_drafts?: boolean;
   page_size?: number;
   /** deprecated legacy alias; cannot be combined with page_size */
   limit?: number;
