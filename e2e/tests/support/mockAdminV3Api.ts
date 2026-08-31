@@ -474,6 +474,8 @@ function listItem(word: AdminWordV3): AdminWordListItemAny {
       ? {}
       : { published_revision: word.published_revision }),
     created_by_name: "V3 Mock E2E Admin",
+    created_by: ACTOR_ID,
+    reference_summary: { total: 0, previews: [], truncated: false },
     created_at: word.created_at,
     updated_at: word.updated_at
   };
@@ -496,6 +498,8 @@ const LEGACY_LIST_ITEM: AdminWordListItemAny = {
   published_revision: 7,
   has_unpublished_changes: false,
   created_by_name: "Legacy Admin",
+  created_by: ACTOR_ID,
+  reference_summary: { total: 0, previews: [], truncated: false },
   created_at: NOW,
   updated_at: NOW
 };
