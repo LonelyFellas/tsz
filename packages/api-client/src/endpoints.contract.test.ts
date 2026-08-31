@@ -496,7 +496,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "48d9a5d7d753f72232d3fdc86f26d6fa04b030e0d0a951ae4ac1d6fb1111006c"
+      "46823cb01a942577825970981323f46da60a4aca6d3225732ec813e39bb59efe"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -513,6 +513,10 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(defs.WordPosFormsV3.required).toContain("dialect_rules");
     expect(defs.DialectModeV3.enum).toEqual(["unified", "distinguish"]);
     expect(Object.keys(defs.AdminWordV3.properties)).not.toContain("headwords");
+    expect(defs.AdminWordV3.properties.detection_basis_dialect).toEqual({
+      $ref: "#/$defs/SourceDialect"
+    });
+    expect(defs.AdminWordV3.required).not.toContain("detection_basis_dialect");
     expect(
       snapshot.schemas.CreateAdminWordV3Input.properties.headwords
     ).toEqual({

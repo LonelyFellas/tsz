@@ -8,6 +8,7 @@ import type {
   WordCreationStep
 } from "@tsz/types";
 import type { ReactNode } from "react";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import type { V3IssueNavigationTarget } from "./issueNavigation";
 import type { V3Problem } from "./problem";
@@ -81,22 +82,80 @@ function problemTitle(problem: V3Problem) {
   }
 }
 
-function firstBaseFormLabel(word: AdminWordV3): string | undefined {
+type V3BaseFormSummary =
+  | { mode: "common"; common: string }
+  | { mode: "uk_us"; uk: string; us: string };
+
+function firstBaseFormSummary(
+  word: AdminWordV3
+): V3BaseFormSummary | undefined {
   for (const pos of word.forms.pos) {
     const base = pos.forms.find((form) => form.form_type === "base");
     if (!base) continue;
     if (base.regional_variants.mode === "common") {
-      return base.regional_variants.common.spelling.trim() || undefined;
+      const common = base.regional_variants.common.spelling.trim();
+      return common ? { mode: "common", common } : undefined;
     }
-    const spellings = [
-      base.regional_variants.uk.spelling.trim(),
-      base.regional_variants.us.spelling.trim()
-    ].filter((spelling, index, values) =>
-      spelling ? values.indexOf(spelling) === index : false
-    );
-    return spellings.length > 0 ? spellings.join(" / ") : undefined;
+    const uk = base.regional_variants.uk.spelling.trim();
+    const us = base.regional_variants.us.spelling.trim();
+    return uk || us ? { mode: "uk_us", uk, us } : undefined;
   }
   return undefined;
+}
+
+function baseFormSummaryLabel(summary?: V3BaseFormSummary): string | undefined {
+  if (!summary) return undefined;
+  if (summary.mode === "common") return summary.common;
+  return [...new Set([summary.uk, summary.us].filter(Boolean))].join(" / ");
+}
+
+function V3HeadwordSummary({
+  basis,
+  fallback,
+  summary
+}: {
+  basis?: AdminWordV3["detection_basis_dialect"];
+  fallback: string;
+  summary?: V3BaseFormSummary;
+}) {
+  const { preference } = useDialectPreference();
+  if (
+    !summary ||
+    summary.mode === "common" ||
+    !summary.uk ||
+    !summary.us ||
+    summary.uk === summary.us
+  ) {
+    return (
+      <div className="word-creation-summary-headword">
+        <span className="dialect-dot dialect-dot-common" />
+        <strong>{baseFormSummaryLabel(summary) ?? fallback}</strong>
+      </div>
+    );
+  }
+  const sides =
+    preference === "uk" ? (["uk", "us"] as const) : (["us", "uk"] as const);
+  return (
+    <Flex vertical gap={4}>
+      {sides.map((dialect, index) => (
+        <div
+          className={`word-creation-summary-headword${index === 0 ? "" : " word-creation-summary-alt"}`}
+          key={dialect}
+        >
+          <span className={`dialect-dot dialect-dot-${dialect}`} />
+          {index === 0 ? (
+            <strong>{summary[dialect]}</strong>
+          ) : (
+            <span>{summary[dialect]}</span>
+          )}
+          <small>
+            {dialect === "uk" ? "BrE" : "AmE"}
+            {basis === dialect ? " · 检测基准" : ""}
+          </small>
+        </div>
+      ))}
+    </Flex>
+  );
 }
 
 export function V3WordCreationLayout({
@@ -119,9 +178,10 @@ export function V3WordCreationLayout({
   onRefreshConflict,
   children
 }: Props) {
+  const baseFormSummary = firstBaseFormSummary(word);
   const presentationLabel = word.presentation.label.trim();
   const visibleLabel =
-    firstBaseFormLabel(word) ??
+    baseFormSummaryLabel(baseFormSummary) ??
     (presentationLabel && !/^未命名词条(?:\s*·.*)?$/u.test(presentationLabel)
       ? presentationLabel
       : (word.presentation.matched_surfaces.find(
@@ -156,19 +216,18 @@ export function V3WordCreationLayout({
         breadcrumbTitle: `${visibleLabel} · ${STEP_TITLE[activeStep]}`,
         completedSteps: word.completed_steps,
         summaryHeadword: (
-          <div className="word-creation-summary-headword">
-            <span className="dialect-dot dialect-dot-common" />
-            <strong>{visibleLabel}</strong>
-          </div>
+          <V3HeadwordSummary
+            basis={word.detection_basis_dialect}
+            fallback={visibleLabel}
+            summary={baseFormSummary}
+          />
         ),
-        ...(activeStep === "preview"
+        // 草稿态不再挂状态标签：向导里本就只可能是草稿，标签没有信息量。
+        ...(activeStep === "preview" || word.status === "draft"
           ? {}
           : {
               status: (
-                <Tag
-                  color={word.status === "draft" ? "processing" : "default"}
-                  style={{ alignSelf: "flex-start" }}
-                >
+                <Tag color="default" style={{ alignSelf: "flex-start" }}>
                   {wordStatusLabel(word.status)}
                   {word.has_unpublished_changes ? " · 有未发布修改" : ""}
                 </Tag>
@@ -177,7 +236,7 @@ export function V3WordCreationLayout({
         progress: (
           <Flex
             vertical
-            gap={13}
+            gap={12}
             className="word-creation-progress-list v3-product-progress-list"
           >
             {progressRows.map((row) => (

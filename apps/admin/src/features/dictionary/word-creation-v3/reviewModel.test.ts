@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AdminWordV3 } from "@tsz/types";
-import { formsFixture } from "./fixtures";
+import { commonFormFixture, formsFixture, uuidFromInt } from "./fixtures";
 import { buildV3ReviewModel } from "./reviewModel";
 
 function modelInput(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
@@ -115,6 +115,38 @@ describe("buildV3ReviewModel", () => {
         relationCount: 1
       }
     });
+  });
+
+  it("原形数按拼写去重：同拼写只数一次，空拼写不计入", () => {
+    const filled = commonFormFixture({
+      id: uuidFromInt(4_101),
+      variant_id: uuidFromInt(4_102),
+      spelling: "center"
+    });
+    // 新增变化组会造出拼写相同的独立原形，概览不该把同一个词数成两个。
+    const duplicate = commonFormFixture({
+      id: uuidFromInt(4_103),
+      variant_id: uuidFromInt(4_104),
+      spelling: " Center "
+    });
+    const other = commonFormFixture({
+      id: uuidFromInt(4_105),
+      variant_id: uuidFromInt(4_106),
+      spelling: "colour"
+    });
+    const blank = commonFormFixture({
+      id: uuidFromInt(4_107),
+      variant_id: uuidFromInt(4_108),
+      spelling: "   "
+    });
+
+    expect(
+      buildV3ReviewModel(
+        modelInput({
+          forms: formsFixture({ forms: [filled, duplicate, other, blank] })
+        })
+      ).summary
+    ).toMatchObject({ baseCount: 2, formCount: 4 });
   });
 
   it("distinguishes published dirty, draft, and archived actions", () => {

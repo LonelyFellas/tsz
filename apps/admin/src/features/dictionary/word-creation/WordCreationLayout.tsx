@@ -248,7 +248,7 @@ export function WordCreationLayout({
 
             <div className="word-summary-language">
               <Typography.Text type="secondary">所属语言</Typography.Text>
-              <strong>English&nbsp; 英语</strong>
+              <strong>English</strong>
             </div>
 
             {presentation?.status ??
@@ -274,7 +274,6 @@ export function WordCreationLayout({
             <Typography.Text type="secondary" className="word-summary-kicker">
               完成情况
             </Typography.Text>
-            <Tag variant="filled">实时</Tag>
           </div>
           {presentation?.progress ?? (
             <ProgressSummary

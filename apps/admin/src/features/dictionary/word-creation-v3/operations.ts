@@ -559,6 +559,23 @@ export function updatePronunciation(
   throw new Error(`pronunciation not found: ${pronunciationId}`);
 }
 
+/** 从模板原形取拼写：common 模板两侧同值，uk_us 模板按侧取；没有模板时留空。 */
+function baseSpellings(form: WordConcreteFormV3 | undefined): {
+  uk: string;
+  us: string;
+} {
+  if (!form) return { uk: "", us: "" };
+  return form.regional_variants.mode === "common"
+    ? {
+        uk: form.regional_variants.common.spelling,
+        us: form.regional_variants.common.spelling
+      }
+    : {
+        uk: form.regional_variants.uk.spelling,
+        us: form.regional_variants.us.spelling
+      };
+}
+
 export function addPartOfSpeech(
   content: DraftFormsStepContentV3,
   catalogItem: PartOfSpeechCatalogItem,
@@ -582,21 +599,7 @@ export function addPartOfSpeech(
   const commonDialect =
     dialectRules.spelling_mode === "unified" &&
     dialectRules.phonetic_mode === "unified";
-  const commonSpelling = template
-    ? template.regional_variants.mode === "common"
-      ? template.regional_variants.common.spelling
-      : template.regional_variants.uk.spelling
-    : "";
-  const ukSpelling = template
-    ? template.regional_variants.mode === "uk_us"
-      ? template.regional_variants.uk.spelling
-      : template.regional_variants.common.spelling
-    : "";
-  const usSpelling = template
-    ? template.regional_variants.mode === "uk_us"
-      ? template.regional_variants.us.spelling
-      : template.regional_variants.common.spelling
-    : "";
+  const templateSpelling = baseSpellings(template);
   const allocated = allNodeIds(content);
   const posId = nextUuid(idFactory, allocated);
   const groupId = nextUuid(idFactory, allocated);
@@ -622,7 +625,7 @@ export function addPartOfSpeech(
         common: {
           id: firstVariantId,
           dialect: "common" as const,
-          spelling: commonSpelling,
+          spelling: templateSpelling.uk,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         }
@@ -632,14 +635,14 @@ export function addPartOfSpeech(
         uk: {
           id: firstVariantId,
           dialect: "uk" as const,
-          spelling: ukSpelling,
+          spelling: templateSpelling.uk,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         },
         us: {
           id: secondVariantId!,
           dialect: "us" as const,
-          spelling: usSpelling,
+          spelling: templateSpelling.us,
           origin: "manual" as const,
           pronunciations: [pronunciation(secondPronunciationId!)]
         }
@@ -687,7 +690,8 @@ export function addFormGroup(
   posId: string,
   idFactory: V3IdFactory = defaultIdFactory
 ): OperationResult<DraftFormsStepContentV3> {
-  if (!content.pos.some((item) => item.pos_id === posId)) {
+  const pos = content.pos.find((item) => item.pos_id === posId);
+  if (!pos) {
     return { ok: false, reason: "pos_not_found" };
   }
   const groupId = nextUuid(idFactory, allNodeIds(content));
@@ -696,10 +700,28 @@ export function addFormGroup(
     .find((item) => item.pos_id === posId)!
     .form_groups.push({
       id: groupId,
-      is_regular: false,
+      is_regular: true,
       members: []
     });
-  return { ok: true, value: next };
+  // 每组词形变化的初始形态一致：新组自带一个原形，拼写沿用本词性已有的原形。
+  const added = addConcreteForm(next, posId, groupId, "base", idFactory);
+  if (!added.ok) return added;
+  const template = pos.forms.find((form) => form.form_type === "base");
+  if (template) {
+    const spelling = baseSpellings(template);
+    const createdPos = added.value.pos.find((item) => item.pos_id === posId)!;
+    const createdFormId = createdPos.form_groups.find(
+      (item) => item.id === groupId
+    )!.members[0]!.form_id;
+    const created = createdPos.forms.find((form) => form.id === createdFormId)!;
+    if (created.regional_variants.mode === "common") {
+      created.regional_variants.common.spelling = spelling.uk;
+    } else {
+      created.regional_variants.uk.spelling = spelling.uk;
+      created.regional_variants.us.spelling = spelling.us;
+    }
+  }
+  return added;
 }
 
 export function deleteFormGroup(
@@ -993,61 +1015,6 @@ export function deleteConcreteForm(
       );
     }
   }
-  return { ok: true, value: next };
-}
-
-export function moveMembership(
-  content: DraftFormsStepContentV3,
-  membershipId: string,
-  targetGroupId: string,
-  targetIndex: number,
-  idFactory: V3IdFactory = defaultIdFactory
-): OperationResult<DraftFormsStepContentV3> {
-  let sourcePosId: string | undefined;
-  let formId: string | undefined;
-  for (const pos of content.pos) {
-    for (const group of pos.form_groups) {
-      const member = group.members.find((item) => item.id === membershipId);
-      if (member) {
-        sourcePosId = pos.pos_id;
-        formId = member.form_id;
-      }
-    }
-  }
-  if (!sourcePosId || !formId) {
-    return { ok: false, reason: "membership_not_found" };
-  }
-  const targetPos = content.pos.find((pos) =>
-    pos.form_groups.some((group) => group.id === targetGroupId)
-  );
-  if (!targetPos) return { ok: false, reason: "group_not_found" };
-  if (targetPos.pos_id !== sourcePosId) {
-    return { ok: false, reason: "cross_pos_membership" };
-  }
-  const targetGroup = targetPos.form_groups.find(
-    (group) => group.id === targetGroupId
-  )!;
-  if (targetGroup.members.some((member) => member.form_id === formId)) {
-    return { ok: false, reason: "duplicate_group_membership" };
-  }
-  const allocated = allNodeIds(content);
-  const newMembershipId = nextUuid(idFactory, allocated);
-  const next = clone(content);
-  for (const pos of next.pos) {
-    for (const group of pos.form_groups) {
-      group.members = group.members.filter(
-        (member) => member.id !== membershipId
-      );
-    }
-  }
-  const nextTarget = next.pos
-    .find((pos) => pos.pos_id === sourcePosId)!
-    .form_groups.find((group) => group.id === targetGroupId)!;
-  const index = Math.max(0, Math.min(targetIndex, nextTarget.members.length));
-  nextTarget.members.splice(index, 0, {
-    id: newMembershipId,
-    form_id: formId
-  });
   return { ok: true, value: next };
 }
 

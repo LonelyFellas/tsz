@@ -45,6 +45,7 @@ export interface V3ConcreteFormRowProps {
   formLabel?: string;
   formTypeAriaLabel?: string;
   formTypeDisabled?: boolean;
+  formTypeDisabledReason?: string;
   formTypeOptions?: readonly WordFormTypeV3[];
   issues: readonly V3DraftValidationIssue[];
   membershipCount: number;
@@ -311,6 +312,7 @@ interface V3ConcreteFormTypeCellProps {
   form: WordConcreteFormV3;
   formTypeAriaLabel: string;
   formTypeDisabled: boolean;
+  formTypeDisabledReason?: string;
   formTypeOptions: readonly WordFormTypeV3[];
   membershipCount: number;
   onChange: (next: DraftFormsStepContentV3) => void;
@@ -323,6 +325,7 @@ function V3ConcreteFormTypeCell({
   form,
   formTypeAriaLabel,
   formTypeDisabled,
+  formTypeDisabledReason,
   formTypeOptions,
   membershipCount,
   onChange,
@@ -343,20 +346,25 @@ function V3ConcreteFormTypeCell({
       data-v3-node-id={form.id}
       tabIndex={-1}
     >
-      <Select
-        aria-label={formTypeAriaLabel}
-        disabled={formTypeDisabled}
-        onChange={(formType) =>
-          onChange(updateConcreteFormType(content, form.id, formType))
-        }
-        options={availableFormTypes.map((value) => ({
-          value,
-          label: formTypeLabel(value)
-        }))}
-        size="small"
-        style={{ width: "100%" }}
-        value={form.form_type}
-      />
+      <div
+        className="word-form-type-select"
+        title={formTypeDisabled ? formTypeDisabledReason : undefined}
+      >
+        <Select
+          aria-label={formTypeAriaLabel}
+          disabled={formTypeDisabled}
+          onChange={(formType) =>
+            onChange(updateConcreteFormType(content, form.id, formType))
+          }
+          options={availableFormTypes.map((value) => ({
+            value,
+            label: formTypeLabel(value)
+          }))}
+          size="small"
+          style={{ width: "100%" }}
+          value={form.form_type}
+        />
+      </div>
       {membershipCount > 1 ? (
         <Typography.Text type="secondary">
           已在 {membershipCount} 个变化组中使用
@@ -419,6 +427,7 @@ function V3DialectFormCell({
           aria-label={`${formLabel}${dialectLabel(dialect)}拼写`}
           data-v3-field="spelling"
           data-v3-node-id={variant.id}
+          placeholder={`${dialectLabel(dialect)}拼写`}
           onChange={(event) => {
             if (dialectRules.spelling_mode === "unified") {
               const result = unifyUkUsSpelling(form, event.target.value);
@@ -459,6 +468,7 @@ export function V3ConcreteFormRow({
   formLabel = "词形",
   formTypeAriaLabel = `${formLabel}类型`,
   formTypeDisabled = false,
+  formTypeDisabledReason,
   formTypeOptions = [form.form_type],
   issues,
   membershipCount,
@@ -534,6 +544,7 @@ export function V3ConcreteFormRow({
           form={form}
           formTypeAriaLabel={formTypeAriaLabel}
           formTypeDisabled={formTypeDisabled}
+          formTypeDisabledReason={formTypeDisabledReason}
           formTypeOptions={formTypeOptions}
           lastRow={lastRow}
           membershipCount={membershipCount}
@@ -673,6 +684,7 @@ export interface V3DialectSeparatedFormRow {
   formLabel: string;
   formTypeAriaLabel: string;
   formTypeDisabled: boolean;
+  formTypeDisabledReason?: string;
   formTypeOptions: readonly WordFormTypeV3[];
   membershipCount: number;
   actions?: ReactNode;
@@ -729,6 +741,7 @@ export function V3DialectSeparatedFormMatrix({
                 form={row.form}
                 formTypeAriaLabel={row.formTypeAriaLabel}
                 formTypeDisabled={row.formTypeDisabled}
+                formTypeDisabledReason={row.formTypeDisabledReason}
                 formTypeOptions={row.formTypeOptions}
                 lastRow={index === rows.length - 1}
                 membershipCount={row.membershipCount}
