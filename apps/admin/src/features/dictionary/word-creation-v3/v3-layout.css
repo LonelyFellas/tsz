@@ -56,6 +56,13 @@
   min-width: 0;
 }
 
+/* 步骤容器本身有 16px 的 gap，标题块再叠 22px 会让标题与正文之间空出 38px。
+   这里只留 8px，合计 24px。 */
+.v3-forms-step > .word-step-heading,
+.v3-meanings-v2 > .word-step-heading {
+  margin-bottom: 0;
+}
+
 .v3-meanings-v2 {
   min-width: 0;
 }

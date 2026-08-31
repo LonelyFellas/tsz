@@ -23,6 +23,13 @@
   border-bottom: 0;
 }
 
+.v3-pos-dialect-note {
+  margin: 0;
+  color: var(--word-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .v3-form-group-card .v3-pos-dialect-rule {
   border-bottom: 1px solid #e5e7eb;
 }
@@ -55,6 +62,11 @@
   background: var(--word-ink);
 }
 
+/* 收起/展开用实心三角，与 STEP 03 的折叠控件一致（换图标而不是旋转箭头）。 */
+.word-form-card-toggle-caret {
+  flex: none;
+}
+
 .v3-form-group-card > .ant-card-body {
   padding: 0;
 }
@@ -62,6 +74,10 @@
 .v3-form-group-card > .ant-card-body > .ant-flex {
   gap: 0;
   padding-bottom: 16px;
+}
+
+.v3-form-group-card .word-form-rules {
+  padding-inline: 16px;
 }
 
 .v3-concrete-form-row .word-form-matrix {
@@ -77,7 +93,8 @@
   grid-template-columns: 142px repeat(2, minmax(0, 1fr));
   column-gap: 28px;
   align-items: stretch;
-  margin: 16px 18px 0;
+  margin: 16px;
+  margin-bottom: 0;
   overflow-x: visible;
 }
 
@@ -160,7 +177,14 @@
 
 .v3-concrete-form-row .word-form-type-cell {
   align-items: center;
-  justify-content: center;
+}
+
+/* 类型下拉要和右侧方言面板里的拼写输入框对齐：方言格第一行是字段标签，
+   这里用一个等高的占位顶掉那一行，剩下的 8px 由格子自身的 gap 补齐。 */
+.v3-concrete-form-row .word-form-type-cell::before {
+  content: "";
+  display: block;
+  height: 22px;
 }
 
 .word-form-type-select {

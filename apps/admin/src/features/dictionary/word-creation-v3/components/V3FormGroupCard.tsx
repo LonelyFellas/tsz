@@ -1,4 +1,6 @@
 import {
+  CaretDownFilled,
+  CaretUpFilled,
   DeleteOutlined,
   DownOutlined,
   EllipsisOutlined,
@@ -96,6 +98,8 @@ export function V3FormGroupCard({
       return baseMembers.length === 1 ? [baseMembers[0]!.form_id] : [];
     })
   );
+  const blockedFormLocked =
+    blockedFormId !== undefined && lockedBaseFormIds.has(blockedFormId);
   const setRegular = (isRegular: boolean) => {
     const next = structuredClone(content);
     const nextPos = next.pos.find((item) => item.pos_id === pos.pos_id);
@@ -249,9 +253,11 @@ export function V3FormGroupCard({
           <span>{`第 ${groupIndex + 1} 组 词形变化`}</span>
           <span className="word-form-card-toggle-state">
             <span>{collapsed ? "展开" : "收起"}</span>
-            <DownOutlined
-              className={`word-form-card-toggle-icon${collapsed ? " is-collapsed" : ""}`}
-            />
+            {collapsed ? (
+              <CaretDownFilled className="word-form-card-toggle-caret" />
+            ) : (
+              <CaretUpFilled className="word-form-card-toggle-caret" />
+            )}
           </span>
         </button>
       }
@@ -317,30 +323,42 @@ export function V3FormGroupCard({
           {blockedFormId ? (
             <Alert
               action={
-                <Button
-                  aria-label="删除词形及相关发音"
-                  danger
-                  onClick={() => {
-                    const result = deleteConcreteForm(
-                      content,
-                      pos.pos_id,
-                      blockedFormId
-                    );
-                    if (result.ok) onChange(result.value);
-                    setBlockedFormId(undefined);
-                  }}
-                  size="small"
-                >
-                  删除词形
-                </Button>
+                blockedFormLocked ? undefined : (
+                  <Button
+                    aria-label="删除词形及相关发音"
+                    danger
+                    onClick={() => {
+                      const result = deleteConcreteForm(
+                        content,
+                        pos.pos_id,
+                        blockedFormId
+                      );
+                      if (result.ok) onChange(result.value);
+                      setBlockedFormId(undefined);
+                    }}
+                    size="small"
+                  >
+                    删除词形
+                  </Button>
+                )
               }
               closable={{
-                "aria-label": "取消删除词形并保留",
+                "aria-label": blockedFormLocked
+                  ? "知道了并保留词形"
+                  : "取消删除词形并保留",
                 onClose: () => setBlockedFormId(undefined)
               }}
-              description="不能只从当前组移除。若不再需要此词形，可将它及相关发音一并删除。"
+              description={
+                blockedFormLocked
+                  ? `${BASE_REQUIRED_HINT}。要删除它，请先在本组添加另一个原形。`
+                  : "不能只从当前组移除。若不再需要此词形，可将它及相关发音一并删除。"
+              }
               showIcon
-              title="此词形仅在当前变化组中使用"
+              title={
+                blockedFormLocked
+                  ? "此词形是本组唯一的原形"
+                  : "此词形仅在当前变化组中使用"
+              }
               type="warning"
             />
           ) : null}

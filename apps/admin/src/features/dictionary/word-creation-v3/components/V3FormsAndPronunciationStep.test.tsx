@@ -1449,7 +1449,11 @@ describe("V3FormsAndPronunciationStep", () => {
         {
           id: uuidFromInt(704),
           is_regular: true,
-          members: [{ id: uuidFromInt(705), form_id: form.id }]
+          members: [
+            { id: uuidFromInt(705), form_id: form.id },
+            // 组里留个备用原形，这条用例走的是普通的「仅在当前组使用」提示。
+            { id: uuidFromInt(706), form_id: keeper.id }
+          ]
         }
       ]
     });
@@ -2601,6 +2605,62 @@ describe("V3FormsAndPronunciationStep", () => {
       "title",
       "每组词形变化至少保留一个原形"
     );
+  });
+
+  it("陈旧的删除提示不会删掉此刻已成为本组唯一原形的词形", async () => {
+    const first = commonFormFixture({
+      id: uuidFromInt(1_240),
+      variant_id: uuidFromInt(1_241),
+      spelling: "run"
+    });
+    const second = commonFormFixture({
+      id: uuidFromInt(1_242),
+      variant_id: uuidFromInt(1_243),
+      spelling: "runs"
+    });
+    const plural = commonFormFixture({
+      id: uuidFromInt(1_244),
+      variant_id: uuidFromInt(1_245),
+      spelling: "running"
+    });
+    plural.form_type = "plural";
+    render(
+      <Harness initial={formsFixture({ forms: [first, second, plural] })} />
+    );
+
+    // 组里两个原形，谁都没锁
+    await waitFor(() =>
+      expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled()
+    );
+    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 2"));
+    expect(await screen.findByText("此词形仅在当前变化组中使用")).toBeVisible();
+
+    // 提示还开着时把第 1 个原形改成复数，第 2 个就成了本组唯一原形
+    chooseOption("变化组 1 词形 1 类型", "复数");
+    await waitFor(() =>
+      expect(screen.getByLabelText("变化组 1 词形 2 类型")).toBeDisabled()
+    );
+
+    expect(screen.getByText("此词形是本组唯一的原形")).toBeVisible();
+    expect(screen.queryByLabelText("删除词形及相关发音")).toBeNull();
+    expect(
+      canonicalValue().pos[0]!.forms.map((item) => item.form_type)
+    ).toEqual(["plural", "base", "plural"]);
+  });
+
+  it("多个变化组时点明英美设置是词性级，单组不啰嗦", async () => {
+    const note =
+      "英美设置按词性生效，在任一变化组内修改都会同步到本词性的全部变化组。";
+    render(<Harness initial={formsFixture()} />);
+
+    await waitFor(() =>
+      expect(screen.getByText("英美拼写是否有区别？")).toBeVisible()
+    );
+    expect(screen.queryByText(note)).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "新增名词变化组" }));
+
+    await waitFor(() => expect(screen.getAllByText(note)).toHaveLength(2));
   });
 
   it("跨组共享的原形按最严的组锁定类型", async () => {

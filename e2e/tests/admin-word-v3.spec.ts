@@ -38,6 +38,18 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
     const firstGroup = nounGroups.nth(0);
+
+    // 组内只剩一个原形时类型锁死；⊕ 复制出第二个原形后放开，删回去又锁上。
+    await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
+    await firstGroup.getByLabel("在原形 1 下方添加同类型词形").click();
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeEnabled();
+    await expect(firstGroup.getByLabel("变化组 1 词形 2 类型")).toBeEnabled();
+    await firstGroup.getByLabel("从变化组 1 移除词形 2").click();
+    await firstGroup.getByLabel("删除词形及相关发音").click();
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(1);
+    await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
+
     const firstForm = firstGroup.locator(".v3-concrete-form-row").nth(0);
     await firstForm.getByLabel("原形通用拼写").fill("orbit-common");
     await firstForm.getByRole("button", { name: /新增发音/ }).click();

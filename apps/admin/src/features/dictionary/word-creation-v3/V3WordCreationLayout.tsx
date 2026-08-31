@@ -136,7 +136,7 @@ function V3HeadwordSummary({
   const sides =
     preference === "uk" ? (["uk", "us"] as const) : (["us", "uk"] as const);
   return (
-    <Flex vertical gap={5}>
+    <Flex vertical gap={4}>
       {sides.map((dialect, index) => (
         <div
           className={`word-creation-summary-headword${index === 0 ? "" : " word-creation-summary-alt"}`}
@@ -149,7 +149,7 @@ function V3HeadwordSummary({
             <span>{summary[dialect]}</span>
           )}
           <small>
-            {dialect === "uk" ? "英式英语 · BrE" : "美式英语 · AmE"}
+            {dialect === "uk" ? "BrE" : "AmE"}
             {basis === dialect ? " · 检测基准" : ""}
           </small>
         </div>
@@ -222,14 +222,12 @@ export function V3WordCreationLayout({
             summary={baseFormSummary}
           />
         ),
-        ...(activeStep === "preview"
+        // 草稿态不再挂状态标签：向导里本就只可能是草稿，标签没有信息量。
+        ...(activeStep === "preview" || word.status === "draft"
           ? {}
           : {
               status: (
-                <Tag
-                  color={word.status === "draft" ? "processing" : "default"}
-                  style={{ alignSelf: "flex-start" }}
-                >
+                <Tag color="default" style={{ alignSelf: "flex-start" }}>
                   {wordStatusLabel(word.status)}
                   {word.has_unpublished_changes ? " · 有未发布修改" : ""}
                 </Tag>
@@ -238,7 +236,7 @@ export function V3WordCreationLayout({
         progress: (
           <Flex
             vertical
-            gap={13}
+            gap={12}
             className="word-creation-progress-list v3-product-progress-list"
           >
             {progressRows.map((row) => (

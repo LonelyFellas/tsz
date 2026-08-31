@@ -93,10 +93,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 15px;
-  background: #f8fafc;
-  border: 1px solid #e6eaf0;
-  border-radius: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--word-line);
 }
 
 .word-summary-kicker {
@@ -110,7 +108,7 @@
 
 .word-creation-summary-headword {
   display: grid;
-  grid-template-columns: 9px minmax(0, 1fr);
+  grid-template-columns: 9px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -126,9 +124,11 @@
 }
 
 .word-creation-summary-headword small {
-  grid-column: 2;
+  grid-column: 3;
+  justify-self: end;
   color: var(--word-muted);
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .word-creation-summary-alt {
@@ -170,12 +170,6 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.word-summary-progress-title .ant-tag {
-  margin: 0;
-  color: #6b7280;
-  background: #f0f2f5;
 }
 
 .word-creation-progress-list {
@@ -234,7 +228,8 @@
   max-width: 1540px;
   min-width: 0;
   margin-inline: auto;
-  padding: 34px clamp(22px, 2.4vw, 40px) 92px;
+  /* 底部 = 顶部 34px + 吸底操作条 66px，滚到底时肉眼看到的上下留白一致。 */
+  padding: 34px clamp(22px, 2.4vw, 40px) 100px;
 }
 
 .word-creation-content--basics {
@@ -1260,7 +1255,7 @@
 }
 
 .word-pos-tabs > .ant-tabs-nav {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .word-pos-tabs > .ant-tabs-nav .ant-tabs-tab {
@@ -2162,16 +2157,15 @@
   }
 }
 
-@container word-creation-page (min-width: 1200px) {
-  .word-creation-shell .word-summary-language {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 4px;
-  }
-}
-
 @container word-creation-page (min-width: 1200px) and (max-width: 1399px) {
   .word-creation-shell {
     grid-template-columns: 190px minmax(0, 1fr);
+  }
+
+  /* 190px 的左栏排不下「所属语言 + English 英语」一行，这一档仍然堆两行。 */
+  .word-creation-shell .word-summary-language {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
   }
 
   .word-creation-shell .word-creation-summary {
@@ -2236,6 +2230,12 @@
     align-items: center;
     gap: 10px 16px;
     padding: 10px 12px;
+    border-bottom: 0;
+  }
+
+  .word-creation-shell .word-creation-summary-headword {
+    grid-template-columns: 9px auto auto;
+    justify-content: start;
   }
 
   .word-creation-shell .word-summary-entry-card > .word-summary-kicker,

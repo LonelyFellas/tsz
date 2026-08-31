@@ -1044,7 +1044,7 @@ describe("V3 forms operations", () => {
     });
     expect(added.value.pos[0]!.form_groups[1]).toEqual({
       id: uuidFromInt(9_201),
-      is_regular: false,
+      is_regular: true,
       members: [{ id: uuidFromInt(9_205), form_id: uuidFromInt(9_202) }]
     });
     expect(content.pos[0]!.form_groups).toHaveLength(1);
@@ -1091,12 +1091,12 @@ describe("V3 forms operations", () => {
     ).toEqual([
       {
         id: UUIDS.group,
-        is_regular: false,
+        is_regular: true,
         members: [{ id: uuidFromInt(9_103), form_id: uuidFromInt(9_101) }]
       },
       {
         id: UUIDS.group_2,
-        is_regular: false,
+        is_regular: true,
         members: [{ id: uuidFromInt(9_113), form_id: uuidFromInt(9_111) }]
       }
     ]);

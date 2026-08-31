@@ -398,10 +398,8 @@ describe("V3WordCreationLayout", () => {
     const summary = within(summaryRegion);
     expect(summary.getByText("centre", { exact: true })).toBeVisible();
     expect(summary.getByText("center", { exact: true })).toBeVisible();
-    expect(summary.getByText("英式英语 · BrE", { exact: true })).toBeVisible();
-    expect(
-      summary.getByText("美式英语 · AmE · 检测基准", { exact: true })
-    ).toBeVisible();
+    expect(summary.getByText("BrE", { exact: true })).toBeVisible();
+    expect(summary.getByText("AmE · 检测基准", { exact: true })).toBeVisible();
     expect(summary.queryByText("centre / center", { exact: true })).toBeNull();
     expect(summaryRegion.querySelector(".dialect-dot-common")).toBeNull();
 
@@ -414,7 +412,7 @@ describe("V3WordCreationLayout", () => {
       )
     );
     expect(rows[0]!.querySelector("strong")?.textContent).toBe("center");
-    expect(rows[0]).toHaveTextContent("美式英语 · AmE · 检测基准");
+    expect(rows[0]).toHaveTextContent("AmE · 检测基准");
     expect(rows[1]).toHaveTextContent("centre");
     expect(rows[1]).not.toHaveTextContent("检测基准");
   });

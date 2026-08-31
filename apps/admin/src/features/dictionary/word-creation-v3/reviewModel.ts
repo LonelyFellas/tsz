@@ -25,6 +25,30 @@ export interface V3ReviewModel {
   };
 }
 
+/**
+ * 原形的拼写身份：英美两侧规范化后拼在一起，common 视作两侧同值，
+ * 好让「同一个词的多套变化范式」共用的原形只数一次。两侧都空的原形还没有
+ * 身份，跟着后端 presentation 投影的口径一并跳过。
+ */
+function baseSpellingKey(
+  form: AdminWordV3["forms"]["pos"][number]["forms"][number]
+): string | undefined {
+  const spellings =
+    form.regional_variants.mode === "common"
+      ? [
+          form.regional_variants.common.spelling,
+          form.regional_variants.common.spelling
+        ]
+      : [
+          form.regional_variants.uk.spelling,
+          form.regional_variants.us.spelling
+        ];
+  const key = spellings
+    .map((spelling) => spelling.trim().toLowerCase())
+    .join("|");
+  return key === "|" ? undefined : key;
+}
+
 export function buildV3ReviewModel(word: AdminWordV3): V3ReviewModel {
   const forms = word.forms.pos.flatMap((pos) => pos.forms);
   const pronunciations = forms.flatMap((form) =>
@@ -62,7 +86,12 @@ export function buildV3ReviewModel(word: AdminWordV3): V3ReviewModel {
     state: { status, ...state },
     summary: {
       posCount: word.forms.pos.length,
-      baseCount: forms.filter((form) => form.form_type === "base").length,
+      baseCount: new Set(
+        forms
+          .filter((form) => form.form_type === "base")
+          .map(baseSpellingKey)
+          .filter((key) => key !== undefined)
+      ).size,
       formCount: forms.length,
       pronunciationCount: pronunciations.length,
       senseCount: senses.length,

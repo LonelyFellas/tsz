@@ -559,6 +559,23 @@ export function updatePronunciation(
   throw new Error(`pronunciation not found: ${pronunciationId}`);
 }
 
+/** 从模板原形取拼写：common 模板两侧同值，uk_us 模板按侧取；没有模板时留空。 */
+function baseSpellings(form: WordConcreteFormV3 | undefined): {
+  uk: string;
+  us: string;
+} {
+  if (!form) return { uk: "", us: "" };
+  return form.regional_variants.mode === "common"
+    ? {
+        uk: form.regional_variants.common.spelling,
+        us: form.regional_variants.common.spelling
+      }
+    : {
+        uk: form.regional_variants.uk.spelling,
+        us: form.regional_variants.us.spelling
+      };
+}
+
 export function addPartOfSpeech(
   content: DraftFormsStepContentV3,
   catalogItem: PartOfSpeechCatalogItem,
@@ -582,21 +599,7 @@ export function addPartOfSpeech(
   const commonDialect =
     dialectRules.spelling_mode === "unified" &&
     dialectRules.phonetic_mode === "unified";
-  const commonSpelling = template
-    ? template.regional_variants.mode === "common"
-      ? template.regional_variants.common.spelling
-      : template.regional_variants.uk.spelling
-    : "";
-  const ukSpelling = template
-    ? template.regional_variants.mode === "uk_us"
-      ? template.regional_variants.uk.spelling
-      : template.regional_variants.common.spelling
-    : "";
-  const usSpelling = template
-    ? template.regional_variants.mode === "uk_us"
-      ? template.regional_variants.us.spelling
-      : template.regional_variants.common.spelling
-    : "";
+  const templateSpelling = baseSpellings(template);
   const allocated = allNodeIds(content);
   const posId = nextUuid(idFactory, allocated);
   const groupId = nextUuid(idFactory, allocated);
@@ -622,7 +625,7 @@ export function addPartOfSpeech(
         common: {
           id: firstVariantId,
           dialect: "common" as const,
-          spelling: commonSpelling,
+          spelling: templateSpelling.uk,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         }
@@ -632,14 +635,14 @@ export function addPartOfSpeech(
         uk: {
           id: firstVariantId,
           dialect: "uk" as const,
-          spelling: ukSpelling,
+          spelling: templateSpelling.uk,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         },
         us: {
           id: secondVariantId!,
           dialect: "us" as const,
-          spelling: usSpelling,
+          spelling: templateSpelling.us,
           origin: "manual" as const,
           pronunciations: [pronunciation(secondPronunciationId!)]
         }
@@ -697,7 +700,7 @@ export function addFormGroup(
     .find((item) => item.pos_id === posId)!
     .form_groups.push({
       id: groupId,
-      is_regular: false,
+      is_regular: true,
       members: []
     });
   // 每组词形变化的初始形态一致：新组自带一个原形，拼写沿用本词性已有的原形。
@@ -705,19 +708,12 @@ export function addFormGroup(
   if (!added.ok) return added;
   const template = pos.forms.find((form) => form.form_type === "base");
   if (template) {
-    const spelling =
-      template.regional_variants.mode === "common"
-        ? {
-            uk: template.regional_variants.common.spelling,
-            us: template.regional_variants.common.spelling
-          }
-        : {
-            uk: template.regional_variants.uk.spelling,
-            us: template.regional_variants.us.spelling
-          };
-    const created = added.value.pos
-      .find((item) => item.pos_id === posId)!
-      .forms.at(-1)!;
+    const spelling = baseSpellings(template);
+    const createdPos = added.value.pos.find((item) => item.pos_id === posId)!;
+    const createdFormId = createdPos.form_groups.find(
+      (item) => item.id === groupId
+    )!.members[0]!.form_id;
+    const created = createdPos.forms.find((form) => form.id === createdFormId)!;
     if (created.regional_variants.mode === "common") {
       created.regional_variants.common.spelling = spelling.uk;
     } else {

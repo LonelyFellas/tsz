@@ -109,6 +109,8 @@ export function V3PosTab({
       );
     }
   };
+  const dialectScopeNote =
+    "英美设置按词性生效，在任一变化组内修改都会同步到本词性的全部变化组。";
   const dialectControl = (
     <div
       className="v3-pos-dialect-control"
@@ -324,7 +326,16 @@ export function V3PosTab({
               content={content}
               entryKind={entryKind}
               deleteDisabled={deletingGroupRemovesLastForm(group.id)}
-              dialectControl={dialectControl}
+              dialectControl={
+                visibleGroups.length > 1 ? (
+                  <>
+                    {dialectControl}
+                    <p className="v3-pos-dialect-note">{dialectScopeNote}</p>
+                  </>
+                ) : (
+                  dialectControl
+                )
+              }
               group={group}
               groupCount={visibleGroups.length}
               groupIndex={index}
