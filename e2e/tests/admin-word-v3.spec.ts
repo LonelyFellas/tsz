@@ -114,6 +114,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       "aria-selected",
       "true"
     );
+    await page.getByRole("button", { name: "去处理首项" }).click();
     const issueTarget = page
       .getByRole("tabpanel", { name: /动词/ })
       .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
@@ -122,7 +123,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(
       page
         .getByRole("alert")
-        .filter({ hasText: "词形与发音尚未完成" })
+        .filter({ hasText: "仍有内容需要完成" })
         .getByText("请完整填写发音方式、字典音标和实际发音")
     ).toBeVisible();
 
@@ -157,7 +158,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     await page.getByText("预览并生效", { exact: true }).click();
     await expect(page).toHaveURL(
-      new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/forms$`)
+      new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/preview$`)
     );
     await expect(page.getByRole("button", { name: "发布词条" })).toHaveCount(0);
 

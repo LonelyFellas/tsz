@@ -1737,6 +1737,18 @@ describe("V3WordCreationWizard", () => {
         pronunciation_id: pronunciation.id
       }
     };
+    const ambiguousIssue: V3DraftValidationIssue = {
+      ...issue,
+      node_location: {
+        node_role: issue.node_location.node_role,
+        ancestor_node_ids: issue.node_location.ancestor_node_ids,
+        pos_id: pos.pos_id,
+        form_id: sharedForm.id,
+        variant_id: variant.common.id,
+        dialect: "common",
+        pronunciation_id: pronunciation.id
+      }
+    };
     renderWizard(
       requests({
         validate: vi.fn(async () => ({
@@ -1759,6 +1771,12 @@ describe("V3WordCreationWizard", () => {
             />
             <button
               type="button"
+              onClick={() => void context.actions.navigateIssue(ambiguousIssue)}
+            >
+              定位无分组共享词形
+            </button>
+            <button
+              type="button"
               onClick={() => void context.actions.navigateIssue(issue)}
             >
               定位共享词形
@@ -1770,6 +1788,14 @@ describe("V3WordCreationWizard", () => {
 
     fireEvent.click(screen.getByLabelText("收起第 2 组词形变化"));
     expect(screen.getByLabelText("展开第 2 组词形变化")).toBeVisible();
+    const ambiguousButton = screen.getByText("定位无分组共享词形");
+    ambiguousButton.focus();
+    fireEvent.click(ambiguousButton);
+    await screen.findByLabelText("收起第 2 组词形变化");
+    const ambiguousMatches = screen.getAllByLabelText("第 1 条发音的实际发音");
+    expect(ambiguousMatches).toHaveLength(2);
+    expect(ambiguousButton).toHaveFocus();
+
     fireEvent.click(screen.getByText("定位共享词形"));
 
     await waitFor(() =>
@@ -1777,8 +1803,19 @@ describe("V3WordCreationWizard", () => {
     );
     const matches = screen.getAllByLabelText("第 1 条发音的实际发音");
     expect(matches).toHaveLength(2);
-    await waitFor(() => expect(matches[1]).toHaveFocus());
-    expect(matches[0]).not.toHaveFocus();
+    await waitFor(() =>
+      expect(document.activeElement).toHaveAttribute(
+        "data-v3-node-id",
+        pronunciation.id
+      )
+    );
+    expect(document.activeElement).toHaveAttribute(
+      "data-v3-field",
+      "actual_pron"
+    );
+    expect(
+      document.activeElement?.closest<HTMLElement>("[data-group-id]")
+    ).toHaveAttribute("data-group-id", UUIDS.group_2);
   });
 
   it("routes a meanings publication issue to its POS and backend text-variant locator", async () => {

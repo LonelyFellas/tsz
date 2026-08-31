@@ -189,12 +189,15 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
       !candidate.closest(
         '.ant-tabs-tabpane-hidden, .ant-collapse-content-hidden, [aria-hidden="true"], [inert]'
       );
-    const scopedElement = [...candidates].find(matchesVisibleTarget);
-    const element =
-      scopedElement ??
-      (scope
-        ? undefined
-        : nodes.find((candidate) => matchesVisibleTarget(candidate)));
+    const scopedElement = scope
+      ? [...candidates].find(matchesVisibleTarget)
+      : undefined;
+    const globalMatches = nodes.filter(matchesVisibleTarget);
+    const uniqueGlobalFallback =
+      globalMatches.length === 1 && collapsedToggles.size === 0
+        ? globalMatches[0]
+        : undefined;
+    const element = scopedElement ?? uniqueGlobalFallback;
     if (element) {
       element.scrollIntoView?.({ block: "center" });
       element.focus();
