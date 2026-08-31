@@ -163,6 +163,23 @@ describe("base form detection presentation", () => {
             entry_kind: "word",
             status: "published",
             content_scope: "current_publication",
+            pos_id: "pos-v3-verb",
+            group_ids: [],
+            form_id: "base-v3-verb",
+            variant_id: "variant-us-verb",
+            form_type: "base",
+            dialect: "us",
+            spelling: "center"
+          }
+        },
+        {
+          match_kind: "form_variant_v3",
+          match: {
+            source_schema_version: 3,
+            entry_id: "entry-v3",
+            entry_kind: "word",
+            status: "published",
+            content_scope: "current_publication",
             pos_id: "pos-v3",
             group_ids: [],
             form_id: "plural-v3",
@@ -219,7 +236,7 @@ describe("base form detection presentation", () => {
           }
         }
       ],
-      total: 5,
+      total: 6,
       matched_entry_contexts: [
         {
           entry_id: "entry-v3",
@@ -228,8 +245,8 @@ describe("base form detection presentation", () => {
             matched_surfaces: ["centre", "center"],
             strategy_version: "surface_summary_v1"
           },
-          pos_labels: ["noun"],
-          gloss_previews: ["中心"],
+          pos_labels: ["noun", "verb"],
+          gloss_previews: ["中心", "居中"],
           updated_at: "2026-08-26T00:00:00Z",
           inbound_relations: {
             total: 0,
@@ -255,15 +272,15 @@ describe("base form detection presentation", () => {
       )
     ).toEqual([
       {
-        key: "3:entry-v3:base-v3",
+        key: "3:entry-v3",
         schemaVersion: 3,
         entryId: "entry-v3",
         formId: "base-v3",
         status: "published",
         label: "centre / center",
         spellings: ["centre", "center"],
-        posLabels: ["noun"],
-        glossPreviews: ["中心"]
+        posLabels: ["noun", "verb"],
+        glossPreviews: ["中心", "居中"]
       },
       {
         key: "2:entry-v2:base-v2",
@@ -381,7 +398,7 @@ describe("base form detection presentation", () => {
     };
     expect(extractDetectedBaseForms(3, [v3Match], [])).toEqual([
       {
-        key: "3:entry-v3-without-context:base-v3-without-context",
+        key: "3:entry-v3-without-context",
         schemaVersion: 3,
         entryId: "entry-v3-without-context",
         formId: "base-v3-without-context",
@@ -420,7 +437,7 @@ describe("base form detection presentation", () => {
   it("用稳定 form id 解析 V3 首个原形的英美式", () => {
     expect(
       resolveDetectedBaseForm(v3Word(), {
-        key: "3:entry-v3:base-v3",
+        key: "3:entry-v3",
         schemaVersion: 3,
         entryId: "entry-v3",
         formId: "base-v3",
@@ -570,7 +587,7 @@ describe("base form detection presentation", () => {
     };
     expect(
       resolveDetectedBaseForm(v3Common, {
-        key: "3:entry-v3:base-v3",
+        key: "3:entry-v3",
         schemaVersion: 3,
         entryId: "entry-v3",
         formId: "base-v3",
