@@ -4372,7 +4372,8 @@ export function createAdminWordsMock({
     profile: MockAdminProfile,
     current: AdminWordsMockPersistedState,
     wordId: string,
-    input: { base_revision: number; base_lifecycle_revision: number }
+    input: { base_revision: number; base_lifecycle_revision: number },
+    batchMembers: readonly string[] = []
   ): void {
     const word = current.words[wordId];
     if (!word) throw new HttpError(404, "word not found", [], "word_not_found");
@@ -4411,7 +4412,11 @@ export function createAdminWordsMock({
       );
     }
     // 被别的词条引用则删不掉——与后端入站引用拦截同口径。
-    if (entryReferenceSources(current, wordId).size > 0) {
+    // 同批次成员之间的引用不算：它们都要删掉，谁先谁后不该改变结果
+    // （后端在 clear_intra_batch_references 里做同样的事）。
+    const sources = entryReferenceSources(current, wordId);
+    for (const member of batchMembers) sources.delete(member);
+    if (sources.size > 0) {
       throw new HttpError(
         409,
         "entry cannot be deleted",
@@ -4485,8 +4490,9 @@ export function createAdminWordsMock({
       return clone(existingOperation.response) as EntryDeleteBatchResponse;
     }
     // 原子：先把整批验完，任意一条不合格就整批不动；验完再统一删。
+    const members = input.entries.map((entry) => entry.id);
     for (const entry of input.entries) {
-      assertEntryDeletable(profile, current, entry.id, entry);
+      assertEntryDeletable(profile, current, entry.id, entry, members);
     }
     for (const entry of input.entries) {
       applyEntryDeletion(current, entry.id);

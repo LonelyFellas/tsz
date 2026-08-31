@@ -716,6 +716,42 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     }
   );
 
+  it("deleteBatch 的 affected 与请求条数不符时 fail closed", async () => {
+    // 原子批量本应全删；affected 对不上说明契约漂移，
+    // 静默接受会让 UI 谎报「已永久删除 N 个词条」。
+    const api = createAdminEndpoints(http);
+    http.post.mockResolvedValueOnce({ affected: 1 });
+    await expect(
+      api.words.deleteBatch("key", {
+        entries: [
+          {
+            id: LIFECYCLE_WORD_A,
+            base_revision: 1,
+            base_lifecycle_revision: 1
+          },
+          { id: LIFECYCLE_WORD_B, base_revision: 1, base_lifecycle_revision: 1 }
+        ]
+      })
+    ).rejects.toMatchObject({ code: "invalid_admin_word_response" });
+  });
+
+  it("deleteBatch 的 affected 等于请求条数时通过", async () => {
+    const api = createAdminEndpoints(http);
+    http.post.mockResolvedValueOnce({ affected: 2 });
+    await expect(
+      api.words.deleteBatch("key", {
+        entries: [
+          {
+            id: LIFECYCLE_WORD_A,
+            base_revision: 1,
+            base_lifecycle_revision: 1
+          },
+          { id: LIFECYCLE_WORD_B, base_revision: 1, base_lifecycle_revision: 1 }
+        ]
+      })
+    ).resolves.toEqual({ affected: 2 });
+  });
+
   it("deleteDraft → DELETE /lexicon/entries/{id}", () => {
     const api = createAdminEndpoints(http);
     api.words.deleteDraft("w-2", {

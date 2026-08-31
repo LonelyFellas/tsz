@@ -173,6 +173,25 @@ function requireWordPathIdentity<T extends { word: { id: string } }>(
   return response;
 }
 
+/**
+ * 批量永久删除是原子语义：要么全删、要么整批不动，因此 affected 必然等于请求条数。
+ * 不比对的话，后端若漂移成部分成功，UI 会照单全收地提示「已永久删除 N 个词条」，
+ * 让管理员以为其余几条也清理了。
+ */
+function requireDeleteBatchAffected<T extends { affected: number }>(
+  response: T,
+  requested: number
+): T {
+  if (response.affected !== requested) {
+    throw new InvalidAdminWordResponseError(
+      "affected",
+      response.affected < requested ? "below_minimum" : "above_maximum",
+      "number"
+    );
+  }
+  return response;
+}
+
 function requireLifecycleBatchIdentity<
   T extends { words: Array<{ id: string }>; affected: number }
 >(response: T, input: EntryLifecycleBatchInput, responsePath: string): T {
@@ -652,7 +671,10 @@ export function createAdminEndpoints(http: HttpClient) {
           .post<unknown>("/lexicon/entries/delete-batch", input, {
             headers: { "Idempotency-Key": idempotencyKey }
           })
-          .then(decodeEntryDeleteBatchResponse),
+          .then(decodeEntryDeleteBatchResponse)
+          .then((response) =>
+            requireDeleteBatchAffected(response, input.entries.length)
+          ),
       /** GET /admin/lexicon/entries/related-search — 关联词/上下文目标搜索。 */
       relatedSearch: (q: string, opts?: RelatedSearchQuery) =>
         http
