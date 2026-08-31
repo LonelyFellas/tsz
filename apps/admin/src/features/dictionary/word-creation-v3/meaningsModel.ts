@@ -15,6 +15,8 @@ import type {
 export interface RelationDisplaySnapshot {
   headword?: string;
   gloss?: string;
+  prebinding_state?: "waiting_first_sense" | "target_sense_deleted";
+  target_status?: "draft" | "published" | "archived";
 }
 
 export type RelationDisplaySnapshots = Readonly<
@@ -59,12 +61,24 @@ export function relationDisplaySnapshots(
   for (const pos of canonical.pos) {
     for (const sense of pos.senses) {
       for (const relation of sense.relations) {
-        if (!relation.target_headword && !relation.target_gloss) continue;
+        if (
+          !relation.target_headword &&
+          !relation.target_gloss &&
+          !relation.prebinding_state &&
+          !relation.target_status
+        )
+          continue;
         snapshots[relation.id] = {
           ...(relation.target_headword
             ? { headword: relation.target_headword }
             : {}),
-          ...(relation.target_gloss ? { gloss: relation.target_gloss } : {})
+          ...(relation.target_gloss ? { gloss: relation.target_gloss } : {}),
+          ...(relation.prebinding_state
+            ? { prebinding_state: relation.prebinding_state }
+            : {}),
+          ...(relation.target_status
+            ? { target_status: relation.target_status }
+            : {})
         };
       }
     }
@@ -196,11 +210,27 @@ export function toWritableMeanings(
           }))
         })),
         relations: sense.relations.map((relation) => {
-          const bound = Boolean(
-            relation.target_word_id && relation.target_sense_id
-          );
+          const hasTargetWord = Boolean(relation.target_word_id);
+          const hasTargetSense = Boolean(relation.target_sense_id);
+          const bound = hasTargetWord && hasTargetSense;
+          const prebound = Boolean(relation.prebound_target_word_id);
           const pendingHeadword = relation.pending_target_headword?.trim();
           const pendingGloss = relation.pending_target_gloss?.trim();
+          if (
+            hasTargetWord !== hasTargetSense ||
+            (bound &&
+              (prebound ||
+                Boolean(pendingHeadword) ||
+                Boolean(pendingGloss))) ||
+            (prebound &&
+              (!pendingHeadword || !relation.prebinding_state || bound)) ||
+            (!prebound && Boolean(relation.prebinding_state)) ||
+            (!bound && !prebound && !pendingHeadword) ||
+            (!bound && !prebound && Boolean(relation.target_status)) ||
+            (!pendingHeadword && Boolean(pendingGloss))
+          ) {
+            throw new Error(`invalid relation target shape: ${relation.id}`);
+          }
           return {
             id: relation.id,
             relation: relation.relation,
@@ -209,14 +239,24 @@ export function toWritableMeanings(
                   target_word_id: relation.target_word_id,
                   target_sense_id: relation.target_sense_id
                 }
-              : {
-                  ...(pendingHeadword
-                    ? { pending_target_headword: pendingHeadword }
-                    : {}),
-                  ...(pendingHeadword && pendingGloss
-                    ? { pending_target_gloss: pendingGloss }
-                    : {})
-                }),
+              : prebound
+                ? {
+                    prebound_target_word_id: relation.prebound_target_word_id,
+                    ...(pendingHeadword
+                      ? { pending_target_headword: pendingHeadword }
+                      : {}),
+                    ...(pendingHeadword && pendingGloss
+                      ? { pending_target_gloss: pendingGloss }
+                      : {})
+                  }
+                : {
+                    ...(pendingHeadword
+                      ? { pending_target_headword: pendingHeadword }
+                      : {}),
+                    ...(pendingHeadword && pendingGloss
+                      ? { pending_target_gloss: pendingGloss }
+                      : {})
+                  }),
             score: relation.score
           };
         })

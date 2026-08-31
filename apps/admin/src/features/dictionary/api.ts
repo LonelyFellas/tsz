@@ -27,8 +27,17 @@ export const wordKeys = {
   relatedSearchV2: (
     q: string,
     kind: "word" | "phrase" | undefined,
-    matchMode: "exact" | "contains"
-  ) => [...wordKeys.all, "related-search-v2", q, kind, matchMode] as const
+    matchMode: "exact" | "contains",
+    includeDrafts = false
+  ) =>
+    [
+      ...wordKeys.all,
+      "related-search-v2",
+      q,
+      kind,
+      matchMode,
+      includeDrafts
+    ] as const
 };
 
 export function useWordList(query: AdminWordListQuery) {
@@ -119,16 +128,21 @@ export function useRelatedSearchV2(
 export function useRelatedSearchAny(
   q: string,
   kind: "word" | "phrase" | undefined,
-  open: boolean
+  open: boolean,
+  includeDrafts = false
 ) {
   const normalizedQ = q.trim();
   const enabled = open && normalizedQ !== "";
   const exact = useInfiniteQuery({
-    queryKey: [...wordKeys.relatedSearchV2(normalizedQ, kind, "exact"), "any"],
+    queryKey: [
+      ...wordKeys.relatedSearchV2(normalizedQ, kind, "exact", includeDrafts),
+      "any"
+    ],
     queryFn: ({ pageParam }) =>
       adminWordsAnyDataSource.relatedSearchAny(normalizedQ, {
         kind,
         match_mode: "exact",
+        include_drafts: includeDrafts || undefined,
         page_size: 20,
         cursor: pageParam
       }),
@@ -139,7 +153,7 @@ export function useRelatedSearchAny(
   });
   const contains = useInfiniteQuery({
     queryKey: [
-      ...wordKeys.relatedSearchV2(normalizedQ, kind, "contains"),
+      ...wordKeys.relatedSearchV2(normalizedQ, kind, "contains", includeDrafts),
       "any"
     ],
     queryFn: ({ pageParam }) =>
@@ -147,6 +161,7 @@ export function useRelatedSearchAny(
         kind,
         match_mode: "contains",
         exclude_exact: true,
+        include_drafts: includeDrafts || undefined,
         page_size: 20,
         cursor: pageParam
       }),

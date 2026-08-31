@@ -457,10 +457,13 @@ export interface WordRelationV3 {
   relation: string;
   target_word_id?: string;
   target_sense_id?: string;
+  prebound_target_word_id?: string;
   pending_target_headword?: string;
   pending_target_gloss?: string;
   target_headword?: string;
   target_gloss?: string;
+  prebinding_state?: "waiting_first_sense" | "target_sense_deleted";
+  target_status?: "draft" | "published" | "archived";
   score: string;
 }
 
@@ -504,6 +507,7 @@ export interface WordRelationWritableV3 {
   relation: string;
   target_word_id?: string;
   target_sense_id?: string;
+  prebound_target_word_id?: string;
   pending_target_headword?: string;
   pending_target_gloss?: string;
   score: string;
@@ -560,6 +564,8 @@ export interface AdminWordV3Capabilities {
   sentence_associations?: boolean;
   /** Absent only when talking to a pre-capability backend. */
   sentence_target_discovery?: boolean;
+  /** Absent only when talking to a pre-capability backend. */
+  draft_relation_prebinding?: boolean;
 }
 
 export type LegacyHeadwordsCompatibilityV3 =
@@ -763,6 +769,10 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "relation_pending_gloss_invalid",
   "relation_pending_gloss_conflict",
   "relation_pending_gloss_target_exists",
+  "relation_prebound_target_not_found",
+  "relation_prebound_target_archived",
+  "relation_prebound_target_has_no_sense",
+  "relation_target_sense_deleted",
   "node_id_reused",
   "node_binding_unknown",
   "node_binding_changed",
@@ -995,6 +1005,7 @@ export interface RelatedWordResultV3 {
   schema_version: 3;
   entry_id: string;
   kind: WordEntryKindV3;
+  status?: "draft" | "published";
   presentation: EntryPresentationV3;
   matches: RelatedWordMatchV3[];
   senses: RelatedWordSenseV3[];

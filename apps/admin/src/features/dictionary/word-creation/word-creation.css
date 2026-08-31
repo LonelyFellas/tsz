@@ -1986,6 +1986,21 @@
   min-width: 0;
 }
 
+.word-relation-sense-cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.word-relation-sense-cell > .ant-tag {
+  align-self: flex-start;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .word-relation-row .ant-input,
 .word-relation-row .ant-input-number-input {
   font-weight: 600;

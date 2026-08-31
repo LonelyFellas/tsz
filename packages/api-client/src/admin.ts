@@ -656,6 +656,10 @@ export function createAdminEndpoints(http: HttpClient) {
                 opts?.exclude_exact === undefined
                   ? undefined
                   : String(opts.exclude_exact),
+              include_drafts:
+                opts?.include_drafts === undefined
+                  ? undefined
+                  : String(opts.include_drafts),
               page_size: opts?.page_size,
               limit: opts?.limit,
               cursor: opts?.cursor
@@ -675,6 +679,10 @@ export function createAdminEndpoints(http: HttpClient) {
                 opts?.exclude_exact === undefined
                   ? undefined
                   : String(opts.exclude_exact),
+              include_drafts:
+                opts?.include_drafts === undefined
+                  ? undefined
+                  : String(opts.include_drafts),
               page_size: opts?.page_size,
               limit: opts?.limit,
               cursor: opts?.cursor

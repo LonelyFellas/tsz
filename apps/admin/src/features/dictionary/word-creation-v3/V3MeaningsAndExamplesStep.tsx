@@ -104,6 +104,7 @@ export interface V3MeaningsAndExamplesStepProps {
     association: SentenceAssociationInputV3
   ) => void;
   sentenceTargetDiscoveryEnabled?: boolean;
+  draftRelationPrebindingEnabled?: boolean;
 }
 
 function fieldIssue(
@@ -1045,6 +1046,7 @@ const RELATION_META: Record<RelationType, { metric: string }> = {
 interface RelatedWordChoice {
   word_id: string;
   headword: string;
+  status: "draft" | "published";
   senses: Array<{ sense_id: string; gloss: string }>;
 }
 
@@ -1064,12 +1066,33 @@ function relatedWordChoices(
               result.schema_version === 3
                 ? result.presentation.label
                 : result.headword,
+            status:
+              result.schema_version === 3
+                ? (result.status ?? "published")
+                : "published",
             senses: result.senses
           }
         ] as const;
       })
     ).values()
   );
+}
+
+function relationPrebindingLabel(
+  relation: WordRelationWritableV3,
+  snapshot: RelationDisplaySnapshots[string] | undefined
+): string | undefined {
+  if (!relation.prebound_target_word_id) return undefined;
+  const state = snapshot?.prebinding_state ?? "waiting_first_sense";
+  const status = snapshot?.target_status ?? "draft";
+  if (status === "archived") {
+    return state === "target_sense_deleted"
+      ? "已归档 · 原词义已删除"
+      : "已归档 · 等待第一词义";
+  }
+  return state === "target_sense_deleted"
+    ? "原词义已删除 · 重新选择"
+    : "草稿 · 等待第一词义";
 }
 
 function newRelation(
@@ -1095,7 +1118,8 @@ function RelationsGrid({
   senseIndex,
   change,
   idFactory,
-  relationDisplaySnapshots
+  relationDisplaySnapshots,
+  includeDraftTargets
 }: {
   sense: WordSenseWritableV3;
   posIndex: number;
@@ -1103,6 +1127,7 @@ function RelationsGrid({
   change: (mutation: DraftMutation) => void;
   idFactory: () => string;
   relationDisplaySnapshots?: RelationDisplaySnapshots;
+  includeDraftTargets: boolean;
 }) {
   const [collapsed, setCollapsed] = useState<Record<RelationType, boolean>>({
     synonym: false,
@@ -1120,7 +1145,8 @@ function RelationsGrid({
   const relatedSearch = useRelatedSearchAny(
     preparedSearch.normalized,
     preparedSearch.kind,
-    Boolean(searching?.query.trim()) && !preparedSearch.issue
+    Boolean(searching?.query.trim()) && !preparedSearch.issue,
+    includeDraftTargets
   );
   const searchWords = relatedWordChoices(
     [
@@ -1278,6 +1304,7 @@ function RelationsGrid({
                             ]!;
                           delete target.target_word_id;
                           delete target.target_sense_id;
+                          delete target.prebound_target_word_id;
                           if (!prepared.issue && prepared.normalized)
                             target.pending_target_headword =
                               prepared.normalized;
@@ -1302,16 +1329,47 @@ function RelationsGrid({
                             draft.pos[posIndex]!.senses[senseIndex]!.relations[
                               relationIndex
                             ]!;
-                          target.target_word_id = word.word_id;
-                          delete target.target_sense_id;
-                          delete target.pending_target_headword;
-                          delete target.pending_target_gloss;
+                          if (
+                            word.status === "draft" &&
+                            word.senses.length === 0
+                          ) {
+                            target.prebound_target_word_id = word.word_id;
+                            target.pending_target_headword = word.headword;
+                            delete target.target_word_id;
+                            delete target.target_sense_id;
+                          } else {
+                            target.target_word_id = word.word_id;
+                            delete target.target_sense_id;
+                            delete target.prebound_target_word_id;
+                            delete target.pending_target_headword;
+                            delete target.pending_target_gloss;
+                          }
                         });
                       }}
                       options={
                         searching?.relationId === relation.id
                           ? searchWords.map((word) => ({
-                              label: word.headword,
+                              label: (
+                                <Flex align="center" gap={6}>
+                                  <span>{word.headword}</span>
+                                  <Tag
+                                    color={
+                                      word.status === "draft"
+                                        ? "orange"
+                                        : "blue"
+                                    }
+                                  >
+                                    {word.status === "draft"
+                                      ? "草稿"
+                                      : "已发布"}
+                                  </Tag>
+                                  {word.senses.length === 0 ? (
+                                    <Typography.Text type="secondary">
+                                      暂无词义
+                                    </Typography.Text>
+                                  ) : null}
+                                </Flex>
+                              ),
                               value: word.word_id
                             }))
                           : []
@@ -1369,26 +1427,47 @@ function RelationsGrid({
                     Boolean(relation.pending_target_headword?.trim()) &&
                     !validateEntryInput(relation.pending_target_headword ?? "")
                       .issue ? (
-                      <Input
-                        aria-label={`${relationLabel(relationType)}预定义词义`}
-                        className="word-relation-sense"
-                        data-v3-field="pending_target_gloss"
-                        data-v3-node-id={relation.id}
-                        maxLength={5000}
-                        onChange={(event) =>
-                          change((draft) => {
-                            const target =
-                              draft.pos[posIndex]!.senses[senseIndex]!
-                                .relations[relationIndex]!;
-                            if (event.target.value)
-                              target.pending_target_gloss = event.target.value;
-                            else delete target.pending_target_gloss;
-                          })
-                        }
-                        placeholder="预定义词义（可选）"
-                        size="small"
-                        value={relation.pending_target_gloss ?? ""}
-                      />
+                      <div className="word-relation-sense-cell">
+                        {relationPrebindingLabel(
+                          relation,
+                          relationDisplaySnapshots?.[relation.id]
+                        ) ? (
+                          <Tag
+                            color={
+                              relationDisplaySnapshots?.[relation.id]
+                                ?.target_status === "archived"
+                                ? "default"
+                                : "orange"
+                            }
+                          >
+                            {relationPrebindingLabel(
+                              relation,
+                              relationDisplaySnapshots?.[relation.id]
+                            )}
+                          </Tag>
+                        ) : null}
+                        <Input
+                          aria-label={`${relationLabel(relationType)}预定义词义`}
+                          className="word-relation-sense"
+                          data-v3-field="pending_target_gloss"
+                          data-v3-node-id={relation.id}
+                          maxLength={5000}
+                          onChange={(event) =>
+                            change((draft) => {
+                              const target =
+                                draft.pos[posIndex]!.senses[senseIndex]!
+                                  .relations[relationIndex]!;
+                              if (event.target.value)
+                                target.pending_target_gloss =
+                                  event.target.value;
+                              else delete target.pending_target_gloss;
+                            })
+                          }
+                          placeholder="预定义词义（可选）"
+                          size="small"
+                          value={relation.pending_target_gloss ?? ""}
+                        />
+                      </div>
                     ) : (
                       <Select
                         aria-label={`${relationLabel(relationType)}目标词义`}
@@ -1446,6 +1525,7 @@ function RelationsGrid({
                 {relations.some(
                   ({ relation }) =>
                     !relation.target_word_id &&
+                    !relation.prebound_target_word_id &&
                     Boolean(relation.pending_target_headword?.trim()) &&
                     !validateEntryInput(relation.pending_target_headword ?? "")
                       .issue
@@ -1506,7 +1586,8 @@ export function V3MeaningsAndExamplesStep({
   sentenceAssociations = {},
   onSaveMultidimensionalSentence,
   onCreatePendingSentenceTarget,
-  sentenceTargetDiscoveryEnabled = true
+  sentenceTargetDiscoveryEnabled = true,
+  draftRelationPrebindingEnabled = false
 }: V3MeaningsAndExamplesStepProps) {
   const { modal } = App.useApp();
   const [contextSearch, setContextSearch] = useState<{
@@ -2914,6 +2995,9 @@ export function V3MeaningsAndExamplesStep({
                                     senseIndex={senseIndex}
                                     relationDisplaySnapshots={
                                       relationDisplaySnapshots
+                                    }
+                                    includeDraftTargets={
+                                      draftRelationPrebindingEnabled
                                     }
                                   />
                                 </SenseSectionBody>

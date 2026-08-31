@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/61f0/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-30T14:49:09.735Z",
+  "_source": "/Users/darwish/.codex/worktrees/draft-relation-prebinding-clean/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-31T03:26:02.779Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -169,6 +169,12 @@
       },
       {
         "name": "exclude_exact",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "boolean" }
+      },
+      {
+        "name": "include_drafts",
         "in": "query",
         "required": false,
         "schema": { "type": "boolean" }
@@ -674,6 +680,7 @@
         "sub_part_of_speech_conflict",
         "revision_conflict",
         "reference_conflict",
+        "relation_prebinding_fanout_exceeded",
         "stable_node_id_changed",
         "form_reference_conflict",
         "detection_mismatch",
@@ -694,6 +701,7 @@
         "downstream_confirmation_required",
         "entry_archived",
         "entry_not_deletable",
+        "entry_has_inbound_prebound_relations",
         "entry_has_inbound_publication_refs",
         "entry_has_unavailable_publication_refs",
         "word_not_found",
@@ -1979,6 +1987,10 @@
         "relation_pending_gloss_invalid",
         "relation_pending_gloss_conflict",
         "relation_pending_gloss_target_exists",
+        "relation_prebound_target_not_found",
+        "relation_prebound_target_archived",
+        "relation_prebound_target_has_no_sense",
+        "relation_target_sense_deleted",
         "node_id_reused",
         "node_binding_unknown",
         "node_binding_changed",
@@ -4284,19 +4296,57 @@
       }
     },
     "WordRelationWritableV3": {
-      "type": "object",
-      "description": "Strict writable relation shape. Resolved target presentation is a\nserver-owned response projection and is intentionally absent here.",
-      "required": ["id", "relation", "score"],
-      "properties": {
-        "id": { "type": "string", "format": "uuid" },
-        "pending_target_gloss": { "type": "string", "maxLength": 5000 },
-        "pending_target_headword": { "type": "string" },
-        "relation": { "type": "string" },
-        "score": { "type": "string" },
-        "target_sense_id": { "type": "string", "format": "uuid" },
-        "target_word_id": { "type": "string", "format": "uuid" }
-      },
-      "additionalProperties": false
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "relation",
+            "score",
+            "target_word_id",
+            "target_sense_id"
+          ],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "relation": { "type": "string" },
+            "score": { "type": "string" },
+            "target_sense_id": { "type": "string", "format": "uuid" },
+            "target_word_id": { "type": "string", "format": "uuid" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["id", "relation", "score", "pending_target_headword"],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
+            "pending_target_headword": { "type": "string" },
+            "relation": { "type": "string" },
+            "score": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "relation",
+            "score",
+            "prebound_target_word_id",
+            "pending_target_headword"
+          ],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
+            "pending_target_headword": { "type": "string" },
+            "prebound_target_word_id": { "type": "string", "format": "uuid" },
+            "relation": { "type": "string" },
+            "score": { "type": "string" }
+          },
+          "additionalProperties": false
+        }
+      ]
     },
     "WordSenseV2": {
       "type": "object",

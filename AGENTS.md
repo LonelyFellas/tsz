@@ -58,9 +58,10 @@ PENDING 白名单）；本仓库只管前端与部署编排。
   （conventional commits），pre-push = typecheck + test:cov。e2e 由 CI 兜底。
 - **绝不绕过钩子**（`LEFTHOOK=0`、`--no-verify` 一律禁止）。push 报
   `failed to push some refs` 时默认是 hook 挂了，不是网络——读输出、修根因、重推。
-- 覆盖率门槛（根 `vitest.config.ts`）：`packages/**` 100%；`apps/*/src` 业务逻辑层
-  （features/lib/stores）90%。纯装配/mock/静态展示文件按约定加 coverage exclude
+- 覆盖率门槛（根 `vitest.config.ts`）：`packages/**` 维持 100%；web/admin 应用层生成完整覆盖率报告，
+  但不设固定百分比门槛。纯装配/mock/静态展示文件按约定加 coverage exclude
   并附 TODO 注释说明补测条件；有逻辑分支的必须补测，不许 exclude。
+- 测试以可观察风险、回归价值和关键契约为中心；覆盖率用于发现盲区，不为提高数字堆叠低价值测试。
 - 默认分支 `main`，一律走 PR；绝不直接提交/推送 main。
 
 ## API 文档

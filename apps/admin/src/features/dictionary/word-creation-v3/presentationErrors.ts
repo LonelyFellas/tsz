@@ -61,6 +61,11 @@ const ISSUE_MESSAGES = {
   relation_pending_gloss_invalid: "预定义词义不能超过 5000 个字符",
   relation_pending_gloss_conflict: "同一待建关联词不能填写不同的预定义词义",
   relation_pending_gloss_target_exists: "同名词条已存在，请选择已有词义",
+  relation_prebound_target_not_found: "已选择的关联词草稿不存在，请重新搜索",
+  relation_prebound_target_archived: "关联词目标已归档，请先恢复或重新选择",
+  relation_prebound_target_has_no_sense:
+    "关联词目标还没有词义，请先补充第一词义",
+  relation_target_sense_deleted: "原关联词义已删除，请显式重选词义或删除关联",
   node_id_reused: "内容标识已被使用，请刷新后重试",
   node_binding_unknown: "内容来源无法确认，请刷新后重试",
   node_binding_changed: "内容结构已变化，请刷新后重试",
