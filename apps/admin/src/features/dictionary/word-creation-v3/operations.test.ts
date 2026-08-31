@@ -13,7 +13,6 @@ import {
   deleteFormGroup,
   deleteGroupAndOrphanForms,
   deletePartOfSpeech,
-  moveMembership,
   normalizePosDialectRules,
   removeMembership,
   reorderFormGroups,
@@ -692,7 +691,7 @@ describe("V3 forms operations", () => {
     );
   });
 
-  it("U05/U08 移组只替换 membership 身份，重排只改变 wire 数组顺序", () => {
+  it("U08 重排只改变 wire 数组顺序", () => {
     const first = commonFormFixture();
     const second = commonFormFixture({
       id: UUIDS.form_2,
@@ -715,30 +714,17 @@ describe("V3 forms operations", () => {
         { id: UUIDS.group_2, is_regular: false, members: [] }
       ]
     });
-    const moved = moveMembership(
-      content,
-      UUIDS.membership,
-      UUIDS.group_2,
-      0,
-      uuidSequence(UUIDS.membership_3)
-    );
-    expect(moved.ok).toBe(true);
-    if (!moved.ok) return;
-    expect(moved.value.pos[0]!.forms.map((form) => form.id)).toEqual([
-      first.id,
-      second.id
-    ]);
-    expect(moved.value.pos[0]!.form_groups[1]!.members).toEqual([
-      { id: UUIDS.membership_3, form_id: first.id }
-    ]);
-
-    const reorderedForms = reorderForms(moved.value, UUIDS.pos, [
+    const reorderedForms = reorderForms(content, UUIDS.pos, [
       second.id,
       first.id
     ]);
     const reorderedMembers = reorderMemberships(reorderedForms, UUIDS.group, [
-      UUIDS.membership_2
+      UUIDS.membership_2,
+      UUIDS.membership
     ]);
+    expect(
+      reorderedMembers.pos[0]!.form_groups[0]!.members.map((item) => item.id)
+    ).toEqual([UUIDS.membership_2, UUIDS.membership]);
     const reorderedPronunciations = reorderPronunciations(
       reorderedMembers,
       second.regional_variants.common.id,
@@ -1003,6 +989,67 @@ describe("V3 forms operations", () => {
     });
   });
 
+  it("新增变化组自带原形并沿用本词性已有原形的拼写", () => {
+    const content = formsFixture({ forms: [ukUsFormFixture()] });
+    const added = addFormGroup(
+      content,
+      UUIDS.pos,
+      uuidSequence(
+        uuidFromInt(9_201),
+        uuidFromInt(9_202),
+        uuidFromInt(9_203),
+        uuidFromInt(9_204),
+        uuidFromInt(9_205),
+        uuidFromInt(9_206),
+        uuidFromInt(9_207)
+      )
+    );
+    expect(added.ok).toBe(true);
+    if (!added.ok) return;
+    const [, created] = added.value.pos[0]!.forms;
+    expect(created).toEqual({
+      id: uuidFromInt(9_202),
+      form_type: "base",
+      regional_variants: {
+        mode: "uk_us",
+        uk: {
+          id: uuidFromInt(9_203),
+          dialect: "uk",
+          spelling: "centre",
+          origin: "manual",
+          pronunciations: [
+            {
+              id: uuidFromInt(9_206),
+              dict_phonetic: "",
+              actual_pron: "",
+              style: "normal"
+            }
+          ]
+        },
+        us: {
+          id: uuidFromInt(9_204),
+          dialect: "us",
+          spelling: "center",
+          origin: "manual",
+          pronunciations: [
+            {
+              id: uuidFromInt(9_207),
+              dict_phonetic: "",
+              actual_pron: "",
+              style: "normal"
+            }
+          ]
+        }
+      }
+    });
+    expect(added.value.pos[0]!.form_groups[1]).toEqual({
+      id: uuidFromInt(9_201),
+      is_regular: false,
+      members: [{ id: uuidFromInt(9_205), form_id: uuidFromInt(9_202) }]
+    });
+    expect(content.pos[0]!.form_groups).toHaveLength(1);
+  });
+
   it("P1-3 普通删除组若会产生 orphan form 则结构化拒绝且不修改输入", () => {
     const only = formsFixture();
     expect(
@@ -1012,14 +1059,26 @@ describe("V3 forms operations", () => {
     const firstGroup = addFormGroup(
       formsFixture({ forms: [], groups: [] }),
       UUIDS.pos,
-      uuidSequence(UUIDS.group)
+      uuidSequence(
+        UUIDS.group,
+        uuidFromInt(9_101),
+        uuidFromInt(9_102),
+        uuidFromInt(9_103),
+        uuidFromInt(9_104)
+      )
     );
     expect(firstGroup.ok).toBe(true);
     if (!firstGroup.ok) return;
     const secondGroup = addFormGroup(
       firstGroup.value,
       UUIDS.pos,
-      uuidSequence(UUIDS.group_2)
+      uuidSequence(
+        UUIDS.group_2,
+        uuidFromInt(9_111),
+        uuidFromInt(9_112),
+        uuidFromInt(9_113),
+        uuidFromInt(9_114)
+      )
     );
     expect(secondGroup.ok).toBe(true);
     if (!secondGroup.ok) return;
@@ -1030,8 +1089,16 @@ describe("V3 forms operations", () => {
         members: item.members
       }))
     ).toEqual([
-      { id: UUIDS.group, is_regular: false, members: [] },
-      { id: UUIDS.group_2, is_regular: false, members: [] }
+      {
+        id: UUIDS.group,
+        is_regular: false,
+        members: [{ id: uuidFromInt(9_103), form_id: uuidFromInt(9_101) }]
+      },
+      {
+        id: UUIDS.group_2,
+        is_regular: false,
+        members: [{ id: uuidFromInt(9_113), form_id: uuidFromInt(9_111) }]
+      }
     ]);
     const reordered = reorderFormGroups(secondGroup.value, UUIDS.pos, [
       UUIDS.group_2,
@@ -1144,16 +1211,12 @@ describe("V3 forms operations", () => {
   });
 
   it("P1-1 新增 concrete form 同事务创建 common variant/membership，重复 type 合法", () => {
-    const content = formsFixture({ forms: [], groups: [] });
-    const withGroup = addFormGroup(
-      content,
-      UUIDS.pos,
-      uuidSequence(UUIDS.group)
-    );
-    expect(withGroup.ok).toBe(true);
-    if (!withGroup.ok) return;
+    const content = formsFixture({
+      forms: [],
+      groups: [{ id: UUIDS.group, is_regular: false, members: [] }]
+    });
     const first = addConcreteForm(
-      withGroup.value,
+      content,
       UUIDS.pos,
       UUIDS.group,
       "base",
@@ -1552,12 +1615,6 @@ describe("V3 forms operations", () => {
       ok: false,
       reason: "form_not_found"
     });
-    expect(
-      moveMembership(content, "missing-membership", UUIDS.group, 0)
-    ).toEqual({ ok: false, reason: "membership_not_found" });
-    expect(
-      moveMembership(content, UUIDS.membership, "missing-group", 0)
-    ).toEqual({ ok: false, reason: "group_not_found" });
     expect(content).toEqual(original);
   });
 });

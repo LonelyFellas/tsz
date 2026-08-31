@@ -329,7 +329,7 @@ describe("V3FormsAndPronunciationStep", () => {
       firstMatrix.querySelector(".word-form-matrix-distinguish")
     ).toBeNull();
     expect(
-      firstMatrix.querySelectorAll(".word-form-type-cell > .ant-select")
+      firstMatrix.querySelectorAll(".word-form-type-cell .ant-select")
     ).toHaveLength(3);
     expect(
       screen.getByLabelText("变化组 1 词形 1 类型").closest(".ant-select")
@@ -693,7 +693,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText("变化组 1 新增词形类型")).toBeNull();
   });
 
-  it("产品图首组显示三行规则，后续组不重复词性级英美规则", async () => {
+  it("每组都显示三行规则，词性级英美规则在各组同步回显", async () => {
     const form = commonFormFixture({ spelling: "center" });
     const content = formsFixture({
       forms: [form],
@@ -723,8 +723,16 @@ describe("V3FormsAndPronunciationStep", () => {
       first.getByLabelText("英美音标无区别").closest(".ant-radio-wrapper")
     ).toHaveClass("ant-radio-wrapper-checked");
     expect(second.getByText("词形是否规则变化？")).toBeVisible();
-    expect(second.queryByText("英美拼写是否有区别？")).toBeNull();
-    expect(second.queryByText("英美音标是否有区别？")).toBeNull();
+    expect(second.getByText("英美拼写是否有区别？")).toBeVisible();
+    expect(second.getByText("英美音标是否有区别？")).toBeVisible();
+    // 英美规则是词性级设置：任一组里的选择对所有组同步生效。
+    expect(
+      second.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
+    ).toHaveClass("ant-radio-wrapper-checked");
+    fireEvent.click(second.getByLabelText("英美拼写有区别"));
+    expect(
+      first.getByLabelText("英美拼写有区别").closest(".ant-radio-wrapper")
+    ).toHaveClass("ant-radio-wrapper-checked");
   });
 
   it("UD 规则独立回显拼写不区分、音标区分", async () => {
@@ -2426,8 +2434,8 @@ describe("V3FormsAndPronunciationStep", () => {
     );
   });
 
-  it("P1-1 从空 skeleton 经 catalog UI 构建多 POS/组/重复 base 与移动 membership", async () => {
-    const ids = Array.from({ length: 20 }, (_, index) =>
+  it("P1-1 从空 skeleton 经 catalog UI 构建多 POS/组/重复 base", async () => {
+    const ids = Array.from({ length: 24 }, (_, index) =>
       uuidFromInt(1_000 + index)
     );
     render(<Harness initial={{ pos: [] }} idFactory={uuidSequence(...ids)} />);
@@ -2459,25 +2467,27 @@ describe("V3FormsAndPronunciationStep", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "新增名词变化组" }));
     const secondGroupId = ids[10]!;
+    const secondGroupFormId = ids[11]!;
     expect(screen.queryByText("复用已有词形")).toBeNull();
 
-    chooseOption("移动词形 2 到其他变化组", "变化组 2");
+    // 新增的组自带原形，已有词形留在原组。
     const noun = canonicalValue().pos[0]!;
-    expect(noun.forms).toHaveLength(2);
+    expect(noun.forms).toHaveLength(3);
     expect(noun.form_groups[0]!.members.map((item) => item.form_id)).toEqual([
-      firstFormId
+      firstFormId,
+      secondFormId
     ]);
     expect(noun.form_groups[1]!.members.map((item) => item.form_id)).toEqual([
-      secondFormId
+      secondGroupFormId
     ]);
     expect(noun.form_groups[0]!.members[0]!.id).toBe(firstMembershipId);
 
     const firstGroupCard = document.querySelector<HTMLElement>(
       `[data-group-id="${firstGroupId}"]`
     )!;
-    const firstInput = within(firstGroupCard).getByLabelText("原形通用拼写");
+    const firstInput = within(firstGroupCard).getByLabelText("原形 1通用拼写");
     fireEvent.change(firstInput, { target: { value: "orbit" } });
-    expect(within(firstGroupCard).getByLabelText("原形通用拼写")).toHaveValue(
+    expect(within(firstGroupCard).getByLabelText("原形 1通用拼写")).toHaveValue(
       "orbit"
     );
 
@@ -2493,11 +2503,11 @@ describe("V3FormsAndPronunciationStep", () => {
     ]);
     const verb = canonicalValue().pos[1]!;
     expect(verb).toMatchObject({
-      pos_id: ids[12],
+      pos_id: ids[15],
       pos: "verb",
       forms: [
         {
-          id: ids[14],
+          id: ids[17],
           form_type: "base",
           regional_variants: {
             mode: "common",
@@ -2507,8 +2517,8 @@ describe("V3FormsAndPronunciationStep", () => {
       ],
       form_groups: [
         {
-          id: ids[13],
-          members: [{ id: ids[16], form_id: ids[14] }]
+          id: ids[16],
+          members: [{ id: ids[19], form_id: ids[17] }]
         }
       ]
     });
@@ -2516,6 +2526,11 @@ describe("V3FormsAndPronunciationStep", () => {
 
   it("#110-111 就地修改词形类型并保留 V3 节点身份与共享关系", async () => {
     const initial = multiPosFixture();
+    // 共享原形在两个组里都不是唯一原形时才允许改型（每组至少保留一个原形）。
+    initial.pos[0]!.form_groups[1]!.members.push({
+      id: uuidFromInt(25),
+      form_id: initial.pos[0]!.forms[1]!.id
+    });
     const original = structuredClone(initial.pos[0]!.forms[0]!);
     const originalGroups = structuredClone(initial.pos[0]!.form_groups);
     render(<Harness initial={initial} />);
@@ -2539,6 +2554,64 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(canonicalValue().pos[0]!.form_groups).toEqual(originalGroups);
     expect(screen.getAllByLabelText("变化组 1 词形 1 类型")).toHaveLength(1);
     expect(screen.getByLabelText("变化组 2 词形 1 类型")).toHaveValue("");
+  });
+
+  it("组内只剩一个原形时锁死类型，复制出第二个原形后才放开", async () => {
+    const base = commonFormFixture({
+      id: uuidFromInt(1_200),
+      variant_id: uuidFromInt(1_201),
+      spelling: "center"
+    });
+    render(
+      <Harness
+        initial={formsFixture({ forms: [base] })}
+        idFactory={uuidSequence(
+          uuidFromInt(1_210),
+          uuidFromInt(1_211),
+          uuidFromInt(1_212),
+          uuidFromInt(1_213)
+        )}
+      />
+    );
+
+    const locked = await screen.findByLabelText("变化组 1 词形 1 类型");
+    expect(locked).toBeDisabled();
+    expect(locked.closest(".word-form-type-select")).toHaveAttribute(
+      "title",
+      "每组词形变化至少保留一个原形"
+    );
+
+    fireEvent.click(screen.getByLabelText("在原形 1 下方添加同类型词形"));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled()
+    );
+    expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled();
+
+    chooseOption("变化组 1 词形 2 类型", "复数");
+
+    await waitFor(() =>
+      expect(
+        canonicalValue().pos[0]!.forms.map((form) => form.form_type)
+      ).toEqual(["base", "plural"])
+    );
+    const relocked = screen.getByLabelText("变化组 1 词形 1 类型");
+    expect(relocked).toBeDisabled();
+    expect(relocked.closest(".word-form-type-select")).toHaveAttribute(
+      "title",
+      "每组词形变化至少保留一个原形"
+    );
+  });
+
+  it("跨组共享的原形按最严的组锁定类型", async () => {
+    render(<Harness initial={multiPosFixture()} />);
+
+    // 共享原形在第 1 组还有同伴，但在第 2 组是唯一原形，两处都锁。
+    await waitFor(() =>
+      expect(screen.getAllByLabelText("变化组 1 词形 1 类型")[0]).toBeDisabled()
+    );
+    expect(screen.getByLabelText("变化组 2 词形 1 类型")).toBeDisabled();
+    expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled();
   });
 
   it("#111 历史词形类型不在当前目录时仍产品化回显且不扩散候选", async () => {

@@ -687,7 +687,8 @@ export function addFormGroup(
   posId: string,
   idFactory: V3IdFactory = defaultIdFactory
 ): OperationResult<DraftFormsStepContentV3> {
-  if (!content.pos.some((item) => item.pos_id === posId)) {
+  const pos = content.pos.find((item) => item.pos_id === posId);
+  if (!pos) {
     return { ok: false, reason: "pos_not_found" };
   }
   const groupId = nextUuid(idFactory, allNodeIds(content));
@@ -699,7 +700,32 @@ export function addFormGroup(
       is_regular: false,
       members: []
     });
-  return { ok: true, value: next };
+  // 每组词形变化的初始形态一致：新组自带一个原形，拼写沿用本词性已有的原形。
+  const added = addConcreteForm(next, posId, groupId, "base", idFactory);
+  if (!added.ok) return added;
+  const template = pos.forms.find((form) => form.form_type === "base");
+  if (template) {
+    const spelling =
+      template.regional_variants.mode === "common"
+        ? {
+            uk: template.regional_variants.common.spelling,
+            us: template.regional_variants.common.spelling
+          }
+        : {
+            uk: template.regional_variants.uk.spelling,
+            us: template.regional_variants.us.spelling
+          };
+    const created = added.value.pos
+      .find((item) => item.pos_id === posId)!
+      .forms.at(-1)!;
+    if (created.regional_variants.mode === "common") {
+      created.regional_variants.common.spelling = spelling.uk;
+    } else {
+      created.regional_variants.uk.spelling = spelling.uk;
+      created.regional_variants.us.spelling = spelling.us;
+    }
+  }
+  return added;
 }
 
 export function deleteFormGroup(
@@ -993,61 +1019,6 @@ export function deleteConcreteForm(
       );
     }
   }
-  return { ok: true, value: next };
-}
-
-export function moveMembership(
-  content: DraftFormsStepContentV3,
-  membershipId: string,
-  targetGroupId: string,
-  targetIndex: number,
-  idFactory: V3IdFactory = defaultIdFactory
-): OperationResult<DraftFormsStepContentV3> {
-  let sourcePosId: string | undefined;
-  let formId: string | undefined;
-  for (const pos of content.pos) {
-    for (const group of pos.form_groups) {
-      const member = group.members.find((item) => item.id === membershipId);
-      if (member) {
-        sourcePosId = pos.pos_id;
-        formId = member.form_id;
-      }
-    }
-  }
-  if (!sourcePosId || !formId) {
-    return { ok: false, reason: "membership_not_found" };
-  }
-  const targetPos = content.pos.find((pos) =>
-    pos.form_groups.some((group) => group.id === targetGroupId)
-  );
-  if (!targetPos) return { ok: false, reason: "group_not_found" };
-  if (targetPos.pos_id !== sourcePosId) {
-    return { ok: false, reason: "cross_pos_membership" };
-  }
-  const targetGroup = targetPos.form_groups.find(
-    (group) => group.id === targetGroupId
-  )!;
-  if (targetGroup.members.some((member) => member.form_id === formId)) {
-    return { ok: false, reason: "duplicate_group_membership" };
-  }
-  const allocated = allNodeIds(content);
-  const newMembershipId = nextUuid(idFactory, allocated);
-  const next = clone(content);
-  for (const pos of next.pos) {
-    for (const group of pos.form_groups) {
-      group.members = group.members.filter(
-        (member) => member.id !== membershipId
-      );
-    }
-  }
-  const nextTarget = next.pos
-    .find((pos) => pos.pos_id === sourcePosId)!
-    .form_groups.find((group) => group.id === targetGroupId)!;
-  const index = Math.max(0, Math.min(targetIndex, nextTarget.members.length));
-  nextTarget.members.splice(index, 0, {
-    id: newMembershipId,
-    form_id: formId
-  });
   return { ok: true, value: next };
 }
 

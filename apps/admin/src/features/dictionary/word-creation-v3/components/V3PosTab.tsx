@@ -324,7 +324,7 @@ export function V3PosTab({
               content={content}
               entryKind={entryKind}
               deleteDisabled={deletingGroupRemovesLastForm(group.id)}
-              dialectControl={index === 0 ? dialectControl : undefined}
+              dialectControl={dialectControl}
               group={group}
               groupCount={visibleGroups.length}
               groupIndex={index}

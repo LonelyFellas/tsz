@@ -158,30 +158,21 @@
   gap: 0;
 }
 
+.v3-concrete-form-row .word-form-type-cell {
+  align-items: center;
+  justify-content: center;
+}
+
+.word-form-type-select {
+  width: 100%;
+}
+
 .v3-membership-actions {
   flex-wrap: wrap;
+  justify-content: center;
   min-width: 0;
   width: 100%;
-  margin-top: auto;
   padding-top: 6px;
-}
-
-.v3-membership-move-details {
-  min-width: 0;
-  color: #7b8495;
-  font-size: 12px;
-}
-
-.v3-membership-move-details > summary {
-  cursor: pointer;
-}
-
-.v3-membership-move-details[open] > summary {
-  margin-bottom: 4px;
-}
-
-.v3-membership-move-details .ant-select {
-  width: 100%;
 }
 
 .v3-pronunciation-list {
@@ -264,11 +255,5 @@
 
   .v3-membership-actions {
     justify-content: flex-start;
-  }
-}
-
-@media (max-width: 479px) {
-  .v3-membership-actions .ant-select {
-    width: 100%;
   }
 }

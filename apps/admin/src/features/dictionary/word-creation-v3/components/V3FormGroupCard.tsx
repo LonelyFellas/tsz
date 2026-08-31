@@ -13,7 +13,6 @@ import {
   Empty,
   Flex,
   Radio,
-  Select,
   Typography
 } from "antd";
 import type {
@@ -29,7 +28,6 @@ import type { ReactNode } from "react";
 import {
   addConcreteFormAfterMembership,
   deleteConcreteForm,
-  moveMembership,
   removeMembership,
   reorderMemberships,
   type V3IdFactory
@@ -40,6 +38,8 @@ import {
   V3DialectSeparatedFormMatrix,
   type V3DialectSeparatedFormRow
 } from "./V3ConcreteFormRow";
+
+const BASE_REQUIRED_HINT = "每组词形变化至少保留一个原形";
 
 export interface V3FormGroupCardProps {
   content: DraftFormsStepContentV3;
@@ -84,6 +84,18 @@ export function V3FormGroupCard({
   const formTypeOptions = posCatalog
     ? (["base", ...(posCatalog.allowed_form_types ?? [])] as WordFormTypeV3[])
     : [];
+  // 每组词形变化都要留住原形：某个组只剩这一个 base 成员时锁死它的类型下拉。
+  // 词形可跨组共享，按最严的组算——只要它在任一所属组里是唯一原形就锁。
+  const lockedBaseFormIds = new Set(
+    pos.form_groups.flatMap((candidate) => {
+      const baseMembers = candidate.members.filter(
+        (member) =>
+          pos.forms.find((item) => item.id === member.form_id)?.form_type ===
+          "base"
+      );
+      return baseMembers.length === 1 ? [baseMembers[0]!.form_id] : [];
+    })
+  );
   const setRegular = (isRegular: boolean) => {
     const next = structuredClone(content);
     const nextPos = next.pos.find((item) => item.pos_id === pos.pos_id);
@@ -98,18 +110,6 @@ export function V3FormGroupCard({
     index: number,
     form: WordPosFormsV3["forms"][number]
   ): V3DialectSeparatedFormRow => {
-    const moveTargets = pos.form_groups
-      .filter(
-        (target) =>
-          target.id !== group.id &&
-          !target.members.some(
-            (targetMember) => targetMember.form_id === form.id
-          )
-      )
-      .map((target) => ({
-        value: target.id,
-        label: `变化组 ${pos.form_groups.indexOf(target) + 1}`
-      }));
     const sameTypeMembers = group.members.filter((candidate) => {
       const candidateForm = pos.forms.find(
         (item) => item.id === candidate.form_id
@@ -124,6 +124,7 @@ export function V3FormGroupCard({
         );
         return candidateForm?.form_type === form.form_type;
       }).length;
+    const lockedBase = lockedBaseFormIds.has(form.id);
     const baseLabel = formTypeLabel(form.form_type);
     const formMembershipCount = membershipCounts.get(form.id) ?? 0;
     const lastRequiredForm = pos.forms.length === 1 && formMembershipCount <= 1;
@@ -136,104 +137,77 @@ export function V3FormGroupCard({
       form,
       formLabel,
       formTypeAriaLabel: `变化组 ${groupIndex + 1} 词形 ${index + 1} 类型`,
-      formTypeDisabled: !posCatalog,
+      formTypeDisabled: !posCatalog || lockedBase,
+      formTypeDisabledReason: lockedBase ? BASE_REQUIRED_HINT : undefined,
       formTypeOptions,
       membershipCount: formMembershipCount,
       actions: (
-        <Flex className="v3-membership-actions" gap={4} vertical>
-          <Flex gap={2} wrap>
-            <Button
-              aria-label={`上移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
-              disabled={index === 0}
-              icon={<UpOutlined />}
-              onClick={() => {
-                const nextOrder = [...orderedIds];
-                [nextOrder[index - 1], nextOrder[index]] = [
-                  nextOrder[index]!,
-                  nextOrder[index - 1]!
-                ];
-                onChange(reorderMemberships(content, group.id, nextOrder));
-              }}
-              size="small"
-              type="text"
-            />
-            <Button
-              aria-label={`下移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
-              disabled={index === group.members.length - 1}
-              icon={<DownOutlined />}
-              onClick={() => {
-                const nextOrder = [...orderedIds];
-                [nextOrder[index], nextOrder[index + 1]] = [
-                  nextOrder[index + 1]!,
-                  nextOrder[index]!
-                ];
-                onChange(reorderMemberships(content, group.id, nextOrder));
-              }}
-              size="small"
-              type="text"
-            />
-            <Button
-              aria-label={`在${formPositionLabel} 下方添加同类型词形`}
-              icon={<PlusOutlined />}
-              onClick={() => {
-                const result = addConcreteFormAfterMembership(
-                  content,
-                  pos.pos_id,
-                  group.id,
-                  member.id,
-                  idFactory
-                );
-                if (result.ok) onChange(result.value);
-              }}
-              size="small"
-              type="text"
-            />
-            <Button
-              aria-label={`从变化组 ${groupIndex + 1} 移除词形 ${index + 1}`}
-              danger
-              disabled={lastRequiredForm}
-              icon={<DeleteOutlined />}
-              onClick={() => {
-                const result = removeMembership(content, member.id);
-                if (result.ok) {
-                  onChange(result.value);
-                  return;
-                }
-                if (
-                  result.reason === "last_membership_requires_form_deletion"
-                ) {
-                  setBlockedFormId(result.form_id);
-                }
-              }}
-              size="small"
-              title={lastRequiredForm ? "每个词性至少保留一个词形" : undefined}
-              type="text"
-            />
-          </Flex>
-          {moveTargets.length > 0 ? (
-            <details className="v3-membership-move-details">
-              <summary>移动到其他组</summary>
-              <Select
-                aria-label={`移动词形 ${index + 1} 到其他变化组`}
-                onChange={(targetGroupId) => {
-                  const target = pos.form_groups.find(
-                    (item) => item.id === targetGroupId
-                  )!;
-                  const result = moveMembership(
-                    content,
-                    member.id,
-                    targetGroupId,
-                    target.members.length,
-                    idFactory
-                  );
-                  if (result.ok) onChange(result.value);
-                }}
-                options={moveTargets}
-                placeholder="选择变化组"
-                size="small"
-              />
-            </details>
-          ) : null}
+        <Flex className="v3-membership-actions" gap={2} wrap>
+          <Button
+            aria-label={`上移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
+            disabled={index === 0}
+            icon={<UpOutlined />}
+            onClick={() => {
+              const nextOrder = [...orderedIds];
+              [nextOrder[index - 1], nextOrder[index]] = [
+                nextOrder[index]!,
+                nextOrder[index - 1]!
+              ];
+              onChange(reorderMemberships(content, group.id, nextOrder));
+            }}
+            size="small"
+            type="text"
+          />
+          <Button
+            aria-label={`下移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
+            disabled={index === group.members.length - 1}
+            icon={<DownOutlined />}
+            onClick={() => {
+              const nextOrder = [...orderedIds];
+              [nextOrder[index], nextOrder[index + 1]] = [
+                nextOrder[index + 1]!,
+                nextOrder[index]!
+              ];
+              onChange(reorderMemberships(content, group.id, nextOrder));
+            }}
+            size="small"
+            type="text"
+          />
+          <Button
+            aria-label={`在${formPositionLabel} 下方添加同类型词形`}
+            icon={<PlusOutlined />}
+            onClick={() => {
+              const result = addConcreteFormAfterMembership(
+                content,
+                pos.pos_id,
+                group.id,
+                member.id,
+                idFactory
+              );
+              if (result.ok) onChange(result.value);
+            }}
+            size="small"
+            type="text"
+          />
+          <Button
+            aria-label={`从变化组 ${groupIndex + 1} 移除词形 ${index + 1}`}
+            danger
+            disabled={lastRequiredForm}
+            icon={<DeleteOutlined />}
+            onClick={() => {
+              const result = removeMembership(content, member.id);
+              if (result.ok) {
+                onChange(result.value);
+                return;
+              }
+              if (result.reason === "last_membership_requires_form_deletion") {
+                setBlockedFormId(result.form_id);
+              }
+            }}
+            size="small"
+            title={lastRequiredForm ? "每个词性至少保留一个词形" : undefined}
+            type="text"
+          />
         </Flex>
       )
     };
@@ -422,6 +396,7 @@ export function V3FormGroupCard({
                     formLabel={row.formLabel}
                     formTypeAriaLabel={row.formTypeAriaLabel}
                     formTypeDisabled={row.formTypeDisabled}
+                    formTypeDisabledReason={row.formTypeDisabledReason}
                     formTypeOptions={row.formTypeOptions}
                     idFactory={idFactory}
                     issues={issues}
