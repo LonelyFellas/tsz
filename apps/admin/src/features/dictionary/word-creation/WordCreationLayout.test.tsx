@@ -102,13 +102,13 @@ describe("WordCreationLayout", () => {
     // 缺省偏好英式：即便本次输入命中的是美式，首行也稳定是英式那一侧。
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent("centre");
-    expect(rows[0]).toHaveTextContent("英式英语 · BrE");
+    expect(rows[0]).toHaveTextContent("英式 · BrE");
     expect(rows[0]).not.toHaveTextContent("检测基准");
     expect(rows[0]!.querySelector("strong")?.textContent).toBe("centre");
     expect(rows[0]).not.toHaveClass("word-creation-summary-alt");
     expect(rows[1]).toHaveTextContent("center");
     // 「检测基准」跟着真正命中的那一侧走，不再等同于首行。
-    expect(rows[1]).toHaveTextContent("美式英语 · AmE · 检测基准");
+    expect(rows[1]).toHaveTextContent("美式 · AmE · 检测基准");
     expect(rows[1]).toHaveClass("word-creation-summary-alt");
     expect(rows[1]!.querySelector("strong")).toBeNull();
 
@@ -128,7 +128,7 @@ describe("WordCreationLayout", () => {
       )
     );
     expect(ukRows[0]!.querySelector("strong")?.textContent).toBe("centre");
-    expect(ukRows[0]).toHaveTextContent("英式英语 · BrE · 检测基准");
+    expect(ukRows[0]).toHaveTextContent("英式 · BrE · 检测基准");
     expect(ukRows[1]).toHaveTextContent("center");
     expect(ukRows[1]).not.toHaveTextContent("检测基准");
   });

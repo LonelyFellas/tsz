@@ -82,7 +82,6 @@ function renderLayout(
     draftMeanings?: DraftMeaningsStepContentWritableV3;
     onStepChange?: (step: WordCreationStep) => void;
     onProgressNavigate?: (target: V3IssueNavigationTarget) => void;
-    onIssueNavigate?: (issue: V3DraftValidationIssue) => void;
     onRefreshConflict?: () => void;
     word?: AdminWordV3;
   } = {}
@@ -97,16 +96,11 @@ function renderLayout(
         draftMeanings={options.draftMeanings}
         readOnly={options.readOnly}
         dirtySteps={options.dirtySteps}
-        readiness={{
-          issue_count: issues.length,
-          positions: []
-        }}
         issues={issues}
         problem={options.problem}
         conflict={options.conflict}
         onStepChange={(step) => options.onStepChange?.(step)}
         onProgressNavigate={(target) => options.onProgressNavigate?.(target)}
-        onIssueNavigate={(value) => options.onIssueNavigate?.(value)}
         onRefreshConflict={options.onRefreshConflict}
       >
         <div>step body</div>
@@ -116,6 +110,13 @@ function renderLayout(
 }
 
 describe("V3WordCreationLayout", () => {
+  it("不在向导布局重复平铺字段问题", () => {
+    renderLayout({ activeStep: "forms", issues: [issue()] });
+
+    expect(screen.queryByRole("region", { name: "待完成项" })).toBeNull();
+    expect(screen.getByText("step body")).toBeVisible();
+  });
+
   it("shows the seven product completion rows without engineering step copy", () => {
     const current = word();
     current.completed_steps = ["basics", "forms"];
@@ -422,25 +423,16 @@ describe("V3WordCreationLayout", () => {
     expect(screen.getByText(title)).toBeInTheDocument();
   });
 
-  it("routes writable step and issue clicks to their handlers", () => {
+  it("routes writable step clicks to their handlers", () => {
     const onStepChange = vi.fn();
-    const onIssueNavigate = vi.fn();
-    const validationIssue = issue();
     renderLayout({
-      issues: [validationIssue],
-      onStepChange,
-      onIssueNavigate
+      issues: [issue()],
+      onStepChange
     });
 
     fireEvent.click(screen.getByText("词义与例句"));
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "内容来源无法确认，请刷新后重试"
-      })
-    );
 
     expect(onStepChange).toHaveBeenCalledWith("meanings");
-    expect(onIssueNavigate).toHaveBeenCalledWith(validationIssue);
   });
 
   it("shows dirty steps only for writable sessions", () => {

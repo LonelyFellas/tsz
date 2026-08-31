@@ -415,20 +415,11 @@
   line-height: 1.6;
 }
 
-.word-pos-sources {
-  display: grid;
-  gap: 6px;
-}
-
-.word-pos-source-row {
+.word-field-with-help {
   display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-.word-pos-source-row > .ant-typography-secondary {
-  flex: none;
-  line-height: 24px;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
 }
 
 /* 第 1 步英美主词确认：复用原有地区面板，保留检测结果区的轻量层级。 */
@@ -478,6 +469,16 @@
 .word-headword-confirmation-card .dialect-panel {
   padding: 13px;
   border-radius: 10px;
+}
+
+.word-headword-confirmation-card .dialect-panel > .ant-typography {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.word-headword-confirmation-card .word-headword-lock-note {
+  display: block;
+  margin: 2px 2px 16px;
 }
 
 .word-headword-confirmation-card .word-headword-source {
@@ -919,6 +920,11 @@
   gap: 10px;
   align-items: center;
   min-width: 0;
+}
+
+.word-pronunciation-row > .word-field-help {
+  grid-column: 2;
+  margin-top: -6px;
 }
 
 .word-pronunciation-label {
@@ -1619,10 +1625,48 @@
   border-bottom: 1px solid #e3e7ed;
 }
 
+.word-sense-section-title.is-interactive {
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.word-sense-section-title.is-interactive:hover {
+  color: #0067ce;
+  background: #edf5ff;
+}
+
+.word-sense-section-title.is-interactive:focus-visible {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid #0071e3;
+  outline-offset: -2px;
+}
+
 .word-sense-section-title .ant-tag {
   margin-inline-end: 0;
   color: #737b89;
   background: #fff;
+}
+
+.word-sense-section-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 220ms ease,
+    opacity 160ms ease;
+}
+
+.word-sense-section-body.is-collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.word-sense-section-body-inner {
+  min-height: 0;
+  overflow: hidden;
 }
 
 .word-sense-section.is-collapsed {
@@ -1713,6 +1757,30 @@
 
 .word-sentence-sound-icon {
   color: #1677ff;
+}
+
+.word-sentence-translation-tier {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: #0071e3;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.word-sentence-translation-tier strong {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  color: #fff;
+  font-size: 12px;
+  background: #0071e3;
+  border-radius: 6px;
+  place-items: center;
+}
+
+.word-sentence-translation-list {
+  width: 100%;
 }
 
 .word-sentence-row .dialect-grid,
@@ -1908,6 +1976,21 @@
 .word-relation-sense {
   width: 100%;
   min-width: 0;
+}
+
+.word-relation-sense-cell {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.word-relation-sense-cell > .ant-tag {
+  align-self: flex-start;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .word-relation-row .ant-input,

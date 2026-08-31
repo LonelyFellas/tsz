@@ -8,7 +8,8 @@ import type {
 } from "@tsz/types";
 import { classifyV3Problem, invalidatesV3Confirmations } from "./problem";
 
-export type V3CanonicalCommand = "save_forms" | "save_meanings" | "publish";
+export type V3CanonicalCommand =
+  "save_forms" | "save_meanings" | "save_sentence_associations" | "publish";
 export type V3RequestCommand =
   V3CanonicalCommand | "detect" | "surface" | "impact" | "validate";
 

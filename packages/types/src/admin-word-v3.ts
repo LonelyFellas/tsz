@@ -254,25 +254,37 @@ export interface WordSentenceTranslationV3 {
   content: RichTextV3;
 }
 
-export interface WordSentenceAssociationV3 {
+interface WordSentenceAssociationBaseV3 {
   id: string;
   association_schema_version: 3;
   source_dialect: Dialect;
   source_segments: SentenceSourceRangeV3[];
-  state: "linked" | "pending";
-  target_word_id?: string;
-  target_sense_id?: string;
-  target_form_slot_id?: string;
   origin: "auto" | "manual";
-  target_headword?: string;
-  target_gloss?: string;
-  resolved_pos?: string;
-  resolved_form_type?: string;
-  pending_target_kind?: WordEntryKindV3;
-  pending_target_headword?: string;
-  normalized_pending_target_headword?: string;
-  pending_target_gloss?: string;
 }
+
+export type WordSentenceAssociationV3 = WordSentenceAssociationBaseV3 &
+  (
+    | {
+        state: "linked";
+        target_word_id: string;
+        target_sense_id: string;
+        target_form_slot_id?: string;
+        target_publication_id?: string;
+        target_form_variant_id?: string;
+        target_component_usages: PhraseComponentUsageV3[];
+        target_headword: string;
+        target_gloss: string;
+        resolved_pos: string;
+        resolved_form_type?: string;
+      }
+    | {
+        state: "pending";
+        pending_target_kind: WordEntryKindV3;
+        pending_target_headword: string;
+        normalized_pending_target_headword?: string;
+        pending_target_gloss?: string;
+      }
+  );
 
 interface SentenceAssociationInputBaseV3 {
   id: string;
@@ -285,6 +297,10 @@ export type SentenceAssociationInputV3 = SentenceAssociationInputBaseV3 &
     | {
         target_word_id: string;
         target_sense_id: string;
+        /** 旧兼容 linked 可能缺失；新发现/认领必须提交 exact identity。 */
+        target_publication_id?: string;
+        /** 旧兼容 linked 可能缺失；新发现/认领必须提交 exact identity。 */
+        target_form_variant_id?: string;
         pending_target_kind?: never;
         pending_target_headword?: never;
         pending_target_gloss?: never;
@@ -333,6 +349,8 @@ export interface PendingSentenceAssociationListQueryV3 {
 export interface ClaimPendingSentenceAssociationInputV3 {
   target_word_id: string;
   target_sense_id: string;
+  target_publication_id?: string;
+  target_form_variant_id?: string;
   base_owner_entry_revision: number;
   base_owner_lifecycle_revision: number;
 }
@@ -353,6 +371,7 @@ export type ResolveSentenceTargetsV3Input =
       selected_segments: SentenceSourceRangeV3[];
       include_drafts: boolean;
       page_size_per_range?: number;
+      cursor?: string;
     };
 
 export type SentenceTargetMatchKindV3 =
@@ -380,11 +399,11 @@ export interface PublishedSentenceTargetCandidateV3 {
   base_form_id: string;
   headword: string;
   pos: string;
-  matched_form_id?: string;
-  matched_variant_id?: string;
-  matched_dialect?: Dialect;
-  matched_form_type?: WordFormTypeV3;
-  component_usages?: PhraseComponentUsageV3[];
+  matched_form_id: string;
+  matched_variant_id: string;
+  matched_dialect: Dialect;
+  matched_form_type: WordFormTypeV3;
+  component_usages: PhraseComponentUsageV3[];
   matches: SentenceTargetMatchEvidenceV3[];
   senses: SentenceTargetSenseV3[];
 }
@@ -403,6 +422,7 @@ export interface SentenceTargetRangeResultV3 {
   normalized_surface: string;
   published_total: number;
   published_matches: PublishedSentenceTargetCandidateV3[];
+  next_cursor?: string;
   draft_matches: DraftSentenceTargetCandidateV3[];
 }
 
@@ -437,10 +457,13 @@ export interface WordRelationV3 {
   relation: string;
   target_word_id?: string;
   target_sense_id?: string;
+  prebound_target_word_id?: string;
   pending_target_headword?: string;
   pending_target_gloss?: string;
   target_headword?: string;
   target_gloss?: string;
+  prebinding_state?: "waiting_first_sense" | "target_sense_deleted";
+  target_status?: "draft" | "published" | "archived";
   score: string;
 }
 
@@ -474,8 +497,7 @@ export interface WordSentenceWritableV3 {
   en_text: EnglishTextV3;
   zh_text_id: string;
   zh_text: RichTextV3;
-  /** Required for new clients; optional only for legacy single-translation drafts. */
-  zh_translations?: WordSentenceTranslationV3[];
+  zh_translations: WordSentenceTranslationV3[];
   links: WordSentenceLinkV3[];
 }
 
@@ -485,6 +507,7 @@ export interface WordRelationWritableV3 {
   relation: string;
   target_word_id?: string;
   target_sense_id?: string;
+  prebound_target_word_id?: string;
   pending_target_headword?: string;
   pending_target_gloss?: string;
   score: string;
@@ -539,6 +562,10 @@ export interface AdminWordV3Capabilities {
   pronunciation_normalization_version: PronunciationNormalizationVersionV3;
   /** Absent only when talking to a pre-capability backend. */
   sentence_associations?: boolean;
+  /** Absent only when talking to a pre-capability backend. */
+  sentence_target_discovery?: boolean;
+  /** Absent only when talking to a pre-capability backend. */
+  draft_relation_prebinding?: boolean;
 }
 
 export type LegacyHeadwordsCompatibilityV3 =
@@ -742,6 +769,10 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "relation_pending_gloss_invalid",
   "relation_pending_gloss_conflict",
   "relation_pending_gloss_target_exists",
+  "relation_prebound_target_not_found",
+  "relation_prebound_target_archived",
+  "relation_prebound_target_has_no_sense",
+  "relation_target_sense_deleted",
   "node_id_reused",
   "node_binding_unknown",
   "node_binding_changed",
@@ -974,6 +1005,7 @@ export interface RelatedWordResultV3 {
   schema_version: 3;
   entry_id: string;
   kind: WordEntryKindV3;
+  status?: "draft" | "published";
   presentation: EntryPresentationV3;
   matches: RelatedWordMatchV3[];
   senses: RelatedWordSenseV3[];

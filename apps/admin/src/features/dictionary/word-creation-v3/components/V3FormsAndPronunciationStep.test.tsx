@@ -25,7 +25,6 @@ import {
   uuidSequence
 } from "../fixtures";
 import { validateFormsContent } from "../model";
-import { v3IssueMessage } from "../presentationErrors";
 import { partOfSpeechCatalogFixture } from "../../word-creation/partOfSpeech.test.helper";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
@@ -49,6 +48,7 @@ const catalogState = vi.hoisted(() => ({
   isError: false,
   pending: undefined as Promise<typeof partOfSpeechCatalogFixture> | undefined
 }));
+const componentLookupState = vi.hoisted(() => ({ resolve: vi.fn() }));
 
 vi.mock("../../dataSource", () => ({
   partOfSpeechDataSource: {
@@ -60,6 +60,12 @@ vi.mock("../../dataSource", () => ({
             catalogState.data ?? { catalog_version: 1, items: [] }
           ))
   }
+}));
+
+vi.mock("../api", () => ({
+  createV3WordRequests: () => ({
+    resolveSentenceTargets: componentLookupState.resolve
+  })
 }));
 
 function group(
@@ -199,6 +205,14 @@ describe("V3FormsAndPronunciationStep", () => {
     catalogState.data = partOfSpeechCatalogFixture;
     catalogState.isError = false;
     catalogState.pending = undefined;
+    componentLookupState.resolve.mockReset();
+    componentLookupState.resolve.mockResolvedValue({
+      schema_version: 3,
+      sentence_hash: "hash",
+      discovery_generation: 1,
+      completeness: "complete",
+      range_results: []
+    });
   });
 
   it("使用 V2 Step 2 的标题、词性页签与英美词形矩阵结构", async () => {
@@ -1162,9 +1176,11 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     expect(screen.getByText("词形与发音尚未完成")).toBeInTheDocument();
-    for (const issue of issues) {
-      expect(screen.getByText(v3IssueMessage(issue))).toBeInTheDocument();
-    }
+    expect(
+      screen.getByText(
+        "已按最近一次发布检查结果标出对应字段；修改后请重新检查以更新状态。"
+      )
+    ).toBeInTheDocument();
     expect(screen.getByLabelText("原形通用拼写")).toHaveAttribute(
       "aria-invalid",
       "true"
@@ -1526,6 +1542,234 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
+  it("短语词形分别维护英式与美式成分用词", () => {
+    const form = ukUsFormFixture({ id: uuidFromInt(850) });
+    const content = formsFixture({ forms: [form] });
+    const onChange = vi.fn();
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={content}
+            dialectRules={{
+              spelling_mode: "distinguish",
+              phonetic_mode: "distinguish"
+            }}
+            entryKind="phrase"
+            form={form}
+            idFactory={() => uuidFromInt(851)}
+            issues={[]}
+            membershipCount={0}
+            onChange={onChange}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    expect(screen.getAllByText("成分用词")).toHaveLength(2);
+    fireEvent.click(screen.getByLabelText("为centre添加成分用词"));
+    const next = onChange.mock.calls[0]![0] as DraftFormsStepContentV3;
+    const regional = next.pos[0]!.forms[0]!.regional_variants;
+    expect(regional.mode).toBe("uk_us");
+    if (regional.mode !== "uk_us") throw new Error("expected uk/us variants");
+    expect(regional.uk.component_usages).toEqual([
+      { state: "unresolved", id: uuidFromInt(851), literal: "" }
+    ]);
+    expect(regional.us.component_usages).toEqual([]);
+  });
+
+  it("短语成分可查询并选择已发布词义，完整写入目标快照", async () => {
+    const componentId = uuidFromInt(860);
+    const form = ukUsFormFixture({
+      id: uuidFromInt(861),
+      uk: {
+        component_usages: [
+          { state: "unresolved", id: componentId, literal: "centre" }
+        ]
+      }
+    });
+    componentLookupState.resolve.mockResolvedValue({
+      schema_version: 3,
+      sentence_hash: "hash",
+      discovery_generation: 2,
+      completeness: "complete",
+      range_results: [
+        {
+          source_segments: [{ start: 0, end: 6, surface: "centre" }],
+          segments_fingerprint: "segment",
+          normalized_surface: "centre",
+          published_total: 1,
+          draft_matches: [],
+          published_matches: [
+            {
+              entry_id: uuidFromInt(862),
+              publication_id: uuidFromInt(863),
+              pos_id: uuidFromInt(864),
+              base_form_id: uuidFromInt(865),
+              headword: "centre",
+              pos: "noun",
+              matched_form_id: uuidFromInt(866),
+              matched_variant_id: uuidFromInt(867),
+              matched_dialect: "uk",
+              matched_form_type: "base",
+              component_usages: [],
+              matches: [],
+              senses: [
+                {
+                  sense_id: uuidFromInt(868),
+                  publication_id: uuidFromInt(863),
+                  pos_id: uuidFromInt(864),
+                  base_form_id: uuidFromInt(865),
+                  level: "A2",
+                  gloss: "中心"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    });
+    const onChange = vi.fn();
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={formsFixture({ forms: [form] })}
+            dialectRules={{
+              spelling_mode: "distinguish",
+              phonetic_mode: "distinguish"
+            }}
+            entryKind="phrase"
+            form={form}
+            idFactory={() => uuidFromInt(869)}
+            issues={[]}
+            membershipCount={0}
+            onChange={onChange}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "查找词义" }));
+    const select = await screen.findByLabelText("选择第1个成分的词义");
+    fireEvent.mouseDown(select);
+    fireEvent.click(await screen.findByText(/centre · 中心/));
+    const next = onChange.mock.calls[0]![0] as DraftFormsStepContentV3;
+    const regional = next.pos[0]!.forms[0]!.regional_variants;
+    if (regional.mode !== "uk_us") throw new Error("expected uk/us variants");
+    expect(regional.uk.component_usages?.[0]).toMatchObject({
+      state: "resolved",
+      id: componentId,
+      literal: "centre",
+      target_word_id: uuidFromInt(862),
+      target_publication_id: uuidFromInt(863),
+      target_sense_id: uuidFromInt(868),
+      target_variant_id: uuidFromInt(867),
+      target_headword: "centre",
+      target_gloss: "中心"
+    });
+  });
+
+  it("发现 capability 关闭时禁用成分查询但保留 unresolved 手工编辑", () => {
+    const form = commonFormFixture({ id: uuidFromInt(897) });
+    form.regional_variants.common.component_usages = [
+      { state: "unresolved", id: uuidFromInt(898), literal: "center" }
+    ];
+    const content = formsFixture({ forms: [form] });
+    const onChange = vi.fn();
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={content}
+            dialectRules={{
+              spelling_mode: "unified",
+              phonetic_mode: "unified"
+            }}
+            entryKind="phrase"
+            form={form}
+            idFactory={() => uuidFromInt(899)}
+            issues={[]}
+            membershipCount={0}
+            onChange={onChange}
+            sentenceTargetDiscoveryEnabled={false}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    expect(
+      screen.getByText(
+        "目标发现能力未启用；可先保留成分文字，稍后再选择具体词义。"
+      )
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "查找词义" })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("第1个成分用词"), {
+      target: { value: "central" }
+    });
+    const next = onChange.mock.calls.at(-1)![0] as DraftFormsStepContentV3;
+    const regional = next.pos[0]!.forms[0]!.regional_variants;
+    if (regional.mode !== "common") throw new Error("expected common variant");
+    expect(regional.common.component_usages).toEqual([
+      { state: "unresolved", id: uuidFromInt(898), literal: "central" }
+    ]);
+    expect(componentLookupState.resolve).not.toHaveBeenCalled();
+  });
+
+  it("成分 literal 变化后丢弃迟到查询结果", async () => {
+    const form = commonFormFixture({ id: uuidFromInt(880) });
+    form.regional_variants.common.component_usages = [
+      { state: "unresolved", id: uuidFromInt(881), literal: "center" }
+    ];
+    const content = formsFixture({ forms: [form] });
+    let resolveLookup!: (
+      value: Awaited<ReturnType<typeof componentLookupState.resolve>>
+    ) => void;
+    componentLookupState.resolve.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveLookup = resolve;
+        })
+    );
+    const onChange = vi.fn();
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3ConcreteFormRow
+            content={content}
+            dialectRules={{
+              spelling_mode: "unified",
+              phonetic_mode: "unified"
+            }}
+            entryKind="phrase"
+            form={form}
+            idFactory={() => uuidFromInt(882)}
+            issues={[]}
+            membershipCount={0}
+            onChange={onChange}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "查找词义" }));
+    fireEvent.change(screen.getByLabelText("第1个成分用词"), {
+      target: { value: "central" }
+    });
+    await act(async () =>
+      resolveLookup({
+        schema_version: 3,
+        sentence_hash: "stale",
+        discovery_generation: 1,
+        completeness: "complete",
+        range_results: []
+      })
+    );
+
+    expect(screen.queryByLabelText("选择第1个成分的词义")).toBeNull();
+    expect(screen.queryByText(/未找到可关联的已发布词义/u)).toBeNull();
+  });
+
   it("覆盖 UK 发音缺省 style、字段编辑、增删与 issue", () => {
     const first = pronunciationFixture({
       id: uuidFromInt(901),
@@ -1585,6 +1829,10 @@ describe("V3FormsAndPronunciationStep", () => {
       "aria-invalid",
       "true"
     );
+    expect(screen.getByText("请填写实际发音")).toBeVisible();
+    expect(
+      screen.getByLabelText("第 1 条发音的实际发音").closest(".ant-input")
+    ).toHaveClass("ant-input-status-error");
     expect(screen.getByLabelText("第 1 条发音的字典音标")).toHaveAttribute(
       "aria-invalid",
       "false"

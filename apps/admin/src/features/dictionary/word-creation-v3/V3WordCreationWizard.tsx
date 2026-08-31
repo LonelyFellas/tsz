@@ -4,11 +4,13 @@ import type {
   DraftMeaningsStepContentWritableV3,
   DraftValidationResponseV3,
   FormsImpactResponseV3,
+  SentenceAssociationInputV3,
   RetiredStableNodeV3,
   StepSaveIntent,
   SurfaceMatchPageV3,
   V3DraftValidationIssue,
-  WordCreationStep
+  WordCreationStep,
+  WordSentenceWritableV3
 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,8 +26,8 @@ import {
   type V3IssueNavigationTarget
 } from "./issueNavigation";
 import { ensureV3MeaningsForForms, toWritableMeanings } from "./meaningsModel";
+import { toFormsWire } from "./model";
 import { classifyV3Problem, type V3Problem } from "./problem";
-import { buildV3Readiness } from "./readiness";
 import {
   createV3SaveFlow,
   type V3ConfirmationContext,
@@ -55,6 +57,13 @@ export interface V3WizardActions {
   saveMeanings(
     content: DraftMeaningsStepContentWritableV3,
     intent: StepSaveIntent
+  ): Promise<void>;
+  saveMultidimensionalSentence(
+    posId: string,
+    senseId: string,
+    sentence: WordSentenceWritableV3,
+    associations: SentenceAssociationInputV3[],
+    idempotencyKey?: string
   ): Promise<void>;
   validate(): Promise<DraftValidationResponseV3 | undefined>;
   publish(confirmedSurfaceToken?: string): Promise<void>;
@@ -518,7 +527,7 @@ function V3WordCreationSession({
       if (nextProblem.kind === "validation") {
         setIssues(nextProblem.issues);
         const first = nextProblem.issues[0];
-        if (first) await navigateIssue(first);
+        if (first && operation !== "publish") await navigateIssue(first);
       }
     },
     [navigateIssue]
@@ -631,6 +640,7 @@ function V3WordCreationSession({
         return false;
       }
       const baseRevision = flow.canonical().revision;
+      const wireContent = toFormsWire(content);
       const scope = scopeRef.current;
       const done = markPending("save_forms");
       const retry = async () => {
@@ -639,7 +649,7 @@ function V3WordCreationSession({
       try {
         const tokens = flow.confirmations({
           base_revision: baseRevision,
-          impact_content: content,
+          impact_content: wireContent,
           ...confirmationContext
         });
         const result = await flow.runCanonical("save_forms", () =>
@@ -647,7 +657,7 @@ function V3WordCreationSession({
             schema_version: 3,
             base_revision: baseRevision,
             intent,
-            content,
+            content: wireContent,
             ...tokens
           })
         );
@@ -747,7 +757,9 @@ function V3WordCreationSession({
       const baseRevision = flow.canonical().revision;
       const scope = scopeRef.current;
       const done = markPending("save_meanings");
-      const retry = () => saveMeanings(content, intent);
+      const retry = async () => {
+        await saveMeanings(content, intent);
+      };
       try {
         const result = await flow.runCanonical("save_meanings", () =>
           requests.saveMeanings(flow.canonical().id, {
@@ -768,6 +780,7 @@ function V3WordCreationSession({
               ).effective
             );
           }
+          return result.value.word;
         }
       } catch (error) {
         if (
@@ -794,6 +807,94 @@ function V3WordCreationSession({
       markPending,
       requests,
       saveFormsContent
+    ]
+  );
+
+  const saveMultidimensionalSentence = useCallback(
+    async (
+      posId: string,
+      senseId: string,
+      sentence: WordSentenceWritableV3,
+      associations: SentenceAssociationInputV3[],
+      associationIdempotencyKey = newWordNodeId()
+    ) => {
+      const nextMeanings = structuredClone(draftMeanings);
+      const pos = nextMeanings.pos.find((item) => item.pos_id === posId);
+      const sense = pos?.senses.find((item) => item.id === senseId);
+      if (!sense) throw new Error("当前词义已变化，请刷新后重试");
+      const existingIndex = sense.sentences.findIndex(
+        (item) => item.id === sentence.id
+      );
+      const sentenceChanged =
+        existingIndex < 0 ||
+        JSON.stringify(sense.sentences[existingIndex]) !==
+          JSON.stringify(sentence);
+      if (existingIndex >= 0) sense.sentences[existingIndex] = sentence;
+      else sense.sentences.push(sentence);
+
+      const saved = sentenceChanged
+        ? await saveMeanings(nextMeanings, "save")
+        : flowRef.current.canonical();
+      if (!saved) throw new Error("例句尚未保存，请按页面提示重试");
+      const flow = flowRef.current;
+      const baseRevision = saved.revision;
+      const baseLifecycleRevision = saved.lifecycle_revision;
+      const scope = scopeRef.current;
+      const done = markPending("save_sentence_associations");
+      const retry = () =>
+        saveMultidimensionalSentence(
+          posId,
+          senseId,
+          sentence,
+          associations,
+          associationIdempotencyKey
+        );
+      try {
+        const result = await flow.runCanonical(
+          "save_sentence_associations",
+          () =>
+            requests.replaceSentenceAssociations(
+              saved.id,
+              sentence.id,
+              associationIdempotencyKey,
+              {
+                association_schema_version: 3,
+                base_revision: baseRevision,
+                base_lifecycle_revision: baseLifecycleRevision,
+                associations
+              }
+            )
+        );
+        if (!result.accepted || scope !== scopeRef.current) {
+          throw new Error("例句关联响应已过期，请刷新后重试");
+        }
+        applyCanonical(result.value.word, "meanings");
+      } catch (error) {
+        if (
+          classifyV3Problem(error, "save_sentence_associations").kind ===
+          "entry_archived"
+        ) {
+          await handleEntryArchived(error);
+        } else if (scope === scopeRef.current) {
+          await handleError(error, "save_sentence_associations", retry, {
+            step: "meanings",
+            baseRevision,
+            localMeanings: nextMeanings
+          });
+        }
+        throw error;
+      } finally {
+        done();
+      }
+    },
+    [
+      applyCanonical,
+      draftMeanings,
+      handleEntryArchived,
+      handleError,
+      markPending,
+      requests,
+      saveMeanings
     ]
   );
 
@@ -828,8 +929,6 @@ function V3WordCreationSession({
         setImpact(undefined);
         setImpactConfirmed(false);
       }
-      const first = result.value.issues[0];
-      if (first) await navigateIssue(first);
       return result.value;
     } catch (error) {
       if (classifyV3Problem(error, "validate").kind === "entry_archived") {
@@ -841,7 +940,7 @@ function V3WordCreationSession({
     } finally {
       done();
     }
-  }, [handleEntryArchived, handleError, markPending, navigateIssue, requests]);
+  }, [handleEntryArchived, handleError, markPending, requests]);
 
   const confirmImpactSurface = useCallback(
     (page: SurfaceMatchPageV3) => {
@@ -1002,8 +1101,9 @@ function V3WordCreationSession({
             await reconcilePublishConflict();
           } else {
             if (
-              nextProblem.kind === "surface_confirmation" &&
-              nextProblem.requires_new_idempotency_key
+              (nextProblem.kind === "surface_confirmation" &&
+                nextProblem.requires_new_idempotency_key) ||
+              nextProblem.kind === "validation"
             ) {
               finishAttempt();
             }
@@ -1120,7 +1220,10 @@ function V3WordCreationSession({
       },
       previewFormsImpact: () => previewFormsImpact("publish"),
       previewFormsSaveImpact: () => previewFormsImpact("save"),
-      saveMeanings,
+      saveMeanings: async (content, intent) => {
+        await saveMeanings(content, intent);
+      },
+      saveMultidimensionalSentence,
       validate,
       publish,
       confirmImpact,
@@ -1142,14 +1245,11 @@ function V3WordCreationSession({
       retry,
       saveFormsContent,
       saveMeanings,
+      saveMultidimensionalSentence,
       validate
     ]
   );
 
-  const readiness = useMemo(
-    () => buildV3Readiness(issues, draftForms),
-    [draftForms, issues]
-  );
   const reachableSteps = useMemo(
     () =>
       resolveV3StepAccess(word, activeStep, allowPublishedEditing).reachable,
@@ -1199,7 +1299,6 @@ function V3WordCreationSession({
       dirtySteps={dirtySteps}
       draftForms={draftForms}
       draftMeanings={draftMeanings}
-      readiness={readiness}
       issues={issues}
       problem={problem}
       conflict={conflict}
@@ -1207,7 +1306,6 @@ function V3WordCreationSession({
       refreshingConflict={pending.has("refresh_conflict")}
       onStepChange={setActiveStep}
       onProgressNavigate={(target) => void navigateProgress(target)}
-      onIssueNavigate={(issue) => void navigateIssue(issue)}
       onRetry={() => void retry()}
       onRefreshConflict={() => void refreshConflict()}
     >

@@ -73,11 +73,14 @@ const meaningsCanonicalFixture: DraftMeaningsStepContentV3 = {
               associations: [
                 {
                   id: "association-read-only",
+                  association_schema_version: 3,
                   source_dialect: "common",
-                  source_range: { start: 4, end: 10, surface: "center" },
+                  source_segments: [{ start: 4, end: 10, surface: "center" }],
                   target_word_id: "target-entry",
                   target_sense_id: "target-sense",
                   target_form_slot_id: "legacy-slot",
+                  state: "linked",
+                  target_component_usages: [],
                   origin: "auto",
                   target_headword: "center",
                   target_gloss: "中心",
@@ -179,6 +182,13 @@ describe("V3 meanings writable model", () => {
           },
           zh_text_id: expect.any(String),
           zh_text: { version: 2, text: "", annotations: [] },
+          zh_translations: [
+            {
+              id: expect.any(String),
+              band: "a1_a2",
+              content: { version: 2, text: "", annotations: [] }
+            }
+          ],
           links: [{ word_id: "word-1", sense_id: sense.id, role: "focus" }]
         }
       ]);
@@ -340,6 +350,36 @@ describe("V3 meanings writable model", () => {
     expect(snapshots["relation-1"]).toEqual({
       headword: "middle",
       gloss: "中部"
+    });
+  });
+
+  it("预绑定保留隐藏稳定目标 ID，并只把服务端状态留在展示快照", () => {
+    const canonical = structuredClone(meaningsCanonicalFixture);
+    const relation = canonical.pos[0]!.senses[0]!.relations[0]!;
+    delete relation.target_word_id;
+    delete relation.target_sense_id;
+    Object.assign(relation, {
+      prebound_target_word_id: "draft-target-entry",
+      pending_target_headword: "reliability",
+      pending_target_gloss: "可靠性",
+      prebinding_state: "target_sense_deleted",
+      target_status: "archived"
+    });
+
+    const writable = toWritableMeanings(canonical);
+    expect(writable.pos[0]!.senses[0]!.relations[0]).toEqual({
+      id: "relation-1",
+      relation: "synonym",
+      prebound_target_word_id: "draft-target-entry",
+      pending_target_headword: "reliability",
+      pending_target_gloss: "可靠性",
+      score: "0.8"
+    });
+    expect(relationDisplaySnapshots(canonical)["relation-1"]).toEqual({
+      headword: "middle",
+      gloss: "中部",
+      prebinding_state: "target_sense_deleted",
+      target_status: "archived"
     });
   });
 
@@ -704,5 +744,12 @@ describe("V3 meanings writable model", () => {
       pending_target_gloss: "中心点",
       score: "0"
     });
+    expect(projectedSense.sentences[0]!.zh_translations).toEqual([
+      {
+        id: projectedSense.sentences[0]!.zh_text_id,
+        band: "a1_a2",
+        content: projectedSense.sentences[0]!.zh_text
+      }
+    ]);
   });
 });

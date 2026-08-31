@@ -26,6 +26,7 @@ import {
   decodeFormsImpactResponseV3,
   decodePendingSentenceAssociationListResponse,
   decodeRelatedSearchResponseAny,
+  decodeResolveSentenceTargetsV3Response,
   decodeSurfaceMatchPageAny,
   decodeSurfaceMatchPageV3
 } from "./admin-word-schema";
@@ -179,6 +180,7 @@ function validAdminWordV3() {
                   dialect: "common",
                   spelling: "bright",
                   origin: "manual",
+                  component_usages: [],
                   pronunciations: [
                     {
                       id: IDS.pronunciation1,
@@ -206,6 +208,7 @@ function validAdminWordV3() {
                   dialect: "uk",
                   spelling: "colour",
                   origin: "dictionary",
+                  component_usages: [],
                   pronunciations: []
                 },
                 us: {
@@ -213,6 +216,7 @@ function validAdminWordV3() {
                   dialect: "us",
                   spelling: "color",
                   origin: "dictionary",
+                  component_usages: [],
                   pronunciations: []
                 }
               }
@@ -461,6 +465,40 @@ describe("admin word V2 response schema guard", () => {
 });
 
 describe("admin word V3/Any runtime decoder", () => {
+  it("句内目标发现响应通过生成 runtime schema 严格解码", () => {
+    const response = validRuntimeDefinition("ResolveSentenceTargetsV3Response");
+    expect(decodeResolveSentenceTargetsV3Response(response)).toBe(response);
+  });
+
+  it("related-search 接受零词义草稿状态并拒绝未知状态", () => {
+    const response = {
+      results: [
+        {
+          schema_version: 3,
+          entry_id: IDS.entry,
+          kind: "word",
+          status: "draft",
+          presentation: {
+            label: "reliability",
+            matched_surfaces: ["reliability"],
+            strategy_version: "surface_summary_v1"
+          },
+          matches: [],
+          senses: []
+        }
+      ],
+      total: 1,
+      next_cursor: null
+    };
+
+    expect(decodeRelatedSearchResponseAny(response)).toEqual(response);
+    const invalid = structuredClone(response);
+    invalid.results[0]!.status = "archived";
+    expect(() => decodeRelatedSearchResponseAny(invalid)).toThrow(
+      InvalidAdminWordResponseError
+    );
+  });
+
   it("Pending 例句关联列表按完整 runtime schema 接受合法 wire 并拒绝缺字段", () => {
     const response = {
       results: [

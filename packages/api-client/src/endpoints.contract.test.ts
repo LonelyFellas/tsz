@@ -481,7 +481,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "4f6c17a2277ff2606b2c538e4fd3f0a1287cad078614d42db2ea80dbf0d2a4e3"
+      "e2cfa3b832d0cac7eab591349b61fd92fd126464b5867dff87393bbf37e7e4a8"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -574,6 +574,32 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(
       Object.keys(schemas.WordRelationWritableV3.properties)
     ).not.toContain("target_headword");
+    expect(schemas.WordRelationWritableV3.properties).toHaveProperty(
+      "prebound_target_word_id"
+    );
+    expect(runtimeSchemaBundle.$defs.WordRelationV3.properties).toMatchObject({
+      prebound_target_word_id: { type: "string", format: "uuid" },
+      prebinding_state: { $ref: "#/$defs/RelationPrebindingStateV3" },
+      target_status: { $ref: "#/$defs/AdminWordStatus" }
+    });
+    expect(runtimeSchemaBundle.$defs.RelationPrebindingStateV3.enum).toEqual([
+      "waiting_first_sense",
+      "target_sense_deleted"
+    ]);
+    expect(
+      snapshot.operationQueryParameters[
+        "get /admin/lexicon/entries/related-search"
+      ].map((parameter) => parameter.name)
+    ).toContain("include_drafts");
+    expect(
+      runtimeSchemaBundle.$defs.RelatedWordResultV3.properties.status
+    ).toEqual({
+      $ref: "#/$defs/RelatedWordStatusV3"
+    });
+    expect(runtimeSchemaBundle.$defs.RelatedWordStatusV3.enum).toEqual([
+      "draft",
+      "published"
+    ]);
     const relationSchemas = [
       schemas.WordRelationV2,
       schemas.WordRelationWritableV3,
@@ -780,6 +806,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       },
       {
         name: "exclude_exact",
+        in: "query",
+        required: false,
+        schema: { type: "boolean" }
+      },
+      {
+        name: "include_drafts",
         in: "query",
         required: false,
         schema: { type: "boolean" }

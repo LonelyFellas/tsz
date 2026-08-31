@@ -28,6 +28,7 @@ export type V3ProblemOperation =
   | "impact"
   | "save_forms"
   | "save_meanings"
+  | "save_sentence_associations"
   | "validate"
   | "publish"
   | "activate";
@@ -35,6 +36,7 @@ export type V3ProblemOperation =
 function hasIdempotencyKey(operation?: V3ProblemOperation): boolean {
   return (
     operation === "create" ||
+    operation === "save_sentence_associations" ||
     operation === "publish" ||
     operation === "activate"
   );
@@ -48,6 +50,15 @@ export type V3Problem =
       status: 409;
       current_revision?: number;
       invalidates_confirmation: true;
+    })
+  | (HttpProblemBase & {
+      kind: "reference_conflict";
+      status: 409;
+      invalidates_confirmation: true;
+    })
+  | (HttpProblemBase & {
+      kind: "relation_prebinding_fanout_exceeded";
+      status: 409;
     })
   | (HttpProblemBase & {
       kind: "idempotency_conflict";
@@ -166,6 +177,26 @@ export function classifyV3Problem(
       invalidates_confirmation: true
     };
   }
+  if (error.status === 409 && error.code === "reference_conflict") {
+    return {
+      ...base,
+      kind: "reference_conflict",
+      status: 409,
+      retryable: true,
+      invalidates_confirmation: true
+    };
+  }
+  if (
+    error.status === 409 &&
+    error.code === "relation_prebinding_fanout_exceeded"
+  ) {
+    return {
+      ...base,
+      kind: "relation_prebinding_fanout_exceeded",
+      status: 409,
+      retryable: false
+    };
+  }
   if (error.status === 409 && error.code === "idempotency_conflict") {
     return {
       ...base,
@@ -237,6 +268,7 @@ export function classifyV3Problem(
 export function invalidatesV3Confirmations(problem: V3Problem): boolean {
   return (
     problem.kind === "revision_conflict" ||
+    problem.kind === "reference_conflict" ||
     problem.kind === "entry_archived" ||
     problem.kind === "surface_confirmation" ||
     problem.kind === "impact_confirmation"

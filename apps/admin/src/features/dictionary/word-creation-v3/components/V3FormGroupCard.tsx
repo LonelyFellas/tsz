@@ -56,6 +56,8 @@ export interface V3FormGroupCardProps {
   onMove?: (offset: -1 | 1) => void;
   posCatalog?: PartOfSpeechCatalogItem;
   dialectControl?: ReactNode;
+  entryKind?: "word" | "phrase";
+  sentenceTargetDiscoveryEnabled?: boolean;
 }
 
 export function V3FormGroupCard({
@@ -72,7 +74,9 @@ export function V3FormGroupCard({
   deleteDisabled = false,
   onMove,
   posCatalog,
-  dialectControl
+  dialectControl,
+  entryKind = "word",
+  sentenceTargetDiscoveryEnabled = true
 }: V3FormGroupCardProps) {
   const [blockedFormId, setBlockedFormId] = useState<string>();
   const [collapsed, setCollapsed] = useState(false);
@@ -376,6 +380,8 @@ export function V3FormGroupCard({
             <V3DialectSeparatedFormMatrix
               content={content}
               dialectRules={pos.dialect_rules}
+              entryKind={entryKind}
+              sentenceTargetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
               idFactory={idFactory}
               issues={issues}
               onChange={onChange}
@@ -410,6 +416,10 @@ export function V3FormGroupCard({
                   <V3ConcreteFormRow
                     actions={row.actions}
                     content={content}
+                    entryKind={entryKind}
+                    sentenceTargetDiscoveryEnabled={
+                      sentenceTargetDiscoveryEnabled
+                    }
                     dialectRules={pos.dialect_rules}
                     form={form}
                     formLabel={row.formLabel}

@@ -140,18 +140,40 @@ describe("V3MeaningsPreview", () => {
                       associations: [
                         {
                           id: "internal-association-id",
+                          association_schema_version: 3,
                           source_dialect: "common",
-                          source_range: {
-                            start: 13,
-                            end: 19,
-                            surface: "center"
-                          },
+                          source_segments: [
+                            {
+                              start: 13,
+                              end: 19,
+                              surface: "center"
+                            }
+                          ],
                           target_word_id: "internal-target-word-id",
                           target_sense_id: "internal-target-sense-id",
+                          state: "linked",
+                          target_component_usages: [],
                           origin: "manual",
                           target_headword: "middle",
                           target_gloss: "中间",
                           resolved_pos: "noun"
+                        },
+                        {
+                          id: "internal-pending-association-id",
+                          association_schema_version: 3,
+                          source_dialect: "common",
+                          source_segments: [
+                            {
+                              start: 0,
+                              end: 5,
+                              surface: "Stand"
+                            }
+                          ],
+                          state: "pending",
+                          origin: "manual",
+                          pending_target_kind: "word",
+                          pending_target_headword: "stand",
+                          pending_target_gloss: "站立"
                         }
                       ],
                       associations_state: "resolved"
@@ -182,10 +204,15 @@ describe("V3MeaningsPreview", () => {
     expect(screen.getByText("中心位置")).toBeVisible();
     expect(screen.getByText("the middle point")).toBeVisible();
     expect(screen.getByText("Stand in the center.")).toBeVisible();
-    expect(screen.getByText("中文：站在中心。")).toBeVisible();
+    expect(screen.getByText("站在中心。")).toBeVisible();
+    expect(screen.getByText("中")).toBeVisible();
     expect(screen.getByText("主关联")).toBeVisible();
     expect(screen.getByText("其他关联")).toBeVisible();
     expect(screen.getByText("上下文关联：middle · 中间")).toBeVisible();
+    expect(screen.getByText("待关联词条：stand · 站立")).toBeVisible();
+    expect(screen.getByText("已关联")).toBeVisible();
+    expect(screen.getByText("待关联")).toBeVisible();
+    expect(document.body).not.toHaveTextContent(/\b(?:Linked|Pending)\b/u);
     expect(screen.getByText("近义词")).toBeVisible();
     expect(screen.getByText("midpoint · 中点")).toBeVisible();
     expect(
@@ -261,14 +288,19 @@ describe("V3MeaningsPreview", () => {
                       associations: [
                         {
                           id: "fallback-association",
+                          association_schema_version: 3,
                           source_dialect: "common",
-                          source_range: {
-                            start: 0,
-                            end: 8,
-                            surface: "Fallback"
-                          },
+                          source_segments: [
+                            {
+                              start: 0,
+                              end: 8,
+                              surface: "Fallback"
+                            }
+                          ],
                           target_word_id: "target-word",
                           target_sense_id: "target-sense",
+                          state: "linked",
+                          target_component_usages: [],
                           origin: "manual",
                           target_headword: "fallback",
                           target_gloss: "",

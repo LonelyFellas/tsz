@@ -1,0 +1,417 @@
+.v3-sentence-mock-drawer .ant-drawer-header {
+  padding: 18px 22px;
+  border-bottom-color: #e8edf3;
+}
+
+.v3-sentence-mock-drawer .ant-drawer-title {
+  color: #17233c;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.v3-sentence-mock-drawer .ant-drawer-body {
+  padding: 18px 22px 24px;
+  background:
+    radial-gradient(circle at 96% 0%, rgba(0, 113, 227, 0.07), transparent 24%),
+    #f6f8fb;
+}
+
+.v3-sentence-mock-drawer .ant-drawer-footer {
+  padding: 12px 22px;
+  background: rgba(255, 255, 255, 0.96);
+  border-top-color: #e5eaf0;
+  box-shadow: 0 -8px 24px rgba(25, 42, 70, 0.05);
+}
+
+.v3-sentence-mock-content {
+  width: 100%;
+}
+
+.v3-sentence-mock-section {
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #e1e7ef;
+  border-radius: 16px;
+  box-shadow: 0 8px 26px rgba(31, 51, 82, 0.045);
+}
+
+.v3-sentence-mock-primary {
+  border-color: #cfe4fb;
+  box-shadow: 0 10px 30px rgba(0, 113, 227, 0.075);
+}
+
+.v3-sentence-mock-section-heading {
+  margin-bottom: 14px;
+}
+
+.v3-sentence-mock-section-heading > .ant-flex:first-child {
+  min-width: 0;
+}
+
+.v3-sentence-mock-section-heading .ant-typography {
+  margin: 0;
+}
+
+.v3-sentence-mock-section-heading .ant-typography-secondary {
+  margin-top: 3px;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.v3-sentence-mock-section-number {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: #0071e3;
+  font-size: 12px;
+  font-weight: 700;
+  background: #eaf4ff;
+  border: 1px solid #b9dbff;
+  border-radius: 10px;
+}
+
+.v3-sentence-mock-sentence-grid {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.v3-sentence-mock-level-field,
+.v3-sentence-mock-english-field {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.v3-sentence-mock-level-field .ant-select {
+  width: 100%;
+}
+
+.v3-sentence-mock-english-field .ant-input {
+  font-size: 16px;
+  line-height: 1.65;
+  border-radius: 10px;
+}
+
+.v3-sentence-mock-token-canvas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 8px;
+  align-items: baseline;
+  min-height: 72px;
+  padding: 18px;
+  background: linear-gradient(135deg, #f9fbfe 0%, #f4f8fd 100%);
+  border: 1px solid #dce5f0;
+  border-radius: 13px;
+  transition: opacity 160ms ease;
+}
+
+.v3-sentence-mock-token-canvas.is-stale {
+  opacity: 0.66;
+}
+
+.v3-sentence-mock-token,
+.v3-sentence-mock-punctuation {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 4px 2px;
+  color: #253044;
+  font: inherit;
+  font-size: 18px;
+  line-height: 1.35;
+  background: transparent;
+  border: 0;
+}
+
+.v3-sentence-mock-token {
+  position: relative;
+  cursor: pointer;
+  border-radius: 7px;
+}
+
+.v3-sentence-mock-token::after {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  left: 2px;
+  height: 2px;
+  content: "";
+  background: transparent;
+  border-radius: 999px;
+}
+
+.v3-sentence-mock-token.is-center {
+  padding-inline: 7px;
+  color: #0067ce;
+  font-weight: 650;
+  background: #eaf4ff;
+}
+
+.v3-sentence-mock-token.is-center::after {
+  background: #0071e3;
+}
+
+.v3-sentence-mock-token.is-wall {
+  padding-inline: 7px;
+  color: #16744b;
+  font-weight: 650;
+  background: #eaf8f1;
+}
+
+.v3-sentence-mock-token.is-wall::after {
+  background: #24a66a;
+}
+
+.v3-sentence-mock-token.is-phrase {
+  box-shadow: inset 0 -2px 0 #8067d8;
+}
+
+.v3-sentence-mock-token.is-custom-range {
+  color: #5940b3;
+  font-weight: 650;
+  background: #f0ecff;
+  box-shadow: inset 0 -3px 0 #8067d8;
+}
+
+.v3-sentence-mock-token[aria-pressed="true"] {
+  outline: 2px solid #0071e3;
+  outline-offset: 2px;
+}
+
+.v3-sentence-mock-token:focus-visible {
+  outline: 2px solid #0071e3;
+  outline-offset: 3px;
+}
+
+.v3-sentence-mock-token-meta {
+  margin-top: 10px;
+}
+
+.v3-sentence-mock-phrase-builder {
+  margin-top: 10px;
+  padding: 11px 12px;
+  background: linear-gradient(135deg, #f8f5ff, #f3efff);
+  border: 1px solid #d7ccfa;
+  border-radius: 11px;
+}
+
+.v3-sentence-mock-phrase-builder .ant-typography {
+  margin: 0;
+}
+
+.v3-sentence-mock-phrase-builder .ant-typography-secondary {
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.v3-sentence-mock-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #607086;
+  font-size: 12px;
+}
+
+.v3-sentence-mock-legend::before {
+  width: 9px;
+  height: 9px;
+  content: "";
+  background: #0071e3;
+  border-radius: 3px;
+}
+
+.v3-sentence-mock-legend.is-phrase::before {
+  background: #8067d8;
+}
+
+.v3-sentence-mock-legend.is-wall::before {
+  background: #24a66a;
+}
+
+.v3-sentence-mock-association-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.v3-sentence-mock-association-card {
+  overflow: hidden;
+  border-color: #dde4ed;
+  border-radius: 13px;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.v3-sentence-mock-association-card.is-active {
+  border-color: #69b1ff;
+  box-shadow: 0 9px 24px rgba(0, 113, 227, 0.12);
+  transform: translateY(-1px);
+}
+
+.v3-sentence-mock-association-card.is-purple {
+  grid-column: 1 / -1;
+}
+
+.v3-sentence-mock-association-card > .ant-card-head {
+  min-height: 44px;
+  padding-inline: 14px;
+  background: #f9fbfd;
+}
+
+.v3-sentence-mock-association-card.is-blue > .ant-card-head {
+  background: #f2f8ff;
+}
+
+.v3-sentence-mock-association-card.is-green > .ant-card-head {
+  background: #f2faf6;
+}
+
+.v3-sentence-mock-association-card.is-purple > .ant-card-head {
+  background: #f7f4ff;
+}
+
+.v3-sentence-mock-association-card > .ant-card-body {
+  padding: 14px;
+}
+
+.v3-sentence-mock-association-card .ant-typography {
+  margin-bottom: 0;
+}
+
+.v3-sentence-mock-sense {
+  display: block;
+  color: #253044;
+}
+
+.v3-sentence-mock-pending-sense {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  background: #fffaf0;
+  border: 1px solid #ffe0a3;
+  border-radius: 10px;
+}
+
+.v3-sentence-mock-pending-sense .ant-tag {
+  margin-inline-end: 0;
+}
+
+.v3-sentence-mock-pending-sense .ant-input {
+  background: #fff;
+  border-color: #f1c36d;
+  border-radius: 8px;
+}
+
+.v3-sentence-mock-association-card .ant-typography-secondary {
+  margin-top: 4px;
+  font-size: 12px;
+}
+
+.v3-sentence-mock-form-list {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.v3-sentence-mock-form-card {
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid #e5eaf0;
+  border-radius: 10px;
+}
+
+.v3-sentence-mock-variant-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.v3-sentence-mock-variant {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 7px;
+  align-items: center;
+  min-width: 0;
+  padding: 7px 9px;
+  background: #fff;
+  border: 1px solid #e4e9f0;
+  border-radius: 8px;
+}
+
+.v3-sentence-mock-variant > span:last-child {
+  color: #7b8798;
+  font-size: 11px;
+}
+
+.v3-sentence-mock-translation-list {
+  width: 100%;
+}
+
+.v3-sentence-mock-translation-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 32px;
+  gap: 8px;
+  align-items: start;
+  padding: 10px;
+  background: #fafbfc;
+  border: 1px solid #e5eaf0;
+  border-radius: 11px;
+}
+
+.v3-sentence-mock-translation-row .ant-select,
+.v3-sentence-mock-translation-row .ant-input {
+  width: 100%;
+}
+
+.v3-sentence-mock-add-translation {
+  margin-top: 10px;
+  color: #53657d;
+  border-color: #cfd8e4;
+  border-radius: 10px;
+}
+
+@media (max-width: 760px) {
+  .v3-sentence-mock-drawer .ant-drawer-body {
+    padding-inline: 14px;
+  }
+
+  .v3-sentence-mock-section {
+    padding: 14px;
+  }
+
+  .v3-sentence-mock-section-heading {
+    flex-direction: column;
+  }
+
+  .v3-sentence-mock-mark-actions {
+    width: 100%;
+  }
+
+  .v3-sentence-mock-sentence-grid,
+  .v3-sentence-mock-association-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .v3-sentence-mock-association-card.is-purple {
+    grid-column: auto;
+  }
+
+  .v3-sentence-mock-variant-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .v3-sentence-mock-translation-row {
+    grid-template-columns: minmax(0, 1fr) 32px;
+  }
+
+  .v3-sentence-mock-translation-row .ant-select {
+    grid-column: 1 / -1;
+  }
+}

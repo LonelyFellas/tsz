@@ -2,6 +2,7 @@ import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
+  PhraseComponentUsageV3,
   PronunciationStyle,
   RetiredStableNodeV3,
   TextOriginV3,
@@ -34,6 +35,7 @@ type OperationFailureReason =
   | "duplicate_group_membership"
   | "explicit_mapping_required"
   | "invalid_dialect_rules"
+  | "component_merge_required"
   | "last_form_required"
   | "last_pos_required"
   | "wrong_regional_mode";
@@ -142,7 +144,8 @@ function formNodeIds(form: WordConcreteFormV3): string[] {
     form.id,
     ...variants.flatMap((variant) => [
       variant.id,
-      ...variant.pronunciations.map((pronunciation) => pronunciation.id)
+      ...variant.pronunciations.map((pronunciation) => pronunciation.id),
+      ...(variant.component_usages ?? []).map((component) => component.id)
     ])
   ];
 }
@@ -224,6 +227,17 @@ function mappedPronunciations(
   }));
 }
 
+function clonedComponentUsages(
+  values: readonly PhraseComponentUsageV3[],
+  factory: V3IdFactory,
+  allocated: Set<string>
+): PhraseComponentUsageV3[] {
+  return values.map((component) => ({
+    ...structuredClone(component),
+    id: nextUuid(factory, allocated)
+  }));
+}
+
 /** Mode changes are destructive mappings, never implicit copy/side selection. */
 export function convertCommonToUkUs(
   form: WordConcreteFormV3,
@@ -253,6 +267,7 @@ export function convertCommonToUkUs(
     idFactory,
     allocated
   );
+  const sourceComponents = form.regional_variants.common.component_usages ?? [];
   return {
     ok: true,
     value: {
@@ -265,14 +280,24 @@ export function convertCommonToUkUs(
           dialect: "uk",
           spelling: mapping.uk.spelling,
           origin: mapping.uk.origin,
-          pronunciations: ukPronunciations
+          pronunciations: ukPronunciations,
+          component_usages: clonedComponentUsages(
+            sourceComponents,
+            idFactory,
+            allocated
+          )
         },
         us: {
           id: usId,
           dialect: "us",
           spelling: mapping.us.spelling,
           origin: mapping.us.origin,
-          pronunciations: usPronunciations
+          pronunciations: usPronunciations,
+          component_usages: clonedComponentUsages(
+            sourceComponents,
+            idFactory,
+            allocated
+          )
         }
       }
     }
@@ -289,6 +314,12 @@ export function convertUkUsToCommon(
   }
   if (mapping.confirmed !== true || !explicitMapping(mapping.common)) {
     return { ok: false, reason: "explicit_mapping_required" };
+  }
+  if (
+    (form.regional_variants.uk.component_usages?.length ?? 0) > 0 ||
+    (form.regional_variants.us.component_usages?.length ?? 0) > 0
+  ) {
+    return { ok: false, reason: "component_merge_required" };
   }
   const allocated = new Set<string>(formNodeIds(form));
   const commonId = nextUuid(idFactory, allocated);
@@ -308,7 +339,8 @@ export function convertUkUsToCommon(
             mapping.common,
             idFactory,
             allocated
-          )
+          ),
+          component_usages: []
         }
       }
     }

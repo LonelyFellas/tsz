@@ -5,6 +5,7 @@ import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
+  WordEntryKindV3,
   WordPosFormsV3
 } from "@tsz/types";
 import {
@@ -43,6 +44,8 @@ export interface V3PosTabProps {
   onChange: (next: DraftFormsStepContentV3) => void;
   posCatalog?: PartOfSpeechCatalogItem;
   stableVariantIds?: V3StableVariantIdFactory;
+  entryKind?: WordEntryKindV3;
+  sentenceTargetDiscoveryEnabled?: boolean;
 }
 
 export function V3PosTab({
@@ -52,13 +55,16 @@ export function V3PosTab({
   idFactory,
   onChange,
   posCatalog,
-  stableVariantIds
+  stableVariantIds,
+  entryKind = "word",
+  sentenceTargetDiscoveryEnabled = true
 }: V3PosTabProps) {
   const [pendingGroupDeletion, setPendingGroupDeletion] = useState<{
     groupId: string;
     formIds: string[];
     changed: boolean;
   }>();
+  const [dialectChangeError, setDialectChangeError] = useState<string>();
   const posLabel = posCatalog?.name_zh ?? partOfSpeechLabel(pos.pos);
   const { preference } = useDialectPreference();
   const allowedDerivedTypes = posCatalog?.allowed_form_types ?? [];
@@ -94,7 +100,14 @@ export function V3PosTab({
       idFactory,
       stableVariantIds
     );
-    if (result.ok) onChange(result.value);
+    if (result.ok) {
+      setDialectChangeError(undefined);
+      onChange(result.value);
+    } else if (result.reason === "component_merge_required") {
+      setDialectChangeError(
+        "英式与美式词形已有独立成分用词。请先保留需要的一侧并清空另一侧，再合并为英美共用。"
+      );
+    }
   };
   const dialectControl = (
     <div
@@ -257,6 +270,16 @@ export function V3PosTab({
           type="warning"
         />
       ) : null}
+      {dialectChangeError ? (
+        <Alert
+          closable
+          onClose={() => setDialectChangeError(undefined)}
+          showIcon
+          title="暂不能合并英美成分配置"
+          description={dialectChangeError}
+          type="warning"
+        />
+      ) : null}
       {pendingGroupDeletion ? (
         <Alert
           action={
@@ -299,6 +322,7 @@ export function V3PosTab({
           {visibleGroups.map((group, index) => (
             <V3FormGroupCard
               content={content}
+              entryKind={entryKind}
               deleteDisabled={deletingGroupRemovesLastForm(group.id)}
               dialectControl={index === 0 ? dialectControl : undefined}
               group={group}
@@ -313,6 +337,7 @@ export function V3PosTab({
               onMove={(offset) => moveGroup(index, offset)}
               pos={pos}
               posCatalog={posCatalog}
+              sentenceTargetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
             />
           ))}
         </Space>

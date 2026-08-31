@@ -120,11 +120,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .getByLabel("第 1 条发音的实际发音");
     await expect(issueTarget).toBeFocused();
     await expect(
-      page
-        .getByRole("alert")
-        .filter({ hasText: "词形与发音尚未完成" })
-        .getByText("请完整填写发音方式、字典音标和实际发音")
+      page.getByRole("alert").filter({ hasText: "词形与发音尚未完成" })
     ).toBeVisible();
+    await expect(verbPanel.getByText("请填写实际发音")).toBeVisible();
 
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect.poll(() => api.getWord().revision).toBe(2);
@@ -157,7 +155,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     await page.getByText("预览并生效", { exact: true }).click();
     await expect(page).toHaveURL(
-      new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/forms$`)
+      new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/preview$`)
     );
     await expect(page.getByRole("button", { name: "发布词条" })).toHaveCount(0);
 

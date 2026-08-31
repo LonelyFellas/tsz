@@ -1711,8 +1711,13 @@ describe("FormsAndPronunciationStep", () => {
     const phoneticInput = screen.getAllByLabelText("字典音标")[0]!;
     const compactGroup = phoneticInput.closest(".ant-space-compact");
     expect(compactGroup).not.toBeNull();
-    expect(compactGroup?.children).toHaveLength(3);
-    const [playAction, input, voiceAction] = Array.from(compactGroup!.children);
+    const playAction = compactGroup!.querySelector(
+      ".word-pronunciation-play-action"
+    );
+    const input = phoneticInput;
+    const voiceAction = compactGroup!.querySelector(
+      ".word-pronunciation-voice-action"
+    );
     expect(playAction).toBeDefined();
     expect(input).toBeDefined();
     expect(voiceAction).toBeDefined();

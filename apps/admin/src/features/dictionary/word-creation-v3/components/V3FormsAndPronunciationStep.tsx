@@ -1,11 +1,22 @@
 import { MinusCircleOutlined } from "@ant-design/icons";
-import { Alert, App, Button, Empty, Flex, Space, Tabs, Typography } from "antd";
+import {
+  Alert,
+  App,
+  Badge,
+  Button,
+  Empty,
+  Flex,
+  Space,
+  Tabs,
+  Typography
+} from "antd";
 import type {
   Dialect,
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
   PartOfSpeechCatalogResponse,
-  V3DraftValidationIssue
+  V3DraftValidationIssue,
+  WordEntryKindV3
 } from "@tsz/types";
 import { useEffect, useState } from "react";
 import { partOfSpeechDataSource } from "../../dataSource";
@@ -20,6 +31,7 @@ import { V3PosTab } from "./V3PosTab";
 import { V3AddBasicPosSelect } from "./V3AddBasicPosSelect";
 import { partOfSpeechLabel } from "../presentation";
 import { v3IssueMessage } from "../presentationErrors";
+import { countV3PosFormIncomplete } from "../posCompletion";
 import {
   PronunciationPreviewProvider,
   usePronunciationVoiceNotice
@@ -34,6 +46,8 @@ export interface V3FormsAndPronunciationStepProps {
   issues?: readonly V3DraftValidationIssue[];
   idFactory?: V3IdFactory;
   stableVariantIds?: V3StableVariantIdFactory;
+  entryKind?: WordEntryKindV3;
+  sentenceTargetDiscoveryEnabled?: boolean;
 }
 
 function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
@@ -69,7 +83,9 @@ export function V3FormsAndPronunciationStep({
   onActivePosChange,
   issues = [],
   idFactory = newWordNodeId,
-  stableVariantIds
+  stableVariantIds,
+  entryKind = "word",
+  sentenceTargetDiscoveryEnabled = true
 }: V3FormsAndPronunciationStepProps) {
   const { modal } = App.useApp();
   const [catalog, setCatalog] = useState<{
@@ -142,6 +158,18 @@ export function V3FormsAndPronunciationStep({
                       <Typography.Text type="secondary">
                         请从右上角添加词性。
                       </Typography.Text>
+                      {issues.find((issue) => issue.code === "pos_required") ? (
+                        <Typography.Text
+                          className="word-field-help"
+                          type="danger"
+                        >
+                          {v3IssueMessage(
+                            issues.find(
+                              (issue) => issue.code === "pos_required"
+                            )!
+                          )}
+                        </Typography.Text>
+                      ) : null}
                     </Space>
                   }
                 />
@@ -158,6 +186,11 @@ export function V3FormsAndPronunciationStep({
             label: (
               <Space size={6}>
                 <strong>{label}</strong>
+                <Badge
+                  count={countV3PosFormIncomplete(pos)}
+                  size="small"
+                  title="该词性未填项"
+                />
                 {value.pos.length > 1 ? (
                   <Button
                     aria-label={`删除${label}`}
@@ -183,6 +216,8 @@ export function V3FormsAndPronunciationStep({
             children: (
               <V3PosTab
                 content={value}
+                entryKind={entryKind}
+                sentenceTargetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
                 idFactory={idFactory}
                 issues={issues}
                 onChange={onChange}
@@ -214,15 +249,7 @@ export function V3FormsAndPronunciationStep({
         <V3VoiceNotice value={value} />
         {issues.length > 0 && (
           <Alert
-            description={
-              <ul className="v3-issue-list">
-                {issues.map((issue) => (
-                  <li key={`${issue.node_id}:${issue.field}:${issue.code}`}>
-                    {v3IssueMessage(issue)}
-                  </li>
-                ))}
-              </ul>
-            }
+            description="已按最近一次发布检查结果标出对应字段；修改后请重新检查以更新状态。"
             showIcon
             title="词形与发音尚未完成"
             type="warning"

@@ -44,12 +44,14 @@ import {
 import { useSurfaceSnapshotAny } from "../useSurfaceSnapshot";
 import { createV3WordRequests } from "../word-creation-v3/api";
 import { newWordNodeId } from "../word-model/primitives";
+import { useDialectPreference } from "../../settings/useDialectPreference";
 import {
   extractDetectedBaseForms,
   resolveDetectedBaseForm,
   type DetectedBaseForm
 } from "./baseFormDetection";
 import { classifyEntryInput, validateEntryInput } from "./entryClassification";
+import { hasHeadwordsIssue, headwordsIssues } from "./headwordValidation";
 import type { CreationNavigationState } from "./CreationSourceNotice";
 import "./word-creation.css";
 
@@ -77,6 +79,8 @@ type PendingCreation = {
 
 interface Props {
   requests?: UnifiedCreateRequests;
+  initialValue?: string;
+  onDetectedHeadwords?: (headwords?: WordHeadwordsV2) => void;
   onCreated: (
     word: AdminWordV3,
     navigationState: CreationNavigationState
@@ -208,6 +212,26 @@ function builtinRegionalValue(pending: PendingCreation): {
   };
 }
 
+function regionalValueForDetection(
+  value: WordHeadwordsV2,
+  surface: string,
+  preference: "uk" | "us"
+): WordHeadwordsV2 {
+  if (value.mode === "unified") return value;
+  const input = surface.trim().toLowerCase();
+  const uk = value.uk.trim().toLowerCase();
+  const us = value.us.trim().toLowerCase();
+  const sourceDialect =
+    uk === us
+      ? preference
+      : input === uk
+        ? "uk"
+        : input === us
+          ? "us"
+          : preference;
+  return { ...value, source_dialect: sourceDialect };
+}
+
 function DetectionPresentationCard({
   pending,
   catalog,
@@ -227,10 +251,8 @@ function DetectionPresentationCard({
     pending.detection.builtin_dictionary.status === "matched"
       ? pending.detection.builtin_dictionary.coverage
       : undefined;
-  let posCodes: string[] = [];
   let builtinPosCodes = new Set<string>();
   if (pending.detection.builtin_dictionary.status === "matched") {
-    posCodes = [...new Set(pending.detection.suggested_pos)];
     builtinPosCodes = new Set([
       ...pending.detection.builtin_dictionary.suggested_pos,
       ...pending.detection.builtin_dictionary.suggested_forms.map(
@@ -276,13 +298,12 @@ function DetectionPresentationCard({
     )
   ];
   const smartPosLabels = [
-    ...new Set([
-      ...posCodes
-        .filter((pos) => !builtinPosCodes.has(pos))
-        .map((pos) => partOfSpeechLabel(pos, catalog)),
-      ...displayEntries.flatMap((entry) => entry.posLabels)
-    ])
+    ...new Set(displayEntries.flatMap((entry) => entry.posLabels))
   ];
+  const preferredPosLabels =
+    smartPosLabels.length > 0 ? smartPosLabels : builtinPosLabels;
+  const preferredPosSource =
+    smartPosLabels.length > 0 ? "智能词库" : "内置词典";
 
   return (
     <Card
@@ -310,34 +331,18 @@ function DetectionPresentationCard({
               </Space>
             )}
           </Descriptions.Item>
-          {builtinPosLabels.length > 0 || smartPosLabels.length > 0 ? (
+          {preferredPosLabels.length > 0 ? (
             <Descriptions.Item label="建议词性">
-              <div className="word-pos-sources">
-                {builtinPosLabels.length > 0 ? (
-                  <div className="word-pos-source-row">
-                    <Typography.Text type="secondary">内置：</Typography.Text>
-                    <Space size={[4, 4]} wrap>
-                      {builtinPosLabels.map((label) => (
-                        <Tag key={label} color="blue">
-                          {label}
-                        </Tag>
-                      ))}
-                    </Space>
-                  </div>
-                ) : null}
-                {smartPosLabels.length > 0 ? (
-                  <div className="word-pos-source-row">
-                    <Typography.Text type="secondary">智能：</Typography.Text>
-                    <Space size={[4, 4]} wrap>
-                      {smartPosLabels.map((label) => (
-                        <Tag key={label} color="cyan">
-                          {label}
-                        </Tag>
-                      ))}
-                    </Space>
-                  </div>
-                ) : null}
-              </div>
+              <Space size={[6, 6]} wrap>
+                {preferredPosLabels.map((label) => (
+                  <Tag key={label} color="blue">
+                    {label}
+                  </Tag>
+                ))}
+                <Typography.Text type="secondary">
+                  来源：{preferredPosSource}
+                </Typography.Text>
+              </Space>
             </Descriptions.Item>
           ) : null}
           {builtinCoverage ? (
@@ -433,8 +438,13 @@ function DetectionPresentationCard({
                         ))}
                       </Space>
                     ) : null}
-                    {entry.glossPreviews.map((gloss) => (
-                      <div key={gloss}>释义：{gloss}</div>
+                    {entry.glossPreviews.map((gloss, index) => (
+                      <div key={gloss}>
+                        {index < 20
+                          ? String.fromCodePoint(0x2460 + index)
+                          : String(index + 1) + "."}{" "}
+                        释义：{gloss}
+                      </div>
                     ))}
                   </div>
                 ) : null}
@@ -464,12 +474,12 @@ function DetectionPresentationCard({
 
 function HeadwordConfirmationCard({
   state,
-  editable,
+  preference,
   onChange,
   onRetry
 }: {
   state: RegionalDisplayState;
-  editable: boolean;
+  preference: "uk" | "us";
   onChange: (value: WordHeadwordsV2) => void;
   onRetry: () => void;
 }) {
@@ -502,8 +512,8 @@ function HeadwordConfirmationCard({
     );
   }
   const value = state.value;
-  const uk = value.mode === "distinguish" ? value.uk : value.common;
-  const us = value.mode === "distinguish" ? value.us : value.common;
+  const issues = headwordsIssues(value);
+  const lockedLabel = preference === "uk" ? "英式" : "美式";
   return (
     <Card
       className="word-headword-confirmation-card"
@@ -514,61 +524,102 @@ function HeadwordConfirmationCard({
         <div>
           <Typography.Text strong>区分英美词形</Typography.Text>
           <Typography.Text type="secondary">
-            开启后可分别确认英式与美式主词
+            开启后按个人方言偏好锁定一侧，另一侧可编辑
           </Typography.Text>
         </div>
         <Switch
           aria-label="区分英美词形"
           checked={value.mode === "distinguish"}
-          disabled={!editable}
           onChange={(checked) => {
+            const confirmed =
+              value.mode === "distinguish" ? value[preference] : value.common;
             onChange(
               checked
                 ? {
                     mode: "distinguish",
-                    uk,
-                    us,
-                    source_dialect: "us"
+                    uk: confirmed,
+                    us: confirmed,
+                    source_dialect: preference
                   }
-                : { mode: "unified", common: us }
+                : { mode: "unified", common: confirmed }
             );
           }}
         />
       </div>
-      <Row gutter={16}>
-        <Col xs={24} md={12}>
-          <div className="dialect-panel dialect-panel-uk">
-            <Typography.Text strong>英式英语 · BrE</Typography.Text>
+      {value.mode === "unified" ? (
+        <div className="dialect-panel">
+          <Form.Item
+            label="统一主词"
+            required
+            validateStatus={
+              value.common.trim() === "" || issues.uk ? "error" : undefined
+            }
+            help={value.common.trim() === "" ? "请输入统一主词" : issues.uk}
+          >
             <Input
-              aria-label="英式主词"
-              value={uk}
-              disabled={!editable || value.mode === "unified"}
-              onChange={(event) => {
-                if (value.mode === "distinguish") {
-                  onChange({ ...value, uk: event.target.value });
-                }
-              }}
-              style={{ marginTop: 10 }}
+              aria-label="统一主词"
+              value={value.common}
+              onChange={(event) =>
+                onChange({ mode: "unified", common: event.target.value })
+              }
             />
-          </div>
-        </Col>
-        <Col xs={24} md={12}>
-          <div className="dialect-panel dialect-panel-us">
-            <Typography.Text strong>美式英语 · AmE</Typography.Text>
-            <Input
-              aria-label="美式主词"
-              value={us}
-              disabled={!editable || value.mode === "unified"}
-              onChange={(event) => {
-                if (value.mode === "distinguish") {
-                  onChange({ ...value, us: event.target.value });
-                }
-              }}
-              style={{ marginTop: 10 }}
-            />
-          </div>
-        </Col>
-      </Row>
+          </Form.Item>
+        </div>
+      ) : (
+        <>
+          <Typography.Text
+            type="secondary"
+            className="word-field-help word-headword-lock-note"
+          >
+            按个人偏好锁定{lockedLabel}
+            主词；如需调整锁定侧，请先修改个人方言偏好。
+          </Typography.Text>
+          <Row gutter={16}>
+            <Col xs={24} md={12}>
+              <div className="dialect-panel dialect-panel-uk">
+                <Typography.Text strong>英式英语 · BrE</Typography.Text>
+                <Form.Item
+                  required
+                  validateStatus={
+                    value.uk.trim() === "" || issues.uk ? "error" : undefined
+                  }
+                  help={value.uk.trim() === "" ? "请输入英式主词" : issues.uk}
+                >
+                  <Input
+                    aria-label="英式主词"
+                    value={value.uk}
+                    disabled={preference === "uk"}
+                    onChange={(event) =>
+                      onChange({ ...value, uk: event.target.value })
+                    }
+                  />
+                </Form.Item>
+              </div>
+            </Col>
+            <Col xs={24} md={12}>
+              <div className="dialect-panel dialect-panel-us">
+                <Typography.Text strong>美式英语 · AmE</Typography.Text>
+                <Form.Item
+                  required
+                  validateStatus={
+                    value.us.trim() === "" || issues.us ? "error" : undefined
+                  }
+                  help={value.us.trim() === "" ? "请输入美式主词" : issues.us}
+                >
+                  <Input
+                    aria-label="美式主词"
+                    value={value.us}
+                    disabled={preference === "us"}
+                    onChange={(event) =>
+                      onChange({ ...value, us: event.target.value })
+                    }
+                  />
+                </Form.Item>
+              </div>
+            </Col>
+          </Row>
+        </>
+      )}
       <Typography.Text
         type="secondary"
         className="word-field-help word-headword-source"
@@ -586,11 +637,14 @@ function HeadwordConfirmationCard({
 
 export function UnifiedCreateEntryStep({
   requests = defaultRequests,
+  initialValue = "",
+  onDetectedHeadwords,
   onCreated
 }: Props) {
   const { modal } = App.useApp();
   const catalog = usePartOfSpeechCatalog();
-  const [value, setValue] = useState("");
+  const { preference } = useDialectPreference();
+  const [value, setValue] = useState(initialValue);
   const [fieldError, setFieldError] = useState<string>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState<"checking" | "creating">();
@@ -606,6 +660,9 @@ export function UnifiedCreateEntryStep({
   const retryKey = useRef<{ normalized: string; key: string } | undefined>(
     undefined
   );
+  const preservedRegionalDisplay = useRef<
+    Extract<RegionalDisplayState, { status: "ready" }> | undefined
+  >(undefined);
 
   useEffect(() => {
     mounted.current = true;
@@ -615,6 +672,12 @@ export function UnifiedCreateEntryStep({
       locked.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    onDetectedHeadwords?.(
+      regionalDisplay.status === "ready" ? regionalDisplay.value : undefined
+    );
+  }, [onDetectedHeadwords, regionalDisplay]);
 
   const page = initialSurfacePage(pending);
   const fetchSurfacePage = useCallback(
@@ -667,10 +730,26 @@ export function UnifiedCreateEntryStep({
       );
       return;
     }
+    if (preservedRegionalDisplay.current) {
+      setRegionalDisplay(preservedRegionalDisplay.current);
+      return;
+    }
+    const fallback = builtinRegionalValue(prepared);
+    const preferredFallback = {
+      ...fallback,
+      value: regionalValueForDetection(
+        fallback.value,
+        prepared.detection.normalized_surface,
+        preference
+      )
+    };
+    if (fallback.value.mode === "distinguish") {
+      setRegionalDisplay({ status: "ready", ...preferredFallback });
+      return;
+    }
     const first = baseCandidates[0];
     if (!first) {
-      const fallback = builtinRegionalValue(prepared);
-      setRegionalDisplay({ status: "ready", ...fallback });
+      setRegionalDisplay({ status: "ready", ...preferredFallback });
       return;
     }
     let active = true;
@@ -681,7 +760,18 @@ export function UnifiedCreateEntryStep({
         const value = resolveDetectedBaseForm(response.word, first);
         setRegionalDisplay(
           value
-            ? { status: "ready", source: "database", value }
+            ? {
+                status: "ready",
+                source: "database",
+                value:
+                  value.mode === "distinguish"
+                    ? regionalValueForDetection(
+                        value,
+                        prepared.detection.normalized_surface,
+                        preference
+                      )
+                    : value
+              }
             : { status: "error" }
         );
       })
@@ -696,6 +786,7 @@ export function UnifiedCreateEntryStep({
     candidateDiscoveryReady,
     detailRetry,
     prepared,
+    preference,
     requests,
     snapshot.phase
   ]);
@@ -703,6 +794,7 @@ export function UnifiedCreateEntryStep({
   const changeValue = (next: string) => {
     generation.current += 1;
     retryKey.current = undefined;
+    preservedRegionalDisplay.current = undefined;
     setValue(next);
     setFieldError(undefined);
     setError(undefined);
@@ -713,6 +805,7 @@ export function UnifiedCreateEntryStep({
 
   const createPending = async (
     target: PendingCreation,
+    headwords: WordHeadwordsV2,
     confirmedSurfaceToken?: string
   ) => {
     if (locked.current) return;
@@ -724,6 +817,7 @@ export function UnifiedCreateEntryStep({
         schema_version: 3,
         detection_id: target.detection.detection_id,
         kind: target.kind,
+        headwords,
         ...(confirmedSurfaceToken
           ? { confirmed_surface_match_token: confirmedSurfaceToken }
           : {})
@@ -877,6 +971,16 @@ export function UnifiedCreateEntryStep({
       setError("请先完成原形确认后再创建。");
       return;
     }
+    const headwords = regionalDisplay.value;
+    preservedRegionalDisplay.current = regionalDisplay;
+    const hasEmptyHeadword =
+      headwords.mode === "unified"
+        ? headwords.common.trim() === ""
+        : headwords.uk.trim() === "" || headwords.us.trim() === "";
+    if (hasEmptyHeadword || hasHeadwordsIssue(headwords)) {
+      setError("请先填写合法的英文主词后再创建。");
+      return;
+    }
     try {
       assertFreshDetection(target.detection.expires_at);
     } catch {
@@ -885,7 +989,7 @@ export function UnifiedCreateEntryStep({
       setError("检查结果已过期，请重新检测。");
       return;
     }
-    void createPending(target, confirmedSurfaceToken);
+    void createPending(target, headwords, confirmedSurfaceToken);
   };
 
   const confirm = () => {
@@ -971,8 +1075,16 @@ export function UnifiedCreateEntryStep({
             <div className="word-headword-confirmation-wrap">
               <HeadwordConfirmationCard
                 state={regionalDisplay}
-                editable={false}
-                onChange={() => undefined}
+                preference={preference}
+                onChange={(next) => {
+                  setError(undefined);
+                  setRegionalDisplay((current) => {
+                    if (current.status !== "ready") return current;
+                    const updated = { ...current, value: next };
+                    preservedRegionalDisplay.current = updated;
+                    return updated;
+                  });
+                }}
                 onRetry={() => setDetailRetry((retry) => retry + 1)}
               />
             </div>
@@ -982,7 +1094,12 @@ export function UnifiedCreateEntryStep({
 
       {pending ? (
         <div className="word-entry-actions">
-          <Button onClick={() => changeValue(value)}>重新检测</Button>
+          <Button
+            icon={<SearchOutlined aria-hidden />}
+            onClick={() => changeValue(value)}
+          >
+            重新检测
+          </Button>
           <Button
             type="primary"
             icon={<PlusOutlined aria-hidden />}

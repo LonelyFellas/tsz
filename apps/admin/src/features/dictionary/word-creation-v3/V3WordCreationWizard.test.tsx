@@ -6,8 +6,10 @@ import type {
   DraftMeaningsStepContentWritableV3,
   DraftValidationResponseV3,
   FormsImpactResponseV3,
+  SentenceAssociationInputV3,
   SurfaceMatchPageV3,
-  V3DraftValidationIssue
+  V3DraftValidationIssue,
+  WordSentenceWritableV3
 } from "@tsz/types";
 import {
   act,
@@ -186,6 +188,13 @@ function requests(overrides: Partial<V3WordRequests> = {}): V3WordRequests {
     })),
     saveForms: vi.fn(async () => envelope(2, "centre")),
     saveMeanings: vi.fn(async () => envelope(2, "centre")),
+    replaceSentenceAssociations: vi.fn(async () => envelope(2, "centre")),
+    listPendingSentenceAssociations: vi.fn(async () => ({
+      results: [],
+      total: 0,
+      next_cursor: null
+    })),
+    claimPendingSentenceAssociation: vi.fn(async () => envelope(2, "centre")),
     validate: vi.fn(async () => validation),
     publish: vi.fn(async () => envelope(2, "centre")),
     ...overrides
@@ -210,6 +219,7 @@ function Slot({ context }: { context: V3WizardSlotContext }) {
       <output data-testid="revision">{context.word.revision}</output>
       <output data-testid="spelling">{spellingOf(context)}</output>
       <output data-testid="active-pos">{context.activePosId}</output>
+      <output data-testid="slot-issue-count">{context.issues.length}</output>
       <button
         type="button"
         onClick={() => context.setDraftForms(editedForms(context))}
@@ -271,6 +281,7 @@ function renderWizard(
     initialStep?: Parameters<typeof V3WordCreationWizard>[0]["initialStep"];
     readOnly?: boolean;
     allowPublishedEditing?: boolean;
+    idempotencyKeyFactory?: () => string;
     renderStep?: (context: V3WizardSlotContext) => ReactNode;
     retiredStableNodes?: Parameters<
       typeof V3WordCreationWizard
@@ -285,6 +296,7 @@ function renderWizard(
         initialStep={options.initialStep}
         readOnly={options.readOnly}
         allowPublishedEditing={options.allowPublishedEditing}
+        idempotencyKeyFactory={options.idempotencyKeyFactory}
         navigationAdapter={options.navigationAdapter}
         onWordChange={options.onWordChange}
         retiredStableNodes={options.retiredStableNodes}
@@ -339,6 +351,190 @@ function impactSurfacePage(nextCursor: string | null): SurfaceMatchPageV3 {
 }
 
 describe("V3WordCreationWizard", () => {
+  it("新增多维例句先保存 meanings，再用新 revision 整组保存 Pending 关联", async () => {
+    const initial = word();
+    initial.completed_steps = ["basics", "forms"];
+    initial.max_reachable_step = "meanings";
+    const saved = word(2);
+    saved.completed_steps = ["basics", "forms"];
+    saved.max_reachable_step = "meanings";
+    const associated = structuredClone(saved);
+    associated.lifecycle_revision = 2;
+    const saveMeanings = vi.fn(async () => ({ word: saved }));
+    const replaceSentenceAssociations = vi.fn(async () => ({
+      word: associated
+    }));
+    const source = requests({
+      saveMeanings,
+      replaceSentenceAssociations
+    });
+    const sentence: WordSentenceWritableV3 = {
+      id: "sentence-new",
+      level: "B1",
+      en_text: {
+        mode: "unified",
+        common: {
+          id: "sentence-new-en",
+          origin: "manual",
+          value: {
+            version: 2,
+            text: "It is centered on the center of the wall.",
+            annotations: []
+          }
+        }
+      },
+      zh_text_id: "sentence-new-zh",
+      zh_text: { version: 2, text: "它位于墙的中央。", annotations: [] },
+      zh_translations: [
+        {
+          id: "sentence-new-zh",
+          band: "b1_b2",
+          content: {
+            version: 2,
+            text: "它位于墙的中央。",
+            annotations: []
+          }
+        }
+      ],
+      links: [{ word_id: "word-1", sense_id: "sense-canonical", role: "head" }]
+    };
+    const associations: SentenceAssociationInputV3[] = [
+      {
+        id: "association-new",
+        source_dialect: "common",
+        source_segments: [
+          {
+            start: 22,
+            end: 40,
+            surface: "center of the wall"
+          }
+        ],
+        pending_target_kind: "phrase",
+        pending_target_headword: "center of the wall",
+        pending_target_gloss: "墙的中心位置"
+      }
+    ];
+
+    renderWizard(source, {
+      initialWord: initial,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <button
+          onClick={() =>
+            void context.actions.saveMultidimensionalSentence(
+              UUIDS.pos,
+              "sense-canonical",
+              sentence,
+              associations
+            )
+          }
+          type="button"
+        >
+          保存多维例句
+        </button>
+      )
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存多维例句" }));
+
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(1));
+    expect(saveMeanings).toHaveBeenCalledWith(
+      "word-1",
+      expect.objectContaining({
+        schema_version: 3,
+        base_revision: 1,
+        intent: "save",
+        content: expect.objectContaining({
+          pos: [
+            expect.objectContaining({
+              senses: [
+                expect.objectContaining({
+                  sentences: expect.arrayContaining([
+                    expect.objectContaining({ id: "sentence-new" })
+                  ])
+                })
+              ]
+            })
+          ]
+        })
+      })
+    );
+    await waitFor(() =>
+      expect(replaceSentenceAssociations).toHaveBeenCalledTimes(1)
+    );
+    expect(replaceSentenceAssociations).toHaveBeenCalledWith(
+      "word-1",
+      "sentence-new",
+      expect.any(String),
+      {
+        association_schema_version: 3,
+        base_revision: 2,
+        base_lifecycle_revision: 1,
+        associations
+      }
+    );
+  });
+
+  it("已有例句只改关联时直接使用当前 revision，不重复保存 meanings", async () => {
+    const initial = word();
+    initial.completed_steps = ["basics", "forms"];
+    initial.max_reachable_step = "meanings";
+    const associated = structuredClone(initial);
+    associated.lifecycle_revision = 2;
+    const saveMeanings = vi.fn(async () => ({ word: word(2) }));
+    const replaceSentenceAssociations = vi.fn(async () => ({
+      word: associated
+    }));
+    const source = requests({ saveMeanings, replaceSentenceAssociations });
+    const sentence = toWritableMeanings(initial.meanings).pos[0]!.senses[0]!
+      .sentences[0]!;
+    const associations: SentenceAssociationInputV3[] = [
+      {
+        id: "association-existing",
+        source_dialect: "common",
+        source_segments: [{ start: 2, end: 8, surface: "centre" }],
+        pending_target_kind: "word",
+        pending_target_headword: "centre"
+      }
+    ];
+
+    renderWizard(source, {
+      initialWord: initial,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <button
+          onClick={() =>
+            void context.actions.saveMultidimensionalSentence(
+              UUIDS.pos,
+              "sense-canonical",
+              sentence,
+              associations
+            )
+          }
+          type="button"
+        >
+          更新已有例句关联
+        </button>
+      )
+    });
+    fireEvent.click(screen.getByRole("button", { name: "更新已有例句关联" }));
+
+    await waitFor(() =>
+      expect(replaceSentenceAssociations).toHaveBeenCalledTimes(1)
+    );
+    expect(saveMeanings).not.toHaveBeenCalled();
+    expect(replaceSentenceAssociations).toHaveBeenCalledWith(
+      "word-1",
+      "sentence-canonical",
+      expect.any(String),
+      {
+        association_schema_version: 3,
+        base_revision: 1,
+        base_lifecycle_revision: 1,
+        associations
+      }
+    );
+  });
+
   it("initializes empty meanings once per session and preserves every generated UUID across step changes and rerenders", () => {
     const initial = word();
     initial.forms = {
@@ -1154,9 +1350,7 @@ describe("V3WordCreationWizard", () => {
       ])
     );
     expect(screen.getByTestId("active-pos")).toHaveTextContent("pos-2");
-    expect(
-      screen.getByText("内容来源无法确认，请刷新后重试")
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("slot-issue-count")).toHaveTextContent("1");
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
   });
 
@@ -1803,6 +1997,9 @@ describe("V3WordCreationWizard", () => {
             {String(context.dirtySteps.forms)}/
             {String(context.dirtySteps.meanings)}
           </output>
+          <output data-testid="partial-complete-issues">
+            {context.issues.map((issue) => issue.code).join(",")}
+          </output>
           <button
             type="button"
             onClick={() => {
@@ -1832,9 +2029,11 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByText("编辑分步草稿"));
     fireEvent.click(screen.getByText("完成后续失败"));
 
-    expect(
-      await screen.findByText("请完整填写释义并选择语法结构")
-    ).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByTestId("partial-complete-issues")).toHaveTextContent(
+        "definition_invalid"
+      )
+    );
     expect(saveForms).toHaveBeenCalledTimes(1);
     expect(saveMeanings).toHaveBeenCalledTimes(1);
     expect(saveMeanings.mock.calls[0]![1].base_revision).toBe(2);
@@ -2110,6 +2309,117 @@ describe("V3WordCreationWizard", () => {
       });
     }
   );
+
+  it("invalidates prepared publication state when publish returns fresh validation issues", async () => {
+    const initialWord = word();
+    initialWord.capabilities.publication = {
+      mode: "migration_canary",
+      whitelisted: true
+    };
+    initialWord.completed_steps = ["basics", "forms", "meanings"];
+    initialWord.max_reachable_step = "preview";
+    const issue = validationIssue();
+    const publish = vi
+      .fn<V3WordRequests["publish"]>()
+      .mockRejectedValueOnce(
+        new HttpError(422, "invalid", [], "validation_failed", [issue])
+      )
+      .mockResolvedValueOnce({
+        word: { ...initialWord, revision: 3, status: "published" }
+      });
+    const saveForms = vi.fn<V3WordRequests["saveForms"]>(
+      async (_wordId, input) => ({
+        word: { ...initialWord, revision: 2, forms: input.content }
+      })
+    );
+    const validate = vi
+      .fn<V3WordRequests["validate"]>()
+      .mockResolvedValueOnce({
+        schema_version: 3,
+        validated_revision: 1,
+        valid: true,
+        issues: []
+      })
+      .mockResolvedValueOnce({
+        schema_version: 3,
+        validated_revision: 2,
+        valid: true,
+        issues: []
+      });
+    const idempotencyKeyFactory = vi
+      .fn<() => string>()
+      .mockReturnValueOnce("publish-key-1")
+      .mockReturnValueOnce("publish-key-2");
+
+    renderWizard(requests({ publish, saveForms, validate }), {
+      initialWord,
+      initialStep: "preview",
+      idempotencyKeyFactory,
+      renderStep: (context) => (
+        <>
+          <output data-testid="active-step">{context.activeStep}</output>
+          <output data-testid="publish-revision">
+            {context.word.revision}
+          </output>
+          <V3PreviewAndPublishStep
+            word={context.word}
+            controller={{
+              ...(context.validation ? { validation: context.validation } : {}),
+              ...(context.impact ? { impact: context.impact } : {}),
+              impactConfirmed: context.impactConfirmed,
+              issues: context.issues,
+              ...(context.problem ? { problem: context.problem } : {}),
+              isPending: (command) => context.isPending(command),
+              actions: {
+                validate: context.actions.validate,
+                previewFormsImpact: context.actions.previewFormsImpact,
+                publish: context.actions.publish,
+                navigateIssue: context.actions.navigateIssue,
+                confirmImpact: context.actions.confirmImpact,
+                confirmImpactSurface: context.actions.confirmImpactSurface,
+                fetchSurfacePage: context.actions.fetchSurfacePage
+              }
+            }}
+          />
+          <button onClick={() => context.setDraftForms(editedForms(context))}>
+            编辑修复
+          </button>
+          <button onClick={() => void context.actions.saveForms("save")}>
+            保存修复
+          </button>
+          <button
+            onClick={async () => {
+              const result = await context.actions.validate();
+              if (result?.valid) await context.actions.previewFormsImpact();
+            }}
+          >
+            重新准备发布
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "还有 1 项待完成" })
+    ).toBeVisible();
+    expect(screen.getByTestId("active-step")).toHaveTextContent("preview");
+    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
+
+    fireEvent.click(screen.getByText("编辑修复"));
+    fireEvent.click(screen.getByText("保存修复"));
+    await waitFor(() => expect(saveForms).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText("重新准备发布"));
+    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
+
+    await waitFor(() => expect(publish).toHaveBeenCalledTimes(2));
+    expect(publish.mock.calls.map((call) => call[1])).toEqual([
+      "publish-key-1",
+      "publish-key-2"
+    ]);
+  }, 15_000);
 
   it("refreshes canonical before rotating a publish idempotency key and requires a fresh controlled prepare", async () => {
     const initialWord = word();
@@ -3054,7 +3364,7 @@ describe("V3WordCreationWizard", () => {
       )
     );
     expect(screen.getByTestId("impact-state")).toHaveTextContent("none/false");
-    expect(focusField).toHaveBeenCalledTimes(1);
+    expect(focusField).not.toHaveBeenCalled();
   });
 
   it("drops stale validate and impact responses after a POS supersede", async () => {

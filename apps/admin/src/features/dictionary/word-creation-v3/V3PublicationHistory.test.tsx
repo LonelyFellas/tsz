@@ -387,10 +387,13 @@ function complexV3Publication(): AdminWordPublicationV3 {
       associations: [
         {
           id: "v3-association-only",
+          association_schema_version: 3,
           source_dialect: "common",
-          source_range: { start: 0, end: 2, surface: "V3" },
+          source_segments: [{ start: 0, end: 2, surface: "V3" }],
           target_word_id: "v3-associated-word",
           target_sense_id: "v3-associated-sense",
+          state: "linked",
+          target_component_usages: [],
           origin: "manual",
           target_headword: "v3-associated-only",
           target_gloss: "V3 association",
@@ -668,7 +671,7 @@ describe("V3PublicationHistory", () => {
     ).toBeInTheDocument();
     expect(detail.getByText("V3 grammar only")).toBeInTheDocument();
     expect(detail.getByText("通用：V3 sentence only.")).toBeInTheDocument();
-    expect(detail.getByText("中文：仅 V3 例句")).toBeInTheDocument();
+    expect(detail.getByText("仅 V3 例句")).toBeInTheDocument();
     expect(detail.getByText("主关联")).toBeInTheDocument();
     expect(
       detail.getByText("上下文关联：v3-associated-only · V3 association")
@@ -702,7 +705,10 @@ describe("V3PublicationHistory", () => {
     const v3Pos = detailV3.word.meanings.pos[0]!;
     v3Pos.pos_id = "orphan-v3-pos";
     v3Pos.senses[0]!.sentences[0]!.level = "";
-    v3Pos.senses[0]!.sentences[0]!.associations[0]!.target_gloss = "";
+    const v3Association = v3Pos.senses[0]!.sentences[0]!.associations[0]!;
+    if (v3Association.state !== "linked")
+      throw new Error("expected linked association");
+    v3Association.target_gloss = "";
     const v3Relation = v3Pos.senses[0]!.relations[0]!;
     delete v3Relation.pending_target_headword;
     v3Relation.target_gloss = "V3 待补充释义";

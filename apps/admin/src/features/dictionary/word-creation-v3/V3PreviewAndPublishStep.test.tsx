@@ -12,6 +12,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
   waitFor
 } from "@testing-library/react";
 import { StrictMode } from "react";
@@ -458,6 +459,140 @@ describe("V3PreviewAndPublishStep", () => {
     expect(
       screen.queryByText("invalid_form_type_for_part_of_speech")
     ).toBeNull();
+  });
+
+  it("按总数、基本词性与问题类型汇总重复校验项并定位首个缺失字段", () => {
+    const current = word({ mode: "migration_canary", whitelisted: true });
+    const positions = [
+      { code: "adjective", id: uuidFromInt(1001), count: 8 },
+      { code: "noun", id: uuidFromInt(1002), count: 10 },
+      { code: "verb", id: uuidFromInt(1003), count: 11 }
+    ];
+    current.forms = {
+      pos: positions.map(({ code, id }) => ({
+        ...formsFixture({ pos: code, pos_id: id }).pos[0]!,
+        pos: code,
+        pos_id: id
+      }))
+    };
+    const issues = positions.flatMap(({ id, count }, positionIndex) =>
+      Array.from({ length: count }, (_, issueIndex) => {
+        const pronunciationId = uuidFromInt(
+          1100 + positionIndex * 20 + issueIndex
+        );
+        return {
+          schema_version: 3,
+          step: "forms",
+          node_id: pronunciationId,
+          field: "actual_pron",
+          code: "pronunciation_required",
+          message: "actual pronunciation is missing",
+          node_location: {
+            node_role: "pronunciation",
+            ancestor_node_ids: [id],
+            pos_id: id,
+            form_id: current.forms.pos[positionIndex]!.forms[0]!.id,
+            form_type: "base",
+            variant_id: uuidFromInt(1300 + positionIndex),
+            pronunciation_id: pronunciationId
+          }
+        } satisfies V3DraftValidationIssue;
+      })
+    );
+    const navigateIssue = vi.fn();
+    const controller: V3PreviewPublishController = {
+      issues,
+      isPending: () => false,
+      actions: {
+        validate: vi.fn(),
+        previewFormsImpact: vi.fn(),
+        publish: vi.fn(),
+        navigateIssue
+      }
+    };
+
+    render(<V3PreviewAndPublishStep word={current} controller={controller} />);
+
+    const summary = screen.getByRole("region", { name: "发布待完成摘要" });
+    expect(
+      within(summary).getByRole("heading", { name: "还有 29 项待完成" })
+    ).toBeVisible();
+    expect(
+      within(summary).getByTestId("issue-pos-adjective")
+    ).toHaveTextContent("形容词8 项待完成");
+    expect(within(summary).getByTestId("issue-pos-noun")).toHaveTextContent(
+      "名词10 项待完成"
+    );
+    expect(within(summary).getByTestId("issue-pos-verb")).toHaveTextContent(
+      "动词11 项待完成"
+    );
+    expect(
+      within(summary).getAllByText("请完整填写发音方式、字典音标和实际发音", {
+        exact: true
+      })
+    ).toHaveLength(1);
+    expect(
+      within(summary).getByText(
+        "形容词：原形 8 项 · 名词：原形 10 项 · 动词：原形 11 项"
+      )
+    ).toBeVisible();
+
+    fireEvent.click(
+      within(summary).getByRole("button", { name: "填写形容词未完成项" })
+    );
+    expect(navigateIssue).toHaveBeenCalledWith(issues[0]);
+  });
+
+  it("从服务端 ancestor 定位没有显式 pos_id 的词义问题", () => {
+    const current = word({ mode: "migration_canary", whitelisted: true });
+    current.meanings = {
+      sense_groups: [],
+      pos: [
+        {
+          pos_id: UUIDS.pos,
+          grammar_structures: [],
+          senses: [
+            {
+              id: "sense-1",
+              sub_pos: "countable",
+              level: "A1",
+              depends_on_context: false,
+              definitions: [],
+              sentences: [],
+              relations: []
+            }
+          ]
+        }
+      ]
+    };
+    const issue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "meanings",
+      node_id: "sense-1",
+      field: "frequency",
+      code: "frequency_invalid",
+      message: "invalid frequency",
+      node_location: {
+        node_role: "meanings.sense",
+        ancestor_node_ids: [UUIDS.pos]
+      }
+    };
+    const controller: V3PreviewPublishController = {
+      issues: [issue],
+      isPending: () => false,
+      actions: {
+        validate: vi.fn(),
+        previewFormsImpact: vi.fn(),
+        publish: vi.fn()
+      }
+    };
+
+    render(<V3PreviewAndPublishStep word={current} controller={controller} />);
+
+    expect(screen.getByTestId("issue-pos-noun")).toHaveTextContent(
+      "名词1 项待完成"
+    );
+    expect(screen.getByText("名词 1 项")).toBeVisible();
   });
 
   it("shows every concrete impact item instead of only the affected count", () => {

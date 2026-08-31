@@ -255,7 +255,7 @@ describe("base form detection presentation", () => {
       )
     ).toEqual([
       {
-        key: "3:entry-v3:base-v3",
+        key: "3:entry-v3",
         schemaVersion: 3,
         entryId: "entry-v3",
         formId: "base-v3",
@@ -266,7 +266,7 @@ describe("base form detection presentation", () => {
         glossPreviews: ["中心"]
       },
       {
-        key: "2:entry-v2:base-v2",
+        key: "2:entry-v2",
         schemaVersion: 2,
         entryId: "entry-v2",
         formId: "base-v2",
@@ -334,7 +334,7 @@ describe("base form detection presentation", () => {
       )
     ).toEqual([
       {
-        key: "2:entry-v2:base-v2",
+        key: "2:entry-v2",
         schemaVersion: 2,
         entryId: "entry-v2",
         formId: "base-v2",
@@ -350,7 +350,7 @@ describe("base form detection presentation", () => {
   it("缺少上下文时仍使用 surface 自身信息展示 V2 与 V3 原形", () => {
     expect(extractDetectedBaseForms(2, [v2FormMatch()], [])).toEqual([
       {
-        key: "2:entry-v2:base-v2",
+        key: "2:entry-v2",
         schemaVersion: 2,
         entryId: "entry-v2",
         formId: "base-v2",
@@ -381,7 +381,7 @@ describe("base form detection presentation", () => {
     };
     expect(extractDetectedBaseForms(3, [v3Match], [])).toEqual([
       {
-        key: "3:entry-v3-without-context:base-v3-without-context",
+        key: "3:entry-v3-without-context",
         schemaVersion: 3,
         entryId: "entry-v3-without-context",
         formId: "base-v3-without-context",
@@ -420,7 +420,7 @@ describe("base form detection presentation", () => {
   it("用稳定 form id 解析 V3 首个原形的英美式", () => {
     expect(
       resolveDetectedBaseForm(v3Word(), {
-        key: "3:entry-v3:base-v3",
+        key: "3:entry-v3",
         schemaVersion: 3,
         entryId: "entry-v3",
         formId: "base-v3",
@@ -454,7 +454,7 @@ describe("base form detection presentation", () => {
 
     expect(
       resolveDetectedBaseForm(word, {
-        key: "2:entry-v2:base-v2",
+        key: "2:entry-v2",
         schemaVersion: 2,
         entryId: "entry-v2",
         formId: "base-v2",
@@ -534,7 +534,7 @@ describe("base form detection presentation", () => {
       }
     ];
     const v2Candidate = {
-      key: "2:entry-v2:base-v2",
+      key: "2:entry-v2",
       schemaVersion: 2 as const,
       entryId: "entry-v2",
       formId: "base-v2",
@@ -570,7 +570,7 @@ describe("base form detection presentation", () => {
     };
     expect(
       resolveDetectedBaseForm(v3Common, {
-        key: "3:entry-v3:base-v3",
+        key: "3:entry-v3",
         schemaVersion: 3,
         entryId: "entry-v3",
         formId: "base-v3",

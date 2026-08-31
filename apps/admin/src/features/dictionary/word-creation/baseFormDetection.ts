@@ -45,6 +45,12 @@ export function extractDetectedBaseForms(
     const existing = candidates.get(candidate.key);
     if (existing) {
       addUnique(existing.spellings, spelling);
+      candidate.posLabels.forEach((label) =>
+        addUnique(existing.posLabels, label)
+      );
+      candidate.glossPreviews.forEach((gloss) =>
+        addUnique(existing.glossPreviews, gloss)
+      );
       return;
     }
     addUnique(candidate.spellings, spelling);
@@ -61,7 +67,7 @@ export function extractDetectedBaseForms(
       const context = contextByEntry.get(item.existing.word_id);
       add(
         {
-          key: `2:${item.existing.word_id}:${source.source_node_id}`,
+          key: `2:${item.existing.word_id}`,
           schemaVersion: 2,
           entryId: item.existing.word_id,
           formId: source.source_node_id,
@@ -85,7 +91,7 @@ export function extractDetectedBaseForms(
       const context = contextByEntry.get(match.entry_id);
       add(
         {
-          key: `3:${match.entry_id}:${match.form_id}`,
+          key: `3:${match.entry_id}`,
           schemaVersion: 3,
           entryId: match.entry_id,
           formId: match.form_id,
@@ -111,7 +117,7 @@ export function extractDetectedBaseForms(
     }
     add(
       {
-        key: `2:${existing.word_id}:${source.source_node_id}`,
+        key: `2:${existing.word_id}`,
         schemaVersion: 2,
         entryId: existing.word_id,
         formId: source.source_node_id,

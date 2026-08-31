@@ -22,10 +22,12 @@ import type { V3Problem } from "./problem";
 import {
   impactReasonLabel,
   impactTypeLabel,
+  formTypeLabel,
+  partOfSpeechLabel,
   publicationBlockMessage
 } from "./presentation";
 import { createV3SaveFlow, type V3SaveFlow } from "./saveFlow";
-import { v3IssueMessages } from "./presentationErrors";
+import { v3IssueMessage } from "./presentationErrors";
 import { V3ReviewContent } from "./V3ReviewContent";
 
 type PublishRequests = Pick<
@@ -52,6 +54,7 @@ export interface V3PreviewPublishController {
     validate: () => Promise<DraftValidationResponseV3 | undefined>;
     previewFormsImpact: () => Promise<FormsImpactResponseV3 | undefined>;
     publish: (confirmedSurfaceToken?: string) => Promise<void>;
+    navigateIssue?: (issue: V3DraftValidationIssue) => Promise<void>;
     confirmImpact?: () => boolean;
     confirmImpactSurface?: (page: SurfaceMatchPageV3) => boolean;
     fetchSurfacePage?: (
@@ -174,6 +177,261 @@ function ImpactDescription({
   );
 }
 
+interface IssuePositionGroup {
+  key: string;
+  testId: string;
+  label: string;
+  issues: V3DraftValidationIssue[];
+}
+
+interface IssueTypeGroup {
+  key: string;
+  label: string;
+  issues: V3DraftValidationIssue[];
+}
+
+function meaningPosOwnsIssue(
+  word: AdminWordV3,
+  posId: string,
+  issueNodeIds: ReadonlySet<string>
+) {
+  const pos = word.meanings.pos.find((candidate) => candidate.pos_id === posId);
+  if (!pos) return false;
+  if (issueNodeIds.has(pos.pos_id)) return true;
+  if (
+    pos.grammar_structures.some(
+      (grammar) =>
+        issueNodeIds.has(grammar.id) ||
+        grammar.variants.some((variant) => issueNodeIds.has(variant.id))
+    )
+  ) {
+    return true;
+  }
+  return pos.senses.some((sense) => {
+    if (issueNodeIds.has(sense.id)) return true;
+    if (sense.sense_group_id && issueNodeIds.has(sense.sense_group_id)) {
+      return true;
+    }
+    if (
+      sense.definitions.some((definition) => {
+        if (issueNodeIds.has(definition.id)) return true;
+        if (
+          "content_id" in definition &&
+          issueNodeIds.has(definition.content_id)
+        ) {
+          return true;
+        }
+        if (
+          "mode" in definition.content &&
+          definition.content.mode === "unified"
+        ) {
+          return issueNodeIds.has(definition.content.common.id);
+        }
+        if ("mode" in definition.content) {
+          return [definition.content.uk, definition.content.us].some(
+            (side) =>
+              side.state === "ready" && issueNodeIds.has(side.variant.id)
+          );
+        }
+        return false;
+      })
+    ) {
+      return true;
+    }
+    if (
+      sense.sentences.some((sentence) => {
+        if (
+          issueNodeIds.has(sentence.id) ||
+          issueNodeIds.has(sentence.zh_text_id) ||
+          sentence.zh_translations?.some((translation) =>
+            issueNodeIds.has(translation.id)
+          )
+        ) {
+          return true;
+        }
+        if (sentence.en_text.mode === "unified") {
+          return issueNodeIds.has(sentence.en_text.common.id);
+        }
+        return [sentence.en_text.uk, sentence.en_text.us].some(
+          (side) => side.state === "ready" && issueNodeIds.has(side.variant.id)
+        );
+      })
+    ) {
+      return true;
+    }
+    return sense.relations.some((relation) => issueNodeIds.has(relation.id));
+  });
+}
+
+function issuePosition(
+  word: AdminWordV3,
+  issue: V3DraftValidationIssue
+): Omit<IssuePositionGroup, "issues"> {
+  const issueNodeIds = new Set([
+    issue.node_id,
+    ...issue.node_location.ancestor_node_ids
+  ]);
+  const pos = word.forms.pos.find(
+    (candidate) =>
+      candidate.pos_id === issue.node_location.pos_id ||
+      issueNodeIds.has(candidate.pos_id) ||
+      meaningPosOwnsIssue(word, candidate.pos_id, issueNodeIds)
+  );
+  if (pos) {
+    return {
+      key: pos.pos_id,
+      testId: `issue-pos-${pos.pos}`,
+      label: partOfSpeechLabel(pos.pos)
+    };
+  }
+  return issue.step === "forms"
+    ? {
+        key: "forms-general",
+        testId: "issue-pos-forms-general",
+        label: "词形与发音"
+      }
+    : {
+        key: "meanings-general",
+        testId: "issue-pos-meanings-general",
+        label: "词义与例句"
+      };
+}
+
+function groupIssuesByPosition(
+  word: AdminWordV3,
+  issues: readonly V3DraftValidationIssue[]
+): IssuePositionGroup[] {
+  const groups = new Map<string, IssuePositionGroup>();
+  for (const issue of issues) {
+    const position = issuePosition(word, issue);
+    const current = groups.get(position.key);
+    if (current) current.issues.push(issue);
+    else groups.set(position.key, { ...position, issues: [issue] });
+  }
+  return [...groups.values()];
+}
+
+function groupIssuesByType(
+  issues: readonly V3DraftValidationIssue[]
+): IssueTypeGroup[] {
+  const groups = new Map<string, IssueTypeGroup>();
+  for (const issue of issues) {
+    const current = groups.get(issue.code);
+    if (current) current.issues.push(issue);
+    else {
+      groups.set(issue.code, {
+        key: issue.code,
+        label: v3IssueMessage(issue),
+        issues: [issue]
+      });
+    }
+  }
+  return [...groups.values()];
+}
+
+function issueScopeLabels(
+  word: AdminWordV3,
+  issues: readonly V3DraftValidationIssue[]
+): string[] {
+  return groupIssuesByPosition(word, issues).map((position) => {
+    const formTypes = new Map<string, number>();
+    for (const issue of position.issues) {
+      const formType = issue.node_location.form_type;
+      if (!formType) continue;
+      const label = formTypeLabel(formType);
+      formTypes.set(label, (formTypes.get(label) ?? 0) + 1);
+    }
+    if (formTypes.size === 0) {
+      return `${position.label} ${position.issues.length} 项`;
+    }
+    return `${position.label}：${[...formTypes]
+      .map(([label, count]) => `${label} ${count} 项`)
+      .join("、")}`;
+  });
+}
+
+function ValidationIssueSummary({
+  word,
+  issues,
+  onNavigate
+}: {
+  word: AdminWordV3;
+  issues: readonly V3DraftValidationIssue[];
+  onNavigate?: (issue: V3DraftValidationIssue) => Promise<void>;
+}) {
+  const positions = groupIssuesByPosition(word, issues);
+  const types = groupIssuesByType(issues);
+  return (
+    <section aria-label="发布待完成摘要" className="v3-validation-summary">
+      <div className="v3-validation-summary__overview">
+        <Typography.Text type="danger" strong>
+          发布校验未通过
+        </Typography.Text>
+        <Typography.Title level={3}>
+          还有 {issues.length} 项待完成
+        </Typography.Title>
+        <Typography.Text type="secondary">
+          发布条件保持不变。请先处理下列内容，再重新检查。
+        </Typography.Text>
+      </div>
+
+      <div className="v3-validation-summary__positions">
+        {positions.map((position) => (
+          <div
+            className="v3-validation-summary__position"
+            data-testid={position.testId}
+            key={position.key}
+          >
+            <div>
+              <Typography.Text strong>{position.label}</Typography.Text>
+              <Typography.Text type="secondary">
+                {position.issues.length} 项待完成
+              </Typography.Text>
+            </div>
+            {onNavigate ? (
+              <Button
+                aria-label={`填写${position.label}未完成项`}
+                size="small"
+                type="link"
+                onClick={() => void onNavigate(position.issues[0]!)}
+              >
+                去填写
+              </Button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+
+      <div className="v3-validation-summary__types">
+        <Typography.Text strong>问题分布</Typography.Text>
+        {types.map((type) => (
+          <div className="v3-validation-summary__type" key={type.key}>
+            <div className="v3-validation-summary__type-copy">
+              <Space size={6} wrap>
+                <Tag color="error">{type.issues.length} 项</Tag>
+                <Typography.Text>{type.label}</Typography.Text>
+              </Space>
+              <Typography.Text type="secondary">
+                {issueScopeLabels(word, type.issues).join(" · ")}
+              </Typography.Text>
+            </div>
+            {onNavigate ? (
+              <Button
+                aria-label={`填写${type.label}问题`}
+                size="small"
+                type="link"
+                onClick={() => void onNavigate(type.issues[0]!)}
+              >
+                去填写
+              </Button>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function ControlledV3PreviewAndPublishStep({
   word,
   controller
@@ -208,6 +466,7 @@ function ControlledV3PreviewAndPublishStep({
   );
   const readyToPublish = Boolean(
     !unavailableMessage &&
+    controller.issues.length === 0 &&
     controller.validation?.valid &&
     controller.impact &&
     (!requiresImpactConfirmation || controller.impactConfirmed)
@@ -246,9 +505,7 @@ function ControlledV3PreviewAndPublishStep({
           unavailableMessage ? (
             <Typography.Text type="secondary">当前词条不可发布</Typography.Text>
           ) : controller.issues.length > 0 ? (
-            <Typography.Text type="danger">
-              待完成 {v3IssueMessages(controller.issues).length} 项
-            </Typography.Text>
+            <Typography.Text type="danger">有待完成内容</Typography.Text>
           ) : controller.validation?.valid ? (
             <Typography.Text type="success">
               当前内容已通过发布检查
@@ -279,11 +536,10 @@ function ControlledV3PreviewAndPublishStep({
               检查发布条件
             </Button>
             {controller.issues.length > 0 ? (
-              <Alert
-                showIcon
-                type="error"
-                title="发布校验未通过"
-                description={v3IssueMessages(controller.issues).join("；")}
+              <ValidationIssueSummary
+                word={word}
+                issues={controller.issues}
+                onNavigate={controller.actions.navigateIssue}
               />
             ) : null}
             {controller.impact ? (
@@ -367,7 +623,9 @@ function StandaloneV3PreviewAndPublishStep({
   const [refreshingCanonical, setRefreshingCanonical] = useState(false);
   const [reconciliationRequired, setReconciliationRequired] = useState(false);
   const [reconciliationError, setReconciliationError] = useState(false);
-  const [validationIssues, setValidationIssues] = useState<string[]>([]);
+  const [validationIssues, setValidationIssues] = useState<
+    V3DraftValidationIssue[]
+  >([]);
   const [impact, setImpact] = useState<FormsImpactResponseV3>();
   const [impactAccepted, setImpactAccepted] = useState(false);
   const [publishSurfacePage, setPublishSurfacePage] =
@@ -518,7 +776,7 @@ function StandaloneV3PreviewAndPublishStep({
       );
       if (!validation.accepted) return;
       if (!validation.value.valid) {
-        setValidationIssues(v3IssueMessages(validation.value.issues));
+        setValidationIssues(validation.value.issues);
         return;
       }
       const preview = await flowRef.current.runRequest("impact", () =>
@@ -665,9 +923,7 @@ function StandaloneV3PreviewAndPublishStep({
           unavailableMessage ? (
             <Typography.Text type="secondary">当前词条不可发布</Typography.Text>
           ) : validationIssues.length > 0 ? (
-            <Typography.Text type="danger">
-              待完成 {validationIssues.length} 项
-            </Typography.Text>
+            <Typography.Text type="danger">有待完成内容</Typography.Text>
           ) : impact ? (
             <Typography.Text type="success">
               当前内容已通过发布检查
@@ -696,11 +952,9 @@ function StandaloneV3PreviewAndPublishStep({
               检查发布条件
             </Button>
             {validationIssues.length > 0 ? (
-              <Alert
-                showIcon
-                type="error"
-                title="发布校验未通过"
-                description={validationIssues.join("；")}
+              <ValidationIssueSummary
+                word={currentWord}
+                issues={validationIssues}
               />
             ) : null}
             {impact ? (

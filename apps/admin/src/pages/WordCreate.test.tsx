@@ -42,6 +42,16 @@ vi.mock("@/features/dictionary/word-creation/UnifiedCreateEntryStep", () => ({
         >
           完成短语创建
         </button>
+        <button
+          onClick={() =>
+            props.onDetectedHeadwords?.({
+              mode: "unified",
+              common: "center"
+            })
+          }
+        >
+          同步检测词条
+        </button>
       </>
     );
   }
@@ -90,5 +100,51 @@ describe("WordCreatePage", () => {
     expect(wired.props?.requests).toBe(requests);
     fireEvent.click(screen.getByText(action));
     expect(screen.getByTestId("location")).toHaveTextContent(expected);
+  });
+
+  it("检测成功后将主词同步到左侧当前词条摘要", () => {
+    render(
+      <MemoryRouter initialEntries={["/words/new"]}>
+        <WordCreatePage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("待检测")).toBeVisible();
+    fireEvent.click(screen.getByText("同步检测词条"));
+    expect(screen.getByText("center")).toBeVisible();
+    expect(screen.queryByText("待检测")).toBeNull();
+  });
+
+  it("从 Pending 创建短语时预填词面并把词义建议与返回地址带入 V3 向导", () => {
+    const pendingSentenceTarget = {
+      associationId: "association-1",
+      headword: "center of the wall",
+      gloss: "墙的中心位置",
+      returnTo: "/words/source/v3/wizard/meanings?mode=edit"
+    };
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: "/words/new",
+            state: { pendingSentenceTarget }
+          }
+        ]}
+      >
+        <Routes>
+          <Route path="/words/new" element={<WordCreatePage />} />
+          <Route path="*" element={<LocationProbe />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(wired.props?.initialValue).toBe("center of the wall");
+    fireEvent.click(screen.getByText("完成短语创建"));
+    expect(screen.getByTestId("location")).toHaveTextContent(
+      JSON.stringify({
+        creationSource: "blank",
+        pendingSentenceTarget
+      })
+    );
   });
 });

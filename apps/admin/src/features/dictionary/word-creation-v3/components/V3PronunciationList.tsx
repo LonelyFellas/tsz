@@ -21,9 +21,20 @@ import {
 } from "../operations";
 import { pronunciationStyleLabel } from "../presentation";
 import { dialectLabel } from "../presentation";
+import { v3IssueMessage } from "../presentationErrors";
 import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 
 const PRONUNCIATION_DRAG_TYPE = "application/x-tsz-pronunciation";
+
+function pronunciationFieldMessage(
+  issue: V3DraftValidationIssue,
+  field: "style" | "dict_phonetic" | "actual_pron"
+) {
+  if (issue.code !== "pronunciation_required") return v3IssueMessage(issue);
+  if (field === "style") return "请选择发音方式";
+  if (field === "dict_phonetic") return "请填写字典音标";
+  return "请填写实际发音";
+}
 
 function updateVariantPronunciations(
   content: DraftFormsStepContentV3,
@@ -105,6 +116,15 @@ export function V3PronunciationList({
                 const rowIssues = issuesForPronunciation(
                   issues,
                   pronunciation.id
+                );
+                const styleIssue = rowIssues.find(
+                  (item) => item.field === "style"
+                );
+                const dictPhoneticIssue = rowIssues.find(
+                  (item) => item.field === "dict_phonetic"
+                );
+                const actualPronunciationIssue = rowIssues.find(
+                  (item) => item.field === "actual_pron"
                 );
                 return (
                   <div
@@ -258,6 +278,7 @@ export function V3PronunciationList({
                         </Typography.Text>
                         <Form.Item noStyle>
                           <Select
+                            aria-invalid={Boolean(styleIssue)}
                             aria-label={`第 ${index + 1} 条发音的发音方式`}
                             className="word-pronunciation-style-select"
                             data-v3-field="style"
@@ -284,9 +305,18 @@ export function V3PronunciationList({
                               }
                             ]}
                             placeholder="风格"
+                            status={styleIssue ? "error" : undefined}
                             value={pronunciation.style}
                           />
                         </Form.Item>
+                        {styleIssue ? (
+                          <Typography.Text
+                            className="word-field-help"
+                            type="danger"
+                          >
+                            {pronunciationFieldMessage(styleIssue, "style")}
+                          </Typography.Text>
+                        ) : null}
                       </label>
                       <div className="word-pronunciation-row">
                         <Typography.Text className="word-pronunciation-label">
@@ -302,9 +332,7 @@ export function V3PronunciationList({
                           >
                             <Form.Item noStyle>
                               <Input
-                                aria-invalid={rowIssues.some(
-                                  (item) => item.field === "dict_phonetic"
-                                )}
+                                aria-invalid={Boolean(dictPhoneticIssue)}
                                 aria-label={`第 ${index + 1} 条发音的字典音标`}
                                 className="word-pronunciation-phonetic-input"
                                 data-v3-field="dict_phonetic"
@@ -321,11 +349,23 @@ export function V3PronunciationList({
                                   )
                                 }
                                 placeholder="字典音标"
+                                status={dictPhoneticIssue ? "error" : undefined}
                                 value={pronunciation.dict_phonetic}
                               />
                             </Form.Item>
                           </PronunciationPreviewControls>
                         </div>
+                        {dictPhoneticIssue ? (
+                          <Typography.Text
+                            className="word-field-help"
+                            type="danger"
+                          >
+                            {pronunciationFieldMessage(
+                              dictPhoneticIssue,
+                              "dict_phonetic"
+                            )}
+                          </Typography.Text>
+                        ) : null}
                       </div>
                       <label className="word-pronunciation-row">
                         <Typography.Text className="word-pronunciation-label">
@@ -333,9 +373,7 @@ export function V3PronunciationList({
                         </Typography.Text>
                         <Form.Item noStyle>
                           <Input
-                            aria-invalid={rowIssues.some(
-                              (item) => item.field === "actual_pron"
-                            )}
+                            aria-invalid={Boolean(actualPronunciationIssue)}
                             aria-label={`第 ${index + 1} 条发音的实际发音`}
                             data-v3-field="actual_pron"
                             data-v3-node-id={pronunciation.id}
@@ -347,9 +385,23 @@ export function V3PronunciationList({
                               )
                             }
                             placeholder="实际发音"
+                            status={
+                              actualPronunciationIssue ? "error" : undefined
+                            }
                             value={pronunciation.actual_pron}
                           />
                         </Form.Item>
+                        {actualPronunciationIssue ? (
+                          <Typography.Text
+                            className="word-field-help"
+                            type="danger"
+                          >
+                            {pronunciationFieldMessage(
+                              actualPronunciationIssue,
+                              "actual_pron"
+                            )}
+                          </Typography.Text>
+                        ) : null}
                       </label>
                     </div>
                   </div>

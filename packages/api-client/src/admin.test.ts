@@ -735,6 +735,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       kind: "word",
       match_mode: "contains",
       exclude_exact: true,
+      include_drafts: false,
       page_size: 20,
       cursor: "opaque-cursor"
     });
@@ -745,6 +746,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       kind: "word",
       match_mode: "contains",
       exclude_exact: "true",
+      include_drafts: "false",
       page_size: "20",
       cursor: "opaque-cursor"
     });
@@ -889,6 +891,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       kind: "word",
       match_mode: "contains",
       exclude_exact: true,
+      include_drafts: true,
       page_size: 20,
       cursor: "related-cursor"
     });
@@ -982,6 +985,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       kind: "word",
       match_mode: "contains",
       exclude_exact: "true",
+      include_drafts: "true",
       page_size: "20",
       cursor: "related-cursor"
     });

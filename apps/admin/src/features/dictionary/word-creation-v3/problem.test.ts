@@ -67,6 +67,26 @@ describe("classifyV3Problem", () => {
 
   it("separates revision, idempotency, and surface-token conflicts", () => {
     expect(
+      classifyV3Problem(new HttpError(409, "busy", [], "reference_conflict"))
+    ).toMatchObject({
+      kind: "reference_conflict",
+      retryable: true,
+      invalidates_confirmation: true
+    });
+    expect(
+      classifyV3Problem(
+        new HttpError(
+          409,
+          "too many",
+          [],
+          "relation_prebinding_fanout_exceeded"
+        )
+      )
+    ).toMatchObject({
+      kind: "relation_prebinding_fanout_exceeded",
+      retryable: false
+    });
+    expect(
       classifyV3Problem(
         new HttpError(409, "stale", [], "revision_conflict", [], {
           current_revision: 9

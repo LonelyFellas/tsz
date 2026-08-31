@@ -2,6 +2,7 @@ import {
   DeleteOutlined,
   PlusOutlined,
   ReloadOutlined,
+  RestOutlined,
   RollbackOutlined,
   SearchOutlined
 } from "@ant-design/icons";
@@ -603,33 +604,38 @@ export function SmartDictionary({
               {getWordRowActionLabel(record)}
             </Button>
             {adminWordsDataSourceCapabilities.archive && (
-              <Button
-                type="link"
-                size="small"
-                danger={record.status !== "archived"}
-                aria-label={`${record.status === "archived" ? "恢复" : "移入垃圾桶"}${rowName}`}
-                icon={
-                  record.status === "archived" ? (
-                    <RollbackOutlined />
-                  ) : (
-                    <DeleteOutlined />
-                  )
-                }
-                disabled={lifecycleInput(record) === undefined}
-                loading={
-                  lifecyclePending &&
-                  (archiveWord.variables?.wordId === record.id ||
-                    restoreWord.variables?.wordId === record.id)
-                }
-                onClick={() =>
-                  transitionOne(
-                    record,
-                    record.status === "archived" ? "restore" : "archive"
-                  )
-                }
+              <Tooltip
+                title={record.status === "archived" ? "恢复" : "移入垃圾桶"}
               >
-                {record.status === "archived" ? "恢 复" : "移入垃圾桶"}
-              </Button>
+                <Button
+                  type="link"
+                  size="small"
+                  danger={record.status !== "archived"}
+                  style={{ gap: 4 }}
+                  aria-label={`${record.status === "archived" ? "恢复" : "移入垃圾桶"}${rowName}`}
+                  icon={
+                    record.status === "archived" ? (
+                      <RollbackOutlined />
+                    ) : (
+                      <RestOutlined />
+                    )
+                  }
+                  disabled={lifecycleInput(record) === undefined}
+                  loading={
+                    lifecyclePending &&
+                    (archiveWord.variables?.wordId === record.id ||
+                      restoreWord.variables?.wordId === record.id)
+                  }
+                  onClick={() =>
+                    transitionOne(
+                      record,
+                      record.status === "archived" ? "restore" : "archive"
+                    )
+                  }
+                >
+                  {record.status === "archived" ? "恢 复" : "移入垃圾桶"}
+                </Button>
+              </Tooltip>
             )}
           </Space>
         );

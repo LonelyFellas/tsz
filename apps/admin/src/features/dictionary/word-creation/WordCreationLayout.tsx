@@ -75,7 +75,7 @@ function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
   ).map((dialect) => ({
     dialect,
     spelling: dialect === "uk" ? headwords.uk : headwords.us,
-    caption: dialect === "uk" ? "英式英语 · BrE" : "美式英语 · AmE",
+    caption: dialect === "uk" ? "英式 · BrE" : "美式 · AmE",
     // 「检测基准」标在真正命中的那一侧，不再等同于首行——首行现在按偏好排。
     detectionBasis: dialect === headwords.source_dialect
   }));

@@ -11,8 +11,7 @@ import type { ReactNode } from "react";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import type { V3IssueNavigationTarget } from "./issueNavigation";
 import type { V3Problem } from "./problem";
-import { v3IssueMessage } from "./presentationErrors";
-import { buildV3ProductProgress, type V3ReadinessSummary } from "./readiness";
+import { buildV3ProductProgress } from "./readiness";
 import { wordStatusLabel } from "./presentation";
 import "./v3-layout.css";
 
@@ -44,7 +43,6 @@ interface Props {
   dirtySteps?: Readonly<{ forms: boolean; meanings: boolean }>;
   draftForms?: DraftFormsStepContentV3;
   draftMeanings?: DraftMeaningsStepContentWritableV3;
-  readiness: V3ReadinessSummary;
   issues: readonly V3DraftValidationIssue[];
   problem?: V3Problem;
   conflict?: V3ConflictComparison;
@@ -52,7 +50,6 @@ interface Props {
   refreshingConflict?: boolean;
   onStepChange: (step: WordCreationStep) => void;
   onProgressNavigate?: (target: V3IssueNavigationTarget) => void;
-  onIssueNavigate: (issue: V3DraftValidationIssue) => void;
   onRetry?: () => void;
   onRefreshConflict?: () => void;
   children: ReactNode;
@@ -62,6 +59,10 @@ function problemTitle(problem: V3Problem) {
   switch (problem.kind) {
     case "revision_conflict":
       return "版本冲突";
+    case "reference_conflict":
+      return "关联词条正在编辑";
+    case "relation_prebinding_fanout_exceeded":
+      return "关联词数量超过同步上限";
     case "entry_archived":
       return "词条已在垃圾桶中";
     case "validation":
@@ -108,7 +109,6 @@ export function V3WordCreationLayout({
   dirtySteps = { forms: false, meanings: false },
   draftForms,
   draftMeanings,
-  readiness,
   issues,
   problem,
   conflict,
@@ -116,7 +116,6 @@ export function V3WordCreationLayout({
   refreshingConflict,
   onStepChange,
   onProgressNavigate,
-  onIssueNavigate,
   onRetry,
   onRefreshConflict,
   children
@@ -131,16 +130,6 @@ export function V3WordCreationLayout({
             surface.trim() !== "" &&
             !/^未命名词条(?:\s*·.*)?$/u.test(surface.trim())
         ) ?? "新词条"));
-  const displayedIssues = issues.filter(
-    (issue, index) =>
-      issues.findIndex(
-        (candidate) =>
-          candidate.step === issue.step &&
-          candidate.node_id === issue.node_id &&
-          candidate.field === issue.field &&
-          candidate.code === issue.code
-      ) === index
-  );
   const progressRows = buildV3ProductProgress({
     wordId: word.id,
     completedSteps: word.completed_steps,
@@ -279,25 +268,6 @@ export function V3WordCreationLayout({
           />
         )}
 
-        {readiness.issue_count > 0 && (
-          <section className="v3-word-creation__issues" aria-label="待完成项">
-            <Typography.Text strong>
-              待完成 {readiness.issue_count} 项
-            </Typography.Text>
-            <Flex vertical gap={6}>
-              {displayedIssues.map((issue) => (
-                <Button
-                  type="text"
-                  className="v3-word-creation__issue"
-                  key={`${issue.step}:${issue.node_id}:${issue.field}:${issue.code}`}
-                  onClick={() => onIssueNavigate(issue)}
-                >
-                  {v3IssueMessage(issue)}
-                </Button>
-              ))}
-            </Flex>
-          </section>
-        )}
         {children}
       </Flex>
     </WordCreationLayout>

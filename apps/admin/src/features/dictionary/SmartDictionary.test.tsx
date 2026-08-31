@@ -434,7 +434,7 @@ describe("SmartDictionary", () => {
     expect(secondActions[1]!.getAttribute("aria-label")).toBe(
       "移入垃圾桶「workspace」"
     );
-    expect(secondActions[1]!.querySelector(".anticon-delete")).not.toBeNull();
+    expect(secondActions[1]!.querySelector(".anticon-rest")).not.toBeNull();
     fireEvent.click(secondActions[1]!);
     fireEvent.click(
       (await screen.findAllByText("移入垃圾桶", { exact: true }))
@@ -470,10 +470,7 @@ describe("SmartDictionary", () => {
     ]);
     expect(screen.getByText("继续创建").closest("button")).toBeEnabled();
     expect(
-      screen
-        .getAllByText("移入垃圾桶", { exact: true })
-        .map((item) => item.closest("button"))
-        .find((item) => item?.classList.contains("ant-btn-link"))
+      screen.getByRole("button", { name: "移入垃圾桶「first」" })
     ).toBeEnabled();
   });
 
@@ -727,10 +724,9 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    const rowArchive = screen
-      .getAllByText("移入垃圾桶", { exact: true })
-      .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
+    const rowArchive = screen.getByRole("button", {
+      name: "移入垃圾桶「first」"
+    });
     fireEvent.click(rowArchive);
     await screen.findAllByText("移入垃圾桶「first」？");
     const confirm = screen
@@ -824,15 +820,9 @@ describe("SmartDictionary", () => {
     );
 
     expect(
-      screen
-        .queryAllByText("移入垃圾桶", { exact: true })
-        .map((item) => item.closest("button"))
-        .some((item) => item?.classList.contains("ant-btn-link"))
-    ).toBe(false);
-    const rowRestore = screen
-      .getAllByText("恢 复", { exact: true })
-      .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
+      screen.queryByRole("button", { name: "移入垃圾桶「first」" })
+    ).toBeNull();
+    const rowRestore = screen.getByRole("button", { name: "恢复「first」" });
     expect(rowRestore.getAttribute("aria-label")).toBe("恢复「first」");
     expect(
       rowRestore
@@ -885,10 +875,7 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    const rowRestore = screen
-      .getAllByText("恢 复", { exact: true })
-      .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
+    const rowRestore = screen.getByRole("button", { name: "恢复「first」" });
     fireEvent.click(rowRestore);
     await screen.findAllByText("恢复「first」？");
     fireEvent.click(
@@ -939,10 +926,9 @@ describe("SmartDictionary", () => {
     );
 
     const restoreOnce = async () => {
-      const rowRestore = screen
-        .getAllByText("恢 复", { exact: true })
-        .map((item) => item.closest("button"))
-        .find((item) => item?.classList.contains("ant-btn-link"))!;
+      const rowRestore = screen.getByRole("button", {
+        name: "恢复「first」"
+      });
       fireEvent.click(rowRestore);
       fireEvent.click(
         (await screen.findAllByText("恢 复", { exact: true }))

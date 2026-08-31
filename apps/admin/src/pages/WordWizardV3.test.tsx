@@ -166,7 +166,8 @@ function impactSurfacePage(nextCursor: string | null): SurfaceMatchPageV3 {
 function renderPage(
   entry: string,
   requests: V3WordRequests,
-  renderMeaningsStep?: V3MeaningsStepRenderer
+  renderMeaningsStep?: V3MeaningsStepRenderer,
+  state?: unknown
 ) {
   const router = createMemoryRouter(
     [
@@ -180,7 +181,9 @@ function renderPage(
         )
       }
     ],
-    { initialEntries: [entry] }
+    {
+      initialEntries: [state === undefined ? entry : { pathname: entry, state }]
+    }
   );
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
@@ -196,6 +199,34 @@ function renderPage(
 }
 
 describe("WordWizardV3Page", () => {
+  it("目标创建向导在任意步骤保留 Pending 返回来源入口", async () => {
+    const current = word();
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(source({ word: current, retired_stable_nodes: [] })),
+      undefined,
+      {
+        pendingSentenceTarget: {
+          associationId: "association-1",
+          headword: "center of the wall",
+          gloss: "墙的中心位置",
+          returnTo: "/words/source/v3/wizard/meanings?mode=edit"
+        }
+      }
+    );
+
+    expect(
+      await screen.findByText("正在为 Pending 创建目标：center of the wall")
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "返回来源例句" }));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        "/words/source/v3/wizard/meanings"
+      )
+    );
+    expect(router.state.location.search).toBe("?mode=edit");
+  });
+
   it("renders the V3 basics route with the established V2 first-step structure instead of a placeholder card", async () => {
     const current = word();
     const api = source({ word: current, retired_stable_nodes: [] });
@@ -312,7 +343,7 @@ describe("WordWizardV3Page", () => {
     expect(screen.getByLabelText("录入词条")).toHaveValue("");
   });
 
-  it("reports meaning progress without bypassing the server max reachable step", async () => {
+  it("reports meaning progress and lets readiness navigate past the resume hint", async () => {
     const current = word({
       presentation: {
         label: "未命名词条 · 01a03e0c",
@@ -359,6 +390,18 @@ describe("WordWizardV3Page", () => {
                       spans: [],
                       liaisons: []
                     },
+                    zh_translations: [
+                      {
+                        id: uuidFromInt(507),
+                        band: "a1_a2",
+                        content: {
+                          version: 1,
+                          text: "例句。",
+                          spans: [],
+                          liaisons: []
+                        }
+                      }
+                    ],
                     links: [],
                     associations: [],
                     associations_state: "resolved"
@@ -385,7 +428,7 @@ describe("WordWizardV3Page", () => {
     fireEvent.click(screen.getByRole("button", { name: /多维例句1\/1/ }));
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(
-        `/words/${WORD_ID}/v3/wizard/forms`
+        `/words/${WORD_ID}/v3/wizard/meanings`
       )
     );
   });
@@ -548,7 +591,7 @@ describe("WordWizardV3Page", () => {
     );
   });
 
-  it("#136 不完整词形不能越过服务端最大可达步骤", async () => {
+  it("#136 不完整词形仍能进入词义与例句且不触发隐式保存", async () => {
     const current = word({ meanings: { sense_groups: [], pos: [] } });
     const endpoints = source({ word: current, retired_stable_nodes: [] });
     const router = renderPage(
@@ -560,14 +603,73 @@ describe("WordWizardV3Page", () => {
 
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(
-        `/words/${WORD_ID}/v3/wizard/forms`
+        `/words/${WORD_ID}/v3/wizard/meanings`
       )
     );
-    expect(screen.queryByLabelText("语义区间 1 中文")).toBeNull();
+    expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue("");
     expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
     expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
     expect(endpoints.saveMeaningsStepV3).not.toHaveBeenCalled();
   }, 20_000);
+
+  it("max=forms 的 draft 直接刷新 meanings 仍停留并可编辑", async () => {
+    const current = word({
+      completed_steps: ["basics"],
+      max_reachable_step: "forms"
+    });
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/meanings`,
+      createV3WordRequests(source({ word: current, retired_stable_nodes: [] }))
+    );
+
+    expect(await screen.findByText("STEP 03")).toBeVisible();
+    expect(screen.getByLabelText("语义区间 1 中文")).toBeEnabled();
+    expect(router.state.location.pathname).toBe(
+      `/words/${WORD_ID}/v3/wizard/meanings`
+    );
+  });
+
+  it("forms 未完成时保存 meanings 草稿并保留服务端完成状态", async () => {
+    const current = word({
+      completed_steps: ["basics"],
+      max_reachable_step: "forms"
+    });
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.saveMeaningsStepV3).mockImplementationOnce(
+      async (_wordId, input) => ({
+        word: {
+          ...current,
+          revision: 2,
+          meanings: canonicalMeaningsFromWritable(input.content),
+          completed_steps: ["basics"],
+          max_reachable_step: "forms"
+        }
+      })
+    );
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/meanings`,
+      createV3WordRequests(endpoints)
+    );
+
+    fireEvent.change(await screen.findByLabelText("语义区间 1 中文"), {
+      target: { value: "先保存的词义草稿" }
+    });
+    fireEvent.click(screen.getByText("保存草稿").closest("button")!);
+
+    await waitFor(() =>
+      expect(endpoints.saveMeaningsStepV3).toHaveBeenCalledWith(
+        WORD_ID,
+        expect.objectContaining({ base_revision: 1, intent: "save" })
+      )
+    );
+    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+    expect(await screen.findByLabelText("语义区间 1 中文")).toHaveValue(
+      "先保存的词义草稿"
+    );
+    expect(router.state.location.pathname).toBe(
+      `/words/${WORD_ID}/v3/wizard/meanings`
+    );
+  });
 
   it("#137 未保存词形草稿跨步骤导航后仍保留", async () => {
     const current = word({
@@ -695,6 +797,69 @@ describe("WordWizardV3Page", () => {
     await waitFor(() =>
       expect(endpoints.previewFormsImpactV3).toHaveBeenCalledTimes(1)
     );
+  });
+
+  it("max=forms 的 draft 可进入预览且校验问题留在摘要阻止发布", async () => {
+    const current = word({
+      completed_steps: ["basics"],
+      max_reachable_step: "forms",
+      capabilities: {
+        publication: { mode: "migration_canary", whitelisted: true },
+        pronunciation_normalization_version: "nfkc_trim_lower_v1"
+      }
+    });
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.validateV3).mockResolvedValue({
+      schema_version: 3,
+      validated_revision: 1,
+      valid: false,
+      issues: [
+        {
+          schema_version: 3,
+          step: "forms",
+          node_id: current.forms.pos[0]!.forms[0]!.id,
+          field: "pronunciations",
+          code: "pronunciation_required",
+          message: "pronunciation is required",
+          node_location: {
+            node_role: "concrete_form",
+            ancestor_node_ids: [current.forms.pos[0]!.pos_id],
+            pos_id: current.forms.pos[0]!.pos_id,
+            form_id: current.forms.pos[0]!.forms[0]!.id,
+            form_type: "base"
+          }
+        }
+      ]
+    });
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/preview`,
+      createV3WordRequests(endpoints)
+    );
+
+    const validate = await screen.findByRole("button", {
+      name: "检查发布条件"
+    });
+    expect(router.state.location.pathname).toBe(
+      `/words/${WORD_ID}/v3/wizard/preview`
+    );
+    fireEvent.click(validate);
+
+    await waitFor(() => expect(endpoints.validateV3).toHaveBeenCalledTimes(1));
+    expect(router.state.location.pathname).toBe(
+      `/words/${WORD_ID}/v3/wizard/preview`
+    );
+    const summary = await screen.findByRole("region", {
+      name: "发布待完成摘要"
+    });
+    expect(
+      within(summary).getByRole("heading", { name: "还有 1 项待完成" })
+    ).toBeVisible();
+    expect(within(summary).getByText("问题分布")).toBeVisible();
+    expect(
+      within(summary).getByText("请完整填写发音方式、字典音标和实际发音")
+    ).toBeVisible();
+    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
+    expect(endpoints.publishV3).not.toHaveBeenCalled();
   });
 
   it("preserves an unsaved forms draft across steps and gates canonical preview actions", async () => {

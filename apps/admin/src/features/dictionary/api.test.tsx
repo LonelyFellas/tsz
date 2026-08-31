@@ -88,7 +88,7 @@ describe("dictionary React Query hooks", () => {
     );
     const { wrapper } = queryWrapper();
     const hook = renderHook(
-      () => useRelatedSearchAny("  outside  ", "word", true),
+      () => useRelatedSearchAny("  outside  ", "word", true, true),
       { wrapper }
     );
 
@@ -99,6 +99,7 @@ describe("dictionary React Query hooks", () => {
     expect(anyDataSource.relatedSearchAny).toHaveBeenCalledWith("outside", {
       kind: "word",
       match_mode: "exact",
+      include_drafts: true,
       page_size: 20,
       cursor: undefined
     });
@@ -106,6 +107,7 @@ describe("dictionary React Query hooks", () => {
       kind: "word",
       match_mode: "contains",
       exclude_exact: true,
+      include_drafts: true,
       page_size: 20,
       cursor: undefined
     });

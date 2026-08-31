@@ -80,6 +80,7 @@ const IMPACT_LABEL: Record<FormsImpactNodeTypeV3, string> = {
   form: "词形",
   variant: "地区拼写",
   pronunciation: "发音",
+  phrase_component_usage: "成分用词",
   surface: "公开词面",
   publication: "发布内容",
   grammar_structure: "语法结构",
