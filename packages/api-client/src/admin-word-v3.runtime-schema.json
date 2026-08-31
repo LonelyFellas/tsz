@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "48d9a5d7d753f72232d3fdc86f26d6fa04b030e0d0a951ae4ac1d6fb1111006c",
+  "_source": "/Users/darwish/.codex/worktrees/restore-v3-detection-basis/tsz-rust/docs/openapi.json",
+  "_source_sha256": "46823cb01a942577825970981323f46da60a4aca6d3225732ec813e39bb59efe",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -346,6 +346,7 @@
         },
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": { "type": "string", "format": "uuid" },
+        "detection_basis_dialect": { "$ref": "#/$defs/SourceDialect" },
         "forms": { "$ref": "#/$defs/DraftFormsStepContentV3" },
         "has_unpublished_changes": { "type": "boolean" },
         "id": { "type": "string", "format": "uuid" },
