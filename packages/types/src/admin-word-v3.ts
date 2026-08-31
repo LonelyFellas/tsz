@@ -594,6 +594,7 @@ export interface AdminWordV3 {
   has_unpublished_changes: boolean;
   presentation: EntryPresentationV3;
   capabilities: AdminWordV3Capabilities;
+  detection_basis_dialect?: SourceDialect;
   compatibility?: AdminWordV3Compatibility;
   forms: DraftFormsStepContentV3;
   meanings: DraftMeaningsStepContentV3;

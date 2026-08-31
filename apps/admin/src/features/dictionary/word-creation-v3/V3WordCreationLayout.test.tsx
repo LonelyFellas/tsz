@@ -7,7 +7,7 @@ import type {
 } from "@tsz/types";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   commonFormFixture,
   formsFixture,
@@ -20,6 +20,15 @@ import {
   V3WordCreationLayout,
   type V3ConflictComparison
 } from "./V3WordCreationLayout";
+
+const dialectPreference = vi.hoisted(() => ({ value: "uk" as "uk" | "us" }));
+
+vi.mock("@/features/settings/useDialectPreference", () => ({
+  useDialectPreference: () => ({
+    preference: dialectPreference.value,
+    savePreference: vi.fn()
+  })
+}));
 
 function word(): AdminWordV3 {
   return {
@@ -112,6 +121,10 @@ function renderLayout(
 }
 
 describe("V3WordCreationLayout", () => {
+  beforeEach(() => {
+    dialectPreference.value = "uk";
+  });
+
   it("does not repeat publication issues in the wizard layout", () => {
     renderLayout({ activeStep: "forms", issues: [issue()] });
 
@@ -361,6 +374,72 @@ describe("V3WordCreationLayout", () => {
     expect(summary.queryByText("center / centers")).toBeNull();
     expect(summary.queryByText("alternate-base")).toBeNull();
     expect(summary.queryByText("centers", { exact: true })).toBeNull();
+  });
+
+  it("英美原形按偏好分行并把检测基准标在真实命中侧", () => {
+    const current = word();
+    current.detection_basis_dialect = "us";
+    current.forms = formsFixture({
+      dialect_rules: {
+        spelling_mode: "distinguish",
+        phonetic_mode: "distinguish"
+      },
+      forms: [
+        ukUsFormFixture({
+          uk: { spelling: "centre" },
+          us: { spelling: "center" }
+        })
+      ]
+    });
+
+    const view = renderLayout({ word: current });
+
+    const summaryRegion = screen.getByRole("region", { name: "词条摘要" });
+    const summary = within(summaryRegion);
+    expect(summary.getByText("centre", { exact: true })).toBeVisible();
+    expect(summary.getByText("center", { exact: true })).toBeVisible();
+    expect(summary.getByText("英式英语 · BrE", { exact: true })).toBeVisible();
+    expect(
+      summary.getByText("美式英语 · AmE · 检测基准", { exact: true })
+    ).toBeVisible();
+    expect(summary.queryByText("centre / center", { exact: true })).toBeNull();
+    expect(summaryRegion.querySelector(".dialect-dot-common")).toBeNull();
+
+    view.unmount();
+    dialectPreference.value = "us";
+    const usView = renderLayout({ word: current });
+    const rows = Array.from(
+      usView.container.querySelectorAll<HTMLElement>(
+        ".word-creation-summary-headword"
+      )
+    );
+    expect(rows[0]!.querySelector("strong")?.textContent).toBe("center");
+    expect(rows[0]).toHaveTextContent("美式英语 · AmE · 检测基准");
+    expect(rows[1]).toHaveTextContent("centre");
+    expect(rows[1]).not.toHaveTextContent("检测基准");
+  });
+
+  it("缺少原始检测证据时仍分行展示但不猜测检测基准", () => {
+    const current = word();
+    current.forms = formsFixture({
+      dialect_rules: {
+        spelling_mode: "distinguish",
+        phonetic_mode: "distinguish"
+      },
+      forms: [
+        ukUsFormFixture({
+          uk: { spelling: "centre" },
+          us: { spelling: "center" }
+        })
+      ]
+    });
+
+    const view = renderLayout({ word: current });
+
+    expect(
+      view.container.querySelectorAll(".word-creation-summary-headword")
+    ).toHaveLength(2);
+    expect(screen.queryByText(/检测基准/u)).toBeNull();
   });
 
   it("第一个原形为同拼写英美结构时摘要只显示一次", () => {

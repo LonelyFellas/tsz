@@ -613,6 +613,22 @@ describe("admin word V3/Any runtime decoder", () => {
     );
   });
 
+  it("V3 词条接受可选检测基准方言并拒绝 common 或未知值", () => {
+    const word = {
+      ...validAdminWordV3(),
+      detection_basis_dialect: "us"
+    };
+
+    expect(decodeAdminWordV3Envelope({ word })).toEqual({ word });
+    for (const invalidDialect of ["common", "unknown"]) {
+      expect(() =>
+        decodeAdminWordV3Envelope({
+          word: { ...word, detection_basis_dialect: invalidDialect }
+        })
+      ).toThrow(InvalidAdminWordResponseError);
+    }
+  });
+
   it("关联词运行时 schema 接受四态并拒绝缺字段或混合目标", () => {
     const word = validAdminWordV3() as unknown as Record<string, unknown>;
     const pos = validRuntimeDefinition("WordPosMeaningsV3") as Record<
