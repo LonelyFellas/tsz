@@ -735,6 +735,19 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     ).rejects.toMatchObject({ code: "invalid_admin_word_response" });
   });
 
+  it("deleteBatch 的 affected 超过请求条数时同样 fail closed", async () => {
+    // 多删了比少删更可疑——后端不该删掉没请求的词条。
+    const api = createAdminEndpoints(http);
+    http.post.mockResolvedValueOnce({ affected: 5 });
+    await expect(
+      api.words.deleteBatch("key", {
+        entries: [
+          { id: LIFECYCLE_WORD_A, base_revision: 1, base_lifecycle_revision: 1 }
+        ]
+      })
+    ).rejects.toMatchObject({ code: "invalid_admin_word_response" });
+  });
+
   it("deleteBatch 的 affected 等于请求条数时通过", async () => {
     const api = createAdminEndpoints(http);
     http.post.mockResolvedValueOnce({ affected: 2 });
