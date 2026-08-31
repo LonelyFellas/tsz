@@ -227,6 +227,26 @@ function builtinRegionalValue(pending: PendingCreation): {
   };
 }
 
+function regionalValueForDetection(
+  value: WordHeadwordsV2,
+  surface: string,
+  preference: "uk" | "us"
+): WordHeadwordsV2 {
+  if (value.mode === "unified") return value;
+  const input = surface.trim().toLowerCase();
+  const uk = value.uk.trim().toLowerCase();
+  const us = value.us.trim().toLowerCase();
+  const sourceDialect =
+    uk === us
+      ? preference
+      : input === uk
+        ? "uk"
+        : input === us
+          ? "us"
+          : preference;
+  return { ...value, source_dialect: sourceDialect };
+}
+
 function DetectionPresentationCard({
   pending,
   catalog,
@@ -741,17 +761,22 @@ export function UnifiedCreateEntryStep({
       setRegionalDisplay(preservedRegionalDisplay.current);
       return;
     }
+    const fallback = builtinRegionalValue(prepared);
+    const preferredFallback = {
+      ...fallback,
+      value: regionalValueForDetection(
+        fallback.value,
+        prepared.detection.normalized_surface,
+        preference
+      )
+    };
+    if (fallback.value.mode === "distinguish") {
+      setRegionalDisplay({ status: "ready", ...preferredFallback });
+      return;
+    }
     const first = baseCandidates[0];
     if (!first) {
-      const fallback = builtinRegionalValue(prepared);
-      setRegionalDisplay({
-        status: "ready",
-        ...fallback,
-        value:
-          fallback.value.mode === "distinguish"
-            ? { ...fallback.value, source_dialect: preference }
-            : fallback.value
-      });
+      setRegionalDisplay({ status: "ready", ...preferredFallback });
       return;
     }
     let active = true;
@@ -767,7 +792,11 @@ export function UnifiedCreateEntryStep({
                 source: "database",
                 value:
                   value.mode === "distinguish"
-                    ? { ...value, source_dialect: preference }
+                    ? regionalValueForDetection(
+                        value,
+                        prepared.detection.normalized_surface,
+                        preference
+                      )
                     : value
               }
             : { status: "error" }
