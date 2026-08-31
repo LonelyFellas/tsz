@@ -65,16 +65,10 @@ export const coverageCollectionConfig = {
 
 export const fullCoverageConfig: CoverageV8Options = {
   ...coverageCollectionConfig,
-  reporter: ["text", "html"],
-  // 包内逻辑继续保持 100%；应用层生成完整报告，但不以固定百分比替代测试质量审查。
-  thresholds: {
-    "packages/**": {
-      statements: 100,
-      branches: 100,
-      functions: 100,
-      lines: 100
-    }
-  }
+  reporter: ["text", "html"]
+  // 不设百分比门槛：覆盖率报告用来找盲区，不用固定数字替代测试质量审查。
+  // 曾对 packages/** 要求 100%，实际促成的是「为凑数补一条弱断言」，
+  // 而不是更好的用例设计——报告照出，是否补测由 review 判断。
 };
 
 export const shardCoverageConfig: CoverageV8Options = {

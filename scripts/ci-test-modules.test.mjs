@@ -157,7 +157,10 @@ test("M06: full and shard configs share collection policy", () => {
   );
   assert.deepEqual(shardCoverageConfig.reporter, []);
   assert.equal(shardCoverageConfig.thresholds, undefined);
-  assert.ok(fullCoverageConfig.thresholds);
+  // 两套配置都不设百分比门槛：覆盖率报告用来找盲区，测试是否够由 review 判断。
+  assert.equal(fullCoverageConfig.thresholds, undefined);
+  // full 出报告、shard 只收集数据，这个差异仍要守住。
+  assert.deepEqual(fullCoverageConfig.reporter, ["text", "html"]);
 });
 
 test("M07: reporter inventory comes from actual TestModule values", () => {
