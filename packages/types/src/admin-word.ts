@@ -74,6 +74,8 @@ export interface AdminWordListItem {
   /** 当前工作 revision 是否包含尚未发布的修改。 */
   has_unpublished_changes: boolean;
   created_by_name: string;
+  /** 创建人 admin id；判定「仅本人可删」的归属依据（姓名会因重名误判）。 */
+  created_by: string;
   created_at: string;
   updated_at: string;
 }

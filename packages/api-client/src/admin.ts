@@ -26,6 +26,7 @@ import type {
   CreateAdminResponse,
   CreateRoleRequest,
   DeleteDraftInput,
+  EntryDeleteBatchInput,
   DetectWordInputV2,
   DetectWordResponseV2,
   DetectLexiconSurfaceV3Input,
@@ -96,6 +97,7 @@ import {
   decodeRelatedSearchResponseAny,
   decodeSurfaceMatchPageAny,
   decodeSurfaceMatchPageV3,
+  decodeEntryDeleteBatchResponse,
   decodeEntryLifecycleBatchV2Response
 } from "./admin-word-schema";
 import type { HttpClient } from "./http";
@@ -641,9 +643,16 @@ export function createAdminEndpoints(http: HttpClient) {
           .then((response) =>
             requireLifecycleBatchIdentity(response, input, "restore_batch")
           ),
-      /** DELETE /admin/lexicon/entries/{id} — 仅永久删除从未发布的 V2 草稿。 */
+      /** DELETE /admin/lexicon/entries/{id} — 永久删除从未发布的草稿（含垃圾桶中的）。 */
       deleteDraft: (wordId: string, input: DeleteDraftInput) =>
         http.del<void>(`/lexicon/entries/${wordId}`, input),
+      /** POST /admin/lexicon/entries/delete-batch — 最多 100 条原子永久删除。 */
+      deleteBatch: (idempotencyKey: string, input: EntryDeleteBatchInput) =>
+        http
+          .post<unknown>("/lexicon/entries/delete-batch", input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then(decodeEntryDeleteBatchResponse),
       /** GET /admin/lexicon/entries/related-search — 关联词/上下文目标搜索。 */
       relatedSearch: (q: string, opts?: RelatedSearchQuery) =>
         http

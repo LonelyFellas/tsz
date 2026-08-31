@@ -22,6 +22,8 @@ import type {
   DraftValidationIssueV2,
   DraftValidationResponse,
   DeletePartOfSpeechQuery,
+  EntryDeleteBatchInput,
+  EntryDeleteBatchResponse,
   EntryLifecycleBatchInput,
   EntryLifecycleBatchResponse,
   EntryLifecycleInput,
@@ -132,9 +134,10 @@ interface MockFormsSurfaceEvidence {
 }
 
 interface MockLifecycleOperationRecord {
-  scope: "archive" | "restore" | "archive_batch" | "restore_batch";
+  scope:
+    "archive" | "restore" | "archive_batch" | "restore_batch" | "delete_batch";
   request_json: string;
-  response: EntryLifecycleBatchResponse;
+  response: EntryLifecycleBatchResponse | EntryDeleteBatchResponse;
 }
 
 interface MockWordOperationRecord {
@@ -2975,6 +2978,7 @@ export function createAdminWordsMock({
           word.created_by === profile.id
             ? profile.display_name
             : word.created_by,
+        created_by: word.created_by,
         created_at: word.created_at,
         updated_at: word.updated_at
       }))
@@ -4067,7 +4071,8 @@ export function createAdminWordsMock({
           "idempotency_conflict"
         );
       }
-      return clone(existingOperation.response);
+      // scope 已与本次调用比对过，此处必为生命周期批量的响应形状。
+      return clone(existingOperation.response) as EntryLifecycleBatchResponse;
     }
 
     const words = input.entries.map((entry) => {
@@ -4310,22 +4315,19 @@ export function createAdminWordsMock({
     );
   }
 
-  async function deleteDraft(
+  /**
+   * 判定一条能否永久删除；顺序与后端 delete_entry_in_transaction 严格一致
+   * （revision → lifecycle → 归属 → 发布历史），否则同时踩两个条件时
+   * mock 与真机会给出不同错误码。只校验不改状态，供批量先全验后全删。
+   */
+  function assertEntryDeletable(
+    profile: MockAdminProfile,
+    current: AdminWordsMockPersistedState,
     wordId: string,
     input: { base_revision: number; base_lifecycle_revision: number }
-  ): Promise<void> {
-    await pause();
-    const { state: current } = context();
+  ): void {
     const word = current.words[wordId];
     if (!word) throw new HttpError(404, "word not found", [], "word_not_found");
-    if (current.publication_words[wordId]) {
-      throw new HttpError(
-        409,
-        "entry cannot be deleted",
-        [],
-        "entry_not_deletable"
-      );
-    }
     if (word.revision !== input.base_revision) {
       throw new HttpError(
         409,
@@ -4342,7 +4344,17 @@ export function createAdminWordsMock({
         "revision_conflict"
       );
     }
-    if (word.status === "archived") {
+    // 普通管理员只能删自己创建的；超管不受限。
+    if (profile.role !== "super_admin" && word.created_by !== profile.id) {
+      throw new HttpError(
+        403,
+        "entry can only be deleted by its creator",
+        [],
+        "entry_delete_forbidden"
+      );
+    }
+    // 归档态可删（垃圾桶是软删除中间站）；真正不可删的是发布过。
+    if (current.publication_words[wordId]) {
       throw new HttpError(
         409,
         "entry cannot be deleted",
@@ -4350,9 +4362,88 @@ export function createAdminWordsMock({
         "entry_not_deletable"
       );
     }
+  }
+
+  function applyEntryDeletion(
+    current: AdminWordsMockPersistedState,
+    wordId: string
+  ): void {
     delete current.words[wordId];
     delete current.retired_stable_slots[wordId];
+  }
+
+  async function deleteDraft(
+    wordId: string,
+    input: { base_revision: number; base_lifecycle_revision: number }
+  ): Promise<void> {
+    await pause();
+    const { profile, state: current } = context();
+    assertEntryDeletable(profile, current, wordId, input);
+    applyEntryDeletion(current, wordId);
     persist(current);
+  }
+
+  async function deleteBatch(
+    idempotencyKey: string,
+    input: EntryDeleteBatchInput
+  ): Promise<EntryDeleteBatchResponse> {
+    await pause();
+    const { profile, state: current } = context();
+    if (input.entries.length < 1 || input.entries.length > 100) {
+      throw new HttpError(
+        422,
+        "entries must contain between 1 and 100 values",
+        [],
+        "validation_failed"
+      );
+    }
+    const ids = new Set(input.entries.map((entry) => entry.id));
+    if (
+      ids.size !== input.entries.length ||
+      input.entries.some(
+        (entry) => entry.base_revision < 1 || entry.base_lifecycle_revision < 1
+      )
+    ) {
+      throw new HttpError(
+        422,
+        "entry ids must be unique and revisions must be positive",
+        [],
+        "validation_failed"
+      );
+    }
+    const requestJson = JSON.stringify(input);
+    const existingOperation = current.lifecycle_operations[idempotencyKey];
+    if (existingOperation) {
+      if (
+        existingOperation.scope !== "delete_batch" ||
+        existingOperation.request_json !== requestJson
+      ) {
+        throw new HttpError(
+          409,
+          "idempotency key reused",
+          [],
+          "idempotency_conflict"
+        );
+      }
+      return clone(existingOperation.response) as EntryDeleteBatchResponse;
+    }
+    // 原子：先把整批验完，任意一条不合格就整批不动；验完再统一删。
+    for (const entry of input.entries) {
+      assertEntryDeletable(profile, current, entry.id, entry);
+    }
+    for (const entry of input.entries) {
+      applyEntryDeletion(current, entry.id);
+    }
+    const response: EntryDeleteBatchResponse = {
+      affected: input.entries.length
+    };
+    current.lifecycle_operations[idempotencyKey] = {
+      scope: "delete_batch",
+      request_json: requestJson,
+      response: clone(response)
+    };
+    persist(current);
+    return clone(response);
   }
 
   async function relatedSearch(
@@ -4732,6 +4823,7 @@ export function createAdminWordsMock({
     archiveBatch,
     restoreBatch,
     deleteDraft,
+    deleteBatch,
     relatedSearch,
     sentenceAssociations: {
       resolve: resolveSentenceAssociation,

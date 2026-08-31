@@ -13,6 +13,7 @@ import type {
   DraftValidationIssueAny,
   DraftValidationResponseAny,
   DraftValidationResponseV3,
+  EntryDeleteBatchResponse,
   EntryLifecycleBatchResponse,
   EntryLifecycleBatchResponseAny,
   FormsImpactResponseAny,
@@ -307,6 +308,32 @@ export function decodeEntryLifecycleBatchV2Response(
   const words = isRecord(value) ? value.words : undefined;
   assertVersionedArray(words, "words", SUPPORTED_ADMIN_WORD_SCHEMA_VERSIONS);
   return value as EntryLifecycleBatchResponse;
+}
+
+/**
+ * 批量永久删除只回 { affected }：词条已不存在，没有实体可校验版本。
+ * 但仍要挡住结构漂移——affected 不是非负整数就说明契约变了，
+ * 静默当 0 会让 UI 报「已删除 0 条」而掩盖真实故障。
+ */
+export function decodeEntryDeleteBatchResponse(
+  value: unknown
+): EntryDeleteBatchResponse {
+  const affected = isRecord(value) ? value.affected : undefined;
+  if (typeof affected !== "number") {
+    throw new InvalidAdminWordResponseError(
+      "affected",
+      affected === undefined ? "missing_required_property" : "wrong_type",
+      describeReceivedType(affected) as RuntimeSchemaReceivedType
+    );
+  }
+  if (!Number.isInteger(affected) || affected < 0) {
+    throw new InvalidAdminWordResponseError(
+      "affected",
+      affected < 0 ? "below_minimum" : "wrong_type",
+      "number"
+    );
+  }
+  return value as EntryDeleteBatchResponse;
 }
 
 export function decodeAdminWordV3Envelope(

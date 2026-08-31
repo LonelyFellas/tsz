@@ -22,6 +22,7 @@ const v3Row = (
   has_unpublished_changes: false,
   max_reachable_step: "forms",
   created_by_name: "Admin",
+  created_by: "admin-1",
   created_at: "2026-08-25T00:00:00Z",
   updated_at: "2026-08-25T00:00:00Z"
 });
@@ -48,6 +49,7 @@ describe("mixed word list presentation", () => {
       max_reachable_step: "forms",
       has_unpublished_changes: false,
       created_by_name: "Admin",
+      created_by: "admin-1",
       created_at: "2026-08-25T00:00:00Z",
       updated_at: "2026-08-25T00:00:00Z"
     };
@@ -116,6 +118,7 @@ describe("mixed word list presentation", () => {
       max_reachable_step: "basics",
       has_unpublished_changes: false,
       created_by_name: "Admin",
+      created_by: "admin-1",
       created_at: "2026-08-25T00:00:00Z",
       updated_at: "2026-08-25T00:00:00Z"
     } as const satisfies AdminWordListItemAny;

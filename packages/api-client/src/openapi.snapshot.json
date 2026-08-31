@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/.codex/worktrees/draft-relation-prebinding-clean/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-08-31T03:26:02.779Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-08-31T05:42:49.664Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -17,6 +17,7 @@
     "/admin/lexicon/dialect-variant-suggestions": ["post"],
     "/admin/lexicon/entries": ["get", "post"],
     "/admin/lexicon/entries/archive-batch": ["post"],
+    "/admin/lexicon/entries/delete-batch": ["post"],
     "/admin/lexicon/entries/related-search": ["get"],
     "/admin/lexicon/entries/restore-batch": ["post"],
     "/admin/lexicon/entries/sentence-targets/resolve": ["post"],
@@ -79,6 +80,14 @@
       }
     ],
     "post /admin/lexicon/entries/archive-batch": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/entries/delete-batch": [
       {
         "name": "Idempotency-Key",
         "in": "header",
@@ -292,6 +301,18 @@
         "200": {
           "$ref": "#/components/schemas/EntryLifecycleBatchResponseAny"
         },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/entries/delete-batch": {
+      "request": { "$ref": "#/components/schemas/EntryDeleteBatchInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/EntryDeleteBatchResponse" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -701,6 +722,7 @@
         "downstream_confirmation_required",
         "entry_archived",
         "entry_not_deletable",
+        "entry_delete_forbidden",
         "entry_has_inbound_prebound_relations",
         "entry_has_inbound_publication_refs",
         "entry_has_unavailable_publication_refs",
@@ -2235,11 +2257,17 @@
         "has_unpublished_changes",
         "max_reachable_step",
         "created_by_name",
+        "created_by",
         "created_at",
         "updated_at"
       ],
       "properties": {
         "created_at": { "type": "string", "format": "date-time" },
+        "created_by": {
+          "type": "string",
+          "format": "uuid",
+          "description": "创建人 admin id；前端按「仅本人可删」判定归属时使用。"
+        },
         "created_by_name": { "type": "string" },
         "dialects": {
           "type": "array",
@@ -3324,6 +3352,18 @@
         }
       ],
       "discriminator": { "propertyName": "mode" }
+    },
+    "EntryDeleteBatchInput": {
+      "type": "object",
+      "description": "批量永久删除入参；不带 confirmed_surface_match_token——\n删除只撤除 surface 贡献、不新增占位，不存在需要确认的同表面冲突。",
+      "required": ["entries"],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/EntryLifecycleTarget" }
+        }
+      },
+      "additionalProperties": false
     },
     "EntryKind": { "type": "string", "enum": ["word", "phrase"] },
     "GrammarStructureV2": {

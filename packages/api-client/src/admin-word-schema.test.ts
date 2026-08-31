@@ -21,6 +21,7 @@ import {
   decodeDraftValidationResponseAny,
   decodeDraftValidationResponseV3,
   decodeEntryLifecycleBatchAnyResponse,
+  decodeEntryDeleteBatchResponse,
   decodeEntryLifecycleBatchV2Response,
   decodeFormsImpactResponseAny,
   decodeFormsImpactResponseV3,
@@ -335,6 +336,7 @@ function validAdminWordListItemV2() {
     has_unpublished_changes: false,
     max_reachable_step: "basics",
     created_by_name: "Admin",
+    created_by: IDS.creator,
     created_at: "2026-08-24T12:00:00Z",
     updated_at: "2026-08-24T12:00:00Z"
   };
@@ -359,6 +361,7 @@ function validAdminWordListItemV3() {
     has_unpublished_changes: true,
     max_reachable_step: "forms",
     created_by_name: "Admin",
+    created_by: IDS.creator,
     created_at: "2026-08-24T12:00:00Z",
     updated_at: "2026-08-24T12:00:00Z"
   };
@@ -405,6 +408,47 @@ describe("admin word V2 response schema guard", () => {
     expect(decodeEntryLifecycleBatchV2Response(batch)).toBe(batch);
     expect(SUPPORTED_ADMIN_WORD_SCHEMA_VERSIONS).toEqual([2]);
     expect(Object.isFrozen(SUPPORTED_ADMIN_WORD_SCHEMA_VERSIONS)).toBe(true);
+  });
+
+  describe("decodeEntryDeleteBatchResponse", () => {
+    it("接受合法的 affected 并保留原引用", () => {
+      const response = { affected: 3 };
+      expect(decodeEntryDeleteBatchResponse(response)).toBe(response);
+      const zero = { affected: 0 };
+      expect(decodeEntryDeleteBatchResponse(zero)).toBe(zero);
+    });
+
+    it.each([
+      ["缺失 affected", {}, "missing_required_property", "missing"],
+      ["affected 是字符串", { affected: "3" }, "wrong_type", "string"],
+      ["affected 是 null", { affected: null }, "wrong_type", "null"],
+      ["根不是对象", null, "missing_required_property", "missing"]
+    ])("%s 时 fail closed", (_label, value, reason, receivedType) => {
+      // 静默当 0 会让 UI 报「已删除 0 条」而掩盖真实的契约漂移。
+      try {
+        decodeEntryDeleteBatchResponse(value);
+        throw new Error("应当抛出");
+      } catch (error) {
+        expect(error).toBeInstanceOf(InvalidAdminWordResponseError);
+        const failure = error as InvalidAdminWordResponseError;
+        expect(failure.response_path).toBe("affected");
+        expect(failure.reason).toBe(reason);
+        expect(failure.received_type).toBe(receivedType);
+      }
+    });
+
+    it.each([
+      ["负数", { affected: -1 }, "below_minimum"],
+      ["小数", { affected: 1.5 }, "wrong_type"]
+    ])("%s 时 fail closed", (_label, value, reason) => {
+      try {
+        decodeEntryDeleteBatchResponse(value);
+        throw new Error("应当抛出");
+      } catch (error) {
+        expect(error).toBeInstanceOf(InvalidAdminWordResponseError);
+        expect((error as InvalidAdminWordResponseError).reason).toBe(reason);
+      }
+    });
   });
 
   it.each([

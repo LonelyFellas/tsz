@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/.codex/worktrees/draft-relation-prebinding-clean/tsz-rust/docs/openapi.json",
-  "_source_sha256": "5f6466e94776cf2e9cb4b34b5eb9ccf910741a6e4570bc8ad033af859a71ebbc",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
+  "_source_sha256": "fe4b70d5e728e1e59002b57665f690a1bf94b6f3fb45ed7ca99c0c4fbea7606c",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -81,11 +81,13 @@
         "has_unpublished_changes",
         "max_reachable_step",
         "created_by_name",
+        "created_by",
         "created_at",
         "updated_at"
       ],
       "properties": {
         "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "type": "string", "format": "uuid" },
         "created_by_name": { "type": "string" },
         "dialects": { "type": "array", "items": { "$ref": "#/$defs/Dialect" } },
         "gloss": { "type": "string" },
@@ -131,11 +133,13 @@
         "has_unpublished_changes",
         "max_reachable_step",
         "created_by_name",
+        "created_by",
         "created_at",
         "updated_at"
       ],
       "properties": {
         "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "type": "string", "format": "uuid" },
         "created_by_name": { "type": "string" },
         "gloss": { "type": "string" },
         "has_unpublished_changes": { "type": "boolean" },
@@ -1130,6 +1134,7 @@
         "downstream_confirmation_required",
         "entry_archived",
         "entry_not_deletable",
+        "entry_delete_forbidden",
         "entry_has_inbound_prebound_relations",
         "entry_has_inbound_publication_refs",
         "entry_has_unavailable_publication_refs",

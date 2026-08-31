@@ -652,6 +652,16 @@ export interface EntryLifecycleBatchResponse {
   affected: number;
 }
 
+/** POST /admin/lexicon/entries/delete-batch 入参；删除不涉及同表面确认，故无 token。 */
+export interface EntryDeleteBatchInput {
+  entries: EntryLifecycleTarget[];
+}
+
+/** 批量永久删除出参；词条已不存在，只回受影响条数。 */
+export interface EntryDeleteBatchResponse {
+  affected: number;
+}
+
 /** @deprecated 新代码统一使用通用 ProblemMeta。 */
 export type AdminWordApiErrorMeta = ProblemMeta;
 

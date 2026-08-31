@@ -26,6 +26,7 @@ const METHOD_NAMES = [
   "archiveBatch",
   "restoreBatch",
   "deleteDraft",
+  "deleteBatch",
   "relatedSearch"
 ] as const satisfies ReadonlyArray<keyof AdminWordsDataSource>;
 
@@ -137,6 +138,10 @@ const INVOCATIONS = [
   {
     method: "deleteDraft",
     args: ["word-1", { base_revision: 2, base_lifecycle_revision: 1 }]
+  },
+  {
+    method: "deleteBatch",
+    args: ["delete-batch-key", { entries: [] }]
   },
   {
     method: "relatedSearch",
@@ -581,7 +586,9 @@ describe("admin words data source selection", () => {
       dialectVariantSuggestions: true,
       phraseCreation: true,
       archive: true,
-      batchArchive: true
+      batchArchive: true,
+      permanentDelete: true,
+      batchPermanentDelete: true
     });
     await expectFacadeDelegation(
       loaded.module.adminWordsDataSource,
@@ -627,7 +634,9 @@ describe("admin words data source selection", () => {
       dialectVariantSuggestions: true,
       phraseCreation: true,
       archive: true,
-      batchArchive: true
+      batchArchive: true,
+      permanentDelete: true,
+      batchPermanentDelete: true
     });
     await expectFacadeDelegation(
       loaded.module.adminWordsDataSource,

@@ -26,6 +26,7 @@ import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { useAuthStore } from "@/lib/auth";
 import { InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
   AdminWordKind,
@@ -38,6 +39,8 @@ import type {
 import {
   useArchiveWordAny as useArchiveWord,
   useArchiveWordsBatchAny as useArchiveWordsBatch,
+  useDeleteWordBatch,
+  useDeleteWordDraft,
   useRestoreWordAny as useRestoreWord,
   useRestoreWordsBatchAny as useRestoreWordsBatch,
   useWordList,
@@ -47,6 +50,11 @@ import {
   adminWordsAnyDataSource,
   adminWordsDataSourceCapabilities
 } from "./dataSource";
+import {
+  DELETE_BLOCK_REASON_TEXT,
+  evaluateDeleteEligibility,
+  partitionDeletableRows
+} from "./deletePermission";
 import { LifecycleSurfaceConfirmation } from "./LifecycleSurfaceConfirmation";
 import {
   CEFR_OPTIONS,
@@ -129,6 +137,11 @@ export function SmartDictionary({
 } = {}) {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  // 归属判定所需；门禁保证受保护页内 profile 必有值，缺失时判定一律不放行。
+  const profile = useAuthStore((s) => s.profile);
+  const deleteActor = profile
+    ? { id: profile.id, role: profile.role }
+    : undefined;
   const [searchParams, setSearchParams] = useSearchParams();
   const [form] = Form.useForm<WordFilterValues>();
   const serializedSearchParams = searchParams.toString();
@@ -165,6 +178,8 @@ export function SmartDictionary({
   const restoreWord = useRestoreWord();
   const archiveBatch = useArchiveWordsBatch();
   const restoreBatch = useRestoreWordsBatch();
+  const deleteWord = useDeleteWordDraft();
+  const deleteBatch = useDeleteWordBatch();
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const partOfSpeechLookup = useMemo(
     () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
@@ -334,6 +349,119 @@ export function SmartDictionary({
       base_revision: record.revision,
       base_lifecycle_revision: record.lifecycle_revision
     };
+  };
+
+  // 永久删除的错误分流：403(越权)、409(本身不可删/版本冲突) 对管理员意味完全不同，
+  // 统一提示会让人以为是同一类问题。
+  const describeDeleteFailure = (error: unknown): string => {
+    const code = (error as { code?: string } | undefined)?.code;
+    if (code === "entry_delete_forbidden") {
+      return "只能永久删除自己创建的词条";
+    }
+    if (code === "entry_not_deletable") {
+      return "该词条已发布过或仍被其他草稿引用，不能永久删除";
+    }
+    if (code === "entry_has_inbound_prebound_relations") {
+      return "该词条被其他草稿的关联词选中，请先解除后再删除";
+    }
+    if (code === "revision_conflict") {
+      return "词条已被他人改动，请刷新列表后重试";
+    }
+    if (code === "word_not_found") {
+      return "词条已不存在，请刷新列表";
+    }
+    return error instanceof Error ? error.message : "永久删除失败";
+  };
+
+  const deleteOne = (record: AdminWordListItemAny) => {
+    const eligibility = evaluateDeleteEligibility(deleteActor, record);
+    if (!eligibility.deletable) {
+      message.warning(DELETE_BLOCK_REASON_TEXT[eligibility.reason!]);
+      return;
+    }
+    const label = wordListLabel(record);
+    modal.confirm({
+      title: `永久删除「${label}」？`,
+      content:
+        "此操作不可恢复：词条及其草稿内容会被彻底清除，占用的词头随之释放（之后可用同名重新创建）。",
+      okText: "永久删除",
+      okButtonProps: { danger: true },
+      cancelText: "取消",
+      onOk: () =>
+        runLifecycleCommandOnce(lifecycleCommandPending, async () => {
+          try {
+            await deleteWord.mutateAsync({
+              wordId: record.id,
+              baseRevision: record.revision,
+              baseLifecycleRevision: record.lifecycle_revision
+            });
+            setSelectedKeys((keys) =>
+              keys.filter((key) => String(key) !== record.id)
+            );
+            message.success("词条已永久删除");
+          } catch (error) {
+            message.error(describeDeleteFailure(error));
+            void listQuery.refetch();
+          }
+        })
+    });
+  };
+
+  const deleteSelected = () => {
+    if (selectedRows.length !== selectedKeys.length) {
+      message.error("所选词条缺少并发版本信息，请刷新列表后重试");
+      return;
+    }
+    const { deletable, blocked } = partitionDeletableRows(
+      deleteActor,
+      selectedRows
+    );
+    // 永久删除不可逆，后端也是整批原子的：与其部分成功，不如提交前就把不合格的挑明。
+    if (blocked.length > 0) {
+      const detail = blocked
+        .slice(0, 3)
+        .map(
+          ({ row, reason }) =>
+            `「${wordListLabel(row)}」${DELETE_BLOCK_REASON_TEXT[reason]}`
+        )
+        .join("；");
+      message.warning(
+        blocked.length > 3
+          ? `${detail}；另有 ${blocked.length - 3} 条不可删除`
+          : detail
+      );
+      return;
+    }
+    if (deletable.length === 0) return;
+    modal.confirm({
+      title: `永久删除选中的 ${deletable.length} 个词条？`,
+      content:
+        "此操作不可恢复，且整批原子执行：任意一条不满足条件时全部保持原状。词条彻底清除后，占用的词头随之释放。",
+      okText: "永久删除",
+      okButtonProps: { danger: true },
+      cancelText: "取消",
+      onOk: () =>
+        runLifecycleCommandOnce(lifecycleCommandPending, async () => {
+          try {
+            const response = await deleteBatch.mutateAsync({
+              idempotencyKey: newWordNodeId(),
+              input: {
+                entries: deletable.map((row) => ({
+                  id: row.id,
+                  base_revision: row.revision,
+                  base_lifecycle_revision: row.lifecycle_revision
+                }))
+              }
+            });
+            setSelectedKeys([]);
+            setSelectedRecords({});
+            message.success(`已永久删除 ${response.affected} 个词条`);
+          } catch (error) {
+            message.error(describeDeleteFailure(error));
+            void listQuery.refetch();
+          }
+        })
+    });
   };
 
   const transitionOne = (
@@ -631,6 +759,41 @@ export function SmartDictionary({
                 {record.status === "archived" ? "恢 复" : "移入垃圾桶"}
               </Button>
             )}
+            {adminWordsDataSourceCapabilities.permanentDelete &&
+              record.status === "archived" &&
+              (() => {
+                const eligibility = evaluateDeleteEligibility(
+                  deleteActor,
+                  record
+                );
+                const button = (
+                  <Button
+                    type="link"
+                    size="small"
+                    danger
+                    aria-label={`永久删除${rowName}`}
+                    icon={<DeleteOutlined />}
+                    disabled={!eligibility.deletable}
+                    loading={
+                      deleteWord.isPending &&
+                      deleteWord.variables?.wordId === record.id
+                    }
+                    onClick={() => deleteOne(record)}
+                  >
+                    永久删除
+                  </Button>
+                );
+                // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
+                return eligibility.deletable ? (
+                  button
+                ) : (
+                  <Tooltip
+                    title={DELETE_BLOCK_REASON_TEXT[eligibility.reason!]}
+                  >
+                    <span>{button}</span>
+                  </Tooltip>
+                );
+              })()}
           </Space>
         );
       }
@@ -782,6 +945,19 @@ export function SmartDictionary({
                 {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
               </Button>
             )}
+            {adminWordsDataSourceCapabilities.batchPermanentDelete &&
+              restoringSelection && (
+                <Button
+                  danger
+                  icon={<DeleteOutlined />}
+                  disabled={selectedKeys.length === 0}
+                  loading={deleteBatch.isPending}
+                  onClick={deleteSelected}
+                >
+                  永久删除
+                  {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
+                </Button>
+              )}
           </Space>
           <Space size="large" wrap>
             <Typography.Text type="secondary">

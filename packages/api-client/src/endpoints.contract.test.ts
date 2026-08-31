@@ -20,6 +20,7 @@ const specPaths = snapshot.paths as Record<string, string[]>;
 const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries",
   "post /admin/lexicon/entries/archive-batch",
+  "post /admin/lexicon/entries/delete-batch",
   "post /admin/lexicon/entries/restore-batch",
   "post /admin/lexicon/entries/{id}/archive",
   "post /admin/lexicon/entries/{id}/content-completion-jobs",
@@ -301,6 +302,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "EntryLifecycleBatchResponseAny"
       ],
       [
+        "post /admin/lexicon/entries/delete-batch",
+        "EntryDeleteBatchInput",
+        "200",
+        "EntryDeleteBatchResponse"
+      ],
+      [
         "post /admin/lexicon/entries/{id}/archive",
         "EntryLifecycleInput",
         "200",
@@ -433,6 +440,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "422",
         "503"
       ],
+      "post /admin/lexicon/entries/delete-batch": [
+        "400",
+        "401",
+        "403",
+        "404",
+        "409",
+        "422"
+      ],
       "post /admin/lexicon/entries/{id}/archive": [
         "400",
         "401",
@@ -481,7 +496,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "5f6466e94776cf2e9cb4b34b5eb9ccf910741a6e4570bc8ad033af859a71ebbc"
+      "fe4b70d5e728e1e59002b57665f690a1bf94b6f3fb45ed7ca99c0c4fbea7606c"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
