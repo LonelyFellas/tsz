@@ -97,6 +97,7 @@ function word(
     has_unpublished_changes: false,
     created_by_name: "Admin",
     created_by: "admin-1",
+    reference_summary: { total: 0, previews: [], truncated: false },
     created_at: "2026-08-01T00:00:00Z",
     updated_at: "2026-08-01T00:00:00Z"
   };
@@ -126,6 +127,7 @@ function v3Word(
     has_unpublished_changes: false,
     created_by_name: "Admin",
     created_by: "admin-1",
+    reference_summary: { total: 0, previews: [], truncated: false },
     created_at: "2026-08-25T00:00:00Z",
     updated_at: "2026-08-25T00:00:00Z"
   };
@@ -529,7 +531,11 @@ describe("SmartDictionary", () => {
     const creator = screen.getByText("非常非常长的创建人名称");
     expect(creator).toHaveAttribute("tabindex", "0");
     expect(creator.closest("td")).toHaveClass("ant-table-cell-ellipsis");
-    expect(screen.getByText("-")).not.toHaveAttribute("tabindex");
+    // 引用列在无引用时也渲染 "-"，这里只针对创建人列那一个占位断言。
+    const creatorPlaceholder = screen
+      .getAllByText("-")
+      .find((node) => !node.classList.contains("ant-typography"))!;
+    expect(creatorPlaceholder).not.toHaveAttribute("tabindex");
   });
 
   it("从重复检测入口进入时自动定位归档词条", () => {
@@ -879,6 +885,104 @@ describe("SmartDictionary", () => {
         input: { base_revision: 1, base_lifecycle_revision: 1 }
       })
     );
+  });
+
+  it("引用列显示计数，点击展开被谁引用", async () => {
+    matchViewport(1440);
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...archivedWord("word-1", "referenced"),
+            reference_summary: {
+              total: 7,
+              previews: [
+                {
+                  source_word_id: "src-1",
+                  source_headword: "holiday",
+                  source_status: "published",
+                  source_kind: "relation"
+                },
+                {
+                  source_word_id: "src-2",
+                  source_headword: "take off",
+                  source_status: "draft",
+                  source_kind: "phrase_component"
+                }
+              ],
+              truncated: true
+            }
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    const trigger = screen.getByLabelText("查看「referenced」的 7 条引用");
+    fireEvent.click(trigger);
+
+    await screen.findByText("被以下内容引用");
+    expect(screen.getByText("holiday")).toBeInTheDocument();
+    expect(screen.getByText("take off")).toBeInTheDocument();
+    // 来源类型要能区分「被短语当成分」和「被设为关联词」。
+    expect(screen.getByText(/关联词/)).toBeInTheDocument();
+    expect(screen.getByText(/短语成分/)).toBeInTheDocument();
+    expect(screen.getByText(/共 7 条，仅显示前 2 条/)).toBeInTheDocument();
+  });
+
+  it("被引用的词条不可永久删除，且说明原因", () => {
+    matchViewport(1440);
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...archivedWord("word-1", "referenced"),
+            reference_summary: {
+              total: 1,
+              previews: [
+                {
+                  source_word_id: "src-1",
+                  source_headword: "holiday",
+                  source_status: "draft",
+                  source_kind: "relation"
+                }
+              ],
+              truncated: false
+            }
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(
+      screen
+        .getAllByText("永久删除", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => item?.classList.contains("ant-btn-link"))
+    ).toBeDisabled();
   });
 
   it("垃圾桶模式固定归档、去掉状态筛选与创建入口", () => {

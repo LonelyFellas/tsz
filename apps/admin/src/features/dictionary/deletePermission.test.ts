@@ -24,6 +24,7 @@ function row(overrides: Partial<AdminWordListItemAny> = {}) {
     max_reachable_step: "basics",
     created_by_name: "Admin",
     created_by: "admin-1",
+    reference_summary: { total: 0, previews: [], truncated: false },
     created_at: "2026-08-31T00:00:00Z",
     updated_at: "2026-08-31T00:00:00Z",
     ...overrides
@@ -97,10 +98,37 @@ describe("evaluateDeleteEligibility", () => {
     ).toEqual({ deletable: false, reason: "not_owner" });
   });
 
+  it("被其他内容引用时不可删——与后端入站引用拦截同口径", () => {
+    expect(
+      evaluateDeleteEligibility(
+        owner,
+        row({
+          reference_summary: {
+            total: 2,
+            previews: [],
+            truncated: false
+          }
+        })
+      )
+    ).toEqual({ deletable: false, reason: "referenced" });
+  });
+
+  it("引用数为 0 时可删——这条不变量由后端测试同时守着", () => {
+    expect(
+      evaluateDeleteEligibility(
+        owner,
+        row({
+          reference_summary: { total: 0, previews: [], truncated: false }
+        })
+      )
+    ).toEqual({ deletable: true });
+  });
+
   it("每个拦截原因都有对应文案", () => {
     const reasons = [
       "not_archived",
       "published",
+      "referenced",
       "not_owner",
       "unknown_identity",
       "missing_revision"

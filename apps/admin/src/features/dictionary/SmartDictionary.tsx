@@ -15,6 +15,7 @@ import {
   Flex,
   Form,
   Input,
+  Popover,
   Select,
   Space,
   Table,
@@ -34,7 +35,8 @@ import type {
   AdminWordListItemAny,
   CefrLevel,
   Dialect,
-  EntryLifecycleBatchResponseAny
+  EntryLifecycleBatchResponseAny,
+  EntryReferenceKind
 } from "@tsz/types";
 import {
   useArchiveWordAny as useArchiveWord,
@@ -87,6 +89,15 @@ import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 import { newWordNodeId } from "./word-model/primitives";
 
 const { RangePicker } = DatePicker;
+
+const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, string> = {
+  relation: "关联词",
+  relation_prebound: "关联词待物化",
+  sentence_link: "例句关联",
+  publication_sense_ref: "已发布引用",
+  sentence_association: "例句关联待认领",
+  phrase_component: "短语成分"
+};
 
 const DIALECT_LABEL: Record<Dialect, string> = {
   uk: "BrE",
@@ -696,6 +707,48 @@ export function SmartDictionary({
           <Tooltip title={name?.trim() || undefined}>
             <span tabIndex={name?.trim() ? 0 : undefined}>{label}</span>
           </Tooltip>
+        );
+      }
+    },
+    {
+      title: "引用",
+      key: "references",
+      width: 80,
+      responsive: ["sm"],
+      render: (_: unknown, record) => {
+        const summary = record.reference_summary;
+        const total = summary?.total ?? 0;
+        if (total === 0) {
+          return <Typography.Text type="secondary">-</Typography.Text>;
+        }
+        // 展开前 5 条「被谁引用」：管理员看到数字后的下一个问题永远是「谁」。
+        const content = (
+          <Space direction="vertical" size={2}>
+            {summary.previews.map((preview) => (
+              <Typography.Text key={preview.source_word_id}>
+                {preview.source_headword || preview.source_word_id}
+                <Typography.Text type="secondary">
+                  {` · ${ENTRY_REFERENCE_KIND_LABEL[preview.source_kind]}`}
+                </Typography.Text>
+              </Typography.Text>
+            ))}
+            {summary.truncated && (
+              <Typography.Text type="secondary">
+                {`…共 ${total} 条，仅显示前 ${summary.previews.length} 条`}
+              </Typography.Text>
+            )}
+          </Space>
+        );
+        return (
+          <Popover content={content} title="被以下内容引用" trigger="click">
+            <Button
+              type="link"
+              size="small"
+              aria-label={`查看「${wordListLabel(record)}」的 ${total} 条引用`}
+            >
+              {total}
+            </Button>
+          </Popover>
         );
       }
     },

@@ -23,6 +23,8 @@ import type {
   DraftValidationResponse,
   DeletePartOfSpeechQuery,
   EntryDeleteBatchInput,
+  EntryReferenceKind,
+  EntryReferenceSummary,
   EntryDeleteBatchResponse,
   EntryLifecycleBatchInput,
   EntryLifecycleBatchResponse,
@@ -1819,6 +1821,51 @@ export function createAdminWordsMock({
     );
   }
 
+  /**
+   * mock 侧的入站引用统计，口径**必须**与后端 entry_reference_rows 一致：
+   * 按引用方词条去重、含草稿引用、排除自引用。否则会出现单测全绿而真机
+   * 「显示 0 却删不掉」。mock 只模拟关联词一类引用，其余 5 类在 mock 中不存在。
+   */
+  function entryReferenceSources(
+    current: AdminWordsMockPersistedState,
+    wordId: string
+  ): Map<string, EntryReferenceKind> {
+    const sources = new Map<string, EntryReferenceKind>();
+    for (const source of Object.values(current.words)) {
+      if (!source || source.id === wordId) continue;
+      const references = source.meanings.pos.some((pos) =>
+        pos.senses.some((sense) =>
+          sense.relations.some((relation) => relation.target_word_id === wordId)
+        )
+      );
+      if (references) sources.set(source.id, "relation");
+    }
+    return sources;
+  }
+
+  function entryReferenceSummary(
+    current: AdminWordsMockPersistedState,
+    wordId: string
+  ): EntryReferenceSummary {
+    const sources = [...entryReferenceSources(current, wordId)].sort(
+      ([left], [right]) => left.localeCompare(right)
+    );
+    const previews = sources.slice(0, 5).map(([sourceId, kind]) => {
+      const source = current.words[sourceId]!;
+      return {
+        source_word_id: sourceId,
+        source_headword: displayHeadword(source),
+        source_status: source.status,
+        source_kind: kind
+      };
+    });
+    return {
+      total: sources.length,
+      previews,
+      truncated: sources.length > previews.length
+    };
+  }
+
   function matchedEntryContext(
     current: AdminWordsMockPersistedState,
     word: MockWord
@@ -2979,6 +3026,7 @@ export function createAdminWordsMock({
             ? profile.display_name
             : word.created_by,
         created_by: word.created_by,
+        reference_summary: entryReferenceSummary(current, word.id),
         created_at: word.created_at,
         updated_at: word.updated_at
       }))
@@ -4355,6 +4403,15 @@ export function createAdminWordsMock({
     }
     // 归档态可删（垃圾桶是软删除中间站）；真正不可删的是发布过。
     if (current.publication_words[wordId]) {
+      throw new HttpError(
+        409,
+        "entry cannot be deleted",
+        [],
+        "entry_not_deletable"
+      );
+    }
+    // 被别的词条引用则删不掉——与后端入站引用拦截同口径。
+    if (entryReferenceSources(current, wordId).size > 0) {
       throw new HttpError(
         409,
         "entry cannot be deleted",

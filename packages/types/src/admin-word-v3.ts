@@ -25,7 +25,8 @@ import type {
   StepSaveIntent,
   ValidateAdminWordV2Input,
   WordCreationStep,
-  WordHeadwordsV2
+  WordHeadwordsV2,
+  EntryReferenceSummary
 } from "./admin-word-v2";
 import type { SurfaceMatchItemV3, SurfaceMatchPageV3 } from "./surface-match";
 
@@ -972,6 +973,8 @@ export interface AdminWordListItemV3 {
   created_by_name: string;
   /** 创建人 admin id；判定「仅本人可删」的归属依据（姓名会因重名误判）。 */
   created_by: string;
+  /** 被引用汇总；total 为 0 即无人引用、可安全清理。 */
+  reference_summary: EntryReferenceSummary;
   created_at: string;
   updated_at: string;
 }

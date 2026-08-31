@@ -9,6 +9,8 @@ export type DeleteBlockReason =
   | "not_archived"
   /** 发布过：publication 历史必须保留，后端一律拒绝。 */
   | "published"
+  /** 被其他词条引用（关联词/例句/短语成分等），后端会拒绝删除。 */
+  | "referenced"
   /** 非本人创建，且当前不是超管。 */
   | "not_owner"
   /** 拿不到当前管理员身份，无法判定归属——保守不放行。 */
@@ -29,6 +31,7 @@ export interface DeleteActor {
 export const DELETE_BLOCK_REASON_TEXT: Record<DeleteBlockReason, string> = {
   not_archived: "只有垃圾桶中的词条可以永久删除",
   published: "该词条已发布过，发布历史必须保留，不能永久删除",
+  referenced: "该词条被其他内容引用，需先解除引用才能删除",
   not_owner: "只能永久删除自己创建的词条",
   unknown_identity: "无法确认当前管理员身份，请刷新后重试",
   missing_revision: "该行缺少并发版本信息，请刷新列表后重试"
@@ -59,6 +62,11 @@ export function evaluateDeleteEligibility(
   // 该字段对 legacy 行也会缺省，可能漏判——后端的 409 是最终兜底。
   if (row.published_revision !== undefined) {
     return { deletable: false, reason: "published" };
+  }
+  // 被引用则删不掉。这里的 total 与后端删除拦截同口径（去重、含草稿），
+  // 所以 total 为 0 就一定能删——这条不变量由后端测试守着。
+  if ((row.reference_summary?.total ?? 0) > 0) {
+    return { deletable: false, reason: "referenced" };
   }
   return { deletable: true };
 }

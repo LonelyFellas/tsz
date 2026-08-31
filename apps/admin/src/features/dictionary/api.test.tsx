@@ -144,6 +144,7 @@ describe("dictionary React Query hooks", () => {
       max_reachable_step: "forms",
       created_by_name: "Admin",
       created_by: "admin-1",
+      reference_summary: { total: 0, previews: [], truncated: false },
       created_at: "2026-08-25T00:00:00Z",
       updated_at: "2026-08-25T00:00:00Z"
     } satisfies AdminWordListItemV3;

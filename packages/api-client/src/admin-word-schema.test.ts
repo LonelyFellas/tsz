@@ -337,6 +337,7 @@ function validAdminWordListItemV2() {
     max_reachable_step: "basics",
     created_by_name: "Admin",
     created_by: IDS.creator,
+    reference_summary: { total: 0, previews: [], truncated: false },
     created_at: "2026-08-24T12:00:00Z",
     updated_at: "2026-08-24T12:00:00Z"
   };
@@ -362,6 +363,7 @@ function validAdminWordListItemV3() {
     max_reachable_step: "forms",
     created_by_name: "Admin",
     created_by: IDS.creator,
+    reference_summary: { total: 0, previews: [], truncated: false },
     created_at: "2026-08-24T12:00:00Z",
     updated_at: "2026-08-24T12:00:00Z"
   };

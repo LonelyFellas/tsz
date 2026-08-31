@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "fe4b70d5e728e1e59002b57665f690a1bf94b6f3fb45ed7ca99c0c4fbea7606c",
+  "_source_sha256": "48d9a5d7d753f72232d3fdc86f26d6fa04b030e0d0a951ae4ac1d6fb1111006c",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -82,6 +82,7 @@
         "max_reachable_step",
         "created_by_name",
         "created_by",
+        "reference_summary",
         "created_at",
         "updated_at"
       ],
@@ -104,6 +105,7 @@
         "max_reachable_step": { "$ref": "#/$defs/WordCreationStep" },
         "pos_list": { "type": "array", "items": { "type": "string" } },
         "published_revision": { "type": "integer" },
+        "reference_summary": { "$ref": "#/$defs/EntryReferenceSummary" },
         "revision": { "type": "integer" },
         "schema_version": { "type": "integer", "enum": [2] },
         "source_dialect": { "$ref": "#/$defs/SourceDialect" },
@@ -134,6 +136,7 @@
         "max_reachable_step",
         "created_by_name",
         "created_by",
+        "reference_summary",
         "created_at",
         "updated_at"
       ],
@@ -151,6 +154,7 @@
         "pos_list": { "type": "array", "items": { "type": "string" } },
         "presentation": { "$ref": "#/$defs/EntryPresentationV3" },
         "published_revision": { "type": "integer" },
+        "reference_summary": { "$ref": "#/$defs/EntryReferenceSummary" },
         "revision": { "type": "integer" },
         "schema_version": { "type": "integer", "enum": [3] },
         "status": { "$ref": "#/$defs/AdminWordStatus" },
@@ -1067,6 +1071,45 @@
         "strategy_version": { "type": "string" }
       },
       "additionalProperties": false
+    },
+    "EntryReferenceKind": {
+      "type": "string",
+      "enum": [
+        "relation",
+        "relation_prebound",
+        "sentence_link",
+        "publication_sense_ref",
+        "sentence_association",
+        "phrase_component"
+      ]
+    },
+    "EntryReferencePreview": {
+      "type": "object",
+      "required": [
+        "source_word_id",
+        "source_headword",
+        "source_status",
+        "source_kind"
+      ],
+      "properties": {
+        "source_headword": { "type": "string" },
+        "source_kind": { "$ref": "#/$defs/EntryReferenceKind" },
+        "source_status": { "$ref": "#/$defs/AdminWordStatus" },
+        "source_word_id": { "type": "string", "format": "uuid" }
+      }
+    },
+    "EntryReferenceSummary": {
+      "type": "object",
+      "required": ["total", "previews", "truncated"],
+      "properties": {
+        "previews": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EntryReferencePreview" },
+          "maxItems": 5
+        },
+        "total": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" }
+      }
     },
     "ErrorCode": {
       "type": "string",

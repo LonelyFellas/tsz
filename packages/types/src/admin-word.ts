@@ -1,4 +1,4 @@
-import type { WordCreationStep } from "./admin-word-v2";
+import type { EntryReferenceSummary, WordCreationStep } from "./admin-word-v2";
 import type { PartOfSpeechCode, SubPartOfSpeechCode } from "./part-of-speech";
 // 智能词库 V2 列表、筛选与共享枚举；wire 字段 1:1 镜像 Rust OpenAPI。
 
@@ -76,6 +76,8 @@ export interface AdminWordListItem {
   created_by_name: string;
   /** 创建人 admin id；判定「仅本人可删」的归属依据（姓名会因重名误判）。 */
   created_by: string;
+  /** 被引用汇总；total 为 0 即无人引用、可安全清理。 */
+  reference_summary: EntryReferenceSummary;
   created_at: string;
   updated_at: string;
 }

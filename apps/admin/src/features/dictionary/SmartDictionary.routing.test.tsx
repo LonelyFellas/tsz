@@ -23,6 +23,7 @@ function row(
     has_unpublished_changes: false,
     created_by_name: "Admin",
     created_by: "admin-1",
+    reference_summary: { total: 0, previews: [], truncated: false },
     created_at: "2026-08-01T00:00:00Z",
     updated_at: "2026-08-01T00:00:00Z"
   };
@@ -94,6 +95,7 @@ describe("智能词库行入口", () => {
       max_reachable_step: "forms",
       created_by_name: "Admin",
       created_by: "admin-1",
+      reference_summary: { total: 0, previews: [], truncated: false },
       created_at: "2026-08-25T00:00:00Z",
       updated_at: "2026-08-25T00:00:00Z"
     };
@@ -122,6 +124,7 @@ describe("智能词库行入口", () => {
       max_reachable_step: "preview",
       created_by_name: "Admin",
       created_by: "admin-1",
+      reference_summary: { total: 0, previews: [], truncated: false },
       created_at: "2026-08-25T00:00:00Z",
       updated_at: "2026-08-25T00:00:00Z"
     };
