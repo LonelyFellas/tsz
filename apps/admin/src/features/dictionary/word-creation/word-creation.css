@@ -415,22 +415,6 @@
   line-height: 1.6;
 }
 
-.word-pos-sources {
-  display: grid;
-  gap: 6px;
-}
-
-.word-pos-source-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 6px;
-}
-
-.word-pos-source-row > .ant-typography-secondary {
-  flex: none;
-  line-height: 24px;
-}
-
 /* 第 1 步英美主词确认：复用原有地区面板，保留检测结果区的轻量层级。 */
 .word-headword-confirmation-card {
   overflow: hidden;

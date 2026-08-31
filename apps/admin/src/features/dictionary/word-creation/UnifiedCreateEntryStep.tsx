@@ -266,10 +266,8 @@ function DetectionPresentationCard({
     pending.detection.builtin_dictionary.status === "matched"
       ? pending.detection.builtin_dictionary.coverage
       : undefined;
-  let posCodes: string[] = [];
   let builtinPosCodes = new Set<string>();
   if (pending.detection.builtin_dictionary.status === "matched") {
-    posCodes = [...new Set(pending.detection.suggested_pos)];
     builtinPosCodes = new Set([
       ...pending.detection.builtin_dictionary.suggested_pos,
       ...pending.detection.builtin_dictionary.suggested_forms.map(
@@ -315,13 +313,12 @@ function DetectionPresentationCard({
     )
   ];
   const smartPosLabels = [
-    ...new Set([
-      ...posCodes
-        .filter((pos) => !builtinPosCodes.has(pos))
-        .map((pos) => partOfSpeechLabel(pos, catalog)),
-      ...displayEntries.flatMap((entry) => entry.posLabels)
-    ])
+    ...new Set(displayEntries.flatMap((entry) => entry.posLabels))
   ];
+  const preferredPosLabels =
+    smartPosLabels.length > 0 ? smartPosLabels : builtinPosLabels;
+  const preferredPosSource =
+    smartPosLabels.length > 0 ? "智能词库" : "内置词典";
 
   return (
     <Card
@@ -349,34 +346,18 @@ function DetectionPresentationCard({
               </Space>
             )}
           </Descriptions.Item>
-          {builtinPosLabels.length > 0 || smartPosLabels.length > 0 ? (
+          {preferredPosLabels.length > 0 ? (
             <Descriptions.Item label="建议词性">
-              <div className="word-pos-sources">
-                {builtinPosLabels.length > 0 ? (
-                  <div className="word-pos-source-row">
-                    <Typography.Text type="secondary">内置：</Typography.Text>
-                    <Space size={[4, 4]} wrap>
-                      {builtinPosLabels.map((label) => (
-                        <Tag key={label} color="blue">
-                          {label}
-                        </Tag>
-                      ))}
-                    </Space>
-                  </div>
-                ) : null}
-                {smartPosLabels.length > 0 ? (
-                  <div className="word-pos-source-row">
-                    <Typography.Text type="secondary">智能：</Typography.Text>
-                    <Space size={[4, 4]} wrap>
-                      {smartPosLabels.map((label) => (
-                        <Tag key={label} color="cyan">
-                          {label}
-                        </Tag>
-                      ))}
-                    </Space>
-                  </div>
-                ) : null}
-              </div>
+              <Space size={[6, 6]} wrap>
+                {preferredPosLabels.map((label) => (
+                  <Tag key={label} color="blue">
+                    {label}
+                  </Tag>
+                ))}
+                <Typography.Text type="secondary">
+                  来源：{preferredPosSource}
+                </Typography.Text>
+              </Space>
             </Descriptions.Item>
           ) : null}
           {builtinCoverage ? (
