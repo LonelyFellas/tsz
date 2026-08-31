@@ -29,6 +29,12 @@ export const wordRoutes: RouteObject[] = [
     })
   },
   {
+    path: "words/trash",
+    lazy: async () => ({
+      Component: (await import("@/pages/WordsTrash")).WordsTrashPage
+    })
+  },
+  {
     path: "words/new/v3",
     loader: () => redirect("/words/new")
   },

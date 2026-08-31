@@ -881,6 +881,87 @@ describe("SmartDictionary", () => {
     );
   });
 
+  it("垃圾桶模式固定归档、去掉状态筛选与创建入口", () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [archivedWord("word-1", "first")],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary mode="trash" />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("垃圾桶")).toBeInTheDocument();
+    expect(screen.queryByText("状态")).toBeNull();
+    expect(screen.queryByText("创建词条")).toBeNull();
+    // 垃圾桶里全是归档词条，批量动作恒为恢复，不该出现「移入垃圾桶」。
+    expect(screen.queryByText("移入垃圾桶")).toBeNull();
+    expect(
+      screen
+        .getAllByText("恢 复", { exact: true })
+        .map((item) => item.closest("button"))
+        .find((item) => !item?.classList.contains("ant-btn-link"))
+    ).toBeTruthy();
+    // 即使 URL 上没带 status，也必须只查归档。
+    expect(apiMocks.useWordList).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "archived" })
+    );
+  });
+
+  it("垃圾桶模式忽略 URL 上残留的其他状态", () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: { words: [], page: { page: 1, page_size: 20, total: 0 } },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter initialEntries={["/words/trash?status=draft"]}>
+        <AntApp>
+          <SmartDictionary mode="trash" />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(apiMocks.useWordList).toHaveBeenCalledWith(
+      expect.objectContaining({ status: "archived" })
+    );
+  });
+
+  it("默认模式保留状态筛选与创建入口", () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [word("word-1", "first")],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      error: null,
+      isError: false,
+      isPending: false,
+      refetch: vi.fn()
+    });
+    render(
+      <MemoryRouter>
+        <AntApp>
+          <SmartDictionary />
+        </AntApp>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText("智能词库")).toBeInTheDocument();
+    expect(screen.getByText("状态")).toBeInTheDocument();
+    expect(screen.getByText("创建词条")).toBeInTheDocument();
+  });
+
   it("垃圾桶行提供永久删除，确认后携带双 revision 调用", async () => {
     const mutateAsync = vi.fn().mockResolvedValue(undefined);
     apiMocks.useDeleteWordDraft.mockReturnValue({

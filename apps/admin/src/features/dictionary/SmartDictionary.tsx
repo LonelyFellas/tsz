@@ -130,11 +130,21 @@ function sameRestoreRequest(
   return false;
 }
 
+/**
+ * `library` = 智能词库全量列表；`trash` = 词库管理下的独立垃圾桶页。
+ * 两者共用同一套表格、生命周期与权限判定，只在入口语境上分叉：
+ * 垃圾桶固定归档、不提供状态筛选与创建入口。
+ */
+export type SmartDictionaryMode = "library" | "trash";
+
 export function SmartDictionary({
-  reportUnknownPresentationStrategy
+  reportUnknownPresentationStrategy,
+  mode = "library"
 }: {
   reportUnknownPresentationStrategy?: PresentationStrategyReporter;
+  mode?: SmartDictionaryMode;
 } = {}) {
+  const trashMode = mode === "trash";
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   // 归属判定所需；门禁保证受保护页内 profile 必有值，缺失时判定一律不放行。
@@ -172,7 +182,12 @@ export function SmartDictionary({
     form.setFieldsValue(filters);
   }, [filters, form]);
 
-  const listQuery = useWordList(toListQuery(filters, page, pageSize));
+  // 垃圾桶页固定只看归档，不受 URL 上残留的 status 影响。
+  const effectiveFilters = useMemo(
+    () => (trashMode ? { ...filters, status: "archived" as const } : filters),
+    [filters, trashMode]
+  );
+  const listQuery = useWordList(toListQuery(effectiveFilters, page, pageSize));
   const stats = useWordStats();
   const archiveWord = useArchiveWord();
   const restoreWord = useRestoreWord();
@@ -216,6 +231,8 @@ export function SmartDictionary({
   const restoringSelection =
     selectedRows.length > 0 &&
     selectedRows.every((row) => row.status === "archived");
+  // 垃圾桶页里全是归档词条，批量动作恒为恢复——未选中时也不该显示「移入垃圾桶」。
+  const showRestoreAction = restoringSelection || trashMode;
   const lifecyclePending =
     archiveWord.isPending ||
     restoreWord.isPending ||
@@ -802,7 +819,12 @@ export function SmartDictionary({
 
   return (
     <Flex vertical gap={16}>
-      <Breadcrumb items={[{ title: "词库管理" }, { title: "智能词库" }]} />
+      <Breadcrumb
+        items={[
+          { title: "词库管理" },
+          { title: trashMode ? "垃圾桶" : "智能词库" }
+        ]}
+      />
 
       <Card size="small" styles={{ body: { paddingBottom: 8 } }}>
         <Form
@@ -853,14 +875,16 @@ export function SmartDictionary({
               style={{ width: 120 }}
             />
           </Form.Item>
-          <Form.Item name="status" label="状态">
-            <Select
-              placeholder="请选择状态"
-              options={STATUS_OPTIONS}
-              allowClear
-              style={{ width: 120 }}
-            />
-          </Form.Item>
+          {!trashMode && (
+            <Form.Item name="status" label="状态">
+              <Select
+                placeholder="请选择状态"
+                options={STATUS_OPTIONS}
+                allowClear
+                style={{ width: 120 }}
+              />
+            </Form.Item>
+          )}
           <Form.Item name="range" label="创建时间">
             <RangePicker />
           </Form.Item>
@@ -924,24 +948,26 @@ export function SmartDictionary({
           style={{ marginBottom: 12 }}
         >
           <Space wrap>
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => navigate("/words/new")}
-            >
-              创建词条
-            </Button>
+            {!trashMode && (
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => navigate("/words/new")}
+              >
+                创建词条
+              </Button>
+            )}
             {adminWordsDataSourceCapabilities.batchArchive && (
               <Button
-                danger={!restoringSelection}
+                danger={!showRestoreAction}
                 icon={
-                  restoringSelection ? <RollbackOutlined /> : <DeleteOutlined />
+                  showRestoreAction ? <RollbackOutlined /> : <DeleteOutlined />
                 }
                 disabled={selectedKeys.length === 0}
                 loading={archiveBatch.isPending || restoreBatch.isPending}
                 onClick={transitionSelected}
               >
-                {restoringSelection ? "恢 复" : "移入垃圾桶"}
+                {showRestoreAction ? "恢 复" : "移入垃圾桶"}
                 {selectedKeys.length > 0 ? `(${selectedKeys.length})` : ""}
               </Button>
             )}

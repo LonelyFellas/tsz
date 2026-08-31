@@ -76,6 +76,7 @@ const GROUPS: Group[] = [
     label: "词库管理",
     leaves: [
       { key: "/words", label: "智能词库", perm: "words.access" },
+      { key: "/words/trash", label: "垃圾桶", perm: "words.access" },
       {
         key: "todo:custom-dict",
         label: "自定义词库",
