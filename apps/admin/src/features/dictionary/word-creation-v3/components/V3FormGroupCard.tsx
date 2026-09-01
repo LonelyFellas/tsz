@@ -86,18 +86,26 @@ export function V3FormGroupCard({
   const formTypeOptions = posCatalog
     ? (["base", ...(posCatalog.allowed_form_types ?? [])] as WordFormTypeV3[])
     : [];
-  // 每组词形变化都要留住原形：某个组只剩这一个 base 成员时锁死它的类型下拉。
-  // 词形可跨组共享，按最严的组算——只要它在任一所属组里是唯一原形就锁。
+  const baseMembersOf = (candidate: WordFormGroupV3) =>
+    candidate.members.filter(
+      (member) =>
+        pos.forms.find((item) => item.id === member.form_id)?.form_type ===
+        "base"
+    );
+  // 改类型和删词形动的是 form 本身，所有引用它的组都会受影响，所以按最严的组算：
+  // 只要它在任一所属组里是唯一原形就锁。
   const lockedBaseFormIds = new Set(
     pos.form_groups.flatMap((candidate) => {
-      const baseMembers = candidate.members.filter(
-        (member) =>
-          pos.forms.find((item) => item.id === member.form_id)?.form_type ===
-          "base"
-      );
+      const baseMembers = baseMembersOf(candidate);
       return baseMembers.length === 1 ? [baseMembers[0]!.form_id] : [];
     })
   );
+  // 「从本组移除」只摘掉当前组的一条 membership，其他组不受影响，所以只看本组：
+  // 本组还有别的原形就照常放行，跨组共享与否都不影响这一判断。
+  const soleBaseMembershipId = (() => {
+    const baseMembers = baseMembersOf(group);
+    return baseMembers.length === 1 ? baseMembers[0]!.id : undefined;
+  })();
   const blockedFormLocked =
     blockedFormId !== undefined && lockedBaseFormIds.has(blockedFormId);
   const setRegular = (isRegular: boolean) => {
@@ -196,7 +204,7 @@ export function V3FormGroupCard({
           <Button
             aria-label={`从变化组 ${groupIndex + 1} 移除词形 ${index + 1}`}
             danger
-            disabled={lastRequiredForm}
+            disabled={lastRequiredForm || member.id === soleBaseMembershipId}
             icon={<DeleteOutlined />}
             onClick={() => {
               const result = removeMembership(content, member.id);
@@ -209,7 +217,13 @@ export function V3FormGroupCard({
               }
             }}
             size="small"
-            title={lastRequiredForm ? "每个词性至少保留一个词形" : undefined}
+            title={
+              lastRequiredForm
+                ? "每个词性至少保留一个词形"
+                : member.id === soleBaseMembershipId
+                  ? BASE_REQUIRED_HINT
+                  : undefined
+            }
             type="text"
           />
         </Flex>

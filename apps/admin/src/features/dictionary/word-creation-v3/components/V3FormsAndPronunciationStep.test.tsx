@@ -912,9 +912,18 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(content.pos[0]!.forms).toHaveLength(2);
     expect(canonicalValue().pos[0]!.forms).toHaveLength(2);
 
-    fireEvent.click(screen.getByLabelText("从变化组 2 移除词形 1"));
+    // 从组 1 摘掉共享原形：组 1 还剩另一个原形所以放行，canonical form 留着，
+    // 组 2 的那条 membership 也不受影响——移除只作用于当前组。
+    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 1"));
     expect(canonicalValue().pos[0]!.forms).toHaveLength(2);
-    expect(canonicalValue().pos[0]!.form_groups[1]!.members).toEqual([]);
+    expect(canonicalValue().pos[0]!.form_groups[0]!.members).toEqual([
+      { id: uuidFromInt(22), form_id: secondId }
+    ]);
+    expect(canonicalValue().pos[0]!.form_groups[1]!.members).toEqual([
+      { id: uuidFromInt(23), form_id: sharedId }
+    ]);
+    // 组 2 里它成了唯一原形，摘不掉。
+    expect(screen.getByLabelText("从变化组 2 移除词形 1")).toBeDisabled();
   });
 
   it("I02 使用 form UUID key，membership 重排时输入节点与焦点保持", async () => {
@@ -2661,6 +2670,47 @@ describe("V3FormsAndPronunciationStep", () => {
     fireEvent.click(screen.getByRole("button", { name: "新增名词变化组" }));
 
     await waitFor(() => expect(screen.getAllByText(note)).toHaveLength(2));
+  });
+
+  it("组内唯一原形摘不掉，本组还有别的原形时照常放行", async () => {
+    const base = commonFormFixture({
+      id: uuidFromInt(1_260),
+      variant_id: uuidFromInt(1_261),
+      spelling: "run"
+    });
+    const plural = commonFormFixture({
+      id: uuidFromInt(1_262),
+      variant_id: uuidFromInt(1_263),
+      spelling: "runs"
+    });
+    plural.form_type = "plural";
+    render(<Harness initial={formsFixture({ forms: [base, plural] })} />);
+
+    // 组里只有这一个原形：摘掉它组就空了原形，禁用并说明理由。
+    const removeBase = await screen.findByLabelText("从变化组 1 移除词形 1");
+    expect(removeBase).toBeDisabled();
+    expect(removeBase).toHaveAttribute("title", "每组词形变化至少保留一个原形");
+    // 派生词形不受影响。
+    expect(screen.getByLabelText("从变化组 1 移除词形 2")).not.toBeDisabled();
+  });
+
+  it("组里有两个原形时谁都能摘", async () => {
+    const base = commonFormFixture({
+      id: uuidFromInt(1_270),
+      variant_id: uuidFromInt(1_271),
+      spelling: "run"
+    });
+    const secondBase = commonFormFixture({
+      id: uuidFromInt(1_272),
+      variant_id: uuidFromInt(1_273),
+      spelling: "runs"
+    });
+    render(<Harness initial={formsFixture({ forms: [base, secondBase] })} />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("从变化组 1 移除词形 1")).not.toBeDisabled()
+    );
+    expect(screen.getByLabelText("从变化组 1 移除词形 2")).not.toBeDisabled();
   });
 
   it("跨组共享的原形按最严的组锁定类型", async () => {
