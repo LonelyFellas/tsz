@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "46823cb01a942577825970981323f46da60a4aca6d3225732ec813e39bb59efe",
+  "_source_sha256": "3cf027060cf8d707f7c8aebdae574947e7c70bc0aa69696b1ffccf2ccc02e91a",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -3063,6 +3063,7 @@
         "orphan_form",
         "form_group_required",
         "empty_form_group",
+        "base_form_required_in_group",
         "variant_spelling_required",
         "pronunciation_required",
         "duplicate_pronunciation",

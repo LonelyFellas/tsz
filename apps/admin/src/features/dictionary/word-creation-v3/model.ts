@@ -542,6 +542,7 @@ export function validateFormsContent(
   const issues: V3DraftValidationIssue[] = [];
   const nodeRoles = new Map<string, string>();
   const formOwners = new Map<string, string>();
+  const formTypes = new Map<string, WordFormTypeV3>();
   const membershipCounts = new Map<string, number>();
   const posCodes = new Set<string>();
   const registerNode = (
@@ -636,6 +637,7 @@ export function validateFormsContent(
       );
       registerNode(form.id, "forms.concrete_form", formLocation);
       if (!formOwners.has(form.id)) formOwners.set(form.id, pos.pos_id);
+      formTypes.set(form.id, form.form_type);
       membershipCounts.set(form.id, 0);
       if (!FORM_TYPES.has(form.form_type)) {
         issues.push(
@@ -703,6 +705,11 @@ export function validateFormsContent(
         [pos.pos_id]
       );
       registerNode(group.id, "forms.form_group", groupLocation);
+      // 与后端 base_form_required_in_group 同一口径：一组词形变化描述同一个词的
+      // 一套变化范式，缺了原形就没有落脚点。空组已由 empty_form_group 说明，不叠报。
+      const groupHasBase = group.members.some(
+        (member) => formTypes.get(member.form_id) === "base"
+      );
       if (intent === "complete" && group.members.length === 0) {
         issues.push(
           issue(
@@ -710,6 +717,16 @@ export function validateFormsContent(
             "members",
             group.id,
             "完整词条不能保留空变化组",
+            groupLocation
+          )
+        );
+      } else if (intent === "complete" && !groupHasBase) {
+        issues.push(
+          issue(
+            "base_form_required_in_group",
+            "members",
+            group.id,
+            "完整词条的每个变化组都需要一个原形",
             groupLocation
           )
         );
