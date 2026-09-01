@@ -225,11 +225,12 @@ export function toWritableMeanings(
                 Boolean(pendingHeadword) ||
                 Boolean(pendingGloss))) ||
             (prebound &&
-              (!pendingHeadword || !relation.prebinding_state || bound)) ||
+              (Boolean(pendingHeadword) ||
+                !relation.prebinding_state ||
+                bound)) ||
             (!prebound && Boolean(relation.prebinding_state)) ||
             (!bound && !prebound && !pendingHeadword) ||
-            (!bound && !prebound && Boolean(relation.target_status)) ||
-            (!pendingHeadword && Boolean(pendingGloss))
+            (!bound && !prebound && Boolean(relation.target_status))
           ) {
             throw new Error(`invalid relation target shape: ${relation.id}`);
           }
@@ -244,10 +245,7 @@ export function toWritableMeanings(
               : prebound
                 ? {
                     prebound_target_word_id: relation.prebound_target_word_id,
-                    ...(pendingHeadword
-                      ? { pending_target_headword: pendingHeadword }
-                      : {}),
-                    ...(pendingHeadword && pendingGloss
+                    ...(pendingGloss
                       ? { pending_target_gloss: pendingGloss }
                       : {})
                   }
