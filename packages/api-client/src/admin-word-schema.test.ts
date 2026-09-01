@@ -660,13 +660,14 @@ describe("admin word V3/Any runtime decoder", () => {
       {
         ...base,
         prebound_target_word_id: IDS.entry,
-        pending_target_headword: "reliability",
+        target_headword: "reliability",
+        pending_target_gloss: "可靠性",
         prebinding_state: "waiting_first_sense"
       },
       {
         ...base,
         prebound_target_word_id: IDS.entry,
-        pending_target_headword: "reliability",
+        target_headword: "reliability",
         prebinding_state: "target_sense_deleted"
       }
     ];
@@ -680,6 +681,14 @@ describe("admin word V3/Any runtime decoder", () => {
       {
         ...validRelations[0],
         prebound_target_word_id: IDS.entry,
+        target_headword: "reliability",
+        prebinding_state: "waiting_first_sense"
+      },
+      // 预绑定不得携带待建词面（旧宽形态，已收窄）。
+      {
+        ...base,
+        prebound_target_word_id: IDS.entry,
+        target_headword: "reliability",
         pending_target_headword: "reliability",
         prebinding_state: "waiting_first_sense"
       },

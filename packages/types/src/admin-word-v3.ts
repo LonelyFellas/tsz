@@ -509,7 +509,9 @@ export interface WordRelationWritableV3 {
   target_word_id?: string;
   target_sense_id?: string;
   prebound_target_word_id?: string;
+  /** 纯待建关联词的词面；预绑定（prebound_target_word_id 非空）不得携带，词面回显走只读 target_headword。 */
   pending_target_headword?: string;
+  /** 预定义词义：跟随待建词面或预绑定草稿。 */
   pending_target_gloss?: string;
   score: string;
 }

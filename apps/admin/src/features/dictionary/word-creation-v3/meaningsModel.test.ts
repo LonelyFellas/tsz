@@ -625,7 +625,6 @@ describe("V3 meanings writable model", () => {
     delete relation.target_sense_id;
     Object.assign(relation, {
       prebound_target_word_id: "draft-target-entry",
-      pending_target_headword: "reliability",
       pending_target_gloss: "可靠性",
       prebinding_state: "target_sense_deleted",
       target_status: "archived"
@@ -636,7 +635,6 @@ describe("V3 meanings writable model", () => {
       id: "relation-1",
       relation: "synonym",
       prebound_target_word_id: "draft-target-entry",
-      pending_target_headword: "reliability",
       pending_target_gloss: "可靠性",
       score: "0.8"
     });
@@ -658,7 +656,13 @@ describe("V3 meanings writable model", () => {
         pending_target_headword: "reliability",
         prebinding_state: "waiting_first_sense" as const
       },
-      { prebinding_state: "target_sense_deleted" as const }
+      { prebinding_state: "target_sense_deleted" as const },
+      // 预绑定不得携带待建词面（旧宽形态，已收窄）。
+      {
+        prebound_target_word_id: "draft-target-entry",
+        pending_target_headword: "reliability",
+        prebinding_state: "waiting_first_sense" as const
+      }
     ]) {
       const canonical = structuredClone(meaningsCanonicalFixture);
       const relation = canonical.pos[0]!.senses[0]!.relations[0]!;

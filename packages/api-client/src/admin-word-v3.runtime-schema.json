@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "3cf027060cf8d707f7c8aebdae574947e7c70bc0aa69696b1ffccf2ccc02e91a",
+  "_source_sha256": "5b663450fb5ad4257713aae579e8c8255aaa1b0fa65f1a9871fbe44ebe0f45d1",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -3704,13 +3704,12 @@
             "relation",
             "score",
             "prebound_target_word_id",
-            "pending_target_headword",
+            "target_headword",
             "prebinding_state"
           ],
           "properties": {
             "id": { "type": "string", "format": "uuid" },
             "pending_target_gloss": { "type": "string", "maxLength": 5000 },
-            "pending_target_headword": { "type": "string" },
             "prebinding_state": {
               "type": "string",
               "enum": ["waiting_first_sense"]
@@ -3718,6 +3717,7 @@
             "prebound_target_word_id": { "type": "string", "format": "uuid" },
             "relation": { "type": "string" },
             "score": { "type": "string" },
+            "target_headword": { "type": "string" },
             "target_status": { "$ref": "#/$defs/AdminWordStatus" }
           },
           "additionalProperties": false
@@ -3729,13 +3729,12 @@
             "relation",
             "score",
             "prebound_target_word_id",
-            "pending_target_headword",
+            "target_headword",
             "prebinding_state"
           ],
           "properties": {
             "id": { "type": "string", "format": "uuid" },
             "pending_target_gloss": { "type": "string", "maxLength": 5000 },
-            "pending_target_headword": { "type": "string" },
             "prebinding_state": {
               "type": "string",
               "enum": ["target_sense_deleted"]
@@ -3743,6 +3742,7 @@
             "prebound_target_word_id": { "type": "string", "format": "uuid" },
             "relation": { "type": "string" },
             "score": { "type": "string" },
+            "target_headword": { "type": "string" },
             "target_status": { "$ref": "#/$defs/AdminWordStatus" }
           },
           "additionalProperties": false

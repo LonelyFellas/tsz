@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-01T01:53:19.132Z",
+  "_generatedAt": "2026-09-01T11:30:45.982Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -4378,7 +4378,7 @@
     },
     "WordRelationV2": {
       "type": "object",
-      "description": "关联词有两种形态，由 `lexicon_relations_target_shape_check` 在库层保证互斥：\n\n- **已绑定**：`target_word_id` + `target_sense_id` 指向真实义项，\n  `target_headword` / `target_gloss` 是服务端回填的快照。\n- **待物化**：目标词还没有词条，`pending_target_headword` 承载管理员录入的词面，\n  `pending_target_gloss` 可选地承载创建目标草稿时预填的中文词义。这种形态只允许存在\n  于草稿；发布时会先建出词条再回填 target，所以发布出去的关联词永远是已绑定的。",
+      "description": "关联词有三种形态，由 `lexicon_relations_target_shape_check` 在库层保证互斥：\n\n- **已绑定**：`target_word_id` + `target_sense_id` 指向真实义项，\n  `target_headword` / `target_gloss` 是服务端回填的快照。\n- **待物化**：目标词还没有词条，`pending_target_headword` 承载管理员录入的词面，\n  `pending_target_gloss` 可选地承载创建目标草稿时预填的中文词义。这种形态只允许存在\n  于草稿；发布时会先建出词条再回填 target，所以发布出去的关联词永远是已绑定的。\n- **预绑定**：目标词条已存在但还没有可绑词义，`prebound_target_word_id` 锁定词条身份，\n  不携带 `pending_target_headword`（词面回显走服务端回填的只读 `target_headword`），\n  `pending_target_gloss` 可选。目标长出第一词义后自动物化为已绑定。",
       "required": ["id", "relation", "score"],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
@@ -4417,8 +4417,15 @@
           "required": ["id", "relation", "score", "pending_target_headword"],
           "properties": {
             "id": { "type": "string", "format": "uuid" },
-            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
-            "pending_target_headword": { "type": "string" },
+            "pending_target_gloss": {
+              "type": "string",
+              "description": "预定义词义：跟随待建词面或预绑定草稿。",
+              "maxLength": 5000
+            },
+            "pending_target_headword": {
+              "type": "string",
+              "description": "纯待建关联词的词面；预绑定（`prebound_target_word_id` 非空）不得携带。"
+            },
             "relation": { "type": "string" },
             "score": { "type": "string" }
           },
@@ -4426,17 +4433,14 @@
         },
         {
           "type": "object",
-          "required": [
-            "id",
-            "relation",
-            "score",
-            "prebound_target_word_id",
-            "pending_target_headword"
-          ],
+          "required": ["id", "relation", "score", "prebound_target_word_id"],
           "properties": {
             "id": { "type": "string", "format": "uuid" },
-            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
-            "pending_target_headword": { "type": "string" },
+            "pending_target_gloss": {
+              "type": "string",
+              "description": "预定义词义：跟随待建词面或预绑定草稿。",
+              "maxLength": 5000
+            },
             "prebound_target_word_id": { "type": "string", "format": "uuid" },
             "relation": { "type": "string" },
             "score": { "type": "string" }

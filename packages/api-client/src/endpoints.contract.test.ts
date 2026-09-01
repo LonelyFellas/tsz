@@ -496,7 +496,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "3cf027060cf8d707f7c8aebdae574947e7c70bc0aa69696b1ffccf2ccc02e91a"
+      "5b663450fb5ad4257713aae579e8c8255aaa1b0fa65f1a9871fbe44ebe0f45d1"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -621,12 +621,24 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           !("target_headword" in branch.properties)
       )
     ).toBe(true);
+    // 预绑定写分支不携带待建词面，词条身份只在稳定 id 上。
     expect(
       writableRelationBranches.some(
         (branch) =>
           "prebound_target_word_id" in branch.properties &&
-          branch.required.includes("pending_target_headword")
+          !("pending_target_headword" in branch.properties) &&
+          "pending_target_gloss" in branch.properties
       )
+    ).toBe(true);
+    // 预绑定响应分支的词面回显走只读 target_headword。
+    expect(
+      responseRelationBranches
+        .filter((branch) => "prebound_target_word_id" in branch.properties)
+        .every(
+          (branch) =>
+            branch.required.includes("target_headword") &&
+            !("pending_target_headword" in branch.properties)
+        )
     ).toBe(true);
     expect(
       responseRelationBranches

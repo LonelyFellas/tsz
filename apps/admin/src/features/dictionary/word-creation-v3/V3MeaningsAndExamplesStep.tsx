@@ -1047,6 +1047,37 @@ function relatedWordChoices(
   );
 }
 
+/**
+ * 关系目标词面回显。knownWords 是未保存选择的唯一权威；快照来自上次保存的
+ * canonical，预绑定态须以快照里的 prebinding_state 甄别新旧——改选草稿未保存时
+ * 快照仍指旧目标，直接用会串词面，此时退回通用占位，保存后自愈。
+ */
+function relationDisplayHeadword(
+  relation: WordRelationWritableV3,
+  known: RelatedWordChoice | undefined,
+  snapshot: RelationDisplaySnapshots[string] | undefined
+): string {
+  const snapshotHeadword = relation.target_word_id
+    ? snapshot?.headword
+    : relation.prebound_target_word_id && snapshot?.prebinding_state
+      ? snapshot?.headword
+      : undefined;
+  return (
+    known?.headword ??
+    snapshotHeadword ??
+    relation.pending_target_headword ??
+    ""
+  );
+}
+
+/** 合法的待建词面：非空且通过英文词条名校验（纯待建形态的判定基础）。 */
+function hasValidPendingHeadword(relation: WordRelationWritableV3): boolean {
+  return (
+    Boolean(relation.pending_target_headword?.trim()) &&
+    !validateEntryInput(relation.pending_target_headword ?? "").issue
+  );
+}
+
 function relationPrebindingLabel(
   relation: WordRelationWritableV3,
   snapshot: RelationDisplaySnapshots[string] | undefined
@@ -1247,14 +1278,11 @@ function RelationsGrid({
                         if (searching?.relationId === relation.id) return;
                         setSearching({
                           relationId: relation.id,
-                          query:
-                            knownWords[relation.id]?.headword ??
-                            (relation.target_word_id
-                              ? relationDisplaySnapshots?.[relation.id]
-                                  ?.headword
-                              : undefined) ??
-                            relation.pending_target_headword ??
-                            ""
+                          query: relationDisplayHeadword(
+                            relation,
+                            knownWords[relation.id],
+                            relationDisplaySnapshots?.[relation.id]
+                          )
                         });
                       }}
                       onSearch={(query) => {
@@ -1303,7 +1331,8 @@ function RelationsGrid({
                             word.senses.length === 0
                           ) {
                             target.prebound_target_word_id = word.word_id;
-                            target.pending_target_headword = word.headword;
+                            // 预绑定不携带待建词面：词条身份在 prebound id 上，回显走只读快照。
+                            delete target.pending_target_headword;
                             delete target.target_word_id;
                             delete target.target_sense_id;
                           } else {
@@ -1350,13 +1379,15 @@ function RelationsGrid({
                       value={
                         searching?.relationId === relation.id
                           ? searching.query
-                          : (knownWords[relation.id]?.headword ??
-                            (relation.target_word_id
-                              ? relationDisplaySnapshots?.[relation.id]
-                                  ?.headword
-                              : undefined) ??
-                            relation.pending_target_headword ??
-                            (relation.target_word_id ? "已选择关联词" : ""))
+                          : relationDisplayHeadword(
+                              relation,
+                              knownWords[relation.id],
+                              relationDisplaySnapshots?.[relation.id]
+                            ) ||
+                            (relation.target_word_id ||
+                            relation.prebound_target_word_id
+                              ? "已选择关联词"
+                              : "")
                       }
                     >
                       <Input
@@ -1393,9 +1424,8 @@ function RelationsGrid({
                       />
                     </AutoComplete>
                     {!relation.target_word_id &&
-                    Boolean(relation.pending_target_headword?.trim()) &&
-                    !validateEntryInput(relation.pending_target_headword ?? "")
-                      .issue ? (
+                    (relation.prebound_target_word_id ||
+                      hasValidPendingHeadword(relation)) ? (
                       <div className="word-relation-sense-cell">
                         {relationPrebindingLabel(
                           relation,
@@ -1495,9 +1525,7 @@ function RelationsGrid({
                   ({ relation }) =>
                     !relation.target_word_id &&
                     !relation.prebound_target_word_id &&
-                    Boolean(relation.pending_target_headword?.trim()) &&
-                    !validateEntryInput(relation.pending_target_headword ?? "")
-                      .issue
+                    hasValidPendingHeadword(relation)
                 ) ? (
                   <div
                     aria-label={`${relationLabel(relationType)}待建条汇总`}

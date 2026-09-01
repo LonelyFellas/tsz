@@ -1225,9 +1225,9 @@ describe("V3MeaningsAndExamplesStep", () => {
 
     const relation = value().pos[0]!.senses[0]!.relations[0]!;
     expect(relation).toMatchObject({
-      prebound_target_word_id: "draft-target-entry",
-      pending_target_headword: "reliability"
+      prebound_target_word_id: "draft-target-entry"
     });
+    expect(relation).not.toHaveProperty("pending_target_headword");
     expect(relation).not.toHaveProperty("target_word_id");
     expect(relation).not.toHaveProperty("target_sense_id");
     expect(screen.getByText("草稿 · 等待第一词义")).toBeVisible();
@@ -1251,7 +1251,6 @@ describe("V3MeaningsAndExamplesStep", () => {
         id: "detached-relation",
         relation: "synonym",
         prebound_target_word_id: "draft-target-entry",
-        pending_target_headword: "reliability",
         pending_target_gloss: "可靠性",
         score: "80"
       }
@@ -1261,6 +1260,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         initial={initial}
         relationSnapshots={{
           "detached-relation": {
+            headword: "reliability",
             prebinding_state: "target_sense_deleted",
             target_status: "archived"
           }
@@ -1273,9 +1273,11 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.getByLabelText("近义词预定义词义")).toHaveValue("可靠性");
     expect(screen.queryByLabelText("近义词目标词义")).toBeNull();
     expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
-      prebound_target_word_id: "draft-target-entry",
-      pending_target_headword: "reliability"
+      prebound_target_word_id: "draft-target-entry"
     });
+    expect(value().pos[0]!.senses[0]!.relations[0]).not.toHaveProperty(
+      "pending_target_headword"
+    );
   });
 
   it("关联词搜索有后页时提供加载入口，未完成 exact 前不宣称无匹配", () => {
