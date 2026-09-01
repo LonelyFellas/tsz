@@ -32,10 +32,11 @@ import {
   Typography
 } from "antd";
 import type {
+  Dialect,
+  DialectModeV3,
   DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   EnglishTextV3,
-  GrammarStructureV3,
   PartOfSpeechCatalogResponse,
   RelatedWordResultAny,
   RichTextV3,
@@ -59,9 +60,11 @@ import { newWordNodeId } from "../word-model/primitives";
 import { addPartOfSpeech, deletePartOfSpeech } from "./operations";
 import {
   editableEnglishText,
+  newGrammarStructure,
   type RelationDisplaySnapshots,
   replaceEnglishText,
-  replaceRichText
+  replaceRichText,
+  spellingModeForPos
 } from "./meaningsModel";
 import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import { v3IssueMessage } from "./presentationErrors";
@@ -443,46 +446,6 @@ function SortableRows<T>({
   return children(sorting);
 }
 
-function senseGroupsForPos(
-  value: DraftMeaningsStepContentWritableV3,
-  posId: string
-) {
-  const referencedByPos = new Set(
-    value.pos
-      .find((pos) => pos.pos_id === posId)
-      ?.senses.flatMap((sense) =>
-        sense.sense_group_id ? [sense.sense_group_id] : []
-      ) ?? []
-  );
-  const referencedAnywhere = new Set(
-    value.pos.flatMap((pos) =>
-      pos.senses.flatMap((sense) =>
-        sense.sense_group_id ? [sense.sense_group_id] : []
-      )
-    )
-  );
-  const includeUnowned = value.pos[0]?.pos_id === posId;
-  return value.sense_groups.filter(
-    (group) =>
-      referencedByPos.has(group.id) ||
-      (includeUnowned && !referencedAnywhere.has(group.id))
-  );
-}
-
-function replaceSenseGroupOrderForPos(
-  draft: DraftMeaningsStepContentWritableV3,
-  posId: string,
-  nextGroups: DraftMeaningsStepContentWritableV3["sense_groups"]
-) {
-  const visibleIds = new Set(
-    senseGroupsForPos(draft, posId).map((group) => group.id)
-  );
-  let nextIndex = 0;
-  draft.sense_groups = draft.sense_groups.map((group) =>
-    visibleIds.has(group.id) ? nextGroups[nextIndex++]! : group
-  );
-}
-
 function SenseEditorShell({
   children,
   index,
@@ -583,27 +546,22 @@ function SenseEditorShell({
   );
 }
 
-function newGrammarStructure(idFactory: () => string): GrammarStructureV3 {
-  return {
-    id: idFactory(),
-    variants: [
-      {
-        id: idFactory(),
-        dialect: "common",
-        content: { version: 2, text: "", annotations: [] }
-      }
-    ]
-  };
-}
+const GRAMMAR_PLACEHOLDER: Record<Dialect, string> = {
+  common: "例如 a centre / the centre",
+  uk: "例如 a centre / the centre",
+  us: "例如 a center / the center"
+};
 
 function GrammarStructuresCard({
   pos,
   posIndex,
+  spellingMode,
   change,
   idFactory
 }: {
   pos: DraftMeaningsStepContentWritableV3["pos"][number];
   posIndex: number;
+  spellingMode: DialectModeV3;
   change: (mutation: DraftMutation) => void;
   idFactory: () => string;
 }) {
@@ -625,7 +583,7 @@ function GrammarStructuresCard({
           onClick={() =>
             change((draft) => {
               draft.pos[posIndex]!.grammar_structures.push(
-                newGrammarStructure(idFactory)
+                newGrammarStructure(idFactory, spellingMode)
               );
             })
           }
@@ -660,35 +618,49 @@ function GrammarStructuresCard({
               tabIndex={-1}
             >
               <span className="word-grammar-index">{structureIndex + 1}</span>
-              {structure.variants.map((variant, variantIndex) => (
-                <div
-                  className="word-grammar-panel"
-                  data-v3-node-id={variant.id}
-                  key={variant.id}
-                >
-                  <Input.TextArea
-                    aria-label={`语法结构 ${structureIndex + 1} 内容 ${variantIndex + 1}`}
-                    autoSize={{ minRows: 2, maxRows: 6 }}
-                    className="word-pronunciation-phonetic-input"
-                    data-v3-field="content"
-                    data-v3-node-id={variant.id}
-                    onChange={(event) =>
-                      change((draft) => {
-                        const target =
-                          draft.pos[posIndex]!.grammar_structures[
-                            structureIndex
-                          ]!.variants[variantIndex]!;
-                        target.content = replaceRichText(
-                          target.content,
-                          event.target.value
-                        );
-                      })
+              <div className="word-grammar-variants">
+                {structure.variants.map((variant, variantIndex) => (
+                  <div
+                    className={
+                      variant.dialect === "common"
+                        ? "word-grammar-panel"
+                        : `word-grammar-panel word-grammar-panel-${variant.dialect}`
                     }
-                    placeholder="例如 a centre / the centre"
-                    value={variant.content.text}
-                  />
-                </div>
-              ))}
+                    data-v3-node-id={variant.id}
+                    key={variant.id}
+                  >
+                    {variant.dialect === "common" ? null : (
+                      <Typography.Text
+                        className="word-grammar-dialect-label"
+                        type="secondary"
+                      >
+                        {dialectLabel(variant.dialect)}
+                      </Typography.Text>
+                    )}
+                    <Input.TextArea
+                      aria-label={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
+                      autoSize={{ minRows: 2, maxRows: 6 }}
+                      className="word-pronunciation-phonetic-input"
+                      data-v3-field="content"
+                      data-v3-node-id={variant.id}
+                      onChange={(event) =>
+                        change((draft) => {
+                          const target =
+                            draft.pos[posIndex]!.grammar_structures[
+                              structureIndex
+                            ]!.variants[variantIndex]!;
+                          target.content = replaceRichText(
+                            target.content,
+                            event.target.value
+                          );
+                        })
+                      }
+                      placeholder={GRAMMAR_PLACEHOLDER[variant.dialect]}
+                      value={variant.content.text}
+                    />
+                  </div>
+                ))}
+              </div>
               <Space
                 className="word-sort-actions"
                 orientation="vertical"
@@ -752,34 +724,38 @@ function newSense(
 
 function SenseGroupsCard({
   value,
-  pos,
-  posIndex,
   wordId,
   change,
   idFactory
 }: {
   value: DraftMeaningsStepContentWritableV3;
-  pos: DraftMeaningsStepContentWritableV3["pos"][number];
-  posIndex: number;
   wordId?: string;
   change: (mutation: DraftMutation) => void;
   idFactory: () => string;
 }) {
-  const groups = senseGroupsForPos(value, pos.pos_id);
+  const groups = value.sense_groups;
   const sorting = useSortableRows({
     items: groups,
-    scopeId: `${wordId ?? "current-entry"}:${pos.pos_id}`,
+    scopeId: wordId ?? "current-entry",
     dragType: SENSE_GROUP_DRAG_TYPE,
     onChange: (next) =>
       change((draft) => {
-        replaceSenseGroupOrderForPos(draft, pos.pos_id, next);
+        // 按拖拽结果重排 draft 里已有的区间；draft 中晚于本次渲染快照新增的
+        // 区间不在 next 里，保留在尾部而不是被整体重建时静默抹掉。
+        const order = new Map(next.map((group, index) => [group.id, index]));
+        draft.sense_groups = [
+          ...draft.sense_groups
+            .filter((group) => order.has(group.id))
+            .sort((a, b) => order.get(a.id)! - order.get(b.id)!),
+          ...draft.sense_groups.filter((group) => !order.has(group.id))
+        ];
       })
   });
   return (
     <Card
       className="word-sense-groups-card"
       data-v3-field="sense_groups"
-      data-v3-node-id={pos.pos_id}
+      data-v3-node-id={wordId ?? "current-entry"}
       size="small"
       title="语义区间"
       extra={
@@ -787,18 +763,11 @@ function SenseGroupsCard({
           icon={<PlusOutlined aria-hidden />}
           onClick={() =>
             change((draft) => {
-              const group = {
+              draft.sense_groups.push({
                 id: idFactory(),
                 name_zh: "",
                 name_en: ""
-              };
-              draft.sense_groups.push(group);
-              const targetPos = draft.pos[posIndex]!;
-              const ungrouped = targetPos.senses.find(
-                (sense) => !sense.sense_group_id
-              );
-              if (ungrouped) ungrouped.sense_group_id = group.id;
-              else targetPos.senses.push(newSense(idFactory, group.id));
+              });
             })
           }
           size="small"
@@ -882,7 +851,7 @@ function SenseGroupsCard({
                 icon={<DeleteOutlined />}
                 onClick={() =>
                   change((draft) => {
-                    if (senseGroupsForPos(draft, pos.pos_id).length <= 1) {
+                    if (draft.sense_groups.length <= 1) {
                       return;
                     }
                     draft.sense_groups = draft.sense_groups.filter(
@@ -1752,6 +1721,13 @@ export function V3MeaningsAndExamplesStep({
         <Alert showIcon title="词性目录不可用，已停止新增结构" type="error" />
       ) : null}
 
+      <SenseGroupsCard
+        change={change}
+        idFactory={idFactory}
+        value={value}
+        wordId={wordId}
+      />
+
       {visiblePosIds.length === 0 ? (
         <Flex vertical gap="small">
           <Flex justify="flex-end">{addBasicPosSelect}</Flex>
@@ -1810,20 +1786,12 @@ export function V3MeaningsAndExamplesStep({
                   tabIndex={-1}
                 >
                   <Flex vertical gap="middle">
-                    <SenseGroupsCard
-                      change={change}
-                      idFactory={idFactory}
-                      pos={pos}
-                      posIndex={posIndex}
-                      value={value}
-                      wordId={wordId}
-                    />
-
                     <GrammarStructuresCard
                       change={change}
                       idFactory={idFactory}
                       pos={pos}
                       posIndex={posIndex}
+                      spellingMode={spellingModeForPos(forms, pos.pos_id)}
                     />
 
                     <div
@@ -1930,16 +1898,15 @@ export function V3MeaningsAndExamplesStep({
                                     }
                                     options={[
                                       { label: "不归入语义区间", value: "" },
-                                      ...senseGroupsForPos(
-                                        value,
-                                        pos.pos_id
-                                      ).map((group, groupIndex) => ({
-                                        label:
-                                          group.name_zh ||
-                                          group.name_en ||
-                                          `语义区间 ${groupIndex + 1}`,
-                                        value: group.id
-                                      }))
+                                      ...value.sense_groups.map(
+                                        (group, groupIndex) => ({
+                                          label:
+                                            group.name_zh ||
+                                            group.name_en ||
+                                            `语义区间 ${groupIndex + 1}`,
+                                          value: group.id
+                                        })
+                                      )
                                     ]}
                                     placeholder="选择语义区间"
                                     value={sense.sense_group_id}
@@ -3012,11 +2979,14 @@ export function V3MeaningsAndExamplesStep({
                         icon={<PlusOutlined aria-hidden />}
                         onClick={() =>
                           change((draft) => {
-                            draft.pos[posIndex]!.senses.push(
-                              newSense(
-                                idFactory,
-                                senseGroupsForPos(draft, pos.pos_id)[0]?.id
-                              )
+                            const posDraft = draft.pos[posIndex]!;
+                            const inheritedGroupId =
+                              [...posDraft.senses]
+                                .reverse()
+                                .find((sense) => sense.sense_group_id)
+                                ?.sense_group_id ?? draft.sense_groups[0]?.id;
+                            posDraft.senses.push(
+                              newSense(idFactory, inheritedGroupId)
                             );
                           })
                         }

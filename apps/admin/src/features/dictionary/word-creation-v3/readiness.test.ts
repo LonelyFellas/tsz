@@ -360,9 +360,8 @@ describe("buildV3ProductProgress", () => {
     });
 
     expect(rows.slice(3).map((row) => row.count)).toEqual([1, 3, 3, 3]);
-    expect(rows[3]!.target).toMatchObject({
+    expect(rows[3]!.target).toEqual({
       step: "meanings",
-      pos_id: UUIDS.pos,
       node_id: uuidFromInt(500),
       field: "name_zh"
     });

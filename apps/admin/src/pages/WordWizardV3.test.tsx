@@ -1831,10 +1831,10 @@ describe("WordWizardV3Page", () => {
     );
     expect(
       document.querySelector(".v3-meanings-v2 > .word-sense-groups-card")
-    ).toBeNull();
+    ).not.toBeNull();
     expect(
       document.querySelector(".word-pos-editor .word-sense-groups-card")
-    ).not.toBeNull();
+    ).toBeNull();
     expect(screen.getByText("上一步").closest("button")).toBeVisible();
     expect(screen.getByText("保存草稿").closest("button")).toBeVisible();
     expect(screen.getByText("完成并进入预览").closest("button")).toBeVisible();

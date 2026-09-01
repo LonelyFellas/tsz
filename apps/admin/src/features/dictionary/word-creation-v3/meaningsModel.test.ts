@@ -4,6 +4,7 @@ import type {
   EnglishTextV3
 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
+import { newWordNodeId } from "../word-model/primitives";
 import { formsFixture } from "./fixtures";
 import {
   editableEnglishText,
@@ -109,7 +110,7 @@ const meaningsCanonicalFixture: DraftMeaningsStepContentV3 = {
 };
 
 describe("V3 meanings writable model", () => {
-  it("initializes one native V3 template per POS for an empty canonical draft", () => {
+  it("initializes native V3 POS templates sharing one word-level sense group", () => {
     let nextId = 0;
     const idFactory = vi.fn(() => `new-node-${++nextId}`);
     const first = formsFixture({ pos_id: "pos-1" }).pos[0]!;
@@ -123,20 +124,11 @@ describe("V3 meanings writable model", () => {
       idFactory
     );
 
-    expect(result.sense_groups).toHaveLength(2);
-    expect(result.sense_groups[0]).toEqual({
-      id: "new-node-1",
-      name_zh: "",
-      name_en: ""
-    });
-    expect(result.sense_groups[1]).toEqual({
-      id: expect.any(String),
-      name_zh: "",
-      name_en: ""
-    });
-    expect(result.sense_groups[1]!.id).not.toBe(result.sense_groups[0]!.id);
+    expect(result.sense_groups).toEqual([
+      { id: "new-node-1", name_zh: "", name_en: "" }
+    ]);
     expect(result.pos.map((pos) => pos.pos_id)).toEqual(["pos-1", "pos-2"]);
-    for (const [index, pos] of result.pos.entries()) {
+    for (const pos of result.pos) {
       expect(pos.grammar_structures).toEqual([
         {
           id: expect.any(String),
@@ -155,7 +147,7 @@ describe("V3 meanings writable model", () => {
         id: expect.any(String),
         sub_pos: "",
         level: "A1",
-        sense_group_id: result.sense_groups[index]!.id,
+        sense_group_id: result.sense_groups[0]!.id,
         depends_on_context: false,
         relations: []
       });
@@ -222,9 +214,8 @@ describe("V3 meanings writable model", () => {
     );
 
     expect(result).not.toBe(existing);
-    expect(result.sense_groups).not.toBe(existing.sense_groups);
-    expect(result.sense_groups[0]).toBe(existing.sense_groups[0]);
-    expect(result.sense_groups).toHaveLength(2);
+    expect(result.sense_groups).toBe(existing.sense_groups);
+    expect(result.sense_groups).toHaveLength(1);
     expect(result.pos[0]).toBe(existingPos);
     expect(JSON.stringify(existing)).toBe(existingJson);
     expect(result.pos.map((pos) => pos.pos_id)).toEqual(["pos-1", "pos-2"]);
@@ -236,9 +227,9 @@ describe("V3 meanings writable model", () => {
       }
     ]);
     expect(result.pos[1]!.senses[0]!.sense_group_id).toBe(
-      result.sense_groups[1]!.id
+      result.sense_groups[0]!.id
     );
-    expect(result.pos[1]!.senses[0]!.sense_group_id).not.toBe(
+    expect(result.pos[1]!.senses[0]!.sense_group_id).toBe(
       result.pos[0]!.senses[0]!.sense_group_id
     );
   });
@@ -283,7 +274,7 @@ describe("V3 meanings writable model", () => {
     expect(idFactory).not.toHaveBeenCalled();
   });
 
-  it("splits a historical cross-POS group once while preserving every existing node", () => {
+  it("keeps a cross-POS shared group intact without cloning", () => {
     const existing = toWritableMeanings(meaningsCanonicalFixture);
     const secondPos = structuredClone(existing.pos[0]!);
     secondPos.pos_id = "pos-2";
@@ -292,7 +283,7 @@ describe("V3 meanings writable model", () => {
     secondPos.senses[0]!.sentences[0]!.id = "sentence-2";
     existing.pos.push(secondPos);
     const before = structuredClone(existing);
-    const idFactory = vi.fn(() => "split-group-pos-2");
+    const idFactory = vi.fn(() => "never-used");
     const forms: DraftFormsStepContentV3 = {
       pos: [
         formsFixture({ pos_id: "pos-1" }).pos[0]!,
@@ -307,19 +298,52 @@ describe("V3 meanings writable model", () => {
       idFactory
     );
 
-    expect(result.sense_groups).toEqual([
-      before.sense_groups[0],
-      { ...before.sense_groups[0], id: "split-group-pos-2" }
-    ]);
-    expect(result.pos[0]).toBe(existing.pos[0]);
+    expect(result).toBe(existing);
     expect(result.pos[0]!.senses[0]!.sense_group_id).toBe("sense-group-1");
-    expect(result.pos[1]!.senses[0]).toEqual({
-      ...before.pos[1]!.senses[0],
-      sense_group_id: "split-group-pos-2"
-    });
-    expect(result.pos[1]!.senses[0]!.definitions[0]!.id).toBe("definition-2");
-    expect(result.pos[1]!.senses[0]!.sentences[0]!.id).toBe("sentence-2");
+    expect(result.pos[1]!.senses[0]!.sense_group_id).toBe("sense-group-1");
     expect(existing).toEqual(before);
+    expect(idFactory).not.toHaveBeenCalled();
+  });
+
+  it("distinguish 词性把存量单条 common 语法结构拆成英美双条并保持幂等", () => {
+    const existing = toWritableMeanings(meaningsCanonicalFixture);
+    let nextId = 0;
+    const idFactory = vi.fn(() => `split-variant-${++nextId}`);
+    const forms = formsFixture({
+      pos_id: "pos-1",
+      dialect_rules: {
+        spelling_mode: "distinguish",
+        phonetic_mode: "distinguish"
+      }
+    });
+
+    const result = ensureV3MeaningsForForms(
+      "entry-1",
+      forms,
+      existing,
+      idFactory
+    );
+
+    const structure = result.pos[0]!.grammar_structures[0]!;
+    expect(structure.id).toBe("grammar-1");
+    expect(structure.variants.map((variant) => variant.dialect)).toEqual([
+      "uk",
+      "us"
+    ]);
+    expect(structure.variants.map((variant) => variant.id)).toEqual([
+      "split-variant-1",
+      "split-variant-2"
+    ]);
+    for (const variant of structure.variants) {
+      expect(variant.content).toEqual({
+        version: 2,
+        text: "used as a noun",
+        annotations: []
+      });
+    }
+    expect(structure.variants[0]!.content).not.toBe(
+      structure.variants[1]!.content
+    );
 
     const calls = idFactory.mock.calls.length;
     const repeated = ensureV3MeaningsForForms(
@@ -332,7 +356,198 @@ describe("V3 meanings writable model", () => {
     expect(idFactory).toHaveBeenCalledTimes(calls);
   });
 
-  it("prunes a removed forms POS and only its exclusively owned sense groups", () => {
+  it("distinguish 词性的默认模板语法结构直接是英美双条", () => {
+    let nextId = 0;
+    const idFactory = vi.fn(() => `node-${++nextId}`);
+    const forms = formsFixture({
+      pos_id: "pos-1",
+      dialect_rules: {
+        spelling_mode: "distinguish",
+        phonetic_mode: "distinguish"
+      }
+    });
+
+    const result = ensureV3MeaningsForForms(
+      "word-1",
+      forms,
+      { sense_groups: [], pos: [] },
+      idFactory
+    );
+
+    const variants = result.pos[0]!.grammar_structures[0]!.variants;
+    expect(variants.map((variant) => variant.dialect)).toEqual(["uk", "us"]);
+    expect(new Set(variants.map((variant) => variant.id)).size).toBe(2);
+    expect(variants.every((variant) => variant.content.text === "")).toBe(true);
+  });
+
+  it("unified 词性把 uk/us 双条语法结构合并回单条 common，英式为空则取美式", () => {
+    const existing = toWritableMeanings(meaningsCanonicalFixture);
+    existing.pos[0]!.grammar_structures[0]!.variants = [
+      {
+        id: "grammar-variant-uk",
+        dialect: "uk",
+        content: { version: 2, text: "a centre", annotations: [] }
+      },
+      {
+        id: "grammar-variant-us",
+        dialect: "us",
+        content: { version: 2, text: "a center", annotations: [] }
+      }
+    ];
+    let nextId = 0;
+    const idFactory = vi.fn(() => `merged-variant-${++nextId}`);
+
+    const result = ensureV3MeaningsForForms(
+      "entry-1",
+      formsFixture({ pos_id: "pos-1" }),
+      existing,
+      idFactory
+    );
+
+    expect(result.pos[0]!.grammar_structures[0]!.variants).toEqual([
+      {
+        id: "merged-variant-1",
+        dialect: "common",
+        content: { version: 2, text: "a centre", annotations: [] }
+      }
+    ]);
+
+    const blankUk = toWritableMeanings(meaningsCanonicalFixture);
+    blankUk.pos[0]!.grammar_structures[0]!.variants = [
+      {
+        id: "grammar-variant-uk",
+        dialect: "uk",
+        content: { version: 2, text: "  ", annotations: [] }
+      },
+      {
+        id: "grammar-variant-us",
+        dialect: "us",
+        content: { version: 2, text: "a center", annotations: [] }
+      }
+    ];
+    const fallback = ensureV3MeaningsForForms(
+      "entry-1",
+      formsFixture({ pos_id: "pos-1" }),
+      blankUk,
+      idFactory
+    );
+    expect(
+      fallback.pos[0]!.grammar_structures[0]!.variants[0]!.content.text
+    ).toBe("a center");
+  });
+
+  it("拆分复用 missingPosTemplates 里同 ID 结构的 variants，draft 与 clean 两次装配产出相同节点 ID", () => {
+    const forms = formsFixture({
+      pos_id: "pos-1",
+      dialect_rules: {
+        spelling_mode: "distinguish",
+        phonetic_mode: "distinguish"
+      }
+    });
+    const draft = ensureV3MeaningsForForms(
+      "entry-1",
+      forms,
+      toWritableMeanings(meaningsCanonicalFixture),
+      newWordNodeId
+    );
+    const clean = ensureV3MeaningsForForms(
+      "entry-1",
+      forms,
+      toWritableMeanings(meaningsCanonicalFixture),
+      newWordNodeId,
+      draft
+    );
+
+    expect(JSON.stringify(clean)).toBe(JSON.stringify(draft));
+    expect(
+      clean.pos[0]!.grammar_structures[0]!.variants.map((variant) => variant.id)
+    ).toEqual(
+      draft.pos[0]!.grammar_structures[0]!.variants.map((variant) => variant.id)
+    );
+  });
+
+  it("模板只对齐节点 ID，不把 draft 的未保存文本带进 clean 基线", () => {
+    const forms = formsFixture({
+      pos_id: "pos-1",
+      dialect_rules: {
+        spelling_mode: "distinguish",
+        phonetic_mode: "distinguish"
+      }
+    });
+    const edited = toWritableMeanings(meaningsCanonicalFixture);
+    edited.pos[0]!.grammar_structures[0]!.variants[0]!.content = {
+      version: 2,
+      text: "edited by user",
+      annotations: []
+    };
+    const draft = ensureV3MeaningsForForms(
+      "entry-1",
+      forms,
+      edited,
+      newWordNodeId
+    );
+    const clean = ensureV3MeaningsForForms(
+      "entry-1",
+      forms,
+      toWritableMeanings(meaningsCanonicalFixture),
+      newWordNodeId,
+      draft
+    );
+
+    const cleanVariants = clean.pos[0]!.grammar_structures[0]!.variants;
+    const draftVariants = draft.pos[0]!.grammar_structures[0]!.variants;
+    expect(cleanVariants.map((variant) => variant.id)).toEqual(
+      draftVariants.map((variant) => variant.id)
+    );
+    expect(
+      cleanVariants.every(
+        (variant) => variant.content.text === "used as a noun"
+      )
+    ).toBe(true);
+    expect(
+      draftVariants.every(
+        (variant) => variant.content.text === "edited by user"
+      )
+    ).toBe(true);
+    expect(JSON.stringify(clean)).not.toBe(JSON.stringify(draft));
+  });
+
+  it("与拼写模式不匹配的畸形 variants 形态原样保留，交给发布校验兜底", () => {
+    const existing = toWritableMeanings(meaningsCanonicalFixture);
+    existing.pos[0]!.grammar_structures[0]!.variants = [
+      {
+        id: "grammar-variant-1",
+        dialect: "common",
+        content: { version: 2, text: "a", annotations: [] }
+      },
+      {
+        id: "grammar-variant-2",
+        dialect: "common",
+        content: { version: 2, text: "b", annotations: [] }
+      }
+    ];
+    const before = structuredClone(existing);
+    const idFactory = vi.fn();
+
+    const result = ensureV3MeaningsForForms(
+      "entry-1",
+      formsFixture({
+        pos_id: "pos-1",
+        dialect_rules: {
+          spelling_mode: "distinguish",
+          phonetic_mode: "distinguish"
+        }
+      }),
+      existing,
+      idFactory
+    );
+
+    expect(result).toBe(existing);
+    expect(existing).toEqual(before);
+    expect(idFactory).not.toHaveBeenCalled();
+  });
+
+  it("prunes a removed forms POS but keeps word-level sense groups", () => {
     const existing = toWritableMeanings(meaningsCanonicalFixture);
     const secondPos = structuredClone(existing.pos[0]!);
     secondPos.pos_id = "pos-2";
@@ -366,7 +581,11 @@ describe("V3 meanings writable model", () => {
 
     expect(result.pos).toHaveLength(1);
     expect(result.pos[0]!.pos_id).toBe("pos-1");
-    expect(result.sense_groups).toEqual([existing.sense_groups[0]]);
+    expect(result.sense_groups).toBe(existing.sense_groups);
+    expect(result.sense_groups.map((group) => group.id)).toEqual([
+      "sense-group-1",
+      "sense-group-2"
+    ]);
     expect(result.pos[0]!.senses[0]!.sentences[0]!.links).not.toContainEqual(
       expect.objectContaining({ sense_id: "sense-2" })
     );
