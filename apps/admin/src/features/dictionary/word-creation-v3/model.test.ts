@@ -433,6 +433,33 @@ describe("V3 forms model", () => {
     expect(codes(emptyGroup, "complete")).toContain("empty_form_group");
   });
 
+  it("complete 要求每个变化组都留住原形，草稿放行", () => {
+    const derived = commonFormFixture({ spelling: "centers" });
+    derived.form_type = "plural";
+    const withoutBase = formsFixture({ forms: [derived] });
+
+    // 草稿期允许边录边补。
+    expect(validateFormsContent(withoutBase, "save")).toEqual([]);
+
+    const complete = codes(withoutBase, "complete");
+    expect(complete).toContain("base_form_required_in_group");
+
+    // 组里挂着原形就不该被这条规则误伤。
+    const withBase = formsFixture({ forms: [commonFormFixture()] });
+    expect(codes(withBase, "complete")).not.toContain(
+      "base_form_required_in_group"
+    );
+
+    // 空组已由 empty_form_group 说明，不叠报缺原形。
+    const emptyGroup = formsFixture({ forms: [], groups: [] });
+    emptyGroup.pos[0]!.form_groups = [
+      { id: UUIDS.group, is_regular: false, members: [] }
+    ];
+    const emptyCodes = codes(emptyGroup, "complete");
+    expect(emptyCodes).toContain("empty_form_group");
+    expect(emptyCodes).not.toContain("base_form_required_in_group");
+  });
+
   it("U07 draft 允许未完成 variant/pronunciation，complete 精确阻断", () => {
     const incomplete = commonFormFixture({
       spelling: "",

@@ -729,6 +729,7 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "orphan_form",
   "form_group_required",
   "empty_form_group",
+  "base_form_required_in_group",
   "variant_spelling_required",
   "pronunciation_required",
   "duplicate_pronunciation",
