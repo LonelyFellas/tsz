@@ -473,6 +473,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(formsValue().pos.map((pos) => pos.pos_id)).toEqual(["pos-2"]);
     expect(value().pos.map((pos) => pos.pos_id)).toEqual(["pos-2"]);
     expect(value().sense_groups.map((group) => group.id)).toEqual([
+      "sense-group-1",
       "sense-group-2"
     ]);
     expect(value().pos[0]!.senses[0]!.relations).toEqual([]);
@@ -666,7 +667,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       within(grammarPanel as HTMLElement).queryByLabelText("语法结构 1 地区 1")
     ).toBeNull();
     const content = within(grammarPanel as HTMLElement).getByLabelText(
-      "语法结构 1 内容 1"
+      "语法结构 1 通用内容"
     );
     expect(content.tagName).toBe("TEXTAREA");
     expect(content).toHaveAttribute(
@@ -688,6 +689,72 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(addGrammar.closest(".ant-card-extra")).not.toBeNull();
     expect(addGrammar).toHaveClass("ant-btn-text");
     expect(container.querySelector(".word-grammar-add")).toBeNull();
+  });
+
+  it("区分英美式词性的语法结构提供英式美式双栏，新增也按方言建双条", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.grammar_structures[0]!.variants = [
+      {
+        id: "grammar-variant-uk",
+        dialect: "uk",
+        content: { version: 2, text: "a centre", annotations: [] }
+      },
+      {
+        id: "grammar-variant-us",
+        dialect: "us",
+        content: { version: 2, text: "a center", annotations: [] }
+      }
+    ];
+    const forms: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "noun",
+          dialect_rules: {
+            spelling_mode: "distinguish",
+            phonetic_mode: "distinguish"
+          },
+          forms: [],
+          form_groups: []
+        }
+      ]
+    };
+    const ids = [
+      "grammar-new",
+      "grammar-variant-new-uk",
+      "grammar-variant-new-us"
+    ];
+    render(
+      <Harness
+        forms={forms}
+        idFactory={() => ids.shift()!}
+        initial={initial}
+        wordId="entry-1"
+      />
+    );
+
+    const uk = screen.getByLabelText("语法结构 1 英式内容");
+    const us = screen.getByLabelText("语法结构 1 美式内容");
+    expect(uk).toHaveValue("a centre");
+    expect(us).toHaveValue("a center");
+    expect(uk).toHaveAttribute("placeholder", "例如 a centre / the centre");
+    expect(us).toHaveAttribute("placeholder", "例如 a center / the center");
+    expect(screen.getByText("英式")).toBeVisible();
+    expect(screen.getByText("美式")).toBeVisible();
+
+    fireEvent.change(us, { target: { value: "the center" } });
+    expect(value().pos[0]!.grammar_structures[0]!.variants[1]).toMatchObject({
+      dialect: "us",
+      content: { text: "the center" }
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "添加语法结构" }));
+    const structures = value().pos[0]!.grammar_structures;
+    expect(structures).toHaveLength(2);
+    expect(structures[1]!.variants.map((variant) => variant.dialect)).toEqual([
+      "uk",
+      "us"
+    ]);
   });
 
   it("语法结构保持必填，但仅在发布校验返回对应 issue 后显示红色", () => {
@@ -1670,7 +1737,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     );
   });
 
-  it("语义区间位于各词性内部、语法结构上方且只显示当前词性的区间", () => {
+  it("语义区间卡片位于步骤顶部、词性 Tabs 之外，并展示全部区间", () => {
     const initial = structuredClone(meaningsFixture);
     initial.sense_groups.push({
       id: "sense-group-2",
@@ -1710,71 +1777,35 @@ describe("V3MeaningsAndExamplesStep", () => {
       <Harness forms={forms} initial={initial} wordId="entry-pos-groups" />
     );
 
+    const globalCard = container.querySelector<HTMLElement>(
+      ".v3-meanings-v2 > .word-sense-groups-card"
+    );
+    expect(globalCard).not.toBeNull();
+    const tabs = container.querySelector(".word-pos-tabs")!;
     expect(
-      container.querySelector(".v3-meanings-v2 > .word-sense-groups-card")
-    ).toBeNull();
-    const nounPanel = screen.getByRole("tabpanel", {
-      name: /^名词/u
-    });
-    const nounGrammar = nounPanel.querySelector(".word-grammar-card")!;
-    const nounGroups = nounPanel.querySelector(".word-sense-groups-card")!;
-    const nounSenses = nounPanel.querySelector(".word-sense-list")!;
-    expect(
-      nounGroups.compareDocumentPosition(nounGrammar) &
+      globalCard!.compareDocumentPosition(tabs) &
         Node.DOCUMENT_POSITION_FOLLOWING
     ).not.toBe(0);
-    expect(
-      nounGrammar.compareDocumentPosition(nounSenses) &
-        Node.DOCUMENT_POSITION_FOLLOWING
-    ).not.toBe(0);
-    expect(within(nounPanel).getByLabelText("语义区间 1 中文")).toHaveValue(
+    expect(tabs.querySelector(".word-sense-groups-card")).toBeNull();
+    expect(within(globalCard!).getByLabelText("语义区间 1 中文")).toHaveValue(
       "核心"
     );
-    expect(within(nounPanel).queryByDisplayValue("动作区间")).toBeNull();
-
-    fireEvent.click(screen.getByRole("tab", { name: /^动词/u }));
-    const verbPanel = screen.getByRole("tabpanel", {
-      name: /^动词/u
-    });
-    expect(within(verbPanel).getByLabelText("语义区间 1 中文")).toHaveValue(
+    expect(within(globalCard!).getByLabelText("语义区间 2 中文")).toHaveValue(
       "动作区间"
     );
-    expect(within(verbPanel).queryByDisplayValue("核心")).toBeNull();
   });
 
-  it("当前词性新增语义区间时建立可持久化的本地词义归属", () => {
-    const ids = ["sense-group-new", "sense-new"];
-    const { unmount } = render(
-      <Harness idFactory={() => ids.shift()!} wordId="entry-add-group" />
-    );
+  it("新增语义区间只追加词条级区间，不改动任何词义归属", () => {
+    const ids = ["sense-group-new"];
+    render(<Harness idFactory={() => ids.shift()!} wordId="entry-add-group" />);
 
     fireEvent.click(screen.getByRole("button", { name: "添加语义区间" }));
     expect(value().sense_groups.map((group) => group.id)).toEqual([
       "sense-group-1",
       "sense-group-new"
     ]);
-    expect(value().pos[0]!.senses).toHaveLength(2);
-    expect(value().pos[0]!.senses[1]).toMatchObject({
-      id: "sense-new",
-      sense_group_id: "sense-group-new"
-    });
-
-    unmount();
-    const ungrouped = structuredClone(meaningsFixture);
-    delete ungrouped.pos[0]!.senses[0]!.sense_group_id;
-    const reuseIds = ["sense-group-reused"];
-    render(
-      <Harness
-        idFactory={() => reuseIds.shift()!}
-        initial={ungrouped}
-        wordId="entry-reuse-group"
-      />
-    );
-    fireEvent.click(screen.getByRole("button", { name: "添加语义区间" }));
     expect(value().pos[0]!.senses).toHaveLength(1);
-    expect(value().pos[0]!.senses[0]!.sense_group_id).toBe(
-      "sense-group-reused"
-    );
+    expect(value().pos[0]!.senses[0]!.sense_group_id).toBe("sense-group-1");
   }, 15_000);
 
   it("原生拖放隔离语义区间、语法结构和 POS scope，并清理拖动态", () => {
@@ -2065,7 +2096,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.change(screen.getByLabelText("释义 1 频率"), {
       target: { value: "42.5" }
     });
-    fireEvent.change(screen.getByLabelText("语法结构 1 内容 1"), {
+    fireEvent.change(screen.getByLabelText("语法结构 1 通用内容"), {
       target: { value: "updated grammar" }
     });
     fireEvent.change(screen.getByLabelText("定义 1 内容"), {

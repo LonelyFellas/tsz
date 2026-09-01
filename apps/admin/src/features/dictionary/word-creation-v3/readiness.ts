@@ -126,13 +126,6 @@ export function buildV3ProductProgress({
   const grammarEntries = meanings.pos.flatMap((pos) =>
     pos.grammar_structures.map((grammar) => ({ pos, grammar }))
   );
-  const senseGroupEntries = meanings.sense_groups.map((group) => ({
-    group,
-    pos:
-      meanings.pos.find((pos) =>
-        pos.senses.some((sense) => sense.sense_group_id === group.id)
-      ) ?? meanings.pos[0]
-  }));
   const senseEntries = meanings.pos.flatMap((pos) =>
     pos.senses.map((sense) => ({ pos, sense }))
   );
@@ -238,7 +231,7 @@ export function buildV3ProductProgress({
   );
 
   const firstDerived = derivedForms[0];
-  const firstSenseGroup = senseGroupEntries[0];
+  const firstSenseGroup = meanings.sense_groups[0];
   const firstGrammar = grammarEntries[0];
   const firstSense = senseEntries[0];
   const firstSentence = sentenceEntries[0];
@@ -288,24 +281,18 @@ export function buildV3ProductProgress({
       index: 4,
       label: "语义区间",
       completed: completed.has("meanings"),
-      count: senseGroupEntries.length,
+      count: meanings.sense_groups.length,
       target: senseGroupIssue
         ? v3IssueNavigationTarget(senseGroupIssue)
         : firstSenseGroup
           ? {
               step: "meanings",
-              ...(firstSenseGroup.pos
-                ? { pos_id: firstSenseGroup.pos.pos_id }
-                : firstPos
-                  ? { pos_id: firstPos.pos_id }
-                  : {}),
-              node_id: firstSenseGroup.group.id,
+              node_id: firstSenseGroup.id,
               field: "name_zh"
             }
           : {
               step: "meanings",
-              ...(firstPos ? { pos_id: firstPos.pos_id } : {}),
-              node_id: firstPos?.pos_id ?? wordId,
+              node_id: wordId,
               field: "sense_groups"
             }
     },

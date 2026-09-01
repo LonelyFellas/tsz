@@ -1,9 +1,11 @@
 import type {
   Dialect,
+  DialectModeV3,
   DraftFormsStepContentV3,
   DraftMeaningsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   EnglishTextV3,
+  GrammarStructureV3,
   RichTextV3,
   RichTextVariantV3,
   SentenceTranslationBandV3,
@@ -265,28 +267,49 @@ export function toWritableMeanings(
   };
 }
 
+/** 词性拼写模式决定语法结构的方言形态：distinguish → uk/us 双条，否则单条 common。 */
+function grammarVariantDialects(
+  spellingMode: DialectModeV3
+): readonly Dialect[] {
+  return spellingMode === "distinguish" ? ["uk", "us"] : ["common"];
+}
+
+export function spellingModeForPos(
+  forms: DraftFormsStepContentV3 | undefined,
+  posId: string
+): DialectModeV3 {
+  return (
+    forms?.pos.find((pos) => pos.pos_id === posId)?.dialect_rules
+      .spelling_mode ?? "unified"
+  );
+}
+
+export function newGrammarStructure(
+  idFactory: () => string,
+  spellingMode: DialectModeV3
+): GrammarStructureV3 {
+  return {
+    id: idFactory(),
+    variants: grammarVariantDialects(spellingMode).map((dialect) => ({
+      id: idFactory(),
+      dialect,
+      content: { version: 2, text: "", annotations: [] }
+    }))
+  };
+}
+
 function createDefaultPosMeanings(
   posId: string,
   wordId: string,
   senseGroupId: string,
+  spellingMode: DialectModeV3,
   idFactory: () => string
 ): WordPosMeaningsWritableV3 {
   const senseId = idFactory();
   const translationId = idFactory();
   return {
     pos_id: posId,
-    grammar_structures: [
-      {
-        id: idFactory(),
-        variants: [
-          {
-            id: idFactory(),
-            dialect: "common",
-            content: { version: 2, text: "", annotations: [] }
-          }
-        ]
-      }
-    ],
+    grammar_structures: [newGrammarStructure(idFactory, spellingMode)],
     senses: [
       {
         id: senseId,
@@ -334,9 +357,9 @@ function createDefaultPosMeanings(
 }
 
 /**
- * Adds the product defaults directly to a writable V3 draft and maintains the
- * UI invariant that one sense group belongs to only one POS. The wire remains
- * unchanged: ownership is derived from `sense_group_id` references.
+ * Adds the product defaults directly to a writable V3 draft. Sense groups are
+ * word-level and shared across POS: removing a POS never removes groups, and
+ * a new POS reuses the first existing group instead of minting its own.
  */
 export function ensureV3MeaningsForForms(
   wordId: string,
@@ -387,34 +410,11 @@ export function ensureV3MeaningsForForms(
     crossReferencesChanged = true;
     return { ...pos, senses };
   });
-  const keptGroupIds = new Set(
-    keptPos.flatMap((pos) =>
-      pos.senses.flatMap((sense) =>
-        sense.sense_group_id ? [sense.sense_group_id] : []
-      )
-    )
-  );
-  const removedOnlyGroupIds = new Set(
-    removedPos.flatMap((pos) =>
-      pos.senses.flatMap((sense) =>
-        sense.sense_group_id && !keptGroupIds.has(sense.sense_group_id)
-          ? [sense.sense_group_id]
-          : []
-      )
-    )
-  );
-  let nextGroups =
-    removedOnlyGroupIds.size === 0
-      ? meanings.sense_groups
-      : meanings.sense_groups.filter(
-          (group) => !removedOnlyGroupIds.has(group.id)
-        );
+  let nextGroups = meanings.sense_groups;
   let nextPos =
     removedPos.length === 0 && !crossReferencesChanged ? meanings.pos : keptPos;
-  let changed =
-    nextGroups !== meanings.sense_groups || nextPos !== meanings.pos;
+  let changed = nextPos !== meanings.pos;
   const groupById = new Map(nextGroups.map((group) => [group.id, group]));
-  const groupOwner = new Map<string, string>();
   const appendGroup = (
     group: DraftMeaningsStepContentWritableV3["sense_groups"][number]
   ) => {
@@ -423,50 +423,20 @@ export function ensureV3MeaningsForForms(
     groupById.set(group.id, group);
     changed = true;
   };
-  const replacePos = (
-    index: number,
-    pos: DraftMeaningsStepContentWritableV3["pos"][number]
-  ) => {
-    if (nextPos === meanings.pos) nextPos = [...nextPos];
-    nextPos[index] = pos;
-    changed = true;
-  };
 
-  for (const [posIndex, pos] of nextPos.entries()) {
-    const referencedGroupIds = Array.from(
-      new Set(
-        pos.senses.flatMap((sense) =>
-          sense.sense_group_id ? [sense.sense_group_id] : []
-        )
-      )
-    );
-    let currentPos = pos;
-    for (const groupId of referencedGroupIds) {
-      let group = groupById.get(groupId);
-      if (!group) {
-        group = { id: groupId, name_zh: "", name_en: "" };
-        appendGroup(group);
+  for (const pos of nextPos) {
+    for (const sense of pos.senses) {
+      if (sense.sense_group_id && !groupById.has(sense.sense_group_id)) {
+        appendGroup({ id: sense.sense_group_id, name_zh: "", name_en: "" });
       }
-      const owner = groupOwner.get(groupId);
-      if (!owner || owner === pos.pos_id) {
-        groupOwner.set(groupId, pos.pos_id);
-        continue;
-      }
-      const clonedGroup = { ...group, id: idFactory() };
-      appendGroup(clonedGroup);
-      groupOwner.set(clonedGroup.id, pos.pos_id);
-      currentPos = {
-        ...currentPos,
-        senses: currentPos.senses.map((sense) =>
-          sense.sense_group_id === groupId
-            ? { ...sense, sense_group_id: clonedGroup.id }
-            : sense
-        )
-      };
     }
-    if (currentPos !== pos) replacePos(posIndex, currentPos);
   }
 
+  const spellingModeByPos = new Map(
+    forms.pos.map(
+      (pos) => [pos.pos_id, pos.dialect_rules.spelling_mode] as const
+    )
+  );
   const existingPosIds = new Set(nextPos.map((pos) => pos.pos_id));
   const missingPosIds: string[] = [];
   for (const pos of forms.pos) {
@@ -495,16 +465,122 @@ export function ensureV3MeaningsForForms(
       changed = true;
       continue;
     }
-    const senseGroup = { id: idFactory(), name_zh: "", name_en: "" };
-    appendGroup(senseGroup);
+    let senseGroupId = nextGroups[0]?.id;
+    if (!senseGroupId) {
+      const senseGroup = { id: idFactory(), name_zh: "", name_en: "" };
+      appendGroup(senseGroup);
+      senseGroupId = senseGroup.id;
+    }
     if (nextPos === meanings.pos) nextPos = [...nextPos];
     nextPos.push(
-      createDefaultPosMeanings(posId, wordId, senseGroup.id, idFactory)
+      createDefaultPosMeanings(
+        posId,
+        wordId,
+        senseGroupId,
+        spellingModeByPos.get(posId) ?? "unified",
+        idFactory
+      )
     );
     changed = true;
   }
 
+  // 语法结构方言形态跟随词性拼写模式双向归一（对齐 forms 侧 applyDialectRules）：
+  // distinguish 把单条 common 拆成 uk/us 双条（文本复制），unified 把 uk/us 合回
+  // 单条 common（取英式文本，英式为空则取美式——与后端补全偏英式同口径）。
+  // 转换一律旧节点退场换新 ID：text_variant 的 node_role 编入方言，原 ID 换方言
+  // 会被后端 422 拒。missingPosTemplates 里同 ID 结构若已是目标形态则直接复用其
+  // variants，让 draft 与 clean 两次装配产出相同节点 ID，不产生虚假脏标记。
+  const templateGrammarById = new Map(
+    (missingPosTemplates?.pos ?? []).flatMap((pos) =>
+      pos.grammar_structures.map((grammar) => [grammar.id, grammar] as const)
+    )
+  );
+  for (const [posIndex, pos] of nextPos.entries()) {
+    const spellingMode = spellingModeByPos.get(pos.pos_id);
+    if (spellingMode === undefined) continue;
+    let currentPos = pos;
+    for (const [grammarIndex, grammar] of pos.grammar_structures.entries()) {
+      const variants = normalizeGrammarVariants(
+        grammar,
+        spellingMode,
+        templateGrammarById.get(grammar.id),
+        idFactory
+      );
+      if (!variants) continue;
+      if (currentPos === pos) {
+        currentPos = {
+          ...pos,
+          grammar_structures: [...pos.grammar_structures]
+        };
+      }
+      currentPos.grammar_structures[grammarIndex] = { ...grammar, variants };
+    }
+    if (currentPos !== pos) {
+      if (nextPos === meanings.pos) nextPos = [...nextPos];
+      nextPos[posIndex] = currentPos;
+      changed = true;
+    }
+  }
+
   return changed ? { sense_groups: nextGroups, pos: nextPos } : meanings;
+}
+
+function variantDialectsMatch(
+  variants: readonly GrammarStructureV3["variants"][number][],
+  dialects: readonly Dialect[]
+) {
+  return (
+    variants.length === dialects.length &&
+    dialects.every((dialect) =>
+      variants.some((variant) => variant.dialect === dialect)
+    )
+  );
+}
+
+/**
+ * 返回归一后的 variants；形态已符合或属于无法安全转换的畸形（交给发布校验兜底）
+ * 时返回 undefined 表示不动。
+ *
+ * template 只复用节点 ID，内容一律取自被归一结构自身——若把 template 的内容
+ * 一并带过来，clean 基线会吸收 draft 的未保存文本，脏比对失真后 canonical
+ * 同步会把用户编辑静默冲掉。
+ */
+function normalizeGrammarVariants(
+  grammar: GrammarStructureV3,
+  spellingMode: DialectModeV3,
+  template: GrammarStructureV3 | undefined,
+  idFactory: () => string
+): GrammarStructureV3["variants"] | undefined {
+  const dialects = grammarVariantDialects(spellingMode);
+  if (variantDialectsMatch(grammar.variants, dialects)) return undefined;
+  const templateVariants =
+    template && variantDialectsMatch(template.variants, dialects)
+      ? template.variants
+      : undefined;
+  const variantId = (dialect: Dialect) =>
+    templateVariants?.find((variant) => variant.dialect === dialect)?.id ??
+    idFactory();
+  if (spellingMode === "distinguish") {
+    const only =
+      grammar.variants.length === 1 ? grammar.variants[0] : undefined;
+    if (!only || only.dialect !== "common") return undefined;
+    return dialects.map((dialect) => ({
+      id: variantId(dialect),
+      dialect,
+      content: structuredClone(only.content)
+    }));
+  }
+  const uk = grammar.variants.find((variant) => variant.dialect === "uk");
+  const us = grammar.variants.find((variant) => variant.dialect === "us");
+  if (grammar.variants.length !== 2 || !uk || !us) return undefined;
+  const source = uk.content.text.trim() ? uk : us;
+  return [
+    {
+      id: variantId("common"),
+      dialect: "common",
+      content: structuredClone(source.content)
+    }
+  ];
 }
 
 export function replaceRichText(value: RichTextV3, text: string): RichTextV3 {

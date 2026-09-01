@@ -63,6 +63,11 @@
   margin-bottom: 0;
 }
 
+/* 语义区间卡片挪到步骤顶层后，遗留的 14px margin 会与容器 gap 叠成 30px。 */
+.v3-meanings-v2 > .word-sense-groups-card {
+  margin-bottom: 0;
+}
+
 .v3-meanings-v2 {
   min-width: 0;
 }
@@ -89,6 +94,44 @@
 
 .v3-meanings-v2 .word-grammar-panel {
   display: block;
+}
+
+/* 区分英美式词条下，一条语法结构承载英式/美式两个文本面板，左右两栏平分中间列。 */
+.v3-meanings-v2 .word-grammar-variants {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.v3-meanings-v2 .word-grammar-variants > .word-grammar-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+.v3-meanings-v2 .word-grammar-dialect-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 英美配色对齐 Step 2 的方言面板（v3-forms.css 的 .v3-dialect-panel-uk/us）。 */
+.v3-meanings-v2 .word-grammar-panel-uk {
+  background: #eef2ff;
+  border-color: #8792a5;
+}
+
+.v3-meanings-v2 .word-grammar-panel-uk .word-grammar-dialect-label {
+  color: #2f5bff;
+}
+
+.v3-meanings-v2 .word-grammar-panel-us {
+  background: #fff0f7;
+  border-color: #f3c5de;
+}
+
+.v3-meanings-v2 .word-grammar-panel-us .word-grammar-dialect-label {
+  color: #d42a91;
 }
 
 .v3-meanings-v2 .word-table-row {

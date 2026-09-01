@@ -827,14 +827,14 @@ describe("V3WordCreationWizard", () => {
     const view = render(inRouter(wizard));
 
     expect(screen.getByTestId("initialized-counts")).toHaveTextContent(
-      "2/2/2/2/2"
+      "1/2/2/2/2"
     );
     expect(screen.getByTestId("initialized-dirty")).toHaveTextContent(
       "false/false"
     );
     const initialIds = screen.getByTestId("initialized-node-ids").textContent;
-    expect(initialIds?.split(",")).toHaveLength(18);
-    expect(new Set(initialIds?.split(",")).size).toBe(18);
+    expect(initialIds?.split(",")).toHaveLength(17);
+    expect(new Set(initialIds?.split(",")).size).toBe(17);
 
     fireEvent.click(screen.getByText("切换步骤"));
     fireEvent.click(screen.getByText("切换步骤"));
