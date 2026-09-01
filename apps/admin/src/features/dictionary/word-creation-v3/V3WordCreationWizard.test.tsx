@@ -2153,7 +2153,7 @@ describe("V3WordCreationWizard", () => {
     expect(saveMeanings.mock.calls[0]![1].content.pos).toHaveLength(1);
   });
 
-  it("keeps completion validation errors out of publication navigation state", async () => {
+  it("keeps forms completion errors in field state without forcing navigation", async () => {
     const issue = validationIssue();
     const calls: string[] = [];
     const navigationAdapter = {
@@ -2173,14 +2173,15 @@ describe("V3WordCreationWizard", () => {
         calls.push("focus");
       })
     };
-    const saveForms = vi.fn(
-      async (
-        _wordId: string,
-        _input: Parameters<V3WordRequests["saveForms"]>[1]
-      ) => {
-        throw new HttpError(422, "invalid", [], "validation_failed", [issue]);
-      }
-    );
+    const savedForms = envelope(2, "saved forms");
+    savedForms.word.completed_steps = ["basics", "forms"];
+    savedForms.word.max_reachable_step = "meanings";
+    const saveForms = vi
+      .fn<V3WordRequests["saveForms"]>()
+      .mockRejectedValueOnce(
+        new HttpError(422, "invalid", [], "validation_failed", [issue])
+      )
+      .mockResolvedValue(savedForms);
     const saveMeanings = vi.fn(async () => envelope(2, "must not save"));
     renderWizard(requests({ saveForms, saveMeanings }), {
       initialStep: "meanings",
@@ -2191,6 +2192,9 @@ describe("V3WordCreationWizard", () => {
           <output data-testid="forms-error-pos">{context.activePosId}</output>
           <output data-testid="forms-error-revision">
             {context.word.revision}
+          </output>
+          <output data-testid="forms-error-issues">
+            {context.issues.map((issue) => issue.code).join(",")}
           </output>
           <button
             type="button"
@@ -2214,6 +2218,12 @@ describe("V3WordCreationWizard", () => {
           >
             触发词形完成校验
           </button>
+          <button
+            type="button"
+            onClick={() => void context.actions.saveForms("complete")}
+          >
+            重试词形完成
+          </button>
         </>
       )
     });
@@ -2234,7 +2244,14 @@ describe("V3WordCreationWizard", () => {
     );
     expect(screen.getByTestId("forms-error-pos")).toHaveTextContent(UUIDS.pos);
     expect(screen.getByTestId("forms-error-revision")).toHaveTextContent("1");
+    expect(screen.getByTestId("forms-error-issues")).toHaveTextContent(
+      issue.code
+    );
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("重试词形完成"));
+    await waitFor(() => expect(saveForms).toHaveBeenCalledTimes(2));
+    expect(screen.getByTestId("forms-error-issues")).toBeEmptyDOMElement();
   });
 
   it("keeps one forms and one meanings request under same-tick complete calls", async () => {
@@ -2454,7 +2471,9 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByText("完成后续失败"));
 
     expect(await screen.findByText("仍有内容需要完成")).toBeInTheDocument();
-    expect(screen.getByTestId("partial-complete-issues")).toBeEmptyDOMElement();
+    expect(screen.getByTestId("partial-complete-issues").textContent).toBe(
+      meaningsIssue.code
+    );
     expect(saveForms).toHaveBeenCalledTimes(1);
     expect(saveMeanings).toHaveBeenCalledTimes(1);
     expect(saveMeanings.mock.calls[0]![1].base_revision).toBe(2);
@@ -2466,6 +2485,148 @@ describe("V3WordCreationWizard", () => {
     );
     expect(screen.getByTestId("partial-complete-step")).toHaveTextContent(
       "meanings"
+    );
+  });
+
+  it("dedupes cross-step completion issues across retries and clears both steps on success", async () => {
+    const initialWord = word();
+    const formsIssue = validationIssue();
+    const meaningsIssue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "meanings",
+      node_id: "sense-canonical",
+      field: "level",
+      code: "definition_invalid",
+      message: "词义仍不完整",
+      node_location: {
+        node_role: "sense",
+        ancestor_node_ids: [UUIDS.pos],
+        pos_id: UUIDS.pos
+      }
+    };
+    const saveForms = vi.fn(
+      async (
+        _wordId: string,
+        input: Parameters<V3WordRequests["saveForms"]>[1]
+      ) => {
+        const nextWord: AdminWordV3 = {
+          ...initialWord,
+          revision: 2,
+          forms: input.content,
+          completed_steps: ["basics", "forms"],
+          max_reachable_step: "meanings"
+        };
+        return { word: nextWord };
+      }
+    );
+    const completedEnvelope = envelope(3, "all complete");
+    completedEnvelope.word.completed_steps = ["basics", "forms", "meanings"];
+    completedEnvelope.word.max_reachable_step = "preview";
+    const saveMeanings = vi
+      .fn<V3WordRequests["saveMeanings"]>()
+      .mockRejectedValueOnce(
+        new HttpError(422, "invalid", [], "validation_failed", [
+          formsIssue,
+          meaningsIssue
+        ])
+      )
+      .mockRejectedValueOnce(
+        new HttpError(422, "invalid", [], "validation_failed", [
+          formsIssue,
+          meaningsIssue
+        ])
+      )
+      .mockResolvedValue(completedEnvelope);
+    renderWizard(requests({ saveForms, saveMeanings }), {
+      initialWord,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <>
+          <output data-testid="cross-step-issues">
+            {context.issues.map((issue) => issue.code).join(",")}
+          </output>
+          <button
+            type="button"
+            onClick={() =>
+              void context.actions.saveMeanings(
+                context.draftMeanings,
+                "complete"
+              )
+            }
+          >
+            完成词义步
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("完成词义步"));
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(1));
+    expect(screen.getByTestId("cross-step-issues").textContent).toBe(
+      `${formsIssue.code},${meaningsIssue.code}`
+    );
+
+    fireEvent.click(screen.getByText("完成词义步"));
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(2));
+    expect(saveForms).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("cross-step-issues").textContent).toBe(
+      `${formsIssue.code},${meaningsIssue.code}`
+    );
+
+    fireEvent.click(screen.getByText("完成词义步"));
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(3));
+    expect(screen.getByTestId("cross-step-issues")).toBeEmptyDOMElement();
+  });
+
+  it("clears completion issues when a newer canonical replaces the session wholesale", async () => {
+    const issue = validationIssue();
+    const source = requests({
+      saveForms: vi
+        .fn<V3WordRequests["saveForms"]>()
+        .mockRejectedValue(
+          new HttpError(422, "invalid", [], "validation_failed", [issue])
+        )
+    });
+    const renderStep = (context: V3WizardSlotContext) => (
+      <>
+        <output data-testid="reset-issues">
+          {context.issues.map((item) => item.code).join(",")}
+        </output>
+        <button
+          type="button"
+          onClick={() => void context.actions.saveForms("complete")}
+        >
+          完成词形
+        </button>
+      </>
+    );
+    const view = render(
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={word()}
+          requests={source}
+          renderStep={renderStep}
+        />
+      )
+    );
+
+    fireEvent.click(screen.getByText("完成词形"));
+    await waitFor(() =>
+      expect(screen.getByTestId("reset-issues")).toHaveTextContent(issue.code)
+    );
+
+    view.rerender(
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={word(5, "newer canonical")}
+          requests={source}
+          renderStep={renderStep}
+        />
+      )
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("reset-issues")).toBeEmptyDOMElement()
     );
   });
 

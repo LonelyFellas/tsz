@@ -1741,7 +1741,7 @@ export function V3MeaningsAndExamplesStep({
 
       {issues.length > 0 && (
         <Alert
-          description="已按最近一次发布检查结果标出对应字段；修改后请重新检查以更新状态。"
+          description="已按最近一次校验结果标出对应字段；修改后重新完成本步或重新检查发布条件以更新状态。"
           showIcon
           title="词义与例句尚未完成"
           type="warning"

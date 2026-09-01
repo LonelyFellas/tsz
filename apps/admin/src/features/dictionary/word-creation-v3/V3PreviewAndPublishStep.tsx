@@ -189,7 +189,7 @@ function ValidationIssueSummary({
     <section aria-label="发布待完成摘要" className="v3-validation-summary">
       <div className="v3-validation-summary__overview">
         <Typography.Text type="danger" strong>
-          发布校验未通过
+          仍有未完成的内容
         </Typography.Text>
         <Typography.Title level={3}>
           还有 {summary.total} 项待完成

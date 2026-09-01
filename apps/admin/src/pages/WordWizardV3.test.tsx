@@ -12,7 +12,8 @@ import type {
   AdminWordPublicationV3,
   AdminWordV3,
   DraftMeaningsStepContentWritableV3,
-  SurfaceMatchPageV3
+  SurfaceMatchPageV3,
+  V3DraftValidationIssue
 } from "@tsz/types";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
@@ -1704,6 +1705,57 @@ describe("WordWizardV3Page", () => {
     expect(router.state.location.pathname).toBe(
       `/words/${WORD_ID}/v3/wizard/meanings`
     );
+  });
+
+  it("完成并进入预览遇到词形 422 后在对应 Input 下显示字段错误", async () => {
+    const incompleteForm = commonFormFixture({
+      pronunciations: [pronunciationFixture({ dict_phonetic: "" })]
+    });
+    const forms = formsFixture({ forms: [incompleteForm] });
+    const current = word({
+      forms,
+      completed_steps: ["basics"],
+      max_reachable_step: "meanings"
+    });
+    const issue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "forms",
+      node_id: UUIDS.pronunciation,
+      field: "dict_phonetic",
+      code: "pronunciation_required",
+      message: "请完整填写发音方式、字典音标和实际发音",
+      node_location: {
+        node_role: "forms.pronunciation",
+        ancestor_node_ids: [
+          forms.pos[0]!.pos_id,
+          incompleteForm.id,
+          incompleteForm.regional_variants.common.id
+        ],
+        pos_id: forms.pos[0]!.pos_id,
+        form_id: incompleteForm.id,
+        variant_id: incompleteForm.regional_variants.common.id,
+        dialect: "common",
+        pronunciation_id: UUIDS.pronunciation
+      }
+    };
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.saveFormsStepV3).mockRejectedValue(
+      new HttpError(422, "invalid", [], "validation_failed", [issue])
+    );
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/meanings`,
+      createV3WordRequests(endpoints)
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "完成并进入预览" })
+    );
+    expect(await screen.findByText("仍有内容需要完成")).toBeVisible();
+    fireEvent.click(screen.getByText("词形与发音"));
+
+    const input = await screen.findByLabelText("第 1 条发音的字典音标");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText("请填写字典音标")).toBeVisible();
   });
 
   it("retains a dirty meanings draft and save gate after a failed save", async () => {
