@@ -453,7 +453,7 @@ describe("V3PreviewAndPublishStep", () => {
       />
     );
 
-    expect(screen.getByText("发布校验未通过")).toBeVisible();
+    expect(screen.getByText("仍有未完成的内容")).toBeVisible();
     expect(screen.getByText("当前词性不支持该词形类型")).toBeVisible();
     expect(screen.queryByText(/词形内容需要修正/)).toBeNull();
     expect(

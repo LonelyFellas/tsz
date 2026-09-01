@@ -511,6 +511,7 @@ function V3WordCreationSession({
       setDraftMeaningsState(nextMeanings.draft);
       updateDirty("meanings", false);
     }
+    setPublicationIssues([]);
     setProblem(undefined);
     setConflict(undefined);
     clearPreviewState();
@@ -552,12 +553,34 @@ function V3WordCreationSession({
     [clearDirty, clearPreviewState, onWordChange]
   );
 
+  const replaceStepIssues = useCallback(
+    (
+      steps: readonly ("forms" | "meanings")[],
+      issues: readonly V3DraftValidationIssue[]
+    ) => {
+      setPublicationIssues((current) => {
+        const replaced = new Set<string>(steps);
+        for (const issue of issues) replaced.add(issue.step);
+        const next = [
+          ...current.filter((issue) => !replaced.has(issue.step)),
+          ...issues
+        ];
+        return next.length === current.length &&
+          next.every((issue, index) => issue === current[index])
+          ? current
+          : next;
+      });
+    },
+    []
+  );
+
   const handleError = useCallback(
     async (
       error: unknown,
       operation: Parameters<typeof classifyV3Problem>[1],
       retry: () => Promise<void>,
-      localConflict?: V3ConflictComparison
+      localConflict?: V3ConflictComparison,
+      completionSave?: boolean
     ) => {
       if (!mountedRef.current) return;
       const nextProblem = classifyV3Problem(error, operation);
@@ -572,9 +595,18 @@ function V3WordCreationSession({
       ) {
         setPublicationIssues(nextProblem.issues);
         if (operation === "publish") clearPreviewState();
+      } else if (
+        nextProblem.kind === "validation" &&
+        completionSave &&
+        (operation === "save_forms" || operation === "save_meanings")
+      ) {
+        replaceStepIssues(
+          [operation === "save_forms" ? "forms" : "meanings"],
+          nextProblem.issues
+        );
       }
     },
-    [clearPreviewState]
+    [clearPreviewState, replaceStepIssues]
   );
 
   const reconcileArchivedCanonical = useCallback(async () => {
@@ -619,6 +651,7 @@ function V3WordCreationSession({
         setDraftMeaningsState(nextMeanings.draft);
         updateDirty("meanings", false);
       }
+      setPublicationIssues([]);
       setProblem(undefined);
       setConflict(undefined);
       clearPreviewState();
@@ -704,6 +737,7 @@ function V3WordCreationSession({
           })
         );
         if (result.accepted && scope === scopeRef.current) {
+          if (intent === "complete") replaceStepIssues(["forms"], []);
           applyCanonical(result.value.word, "forms");
           return true;
         }
@@ -712,18 +746,31 @@ function V3WordCreationSession({
         if (classifyV3Problem(error, "save_forms").kind === "entry_archived") {
           await handleEntryArchived(error);
         } else if (scope === scopeRef.current) {
-          await handleError(error, "save_forms", retry, {
-            step: "forms",
-            baseRevision,
-            localForms: content
-          });
+          await handleError(
+            error,
+            "save_forms",
+            retry,
+            {
+              step: "forms",
+              baseRevision,
+              localForms: content
+            },
+            intent === "complete"
+          );
         }
         return false;
       } finally {
         done();
       }
     },
-    [applyCanonical, handleEntryArchived, handleError, markPending, requests]
+    [
+      applyCanonical,
+      handleEntryArchived,
+      handleError,
+      markPending,
+      replaceStepIssues,
+      requests
+    ]
   );
 
   const previewFormsImpact = useCallback(
@@ -812,6 +859,11 @@ function V3WordCreationSession({
           })
         );
         if (result.accepted && scope === scopeRef.current) {
+          if (intent === "complete") {
+            // meanings 完成成功隐含服务端已认可 forms 完成态（后端仅在内容
+            // 通过完成校验时保留 completed_steps），两步的滞留 issues 一并失效
+            replaceStepIssues(["forms", "meanings"], []);
+          }
           applyCanonical(result.value.word, "meanings");
           if (intent === "complete") {
             setActiveStepState(
@@ -830,11 +882,17 @@ function V3WordCreationSession({
         ) {
           await handleEntryArchived(error);
         } else if (scope === scopeRef.current) {
-          await handleError(error, "save_meanings", retry, {
-            step: "meanings",
-            baseRevision,
-            localMeanings: content
-          });
+          await handleError(
+            error,
+            "save_meanings",
+            retry,
+            {
+              step: "meanings",
+              baseRevision,
+              localMeanings: content
+            },
+            intent === "complete"
+          );
         }
       } finally {
         done();
@@ -847,6 +905,7 @@ function V3WordCreationSession({
       handleEntryArchived,
       handleError,
       markPending,
+      replaceStepIssues,
       requests,
       saveFormsContent
     ]
@@ -1078,6 +1137,7 @@ function V3WordCreationSession({
         setDraftMeaningsState(nextMeanings.draft);
         updateDirty("meanings", false);
       }
+      setPublicationIssues([]);
       setProblem(undefined);
       setConflict(undefined);
       clearPreviewState();

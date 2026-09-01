@@ -1202,7 +1202,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(
       screen.getByText(
-        "已按最近一次发布检查结果标出对应字段；修改后请重新检查以更新状态。"
+        "已按最近一次校验结果标出对应字段；修改后重新完成本步或重新检查发布条件以更新状态。"
       )
     ).toBeInTheDocument();
 
