@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "5b663450fb5ad4257713aae579e8c8255aaa1b0fa65f1a9871fbe44ebe0f45d1",
+  "_source_sha256": "783b68b87747a824bd07278f3a29a4faa9781ea992e2116cc301a0a4ec1fb44b",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -1767,12 +1767,14 @@
         "publication_id",
         "pos_id",
         "base_form_id",
+        "kind",
         "headword",
         "pos",
         "matched_form_id",
         "matched_variant_id",
         "matched_dialect",
         "matched_form_type",
+        "forms",
         "component_usages",
         "matches",
         "senses"
@@ -1785,7 +1787,12 @@
           "maxItems": 100
         },
         "entry_id": { "type": "string", "format": "uuid" },
+        "forms": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceTargetCandidateFormV3" }
+        },
         "headword": { "type": "string" },
+        "kind": { "$ref": "#/$defs/EntryKind" },
         "matched_dialect": { "$ref": "#/$defs/Dialect" },
         "matched_form_id": { "type": "string", "format": "uuid" },
         "matched_form_type": { "$ref": "#/$defs/WordFormTypeV3" },
@@ -2311,6 +2318,18 @@
         "end": { "type": "integer", "minimum": 0 },
         "start": { "type": "integer", "minimum": 0 },
         "surface": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "SentenceTargetCandidateFormV3": {
+      "type": "object",
+      "required": ["form_id", "variant_id", "form_type", "spelling", "dialect"],
+      "properties": {
+        "dialect": { "$ref": "#/$defs/Dialect" },
+        "form_id": { "type": "string", "format": "uuid" },
+        "form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+        "spelling": { "type": "string" },
+        "variant_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },

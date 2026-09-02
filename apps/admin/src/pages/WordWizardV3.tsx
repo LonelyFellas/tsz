@@ -182,10 +182,6 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
     <Flex vertical gap="middle">
       <V3FormsAndPronunciationStep
         activePosId={context.activePosId}
-        entryKind={context.word.kind}
-        sentenceTargetDiscoveryEnabled={
-          context.word.capabilities.sentence_target_discovery === true
-        }
         issues={context.issues.filter((issue) => issue.step === "forms")}
         onActivePosChange={(posId) => {
           resetConfirmation();
@@ -335,6 +331,7 @@ function V3MeaningsSlot({
         draftRelationPrebindingEnabled={
           context.word.capabilities.draft_relation_prebinding === true
         }
+        entryKind={context.word.kind}
         forms={context.draftForms}
         issues={context.issues.filter((issue) => issue.step === "meanings")}
         onActivePosChange={context.setActivePosId}

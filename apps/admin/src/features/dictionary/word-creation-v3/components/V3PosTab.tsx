@@ -5,7 +5,6 @@ import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
-  WordEntryKindV3,
   WordPosFormsV3
 } from "@tsz/types";
 import {
@@ -44,8 +43,6 @@ export interface V3PosTabProps {
   onChange: (next: DraftFormsStepContentV3) => void;
   posCatalog?: PartOfSpeechCatalogItem;
   stableVariantIds?: V3StableVariantIdFactory;
-  entryKind?: WordEntryKindV3;
-  sentenceTargetDiscoveryEnabled?: boolean;
 }
 
 export function V3PosTab({
@@ -55,9 +52,7 @@ export function V3PosTab({
   idFactory,
   onChange,
   posCatalog,
-  stableVariantIds,
-  entryKind = "word",
-  sentenceTargetDiscoveryEnabled = true
+  stableVariantIds
 }: V3PosTabProps) {
   const [pendingGroupDeletion, setPendingGroupDeletion] = useState<{
     groupId: string;
@@ -324,7 +319,6 @@ export function V3PosTab({
           {visibleGroups.map((group, index) => (
             <V3FormGroupCard
               content={content}
-              entryKind={entryKind}
               deleteDisabled={deletingGroupRemovesLastForm(group.id)}
               dialectControl={
                 visibleGroups.length > 1 ? (
@@ -348,7 +342,6 @@ export function V3PosTab({
               onMove={(offset) => moveGroup(index, offset)}
               pos={pos}
               posCatalog={posCatalog}
-              sentenceTargetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
             />
           ))}
         </Space>
