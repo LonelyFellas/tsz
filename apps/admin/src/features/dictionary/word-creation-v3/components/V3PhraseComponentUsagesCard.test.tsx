@@ -326,7 +326,8 @@ describe("V3PhraseComponentUsagesCard", () => {
                   variant_id: "variant-give",
                   form_type: "base",
                   spelling: "give",
-                  dialect: "common"
+                  dialect: "common",
+                  base_form_ids: ["form-give"]
                 }
               ],
               matches: [],
@@ -380,7 +381,8 @@ describe("V3PhraseComponentUsagesCard", () => {
                   variant_id: "variant-give",
                   form_type: "base",
                   spelling: "give",
-                  dialect: "common"
+                  dialect: "common",
+                  base_form_ids: ["form-give"]
                 }
               ],
               matches: [],
@@ -474,14 +476,16 @@ describe("V3PhraseComponentUsagesCard", () => {
                   variant_id: "variant-give",
                   form_type: "base",
                   spelling: "give",
-                  dialect: "common"
+                  dialect: "common",
+                  base_form_ids: ["form-give"]
                 },
                 {
                   form_id: "form-give-past",
                   variant_id: "variant-give-past",
                   form_type: "past_tense",
                   spelling: "gave",
-                  dialect: "common"
+                  dialect: "common",
+                  base_form_ids: ["base-give"]
                 }
               ],
               matches: [],
@@ -570,6 +574,53 @@ describe("V3PhraseComponentUsagesCard", () => {
     );
   });
 
+  it("没有可搭配原形的词形不进候选（V2 目标或未挂变化组）", async () => {
+    resolveSentenceTargets.mockResolvedValue({
+      range_results: [
+        {
+          source_segments: [{ start: 0, end: 4, surface: "give" }],
+          published_matches: [
+            {
+              entry_id: "entry-give",
+              publication_id: "pub-give",
+              pos_id: "pos-give",
+              base_form_id: "base-give",
+              kind: "word",
+              headword: "give",
+              pos: "verb",
+              matched_form_id: "form-give",
+              matched_variant_id: "variant-give",
+              matched_dialect: "common",
+              matched_form_type: "base",
+              component_usages: [],
+              matches: [],
+              forms: [
+                {
+                  form_id: "form-give",
+                  variant_id: "variant-give",
+                  form_type: "base",
+                  spelling: "give",
+                  dialect: "common",
+                  base_form_ids: []
+                }
+              ],
+              senses: [{ sense_id: "sense-give-1", gloss: "给；交给" }]
+            }
+          ]
+        }
+      ]
+    });
+    render(
+      <V3PhraseComponentUsagesCard
+        forms={makeForms()}
+        onFormsChange={vi.fn()}
+        posId="pos-1"
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
+    expect(await screen.findByText("没有匹配的已发布词条")).toBeInTheDocument();
+  });
+
   it("候选词形层展示全词形并标注命中行", async () => {
     resolveSentenceTargets.mockResolvedValue({
       range_results: [
@@ -595,14 +646,16 @@ describe("V3PhraseComponentUsagesCard", () => {
                   variant_id: "variant-give",
                   form_type: "base",
                   spelling: "give",
-                  dialect: "common"
+                  dialect: "common",
+                  base_form_ids: ["form-give"]
                 },
                 {
                   form_id: "form-give-past",
                   variant_id: "variant-give-past",
                   form_type: "past_tense",
                   spelling: "gave",
-                  dialect: "common"
+                  dialect: "common",
+                  base_form_ids: ["base-give"]
                 }
               ],
               matches: [],
