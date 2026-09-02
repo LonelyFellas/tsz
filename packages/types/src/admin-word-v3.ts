@@ -399,6 +399,8 @@ export interface SentenceTargetCandidateFormV3 {
   form_type: WordFormTypeV3;
   spelling: string;
   dialect: Dialect;
+  /** 该词形可搭配的原形 id（同组或自身即原形）；为空表示不可作成分目标。 */
+  base_form_ids: string[];
 }
 
 export interface PublishedSentenceTargetCandidateV3 {

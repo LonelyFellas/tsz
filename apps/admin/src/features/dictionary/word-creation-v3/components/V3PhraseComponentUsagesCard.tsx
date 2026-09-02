@@ -243,6 +243,8 @@ function CascaderLinkContent({
             const posLabel = partOfSpeechLabel(candidate.pos);
             // 词形层来自候选的全词形清单；resolve 命中的那一行标「命中」。
             for (const form of candidate.forms) {
+              // 没有可搭配原形的词形不可作成分目标（V2 发布的目标、或未挂进变化组）。
+              if (form.base_form_ids.length === 0) continue;
               const formKey = `${candidate.entry_id}#${candidate.pos_id}#${form.form_id}#${form.variant_id}`;
               let formGroup = entry.formGroups.find(
                 (item) => item.formKey === formKey
@@ -278,11 +280,13 @@ function CascaderLinkContent({
                     // 发布/词性/原形以词义自带的为准：候选层的值只对命中词形成立。
                     target_publication_id: sense.publication_id,
                     target_pos_id: sense.pos_id,
-                    // 后端要求所选词形与原形同组；选中原形自身时该约束天然成立。
-                    target_base_form_id:
-                      form.form_type === "base"
-                        ? form.form_id
-                        : sense.base_form_id,
+                    // 后端要求所选词形与原形同组：候选词形自带可搭配的原形清单，
+                    // 词义自带的原形在清单内就沿用，否则取清单里的任意一个。
+                    target_base_form_id: form.base_form_ids.includes(
+                      sense.base_form_id
+                    )
+                      ? sense.base_form_id
+                      : form.base_form_ids[0]!,
                     target_sense_id: sense.sense_id,
                     target_form_id: form.form_id,
                     target_variant_id: form.variant_id,

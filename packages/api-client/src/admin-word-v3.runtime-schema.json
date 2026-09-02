@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "783b68b87747a824bd07278f3a29a4faa9781ea992e2116cc301a0a4ec1fb44b",
+  "_source_sha256": "7596eede1a86d62543dd5b3d652594ca93e6e5d49df4bc5625960f401e8a5789",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -1789,7 +1789,8 @@
         "entry_id": { "type": "string", "format": "uuid" },
         "forms": {
           "type": "array",
-          "items": { "$ref": "#/$defs/SentenceTargetCandidateFormV3" }
+          "items": { "$ref": "#/$defs/SentenceTargetCandidateFormV3" },
+          "maxItems": 2000
         },
         "headword": { "type": "string" },
         "kind": { "$ref": "#/$defs/EntryKind" },
@@ -2323,8 +2324,20 @@
     },
     "SentenceTargetCandidateFormV3": {
       "type": "object",
-      "required": ["form_id", "variant_id", "form_type", "spelling", "dialect"],
+      "required": [
+        "form_id",
+        "variant_id",
+        "form_type",
+        "spelling",
+        "dialect",
+        "base_form_ids"
+      ],
       "properties": {
+        "base_form_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "maxItems": 2000
+        },
         "dialect": { "$ref": "#/$defs/Dialect" },
         "form_id": { "type": "string", "format": "uuid" },
         "form_type": { "$ref": "#/$defs/WordFormTypeV3" },

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-02T03:58:22.756Z",
+  "_generatedAt": "2026-09-02T12:04:18.695Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2948,7 +2948,11 @@
         "gloss"
       ],
       "properties": {
-        "base_form_id": { "type": "string", "format": "uuid" },
+        "base_form_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "与候选行的 base_form_id 相同：词义挂在词性下而不挂在变化组下，这里只是原样带出，\n改选词形时同样以词形自带的 base_form_ids 为准。"
+        },
         "gloss": { "type": "string" },
         "level": { "type": "string" },
         "pos_id": { "type": "string", "format": "uuid" },
@@ -2977,7 +2981,11 @@
         "senses"
       ],
       "properties": {
-        "base_form_id": { "type": "string", "format": "uuid" },
+        "base_form_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "命中词形（matched_form_id）所属的原形，标明这条候选的身份：命中词形挂在几个原形下就\n出几条候选，跨组去重。它不表示可用作短语成分——能不能选、配哪个 base，一律以\nforms[].base_form_ids 为准（V2 发布的目标该列表恒为空，这里却仍有值）。"
+        },
         "component_usages": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/PhraseComponentUsageV3" },
@@ -2989,7 +2997,8 @@
           "items": {
             "$ref": "#/components/schemas/SentenceTargetCandidateFormV3"
           },
-          "description": "该词性下全部词形变体的清单，供改选屈折形之外的词形。"
+          "description": "该词性下全部词形变体的清单，供改选屈折形之外的词形。",
+          "maxItems": 2000
         },
         "headword": { "type": "string" },
         "kind": { "$ref": "#/components/schemas/EntryKind" },

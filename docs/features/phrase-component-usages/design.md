@@ -74,11 +74,17 @@ N 份重复视图，且需要后端新增 sense 维度。
 3. **候选补全词形清单 `forms`**：级联第二层列出目标词条全部词形，命中行标「命中」，
    管理员可改选屈折形之外的词形。
 
-已知契约缺口（留待后续）：`SentenceTargetCandidateFormV3` 没有 per-form 的所属变化组
-信息，而后端要求 `target_form_id` 与 `target_base_form_id` 同组。前端的处理是：选中原形
-行时以该原形自身作 `target_base_form_id`（天然同组），其余取词义自带的 `base_form_id`。
-目标词条含多个变化组（多原形）时，跨组改选仍会被后端 422 拒绝——需要后端在候选词形上
-补出所属原形后才能根治。
+契约缺口已由后端 #86 补齐（2026-09-02）：`SentenceTargetCandidateFormV3` 新增
+`base_form_ids`——该词形可搭配的全部原形 id。前端据此选 `target_base_form_id`：词义自带
+的原形在清单内就沿用，否则取清单里任意一个；清单为空表示该词形不可作成分目标（目标来自
+V2 发布，或词形没挂进任何带原形的变化组），直接不进候选。跨变化组改选词形被 422 的问题
+就此关闭。
+
+> 部署顺序：该字段在后端为**必填**，而前端 runtime schema 对候选对象是
+> `additionalProperties: false`。前端未同步契约快照时，带此字段的后端一上线会让
+> `sentence-targets/resolve` 整体解码失败（成分用词与多维例句的句中目标发现同时不可用）。
+> 本仓已 `sync:openapi` 跟进（源 sha `7596eede…`）。后端此后每次改动 spec，前端都须先
+> 同步再部署。
 
 ## 复用与约定
 
