@@ -393,18 +393,28 @@ export interface SentenceTargetSenseV3 {
   gloss: string;
 }
 
+export interface SentenceTargetCandidateFormV3 {
+  form_id: string;
+  variant_id: string;
+  form_type: WordFormTypeV3;
+  spelling: string;
+  dialect: Dialect;
+}
+
 export interface PublishedSentenceTargetCandidateV3 {
   entry_id: string;
   publication_id: string;
   pos_id: string;
   base_form_id: string;
   headword: string;
+  kind: WordEntryKindV3;
   pos: string;
   matched_form_id: string;
   matched_variant_id: string;
   matched_dialect: Dialect;
   matched_form_type: WordFormTypeV3;
   component_usages: PhraseComponentUsageV3[];
+  forms: SentenceTargetCandidateFormV3[];
   matches: SentenceTargetMatchEvidenceV3[];
   senses: SentenceTargetSenseV3[];
 }

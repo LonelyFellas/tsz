@@ -45,6 +45,7 @@ import type {
   StepSaveIntent,
   V3DraftValidationIssue,
   WordDefinitionV3,
+  WordEntryKindV3,
   WordRelationWritableV3,
   WordSentenceAssociationV3,
   WordSentenceTranslationV3,
@@ -70,6 +71,7 @@ import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
 import { V3AddBasicPosSelect } from "./components/V3AddBasicPosSelect";
+import { V3PhraseComponentUsagesCard } from "./components/V3PhraseComponentUsagesCard";
 import {
   V3MultidimensionalSentenceDrawer,
   type V3MultidimensionalSentenceSaveDraft
@@ -93,6 +95,7 @@ export interface V3MeaningsAndExamplesStepProps {
   partOfSpeechCatalogPending?: boolean;
   onFormsChange?: (next: DraftFormsStepContentV3) => void;
   onActivePosChange?: (posId: string) => void;
+  entryKind?: WordEntryKindV3;
   idFactory?: () => string;
   relationDisplaySnapshots?: RelationDisplaySnapshots;
   sentenceAssociations?: Readonly<
@@ -1578,6 +1581,7 @@ export function V3MeaningsAndExamplesStep({
   partOfSpeechCatalogPending = false,
   onFormsChange,
   onActivePosChange,
+  entryKind,
   idFactory = newWordNodeId,
   relationDisplaySnapshots,
   sentenceAssociations = {},
@@ -1821,6 +1825,15 @@ export function V3MeaningsAndExamplesStep({
                       posIndex={posIndex}
                       spellingMode={spellingModeForPos(forms, pos.pos_id)}
                     />
+
+                    {entryKind === "phrase" ? (
+                      <V3PhraseComponentUsagesCard
+                        discoveryEnabled={sentenceTargetDiscoveryEnabled}
+                        forms={forms}
+                        onFormsChange={onFormsChange}
+                        posId={pos.pos_id}
+                      />
+                    ) : null}
 
                     <div
                       className="word-sense-list"

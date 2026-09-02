@@ -1,9 +1,7 @@
-import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
-import { Alert, Button, Flex, Input, Select, Tag, Typography } from "antd";
+import { Flex, Input, Select, Tag, Typography } from "antd";
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
-  PhraseComponentUsageV3,
   V3DraftValidationIssue,
   WordCommonFormVariantV3,
   WordConcreteFormV3,
@@ -12,7 +10,6 @@ import type {
   WordUsFormVariantV3
 } from "@tsz/types";
 import type { CSSProperties, ReactNode } from "react";
-import { useMemo, useState } from "react";
 import {
   unifyUkUsSpelling,
   updateConcreteFormType,
@@ -20,7 +17,6 @@ import {
   type V3IdFactory
 } from "../operations";
 import { dialectLabel, formTypeLabel } from "../presentation";
-import { createV3WordRequests } from "../api";
 import { V3PronunciationList } from "./V3PronunciationList";
 
 function replaceForm(
@@ -54,257 +50,6 @@ export interface V3ConcreteFormRowProps {
   showMatrixHeader?: boolean;
   lastRow?: boolean;
   actions?: ReactNode;
-  entryKind?: "word" | "phrase";
-  sentenceTargetDiscoveryEnabled?: boolean;
-}
-
-type V3FormVariant =
-  WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3;
-
-function updateVariantComponents(
-  content: DraftFormsStepContentV3,
-  variantId: string,
-  components: PhraseComponentUsageV3[]
-) {
-  const next = structuredClone(content);
-  for (const pos of next.pos) {
-    for (const form of pos.forms) {
-      const variants =
-        form.regional_variants.mode === "common"
-          ? [form.regional_variants.common]
-          : [form.regional_variants.uk, form.regional_variants.us];
-      const variant = variants.find((item) => item.id === variantId);
-      if (variant) {
-        variant.component_usages = components;
-        return next;
-      }
-    }
-  }
-  throw new Error(`variant not found: ${variantId}`);
-}
-
-function V3PhraseComponentEditor({
-  content,
-  variant,
-  idFactory,
-  onChange,
-  targetDiscoveryEnabled
-}: {
-  content: DraftFormsStepContentV3;
-  variant: V3FormVariant;
-  idFactory: V3IdFactory;
-  onChange: (next: DraftFormsStepContentV3) => void;
-  targetDiscoveryEnabled: boolean;
-}) {
-  const components = variant.component_usages ?? [];
-  const requests = useMemo(() => createV3WordRequests(), []);
-  const [lookup, setLookup] = useState<{
-    componentId: string;
-    pending: boolean;
-    message?: string;
-    options: Array<{
-      key: string;
-      label: string;
-      value: Extract<PhraseComponentUsageV3, { state: "resolved" }>;
-    }>;
-  }>();
-  const change = (next: PhraseComponentUsageV3[]) =>
-    onChange(updateVariantComponents(content, variant.id, next));
-  const findMeanings = async (component: PhraseComponentUsageV3) => {
-    if (!targetDiscoveryEnabled) return;
-    const literal = component.literal.trim();
-    if (!literal) return;
-    setLookup({ componentId: component.id, pending: true, options: [] });
-    try {
-      const response = await requests.resolveSentenceTargets({
-        schema_version: 3,
-        sentence_text: literal,
-        source_dialect: variant.dialect,
-        mode: "selected_segments",
-        selected_segments: [
-          { start: 0, end: Array.from(literal).length, surface: literal }
-        ],
-        include_drafts: false,
-        page_size_per_range: 50
-      });
-      const options = response.range_results.flatMap((range) =>
-        range.published_matches.flatMap((candidate) => {
-          if (
-            !candidate.matched_form_id ||
-            !candidate.matched_variant_id ||
-            !candidate.matched_dialect ||
-            !candidate.matched_form_type
-          )
-            return [];
-          return candidate.senses.map((sense) => ({
-            key: `${candidate.entry_id}:${candidate.publication_id}:${sense.sense_id}:${candidate.matched_variant_id}`,
-            label: `${candidate.headword} · ${sense.gloss || "暂无释义"} · ${dialectLabel(candidate.matched_dialect!)} · ${formTypeLabel(candidate.matched_form_type!)}`,
-            value: {
-              state: "resolved" as const,
-              id: component.id,
-              literal,
-              target_word_id: candidate.entry_id,
-              target_publication_id: candidate.publication_id,
-              target_pos_id: candidate.pos_id,
-              target_base_form_id: candidate.base_form_id,
-              target_sense_id: sense.sense_id,
-              target_form_id: candidate.matched_form_id!,
-              target_variant_id: candidate.matched_variant_id!,
-              target_dialect: candidate.matched_dialect!,
-              target_form_type: candidate.matched_form_type!,
-              target_headword: candidate.headword,
-              target_gloss: sense.gloss
-            }
-          }));
-        })
-      );
-      setLookup({
-        componentId: component.id,
-        pending: false,
-        options,
-        message:
-          options.length === 0
-            ? "未找到可关联的已发布词义；当前成分将继续保留为待选择状态。"
-            : undefined
-      });
-    } catch {
-      setLookup({
-        componentId: component.id,
-        pending: false,
-        options: [],
-        message: "词义查询失败，请稍后重试；当前编辑内容未丢失。"
-      });
-    }
-  };
-  return (
-    <Flex
-      className="v3-phrase-component-editor"
-      gap="small"
-      vertical
-      style={{
-        borderTop: "1px solid #e8edf5",
-        marginTop: 12,
-        paddingTop: 12
-      }}
-    >
-      <Flex align="center" justify="space-between">
-        <div>
-          <Typography.Text strong>成分用词</Typography.Text>
-          <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
-            仅属于当前{dialectLabel(variant.dialect)}词形
-          </Typography.Text>
-        </div>
-        <Button
-          aria-label={`为${variant.spelling || "当前词形"}添加成分用词`}
-          icon={<PlusOutlined />}
-          onClick={() =>
-            change([
-              ...components,
-              { state: "unresolved", id: idFactory(), literal: "" }
-            ])
-          }
-          size="small"
-          type="text"
-        >
-          添 加
-        </Button>
-      </Flex>
-      {components.length === 0 ? (
-        <Typography.Text type="secondary">
-          暂无成分；可分别配置英式与美式短语中的组成单词。
-        </Typography.Text>
-      ) : (
-        components.map((component, index) => (
-          <Flex gap={4} key={component.id} vertical>
-            <Flex align="center" gap="small">
-              <Input
-                aria-label={`第${index + 1}个成分用词`}
-                onChange={(event) =>
-                  change(
-                    components.map((item) =>
-                      item.id === component.id
-                        ? item.state === "resolved"
-                          ? {
-                              state: "unresolved",
-                              id: item.id,
-                              literal: event.target.value
-                            }
-                          : { ...item, literal: event.target.value }
-                        : item
-                    )
-                  )
-                }
-                placeholder="输入组成单词"
-                value={component.literal}
-              />
-              <Tag color={component.state === "resolved" ? "green" : "gold"}>
-                {component.state === "resolved" ? "已关联词义" : "待选择词义"}
-              </Tag>
-              <Button
-                disabled={!targetDiscoveryEnabled}
-                loading={lookup?.componentId === component.id && lookup.pending}
-                onClick={() => void findMeanings(component)}
-                size="small"
-              >
-                {component.state === "resolved" ? "更换词义" : "查找词义"}
-              </Button>
-              <Button
-                aria-label={`删除第${index + 1}个成分用词`}
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() =>
-                  change(components.filter((item) => item.id !== component.id))
-                }
-                size="small"
-                type="text"
-              />
-            </Flex>
-            {component.state === "resolved" ? (
-              <Typography.Text type="secondary">
-                {component.target_headword} ·{" "}
-                {component.target_gloss || "暂无释义"} ·{" "}
-                {dialectLabel(component.target_dialect)} ·{" "}
-                {formTypeLabel(component.target_form_type)}
-              </Typography.Text>
-            ) : null}
-            {lookup?.componentId === component.id && lookup.options.length ? (
-              <Select
-                aria-label={`选择第${index + 1}个成分的词义`}
-                onChange={(key) => {
-                  const selected = lookup.options.find(
-                    (option) => option.key === key
-                  );
-                  if (!selected) return;
-                  change(
-                    components.map((item) =>
-                      item.id === component.id ? selected.value : item
-                    )
-                  );
-                  setLookup(undefined);
-                }}
-                options={lookup.options.map((option) => ({
-                  value: option.key,
-                  label: option.label
-                }))}
-                placeholder="选择已发布词义"
-                showSearch
-              />
-            ) : null}
-            {lookup?.componentId === component.id && lookup.message ? (
-              <Alert showIcon title={lookup.message} type="info" />
-            ) : null}
-          </Flex>
-        ))
-      )}
-      {!targetDiscoveryEnabled ? (
-        <Alert
-          showIcon
-          title="当前未开启词义查询，仍可手工维护成分用词并保存。"
-          type="info"
-        />
-      ) : null}
-    </Flex>
-  );
 }
 
 interface V3ConcreteFormTypeCellProps {
@@ -386,8 +131,6 @@ interface V3DialectFormCellProps {
   dialect: "uk" | "us";
   lastRow?: boolean;
   narrowGridRow?: number;
-  entryKind?: "word" | "phrase";
-  sentenceTargetDiscoveryEnabled?: boolean;
 }
 
 function V3DialectFormCell({
@@ -400,9 +143,7 @@ function V3DialectFormCell({
   onChange,
   dialect,
   lastRow,
-  narrowGridRow,
-  entryKind = "word",
-  sentenceTargetDiscoveryEnabled = true
+  narrowGridRow
 }: V3DialectFormCellProps) {
   if (form.regional_variants.mode !== "uk_us") return null;
   const variant = form.regional_variants[dialect];
@@ -447,15 +188,6 @@ function V3DialectFormCell({
           onChange={onChange}
           variant={variant}
         />
-        {entryKind === "phrase" ? (
-          <V3PhraseComponentEditor
-            content={content}
-            idFactory={idFactory}
-            onChange={onChange}
-            targetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
-            variant={variant}
-          />
-        ) : null}
       </Flex>
     </div>
   );
@@ -476,9 +208,7 @@ export function V3ConcreteFormRow({
   onChange,
   showMatrixHeader = true,
   lastRow = true,
-  actions,
-  entryKind = "word",
-  sentenceTargetDiscoveryEnabled = true
+  actions
 }: V3ConcreteFormRowProps) {
   const variants: Array<
     WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3
@@ -592,15 +322,6 @@ export function V3ConcreteFormRow({
                   onChange={onChange}
                   variant={commonVariant}
                 />
-                {entryKind === "phrase" ? (
-                  <V3PhraseComponentEditor
-                    content={content}
-                    idFactory={idFactory}
-                    onChange={onChange}
-                    targetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
-                    variant={commonVariant}
-                  />
-                ) : null}
               </div>
             </div>
           </div>
@@ -641,15 +362,6 @@ export function V3ConcreteFormRow({
                       onChange={onChange}
                       variant={variant}
                     />
-                    {entryKind === "phrase" ? (
-                      <V3PhraseComponentEditor
-                        content={content}
-                        idFactory={idFactory}
-                        onChange={onChange}
-                        targetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
-                        variant={variant}
-                      />
-                    ) : null}
                   </div>
                 )
               )}
@@ -668,8 +380,6 @@ export function V3ConcreteFormRow({
               key={variant.id}
               lastRow={lastRow}
               onChange={onChange}
-              sentenceTargetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
-              entryKind={entryKind}
             />
           ))
         )}
@@ -696,9 +406,7 @@ export function V3DialectSeparatedFormMatrix({
   rows,
   issues,
   idFactory,
-  onChange,
-  entryKind = "word",
-  sentenceTargetDiscoveryEnabled = true
+  onChange
 }: {
   content: DraftFormsStepContentV3;
   dialectRules: DialectRulesV3;
@@ -706,8 +414,6 @@ export function V3DialectSeparatedFormMatrix({
   issues: readonly V3DraftValidationIssue[];
   idFactory: V3IdFactory;
   onChange: (next: DraftFormsStepContentV3) => void;
-  entryKind?: "word" | "phrase";
-  sentenceTargetDiscoveryEnabled?: boolean;
 }) {
   const columnStyle = {
     "--v3-row-span": rows.length + 1
@@ -771,13 +477,11 @@ export function V3DialectSeparatedFormMatrix({
               form={row.form}
               formLabel={row.formLabel}
               idFactory={idFactory}
-              entryKind={entryKind}
               issues={issues}
               key={row.form.id}
               lastRow={index === rows.length - 1}
               narrowGridRow={index * 2 + (dialect === "uk" ? 3 : 4)}
               onChange={onChange}
-              sentenceTargetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
             />
           ))}
         </section>

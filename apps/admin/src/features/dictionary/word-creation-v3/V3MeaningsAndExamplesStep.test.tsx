@@ -307,6 +307,65 @@ describe("V3MeaningsAndExamplesStep", () => {
   beforeEach(() => {
     relatedSearchAny.mockImplementation(defaultRelatedSearchImplementation);
   });
+
+  it("短语在词性 tab 内渲染成分用词卡片，单词不渲染", () => {
+    const forms: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "verb",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
+          forms: [
+            {
+              id: "form-base",
+              form_type: "base",
+              regional_variants: {
+                mode: "common",
+                common: {
+                  id: "variant-common",
+                  dialect: "common",
+                  spelling: "give up",
+                  origin: "manual",
+                  pronunciations: []
+                }
+              }
+            }
+          ],
+          form_groups: []
+        }
+      ]
+    };
+    const { rerender } = render(
+      <AntApp>
+        <V3MeaningsAndExamplesStep
+          entryKind="phrase"
+          forms={forms}
+          onChange={vi.fn()}
+          onFormsChange={vi.fn()}
+          value={structuredClone(meaningsFixture)}
+        />
+      </AntApp>
+    );
+    expect(screen.getByText("成分用词")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "关联第 1 个词 give" })
+    ).toBeInTheDocument();
+    rerender(
+      <AntApp>
+        <V3MeaningsAndExamplesStep
+          entryKind="word"
+          forms={forms}
+          onChange={vi.fn()}
+          onFormsChange={vi.fn()}
+          value={structuredClone(meaningsFixture)}
+        />
+      </AntApp>
+    );
+    expect(screen.queryByText("成分用词")).toBeNull();
+  });
   it("Step 3 仅列出未添加词性，并复用 forms 创建规则后切换到新 POS", () => {
     const forms: DraftFormsStepContentV3 = {
       pos: [

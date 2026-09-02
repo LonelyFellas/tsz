@@ -6,9 +6,12 @@ import type {
   PronunciationStyle,
   RetiredStableNodeV3,
   TextOriginV3,
+  WordCommonFormVariantV3,
   WordConcreteFormV3,
   WordFormTypeV3,
-  WordPronunciationV3
+  WordPronunciationV3,
+  WordUkFormVariantV3,
+  WordUsFormVariantV3
 } from "@tsz/types";
 import { newWordNodeId } from "../word-model/primitives";
 
@@ -495,10 +498,13 @@ export function unifyUkUsSpelling(
   };
 }
 
-export function updateVariantSpelling(
+/** 在草稿副本里定位变体并就地改写；找不到抛错，与其余写操作的约定一致。 */
+function mutateVariant(
   content: DraftFormsStepContentV3,
   variantId: string,
-  spelling: string
+  mutate: (
+    variant: WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3
+  ) => void
 ): DraftFormsStepContentV3 {
   const next = clone(content);
   for (const pos of next.pos) {
@@ -509,12 +515,32 @@ export function updateVariantSpelling(
           : [form.regional_variants.uk, form.regional_variants.us];
       const variant = variants.find((item) => item.id === variantId);
       if (variant) {
-        variant.spelling = spelling;
+        mutate(variant);
         return next;
       }
     }
   }
   throw new Error(`variant not found: ${variantId}`);
+}
+
+export function updateVariantSpelling(
+  content: DraftFormsStepContentV3,
+  variantId: string,
+  spelling: string
+): DraftFormsStepContentV3 {
+  return mutateVariant(content, variantId, (variant) => {
+    variant.spelling = spelling;
+  });
+}
+
+export function updateVariantComponentUsages(
+  content: DraftFormsStepContentV3,
+  variantId: string,
+  componentUsages: PhraseComponentUsageV3[]
+): DraftFormsStepContentV3 {
+  return mutateVariant(content, variantId, (variant) => {
+    variant.component_usages = componentUsages;
+  });
 }
 
 export function updateConcreteFormType(
