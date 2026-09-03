@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import type {
   DraftFormsStepContentV3,
   PhraseComponentUsageV3
@@ -51,6 +52,51 @@ function resolvedUsage(overrides: Partial<ResolvedUsage> = {}): ResolvedUsage {
 function selectionOf(usage: ResolvedUsage) {
   const { id: _id, literal: _literal, ...target } = usage;
   return target;
+}
+
+/** 通用词条 give 的候选：一条 common 词形 + 一条已发布词义。 */
+function giveEntryResponse() {
+  return {
+    total: 1,
+    truncated: false,
+    matches: [
+      {
+        entry_id: "entry-give",
+        publication_id: "pub-give",
+        pos_id: "pos-give",
+        base_form_id: "form-give",
+        headword: "give",
+        kind: "word" as const,
+        pos: "verb",
+        matched_form_id: "form-give",
+        matched_variant_id: "variant-give",
+        matched_dialect: "common" as const,
+        matched_form_type: "base" as const,
+        component_usages: [],
+        forms: [
+          {
+            form_id: "form-give",
+            variant_id: "variant-give",
+            form_type: "base" as const,
+            spelling: "give",
+            dialect: "common" as const,
+            base_form_ids: ["form-give"]
+          }
+        ],
+        matches: [],
+        senses: [
+          {
+            sense_id: "sense-give-1",
+            publication_id: "pub-give",
+            pos_id: "pos-give",
+            base_form_id: "form-give",
+            level: "A1",
+            gloss: "给；交给"
+          }
+        ]
+      }
+    ]
+  };
 }
 
 /** 英美区分的候选：词形层每种类型有 uk / us 两条，用来验证按偏好只留一侧。 */
@@ -818,8 +864,92 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(
       baseElement.querySelector(".ant-cascader-menu-item-content")!
     );
-    // 偏好是英式，但美式那条已有关联，必须一并列出才能取消勾选
+    // 偏好是英式，但美式那条已有关联，必须一并列出才能取消勾选；
+    // 例外放行的那条要标出方言，否则两侧拼写相同时会是两行一模一样
     expect(await screen.findByText("原形 colour")).toBeInTheDocument();
-    expect(screen.getByText("原形 color")).toBeInTheDocument();
+    expect(screen.getByText("原形 color（美式）")).toBeInTheDocument();
+  });
+
+  it("取消非偏好侧的存量关联后，该词形仍留在列表里可以回勾", async () => {
+    dialectPreference.current = "uk";
+    searchComponentTargets.mockResolvedValue(distinguishedColourResponse());
+    const usage = resolvedUsage({
+      target_word_id: "entry-colour",
+      target_publication_id: "pub-colour",
+      target_pos_id: "pos-colour",
+      target_base_form_id: "form-colour-us",
+      target_sense_id: "sense-colour",
+      target_form_id: "form-colour-us",
+      target_variant_id: "variant-colour-us",
+      target_dialect: "us",
+      target_form_type: "base",
+      target_headword: "colour"
+    });
+    function Harness() {
+      const [forms, setForms] = useState(() => makeForms([usage]));
+      return (
+        <V3PhraseComponentUsagesCard
+          forms={forms}
+          onFormsChange={setForms}
+          posId="pos-1"
+        />
+      );
+    }
+    const { baseElement } = render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
+    await waitFor(() =>
+      expect(baseElement.querySelector(".ant-cascader-checkbox")).not.toBeNull()
+    );
+    fireEvent.click(
+      baseElement.querySelector(".ant-cascader-menu-item-content")!
+    );
+    fireEvent.click(await screen.findByText("原形 color（美式）"));
+    const checked = await screen.findByText("颜色");
+    fireEvent.click(checked);
+    // 取消后该行不能消失：keep-set 若跟着 targets 走，误点就再也回勾不了
+    expect(screen.getByText("原形 color（美式）")).toBeInTheDocument();
+  });
+
+  it("正在编辑的词条自身不进候选（后端不许自指）", async () => {
+    searchComponentTargets.mockResolvedValue(giveEntryResponse());
+    const { baseElement } = render(
+      <V3PhraseComponentUsagesCard
+        forms={makeForms()}
+        onFormsChange={vi.fn()}
+        posId="pos-1"
+        wordId="entry-give"
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
+    await waitFor(() =>
+      expect(screen.getByText("没有匹配的已发布词条")).toBeInTheDocument()
+    );
+    expect(baseElement.querySelector(".ant-cascader-checkbox")).toBeNull();
+  });
+
+  it("命中被截断且候选全被过滤时，提示换关键字而不是说没有匹配", async () => {
+    searchComponentTargets.mockResolvedValue({
+      total: 120,
+      truncated: true,
+      matches: [
+        {
+          ...giveEntryResponse().matches[0]!,
+          senses: []
+        }
+      ]
+    });
+    render(
+      <V3PhraseComponentUsagesCard
+        forms={makeForms()}
+        onFormsChange={vi.fn()}
+        posId="pos-1"
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
+    expect(
+      await screen.findByText(
+        "前 50 条命中里没有可关联的已发布词条，请换更具体的关键字"
+      )
+    ).toBeInTheDocument();
   });
 });

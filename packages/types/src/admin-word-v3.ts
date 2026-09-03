@@ -447,6 +447,8 @@ export interface SearchComponentTargetsV3Input {
   /** 只要单词或只要短语；不传则两者都返回。 */
   kind?: WordEntryKindV3;
   page_size?: number;
+  /** 上一页返回的 `next_cursor`；换了关键字/kind 或词面数据变动后即失效（400 invalid_query）。 */
+  cursor?: string;
 }
 
 export interface SearchComponentTargetsV3Response {
@@ -458,8 +460,10 @@ export interface SearchComponentTargetsV3Response {
   matches: PublishedSentenceTargetCandidateV3[];
   /** 扫描窗口内命中的候选总数；`truncated` 为 true 时是下界，不是全库命中数。 */
   total: number;
-  /** 还有未返回的候选：超过 page_size，或触到后端扫描上限。 */
+  /** 还有未返回的候选：有下一页（同时给出 `next_cursor`），或触到后端扫描上限（此时无 `next_cursor`）。 */
   truncated: boolean;
+  /** 还有下一页时返回；下一页用相同的 `q` / `kind` / `page_size` 携带此值。 */
+  next_cursor?: string;
 }
 
 export interface ResolveSentenceTargetsV3Response {

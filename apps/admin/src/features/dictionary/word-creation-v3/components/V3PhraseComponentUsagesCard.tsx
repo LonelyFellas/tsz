@@ -30,7 +30,11 @@ import { createV3WordRequests } from "../api";
 import { updateVariantComponentUsages } from "../operations";
 import { sentenceTokens } from "../tokens";
 import { newWordNodeId } from "../../word-model/primitives";
-import { formTypeLabel, partOfSpeechLabel } from "../presentation";
+import {
+  dialectLabel,
+  formTypeLabel,
+  partOfSpeechLabel
+} from "../presentation";
 import "./V3SentenceTargetDiscovery.css";
 
 type ResolvedUsage = Extract<PhraseComponentUsageV3, { state: "resolved" }>;
@@ -198,10 +202,15 @@ function leafKeyOf(target: ResolvedTarget): string {
 function groupsFromCandidates(
   candidates: readonly PublishedSentenceTargetCandidateV3[],
   preference: AdminDialectPreference,
-  keepVariantIds: ReadonlySet<string>
+  keepVariantIds: ReadonlySet<string>,
+  selfEntryId?: string
 ): CandidateEntryGroup[] {
   const byEntry = new Map<string, CandidateEntryGroup>();
   for (const candidate of candidates) {
+    // 关键字是包含匹配，正在编辑的短语自己也会命中；后端不许自指，
+    // 留着只会让用户选完在保存时被拒。
+    if (selfEntryId !== undefined && candidate.entry_id === selfEntryId)
+      continue;
     // 无已发布词义的候选无从关联；留着会渲染出可勾选却写不出数据的空节点。
     if (candidate.senses.length === 0) continue;
     const entry: CandidateEntryGroup = byEntry.get(candidate.entry_id) ?? {
@@ -229,8 +238,12 @@ function groupsFromCandidates(
       if (!formGroup) {
         formGroup = {
           formKey,
-          // 只剩一侧，方言后缀没有区分作用，不再显示。
-          formLabel: `${formTypeLabel(form.form_type)} ${form.spelling}`,
+          // 正常只剩一侧，方言后缀没有区分作用。但存量关联会把非偏好侧也放行，
+          // 两侧拼写相同时不标方言就成了两行一模一样。
+          formLabel:
+            form.dialect === "common" || form.dialect === preference
+              ? `${formTypeLabel(form.form_type)} ${form.spelling}`
+              : `${formTypeLabel(form.form_type)} ${form.spelling}（${dialectLabel(form.dialect)}）`,
           posLabel,
           matched:
             hasEvidence &&
@@ -276,18 +289,21 @@ function groupsFromCandidates(
 function CascaderLinkContent({
   literal,
   targets,
-  onReplace
+  onReplace,
+  selfEntryId
 }: {
   literal: string;
   targets: readonly ResolvedTarget[];
   onReplace: (next: ResolvedTarget[]) => void;
+  selfEntryId?: string;
 }) {
   const requests = useMemo(() => createV3WordRequests(), []);
   const { preference } = useDialectPreference();
   // 存量关联所在的词形变体：过滤时要放行，否则非偏好侧的旧关联无法解除。
-  const selectedVariantIds = useMemo(
-    () => new Set(targets.map((target) => target.target_variant_id)),
-    [targets]
+  // 取打开那一刻的快照——跟着 targets 走的话，取消勾选会让该行当场从级联里消失，
+  // 误点无法回勾。面板每次打开都按 key 重挂，所以快照不会过期。
+  const [selectedVariantIds] = useState(
+    () => new Set(targets.map((target) => target.target_variant_id))
   );
   // 只存原始候选。分组依赖 targets 与方言偏好，放在渲染期算——挂进取数依赖里会让
   // 每次勾选（targets 换身份）都重打一次后端。
@@ -332,8 +348,13 @@ function CascaderLinkContent({
 
   const groups = useMemo(
     () =>
-      groupsFromCandidates(state.candidates, preference, selectedVariantIds),
-    [preference, selectedVariantIds, state.candidates]
+      groupsFromCandidates(
+        state.candidates,
+        preference,
+        selectedVariantIds,
+        selfEntryId
+      ),
+    [preference, selectedVariantIds, selfEntryId, state.candidates]
   );
   const options = useMemo(() => cascaderOptionsFromGroups(groups), [groups]);
   const selectionByLeaf = useMemo(() => {
@@ -380,7 +401,12 @@ function CascaderLinkContent({
   if (options.length === 0) {
     return (
       <Empty
-        description="没有匹配的已发布词条"
+        description={
+          // 命中被截断时不能只说「没有匹配」：可用的候选可能落在窗口之外。
+          state.truncated
+            ? "前 50 条命中里没有可关联的已发布词条，请换更具体的关键字"
+            : "没有匹配的已发布词条"
+        }
         image={Empty.PRESENTED_IMAGE_SIMPLE}
       />
     );
@@ -415,12 +441,15 @@ export function V3PhraseComponentUsagesCard({
   posId,
   forms,
   onFormsChange,
-  discoveryEnabled = true
+  discoveryEnabled = true,
+  wordId
 }: {
   posId: string;
   forms?: DraftFormsStepContentV3;
   onFormsChange?: (next: DraftFormsStepContentV3) => void;
   discoveryEnabled?: boolean;
+  /** 正在编辑的词条，用于把自身从候选里排除。 */
+  wordId?: string;
 }) {
   const located = useMemo(
     () => locateBaseVariant(forms, posId),
@@ -497,6 +526,7 @@ export function V3PhraseComponentUsagesCard({
                     key={`${index}:${openNonce}`}
                     literal={token}
                     onReplace={(replaced) => replaceLiteral(token, replaced)}
+                    selfEntryId={wordId}
                     targets={targets}
                   />
                 }

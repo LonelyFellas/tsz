@@ -601,6 +601,9 @@ describe("admin word V3/Any runtime decoder", () => {
     };
 
     expect(decodeSearchComponentTargetsV3Response(response)).toBe(response);
+    // 命中超过 page_size 时后端附带 next_cursor：可选字段，严格 schema 必须放行
+    const paged = { ...response, truncated: true, next_cursor: "c1" };
+    expect(decodeSearchComponentTargetsV3Response(paged)).toBe(paged);
     expect(() =>
       decodeSearchComponentTargetsV3Response({
         ...response,

@@ -1832,6 +1832,7 @@ export function V3MeaningsAndExamplesStep({
                         forms={forms}
                         onFormsChange={onFormsChange}
                         posId={pos.pos_id}
+                        wordId={wordId}
                       />
                     ) : null}
 

@@ -322,6 +322,9 @@ function V3MeaningsSlot({
   ) => {
     if (preparingRef.current) return;
     preparingRef.current = true;
+    // 每次保存都从干净状态重来：上一轮的提示条留到这一轮，会和当前结果对不上。
+    setSurfaceBlocked(false);
+    setPendingIntent(undefined);
     try {
       if (context.dirtySteps.forms) {
         const impact = await context.actions.previewFormsSaveImpact();
@@ -333,7 +336,6 @@ function V3MeaningsSlot({
           return;
         }
         if (impact.requires_confirmation) {
-          setSurfaceBlocked(false);
           setPendingIntent(intent);
           return;
         }
@@ -417,10 +419,7 @@ function V3MeaningsSlot({
           action={
             <Flex gap="small">
               <Button onClick={() => setPendingIntent(undefined)}>取 消</Button>
-              <Button
-                loading={context.isPending("save_forms")}
-                onClick={() => void confirmAndSave()}
-              >
+              <Button onClick={() => void confirmAndSave()}>
                 {pendingIntent === "complete"
                   ? "确认影响并完成"
                   : "确认影响并保存草稿"}
@@ -486,6 +485,7 @@ function V3MeaningsSlot({
         sentenceAssociations={sentenceAssociationSnapshots(context.word)}
         sentenceTargetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
         saving={
+          context.isPending("impact") ||
           context.isPending("save_forms") ||
           context.isPending("save_meanings") ||
           context.isPending("save_sentence_associations")
