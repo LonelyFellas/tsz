@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "15c0797225ee09df098517c93bd658e97e130788ba5c3b2389007cb3dc007335",
+  "_source_sha256": "fc2175858b79bbbf40c8a3c890abce4564d01077375c00ad92fd461af8b254af",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -377,6 +377,7 @@
           "$ref": "#/$defs/PronunciationNormalizationVersionV3"
         },
         "publication": { "$ref": "#/$defs/V3PublicationCapability" },
+        "sense_component_usages": { "type": "boolean" },
         "sentence_associations": { "type": "boolean" },
         "sentence_target_discovery": { "type": "boolean" }
       },
@@ -1778,7 +1779,6 @@
         "matched_dialect",
         "matched_form_type",
         "forms",
-        "component_usages",
         "matches",
         "senses"
       ],
@@ -2431,6 +2431,11 @@
       ],
       "properties": {
         "base_form_id": { "type": "string", "format": "uuid" },
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PhraseComponentUsageV3" },
+          "maxItems": 100
+        },
         "gloss": { "type": "string" },
         "level": { "type": "string" },
         "pos_id": { "type": "string", "format": "uuid" },
@@ -3165,7 +3170,14 @@
         "node_binding_changed",
         "meanings_storage_unsafe",
         "pos_meanings_required",
-        "sense_has_inbound_publication_refs"
+        "sense_has_inbound_publication_refs",
+        "phrase_component_not_allowed",
+        "phrase_component_limit_exceeded",
+        "phrase_component_literal_invalid",
+        "phrase_component_self_target",
+        "phrase_component_target_unavailable",
+        "phrase_component_target_nested",
+        "phrase_component_target_stale"
       ]
     },
     "WordBaseFormSlotV2": {
@@ -3182,14 +3194,7 @@
     },
     "WordCommonFormVariantV3": {
       "type": "object",
-      "required": [
-        "id",
-        "dialect",
-        "spelling",
-        "origin",
-        "pronunciations",
-        "component_usages"
-      ],
+      "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
         "component_usages": {
           "type": "array",
@@ -3843,6 +3848,11 @@
         "relations"
       ],
       "properties": {
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PhraseComponentUsageV3" },
+          "maxItems": 100
+        },
         "definitions": {
           "type": "array",
           "items": { "$ref": "#/$defs/WordDefinitionV3" },
@@ -4110,14 +4120,7 @@
     },
     "WordUkFormVariantV3": {
       "type": "object",
-      "required": [
-        "id",
-        "dialect",
-        "spelling",
-        "origin",
-        "pronunciations",
-        "component_usages"
-      ],
+      "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
         "component_usages": {
           "type": "array",
@@ -4138,14 +4141,7 @@
     },
     "WordUsFormVariantV3": {
       "type": "object",
-      "required": [
-        "id",
-        "dialect",
-        "spelling",
-        "origin",
-        "pronunciations",
-        "component_usages"
-      ],
+      "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
         "component_usages": {
           "type": "array",
