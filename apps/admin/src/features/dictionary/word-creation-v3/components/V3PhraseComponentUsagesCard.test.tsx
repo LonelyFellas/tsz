@@ -10,11 +10,19 @@ import {
   V3PhraseComponentUsagesCard
 } from "./V3PhraseComponentUsagesCard";
 
-const resolveSentenceTargets = vi.fn();
+const searchComponentTargets = vi.fn();
 
 vi.mock("../api", () => ({
   createV3WordRequests: () => ({
-    resolveSentenceTargets: (input: unknown) => resolveSentenceTargets(input)
+    searchComponentTargets: (input: unknown) => searchComponentTargets(input)
+  })
+}));
+
+const dialectPreference = { current: "uk" as "uk" | "us" };
+vi.mock("@/features/settings/useDialectPreference", () => ({
+  useDialectPreference: () => ({
+    preference: dialectPreference.current,
+    savePreference: vi.fn()
   })
 }));
 
@@ -43,6 +51,59 @@ function resolvedUsage(overrides: Partial<ResolvedUsage> = {}): ResolvedUsage {
 function selectionOf(usage: ResolvedUsage) {
   const { id: _id, literal: _literal, ...target } = usage;
   return target;
+}
+
+/** 英美区分的候选：词形层每种类型有 uk / us 两条，用来验证按偏好只留一侧。 */
+function distinguishedColourResponse() {
+  return {
+    total: 1,
+    truncated: false,
+    matches: [
+      {
+        entry_id: "entry-colour",
+        publication_id: "pub-colour",
+        pos_id: "pos-colour",
+        base_form_id: "form-colour-uk",
+        headword: "colour",
+        kind: "word" as const,
+        pos: "noun",
+        matched_form_id: "form-colour-uk",
+        matched_variant_id: "variant-colour-uk",
+        matched_dialect: "uk" as const,
+        matched_form_type: "base" as const,
+        component_usages: [],
+        forms: [
+          {
+            form_id: "form-colour-uk",
+            variant_id: "variant-colour-uk",
+            form_type: "base" as const,
+            spelling: "colour",
+            dialect: "uk" as const,
+            base_form_ids: ["form-colour-uk"]
+          },
+          {
+            form_id: "form-colour-us",
+            variant_id: "variant-colour-us",
+            form_type: "base" as const,
+            spelling: "color",
+            dialect: "us" as const,
+            base_form_ids: ["form-colour-us"]
+          }
+        ],
+        matches: [],
+        senses: [
+          {
+            sense_id: "sense-colour",
+            publication_id: "pub-colour",
+            pos_id: "pos-colour",
+            base_form_id: "form-colour-uk",
+            level: "A1",
+            gloss: "颜色"
+          }
+        ]
+      }
+    ]
+  };
 }
 
 function makeForms(
@@ -210,7 +271,8 @@ describe("rebuildUsages", () => {
 
 describe("V3PhraseComponentUsagesCard", () => {
   beforeEach(() => {
-    resolveSentenceTargets.mockReset();
+    searchComponentTargets.mockReset();
+    dialectPreference.current = "uk";
   });
 
   it("按拼写渲染可点击单词并回显已关联状态", () => {
@@ -269,11 +331,11 @@ describe("V3PhraseComponentUsagesCard", () => {
     expect(
       screen.getByRole("button", { name: "关联第 1 个词 give" })
     ).toBeDisabled();
-    expect(resolveSentenceTargets).not.toHaveBeenCalled();
+    expect(searchComponentTargets).not.toHaveBeenCalled();
   });
 
   it("查询失败时提示错误且不改动已有关联", async () => {
-    resolveSentenceTargets.mockRejectedValueOnce(new Error("offline"));
+    searchComponentTargets.mockRejectedValueOnce(new Error("offline"));
     const onFormsChange = vi.fn();
     render(
       <V3PhraseComponentUsagesCard
@@ -289,7 +351,11 @@ describe("V3PhraseComponentUsagesCard", () => {
   });
 
   it("无候选时显示空态", async () => {
-    resolveSentenceTargets.mockResolvedValueOnce({ range_results: [] });
+    searchComponentTargets.mockResolvedValueOnce({
+      matches: [],
+      total: 0,
+      truncated: false
+    });
     render(
       <V3PhraseComponentUsagesCard
         forms={makeForms()}
@@ -302,38 +368,35 @@ describe("V3PhraseComponentUsagesCard", () => {
   });
 
   it("候选没有已发布词义时不产生可勾选节点", async () => {
-    resolveSentenceTargets.mockResolvedValueOnce({
-      range_results: [
+    searchComponentTargets.mockResolvedValueOnce({
+      total: 1,
+      truncated: false,
+      matches: [
         {
-          source_segments: [{ start: 0, end: 4, surface: "give" }],
-          published_matches: [
+          entry_id: "entry-give",
+          publication_id: "pub-give",
+          pos_id: "pos-give",
+          base_form_id: "base-give",
+          headword: "give",
+          kind: "word",
+          pos: "verb",
+          matched_form_id: "form-give",
+          matched_variant_id: "variant-give",
+          matched_dialect: "common",
+          matched_form_type: "base",
+          component_usages: [],
+          forms: [
             {
-              entry_id: "entry-give",
-              publication_id: "pub-give",
-              pos_id: "pos-give",
-              base_form_id: "base-give",
-              headword: "give",
-              kind: "word",
-              pos: "verb",
-              matched_form_id: "form-give",
-              matched_variant_id: "variant-give",
-              matched_dialect: "common",
-              matched_form_type: "base",
-              component_usages: [],
-              forms: [
-                {
-                  form_id: "form-give",
-                  variant_id: "variant-give",
-                  form_type: "base",
-                  spelling: "give",
-                  dialect: "common",
-                  base_form_ids: ["form-give"]
-                }
-              ],
-              matches: [],
-              senses: []
+              form_id: "form-give",
+              variant_id: "variant-give",
+              form_type: "base",
+              spelling: "give",
+              dialect: "common",
+              base_form_ids: ["form-give"]
             }
-          ]
+          ],
+          matches: [],
+          senses: []
         }
       ]
     });
@@ -357,45 +420,42 @@ describe("V3PhraseComponentUsagesCard", () => {
       target_word_id: "entry-archived",
       target_sense_id: "sense-archived"
     });
-    resolveSentenceTargets.mockResolvedValueOnce({
-      range_results: [
+    searchComponentTargets.mockResolvedValueOnce({
+      total: 1,
+      truncated: false,
+      matches: [
         {
-          source_segments: [{ start: 0, end: 4, surface: "give" }],
-          published_matches: [
+          entry_id: "entry-give",
+          publication_id: "pub-give",
+          pos_id: "pos-give",
+          base_form_id: "base-give",
+          headword: "give",
+          kind: "word",
+          pos: "verb",
+          matched_form_id: "form-give",
+          matched_variant_id: "variant-give",
+          matched_dialect: "common",
+          matched_form_type: "base",
+          component_usages: [],
+          forms: [
             {
-              entry_id: "entry-give",
+              form_id: "form-give",
+              variant_id: "variant-give",
+              form_type: "base",
+              spelling: "give",
+              dialect: "common",
+              base_form_ids: ["form-give"]
+            }
+          ],
+          matches: [],
+          senses: [
+            {
+              sense_id: "sense-give-1",
               publication_id: "pub-give",
               pos_id: "pos-give",
               base_form_id: "base-give",
-              headword: "give",
-              kind: "word",
-              pos: "verb",
-              matched_form_id: "form-give",
-              matched_variant_id: "variant-give",
-              matched_dialect: "common",
-              matched_form_type: "base",
-              component_usages: [],
-              forms: [
-                {
-                  form_id: "form-give",
-                  variant_id: "variant-give",
-                  form_type: "base",
-                  spelling: "give",
-                  dialect: "common",
-                  base_form_ids: ["form-give"]
-                }
-              ],
-              matches: [],
-              senses: [
-                {
-                  sense_id: "sense-give-1",
-                  publication_id: "pub-give",
-                  pos_id: "pos-give",
-                  base_form_id: "base-give",
-                  level: "A1",
-                  gloss: "给；交给"
-                }
-              ]
+              level: "A1",
+              gloss: "给；交给"
             }
           ]
         }
@@ -452,61 +512,58 @@ describe("V3PhraseComponentUsagesCard", () => {
   });
 
   it("点击单词查询候选，勾选词条后把 resolved 条目写回 forms", async () => {
-    resolveSentenceTargets.mockResolvedValue({
-      range_results: [
+    searchComponentTargets.mockResolvedValue({
+      total: 1,
+      truncated: false,
+      matches: [
         {
-          source_segments: [{ start: 0, end: 4, surface: "give" }],
-          published_matches: [
+          entry_id: "entry-give",
+          publication_id: "pub-give",
+          pos_id: "pos-give",
+          base_form_id: "base-give",
+          headword: "give",
+          kind: "word",
+          pos: "verb",
+          matched_form_id: "form-give",
+          matched_variant_id: "variant-give",
+          matched_dialect: "common",
+          matched_form_type: "base",
+          component_usages: [],
+          forms: [
             {
-              entry_id: "entry-give",
+              form_id: "form-give",
+              variant_id: "variant-give",
+              form_type: "base",
+              spelling: "give",
+              dialect: "common",
+              base_form_ids: ["form-give"]
+            },
+            {
+              form_id: "form-give-past",
+              variant_id: "variant-give-past",
+              form_type: "past_tense",
+              spelling: "gave",
+              dialect: "common",
+              base_form_ids: ["base-give"]
+            }
+          ],
+          matches: [],
+          senses: [
+            {
+              sense_id: "sense-give-1",
               publication_id: "pub-give",
               pos_id: "pos-give",
               base_form_id: "base-give",
-              headword: "give",
-              kind: "word",
-              pos: "verb",
-              matched_form_id: "form-give",
-              matched_variant_id: "variant-give",
-              matched_dialect: "common",
-              matched_form_type: "base",
-              component_usages: [],
-              forms: [
-                {
-                  form_id: "form-give",
-                  variant_id: "variant-give",
-                  form_type: "base",
-                  spelling: "give",
-                  dialect: "common",
-                  base_form_ids: ["form-give"]
-                },
-                {
-                  form_id: "form-give-past",
-                  variant_id: "variant-give-past",
-                  form_type: "past_tense",
-                  spelling: "gave",
-                  dialect: "common",
-                  base_form_ids: ["base-give"]
-                }
-              ],
-              matches: [],
-              senses: [
-                {
-                  sense_id: "sense-give-1",
-                  publication_id: "pub-give",
-                  pos_id: "pos-give",
-                  base_form_id: "base-give",
-                  level: "A1",
-                  gloss: "给；交给"
-                },
-                {
-                  sense_id: "sense-give-2",
-                  publication_id: "pub-give",
-                  pos_id: "pos-give",
-                  base_form_id: "base-give",
-                  level: "B1",
-                  gloss: "举办；提供"
-                }
-              ]
+              level: "A1",
+              gloss: "给；交给"
+            },
+            {
+              sense_id: "sense-give-2",
+              publication_id: "pub-give",
+              pos_id: "pos-give",
+              base_form_id: "base-give",
+              level: "B1",
+              gloss: "举办；提供"
             }
           ]
         }
@@ -522,12 +579,8 @@ describe("V3PhraseComponentUsagesCard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
-      expect(resolveSentenceTargets).toHaveBeenCalledWith(
-        expect.objectContaining({
-          sentence_text: "give",
-          mode: "selected_segments",
-          include_drafts: false
-        })
+      expect(searchComponentTargets).toHaveBeenCalledWith(
+        expect.objectContaining({ schema_version: 3, q: "give" })
       )
     );
     // 逐层下钻到词义叶子：父级（词条/词形）不可勾选，只有词义能选
@@ -575,38 +628,35 @@ describe("V3PhraseComponentUsagesCard", () => {
   });
 
   it("没有可搭配原形的词形不进候选（V2 目标或未挂变化组）", async () => {
-    resolveSentenceTargets.mockResolvedValue({
-      range_results: [
+    searchComponentTargets.mockResolvedValue({
+      total: 1,
+      truncated: false,
+      matches: [
         {
-          source_segments: [{ start: 0, end: 4, surface: "give" }],
-          published_matches: [
+          entry_id: "entry-give",
+          publication_id: "pub-give",
+          pos_id: "pos-give",
+          base_form_id: "base-give",
+          kind: "word",
+          headword: "give",
+          pos: "verb",
+          matched_form_id: "form-give",
+          matched_variant_id: "variant-give",
+          matched_dialect: "common",
+          matched_form_type: "base",
+          component_usages: [],
+          matches: [],
+          forms: [
             {
-              entry_id: "entry-give",
-              publication_id: "pub-give",
-              pos_id: "pos-give",
-              base_form_id: "base-give",
-              kind: "word",
-              headword: "give",
-              pos: "verb",
-              matched_form_id: "form-give",
-              matched_variant_id: "variant-give",
-              matched_dialect: "common",
-              matched_form_type: "base",
-              component_usages: [],
-              matches: [],
-              forms: [
-                {
-                  form_id: "form-give",
-                  variant_id: "variant-give",
-                  form_type: "base",
-                  spelling: "give",
-                  dialect: "common",
-                  base_form_ids: []
-                }
-              ],
-              senses: [{ sense_id: "sense-give-1", gloss: "给；交给" }]
+              form_id: "form-give",
+              variant_id: "variant-give",
+              form_type: "base",
+              spelling: "give",
+              dialect: "common",
+              base_form_ids: []
             }
-          ]
+          ],
+          senses: [{ sense_id: "sense-give-1", gloss: "给；交给" }]
         }
       ]
     });
@@ -622,53 +672,56 @@ describe("V3PhraseComponentUsagesCard", () => {
   });
 
   it("候选词形层展示全词形并标注命中行", async () => {
-    resolveSentenceTargets.mockResolvedValue({
-      range_results: [
+    searchComponentTargets.mockResolvedValue({
+      total: 1,
+      truncated: false,
+      matches: [
         {
-          source_segments: [{ start: 0, end: 4, surface: "give" }],
-          published_matches: [
+          entry_id: "entry-give",
+          publication_id: "pub-give",
+          pos_id: "pos-give",
+          base_form_id: "base-give",
+          headword: "give",
+          kind: "phrase",
+          pos: "verb",
+          matched_form_id: "form-give-past",
+          matched_variant_id: "variant-give-past",
+          matched_dialect: "common",
+          matched_form_type: "past_tense",
+          component_usages: [],
+          forms: [
             {
-              entry_id: "entry-give",
+              form_id: "form-give",
+              variant_id: "variant-give",
+              form_type: "base",
+              spelling: "give",
+              dialect: "common",
+              base_form_ids: ["form-give"]
+            },
+            {
+              form_id: "form-give-past",
+              variant_id: "variant-give-past",
+              form_type: "past_tense",
+              spelling: "gave",
+              dialect: "common",
+              base_form_ids: ["base-give"]
+            }
+          ],
+          matches: [
+            {
+              surface: "give",
+              normalized_surface: "give",
+              match_kind: "word"
+            }
+          ],
+          senses: [
+            {
+              sense_id: "sense-give-1",
               publication_id: "pub-give",
               pos_id: "pos-give",
               base_form_id: "base-give",
-              headword: "give",
-              kind: "phrase",
-              pos: "verb",
-              matched_form_id: "form-give-past",
-              matched_variant_id: "variant-give-past",
-              matched_dialect: "common",
-              matched_form_type: "past_tense",
-              component_usages: [],
-              forms: [
-                {
-                  form_id: "form-give",
-                  variant_id: "variant-give",
-                  form_type: "base",
-                  spelling: "give",
-                  dialect: "common",
-                  base_form_ids: ["form-give"]
-                },
-                {
-                  form_id: "form-give-past",
-                  variant_id: "variant-give-past",
-                  form_type: "past_tense",
-                  spelling: "gave",
-                  dialect: "common",
-                  base_form_ids: ["base-give"]
-                }
-              ],
-              matches: [],
-              senses: [
-                {
-                  sense_id: "sense-give-1",
-                  publication_id: "pub-give",
-                  pos_id: "pos-give",
-                  base_form_id: "base-give",
-                  level: "A1",
-                  gloss: "给；交给"
-                }
-              ]
+              level: "A1",
+              gloss: "给；交给"
             }
           ]
         }
@@ -685,16 +738,88 @@ describe("V3PhraseComponentUsagesCard", () => {
     await waitFor(() =>
       expect(baseElement.querySelector(".ant-cascader-checkbox")).not.toBeNull()
     );
-    // 第一列展示 kind 标签（短语候选与单词同构）
-    expect(screen.getByText("短语")).toBeInTheDocument();
+    // 第一列只展示词面：kind 标签对选择没有帮助，短语候选与单词同构
+    expect(
+      baseElement.querySelector(".ant-cascader-menu-item-content")!.textContent
+    ).toBe("give");
     fireEvent.click(
       baseElement.querySelector(".ant-cascader-menu-item-content")!
     );
     expect(await screen.findByText(/原形 give/)).toBeInTheDocument();
+    // 命中行只靠颜色区分：类名在，文案不在。
     const pastRow = await screen.findByText(/过去式 gave/);
-    expect(pastRow.closest("li")!.textContent).toContain("命中");
-    expect(
-      screen.getByText(/原形 give/).closest("li")!.textContent
-    ).not.toContain("命中");
+    expect(pastRow).toHaveClass("v3-component-usage-matched-form");
+    expect(pastRow.closest("li")!.textContent).not.toContain("命中");
+    expect(screen.getByText(/原形 give/)).not.toHaveClass(
+      "v3-component-usage-matched-form"
+    );
+  });
+  it.each([
+    ["uk", "colour", "color"],
+    ["us", "color", "colour"]
+  ])(
+    "方言偏好为 %s 时词形层只给该侧、且不带方言后缀",
+    async (preference, shown, hidden) => {
+      dialectPreference.current = preference as "uk" | "us";
+      searchComponentTargets.mockResolvedValue(distinguishedColourResponse());
+      const { baseElement } = render(
+        <V3PhraseComponentUsagesCard
+          forms={makeForms()}
+          onFormsChange={vi.fn()}
+          posId="pos-1"
+        />
+      );
+      fireEvent.click(
+        screen.getByRole("button", { name: "关联第 1 个词 give" })
+      );
+      await waitFor(() =>
+        expect(
+          baseElement.querySelector(".ant-cascader-checkbox")
+        ).not.toBeNull()
+      );
+      fireEvent.click(
+        baseElement.querySelector(".ant-cascader-menu-item-content")!
+      );
+      expect(await screen.findByText(`原形 ${shown}`)).toBeInTheDocument();
+      expect(screen.queryByText(`原形 ${hidden}`)).toBeNull();
+      // 只剩一侧，方言后缀没有区分作用
+      expect(baseElement.textContent).not.toContain("BrE");
+      expect(baseElement.textContent).not.toContain("AmE");
+    }
+  );
+
+  it("非偏好侧的存量关联仍出现在词形层，否则解除不了", async () => {
+    dialectPreference.current = "uk";
+    searchComponentTargets.mockResolvedValue(distinguishedColourResponse());
+    const { baseElement } = render(
+      <V3PhraseComponentUsagesCard
+        forms={makeForms([
+          resolvedUsage({
+            target_word_id: "entry-colour",
+            target_publication_id: "pub-colour",
+            target_pos_id: "pos-colour",
+            target_base_form_id: "form-colour-us",
+            target_sense_id: "sense-colour",
+            target_form_id: "form-colour-us",
+            target_variant_id: "variant-colour-us",
+            target_dialect: "us",
+            target_form_type: "base",
+            target_headword: "colour"
+          })
+        ])}
+        onFormsChange={vi.fn()}
+        posId="pos-1"
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
+    await waitFor(() =>
+      expect(baseElement.querySelector(".ant-cascader-checkbox")).not.toBeNull()
+    );
+    fireEvent.click(
+      baseElement.querySelector(".ant-cascader-menu-item-content")!
+    );
+    // 偏好是英式，但美式那条已有关联，必须一并列出才能取消勾选
+    expect(await screen.findByText("原形 colour")).toBeInTheDocument();
+    expect(screen.getByText("原形 color")).toBeInTheDocument();
   });
 });

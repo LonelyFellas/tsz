@@ -53,7 +53,7 @@ export function wordListLabel(record: AdminWordListItemAny): string {
     : record.presentation.label;
 }
 
-/** V3 列表契约没有方言摘要，因此保持未知，不从 matched surfaces 猜测。 */
+/** 两个 schema 的方言摘要都由服务端给出（V3 按词性当前设置聚合），不从 matched surfaces 猜测。 */
 export function wordListDialects(record: AdminWordListItemAny): Dialect[] {
-  return record.schema_version === 2 ? record.dialects : [];
+  return record.dialects;
 }

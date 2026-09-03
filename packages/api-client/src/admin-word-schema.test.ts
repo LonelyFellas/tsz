@@ -28,6 +28,7 @@ import {
   decodePendingSentenceAssociationListResponse,
   decodeRelatedSearchResponseAny,
   decodeResolveSentenceTargetsV3Response,
+  decodeSearchComponentTargetsV3Response,
   decodeSurfaceMatchPageAny,
   decodeSurfaceMatchPageV3
 } from "./admin-word-schema";
@@ -353,6 +354,7 @@ function validAdminWordListItemV3() {
       matched_surfaces: ["colour", "color"],
       strategy_version: "surface_summary_v1"
     },
+    dialects: ["uk", "us"],
     revision: 2,
     lifecycle_revision: 1,
     gloss: "颜色",
@@ -583,6 +585,34 @@ describe("admin word V3/Any runtime decoder", () => {
       decodeResolveSentenceTargetsV3Response({
         ...response,
         schema_version: 4
+      })
+    ).toThrow(InvalidAdminWordResponseError);
+  });
+
+  it("成分目标关键字检索响应完整解码并拒绝未知 schema_version", () => {
+    const candidate = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.PublishedSentenceTargetCandidateV3!
+    );
+    const response = {
+      schema_version: 3,
+      matches: [candidate],
+      total: 1,
+      truncated: false
+    };
+
+    expect(decodeSearchComponentTargetsV3Response(response)).toBe(response);
+    expect(() =>
+      decodeSearchComponentTargetsV3Response({
+        ...response,
+        schema_version: 4
+      })
+    ).toThrow(InvalidAdminWordResponseError);
+    // truncated 是必填布尔：缺了就说明后端契约漂了，必须 fail-closed
+    expect(() =>
+      decodeSearchComponentTargetsV3Response({
+        schema_version: 3,
+        matches: [],
+        total: 0
       })
     ).toThrow(InvalidAdminWordResponseError);
   });

@@ -3,6 +3,7 @@ import { Alert, Button, Flex, Result, Spin, Typography } from "antd";
 import type {
   AdminWordDraftV3Envelope,
   AdminWordV3,
+  DraftMeaningsStepContentWritableV3,
   StepSaveIntent,
   SurfaceMatchEnabledTerminalPageV3,
   SurfaceMatchPageAny,
@@ -308,6 +309,53 @@ function V3MeaningsSlot({
     prefillApplied.current = pendingTarget.associationId;
     context.setDraftMeanings(next);
   }, [context, pendingTarget]);
+  // 词义步里的成分用词卡片会改词形内容，保存时向导要先存脏词形。删除已有成分属于
+  // 下游变更，后端要 confirmed_impact_token，直接 PUT 会 409 downstream_confirmation_required
+  // 而整次保存中止。所以这里和词形步一样：先预览影响，需要确认就把保存挂起等确认。
+  // 只记 intent：确认时用当时的 draftMeanings，快照 content 会把确认期间的编辑丢掉。
+  const [pendingIntent, setPendingIntent] = useState<StepSaveIntent>();
+  const [surfaceBlocked, setSurfaceBlocked] = useState(false);
+  const preparingRef = useRef(false);
+  const saveMeanings = async (
+    content: DraftMeaningsStepContentWritableV3,
+    intent: StepSaveIntent
+  ) => {
+    if (preparingRef.current) return;
+    preparingRef.current = true;
+    try {
+      if (context.dirtySteps.forms) {
+        const impact = await context.actions.previewFormsSaveImpact();
+        if (!impact) return;
+        if (impact.surface_match_page) {
+          // 同形匹配的确认要带 snapshot/policy 上下文，只有词形步的保存入口能透传，
+          // 这里不复制那套状态机，直接把人引回词形步确认。
+          setSurfaceBlocked(true);
+          return;
+        }
+        if (impact.requires_confirmation) {
+          setSurfaceBlocked(false);
+          setPendingIntent(intent);
+          return;
+        }
+      }
+      await context.actions.saveMeanings(content, intent);
+    } finally {
+      preparingRef.current = false;
+    }
+  };
+  const confirmAndSave = async () => {
+    if (!pendingIntent) return;
+    // 影响令牌绑定在预览时那份词形内容上：确认条挂着时又改了词形，令牌就对不上。
+    // 这时静默什么都不做最难排查，改成收起确认条、让用户重新点保存去拿新的预览。
+    if (!context.actions.confirmImpact()) {
+      setPendingIntent(undefined);
+      return;
+    }
+    const intent = pendingIntent;
+    setPendingIntent(undefined);
+    await context.actions.saveMeanings(context.draftMeanings, intent);
+  };
+
   const sentenceAssociationCapability =
     context.word.capabilities.sentence_associations;
   const sentenceAssociationsEnabled =
@@ -326,6 +374,61 @@ function V3MeaningsSlot({
           word={context.word}
         />
       ) : null}
+      {surfaceBlocked ? (
+        <Alert
+          showIcon
+          type="warning"
+          title="词形变更需要在上一步确认"
+          description="本次词形改动触发了同形匹配核对，请回到「词形与发音」保存一次并确认，再回来保存词义。"
+          action={
+            <Flex gap="small">
+              <Button onClick={() => setSurfaceBlocked(false)}>知道了</Button>
+              <Button
+                onClick={() => {
+                  setSurfaceBlocked(false);
+                  context.setActiveStep("forms");
+                }}
+              >
+                去词形与发音
+              </Button>
+            </Flex>
+          }
+        />
+      ) : null}
+      {pendingIntent && context.impact ? (
+        <Alert
+          showIcon
+          type="warning"
+          title="保存前请确认词形影响"
+          description={
+            <Flex vertical gap={4}>
+              <span>{`本次词形变更影响 ${context.impact.affected.length} 个引用节点。`}</span>
+              {context.impact.affected.map((item) => (
+                <Typography.Text
+                  key={`${item.node_type}:${item.node_id}:${item.reason}`}
+                  type="secondary"
+                >
+                  {impactTypeLabel(item.node_type)}：
+                  {impactReasonLabel(item.reason)}
+                </Typography.Text>
+              ))}
+            </Flex>
+          }
+          action={
+            <Flex gap="small">
+              <Button onClick={() => setPendingIntent(undefined)}>取 消</Button>
+              <Button
+                loading={context.isPending("save_forms")}
+                onClick={() => void confirmAndSave()}
+              >
+                {pendingIntent === "complete"
+                  ? "确认影响并完成"
+                  : "确认影响并保存草稿"}
+              </Button>
+            </Flex>
+          }
+        />
+      ) : null}
       <V3MeaningsAndExamplesStep
         activePosId={context.activePosId}
         draftRelationPrebindingEnabled={
@@ -336,9 +439,13 @@ function V3MeaningsSlot({
         issues={context.issues.filter((issue) => issue.step === "meanings")}
         onActivePosChange={context.setActivePosId}
         onChange={context.setDraftMeanings}
-        onFormsChange={context.setDraftForms}
+        onFormsChange={(next) => {
+          // 词形一改，上一轮预览拿到的影响令牌就失效了，先把确认条收起来。
+          setPendingIntent(undefined);
+          context.setDraftForms(next);
+        }}
         onPrevious={() => context.setActiveStep("forms")}
-        onSave={context.actions.saveMeanings}
+        onSave={saveMeanings}
         onSaveMultidimensionalSentence={
           sentenceAssociationsEnabled
             ? (posId, senseId, draft) =>

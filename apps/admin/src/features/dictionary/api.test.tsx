@@ -134,6 +134,7 @@ describe("dictionary React Query hooks", () => {
         matched_surfaces: ["centre", "center"],
         strategy_version: "surface_summary_v1"
       },
+      dialects: ["uk", "us"],
       revision: 2,
       lifecycle_revision: 1,
       gloss: "中心",
