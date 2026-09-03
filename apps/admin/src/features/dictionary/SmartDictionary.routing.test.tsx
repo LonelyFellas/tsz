@@ -85,6 +85,7 @@ describe("智能词库行入口", () => {
         matched_surfaces: ["centre", "center"],
         strategy_version: "surface_summary_v1"
       },
+      dialects: ["uk", "us"],
       revision: 3,
       lifecycle_revision: 1,
       gloss: "中心",
@@ -114,6 +115,7 @@ describe("智能词库行入口", () => {
         matched_surfaces: [],
         strategy_version: "surface_summary_v1"
       },
+      dialects: ["common"],
       revision: 8,
       lifecycle_revision: 3,
       gloss: "",

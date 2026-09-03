@@ -20,6 +20,7 @@ import type {
   FormsImpactResponseV3,
   PendingSentenceAssociationListResponseV3,
   ResolveSentenceTargetsV3Response,
+  SearchComponentTargetsV3Response,
   RelatedSearchResponseAny,
   SurfaceMatchPageAny,
   SurfaceMatchPageV3
@@ -505,6 +506,13 @@ export function decodeResolveSentenceTargetsV3Response(
 ): ResolveSentenceTargetsV3Response {
   assertRuntimeContract("ResolveSentenceTargetsV3Response", value);
   return value as ResolveSentenceTargetsV3Response;
+}
+
+export function decodeSearchComponentTargetsV3Response(
+  value: unknown
+): SearchComponentTargetsV3Response {
+  assertRuntimeContract("SearchComponentTargetsV3Response", value);
+  return value as SearchComponentTargetsV3Response;
 }
 
 export function decodeAdminWordPublicationListResponse(

@@ -462,6 +462,7 @@ function listItem(word: AdminWordV3): AdminWordListItemAny {
     id: word.id,
     kind: "word",
     presentation: structuredClone(word.presentation),
+    dialects: ["uk", "us"],
     revision: word.revision,
     lifecycle_revision: word.lifecycle_revision,
     gloss: "轨道",

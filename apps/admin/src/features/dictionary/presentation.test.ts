@@ -13,6 +13,7 @@ const v3Row = (
   id: "v3-entry",
   kind: "word",
   presentation,
+  dialects: ["uk", "us"],
   revision: 4,
   lifecycle_revision: 2,
   gloss: "中心",
@@ -60,7 +61,7 @@ describe("mixed word list presentation", () => {
     expect(wordListDialects(row)).toEqual(["uk", "us"]);
   });
 
-  it("V3 忠实消费服务端 presentation，不从具体词形猜展示名或方言", () => {
+  it("V3 忠实消费服务端 presentation 与 dialects，不从具体词形猜展示名或方言", () => {
     const row = v3Row({
       label: "legacy: centre · center",
       matched_surfaces: ["centre", "center"],
@@ -68,6 +69,19 @@ describe("mixed word list presentation", () => {
     });
 
     expect(wordListLabel(row)).toBe("legacy: centre · center");
+    expect(wordListDialects(row)).toEqual(["uk", "us"]);
+  });
+
+  it("V3 空白草稿的 dialects 为空数组时保持未知，不落回默认", () => {
+    const row = {
+      ...v3Row({
+        label: "未命名词条",
+        matched_surfaces: [],
+        strategy_version: "short_uuid_v1"
+      }),
+      dialects: []
+    };
+
     expect(wordListDialects(row)).toEqual([]);
   });
 

@@ -13,6 +13,7 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "DetectLexiconResponseAny",
   "PendingSentenceAssociationListResponse",
   "ResolveSentenceTargetsV3Response",
+  "SearchComponentTargetsV3Response",
   "AdminWordPublicationListResponse",
   "AdminWordPublicationEnvelope",
   "DraftValidationIssueAny",

@@ -46,6 +46,7 @@ const ROOTS = [
   "DetectLexiconResponseAny",
   "PendingSentenceAssociationListResponse",
   "ResolveSentenceTargetsV3Response",
+  "SearchComponentTargetsV3Response",
   "AdminWordPublicationListResponse",
   "AdminWordPublicationEnvelope",
   "DraftValidationIssueAny",

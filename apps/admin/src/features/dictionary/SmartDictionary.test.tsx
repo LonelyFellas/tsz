@@ -117,6 +117,7 @@ function v3Word(
       matched_surfaces: ["surface-not-used-as-label"],
       strategy_version: strategyVersion
     },
+    dialects: ["uk", "us"],
     gloss: "V3 释义",
     pos_list: ["noun"],
     levels: ["X9"],
@@ -260,7 +261,7 @@ describe("SmartDictionary", () => {
       strategy_version: "future_strategy_9"
     });
     const v3Row = screen.getByText("服务端 V3 展示名").closest("tr")!;
-    expect(v3Row.querySelectorAll("td")[3]).toHaveTextContent("-");
+    expect(v3Row.querySelectorAll("td")[3]).toHaveTextContent("BrE / AmE");
     expect(v3Row).toHaveTextContent("X9");
     fireEvent.click(v3Row.querySelector("td:last-child button")!);
     expect(screen.getByTestId("location")).toHaveTextContent(

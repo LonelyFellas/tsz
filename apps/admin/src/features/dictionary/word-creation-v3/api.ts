@@ -23,6 +23,7 @@ export type V3WordsApi = Pick<
   | "saveMeaningsStepV3"
   | "replaceSentenceAssociations"
   | "resolveSentenceTargetsV3"
+  | "searchComponentTargetsV3"
   | "listPendingSentenceAssociations"
   | "claimPendingSentenceAssociation"
   | "validateV3"
@@ -191,6 +192,10 @@ export function createV3WordRequests(source: V3WordsApi = api.words) {
       input: Parameters<V3WordsApi["resolveSentenceTargetsV3"]>[0],
       signal?: AbortSignal
     ) => source.resolveSentenceTargetsV3(input, signal),
+    searchComponentTargets: (
+      input: Parameters<V3WordsApi["searchComponentTargetsV3"]>[0],
+      signal?: AbortSignal
+    ) => source.searchComponentTargetsV3(input, signal),
     listPendingSentenceAssociations: (
       targetWordId: string,
       query?: Parameters<V3WordsApi["listPendingSentenceAssociations"]>[1]

@@ -439,6 +439,33 @@ export interface SentenceTargetRangeResultV3 {
   draft_matches: DraftSentenceTargetCandidateV3[];
 }
 
+/** 按关键字检索短语成分目标：对已发布词面做包含匹配，与 resolve 的候选同构。 */
+export interface SearchComponentTargetsV3Input {
+  schema_version: 3;
+  /** 关键字，1..=100 码点且两端不留空白；带空白后端直接 422。 */
+  q: string;
+  /** 只要单词或只要短语；不传则两者都返回。 */
+  kind?: WordEntryKindV3;
+  page_size?: number;
+  /** 上一页返回的 `next_cursor`；换了关键字/kind 或词面数据变动后即失效（400 invalid_query）。 */
+  cursor?: string;
+}
+
+export interface SearchComponentTargetsV3Response {
+  schema_version: 3;
+  /**
+   * 与 resolve 的 `published_matches` 同构。关键字检索没有句子区间，
+   * 每条候选的 `matches` 恒为空数组，前端据此不渲染「命中」标识。
+   */
+  matches: PublishedSentenceTargetCandidateV3[];
+  /** 扫描窗口内命中的候选总数；`truncated` 为 true 时是下界，不是全库命中数。 */
+  total: number;
+  /** 还有未返回的候选：有下一页（同时给出 `next_cursor`），或触到后端扫描上限（此时无 `next_cursor`）。 */
+  truncated: boolean;
+  /** 还有下一页时返回；下一页用相同的 `q` / `kind` / `page_size` 携带此值。 */
+  next_cursor?: string;
+}
+
 export interface ResolveSentenceTargetsV3Response {
   schema_version: 3;
   sentence_hash: string;
@@ -976,6 +1003,11 @@ export interface AdminWordListItemV3 {
   id: string;
   kind: WordEntryKindV3;
   presentation: EntryPresentationV3;
+  /**
+   * 方言摘要，后端按词性**当前**设置聚合：任一词性区分英美拼写 → `["uk", "us"]`，
+   * 否则 `["common"]`；还没有词性的空白草稿为空数组。建条 step 1 的选择只是初始快照。
+   */
+  dialects: Dialect[];
   revision: number;
   lifecycle_revision: number;
   gloss: string;

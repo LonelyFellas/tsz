@@ -213,3 +213,15 @@
     max-width: 100%;
   }
 }
+
+/* 成分用词级联：词条层与词形层只用来展开，勾选只发生在词义叶子上（选项带
+   disableCheckbox，rc-cascader 会给复选框加 -disabled）。留着一个点不动的空框
+   只会让人以为能勾，这里整个隐藏。此面板没有别的禁用态复选框。 */
+.v3-component-usage-cascader .ant-cascader-checkbox-disabled {
+  display: none;
+}
+
+/* resolve 命中的那一行：原来挂一个「命中」标签，占宽且把词形文本挤窄，改成只换文字颜色。 */
+.v3-component-usage-cascader .v3-component-usage-matched-form {
+  color: #d48806;
+}

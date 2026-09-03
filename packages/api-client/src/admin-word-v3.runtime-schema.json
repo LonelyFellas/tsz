@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "7596eede1a86d62543dd5b3d652594ca93e6e5d49df4bc5625960f401e8a5789",
+  "_source_sha256": "15c0797225ee09df098517c93bd658e97e130788ba5c3b2389007cb3dc007335",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -15,6 +15,7 @@
     "DetectLexiconResponseAny",
     "PendingSentenceAssociationListResponse",
     "ResolveSentenceTargetsV3Response",
+    "SearchComponentTargetsV3Response",
     "AdminWordPublicationListResponse",
     "AdminWordPublicationEnvelope",
     "DraftValidationIssueAny",
@@ -126,6 +127,7 @@
         "id",
         "kind",
         "presentation",
+        "dialects",
         "revision",
         "lifecycle_revision",
         "gloss",
@@ -144,6 +146,7 @@
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": { "type": "string", "format": "uuid" },
         "created_by_name": { "type": "string" },
+        "dialects": { "type": "array", "items": { "$ref": "#/$defs/Dialect" } },
         "gloss": { "type": "string" },
         "has_unpublished_changes": { "type": "boolean" },
         "id": { "type": "string", "format": "uuid" },
@@ -2282,6 +2285,21 @@
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
         "value": { "$ref": "#/$defs/RichTextV3" }
+      },
+      "additionalProperties": false
+    },
+    "SearchComponentTargetsV3Response": {
+      "type": "object",
+      "required": ["schema_version", "matches", "total", "truncated"],
+      "properties": {
+        "matches": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/PublishedSentenceTargetCandidateV3" }
+        },
+        "next_cursor": { "type": "string" },
+        "schema_version": { "type": "integer", "enum": [3] },
+        "total": { "type": "integer", "minimum": 0 },
+        "truncated": { "type": "boolean" }
       },
       "additionalProperties": false
     },
