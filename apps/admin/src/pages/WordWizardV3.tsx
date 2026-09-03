@@ -433,6 +433,9 @@ function V3MeaningsSlot({
         draftRelationPrebindingEnabled={
           context.word.capabilities.draft_relation_prebinding === true
         }
+        componentUsagesEnabled={
+          context.word.capabilities.sense_component_usages === true
+        }
         entryKind={context.word.kind}
         forms={context.draftForms}
         issues={context.issues.filter((issue) => issue.step === "meanings")}

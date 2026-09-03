@@ -6,7 +6,8 @@ import type {
 } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  locateBaseVariant,
+  baseSpellingForPos,
+  reachableUsageCount,
   rebuildUsages,
   V3PhraseComponentUsagesCard
 } from "./V3PhraseComponentUsagesCard";
@@ -152,8 +153,8 @@ function distinguishedColourResponse() {
   };
 }
 
+/** 切词锚点只关心 base 词形的拼写；成分数据已挪到释义级，不再挂在变体上。 */
 function makeForms(
-  usages: readonly PhraseComponentUsageV3[] = [],
   mode: "common" | "uk_us" = "common"
 ): DraftFormsStepContentV3 {
   return {
@@ -178,8 +179,7 @@ function makeForms(
                       dialect: "common",
                       spelling: "give up",
                       origin: "manual",
-                      pronunciations: [],
-                      component_usages: [...usages]
+                      pronunciations: []
                     }
                   }
                 : {
@@ -189,13 +189,12 @@ function makeForms(
                       dialect: "uk",
                       spelling: "give up",
                       origin: "manual",
-                      pronunciations: [],
-                      component_usages: [...usages]
+                      pronunciations: []
                     },
                     us: {
                       id: "variant-us",
                       dialect: "us",
-                      spelling: "give up",
+                      spelling: "gib up",
                       origin: "manual",
                       pronunciations: []
                     }
@@ -208,28 +207,53 @@ function makeForms(
   };
 }
 
-describe("locateBaseVariant", () => {
-  it("unified 模式取 common 变体", () => {
-    const located = locateBaseVariant(makeForms([resolvedUsage()]), "pos-1");
-    expect(located).toMatchObject({
-      variantId: "variant-common",
-      spelling: "give up",
-      dialect: "common"
-    });
-    expect(located?.usages).toHaveLength(1);
+describe("baseSpellingForPos", () => {
+  it("unified 模式取 common 变体拼写作切词锚点", () => {
+    expect(baseSpellingForPos(makeForms(), "pos-1")).toBe("give up");
   });
 
-  it("distinguish 模式取 uk 变体", () => {
-    const located = locateBaseVariant(makeForms([], "uk_us"), "pos-1");
-    expect(located).toMatchObject({ variantId: "variant-uk", dialect: "uk" });
-    expect(located?.usages).toEqual([]);
+  it("distinguish 模式取 uk 变体拼写（英美不同时以英式切词）", () => {
+    expect(baseSpellingForPos(makeForms("uk_us"), "pos-1")).toBe("give up");
   });
 
   it("找不到 base 词形时返回 undefined", () => {
     const forms = makeForms();
     forms.pos[0]!.forms[0]!.form_type = "past_tense";
-    expect(locateBaseVariant(forms, "pos-1")).toBeUndefined();
-    expect(locateBaseVariant(undefined, "pos-1")).toBeUndefined();
+    expect(baseSpellingForPos(forms, "pos-1")).toBeUndefined();
+    expect(baseSpellingForPos(undefined, "pos-1")).toBeUndefined();
+  });
+});
+
+describe("reachableUsageCount", () => {
+  it("只数当前拼写里点得到的成分", () => {
+    expect(
+      reachableUsageCount("give up", [
+        resolvedUsage(),
+        resolvedUsage({ id: "usage-up", literal: "up" })
+      ])
+    ).toBe(2);
+  });
+
+  it("拼写改动后落在拼写外的孤儿条目不计数", () => {
+    expect(
+      reachableUsageCount("give up", [
+        resolvedUsage(),
+        resolvedUsage({ id: "usage-stray", literal: "away" })
+      ])
+    ).toBe(1);
+  });
+
+  it("unresolved 存量不计数：它同样点不开也删不掉", () => {
+    const unresolved: PhraseComponentUsageV3 = {
+      state: "unresolved",
+      id: "legacy-unresolved",
+      literal: "give"
+    };
+    expect(reachableUsageCount("give up", [unresolved])).toBe(0);
+  });
+
+  it("没有拼写锚点时为 0", () => {
+    expect(reachableUsageCount(undefined, [resolvedUsage()])).toBe(0);
   });
 });
 
@@ -313,6 +337,17 @@ describe("rebuildUsages", () => {
     ]);
     expect(next.map((usage) => usage.literal)).toEqual(["give", "away"]);
   });
+
+  it("新勾选条目的 id 由注入的 idFactory 生成", () => {
+    const next = rebuildUsages(
+      [],
+      tokens,
+      "give",
+      [selectionOf(resolvedUsage())],
+      () => "fixed-node-id"
+    );
+    expect(next[0]!.id).toBe("fixed-node-id");
+  });
 });
 
 describe("V3PhraseComponentUsagesCard", () => {
@@ -328,9 +363,9 @@ describe("V3PhraseComponentUsagesCard", () => {
     ];
     render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms(usages)}
-        onFormsChange={vi.fn()}
-        posId="pos-1"
+        onUsagesChange={vi.fn()}
+        spelling="give up"
+        usages={usages}
       />
     );
     const giveButton = screen.getByRole("button", {
@@ -341,36 +376,51 @@ describe("V3PhraseComponentUsagesCard", () => {
     expect(
       screen.getByRole("button", { name: "关联第 2 个词 up" })
     ).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByText("2 条")).toBeInTheDocument();
   });
 
   it("没有 base 词形时显示空态引导", () => {
-    const forms = makeForms();
-    forms.pos[0]!.forms = [];
     render(
       <V3PhraseComponentUsagesCard
-        forms={forms}
-        onFormsChange={vi.fn()}
-        posId="pos-1"
+        onUsagesChange={vi.fn()}
+        spelling={undefined}
+        usages={[]}
       />
     );
     expect(screen.getByText("请先在词形步填写短语拼写")).toBeInTheDocument();
   });
 
-  it("缺少 onFormsChange 时单词按钮禁用", () => {
-    render(<V3PhraseComponentUsagesCard forms={makeForms()} posId="pos-1" />);
+  it("缺少 onUsagesChange 时单词按钮禁用（只读）", () => {
+    render(<V3PhraseComponentUsagesCard spelling="give up" usages={[]} />);
     expect(
       screen.getByRole("button", { name: "关联第 1 个词 give" })
     ).toBeDisabled();
+  });
+
+  it("后端不支持释义级成分用词时只读提示并禁用，不发请求", () => {
+    render(
+      <V3PhraseComponentUsagesCard
+        onUsagesChange={vi.fn()}
+        senseComponentUsagesEnabled={false}
+        spelling="give up"
+        usages={[resolvedUsage()]}
+      />
+    );
+    expect(
+      screen.getByText(/当前后端尚不支持释义级成分用词/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "关联第 1 个词 give" })
+    ).toBeDisabled();
+    expect(searchComponentTargets).not.toHaveBeenCalled();
   });
 
   it("后端未开启词义查询时提示能力关闭并禁用编辑，不发请求", () => {
     render(
       <V3PhraseComponentUsagesCard
         discoveryEnabled={false}
-        forms={makeForms([resolvedUsage()])}
-        onFormsChange={vi.fn()}
-        posId="pos-1"
+        onUsagesChange={vi.fn()}
+        spelling="give up"
+        usages={[resolvedUsage()]}
       />
     );
     expect(screen.getByText(/当前后端未开启词义查询能力/)).toBeInTheDocument();
@@ -382,18 +432,20 @@ describe("V3PhraseComponentUsagesCard", () => {
 
   it("查询失败时提示错误且不改动已有关联", async () => {
     searchComponentTargets.mockRejectedValueOnce(new Error("offline"));
-    const onFormsChange = vi.fn();
+    const onUsagesChange = vi.fn();
     render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms([resolvedUsage()])}
-        onFormsChange={onFormsChange}
-        posId="pos-1"
+        onUsagesChange={onUsagesChange}
+        spelling="give up"
+        usages={[resolvedUsage()]}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     expect(await screen.findByText(/词库查询失败/)).toBeInTheDocument();
-    expect(onFormsChange).not.toHaveBeenCalled();
-    expect(screen.getByText("1 条")).toBeInTheDocument();
+    expect(onUsagesChange).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("button", { name: "关联第 1 个词 give" })
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   it("无候选时显示空态", async () => {
@@ -404,9 +456,9 @@ describe("V3PhraseComponentUsagesCard", () => {
     });
     render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms()}
-        onFormsChange={vi.fn()}
-        posId="pos-1"
+        onUsagesChange={vi.fn()}
+        spelling="give up"
+        usages={[]}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
@@ -446,17 +498,17 @@ describe("V3PhraseComponentUsagesCard", () => {
         }
       ]
     });
-    const onFormsChange = vi.fn();
+    const onUsagesChange = vi.fn();
     render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms()}
-        onFormsChange={onFormsChange}
-        posId="pos-1"
+        onUsagesChange={onUsagesChange}
+        spelling="give up"
+        usages={[]}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     expect(await screen.findByText("没有匹配的已发布词条")).toBeInTheDocument();
-    expect(onFormsChange).not.toHaveBeenCalled();
+    expect(onUsagesChange).not.toHaveBeenCalled();
   });
 
   it("候选里查不到的存量关联，勾选其他项时不被静默删除", async () => {
@@ -507,12 +559,12 @@ describe("V3PhraseComponentUsagesCard", () => {
         }
       ]
     });
-    const onFormsChange = vi.fn();
+    const onUsagesChange = vi.fn();
     const { baseElement } = render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms([stale])}
-        onFormsChange={onFormsChange}
-        posId="pos-1"
+        onUsagesChange={onUsagesChange}
+        spelling="give up"
+        usages={[stale]}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
@@ -532,32 +584,36 @@ describe("V3PhraseComponentUsagesCard", () => {
         .closest(".ant-cascader-menu-item")!
         .querySelector(".ant-cascader-checkbox")!
     );
-    await waitFor(() => expect(onFormsChange).toHaveBeenCalled());
-    const nextForms = onFormsChange.mock.calls.at(
+    await waitFor(() => expect(onUsagesChange).toHaveBeenCalled());
+    const written = onUsagesChange.mock.calls.at(
       -1
-    )![0] as DraftFormsStepContentV3;
-    const variants = nextForms.pos[0]!.forms[0]!.regional_variants;
-    const written =
-      variants.mode === "common" ? variants.common.component_usages : [];
-    expect(written?.map((usage) => usage.id)).toEqual(
+    )![0] as PhraseComponentUsageV3[];
+    expect(written.map((usage) => usage.id)).toEqual(
       expect.arrayContaining(["usage-stale"])
     );
     expect(written).toHaveLength(2);
   });
 
-  it("拼写改动后落在拼写外的存量关联不计入角标", () => {
+  it("拼写改动后落在拼写外的存量关联仍随词义保存，只是点不到", () => {
     const stray = resolvedUsage({ id: "usage-stray", literal: "away" });
     render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms([resolvedUsage(), stray])}
-        onFormsChange={vi.fn()}
-        posId="pos-1"
+        onUsagesChange={vi.fn()}
+        spelling="give up"
+        usages={[resolvedUsage(), stray]}
       />
     );
-    expect(screen.getByText("1 条")).toBeInTheDocument();
+    // 孤儿 literal 不在拼写里，没有对应按钮可点；give / up 的状态不受它影响
+    expect(screen.queryByRole("button", { name: /away/ })).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "关联第 1 个词 give" })
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(
+      screen.getByRole("button", { name: "关联第 2 个词 up" })
+    ).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("点击单词查询候选，勾选词条后把 resolved 条目写回 forms", async () => {
+  it("点击单词查询候选，勾选词义后把 resolved 条目回调给释义", async () => {
     searchComponentTargets.mockResolvedValue({
       total: 1,
       truncated: false,
@@ -615,12 +671,12 @@ describe("V3PhraseComponentUsagesCard", () => {
         }
       ]
     });
-    const onFormsChange = vi.fn();
+    const onUsagesChange = vi.fn();
     const { baseElement } = render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms()}
-        onFormsChange={onFormsChange}
-        posId="pos-1"
+        onUsagesChange={onUsagesChange}
+        spelling="give up"
+        usages={[]}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
@@ -646,16 +702,13 @@ describe("V3PhraseComponentUsagesCard", () => {
         .closest(".ant-cascader-menu-item")!
         .querySelector(".ant-cascader-checkbox")!
     );
-    await waitFor(() => expect(onFormsChange).toHaveBeenCalled());
-    const nextForms = onFormsChange.mock.calls.at(
+    await waitFor(() => expect(onUsagesChange).toHaveBeenCalled());
+    const written = onUsagesChange.mock.calls.at(
       -1
-    )![0] as DraftFormsStepContentV3;
-    const variants = nextForms.pos[0]!.forms[0]!.regional_variants;
-    const written =
-      variants.mode === "common" ? variants.common.component_usages : [];
+    )![0] as PhraseComponentUsageV3[];
     // 只写选中的那一个「词形 × 词义」叶子
     expect(written).toHaveLength(1);
-    expect(written![0]).toEqual(
+    expect(written[0]).toEqual(
       expect.objectContaining({
         state: "resolved",
         literal: "give",
@@ -708,9 +761,9 @@ describe("V3PhraseComponentUsagesCard", () => {
     });
     render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms()}
-        onFormsChange={vi.fn()}
-        posId="pos-1"
+        onUsagesChange={vi.fn()}
+        spelling="give up"
+        usages={[]}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
@@ -775,9 +828,9 @@ describe("V3PhraseComponentUsagesCard", () => {
     });
     const { baseElement } = render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms()}
-        onFormsChange={vi.fn()}
-        posId="pos-1"
+        onUsagesChange={vi.fn()}
+        spelling="give up"
+        usages={[]}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
@@ -810,9 +863,9 @@ describe("V3PhraseComponentUsagesCard", () => {
       searchComponentTargets.mockResolvedValue(distinguishedColourResponse());
       const { baseElement } = render(
         <V3PhraseComponentUsagesCard
-          forms={makeForms()}
-          onFormsChange={vi.fn()}
-          posId="pos-1"
+          onUsagesChange={vi.fn()}
+          spelling="give up"
+          usages={[]}
         />
       );
       fireEvent.click(
@@ -839,7 +892,9 @@ describe("V3PhraseComponentUsagesCard", () => {
     searchComponentTargets.mockResolvedValue(distinguishedColourResponse());
     const { baseElement } = render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms([
+        onUsagesChange={vi.fn()}
+        spelling="give up"
+        usages={[
           resolvedUsage({
             target_word_id: "entry-colour",
             target_publication_id: "pub-colour",
@@ -852,9 +907,7 @@ describe("V3PhraseComponentUsagesCard", () => {
             target_form_type: "base",
             target_headword: "colour"
           })
-        ])}
-        onFormsChange={vi.fn()}
-        posId="pos-1"
+        ]}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
@@ -886,12 +939,14 @@ describe("V3PhraseComponentUsagesCard", () => {
       target_headword: "colour"
     });
     function Harness() {
-      const [forms, setForms] = useState(() => makeForms([usage]));
+      const [usages, setUsages] = useState<PhraseComponentUsageV3[]>(() => [
+        usage
+      ]);
       return (
         <V3PhraseComponentUsagesCard
-          forms={forms}
-          onFormsChange={setForms}
-          posId="pos-1"
+          onUsagesChange={setUsages}
+          spelling="give up"
+          usages={usages}
         />
       );
     }
@@ -914,9 +969,9 @@ describe("V3PhraseComponentUsagesCard", () => {
     searchComponentTargets.mockResolvedValue(giveEntryResponse());
     const { baseElement } = render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms()}
-        onFormsChange={vi.fn()}
-        posId="pos-1"
+        onUsagesChange={vi.fn()}
+        spelling="give up"
+        usages={[]}
         wordId="entry-give"
       />
     );
@@ -940,9 +995,9 @@ describe("V3PhraseComponentUsagesCard", () => {
     });
     render(
       <V3PhraseComponentUsagesCard
-        forms={makeForms()}
-        onFormsChange={vi.fn()}
-        posId="pos-1"
+        onUsagesChange={vi.fn()}
+        spelling="give up"
+        usages={[]}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));

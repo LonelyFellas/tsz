@@ -265,7 +265,11 @@ function discoveryResult(
           state: "published",
           senses: candidate.senses.map((sense) => ({
             id: sense.sense_id,
-            gloss: sense.gloss
+            gloss: sense.gloss,
+            // 释义级成分（B1 起）；候选级 componentUsages 保留作回退。
+            ...(sense.component_usages === undefined
+              ? {}
+              : { componentUsages: sense.component_usages })
           })),
           senseTotal: candidate.senses.length
         }));
@@ -624,8 +628,12 @@ function Session({
         target_publication_id: selection.candidate.publicationId!,
         target_form_variant_id: selection.candidate.matchedVariantId!
       });
-      if (selection.candidate.componentUsages?.length) {
-        componentUpdates[associationId] = selection.candidate.componentUsages;
+      const selectedSenseUsages =
+        selection.candidate.senses.find(
+          (sense) => sense.id === selection.senseId
+        )?.componentUsages ?? selection.candidate.componentUsages;
+      if (selectedSenseUsages?.length) {
+        componentUpdates[associationId] = selectedSenseUsages;
       }
     }
     associationsRef.current = next;
@@ -1026,10 +1034,12 @@ function Session({
                       target_publication_id: candidate.publicationId,
                       target_form_variant_id: candidate.matchedVariantId
                     });
-                    if (candidate.componentUsages?.length) {
+                    const senseUsages =
+                      sense.componentUsages ?? candidate.componentUsages;
+                    if (senseUsages?.length) {
                       setAssociationComponents((current) => ({
                         ...current,
-                        [associationId]: candidate.componentUsages!
+                        [associationId]: senseUsages
                       }));
                     }
                   })()

@@ -197,6 +197,15 @@ export function toWritableMeanings(
           ? {}
           : { frequency: sense.frequency }),
         depends_on_context: sense.depends_on_context,
+        // 释义级成分用词是后端 B1 起才返回的可选字段；逐字段重建时必须显式带上，
+        // 否则草稿一进编辑器就丢、再保存一次就把后端清空。
+        ...(sense.component_usages === undefined
+          ? {}
+          : {
+              component_usages: sense.component_usages.map((usage) =>
+                structuredClone(usage)
+              )
+            }),
         definitions: sense.definitions.map(cloneDefinition),
         sentences: sense.sentences.map((sentence) => ({
           id: sentence.id,
@@ -656,4 +665,30 @@ export function replaceEnglishText(
   }
   slot.variant.value = replaceRichText(slot.variant.value, text);
   return next;
+}
+
+/**
+ * 旧后端（capabilities.sense_component_usages 缺失）对 sense 上的未知字段会 400：
+ * 发送前把释义级成分用词整段剥掉，其余内容原样。
+ */
+export function stripSenseComponentUsages(
+  content: DraftMeaningsStepContentWritableV3
+): DraftMeaningsStepContentWritableV3 {
+  if (
+    !content.pos.some((pos) =>
+      pos.senses.some((sense) => sense.component_usages !== undefined)
+    )
+  ) {
+    return content;
+  }
+  return {
+    ...content,
+    pos: content.pos.map((pos) => ({
+      ...pos,
+      senses: pos.senses.map((sense) => {
+        const { component_usages: _dropped, ...rest } = sense;
+        return rest;
+      })
+    }))
+  };
 }

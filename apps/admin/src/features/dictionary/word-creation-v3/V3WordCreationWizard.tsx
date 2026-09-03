@@ -25,7 +25,11 @@ import {
   type V3IssueNavigationAdapter,
   type V3IssueNavigationTarget
 } from "./issueNavigation";
-import { ensureV3MeaningsForForms, toWritableMeanings } from "./meaningsModel";
+import {
+  ensureV3MeaningsForForms,
+  stripSenseComponentUsages,
+  toWritableMeanings
+} from "./meaningsModel";
 import { classifyV3Problem, type V3Problem } from "./problem";
 import {
   createV3SaveFlow,
@@ -855,7 +859,11 @@ function V3WordCreationSession({
             schema_version: 3,
             base_revision: baseRevision,
             intent,
-            content
+            // 释义级成分用词只在后端声明支持时发送（无 dev 放宽）：旧后端会 400。
+            content:
+              flow.canonical().capabilities.sense_component_usages === true
+                ? content
+                : stripSenseComponentUsages(content)
           })
         );
         if (result.accepted && scope === scopeRef.current) {

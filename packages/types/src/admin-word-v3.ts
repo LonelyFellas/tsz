@@ -391,6 +391,8 @@ export interface SentenceTargetSenseV3 {
   base_form_id: string;
   level: string;
   gloss: string;
+  /** 目标释义自己的成分用词（释义级）。B1 起返回；缺失时退回候选级 component_usages。 */
+  component_usages?: PhraseComponentUsageV3[];
 }
 
 export interface SentenceTargetCandidateFormV3 {
@@ -517,6 +519,8 @@ export interface WordSenseV3 {
   definitions: WordDefinitionV3[];
   sentences: WordSentenceV3[];
   relations: WordRelationV3[];
+  /** 短语成分用词（释义级）。后端 B1 起在非空时返回；旧后端不返回。 */
+  component_usages?: PhraseComponentUsageV3[];
 }
 
 export interface WordPosMeaningsV3 {
@@ -565,6 +569,8 @@ export interface WordSenseWritableV3 {
   definitions: WordDefinitionV3[];
   sentences: WordSentenceWritableV3[];
   relations: WordRelationWritableV3[];
+  /** 仅当 capabilities.sense_component_usages === true 时发送。 */
+  component_usages?: PhraseComponentUsageV3[];
 }
 
 export interface WordPosMeaningsWritableV3 {
@@ -608,6 +614,8 @@ export interface AdminWordV3Capabilities {
   sentence_target_discovery?: boolean;
   /** Absent only when talking to a pre-capability backend. */
   draft_relation_prebinding?: boolean;
+  /** 释义级成分用词（B1 起恒 true）；缺失表示后端尚不支持，前端不得发送 sense.component_usages。 */
+  sense_component_usages?: boolean;
 }
 
 export type LegacyHeadwordsCompatibilityV3 =

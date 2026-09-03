@@ -71,7 +71,11 @@ import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
 import { V3AddBasicPosSelect } from "./components/V3AddBasicPosSelect";
-import { V3PhraseComponentUsagesCard } from "./components/V3PhraseComponentUsagesCard";
+import {
+  baseSpellingForPos,
+  reachableUsageCount,
+  V3PhraseComponentUsagesCard
+} from "./components/V3PhraseComponentUsagesCard";
 import {
   V3MultidimensionalSentenceDrawer,
   type V3MultidimensionalSentenceSaveDraft
@@ -110,6 +114,8 @@ export interface V3MeaningsAndExamplesStepProps {
     association: SentenceAssociationInputV3
   ) => void;
   sentenceTargetDiscoveryEnabled?: boolean;
+  /** 后端释义级成分用词能力（capabilities.sense_component_usages）；关闭时成分区块只读、不发送。 */
+  componentUsagesEnabled?: boolean;
   draftRelationPrebindingEnabled?: boolean;
 }
 
@@ -149,7 +155,8 @@ function definitionContentIssue(
 }
 
 type DraftMutation = (draft: DraftMeaningsStepContentWritableV3) => void;
-type SenseSectionKind = "definitions" | "sentences" | "relations";
+type SenseSectionKind =
+  "definitions" | "component_usages" | "sentences" | "relations";
 
 function translationTier(band: SentenceTranslationBandV3): {
   short: string;
@@ -1588,6 +1595,7 @@ export function V3MeaningsAndExamplesStep({
   onSaveMultidimensionalSentence,
   onCreatePendingSentenceTarget,
   sentenceTargetDiscoveryEnabled = true,
+  componentUsagesEnabled = false,
   draftRelationPrebindingEnabled = false
 }: V3MeaningsAndExamplesStepProps) {
   const { modal } = App.useApp();
@@ -1607,11 +1615,16 @@ export function V3MeaningsAndExamplesStep({
     senseId: string;
     sentence?: WordSentenceWritableV3;
   }>();
-  const toggleSenseSection = (senseId: string, section: SenseSectionKind) => {
-    const key = `${senseId}:${section}`;
+  // 取反用的是当前**生效**的折叠态而不是 `current[key]`：成分区块在能力关闭时默认
+  // 折叠，键尚未写入时 `!current[key]` 恒为 true，第一次点击会是无反馈的空操作。
+  const toggleSenseSection = (
+    senseId: string,
+    section: SenseSectionKind,
+    collapsed: boolean
+  ) => {
     setCollapsedSenseSections((current) => ({
       ...current,
-      [key]: !current[key]
+      [`${senseId}:${section}`]: !collapsed
     }));
   };
   const change = (mutation: DraftMutation) => {
@@ -1826,16 +1839,6 @@ export function V3MeaningsAndExamplesStep({
                       spellingMode={spellingModeForPos(forms, pos.pos_id)}
                     />
 
-                    {entryKind === "phrase" ? (
-                      <V3PhraseComponentUsagesCard
-                        discoveryEnabled={sentenceTargetDiscoveryEnabled}
-                        forms={forms}
-                        onFormsChange={onFormsChange}
-                        posId={pos.pos_id}
-                        wordId={wordId}
-                      />
-                    ) : null}
-
                     <div
                       className="word-sense-list"
                       data-v3-field="senses"
@@ -1869,6 +1872,18 @@ export function V3MeaningsAndExamplesStep({
                         );
                         const relationsCollapsed = Boolean(
                           collapsedSenseSections[`${sense.id}:relations`]
+                        );
+                        // 后端未声明能力时区块整体不可编辑，默认折叠：每条释义都摊开
+                        // 一条同样的只读提示加一排点不动的按钮，只会把多维例句挤下去。
+                        const componentUsagesCollapsed =
+                          collapsedSenseSections[
+                            `${sense.id}:component_usages`
+                          ] ?? !componentUsagesEnabled;
+                        const senseComponentUsages =
+                          sense.component_usages ?? [];
+                        const componentSpelling = baseSpellingForPos(
+                          forms,
+                          pos.pos_id
                         );
                         return (
                           <SenseEditorShell
@@ -2084,7 +2099,11 @@ export function V3MeaningsAndExamplesStep({
                                   count={sense.definitions.length}
                                   label="多维释义"
                                   onToggle={() =>
-                                    toggleSenseSection(sense.id, "definitions")
+                                    toggleSenseSection(
+                                      sense.id,
+                                      "definitions",
+                                      definitionsCollapsed
+                                    )
                                   }
                                   unit="条"
                                 />
@@ -2431,6 +2450,54 @@ export function V3MeaningsAndExamplesStep({
                                 </SenseSectionBody>
                               </section>
 
+                              {entryKind === "phrase" ? (
+                                <section
+                                  className={`word-sense-section${componentUsagesCollapsed ? " is-collapsed" : ""}`}
+                                  data-v3-field="component_usages"
+                                  data-v3-node-id={sense.id}
+                                >
+                                  <SenseSectionTitle
+                                    collapsed={componentUsagesCollapsed}
+                                    count={reachableUsageCount(
+                                      componentSpelling,
+                                      senseComponentUsages
+                                    )}
+                                    label="成分用词"
+                                    onToggle={() =>
+                                      toggleSenseSection(
+                                        sense.id,
+                                        "component_usages",
+                                        componentUsagesCollapsed
+                                      )
+                                    }
+                                    unit="条"
+                                  />
+                                  <SenseSectionBody
+                                    collapsed={componentUsagesCollapsed}
+                                  >
+                                    <V3PhraseComponentUsagesCard
+                                      discoveryEnabled={
+                                        sentenceTargetDiscoveryEnabled
+                                      }
+                                      idFactory={idFactory}
+                                      onUsagesChange={(next) =>
+                                        change((draft) => {
+                                          draft.pos[posIndex]!.senses[
+                                            senseIndex
+                                          ]!.component_usages = next;
+                                        })
+                                      }
+                                      senseComponentUsagesEnabled={
+                                        componentUsagesEnabled
+                                      }
+                                      spelling={componentSpelling}
+                                      usages={senseComponentUsages}
+                                      wordId={wordId}
+                                    />
+                                  </SenseSectionBody>
+                                </section>
+                              ) : null}
+
                               <section
                                 className={`word-sense-section${sentencesCollapsed ? " is-collapsed" : ""}`}
                               >
@@ -2439,7 +2506,11 @@ export function V3MeaningsAndExamplesStep({
                                   count={sense.sentences.length}
                                   label="多维例句"
                                   onToggle={() =>
-                                    toggleSenseSection(sense.id, "sentences")
+                                    toggleSenseSection(
+                                      sense.id,
+                                      "sentences",
+                                      sentencesCollapsed
+                                    )
                                   }
                                   unit="条"
                                 />
@@ -2989,7 +3060,11 @@ export function V3MeaningsAndExamplesStep({
                                   count={sense.relations.length}
                                   label="关联词"
                                   onToggle={() =>
-                                    toggleSenseSection(sense.id, "relations")
+                                    toggleSenseSection(
+                                      sense.id,
+                                      "relations",
+                                      relationsCollapsed
+                                    )
                                   }
                                   unit="个"
                                 />
