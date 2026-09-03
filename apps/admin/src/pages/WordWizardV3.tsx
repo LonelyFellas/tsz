@@ -436,7 +436,11 @@ function V3MeaningsSlot({
         entryKind={context.word.kind}
         forms={context.draftForms}
         issues={context.issues.filter((issue) => issue.step === "meanings")}
-        onActivePosChange={context.setActivePosId}
+        onActivePosChange={(posId) => {
+          // 切词性同样会作废影响令牌，条子留着的话点确认是无反馈的空操作。
+          setPendingIntent(undefined);
+          context.setActivePosId(posId);
+        }}
         onChange={context.setDraftMeanings}
         onFormsChange={(next) => {
           // 词形一改，上一轮预览拿到的影响令牌就失效了，先把确认条收起来。
