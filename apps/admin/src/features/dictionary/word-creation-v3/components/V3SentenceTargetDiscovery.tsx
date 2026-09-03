@@ -33,6 +33,8 @@ export interface V3SentenceTargetDiscoverySegment {
 export interface V3SentenceTargetDiscoverySense {
   id: string;
   gloss: string;
+  /** 该词义自己的成分用词（释义级，后端 B1 起返回）；缺失时回退候选级 componentUsages。 */
+  componentUsages?: PhraseComponentUsageV3[];
 }
 
 export type V3SentenceTargetDiscoveryCandidateState =
@@ -759,9 +761,28 @@ export function V3SentenceTargetDiscovery({
                                 justify="space-between"
                                 key={sense.id}
                               >
-                                <Typography.Text>
-                                  {sense.gloss || "未填写释义"}
-                                </Typography.Text>
+                                <Flex gap={4} style={{ minWidth: 0 }} vertical>
+                                  <Typography.Text>
+                                    {sense.gloss || "未填写释义"}
+                                  </Typography.Text>
+                                  {sense.componentUsages?.length ? (
+                                    <Flex gap={6} wrap>
+                                      <Typography.Text type="secondary">
+                                        该词义的成分用词
+                                      </Typography.Text>
+                                      {sense.componentUsages.map(
+                                        (component) => (
+                                          <Tag key={component.id}>
+                                            {component.literal}
+                                            {component.state === "resolved"
+                                              ? ` → ${component.target_headword}`
+                                              : ""}
+                                          </Tag>
+                                        )
+                                      )}
+                                    </Flex>
+                                  ) : null}
+                                </Flex>
                                 {activeOccurrence.coveredByPhrase ? (
                                   <Typography.Text type="secondary">
                                     随短语关联

@@ -135,7 +135,10 @@ function meaningPosOwnsIssue(
     ) {
       return true;
     }
-    return sense.relations.some((relation) => nodeIds.has(relation.id));
+    return (
+      sense.relations.some((relation) => nodeIds.has(relation.id)) ||
+      (sense.component_usages ?? []).some((usage) => nodeIds.has(usage.id))
+    );
   });
 }
 

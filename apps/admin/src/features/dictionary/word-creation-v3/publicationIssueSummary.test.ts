@@ -136,6 +136,31 @@ describe("buildV3PublicationIssueSummary", () => {
     });
   });
 
+  it("resolves meanings ownership for sense-level component usage nodes", () => {
+    const current = word();
+    current.meanings.pos[0]!.senses[0]!.component_usages = [
+      { state: "unresolved", id: uuidFromInt(1011), literal: "give" }
+    ];
+    const componentIssue = issue(1400, {
+      step: "meanings",
+      node_id: uuidFromInt(1011),
+      field: "component_usages",
+      code: "frequency_invalid",
+      message: "invalid component usage",
+      node_location: {
+        node_role: "meanings.sense",
+        ancestor_node_ids: []
+      }
+    });
+
+    const summary = buildV3PublicationIssueSummary(current, [componentIssue]);
+
+    expect(summary.positions[0]).toMatchObject({
+      pos_id: uuidFromInt(1001),
+      by_step: { meanings: 1 }
+    });
+  });
+
   it("falls back to a step group when no POS can be proven", () => {
     const current = word();
     const general = issue(1400, {

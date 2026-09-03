@@ -1,23 +1,11 @@
-// 词性 tab 内的「成分用词」卡片（语法结构下方，仅短语渲染）。
+// 释义卡内的「成分用词」区块（多维释义与多维例句之间，仅短语渲染，可选内容）。
 // 交互定稿（2026-09-02）：点击短语中的单词 → Popover 级联（词条 → 词形 → 词义）多选，
-// 勾选即关联、取消即解除；同一单词允许多条关联；搜索按词形命中（仅已发布候选）；
-// 单词与短语候选同构，短语候选的成分用词直接复用其词条数据（不进级联）。
-// 数据读写词性 base 词形主变体的 component_usages，随词形步保存（向导在 step3 保存前
-// 会自动先保存脏词形）。
-import {
-  Alert,
-  Card,
-  Cascader,
-  Empty,
-  Flex,
-  Popover,
-  Space,
-  Spin,
-  Tag,
-  Typography
-} from "antd";
+// 勾选即关联、取消即解除；同一单词允许多条关联；候选按关键字**包含**匹配检索（仅已发布），
+// 词形层按管理员方言偏好只给一侧。
+// 数据按释义归属：读写 sense.component_usages，随词义步保存；短语拼写只用于切词展示
+// （unified 取 common、distinguish 取 uk，英美拼写不同时以英式为准）。
+import { Alert, Cascader, Empty, Flex, Popover, Spin, Typography } from "antd";
 import type {
-  Dialect,
   DraftFormsStepContentV3,
   PhraseComponentUsageV3,
   PublishedSentenceTargetCandidateV3
@@ -27,7 +15,6 @@ import { useEffect, useMemo, useState } from "react";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { createV3WordRequests } from "../api";
-import { updateVariantComponentUsages } from "../operations";
 import { sentenceTokens } from "../tokens";
 import { newWordNodeId } from "../../word-model/primitives";
 import {
@@ -48,7 +35,7 @@ interface CandidateSense {
 
 /**
  * 第二层：词形（不设词性层，产品图定稿 2026-09-02）。
- * 数据源为候选自带的全词形清单（forms），resolve 命中的那一行标「命中」。
+ * 数据源为候选自带的全词形清单（forms），命中的那一行标「命中」。
  */
 interface CandidateFormGroup {
   formKey: string;
@@ -64,31 +51,36 @@ interface CandidateEntryGroup {
   formGroups: CandidateFormGroup[];
 }
 
-interface LocatedBaseVariant {
-  variantId: string;
-  spelling: string;
-  dialect: Dialect;
-  usages: readonly PhraseComponentUsageV3[];
-}
-
-/** 定位词性 base 词形的主变体（unified 取 common，分拼暂取英式，见 design v1 约束）。 */
-export function locateBaseVariant(
+/**
+ * 取词性 base 词形的主变体拼写作为切词锚点：unified 取 common，distinguish 取 uk。
+ * 成分不再依附方言变体，这里只决定「把哪串拼写切成可点击的单词」。
+ */
+export function baseSpellingForPos(
   forms: DraftFormsStepContentV3 | undefined,
   posId: string
-): LocatedBaseVariant | undefined {
+): string | undefined {
   const pos = forms?.pos.find((item) => item.pos_id === posId);
   const base = pos?.forms.find((form) => form.form_type === "base");
   if (!base) return undefined;
-  const variant =
-    base.regional_variants.mode === "common"
-      ? base.regional_variants.common
-      : base.regional_variants.uk;
-  return {
-    variantId: variant.id,
-    spelling: variant.spelling,
-    dialect: variant.dialect,
-    usages: variant.component_usages ?? []
-  };
+  return base.regional_variants.mode === "common"
+    ? base.regional_variants.common.spelling
+    : base.regional_variants.uk.spelling;
+}
+
+/**
+ * 只统计当前拼写里还点得到的成分：拼写改过之后的孤儿条目、以及后端存量的 unresolved
+ * 条目都既打不开也删不掉，把它们计进区块角标只会让数字和界面对不上
+ * （条目本身仍保留、仍随词义保存）。
+ */
+export function reachableUsageCount(
+  spelling: string | undefined,
+  usages: readonly PhraseComponentUsageV3[]
+): number {
+  if (spelling === undefined) return 0;
+  const tokens = new Set(sentenceTokens(spelling).map((token) => token.text));
+  return usages.filter(
+    (usage) => usage.state === "resolved" && tokens.has(usage.literal)
+  ).length;
 }
 
 function sameTarget(left: ResolvedTarget, right: ResolvedTarget): boolean {
@@ -102,15 +94,16 @@ function sameTarget(left: ResolvedTarget, right: ResolvedTarget): boolean {
 }
 
 /**
- * 以「某个单词的全量勾选结果」重建变体的 component_usages：
+ * 以「某个单词的全量勾选结果」重建释义的 component_usages：
  * 其他单词的条目原样保留，整体按短语中单词首次出现的顺序排列；
- * 该单词原有条目里目标不变的复用节点 id，新勾选的生成新 id。
+ * 该单词原有条目里目标不变的复用节点 id，新勾选的由 idFactory 生成。
  */
 export function rebuildUsages(
   usages: readonly PhraseComponentUsageV3[],
   tokens: readonly string[],
   literal: string,
-  selections: readonly ResolvedTarget[]
+  selections: readonly ResolvedTarget[],
+  idFactory: () => string = newWordNodeId
 ): PhraseComponentUsageV3[] {
   const kept = usages.filter(
     (usage): usage is ResolvedUsage =>
@@ -119,8 +112,7 @@ export function rebuildUsages(
   const replaced = selections.map<PhraseComponentUsageV3>((selection) => ({
     ...selection,
     state: "resolved",
-    id:
-      kept.find((usage) => sameTarget(usage, selection))?.id ?? newWordNodeId(),
+    id: kept.find((usage) => sameTarget(usage, selection))?.id ?? idFactory(),
     literal
   }));
   const byLiteral = new Map<string, PhraseComponentUsageV3[]>();
@@ -198,7 +190,7 @@ function leafKeyOf(target: ResolvedTarget): string {
   return `${formKeyOf(target)}:${target.target_sense_id}`;
 }
 
-/** 候选 → 级联三层分组。resolve 与关键字检索的候选同构，这里是两条路径的唯一转换点。 */
+/** 候选 → 级联三层分组。 */
 function groupsFromCandidates(
   candidates: readonly PublishedSentenceTargetCandidateV3[],
   preference: AdminDialectPreference,
@@ -437,34 +429,41 @@ function CascaderLinkContent({
   );
 }
 
-export function V3PhraseComponentUsagesCard({
-  posId,
-  forms,
-  onFormsChange,
-  discoveryEnabled = true,
-  wordId
-}: {
-  posId: string;
-  forms?: DraftFormsStepContentV3;
-  onFormsChange?: (next: DraftFormsStepContentV3) => void;
+export interface V3PhraseComponentUsagesCardProps {
+  /** 切词锚点拼写；缺失表示词形步还没有 base 词形拼写。 */
+  spelling?: string;
+  /** 当前释义的成分用词（释义级数据）。 */
+  usages: readonly PhraseComponentUsageV3[];
+  /** 缺失即只读。 */
+  onUsagesChange?: (next: PhraseComponentUsageV3[]) => void;
+  /** 后端词义查询能力；关闭时不发请求、不可编辑。 */
   discoveryEnabled?: boolean;
+  /** 后端释义级成分用词能力；关闭时只读（旧后端不接受 sense.component_usages）。 */
+  senseComponentUsagesEnabled?: boolean;
   /** 正在编辑的词条，用于把自身从候选里排除。 */
   wordId?: string;
-}) {
-  const located = useMemo(
-    () => locateBaseVariant(forms, posId),
-    [forms, posId]
-  );
+  idFactory?: () => string;
+}
+
+export function V3PhraseComponentUsagesCard({
+  spelling,
+  usages,
+  onUsagesChange,
+  discoveryEnabled = true,
+  senseComponentUsagesEnabled = true,
+  wordId,
+  idFactory = newWordNodeId
+}: V3PhraseComponentUsagesCardProps) {
   const tokens = useMemo(
-    () => sentenceTokens(located?.spelling ?? "").map((token) => token.text),
-    [located?.spelling]
+    () => sentenceTokens(spelling ?? "").map((token) => token.text),
+    [spelling]
   );
   const [openIndex, setOpenIndex] = useState<number | undefined>(undefined);
   // 每次打开都换一次 nonce，强制重新取候选——否则同事新发布的词条一直看不到。
   const [openNonce, setOpenNonce] = useState(0);
   const selectionsByLiteral = useMemo(() => {
     const map = new Map<string, ResolvedTarget[]>();
-    for (const usage of located?.usages ?? []) {
+    for (const usage of usages) {
       if (usage.state !== "resolved") continue;
       const { id: _id, literal, ...target } = usage;
       const list = map.get(literal) ?? [];
@@ -472,118 +471,93 @@ export function V3PhraseComponentUsagesCard({
       map.set(literal, list);
     }
     return map;
-  }, [located?.usages]);
-  const tokenSet = useMemo(() => new Set(tokens), [tokens]);
-  // 只统计当前拼写里还存在的成分：拼写改过之后的孤儿条目点不开也删不掉，
-  // 计进去只会让角标与界面对不上。
-  const totalLinks = useMemo(
-    () =>
-      [...selectionsByLiteral.entries()].reduce(
-        (count, [literal, targets]) =>
-          tokenSet.has(literal) ? count + targets.length : count,
-        0
-      ),
-    [selectionsByLiteral, tokenSet]
-  );
+  }, [usages]);
   const editable =
-    forms !== undefined && onFormsChange !== undefined && discoveryEnabled;
+    onUsagesChange !== undefined &&
+    discoveryEnabled &&
+    senseComponentUsagesEnabled;
 
   const replaceLiteral = (literal: string, selections: ResolvedTarget[]) => {
-    if (!forms || !onFormsChange || !located) return;
-    onFormsChange(
-      updateVariantComponentUsages(
-        forms,
-        located.variantId,
-        rebuildUsages(located.usages, tokens, literal, selections)
-      )
+    if (!onUsagesChange) return;
+    onUsagesChange(
+      rebuildUsages(usages, tokens, literal, selections, idFactory)
     );
   };
 
-  const body =
-    !located || tokens.length === 0 ? (
-      <Empty description="请先在词形步填写短语拼写" />
-    ) : (
-      <Flex vertical gap="small">
-        {discoveryEnabled ? null : (
-          <Alert
-            showIcon
-            title="当前后端未开启词义查询能力，成分用词暂不可编辑；已有关联仍会随词形一起保存。"
-            type="info"
-          />
-        )}
-        <div
-          aria-label="短语单词选择区"
-          className="v3-sentence-target-discovery-tokens"
-          style={{ marginTop: 0 }}
-        >
-          {tokens.map((token, index) => {
-            const targets = selectionsByLiteral.get(token) ?? [];
-            const hasLinks = targets.length > 0;
-            return (
-              <Popover
-                content={
-                  <CascaderLinkContent
-                    key={`${index}:${openNonce}`}
-                    literal={token}
-                    onReplace={(replaced) => replaceLiteral(token, replaced)}
-                    selfEntryId={wordId}
-                    targets={targets}
-                  />
-                }
-                destroyOnHidden
-                key={`${index}:${token}`}
-                onOpenChange={(open) => {
-                  if (!editable) return;
-                  if (open) setOpenNonce((current) => current + 1);
-                  setOpenIndex(open ? index : undefined);
-                }}
-                open={editable && openIndex === index}
-                placement="bottomLeft"
-                trigger="click"
-              >
-                <button
-                  aria-label={`关联第 ${index + 1} 个词 ${token}`}
-                  aria-pressed={hasLinks}
-                  className={
-                    hasLinks || openIndex === index ? "is-selected" : undefined
-                  }
-                  disabled={!editable}
-                  style={
-                    hasLinks
-                      ? { background: "#389e0d", borderColor: "#389e0d" }
-                      : undefined
-                  }
-                  type="button"
-                >
-                  {token}
-                  {targets.length > 1 ? (
-                    <span style={{ marginLeft: 4, fontSize: 12 }}>
-                      ×{targets.length}
-                    </span>
-                  ) : null}
-                </button>
-              </Popover>
-            );
-          })}
-        </div>
-      </Flex>
-    );
-
+  if (spelling === undefined || tokens.length === 0) {
+    return <Empty description="请先在词形步填写短语拼写" />;
+  }
   return (
-    <Card
-      className="word-grammar-card"
-      extra={<Tag>{`${totalLinks} 条`}</Tag>}
-      size="small"
-      title={
-        <Space size={8}>
-          成分用词
-          <Typography.Text type="secondary" style={{ fontWeight: "normal" }}>
-            点击短语中的单词，关联智能词库（可选）
-          </Typography.Text>
-        </Space>
-      }
-    >
-      {body}
-    </Card>
+    <Flex vertical gap="small">
+      {senseComponentUsagesEnabled ? null : (
+        <Alert
+          showIcon
+          title="当前后端尚不支持释义级成分用词，暂只读；升级后端后即可编辑。"
+          type="info"
+        />
+      )}
+      {senseComponentUsagesEnabled && !discoveryEnabled ? (
+        <Alert
+          showIcon
+          title="当前后端未开启词义查询能力，成分用词暂不可编辑；已有关联仍会随词义一起保存。"
+          type="info"
+        />
+      ) : null}
+      <div
+        aria-label="短语单词选择区"
+        className="v3-sentence-target-discovery-tokens"
+        style={{ marginTop: 0 }}
+      >
+        {tokens.map((token, index) => {
+          const targets = selectionsByLiteral.get(token) ?? [];
+          const hasLinks = targets.length > 0;
+          return (
+            <Popover
+              content={
+                <CascaderLinkContent
+                  key={`${index}:${openNonce}`}
+                  literal={token}
+                  onReplace={(replaced) => replaceLiteral(token, replaced)}
+                  selfEntryId={wordId}
+                  targets={targets}
+                />
+              }
+              destroyOnHidden
+              key={`${index}:${token}`}
+              onOpenChange={(open) => {
+                if (!editable) return;
+                if (open) setOpenNonce((current) => current + 1);
+                setOpenIndex(open ? index : undefined);
+              }}
+              open={editable && openIndex === index}
+              placement="bottomLeft"
+              trigger="click"
+            >
+              <button
+                aria-label={`关联第 ${index + 1} 个词 ${token}`}
+                aria-pressed={hasLinks}
+                className={
+                  hasLinks || openIndex === index ? "is-selected" : undefined
+                }
+                disabled={!editable}
+                style={
+                  hasLinks
+                    ? { background: "#389e0d", borderColor: "#389e0d" }
+                    : undefined
+                }
+                type="button"
+              >
+                {token}
+                {targets.length > 1 ? (
+                  <span style={{ marginLeft: 4, fontSize: 12 }}>
+                    ×{targets.length}
+                  </span>
+                ) : null}
+              </button>
+            </Popover>
+          );
+        })}
+      </div>
+    </Flex>
   );
 }

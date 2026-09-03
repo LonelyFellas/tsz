@@ -6,6 +6,7 @@ import type {
   DraftMeaningsStepContentWritableV3,
   DraftValidationResponseV3,
   FormsImpactResponseV3,
+  PhraseComponentUsageV3,
   SentenceAssociationInputV3,
   SurfaceMatchPageV3,
   V3DraftValidationIssue,
@@ -542,6 +543,54 @@ describe("V3WordCreationWizard", () => {
         associations
       }
     );
+  });
+
+  it.each([
+    [
+      "未声明 sense_component_usages 能力时整键剥除（旧后端 deny_unknown_fields 会 400）",
+      undefined,
+      false
+    ],
+    ["声明能力后原样发送（含显式空数组，让后端区分未发送与清空）", true, true]
+  ])("词义步保存：%s", async (_name, capability, shouldSend) => {
+    const initial = word();
+    initial.completed_steps = ["basics", "forms"];
+    initial.max_reachable_step = "meanings";
+    initial.capabilities.sense_component_usages = capability;
+    const saveMeanings = vi.fn<V3WordRequests["saveMeanings"]>(async () => ({
+      word: word(2)
+    }));
+    const usage: PhraseComponentUsageV3 = {
+      state: "unresolved",
+      id: "usage-1",
+      literal: "give"
+    };
+    renderWizard(requests({ saveMeanings }), {
+      initialWord: initial,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <button
+          onClick={() => {
+            const next = structuredClone(context.draftMeanings);
+            // 第一条释义带成分，第二条显式清空——两种形态都要按能力一起处置
+            next.pos[0]!.senses[0]!.component_usages = [usage];
+            void context.actions.saveMeanings(next, "save");
+          }}
+          type="button"
+        >
+          保存词义
+        </button>
+      )
+    });
+    fireEvent.click(screen.getByRole("button", { name: "保存词义" }));
+
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(1));
+    const sentSense = saveMeanings.mock.calls[0]![1].content.pos[0]!.senses[0]!;
+    expect("component_usages" in sentSense).toBe(shouldSend);
+    if (shouldSend) expect(sentSense.component_usages).toEqual([usage]);
+    // 剥除只针对成分键，其余词义内容照发
+    expect(sentSense.id).toBe("sense-canonical");
+    expect(sentSense.definitions).not.toHaveLength(0);
   });
 
   it("新增例句 meanings 保存失败时不发整组关联请求且父级不变", async () => {

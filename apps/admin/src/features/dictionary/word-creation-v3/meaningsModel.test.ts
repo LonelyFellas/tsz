@@ -12,6 +12,7 @@ import {
   relationDisplaySnapshots,
   replaceEnglishText,
   replaceRichText,
+  stripSenseComponentUsages,
   toWritableMeanings
 } from "./meaningsModel";
 
@@ -1052,5 +1053,51 @@ describe("V3 meanings writable model", () => {
         content: projectedSense.sentences[0]!.zh_text
       }
     ]);
+  });
+});
+
+describe("释义级成分用词在词义投影中的往返", () => {
+  const usage = {
+    state: "resolved" as const,
+    id: "usage-1",
+    literal: "give",
+    target_word_id: "entry-give",
+    target_publication_id: "pub-give",
+    target_pos_id: "pos-give",
+    target_base_form_id: "base-give",
+    target_sense_id: "sense-give-1",
+    target_form_id: "form-give",
+    target_variant_id: "variant-give",
+    target_dialect: "common" as const,
+    target_form_type: "base" as const,
+    target_headword: "give",
+    target_gloss: "给；交给"
+  };
+
+  it("toWritableMeanings 保留服务端返回的 sense.component_usages（深拷贝）", () => {
+    const canonical = structuredClone(meaningsCanonicalFixture);
+    canonical.pos[0]!.senses[0]!.component_usages = [usage];
+    const writable = toWritableMeanings(canonical);
+    expect(writable.pos[0]!.senses[0]!.component_usages).toEqual([usage]);
+    expect(writable.pos[0]!.senses[0]!.component_usages![0]).not.toBe(usage);
+  });
+
+  it("toWritableMeanings 在字段缺失时不凭空生成键（旧后端 deny_unknown_fields）", () => {
+    const writable = toWritableMeanings(meaningsCanonicalFixture);
+    expect("component_usages" in writable.pos[0]!.senses[0]!).toBe(false);
+  });
+
+  it("stripSenseComponentUsages 整键剥除，其余内容与引用不变", () => {
+    const canonical = structuredClone(meaningsCanonicalFixture);
+    canonical.pos[0]!.senses[0]!.component_usages = [usage];
+    const writable = toWritableMeanings(canonical);
+    const stripped = stripSenseComponentUsages(writable);
+    expect("component_usages" in stripped.pos[0]!.senses[0]!).toBe(false);
+    expect(stripped.pos[0]!.senses[0]!.definitions).toBe(
+      writable.pos[0]!.senses[0]!.definitions
+    );
+    // 无字段时原样返回同一引用
+    const plain = toWritableMeanings(meaningsCanonicalFixture);
+    expect(stripSenseComponentUsages(plain)).toBe(plain);
   });
 });

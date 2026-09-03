@@ -308,7 +308,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     relatedSearchAny.mockImplementation(defaultRelatedSearchImplementation);
   });
 
-  it("短语在词性 tab 内渲染成分用词卡片，单词不渲染", () => {
+  it("短语在每条释义卡内渲染成分用词区块（多维释义与多维例句之间），单词不渲染", () => {
     const forms: DraftFormsStepContentV3 = {
       pos: [
         {
@@ -338,21 +338,70 @@ describe("V3MeaningsAndExamplesStep", () => {
         }
       ]
     };
-    const { rerender } = render(
+    const value = structuredClone(meaningsFixture);
+    value.pos[0]!.senses[0]!.component_usages = [
+      {
+        state: "resolved",
+        id: "usage-1",
+        literal: "give",
+        target_word_id: "entry-give",
+        target_publication_id: "pub-give",
+        target_pos_id: "pos-give",
+        target_base_form_id: "base-give",
+        target_sense_id: "sense-give-1",
+        target_form_id: "form-give",
+        target_variant_id: "variant-give",
+        target_dialect: "common",
+        target_form_type: "base",
+        target_headword: "give",
+        target_gloss: "给；交给"
+      },
+      // 拼写改动后落在 "give up" 之外的孤儿条目：保留在数据里，但点不到也删不掉，
+      // 因此不能计进区块角标（否则数字与界面对不上）。
+      {
+        state: "unresolved",
+        id: "usage-orphan",
+        literal: "away"
+      }
+    ];
+    const { container, rerender } = render(
       <AntApp>
         <V3MeaningsAndExamplesStep
+          componentUsagesEnabled
           entryKind="phrase"
           forms={forms}
           onChange={vi.fn()}
           onFormsChange={vi.fn()}
-          value={structuredClone(meaningsFixture)}
+          value={value}
         />
       </AntApp>
     );
-    expect(screen.getByText("成分用词")).toBeInTheDocument();
+    // 位置：多维释义 → 成分用词 → 多维例句 → 关联词
+    const sectionTitles = Array.from(
+      container.querySelectorAll(".word-sense-section-title")
+    ).map((node) => node.textContent?.replace(/\s+/g, "") ?? "");
+    expect(sectionTitles.join("|")).toMatch(
+      /多维释义.*\|成分用词.*\|多维例句.*\|关联词/
+    );
+    const section = container.querySelector(
+      '[data-v3-field="component_usages"]'
+    );
+    expect(section).not.toBeNull();
+    expect(section).toHaveAttribute(
+      "data-v3-node-id",
+      value.pos[0]!.senses[0]!.id
+    );
+    // 能力开启时与其他区块一致：默认展开
+    expect(section!.querySelector(".word-sense-section-title")).toHaveAttribute(
+      "aria-expanded",
+      "true"
+    );
+    // 计数只算当前拼写里点得到的成分（孤儿 "away" 不计）；已关联的单词回显为按下态
+    expect(section!.textContent).toContain("1 条");
+    expect(section!.textContent).not.toContain("2 条");
     expect(
       screen.getByRole("button", { name: "关联第 1 个词 give" })
-    ).toBeInTheDocument();
+    ).toHaveAttribute("aria-pressed", "true");
     rerender(
       <AntApp>
         <V3MeaningsAndExamplesStep
@@ -365,6 +414,73 @@ describe("V3MeaningsAndExamplesStep", () => {
       </AntApp>
     );
     expect(screen.queryByText("成分用词")).toBeNull();
+  });
+
+  it("后端未声明释义级成分能力时区块只读，单词按钮禁用", () => {
+    const forms: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "verb",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
+          forms: [
+            {
+              id: "form-base",
+              form_type: "base",
+              regional_variants: {
+                mode: "common",
+                common: {
+                  id: "variant-common",
+                  dialect: "common",
+                  spelling: "give up",
+                  origin: "manual",
+                  pronunciations: []
+                }
+              }
+            }
+          ],
+          form_groups: []
+        }
+      ]
+    };
+    const { container } = render(
+      <AntApp>
+        <V3MeaningsAndExamplesStep
+          entryKind="phrase"
+          forms={forms}
+          onChange={vi.fn()}
+          onFormsChange={vi.fn()}
+          value={structuredClone(meaningsFixture)}
+        />
+      </AntApp>
+    );
+    const section = container.querySelector(
+      '[data-v3-field="component_usages"]'
+    )!;
+    const title = section.querySelector(".word-sense-section-title")!;
+    // 整块不可编辑时默认折叠：每条释义都摊开一条同样的只读提示只会挤占版面
+    expect(title).toHaveAttribute("aria-expanded", "false");
+    expect(section.querySelector(".word-sense-section-body")).toHaveAttribute(
+      "aria-hidden",
+      "true"
+    );
+    // 折叠是默认值而非已写入的状态，第一次点击必须就能展开（不能是空操作）
+    fireEvent.click(title);
+    expect(title).toHaveAttribute("aria-expanded", "true");
+    expect(section.querySelector(".word-sense-section-body")).toHaveAttribute(
+      "aria-hidden",
+      "false"
+    );
+    // 展开后仍是只读，并说明原因
+    expect(
+      screen.getByText(/当前后端尚不支持释义级成分用词/)
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "关联第 1 个词 give" })
+    ).toBeDisabled();
   });
   it("Step 3 仅列出未添加词性，并复用 forms 创建规则后切换到新 POS", () => {
     const forms: DraftFormsStepContentV3 = {

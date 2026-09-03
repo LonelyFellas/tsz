@@ -533,16 +533,6 @@ export function updateVariantSpelling(
   });
 }
 
-export function updateVariantComponentUsages(
-  content: DraftFormsStepContentV3,
-  variantId: string,
-  componentUsages: PhraseComponentUsageV3[]
-): DraftFormsStepContentV3 {
-  return mutateVariant(content, variantId, (variant) => {
-    variant.component_usages = componentUsages;
-  });
-}
-
 export function updateConcreteFormType(
   content: DraftFormsStepContentV3,
   formId: string,
