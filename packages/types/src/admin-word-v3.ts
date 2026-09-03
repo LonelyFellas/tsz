@@ -830,7 +830,14 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "node_binding_changed",
   "meanings_storage_unsafe",
   "pos_meanings_required",
-  "sense_has_inbound_publication_refs"
+  "sense_has_inbound_publication_refs",
+  "phrase_component_not_allowed",
+  "phrase_component_limit_exceeded",
+  "phrase_component_literal_invalid",
+  "phrase_component_self_target",
+  "phrase_component_target_unavailable",
+  "phrase_component_target_nested",
+  "phrase_component_target_stale"
 ] as const;
 
 export type V3ValidationIssueCode = (typeof V3_VALIDATION_ISSUE_CODES)[number];

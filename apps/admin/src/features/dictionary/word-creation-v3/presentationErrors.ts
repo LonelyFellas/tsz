@@ -72,7 +72,14 @@ const ISSUE_MESSAGES = {
   node_binding_changed: "内容结构已变化，请刷新后重试",
   meanings_storage_unsafe: "词义内容暂时无法安全保存，请刷新后重试",
   pos_meanings_required: "每个词性都需要填写词义",
-  sense_has_inbound_publication_refs: "该词义已被发布内容引用，暂时不能移除"
+  sense_has_inbound_publication_refs: "该词义已被发布内容引用，暂时不能移除",
+  phrase_component_not_allowed: "只有短语词条可以设置成分用词",
+  phrase_component_limit_exceeded: "单条释义最多设置 100 个成分用词",
+  phrase_component_literal_invalid: "成分用词的词面不合法，请重新选词",
+  phrase_component_self_target: "成分用词不能关联短语自己",
+  phrase_component_target_unavailable: "成分用词关联的词条已不可用，请重新选择",
+  phrase_component_target_nested: "关联的短语自身含成分用词，只能再套一层",
+  phrase_component_target_stale: "关联的词条内容已变化，请重新选择"
 } satisfies Record<V3ValidationIssueCode, string>;
 
 export function v3IssueMessage(issue: V3DraftValidationIssue): string {
