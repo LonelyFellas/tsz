@@ -19,19 +19,18 @@ import {
 import type {
   Dialect,
   DraftFormsStepContentV3,
-  PhraseComponentUsageV3
+  PhraseComponentUsageV3,
+  PublishedSentenceTargetCandidateV3
 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
+import type { AdminDialectPreference } from "@tsz/shared";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { createV3WordRequests } from "../api";
 import { updateVariantComponentUsages } from "../operations";
 import { sentenceTokens } from "../tokens";
 import { newWordNodeId } from "../../word-model/primitives";
-import {
-  dialectLabel,
-  formTypeLabel,
-  partOfSpeechLabel
-} from "../presentation";
+import { formTypeLabel, partOfSpeechLabel } from "../presentation";
 import "./V3SentenceTargetDiscovery.css";
 
 type ResolvedUsage = Extract<PhraseComponentUsageV3, { state: "resolved" }>;
@@ -56,7 +55,6 @@ interface CandidateFormGroup {
 }
 
 interface CandidateEntryGroup {
-  kind: "word" | "phrase";
   entryId: string;
   headword: string;
   formGroups: CandidateFormGroup[];
@@ -143,8 +141,13 @@ export function rebuildUsages(
 interface CascaderOptionNode {
   value: string;
   label: ReactNode;
-  /** 仅词义叶子可勾选：勾父级会展开成「全词形 × 全词义」，一次就能撑爆后端 100 条上限。 */
-  checkable?: boolean;
+  /**
+   * 仅词义叶子可勾选：勾父级会展开成「全词形 × 全词义」，一次就能撑爆后端 100 条上限；
+   * 且 SHOW_PARENT 会把已选叶子折叠成父级路径，落到 onChange 里解不出叶子、反倒清空已有关联。
+   * 必须用 rc-cascader 真正认的 `disableCheckbox`（选项级 `checkable` 它根本不读），
+   * 父级复选框再由 `.v3-component-usage-cascader` 的样式整个隐藏，避免留下点不动的空框。
+   */
+  disableCheckbox?: boolean;
   children?: CascaderOptionNode[];
 }
 
@@ -157,25 +160,22 @@ function cascaderOptionsFromGroups(
     );
     return {
       value: group.entryId,
-      checkable: false,
-      label: (
-        <Space size={6}>
-          <Tag color={group.kind === "word" ? "blue" : "purple"}>
-            {group.kind === "word" ? "单词" : "短语"}
-          </Tag>
-          <Typography.Text strong>{group.headword}</Typography.Text>
-        </Space>
-      ),
+      disableCheckbox: true,
+      label: <Typography.Text strong>{group.headword}</Typography.Text>,
       children: group.formGroups.map((formGroup) => ({
         value: formGroup.formKey,
-        checkable: false,
+        disableCheckbox: true,
         label: (
-          <Space size={6}>
+          // 命中行只靠颜色区分，不再占一个「命中」标签的宽度。
+          <span
+            className={
+              formGroup.matched ? "v3-component-usage-matched-form" : undefined
+            }
+          >
             {posLabels.size > 1
               ? `${formGroup.formLabel}（${formGroup.posLabel}）`
               : formGroup.formLabel}
-            {formGroup.matched ? <Tag color="gold">命中</Tag> : null}
-          </Space>
+          </span>
         ),
         children: formGroup.senses.map((sense) => ({
           value: sense.senseId,
@@ -194,120 +194,133 @@ function leafKeyOf(target: ResolvedTarget): string {
   return `${formKeyOf(target)}:${target.target_sense_id}`;
 }
 
+/** 候选 → 级联三层分组。resolve 与关键字检索的候选同构，这里是两条路径的唯一转换点。 */
+function groupsFromCandidates(
+  candidates: readonly PublishedSentenceTargetCandidateV3[],
+  preference: AdminDialectPreference,
+  keepVariantIds: ReadonlySet<string>
+): CandidateEntryGroup[] {
+  const byEntry = new Map<string, CandidateEntryGroup>();
+  for (const candidate of candidates) {
+    // 无已发布词义的候选无从关联；留着会渲染出可勾选却写不出数据的空节点。
+    if (candidate.senses.length === 0) continue;
+    const entry: CandidateEntryGroup = byEntry.get(candidate.entry_id) ?? {
+      entryId: candidate.entry_id,
+      headword: candidate.headword,
+      formGroups: []
+    };
+    const posLabel = partOfSpeechLabel(candidate.pos);
+    // 词形层来自候选的全词形清单。命中标识只在有区间证据时给：关键字检索没有句子区间，
+    // 后端把 matches 置空，此时任何词形都谈不上「命中」。
+    const hasEvidence = candidate.matches.length > 0;
+    for (const form of candidate.forms) {
+      // 没有可搭配原形的词形不可作成分目标（V2 发布的目标、或未挂进变化组）。
+      if (form.base_form_ids.length === 0) continue;
+      // 词形层只给一侧：不分英美的词条给 common，分英美的按管理员方言偏好取一侧。
+      // 例外是已经关联上的词形——哪怕落在非偏好侧也要留着，否则用户解除不了它。
+      if (
+        form.dialect !== "common" &&
+        form.dialect !== preference &&
+        !keepVariantIds.has(form.variant_id)
+      )
+        continue;
+      const formKey = `${candidate.entry_id}#${candidate.pos_id}#${form.form_id}#${form.variant_id}`;
+      let formGroup = entry.formGroups.find((item) => item.formKey === formKey);
+      if (!formGroup) {
+        formGroup = {
+          formKey,
+          // 只剩一侧，方言后缀没有区分作用，不再显示。
+          formLabel: `${formTypeLabel(form.form_type)} ${form.spelling}`,
+          posLabel,
+          matched:
+            hasEvidence &&
+            form.form_id === candidate.matched_form_id &&
+            form.variant_id === candidate.matched_variant_id,
+          senses: []
+        };
+        entry.formGroups.push(formGroup);
+      }
+      for (const sense of candidate.senses) {
+        if (formGroup.senses.some((item) => item.senseId === sense.sense_id))
+          continue;
+        formGroup.senses.push({
+          senseId: sense.sense_id,
+          gloss: sense.gloss,
+          usage: {
+            state: "resolved",
+            target_word_id: candidate.entry_id,
+            // 发布/词性/原形以词义自带的为准：候选层的值只对命中词形成立。
+            target_publication_id: sense.publication_id,
+            target_pos_id: sense.pos_id,
+            // 后端要求所选词形与原形同组：候选词形自带可搭配的原形清单，
+            // 词义自带的原形在清单内就沿用，否则取清单里的任意一个。
+            target_base_form_id: form.base_form_ids.includes(sense.base_form_id)
+              ? sense.base_form_id
+              : form.base_form_ids[0]!,
+            target_sense_id: sense.sense_id,
+            target_form_id: form.form_id,
+            target_variant_id: form.variant_id,
+            target_dialect: form.dialect,
+            target_form_type: form.form_type,
+            target_headword: candidate.headword,
+            target_gloss: sense.gloss
+          }
+        });
+      }
+    }
+    if (entry.formGroups.length > 0) byEntry.set(candidate.entry_id, entry);
+  }
+  return [...byEntry.values()];
+}
+
 function CascaderLinkContent({
   literal,
-  sourceDialect,
   targets,
   onReplace
 }: {
   literal: string;
-  sourceDialect: Dialect;
   targets: readonly ResolvedTarget[];
   onReplace: (next: ResolvedTarget[]) => void;
 }) {
   const requests = useMemo(() => createV3WordRequests(), []);
+  const { preference } = useDialectPreference();
+  // 存量关联所在的词形变体：过滤时要放行，否则非偏好侧的旧关联无法解除。
+  const selectedVariantIds = useMemo(
+    () => new Set(targets.map((target) => target.target_variant_id)),
+    [targets]
+  );
+  // 只存原始候选。分组依赖 targets 与方言偏好，放在渲染期算——挂进取数依赖里会让
+  // 每次勾选（targets 换身份）都重打一次后端。
   const [state, setState] = useState<{
     pending: boolean;
     error?: string;
-    groups: CandidateEntryGroup[];
-  }>({ pending: true, groups: [] });
+    truncated: boolean;
+    candidates: readonly PublishedSentenceTargetCandidateV3[];
+  }>({ pending: true, truncated: false, candidates: [] });
 
   useEffect(() => {
     let alive = true;
     void (async () => {
       try {
-        const response = await requests.resolveSentenceTargets({
+        // 点中的词直接当关键字：候选按词面**包含**匹配，口径与智能词库列表一致。
+        // 所以在 give me 里点 give，既能选到词条 give，也能选到短语 give up。
+        const response = await requests.searchComponentTargets({
           schema_version: 3,
-          sentence_text: literal,
-          source_dialect: sourceDialect,
-          mode: "selected_segments",
-          selected_segments: [
-            { start: 0, end: Array.from(literal).length, surface: literal }
-          ],
-          include_drafts: false,
-          page_size_per_range: 50
+          q: literal,
+          page_size: 50
         });
-        const byEntry = new Map<string, CandidateEntryGroup>();
-        for (const range of response.range_results) {
-          for (const candidate of range.published_matches) {
-            // 无已发布词义的候选无从关联；留着会渲染出可勾选却写不出数据的空节点。
-            if (candidate.senses.length === 0) continue;
-            const entry: CandidateEntryGroup = byEntry.get(
-              candidate.entry_id
-            ) ?? {
-              kind: candidate.kind,
-              entryId: candidate.entry_id,
-              headword: candidate.headword,
-              formGroups: []
-            };
-            const posLabel = partOfSpeechLabel(candidate.pos);
-            // 词形层来自候选的全词形清单；resolve 命中的那一行标「命中」。
-            for (const form of candidate.forms) {
-              // 没有可搭配原形的词形不可作成分目标（V2 发布的目标、或未挂进变化组）。
-              if (form.base_form_ids.length === 0) continue;
-              const formKey = `${candidate.entry_id}#${candidate.pos_id}#${form.form_id}#${form.variant_id}`;
-              let formGroup = entry.formGroups.find(
-                (item) => item.formKey === formKey
-              );
-              if (!formGroup) {
-                formGroup = {
-                  formKey,
-                  formLabel:
-                    form.dialect === "common"
-                      ? `${formTypeLabel(form.form_type)} ${form.spelling}`
-                      : `${formTypeLabel(form.form_type)} ${form.spelling}（${dialectLabel(form.dialect)}）`,
-                  posLabel,
-                  matched:
-                    form.form_id === candidate.matched_form_id &&
-                    form.variant_id === candidate.matched_variant_id,
-                  senses: []
-                };
-                entry.formGroups.push(formGroup);
-              }
-              for (const sense of candidate.senses) {
-                if (
-                  formGroup.senses.some(
-                    (item) => item.senseId === sense.sense_id
-                  )
-                )
-                  continue;
-                formGroup.senses.push({
-                  senseId: sense.sense_id,
-                  gloss: sense.gloss,
-                  usage: {
-                    state: "resolved",
-                    target_word_id: candidate.entry_id,
-                    // 发布/词性/原形以词义自带的为准：候选层的值只对命中词形成立。
-                    target_publication_id: sense.publication_id,
-                    target_pos_id: sense.pos_id,
-                    // 后端要求所选词形与原形同组：候选词形自带可搭配的原形清单，
-                    // 词义自带的原形在清单内就沿用，否则取清单里的任意一个。
-                    target_base_form_id: form.base_form_ids.includes(
-                      sense.base_form_id
-                    )
-                      ? sense.base_form_id
-                      : form.base_form_ids[0]!,
-                    target_sense_id: sense.sense_id,
-                    target_form_id: form.form_id,
-                    target_variant_id: form.variant_id,
-                    target_dialect: form.dialect,
-                    target_form_type: form.form_type,
-                    target_headword: candidate.headword,
-                    target_gloss: sense.gloss
-                  }
-                });
-              }
-            }
-            if (entry.formGroups.length > 0)
-              byEntry.set(candidate.entry_id, entry);
-          }
-        }
-        if (alive) setState({ pending: false, groups: [...byEntry.values()] });
+        if (alive)
+          setState({
+            pending: false,
+            truncated: response.truncated,
+            candidates: response.matches
+          });
       } catch {
         if (alive)
           setState({
             pending: false,
-            groups: [],
+            truncated: false,
+            candidates: [],
             error: "词库查询失败，请稍后重试；已有关联未受影响。"
           });
       }
@@ -315,23 +328,25 @@ function CascaderLinkContent({
     return () => {
       alive = false;
     };
-  }, [literal, requests, sourceDialect]);
+  }, [literal, requests]);
 
-  const options = useMemo(
-    () => cascaderOptionsFromGroups(state.groups),
-    [state.groups]
+  const groups = useMemo(
+    () =>
+      groupsFromCandidates(state.candidates, preference, selectedVariantIds),
+    [preference, selectedVariantIds, state.candidates]
   );
+  const options = useMemo(() => cascaderOptionsFromGroups(groups), [groups]);
   const selectionByLeaf = useMemo(() => {
     const map = new Map<string, ResolvedTarget>();
     // 候选里查不到的存量关联（目标已归档/改版/落在分页外）也要能按原样回填，
     // 否则用户勾选任意一项都会把它们连带删掉。
     for (const target of targets) map.set(leafKeyOf(target), target);
-    for (const group of state.groups)
+    for (const group of groups)
       for (const formGroup of group.formGroups)
         for (const sense of formGroup.senses)
           map.set(`${formGroup.formKey}:${sense.senseId}`, sense.usage);
     return map;
-  }, [state.groups, targets]);
+  }, [groups, targets]);
   const value = useMemo(
     () =>
       targets.map((target) => [
@@ -351,7 +366,7 @@ function CascaderLinkContent({
         style={{ width: 360, padding: 16 }}
       >
         <Spin />
-        <Typography.Text type="secondary">正在按词形查询词库</Typography.Text>
+        <Typography.Text type="secondary">正在按关键字查询词库</Typography.Text>
       </Flex>
     );
   }
@@ -371,21 +386,28 @@ function CascaderLinkContent({
     );
   }
   return (
-    <Cascader.Panel
-      multiple
-      onChange={(next) => {
-        // 只有词义叶子可勾选，路径恒为三段；rc-cascader 会把候选里查不到的
-        // 存量路径原样带回，交给 selectionByLeaf 里的存量兜底。
-        const replaced = (next as string[][])
-          .map((path) => selectionByLeaf.get(`${path[1]}:${path[2]}`))
-          .filter(
-            (selection): selection is ResolvedTarget => selection !== undefined
-          );
-        onReplace(replaced);
-      }}
-      options={options}
-      value={value}
-    />
+    <Flex vertical gap="small">
+      {state.truncated ? (
+        <Alert showIcon title="匹配过多，只列出前 50 条" type="info" />
+      ) : null}
+      <Cascader.Panel
+        className="v3-component-usage-cascader"
+        multiple
+        onChange={(next) => {
+          // 只有词义叶子可勾选，路径恒为三段；rc-cascader 会把候选里查不到的
+          // 存量路径原样带回，交给 selectionByLeaf 里的存量兜底。
+          const replaced = (next as string[][])
+            .map((path) => selectionByLeaf.get(`${path[1]}:${path[2]}`))
+            .filter(
+              (selection): selection is ResolvedTarget =>
+                selection !== undefined
+            );
+          onReplace(replaced);
+        }}
+        options={options}
+        value={value}
+      />
+    </Flex>
   );
 }
 
@@ -475,7 +497,6 @@ export function V3PhraseComponentUsagesCard({
                     key={`${index}:${openNonce}`}
                     literal={token}
                     onReplace={(replaced) => replaceLiteral(token, replaced)}
-                    sourceDialect={located.dialect}
                     targets={targets}
                   />
                 }

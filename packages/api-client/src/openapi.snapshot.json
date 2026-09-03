@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-02T12:04:18.695Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/dev-page-test/docs/openapi.json",
+  "_generatedAt": "2026-09-03T04:17:51.480Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -17,6 +17,7 @@
     "/admin/lexicon/dialect-variant-suggestions": ["post"],
     "/admin/lexicon/entries": ["get", "post"],
     "/admin/lexicon/entries/archive-batch": ["post"],
+    "/admin/lexicon/entries/component-targets/search": ["post"],
     "/admin/lexicon/entries/delete-batch": ["post"],
     "/admin/lexicon/entries/related-search": ["get"],
     "/admin/lexicon/entries/restore-batch": ["post"],
@@ -307,6 +308,21 @@
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/entries/component-targets/search": {
+      "request": {
+        "$ref": "#/components/schemas/SearchComponentTargetsV3Input"
+      },
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/SearchComponentTargetsV3Response"
+        },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "post /admin/lexicon/entries/delete-batch": {
@@ -2914,6 +2930,55 @@
         },
         "schema_version": { "type": "integer", "enum": [3] },
         "sentence_hash": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "SearchComponentTargetsV3Input": {
+      "type": "object",
+      "required": ["schema_version", "q"],
+      "properties": {
+        "kind": {
+          "$ref": "#/components/schemas/EntryKind",
+          "description": "只要单词或只要短语；不传则两者都返回。"
+        },
+        "page_size": {
+          "type": "integer",
+          "format": "int32",
+          "maximum": 200,
+          "minimum": 1
+        },
+        "q": {
+          "type": "string",
+          "description": "关键字：对已发布词面做大小写不敏感的包含匹配，1..=100 码点且两端不留空白。",
+          "maxLength": 100,
+          "minLength": 1
+        },
+        "schema_version": { "type": "integer", "enum": [3] }
+      },
+      "additionalProperties": false
+    },
+    "SearchComponentTargetsV3Response": {
+      "type": "object",
+      "required": ["schema_version", "matches", "total", "truncated"],
+      "properties": {
+        "matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/components/schemas/PublishedSentenceTargetCandidateV3"
+          },
+          "description": "与 resolve 的 `published_matches` 完全同构。关键字检索没有句子区间，所以每条候选的\n`matches` 恒为空数组——没有「命中了句子里的哪一段」可言，后端不构造假证据。"
+        },
+        "schema_version": { "type": "integer", "enum": [3] },
+        "total": {
+          "type": "integer",
+          "format": "int64",
+          "description": "本次扫描窗口内命中的候选总数；`truncated` 为 true 时它是下界，不是全库命中数。",
+          "minimum": 0
+        },
+        "truncated": {
+          "type": "boolean",
+          "description": "还有未返回的候选：命中数超过 `page_size`，或触到了后端的扫描行/词条数上限。"
+        }
       },
       "additionalProperties": false
     },

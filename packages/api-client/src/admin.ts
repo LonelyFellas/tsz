@@ -40,6 +40,7 @@ import type {
   PublishAdminWordV3Input,
   ReplaceSentenceAssociationsInputV3,
   ResolveSentenceTargetsV3Input,
+  SearchComponentTargetsV3Input,
   Admin,
   AdminAuthResponse,
   AdminProfile,
@@ -93,6 +94,7 @@ import {
   decodeFormsImpactResponseV3,
   decodePendingSentenceAssociationListResponse,
   decodeResolveSentenceTargetsV3Response,
+  decodeSearchComponentTargetsV3Response,
   InvalidAdminWordResponseError,
   decodeRelatedSearchResponseAny,
   decodeSurfaceMatchPageAny,
@@ -452,6 +454,22 @@ export function createAdminEndpoints(http: HttpClient) {
           : http
               .post<unknown>("/lexicon/entries/sentence-targets/resolve", input)
               .then(decodeResolveSentenceTargetsV3Response),
+      /** 按关键字检索可做短语成分目标的已发布词条。 */
+      searchComponentTargetsV3: (
+        input: SearchComponentTargetsV3Input,
+        signal?: AbortSignal
+      ) =>
+        (signal
+          ? http.post<unknown>(
+              "/lexicon/entries/component-targets/search",
+              input,
+              { signal }
+            )
+          : http.post<unknown>(
+              "/lexicon/entries/component-targets/search",
+              input
+            )
+        ).then(decodeSearchComponentTargetsV3Response),
       /** 当前目标词条可认领的 Pending 例句关联。 */
       listPendingSentenceAssociations: (
         wordId: string,

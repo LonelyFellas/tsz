@@ -106,14 +106,26 @@
   min-width: 0;
 }
 
+/* 词形类型列以英美分栏布局为唯一标准：裸标签、无卡片。英美共用模式仍走单张
+   word-form-matrix 网格，这里把 V2 基础样式给类型列的灰底/边框一并剥掉，
+   并把列宽、列距、外边距对齐到 .v3-dialect-separated-matrix。 */
+.v3-concrete-form-row .word-form-matrix-unified {
+  grid-template-columns: 142px minmax(620px, 1fr);
+  column-gap: 28px;
+  margin-inline: 16px;
+}
+
 .v3-form-type-column .word-form-matrix-type-header,
-.v3-form-type-column .word-form-type-cell {
+.v3-form-type-column .word-form-type-cell,
+.v3-concrete-form-row .word-form-matrix-type-header,
+.v3-concrete-form-row .word-form-type-cell {
   background: transparent;
   border: 0;
   border-radius: 0;
 }
 
-.v3-form-type-column .word-form-matrix-type-header {
+.v3-form-type-column .word-form-matrix-type-header,
+.v3-concrete-form-row .word-form-matrix-type-header {
   padding-inline: 10px;
   color: var(--word-ink);
 }
@@ -213,6 +225,11 @@
     column-gap: 10px;
     row-gap: 10px;
     overflow-x: visible;
+  }
+
+  .v3-concrete-form-row .word-form-matrix-unified {
+    grid-template-columns: 112px minmax(0, 1fr);
+    column-gap: 10px;
   }
 
   .v3-form-type-column,

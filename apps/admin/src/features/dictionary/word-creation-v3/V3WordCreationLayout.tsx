@@ -66,6 +66,10 @@ function problemTitle(problem: V3Problem) {
       return "词条已在垃圾桶中";
     case "validation":
       return "仍有内容需要完成";
+    // 影响确认失效（后端 409 downstream_confirmation_required）：兜底文案，
+    // 正常路径由词形步/词义步的确认条挡在前面。
+    case "impact_confirmation":
+      return "词形影响需要重新确认";
     case "network":
     case "server":
     case "service_unavailable":
