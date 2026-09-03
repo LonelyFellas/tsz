@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-03T06:42:03.951Z",
+  "_generatedAt": "2026-09-03T13:05:01.130Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2035,7 +2035,14 @@
         "node_binding_changed",
         "meanings_storage_unsafe",
         "pos_meanings_required",
-        "sense_has_inbound_publication_refs"
+        "sense_has_inbound_publication_refs",
+        "phrase_component_not_allowed",
+        "phrase_component_limit_exceeded",
+        "phrase_component_literal_invalid",
+        "phrase_component_self_target",
+        "phrase_component_target_unavailable",
+        "phrase_component_target_nested",
+        "phrase_component_target_stale"
       ]
     },
     "RelatedWordSense": {
@@ -3026,6 +3033,12 @@
           "format": "uuid",
           "description": "与候选行的 base_form_id 相同：词义挂在词性下而不挂在变化组下，这里只是原样带出，\n改选词形时同样以词形自带的 base_form_ids 为准。"
         },
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/PhraseComponentUsageV3" },
+          "description": "该词义（发布快照里）自带的短语成分用词；空则省略。",
+          "maxItems": 100
+        },
         "gloss": { "type": "string" },
         "level": { "type": "string" },
         "pos_id": { "type": "string", "format": "uuid" },
@@ -3049,7 +3062,6 @@
         "matched_dialect",
         "matched_form_type",
         "forms",
-        "component_usages",
         "matches",
         "senses"
       ],
@@ -3062,6 +3074,7 @@
         "component_usages": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/PhraseComponentUsageV3" },
+          "description": "命中词形（`matched_variant_id`）自带的成分用词。B2 起恒为 `[]`，\n所以 spec 里已经标成可选，避免停输出时旧前端 `missing_required_property`。",
           "maxItems": 100
         },
         "entry_id": { "type": "string", "format": "uuid" },
@@ -4057,14 +4070,7 @@
     },
     "WordCommonFormVariantV3": {
       "type": "object",
-      "required": [
-        "id",
-        "dialect",
-        "spelling",
-        "origin",
-        "pronunciations",
-        "component_usages"
-      ],
+      "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
         "component_usages": {
           "type": "array",
@@ -4585,6 +4591,12 @@
         "relations"
       ],
       "properties": {
+        "component_usages": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/PhraseComponentUsageV3" },
+          "description": "短语成分用词：仅 `kind = phrase` 可携带，随词义步保存；缺键表示不改动，\n显式 `[]` 表示清空。",
+          "maxItems": 100
+        },
         "definitions": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/WordDefinitionV3" },
@@ -4791,14 +4803,7 @@
     },
     "WordUkFormVariantV3": {
       "type": "object",
-      "required": [
-        "id",
-        "dialect",
-        "spelling",
-        "origin",
-        "pronunciations",
-        "component_usages"
-      ],
+      "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
         "component_usages": {
           "type": "array",
@@ -4819,14 +4824,7 @@
     },
     "WordUsFormVariantV3": {
       "type": "object",
-      "required": [
-        "id",
-        "dialect",
-        "spelling",
-        "origin",
-        "pronunciations",
-        "component_usages"
-      ],
+      "required": ["id", "dialect", "spelling", "origin", "pronunciations"],
       "properties": {
         "component_usages": {
           "type": "array",
