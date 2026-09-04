@@ -235,9 +235,9 @@ export function AnnotationStrip({
        * 读两遍，连读模式下还会逐字母念「xxx 的第 1 个字母 p」。
        * 注意 textarea 是它的兄弟而不是子节点，所以宿主按 data-v3-* 定位仍然有效。
        *
-       * TODO(无障碍): 词 / 词缝 / 字母目前只认鼠标（span 上既无 tabIndex 也无
-       * onClick），键盘与读屏用户还标不了。要补得另做「光标所在词 + 快捷键落笔」，
-       * 而不是给几十个 span 塞进 tab 序。
+       * 词 / 词缝 / 字母只认鼠标（span 上不设 tabIndex、也不挂 onClick）：admin 是
+       * 内部后台，按项目约定不做无障碍适配，不为此把几十个 span 塞进 tab 序。
+       * 这些 role / aria-label 保留，是给测试用的定位锚点。
        */}
       <div
         className="tsz-ve-strip"
