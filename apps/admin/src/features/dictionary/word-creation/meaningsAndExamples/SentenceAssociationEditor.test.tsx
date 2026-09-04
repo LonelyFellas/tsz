@@ -160,13 +160,25 @@ async function selectAntOption(label: string, optionText: string) {
   fireEvent.click(option);
 }
 
+function findClaimButton(): HTMLButtonElement {
+  const buttons = Array.from(
+    document.querySelectorAll<HTMLButtonElement>("button.ant-btn-primary")
+  ).filter((button) => button.textContent?.includes("正式认领"));
+  if (buttons.length !== 1) {
+    throw new Error(
+      `expected exactly one claim button, found ${buttons.length}`
+    );
+  }
+  return buttons[0]!;
+}
+
 async function waitForClaimButton() {
   await waitFor(() => {
-    const button = screen.getByRole("button", { name: /正式认领/ });
+    const button = findClaimButton();
     expect(button).toBeEnabled();
     expect(button).not.toHaveClass("ant-btn-loading");
   });
-  return screen.getByRole("button", { name: /正式认领/ });
+  return findClaimButton();
 }
 
 const resolved = {
