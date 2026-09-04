@@ -52,6 +52,15 @@ import { useVoiceAudition } from "./useVoiceAudition";
 /** 历史栈上限：标注操作很轻，但长时间编辑也不该无限攒快照。 */
 const MAX_HISTORY = 100;
 
+/**
+ * 连续打字合并成一步撤销的时间窗。
+ *
+ * 不合并的话每个按键推一个快照，一百来个字符就把 MAX_HISTORY 填满，
+ * 早先的标注操作被挤出栈、再也撤不回来。停手超过这个窗口、或中间做了别的操作，
+ * 就重新起一步——与常见编辑器的「一段连续输入算一步」一致。
+ */
+const TYPING_COALESCE_MS = 800;
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "操作失败，请重试";
 }
@@ -159,6 +168,8 @@ export function VoiceEditor({
   /** 记住最近用过的语法结构分类：画笔切到连读/停顿再切回来时不必重挑。 */
   const lastRoleRef = useRef("core");
   const lastPauseRef = useRef(PAUSE_PRESETS[0]!);
+  /** 上一次「键入正文」的时刻；0 表示当前没有正在进行的打字连击。 */
+  const typingRunRef = useRef(0);
 
   const stopUploadPlayback = useCallback(() => {
     uploadAudioRef.current?.pause();
@@ -212,6 +223,7 @@ export function VoiceEditor({
     setText(parsed.value.text);
     setMarks(annotationsToMarks(parsed.value));
     setLoadError(parsed.error ?? "");
+    typingRunRef.current = 0;
     setBrush(DEFAULT_BRUSH);
     setCustomPause("");
     setOpenTool(undefined);
@@ -286,6 +298,16 @@ export function VoiceEditor({
       changeBrush({ kind: "none" });
       return;
     }
+    /*
+     * 连读的面板就是它的工作台：起点/终点回显与「添加」都在里面。关掉面板还留着
+     * 这支笔的话，人还能继续点字母攒草稿，却够不着提交按钮。语法结构与停顿不同，
+     * 它们本来就是「选完收起面板再落笔」，收起后要继续armed。
+     */
+    if (key === undefined && brush.kind === "liaison") {
+      setOpenTool(undefined);
+      changeBrush({ kind: "none" });
+      return;
+    }
     setOpenTool(key);
     if (key === "voices") setVoicesRequested(true);
     /* 已经是这支笔就不重复换：再换一次会把当前分类/时长打回记忆值。 */
@@ -298,11 +320,26 @@ export function VoiceEditor({
     }
   };
 
-  /** 所有会改动内容的操作都走这里，好把上一版整体推进历史栈。 */
-  const commit = (next: (current: EditorSnapshot) => EditorSnapshot) => {
+  /**
+   * 所有会改动内容的操作都走这里，好把上一版整体推进历史栈。
+   *
+   * `typing` 表示这次是键入正文：连着敲的一串只占一步撤销，栈顶那一份就是
+   * 这段输入开始之前的状态，所以续写时不再推新快照。
+   */
+  const commit = (
+    next: (current: EditorSnapshot) => EditorSnapshot,
+    options?: { typing?: boolean }
+  ) => {
     const before: EditorSnapshot = { text, marks };
     const after = next(before);
-    setPast((stack) => [...stack, before].slice(-MAX_HISTORY));
+    const now = Date.now();
+    const continuingRun =
+      options?.typing === true &&
+      now - typingRunRef.current < TYPING_COALESCE_MS;
+    typingRunRef.current = options?.typing === true ? now : 0;
+    if (!continuingRun) {
+      setPast((stack) => [...stack, before].slice(-MAX_HISTORY));
+    }
     setFuture([]);
     setText(after.text);
     setMarks(after.marks);
@@ -312,6 +349,7 @@ export function VoiceEditor({
   const undo = () => {
     const previous = past[past.length - 1];
     if (!previous) return;
+    typingRunRef.current = 0;
     setPast((stack) => stack.slice(0, -1));
     setFuture((stack) => [{ text, marks }, ...stack].slice(0, MAX_HISTORY));
     setText(previous.text);
@@ -333,10 +371,13 @@ export function VoiceEditor({
 
   const changeText = (nextText: string) => {
     // 改文本时按词重挂标注：词没动的保留，被改写的连同它的标注一起消失。
-    commit((current) => ({
-      text: nextText,
-      marks: remapMarks(current.text, nextText, current.marks)
-    }));
+    commit(
+      (current) => ({
+        text: nextText,
+        marks: remapMarks(current.text, nextText, current.marks)
+      }),
+      { typing: true }
+    );
     setDraft({});
   };
 
@@ -730,7 +771,21 @@ export function VoiceEditor({
 
   // 外壳不另起可及名：名字归那个真正可编辑的文本框，避免同名两份。
   return (
-    <section className="tsz-ve-editor" data-readonly={readOnly || undefined}>
+    <section
+      className="tsz-ve-editor"
+      data-readonly={readOnly || undefined}
+      /*
+       * Esc 收笔挂在编辑器根节点而不是画布上：拿着笔时鼠标点不了光标，得有个
+       * 不用瞄按钮的退路，而这时焦点常常还落在工具栏按钮上——挂在画布上收不到。
+       * 浮层渲染在 portal（不在本节点内），所以「Esc 关浮层」不受影响，仍归 antd。
+       */
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        if (brush.kind === "none") return;
+        event.stopPropagation();
+        openToolAndArm("text");
+      }}
+    >
       {blockingError && <Alert type="error" title={blockingError} showIcon />}
 
       <div className="tsz-ve-badge-row">
@@ -763,7 +818,6 @@ export function VoiceEditor({
         inputDataAttributes={inputDataAttributes}
         inputPlaceholder={placeholder}
         onTextChange={changeText}
-        onDisarm={() => openToolAndArm("text")}
         canUndo={past.length > 0}
         canRedo={future.length > 0}
         onUndo={undo}

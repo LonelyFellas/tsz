@@ -746,6 +746,81 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(applied(view).annotations).toHaveLength(1);
   });
 
+  it("连着敲的一串字只占一步撤销", () => {
+    // 每个按键推一个快照的话，MAX_HISTORY 一百来个字符就被填满，
+    // 早先的标注操作会被挤出栈、再也撤不回来。
+    render(<VoiceEditor {...props()} />);
+    const input = () => screen.getByLabelText("语音编辑器");
+    for (const value of ["a c", "a ce", "a cen", "a cent"]) {
+      fireEvent.change(input(), { target: { value } });
+    }
+    expect(input()).toHaveValue("a cent");
+
+    fireEvent.click(button("上一步"));
+    expect(input()).toHaveValue(TEXT);
+    expect(button("上一步")).toBeDisabled();
+  });
+
+  it("中间做了标注就断开连击，两段输入各占一步", () => {
+    render(<VoiceEditor {...props()} />);
+    const input = () => screen.getByLabelText("语音编辑器");
+
+    fireEvent.change(input(), { target: { value: "a centre of the town" } });
+    pickRole("核心词");
+    fireEvent.mouseDown(word("centre"));
+    fireEvent.change(input(), { target: { value: "a centre of the city" } });
+
+    fireEvent.click(button("上一步")); // 撤第二段输入
+    expect(input()).toHaveValue("a centre of the town");
+    expect(word("centre")).toHaveClass("is-core");
+
+    fireEvent.click(button("上一步")); // 撤标注
+    expect(word("centre")).not.toHaveClass("is-core");
+
+    fireEvent.click(button("上一步")); // 撤第一段输入
+    expect(input()).toHaveValue(TEXT);
+  });
+
+  it("停手超过合并窗口后再敲，另起一步撤销", () => {
+    const now = vi.spyOn(Date, "now");
+    now.mockReturnValue(1_000);
+    render(<VoiceEditor {...props()} />);
+    const input = () => screen.getByLabelText("语音编辑器");
+
+    fireEvent.change(input(), { target: { value: "a centre of the town" } });
+    // 隔了 2 秒才继续敲：算两段
+    now.mockReturnValue(3_000);
+    fireEvent.change(input(), { target: { value: "a centre of the city" } });
+
+    fireEvent.click(button("上一步"));
+    expect(input()).toHaveValue("a centre of the town");
+  });
+
+  it("关掉连读面板即收笔，不会留下够不着「添加」的草稿", () => {
+    render(<VoiceEditor {...props()} />);
+    const canvas = document.querySelector(".tsz-ve-canvas")!;
+    useLiaisonBrush();
+    expect(canvas).toHaveAttribute("data-target", "letter");
+
+    // 再点一次 = 关面板；面板是它的工作台，关掉就该收笔
+    useLiaisonBrush();
+    expect(canvas).toHaveAttribute("data-target", "none");
+  });
+
+  it("焦点在工具栏上时 Esc 也能收笔", () => {
+    // Esc 处理挂在编辑器根节点而非画布：落笔时 preventDefault 会把焦点留在按钮上，
+    // 挂画布上就收不到这个键。
+    render(<VoiceEditor {...props()} />);
+    const canvas = document.querySelector(".tsz-ve-canvas")!;
+    pickRole("核心词");
+    expect(canvas).toHaveAttribute("data-target", "word");
+
+    fireEvent.keyDown(document.querySelector(".tsz-ve-role-button")!, {
+      key: "Escape"
+    });
+    expect(canvas).toHaveAttribute("data-target", "none");
+  });
+
   it("默认空手：不取笔时点词不落标，鼠标归文本", () => {
     const view = props();
     render(<VoiceEditor {...view} />);

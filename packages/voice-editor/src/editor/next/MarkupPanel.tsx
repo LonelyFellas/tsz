@@ -65,7 +65,6 @@ export interface MarkupPanelProps {
   inputDataAttributes?: Record<string, string>;
   inputPlaceholder?: string;
   onTextChange: (value: string) => void;
-  onDisarm: () => void;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -96,7 +95,6 @@ export function MarkupPanel({
   inputDataAttributes,
   inputPlaceholder,
   onTextChange,
-  onDisarm,
   canUndo,
   canRedo,
   onUndo,
@@ -220,7 +218,6 @@ export function MarkupPanel({
         inputDataAttributes={inputDataAttributes}
         inputPlaceholder={inputPlaceholder}
         onTextChange={onTextChange}
-        onDisarm={onDisarm}
         text={text}
         marks={marks}
         brush={brush}

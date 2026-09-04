@@ -55,8 +55,6 @@ export interface AnnotationStripProps {
   inputDataAttributes?: Record<string, string>;
   inputPlaceholder?: string;
   onTextChange: (value: string) => void;
-  /** 收笔，把鼠标交还给文本。 */
-  onDisarm: () => void;
   onWordClick: (tokenIndex: number) => void;
   onGapClick: (gapIndex: number) => void;
   onLetterClick: (anchor: LiaisonAnchor) => void;
@@ -97,7 +95,6 @@ export function AnnotationStrip({
   inputDataAttributes,
   inputPlaceholder,
   onTextChange,
-  onDisarm,
   onWordClick,
   onGapClick,
   onLetterClick,
@@ -219,17 +216,7 @@ export function AnnotationStrip({
   };
 
   return (
-    <div
-      className="tsz-ve-canvas"
-      data-target={target}
-      // Esc 收笔：拿着笔时鼠标点不了光标，得有个不用瞄按钮的退路。
-      onKeyDown={(event) => {
-        if (event.key === "Escape" && painting) {
-          event.stopPropagation();
-          onDisarm();
-        }
-      }}
-    >
+    <div className="tsz-ve-canvas" data-target={target}>
       {/*
        * 标注层对读屏隐藏：正文由下面那个 textarea 提供，两边都念的话同一句话会被
        * 读两遍，连读模式下还会逐字母念「xxx 的第 1 个字母 p」。
