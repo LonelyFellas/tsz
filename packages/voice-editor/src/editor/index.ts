@@ -1,15 +1,7 @@
-export { VoiceRichTextEditor as default } from "./VoiceRichTextEditor";
-export { VoiceRichTextEditor } from "./VoiceRichTextEditor";
-export { editorJsonToRichTextV2, richTextToEditorJson } from "./mapping";
-export {
-  EmphasisMark,
-  HighlightMark,
-  LiaisonMark,
-  PauseNode,
-  PhonemeMark
-} from "./extensions";
+export { VoiceEditor as default } from "./next";
+export { VoiceEditor } from "./next";
 export type {
+  VoiceEditorProps,
   VoicePreviewAdapter,
-  VoiceRichTextEditorProps,
   VoiceSettings
 } from "../types";

@@ -72,12 +72,17 @@ export interface VoiceRichTextFieldProps {
   onEdit?: () => void;
 }
 
-export interface VoiceRichTextEditorProps {
-  open: boolean;
+/**
+ * 编辑器是**受控内联**组件：直接落在表单里，改动实时抛给宿主，没有「应用/取消」。
+ *
+ * 早期版本是抽屉 + 应用/取消，标注要先开一层浮层才看得见。既然标注本身就是在
+ * 正文上点，把它和正文分到两个层面反而多一次往返；内联后所见即所改。
+ */
+export interface VoiceEditorProps {
   value: RichText;
   language?: string;
+  /** 无障碍名，同时用于区分同一页面上的多个编辑器。 */
   contextLabel?: string;
-  pronunciationHints?: Readonly<Record<string, string>>;
   previewAdapter?: VoicePreviewAdapter;
   /**
    * previewAdapter 是否是「假」适配器(不发请求、返回假音频)。宿主自己判断并告知，
@@ -85,8 +90,13 @@ export interface VoiceRichTextEditorProps {
    */
   previewIsMock?: boolean;
   readOnly?: boolean;
-  onApply: (value: RichTextV2) => void;
-  onCancel: () => void;
-  onDirtyChange?: (dirty: boolean) => void;
-  confirmDiscard?: () => boolean | Promise<boolean>;
+  /**
+   * 透传到正文输入框上的 data-* 属性。宿主（admin）用它做错误定位：拿
+   * `[data-v3-node-id][data-v3-field]` 找到元素后要 `focus()` 并校验
+   * `activeElement`，所以这些属性必须落在真正可聚焦的输入框上，挂在外层容器无效。
+   */
+  inputDataAttributes?: Record<string, string>;
+  /** 正文输入框的占位提示；宿主的字段专属提示比通用那句有用，故可覆盖。 */
+  placeholder?: string;
+  onChange: (value: RichTextV2) => void;
 }

@@ -1315,17 +1315,6 @@
   justify-content: space-between;
 }
 
-.word-voice-editor-action {
-  height: 24px;
-  padding-inline: 6px;
-  color: #5d6574;
-}
-
-.word-voice-editor-action:hover {
-  color: #0071e3 !important;
-  background: #eaf4ff !important;
-}
-
 .word-dialect-panel-header {
   min-height: 24px;
 }

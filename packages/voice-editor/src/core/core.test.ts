@@ -81,9 +81,16 @@ describe("RichText V2 normalization and validation", () => {
       version: 2,
       text: "abcdef",
       annotations: [
-        { type: "liaison", start: 0, end: 4 },
+        /*
+         * 两条相接的 liaison **不合并**：连读是「两点之间的一条连线」，
+         * a‿b 与 b‿c 相接是连读链（pick‿it‿up）最常见的形态，合并成 a‿c
+         * 会把两道弧变成一道错误的长弧。emphasis 那种「一段文字的属性」
+         * 相接才该合并，见下一条 [0,2)+[2,4) → [0,4)。
+         */
+        { type: "liaison", start: 0, end: 2 },
         { type: "emphasis", start: 0, end: 4, level: "strong" },
         { type: "highlight", start: 1, end: 3, color: "blue" },
+        { type: "liaison", start: 2, end: 4 },
         { type: "pause", at: 4, duration_ms: 800 }
       ]
     });
@@ -221,11 +228,17 @@ describe("RichText compatibility and canonical hash", () => {
     const snapshot = structuredClone(input);
 
     const migrated = migrateRichTextV1(input);
+    /*
+     * 连读点 0、2、3 里，点 1 不是连读点，所以 [0,2) 与 [2,4) 只是首尾相接、
+     * 并非同一段，必须分开——早先它们被合并成 [0,5)，等于凭空多出一处点 1
+     * 的连读。点 2 与点 3 相邻，[2,4) 与 [3,5) 真重叠，合并成 [2,5) 是对的。
+     */
     expect(migrated.annotations).toEqual(
       expect.arrayContaining([
         { type: "emphasis", start: 0, end: 1, level: "strong" },
         { type: "highlight", start: 1, end: 3, color: "blue" },
-        { type: "liaison", start: 0, end: 5 }
+        { type: "liaison", start: 0, end: 2 },
+        { type: "liaison", start: 2, end: 5 }
       ])
     );
     expect(input).toEqual(snapshot);

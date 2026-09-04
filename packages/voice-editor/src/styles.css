@@ -20,12 +20,431 @@
   text-decoration: underline wavy var(--ant-color-error, #ff4d4f);
 }
 
+/* 语法结构三分类的配色单一来源：按钮与正文标记共用。 */
+:root {
+  --tsz-ve-role-function: #000000;
+  --tsz-ve-role-core: #2f54ff;
+  --tsz-ve-role-grammar: #b4b4b4;
+  /* 同一档灰用作字色时要更深：#b4b4b4 在白底上仅约 1.9:1，读不出来。 */
+  --tsz-ve-role-grammar-text: #9b9b9b;
+}
+
+/* 语法结构标记。data-level 为三分类之一；"strong" 是历史数据，按核心词呈现。 */
 .tsz-ve-emphasis {
-  color: #0e7c7b;
-  background: rgba(14, 124, 123, 0.12);
+  /* 兜底取核心词字色：万一某处漏传 data-level，也不会渲染成无色纯文本。 */
+  color: var(--tsz-ve-role-core);
+  font-weight: 600;
+}
+
+.tsz-ve-emphasis[data-level="function"] {
+  color: var(--tsz-ve-role-function);
+  background: none;
+}
+
+.tsz-ve-emphasis[data-level="core"],
+.tsz-ve-emphasis[data-level="strong"] {
+  color: var(--tsz-ve-role-core);
+  background: none;
+}
+
+.tsz-ve-emphasis[data-level="grammar"] {
+  color: var(--tsz-ve-role-grammar-text);
+  background: none;
+}
+
+.tsz-ve-toolbar-label {
+  min-width: 56px;
+}
+
+/*
+ * 六个工具的触发按钮长得一模一样，只有「当前用的是哪支笔」用同一套激活样式区分。
+ * 颜色只留给语法结构按钮上那颗色点——三分类靠颜色识别，其余工具不必各自一色；
+ * 一排彩色按钮反而让人分不清哪个是当前状态、哪个只是它本来的颜色。
+ */
+.tsz-ve-tool-toggle[aria-pressed="true"],
+.tsz-ve-tool-toggle[aria-pressed="true"]:not(:disabled):hover,
+.tsz-ve-tool-toggle[aria-pressed="true"]:not(:disabled):focus-visible {
+  border-color: var(--tsz-ve-role-core);
+  background: #eef2ff;
+  color: var(--tsz-ve-role-core);
+  font-weight: 600;
+}
+
+.tsz-ve-tool-toggle:disabled {
+  opacity: 0.45;
+}
+
+/* 时长写在按钮上，档位在 500ms↔5s 之间变时按钮宽度不要跟着跳。 */
+.tsz-ve-pause-button {
+  min-width: 78px;
+}
+
+.tsz-ve-custom-input {
+  width: 160px;
+}
+
+/* ── 新版编辑器（editor/next） ──────────────────────────────────────── */
+
+.tsz-ve-row-label {
+  min-width: 72px;
+}
+
+.tsz-ve-audition-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--ant-color-text-secondary, #8c8c8c);
+}
+
+.tsz-ve-audition-button:not(:disabled):hover {
+  color: var(--tsz-ve-role-core);
+}
+
+/* 正在播放的那一条持续高亮，便于在整片音色里认出声音来源。 */
+.tsz-ve-audition-button[data-playing="true"] {
+  color: var(--tsz-ve-role-core);
+}
+
+.tsz-ve-text-input {
+  font-size: 16px;
+}
+
+/* ── 标注带：词 + 词缝 ─────────────────────────────────────────────── */
+
+/*
+ * 画布：显色层与透明 textarea 严格同域叠放。
+ * 边框与底色画在外层，两个内层各自带**完全相同**的内边距与字体度量——
+ * 任何一项对不上，光标就会和字错位。
+ */
+.tsz-ve-canvas {
+  position: relative;
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-radius: 10px;
+  background: var(--ant-color-bg-layout, #fafafa);
+}
+
+.tsz-ve-strip,
+.tsz-ve-canvas-input {
+  /* 上方留给连读弧，下方留给上下两排停顿记号。 */
+  padding: 34px 14px 46px;
+  font-family: inherit;
+  font-size: 26px;
+  /* 行高必须写死数值：textarea 的 normal 与 div 的 normal 不一定同值。 */
+  line-height: 1.6;
+  letter-spacing: normal;
+  /* 换行规则也要一致，否则长词的折行位置两层会不同。 */
+  overflow-wrap: break-word;
+  white-space: pre-wrap;
+  word-break: normal;
+}
+
+.tsz-ve-strip {
+  position: relative;
+  min-height: 1.6em;
+}
+
+/*
+ * 上层只留光标和选区：字是透明的，看到的字来自下层——逐词上色、跨词画弧
+ * 是 textarea 做不到的，而光标、选区、输入法、粘贴又是它做得最好的。
+ */
+.tsz-ve-canvas-input {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: transparent;
+  caret-color: var(--ant-color-text, #1a1a1a);
+  overflow: hidden;
+  resize: none;
+}
+
+.tsz-ve-canvas-input::placeholder {
+  color: var(--ant-color-text-quaternary, #bfbfbf);
+}
+
+/* 拿起笔时鼠标归标注层；空手时归 textarea，好放光标、拉选区。 */
+.tsz-ve-canvas[data-target="none"] .tsz-ve-strip {
+  pointer-events: none;
+}
+
+.tsz-ve-canvas:not([data-target="none"]) .tsz-ve-canvas-input {
+  pointer-events: none;
+}
+
+/* 连读弧独立一层：要跨越任意距离并压在字上方，CSS 伪元素画不出这种形状。 */
+.tsz-ve-arc-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.tsz-ve-arc {
+  fill: none;
+  stroke: #db2777;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* 加粗的透明副本只用来接点击，让「点弧线删除」不必瞄准 1px 的线。 */
+.tsz-ve-arc-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-linecap: round;
+  cursor: pointer;
+  pointer-events: stroke;
+}
+
+.tsz-ve-arc-hit:hover + .tsz-ve-arc {
+  stroke: #9d174d;
+}
+
+/*
+ * 连读模式下词只是字母的容器，同样必须是**零内边距的纯 inline**。
+ * 早先这里留着 inline-flex + 1px 2px 的内边距：每个词横向多 4px、逐词累计，
+ * 三四个词就和上层 textarea 错开一个字宽；而 inline-flex 是原子行内盒，
+ * overflow-wrap 进不去，超长单词还会出现「上层断行、下层不断行」。
+ */
+.tsz-ve-token.is-letters {
+  border-radius: 5px;
+}
+
+.tsz-ve-letter {
+  padding: 0;
+  border: 0;
   border-radius: 3px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+.tsz-ve-letter:hover {
+  background: rgba(219, 39, 119, 0.22);
+}
+
+/* 起点/终点分色，避免两段选区看成一段（沿用参考件的蓝/橙）。 */
+.tsz-ve-letter.is-anchor-start {
+  background: #1677ff;
+  color: #fff;
+}
+
+.tsz-ve-letter.is-anchor-end {
+  background: #fa8c16;
+  color: #fff;
+}
+
+.tsz-ve-letter:focus-visible {
+  outline: 2px solid #db2777;
+  outline-offset: 1px;
+}
+
+/* 「起点 / 终点」回显：词名 + 该词里被选中的字母。 */
+.tsz-ve-anchor-slot {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+  padding: 1px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.tsz-ve-anchor-slot.is-start {
+  border-color: #1677ff;
+  color: #1677ff;
+}
+
+.tsz-ve-anchor-slot.is-end {
+  border-color: #fa8c16;
+  color: #fa8c16;
+}
+
+.tsz-ve-anchor-letters {
   font-weight: 700;
-  padding: 0 2px;
+}
+
+.tsz-ve-anchor-letters::before {
+  content: "·";
+  margin-right: 4px;
+  opacity: 0.5;
+}
+
+/*
+ * 「添加」用连读自己的粉色，不用 antd 主色蓝：这一行里蓝色已经是「起点锚点」
+ * 的意思，主按钮再用蓝会让同一个颜色在同一行表示两件事。
+ */
+.tsz-ve-liaison-commit.tsz-ve-liaison-commit {
+  border-color: #db2777;
+  background: #db2777;
+  color: #fff;
+}
+
+.tsz-ve-liaison-commit.tsz-ve-liaison-commit:not(:disabled):hover,
+.tsz-ve-liaison-commit.tsz-ve-liaison-commit:not(:disabled):focus-visible {
+  border-color: #c21f68;
+  background: #c21f68;
+  color: #fff;
+}
+
+.tsz-ve-liaison-commit.tsz-ve-liaison-commit:disabled {
+  border-color: var(--ant-color-border, #d9d9d9);
+  background: var(--ant-color-bg-container-disabled, #f5f5f5);
+  color: var(--ant-color-text-disabled, rgba(0, 0, 0, 0.25));
+}
+
+/*
+ * 连读画笔下词渲染成 inline-flex 容器、其余画笔下是 button，盒模型必须一致，
+ * 否则每次切画笔整行都会上下跳几像素。
+ */
+/*
+ * 词必须是**零内边距的纯 inline**：横向内边距会逐词累计，一个词偏 4px，
+ * 一行下来就和上层 textarea 错开半个字。同理不能用 inline-flex。
+ */
+.tsz-ve-token {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/*
+ * 词与词缝是 <span aria-disabled>，不是 <button>——`:disabled` 在它们身上永不
+ * 匹配，`:not(:disabled)` 恒真。可用/禁用一律挂 aria-disabled 判定，否则「不该
+ * 有反馈的时候给了反馈」这类错会静默发生。
+ */
+.tsz-ve-token[aria-disabled="true"] {
+  cursor: default;
+}
+
+/* 可点时给出悬停反馈；画笔指向词缝时，词不给反馈，避免点了没反应。 */
+.tsz-ve-token[aria-disabled="false"]:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/*
+ * 语法结构只改字色、不填背景：整句仍读作一段正常文本，标记是「这个词是什么」
+ * 而不是「这个词被高亮了」。填背景会把短语切成一块块色条，反而盖过文本本身。
+ */
+.tsz-ve-token.is-function {
+  color: var(--tsz-ve-role-function);
+}
+.tsz-ve-token.is-core {
+  color: var(--tsz-ve-role-core);
+}
+.tsz-ve-token.is-grammar {
+  color: var(--tsz-ve-role-grammar-text);
+}
+
+/*
+ * 词缝常态只占一个空格的宽度，让整句读起来是正常字距；只有切到停顿画笔、
+ * 这条缝真的可点时，才撑开到 26px 的命中区（不小于可用性建议的 24px）。
+ * 早先无条件用 26px，结果每个词之间都被撑出一道大缝。
+ */
+/*
+ * 词缝里装的是原文里那个**真正的空格字符**，所以不能有固定宽高——
+ * 它的宽度就该是一个空格的宽度，两层才对得上。
+ */
+.tsz-ve-gap {
+  position: relative;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+/*
+ * 停顿画笔生效时把命中区向两侧各外扩 11px，实测可点宽度 3+22=25px，够到可用性
+ * 建议的 24px。布局宽度保持 3px 不变：改布局宽度会让整行随切画笔横向重排，还会
+ * 让连读弧的测量赶不上。此时词本就禁用，外扩区不抢点击。
+ *
+ * 注意这块只能在真浏览器里用 elementFromPoint 验：伪元素不进 getBoundingClientRect，
+ * 按盒子量会误判成 3px；jsdom 更是不做布局，单测覆盖不到。
+ */
+.tsz-ve-strip[data-target="gap"] .tsz-ve-gap::after {
+  content: "";
+  position: absolute;
+  inset: 0 -11px;
+}
+
+.tsz-ve-gap[aria-disabled="true"] {
+  cursor: default;
+}
+
+/* 只有切到停顿画笔、这条缝真的可点时才画竖线。 */
+.tsz-ve-gap[aria-disabled="false"]::before {
+  content: "";
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  left: 50%;
+  width: 3px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.tsz-ve-gap[aria-disabled="false"]:focus-visible {
+  outline: 2px solid var(--tsz-ve-role-core);
+  outline-offset: 1px;
+}
+
+.tsz-ve-gap[aria-disabled="false"]:hover::before {
+  background: var(--tsz-ve-role-core);
+}
+
+/* 有停顿片时不再画那条细提示，两个记号叠在一起会糊。 */
+.tsz-ve-gap.has-pause[aria-disabled="false"]::before {
+  content: none;
+}
+
+/* 连读弧走文字上方，停顿记号走下方，两条通道互不遮挡。 */
+.tsz-ve-gap-pause {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(-50%);
+  color: #b45309;
+  pointer-events: none;
+}
+
+/* 竖线是语音学里表示停顿的记号，比色块更贴合这个语义。 */
+.tsz-ve-gap-pause-bar {
+  width: 2px;
+  height: 12px;
+  border-radius: 1px;
+  background: currentColor;
+}
+
+/*
+ * 下排的竖线拉长到第二行，标签始终贴在自己那根线的末端——
+ * 否则错开后看不出哪个标签属于哪条缝。
+ */
+.tsz-ve-gap-pause[data-row="1"] .tsz-ve-gap-pause-bar {
+  height: 28px;
+}
+
+.tsz-ve-gap-pause-value {
+  margin-top: 1px;
+  font-size: 11px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .tsz-ve-phoneme {
@@ -63,6 +482,17 @@
   pointer-events: none;
 }
 
+/* 起点只画左半弧、终点只画右半弧，两段拼成一条完整连读弧。 */
+.tsz-ve-liaison[data-position="start"]::after {
+  border-right: 0;
+  border-radius: 9px 0 0 0;
+}
+
+.tsz-ve-liaison[data-position="end"]::after {
+  border-left: 0;
+  border-radius: 0 9px 0 0;
+}
+
 .tsz-ve-highlight {
   border-radius: 0.55em;
   padding: 0.06em 0.25em;
@@ -97,31 +527,6 @@
   font-size: 11px;
   line-height: 20px;
   user-select: none;
-}
-
-.tsz-ve-editor-shell .ProseMirror {
-  min-height: 260px;
-  padding: 18px;
-  border: 1px solid var(--ant-color-border, #d9d9d9);
-  border-radius: 10px;
-  outline: none;
-  font-size: 18px;
-  line-height: 2.1;
-}
-
-.tsz-ve-editor-shell .ProseMirror:focus {
-  border-color: var(--ant-color-primary, #1677ff);
-  box-shadow: 0 0 0 2px rgba(5, 145, 255, 0.1);
-}
-
-.tsz-ve-editor-shell .ProseMirror p {
-  margin: 0 0 0.8em;
-}
-.tsz-ve-editor-shell .ProseMirror p:last-child {
-  margin-bottom: 0;
-}
-.tsz-ve-editor-shell .ProseMirror-selectednode {
-  outline: 2px solid #b45309;
 }
 
 .tsz-ve-color-button {
@@ -176,4 +581,373 @@
   @page {
     margin: 1.6cm;
   }
+}
+
+/* ── 已上传音频列表 ─────────────────────────────────────────────── */
+
+.tsz-ve-upload-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* 用网格对齐：名字长短不一时，标签和「移除」仍各自成列，不参差。 */
+.tsz-ve-upload-item {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
+  gap: 0 10px;
+  align-items: center;
+  min-height: 30px;
+}
+
+.tsz-ve-upload-name {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tsz-ve-upload-tag {
+  padding: 0 7px;
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-radius: 999px;
+  color: var(--ant-color-text-secondary, #8c8c8c);
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.tsz-ve-upload-list {
+  min-width: 340px;
+}
+
+/*
+ * 移除是次要动作，常态用弱化的文字色；只在悬停/聚焦时转红，
+ * 避免一列红字比文件名本身还抢眼。
+ */
+.tsz-ve-upload-remove.tsz-ve-upload-remove {
+  color: var(--ant-color-text-secondary, #8c8c8c);
+}
+
+.tsz-ve-upload-remove.tsz-ve-upload-remove:not(:disabled):hover,
+.tsz-ve-upload-remove.tsz-ve-upload-remove:not(:disabled):focus-visible {
+  color: var(--ant-color-error, #ff4d4f);
+}
+
+/* ── 标注器：工具栏 + 编辑区连成一体（富文本头部的形态） ──────────── */
+
+.tsz-ve-markup {
+  width: 100%;
+}
+
+.tsz-ve-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-radius: 10px 10px 0 0;
+  background: var(--ant-color-bg-container, #fff);
+}
+
+.tsz-ve-toolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--ant-color-border, #d9d9d9);
+}
+
+/* 与工具栏共用一条边：视觉上是同一个控件，而不是上下两块。 */
+.tsz-ve-markup .tsz-ve-canvas {
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+}
+
+.tsz-ve-toolbar .tsz-ve-custom-input {
+  width: 132px;
+}
+
+/* 每枚工具连同它前面的分隔线占一格，工具栏因此是恒定宽度的一排。 */
+.tsz-ve-toolbar-slot {
+  display: contents;
+}
+
+/* 纯图标按钮做成等宽方块，图标居中；文案走 Tooltip 与 aria-label。 */
+.tsz-ve-icon-button.tsz-ve-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-width: 28px;
+  padding: 0;
+  font-size: 15px;
+}
+
+/* ── 下拉工具（音色 / 语速 / 音频）───────────────────────────────────── */
+
+/*
+ * 触发按钮：名字后面跟一枚当前值徽章，工具栏顺带成了状态条——
+ * 不点开也能看到「启用了几个音色、现在多少倍速、传了几条音频」。
+ */
+.tsz-ve-tool-summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  margin-left: 2px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: var(--ant-color-fill-tertiary, #f0f0f0);
+  color: var(--ant-color-text-secondary, #8c8c8c);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+}
+
+.tsz-ve-tool-toggle[aria-pressed="true"] .tsz-ve-tool-summary {
+  background: var(--tsz-ve-role-core);
+  color: #fff;
+}
+
+/*
+ * 面板宽度定在自己的容器上，不去改 antd 的内部类名：v6 里
+ * .ant-popover-inner-content 根本不存在，按那个类名写会静默失效。
+ */
+.tsz-ve-pop {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 208px;
+  max-width: min(360px, 80vw);
+  padding: 2px;
+}
+
+.tsz-ve-pop-upload {
+  gap: 8px;
+  min-width: 288px;
+  padding: 4px;
+}
+
+.tsz-ve-pop-section + .tsz-ve-pop-section {
+  margin-top: 6px;
+}
+
+/* 语种用一行小标题带色，而不是浮在卡角外的徽标——浮层里那种徽标必被切边。 */
+.tsz-ve-pop-section-head {
+  padding: 2px 8px 4px;
+  color: var(--tsz-ve-pop-accent, var(--ant-color-text-secondary, #8c8c8c));
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.tsz-ve-pop-section[data-locale="en-GB"] {
+  --tsz-ve-pop-accent: #1c4bff;
+}
+
+.tsz-ve-pop-section[data-locale="en-US"] {
+  --tsz-ve-pop-accent: #e5308f;
+}
+
+.tsz-ve-pop-row {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.tsz-ve-pop-row:hover {
+  background: var(--ant-color-fill-quaternary, #f5f5f5);
+}
+
+.tsz-ve-pop-hit {
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.tsz-ve-pop-hit:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.tsz-ve-pop-hit:focus-visible {
+  outline: 2px solid var(--tsz-ve-role-core);
+  outline-offset: -2px;
+}
+
+/* 勾选位常驻占宽，勾上勾下时行内文字不会左右跳。 */
+.tsz-ve-pop-check {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  color: var(--tsz-ve-pop-accent, var(--tsz-ve-role-core));
+  font-size: 12px;
+  visibility: hidden;
+}
+
+.tsz-ve-pop-hit[aria-checked="true"] .tsz-ve-pop-check {
+  visibility: visible;
+}
+
+.tsz-ve-pop-name {
+  overflow: hidden;
+  flex: 1;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tsz-ve-pop-hit[aria-checked="true"] .tsz-ve-pop-name {
+  font-weight: 600;
+}
+
+.tsz-ve-pop-meta {
+  flex: none;
+  color: var(--ant-color-text-secondary, #8c8c8c);
+  font-size: 12px;
+}
+
+.tsz-ve-pop-divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--ant-color-split, #f0f0f0);
+}
+
+.tsz-ve-pop-foot,
+.tsz-ve-pop-field {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 0 6px;
+  font-size: 12px;
+}
+
+.tsz-ve-pop-field {
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tsz-ve-pop-loading,
+.tsz-ve-pop-status {
+  padding: 6px 8px;
+  color: var(--ant-color-text-secondary, #8c8c8c);
+  font-size: 12px;
+}
+
+.tsz-ve-pop-status {
+  border-top: 1px solid var(--ant-color-split, #f0f0f0);
+  margin-top: 4px;
+}
+
+/* 语法结构那三行左侧的色块，与标注带上的字色一致。 */
+.tsz-ve-pop-swatch {
+  display: inline-block;
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.tsz-ve-pop-swatch.is-function {
+  background: var(--tsz-ve-role-function);
+}
+
+.tsz-ve-pop-swatch.is-core {
+  background: var(--tsz-ve-role-core);
+}
+
+.tsz-ve-pop-swatch.is-grammar {
+  background: var(--tsz-ve-role-grammar);
+}
+
+.tsz-ve-pop-hint {
+  padding: 2px 6px 4px;
+  color: var(--ant-color-text-secondary, #8c8c8c);
+  font-size: 12px;
+}
+
+.tsz-ve-pop-liaison {
+  min-width: 236px;
+}
+
+/* 浮层里的自定义输入框不收窄的话，会把几个很短的档位撑出一片空白。 */
+.tsz-ve-pop .tsz-ve-custom-input {
+  width: 112px;
+}
+
+/* 连读工作台：锚点一行、动作一行，整体压到两行高。 */
+.tsz-ve-liaison-anchors {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 2px 6px;
+  font-size: 13px;
+}
+
+.tsz-ve-anchor-field {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.tsz-ve-liaison-arrow {
+  color: var(--ant-color-text-quaternary, #bfbfbf);
+}
+
+.tsz-ve-liaison-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 6px;
+}
+
+.tsz-ve-liaison-actions .tsz-ve-pop-hint {
+  flex: 1;
+  padding: 0;
+}
+
+/* 工具栏上那枚色块跟在「语法结构」后面，右边不再留字距。 */
+.tsz-ve-role-dot {
+  margin-right: 0;
+  margin-left: 2px;
+}
+
+/* ── 内联外壳：编辑器直接落在宿主表单里，不再有抽屉 ─────────────────── */
+
+.tsz-ve-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+/* 「模拟」标记贴在文本框右上角，不占一行。 */
+.tsz-ve-text-row {
+  position: relative;
+}
+
+.tsz-ve-text-row .tsz-ve-preview-mock-tag {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  margin: 0;
 }

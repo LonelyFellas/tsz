@@ -5,7 +5,7 @@ import type {
   EnglishTextV2,
   RichText
 } from "@tsz/types";
-import type { VoiceRichTextEditorProps } from "@tsz/voice-editor/editor";
+import type { VoiceEditorProps } from "@tsz/voice-editor/editor";
 import {
   act,
   fireEvent,
@@ -138,34 +138,34 @@ vi.mock("@tsz/voice-editor/editor", async () => {
   );
   return {
     ...actual,
-    VoiceRichTextEditor: ({
-      open,
+    // 内联受控：编辑器就地渲染，改动实时回写，没有开合与应用/取消。
+    VoiceEditor: ({
       value,
-      pronunciationHints,
+      contextLabel,
+      readOnly,
       previewAdapter,
       previewIsMock,
-      onApply,
-      onCancel
-    }: VoiceRichTextEditorProps) =>
-      open ? (
-        <div
-          role="dialog"
-          aria-label="测试语音编辑器"
-          data-pronunciation-hint={pronunciationHints?.centre}
-          data-preview-enabled={String(Boolean(previewAdapter))}
-          data-preview-mock={String(Boolean(previewIsMock))}
-        >
-          <button
-            type="button"
-            onClick={() => onApply(actual.toRichTextV2(value))}
-          >
-            应用
-          </button>
-          <button type="button" onClick={onCancel}>
-            取消
-          </button>
-        </div>
-      ) : null
+      onChange
+    }: VoiceEditorProps) => (
+      <div
+        data-testid="voice-editor"
+        data-context-label={contextLabel}
+        data-preview-enabled={String(Boolean(previewAdapter))}
+        data-preview-mock={String(Boolean(previewIsMock))}
+      >
+        <textarea
+          aria-label={contextLabel}
+          value={actual.toRichTextV2(value).text}
+          readOnly={readOnly}
+          onChange={(event) =>
+            onChange({
+              ...actual.toRichTextV2(value),
+              text: event.target.value
+            })
+          }
+        />
+      </div>
+    )
   };
 });
 
@@ -2031,9 +2031,14 @@ describe("MeaningsAndExamplesStep", () => {
     expect(
       within(englishCard!).getByRole("note", { name: "例句主关联" })
     ).toHaveTextContent("已自动关联当前词义");
-    expect(
-      within(englishCard!).getByLabelText(/高级语音编辑/)
-    ).toBeInTheDocument();
+    // 编辑器就地内联，不再有「高级语音编辑」这个入口
+    expect(within(englishCard!).queryByLabelText(/高级语音编辑/)).toBeNull();
+    // 编辑器按需加载，首帧是 Suspense 兜底的只读文本框
+    await waitFor(() =>
+      expect(
+        within(englishCard!).getByTestId("voice-editor")
+      ).toBeInTheDocument()
+    );
     fireEvent.change(screen.getAllByLabelText("汉语译文")[0]!, {
       target: { value: "这是更新后的汉语译文。" }
     });
@@ -2069,11 +2074,9 @@ describe("MeaningsAndExamplesStep", () => {
     voicePreview.mocked = true;
     renderStep(wordFixture({ ready: true }));
 
-    fireEvent.click(screen.getAllByLabelText(/高级语音编辑/)[0]!);
-
-    const dialog = await screen.findByLabelText("测试语音编辑器");
-    expect(dialog).toHaveAttribute("data-preview-enabled", "true");
-    expect(dialog).toHaveAttribute("data-preview-mock", "true");
+    const editor = (await screen.findAllByTestId("voice-editor"))[0]!;
+    expect(editor).toHaveAttribute("data-preview-enabled", "true");
+    expect(editor).toHaveAttribute("data-preview-mock", "true");
   });
 
   it("试听走真实 TTS 时不给语音富文本编辑器打「模拟」标记", async () => {
@@ -2081,14 +2084,12 @@ describe("MeaningsAndExamplesStep", () => {
     featureFlags.VOICE_PREVIEW = true;
     renderStep(wordFixture({ ready: true }));
 
-    fireEvent.click(screen.getAllByLabelText(/高级语音编辑/)[0]!);
-
-    const dialog = await screen.findByLabelText("测试语音编辑器");
-    expect(dialog).toHaveAttribute("data-preview-enabled", "true");
-    expect(dialog).toHaveAttribute("data-preview-mock", "false");
+    const editor = (await screen.findAllByTestId("voice-editor"))[0]!;
+    expect(editor).toHaveAttribute("data-preview-enabled", "true");
+    expect(editor).toHaveAttribute("data-preview-mock", "false");
   });
 
-  it("普通文本可直接编辑，按需打开高级语音编辑并按稳定节点回写", async () => {
+  it("文本就地实时编辑，并按稳定节点回写升到 v2", async () => {
     featureFlags.VOICE_EDITOR = true;
     const word = wordFixture({ ready: true });
     const firstDefinition = word.meanings.pos[0]!.senses[0]!.definitions[0]!;
@@ -2126,43 +2127,26 @@ describe("MeaningsAndExamplesStep", () => {
     renderStep(word);
 
     // 存量双份内容只呈现偏好侧（英式）那一份。
+    await screen.findAllByTestId("voice-editor");
     const plainDefinition = screen.getByDisplayValue("British definition");
     expect(plainDefinition).toBeInstanceOf(HTMLTextAreaElement);
     expect(screen.queryByDisplayValue("American definition")).toBeNull();
     fireEvent.change(plainDefinition, {
       target: { value: "British definition updated" }
     });
-    expect(screen.queryByLabelText("测试语音编辑器")).toBeNull();
-
-    const applyField = async (text: string) => {
+    // 编辑器就地内联，没有「打开 → 应用」这一步；碰一下就实时回写。
+    const touchField = (text: string) => {
       const field = screen.getByDisplayValue(text);
-      if (!field) throw new Error(`voice field not found: ${text}`);
-      const editButton =
-        field
-          .closest(".word-voice-text-control")
-          ?.querySelector('button[aria-label$="高级语音编辑"]') ??
-        field
-          .closest(".word-grammar-panel")
-          ?.querySelector('button[aria-label$="高级语音编辑"]');
-      if (!editButton) throw new Error(`edit button not found: ${text}`);
-      expect(editButton).toHaveClass("word-voice-editor-action");
-      expect(editButton).toHaveTextContent("高级语音编辑");
-      expect(editButton.closest(".ant-space-compact")).toBeNull();
-      fireEvent.click(editButton);
-      const dialog = await screen.findByLabelText("测试语音编辑器");
-      expect(dialog).toHaveAttribute("data-pronunciation-hint", "ˈsentə");
-      expect(dialog).toHaveAttribute("data-preview-enabled", "false");
-      const applyButton = dialog.querySelector("button");
-      if (!applyButton) throw new Error(`apply button not found: ${text}`);
-      fireEvent.click(applyButton);
-      await waitFor(() =>
-        expect(screen.queryByLabelText("测试语音编辑器")).toBeNull()
-      );
+      const host = field.closest('[data-testid="voice-editor"]');
+      if (!host) throw new Error(`voice editor not found: ${text}`);
+      expect(host).toHaveAttribute("data-preview-enabled", "false");
+      // 必须真的改一下：同值 change 被 React 判定为没变，不会触发 onChange。
+      fireEvent.change(field, { target: { value: `${text} v2` } });
     };
 
-    await applyField("a centre");
-    await applyField("British definition updated");
-    await applyField("The center is here.");
+    touchField("a centre");
+    touchField("British definition updated");
+    touchField("The center is here.");
     expect(screen.getAllByLabelText("汉语译文")[0]).toBeInstanceOf(
       HTMLTextAreaElement
     );

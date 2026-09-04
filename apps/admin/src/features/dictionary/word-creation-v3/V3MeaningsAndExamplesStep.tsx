@@ -70,6 +70,7 @@ import {
 import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
+import { V3VoiceTextField } from "./components/V3VoiceTextField";
 import { V3AddBasicPosSelect } from "./components/V3AddBasicPosSelect";
 import {
   baseSpellingForPos,
@@ -647,26 +648,21 @@ function GrammarStructuresCard({
                         {dialectLabel(variant.dialect)}
                       </Typography.Text>
                     )}
-                    <Input.TextArea
-                      aria-label={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
-                      autoSize={{ minRows: 2, maxRows: 6 }}
-                      className="word-pronunciation-phonetic-input"
-                      data-v3-field="content"
-                      data-v3-node-id={variant.id}
-                      onChange={(event) =>
+                    <V3VoiceTextField
+                      ariaLabel={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
+                      field="content"
+                      nodeId={variant.id}
+                      onChange={(next) =>
                         change((draft) => {
                           const target =
                             draft.pos[posIndex]!.grammar_structures[
                               structureIndex
                             ]!.variants[variantIndex]!;
-                          target.content = replaceRichText(
-                            target.content,
-                            event.target.value
-                          );
+                          target.content = next;
                         })
                       }
                       placeholder={GRAMMAR_PLACEHOLDER[variant.dialect]}
-                      value={variant.content.text}
+                      value={variant.content}
                     />
                   </div>
                 ))}
