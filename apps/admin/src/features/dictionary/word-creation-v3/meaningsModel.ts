@@ -14,6 +14,24 @@ import type {
   WordSentenceTranslationV3
 } from "@tsz/types";
 
+export function definitionSummary(sense: {
+  definitions: readonly WordDefinitionV3[];
+}): string {
+  const definition = sense.definitions[0];
+  if (!definition) return "待填写释义";
+  if (
+    definition.definition_mode === "zh_definition" ||
+    definition.definition_mode === "zh_sentence"
+  ) {
+    return definition.content.text.trim() || "待填写释义";
+  }
+  return (
+    editableEnglishText(definition.content as EnglishTextV3).find((row) =>
+      row.text.trim()
+    )?.text ?? "待填写释义"
+  );
+}
+
 export interface RelationDisplaySnapshot {
   headword?: string;
   gloss?: string;

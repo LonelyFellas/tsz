@@ -273,6 +273,7 @@ describe("buildV3Readiness", () => {
 describe("buildV3ProductProgress", () => {
   it("returns the fixed seven product rows for an empty native draft", () => {
     const rows = buildV3ProductProgress({
+      language: "en",
       wordId: "word-1",
       completedSteps: ["basics"],
       forms: { pos: [] },
@@ -281,7 +282,7 @@ describe("buildV3ProductProgress", () => {
     });
 
     expect(rows.map(({ key, label }) => [key, label])).toEqual([
-      ["dialect", "方言识别"],
+      ["dialect", "语言识别"],
       ["parts_of_speech", "基本词性"],
       ["forms", "词形变化"],
       ["sense_groups", "语义区间"],
@@ -330,6 +331,7 @@ describe("buildV3ProductProgress", () => {
       forms: [commonFormFixture({ id: uuidFromInt(602) }), comparative]
     }).pos[0]!;
     const rows = buildV3ProductProgress({
+      language: "en",
       wordId: "word-1",
       completedSteps: ["basics", "forms"],
       forms: { pos: [...first.pos, second] },
@@ -339,6 +341,11 @@ describe("buildV3ProductProgress", () => {
 
     expect(rows[1]).toMatchObject({ count: 2, completed: true });
     expect(rows[2]).toMatchObject({ count: 2, completed: true });
+    expect(rows[1]!.details.map((item) => item.label)).toEqual([
+      "名词",
+      "形容词"
+    ]);
+    expect(rows[2]!.details.map((item) => item.count)).toEqual([1, 1]);
     expect(rows[2]!.target).toMatchObject({
       step: "forms",
       pos_id: UUIDS.pos,
@@ -352,6 +359,7 @@ describe("buildV3ProductProgress", () => {
 
   it("counts sense groups, grammar, sense, and nested sentence nodes across POS", () => {
     const rows = buildV3ProductProgress({
+      language: "en",
       wordId: "word-1",
       completedSteps: ["basics", "forms"],
       forms: formsFixture(),
@@ -411,6 +419,7 @@ describe("buildV3ProductProgress", () => {
     };
 
     const rows = buildV3ProductProgress({
+      language: "en",
       wordId: "word-1",
       completedSteps: ["basics", "forms"],
       forms: formsFixture(),
@@ -489,6 +498,7 @@ describe("buildV3ProductProgress", () => {
     };
 
     const rows = buildV3ProductProgress({
+      language: "en",
       wordId: "word-1",
       completedSteps: ["basics"],
       forms: formsFixture({
@@ -512,5 +522,159 @@ describe("buildV3ProductProgress", () => {
       node_id: sentenceId,
       field: "level"
     });
+  });
+});
+
+describe("实时摘要明细", () => {
+  it("分组真实文本和数量，英美变体与多档译文不重复计数", () => {
+    const forms = {
+      pos: [
+        ...formsFixture().pos,
+        ...formsFixture({ pos_id: UUIDS.pos_2, pos: "verb" }).pos
+      ]
+    };
+    const meanings = meaningsFixture();
+    meanings.sense_groups.push({
+      id: "empty-group",
+      name_zh: " ",
+      name_en: " "
+    });
+    meanings.pos[0]!.grammar_structures[0]!.variants = [
+      {
+        id: "uk",
+        dialect: "uk",
+        content: { version: 2, text: "a centre", annotations: [] }
+      },
+      {
+        id: "us",
+        dialect: "us",
+        content: { version: 2, text: "a center", annotations: [] }
+      }
+    ];
+    const sense = meanings.pos[0]!.senses[0]!;
+    sense.definitions = [
+      {
+        id: "definition",
+        level: "A1",
+        definition_mode: "zh_definition",
+        content_id: "zh-definition",
+        content: { version: 2, text: "  真实释义  ", annotations: [] }
+      }
+    ];
+    sense.sentences[0]!.level = "C2";
+    sense.sentences[1]!.level = "";
+    sense.sentences[0]!.zh_translations.push({
+      id: "advanced",
+      band: "c1_c2",
+      content: { version: 2, text: "另一译文", annotations: [] }
+    });
+    const before = structuredClone({ forms, meanings });
+    const rows = buildV3ProductProgress({
+      wordId: "word",
+      language: "en",
+      completedSteps: ["basics", "forms", "meanings"],
+      forms,
+      meanings,
+      issues: []
+    });
+    expect(rows[3]!.details.map((item) => item.label)).toEqual([
+      "1. 位置",
+      "2. 待填写语义区间"
+    ]);
+    expect(rows[4]!.count).toBe(3);
+    expect(rows[4]!.details.map((item) => [item.label, item.count])).toEqual([
+      ["名词", 2],
+      ["动词", 1]
+    ]);
+    expect(rows[5]!.details[0]!.items?.map((item) => item.label)).toEqual([
+      "1. 真实释义",
+      "2. 待填写释义"
+    ]);
+    expect(rows[6]!.count).toBe(3);
+    expect(rows[6]!.details.map((item) => [item.label, item.count])).toEqual([
+      ["A1", 1],
+      ["C2", 1],
+      ["未分级", 1]
+    ]);
+    expect(
+      rows[6]!.details.reduce((sum, item) => sum + (item.count ?? 0), 0)
+    ).toBe(rows[6]!.count);
+    expect({ forms, meanings }).toEqual(before);
+    meanings.sense_groups.reverse();
+    sense.definitions[0]!.content = {
+      version: 2,
+      text: "修改后的释义",
+      annotations: []
+    };
+    const updated = buildV3ProductProgress({
+      wordId: "word",
+      language: "en",
+      completedSteps: ["basics", "forms", "meanings"],
+      forms,
+      meanings,
+      dirtySteps: { forms: false, meanings: true },
+      issues: []
+    });
+    expect(updated[3]!.details.map((item) => item.label)).toEqual([
+      "1. 待填写语义区间",
+      "2. 位置"
+    ]);
+    expect(updated[5]!.details[0]!.items?.[0]!.label).toBe("1. 修改后的释义");
+    expect(updated.slice(3).every((row) => !row.completed)).toBe(true);
+    expect(updated[3]!.statusDescription).toBe("编辑中，完成状态待确认");
+    expect(updated[1]!.completed).toBe(true);
+  });
+
+  it("通用不增加子行，实时类型与目录名称来自输入，未知语言不完成", () => {
+    const forms = formsFixture();
+    const input = {
+      wordId: "word",
+      language: "en",
+      completedSteps: ["basics", "forms"] as const,
+      forms,
+      meanings: { sense_groups: [], pos: [] },
+      issues: []
+    };
+    expect(buildV3ProductProgress(input)[0]!.details).toEqual([
+      { key: "language", label: "英语 English" }
+    ]);
+    forms.pos[0]!.dialect_rules.phonetic_mode = "distinguish";
+    const rows = buildV3ProductProgress({
+      ...input,
+      dirtySteps: { forms: true, meanings: false },
+      partOfSpeechCatalog: [
+        {
+          id: "catalog",
+          code: "noun",
+          name_zh: "配置名词",
+          name_en: "Noun",
+          abbreviation: "n.",
+          sort_order: 1,
+          sub_parts: []
+        }
+      ]
+    });
+    expect(rows[0]!.details.map((item) => item.label)).toEqual([
+      "英语 English",
+      "英式 BrE",
+      "美式 AmE"
+    ]);
+    expect(rows[1]!.details[0]!.label).toBe("配置名词");
+    expect(rows[1]!.completed).toBe(false);
+    expect(
+      buildV3ProductProgress({ ...input, language: "xx" })[0]
+    ).toMatchObject({ completed: false, value: "未完成" });
+    const orphan = buildV3ProductProgress({
+      ...input,
+      forms: { pos: [] },
+      meanings: meaningsFixture(),
+      completedSteps: ["basics", "meanings"]
+    });
+    expect(orphan[5]!.details.map((item) => item.label)).toEqual([
+      "未识别词性",
+      "未识别词性"
+    ]);
+    expect(orphan[5]!.count).toBe(3);
+    expect(orphan[5]!.completed).toBe(false);
   });
 });

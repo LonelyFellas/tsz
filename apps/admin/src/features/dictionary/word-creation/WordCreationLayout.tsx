@@ -37,7 +37,8 @@ interface Props {
     wordExists: boolean;
     breadcrumbTitle: ReactNode;
     completedSteps: readonly WordCreationStep[];
-    summaryHeadword: ReactNode;
+    summaryHeadword?: ReactNode;
+    showEntrySummary?: boolean;
     status?: ReactNode;
     progress: ReactNode;
   };
@@ -236,37 +237,41 @@ export function WordCreationLayout({
             返回智能词库
           </Button>
 
-          <div className="word-summary-entry-card">
-            <Typography.Text type="secondary" className="word-summary-kicker">
-              当前词条
-            </Typography.Text>
-            {presentation?.summaryHeadword ?? (
-              <HeadwordSummary headwords={word?.headwords ?? draftHeadwords} />
-            )}
+          {presentation?.showEntrySummary !== false && (
+            <div className="word-summary-entry-card">
+              <Typography.Text type="secondary" className="word-summary-kicker">
+                当前词条
+              </Typography.Text>
+              {presentation?.summaryHeadword ?? (
+                <HeadwordSummary
+                  headwords={word?.headwords ?? draftHeadwords}
+                />
+              )}
 
-            <div className="word-summary-language">
-              <Typography.Text type="secondary">所属语言</Typography.Text>
-              <strong>English</strong>
+              <div className="word-summary-language">
+                <Typography.Text type="secondary">所属语言</Typography.Text>
+                <strong>English</strong>
+              </div>
+
+              {presentation?.status ??
+                (word?.status === "archived" ? (
+                  <Tag color="warning" style={{ alignSelf: "flex-start" }}>
+                    垃圾桶 · 只读
+                  </Tag>
+                ) : word?.status === "published" ? (
+                  <Tag
+                    color={readOnly ? "success" : "processing"}
+                    style={{ alignSelf: "flex-start" }}
+                  >
+                    {readOnly
+                      ? "已发布 · 只读"
+                      : word.has_unpublished_changes
+                        ? "已发布 · 编辑未发布修改"
+                        : "已发布 · 编辑中"}
+                  </Tag>
+                ) : null)}
             </div>
-
-            {presentation?.status ??
-              (word?.status === "archived" ? (
-                <Tag color="warning" style={{ alignSelf: "flex-start" }}>
-                  垃圾桶 · 只读
-                </Tag>
-              ) : word?.status === "published" ? (
-                <Tag
-                  color={readOnly ? "success" : "processing"}
-                  style={{ alignSelf: "flex-start" }}
-                >
-                  {readOnly
-                    ? "已发布 · 只读"
-                    : word.has_unpublished_changes
-                      ? "已发布 · 编辑未发布修改"
-                      : "已发布 · 编辑中"}
-                </Tag>
-              ) : null)}
-          </div>
+          )}
 
           <div className="word-summary-progress-title">
             <Typography.Text type="secondary" className="word-summary-kicker">

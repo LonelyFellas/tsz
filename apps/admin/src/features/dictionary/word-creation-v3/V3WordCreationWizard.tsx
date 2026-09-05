@@ -1,5 +1,6 @@
 import type {
   AdminWordV3,
+  PartOfSpeechCatalogResponse,
   DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   DraftValidationResponseV3,
@@ -75,6 +76,9 @@ export interface V3WizardActions {
 
 export interface V3WizardSlotContext {
   word: AdminWordV3;
+  partOfSpeechCatalog?: PartOfSpeechCatalogResponse;
+  partOfSpeechCatalogError: boolean;
+  partOfSpeechCatalogPending: boolean;
   readOnly: boolean;
   draftForms: DraftFormsStepContentV3;
   setDraftForms: (content: DraftFormsStepContentV3) => void;
@@ -99,6 +103,9 @@ export interface V3WizardSlotContext {
 }
 
 export interface V3WordCreationWizardProps {
+  partOfSpeechCatalog?: PartOfSpeechCatalogResponse;
+  partOfSpeechCatalogError?: boolean;
+  partOfSpeechCatalogPending?: boolean;
   initialWord: AdminWordV3;
   requests: V3WordRequests;
   initialStep?: WordCreationStep;
@@ -178,12 +185,20 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
     const candidates = scope
       ? [scope, ...scope.querySelectorAll<HTMLElement>("[data-v3-node-id]")]
       : nodes;
-    const matchesVisibleTarget = (candidate: HTMLElement) =>
-      candidate.dataset.v3NodeId === target.node_id &&
-      candidate.dataset.v3Field === target.field &&
-      !candidate.closest(
-        '.ant-tabs-tabpane-hidden, .ant-collapse-content-hidden, [aria-hidden="true"], [inert]'
+    const matchesVisibleTarget = (candidate: HTMLElement) => {
+      const nodeMatches =
+        candidate.dataset.v3NodeId === target.node_id ||
+        candidate.dataset.v3NodeAliases
+          ?.split(/\s+/u)
+          .includes(target.node_id) === true;
+      return (
+        nodeMatches &&
+        candidate.dataset.v3Field === target.field &&
+        !candidate.closest(
+          '.ant-tabs-tabpane-hidden, .ant-collapse-content-hidden, [aria-hidden="true"], [inert]'
+        )
       );
+    };
     const scopedElement = scope
       ? [...candidates].find(matchesVisibleTarget)
       : undefined;
@@ -204,6 +219,9 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
 
 function V3WordCreationSession({
   initialWord,
+  partOfSpeechCatalog,
+  partOfSpeechCatalogError = false,
+  partOfSpeechCatalogPending = false,
   requests,
   initialStep = "forms",
   readOnly = false,
@@ -1280,6 +1298,9 @@ function V3WordCreationSession({
   );
   const context: V3WizardSlotContext = {
     word,
+    partOfSpeechCatalog,
+    partOfSpeechCatalogError,
+    partOfSpeechCatalogPending,
     readOnly: sessionReadOnly,
     draftForms,
     setDraftForms,
@@ -1316,6 +1337,7 @@ function V3WordCreationSession({
   return (
     <V3WordCreationLayout
       word={word}
+      partOfSpeechCatalog={partOfSpeechCatalog?.items}
       activeStep={activeStep}
       reachableSteps={reachableSteps}
       readOnly={sessionReadOnly}

@@ -36,6 +36,7 @@ import {
   commonFormFixture,
   formsFixture,
   pronunciationFixture,
+  ukUsFormFixture,
   UUIDS
 } from "./fixtures";
 import {
@@ -357,6 +358,59 @@ function impactSurfacePage(nextCursor: string | null): SurfaceMatchPageV3 {
 }
 
 describe("V3WordCreationWizard", () => {
+  it("短语拼写开关在真实向导中可以往返并保留成分配置", async () => {
+    const initialWord = word(1, "hit the sack");
+    initialWord.kind = "phrase";
+    const variant = initialWord.forms.pos[0]!.forms[0]!.regional_variants;
+    if (variant.mode !== "common") throw new Error("expected common form");
+    variant.common.component_usages = [
+      { id: UUIDS.membership_2, state: "unresolved", literal: "hit" }
+    ];
+    renderWizard(requests(), {
+      initialWord,
+      initialStep: "forms",
+      renderStep: (context) => (
+        <>
+          <V3FormsAndPronunciationStep
+            value={context.draftForms}
+            onChange={context.setDraftForms}
+            issues={[]}
+            stableVariantIds={context.stableVariantIds}
+          />
+          <output data-testid="spelling-roundtrip">
+            {JSON.stringify(context.draftForms)}
+          </output>
+        </>
+      )
+    });
+    for (let index = 0; index < 2; index += 1) {
+      fireEvent.click(await screen.findByLabelText("英美拼写有区别"));
+      expect(
+        JSON.parse(screen.getByTestId("spelling-roundtrip").textContent!).pos[0]
+          .dialect_rules.spelling_mode
+      ).toBe("distinguish");
+      fireEvent.click(screen.getByLabelText("英美拼写无区别"));
+      const pos = JSON.parse(
+        screen.getByTestId("spelling-roundtrip").textContent!
+      ).pos[0];
+      expect(pos.dialect_rules).toEqual({
+        spelling_mode: "unified",
+        phonetic_mode: "distinguish"
+      });
+      expect(pos.forms[0].regional_variants.uk.component_usages).toMatchObject([
+        { literal: "hit", state: "unresolved" }
+      ]);
+      expect(screen.queryByLabelText("原形英式拼写")).toBeNull();
+      expect(screen.queryByLabelText("原形美式拼写")).toBeNull();
+      expect(screen.getByLabelText("原形英美共用拼写")).toHaveValue(
+        "hit the sack"
+      );
+      expect(
+        screen.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
+      ).toHaveClass("ant-radio-wrapper-checked");
+    }
+  });
+
   it("only replaces publication issues after check and keeps them through ordinary saves", async () => {
     const checkedIssue = validationIssue();
     const validate = vi
@@ -709,7 +763,7 @@ describe("V3WordCreationWizard", () => {
   }, 20_000);
 
   it.each([
-    ["方言识别", "basics"],
+    ["语言识别", "basics"],
     ["基本词性", "forms"],
     ["词形变化", "forms"],
     ["语法结构", "meanings"],
@@ -1381,6 +1435,122 @@ describe("V3WordCreationWizard", () => {
     );
     await waitFor(() => expect(target).toHaveFocus());
   });
+
+  it.each(["uk", "us"] as const)(
+    "UD 将 %s variant 的拼写问题映射到同一个共用拼写输入",
+    async (dialect) => {
+      const form = ukUsFormFixture({
+        id: UUIDS.form,
+        uk: { spelling: "harbor" },
+        us: { spelling: "harbor" }
+      });
+      const initialWord = word();
+      initialWord.forms = formsFixture({
+        dialect_rules: {
+          spelling_mode: "unified",
+          phonetic_mode: "distinguish"
+        },
+        forms: [form],
+        groups: [
+          {
+            id: UUIDS.group,
+            is_regular: true,
+            members: [{ id: UUIDS.membership, form_id: form.id }]
+          }
+        ]
+      });
+      const issues = (["uk", "us"] as const).map((issueDialect) => {
+        const variant = form.regional_variants[issueDialect];
+        return {
+          schema_version: 3,
+          step: "forms",
+          node_id: variant.id,
+          field: "spelling",
+          code: "variant_spelling_required",
+          message: `${issueDialect} 拼写待补充`,
+          node_location: {
+            node_role: "forms.variant",
+            ancestor_node_ids: [
+              initialWord.forms.pos[0]!.pos_id,
+              UUIDS.group,
+              form.id,
+              variant.id
+            ],
+            pos_id: initialWord.forms.pos[0]!.pos_id,
+            form_group_id: UUIDS.group,
+            membership_id: UUIDS.membership,
+            form_id: form.id,
+            variant_id: variant.id,
+            dialect: issueDialect
+          }
+        } satisfies V3DraftValidationIssue;
+      });
+      const issue = issues.find(
+        (candidate) => candidate.node_location.dialect === dialect
+      )!;
+      renderWizard(
+        requests({
+          validate: vi.fn(async () => ({
+            schema_version: 3 as const,
+            validated_revision: 1,
+            valid: false,
+            issues
+          }))
+        }),
+        {
+          initialWord,
+          initialStep: "forms",
+          renderStep: (context) => (
+            <>
+              <V3FormsAndPronunciationStep
+                activePosId={context.activePosId}
+                issues={context.issues}
+                onActivePosChange={context.setActivePosId}
+                onChange={context.setDraftForms}
+                value={context.draftForms}
+              />
+              <output data-testid="ud-spelling-issues">
+                {context.issues.map((item) => item.code).join(",")}
+              </output>
+              <button
+                type="button"
+                onClick={() => void context.actions.validate()}
+              >
+                加载 UD 拼写问题
+              </button>
+              <button
+                type="button"
+                onClick={() => void context.actions.navigateIssue(issue)}
+              >
+                定位 UD 拼写问题
+              </button>
+            </>
+          )
+        }
+      );
+
+      fireEvent.click(screen.getByText("加载 UD 拼写问题"));
+      await waitFor(() =>
+        expect(screen.getByTestId("ud-spelling-issues")).toHaveTextContent(
+          "variant_spelling_required"
+        )
+      );
+      expect(screen.getAllByLabelText("原形英美共用拼写")).toHaveLength(1);
+      const sharedInput = screen.getByLabelText("原形英美共用拼写");
+      expect(sharedInput).toHaveAttribute("aria-invalid", "true");
+      expect(sharedInput).toHaveClass("ant-input-status-error");
+      for (const candidate of issues) {
+        expect(
+          document.querySelectorAll(
+            `[data-v3-node-aliases~="${candidate.node_id}"][data-v3-field="spelling"]`
+          )
+        ).toHaveLength(1);
+      }
+
+      fireEvent.click(screen.getByText("定位 UD 拼写问题"));
+      await waitFor(() => expect(sharedInput).toHaveFocus());
+    }
+  );
 
   it("focuses a shared form issue inside the exact membership group", async () => {
     const initialWord = word();

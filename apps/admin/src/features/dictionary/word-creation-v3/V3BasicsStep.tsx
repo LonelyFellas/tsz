@@ -5,6 +5,10 @@ import {
 } from "@ant-design/icons";
 import type {
   AdminWordV3,
+  DraftFormsStepContentV3,
+  DraftMeaningsStepContentWritableV3,
+  PartOfSpeechCatalogItem,
+  V3DraftValidationIssue,
   WordCreationStep,
   WordConcreteFormV3,
   WordPronunciationV3
@@ -22,7 +26,6 @@ import {
   Tag,
   Typography
 } from "antd";
-import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "./components/V3ProductProgressList";
 import {
@@ -31,9 +34,16 @@ import {
   pronunciationStyleLabel
 } from "./presentation";
 import "../word-creation/word-creation.css";
+import { buildV3ProductProgress } from "./readiness";
+import "./v3-layout.css";
 
 interface Props {
   word: AdminWordV3;
+  draftForms?: DraftFormsStepContentV3;
+  draftMeanings?: DraftMeaningsStepContentWritableV3;
+  dirtySteps?: Readonly<{ forms: boolean; meanings: boolean }>;
+  issues?: readonly V3DraftValidationIssue[];
+  partOfSpeechCatalog?: readonly PartOfSpeechCatalogItem[];
   onContinue: () => void;
   onStepChange: (step: WordCreationStep) => void;
 }
@@ -367,176 +377,27 @@ function V3BasicsContent({
   );
 }
 
-function V3HeadwordSummary({
+export function V3BasicsStep({
   word,
-  entryLabel
-}: {
-  word: AdminWordV3;
-  entryLabel: string;
-}) {
-  const { preference } = useDialectPreference();
-  const base = word.forms.pos
-    .flatMap((pos) => pos.forms)
-    .find((form) => form.form_type === "base");
-  if (!base) {
-    return entryLabel ? (
-      <div className="word-creation-summary-headword">
-        <span className="dialect-dot dialect-dot-common" />
-        <strong>{entryLabel}</strong>
-      </div>
-    ) : (
-      <Typography.Text type="secondary">完成检测后显示</Typography.Text>
-    );
-  }
-  if (base.regional_variants.mode === "common") {
-    return (
-      <div className="word-creation-summary-headword">
-        <span className="dialect-dot dialect-dot-common" />
-        <strong>{base.regional_variants.common.spelling}</strong>
-      </div>
-    );
-  }
-  const variants =
-    preference === "uk"
-      ? [base.regional_variants.uk, base.regional_variants.us]
-      : [base.regional_variants.us, base.regional_variants.uk];
-  return (
-    <Space orientation="vertical" size={5}>
-      {variants.map((variant, index) => (
-        <div
-          className={`word-creation-summary-headword${index === 0 ? "" : " word-creation-summary-alt"}`}
-          key={variant.dialect}
-        >
-          <span className={`dialect-dot dialect-dot-${variant.dialect}`} />
-          {index === 0 ? (
-            <strong>{variant.spelling}</strong>
-          ) : (
-            <span>{variant.spelling}</span>
-          )}
-          <small>
-            {variant.dialect === "uk" ? "英式英语 · BrE" : "美式英语 · AmE"}
-          </small>
-        </div>
-      ))}
-    </Space>
-  );
-}
-
-function V3ProgressSummary({
-  word,
+  draftForms,
+  draftMeanings,
+  dirtySteps,
+  issues = [],
+  partOfSpeechCatalog,
+  onContinue,
   onStepChange
-}: {
-  word: AdminWordV3;
-  onStepChange: (step: WordCreationStep) => void;
-}) {
-  const forms = word.forms.pos.flatMap((pos) => pos.forms);
-  const baseForms = forms.filter((form) => form.form_type === "base");
-  const baseWithPronunciation = baseForms.filter((form) => {
-    const variants =
-      form.regional_variants.mode === "common"
-        ? [form.regional_variants.common]
-        : [form.regional_variants.uk, form.regional_variants.us];
-    return variants.every((variant) => variant.pronunciations.length > 0);
-  }).length;
-  const derivedForms = forms.filter((form) => form.form_type !== "base");
-  const grammars = word.meanings.pos.flatMap((pos) => pos.grammar_structures);
-  const senses = word.meanings.pos.flatMap((pos) => pos.senses);
-  const sentences = senses.flatMap((sense) => sense.sentences);
-  const rows: Array<{
-    key: string;
-    label: string;
-    step: WordCreationStep;
-    state: "complete" | "incomplete" | "not_required";
-    value: string;
-  }> = [
-    {
-      key: "dialect",
-      label: "方言识别",
-      step: "basics",
-      state: "complete",
-      value: "完成"
-    },
-    {
-      key: "parts_of_speech",
-      label: "基本词性",
-      step: "forms",
-      state: word.forms.pos.length > 0 ? "complete" : "incomplete",
-      value: `${word.forms.pos.length}/${Math.max(1, word.forms.pos.length)}`
-    },
-    {
-      key: "base_pronunciation",
-      label: "原形发音",
-      step: "forms",
-      state:
-        baseForms.length > 0 && baseWithPronunciation === baseForms.length
-          ? "complete"
-          : "incomplete",
-      value: `${baseWithPronunciation}/${Math.max(1, baseForms.length)}`
-    },
-    {
-      key: "forms",
-      label: "词形变化",
-      step: "forms",
-      state: derivedForms.length > 0 ? "complete" : "not_required",
-      value:
-        derivedForms.length > 0
-          ? `${derivedForms.length}/${derivedForms.length}`
-          : "无需填写"
-    },
-    {
-      key: "sense_groups",
-      label: "语义区间",
-      step: "meanings",
-      state: word.meanings.sense_groups.length > 0 ? "complete" : "incomplete",
-      value: `${word.meanings.sense_groups.length}/${Math.max(1, word.meanings.sense_groups.length)}`
-    },
-    {
-      key: "grammar_structures",
-      label: "语法结构",
-      step: "meanings",
-      state: grammars.length > 0 ? "complete" : "not_required",
-      value:
-        grammars.length > 0
-          ? `${grammars.length}/${grammars.length}`
-          : "无需填写"
-    },
-    {
-      key: "senses",
-      label: "多维词义",
-      step: "meanings",
-      state: senses.length > 0 ? "complete" : "incomplete",
-      value: `${senses.length}/${Math.max(1, senses.length)}`
-    },
-    {
-      key: "sentences",
-      label: "多维例句",
-      step: "meanings",
-      state: sentences.length > 0 ? "complete" : "not_required",
-      value:
-        sentences.length > 0
-          ? `${sentences.length}/${sentences.length}`
-          : "无需填写"
-    }
-  ];
-  return (
-    <V3ProductProgressList
-      onSelect={(key) => {
-        const row = rows.find((item) => item.key === key);
-        if (row) onStepChange(row.step);
-      }}
-      rows={rows.map((row, index) => ({
-        completed: row.state === "complete",
-        index: index + 1,
-        key: row.key,
-        label: row.label,
-        value: row.value
-      }))}
-    />
-  );
-}
-
-export function V3BasicsStep({ word, onContinue, onStepChange }: Props) {
+}: Props) {
   const entryLabel = visibleEntryLabel(word);
+  const rows = buildV3ProductProgress({
+    wordId: word.id,
+    language: word.language,
+    completedSteps: word.completed_steps,
+    forms: draftForms ?? word.forms,
+    meanings: draftMeanings ?? word.meanings,
+    dirtySteps,
+    issues,
+    partOfSpeechCatalog
+  });
   return (
     <WordCreationLayout
       currentStep="basics"
@@ -546,10 +407,20 @@ export function V3BasicsStep({ word, onContinue, onStepChange }: Props) {
         wordExists: true,
         breadcrumbTitle: entryLabel ? `${entryLabel} · 创建新词条` : "创建词条",
         completedSteps: word.completed_steps,
-        summaryHeadword: (
-          <V3HeadwordSummary word={word} entryLabel={entryLabel} />
-        ),
-        progress: <V3ProgressSummary word={word} onStepChange={onStepChange} />
+        showEntrySummary: false,
+        progress: (
+          <V3ProductProgressList
+            currentKey="dialect"
+            onSelect={(key) => {
+              const row = rows.find((item) => item.key === key);
+              if (row) onStepChange(row.target.step);
+            }}
+            rows={rows.map((row) => ({
+              ...row,
+              value: row.value ?? row.count
+            }))}
+          />
+        )
       }}
     >
       <V3BasicsContent

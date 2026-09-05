@@ -1,6 +1,7 @@
 import { CheckCircleFilled } from "@ant-design/icons";
 import { Flex, Typography } from "antd";
 import type { ReactNode } from "react";
+import type { V3ProductProgressDetail } from "../readiness";
 
 export interface V3ProductProgressListRow {
   key: string;
@@ -8,6 +9,8 @@ export interface V3ProductProgressListRow {
   label: string;
   completed: boolean;
   value: ReactNode;
+  details?: readonly V3ProductProgressDetail[];
+  statusDescription?: string;
 }
 
 /**
@@ -33,28 +36,75 @@ export function V3ProductProgressList({
       vertical
     >
       {rows.map((row) => (
-        <button
-          aria-current={row.key === currentKey ? "step" : undefined}
-          className="word-creation-progress-row"
-          data-readiness-state={row.completed ? "complete" : "incomplete"}
-          disabled={disabled}
+        <section
+          aria-label={`${row.label}摘要`}
+          className="v3-product-progress-group"
           key={row.key}
-          onClick={() => onSelect(row.key)}
-          type="button"
         >
-          {row.completed ? (
-            <CheckCircleFilled
-              aria-label={`${row.label}已完成`}
-              className="word-progress-done"
-            />
-          ) : (
-            <span aria-hidden="true" className="word-progress-index">
-              {row.index}
-            </span>
+          <button
+            aria-current={row.key === currentKey ? "step" : undefined}
+            className="word-creation-progress-row"
+            data-readiness-state={row.completed ? "complete" : "incomplete"}
+            disabled={disabled}
+            onClick={() => onSelect(row.key)}
+            title={row.statusDescription}
+            type="button"
+          >
+            {row.completed ? (
+              <CheckCircleFilled
+                aria-label={`${row.label}已完成`}
+                className="word-progress-done"
+              />
+            ) : (
+              <span aria-hidden="true" className="word-progress-index">
+                {row.index}
+              </span>
+            )}
+            <span className="word-progress-label">{row.label}</span>
+            <Typography.Text type="secondary">{row.value}</Typography.Text>
+          </button>
+          {row.details && (
+            <ul className="v3-product-progress-details">
+              {row.details.length === 0 ? (
+                <li className="v3-product-progress-empty">暂未添加</li>
+              ) : (
+                row.details.map((detail) => (
+                  <li key={detail.key}>
+                    <div className="v3-product-progress-detail">
+                      {detail.dialect && (
+                        <span
+                          className={`dialect-dot dialect-dot-${detail.dialect}`}
+                        />
+                      )}
+                      <span
+                        className="v3-product-progress-text"
+                        title={detail.label}
+                      >
+                        {detail.label}
+                      </span>
+                      {detail.count !== undefined && (
+                        <span>{detail.count}</span>
+                      )}
+                    </div>
+                    {detail.items && detail.items.length > 0 && (
+                      <ul className="v3-product-progress-items">
+                        {detail.items.map((item) => (
+                          <li
+                            key={item.key}
+                            className="v3-product-progress-text"
+                            title={item.label}
+                          >
+                            {item.label}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                ))
+              )}
+            </ul>
           )}
-          <span className="word-progress-label">{row.label}</span>
-          <Typography.Text type="secondary">{row.value}</Typography.Text>
-        </button>
+        </section>
       ))}
     </Flex>
   );

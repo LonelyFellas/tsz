@@ -219,7 +219,7 @@ describe("V3WordCreationLayout", () => {
     expect(
       rows.map((row) => row.querySelector(".word-progress-label")?.textContent)
     ).toEqual([
-      "方言识别",
+      "语言识别",
       "基本词性",
       "词形变化",
       "语义区间",
@@ -228,7 +228,7 @@ describe("V3WordCreationLayout", () => {
       "多维例句"
     ]);
     expect(rows.map((row) => row.textContent)).toEqual([
-      "方言识别完成",
+      "语言识别完成",
       "基本词性1",
       "词形变化1",
       "4语义区间1",
@@ -305,7 +305,7 @@ describe("V3WordCreationLayout", () => {
     renderLayout({ word: current, onProgressNavigate });
 
     for (const label of [
-      "方言识别",
+      "语言识别",
       "基本词性",
       "词形变化",
       "语义区间",
@@ -348,7 +348,7 @@ describe("V3WordCreationLayout", () => {
     });
   });
 
-  it("当前词条只展示第一个原形，不拼接后续原形或其他词形", () => {
+  it("左栏只保留返回和完成情况，面包屑保留第一个原形", () => {
     const current = word();
     current.presentation.label = "center / centers";
     current.presentation.matched_surfaces = ["center", "centers"];
@@ -370,54 +370,33 @@ describe("V3WordCreationLayout", () => {
     renderLayout({ word: current });
 
     const summary = within(screen.getByRole("region", { name: "词条摘要" }));
-    expect(summary.getByText("center", { exact: true })).toBeVisible();
+    expect(summary.queryByText("center", { exact: true })).toBeNull();
+    expect(summary.queryByText("当前词条")).toBeNull();
+    expect(summary.queryByText("所属语言")).toBeNull();
+    expect(
+      summary.getByRole("button", { name: /返回智能词库/u })
+    ).toBeVisible();
+    expect(screen.getByText("center · 词形与发音")).toBeVisible();
     expect(summary.queryByText("center / centers")).toBeNull();
     expect(summary.queryByText("alternate-base")).toBeNull();
     expect(summary.queryByText("centers", { exact: true })).toBeNull();
   });
 
-  it("英美原形按偏好分行并把检测基准标在真实命中侧", () => {
+  it("语言识别展示英美类型色点，不重复展示原形与检测基准", () => {
     const current = word();
     current.detection_basis_dialect = "us";
-    current.forms = formsFixture({
-      dialect_rules: {
-        spelling_mode: "distinguish",
-        phonetic_mode: "distinguish"
-      },
-      forms: [
-        ukUsFormFixture({
-          uk: { spelling: "centre" },
-          us: { spelling: "center" }
-        })
-      ]
-    });
-
-    const view = renderLayout({ word: current });
-
-    const summaryRegion = screen.getByRole("region", { name: "词条摘要" });
-    const summary = within(summaryRegion);
-    expect(summary.getByText("centre", { exact: true })).toBeVisible();
-    expect(summary.getByText("center", { exact: true })).toBeVisible();
-    expect(summary.getByText("BrE", { exact: true })).toBeVisible();
-    expect(summary.getByText("AmE · 检测基准", { exact: true })).toBeVisible();
-    expect(summary.queryByText("centre / center", { exact: true })).toBeNull();
-    expect(summaryRegion.querySelector(".dialect-dot-common")).toBeNull();
-
-    view.unmount();
-    dialectPreference.value = "us";
-    const usView = renderLayout({ word: current });
-    const rows = Array.from(
-      usView.container.querySelectorAll<HTMLElement>(
-        ".word-creation-summary-headword"
-      )
-    );
-    expect(rows[0]!.querySelector("strong")?.textContent).toBe("center");
-    expect(rows[0]).toHaveTextContent("AmE · 检测基准");
-    expect(rows[1]).toHaveTextContent("centre");
-    expect(rows[1]).not.toHaveTextContent("检测基准");
+    current.forms = formsFixture({ forms: [ukUsFormFixture()] });
+    renderLayout({ word: current });
+    const summary = screen.getByRole("region", { name: "语言识别摘要" });
+    expect(within(summary).getByText("英语 English")).toBeVisible();
+    expect(within(summary).getByText("英式 BrE")).toBeVisible();
+    expect(within(summary).getByText("美式 AmE")).toBeVisible();
+    expect(summary.querySelector(".dialect-dot-uk")).not.toBeNull();
+    expect(summary.querySelector(".dialect-dot-us")).not.toBeNull();
+    expect(screen.queryByText(/检测基准/u)).toBeNull();
   });
 
-  it("缺少原始检测证据时仍分行展示但不猜测检测基准", () => {
+  it("类型子行只依据当前草稿配置，不依赖原始检测证据", () => {
     const current = word();
     current.forms = formsFixture({
       dialect_rules: {
@@ -436,11 +415,13 @@ describe("V3WordCreationLayout", () => {
 
     expect(
       view.container.querySelectorAll(".word-creation-summary-headword")
-    ).toHaveLength(2);
+    ).toHaveLength(0);
+    expect(screen.getByText("英式 BrE")).toBeVisible();
+    expect(screen.getByText("美式 AmE")).toBeVisible();
     expect(screen.queryByText(/检测基准/u)).toBeNull();
   });
 
-  it("第一个原形为同拼写英美结构时摘要只显示一次", () => {
+  it("拼写相同但发音区分时仍展示两种语言类型", () => {
     const current = word();
     current.forms = formsFixture({
       dialect_rules: {
@@ -458,8 +439,16 @@ describe("V3WordCreationLayout", () => {
     renderLayout({ word: current });
 
     const summary = within(screen.getByRole("region", { name: "词条摘要" }));
-    expect(summary.getByText("center", { exact: true })).toBeVisible();
+    expect(summary.queryByText("center", { exact: true })).toBeNull();
+    expect(summary.queryByText("当前词条")).toBeNull();
+    expect(summary.queryByText("所属语言")).toBeNull();
+    expect(
+      summary.getByRole("button", { name: /返回智能词库/u })
+    ).toBeVisible();
+    expect(screen.getByText("center · 词形与发音")).toBeVisible();
     expect(summary.queryByText("center / center")).toBeNull();
+    expect(summary.getByText("英式 BrE")).toBeVisible();
+    expect(summary.getByText("美式 AmE")).toBeVisible();
   });
 
   it("没有原形时回退后端 presentation label", () => {
@@ -472,7 +461,8 @@ describe("V3WordCreationLayout", () => {
     renderLayout({ word: current });
 
     const summary = within(screen.getByRole("region", { name: "词条摘要" }));
-    expect(summary.getByText("fallback-label", { exact: true })).toBeVisible();
+    expect(summary.queryByText("fallback-label", { exact: true })).toBeNull();
+    expect(screen.getByText("fallback-label · 词形与发音")).toBeVisible();
   });
 
   it("第一个原形为空白时回退后端 presentation label", () => {
@@ -486,7 +476,10 @@ describe("V3WordCreationLayout", () => {
 
     const summary = within(screen.getByRole("region", { name: "词条摘要" }));
     expect(
-      summary.getByText("fallback-for-blank-base", { exact: true })
+      summary.queryByText("fallback-for-blank-base", { exact: true })
+    ).toBeNull();
+    expect(
+      screen.getByText("fallback-for-blank-base · 词形与发音")
     ).toBeVisible();
   });
 

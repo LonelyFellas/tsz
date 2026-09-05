@@ -960,8 +960,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(us).toHaveValue("a center");
     expect(uk).toHaveAttribute("placeholder", "例如 a centre / the centre");
     expect(us).toHaveAttribute("placeholder", "例如 a center / the center");
-    expect(screen.getByText("英式")).toBeVisible();
-    expect(screen.getByText("美式")).toBeVisible();
+    expect(screen.queryByText("英式")).toBeNull();
+    expect(screen.queryByText("美式")).toBeNull();
 
     fireEvent.change(us, { target: { value: "the center" } });
     expect(value().pos[0]!.grammar_structures[0]!.variants[1]).toMatchObject({

@@ -3,12 +3,17 @@ import type {
   DraftMeaningsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   PersistedWordStep,
+  PartOfSpeechCatalogItem,
   V3DraftValidationIssue
 } from "@tsz/types";
 import {
   v3IssueNavigationTarget,
   type V3IssueNavigationTarget
 } from "./issueNavigation";
+
+import { CEFR_OPTIONS } from "../labels";
+import { definitionSummary } from "./meaningsModel";
+import { languageSummary, partOfSpeechLabel } from "./presentation";
 
 export type V3ReadinessNodeRole =
   | "pos"
@@ -42,18 +47,31 @@ export type V3ProductProgressKey =
   | "senses"
   | "sentences";
 
+export interface V3ProductProgressDetail {
+  key: string;
+  label: string;
+  count?: number;
+  dialect?: "uk" | "us";
+  items?: readonly { key: string; label: string }[];
+}
+
 export interface V3ProductProgressRow {
   key: V3ProductProgressKey;
   index: number;
   label: string;
   completed: boolean;
-  value?: "完成";
+  value?: "完成" | "未完成";
+  details: readonly V3ProductProgressDetail[];
+  statusDescription?: string;
   count?: number;
   target: V3IssueNavigationTarget;
 }
 
 export interface V3ProductProgressInput {
   wordId: string;
+  language: string;
+  partOfSpeechCatalog?: readonly PartOfSpeechCatalogItem[];
+  dirtySteps?: Readonly<{ forms: boolean; meanings: boolean }>;
   completedSteps: readonly PersistedWordStep[];
   forms: DraftFormsStepContentV3;
   meanings: DraftMeaningsStepContentV3 | DraftMeaningsStepContentWritableV3;
@@ -95,6 +113,9 @@ function touchesNode(
 
 export function buildV3ProductProgress({
   wordId,
+  language,
+  partOfSpeechCatalog = [],
+  dirtySteps = { forms: false, meanings: false },
   completedSteps,
   forms,
   meanings,
@@ -230,18 +251,120 @@ export function buildV3ProductProgress({
       (touchesNode(issue, senseNodeIds) || meaningIssues.length > 0)
   );
 
+  const languageInfo = languageSummary(language);
+  const catalogNames = new Map(
+    partOfSpeechCatalog.map((part) => [
+      part.code,
+      part.name_zh.trim() || part.name_en.trim()
+    ])
+  );
+  const meaningsByPos = new Map(meanings.pos.map((pos) => [pos.pos_id, pos]));
+  const formPosIds = new Set(forms.pos.map((pos) => pos.pos_id));
+  const positions = [
+    ...forms.pos.map((pos) => ({
+      key: pos.pos_id,
+      label:
+        catalogNames.get(pos.pos) ||
+        (partOfSpeechLabel(pos.pos) === "其他词性"
+          ? pos.pos
+          : partOfSpeechLabel(pos.pos)),
+      forms: pos.forms,
+      meanings: meaningsByPos.get(pos.pos_id)
+    })),
+    ...meanings.pos
+      .filter((pos) => !formPosIds.has(pos.pos_id))
+      .map((pos) => ({
+        key: pos.pos_id,
+        label: "未识别词性",
+        forms: [],
+        meanings: pos
+      }))
+  ];
+  const hasUnmatchedPos = meanings.pos.some(
+    (pos) => !formPosIds.has(pos.pos_id)
+  );
+  const distinguish =
+    language === "en" &&
+    forms.pos.some(
+      (pos) =>
+        pos.dialect_rules.spelling_mode === "distinguish" ||
+        pos.dialect_rules.phonetic_mode === "distinguish"
+    );
+  const levelCounts = new Map<string, number>();
+  for (const { sentence } of sentenceEntries) {
+    const level = CEFR_OPTIONS.some((option) => option.value === sentence.level)
+      ? sentence.level
+      : "ungraded";
+    levelCounts.set(level, (levelCounts.get(level) ?? 0) + 1);
+  }
+  const details: Record<V3ProductProgressKey, V3ProductProgressDetail[]> = {
+    dialect: [
+      { key: "language", label: languageInfo.label },
+      ...(distinguish
+        ? ([
+            { key: "uk", label: "英式 BrE", dialect: "uk" },
+            { key: "us", label: "美式 AmE", dialect: "us" }
+          ] as const)
+        : [])
+    ],
+    parts_of_speech: positions
+      .filter((pos) => formPosIds.has(pos.key))
+      .map(({ key, label }) => ({ key, label })),
+    forms: positions
+      .filter((pos) => formPosIds.has(pos.key))
+      .map((pos) => ({
+        key: pos.key,
+        label: pos.label,
+        count: pos.forms.filter((form) => form.form_type !== "base").length
+      })),
+    sense_groups: meanings.sense_groups.map((group, index) => ({
+      key: group.id,
+      label: `${index + 1}. ${group.name_zh.trim() || group.name_en.trim() || "待填写语义区间"}`
+    })),
+    grammar_structures: positions.map((pos) => ({
+      key: pos.key,
+      label: pos.label,
+      count: pos.meanings?.grammar_structures.length ?? 0
+    })),
+    senses: positions.map((pos) => ({
+      key: pos.key,
+      label: pos.label,
+      count: pos.meanings?.senses.length ?? 0,
+      items: (pos.meanings?.senses ?? []).map((sense, index) => ({
+        key: sense.id,
+        label: `${index + 1}. ${definitionSummary(sense)}`
+      }))
+    })),
+    sentences: [
+      ...CEFR_OPTIONS.flatMap(({ value: level }) => {
+        const count = levelCounts.get(level) ?? 0;
+        return count > 0 ? [{ key: level, label: level, count }] : [];
+      }),
+      ...(levelCounts.has("ungraded")
+        ? [
+            {
+              key: "ungraded",
+              label: "未分级",
+              count: levelCounts.get("ungraded")!
+            }
+          ]
+        : [])
+    ]
+  };
+
   const firstDerived = derivedForms[0];
   const firstSenseGroup = meanings.sense_groups[0];
   const firstGrammar = grammarEntries[0];
   const firstSense = senseEntries[0];
   const firstSentence = sentenceEntries[0];
-  return [
+  const rows: Omit<V3ProductProgressRow, "details">[] = [
     {
       key: "dialect",
       index: 1,
-      label: "方言识别",
-      completed: completed.has("basics"),
-      value: "完成",
+      label: "语言识别",
+      completed: completed.has("basics") && languageInfo.identified,
+      value:
+        completed.has("basics") && languageInfo.identified ? "完成" : "未完成",
       target: { step: "basics", node_id: wordId, field: "presentation" }
     },
     {
@@ -370,6 +493,22 @@ export function buildV3ProductProgress({
               }
     }
   ];
+  return rows.map((row) => {
+    const step =
+      row.key === "dialect"
+        ? "basics"
+        : row.key === "parts_of_speech" || row.key === "forms"
+          ? "forms"
+          : "meanings";
+    const dirty = step !== "basics" && dirtySteps[step];
+    return {
+      ...row,
+      completed:
+        row.completed && !dirty && !(step === "meanings" && hasUnmatchedPos),
+      details: details[row.key],
+      ...(dirty ? { statusDescription: "编辑中，完成状态待确认" } : {})
+    };
+  });
 }
 
 function node(role: V3ReadinessNodeRole, node_id: string): MutableNode {

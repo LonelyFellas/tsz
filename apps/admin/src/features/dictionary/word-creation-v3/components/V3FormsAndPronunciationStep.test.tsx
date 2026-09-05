@@ -341,9 +341,12 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(canonicalValue()).toEqual(content);
   });
 
-  it("UD 在两张方言面板显示相同拼写并保持双方言发音独立", async () => {
+  it("UD 只显示共用拼写并保持双方言发音独立", async () => {
     const ukPronunciation = pronunciationFixture({ id: uuidFromInt(2141) });
-    const usPronunciation = pronunciationFixture({ id: uuidFromInt(2142) });
+    const usPronunciation = pronunciationFixture({
+      id: uuidFromInt(2142),
+      actual_pron: "us-edited"
+    });
     const form = ukUsFormFixture({
       id: uuidFromInt(2140),
       uk: {
@@ -369,34 +372,23 @@ describe("V3FormsAndPronunciationStep", () => {
       />
     );
 
-    await waitFor(() =>
-      expect(
-        container.querySelector(".v3-dialect-separated-matrix")
-      ).not.toBeNull()
+    expect(await screen.findByLabelText("原形英美共用拼写")).toHaveValue(
+      "harbor"
     );
-    const ukPanel = container.querySelector(".v3-dialect-panel-uk")!;
-    const usPanel = container.querySelector(".v3-dialect-panel-us")!;
+    expect(container.querySelector(".v3-dialect-separated-matrix")).toBeNull();
+    expect(screen.queryByLabelText("原形英式拼写")).toBeNull();
+    expect(screen.queryByLabelText("原形美式拼写")).toBeNull();
+    expect(screen.getByText("英式英语 · BrE")).toBeVisible();
+    expect(screen.getByText("美式英语 · AmE")).toBeVisible();
     expect(
-      within(ukPanel as HTMLElement).getByText("英式英语 · BrE")
-    ).toBeVisible();
-    expect(
-      within(usPanel as HTMLElement).getByText("美式英语 · AmE")
-    ).toBeVisible();
-    expect(ukPanel.querySelectorAll(".word-pronunciation-editor")).toHaveLength(
-      1
-    );
-    expect(usPanel.querySelectorAll(".word-pronunciation-editor")).toHaveLength(
-      1
-    );
-    expect(screen.getByLabelText("原形英式拼写")).toHaveValue("harbor");
-    expect(screen.getByLabelText("原形美式拼写")).toHaveValue("harbor");
+      container.querySelectorAll(".word-pronunciation-editor")
+    ).toHaveLength(2);
 
-    fireEvent.change(screen.getByLabelText("原形英式拼写"), {
+    fireEvent.change(screen.getByLabelText("原形英美共用拼写"), {
       target: { value: "harbour" }
     });
 
-    expect(screen.getByLabelText("原形英式拼写")).toHaveValue("harbour");
-    expect(screen.getByLabelText("原形美式拼写")).toHaveValue("harbour");
+    expect(screen.getByLabelText("原形英美共用拼写")).toHaveValue("harbour");
     const updated = formById(canonicalValue(), form.id);
     expect(updated).toMatchObject({
       id: form.id,
@@ -405,15 +397,23 @@ describe("V3FormsAndPronunciationStep", () => {
         uk: {
           id: form.regional_variants.uk.id,
           spelling: "harbour",
-          pronunciations: [{ id: ukPronunciation.id }]
+          pronunciations: [ukPronunciation]
         },
         us: {
           id: form.regional_variants.us.id,
           spelling: "harbour",
-          pronunciations: [{ id: usPronunciation.id }]
+          pronunciations: [usPronunciation]
         }
       }
     });
+    const beforeMerge = canonicalValue();
+    fireEvent.click(screen.getByLabelText("英美音标无区别"));
+    expect(canonicalValue()).toEqual(beforeMerge);
+    expect(
+      screen.getByText(
+        "英式与美式发音内容不同，请先统一需要保留的发音，再合并为英美共用。"
+      )
+    ).toBeVisible();
   });
 
   it("UU 保持英美共用结构且不渲染独立 BrE/AmE 面板", async () => {
@@ -761,16 +761,13 @@ describe("V3FormsAndPronunciationStep", () => {
       screen.getByLabelText("英美音标有区别").closest(".ant-radio-wrapper")
     ).toHaveClass("ant-radio-wrapper-checked");
     expect(screen.getByLabelText("英美音标无区别")).not.toBeDisabled();
-    expect(screen.getByLabelText("原形英式拼写")).toHaveValue("center");
-    expect(screen.getByLabelText("原形美式拼写")).toHaveValue("center");
-    expect(
-      container.querySelector(".v3-dialect-separated-matrix")
-    ).not.toBeNull();
+    expect(screen.getByLabelText("原形英美共用拼写")).toHaveValue("center");
+    expect(container.querySelector(".v3-dialect-separated-matrix")).toBeNull();
     expect(container.querySelector(".word-form-matrix-distinguish")).toBeNull();
-    fireEvent.change(screen.getByLabelText("原形英式拼写"), {
+    fireEvent.change(screen.getByLabelText("原形英美共用拼写"), {
       target: { value: "centred" }
     });
-    expect(screen.getByLabelText("原形美式拼写")).toHaveValue("centred");
+    expect(screen.getByLabelText("原形英美共用拼写")).toHaveValue("centred");
     const updated = formById(canonicalValue(), form.id);
     if (updated.regional_variants.mode !== "uk_us") throw new Error("fixture");
     expect(updated.regional_variants.uk.spelling).toBe("centred");
@@ -947,6 +944,46 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(rows[1]).toHaveAttribute("data-form-id", formId);
   });
+
+  it.each(["拼写", "音标"])(
+    "短语成分未改动时，英美%s区分可切回通用并保留内容",
+    (control) => {
+      const form = commonFormFixture({ spelling: "hit the sack" });
+      form.regional_variants.common.component_usages = [
+        { state: "unresolved", id: uuidFromInt(710), literal: "hit" }
+      ];
+      render(<Harness initial={formsFixture({ forms: [form] })} />);
+
+      fireEvent.click(screen.getByLabelText(`英美${control}有区别`));
+      expect(formById(canonicalValue(), form.id).regional_variants.mode).toBe(
+        "uk_us"
+      );
+      if (control === "拼写") {
+        fireEvent.click(screen.getByLabelText("英美拼写无区别"));
+        expect(
+          screen.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
+        ).toHaveClass("ant-radio-wrapper-checked");
+        expect(canonicalValue().pos[0]!.dialect_rules).toEqual({
+          spelling_mode: "unified",
+          phonetic_mode: "distinguish"
+        });
+      }
+      fireEvent.click(screen.getByLabelText("英美音标无区别"));
+      expect(
+        formById(canonicalValue(), form.id).regional_variants
+      ).toMatchObject({
+        mode: "common",
+        common: {
+          spelling: "hit the sack",
+          pronunciations: form.regional_variants.common.pronunciations.map(
+            ({ id: _id, ...value }) => value
+          ),
+          component_usages: [{ state: "unresolved", literal: "hit" }]
+        }
+      });
+      expect(screen.queryByText("暂不能合并英美配置")).toBeNull();
+    }
+  );
 
   it("I03 三态切换按 V2 直接转换，不弹窗且保留 form UUID", () => {
     const form = commonFormFixture({
@@ -2337,7 +2374,7 @@ describe("V3FormsAndPronunciationStep", () => {
         spelling_mode: "unified" as const,
         phonetic_mode: "distinguish" as const
       },
-      expectedLabel: "复数英式拼写"
+      expectedLabel: "复数英美共用拼写"
     },
     {
       name: "DD",

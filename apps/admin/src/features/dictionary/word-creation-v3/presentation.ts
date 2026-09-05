@@ -91,6 +91,31 @@ const IMPACT_LABEL: Record<FormsImpactNodeTypeV3, string> = {
   relation: "词义关系"
 };
 
+const languageNamesZh = new Intl.DisplayNames(["zh-CN"], {
+  type: "language",
+  fallback: "none"
+});
+const languageNamesEn = new Intl.DisplayNames(["en"], {
+  type: "language",
+  fallback: "none"
+});
+
+export function languageSummary(language: string): {
+  label: string;
+  identified: boolean;
+} {
+  const code = language.trim();
+  if (!code) return { label: "未识别语言", identified: false };
+  try {
+    const zh = languageNamesZh.of(code);
+    const en = languageNamesEn.of(code);
+    if (zh && en) return { label: `${zh} ${en}`, identified: true };
+  } catch {
+    // 未知/不合法的代码只作展示兜底，不能被显示成默认英语。
+  }
+  return { label: `${code}（未识别语言）`, identified: false };
+}
+
 export function wordStatusLabel(status: AdminWordStatus): string {
   return {
     draft: "草稿",

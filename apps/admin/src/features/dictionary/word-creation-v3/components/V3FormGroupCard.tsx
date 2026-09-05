@@ -228,6 +228,7 @@ export function V3FormGroupCard({
   };
 
   const useSeparatedMatrix =
+    pos.dialect_rules.spelling_mode === "distinguish" &&
     group.members.length > 0 &&
     group.members.every((member) => {
       const form = pos.forms.find((item) => item.id === member.form_id);

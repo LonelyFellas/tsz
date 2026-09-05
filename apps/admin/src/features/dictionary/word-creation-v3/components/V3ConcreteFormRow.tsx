@@ -225,6 +225,15 @@ export function V3ConcreteFormRow({
     dialectRules.spelling_mode === "unified"
       ? form.regional_variants
       : undefined;
+  const unifiedSpellingVariantIds = unifiedSpellingVariants
+    ? [unifiedSpellingVariants.uk.id, unifiedSpellingVariants.us.id]
+    : [];
+  const unifiedSpellingInvalid = issues.some(
+    (issue) =>
+      issue.field === "spelling" &&
+      issue.node_location.variant_id !== undefined &&
+      unifiedSpellingVariantIds.includes(issue.node_location.variant_id)
+  );
   return (
     <div
       className={`v3-concrete-form-row${showMatrixHeader ? "" : " v3-concrete-form-row-continuation"}`}
@@ -336,14 +345,17 @@ export function V3ConcreteFormRow({
                 <Tag color="blue">英美共用</Tag>
               </Flex>
               <Input
+                aria-invalid={unifiedSpellingInvalid}
                 aria-label={`${formLabel}英美共用拼写`}
                 data-v3-field="spelling"
+                data-v3-node-aliases={unifiedSpellingVariantIds.join(" ")}
                 data-v3-node-id={form.id}
                 onChange={(event) => {
                   const result = unifyUkUsSpelling(form, event.target.value);
                   if (result.ok) onChange(replaceForm(content, result.value));
                 }}
                 placeholder="词形拼写"
+                status={unifiedSpellingInvalid ? "error" : undefined}
                 style={{ marginTop: 10 }}
                 value={unifiedSpellingVariants.uk.spelling}
               />
@@ -353,6 +365,7 @@ export function V3ConcreteFormRow({
                 (variant) => (
                   <div
                     className={`word-shared-pronunciation word-shared-pronunciation-${variant.dialect}`}
+                    data-v3-node-id={variant.id}
                     key={variant.id}
                   >
                     <V3PronunciationList

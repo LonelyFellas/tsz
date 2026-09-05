@@ -2,6 +2,7 @@ import {
   AudioOutlined,
   DashboardOutlined,
   EditOutlined,
+  PauseOutlined,
   SoundOutlined
 } from "@ant-design/icons";
 import { Alert, Tag, Tooltip } from "antd";
@@ -690,7 +691,7 @@ export function VoiceEditor({
       ariaLabel: `语法结构 ${roleLabel}`,
       className: `tsz-ve-role-button is-${roleLevel}`,
       active: brush.kind === "role",
-      trailing: (
+      icon: (
         <span
           className={`tsz-ve-pop-swatch is-${roleLevel} tsz-ve-role-dot`}
           aria-hidden
@@ -728,6 +729,7 @@ export function VoiceEditor({
     {
       key: "pause",
       label: "停顿",
+      icon: <PauseOutlined />,
       summary: formatPauseLabel(pauseDuration),
       className: "tsz-ve-pause-button",
       active: brush.kind === "pause",
