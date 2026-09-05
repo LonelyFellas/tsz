@@ -44,7 +44,6 @@ const ROOTS = [
   "SurfaceMatchPageAny",
   "RelatedSearchResponse",
   "DetectLexiconResponseAny",
-  "PendingSentenceAssociationListResponse",
   "ResolveSentenceTargetsV3Response",
   "SearchComponentTargetsV3Response",
   "AdminWordPublicationListResponse",

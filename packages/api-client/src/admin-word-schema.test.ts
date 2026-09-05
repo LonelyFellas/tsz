@@ -25,7 +25,6 @@ import {
   decodeEntryLifecycleBatchV2Response,
   decodeFormsImpactResponseAny,
   decodeFormsImpactResponseV3,
-  decodePendingSentenceAssociationListResponse,
   decodeRelatedSearchResponseAny,
   decodeResolveSentenceTargetsV3Response,
   decodeSearchComponentTargetsV3Response,
@@ -548,26 +547,6 @@ describe("admin word V2 response schema guard", () => {
 });
 
 describe("admin word V3/Any runtime decoder", () => {
-  it("Pending 关联列表完整解码并拒绝缺失 source_segments", () => {
-    const item = buildRuntimeFixture(
-      runtimeFixtureBundle.$defs.PendingSentenceAssociationItemV3!
-    ) as Record<string, unknown>;
-    const response = {
-      results: [item],
-      total: 1,
-      next_cursor: null
-    };
-
-    expect(decodePendingSentenceAssociationListResponse(response)).toBe(
-      response
-    );
-    const invalid = structuredClone(response);
-    delete invalid.results[0]!.source_segments;
-    expect(() => decodePendingSentenceAssociationListResponse(invalid)).toThrow(
-      InvalidAdminWordResponseError
-    );
-  });
-
   it("目标发现响应完整解码并拒绝未知 schema_version", () => {
     const range = buildRuntimeFixture(
       runtimeFixtureBundle.$defs.SentenceTargetRangeResultV3!

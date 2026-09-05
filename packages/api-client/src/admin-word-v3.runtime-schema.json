@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "e1f79da2bc4ee69900a573598c812fbbe092dde76481ee4ad4e3058be8835daf",
+  "_source_sha256": "1dd180a82877e8ad7afb79ec76807c7d56d6f7f089b584126f668231dec42dab",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -13,7 +13,6 @@
     "SurfaceMatchPageAny",
     "RelatedSearchResponse",
     "DetectLexiconResponseAny",
-    "PendingSentenceAssociationListResponse",
     "ResolveSentenceTargetsV3Response",
     "SearchComponentTargetsV3Response",
     "AdminWordPublicationListResponse",
@@ -1593,53 +1592,6 @@
         },
         "presentation": { "$ref": "#/$defs/EntryPresentationV3" },
         "updated_at": { "type": "string", "format": "date-time" }
-      },
-      "additionalProperties": false
-    },
-    "PendingSentenceAssociationItemV3": {
-      "type": "object",
-      "required": [
-        "association_id",
-        "owner_entry_id",
-        "owner_entry_revision",
-        "owner_lifecycle_revision",
-        "sentence_id",
-        "source_dialect",
-        "source_segments",
-        "sentence_text",
-        "pending_target_kind",
-        "pending_target_headword"
-      ],
-      "properties": {
-        "association_id": { "type": "string", "format": "uuid" },
-        "owner_entry_id": { "type": "string", "format": "uuid" },
-        "owner_entry_revision": { "type": "integer" },
-        "owner_lifecycle_revision": { "type": "integer" },
-        "pending_target_gloss": { "type": "string" },
-        "pending_target_headword": { "type": "string" },
-        "pending_target_kind": { "$ref": "#/$defs/EntryKind" },
-        "sentence_id": { "type": "string", "format": "uuid" },
-        "sentence_text": { "type": "string" },
-        "source_dialect": { "$ref": "#/$defs/Dialect" },
-        "source_segments": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/SentenceSourceRangeV1" },
-          "maxItems": 20,
-          "minItems": 1
-        }
-      },
-      "additionalProperties": false
-    },
-    "PendingSentenceAssociationListResponse": {
-      "type": "object",
-      "required": ["results", "total", "next_cursor"],
-      "properties": {
-        "next_cursor": { "type": ["string", "null"] },
-        "results": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/PendingSentenceAssociationItemV3" }
-        },
-        "total": { "type": "integer", "minimum": 0 }
       },
       "additionalProperties": false
     },
