@@ -867,6 +867,23 @@ describe("V3MeaningsAndExamplesStep", () => {
     ]);
   }, 15_000);
 
+  it("音色与语速落到语法结构变体的 voice_profile 上", async () => {
+    render(<Harness initial={meaningsFixture} />);
+    await screen.findByRole("toolbar", { name: "标注工具栏" });
+
+    const variant = () => value().pos[0]!.grammar_structures[0]!.variants[0]!;
+    // 没动过之前不该凭空写出一份配置
+    expect(variant().voice_profile).toBeUndefined();
+
+    fireEvent.click(screen.getByLabelText("语速"));
+    fireEvent.click(screen.getByLabelText("语速 1.25 倍"));
+
+    expect(variant().voice_profile).toEqual({
+      voice_ids: expect.any(Array),
+      rate_percent: 25
+    });
+  }, 15_000);
+
   it("语法结构复用 V2 单栏文本区且不显示地区下拉", () => {
     const { container } = render(<Harness initial={meaningsFixture} />);
 

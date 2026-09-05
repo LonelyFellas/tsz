@@ -106,6 +106,8 @@ export function VoiceEditor({
   readOnly,
   inputDataAttributes,
   placeholder,
+  voiceProfile,
+  onVoiceProfileChange,
   onChange
 }: VoiceEditorProps) {
   /*
@@ -123,8 +125,15 @@ export function VoiceEditor({
   const [draft, setDraft] = useState<LiaisonDraft>({});
   const [validationMessage, setValidationMessage] = useState("");
 
-  const [enabledVoiceIds, setEnabledVoiceIds] = useState<string[]>([]);
-  const [enabledTouched, setEnabledTouched] = useState(false);
+  /*
+   * enabledTouched 区分「没配过」与「配过且恰好选了这些」：
+   * 没配过时启用全部音色（清单是异步拉的，所以不能一上来就固化成一个列表）。
+   * wire 上 voice_profile 为 null 就对应「没配过」。
+   */
+  const [enabledVoiceIds, setEnabledVoiceIds] = useState<string[]>(
+    voiceProfile?.voice_ids ?? []
+  );
+  const [enabledTouched, setEnabledTouched] = useState(Boolean(voiceProfile));
   const [upload, setUpload] = useState<UploadDraft>({
     locale: "en-GB",
     gender: "female"
@@ -133,7 +142,9 @@ export function VoiceEditor({
   const [playingUploadId, setPlayingUploadId] = useState<string>();
   const uploadSeqRef = useRef(0);
   const uploadAudioRef = useRef<HTMLAudioElement | null>(null);
-  const [ratePercent, setRatePercent] = useState<number>();
+  const [ratePercent, setRatePercent] = useState<number | undefined>(
+    voiceProfile?.rate_percent
+  );
   const [customRate, setCustomRate] = useState("");
   const [customPause, setCustomPause] = useState("");
   const [openTool, setOpenTool] = useState<string>();
@@ -250,6 +261,34 @@ export function VoiceEditor({
     incomingRef.current = serialized;
     onChange(workingValue);
   }, [onChange, readOnly, serialized, working.error, workingValue]);
+
+  /* 自己刚抛出去、又被父组件回灌的那份要跳过，否则每次改动都会重置一遍。 */
+  const emittedProfileRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const incoming = JSON.stringify(voiceProfile ?? null);
+    if (incoming === emittedProfileRef.current) return;
+    emittedProfileRef.current = incoming;
+    setEnabledVoiceIds(voiceProfile?.voice_ids ?? []);
+    setEnabledTouched(Boolean(voiceProfile));
+    setRatePercent(voiceProfile?.rate_percent);
+  }, [voiceProfile]);
+
+  /**
+   * 把当前的音色与语速抛给宿主。
+   *
+   * 只在用户真的动过之后才抛：没动过时 voice_ids 该是「全部」，而「全部」在 wire 上
+   * 没有表示法——此时固化成当天的音色列表是错的（以后新增的音色就落不进来）。
+   * 一旦动过，选择就固化成显式列表，这正是「持久化」的含义。
+   */
+  const emitProfile = (next: { voiceIds: string[]; rate?: number }) => {
+    if (readOnly || !onVoiceProfileChange) return;
+    const profile = {
+      voice_ids: next.voiceIds,
+      rate_percent: next.rate ?? 0
+    };
+    emittedProfileRef.current = JSON.stringify(profile);
+    onVoiceProfileChange(profile);
+  };
 
   const auditionSettings = useMemo(() => ({ ratePercent }), [ratePercent]);
   const {
@@ -495,12 +534,12 @@ export function VoiceEditor({
 
   const toggleVoice = (voiceId: string) => {
     const current = effectiveEnabledIds;
+    const next = current.includes(voiceId)
+      ? current.filter((id) => id !== voiceId)
+      : [...current, voiceId];
     setEnabledTouched(true);
-    setEnabledVoiceIds(
-      current.includes(voiceId)
-        ? current.filter((id) => id !== voiceId)
-        : [...current, voiceId]
-    );
+    setEnabledVoiceIds(next);
+    emitProfile({ voiceIds: next, rate: ratePercent });
   };
 
   const isRateAllowed = useCallback(
@@ -523,6 +562,7 @@ export function VoiceEditor({
     setRatePercent(percent);
     setCustomRate("");
     setValidationMessage("");
+    emitProfile({ voiceIds: effectiveEnabledIds, rate: percent });
   };
 
   const applyCustomRate = (raw: string) => {
@@ -538,8 +578,10 @@ export function VoiceEditor({
       );
       return;
     }
-    setRatePercent(Math.round((multiplier - 1) * 100));
+    const percent = Math.round((multiplier - 1) * 100);
+    setRatePercent(percent);
     setValidationMessage("");
+    emitProfile({ voiceIds: effectiveEnabledIds, rate: percent });
   };
 
   /** 自定义停顿按毫秒输入，与底层模型同单位，避免多一层换算。 */
@@ -710,8 +752,11 @@ export function VoiceEditor({
       dividerBefore: true,
       label: "音色",
       // 清单要到面板首次打开才拉，没拉之前不报数——显示「0」会被读成「一个都没启用」。
+      // 已配过就直接报数；没配过时要等清单拉回来才知道「全部」是几个。
       summary:
-        voices.length > 0 ? String(effectiveEnabledIds.length) : undefined,
+        enabledTouched || voices.length > 0
+          ? String(effectiveEnabledIds.length)
+          : undefined,
       icon: <SoundOutlined />,
       content: (
         <VoicePanel

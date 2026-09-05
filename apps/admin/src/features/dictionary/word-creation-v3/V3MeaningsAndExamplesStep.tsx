@@ -661,8 +661,18 @@ function GrammarStructuresCard({
                           target.content = next;
                         })
                       }
+                      onVoiceProfileChange={(next) =>
+                        change((draft) => {
+                          const target =
+                            draft.pos[posIndex]!.grammar_structures[
+                              structureIndex
+                            ]!.variants[variantIndex]!;
+                          target.voice_profile = next;
+                        })
+                      }
                       placeholder={GRAMMAR_PLACEHOLDER[variant.dialect]}
                       value={variant.content}
+                      voiceProfile={variant.voice_profile}
                     />
                   </div>
                 ))}
