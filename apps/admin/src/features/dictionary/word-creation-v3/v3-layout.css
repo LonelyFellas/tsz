@@ -156,6 +156,20 @@
   width: 100%;
 }
 
+/* 待建条提示收进输入框右侧，和 status="warning" 的黄框同色。 */
+.v3-meanings-v2 .word-relation-pending-icon {
+  color: #d48806;
+  cursor: help;
+}
+
+/* 校验提示包装层没有自己的布局，里面的控件会退回 antd 默认宽度
+   （语法结构下拉只有 140px，而列宽 260px），显式撑满列。 */
+.v3-meanings-v2 .word-field-with-help > .ant-select,
+.v3-meanings-v2 .word-field-with-help > .ant-input,
+.v3-meanings-v2 .word-field-with-help > .ant-input-affix-wrapper {
+  width: 100%;
+}
+
 .v3-product-progress-list .word-progress-done {
   color: #252c3c;
   font-size: 18px;

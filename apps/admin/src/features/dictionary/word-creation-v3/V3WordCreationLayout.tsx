@@ -1,5 +1,4 @@
-import { CheckCircleFilled } from "@ant-design/icons";
-import { Alert, Button, Flex, Tag, Typography } from "antd";
+import { Alert, Button, Flex, Tag } from "antd";
 import type {
   AdminWordV3,
   DraftFormsStepContentV3,
@@ -10,6 +9,7 @@ import type {
 import type { ReactNode } from "react";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
+import { V3ProductProgressList } from "./components/V3ProductProgressList";
 import type { V3IssueNavigationTarget } from "./issueNavigation";
 import type { V3Problem } from "./problem";
 import { buildV3ProductProgress } from "./readiness";
@@ -238,46 +238,23 @@ export function V3WordCreationLayout({
               )
             }),
         progress: (
-          <Flex
-            vertical
-            gap={12}
-            className="word-creation-progress-list v3-product-progress-list"
-          >
-            {progressRows.map((row) => (
-              <button
-                type="button"
-                className="word-creation-progress-row"
-                data-readiness-state={row.completed ? "complete" : "incomplete"}
-                disabled={readOnly}
-                key={row.key}
-                aria-current={
-                  row.key === currentProgressKey ? "step" : undefined
-                }
-                onClick={() => {
-                  if (onProgressNavigate) {
-                    onProgressNavigate(row.target);
-                  } else {
-                    onStepChange(row.target.step);
-                  }
-                }}
-              >
-                {row.completed ? (
-                  <CheckCircleFilled
-                    aria-label={`${row.label}已完成`}
-                    className="word-progress-done"
-                  />
-                ) : (
-                  <span aria-hidden="true" className="word-progress-index">
-                    {row.index}
-                  </span>
-                )}
-                <span className="word-progress-label">{row.label}</span>
-                <Typography.Text type="secondary">
-                  {row.value ?? row.count}
-                </Typography.Text>
-              </button>
-            ))}
-          </Flex>
+          <V3ProductProgressList
+            currentKey={currentProgressKey}
+            disabled={readOnly}
+            onSelect={(key) => {
+              const row = progressRows.find((item) => item.key === key);
+              if (!row) return;
+              if (onProgressNavigate) onProgressNavigate(row.target);
+              else onStepChange(row.target.step);
+            }}
+            rows={progressRows.map((row) => ({
+              completed: row.completed,
+              index: row.index,
+              key: row.key,
+              label: row.label,
+              value: row.value ?? row.count
+            }))}
+          />
         )
       }}
       readOnly={readOnly}

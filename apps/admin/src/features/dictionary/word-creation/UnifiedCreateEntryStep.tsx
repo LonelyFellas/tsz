@@ -43,7 +43,6 @@ import {
 } from "../surfaceSnapshot";
 import { useSurfaceSnapshotAny } from "../useSurfaceSnapshot";
 import { createV3WordRequests } from "../word-creation-v3/api";
-import type { PendingSentenceTargetNavigation } from "../word-creation-v3/pendingSentenceTargetNavigation";
 import { newWordNodeId } from "../word-model/primitives";
 import { useDialectPreference } from "../../settings/useDialectPreference";
 import {
@@ -85,7 +84,6 @@ type CreateAttempt = {
 
 interface Props {
   requests?: UnifiedCreateRequests;
-  initialPendingTarget?: PendingSentenceTargetNavigation;
   onCreated: (
     word: AdminWordV3,
     navigationState: CreationNavigationState
@@ -651,13 +649,12 @@ function HeadwordConfirmationCard({
 
 export function UnifiedCreateEntryStep({
   requests = defaultRequests,
-  initialPendingTarget,
   onCreated
 }: Props) {
   const { modal } = App.useApp();
   const catalog = usePartOfSpeechCatalog();
   const { preference } = useDialectPreference();
-  const [value, setValue] = useState(initialPendingTarget?.headword ?? "");
+  const [value, setValue] = useState("");
   const [fieldError, setFieldError] = useState<string>();
   const [error, setError] = useState<string>();
   const [busy, setBusy] = useState<"checking" | "creating">();
@@ -829,10 +826,7 @@ export function UnifiedCreateEntryStep({
             ? !hasV3PrefilledForms(response.word)
               ? "dictionary-empty"
               : "dictionary"
-            : "blank",
-        ...(initialPendingTarget
-          ? { pendingSentenceTarget: initialPendingTarget }
-          : {})
+            : "blank"
       });
     } catch (requestError) {
       if (!mounted.current) return;

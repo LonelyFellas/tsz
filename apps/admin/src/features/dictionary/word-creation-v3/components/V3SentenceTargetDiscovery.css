@@ -34,7 +34,7 @@
 .v3-sentence-target-discovery-tokens {
   display: flex;
   flex-wrap: wrap;
-  gap: 7px;
+  gap: 8px;
   margin-top: 14px;
   padding: 12px;
   border: 1px solid #e4eaf1;
@@ -43,10 +43,15 @@
 }
 
 .v3-sentence-target-discovery-tokens button {
-  min-width: 34px;
-  padding: 6px 9px;
+  min-width: 40px;
+  padding: 8px 12px;
   border: 1px solid transparent;
   border-radius: 8px;
+  /* button 不继承页面字体：不写死就会落到 UA 默认的 13.33px Arial，
+     和周围 system-ui 正文不是一套字。 */
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 20px;
   color: #2d3748;
   background: #f1f4f8;
   cursor: pointer;

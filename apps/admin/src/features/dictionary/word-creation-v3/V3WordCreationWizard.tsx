@@ -4,13 +4,11 @@ import type {
   DraftMeaningsStepContentWritableV3,
   DraftValidationResponseV3,
   FormsImpactResponseV3,
-  SentenceAssociationInputV3,
   RetiredStableNodeV3,
   StepSaveIntent,
   SurfaceMatchPageV3,
   V3DraftValidationIssue,
-  WordCreationStep,
-  WordSentenceWritableV3
+  WordCreationStep
 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -60,13 +58,6 @@ export interface V3WizardActions {
   saveMeanings(
     content: DraftMeaningsStepContentWritableV3,
     intent: StepSaveIntent
-  ): Promise<void>;
-  saveMultidimensionalSentence(
-    posId: string,
-    senseId: string,
-    sentence: WordSentenceWritableV3,
-    associations: SentenceAssociationInputV3[],
-    idempotencyKey?: string
   ): Promise<void>;
   validate(): Promise<DraftValidationResponseV3 | undefined>;
   publish(confirmedSurfaceToken?: string): Promise<void>;
@@ -919,94 +910,6 @@ function V3WordCreationSession({
     ]
   );
 
-  const saveMultidimensionalSentence = useCallback(
-    async (
-      posId: string,
-      senseId: string,
-      sentence: WordSentenceWritableV3,
-      associations: SentenceAssociationInputV3[],
-      associationIdempotencyKey = newWordNodeId()
-    ) => {
-      const nextMeanings = structuredClone(draftMeanings);
-      const pos = nextMeanings.pos.find((item) => item.pos_id === posId);
-      const sense = pos?.senses.find((item) => item.id === senseId);
-      if (!sense) throw new Error("当前词义已变化，请刷新后重试");
-      const existingIndex = sense.sentences.findIndex(
-        (item) => item.id === sentence.id
-      );
-      const sentenceChanged =
-        existingIndex < 0 ||
-        JSON.stringify(sense.sentences[existingIndex]) !==
-          JSON.stringify(sentence);
-      if (existingIndex >= 0) sense.sentences[existingIndex] = sentence;
-      else sense.sentences.push(sentence);
-
-      const saved = sentenceChanged
-        ? await saveMeanings(nextMeanings, "save")
-        : flowRef.current.canonical();
-      if (!saved) throw new Error("例句尚未保存，请按页面提示重试");
-      const flow = flowRef.current;
-      const baseRevision = saved.revision;
-      const baseLifecycleRevision = saved.lifecycle_revision;
-      const scope = scopeRef.current;
-      const done = markPending("save_sentence_associations");
-      const retry = () =>
-        saveMultidimensionalSentence(
-          posId,
-          senseId,
-          sentence,
-          associations,
-          associationIdempotencyKey
-        );
-      try {
-        const result = await flow.runCanonical(
-          "save_sentence_associations",
-          () =>
-            requests.replaceSentenceAssociations(
-              saved.id,
-              sentence.id,
-              associationIdempotencyKey,
-              {
-                association_schema_version: 3,
-                base_revision: baseRevision,
-                base_lifecycle_revision: baseLifecycleRevision,
-                associations
-              }
-            )
-        );
-        if (!result.accepted || scope !== scopeRef.current) {
-          throw new Error("例句关联响应已过期，请刷新后重试");
-        }
-        applyCanonical(result.value.word, "meanings");
-      } catch (error) {
-        if (
-          classifyV3Problem(error, "save_sentence_associations").kind ===
-          "entry_archived"
-        ) {
-          await handleEntryArchived(error);
-        } else if (scope === scopeRef.current) {
-          await handleError(error, "save_sentence_associations", retry, {
-            step: "meanings",
-            baseRevision,
-            localMeanings: nextMeanings
-          });
-        }
-        throw error;
-      } finally {
-        done();
-      }
-    },
-    [
-      applyCanonical,
-      draftMeanings,
-      handleEntryArchived,
-      handleError,
-      markPending,
-      requests,
-      saveMeanings
-    ]
-  );
-
   const validate = useCallback(async () => {
     if (hasLiveDirtyDraft()) return undefined;
     const flow = flowRef.current;
@@ -1345,7 +1248,6 @@ function V3WordCreationSession({
       saveMeanings: async (content, intent) => {
         await saveMeanings(content, intent);
       },
-      saveMultidimensionalSentence,
       validate,
       publish,
       confirmImpact,
@@ -1367,7 +1269,6 @@ function V3WordCreationSession({
       retry,
       saveFormsContent,
       saveMeanings,
-      saveMultidimensionalSentence,
       validate
     ]
   );
