@@ -45,18 +45,6 @@
   color: #111827;
 }
 
-.word-creation-stepper--basics {
-  padding-block: 14px;
-}
-
-.word-creation-stepper--basics .ant-steps-item-content {
-  display: none;
-}
-
-.word-creation-stepper--basics .ant-steps-item-title {
-  font-size: 14px;
-}
-
 .word-creation-shell {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);

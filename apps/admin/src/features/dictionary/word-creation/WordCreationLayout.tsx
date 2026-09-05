@@ -215,9 +215,7 @@ export function WordCreationLayout({
         ]}
       />
 
-      <section
-        className={`word-creation-stepper${isBasicsStep ? " word-creation-stepper--basics" : ""}`}
-      >
+      <section className="word-creation-stepper">
         <Steps
           className="word-creation-steps"
           current={currentIndex}

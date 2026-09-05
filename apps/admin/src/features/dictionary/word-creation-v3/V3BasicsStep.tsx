@@ -1,8 +1,6 @@
 import {
   CheckCircleFilled,
-  ClockCircleOutlined,
   InfoCircleOutlined,
-  MinusCircleOutlined,
   SafetyCertificateOutlined
 } from "@ant-design/icons";
 import type {
@@ -26,6 +24,7 @@ import {
 } from "antd";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
+import { V3ProductProgressList } from "./components/V3ProductProgressList";
 import {
   formTypeLabel,
   partOfSpeechLabel,
@@ -119,10 +118,52 @@ function VariantPanel({
   );
 }
 
-function SuggestedForm({ form }: { form: WordConcreteFormV3 }) {
+/**
+ * 同类型出现多条时补序号（spill 的过去式就有 spilled / spilt 两条），
+ * 规则与词形步一致，否则这里会并排出现两个「过去式」看着像重复。
+ */
+function suggestedFormLabels(
+  forms: readonly WordConcreteFormV3[]
+): Map<string, string> {
+  const seen = new Map<string, number>();
+  const total = new Map<string, number>();
+  for (const form of forms) {
+    total.set(form.form_type, (total.get(form.form_type) ?? 0) + 1);
+  }
+  return new Map(
+    forms.map((form) => {
+      const index = (seen.get(form.form_type) ?? 0) + 1;
+      seen.set(form.form_type, index);
+      const base = formTypeLabel(form.form_type);
+      return [
+        form.id,
+        (total.get(form.form_type) ?? 0) > 1 ? `${base} ${index}` : base
+      ];
+    })
+  );
+}
+
+function SuggestedForms({ forms }: { forms: readonly WordConcreteFormV3[] }) {
+  const labels = suggestedFormLabels(forms);
+  return forms.map((form) => (
+    <SuggestedForm
+      form={form}
+      key={form.id}
+      label={labels.get(form.id) ?? formTypeLabel(form.form_type)}
+    />
+  ));
+}
+
+function SuggestedForm({
+  form,
+  label
+}: {
+  form: WordConcreteFormV3;
+  label: string;
+}) {
   return (
     <Space orientation="vertical" size="small" style={{ width: "100%" }}>
-      <Tag color="blue">{formTypeLabel(form.form_type)}</Tag>
+      <Tag color="blue">{label}</Tag>
       {form.regional_variants.mode === "common" ? (
         <VariantPanel
           className="dialect-panel-common"
@@ -179,9 +220,9 @@ function DictionarySuggestions({ word }: { word: AdminWordV3 }) {
     >
       <div className="word-dialect-detection-row">
         <div>
-          <Typography.Text strong>内置词典建议</Typography.Text>
+          <Typography.Text strong>当前草稿词形</Typography.Text>
           <Typography.Text type="secondary">
-            以下英美拼写、词形和音标已应用到草稿，请核对后继续。
+            建条时已套用内置词典的英美拼写、词形和音标；下面是草稿的最新内容，在词形与发音步改动后这里同步更新。
           </Typography.Text>
         </div>
         <SafetyCertificateOutlined />
@@ -198,9 +239,7 @@ function DictionarySuggestions({ word }: { word: AdminWordV3 }) {
               size="middle"
               style={{ width: "100%" }}
             >
-              {pos.forms.map((form) => (
-                <SuggestedForm key={form.id} form={form} />
-              ))}
+              <SuggestedForms forms={pos.forms} />
             </Space>
           </Card>
         ))}
@@ -480,31 +519,19 @@ function V3ProgressSummary({
     }
   ];
   return (
-    <Space
-      orientation="vertical"
-      size={13}
-      className="word-creation-progress-list"
-    >
-      {rows.map((row) => (
-        <button
-          type="button"
-          className="word-creation-progress-row"
-          data-readiness-state={row.state}
-          key={row.key}
-          onClick={() => onStepChange(row.step)}
-        >
-          {row.state === "complete" ? (
-            <CheckCircleFilled className="word-progress-done" />
-          ) : row.state === "not_required" ? (
-            <MinusCircleOutlined className="word-progress-none" />
-          ) : (
-            <ClockCircleOutlined className="word-progress-wait" />
-          )}
-          <span>{row.label}</span>
-          <Typography.Text type="secondary">{row.value}</Typography.Text>
-        </button>
-      ))}
-    </Space>
+    <V3ProductProgressList
+      onSelect={(key) => {
+        const row = rows.find((item) => item.key === key);
+        if (row) onStepChange(row.step);
+      }}
+      rows={rows.map((row, index) => ({
+        completed: row.state === "complete",
+        index: index + 1,
+        key: row.key,
+        label: row.label,
+        value: row.value
+      }))}
+    />
   );
 }
 

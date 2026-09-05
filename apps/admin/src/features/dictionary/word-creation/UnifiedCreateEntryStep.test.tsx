@@ -522,39 +522,6 @@ describe("UnifiedCreateEntryStep", () => {
     expect(screen.getByText("请先填写合法的英文主词后再创建。")).toBeVisible();
   });
 
-  it("Pending 创建入口预填目标词头并把完整导航状态交还创建页", async () => {
-    const supplied = requests();
-    vi.mocked(supplied.detectV3).mockResolvedValue(
-      v3PhraseDetection("center of the wall")
-    );
-    vi.mocked(supplied.createV3).mockResolvedValue({ word: v3Word() });
-    const onCreated = vi.fn();
-    const initialPendingTarget = {
-      associationId: "association-1",
-      headword: "center of the wall",
-      gloss: "墙的中心位置",
-      returnTo: "/words/source/v3/wizard/meanings?mode=edit"
-    };
-    render(
-      <AntApp>
-        <UnifiedCreateEntryStep
-          initialPendingTarget={initialPendingTarget}
-          onCreated={onCreated}
-          requests={supplied}
-        />
-      </AntApp>
-    );
-
-    expect(input()).toHaveValue("center of the wall");
-    fireEvent.click(screen.getByText("词典检测"));
-    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
-    await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(1));
-    expect(onCreated).toHaveBeenCalledWith(v3Word(), {
-      creationSource: "blank",
-      pendingSentenceTarget: initialPendingTarget
-    });
-  });
-
   it("统一入口复用旧版第一步结构和中文文案", () => {
     renderStep(requests());
 

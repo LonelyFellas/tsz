@@ -4,8 +4,7 @@ import type {
   DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   PartOfSpeechCatalogResponse,
-  V3DraftValidationIssue,
-  WordSentenceAssociationV3
+  V3DraftValidationIssue
 } from "@tsz/types";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -14,7 +13,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ensureV3MeaningsForForms, toWritableMeanings } from "./meaningsModel";
 import { V3MeaningsAndExamplesStep } from "./V3MeaningsAndExamplesStep";
 import { uuidFromInt, uuidSequence } from "./fixtures";
-import type { V3MultidimensionalSentenceSaveDraft } from "./components/V3MultidimensionalSentenceDrawer";
 
 const meaningsCss = readFileSync(
   resolve(
@@ -201,9 +199,7 @@ function Harness({
   partOfSpeechCatalogPending,
   wordId,
   relationSnapshots,
-  draftRelationPrebindingEnabled = true,
-  sentenceAssociations,
-  onSaveMultidimensionalSentence = vi.fn().mockResolvedValue(undefined)
+  draftRelationPrebindingEnabled = true
 }: {
   initial?: DraftMeaningsStepContentWritableV3;
   issues?: V3DraftValidationIssue[];
@@ -230,12 +226,6 @@ function Harness({
     >
   >;
   draftRelationPrebindingEnabled?: boolean;
-  sentenceAssociations?: Readonly<Record<string, WordSentenceAssociationV3[]>>;
-  onSaveMultidimensionalSentence?: (
-    posId: string,
-    senseId: string,
-    draft: V3MultidimensionalSentenceSaveDraft
-  ) => Promise<void>;
 }) {
   const [value, setValue] = useState(initial);
   const [formsValue, setFormsValue] = useState(forms);
@@ -262,12 +252,10 @@ function Harness({
           onFormsChange?.(next);
         }}
         onSave={onSave}
-        onSaveMultidimensionalSentence={onSaveMultidimensionalSentence}
         partOfSpeechCatalog={partOfSpeechCatalog}
         partOfSpeechCatalogError={partOfSpeechCatalogError}
         partOfSpeechCatalogPending={partOfSpeechCatalogPending}
         relationDisplaySnapshots={relationSnapshots}
-        sentenceAssociations={sentenceAssociations}
         value={value}
         wordId={wordId}
       />
@@ -757,71 +745,69 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(result.senses[1]).toMatchObject({ id: "sense-new", relations: [] });
   });
 
-  it("点击添加例句打开正式抽屉，取消不调用两阶段保存且父级草稿不变", async () => {
-    const saveSentence = vi.fn().mockResolvedValue(undefined);
+  it("页内新增例句并通过词义草稿保存等级和英中内容", async () => {
+    const onSave = vi.fn().mockResolvedValue(undefined);
     render(
-      <Harness
-        initial={meaningsFixture}
-        onSaveMultidimensionalSentence={saveSentence}
-        wordId="entry-1"
-      />
+      <Harness initial={meaningsFixture} onSave={onSave} wordId="entry-1" />
     );
-    const initial = value();
-
     fireEvent.click(screen.getByText("添加例句"));
-
-    expect(await screen.findByText("新增多维例句")).toBeVisible();
-    expect(screen.getByText("正式能力")).toBeVisible();
-    fireEvent.change(screen.getByLabelText("英文例句"), {
-      target: { value: "A production multidimensional sentence." }
+    expect(document.querySelector(".ant-drawer")).toBeNull();
+    expect(screen.getByLabelText("例句 2 等级")).not.toBeDisabled();
+    fireEvent.change(screen.getByLabelText("例句 2 通用英文"), {
+      target: { value: "We broke the ice." }
     });
-    expect(value()).toEqual(initial);
-    expect(saveSentence).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole("button", { name: /^取\s?消$/u }));
-    expect(screen.queryByText("新增多维例句")).toBeNull();
-    expect(value()).toEqual(initial);
-    expect(saveSentence).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("例句 2 中文"), {
+      target: { value: "我们打破了沉默。" }
+    });
+    fireEvent.mouseDown(screen.getByLabelText("例句 2 等级"));
+    const choice = [
+      ...document.querySelectorAll<HTMLElement>(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )
+    ].find((option) => option.textContent === "C1");
+    expect(choice).toBeDefined();
+    fireEvent.click(choice!);
+    fireEvent.click(screen.getByText("保存草稿"));
+    expect(onSave).toHaveBeenCalledWith(value(), "save");
+    expect(value().pos[0]!.senses[0]!.sentences[1]).toMatchObject({
+      level: "C1",
+      en_text: {
+        common: { origin: "manual", value: { text: "We broke the ice." } }
+      },
+      zh_text: { text: "我们打破了沉默。" },
+      // 等级改到 C1 后，唯一那档（zh_text 别名）的 band 跟着走
+      zh_translations: [
+        { band: "c1_c2", content: { text: "我们打破了沉默。" } }
+      ],
+      links: [{ word_id: "entry-1", sense_id: "sense-1", role: "focus" }]
+    });
   });
 
-  it("编辑已有例句时把服务端关联投影交给生产抽屉，取消不修改父级", async () => {
-    const saveSentence = vi.fn().mockResolvedValue(undefined);
+  it("直接编辑保留节点和关联，保存失败后仍保留输入", async () => {
+    const onSave = vi.fn().mockRejectedValue(new Error("保存失败"));
     render(
-      <Harness
-        initial={meaningsFixture}
-        onSaveMultidimensionalSentence={saveSentence}
-        sentenceAssociations={{
-          "sentence-1": [
-            {
-              id: "association-1",
-              association_schema_version: 3,
-              origin: "manual",
-              source_dialect: "common",
-              source_segments: [{ start: 9, end: 15, surface: "center" }],
-              state: "pending",
-              pending_target_kind: "word",
-              pending_target_headword: "center"
-            }
-          ]
-        }}
-        wordId="entry-1"
-      />
+      <Harness initial={meaningsFixture} onSave={onSave} wordId="entry-1" />
     );
-    const initial = value();
-
-    fireEvent.click(screen.getByLabelText("编辑例句 1 的多维关联"));
-
-    expect(await screen.findByText("编辑多维例句")).toBeVisible();
-    expect(screen.getByLabelText("英文例句")).toHaveValue(
-      "The city center is busy."
+    const original = structuredClone(value().pos[0]!.senses[0]!.sentences[0]!);
+    fireEvent.change(screen.getByLabelText("例句 1 通用英文"), {
+      target: { value: "The city center is quiet." }
+    });
+    fireEvent.change(screen.getByLabelText("例句 1 中文"), {
+      target: { value: "市中心很安静。" }
+    });
+    fireEvent.click(screen.getByText("保存草稿"));
+    await Promise.resolve();
+    const edited = value().pos[0]!.senses[0]!.sentences[0]!;
+    expect(edited.id).toBe(original.id);
+    expect(edited.links).toEqual(original.links);
+    expect(edited.zh_text_id).toBe(original.zh_text_id);
+    expect(screen.getByLabelText("例句 1 通用英文")).toHaveValue(
+      "The city center is quiet."
     );
-    expect(
-      screen.getByText("待关联").closest(".v3-sentence-drawer-association")
-    ).toHaveTextContent("center");
-    fireEvent.click(screen.getByRole("button", { name: /^取\s?消$/u }));
-    expect(value()).toEqual(initial);
-    expect(saveSentence).not.toHaveBeenCalled();
-  }, 10_000);
+    expect(screen.getByLabelText("例句 1 中文")).toHaveValue("市中心很安静。");
+    expect(document.querySelector(".ant-drawer")).toBeNull();
+    expect(onSave).toHaveBeenCalledWith(value(), "save");
+  });
 
   it("删除最后一条例句后显示空状态并保留添加入口", () => {
     render(<Harness initial={meaningsFixture} wordId="entry-1" />);
@@ -992,6 +978,63 @@ describe("V3MeaningsAndExamplesStep", () => {
     ]);
   });
 
+  it("没写内容的语法结构不进下拉，未被选中时下拉为空并说明去哪填", () => {
+    const dropdownOptions = () =>
+      [
+        ...document.querySelectorAll<HTMLElement>(
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+        )
+      ].map((option) => option.textContent);
+
+    // 填了内容：序号对齐上方卡片编号，后面跟内容预览
+    const { unmount } = render(<Harness />);
+    fireEvent.mouseDown(screen.getByLabelText("定义 1 语法结构"));
+    expect(dropdownOptions()).toEqual(["① used as a noun"]);
+    unmount();
+
+    // 新建词性默认带的空结构：没被选中就不该出现在下拉里
+    const blank = structuredClone(meaningsFixture);
+    blank.pos[0]!.grammar_structures[0]!.variants[0]!.content.text = "   ";
+    delete blank.pos[0]!.senses[0]!.definitions[0]!.grammar_structure_id;
+    render(<Harness initial={blank} />);
+    fireEvent.mouseDown(screen.getByLabelText("定义 1 语法结构"));
+    expect(dropdownOptions()).toEqual([]);
+    expect(screen.getByText("请先在上方填写语法结构")).toBeInTheDocument();
+  });
+
+  it("空的语法结构一旦被选中仍保留在下拉里，避免选中值显示成空白", () => {
+    // fixture 的定义绑着 grammar-1；把它清空后这条仍要可见，否则 Select 显示空白
+    const blank = structuredClone(meaningsFixture);
+    blank.pos[0]!.grammar_structures[0]!.variants[0]!.content.text = "";
+    render(<Harness initial={blank} />);
+
+    fireEvent.mouseDown(screen.getByLabelText("定义 1 语法结构"));
+    expect(
+      [
+        ...document.querySelectorAll<HTMLElement>(
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+        )
+      ].map((option) => option.textContent)
+    ).toEqual(["① "]);
+  });
+
+  it("过长的语法结构预览截断到 24 字并留省略号", () => {
+    const long = structuredClone(meaningsFixture);
+    long.pos[0]!.grammar_structures[0]!.variants[0]!.content.text = "a".repeat(
+      25
+    );
+    render(<Harness initial={long} />);
+
+    fireEvent.mouseDown(screen.getByLabelText("定义 1 语法结构"));
+    expect(
+      [
+        ...document.querySelectorAll<HTMLElement>(
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+        )
+      ].map((option) => option.textContent)
+    ).toEqual([`① ${"a".repeat(24)}…`]);
+  });
+
   it("语法结构保持必填，但仅在发布校验返回对应 issue 后显示红色", () => {
     const initial = structuredClone(meaningsFixture);
     delete initial.pos[0]!.senses[0]!.definitions[0]!.grammar_structure_id;
@@ -1130,17 +1173,67 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect([...row.children]).toHaveLength(5);
     expect(row.children[0]).toHaveClass("word-number-cell");
     expect(row.children[0]).not.toHaveClass("word-sentence-index");
-    expect(screen.getByLabelText("例句 1 等级")).toBeDisabled();
-    expect(screen.getByLabelText("例句 1 通用英文")).toHaveAttribute(
+    expect(screen.getByLabelText("例句 1 等级")).not.toBeDisabled();
+    expect(screen.getByLabelText("例句 1 通用英文")).not.toHaveAttribute(
       "readonly"
     );
-    expect(screen.getByLabelText("例句 1 中文")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("例句 1 中文")).not.toHaveAttribute(
+      "readonly"
+    );
     expect(row.querySelectorAll(".anticon-sound")).toHaveLength(1);
     expect(screen.getByLabelText("高阶译文")).toHaveTextContent("高");
     expect(meaningsCss).toContain(".word-table-row.word-sentence-row {");
   });
 
-  it("外层只读展示初中高三档译文且不显示序号", () => {
+  it("行内改例句等级：仅有的 zh_text 别名译文档位跟着走，多档译文不动", () => {
+    const single = structuredClone(meaningsFixture);
+    const sentence = single.pos[0]!.senses[0]!.sentences[0]!;
+    sentence.level = "A1";
+    sentence.zh_translations = [
+      {
+        id: sentence.zh_text_id,
+        band: "a1_a2",
+        content: { version: 2, text: "高阶译文", annotations: [] }
+      }
+    ];
+    const { unmount } = render(<Harness initial={single} />);
+    fireEvent.mouseDown(screen.getByLabelText("例句 1 等级"));
+    fireEvent.click(screen.getAllByText("C1").at(-1)!);
+    expect(value().pos[0]!.senses[0]!.sentences[0]).toMatchObject({
+      level: "C1",
+      zh_translations: [
+        expect.objectContaining({ id: sentence.zh_text_id, band: "c1_c2" })
+      ]
+    });
+    unmount();
+
+    const multi = structuredClone(meaningsFixture);
+    const target = multi.pos[0]!.senses[0]!.sentences[0]!;
+    target.level = "A1";
+    target.zh_translations = [
+      {
+        id: "translation-a",
+        band: "a1_a2",
+        content: { version: 2, text: "高", annotations: [] }
+      },
+      {
+        id: "translation-b",
+        band: "b1_b2",
+        content: { version: 2, text: "中", annotations: [] }
+      }
+    ];
+    render(<Harness initial={multi} />);
+    fireEvent.mouseDown(screen.getByLabelText("例句 1 等级"));
+    fireEvent.click(screen.getAllByText("C1").at(-1)!);
+    const after = value().pos[0]!.senses[0]!.sentences[0]!;
+    expect(after.level).toBe("C1");
+    expect(after.zh_translations!.map((item) => item.band)).toEqual([
+      "a1_a2",
+      "b1_b2"
+    ]);
+  });
+
+  it("页内编辑一档译文时保留其他译文和 ID", () => {
     const initial = structuredClone(meaningsFixture);
     initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations = [
       {
@@ -1167,6 +1260,21 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.getByLabelText("初阶译文")).toHaveTextContent("初");
     expect(screen.getByLabelText("中阶译文")).toHaveTextContent("中");
     expect(screen.getByLabelText("高阶译文")).toHaveTextContent("高");
+    fireEvent.change(screen.getByLabelText("例句 1 中阶中文"), {
+      target: { value: "更新中阶译文" }
+    });
+    const translations =
+      value().pos[0]!.senses[0]!.sentences[0]!.zh_translations;
+    expect(translations[0]).toEqual(
+      initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations[0]
+    );
+    expect(translations[1]).toMatchObject({
+      id: "translation-b",
+      content: { text: "更新中阶译文" }
+    });
+    expect(translations[2]).toEqual(
+      initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations[2]
+    );
   });
 
   it("多维释义、多维例句与关联词可独立收起展开且不修改草稿", () => {
@@ -1362,9 +1470,19 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value().pos[0]!.senses[0]!.relations[2]).toMatchObject({
       pending_target_headword: "newword"
     });
+    // 提示不再沉在卡片底部：两条待建条各自在输入框右侧挂一个图标，框体转黄
+    const pendingIcons =
+      within(synonymCard).getAllByLabelText("近义词待建条提示");
+    expect(pendingIcons).toHaveLength(2);
     expect(
-      within(synonymCard).getAllByText(/发布时会自动匹配同名词条或建条/u)
-    ).toHaveLength(1);
+      within(synonymCard).queryByText(/发布时会自动匹配同名词条或建条/u)
+    ).toBeNull();
+    expect(
+      within(synonymCard)
+        .getAllByLabelText("近义词目标词条")
+        .at(-1)!
+        .closest(".ant-input-status-warning")
+    ).not.toBeNull();
 
     const pendingTarget = within(synonymCard)
       .getAllByLabelText("近义词目标词条")
@@ -2281,7 +2399,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     ]);
   });
 
-  it("外层例句只读且不会修改正文或底层 links", () => {
+  it("页内编辑正文不改动底层 links", () => {
     const { container } = render(<Harness wordId="entry-hidden-links" />);
     const editor = container.querySelector(".word-sentence-associations");
     expect(editor).not.toBeNull();
@@ -2293,9 +2411,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.change(screen.getByLabelText("例句 1 通用英文"), {
       target: { value: "Updated sentence." }
     });
-    expect(value().pos[0]!.senses[0]!.sentences[0]!.en_text).toEqual(
-      meaningsFixture.pos[0]!.senses[0]!.sentences[0]!.en_text
-    );
+    expect(value().pos[0]!.senses[0]!.sentences[0]!.en_text).toMatchObject({
+      common: { id: "sentence-en-1", value: { text: "Updated sentence." } }
+    });
     expect(value().pos[0]!.senses[0]!.sentences[0]!.links).toEqual(linksBefore);
   });
 
@@ -2554,7 +2672,13 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
     initial.pos[0]!.grammar_structures.push({
       id: "grammar-2",
-      variants: []
+      variants: [
+        {
+          id: "grammar-variant-2",
+          dialect: "common",
+          content: { version: 2, text: "used as a verb", annotations: [] }
+        }
+      ]
     });
     initial.pos[0]!.senses.push({
       id: "sense-2",
@@ -2597,7 +2721,7 @@ describe("V3MeaningsAndExamplesStep", () => {
 
     select("释义 1 所属语义区间", "次要");
     change("释义 1 频率", "37.25");
-    select("定义 1 语法结构", "语法结构 2");
+    select("定义 1 语法结构", "② used as a verb");
     select("释义 1 等级", "B1");
     select("定义 1 等级", "B2");
     fireEvent.click(
@@ -2675,7 +2799,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.getByRole("tab", { name: /^名词/u })).toBeInTheDocument();
     expect(screen.getAllByText("可数名词")).toHaveLength(2);
     expect(screen.getByText("核心")).toBeInTheDocument();
-    expect(screen.getAllByText("语法结构 1")).toHaveLength(1);
+    expect(screen.getAllByText("① used as a noun")).toHaveLength(1);
     expect(editor).not.toHaveTextContent("pos-1");
     expect(editor).not.toHaveTextContent("sense-group-1");
     expect(editor).not.toHaveTextContent("grammar-1");
@@ -2738,7 +2862,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(us).not.toBeNull();
     fireEvent.change(zh!, { target: { value: "更新中文句意" } });
     fireEvent.change(uk!, { target: { value: "Updated UK meaning" } });
-    expect(us).toHaveAttribute("readonly");
+    expect(us).not.toHaveAttribute("readonly");
+    fireEvent.change(us!, { target: { value: "Updated US example" } });
 
     const sense = value().pos[0]!.senses[0]!;
     expect(sense.definitions).toEqual([
@@ -2763,7 +2888,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       uk: { state: "missing" },
       us: {
         state: "ready",
-        variant: { id: "sentence-us", value: { text: "US example" } }
+        variant: { id: "sentence-us", value: { text: "Updated US example" } }
       }
     });
   });

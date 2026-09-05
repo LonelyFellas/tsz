@@ -91,46 +91,4 @@ describe("WordCreatePage", () => {
     fireEvent.click(screen.getByText(action));
     expect(screen.getByTestId("location")).toHaveTextContent(expected);
   });
-
-  it("Pending 创建目标预填词头并在创建后保留 gloss 与 returnTo", () => {
-    render(
-      <MemoryRouter
-        initialEntries={[
-          {
-            pathname: "/words/create",
-            state: {
-              pendingSentenceTarget: {
-                associationId: "association-1",
-                headword: "center of the wall",
-                gloss: "墙的中心位置",
-                returnTo: "/words/source/v3/wizard/meanings?mode=edit"
-              }
-            }
-          }
-        ]}
-      >
-        <Routes>
-          <Route path="/words/create" element={<WordCreatePage />} />
-          <Route path="*" element={<LocationProbe />} />
-        </Routes>
-      </MemoryRouter>
-    );
-
-    expect(
-      (
-        wired.props as typeof wired.props & {
-          initialPendingTarget?: unknown;
-        }
-      )?.initialPendingTarget
-    ).toEqual({
-      associationId: "association-1",
-      headword: "center of the wall",
-      gloss: "墙的中心位置",
-      returnTo: "/words/source/v3/wizard/meanings?mode=edit"
-    });
-    fireEvent.click(screen.getByText("完成短语创建"));
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      '/words/created-phrase-v3/v3/wizard/forms|{"creationSource":"blank","pendingSentenceTarget":{"associationId":"association-1","headword":"center of the wall","gloss":"墙的中心位置","returnTo":"/words/source/v3/wizard/meanings?mode=edit"}}'
-    );
-  });
 });

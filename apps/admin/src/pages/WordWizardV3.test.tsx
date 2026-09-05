@@ -200,34 +200,6 @@ function renderPage(
 }
 
 describe("WordWizardV3Page", () => {
-  it("目标创建向导在任意步骤保留 Pending 返回来源入口", async () => {
-    const current = word();
-    const router = renderPage(
-      `/words/${WORD_ID}/v3/wizard/forms`,
-      createV3WordRequests(source({ word: current, retired_stable_nodes: [] })),
-      undefined,
-      {
-        pendingSentenceTarget: {
-          associationId: "association-1",
-          headword: "center of the wall",
-          gloss: "墙的中心位置",
-          returnTo: "/words/source/v3/wizard/meanings?mode=edit"
-        }
-      }
-    );
-
-    expect(
-      await screen.findByText("正在为 Pending 创建目标：center of the wall")
-    ).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: "返回来源例句" }));
-    await waitFor(() =>
-      expect(router.state.location.pathname).toBe(
-        "/words/source/v3/wizard/meanings"
-      )
-    );
-    expect(router.state.location.search).toBe("?mode=edit");
-  });
-
   it("renders the V3 basics route with the established V2 first-step structure instead of a placeholder card", async () => {
     const current = word();
     const api = source({ word: current, retired_stable_nodes: [] });

@@ -1,11 +1,9 @@
 import { Alert } from "antd";
-import type { PendingSentenceTargetNavigation } from "../word-creation-v3/pendingSentenceTargetNavigation";
 
 export type CreationSource = "dictionary" | "dictionary-empty" | "blank";
 
 export interface CreationNavigationState {
   creationSource: CreationSource;
-  pendingSentenceTarget?: PendingSentenceTargetNavigation;
 }
 
 export function creationSourceFromState(
