@@ -97,21 +97,62 @@ V3 词条编辑器 step3 的**语法结构**字段。编辑器工具栏提供 6 
 
 ---
 
-## 变更 3：音色 / 语速是否持久化 —— ⚠️ 待产品确认，后端暂不动工
+## 变更 3：音色 / 语速持久化（已决策：两者都要存）
 
-编辑器里「可选音色」（勾选启用哪些发音人）和「语速微调」目前是**纯会话状态**，
-关掉页面即丢。需要先确认它们的语义：
+### 现状
 
-- **若只是"试听时用什么听"** → 现状即正确，后端无需改动，前端会在界面上标注为仅试听。
-- **若是"这段文本将来合成语音时的配置"** → 需要新增字段，形状大致：
-  ```json
-  "voice_profile": { "voice_ids": [string], "rate_percent": int } | null
-  ```
-  挂在 `RichTextVariantV3` 同级。属新增响应字段，前端先部署。
+编辑器里「可选音色」（勾选启用哪几个发音人）和「语速微调」目前是**纯会话状态**，
+关掉页面即丢。wire 里没有任何字段承载它们。
 
-**这一条在产品决策落定前，后端不要开工。**
+2026-09-05 产品决策：**两者都要持久化**，语义是「这段文本将来合成语音时的配置」，
+而不只是编辑时的试听参数。
 
----
+### 目标形状
+
+挂在 `RichTextVariantV3` 上，与 `value` 同级（**不要**塞进 `RichTextV2V3` 内部——
+那个类型在多处复用，且是 `additionalProperties: false`）：
+
+```json
+"RichTextVariantV3": {
+  "required": ["id", "value", "origin"],
+  "properties": {
+    "id": {...}, "value": {...}, "origin": {...},
+    "voice_profile": { "$ref": "#/components/schemas/VoiceProfileV3" }   // 可选，可为 null
+  }
+}
+
+"VoiceProfileV3": {
+  "type": "object",
+  "required": ["voice_ids", "rate_percent"],
+  "properties": {
+    "voice_ids":    { "type": "array", "items": { "type": "string" }, "maxItems": 20 },
+    "rate_percent": { "type": "integer", "minimum": -50, "maximum": 100 }
+  },
+  "additionalProperties": false
+}
+```
+
+### 字段口径（重要）
+
+- **`voice_ids` 里存的是 `VoiceResponse.alias`**（`/speech/voices` 返回的那个字段）。
+  前端 `VoiceOption.id` 就是直接取 `alias`（见 admin 的 `voice-editor/adapter.ts`）。
+  发音人清单是外部 TTS 供应商给的，alias 可能随供应商变动 —— 因此**后端不要对
+  `voice_ids` 做外键式强校验**，读到已下线的 alias 时原样返回，由前端在界面上标为失效。
+- **`rate_percent` 不要按单个音色的范围校验。** `VoiceCapabilities` 里
+  `min_rate_percent` / `max_rate_percent` 是**逐音色不同**的，而一个 profile 可以同时
+  启用多个音色。正确做法是：存储层只校验 `-50..100` 这个全局区间（对应前端 0.50×–2.00×），
+  真正的夹取发生在合成时（前端试听已经这么做了：按当前音色的范围 clamp）。
+- `voice_profile` 缺省 / `null` 表示「未配置」，按系统默认音色与原速处理。
+
+### 上线顺序
+
+属**新增响应字段**。前端对响应做 `additionalProperties: false` 的运行时校验，
+所以顺序同变更 1：后端先加字段但不返回 → 前端 `sync:openapi` + 部署 → 后端开始返回。
+
+### 前端待办（本变更落地后）
+
+编辑器目前把 `enabledVoiceIds` / `ratePercent` 留在组件内部状态，没有出口。前端需要给
+`VoiceEditor` 增加一条 profile 的进出通道，并接到 V3 的变体上。
 
 ## 变更 4：上传音频持久化 —— 建议单独立项
 
@@ -166,3 +207,10 @@ V3 词条编辑器 step3 的**语法结构**字段。编辑器工具栏提供 6 
 变更 2 上线后：
 
 - [ ] 起点选 2 个字母、终点选 1 个字母，保存后刷新 → 弧线端点位置与保存前一致
+
+变更 3 上线后：
+
+- [ ] 勾选 2 个音色、语速调成 1.25×，保存后刷新 → 勾选与语速原样回来
+- [ ] `voice_ids` 里放一个已下线的 alias → 接口正常返回，不 4xx
+- [ ] `rate_percent` 传 -50 与 100 → 接受；传 -60 或 120 → 拒绝
+- [ ] 不传 `voice_profile` → 接受，视为未配置
