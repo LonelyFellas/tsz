@@ -207,6 +207,27 @@ function makeForms(
   };
 }
 
+/**
+ * 点开候选层第一行，等到词形层出现并返回目标词形行。
+ * 候选到位的那次提交才挂载 Cascader，rc-cascader `useActive` 的挂载副作用会把激活路径
+ * 重置成 value 对应的路径（无预选即空）。这个被动副作用在慢机上会排到测试点击之后才执行，
+ * 把首列点击吞掉——CI 覆盖率分片就曾因此等到 findBy 超时。所以把点击放进 waitFor 里
+ * 重试直到词形行真的出现；重复点击同一父级只会重设同一条激活路径，是幂等的。
+ */
+async function expandFirstEntry(
+  baseElement: Element,
+  formRowText: string | RegExp
+): Promise<HTMLElement> {
+  return waitFor(() => {
+    const entryRow = baseElement.querySelector(
+      ".ant-cascader-menu-item-content"
+    );
+    expect(entryRow).not.toBeNull();
+    fireEvent.click(entryRow!);
+    return screen.getByText(formRowText);
+  });
+}
+
 describe("baseSpellingForPos", () => {
   it("unified 模式取 common 变体拼写作切词锚点", () => {
     expect(baseSpellingForPos(makeForms(), "pos-1")).toBe("give up");
@@ -572,10 +593,7 @@ describe("V3PhraseComponentUsagesCard", () => {
         baseElement.querySelector(".ant-cascader-menu-item-content")
       ).not.toBeNull()
     );
-    fireEvent.click(
-      baseElement.querySelector(".ant-cascader-menu-item-content")!
-    );
-    const formRow = await screen.findByText(/原形 give/);
+    const formRow = await expandFirstEntry(baseElement, /原形 give/);
     fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
     // 改选另一条词义：单选下应替换掉原关联，而非并存
     const otherSense = await screen.findByText("举办；提供");
@@ -690,10 +708,7 @@ describe("V3PhraseComponentUsagesCard", () => {
         baseElement.querySelector(".ant-cascader-menu-item-content")
       ).not.toBeNull()
     );
-    fireEvent.click(
-      baseElement.querySelector(".ant-cascader-menu-item-content")!
-    );
-    const formRow = await screen.findByText(/原形 give/);
+    const formRow = await expandFirstEntry(baseElement, /原形 give/);
     fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
     const senseRow = await screen.findByText("给；交给");
     fireEvent.click(senseRow.closest(".ant-cascader-menu-item-content")!);
@@ -838,10 +853,9 @@ describe("V3PhraseComponentUsagesCard", () => {
     expect(
       baseElement.querySelector(".ant-cascader-menu-item-content")!.textContent
     ).toBe("give");
-    fireEvent.click(
-      baseElement.querySelector(".ant-cascader-menu-item-content")!
-    );
-    expect(await screen.findByText(/原形 give/)).toBeInTheDocument();
+    expect(
+      await expandFirstEntry(baseElement, /原形 give/)
+    ).toBeInTheDocument();
     // 命中行只靠颜色区分：类名在，文案不在。
     const pastRow = await screen.findByText(/过去式 gave/);
     expect(pastRow).toHaveClass("v3-component-usage-matched-form");
@@ -873,10 +887,9 @@ describe("V3PhraseComponentUsagesCard", () => {
           baseElement.querySelector(".ant-cascader-menu-item-content")
         ).not.toBeNull()
       );
-      fireEvent.click(
-        baseElement.querySelector(".ant-cascader-menu-item-content")!
-      );
-      expect(await screen.findByText(`原形 ${shown}`)).toBeInTheDocument();
+      expect(
+        await expandFirstEntry(baseElement, `原形 ${shown}`)
+      ).toBeInTheDocument();
       expect(screen.queryByText(`原形 ${hidden}`)).toBeNull();
       // 只剩一侧，方言后缀没有区分作用
       expect(baseElement.textContent).not.toContain("BrE");
@@ -913,12 +926,11 @@ describe("V3PhraseComponentUsagesCard", () => {
         baseElement.querySelector(".ant-cascader-menu-item-content")
       ).not.toBeNull()
     );
-    fireEvent.click(
-      baseElement.querySelector(".ant-cascader-menu-item-content")!
-    );
     // 偏好是英式，但美式那条已有关联，必须一并列出才能解除；
     // 例外放行的那条要标出方言，否则两侧拼写相同时会是两行一模一样
-    expect(await screen.findByText("原形 colour")).toBeInTheDocument();
+    expect(
+      await expandFirstEntry(baseElement, "原形 colour")
+    ).toBeInTheDocument();
     expect(screen.getByText("原形 color（美式）")).toBeInTheDocument();
   });
 
@@ -956,18 +968,16 @@ describe("V3PhraseComponentUsagesCard", () => {
         baseElement.querySelector(".ant-cascader-menu-item-content")
       ).not.toBeNull()
     );
-    fireEvent.click(
-      baseElement.querySelector(".ant-cascader-menu-item-content")!
-    );
-    expect(await screen.findByText("原形 color（美式）")).toBeInTheDocument();
+    expect(
+      await expandFirstEntry(baseElement, "原形 color（美式）")
+    ).toBeInTheDocument();
     // 单选没有反选：解除靠「清除关联」。keep-set 快照冻结在打开那刻，清除后再下钻
     // 该非偏好侧词形仍应在，否则误清就再也回选不了。
     fireEvent.click(screen.getByText("清除关联"));
     await waitFor(() => expect(screen.queryByText("清除关联")).toBeNull());
-    fireEvent.click(
-      baseElement.querySelector(".ant-cascader-menu-item-content")!
-    );
-    expect(await screen.findByText("原形 color（美式）")).toBeInTheDocument();
+    expect(
+      await expandFirstEntry(baseElement, "原形 color（美式）")
+    ).toBeInTheDocument();
   });
 
   it("正在编辑的词条自身不进候选（后端不许自指）", async () => {
@@ -1021,16 +1031,7 @@ describe("V3PhraseComponentUsagesCard", () => {
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
-    fireEvent.click(
-      await waitFor(() => {
-        const node = baseElement.querySelector(
-          ".ant-cascader-menu-item-content"
-        );
-        expect(node).not.toBeNull();
-        return node as HTMLElement;
-      })
-    );
-    const formRow = await screen.findByText(/原形 give/);
+    const formRow = await expandFirstEntry(baseElement, /原形 give/);
     fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
     // 单选模式下 radio 圆点是唯一的可视选中指示（antd 单选叶子只有背景高亮）
     const senseRow = await screen.findByText("给；交给");
