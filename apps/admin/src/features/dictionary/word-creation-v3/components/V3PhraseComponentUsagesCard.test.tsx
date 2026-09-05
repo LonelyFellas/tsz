@@ -356,23 +356,20 @@ describe("V3PhraseComponentUsagesCard", () => {
     dialectPreference.current = "uk";
   });
 
-  it("按拼写渲染可点击单词并回显已关联状态", () => {
-    const usages = [
-      resolvedUsage(),
-      resolvedUsage({ id: "usage-2", target_sense_id: "sense-give-2" })
-    ];
+  it("按拼写渲染可点击单词并回显已关联状态（单选无 ×N 角标）", () => {
     render(
       <V3PhraseComponentUsagesCard
         onUsagesChange={vi.fn()}
         spelling="give up"
-        usages={usages}
+        usages={[resolvedUsage()]}
       />
     );
     const giveButton = screen.getByRole("button", {
       name: "关联第 1 个词 give"
     });
     expect(giveButton).toHaveAttribute("aria-pressed", "true");
-    expect(giveButton.textContent).toContain("×2");
+    // 单选每个单词至多一条关联，不再显示 ×N 角标
+    expect(giveButton.textContent).not.toContain("×");
     expect(
       screen.getByRole("button", { name: "关联第 2 个词 up" })
     ).toHaveAttribute("aria-pressed", "false");
@@ -511,14 +508,8 @@ describe("V3PhraseComponentUsagesCard", () => {
     expect(onUsagesChange).not.toHaveBeenCalled();
   });
 
-  it("候选里查不到的存量关联，勾选其他项时不被静默删除", async () => {
-    // 存量指向一个已归档/改版的目标：本次候选里没有它
-    const stale = resolvedUsage({
-      id: "usage-stale",
-      target_word_id: "entry-archived",
-      target_sense_id: "sense-archived"
-    });
-    searchComponentTargets.mockResolvedValueOnce({
+  it("单选：为已关联的单词改选其他词义会整组替换而非追加", async () => {
+    searchComponentTargets.mockResolvedValue({
       total: 1,
       truncated: false,
       matches: [
@@ -551,9 +542,17 @@ describe("V3PhraseComponentUsagesCard", () => {
               sense_id: "sense-give-1",
               publication_id: "pub-give",
               pos_id: "pos-give",
-              base_form_id: "base-give",
+              base_form_id: "form-give",
               level: "A1",
               gloss: "给；交给"
+            },
+            {
+              sense_id: "sense-give-2",
+              publication_id: "pub-give",
+              pos_id: "pos-give",
+              base_form_id: "form-give",
+              level: "B1",
+              gloss: "举办；提供"
             }
           ]
         }
@@ -564,7 +563,7 @@ describe("V3PhraseComponentUsagesCard", () => {
       <V3PhraseComponentUsagesCard
         onUsagesChange={onUsagesChange}
         spelling="give up"
-        usages={[stale]}
+        usages={[resolvedUsage({ target_sense_id: "sense-give-1" })]}
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
@@ -578,20 +577,20 @@ describe("V3PhraseComponentUsagesCard", () => {
     );
     const formRow = await screen.findByText(/原形 give/);
     fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
-    const senseRow = await screen.findByText("给；交给");
-    fireEvent.click(
-      senseRow
-        .closest(".ant-cascader-menu-item")!
-        .querySelector(".ant-cascader-checkbox")!
-    );
+    // 改选另一条词义：单选下应替换掉原关联，而非并存
+    const otherSense = await screen.findByText("举办；提供");
+    fireEvent.click(otherSense.closest(".ant-cascader-menu-item-content")!);
     await waitFor(() => expect(onUsagesChange).toHaveBeenCalled());
     const written = onUsagesChange.mock.calls.at(
       -1
     )![0] as PhraseComponentUsageV3[];
-    expect(written.map((usage) => usage.id)).toEqual(
-      expect.arrayContaining(["usage-stale"])
+    expect(written).toHaveLength(1);
+    expect(written[0]).toEqual(
+      expect.objectContaining({
+        literal: "give",
+        target_sense_id: "sense-give-2"
+      })
     );
-    expect(written).toHaveLength(2);
   });
 
   it("拼写改动后落在拼写外的存量关联仍随词义保存，只是点不到", () => {
@@ -613,7 +612,7 @@ describe("V3PhraseComponentUsagesCard", () => {
     ).toHaveAttribute("aria-pressed", "false");
   });
 
-  it("点击单词查询候选，勾选词义后把 resolved 条目回调给释义", async () => {
+  it("点击单词查询候选，选词义后把 resolved 条目回调给释义", async () => {
     searchComponentTargets.mockResolvedValue({
       total: 1,
       truncated: false,
@@ -685,7 +684,7 @@ describe("V3PhraseComponentUsagesCard", () => {
         expect.objectContaining({ schema_version: 3, q: "give" })
       )
     );
-    // 逐层下钻到词义叶子：父级（词条/词形）不可勾选，只有词义能选
+    // 逐层下钻到词义叶子：父级（词条/词形）不可选，只有词义叶子能选
     await waitFor(() =>
       expect(
         baseElement.querySelector(".ant-cascader-menu-item-content")
@@ -697,11 +696,7 @@ describe("V3PhraseComponentUsagesCard", () => {
     const formRow = await screen.findByText(/原形 give/);
     fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
     const senseRow = await screen.findByText("给；交给");
-    fireEvent.click(
-      senseRow
-        .closest(".ant-cascader-menu-item")!
-        .querySelector(".ant-cascader-checkbox")!
-    );
+    fireEvent.click(senseRow.closest(".ant-cascader-menu-item-content")!);
     await waitFor(() => expect(onUsagesChange).toHaveBeenCalled());
     const written = onUsagesChange.mock.calls.at(
       -1
@@ -835,7 +830,9 @@ describe("V3PhraseComponentUsagesCard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
-      expect(baseElement.querySelector(".ant-cascader-checkbox")).not.toBeNull()
+      expect(
+        baseElement.querySelector(".ant-cascader-menu-item-content")
+      ).not.toBeNull()
     );
     // 第一列只展示词面：kind 标签对选择没有帮助，短语候选与单词同构
     expect(
@@ -873,7 +870,7 @@ describe("V3PhraseComponentUsagesCard", () => {
       );
       await waitFor(() =>
         expect(
-          baseElement.querySelector(".ant-cascader-checkbox")
+          baseElement.querySelector(".ant-cascader-menu-item-content")
         ).not.toBeNull()
       );
       fireEvent.click(
@@ -912,18 +909,20 @@ describe("V3PhraseComponentUsagesCard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
-      expect(baseElement.querySelector(".ant-cascader-checkbox")).not.toBeNull()
+      expect(
+        baseElement.querySelector(".ant-cascader-menu-item-content")
+      ).not.toBeNull()
     );
     fireEvent.click(
       baseElement.querySelector(".ant-cascader-menu-item-content")!
     );
-    // 偏好是英式，但美式那条已有关联，必须一并列出才能取消勾选；
+    // 偏好是英式，但美式那条已有关联，必须一并列出才能解除；
     // 例外放行的那条要标出方言，否则两侧拼写相同时会是两行一模一样
     expect(await screen.findByText("原形 colour")).toBeInTheDocument();
     expect(screen.getByText("原形 color（美式）")).toBeInTheDocument();
   });
 
-  it("取消非偏好侧的存量关联后，该词形仍留在列表里可以回勾", async () => {
+  it("清除非偏好侧的存量关联后，该词形仍留在列表里可以回选", async () => {
     dialectPreference.current = "uk";
     searchComponentTargets.mockResolvedValue(distinguishedColourResponse());
     const usage = resolvedUsage({
@@ -953,16 +952,22 @@ describe("V3PhraseComponentUsagesCard", () => {
     const { baseElement } = render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
-      expect(baseElement.querySelector(".ant-cascader-checkbox")).not.toBeNull()
+      expect(
+        baseElement.querySelector(".ant-cascader-menu-item-content")
+      ).not.toBeNull()
     );
     fireEvent.click(
       baseElement.querySelector(".ant-cascader-menu-item-content")!
     );
-    fireEvent.click(await screen.findByText("原形 color（美式）"));
-    const checked = await screen.findByText("颜色");
-    fireEvent.click(checked);
-    // 取消后该行不能消失：keep-set 若跟着 targets 走，误点就再也回勾不了
-    expect(screen.getByText("原形 color（美式）")).toBeInTheDocument();
+    expect(await screen.findByText("原形 color（美式）")).toBeInTheDocument();
+    // 单选没有反选：解除靠「清除关联」。keep-set 快照冻结在打开那刻，清除后再下钻
+    // 该非偏好侧词形仍应在，否则误清就再也回选不了。
+    fireEvent.click(screen.getByText("清除关联"));
+    await waitFor(() => expect(screen.queryByText("清除关联")).toBeNull());
+    fireEvent.click(
+      baseElement.querySelector(".ant-cascader-menu-item-content")!
+    );
+    expect(await screen.findByText("原形 color（美式）")).toBeInTheDocument();
   });
 
   it("正在编辑的词条自身不进候选（后端不许自指）", async () => {
@@ -979,7 +984,61 @@ describe("V3PhraseComponentUsagesCard", () => {
     await waitFor(() =>
       expect(screen.getByText("没有匹配的已发布词条")).toBeInTheDocument()
     );
-    expect(baseElement.querySelector(".ant-cascader-checkbox")).toBeNull();
+    expect(
+      baseElement.querySelector(".ant-cascader-menu-item-content")
+    ).toBeNull();
+  });
+
+  it("孤儿关联在候选为空时仍可用「清除关联」解除", async () => {
+    // 目标已下架/归档 → 关键字检索返回 0 条已发布候选，但该单词仍有存量关联；
+    // 单选没有反选，必须在空候选态也给出「清除关联」，否则孤儿关联再也删不掉。
+    searchComponentTargets.mockResolvedValue({
+      matches: [],
+      total: 0,
+      truncated: false
+    });
+    const onUsagesChange = vi.fn();
+    render(
+      <V3PhraseComponentUsagesCard
+        onUsagesChange={onUsagesChange}
+        spelling="give up"
+        usages={[resolvedUsage()]}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
+    expect(await screen.findByText("没有匹配的已发布词条")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "清除关联" }));
+    await waitFor(() => expect(onUsagesChange).toHaveBeenCalledWith([]));
+  });
+
+  it("单选：选中的词义叶子前的 radio 显示为选中态", async () => {
+    searchComponentTargets.mockResolvedValue(giveEntryResponse());
+    const { baseElement } = render(
+      <V3PhraseComponentUsagesCard
+        onUsagesChange={vi.fn()}
+        spelling="give up"
+        usages={[resolvedUsage()]}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
+    fireEvent.click(
+      await waitFor(() => {
+        const node = baseElement.querySelector(
+          ".ant-cascader-menu-item-content"
+        );
+        expect(node).not.toBeNull();
+        return node as HTMLElement;
+      })
+    );
+    const formRow = await screen.findByText(/原形 give/);
+    fireEvent.click(formRow.closest(".ant-cascader-menu-item-content")!);
+    // 单选模式下 radio 圆点是唯一的可视选中指示（antd 单选叶子只有背景高亮）
+    const senseRow = await screen.findByText("给；交给");
+    expect(
+      senseRow
+        .closest(".ant-cascader-menu-item")!
+        .querySelector(".v3-component-usage-radio")
+    ).toHaveClass("is-checked");
   });
 
   it("命中被截断且候选全被过滤时，提示换关键字而不是说没有匹配", async () => {
