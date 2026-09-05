@@ -78,6 +78,15 @@ export interface VoiceRichTextFieldProps {
  * 早期版本是抽屉 + 应用/取消，标注要先开一层浮层才看得见。既然标注本身就是在
  * 正文上点，把它和正文分到两个层面反而多一次往返；内联后所见即所改。
  */
+/**
+ * 发音配置：启用哪几个音色、语速多少。结构与 wire 的 VoiceProfileV3 一致，
+ * 但本包不依赖 admin 的词条类型，故在此另行定义。
+ */
+export interface VoiceProfile {
+  voice_ids: string[];
+  rate_percent: number;
+}
+
 export interface VoiceEditorProps {
   value: RichText;
   language?: string;
@@ -96,6 +105,12 @@ export interface VoiceEditorProps {
    * `activeElement`，所以这些属性必须落在真正可聚焦的输入框上，挂在外层容器无效。
    */
   inputDataAttributes?: Record<string, string>;
+  /**
+   * 发音配置。`null` / 缺省表示未配置——此时启用全部音色、原速。
+   * 与正文分开走一条通道，因为它在 wire 上是正文的兄弟字段而不是正文的一部分。
+   */
+  voiceProfile?: VoiceProfile | null;
+  onVoiceProfileChange?: (next: VoiceProfile) => void;
   /** 正文输入框的占位提示；宿主的字段专属提示比通用那句有用，故可覆盖。 */
   placeholder?: string;
   onChange: (value: RichTextV2) => void;

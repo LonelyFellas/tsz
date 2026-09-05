@@ -237,7 +237,13 @@ describe("VoiceEditor 标注带", () => {
     fireEvent.click(button("添加连读"));
 
     expect(applied(view).annotations).toEqual([
-      { type: "liaison", start: 7, end: 10 }
+      {
+        type: "liaison",
+        start: 7,
+        end: 10,
+        start_len: 1,
+        end_len: 1
+      }
     ]);
   });
 
@@ -266,9 +272,9 @@ describe("VoiceEditor 标注带", () => {
     expect(slots[1]).toContain("of");
 
     fireEvent.click(button("添加连读"));
-    // wire 只存得下外缘区间：起点首字母 → 终点末字母。
+    // 两端各自的宽度也存得下：起点 "re"、终点 "of" 各占 2 个码点。
     expect(applied(view).annotations).toEqual([
-      { type: "liaison", start: 6, end: 11 }
+      { type: "liaison", start: 6, end: 11, start_len: 2, end_len: 2 }
     ]);
   });
 
@@ -302,7 +308,13 @@ describe("VoiceEditor 标注带", () => {
     fireEvent.click(button("添加连读"));
 
     expect(applied(view).annotations).toEqual([
-      { type: "liaison", start: 0, end: 20 }
+      {
+        type: "liaison",
+        start: 0,
+        end: 20,
+        start_len: 1,
+        end_len: 1
+      }
     ]);
   });
 
@@ -468,7 +480,7 @@ describe("VoiceEditor 文本与落盘", () => {
     fireEvent.mouseDown(word("centre"));
 
     expect(applied(view).annotations).toEqual([
-      { type: "emphasis", start: 2, end: 8, level: "strong" }
+      { type: "emphasis", start: 2, end: 8, level: "core" }
     ]);
   });
 
@@ -476,7 +488,7 @@ describe("VoiceEditor 文本与落盘", () => {
     const value: RichTextV2 = {
       version: 2,
       text: TEXT,
-      annotations: [{ type: "emphasis", start: 2, end: 8, level: "strong" }]
+      annotations: [{ type: "emphasis", start: 2, end: 8, level: "core" }]
     };
     render(<VoiceEditor {...props({ value })} />);
     expect(word("centre")).toHaveClass("is-core");
@@ -541,7 +553,7 @@ describe("VoiceEditor 文本与落盘", () => {
     fireEvent.mouseDown(word("centre"));
     expect(view.onChange).toHaveBeenCalled();
     expect(applied(view).annotations).toEqual([
-      { type: "emphasis", start: 2, end: 8, level: "strong" }
+      { type: "emphasis", start: 2, end: 8, level: "core" }
     ]);
   });
 
@@ -620,7 +632,7 @@ describe("VoiceEditor 文本与落盘", () => {
       {
         version: 2,
         text: "the cat sat",
-        annotations: [{ type: "emphasis", start: 0, end: 7, level: "strong" }]
+        annotations: [{ type: "emphasis", start: 0, end: 7, level: "core" }]
       }
     ],
     [
@@ -705,8 +717,20 @@ describe("VoiceEditor 文本与落盘", () => {
     fireEvent.click(button("添加连读"));
 
     expect(applied(view).annotations).toEqual([
-      { type: "liaison", start: 3, end: 6 },
-      { type: "liaison", start: 6, end: 9 }
+      {
+        type: "liaison",
+        start: 3,
+        end: 6,
+        start_len: 1,
+        end_len: 1
+      },
+      {
+        type: "liaison",
+        start: 6,
+        end: 9,
+        start_len: 1,
+        end_len: 1
+      }
     ]);
   });
 
@@ -821,6 +845,44 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(canvas).toHaveAttribute("data-target", "none");
   });
 
+  it.each([
+    ["功能词", "function"],
+    ["核心词", "core"],
+    ["语法词", "grammar"]
+  ])("三分类各自落盘并读得回来：%s", (label, level) => {
+    // 后端枚举放开前，三类一律写成 strong、读回来全变核心词——分类等于白做。
+    const view = props();
+    const { rerender } = render(<VoiceEditor {...view} />);
+    pickRole(label);
+    fireEvent.mouseDown(word("centre"));
+
+    const saved = applied(view);
+    expect(saved.annotations).toEqual([
+      { type: "emphasis", start: 2, end: 8, level }
+    ]);
+
+    // 存回去再读出来，分类不能变
+    rerender(<VoiceEditor {...view} value={saved} />);
+    expect(word("centre")).toHaveClass(`is-${level}`);
+  });
+
+  it("存量 strong 读回来按核心词理解", () => {
+    render(
+      <VoiceEditor
+        {...props({
+          value: {
+            version: 2,
+            text: TEXT,
+            annotations: [
+              { type: "emphasis", start: 2, end: 8, level: "strong" }
+            ]
+          }
+        })}
+      />
+    );
+    expect(word("centre")).toHaveClass("is-core");
+  });
+
   it("默认空手：不取笔时点词不落标，鼠标归文本", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
@@ -865,7 +927,7 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(word("centre")).toHaveClass("is-core");
     expect(applied(view).text).toBe("a centre of the town");
     expect(applied(view).annotations).toEqual([
-      { type: "emphasis", start: 2, end: 8, level: "strong" }
+      { type: "emphasis", start: 2, end: 8, level: "core" }
     ]);
   });
 
@@ -1007,6 +1069,84 @@ describe("VoiceEditor 发音区", () => {
     fireEvent.click(button("试听 a.wav"));
     expect(audio.pause).toHaveBeenCalledOnce();
     expect(AudioMock.instances).toHaveLength(1);
+  });
+
+  it("勾选音色与调语速都抛出 voice_profile", async () => {
+    const onVoiceProfileChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({ previewAdapter: adapter(), onVoiceProfileChange })}
+      />
+    );
+    openVoices();
+    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+
+    // 没动过之前不抛：未配置时「全部」在 wire 上没有表示法，
+    // 固化成当天的清单会让以后新增的音色落不进来。
+    expect(onVoiceProfileChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText("启用 Sonia · 英式女声"));
+    expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+      voice_ids: ["guy"],
+      rate_percent: 0
+    });
+
+    openTool("语速");
+    fireEvent.click(button("语速 1.25 倍"));
+    expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+      voice_ids: ["guy"],
+      rate_percent: 25
+    });
+  });
+
+  it("传入的 voice_profile 回填到面板上", async () => {
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: adapter(),
+          voiceProfile: { voice_ids: ["guy"], rate_percent: -25 }
+        })}
+      />
+    );
+    // 已配过就不必等清单拉回来才报数
+    expect(
+      document.querySelector('[aria-label="语速"]')!.textContent
+    ).toContain("0.75×");
+
+    openVoices();
+    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+    expect(screen.getByLabelText("启用 Sonia · 英式女声")).not.toBeChecked();
+    expect(screen.getByLabelText("启用 Guy · 美式男声")).toBeChecked();
+  });
+
+  it("父组件把 voice_profile 回灌下来时不重置面板", async () => {
+    const onVoiceProfileChange = vi.fn();
+    const view = props({ previewAdapter: adapter(), onVoiceProfileChange });
+    const { rerender } = render(<VoiceEditor {...view} />);
+    openVoices();
+    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+    fireEvent.click(screen.getByLabelText("启用 Sonia · 英式女声"));
+
+    const emitted = onVoiceProfileChange.mock.calls.at(-1)![0];
+    rerender(<VoiceEditor {...view} voiceProfile={emitted} />);
+
+    expect(screen.getByLabelText("启用 Sonia · 英式女声")).not.toBeChecked();
+    expect(onVoiceProfileChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("只读时不抛 voice_profile", async () => {
+    const onVoiceProfileChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: adapter(),
+          readOnly: true,
+          onVoiceProfileChange
+        })}
+      />
+    );
+    expect(document.querySelector('[aria-label="音色"]')).toBeDisabled();
+    expect(onVoiceProfileChange).not.toHaveBeenCalled();
   });
 
   it("没有 TTS 适配器时在音色面板里给出说明而不是空白", () => {

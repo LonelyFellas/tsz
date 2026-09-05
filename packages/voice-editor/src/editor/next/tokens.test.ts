@@ -136,7 +136,7 @@ describe("marksToAnnotations", () => {
       passthrough: []
     };
     expect(marksToAnnotations(TEXT, marks)).toEqual([
-      { type: "emphasis", start: 2, end: 8, level: "strong" }
+      { type: "emphasis", start: 2, end: 8, level: "core" }
     ]);
   });
 
@@ -151,7 +151,13 @@ describe("marksToAnnotations", () => {
       passthrough: []
     };
     expect(marksToAnnotations(TEXT, marks)).toEqual([
-      { type: "liaison", start: 7, end: 10 }
+      {
+        type: "liaison",
+        start: 7,
+        end: 10,
+        start_len: 1,
+        end_len: 1
+      }
     ]);
   });
 
@@ -165,7 +171,13 @@ describe("marksToAnnotations", () => {
       passthrough: []
     };
     expect(marksToAnnotations(TEXT, marks)).toEqual([
-      { type: "liaison", start: 0, end: 20 }
+      {
+        type: "liaison",
+        start: 0,
+        end: 20,
+        start_len: 1,
+        end_len: 1
+      }
     ]);
   });
 
@@ -238,7 +250,7 @@ describe("annotationsToMarks", () => {
       version: 2,
       text: TEXT,
       annotations: [
-        { type: "emphasis", start: 2, end: 8, level: "strong" },
+        { type: "emphasis", start: 2, end: 8, level: "core" },
         {
           type: "phoneme",
           start: 2,
@@ -282,7 +294,7 @@ describe("annotationsToMarks", () => {
     const value: RichTextV2 = {
       version: 2,
       text: TEXT,
-      annotations: [{ type: "emphasis", start: 2, end: 8, level: "strong" }]
+      annotations: [{ type: "emphasis", start: 2, end: 8, level: "core" }]
     };
     expect(annotationsToMarks(value).roles).toEqual({ 1: "core" });
   });
@@ -291,12 +303,13 @@ describe("annotationsToMarks", () => {
     const value: RichTextV2 = {
       version: 2,
       text: TEXT,
-      annotations: [{ type: "emphasis", start: 2, end: 11, level: "strong" }]
+      annotations: [{ type: "emphasis", start: 2, end: 11, level: "core" }]
     };
     expect(annotationsToMarks(value).roles).toEqual({ 1: "core", 2: "core" });
   });
 
-  it("多字母锚点存回 wire 后退化成两端单字母（契约限制，非缺陷）", () => {
+  it("多字母锚点带宽度往返，不再退化成两端单字母", () => {
+    // 后端为 liaison 加了 start_len / end_len 之后，两端各自的宽度存得下了
     const marks: MarkState = {
       roles: {},
       liaisons: [
@@ -314,11 +327,42 @@ describe("annotationsToMarks", () => {
       text: TEXT,
       annotations: marksToAnnotations(TEXT, marks)
     };
-    // wire 的 liaison 只有 {start,end} 两个数，装不下两个锚点各自的宽度。
-    expect(value.annotations).toEqual([{ type: "liaison", start: 6, end: 11 }]);
+    expect(value.annotations).toEqual([
+      { type: "liaison", start: 6, end: 11, start_len: 2, end_len: 2 }
+    ]);
+    expect(annotationsToMarks(value).liaisons).toEqual(marks.liaisons);
+  });
+
+  it("没有宽度字段的存量连读按两端各一个字母读回", () => {
+    const value: RichTextV2 = {
+      version: 2,
+      text: TEXT,
+      annotations: [
+        {
+          type: "liaison",
+          start: 6,
+          end: 11,
+          start_len: 1,
+          end_len: 1
+        }
+      ]
+    };
     expect(annotationsToMarks(value).liaisons).toEqual([
       { start: { token: 1, offsets: [4] }, end: { token: 2, offsets: [1] } }
     ]);
+  });
+
+  it("宽度越过词边界时退回单字母，不把弧画到别的词上", () => {
+    const value: RichTextV2 = {
+      version: 2,
+      text: TEXT,
+      // centre 只到偏移 8，start_len=5 会越界
+      annotations: [
+        { type: "liaison", start: 6, end: 11, start_len: 5, end_len: 1 }
+      ]
+    };
+    const [link] = annotationsToMarks(value).liaisons;
+    expect(link!.start.offsets).toEqual([4]);
   });
 
   it("端点落在空白上的历史连读直接丢弃，不硬凑锚点", () => {
@@ -326,7 +370,15 @@ describe("annotationsToMarks", () => {
       version: 2,
       text: TEXT,
       // 1 与 8 都是空格位
-      annotations: [{ type: "liaison", start: 1, end: 9 }]
+      annotations: [
+        {
+          type: "liaison",
+          start: 1,
+          end: 9,
+          start_len: 1,
+          end_len: 1
+        }
+      ]
     };
     expect(annotationsToMarks(value).liaisons).toEqual([]);
   });

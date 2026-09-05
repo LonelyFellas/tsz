@@ -1,4 +1,4 @@
-import type { RichTextV2, RichTextV3 } from "@tsz/types";
+import type { RichTextV2, RichTextV3, VoiceProfileV3 } from "@tsz/types";
 import { Input } from "antd";
 import { Suspense, lazy } from "react";
 import {
@@ -22,6 +22,9 @@ export interface V3VoiceTextFieldProps {
   field: string;
   placeholder?: string;
   readOnly?: boolean;
+  /** 发音配置；与正文分开走，因为它在 wire 上是正文的兄弟字段。 */
+  voiceProfile?: VoiceProfileV3 | null;
+  onVoiceProfileChange?: (next: VoiceProfileV3) => void;
   onChange: (next: RichTextV3) => void;
 }
 
@@ -42,6 +45,8 @@ export function V3VoiceTextField({
   field,
   placeholder,
   readOnly,
+  voiceProfile,
+  onVoiceProfileChange,
   onChange
 }: V3VoiceTextFieldProps) {
   const fallback = (
@@ -77,8 +82,10 @@ export function V3VoiceTextField({
           env.VOICE_PREVIEW ? adminVoicePreviewAdapter : undefined
         }
         previewIsMock={voicePreviewIsMock}
+        onVoiceProfileChange={onVoiceProfileChange}
         readOnly={readOnly}
         value={value}
+        voiceProfile={voiceProfile}
       />
     </Suspense>
   );

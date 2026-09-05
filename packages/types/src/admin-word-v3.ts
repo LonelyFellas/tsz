@@ -1,3 +1,4 @@
+import type { RichTextEmphasisLevel } from "./rich-text";
 import type {
   AdminWordListPage,
   AdminWordStatus,
@@ -146,7 +147,7 @@ export type RichTextAnnotationV3 =
       type: "emphasis";
       start: number;
       end: number;
-      level: "strong";
+      level: RichTextEmphasisLevel;
     }
   | {
       type: "phoneme";
@@ -159,6 +160,10 @@ export type RichTextAnnotationV3 =
       type: "liaison";
       start: number;
       end: number;
+      /** 起点锚点占几个码点（默认 1）；多字母锚点靠它还原。 */
+      start_len?: number;
+      /** 终点锚点占几个码点（默认 1）。 */
+      end_len?: number;
     }
   | {
       type: "highlight";
@@ -191,6 +196,11 @@ export interface RichTextVariantV3 {
   id: string;
   value: RichTextV3;
   origin: TextOriginV3;
+  /**
+   * 缺省 / null 表示未配置。例句英文与释义内容目前还没接语音编辑器，
+   * 这里先留着，等它们接入时用。
+   */
+  voice_profile?: VoiceProfileV3 | null;
 }
 
 export type DialectVariantRichTextSlotV3 =
@@ -211,10 +221,25 @@ export interface SenseGroupV3 {
   name_en: string;
 }
 
+/**
+ * 这段文本将来合成语音时的配置：启用哪几个发音人、语速多少。
+ *
+ * `voice_ids` 存的是 `/speech/voices` 的 `alias`。发音人清单来自外部 TTS 供应商，
+ * alias 可能随供应商下线而失效，所以两端都不做外键式校验——读到已下线的 alias
+ * 原样保留，由界面标为失效。`rate_percent` 只按全局区间（-50..100，即 0.50×–2.00×）
+ * 约束，逐音色的窄区间在合成时才夹取。
+ */
+export interface VoiceProfileV3 {
+  voice_ids: string[];
+  rate_percent: number;
+}
+
 export interface GrammarVariantV3 {
   id: string;
   dialect: Dialect;
   content: RichTextV3;
+  /** 缺省 / null 表示未配置：按系统默认音色与原速处理。 */
+  voice_profile?: VoiceProfileV3 | null;
 }
 
 export interface GrammarStructureV3 {
@@ -837,7 +862,8 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "phrase_component_self_target",
   "phrase_component_target_unavailable",
   "phrase_component_target_nested",
-  "phrase_component_target_stale"
+  "phrase_component_target_stale",
+  "voice_profile_invalid"
 ] as const;
 
 export type V3ValidationIssueCode = (typeof V3_VALIDATION_ISSUE_CODES)[number];
