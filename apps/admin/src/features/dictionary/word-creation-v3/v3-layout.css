@@ -156,6 +156,37 @@
   width: 100%;
 }
 
+/* 释义行与例句行的控件都是 32px 单行，操作列竖排（24+2+24=50px）反而成了行高瓶颈：
+   改横排并把列放宽到两颗小按钮加默认间距（24+8+24=56px）。变量挂在两张表共同的 section 上，
+   表头、行、操作列一起继承；语法结构行与语义区间行在 section 之外，保持竖排 32px。 */
+.v3-meanings-v2 .word-sense-section {
+  --word-ops-col: 56px;
+}
+
+/* 横排后操作列只有 24px 高，而行是 align-items: start：撑到 32px 让图标与同行控件共一条中心线。 */
+.v3-meanings-v2 .word-definition-row > .word-sort-actions,
+.v3-meanings-v2 .word-sentence-row > .word-sort-actions {
+  min-height: 32px;
+}
+
+/* 行号盒与 32px 控件同高、数字随之居中（共享规则的 6px 上边距是按 22px 行盒凑的近似）。
+   窄容器（共享规则 max-width: 640px）下行已退化为单列堆叠，沿用紧凑行号；用区间语法与之严格互补。 */
+@container (width > 640px) {
+  .v3-meanings-v2 .word-definition-row .word-number-cell,
+  .v3-meanings-v2 .word-sentence-row .word-number-cell {
+    line-height: 32px;
+    padding-top: 0;
+  }
+}
+
+/* 共享窄容器规则靠 `> .ant-space:last-child` 把操作列推到右侧，而例句行结构上的末子
+   现在是 hidden 的旧关联编辑器（:last-child 不看 display），按类名把右对齐补回来。 */
+@container (max-width: 640px) {
+  .v3-meanings-v2 .word-sentence-row > .word-sort-actions {
+    justify-content: flex-end;
+  }
+}
+
 /* 待建条提示收进输入框右侧，和 status="warning" 的黄框同色。 */
 .v3-meanings-v2 .word-relation-pending-icon {
   color: #d48806;

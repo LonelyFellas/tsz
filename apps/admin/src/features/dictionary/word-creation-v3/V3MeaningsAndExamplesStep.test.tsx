@@ -1090,7 +1090,16 @@ describe("V3MeaningsAndExamplesStep", () => {
       screen.getByLabelText("定义 1 语法结构").closest(".ant-select")
     ).toHaveClass("ant-select-status-error");
     expect(screen.getByText("请完整填写释义并选择语法结构")).toBeVisible();
-    expect(actions).toHaveClass("word-sort-actions", "ant-space-vertical");
+    expect(actions).toHaveClass("word-sort-actions", "ant-space-horizontal");
+    expect(v3LayoutCss).toMatch(
+      /\.v3-meanings-v2 \.word-sense-section\s*\{[^}]*--word-ops-col:\s*56px;/u
+    );
+    expect(v3LayoutCss).toMatch(
+      /\.v3-meanings-v2 \.word-definition-row > \.word-sort-actions,\s*\.v3-meanings-v2 \.word-sentence-row > \.word-sort-actions\s*\{[^}]*min-height:\s*32px;/u
+    );
+    expect(v3LayoutCss).toMatch(
+      /\.v3-meanings-v2 \.word-definition-row \.word-number-cell,\s*\.v3-meanings-v2 \.word-sentence-row \.word-number-cell\s*\{[^}]*line-height:\s*32px;/u
+    );
     expect(meaningsCss).toContain(".word-table-row.word-definition-row {");
   });
 
@@ -1170,7 +1179,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       ""
     ]);
     const row = container.querySelector(".word-sentence-row") as HTMLElement;
-    expect([...row.children]).toHaveLength(5);
+    expect(
+      [...row.children].filter((child) => !child.hasAttribute("hidden"))
+    ).toHaveLength(5);
     expect(row.children[0]).toHaveClass("word-number-cell");
     expect(row.children[0]).not.toHaveClass("word-sentence-index");
     expect(screen.getByLabelText("例句 1 等级")).not.toBeDisabled();
@@ -2085,7 +2096,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(remove.closest(".word-sort-actions")).toBe(actions);
     }
     expect(meaningsCss).toMatch(
-      /\.word-sort-actions\s*\{[^}]*align-items:\s*center;[^}]*width:\s*32px;/su
+      /\.word-sort-actions\s*\{[^}]*align-items:\s*center;[^}]*width:\s*var\(--word-ops-col,\s*32px\);/su
     );
     expect(meaningsCss).toMatch(
       /\.word-sort-actions\s*>\s*\.ant-btn\s*\{[^}]*width:\s*32px;/su
