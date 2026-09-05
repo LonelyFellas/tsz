@@ -838,7 +838,12 @@ describe("V3MeaningsAndExamplesStep", () => {
     // 而线上走的是 V3，等于现网够不着。
     render(<Harness initial={meaningsFixture} />);
 
-    const editor = await screen.findByRole("toolbar", { name: "标注工具栏" });
+    // 等的是按需加载的编辑器分块，给足超时：默认 1 秒在负载高的 CI runner 上不够
+    const editor = await screen.findByRole(
+      "toolbar",
+      { name: "标注工具栏" },
+      { timeout: 10_000 }
+    );
     expect(editor).toBeInTheDocument();
 
     const input = screen.getByLabelText("语法结构 1 通用内容");
@@ -869,7 +874,11 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("音色与语速落到语法结构变体的 voice_profile 上", async () => {
     render(<Harness initial={meaningsFixture} />);
-    await screen.findByRole("toolbar", { name: "标注工具栏" });
+    await screen.findByRole(
+      "toolbar",
+      { name: "标注工具栏" },
+      { timeout: 10_000 }
+    );
 
     const variant = () => value().pos[0]!.grammar_structures[0]!.variants[0]!;
     // 没动过之前不该凭空写出一份配置
