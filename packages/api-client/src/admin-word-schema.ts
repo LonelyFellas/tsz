@@ -18,7 +18,6 @@ import type {
   EntryLifecycleBatchResponseAny,
   FormsImpactResponseAny,
   FormsImpactResponseV3,
-  PendingSentenceAssociationListResponseV3,
   ResolveSentenceTargetsV3Response,
   SearchComponentTargetsV3Response,
   RelatedSearchResponseAny,
@@ -492,13 +491,6 @@ export function decodeRelatedSearchResponseAny(
   }
   assertRuntimeContract("RelatedSearchResponse", value);
   return value as RelatedSearchResponseAny;
-}
-
-export function decodePendingSentenceAssociationListResponse(
-  value: unknown
-): PendingSentenceAssociationListResponseV3 {
-  assertRuntimeContract("PendingSentenceAssociationListResponse", value);
-  return value as PendingSentenceAssociationListResponseV3;
 }
 
 export function decodeResolveSentenceTargetsV3Response(

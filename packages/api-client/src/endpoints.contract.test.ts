@@ -27,9 +27,7 @@ const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries/{id}/content-completion-jobs/{job_id}/retries",
   "post /admin/lexicon/entries/{id}/publications",
   "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate",
-  "post /admin/lexicon/entries/{id}/restore",
-  "post /admin/lexicon/pending-sentence-associations/{association_id}/claim",
-  "put /admin/lexicon/entries/{id}/sentences/{sentence_id}/associations"
+  "post /admin/lexicon/entries/{id}/restore"
 ] as const;
 
 // 已知「后端尚未提供 / 待对接」的端点白名单。每条都必须真不在 spec 里——
@@ -496,7 +494,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "e1f79da2bc4ee69900a573598c812fbbe092dde76481ee4ad4e3058be8835daf"
+      "1dd180a82877e8ad7afb79ec76807c7d56d6f7f089b584126f668231dec42dab"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");

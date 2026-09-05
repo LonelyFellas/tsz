@@ -31,8 +31,7 @@ const API_PREFIX = "/api/v1";
 const ADMIN_LEXICON_PREFIX = `${API_PREFIX}/admin/lexicon`;
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
 const QUERY_CONTRACT_OPERATIONS = new Set([
-  "get /admin/lexicon/entries/related-search",
-  "get /admin/lexicon/entries/{id}/pending-sentence-associations"
+  "get /admin/lexicon/entries/related-search"
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
@@ -46,7 +45,6 @@ const RUNTIME_SCHEMA_ROOTS = [
   "SurfaceMatchPageAny",
   "RelatedSearchResponse",
   "DetectLexiconResponseAny",
-  "PendingSentenceAssociationListResponse",
   "ResolveSentenceTargetsV3Response",
   "SearchComponentTargetsV3Response",
   "AdminWordPublicationListResponse",
@@ -178,15 +176,6 @@ const contractSchemaNames = [
   "ContentCompletionJob",
   "ContentCompletionJobEnvelope",
   "SentenceAssociationStateV1",
-  "SentenceAssociationInputV2",
-  "SentenceAssociationInputV3",
-  "ReplaceSentenceAssociationsInputV2",
-  "ReplaceSentenceAssociationsInputV3",
-  "ReplaceSentenceAssociationsInput",
-  "PendingSentenceAssociationItemV1",
-  "PendingSentenceAssociationItemV3",
-  "PendingSentenceAssociationListResponse",
-  "ClaimPendingSentenceAssociationInput",
   "ResolveSentenceTargetsV3Input",
   "ResolveSentenceTargetsV3Response",
   "SearchComponentTargetsV3Input",

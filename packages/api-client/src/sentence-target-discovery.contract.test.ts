@@ -227,31 +227,4 @@ describe("句内目标发现 · api-client 契约", () => {
     );
     expect(draftCandidate.properties?.publication_id).toBeUndefined();
   });
-
-  it("association schema v3 只接受 source_segments，legacy 分支才接受 source_range", () => {
-    const operation =
-      operationSchemas[
-        "put /admin/lexicon/entries/{id}/sentences/{sentence_id}/associations"
-      ];
-    const request = dereference(operation?.request);
-    const v3 = branchByLiteral(request, "association_schema_version", 3);
-    required(v3, "association_schema_version", "associations");
-
-    const v3Item = dereference(property(v3, "associations").items);
-    required(v3Item, "id", "source_dialect", "source_segments");
-    expect(v3Item.properties?.source_range).toBeUndefined();
-    const segments = dereference(property(v3Item, "source_segments"));
-    expect(segments.minItems).toBe(1);
-    expect(segments.maxItems).toBe(20);
-
-    const legacy = request.oneOf
-      ?.map(dereference)
-      .find(
-        (branch) => branch.properties?.association_schema_version === undefined
-      );
-    expect(legacy, "缺少 legacy source_range 分支").toBeDefined();
-    const legacyItem = dereference(property(legacy!, "associations").items);
-    required(legacyItem, "source_range");
-    expect(legacyItem.properties?.source_segments).toBeUndefined();
-  });
 });

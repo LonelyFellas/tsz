@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-05T02:08:36.736Z",
+  "_generatedAt": "2026-09-05T09:54:36.056Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -30,21 +30,16 @@
     "/admin/lexicon/entries/{id}/content-completion-jobs/{job_id}/retries": [
       "post"
     ],
-    "/admin/lexicon/entries/{id}/pending-sentence-associations": ["get"],
     "/admin/lexicon/entries/{id}/publications": ["get", "post"],
     "/admin/lexicon/entries/{id}/publications/{publication_id}": ["get"],
     "/admin/lexicon/entries/{id}/publications/{publication_id}/activate": [
       "post"
     ],
     "/admin/lexicon/entries/{id}/restore": ["post"],
-    "/admin/lexicon/entries/{id}/sentences/{sentence_id}/associations": ["put"],
     "/admin/lexicon/entries/{id}/steps/forms": ["put"],
     "/admin/lexicon/entries/{id}/steps/forms/impact": ["post"],
     "/admin/lexicon/entries/{id}/steps/meanings": ["put"],
     "/admin/lexicon/entries/{id}/validate": ["post"],
-    "/admin/lexicon/pending-sentence-associations/{association_id}/claim": [
-      "post"
-    ],
     "/admin/lexicon/surface-match-snapshots/{snapshot_id}": ["get"],
     "/admin/profile": ["get"],
     "/admin/profile/preferences": ["patch"],
@@ -151,22 +146,6 @@
         "required": true,
         "schema": { "type": "string", "format": "uuid" }
       }
-    ],
-    "put /admin/lexicon/entries/{id}/sentences/{sentence_id}/associations": [
-      {
-        "name": "Idempotency-Key",
-        "in": "header",
-        "required": true,
-        "schema": { "type": "string", "format": "uuid" }
-      }
-    ],
-    "post /admin/lexicon/pending-sentence-associations/{association_id}/claim": [
-      {
-        "name": "Idempotency-Key",
-        "in": "header",
-        "required": true,
-        "schema": { "type": "string", "format": "uuid" }
-      }
     ]
   },
   "operationQueryParameters": {
@@ -229,20 +208,6 @@
         "in": "query",
         "required": false,
         "schema": { "type": "string" }
-      }
-    ],
-    "get /admin/lexicon/entries/{id}/pending-sentence-associations": [
-      {
-        "name": "cursor",
-        "in": "query",
-        "required": false,
-        "schema": { "type": "string", "format": "uuid" }
-      },
-      {
-        "name": "page_size",
-        "in": "query",
-        "required": false,
-        "schema": { "type": "integer", "format": "int32", "minimum": 0 }
       }
     ]
   },
@@ -463,19 +428,6 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
-    "get /admin/lexicon/entries/{id}/pending-sentence-associations": {
-      "request": null,
-      "responses": {
-        "200": {
-          "$ref": "#/components/schemas/PendingSentenceAssociationListResponse"
-        },
-        "400": { "$ref": "#/components/schemas/ProblemDetails" },
-        "401": { "$ref": "#/components/schemas/ProblemDetails" },
-        "403": { "$ref": "#/components/schemas/ProblemDetails" },
-        "404": { "$ref": "#/components/schemas/ProblemDetails" },
-        "503": { "$ref": "#/components/schemas/ProblemDetails" }
-      }
-    },
     "get /admin/lexicon/entries/{id}/publications": {
       "request": null,
       "responses": {
@@ -545,21 +497,6 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
-    "put /admin/lexicon/entries/{id}/sentences/{sentence_id}/associations": {
-      "request": {
-        "$ref": "#/components/schemas/ReplaceSentenceAssociationsInput"
-      },
-      "responses": {
-        "200": { "$ref": "#/components/schemas/AdminWordAnyEnvelope" },
-        "400": { "$ref": "#/components/schemas/ProblemDetails" },
-        "401": { "$ref": "#/components/schemas/ProblemDetails" },
-        "403": { "$ref": "#/components/schemas/ProblemDetails" },
-        "404": { "$ref": "#/components/schemas/ProblemDetails" },
-        "409": { "$ref": "#/components/schemas/ProblemDetails" },
-        "422": { "$ref": "#/components/schemas/ProblemDetails" },
-        "503": { "$ref": "#/components/schemas/ProblemDetails" }
-      }
-    },
     "put /admin/lexicon/entries/{id}/steps/forms": {
       "request": { "$ref": "#/components/schemas/SaveFormsStepInputAny" },
       "responses": {
@@ -604,21 +541,6 @@
       "request": { "$ref": "#/components/schemas/ValidateAdminWordAnyInput" },
       "responses": {
         "200": { "$ref": "#/components/schemas/DraftValidationResponseAny" },
-        "401": { "$ref": "#/components/schemas/ProblemDetails" },
-        "403": { "$ref": "#/components/schemas/ProblemDetails" },
-        "404": { "$ref": "#/components/schemas/ProblemDetails" },
-        "409": { "$ref": "#/components/schemas/ProblemDetails" },
-        "422": { "$ref": "#/components/schemas/ProblemDetails" },
-        "503": { "$ref": "#/components/schemas/ProblemDetails" }
-      }
-    },
-    "post /admin/lexicon/pending-sentence-associations/{association_id}/claim": {
-      "request": {
-        "$ref": "#/components/schemas/ClaimPendingSentenceAssociationInput"
-      },
-      "responses": {
-        "200": { "$ref": "#/components/schemas/AdminWordAnyEnvelope" },
-        "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "404": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -2651,208 +2573,6 @@
     "SentenceAssociationStateV1": {
       "type": "string",
       "enum": ["linked", "pending"]
-    },
-    "SentenceAssociationInputV2": {
-      "type": "object",
-      "description": "事后修正例句关联的一项。目标必须是二选一的完整形状：\n\n- linked：`target_word_id + target_sense_id`；\n- Pending：`pending_target_kind + pending_target_headword`，预填词义可选。\n\n只读投影（词形槽位、词头/释义快照、词性）不接受输入，一律由服务端解析。",
-      "required": ["id", "source_dialect", "source_range"],
-      "properties": {
-        "id": {
-          "type": "string",
-          "format": "uuid",
-          "description": "关联 ID 由前端生成、跨保存稳定；沿用本仓节点 ID 的既有约定。"
-        },
-        "pending_target_gloss": { "type": "string", "maxLength": 5000 },
-        "pending_target_headword": { "type": "string", "maxLength": 200 },
-        "pending_target_kind": { "$ref": "#/components/schemas/EntryKind" },
-        "source_dialect": { "$ref": "#/components/schemas/Dialect" },
-        "source_range": {
-          "$ref": "#/components/schemas/SentenceSourceRangeV1"
-        },
-        "target_sense_id": { "type": "string", "format": "uuid" },
-        "target_word_id": { "type": "string", "format": "uuid" }
-      },
-      "additionalProperties": false
-    },
-    "SentenceAssociationInputV3": {
-      "type": "object",
-      "description": "V3 例句关联只使用有序片段作为位置权威；连续命中同样提交一个片段。",
-      "required": ["id", "source_dialect", "source_segments"],
-      "properties": {
-        "id": { "type": "string", "format": "uuid" },
-        "pending_target_gloss": { "type": "string", "maxLength": 5000 },
-        "pending_target_headword": { "type": "string", "maxLength": 200 },
-        "pending_target_kind": { "$ref": "#/components/schemas/EntryKind" },
-        "source_dialect": { "$ref": "#/components/schemas/Dialect" },
-        "source_segments": {
-          "type": "array",
-          "items": { "$ref": "#/components/schemas/SentenceSourceRangeV1" },
-          "maxItems": 20,
-          "minItems": 1
-        },
-        "target_form_variant_id": { "type": "string", "format": "uuid" },
-        "target_publication_id": { "type": "string", "format": "uuid" },
-        "target_sense_id": { "type": "string", "format": "uuid" },
-        "target_word_id": { "type": "string", "format": "uuid" }
-      },
-      "additionalProperties": false
-    },
-    "ReplaceSentenceAssociationsInputV2": {
-      "type": "object",
-      "description": "按例句整组替换关联：改目标 = 改列表里那一项，删 = 去掉，补 = 加一项。\n\n与词形步/词义步的整步替换同一种风格：列表就是这条例句关联的完整目标状态，\n覆盖它所有存在的方言侧，空列表即清空。",
-      "required": ["base_revision", "base_lifecycle_revision", "associations"],
-      "properties": {
-        "associations": {
-          "type": "array",
-          "items": { "$ref": "#/components/schemas/SentenceAssociationInputV2" }
-        },
-        "base_lifecycle_revision": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 1
-        },
-        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 }
-      },
-      "additionalProperties": false
-    },
-    "ReplaceSentenceAssociationsInputV3": {
-      "type": "object",
-      "required": [
-        "association_schema_version",
-        "base_revision",
-        "base_lifecycle_revision",
-        "associations"
-      ],
-      "properties": {
-        "association_schema_version": { "type": "integer", "enum": [3] },
-        "associations": {
-          "type": "array",
-          "items": { "$ref": "#/components/schemas/SentenceAssociationInputV3" }
-        },
-        "base_lifecycle_revision": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 1
-        },
-        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 }
-      },
-      "additionalProperties": false
-    },
-    "ReplaceSentenceAssociationsInput": {
-      "oneOf": [
-        { "$ref": "#/components/schemas/ReplaceSentenceAssociationsInputV3" },
-        { "$ref": "#/components/schemas/ReplaceSentenceAssociationsInputV2" }
-      ],
-      "discriminator": {
-        "propertyName": "association_schema_version",
-        "mapping": {
-          "3": "#/components/schemas/ReplaceSentenceAssociationsInputV3"
-        }
-      }
-    },
-    "PendingSentenceAssociationItemV1": {
-      "type": "object",
-      "required": [
-        "association_id",
-        "owner_entry_id",
-        "owner_entry_revision",
-        "owner_lifecycle_revision",
-        "sentence_id",
-        "source_dialect",
-        "source_range",
-        "sentence_text",
-        "pending_target_kind",
-        "pending_target_headword"
-      ],
-      "properties": {
-        "association_id": { "type": "string", "format": "uuid" },
-        "owner_entry_id": { "type": "string", "format": "uuid" },
-        "owner_entry_revision": { "type": "integer", "format": "int64" },
-        "owner_lifecycle_revision": { "type": "integer", "format": "int64" },
-        "pending_target_gloss": { "type": "string" },
-        "pending_target_headword": { "type": "string" },
-        "pending_target_kind": { "$ref": "#/components/schemas/EntryKind" },
-        "sentence_id": { "type": "string", "format": "uuid" },
-        "sentence_text": { "type": "string" },
-        "source_dialect": { "$ref": "#/components/schemas/Dialect" },
-        "source_range": { "$ref": "#/components/schemas/SentenceSourceRangeV1" }
-      },
-      "additionalProperties": false
-    },
-    "PendingSentenceAssociationItemV3": {
-      "type": "object",
-      "required": [
-        "association_id",
-        "owner_entry_id",
-        "owner_entry_revision",
-        "owner_lifecycle_revision",
-        "sentence_id",
-        "source_dialect",
-        "source_segments",
-        "sentence_text",
-        "pending_target_kind",
-        "pending_target_headword"
-      ],
-      "properties": {
-        "association_id": { "type": "string", "format": "uuid" },
-        "owner_entry_id": { "type": "string", "format": "uuid" },
-        "owner_entry_revision": { "type": "integer", "format": "int64" },
-        "owner_lifecycle_revision": { "type": "integer", "format": "int64" },
-        "pending_target_gloss": { "type": "string" },
-        "pending_target_headword": { "type": "string" },
-        "pending_target_kind": { "$ref": "#/components/schemas/EntryKind" },
-        "sentence_id": { "type": "string", "format": "uuid" },
-        "sentence_text": { "type": "string" },
-        "source_dialect": { "$ref": "#/components/schemas/Dialect" },
-        "source_segments": {
-          "type": "array",
-          "items": { "$ref": "#/components/schemas/SentenceSourceRangeV1" },
-          "maxItems": 20,
-          "minItems": 1
-        }
-      },
-      "additionalProperties": false
-    },
-    "PendingSentenceAssociationListResponse": {
-      "type": "object",
-      "required": ["results", "total", "next_cursor"],
-      "properties": {
-        "next_cursor": { "type": ["string", "null"] },
-        "results": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/PendingSentenceAssociationItemV3"
-          }
-        },
-        "total": { "type": "integer", "format": "int64", "minimum": 0 }
-      },
-      "additionalProperties": false
-    },
-    "ClaimPendingSentenceAssociationInput": {
-      "type": "object",
-      "required": [
-        "target_word_id",
-        "target_sense_id",
-        "base_owner_entry_revision",
-        "base_owner_lifecycle_revision"
-      ],
-      "properties": {
-        "base_owner_entry_revision": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 1
-        },
-        "base_owner_lifecycle_revision": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 1
-        },
-        "target_form_variant_id": { "type": "string", "format": "uuid" },
-        "target_publication_id": { "type": "string", "format": "uuid" },
-        "target_sense_id": { "type": "string", "format": "uuid" },
-        "target_word_id": { "type": "string", "format": "uuid" }
-      },
-      "additionalProperties": false
     },
     "ResolveSentenceTargetsV3Input": {
       "oneOf": [
