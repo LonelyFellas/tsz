@@ -1333,7 +1333,7 @@
 
 .word-sort-actions {
   align-items: center;
-  width: 32px;
+  width: var(--word-ops-col, 32px);
 }
 
 .word-sort-actions > .ant-btn {
@@ -1674,19 +1674,19 @@
 .word-definition-list-header {
   grid-template-columns:
     28px minmax(58px, 64px) minmax(128px, 150px) minmax(0, 1fr)
-    minmax(180px, 260px) 32px;
+    minmax(180px, 260px) var(--word-ops-col, 32px);
 }
 
 .word-sentence-list-header {
   grid-template-columns:
     28px minmax(58px, 64px) minmax(0, 1.7fr) minmax(240px, 0.95fr)
-    32px;
+    var(--word-ops-col, 32px);
 }
 
 .word-table-row.word-definition-row {
   grid-template-columns:
     28px minmax(58px, 64px) minmax(128px, 150px) minmax(0, 1fr)
-    minmax(180px, 260px) 32px;
+    minmax(180px, 260px) var(--word-ops-col, 32px);
   padding-block: 9px;
 }
 
@@ -1711,7 +1711,7 @@
 .word-table-row.word-sentence-row {
   grid-template-columns:
     28px minmax(58px, 64px) minmax(0, 1.7fr) minmax(240px, 0.95fr)
-    32px;
+    var(--word-ops-col, 32px);
   padding-block: 9px;
 }
 

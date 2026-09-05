@@ -2452,8 +2452,7 @@ export function V3MeaningsAndExamplesStep({
                                               </div>
                                               <Space
                                                 className="word-sort-actions"
-                                                orientation="vertical"
-                                                size={2}
+                                                orientation="horizontal"
                                               >
                                                 <SortableDragHandle
                                                   index={definitionIndex}
@@ -2707,319 +2706,6 @@ export function V3MeaningsAndExamplesStep({
                                                     value={row.text}
                                                   />
                                                 ))}
-                                                <div
-                                                  aria-hidden="true"
-                                                  className="word-sentence-associations"
-                                                  hidden
-                                                >
-                                                  {sentence.links.map(
-                                                    (link, linkIndex) => {
-                                                      const isPrimary =
-                                                        link.role === "focus" ||
-                                                        link.role === "head";
-                                                      const targetKey = `${link.word_id}:${link.sense_id}`;
-                                                      const availableTargets =
-                                                        contextTargets.filter(
-                                                          (target) =>
-                                                            target.key ===
-                                                              targetKey ||
-                                                            !sentence.links.some(
-                                                              (
-                                                                otherLink,
-                                                                otherIndex
-                                                              ) =>
-                                                                otherIndex !==
-                                                                  linkIndex &&
-                                                                otherLink.word_id ===
-                                                                  target.word_id &&
-                                                                otherLink.sense_id ===
-                                                                  target.sense_id
-                                                            )
-                                                        );
-                                                      const targetOptions =
-                                                        availableTargets.some(
-                                                          (target) =>
-                                                            target.key ===
-                                                            targetKey
-                                                        )
-                                                          ? availableTargets
-                                                          : [
-                                                              ...availableTargets,
-                                                              {
-                                                                key: targetKey,
-                                                                label:
-                                                                  "已关联其他词义",
-                                                                word_id:
-                                                                  link.word_id,
-                                                                sense_id:
-                                                                  link.sense_id
-                                                              }
-                                                            ];
-                                                      return (
-                                                        <Flex
-                                                          align="center"
-                                                          data-v3-field="links"
-                                                          data-v3-node-id={
-                                                            sentence.id
-                                                          }
-                                                          gap="small"
-                                                          key={`${targetKey}:${linkIndex}`}
-                                                          wrap
-                                                        >
-                                                          <Tag
-                                                            color={
-                                                              isPrimary
-                                                                ? "blue"
-                                                                : undefined
-                                                            }
-                                                          >
-                                                            {sentenceLinkRoleLabel(
-                                                              link.role
-                                                            )}
-                                                          </Tag>
-                                                          <Typography.Text>
-                                                            {wordId &&
-                                                            link.word_id ===
-                                                              wordId &&
-                                                            link.sense_id ===
-                                                              sense.id
-                                                              ? "当前词义"
-                                                              : "已关联其他词义"}
-                                                          </Typography.Text>
-                                                          {!isPrimary ? (
-                                                            <>
-                                                              <AutoComplete
-                                                                aria-label={`例句 ${sentenceIndex + 1} 上下文关联 ${linkIndex + 1} 目标`}
-                                                                filterOption={
-                                                                  false
-                                                                }
-                                                                onSearch={(
-                                                                  query
-                                                                ) =>
-                                                                  setContextSearch(
-                                                                    {
-                                                                      sentenceId:
-                                                                        sentence.id,
-                                                                      linkIndex,
-                                                                      query
-                                                                    }
-                                                                  )
-                                                                }
-                                                                onSelect={(
-                                                                  nextKey
-                                                                ) => {
-                                                                  const target =
-                                                                    targetOptions.find(
-                                                                      (
-                                                                        option
-                                                                      ) =>
-                                                                        option.key ===
-                                                                        nextKey
-                                                                    );
-                                                                  if (!target)
-                                                                    return;
-                                                                  change(
-                                                                    (draft) => {
-                                                                      const draftLink =
-                                                                        draft
-                                                                          .pos[
-                                                                          posIndex
-                                                                        ]!
-                                                                          .senses[
-                                                                          senseIndex
-                                                                        ]!
-                                                                          .sentences[
-                                                                          sentenceIndex
-                                                                        ]!
-                                                                          .links[
-                                                                          linkIndex
-                                                                        ]!;
-                                                                      draftLink.word_id =
-                                                                        target.word_id;
-                                                                      draftLink.sense_id =
-                                                                        target.sense_id;
-                                                                    }
-                                                                  );
-                                                                  setKnownContextTargets(
-                                                                    (
-                                                                      current
-                                                                    ) => ({
-                                                                      ...current,
-                                                                      [target.key]:
-                                                                        target
-                                                                    })
-                                                                  );
-                                                                  setContextSearch(
-                                                                    undefined
-                                                                  );
-                                                                }}
-                                                                options={targetOptions.map(
-                                                                  (target) => ({
-                                                                    label:
-                                                                      target.label,
-                                                                    value:
-                                                                      target.key
-                                                                  })
-                                                                )}
-                                                                placeholder="搜索已发布词条并选择具体词义"
-                                                                value={
-                                                                  contextSearch?.sentenceId ===
-                                                                    sentence.id &&
-                                                                  contextSearch.linkIndex ===
-                                                                    linkIndex
-                                                                    ? contextSearch.query
-                                                                    : targetOptions.find(
-                                                                        (
-                                                                          target
-                                                                        ) =>
-                                                                          target.key ===
-                                                                          targetKey
-                                                                      )?.label
-                                                                }
-                                                              />
-                                                              <Button
-                                                                aria-label={`删除例句 ${sentenceIndex + 1} 的上下文关联 ${linkIndex + 1}`}
-                                                                danger
-                                                                onClick={() =>
-                                                                  change(
-                                                                    (draft) => {
-                                                                      draft.pos[
-                                                                        posIndex
-                                                                      ]!.senses[
-                                                                        senseIndex
-                                                                      ]!.sentences[
-                                                                        sentenceIndex
-                                                                      ]!.links.splice(
-                                                                        linkIndex,
-                                                                        1
-                                                                      );
-                                                                    }
-                                                                  )
-                                                                }
-                                                              >
-                                                                删除关联
-                                                              </Button>
-                                                            </>
-                                                          ) : null}
-                                                        </Flex>
-                                                      );
-                                                    }
-                                                  )}
-                                                  {primaryLinkState(
-                                                    sentence,
-                                                    wordId,
-                                                    sense.id
-                                                  ) !== "valid" && wordId ? (
-                                                    <Button
-                                                      onClick={() =>
-                                                        change((draft) => {
-                                                          const draftSentence =
-                                                            draft.pos[posIndex]!
-                                                              .senses[
-                                                              senseIndex
-                                                            ]!.sentences[
-                                                              sentenceIndex
-                                                            ]!;
-                                                          draftSentence.links =
-                                                            [
-                                                              {
-                                                                word_id: wordId,
-                                                                sense_id:
-                                                                  sense.id,
-                                                                role: "focus"
-                                                              },
-                                                              ...draftSentence.links.filter(
-                                                                (link) =>
-                                                                  link.role !==
-                                                                    "focus" &&
-                                                                  link.role !==
-                                                                    "head" &&
-                                                                  (link.word_id !==
-                                                                    wordId ||
-                                                                    link.sense_id !==
-                                                                      sense.id)
-                                                              )
-                                                            ];
-                                                        })
-                                                      }
-                                                    >
-                                                      {primaryLinkState(
-                                                        sentence,
-                                                        wordId,
-                                                        sense.id
-                                                      ) === "missing"
-                                                        ? "补充主关联"
-                                                        : "修复主关联"}
-                                                    </Button>
-                                                  ) : null}
-                                                  <AutoComplete
-                                                    aria-label={`为例句 ${sentenceIndex + 1} 新增上下文关联`}
-                                                    filterOption={false}
-                                                    onSearch={(query) =>
-                                                      setContextSearch({
-                                                        sentenceId: sentence.id,
-                                                        query
-                                                      })
-                                                    }
-                                                    onSelect={(targetKey) => {
-                                                      const target =
-                                                        contextTargets.find(
-                                                          (option) =>
-                                                            option.key ===
-                                                            targetKey
-                                                        );
-                                                      if (!target) return;
-                                                      change((draft) => {
-                                                        draft.pos[
-                                                          posIndex
-                                                        ]!.senses[
-                                                          senseIndex
-                                                        ]!.sentences[
-                                                          sentenceIndex
-                                                        ]!.links.push({
-                                                          word_id:
-                                                            target.word_id,
-                                                          sense_id:
-                                                            target.sense_id,
-                                                          role: "context"
-                                                        });
-                                                      });
-                                                      setKnownContextTargets(
-                                                        (current) => ({
-                                                          ...current,
-                                                          [target.key]: target
-                                                        })
-                                                      );
-                                                      setContextSearch(
-                                                        undefined
-                                                      );
-                                                    }}
-                                                    options={contextTargets
-                                                      .filter(
-                                                        (target) =>
-                                                          !sentence.links.some(
-                                                            (link) =>
-                                                              link.word_id ===
-                                                                target.word_id &&
-                                                              link.sense_id ===
-                                                                target.sense_id
-                                                          )
-                                                      )
-                                                      .map((target) => ({
-                                                        label: target.label,
-                                                        value: target.key
-                                                      }))}
-                                                    placeholder="搜索已发布词条并选择具体词义"
-                                                    value={
-                                                      contextSearch?.sentenceId ===
-                                                        sentence.id &&
-                                                      contextSearch.linkIndex ===
-                                                        undefined
-                                                        ? contextSearch.query
-                                                        : ""
-                                                    }
-                                                  />
-                                                </div>
                                               </Space>
                                               <Space
                                                 className="word-sentence-translation-list"
@@ -3112,8 +2798,7 @@ export function V3MeaningsAndExamplesStep({
                                               </Space>
                                               <Space
                                                 className="word-sort-actions"
-                                                orientation="vertical"
-                                                size={2}
+                                                orientation="horizontal"
                                               >
                                                 <SortableDragHandle
                                                   index={sentenceIndex}
@@ -3141,6 +2826,308 @@ export function V3MeaningsAndExamplesStep({
                                                   type="text"
                                                 />
                                               </Space>
+                                              <div
+                                                aria-hidden="true"
+                                                className="word-sentence-associations"
+                                                hidden
+                                              >
+                                                {sentence.links.map(
+                                                  (link, linkIndex) => {
+                                                    const isPrimary =
+                                                      link.role === "focus" ||
+                                                      link.role === "head";
+                                                    const targetKey = `${link.word_id}:${link.sense_id}`;
+                                                    const availableTargets =
+                                                      contextTargets.filter(
+                                                        (target) =>
+                                                          target.key ===
+                                                            targetKey ||
+                                                          !sentence.links.some(
+                                                            (
+                                                              otherLink,
+                                                              otherIndex
+                                                            ) =>
+                                                              otherIndex !==
+                                                                linkIndex &&
+                                                              otherLink.word_id ===
+                                                                target.word_id &&
+                                                              otherLink.sense_id ===
+                                                                target.sense_id
+                                                          )
+                                                      );
+                                                    const targetOptions =
+                                                      availableTargets.some(
+                                                        (target) =>
+                                                          target.key ===
+                                                          targetKey
+                                                      )
+                                                        ? availableTargets
+                                                        : [
+                                                            ...availableTargets,
+                                                            {
+                                                              key: targetKey,
+                                                              label:
+                                                                "已关联其他词义",
+                                                              word_id:
+                                                                link.word_id,
+                                                              sense_id:
+                                                                link.sense_id
+                                                            }
+                                                          ];
+                                                    return (
+                                                      <Flex
+                                                        align="center"
+                                                        data-v3-field="links"
+                                                        data-v3-node-id={
+                                                          sentence.id
+                                                        }
+                                                        gap="small"
+                                                        key={`${targetKey}:${linkIndex}`}
+                                                        wrap
+                                                      >
+                                                        <Tag
+                                                          color={
+                                                            isPrimary
+                                                              ? "blue"
+                                                              : undefined
+                                                          }
+                                                        >
+                                                          {sentenceLinkRoleLabel(
+                                                            link.role
+                                                          )}
+                                                        </Tag>
+                                                        <Typography.Text>
+                                                          {wordId &&
+                                                          link.word_id ===
+                                                            wordId &&
+                                                          link.sense_id ===
+                                                            sense.id
+                                                            ? "当前词义"
+                                                            : "已关联其他词义"}
+                                                        </Typography.Text>
+                                                        {!isPrimary ? (
+                                                          <>
+                                                            <AutoComplete
+                                                              aria-label={`例句 ${sentenceIndex + 1} 上下文关联 ${linkIndex + 1} 目标`}
+                                                              filterOption={
+                                                                false
+                                                              }
+                                                              onSearch={(
+                                                                query
+                                                              ) =>
+                                                                setContextSearch(
+                                                                  {
+                                                                    sentenceId:
+                                                                      sentence.id,
+                                                                    linkIndex,
+                                                                    query
+                                                                  }
+                                                                )
+                                                              }
+                                                              onSelect={(
+                                                                nextKey
+                                                              ) => {
+                                                                const target =
+                                                                  targetOptions.find(
+                                                                    (option) =>
+                                                                      option.key ===
+                                                                      nextKey
+                                                                  );
+                                                                if (!target)
+                                                                  return;
+                                                                change(
+                                                                  (draft) => {
+                                                                    const draftLink =
+                                                                      draft.pos[
+                                                                        posIndex
+                                                                      ]!.senses[
+                                                                        senseIndex
+                                                                      ]!
+                                                                        .sentences[
+                                                                        sentenceIndex
+                                                                      ]!.links[
+                                                                        linkIndex
+                                                                      ]!;
+                                                                    draftLink.word_id =
+                                                                      target.word_id;
+                                                                    draftLink.sense_id =
+                                                                      target.sense_id;
+                                                                  }
+                                                                );
+                                                                setKnownContextTargets(
+                                                                  (
+                                                                    current
+                                                                  ) => ({
+                                                                    ...current,
+                                                                    [target.key]:
+                                                                      target
+                                                                  })
+                                                                );
+                                                                setContextSearch(
+                                                                  undefined
+                                                                );
+                                                              }}
+                                                              options={targetOptions.map(
+                                                                (target) => ({
+                                                                  label:
+                                                                    target.label,
+                                                                  value:
+                                                                    target.key
+                                                                })
+                                                              )}
+                                                              placeholder="搜索已发布词条并选择具体词义"
+                                                              value={
+                                                                contextSearch?.sentenceId ===
+                                                                  sentence.id &&
+                                                                contextSearch.linkIndex ===
+                                                                  linkIndex
+                                                                  ? contextSearch.query
+                                                                  : targetOptions.find(
+                                                                      (
+                                                                        target
+                                                                      ) =>
+                                                                        target.key ===
+                                                                        targetKey
+                                                                    )?.label
+                                                              }
+                                                            />
+                                                            <Button
+                                                              aria-label={`删除例句 ${sentenceIndex + 1} 的上下文关联 ${linkIndex + 1}`}
+                                                              danger
+                                                              onClick={() =>
+                                                                change(
+                                                                  (draft) => {
+                                                                    draft.pos[
+                                                                      posIndex
+                                                                    ]!.senses[
+                                                                      senseIndex
+                                                                    ]!.sentences[
+                                                                      sentenceIndex
+                                                                    ]!.links.splice(
+                                                                      linkIndex,
+                                                                      1
+                                                                    );
+                                                                  }
+                                                                )
+                                                              }
+                                                            >
+                                                              删除关联
+                                                            </Button>
+                                                          </>
+                                                        ) : null}
+                                                      </Flex>
+                                                    );
+                                                  }
+                                                )}
+                                                {primaryLinkState(
+                                                  sentence,
+                                                  wordId,
+                                                  sense.id
+                                                ) !== "valid" && wordId ? (
+                                                  <Button
+                                                    onClick={() =>
+                                                      change((draft) => {
+                                                        const draftSentence =
+                                                          draft.pos[posIndex]!
+                                                            .senses[senseIndex]!
+                                                            .sentences[
+                                                            sentenceIndex
+                                                          ]!;
+                                                        draftSentence.links = [
+                                                          {
+                                                            word_id: wordId,
+                                                            sense_id: sense.id,
+                                                            role: "focus"
+                                                          },
+                                                          ...draftSentence.links.filter(
+                                                            (link) =>
+                                                              link.role !==
+                                                                "focus" &&
+                                                              link.role !==
+                                                                "head" &&
+                                                              (link.word_id !==
+                                                                wordId ||
+                                                                link.sense_id !==
+                                                                  sense.id)
+                                                          )
+                                                        ];
+                                                      })
+                                                    }
+                                                  >
+                                                    {primaryLinkState(
+                                                      sentence,
+                                                      wordId,
+                                                      sense.id
+                                                    ) === "missing"
+                                                      ? "补充主关联"
+                                                      : "修复主关联"}
+                                                  </Button>
+                                                ) : null}
+                                                <AutoComplete
+                                                  aria-label={`为例句 ${sentenceIndex + 1} 新增上下文关联`}
+                                                  filterOption={false}
+                                                  onSearch={(query) =>
+                                                    setContextSearch({
+                                                      sentenceId: sentence.id,
+                                                      query
+                                                    })
+                                                  }
+                                                  onSelect={(targetKey) => {
+                                                    const target =
+                                                      contextTargets.find(
+                                                        (option) =>
+                                                          option.key ===
+                                                          targetKey
+                                                      );
+                                                    if (!target) return;
+                                                    change((draft) => {
+                                                      draft.pos[
+                                                        posIndex
+                                                      ]!.senses[
+                                                        senseIndex
+                                                      ]!.sentences[
+                                                        sentenceIndex
+                                                      ]!.links.push({
+                                                        word_id: target.word_id,
+                                                        sense_id:
+                                                          target.sense_id,
+                                                        role: "context"
+                                                      });
+                                                    });
+                                                    setKnownContextTargets(
+                                                      (current) => ({
+                                                        ...current,
+                                                        [target.key]: target
+                                                      })
+                                                    );
+                                                    setContextSearch(undefined);
+                                                  }}
+                                                  options={contextTargets
+                                                    .filter(
+                                                      (target) =>
+                                                        !sentence.links.some(
+                                                          (link) =>
+                                                            link.word_id ===
+                                                              target.word_id &&
+                                                            link.sense_id ===
+                                                              target.sense_id
+                                                        )
+                                                    )
+                                                    .map((target) => ({
+                                                      label: target.label,
+                                                      value: target.key
+                                                    }))}
+                                                  placeholder="搜索已发布词条并选择具体词义"
+                                                  value={
+                                                    contextSearch?.sentenceId ===
+                                                      sentence.id &&
+                                                    contextSearch.linkIndex ===
+                                                      undefined
+                                                      ? contextSearch.query
+                                                      : ""
+                                                  }
+                                                />
+                                              </div>
                                             </div>
                                           )
                                         )
