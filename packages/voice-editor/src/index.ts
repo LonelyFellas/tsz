@@ -1,13 +1,13 @@
 export * from "./core";
 export * from "./reader";
-export { VoiceRichTextEditor } from "./editor/VoiceRichTextEditor";
+export { VoiceEditor } from "./editor/next";
 export type {
   VoiceOption,
   VoicePreviewAdapter,
   VoicePreviewErrorCode,
   VoicePreviewRequest,
   VoicePreviewResult,
-  VoiceRichTextEditorProps,
+  VoiceEditorProps,
   VoiceRichTextFieldProps,
   VoiceSettings
 } from "./types";

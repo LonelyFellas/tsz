@@ -248,7 +248,18 @@ export function normalizeRichTextV2(value: RichTextV2): RichTextV2 {
           candidate.type !== "phoneme" &&
           sameMergeAttributes(candidate, annotation)
       );
-    if (previous && annotation.start <= previous.end) {
+    /*
+     * 首尾相接（start === previous.end）算不算同一段，按类型分：
+     *
+     * - emphasis / highlight 是「一段文字的属性」，相接的两段本就是同一段，合并对；
+     * - liaison 是「两点之间的一条连线」。pick‿it 落 [3,6)、it‿up 落 [6,9) 恰好相接，
+     *   合并就变成 pick‿up 一道长弧——而连读链正是最常见的用法，必须留成两条。
+     */
+    const overlaps = previous
+      ? annotation.start < previous.end ||
+        (annotation.start === previous.end && annotation.type !== "liaison")
+      : false;
+    if (previous && overlaps) {
       previous.end = Math.max(previous.end, annotation.end);
     } else {
       merged.push(annotation);

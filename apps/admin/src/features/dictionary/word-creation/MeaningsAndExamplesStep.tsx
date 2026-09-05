@@ -1,7 +1,6 @@
 import {
   DeleteOutlined,
   DownOutlined,
-  EditOutlined,
   EllipsisOutlined,
   LockOutlined,
   PlusOutlined,
@@ -47,13 +46,10 @@ import "@tsz/voice-editor/styles.css";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
 import { HttpError } from "@tsz/api-client/http";
 import {
-  createContext,
   type DragEvent,
   type KeyboardEvent,
   lazy,
-  type ReactNode,
   Suspense,
-  useContext,
   useEffect,
   useMemo,
   useRef,
@@ -126,7 +122,6 @@ import {
 } from "./useWordValidationIssueFocus";
 import {
   applySoleSubPartOfSpeech,
-  collectPronunciationHints,
   countSenseReferences,
   meaningsPosOwnsNode,
   removeSenseAndReferences,
@@ -140,9 +135,9 @@ import { MultidimensionalSentencesEditor } from "./meaningsAndExamples/SentenceA
 import { deriveSharedSentencesForSense } from "./meaningsAndExamples/sentenceAssociationModel";
 import type { DraftMeaningsWithSentenceAssociations } from "./meaningsAndExamples/sentenceAssociationTypes";
 
-const VoiceRichTextEditor = lazy(() =>
+const VoiceEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((module) => ({
-    default: module.VoiceRichTextEditor
+    default: module.VoiceEditor
   }))
 );
 
@@ -328,130 +323,57 @@ function useSortableRows<T>({
   };
 }
 
-interface VoiceEditorTarget {
-  value: RichText;
-  contextLabel: string;
-  onApply: (value: RichText) => void;
-}
-
-interface VoiceEditorContextValue {
-  open: (target: VoiceEditorTarget) => void;
-}
-
-const VoiceEditorContext = createContext<VoiceEditorContextValue | null>(null);
-
-function VoiceEditorProvider({
-  children,
-  pronunciationHints,
-  readOnly
-}: {
-  children: ReactNode;
-  pronunciationHints: Readonly<Record<string, string>>;
-  readOnly?: boolean;
-}) {
-  const [target, setTarget] = useState<VoiceEditorTarget>();
-  const content = (
-    <PronunciationPreviewProvider readOnly={readOnly}>
-      {children}
-    </PronunciationPreviewProvider>
-  );
-  if (!env.VOICE_EDITOR) return content;
-  return (
-    <VoiceEditorContext.Provider value={{ open: setTarget }}>
-      {content}
-      {target && (
-        <Suspense fallback={null}>
-          <VoiceRichTextEditor
-            open
-            value={target.value}
-            language="en"
-            contextLabel={target.contextLabel}
-            pronunciationHints={pronunciationHints}
-            previewAdapter={
-              env.VOICE_PREVIEW ? adminVoicePreviewAdapter : undefined
-            }
-            previewIsMock={voicePreviewIsMock}
-            onApply={(value) => {
-              target.onApply(value);
-              setTarget(undefined);
-            }}
-            onCancel={() => setTarget(undefined)}
-          />
-        </Suspense>
-      )}
-    </VoiceEditorContext.Provider>
-  );
-}
-
+/**
+ * 语音文本控件：编辑器直接落在表单里，改动实时回写。
+ *
+ * 早先是「文本框 + 高级语音编辑」按钮开抽屉，标注要跨一层浮层才做得到；既然标注
+ * 本来就是在正文上点，把正文和标注分到两个层面只是多一次往返。编辑器自带文本框，
+ * 所以这里不再另挂一个。
+ */
 function VoiceTextControl({
   value,
   contextLabel,
   toolbarLabel,
   readOnly,
-  showEditorAction = true,
   onChange
 }: {
   value: RichText;
   contextLabel: string;
   toolbarLabel?: string;
   readOnly?: boolean;
-  showEditorAction?: boolean;
   onChange: (value: RichText) => void;
 }) {
   return (
     <div className="word-voice-text-control">
-      {(toolbarLabel || showEditorAction) && (
-        <div
-          className={`word-voice-text-toolbar${toolbarLabel ? " word-voice-text-toolbar-labeled" : ""}`}
-        >
-          {toolbarLabel && (
-            <Typography.Text strong>{toolbarLabel}</Typography.Text>
-          )}
-          <VoiceEditorAction
-            value={value}
-            contextLabel={contextLabel}
-            readOnly={readOnly}
-            onApply={onChange}
-          />
+      {toolbarLabel && (
+        <div className="word-voice-text-toolbar word-voice-text-toolbar-labeled">
+          <Typography.Text strong>{toolbarLabel}</Typography.Text>
         </div>
       )}
-      <Input.TextArea
-        aria-label={contextLabel}
-        value={value.text}
-        readOnly={readOnly}
-        autoSize={{ minRows: 2, maxRows: 6 }}
-        onChange={(event) =>
-          onChange(toWordRichText(event.target.value, value))
+      {/* 编辑器是按需加载的大块，退化时先给出可读的纯文本，别留一片空白。 */}
+      <Suspense
+        fallback={
+          <Input.TextArea
+            aria-label={contextLabel}
+            value={value.text}
+            readOnly
+            autoSize={{ minRows: 2, maxRows: 6 }}
+          />
         }
-      />
+      >
+        <VoiceEditor
+          value={value}
+          language="en"
+          contextLabel={contextLabel}
+          readOnly={readOnly}
+          previewAdapter={
+            env.VOICE_PREVIEW ? adminVoicePreviewAdapter : undefined
+          }
+          previewIsMock={voicePreviewIsMock}
+          onChange={onChange}
+        />
+      </Suspense>
     </div>
-  );
-}
-
-function VoiceEditorAction({
-  value,
-  contextLabel,
-  readOnly,
-  onApply
-}: {
-  value: RichText;
-  contextLabel: string;
-  readOnly?: boolean;
-  onApply: (value: RichText) => void;
-}) {
-  const editor = useContext(VoiceEditorContext);
-  if (readOnly || !editor) return null;
-  return (
-    <Button
-      className="word-voice-editor-action"
-      type="text"
-      size="small"
-      icon={<EditOutlined />}
-      aria-label={`${contextLabel} 高级语音编辑`}
-      onClick={() => editor.open({ value, contextLabel, onApply })}
-    >
-      高级语音编辑
-    </Button>
   );
 }
 
@@ -597,34 +519,12 @@ function GrammarEditor({
             data-word-node-id={grammar.id}
             data-word-field="content"
           >
-            <Flex
-              className="word-dialect-panel-header"
-              justify="flex-end"
-              align="center"
-              gap={8}
-            >
-              <VoiceEditorAction
-                value={resolveGrammarText(grammar, preference)}
-                contextLabel={`语法结构 ${grammarIndex + 1}`}
-                readOnly={readOnly}
-                onApply={(content) =>
-                  onChange(
-                    value.map((item, index) =>
-                      index === grammarIndex
-                        ? writeGrammarText(item, preference, content)
-                        : item
-                    )
-                  )
-                }
-              />
-            </Flex>
             <div className="word-grammar-text-field">
               {env.VOICE_EDITOR ? (
                 <VoiceTextControl
                   value={resolveGrammarText(grammar, preference)}
                   contextLabel={`语法结构 ${grammarIndex + 1}`}
                   readOnly={readOnly}
-                  showEditorAction={false}
                   onChange={(content) =>
                     onChange(
                       value.map((item, index) =>
@@ -2222,10 +2122,6 @@ export function MeaningsAndExamplesStep({
     () => new Map(word.forms.pos.map((pos) => [pos.pos_id, pos])),
     [word.forms.pos]
   );
-  const pronunciationHints = useMemo(
-    () => collectPronunciationHints(word.forms),
-    [word.forms]
-  );
   // 存量双份英文内容：进来时给一条说明，保存前再确认一次要丢弃哪些，绝不静默截断。
   // 判据是「确实有内容会被丢弃」而不是「wire 形状是不是 distinguish」——
   // 只填了单侧的旧草稿收敛时无物可丢，再提示「留着两份内容」只会让人去找不存在的那一份。
@@ -2457,10 +2353,7 @@ export function MeaningsAndExamplesStep({
   });
 
   return (
-    <VoiceEditorProvider
-      pronunciationHints={pronunciationHints}
-      readOnly={readOnly}
-    >
+    <PronunciationPreviewProvider readOnly={readOnly}>
       <div className="word-step-heading">
         <span className="word-step-number">STEP 03</span>
         <Typography.Title level={2} style={{ margin: 0 }}>
@@ -2684,6 +2577,6 @@ export function MeaningsAndExamplesStep({
           </div>
         )}
       </fieldset>
-    </VoiceEditorProvider>
+    </PronunciationPreviewProvider>
   );
 }

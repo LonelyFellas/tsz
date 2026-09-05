@@ -833,6 +833,40 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.getByText("添加例句").closest("button")).toBeVisible();
   });
 
+  it("语法结构挂上语音编辑器，标注实时回写且不丢正文", async () => {
+    // 这是 V3 唯一可编辑的语音文本入口；编辑器早先只接在 v2 向导上，
+    // 而线上走的是 V3，等于现网够不着。
+    render(<Harness initial={meaningsFixture} />);
+
+    const editor = await screen.findByRole("toolbar", { name: "标注工具栏" });
+    expect(editor).toBeInTheDocument();
+
+    const input = screen.getByLabelText("语法结构 1 通用内容");
+    // 错误定位靠 focus() + activeElement 校验，属性必须落在输入框本身
+    expect(input).toHaveAttribute("data-v3-field", "content");
+    expect(input.tagName).toBe("TEXTAREA");
+
+    fireEvent.change(input, { target: { value: "a centre of the city" } });
+    expect(
+      value().pos[0]!.grammar_structures[0]!.variants[0]!.content.text
+    ).toBe("a centre of the city");
+
+    // 取语法结构画笔标一个词，标注应实时落到草稿里
+    fireEvent.click(document.querySelector(".tsz-ve-role-button")!);
+    fireEvent.click(screen.getByLabelText("用核心词画笔"));
+    const word = [...document.querySelectorAll(".tsz-ve-token")].find(
+      (node) => node.textContent === "centre"
+    )!;
+    fireEvent.mouseDown(word);
+
+    const content = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
+    expect(content.text).toBe("a centre of the city");
+    expect(content.version).toBe(2);
+    expect(content.version === 2 ? content.annotations : []).toEqual([
+      { type: "emphasis", start: 2, end: 8, level: "strong" }
+    ]);
+  }, 15_000);
+
   it("语法结构复用 V2 单栏文本区且不显示地区下拉", () => {
     const { container } = render(<Harness initial={meaningsFixture} />);
 

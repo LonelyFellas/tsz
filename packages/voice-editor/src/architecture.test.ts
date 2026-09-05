@@ -7,11 +7,15 @@ const sources = import.meta.glob("./**/*.{ts,tsx}", {
   query: "?raw"
 }) as Record<string, string>;
 
+function productionSourcesOf(all: Record<string, string>) {
+  return Object.entries(all).filter(
+    ([path]) => !path.includes(".test.") && !path.endsWith("vitest.d.ts")
+  );
+}
+
 describe("package boundaries", () => {
   it("does not import app, request, routing, query, auth, or business DTO layers", () => {
-    const productionSources = Object.entries(sources).filter(
-      ([path]) => !path.includes(".test.") && !path.endsWith("vitest.d.ts")
-    );
+    const productionSources = productionSourcesOf(sources);
     const forbidden = [
       /(?:from|import\()\s*["'][^"']*apps\//,
       /@tsz\/api-client/,
@@ -28,25 +32,23 @@ describe("package boundaries", () => {
     expect(violations).toEqual([]);
   });
 
-  it("resolves every public entry while reader remains TipTap-free", async () => {
+  it("resolves every public entry and stays free of rich-text editor deps", async () => {
     const [root, core, reader, editor] = await Promise.all([
       import("./index"),
       import("./core/index"),
       import("./reader/index"),
       import("./editor/index")
     ]);
-    expect(root.VoiceRichTextEditor).toBeTypeOf("function");
+    expect(root.VoiceEditor).toBeTypeOf("function");
     expect(core.toRichTextV2).toBeTypeOf("function");
     expect(reader.RichTextReadOnly).toBeTypeOf("function");
-    expect(editor.VoiceRichTextEditor).toBeTypeOf("function");
+    expect(editor.VoiceEditor).toBeTypeOf("function");
     expect(stylesSource).toBeTypeOf("string");
 
-    const readerSources = Object.entries(sources).filter(([path]) =>
-      path.startsWith("./reader/")
-    );
+    // 标注工具形态不需要富文本编辑器：整个包都不应再出现 tiptap 依赖。
     expect(
-      readerSources.flatMap(([path, source]) =>
-        /@tiptap|VoiceRichTextEditor/.test(source) ? [path] : []
+      productionSourcesOf(sources).flatMap(([path, source]) =>
+        /@tiptap/.test(source) ? [path] : []
       )
     ).toEqual([]);
   });

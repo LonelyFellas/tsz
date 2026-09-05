@@ -26,7 +26,14 @@ function renderMarkedText(
       </span>
     );
   }
-  if (emphasis) node = <strong className="tsz-ve-emphasis">{node}</strong>;
+  if (emphasis?.type === "emphasis") {
+    // 带上 level，只读视图/导出 PDF 才能沿用编辑器里的语法结构配色。
+    node = (
+      <strong className="tsz-ve-emphasis" data-level={emphasis.level}>
+        {node}
+      </strong>
+    );
+  }
   if (liaison) node = <span className="tsz-ve-liaison">{node}</span>;
   if (highlight?.type === "highlight") {
     node = (
