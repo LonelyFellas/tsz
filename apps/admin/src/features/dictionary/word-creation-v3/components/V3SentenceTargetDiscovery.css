@@ -214,11 +214,35 @@
   }
 }
 
-/* 成分用词级联：词条层与词形层只用来展开，勾选只发生在词义叶子上（选项带
-   disableCheckbox，rc-cascader 会给复选框加 -disabled）。留着一个点不动的空框
-   只会让人以为能勾，这里整个隐藏。此面板没有别的禁用态复选框。 */
-.v3-component-usage-cascader .ant-cascader-checkbox-disabled {
-  display: none;
+/* 成分用词级联（单选）：词条层与词形层只用来展开，选择只发生在词义叶子上（单选
+   Cascader 默认只在叶子提交，父级不可选）。词义叶子前用一个 radio 圆点回显选中态。 */
+.v3-component-usage-sense {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.v3-component-usage-radio {
+  box-sizing: border-box;
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #d9d9d9;
+  border-radius: 50%;
+}
+
+.v3-component-usage-radio.is-checked {
+  border-color: #0071e3;
+}
+
+.v3-component-usage-radio.is-checked::after {
+  content: "";
+  display: block;
+  width: 6px;
+  height: 6px;
+  margin: 3px;
+  border-radius: 50%;
+  background: #0071e3;
 }
 
 /* resolve 命中的那一行：原来挂一个「命中」标签，占宽且把词形文本挤窄，改成只换文字颜色。 */
