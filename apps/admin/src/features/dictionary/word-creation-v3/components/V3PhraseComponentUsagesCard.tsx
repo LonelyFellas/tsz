@@ -1,10 +1,20 @@
 // 释义卡内的「成分用词」区块（多维释义与多维例句之间，仅短语渲染，可选内容）。
-// 交互定稿（2026-09-02）：点击短语中的单词 → Popover 级联（词条 → 词形 → 词义）多选，
-// 勾选即关联、取消即解除；同一单词允许多条关联；候选按关键字**包含**匹配检索（仅已发布），
-// 词形层按管理员方言偏好只给一侧。
-// 数据按释义归属：读写 sense.component_usages，随词义步保存；短语拼写只用于切词展示
-// （unified 取 common、distinguish 取 uk，英美拼写不同时以英式为准）。
-import { Alert, Cascader, Empty, Flex, Popover, Spin, Typography } from "antd";
+// 交互（2026-09-02 定稿三层级联；2026-09-04 前端临时收成单选）：点击短语中的单词 →
+// Popover 级联（词条 → 词形 → 词义）**单选（radio）**，点词义即关联、经「清除关联」解除；
+// 一个单词至多关联一条词义（多选语义后续再放开，届时把 Cascader.Panel 改回 multiple）；
+// 候选按关键字**包含**匹配检索（仅已发布），词形层按管理员方言偏好只给一侧。
+// 数据按释义归属：读写 sense.component_usages（数组，每单词 0/1 条），随词义步保存；
+// 短语拼写只用于切词展示（unified 取 common、distinguish 取 uk，英美拼写不同时以英式为准）。
+import {
+  Alert,
+  Button,
+  Cascader,
+  Empty,
+  Flex,
+  Popover,
+  Spin,
+  Typography
+} from "antd";
 import type {
   DraftFormsStepContentV3,
   PhraseComponentUsageV3,
@@ -137,18 +147,14 @@ export function rebuildUsages(
 interface CascaderOptionNode {
   value: string;
   label: ReactNode;
-  /**
-   * 仅词义叶子可勾选：勾父级会展开成「全词形 × 全词义」，一次就能撑爆后端 100 条上限；
-   * 且 SHOW_PARENT 会把已选叶子折叠成父级路径，落到 onChange 里解不出叶子、反倒清空已有关联。
-   * 必须用 rc-cascader 真正认的 `disableCheckbox`（选项级 `checkable` 它根本不读），
-   * 父级复选框再由 `.v3-component-usage-cascader` 的样式整个隐藏，避免留下点不动的空框。
-   */
-  disableCheckbox?: boolean;
+  // 单选 Cascader 默认 changeOnSelect=false，只在词义叶子提交，父级（词条/词形）天然
+  // 只用于展开、不可选，无需再靠 disableCheckbox 屏蔽复选框。
   children?: CascaderOptionNode[];
 }
 
 function cascaderOptionsFromGroups(
-  groups: CandidateEntryGroup[]
+  groups: CandidateEntryGroup[],
+  selectedLeafKey?: string
 ): CascaderOptionNode[] {
   return groups.map((group) => {
     const posLabels = new Set(
@@ -156,11 +162,9 @@ function cascaderOptionsFromGroups(
     );
     return {
       value: group.entryId,
-      disableCheckbox: true,
       label: <Typography.Text strong>{group.headword}</Typography.Text>,
       children: group.formGroups.map((formGroup) => ({
         value: formGroup.formKey,
-        disableCheckbox: true,
         label: (
           // 命中行只靠颜色区分，不再占一个「命中」标签的宽度。
           <span
@@ -173,10 +177,22 @@ function cascaderOptionsFromGroups(
               : formGroup.formLabel}
           </span>
         ),
-        children: formGroup.senses.map((sense) => ({
-          value: sense.senseId,
-          label: sense.gloss || "暂无释义"
-        }))
+        children: formGroup.senses.map((sense) => {
+          // 单选：词义叶子前挂一个 radio 圆点回显选中态；选择本身仍由级联叶子的点击驱动。
+          const leafKey = `${formGroup.formKey}:${sense.senseId}`;
+          return {
+            value: sense.senseId,
+            label: (
+              <span className="v3-component-usage-sense">
+                <span
+                  aria-hidden
+                  className={`v3-component-usage-radio${selectedLeafKey === leafKey ? " is-checked" : ""}`}
+                />
+                {sense.gloss || "暂无释义"}
+              </span>
+            )
+          };
+        })
       }))
     };
   });
@@ -348,7 +364,13 @@ function CascaderLinkContent({
       ),
     [preference, selectedVariantIds, selfEntryId, state.candidates]
   );
-  const options = useMemo(() => cascaderOptionsFromGroups(groups), [groups]);
+  // 单选：至多一条关联。回填单条路径（存量多于一条时以第一条为准，选新词义时整组替换）。
+  const selected = targets[0];
+  const selectedLeafKey = selected ? leafKeyOf(selected) : undefined;
+  const options = useMemo(
+    () => cascaderOptionsFromGroups(groups, selectedLeafKey),
+    [groups, selectedLeafKey]
+  );
   const selectionByLeaf = useMemo(() => {
     const map = new Map<string, ResolvedTarget>();
     // 候选里查不到的存量关联（目标已归档/改版/落在分页外）也要能按原样回填，
@@ -362,13 +384,30 @@ function CascaderLinkContent({
   }, [groups, targets]);
   const value = useMemo(
     () =>
-      targets.map((target) => [
-        target.target_word_id,
-        formKeyOf(target),
-        target.target_sense_id
-      ]),
-    [targets]
+      selected
+        ? [
+            selected.target_word_id,
+            formKeyOf(selected),
+            selected.target_sense_id
+          ]
+        : undefined,
+    [selected]
   );
+
+  // 单选没有「反选」：已有关联的解除全靠这个入口，把该单词的关联整组清空。
+  // 无候选/查询失败时也要出现——否则指向已下架目标的孤儿关联再也删不掉。
+  const clearControl = selected ? (
+    <Flex justify="flex-end">
+      <Button
+        onClick={() => onReplace([])}
+        size="small"
+        style={{ paddingInline: 0, height: "auto" }}
+        type="link"
+      >
+        清除关联
+      </Button>
+    </Flex>
+  ) : null;
 
   if (state.pending) {
     return (
@@ -385,22 +424,26 @@ function CascaderLinkContent({
   }
   if (state.error) {
     return (
-      <div style={{ width: 360 }}>
+      <Flex vertical gap="small" style={{ width: 360 }}>
+        {clearControl}
         <Alert showIcon title={state.error} type="warning" />
-      </div>
+      </Flex>
     );
   }
   if (options.length === 0) {
     return (
-      <Empty
-        description={
-          // 命中被截断时不能只说「没有匹配」：可用的候选可能落在窗口之外。
-          state.truncated
-            ? "前 50 条命中里没有可关联的已发布词条，请换更具体的关键字"
-            : "没有匹配的已发布词条"
-        }
-        image={Empty.PRESENTED_IMAGE_SIMPLE}
-      />
+      <Flex vertical gap="small">
+        {clearControl}
+        <Empty
+          description={
+            // 命中被截断时不能只说「没有匹配」：可用的候选可能落在窗口之外。
+            state.truncated
+              ? "前 50 条命中里没有可关联的已发布词条，请换更具体的关键字"
+              : "没有匹配的已发布词条"
+          }
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+        />
+      </Flex>
     );
   }
   return (
@@ -408,19 +451,15 @@ function CascaderLinkContent({
       {state.truncated ? (
         <Alert showIcon title="匹配过多，只列出前 50 条" type="info" />
       ) : null}
+      {clearControl}
       <Cascader.Panel
         className="v3-component-usage-cascader"
-        multiple
         onChange={(next) => {
-          // 只有词义叶子可勾选，路径恒为三段；rc-cascader 会把候选里查不到的
-          // 存量路径原样带回，交给 selectionByLeaf 里的存量兜底。
-          const replaced = (next as string[][])
-            .map((path) => selectionByLeaf.get(`${path[1]}:${path[2]}`))
-            .filter(
-              (selection): selection is ResolvedTarget =>
-                selection !== undefined
-            );
-          onReplace(replaced);
+          // 单选：点到词义叶子，路径恒为三段；rc-cascader 会把候选里查不到的存量路径
+          // 原样带回，交给 selectionByLeaf 里的存量兜底。点非叶子不会触发 onChange。
+          const path = next as string[];
+          const selection = selectionByLeaf.get(`${path[1]}:${path[2]}`);
+          onReplace(selection ? [selection] : []);
         }}
         options={options}
         value={value}
@@ -548,11 +587,6 @@ export function V3PhraseComponentUsagesCard({
                 type="button"
               >
                 {token}
-                {targets.length > 1 ? (
-                  <span style={{ marginLeft: 4, fontSize: 12 }}>
-                    ×{targets.length}
-                  </span>
-                ) : null}
               </button>
             </Popover>
           );
