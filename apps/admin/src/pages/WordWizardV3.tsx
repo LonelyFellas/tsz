@@ -256,6 +256,11 @@ function V3BasicsSlot({ context }: { context: V3WizardSlotContext }) {
   return (
     <V3BasicsStep
       word={context.word}
+      draftForms={context.draftForms}
+      draftMeanings={context.draftMeanings}
+      dirtySteps={context.dirtySteps}
+      issues={context.issues}
+      partOfSpeechCatalog={context.partOfSpeechCatalog?.items}
       onContinue={() => context.setActiveStep("forms")}
       onStepChange={context.setActiveStep}
     />
@@ -263,7 +268,6 @@ function V3BasicsSlot({ context }: { context: V3WizardSlotContext }) {
 }
 
 function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
-  const partOfSpeechCatalog = usePartOfSpeechCatalog();
   // 词义步里的成分用词卡片会改词形内容，保存时向导要先存脏词形。删除已有成分属于
   // 下游变更，后端要 confirmed_impact_token，直接 PUT 会 409 downstream_confirmation_required
   // 而整次保存中止。所以这里和词形步一样：先预览影响，需要确认就把保存挂起等确认。
@@ -396,9 +400,9 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
         }}
         onPrevious={() => context.setActiveStep("forms")}
         onSave={saveMeanings}
-        partOfSpeechCatalog={partOfSpeechCatalog.data}
-        partOfSpeechCatalogError={partOfSpeechCatalog.isError}
-        partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
+        partOfSpeechCatalog={context.partOfSpeechCatalog}
+        partOfSpeechCatalogError={context.partOfSpeechCatalogError}
+        partOfSpeechCatalogPending={context.partOfSpeechCatalogPending}
         relationDisplaySnapshots={relationDisplaySnapshots(
           context.word.meanings
         )}
@@ -561,6 +565,7 @@ export function WordWizardV3Page({
   renderMeaningsStep?: V3MeaningsStepRenderer;
 } = {}) {
   const { wordId = "", step } = useParams();
+  const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const location = useLocation();
   const [searchParams] = useSearchParams();
   const [activationGeneration, setActivationGeneration] = useState(0);
@@ -646,6 +651,9 @@ export function WordWizardV3Page({
         allowPublishedEditing={editingPublished}
         initialStep={legalStep}
         initialWord={word}
+        partOfSpeechCatalog={partOfSpeechCatalog.data}
+        partOfSpeechCatalogError={partOfSpeechCatalog.isError}
+        partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
         retiredStableNodes={detail.data.retired_stable_nodes}
         readOnly={forcePreview}
         requests={requests}

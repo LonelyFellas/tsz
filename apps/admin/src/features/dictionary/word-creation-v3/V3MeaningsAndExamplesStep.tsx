@@ -64,6 +64,7 @@ import {
   newGrammarStructure,
   type RelationDisplaySnapshots,
   replaceEnglishText,
+  definitionSummary,
   replaceRichText,
   spellingModeForPos,
   sentenceTranslationBand
@@ -626,14 +627,6 @@ function GrammarStructuresCard({
                     data-v3-node-id={variant.id}
                     key={variant.id}
                   >
-                    {variant.dialect === "common" ? null : (
-                      <Typography.Text
-                        className="word-grammar-dialect-label"
-                        type="secondary"
-                      >
-                        {dialectLabel(variant.dialect)}
-                      </Typography.Text>
-                    )}
                     <V3VoiceTextField
                       ariaLabel={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
                       field="content"
@@ -1663,21 +1656,6 @@ export function V3MeaningsAndExamplesStep({
     activePosId && visiblePosIds.includes(activePosId)
       ? activePosId
       : visiblePosIds[0];
-  const definitionSummary = (sense: WordSenseWritableV3) => {
-    const definition = sense.definitions[0];
-    if (!definition) return "待填写释义";
-    if (
-      definition.definition_mode === "zh_definition" ||
-      definition.definition_mode === "zh_sentence"
-    ) {
-      return definition.content.text.trim() || "待填写释义";
-    }
-    return (
-      editableEnglishText(definition.content as EnglishTextV3).find((row) =>
-        row.text.trim()
-      )?.text ?? "待填写释义"
-    );
-  };
   const addBasicPos =
     forms && onFormsChange
       ? (item: PartOfSpeechCatalogResponse["items"][number]) => {

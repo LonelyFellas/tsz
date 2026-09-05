@@ -72,6 +72,22 @@
   min-width: 0;
 }
 
+.v3-meanings-v2 .word-sense-meta-grid > .word-sense-field:first-child {
+  width: min(64px, 100%);
+}
+
+.v3-meanings-v2 .word-sense-field-frequency {
+  width: min(112px, 100%);
+}
+
+@container (min-width: 981px) {
+  .v3-meanings-v2 .word-sense-meta-grid {
+    grid-template-columns:
+      64px minmax(190px, 1.45fr) minmax(210px, 1.35fr)
+      112px minmax(130px, 0.72fr);
+  }
+}
+
 .v3-meanings-v2 .word-list-actions {
   align-self: center;
 }
@@ -106,32 +122,32 @@
 .v3-meanings-v2 .word-grammar-variants > .word-grammar-panel {
   flex: 1;
   min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
-.v3-meanings-v2 .word-grammar-dialect-label {
-  display: block;
-  margin-bottom: 4px;
-  font-size: 12px;
-  font-weight: 600;
+.v3-meanings-v2 .word-grammar-panel .tsz-ve-toolbar {
+  background: #f5faf7;
 }
 
-/* 英美配色对齐 Step 2 的方言面板（v3-forms.css 的 .v3-dialect-panel-uk/us）。 */
-.v3-meanings-v2 .word-grammar-panel-uk {
+.v3-meanings-v2 .word-grammar-panel :is(.tsz-ve-strip, .tsz-ve-canvas-input) {
+  padding-block: 40px;
+}
+
+/* 空标注层也要为一行文字预留高度，避免占位文字挤进底部内边距。 */
+.v3-meanings-v2 .word-grammar-panel .tsz-ve-strip {
+  min-height: calc(1lh + 80px);
+}
+
+/* 工具栏沿用通用/英美面板配色，正文保留编辑器自身背景。 */
+.v3-meanings-v2 .word-grammar-panel-uk .tsz-ve-toolbar {
   background: #eef2ff;
-  border-color: #8792a5;
 }
 
-.v3-meanings-v2 .word-grammar-panel-uk .word-grammar-dialect-label {
-  color: #2f5bff;
-}
-
-.v3-meanings-v2 .word-grammar-panel-us {
+.v3-meanings-v2 .word-grammar-panel-us .tsz-ve-toolbar {
   background: #fff0f7;
-  border-color: #f3c5de;
-}
-
-.v3-meanings-v2 .word-grammar-panel-us .word-grammar-dialect-label {
-  color: #d42a91;
 }
 
 .v3-meanings-v2 .word-table-row {
@@ -226,25 +242,82 @@
   border-radius: 0;
 }
 
+.word-creation-shell .v3-product-progress-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px 32px !important;
+}
+
+.v3-product-progress-group {
+  min-width: 0;
+}
+
+.word-creation-shell .v3-product-progress-list .word-creation-progress-row {
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 8px;
+  padding: 0;
+  font-size: 13px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.word-creation-summary:has(.v3-product-progress-list)
+  .word-summary-progress-title {
+  display: block;
+}
+
+.v3-product-progress-details,
+.v3-product-progress-items {
+  display: grid;
+  gap: 4px;
+  margin: 8px 0 0;
+  padding: 0 0 0 26px;
+  color: #8b9099;
+  font-size: 13px;
+  line-height: 1.6;
+  list-style: none;
+}
+
+.v3-product-progress-items {
+  margin-top: 4px;
+  padding-left: 8px;
+}
+
+.v3-product-progress-details > li {
+  min-width: 0;
+}
+
+.v3-product-progress-detail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.v3-product-progress-detail > .v3-product-progress-text {
+  flex: 1;
+}
+
+.v3-product-progress-detail > .dialect-dot {
+  flex: none;
+}
+
+.v3-product-progress-text {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 @container word-creation-page (max-width: 1199px) {
-  .word-creation-shell .v3-product-progress-list {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-  }
-}
-
-@container word-creation-page (max-width: 1100px) {
-  .word-creation-shell .v3-product-progress-list {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@container word-creation-page (max-width: 820px) {
   .word-creation-shell .v3-product-progress-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
-@container word-creation-page (max-width: 420px) {
+@container word-creation-page (max-width: 640px) {
   .word-creation-shell .v3-product-progress-list {
     grid-template-columns: minmax(0, 1fr);
   }

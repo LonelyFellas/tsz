@@ -39,6 +39,7 @@ type OperationFailureReason =
   | "explicit_mapping_required"
   | "invalid_dialect_rules"
   | "component_merge_required"
+  | "pronunciation_merge_required"
   | "last_form_required"
   | "last_pos_required"
   | "wrong_regional_mode";
@@ -318,10 +319,18 @@ export function convertUkUsToCommon(
   if (mapping.confirmed !== true || !explicitMapping(mapping.common)) {
     return { ok: false, reason: "explicit_mapping_required" };
   }
-  if (
-    (form.regional_variants.uk.component_usages?.length ?? 0) > 0 ||
-    (form.regional_variants.us.component_usages?.length ?? 0) > 0
-  ) {
+  const ukComponents = form.regional_variants.uk.component_usages ?? [];
+  const usComponents = form.regional_variants.us.component_usages ?? [];
+  // 拆分会分配独立节点 ID；只有实际配置不同才需要管理员取舍。
+  const componentValues = (values: readonly PhraseComponentUsageV3[]) =>
+    JSON.stringify(
+      values.map((value) =>
+        Object.entries(value)
+          .filter(([key]) => key !== "id")
+          .sort(([left], [right]) => left.localeCompare(right))
+      )
+    );
+  if (componentValues(ukComponents) !== componentValues(usComponents)) {
     return { ok: false, reason: "component_merge_required" };
   }
   const allocated = new Set<string>(formNodeIds(form));
@@ -343,7 +352,11 @@ export function convertUkUsToCommon(
             idFactory,
             allocated
           ),
-          component_usages: []
+          component_usages: clonedComponentUsages(
+            ukComponents,
+            idFactory,
+            allocated
+          )
         }
       }
     }
@@ -430,6 +443,16 @@ export function normalizePosDialectRules(
       rules.phonetic_mode === "unified"
     ) {
       if (form.regional_variants.mode === "common") continue;
+      if (
+        JSON.stringify(
+          variantMappingFrom(form.regional_variants.uk).pronunciations
+        ) !==
+        JSON.stringify(
+          variantMappingFrom(form.regional_variants.us).pronunciations
+        )
+      ) {
+        return { ok: false, reason: "pronunciation_merge_required" };
+      }
       const source = form.regional_variants[preferredDialect];
       let mergeIdIndex = 0;
       const converted = convertUkUsToCommon(

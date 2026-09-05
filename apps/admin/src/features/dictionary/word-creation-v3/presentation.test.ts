@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   definitionModeLabel,
+  languageSummary,
   dialectLabel,
   formTypeLabel,
   impactReasonLabel,
@@ -15,6 +16,25 @@ import {
 } from "./presentation";
 
 describe("V3 product presentation", () => {
+  it("根据实际语言映射中英文名，未知代码不伪装英语", () => {
+    expect(languageSummary("en")).toEqual({
+      label: "英语 English",
+      identified: true
+    });
+    expect(languageSummary("fr")).toEqual({
+      label: "法语 French",
+      identified: true
+    });
+    expect(languageSummary("")).toEqual({
+      label: "未识别语言",
+      identified: false
+    });
+    expect(languageSummary("xx")).toEqual({
+      label: "xx（未识别语言）",
+      identified: false
+    });
+    expect(languageSummary("invalid_code").identified).toBe(false);
+  });
   it("集中映射词条、词形、地区与发音业务标签", () => {
     expect(wordStatusLabel("published")).toBe("已发布");
     expect(formTypeLabel("base")).toBe("原形");

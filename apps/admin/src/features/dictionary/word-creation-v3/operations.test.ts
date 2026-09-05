@@ -207,7 +207,7 @@ describe("V3 forms operations", () => {
     });
   });
 
-  it("common 成分拆分后生成独立 ID，已有 UK/US 成分时拒绝静默合并", () => {
+  it("common 成分拆分后生成独立 ID，UK/US 成分不同时拒绝静默合并", () => {
     const common = commonFormFixture();
     common.regional_variants.common.component_usages = [
       { state: "unresolved", id: uuidFromInt(710), literal: "centre" }
@@ -239,6 +239,7 @@ describe("V3 forms operations", () => {
       return;
     const { uk, us } = converted.value.regional_variants;
     expect(uk.component_usages?.[0]?.id).not.toBe(us.component_usages?.[0]?.id);
+    us.component_usages![0]!.literal = "center";
     expect(
       convertUkUsToCommon(
         converted.value,

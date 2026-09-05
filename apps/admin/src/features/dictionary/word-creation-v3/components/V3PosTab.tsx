@@ -100,7 +100,11 @@ export function V3PosTab({
       onChange(result.value);
     } else if (result.reason === "component_merge_required") {
       setDialectChangeError(
-        "英式与美式词形已有独立成分用词。请先保留需要的一侧并清空另一侧，再合并为英美共用。"
+        "英式与美式成分用词配置不同，请先统一需要保留的配置，再合并为英美共用。"
+      );
+    } else if (result.reason === "pronunciation_merge_required") {
+      setDialectChangeError(
+        "英式与美式发音内容不同，请先统一需要保留的发音，再合并为英美共用。"
       );
     }
   };
@@ -272,7 +276,7 @@ export function V3PosTab({
           closable
           onClose={() => setDialectChangeError(undefined)}
           showIcon
-          title="暂不能合并英美成分配置"
+          title="暂不能合并英美配置"
           description={dialectChangeError}
           type="warning"
         />

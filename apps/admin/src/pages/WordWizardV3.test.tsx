@@ -200,6 +200,33 @@ function renderPage(
 }
 
 describe("WordWizardV3Page", () => {
+  it("未保存摘要实时更新并在返回第一步时保留，期间不调用保存或校验", async () => {
+    const current = word();
+    const api = source({ word: current, retired_stable_nodes: [] });
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/meanings`,
+      createV3WordRequests(api)
+    );
+    const field = await screen.findByLabelText("语义区间 1 中文");
+    fireEvent.change(field, { target: { value: "即时语义区间" } });
+    expect(screen.getByText("1. 即时语义区间")).toBeVisible();
+    const group = screen.getByRole("region", { name: "语义区间摘要" });
+    expect(group.querySelector("button")).toHaveAttribute(
+      "data-readiness-state",
+      "incomplete"
+    );
+    fireEvent.click(screen.getByText("语言识别"));
+    await waitFor(() =>
+      expect(router.state.location.pathname).toContain("/basics")
+    );
+    expect(screen.getByText("1. 即时语义区间")).toBeVisible();
+    expect(screen.queryByText("当前词条")).toBeNull();
+    expect(api.saveMeaningsStepV3).not.toHaveBeenCalled();
+    expect(api.saveFormsStepV3).not.toHaveBeenCalled();
+    expect(api.validateV3).not.toHaveBeenCalled();
+    expect(api.getAny).toHaveBeenCalledTimes(1);
+  });
+
   it("renders the V3 basics route with the established V2 first-step structure instead of a placeholder card", async () => {
     const current = word();
     const api = source({ word: current, retired_stable_nodes: [] });
@@ -214,9 +241,9 @@ describe("WordWizardV3Page", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("所属语言｜英美区分")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /返回智能词库/ })).toBeVisible();
-    expect(screen.getByText("当前词条")).toBeVisible();
+    expect(screen.queryByText("当前词条")).toBeNull();
     expect(screen.getByText("完成情况")).toBeVisible();
-    expect(screen.getByText("方言识别")).toBeVisible();
+    expect(screen.getByText("语言识别")).toBeVisible();
     expect(screen.getByText("录入与检测")).toBeInTheDocument();
     expect(screen.getByText("词典检测结果")).toBeInTheDocument();
     expect(
@@ -310,7 +337,8 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(source({ word: current, retired_stable_nodes: [] }))
     );
 
-    expect(await screen.findByText("完成检测后显示")).toBeVisible();
+    expect(await screen.findByText("完成情况")).toBeVisible();
+    expect(screen.queryByText("完成检测后显示")).toBeNull();
     expect(screen.getByText("未找到内置词典建议")).toBeVisible();
     expect(screen.queryByText(/未命名词条/)).toBeNull();
     expect(screen.getByLabelText("录入词条")).toHaveValue("");
@@ -323,7 +351,7 @@ describe("WordWizardV3Page", () => {
         matched_surfaces: ["未命名词条", "surface fallback"],
         strategy_version: "v3"
       },
-      forms: { pos: [] },
+      forms: formsFixture({ pos_id: uuidFromInt(502) }),
       meanings: {
         sense_groups: [
           { id: uuidFromInt(501), name_zh: "动作", name_en: "action" }
@@ -395,10 +423,10 @@ describe("WordWizardV3Page", () => {
     expect(await screen.findByLabelText("录入词条")).toHaveValue(
       "surface fallback"
     );
-    expect(screen.getByRole("button", { name: /语义区间1\/1/ })).toBeVisible();
-    expect(screen.getByRole("button", { name: /语法结构1\/1/ })).toBeVisible();
-    expect(screen.getByRole("button", { name: /多维词义1\/1/ })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: /多维例句1\/1/ }));
+    expect(screen.getByRole("button", { name: /语义区间.*1/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /语法结构.*1/ })).toBeVisible();
+    expect(screen.getByRole("button", { name: /多维词义.*1/ })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: /多维例句.*1/ }));
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(
         `/words/${WORD_ID}/v3/wizard/meanings`
@@ -448,14 +476,14 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
-    expect(await screen.findByText("centre")).toBeInTheDocument();
+    expect(await screen.findByText("centre · 词形与发音")).toBeInTheDocument();
     expect(screen.getByText("STEP 02")).toBeVisible();
-    expect(screen.getByText("当前词条")).toBeVisible();
+    expect(screen.queryByText("当前词条")).toBeNull();
     expect(screen.getByText("完成情况")).toBeVisible();
     expect(document.querySelector(".word-creation-page")).not.toBeNull();
     expect(document.querySelector(".word-creation-stepper")).not.toBeNull();
     expect(document.querySelector(".word-creation-summary")).not.toBeNull();
-    expect(screen.getByText("名词")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /名词/u })).toBeInTheDocument();
     expect(screen.getByText("上一步").closest("button")).toBeVisible();
     expect(
       screen.getByRole("button", { name: "保存草稿" })

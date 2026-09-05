@@ -18,8 +18,6 @@ export interface DropdownTool {
   /** 按钮上的当前值（当前时长、已启用音色数…），让工具栏顺带成为状态条。 */
   summary?: string;
   icon?: ReactNode;
-  /** 跟在名字后面的一小块内容，语法结构用它显示当前分类的色块。 */
-  trailing?: ReactNode;
   /** 没有面板的工具（如「文本」）不传，渲染成一枚普通开关按钮。 */
   content?: ReactNode;
   /** 触发按钮的附加类名，用于语法结构那枚按钮取当前分类的颜色。 */
@@ -163,7 +161,6 @@ export function MarkupPanel({
                 >
                   {tool.icon}
                   {tool.label}
-                  {tool.trailing}
                   {tool.summary !== undefined && (
                     <span className="tsz-ve-tool-summary">{tool.summary}</span>
                   )}

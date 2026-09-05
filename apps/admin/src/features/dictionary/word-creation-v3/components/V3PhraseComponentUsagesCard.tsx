@@ -545,7 +545,13 @@ export function V3PhraseComponentUsagesCard({
       <div
         aria-label="短语单词选择区"
         className="v3-sentence-target-discovery-tokens"
-        style={{ marginTop: 0 }}
+        style={{
+          marginTop: 9,
+          padding: 0,
+          border: "none",
+          borderRadius: 0,
+          background: "transparent"
+        }}
       >
         {tokens.map((token, index) => {
           const targets = selectionsByLiteral.get(token) ?? [];

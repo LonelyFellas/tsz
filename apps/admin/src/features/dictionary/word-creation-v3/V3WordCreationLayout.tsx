@@ -1,19 +1,18 @@
-import { Alert, Button, Flex, Tag } from "antd";
+import { Alert, Button, Flex } from "antd";
 import type {
   AdminWordV3,
+  PartOfSpeechCatalogItem,
   DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   V3DraftValidationIssue,
   WordCreationStep
 } from "@tsz/types";
 import type { ReactNode } from "react";
-import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "./components/V3ProductProgressList";
 import type { V3IssueNavigationTarget } from "./issueNavigation";
 import type { V3Problem } from "./problem";
 import { buildV3ProductProgress } from "./readiness";
-import { wordStatusLabel } from "./presentation";
 import { v3IssueMessages } from "./presentationErrors";
 import "./v3-layout.css";
 
@@ -39,6 +38,7 @@ export type V3ConflictComparison = (
 
 interface Props {
   word: AdminWordV3;
+  partOfSpeechCatalog?: readonly PartOfSpeechCatalogItem[];
   activeStep: WordCreationStep;
   reachableSteps?: ReadonlySet<WordCreationStep>;
   readOnly?: boolean;
@@ -113,57 +113,9 @@ function baseFormSummaryLabel(summary?: V3BaseFormSummary): string | undefined {
   return [...new Set([summary.uk, summary.us].filter(Boolean))].join(" / ");
 }
 
-function V3HeadwordSummary({
-  basis,
-  fallback,
-  summary
-}: {
-  basis?: AdminWordV3["detection_basis_dialect"];
-  fallback: string;
-  summary?: V3BaseFormSummary;
-}) {
-  const { preference } = useDialectPreference();
-  if (
-    !summary ||
-    summary.mode === "common" ||
-    !summary.uk ||
-    !summary.us ||
-    summary.uk === summary.us
-  ) {
-    return (
-      <div className="word-creation-summary-headword">
-        <span className="dialect-dot dialect-dot-common" />
-        <strong>{baseFormSummaryLabel(summary) ?? fallback}</strong>
-      </div>
-    );
-  }
-  const sides =
-    preference === "uk" ? (["uk", "us"] as const) : (["us", "uk"] as const);
-  return (
-    <Flex vertical gap={4}>
-      {sides.map((dialect, index) => (
-        <div
-          className={`word-creation-summary-headword${index === 0 ? "" : " word-creation-summary-alt"}`}
-          key={dialect}
-        >
-          <span className={`dialect-dot dialect-dot-${dialect}`} />
-          {index === 0 ? (
-            <strong>{summary[dialect]}</strong>
-          ) : (
-            <span>{summary[dialect]}</span>
-          )}
-          <small>
-            {dialect === "uk" ? "BrE" : "AmE"}
-            {basis === dialect ? " · 检测基准" : ""}
-          </small>
-        </div>
-      ))}
-    </Flex>
-  );
-}
-
 export function V3WordCreationLayout({
   word,
+  partOfSpeechCatalog,
   activeStep,
   reachableSteps,
   readOnly = false,
@@ -195,6 +147,9 @@ export function V3WordCreationLayout({
         ) ?? "新词条"));
   const progressRows = buildV3ProductProgress({
     wordId: word.id,
+    language: word.language,
+    partOfSpeechCatalog,
+    dirtySteps,
     completedSteps: word.completed_steps,
     forms: draftForms ?? word.forms,
     meanings: draftMeanings ?? word.meanings,
@@ -219,24 +174,7 @@ export function V3WordCreationLayout({
         wordExists: true,
         breadcrumbTitle: `${visibleLabel} · ${STEP_TITLE[activeStep]}`,
         completedSteps: word.completed_steps,
-        summaryHeadword: (
-          <V3HeadwordSummary
-            basis={word.detection_basis_dialect}
-            fallback={visibleLabel}
-            summary={baseFormSummary}
-          />
-        ),
-        // 草稿态不再挂状态标签：向导里本就只可能是草稿，标签没有信息量。
-        ...(activeStep === "preview" || word.status === "draft"
-          ? {}
-          : {
-              status: (
-                <Tag color="default" style={{ alignSelf: "flex-start" }}>
-                  {wordStatusLabel(word.status)}
-                  {word.has_unpublished_changes ? " · 有未发布修改" : ""}
-                </Tag>
-              )
-            }),
+        showEntrySummary: false,
         progress: (
           <V3ProductProgressList
             currentKey={currentProgressKey}
@@ -252,7 +190,9 @@ export function V3WordCreationLayout({
               index: row.index,
               key: row.key,
               label: row.label,
-              value: row.value ?? row.count
+              value: row.value ?? row.count,
+              details: row.details,
+              statusDescription: row.statusDescription
             }))}
           />
         )
