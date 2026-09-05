@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "fc2175858b79bbbf40c8a3c890abce4564d01077375c00ad92fd461af8b254af",
+  "_source_sha256": "713f6919ff7283f880c7669fa30f1cbd021beb88e0507e78e5c7d2c0eac5f3e8",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -1466,7 +1466,8 @@
       "properties": {
         "content": { "$ref": "#/$defs/RichTextV3" },
         "dialect": { "$ref": "#/$defs/Dialect" },
-        "id": { "type": "string", "format": "uuid" }
+        "id": { "type": "string", "format": "uuid" },
+        "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
       "additionalProperties": false
     },
@@ -2099,7 +2100,9 @@
           "required": ["start", "end", "type"],
           "properties": {
             "end": { "type": "integer", "minimum": 0 },
+            "end_len": { "type": "integer", "minimum": 1 },
             "start": { "type": "integer", "minimum": 0 },
+            "start_len": { "type": "integer", "minimum": 1 },
             "type": { "type": "string", "enum": ["liaison"] }
           }
         },
@@ -2154,7 +2157,9 @@
           "required": ["start", "end", "type"],
           "properties": {
             "end": { "type": "integer", "minimum": 0 },
+            "end_len": { "type": "integer", "minimum": 1 },
             "start": { "type": "integer", "minimum": 0 },
+            "start_len": { "type": "integer", "minimum": 1 },
             "type": { "type": "string", "enum": ["liaison"] }
           },
           "additionalProperties": false
@@ -2182,7 +2187,10 @@
         }
       ]
     },
-    "RichTextEmphasisLevel": { "type": "string", "enum": ["strong"] },
+    "RichTextEmphasisLevel": {
+      "type": "string",
+      "enum": ["strong", "function", "core", "grammar"]
+    },
     "RichTextHighlightColor": {
       "type": "string",
       "enum": ["yellow", "green", "pink", "blue", "orange"]
@@ -2240,7 +2248,7 @@
           "items": { "$ref": "#/$defs/RichTextSpanV3" },
           "maxItems": 2000
         },
-        "text": { "type": "string", "maxLength": 200 },
+        "text": { "type": "string", "maxLength": 5000 },
         "version": { "type": "integer", "enum": [1] }
       },
       "additionalProperties": false
@@ -2267,7 +2275,7 @@
           "items": { "$ref": "#/$defs/RichTextAnnotationV3" },
           "maxItems": 2000
         },
-        "text": { "type": "string", "maxLength": 200 },
+        "text": { "type": "string", "maxLength": 5000 },
         "version": { "type": "integer", "enum": [2] }
       },
       "additionalProperties": false
@@ -2284,7 +2292,8 @@
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
-        "value": { "$ref": "#/$defs/RichTextV3" }
+        "value": { "$ref": "#/$defs/RichTextV3" },
+        "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
       "additionalProperties": false
     },
@@ -3177,8 +3186,22 @@
         "phrase_component_self_target",
         "phrase_component_target_unavailable",
         "phrase_component_target_nested",
-        "phrase_component_target_stale"
+        "phrase_component_target_stale",
+        "voice_profile_invalid"
       ]
+    },
+    "VoiceProfileV3": {
+      "type": "object",
+      "required": ["voice_ids", "rate_percent"],
+      "properties": {
+        "rate_percent": { "type": "integer", "maximum": 100, "minimum": -50 },
+        "voice_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 20
+        }
+      },
+      "additionalProperties": false
     },
     "WordBaseFormSlotV2": {
       "type": "object",

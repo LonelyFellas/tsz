@@ -20,12 +20,19 @@ export interface RichTextSpan {
 export type RichTextHighlightColor =
   "yellow" | "green" | "pink" | "blue" | "orange";
 
+/**
+ * 语音编辑器的「语法结构」三分类。
+ *
+ * `strong` 是三分类落地之前的存量取值，读到时按核心词理解；新内容只写后三个。
+ */
+export type RichTextEmphasisLevel = "strong" | "function" | "core" | "grammar";
+
 export type RichTextAnnotation =
   | {
       type: "emphasis";
       start: number;
       end: number;
-      level: "strong";
+      level: RichTextEmphasisLevel;
     }
   | {
       type: "phoneme";
@@ -38,6 +45,10 @@ export type RichTextAnnotation =
       type: "liaison";
       start: number;
       end: number;
+      /** 起点锚点占几个码点（默认 1）；多字母锚点靠它还原。 */
+      start_len?: number;
+      /** 终点锚点占几个码点（默认 1）。 */
+      end_len?: number;
     }
   | {
       type: "highlight";

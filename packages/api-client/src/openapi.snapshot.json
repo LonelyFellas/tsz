@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-03T13:05:01.130Z",
+  "_generatedAt": "2026-09-05T02:08:36.736Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2042,7 +2042,8 @@
         "phrase_component_self_target",
         "phrase_component_target_unavailable",
         "phrase_component_target_nested",
-        "phrase_component_target_stale"
+        "phrase_component_target_stale",
+        "voice_profile_invalid"
       ]
     },
     "RelatedWordSense": {
@@ -3567,7 +3568,11 @@
       "properties": {
         "content": { "$ref": "#/components/schemas/RichTextV3" },
         "dialect": { "$ref": "#/components/schemas/Dialect" },
-        "id": { "type": "string", "format": "uuid" }
+        "id": { "type": "string", "format": "uuid" },
+        "voice_profile": {
+          "$ref": "#/components/schemas/VoiceProfileV3",
+          "description": "缺省即「没配过」。未配置时不上 wire，存量内容重新序列化后逐字节不变。"
+        }
       },
       "additionalProperties": false
     },
@@ -3707,7 +3712,19 @@
           "required": ["start", "end", "type"],
           "properties": {
             "end": { "type": "integer", "minimum": 0 },
+            "end_len": {
+              "type": "integer",
+              "description": "终点锚点的宽度：锚点占 `[end - end_len, end)`。",
+              "default": 1,
+              "minimum": 1
+            },
             "start": { "type": "integer", "minimum": 0 },
+            "start_len": {
+              "type": "integer",
+              "description": "起点锚点的宽度：锚点占 `[start, start + start_len)`。",
+              "default": 1,
+              "minimum": 1
+            },
             "type": { "type": "string", "enum": ["liaison"] }
           }
         },
@@ -3768,7 +3785,19 @@
           "required": ["start", "end", "type"],
           "properties": {
             "end": { "type": "integer", "minimum": 0 },
+            "end_len": {
+              "type": "integer",
+              "description": "终点锚点的宽度：锚点占 `[end - end_len, end)`。",
+              "default": 1,
+              "minimum": 1
+            },
             "start": { "type": "integer", "minimum": 0 },
+            "start_len": {
+              "type": "integer",
+              "description": "起点锚点的宽度：锚点占 `[start, start + start_len)`。",
+              "default": 1,
+              "minimum": 1
+            },
             "type": { "type": "string", "enum": ["liaison"] }
           },
           "additionalProperties": false
@@ -3801,7 +3830,11 @@
       ],
       "discriminator": { "propertyName": "type" }
     },
-    "RichTextEmphasisLevel": { "type": "string", "enum": ["strong"] },
+    "RichTextEmphasisLevel": {
+      "type": "string",
+      "description": "语音编辑器的「语法结构」三分类。\n\n`Strong` 是三分类落地之前的存量取值，读到时按「核心词」理解；新内容只写\n`Function` / `Core` / `Grammar`。",
+      "enum": ["strong", "function", "core", "grammar"]
+    },
     "RichTextHighlightColor": {
       "type": "string",
       "enum": ["yellow", "green", "pink", "blue", "orange"]
@@ -3859,7 +3892,7 @@
           "items": { "$ref": "#/components/schemas/RichTextSpanV3" },
           "maxItems": 2000
         },
-        "text": { "type": "string", "maxLength": 200 },
+        "text": { "type": "string", "maxLength": 5000 },
         "version": { "type": "integer", "enum": [1] }
       },
       "additionalProperties": false
@@ -3886,7 +3919,7 @@
           "items": { "$ref": "#/components/schemas/RichTextAnnotationV3" },
           "maxItems": 2000
         },
-        "text": { "type": "string", "maxLength": 200 },
+        "text": { "type": "string", "maxLength": 5000 },
         "version": { "type": "integer", "enum": [2] }
       },
       "additionalProperties": false
@@ -3903,7 +3936,11 @@
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/components/schemas/TextOrigin" },
-        "value": { "$ref": "#/components/schemas/RichTextV3" }
+        "value": { "$ref": "#/components/schemas/RichTextV3" },
+        "voice_profile": {
+          "$ref": "#/components/schemas/VoiceProfileV3",
+          "description": "缺省即「没配过」。未配置时不上 wire，存量内容重新序列化后逐字节不变。"
+        }
       },
       "additionalProperties": false
     },
@@ -4053,6 +4090,25 @@
       "properties": {
         "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
         "schema_version": { "type": "integer", "enum": [3] }
+      },
+      "additionalProperties": false
+    },
+    "VoiceProfileV3": {
+      "type": "object",
+      "description": "这段文本将来合成语音时用的配置：启用哪几个发音人、语速多少。\n\n`voice_ids` 存的是 `/speech/voices` 的 `alias`。发音人清单来自外部 TTS 供应商，\nalias 可能随供应商下线而失效，所以**不做外键式校验**——读到已下线的 alias 原样返回，\n由前端标为失效。`rate_percent` 只按全局区间校验，逐音色的窄区间在合成时才夹取。",
+      "required": ["voice_ids", "rate_percent"],
+      "properties": {
+        "rate_percent": {
+          "type": "integer",
+          "format": "int32",
+          "maximum": 100,
+          "minimum": -50
+        },
+        "voice_ids": {
+          "type": "array",
+          "items": { "type": "string" },
+          "maxItems": 20
+        }
       },
       "additionalProperties": false
     },
