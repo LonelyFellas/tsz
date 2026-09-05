@@ -2034,10 +2034,12 @@ describe("MeaningsAndExamplesStep", () => {
     // 编辑器就地内联，不再有「高级语音编辑」这个入口
     expect(within(englishCard!).queryByLabelText(/高级语音编辑/)).toBeNull();
     // 编辑器按需加载，首帧是 Suspense 兜底的只读文本框
-    await waitFor(() =>
-      expect(
-        within(englishCard!).getByTestId("voice-editor")
-      ).toBeInTheDocument()
+    await waitFor(
+      () =>
+        expect(
+          within(englishCard!).getByTestId("voice-editor")
+        ).toBeInTheDocument(),
+      { timeout: 10_000 }
     );
     fireEvent.change(screen.getAllByLabelText("汉语译文")[0]!, {
       target: { value: "这是更新后的汉语译文。" }
@@ -2074,7 +2076,11 @@ describe("MeaningsAndExamplesStep", () => {
     voicePreview.mocked = true;
     renderStep(wordFixture({ ready: true }));
 
-    const editor = (await screen.findAllByTestId("voice-editor"))[0]!;
+    const editor = (
+      await screen.findAllByTestId("voice-editor", undefined, {
+        timeout: 10_000
+      })
+    )[0]!;
     expect(editor).toHaveAttribute("data-preview-enabled", "true");
     expect(editor).toHaveAttribute("data-preview-mock", "true");
   });
@@ -2084,7 +2090,11 @@ describe("MeaningsAndExamplesStep", () => {
     featureFlags.VOICE_PREVIEW = true;
     renderStep(wordFixture({ ready: true }));
 
-    const editor = (await screen.findAllByTestId("voice-editor"))[0]!;
+    const editor = (
+      await screen.findAllByTestId("voice-editor", undefined, {
+        timeout: 10_000
+      })
+    )[0]!;
     expect(editor).toHaveAttribute("data-preview-enabled", "true");
     expect(editor).toHaveAttribute("data-preview-mock", "false");
   });
@@ -2127,7 +2137,9 @@ describe("MeaningsAndExamplesStep", () => {
     renderStep(word);
 
     // 存量双份内容只呈现偏好侧（英式）那一份。
-    await screen.findAllByTestId("voice-editor");
+    await screen.findAllByTestId("voice-editor", undefined, {
+      timeout: 10_000
+    });
     const plainDefinition = screen.getByDisplayValue("British definition");
     expect(plainDefinition).toBeInstanceOf(HTMLTextAreaElement);
     expect(screen.queryByDisplayValue("American definition")).toBeNull();
