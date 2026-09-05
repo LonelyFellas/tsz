@@ -1071,6 +1071,84 @@ describe("VoiceEditor 发音区", () => {
     expect(AudioMock.instances).toHaveLength(1);
   });
 
+  it("勾选音色与调语速都抛出 voice_profile", async () => {
+    const onVoiceProfileChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({ previewAdapter: adapter(), onVoiceProfileChange })}
+      />
+    );
+    openVoices();
+    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+
+    // 没动过之前不抛：未配置时「全部」在 wire 上没有表示法，
+    // 固化成当天的清单会让以后新增的音色落不进来。
+    expect(onVoiceProfileChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText("启用 Sonia · 英式女声"));
+    expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+      voice_ids: ["guy"],
+      rate_percent: 0
+    });
+
+    openTool("语速");
+    fireEvent.click(button("语速 1.25 倍"));
+    expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+      voice_ids: ["guy"],
+      rate_percent: 25
+    });
+  });
+
+  it("传入的 voice_profile 回填到面板上", async () => {
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: adapter(),
+          voiceProfile: { voice_ids: ["guy"], rate_percent: -25 }
+        })}
+      />
+    );
+    // 已配过就不必等清单拉回来才报数
+    expect(
+      document.querySelector('[aria-label="语速"]')!.textContent
+    ).toContain("0.75×");
+
+    openVoices();
+    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+    expect(screen.getByLabelText("启用 Sonia · 英式女声")).not.toBeChecked();
+    expect(screen.getByLabelText("启用 Guy · 美式男声")).toBeChecked();
+  });
+
+  it("父组件把 voice_profile 回灌下来时不重置面板", async () => {
+    const onVoiceProfileChange = vi.fn();
+    const view = props({ previewAdapter: adapter(), onVoiceProfileChange });
+    const { rerender } = render(<VoiceEditor {...view} />);
+    openVoices();
+    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+    fireEvent.click(screen.getByLabelText("启用 Sonia · 英式女声"));
+
+    const emitted = onVoiceProfileChange.mock.calls.at(-1)![0];
+    rerender(<VoiceEditor {...view} voiceProfile={emitted} />);
+
+    expect(screen.getByLabelText("启用 Sonia · 英式女声")).not.toBeChecked();
+    expect(onVoiceProfileChange).toHaveBeenCalledTimes(1);
+  });
+
+  it("只读时不抛 voice_profile", async () => {
+    const onVoiceProfileChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: adapter(),
+          readOnly: true,
+          onVoiceProfileChange
+        })}
+      />
+    );
+    expect(document.querySelector('[aria-label="音色"]')).toBeDisabled();
+    expect(onVoiceProfileChange).not.toHaveBeenCalled();
+  });
+
   it("没有 TTS 适配器时在音色面板里给出说明而不是空白", () => {
     render(<VoiceEditor {...props()} />);
     openVoices();
