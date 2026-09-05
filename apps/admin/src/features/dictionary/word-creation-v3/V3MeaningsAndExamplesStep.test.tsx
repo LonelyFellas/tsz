@@ -1179,9 +1179,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       ""
     ]);
     const row = container.querySelector(".word-sentence-row") as HTMLElement;
-    expect(
-      [...row.children].filter((child) => !child.hasAttribute("hidden"))
-    ).toHaveLength(5);
+    expect(row.children).toHaveLength(5);
     expect(row.children[0]).toHaveClass("word-number-cell");
     expect(row.children[0]).not.toHaveClass("word-sentence-index");
     expect(screen.getByLabelText("例句 1 等级")).not.toBeDisabled();
@@ -1838,48 +1836,6 @@ describe("V3MeaningsAndExamplesStep", () => {
     );
   });
 
-  it("关联编辑器隐藏时保留错误、重复和上下文 links 原样等待后续恢复", () => {
-    const initial = structuredClone(meaningsFixture);
-    initial.pos[0]!.senses[0]!.sentences[0]!.links = [
-      { word_id: "wrong-word", sense_id: "wrong-sense", role: "focus" },
-      { word_id: "entry-1", sense_id: "sense-1", role: "head" },
-      {
-        word_id: "existing-context-word",
-        sense_id: "existing-context-sense",
-        role: "context"
-      }
-    ];
-    const { container } = render(
-      <Harness initial={initial} wordId="entry-1" />
-    );
-    expect(
-      container.querySelector(".word-sentence-associations")
-    ).toHaveAttribute("hidden");
-    expect(value().pos[0]!.senses[0]!.sentences[0]!.links).toEqual(
-      initial.pos[0]!.senses[0]!.sentences[0]!.links
-    );
-  });
-
-  it("关联编辑器隐藏时不自动改写历史 head 或 context 角色", () => {
-    const headDraft = structuredClone(meaningsFixture);
-    const { unmount } = render(
-      <Harness initial={headDraft} wordId="entry-1" />
-    );
-    expect(value().pos[0]!.senses[0]!.sentences[0]!.links).toEqual(
-      headDraft.pos[0]!.senses[0]!.sentences[0]!.links
-    );
-    unmount();
-
-    const contextDraft = structuredClone(meaningsFixture);
-    contextDraft.pos[0]!.senses[0]!.sentences[0]!.links = [
-      { word_id: "entry-1", sense_id: "sense-1", role: "context" }
-    ];
-    render(<Harness initial={contextDraft} wordId="entry-1" />);
-    expect(value().pos[0]!.senses[0]!.sentences[0]!.links).toEqual(
-      contextDraft.pos[0]!.senses[0]!.sentences[0]!.links
-    );
-  });
-
   it("各 meanings 列表可重排并删除，删除释义组会解除 sense 引用", () => {
     const initial = structuredClone(meaningsFixture);
     initial.sense_groups.push({
@@ -2411,10 +2367,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   it("页内编辑正文不改动底层 links", () => {
-    const { container } = render(<Harness wordId="entry-hidden-links" />);
-    const editor = container.querySelector(".word-sentence-associations");
-    expect(editor).not.toBeNull();
-    expect(editor).toHaveAttribute("hidden");
+    render(<Harness />);
 
     const linksBefore = structuredClone(
       value().pos[0]!.senses[0]!.sentences[0]!.links
@@ -2428,7 +2381,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value().pos[0]!.senses[0]!.sentences[0]!.links).toEqual(linksBefore);
   });
 
-  it("使用后端 node/field 规范暴露 rich-text、grammar 与 sentence-link locators", () => {
+  it("使用后端 node/field 规范暴露 rich-text 与 grammar locators", () => {
     const initial = structuredClone(meaningsFixture);
     initial.pos[0]!.senses[0]!.definitions.push({
       id: "definition-en-1",
@@ -2449,8 +2402,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       '[data-v3-node-id="grammar-1"][data-v3-field="variants"]',
       '[data-v3-node-id="definition-en-variant-1"][data-v3-field="value"]',
       '[data-v3-node-id="sentence-en-1"][data-v3-field="value"]',
-      '[data-v3-node-id="sentence-zh-1"][data-v3-field="zh_translations"]',
-      '[data-v3-node-id="sentence-1"][data-v3-field="links"]'
+      '[data-v3-node-id="sentence-zh-1"][data-v3-field="zh_translations"]'
     ]) {
       expect(container.querySelector(selector)).not.toBeNull();
     }

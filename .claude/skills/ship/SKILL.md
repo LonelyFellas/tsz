@@ -7,12 +7,13 @@ description: 把当前工作区的代码改动经「审查 → 提交 → 推送
 
 把当前未提交/未推送的改动，经过审查后安全地送上远程仓库并开 PR。
 
-**核心原则：这个 skill 是「质量门 + 编排」，不重复跑「慢校验」。**
-- typecheck 由 lefthook `pre-push` 负责；**e2e 由 CI 的 e2e job 负责**（本地不跑，太慢），
-  本 skill 都**不**自己跑。
-- 单元/集成测试套件 `test:cov`（vitest，全 monorepo + 覆盖率）**会在审查阶段跑一次**，
-  用来产出测试质量与覆盖率的评估依据、并尽早暴露破坏；pre-push 会再作为最终门跑一遍，
-  这点冗余是「绝不绕过钩子」的必要代价，且 vitest 很快，可接受。
+**核心原则：这个 skill 是「质量门 + 编排」，不重复跑「慢校验」，审查力度按改动右尺寸。**
+- typecheck 与全量 `test:cov` 由 lefthook `pre-push` 负责；**e2e 由 CI 的 e2e job 负责**
+  （本地不跑，太慢）。以上三项，本 skill 都**不**自己跑。
+- 审查阶段只跑**受影响包/路径**的 vitest（见 B 维度），目的是尽早暴露破坏；全量套件与
+  覆盖率报告留给 pre-push 那一次。覆盖率自 2026-08-31 起不设百分比门槛，报告只用来找盲区，
+  审查阶段没有理由为「拿个覆盖率数字」再全量跑一遍。
+- code-review **必跑**，但 effort 按 diff 分级（见 C 维度）；它与 B 的测试**并行起跑**。
 - 其余 hooks 管不到的环节（多维评估、安全、分支保护、规范提交、PR）由本 skill 补齐。
 
 ## 不可逾越的红线
@@ -49,24 +50,46 @@ description: 把当前工作区的代码改动经「审查 → 提交 → 推送
 先看 `git diff` 判断改动触及哪些面，再逐维度评估。**不要把不相关的维度硬跑一遍**——
 后端/配置改动谈不上 SEO，纯文案改动谈不上组件拆分。最后产出一张评估表（见下）。
 
+**B 与 C 并行起跑**：两者互不依赖，先发起 C 的 `/code-review`（它在后台跑），随即用 Bash 跑 B 的
+vitest，两边结果都回来再一起汇总，别串行干等。
+
 **A. 测试质量与边缘用例 —— 改动含逻辑代码时**
 - 找到本次改动对应的测试；缺测试的逻辑直接标「缺测试」。
 - 审查是否覆盖：边界值（空/null/0/越界）、错误与异常路径、并发/竞态、
   权限分支、非预期输入。仅有 happy-path 视为不达标。
 - 缺口默认补上对应用例（小而准），大范围补测先列给用户。
 
-**B. 全量测试套件 —— 改动含代码时**
-- 跑一次 `pnpm test:cov`（全 monorepo 单元/集成 + 覆盖率阈值）。**不跑 e2e**（留给 CI）。
-- 红 → 先修到全绿再往下；覆盖率掉 → 评估是否补测。
-- 目的：尽早暴露「本次改动是否打挂了项目里别处的用例」。
+**B. 受影响测试 —— 改动含代码时**
+- 只跑受影响包/路径的 vitest，**不在这一步跑全量 `pnpm test:cov`**（留给 pre-push 钩子，
+  钩子照常跑、绝不绕过）。**不跑 e2e**（留给 CI）。按 diff 圈范围：
+  - 改动落在单个包内：`pnpm --filter <pkg> exec vitest run <paths>`
+    （如 `pnpm --filter @tsz/admin exec vitest run src/features/dictionary`；省略路径即整包）。
+  - 改到被多包依赖的 `packages/*`（shared/types/api-client/ui）：连下游包一起跑
+    （`pnpm --filter @tsz/shared --filter @tsz/web --filter @tsz/admin exec vitest run`）；
+    范围拿不准就 `pnpm test`（全量但不带覆盖率，仍比 test:cov 快）。
+- 红 → 先修到全绿再往下。
+- 目的：尽早暴露「本次改动是否打挂了别处的用例」。覆盖率盲区看 pre-push 时 `test:cov`
+  出的报告即可，这一步不产出覆盖率数字。
 
-**C. 代码质量 —— 改动含代码时**
-- 调用 `/code-review`（默认 effort，针对当前 diff）：正确性 bug + 可读性/命名/死代码。
+**C. 代码质量 —— 改动含代码时（必跑，effort 按 diff 分级）**
+- 一律**真跑** `/code-review`（针对当前 diff），不用自查代替；但档位按改动右尺寸，
+  **每次显式带 effort 参数**——不带参数时 code-review 会沿用上次用过的档位，容易一直卡在 xhigh：
+
+  | 改动性质 | 档位 | 调用 |
+  |---|---|---|
+  | 纯样式/文案/测试断言/文档，且增删合计 ≲ 80 行（看 `git diff --stat`） | 低，单轮 | `/code-review low` |
+  | 一般逻辑改动（组件交互、本地 state、工具函数、常规页面对接） | 默认 | `/code-review medium` |
+  | 鉴权/会话、数据层与 `@tsz/types` 镜像、api-client 契约、删功能/下线链路、跨包公共逻辑 | 最高 | `/code-review xhigh` |
+
+- 混合改动按其中**最重的部分**定档；纯样式/文案超过 80 行升到 medium。
+- 审的是正确性 bug + 自带的 Reuse/Simplification/Efficiency/Altitude 清理角度
+  （D 维度的复用/拆分判断也靠它，不再单独调 `/simplify`）。
 - bug 默认修掉；其余建议列给用户。
 
 **D. 组件复用与拆分 —— 改动含组件/可复用逻辑时**
-- 调用 `/simplify` 或人工审查：是否重复造轮子、巨型组件/函数是否该拆、
-  props 是否过载、抽象层级是否一致。
+- **不再单独调 `/simplify`**：重复造轮子、巨型组件/函数该不该拆、props 是否过载、抽象层级
+  是否一致，这些已由 C 的 code-review 自带的 Reuse/Simplification/Efficiency/Altitude 角度覆盖，
+  直接沿用它的发现。本维度只做下面这张**按端复用来源**的人工清单。
 - 复用来源**按端区分**（两端 UI 栈已分叉，见「项目事实速查」）：
   - 通用（两端同查）：逻辑 `@tsz/shared`、类型 `@tsz/types`、请求 `@tsz/api-client`。
   - **web**：UI 复用优先 `@tsz/ui`。
@@ -103,8 +126,8 @@ description: 把当前工作区的代码改动经「审查 → 提交 → 推送
 | 维度 | 状态 | 结论 |
 |---|---|---|
 | A 测试质量/边缘 | ✅/⚠️/⏭️跳过 | … |
-| B 全量测试套件 | ✅/❌/⏭️ | 覆盖率 xx% |
-| C 代码质量 | … | … |
+| B 受影响测试 | ✅/❌/⏭️ | 跑了哪些包/路径，绿/红 |
+| C 代码质量 | … | 用的档位 + 结论 |
 | D 复用/拆分 | … | … |
 | E 性能 | … | … |
 | F SEO | … | … |
@@ -137,7 +160,8 @@ A–G 是逐维度找问题，这一步把改动当**一个整体**快速扫一�
   失败就修，别绕。
 
 ### 6. 推送
-- `git push -u origin <branch>`，**正常推，让 lefthook pre-push 跑 typecheck / test:cov**。
+- `git push -u origin <branch>`，**正常推，让 lefthook pre-push 跑 typecheck / test:cov**
+  （全量套件与覆盖率报告只在这里跑这一次）。
 - 失败处理：
   - 读完整 hook 输出，判断是哪一道（typecheck / test:cov）挂了。
   - 修复根因 → 必要时 `git commit --amend` 或追加提交 → 重推。
@@ -155,15 +179,18 @@ A–G 是逐维度找问题，这一步把改动当**一个整体**快速扫一�
 ## 项目事实速查
 - pnpm + turbo monorepo；Node = 24.19.0。
 - 钩子：pre-commit=prettier+eslint(按包)，commit-msg=commitlint(conventional)，pre-push=typecheck+test:cov。
-- e2e 很慢，本地不跑（pre-push 也不跑），交给 CI 的 e2e job 兜底；test:cov 在审查阶段跑一次用于评估。
+- e2e 很慢，本地不跑（pre-push 也不跑），交给 CI 的 e2e job 兜底；全量 test:cov 只在 pre-push 跑，
+  审查阶段只跑受影响包/路径的 vitest（`pnpm --filter <pkg> exec vitest run <paths>`）。
+- code-review 是 bundled skill，只能选 effort（low/medium/high/xhigh/max），改不了内部流程；
+  不带参数会沿用上次用过的档位，所以每次显式带。
 - 推送后若要合并，以 CI 全绿（含 e2e）为准，不以本地 hook 通过为准。
 - **两端技术栈已分叉，评估维度按端取清单（大部分流程仍通用）**：
   - **web（apps/web，C 端）**：Next App Router + tailwind + `@tsz/ui`，Apple 风设计体系
     （token #0071e3/rounded-3xl），对用户体验、性能、SEO 有硬要求。
   - **admin（apps/admin，内部后台）**：Vite + React Router + TanStack Query + antd v6
     （ConfigProvider 品牌蓝 #0071e3），**不用** tailwind/`@tsz/ui`，视觉以 antd 默认为准；
-    无 SEO 要求；`apps/admin/src` 有 90% 单测覆盖率门槛（根 vitest.config），
-    mock/装配文件按约定加 coverage exclude + TODO。
+    无 SEO 要求；覆盖率自 2026-08-31 起不设百分比门槛（根 vitest.config 只出报告），
+    mock/装配文件仍按约定加 coverage exclude + TODO。
 - 复用优先：逻辑 `@tsz/shared`、类型 `@tsz/types`（snake_case 镜像后端 wire 格式）、
   请求 `@tsz/api-client`；UI 复用按端（web→`@tsz/ui`，admin→antd）。
 - 默认分支 `main`，走 PR 流程，CI 兜底。

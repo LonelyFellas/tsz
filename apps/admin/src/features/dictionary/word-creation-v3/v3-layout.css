@@ -179,14 +179,6 @@
   }
 }
 
-/* 共享窄容器规则靠 `> .ant-space:last-child` 把操作列推到右侧，而例句行结构上的末子
-   现在是 hidden 的旧关联编辑器（:last-child 不看 display），按类名把右对齐补回来。 */
-@container (max-width: 640px) {
-  .v3-meanings-v2 .word-sentence-row > .word-sort-actions {
-    justify-content: flex-end;
-  }
-}
-
 /* 待建条提示收进输入框右侧，和 status="warning" 的黄框同色。 */
 .v3-meanings-v2 .word-relation-pending-icon {
   color: #d48806;
