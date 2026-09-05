@@ -1,3 +1,4 @@
+import type { RichTextEmphasisLevel } from "./rich-text";
 import type {
   AdminWordListPage,
   AdminWordStatus,
@@ -146,7 +147,7 @@ export type RichTextAnnotationV3 =
       type: "emphasis";
       start: number;
       end: number;
-      level: "strong";
+      level: RichTextEmphasisLevel;
     }
   | {
       type: "phoneme";
@@ -159,6 +160,10 @@ export type RichTextAnnotationV3 =
       type: "liaison";
       start: number;
       end: number;
+      /** 起点锚点占几个码点（默认 1）；多字母锚点靠它还原。 */
+      start_len?: number;
+      /** 终点锚点占几个码点（默认 1）。 */
+      end_len?: number;
     }
   | {
       type: "highlight";
@@ -837,7 +842,8 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "phrase_component_self_target",
   "phrase_component_target_unavailable",
   "phrase_component_target_nested",
-  "phrase_component_target_stale"
+  "phrase_component_target_stale",
+  "voice_profile_invalid"
 ] as const;
 
 export type V3ValidationIssueCode = (typeof V3_VALIDATION_ISSUE_CODES)[number];

@@ -1,4 +1,8 @@
-import type { RichTextAnnotation, RichTextV2 } from "@tsz/types";
+import type {
+  RichTextAnnotation,
+  RichTextEmphasisLevel,
+  RichTextV2
+} from "@tsz/types";
 import { normalizeGrammarLevel } from "./roles";
 
 /** 一个词在码点序列中的位置，左闭右开。 */
@@ -92,6 +96,27 @@ export function offsetToAnchor(
     (candidate) => position >= candidate.start && position < candidate.end
   );
   return token ? makeAnchor(token.index, position - token.start) : undefined;
+}
+
+/**
+ * 把单字母锚点按 wire 上记的宽度展开成多字母锚点。
+ *
+ * 只在这些码点确实同属一个词时展开：宽度越过词边界说明数据与当前正文对不上，
+ * 这时退回单字母，宁可画短一点也不要画到别的词身上。
+ */
+function widenAnchor(
+  tokens: Token[],
+  anchor: LiaisonAnchor | undefined,
+  from: number,
+  length: number
+): LiaisonAnchor | undefined {
+  if (!anchor || length <= 1) return anchor;
+  const token = tokens[anchor.token];
+  if (!token || from + length > token.end) return anchor;
+  return {
+    token: anchor.token,
+    offsets: Array.from({ length }, (_, index) => from - token.start + index)
+  };
 }
 
 /** 锚点选中的字母，用于「起点 / 终点」那行回显。 */
@@ -220,21 +245,24 @@ export function tokenize(text: string): Token[] {
 }
 
 /**
- * 连读落到 wire 是一段区间：起点锚点的首字母 → 终点锚点的末字母（右开）。
- *
- * TODO(契约): RichTextV2 的 liaison 只有 {start, end} 两个数，存不下两个锚点
- * 各自的宽度。多字母锚点在编辑期完整可用，但保存后重新载入只能还原成两端的
- * 单字母锚点（弧线端点约偏移半个字母）。要完整保真需后端为 liaison 增加端点
- * 长度字段。
+ * 连读落到 wire 是一段区间（起点锚点首字母 → 终点锚点末字母，右开），外加两端
+ * 各自的宽度——后端已为此加了 start_len / end_len，多字母锚点因此能完整往返。
  */
 function liaisonRange(
   tokens: Token[],
   link: LiaisonLink
-): { start: number; end: number } | undefined {
+):
+  | { start: number; end: number; start_len: number; end_len: number }
+  | undefined {
   const start = anchorRange(tokens, link.start);
   const end = anchorRange(tokens, link.end);
   if (!start || !end || end.end <= start.start) return undefined;
-  return { start: start.start, end: end.end };
+  return {
+    start: start.start,
+    end: end.end,
+    start_len: start.end - start.start,
+    end_len: end.end - end.start
+  };
 }
 
 /** 停顿插在左词末尾之后。 */
@@ -258,15 +286,15 @@ export function marksToAnnotations(
       type: "emphasis",
       start: token.start,
       end: token.end,
-      // wire 仍锁死 "strong"；三分类只活在编辑态，待后端放开枚举后改为透传 level。
-      level: "strong"
+      // 三分类直接落盘（后端枚举已放开）；存量 "strong" 读回时按核心词理解。
+      level: level as RichTextEmphasisLevel
     });
   }
 
   for (const link of marks.liaisons) {
     const range = liaisonRange(tokens, link);
     if (!range) continue;
-    annotations.push({ type: "liaison", start: range.start, end: range.end });
+    annotations.push({ type: "liaison", ...range });
   }
 
   for (const [rawGap, durationMs] of Object.entries(marks.pauses)) {
@@ -309,8 +337,24 @@ export function annotationsToMarks(value: RichTextV2): MarkState {
         }
       }
     } else if (annotation.type === "liaison") {
-      const start = offsetToAnchor(tokens, annotation.start);
-      const end = offsetToAnchor(tokens, annotation.end - 1);
+      /*
+       * 两端各自的宽度由 start_len / end_len 还原；缺省按 1 个码点，
+       * 这样三分类落地之前存的老数据仍读得回来。
+       */
+      const startLen = Math.max(1, annotation.start_len ?? 1);
+      const endLen = Math.max(1, annotation.end_len ?? 1);
+      const start = widenAnchor(
+        tokens,
+        offsetToAnchor(tokens, annotation.start),
+        annotation.start,
+        startLen
+      );
+      const end = widenAnchor(
+        tokens,
+        offsetToAnchor(tokens, annotation.end - endLen),
+        annotation.end - endLen,
+        endLen
+      );
       if (start && end && isValidLiaison({ start, end })) {
         liaisons.push({ start, end });
       }

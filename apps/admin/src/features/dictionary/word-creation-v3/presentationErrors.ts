@@ -79,7 +79,9 @@ const ISSUE_MESSAGES = {
   phrase_component_self_target: "成分用词不能关联短语自己",
   phrase_component_target_unavailable: "成分用词关联的词条已不可用，请重新选择",
   phrase_component_target_nested: "关联的短语自身含成分用词，只能再套一层",
-  phrase_component_target_stale: "关联的词条内容已变化，请重新选择"
+  phrase_component_target_stale: "关联的词条内容已变化，请重新选择",
+  voice_profile_invalid:
+    "音色或语速设置不合法，请重新选择音色并把语速调回 0.50×–2.00×"
 } satisfies Record<V3ValidationIssueCode, string>;
 
 export function v3IssueMessage(issue: V3DraftValidationIssue): string {

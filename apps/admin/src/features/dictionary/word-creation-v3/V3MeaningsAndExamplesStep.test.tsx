@@ -863,7 +863,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(content.text).toBe("a centre of the city");
     expect(content.version).toBe(2);
     expect(content.version === 2 ? content.annotations : []).toEqual([
-      { type: "emphasis", start: 2, end: 8, level: "strong" }
+      { type: "emphasis", start: 2, end: 8, level: "core" }
     ]);
   }, 15_000);
 

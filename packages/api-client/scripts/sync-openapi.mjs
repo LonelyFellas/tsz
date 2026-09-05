@@ -64,7 +64,17 @@ const SUPPORTED_SCHEMA_TYPES = new Set([
   "object",
   "string"
 ]);
+/*
+ * 纯注解关键字：不参与校验，直接丢掉。
+ *
+ * 收录标准是「忽略它不会让校验器放过本该拒绝的数据」——这也是这份白名单存在的意义：
+ * 对没明确处理过的关键字一律报错，免得静默吃掉某条校验语义。
+ *
+ * `default` 属于这一类：JSON Schema 里它是注解，不改变什么数据算合法（真正的默认值
+ * 由后端代码给）。后端给 liaison 的 start_len / end_len 标了 default: 1。
+ */
 const IGNORED_ANNOTATION_KEYWORDS = new Set([
+  "default",
   "deprecated",
   "description",
   "discriminator",
