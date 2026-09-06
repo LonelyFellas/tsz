@@ -216,6 +216,8 @@ function makeWord(
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     headwords,
     detection_snapshot: {
       detection_id: "detection-1",

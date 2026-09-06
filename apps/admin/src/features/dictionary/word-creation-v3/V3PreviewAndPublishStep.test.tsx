@@ -56,6 +56,8 @@ function word(
     status: "draft",
     revision: 7,
     lifecycle_revision: 2,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: true,
     presentation: {
       label: "learn / learnt",

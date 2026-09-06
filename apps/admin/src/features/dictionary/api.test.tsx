@@ -141,6 +141,8 @@ describe("dictionary React Query hooks", () => {
       pos_list: ["noun"],
       levels: ["A1"],
       status: "draft",
+      annotation: null,
+      annotation_revision: 1,
       has_unpublished_changes: false,
       max_reachable_step: "forms",
       created_by_name: "Admin",

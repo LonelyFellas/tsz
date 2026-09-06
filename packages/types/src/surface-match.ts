@@ -185,6 +185,9 @@ export interface RelationReferenceSummaryV3 {
 
 export interface MatchedEntryContextV3 {
   entry_id: string;
+  /** 同原型词条的区分标签，未标注为 null。 */
+  annotation: string | null;
+  annotation_revision: number;
   presentation: EntryPresentationV3;
   pos_labels: string[];
   gloss_previews: string[];

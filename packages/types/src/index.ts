@@ -17,6 +17,7 @@ export * from "./admin-audio-asset";
 export * from "./admin-word-v2";
 export * from "./admin-word-v3";
 export * from "./surface-match";
+export * from "./entry-annotation";
 export type {
   AdminWordKind,
   AdminWordListItem,
