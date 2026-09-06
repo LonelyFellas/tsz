@@ -35,6 +35,7 @@ const QUERY_CONTRACT_OPERATIONS = new Set([
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
+  "EntryAnnotationResponse",
   "AdminWordV3",
   "AdminWordAnyEnvelope",
   "AdminWordDraftAnyEnvelope",

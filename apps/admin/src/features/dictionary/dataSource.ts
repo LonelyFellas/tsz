@@ -40,6 +40,7 @@ type RealAdminWordsDataSource = Pick<
   | "deleteDraft"
   | "deleteBatch"
   | "relatedSearch"
+  | "updateAnnotation"
 >;
 
 export type AdminWordsDataSource = Omit<RealAdminWordsDataSource, "list"> & {
@@ -56,6 +57,7 @@ type RealAdminWordsAnyDataSource = Pick<
   | "archiveBatchAny"
   | "restoreBatchAny"
   | "relatedSearchAny"
+  | "updateAnnotation"
 >;
 
 export type AdminWordsAnyDataSource = Omit<
@@ -179,7 +181,9 @@ async function resolveAdminWordsAnyDataSource(): Promise<AdminWordsAnyDataSource
       source.archiveBatch(idempotencyKey, input),
     restoreBatchAny: (idempotencyKey, input) =>
       source.restoreBatch(idempotencyKey, input),
-    relatedSearchAny: (q, opts) => source.relatedSearch(q, opts)
+    relatedSearchAny: (q, opts) => source.relatedSearch(q, opts),
+    updateAnnotation: (entryId, input) =>
+      source.updateAnnotation(entryId, input)
   };
 }
 
@@ -271,7 +275,9 @@ export const adminWordsDataSource: AdminWordsDataSource = {
   deleteBatch: async (idempotencyKey, input) =>
     (await resolveAdminWordsDataSource()).deleteBatch(idempotencyKey, input),
   relatedSearch: async (q, opts) =>
-    (await resolveAdminWordsDataSource()).relatedSearch(q, opts)
+    (await resolveAdminWordsDataSource()).relatedSearch(q, opts),
+  updateAnnotation: async (entryId, input) =>
+    (await resolveAdminWordsDataSource()).updateAnnotation(entryId, input)
 };
 
 /**
@@ -312,7 +318,9 @@ export const adminWordsAnyDataSource: AdminWordsAnyDataSource = {
       input
     ),
   relatedSearchAny: async (q, opts) =>
-    (await resolveAdminWordsAnyDataSource()).relatedSearchAny(q, opts)
+    (await resolveAdminWordsAnyDataSource()).relatedSearchAny(q, opts),
+  updateAnnotation: async (entryId, input) =>
+    (await resolveAdminWordsAnyDataSource()).updateAnnotation(entryId, input)
 };
 
 async function requireSentenceAssociationMock(): Promise<

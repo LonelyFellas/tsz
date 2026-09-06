@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { wordKeys } from "@/features/dictionary/api";
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -75,20 +77,38 @@ describe("WordCreatePage", () => {
     ]
   ])("按 canonical schema 进入对应原生编辑器", (action, expected) => {
     const requests = {} as UnifiedCreateRequests;
+    const client = new QueryClient({
+      defaultOptions: { queries: { staleTime: 60_000 } }
+    });
+    const listKey = wordKeys.list({ page: 1 });
+    client.setQueryData(listKey, {
+      annotation: "1",
+      annotation_visible: false
+    });
+    client.setQueryData(wordKeys.detailAny("existing"), {
+      annotation_revision: 1
+    });
+    expect(client.getQueryState(listKey)?.isInvalidated).toBe(false);
     render(
-      <MemoryRouter initialEntries={["/words/new"]}>
-        <Routes>
-          <Route
-            path="/words/new"
-            element={<WordCreatePage requests={requests} />}
-          />
-          <Route path="*" element={<LocationProbe />} />
-        </Routes>
-      </MemoryRouter>
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/words/new"]}>
+          <Routes>
+            <Route
+              path="/words/new"
+              element={<WordCreatePage requests={requests} />}
+            />
+            <Route path="*" element={<LocationProbe />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
     );
 
     expect(wired.props?.requests).toBe(requests);
     fireEvent.click(screen.getByText(action));
     expect(screen.getByTestId("location")).toHaveTextContent(expected);
+    expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
+    expect(
+      client.getQueryState(wordKeys.detailAny("existing"))?.isInvalidated
+    ).toBe(true);
   });
 });

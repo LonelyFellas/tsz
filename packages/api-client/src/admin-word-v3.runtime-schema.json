@@ -1,8 +1,9 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "f90ed520b505389ed068cc11e69f9835554e520bde5d640392b87fbdf7a9bab7",
+  "_source_sha256": "c3f6a18ac3dba0dfb790cdf68c29d8638e83cfc037a582d1d8273d366c55006f",
   "roots": [
+    "EntryAnnotationResponse",
     "AdminWordV3",
     "AdminWordAnyEnvelope",
     "AdminWordDraftAnyEnvelope",
@@ -66,6 +67,7 @@
     "AdminWordListItem": {
       "type": "object",
       "required": [
+        "annotation_visible",
         "annotation",
         "annotation_revision",
         "schema_version",
@@ -91,6 +93,7 @@
       "properties": {
         "annotation": { "type": ["string", "null"] },
         "annotation_revision": { "type": "integer", "minimum": 1 },
+        "annotation_visible": { "type": "boolean" },
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": { "type": "string", "format": "uuid" },
         "created_by_name": { "type": "string" },
@@ -126,6 +129,7 @@
     "AdminWordListItemV3": {
       "type": "object",
       "required": [
+        "annotation_visible",
         "annotation",
         "annotation_revision",
         "schema_version",
@@ -150,6 +154,7 @@
       "properties": {
         "annotation": { "type": ["string", "null"] },
         "annotation_revision": { "type": "integer", "minimum": 1 },
+        "annotation_visible": { "type": "boolean" },
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": { "type": "string", "format": "uuid" },
         "created_by_name": { "type": "string" },
@@ -604,6 +609,7 @@
       "properties": {
         "builtin_dictionary": { "$ref": "#/$defs/BuiltinDictionaryEvidenceV3" },
         "detection_id": { "type": "string", "format": "uuid" },
+        "existing_draft_id": { "type": "string", "format": "uuid" },
         "expires_at": { "type": "string", "format": "date-time" },
         "matches": {
           "type": "array",
@@ -1099,6 +1105,16 @@
           "items": { "type": "string", "format": "uuid" }
         },
         "normalized_surface": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "EntryAnnotationResponse": {
+      "type": "object",
+      "required": ["entry_id", "annotation", "annotation_revision"],
+      "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "annotation_revision": { "type": "integer", "minimum": 1 },
+        "entry_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },

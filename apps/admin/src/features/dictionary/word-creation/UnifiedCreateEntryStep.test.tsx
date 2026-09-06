@@ -154,7 +154,10 @@ function v3PhraseDetection(
   });
 }
 
-function terminalV3Page(): SurfaceMatchPageV3 {
+function terminalV3Page(): Extract<
+  SurfaceMatchPageV3,
+  { surface_confirmation_token: string }
+> {
   return {
     schema_version: 3,
     snapshot_id: "snapshot-v3",
@@ -780,7 +783,7 @@ describe("UnifiedCreateEntryStep", () => {
     expect(screen.queryByText("词典音标：ˈsentə")).toBeNull();
   });
 
-  it("命中已有原形时二次确认后才创建新的独立词条", async () => {
+  it("命中已有原形时先经独立词条二次确认，再由创建事务判定是否需要标注", async () => {
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue({
       ...matchedV3Detection(),
@@ -800,18 +803,8 @@ describe("UnifiedCreateEntryStep", () => {
         name: "确认并创建，进入词形与发音"
       })
     );
-    expect(supplied.createV3).not.toHaveBeenCalled();
-    const dialog = await screen.findByRole("dialog");
-    expect(
-      within(dialog).getAllByText("确认创建新的独立词条？").length
-    ).toBeGreaterThan(0);
-    expect(
-      within(dialog).getByText(
-        "检测到智能词库已有相同原形。继续后将创建一个新的独立词条，不会修改已有词条。"
-      )
-    ).toBeInTheDocument();
-
-    fireEvent.click(within(dialog).getByRole("button", { name: "继续创建" }));
+    // 检测已摆出「已有原形」，创建前必须由管理员显式承认要另建一条。
+    fireEvent.click(await screen.findByText("继续创建"));
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
   });
 
@@ -1504,8 +1497,7 @@ describe("UnifiedCreateEntryStep", () => {
         name: "确认并创建，进入词形与发音"
       })
     );
-    const dialog = await screen.findByRole("dialog");
-    fireEvent.click(within(dialog).getByRole("button", { name: "继续创建" }));
+    fireEvent.click(await screen.findByText("继续创建"));
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
     expect(supplied.createV3).toHaveBeenCalledWith(
       expect.any(String),
@@ -1572,3 +1564,336 @@ describe("UnifiedCreateEntryStep", () => {
     expect(supplied.detectV3).not.toHaveBeenCalled();
   });
 });
+
+describe("真实词条标注创建", () => {
+  function conflict() {
+    return new HttpError(
+      409,
+      "annotation conflict",
+      [],
+      "annotation_conflict",
+      [],
+      {
+        annotation_conflict: {
+          reason: "required",
+          entries: v3BaseFormPage().matched_entry_contexts,
+          groups: [
+            {
+              dialect_scope: "us",
+              normalized_surface: "center",
+              entry_ids: v3BaseFormPage().matched_entry_contexts.map(
+                (entry) => entry.entry_id
+              )
+            }
+          ]
+        }
+      }
+    );
+  }
+
+  it("服务端分组打开弹窗，原子提交旧新标注，网络失败保留原key/body重试后直接onCreated", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
+    vi.mocked(supplied.createV3)
+      .mockRejectedValueOnce(conflict())
+      .mockRejectedValueOnce(new TypeError("offline"))
+      .mockResolvedValueOnce({ word: v3Word() });
+    const created = renderStep(supplied);
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    await screen.findByLabelText("统一主词");
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+    const dialog = await screen.findByRole("dialog");
+    const fields = within(dialog).getAllByPlaceholderText("请输入标注");
+    fireEvent.change(fields[0]!, { target: { value: " 001 " } });
+    fireEvent.change(fields[1]!, { target: { value: " 002 " } });
+    fireEvent.click(within(dialog).getByText("保存标注并创建"));
+    await screen.findByText("网络异常，创建结果未知。请原样重试。");
+    expect(fields[0]).toHaveValue(" 001 ");
+    expect(fields[0]).toBeDisabled();
+    const attempt = vi.mocked(supplied.createV3).mock.calls[1]!;
+    expect(attempt[1]).toMatchObject({
+      annotation: "002",
+      annotation_updates: [
+        {
+          entry_id: v3BaseFormPage().matched_entry_contexts[0]!.entry_id,
+          annotation: "001",
+          base_annotation_revision: 1
+        }
+      ]
+    });
+    expect(attempt[0]).toBe(vi.mocked(supplied.createV3).mock.calls[0]![0]);
+    fireEvent.click(within(dialog).getByText("保存标注并创建"));
+    await waitFor(() => expect(created).toHaveBeenCalledOnce());
+    expect(vi.mocked(supplied.createV3).mock.calls[2]).toEqual(attempt);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("取消不发送任何旧标注更新，再打开恢复服务端值", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
+    vi.mocked(supplied.createV3).mockRejectedValue(conflict());
+    renderStep(supplied);
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    await screen.findByLabelText("统一主词");
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getAllByPlaceholderText("请输入标注")[0]!, {
+      target: { value: "999" }
+    });
+    fireEvent.click(within(dialog).getByText(/取\s*消/));
+    expect(supplied.createV3).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+    const reopened = await screen.findByRole("dialog");
+    expect(
+      within(reopened).getAllByPlaceholderText("请输入标注")[0]
+    ).toHaveValue("");
+    expect(vi.mocked(supplied.createV3).mock.calls[1]![1]).not.toHaveProperty(
+      "annotation_updates"
+    );
+  });
+  it("标注提交遇到surface变化后保留标注并重确认，revision变化使用最新旧值", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
+    const newer = conflict();
+    newer.meta!.annotation_conflict!.reason = "revision_conflict";
+    newer.meta!.annotation_conflict!.entries[0]!.annotation = "003";
+    newer.meta!.annotation_conflict!.entries[0]!.annotation_revision = 2;
+    vi.mocked(supplied.createV3)
+      .mockRejectedValueOnce(conflict())
+      .mockRejectedValueOnce(
+        new HttpError(
+          409,
+          "surface",
+          [],
+          "surface_match_acknowledgement_required",
+          [],
+          {
+            surface_match_page: {
+              ...terminalV3Page(),
+              surface_confirmation_token: "new-token"
+            }
+          }
+        )
+      )
+      .mockRejectedValueOnce(newer)
+      .mockResolvedValueOnce({ word: v3Word() });
+    const created = renderStep(supplied);
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    await screen.findByLabelText("统一主词");
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+    const dialog = await screen.findByRole("dialog");
+    const fields = within(dialog).getAllByPlaceholderText("请输入标注");
+    fireEvent.change(fields[0]!, { target: { value: "001" } });
+    fireEvent.change(fields[1]!, { target: { value: "002" } });
+    fireEvent.click(within(dialog).getByText("保存标注并创建"));
+    await screen.findByText("匹配结果已更新，请重新确认后继续创建。");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("确认并创建，进入词形与发音"));
+    const latest = await screen.findByRole("dialog");
+    expect(within(latest).getAllByPlaceholderText("请输入标注")[0]).toHaveValue(
+      "003"
+    );
+    expect(within(latest).getByLabelText("新建词条标注")).toHaveValue("002");
+    const calls = vi.mocked(supplied.createV3).mock.calls;
+    expect(calls[2]![0]).not.toBe(calls[1]![0]);
+    expect(calls[2]![1]).toMatchObject({
+      annotation: "002",
+      confirmed_surface_match_token: "new-token"
+    });
+    fireEvent.click(within(latest).getByText("保存标注并创建"));
+    await waitFor(() => expect(created).toHaveBeenCalledOnce());
+    expect(calls[3]![1].annotation_updates?.[0]).toMatchObject({
+      annotation: "003",
+      base_annotation_revision: 2
+    });
+  });
+  it("服务端发现旧条其他原型重复时显示通用错误并保留输入供修改", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
+    const duplicate = conflict();
+    duplicate.meta!.annotation_conflict!.reason = "duplicate";
+    vi.mocked(supplied.createV3)
+      .mockRejectedValueOnce(conflict())
+      .mockRejectedValueOnce(duplicate)
+      .mockResolvedValueOnce({ word: v3Word() });
+    const created = renderStep(supplied);
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    await screen.findByLabelText("统一主词");
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+    const dialog = await screen.findByRole("dialog");
+    const fields = within(dialog).getAllByPlaceholderText("请输入标注");
+    fireEvent.change(fields[0]!, { target: { value: "001" } });
+    fireEvent.change(fields[1]!, { target: { value: "002" } });
+    fireEvent.click(within(dialog).getByText("保存标注并创建"));
+    await screen.findByText(
+      "标注与同原型词条重复，请修改；已有词条还可能关联其他原型。"
+    );
+    const currentFields = screen.getAllByPlaceholderText("请输入标注");
+    expect(currentFields[0]).toHaveValue("001");
+    expect(currentFields[1]).toHaveValue("002");
+    fireEvent.change(currentFields[0]!, { target: { value: "004" } });
+    fireEvent.click(screen.getByText("保存标注并创建"));
+    await waitFor(() => expect(created).toHaveBeenCalledOnce());
+    expect(
+      vi.mocked(supplied.createV3).mock.calls[2]![1].annotation_updates?.[0]
+        ?.annotation
+    ).toBe("004");
+  });
+});
+
+describe("空草稿创建冲突", () => {
+  it("duplicate_word 不显示稍后重试且不泄露不可见目标", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
+    vi.mocked(supplied.createV3).mockRejectedValue(
+      new HttpError(409, "duplicate", [], "duplicate_word")
+    );
+    renderStep(supplied);
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    fireEvent.click(await screen.findByText("创建并进入词形与发音"));
+    expect(
+      await screen.findByText("已有同名词条，无法重复创建。")
+    ).toBeInTheDocument();
+    expect(screen.queryByText("创建并进入词形与发音")).not.toBeInTheDocument();
+    expect(screen.queryByText(/稍后重试|原样重试创建/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "继续创建" })
+    ).not.toBeInTheDocument();
+    expect(supplied.createV3).toHaveBeenCalledTimes(1);
+  });
+});
+
+it("创建竞态返回可见空草稿时只提供继续入口，修改输入后可重新检测", async () => {
+  const supplied = requests();
+  vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
+  vi.mocked(supplied.createV3).mockRejectedValue(
+    new HttpError(409, "duplicate", [], "duplicate_word", [], {
+      word_id: "existing-draft"
+    })
+  );
+  renderStep(supplied);
+  fireEvent.change(input(), { target: { value: "center" } });
+  fireEvent.click(screen.getByText("词典检测"));
+  fireEvent.click(await screen.findByText("创建并进入词形与发音"));
+  expect(await screen.findByText("已有未完成草稿")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "继续创建" })).toHaveAttribute(
+    "href",
+    "/words/existing-draft/v3/wizard/forms"
+  );
+  expect(screen.queryByText("创建并进入词形与发音")).not.toBeInTheDocument();
+  expect(screen.queryByText(/稍后重试|原样重试创建/)).not.toBeInTheDocument();
+  expect(supplied.createV3).toHaveBeenCalledTimes(1);
+  fireEvent.change(input(), { target: { value: "other" } });
+  expect(
+    screen.queryByRole("link", { name: "继续创建" })
+  ).not.toBeInTheDocument();
+  vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection("other"));
+  fireEvent.click(screen.getByText("词典检测"));
+  expect(await screen.findByText("创建并进入词形与发音")).toBeEnabled();
+});
+
+it("检测到无已保存原形的空草稿时继续已有草稿，不重复创建或获取虚假原形", async () => {
+  const supplied = requests();
+  vi.mocked(supplied.detectV3).mockResolvedValue(
+    v3Detection("center", { existing_draft_id: "empty-draft" })
+  );
+  renderStep(supplied);
+  fireEvent.change(input(), { target: { value: "center" } });
+  fireEvent.click(screen.getByText("词典检测"));
+  expect(await screen.findByText("已有未完成草稿")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "继续创建" })).toHaveAttribute(
+    "href",
+    "/words/empty-draft/v3/wizard/forms"
+  );
+  expect(screen.getByText("未发现")).toBeInTheDocument();
+  expect(screen.queryByText("已发现")).not.toBeInTheDocument();
+  expect(screen.queryByText("创建并进入词形与发音")).not.toBeInTheDocument();
+  expect(supplied.createV3).not.toHaveBeenCalled();
+  expect(supplied.getWord).not.toHaveBeenCalled();
+  fireEvent.change(input(), { target: { value: "other" } });
+  expect(
+    screen.queryByRole("link", { name: "继续创建" })
+  ).not.toBeInTheDocument();
+});
+
+it("空草稿与已保存原形共存时保留原形结果、阻止创建且允许修改输入", async () => {
+  const supplied = requests();
+  vi.mocked(supplied.detectV3).mockResolvedValue(
+    v3Detection("center", {
+      existing_draft_id: "empty-draft",
+      requires_acknowledgement: true,
+      surface_match_page: v3BaseFormPage()
+    })
+  );
+  vi.mocked(supplied.getWord).mockResolvedValue({ word: existingV3Word() });
+  renderStep(supplied);
+  fireEvent.change(input(), { target: { value: "center" } });
+  fireEvent.click(screen.getByText("词典检测"));
+  expect(await screen.findByText("已有未完成草稿")).toBeInTheDocument();
+  expect(await screen.findByText("已发现")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "继续创建" })).toHaveAttribute(
+    "href",
+    "/words/empty-draft/v3/wizard/forms"
+  );
+  expect(
+    screen.queryByText("确认并创建，进入词形与发音")
+  ).not.toBeInTheDocument();
+  expect(supplied.createV3).not.toHaveBeenCalled();
+  expect(input()).toBeEnabled();
+  fireEvent.change(input(), { target: { value: "other" } });
+  expect(screen.queryByText("已有未完成草稿")).not.toBeInTheDocument();
+});
+
+it("原形确认后竞态空草稿冲突解除输入锁定，不再提交旧token", async () => {
+  const supplied = requests();
+  vi.mocked(supplied.detectV3).mockResolvedValue(
+    v3Detection("center", {
+      requires_acknowledgement: true,
+      surface_match_page: terminalV3Page()
+    })
+  );
+  vi.mocked(supplied.createV3).mockRejectedValue(
+    new HttpError(409, "duplicate", [], "duplicate_word", [], {
+      word_id: "empty-draft"
+    })
+  );
+  renderStep(supplied);
+  fireEvent.change(input(), { target: { value: "center" } });
+  fireEvent.click(screen.getByText("词典检测"));
+  const create = await screen.findByText("确认并创建，进入词形与发音");
+  await waitFor(() => expect(create.closest("button")).toBeEnabled());
+  fireEvent.click(create);
+  expect(await screen.findByText("已有未完成草稿")).toBeInTheDocument();
+  expect(input()).toBeEnabled();
+  expect(
+    screen.queryByText("确认并创建，进入词形与发音")
+  ).not.toBeInTheDocument();
+  expect(supplied.createV3).toHaveBeenCalledTimes(1);
+});
+
+it.each(["unavailable", "unknown-pos"])(
+  "可见空草稿续编不依赖新建准备状态：%s",
+  async (condition) => {
+    const supplied = requests();
+    const detection = matchedV3Detection();
+    detection.existing_draft_id = "empty-draft";
+    if (condition === "unavailable")
+      detection.builtin_dictionary = { status: "unavailable" };
+    else if (detection.builtin_dictionary.status === "matched")
+      detection.builtin_dictionary.suggested_pos = ["unknown-pos"];
+    vi.mocked(supplied.detectV3).mockResolvedValue(detection);
+    renderStep(supplied);
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    expect(
+      await screen.findByRole("link", { name: "继续创建" })
+    ).toHaveAttribute("href", "/words/empty-draft/v3/wizard/forms");
+    expect(screen.queryByText("创建并进入词形与发音")).not.toBeInTheDocument();
+    expect(supplied.createV3).not.toHaveBeenCalled();
+  }
+);

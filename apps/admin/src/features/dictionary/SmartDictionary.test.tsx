@@ -81,6 +81,7 @@ function word(
   headword: string
 ): Extract<AdminWordListItemAny, { schema_version: 2 }> {
   return {
+    annotation_visible: false,
     schema_version: 2,
     id,
     headword,
@@ -111,6 +112,7 @@ function v3Word(
   strategyVersion = "future_strategy_9"
 ): AdminWordListItemV3 {
   return {
+    annotation_visible: false,
     schema_version: 3,
     id,
     kind: "word",
@@ -223,6 +225,65 @@ afterEach(() => {
 });
 
 describe("SmartDictionary", () => {
+  it("真实查询行以词名上标保留完整数字和前导0，并提供编辑入口", async () => {
+    const annotated = {
+      ...v3Word("entry", "center"),
+      annotation_visible: true,
+      annotation: "00123456789012345678"
+    };
+    apiMocks.useWordList.mockReturnValue({
+      data: { words: [annotated], page: { page: 1, page_size: 20, total: 1 } },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter initialEntries={["/words?keyword=center"]}>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    const annotation = screen.getByText("00123456789012345678");
+    expect(annotation.tagName).toBe("SUP");
+    fireEvent.mouseEnter(annotation.parentElement!);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(
+      "center · 00123456789012345678"
+    );
+    expect(annotation.previousElementSibling).toHaveTextContent("center");
+    expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
+  });
+
+  it("服务端标志隐藏圆标和tooltip，刷新可恢复且不依据当前页数量", async () => {
+    const item = {
+      ...v3Word("entry", "center"),
+      annotation: "007",
+      annotation_visible: false
+    };
+    const list = () => ({
+      data: { words: [item], page: { page: 1, page_size: 20, total: 1 } },
+      isPending: false,
+      isError: false
+    });
+    apiMocks.useWordList.mockImplementation(list);
+    const view = () => (
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    const rendered = render(view());
+    expect(screen.queryByText("007")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
+    fireEvent.mouseEnter(screen.getByText("center").parentElement!);
+    expect(await screen.findByRole("tooltip")).not.toHaveTextContent("007");
+    fireEvent.mouseLeave(screen.getByText("center").parentElement!);
+    item.annotation_visible = true;
+    rendered.rerender(view());
+    expect(screen.getByText("007").tagName).toBe("SUP");
+    expect(item.annotation).toBe("007");
+  });
+
   it("同页混合展示 V2 phrase 与 V3，V3 只使用 presentation.label 且可进入独立路由", () => {
     matchViewport(1440);
     const legacy = {
@@ -461,11 +522,11 @@ describe("SmartDictionary", () => {
     expect(secondActions[0]!.getAttribute("aria-label")).toBe(
       "继续创建「workspace」"
     );
-    expect(secondActions[1]!.getAttribute("aria-label")).toBe(
+    expect(secondActions[2]!.getAttribute("aria-label")).toBe(
       "移入垃圾桶「workspace」"
     );
-    expect(secondActions[1]!.querySelector(".anticon-delete")).not.toBeNull();
-    fireEvent.click(secondActions[1]!);
+    expect(secondActions[2]!.querySelector(".anticon-delete")).not.toBeNull();
+    fireEvent.click(secondActions[2]!);
     fireEvent.click(
       (await screen.findAllByText("移入垃圾桶", { exact: true }))
         .map((item) => item.closest("button"))

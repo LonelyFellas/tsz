@@ -474,6 +474,7 @@ const LEGACY_PUBLICATION: AdminWordPublicationAny = {
 
 function listItem(word: AdminWordV3): AdminWordListItemAny {
   return {
+    annotation_visible: false,
     schema_version: 3,
     id: word.id,
     kind: "word",
@@ -501,6 +502,7 @@ function listItem(word: AdminWordV3): AdminWordListItemAny {
 }
 
 const LEGACY_LIST_ITEM: AdminWordListItemAny = {
+  annotation_visible: false,
   schema_version: 2,
   id: ADMIN_V2_LEGACY_WORD_ID,
   headword: "legacy-orbit",

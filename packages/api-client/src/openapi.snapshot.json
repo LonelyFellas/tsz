@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-06T12:09:26.290Z",
+  "_generatedAt": "2026-09-06T15:40:02.755Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2209,6 +2209,7 @@
     "AdminWordListItem": {
       "type": "object",
       "required": [
+        "annotation_visible",
         "annotation",
         "annotation_revision",
         "schema_version",
@@ -2237,6 +2238,10 @@
           "type": "integer",
           "format": "int64",
           "minimum": 1
+        },
+        "annotation_visible": {
+          "type": "boolean",
+          "description": "Whether another visible active entry shares any base/headword prototype."
         },
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": {

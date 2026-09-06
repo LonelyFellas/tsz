@@ -783,6 +783,7 @@ function listItem(word: MockWord) {
     throw new Error("Admin E2E word fixture has invalid headwords");
   }
   return {
+    annotation_visible: false,
     schema_version: 2,
     id: word.id,
     ...presentation,

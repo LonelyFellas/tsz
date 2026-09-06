@@ -50,6 +50,7 @@ export interface AdminWordListQuery {
 
 /** 列表行(读取时派生:gloss 取第一个词性第一个词义的第一条释义)。 */
 export interface AdminWordListItem {
+  annotation_visible: boolean;
   schema_version: 2;
   id: string;
   /** 并列拼写按检测基准侧在前拼接，与 `dialects` 同序。 */

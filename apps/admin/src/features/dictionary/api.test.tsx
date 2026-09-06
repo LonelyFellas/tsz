@@ -7,6 +7,7 @@ import { wordFixture } from "./word-creation/wordCreation.test.helper";
 
 const dataSource = vi.hoisted(() => ({
   deleteDraft: vi.fn(),
+  deleteBatch: vi.fn(),
   get: vi.fn(),
   relatedSearch: vi.fn()
 }));
@@ -30,6 +31,7 @@ import {
   useArchiveWordAny,
   useArchiveWordsBatchAny,
   useDeleteWordDraft,
+  useDeleteWordBatch,
   useRelatedSearchAny,
   useRelatedSearchV2,
   useRestoreWordAny,
@@ -71,6 +73,36 @@ const relatedWord = (wordId: string, headword: string) => ({
   pos_labels: ["noun"],
   senses: [{ sense_id: `${wordId}-sense`, gloss: wordId }]
 });
+
+function listItemFixture(): AdminWordListItemV3 {
+  return {
+    annotation_visible: false,
+    annotation: null,
+    annotation_revision: 1,
+    schema_version: 3,
+    id: "v3-1",
+    kind: "word",
+    presentation: {
+      label: "centre · center",
+      matched_surfaces: ["centre", "center"],
+      strategy_version: "surface_summary_v1"
+    },
+    dialects: ["uk", "us"],
+    revision: 2,
+    lifecycle_revision: 1,
+    gloss: "中心",
+    pos_list: ["noun"],
+    levels: ["A1"],
+    status: "draft",
+    has_unpublished_changes: false,
+    max_reachable_step: "forms",
+    created_by_name: "Admin",
+    created_by: "admin-1",
+    reference_summary: { total: 0, previews: [], truncated: false },
+    created_at: "2026-08-25T00:00:00Z",
+    updated_at: "2026-08-25T00:00:00Z"
+  };
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -125,32 +157,7 @@ describe("dictionary React Query hooks", () => {
   });
 
   it("mixed 列表与 Any 详情只调用 schema-aware facade", async () => {
-    const listItem = {
-      schema_version: 3,
-      id: "v3-1",
-      kind: "word",
-      presentation: {
-        label: "centre · center",
-        matched_surfaces: ["centre", "center"],
-        strategy_version: "surface_summary_v1"
-      },
-      dialects: ["uk", "us"],
-      revision: 2,
-      lifecycle_revision: 1,
-      gloss: "中心",
-      pos_list: ["noun"],
-      levels: ["A1"],
-      status: "draft",
-      annotation: null,
-      annotation_revision: 1,
-      has_unpublished_changes: false,
-      max_reachable_step: "forms",
-      created_by_name: "Admin",
-      created_by: "admin-1",
-      reference_summary: { total: 0, previews: [], truncated: false },
-      created_at: "2026-08-25T00:00:00Z",
-      updated_at: "2026-08-25T00:00:00Z"
-    } satisfies AdminWordListItemV3;
+    const listItem = listItemFixture();
     const list = {
       words: [listItem],
       page: { page: 1, page_size: 20, total: 1 }
@@ -253,6 +260,80 @@ describe("dictionary React Query hooks", () => {
       "restore-batch-key",
       { entries: [{ id: "v3-1", ...input }] }
     );
+  });
+
+  it("归档、恢复和删除后实际重取列表显示标志，支持单条与批量", async () => {
+    let visible = true;
+    anyDataSource.listAny.mockImplementation(async () => ({
+      words: [
+        { ...listItemFixture(), annotation: "007", annotation_visible: visible }
+      ],
+      page: { page: 1, page_size: 20, total: 1 }
+    }));
+    const { wrapper } = queryWrapper();
+    const hook = renderHook(
+      () => ({
+        list: useWordList({ page: 1 }),
+        archive: useArchiveWordAny(),
+        restore: useRestoreWordAny(),
+        archiveBatch: useArchiveWordsBatchAny(),
+        restoreBatch: useRestoreWordsBatchAny(),
+        deletion: useDeleteWordDraft(),
+        deleteBatch: useDeleteWordBatch()
+      }),
+      { wrapper }
+    );
+    await waitFor(() => expect(hook.result.current.list.isSuccess).toBe(true));
+    const input = { base_revision: 1, base_lifecycle_revision: 1 };
+    const actions = [
+      () =>
+        hook.result.current.archive.mutateAsync({
+          wordId: "peer",
+          idempotencyKey: "a",
+          input
+        }),
+      () =>
+        hook.result.current.restore.mutateAsync({
+          wordId: "peer",
+          idempotencyKey: "r",
+          input
+        }),
+      () =>
+        hook.result.current.archiveBatch.mutateAsync({
+          idempotencyKey: "ab",
+          input: { entries: [{ id: "peer", ...input }] }
+        }),
+      () =>
+        hook.result.current.restoreBatch.mutateAsync({
+          idempotencyKey: "rb",
+          input: { entries: [{ id: "peer", ...input }] }
+        }),
+      () =>
+        hook.result.current.deletion.mutateAsync({
+          wordId: "peer",
+          baseRevision: 1,
+          baseLifecycleRevision: 1
+        }),
+      () =>
+        hook.result.current.deleteBatch.mutateAsync({
+          idempotencyKey: "db",
+          input: { entries: [{ id: "peer", ...input }] }
+        })
+    ];
+    for (const [index, mutate] of actions.entries()) {
+      visible = index === 1 || index === 3;
+      const previousCalls = anyDataSource.listAny.mock.calls.length;
+      await act(async () => {
+        await mutate();
+      });
+      await waitFor(() =>
+        expect(anyDataSource.listAny.mock.calls.length).toBe(previousCalls + 1)
+      );
+      expect(hook.result.current.list.data?.words[0]).toMatchObject({
+        annotation: "007",
+        annotation_visible: visible
+      });
+    }
   });
 
   it("V2 exact 与 contains 独立请求，并分别按 cursor 累积全部页", async () => {

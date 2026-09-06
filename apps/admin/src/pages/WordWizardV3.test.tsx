@@ -1,3 +1,4 @@
+import { wordKeys } from "@/features/dictionary/api";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
 import {
@@ -170,7 +171,8 @@ function renderPage(
   entry: string,
   requests: V3WordRequests,
   renderMeaningsStep?: V3MeaningsStepRenderer,
-  state?: unknown
+  state?: unknown,
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
 ) {
   const router = createMemoryRouter(
     [
@@ -188,9 +190,6 @@ function renderPage(
       initialEntries: [state === undefined ? entry : { pathname: entry, state }]
     }
   );
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } }
-  });
   render(
     <QueryClientProvider client={client}>
       <AntApp>
@@ -574,9 +573,19 @@ describe("WordWizardV3Page", () => {
     vi.mocked(endpoints.saveFormsStepV3).mockResolvedValueOnce({
       word: { ...current, revision: 2 }
     });
+    const client = new QueryClient({
+      defaultOptions: { queries: { staleTime: 60_000, retry: false } }
+    });
+    const listKey = wordKeys.list({ page: 1 });
+    client.setQueryData(listKey, { annotation_visible: false });
+    client.setQueryData(wordKeys.stats(), { total: 1 });
+    expect(client.getQueryState(listKey)?.isInvalidated).toBe(false);
     renderPage(
       `/words/${WORD_ID}/v3/wizard/forms`,
-      createV3WordRequests(endpoints)
+      createV3WordRequests(endpoints),
+      undefined,
+      undefined,
+      client
     );
 
     fireEvent.click(await screen.findByText("保存草稿"));
@@ -592,6 +601,17 @@ describe("WordWizardV3Page", () => {
         content: current.forms
       })
     );
+    await waitFor(() =>
+      expect(client.getQueryState(listKey)?.isInvalidated).toBe(true)
+    );
+    expect(client.getQueryState(wordKeys.stats())?.isInvalidated).toBe(true);
+    expect(
+      client.getQueryData<{ word: AdminWordV3 }>([
+        "admin-words",
+        "detail-v3",
+        WORD_ID
+      ])?.word.revision
+    ).toBe(2);
   });
 
   it("#136 不完整词形可直接进入词义且纯导航不发请求", async () => {

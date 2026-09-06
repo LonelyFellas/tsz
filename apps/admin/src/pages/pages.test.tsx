@@ -163,7 +163,9 @@ describe("admin 页面烟雾测试", () => {
   ] as const)("词条页面入口挂载正确流程", (Page, expected) => {
     render(
       <MemoryRouter>
-        <Page />
+        <QueryClientProvider client={new QueryClient()}>
+          <Page />
+        </QueryClientProvider>
       </MemoryRouter>
     );
     expect(screen.getByText(expected)).toBeInTheDocument();

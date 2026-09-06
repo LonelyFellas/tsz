@@ -325,6 +325,7 @@ function addLegacyV2Association(container: Record<string, unknown>) {
 
 function validAdminWordListItemV2() {
   return {
+    annotation_visible: false,
     schema_version: 2,
     id: IDS.entry,
     headword: "legacy",
@@ -351,6 +352,7 @@ function validAdminWordListItemV2() {
 
 function validAdminWordListItemV3() {
   return {
+    annotation_visible: false,
     schema_version: 3,
     id: IDS.form1,
     kind: "word",
@@ -1171,6 +1173,48 @@ describe("admin word V3/Any runtime decoder", () => {
       });
     }
   );
+
+  it.each([validAdminWordListItemV2, validAdminWordListItemV3])(
+    "列表显示标志必须是boolean，隐藏仍保留原始annotation",
+    (makeItem) => {
+      const item: Record<string, unknown> = {
+        ...makeItem(),
+        annotation: "007"
+      };
+      const value = {
+        words: [item],
+        page: { page: 1, page_size: 20, total: 1 }
+      };
+      for (const visible of [false, true]) {
+        item.annotation_visible = visible;
+        expect(decodeAdminWordAnyListResponse(value).words[0]).toMatchObject({
+          annotation: "007",
+          annotation_visible: visible
+        });
+      }
+      for (const invalid of [undefined, null, "true", 1]) {
+        if (invalid === undefined) delete item.annotation_visible;
+        else item.annotation_visible = invalid;
+        expect(() => decodeAdminWordAnyListResponse(value)).toThrow();
+      }
+    }
+  );
+
+  it("V3 detection 保留可选空草稿 UUID，兼容省略并拒绝非法目标", () => {
+    const value = validRuntimeDefinition(
+      "DetectLexiconSurfaceResponseV3"
+    ) as Record<string, unknown>;
+    delete value.existing_draft_id;
+    expect(decodeDetectLexiconResponseV3(value)).toBe(value);
+    value.existing_draft_id = IDS.entry;
+    expect(decodeDetectLexiconResponseV3(value).existing_draft_id).toBe(
+      IDS.entry
+    );
+    for (const invalid of [null, "", "not-a-uuid", 1]) {
+      value.existing_draft_id = invalid;
+      expect(() => decodeDetectLexiconResponseV3(value)).toThrow();
+    }
+  });
 
   it("V3 detection runtime schema 将顶层 suggested_pos 固定为必填字符串数组", () => {
     const schema = runtimeFixtureBundle.$defs.DetectLexiconSurfaceResponseV3!;

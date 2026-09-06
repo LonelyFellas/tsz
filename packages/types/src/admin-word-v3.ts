@@ -985,6 +985,8 @@ export interface DetectionSurfaceRequestEchoV3 {
 }
 
 export interface DetectLexiconSurfaceResponseV3 {
+  /** Own unfinished draft without saved surface sources; not a surface match. */
+  existing_draft_id?: string;
   schema_version: 3;
   detection_id: string;
   expires_at: string;
@@ -1002,6 +1004,7 @@ export type DetectLexiconResponseAny =
   DetectWordResponseV2 | DetectLexiconSurfaceResponseV3;
 
 export interface AdminWordListItemV3 {
+  annotation_visible: boolean;
   schema_version: 3;
   id: string;
   kind: WordEntryKindV3;
