@@ -314,6 +314,8 @@ function createDraft(
   kind: "word" | "phrase" = "word"
 ): MockWord {
   return {
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 2,
     id: ADMIN_E2E_WORD_ID,
     language: "en",
@@ -781,6 +783,9 @@ function listItem(word: MockWord) {
     throw new Error("Admin E2E word fixture has invalid headwords");
   }
   return {
+    annotation: null,
+    annotation_revision: 1,
+    annotation_visible: false,
     schema_version: 2,
     id: word.id,
     ...presentation,

@@ -41,6 +41,8 @@ const LIFECYCLE_WORD_C = "018f47b8-e3c1-7bd1-9f0a-123456789aa3";
 function lifecycleWord(id: string): AdminWordV2 {
   const headwords = { mode: "unified", common: "legacy" } as const;
   return {
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 2,
     id,
     language: "en",

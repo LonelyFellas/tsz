@@ -296,6 +296,8 @@ function v3SurfacePageFixture(overrides: Record<string, unknown> = {}) {
     total: 1,
     matched_entry_contexts: [
       {
+        annotation: null,
+        annotation_revision: 1,
         entry_id: UUIDS.entry,
         presentation: {
           label: "run",

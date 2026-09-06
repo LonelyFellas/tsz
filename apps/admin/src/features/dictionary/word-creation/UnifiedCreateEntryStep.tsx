@@ -1,6 +1,7 @@
 import { HttpError } from "@tsz/api-client/http";
 import type {
   AdminWordAnyEnvelope,
+  EntryAnnotationConflict,
   AdminWordV3,
   AdminWordV3Envelope,
   CreateAdminWordV3Input,
@@ -12,13 +13,11 @@ import type {
 } from "@tsz/types";
 import {
   CheckCircleFilled,
-  ExclamationCircleOutlined,
   PlusOutlined,
   SearchOutlined
 } from "@ant-design/icons";
 import {
   Alert,
-  App,
   Button,
   Card,
   Col,
@@ -53,6 +52,7 @@ import {
 import { validateEntryInput } from "./entryClassification";
 import { hasHeadwordsIssue, headwordsIssues } from "./headwordValidation";
 import type { CreationNavigationState } from "./CreationSourceNotice";
+import { EntryAnnotationModal } from "../EntryAnnotationModal";
 import "./word-creation.css";
 
 export interface UnifiedCreateRequests {
@@ -132,6 +132,8 @@ function initialSurfacePage(pending?: PendingCreation) {
 
 function errorMessage(error: unknown): string {
   if (error instanceof HttpError) {
+    if (error.status === 409 && error.code === "duplicate_word")
+      return "已有同名词条，无法重复创建。";
     if (error.status === 401) return "登录状态已失效，请重新登录。";
     if (error.status === 403) return "当前账号没有创建词条的权限。";
     if (error.status === 503) return "词条服务暂时不可用，请稍后重试。";
@@ -651,16 +653,26 @@ export function UnifiedCreateEntryStep({
   requests = defaultRequests,
   onCreated
 }: Props) {
-  const { modal } = App.useApp();
   const catalog = usePartOfSpeechCatalog();
   const { preference } = useDialectPreference();
   const [value, setValue] = useState("");
   const [fieldError, setFieldError] = useState<string>();
   const [error, setError] = useState<string>();
+  const [duplicateWord, setDuplicateWord] = useState<{ wordId?: string }>();
   const [busy, setBusy] = useState<"checking" | "creating">();
   const [pending, setPending] = useState<PendingCreation>();
   const [prepared, setPrepared] = useState<PendingCreation>();
   const [createAttempt, setCreateAttempt] = useState<CreateAttempt>();
+  const existingDraftId =
+    duplicateWord?.wordId ?? prepared?.detection.existing_draft_id;
+  const [annotationSession, setAnnotationSession] = useState<{
+    conflict: EntryAnnotationConflict;
+    attempt: CreateAttempt;
+    version: number;
+  }>();
+  const annotationDraft = useRef<
+    Pick<CreateAdminWordV3Input, "annotation" | "annotation_updates">
+  >({});
   const [regionalDisplay, setRegionalDisplay] = useState<RegionalDisplayState>({
     status: "idle"
   });
@@ -798,10 +810,13 @@ export function UnifiedCreateEntryStep({
 
   const changeValue = (next: string) => {
     generation.current += 1;
+    setAnnotationSession(undefined);
+    annotationDraft.current = {};
     retryKey.current = undefined;
     preservedRegionalDisplay.current = undefined;
     setValue(next);
     setFieldError(undefined);
+    setDuplicateWord(undefined);
     setError(undefined);
     setPending(undefined);
     setPrepared(undefined);
@@ -820,6 +835,7 @@ export function UnifiedCreateEntryStep({
       if (!mounted.current) return;
       retryKey.current = undefined;
       setCreateAttempt(undefined);
+      setAnnotationSession(undefined);
       onCreated(response.word, {
         creationSource:
           target.detection.builtin_dictionary.status === "matched"
@@ -832,8 +848,40 @@ export function UnifiedCreateEntryStep({
       if (!mounted.current) return;
       if (
         requestError instanceof HttpError &&
+        requestError.status === 409 &&
+        requestError.code === "duplicate_word"
+      ) {
+        setCreateAttempt(undefined);
+        setAnnotationSession(undefined);
+        setPending(undefined);
+        setDuplicateWord({ wordId: requestError.meta?.word_id });
+        setError(errorMessage(requestError));
+      } else if (
+        requestError instanceof HttpError &&
+        requestError.status === 409 &&
+        requestError.code === "annotation_conflict" &&
+        requestError.meta?.annotation_conflict
+      ) {
+        setCreateAttempt(undefined);
+        setAnnotationSession((current) => ({
+          conflict: requestError.meta!.annotation_conflict!,
+          attempt,
+          version: (current?.version ?? 0) + 1
+        }));
+        setError(
+          requestError.meta.annotation_conflict.reason ===
+            "revision_conflict" ||
+            requestError.meta.annotation_conflict.reason === "group_changed"
+            ? "词条标注或原型分组已更新，请重新确认。"
+            : requestError.meta.annotation_conflict.reason === "duplicate"
+              ? "标注与同原型词条重复，请修改；已有词条还可能关联其他原型。"
+              : undefined
+        );
+      } else if (
+        requestError instanceof HttpError &&
         requiresNewIdempotencyKey(requestError.status, requestError.code)
       ) {
+        setAnnotationSession(undefined);
         const replacementPage = requestError.meta?.surface_match_page;
         setCreateAttempt(undefined);
         retryKey.current = {
@@ -901,6 +949,7 @@ export function UnifiedCreateEntryStep({
     setCreateAttempt(undefined);
     setError(undefined);
     setFieldError(undefined);
+    setDuplicateWord(undefined);
     setBusy("checking");
     try {
       const detection = await requests.detectV3({
@@ -920,10 +969,16 @@ export function UnifiedCreateEntryStep({
         throw new ProductError("词条检查结果不一致，请刷新后重试。");
       }
       assertFreshDetection(detection.expires_at);
-      if (detection.builtin_dictionary.status === "unavailable") {
+      if (
+        !detection.existing_draft_id &&
+        detection.builtin_dictionary.status === "unavailable"
+      ) {
         throw new ProductError("内置词典暂时不可用，请稍后重试。");
       }
-      if (detection.builtin_dictionary.status === "matched") {
+      if (
+        !detection.existing_draft_id &&
+        detection.builtin_dictionary.status === "matched"
+      ) {
         const configuredPos = new Set(
           catalog.data?.items.map((item) => item.code)
         );
@@ -968,6 +1023,7 @@ export function UnifiedCreateEntryStep({
     target: PendingCreation,
     confirmedSurfaceToken?: string
   ) => {
+    if (duplicateWord || target.detection.existing_draft_id) return;
     const frozenAttempt =
       createAttempt?.target.idempotencyKey === target.idempotencyKey
         ? createAttempt
@@ -1002,6 +1058,7 @@ export function UnifiedCreateEntryStep({
     const attempt: CreateAttempt = {
       target,
       input: {
+        ...annotationDraft.current,
         schema_version: 3,
         detection_id: target.detection.detection_id,
         kind: target.kind,
@@ -1019,21 +1076,7 @@ export function UnifiedCreateEntryStep({
 
   const confirm = () => {
     if (!pending || !canAcknowledgeSurfaceSnapshot(snapshot)) return;
-    const create = () =>
-      beginCreation(pending, snapshot.surface_confirmation_token);
-    if (baseCandidates.length === 0) {
-      create();
-      return;
-    }
-    modal.confirm({
-      title: "确认创建新的独立词条？",
-      icon: <ExclamationCircleOutlined />,
-      content:
-        "检测到智能词库已有相同原形。继续后将创建一个新的独立词条，不会修改已有词条。",
-      okText: "继续创建",
-      cancelText: "取消",
-      onOk: create
-    });
+    beginCreation(pending, snapshot.surface_confirmation_token);
   };
 
   return (
@@ -1068,7 +1111,7 @@ export function UnifiedCreateEntryStep({
               autoFocus
               disabled={
                 busy !== undefined ||
-                pending !== undefined ||
+                (pending !== undefined && !existingDraftId) ||
                 createAttempt !== undefined
               }
               enterButton={
@@ -1100,7 +1143,9 @@ export function UnifiedCreateEntryStep({
             surfaceCards={cards}
             snapshot={snapshot}
           />
-          {snapshot.phase !== "disabled" ? (
+          {snapshot.phase !== "disabled" &&
+          !existingDraftId &&
+          !duplicateWord ? (
             <div className="word-headword-confirmation-wrap">
               <HeadwordConfirmationCard
                 state={regionalDisplay}
@@ -1122,7 +1167,7 @@ export function UnifiedCreateEntryStep({
         </div>
       ) : null}
 
-      {pending ? (
+      {pending && !duplicateWord && !existingDraftId ? (
         <div className="word-entry-actions">
           <Button onClick={() => changeValue(value)}>重新检测</Button>
           <Button
@@ -1140,7 +1185,7 @@ export function UnifiedCreateEntryStep({
         </div>
       ) : null}
 
-      {prepared && !pending ? (
+      {prepared && !pending && !duplicateWord && !existingDraftId ? (
         <div className="word-entry-actions">
           {createAttempt ? (
             <Button onClick={() => changeValue(value)}>重新检测</Button>
@@ -1158,7 +1203,87 @@ export function UnifiedCreateEntryStep({
         </div>
       ) : null}
 
-      {error ? <Alert showIcon type="error" title={error} /> : null}
+      {annotationSession ? (
+        <EntryAnnotationModal
+          key={annotationSession.version}
+          creating
+          busy={busy === "creating"}
+          frozen={createAttempt !== undefined && busy !== "creating"}
+          error={error}
+          groups={annotationSession.conflict.groups}
+          rows={[
+            ...annotationSession.conflict.entries.map((entry) => ({
+              key: entry.entry_id,
+              label: entry.presentation.label,
+              annotation:
+                annotationSession.conflict.reason === "duplicate" ||
+                annotationSession.conflict.reason === "required"
+                  ? (annotationSession.attempt.input.annotation_updates?.find(
+                      (update) => update.entry_id === entry.entry_id
+                    )?.annotation ?? entry.annotation)
+                  : entry.annotation,
+              gloss: [...entry.pos_labels, ...entry.gloss_previews].join(" · ")
+            })),
+            {
+              key: "incoming",
+              incoming: true,
+              label:
+                regionalDisplay.status === "ready"
+                  ? regionalDisplay.value.mode === "unified"
+                    ? regionalDisplay.value.common
+                    : `${regionalDisplay.value.uk} / ${regionalDisplay.value.us}`
+                  : value,
+              annotation: annotationSession.attempt.input.annotation ?? null
+            }
+          ]}
+          onClose={() => {
+            setAnnotationSession(undefined);
+            setCreateAttempt(undefined);
+            annotationDraft.current = {};
+            setError(undefined);
+          }}
+          onSave={(values) => {
+            if (createAttempt) {
+              void createPending(createAttempt);
+              return;
+            }
+            const annotations = {
+              annotation: values.incoming ?? null,
+              annotation_updates: annotationSession.conflict.entries.map(
+                (entry) => ({
+                  entry_id: entry.entry_id,
+                  annotation: values[entry.entry_id] ?? null,
+                  base_annotation_revision: entry.annotation_revision
+                })
+              )
+            };
+            annotationDraft.current = annotations;
+            const attempt = {
+              ...annotationSession.attempt,
+              input: { ...annotationSession.attempt.input, ...annotations }
+            };
+            setCreateAttempt(attempt);
+            setAnnotationSession({ ...annotationSession, attempt });
+            void createPending(attempt);
+          }}
+        />
+      ) : existingDraftId ? (
+        <Alert
+          showIcon
+          type="info"
+          title="已有未完成草稿"
+          action={
+            <Button
+              type="link"
+              href={`/words/${existingDraftId}/v3/wizard/forms`}
+            >
+              继续创建
+            </Button>
+          }
+        />
+      ) : error ? (
+        <Alert showIcon type="error" title={error} />
+      ) : null}
     </div>
   );
 }

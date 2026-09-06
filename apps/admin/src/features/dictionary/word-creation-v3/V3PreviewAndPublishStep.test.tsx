@@ -49,6 +49,8 @@ function word(
   }
 ): AdminWordV3 {
   return {
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 3,
     id: "word-v3",
     language: "en",

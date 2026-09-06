@@ -150,6 +150,8 @@ export function wordFixture(options: WordFixtureOptions = {}): AdminWordV2 {
     : structuredClone(initialMeanings);
 
   return {
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 2,
     id,
     language: "en",

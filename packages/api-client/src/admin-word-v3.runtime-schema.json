@@ -1,8 +1,9 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dev-clean/docs/openapi.json",
-  "_source_sha256": "cb25a31cb04e486c6900b6c6dafaa5db2a43b968a8a702b1a112dff8c000f8c1",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dev-worktree/docs/openapi.json",
+  "_source_sha256": "f8352c91a0165506a80034273645a339e0e0cbb25ec1ee7e77d95aa0a24c172c",
   "roots": [
+    "EntryAnnotationResponse",
     "AdminWordV3",
     "AdminWordAnyEnvelope",
     "AdminWordDraftAnyEnvelope",
@@ -66,6 +67,9 @@
     "AdminWordListItem": {
       "type": "object",
       "required": [
+        "annotation_visible",
+        "annotation",
+        "annotation_revision",
         "schema_version",
         "id",
         "headword",
@@ -87,6 +91,9 @@
         "updated_at"
       ],
       "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "annotation_revision": { "type": "integer", "minimum": 1 },
+        "annotation_visible": { "type": "boolean" },
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": { "type": "string", "format": "uuid" },
         "created_by_name": { "type": "string" },
@@ -122,6 +129,9 @@
     "AdminWordListItemV3": {
       "type": "object",
       "required": [
+        "annotation_visible",
+        "annotation",
+        "annotation_revision",
         "schema_version",
         "id",
         "kind",
@@ -142,6 +152,9 @@
         "updated_at"
       ],
       "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "annotation_revision": { "type": "integer", "minimum": 1 },
+        "annotation_visible": { "type": "boolean" },
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": { "type": "string", "format": "uuid" },
         "created_by_name": { "type": "string" },
@@ -270,6 +283,8 @@
     "AdminWordV2": {
       "type": "object",
       "required": [
+        "annotation",
+        "annotation_revision",
         "schema_version",
         "id",
         "language",
@@ -289,6 +304,8 @@
         "updated_at"
       ],
       "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "annotation_revision": { "type": "integer", "minimum": 1 },
         "archived_at": { "type": "string", "format": "date-time" },
         "archived_by": { "type": "string", "format": "uuid" },
         "completed_steps": {
@@ -319,6 +336,8 @@
     "AdminWordV3": {
       "type": "object",
       "required": [
+        "annotation",
+        "annotation_revision",
         "schema_version",
         "id",
         "language",
@@ -338,6 +357,8 @@
         "updated_at"
       ],
       "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "annotation_revision": { "type": "integer", "minimum": 1 },
         "archived_at": { "type": "string", "format": "date-time" },
         "archived_by": { "type": "string", "format": "uuid" },
         "capabilities": { "$ref": "#/$defs/AdminWordV3Capabilities" },
@@ -588,6 +609,7 @@
       "properties": {
         "builtin_dictionary": { "$ref": "#/$defs/BuiltinDictionaryEvidenceV3" },
         "detection_id": { "type": "string", "format": "uuid" },
+        "existing_draft_id": { "type": "string", "format": "uuid" },
         "expires_at": { "type": "string", "format": "date-time" },
         "matches": {
           "type": "array",
@@ -1053,6 +1075,49 @@
         }
       ]
     },
+    "EntryAnnotationConflict": {
+      "type": "object",
+      "required": ["reason", "entries", "groups"],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MatchedEntryContextV3" }
+        },
+        "groups": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EntryAnnotationGroup" }
+        },
+        "reason": { "$ref": "#/$defs/EntryAnnotationConflictReason" }
+      },
+      "additionalProperties": false
+    },
+    "EntryAnnotationConflictReason": {
+      "type": "string",
+      "enum": ["required", "duplicate", "revision_conflict", "group_changed"]
+    },
+    "EntryAnnotationGroup": {
+      "type": "object",
+      "required": ["dialect_scope", "normalized_surface", "entry_ids"],
+      "properties": {
+        "dialect_scope": { "type": "string" },
+        "entry_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" }
+        },
+        "normalized_surface": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "EntryAnnotationResponse": {
+      "type": "object",
+      "required": ["entry_id", "annotation", "annotation_revision"],
+      "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "annotation_revision": { "type": "integer", "minimum": 1 },
+        "entry_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "EntryKind": { "type": "string", "enum": ["word", "phrase"] },
     "EntryLifecycleBatchResponseAny": {
       "type": "object",
@@ -1158,6 +1223,7 @@
         "sub_part_of_speech_not_found",
         "part_of_speech_conflict",
         "sub_part_of_speech_conflict",
+        "annotation_conflict",
         "revision_conflict",
         "reference_conflict",
         "relation_prebinding_fanout_exceeded",
@@ -1572,6 +1638,8 @@
     "MatchedEntryContextV3": {
       "type": "object",
       "required": [
+        "annotation",
+        "annotation_revision",
         "entry_id",
         "presentation",
         "pos_labels",
@@ -1580,6 +1648,8 @@
         "inbound_relations"
       ],
       "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "annotation_revision": { "type": "integer", "minimum": 1 },
         "entry_id": { "type": "string", "format": "uuid" },
         "gloss_previews": {
           "type": "array",
@@ -1676,6 +1746,7 @@
           "type": "array",
           "items": { "type": "string", "format": "uuid" }
         },
+        "annotation_conflict": { "$ref": "#/$defs/EntryAnnotationConflict" },
         "code": { "type": "string" },
         "current_lifecycle_revision": { "type": "integer" },
         "current_policy_epoch": { "type": "integer", "minimum": 0 },
@@ -3726,6 +3797,56 @@
             "pending_target_headword": { "type": "string" },
             "relation": { "type": "string" },
             "score": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "relation",
+            "score",
+            "prebound_target_word_id",
+            "target_headword",
+            "prebinding_state"
+          ],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
+            "prebinding_state": {
+              "type": "string",
+              "enum": ["waiting_first_sense"]
+            },
+            "prebound_target_word_id": { "type": "string", "format": "uuid" },
+            "relation": { "type": "string" },
+            "score": { "type": "string" },
+            "target_headword": { "type": "string" },
+            "target_status": { "$ref": "#/$defs/AdminWordStatus" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "id",
+            "relation",
+            "score",
+            "prebound_target_word_id",
+            "target_headword",
+            "prebinding_state"
+          ],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
+            "prebinding_state": {
+              "type": "string",
+              "enum": ["target_sense_deleted"]
+            },
+            "prebound_target_word_id": { "type": "string", "format": "uuid" },
+            "relation": { "type": "string" },
+            "score": { "type": "string" },
+            "target_headword": { "type": "string" },
+            "target_status": { "$ref": "#/$defs/AdminWordStatus" }
           },
           "additionalProperties": false
         }

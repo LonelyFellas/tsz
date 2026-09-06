@@ -1,3 +1,4 @@
+import { wordKeys } from "@/features/dictionary/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Flex, Result, Spin, Typography } from "antd";
 import type {
@@ -580,6 +581,8 @@ export function WordWizardV3Page({
       queryClient.setQueryData<AdminWordDraftV3Envelope>(queryKey, (current) =>
         current ? { ...current, word } : current
       );
+      void queryClient.invalidateQueries({ queryKey: wordKeys.lists() });
+      void queryClient.invalidateQueries({ queryKey: wordKeys.stats() });
     },
     [queryClient, queryKey]
   );

@@ -9,6 +9,9 @@ import {
 const v3Row = (
   presentation: AdminWordListItemV3["presentation"]
 ): AdminWordListItemV3 => ({
+  annotation_visible: false,
+  annotation: null,
+  annotation_revision: 1,
   schema_version: 3,
   id: "v3-entry",
   kind: "word",
@@ -32,6 +35,9 @@ const v3Row = (
 describe("mixed word list presentation", () => {
   it("V2 保留既有 headword 与 dialects", () => {
     const row: AdminWordListItemAny = {
+      annotation_visible: false,
+      annotation: null,
+      annotation_revision: 1,
       schema_version: 2,
       id: "v2-entry",
       headword: "centre / center",
@@ -119,6 +125,9 @@ describe("mixed word list presentation", () => {
   it("V2 不进入 V3 presentation 观测", () => {
     const report = vi.fn();
     const row = {
+      annotation_visible: false,
+      annotation: null,
+      annotation_revision: 1,
       schema_version: 2,
       id: "v2-entry",
       headword: "word",

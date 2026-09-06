@@ -209,6 +209,8 @@ function makeWord(
   headwords: WordHeadwordsV2 = unifiedHeadwords
 ): AdminWordV2 {
   return {
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 2,
     id: "word-1",
     language: "en",

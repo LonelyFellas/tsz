@@ -21,6 +21,8 @@ import { V3PublicationHistory } from "./V3PublicationHistory";
 
 function v3Word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
   return {
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 3,
     id: "word-mixed",
     language: "en",

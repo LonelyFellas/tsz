@@ -3091,6 +3091,9 @@ export function createAdminWordsMock({
         return true;
       })
       .map((word) => ({
+        annotation_visible: false,
+        annotation: word.annotation,
+        annotation_revision: word.annotation_revision,
         schema_version: 2 as const,
         id: word.id,
         headword: listHeadword(word),
@@ -3552,6 +3555,8 @@ export function createAdminWordsMock({
         }
       : { smart_dictionary_status: "clear" as const };
     const word: AdminWordV2 = {
+      annotation: null,
+      annotation_revision: 1,
       schema_version: 2,
       id: wordId,
       language: "en",

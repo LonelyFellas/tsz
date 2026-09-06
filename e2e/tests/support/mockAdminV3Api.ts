@@ -325,6 +325,8 @@ function v3Word(
   compatibility?: AdminWordV3["compatibility"]
 ): AdminWordV3 {
   return {
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 3,
     id,
     language: "en",
@@ -354,6 +356,8 @@ function v3Word(
 }
 
 const LEGACY_WORD: AdminWordV2 = {
+  annotation: null,
+  annotation_revision: 1,
   schema_version: 2,
   id: ADMIN_V2_LEGACY_WORD_ID,
   language: "en",
@@ -470,6 +474,9 @@ const LEGACY_PUBLICATION: AdminWordPublicationAny = {
 
 function listItem(word: AdminWordV3): AdminWordListItemAny {
   return {
+    annotation_visible: false,
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 3,
     id: word.id,
     kind: "word",
@@ -495,6 +502,9 @@ function listItem(word: AdminWordV3): AdminWordListItemAny {
 }
 
 const LEGACY_LIST_ITEM: AdminWordListItemAny = {
+  annotation_visible: false,
+  annotation: null,
+  annotation_revision: 1,
   schema_version: 2,
   id: ADMIN_V2_LEGACY_WORD_ID,
   headword: "legacy-orbit",
@@ -672,6 +682,8 @@ function surfaceMatchPage(
     items,
     total: duplicate ? 2 : 3,
     matched_entry_contexts: entries.map(([entryId, , spelling]) => ({
+      annotation: null,
+      annotation_revision: 1,
       entry_id: entryId,
       presentation: {
         label: spelling,

@@ -158,6 +158,8 @@ function v3Item(
 
 function v3Context(entryId: string): MatchedEntryContextV3 {
   return {
+    annotation: null,
+    annotation_revision: 1,
     entry_id: entryId,
     presentation: {
       label: `V3 ${entryId}`,

@@ -88,6 +88,8 @@ import { useLifecycleSurfaceCommand } from "./useLifecycleSurfaceCommand";
 import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 import { newWordNodeId } from "./word-model/primitives";
 
+import { EditEntryAnnotation } from "./EditEntryAnnotation";
+
 const { RangePicker } = DatePicker;
 
 const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, string> = {
@@ -164,6 +166,8 @@ export function SmartDictionary({
     ? { id: profile.id, role: profile.role }
     : undefined;
   const [searchParams, setSearchParams] = useSearchParams();
+  const [annotationEntry, setAnnotationEntry] =
+    useState<AdminWordListItemAny>();
   const [form] = Form.useForm<WordFilterValues>();
   const serializedSearchParams = searchParams.toString();
 
@@ -609,20 +613,56 @@ export function SmartDictionary({
     {
       title: "词汇",
       key: "label",
-      width: 120,
+      width: 150,
       fixed: "left",
       ellipsis: { showTitle: false },
       render: (_: unknown, record) => {
         const label = wordListLabel(record);
+        const annotation = record.annotation_visible ? record.annotation : null;
         const dialects = wordListDialects(record);
         const context =
           dialects.length > 0
             ? dialects.map((dialect) => DIALECT_LABEL[dialect]).join(" / ")
             : "";
         return (
-          <Tooltip title={[label, context].filter(Boolean).join(" · ")}>
-            <span tabIndex={0} style={{ display: "block" }}>
-              <span style={{ display: "block", fontWeight: 600 }}>{label}</span>
+          <Tooltip
+            title={[label, annotation, context].filter(Boolean).join(" · ")}
+          >
+            <span
+              tabIndex={0}
+              style={{
+                display: "block",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                lineHeight: 1.6
+              }}
+            >
+              <span style={{ fontWeight: 600 }}>{label}</span>
+              {annotation ? (
+                <sup
+                  style={{
+                    display: "inline-block",
+                    position: "relative",
+                    top: "-0.5em",
+                    marginInlineStart: 4,
+                    minWidth: 16,
+                    height: 16,
+                    paddingInline: 4,
+                    boxSizing: "border-box",
+                    borderRadius: 999,
+                    backgroundColor: "#000",
+                    color: "#fff",
+                    fontSize: 10,
+                    fontWeight: 600,
+                    lineHeight: "16px",
+                    textAlign: "center",
+                    verticalAlign: "baseline"
+                  }}
+                >
+                  {annotation}
+                </sup>
+              ) : null}
             </span>
           </Tooltip>
         );
@@ -800,6 +840,16 @@ export function SmartDictionary({
             >
               {getWordRowActionLabel(record)}
             </Button>
+            {record.status !== "archived" ? (
+              <Button
+                type="link"
+                size="small"
+                aria-label={`编辑标注${rowName}`}
+                onClick={() => setAnnotationEntry(record)}
+              >
+                标注
+              </Button>
+            ) : null}
             {adminWordsDataSourceCapabilities.archive && (
               <Button
                 type="link"
@@ -1092,6 +1142,13 @@ export function SmartDictionary({
             }
           />
         )}
+
+        {annotationEntry ? (
+          <EditEntryAnnotation
+            entry={annotationEntry}
+            onClose={() => setAnnotationEntry(undefined)}
+          />
+        ) : null}
 
         <Table<AdminWordListItemAny>
           rowKey="id"

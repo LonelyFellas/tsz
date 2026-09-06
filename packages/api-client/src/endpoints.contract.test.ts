@@ -494,7 +494,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "cb25a31cb04e486c6900b6c6dafaa5db2a43b968a8a702b1a112dff8c000f8c1"
+      "f8352c91a0165506a80034273645a339e0e0cbb25ec1ee7e77d95aa0a24c172c"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -610,8 +610,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       required: string[];
       properties: Record<string, { enum?: string[] }>;
     }>;
-    expect(writableRelationBranches).toHaveLength(2);
-    expect(responseRelationBranches).toHaveLength(2);
+    expect(writableRelationBranches).toHaveLength(3);
+    expect(responseRelationBranches).toHaveLength(4);
     expect(
       writableRelationBranches.every(
         (branch) =>
@@ -619,13 +619,50 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           !("target_headword" in branch.properties)
       )
     ).toBe(true);
+    // Backend checkout already supports prebound relations; keep its mutually
+    // exclusive wire branches while leaving relation UI outside this feature.
     expect(
-      [...writableRelationBranches, ...responseRelationBranches].every(
-        (branch) =>
-          !("prebound_target_word_id" in branch.properties) &&
-          !("prebinding_state" in branch.properties)
+      writableRelationBranches.every(
+        (branch) => !("prebinding_state" in branch.properties)
       )
     ).toBe(true);
+    const preboundWrite = writableRelationBranches.filter(
+      (branch) => "prebound_target_word_id" in branch.properties
+    );
+    expect(preboundWrite).toHaveLength(1);
+    expect(preboundWrite[0]!.required).toEqual([
+      "id",
+      "relation",
+      "score",
+      "prebound_target_word_id"
+    ]);
+    const preboundResponses = responseRelationBranches.filter(
+      (branch) => "prebound_target_word_id" in branch.properties
+    );
+    expect(preboundResponses).toHaveLength(2);
+    expect(
+      preboundResponses
+        .flatMap((branch) => branch.properties.prebinding_state?.enum ?? [])
+        .sort()
+    ).toEqual(["target_sense_deleted", "waiting_first_sense"]);
+    for (const branch of [
+      ...writableRelationBranches,
+      ...responseRelationBranches
+    ]) {
+      const targetFields = [
+        "target_word_id",
+        "pending_target_headword",
+        "prebound_target_word_id"
+      ].filter((key) => key in branch.properties);
+      expect(targetFields).toHaveLength(1);
+      expect(branch.required).toContain(targetFields[0]);
+      expect(branch.additionalProperties).toBe(false);
+    }
+    for (const branch of preboundResponses) {
+      expect(branch.required).toContain("prebinding_state");
+      expect(branch.required).toContain("target_headword");
+      expect(branch.properties).not.toHaveProperty("target_sense_id");
+    }
     expect(
       writableRelationBranches.some(
         (branch) =>

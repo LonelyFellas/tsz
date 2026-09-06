@@ -74,6 +74,8 @@ function surfacePage(snapshotId = SNAPSHOT_ID): SurfaceMatchPageV3 {
 function v3Draft(wordId = WORD_ID): AdminWordDraftV3Envelope {
   return {
     word: {
+      annotation: null,
+      annotation_revision: 1,
       schema_version: 3,
       id: wordId,
       language: "en",

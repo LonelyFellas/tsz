@@ -43,3 +43,5 @@ export type {
   WordSubPos,
   PronunciationStyle
 } from "./admin-word";
+
+export * from "./entry-annotation";

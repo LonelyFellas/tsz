@@ -1,3 +1,4 @@
+import type { EntryAnnotationResponse } from "@tsz/types";
 import type {
   AdminWordAnyEnvelope,
   AdminWordDraftAnyEnvelope,
@@ -533,4 +534,11 @@ export function decodeAdminWordPublicationEnvelope(
   );
   assertRuntimeContract("AdminWordPublicationEnvelope", value);
   return value as AdminWordPublicationEnvelope;
+}
+
+export function decodeEntryAnnotationResponse(
+  value: unknown
+): EntryAnnotationResponse {
+  assertRuntimeContract("EntryAnnotationResponse", value);
+  return value as EntryAnnotationResponse;
 }

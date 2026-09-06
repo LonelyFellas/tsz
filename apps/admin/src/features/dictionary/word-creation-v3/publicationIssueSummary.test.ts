@@ -13,6 +13,8 @@ function word(): AdminWordV3 {
     pos_id: uuidFromInt(1002)
   }).pos[0]!;
   return {
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 3,
     id: uuidFromInt(1000),
     language: "en",

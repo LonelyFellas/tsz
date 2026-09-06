@@ -184,6 +184,8 @@ export interface RelationReferenceSummaryV3 {
 }
 
 export interface MatchedEntryContextV3 {
+  annotation: string | null;
+  annotation_revision: number;
   entry_id: string;
   presentation: EntryPresentationV3;
   pos_labels: string[];

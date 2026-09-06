@@ -1,5 +1,6 @@
 // 通用 API 包裹类型。
 
+import type { EntryAnnotationConflict } from "./entry-annotation";
 import type { DraftValidationIssueAny } from "./admin-word-v3";
 import type { SurfaceMatchPageAny, SurfacePolicyNameV2 } from "./surface-match";
 
@@ -24,6 +25,7 @@ export interface Actor {
 
 /** RFC 9457 领域错误的通用结构化上下文。 */
 export interface ProblemMeta {
+  annotation_conflict?: EntryAnnotationConflict;
   current_revision?: number;
   current_lifecycle_revision?: number;
   word_id?: string;

@@ -7,6 +7,9 @@ function row(
   overrides: Partial<Extract<AdminWordListItemAny, { schema_version: 2 }>> = {}
 ): Extract<AdminWordListItemAny, { schema_version: 2 }> {
   const base: Extract<AdminWordListItemAny, { schema_version: 2 }> = {
+    annotation_visible: false,
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 2,
     id: "w-1",
     headword: "centre",
@@ -77,6 +80,9 @@ describe("智能词库行入口", () => {
 
   it("V3 草稿进入独立 V3 向导路径", () => {
     const record: Extract<AdminWordListItemAny, { schema_version: 3 }> = {
+      annotation_visible: false,
+      annotation: null,
+      annotation_revision: 1,
       schema_version: 3,
       id: "v3-1",
       kind: "word",
@@ -107,6 +113,9 @@ describe("智能词库行入口", () => {
 
   it("V3 已发布状态沿用 preview 与 edit 规则，但保持 V3 路径", () => {
     const base: Extract<AdminWordListItemAny, { schema_version: 3 }> = {
+      annotation_visible: false,
+      annotation: null,
+      annotation_revision: 1,
       schema_version: 3,
       id: "v3-2",
       kind: "word",

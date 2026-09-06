@@ -32,6 +32,8 @@ vi.mock("@/features/settings/useDialectPreference", () => ({
 
 function word(): AdminWordV3 {
   return {
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 3,
     id: "word-1",
     language: "en",

@@ -353,6 +353,8 @@ export type WordDetectionSnapshotV2 = WordDetectionSnapshotBaseV2 &
   );
 
 export interface AdminWordV2 {
+  annotation: string | null;
+  annotation_revision: number;
   schema_version: 2;
   id: string;
   language: AdminWordLanguageV2;

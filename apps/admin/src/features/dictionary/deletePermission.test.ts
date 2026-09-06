@@ -8,6 +8,8 @@ import {
 
 function row(overrides: Partial<AdminWordListItemAny> = {}) {
   return {
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 2,
     id: "w-1",
     headword: "colour",

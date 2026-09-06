@@ -5,6 +5,8 @@ import { buildV3ReviewModel } from "./reviewModel";
 
 function modelInput(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
   return {
+    annotation: null,
+    annotation_revision: 1,
     schema_version: 3 as const,
     id: "word-1",
     language: "en" as const,

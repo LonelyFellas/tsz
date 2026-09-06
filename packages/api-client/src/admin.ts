@@ -2,6 +2,7 @@
 // 独立登录 / 独立 token / 独立 refresh cookie（path=/api/v1/admin）。
 // 这些端点要绑定到 baseUrl=/api/v1/admin 的 HttpClient 上，路径才会落到 /api/v1/admin/*。
 import type {
+  UpdateEntryAnnotationInput,
   ActivatePublicationInput,
   ActivatePublicationV3Input,
   AdminListQuery,
@@ -76,6 +77,7 @@ import type {
 } from "@tsz/types";
 import type { RefreshResponse } from "./endpoints";
 import {
+  decodeEntryAnnotationResponse,
   decodeAdminWordAnyEnvelope,
   decodeAdminWordAnyListResponse,
   decodeAdminWordDraftV2Envelope,
@@ -357,6 +359,10 @@ export function createAdminEndpoints(http: HttpClient) {
             headers: { "Idempotency-Key": idempotencyKey }
           })
           .then(decodeAdminWordV2Envelope),
+      updateAnnotation: (entryId: string, input: UpdateEntryAnnotationInput) =>
+        http
+          .patch<unknown>(`/lexicon/entries/${entryId}/annotation`, input)
+          .then(decodeEntryAnnotationResponse),
       /** 显式 V3 create；绝不把 V2 成功响应强制断言成 V3。 */
       createV3: (idempotencyKey: string, input: CreateAdminWordV3Input) =>
         http

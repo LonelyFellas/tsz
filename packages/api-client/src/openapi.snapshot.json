@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dev-clean/docs/openapi.json",
-  "_generatedAt": "2026-09-06T08:33:32.029Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dev-worktree/docs/openapi.json",
+  "_generatedAt": "2026-09-06T14:09:41.434Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -24,6 +24,7 @@
     "/admin/lexicon/entries/sentence-targets/resolve": ["post"],
     "/admin/lexicon/entries/stats": ["get"],
     "/admin/lexicon/entries/{id}": ["delete", "get"],
+    "/admin/lexicon/entries/{id}/annotation": ["patch"],
     "/admin/lexicon/entries/{id}/archive": ["post"],
     "/admin/lexicon/entries/{id}/content-completion-jobs": ["post"],
     "/admin/lexicon/entries/{id}/content-completion-jobs/{job_id}": ["get"],
@@ -377,6 +378,17 @@
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "patch /admin/lexicon/entries/{id}/annotation": {
+      "request": { "$ref": "#/components/schemas/UpdateEntryAnnotationInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/EntryAnnotationResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "post /admin/lexicon/entries/{id}/archive": {
       "request": { "$ref": "#/components/schemas/EntryLifecycleInput" },
       "responses": {
@@ -565,6 +577,8 @@
   "schemas": {
     "AdminWordV2": {
       "required": [
+        "annotation",
+        "annotation_revision",
         "schema_version",
         "id",
         "language",
@@ -637,6 +651,7 @@
         "sub_part_of_speech_not_found",
         "part_of_speech_conflict",
         "sub_part_of_speech_conflict",
+        "annotation_conflict",
         "revision_conflict",
         "reference_conflict",
         "relation_prebinding_fanout_exceeded",
@@ -1760,6 +1775,9 @@
           "type": "array",
           "items": { "type": "string", "format": "uuid" }
         },
+        "annotation_conflict": {
+          "$ref": "#/components/schemas/EntryAnnotationConflict"
+        },
         "code": { "type": "string" },
         "current_lifecycle_revision": { "type": "integer", "format": "int64" },
         "current_policy_epoch": {
@@ -2191,6 +2209,9 @@
     "AdminWordListItem": {
       "type": "object",
       "required": [
+        "annotation_visible",
+        "annotation",
+        "annotation_revision",
         "schema_version",
         "id",
         "headword",
@@ -2212,6 +2233,16 @@
         "updated_at"
       ],
       "properties": {
+        "annotation": { "type": ["string", "null"] },
+        "annotation_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "annotation_visible": {
+          "type": "boolean",
+          "description": "Whether another visible active entry shares any base/headword prototype."
+        },
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": {
           "type": "string",
@@ -3014,6 +3045,11 @@
       "type": "object",
       "required": ["schema_version", "detection_id", "kind"],
       "properties": {
+        "annotation": { "type": ["string", "null"], "maxLength": 20 },
+        "annotation_updates": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/EntryAnnotationUpdate" }
+        },
         "confirmed_surface_match_token": {
           "type": "string",
           "description": "检测阶段 surface warning 的服务端签名确认 token；用于确认匹配集合没有漂移。"
@@ -3249,6 +3285,20 @@
         }
       ],
       "discriminator": { "propertyName": "mode" }
+    },
+    "EntryAnnotationUpdate": {
+      "type": "object",
+      "required": ["entry_id", "base_annotation_revision"],
+      "properties": {
+        "annotation": { "type": ["string", "null"], "maxLength": 20 },
+        "base_annotation_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "entry_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
     },
     "EntryKind": { "type": "string", "enum": ["word", "phrase"] },
     "GrammarStructureV2": {
@@ -3790,6 +3840,19 @@
       }
     },
     "UkDialectV3": { "type": "string", "enum": ["uk"] },
+    "UpdateEntryAnnotationInput": {
+      "type": "object",
+      "required": ["base_annotation_revision"],
+      "properties": {
+        "annotation": { "type": ["string", "null"], "maxLength": 20 },
+        "base_annotation_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
     "UsDialectV3": { "type": "string", "enum": ["us"] },
     "ValidateAdminWordAnyInput": {
       "oneOf": [
@@ -4254,7 +4317,7 @@
     },
     "WordRelationV2": {
       "type": "object",
-      "description": "关联词支持显式词义绑定与纯文本两种形态：\n\n- `target_word_id` + `target_sense_id` 指向管理员选择的真实义项，\n  `target_headword` / `target_gloss` 是服务端回填的快照。\n- `pending_target_headword` 是独立展示文本，保存和发布均不创建词条或自动绑定。\n  `pending_target_gloss` 仅保留旧数据兼容，不再用于创建或匹配目标。\n\n旧预绑定字段仅供内部历史数据兼容；写入不接受，迁移会移除旧预绑定关联。",
+      "description": "关联词有三种形态，由 `lexicon_relations_target_shape_check` 在库层保证互斥：\n\n- **已绑定**：`target_word_id` + `target_sense_id` 指向真实义项，\n  `target_headword` / `target_gloss` 是服务端回填的快照。\n- **待物化**：目标词还没有词条，`pending_target_headword` 承载管理员录入的词面，\n  `pending_target_gloss` 可选地承载创建目标草稿时预填的中文词义。这种形态只允许存在\n  于草稿；发布时会先建出词条再回填 target，所以发布出去的关联词永远是已绑定的。\n- **预绑定**：目标词条已存在但还没有可绑词义，`prebound_target_word_id` 锁定词条身份，\n  不携带 `pending_target_headword`（词面回显走服务端回填的只读 `target_headword`），\n  `pending_target_gloss` 可选。目标长出第一词义后自动物化为已绑定。",
       "required": ["id", "relation", "score"],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
@@ -4295,13 +4358,29 @@
             "id": { "type": "string", "format": "uuid" },
             "pending_target_gloss": {
               "type": "string",
-              "description": "Legacy text annotation; never used to create or bind a target.",
+              "description": "预定义词义：跟随待建词面或预绑定草稿。",
               "maxLength": 5000
             },
             "pending_target_headword": {
               "type": "string",
-              "description": "Unlinked display text; saving and publishing never creates or binds a target."
+              "description": "纯待建关联词的词面；预绑定（`prebound_target_word_id` 非空）不得携带。"
             },
+            "relation": { "type": "string" },
+            "score": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["id", "relation", "score", "prebound_target_word_id"],
+          "properties": {
+            "id": { "type": "string", "format": "uuid" },
+            "pending_target_gloss": {
+              "type": "string",
+              "description": "预定义词义：跟随待建词面或预绑定草稿。",
+              "maxLength": 5000
+            },
+            "prebound_target_word_id": { "type": "string", "format": "uuid" },
             "relation": { "type": "string" },
             "score": { "type": "string" }
           },

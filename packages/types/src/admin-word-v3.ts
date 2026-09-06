@@ -1,3 +1,4 @@
+import type { EntryAnnotationUpdate } from "./entry-annotation";
 import type { RichTextEmphasisLevel } from "./rich-text";
 import type {
   AdminWordListPage,
@@ -586,6 +587,8 @@ export interface AdminWordV3Compatibility {
 }
 
 export interface AdminWordV3 {
+  annotation: string | null;
+  annotation_revision: number;
   schema_version: 3;
   id: string;
   language: EnglishLanguageV3;
@@ -651,6 +654,8 @@ export type AdminWordDraftAnyEnvelope =
   AdminWordDraftV2Envelope | AdminWordDraftV3Envelope;
 
 export interface CreateAdminWordV3Input {
+  annotation?: string | null;
+  annotation_updates?: EntryAnnotationUpdate[];
   schema_version: 3;
   detection_id: string;
   kind: WordEntryKindV3;
@@ -951,6 +956,8 @@ export interface DetectionSurfaceRequestEchoV3 {
 }
 
 export interface DetectLexiconSurfaceResponseV3 {
+  /** Own unfinished draft without saved surface sources; not a surface match. */
+  existing_draft_id?: string;
   schema_version: 3;
   detection_id: string;
   expires_at: string;
@@ -968,6 +975,9 @@ export type DetectLexiconResponseAny =
   DetectWordResponseV2 | DetectLexiconSurfaceResponseV3;
 
 export interface AdminWordListItemV3 {
+  annotation_visible: boolean;
+  annotation: string | null;
+  annotation_revision: number;
   schema_version: 3;
   id: string;
   kind: WordEntryKindV3;
