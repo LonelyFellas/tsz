@@ -641,7 +641,7 @@ describe("admin word V3/Any runtime decoder", () => {
     }
   });
 
-  it("关联词运行时 schema 接受四态并拒绝缺字段或混合目标", () => {
+  it("关联词运行时 schema 接受正式绑定与纯文本，拒绝预绑定和混合目标", () => {
     const word = validAdminWordV3() as unknown as Record<string, unknown>;
     const pos = validRuntimeDefinition("WordPosMeaningsV3") as Record<
       string,
@@ -668,19 +668,6 @@ describe("admin word V3/Any runtime decoder", () => {
         ...base,
         pending_target_headword: "reliability",
         pending_target_gloss: "可靠性"
-      },
-      {
-        ...base,
-        prebound_target_word_id: IDS.entry,
-        target_headword: "reliability",
-        pending_target_gloss: "可靠性",
-        prebinding_state: "waiting_first_sense"
-      },
-      {
-        ...base,
-        prebound_target_word_id: IDS.entry,
-        target_headword: "reliability",
-        prebinding_state: "target_sense_deleted"
       }
     ];
     sense.relations = validRelations;
@@ -696,7 +683,7 @@ describe("admin word V3/Any runtime decoder", () => {
         target_headword: "reliability",
         prebinding_state: "waiting_first_sense"
       },
-      // 预绑定不得携带待建词面（旧宽形态，已收窄）。
+      // 旧客户端也不得通过纯文本混合形态恢复预绑定。
       {
         ...base,
         prebound_target_word_id: IDS.entry,

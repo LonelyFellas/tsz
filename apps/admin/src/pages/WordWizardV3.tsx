@@ -378,9 +378,6 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
       ) : null}
       <V3MeaningsAndExamplesStep
         activePosId={context.activePosId}
-        draftRelationPrebindingEnabled={
-          context.word.capabilities.draft_relation_prebinding === true
-        }
         componentUsagesEnabled={
           context.word.capabilities.sense_component_usages === true
         }

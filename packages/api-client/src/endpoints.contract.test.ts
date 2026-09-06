@@ -494,7 +494,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "fb86524a4af6a1b155199ebacc9863d80975680d6739590348f22fb6ebefb818"
+      "cb25a31cb04e486c6900b6c6dafaa5db2a43b968a8a702b1a112dff8c000f8c1"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -610,8 +610,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       required: string[];
       properties: Record<string, { enum?: string[] }>;
     }>;
-    expect(writableRelationBranches).toHaveLength(3);
-    expect(responseRelationBranches).toHaveLength(4);
+    expect(writableRelationBranches).toHaveLength(2);
+    expect(responseRelationBranches).toHaveLength(2);
     expect(
       writableRelationBranches.every(
         (branch) =>
@@ -619,30 +619,20 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
           !("target_headword" in branch.properties)
       )
     ).toBe(true);
-    // 预绑定写分支不携带待建词面，词条身份只在稳定 id 上。
+    expect(
+      [...writableRelationBranches, ...responseRelationBranches].every(
+        (branch) =>
+          !("prebound_target_word_id" in branch.properties) &&
+          !("prebinding_state" in branch.properties)
+      )
+    ).toBe(true);
     expect(
       writableRelationBranches.some(
         (branch) =>
-          "prebound_target_word_id" in branch.properties &&
-          !("pending_target_headword" in branch.properties) &&
+          "pending_target_headword" in branch.properties &&
           "pending_target_gloss" in branch.properties
       )
     ).toBe(true);
-    // 预绑定响应分支的词面回显走只读 target_headword。
-    expect(
-      responseRelationBranches
-        .filter((branch) => "prebound_target_word_id" in branch.properties)
-        .every(
-          (branch) =>
-            branch.required.includes("target_headword") &&
-            !("pending_target_headword" in branch.properties)
-        )
-    ).toBe(true);
-    expect(
-      responseRelationBranches
-        .flatMap((branch) => branch.properties.prebinding_state?.enum ?? [])
-        .sort()
-    ).toEqual(["target_sense_deleted", "waiting_first_sense"]);
     expect(
       snapshot.operationQueryParameters[
         "get /admin/lexicon/entries/related-search"

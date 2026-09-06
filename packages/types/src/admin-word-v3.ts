@@ -455,12 +455,10 @@ export interface WordRelationV3 {
   relation: string;
   target_word_id?: string;
   target_sense_id?: string;
-  prebound_target_word_id?: string;
   pending_target_headword?: string;
   pending_target_gloss?: string;
   target_headword?: string;
   target_gloss?: string;
-  prebinding_state?: "waiting_first_sense" | "target_sense_deleted";
   target_status?: "draft" | "published" | "archived";
   score: string;
 }
@@ -507,10 +505,9 @@ export interface WordRelationWritableV3 {
   relation: string;
   target_word_id?: string;
   target_sense_id?: string;
-  prebound_target_word_id?: string;
-  /** 纯待建关联词的词面；预绑定（prebound_target_word_id 非空）不得携带，词面回显走只读 target_headword。 */
+  /** 未显式绑定的关联词词面；保存和发布后仍为纯文本。 */
   pending_target_headword?: string;
-  /** 预定义词义：跟随待建词面或预绑定草稿。 */
+  /** 未显式绑定的关联词词义；仅保存文本，不触发词条创建或关联。 */
   pending_target_gloss?: string;
   score: string;
 }
