@@ -753,7 +753,8 @@ describe("V3WordCreationWizard", () => {
       )
     });
 
-    expect(screen.getByText("语义区间 1")).toBeVisible();
+    expect(screen.getByLabelText("语义区间 1 中文")).toBeVisible();
+    expect(screen.getByText("未命名语义区间")).toBeVisible();
     expect(screen.getAllByText("语法结构").length).toBeGreaterThan(0);
     expect(screen.getByText("多维释义")).toBeVisible();
     expect(screen.getAllByText("多维例句").length).toBeGreaterThan(0);
