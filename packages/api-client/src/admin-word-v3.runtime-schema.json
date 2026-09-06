@@ -1,6 +1,6 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dev-worktree/docs/openapi.json",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
   "_source_sha256": "c3f6a18ac3dba0dfb790cdf68c29d8638e83cfc037a582d1d8273d366c55006f",
   "roots": [
     "EntryAnnotationResponse",

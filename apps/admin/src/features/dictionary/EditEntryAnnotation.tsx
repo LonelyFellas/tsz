@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client/http";
 import type { AdminWordListItemAny, EntryAnnotationConflict } from "@tsz/types";
-import { api } from "@/lib/auth";
+import { adminWordsAnyDataSource } from "./dataSource";
 import { EntryAnnotationModal } from "./EntryAnnotationModal";
 import { wordListLabel } from "./presentation";
 import { wordKeys } from "./api";
@@ -51,11 +51,14 @@ export function EditEntryAnnotation({
         setBusy(true);
         setError(undefined);
         try {
-          const response = await api.words.updateAnnotation(entry.id, {
-            annotation: values[entry.id] || null,
-            base_annotation_revision:
-              current?.annotation_revision ?? entry.annotation_revision
-          });
+          const response = await adminWordsAnyDataSource.updateAnnotation(
+            entry.id,
+            {
+              annotation: values[entry.id] || null,
+              base_annotation_revision:
+                current?.annotation_revision ?? entry.annotation_revision
+            }
+          );
           if (response.entry_id !== entry.id)
             throw new Error("Unexpected entry");
           await queryClient.invalidateQueries({ queryKey: wordKeys.all });

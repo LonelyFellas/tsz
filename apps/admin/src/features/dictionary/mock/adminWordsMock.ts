@@ -22,6 +22,7 @@ import type {
   DraftValidationIssueV2,
   DraftValidationResponse,
   DeletePartOfSpeechQuery,
+  EntryAnnotationResponse,
   EntryDeleteBatchInput,
   EntryReferenceKind,
   EntryReferenceSummary,
@@ -52,6 +53,7 @@ import type {
   MatchedEntryContextV2,
   SubPartOfSpeechConfig,
   SubPartOfSpeechListResponse,
+  UpdateEntryAnnotationInput,
   UpdatePartOfSpeechInput,
   UpdateSubPartOfSpeechInput,
   ValidateAdminWordV2Input,
@@ -1703,6 +1705,45 @@ export function createAdminWordsMock({
     return word;
   }
 
+  /**
+   * PATCH /entries/{id}/annotation 的 mock。
+   *
+   * 只做「存下来、修订加一」；**不模拟 409 annotation_conflict 的重复判定**——
+   * 那是后端按 dialect_scope + normalized_surface 分组算的，前端复刻必然分叉。
+   * 冲突路径由单测注入错误覆盖。
+   */
+  async function updateAnnotation(
+    entryId: string,
+    input: UpdateEntryAnnotationInput
+  ): Promise<EntryAnnotationResponse> {
+    await pause();
+    const { state: current } = context();
+    const word = requireWord(current, entryId);
+    if (word.status === "archived") {
+      throw new HttpError(409, "entry is archived", [], "entry_archived");
+    }
+    if (word.annotation_revision !== input.base_annotation_revision) {
+      throw new HttpError(
+        409,
+        "annotation revision conflict",
+        [],
+        "annotation_conflict"
+      );
+    }
+    const next = input.annotation?.trim() ? input.annotation.trim() : null;
+    if (next !== word.annotation) {
+      // 值没变就不涨修订，与后端一致。
+      word.annotation = next;
+      word.annotation_revision += 1;
+    }
+    persist(current);
+    return {
+      entry_id: entryId,
+      annotation: word.annotation,
+      annotation_revision: word.annotation_revision
+    };
+  }
+
   function requireV2Draft(
     current: AdminWordsMockPersistedState,
     wordId: string
@@ -3091,6 +3132,8 @@ export function createAdminWordsMock({
         return true;
       })
       .map((word) => ({
+        // mock 禁止同词面建第二条（createV2 抛 duplicate_word），因此永远没有
+        // 需要角标区分的同原型组；这里恒为 false，不是简化。
         annotation_visible: false,
         annotation: word.annotation,
         annotation_revision: word.annotation_revision,
@@ -4983,6 +5026,7 @@ export function createAdminWordsMock({
     deleteDraft,
     deleteBatch,
     relatedSearch,
+    updateAnnotation,
     sentenceAssociations: {
       resolve: resolveSentenceAssociation,
       listPending: listPendingSentenceAssociations,

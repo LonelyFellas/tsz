@@ -5155,3 +5155,63 @@ describe("forms surface warning mock", () => {
     });
   });
 });
+
+describe("词条标注（mock）", () => {
+  it("保存标注并递增独立修订，内容 revision 不变", async () => {
+    const mock = mockFor();
+    const { word } = await createCenter(mock);
+    expect(word.annotation).toBeNull();
+    expect(word.annotation_revision).toBe(1);
+
+    const saved = await mock.updateAnnotation(word.id, {
+      annotation: " 01 ",
+      base_annotation_revision: 1
+    });
+    expect(saved).toEqual({
+      entry_id: word.id,
+      annotation: "01",
+      annotation_revision: 2
+    });
+
+    const { word: reloaded } = await mock.get(word.id);
+    expect(reloaded.annotation).toBe("01");
+    // 标注独立于内容：改标注不该动 revision。
+    expect(reloaded.revision).toBe(word.revision);
+  });
+
+  it("值没变不涨修订", async () => {
+    const mock = mockFor();
+    const { word } = await createCenter(mock);
+    await mock.updateAnnotation(word.id, {
+      annotation: "7",
+      base_annotation_revision: 1
+    });
+    await expect(
+      mock.updateAnnotation(word.id, {
+        annotation: "7",
+        base_annotation_revision: 2
+      })
+    ).resolves.toMatchObject({ annotation_revision: 2 });
+  });
+
+  it("修订过期返回 409 annotation_conflict", async () => {
+    const mock = mockFor();
+    const { word } = await createCenter(mock);
+    await expect(
+      mock.updateAnnotation(word.id, {
+        annotation: "1",
+        base_annotation_revision: 99
+      })
+    ).rejects.toMatchObject({ status: 409, code: "annotation_conflict" });
+  });
+
+  it("不存在的词条 404", async () => {
+    const mock = mockFor();
+    await expect(
+      mock.updateAnnotation("missing", {
+        annotation: "1",
+        base_annotation_revision: 1
+      })
+    ).rejects.toMatchObject({ status: 404, code: "word_not_found" });
+  });
+});
