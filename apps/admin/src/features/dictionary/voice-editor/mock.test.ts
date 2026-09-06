@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { createMockVoicePreviewAdapter, MOCK_VOICES } from "./mock";
+import { describe, expect, it, vi } from "vitest";
+import {
+  createMockAudioUploadAdapter,
+  createMockVoicePreviewAdapter,
+  MOCK_VOICES
+} from "./mock";
 
 const REQUEST = {
   language: "en",
@@ -55,5 +59,45 @@ describe("mock voice preview adapter", () => {
     await expect(
       adapter.synthesize({ ...REQUEST, voiceId: "missing" })
     ).rejects.toThrow("mock voice not found");
+  });
+});
+
+describe("mock audio upload adapter", () => {
+  it("fakes the three steps: reports progress, returns an asset carrying the chosen attribution, serves a silent url", async () => {
+    const adapter = createMockAudioUploadAdapter();
+    const onProgress = vi.fn();
+    const asset = await adapter.upload({
+      file: new File([new Uint8Array(3)], "a.mp3", { type: "audio/mpeg" }),
+      locale: "en-US",
+      gender: "male",
+      onProgress
+    });
+    expect(onProgress.mock.calls.map(([ratio]) => ratio)).toEqual([0.4, 1]);
+    expect(asset).toMatchObject({
+      id: "mock-audio-1",
+      locale: "en-US",
+      gender: "male",
+      content_type: "audio/mpeg",
+      size_bytes: 3,
+      original_name: "a.mp3"
+    });
+    expect(adapter.isStorageUnavailable?.()).toBe(false);
+    const resolved = await adapter.resolveUrl(asset.id);
+    expect(resolved.url.startsWith("data:audio/wav;base64,")).toBe(true);
+    expect(Date.parse(resolved.expiresAt)).toBeGreaterThan(Date.now());
+  });
+
+  it("rejects an aborted upload without producing an asset", async () => {
+    const adapter = createMockAudioUploadAdapter();
+    const controller = new AbortController();
+    controller.abort();
+    await expect(
+      adapter.upload({
+        file: new File([new Uint8Array(3)], "a.mp3", { type: "audio/mpeg" }),
+        locale: "en-GB",
+        gender: "female",
+        signal: controller.signal
+      })
+    ).rejects.toMatchObject({ name: "AbortError" });
   });
 });

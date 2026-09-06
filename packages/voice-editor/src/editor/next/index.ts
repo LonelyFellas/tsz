@@ -8,9 +8,9 @@ export type {
   RatePanelProps,
   UploadDraft,
   UploadPanelProps,
-  UploadedAudio,
   VoicePanelProps
 } from "./ToolPanels";
+export type { PendingUpload } from "./audioAssets";
 export { useVoiceAudition } from "./useVoiceAudition";
 export type { VoiceAudition, VoiceAuditionInput } from "./useVoiceAudition";
 export * from "./roles";

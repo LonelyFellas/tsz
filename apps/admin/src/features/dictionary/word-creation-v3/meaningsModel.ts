@@ -6,6 +6,7 @@ import type {
   DraftMeaningsStepContentWritableV3,
   EnglishTextV3,
   GrammarStructureV3,
+  GrammarVariantV3,
   RichTextV3,
   RichTextVariantV3,
   SentenceTranslationBandV3,
@@ -180,6 +181,25 @@ function cloneDefinition(definition: WordDefinitionV3): WordDefinitionV3 {
  * Read-only association resolution and target display snapshots are deliberately
  * reconstructed away instead of being retained through object spread.
  */
+/**
+ * 发音配置与音频引用是正文的兄弟字段，重建变体时要一并带上（深拷贝）；
+ * 缺省时不凭空生成键（旧后端 deny_unknown_fields）。合并英美两条时音频引用
+ * 由调用方拼好传进来。
+ */
+function variantSidecars(
+  variant: GrammarVariantV3,
+  audioAssets: GrammarVariantV3["audio_assets"] = variant.audio_assets
+): Pick<GrammarVariantV3, "voice_profile" | "audio_assets"> {
+  return {
+    ...(variant.voice_profile === undefined
+      ? {}
+      : { voice_profile: structuredClone(variant.voice_profile) }),
+    ...(audioAssets === undefined
+      ? {}
+      : { audio_assets: structuredClone(audioAssets) })
+  };
+}
+
 export function toWritableMeanings(
   canonical: DraftMeaningsStepContentV3
 ): DraftMeaningsStepContentWritableV3 {
@@ -196,7 +216,8 @@ export function toWritableMeanings(
         variants: structure.variants.map((variant) => ({
           id: variant.id,
           dialect: variant.dialect,
-          content: cloneRichText(variant.content)
+          content: cloneRichText(variant.content),
+          ...variantSidecars(variant)
         }))
       })),
       senses: pos.senses.map((sense) => ({
@@ -568,21 +589,34 @@ function normalizeGrammarVariants(
     const only =
       grammar.variants.length === 1 ? grammar.variants[0] : undefined;
     if (!only || only.dialect !== "common") return undefined;
+    // 音频按自己的归属语种分到英 / 美那一侧，一条都不丢
     return dialects.map((dialect) => ({
       id: variantId(dialect),
       dialect,
-      content: structuredClone(only.content)
+      content: structuredClone(only.content),
+      ...variantSidecars(
+        only,
+        only.audio_assets?.filter(
+          (asset) => asset.locale === (dialect === "uk" ? "en-GB" : "en-US")
+        )
+      )
     }));
   }
   const uk = grammar.variants.find((variant) => variant.dialect === "uk");
   const us = grammar.variants.find((variant) => variant.dialect === "us");
   if (grammar.variants.length !== 2 || !uk || !us) return undefined;
   const source = uk.content.text.trim() ? uk : us;
+  // 合并时两侧音频都保留（英式在前）；超过单变体上限由面板的「已用」计数与发布校验兜底
+  const audioAssets =
+    uk.audio_assets === undefined && us.audio_assets === undefined
+      ? undefined
+      : [...(uk.audio_assets ?? []), ...(us.audio_assets ?? [])];
   return [
     {
       id: variantId("common"),
       dialect: "common",
-      content: structuredClone(source.content)
+      content: structuredClone(source.content),
+      ...variantSidecars(source, audioAssets)
     }
   ];
 }

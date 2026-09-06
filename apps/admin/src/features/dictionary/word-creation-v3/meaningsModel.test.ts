@@ -1,4 +1,5 @@
 import type {
+  AudioAssetV3,
   DraftFormsStepContentV3,
   DraftMeaningsStepContentV3,
   EnglishTextV3
@@ -15,6 +16,19 @@ import {
   stripSenseComponentUsages,
   toWritableMeanings
 } from "./meaningsModel";
+
+const audioAsset = (
+  id: string,
+  locale: AudioAssetV3["locale"]
+): AudioAssetV3 => ({
+  id,
+  locale,
+  gender: "female",
+  content_type: "audio/mpeg",
+  size_bytes: 3,
+  original_name: `${id}.mp3`,
+  created_at: "2026-09-06T00:00:00Z"
+});
 
 const meaningsCanonicalFixture: DraftMeaningsStepContentV3 = {
   sense_groups: [{ id: "sense-group-1", name_zh: "核心", name_en: "Core" }],
@@ -1050,6 +1064,80 @@ describe("释义级成分用词在词义投影中的往返", () => {
   it("toWritableMeanings 在字段缺失时不凭空生成键（旧后端 deny_unknown_fields）", () => {
     const writable = toWritableMeanings(meaningsCanonicalFixture);
     expect("component_usages" in writable.pos[0]!.senses[0]!).toBe(false);
+    const variant = writable.pos[0]!.grammar_structures[0]!.variants[0]!;
+    expect("voice_profile" in variant).toBe(false);
+    expect("audio_assets" in variant).toBe(false);
+  });
+
+  it("toWritableMeanings 保留语法结构变体的 voice_profile 与 audio_assets（深拷贝）", () => {
+    const canonical = structuredClone(meaningsCanonicalFixture);
+    const source = canonical.pos[0]!.grammar_structures[0]!.variants[0]!;
+    source.voice_profile = {
+      voice_ids: ["en-GB-SoniaNeural"],
+      rate_percent: -10
+    };
+    source.audio_assets = [audioAsset("asset-1", "en-GB")];
+    const writable = toWritableMeanings(canonical);
+    const variant = writable.pos[0]!.grammar_structures[0]!.variants[0]!;
+    expect(variant.voice_profile).toEqual(source.voice_profile);
+    expect(variant.audio_assets).toEqual(source.audio_assets);
+    expect(variant.voice_profile).not.toBe(source.voice_profile);
+    expect(variant.audio_assets![0]).not.toBe(source.audio_assets[0]);
+  });
+
+  it("拼写模式切换重建变体时音频引用不丢：拆分按归属语种分侧，合并两侧拼接", () => {
+    const existing = toWritableMeanings(meaningsCanonicalFixture);
+    const common = existing.pos[0]!.grammar_structures[0]!.variants[0]!;
+    common.voice_profile = {
+      voice_ids: ["en-GB-SoniaNeural"],
+      rate_percent: 0
+    };
+    common.audio_assets = [
+      audioAsset("asset-uk", "en-GB"),
+      audioAsset("asset-us", "en-US")
+    ];
+    let nextId = 0;
+    const idFactory = () => `variant-${++nextId}`;
+
+    const split = ensureV3MeaningsForForms(
+      "entry-1",
+      formsFixture({
+        pos_id: "pos-1",
+        dialect_rules: {
+          spelling_mode: "distinguish",
+          phonetic_mode: "distinguish"
+        }
+      }),
+      existing,
+      idFactory
+    ).pos[0]!.grammar_structures[0]!.variants;
+    expect(split.map((variant) => variant.dialect)).toEqual(["uk", "us"]);
+    expect(split.map((variant) => variant.audio_assets)).toEqual([
+      [audioAsset("asset-uk", "en-GB")],
+      [audioAsset("asset-us", "en-US")]
+    ]);
+    expect(split.every((variant) => variant.voice_profile)).toBe(true);
+
+    const merged = ensureV3MeaningsForForms(
+      "entry-1",
+      formsFixture({ pos_id: "pos-1" }),
+      {
+        ...existing,
+        pos: [
+          {
+            ...existing.pos[0]!,
+            grammar_structures: [{ id: "grammar-1", variants: split }]
+          }
+        ]
+      },
+      idFactory
+    ).pos[0]!.grammar_structures[0]!.variants;
+    expect(merged).toHaveLength(1);
+    expect(merged[0]!.audio_assets!.map((asset) => asset.id)).toEqual([
+      "asset-uk",
+      "asset-us"
+    ]);
+    expect(merged[0]!.voice_profile).toEqual(common.voice_profile);
   });
 
   it("stripSenseComponentUsages 整键剥除，其余内容与引用不变", () => {

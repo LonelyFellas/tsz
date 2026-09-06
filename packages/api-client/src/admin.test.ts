@@ -226,6 +226,42 @@ describe("createAdminEndpoints — speech 试听", () => {
   });
 });
 
+describe("createAdminEndpoints — 音频资产 audioAssets", () => {
+  it("createUpload → POST /lexicon/audio-assets/upload-url 原样发送 snake_case wire", () => {
+    const api = createAdminEndpoints(http);
+    const controller = new AbortController();
+    const input = { content_type: "audio/mpeg", size: 1234 };
+    api.audioAssets.createUpload(input, controller.signal);
+    expect(http.post).toHaveBeenCalledWith(
+      "/lexicon/audio-assets/upload-url",
+      input,
+      { signal: controller.signal }
+    );
+  });
+
+  it("confirm → POST /lexicon/audio-assets", () => {
+    const api = createAdminEndpoints(http);
+    const input = {
+      key: "uploads/audio/x.mp3",
+      locale: "en-GB" as const,
+      gender: "female" as const,
+      original_name: "a.mp3"
+    };
+    api.audioAssets.confirm(input);
+    expect(http.post).toHaveBeenCalledWith("/lexicon/audio-assets", input, {
+      signal: undefined
+    });
+  });
+
+  it("url → GET /lexicon/audio-assets/{id}/url,id 走 URL 编码", () => {
+    const api = createAdminEndpoints(http);
+    api.audioAssets.url("a/b");
+    expect(http.get).toHaveBeenCalledWith("/lexicon/audio-assets/a%2Fb/url", {
+      signal: undefined
+    });
+  });
+});
+
 describe("createAdminEndpoints — 智能词库 words", () => {
   it("list 无参 → GET /lexicon/entries(不带 ?)", () => {
     const api = createAdminEndpoints(http);
