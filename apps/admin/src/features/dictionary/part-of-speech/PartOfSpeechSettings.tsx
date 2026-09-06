@@ -1,6 +1,4 @@
 import {
-  DeleteOutlined,
-  EditOutlined,
   PlusOutlined,
   ReloadOutlined,
   SearchOutlined
@@ -11,6 +9,7 @@ import {
   Breadcrumb,
   Button,
   Card,
+  ConfigProvider,
   Flex,
   Form,
   Input,
@@ -26,24 +25,47 @@ import type { TableColumnsType } from "antd";
 import { HttpError } from "@tsz/api-client";
 import type { PartOfSpeechConfig } from "@tsz/types";
 import dayjs from "dayjs";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   usePartOfSpeechCatalog,
   usePartOfSpeechConfigList,
   useRemovePartOfSpeech
 } from "./api";
+import { nextSortOrder } from "./catalog";
 import { PartOfSpeechFormModal } from "./PartOfSpeechFormModal";
 import { SubPartOfSpeechPanel } from "./SubPartOfSpeechDrawer";
+import type { SubPartOfSpeechPanelHandle } from "./SubPartOfSpeechDrawer";
+
+// 后端 409 冲突会带上撞车的字段名；编码用户看不到，撞了只能从英文全称入手。
+const CONFLICT_FIELD_LABEL: Record<string, string> = {
+  name_zh: "正式中文",
+  name_en: "正式英文",
+  abbreviation: "英文缩写",
+  short_name_zh: "简洁显示",
+  full_name_en: "英文全称"
+};
+
+function conflictMessage(kind: string, field: string | null | undefined) {
+  if (field === "code") return `英文全称与已有${kind}过于接近，请调整英文全称`;
+  const label = field ? CONFLICT_FIELD_LABEL[field] : undefined;
+  return label ? `${label}与已有${kind}重复` : `${kind}名称已存在`;
+}
 
 function errorMessage(error: unknown): string {
   if (error instanceof HttpError) {
-    if (error.code === "part_of_speech_conflict") return "词性编码或名称已存在";
+    // 稳定编码不对用户暴露：编码撞车只可能来自英文全称派生结果相同，提示改英文全称。
+    if (error.code === "part_of_speech_conflict")
+      return conflictMessage("基本词性", error.problem?.field);
     if (error.code === "sub_part_of_speech_conflict")
-      return "细分词性编码或名称已存在";
+      return conflictMessage("细分词性", error.problem?.field);
     if (error.code === "part_of_speech_in_use")
       return "该基本词性已被单词或短语引用，只能修改";
+    if (error.code === "part_of_speech_has_sub_parts")
+      return "该基本词性下还有细分词性，请先删除细分词性";
     if (error.code === "sub_part_of_speech_in_use")
       return "该细分词性已被词义引用，只能修改";
+    if (error.code === "sub_part_of_speech_not_allowed")
+      return "该基本词性不支持细分词性";
     if (error.code === "revision_conflict")
       return "配置已被其他管理员修改，请刷新后重试";
     if (error.code === "part_of_speech_not_found")
@@ -70,23 +92,32 @@ export function PartOfSpeechSettings() {
   const [editing, setEditing] = useState<PartOfSpeechConfig>();
   const [activeTab, setActiveTab] = useState<"basic" | "detailed">("basic");
   const [selectedPartId, setSelectedPartId] = useState("");
+  const subPanelRef = useRef<SubPartOfSpeechPanelHandle>(null);
   const list = usePartOfSpeechConfigList({
     q: q || undefined,
     page,
     page_size: pageSize
   });
   const catalog = usePartOfSpeechCatalog();
+  // 新建基本词性时排序值自动排在目录最后；目录没加载完前不开新建，免得算出错误的排序。
+  const catalogReady = !catalog.isPending && !catalog.isError;
+  const defaultSortOrder = nextSortOrder(catalog.data?.items ?? []);
   const remove = useRemovePartOfSpeech();
-  const selectedPart =
-    catalog.data?.items.find((item) => item.id === selectedPartId) ??
-    catalog.data?.items[0];
+  // 细分词性只能挂在后端标记为可扩展的基本词性下，下拉与默认选中都只看这部分。
+  const extensibleParts = (catalog.data?.items ?? []).filter(
+    (item) => item.sub_parts_extensible
+  );
+  // 空串表示「全部」：面板并排展示所有可扩展词性的细分词性；新增时在弹窗里选所属词性。
+  const selectedPart = extensibleParts.find(
+    (item) => item.id === selectedPartId
+  );
 
   const showError = (error: unknown) => message.error(errorMessage(error));
 
   const removeItem = (item: PartOfSpeechConfig) => {
     modal.confirm({
       title: `删除基本词性“${item.name_zh}”？`,
-      content: "删除后将同时移除其未被引用的细分词性，该操作不可恢复。",
+      content: "该操作不可恢复。",
       okText: "删 除",
       okButtonProps: { danger: true },
       cancelText: "取 消",
@@ -108,53 +139,49 @@ export function PartOfSpeechSettings() {
   const columns: TableColumnsType<PartOfSpeechConfig> = [
     {
       title: "序号",
-      width: 72,
+      width: 56,
       render: (_, __, index) => (page - 1) * pageSize + index + 1
     },
-    { title: "基本词性中文", dataIndex: "name_zh", width: 150 },
-    { title: "基本词性英文", dataIndex: "name_en", width: 180 },
-    {
-      title: "稳定编码",
-      dataIndex: "code",
-      width: 130,
-      render: (code: string) => <Tag>{code}</Tag>
-    },
-    { title: "英文缩写", dataIndex: "abbreviation", width: 110 },
+    { title: "正式中文", dataIndex: "name_zh", width: 120 },
+    { title: "简洁显示", dataIndex: "short_name_zh", width: 110 },
+    { title: "正式英文", dataIndex: "name_en", width: 130 },
+    { title: "英文缩写", dataIndex: "abbreviation", width: 90 },
+    { title: "英文全称", dataIndex: "full_name_en", width: 140 },
     {
       title: "细分词性",
       dataIndex: "sub_part_count",
-      width: 100,
-      render: (count: number) => `${count} 项`
+      width: 90,
+      render: (count: number, item) =>
+        item.sub_parts_extensible ? `${count} 项` : "不可扩展"
     },
     {
       title: "引用",
       dataIndex: "usage_count",
-      width: 110,
+      width: 100,
       render: (count: number) =>
         count > 0 ? <Tag color="blue">{count} 个词条</Tag> : "未引用"
     },
     {
       title: "创建人",
       dataIndex: "created_by",
-      width: 130,
+      width: 100,
       render: (actor: PartOfSpeechConfig["created_by"]) => actor.display_name
     },
     {
       title: "创建时间",
       dataIndex: "created_at",
-      width: 160,
+      width: 150,
       render: (value: string) => dayjs(value).format("YYYY-MM-DD HH:mm")
     },
     {
       title: "操作",
       key: "actions",
       fixed: "right",
-      width: 180,
+      width: 150,
       render: (_, item) => (
         <Space>
           <Button
             size="small"
-            icon={<EditOutlined />}
             onClick={() => {
               setEditing(item);
               setFormOpen(true);
@@ -166,14 +193,15 @@ export function PartOfSpeechSettings() {
             title={
               item.usage_count > 0
                 ? `已有 ${item.usage_count} 个单词或短语引用，只能修改`
-                : undefined
+                : item.sub_part_count > 0
+                  ? `还有 ${item.sub_part_count} 项细分词性，请先删除细分词性`
+                  : undefined
             }
           >
             <Button
               size="small"
               danger
-              disabled={item.usage_count > 0}
-              icon={<DeleteOutlined />}
+              disabled={item.usage_count > 0 || item.sub_part_count > 0}
               onClick={() => removeItem(item)}
             >
               删 除
@@ -192,74 +220,84 @@ export function PartOfSpeechSettings() {
           <Typography.Title level={3} style={{ margin: 0 }}>
             词性配置
           </Typography.Title>
-          <Typography.Text type="secondary">
+          <Typography.Text type="secondary" style={{ display: "block" }}>
             统一维护智能词库使用的基本词性与细分词性；业务页面默认显示中文名称。
           </Typography.Text>
         </div>
-        {activeTab === "basic" && (
-          <Button
-            type="primary"
-            icon={<PlusOutlined />}
-            onClick={() => {
-              setEditing(undefined);
-              setFormOpen(true);
-            }}
-          >
-            新增基本词性
-          </Button>
-        )}
       </Flex>
 
-      <Tabs
-        activeKey={activeTab}
-        onChange={(key) => setActiveTab(key as "basic" | "detailed")}
-        items={[
-          { key: "basic", label: "基本词性" },
-          { key: "detailed", label: "细分词性" }
-        ]}
-      />
+      {/* Tab 自带的上内边距与下外边距会让它和上下块的间距比页面统一的 16px 大，这里归零。 */}
+      <ConfigProvider
+        theme={{
+          components: {
+            Tabs: { horizontalItemPadding: "0 0 12px", horizontalMargin: "0" }
+          }
+        }}
+      >
+        <Tabs
+          activeKey={activeTab}
+          onChange={(key) => setActiveTab(key as "basic" | "detailed")}
+          items={[
+            { key: "basic", label: "基本词性" },
+            { key: "detailed", label: "细分词性" }
+          ]}
+        />
+      </ConfigProvider>
 
       {activeTab === "basic" ? (
         <>
           <Card size="small">
-            <Form
-              form={form}
-              layout="inline"
-              onFinish={({ q: nextQ }) => {
-                setQ(nextQ?.trim() ?? "");
-                setPage(1);
-              }}
-              style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
-            >
-              <Form.Item name="q" label="关键词">
-                <Input
-                  allowClear
-                  placeholder="中文 / 英文 / 编码 / 缩写"
-                  style={{ width: 260 }}
-                />
-              </Form.Item>
-              <Form.Item>
-                <Space>
-                  <Button
-                    type="primary"
-                    htmlType="submit"
-                    icon={<SearchOutlined />}
-                  >
-                    搜 索
-                  </Button>
-                  <Button
-                    icon={<ReloadOutlined />}
-                    onClick={() => {
-                      form.resetFields();
-                      setQ("");
-                      setPage(1);
-                    }}
-                  >
-                    重 置
-                  </Button>
-                </Space>
-              </Form.Item>
-            </Form>
+            <Flex justify="space-between" align="center" wrap gap={12}>
+              <Form
+                form={form}
+                layout="inline"
+                onFinish={({ q: nextQ }) => {
+                  setQ(nextQ?.trim() ?? "");
+                  setPage(1);
+                }}
+                style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+              >
+                <Form.Item name="q" label="关键词">
+                  <Input
+                    allowClear
+                    placeholder="中文 / 英文 / 编码 / 缩写"
+                    style={{ width: 260 }}
+                  />
+                </Form.Item>
+                <Form.Item>
+                  <Space>
+                    <Button
+                      type="primary"
+                      htmlType="submit"
+                      icon={<SearchOutlined />}
+                    >
+                      搜 索
+                    </Button>
+                    <Button
+                      icon={<ReloadOutlined />}
+                      onClick={() => {
+                        form.resetFields();
+                        setQ("");
+                        setPage(1);
+                      }}
+                    >
+                      重 置
+                    </Button>
+                  </Space>
+                </Form.Item>
+              </Form>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                disabled={!catalogReady}
+                onClick={() => {
+                  setEditing(undefined);
+                  setFormOpen(true);
+                }}
+              >
+                新增基本词性
+              </Button>
+            </Flex>
           </Card>
 
           <Card size="small">
@@ -283,7 +321,7 @@ export function PartOfSpeechSettings() {
               columns={columns}
               dataSource={list.data?.items ?? []}
               loading={list.isPending}
-              scroll={{ x: 1450 }}
+              scroll={{ x: 1240 }}
               pagination={{
                 current: page,
                 pageSize,
@@ -315,27 +353,51 @@ export function PartOfSpeechSettings() {
             />
           )}
           <Card size="small">
-            <Flex align="center" gap={12} wrap>
-              <Typography.Text strong>所属基本词性</Typography.Text>
-              <Select
-                aria-label="所属基本词性"
-                value={selectedPart?.id}
-                showSearch
-                optionFilterProp="label"
-                loading={catalog.isPending}
-                disabled={catalog.isError || !selectedPart}
-                options={(catalog.data?.items ?? []).map((item) => ({
-                  value: item.id,
-                  label: item.name_zh
-                }))}
-                onChange={setSelectedPartId}
-                style={{ width: 220 }}
-                placeholder="请选择基本词性"
-              />
+            <Flex justify="space-between" align="center" wrap gap={12}>
+              <Flex align="center" gap={12} wrap>
+                <Typography.Text strong>所属基本词性</Typography.Text>
+                <Select
+                  aria-label="所属基本词性"
+                  value={selectedPart?.id ?? ""}
+                  showSearch
+                  optionFilterProp="label"
+                  loading={catalog.isPending}
+                  disabled={catalog.isError || !extensibleParts.length}
+                  options={[
+                    { value: "", label: "全部" },
+                    ...extensibleParts.map((item) => ({
+                      value: item.id,
+                      label: item.name_zh
+                    }))
+                  ]}
+                  onChange={setSelectedPartId}
+                  style={{ width: 220 }}
+                  placeholder="请选择基本词性"
+                />
+              </Flex>
+              <Tooltip
+                title={
+                  !catalog.isError && extensibleParts.length === 0
+                    ? "暂无可扩展的基本词性"
+                    : undefined
+                }
+              >
+                <Button
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  disabled={catalog.isError || extensibleParts.length === 0}
+                  onClick={() => subPanelRef.current?.openCreate()}
+                >
+                  新增细分词性
+                </Button>
+              </Tooltip>
             </Flex>
           </Card>
           <SubPartOfSpeechPanel
-            parent={selectedPart}
+            ref={subPanelRef}
+            parents={selectedPart ? [selectedPart] : extensibleParts}
+            createParent={selectedPart}
+            loading={catalog.isPending}
             onSaved={(text) => message.success(text)}
             onError={showError}
           />
@@ -345,15 +407,18 @@ export function PartOfSpeechSettings() {
       <PartOfSpeechFormModal
         open={formOpen}
         value={editing}
+        defaultSortOrder={defaultSortOrder}
         onClose={() => setFormOpen(false)}
-        onSaved={(id) => {
+        onSaved={(saved) => {
           if (editing) {
             message.success("基本词性已更新");
             return;
           }
-          setSelectedPartId(id);
-          setActiveTab("detailed");
           message.success("基本词性已新增");
+          // 只有可扩展细分词性的基础词性才值得直接跳到细分词性 Tab。
+          if (!saved.sub_parts_extensible) return;
+          setSelectedPartId(saved.id);
+          setActiveTab("detailed");
         }}
         onError={showError}
       />

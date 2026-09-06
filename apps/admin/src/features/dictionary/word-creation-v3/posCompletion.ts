@@ -62,7 +62,9 @@ function hasChineseDefinition(sense: MeaningsPos["senses"][number]) {
  */
 export function countV3PosMeaningIncomplete(
   pos: MeaningsPos,
-  content: MeaningsContent
+  content: MeaningsContent,
+  /** 该词性是否允许挂细分词性；非基础词性没有细分词性可选，不把空 sub_pos 算作未填。 */
+  subPosRequired = true
 ): number {
   const senseGroupIds = new Set(content.sense_groups.map((group) => group.id));
   let count = pos.grammar_structures.length === 0 ? 1 : 0;
@@ -74,7 +76,7 @@ export function countV3PosMeaningIncomplete(
     if (!sense.sense_group_id || !senseGroupIds.has(sense.sense_group_id)) {
       count += 1;
     }
-    if (!sense.sub_pos) count += 1;
+    if (subPosRequired && !sense.sub_pos) count += 1;
     if (!sense.frequency?.trim()) count += 1;
     if (!hasChineseDefinition(sense)) count += 1;
     count += sense.sentences.filter(

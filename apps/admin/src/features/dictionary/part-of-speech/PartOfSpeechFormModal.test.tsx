@@ -27,9 +27,12 @@ const value: PartOfSpeechConfig = {
   name_zh: "小品词",
   name_en: "PARTICLE",
   abbreviation: "part.",
+  short_name_zh: "小品词",
+  full_name_en: "particle",
   sort_order: 100,
   usage_count: 0,
   sub_part_count: 0,
+  sub_parts_extensible: false,
   revision: 3,
   created_by: { id: "admin-1", display_name: "管理员" },
   created_at: "2026-08-08T00:00:00.000Z",
@@ -61,25 +64,24 @@ beforeEach(() => {
 });
 
 describe("PartOfSpeechFormModal", () => {
-  it("新增时校验并提交稳定编码、中文名、英文名、缩写和排序", async () => {
+  it("新增时提交中文名、英文名、缩写、简洁显示、英文全称，编码与排序值由系统补齐", async () => {
     const callbacks = renderModal();
-    expect(screen.getByLabelText("稳定编码")).toBeEnabled();
-    expect(screen.queryByText("稳定编码创建后不可修改。")).toBeNull();
+    expect(screen.queryByLabelText("稳定编码")).toBeNull();
     expect(screen.queryByText(/已被词条引用/)).toBeNull();
-    fireEvent.change(screen.getByLabelText("稳定编码"), {
-      target: { value: "particle" }
-    });
-    fireEvent.change(screen.getByLabelText("基本词性中文"), {
+    fireEvent.change(screen.getByLabelText("正式中文"), {
       target: { value: "小品词" }
     });
-    fireEvent.change(screen.getByLabelText("基本词性英文"), {
+    fireEvent.change(screen.getByLabelText("正式英文"), {
       target: { value: "PARTICLE" }
     });
     fireEvent.change(screen.getByLabelText("英文缩写"), {
       target: { value: "part." }
     });
-    fireEvent.change(screen.getByLabelText("排序值"), {
-      target: { value: "30" }
+    fireEvent.change(screen.getByLabelText("简洁显示"), {
+      target: { value: "小品词" }
+    });
+    fireEvent.change(screen.getByLabelText("英文全称"), {
+      target: { value: "particle" }
     });
     fireEvent.click(screen.getByText("新 建"));
 
@@ -89,19 +91,22 @@ describe("PartOfSpeechFormModal", () => {
         name_zh: "小品词",
         name_en: "PARTICLE",
         abbreviation: "part.",
-        sort_order: 30
+        short_name_zh: "小品词",
+        full_name_en: "particle",
+        sort_order: 100
       })
     );
-    expect(callbacks.onSaved).toHaveBeenCalledWith(value.id);
+    expect(callbacks.onSaved).toHaveBeenCalledWith(
+      expect.objectContaining({ id: value.id })
+    );
     expect(callbacks.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("未引用配置修改时稳定编码只读且准确说明不可变规则", async () => {
+  it("未引用配置修改时不暴露稳定编码，提交沿用原编码与排序", async () => {
     const callbacks = renderModal(value);
-    expect(screen.getByLabelText("稳定编码")).toBeDisabled();
-    expect(screen.getByText("稳定编码创建后不可修改。")).toBeInTheDocument();
+    expect(screen.queryByLabelText("稳定编码")).toBeNull();
     expect(screen.queryByText(/已被词条引用/)).toBeNull();
-    fireEvent.change(screen.getByLabelText("基本词性中文"), {
+    fireEvent.change(screen.getByLabelText("正式中文"), {
       target: { value: "语气词" }
     });
     fireEvent.click(screen.getByText("保 存"));
@@ -114,17 +119,20 @@ describe("PartOfSpeechFormModal", () => {
           name_zh: "语气词",
           name_en: "PARTICLE",
           abbreviation: "part.",
+          short_name_zh: "小品词",
+          full_name_en: "particle",
           sort_order: 100
         }
       })
     );
-    expect(callbacks.onSaved).toHaveBeenCalledWith(value.id);
+    expect(callbacks.onSaved).toHaveBeenCalledWith(
+      expect.objectContaining({ id: value.id })
+    );
   });
 
-  it("已引用配置修改时同样以创建后不可修改解释稳定编码", () => {
+  it("已引用配置修改时同样不暴露稳定编码，也不提示引用", () => {
     renderModal({ ...value, usage_count: 4 });
-    expect(screen.getByLabelText("稳定编码")).toBeDisabled();
-    expect(screen.getByText("稳定编码创建后不可修改。")).toBeInTheDocument();
+    expect(screen.queryByLabelText("稳定编码")).toBeNull();
     expect(screen.queryByText(/已被词条引用/)).toBeNull();
   });
 
@@ -133,10 +141,11 @@ describe("PartOfSpeechFormModal", () => {
     api.create.mockRejectedValue(failure);
     const callbacks = renderModal();
     for (const [label, input] of [
-      ["稳定编码", "particle"],
-      ["基本词性中文", "小品词"],
-      ["基本词性英文", "PARTICLE"],
-      ["英文缩写", "part."]
+      ["正式中文", "小品词"],
+      ["正式英文", "PARTICLE"],
+      ["英文缩写", "part."],
+      ["简洁显示", "小品词"],
+      ["英文全称", "particle"]
     ] as const) {
       fireEvent.change(screen.getByLabelText(label), {
         target: { value: input }
@@ -163,5 +172,108 @@ describe("PartOfSpeechFormModal", () => {
     const callbacks = renderModal();
     fireEvent.click(screen.getByRole("button", { name: "取 消" }));
     expect(callbacks.onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PartOfSpeechFormModal 派生默认值", () => {
+  it("新建时简洁显示、英文全称跟随来源字段，手动改过后不再覆盖，编码由英文全称派生", async () => {
+    renderModal();
+
+    fireEvent.change(screen.getByLabelText("正式中文"), {
+      target: { value: "小品词" }
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("简洁显示")).toHaveValue("小品词")
+    );
+
+    fireEvent.change(screen.getByLabelText("正式英文"), {
+      target: { value: "PARTICLE" }
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("英文全称")).toHaveValue("particle")
+    );
+    expect(screen.queryByLabelText("稳定编码")).toBeNull();
+
+    // 手动改过简洁显示后，再改正式中文不再覆盖。
+    fireEvent.change(screen.getByLabelText("简洁显示"), {
+      target: { value: "小品" }
+    });
+    fireEvent.change(screen.getByLabelText("正式中文"), {
+      target: { value: "语气词" }
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("正式中文")).toHaveValue("语气词")
+    );
+    expect(screen.getByLabelText("简洁显示")).toHaveValue("小品");
+
+    // 英文全称带空格与大小写时，提交的编码折成小写下划线。
+    fireEvent.change(screen.getByLabelText("英文全称"), {
+      target: { value: "Focus Particle Word" }
+    });
+    fireEvent.change(screen.getByLabelText("英文缩写"), {
+      target: { value: "part." }
+    });
+    fireEvent.click(screen.getByText("新 建"));
+    await waitFor(() =>
+      expect(api.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "focus_particle_word",
+          full_name_en: "Focus Particle Word"
+        })
+      )
+    );
+  });
+
+  it("新建时排序值不暴露、自动取默认值提交；修改时保持原值且不派生", async () => {
+    const view = render(
+      <PartOfSpeechFormModal
+        open
+        defaultSortOrder={60}
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+        onError={vi.fn()}
+      />
+    );
+    expect(screen.queryByLabelText("排序值")).toBeNull();
+    fireEvent.change(screen.getByLabelText("正式中文"), {
+      target: { value: "小品词" }
+    });
+    fireEvent.change(screen.getByLabelText("正式英文"), {
+      target: { value: "PARTICLE" }
+    });
+    fireEvent.change(screen.getByLabelText("英文缩写"), {
+      target: { value: "part." }
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("英文全称")).toHaveValue("particle")
+    );
+    fireEvent.click(screen.getByText("新 建"));
+    await waitFor(() =>
+      expect(api.create).toHaveBeenCalledWith(
+        expect.objectContaining({ sort_order: 60, code: "particle" })
+      )
+    );
+    view.unmount();
+
+    renderModal(value);
+    fireEvent.change(screen.getByLabelText("正式中文"), {
+      target: { value: "语气词" }
+    });
+    await waitFor(() =>
+      expect(screen.getByLabelText("正式中文")).toHaveValue("语气词")
+    );
+    expect(screen.getByLabelText("简洁显示")).toHaveValue("小品词");
+  });
+});
+
+describe("derivePartOfSpeechCode", () => {
+  it("把英文全称折成小写下划线编码，非字母开头时补前缀", async () => {
+    const { derivePartOfSpeechCode } = await import("./PartOfSpeechFormModal");
+    expect(derivePartOfSpeechCode("noun")).toBe("noun");
+    expect(derivePartOfSpeechCode("  Focus Particle-Word  ")).toBe(
+      "focus_particle_word"
+    );
+    expect(derivePartOfSpeechCode("3rd person")).toBe("p_3rd_person");
+    expect(derivePartOfSpeechCode("x".repeat(40))).toHaveLength(32);
   });
 });

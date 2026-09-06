@@ -649,7 +649,10 @@ describe("实时摘要明细", () => {
           name_zh: "配置名词",
           name_en: "Noun",
           abbreviation: "n.",
+          short_name_zh: "配置名词",
+          full_name_en: "noun",
           sort_order: 1,
+          sub_parts_extensible: true,
           sub_parts: []
         }
       ]

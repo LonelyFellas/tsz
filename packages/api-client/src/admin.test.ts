@@ -1178,6 +1178,8 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
       name_zh: "小品词",
       name_en: "PARTICLE",
       abbreviation: "part.",
+      short_name_zh: "小品词",
+      full_name_en: "particle",
       sort_order: 100
     });
     api.partOfSpeechSettings.update("pos-1", {
@@ -1185,6 +1187,8 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
       name_zh: "小品词",
       name_en: "Particle",
       abbreviation: "ptcl.",
+      short_name_zh: "小品",
+      full_name_en: "particle word",
       sort_order: 20
     });
     api.partOfSpeechSettings.remove("pos-1", { base_revision: 4 });
@@ -1204,6 +1208,8 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
       name_zh: "小品词",
       name_en: "PARTICLE",
       abbreviation: "part.",
+      short_name_zh: "小品词",
+      full_name_en: "particle",
       sort_order: 100
     });
     expect(http.patch).toHaveBeenCalledWith("/settings/parts-of-speech/pos-1", {
@@ -1211,6 +1217,8 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
       name_zh: "小品词",
       name_en: "Particle",
       abbreviation: "ptcl.",
+      short_name_zh: "小品",
+      full_name_en: "particle word",
       sort_order: 20
     });
     expect(http.del).toHaveBeenCalledWith(
@@ -1226,12 +1234,18 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
       code: "N-COLLECTIVE",
       name_zh: "集合名词",
       name_en: "Collective noun",
+      short_name_zh: "集合名词",
+      abbreviation: "n.",
+      full_name_en: "collective noun",
       sort_order: 10
     });
     api.partOfSpeechSettings.updateSubPart("pos-1", "sub-2", {
       base_revision: 3,
       name_zh: "集合类名词",
       name_en: "Collective noun",
+      short_name_zh: "集合类名词",
+      abbreviation: "n.",
+      full_name_en: "collective noun",
       sort_order: 20
     });
     api.partOfSpeechSettings.removeSubPart("pos-1", "sub-2", {
@@ -1249,6 +1263,9 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
         code: "N-COLLECTIVE",
         name_zh: "集合名词",
         name_en: "Collective noun",
+        short_name_zh: "集合名词",
+        abbreviation: "n.",
+        full_name_en: "collective noun",
         sort_order: 10
       }
     );
@@ -1258,6 +1275,9 @@ describe("createAdminEndpoints — 系统设置词性配置", () => {
         base_revision: 3,
         name_zh: "集合类名词",
         name_en: "Collective noun",
+        short_name_zh: "集合类名词",
+        abbreviation: "n.",
+        full_name_en: "collective noun",
         sort_order: 20
       }
     );

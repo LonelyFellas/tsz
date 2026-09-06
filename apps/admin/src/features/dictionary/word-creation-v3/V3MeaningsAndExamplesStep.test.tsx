@@ -494,9 +494,12 @@ describe("V3MeaningsAndExamplesStep", () => {
           name_zh: "名词",
           name_en: "Noun",
           abbreviation: "n.",
+          short_name_zh: "名词",
+          full_name_en: "noun",
           sort_order: 1,
           allowed_form_types: [],
           default_form_types: [],
+          sub_parts_extensible: true,
           sub_parts: []
         },
         {
@@ -505,9 +508,12 @@ describe("V3MeaningsAndExamplesStep", () => {
           name_zh: "动词",
           name_en: "Verb",
           abbreviation: "v.",
+          short_name_zh: "动词",
+          full_name_en: "verb",
           sort_order: 2,
           allowed_form_types: [],
           default_form_types: [],
+          sub_parts_extensible: true,
           sub_parts: []
         }
       ]
@@ -2741,15 +2747,21 @@ describe("V3MeaningsAndExamplesStep", () => {
           name_zh: "名词",
           name_en: "Noun",
           abbreviation: "n.",
+          short_name_zh: "名词",
+          full_name_en: "noun",
           sort_order: 1,
           allowed_form_types: [],
           default_form_types: [],
+          sub_parts_extensible: true,
           sub_parts: [
             {
               id: "catalog-countable",
               code: "countable",
               name_zh: "可数名词",
               name_en: "Countable noun",
+              short_name_zh: "可数名词",
+              abbreviation: "n.",
+              full_name_en: "countable noun",
               sort_order: 1
             }
           ]
@@ -2766,6 +2778,63 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(editor).not.toHaveTextContent("pos-1");
     expect(editor).not.toHaveTextContent("sense-group-1");
     expect(editor).not.toHaveTextContent("grammar-1");
+    expect(editor).not.toHaveTextContent("countable");
+  });
+
+  it("非基础词性的释义不再提供子词性选择，历史子词性只读回显", () => {
+    const forms: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "noun",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
+          forms: [],
+          form_groups: []
+        }
+      ]
+    };
+    const partOfSpeechCatalog: PartOfSpeechCatalogResponse = {
+      catalog_version: 1,
+      items: [
+        {
+          id: "catalog-noun",
+          code: "noun",
+          name_zh: "名词",
+          name_en: "Noun",
+          abbreviation: "n.",
+          short_name_zh: "名词",
+          full_name_en: "noun",
+          sort_order: 1,
+          allowed_form_types: [],
+          default_form_types: [],
+          sub_parts_extensible: false,
+          sub_parts: [
+            {
+              id: "catalog-countable",
+              code: "countable",
+              name_zh: "可数名词",
+              name_en: "Countable noun",
+              short_name_zh: "可数名词",
+              abbreviation: "n.",
+              full_name_en: "countable noun",
+              sort_order: 1
+            }
+          ]
+        }
+      ]
+    };
+    render(<Harness forms={forms} partOfSpeechCatalog={partOfSpeechCatalog} />);
+    const editor = screen.getByTestId("meanings-value").previousElementSibling;
+
+    // 后端标记不可扩展：没有子词性下拉，但历史 sub_pos 仍以中文名只读展示，且保留定位锚点。
+    expect(screen.queryByLabelText("释义 1 子词性")).toBeNull();
+    const readonly = editor?.querySelector('[data-v3-field="sub_pos"]');
+    expect(readonly).not.toBeNull();
+    expect(readonly).toHaveTextContent("可数名词");
+    expect(readonly).toHaveAttribute("data-v3-node-id", "sense-1");
     expect(editor).not.toHaveTextContent("countable");
   });
 
@@ -3072,15 +3141,21 @@ describe("V3MeaningsAndExamplesStep", () => {
           name_zh: "名词",
           name_en: "Noun",
           abbreviation: "n.",
+          short_name_zh: "名词",
+          full_name_en: "noun",
           sort_order: 1,
           allowed_form_types: [],
           default_form_types: [],
+          sub_parts_extensible: true,
           sub_parts: [
             {
               id: "catalog-countable",
               code: "countable",
               name_zh: "可数名词",
               name_en: "Countable noun",
+              short_name_zh: "可数名词",
+              abbreviation: "n.",
+              full_name_en: "countable noun",
               sort_order: 1
             }
           ]

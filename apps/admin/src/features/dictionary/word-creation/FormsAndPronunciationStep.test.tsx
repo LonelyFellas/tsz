@@ -336,11 +336,11 @@ describe("FormsAndPronunciationStep", () => {
 
   it("零派生能力词性缺基准发音时仍能就地补齐并完成", async () => {
     const word = wordFixture({ headword: "potato" });
-    const interjection = word.forms.pos[0]!;
-    interjection.pos = "interjection";
+    const pronoun = word.forms.pos[0]!;
+    pronoun.pos = "pronoun";
     // 后端对无派生能力的词性回空 form_groups，只回独立的 base_form。
-    interjection.form_groups = [];
-    for (const variant of interjection.base_form.variants) {
+    pronoun.form_groups = [];
+    for (const variant of pronoun.base_form.variants) {
       variant.pronunciations = [
         { ...variant.pronunciations[0]!, dict_phonetic: "", actual_pron: "" }
       ];
@@ -378,11 +378,10 @@ describe("FormsAndPronunciationStep", () => {
 
   it("零派生组时原形发音的校验定位仍能聚焦到缺失字段", async () => {
     const word = wordFixture({ headword: "potato" });
-    const interjection = word.forms.pos[0]!;
-    interjection.pos = "interjection";
-    interjection.form_groups = [];
-    const pronunciation =
-      interjection.base_form.variants[0]!.pronunciations[0]!;
+    const pronoun = word.forms.pos[0]!;
+    pronoun.pos = "pronoun";
+    pronoun.form_groups = [];
+    const pronunciation = pronoun.base_form.variants[0]!.pronunciations[0]!;
     pronunciation.dict_phonetic = "";
     renderStep(word, { nodeId: pronunciation.id, field: "dict_phonetic" });
 
