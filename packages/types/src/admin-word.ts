@@ -51,8 +51,6 @@ export interface AdminWordListQuery {
 /** 列表行(读取时派生:gloss 取第一个词性第一个词义的第一条释义)。 */
 export interface AdminWordListItem {
   annotation_visible: boolean;
-  annotation: string | null;
-  annotation_revision: number;
   schema_version: 2;
   id: string;
   /** 并列拼写按检测基准侧在前拼接，与 `dialects` 同序。 */
@@ -71,6 +69,10 @@ export interface AdminWordListItem {
   status: AdminWordStatus;
   revision: number;
   lifecycle_revision: number;
+  /** 同原型词条的区分标签（≤ 20 个 Unicode scalar），未标注为 null。 */
+  annotation: string | null;
+  /** 标注独立修订；`PATCH /entries/{id}/annotation` 以此做乐观锁，与内容 revision 无关。 */
+  annotation_revision: number;
   max_reachable_step: WordCreationStep;
   /** V2 当前线上 publication 的源 revision；legacy/未发布行缺省。 */
   published_revision?: number;

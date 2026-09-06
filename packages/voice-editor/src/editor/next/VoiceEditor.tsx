@@ -8,13 +8,23 @@ import {
 import { Alert, Tag, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { RichText, RichTextV2 } from "@tsz/types";
+import { AUDIO_ASSETS_PER_VARIANT_MAX } from "@tsz/types";
 import {
   MAX_PAUSE_MS,
   MIN_PAUSE_MS,
   normalizeRichTextV2,
-  toRichTextV2
+  toRichTextV2,
+  validateRichTextV2
 } from "../../core";
-import type { VoiceOption, VoiceEditorProps } from "../../types";
+import type { AudioAsset, VoiceOption, VoiceEditorProps } from "../../types";
+import {
+  describeUploadError,
+  isSignedUrlFresh,
+  preflightAudioFile,
+  progressPercent,
+  tooManyAudioError,
+  type PendingUpload
+} from "./audioAssets";
 import { MarkupPanel } from "./MarkupPanel";
 import {
   LiaisonIcon,
@@ -25,7 +35,7 @@ import {
   UploadPanel,
   VoicePanel
 } from "./ToolPanels";
-import type { UploadDraft, UploadedAudio } from "./ToolPanels";
+import type { UploadDraft } from "./ToolPanels";
 import {
   DEFAULT_BRUSH,
   GRAMMAR_ROLES,
@@ -33,20 +43,26 @@ import {
   RATE_MULTIPLIER_MAX,
   RATE_MULTIPLIER_MIN,
   formatPauseLabel,
-  type Brush
+  type Brush,
+  type LiaisonEnd
 } from "./roles";
 import {
   type EditorSnapshot,
   annotationsToMarks,
+  applyRoleRange,
   extendAnchor,
+  unitAt,
   isValidLiaison,
   marksToAnnotations,
   crossesParagraph,
+  offsetToAnchor,
   remapMarks,
+  splitRangeAtParagraphs,
   tokenize,
   type LiaisonAnchor,
   type LiaisonDraft,
-  type MarkState
+  type MarkState,
+  type RoleUnit
 } from "./tokens";
 import { useVoiceAudition } from "./useVoiceAudition";
 
@@ -109,6 +125,10 @@ export function VoiceEditor({
   placeholder,
   voiceProfile,
   onVoiceProfileChange,
+  audioUploadAdapter,
+  audioAssets,
+  onAudioAssetsChange,
+  audioAssetLimit = AUDIO_ASSETS_PER_VARIANT_MAX,
   onChange
 }: VoiceEditorProps) {
   /*
@@ -124,6 +144,22 @@ export function VoiceEditor({
   const [brush, setBrush] = useState<Brush>(DEFAULT_BRUSH);
   /** 正在拼的这条连读：起点/终点两个锚点，各自可含多个连续字母。 */
   const [draft, setDraft] = useState<LiaisonDraft>({});
+  /** 接下来点的字母归哪一端；由面板上的「起点 / 终点」开关决定。 */
+  const [liaisonEnd, setLiaisonEnd] = useState<LiaisonEnd>("start");
+  /**
+   * 语法结构画笔上一次单击上色的那个字母。同一个词里再单击另一个字母时，
+   * 两者之间的字母一并上色——点首尾两个字母就能标一段，不必拖。
+   */
+  const [roleAnchor, setRoleAnchor] = useState<
+    { token: number; start: number; end: number } | undefined
+  >();
+  /** 换笔、改文本、撤销重做、连读成线……凡是字母会挪或语义失效的时刻，瞬态状态一起清。 */
+  const resetTransient = useCallback(() => {
+    setDraft({});
+    setRoleAnchor(undefined);
+    setLiaisonEnd("start");
+  }, []);
+  const tokens = tokenize(text);
   const [validationMessage, setValidationMessage] = useState("");
 
   /*
@@ -139,10 +175,24 @@ export function VoiceEditor({
     locale: "en-GB",
     gender: "female"
   });
-  const [uploads, setUploads] = useState<UploadedAudio[]>([]);
-  const [playingUploadId, setPlayingUploadId] = useState<string>();
+  /** 已落成资产的音频（受控，与 voiceProfile 同款进出）。 */
+  const [assets, setAssets] = useState<AudioAsset[]>(audioAssets ?? []);
+  const assetsRef = useRef(assets);
+  /** 还没落成资产的上传：进行中或失败待重试。 */
+  const [pendingUploads, setPendingUploads] = useState<PendingUpload[]>([]);
+  const [playingAssetId, setPlayingAssetId] = useState<string>();
+  /** 试听失败的说明；只在音频面板里显示，不走阻断性错误那条红色通道。 */
+  const [playbackMessage, setPlaybackMessage] = useState<string>();
   const uploadSeqRef = useRef(0);
   const uploadAudioRef = useRef<HTMLAudioElement | null>(null);
+  /** 正在取签名 URL 的那次试听；停播 / 卸载时中止，免得 URL 回来后在没人管的地方开播。 */
+  const playRequestRef = useRef<AbortController | null>(null);
+  const playingAssetIdRef = useRef<string | undefined>(undefined);
+  const uploadControllersRef = useRef(new Map<string, AbortController>());
+  /** 试听 URL 是短期签名，只放内存；过期重取。 */
+  const assetUrlCacheRef = useRef(
+    new Map<string, { url: string; expiresAt: string }>()
+  );
   const [ratePercent, setRatePercent] = useState<number | undefined>(
     voiceProfile?.rate_percent
   );
@@ -183,29 +233,57 @@ export function VoiceEditor({
   /** 上一次「键入正文」的时刻；0 表示当前没有正在进行的打字连击。 */
   const typingRunRef = useRef(0);
 
-  const stopUploadPlayback = useCallback(() => {
+  const stopAssetPlayback = useCallback(() => {
+    playRequestRef.current?.abort();
+    playRequestRef.current = null;
     uploadAudioRef.current?.pause();
     uploadAudioRef.current = null;
-    setPlayingUploadId(undefined);
+    playingAssetIdRef.current = undefined;
+    setPlayingAssetId(undefined);
   }, []);
 
-  /** object URL 必须显式回收，否则每传一次都留一份内存直到整页卸载。 */
-  const releaseUploads = useCallback((items: UploadedAudio[]) => {
-    for (const item of items) URL.revokeObjectURL(item.url);
-  }, []);
-
-  // 卸载时回收全部 object URL；同样不能把副作用塞进 setState 的更新函数。
-  const uploadsRef = useRef<UploadedAudio[]>([]);
-  useEffect(() => {
-    uploadsRef.current = uploads;
-  }, [uploads]);
+  // 卸载：停播，并中止还在路上的上传（confirm 落库前中止不会留下资产）。
   useEffect(
     () => () => {
-      stopUploadPlayback();
-      releaseUploads(uploadsRef.current);
+      stopAssetPlayback();
+      uploadControllersRef.current.forEach((controller) => controller.abort());
+      uploadControllersRef.current.clear();
     },
-    [releaseUploads, stopUploadPlayback]
+    [stopAssetPlayback]
   );
+
+  /* 与 voiceProfile 同款：自己刚抛出去、又被父组件回灌的那份要跳过。 */
+  const emittedAssetsRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const incoming = JSON.stringify(audioAssets ?? []);
+    if (incoming === emittedAssetsRef.current) return;
+    emittedAssetsRef.current = incoming;
+    assetsRef.current = audioAssets ?? [];
+    setAssets(assetsRef.current);
+    // 外部换值把正在播的那条拿掉了：列表项没了音频还在响，得跟着停；缓存的签名 URL 也一并丢
+    const ids = new Set(assetsRef.current.map((asset) => asset.id));
+    if (playingAssetIdRef.current && !ids.has(playingAssetIdRef.current)) {
+      stopAssetPlayback();
+    }
+    for (const id of assetUrlCacheRef.current.keys()) {
+      if (!ids.has(id)) assetUrlCacheRef.current.delete(id);
+    }
+  }, [audioAssets, stopAssetPlayback]);
+
+  /*
+   * 上传是异步的，完成回调里拿到的 props 是发起那一帧的：宿主的 onAudioAssetsChange
+   * 往往内联捕获了当时的草稿，直接调用会把上传期间的编辑整体冲掉。走 ref 取最新的那份。
+   */
+  const onAudioAssetsChangeRef = useRef(onAudioAssetsChange);
+  useEffect(() => {
+    onAudioAssetsChangeRef.current = onAudioAssetsChange;
+  });
+  const emitAssets = (next: AudioAsset[]) => {
+    assetsRef.current = next;
+    setAssets(next);
+    emittedAssetsRef.current = JSON.stringify(next);
+    onAudioAssetsChangeRef.current?.(next);
+  };
 
   /** 编辑态（文本 + 标注）折算回 wire；非法内容在这里被拦下。 */
   const working = useMemo((): { value: RichTextV2; error?: string } => {
@@ -239,7 +317,7 @@ export function VoiceEditor({
     setBrush(DEFAULT_BRUSH);
     setCustomPause("");
     setOpenTool(undefined);
-    setDraft({});
+    resetTransient();
     setValidationMessage("");
     setPast([]);
     setFuture([]);
@@ -298,7 +376,8 @@ export function VoiceEditor({
     status: auditionStatus,
     pendingVoiceId,
     playingVoiceId,
-    audition
+    audition,
+    stop: stopAudition
   } = useVoiceAudition({
     open: voicesRequested,
     language,
@@ -316,7 +395,7 @@ export function VoiceEditor({
     if (next.kind === "role") lastRoleRef.current = next.level;
     if (next.kind === "pause") lastPauseRef.current = next.durationMs;
     setBrush(next);
-    setDraft({});
+    resetTransient();
   };
 
   /* 语法结构与停顿选完就收起浮层，好腾出标注带落笔；连读的面板要留着用。 */
@@ -394,7 +473,7 @@ export function VoiceEditor({
     setFuture((stack) => [{ text, marks }, ...stack].slice(0, MAX_HISTORY));
     setText(previous.text);
     setMarks(previous.marks);
-    setDraft({});
+    resetTransient();
     setValidationMessage("");
   };
 
@@ -405,7 +484,7 @@ export function VoiceEditor({
     setPast((stack) => [...stack, { text, marks }].slice(-MAX_HISTORY));
     setText(next.text);
     setMarks(next.marks);
-    setDraft({});
+    resetTransient();
     setValidationMessage("");
   };
 
@@ -418,17 +497,73 @@ export function VoiceEditor({
       }),
       { typing: true }
     );
-    setDraft({});
+    resetTransient();
   };
 
-  const handleWordClick = (tokenIndex: number) => {
-    if (brush.kind !== "role") return;
-    commit((current) => {
-      const roles = { ...current.marks.roles };
-      if (roles[tokenIndex] === brush.level) delete roles[tokenIndex];
-      else roles[tokenIndex] = brush.level;
-      return { ...current, marks: { ...current.marks, roles } };
+  /**
+   * 语法结构按**字母**落笔：点一个字母上一个字母的色，按住拖过一段字母则整段
+   * 上色（可以只是一个词里的几个字母，也可以拖过几个词）；区间里已经全是这个
+   * 分类时再刷一次即取消。区间是绝对码点 [start, end)。
+   *
+   * 单击还会记下锚点：同一个词里紧接着再单击另一个字母，两者之间的字母一并
+   * 上色（点 w 再点 k，work 整段变色），接上之后锚点清空。只在同一个词里接——
+   * 隔着几个词的两次单击各自独立，否则想分别标两个字母就会被连成一大段。
+   */
+  /**
+   * 语法结构落笔前先过一遍核心层校验：与音标区间交叉这类错要当场说清并拒掉，
+   * 不能让它进入 marks 之后才在折算时报错——那样编辑器会进入「不保存」状态。
+   */
+  const paintRoles = (roles: RoleUnit[]): boolean => {
+    const issues = validateRichTextV2({
+      version: 2,
+      text,
+      annotations: marksToAnnotations(text, { ...marks, roles })
     });
+    if (issues.length > 0) {
+      setValidationMessage(issues[0]!.message);
+      return false;
+    }
+    commit((current) => ({ ...current, marks: { ...current.marks, roles } }));
+    return true;
+  };
+
+  const handleRoleRange = (
+    start: number,
+    end: number,
+    mode: "click" | "drag"
+  ) => {
+    if (brush.kind !== "role") return;
+    const level = brush.level;
+    const token = offsetToAnchor(tokens, start)?.token;
+    if (
+      mode === "click" &&
+      roleAnchor &&
+      token !== undefined &&
+      roleAnchor.token === token &&
+      roleAnchor.start !== start
+    ) {
+      const bridge = {
+        start: Math.min(roleAnchor.start, start),
+        end: Math.max(roleAnchor.end, end),
+        level
+      };
+      paintRoles(applyRoleRange(text, marks.roles, bridge, { toggle: false }));
+      setRoleAnchor(undefined);
+      return;
+    }
+    // 拖过换行的区间按行各自上色：wire 不接受跨段落的标注。
+    let roles = marks.roles;
+    for (const piece of splitRangeAtParagraphs(text, start, end)) {
+      roles = applyRoleRange(text, roles, { ...piece, level });
+    }
+    if (!paintRoles(roles)) return;
+    // 只有「这一下真把字母上了色」才留锚点：取消上色或拖选之后都不留。
+    const painted = unitAt(roles, start)?.level === level;
+    setRoleAnchor(
+      mode === "click" && painted && token !== undefined
+        ? { token, start, end }
+        : undefined
+    );
   };
 
   const handleGapClick = (gapIndex: number) => {
@@ -447,23 +582,21 @@ export function VoiceEditor({
   };
 
   /**
-   * 连读端别自动判定：第一个点中的词是起点，点到另一个词就成为终点；
-   * 在已选中的那个词里继续点相邻字母，则扩展该端的锚点。
-   * 少一次「我现在在选哪一端」的切换，点起点→点终点一气呵成。
-   * 因为两端都要允许继续扩展，成线仍由「添加连读」显式确认。
+   * 端别由面板上的「起点 / 终点」开关决定，不按点击先后推断。
+   * 早先「第一个词是起点、点到另一个词就是终点」的自动判定，让人没法先定终点
+   * 再回头选起点，也没法选完终点后回去改起点。同一端内点相邻字母则扩展锚点，
+   * 点到别的词则换成那个词。成线仍由「添加连读」显式确认。
    */
   const handleLetterClick = (anchor: LiaisonAnchor) => {
     if (brush.kind !== "liaison") return;
     const offset = anchor.offsets[0]!;
     setDraft((current) => {
-      if (!current.start) return { start: anchor };
-      if (anchor.token === current.start.token) {
-        return { ...current, start: extendAnchor(current.start, offset) };
-      }
-      if (current.end && anchor.token === current.end.token) {
-        return { ...current, end: extendAnchor(current.end, offset) };
-      }
-      return { ...current, end: anchor };
+      const existing = current[liaisonEnd];
+      const next =
+        existing && existing.token === anchor.token
+          ? extendAnchor(existing, offset)
+          : anchor;
+      return { ...current, [liaisonEnd]: next };
     });
   };
 
@@ -492,10 +625,10 @@ export function VoiceEditor({
     ) {
       // 重复添加会画出两道重合的弧，落盘时被 normalize 合并成一条，数据与屏幕分叉。
       setValidationMessage("这两处已经连过了");
-      setDraft({});
+      resetTransient();
       return;
     }
-    if (crossesParagraph(text, tokenize(text), link)) {
+    if (crossesParagraph(text, tokens, link)) {
       // wire 不接受跨换行的标注；放进来的话本地就折算不出合法 wire，
       // 从此改动静默停止回写，比当场说清楚糟得多。
       setValidationMessage("连读不能跨越换行，请把两个词放在同一行");
@@ -505,12 +638,10 @@ export function VoiceEditor({
       ...current,
       marks: { ...current.marks, liaisons: [...current.marks.liaisons, link] }
     }));
-    setDraft({});
+    resetTransient();
   };
 
-  const resetDraft = () => {
-    setDraft({});
-  };
+  const resetDraft = resetTransient;
 
   const handleLiaisonClick = (index: number) => {
     commit((current) => ({
@@ -528,7 +659,7 @@ export function VoiceEditor({
     // 透传注解不是用户在这里标的，清空标注不该把它们一并抹掉。
     commit((current) => ({
       ...current,
-      marks: { ...current.marks, roles: {}, liaisons: [], pauses: {} }
+      marks: { ...current.marks, roles: [], liaisons: [], pauses: {} }
     }));
     resetDraft();
   };
@@ -612,56 +743,165 @@ export function VoiceEditor({
     (working.error && `${working.error}；在改回来之前，这里的编辑不会被保存`) ||
     loadError;
 
-  const handleAudition = (voice: VoiceOption) => audition(voice);
+  // TTS 试听与资产试听同一时间只响一路
+  const handleAudition = (voice: VoiceOption) => {
+    stopAssetPlayback();
+    audition(voice);
+  };
 
-  const addUploads = (files: FileList) => {
-    // id 不用 crypto.randomUUID：测试服是裸 HTTP 的非安全上下文，该 API 缺失。
-    const added = [...files].map((file) => {
+  /**
+   * 一条上传的三步（申请许可 → 直传 → confirm）都在适配器里；这里只管排队、进度、
+   * 成功入列、失败留在队列可重试。StrictMode 下更新函数会跑两次，所以启动请求
+   * 这类副作用都放在更新函数之外。
+   */
+  const patchPending = (id: string, patch: Partial<PendingUpload>) =>
+    setPendingUploads((current) =>
+      current.map((item) => (item.id === id ? { ...item, ...patch } : item))
+    );
+  const dropPending = (id: string) =>
+    setPendingUploads((current) => current.filter((item) => item.id !== id));
+
+  const startUpload = (entry: PendingUpload) => {
+    if (!audioUploadAdapter) return;
+    const controller = new AbortController();
+    uploadControllersRef.current.set(entry.id, controller);
+    patchPending(entry.id, { error: undefined, progress: 0 });
+    audioUploadAdapter
+      .upload({
+        file: entry.file,
+        locale: entry.locale,
+        gender: entry.gender,
+        signal: controller.signal,
+        // 进度条只显示整数百分比，同一个百分点内的事件不必重渲染
+        onProgress: (ratio) =>
+          setPendingUploads((current) => {
+            const item = current.find((candidate) => candidate.id === entry.id);
+            if (
+              !item ||
+              progressPercent(item.progress) === progressPercent(ratio)
+            )
+              return current;
+            return current.map((candidate) =>
+              candidate.id === entry.id
+                ? { ...candidate, progress: ratio }
+                : candidate
+            );
+          })
+      })
+      .then(
+        (asset) => {
+          uploadControllersRef.current.delete(entry.id);
+          if (controller.signal.aborted) return;
+          dropPending(entry.id);
+          emitAssets([...assetsRef.current, asset]);
+        },
+        (error: unknown) => {
+          uploadControllersRef.current.delete(entry.id);
+          if (controller.signal.aborted) return;
+          patchPending(entry.id, { error: describeUploadError(error) });
+        }
+      );
+  };
+
+  const addAudioFiles = (files: FileList) => {
+    if (!audioUploadAdapter || readOnly) return;
+    // 名额 = 上限 − 已落成 − 还在路上的；预检不过的那些不占名额。
+    const inFlight = pendingUploads.filter((item) => !item.error).length;
+    let room = audioAssetLimit - assetsRef.current.length - inFlight;
+    const entries: PendingUpload[] = [...files].map((file) => {
+      // id 不用 crypto.randomUUID：测试服是裸 HTTP 的非安全上下文，该 API 缺失。
       uploadSeqRef.current += 1;
+      let error = preflightAudioFile(file);
+      if (!error) {
+        if (room <= 0) error = tooManyAudioError(audioAssetLimit);
+        else room -= 1;
+      }
       return {
         id: `upload-${uploadSeqRef.current}`,
+        file,
         name: file.name,
         locale: upload.locale,
         gender: upload.gender,
-        url: URL.createObjectURL(file)
+        progress: 0,
+        error: error ? describeUploadError(error) : undefined
       };
     });
-    setUploads((current) => [...current, ...added]);
+    setPendingUploads((current) => [...current, ...entries]);
+    entries.filter((entry) => !entry.error).forEach(startUpload);
   };
 
-  const removeUpload = (id: string) => {
-    // 回收放在更新函数之外：更新函数必须是纯的，StrictMode 会调用两次。
-    // 正在放的那条被移除时先停：只清播放态的话音频还在响，而列表项已经没了，
-    // 用户再没有任何停止入口。revoke 一个正在播的 URL 也是错的。
-    if (playingUploadId === id) stopUploadPlayback();
-    const target = uploads.find((item) => item.id === id);
-    if (target) URL.revokeObjectURL(target.url);
-    setUploads((current) => current.filter((item) => item.id !== id));
+  const retryUpload = (id: string) => {
+    const entry = pendingUploads.find((item) => item.id === id);
+    if (entry) startUpload(entry);
   };
 
-  const playUpload = (item: UploadedAudio) => {
-    if (playingUploadId === item.id) {
-      stopUploadPlayback();
+  const dismissUpload = (id: string) => {
+    if (readOnly) return;
+    uploadControllersRef.current.get(id)?.abort();
+    uploadControllersRef.current.delete(id);
+    dropPending(id);
+  };
+
+  /**
+   * 移除只是把引用从草稿里去掉（保存后才生效），对象由后端按引用回收。
+   * 不进撤销栈：音频不属于「文本 + 标注」的快照，硬塞进去两套历史会打架，
+   * 面板里那一步确认（Popconfirm）兜底。
+   */
+  const removeAsset = (asset: AudioAsset) => {
+    if (readOnly) return;
+    if (playingAssetId === asset.id) stopAssetPlayback();
+    emitAssets(assetsRef.current.filter((item) => item.id !== asset.id));
+  };
+
+  const PLAYBACK_FAILED = "音频暂时无法试听，请稍后重试";
+
+  const playAsset = async (asset: AudioAsset) => {
+    if (playingAssetId === asset.id) {
+      stopAssetPlayback();
       return;
     }
-    stopUploadPlayback();
-    const audio = new Audio(item.url);
+    stopAssetPlayback();
+    stopAudition();
+    if (!audioUploadAdapter) return;
+    setPlaybackMessage(undefined);
+    // 取 URL 期间就算「在播」：再点一次是停止，连点不会起第二路
+    playingAssetIdRef.current = asset.id;
+    setPlayingAssetId(asset.id);
+    const request = new AbortController();
+    playRequestRef.current = request;
+    const cached = assetUrlCacheRef.current.get(asset.id);
+    let resolved =
+      cached && isSignedUrlFresh(cached.expiresAt) ? cached : undefined;
+    if (!resolved) {
+      try {
+        resolved = await audioUploadAdapter.resolveUrl(asset.id, {
+          signal: request.signal
+        });
+      } catch {
+        if (request.signal.aborted) return;
+        stopAssetPlayback();
+        setPlaybackMessage(PLAYBACK_FAILED);
+        return;
+      }
+      // 等 URL 期间被停掉 / 换了一条 / 卸载了：这一路作废
+      if (request.signal.aborted) return;
+      assetUrlCacheRef.current.set(asset.id, resolved);
+    }
+    playRequestRef.current = null;
+    const audio = new Audio(resolved.url);
     uploadAudioRef.current = audio;
     audio.addEventListener(
       "ended",
       () => {
-        if (uploadAudioRef.current === audio) setPlayingUploadId(undefined);
+        if (uploadAudioRef.current === audio) stopAssetPlayback();
       },
       { once: true }
     );
-    void audio.play().then(
-      () => {
-        if (uploadAudioRef.current === audio) setPlayingUploadId(item.id);
-      },
-      () => {
-        if (uploadAudioRef.current === audio) setPlayingUploadId(undefined);
-      }
-    );
+    void audio.play().catch(() => {
+      if (uploadAudioRef.current !== audio) return;
+      stopAssetPlayback();
+      setPlaybackMessage(PLAYBACK_FAILED);
+    });
   };
 
   /* 自定义语速也要显示得出来，所以由百分比反算倍数，而不是回查预设表。 */
@@ -673,7 +913,10 @@ export function VoiceEditor({
     GRAMMAR_ROLES[0]!.label;
   const pauseDuration =
     brush.kind === "pause" ? brush.durationMs : lastPauseRef.current;
-  const tokens = tokenize(text);
+
+  /* 存储未开通由适配器记一次（同一页可能挂着几十个编辑器），这里每次渲染直接问。 */
+  const storageUnavailable =
+    audioUploadAdapter?.isStorageUnavailable?.() ?? false;
 
   const tools = [
     {
@@ -721,6 +964,8 @@ export function VoiceEditor({
           readOnly={readOnly}
           tokens={tokens}
           draft={draft}
+          activeEnd={liaisonEnd}
+          onActiveEndChange={setLiaisonEnd}
           onCommit={commitLiaison}
           onResetDraft={resetDraft}
         />
@@ -797,20 +1042,31 @@ export function VoiceEditor({
     {
       key: "uploads",
       label: "音频",
-      summary: uploads.length > 0 ? String(uploads.length) : undefined,
+      summary: assets.length > 0 ? String(assets.length) : undefined,
       icon: <AudioOutlined />,
       content: (
         <UploadPanel
           readOnly={readOnly}
+          available={Boolean(audioUploadAdapter) && !storageUnavailable}
+          unavailableReason={
+            audioUploadAdapter
+              ? "音频存储尚未开通，暂时不能上传"
+              : "音频上传未启用"
+          }
           upload={upload}
           onUploadChange={(next: Partial<UploadDraft>) =>
             setUpload((current) => ({ ...current, ...next }))
           }
-          uploads={uploads}
-          onAddUploads={addUploads}
-          onRemoveUpload={removeUpload}
-          onPlayUpload={playUpload}
-          playingUploadId={playingUploadId}
+          assets={assets}
+          pending={pendingUploads}
+          limit={audioAssetLimit}
+          onAddFiles={addAudioFiles}
+          onRetryUpload={retryUpload}
+          onDismissUpload={dismissUpload}
+          onRemoveAsset={removeAsset}
+          onPlayAsset={(asset) => void playAsset(asset)}
+          playingAssetId={playingAssetId}
+          playbackMessage={playbackMessage}
         />
       )
     }
@@ -856,7 +1112,8 @@ export function VoiceEditor({
         brush={brush}
         draft={draft}
         readOnly={readOnly}
-        onWordClick={handleWordClick}
+        onRoleRange={handleRoleRange}
+        roleAnchorStart={roleAnchor?.start}
         onGapClick={handleGapClick}
         onLetterClick={handleLetterClick}
         onLiaisonClick={handleLiaisonClick}

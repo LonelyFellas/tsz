@@ -14,8 +14,6 @@ import { wordFixture } from "./wordCreation.test.helper";
 
 function v3Word(): AdminWordV3 {
   return {
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 3,
     id: "entry-v3",
     language: "en",
@@ -23,6 +21,8 @@ function v3Word(): AdminWordV3 {
     status: "published",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: false,
     presentation: {
       label: "centre / center",
@@ -241,9 +241,9 @@ describe("base form detection presentation", () => {
       total: 6,
       matched_entry_contexts: [
         {
+          entry_id: "entry-v3",
           annotation: null,
           annotation_revision: 1,
-          entry_id: "entry-v3",
           presentation: {
             label: "centre / center",
             matched_surfaces: ["centre", "center"],

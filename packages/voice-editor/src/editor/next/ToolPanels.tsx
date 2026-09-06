@@ -1,10 +1,32 @@
 import { CheckOutlined, SoundOutlined } from "@ant-design/icons";
-import { Button, Input, Radio, Spin, Typography } from "antd";
+import {
+  Button,
+  ColorPicker,
+  Input,
+  Popconfirm,
+  Progress,
+  Radio,
+  Spin,
+  Typography
+} from "antd";
 import type { ReactNode } from "react";
-import { useRef } from "react";
-import type { VoiceOption } from "../../types";
+import { Fragment, useRef } from "react";
+import { setLiaisonColor, useLiaisonColor } from "../../marks";
+import type {
+  AudioAsset,
+  AudioAssetGender,
+  AudioAssetLocale,
+  VoiceOption
+} from "../../types";
+import {
+  AUDIO_UPLOAD_ACCEPT,
+  AUDIO_UPLOAD_HINT,
+  progressPercent,
+  type PendingUpload
+} from "./audioAssets";
 import {
   GRAMMAR_ROLES,
+  LIAISON_ANCHORS,
   PAUSE_PRESETS,
   RATE_PRESETS,
   VOICE_GENDERS,
@@ -12,7 +34,7 @@ import {
   formatPauseLabel,
   voiceShortName
 } from "./roles";
-import type { Brush } from "./roles";
+import type { Brush, LiaisonEnd } from "./roles";
 import { anchorLetters } from "./tokens";
 import type { LiaisonAnchor, LiaisonDraft, Token } from "./tokens";
 
@@ -224,42 +246,62 @@ export function RatePanel({
 
 /** 下一批要添加的音频归到哪个语种/性别；每条加进来后就固定各自的归属。 */
 export interface UploadDraft {
-  locale: string;
-  gender: string;
-}
-
-export interface UploadedAudio {
-  id: string;
-  name: string;
-  locale: string;
-  gender: string;
-  /** object URL，仅用于本地试听；删除与卸载时必须 revoke。 */
-  url: string;
+  locale: AudioAssetLocale;
+  gender: AudioAssetGender;
 }
 
 export interface UploadPanelProps {
   readOnly?: boolean;
+  /** 没注入适配器、或存储未开通时为 false：整块置灰并说明原因。 */
+  available: boolean;
+  unavailableReason?: string;
   upload: UploadDraft;
   onUploadChange: (next: Partial<UploadDraft>) => void;
-  uploads: UploadedAudio[];
-  onAddUploads: (files: FileList) => void;
-  onRemoveUpload: (id: string) => void;
-  onPlayUpload: (item: UploadedAudio) => void;
-  playingUploadId?: string;
+  /** 已落成资产的音频。 */
+  assets: AudioAsset[];
+  /** 还在路上或失败待重试的上传。 */
+  pending: PendingUpload[];
+  limit: number;
+  onAddFiles: (files: FileList) => void;
+  onRetryUpload: (id: string) => void;
+  onDismissUpload: (id: string) => void;
+  onRemoveAsset: (asset: AudioAsset) => void;
+  onPlayAsset: (asset: AudioAsset) => void;
+  playingAssetId?: string;
+  /** 试听失败的说明；只在这块面板里显示。 */
+  playbackMessage?: string;
 }
 
-/** 音频：先定归属再选文件，已添加的列在下面。 */
+const localeBadge = (locale: string) =>
+  VOICE_LOCALES.find((item) => item.locale === locale)?.badge ?? locale;
+const genderLabel = (gender: string) =>
+  VOICE_GENDERS.find((item) => item.gender === gender)?.label ?? gender;
+
+/**
+ * 音频：先定归属再选文件；上面是还在路上的（进度 / 失败可重试），下面是已保存的（试听 / 移除）。
+ * 上传本身在宿主注入的适配器里跑，这里只呈现队列。
+ */
 export function UploadPanel({
   readOnly,
+  available,
+  unavailableReason,
   upload,
   onUploadChange,
-  uploads,
-  onAddUploads,
-  onRemoveUpload,
-  onPlayUpload,
-  playingUploadId
+  assets,
+  pending,
+  limit,
+  onAddFiles,
+  onRetryUpload,
+  onDismissUpload,
+  onRemoveAsset,
+  onPlayAsset,
+  playingAssetId,
+  playbackMessage
 }: UploadPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inFlight = pending.filter((item) => !item.error).length;
+  const used = assets.length + inFlight;
+  const canAdd = available && !readOnly && used < limit;
   return (
     <div className="tsz-ve-pop tsz-ve-pop-upload" aria-label="音频">
       {/*
@@ -270,13 +312,13 @@ export function UploadPanel({
       <input
         ref={fileInputRef}
         type="file"
-        accept="audio/*"
+        accept={AUDIO_UPLOAD_ACCEPT}
         multiple
         aria-label="上传音频"
         style={{ display: "none" }}
-        disabled={readOnly}
+        disabled={!canAdd}
         onChange={(event) => {
-          if (event.target.files?.length) onAddUploads(event.target.files);
+          if (event.target.files?.length) onAddFiles(event.target.files);
           event.target.value = "";
         }}
       />
@@ -292,7 +334,7 @@ export function UploadPanel({
           optionType="button"
           aria-label="上传音频语种"
           value={upload.locale}
-          disabled={readOnly}
+          disabled={readOnly || !available}
           onChange={(event) => onUploadChange({ locale: event.target.value })}
           options={VOICE_LOCALES.map(({ locale, badge }) => ({
             value: locale,
@@ -304,7 +346,7 @@ export function UploadPanel({
           optionType="button"
           aria-label="上传音频性别"
           value={upload.gender}
-          disabled={readOnly}
+          disabled={readOnly || !available}
           onChange={(event) => onUploadChange({ gender: event.target.value })}
           options={VOICE_GENDERS.map(({ gender, label }) => ({
             value: gender,
@@ -316,45 +358,124 @@ export function UploadPanel({
       <Button
         block
         size="small"
-        disabled={readOnly}
+        disabled={!canAdd}
         onClick={() => fileInputRef.current?.click()}
       >
         选择音频文件
       </Button>
+      <Typography.Text
+        type="secondary"
+        className="tsz-ve-upload-hint"
+        role={available ? undefined : "note"}
+      >
+        {available
+          ? `${AUDIO_UPLOAD_HINT}，最多 ${limit} 条（已用 ${used}）`
+          : unavailableReason}
+      </Typography.Text>
+      {playbackMessage && (
+        <Typography.Text
+          type="danger"
+          className="tsz-ve-upload-hint"
+          role="alert"
+        >
+          {playbackMessage}
+        </Typography.Text>
+      )}
 
-      {uploads.length > 0 && (
+      {(pending.length > 0 || assets.length > 0) && (
         <>
           <div className="tsz-ve-pop-divider" aria-hidden />
           <ul className="tsz-ve-upload-list" aria-label="已上传音频">
-            {uploads.map((item) => (
-              <li key={item.id} className="tsz-ve-upload-item">
+            {pending.map((item) => (
+              <li
+                key={item.id}
+                className="tsz-ve-upload-item is-pending"
+                data-state={item.error ? "failed" : "uploading"}
+              >
+                <span className="tsz-ve-upload-status" aria-hidden />
+                <span className="tsz-ve-upload-name" title={item.name}>
+                  {item.name}
+                </span>
+                {item.error ? (
+                  <span className="tsz-ve-upload-error" role="alert">
+                    {item.error.message}
+                  </span>
+                ) : (
+                  <Progress
+                    className="tsz-ve-upload-progress"
+                    percent={progressPercent(item.progress)}
+                    size="small"
+                    showInfo={false}
+                    aria-label={`上传进度 ${item.name}`}
+                  />
+                )}
+                <span className="tsz-ve-upload-actions">
+                  {item.error?.retryable && (
+                    <Button
+                      size="small"
+                      type="text"
+                      aria-label={`重试 ${item.name}`}
+                      disabled={!available || readOnly}
+                      onClick={() => onRetryUpload(item.id)}
+                    >
+                      重试
+                    </Button>
+                  )}
+                  <Button
+                    size="small"
+                    type="text"
+                    className="tsz-ve-upload-remove"
+                    aria-label={`移除 ${item.name}`}
+                    disabled={readOnly}
+                    onClick={() => onDismissUpload(item.id)}
+                  >
+                    移除
+                  </Button>
+                </span>
+              </li>
+            ))}
+            {assets.map((asset) => (
+              <li key={asset.id} className="tsz-ve-upload-item">
                 <Button
                   size="small"
                   type="text"
                   className="tsz-ve-audition-button"
-                  aria-label={`试听 ${item.name}`}
-                  data-playing={playingUploadId === item.id}
-                  onClick={() => onPlayUpload(item)}
+                  aria-label={`试听 ${asset.original_name}`}
+                  data-playing={playingAssetId === asset.id}
+                  disabled={!available}
+                  onClick={() => onPlayAsset(asset)}
                 >
                   <SoundOutlined />
                 </Button>
-                <span className="tsz-ve-upload-name" title={item.name}>
-                  {item.name}
+                <span
+                  className="tsz-ve-upload-name"
+                  title={asset.original_name}
+                >
+                  {asset.original_name}
                 </span>
                 <span className="tsz-ve-upload-tag">
-                  {VOICE_LOCALES.find((l) => l.locale === item.locale)?.badge ??
-                    item.locale}
+                  {localeBadge(asset.locale)} · {genderLabel(asset.gender)}
                 </span>
-                <Button
-                  size="small"
-                  type="text"
-                  className="tsz-ve-upload-remove"
-                  aria-label={`移除 ${item.name}`}
+                {/* 移除只是从草稿里去掉引用、保存后才生效，但不进撤销栈，所以要确认一下 */}
+                <Popconfirm
+                  title="移除这条音频？"
+                  description="保存草稿后生效"
+                  okText="移除"
+                  cancelText="取消"
+                  okButtonProps={{ danger: true }}
                   disabled={readOnly}
-                  onClick={() => onRemoveUpload(item.id)}
+                  onConfirm={() => onRemoveAsset(asset)}
                 >
-                  移除
-                </Button>
+                  <Button
+                    size="small"
+                    type="text"
+                    className="tsz-ve-upload-remove"
+                    aria-label={`移除 ${asset.original_name}`}
+                    disabled={readOnly}
+                  >
+                    移除
+                  </Button>
+                </Popconfirm>
               </li>
             ))}
           </ul>
@@ -424,22 +545,39 @@ export function RolePanel({
   );
 }
 
-/** 「起点 / 终点」回显：显示锚点所在的词，以及词里选中的那几个字母。 */
+/**
+ * 「起点 / 终点」：既回显锚点所在的词与选中的字母，也是一枚开关——按下哪一端，
+ * 接下来点的字母就归哪一端。端别由人选而不按点击先后推断，先定终点再回头选起点、
+ * 选完终点再回去扩起点都行。
+ */
 function AnchorSlot({
   label,
   slot,
   tokens,
-  anchor
+  anchor,
+  active,
+  disabled,
+  onSelect
 }: {
   label: string;
-  slot: "start" | "end";
+  slot: LiaisonEnd;
   tokens: Token[];
   anchor?: LiaisonAnchor;
+  active: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
 }) {
   const word = anchor ? tokens[anchor.token]?.text : undefined;
   const letters = anchor ? anchorLetters(tokens, anchor) : "";
   return (
-    <span className="tsz-ve-anchor-field">
+    <button
+      type="button"
+      className="tsz-ve-anchor-field"
+      aria-pressed={active}
+      aria-label={`选择${label}`}
+      disabled={disabled}
+      onClick={onSelect}
+    >
       <Typography.Text type="secondary">{label}</Typography.Text>
       {word ? (
         <span className={`tsz-ve-anchor-slot is-${slot}`}>
@@ -449,7 +587,7 @@ function AnchorSlot({
       ) : (
         <Typography.Text type="secondary">—</Typography.Text>
       )}
-    </span>
+    </button>
   );
 }
 
@@ -457,6 +595,9 @@ export interface LiaisonPanelProps {
   readOnly?: boolean;
   tokens: Token[];
   draft: LiaisonDraft;
+  /** 接下来点的字母归哪一端。 */
+  activeEnd: LiaisonEnd;
+  onActiveEndChange: (end: LiaisonEnd) => void;
   onCommit: () => void;
   onResetDraft: () => void;
 }
@@ -471,9 +612,16 @@ export function LiaisonPanel({
   readOnly,
   tokens,
   draft,
+  activeEnd,
+  onActiveEndChange,
   onCommit,
   onResetDraft
 }: LiaisonPanelProps) {
+  /*
+   * 颜色订阅放在面板里而不是编辑器根上：拖取色器时每个 mousemove 都会改色，
+   * 订阅挂在根上会让同一页的几十个编辑器整树重渲染。弧线层自己订阅，不经这里。
+   */
+  const color = useLiaisonColor();
   const canCommit =
     Boolean(draft.start && draft.end) &&
     draft.start!.token !== draft.end!.token;
@@ -481,25 +629,39 @@ export function LiaisonPanel({
     <div className="tsz-ve-pop tsz-ve-pop-liaison" aria-label="连读">
       {/* 压成两行：这层浮层开在工具栏上方，再高就顶到抽屉标题栏了。 */}
       <div className="tsz-ve-liaison-anchors">
-        <AnchorSlot
-          label="起点"
-          slot="start"
-          tokens={tokens}
-          anchor={draft.start}
-        />
-        <span className="tsz-ve-liaison-arrow" aria-hidden>
-          →
-        </span>
-        <AnchorSlot
-          label="终点"
-          slot="end"
-          tokens={tokens}
-          anchor={draft.end}
-        />
+        {LIAISON_ANCHORS.map(({ anchor, label }, index) => (
+          <Fragment key={anchor}>
+            {index > 0 && (
+              <span className="tsz-ve-liaison-arrow" aria-hidden>
+                →
+              </span>
+            )}
+            <AnchorSlot
+              label={label}
+              slot={anchor}
+              tokens={tokens}
+              anchor={draft[anchor]}
+              active={activeEnd === anchor}
+              disabled={readOnly}
+              onSelect={() => onActiveEndChange(anchor)}
+            />
+          </Fragment>
+        ))}
       </div>
       <div className="tsz-ve-liaison-actions">
+        <span className="tsz-ve-liaison-color">
+          <Typography.Text type="secondary">颜色</Typography.Text>
+          {/* 显示偏好而非内容：wire 的 liaison 没有颜色字段，见 marks/liaisonColor。 */}
+          <ColorPicker
+            size="small"
+            value={color}
+            disabledAlpha
+            disabled={readOnly}
+            onChange={(value) => setLiaisonColor(value.toHexString())}
+          />
+        </span>
         {/* 上手提示只在还没落第一个锚点时占位，选起来之后就让位给按钮。 */}
-        {!draft.start && (
+        {!draft.start && !draft.end && (
           <span className="tsz-ve-pop-hint">点下面文字里的字母</span>
         )}
         <Button

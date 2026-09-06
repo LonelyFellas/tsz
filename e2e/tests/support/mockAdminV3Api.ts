@@ -325,8 +325,6 @@ function v3Word(
   compatibility?: AdminWordV3["compatibility"]
 ): AdminWordV3 {
   return {
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 3,
     id,
     language: "en",
@@ -334,6 +332,8 @@ function v3Word(
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: false,
     presentation: {
       label,
@@ -356,8 +356,6 @@ function v3Word(
 }
 
 const LEGACY_WORD: AdminWordV2 = {
-  annotation: null,
-  annotation_revision: 1,
   schema_version: 2,
   id: ADMIN_V2_LEGACY_WORD_ID,
   language: "en",
@@ -365,6 +363,8 @@ const LEGACY_WORD: AdminWordV2 = {
   status: "published",
   revision: 7,
   lifecycle_revision: 2,
+  annotation: null,
+  annotation_revision: 1,
   headwords: { mode: "unified", common: "legacy-orbit" },
   detection_snapshot: {
     detection_id: nodeId(205),
@@ -475,8 +475,6 @@ const LEGACY_PUBLICATION: AdminWordPublicationAny = {
 function listItem(word: AdminWordV3): AdminWordListItemAny {
   return {
     annotation_visible: false,
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 3,
     id: word.id,
     kind: "word",
@@ -484,6 +482,8 @@ function listItem(word: AdminWordV3): AdminWordListItemAny {
     dialects: ["uk", "us"],
     revision: word.revision,
     lifecycle_revision: word.lifecycle_revision,
+    annotation: null,
+    annotation_revision: 1,
     gloss: "轨道",
     pos_list: ["noun", "verb"],
     levels: ["B1"],
@@ -503,8 +503,6 @@ function listItem(word: AdminWordV3): AdminWordListItemAny {
 
 const LEGACY_LIST_ITEM: AdminWordListItemAny = {
   annotation_visible: false,
-  annotation: null,
-  annotation_revision: 1,
   schema_version: 2,
   id: ADMIN_V2_LEGACY_WORD_ID,
   headword: "legacy-orbit",
@@ -517,6 +515,8 @@ const LEGACY_LIST_ITEM: AdminWordListItemAny = {
   status: "published",
   revision: 7,
   lifecycle_revision: 2,
+  annotation: null,
+  annotation_revision: 1,
   max_reachable_step: "preview",
   published_revision: 7,
   has_unpublished_changes: false,
@@ -682,9 +682,9 @@ function surfaceMatchPage(
     items,
     total: duplicate ? 2 : 3,
     matched_entry_contexts: entries.map(([entryId, , spelling]) => ({
+      entry_id: entryId,
       annotation: null,
       annotation_revision: 1,
-      entry_id: entryId,
       presentation: {
         label: spelling,
         matched_surfaces: [spelling],

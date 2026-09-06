@@ -209,8 +209,6 @@ function makeWord(
   headwords: WordHeadwordsV2 = unifiedHeadwords
 ): AdminWordV2 {
   return {
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 2,
     id: "word-1",
     language: "en",
@@ -218,6 +216,8 @@ function makeWord(
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     headwords,
     detection_snapshot: {
       detection_id: "detection-1",

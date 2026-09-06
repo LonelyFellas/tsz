@@ -1,10 +1,16 @@
-import type { VoicePreviewAdapter } from "@tsz/voice-editor/types";
+import type {
+  AudioUploadAdapter,
+  VoicePreviewAdapter
+} from "@tsz/voice-editor/types";
 import { api } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { createAdminVoicePreviewAdapter } from "./adapter";
+import { createAdminAudioUploadAdapter } from "./audioUploadAdapter";
 
 const realAdapter = createAdminVoicePreviewAdapter(api.speech);
 let mockAdapterPromise: Promise<VoicePreviewAdapter> | undefined;
+const realAudioAdapter = createAdminAudioUploadAdapter(api.audioAssets);
+let mockAudioAdapterPromise: Promise<AudioUploadAdapter> | undefined;
 
 /**
  * 当前试听是否走 mock 适配器（不发请求、返回假音频）。
@@ -31,5 +37,23 @@ export const adminVoicePreviewAdapter: VoicePreviewAdapter = {
   },
   async synthesize(input, options) {
     return (await resolveAdapter()).synthesize(input, options);
+  }
+};
+
+/* 上传音频与试听共用同一个 mock 开关：后端两者都没配时一起走假的。 */
+async function resolveAudioAdapter(): Promise<AudioUploadAdapter> {
+  if (!voicePreviewIsMock) return realAudioAdapter;
+  mockAudioAdapterPromise ??= import("./mock").then(
+    ({ createMockAudioUploadAdapter }) => createMockAudioUploadAdapter()
+  );
+  return mockAudioAdapterPromise;
+}
+
+export const adminAudioUploadAdapter: AudioUploadAdapter = {
+  async upload(input) {
+    return (await resolveAudioAdapter()).upload(input);
+  },
+  async resolveUrl(assetId, options) {
+    return (await resolveAudioAdapter()).resolveUrl(assetId, options);
   }
 };

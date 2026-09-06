@@ -144,8 +144,6 @@ function validRuntimeDefinition(name: string): unknown {
 
 function validAdminWordV3() {
   return {
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 3,
     id: IDS.entry,
     language: "en",
@@ -153,6 +151,8 @@ function validAdminWordV3() {
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: false,
     presentation: {
       label: "colour / color",
@@ -255,8 +255,6 @@ function validAdminWordV3() {
 function validAdminWordV2() {
   const headwords = { mode: "unified", common: "legacy" } as const;
   return {
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 2,
     id: IDS.entry,
     language: "en",
@@ -264,6 +262,8 @@ function validAdminWordV2() {
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: false,
     headwords,
     detection_snapshot: {
@@ -326,8 +326,6 @@ function addLegacyV2Association(container: Record<string, unknown>) {
 function validAdminWordListItemV2() {
   return {
     annotation_visible: false,
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 2,
     id: IDS.entry,
     headword: "legacy",
@@ -336,6 +334,8 @@ function validAdminWordListItemV2() {
     headword_variants: [{ dialect: "common", headword: "legacy" }],
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     gloss: "旧词条",
     pos_list: [],
     levels: [],
@@ -353,8 +353,6 @@ function validAdminWordListItemV2() {
 function validAdminWordListItemV3() {
   return {
     annotation_visible: false,
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 3,
     id: IDS.form1,
     kind: "word",
@@ -366,6 +364,8 @@ function validAdminWordListItemV3() {
     dialects: ["uk", "us"],
     revision: 2,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     gloss: "颜色",
     pos_list: ["noun"],
     levels: ["A1"],

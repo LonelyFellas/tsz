@@ -314,8 +314,6 @@ function createDraft(
   kind: "word" | "phrase" = "word"
 ): MockWord {
   return {
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 2,
     id: ADMIN_E2E_WORD_ID,
     language: "en",
@@ -323,6 +321,8 @@ function createDraft(
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     headwords,
     detection_snapshot: {
       detection_id: "detect-center",
@@ -783,8 +783,6 @@ function listItem(word: MockWord) {
     throw new Error("Admin E2E word fixture has invalid headwords");
   }
   return {
-    annotation: null,
-    annotation_revision: 1,
     annotation_visible: false,
     schema_version: 2,
     id: word.id,
@@ -796,6 +794,8 @@ function listItem(word: MockWord) {
     status: word.status,
     revision: word.revision,
     lifecycle_revision: word.lifecycle_revision,
+    annotation: null,
+    annotation_revision: 1,
     max_reachable_step: word.max_reachable_step,
     ...(word.published_revision !== undefined
       ? { published_revision: word.published_revision }

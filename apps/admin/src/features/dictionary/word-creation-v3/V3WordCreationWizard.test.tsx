@@ -126,8 +126,6 @@ function word(revision = 1, spelling = "centre"): AdminWordV3 {
   const variants = forms.pos[0]!.forms[0]!.regional_variants;
   if (variants.mode === "common") variants.common.spelling = spelling;
   return {
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 3,
     id: "word-1",
     language: "en",
@@ -135,6 +133,8 @@ function word(revision = 1, spelling = "centre"): AdminWordV3 {
     status: "draft",
     revision,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: true,
     presentation: {
       label: spelling,

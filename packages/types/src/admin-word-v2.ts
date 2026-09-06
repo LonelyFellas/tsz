@@ -353,8 +353,6 @@ export type WordDetectionSnapshotV2 = WordDetectionSnapshotBaseV2 &
   );
 
 export interface AdminWordV2 {
-  annotation: string | null;
-  annotation_revision: number;
   schema_version: 2;
   id: string;
   language: AdminWordLanguageV2;
@@ -363,6 +361,10 @@ export interface AdminWordV2 {
   revision: number;
   /** 独立生命周期并发 token；归档/恢复递增，内容保存不变。 */
   lifecycle_revision: number;
+  /** 同原型词条的区分标签（≤ 20 个 Unicode scalar），未标注为 null。 */
+  annotation: string | null;
+  /** 标注独立修订；`PATCH /entries/{id}/annotation` 以此做乐观锁，与内容 revision 无关。 */
+  annotation_revision: number;
   headwords: WordHeadwordsV2;
   frequency?: FixedPercent;
   detection_snapshot: WordDetectionSnapshotV2;

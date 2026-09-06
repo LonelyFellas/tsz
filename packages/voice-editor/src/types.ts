@@ -1,4 +1,10 @@
-import type { RichText, RichTextV2 } from "@tsz/types";
+import type {
+  AudioAssetGenderV3,
+  AudioAssetLocaleV3,
+  AudioAssetV3,
+  RichText,
+  RichTextV2
+} from "@tsz/types";
 
 export interface VoiceOption {
   id: string;
@@ -64,6 +70,60 @@ export interface VoicePreviewAdapter {
   ): Promise<VoicePreviewResult>;
 }
 
+/**
+ * 一条已持久化的音频资产（真人录音）。直接用 wire 形状：与 VoiceProfile 同款，
+ * 本包不另起一套命名，宿主进出都不必转换。
+ */
+export type AudioAsset = AudioAssetV3;
+export type AudioAssetLocale = AudioAssetLocaleV3;
+export type AudioAssetGender = AudioAssetGenderV3;
+
+export type AudioUploadErrorCode =
+  | "unsupported_type"
+  | "too_large"
+  | "too_many"
+  | "storage_unavailable"
+  | "upload_failed"
+  | "confirm_failed"
+  | "unavailable"
+  | "unknown";
+
+export class AudioUploadError extends Error {
+  constructor(
+    public readonly code: AudioUploadErrorCode,
+    message: string,
+    public readonly retryable = false
+  ) {
+    super(message);
+    this.name = "AudioUploadError";
+  }
+}
+
+/**
+ * 音频上传适配器，由宿主注入（与 VoicePreviewAdapter 同款）：本包不碰 HTTP，
+ * 「申请许可 → 直传 → confirm」三步都在适配器里完成，编辑器只看到一条资产或一个错误。
+ */
+export interface AudioUploadAdapter {
+  upload(input: {
+    file: File;
+    locale: AudioAssetLocale;
+    gender: AudioAssetGender;
+    signal?: AbortSignal;
+    /** 0..1；直传进度，申请许可与 confirm 阶段可不报。 */
+    onProgress?: (ratio: number) => void;
+  }): Promise<AudioAsset>;
+  /** 试听用短期签名 URL；调用方在 expiresAt 前使用，过期重取。 */
+  resolveUrl(
+    assetId: string,
+    options?: { signal?: AbortSignal }
+  ): Promise<{ url: string; expiresAt: string }>;
+  /**
+   * 本会话是否已探测到存储未开通（501）。由适配器记一次即可：同一页可能挂着几十个
+   * 编辑器，各自记的话既重复又对不齐；编辑器每次渲染直接问。缺省视为可用。
+   */
+  isStorageUnavailable?(): boolean;
+}
+
 export interface VoiceRichTextFieldProps {
   value: RichText;
   contextLabel?: string;
@@ -113,5 +173,15 @@ export interface VoiceEditorProps {
   onVoiceProfileChange?: (next: VoiceProfile) => void;
   /** 正文输入框的占位提示；宿主的字段专属提示比通用那句有用，故可覆盖。 */
   placeholder?: string;
+  /**
+   * 音频上传适配器。不传表示当前环境不支持上传：「音频」面板置灰而不是退回本地试听——
+   * 两套语义并存会让人分不清哪些音频真的保存了。
+   */
+  audioUploadAdapter?: AudioUploadAdapter;
+  /** 挂在这段文本上的音频资产；与 voiceProfile 一样是受控通道，改动实时抛出。 */
+  audioAssets?: AudioAsset[];
+  onAudioAssetsChange?: (next: AudioAsset[]) => void;
+  /** 每段文本最多几条音频；缺省用 wire 的上限。 */
+  audioAssetLimit?: number;
   onChange: (value: RichTextV2) => void;
 }

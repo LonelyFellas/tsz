@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dev-worktree/docs/openapi.json",
-  "_source_sha256": "f8352c91a0165506a80034273645a339e0e0cbb25ec1ee7e77d95aa0a24c172c",
+  "_source_sha256": "c3f6a18ac3dba0dfb790cdf68c29d8638e83cfc037a582d1d8273d366c55006f",
   "roots": [
     "EntryAnnotationResponse",
     "AdminWordV3",
@@ -3797,56 +3797,6 @@
             "pending_target_headword": { "type": "string" },
             "relation": { "type": "string" },
             "score": { "type": "string" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "id",
-            "relation",
-            "score",
-            "prebound_target_word_id",
-            "target_headword",
-            "prebinding_state"
-          ],
-          "properties": {
-            "id": { "type": "string", "format": "uuid" },
-            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
-            "prebinding_state": {
-              "type": "string",
-              "enum": ["waiting_first_sense"]
-            },
-            "prebound_target_word_id": { "type": "string", "format": "uuid" },
-            "relation": { "type": "string" },
-            "score": { "type": "string" },
-            "target_headword": { "type": "string" },
-            "target_status": { "$ref": "#/$defs/AdminWordStatus" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "id",
-            "relation",
-            "score",
-            "prebound_target_word_id",
-            "target_headword",
-            "prebinding_state"
-          ],
-          "properties": {
-            "id": { "type": "string", "format": "uuid" },
-            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
-            "prebinding_state": {
-              "type": "string",
-              "enum": ["target_sense_deleted"]
-            },
-            "prebound_target_word_id": { "type": "string", "format": "uuid" },
-            "relation": { "type": "string" },
-            "score": { "type": "string" },
-            "target_headword": { "type": "string" },
-            "target_status": { "$ref": "#/$defs/AdminWordStatus" }
           },
           "additionalProperties": false
         }

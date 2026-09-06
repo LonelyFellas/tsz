@@ -1,6 +1,6 @@
 # 词条标注前端设计
 
-状态：已对齐后端稳定契约 v1，正式实现和验收完成。既有产品已批准。
+状态：已完成产品实施和真实验收，当前仅做用户授权的本地 dev 整合，不推远程。最终契约与验证以 verification.md 的最新记录为准。
 
 ## 依赖和关键路径
 
@@ -36,7 +36,7 @@ sync:openapi 明确 OPENAPI_SOURCE=/Users/darwish/Dev/tsz-core/tsz-rust-dev-work
 | 部分更新、重复创建                | 请求集成：一次 create 包含完整标注，未知结果按原 key/payload 重试 |
 | revision/token 并发变化           | create 集成：权威分组重确认、禁止静默覆盖、surface 链路回归       |
 | 假步骤残留                        | 页面：真实 id 导航 forms，无第二次创建/结果弹窗                   |
-| 列表/查询/详情不同步              | 列表：词名下方标注、编辑成功失效查询、失败保留输入                |
+| 列表/查询/详情不同步              | 列表：数字圆标按服务端标志显隐、编辑成功失效查询、失败保留输入    |
 | wire 与 runtime 脱节              | API 契约、显式来源同步、运行时响应测试                            |
 
 定向 Vitest/types/API/admin lint 后，完整实现近完成时运行一次 test:cov 和适度最终构建。失败最小范围修复，独立只读审查完整 diff；不为覆盖数字制造镜像测试。
@@ -45,8 +45,12 @@ sync:openapi 明确 OPENAPI_SOURCE=/Users/darwish/Dev/tsz-core/tsz-rust-dev-work
 
 OpenAPI 已从指定后端工作树同步，最终来源哈希与验证结果见 verification.md。重点为未知创建结果、并发更新、最终主词变化。仅回滚本功能 diff，保留用户其他变更，不整树 reset。
 
-判重限定直接 groups；groups 中现有 entry_ids 不含新条，新条隐式属于每组。校验拒绝控制字符、trim 后 Array.from 长度不超过20、Unicode lowercase 判重，不做 NFKC。PATCH 非分组可清空；返回冲突时邻居只读，目标使用最新 revision 重确认。
+判重限定直接 groups；groups 中现有 entry_ids 不含新条，新条隐式属于每组。前端校验 trim 后 ASCII 数字、最多20位，保留前导0，不做Number转换或自动编号；后端仍为独立字符串契约。PATCH 非分组可清空；返回冲突时邻居只读，目标使用最新 revision 重确认。
 
-## 基线契约差异
+## 本地 dev 整合裁决
 
-指定后端基线已包含关系预绑定（WordRelationWritableV3 三分支、WordRelationV3 四分支），前端基线原快照为两分支。主协调任务核实后批准最小契约收敛：保留真实生成快照，更新旧测试验证三种关系形状互斥、响应只读字段及预绑定状态，不实现关系UI、不重写关系逻辑。该差异不来自标注修改。
+早期隔离基线包含关系预绑定，后端 dev 已移除该能力。最终按整合后的权威 OpenAPI c3f6a18ac3dba0dfb790cdf68c29d8638e83cfc037a582d1d8273d366c55006f 重新生成快照，保留 dev 的两分支关系契约，不恢复预绑定。前端 dev 已有标注基础 types、音频资产和语音编辑器能力全部保留；标注类型复用 dev 的完整注释及 EntryAnnotationConflictReason 导出，仅补列表 annotation_visible 和检测 existing_draft_id。
+
+列表使用黑底白字 sup；annotation_visible 为 false 时圆标和 tooltip 中标注均隐藏，编辑仍读原值。有效重复关系由后端计算，不依赖分页或过滤条数。创建空草稿提示通过 existing_draft_id / duplicate_word.meta.word_id 进入已有 V3 forms，缺目标不泄露，避免重复创建。创建成功失效词条缓存，保存原型更新当前详情并失效列表/统计。
+
+原 dev 另一套未提交标注 UI 经用户裁决可恢复撤下；stash 和完整 tar/哈希备份保留，不恢复旧自由文本弹窗、下行标注及额外 STEP01 卡片。批量恢复3/4问题仅记录，不属于此次修复。

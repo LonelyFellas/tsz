@@ -3,6 +3,7 @@ import type {
   RichTextEmphasisLevel,
   RichTextV2
 } from "@tsz/types";
+import { liaisonAnchorSpans } from "../../core";
 import { normalizeGrammarLevel } from "./roles";
 
 /** 一个词在码点序列中的位置，左闭右开。 */
@@ -20,8 +21,8 @@ export interface Token {
  * 词缝 i 指第 i 个词与第 i+1 个词之间。
  */
 export interface MarkState {
-  /** 词序号 → 语法结构分类。 */
-  roles: Record<number, string>;
+  /** 语法结构单元：一段连续的码点区间（可以只是一个词里的几个字母）归入某一分类。 */
+  roles: RoleUnit[];
   /** 连读连线；每条连接两个字母锚点，可跨任意距离。 */
   liaisons: LiaisonLink[];
   /** 词缝序号 → 停顿毫秒。 */
@@ -32,6 +33,20 @@ export interface MarkState {
    * 「载入 → 保存」时被静默丢弃，而丢标注比标错更难被发现。
    */
   passthrough: RichTextAnnotation[];
+}
+
+/**
+ * 语法结构单元：绝对码点区间 [start, end) 归入某一分类，与 wire 的 emphasis 同形。
+ *
+ * 粒度是**字母**而不是词：管理员要把 "working" 的 "ing" 单独标成语法词、
+ * "work" 标成核心词，所以区间可以落在一个词内部，也可以拖过几个词。
+ * 不像连读那样按「词序号 + 词内偏移」存，是因为区间本就允许跨词、含空格，
+ * 改文本时按编辑窗口平移/裁切比按词判定更贴合。
+ */
+export interface RoleUnit {
+  start: number;
+  end: number;
+  level: string;
 }
 
 /**
@@ -63,11 +78,112 @@ export interface EditorSnapshot {
 }
 
 export const EMPTY_MARKS: MarkState = {
-  roles: {},
+  roles: [],
   liaisons: [],
   pauses: {},
   passthrough: []
 };
+
+/** 覆盖码点 position 的单元；不属于任何单元则为空。 */
+export function unitAt(
+  units: RoleUnit[],
+  position: number
+): RoleUnit | undefined {
+  return units.find((unit) => position >= unit.start && position < unit.end);
+}
+
+/** 从单元列表里挖掉 [start, end)：整个落在区间里的消失，跨过边界的被裁短或一分为二。 */
+function cutRange(units: RoleUnit[], start: number, end: number): RoleUnit[] {
+  const result: RoleUnit[] = [];
+  for (const unit of units) {
+    if (unit.end <= start || unit.start >= end) {
+      result.push(unit);
+      continue;
+    }
+    if (unit.start < start) result.push({ ...unit, end: start });
+    if (unit.end > end) result.push({ ...unit, start: end });
+  }
+  return result;
+}
+
+/** 相邻或重叠的同分类单元并成一个，输出按位置排好序。 */
+function coalesce(units: RoleUnit[]): RoleUnit[] {
+  const sorted = [...units].sort((a, b) => a.start - b.start);
+  const result: RoleUnit[] = [];
+  for (const unit of sorted) {
+    const previous = result[result.length - 1];
+    if (
+      previous &&
+      previous.level === unit.level &&
+      unit.start <= previous.end
+    ) {
+      previous.end = Math.max(previous.end, unit.end);
+    } else {
+      result.push({ ...unit });
+    }
+  }
+  return result;
+}
+
+/**
+ * 用某个分类刷一段区间。
+ *
+ * - 区间里已经**全部**是这个分类 → 视为取消：这几个字母退出单元（单元可能因此
+ *   一分为二），这样逐个点字母既能上色也能撤色；`toggle: false` 关掉这条，
+ *   用于「两次单击把中间接上」——补齐中间时不能把已上色的两端反过来抹掉；
+ * - 否则区间内不管原来是什么，统一改成这个分类，再与两侧同分类的单元接成一段——
+ *   一个字母一个字母地点过去，落盘就是一条连续的 emphasis。
+ */
+export function applyRoleRange(
+  text: string,
+  units: RoleUnit[],
+  unit: RoleUnit,
+  options: { toggle?: boolean } = {}
+): RoleUnit[] {
+  if (unit.end <= unit.start) return units;
+  const cleared = cutRange(units, unit.start, unit.end);
+  let next: RoleUnit[];
+  if (options.toggle !== false) {
+    let covered = 0;
+    for (const existing of units) {
+      if (existing.level !== unit.level) continue;
+      const overlap =
+        Math.min(existing.end, unit.end) - Math.max(existing.start, unit.start);
+      if (overlap > 0) covered += overlap;
+    }
+    next = covered >= unit.end - unit.start ? cleared : [...cleared, unit];
+  } else {
+    next = [...cleared, unit];
+  }
+  // 逐字母撤色会在残段两头留下空格；只剩空格的单元看不见也点不掉，却照样落盘。
+  const points = Array.from(text);
+  return coalesce(next).flatMap((item) => {
+    const trimmed = trimUnit(points, item);
+    return trimmed ? [trimmed] : [];
+  });
+}
+
+/**
+ * 把 [start, end) 按换行拆成几段（不含换行符本身）：wire 不接受跨段落的标注，
+ * 拖过换行的一段语法结构按行各自上色，而不是整段进不了 wire。
+ */
+export function splitRangeAtParagraphs(
+  text: string,
+  start: number,
+  end: number
+): Array<{ start: number; end: number }> {
+  const points = Array.from(text);
+  const pieces: Array<{ start: number; end: number }> = [];
+  let from = start;
+  for (let index = start; index <= end; index += 1) {
+    const point = points[index];
+    if (index === end || point === "\n" || point === "\r") {
+      if (index > from) pieces.push({ start: from, end: index });
+      from = index + 1;
+    }
+  }
+  return pieces;
+}
 
 export function makeAnchor(token: number, offset: number): LiaisonAnchor {
   return { token, offsets: [offset] };
@@ -279,15 +395,17 @@ export function marksToAnnotations(
   const tokens = tokenize(text);
   const annotations: RichTextAnnotation[] = [];
 
-  for (const token of tokens) {
-    const level = marks.roles[token.index];
-    if (!level) continue;
+  const length = Array.from(text).length;
+  for (const unit of marks.roles) {
+    const start = Math.max(0, unit.start);
+    const end = Math.min(length, unit.end);
+    if (end <= start) continue;
     annotations.push({
       type: "emphasis",
-      start: token.start,
-      end: token.end,
+      start,
+      end,
       // 三分类直接落盘（后端枚举已放开）；存量 "strong" 读回时按核心词理解。
-      level: level as RichTextEmphasisLevel
+      level: unit.level as RichTextEmphasisLevel
     });
   }
 
@@ -317,7 +435,7 @@ export function marksToAnnotations(
  */
 export function annotationsToMarks(value: RichTextV2): MarkState {
   const tokens = tokenize(value.text);
-  const roles: Record<number, string> = {};
+  let roles: RoleUnit[] = [];
   const liaisons: LiaisonLink[] = [];
   const pauses: Record<number, number> = {};
   const passthrough: RichTextAnnotation[] = [];
@@ -328,32 +446,36 @@ export function annotationsToMarks(value: RichTextV2): MarkState {
       continue;
     }
     if (annotation.type === "emphasis") {
-      for (const token of tokens) {
-        const overlaps =
-          annotation.start < token.end && annotation.end > token.start;
-        if (overlaps) {
-          roles[token.index] =
-            normalizeGrammarLevel(annotation.level) ?? "core";
-        }
+      /*
+       * 与 wire 同形进来，分类归一到三分类之一。normalize 只合并同分类的重叠，
+       * 手工 / 导入数据里不同分类的重叠 emphasis 能合法通过——这里按「后者覆盖
+       * 前者」收成互不重叠的单元，否则屏幕显示哪条、落笔算哪条会对不上。
+       */
+      if (annotation.end > annotation.start) {
+        const unit = {
+          start: annotation.start,
+          end: annotation.end,
+          level: normalizeGrammarLevel(annotation.level) ?? "core"
+        };
+        roles = coalesce([...cutRange(roles, unit.start, unit.end), unit]);
       }
     } else if (annotation.type === "liaison") {
       /*
        * 两端各自的宽度由 start_len / end_len 还原；缺省按 1 个码点，
        * 这样三分类落地之前存的老数据仍读得回来。
        */
-      const startLen = Math.max(1, annotation.start_len ?? 1);
-      const endLen = Math.max(1, annotation.end_len ?? 1);
+      const spans = liaisonAnchorSpans(annotation);
       const start = widenAnchor(
         tokens,
-        offsetToAnchor(tokens, annotation.start),
-        annotation.start,
-        startLen
+        offsetToAnchor(tokens, spans.start.start),
+        spans.start.start,
+        spans.start.end - spans.start.start
       );
       const end = widenAnchor(
         tokens,
-        offsetToAnchor(tokens, annotation.end - endLen),
-        annotation.end - endLen,
-        endLen
+        offsetToAnchor(tokens, spans.end.start),
+        spans.end.start,
+        spans.end.end - spans.end.start
       );
       if (start && end && isValidLiaison({ start, end })) {
         liaisons.push({ start, end });
@@ -386,11 +508,7 @@ export function remapMarks(
   const survives = (index: number) =>
     before[index] !== undefined && before[index]!.text === after[index]?.text;
 
-  const roles: Record<number, string> = {};
-  for (const [rawIndex, level] of Object.entries(marks.roles)) {
-    const index = Number(rawIndex);
-    if (survives(index)) roles[index] = level;
-  }
+  const roles = remapRoleUnits(previousText, nextText, marks.roles);
 
   // 词缝两侧的词都还在原位，这条缝上的停顿才有意义。
   const gapSurvives = (gap: number) => survives(gap) && survives(gap + 1);
@@ -422,22 +540,11 @@ export function remapMarks(
   };
 }
 
-/**
- * 透传注解（音标 / 高亮）带的是绝对码点偏移，改文本后要跟着挪。
- *
- * 用「公共前缀 + 公共后缀」圈出这次编辑真正动过的那一段：动过的段之前的注解原样
- * 保留，之后的整体平移，只有压在改动段上的才丢——那种确实已经不指向原来的音了。
- *
- * 早先这里写的是「文本一变就整批丢弃」，而 remapMarks 只在改文本时才被调用，
- * 于是那个条件恒真：随便敲一个字符，整条例句的音标和高亮就被清空且毫无提示。
- * 这跟 MarkState.passthrough 立的规矩（丢标注比标错更难发现）正好相反。
- */
-function remapPassthrough(
+/** 一次编辑真正动过的那一段（旧坐标），由公共前缀 + 公共后缀圈出来。 */
+function editWindow(
   previousText: string,
-  nextText: string,
-  annotations: RichTextAnnotation[]
-): RichTextAnnotation[] {
-  if (previousText === nextText) return annotations;
+  nextText: string
+): { prefix: number; changedEnd: number; delta: number } {
   const before = Array.from(previousText);
   const after = Array.from(nextText);
 
@@ -459,9 +566,96 @@ function remapPassthrough(
     suffix += 1;
   }
 
-  /** 旧坐标里改动段的右开边界，以及本次编辑带来的长度变化。 */
-  const changedEnd = before.length - suffix;
-  const delta = after.length - before.length;
+  return {
+    prefix,
+    changedEnd: before.length - suffix,
+    delta: after.length - before.length
+  };
+}
+
+/** 去掉区间两端的空白码点：裁切后留下的半截单元不该带着一个空格。 */
+function trimUnit(text: string[], unit: RoleUnit): RoleUnit | undefined {
+  let { start, end } = unit;
+  while (start < end && /\s/u.test(text[start] ?? "")) start += 1;
+  while (end > start && /\s/u.test(text[end - 1] ?? "")) end -= 1;
+  return end > start ? { ...unit, start, end } : undefined;
+}
+
+/**
+ * 语法结构单元随文本改动平移：改动段之前的原样保留，之后的整体平移；
+ * 压在改动段上的单元只丢被改到的那一段，两侧剩下的部分各自留成一段——
+ * 改一个错字不该把整个短语的标记抹掉。
+ *
+ * 改动段落在词内时先撑到整词：把 centre 改成 middle，按字符比对只有末尾的 e
+ * 没动，可那已经是另一个词了，留着一个孤零零上了色的 e 只会让人困惑；
+ * 在词中间插一个字母同理，那个词的颜色整体作废，让人重标。
+ */
+function remapRoleUnits(
+  previousText: string,
+  nextText: string,
+  units: RoleUnit[]
+): RoleUnit[] {
+  if (previousText === nextText) return units;
+  const { prefix, changedEnd, delta } = editWindow(previousText, nextText);
+  const before = Array.from(previousText);
+  const after = Array.from(nextText);
+  const isWordChar = (index: number) =>
+    index >= 0 && index < before.length && !/\s/u.test(before[index]!);
+
+  let cutStart = prefix;
+  if (isWordChar(cutStart - 1) && isWordChar(cutStart)) {
+    while (isWordChar(cutStart - 1)) cutStart -= 1;
+  }
+  let cutEnd = changedEnd;
+  if (isWordChar(cutEnd - 1) && isWordChar(cutEnd)) {
+    while (isWordChar(cutEnd)) cutEnd += 1;
+  }
+
+  const kept: RoleUnit[] = [];
+  for (const unit of units) {
+    if (unit.end <= cutStart) {
+      kept.push(unit);
+      continue;
+    }
+    if (unit.start >= cutEnd) {
+      kept.push({ ...unit, start: unit.start + delta, end: unit.end + delta });
+      continue;
+    }
+    const left =
+      unit.start < cutStart
+        ? trimUnit(after, { ...unit, end: cutStart })
+        : undefined;
+    const right =
+      unit.end > cutEnd
+        ? trimUnit(after, {
+            ...unit,
+            start: cutEnd + delta,
+            end: unit.end + delta
+          })
+        : undefined;
+    if (left) kept.push(left);
+    if (right) kept.push(right);
+  }
+  return kept;
+}
+
+/**
+ * 透传注解（音标 / 高亮）带的是绝对码点偏移，改文本后要跟着挪。
+ *
+ * 用「公共前缀 + 公共后缀」圈出这次编辑真正动过的那一段：动过的段之前的注解原样
+ * 保留，之后的整体平移，只有压在改动段上的才丢——那种确实已经不指向原来的音了。
+ *
+ * 早先这里写的是「文本一变就整批丢弃」，而 remapMarks 只在改文本时才被调用，
+ * 于是那个条件恒真：随便敲一个字符，整条例句的音标和高亮就被清空且毫无提示。
+ * 这跟 MarkState.passthrough 立的规矩（丢标注比标错更难发现）正好相反。
+ */
+function remapPassthrough(
+  previousText: string,
+  nextText: string,
+  annotations: RichTextAnnotation[]
+): RichTextAnnotation[] {
+  if (previousText === nextText) return annotations;
+  const { prefix, changedEnd, delta } = editWindow(previousText, nextText);
 
   const kept: RichTextAnnotation[] = [];
   for (const annotation of annotations) {

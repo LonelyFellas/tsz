@@ -14,8 +14,6 @@ function word(
   presentation = `word-${revision}`
 ): AdminWordV3 {
   return {
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 3,
     id: "word-1",
     language: "en",
@@ -23,6 +21,8 @@ function word(
     status: "draft",
     revision,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: true,
     presentation: {
       label: presentation,

@@ -3555,8 +3555,6 @@ export function createAdminWordsMock({
         }
       : { smart_dictionary_status: "clear" as const };
     const word: AdminWordV2 = {
-      annotation: null,
-      annotation_revision: 1,
       schema_version: 2,
       id: wordId,
       language: "en",
@@ -3564,6 +3562,8 @@ export function createAdminWordsMock({
       status: "draft",
       revision: 1,
       lifecycle_revision: 1,
+      annotation: null,
+      annotation_revision: 1,
       headwords: clone(input.headwords),
       detection_snapshot: {
         detection_id: detection.detection_id,

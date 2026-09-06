@@ -8,8 +8,6 @@ import { V3ReviewContent } from "./V3ReviewContent";
 function word(): AdminWordV3 {
   const forms = formsFixture();
   return {
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 3,
     id: "word-internal-id",
     language: "en",
@@ -17,6 +15,8 @@ function word(): AdminWordV3 {
     status: "published",
     revision: 4,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     published_revision: 4,
     has_unpublished_changes: false,
     presentation: {

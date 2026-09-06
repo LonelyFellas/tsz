@@ -46,8 +46,6 @@ import {
 
 function v3Word(): AdminWordV3 {
   return {
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 3,
     id: "word-v3",
     language: "en",
@@ -55,6 +53,8 @@ function v3Word(): AdminWordV3 {
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: true,
     presentation: {
       label: "center",
@@ -215,9 +215,9 @@ function v3BaseFormPage(): SurfaceMatchPageV3 {
     ],
     matched_entry_contexts: [
       {
+        entry_id: "existing-v3",
         annotation: null,
         annotation_revision: 1,
-        entry_id: "existing-v3",
         presentation: {
           label: "centre / center",
           matched_surfaces: ["centre", "center"],
@@ -1402,9 +1402,9 @@ describe("UnifiedCreateEntryStep", () => {
       })),
       matched_entry_contexts: [
         {
+          entry_id: "internal-entry-id",
           annotation: null,
           annotation_revision: 1,
-          entry_id: "internal-entry-id",
           presentation: {
             label: "existing entry",
             matched_surfaces: ["first", "second"],

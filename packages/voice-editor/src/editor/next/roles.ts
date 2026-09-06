@@ -1,4 +1,8 @@
-import type { VoiceOption } from "../../types";
+import type {
+  AudioAssetGender,
+  AudioAssetLocale,
+  VoiceOption
+} from "../../types";
 
 /**
  * 语法结构三分类。一段文字只能属于其中一类：点非当前类=替换，点当前类=取消。
@@ -20,7 +24,7 @@ export const LEGACY_GRAMMAR_LEVEL = "strong";
  * 当前画笔。选中一支笔后直接点靶子落笔，免去「先拖选、再去远处点按钮」的往返。
  *
  * 三种笔各有各的靶子，互不干扰：
- * - role   → 点词，标语法结构分类
+ * - role   → 点字母 / 拖过一段字母，标语法结构分类（粒度到字母）
  * - liaison→ 点字母，连出一条连读弧（两端可跨任意距离）
  * - pause  → 点词缝，插入停顿
  */
@@ -40,8 +44,8 @@ export type LiaisonEnd = "start" | "end";
 export const DEFAULT_BRUSH: Brush = { kind: "none" };
 
 /** 当前画笔作用在哪种靶子上；none 表示这一刻鼠标归文本编辑。 */
-export function brushTarget(brush: Brush): "word" | "letter" | "gap" | "none" {
-  if (brush.kind === "role") return "word";
+export function brushTarget(brush: Brush): "letter" | "gap" | "none" {
+  if (brush.kind === "role") return "letter";
   if (brush.kind === "liaison") return "letter";
   if (brush.kind === "pause") return "gap";
   return "none";
@@ -54,7 +58,7 @@ export function normalizeGrammarLevel(raw: unknown): string | undefined {
   return level === LEGACY_GRAMMAR_LEVEL ? "core" : level;
 }
 
-/** 连读两端的显示名；端别由点击位置自动判定，这里只用于回显。 */
+/** 连读两端的显示名与面板顺序；端别由面板上的开关手选。 */
 export const LIAISON_ANCHORS: ReadonlyArray<{
   anchor: LiaisonEnd;
   label: string;
@@ -82,12 +86,18 @@ export const RATE_MULTIPLIER_MAX = 2;
 export const PAUSE_PRESETS: readonly number[] = [500, 1000, 2000, 5000];
 
 /** 语种分组：wire 的 locale ↔ 界面上的 BrE / AmE 徽标。 */
-export const VOICE_LOCALES: ReadonlyArray<{ locale: string; badge: string }> = [
+export const VOICE_LOCALES: ReadonlyArray<{
+  locale: AudioAssetLocale;
+  badge: string;
+}> = [
   { locale: "en-GB", badge: "BrE" },
   { locale: "en-US", badge: "AmE" }
 ];
 
-export const VOICE_GENDERS: ReadonlyArray<{ gender: string; label: string }> = [
+export const VOICE_GENDERS: ReadonlyArray<{
+  gender: AudioAssetGender;
+  label: string;
+}> = [
   { gender: "female", label: "女声 ♀" },
   { gender: "male", label: "男声 ♂" }
 ];

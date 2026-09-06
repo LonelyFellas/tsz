@@ -123,3 +123,13 @@ ship 继续暂停：未暂存、提交、推送或创建 PR。
 原dev的另一套未提交annotation UI共25文件，经逐文件评估，涉及重复创建弹窗、自由文字校验、下行标注、额外STEP01编辑卡和支撑API/mock；用户裁决以右侧已验收版本为主，可恢复撤下重复实现，不恢复旧UI。未发现这批脏文件中有非标注独立功能。核对其Claude会话最后时间2026-09-06T14:34:18.214Z无更新，25文件内容hash与备份一致后，执行stash -u保全，stash为a07479258d9ff7566a383c05e6da68a13a82530f，保留不pop/drop。完整备份 /tmp/tsz-original-dev-backup-20260906：manifest SHA256 aea7254ba56878373c5703b0447d5e3ca996a97834ad8f66e688f1b16d2227bf；tar SHA256 0c6ab3e1d9357ffc57f1d6f79030775b8b6320b635d3f55c134051d47fad6dc5。原dev现clean。
 
 独立审查缓存P2已修：创建成功失效wordKeys.all，原型成功保存更新当前canonical后仅失效lists/stats。fresh60秒缓存复现前3失败，修复后WordCreate/WordWizardV3共42测试通过；不改变当前向导编辑状态，不修另项批量恢复3/4。最终质量门在吸收dev和新OpenAPI后统一执行。
+
+## 最终本地合并质量门（2026-09-06）
+
+功能checkpoint为c3f4a09b7211a358661146baadfb2f7d60692f59，正常pre-commit/commit-msg hooks通过。随后吸收dev 47232aad6cd05750742db7d6b14143697b5cc23c，逐项解冲突并保留已提交的语音编辑器、音频上传及标注基础类型；相对dev的语音/音频实现无差异。另一套未提交旧UI继续保留在上述stash，不重新应用。
+
+后端已合并的dev/feature为fac0a06ce8b4c4558b6d08c4cef656c47c8c593a。最终显式同步其docs/openapi.json，SHA256为c3f6a18ac3dba0dfb790cdf68c29d8638e83cfc037a582d1d8273d366c55006f；保留dev去预绑定后的两分支关系契约、音频端点及其既有PENDING白名单，仅追加本次显示标志/空草稿字段及标注解码根。
+
+最终合并树7包typecheck、admin生产build通过。首轮test:cov为2997/2998通过，唯一失败是创建页新增useQueryClient后页面烟雾测试缺QueryClientProvider；只补该测试装配，定向8项通过。随后以相同原生命令和默认2 workers完整重跑pnpm test:cov：180文件/2998测试全部通过，覆盖率门通过，未降低门槛或绕过hooks。日志分别为/tmp/annotation-merged-typecheck.log、/tmp/annotation-merged-build.log、/tmp/annotation-merged-smoke.log、/tmp/annotation-merged-coverage-final.log；原失败保留于/tmp/annotation-merged-coverage.log。
+
+提交前独立只读审查复核合并冲突处理、dev能力保留、最终契约及缓存修复，无新增阻断；精确合并SHA在提交后另行独立复核。此次本地整合未操作浏览器、业务数据、服务进程或远程仓库，既有批量恢复3/4另项仍仅记录。

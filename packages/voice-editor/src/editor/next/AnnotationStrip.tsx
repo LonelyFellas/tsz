@@ -2,28 +2,31 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import {
   Fragment,
   useCallback,
-  useLayoutEffect,
+  useEffect,
+  useMemo,
   useRef,
   useState
 } from "react";
-import { liaisonPath, liaisonStrokeWidth } from "./liaisonPath";
 import {
-  GRAMMAR_ROLES,
-  brushTarget,
-  formatPauseLabel,
-  type Brush
-} from "./roles";
+  LiaisonArcLayer,
+  useLiaisonArcs,
+  type LiaisonLinkElements
+} from "../../marks";
+import { brushTarget, formatPauseLabel, type Brush } from "./roles";
 import {
   graphemes,
   tokenize,
+  unitAt,
   type LiaisonAnchor,
   type LiaisonDraft,
   type MarkState
 } from "./tokens";
 
-const ROLE_LABELS = new Map(
-  GRAMMAR_ROLES.map((role) => [role.level, role.label])
-);
+/** 一个字母（字素簇）占的绝对码点区间。 */
+interface CodeSpan {
+  start: number;
+  end: number;
+}
 
 const letterKey = (token: number, offset: number) => `${token}:${offset}`;
 
@@ -55,17 +58,13 @@ export interface AnnotationStripProps {
   inputDataAttributes?: Record<string, string>;
   inputPlaceholder?: string;
   onTextChange: (value: string) => void;
-  onWordClick: (tokenIndex: number) => void;
+  /** 语法结构落笔：绝对码点区间 [start, end)；单击一个字母是 click，拖过一段是 drag。 */
+  onRoleRange: (start: number, end: number, mode: "click" | "drag") => void;
+  /** 语法结构画笔上一次单击上色的字母，标出来让人知道下一次同词单击会与它接上。 */
+  roleAnchorStart?: number;
   onGapClick: (gapIndex: number) => void;
   onLetterClick: (anchor: LiaisonAnchor) => void;
   onLiaisonClick: (index: number) => void;
-}
-
-interface ArcGeometry {
-  /** 跨行的连读会拆成两截，故 key 与 index 分开：两截指向同一条连读。 */
-  key: string;
-  index: number;
-  d: string;
 }
 
 /**
@@ -95,7 +94,8 @@ export function AnnotationStrip({
   inputDataAttributes,
   inputPlaceholder,
   onTextChange,
-  onWordClick,
+  onRoleRange,
+  roleAnchorStart,
   onGapClick,
   onLetterClick,
   onLiaisonClick
@@ -113,7 +113,6 @@ export function AnnotationStrip({
     .sort((left, right) => left - right);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const letterRefs = useRef(new Map<string, HTMLElement>());
-  const [arcs, setArcs] = useState<ArcGeometry[]>([]);
 
   const registerLetter = useCallback(
     (key: string) => (node: HTMLElement | null) => {
@@ -123,100 +122,87 @@ export function AnnotationStrip({
     []
   );
 
-  /** 量出每条连读两端字母的位置，换算成容器坐标系里的弧线路径。 */
-  const measure = useCallback(() => {
-    const container = containerRef.current;
-    if (!container) return;
-    const base = container.getBoundingClientRect();
-    const fontSize = Number.parseFloat(getComputedStyle(container).fontSize);
-
-    // 多字母锚点的落点取整段选区的中心，与参考实现一致。
-    const geometryOf = (anchor: LiaisonAnchor) => {
+  /*
+   * 每条连读两端的字母元素，按 marks.liaisons 的序号对位（缺元素的留空位，
+   * 弧线序号才能继续指回原来那条连读，点弧线删除靠它）。
+   *
+   * target 与 text 也要进依赖：换文本、切画笔都会改字母的渲染方式与横向位置，
+   * 而容器宽度不变、ResizeObserver 不会触发，弧线不重算就会错位。
+   */
+  const collectLinks = useCallback((): Array<
+    LiaisonLinkElements | undefined
+  > => {
+    const elementsOf = (anchor: LiaisonAnchor) => {
       const offsets = [...anchor.offsets].sort((a, b) => a - b);
-      const first = letterRefs.current.get(
-        letterKey(anchor.token, offsets[0]!)
+      const letters = offsets.map((offset) =>
+        letterRefs.current.get(letterKey(anchor.token, offset))
       );
-      const last = letterRefs.current.get(
-        letterKey(anchor.token, offsets[offsets.length - 1]!)
-      );
+      const first = letters[0];
+      const last = letters[letters.length - 1];
       if (!first || !last) return undefined;
-      const head = first.getBoundingClientRect();
-      const tail = last.getBoundingClientRect();
       return {
-        x: (head.left + tail.right) / 2 - base.left,
-        tipY: Math.min(head.top, tail.top) - base.top
+        first,
+        last,
+        text: letters.map((letter) => letter?.textContent ?? "").join("")
       };
     };
-
-    const style = getComputedStyle(container);
-    const innerLeft = Number.parseFloat(style.paddingLeft);
-    const innerRight = base.width - Number.parseFloat(style.paddingRight);
-
-    const next: ArcGeometry[] = [];
-    marks.liaisons.forEach((link, index) => {
-      const left = geometryOf(link.start);
-      const right = geometryOf(link.end);
-      if (!left || !right) return;
-
-      if (left.tipY === right.tipY && right.x > left.x) {
-        next.push({
-          key: `${index}`,
-          index,
-          d: liaisonPath(left, right, fontSize)
-        });
-        return;
-      }
-
-      /*
-       * 两端落在不同行：像乐谱里跨行的连音线那样断成两截，各自延到行边缘。
-       * 换行纯粹是排版结果（同样两个词换个宽度就同行了），标注本身合法，
-       * 不能因为画不出一条完整弧就整条不画——那会留下「统计里有、屏幕上没有」
-       * 的隐形状态，既看不见也点不掉。
-       */
-      next.push({
-        key: `${index}-head`,
-        index,
-        d: liaisonPath(left, { x: innerRight, tipY: left.tipY }, fontSize)
-      });
-      next.push({
-        key: `${index}-tail`,
-        index,
-        d: liaisonPath({ x: innerLeft, tipY: right.tipY }, right, fontSize)
-      });
+    return marks.liaisons.map((link) => {
+      const start = elementsOf(link.start);
+      const end = elementsOf(link.end);
+      return start && end ? { start, end } : undefined;
     });
-    setArcs(next);
-  }, [marks.liaisons]);
+  }, [marks.liaisons, target, text]);
 
-  useLayoutEffect(() => {
-    measure();
-    const container = containerRef.current;
-    // 换行、容器宽度变化都会挪动字母，弧线必须跟着重算。
-    if (!container || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(measure);
-    observer.observe(container);
-    return () => observer.disconnect();
-    // target 也要进依赖：切画笔会改词的渲染方式，字母随之横向位移，
-    // 而容器宽度不变、ResizeObserver 不会触发，弧线不重算就会错位。
-  }, [measure, target, text]);
+  const { arcs, strokeWidth } = useLiaisonArcs(containerRef, collectLinks);
 
-  const strokeWidth = liaisonStrokeWidth(
-    containerRef.current
-      ? Number.parseFloat(getComputedStyle(containerRef.current).fontSize)
-      : 20
+  /*
+   * 语法结构按字母圈选：按下一个字母、拖过一段字母、松手落笔；只按一下就是
+   * 那一个字母。anchor 是按下的字母、focus 是最后经过的字母，都记绝对码点区间。
+   * 松手在 document 上收：拖到标注带外面松开也照常落笔，不留下悬着的圈选。
+   */
+  const [selecting, setSelecting] = useState<
+    { anchor: CodeSpan; focus: CodeSpan } | undefined
+  >();
+  const selectedRange = useMemo<CodeSpan | undefined>(
+    () =>
+      selecting
+        ? {
+            start: Math.min(selecting.anchor.start, selecting.focus.start),
+            end: Math.max(selecting.anchor.end, selecting.focus.end)
+          }
+        : undefined,
+    [selecting]
   );
+
+  // 圈选一变就重挂一次 mouseup 监听，闭包里永远是当前这段，不必另存 ref。
+  useEffect(() => {
+    if (!selecting || !selectedRange) return;
+    const mode =
+      selecting.anchor.start === selecting.focus.start ? "click" : "drag";
+    const finish = () => {
+      setSelecting(undefined);
+      onRoleRange(selectedRange.start, selectedRange.end, mode);
+    };
+    document.addEventListener("mouseup", finish);
+    return () => document.removeEventListener("mouseup", finish);
+  }, [selecting, selectedRange, onRoleRange]);
+
+  const covers = (range: CodeSpan | undefined, start: number, end: number) =>
+    range !== undefined && range.start <= start && range.end >= end;
 
   /*
    * 落笔用 mousedown + preventDefault，不用 click：click 之前浏览器已经把光标
    * 挪到点击处、还可能起一段选区，等到 click 再拦就晚了。
    */
   const paint = (run: () => void) => (event: ReactMouseEvent) => {
-    if (!painting) return;
+    // 只认主键：右键要留给原生菜单，而且它的 mouseup 常常送不到页面，会留下悬着的圈选。
+    if (!painting || event.button !== 0) return;
     event.preventDefault();
     run();
   };
 
   return (
-    <div className="tsz-ve-canvas" data-target={target}>
+    <div className="tsz-ve-canvas" data-target={target} data-brush={brush.kind}>
       {/*
        * 标注层对读屏隐藏：正文由下面那个 textarea 提供，两边都念的话同一句话会被
        * 读两遍，连读模式下还会逐字母念「xxx 的第 1 个字母 p」。
@@ -232,25 +218,17 @@ export function AnnotationStrip({
         data-target={target}
         aria-hidden
       >
-        <svg className="tsz-ve-arc-layer" aria-hidden focusable="false">
-          {arcs.map((arc) => (
-            <g key={arc.key}>
-              {target === "letter" && (
-                <path
-                  className="tsz-ve-arc-hit"
-                  d={arc.d}
-                  strokeWidth={Math.max(strokeWidth * 3, 12)}
-                  onMouseDown={paint(() => onLiaisonClick(arc.index))}
-                />
-              )}
-              <path
-                className="tsz-ve-arc"
-                d={arc.d}
-                strokeWidth={strokeWidth}
-              />
-            </g>
-          ))}
-        </svg>
+        <LiaisonArcLayer
+          arcs={arcs}
+          strokeWidth={strokeWidth}
+          onArcMouseDown={
+            // 只有连读画笔才能点弧线删除：语法结构画笔也落在字母上，弧线的命中带
+            // 压在字母上方，不限画笔的话给弧线端点附近的字母上色会把连读点掉。
+            brush.kind === "liaison"
+              ? (index, event) => paint(() => onLiaisonClick(index))(event)
+              : undefined
+          }
+        />
 
         {/*
          * 词与词之间渲染的是**真正的空格字符**，不是一个占位方块：下层要和
@@ -258,69 +236,81 @@ export function AnnotationStrip({
          */}
         {leadingSpace(text, tokens)}
         {tokens.map((token, position) => {
-          const role = marks.roles[token.index];
-          const roleLabel = role ? ROLE_LABELS.get(role) : undefined;
           const hasNext = position < tokens.length - 1;
+          const nextToken = tokens[position + 1];
           const pause = marks.pauses[position];
           // 按字素簇渲染，不按码点：否则组合字符与 emoji 会被拆开、整行错位。
           const letters = graphemes(token.text);
-          const roleClass = role ? ` is-${role}` : "";
+          // 拖选跨过词缝时，那段空白也描进预览里，看得出是连着的一段。
+          const gapClass =
+            nextToken && covers(selectedRange, token.end, nextToken.start)
+              ? " is-selecting"
+              : "";
 
           return (
             <Fragment key={token.index}>
-              {target === "letter" ? (
-                // 连读模式：每个字母各自可点，词本身退为容器。
-                <span className={`tsz-ve-token is-letters${roleClass}`}>
-                  {letters.map(({ text: letter, offset }) => {
-                    // 注意与外层的 role（词的语法分类）区分：这里是草稿的端别。
-                    const anchorRole = draftRole(draft, token.index, offset);
-                    return (
-                      <span
-                        key={offset}
-                        ref={registerLetter(letterKey(token.index, offset))}
-                        className={`tsz-ve-letter${anchorRole ? ` is-anchor-${anchorRole}` : ""}`}
-                        role="button"
-                        aria-label={`${token.text} 的第 ${offset + 1} 个字母 ${letter}`}
-                        aria-pressed={Boolean(anchorRole)}
-                        onMouseDown={paint(() =>
-                          onLetterClick({
-                            token: token.index,
-                            offsets: [offset]
-                          })
-                        )}
-                      >
-                        {letter}
-                      </span>
-                    );
-                  })}
-                </span>
-              ) : (
-                <span
-                  className={`tsz-ve-token${roleClass}`}
-                  role="button"
-                  aria-label={
-                    roleLabel ? `${token.text}（${roleLabel}）` : token.text
-                  }
-                  aria-pressed={Boolean(role)}
-                  aria-disabled={target !== "word"}
-                  onMouseDown={paint(() => {
-                    if (target === "word") onWordClick(token.index);
-                  })}
-                >
-                  {letters.map(({ text: letter, offset }) => (
+              {/*
+               * 词只是字母的容器：语法结构与连读都落在字母上，前者按码点区间上色
+               * （可以只标一个词里的几个字母），后者把字母当锚点。
+               */}
+              <span className="tsz-ve-token is-letters">
+                {letters.map(({ text: letter, offset }) => {
+                  const start = token.start + offset;
+                  const end = start + Array.from(letter).length;
+                  const unit = unitAt(marks.roles, start);
+                  const roleClass = unit ? ` is-${unit.level}` : "";
+                  // 注意与 unit 的 level（语法分类）区分：这里是连读草稿的端别。
+                  const anchorRole = draftRole(draft, token.index, offset);
+                  const selectedClass = covers(selectedRange, start, end)
+                    ? " is-selecting"
+                    : "";
+                  const anchorClass =
+                    roleAnchorStart === start ? " is-role-anchor" : "";
+                  return (
                     <span
                       key={offset}
                       ref={registerLetter(letterKey(token.index, offset))}
+                      className={`tsz-ve-letter${roleClass}${anchorRole ? ` is-anchor-${anchorRole}` : ""}${selectedClass}${anchorClass}`}
+                      role="button"
+                      aria-label={`${token.text} 的第 ${offset + 1} 个字母 ${letter}`}
+                      aria-pressed={Boolean(anchorRole)}
+                      aria-disabled={target !== "letter"}
+                      data-level={unit?.level}
+                      onMouseDown={paint(() => {
+                        if (brush.kind === "liaison") {
+                          onLetterClick({
+                            token: token.index,
+                            offsets: [offset]
+                          });
+                        } else if (brush.kind === "role") {
+                          const span = { start, end };
+                          setSelecting({ anchor: span, focus: span });
+                        }
+                      })}
+                      onMouseEnter={(event) => {
+                        // 主键没按着就说明上次的 mouseup 丢了（如右键菜单吞掉），圈选作废。
+                        if (!(event.buttons & 1)) {
+                          setSelecting(undefined);
+                          return;
+                        }
+                        setSelecting(
+                          (current) =>
+                            current && {
+                              anchor: current.anchor,
+                              focus: { start, end }
+                            }
+                        );
+                      }}
                     >
                       {letter}
                     </span>
-                  ))}
-                </span>
-              )}
+                  );
+                })}
+              </span>
 
               {hasNext && (
                 <span
-                  className={`tsz-ve-gap${pause === undefined ? "" : " has-pause"}`}
+                  className={`tsz-ve-gap${pause === undefined ? "" : " has-pause"}${gapClass}`}
                   role="button"
                   aria-label={gapLabel(position, pause)}
                   aria-pressed={pause !== undefined}

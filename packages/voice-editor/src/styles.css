@@ -1,3 +1,16 @@
+/*
+ * 标注正文统一用 Ubuntu Bold：连读弧的落点按字形墨迹量，字体一换弧的观感就变，
+ * 编辑器与只读视图必须同一副字体才对得上。Ubuntu Font Licence 1.0 允许网页嵌入。
+ * 无 CJK 字形，中文回落到后面的系统字体。
+ */
+@font-face {
+  font-family: "Ubuntu";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/Ubuntu-Bold.ttf") format("truetype");
+}
+
 .tsz-ve-field {
   border: 1px solid var(--ant-color-border, #d9d9d9);
   border-radius: var(--ant-border-radius, 6px);
@@ -22,6 +35,9 @@
 
 /* 语法结构三分类的配色单一来源：按钮与正文标记共用。 */
 :root {
+  --tsz-ve-text-font:
+    "Ubuntu", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "PingFang SC", "Microsoft YaHei", sans-serif;
   --tsz-ve-role-function: #000000;
   --tsz-ve-role-core: #2f54ff;
   --tsz-ve-role-grammar: #b4b4b4;
@@ -131,7 +147,8 @@
 .tsz-ve-canvas-input {
   /* 上方留给连读弧，下方留给上下两排停顿记号。 */
   padding: 34px 14px 46px;
-  font-family: inherit;
+  font-family: var(--tsz-ve-text-font);
+  font-weight: 700;
   font-size: 26px;
   /* 行高必须写死数值：textarea 的 normal 与 div 的 normal 不一定同值。 */
   line-height: 1.6;
@@ -191,9 +208,10 @@
   pointer-events: none;
 }
 
+/* 颜色来自弧线层上的 CSS 变量（本机偏好，见 marks/liaisonColor），缺省沿用连读粉。 */
 .tsz-ve-arc {
   fill: none;
-  stroke: #db2777;
+  stroke: var(--tsz-ve-liaison, #db2777);
   stroke-linecap: round;
   stroke-linejoin: round;
 }
@@ -208,7 +226,7 @@
 }
 
 .tsz-ve-arc-hit:hover + .tsz-ve-arc {
-  stroke: #9d174d;
+  stroke: color-mix(in srgb, var(--tsz-ve-liaison, #db2777) 70%, black);
 }
 
 /*
@@ -224,25 +242,34 @@
 .tsz-ve-letter {
   padding: 0;
   border: 0;
-  border-radius: 3px;
   background: transparent;
   color: inherit;
   font: inherit;
   line-height: inherit;
+}
+
+.tsz-ve-strip[data-target="letter"] .tsz-ve-letter {
   cursor: pointer;
 }
 
-.tsz-ve-letter:hover {
+/* 悬停反馈随画笔走：连读用连读粉，语法结构用中性灰。 */
+.tsz-ve-canvas[data-brush="liaison"] .tsz-ve-letter:hover {
   background: rgba(219, 39, 119, 0.22);
+}
+
+.tsz-ve-canvas[data-brush="role"] .tsz-ve-letter:hover {
+  background: rgba(0, 0, 0, 0.1);
 }
 
 /* 起点/终点分色，避免两段选区看成一段（沿用参考件的蓝/橙）。 */
 .tsz-ve-letter.is-anchor-start {
+  border-radius: 3px;
   background: #1677ff;
   color: #fff;
 }
 
 .tsz-ve-letter.is-anchor-end {
+  border-radius: 3px;
   background: #fa8c16;
   color: #fff;
 }
@@ -319,35 +346,42 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  cursor: pointer;
 }
 
 /*
- * 词与词缝是 <span aria-disabled>，不是 <button>——`:disabled` 在它们身上永不
+ * 字母与词缝是 <span aria-disabled>，不是 <button>——`:disabled` 在它们身上永不
  * 匹配，`:not(:disabled)` 恒真。可用/禁用一律挂 aria-disabled 判定，否则「不该
- * 有反馈的时候给了反馈」这类错会静默发生。
+ * 有反馈的时候给了反馈」这类错会静默发生：停顿画笔下字母不可点，就不能给手形。
  */
-.tsz-ve-token[aria-disabled="true"] {
+.tsz-ve-letter[aria-disabled="true"] {
   cursor: default;
 }
 
-/* 可点时给出悬停反馈；画笔指向词缝时，词不给反馈，避免点了没反应。 */
-.tsz-ve-token[aria-disabled="false"]:hover {
-  background: rgba(0, 0, 0, 0.06);
-}
-
 /*
- * 语法结构只改字色、不填背景：整句仍读作一段正常文本，标记是「这个词是什么」
- * 而不是「这个词被高亮了」。填背景会把短语切成一块块色条，反而盖过文本本身。
+ * 语法结构按**字母**着色，只改字色、不填背景：整句仍读作一段正常文本，标记是
+ * 「这几个字母是什么」而不是「被高亮了」。粒度到字母——可以只是 "working" 的
+ * "ing"，也可以拖过几个词。
  */
-.tsz-ve-token.is-function {
+.tsz-ve-letter.is-function {
   color: var(--tsz-ve-role-function);
 }
-.tsz-ve-token.is-core {
+.tsz-ve-letter.is-core {
   color: var(--tsz-ve-role-core);
 }
-.tsz-ve-token.is-grammar {
+.tsz-ve-letter.is-grammar {
   color: var(--tsz-ve-role-grammar-text);
+}
+
+/* 上一次单击上色的字母：点一下虚线，提示同词里再点一个字母会把中间接上。 */
+.tsz-ve-letter.is-role-anchor {
+  text-decoration: underline dotted currentColor;
+  text-underline-offset: 0.14em;
+}
+
+/* 拖选中的那一段：松手前先描出将要上色的范围，松手即消失，不是标记本身。 */
+.tsz-ve-letter.is-selecting,
+.tsz-ve-gap.is-selecting {
+  background: color-mix(in srgb, var(--tsz-ve-role-core) 22%, transparent);
 }
 
 /*
@@ -462,35 +496,20 @@
   font-weight: 400;
 }
 
-.tsz-ve-liaison {
+/*
+ * 只读视图的连读弧与编辑器共用同一层 SVG（.tsz-ve-arc-layer），不再用伪元素
+ * 画半框：伪元素只能沿整段选区描一个圆角框，画不出从起点字母到终点字母的弧。
+ * 容器要成为定位与块级上下文，弧线层才能铺满整段文字。
+ */
+.tsz-ve-readonly {
   position: relative;
-  background: rgba(219, 39, 119, 0.08);
-  border-radius: 3px;
+  display: inline-block;
+  max-width: 100%;
 }
 
-.tsz-ve-liaison::after {
-  content: "";
-  position: absolute;
-  right: 2px;
-  bottom: 100%;
-  left: 2px;
-  height: 8px;
-  margin-bottom: -2px;
-  border: 2px solid #db2777;
-  border-bottom: 0;
-  border-radius: 9px 9px 0 0;
-  pointer-events: none;
-}
-
-/* 起点只画左半弧、终点只画右半弧，两段拼成一条完整连读弧。 */
-.tsz-ve-liaison[data-position="start"]::after {
-  border-right: 0;
-  border-radius: 9px 0 0 0;
-}
-
-.tsz-ve-liaison[data-position="end"]::after {
-  border-left: 0;
-  border-radius: 0 9px 0 0;
+/* 弧线画在首行文字上方，行距盛不下的部分要预留出来，否则会压到上一行或被裁掉。 */
+.tsz-ve-readonly.has-liaison {
+  padding-top: 0.5em;
 }
 
 .tsz-ve-highlight {
@@ -619,6 +638,34 @@
 
 .tsz-ve-upload-list {
   min-width: 340px;
+}
+
+.tsz-ve-upload-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* 还在路上的那几条：名字压淡，进度条 / 失败原因占第三列。 */
+.tsz-ve-upload-item.is-pending .tsz-ve-upload-name {
+  color: var(--ant-color-text-secondary, #8c8c8c);
+}
+
+.tsz-ve-upload-progress {
+  min-width: 96px;
+  margin: 0;
+}
+
+.tsz-ve-upload-error {
+  color: var(--ant-color-error, #ff4d4f);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.tsz-ve-upload-actions {
+  display: inline-flex;
+  gap: 2px;
 }
 
 /*
@@ -902,9 +949,32 @@
   font-size: 13px;
 }
 
+/* 「起点 / 终点」是开关：按下的那端接收接下来点的字母。 */
 .tsz-ve-anchor-field {
   display: inline-flex;
   gap: 5px;
+  align-items: center;
+  padding: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.tsz-ve-anchor-field[aria-pressed="true"] {
+  border-color: var(--ant-color-border, #d9d9d9);
+  background: var(--ant-color-fill-tertiary, rgba(0, 0, 0, 0.04));
+}
+
+.tsz-ve-anchor-field:disabled {
+  cursor: default;
+}
+
+.tsz-ve-liaison-color {
+  display: inline-flex;
+  gap: 6px;
   align-items: center;
 }
 

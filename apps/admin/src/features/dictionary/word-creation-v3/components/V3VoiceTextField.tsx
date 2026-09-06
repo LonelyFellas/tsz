@@ -1,7 +1,13 @@
-import type { RichTextV2, RichTextV3, VoiceProfileV3 } from "@tsz/types";
+import type {
+  AudioAssetV3,
+  RichTextV2,
+  RichTextV3,
+  VoiceProfileV3
+} from "@tsz/types";
 import { Input } from "antd";
 import { Suspense, lazy } from "react";
 import {
+  adminAudioUploadAdapter,
   adminVoicePreviewAdapter,
   voicePreviewIsMock
 } from "@/features/dictionary/voice-editor/dataSource";
@@ -25,6 +31,9 @@ export interface V3VoiceTextFieldProps {
   /** 发音配置；与正文分开走，因为它在 wire 上是正文的兄弟字段。 */
   voiceProfile?: VoiceProfileV3 | null;
   onVoiceProfileChange?: (next: VoiceProfileV3) => void;
+  /** 挂在这段文本上的真人录音；与 voice_profile 一样是正文的兄弟字段。 */
+  audioAssets?: AudioAssetV3[] | null;
+  onAudioAssetsChange?: (next: AudioAssetV3[]) => void;
   onChange: (next: RichTextV3) => void;
 }
 
@@ -47,6 +56,8 @@ export function V3VoiceTextField({
   readOnly,
   voiceProfile,
   onVoiceProfileChange,
+  audioAssets,
+  onAudioAssetsChange,
   onChange
 }: V3VoiceTextFieldProps) {
   const fallback = (
@@ -83,6 +94,12 @@ export function V3VoiceTextField({
         }
         previewIsMock={voicePreviewIsMock}
         onVoiceProfileChange={onVoiceProfileChange}
+        // 开关关着 = 不注入适配器：面板置灰说明原因，已有的音频引用仍列出来。
+        audioUploadAdapter={
+          env.VOICE_AUDIO_UPLOAD ? adminAudioUploadAdapter : undefined
+        }
+        audioAssets={audioAssets ?? undefined}
+        onAudioAssetsChange={onAudioAssetsChange}
         readOnly={readOnly}
         value={value}
         voiceProfile={voiceProfile}

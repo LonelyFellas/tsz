@@ -13,9 +13,11 @@ export * from "./admin-role";
 export * from "./part-of-speech";
 export * from "./rich-text";
 export * from "./admin-tts";
+export * from "./admin-audio-asset";
 export * from "./admin-word-v2";
 export * from "./admin-word-v3";
 export * from "./surface-match";
+export * from "./entry-annotation";
 export type {
   AdminWordKind,
   AdminWordListItem,
@@ -43,5 +45,3 @@ export type {
   WordSubPos,
   PronunciationStyle
 } from "./admin-word";
-
-export * from "./entry-annotation";

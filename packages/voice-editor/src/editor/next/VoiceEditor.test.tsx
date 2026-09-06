@@ -1,11 +1,25 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RichTextV2 } from "@tsz/types";
-import type {
-  VoiceOption,
-  VoicePreviewAdapter,
-  VoicePreviewResult
+import {
+  AudioUploadError,
+  type AudioAsset,
+  type AudioUploadAdapter,
+  type VoiceOption,
+  type VoicePreviewAdapter,
+  type VoicePreviewResult
 } from "../../types";
+import {
+  DEFAULT_LIAISON_COLOR,
+  getLiaisonColor,
+  setLiaisonColor
+} from "../../marks";
 import { VoiceEditor } from "./VoiceEditor";
 
 const TEXT = "a centre of the city";
@@ -66,6 +80,51 @@ function adapter(
   return { listVoices: vi.fn().mockResolvedValue(VOICES), synthesize };
 }
 
+let assetSeq = 0;
+function asset(overrides: Partial<AudioAsset> = {}): AudioAsset {
+  assetSeq += 1;
+  return {
+    id: `asset-${assetSeq}`,
+    locale: "en-GB",
+    gender: "female",
+    content_type: "audio/mpeg",
+    size_bytes: 3,
+    original_name: "a.mp3",
+    created_at: "2026-09-06T00:00:00Z",
+    ...overrides
+  };
+}
+
+const mp3 = (name: string, size = 3) =>
+  new File([new Uint8Array(size)], name, { type: "audio/mpeg" });
+
+/** 上传适配器桩：默认直传一半时报一次进度，然后按传入的归属与文件名落成资产。 */
+function audioAdapter(overrides: Partial<AudioUploadAdapter> = {}) {
+  const upload = vi.fn(
+    async ({
+      file,
+      locale,
+      gender,
+      onProgress
+    }: Parameters<AudioUploadAdapter["upload"]>[0]) => {
+      onProgress?.(0.5);
+      return asset({ original_name: file.name, locale, gender });
+    }
+  );
+  const resolveUrl = vi.fn(async (id: string) => ({
+    url: `https://signed.example/${id}`,
+    expiresAt: new Date(Date.now() + 300_000).toISOString()
+  }));
+  return { upload, resolveUrl, ...overrides } as AudioUploadAdapter & {
+    upload: ReturnType<typeof vi.fn>;
+    resolveUrl: ReturnType<typeof vi.fn>;
+  };
+}
+
+function chooseFiles(files: File[]) {
+  fireEvent.change(screen.getByLabelText("上传音频"), { target: { files } });
+}
+
 function props(overrides: Record<string, unknown> = {}) {
   return {
     value: { version: 2, text: TEXT, annotations: [] } as RichTextV2,
@@ -95,6 +154,41 @@ function word(text: string): HTMLElement {
   ].find((candidate) => candidate.textContent === text);
   if (!found) throw new Error(`word not found: ${text}`);
   return found;
+}
+
+/** 一个词里的全部字母元素。 */
+function wordLetters(text: string): HTMLElement[] {
+  return [...word(text).querySelectorAll<HTMLElement>(".tsz-ve-letter")];
+}
+
+/** 一个词里字母们的语法结构分类（去重）；[] 表示没上色，多于一项表示词内混色。 */
+function wordLevels(text: string): string[] {
+  return [
+    ...new Set(
+      wordLetters(text).flatMap((letter) =>
+        letter.dataset.level ? [letter.dataset.level] : []
+      )
+    )
+  ];
+}
+
+/** 语法结构画笔下从一个字母拖到另一个字母松手，中间的字母一并上色。 */
+function dragLetters(from: HTMLElement, to: HTMLElement) {
+  fireEvent.mouseDown(from);
+  if (to !== from) fireEvent.mouseEnter(to, { buttons: 1 });
+  fireEvent.mouseUp(to);
+}
+
+/** 语法结构画笔下给整个词上色：从首字母拖到末字母。 */
+function tapWord(text: string) {
+  const letters = wordLetters(text);
+  dragLetters(letters[0]!, letters[letters.length - 1]!);
+}
+
+/** 语法结构画笔下从一个词的首字母拖到另一个词的末字母，中间的词与空格一并上色。 */
+function dragWords(...texts: string[]) {
+  const last = wordLetters(texts[texts.length - 1]!);
+  dragLetters(wordLetters(texts[0]!)[0]!, last[last.length - 1]!);
 }
 
 function gap(index: number): HTMLElement {
@@ -129,6 +223,11 @@ function useLiaisonBrush() {
   fireEvent.click(document.querySelector(".tsz-ve-liaison-button")!);
 }
 
+/** 连读面板上的「起点 / 终点」开关：接下来点的字母归这一端。 */
+function chooseEnd(label: "起点" | "终点") {
+  fireEvent.click(button(`选择${label}`));
+}
+
 /**
  * 音色收在工具栏「音色」工具的浮层里，取用前先点开。
  * 浮层渲染在 portal 且带入场动画，jsdom 算不出可见性，断言一律用
@@ -159,7 +258,6 @@ function applied(view: ReturnType<typeof props>): RichTextV2 {
 beforeEach(() => {
   AudioMock.instances = [];
   vi.stubGlobal("Audio", AudioMock);
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -182,42 +280,38 @@ describe("VoiceEditor 标注带", () => {
     render(<VoiceEditor {...view} />);
 
     pickRole("核心词");
-    fireEvent.mouseDown(word("centre"));
-    expect(word("centre")).toHaveClass("is-core");
+    tapWord("centre");
+    expect(wordLevels("centre")).toEqual(["core"]);
 
-    fireEvent.mouseDown(word("centre"));
-    expect(word("centre")).not.toHaveClass("is-core");
+    tapWord("centre");
+    expect(wordLevels("centre")).not.toContain("core");
 
-    fireEvent.mouseDown(word("centre"));
+    tapWord("centre");
     pickRole("语法词");
-    fireEvent.mouseDown(word("centre"));
+    tapWord("centre");
     // 替换而非叠加：只剩后一个分类。
-    expect(word("centre")).toHaveClass("is-grammar");
-    expect(word("centre")).not.toHaveClass("is-core");
+    expect(wordLevels("centre")).toEqual(["grammar"]);
+    expect(wordLevels("centre")).not.toContain("core");
   });
 
   it("每支画笔只让自己的靶子可点", () => {
     render(<VoiceEditor {...props()} />);
 
-    // 语法结构：认词
+    // 语法结构：认字母（粒度到字母，词只是容器）
     pickRole("核心词");
-    expect(word("a")).toHaveAttribute("aria-disabled", "false");
+    expect(letter(0, 0)).toHaveAttribute("aria-disabled", "false");
     expect(gap(0)).toHaveAttribute("aria-disabled", "true");
-    expect(document.querySelectorAll(".tsz-ve-letter")).toHaveLength(0);
 
-    // 连读：认字母——此时词退为容器（span），字母才是按钮
+    // 连读：同样认字母
     useLiaisonBrush();
     expect(word("a").tagName).toBe("SPAN");
+    expect(letter(0, 0)).toHaveAttribute("aria-disabled", "false");
     expect(gap(0)).toHaveAttribute("aria-disabled", "true");
-    expect(document.querySelectorAll(".tsz-ve-letter").length).toBeGreaterThan(
-      0
-    );
 
-    // 停顿：认词缝
+    // 停顿：认词缝，字母不可点
     usePauseBrush();
     expect(gap(0)).toHaveAttribute("aria-disabled", "false");
-    expect(word("a")).toHaveAttribute("aria-disabled", "true");
-    expect(document.querySelectorAll(".tsz-ve-letter")).toHaveLength(0);
+    expect(letter(0, 0)).toHaveAttribute("aria-disabled", "true");
   });
 
   it("连读两段选：起点一个词、终点另一个词，确认后成线", () => {
@@ -230,6 +324,7 @@ describe("VoiceEditor 标注带", () => {
     // 两端未齐前不能确认
     expect(button("添加连读")).toBeDisabled();
 
+    chooseEnd("终点");
     fireEvent.mouseDown(letter(2, 0)); // of 的 o
     expect(letter(2, 0)).toHaveClass("is-anchor-end");
     expect(button("添加连读")).toBeEnabled();
@@ -259,6 +354,7 @@ describe("VoiceEditor 标注带", () => {
     expect(letter(1, 5)).toHaveClass("is-anchor-start");
 
     // 终点：of 的 "of"
+    chooseEnd("终点");
     fireEvent.mouseDown(letter(2, 0));
     fireEvent.mouseDown(letter(2, 1));
     expect(letter(2, 1)).toHaveClass("is-anchor-end");
@@ -298,12 +394,60 @@ describe("VoiceEditor 标注带", () => {
     expect(button("添加连读")).toBeDisabled();
   });
 
+  it("端别由面板开关手选，不按点击先后推断：先定终点再回头选起点也行", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    useLiaisonBrush();
+    expect(button("选择起点")).toHaveAttribute("aria-pressed", "true");
+
+    // 点到另一个词也不会被当成终点：开关还在「起点」上，只是换了起点
+    fireEvent.mouseDown(letter(1, 5));
+    fireEvent.mouseDown(letter(2, 0));
+    expect(letter(2, 0)).toHaveClass("is-anchor-start");
+    expect(document.querySelectorAll(".is-anchor-end")).toHaveLength(0);
+
+    chooseEnd("终点");
+    expect(button("选择终点")).toHaveAttribute("aria-pressed", "true");
+    fireEvent.mouseDown(letter(3, 0)); // the 的 t
+    expect(letter(3, 0)).toHaveClass("is-anchor-end");
+
+    // 回头改起点，终点原样保留
+    chooseEnd("起点");
+    fireEvent.mouseDown(letter(1, 5));
+    expect(letter(1, 5)).toHaveClass("is-anchor-start");
+    expect(letter(3, 0)).toHaveClass("is-anchor-end");
+
+    fireEvent.click(button("添加连读"));
+    expect(applied(view).annotations).toEqual([
+      { type: "liaison", start: 7, end: 13, start_len: 1, end_len: 1 }
+    ]);
+    // 成线后开关回到「起点」
+    expect(button("选择起点")).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("连读弧颜色是本机偏好：面板里有取色器，改一次弧线层立即换色", () => {
+    render(<VoiceEditor {...props()} />);
+    useLiaisonBrush();
+    expect(document.querySelector(".ant-color-picker-trigger")).not.toBeNull();
+    const layer = () =>
+      document.querySelector<SVGElement>(".tsz-ve-arc-layer")!;
+    expect(layer().style.getPropertyValue("--tsz-ve-liaison")).toBe(
+      DEFAULT_LIAISON_COLOR
+    );
+
+    act(() => setLiaisonColor("#1677ff"));
+    expect(layer().style.getPropertyValue("--tsz-ve-liaison")).toBe("#1677ff");
+    expect(getLiaisonColor()).toBe("#1677ff");
+    act(() => setLiaisonColor(DEFAULT_LIAISON_COLOR));
+  });
+
   it("连读可跨越任意距离，不限相邻词", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
     useLiaisonBrush();
 
     fireEvent.mouseDown(letter(0, 0)); // a
+    chooseEnd("终点");
     fireEvent.mouseDown(letter(4, 3)); // city 的 y
     fireEvent.click(button("添加连读"));
 
@@ -425,18 +569,213 @@ describe("VoiceEditor 标注带", () => {
     );
   });
 
+  it("拖过一段字母松手整段上色，落盘是一条 emphasis；拖过几个词则连空格一起", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    pickRole("核心词");
+
+    dragWords("centre", "the");
+    // centre(2-8) of(9-11) the(12-15)：一条区间，含中间的空格
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 15, level: "core" }
+    ]);
+    // 区间内每个字母都上色，区间外的不动；标记只改字色，词缝不带任何类
+    expect(letter(1, 0)).toHaveClass("is-core");
+    expect(letter(2, 0)).toHaveClass("is-core");
+    expect(letter(3, 2)).toHaveClass("is-core");
+    expect(letter(4, 0)).not.toHaveClass("is-core");
+    expect(gap(1).className).toBe("tsz-ve-gap");
+  });
+
+  it("粒度到字母：只给 centre 的 re 标语法词，其余字母不受影响", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    pickRole("语法词");
+    dragLetters(letter(1, 4), letter(1, 5));
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 6, end: 8, level: "grammar" }
+    ]);
+    expect(letter(1, 3)).not.toHaveAttribute("data-level");
+    expect(letter(1, 4)).toHaveAttribute("data-level", "grammar");
+
+    // 同一个词里再给 cent 标核心词：词内两种颜色并存
+    pickRole("核心词");
+    dragLetters(letter(1, 0), letter(1, 3));
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 6, level: "core" },
+      { type: "emphasis", start: 6, end: 8, level: "grammar" }
+    ]);
+    expect(wordLevels("centre")).toEqual(["core", "grammar"]);
+  });
+
+  it("一个字母一个字母地点：相邻同色接成一段，锚点清空后再点已上色的字母即取消", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    pickRole("核心词");
+    dragLetters(letter(1, 0), letter(1, 0)); // c：锚点
+    dragLetters(letter(1, 1), letter(1, 1)); // e：与 c 接上，锚点清空
+    dragLetters(letter(1, 2), letter(1, 2)); // n：单独上色，成为新锚点
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 5, level: "core" }
+    ]);
+
+    // 锚点还在 n 上：再点 e 是把 e..n 接上（本就相连，没有变化），并清空锚点
+    dragLetters(letter(1, 1), letter(1, 1));
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 5, level: "core" }
+    ]);
+    expect(document.querySelector(".is-role-anchor")).toBeNull();
+
+    // 没有锚点时再点已上色的 e 才是取消它
+    dragLetters(letter(1, 1), letter(1, 1));
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 3, level: "core" },
+      { type: "emphasis", start: 4, end: 5, level: "core" }
+    ]);
+  });
+
+  it("同一个词里先后单击两个字母，中间的字母自动接上，接上后锚点清空", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    pickRole("核心词");
+
+    dragLetters(letter(1, 0), letter(1, 0)); // c
+    expect(letter(1, 0)).toHaveClass("is-role-anchor");
+    dragLetters(letter(1, 5), letter(1, 5)); // e：c 到 e 之间一并上色
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 8, level: "core" }
+    ]);
+    expect(document.querySelector(".is-role-anchor")).toBeNull();
+
+    // 锚点已清空：再点一个已上色的字母是取消它，不是再连一次
+    dragLetters(letter(1, 2), letter(1, 2));
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 4, level: "core" },
+      { type: "emphasis", start: 5, end: 8, level: "core" }
+    ]);
+  });
+
+  it("隔着别的词的两次单击各自独立，不会被连成一大段；拖选之后也不留锚点", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    pickRole("核心词");
+
+    dragLetters(letter(1, 0), letter(1, 0)); // centre 的 c
+    dragLetters(letter(3, 0), letter(3, 0)); // the 的 t：另一个词，各自一个字母
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 3, level: "core" },
+      { type: "emphasis", start: 12, end: 13, level: "core" }
+    ]);
+
+    dragLetters(letter(4, 0), letter(4, 1)); // 拖选 ci
+    dragLetters(letter(4, 3), letter(4, 3)); // 再单击 y：不与拖选的那段接上
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 3, level: "core" },
+      { type: "emphasis", start: 12, end: 13, level: "core" },
+      { type: "emphasis", start: 16, end: 18, level: "core" },
+      { type: "emphasis", start: 19, end: 20, level: "core" }
+    ]);
+  });
+
+  it("拖过换行的区间按行各自上色，不会让编辑器进入「不保存」", () => {
+    const view = props({
+      value: { version: 2, text: "a centre\nof the city", annotations: [] }
+    });
+    render(<VoiceEditor {...view} />);
+    pickRole("核心词");
+    dragLetters(letter(1, 0), letter(2, 1)); // centre → of，中间隔着换行
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 8, level: "core" },
+      { type: "emphasis", start: 9, end: 11, level: "core" }
+    ]);
+    expect(screen.queryByText(/不会被保存/)).toBeNull();
+  });
+
+  it("与音标区间交叉的语法结构落笔被当场拒掉并说明，而不是让编辑器停止回写", () => {
+    const view = props({
+      value: {
+        version: 2,
+        text: TEXT,
+        annotations: [
+          {
+            type: "phoneme",
+            start: 2,
+            end: 8,
+            alphabet: "ipa",
+            phoneme: "ˈsentə"
+          }
+        ]
+      }
+    });
+    render(<VoiceEditor {...view} />);
+    pickRole("语法词");
+    dragLetters(letter(1, 4), letter(1, 5)); // 只标 centre 的 re，与音标交叉
+    expect(view.onChange).not.toHaveBeenCalled();
+    expect(screen.getByText(/IPA/)).toBeInTheDocument();
+    expect(screen.queryByText(/不会被保存/)).toBeNull();
+
+    // 完整覆盖音标区间则允许
+    dragLetters(letter(1, 0), letter(1, 5));
+    expect(applied(view).annotations).toEqual(
+      expect.arrayContaining([
+        { type: "emphasis", start: 2, end: 8, level: "grammar" }
+      ])
+    );
+  });
+
+  it("右键不落笔；主键没按着时扫过字母会作废悬着的圈选", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    pickRole("核心词");
+    fireEvent.mouseDown(letter(1, 0), { button: 2 });
+    fireEvent.mouseUp(letter(1, 0), { button: 2 });
+    expect(view.onChange).not.toHaveBeenCalled();
+
+    fireEvent.mouseDown(letter(1, 0));
+    fireEvent.mouseEnter(letter(1, 3)); // buttons 缺省 0：像右键菜单吞掉 mouseup 之后
+    expect(letter(1, 3)).not.toHaveClass("is-selecting");
+    fireEvent.mouseUp(document.body);
+    expect(view.onChange).not.toHaveBeenCalled();
+  });
+
+  it("拖选压到已有颜色时按当前笔统一改色，一个字母只属于一种分类", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    pickRole("核心词");
+    tapWord("the");
+    pickRole("功能词");
+    dragWords("centre", "the");
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 15, level: "function" }
+    ]);
+  });
+
+  it("拖到标注带外面松手也照常落笔，不会留下悬着的圈选", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    pickRole("核心词");
+    fireEvent.mouseDown(letter(1, 0));
+    fireEvent.mouseEnter(letter(2, 1), { buttons: 1 });
+    expect(letter(2, 0)).toHaveClass("is-selecting");
+    fireEvent.mouseUp(document.body);
+    expect(letter(2, 0)).not.toHaveClass("is-selecting");
+    expect(applied(view).annotations).toEqual([
+      { type: "emphasis", start: 2, end: 11, level: "core" }
+    ]);
+  });
+
   it("清空标注后所有标记归零", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
 
     pickRole("核心词");
-    fireEvent.mouseDown(word("a"));
-    fireEvent.mouseDown(word("the"));
-    expect(word("a")).toHaveClass("is-core");
+    tapWord("a");
+    tapWord("the");
+    expect(wordLevels("a")).toEqual(["core"]);
 
     fireEvent.click(button("清空标注"));
-    expect(word("a")).not.toHaveClass("is-core");
-    expect(word("the")).not.toHaveClass("is-core");
+    expect(wordLevels("a")).not.toContain("core");
+    expect(wordLevels("the")).not.toContain("core");
 
     expect(applied(view).annotations).toEqual([]);
   });
@@ -461,15 +800,15 @@ describe("VoiceEditor 文本与落盘", () => {
     render(<VoiceEditor {...view} />);
 
     pickRole("核心词");
-    fireEvent.mouseDown(word("a"));
-    fireEvent.mouseDown(word("centre"));
+    tapWord("a");
+    tapWord("centre");
 
     fireEvent.change(screen.getByLabelText("语音编辑器"), {
       target: { value: "a middle of the city" }
     });
 
-    expect(word("a")).toHaveClass("is-core");
-    expect(word("middle")).not.toHaveClass("is-core");
+    expect(wordLevels("a")).toEqual(["core"]);
+    expect(wordLevels("middle")).not.toContain("core");
   });
 
   it("落盘时把词标注折算成该词的码点区间", () => {
@@ -477,7 +816,7 @@ describe("VoiceEditor 文本与落盘", () => {
     render(<VoiceEditor {...view} />);
 
     pickRole("核心词");
-    fireEvent.mouseDown(word("centre"));
+    tapWord("centre");
 
     expect(applied(view).annotations).toEqual([
       { type: "emphasis", start: 2, end: 8, level: "core" }
@@ -491,7 +830,7 @@ describe("VoiceEditor 文本与落盘", () => {
       annotations: [{ type: "emphasis", start: 2, end: 8, level: "core" }]
     };
     render(<VoiceEditor {...props({ value })} />);
-    expect(word("centre")).toHaveClass("is-core");
+    expect(wordLevels("centre")).toEqual(["core"]);
   });
 
   it("上一步 / 下一步能回退和重放标注", () => {
@@ -503,44 +842,44 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(button("上一步")).toBeDisabled();
     expect(button("下一步")).toBeDisabled();
 
-    fireEvent.mouseDown(word("centre"));
-    expect(word("centre")).toHaveClass("is-core");
+    tapWord("centre");
+    expect(wordLevels("centre")).toEqual(["core"]);
     expect(button("上一步")).toBeEnabled();
 
     fireEvent.click(button("上一步"));
-    expect(word("centre")).not.toHaveClass("is-core");
+    expect(wordLevels("centre")).not.toContain("core");
     expect(button("下一步")).toBeEnabled();
 
     fireEvent.click(button("下一步"));
-    expect(word("centre")).toHaveClass("is-core");
+    expect(wordLevels("centre")).toEqual(["core"]);
   });
 
   it("撤销把文本和标注一起回退，两者不会各退各的", () => {
     render(<VoiceEditor {...props()} />);
 
     pickRole("核心词");
-    fireEvent.mouseDown(word("centre"));
+    tapWord("centre");
 
     // 改写 centre：它的标注应随之消失
     fireEvent.change(screen.getByLabelText("语音编辑器"), {
       target: { value: "a middle of the city" }
     });
-    expect(word("middle")).not.toHaveClass("is-core");
+    expect(wordLevels("middle")).not.toContain("core");
 
     fireEvent.click(button("上一步"));
     expect(screen.getByLabelText("语音编辑器")).toHaveValue(TEXT);
-    expect(word("centre")).toHaveClass("is-core");
+    expect(wordLevels("centre")).toEqual(["core"]);
   });
 
   it("新的改动会清掉重做栈", () => {
     render(<VoiceEditor {...props()} />);
 
     pickRole("核心词");
-    fireEvent.mouseDown(word("centre"));
+    tapWord("centre");
     fireEvent.click(button("上一步"));
     expect(button("下一步")).toBeEnabled();
 
-    fireEvent.mouseDown(word("the"));
+    tapWord("the");
     expect(button("下一步")).toBeDisabled();
   });
 
@@ -550,7 +889,7 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(view.onChange).not.toHaveBeenCalled();
 
     pickRole("核心词");
-    fireEvent.mouseDown(word("centre"));
+    tapWord("centre");
     expect(view.onChange).toHaveBeenCalled();
     expect(applied(view).annotations).toEqual([
       { type: "emphasis", start: 2, end: 8, level: "core" }
@@ -563,7 +902,7 @@ describe("VoiceEditor 文本与落盘", () => {
     const { rerender } = render(<VoiceEditor {...view} />);
 
     pickRole("语法词");
-    fireEvent.mouseDown(word("centre"));
+    tapWord("centre");
     const emitted = applied(view);
     expect(button("上一步")).toBeEnabled();
 
@@ -574,14 +913,14 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(
       document.querySelector(".tsz-ve-role-button")!.getAttribute("aria-label")
     ).toBe("语法结构 语法词");
-    expect(word("centre").className).toContain("is-grammar");
+    expect(wordLevels("centre")).toEqual(["grammar"]);
   });
 
   it("外部换了一份新值时，才重新灌入并清掉历史", () => {
     const view = props();
     const { rerender } = render(<VoiceEditor {...view} />);
     pickRole("核心词");
-    fireEvent.mouseDown(word("centre"));
+    tapWord("centre");
     expect(button("上一步")).toBeEnabled();
 
     rerender(
@@ -667,6 +1006,7 @@ describe("VoiceEditor 文本与落盘", () => {
     render(<VoiceEditor {...view} />);
     useLiaisonBrush();
     fireEvent.mouseDown(letter(1, 5));
+    chooseEnd("终点");
     fireEvent.mouseDown(letter(2, 0));
     fireEvent.click(button("添加连读"));
     expect(applied(view).annotations).toHaveLength(1);
@@ -692,6 +1032,7 @@ describe("VoiceEditor 文本与落盘", () => {
     render(<VoiceEditor {...view} />);
     useLiaisonBrush();
     fireEvent.mouseDown(letter(1, 5));
+    chooseEnd("终点");
     fireEvent.mouseDown(letter(2, 0));
     fireEvent.click(button("添加连读"));
 
@@ -709,10 +1050,12 @@ describe("VoiceEditor 文本与落盘", () => {
     useLiaisonBrush();
 
     fireEvent.mouseDown(letter(0, 3));
+    chooseEnd("终点");
     fireEvent.mouseDown(letter(1, 0));
     fireEvent.click(button("添加连读"));
 
     fireEvent.mouseDown(letter(1, 1));
+    chooseEnd("终点");
     fireEvent.mouseDown(letter(2, 0));
     fireEvent.click(button("添加连读"));
 
@@ -759,10 +1102,13 @@ describe("VoiceEditor 文本与落盘", () => {
     render(<VoiceEditor {...view} />);
     useLiaisonBrush();
     fireEvent.mouseDown(letter(1, 5));
+    chooseEnd("终点");
     fireEvent.mouseDown(letter(2, 0));
     fireEvent.click(button("添加连读"));
 
+    // 添加成功后开关回到「起点」，第二条从头选
     fireEvent.mouseDown(letter(1, 5));
+    chooseEnd("终点");
     fireEvent.mouseDown(letter(2, 0));
     fireEvent.click(button("添加连读"));
 
@@ -791,15 +1137,15 @@ describe("VoiceEditor 文本与落盘", () => {
 
     fireEvent.change(input(), { target: { value: "a centre of the town" } });
     pickRole("核心词");
-    fireEvent.mouseDown(word("centre"));
+    tapWord("centre");
     fireEvent.change(input(), { target: { value: "a centre of the city" } });
 
     fireEvent.click(button("上一步")); // 撤第二段输入
     expect(input()).toHaveValue("a centre of the town");
-    expect(word("centre")).toHaveClass("is-core");
+    expect(wordLevels("centre")).toEqual(["core"]);
 
     fireEvent.click(button("上一步")); // 撤标注
-    expect(word("centre")).not.toHaveClass("is-core");
+    expect(wordLevels("centre")).not.toContain("core");
 
     fireEvent.click(button("上一步")); // 撤第一段输入
     expect(input()).toHaveValue(TEXT);
@@ -837,7 +1183,7 @@ describe("VoiceEditor 文本与落盘", () => {
     render(<VoiceEditor {...props()} />);
     const canvas = document.querySelector(".tsz-ve-canvas")!;
     pickRole("核心词");
-    expect(canvas).toHaveAttribute("data-target", "word");
+    expect(canvas).toHaveAttribute("data-target", "letter");
 
     fireEvent.keyDown(document.querySelector(".tsz-ve-role-button")!, {
       key: "Escape"
@@ -854,7 +1200,7 @@ describe("VoiceEditor 文本与落盘", () => {
     const view = props();
     const { rerender } = render(<VoiceEditor {...view} />);
     pickRole(label);
-    fireEvent.mouseDown(word("centre"));
+    tapWord("centre");
 
     const saved = applied(view);
     expect(saved.annotations).toEqual([
@@ -863,7 +1209,7 @@ describe("VoiceEditor 文本与落盘", () => {
 
     // 存回去再读出来，分类不能变
     rerender(<VoiceEditor {...view} value={saved} />);
-    expect(word("centre")).toHaveClass(`is-${level}`);
+    expect(wordLevels("centre")).toEqual([level]);
   });
 
   it("存量 strong 读回来按核心词理解", () => {
@@ -880,7 +1226,7 @@ describe("VoiceEditor 文本与落盘", () => {
         })}
       />
     );
-    expect(word("centre")).toHaveClass("is-core");
+    expect(wordLevels("centre")).toEqual(["core"]);
   });
 
   it("默认空手：不取笔时点词不落标，鼠标归文本", () => {
@@ -892,8 +1238,8 @@ describe("VoiceEditor 文本与落盘", () => {
       "data-target",
       "none"
     );
-    fireEvent.mouseDown(word("centre"));
-    expect(word("centre")).not.toHaveClass("is-core");
+    tapWord("centre");
+    expect(wordLevels("centre")).not.toContain("core");
     expect(view.onChange).not.toHaveBeenCalled();
   });
 
@@ -902,7 +1248,7 @@ describe("VoiceEditor 文本与落盘", () => {
     const canvas = document.querySelector(".tsz-ve-canvas")!;
 
     pickRole("核心词");
-    expect(canvas).toHaveAttribute("data-target", "word");
+    expect(canvas).toHaveAttribute("data-target", "letter");
 
     fireEvent.keyDown(canvas, { key: "Escape" });
     expect(canvas).toHaveAttribute("data-target", "none");
@@ -917,14 +1263,14 @@ describe("VoiceEditor 文本与落盘", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
     pickRole("核心词");
-    fireEvent.mouseDown(word("centre"));
+    tapWord("centre");
 
     // 改的是最后一个词，前面的标注要留住
     fireEvent.change(screen.getByLabelText("语音编辑器"), {
       target: { value: "a centre of the town" }
     });
 
-    expect(word("centre")).toHaveClass("is-core");
+    expect(wordLevels("centre")).toEqual(["core"]);
     expect(applied(view).text).toBe("a centre of the town");
     expect(applied(view).annotations).toEqual([
       { type: "emphasis", start: 2, end: 8, level: "core" }
@@ -934,7 +1280,7 @@ describe("VoiceEditor 文本与落盘", () => {
   it("只读时不给画笔，也不往上抛改动", () => {
     const view = props({ readOnly: true });
     render(<VoiceEditor {...view} />);
-    expect(word("a")).toHaveAttribute("aria-disabled", "true");
+    expect(letter(0, 0)).toHaveAttribute("aria-disabled", "true");
     // 六个工具的触发按钮一律禁用，浮层根本打不开
     expect(document.querySelector(".tsz-ve-role-button")).toBeDisabled();
     expect(document.querySelector(".tsz-ve-liaison-button")).toBeDisabled();
@@ -997,30 +1343,334 @@ describe("VoiceEditor 发音区", () => {
     );
   });
 
-  it("上传多个音频，各自记住添加时的语种与性别，并可移除", () => {
+  it("没有上传适配器时「音频」面板置灰并说明原因，不再假装能本地上传", () => {
     render(<VoiceEditor {...props()} />);
     openTool("音频");
-    const input = screen.getByLabelText("上传音频") as HTMLInputElement;
-    expect(input.multiple).toBe(true);
+    expect(button("选择音频文件")).toBeDisabled();
+    expect(screen.getByLabelText("上传音频")).toBeDisabled();
+    expect(screen.getByText("音频上传未启用")).toBeInTheDocument();
+  });
 
-    const wav = (name: string) =>
-      new File([new Uint8Array([82, 73, 70, 70])], name, {
-        type: "audio/wav"
-      });
-    fireEvent.change(input, {
-      target: { files: [wav("a.wav"), wav("b.wav")] }
-    });
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
-
-    // 切换归属后再传，只影响之后添加的那条
+  it("上传：预检不过的不发请求，合格的走适配器，成功后按当次归属落成资产并抛出", async () => {
+    const adapter = audioAdapter();
+    const onAudioAssetsChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, onAudioAssetsChange })}
+      />
+    );
+    openTool("音频");
     fireEvent.click(screen.getByLabelText("AmE"));
-    fireEvent.change(input, { target: { files: [wav("c.wav")] } });
-    const rows = screen.getAllByRole("listitem").map((li) => li.textContent);
-    expect(rows[0]).toContain("BrE");
-    expect(rows[2]).toContain("AmE");
+    chooseFiles([
+      mp3("a.mp3"),
+      new File([new Uint8Array(3)], "b.txt", { type: "text/plain" }),
+      new File([new Uint8Array(3)], "c.wav", { type: "audio/wav" })
+    ]);
 
-    fireEvent.click(screen.getByLabelText("移除 b.wav"));
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    // 只有 a.mp3 与 c.wav 走到适配器，b.txt 在预检就被挡下
+    await waitFor(() => expect(adapter.upload).toHaveBeenCalledTimes(2));
+    expect(adapter.upload.mock.calls[0]![0]).toMatchObject({
+      locale: "en-US",
+      gender: "female"
+    });
+    expect(
+      screen.getByText("仅支持 mp3 / m4a / wav / ogg")
+    ).toBeInTheDocument();
+
+    await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(2));
+    const emitted = onAudioAssetsChange.mock.calls.at(-1)![0] as AudioAsset[];
+    expect(emitted.map((item) => item.original_name)).toEqual([
+      "a.mp3",
+      "c.wav"
+    ]);
+    expect(emitted[0]).toMatchObject({ locale: "en-US", gender: "female" });
+    // 列表：两条资产 + 一条失败；资产行带归属标签
+    expect(screen.getByLabelText("试听 a.mp3")).toBeInTheDocument();
+    expect(screen.getByLabelText("移除 b.txt")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("AmE")])
+    );
+    // 工具栏计数只算落成的
+    expect(
+      document.querySelector('[aria-label="音频"]')!.textContent
+    ).toContain("2");
+  });
+
+  it("超过大小或条数上限的直接进失败列表，不占名额", async () => {
+    const adapter = audioAdapter();
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, audioAssetLimit: 2 })}
+      />
+    );
+    openTool("音频");
+    chooseFiles([
+      mp3("big.mp3", 10 * 1024 * 1024 + 1),
+      mp3("1.mp3"),
+      mp3("2.mp3"),
+      mp3("3.mp3")
+    ]);
+    await waitFor(() => expect(adapter.upload).toHaveBeenCalledTimes(2));
+    expect(screen.getByText(/不能超过 10 MiB/)).toBeInTheDocument();
+    expect(screen.getByText("最多只能挂 2 条音频")).toBeInTheDocument();
+    // 不可重试的失败没有「重试」，只能移除
+    expect(screen.queryByLabelText("重试 big.mp3")).toBeNull();
+    fireEvent.click(screen.getByLabelText("移除 big.mp3"));
+    expect(screen.queryByText(/不能超过 10 MiB/)).toBeNull();
+  });
+
+  it("上传失败留在队列可重试；适配器报存储未开通则整块置灰", async () => {
+    const adapter = audioAdapter();
+    adapter.upload.mockRejectedValueOnce(
+      new AudioUploadError("upload_failed", "直传失败，请重试", true)
+    );
+    const onAudioAssetsChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, onAudioAssetsChange })}
+      />
+    );
+    openTool("音频");
+    chooseFiles([mp3("a.mp3")]);
+    await waitFor(() =>
+      expect(screen.getByText("直传失败，请重试")).toBeInTheDocument()
+    );
+    expect(onAudioAssetsChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText("重试 a.mp3"));
+    await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("直传失败，请重试")).toBeNull();
+    expect(screen.getByLabelText("试听 a.mp3")).toBeInTheDocument();
+
+    // 存储未开通由适配器记一次，编辑器每次渲染直接问它
+    adapter.upload.mockRejectedValueOnce(
+      new AudioUploadError("storage_unavailable", "音频存储未开通")
+    );
+    adapter.isStorageUnavailable = () => true;
+    chooseFiles([mp3("b.mp3")]);
+    await waitFor(() =>
+      expect(
+        screen.getByText("音频存储尚未开通，暂时不能上传")
+      ).toBeInTheDocument()
+    );
+    expect(button("选择音频文件")).toBeDisabled();
+  });
+
+  it("上传完成时用最新的 onAudioAssetsChange，不用发起那一帧捕获的旧回调", async () => {
+    let finish!: (value: AudioAsset) => void;
+    const adapter = audioAdapter({
+      upload: vi.fn(
+        () => new Promise<AudioAsset>((resolve) => (finish = resolve))
+      )
+    });
+    const stale = vi.fn();
+    const fresh = vi.fn();
+    const view = props({ audioUploadAdapter: adapter });
+    const { rerender } = render(
+      <VoiceEditor {...view} onAudioAssetsChange={stale} />
+    );
+    openTool("音频");
+    chooseFiles([mp3("slow.mp3")]);
+    await waitFor(() => expect(adapter.upload).toHaveBeenCalledTimes(1));
+
+    // 上传期间宿主重渲染换了回调（内联箭头函数每次都是新的）
+    rerender(<VoiceEditor {...view} onAudioAssetsChange={fresh} />);
+    finish(asset({ original_name: "slow.mp3" }));
+    await waitFor(() => expect(fresh).toHaveBeenCalledTimes(1));
+    expect(stale).not.toHaveBeenCalled();
+  });
+
+  it("只读态下队列行的「移除」也不可用", async () => {
+    const adapter = audioAdapter({
+      upload: vi.fn(() => new Promise<AudioAsset>(() => {}))
+    });
+    const view = props({ audioUploadAdapter: adapter });
+    const { rerender } = render(<VoiceEditor {...view} />);
+    openTool("音频");
+    chooseFiles([mp3("a.mp3")]);
+    await waitFor(() => expect(adapter.upload).toHaveBeenCalledTimes(1));
+    rerender(<VoiceEditor {...view} readOnly />);
+    expect(screen.getByLabelText("移除 a.mp3")).toBeDisabled();
+  });
+
+  it("外部给的 audioAssets 列出来；自己抛出去再灌回来不重置、不重复抛", async () => {
+    const adapter = audioAdapter();
+    const onAudioAssetsChange = vi.fn();
+    const existing = asset({ original_name: "old.mp3", locale: "en-US" });
+    const view = props({
+      audioUploadAdapter: adapter,
+      audioAssets: [existing],
+      onAudioAssetsChange
+    });
+    const { rerender } = render(<VoiceEditor {...view} />);
+    openTool("音频");
+    expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
+
+    chooseFiles([mp3("new.mp3")]);
+    await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(1));
+    const emitted = onAudioAssetsChange.mock.calls[0]![0] as AudioAsset[];
+    expect(emitted.map((item) => item.original_name)).toEqual([
+      "old.mp3",
+      "new.mp3"
+    ]);
+
+    rerender(<VoiceEditor {...view} audioAssets={emitted} />);
+    expect(screen.getAllByLabelText(/^试听 /)).toHaveLength(2);
+    expect(onAudioAssetsChange).toHaveBeenCalledTimes(1);
+
+    // 外部真换了一份值才重灌
+    rerender(<VoiceEditor {...view} audioAssets={[]} />);
+    expect(screen.queryByLabelText(/^试听 /)).toBeNull();
+  });
+
+  it("移除资产要确认：取消则保留，确认后从草稿去掉引用并抛出", async () => {
+    const onAudioAssetsChange = vi.fn();
+    const existing = asset({ original_name: "old.mp3" });
+    render(
+      <VoiceEditor
+        {...props({
+          audioUploadAdapter: audioAdapter(),
+          audioAssets: [existing],
+          onAudioAssetsChange
+        })}
+      />
+    );
+    openTool("音频");
+    fireEvent.click(screen.getByLabelText("移除 old.mp3"));
+    // antd 在两字按钮之间插了空格，可及名是「取 消」/「移 除」
+    fireEvent.click(await screen.findByRole("button", { name: "取 消" }));
+    expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
+    expect(onAudioAssetsChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText("移除 old.mp3"));
+    // 行按钮的可及名是「移除 old.mp3」，只有确认框的按钮叫「移 除」
+    fireEvent.click(await screen.findByRole("button", { name: "移 除" }));
+    expect(screen.queryByLabelText("试听 old.mp3")).toBeNull();
+    expect(onAudioAssetsChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it("试听资产：取签名 URL 后播放，未过期复用，再点一次停止", async () => {
+    const adapter = audioAdapter();
+    const existing = asset({ original_name: "old.mp3" });
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, audioAssets: [existing] })}
+      />
+    );
+    openTool("音频");
+
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+    expect(adapter.resolveUrl).toHaveBeenCalledWith(existing.id, {
+      signal: expect.any(AbortSignal)
+    });
+    expect(AudioMock.instances[0]!.src).toBe(
+      `https://signed.example/${existing.id}`
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("试听 old.mp3")).toHaveAttribute(
+        "data-playing",
+        "true"
+      )
+    );
+
+    // 再点一次是停止，不该又起一路播放
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    expect(AudioMock.instances[0]!.pause).toHaveBeenCalledOnce();
+
+    // 第三次点：URL 没过期，直接复用，不再向适配器要
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(2));
+    expect(adapter.resolveUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("签名 URL 过期后再试听会重新取一张", async () => {
+    const adapter = audioAdapter();
+    adapter.resolveUrl.mockResolvedValueOnce({
+      url: "https://signed.example/expired",
+      expiresAt: new Date(Date.now() - 1_000).toISOString()
+    });
+    const existing = asset({ original_name: "old.mp3" });
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, audioAssets: [existing] })}
+      />
+    );
+    openTool("音频");
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+    fireEvent.click(screen.getByLabelText("试听 old.mp3")); // 停
+    fireEvent.click(screen.getByLabelText("试听 old.mp3")); // 已过期 → 重取
+    await waitFor(() => expect(adapter.resolveUrl).toHaveBeenCalledTimes(2));
+  });
+
+  it("取签名 URL 期间再点是停止：URL 回来后不开播，也不起第二路", async () => {
+    let release!: (value: { url: string; expiresAt: string }) => void;
+    const adapter = audioAdapter({
+      resolveUrl: vi.fn(
+        () =>
+          new Promise<{ url: string; expiresAt: string }>((resolve) => {
+            release = resolve;
+          })
+      )
+    });
+    const existing = asset({ original_name: "old.mp3" });
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, audioAssets: [existing] })}
+      />
+    );
+    openTool("音频");
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    expect(screen.getByLabelText("试听 old.mp3")).toHaveAttribute(
+      "data-playing",
+      "true"
+    );
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    expect(screen.getByLabelText("试听 old.mp3")).toHaveAttribute(
+      "data-playing",
+      "false"
+    );
+    release({
+      url: "https://signed.example/late",
+      expiresAt: new Date(Date.now() + 300_000).toISOString()
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(AudioMock.instances).toHaveLength(0);
+    expect(adapter.resolveUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("外部回灌把正在播的那条拿掉时停播；试听失败只在面板里说明，不当阻断性错误", async () => {
+    const adapter = audioAdapter();
+    const existing = asset({ original_name: "old.mp3" });
+    const view = props({
+      audioUploadAdapter: adapter,
+      audioAssets: [existing]
+    });
+    const { rerender } = render(<VoiceEditor {...view} />);
+    openTool("音频");
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+    rerender(<VoiceEditor {...view} audioAssets={[]} />);
+    expect(AudioMock.instances[0]!.pause).toHaveBeenCalledOnce();
+
+    const other = asset({ original_name: "other.mp3" });
+    adapter.resolveUrl.mockRejectedValueOnce(new Error("boom"));
+    rerender(<VoiceEditor {...view} audioAssets={[other]} />);
+    fireEvent.click(screen.getByLabelText("试听 other.mp3"));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("音频暂时无法试听")
+    );
+    expect(document.querySelector(".ant-alert-error")).toBeNull();
+    expect(screen.getByLabelText("试听 other.mp3")).toHaveAttribute(
+      "data-playing",
+      "false"
+    );
+    // 下一次试听成功即清掉说明
+    fireEvent.click(screen.getByLabelText("试听 other.mp3"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(2));
+    expect(screen.queryByText("音频暂时无法试听，请稍后重试")).toBeNull();
   });
 
   it("拒绝越界、非数字与空的自定义语速", () => {
@@ -1044,31 +1694,6 @@ describe("VoiceEditor 发音区", () => {
     fireEvent.keyDown(rateInput(), { key: "Enter" });
     expect(screen.queryByText(/语速倍数必须在/)).toBeNull();
     expect(summary()).toContain("1.50×");
-  });
-
-  it("试听上传的音频：再点一次停止，播放失败不留播放态", async () => {
-    render(<VoiceEditor {...props()} />);
-    openTool("音频");
-    const input = screen.getByLabelText("上传音频");
-    fireEvent.change(input, {
-      target: {
-        files: [
-          new File([new Uint8Array([82, 73, 70, 70])], "a.wav", {
-            type: "audio/wav"
-          })
-        ]
-      }
-    });
-
-    fireEvent.click(button("试听 a.wav"));
-    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
-    const audio = AudioMock.instances[0]!;
-    expect(audio.play).toHaveBeenCalledOnce();
-
-    // 再点一次是停止，不该又起一路播放
-    fireEvent.click(button("试听 a.wav"));
-    expect(audio.pause).toHaveBeenCalledOnce();
-    expect(AudioMock.instances).toHaveLength(1);
   });
 
   it("勾选音色与调语速都抛出 voice_profile", async () => {

@@ -3,12 +3,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const state = vi.hoisted(() => ({
   env: { ADMIN_TTS_MOCK: false },
   voices: vi.fn(),
-  preview: vi.fn()
+  preview: vi.fn(),
+  audioUrl: vi.fn(),
+  audioCreateUpload: vi.fn(),
+  audioConfirm: vi.fn()
 }));
 
 vi.mock("@/lib/env", () => ({ env: state.env }));
 vi.mock("@/lib/auth", () => ({
-  api: { speech: { voices: state.voices, preview: state.preview } }
+  api: {
+    speech: { voices: state.voices, preview: state.preview },
+    audioAssets: {
+      createUpload: state.audioCreateUpload,
+      confirm: state.audioConfirm,
+      url: state.audioUrl
+    }
+  }
 }));
 
 const CONTENT = { version: 2 as const, text: "hello", annotations: [] };
@@ -42,6 +52,13 @@ beforeEach(() => {
   state.env.ADMIN_TTS_MOCK = false;
   state.voices.mockReset();
   state.preview.mockReset();
+  state.audioUrl.mockReset().mockResolvedValue({
+    url: "https://example.test/asset.mp3",
+    expires_at: "2026-09-06T00:05:00Z",
+    url_expires_in_seconds: 300
+  });
+  state.audioCreateUpload.mockReset();
+  state.audioConfirm.mockReset();
   stubRealSource();
   vi.resetModules();
 });
@@ -108,6 +125,30 @@ describe("admin voice preview data source", () => {
     expect(preview.audioUrl).toMatch(/^data:audio\/wav;base64,/);
     expect(state.voices).not.toHaveBeenCalled();
     expect(state.preview).not.toHaveBeenCalled();
+  });
+
+  it("routes the audio upload adapter with the same mock switch: real API when off, in-memory mock when on", async () => {
+    vi.stubEnv("PROD", false);
+    const real = await import("./dataSource");
+    await expect(
+      real.adminAudioUploadAdapter.resolveUrl("asset-1")
+    ).resolves.toEqual({
+      url: "https://example.test/asset.mp3",
+      expiresAt: "2026-09-06T00:05:00Z"
+    });
+    expect(state.audioUrl).toHaveBeenCalledWith("asset-1", undefined);
+
+    vi.resetModules();
+    state.env.ADMIN_TTS_MOCK = true;
+    const mocked = await import("./dataSource");
+    const asset = await mocked.adminAudioUploadAdapter.upload({
+      file: new File([new Uint8Array(3)], "a.mp3", { type: "audio/mpeg" }),
+      locale: "en-GB",
+      gender: "female"
+    });
+    expect(asset).toMatchObject({ id: "mock-audio-1", original_name: "a.mp3" });
+    expect(state.audioCreateUpload).not.toHaveBeenCalled();
+    expect(state.audioConfirm).not.toHaveBeenCalled();
   });
 
   it("forces the real adapter in production even when the mock flag is true", async () => {

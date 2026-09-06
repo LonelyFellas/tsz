@@ -14,6 +14,11 @@ import type {
   AdminUserUpdateInput,
   AdminSpeechPreviewResponse,
   AdminSpeechVoiceListResponse,
+  AudioAssetUrlResponse,
+  ConfirmAudioAssetInput,
+  ConfirmAudioAssetResponse,
+  CreateAudioUploadInput,
+  CreateAudioUploadResponse,
   AdminWordListQuery,
   AdminWordStats,
   AdminStatus,
@@ -286,6 +291,31 @@ export function createAdminEndpoints(http: HttpClient) {
         http.post<AdminSpeechPreviewResponse>("/speech/previews", input, {
           signal
         })
+    },
+    /**
+     * 音频资产（真人录音）：OSS 预签名直传三步——申请许可 → 前端直传 → confirm 落库。
+     * 契约见 docs/features/voice-editor-audio-upload/design.md；后端落地前在契约测试的
+     * PENDING 白名单里。
+     */
+    audioAssets: {
+      /** POST /admin/lexicon/audio-assets/upload-url — 三步之①；存储未开通返回 501。 */
+      createUpload: (input: CreateAudioUploadInput, signal?: AbortSignal) =>
+        http.post<CreateAudioUploadResponse>(
+          "/lexicon/audio-assets/upload-url",
+          input,
+          { signal }
+        ),
+      /** POST /admin/lexicon/audio-assets — 三步之③；服务端核验对象后返回资产。 */
+      confirm: (input: ConfirmAudioAssetInput, signal?: AbortSignal) =>
+        http.post<ConfirmAudioAssetResponse>("/lexicon/audio-assets", input, {
+          signal
+        }),
+      /** GET /admin/lexicon/audio-assets/{id}/url — 试听用短期签名 URL。 */
+      url: (id: string, signal?: AbortSignal) =>
+        http.get<AudioAssetUrlResponse>(
+          `/lexicon/audio-assets/${encodeURIComponent(id)}/url`,
+          { signal }
+        )
     },
     /**
      * 智能词库（词条创编）。字段与状态码见 docs/admin-wordlist-frontend-integration.md；

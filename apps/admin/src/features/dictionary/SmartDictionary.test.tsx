@@ -82,8 +82,6 @@ function word(
 ): Extract<AdminWordListItemAny, { schema_version: 2 }> {
   return {
     annotation_visible: false,
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 2,
     id,
     headword,
@@ -96,6 +94,8 @@ function word(
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     max_reachable_step: "basics",
     has_unpublished_changes: false,
     created_by_name: "Admin",
@@ -113,8 +113,6 @@ function v3Word(
 ): AdminWordListItemV3 {
   return {
     annotation_visible: false,
-    annotation: null,
-    annotation_revision: 1,
     schema_version: 3,
     id,
     kind: "word",
@@ -130,6 +128,8 @@ function v3Word(
     status: "draft",
     revision: 3,
     lifecycle_revision: 2,
+    annotation: null,
+    annotation_revision: 1,
     max_reachable_step: "forms",
     has_unpublished_changes: false,
     created_by_name: "Admin",

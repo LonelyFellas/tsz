@@ -10,8 +10,6 @@ const v3Row = (
   presentation: AdminWordListItemV3["presentation"]
 ): AdminWordListItemV3 => ({
   annotation_visible: false,
-  annotation: null,
-  annotation_revision: 1,
   schema_version: 3,
   id: "v3-entry",
   kind: "word",
@@ -19,6 +17,8 @@ const v3Row = (
   dialects: ["uk", "us"],
   revision: 4,
   lifecycle_revision: 2,
+  annotation: null,
+  annotation_revision: 1,
   gloss: "中心",
   pos_list: ["noun"],
   levels: ["A1"],
@@ -36,8 +36,6 @@ describe("mixed word list presentation", () => {
   it("V2 保留既有 headword 与 dialects", () => {
     const row: AdminWordListItemAny = {
       annotation_visible: false,
-      annotation: null,
-      annotation_revision: 1,
       schema_version: 2,
       id: "v2-entry",
       headword: "centre / center",
@@ -54,6 +52,8 @@ describe("mixed word list presentation", () => {
       status: "draft",
       revision: 1,
       lifecycle_revision: 1,
+      annotation: null,
+      annotation_revision: 1,
       max_reachable_step: "forms",
       has_unpublished_changes: false,
       created_by_name: "Admin",
@@ -126,8 +126,6 @@ describe("mixed word list presentation", () => {
     const report = vi.fn();
     const row = {
       annotation_visible: false,
-      annotation: null,
-      annotation_revision: 1,
       schema_version: 2,
       id: "v2-entry",
       headword: "word",
@@ -140,6 +138,8 @@ describe("mixed word list presentation", () => {
       status: "draft",
       revision: 1,
       lifecycle_revision: 1,
+      annotation: null,
+      annotation_revision: 1,
       max_reachable_step: "basics",
       has_unpublished_changes: false,
       created_by_name: "Admin",

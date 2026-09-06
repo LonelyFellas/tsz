@@ -202,6 +202,8 @@ export interface RichTextVariantV3 {
    * 这里先留着，等它们接入时用。
    */
   voice_profile?: VoiceProfileV3 | null;
+  /** 与 GrammarVariantV3 同形预留；例句 / 释义接入语音编辑器前 admin 不写入。 */
+  audio_assets?: AudioAssetV3[];
 }
 
 export type DialectVariantRichTextSlotV3 =
@@ -235,12 +237,35 @@ export interface VoiceProfileV3 {
   rate_percent: number;
 }
 
+export type AudioAssetLocaleV3 = "en-GB" | "en-US";
+export type AudioAssetGenderV3 = "female" | "male";
+
+/**
+ * 一条已上传的音频资产（真人录音）。元数据由服务端在 confirm 时生成，前端原样回传；
+ * 不含可播放 URL——试听要按 id 另取短期签名 URL，签名 URL 不进 aggregate / publication。
+ * 契约见 docs/features/voice-editor-audio-upload/design.md「后端对接」。
+ */
+export interface AudioAssetV3 {
+  id: string;
+  locale: AudioAssetLocaleV3;
+  gender: AudioAssetGenderV3;
+  content_type: string;
+  size_bytes: number;
+  /** 服务端能探到时长才有。 */
+  duration_ms?: number | null;
+  /** 上传时的原始文件名，仅作展示。 */
+  original_name: string;
+  created_at: string;
+}
+
 export interface GrammarVariantV3 {
   id: string;
   dialect: Dialect;
   content: RichTextV3;
   /** 缺省 / null 表示未配置：按系统默认音色与原速处理。 */
   voice_profile?: VoiceProfileV3 | null;
+  /** 挂在这段文本上的真人录音；缺省 / 空数组 = 没有音频。 */
+  audio_assets?: AudioAssetV3[];
 }
 
 export interface GrammarStructureV3 {
@@ -587,8 +612,6 @@ export interface AdminWordV3Compatibility {
 }
 
 export interface AdminWordV3 {
-  annotation: string | null;
-  annotation_revision: number;
   schema_version: 3;
   id: string;
   language: EnglishLanguageV3;
@@ -596,6 +619,10 @@ export interface AdminWordV3 {
   status: AdminWordStatus;
   revision: number;
   lifecycle_revision: number;
+  /** 同原型词条的区分标签（≤ 20 个 Unicode scalar），未标注为 null。 */
+  annotation: string | null;
+  /** 标注独立修订；`PATCH /entries/{id}/annotation` 以此做乐观锁，与内容 revision 无关。 */
+  annotation_revision: number;
   has_unpublished_changes: boolean;
   presentation: EntryPresentationV3;
   capabilities: AdminWordV3Capabilities;
@@ -654,14 +681,16 @@ export type AdminWordDraftAnyEnvelope =
   AdminWordDraftV2Envelope | AdminWordDraftV3Envelope;
 
 export interface CreateAdminWordV3Input {
-  annotation?: string | null;
-  annotation_updates?: EntryAnnotationUpdate[];
   schema_version: 3;
   detection_id: string;
   kind: WordEntryKindV3;
   /** Step 1 最终确认值；兼容窗口内旧客户端可省略。 */
   headwords?: WordHeadwordsV2;
   confirmed_surface_match_token?: string;
+  /** 新词条标注；与已有词条同原型时必填，否则可省略。 */
+  annotation?: string | null;
+  /** 同原型已有词条的标注（含未改动的），须带上各自当前 annotation_revision。 */
+  annotation_updates?: EntryAnnotationUpdate[];
 }
 
 export type CreateAdminWordAnyInput =
@@ -976,8 +1005,6 @@ export type DetectLexiconResponseAny =
 
 export interface AdminWordListItemV3 {
   annotation_visible: boolean;
-  annotation: string | null;
-  annotation_revision: number;
   schema_version: 3;
   id: string;
   kind: WordEntryKindV3;
@@ -989,6 +1016,10 @@ export interface AdminWordListItemV3 {
   dialects: Dialect[];
   revision: number;
   lifecycle_revision: number;
+  /** 同原型词条的区分标签（≤ 20 个 Unicode scalar），未标注为 null。 */
+  annotation: string | null;
+  /** 标注独立修订；`PATCH /entries/{id}/annotation` 以此做乐观锁，与内容 revision 无关。 */
+  annotation_revision: number;
   gloss: string;
   pos_list: string[];
   levels: string[];
