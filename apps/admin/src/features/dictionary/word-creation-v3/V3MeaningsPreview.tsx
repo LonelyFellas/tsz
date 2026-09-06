@@ -87,6 +87,11 @@ export function V3MeaningsPreview({
                         <Typography.Text key={variant.id}>
                           {dialectLabel(variant.dialect)}：
                           {variant.content.text}
+                          {variant.audio_assets?.length ? (
+                            <Tag style={{ marginInlineStart: 6 }}>
+                              音频 {variant.audio_assets.length} 条
+                            </Tag>
+                          ) : null}
                         </Typography.Text>
                       ))}
                     </Flex>

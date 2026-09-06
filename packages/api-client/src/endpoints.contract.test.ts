@@ -46,6 +46,10 @@ const PENDING = new Set<string>([
   "put /me/learning-settings",
   "post /me/avatar/upload-url",
   "post /me/avatar",
+  // 音频资产上传(真人录音,tsz-rust 未实现;契约见 docs/features/voice-editor-audio-upload/design.md)。
+  "post /admin/lexicon/audio-assets/upload-url",
+  "post /admin/lexicon/audio-assets",
+  "get /admin/lexicon/audio-assets/_/url",
   // 找回密码(tsz-rust 未实现)。
   "post /auth/password/forgot",
   "post /auth/password/reset",

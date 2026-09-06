@@ -1,4 +1,8 @@
-import type { VoiceOption } from "../../types";
+import type {
+  AudioAssetGender,
+  AudioAssetLocale,
+  VoiceOption
+} from "../../types";
 
 /**
  * 语法结构三分类。一段文字只能属于其中一类：点非当前类=替换，点当前类=取消。
@@ -82,12 +86,18 @@ export const RATE_MULTIPLIER_MAX = 2;
 export const PAUSE_PRESETS: readonly number[] = [500, 1000, 2000, 5000];
 
 /** 语种分组：wire 的 locale ↔ 界面上的 BrE / AmE 徽标。 */
-export const VOICE_LOCALES: ReadonlyArray<{ locale: string; badge: string }> = [
+export const VOICE_LOCALES: ReadonlyArray<{
+  locale: AudioAssetLocale;
+  badge: string;
+}> = [
   { locale: "en-GB", badge: "BrE" },
   { locale: "en-US", badge: "AmE" }
 ];
 
-export const VOICE_GENDERS: ReadonlyArray<{ gender: string; label: string }> = [
+export const VOICE_GENDERS: ReadonlyArray<{
+  gender: AudioAssetGender;
+  label: string;
+}> = [
   { gender: "female", label: "女声 ♀" },
   { gender: "male", label: "男声 ♂" }
 ];

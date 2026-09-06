@@ -16,9 +16,12 @@ describe("env", () => {
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.stubEnv("VITE_RELATED_SEARCH_V2", undefined);
     vi.stubEnv("VITE_WORD_CONTENT_COMPLETION", undefined);
+    vi.stubEnv("VITE_VOICE_AUDIO_UPLOAD", undefined);
     vi.resetModules();
     const { env } = await import("./env");
     expect(env.API_BASE_URL).toBe("/api/v1");
+    // 后端契约落地前默认关，dev 也不例外
+    expect(env.VOICE_AUDIO_UPLOAD).toBe(false);
     expect(env.ADMIN_WORDS_MOCK).toBe(false);
     expect(env.ADMIN_PART_OF_SPEECH_MOCK).toBe(false);
     expect(env.VOICE_EDITOR).toBe(true);
@@ -65,7 +68,9 @@ describe("env", () => {
     ["VITE_RELATED_SEARCH_V2", "true", true],
     ["VITE_RELATED_SEARCH_V2", "false", false],
     ["VITE_WORD_CONTENT_COMPLETION", "true", true],
-    ["VITE_WORD_CONTENT_COMPLETION", "false", false]
+    ["VITE_WORD_CONTENT_COMPLETION", "false", false],
+    ["VITE_VOICE_AUDIO_UPLOAD", "true", true],
+    ["VITE_VOICE_AUDIO_UPLOAD", "false", false]
   ] as const)("严格解析 %s=%s", async (name, value, expected) => {
     vi.stubEnv(name, value);
     vi.resetModules();
@@ -77,7 +82,8 @@ describe("env", () => {
       | "VOICE_PREVIEW"
       | "ADMIN_TTS_MOCK"
       | "RELATED_SEARCH_V2"
-      | "WORD_CONTENT_COMPLETION";
+      | "WORD_CONTENT_COMPLETION"
+      | "VOICE_AUDIO_UPLOAD";
     expect(env[key]).toBe(expected);
   });
 

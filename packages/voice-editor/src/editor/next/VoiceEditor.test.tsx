@@ -7,10 +7,13 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RichTextV2 } from "@tsz/types";
-import type {
-  VoiceOption,
-  VoicePreviewAdapter,
-  VoicePreviewResult
+import {
+  AudioUploadError,
+  type AudioAsset,
+  type AudioUploadAdapter,
+  type VoiceOption,
+  type VoicePreviewAdapter,
+  type VoicePreviewResult
 } from "../../types";
 import {
   DEFAULT_LIAISON_COLOR,
@@ -75,6 +78,51 @@ function adapter(
     .mockResolvedValue(previewResult())
 ): VoicePreviewAdapter {
   return { listVoices: vi.fn().mockResolvedValue(VOICES), synthesize };
+}
+
+let assetSeq = 0;
+function asset(overrides: Partial<AudioAsset> = {}): AudioAsset {
+  assetSeq += 1;
+  return {
+    id: `asset-${assetSeq}`,
+    locale: "en-GB",
+    gender: "female",
+    content_type: "audio/mpeg",
+    size_bytes: 3,
+    original_name: "a.mp3",
+    created_at: "2026-09-06T00:00:00Z",
+    ...overrides
+  };
+}
+
+const mp3 = (name: string, size = 3) =>
+  new File([new Uint8Array(size)], name, { type: "audio/mpeg" });
+
+/** 上传适配器桩：默认直传一半时报一次进度，然后按传入的归属与文件名落成资产。 */
+function audioAdapter(overrides: Partial<AudioUploadAdapter> = {}) {
+  const upload = vi.fn(
+    async ({
+      file,
+      locale,
+      gender,
+      onProgress
+    }: Parameters<AudioUploadAdapter["upload"]>[0]) => {
+      onProgress?.(0.5);
+      return asset({ original_name: file.name, locale, gender });
+    }
+  );
+  const resolveUrl = vi.fn(async (id: string) => ({
+    url: `https://signed.example/${id}`,
+    expiresAt: new Date(Date.now() + 300_000).toISOString()
+  }));
+  return { upload, resolveUrl, ...overrides } as AudioUploadAdapter & {
+    upload: ReturnType<typeof vi.fn>;
+    resolveUrl: ReturnType<typeof vi.fn>;
+  };
+}
+
+function chooseFiles(files: File[]) {
+  fireEvent.change(screen.getByLabelText("上传音频"), { target: { files } });
 }
 
 function props(overrides: Record<string, unknown> = {}) {
@@ -210,7 +258,6 @@ function applied(view: ReturnType<typeof props>): RichTextV2 {
 beforeEach(() => {
   AudioMock.instances = [];
   vi.stubGlobal("Audio", AudioMock);
-  vi.spyOn(window, "confirm").mockReturnValue(true);
 });
 
 afterEach(() => {
@@ -1296,30 +1343,334 @@ describe("VoiceEditor 发音区", () => {
     );
   });
 
-  it("上传多个音频，各自记住添加时的语种与性别，并可移除", () => {
+  it("没有上传适配器时「音频」面板置灰并说明原因，不再假装能本地上传", () => {
     render(<VoiceEditor {...props()} />);
     openTool("音频");
-    const input = screen.getByLabelText("上传音频") as HTMLInputElement;
-    expect(input.multiple).toBe(true);
+    expect(button("选择音频文件")).toBeDisabled();
+    expect(screen.getByLabelText("上传音频")).toBeDisabled();
+    expect(screen.getByText("音频上传未启用")).toBeInTheDocument();
+  });
 
-    const wav = (name: string) =>
-      new File([new Uint8Array([82, 73, 70, 70])], name, {
-        type: "audio/wav"
-      });
-    fireEvent.change(input, {
-      target: { files: [wav("a.wav"), wav("b.wav")] }
-    });
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
-
-    // 切换归属后再传，只影响之后添加的那条
+  it("上传：预检不过的不发请求，合格的走适配器，成功后按当次归属落成资产并抛出", async () => {
+    const adapter = audioAdapter();
+    const onAudioAssetsChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, onAudioAssetsChange })}
+      />
+    );
+    openTool("音频");
     fireEvent.click(screen.getByLabelText("AmE"));
-    fireEvent.change(input, { target: { files: [wav("c.wav")] } });
-    const rows = screen.getAllByRole("listitem").map((li) => li.textContent);
-    expect(rows[0]).toContain("BrE");
-    expect(rows[2]).toContain("AmE");
+    chooseFiles([
+      mp3("a.mp3"),
+      new File([new Uint8Array(3)], "b.txt", { type: "text/plain" }),
+      new File([new Uint8Array(3)], "c.wav", { type: "audio/wav" })
+    ]);
 
-    fireEvent.click(screen.getByLabelText("移除 b.wav"));
-    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    // 只有 a.mp3 与 c.wav 走到适配器，b.txt 在预检就被挡下
+    await waitFor(() => expect(adapter.upload).toHaveBeenCalledTimes(2));
+    expect(adapter.upload.mock.calls[0]![0]).toMatchObject({
+      locale: "en-US",
+      gender: "female"
+    });
+    expect(
+      screen.getByText("仅支持 mp3 / m4a / wav / ogg")
+    ).toBeInTheDocument();
+
+    await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(2));
+    const emitted = onAudioAssetsChange.mock.calls.at(-1)![0] as AudioAsset[];
+    expect(emitted.map((item) => item.original_name)).toEqual([
+      "a.mp3",
+      "c.wav"
+    ]);
+    expect(emitted[0]).toMatchObject({ locale: "en-US", gender: "female" });
+    // 列表：两条资产 + 一条失败；资产行带归属标签
+    expect(screen.getByLabelText("试听 a.mp3")).toBeInTheDocument();
+    expect(screen.getByLabelText("移除 b.txt")).toBeInTheDocument();
+    expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(
+      expect.arrayContaining([expect.stringContaining("AmE")])
+    );
+    // 工具栏计数只算落成的
+    expect(
+      document.querySelector('[aria-label="音频"]')!.textContent
+    ).toContain("2");
+  });
+
+  it("超过大小或条数上限的直接进失败列表，不占名额", async () => {
+    const adapter = audioAdapter();
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, audioAssetLimit: 2 })}
+      />
+    );
+    openTool("音频");
+    chooseFiles([
+      mp3("big.mp3", 10 * 1024 * 1024 + 1),
+      mp3("1.mp3"),
+      mp3("2.mp3"),
+      mp3("3.mp3")
+    ]);
+    await waitFor(() => expect(adapter.upload).toHaveBeenCalledTimes(2));
+    expect(screen.getByText(/不能超过 10 MiB/)).toBeInTheDocument();
+    expect(screen.getByText("最多只能挂 2 条音频")).toBeInTheDocument();
+    // 不可重试的失败没有「重试」，只能移除
+    expect(screen.queryByLabelText("重试 big.mp3")).toBeNull();
+    fireEvent.click(screen.getByLabelText("移除 big.mp3"));
+    expect(screen.queryByText(/不能超过 10 MiB/)).toBeNull();
+  });
+
+  it("上传失败留在队列可重试；适配器报存储未开通则整块置灰", async () => {
+    const adapter = audioAdapter();
+    adapter.upload.mockRejectedValueOnce(
+      new AudioUploadError("upload_failed", "直传失败，请重试", true)
+    );
+    const onAudioAssetsChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, onAudioAssetsChange })}
+      />
+    );
+    openTool("音频");
+    chooseFiles([mp3("a.mp3")]);
+    await waitFor(() =>
+      expect(screen.getByText("直传失败，请重试")).toBeInTheDocument()
+    );
+    expect(onAudioAssetsChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText("重试 a.mp3"));
+    await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText("直传失败，请重试")).toBeNull();
+    expect(screen.getByLabelText("试听 a.mp3")).toBeInTheDocument();
+
+    // 存储未开通由适配器记一次，编辑器每次渲染直接问它
+    adapter.upload.mockRejectedValueOnce(
+      new AudioUploadError("storage_unavailable", "音频存储未开通")
+    );
+    adapter.isStorageUnavailable = () => true;
+    chooseFiles([mp3("b.mp3")]);
+    await waitFor(() =>
+      expect(
+        screen.getByText("音频存储尚未开通，暂时不能上传")
+      ).toBeInTheDocument()
+    );
+    expect(button("选择音频文件")).toBeDisabled();
+  });
+
+  it("上传完成时用最新的 onAudioAssetsChange，不用发起那一帧捕获的旧回调", async () => {
+    let finish!: (value: AudioAsset) => void;
+    const adapter = audioAdapter({
+      upload: vi.fn(
+        () => new Promise<AudioAsset>((resolve) => (finish = resolve))
+      )
+    });
+    const stale = vi.fn();
+    const fresh = vi.fn();
+    const view = props({ audioUploadAdapter: adapter });
+    const { rerender } = render(
+      <VoiceEditor {...view} onAudioAssetsChange={stale} />
+    );
+    openTool("音频");
+    chooseFiles([mp3("slow.mp3")]);
+    await waitFor(() => expect(adapter.upload).toHaveBeenCalledTimes(1));
+
+    // 上传期间宿主重渲染换了回调（内联箭头函数每次都是新的）
+    rerender(<VoiceEditor {...view} onAudioAssetsChange={fresh} />);
+    finish(asset({ original_name: "slow.mp3" }));
+    await waitFor(() => expect(fresh).toHaveBeenCalledTimes(1));
+    expect(stale).not.toHaveBeenCalled();
+  });
+
+  it("只读态下队列行的「移除」也不可用", async () => {
+    const adapter = audioAdapter({
+      upload: vi.fn(() => new Promise<AudioAsset>(() => {}))
+    });
+    const view = props({ audioUploadAdapter: adapter });
+    const { rerender } = render(<VoiceEditor {...view} />);
+    openTool("音频");
+    chooseFiles([mp3("a.mp3")]);
+    await waitFor(() => expect(adapter.upload).toHaveBeenCalledTimes(1));
+    rerender(<VoiceEditor {...view} readOnly />);
+    expect(screen.getByLabelText("移除 a.mp3")).toBeDisabled();
+  });
+
+  it("外部给的 audioAssets 列出来；自己抛出去再灌回来不重置、不重复抛", async () => {
+    const adapter = audioAdapter();
+    const onAudioAssetsChange = vi.fn();
+    const existing = asset({ original_name: "old.mp3", locale: "en-US" });
+    const view = props({
+      audioUploadAdapter: adapter,
+      audioAssets: [existing],
+      onAudioAssetsChange
+    });
+    const { rerender } = render(<VoiceEditor {...view} />);
+    openTool("音频");
+    expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
+
+    chooseFiles([mp3("new.mp3")]);
+    await waitFor(() => expect(onAudioAssetsChange).toHaveBeenCalledTimes(1));
+    const emitted = onAudioAssetsChange.mock.calls[0]![0] as AudioAsset[];
+    expect(emitted.map((item) => item.original_name)).toEqual([
+      "old.mp3",
+      "new.mp3"
+    ]);
+
+    rerender(<VoiceEditor {...view} audioAssets={emitted} />);
+    expect(screen.getAllByLabelText(/^试听 /)).toHaveLength(2);
+    expect(onAudioAssetsChange).toHaveBeenCalledTimes(1);
+
+    // 外部真换了一份值才重灌
+    rerender(<VoiceEditor {...view} audioAssets={[]} />);
+    expect(screen.queryByLabelText(/^试听 /)).toBeNull();
+  });
+
+  it("移除资产要确认：取消则保留，确认后从草稿去掉引用并抛出", async () => {
+    const onAudioAssetsChange = vi.fn();
+    const existing = asset({ original_name: "old.mp3" });
+    render(
+      <VoiceEditor
+        {...props({
+          audioUploadAdapter: audioAdapter(),
+          audioAssets: [existing],
+          onAudioAssetsChange
+        })}
+      />
+    );
+    openTool("音频");
+    fireEvent.click(screen.getByLabelText("移除 old.mp3"));
+    // antd 在两字按钮之间插了空格，可及名是「取 消」/「移 除」
+    fireEvent.click(await screen.findByRole("button", { name: "取 消" }));
+    expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
+    expect(onAudioAssetsChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByLabelText("移除 old.mp3"));
+    // 行按钮的可及名是「移除 old.mp3」，只有确认框的按钮叫「移 除」
+    fireEvent.click(await screen.findByRole("button", { name: "移 除" }));
+    expect(screen.queryByLabelText("试听 old.mp3")).toBeNull();
+    expect(onAudioAssetsChange).toHaveBeenLastCalledWith([]);
+  });
+
+  it("试听资产：取签名 URL 后播放，未过期复用，再点一次停止", async () => {
+    const adapter = audioAdapter();
+    const existing = asset({ original_name: "old.mp3" });
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, audioAssets: [existing] })}
+      />
+    );
+    openTool("音频");
+
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+    expect(adapter.resolveUrl).toHaveBeenCalledWith(existing.id, {
+      signal: expect.any(AbortSignal)
+    });
+    expect(AudioMock.instances[0]!.src).toBe(
+      `https://signed.example/${existing.id}`
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("试听 old.mp3")).toHaveAttribute(
+        "data-playing",
+        "true"
+      )
+    );
+
+    // 再点一次是停止，不该又起一路播放
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    expect(AudioMock.instances[0]!.pause).toHaveBeenCalledOnce();
+
+    // 第三次点：URL 没过期，直接复用，不再向适配器要
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(2));
+    expect(adapter.resolveUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("签名 URL 过期后再试听会重新取一张", async () => {
+    const adapter = audioAdapter();
+    adapter.resolveUrl.mockResolvedValueOnce({
+      url: "https://signed.example/expired",
+      expiresAt: new Date(Date.now() - 1_000).toISOString()
+    });
+    const existing = asset({ original_name: "old.mp3" });
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, audioAssets: [existing] })}
+      />
+    );
+    openTool("音频");
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+    fireEvent.click(screen.getByLabelText("试听 old.mp3")); // 停
+    fireEvent.click(screen.getByLabelText("试听 old.mp3")); // 已过期 → 重取
+    await waitFor(() => expect(adapter.resolveUrl).toHaveBeenCalledTimes(2));
+  });
+
+  it("取签名 URL 期间再点是停止：URL 回来后不开播，也不起第二路", async () => {
+    let release!: (value: { url: string; expiresAt: string }) => void;
+    const adapter = audioAdapter({
+      resolveUrl: vi.fn(
+        () =>
+          new Promise<{ url: string; expiresAt: string }>((resolve) => {
+            release = resolve;
+          })
+      )
+    });
+    const existing = asset({ original_name: "old.mp3" });
+    render(
+      <VoiceEditor
+        {...props({ audioUploadAdapter: adapter, audioAssets: [existing] })}
+      />
+    );
+    openTool("音频");
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    expect(screen.getByLabelText("试听 old.mp3")).toHaveAttribute(
+      "data-playing",
+      "true"
+    );
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    expect(screen.getByLabelText("试听 old.mp3")).toHaveAttribute(
+      "data-playing",
+      "false"
+    );
+    release({
+      url: "https://signed.example/late",
+      expiresAt: new Date(Date.now() + 300_000).toISOString()
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(AudioMock.instances).toHaveLength(0);
+    expect(adapter.resolveUrl).toHaveBeenCalledTimes(1);
+  });
+
+  it("外部回灌把正在播的那条拿掉时停播；试听失败只在面板里说明，不当阻断性错误", async () => {
+    const adapter = audioAdapter();
+    const existing = asset({ original_name: "old.mp3" });
+    const view = props({
+      audioUploadAdapter: adapter,
+      audioAssets: [existing]
+    });
+    const { rerender } = render(<VoiceEditor {...view} />);
+    openTool("音频");
+    fireEvent.click(screen.getByLabelText("试听 old.mp3"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+    rerender(<VoiceEditor {...view} audioAssets={[]} />);
+    expect(AudioMock.instances[0]!.pause).toHaveBeenCalledOnce();
+
+    const other = asset({ original_name: "other.mp3" });
+    adapter.resolveUrl.mockRejectedValueOnce(new Error("boom"));
+    rerender(<VoiceEditor {...view} audioAssets={[other]} />);
+    fireEvent.click(screen.getByLabelText("试听 other.mp3"));
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent("音频暂时无法试听")
+    );
+    expect(document.querySelector(".ant-alert-error")).toBeNull();
+    expect(screen.getByLabelText("试听 other.mp3")).toHaveAttribute(
+      "data-playing",
+      "false"
+    );
+    // 下一次试听成功即清掉说明
+    fireEvent.click(screen.getByLabelText("试听 other.mp3"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(2));
+    expect(screen.queryByText("音频暂时无法试听，请稍后重试")).toBeNull();
   });
 
   it("拒绝越界、非数字与空的自定义语速", () => {
@@ -1343,31 +1694,6 @@ describe("VoiceEditor 发音区", () => {
     fireEvent.keyDown(rateInput(), { key: "Enter" });
     expect(screen.queryByText(/语速倍数必须在/)).toBeNull();
     expect(summary()).toContain("1.50×");
-  });
-
-  it("试听上传的音频：再点一次停止，播放失败不留播放态", async () => {
-    render(<VoiceEditor {...props()} />);
-    openTool("音频");
-    const input = screen.getByLabelText("上传音频");
-    fireEvent.change(input, {
-      target: {
-        files: [
-          new File([new Uint8Array([82, 73, 70, 70])], "a.wav", {
-            type: "audio/wav"
-          })
-        ]
-      }
-    });
-
-    fireEvent.click(button("试听 a.wav"));
-    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
-    const audio = AudioMock.instances[0]!;
-    expect(audio.play).toHaveBeenCalledOnce();
-
-    // 再点一次是停止，不该又起一路播放
-    fireEvent.click(button("试听 a.wav"));
-    expect(audio.pause).toHaveBeenCalledOnce();
-    expect(AudioMock.instances).toHaveLength(1);
   });
 
   it("勾选音色与调语速都抛出 voice_profile", async () => {

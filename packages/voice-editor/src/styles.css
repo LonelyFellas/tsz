@@ -640,6 +640,34 @@
   min-width: 340px;
 }
 
+.tsz-ve-upload-hint {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* 还在路上的那几条：名字压淡，进度条 / 失败原因占第三列。 */
+.tsz-ve-upload-item.is-pending .tsz-ve-upload-name {
+  color: var(--ant-color-text-secondary, #8c8c8c);
+}
+
+.tsz-ve-upload-progress {
+  min-width: 96px;
+  margin: 0;
+}
+
+.tsz-ve-upload-error {
+  color: var(--ant-color-error, #ff4d4f);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.tsz-ve-upload-actions {
+  display: inline-flex;
+  gap: 2px;
+}
+
 /*
  * 移除是次要动作，常态用弱化的文字色；只在悬停/聚焦时转红，
  * 避免一列红字比文件名本身还抢眼。

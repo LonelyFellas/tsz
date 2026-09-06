@@ -863,6 +863,36 @@ describe("V3MeaningsAndExamplesStep", () => {
     ]);
   }, 15_000);
 
+  it("语法结构变体上已有的 audio_assets 列在音频面板里，移除后从草稿去掉引用", async () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets = [
+      {
+        id: "asset-1",
+        locale: "en-GB",
+        gender: "female",
+        content_type: "audio/mpeg",
+        size_bytes: 3,
+        original_name: "old.mp3",
+        created_at: "2026-09-06T00:00:00Z"
+      }
+    ];
+    render(<Harness initial={initial} />);
+    await screen.findByRole(
+      "toolbar",
+      { name: "标注工具栏" },
+      { timeout: 10_000 }
+    );
+    fireEvent.click(screen.getByRole("button", { name: "音频" }));
+    expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByLabelText("移除 old.mp3"));
+    // Popconfirm 的确认键（antd 在两字之间插空格）
+    fireEvent.click(await screen.findByRole("button", { name: "移 除" }));
+    expect(
+      value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
+    ).toEqual([]);
+  }, 15_000);
+
   it("音色与语速落到语法结构变体的 voice_profile 上", async () => {
     render(<Harness initial={meaningsFixture} />);
     await screen.findByRole(

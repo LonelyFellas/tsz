@@ -201,6 +201,8 @@ export interface RichTextVariantV3 {
    * 这里先留着，等它们接入时用。
    */
   voice_profile?: VoiceProfileV3 | null;
+  /** 与 GrammarVariantV3 同形预留；例句 / 释义接入语音编辑器前 admin 不写入。 */
+  audio_assets?: AudioAssetV3[];
 }
 
 export type DialectVariantRichTextSlotV3 =
@@ -234,12 +236,35 @@ export interface VoiceProfileV3 {
   rate_percent: number;
 }
 
+export type AudioAssetLocaleV3 = "en-GB" | "en-US";
+export type AudioAssetGenderV3 = "female" | "male";
+
+/**
+ * 一条已上传的音频资产（真人录音）。元数据由服务端在 confirm 时生成，前端原样回传；
+ * 不含可播放 URL——试听要按 id 另取短期签名 URL，签名 URL 不进 aggregate / publication。
+ * 契约见 docs/features/voice-editor-audio-upload/design.md「后端对接」。
+ */
+export interface AudioAssetV3 {
+  id: string;
+  locale: AudioAssetLocaleV3;
+  gender: AudioAssetGenderV3;
+  content_type: string;
+  size_bytes: number;
+  /** 服务端能探到时长才有。 */
+  duration_ms?: number | null;
+  /** 上传时的原始文件名，仅作展示。 */
+  original_name: string;
+  created_at: string;
+}
+
 export interface GrammarVariantV3 {
   id: string;
   dialect: Dialect;
   content: RichTextV3;
   /** 缺省 / null 表示未配置：按系统默认音色与原速处理。 */
   voice_profile?: VoiceProfileV3 | null;
+  /** 挂在这段文本上的真人录音；缺省 / 空数组 = 没有音频。 */
+  audio_assets?: AudioAssetV3[];
 }
 
 export interface GrammarStructureV3 {

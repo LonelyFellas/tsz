@@ -1,5 +1,9 @@
 import { canonicalVoiceHash } from "@tsz/voice-editor/core";
-import type { VoiceOption, VoicePreviewAdapter } from "@tsz/voice-editor/types";
+import type {
+  AudioUploadAdapter,
+  VoiceOption,
+  VoicePreviewAdapter
+} from "@tsz/voice-editor/types";
 
 const SILENT_WAV =
   "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
@@ -74,6 +78,42 @@ export function createMockVoicePreviewAdapter(): VoicePreviewAdapter {
         audioUrl: SILENT_WAV,
         expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
         cached
+      };
+    }
+  };
+}
+
+/**
+ * 上传音频的假适配器：不发请求，报两次进度后按传入的归属与文件名落成一条假资产；
+ * 试听给静音音频。只用于后端未落地时调 UI 与 jsdom 用例。
+ */
+export function createMockAudioUploadAdapter(): AudioUploadAdapter {
+  let seq = 0;
+  return {
+    isStorageUnavailable: () => false,
+    async upload({ file, locale, gender, signal, onProgress }) {
+      if (signal?.aborted) throw abortError();
+      onProgress?.(0.4);
+      await Promise.resolve();
+      if (signal?.aborted) throw abortError();
+      onProgress?.(1);
+      seq += 1;
+      return {
+        id: `mock-audio-${seq}`,
+        locale,
+        gender,
+        content_type: file.type,
+        size_bytes: file.size,
+        duration_ms: null,
+        original_name: file.name,
+        created_at: new Date().toISOString()
+      };
+    },
+    async resolveUrl(_assetId, options) {
+      if (options?.signal?.aborted) throw abortError();
+      return {
+        url: SILENT_WAV,
+        expiresAt: new Date(Date.now() + 5 * 60_000).toISOString()
       };
     }
   };
