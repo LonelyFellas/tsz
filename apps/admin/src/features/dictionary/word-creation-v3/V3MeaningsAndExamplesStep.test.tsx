@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within
+} from "@testing-library/react";
 import { App as AntApp } from "antd";
 import type {
   DraftFormsStepContentV3,
@@ -886,12 +892,19 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("移除 old.mp3"));
-    // Popconfirm 的确认键（antd 在两字之间插空格）
-    fireEvent.click(await screen.findByRole("button", { name: "移 除" }));
+    // Popconfirm 的确认键：这一页 DOM 很大，findByRole 逐个算可及名在 CI 上会拖到超时，按类名定位
+    const confirm = await waitFor(() => {
+      const found = document.querySelector<HTMLButtonElement>(
+        ".ant-popconfirm-buttons .ant-btn-primary"
+      );
+      expect(found).not.toBeNull();
+      return found!;
+    });
+    fireEvent.click(confirm);
     expect(
       value().pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets
     ).toEqual([]);
-  }, 15_000);
+  }, 30_000);
 
   it("音色与语速落到语法结构变体的 voice_profile 上", async () => {
     render(<Harness initial={meaningsFixture} />);
