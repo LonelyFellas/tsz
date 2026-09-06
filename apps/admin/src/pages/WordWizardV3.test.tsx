@@ -70,6 +70,8 @@ function word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: true,
     presentation: {
       label: "centre",

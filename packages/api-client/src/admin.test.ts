@@ -48,6 +48,8 @@ function lifecycleWord(id: string): AdminWordV2 {
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: false,
     headwords,
     detection_snapshot: {

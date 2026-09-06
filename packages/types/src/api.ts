@@ -1,6 +1,7 @@
 // 通用 API 包裹类型。
 
 import type { DraftValidationIssueAny } from "./admin-word-v3";
+import type { EntryAnnotationConflict } from "./entry-annotation";
 import type { SurfaceMatchPageAny, SurfacePolicyNameV2 } from "./surface-match";
 
 export interface ApiResponse<T> {
@@ -36,6 +37,8 @@ export interface ProblemMeta {
   surface_match_page?: SurfaceMatchPageAny;
   current_policy_name?: SurfacePolicyNameV2;
   current_policy_epoch?: number;
+  /** `409 annotation_conflict`：同原型词条标注冲突的完整上下文。 */
+  annotation_conflict?: EntryAnnotationConflict;
 }
 
 export interface ProblemReferenceLocation {

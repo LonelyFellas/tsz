@@ -88,6 +88,8 @@ describe("LifecycleSurfaceConfirmation", () => {
       matched_entry_contexts: [
         {
           entry_id: "v3-entry-12345678",
+          annotation: null,
+          annotation_revision: 1,
           presentation: {
             label: "colour · color",
             matched_surfaces: ["colour", "color"],

@@ -21,6 +21,8 @@ function v3Word(): AdminWordV3 {
     status: "published",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: false,
     presentation: {
       label: "centre / center",
@@ -240,6 +242,8 @@ describe("base form detection presentation", () => {
       matched_entry_contexts: [
         {
           entry_id: "entry-v3",
+          annotation: null,
+          annotation_revision: 1,
           presentation: {
             label: "centre / center",
             matched_surfaces: ["centre", "center"],

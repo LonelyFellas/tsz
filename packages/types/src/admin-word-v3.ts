@@ -1,3 +1,4 @@
+import type { EntryAnnotationUpdate } from "./entry-annotation";
 import type { RichTextEmphasisLevel } from "./rich-text";
 import type {
   AdminWordListPage,
@@ -618,6 +619,10 @@ export interface AdminWordV3 {
   status: AdminWordStatus;
   revision: number;
   lifecycle_revision: number;
+  /** 同原型词条的区分标签（≤ 20 个 Unicode scalar），未标注为 null。 */
+  annotation: string | null;
+  /** 标注独立修订；`PATCH /entries/{id}/annotation` 以此做乐观锁，与内容 revision 无关。 */
+  annotation_revision: number;
   has_unpublished_changes: boolean;
   presentation: EntryPresentationV3;
   capabilities: AdminWordV3Capabilities;
@@ -682,6 +687,10 @@ export interface CreateAdminWordV3Input {
   /** Step 1 最终确认值；兼容窗口内旧客户端可省略。 */
   headwords?: WordHeadwordsV2;
   confirmed_surface_match_token?: string;
+  /** 新词条标注；与已有词条同原型时必填，否则可省略。 */
+  annotation?: string | null;
+  /** 同原型已有词条的标注（含未改动的），须带上各自当前 annotation_revision。 */
+  annotation_updates?: EntryAnnotationUpdate[];
 }
 
 export type CreateAdminWordAnyInput =
@@ -1004,6 +1013,10 @@ export interface AdminWordListItemV3 {
   dialects: Dialect[];
   revision: number;
   lifecycle_revision: number;
+  /** 同原型词条的区分标签（≤ 20 个 Unicode scalar），未标注为 null。 */
+  annotation: string | null;
+  /** 标注独立修订；`PATCH /entries/{id}/annotation` 以此做乐观锁，与内容 revision 无关。 */
+  annotation_revision: number;
   gloss: string;
   pos_list: string[];
   levels: string[];

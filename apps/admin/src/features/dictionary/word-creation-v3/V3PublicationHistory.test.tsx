@@ -28,6 +28,8 @@ function v3Word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
     status: "published",
     revision: 9,
     lifecycle_revision: 3,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: false,
     presentation: {
       label: "server V3 presentation",

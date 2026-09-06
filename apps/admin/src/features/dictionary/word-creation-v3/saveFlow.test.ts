@@ -21,6 +21,8 @@ function word(
     status: "draft",
     revision,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: true,
     presentation: {
       label: presentation,

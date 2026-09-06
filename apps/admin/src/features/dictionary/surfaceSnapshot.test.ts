@@ -159,6 +159,8 @@ function v3Item(
 function v3Context(entryId: string): MatchedEntryContextV3 {
   return {
     entry_id: entryId,
+    annotation: null,
+    annotation_revision: 1,
     presentation: {
       label: `V3 ${entryId}`,
       matched_surfaces: [`surface-${entryId}`],

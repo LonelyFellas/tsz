@@ -157,6 +157,8 @@ export function wordFixture(options: WordFixtureOptions = {}): AdminWordV2 {
     status,
     revision,
     lifecycle_revision: options.lifecycle_revision ?? 1,
+    annotation: null,
+    annotation_revision: 1,
     headwords,
     frequency: "12.5",
     detection_snapshot: {

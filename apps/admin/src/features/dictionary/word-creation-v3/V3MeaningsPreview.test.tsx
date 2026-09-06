@@ -13,6 +13,8 @@ function word(meanings: AdminWordV3["meanings"]): AdminWordV3 {
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: true,
     presentation: {
       label: "center",

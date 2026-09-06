@@ -3107,6 +3107,8 @@ export function createAdminWordsMock({
         max_reachable_step: word.max_reachable_step,
         revision: word.revision,
         lifecycle_revision: word.lifecycle_revision,
+        annotation: null,
+        annotation_revision: 1,
         ...(word.published_revision !== undefined
           ? { published_revision: word.published_revision }
           : {}),
@@ -3559,6 +3561,8 @@ export function createAdminWordsMock({
       status: "draft",
       revision: 1,
       lifecycle_revision: 1,
+      annotation: null,
+      annotation_revision: 1,
       headwords: clone(input.headwords),
       detection_snapshot: {
         detection_id: detection.detection_id,
