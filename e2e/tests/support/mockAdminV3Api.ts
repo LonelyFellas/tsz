@@ -332,6 +332,8 @@ function v3Word(
     status: "draft",
     revision: 1,
     lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
     has_unpublished_changes: false,
     presentation: {
       label,
@@ -361,6 +363,8 @@ const LEGACY_WORD: AdminWordV2 = {
   status: "published",
   revision: 7,
   lifecycle_revision: 2,
+  annotation: null,
+  annotation_revision: 1,
   headwords: { mode: "unified", common: "legacy-orbit" },
   detection_snapshot: {
     detection_id: nodeId(205),
@@ -477,6 +481,8 @@ function listItem(word: AdminWordV3): AdminWordListItemAny {
     dialects: ["uk", "us"],
     revision: word.revision,
     lifecycle_revision: word.lifecycle_revision,
+    annotation: null,
+    annotation_revision: 1,
     gloss: "轨道",
     pos_list: ["noun", "verb"],
     levels: ["B1"],
@@ -507,6 +513,8 @@ const LEGACY_LIST_ITEM: AdminWordListItemAny = {
   status: "published",
   revision: 7,
   lifecycle_revision: 2,
+  annotation: null,
+  annotation_revision: 1,
   max_reachable_step: "preview",
   published_revision: 7,
   has_unpublished_changes: false,
@@ -673,6 +681,8 @@ function surfaceMatchPage(
     total: duplicate ? 2 : 3,
     matched_entry_contexts: entries.map(([entryId, , spelling]) => ({
       entry_id: entryId,
+      annotation: null,
+      annotation_revision: 1,
       presentation: {
         label: spelling,
         matched_surfaces: [spelling],
