@@ -984,6 +984,52 @@ describe("V3MeaningsAndExamplesStep", () => {
     ]);
   });
 
+  it("语义区间下拉只显示至少一个有效名称的区间，保留不归入选项", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.sense_groups = [
+      { id: "sense-group-1", name_zh: "", name_en: "" },
+      { id: "blank", name_zh: "  ", name_en: "\t" },
+      { id: "zh", name_zh: " 中文 ", name_en: "" },
+      { id: "en", name_zh: "  ", name_en: " English " },
+      { id: "both", name_zh: "双语", name_en: "Bilingual" }
+    ];
+    render(<Harness initial={initial} />);
+    const select = screen.getByLabelText("释义 1 所属语义区间");
+    expect(select.closest(".ant-select")).toHaveTextContent("未命名语义区间");
+    expect(select.closest(".ant-select")).not.toHaveTextContent(
+      "sense-group-1"
+    );
+    fireEvent.mouseDown(select);
+    const options = Array.from(
+      document.querySelectorAll(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )
+    );
+    expect(options.map((option) => option.textContent)).toEqual([
+      "不归入语义区间",
+      "中文",
+      "English",
+      "双语"
+    ]);
+    expect(value()).toEqual(initial);
+    fireEvent.click(options[2]!);
+    expect(value().pos[0]!.senses[0]!.sense_group_id).toBe("en");
+    expect(select.closest(".ant-select")).toHaveTextContent("English");
+    fireEvent.change(screen.getByLabelText("语义区间 4 英文"), {
+      target: { value: "  " }
+    });
+    expect(select.closest(".ant-select")).toHaveTextContent("未命名语义区间");
+    expect(value().pos[0]!.senses[0]!.sense_group_id).toBe("en");
+    fireEvent.mouseDown(select);
+    fireEvent.click(
+      document.querySelector(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )!
+    );
+    expect(value().pos[0]!.senses[0]!.sense_group_id).toBeUndefined();
+    expect(value().sense_groups).toHaveLength(5);
+  });
+
   it("没写内容的语法结构不进下拉，未被选中时下拉为空并说明去哪填", () => {
     const dropdownOptions = () =>
       [

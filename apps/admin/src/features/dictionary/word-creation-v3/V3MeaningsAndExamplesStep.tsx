@@ -1623,6 +1623,11 @@ export function V3MeaningsAndExamplesStep({
     onChange(next);
   };
 
+  const senseGroupOptions = value.sense_groups.flatMap((group) => {
+    const label = group.name_zh.trim() || group.name_en.trim();
+    return label ? [{ label, value: group.id }] : [];
+  });
+
   const formPosById = new Map(
     (forms?.pos ?? []).map((pos) => [pos.pos_id, pos.pos] as const)
   );
@@ -1912,16 +1917,16 @@ export function V3MeaningsAndExamplesStep({
                                     }
                                     options={[
                                       { label: "不归入语义区间", value: "" },
-                                      ...value.sense_groups.map(
-                                        (group, groupIndex) => ({
-                                          label:
-                                            group.name_zh ||
-                                            group.name_en ||
-                                            `语义区间 ${groupIndex + 1}`,
-                                          value: group.id
-                                        })
-                                      )
+                                      ...senseGroupOptions
                                     ]}
+                                    labelRender={({ value: selectedId }) =>
+                                      selectedId === ""
+                                        ? "不归入语义区间"
+                                        : (senseGroupOptions.find(
+                                            (option) =>
+                                              option.value === selectedId
+                                          )?.label ?? "未命名语义区间")
+                                    }
                                     placeholder="选择语义区间"
                                     value={sense.sense_group_id}
                                   />
