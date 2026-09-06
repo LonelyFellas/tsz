@@ -35,7 +35,6 @@ export function definitionSummary(sense: {
 export interface RelationDisplaySnapshot {
   headword?: string;
   gloss?: string;
-  prebinding_state?: "waiting_first_sense" | "target_sense_deleted";
   target_status?: "draft" | "published" | "archived";
 }
 
@@ -84,7 +83,6 @@ export function relationDisplaySnapshots(
         if (
           !relation.target_headword &&
           !relation.target_gloss &&
-          !relation.prebinding_state &&
           !relation.target_status
         )
           continue;
@@ -93,9 +91,6 @@ export function relationDisplaySnapshots(
             ? { headword: relation.target_headword }
             : {}),
           ...(relation.target_gloss ? { gloss: relation.target_gloss } : {}),
-          ...(relation.prebinding_state
-            ? { prebinding_state: relation.prebinding_state }
-            : {}),
           ...(relation.target_status
             ? { target_status: relation.target_status }
             : {})
@@ -242,22 +237,13 @@ export function toWritableMeanings(
           const hasTargetWord = Boolean(relation.target_word_id);
           const hasTargetSense = Boolean(relation.target_sense_id);
           const bound = hasTargetWord && hasTargetSense;
-          const prebound = Boolean(relation.prebound_target_word_id);
           const pendingHeadword = relation.pending_target_headword?.trim();
           const pendingGloss = relation.pending_target_gloss?.trim();
           if (
             hasTargetWord !== hasTargetSense ||
-            (bound &&
-              (prebound ||
-                Boolean(pendingHeadword) ||
-                Boolean(pendingGloss))) ||
-            (prebound &&
-              (Boolean(pendingHeadword) ||
-                !relation.prebinding_state ||
-                bound)) ||
-            (!prebound && Boolean(relation.prebinding_state)) ||
-            (!bound && !prebound && !pendingHeadword) ||
-            (!bound && !prebound && Boolean(relation.target_status))
+            (bound && (Boolean(pendingHeadword) || Boolean(pendingGloss))) ||
+            (!bound && !pendingHeadword) ||
+            (!bound && Boolean(relation.target_status))
           ) {
             throw new Error(`invalid relation target shape: ${relation.id}`);
           }
@@ -269,21 +255,14 @@ export function toWritableMeanings(
                   target_word_id: relation.target_word_id,
                   target_sense_id: relation.target_sense_id
                 }
-              : prebound
-                ? {
-                    prebound_target_word_id: relation.prebound_target_word_id,
-                    ...(pendingGloss
-                      ? { pending_target_gloss: pendingGloss }
-                      : {})
-                  }
-                : {
-                    ...(pendingHeadword
-                      ? { pending_target_headword: pendingHeadword }
-                      : {}),
-                    ...(pendingHeadword && pendingGloss
-                      ? { pending_target_gloss: pendingGloss }
-                      : {})
-                  }),
+              : {
+                  ...(pendingHeadword
+                    ? { pending_target_headword: pendingHeadword }
+                    : {}),
+                  ...(pendingHeadword && pendingGloss
+                    ? { pending_target_gloss: pendingGloss }
+                    : {})
+                }),
             score: relation.score
           };
         })
