@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "fb86524a4af6a1b155199ebacc9863d80975680d6739590348f22fb6ebefb818",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dev-clean/docs/openapi.json",
+  "_source_sha256": "cb25a31cb04e486c6900b6c6dafaa5db2a43b968a8a702b1a112dff8c000f8c1",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -3726,56 +3726,6 @@
             "pending_target_headword": { "type": "string" },
             "relation": { "type": "string" },
             "score": { "type": "string" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "id",
-            "relation",
-            "score",
-            "prebound_target_word_id",
-            "target_headword",
-            "prebinding_state"
-          ],
-          "properties": {
-            "id": { "type": "string", "format": "uuid" },
-            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
-            "prebinding_state": {
-              "type": "string",
-              "enum": ["waiting_first_sense"]
-            },
-            "prebound_target_word_id": { "type": "string", "format": "uuid" },
-            "relation": { "type": "string" },
-            "score": { "type": "string" },
-            "target_headword": { "type": "string" },
-            "target_status": { "$ref": "#/$defs/AdminWordStatus" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "id",
-            "relation",
-            "score",
-            "prebound_target_word_id",
-            "target_headword",
-            "prebinding_state"
-          ],
-          "properties": {
-            "id": { "type": "string", "format": "uuid" },
-            "pending_target_gloss": { "type": "string", "maxLength": 5000 },
-            "prebinding_state": {
-              "type": "string",
-              "enum": ["target_sense_deleted"]
-            },
-            "prebound_target_word_id": { "type": "string", "format": "uuid" },
-            "relation": { "type": "string" },
-            "score": { "type": "string" },
-            "target_headword": { "type": "string" },
-            "target_status": { "$ref": "#/$defs/AdminWordStatus" }
           },
           "additionalProperties": false
         }

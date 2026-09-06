@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-06T03:28:33.135Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dev-clean/docs/openapi.json",
+  "_generatedAt": "2026-09-06T08:33:32.029Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -4254,7 +4254,7 @@
     },
     "WordRelationV2": {
       "type": "object",
-      "description": "关联词有三种形态，由 `lexicon_relations_target_shape_check` 在库层保证互斥：\n\n- **已绑定**：`target_word_id` + `target_sense_id` 指向真实义项，\n  `target_headword` / `target_gloss` 是服务端回填的快照。\n- **待物化**：目标词还没有词条，`pending_target_headword` 承载管理员录入的词面，\n  `pending_target_gloss` 可选地承载创建目标草稿时预填的中文词义。这种形态只允许存在\n  于草稿；发布时会先建出词条再回填 target，所以发布出去的关联词永远是已绑定的。\n- **预绑定**：目标词条已存在但还没有可绑词义，`prebound_target_word_id` 锁定词条身份，\n  不携带 `pending_target_headword`（词面回显走服务端回填的只读 `target_headword`），\n  `pending_target_gloss` 可选。目标长出第一词义后自动物化为已绑定。",
+      "description": "关联词支持显式词义绑定与纯文本两种形态：\n\n- `target_word_id` + `target_sense_id` 指向管理员选择的真实义项，\n  `target_headword` / `target_gloss` 是服务端回填的快照。\n- `pending_target_headword` 是独立展示文本，保存和发布均不创建词条或自动绑定。\n  `pending_target_gloss` 仅保留旧数据兼容，不再用于创建或匹配目标。\n\n旧预绑定字段仅供内部历史数据兼容；写入不接受，迁移会移除旧预绑定关联。",
       "required": ["id", "relation", "score"],
       "properties": {
         "id": { "type": "string", "format": "uuid" },
@@ -4295,29 +4295,13 @@
             "id": { "type": "string", "format": "uuid" },
             "pending_target_gloss": {
               "type": "string",
-              "description": "预定义词义：跟随待建词面或预绑定草稿。",
+              "description": "Legacy text annotation; never used to create or bind a target.",
               "maxLength": 5000
             },
             "pending_target_headword": {
               "type": "string",
-              "description": "纯待建关联词的词面；预绑定（`prebound_target_word_id` 非空）不得携带。"
+              "description": "Unlinked display text; saving and publishing never creates or binds a target."
             },
-            "relation": { "type": "string" },
-            "score": { "type": "string" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": ["id", "relation", "score", "prebound_target_word_id"],
-          "properties": {
-            "id": { "type": "string", "format": "uuid" },
-            "pending_target_gloss": {
-              "type": "string",
-              "description": "预定义词义：跟随待建词面或预绑定草稿。",
-              "maxLength": 5000
-            },
-            "prebound_target_word_id": { "type": "string", "format": "uuid" },
             "relation": { "type": "string" },
             "score": { "type": "string" }
           },

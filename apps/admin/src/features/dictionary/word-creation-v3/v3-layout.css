@@ -195,8 +195,12 @@
   }
 }
 
-/* 待建条提示收进输入框右侧，和 status="warning" 的黄框同色。 */
-.v3-meanings-v2 .word-relation-pending-icon {
+.v3-meanings-v2 .word-relation-sound-disabled {
+  color: #bfbfbf;
+  cursor: not-allowed;
+}
+
+.v3-meanings-v2 .word-relation-unlinked-icon {
   color: #d48806;
   cursor: help;
 }

@@ -104,7 +104,6 @@ export interface V3MeaningsAndExamplesStepProps {
   sentenceTargetDiscoveryEnabled?: boolean;
   /** 后端释义级成分用词能力（capabilities.sense_component_usages）；关闭时成分区块只读、不发送。 */
   componentUsagesEnabled?: boolean;
-  draftRelationPrebindingEnabled?: boolean;
 }
 
 function fieldIssue(
@@ -1058,61 +1057,18 @@ function relatedWordChoices(
   );
 }
 
-/**
- * 关系目标词面回显。knownWords 是未保存选择的唯一权威；快照来自上次保存的
- * canonical，预绑定态须以快照里的 prebinding_state 甄别新旧——改选草稿未保存时
- * 快照仍指旧目标，直接用会串词面，此时退回通用占位，保存后自愈。
- */
+/** 未保存选择优先用搜索结果，已绑定关系回显服务端快照。 */
 function relationDisplayHeadword(
   relation: WordRelationWritableV3,
   known: RelatedWordChoice | undefined,
   snapshot: RelationDisplaySnapshots[string] | undefined
 ): string {
-  const snapshotHeadword = relation.target_word_id
-    ? snapshot?.headword
-    : relation.prebound_target_word_id && snapshot?.prebinding_state
-      ? snapshot?.headword
-      : undefined;
   return (
     known?.headword ??
-    snapshotHeadword ??
+    (relation.target_word_id ? snapshot?.headword : undefined) ??
     relation.pending_target_headword ??
     ""
   );
-}
-
-/** 合法的待建词面：非空且通过英文词条名校验（纯待建形态的判定基础）。 */
-function hasValidPendingHeadword(relation: WordRelationWritableV3): boolean {
-  return (
-    Boolean(relation.pending_target_headword?.trim()) &&
-    !validateEntryInput(relation.pending_target_headword ?? "").issue
-  );
-}
-
-/** 填了合法词头但还没落到具体词条：发布时才会去匹配同名词条或建条。 */
-function relationPendingCreation(relation: WordRelationWritableV3): boolean {
-  return (
-    !relation.target_word_id &&
-    !relation.prebound_target_word_id &&
-    hasValidPendingHeadword(relation)
-  );
-}
-
-function relationPrebindingLabel(
-  relation: WordRelationWritableV3,
-  snapshot: RelationDisplaySnapshots[string] | undefined
-): string | undefined {
-  if (!relation.prebound_target_word_id) return undefined;
-  const state = snapshot?.prebinding_state ?? "waiting_first_sense";
-  const status = snapshot?.target_status ?? "draft";
-  if (status === "archived") {
-    return state === "target_sense_deleted"
-      ? "已归档 · 原词义已删除"
-      : "已归档 · 等待第一词义";
-  }
-  return state === "target_sense_deleted"
-    ? "原词义已删除 · 重新选择"
-    : "草稿 · 等待第一词义";
 }
 
 function newRelation(
@@ -1132,8 +1088,7 @@ function RelationsGrid({
   senseIndex,
   change,
   idFactory,
-  relationDisplaySnapshots,
-  includeDraftTargets
+  relationDisplaySnapshots
 }: {
   sense: WordSenseWritableV3;
   posIndex: number;
@@ -1141,7 +1096,6 @@ function RelationsGrid({
   change: (mutation: DraftMutation) => void;
   idFactory: () => string;
   relationDisplaySnapshots?: RelationDisplaySnapshots;
-  includeDraftTargets: boolean;
 }) {
   const [collapsed, setCollapsed] = useState<Record<RelationType, boolean>>({
     synonym: false,
@@ -1160,7 +1114,7 @@ function RelationsGrid({
     preparedSearch.normalized,
     preparedSearch.kind,
     Boolean(searching?.query.trim()) && !preparedSearch.issue,
-    includeDraftTargets
+    true
   );
   const searchWords = relatedWordChoices(
     [
@@ -1196,6 +1150,11 @@ function RelationsGrid({
         : (relation.pending_target_headword ?? "");
     return raw.trim() ? validateEntryInput(raw).issue : undefined;
   };
+
+  const isUnlinkedText = (relation: WordRelationWritableV3) =>
+    !relation.target_word_id &&
+    Boolean(relation.pending_target_headword?.trim()) &&
+    !relationInputIssue(relation);
 
   return (
     <div className="word-relations-grid">
@@ -1257,6 +1216,7 @@ function RelationsGrid({
                   >
                     <InputNumber
                       aria-label={meta.metric}
+                      status={isUnlinkedText(relation) ? "warning" : undefined}
                       data-v3-field="score"
                       data-v3-node-id={relation.id}
                       max={100}
@@ -1315,7 +1275,6 @@ function RelationsGrid({
                             ]!;
                           delete target.target_word_id;
                           delete target.target_sense_id;
-                          delete target.prebound_target_word_id;
                           if (!prepared.issue && prepared.normalized)
                             target.pending_target_headword =
                               prepared.normalized;
@@ -1329,7 +1288,7 @@ function RelationsGrid({
                         const word = searchWords.find(
                           (candidate) => candidate.word_id === wordId
                         );
-                        if (!word) return;
+                        if (!word || word.senses.length === 0) return;
                         setKnownWords((current) => ({
                           ...current,
                           [relation.id]: word
@@ -1340,22 +1299,10 @@ function RelationsGrid({
                             draft.pos[posIndex]!.senses[senseIndex]!.relations[
                               relationIndex
                             ]!;
-                          if (
-                            word.status === "draft" &&
-                            word.senses.length === 0
-                          ) {
-                            target.prebound_target_word_id = word.word_id;
-                            // 预绑定不携带待建词面：词条身份在 prebound id 上，回显走只读快照。
-                            delete target.pending_target_headword;
-                            delete target.target_word_id;
-                            delete target.target_sense_id;
-                          } else {
-                            target.target_word_id = word.word_id;
-                            delete target.target_sense_id;
-                            delete target.prebound_target_word_id;
-                            delete target.pending_target_headword;
-                            delete target.pending_target_gloss;
-                          }
+                          target.target_word_id = word.word_id;
+                          delete target.target_sense_id;
+                          delete target.pending_target_headword;
+                          delete target.pending_target_gloss;
                         });
                       }}
                       options={
@@ -1377,18 +1324,23 @@ function RelationsGrid({
                                   </Tag>
                                   {word.senses.length === 0 ? (
                                     <Typography.Text type="secondary">
-                                      暂无词义
+                                      暂无词义，请先添加词义
                                     </Typography.Text>
                                   ) : null}
                                 </Flex>
                               ),
-                              value: word.word_id
+                              value: word.word_id,
+                              disabled: word.senses.length === 0
                             }))
                           : []
                       }
                       popupMatchSelectWidth={260}
                       status={
-                        relationInputIssue(relation) ? "error" : undefined
+                        relationInputIssue(relation)
+                          ? "error"
+                          : isUnlinkedText(relation)
+                            ? "warning"
+                            : undefined
                       }
                       value={
                         searching?.relationId === relation.id
@@ -1397,22 +1349,30 @@ function RelationsGrid({
                               relation,
                               knownWords[relation.id],
                               relationDisplaySnapshots?.[relation.id]
-                            ) ||
-                            (relation.target_word_id ||
-                            relation.prebound_target_word_id
-                              ? "已选择关联词"
-                              : "")
+                            ) || (relation.target_word_id ? "已选择关联词" : "")
                       }
                     >
                       <Input
                         aria-label={`${relationLabel(relationType)}目标词条`}
                         className="word-relation-target"
-                        prefix={<SoundOutlined />}
+                        prefix={
+                          relation.target_word_id ? (
+                            <SoundOutlined />
+                          ) : (
+                            <Tooltip title="待关联词暂不支持语音">
+                              <SoundOutlined
+                                aria-disabled="true"
+                                className="word-relation-sound-disabled"
+                              />
+                            </Tooltip>
+                          )
+                        }
                         status={
-                          relationPendingCreation(relation) &&
-                          !relationInputIssue(relation)
-                            ? "warning"
-                            : undefined
+                          relationInputIssue(relation)
+                            ? "error"
+                            : isUnlinkedText(relation)
+                              ? "warning"
+                              : undefined
                         }
                         suffix={
                           <>
@@ -1439,11 +1399,13 @@ function RelationsGrid({
                                 加载更多
                               </Button>
                             ) : null}
-                            {relationPendingCreation(relation) ? (
-                              <Tooltip title="未选定词条，发布时会自动匹配同名词条或建条">
+                            {isUnlinkedText(relation) ? (
+                              <Tooltip
+                                title={`待关联的${relationLabel(relationType)}`}
+                              >
                                 <InfoCircleOutlined
-                                  aria-label={`${relationLabel(relationType)}待建条提示`}
-                                  className="word-relation-pending-icon"
+                                  aria-label={`待关联的${relationLabel(relationType)}`}
+                                  className="word-relation-unlinked-icon"
                                   role="note"
                                 />
                               </Tooltip>
@@ -1454,50 +1416,28 @@ function RelationsGrid({
                         size="small"
                       />
                     </AutoComplete>
-                    {!relation.target_word_id &&
-                    (relation.prebound_target_word_id ||
-                      hasValidPendingHeadword(relation)) ? (
-                      <div className="word-relation-sense-cell">
-                        {relationPrebindingLabel(
-                          relation,
-                          relationDisplaySnapshots?.[relation.id]
-                        ) ? (
-                          <Tag
-                            color={
-                              relationDisplaySnapshots?.[relation.id]
-                                ?.target_status === "archived"
-                                ? "default"
-                                : "orange"
-                            }
-                          >
-                            {relationPrebindingLabel(
-                              relation,
-                              relationDisplaySnapshots?.[relation.id]
-                            )}
-                          </Tag>
-                        ) : null}
-                        <Input
-                          aria-label={`${relationLabel(relationType)}预定义词义`}
-                          className="word-relation-sense"
-                          data-v3-field="pending_target_gloss"
-                          data-v3-node-id={relation.id}
-                          maxLength={5000}
-                          onChange={(event) =>
-                            change((draft) => {
-                              const target =
-                                draft.pos[posIndex]!.senses[senseIndex]!
-                                  .relations[relationIndex]!;
-                              if (event.target.value)
-                                target.pending_target_gloss =
-                                  event.target.value;
-                              else delete target.pending_target_gloss;
-                            })
-                          }
-                          placeholder="预定义词义（可选）"
-                          size="small"
-                          value={relation.pending_target_gloss ?? ""}
-                        />
-                      </div>
+                    {isUnlinkedText(relation) ? (
+                      <Input
+                        aria-label={`${relationLabel(relationType)}待关联词义`}
+                        className="word-relation-sense"
+                        data-v3-field="pending_target_gloss"
+                        data-v3-node-id={relation.id}
+                        maxLength={5000}
+                        onChange={(event) =>
+                          change((draft) => {
+                            const target =
+                              draft.pos[posIndex]!.senses[senseIndex]!
+                                .relations[relationIndex]!;
+                            if (event.target.value)
+                              target.pending_target_gloss = event.target.value;
+                            else delete target.pending_target_gloss;
+                          })
+                        }
+                        placeholder="输入词义"
+                        size="small"
+                        status="warning"
+                        value={relation.pending_target_gloss ?? ""}
+                      />
                     ) : (
                       <Select
                         aria-label={`${relationLabel(relationType)}目标词义`}
@@ -1598,8 +1538,7 @@ export function V3MeaningsAndExamplesStep({
   idFactory = newWordNodeId,
   relationDisplaySnapshots,
   sentenceTargetDiscoveryEnabled = true,
-  componentUsagesEnabled = false,
-  draftRelationPrebindingEnabled = false
+  componentUsagesEnabled = false
 }: V3MeaningsAndExamplesStepProps) {
   const { modal } = App.useApp();
   const [collapsedSenseSections, setCollapsedSenseSections] = useState<
@@ -2848,9 +2787,6 @@ export function V3MeaningsAndExamplesStep({
                                     senseIndex={senseIndex}
                                     relationDisplaySnapshots={
                                       relationDisplaySnapshots
-                                    }
-                                    includeDraftTargets={
-                                      draftRelationPrebindingEnabled
                                     }
                                   />
                                 </SenseSectionBody>
