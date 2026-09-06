@@ -45,7 +45,10 @@ describe("RichText reader", () => {
       "data-phoneme",
       "hə"
     );
-    expect(container.querySelector(".tsz-ve-liaison")).not.toBeNull();
+    expect(container.querySelector(".tsz-ve-liaison-anchor")).not.toBeNull();
+    expect(screen.getByTestId("voice-rich-text-readonly")).toHaveClass(
+      "has-liaison"
+    );
     expect(container.querySelector(".tsz-ve-highlight")).toHaveAttribute(
       "data-color",
       "green"
@@ -56,9 +59,46 @@ describe("RichText reader", () => {
     );
   });
 
+  it("marks both liaison anchors, honouring anchor widths, for the arc layer to measure", () => {
+    const { container } = render(
+      <RichTextReadOnly
+        value={{
+          version: 2,
+          text: "pick it up",
+          annotations: [
+            { type: "liaison", start: 2, end: 6, start_len: 2, end_len: 1 },
+            { type: "emphasis", start: 3, end: 6, level: "core" }
+          ]
+        }}
+      />
+    );
+    const anchors = Array.from(
+      container.querySelectorAll(".tsz-ve-liaison-anchor")
+    );
+    // 起点锚点 "ck" 被语法结构边界切成两段，终点锚点是单独的 "i"；弧线中段的空格不是锚点。
+    expect(
+      anchors.map((node) => [node.getAttribute("data-end"), node.textContent])
+    ).toEqual([
+      ["start", "c"],
+      ["start", "k"],
+      ["end", "i"]
+    ]);
+    expect(
+      anchors.every((node) => node.getAttribute("data-liaison") === "2:6")
+    ).toBe(true);
+    expect(screen.getByTestId("voice-rich-text-readonly")).toHaveClass(
+      "has-liaison"
+    );
+    expect(container.querySelector("svg.tsz-ve-arc-layer")).not.toBeNull();
+  });
+
   it("renders V1, empty, and invalid values defensively", () => {
     const { container, rerender } = render(<RichTextReadOnly value={V1} />);
     expect(container.querySelector(".tsz-ve-emphasis")).not.toBeNull();
+    // V1 的 liaisons: [2] 迁成 [2,4) 的连读，同样要标出两端锚点。
+    expect(container.querySelectorAll(".tsz-ve-liaison-anchor")).toHaveLength(
+      2
+    );
 
     rerender(
       <RichTextReadOnly

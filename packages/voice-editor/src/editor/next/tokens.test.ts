@@ -6,6 +6,8 @@ import {
   graphemes,
   anchorRange,
   annotationsToMarks,
+  applyRoleRange,
+  splitRangeAtParagraphs,
   extendAnchor,
   isValidAnchor,
   isValidLiaison,
@@ -130,7 +132,7 @@ describe("连读锚点换算", () => {
 describe("marksToAnnotations", () => {
   it("maps a word role onto that word's exact range", () => {
     const marks: MarkState = {
-      roles: { 1: "core" },
+      roles: [{ start: 2, end: 8, level: "core" }],
       liaisons: [],
       pauses: {},
       passthrough: []
@@ -142,7 +144,7 @@ describe("marksToAnnotations", () => {
 
   it("连读落成从起点字母到终点字母的区间", () => {
     const marks: MarkState = {
-      roles: {},
+      roles: [],
       liaisons: [
         // centre 的 e(末字母, offset 5) → of 的 o(offset 0)
         { start: { token: 1, offsets: [5] }, end: { token: 2, offsets: [0] } }
@@ -163,7 +165,7 @@ describe("marksToAnnotations", () => {
 
   it("连读可以跨越任意距离，不限于相邻词", () => {
     const marks: MarkState = {
-      roles: {},
+      roles: [],
       liaisons: [
         { start: { token: 0, offsets: [0] }, end: { token: 4, offsets: [3] } }
       ],
@@ -183,7 +185,7 @@ describe("marksToAnnotations", () => {
 
   it("锚点越界的连读整条丢弃，不落半条线", () => {
     const marks: MarkState = {
-      roles: {},
+      roles: [],
       liaisons: [
         { start: { token: 0, offsets: [5] }, end: { token: 2, offsets: [0] } },
         { start: { token: 0, offsets: [0] }, end: { token: 9, offsets: [0] } }
@@ -196,7 +198,7 @@ describe("marksToAnnotations", () => {
 
   it("places a pause right after the left-hand word", () => {
     const marks: MarkState = {
-      roles: {},
+      roles: [],
       liaisons: [],
       pauses: { 1: 500 },
       passthrough: []
@@ -208,7 +210,7 @@ describe("marksToAnnotations", () => {
 
   it("drops gap marks that have no word on the right", () => {
     const marks: MarkState = {
-      roles: {},
+      roles: [],
       liaisons: [],
       pauses: { 4: 500, 9: 500 },
       passthrough: []
@@ -218,7 +220,7 @@ describe("marksToAnnotations", () => {
 
   it("drops role marks pointing past the last word", () => {
     const marks: MarkState = {
-      roles: { 9: "core" },
+      roles: [{ start: 30, end: 33, level: "core" }],
       liaisons: [],
       pauses: {},
       passthrough: []
@@ -230,7 +232,10 @@ describe("marksToAnnotations", () => {
 describe("annotationsToMarks", () => {
   it("round-trips roles, liaisons and pauses", () => {
     const marks: MarkState = {
-      roles: { 0: "core", 3: "core" },
+      roles: [
+        { start: 0, end: 1, level: "core" },
+        { start: 12, end: 15, level: "core" }
+      ],
       liaisons: [
         { start: { token: 1, offsets: [5] }, end: { token: 2, offsets: [0] } }
       ],
@@ -274,7 +279,7 @@ describe("annotationsToMarks", () => {
 
   it("透传注解按改动段重挂，而不是一改文本就整批丢弃", () => {
     const marks: MarkState = {
-      roles: {},
+      roles: [],
       liaisons: [],
       pauses: {},
       passthrough: [{ type: "highlight", start: 0, end: 1, color: "pink" }]
@@ -296,22 +301,46 @@ describe("annotationsToMarks", () => {
       text: TEXT,
       annotations: [{ type: "emphasis", start: 2, end: 8, level: "core" }]
     };
-    expect(annotationsToMarks(value).roles).toEqual({ 1: "core" });
+    expect(annotationsToMarks(value).roles).toEqual([
+      { start: 2, end: 8, level: "core" }
+    ]);
   });
 
-  it("assigns a hand-authored multi-word emphasis to every word it covers", () => {
+  it("reads a multi-word emphasis as one unit spanning every word it touches", () => {
     const value: RichTextV2 = {
       version: 2,
       text: TEXT,
       annotations: [{ type: "emphasis", start: 2, end: 11, level: "core" }]
     };
-    expect(annotationsToMarks(value).roles).toEqual({ 1: "core", 2: "core" });
+    expect(annotationsToMarks(value).roles).toEqual([
+      { start: 2, end: 11, level: "core" }
+    ]);
+  });
+
+  it("writes a unit back as one emphasis covering the phrase, spaces included", () => {
+    const marks: MarkState = {
+      roles: [{ start: 2, end: 15, level: "function" }],
+      liaisons: [],
+      pauses: {},
+      passthrough: []
+    };
+    // centre(2-8) of(9-11) the(12-15) → 一条 [2,15)
+    expect(marksToAnnotations(TEXT, marks)).toEqual([
+      { type: "emphasis", start: 2, end: 15, level: "function" }
+    ]);
+    expect(
+      annotationsToMarks({
+        version: 2,
+        text: TEXT,
+        annotations: marksToAnnotations(TEXT, marks)
+      }).roles
+    ).toEqual(marks.roles);
   });
 
   it("多字母锚点带宽度往返，不再退化成两端单字母", () => {
     // 后端为 liaison 加了 start_len / end_len 之后，两端各自的宽度存得下了
     const marks: MarkState = {
-      roles: {},
+      roles: [],
       liaisons: [
         // centre 的 "re" → of 的 "of"
         {
@@ -390,7 +419,7 @@ describe("annotationsToMarks", () => {
       annotations: [{ type: "pause", at: 0, duration_ms: 500 }]
     };
     expect(annotationsToMarks(value)).toEqual({
-      roles: {},
+      roles: [],
       liaisons: [],
       pauses: {},
       passthrough: []
@@ -406,7 +435,10 @@ describe("remapMarks", () => {
 
   it("keeps marks when the edit leaves earlier words untouched", () => {
     const marks: MarkState = {
-      roles: { 0: "function", 1: "core" },
+      roles: [
+        { start: 0, end: 1, level: "function" },
+        { start: 2, end: 8, level: "core" }
+      ],
       liaisons: [liaison],
       pauses: { 0: 500 },
       passthrough: []
@@ -416,19 +448,36 @@ describe("remapMarks", () => {
 
   it("drops the mark on a word that was rewritten", () => {
     const marks: MarkState = {
-      roles: { 0: "function", 1: "core" },
+      roles: [
+        { start: 0, end: 1, level: "function" },
+        { start: 2, end: 8, level: "core" }
+      ],
       liaisons: [],
       pauses: {},
       passthrough: []
     };
-    expect(remapMarks(TEXT, "a middle of the city", marks).roles).toEqual({
-      0: "function"
-    });
+    expect(remapMarks(TEXT, "a middle of the city", marks).roles).toEqual([
+      { start: 0, end: 1, level: "function" }
+    ]);
+  });
+
+  it("改写单元中间的词：那个词退出单元，两侧各自留成单元", () => {
+    // a centre of the city 全句一个核心词单元，改掉 of
+    const marks: MarkState = {
+      roles: [{ start: 0, end: 20, level: "core" }],
+      liaisons: [],
+      pauses: {},
+      passthrough: []
+    };
+    expect(remapMarks(TEXT, "a centre in the city", marks).roles).toEqual([
+      { start: 0, end: 8, level: "core" },
+      { start: 12, end: 20, level: "core" }
+    ]);
   });
 
   it("改写连读任一端所在的词，整条连线消失", () => {
     const marks: MarkState = {
-      roles: {},
+      roles: [],
       liaisons: [liaison],
       pauses: {},
       passthrough: []
@@ -443,7 +492,7 @@ describe("remapMarks", () => {
 
   it("词被改短到锚点落空时也丢弃，避免连线挂在不存在的字母上", () => {
     const marks: MarkState = {
-      roles: {},
+      roles: [],
       liaisons: [liaison],
       pauses: {},
       passthrough: []
@@ -454,7 +503,7 @@ describe("remapMarks", () => {
 
   it("drops gap marks when either neighbouring word changed", () => {
     const marks: MarkState = {
-      roles: {},
+      roles: [],
       liaisons: [],
       pauses: { 0: 500, 3: 500 },
       passthrough: []
@@ -466,13 +515,13 @@ describe("remapMarks", () => {
 
   it("drops everything when the text is cleared", () => {
     const marks: MarkState = {
-      roles: { 0: "core" },
+      roles: [{ start: 0, end: 1, level: "core" }],
       liaisons: [liaison],
       pauses: { 0: 500 },
       passthrough: []
     };
     expect(remapMarks(TEXT, "", marks)).toEqual({
-      roles: {},
+      roles: [],
       liaisons: [],
       pauses: {},
       passthrough: []
@@ -556,5 +605,90 @@ describe("graphemes", () => {
           .join("")
       ).toBe(text);
     }
+  });
+});
+
+describe("applyRoleRange", () => {
+  const core = (start: number, end: number) => ({ start, end, level: "core" });
+
+  it("paints letter by letter and coalesces touching same-level ranges", () => {
+    let units = applyRoleRange(TEXT, [], core(2, 3));
+    units = applyRoleRange(TEXT, units, core(3, 4));
+    units = applyRoleRange(TEXT, units, core(4, 5));
+    expect(units).toEqual([core(2, 5)]);
+  });
+
+  it("painting a range already fully in that level removes those letters (splitting the unit)", () => {
+    expect(applyRoleRange(TEXT, [core(2, 8)], core(4, 6))).toEqual([
+      core(2, 4),
+      core(6, 8)
+    ]);
+    expect(applyRoleRange(TEXT, [core(2, 8)], core(2, 8))).toEqual([]);
+  });
+
+  it("a different level recolours the overlap and leaves the rest of the old unit", () => {
+    expect(
+      applyRoleRange(TEXT, [core(2, 8)], { start: 5, end: 8, level: "grammar" })
+    ).toEqual([core(2, 5), { start: 5, end: 8, level: "grammar" }]);
+  });
+
+  it("a mixed range is unified to the brush level, not toggled off", () => {
+    const units = [core(2, 4), { start: 4, end: 6, level: "grammar" }];
+    expect(applyRoleRange(TEXT, units, core(2, 6))).toEqual([core(2, 6)]);
+  });
+
+  it("with toggle off, repainting an already-painted range keeps it (used to bridge two clicks)", () => {
+    expect(
+      applyRoleRange(TEXT, [core(2, 3), core(7, 8)], core(2, 8), {
+        toggle: false
+      })
+    ).toEqual([core(2, 8)]);
+    expect(
+      applyRoleRange(TEXT, [core(2, 8)], core(3, 5), { toggle: false })
+    ).toEqual([core(2, 8)]);
+  });
+
+  it("drops the whitespace a toggle-off leaves at a unit's edge, and whitespace-only leftovers", () => {
+    // "centre of"(2-11) 上色后逐字母撤掉 "of"：残段不能拖着尾部空格，只剩空格的更要消失
+    const painted = applyRoleRange(TEXT, [], core(2, 11));
+    const withoutOf = applyRoleRange(TEXT, painted, core(9, 11));
+    expect(withoutOf).toEqual([core(2, 8)]);
+    // [2,9) 带着尾部空格，撤掉 centre 后只剩那个空格的单元要整个消失
+    expect(applyRoleRange(TEXT, [core(2, 9)], core(2, 8))).toEqual([]);
+  });
+
+  it("ignores empty ranges", () => {
+    expect(applyRoleRange(TEXT, [core(2, 8)], core(3, 3))).toEqual([
+      core(2, 8)
+    ]);
+  });
+});
+
+describe("splitRangeAtParagraphs", () => {
+  it("splits a range at line breaks and never yields empty pieces", () => {
+    const text = "a centre\nof the\ncity";
+    expect(splitRangeAtParagraphs(text, 2, 12)).toEqual([
+      { start: 2, end: 8 },
+      { start: 9, end: 12 }
+    ]);
+    expect(splitRangeAtParagraphs(text, 8, 9)).toEqual([]);
+    expect(splitRangeAtParagraphs(text, 0, 1)).toEqual([{ start: 0, end: 1 }]);
+  });
+});
+
+describe("annotationsToMarks 与 emphasis 重叠", () => {
+  it("不同分类的重叠 emphasis 按后者覆盖前者收成互不重叠的单元", () => {
+    const value: RichTextV2 = {
+      version: 2,
+      text: TEXT,
+      annotations: [
+        { type: "emphasis", start: 2, end: 8, level: "core" },
+        { type: "emphasis", start: 4, end: 11, level: "grammar" }
+      ]
+    };
+    expect(annotationsToMarks(value).roles).toEqual([
+      { start: 2, end: 4, level: "core" },
+      { start: 4, end: 11, level: "grammar" }
+    ]);
   });
 });

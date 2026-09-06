@@ -844,13 +844,16 @@ describe("V3MeaningsAndExamplesStep", () => {
       value().pos[0]!.grammar_structures[0]!.variants[0]!.content.text
     ).toBe("a centre of the city");
 
-    // 取语法结构画笔标一个词，标注应实时落到草稿里
+    // 取语法结构画笔从词的首字母拖到末字母（上色粒度是字母），标注应实时落到草稿里
     fireEvent.click(document.querySelector(".tsz-ve-role-button")!);
     fireEvent.click(screen.getByLabelText("用核心词画笔"));
     const word = [...document.querySelectorAll(".tsz-ve-token")].find(
       (node) => node.textContent === "centre"
     )!;
-    fireEvent.mouseDown(word);
+    const letters = [...word.querySelectorAll(".tsz-ve-letter")];
+    fireEvent.mouseDown(letters[0]!);
+    fireEvent.mouseEnter(letters[letters.length - 1]!, { buttons: 1 });
+    fireEvent.mouseUp(letters[letters.length - 1]!);
 
     const content = value().pos[0]!.grammar_structures[0]!.variants[0]!.content;
     expect(content.text).toBe("a centre of the city");

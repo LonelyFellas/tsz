@@ -1,10 +1,12 @@
 import { CheckOutlined, SoundOutlined } from "@ant-design/icons";
-import { Button, Input, Radio, Spin, Typography } from "antd";
+import { Button, ColorPicker, Input, Radio, Spin, Typography } from "antd";
 import type { ReactNode } from "react";
-import { useRef } from "react";
+import { Fragment, useRef } from "react";
+import { setLiaisonColor, useLiaisonColor } from "../../marks";
 import type { VoiceOption } from "../../types";
 import {
   GRAMMAR_ROLES,
+  LIAISON_ANCHORS,
   PAUSE_PRESETS,
   RATE_PRESETS,
   VOICE_GENDERS,
@@ -12,7 +14,7 @@ import {
   formatPauseLabel,
   voiceShortName
 } from "./roles";
-import type { Brush } from "./roles";
+import type { Brush, LiaisonEnd } from "./roles";
 import { anchorLetters } from "./tokens";
 import type { LiaisonAnchor, LiaisonDraft, Token } from "./tokens";
 
@@ -424,22 +426,39 @@ export function RolePanel({
   );
 }
 
-/** 「起点 / 终点」回显：显示锚点所在的词，以及词里选中的那几个字母。 */
+/**
+ * 「起点 / 终点」：既回显锚点所在的词与选中的字母，也是一枚开关——按下哪一端，
+ * 接下来点的字母就归哪一端。端别由人选而不按点击先后推断，先定终点再回头选起点、
+ * 选完终点再回去扩起点都行。
+ */
 function AnchorSlot({
   label,
   slot,
   tokens,
-  anchor
+  anchor,
+  active,
+  disabled,
+  onSelect
 }: {
   label: string;
-  slot: "start" | "end";
+  slot: LiaisonEnd;
   tokens: Token[];
   anchor?: LiaisonAnchor;
+  active: boolean;
+  disabled?: boolean;
+  onSelect: () => void;
 }) {
   const word = anchor ? tokens[anchor.token]?.text : undefined;
   const letters = anchor ? anchorLetters(tokens, anchor) : "";
   return (
-    <span className="tsz-ve-anchor-field">
+    <button
+      type="button"
+      className="tsz-ve-anchor-field"
+      aria-pressed={active}
+      aria-label={`选择${label}`}
+      disabled={disabled}
+      onClick={onSelect}
+    >
       <Typography.Text type="secondary">{label}</Typography.Text>
       {word ? (
         <span className={`tsz-ve-anchor-slot is-${slot}`}>
@@ -449,7 +468,7 @@ function AnchorSlot({
       ) : (
         <Typography.Text type="secondary">—</Typography.Text>
       )}
-    </span>
+    </button>
   );
 }
 
@@ -457,6 +476,9 @@ export interface LiaisonPanelProps {
   readOnly?: boolean;
   tokens: Token[];
   draft: LiaisonDraft;
+  /** 接下来点的字母归哪一端。 */
+  activeEnd: LiaisonEnd;
+  onActiveEndChange: (end: LiaisonEnd) => void;
   onCommit: () => void;
   onResetDraft: () => void;
 }
@@ -471,9 +493,16 @@ export function LiaisonPanel({
   readOnly,
   tokens,
   draft,
+  activeEnd,
+  onActiveEndChange,
   onCommit,
   onResetDraft
 }: LiaisonPanelProps) {
+  /*
+   * 颜色订阅放在面板里而不是编辑器根上：拖取色器时每个 mousemove 都会改色，
+   * 订阅挂在根上会让同一页的几十个编辑器整树重渲染。弧线层自己订阅，不经这里。
+   */
+  const color = useLiaisonColor();
   const canCommit =
     Boolean(draft.start && draft.end) &&
     draft.start!.token !== draft.end!.token;
@@ -481,25 +510,39 @@ export function LiaisonPanel({
     <div className="tsz-ve-pop tsz-ve-pop-liaison" aria-label="连读">
       {/* 压成两行：这层浮层开在工具栏上方，再高就顶到抽屉标题栏了。 */}
       <div className="tsz-ve-liaison-anchors">
-        <AnchorSlot
-          label="起点"
-          slot="start"
-          tokens={tokens}
-          anchor={draft.start}
-        />
-        <span className="tsz-ve-liaison-arrow" aria-hidden>
-          →
-        </span>
-        <AnchorSlot
-          label="终点"
-          slot="end"
-          tokens={tokens}
-          anchor={draft.end}
-        />
+        {LIAISON_ANCHORS.map(({ anchor, label }, index) => (
+          <Fragment key={anchor}>
+            {index > 0 && (
+              <span className="tsz-ve-liaison-arrow" aria-hidden>
+                →
+              </span>
+            )}
+            <AnchorSlot
+              label={label}
+              slot={anchor}
+              tokens={tokens}
+              anchor={draft[anchor]}
+              active={activeEnd === anchor}
+              disabled={readOnly}
+              onSelect={() => onActiveEndChange(anchor)}
+            />
+          </Fragment>
+        ))}
       </div>
       <div className="tsz-ve-liaison-actions">
+        <span className="tsz-ve-liaison-color">
+          <Typography.Text type="secondary">颜色</Typography.Text>
+          {/* 显示偏好而非内容：wire 的 liaison 没有颜色字段，见 marks/liaisonColor。 */}
+          <ColorPicker
+            size="small"
+            value={color}
+            disabledAlpha
+            disabled={readOnly}
+            onChange={(value) => setLiaisonColor(value.toHexString())}
+          />
+        </span>
         {/* 上手提示只在还没落第一个锚点时占位，选起来之后就让位给按钮。 */}
-        {!draft.start && (
+        {!draft.start && !draft.end && (
           <span className="tsz-ve-pop-hint">点下面文字里的字母</span>
         )}
         <Button

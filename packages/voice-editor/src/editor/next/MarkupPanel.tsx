@@ -53,7 +53,10 @@ export interface MarkupPanelProps {
   brush: Brush;
   draft: LiaisonDraft;
   readOnly?: boolean;
-  onWordClick: (tokenIndex: number) => void;
+  /** 语法结构落笔：绝对码点区间 [start, end)；mode 区分单击与拖选。 */
+  onRoleRange: (start: number, end: number, mode: "click" | "drag") => void;
+  /** 语法结构画笔上一次单击上色的字母（码点位置），下一次同词单击会与它接上。 */
+  roleAnchorStart?: number;
   onGapClick: (gapIndex: number) => void;
   onLetterClick: (anchor: LiaisonAnchor) => void;
   onLiaisonClick: (index: number) => void;
@@ -84,7 +87,8 @@ export function MarkupPanel({
   brush,
   draft,
   readOnly,
-  onWordClick,
+  onRoleRange,
+  roleAnchorStart,
   onGapClick,
   onLetterClick,
   onLiaisonClick,
@@ -102,7 +106,7 @@ export function MarkupPanel({
   onOpenToolChange
 }: MarkupPanelProps) {
   const marked =
-    Object.keys(marks.roles).length +
+    marks.roles.length +
     marks.liaisons.length +
     Object.keys(marks.pauses).length;
 
@@ -220,7 +224,8 @@ export function MarkupPanel({
         brush={brush}
         draft={draft}
         readOnly={readOnly}
-        onWordClick={onWordClick}
+        onRoleRange={onRoleRange}
+        roleAnchorStart={roleAnchorStart}
         onGapClick={onGapClick}
         onLetterClick={onLetterClick}
         onLiaisonClick={onLiaisonClick}

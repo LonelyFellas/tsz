@@ -1,5 +1,10 @@
 import type { RichText, RichTextAnnotation } from "@tsz/types";
-import { codePointLength, codePointSlice, toRichTextV2 } from "../core";
+import {
+  codePointLength,
+  codePointSlice,
+  liaisonAnchorSpans,
+  toRichTextV2
+} from "../core";
 
 export type RichTextRenderSegment =
   | {
@@ -24,6 +29,12 @@ export function segmentRichText(value: RichText): RichTextRenderSegment[] {
     else {
       boundaries.add(annotation.start);
       boundaries.add(annotation.end);
+      if (annotation.type === "liaison") {
+        // 两端锚点各自成段，只读视图才能找到它们、量出弧线的落点。
+        const spans = liaisonAnchorSpans(annotation);
+        boundaries.add(spans.start.end);
+        boundaries.add(spans.end.start);
+      }
     }
   }
   const sorted = Array.from(boundaries).sort((a, b) => a - b);
