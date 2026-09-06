@@ -52,6 +52,9 @@ const PART_OF_SPEECH_CATALOG: PartOfSpeechCatalogResponse = {
       name_zh: "名词",
       name_en: "NOUN",
       abbreviation: "n.",
+      short_name_zh: "名词",
+      full_name_en: "noun",
+      sub_parts_extensible: true,
       sort_order: 10,
       allowed_form_types: ["plural"],
       default_form_types: ["plural"],
@@ -61,6 +64,9 @@ const PART_OF_SPEECH_CATALOG: PartOfSpeechCatalogResponse = {
           code: "N-COUNT",
           name_zh: "可数名词",
           name_en: "Countable noun",
+          short_name_zh: "可数名词",
+          abbreviation: "n.",
+          full_name_en: "countable noun",
           sort_order: 10
         }
       ]

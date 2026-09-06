@@ -10,7 +10,7 @@ import {
   usePartOfSpeechConfigList,
   useRemovePartOfSpeech,
   useRemoveSubPartOfSpeech,
-  useSubPartOfSpeechList,
+  useSubPartOfSpeechLists,
   useUpdatePartOfSpeech,
   useUpdateSubPartOfSpeech
 } from "./api";
@@ -67,13 +67,13 @@ describe("part-of-speech query hooks", () => {
     const list = renderHook(() => usePartOfSpeechConfigList(query), {
       wrapper
     });
-    const subList = renderHook(() => useSubPartOfSpeechList("pos-1", true), {
+    const subList = renderHook(() => useSubPartOfSpeechLists(["pos-1"]), {
       wrapper
     });
 
     await waitFor(() => expect(catalog.result.current.isSuccess).toBe(true));
     await waitFor(() => expect(list.result.current.isSuccess).toBe(true));
-    await waitFor(() => expect(subList.result.current.isSuccess).toBe(true));
+    await waitFor(() => expect(subList.result.current.isPending).toBe(false));
     expect(source.catalog).toHaveBeenCalledTimes(1);
     expect(source.list).toHaveBeenCalledWith(query);
     expect(source.listSubParts).toHaveBeenCalledWith("pos-1");
@@ -81,15 +81,6 @@ describe("part-of-speech query hooks", () => {
       "part-of-speech-config",
       "catalog"
     ]);
-  });
-
-  it("细分列表 disabled 时不请求", () => {
-    const { wrapper } = setup();
-    const result = renderHook(() => useSubPartOfSpeechList("", false), {
-      wrapper
-    });
-    expect(result.result.current.fetchStatus).toBe("idle");
-    expect(source.listSubParts).not.toHaveBeenCalled();
   });
 });
 
@@ -105,6 +96,8 @@ describe("part-of-speech mutation hooks", () => {
       name_zh: "小品词",
       name_en: "Particle",
       abbreviation: "part.",
+      short_name_zh: "小品词",
+      full_name_en: "particle",
       sort_order: 10
     };
     const updateInput = {
@@ -112,6 +105,8 @@ describe("part-of-speech mutation hooks", () => {
       name_zh: "语气词",
       name_en: "Particle",
       abbreviation: "ptcl.",
+      short_name_zh: "语气词",
+      full_name_en: "particle",
       sort_order: 20
     };
 
@@ -144,12 +139,18 @@ describe("part-of-speech mutation hooks", () => {
       code: "N-COLLECTIVE",
       name_zh: "集合名词",
       name_en: "Collective noun",
+      short_name_zh: "集合名词",
+      abbreviation: "n.",
+      full_name_en: "collective noun",
       sort_order: 10
     };
     const updateInput = {
       base_revision: 1,
       name_zh: "集合类名词",
       name_en: "Collective noun",
+      short_name_zh: "集合类名词",
+      abbreviation: "n.",
+      full_name_en: "collective noun",
       sort_order: 20
     };
 
@@ -181,5 +182,49 @@ describe("part-of-speech mutation hooks", () => {
       base_revision: 5
     });
     expect(invalidate).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("useSubPartOfSpeechLists", () => {
+  it("按传入顺序拼接多个父级的细分词性并共用单父级缓存键", async () => {
+    const { client, wrapper } = setup();
+    source.listSubParts.mockImplementation(async (id: string) => ({
+      items: [{ id: `${id}-sub`, part_of_speech_id: id }]
+    }));
+
+    const merged = renderHook(
+      () => useSubPartOfSpeechLists(["pos-2", "pos-1"]),
+      { wrapper }
+    );
+    await waitFor(() => expect(merged.result.current.isPending).toBe(false));
+
+    expect(source.listSubParts).toHaveBeenCalledTimes(2);
+    expect(merged.result.current.error).toBeUndefined();
+    expect(
+      merged.result.current.items.map((item) => item.part_of_speech_id)
+    ).toEqual(["pos-2", "pos-1"]);
+    expect(client.getQueryData(partOfSpeechKeys.subParts("pos-1"))).toEqual({
+      items: [{ id: "pos-1-sub", part_of_speech_id: "pos-1" }]
+    });
+  });
+
+  it("任一父级失败时暴露错误，refetch 重新拉取全部父级", async () => {
+    const { wrapper } = setup();
+    const failure = new Error("sub list failed");
+    source.listSubParts.mockImplementation(async (id: string) => {
+      if (id === "pos-2") throw failure;
+      return { items: [] };
+    });
+
+    const merged = renderHook(
+      () => useSubPartOfSpeechLists(["pos-1", "pos-2"]),
+      { wrapper }
+    );
+    await waitFor(() => expect(merged.result.current.error).toBe(failure));
+
+    source.listSubParts.mockResolvedValue({ items: [] });
+    await act(() => merged.result.current.refetch());
+    await waitFor(() => expect(merged.result.current.error).toBeUndefined());
+    expect(source.listSubParts).toHaveBeenCalledTimes(4);
   });
 });

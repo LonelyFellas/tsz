@@ -1740,7 +1740,12 @@ export function V3MeaningsAndExamplesStep({
                   <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
                   {pos ? (
                     <Badge
-                      count={countV3PosMeaningIncomplete(pos, value)}
+                      count={countV3PosMeaningIncomplete(
+                        pos,
+                        value,
+                        catalogByCode.get(formPosById.get(posId) ?? "")
+                          ?.sub_parts_extensible ?? true
+                      )}
                       size="small"
                       title="该词性未填项"
                     />
@@ -1805,12 +1810,17 @@ export function V3MeaningsAndExamplesStep({
                           sense.id,
                           "frequency"
                         );
-                        const configuredSubParts =
-                          catalogByCode.get(formPosById.get(pos.pos_id) ?? "")
-                            ?.sub_parts ?? [];
+                        const catalogPos = catalogByCode.get(
+                          formPosById.get(pos.pos_id) ?? ""
+                        );
+                        const configuredSubParts = catalogPos?.sub_parts ?? [];
                         const visibleSubPos = configuredSubParts.find(
                           (item) => item.code === sense.sub_pos
                         )?.name_zh;
+                        // 后端标记为不可扩展的基本词性不允许挂细分词性；目录里没有该词性时
+                        // 保留原有可选行为，避免目录加载失败把字段整体藏掉。
+                        const subPosExtensible =
+                          catalogPos?.sub_parts_extensible ?? true;
                         const definitionsCollapsed = Boolean(
                           collapsedSenseSections[`${sense.id}:definitions`]
                         );
@@ -1916,51 +1926,72 @@ export function V3MeaningsAndExamplesStep({
                                     value={sense.sense_group_id}
                                   />
                                 </label>
-                                <label className="word-sense-field word-sense-field-pos">
-                                  <Typography.Text type="secondary">
-                                    细分词性
-                                  </Typography.Text>
-                                  <Select
-                                    aria-label={`释义 ${senseIndex + 1} 子词性`}
-                                    data-v3-field="sub_pos"
-                                    data-v3-node-id={sense.id}
-                                    onChange={(subPos) =>
-                                      change((draft) => {
-                                        draft.pos[posIndex]!.senses[
-                                          senseIndex
-                                        ]!.sub_pos = subPos;
-                                      })
-                                    }
-                                    options={(() => {
-                                      const code = formPosById.get(pos.pos_id);
-                                      const configured = code
-                                        ? (catalogByCode.get(code)?.sub_parts ??
-                                          [])
-                                        : [];
-                                      const known = configured.some(
-                                        (item) => item.code === sense.sub_pos
-                                      );
-                                      return [
-                                        { label: "不指定子词性", value: "" },
-                                        ...(!sense.sub_pos || known
-                                          ? []
-                                          : [
-                                              {
-                                                label: "未配置子词性",
-                                                value: sense.sub_pos
-                                              }
-                                            ]),
-                                        ...configured.map((item) => ({
-                                          label: item.name_zh,
-                                          value: item.code
-                                        }))
-                                      ];
-                                    })()}
-                                    status={subPosIssue ? "error" : undefined}
-                                    value={sense.sub_pos}
-                                  />
-                                  <FieldIssueHelp issue={subPosIssue} />
-                                </label>
+                                {(subPosExtensible ||
+                                  Boolean(sense.sub_pos) ||
+                                  Boolean(subPosIssue)) && (
+                                  <label className="word-sense-field word-sense-field-pos">
+                                    <Typography.Text type="secondary">
+                                      细分词性
+                                    </Typography.Text>
+                                    {subPosExtensible ? (
+                                      <Select
+                                        aria-label={`释义 ${senseIndex + 1} 子词性`}
+                                        data-v3-field="sub_pos"
+                                        data-v3-node-id={sense.id}
+                                        onChange={(subPos) =>
+                                          change((draft) => {
+                                            draft.pos[posIndex]!.senses[
+                                              senseIndex
+                                            ]!.sub_pos = subPos;
+                                          })
+                                        }
+                                        options={(() => {
+                                          const code = formPosById.get(
+                                            pos.pos_id
+                                          );
+                                          const configured = code
+                                            ? (catalogByCode.get(code)
+                                                ?.sub_parts ?? [])
+                                            : [];
+                                          const known = configured.some(
+                                            (item) =>
+                                              item.code === sense.sub_pos
+                                          );
+                                          return [
+                                            {
+                                              label: "不指定子词性",
+                                              value: ""
+                                            },
+                                            ...(!sense.sub_pos || known
+                                              ? []
+                                              : [
+                                                  {
+                                                    label: "未配置子词性",
+                                                    value: sense.sub_pos
+                                                  }
+                                                ]),
+                                            ...configured.map((item) => ({
+                                              label: item.name_zh,
+                                              value: item.code
+                                            }))
+                                          ];
+                                        })()}
+                                        status={
+                                          subPosIssue ? "error" : undefined
+                                        }
+                                        value={sense.sub_pos}
+                                      />
+                                    ) : (
+                                      <Typography.Text
+                                        data-v3-field="sub_pos"
+                                        data-v3-node-id={sense.id}
+                                      >
+                                        {visibleSubPos ?? sense.sub_pos}
+                                      </Typography.Text>
+                                    )}
+                                    <FieldIssueHelp issue={subPosIssue} />
+                                  </label>
+                                )}
                                 <label className="word-sense-field word-sense-field-frequency">
                                   <Typography.Text type="secondary">
                                     词频

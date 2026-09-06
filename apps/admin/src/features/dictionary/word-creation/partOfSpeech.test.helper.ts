@@ -23,6 +23,8 @@ export const partOfSpeechCatalogFixture: PartOfSpeechCatalogResponse = {
     name_zh: part.name_zh,
     name_en: part.name_en,
     abbreviation: part.abbreviation,
+    short_name_zh: part.short_name_zh,
+    full_name_en: part.full_name_en,
     sort_order: part.sort_order,
     allowed_form_types: [
       ...(formCapabilities[part.code as keyof typeof formCapabilities] ?? [])
@@ -30,6 +32,7 @@ export const partOfSpeechCatalogFixture: PartOfSpeechCatalogResponse = {
     default_form_types: [
       ...(formCapabilities[part.code as keyof typeof formCapabilities] ?? [])
     ],
+    sub_parts_extensible: part.sub_parts_extensible,
     sub_parts: seed.subParts
       .filter((subPart) => subPart.part_of_speech_id === part.id)
       .map((subPart) => ({
@@ -37,6 +40,9 @@ export const partOfSpeechCatalogFixture: PartOfSpeechCatalogResponse = {
         code: subPart.code,
         name_zh: subPart.name_zh,
         name_en: subPart.name_en,
+        short_name_zh: subPart.short_name_zh,
+        abbreviation: subPart.abbreviation,
+        full_name_en: subPart.full_name_en,
         sort_order: subPart.sort_order
       }))
   }))

@@ -2,10 +2,17 @@ import type {
   CreatePartOfSpeechInput,
   CreateSubPartOfSpeechInput,
   PartOfSpeechConfigListQuery,
+  SubPartOfSpeechListResponse,
   UpdatePartOfSpeechInput,
   UpdateSubPartOfSpeechInput
 } from "@tsz/types";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient
+} from "@tanstack/react-query";
+import type { UseQueryResult } from "@tanstack/react-query";
 import { partOfSpeechDataSource } from "../dataSource";
 
 export const partOfSpeechKeys = {
@@ -32,11 +39,29 @@ export function usePartOfSpeechConfigList(query: PartOfSpeechConfigListQuery) {
   });
 }
 
-export function useSubPartOfSpeechList(id: string, enabled: boolean) {
-  return useQuery({
-    queryKey: partOfSpeechKeys.subParts(id),
-    queryFn: () => partOfSpeechDataSource.listSubParts(id),
-    enabled
+/**
+ * 同时读取多个基本词性的细分词性并按传入顺序拼成一张表，供「全部」视图使用。
+ * 缓存键与单父级列表共用，写操作失效 `partOfSpeechKeys.all` 时两边一起刷新。
+ */
+// combine 必须是引用稳定的函数，TanStack 才会对结果做结构共享，避免每次 render 都换新 items 引用。
+function combineSubPartLists(
+  results: UseQueryResult<SubPartOfSpeechListResponse>[]
+) {
+  return {
+    isPending: results.some((result) => result.isPending),
+    error: results.find((result) => result.isError)?.error,
+    items: results.flatMap((result) => result.data?.items ?? []),
+    refetch: () => Promise.all(results.map((result) => result.refetch()))
+  };
+}
+
+export function useSubPartOfSpeechLists(ids: string[]) {
+  return useQueries({
+    queries: ids.map((id) => ({
+      queryKey: partOfSpeechKeys.subParts(id),
+      queryFn: () => partOfSpeechDataSource.listSubParts(id)
+    })),
+    combine: combineSubPartLists
   });
 }
 

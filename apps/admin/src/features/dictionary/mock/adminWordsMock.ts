@@ -90,7 +90,10 @@ import {
   type AdminWordsMockStorage,
   type AdminWordsMockStorageLike
 } from "./storage";
-import { createPartOfSpeechSeed } from "./partOfSpeechFixtures";
+import {
+  createPartOfSpeechSeed,
+  isBasicPartOfSpeechCode
+} from "./partOfSpeechFixtures";
 
 type MockWord = AdminWordV2;
 
@@ -199,9 +202,12 @@ function isPartOfSpeechConfig(value: unknown): value is PartOfSpeechConfig {
     typeof value.name_zh === "string" &&
     typeof value.name_en === "string" &&
     typeof value.abbreviation === "string" &&
+    typeof value.short_name_zh === "string" &&
+    typeof value.full_name_en === "string" &&
     Number.isInteger(value.sort_order) &&
     Number.isInteger(value.usage_count) &&
     Number.isInteger(value.sub_part_count) &&
+    typeof value.sub_parts_extensible === "boolean" &&
     Number.isInteger(value.revision) &&
     isPartOfSpeechActor(value.created_by) &&
     typeof value.created_at === "string" &&
@@ -219,6 +225,9 @@ function isSubPartOfSpeechConfig(
     typeof value.code === "string" &&
     typeof value.name_zh === "string" &&
     typeof value.name_en === "string" &&
+    typeof value.short_name_zh === "string" &&
+    typeof value.abbreviation === "string" &&
+    typeof value.full_name_en === "string" &&
     Number.isInteger(value.sort_order) &&
     Number.isInteger(value.usage_count) &&
     Number.isInteger(value.revision) &&
@@ -967,13 +976,19 @@ function validateMeanings(
     }
     for (const sense of pos.senses) {
       if (sense.sub_pos === "") {
-        issues.push({
-          step: "meanings",
-          node_id: sense.id,
-          field: "sub_pos",
-          code: "sub_pos_required",
-          message: "请选择细分词性"
-        });
+        // 只有基础词性才有细分词性可选；非基础词性的释义不填 sub_pos。
+        const senseParent = Object.values(current.parts_of_speech).find(
+          (part) => part.code === formsPos.pos
+        );
+        if (senseParent?.sub_parts_extensible !== false) {
+          issues.push({
+            step: "meanings",
+            node_id: sense.id,
+            field: "sub_pos",
+            code: "sub_pos_required",
+            message: "请选择细分词性"
+          });
+        }
       } else {
         const configuredPart = Object.values(current.parts_of_speech).find(
           (part) => part.code === formsPos.pos
@@ -2463,6 +2478,8 @@ export function createAdminWordsMock({
       name_zh: string;
       name_en: string;
       abbreviation: string;
+      short_name_zh: string;
+      full_name_en: string;
       sort_order: number;
     }
   >(input: T): T {
@@ -2470,7 +2487,9 @@ export function createAdminWordsMock({
       ...input,
       name_zh: input.name_zh.trim(),
       name_en: input.name_en.trim(),
-      abbreviation: input.abbreviation.trim()
+      abbreviation: input.abbreviation.trim(),
+      short_name_zh: input.short_name_zh.trim(),
+      full_name_en: input.full_name_en.trim()
     };
   }
 
@@ -2478,13 +2497,19 @@ export function createAdminWordsMock({
     T extends {
       name_zh: string;
       name_en: string;
+      short_name_zh: string;
+      abbreviation: string;
+      full_name_en: string;
       sort_order: number;
     }
   >(input: T): T {
     return {
       ...input,
       name_zh: input.name_zh.trim(),
-      name_en: input.name_en.trim()
+      name_en: input.name_en.trim(),
+      short_name_zh: input.short_name_zh.trim(),
+      abbreviation: input.abbreviation.trim(),
+      full_name_en: input.full_name_en.trim()
     };
   }
 
@@ -2493,6 +2518,8 @@ export function createAdminWordsMock({
     name_zh: string;
     name_en: string;
     abbreviation: string;
+    short_name_zh: string;
+    full_name_en: string;
     sort_order: number;
   }): void {
     if (input.code !== undefined && !/^[a-z][a-z0-9_]{0,31}$/.test(input.code))
@@ -2503,6 +2530,10 @@ export function createAdminWordsMock({
       throw invalidPartOfSpeech("name_en", "invalid English name");
     if (!input.abbreviation || input.abbreviation.length > 16)
       throw invalidPartOfSpeech("abbreviation", "invalid abbreviation");
+    if (!input.short_name_zh || input.short_name_zh.length > 16)
+      throw invalidPartOfSpeech("short_name_zh", "invalid short name");
+    if (!input.full_name_en || input.full_name_en.length > 64)
+      throw invalidPartOfSpeech("full_name_en", "invalid full English name");
     if (!Number.isInteger(input.sort_order))
       throw invalidPartOfSpeech("sort_order", "invalid sort order");
   }
@@ -2511,6 +2542,9 @@ export function createAdminWordsMock({
     code?: string;
     name_zh: string;
     name_en: string;
+    short_name_zh: string;
+    abbreviation: string;
+    full_name_en: string;
     sort_order: number;
   }): void {
     if (input.code !== undefined && !/^[A-Z][A-Z0-9_-]{0,31}$/.test(input.code))
@@ -2519,8 +2553,29 @@ export function createAdminWordsMock({
       throw invalidPartOfSpeech("name_zh", "invalid Chinese name");
     if (!input.name_en || input.name_en.length > 64)
       throw invalidPartOfSpeech("name_en", "invalid English name");
+    if (!input.short_name_zh || input.short_name_zh.length > 16)
+      throw invalidPartOfSpeech("short_name_zh", "invalid short name");
+    if (!input.abbreviation || input.abbreviation.length > 16)
+      throw invalidPartOfSpeech("abbreviation", "invalid abbreviation");
+    if (!input.full_name_en || input.full_name_en.length > 64)
+      throw invalidPartOfSpeech("full_name_en", "invalid full English name");
     if (!Number.isInteger(input.sort_order))
       throw invalidPartOfSpeech("sort_order", "invalid sort order");
+  }
+
+  function conflict(
+    code: "part_of_speech_conflict" | "sub_part_of_speech_conflict",
+    field: string
+  ): HttpError {
+    const detail = "part of speech configuration already exists";
+    return new HttpError(409, detail, [], code, {
+      type: `urn:tsz:problem:${code}`,
+      title: "Conflict",
+      status: 409,
+      detail,
+      code,
+      field
+    });
   }
 
   function invalidPartOfSpeech(field: string, detail: string): HttpError {
@@ -2552,50 +2607,61 @@ export function createAdminWordsMock({
       name_zh: string;
       name_en: string;
       abbreviation: string;
+      short_name_zh: string;
+      full_name_en: string;
     },
     excludeId?: string
   ): void {
-    const duplicate = Object.values(current.parts_of_speech).find(
-      (item) =>
-        item.id !== excludeId &&
-        ((input.code !== undefined && item.code === input.code) ||
-          item.name_zh === input.name_zh ||
-          item.name_en.toLocaleLowerCase("en") ===
-            input.name_en.toLocaleLowerCase("en") ||
-          item.abbreviation.toLocaleLowerCase("en") ===
-            input.abbreviation.toLocaleLowerCase("en"))
-    );
-    if (duplicate)
-      throw new HttpError(
-        409,
-        "part of speech configuration already exists",
-        [],
-        "part_of_speech_conflict"
-      );
+    const lower = (value: string) => value.toLocaleLowerCase("en");
+    // 与后端一致：冲突响应带上撞车的字段名，前端据此区分"编码撞车"与"名称重复"。
+    for (const item of Object.values(current.parts_of_speech)) {
+      if (item.id === excludeId) continue;
+      const field =
+        input.code !== undefined && item.code === input.code
+          ? "code"
+          : item.name_zh === input.name_zh
+            ? "name_zh"
+            : lower(item.name_en) === lower(input.name_en)
+              ? "name_en"
+              : lower(item.abbreviation) === lower(input.abbreviation)
+                ? "abbreviation"
+                : item.short_name_zh === input.short_name_zh
+                  ? "short_name_zh"
+                  : lower(item.full_name_en) === lower(input.full_name_en)
+                    ? "full_name_en"
+                    : undefined;
+      if (field) throw conflict("part_of_speech_conflict", field);
+    }
   }
 
   function assertUniqueSubPart(
     current: AdminWordsMockPersistedState,
     partId: string,
-    input: { code?: string; name_zh: string; name_en: string },
+    input: {
+      code?: string;
+      name_zh: string;
+      name_en: string;
+      full_name_en: string;
+    },
     excludeId?: string
   ): void {
-    const duplicate = Object.values(current.sub_parts).find(
-      (item) =>
-        item.id !== excludeId &&
-        ((input.code !== undefined && item.code === input.code) ||
-          (item.part_of_speech_id === partId &&
-            (item.name_zh === input.name_zh ||
-              item.name_en.toLocaleLowerCase("en") ===
-                input.name_en.toLocaleLowerCase("en"))))
-    );
-    if (duplicate)
-      throw new HttpError(
-        409,
-        "sub-part of speech configuration already exists",
-        [],
-        "sub_part_of_speech_conflict"
-      );
+    const lower = (value: string) => value.toLocaleLowerCase("en");
+    for (const item of Object.values(current.sub_parts)) {
+      if (item.id === excludeId) continue;
+      const sameParent = item.part_of_speech_id === partId;
+      const field =
+        input.code !== undefined && item.code === input.code
+          ? "code"
+          : sameParent && item.name_zh === input.name_zh
+            ? "name_zh"
+            : sameParent && lower(item.name_en) === lower(input.name_en)
+              ? "name_en"
+              : sameParent &&
+                  lower(item.full_name_en) === lower(input.full_name_en)
+                ? "full_name_en"
+                : undefined;
+      if (field) throw conflict("sub_part_of_speech_conflict", field);
+    }
   }
 
   async function partOfSpeechCatalog(): Promise<PartOfSpeechCatalogResponse> {
@@ -2609,12 +2675,18 @@ export function createAdminWordsMock({
         name_zh: part.name_zh,
         name_en: part.name_en,
         abbreviation: part.abbreviation,
+        short_name_zh: part.short_name_zh,
+        full_name_en: part.full_name_en,
         sort_order: part.sort_order,
+        sub_parts_extensible: part.sub_parts_extensible,
         sub_parts: sortedSubParts(current, part.id).map((subPart) => ({
           id: subPart.id,
           code: subPart.code,
           name_zh: subPart.name_zh,
           name_en: subPart.name_en,
+          short_name_zh: subPart.short_name_zh,
+          abbreviation: subPart.abbreviation,
+          full_name_en: subPart.full_name_en,
           sort_order: subPart.sort_order
         }))
       }))
@@ -2665,6 +2737,7 @@ export function createAdminWordsMock({
       ...input,
       usage_count: 0,
       sub_part_count: 0,
+      sub_parts_extensible: isBasicPartOfSpeechCode(input.code),
       revision: 1,
       created_by: { id: profile.id, display_name: profile.display_name },
       created_at: timestamp,
@@ -2760,9 +2833,16 @@ export function createAdminWordsMock({
         [],
         { usage_count: usageCount, part_of_speech_id: id, code: existing.code }
       );
-    for (const subPart of sortedSubParts(current, id)) {
-      delete current.sub_parts[subPart.id];
-    }
+    // 与后端一致：仍挂有细分词性时不允许删除，要求先清空细分词性。
+    if (sortedSubParts(current, id).length > 0)
+      throw new HttpError(
+        409,
+        "part of speech still has sub parts",
+        [],
+        "part_of_speech_has_sub_parts",
+        [],
+        { part_of_speech_id: id, code: existing.code }
+      );
     delete current.parts_of_speech[id];
     current.catalog_version += 1;
     persist(current);
@@ -2795,12 +2875,22 @@ export function createAdminWordsMock({
     await pause();
     const { profile, state: current } = context();
     requireSuperAdmin(profile);
-    if (!current.parts_of_speech[partId])
+    const parent = current.parts_of_speech[partId];
+    if (!parent)
       throw new HttpError(
         404,
         "part of speech not found",
         [],
         "part_of_speech_not_found"
+      );
+    if (!parent.sub_parts_extensible)
+      throw new HttpError(
+        409,
+        "part of speech does not allow sub-parts",
+        [],
+        "sub_part_of_speech_not_allowed",
+        [],
+        { part_of_speech_id: partId, code: parent.code }
       );
     const input = trimSubPartInput({
       ...rawInput,

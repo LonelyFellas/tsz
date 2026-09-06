@@ -3519,14 +3519,15 @@ describe("part-of-speech settings mock", () => {
       permissions: ["words.access"]
     });
 
-  it("提供 11/19 默认目录、搜索分页、动态引用计数与权限保护", async () => {
+  it("提供 5/13 默认目录（仅五个基础词性）、搜索分页、动态引用计数与权限保护", async () => {
     const settingsMock = mockFor(superAdmin);
     await createCenter(settingsMock, "pos-usage-center");
     const catalog = await settingsMock.partOfSpeechSettings.catalog();
-    expect(catalog.items).toHaveLength(11);
+    expect(catalog.items).toHaveLength(5);
     expect(
       catalog.items.reduce((total, item) => total + item.sub_parts.length, 0)
-    ).toBe(19);
+    ).toBe(13);
+    expect(catalog.items.every((item) => item.sub_parts_extensible)).toBe(true);
     expect(catalog.catalog_version).toBeGreaterThan(0);
 
     const nounPage = await settingsMock.partOfSpeechSettings.list({
@@ -3557,13 +3558,15 @@ describe("part-of-speech settings mock", () => {
     ).resolves.toMatchObject({ items: expect.any(Array) });
   });
 
-  it("基本词性支持新增、修改、唯一性、revision 与未引用级联删除", async () => {
+  it("基本词性支持新增、修改、唯一性、revision，非基础词性禁止细分且未引用可删除", async () => {
     const settingsMock = mockFor(superAdmin);
     const created = await settingsMock.partOfSpeechSettings.create({
       code: " particle ",
       name_zh: " 语气词 ",
       name_en: " Particle ",
       abbreviation: " part. ",
+      short_name_zh: " 语气 ",
+      full_name_en: " particle ",
       sort_order: 115
     });
     expect(created).toMatchObject({
@@ -3571,6 +3574,9 @@ describe("part-of-speech settings mock", () => {
       name_zh: "语气词",
       name_en: "Particle",
       abbreviation: "part.",
+      short_name_zh: "语气",
+      full_name_en: "particle",
+      sub_parts_extensible: false,
       revision: 1
     });
 
@@ -3580,6 +3586,8 @@ describe("part-of-speech settings mock", () => {
         name_zh: "另一个名称",
         name_en: "Another particle",
         abbreviation: "part2.",
+        short_name_zh: "另一",
+        full_name_en: "another particle",
         sort_order: 116
       })
     ).rejects.toMatchObject({ status: 409, code: "part_of_speech_conflict" });
@@ -3589,6 +3597,8 @@ describe("part-of-speech settings mock", () => {
         name_zh: "无效",
         name_en: "Invalid",
         abbreviation: "inv.",
+        short_name_zh: "无效",
+        full_name_en: "invalid",
         sort_order: 1
       })
     ).rejects.toMatchObject({
@@ -3601,6 +3611,8 @@ describe("part-of-speech settings mock", () => {
       name_zh: "语气助词",
       name_en: "Discourse particle",
       abbreviation: "ptcl.",
+      short_name_zh: "语气助词",
+      full_name_en: "discourse particle",
       sort_order: 12
     });
     expect(updated).toMatchObject({
@@ -3614,15 +3626,26 @@ describe("part-of-speech settings mock", () => {
         name_zh: "旧提交",
         name_en: "Stale",
         abbreviation: "st.",
+        short_name_zh: "旧提交",
+        full_name_en: "stale",
         sort_order: 1
       })
     ).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
 
-    await settingsMock.partOfSpeechSettings.createSubPart(created.id, {
-      code: "PARTICLE-GENERAL",
-      name_zh: "一般语气词",
-      name_en: "General particle",
-      sort_order: 10
+    await expect(
+      settingsMock.partOfSpeechSettings.createSubPart(created.id, {
+        code: "PARTICLE-GENERAL",
+        name_zh: "一般语气词",
+        name_en: "General particle",
+        short_name_zh: "一般语气词",
+        abbreviation: "n.",
+        full_name_en: "general particle",
+        sort_order: 10
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "sub_part_of_speech_not_allowed",
+      meta: { part_of_speech_id: created.id, code: "particle" }
     });
     await settingsMock.partOfSpeechSettings.remove(created.id, {
       base_revision: updated.revision
@@ -3638,6 +3661,8 @@ describe("part-of-speech settings mock", () => {
         name_zh: "缺失",
         name_en: "Missing",
         abbreviation: "m.",
+        short_name_zh: "缺失",
+        full_name_en: "missing",
         sort_order: 1
       })
     ).rejects.toMatchObject({
@@ -3663,6 +3688,9 @@ describe("part-of-speech settings mock", () => {
         code: "N-COLLECTIVE",
         name_zh: "集合名词",
         name_en: "Collective noun",
+        short_name_zh: "集合名词",
+        abbreviation: "n.",
+        full_name_en: "collective noun",
         sort_order: 65
       }
     );
@@ -3683,6 +3711,9 @@ describe("part-of-speech settings mock", () => {
         base_revision: 1,
         name_zh: "集合类名词",
         name_en: "Collective noun",
+        short_name_zh: "集合类名词",
+        abbreviation: "n.",
+        full_name_en: "collective noun",
         sort_order: 15
       }
     );
@@ -3692,6 +3723,9 @@ describe("part-of-speech settings mock", () => {
         base_revision: 1,
         name_zh: "旧提交",
         name_en: "Stale collective",
+        short_name_zh: "旧提交",
+        abbreviation: "n.",
+        full_name_en: "stale collective",
         sort_order: 1
       })
     ).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
@@ -3700,6 +3734,9 @@ describe("part-of-speech settings mock", () => {
         code: "V-T",
         name_zh: "重复编码",
         name_en: "Duplicate code",
+        short_name_zh: "重复编码",
+        abbreviation: "n.",
+        full_name_en: "duplicate code",
         sort_order: 1
       })
     ).rejects.toMatchObject({
@@ -3711,6 +3748,9 @@ describe("part-of-speech settings mock", () => {
         code: "lowercase",
         name_zh: "无效",
         name_en: "Invalid",
+        short_name_zh: "无效",
+        abbreviation: "n.",
+        full_name_en: "invalid",
         sort_order: 1
       })
     ).rejects.toMatchObject({
@@ -3764,14 +3804,22 @@ describe("part-of-speech settings mock", () => {
       name_zh: "小品词",
       name_en: "Particle",
       abbreviation: "part.",
+      short_name_zh: "小品词",
+      full_name_en: "particle",
       sort_order: 120
     });
+    const noun = (await settingsMock.partOfSpeechSettings.catalog()).items.find(
+      (item) => item.code === "noun"
+    )!;
     const subPart = await settingsMock.partOfSpeechSettings.createSubPart(
-      created.id,
+      noun.id,
       {
-        code: "PARTICLE-GENERAL",
-        name_zh: "一般小品词",
-        name_en: "General particle",
+        code: "N-GENERAL",
+        name_zh: "一般名词",
+        name_en: "General noun",
+        short_name_zh: "一般名词",
+        abbreviation: "n.",
+        full_name_en: "general noun",
         sort_order: 10
       }
     );
@@ -3786,7 +3834,7 @@ describe("part-of-speech settings mock", () => {
       meta: { current_revision: created.revision }
     });
     await expect(
-      settingsMock.partOfSpeechSettings.removeSubPart(created.id, subPart.id, {
+      settingsMock.partOfSpeechSettings.removeSubPart(noun.id, subPart.id, {
         base_revision: subPart.revision + 1
       })
     ).rejects.toMatchObject({
@@ -3800,14 +3848,16 @@ describe("part-of-speech settings mock", () => {
       })
     ).rejects.toMatchObject({ status: 400, code: "invalid_query" });
     await expect(
-      settingsMock.partOfSpeechSettings.removeSubPart(created.id, subPart.id, {
+      settingsMock.partOfSpeechSettings.removeSubPart(noun.id, subPart.id, {
         base_revision: 0
       })
     ).rejects.toMatchObject({ status: 400, code: "invalid_query" });
     await expect(
-      settingsMock.partOfSpeechSettings.listSubParts(created.id)
+      settingsMock.partOfSpeechSettings.listSubParts(noun.id)
     ).resolves.toMatchObject({
-      items: [expect.objectContaining({ id: subPart.id })]
+      items: expect.arrayContaining([
+        expect.objectContaining({ id: subPart.id })
+      ])
     });
   });
 

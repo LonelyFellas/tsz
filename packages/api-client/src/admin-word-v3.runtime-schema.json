@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "1dd180a82877e8ad7afb79ec76807c7d56d6f7f089b584126f668231dec42dab",
+  "_source_sha256": "fb86524a4af6a1b155199ebacc9863d80975680d6739590348f22fb6ebefb818",
   "roots": [
     "AdminWordV3",
     "AdminWordAnyEnvelope",
@@ -1194,6 +1194,8 @@
         "publication_not_found",
         "part_of_speech_in_use",
         "sub_part_of_speech_in_use",
+        "sub_part_of_speech_not_allowed",
+        "part_of_speech_has_sub_parts",
         "invalid_speech_preview",
         "speech_voice_not_found",
         "speech_preview_in_progress",

@@ -5,8 +5,9 @@ import type { WordFormType } from "./admin-word";
 /**
  * 可配置基本词性/细分词性的稳定 wire 编码。
  *
- * 编码由系统设置目录创建并在词条中长期引用，创建后不可修改。前端不得自行拼接；
- * 业务输入只能来自 catalog、词典检测响应或历史词条 wire。
+ * 编码由系统设置目录创建并在词条中长期引用，创建后不可修改。管理端新建词性时由英文全称
+ * 派生一次（用户不填不看），此后业务输入只能来自 catalog、词典检测响应或历史词条 wire，
+ * 不得再自行拼接。
  */
 export type PartOfSpeechCode = string;
 export type SubPartOfSpeechCode = string;
@@ -20,9 +21,15 @@ export interface PartOfSpeechConfig {
   name_zh: string;
   name_en: string;
   abbreviation: string;
+  /** 简洁显示：业务页面用的短中文名，去空白后 1–16 字，全局唯一。 */
+  short_name_zh: string;
+  /** 英文全称，去空白后 1–64 字，忽略大小写唯一。 */
+  full_name_en: string;
   sort_order: number;
   usage_count: number;
   sub_part_count: number;
+  /** 后端按固定编码集合（名词/动词/代词/形容词/副词）派生：仅为 true 时允许挂细分词性。 */
+  sub_parts_extensible: boolean;
   revision: number;
   created_by: Actor;
   created_at: string;
@@ -36,6 +43,9 @@ export interface SubPartOfSpeechConfig {
   code: SubPartOfSpeechCode;
   name_zh: string;
   name_en: string;
+  short_name_zh: string;
+  abbreviation: string;
+  full_name_en: string;
   sort_order: number;
   usage_count: number;
   revision: number;
@@ -50,6 +60,9 @@ export interface SubPartOfSpeechCatalogItem {
   code: SubPartOfSpeechCode;
   name_zh: string;
   name_en: string;
+  short_name_zh: string;
+  abbreviation: string;
+  full_name_en: string;
   sort_order: number;
 }
 
@@ -59,11 +72,15 @@ export interface PartOfSpeechCatalogItem {
   name_zh: string;
   name_en: string;
   abbreviation: string;
+  short_name_zh: string;
+  full_name_en: string;
   sort_order: number;
   /** 词条创编允许的派生词形；缺省时客户端保留已有数据，不提供新增候选。 */
   allowed_form_types?: Exclude<WordFormType, "base">[];
   /** “添加派生词形”的默认补齐顺序，必须是 allowed_form_types 子集。 */
   default_form_types?: Exclude<WordFormType, "base">[];
+  /** 与 PartOfSpeechConfig.sub_parts_extensible 同源；前端据此决定能否选择/新增细分词性。 */
+  sub_parts_extensible: boolean;
   sub_parts: SubPartOfSpeechCatalogItem[];
 }
 
@@ -88,6 +105,8 @@ export interface CreatePartOfSpeechInput {
   name_zh: string;
   name_en: string;
   abbreviation: string;
+  short_name_zh: string;
+  full_name_en: string;
   sort_order: number;
 }
 
@@ -96,6 +115,8 @@ export interface UpdatePartOfSpeechInput {
   name_zh: string;
   name_en: string;
   abbreviation: string;
+  short_name_zh: string;
+  full_name_en: string;
   sort_order: number;
 }
 
@@ -103,6 +124,9 @@ export interface CreateSubPartOfSpeechInput {
   code: SubPartOfSpeechCode;
   name_zh: string;
   name_en: string;
+  short_name_zh: string;
+  abbreviation: string;
+  full_name_en: string;
   sort_order: number;
 }
 
@@ -110,6 +134,9 @@ export interface UpdateSubPartOfSpeechInput {
   base_revision: number;
   name_zh: string;
   name_en: string;
+  short_name_zh: string;
+  abbreviation: string;
+  full_name_en: string;
   sort_order: number;
 }
 

@@ -92,4 +92,19 @@ describe("V3 basic POS completion counts", () => {
 
     expect(countV3PosMeaningIncomplete(pos, meanings)).toBe(0);
   });
+
+  it("非基础词性没有细分词性可选，空 sub_pos 不算未填", () => {
+    const forms = formsFixture();
+    let nextId = 0;
+    const meanings = ensureV3MeaningsForForms(
+      "entry-1",
+      forms,
+      { sense_groups: [], pos: [] },
+      () => uuidFromInt(950 + ++nextId)
+    );
+    const pos = meanings.pos[0]!;
+
+    expect(countV3PosMeaningIncomplete(pos, meanings)).toBe(5);
+    expect(countV3PosMeaningIncomplete(pos, meanings, false)).toBe(4);
+  });
 });

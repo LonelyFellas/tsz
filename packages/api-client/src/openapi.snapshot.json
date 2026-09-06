@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-05T09:54:36.056Z",
+  "_generatedAt": "2026-09-06T03:28:33.135Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -673,6 +673,8 @@
         "publication_not_found",
         "part_of_speech_in_use",
         "sub_part_of_speech_in_use",
+        "sub_part_of_speech_not_allowed",
+        "part_of_speech_has_sub_parts",
         "invalid_speech_preview",
         "speech_voice_not_found",
         "speech_preview_in_progress",

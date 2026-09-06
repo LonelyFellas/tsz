@@ -51,6 +51,9 @@ const PART_OF_SPEECH_CATALOG = {
       name_zh: "名词",
       name_en: "NOUN",
       abbreviation: "n.",
+      short_name_zh: "名词",
+      full_name_en: "noun",
+      sub_parts_extensible: true,
       sort_order: 10,
       allowed_form_types: ["plural"],
       default_form_types: ["plural"],
@@ -60,6 +63,9 @@ const PART_OF_SPEECH_CATALOG = {
           code: "N-COUNT",
           name_zh: "可数名词",
           name_en: "Countable noun",
+          short_name_zh: "可数名词",
+          abbreviation: "n.",
+          full_name_en: "countable noun",
           sort_order: 10
         }
       ]
@@ -70,6 +76,9 @@ const PART_OF_SPEECH_CATALOG = {
       name_zh: "动词",
       name_en: "VERB",
       abbreviation: "v.",
+      short_name_zh: "动词",
+      full_name_en: "verb",
+      sub_parts_extensible: true,
       sort_order: 20,
       allowed_form_types: [
         "third_person_singular",
@@ -89,6 +98,9 @@ const PART_OF_SPEECH_CATALOG = {
           code: "V-I",
           name_zh: "不及物动词",
           name_en: "Intransitive verb",
+          short_name_zh: "不及物动词",
+          abbreviation: "v.",
+          full_name_en: "intransitive verb",
           sort_order: 10
         }
       ]

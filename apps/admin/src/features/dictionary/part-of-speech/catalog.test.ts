@@ -54,3 +54,24 @@ describe("part-of-speech catalog", () => {
     expect(createPartOfSpeechLookup(undefined).items).toEqual([]);
   });
 });
+
+describe("part-of-speech catalog 基础词性规则", () => {
+  it("非基础词性即使带有 sub_parts 也不提供细分词性选项", () => {
+    const catalog = structuredClone(partOfSpeechCatalogFixture);
+    const noun = catalog.items.find((item) => item.code === "noun")!;
+    const adjective = catalog.items.find((item) => item.code === "adjective")!;
+    noun.sub_parts_extensible = false;
+    adjective.sub_parts_extensible = false;
+    const lookup = createPartOfSpeechLookup(catalog);
+
+    expect(noun.sub_parts.length).toBeGreaterThan(0);
+    expect(subPartOfSpeechOptions(lookup, "noun")).toEqual([]);
+    expect(soleSubPartOfSpeechCode(lookup, "adjective")).toBeUndefined();
+    // 基础词性不受影响。
+    expect(subPartOfSpeechOptions(lookup, "verb")[0]).toEqual({
+      value: "V-T",
+      label: "及物动词"
+    });
+    expect(soleSubPartOfSpeechCode(lookup, "adverb")).toBe("ADV");
+  });
+});
