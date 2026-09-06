@@ -12,7 +12,8 @@ import {
   MAX_PAUSE_MS,
   MIN_PAUSE_MS,
   normalizeRichTextV2,
-  toRichTextV2
+  toRichTextV2,
+  validateRichTextV2
 } from "../../core";
 import type { VoiceOption, VoiceEditorProps } from "../../types";
 import { MarkupPanel } from "./MarkupPanel";
@@ -33,20 +34,26 @@ import {
   RATE_MULTIPLIER_MAX,
   RATE_MULTIPLIER_MIN,
   formatPauseLabel,
-  type Brush
+  type Brush,
+  type LiaisonEnd
 } from "./roles";
 import {
   type EditorSnapshot,
   annotationsToMarks,
+  applyRoleRange,
   extendAnchor,
+  unitAt,
   isValidLiaison,
   marksToAnnotations,
   crossesParagraph,
+  offsetToAnchor,
   remapMarks,
+  splitRangeAtParagraphs,
   tokenize,
   type LiaisonAnchor,
   type LiaisonDraft,
-  type MarkState
+  type MarkState,
+  type RoleUnit
 } from "./tokens";
 import { useVoiceAudition } from "./useVoiceAudition";
 
@@ -124,6 +131,22 @@ export function VoiceEditor({
   const [brush, setBrush] = useState<Brush>(DEFAULT_BRUSH);
   /** 正在拼的这条连读：起点/终点两个锚点，各自可含多个连续字母。 */
   const [draft, setDraft] = useState<LiaisonDraft>({});
+  /** 接下来点的字母归哪一端；由面板上的「起点 / 终点」开关决定。 */
+  const [liaisonEnd, setLiaisonEnd] = useState<LiaisonEnd>("start");
+  /**
+   * 语法结构画笔上一次单击上色的那个字母。同一个词里再单击另一个字母时，
+   * 两者之间的字母一并上色——点首尾两个字母就能标一段，不必拖。
+   */
+  const [roleAnchor, setRoleAnchor] = useState<
+    { token: number; start: number; end: number } | undefined
+  >();
+  /** 换笔、改文本、撤销重做、连读成线……凡是字母会挪或语义失效的时刻，瞬态状态一起清。 */
+  const resetTransient = useCallback(() => {
+    setDraft({});
+    setRoleAnchor(undefined);
+    setLiaisonEnd("start");
+  }, []);
+  const tokens = tokenize(text);
   const [validationMessage, setValidationMessage] = useState("");
 
   /*
@@ -239,7 +262,7 @@ export function VoiceEditor({
     setBrush(DEFAULT_BRUSH);
     setCustomPause("");
     setOpenTool(undefined);
-    setDraft({});
+    resetTransient();
     setValidationMessage("");
     setPast([]);
     setFuture([]);
@@ -316,7 +339,7 @@ export function VoiceEditor({
     if (next.kind === "role") lastRoleRef.current = next.level;
     if (next.kind === "pause") lastPauseRef.current = next.durationMs;
     setBrush(next);
-    setDraft({});
+    resetTransient();
   };
 
   /* 语法结构与停顿选完就收起浮层，好腾出标注带落笔；连读的面板要留着用。 */
@@ -394,7 +417,7 @@ export function VoiceEditor({
     setFuture((stack) => [{ text, marks }, ...stack].slice(0, MAX_HISTORY));
     setText(previous.text);
     setMarks(previous.marks);
-    setDraft({});
+    resetTransient();
     setValidationMessage("");
   };
 
@@ -405,7 +428,7 @@ export function VoiceEditor({
     setPast((stack) => [...stack, { text, marks }].slice(-MAX_HISTORY));
     setText(next.text);
     setMarks(next.marks);
-    setDraft({});
+    resetTransient();
     setValidationMessage("");
   };
 
@@ -418,17 +441,73 @@ export function VoiceEditor({
       }),
       { typing: true }
     );
-    setDraft({});
+    resetTransient();
   };
 
-  const handleWordClick = (tokenIndex: number) => {
-    if (brush.kind !== "role") return;
-    commit((current) => {
-      const roles = { ...current.marks.roles };
-      if (roles[tokenIndex] === brush.level) delete roles[tokenIndex];
-      else roles[tokenIndex] = brush.level;
-      return { ...current, marks: { ...current.marks, roles } };
+  /**
+   * 语法结构按**字母**落笔：点一个字母上一个字母的色，按住拖过一段字母则整段
+   * 上色（可以只是一个词里的几个字母，也可以拖过几个词）；区间里已经全是这个
+   * 分类时再刷一次即取消。区间是绝对码点 [start, end)。
+   *
+   * 单击还会记下锚点：同一个词里紧接着再单击另一个字母，两者之间的字母一并
+   * 上色（点 w 再点 k，work 整段变色），接上之后锚点清空。只在同一个词里接——
+   * 隔着几个词的两次单击各自独立，否则想分别标两个字母就会被连成一大段。
+   */
+  /**
+   * 语法结构落笔前先过一遍核心层校验：与音标区间交叉这类错要当场说清并拒掉，
+   * 不能让它进入 marks 之后才在折算时报错——那样编辑器会进入「不保存」状态。
+   */
+  const paintRoles = (roles: RoleUnit[]): boolean => {
+    const issues = validateRichTextV2({
+      version: 2,
+      text,
+      annotations: marksToAnnotations(text, { ...marks, roles })
     });
+    if (issues.length > 0) {
+      setValidationMessage(issues[0]!.message);
+      return false;
+    }
+    commit((current) => ({ ...current, marks: { ...current.marks, roles } }));
+    return true;
+  };
+
+  const handleRoleRange = (
+    start: number,
+    end: number,
+    mode: "click" | "drag"
+  ) => {
+    if (brush.kind !== "role") return;
+    const level = brush.level;
+    const token = offsetToAnchor(tokens, start)?.token;
+    if (
+      mode === "click" &&
+      roleAnchor &&
+      token !== undefined &&
+      roleAnchor.token === token &&
+      roleAnchor.start !== start
+    ) {
+      const bridge = {
+        start: Math.min(roleAnchor.start, start),
+        end: Math.max(roleAnchor.end, end),
+        level
+      };
+      paintRoles(applyRoleRange(text, marks.roles, bridge, { toggle: false }));
+      setRoleAnchor(undefined);
+      return;
+    }
+    // 拖过换行的区间按行各自上色：wire 不接受跨段落的标注。
+    let roles = marks.roles;
+    for (const piece of splitRangeAtParagraphs(text, start, end)) {
+      roles = applyRoleRange(text, roles, { ...piece, level });
+    }
+    if (!paintRoles(roles)) return;
+    // 只有「这一下真把字母上了色」才留锚点：取消上色或拖选之后都不留。
+    const painted = unitAt(roles, start)?.level === level;
+    setRoleAnchor(
+      mode === "click" && painted && token !== undefined
+        ? { token, start, end }
+        : undefined
+    );
   };
 
   const handleGapClick = (gapIndex: number) => {
@@ -447,23 +526,21 @@ export function VoiceEditor({
   };
 
   /**
-   * 连读端别自动判定：第一个点中的词是起点，点到另一个词就成为终点；
-   * 在已选中的那个词里继续点相邻字母，则扩展该端的锚点。
-   * 少一次「我现在在选哪一端」的切换，点起点→点终点一气呵成。
-   * 因为两端都要允许继续扩展，成线仍由「添加连读」显式确认。
+   * 端别由面板上的「起点 / 终点」开关决定，不按点击先后推断。
+   * 早先「第一个词是起点、点到另一个词就是终点」的自动判定，让人没法先定终点
+   * 再回头选起点，也没法选完终点后回去改起点。同一端内点相邻字母则扩展锚点，
+   * 点到别的词则换成那个词。成线仍由「添加连读」显式确认。
    */
   const handleLetterClick = (anchor: LiaisonAnchor) => {
     if (brush.kind !== "liaison") return;
     const offset = anchor.offsets[0]!;
     setDraft((current) => {
-      if (!current.start) return { start: anchor };
-      if (anchor.token === current.start.token) {
-        return { ...current, start: extendAnchor(current.start, offset) };
-      }
-      if (current.end && anchor.token === current.end.token) {
-        return { ...current, end: extendAnchor(current.end, offset) };
-      }
-      return { ...current, end: anchor };
+      const existing = current[liaisonEnd];
+      const next =
+        existing && existing.token === anchor.token
+          ? extendAnchor(existing, offset)
+          : anchor;
+      return { ...current, [liaisonEnd]: next };
     });
   };
 
@@ -492,10 +569,10 @@ export function VoiceEditor({
     ) {
       // 重复添加会画出两道重合的弧，落盘时被 normalize 合并成一条，数据与屏幕分叉。
       setValidationMessage("这两处已经连过了");
-      setDraft({});
+      resetTransient();
       return;
     }
-    if (crossesParagraph(text, tokenize(text), link)) {
+    if (crossesParagraph(text, tokens, link)) {
       // wire 不接受跨换行的标注；放进来的话本地就折算不出合法 wire，
       // 从此改动静默停止回写，比当场说清楚糟得多。
       setValidationMessage("连读不能跨越换行，请把两个词放在同一行");
@@ -505,12 +582,10 @@ export function VoiceEditor({
       ...current,
       marks: { ...current.marks, liaisons: [...current.marks.liaisons, link] }
     }));
-    setDraft({});
+    resetTransient();
   };
 
-  const resetDraft = () => {
-    setDraft({});
-  };
+  const resetDraft = resetTransient;
 
   const handleLiaisonClick = (index: number) => {
     commit((current) => ({
@@ -528,7 +603,7 @@ export function VoiceEditor({
     // 透传注解不是用户在这里标的，清空标注不该把它们一并抹掉。
     commit((current) => ({
       ...current,
-      marks: { ...current.marks, roles: {}, liaisons: [], pauses: {} }
+      marks: { ...current.marks, roles: [], liaisons: [], pauses: {} }
     }));
     resetDraft();
   };
@@ -673,7 +748,6 @@ export function VoiceEditor({
     GRAMMAR_ROLES[0]!.label;
   const pauseDuration =
     brush.kind === "pause" ? brush.durationMs : lastPauseRef.current;
-  const tokens = tokenize(text);
 
   const tools = [
     {
@@ -721,6 +795,8 @@ export function VoiceEditor({
           readOnly={readOnly}
           tokens={tokens}
           draft={draft}
+          activeEnd={liaisonEnd}
+          onActiveEndChange={setLiaisonEnd}
           onCommit={commitLiaison}
           onResetDraft={resetDraft}
         />
@@ -856,7 +932,8 @@ export function VoiceEditor({
         brush={brush}
         draft={draft}
         readOnly={readOnly}
-        onWordClick={handleWordClick}
+        onRoleRange={handleRoleRange}
+        roleAnchorStart={roleAnchor?.start}
         onGapClick={handleGapClick}
         onLetterClick={handleLetterClick}
         onLiaisonClick={handleLiaisonClick}
