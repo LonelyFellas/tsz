@@ -783,7 +783,7 @@ describe("UnifiedCreateEntryStep", () => {
     expect(screen.queryByText("词典音标：ˈsentə")).toBeNull();
   });
 
-  it("命中已有原形时由真实创建事务判定是否需要标注", async () => {
+  it("命中已有原形时先经独立词条二次确认，再由创建事务判定是否需要标注", async () => {
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue({
       ...matchedV3Detection(),
@@ -803,6 +803,8 @@ describe("UnifiedCreateEntryStep", () => {
         name: "确认并创建，进入词形与发音"
       })
     );
+    // 检测已摆出「已有原形」，创建前必须由管理员显式承认要另建一条。
+    fireEvent.click(await screen.findByText("继续创建"));
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
   });
 
@@ -1495,6 +1497,7 @@ describe("UnifiedCreateEntryStep", () => {
         name: "确认并创建，进入词形与发音"
       })
     );
+    fireEvent.click(await screen.findByText("继续创建"));
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
     expect(supplied.createV3).toHaveBeenCalledWith(
       expect.any(String),

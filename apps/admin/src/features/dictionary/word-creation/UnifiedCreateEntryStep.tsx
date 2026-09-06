@@ -13,11 +13,13 @@ import type {
 } from "@tsz/types";
 import {
   CheckCircleFilled,
+  ExclamationCircleOutlined,
   PlusOutlined,
   SearchOutlined
 } from "@ant-design/icons";
 import {
   Alert,
+  App,
   Button,
   Card,
   Col,
@@ -653,6 +655,7 @@ export function UnifiedCreateEntryStep({
   requests = defaultRequests,
   onCreated
 }: Props) {
+  const { modal } = App.useApp();
   const catalog = usePartOfSpeechCatalog();
   const { preference } = useDialectPreference();
   const [value, setValue] = useState("");
@@ -1076,7 +1079,24 @@ export function UnifiedCreateEntryStep({
 
   const confirm = () => {
     if (!pending || !canAcknowledgeSurfaceSnapshot(snapshot)) return;
-    beginCreation(pending, snapshot.surface_confirmation_token);
+    const create = () =>
+      beginCreation(pending, snapshot.surface_confirmation_token);
+    if (baseCandidates.length === 0) {
+      create();
+      return;
+    }
+    // 检测已经摆出了「已有原形」，这一步是让管理员显式承认「我要另建一条」。
+    // 后端的 409 annotation_conflict 只覆盖真正同原型组的情况；词面命中但分属
+    // 不同原型组时后端不拦，删掉这道确认就等于静默建重名条。
+    modal.confirm({
+      title: "确认创建新的独立词条？",
+      icon: <ExclamationCircleOutlined />,
+      content:
+        "检测到智能词库已有相同原形。继续后将创建一个新的独立词条，不会修改已有词条。",
+      okText: "继续创建",
+      cancelText: "取消",
+      onOk: create
+    });
   };
 
   return (
