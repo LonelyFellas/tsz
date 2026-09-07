@@ -1510,11 +1510,12 @@ describe("UnifiedCreateEntryStep", () => {
 
     expect(await screen.findByText("确认英美主词")).toBeVisible();
     expect(screen.getByText("短语词条")).toBeVisible();
-    fireEvent.click(
-      screen.getByRole("button", {
-        name: "确认并创建，进入词形与发音"
-      })
-    );
+    const confirmButton = screen.getByRole("button", {
+      name: "确认并创建，进入词形与发音"
+    });
+    // 标题会先于地区详情就绪出现；等待真实可交互状态，避免点击禁用按钮。
+    await waitFor(() => expect(confirmButton).toBeEnabled());
+    fireEvent.click(confirmButton);
     fireEvent.click(await screen.findByText("继续创建"));
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(1));
     expect(supplied.createV3).toHaveBeenCalledWith(
