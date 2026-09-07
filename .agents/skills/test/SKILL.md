@@ -33,7 +33,7 @@ Bug 回归先证明旧实现失败，再证明修复后通过。纯文案、静�
 - 沿用邻近测试的 providers、fixture 与 mock 位置；web 的 Next 路由和 admin 的 React Router 不混用。
 - admin 保留 antd 的 matchMedia/ResizeObserver 垫片；两字按钮允许空格，大表格避免昂贵的 role 查询。
 - 断言用户可观察结果、请求契约或公开行为；异步等待最终状态，不断言私有实现，不弱化输入来变绿。
-- API 变化优先定位已安装的 `contract-sync` 技能，核实两仓 checkout 后同步并审查 diff。未安装时按后端原生导出流程生成 spec，显式指定 `OPENAPI_SOURCE`，清除 `SYNC_OPENAPI_RUNTIME_ONLY` 后运行 `pnpm --filter @tsz/api-client sync:openapi`，验证该包契约；只读核对请求不执行生成。
+- API 变化读取本仓 [contract-sync](../contract-sync/SKILL.md)，核实两仓 checkout 后按原生流程同步并验证契约；只读核对请求不执行生成。
 - `PENDING` 只记录后端确实尚未提供的端点及原因，不能掩盖已实现端点的不一致。
 
 ## 4. 验证与交接

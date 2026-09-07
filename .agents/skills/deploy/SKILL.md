@@ -15,7 +15,7 @@ description: 将已合入 GitHub main 且精确 CI 成功的 tsz 前端部署到
 
 ## 1. 确认目标与 CI
 
-本次依赖配套后端变更时，定位已安装的 `contract-sync` 并读取 `references/paired-release.md`，先核实实际版本组合及兼容顺序。若技能不可用，仍需核实兼容性和组件状态；单组件发布不强制走双仓清单，不擅自扩展部署范围。
+本次依赖配套后端变更时，读取本仓 [配套发布清单](../contract-sync/references/paired-release.md)，先核实实际版本组合及兼容顺序；单组件发布不强制走双仓清单，不擅自扩展部署范围。
 
 检查本地状态和脚本，fetch 后记录 main SHA，确认用户要求的改动已合入。
 CI 的 owner/repo 从 GitHub remote 解析，按脚本查询该 SHA 的最新 `CI` workflow run：
