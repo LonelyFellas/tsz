@@ -274,14 +274,128 @@ describe("SmartDictionary", () => {
     );
     const rendered = render(view());
     expect(screen.queryByText("007")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
+    // 入口跟着角标走：没角标就没得改，否则会出现「能改一个看不见的标注」。
+    expect(
+      screen.queryByLabelText("编辑标注「center」")
+    ).not.toBeInTheDocument();
     fireEvent.mouseEnter(screen.getByText("center").parentElement!);
     expect(await screen.findByRole("tooltip")).not.toHaveTextContent("007");
     fireEvent.mouseLeave(screen.getByText("center").parentElement!);
     item.annotation_visible = true;
     rendered.rerender(view());
     expect(screen.getByText("007").tagName).toBe("SUP");
+    expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
     expect(item.annotation).toBe("007");
+  });
+
+  it("未标注的词条不给列表编辑入口", () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [{ ...v3Word("entry", "center"), annotation_visible: true }],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    // 标注只能在建条冲突弹窗里产生；列表上没有角标就没有可改的对象。
+    expect(
+      screen.queryByLabelText("编辑标注「center」")
+    ).not.toBeInTheDocument();
+  });
+
+  it("他人创建的词条照常显示角标，但不给标注编辑入口", async () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...v3Word("entry", "center"),
+            annotation_visible: true,
+            annotation: "007",
+            created_by: "admin-2",
+            created_by_name: "别人"
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    // 角标是「这张列表里还有没有同词面的另一行」，与归属无关，一律显示；
+    // 能不能改才看归属。
+    expect(screen.getByText("007").tagName).toBe("SUP");
+    expect(
+      screen.queryByLabelText("编辑标注「center」")
+    ).not.toBeInTheDocument();
+  });
+
+  it("超管对他人创建的词条也有标注编辑入口", () => {
+    authMocks.profile = { id: "admin-9", role: "super_admin" };
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...v3Word("entry", "center"),
+            annotation_visible: true,
+            annotation: "007",
+            created_by: "admin-2"
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
+  });
+
+  it("拿不到当前管理员身份时不给标注编辑入口", () => {
+    authMocks.profile = null;
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...v3Word("entry", "center"),
+            annotation_visible: true,
+            annotation: "007"
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    expect(screen.getByText("007").tagName).toBe("SUP");
+    expect(
+      screen.queryByLabelText("编辑标注「center」")
+    ).not.toBeInTheDocument();
   });
 
   it("同页混合展示 V2 phrase 与 V3，V3 只使用 presentation.label 且可进入独立路由", () => {
@@ -516,17 +630,27 @@ describe("SmartDictionary", () => {
     expect(screen.getByText("BrE")).toBeVisible();
 
     const secondRow = screen.getByText("协作空间").closest("tr")!;
-    const secondActions = secondRow.querySelectorAll<HTMLButtonElement>(
-      "td:last-child button"
-    );
-    expect(secondActions[0]!.getAttribute("aria-label")).toBe(
-      "继续创建「workspace」"
-    );
-    expect(secondActions[2]!.getAttribute("aria-label")).toBe(
-      "移入垃圾桶「workspace」"
-    );
-    expect(secondActions[2]!.querySelector(".anticon-delete")).not.toBeNull();
-    fireEvent.click(secondActions[2]!);
+    const secondActions = [
+      ...secondRow.querySelectorAll<HTMLButtonElement>("td:last-child button")
+    ];
+    const actionNamed = (name: string) => {
+      const button = secondActions.find(
+        (item) => item.getAttribute("aria-label") === name
+      );
+      if (!button) throw new Error(`找不到操作按钮：${name}`);
+      return button;
+    };
+    // 按可及名定位而非下标：操作数量会随「这行有没有标注角标」变化。
+    actionNamed("继续创建「workspace」");
+    // 未标注的行不提供标注入口（入口与角标同源）。
+    expect(
+      secondActions.some((item) =>
+        item.getAttribute("aria-label")?.startsWith("编辑标注")
+      )
+    ).toBe(false);
+    const trashAction = actionNamed("移入垃圾桶「workspace」");
+    expect(trashAction.querySelector(".anticon-delete")).not.toBeNull();
+    fireEvent.click(trashAction);
     fireEvent.click(
       (await screen.findAllByText("移入垃圾桶", { exact: true }))
         .map((item) => item.closest("button"))

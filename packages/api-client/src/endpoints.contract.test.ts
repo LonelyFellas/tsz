@@ -498,7 +498,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "c3f6a18ac3dba0dfb790cdf68c29d8638e83cfc037a582d1d8273d366c55006f"
+      "c666b53b0b545f001daecfcd1770744d96a59b3194522e1b1d1a6e2894c32ea1"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -519,6 +519,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       $ref: "#/$defs/SourceDialect"
     });
     expect(defs.AdminWordV3.required).not.toContain("detection_basis_dialect");
+    // 标注归属：认得这个键（否则 additionalProperties:false 会整体拒收 ProblemMeta /
+    // SurfaceMatchPage），但**不得**要求它——一旦变成 required，前端就没法先于后端部署，
+    // 旧后端的响应会让 surface 匹配整页失败。见 tsz-rust frontend-integration.md §24.2。
+    expect(defs.MatchedEntryContextV3.properties.created_by).toEqual({
+      type: "string",
+      format: "uuid"
+    });
+    expect(defs.MatchedEntryContextV3.required).not.toContain("created_by");
     expect(
       snapshot.schemas.CreateAdminWordV3Input.properties.headwords
     ).toEqual({

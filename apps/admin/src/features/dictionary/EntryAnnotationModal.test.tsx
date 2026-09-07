@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import {
   annotationErrors,
@@ -155,6 +155,41 @@ describe("词条标注", () => {
       />
     );
     expect(screen.getByLabelText("center标注")).toHaveValue("中心");
+  });
+
+  it("只读行给出理由，且不假装还能输入", () => {
+    render(
+      <EntryAnnotationModal
+        rows={[
+          {
+            key: "b",
+            label: "center",
+            annotation: null,
+            readOnly: true,
+            readOnlyHint: "他人词条"
+          },
+          rows[2]!
+        ]}
+        groups={groups}
+        creating
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    const readOnly = screen.getByLabelText("center标注");
+    expect(readOnly).toBeDisabled();
+    // 「请输入标注」挂在一个改不了的框上是误导。
+    expect(readOnly).toHaveAttribute("placeholder", "未标注");
+    expect(within(readOnly.closest("tr")!).getByText("他人词条")).toBeTruthy();
+    expect(screen.getByLabelText("新建词条标注")).toHaveAttribute(
+      "placeholder",
+      "请输入标注"
+    );
+    // 只读行空着也不该挡住提交。
+    fireEvent.change(screen.getByLabelText("新建词条标注"), {
+      target: { value: "02" }
+    });
+    expect(screen.getByText("保存标注并创建").closest("button")).toBeEnabled();
   });
 
   it("独立编辑保留可空规则，只读历史中文或空值不阻断数字目标", () => {

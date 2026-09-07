@@ -394,6 +394,25 @@ describe("VoiceEditor 标注带", () => {
     expect(button("添加连读")).toBeDisabled();
   });
 
+  it("两端落在同一个词时给出禁用理由，不留哑按钮", () => {
+    render(<VoiceEditor {...props()} />);
+    useLiaisonBrush();
+
+    // 未落锚点时是上手提示。
+    expect(screen.getByText("点下面文字里的字母")).toBeInTheDocument();
+
+    fireEvent.mouseDown(letter(1, 0));
+    chooseEnd("终点");
+    fireEvent.mouseDown(letter(1, 5)); // 同一个词的另一个字母
+
+    expect(button("添加连读")).toBeDisabled();
+    // 光置灰不说原因，用户只会以为按钮坏了。
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "连读要连接两个不同的词"
+    );
+    expect(screen.queryByText("点下面文字里的字母")).toBeNull();
+  });
+
   it("端别由面板开关手选，不按点击先后推断：先定终点再回头选起点也行", () => {
     const view = props();
     render(<VoiceEditor {...view} />);

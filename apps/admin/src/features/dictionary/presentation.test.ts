@@ -2,6 +2,7 @@ import type { AdminWordListItemAny, AdminWordListItemV3 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import {
   observeWordListPresentation,
+  visibleWordAnnotation,
   wordListDialects,
   wordListLabel
 } from "./presentation";
@@ -151,5 +152,55 @@ describe("mixed word list presentation", () => {
 
     expect(observeWordListPresentation(row, report)).toBe(false);
     expect(report).not.toHaveBeenCalled();
+  });
+});
+
+describe("visibleWordAnnotation", () => {
+  function row(
+    annotation: string | null,
+    annotation_visible: boolean
+  ): AdminWordListItemAny {
+    return {
+      schema_version: 2,
+      id: "v2-entry",
+      headword: "center",
+      kind: "word",
+      dialects: ["common"],
+      headword_variants: [{ dialect: "common", headword: "center" }],
+      gloss: "中心",
+      pos_list: [],
+      levels: [],
+      status: "draft",
+      revision: 1,
+      lifecycle_revision: 1,
+      annotation,
+      annotation_revision: 1,
+      annotation_visible,
+      max_reachable_step: "basics",
+      has_unpublished_changes: false,
+      created_by_name: "Admin",
+      created_by: "admin-1",
+      reference_summary: { total: 0, previews: [], truncated: false },
+      created_at: "2026-08-25T00:00:00Z",
+      updated_at: "2026-08-25T00:00:00Z"
+    };
+  }
+
+  it("有标注且服务端判定可见时返回标注", () => {
+    expect(visibleWordAnnotation(row("007", true))).toBe("007");
+  });
+
+  it("服务端判定不可见时不返回（值仍在库里，只是不展示）", () => {
+    expect(visibleWordAnnotation(row("007", false))).toBeUndefined();
+  });
+
+  it("未标注时不返回，可见标志为真也一样", () => {
+    expect(visibleWordAnnotation(row(null, true))).toBeUndefined();
+    expect(visibleWordAnnotation(row("", true))).toBeUndefined();
+    expect(visibleWordAnnotation(row("   ", true))).toBeUndefined();
+  });
+
+  it("标注不影响展示名", () => {
+    expect(wordListLabel(row("007", true))).toBe("center");
   });
 });

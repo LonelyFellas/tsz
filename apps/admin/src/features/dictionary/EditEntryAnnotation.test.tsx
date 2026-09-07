@@ -83,6 +83,27 @@ describe("编辑标注", () => {
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ["admin-words"] });
   });
 
+  it.each([
+    ["entry_annotation_forbidden", "只能修改自己创建的词条的标注。"],
+    [undefined, "当前账号没有修改该词条标注的权限。"]
+  ])("403(%s)给出权限原因而不是「请重试」", async (code, expected) => {
+    update.mockRejectedValueOnce(new HttpError(403, "forbidden", [], code));
+    const close = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <EditEntryAnnotation entry={entry} onClose={close} />
+      </QueryClientProvider>
+    );
+    fireEvent.change(screen.getByLabelText("center标注"), {
+      target: { value: "002" }
+    });
+    fireEvent.click(screen.getByText("保存标注"));
+    expect(await screen.findByText(expected)).toBeInTheDocument();
+    // 越权重试也不会好，弹窗不关、也不谎称「可能已保存」。
+    expect(screen.queryByText(/保存失败/)).not.toBeInTheDocument();
+    expect(close).not.toHaveBeenCalled();
+  });
+
   it("修订冲突展示最新标注，用户再次确认后使用新revision", async () => {
     update
       .mockRejectedValueOnce(

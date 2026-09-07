@@ -685,6 +685,10 @@ function surfaceMatchPage(
       entry_id: entryId,
       annotation: null,
       annotation_revision: 1,
+      // 真实后端从 2026-09-07 起下发创建人，前端据此判定标注能不能改。
+      // mock 里统一记在当前登录管理员名下（= 可改），与这些 fixture 的
+      // created_by 保持一致。
+      created_by: ACTOR_ID,
       presentation: {
         label: spelling,
         matched_surfaces: [spelling],

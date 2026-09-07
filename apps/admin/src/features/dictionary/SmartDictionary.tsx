@@ -81,6 +81,7 @@ import { runLifecycleCommandOnce } from "./lifecycleCommand";
 import {
   observeWordListPresentation,
   type PresentationStrategyReporter,
+  visibleWordAnnotation,
   wordListDialects,
   wordListLabel
 } from "./presentation";
@@ -89,6 +90,7 @@ import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 import { newWordNodeId } from "./word-model/primitives";
 
 import { EditEntryAnnotation } from "./EditEntryAnnotation";
+import { canEditRowAnnotation } from "./annotationPermission";
 
 const { RangePicker } = DatePicker;
 
@@ -165,6 +167,8 @@ export function SmartDictionary({
   const deleteActor = profile
     ? { id: profile.id, role: profile.role }
     : undefined;
+  // 删除与标注共用同一个「当前管理员」，两处归属规则都是「超管或创建人本人」。
+  const annotationActor = deleteActor;
   const [searchParams, setSearchParams] = useSearchParams();
   const [annotationEntry, setAnnotationEntry] =
     useState<AdminWordListItemAny>();
@@ -618,7 +622,7 @@ export function SmartDictionary({
       ellipsis: { showTitle: false },
       render: (_: unknown, record) => {
         const label = wordListLabel(record);
-        const annotation = record.annotation_visible ? record.annotation : null;
+        const annotation = visibleWordAnnotation(record);
         const dialects = wordListDialects(record);
         const context =
           dialects.length > 0
@@ -840,7 +844,10 @@ export function SmartDictionary({
             >
               {getWordRowActionLabel(record)}
             </Button>
-            {record.status !== "archived" ? (
+            {/* 有角标 + 改得动才给入口：入口就是「改这个角标」，没有角标时列表上
+                无从改起（判定与角标同源，见 visibleWordAnnotation）；别人的词条角标
+                照常显示，但只有超管或创建人本人才有编辑按钮。 */}
+            {canEditRowAnnotation(annotationActor, record) ? (
               <Button
                 type="link"
                 size="small"
