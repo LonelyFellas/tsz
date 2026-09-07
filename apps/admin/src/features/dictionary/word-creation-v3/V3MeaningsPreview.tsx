@@ -1,6 +1,7 @@
 import type { AdminWordV3, EnglishTextV3, WordDefinitionV3 } from "@tsz/types";
 import { Card, Empty, Flex, Space, Tag, Typography } from "antd";
-import { editableEnglishText, sentenceTranslationsV3 } from "./meaningsModel";
+import { sentenceTranslationsV3 } from "./meaningsModel";
+import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import {
   definitionModeLabel,
   dialectLabel,
@@ -17,20 +18,11 @@ function DefinitionText({ definition }: { definition: WordDefinitionV3 }) {
   ) {
     return <Typography.Text>{definition.content.text}</Typography.Text>;
   }
-  return (
-    <Flex vertical gap={2}>
-      {editableEnglishText(definition.content as EnglishTextV3).map((row) => (
-        <Typography.Text key={row.variant_id}>
-          <Tag>{dialectLabel(row.dialect)}</Tag>
-          {row.text}
-        </Typography.Text>
-      ))}
-    </Flex>
-  );
+  return <V3EnglishTextPreview value={definition.content as EnglishTextV3} />;
 }
 
 function translationBandLabel(band: "a1_a2" | "b1_b2" | "c1_c2") {
-  if (band === "c1_c2") return "初";
+  if (band === "c1_c2") return "低";
   if (band === "b1_b2") return "中";
   return "高";
 }
@@ -144,14 +136,7 @@ export function V3MeaningsPreview({
                             title={`例句 ${index + 1}`}
                           >
                             <Flex vertical gap={4}>
-                              {editableEnglishText(sentence.en_text).map(
-                                (row) => (
-                                  <Typography.Text key={row.variant_id}>
-                                    <Tag>{dialectLabel(row.dialect)}</Tag>
-                                    {row.text}
-                                  </Typography.Text>
-                                )
-                              )}
+                              <V3EnglishTextPreview value={sentence.en_text} />
                               {sentenceTranslationsV3(sentence).map(
                                 (translation) => (
                                   <Typography.Text key={translation.id}>

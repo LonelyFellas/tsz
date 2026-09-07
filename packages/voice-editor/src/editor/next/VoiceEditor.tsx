@@ -2,12 +2,13 @@ import {
   AudioOutlined,
   DashboardOutlined,
   EditOutlined,
+  LinkOutlined,
   PauseOutlined,
   SoundOutlined
 } from "@ant-design/icons";
-import { Alert, Tag, Tooltip } from "antd";
+import { Alert, Button, Tag, Tooltip } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { RichText, RichTextV2 } from "@tsz/types";
+import type { RichText, RichTextV2, TextLinkV3 } from "@tsz/types";
 import { AUDIO_ASSETS_PER_VARIANT_MAX } from "@tsz/types";
 import {
   MAX_PAUSE_MS,
@@ -16,6 +17,7 @@ import {
   toRichTextV2,
   validateRichTextV2
 } from "../../core";
+import { rangesOverlap, remapTextLinks, wordSegments } from "../../core";
 import type { AudioAsset, VoiceOption, VoiceEditorProps } from "../../types";
 import {
   describeUploadError,
@@ -25,7 +27,7 @@ import {
   tooManyAudioError,
   type PendingUpload
 } from "./audioAssets";
-import { MarkupPanel } from "./MarkupPanel";
+import { MarkupPanel, type DropdownTool } from "./MarkupPanel";
 import {
   LiaisonIcon,
   LiaisonPanel,
@@ -116,11 +118,15 @@ function parseValue(value: RichText): { value: RichTextV2; error?: string } {
  */
 export function VoiceEditor({
   value,
+  mode = "grammar",
+  textLinks,
+  renderAssociationPicker,
   language = "en",
   contextLabel = "语音编辑器",
   previewAdapter,
   previewIsMock,
   readOnly,
+  textReadOnly,
   inputDataAttributes,
   placeholder,
   voiceProfile,
@@ -137,6 +143,14 @@ export function VoiceEditor({
    */
   const [initial] = useState(() => parseValue(value));
   const [text, setText] = useState(initial.value.text);
+  const [links, setLinks] = useState<TextLinkV3[]>(textLinks ?? []);
+  const [linkWords, setLinkWords] = useState<
+    Array<{ start: number; end: number }>
+  >([]);
+  const [linkAnchor, setLinkAnchor] = useState<number>();
+  const [inspectedLinkId, setInspectedLinkId] = useState<string>();
+  const [associationPickerOpen, setAssociationPickerOpen] = useState(false);
+  const [linkNotice, setLinkNotice] = useState("");
   const [marks, setMarks] = useState<MarkState>(() =>
     annotationsToMarks(initial.value)
   );
@@ -155,6 +169,10 @@ export function VoiceEditor({
   >();
   /** 换笔、改文本、撤销重做、连读成线……凡是字母会挪或语义失效的时刻，瞬态状态一起清。 */
   const resetTransient = useCallback(() => {
+    setLinkWords([]);
+    setLinkAnchor(undefined);
+    setInspectedLinkId(undefined);
+    setAssociationPickerOpen(false);
     setDraft({});
     setRoleAnchor(undefined);
     setLiaisonEnd("start");
@@ -225,7 +243,9 @@ export function VoiceEditor({
    * 共用一个基准时，挂载后第一轮就会因为「往返结果 ≠ 传入值」而把这份整理过的
    * 数据当成用户改动抛出去：人还没动手，历史标注已经被改写、表单已经变脏。
    */
-  const incomingRef = useRef(JSON.stringify(initial.value));
+  const incomingRef = useRef(
+    JSON.stringify({ value: initial.value, links: textLinks ?? [] })
+  );
   const emittedRef = useRef<string | undefined>(undefined);
   /** 记住最近用过的语法结构分类：画笔切到连读/停顿再切回来时不必重挑。 */
   const lastRoleRef = useRef("core");
@@ -300,17 +320,21 @@ export function VoiceEditor({
   }, [marks, text]);
 
   const workingValue = working.value;
-  const serialized = JSON.stringify(workingValue);
+  const serialized = JSON.stringify({ value: workingValue, links });
 
   // 外部值变了才重新灌入；自己刚抛出去、又被父组件回灌的那一份直接跳过。
   useEffect(() => {
     const parsed = parseValue(value);
-    const incoming = JSON.stringify(parsed.value);
+    const incoming = JSON.stringify({
+      value: parsed.value,
+      links: textLinks ?? []
+    });
     if (incoming === incomingRef.current) return;
     incomingRef.current = incoming;
     // 换了新值：基准重设，让下面那个 effect 重新记一次而不是当成改动抛出去。
     emittedRef.current = undefined;
     setText(parsed.value.text);
+    setLinks(textLinks ?? []);
     setMarks(annotationsToMarks(parsed.value));
     setLoadError(parsed.error ?? "");
     typingRunRef.current = 0;
@@ -321,7 +345,7 @@ export function VoiceEditor({
     setValidationMessage("");
     setPast([]);
     setFuture([]);
-  }, [value]);
+  }, [value, textLinks]);
 
   // 折算结果一变就往上抛；折算不出合法 wire 时不抛，免得把坏值写进表单。
   useEffect(() => {
@@ -338,8 +362,17 @@ export function VoiceEditor({
     emittedRef.current = serialized;
     // 自己抛出去的这份，等父组件回灌时不能再被当成外部改动。
     incomingRef.current = serialized;
-    onChange(workingValue);
-  }, [onChange, readOnly, serialized, working.error, workingValue]);
+    if (mode === "association") onChange(workingValue, links);
+    else onChange(workingValue);
+  }, [
+    onChange,
+    readOnly,
+    serialized,
+    working.error,
+    workingValue,
+    links,
+    mode
+  ]);
 
   /* 自己刚抛出去、又被父组件回灌的那份要跳过，否则每次改动都会重置一遍。 */
   const emittedProfileRef = useRef<string | undefined>(undefined);
@@ -412,6 +445,15 @@ export function VoiceEditor({
    * 既可能是想收笔、也可能是想重新打开面板换个分类，同一个手势两个意思。
    */
   const openToolAndArm = (key?: string) => {
+    if (key === "association-word" || key === "association-phrase") {
+      const targetKind = key === "association-word" ? "word" : "phrase";
+      setOpenTool(key);
+      setAssociationPickerOpen(false);
+      setInspectedLinkId(undefined);
+      if (brush.kind !== "association" || brush.targetKind !== targetKind)
+        changeBrush({ kind: "association", targetKind });
+      return;
+    }
     if (key === "text") {
       setOpenTool(undefined);
       changeBrush({ kind: "none" });
@@ -422,7 +464,10 @@ export function VoiceEditor({
      * 这支笔的话，人还能继续点字母攒草稿，却够不着提交按钮。语法结构与停顿不同，
      * 它们本来就是「选完收起面板再落笔」，收起后要继续armed。
      */
-    if (key === undefined && brush.kind === "liaison") {
+    if (
+      key === undefined &&
+      (brush.kind === "liaison" || brush.kind === "association")
+    ) {
       setOpenTool(undefined);
       changeBrush({ kind: "none" });
       return;
@@ -449,7 +494,7 @@ export function VoiceEditor({
     next: (current: EditorSnapshot) => EditorSnapshot,
     options?: { typing?: boolean }
   ) => {
-    const before: EditorSnapshot = { text, marks };
+    const before: EditorSnapshot = { text, marks, textLinks: links };
     const after = next(before);
     const now = Date.now();
     const continuingRun =
@@ -462,6 +507,7 @@ export function VoiceEditor({
     setFuture([]);
     setText(after.text);
     setMarks(after.marks);
+    setLinks(after.textLinks ?? []);
     setValidationMessage("");
   };
 
@@ -470,9 +516,13 @@ export function VoiceEditor({
     if (!previous) return;
     typingRunRef.current = 0;
     setPast((stack) => stack.slice(0, -1));
-    setFuture((stack) => [{ text, marks }, ...stack].slice(0, MAX_HISTORY));
+    setFuture((stack) =>
+      [{ text, marks, textLinks: links }, ...stack].slice(0, MAX_HISTORY)
+    );
     setText(previous.text);
     setMarks(previous.marks);
+    setLinks(previous.textLinks ?? []);
+    setLinkNotice("");
     resetTransient();
     setValidationMessage("");
   };
@@ -481,24 +531,126 @@ export function VoiceEditor({
     const next = future[0];
     if (!next) return;
     setFuture((stack) => stack.slice(1));
-    setPast((stack) => [...stack, { text, marks }].slice(-MAX_HISTORY));
+    setPast((stack) =>
+      [...stack, { text, marks, textLinks: links }].slice(-MAX_HISTORY)
+    );
     setText(next.text);
     setMarks(next.marks);
+    setLinks(next.textLinks ?? []);
+    setLinkNotice("");
     resetTransient();
     setValidationMessage("");
   };
 
   const changeText = (nextText: string) => {
+    if (readOnly || textReadOnly) return;
+    setLinkNotice(
+      remapTextLinks(text, nextText, links).length < links.length
+        ? "被修改词段的关联已移除，请重新选择；可撤销恢复。"
+        : ""
+    );
     // 改文本时按词重挂标注：词没动的保留，被改写的连同它的标注一起消失。
     commit(
       (current) => ({
         text: nextText,
+        textLinks: remapTextLinks(
+          current.text,
+          nextText,
+          current.textLinks ?? []
+        ),
         marks: remapMarks(current.text, nextText, current.marks)
       }),
       { typing: true }
     );
     resetTransient();
   };
+
+  const linkSegments = wordSegments(text, linkWords);
+  const selectedLink = links.find((link) => link.id === inspectedLinkId);
+  const selectWord = (range: { start: number; end: number }) => {
+    if (readOnly || !renderAssociationPicker || brush.kind !== "association")
+      return;
+    const existing = links.find((link) =>
+      link.source_segments.some(
+        (segment) => segment.start < range.end && range.start < segment.end
+      )
+    );
+    if (existing) {
+      // 已占用的词只打开原关联，不加入当前选择，也不允许覆盖整组。
+      setInspectedLinkId(existing.id);
+      setLinkAnchor(range.start);
+      setAssociationPickerOpen(true);
+      setOpenTool(undefined);
+      return;
+    }
+    setInspectedLinkId(undefined);
+    if (brush.targetKind === "word") {
+      setLinkNotice("");
+      setLinkWords([range]);
+      setLinkAnchor(range.start);
+      setAssociationPickerOpen(true);
+      setOpenTool(undefined);
+      return;
+    }
+    const next = linkWords.some((item) => item.start === range.start)
+      ? linkWords.filter((item) => item.start !== range.start)
+      : [...linkWords, range];
+    if (next.length > 1) {
+      const start = Math.min(...next.map((item) => item.start));
+      const end = Math.max(...next.map((item) => item.end));
+      if (/[\r\n]/u.test(Array.from(text).slice(start, end).join(""))) {
+        setLinkNotice("请选择同一段落内的词语。");
+        return;
+      }
+    }
+    setLinkNotice("");
+    setLinkWords(next);
+    setLinkAnchor(next.at(-1)?.start);
+    // 短语先完成多选，确认后才挂载候选；改选词段时回到选词阶段。
+    setAssociationPickerOpen(false);
+    setOpenTool("association-phrase");
+  };
+  const associationContent =
+    brush.kind === "association" &&
+    !readOnly &&
+    associationPickerOpen &&
+    (selectedLink || linkSegments.length > 0) &&
+    renderAssociationPicker?.({
+      kind: brush.targetKind,
+      segments: selectedLink?.source_segments ?? linkSegments,
+      selected: selectedLink,
+      onSelect: (next) => {
+        if (readOnly) return;
+        if (selectedLink) {
+          if (next) return;
+          commit((current) => ({
+            ...current,
+            textLinks: (current.textLinks ?? []).filter(
+              (link) => link.id !== selectedLink.id
+            )
+          }));
+          resetTransient();
+          return;
+        }
+        if (!next) return;
+        if (
+          links.some((link) =>
+            rangesOverlap(link.source_segments, linkSegments)
+          )
+        ) {
+          setLinkNotice("所选单词已有关联，请先清除原关联。");
+          return;
+        }
+        commit((current) => ({
+          ...current,
+          textLinks: [
+            ...(current.textLinks ?? []),
+            { ...next, source_segments: linkSegments }
+          ]
+        }));
+        resetTransient();
+      }
+    });
 
   /**
    * 语法结构按**字母**落笔：点一个字母上一个字母的色，按住拖过一段字母则整段
@@ -1070,7 +1222,7 @@ export function VoiceEditor({
         />
       )
     }
-  ];
+  ].filter((tool) => !textReadOnly || tool.key !== "text");
 
   // 外壳不另起可及名：名字归那个真正可编辑的文本框，避免同名两份。
   return (
@@ -1090,6 +1242,7 @@ export function VoiceEditor({
       }}
     >
       {blockingError && <Alert type="error" title={blockingError} showIcon />}
+      {linkNotice && <Alert type="warning" title={linkNotice} showIcon />}
 
       <div className="tsz-ve-badge-row">
         {previewAdapter && previewIsMock && (
@@ -1107,11 +1260,17 @@ export function VoiceEditor({
       </div>
 
       <MarkupPanel
+        associationContent={associationContent || undefined}
+        associationAnchor={linkAnchor}
+        selectedLinkRanges={selectedLink?.source_segments ?? linkSegments}
+        linkedRanges={links.flatMap((link) => link.source_segments)}
+        onWordRange={selectWord}
         text={text}
         marks={marks}
         brush={brush}
         draft={draft}
         readOnly={readOnly}
+        textReadOnly={textReadOnly}
         onRoleRange={handleRoleRange}
         roleAnchorStart={roleAnchor?.start}
         onGapClick={handleGapClick}
@@ -1120,13 +1279,59 @@ export function VoiceEditor({
         onClearAll={clearAll}
         inputLabel={contextLabel}
         inputDataAttributes={inputDataAttributes}
-        inputPlaceholder={placeholder}
+        inputPlaceholder={
+          textReadOnly ? "请先在外面的输入框填写文字" : placeholder
+        }
         onTextChange={changeText}
         canUndo={past.length > 0}
         canRedo={future.length > 0}
         onUndo={undo}
         onRedo={redo}
-        tools={tools}
+        tools={
+          mode === "association"
+            ? tools.flatMap<DropdownTool>((tool) =>
+                tool.key === "roles"
+                  ? (["word", "phrase"] as const).map((targetKind) => ({
+                      key: `association-${targetKind}`,
+                      label: targetKind === "word" ? "关联单词" : "关联短语",
+                      icon: <LinkOutlined />,
+                      active:
+                        brush.kind === "association" &&
+                        brush.targetKind === targetKind,
+                      dividerBefore: targetKind === "word",
+                      placement: "topLeft",
+                      stayOpen: true,
+                      content: (
+                        <div className="tsz-ve-pop">
+                          <div className="tsz-ve-pop-hint">
+                            {!renderAssociationPicker
+                              ? "当前后端尚不支持正文关联，已有关联保留。"
+                              : targetKind === "word"
+                                ? "点击一个未关联的单词，再选择单词、词形和词义。"
+                                : linkWords.length > 0
+                                  ? `已选 ${linkWords.length} 个单词：${linkSegments.map((segment) => segment.surface).join(" … ")}`
+                                  : "依次点击至少两个未关联的单词，可不连续；再次点击取消选择。"}
+                          </div>
+                          {renderAssociationPicker &&
+                            targetKind === "phrase" && (
+                              <Button
+                                size="small"
+                                disabled={readOnly || linkWords.length < 2}
+                                onClick={() => {
+                                  setOpenTool(undefined);
+                                  setAssociationPickerOpen(true);
+                                }}
+                              >
+                                选择关联短语
+                              </Button>
+                            )}
+                        </div>
+                      )
+                    }))
+                  : [tool]
+              )
+            : tools
+        }
         openTool={openTool}
         onOpenToolChange={openToolAndArm}
       />

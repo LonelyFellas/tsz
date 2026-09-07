@@ -1,7 +1,7 @@
 import { ClearOutlined, RedoOutlined, UndoOutlined } from "@ant-design/icons";
 import { Button, Popover, Tooltip } from "antd";
 import type { ReactNode } from "react";
-import { AnnotationStrip } from "./AnnotationStrip";
+import { AnnotationStrip, type AnnotationStripProps } from "./AnnotationStrip";
 import type { Brush } from "./roles";
 import type { LiaisonAnchor, LiaisonDraft, MarkState } from "./tokens";
 
@@ -47,7 +47,15 @@ export interface DropdownTool {
   stayOpen?: boolean;
 }
 
-export interface MarkupPanelProps {
+export interface MarkupPanelProps extends Pick<
+  AnnotationStripProps,
+  | "associationContent"
+  | "associationAnchor"
+  | "selectedLinkRanges"
+  | "linkedRanges"
+  | "onWordRange"
+  | "textReadOnly"
+> {
   text: string;
   marks: MarkState;
   brush: Brush;
@@ -82,11 +90,17 @@ export interface MarkupPanelProps {
  * 另外两类不给悬停反馈——既留在一屏内顺手切换，又不会点了没反应。
  */
 export function MarkupPanel({
+  associationContent,
+  associationAnchor,
+  selectedLinkRanges,
+  linkedRanges,
+  onWordRange,
   text,
   marks,
   brush,
   draft,
   readOnly,
+  textReadOnly,
   onRoleRange,
   roleAnchorStart,
   onGapClick,
@@ -117,9 +131,9 @@ export function MarkupPanel({
        * 与富文本编辑器的头部同构：一条横排、按功能分组、组间用竖线隔开。
        */}
       <div className="tsz-ve-toolbar" role="toolbar" aria-label="标注工具栏">
-        {tools.map((tool) => (
+        {tools.map((tool, index) => (
           <span key={tool.key} className="tsz-ve-toolbar-slot">
-            {tool.dividerBefore && (
+            {index > 0 && tool.dividerBefore && (
               <span className="tsz-ve-toolbar-divider" aria-hidden />
             )}
             {tool.content === undefined ? (
@@ -215,6 +229,11 @@ export function MarkupPanel({
       </div>
 
       <AnnotationStrip
+        associationContent={associationContent}
+        associationAnchor={associationAnchor}
+        selectedLinkRanges={selectedLinkRanges}
+        linkedRanges={linkedRanges}
+        onWordRange={onWordRange}
         inputLabel={inputLabel}
         inputDataAttributes={inputDataAttributes}
         inputPlaceholder={inputPlaceholder}
@@ -224,6 +243,7 @@ export function MarkupPanel({
         brush={brush}
         draft={draft}
         readOnly={readOnly}
+        textReadOnly={textReadOnly}
         onRoleRange={onRoleRange}
         roleAnchorStart={roleAnchorStart}
         onGapClick={onGapClick}

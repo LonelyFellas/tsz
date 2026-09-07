@@ -9,6 +9,7 @@ import { newWordNodeId } from "../word-model/primitives";
 import { formsFixture } from "./fixtures";
 import {
   editableEnglishText,
+  prepareTextLinksForSave,
   ensureV3MeaningsForForms,
   relationDisplaySnapshots,
   replaceEnglishText,
@@ -1153,4 +1154,67 @@ describe("释义级成分用词在词义投影中的往返", () => {
     const plain = toWritableMeanings(meaningsCanonicalFixture);
     expect(stripSenseComponentUsages(plain)).toBe(plain);
   });
+});
+
+it("正文关联和语音克隆后独立保存；去除只读快照，旧后端不接收新字段", () => {
+  const input = structuredClone(meaningsCanonicalFixture);
+  const sentence = input.pos[0]!.senses[0]!.sentences[0]!;
+  if (sentence.en_text.mode !== "unified") throw new Error("fixture");
+  sentence.en_text.common.voice_profile = {
+    voice_ids: ["en-GB-SoniaNeural"],
+    rate_percent: 25
+  };
+  sentence.en_text.common.text_links = [
+    {
+      id: "link",
+      source_segments: [{ start: 9, end: 15, surface: "center" }],
+      target_word_id: "w",
+      target_publication_id: "p",
+      target_pos_id: "pos",
+      target_base_form_id: "b",
+      target_form_id: "f",
+      target_variant_id: "v",
+      target_sense_id: "s",
+      target_headword: "center",
+      target_gloss: "中心"
+    }
+  ];
+  input.pos[0]!.senses[0]!.definitions.push({
+    id: "d",
+    level: "B1",
+    definition_mode: "en_sentence",
+    content: {
+      mode: "distinguish",
+      source_dialect: "uk",
+      uk: {
+        state: "ready",
+        variant: { ...structuredClone(sentence.en_text.common), id: "uk" }
+      },
+      us: { state: "missing" }
+    }
+  });
+  const cloned = toWritableMeanings(input);
+  expect(cloned.pos[0]!.senses[0]!.sentences[0]!.en_text).toEqual(
+    sentence.en_text
+  );
+  const saved = prepareTextLinksForSave(cloned, true);
+  const en = saved.pos[0]!.senses[0]!.sentences[0]!.en_text;
+  if (en.mode !== "unified") throw new Error("fixture");
+  expect(en.common.voice_profile).toEqual(
+    sentence.en_text.common.voice_profile
+  );
+  expect(en.common.text_links![0]).not.toHaveProperty("target_gloss");
+  const definition = saved.pos[0]!.senses[0]!.definitions[1]!;
+  expect(JSON.stringify(definition)).not.toContain("target_headword");
+  expect(sentence.en_text.common.text_links[0]!.target_gloss).toBe("中心");
+  expect(() => prepareTextLinksForSave(cloned, false)).toThrow(
+    "当前后端不支持"
+  );
+  const empty = structuredClone(meaningsCanonicalFixture);
+  const emptyText = empty.pos[0]!.senses[0]!.sentences[0]!.en_text;
+  if (emptyText.mode !== "unified") throw new Error("fixture");
+  emptyText.common.text_links = [];
+  expect(
+    JSON.stringify(prepareTextLinksForSave(toWritableMeanings(empty), false))
+  ).not.toContain("text_links");
 });

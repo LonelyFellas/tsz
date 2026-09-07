@@ -5,7 +5,7 @@ import {
   waitFor,
   within
 } from "@testing-library/react";
-import { App as AntApp } from "antd";
+import { App as AntApp, ConfigProvider } from "antd";
 import type {
   DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3,
@@ -783,9 +783,9 @@ describe("V3MeaningsAndExamplesStep", () => {
         common: { origin: "manual", value: { text: "We broke the ice." } }
       },
       zh_text: { text: "我们打破了沉默。" },
-      // 等级改到 C1 后，唯一那档（zh_text 别名）的 band 跟着走
+      // 译文档位独立于英文例句等级，保留新建时的中阶。
       zh_translations: [
-        { band: "c1_c2", content: { text: "我们打破了沉默。" } }
+        { band: "b1_b2", content: { text: "我们打破了沉默。" } }
       ],
       links: [{ word_id: "entry-1", sense_id: "sense-1", role: "focus" }]
     });
@@ -828,16 +828,17 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   it("语法结构挂上语音编辑器，标注实时回写且不丢正文", async () => {
-    // 这是 V3 唯一可编辑的语音文本入口；编辑器早先只接在 v2 向导上，
-    // 而线上走的是 V3，等于现网够不着。
+    // 关联编辑器共存时，语法结构仍使用原来的标注工具。
     render(<Harness initial={meaningsFixture} />);
 
+    fireEvent.change(screen.getByLabelText("语法结构 1 通用内容"), {
+      target: { value: "a centre of the city" }
+    });
+    fireEvent.click(screen.getByLabelText("打开语法结构 1 通用内容编辑器"));
     // 等的是按需加载的编辑器分块，给足超时：默认 1 秒在负载高的 CI runner 上不够
-    const editor = await screen.findByRole(
-      "toolbar",
-      { name: "标注工具栏" },
-      { timeout: 10_000 }
-    );
+    const editor = await within(
+      document.querySelector(".word-grammar-panel") as HTMLElement
+    ).findByRole("toolbar", { name: "标注工具栏" }, { timeout: 10_000 });
     expect(editor).toBeInTheDocument();
 
     const input = screen.getByLabelText("语法结构 1 通用内容");
@@ -845,7 +846,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(input).toHaveAttribute("data-v3-field", "content");
     expect(input.tagName).toBe("TEXTAREA");
 
-    fireEvent.change(input, { target: { value: "a centre of the city" } });
+    expect(input).toHaveAttribute("readonly");
     expect(
       value().pos[0]!.grammar_structures[0]!.variants[0]!.content.text
     ).toBe("a centre of the city");
@@ -853,9 +854,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     // 取语法结构画笔从词的首字母拖到末字母（上色粒度是字母），标注应实时落到草稿里
     fireEvent.click(document.querySelector(".tsz-ve-role-button")!);
     fireEvent.click(screen.getByLabelText("用核心词画笔"));
-    const word = [...document.querySelectorAll(".tsz-ve-token")].find(
-      (node) => node.textContent === "centre"
-    )!;
+    const word = [
+      ...input.closest(".tsz-ve-editor")!.querySelectorAll(".tsz-ve-token")
+    ].find((node) => node.textContent === "centre")!;
     const letters = [...word.querySelectorAll(".tsz-ve-letter")];
     fireEvent.mouseDown(letters[0]!);
     fireEvent.mouseEnter(letters[letters.length - 1]!, { buttons: 1 });
@@ -871,6 +872,8 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("语法结构变体上已有的 audio_assets 列在音频面板里，移除后从草稿去掉引用", async () => {
     const initial = structuredClone(meaningsFixture);
+    // 此用例只验证语法音频回写，避免无关释义/例句扩大 DOM 和可及名查询成本。
+    initial.pos[0]!.senses = [];
     initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets = [
       {
         id: "asset-1",
@@ -883,12 +886,16 @@ describe("V3MeaningsAndExamplesStep", () => {
       }
     ];
     render(<Harness initial={initial} />);
-    await screen.findByRole(
-      "toolbar",
-      { name: "标注工具栏" },
+    fireEvent.click(screen.getByLabelText("打开语法结构 1 通用内容编辑器"));
+    const grammarPanel = document.querySelector(
+      ".word-grammar-panel"
+    ) as HTMLElement;
+    await within(grammarPanel).findByLabelText(
+      "标注工具栏",
+      {},
       { timeout: 10_000 }
     );
-    fireEvent.click(screen.getByRole("button", { name: "音频" }));
+    fireEvent.click(within(grammarPanel).getByLabelText("音频"));
     expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("移除 old.mp3"));
@@ -908,17 +915,20 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("音色与语速落到语法结构变体的 voice_profile 上", async () => {
     render(<Harness initial={meaningsFixture} />);
-    await screen.findByRole(
-      "toolbar",
-      { name: "标注工具栏" },
-      { timeout: 10_000 }
-    );
+    fireEvent.click(screen.getByLabelText("打开语法结构 1 通用内容编辑器"));
+    await within(
+      document.querySelector(".word-grammar-panel") as HTMLElement
+    ).findByRole("toolbar", { name: "标注工具栏" }, { timeout: 10_000 });
 
     const variant = () => value().pos[0]!.grammar_structures[0]!.variants[0]!;
     // 没动过之前不该凭空写出一份配置
     expect(variant().voice_profile).toBeUndefined();
 
-    fireEvent.click(screen.getByLabelText("语速"));
+    fireEvent.click(
+      within(
+        document.querySelector(".word-grammar-panel") as HTMLElement
+      ).getByLabelText("语速")
+    );
     fireEvent.click(screen.getByLabelText("语速 1.25 倍"));
 
     expect(variant().voice_profile).toEqual({
@@ -1260,7 +1270,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     ).toBeNull();
   });
 
-  it("多维例句表头与等级、英中内容和操作列对齐", () => {
+  it("多维例句首行表头对应等级和英文，译文有独立区域", () => {
     const { container } = render(<Harness initial={meaningsFixture} />);
     const header = container.querySelector(
       ".word-sentence-list-header"
@@ -1269,7 +1279,6 @@ describe("V3MeaningsAndExamplesStep", () => {
       "",
       "等级",
       "英文例句",
-      "汉语译文",
       ""
     ]);
     const row = container.querySelector(".word-sentence-row") as HTMLElement;
@@ -1283,12 +1292,12 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.getByLabelText("例句 1 中文")).not.toHaveAttribute(
       "readonly"
     );
-    expect(row.querySelectorAll(".anticon-sound")).toHaveLength(1);
+    expect(row.querySelectorAll(".anticon-sound")).toHaveLength(0);
     expect(screen.getByLabelText("高阶译文")).toHaveTextContent("高");
     expect(meaningsCss).toContain(".word-table-row.word-sentence-row {");
   });
 
-  it("行内改例句等级：仅有的 zh_text 别名译文档位跟着走，多档译文不动", () => {
+  it("行内改例句等级不改变任何译文档位", () => {
     const single = structuredClone(meaningsFixture);
     const sentence = single.pos[0]!.senses[0]!.sentences[0]!;
     sentence.level = "A1";
@@ -1305,7 +1314,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value().pos[0]!.senses[0]!.sentences[0]).toMatchObject({
       level: "C1",
       zh_translations: [
-        expect.objectContaining({ id: sentence.zh_text_id, band: "c1_c2" })
+        expect.objectContaining({ id: sentence.zh_text_id, band: "a1_a2" })
       ]
     });
     unmount();
@@ -1342,7 +1351,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       {
         id: "translation-c",
         band: "c1_c2",
-        content: { version: 2, text: "初阶译文", annotations: [] }
+        content: { version: 2, text: "低阶译文", annotations: [] }
       },
       {
         id: "translation-b",
@@ -1357,13 +1366,13 @@ describe("V3MeaningsAndExamplesStep", () => {
     ];
     render(<Harness initial={initial} wordId="entry-1" />);
 
-    expect(screen.getByLabelText("例句 1 初阶中文")).toHaveValue("初阶译文");
-    expect(screen.getByLabelText("例句 1 中阶中文")).toHaveValue("中阶译文");
-    expect(screen.getByLabelText("例句 1 高阶中文")).toHaveValue("高阶译文");
-    expect(screen.getByLabelText("初阶译文")).toHaveTextContent("初");
+    expect(screen.getByLabelText("例句 1 译文 1 中文")).toHaveValue("低阶译文");
+    expect(screen.getByLabelText("例句 1 译文 2 中文")).toHaveValue("中阶译文");
+    expect(screen.getByLabelText("例句 1 译文 3 中文")).toHaveValue("高阶译文");
+    expect(screen.getByLabelText("低阶译文")).toHaveTextContent("低");
     expect(screen.getByLabelText("中阶译文")).toHaveTextContent("中");
     expect(screen.getByLabelText("高阶译文")).toHaveTextContent("高");
-    fireEvent.change(screen.getByLabelText("例句 1 中阶中文"), {
+    fireEvent.change(screen.getByLabelText("例句 1 译文 2 中文"), {
       target: { value: "更新中阶译文" }
     });
     const translations =
@@ -1378,6 +1387,28 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(translations[2]).toEqual(
       initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations[2]
     );
+  });
+
+  it("删除兼容译文后更新别名，其他同档译文与英文关联保持不变", () => {
+    const initial = structuredClone(meaningsFixture);
+    const sentence = initial.pos[0]!.senses[0]!.sentences[0]!;
+    sentence.zh_translations = [
+      { id: sentence.zh_text_id, band: "a1_a2", content: sentence.zh_text },
+      {
+        id: "second-high",
+        band: "a1_a2",
+        content: { version: 2, text: "另一条高阶译文", annotations: [] }
+      }
+    ];
+    render(<Harness initial={initial} wordId="entry-1" />);
+    fireEvent.click(screen.getByLabelText("删除例句 1 译文 1"));
+    const after = value().pos[0]!.senses[0]!.sentences[0]!;
+    expect(after.zh_translations).toEqual([sentence.zh_translations[1]]);
+    expect(after.zh_text_id).toBe("second-high");
+    expect(after.zh_text).toEqual(sentence.zh_translations[1]!.content);
+    expect(after.en_text).toEqual(sentence.en_text);
+    expect(after.links).toEqual(sentence.links);
+    expect(screen.getByLabelText("删除例句 1 译文 1")).toBeDisabled();
   });
 
   it("多维释义、多维例句与关联词可独立收起展开且不修改草稿", () => {
@@ -3057,7 +3088,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   it("单项列表移动入口禁用，词义管理收进菜单，保存态禁用提交", () => {
-    const { container } = render(<Harness />);
+    const { container, unmount } = render(<Harness />);
     for (const label of [
       "拖动语义区间 1",
       "拖动语法结构 1",
@@ -3074,8 +3105,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByLabelText("下移定义 1")).toBeNull();
     expect(screen.queryByLabelText("上移例句 1")).toBeNull();
     expect(screen.queryByLabelText("下移例句 1")).toBeNull();
-    expect(screen.getByRole("button", { name: "管理词义 1" })).toBeEnabled();
-    const { container: savingContainer } = render(
+    expect(screen.getByLabelText("管理词义 1")).toBeEnabled();
+    unmount();
+    const { container: savingContainer, unmount: unmountSaving } = render(
       <AntApp>
         <V3MeaningsAndExamplesStep
           onChange={() => undefined}
@@ -3093,6 +3125,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(saveButtons).toHaveLength(2);
     expect(saveButtons.every((button) => button.disabled)).toBe(true);
 
+    unmountSaving();
     const { container: noSaveContainer } = render(
       <AntApp>
         <V3MeaningsAndExamplesStep
@@ -3358,3 +3391,65 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("草稿可暂时不添加词性释义")).toBeNull();
   });
 });
+
+it.each([false, true])(
+  "切换中文前确认移除英文关联，确认=%s",
+  async (confirm) => {
+    const initial = structuredClone(meaningsFixture);
+    const definition = initial.pos[0]!.senses[0]!.definitions[0]!;
+    initial.pos[0]!.senses[0]!.definitions[0] = {
+      id: definition.id,
+      level: definition.level,
+      definition_mode: "en_sentence",
+      content: {
+        mode: "unified",
+        common: {
+          id: "en-def",
+          origin: "manual",
+          value: { version: 2, text: "mother", annotations: [] },
+          voice_profile: { voice_ids: [], rate_percent: 25 },
+          text_links: [
+            {
+              id: "link",
+              source_segments: [{ start: 0, end: 6, surface: "mother" }],
+              target_word_id: "w",
+              target_publication_id: "p",
+              target_pos_id: "pos",
+              target_base_form_id: "b",
+              target_form_id: "f",
+              target_variant_id: "v",
+              target_sense_id: "s"
+            }
+          ]
+        }
+      }
+    };
+    render(
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <Harness initial={initial} />
+      </ConfigProvider>
+    );
+    fireEvent.mouseDown(screen.getByLabelText("定义 1 方式"));
+    fireEvent.click(screen.getByText("中文整句释义"));
+    // jsdom 不执行 antd 弹窗布局；验证确认内容和真实取消/确认回调。
+    expect(
+      await screen.findByText("切换后将移除这条释义的英文关联和发音设置。")
+    ).toBeInTheDocument();
+    if (confirm) {
+      fireEvent.click(
+        document.querySelector(".ant-modal-confirm-btns .ant-btn-primary")!
+      );
+      await waitFor(() =>
+        expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
+          definition_mode: "zh_sentence",
+          content: { text: "mother" }
+        })
+      );
+    } else {
+      fireEvent.click(screen.getByText(/^取\s*消$/u));
+      expect(value().pos[0]!.senses[0]!.definitions[0]).toEqual(
+        initial.pos[0]!.senses[0]!.definitions[0]
+      );
+    }
+  }
+);

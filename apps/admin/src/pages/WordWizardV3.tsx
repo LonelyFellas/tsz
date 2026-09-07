@@ -378,6 +378,7 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
         />
       ) : null}
       <V3MeaningsAndExamplesStep
+        textLinksEnabled={context.word.capabilities.text_links === true}
         activePosId={context.activePosId}
         componentUsagesEnabled={
           context.word.capabilities.sense_component_usages === true

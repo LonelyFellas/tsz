@@ -1,4 +1,6 @@
-import type { MouseEvent as ReactMouseEvent } from "react";
+import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
+import { Popover } from "antd";
+import { associationWords } from "../../core/text-links";
 import {
   Fragment,
   useCallback,
@@ -46,12 +48,18 @@ function draftRole(
 }
 
 export interface AnnotationStripProps {
+  associationContent?: ReactNode;
+  associationAnchor?: number;
+  selectedLinkRanges?: CodeSpan[];
+  linkedRanges?: CodeSpan[];
+  onWordRange?: (range: CodeSpan) => void;
   text: string;
   marks: MarkState;
   brush: Brush;
   /** 正在拼的这条连读，两端各自可含多个连续字母。 */
   draft: LiaisonDraft;
   readOnly?: boolean;
+  textReadOnly?: boolean;
   /** 文本框的无障碍名；同一页面上多个编辑器靠它区分。 */
   inputLabel: string;
   /** 宿主用于错误定位的 data-* 属性；必须落在可聚焦的输入框上。 */
@@ -85,11 +93,17 @@ export interface AnnotationStripProps {
  * 鼠标归谁由当前画笔决定：空手时归 textarea（放光标），拿起笔时归标注层。
  */
 export function AnnotationStrip({
+  associationContent,
+  associationAnchor,
+  selectedLinkRanges,
+  linkedRanges,
+  onWordRange,
   text,
   marks,
   brush,
   draft,
   readOnly,
+  textReadOnly,
   inputLabel,
   inputDataAttributes,
   inputPlaceholder,
@@ -241,6 +255,11 @@ export function AnnotationStrip({
           const pause = marks.pauses[position];
           // 按字素簇渲染，不按码点：否则组合字符与 emoji 会被拆开、整行错位。
           const letters = graphemes(token.text);
+          const linkWords = associationWords(token.text).map((word) => ({
+            ...word,
+            start: token.start + word.start,
+            end: token.start + word.end
+          }));
           // 拖选跨过词缝时，那段空白也描进预览里，看得出是连着的一段。
           const gapClass =
             nextToken && covers(selectedRange, token.end, nextToken.start)
@@ -253,60 +272,99 @@ export function AnnotationStrip({
                * 词只是字母的容器：语法结构与连读都落在字母上，前者按码点区间上色
                * （可以只标一个词里的几个字母），后者把字母当锚点。
                */}
-              <span className="tsz-ve-token is-letters">
-                {letters.map(({ text: letter, offset }) => {
-                  const start = token.start + offset;
-                  const end = start + Array.from(letter).length;
-                  const unit = unitAt(marks.roles, start);
-                  const roleClass = unit ? ` is-${unit.level}` : "";
-                  // 注意与 unit 的 level（语法分类）区分：这里是连读草稿的端别。
-                  const anchorRole = draftRole(draft, token.index, offset);
-                  const selectedClass = covers(selectedRange, start, end)
-                    ? " is-selecting"
-                    : "";
-                  const anchorClass =
-                    roleAnchorStart === start ? " is-role-anchor" : "";
-                  return (
-                    <span
-                      key={offset}
-                      ref={registerLetter(letterKey(token.index, offset))}
-                      className={`tsz-ve-letter${roleClass}${anchorRole ? ` is-anchor-${anchorRole}` : ""}${selectedClass}${anchorClass}`}
-                      role="button"
-                      aria-label={`${token.text} 的第 ${offset + 1} 个字母 ${letter}`}
-                      aria-pressed={Boolean(anchorRole)}
-                      aria-disabled={target !== "letter"}
-                      data-level={unit?.level}
-                      onMouseDown={paint(() => {
-                        if (brush.kind === "liaison") {
-                          onLetterClick({
-                            token: token.index,
-                            offsets: [offset]
-                          });
-                        } else if (brush.kind === "role") {
-                          const span = { start, end };
-                          setSelecting({ anchor: span, focus: span });
-                        }
-                      })}
-                      onMouseEnter={(event) => {
-                        // 主键没按着就说明上次的 mouseup 丢了（如右键菜单吞掉），圈选作废。
-                        if (!(event.buttons & 1)) {
-                          setSelecting(undefined);
-                          return;
-                        }
-                        setSelecting(
-                          (current) =>
-                            current && {
-                              anchor: current.anchor,
-                              focus: { start, end }
-                            }
-                        );
-                      }}
-                    >
-                      {letter}
-                    </span>
-                  );
-                })}
-              </span>
+              <Popover
+                content={associationContent}
+                open={
+                  brush.kind === "association" &&
+                  associationAnchor !== undefined &&
+                  associationAnchor >= token.start &&
+                  associationAnchor < token.end &&
+                  Boolean(associationContent)
+                }
+                trigger={[]}
+                placement="bottomLeft"
+              >
+                <span
+                  className={`tsz-ve-token is-letters${linkedRanges?.some((range) => covers(range, token.start, token.end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, token.start, token.end)) ? " is-link-selected" : ""}`}
+                  role={target === "word" ? "button" : undefined}
+                  aria-label={
+                    target === "word"
+                      ? `关联 ${token.text}（${token.index + 1}）`
+                      : undefined
+                  }
+                  onMouseDown={(event) => {
+                    if (target !== "word" || event.button !== 0) return;
+                    event.preventDefault();
+                    const point = (
+                      event.target as HTMLElement
+                    ).closest<HTMLElement>("[data-codepoint]")?.dataset
+                      .codepoint;
+                    const word =
+                      point === undefined
+                        ? linkWords[0]
+                        : linkWords.find(
+                            (item) =>
+                              item.start <= Number(point) &&
+                              Number(point) < item.end
+                          );
+                    if (word) onWordRange?.(word);
+                  }}
+                >
+                  {letters.map(({ text: letter, offset }) => {
+                    const start = token.start + offset;
+                    const end = start + Array.from(letter).length;
+                    const unit = unitAt(marks.roles, start);
+                    const roleClass = unit ? ` is-${unit.level}` : "";
+                    // 注意与 unit 的 level（语法分类）区分：这里是连读草稿的端别。
+                    const anchorRole = draftRole(draft, token.index, offset);
+                    const selectedClass = covers(selectedRange, start, end)
+                      ? " is-selecting"
+                      : "";
+                    const anchorClass =
+                      roleAnchorStart === start ? " is-role-anchor" : "";
+                    return (
+                      <span
+                        key={offset}
+                        ref={registerLetter(letterKey(token.index, offset))}
+                        className={`tsz-ve-letter${roleClass}${anchorRole ? ` is-anchor-${anchorRole}` : ""}${selectedClass}${anchorClass}${linkedRanges?.some((range) => covers(range, start, end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, start, end)) ? " is-link-selected" : ""}`}
+                        role="button"
+                        aria-label={`${token.text} 的第 ${offset + 1} 个字母 ${letter}`}
+                        aria-pressed={Boolean(anchorRole)}
+                        aria-disabled={target !== "letter"}
+                        data-codepoint={start}
+                        data-level={unit?.level}
+                        onMouseDown={paint(() => {
+                          if (brush.kind === "liaison") {
+                            onLetterClick({
+                              token: token.index,
+                              offsets: [offset]
+                            });
+                          } else if (brush.kind === "role") {
+                            const span = { start, end };
+                            setSelecting({ anchor: span, focus: span });
+                          }
+                        })}
+                        onMouseEnter={(event) => {
+                          // 主键没按着就说明上次的 mouseup 丢了（如右键菜单吞掉），圈选作废。
+                          if (!(event.buttons & 1)) {
+                            setSelecting(undefined);
+                            return;
+                          }
+                          setSelecting(
+                            (current) =>
+                              current && {
+                                anchor: current.anchor,
+                                focus: { start, end }
+                              }
+                          );
+                        }}
+                      >
+                        {letter}
+                      </span>
+                    );
+                  })}
+                </span>
+              </Popover>
 
               {hasNext && (
                 <span
@@ -350,7 +408,7 @@ export function AnnotationStrip({
         className="tsz-ve-canvas-input"
         aria-label={inputLabel}
         value={text}
-        readOnly={readOnly}
+        readOnly={readOnly || textReadOnly}
         spellCheck={false}
         placeholder={
           inputPlaceholder ?? "在这里直接输入英文，然后用上面的工具在字上标注"

@@ -27,6 +27,7 @@ import {
 import {
   ensureV3MeaningsForForms,
   stripSenseComponentUsages,
+  prepareTextLinksForSave,
   toWritableMeanings
 } from "./meaningsModel";
 import { classifyV3Problem, type V3Problem } from "./problem";
@@ -193,7 +194,8 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
           .includes(target.node_id) === true;
       return (
         nodeMatches &&
-        candidate.dataset.v3Field === target.field &&
+        candidate.dataset.v3Field ===
+          (target.field === "text_links" ? "value" : target.field) &&
         !candidate.closest(
           '.ant-tabs-tabpane-hidden, .ant-collapse-content-hidden, [aria-hidden="true"], [inert]'
         )
@@ -869,10 +871,12 @@ function V3WordCreationSession({
             base_revision: baseRevision,
             intent,
             // 释义级成分用词只在后端声明支持时发送（无 dev 放宽）：旧后端会 400。
-            content:
+            content: prepareTextLinksForSave(
               flow.canonical().capabilities.sense_component_usages === true
                 ? content
-                : stripSenseComponentUsages(content)
+                : stripSenseComponentUsages(content),
+              flow.canonical().capabilities.text_links === true
+            )
           })
         );
         if (result.accepted && scope === scopeRef.current) {

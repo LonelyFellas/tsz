@@ -5012,3 +5012,37 @@ describe("V3WordCreationWizard", () => {
     expect(saveForms).toHaveBeenCalledTimes(1);
   });
 });
+
+it("正文关联校验失败定位到所属英文正文输入框", async () => {
+  const initialWord = word();
+  const en = initialWord.meanings.pos[0]!.senses[0]!.sentences[0]!.en_text;
+  if (en.mode !== "unified") throw new Error("fixture");
+  const issue: V3DraftValidationIssue = {
+    ...validationIssue(),
+    step: "meanings",
+    node_id: en.common.id,
+    field: "text_links",
+    code: "definition_invalid",
+    node_location: { node_role: "entry", ancestor_node_ids: [] }
+  };
+  renderWizard(requests(), {
+    initialWord,
+    initialStep: "meanings",
+    renderStep: (context) => (
+      <>
+        <textarea
+          aria-label="关联出错正文"
+          data-v3-node-id={en.common.id}
+          data-v3-field="value"
+        />
+        <button onClick={() => void context.actions.navigateIssue(issue)}>
+          定位关联
+        </button>
+      </>
+    )
+  });
+  fireEvent.click(screen.getByText("定位关联"));
+  await waitFor(() =>
+    expect(screen.getByLabelText("关联出错正文")).toHaveFocus()
+  );
+});
