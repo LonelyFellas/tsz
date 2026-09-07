@@ -53,6 +53,22 @@ export function wordListLabel(record: AdminWordListItemAny): string {
     : record.presentation.label;
 }
 
+/**
+ * 列表上要显示的标注；不显示时返回 undefined。
+ *
+ * 显隐由服务端的 `annotation_visible` 定夺（同原型组里只剩这一条时为 false，
+ * 此时标注值仍在库里，只是不展示）。**角标与列表里的「标注」编辑入口都必须走这一个
+ * 判定**：入口的意义是「改这个角标」，两者若各写各的条件，早晚会出现「有入口没角标」
+ * 或反过来的错位。
+ */
+export function visibleWordAnnotation(
+  record: AdminWordListItemAny
+): string | undefined {
+  if (!record.annotation_visible) return undefined;
+  const annotation = record.annotation?.trim();
+  return annotation ? annotation : undefined;
+}
+
 /** 两个 schema 的方言摘要都由服务端给出（V3 按词性当前设置聚合），不从 matched surfaces 猜测。 */
 export function wordListDialects(record: AdminWordListItemAny): Dialect[] {
   return record.dialects;

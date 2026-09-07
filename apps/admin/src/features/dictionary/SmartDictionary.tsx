@@ -81,6 +81,7 @@ import { runLifecycleCommandOnce } from "./lifecycleCommand";
 import {
   observeWordListPresentation,
   type PresentationStrategyReporter,
+  visibleWordAnnotation,
   wordListDialects,
   wordListLabel
 } from "./presentation";
@@ -618,7 +619,7 @@ export function SmartDictionary({
       ellipsis: { showTitle: false },
       render: (_: unknown, record) => {
         const label = wordListLabel(record);
-        const annotation = record.annotation_visible ? record.annotation : null;
+        const annotation = visibleWordAnnotation(record);
         const dialects = wordListDialects(record);
         const context =
           dialects.length > 0
@@ -840,7 +841,9 @@ export function SmartDictionary({
             >
               {getWordRowActionLabel(record)}
             </Button>
-            {record.status !== "archived" ? (
+            {/* 有角标才给改：入口就是「改这个角标」，没有角标时列表上无从改起，
+                只能在建条冲突弹窗里产生标注。判定与角标同源，见 visibleWordAnnotation。 */}
+            {visibleWordAnnotation(record) ? (
               <Button
                 type="link"
                 size="small"
