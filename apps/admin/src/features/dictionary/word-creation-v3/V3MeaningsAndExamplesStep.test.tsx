@@ -872,6 +872,8 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("语法结构变体上已有的 audio_assets 列在音频面板里，移除后从草稿去掉引用", async () => {
     const initial = structuredClone(meaningsFixture);
+    // 此用例只验证语法音频回写，避免无关释义/例句扩大 DOM 和可及名查询成本。
+    initial.pos[0]!.senses = [];
     initial.pos[0]!.grammar_structures[0]!.variants[0]!.audio_assets = [
       {
         id: "asset-1",
@@ -885,14 +887,15 @@ describe("V3MeaningsAndExamplesStep", () => {
     ];
     render(<Harness initial={initial} />);
     fireEvent.click(screen.getByLabelText("打开语法结构 1 通用内容编辑器"));
-    await within(
-      document.querySelector(".word-grammar-panel") as HTMLElement
-    ).findByRole("toolbar", { name: "标注工具栏" }, { timeout: 10_000 });
-    fireEvent.click(
-      within(
-        document.querySelector(".word-grammar-panel") as HTMLElement
-      ).getByRole("button", { name: "音频" })
+    const grammarPanel = document.querySelector(
+      ".word-grammar-panel"
+    ) as HTMLElement;
+    await within(grammarPanel).findByLabelText(
+      "标注工具栏",
+      {},
+      { timeout: 10_000 }
     );
+    fireEvent.click(within(grammarPanel).getByLabelText("音频"));
     expect(screen.getByLabelText("试听 old.mp3")).toBeInTheDocument();
 
     fireEvent.click(screen.getByLabelText("移除 old.mp3"));
@@ -3085,7 +3088,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   it("单项列表移动入口禁用，词义管理收进菜单，保存态禁用提交", () => {
-    const { container } = render(<Harness />);
+    const { container, unmount } = render(<Harness />);
     for (const label of [
       "拖动语义区间 1",
       "拖动语法结构 1",
@@ -3102,8 +3105,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByLabelText("下移定义 1")).toBeNull();
     expect(screen.queryByLabelText("上移例句 1")).toBeNull();
     expect(screen.queryByLabelText("下移例句 1")).toBeNull();
-    expect(screen.getByRole("button", { name: "管理词义 1" })).toBeEnabled();
-    const { container: savingContainer } = render(
+    expect(screen.getByLabelText("管理词义 1")).toBeEnabled();
+    unmount();
+    const { container: savingContainer, unmount: unmountSaving } = render(
       <AntApp>
         <V3MeaningsAndExamplesStep
           onChange={() => undefined}
@@ -3121,6 +3125,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(saveButtons).toHaveLength(2);
     expect(saveButtons.every((button) => button.disabled)).toBe(true);
 
+    unmountSaving();
     const { container: noSaveContainer } = render(
       <AntApp>
         <V3MeaningsAndExamplesStep
