@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-07T05:09:52.226Z",
+  "_generatedAt": "2026-09-07T15:39:35.581Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -13,6 +13,9 @@
     "/admin/auth/logout": ["post"],
     "/admin/auth/logout-all": ["post"],
     "/admin/auth/refresh": ["post"],
+    "/admin/lexicon/audio-assets": ["post"],
+    "/admin/lexicon/audio-assets/upload-url": ["post"],
+    "/admin/lexicon/audio-assets/{id}/url": ["get"],
     "/admin/lexicon/detections": ["post"],
     "/admin/lexicon/dialect-variant-suggestions": ["post"],
     "/admin/lexicon/entries": ["get", "post"],
@@ -213,6 +216,43 @@
     ]
   },
   "operationSchemas": {
+    "post /admin/lexicon/audio-assets": {
+      "request": { "$ref": "#/components/schemas/ConfirmAudioAssetRequest" },
+      "responses": {
+        "201": { "$ref": "#/components/schemas/ConfirmAudioAssetResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "413": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "501": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/audio-assets/upload-url": {
+      "request": { "$ref": "#/components/schemas/CreateAudioUploadRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/CreateAudioUploadResponse" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "413": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "501": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon/audio-assets/{id}/url": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/AudioAssetUrlResponse" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "501": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "post /admin/lexicon/detections": {
       "request": { "$ref": "#/components/schemas/DetectLexiconInputAny" },
       "responses": {
@@ -697,6 +737,12 @@
         "speech_provider_unavailable",
         "speech_rate_limited",
         "speech_storage_unavailable",
+        "unsupported_audio_content_type",
+        "audio_file_too_large",
+        "audio_upload_not_completed",
+        "invalid_audio_key",
+        "audio_storage_not_configured",
+        "audio_asset_not_found",
         "service_unavailable",
         "internal_error"
       ]
@@ -1986,7 +2032,8 @@
         "phrase_component_target_unavailable",
         "phrase_component_target_nested",
         "phrase_component_target_stale",
-        "voice_profile_invalid"
+        "voice_profile_invalid",
+        "audio_asset_invalid"
       ]
     },
     "RelatedWordSense": {
@@ -3028,7 +3075,53 @@
       },
       "additionalProperties": false
     },
+    "AudioAsset": {
+      "type": "object",
+      "description": "一条已登记的音频资产。既是 confirm 的响应体，也内嵌在 `GrammarVariantV3.audio_assets` 里。\n除 `id` 外的字段都是服务端权威元数据：保存词义时按 id 重新灌入，客户端回传的值不作数。",
+      "required": [
+        "id",
+        "locale",
+        "gender",
+        "content_type",
+        "size_bytes",
+        "original_name",
+        "created_at"
+      ],
+      "properties": {
+        "content_type": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "duration_ms": {
+          "type": ["integer", "null"],
+          "format": "int32",
+          "description": "服务端暂不探测时长，恒为 null。"
+        },
+        "gender": { "$ref": "#/components/schemas/AudioAssetGender" },
+        "id": { "type": "string", "format": "uuid" },
+        "locale": { "$ref": "#/components/schemas/AudioAssetLocale" },
+        "original_name": { "type": "string" },
+        "size_bytes": { "type": "integer", "format": "int64" }
+      },
+      "additionalProperties": false
+    },
+    "AudioAssetGender": { "type": "string", "enum": ["female", "male"] },
+    "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
+    "ConfirmAudioAssetRequest": {
+      "type": "object",
+      "required": ["key", "locale", "gender", "original_name"],
+      "properties": {
+        "gender": { "$ref": "#/components/schemas/AudioAssetGender" },
+        "key": { "type": "string" },
+        "locale": { "$ref": "#/components/schemas/AudioAssetLocale" },
+        "original_name": {
+          "type": "string",
+          "description": "仅作展示元数据，绝不参与对象键。首尾空白会被去掉，不接受控制字符。",
+          "maxLength": 120,
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
     "CreateAdminWordAnyInput": {
       "oneOf": [
         { "$ref": "#/components/schemas/CreateAdminWordV2Input" },
@@ -3062,6 +3155,18 @@
         },
         "kind": { "$ref": "#/components/schemas/WordEntryKindV3" },
         "schema_version": { "type": "integer", "enum": [3] }
+      },
+      "additionalProperties": false
+    },
+    "CreateAudioUploadRequest": {
+      "type": "object",
+      "required": ["content_type", "size"],
+      "properties": {
+        "content_type": {
+          "type": "string",
+          "description": "白名单内的 MIME；客户端 PUT 时必须原样回发，否则 OSS 验签失败。"
+        },
+        "size": { "type": "integer", "format": "int64", "minimum": 0 }
       },
       "additionalProperties": false
     },
@@ -3339,6 +3444,12 @@
       "type": "object",
       "required": ["id", "dialect", "content"],
       "properties": {
+        "audio_assets": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/AudioAsset" },
+          "description": "已上传的真人录音。空数组不上 wire，存量内容重新序列化后逐字节不变。\n元数据以服务端为准：保存时按 id 从 `lexicon.audio_assets` 重新灌入，客户端改了也无效。",
+          "maxItems": 8
+        },
         "content": { "$ref": "#/components/schemas/RichTextV3" },
         "dialect": { "$ref": "#/components/schemas/Dialect" },
         "id": { "type": "string", "format": "uuid" },
@@ -3709,6 +3820,12 @@
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/components/schemas/TextOrigin" },
+        "text_links": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/TextLinkV3" },
+          "description": "人工指定的正文关联；缺键保留存量，显式空数组清除。",
+          "maxItems": 100
+        },
         "value": { "$ref": "#/components/schemas/RichTextV3" },
         "voice_profile": {
           "$ref": "#/components/schemas/VoiceProfileV3",
@@ -3819,6 +3936,51 @@
         },
         "source_dialect": { "$ref": "#/components/schemas/SourceDialect" },
         "target_dialect": { "$ref": "#/components/schemas/SourceDialect" }
+      },
+      "additionalProperties": false
+    },
+    "TextLinkV3": {
+      "type": "object",
+      "required": [
+        "id",
+        "source_segments",
+        "target_word_id",
+        "target_publication_id",
+        "target_pos_id",
+        "target_base_form_id",
+        "target_form_id",
+        "target_variant_id",
+        "target_sense_id"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "source_segments": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/SentenceSourceRangeV1" },
+          "maxItems": 20,
+          "minItems": 1
+        },
+        "target_base_form_id": { "type": "string", "format": "uuid" },
+        "target_form_id": { "type": "string", "format": "uuid" },
+        "target_gloss": { "type": "string", "readOnly": true },
+        "target_headword": { "type": "string", "readOnly": true },
+        "target_pos_id": { "type": "string", "format": "uuid" },
+        "target_publication_id": { "type": "string", "format": "uuid" },
+        "target_sense_id": { "type": "string", "format": "uuid" },
+        "target_variant_id": { "type": "string", "format": "uuid" },
+        "target_word_id": { "type": "string", "format": "uuid" },
+        "via_phrase": { "$ref": "#/components/schemas/TextLinkViaPhraseV3" }
+      },
+      "additionalProperties": false
+    },
+    "TextLinkViaPhraseV3": {
+      "type": "object",
+      "required": ["word_id", "publication_id", "sense_id", "component_id"],
+      "properties": {
+        "component_id": { "type": "string", "format": "uuid" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "sense_id": { "type": "string", "format": "uuid" },
+        "word_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -4622,7 +4784,7 @@
         "zh_translations": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/WordSentenceTranslationV3" },
-          "maxItems": 3
+          "maxItems": 2000
         }
       },
       "additionalProperties": false

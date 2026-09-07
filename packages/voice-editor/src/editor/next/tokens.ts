@@ -3,7 +3,8 @@ import type {
   RichTextEmphasisLevel,
   RichTextV2
 } from "@tsz/types";
-import { liaisonAnchorSpans } from "../../core";
+import type { TextLinkV3 } from "@tsz/types";
+import { liaisonAnchorSpans } from "../../core/liaison";
 import { normalizeGrammarLevel } from "./roles";
 
 /** 一个词在码点序列中的位置，左闭右开。 */
@@ -75,6 +76,7 @@ export interface LiaisonDraft {
 export interface EditorSnapshot {
   text: string;
   marks: MarkState;
+  textLinks?: TextLinkV3[];
 }
 
 export const EMPTY_MARKS: MarkState = {

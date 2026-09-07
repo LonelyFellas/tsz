@@ -128,3 +128,9 @@ describe("V3 product error presentation", () => {
     }
   );
 });
+
+it("正文关联错误给出重选建议，不误报释义或语法未填", () => {
+  expect(
+    v3IssueMessage({ ...issue("definition_invalid"), field: "text_links" })
+  ).toBe("正文关联无效，请重新选择或清除关联");
+});

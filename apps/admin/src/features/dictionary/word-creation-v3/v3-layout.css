@@ -112,6 +112,20 @@
   display: block;
 }
 
+.v3-meanings-v2 .word-table-row.word-grammar-row {
+  --word-ops-col: 56px;
+  grid-template-columns: 28px minmax(0, 1fr) var(--word-ops-col);
+}
+
+.v3-meanings-v2 .word-grammar-row > .word-grammar-index {
+  align-self: start;
+  margin-top: 4px;
+}
+
+.v3-meanings-v2 .word-grammar-row > .word-sort-actions {
+  min-height: 32px;
+}
+
 /* 区分英美式词条下，一条语法结构承载英式/美式两个文本面板，左右两栏平分中间列。 */
 .v3-meanings-v2 .word-grammar-variants {
   display: flex;
@@ -158,6 +172,56 @@
   border-bottom: 0;
 }
 
+.v3-meanings-v2 .word-sentence-list-header {
+  grid-template-columns: 28px 64px minmax(0, 1fr) 56px;
+  padding-inline: 12px;
+}
+
+.v3-meanings-v2 .word-table-row.word-sentence-row {
+  grid-template-columns: 28px 64px minmax(0, 1fr) 56px;
+  grid-template-areas:
+    "number level english actions"
+    ". translations translations translations";
+  gap: 12px 8px;
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid #e8ecf2;
+  border-radius: 10px;
+  background: var(--ant-color-bg-container, #fff);
+}
+
+.v3-meanings-v2 .word-sentence-row > .word-number-cell {
+  grid-area: number;
+  line-height: 32px;
+  padding-top: 0;
+}
+
+.v3-meanings-v2 .word-sentence-row > .ant-select {
+  grid-area: level;
+}
+
+.v3-meanings-v2 .word-sentence-row > .word-sentence-english-fields {
+  grid-area: english;
+}
+
+.v3-meanings-v2 .word-sentence-row > .word-sort-actions {
+  grid-area: actions;
+}
+
+.v3-meanings-v2 .word-sentence-row > .word-sentence-translation-list {
+  grid-area: translations;
+}
+
+@container (width <= 640px) {
+  .v3-meanings-v2 .word-table-row.word-sentence-row {
+    grid-template-columns: 28px minmax(0, 1fr) 56px;
+    grid-template-areas:
+      "number level actions"
+      "english english english"
+      "translations translations translations";
+  }
+}
+
 .v3-meanings-v2 .word-definition-row > .ant-space,
 .v3-meanings-v2 .word-sentence-row > .ant-space {
   min-width: 0;
@@ -174,7 +238,7 @@
 
 /* 释义行与例句行的控件都是 32px 单行，操作列竖排（24+2+24=50px）反而成了行高瓶颈：
    改横排并把列放宽到两颗小按钮加默认间距（24+8+24=56px）。变量挂在两张表共同的 section 上，
-   表头、行、操作列一起继承；语法结构行与语义区间行在 section 之外，保持竖排 32px。 */
+   表头、行、操作列一起继承；语法结构行在 section 之外单独配置相同列宽，语义区间沿用自身布局。 */
 .v3-meanings-v2 .word-sense-section {
   --word-ops-col: 56px;
 }

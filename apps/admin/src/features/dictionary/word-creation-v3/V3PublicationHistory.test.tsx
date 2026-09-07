@@ -672,7 +672,7 @@ describe("V3PublicationHistory", () => {
       detail.getByText("释义组 1：V3 结构组 / V3 structure group")
     ).toBeInTheDocument();
     expect(detail.getByText("V3 grammar only")).toBeInTheDocument();
-    expect(detail.getByText("通用：V3 sentence only.")).toBeInTheDocument();
+    expect(detail.getByText("V3 sentence only.")).toBeInTheDocument();
     expect(detail.getByText("仅 V3 例句")).toBeInTheDocument();
     expect(detail.getByText("主关联")).toBeInTheDocument();
     expect(
@@ -2405,4 +2405,64 @@ describe("V3PublicationHistory", () => {
     expect(await screen.findByText("暂无发布记录")).toBeInTheDocument();
     expect(api.listPublications).toHaveBeenCalledTimes(2);
   });
+});
+
+it("历史发布快照展示释义和例句的人工关联", async () => {
+  const detail = complexV3Publication();
+  const sense = detail.word.meanings.pos[0]!.senses[0]!;
+  sense.sentences[0]!.zh_translations = (
+    ["c1_c2", "c1_c2", "b1_b2", "b1_b2", "a1_a2", "a1_a2"] as const
+  ).map((band, index) => ({
+    id: `historical-translation-${index}`,
+    band,
+    content: { version: 2, text: `历史译文 ${index + 1}`, annotations: [] }
+  }));
+  const english = sense.sentences[0]!.en_text;
+  if (english.mode !== "unified") throw new Error("fixture");
+  english.common.text_links = [
+    {
+      id: "historical-link",
+      source_segments: [{ start: 3, end: 11, surface: "sentence" }],
+      target_word_id: "target",
+      target_publication_id: "pub",
+      target_pos_id: "pos",
+      target_base_form_id: "base",
+      target_form_id: "form",
+      target_variant_id: "variant",
+      target_sense_id: "sense",
+      target_headword: "sentence",
+      target_gloss: "句子"
+    }
+  ];
+  sense.definitions.push({
+    id: "english-definition",
+    level: "B1",
+    definition_mode: "en_sentence",
+    content: structuredClone(english)
+  });
+  const api = requests();
+  api.listPublications.mockResolvedValue({ publications: [detail] });
+  api.getPublication.mockResolvedValue({ publication: detail });
+  render(
+    <V3PublicationHistory
+      currentWord={v3Word()}
+      onActivated={vi.fn()}
+      requests={api}
+    />
+  );
+  fireEvent.click(
+    await screen.findByRole("button", {
+      name: `查看第 ${detail.publication_number} 次发布`
+    })
+  );
+  const body = await screen.findByTestId("publication-snapshot-body");
+  for (const label of ["高", "中", "低"]) {
+    expect(
+      within(body).getAllByText(label, { selector: ".ant-tag" })
+    ).toHaveLength(2);
+  }
+  expect(within(body).queryByText("初", { selector: ".ant-tag" })).toBeNull();
+  expect(within(body).getAllByText("sentence → sentence · 句子")).toHaveLength(
+    2
+  );
 });

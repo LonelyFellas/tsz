@@ -5,6 +5,16 @@ import type {
   RichText,
   RichTextV2
 } from "@tsz/types";
+import type { SentenceSourceRangeV3, TextLinkV3 } from "@tsz/types";
+import type { ReactNode } from "react";
+
+export interface AssociationPickerProps {
+  kind: "word" | "phrase";
+  segments: SentenceSourceRangeV3[];
+  /** 已有关联只供查看与清除；必须解除后才能重新选择。 */
+  selected?: TextLinkV3;
+  onSelect: (link?: TextLinkV3) => void;
+}
 
 export interface VoiceOption {
   id: string;
@@ -148,6 +158,9 @@ export interface VoiceProfile {
 }
 
 export interface VoiceEditorProps {
+  mode?: "grammar" | "association";
+  textLinks?: TextLinkV3[];
+  renderAssociationPicker?: (props: AssociationPickerProps) => ReactNode;
   value: RichText;
   language?: string;
   /** 无障碍名，同时用于区分同一页面上的多个编辑器。 */
@@ -159,6 +172,8 @@ export interface VoiceEditorProps {
    */
   previewIsMock?: boolean;
   readOnly?: boolean;
+  /** 正文由宿主输入框编辑；隐藏文本工具并禁止改字，仍允许标注和发音配置。 */
+  textReadOnly?: boolean;
   /**
    * 透传到正文输入框上的 data-* 属性。宿主（admin）用它做错误定位：拿
    * `[data-v3-node-id][data-v3-field]` 找到元素后要 `focus()` 并校验
@@ -183,5 +198,5 @@ export interface VoiceEditorProps {
   onAudioAssetsChange?: (next: AudioAsset[]) => void;
   /** 每段文本最多几条音频；缺省用 wire 的上限。 */
   audioAssetLimit?: number;
-  onChange: (value: RichTextV2) => void;
+  onChange: (value: RichTextV2, textLinks?: TextLinkV3[]) => void;
 }

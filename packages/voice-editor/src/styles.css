@@ -348,6 +348,19 @@
   font: inherit;
 }
 
+.tsz-ve-token.is-linked,
+.tsz-ve-letter.is-linked {
+  background: #e6f4ea;
+  box-shadow: inset 0 -2px #389e0d;
+}
+.tsz-ve-token.is-link-selected,
+.tsz-ve-letter.is-link-selected {
+  background: #bae0ff;
+}
+.tsz-ve-strip[data-target="word"] .tsz-ve-token {
+  cursor: pointer;
+}
+
 /*
  * 字母与词缝是 <span aria-disabled>，不是 <button>——`:disabled` 在它们身上永不
  * 匹配，`:not(:disabled)` 恒真。可用/禁用一律挂 aria-disabled 判定，否则「不该

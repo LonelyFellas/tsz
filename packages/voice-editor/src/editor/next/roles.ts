@@ -29,6 +29,7 @@ export const LEGACY_GRAMMAR_LEVEL = "strong";
  * - pause  → 点词缝，插入停顿
  */
 export type Brush =
+  | { kind: "association"; targetKind: "word" | "phrase" }
   | { kind: "none" }
   | { kind: "role"; level: string }
   | { kind: "liaison" }
@@ -44,7 +45,8 @@ export type LiaisonEnd = "start" | "end";
 export const DEFAULT_BRUSH: Brush = { kind: "none" };
 
 /** 当前画笔作用在哪种靶子上；none 表示这一刻鼠标归文本编辑。 */
-export function brushTarget(brush: Brush): "letter" | "gap" | "none" {
+export function brushTarget(brush: Brush): "letter" | "gap" | "word" | "none" {
+  if (brush.kind === "association") return "word";
   if (brush.kind === "role") return "letter";
   if (brush.kind === "liaison") return "letter";
   if (brush.kind === "pause") return "gap";
