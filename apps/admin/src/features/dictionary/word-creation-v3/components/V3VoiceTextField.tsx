@@ -84,21 +84,22 @@ export function V3VoiceTextField({
   }>({
     past: [],
     future: [],
-    expected: JSON.stringify([nodeId, value, textLinks])
+    expected: JSON.stringify([nodeId, value, textLinks ?? []])
   });
   useEffect(() => {
-    const key = JSON.stringify([nodeId, value, textLinks]);
+    const key = JSON.stringify([nodeId, value, textLinks ?? []]);
     if (key !== history.current.expected) {
       history.current = { past: [], future: [], expected: key };
     }
   }, [nodeId, value, textLinks]);
   const publish = (next: RichTextV3, links: typeof textLinks) => {
+    const nextLinks = mode === "association" ? (links ?? []) : links;
     history.current.expected = JSON.stringify([
       nodeId,
       toRichTextV2(next),
-      links
+      nextLinks ?? []
     ]);
-    onChange(toRichTextV2(next), links);
+    onChange(toRichTextV2(next), nextLinks);
   };
   const change: VoiceEditorProps["onChange"] = (next, links) => {
     if (readOnly) return;

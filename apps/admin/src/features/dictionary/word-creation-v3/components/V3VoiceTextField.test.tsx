@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { RichTextV3, TextLinkV3 } from "@tsz/types";
+import type { EnglishTextV3, RichTextV3, TextLinkV3 } from "@tsz/types";
 import { useState } from "react";
 import type { AudioUploadAdapter } from "@tsz/voice-editor/types";
 
@@ -23,6 +23,7 @@ vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
 }));
 
 import { V3VoiceTextField } from "./V3VoiceTextField";
+import { V3LinkedEnglishTextField } from "./V3LinkedEnglishTextField";
 
 const VALUE: RichTextV3 = { version: 2, text: "hello there", annotations: [] };
 
@@ -405,3 +406,44 @@ it("旧版正文改字后的撤销保留旧标注，并可继续重做", () => {
   });
   expect(observe.mock.lastCall![0].text).toBe("goodbye");
 });
+
+it.each([false, true])(
+  "真实英文宿主无初始关联时可撤销重做，能力开关=%s",
+  (linksEnabled) => {
+    const observe = vi.fn();
+    function Host() {
+      const [value, setValue] = useState<EnglishTextV3>({
+        mode: "unified",
+        common: {
+          id: "v",
+          origin: "manual",
+          value: { version: 2, text: "hello", annotations: [] }
+        }
+      });
+      return (
+        <V3LinkedEnglishTextField
+          value={value}
+          label="英文"
+          suffix=""
+          linksEnabled={linksEnabled}
+          onChange={(next) => {
+            setValue(next);
+            observe(next);
+          }}
+        />
+      );
+    }
+    render(<Host />);
+    fireEvent.change(screen.getByRole("textbox"), {
+      target: { value: "hello there" }
+    });
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "z", ctrlKey: true });
+    expect(screen.getByRole("textbox")).toHaveValue("hello");
+    const variant = observe.mock.lastCall![0].common;
+    // 关闭能力时仍省略 wire 字段；支持关联时，恢复空关联须明确发送 []，不能让后端保留旧关联。
+    if (linksEnabled) expect(variant.text_links).toEqual([]);
+    else expect(variant).not.toHaveProperty("text_links");
+    fireEvent.keyDown(screen.getByRole("textbox"), { key: "y", ctrlKey: true });
+    expect(screen.getByRole("textbox")).toHaveValue("hello there");
+  }
+);
