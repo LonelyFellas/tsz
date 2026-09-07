@@ -5,7 +5,11 @@ import type {
   VoiceProfileV3
 } from "@tsz/types";
 import type { VoiceEditorProps } from "@tsz/voice-editor/types";
-import { editRichText, remapTextLinks } from "@tsz/voice-editor/core";
+import {
+  editRichText,
+  remapTextLinks,
+  toRichTextV2
+} from "@tsz/voice-editor/core";
 import { EditOutlined } from "@ant-design/icons";
 import { Button, Input, Space, message } from "antd";
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
@@ -89,8 +93,12 @@ export function V3VoiceTextField({
     }
   }, [nodeId, value, textLinks]);
   const publish = (next: RichTextV3, links: typeof textLinks) => {
-    history.current.expected = JSON.stringify([nodeId, next, links]);
-    onChange(next, links);
+    history.current.expected = JSON.stringify([
+      nodeId,
+      toRichTextV2(next),
+      links
+    ]);
+    onChange(toRichTextV2(next), links);
   };
   const change: VoiceEditorProps["onChange"] = (next, links) => {
     if (readOnly) return;
@@ -140,7 +148,7 @@ export function V3VoiceTextField({
             : undefined;
         const removed =
           (textLinks?.length ?? 0) > (links?.length ?? 0) ||
-          (value.annotations?.length ?? 0) > next.annotations.length;
+          toRichTextV2(value).annotations.length > next.annotations.length;
         change(next, links);
         if (removed)
           void feedback.info("已移除受改字影响的关联或标注，可撤销恢复");

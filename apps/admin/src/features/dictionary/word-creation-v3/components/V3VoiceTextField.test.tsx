@@ -361,3 +361,47 @@ it("外部改字移除关联后，撤销和重做同时恢复正文、标注与�
   });
   expect(observe.mock.lastCall).toEqual([initial, originalLinks]);
 });
+
+it("旧版正文改字后的撤销保留旧标注，并可继续重做", () => {
+  const observe = vi.fn();
+  function Host() {
+    const [value, setValue] = useState<RichTextV3>({
+      version: 1,
+      text: "hello",
+      spans: [{ type: "bold", start: 0, end: 5 }],
+      liaisons: []
+    });
+    return (
+      <V3VoiceTextField
+        ariaLabel="旧版正文"
+        nodeId="old"
+        field="value"
+        value={value}
+        onChange={(next) => {
+          setValue(next);
+          observe(next);
+        }}
+      />
+    );
+  }
+  render(<Host />);
+  fireEvent.change(screen.getByLabelText("旧版正文"), {
+    target: { value: "goodbye" }
+  });
+  fireEvent.keyDown(screen.getByLabelText("旧版正文"), {
+    key: "z",
+    ctrlKey: true
+  });
+  expect(observe.mock.lastCall![0]).toMatchObject({
+    version: 2,
+    text: "hello",
+    annotations: [
+      expect.objectContaining({ type: "emphasis", start: 0, end: 5 })
+    ]
+  });
+  fireEvent.keyDown(screen.getByLabelText("旧版正文"), {
+    key: "y",
+    ctrlKey: true
+  });
+  expect(observe.mock.lastCall![0].text).toBe("goodbye");
+});
