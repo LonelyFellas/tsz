@@ -310,6 +310,94 @@ describe("SmartDictionary", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("他人创建的词条照常显示角标，但不给标注编辑入口", async () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...v3Word("entry", "center"),
+            annotation_visible: true,
+            annotation: "007",
+            created_by: "admin-2",
+            created_by_name: "别人"
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    // 角标是「这张列表里还有没有同词面的另一行」，与归属无关，一律显示；
+    // 能不能改才看归属。
+    expect(screen.getByText("007").tagName).toBe("SUP");
+    expect(
+      screen.queryByLabelText("编辑标注「center」")
+    ).not.toBeInTheDocument();
+  });
+
+  it("超管对他人创建的词条也有标注编辑入口", () => {
+    authMocks.profile = { id: "admin-9", role: "super_admin" };
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...v3Word("entry", "center"),
+            annotation_visible: true,
+            annotation: "007",
+            created_by: "admin-2"
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
+  });
+
+  it("拿不到当前管理员身份时不给标注编辑入口", () => {
+    authMocks.profile = null;
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...v3Word("entry", "center"),
+            annotation_visible: true,
+            annotation: "007"
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    expect(screen.getByText("007").tagName).toBe("SUP");
+    expect(
+      screen.queryByLabelText("编辑标注「center」")
+    ).not.toBeInTheDocument();
+  });
+
   it("同页混合展示 V2 phrase 与 V3，V3 只使用 presentation.label 且可进入独立路由", () => {
     matchViewport(1440);
     const legacy = {

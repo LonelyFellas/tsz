@@ -90,6 +90,7 @@ import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
 import { newWordNodeId } from "./word-model/primitives";
 
 import { EditEntryAnnotation } from "./EditEntryAnnotation";
+import { canEditRowAnnotation } from "./annotationPermission";
 
 const { RangePicker } = DatePicker;
 
@@ -166,6 +167,8 @@ export function SmartDictionary({
   const deleteActor = profile
     ? { id: profile.id, role: profile.role }
     : undefined;
+  // 删除与标注共用同一个「当前管理员」，两处归属规则都是「超管或创建人本人」。
+  const annotationActor = deleteActor;
   const [searchParams, setSearchParams] = useSearchParams();
   const [annotationEntry, setAnnotationEntry] =
     useState<AdminWordListItemAny>();
@@ -841,9 +844,10 @@ export function SmartDictionary({
             >
               {getWordRowActionLabel(record)}
             </Button>
-            {/* 有角标才给改：入口就是「改这个角标」，没有角标时列表上无从改起，
-                只能在建条冲突弹窗里产生标注。判定与角标同源，见 visibleWordAnnotation。 */}
-            {visibleWordAnnotation(record) ? (
+            {/* 有角标 + 改得动才给入口：入口就是「改这个角标」，没有角标时列表上
+                无从改起（判定与角标同源，见 visibleWordAnnotation）；别人的词条角标
+                照常显示，但只有超管或创建人本人才有编辑按钮。 */}
+            {canEditRowAnnotation(annotationActor, record) ? (
               <Button
                 type="link"
                 size="small"

@@ -20,6 +20,23 @@ const dialectPreference = vi.hoisted(() => ({
   value: "us" as "uk" | "us"
 }));
 
+// 默认登录者 = 冲突 fixture 里已有词条的 created_by，使「只能改自己的标注」默认放行；
+// 需要验证越权时在单测里改 authMocks.profile。
+const authMocks = vi.hoisted(() => ({
+  profile: { id: "admin-1", role: "admin" } as {
+    id: string;
+    role: string;
+  } | null
+}));
+
+// 只替 useAuthStore；dataSource 会在模块加载时读 api.words，所以补一个空壳
+// （本组用例全部走注入的 requests，真实 dataSource 不参与）。
+vi.mock("@/lib/auth", () => ({
+  api: { words: {} },
+  useAuthStore: (selector: (state: unknown) => unknown) =>
+    selector({ profile: authMocks.profile })
+}));
+
 vi.mock("../../settings/useDialectPreference", () => ({
   useDialectPreference: () => ({
     preference: dialectPreference.value,
@@ -419,6 +436,7 @@ function input() {
 beforeEach(() => {
   vi.clearAllMocks();
   dialectPreference.value = "us";
+  authMocks.profile = { id: "admin-1", role: "admin" };
 });
 
 describe("UnifiedCreateEntryStep", () => {
@@ -1710,6 +1728,172 @@ describe("真实词条标注创建", () => {
       base_annotation_revision: 2
     });
   });
+  function entryContext(entryId: string, label: string, createdBy?: string) {
+    const [base] = v3BaseFormPage().matched_entry_contexts;
+    return {
+      ...base!,
+      entry_id: entryId,
+      created_by: createdBy,
+      presentation: { ...base!.presentation, label }
+    };
+  }
+
+  function ownershipConflict(
+    entries: ReturnType<typeof entryContext>[]
+  ): HttpError {
+    return new HttpError(
+      409,
+      "annotation conflict",
+      [],
+      "annotation_conflict",
+      [],
+      {
+        annotation_conflict: {
+          reason: "required",
+          entries,
+          groups: [
+            {
+              dialect_scope: "us",
+              normalized_surface: "center",
+              entry_ids: entries.map((entry) => entry.entry_id)
+            }
+          ]
+        }
+      }
+    );
+  }
+
+  async function openConflict() {
+    fireEvent.change(input(), { target: { value: "center" } });
+    fireEvent.click(screen.getByText("词典检测"));
+    await screen.findByLabelText("统一主词");
+    fireEvent.click(screen.getByText("创建并进入词形与发音"));
+    return screen.findByRole("dialog");
+  }
+
+  it("他人词条在冲突弹窗里只读、不参与必填，提交只带自己有权改的", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
+    vi.mocked(supplied.createV3)
+      .mockRejectedValueOnce(
+        ownershipConflict([
+          entryContext("mine", "centre / center", "admin-1"),
+          entryContext("theirs", "center (theirs)", "admin-2")
+        ])
+      )
+      .mockResolvedValueOnce({ word: v3Word() });
+    const created = renderStep(supplied);
+    const dialog = await openConflict();
+
+    // 别人那条灰掉并说明原因，不留一个没有解释的禁用输入框。
+    const theirs = within(dialog).getByLabelText("center (theirs)标注");
+    expect(theirs).toBeDisabled();
+    // 理由挂在自己那一行上，不是弹窗里飘着的一句话。
+    expect(
+      within(theirs.closest("tr")!).getByText("他人词条")
+    ).toBeInTheDocument();
+    const mine = within(dialog).getByLabelText("centre / center标注");
+    expect(mine).toBeEnabled();
+    expect(
+      within(mine.closest("tr")!).queryByText("他人词条")
+    ).not.toBeInTheDocument();
+
+    // 只填自己那条和新建条：别人那条空着也不该挡住提交。
+    fireEvent.change(mine, { target: { value: "001" } });
+    fireEvent.change(within(dialog).getByLabelText("新建词条标注"), {
+      target: { value: "002" }
+    });
+    fireEvent.click(within(dialog).getByText("保存标注并创建"));
+    await waitFor(() => expect(created).toHaveBeenCalledOnce());
+
+    expect(vi.mocked(supplied.createV3).mock.calls[1]![1]).toMatchObject({
+      annotation: "002",
+      annotation_updates: [
+        { entry_id: "mine", annotation: "001", base_annotation_revision: 1 }
+      ]
+    });
+  });
+
+  it("整组都是他人词条时只提交新建条的标注，不夹带任何越权更新", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
+    vi.mocked(supplied.createV3)
+      .mockRejectedValueOnce(
+        ownershipConflict([
+          entryContext("theirs", "center (theirs)", "admin-2")
+        ])
+      )
+      .mockResolvedValueOnce({ word: v3Word() });
+    const created = renderStep(supplied);
+    const dialog = await openConflict();
+
+    fireEvent.change(within(dialog).getByLabelText("新建词条标注"), {
+      target: { value: "002" }
+    });
+    fireEvent.click(within(dialog).getByText("保存标注并创建"));
+    await waitFor(() => expect(created).toHaveBeenCalledOnce());
+
+    expect(vi.mocked(supplied.createV3).mock.calls[1]![1]).toMatchObject({
+      annotation: "002",
+      annotation_updates: []
+    });
+  });
+
+  it("超管在冲突弹窗里可以改他人词条的标注", async () => {
+    authMocks.profile = { id: "admin-9", role: "super_admin" };
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
+    vi.mocked(supplied.createV3)
+      .mockRejectedValueOnce(
+        ownershipConflict([
+          entryContext("theirs", "center (theirs)", "admin-2")
+        ])
+      )
+      .mockResolvedValueOnce({ word: v3Word() });
+    const created = renderStep(supplied);
+    const dialog = await openConflict();
+
+    const theirs = within(dialog).getByLabelText("center (theirs)标注");
+    expect(theirs).toBeEnabled();
+    expect(within(dialog).queryByText("他人词条")).not.toBeInTheDocument();
+    fireEvent.change(theirs, { target: { value: "001" } });
+    fireEvent.change(within(dialog).getByLabelText("新建词条标注"), {
+      target: { value: "002" }
+    });
+    fireEvent.click(within(dialog).getByText("保存标注并创建"));
+    await waitFor(() => expect(created).toHaveBeenCalledOnce());
+
+    expect(
+      vi.mocked(supplied.createV3).mock.calls[1]![1].annotation_updates
+    ).toEqual([
+      { entry_id: "theirs", annotation: "001", base_annotation_revision: 1 }
+    ]);
+  });
+
+  it("创建被后端判为越权改标注时给出确切原因，而不是笼统的创建失败", async () => {
+    const supplied = requests();
+    vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());
+    vi.mocked(supplied.createV3)
+      .mockRejectedValueOnce(
+        ownershipConflict([
+          entryContext("theirs", "center (theirs)", "admin-2")
+        ])
+      )
+      .mockRejectedValueOnce(
+        new HttpError(403, "forbidden", [], "entry_annotation_forbidden")
+      );
+    renderStep(supplied);
+    const dialog = await openConflict();
+    fireEvent.change(within(dialog).getByLabelText("新建词条标注"), {
+      target: { value: "002" }
+    });
+    fireEvent.click(within(dialog).getByText("保存标注并创建"));
+
+    expect(
+      await screen.findByText("只能修改自己创建的词条的标注。")
+    ).toBeInTheDocument();
+  });
+
   it("服务端发现旧条其他原型重复时显示通用错误并保留输入供修改", async () => {
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection());

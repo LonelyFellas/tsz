@@ -55,6 +55,13 @@ import { validateEntryInput } from "./entryClassification";
 import { hasHeadwordsIssue, headwordsIssues } from "./headwordValidation";
 import type { CreationNavigationState } from "./CreationSourceNotice";
 import { EntryAnnotationModal } from "../EntryAnnotationModal";
+import {
+  annotationForbiddenMessage,
+  canEditConflictEntry,
+  isAnnotationOwnershipError,
+  OTHERS_ENTRY_HINT
+} from "../annotationPermission";
+import { useAuthStore } from "@/lib/auth";
 import "./word-creation.css";
 
 export interface UnifiedCreateRequests {
@@ -137,7 +144,12 @@ function errorMessage(error: unknown): string {
     if (error.status === 409 && error.code === "duplicate_word")
       return "已有同名词条，无法重复创建。";
     if (error.status === 401) return "登录状态已失效，请重新登录。";
-    if (error.status === 403) return "当前账号没有创建词条的权限。";
+    // 403 分两种：改了别人的标注 vs. 压根没有建条权限。前者刷新重试也没用，
+    // 得让管理员知道是哪一行越界了。
+    if (error.status === 403)
+      return isAnnotationOwnershipError(error.code)
+        ? annotationForbiddenMessage(error.code)
+        : "当前账号没有创建词条的权限。";
     if (error.status === 503) return "词条服务暂时不可用，请稍后重试。";
     if (error.status === 410) return "检查结果已过期，请重新提交。";
   }
@@ -656,6 +668,11 @@ export function UnifiedCreateEntryStep({
   onCreated
 }: Props) {
   const { modal } = App.useApp();
+  // 冲突弹窗里哪几行能改由归属决定；门禁保证受保护页内 profile 必有值。
+  const profile = useAuthStore((s) => s.profile);
+  const annotationActor = profile
+    ? { id: profile.id, role: profile.role }
+    : undefined;
   const catalog = usePartOfSpeechCatalog();
   const { preference } = useDialectPreference();
   const [value, setValue] = useState("");
@@ -1232,18 +1249,26 @@ export function UnifiedCreateEntryStep({
           error={error}
           groups={annotationSession.conflict.groups}
           rows={[
-            ...annotationSession.conflict.entries.map((entry) => ({
-              key: entry.entry_id,
-              label: entry.presentation.label,
-              annotation:
-                annotationSession.conflict.reason === "duplicate" ||
-                annotationSession.conflict.reason === "required"
-                  ? (annotationSession.attempt.input.annotation_updates?.find(
-                      (update) => update.entry_id === entry.entry_id
-                    )?.annotation ?? entry.annotation)
-                  : entry.annotation,
-              gloss: [...entry.pos_labels, ...entry.gloss_previews].join(" · ")
-            })),
+            ...annotationSession.conflict.entries.map((entry) => {
+              // 改不了的行照样列出来：标注要在整组内互不相同，看不见别人的值就没法避重。
+              const editable = canEditConflictEntry(annotationActor, entry);
+              return {
+                key: entry.entry_id,
+                label: entry.presentation.label,
+                annotation:
+                  annotationSession.conflict.reason === "duplicate" ||
+                  annotationSession.conflict.reason === "required"
+                    ? (annotationSession.attempt.input.annotation_updates?.find(
+                        (update) => update.entry_id === entry.entry_id
+                      )?.annotation ?? entry.annotation)
+                    : entry.annotation,
+                gloss: [...entry.pos_labels, ...entry.gloss_previews].join(
+                  " · "
+                ),
+                readOnly: !editable,
+                readOnlyHint: editable ? undefined : OTHERS_ENTRY_HINT
+              };
+            }),
             {
               key: "incoming",
               incoming: true,
@@ -1269,13 +1294,14 @@ export function UnifiedCreateEntryStep({
             }
             const annotations = {
               annotation: values.incoming ?? null,
-              annotation_updates: annotationSession.conflict.entries.map(
-                (entry) => ({
+              // 只提交自己有权改的：非超管带上别人的词条会被后端整单 403 驳回。
+              annotation_updates: annotationSession.conflict.entries
+                .filter((entry) => canEditConflictEntry(annotationActor, entry))
+                .map((entry) => ({
                   entry_id: entry.entry_id,
                   annotation: values[entry.entry_id] ?? null,
                   base_annotation_revision: entry.annotation_revision
-                })
-              )
+                }))
             };
             annotationDraft.current = annotations;
             const attempt = {

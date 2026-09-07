@@ -188,6 +188,14 @@ export interface MatchedEntryContextV3 {
   /** 同原型词条的区分标签，未标注为 null。 */
   annotation: string | null;
   annotation_revision: number;
+  /**
+   * 创建人 admin id，供前端判定「这一行我能不能改标注」。
+   *
+   * 可选是**过渡态**：后端尚未下发时前端按「可改」处理（等同旧契约的填满全组），
+   * 后端补上后必须先 `sync:openapi` 再部署后端，否则严格 runtime schema 会整体拒收
+   * `ProblemMeta`，标注冲突弹窗会退化成普通报错。
+   */
+  created_by?: string;
   presentation: EntryPresentationV3;
   pos_labels: string[];
   gloss_previews: string[];

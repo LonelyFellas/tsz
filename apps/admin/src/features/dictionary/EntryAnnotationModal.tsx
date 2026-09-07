@@ -9,6 +9,8 @@ export interface AnnotationRow {
   gloss?: string;
   incoming?: boolean;
   readOnly?: boolean;
+  /** 只读的理由；不给就只剩一个没有解释的灰输入框。 */
+  readOnlyHint?: string;
 }
 
 export function annotationErrors(
@@ -132,6 +134,9 @@ export function EntryAnnotationModal({
                     {row.label}
                   </Typography.Text>
                   <Tag>{row.incoming ? "新建" : "已有"}</Tag>
+                  {row.readOnly && row.readOnlyHint ? (
+                    <Tag color="default">{row.readOnlyHint}</Tag>
+                  ) : null}
                 </Space>
                 {row.gloss ? (
                   <Typography.Text
@@ -162,7 +167,7 @@ export function EntryAnnotationModal({
                 >
                   <Input
                     aria-label={`${row.incoming ? "新建词条" : row.label}标注`}
-                    placeholder="请输入标注"
+                    placeholder={row.readOnly ? "未标注" : "请输入标注"}
                     inputMode="numeric"
                     style={{
                       fontFamily:
