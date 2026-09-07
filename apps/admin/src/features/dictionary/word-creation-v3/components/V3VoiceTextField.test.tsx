@@ -288,3 +288,76 @@ it("普通输入也同步迁移标注，关闭能力或只读时不能打开编�
   );
   expect(screen.queryByLabelText("打开语法编辑器")).not.toBeInTheDocument();
 });
+
+it("外部改字移除关联后，撤销和重做同时恢复正文、标注与关联", async () => {
+  const initial: RichTextV3 = {
+    version: 2,
+    text: "hello there",
+    annotations: [{ type: "emphasis", start: 6, end: 11, level: "core" }]
+  };
+  const originalLinks: TextLinkV3[] = [
+    {
+      id: "link",
+      source_segments: [{ start: 6, end: 11, surface: "there" }],
+      target_word_id: "w",
+      target_publication_id: "p",
+      target_pos_id: "pos",
+      target_base_form_id: "b",
+      target_form_id: "f",
+      target_variant_id: "v",
+      target_sense_id: "s"
+    }
+  ];
+  const observe = vi.fn();
+  function Host() {
+    const [value, setValue] = useState(initial);
+    const [links, setLinks] = useState(originalLinks);
+    return (
+      <V3VoiceTextField
+        mode="association"
+        ariaLabel="正文撤销"
+        nodeId="v"
+        field="value"
+        value={value}
+        textLinks={links}
+        onChange={(next, nextLinks) => {
+          setValue(next);
+          setLinks(nextLinks ?? []);
+          observe(next, nextLinks);
+        }}
+      />
+    );
+  }
+  render(<Host />);
+  fireEvent.change(screen.getByLabelText("正文撤销"), {
+    target: { value: "hello friend" }
+  });
+  expect(observe.mock.lastCall![1]).toEqual([]);
+  expect(
+    await screen.findByText("已移除受改字影响的关联或标注，可撤销恢复")
+  ).toBeInTheDocument();
+  fireEvent.keyDown(screen.getByLabelText("正文撤销"), {
+    key: "z",
+    metaKey: true
+  });
+  expect(observe.mock.lastCall).toEqual([initial, originalLinks]);
+  fireEvent.keyDown(screen.getByLabelText("正文撤销"), {
+    key: "z",
+    metaKey: true,
+    shiftKey: true
+  });
+  expect(observe.mock.lastCall![0].text).toBe("hello friend");
+  expect(observe.mock.lastCall![1]).toEqual([]);
+  fireEvent.click(screen.getByRole("button", { name: "打开正文撤销编辑器" }));
+  await screen.findByRole(
+    "toolbar",
+    { name: "标注工具栏" },
+    { timeout: 10000 }
+  );
+  fireEvent.click(screen.getByRole("button", { name: "完成正文撤销编辑" }));
+  fireEvent.keyDown(screen.getByLabelText("正文撤销"), {
+    key: "z",
+    ctrlKey: true
+  });
+  expect(observe.mock.lastCall).toEqual([initial, originalLinks]);
+});

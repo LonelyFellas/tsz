@@ -7,8 +7,8 @@ import type {
 import type { VoiceEditorProps } from "@tsz/voice-editor/types";
 import { editRichText, remapTextLinks } from "@tsz/voice-editor/core";
 import { EditOutlined } from "@ant-design/icons";
-import { Button, Input, Space } from "antd";
-import { Suspense, lazy, useState } from "react";
+import { Button, Input, Space, message } from "antd";
+import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import {
   adminAudioUploadAdapter,
   adminVoicePreviewAdapter,
@@ -71,6 +71,45 @@ export function V3VoiceTextField({
   onChange
 }: V3VoiceTextFieldProps) {
   const [editing, setEditing] = useState(false);
+  const [feedback, feedbackHolder] = message.useMessage();
+  type Snapshot = { value: RichTextV3; links: typeof textLinks };
+  const history = useRef<{
+    past: Snapshot[];
+    future: Snapshot[];
+    expected: string;
+  }>({
+    past: [],
+    future: [],
+    expected: JSON.stringify([nodeId, value, textLinks])
+  });
+  useEffect(() => {
+    const key = JSON.stringify([nodeId, value, textLinks]);
+    if (key !== history.current.expected) {
+      history.current = { past: [], future: [], expected: key };
+    }
+  }, [nodeId, value, textLinks]);
+  const publish = (next: RichTextV3, links: typeof textLinks) => {
+    history.current.expected = JSON.stringify([nodeId, next, links]);
+    onChange(next, links);
+  };
+  const change: VoiceEditorProps["onChange"] = (next, links) => {
+    if (readOnly) return;
+    history.current.past = [
+      ...history.current.past.slice(-99),
+      { value, links: textLinks }
+    ];
+    history.current.future = [];
+    publish(next, links);
+  };
+  const restore = (redo: boolean) => {
+    if (readOnly) return;
+    const source = redo ? history.current.future : history.current.past;
+    const snapshot = source.pop();
+    if (!snapshot) return;
+    const destination = redo ? history.current.past : history.current.future;
+    destination.push({ value, links: textLinks });
+    publish(snapshot.value, snapshot.links);
+  };
   const fallback = (
     <Input.TextArea
       aria-label={ariaLabel}
@@ -78,41 +117,71 @@ export function V3VoiceTextField({
       className="word-pronunciation-phonetic-input"
       data-v3-field={field}
       data-v3-node-id={nodeId}
-      onChange={(event) =>
-        onChange(
-          editRichText(value, event.target.value),
+      onKeyDown={(event) => {
+        if (
+          (event.metaKey || event.ctrlKey) &&
+          !event.altKey &&
+          (event.key.toLowerCase() === "z" || event.key.toLowerCase() === "y")
+        ) {
+          event.preventDefault();
+          restore(event.shiftKey || event.key.toLowerCase() === "y");
+        }
+      }}
+      onChange={(event) => {
+        const inputType = (event.nativeEvent as InputEvent).inputType;
+        if (inputType === "historyUndo" || inputType === "historyRedo") {
+          restore(inputType === "historyRedo");
+          return;
+        }
+        const next = editRichText(value, event.target.value);
+        const links =
           mode === "association"
             ? remapTextLinks(value.text, event.target.value, textLinks ?? [])
-            : undefined
-        )
-      }
+            : undefined;
+        const removed =
+          (textLinks?.length ?? 0) > (links?.length ?? 0) ||
+          (value.annotations?.length ?? 0) > next.annotations.length;
+        change(next, links);
+        if (removed)
+          void feedback.info("已移除受改字影响的关联或标注，可撤销恢复");
+      }}
       placeholder={placeholder}
       readOnly={readOnly || (env.VOICE_EDITOR && editing)}
       value={value.text}
     />
   );
 
-  if (!env.VOICE_EDITOR) return fallback;
+  if (!env.VOICE_EDITOR)
+    return (
+      <>
+        {feedbackHolder}
+        {fallback}
+      </>
+    );
 
   if (!editing) {
     return (
-      <Space.Compact block>
-        {fallback}
-        <Button
-          aria-label={`打开${ariaLabel}编辑器`}
-          disabled={readOnly}
-          icon={<EditOutlined />}
-          onClick={() => setEditing(true)}
-          style={{ height: "auto" }}
-        >
-          编辑器
-        </Button>
-      </Space.Compact>
+      <>
+        {feedbackHolder}
+        <Space.Compact block>
+          {fallback}
+          <Button
+            aria-label={`打开${ariaLabel}编辑器`}
+            disabled={readOnly}
+            icon={<EditOutlined />}
+            onClick={() => setEditing(true)}
+            style={{ height: "auto" }}
+          >
+            编辑器
+          </Button>
+        </Space.Compact>
+      </>
     );
   }
 
   return (
     <div className="v3-voice-text-editor">
+      {feedbackHolder}
       <Suspense fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}>
         <VoiceEditor
           textReadOnly
@@ -126,7 +195,7 @@ export function V3VoiceTextField({
           }}
           language="en"
           placeholder={placeholder}
-          onChange={(next: RichTextV2, nextLinks) => onChange(next, nextLinks)}
+          onChange={(next: RichTextV2, nextLinks) => change(next, nextLinks)}
           previewAdapter={
             env.VOICE_PREVIEW ? adminVoicePreviewAdapter : undefined
           }
