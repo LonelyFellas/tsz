@@ -12,6 +12,9 @@ const conflict = {
       entry_id: id,
       annotation: null,
       annotation_revision: 1,
+      // 归属标记必须能穿过严格 runtime schema：ProblemMeta 一旦校验失败会被整体丢弃，
+      // 冲突弹窗就静默退化成普通报错。这条断言守的是 sync:openapi 有没有跟上后端。
+      created_by: "018f47b8-e3c1-7bd1-9f0a-1234567890c7",
       presentation: {
         label: "center",
         matched_surfaces: ["center"],
