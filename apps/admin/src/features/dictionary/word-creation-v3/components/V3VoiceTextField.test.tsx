@@ -416,6 +416,7 @@ it.each([false, true])(
         mode: "unified",
         common: {
           id: "v",
+          origin: "manual",
           value: { version: 2, text: "hello", annotations: [] }
         }
       });
