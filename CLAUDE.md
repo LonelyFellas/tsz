@@ -2,8 +2,8 @@
 
 天生会背 — 词汇学习平台前端 monorepo（pnpm + turbo，Node = 24.19.0）。
 后端正从独立仓库 tsz-go（Go）重写迁移至 tsz-rust（Rust，同上级目录），
-前端已切到 tsz-rust 对接（当前只落地 auth 核心，其余端点见 api-client 契约测试
-PENDING 白名单）；本仓库只管前端与部署编排。
+前端已切到 tsz-rust 对接；具体端点能力以当前后端 OpenAPI、实现及 api-client 契约测试
+PENDING 白名单为准。本仓库负责前端与部署编排。
 
 ## 布局
 
@@ -24,7 +24,7 @@ PENDING 白名单）；本仓库只管前端与部署编排。
 
 ### 类型与数据层
 
-- `@tsz/types` 全部 **snake_case，1:1 镜像后端 Go 的 JSON wire 格式**，前端不做命名转换层
+- `@tsz/types` 全部 **snake_case，1:1 镜像后端的 JSON wire 格式**，前端不做命名转换层
   （http 层纯 parse）。组件 props / 本地 state 是例外，用 camelCase。
 - 复用优先级：逻辑 → `@tsz/shared`，类型 → `@tsz/types`，请求 → `@tsz/api-client`；
   UI 按端分叉：web → `@tsz/ui`，admin → antd 自带组件。
@@ -74,5 +74,5 @@ PENDING 白名单）；本仓库只管前端与部署编排。
 
 ## 部署
 
-- 部署流程见 `.claude/skills/deploy`（测试服 tshb-test 只拉 **Gitee** 镜像，不拉 GitHub）。
+- 部署流程见 `.agents/skills/deploy/SKILL.md`：从 GitHub main 的精确提交导出本地构建，rsync 到 tshb-test；服务器不拉 Git 仓库。
 - 生产环境 `.env` 的 `COOKIE_SECURE` **禁止为 false**（false 仅限纯 HTTP 的测试环境）。
