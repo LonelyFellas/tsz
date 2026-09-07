@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { RichTextV3 } from "@tsz/types";
+import type { RichTextV3, TextLinkV3 } from "@tsz/types";
+import { useState } from "react";
 import type { AudioUploadAdapter } from "@tsz/voice-editor/types";
 
 const state = vi.hoisted(() => ({
@@ -26,6 +27,7 @@ import { V3VoiceTextField } from "./V3VoiceTextField";
 const VALUE: RichTextV3 = { version: 2, text: "hello there", annotations: [] };
 
 async function openAudioPanel() {
+  fireEvent.click(screen.getByRole("button", { name: /^打开.*编辑器$/ }));
   // 编辑器是 lazy 代码块，整包并行跑时首次加载可能超过默认 1s
   await screen.findByRole(
     "toolbar",
@@ -36,12 +38,29 @@ async function openAudioPanel() {
 }
 
 beforeEach(() => {
+  state.flags.VOICE_EDITOR = true;
   state.flags.VOICE_AUDIO_UPLOAD = true;
   state.upload.mockReset();
   state.resolveUrl.mockReset();
 });
 
 describe("V3VoiceTextField 上传音频", () => {
+  it("后端仅支持语法结构音频时，正文关联模式不开放上传", async () => {
+    render(
+      <V3VoiceTextField
+        mode="association"
+        ariaLabel="英文例句"
+        field="value"
+        nodeId="example"
+        value={VALUE}
+        onChange={vi.fn()}
+        onAudioAssetsChange={vi.fn()}
+      />
+    );
+    await openAudioPanel();
+    expect(screen.getByRole("button", { name: "选择音频文件" })).toBeDisabled();
+    expect(state.upload).not.toHaveBeenCalled();
+  });
   it("开关开着时注入适配器：上传成功后把资产原样（wire 形状）抛到 audio_assets", async () => {
     state.upload.mockImplementation(async ({ file, locale, gender }) => ({
       id: "asset-1",
@@ -112,4 +131,160 @@ describe("V3VoiceTextField 上传音频", () => {
     expect(screen.getByRole("button", { name: "选择音频文件" })).toBeDisabled();
     expect(screen.getByText("音频上传未启用")).toBeInTheDocument();
   });
+});
+
+it("降级文本框在插入文本后平移原标注和关联", () => {
+  state.flags.VOICE_EDITOR = false;
+  const onChange = vi.fn();
+  render(
+    <V3VoiceTextField
+      mode="association"
+      ariaLabel="例句正文"
+      field="value"
+      nodeId="v"
+      onChange={onChange}
+      value={{
+        version: 2,
+        text: "hello there",
+        annotations: [{ type: "emphasis", start: 6, end: 11, level: "core" }]
+      }}
+      textLinks={[
+        {
+          id: "link",
+          source_segments: [{ start: 6, end: 11, surface: "there" }],
+          target_word_id: "w",
+          target_publication_id: "p",
+          target_pos_id: "pos",
+          target_base_form_id: "b",
+          target_form_id: "f",
+          target_variant_id: "v",
+          target_sense_id: "s"
+        }
+      ]}
+    />
+  );
+  fireEvent.change(screen.getByLabelText("例句正文"), {
+    target: { value: "oh hello there" }
+  });
+  expect(onChange.mock.lastCall![0].annotations).toEqual([
+    { type: "emphasis", start: 9, end: 14, level: "core" }
+  ]);
+  expect(onChange.mock.lastCall![1][0].source_segments).toEqual([
+    { start: 9, end: 14, surface: "there" }
+  ]);
+});
+
+it("正文在外部输入框编辑，内部只做标注；多行正文、关联和设置往返不丢失", async () => {
+  const observe = vi.fn();
+  function Host() {
+    const [value, setValue] = useState<RichTextV3>({
+      version: 2,
+      text: "hello\nthere",
+      annotations: [{ type: "emphasis", start: 6, end: 11, level: "core" }]
+    });
+    const [links, setLinks] = useState<TextLinkV3[]>([
+      {
+        id: "link",
+        source_segments: [{ start: 6, end: 11, surface: "there" }],
+        target_word_id: "w",
+        target_publication_id: "p",
+        target_pos_id: "pos",
+        target_base_form_id: "b",
+        target_form_id: "f",
+        target_variant_id: "v",
+        target_sense_id: "s"
+      }
+    ]);
+    return (
+      <V3VoiceTextField
+        mode="association"
+        ariaLabel="英文例句"
+        field="value"
+        nodeId="example"
+        value={value}
+        textLinks={links}
+        voiceProfile={{ voice_ids: [], rate_percent: 25 }}
+        onChange={(next, nextLinks) => {
+          setValue(next);
+          setLinks(nextLinks ?? []);
+          observe(next, nextLinks);
+        }}
+      />
+    );
+  }
+  render(<Host />);
+  expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("英文例句")).toHaveValue("hello\nthere");
+  expect(observe).not.toHaveBeenCalled();
+  fireEvent.change(screen.getByLabelText("英文例句"), {
+    target: { value: "oh hello\nthere" }
+  });
+  fireEvent.click(screen.getByLabelText("打开英文例句编辑器"));
+  await screen.findByRole("toolbar", { name: "标注工具栏" });
+  expect(
+    screen.queryByRole("button", { name: "编辑文本" })
+  ).not.toBeInTheDocument();
+  expect(screen.getByLabelText("英文例句")).toHaveAttribute("readonly");
+  fireEvent.change(screen.getByLabelText("英文例句"), {
+    target: { value: "不会覆盖原文" }
+  });
+  fireEvent.click(screen.getByLabelText("完成英文例句编辑"));
+  expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+  expect(screen.getByLabelText("英文例句")).toHaveValue("oh hello\nthere");
+  expect(screen.getByLabelText("英文例句")).not.toHaveAttribute("readonly");
+  expect(screen.getByLabelText("英文例句")).toHaveAttribute(
+    "data-v3-node-id",
+    "example"
+  );
+  expect(observe.mock.lastCall?.[0].annotations).toEqual([
+    { type: "emphasis", start: 9, end: 14, level: "core" }
+  ]);
+  expect(observe.mock.lastCall?.[1][0].source_segments).toEqual([
+    { start: 9, end: 14, surface: "there" }
+  ]);
+  fireEvent.click(screen.getByLabelText("打开英文例句编辑器"));
+  await screen.findByRole("toolbar", { name: "标注工具栏" });
+  expect(screen.getByLabelText("英文例句")).toHaveValue("oh hello\nthere");
+  expect(screen.getByText("1.25×")).toBeVisible();
+  expect(document.querySelectorAll(".tsz-ve-letter.is-linked")).toHaveLength(5);
+});
+
+it("普通输入也同步迁移标注，关闭能力或只读时不能打开编辑器", () => {
+  const onChange = vi.fn();
+  const { rerender } = render(
+    <V3VoiceTextField
+      value={VALUE}
+      ariaLabel="语法"
+      nodeId="v"
+      field="content"
+      onChange={onChange}
+    />
+  );
+  fireEvent.change(screen.getByLabelText("语法"), {
+    target: { value: "changed" }
+  });
+  expect(onChange.mock.lastCall?.[0].text).toBe("changed");
+  rerender(
+    <V3VoiceTextField
+      value={VALUE}
+      ariaLabel="语法"
+      nodeId="v"
+      field="content"
+      onChange={onChange}
+      readOnly
+    />
+  );
+  expect(screen.getByLabelText("打开语法编辑器")).toBeDisabled();
+  expect(screen.getByLabelText("语法")).toHaveAttribute("readonly");
+  state.flags.VOICE_EDITOR = false;
+  rerender(
+    <V3VoiceTextField
+      value={VALUE}
+      ariaLabel="语法"
+      nodeId="v"
+      field="content"
+      onChange={onChange}
+    />
+  );
+  expect(screen.queryByLabelText("打开语法编辑器")).not.toBeInTheDocument();
 });

@@ -46,10 +46,6 @@ const PENDING = new Set<string>([
   "put /me/learning-settings",
   "post /me/avatar/upload-url",
   "post /me/avatar",
-  // 音频资产上传(真人录音,tsz-rust 未实现;契约见 docs/features/voice-editor-audio-upload/design.md)。
-  "post /admin/lexicon/audio-assets/upload-url",
-  "post /admin/lexicon/audio-assets",
-  "get /admin/lexicon/audio-assets/_/url",
   // 找回密码(tsz-rust 未实现)。
   "post /auth/password/forgot",
   "post /auth/password/reset",
@@ -498,7 +494,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "c666b53b0b545f001daecfcd1770744d96a59b3194522e1b1d1a6e2894c32ea1"
+      "8c229548626cf390a6069d129a2aedc79ed79394a66bee6f9571940f119a8352"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -506,6 +502,13 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(runtimeSchemaBundle.roots).toContain("ProblemDetails");
 
     const defs = runtimeSchemaBundle.$defs;
+    expect(defs.WordSentenceV3.properties.zh_translations.maxItems).toBe(2000);
+    expect(defs.RichTextVariantV3.required).not.toContain("text_links");
+    expect(defs.RichTextVariantV3.properties.text_links.items).toEqual({
+      $ref: "#/$defs/TextLinkV3"
+    });
+    expect(defs.TextLinkV3.required).toContain("source_segments");
+    expect(defs.TextLinkV3.required).not.toContain("target_gloss");
     expect(defs.AdminWordAny.oneOf).toEqual([
       { $ref: "#/$defs/AdminWordV2" },
       { $ref: "#/$defs/AdminWordV3" }

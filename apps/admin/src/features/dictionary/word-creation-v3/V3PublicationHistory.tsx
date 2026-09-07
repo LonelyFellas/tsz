@@ -8,7 +8,6 @@ import type {
   EnglishTextV3,
   SurfaceMatchPageAny,
   WordDefinitionV2,
-  WordDefinitionV3,
   WordHeadwordsV2
 } from "@tsz/types";
 import { Alert, Button, Card, Flex, Modal, Spin, Tag, Typography } from "antd";
@@ -26,6 +25,7 @@ import {
 } from "../useSurfaceSnapshot";
 import { createV3WordRequests, type V3WordRequests } from "./api";
 import { sentenceTranslationsV3 } from "./meaningsModel";
+import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import {
   definitionModeLabel,
   dialectLabel,
@@ -87,6 +87,7 @@ interface SnapshotFormLine {
 }
 
 interface SnapshotMeaningLine {
+  english?: EnglishTextV3;
   id: string;
   pos: string;
   mode: string;
@@ -101,6 +102,7 @@ interface SnapshotGrammarLine {
 }
 
 interface SnapshotSentenceLine {
+  richEnglish?: EnglishTextV3;
   id: string;
   pos: string;
   level: string;
@@ -172,18 +174,6 @@ function v3EnglishRows(value: EnglishTextV3) {
 }
 
 function v2DefinitionTexts(definition: WordDefinitionV2): string[] {
-  if ("content_id" in definition) {
-    return [definition.content.text];
-  }
-  if (definition.content.mode === "unified") {
-    return [definition.content.common.value.text];
-  }
-  return [definition.content.uk, definition.content.us].flatMap((slot) =>
-    slot.state === "ready" ? [slot.variant.value.text] : []
-  );
-}
-
-function v3DefinitionTexts(definition: WordDefinitionV3): string[] {
   if ("content_id" in definition) {
     return [definition.content.text];
   }
@@ -322,14 +312,13 @@ function snapshotBody(publication: AdminWordPublicationAny): {
     ),
     meanings: publication.word.meanings.pos.flatMap((pos) =>
       pos.senses.flatMap((sense) =>
-        sense.definitions.flatMap((definition) =>
-          v3DefinitionTexts(definition).map((text, index) => ({
-            id: `${definition.id}-${index}`,
-            pos: posById.get(pos.pos_id) ?? pos.pos_id,
-            mode: definition.definition_mode,
-            text
-          }))
-        )
+        sense.definitions.map((definition) => ({
+          id: definition.id,
+          pos: posById.get(pos.pos_id) ?? pos.pos_id,
+          mode: definition.definition_mode,
+          text: "content_id" in definition ? definition.content.text : "",
+          ...("content_id" in definition ? {} : { english: definition.content })
+        }))
       )
     ),
     senseGroups: publication.word.meanings.sense_groups.map((group) => ({
@@ -353,11 +342,12 @@ function snapshotBody(publication: AdminWordPublicationAny): {
           pos: posById.get(pos.pos_id) ?? pos.pos_id,
           level: sentence.level,
           english: v3EnglishRows(sentence.en_text),
+          richEnglish: sentence.en_text,
           chinese: sentenceTranslationsV3(sentence).map((translation) => ({
             id: translation.id,
             label:
               translation.band === "c1_c2"
-                ? "初"
+                ? "低"
                 : translation.band === "b1_b2"
                   ? "中"
                   : "高",
@@ -459,7 +449,11 @@ function PublicationSnapshotBody({
               <Flex key={meaning.id} align="center" gap="small" wrap>
                 <Tag>{partOfSpeechLabel(meaning.pos)}</Tag>
                 <Tag>{definitionModeLabel(meaning.mode)}</Tag>
-                <Typography.Text>{meaning.text}</Typography.Text>
+                {meaning.english ? (
+                  <V3EnglishTextPreview value={meaning.english} />
+                ) : (
+                  <Typography.Text>{meaning.text}</Typography.Text>
+                )}
               </Flex>
             ))
           )}
@@ -503,11 +497,15 @@ function PublicationSnapshotBody({
                       <Tag key={`${sentence.id}-role-${index}`}>{role}</Tag>
                     ))}
                   </Flex>
-                  {sentence.english.map((row) => (
-                    <Typography.Text key={row.id}>
-                      {dialectLabel(row.dialect as never)}：{row.text}
-                    </Typography.Text>
-                  ))}
+                  {sentence.richEnglish ? (
+                    <V3EnglishTextPreview value={sentence.richEnglish} />
+                  ) : (
+                    sentence.english.map((row) => (
+                      <Typography.Text key={row.id}>
+                        {dialectLabel(row.dialect as never)}：{row.text}
+                      </Typography.Text>
+                    ))
+                  )}
                   {sentence.chinese.map((translation) => (
                     <Typography.Text key={translation.id}>
                       {translation.label ? (

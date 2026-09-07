@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "c666b53b0b545f001daecfcd1770744d96a59b3194522e1b1d1a6e2894c32ea1",
+  "_source_sha256": "8c229548626cf390a6069d129a2aedc79ed79394a66bee6f9571940f119a8352",
   "roots": [
     "EntryAnnotationResponse",
     "AdminWordV3",
@@ -399,7 +399,8 @@
         "publication": { "$ref": "#/$defs/V3PublicationCapability" },
         "sense_component_usages": { "type": "boolean" },
         "sentence_associations": { "type": "boolean" },
-        "sentence_target_discovery": { "type": "boolean" }
+        "sentence_target_discovery": { "type": "boolean" },
+        "text_links": { "type": "boolean" }
       },
       "additionalProperties": false
     },
@@ -411,6 +412,31 @@
       },
       "additionalProperties": false
     },
+    "AudioAsset": {
+      "type": "object",
+      "required": [
+        "id",
+        "locale",
+        "gender",
+        "content_type",
+        "size_bytes",
+        "original_name",
+        "created_at"
+      ],
+      "properties": {
+        "content_type": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "duration_ms": { "type": ["integer", "null"] },
+        "gender": { "$ref": "#/$defs/AudioAssetGender" },
+        "id": { "type": "string", "format": "uuid" },
+        "locale": { "$ref": "#/$defs/AudioAssetLocale" },
+        "original_name": { "type": "string" },
+        "size_bytes": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "AudioAssetGender": { "type": "string", "enum": ["female", "male"] },
+    "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
     "BuiltinDictionaryEvidenceV3": {
       "oneOf": [
         {
@@ -1269,6 +1295,12 @@
         "speech_provider_unavailable",
         "speech_rate_limited",
         "speech_storage_unavailable",
+        "unsupported_audio_content_type",
+        "audio_file_too_large",
+        "audio_upload_not_completed",
+        "invalid_audio_key",
+        "audio_storage_not_configured",
+        "audio_asset_not_found",
         "service_unavailable",
         "internal_error"
       ]
@@ -1532,6 +1564,11 @@
       "type": "object",
       "required": ["id", "dialect", "content"],
       "properties": {
+        "audio_assets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AudioAsset" },
+          "maxItems": 8
+        },
         "content": { "$ref": "#/$defs/RichTextV3" },
         "dialect": { "$ref": "#/$defs/Dialect" },
         "id": { "type": "string", "format": "uuid" },
@@ -2319,6 +2356,11 @@
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
+        "text_links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/TextLinkV3" },
+          "maxItems": 100
+        },
         "value": { "$ref": "#/$defs/RichTextV3" },
         "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
@@ -3031,6 +3073,51 @@
         "allow_multiple_active_exact_headword_publications"
       ]
     },
+    "TextLinkV3": {
+      "type": "object",
+      "required": [
+        "id",
+        "source_segments",
+        "target_word_id",
+        "target_publication_id",
+        "target_pos_id",
+        "target_base_form_id",
+        "target_form_id",
+        "target_variant_id",
+        "target_sense_id"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "source_segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceSourceRangeV1" },
+          "maxItems": 20,
+          "minItems": 1
+        },
+        "target_base_form_id": { "type": "string", "format": "uuid" },
+        "target_form_id": { "type": "string", "format": "uuid" },
+        "target_gloss": { "type": "string" },
+        "target_headword": { "type": "string" },
+        "target_pos_id": { "type": "string", "format": "uuid" },
+        "target_publication_id": { "type": "string", "format": "uuid" },
+        "target_sense_id": { "type": "string", "format": "uuid" },
+        "target_variant_id": { "type": "string", "format": "uuid" },
+        "target_word_id": { "type": "string", "format": "uuid" },
+        "via_phrase": { "$ref": "#/$defs/TextLinkViaPhraseV3" }
+      },
+      "additionalProperties": false
+    },
+    "TextLinkViaPhraseV3": {
+      "type": "object",
+      "required": ["word_id", "publication_id", "sense_id", "component_id"],
+      "properties": {
+        "component_id": { "type": "string", "format": "uuid" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "sense_id": { "type": "string", "format": "uuid" },
+        "word_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "TextOrigin": {
       "type": "string",
       "enum": ["dictionary", "converted", "manual"]
@@ -3214,7 +3301,8 @@
         "phrase_component_target_unavailable",
         "phrase_component_target_nested",
         "phrase_component_target_stale",
-        "voice_profile_invalid"
+        "voice_profile_invalid",
+        "audio_asset_invalid"
       ]
     },
     "VoiceProfileV3": {
@@ -4113,7 +4201,7 @@
         "zh_translations": {
           "type": "array",
           "items": { "$ref": "#/$defs/WordSentenceTranslationV3" },
-          "maxItems": 3
+          "maxItems": 2000
         }
       },
       "additionalProperties": false

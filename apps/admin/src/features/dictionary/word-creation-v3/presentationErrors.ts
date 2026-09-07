@@ -40,12 +40,14 @@ const ISSUE_MESSAGES = {
   definition_required: "请至少添加一条释义",
   definition_level_invalid: "请选择有效的释义等级",
   definition_invalid: "请完整填写释义并选择语法结构",
+  audio_asset_invalid: "音频资产不可用、格式错误或无权引用",
   native_definition_required: "请至少填写一条中文释义",
   sentence_level_invalid: "请选择有效的例句等级",
   sentence_incomplete: "请完整填写中英文例句并关联当前词义",
   sentence_translation_required: "请填写当前等级的中文译文",
-  sentence_translation_invalid: "中文译文格式无效或超过三档",
-  duplicate_sentence_translation_band: "同一译文等级只能添加一次",
+  sentence_translation_invalid: "中文译文格式无效",
+  duplicate_sentence_translation_band:
+    "当前后端尚不支持同档多条译文，请更新服务后重试",
   sentence_link_role_invalid: "例句关联类型无效",
   duplicate_sentence_link: "例句中存在重复关联",
   relation_score_invalid: "关系词相关度必须在有效范围内",
@@ -85,6 +87,7 @@ const ISSUE_MESSAGES = {
 } satisfies Record<V3ValidationIssueCode, string>;
 
 export function v3IssueMessage(issue: V3DraftValidationIssue): string {
+  if (issue.field === "text_links") return "正文关联无效，请重新选择或清除关联";
   return ISSUE_MESSAGES[issue.code] ?? UNKNOWN_ISSUE_MESSAGE;
 }
 

@@ -128,8 +128,60 @@ function cloneVariant(variant: RichTextVariantV3): RichTextVariantV3 {
   return {
     id: variant.id,
     origin: variant.origin,
-    value: cloneRichText(variant.value)
+    value: cloneRichText(variant.value),
+    ...(variant.voice_profile !== undefined
+      ? { voice_profile: structuredClone(variant.voice_profile) }
+      : {}),
+    ...(variant.audio_assets !== undefined
+      ? { audio_assets: structuredClone(variant.audio_assets) }
+      : {}),
+    ...(variant.text_links !== undefined
+      ? { text_links: structuredClone(variant.text_links) }
+      : {})
   };
+}
+
+/** 去掉服务端生成的关联文案；旧后端不能接收新增字段。 */
+export function prepareTextLinksForSave(
+  content: DraftMeaningsStepContentWritableV3,
+  enabled: boolean
+): DraftMeaningsStepContentWritableV3 {
+  const next = structuredClone(content);
+  for (const pos of next.pos)
+    for (const sense of pos.senses) {
+      const texts = [
+        ...sense.definitions.flatMap((definition) =>
+          definition.definition_mode === "en_definition" ||
+          definition.definition_mode === "en_sentence"
+            ? [definition.content]
+            : []
+        ),
+        ...sense.sentences.map((sentence) => sentence.en_text)
+      ];
+      for (const text of texts) {
+        const variants =
+          text.mode === "unified"
+            ? [text.common]
+            : [text.uk, text.us].flatMap((slot) =>
+                slot.state === "ready" ? [slot.variant] : []
+              );
+        for (const variant of variants) {
+          if (!enabled) {
+            if (variant.text_links?.length)
+              throw new Error(
+                "当前后端不支持保存已有正文关联，请升级后端后重试"
+              );
+            delete variant.text_links;
+            continue;
+          }
+          variant.text_links?.forEach((link) => {
+            delete link.target_headword;
+            delete link.target_gloss;
+          });
+        }
+      }
+    }
+  return next;
 }
 
 function cloneEnglishText(value: EnglishTextV3): EnglishTextV3 {

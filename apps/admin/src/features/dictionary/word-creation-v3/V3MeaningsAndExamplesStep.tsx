@@ -42,14 +42,11 @@ import type {
   PartOfSpeechCatalogResponse,
   RelatedWordResultAny,
   RichTextV3,
-  SentenceTranslationBandV3,
   StepSaveIntent,
   V3DraftValidationIssue,
   WordDefinitionV3,
   WordEntryKindV3,
   WordRelationWritableV3,
-  WordSentenceTranslationV3,
-  WordSentenceWritableV3,
   WordSenseWritableV3
 } from "@tsz/types";
 import type { DragEvent, KeyboardEvent, ReactNode } from "react";
@@ -63,7 +60,6 @@ import {
   editableEnglishText,
   newGrammarStructure,
   type RelationDisplaySnapshots,
-  replaceEnglishText,
   definitionSummary,
   replaceRichText,
   spellingModeForPos,
@@ -73,6 +69,8 @@ import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
 import { V3VoiceTextField } from "./components/V3VoiceTextField";
+import { V3LinkedEnglishTextField } from "./components/V3LinkedEnglishTextField";
+import { V3SentenceTranslationsField } from "./components/V3SentenceTranslationsField";
 import { V3AddBasicPosSelect } from "./components/V3AddBasicPosSelect";
 import {
   baseSpellingForPos,
@@ -104,6 +102,7 @@ export interface V3MeaningsAndExamplesStepProps {
   sentenceTargetDiscoveryEnabled?: boolean;
   /** 后端释义级成分用词能力（capabilities.sense_component_usages）；关闭时成分区块只读、不发送。 */
   componentUsagesEnabled?: boolean;
+  textLinksEnabled?: boolean;
 }
 
 function fieldIssue(
@@ -144,34 +143,6 @@ function definitionContentIssue(
 type DraftMutation = (draft: DraftMeaningsStepContentWritableV3) => void;
 type SenseSectionKind =
   "definitions" | "component_usages" | "sentences" | "relations";
-
-function translationTier(band: SentenceTranslationBandV3): {
-  short: string;
-  label: string;
-} {
-  if (band === "c1_c2") return { short: "初", label: "初阶" };
-  if (band === "b1_b2") return { short: "中", label: "中阶" };
-  return { short: "高", label: "高阶" };
-}
-
-function sentenceTranslationRows(
-  sentence: WordSentenceWritableV3
-): WordSentenceTranslationV3[] {
-  if (sentence.zh_translations && sentence.zh_translations.length > 0)
-    return sentence.zh_translations;
-  const band: SentenceTranslationBandV3 = sentence.level.startsWith("C")
-    ? "c1_c2"
-    : sentence.level.startsWith("B")
-      ? "b1_b2"
-      : "a1_a2";
-  return [
-    {
-      id: sentence.zh_text_id,
-      band,
-      content: sentence.zh_text
-    }
-  ];
-}
 
 function SenseSectionTitle({
   label,
@@ -667,8 +638,8 @@ function GrammarStructuresCard({
               </div>
               <Space
                 className="word-sort-actions"
-                orientation="vertical"
-                size={2}
+                orientation="horizontal"
+                size={8}
               >
                 <SortableDragHandle
                   index={structureIndex}
@@ -1548,7 +1519,8 @@ export function V3MeaningsAndExamplesStep({
   idFactory = newWordNodeId,
   relationDisplaySnapshots,
   sentenceTargetDiscoveryEnabled = true,
-  componentUsagesEnabled = false
+  componentUsagesEnabled = false,
+  textLinksEnabled = false
 }: V3MeaningsAndExamplesStepProps) {
   const { modal } = App.useApp();
   const [collapsedSenseSections, setCollapsedSenseSections] = useState<
@@ -2124,27 +2096,73 @@ export function V3MeaningsAndExamplesStep({
                                                   }
                                                   onChange={(
                                                     definitionMode: DefinitionModeV3
-                                                  ) =>
-                                                    change((draft) => {
-                                                      const current =
-                                                        draft.pos[posIndex]!
-                                                          .senses[senseIndex]!
-                                                          .definitions[
+                                                  ) => {
+                                                    const apply = () => {
+                                                      change((draft) => {
+                                                        const current =
+                                                          draft.pos[posIndex]!
+                                                            .senses[senseIndex]!
+                                                            .definitions[
+                                                            definitionIndex
+                                                          ]!;
+                                                        draft.pos[
+                                                          posIndex
+                                                        ]!.senses[
+                                                          senseIndex
+                                                        ]!.definitions[
                                                           definitionIndex
-                                                        ]!;
-                                                      draft.pos[
-                                                        posIndex
-                                                      ]!.senses[
-                                                        senseIndex
-                                                      ]!.definitions[
-                                                        definitionIndex
-                                                      ] = withDefinitionMode(
-                                                        current,
-                                                        definitionMode,
-                                                        idFactory
+                                                        ] = withDefinitionMode(
+                                                          current,
+                                                          definitionMode,
+                                                          idFactory
+                                                        );
+                                                      });
+                                                    };
+                                                    const english =
+                                                      definition.definition_mode ===
+                                                        "en_definition" ||
+                                                      definition.definition_mode ===
+                                                        "en_sentence"
+                                                        ? definition.content
+                                                        : undefined;
+                                                    const variants = english
+                                                      ? english.mode ===
+                                                        "unified"
+                                                        ? [english.common]
+                                                        : [
+                                                            english.uk,
+                                                            english.us
+                                                          ].flatMap((slot) =>
+                                                            slot.state ===
+                                                            "ready"
+                                                              ? [slot.variant]
+                                                              : []
+                                                          )
+                                                      : [];
+                                                    const removesEnglishSettings =
+                                                      (definitionMode ===
+                                                        "zh_definition" ||
+                                                        definitionMode ===
+                                                          "zh_sentence") &&
+                                                      variants.some(
+                                                        (variant) =>
+                                                          variant.text_links
+                                                            ?.length ||
+                                                          variant.voice_profile ||
+                                                          variant.audio_assets
+                                                            ?.length
                                                       );
-                                                    })
-                                                  }
+                                                    if (removesEnglishSettings)
+                                                      modal.confirm({
+                                                        title: "切换为中文释义",
+                                                        content:
+                                                          "切换后将移除这条释义的英文关联和发音设置。",
+                                                        okText: "切换",
+                                                        cancelText: "取消",
+                                                        onOk: apply
+                                                      });
+                                                    else apply();
+                                                  }}
                                                   options={
                                                     DEFINITION_MODE_OPTIONS
                                                   }
@@ -2204,57 +2222,36 @@ export function V3MeaningsAndExamplesStep({
                                                     }
                                                   />
                                                 ) : (
-                                                  editableEnglishText(
-                                                    definition.content as EnglishTextV3
-                                                  ).map((row) => (
-                                                    <Input.TextArea
-                                                      aria-label={`定义 ${definitionIndex + 1} ${dialectLabel(row.dialect)}内容`}
-                                                      autoSize={{
-                                                        maxRows: 6,
-                                                        minRows: 1
-                                                      }}
-                                                      data-v3-field="value"
-                                                      data-v3-node-id={
-                                                        row.variant_id
-                                                      }
-                                                      key={row.variant_id}
-                                                      onChange={(event) =>
-                                                        change((draft) => {
-                                                          const target =
-                                                            draft.pos[posIndex]!
-                                                              .senses[
-                                                              senseIndex
-                                                            ]!.definitions[
-                                                              definitionIndex
-                                                            ]!;
-                                                          if (
-                                                            target.definition_mode ===
-                                                              "en_definition" ||
-                                                            target.definition_mode ===
-                                                              "en_sentence"
-                                                          ) {
-                                                            target.content =
-                                                              replaceEnglishText(
-                                                                target.content,
-                                                                row.dialect,
-                                                                event.target
-                                                                  .value
-                                                              );
-                                                          }
-                                                        })
-                                                      }
-                                                      status={
-                                                        fieldIssue(
-                                                          issues,
-                                                          row.variant_id,
-                                                          "value"
+                                                  <V3LinkedEnglishTextField
+                                                    value={
+                                                      definition.content as EnglishTextV3
+                                                    }
+                                                    label={`定义 ${definitionIndex + 1}`}
+                                                    suffix="内容"
+                                                    wordId={wordId}
+                                                    linksEnabled={
+                                                      textLinksEnabled
+                                                    }
+                                                    readOnly={saving}
+                                                    onChange={(content) =>
+                                                      change((draft) => {
+                                                        const target =
+                                                          draft.pos[posIndex]!
+                                                            .senses[senseIndex]!
+                                                            .definitions[
+                                                            definitionIndex
+                                                          ]!;
+                                                        if (
+                                                          target.definition_mode ===
+                                                            "en_definition" ||
+                                                          target.definition_mode ===
+                                                            "en_sentence"
                                                         )
-                                                          ? "error"
-                                                          : undefined
-                                                      }
-                                                      value={row.text}
-                                                    />
-                                                  ))
+                                                          target.content =
+                                                            content;
+                                                      })
+                                                    }
+                                                  />
                                                 )}
                                                 <FieldIssueHelp
                                                   issue={definitionContentIssue(
@@ -2458,7 +2455,6 @@ export function V3MeaningsAndExamplesStep({
                                         <span aria-hidden="true" />
                                         <span>等级</span>
                                         <span>英文例句</span>
-                                        <span>汉语译文</span>
                                         <span aria-hidden="true" />
                                       </div>
                                     ) : (
@@ -2525,19 +2521,6 @@ export function V3MeaningsAndExamplesStep({
                                                         sentenceIndex
                                                       ]!;
                                                     next.level = level;
-                                                    // 只有一档且就是 zh_text 别名（新建例句的默认形态）时，档位跟着等级走；
-                                                    // 用户手动配了多档的例句不动。
-                                                    if (
-                                                      next.zh_translations
-                                                        ?.length === 1 &&
-                                                      next.zh_translations[0]!
-                                                        .id === next.zh_text_id
-                                                    ) {
-                                                      next.zh_translations[0]!.band =
-                                                        sentenceTranslationBand(
-                                                          level
-                                                        );
-                                                    }
                                                   })
                                                 }
                                                 options={CEFR_OPTIONS}
@@ -2549,132 +2532,54 @@ export function V3MeaningsAndExamplesStep({
                                                 size={6}
                                                 style={{ width: "100%" }}
                                               >
-                                                {editableEnglishText(
-                                                  sentence.en_text
-                                                ).map((row) => (
-                                                  <Input
-                                                    aria-label={`例句 ${sentenceIndex + 1} ${dialectLabel(row.dialect)}英文`}
-                                                    data-v3-field="value"
-                                                    data-v3-node-id={
-                                                      row.variant_id
-                                                    }
-                                                    key={row.variant_id}
-                                                    prefix={
-                                                      <SoundOutlined
-                                                        aria-hidden="true"
-                                                        className="word-sentence-sound-icon"
-                                                      />
-                                                    }
-                                                    disabled={saving}
-                                                    onChange={(event) =>
-                                                      change((draft) => {
-                                                        const next =
-                                                          draft.pos[posIndex]!
-                                                            .senses[senseIndex]!
-                                                            .sentences[
-                                                            sentenceIndex
-                                                          ]!;
-                                                        next.en_text =
-                                                          replaceEnglishText(
-                                                            next.en_text,
-                                                            row.dialect,
-                                                            event.target.value
-                                                          );
-                                                      })
-                                                    }
-                                                    value={row.text}
-                                                  />
-                                                ))}
-                                              </Space>
-                                              <Space
-                                                className="word-sentence-translation-list"
-                                                orientation="vertical"
-                                                size={6}
-                                              >
-                                                {sentenceTranslationRows(
-                                                  sentence
-                                                ).map(
-                                                  (
-                                                    translation,
-                                                    translationIndex
-                                                  ) => {
-                                                    const tier =
-                                                      translationTier(
-                                                        translation.band
-                                                      );
-                                                    return (
-                                                      <Input
-                                                        aria-label={
-                                                          sentenceTranslationRows(
-                                                            sentence
-                                                          ).length === 1
-                                                            ? `例句 ${sentenceIndex + 1} 中文`
-                                                            : `例句 ${sentenceIndex + 1} ${tier.label}中文`
-                                                        }
-                                                        data-v3-field="zh_translations"
-                                                        data-v3-node-id={
-                                                          translation.id
-                                                        }
-                                                        key={`${translation.id}:${translationIndex}`}
-                                                        prefix={
-                                                          <span
-                                                            aria-label={`${tier.label}译文`}
-                                                            className="word-sentence-translation-tier"
-                                                          >
-                                                            <strong>
-                                                              {tier.short}
-                                                            </strong>
-                                                          </span>
-                                                        }
-                                                        disabled={saving}
-                                                        onChange={(event) =>
-                                                          change((draft) => {
-                                                            const next =
-                                                              draft.pos[
-                                                                posIndex
-                                                              ]!.senses[
-                                                                senseIndex
-                                                              ]!.sentences[
-                                                                sentenceIndex
-                                                              ]!;
-                                                            next.zh_translations =
-                                                              sentenceTranslationRows(
-                                                                next
-                                                              ).map((item) =>
-                                                                item.id ===
-                                                                translation.id
-                                                                  ? {
-                                                                      ...item,
-                                                                      content:
-                                                                        replaceRichText(
-                                                                          item.content,
-                                                                          event
-                                                                            .target
-                                                                            .value
-                                                                        )
-                                                                    }
-                                                                  : item
-                                                              );
-                                                            const alias =
-                                                              next.zh_translations.find(
-                                                                (item) =>
-                                                                  item.id ===
-                                                                  next.zh_text_id
-                                                              );
-                                                            if (alias)
-                                                              next.zh_text =
-                                                                alias.content;
-                                                          })
-                                                        }
-                                                        value={
-                                                          translation.content
-                                                            .text
-                                                        }
-                                                      />
-                                                    );
+                                                <V3LinkedEnglishTextField
+                                                  value={sentence.en_text}
+                                                  label={`例句 ${sentenceIndex + 1}`}
+                                                  suffix="英文"
+                                                  wordId={wordId}
+                                                  linksEnabled={
+                                                    textLinksEnabled
                                                   }
-                                                )}
+                                                  readOnly={saving}
+                                                  onChange={(en_text) =>
+                                                    change((draft) => {
+                                                      draft.pos[
+                                                        posIndex
+                                                      ]!.senses[
+                                                        senseIndex
+                                                      ]!.sentences[
+                                                        sentenceIndex
+                                                      ]!.en_text = en_text;
+                                                    })
+                                                  }
+                                                />
                                               </Space>
+                                              <V3SentenceTranslationsField
+                                                sentence={sentence}
+                                                index={sentenceIndex}
+                                                disabled={saving}
+                                                onChange={(translations) =>
+                                                  change((draft) => {
+                                                    const next =
+                                                      draft.pos[posIndex]!
+                                                        .senses[senseIndex]!
+                                                        .sentences[
+                                                        sentenceIndex
+                                                      ]!;
+                                                    next.zh_translations =
+                                                      translations;
+                                                    const alias =
+                                                      translations.find(
+                                                        (item) =>
+                                                          item.id ===
+                                                          next.zh_text_id
+                                                      ) ?? translations[0]!;
+                                                    next.zh_text_id = alias.id;
+                                                    next.zh_text =
+                                                      alias.content;
+                                                  })
+                                                }
+                                              />
                                               <Space
                                                 className="word-sort-actions"
                                                 orientation="horizontal"

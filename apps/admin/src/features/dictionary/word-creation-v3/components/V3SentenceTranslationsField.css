@@ -1,0 +1,69 @@
+.word-sentence-translation-list {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  grid-template-areas: "label groups add";
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.word-sentence-translation-label {
+  grid-area: label;
+  font-size: 12px;
+  line-height: 32px;
+}
+
+.word-sentence-translation-groups {
+  grid-area: groups;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.word-sentence-translation-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.word-sentence-translation-item > textarea {
+  flex: 1;
+  min-width: 0;
+}
+
+.word-sentence-translation-item > .word-sentence-translation-band-button,
+.word-sentence-translation-item > .word-sentence-translation-delete {
+  flex: none;
+  margin-top: 4px;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.word-sentence-translation-delete:not(:disabled) {
+  color: var(--ant-color-text-tertiary, #8c8c8c);
+}
+
+.word-sentence-translation-delete:not(:disabled):hover {
+  color: var(--ant-color-error, #ff4d4f);
+}
+
+.word-sentence-translation-add {
+  grid-area: add;
+  align-self: start;
+  margin-top: 4px;
+  color: var(--ant-color-primary, #0071e3);
+}
+
+@container (width <= 760px) {
+  .word-sentence-translation-list {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "label add"
+      "groups groups";
+    gap: 6px;
+  }
+}

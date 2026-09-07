@@ -204,6 +204,31 @@ export interface RichTextVariantV3 {
   voice_profile?: VoiceProfileV3 | null;
   /** 与 GrammarVariantV3 同形预留；例句 / 释义接入语音编辑器前 admin 不写入。 */
   audio_assets?: AudioAssetV3[];
+  /** 人工正文关联。省略保留存量，显式空数组清除。 */
+  text_links?: TextLinkV3[];
+}
+
+export interface TextLinkViaPhraseV3 {
+  word_id: string;
+  publication_id: string;
+  sense_id: string;
+  component_id: string;
+}
+
+export interface TextLinkV3 {
+  id: string;
+  source_segments: SentenceSourceRangeV3[];
+  target_word_id: string;
+  target_publication_id: string;
+  target_pos_id: string;
+  target_base_form_id: string;
+  target_form_id: string;
+  target_variant_id: string;
+  target_sense_id: string;
+  via_phrase?: TextLinkViaPhraseV3;
+  /** 服务端生成；保存请求不发送。 */
+  target_headword?: string;
+  target_gloss?: string;
 }
 
 export type DialectVariantRichTextSlotV3 =
@@ -298,6 +323,7 @@ export interface SentenceSourceRangeV3 {
   surface: string;
 }
 
+/** 高阶 A1/A2、中阶 B1/B2、低阶 C1/C2；同一例句的同档译文可以有多条。 */
 export type SentenceTranslationBandV3 = "a1_a2" | "b1_b2" | "c1_c2";
 
 export interface WordSentenceTranslationV3 {
@@ -585,6 +611,7 @@ export type V3PublicationCapability =
     };
 
 export interface AdminWordV3Capabilities {
+  text_links?: boolean;
   publication: V3PublicationCapability;
   pronunciation_normalization_version: PronunciationNormalizationVersionV3;
   /** Absent only when talking to a pre-capability backend. */
@@ -825,7 +852,8 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "phrase_component_target_unavailable",
   "phrase_component_target_nested",
   "phrase_component_target_stale",
-  "voice_profile_invalid"
+  "voice_profile_invalid",
+  "audio_asset_invalid"
 ] as const;
 
 export type V3ValidationIssueCode = (typeof V3_VALIDATION_ISSUE_CODES)[number];
