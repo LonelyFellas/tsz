@@ -64,7 +64,8 @@ export interface V3ProductProgressRow {
   details: readonly V3ProductProgressDetail[];
   statusDescription?: string;
   count?: number;
-  target: V3IssueNavigationTarget;
+  /** 该项归属的向导步骤；左栏用它判断哪一行对应当前步骤。 */
+  step: PersistedWordStep;
 }
 
 export interface V3ProductProgressInput {
@@ -75,7 +76,6 @@ export interface V3ProductProgressInput {
   completedSteps: readonly PersistedWordStep[];
   forms: DraftFormsStepContentV3;
   meanings: DraftMeaningsStepContentV3 | DraftMeaningsStepContentWritableV3;
-  issues: readonly V3DraftValidationIssue[];
 }
 
 interface MutableNode extends V3ReadinessNode {
@@ -101,36 +101,15 @@ function uniqueIssues(issues: readonly V3DraftValidationIssue[]) {
   });
 }
 
-function touchesNode(
-  issue: V3DraftValidationIssue,
-  nodeIds: ReadonlySet<string>
-) {
-  return (
-    nodeIds.has(issue.node_id) ||
-    issue.node_location.ancestor_node_ids.some((id) => nodeIds.has(id))
-  );
-}
-
 export function buildV3ProductProgress({
-  wordId,
   language,
   partOfSpeechCatalog = [],
   dirtySteps = { forms: false, meanings: false },
   completedSteps,
   forms,
-  meanings,
-  issues
+  meanings
 }: V3ProductProgressInput): V3ProductProgressRow[] {
   const completed = new Set(completedSteps);
-  const firstPos = forms.pos[0];
-  const defaultFormsTarget: V3IssueNavigationTarget = firstPos
-    ? {
-        step: "forms",
-        pos_id: firstPos.pos_id,
-        node_id: firstPos.pos_id,
-        field: "dialect_rules"
-      }
-    : { step: "forms", node_id: wordId, field: "pos" };
   const derivedForms = forms.pos.flatMap((pos) =>
     pos.forms
       .filter((form) => form.form_type !== "base")
@@ -152,103 +131,6 @@ export function buildV3ProductProgress({
   );
   const sentenceEntries = senseEntries.flatMap(({ pos, sense }) =>
     sense.sentences.map((sentence) => ({ pos, sense, sentence }))
-  );
-  const formNodeIds = (
-    form: DraftFormsStepContentV3["pos"][number]["forms"][number]
-  ) => [
-    form.id,
-    ...(form.regional_variants.mode === "common"
-      ? [
-          form.regional_variants.common.id,
-          ...form.regional_variants.common.pronunciations.map(
-            (pronunciation) => pronunciation.id
-          )
-        ]
-      : [
-          form.regional_variants.uk.id,
-          ...form.regional_variants.uk.pronunciations.map(
-            (pronunciation) => pronunciation.id
-          ),
-          form.regional_variants.us.id,
-          ...form.regional_variants.us.pronunciations.map(
-            (pronunciation) => pronunciation.id
-          )
-        ])
-  ];
-  const baseFormNodeIds = new Set(
-    forms.pos.flatMap((pos) =>
-      pos.forms.filter((form) => form.form_type === "base").flatMap(formNodeIds)
-    )
-  );
-  const derivedFormNodeIds = new Set(
-    derivedForms.flatMap(({ form }) => formNodeIds(form))
-  );
-
-  const grammarNodeIds = new Set(
-    grammarEntries.flatMap(({ grammar }) => [
-      grammar.id,
-      ...grammar.variants.map((variant) => variant.id)
-    ])
-  );
-  const senseGroupNodeIds = new Set(
-    meanings.sense_groups.map((group) => group.id)
-  );
-  const sentenceNodeIds = new Set(
-    sentenceEntries.flatMap(({ sentence }) => [
-      sentence.id,
-      sentence.zh_text_id,
-      ...(sentence.en_text.mode === "unified"
-        ? [sentence.en_text.common.id]
-        : [
-            ...(sentence.en_text.uk.state === "ready"
-              ? [sentence.en_text.uk.variant.id]
-              : []),
-            ...(sentence.en_text.us.state === "ready"
-              ? [sentence.en_text.us.variant.id]
-              : [])
-          ])
-    ])
-  );
-  const senseNodeIds = new Set([
-    ...senseEntries.flatMap(({ sense }) => [
-      sense.id,
-      ...sense.definitions.flatMap((definition) => [
-        definition.id,
-        ...("content_id" in definition ? [definition.content_id] : [])
-      ]),
-      ...sense.relations.map((relation) => relation.id)
-    ])
-  ]);
-
-  const formIssues = issues.filter((issue) => issue.step === "forms");
-  const posIssue = formIssues.find(
-    (issue) =>
-      issue.node_location.node_role === "pos" ||
-      issue.node_location.form_type === "base" ||
-      touchesNode(issue, baseFormNodeIds)
-  );
-  const derivedIssue = formIssues.find(
-    (issue) =>
-      issue !== posIssue &&
-      (touchesNode(issue, derivedFormNodeIds) ||
-        issue.node_location.form_type !== "base")
-  );
-  const meaningIssues = issues.filter((issue) => issue.step === "meanings");
-  const grammarIssue = meaningIssues.find((issue) =>
-    touchesNode(issue, grammarNodeIds)
-  );
-  const senseGroupIssue = meaningIssues.find((issue) =>
-    touchesNode(issue, senseGroupNodeIds)
-  );
-  const sentenceIssue = meaningIssues.find((issue) =>
-    touchesNode(issue, sentenceNodeIds)
-  );
-  const senseIssue = meaningIssues.find(
-    (issue) =>
-      issue !== grammarIssue &&
-      issue !== senseGroupIssue &&
-      issue !== sentenceIssue &&
-      (touchesNode(issue, senseNodeIds) || meaningIssues.length > 0)
   );
 
   const languageInfo = languageSummary(language);
@@ -352,145 +234,56 @@ export function buildV3ProductProgress({
     ]
   };
 
-  const firstDerived = derivedForms[0];
-  const firstSenseGroup = meanings.sense_groups[0];
-  const firstGrammar = grammarEntries[0];
-  const firstSense = senseEntries[0];
-  const firstSentence = sentenceEntries[0];
-  const rows: Omit<V3ProductProgressRow, "details">[] = [
+  const rows: Omit<V3ProductProgressRow, "details" | "step">[] = [
     {
       key: "dialect",
       index: 1,
       label: "语言识别",
       completed: completed.has("basics") && languageInfo.identified,
       value:
-        completed.has("basics") && languageInfo.identified ? "完成" : "未完成",
-      target: { step: "basics", node_id: wordId, field: "presentation" }
+        completed.has("basics") && languageInfo.identified ? "完成" : "未完成"
     },
     {
       key: "parts_of_speech",
       index: 2,
       label: "基本词性",
       completed: completed.has("forms"),
-      count: forms.pos.length,
-      target: posIssue ? v3IssueNavigationTarget(posIssue) : defaultFormsTarget
+      count: forms.pos.length
     },
     {
       key: "forms",
       index: 3,
       label: "词形变化",
       completed: completed.has("forms"),
-      count: derivedForms.length,
-      target: derivedIssue
-        ? v3IssueNavigationTarget(derivedIssue)
-        : firstDerived
-          ? {
-              step: "forms",
-              pos_id: firstDerived.pos.pos_id,
-              node_id: firstDerived.form.id,
-              field: "form_type",
-              form_id: firstDerived.form.id,
-              ...(firstDerived.group
-                ? { form_group_id: firstDerived.group.id }
-                : {}),
-              ...(firstDerived.membership
-                ? { membership_id: firstDerived.membership.id }
-                : {})
-            }
-          : defaultFormsTarget
+      count: derivedForms.length
     },
     {
       key: "sense_groups",
       index: 4,
       label: "语义区间",
       completed: completed.has("meanings"),
-      count: meanings.sense_groups.length,
-      target: senseGroupIssue
-        ? v3IssueNavigationTarget(senseGroupIssue)
-        : firstSenseGroup
-          ? {
-              step: "meanings",
-              node_id: firstSenseGroup.id,
-              field: "name_zh"
-            }
-          : {
-              step: "meanings",
-              node_id: wordId,
-              field: "sense_groups"
-            }
+      count: meanings.sense_groups.length
     },
     {
       key: "grammar_structures",
       index: 5,
       label: "语法结构",
       completed: completed.has("meanings"),
-      count: grammarEntries.length,
-      target: grammarIssue
-        ? v3IssueNavigationTarget(grammarIssue)
-        : firstGrammar
-          ? {
-              step: "meanings",
-              pos_id: firstGrammar.pos.pos_id,
-              node_id: firstGrammar.grammar.id,
-              field: "variants"
-            }
-          : {
-              step: "meanings",
-              ...(firstPos ? { pos_id: firstPos.pos_id } : {}),
-              node_id: firstPos?.pos_id ?? wordId,
-              field: "grammar_structures"
-            }
+      count: grammarEntries.length
     },
     {
       key: "senses",
       index: 6,
       label: "多维词义",
       completed: completed.has("meanings"),
-      count: senseEntries.length,
-      target: senseIssue
-        ? v3IssueNavigationTarget(senseIssue)
-        : firstSense
-          ? {
-              step: "meanings",
-              pos_id: firstSense.pos.pos_id,
-              node_id: firstSense.sense.id,
-              field: "sense"
-            }
-          : {
-              step: "meanings",
-              ...(firstPos ? { pos_id: firstPos.pos_id } : {}),
-              node_id: firstPos?.pos_id ?? wordId,
-              field: "senses"
-            }
+      count: senseEntries.length
     },
     {
       key: "sentences",
       index: 7,
       label: "多维例句",
       completed: completed.has("meanings"),
-      count: sentenceEntries.length,
-      target: sentenceIssue
-        ? v3IssueNavigationTarget(sentenceIssue)
-        : firstSentence
-          ? {
-              step: "meanings",
-              pos_id: firstSentence.pos.pos_id,
-              node_id: firstSentence.sentence.id,
-              field: "sentence"
-            }
-          : firstSense
-            ? {
-                step: "meanings",
-                pos_id: firstSense.pos.pos_id,
-                node_id: firstSense.sense.id,
-                field: "sentences"
-              }
-            : {
-                step: "meanings",
-                ...(firstPos ? { pos_id: firstPos.pos_id } : {}),
-                node_id: firstPos?.pos_id ?? wordId,
-                field: "senses"
-              }
+      count: sentenceEntries.length
     }
   ];
   return rows.map((row) => {
@@ -503,6 +296,7 @@ export function buildV3ProductProgress({
     const dirty = step !== "basics" && dirtySteps[step];
     return {
       ...row,
+      step,
       completed:
         row.completed && !dirty && !(step === "meanings" && hasUnmatchedPos),
       details: details[row.key],

@@ -765,31 +765,6 @@ describe("V3WordCreationWizard", () => {
     expect(screen.queryByRole("button", { name: "开始录入词义" })).toBeNull();
   }, 20_000);
 
-  it.each([
-    ["语言识别", "basics"],
-    ["基本词性", "forms"],
-    ["词形变化", "forms"],
-    ["语法结构", "meanings"],
-    ["多维词义", "meanings"],
-    ["多维例句", "meanings"]
-  ] as const)("maps %s to the %s V3 step", (label, expectedStep) => {
-    const initialWord = word();
-    initialWord.completed_steps = ["basics", "forms", "meanings"];
-    initialWord.max_reachable_step = "preview";
-    renderWizard(requests(), {
-      initialWord,
-      renderStep: (context) => (
-        <output data-testid="progress-active-step">{context.activeStep}</output>
-      )
-    });
-
-    fireEvent.click(screen.getByText(label));
-
-    expect(screen.getByTestId("progress-active-step")).toHaveTextContent(
-      expectedStep
-    );
-  });
-
   it("用 GET 的退役节点播种并保留 variant 身份账本", () => {
     const retiredUk = "00000000-0000-4000-8000-000000000901";
     const retiredUs = "00000000-0000-4000-8000-000000000902";
@@ -1147,6 +1122,44 @@ describe("V3WordCreationWizard", () => {
     );
     expect(screen.getByText("词义与例句冲突")).toBeInTheDocument();
     expect(screen.queryByText(/词形与发音、词义与例句/)).toBeNull();
+  });
+
+  it("保存草稿时不把空关联词行发给后端", async () => {
+    const source = requests({
+      saveMeanings: vi.fn(async () => ({ word: word(2, "saved") }))
+    });
+    renderWizard(source, {
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <button
+          type="button"
+          onClick={() => {
+            const next = structuredClone(context.draftMeanings);
+            next.pos[0]!.senses[0]!.relations = [
+              // 点了「添加派生词」还没填：库里存不下，发出去整次保存会 422
+              { id: "blank", relation: "derivative", score: "0.00" },
+              {
+                id: "text",
+                relation: "synonym",
+                score: "10.00",
+                pending_target_headword: "job-huntird"
+              }
+            ];
+            context.setDraftMeanings(next);
+            void context.actions.saveMeanings(next, "save");
+          }}
+        >
+          保存带空行的草稿
+        </button>
+      )
+    });
+
+    fireEvent.click(screen.getByText("保存带空行的草稿"));
+    await waitFor(() => expect(source.saveMeanings).toHaveBeenCalled());
+    const sent = vi.mocked(source.saveMeanings).mock.calls[0]![1].content;
+    expect(
+      sent.pos[0]!.senses[0]!.relations.map((relation) => relation.id)
+    ).toEqual(["text"]);
   });
 
   it("retries a failed meanings conflict refresh while preserving local input", async () => {

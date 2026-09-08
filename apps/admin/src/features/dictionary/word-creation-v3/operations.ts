@@ -1076,6 +1076,33 @@ function reorderByIds<T extends { id: string }>(
   return ordered as T[];
 }
 
+/**
+ * 基本词性重排。词性用 `pos_id` 而不是 `id`，套不进 `reorderByIds` 的 `{ id }` 约束，
+ * 单独写一份；校验口径保持一致——必须给出全部词性且不重复。
+ *
+ * 顺序只落在 forms 这一份数据里：词义步的标签栏取 `forms.pos` 的顺序，后端
+ * `lexicon.entry_pos.sort_order` 按数组下标写入，所以这一处改完全链路都跟着走。
+ */
+export function reorderPos(
+  content: DraftFormsStepContentV3,
+  orderedIds: readonly string[]
+): DraftFormsStepContentV3 {
+  if (
+    content.pos.length !== orderedIds.length ||
+    new Set(orderedIds).size !== orderedIds.length
+  ) {
+    throw new Error("pos order must contain every ID exactly once");
+  }
+  const next = clone(content);
+  const byId = new Map(next.pos.map((pos) => [pos.pos_id, pos]));
+  const ordered = orderedIds.map((posId) => byId.get(posId));
+  if (ordered.some((pos) => pos === undefined)) {
+    throw new Error("pos order contains an unknown ID");
+  }
+  next.pos = ordered as typeof next.pos;
+  return next;
+}
+
 export function reorderForms(
   content: DraftFormsStepContentV3,
   posId: string,

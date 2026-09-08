@@ -8,7 +8,6 @@ import type {
   DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   PartOfSpeechCatalogItem,
-  V3DraftValidationIssue,
   WordCreationStep,
   WordConcreteFormV3,
   WordPronunciationV3
@@ -42,7 +41,6 @@ interface Props {
   draftForms?: DraftFormsStepContentV3;
   draftMeanings?: DraftMeaningsStepContentWritableV3;
   dirtySteps?: Readonly<{ forms: boolean; meanings: boolean }>;
-  issues?: readonly V3DraftValidationIssue[];
   partOfSpeechCatalog?: readonly PartOfSpeechCatalogItem[];
   onContinue: () => void;
   onStepChange: (step: WordCreationStep) => void;
@@ -382,7 +380,6 @@ export function V3BasicsStep({
   draftForms,
   draftMeanings,
   dirtySteps,
-  issues = [],
   partOfSpeechCatalog,
   onContinue,
   onStepChange
@@ -395,7 +392,6 @@ export function V3BasicsStep({
     forms: draftForms ?? word.forms,
     meanings: draftMeanings ?? word.meanings,
     dirtySteps,
-    issues,
     partOfSpeechCatalog
   });
   return (
@@ -411,10 +407,6 @@ export function V3BasicsStep({
         progress: (
           <V3ProductProgressList
             currentKey="dialect"
-            onSelect={(key) => {
-              const row = rows.find((item) => item.key === key);
-              if (row) onStepChange(row.target.step);
-            }}
             rows={rows.map((row) => ({
               ...row,
               value: row.value ?? row.count

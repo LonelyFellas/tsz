@@ -176,13 +176,12 @@ export function V3VoiceTextField({
           {fallback}
           <Button
             aria-label={`打开${ariaLabel}编辑器`}
-            disabled={readOnly}
+            // 正文还是空的时候没有东西可标注，编辑器打开也只是一块空画布，先置灰。
+            disabled={readOnly || value.text.trim() === ""}
             icon={<EditOutlined />}
             onClick={() => setEditing(true)}
             style={{ height: "auto" }}
-          >
-            编辑器
-          </Button>
+          />
         </Space.Compact>
       </>
     );

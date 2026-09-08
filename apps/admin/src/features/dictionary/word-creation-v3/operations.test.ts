@@ -18,6 +18,7 @@ import {
   reorderFormGroups,
   reorderForms,
   reorderMemberships,
+  reorderPos,
   reorderPronunciations,
   unifyUkUsSpelling,
   updateConcreteFormType,
@@ -739,6 +740,69 @@ describe("V3 forms operations", () => {
         reorderedPronunciations.pos[0]!.forms[0]!
       ).pronunciations.map((item) => item.id)
     ).toEqual([UUIDS.pronunciation_3, UUIDS.pronunciation_2]);
+  });
+
+  it("reorderPos 重排基本词性，缺项重项与未知 ID 一律拒绝", () => {
+    const noun = partOfSpeechCatalogFixture.items.find(
+      (item) => item.code === "noun"
+    )!;
+    const verb = partOfSpeechCatalogFixture.items.find(
+      (item) => item.code === "verb"
+    )!;
+    const withNoun = addPartOfSpeech(
+      { pos: [] },
+      noun,
+      uuidSequence(
+        UUIDS.pos,
+        UUIDS.group,
+        UUIDS.form,
+        UUIDS.common_variant,
+        UUIDS.membership,
+        UUIDS.pronunciation
+      )
+    );
+    expect(withNoun.ok).toBe(true);
+    if (!withNoun.ok) return;
+    const withVerb = addPartOfSpeech(
+      withNoun.value,
+      verb,
+      uuidSequence(
+        UUIDS.pos_2,
+        UUIDS.group_2,
+        UUIDS.form_2,
+        UUIDS.common_variant_2,
+        UUIDS.membership_2,
+        UUIDS.pronunciation_2
+      )
+    );
+    expect(withVerb.ok).toBe(true);
+    if (!withVerb.ok) return;
+    const content = withVerb.value;
+    expect(content.pos.map((pos) => pos.pos_id)).toEqual([
+      UUIDS.pos,
+      UUIDS.pos_2
+    ]);
+
+    const reordered = reorderPos(content, [UUIDS.pos_2, UUIDS.pos]);
+    expect(reordered.pos.map((pos) => pos.pos_id)).toEqual([
+      UUIDS.pos_2,
+      UUIDS.pos
+    ]);
+    // 重排是纯函数，原内容不动
+    expect(content.pos.map((pos) => pos.pos_id)).toEqual([
+      UUIDS.pos,
+      UUIDS.pos_2
+    ]);
+    // 词性本身原样搬运，不只是换了个 ID 顺序
+    expect(reordered.pos[0]).toEqual(content.pos[1]);
+
+    expect(() => reorderPos(content, [UUIDS.pos])).toThrow(/every ID/u);
+    expect(() => reorderPos(content, [UUIDS.pos, UUIDS.pos])).toThrow(
+      /every ID/u
+    );
+    expect(() => reorderPos(content, [UUIDS.pos, UUIDS.group])).toThrow(
+      /unknown ID/u
+    );
   });
 
   it("P1-1 从空 skeleton 新增/删除 POS，重复 POS fail closed", () => {

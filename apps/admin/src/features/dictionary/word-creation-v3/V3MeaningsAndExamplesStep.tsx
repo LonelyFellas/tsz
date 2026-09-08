@@ -49,7 +49,7 @@ import type {
   WordRelationWritableV3,
   WordSenseWritableV3
 } from "@tsz/types";
-import type { DragEvent, KeyboardEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useState } from "react";
 import { useRelatedSearchAny } from "../api";
 import { CEFR_OPTIONS, cefrColor } from "../labels";
@@ -66,6 +66,15 @@ import {
   sentenceTranslationBand
 } from "./meaningsModel";
 import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
+import {
+  moveItem,
+  sortableRowClass,
+  useSortableRows,
+  type SortableRowsController
+} from "./sortableRows";
+import { SortableDragHandle } from "./components/SortableDragHandle";
+import { reorderPos } from "./operations";
+import "./posTabs.css";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
 import { V3VoiceTextField } from "./components/V3VoiceTextField";
@@ -216,186 +225,10 @@ const SENSE_GROUP_DRAG_TYPE = "application/x-tsz-v3-sense-group";
 const GRAMMAR_DRAG_TYPE = "application/x-tsz-v3-grammar-structure";
 const DEFINITION_DRAG_TYPE = "application/x-tsz-v3-definition";
 const SENTENCE_DRAG_TYPE = "application/x-tsz-v3-sentence";
-
-function moveItem<T>(items: T[], index: number, nextIndex: number) {
-  const [item] = items.splice(index, 1);
-  if (item !== undefined) items.splice(nextIndex, 0, item);
-}
-
-interface SortableRowsController {
-  canReorder: boolean;
-  draggingIndex?: number;
-  dragOverIndex?: number;
-  handleDragStart: (event: DragEvent<HTMLElement>, sourceIndex: number) => void;
-  handleDragEnd: () => void;
-  handleDragOver: (
-    event: DragEvent<HTMLDivElement>,
-    targetIndex: number
-  ) => void;
-  handleDragLeave: () => void;
-  handleDrop: (event: DragEvent<HTMLDivElement>, targetIndex: number) => void;
-  handleKeyDown: (
-    event: KeyboardEvent<HTMLElement>,
-    sourceIndex: number
-  ) => void;
-}
-
-function useSortableRows<T>({
-  items,
-  scopeId,
-  dragType,
-  onChange
-}: {
-  items: readonly T[];
-  scopeId: string;
-  dragType: string;
-  onChange: (next: T[]) => void;
-}): SortableRowsController {
-  const [draggingIndex, setDraggingIndex] = useState<number>();
-  const [dragOverIndex, setDragOverIndex] = useState<number>();
-  const canReorder = items.length > 1;
-  const reorder = (sourceIndex: number, targetIndex: number) => {
-    if (
-      sourceIndex < 0 ||
-      sourceIndex >= items.length ||
-      targetIndex < 0 ||
-      targetIndex >= items.length ||
-      sourceIndex === targetIndex
-    ) {
-      return;
-    }
-    const next = [...items];
-    moveItem(next, sourceIndex, targetIndex);
-    onChange(next);
-  };
-  const handleDragStart = (
-    event: DragEvent<HTMLElement>,
-    sourceIndex: number
-  ) => {
-    if (!canReorder) {
-      event.preventDefault();
-      return;
-    }
-    event.dataTransfer.effectAllowed = "move";
-    event.dataTransfer.setData(
-      dragType,
-      JSON.stringify({ scopeId, index: sourceIndex })
-    );
-    setDraggingIndex(sourceIndex);
-  };
-  const handleDragOver = (
-    event: DragEvent<HTMLDivElement>,
-    targetIndex: number
-  ) => {
-    if (!canReorder || !event.dataTransfer.types.includes(dragType)) return;
-    event.preventDefault();
-    event.dataTransfer.dropEffect = "move";
-    setDragOverIndex(targetIndex);
-  };
-  const handleDrop = (
-    event: DragEvent<HTMLDivElement>,
-    targetIndex: number
-  ) => {
-    event.preventDefault();
-    setDragOverIndex(undefined);
-    const raw = event.dataTransfer.getData(dragType);
-    if (!raw) return;
-    try {
-      const source = JSON.parse(raw) as {
-        scopeId?: string;
-        index?: number;
-      };
-      if (source.scopeId === scopeId && typeof source.index === "number") {
-        reorder(source.index, targetIndex);
-      }
-    } catch {
-      // Ignore drag data from outside this sortable editor.
-    }
-  };
-  const handleKeyDown = (
-    event: KeyboardEvent<HTMLElement>,
-    sourceIndex: number
-  ) => {
-    if (!canReorder) return;
-    if (event.key === "ArrowUp" && sourceIndex > 0) {
-      event.preventDefault();
-      reorder(sourceIndex, sourceIndex - 1);
-    }
-    if (event.key === "ArrowDown" && sourceIndex < items.length - 1) {
-      event.preventDefault();
-      reorder(sourceIndex, sourceIndex + 1);
-    }
-  };
-  return {
-    canReorder,
-    ...(draggingIndex === undefined ? {} : { draggingIndex }),
-    ...(dragOverIndex === undefined ? {} : { dragOverIndex }),
-    handleDragStart,
-    handleDragEnd: () => {
-      setDraggingIndex(undefined);
-      setDragOverIndex(undefined);
-    },
-    handleDragOver,
-    handleDragLeave: () => setDragOverIndex(undefined),
-    handleDrop,
-    handleKeyDown
-  };
-}
-
-function sortableRowClass(
-  baseClass: string,
-  sorting: SortableRowsController,
-  index: number
-) {
-  const dragging = sorting.draggingIndex === index;
-  const dragOver = sorting.dragOverIndex === index;
-  const position =
-    dragOver && sorting.draggingIndex !== undefined
-      ? sorting.draggingIndex < index
-        ? " is-drag-over-after"
-        : " is-drag-over-before"
-      : "";
-  return `${baseClass}${dragging ? " is-dragging" : ""}${dragOver ? " is-drag-over" : ""}${position}`;
-}
-
-function SortableDragHandle({
-  label,
-  singleItemTitle,
-  sorting,
-  index
-}: {
-  label: string;
-  singleItemTitle: string;
-  sorting: SortableRowsController;
-  index: number;
-}) {
-  return (
-    <Button
-      aria-label={label}
-      className="word-sort-drag-handle"
-      disabled={!sorting.canReorder}
-      draggable={sorting.canReorder}
-      htmlType="button"
-      icon={<HolderOutlined />}
-      onDragEnd={sorting.handleDragEnd}
-      onDragStart={(event) => {
-        sorting.handleDragStart(event, index);
-        const row = event.currentTarget.closest<HTMLElement>(
-          ".word-sense-group-item, .word-grammar-row, .word-definition-row, .word-sentence-row"
-        );
-        if (row && typeof event.dataTransfer.setDragImage === "function") {
-          event.dataTransfer.setDragImage(row, 24, 24);
-        }
-      }}
-      onKeyDown={(event) => sorting.handleKeyDown(event, index)}
-      size="small"
-      title={
-        sorting.canReorder ? "拖动排序，也可使用上下方向键" : singleItemTitle
-      }
-      type="text"
-    />
-  );
-}
+const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
+/** 拖影取整行而不是把手上那颗小图标；与提取前硬编码的选择器一致。 */
+const SORTABLE_ROW_SELECTOR =
+  ".word-sense-group-item, .word-grammar-row, .word-definition-row, .word-sentence-row";
 
 function SortableRows<T>({
   items,
@@ -642,6 +475,7 @@ function GrammarStructuresCard({
                 size={8}
               >
                 <SortableDragHandle
+                  dragImageSelector={SORTABLE_ROW_SELECTOR}
                   index={structureIndex}
                   label={`拖动语法结构 ${structureIndex + 1}`}
                   singleItemTitle="至少需要两条语法结构"
@@ -753,6 +587,14 @@ function SenseGroupsCard({
       }
     >
       <div className="word-sense-group-list">
+        {/* 列名只出一次：每行都重复「中文 / 英文」会把下一行的输入框推远，
+            行与行之间的留白就跟着不对称了。 */}
+        <div className="word-sense-group-heads">
+          <span />
+          <span>中文</span>
+          <span>英文</span>
+          <span />
+        </div>
         {groups.map((group, groupIndex) => (
           <div
             className={sortableRowClass(
@@ -772,8 +614,7 @@ function SenseGroupsCard({
             >
               {groupIndex + 1}
             </span>
-            <label className="word-sense-group-field">
-              <Typography.Text type="secondary">中文</Typography.Text>
+            <div className="word-sense-group-field">
               <Input
                 aria-label={`语义区间 ${groupIndex + 1} 中文`}
                 data-v3-field="name_zh"
@@ -789,9 +630,8 @@ function SenseGroupsCard({
                 placeholder="例如 几何与物理空间核心"
                 value={group.name_zh}
               />
-            </label>
-            <label className="word-sense-group-field">
-              <Typography.Text type="secondary">英文</Typography.Text>
+            </div>
+            <div className="word-sense-group-field">
               <Input
                 aria-label={`语义区间 ${groupIndex + 1} 英文`}
                 data-v3-field="name_en"
@@ -807,13 +647,14 @@ function SenseGroupsCard({
                 placeholder="例如 Core geometric and physical space"
                 value={group.name_en}
               />
-            </label>
+            </div>
             <Space
               className="word-sort-actions"
-              orientation="vertical"
-              size={2}
+              orientation="horizontal"
+              size={8}
             >
               <SortableDragHandle
+                dragImageSelector={SORTABLE_ROW_SELECTOR}
                 index={groupIndex}
                 label={`拖动语义区间 ${groupIndex + 1}`}
                 singleItemTitle="至少需要两个语义区间"
@@ -1069,6 +910,7 @@ function RelationsGrid({
   senseIndex,
   change,
   idFactory,
+  currentWordId,
   relationDisplaySnapshots
 }: {
   sense: WordSenseWritableV3;
@@ -1076,6 +918,8 @@ function RelationsGrid({
   senseIndex: number;
   change: (mutation: DraftMutation) => void;
   idFactory: () => string;
+  /** 当前词条自身；关联词不能指向自己，候选里要排除掉。新建词条时为 undefined。 */
+  currentWordId?: string;
   relationDisplaySnapshots?: RelationDisplaySnapshots;
 }) {
   const [collapsed, setCollapsed] = useState<Record<RelationType, boolean>>({
@@ -1102,7 +946,7 @@ function RelationsGrid({
       ...(relatedSearch.exact.data?.pages ?? []),
       ...(relatedSearch.contains.data?.pages ?? [])
     ].flatMap((page) => page.results)
-  );
+  ).filter((word) => word.word_id !== currentWordId);
   const searchFailed =
     relatedSearch.exact.isError || relatedSearch.contains.isError;
   const searchHasNextPage = Boolean(
@@ -1578,6 +1422,25 @@ export function V3MeaningsAndExamplesStep({
       ...(activePosId ? [activePosId] : [])
     ])
   );
+  // 词性顺序只有一份，存在 forms.pos 里；本步的标签栏是它的投影，所以拖动回写 forms。
+  // 只有标签集合与 forms.pos 完全对齐时才允许拖——两者不一致时（例如词义里有个
+  // forms 尚未落下的词性）算不出完整顺序，reorderPos 会直接拒绝。
+  const posOrderMatchesForms =
+    Boolean(forms && onFormsChange) &&
+    forms!.pos.length === visiblePosIds.length &&
+    visiblePosIds.every((posId) =>
+      forms!.pos.some((formPos) => formPos.pos_id === posId)
+    );
+  const posSorting = useSortableRows({
+    items: visiblePosIds,
+    scopeId: "v3-meanings-pos-tabs",
+    dragType: POS_DRAG_TYPE,
+    onChange: (next) => {
+      if (!forms || !onFormsChange) return;
+      onFormsChange(reorderPos(forms, next));
+    }
+  });
+
   const resolvedActivePosId =
     activePosId && visiblePosIds.includes(activePosId)
       ? activePosId
@@ -1662,44 +1525,69 @@ export function V3MeaningsAndExamplesStep({
             return {
               key: posId,
               label: (
-                <Space size={6}>
-                  <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
-                  {pos ? (
-                    <Badge
-                      count={countV3PosMeaningIncomplete(
-                        pos,
-                        value,
-                        catalogByCode.get(formPosById.get(posId) ?? "")
-                          ?.sub_parts_extensible ?? true
-                      )}
-                      size="small"
-                      title="该词性未填项"
-                    />
-                  ) : null}
-                  {forms &&
-                  forms.pos.length > 1 &&
-                  forms.pos.some((formPos) => formPos.pos_id === posId) &&
-                  onFormsChange ? (
-                    <Button
-                      aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
-                      danger
-                      icon={<MinusCircleOutlined />}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        modal.confirm({
-                          title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
-                          content:
-                            "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
-                          okText: "删除",
-                          okButtonProps: { danger: true },
-                          onOk: () => deleteBasicPos(posId)
-                        });
-                      }}
-                      size="small"
-                      type="text"
-                    />
-                  ) : null}
-                </Space>
+                <span
+                  className={sortableRowClass(
+                    "word-pos-tab-handle",
+                    posSorting,
+                    displayPosIndex
+                  )}
+                  data-pos-id={posId}
+                  onDragLeave={posSorting.handleDragLeave}
+                  onDragOver={(event) =>
+                    posSorting.handleDragOver(event, displayPosIndex)
+                  }
+                  onDrop={(event) =>
+                    posSorting.handleDrop(event, displayPosIndex)
+                  }
+                >
+                  <Space size={6}>
+                    {posOrderMatchesForms ? (
+                      <SortableDragHandle
+                        dragImageSelector=".word-pos-tab-handle"
+                        index={displayPosIndex}
+                        label={`拖动${visiblePosLabel(posId, displayPosIndex)}`}
+                        singleItemTitle="至少需要两个基本词性"
+                        sorting={posSorting}
+                      />
+                    ) : null}
+                    <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
+                    {pos ? (
+                      <Badge
+                        count={countV3PosMeaningIncomplete(
+                          pos,
+                          value,
+                          catalogByCode.get(formPosById.get(posId) ?? "")
+                            ?.sub_parts_extensible ?? true
+                        )}
+                        size="small"
+                        title="该词性未填项"
+                      />
+                    ) : null}
+                    {forms &&
+                    forms.pos.length > 1 &&
+                    forms.pos.some((formPos) => formPos.pos_id === posId) &&
+                    onFormsChange ? (
+                      <Button
+                        aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
+                        danger
+                        icon={<MinusCircleOutlined />}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          modal.confirm({
+                            title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
+                            content:
+                              "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
+                            okText: "删除",
+                            okButtonProps: { danger: true },
+                            onOk: () => deleteBasicPos(posId)
+                          });
+                        }}
+                        size="small"
+                        type="text"
+                      />
+                    ) : null}
+                  </Space>
+                </span>
               ),
               children: pos ? (
                 <div
@@ -2331,6 +2219,9 @@ export function V3MeaningsAndExamplesStep({
                                                 orientation="horizontal"
                                               >
                                                 <SortableDragHandle
+                                                  dragImageSelector={
+                                                    SORTABLE_ROW_SELECTOR
+                                                  }
                                                   index={definitionIndex}
                                                   label={`拖动定义 ${definitionIndex + 1}`}
                                                   singleItemTitle="至少需要两条释义"
@@ -2585,6 +2476,9 @@ export function V3MeaningsAndExamplesStep({
                                                 orientation="horizontal"
                                               >
                                                 <SortableDragHandle
+                                                  dragImageSelector={
+                                                    SORTABLE_ROW_SELECTOR
+                                                  }
                                                   index={sentenceIndex}
                                                   label={`拖动例句 ${sentenceIndex + 1}`}
                                                   singleItemTitle="至少需要两条例句"
@@ -2696,6 +2590,7 @@ export function V3MeaningsAndExamplesStep({
                                 >
                                   <RelationsGrid
                                     change={change}
+                                    currentWordId={wordId}
                                     idFactory={idFactory}
                                     posIndex={posIndex}
                                     sense={sense}

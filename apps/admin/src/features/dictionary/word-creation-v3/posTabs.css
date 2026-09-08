@@ -1,0 +1,50 @@
+/*
+ * 基本词性标签的拖动排序，词形步（step2）与词义步（step3）共用。
+ * 两步渲染的是同一份 forms.pos，外观也要一致，样式因此独立成文件。
+ *
+ * 把手与拖动反馈刻意对齐词形发音里的行拖动（word-creation.css）：那套样式挂在
+ * `.word-sort-actions` 下，标签页没有那层容器，所以这里按同一组视觉参数复刻，
+ * 而不是去动那个被多处共用的选择器。
+ */
+.word-pos-tab-handle {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+}
+
+.word-pos-tab-handle .word-sort-drag-handle.ant-btn {
+  width: 24px;
+  min-width: 24px;
+  color: #7f8998;
+  cursor: grab;
+  user-select: none;
+  transition:
+    color 140ms ease,
+    background-color 140ms ease,
+    transform 140ms ease;
+}
+
+.word-pos-tab-handle .word-sort-drag-handle.ant-btn:hover:not(:disabled),
+.word-pos-tab-handle .word-sort-drag-handle.ant-btn:focus-visible {
+  color: #1677ff;
+  background: rgba(22, 119, 255, 0.1);
+}
+
+.word-pos-tab-handle .word-sort-drag-handle.ant-btn:active:not(:disabled) {
+  cursor: grabbing;
+  transform: scale(1.06);
+}
+
+.word-pos-tab-handle .word-sort-drag-handle.ant-btn:disabled {
+  color: #c4cad4;
+  cursor: default;
+}
+
+.word-pos-tab-handle.is-dragging {
+  opacity: 0.48;
+}
+
+.word-pos-tab-handle.is-drag-over {
+  outline: 2px solid rgba(22, 119, 255, 0.55);
+  outline-offset: 3px;
+}

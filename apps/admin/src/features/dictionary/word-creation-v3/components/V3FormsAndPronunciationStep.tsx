@@ -23,6 +23,7 @@ import { newWordNodeId } from "../../word-model/primitives";
 import {
   addPartOfSpeech,
   deletePartOfSpeech,
+  reorderPos,
   type V3IdFactory,
   type V3StableVariantIdFactory
 } from "../operations";
@@ -35,6 +36,12 @@ import {
   usePronunciationVoiceNotice
 } from "../../word-creation/PronunciationPreview";
 import "../v3-forms.css";
+import "../posTabs.css";
+import { sortableRowClass, useSortableRows } from "../sortableRows";
+import { SortableDragHandle } from "./SortableDragHandle";
+
+/** 只接受本编辑器发出的词性拖动，避免把外部拖入的内容当成排序。 */
+const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
 
 export interface V3FormsAndPronunciationStepProps {
   value: DraftFormsStepContentV3;
@@ -131,6 +138,22 @@ export function V3FormsAndPronunciationStep({
     />
   );
 
+  // 词性标签拖动排序，与词义步的语义区间／释义／例句共用同一套拖放内核。
+  // 事件挂在自己渲染的 label 容器上，不走 Tabs 的 renderTabBar——那要依赖 rc-tabs 的内部
+  // render prop 约定，antd 小版本一动就可能静默失效。
+  const posSorting = useSortableRows({
+    items: value.pos,
+    scopeId: "v3-pos-tabs",
+    dragType: POS_DRAG_TYPE,
+    onChange: (next) =>
+      onChange(
+        reorderPos(
+          value,
+          next.map((pos) => pos.pos_id)
+        )
+      )
+  });
+
   const tabItems =
     value.pos.length === 0
       ? [
@@ -159,41 +182,62 @@ export function V3FormsAndPronunciationStep({
             )
           }
         ]
-      : value.pos.map((pos) => {
+      : value.pos.map((pos, posIndex) => {
           const label =
             catalog.data?.items.find((item) => item.code === pos.pos)
               ?.name_zh ?? partOfSpeechLabel(pos.pos);
           return {
             key: pos.pos_id,
             label: (
-              <Space size={6}>
-                <strong>{label}</strong>
-                <Badge
-                  count={countV3PosFormIncomplete(pos)}
-                  size="small"
-                  title="该词性未填项"
-                />
-                {value.pos.length > 1 ? (
-                  <Button
-                    aria-label={`删除${label}`}
-                    danger
-                    icon={<MinusCircleOutlined />}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      modal.confirm({
-                        title: `删除词性“${label}”？`,
-                        content:
-                          "保存时会同时预览该词性下游词义、例句和关系的影响。",
-                        okText: "删除",
-                        okButtonProps: { danger: true },
-                        onOk: () => deletePos(pos.pos_id)
-                      });
-                    }}
-                    size="small"
-                    type="text"
+              <span
+                className={sortableRowClass(
+                  "word-pos-tab-handle",
+                  posSorting,
+                  posIndex
+                )}
+                data-pos-id={pos.pos_id}
+                onDragLeave={posSorting.handleDragLeave}
+                onDragOver={(event) =>
+                  posSorting.handleDragOver(event, posIndex)
+                }
+                onDrop={(event) => posSorting.handleDrop(event, posIndex)}
+              >
+                <Space size={6}>
+                  <SortableDragHandle
+                    dragImageSelector=".word-pos-tab-handle"
+                    index={posIndex}
+                    label={`拖动${label}`}
+                    singleItemTitle="至少需要两个基本词性"
+                    sorting={posSorting}
                   />
-                ) : null}
-              </Space>
+                  <strong>{label}</strong>
+                  <Badge
+                    count={countV3PosFormIncomplete(pos)}
+                    size="small"
+                    title="该词性未填项"
+                  />
+                  {value.pos.length > 1 ? (
+                    <Button
+                      aria-label={`删除${label}`}
+                      danger
+                      icon={<MinusCircleOutlined />}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        modal.confirm({
+                          title: `删除词性“${label}”？`,
+                          content:
+                            "保存时会同时预览该词性下游词义、例句和关系的影响。",
+                          okText: "删除",
+                          okButtonProps: { danger: true },
+                          onOk: () => deletePos(pos.pos_id)
+                        });
+                      }}
+                      size="small"
+                      type="text"
+                    />
+                  ) : null}
+                </Space>
+              </span>
             ),
             children: (
               <V3PosTab

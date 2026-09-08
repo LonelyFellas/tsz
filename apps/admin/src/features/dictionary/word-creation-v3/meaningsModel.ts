@@ -12,6 +12,7 @@ import type {
   SentenceTranslationBandV3,
   WordDefinitionV3,
   WordPosMeaningsWritableV3,
+  WordRelationWritableV3,
   WordSentenceTranslationV3
 } from "@tsz/types";
 
@@ -754,6 +755,41 @@ export function replaceEnglishText(
  * 旧后端（capabilities.sense_component_usages 缺失）对 sense 上的未知字段会 400：
  * 发送前把释义级成分用词整段剥掉，其余内容原样。
  */
+/**
+ * 「点了添加但什么都没填」的关联词行不发给后端。
+ *
+ * 库里的 `lexicon_relations_target_shape_check` 要求每行要么绑定了目标、要么带待建词面，
+ * 空行一条都存不下；照原样发过去，后端会把整次保存判成 422，用户连草稿都存不了。
+ *
+ * 判定取最严：只有目标、词面、词义全空才算空行。只填了词义的行留着发出去，
+ * 让后端报「文本注释必须跟随关联词文本」，而不是在这里把人家敲的字悄悄吞掉。
+ */
+export function stripBlankRelations(
+  content: DraftMeaningsStepContentWritableV3
+): DraftMeaningsStepContentWritableV3 {
+  const isBlank = (relation: WordRelationWritableV3) =>
+    !relation.target_word_id &&
+    !relation.pending_target_headword?.trim() &&
+    !relation.pending_target_gloss?.trim();
+  if (
+    !content.pos.some((pos) =>
+      pos.senses.some((sense) => sense.relations.some(isBlank))
+    )
+  ) {
+    return content;
+  }
+  return {
+    ...content,
+    pos: content.pos.map((pos) => ({
+      ...pos,
+      senses: pos.senses.map((sense) => ({
+        ...sense,
+        relations: sense.relations.filter((relation) => !isBlank(relation))
+      }))
+    }))
+  };
+}
+
 export function stripSenseComponentUsages(
   content: DraftMeaningsStepContentWritableV3
 ): DraftMeaningsStepContentWritableV3 {

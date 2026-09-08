@@ -14,6 +14,7 @@ import {
   relationDisplaySnapshots,
   replaceEnglishText,
   replaceRichText,
+  stripBlankRelations,
   stripSenseComponentUsages,
   toWritableMeanings
 } from "./meaningsModel";
@@ -1153,6 +1154,50 @@ describe("释义级成分用词在词义投影中的往返", () => {
     // 无字段时原样返回同一引用
     const plain = toWritableMeanings(meaningsCanonicalFixture);
     expect(stripSenseComponentUsages(plain)).toBe(plain);
+  });
+
+  it("stripBlankRelations 只丢全空行，填了任一字段的都留下", () => {
+    const writable = toWritableMeanings(meaningsCanonicalFixture);
+    writable.pos[0]!.senses[0]!.relations = [
+      // 点了「添加派生词」就走的行：库里存不下，发出去会让整次保存 422
+      { id: "blank", relation: "derivative", score: "0.00" },
+      // 词面只有空白，等同于没填
+      {
+        id: "whitespace",
+        relation: "derivative",
+        score: "0.00",
+        pending_target_headword: "   "
+      },
+      {
+        id: "bound",
+        relation: "synonym",
+        score: "80.00",
+        target_word_id: "word-1",
+        target_sense_id: "sense-1"
+      },
+      {
+        id: "text",
+        relation: "antonym",
+        score: "10.00",
+        pending_target_headword: "job-huntird"
+      },
+      // 只填了词义：留给后端报「文本注释必须跟随关联词文本」，别在这吞掉输入
+      {
+        id: "gloss-only",
+        relation: "derivative",
+        score: "0.00",
+        pending_target_gloss: "只填了词义"
+      }
+    ];
+    expect(
+      stripBlankRelations(writable).pos[0]!.senses[0]!.relations.map(
+        (relation) => relation.id
+      )
+    ).toEqual(["bound", "text", "gloss-only"]);
+
+    // 没有空行时原样返回同一引用
+    const plain = toWritableMeanings(meaningsCanonicalFixture);
+    expect(stripBlankRelations(plain)).toBe(plain);
   });
 });
 

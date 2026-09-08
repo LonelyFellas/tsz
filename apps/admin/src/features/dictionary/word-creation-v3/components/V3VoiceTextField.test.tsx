@@ -290,6 +290,45 @@ it("普通输入也同步迁移标注，关闭能力或只读时不能打开编�
   expect(screen.queryByLabelText("打开语法编辑器")).not.toBeInTheDocument();
 });
 
+it("正文为空时编辑器按钮置灰，敲进内容后才可点", () => {
+  const onChange = vi.fn();
+  const blank: RichTextV3 = { version: 2, text: "", annotations: [] };
+  const { rerender } = render(
+    <V3VoiceTextField
+      value={blank}
+      ariaLabel="语法"
+      nodeId="v"
+      field="content"
+      onChange={onChange}
+    />
+  );
+  // 空画布没有东西可标注
+  expect(screen.getByLabelText("打开语法编辑器")).toBeDisabled();
+
+  // 只有空白同样算空
+  rerender(
+    <V3VoiceTextField
+      value={{ version: 2, text: "   ", annotations: [] }}
+      ariaLabel="语法"
+      nodeId="v"
+      field="content"
+      onChange={onChange}
+    />
+  );
+  expect(screen.getByLabelText("打开语法编辑器")).toBeDisabled();
+
+  rerender(
+    <V3VoiceTextField
+      value={VALUE}
+      ariaLabel="语法"
+      nodeId="v"
+      field="content"
+      onChange={onChange}
+    />
+  );
+  expect(screen.getByLabelText("打开语法编辑器")).toBeEnabled();
+});
+
 it("外部改字移除关联后，撤销和重做同时恢复正文、标注与关联", async () => {
   const initial: RichTextV3 = {
     version: 2,

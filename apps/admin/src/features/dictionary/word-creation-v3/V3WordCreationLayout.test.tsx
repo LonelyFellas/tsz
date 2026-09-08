@@ -15,7 +15,6 @@ import {
   uuidFromInt
 } from "./fixtures";
 import type { V3Problem } from "./problem";
-import type { V3IssueNavigationTarget } from "./issueNavigation";
 import {
   V3WordCreationLayout,
   type V3ConflictComparison
@@ -92,13 +91,11 @@ function renderLayout(
     draftForms?: DraftFormsStepContentV3;
     draftMeanings?: DraftMeaningsStepContentWritableV3;
     onStepChange?: (step: WordCreationStep) => void;
-    onProgressNavigate?: (target: V3IssueNavigationTarget) => void;
     onIssueNavigate?: (issue: V3DraftValidationIssue) => void;
     onRefreshConflict?: () => void;
     word?: AdminWordV3;
   } = {}
 ) {
-  const issues = options.issues ?? [];
   return render(
     <MemoryRouter>
       <V3WordCreationLayout
@@ -108,11 +105,9 @@ function renderLayout(
         draftMeanings={options.draftMeanings}
         readOnly={options.readOnly}
         dirtySteps={options.dirtySteps}
-        issues={issues}
         problem={options.problem}
         conflict={options.conflict}
         onStepChange={(step) => options.onStepChange?.(step)}
-        onProgressNavigate={(target) => options.onProgressNavigate?.(target)}
         onIssueNavigate={(issue) => options.onIssueNavigate?.(issue)}
         onRefreshConflict={options.onRefreshConflict}
       >
@@ -269,43 +264,22 @@ describe("V3WordCreationLayout", () => {
     expect(progressText).not.toMatch(/\d+\/\d+/u);
   });
 
-  it("routes all seven completion questions to native V3 steps and stable nodes", () => {
-    const current = word();
-    current.forms = formsFixture({
-      forms: [
-        commonFormFixture(),
-        commonFormFixture({
-          id: uuidFromInt(921),
-          form_type: "plural"
-        })
-      ]
-    });
-    current.meanings = {
-      sense_groups: [
-        { id: uuidFromInt(924), name_zh: "位置", name_en: "Position" }
-      ],
-      pos: [
-        {
-          pos_id: current.forms.pos[0]!.pos_id,
-          grammar_structures: [{ id: uuidFromInt(922), variants: [] }],
-          senses: [
-            {
-              id: uuidFromInt(923),
-              sub_pos: "countable",
-              level: "A1",
-              sense_group_id: uuidFromInt(924),
-              depends_on_context: false,
-              definitions: [],
-              sentences: [],
-              relations: []
-            }
-          ]
-        }
-      ]
-    };
-    const onProgressNavigate = vi.fn();
-    renderLayout({ word: current, onProgressNavigate });
+  it("完成情况默认收起，点击行展开该行明细、再点收起", () => {
+    renderLayout({ word: word() });
 
+    const row = (label: string) =>
+      screen
+        .getByText(label)
+        .closest<HTMLButtonElement>(".word-creation-progress-row")!;
+    const detailsOf = (label: string) =>
+      row(label)
+        .closest(".v3-product-progress-group")!
+        .querySelector(".v3-product-progress-details");
+
+    // 默认全部收起：一条明细都不渲染
+    expect(
+      document.querySelectorAll(".v3-product-progress-details")
+    ).toHaveLength(0);
     for (const label of [
       "语言识别",
       "基本词性",
@@ -315,39 +289,29 @@ describe("V3WordCreationLayout", () => {
       "多维词义",
       "多维例句"
     ]) {
-      fireEvent.click(screen.getByText(label));
+      expect(row(label)).toHaveAttribute("aria-expanded", "false");
     }
 
+    fireEvent.click(row("多维词义"));
+    expect(row("多维词义")).toHaveAttribute("aria-expanded", "true");
+    expect(detailsOf("多维词义")).not.toBeNull();
+    // 展开互不影响：其余行仍旧收起
     expect(
-      onProgressNavigate.mock.calls.map(
-        (call) => (call[0] as V3IssueNavigationTarget).step
-      )
-    ).toEqual([
-      "basics",
-      "forms",
-      "forms",
-      "meanings",
-      "meanings",
-      "meanings",
-      "meanings"
-    ]);
-    expect(onProgressNavigate.mock.calls[2]![0]).toMatchObject({
-      form_id: uuidFromInt(921),
-      node_id: uuidFromInt(921),
-      field: "form_type"
-    });
-    expect(onProgressNavigate.mock.calls[3]![0]).toMatchObject({
-      node_id: uuidFromInt(924),
-      field: "name_zh"
-    });
-    expect(onProgressNavigate.mock.calls[4]![0]).toMatchObject({
-      node_id: uuidFromInt(922),
-      field: "variants"
-    });
-    expect(onProgressNavigate.mock.calls[5]![0]).toMatchObject({
-      node_id: uuidFromInt(923),
-      field: "sense"
-    });
+      document.querySelectorAll(".v3-product-progress-details")
+    ).toHaveLength(1);
+    expect(row("语义区间")).toHaveAttribute("aria-expanded", "false");
+
+    fireEvent.click(row("语法结构"));
+    expect(
+      document.querySelectorAll(".v3-product-progress-details")
+    ).toHaveLength(2);
+
+    fireEvent.click(row("多维词义"));
+    expect(row("多维词义")).toHaveAttribute("aria-expanded", "false");
+    expect(detailsOf("多维词义")).toBeNull();
+    expect(
+      document.querySelectorAll(".v3-product-progress-details")
+    ).toHaveLength(1);
   });
 
   it("左栏只保留返回和完成情况，面包屑保留第一个原形", () => {
@@ -389,6 +353,8 @@ describe("V3WordCreationLayout", () => {
     current.detection_basis_dialect = "us";
     current.forms = formsFixture({ forms: [ukUsFormFixture()] });
     renderLayout({ word: current });
+    // 明细默认收起，先展开「语言识别」
+    fireEvent.click(screen.getByRole("button", { name: "展开语言识别" }));
     const summary = screen.getByRole("region", { name: "语言识别摘要" });
     expect(within(summary).getByText("英语 English")).toBeVisible();
     expect(within(summary).getByText("英式 BrE")).toBeVisible();
@@ -414,6 +380,8 @@ describe("V3WordCreationLayout", () => {
     });
 
     const view = renderLayout({ word: current });
+    // 明细默认收起，先展开「语言识别」
+    fireEvent.click(screen.getByRole("button", { name: "展开语言识别" }));
 
     expect(
       view.container.querySelectorAll(".word-creation-summary-headword")
@@ -439,6 +407,8 @@ describe("V3WordCreationLayout", () => {
     });
 
     renderLayout({ word: current });
+    // 明细默认收起，先展开「语言识别」
+    fireEvent.click(screen.getByRole("button", { name: "展开语言识别" }));
 
     const summary = within(screen.getByRole("region", { name: "词条摘要" }));
     expect(summary.queryByText("center", { exact: true })).toBeNull();

@@ -830,6 +830,7 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "relation_target_stale",
   "sentence_context_target_unavailable",
   "relation_pending_headword_invalid",
+  "relation_pending_target_unresolved",
   "relation_target_shape_invalid",
   "relation_pending_gloss_without_headword",
   "relation_pending_gloss_invalid",

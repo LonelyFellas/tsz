@@ -1783,6 +1783,73 @@ describe("V3MeaningsAndExamplesStep", () => {
     }
   );
 
+  it.each(["近义词", "反义词", "派生词"])(
+    "%s候选里排除当前词条自身",
+    (label) => {
+      const searchResult = (entryId: string, headword: string) => ({
+        schema_version: 3 as const,
+        entry_id: entryId,
+        kind: "word" as const,
+        status: "published" as const,
+        presentation: {
+          label: headword,
+          matched_surfaces: [headword],
+          strategy_version: "surface_summary_v1"
+        },
+        matches: [],
+        senses: [{ sense_id: `${entryId}-sense`, gloss: `${headword} 的词义` }]
+      });
+      relatedSearchAny.mockImplementation(
+        () =>
+          ({
+            exact: {
+              data: {
+                pages: [
+                  {
+                    // 自身与他人同时命中，只有他人应留在候选里。
+                    results: [
+                      searchResult("entry-1", "selfword"),
+                      searchResult("other-entry", "otherword")
+                    ],
+                    total: 2,
+                    next_cursor: null
+                  }
+                ]
+              },
+              isFetching: false,
+              isError: false,
+              hasNextPage: false,
+              fetchNextPage: vi.fn(),
+              refetch: vi.fn()
+            },
+            contains: {
+              data: { pages: [] },
+              isFetching: false,
+              isError: false,
+              hasNextPage: false,
+              fetchNextPage: vi.fn(),
+              refetch: vi.fn()
+            }
+          }) as never
+      );
+      const initial = structuredClone(meaningsFixture);
+      initial.pos[0]!.senses[0]!.relations = [];
+      render(<Harness initial={initial} wordId="entry-1" />);
+      fireEvent.click(screen.getByText(`添加${label}`).closest("button")!);
+      fireEvent.change(screen.getByLabelText(`${label}目标词条`), {
+        target: { value: "word" }
+      });
+
+      const options = [
+        ...document.querySelectorAll<HTMLElement>(
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+        )
+      ].map((option) => option.textContent);
+      expect(options.some((text) => text?.includes("otherword"))).toBe(true);
+      expect(options.some((text) => text?.includes("selfword"))).toBe(false);
+    }
+  );
+
   it("有词义的草稿仍可显式选择词条和词义", () => {
     relatedSearchAny.mockImplementation((query, kind, open) => {
       const result = defaultRelatedSearchImplementation(query, kind, open);
@@ -3389,6 +3456,83 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByRole("button", { name: "开始录入词义" })).toBeNull();
     expect(screen.queryByText(/暂无语义区间/u)).toBeNull();
     expect(screen.queryByText("草稿可暂时不添加词性释义")).toBeNull();
+  });
+
+  it("拖动词性标签把新顺序回写到 forms", () => {
+    const posFixture = (posId: string, code: string, spelling: string) => ({
+      pos_id: posId,
+      pos: code,
+      dialect_rules: {
+        spelling_mode: "unified" as const,
+        phonetic_mode: "unified" as const
+      },
+      forms: [
+        {
+          id: `${posId}-form`,
+          form_type: "base" as const,
+          regional_variants: {
+            mode: "common" as const,
+            common: {
+              id: `${posId}-variant`,
+              dialect: "common" as const,
+              spelling,
+              origin: "manual" as const,
+              pronunciations: []
+            }
+          }
+        }
+      ],
+      form_groups: []
+    });
+    const forms: DraftFormsStepContentV3 = {
+      pos: [
+        posFixture("pos-1", "verb", "give up"),
+        posFixture("pos-2", "noun", "giving up")
+      ]
+    };
+    const onFormsChange = vi.fn();
+    render(
+      <Harness
+        forms={forms}
+        initial={meaningsFixture}
+        onFormsChange={onFormsChange}
+      />
+    );
+
+    const handles = [
+      ...document.querySelectorAll<HTMLElement>(".word-pos-tab-handle")
+    ];
+    expect(handles.map((handle) => handle.dataset.posId)).toEqual([
+      "pos-1",
+      "pos-2"
+    ]);
+    const grips = handles.map((handle) =>
+      handle.querySelector<HTMLElement>(".word-sort-drag-handle")!
+    );
+    expect(grips.every((grip) => grip.draggable)).toBe(true);
+
+    const store = new Map<string, string>();
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      types: ["application/x-tsz-v3-pos"],
+      setData: (type: string, data: string) => store.set(type, data),
+      getData: (type: string) => store.get(type) ?? "",
+      setDragImage: vi.fn()
+    };
+    fireEvent.dragStart(grips[0]!, { dataTransfer });
+    expect(handles[0]!).toHaveClass("is-dragging");
+    fireEvent.dragOver(handles[1]!, { dataTransfer });
+    fireEvent.drop(handles[1]!, { dataTransfer });
+
+    // 顺序只有 forms 一份，词义步拖动也回写到那里
+    const next = onFormsChange.mock.calls.at(-1)![0] as DraftFormsStepContentV3;
+    expect(next.pos.map((pos) => pos.pos_id)).toEqual(["pos-2", "pos-1"]);
+    expect(
+      [...document.querySelectorAll<HTMLElement>(".word-pos-tab-handle")].map(
+        (handle) => handle.dataset.posId
+      )
+    ).toEqual(["pos-2", "pos-1"]);
   });
 });
 

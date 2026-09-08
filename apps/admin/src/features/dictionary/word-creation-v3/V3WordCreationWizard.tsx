@@ -26,6 +26,7 @@ import {
 } from "./issueNavigation";
 import {
   ensureV3MeaningsForForms,
+  stripBlankRelations,
   stripSenseComponentUsages,
   prepareTextLinksForSave,
   toWritableMeanings
@@ -476,23 +477,6 @@ function V3WordCreationSession({
     [navigationAdapter, setActivePosId, setActiveStep]
   );
 
-  const navigateProgress = useCallback(
-    async (target: V3IssueNavigationTarget) => {
-      setActiveStep(target.step);
-      if (target.pos_id) setActivePosId(target.pos_id);
-      await navigationAdapter?.expandGroup?.(target);
-      await navigationAdapter?.revealForm?.(target);
-      await navigationAdapter?.revealVariant?.(target);
-      await navigationAdapter?.revealPronunciation?.(target);
-      if (navigationAdapter?.focusField) {
-        await navigationAdapter.focusField(target);
-      } else if (target.step !== "basics") {
-        setPendingFocusTarget(target);
-      }
-    },
-    [navigationAdapter, setActivePosId, setActiveStep]
-  );
-
   useEffect(() => {
     const canonical = flowRef.current.canonical();
     const hasNewerCanonicalVersion =
@@ -872,9 +856,11 @@ function V3WordCreationSession({
             intent,
             // 释义级成分用词只在后端声明支持时发送（无 dev 放宽）：旧后端会 400。
             content: prepareTextLinksForSave(
-              flow.canonical().capabilities.sense_component_usages === true
-                ? content
-                : stripSenseComponentUsages(content),
+              stripBlankRelations(
+                flow.canonical().capabilities.sense_component_usages === true
+                  ? content
+                  : stripSenseComponentUsages(content)
+              ),
               flow.canonical().capabilities.text_links === true
             )
           })
@@ -1353,13 +1339,11 @@ function V3WordCreationSession({
       dirtySteps={dirtySteps}
       draftForms={draftForms}
       draftMeanings={draftMeanings}
-      issues={publicationIssues}
       problem={problem}
       conflict={conflict}
       retrying={pending.size > 0}
       refreshingConflict={pending.has("refresh_conflict")}
       onStepChange={setActiveStep}
-      onProgressNavigate={(target) => void navigateProgress(target)}
       onIssueNavigate={(issue) => void navigateIssue(issue)}
       onRetry={() => void retry()}
       onRefreshConflict={() => void refreshConflict()}
