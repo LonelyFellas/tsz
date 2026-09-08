@@ -542,6 +542,9 @@ describe("WordWizardV3Page", () => {
     expect(screen.queryByText(/实际发音：/)).toBeNull();
   });
 
+  // CI 慢机上这条要 ~9.7s，本地 ~1.5s（全文件最慢的两条之一，做的事也确实重：
+  // 走 getAny 加载、收窄到 V3、再把受控的 T4 forms 槽装配起来）。默认 5s 超时卡不住，
+  // 显式放宽而不是靠重跑碰运气。
   it("loads through getAny, narrows V3 and wires the controlled T4 forms slot", async () => {
     const current = word();
     const endpoints = source({ word: current, retired_stable_nodes: [] });
@@ -564,7 +567,7 @@ describe("WordWizardV3Page", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("进入词义与例句").closest("button")).toBeVisible();
     expect(endpoints.getAny).toHaveBeenCalledWith(WORD_ID);
-  });
+  }, 20_000);
 
   it("previews every surface page and saves forms through the wizard flow with both confirmation tokens", async () => {
     const current = word();
