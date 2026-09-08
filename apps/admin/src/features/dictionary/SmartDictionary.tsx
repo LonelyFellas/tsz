@@ -881,9 +881,7 @@ export function SmartDictionary({
             >
               {getWordRowActionLabel(record, rowWritable)}
             </Button>
-            {/* 有角标 + 改得动才给入口：入口就是「改这个角标」，没有角标时列表上
-                无从改起（判定与角标同源，见 visibleWordAnnotation）；别人的词条角标
-                照常显示，但只有超管或创建人本人才有编辑按钮。 */}
+            {/* 重复原型按归属提供入口，尚未填写标注也能补充。 */}
             {canEditRowAnnotation(annotationActor, record) ? (
               <Button
                 type="link"

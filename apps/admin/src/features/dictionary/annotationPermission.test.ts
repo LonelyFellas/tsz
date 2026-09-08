@@ -74,12 +74,18 @@ describe("canEditRowAnnotation", () => {
     expect(canEditRowAnnotation(superAdmin, row())).toBe(true);
   });
 
-  it("没有角标就没有入口——归属放行也不例外", () => {
+  it("唯一原型没有入口，重复原型允许补充空标注", () => {
     expect(
       canEditRowAnnotation(owner, row({ annotation_visible: false }))
     ).toBe(false);
-    expect(canEditRowAnnotation(owner, row({ annotation: null }))).toBe(false);
-    expect(canEditRowAnnotation(owner, row({ annotation: "  " }))).toBe(false);
+    expect(canEditRowAnnotation(owner, row({ annotation: null }))).toBe(true);
+    expect(canEditRowAnnotation(superAdmin, row({ annotation: null }))).toBe(
+      true
+    );
+    expect(canEditRowAnnotation(stranger, row({ annotation: null }))).toBe(
+      false
+    );
+    expect(canEditRowAnnotation(owner, row({ annotation: "  " }))).toBe(true);
     expect(
       canEditRowAnnotation(superAdmin, row({ annotation_visible: false }))
     ).toBe(false);

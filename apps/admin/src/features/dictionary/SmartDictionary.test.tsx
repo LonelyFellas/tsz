@@ -288,7 +288,7 @@ describe("SmartDictionary", () => {
     expect(item.annotation).toBe("007");
   });
 
-  it("未标注的词条不给列表编辑入口", () => {
+  it("重复原型的未标注词条提供列表编辑入口", () => {
     apiMocks.useWordList.mockReturnValue({
       data: {
         words: [{ ...v3Word("entry", "center"), annotation_visible: true }],
@@ -304,10 +304,7 @@ describe("SmartDictionary", () => {
         </MemoryRouter>
       </AntApp>
     );
-    // 标注只能在建条冲突弹窗里产生；列表上没有角标就没有可改的对象。
-    expect(
-      screen.queryByLabelText("编辑标注「center」")
-    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("编辑标注「center」")).toBeVisible();
   });
 
   it("他人创建的词条照常显示角标，但不给标注编辑入口", async () => {

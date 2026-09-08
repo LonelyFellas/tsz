@@ -57,9 +57,8 @@ export function wordListLabel(record: AdminWordListItemAny): string {
  * 列表上要显示的标注；不显示时返回 undefined。
  *
  * 显隐由服务端的 `annotation_visible` 定夺（同原型组里只剩这一条时为 false，
- * 此时标注值仍在库里，只是不展示）。**角标与列表里的「标注」编辑入口都必须走这一个
- * 判定**：入口的意义是「改这个角标」，两者若各写各的条件，早晚会出现「有入口没角标」
- * 或反过来的错位。
+ * 此时标注值仍在库里，只是不展示）。列表编辑入口仅依据重复原型标志与归属权限，
+ * 不要求已有标注值，因此重复原型的空标注仍可从列表补充。
  */
 export function visibleWordAnnotation(
   record: AdminWordListItemAny
