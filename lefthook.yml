@@ -26,9 +26,22 @@ pre-push:
   commands:
     typecheck:
       run: pnpm typecheck
-    # 跑带覆盖率阈值的测试,与 CI verify(pnpm test:cov)对齐,
-    # 避免覆盖率不达标的改动本地全绿、推到 CI 才红。
+    # 只跑测试,不在本地收覆盖率。
+    #
+    # 这里原本是 pnpm test:cov,理由是「避免覆盖率不达标的改动本地全绿、推到 CI 才红」。
+    # 但覆盖率百分比门槛已于 2026-08-31 取消(见 vitest.shared-config.ts 里
+    # fullCoverageConfig 的注释),没有阈值可卡,本地这一趟就只剩开销、不再拦得住任何东西。
+    #
+    # 而且它现在跑不完:fullCoverageConfig 是全量单次收集,187 个测试文件跑完之后,
+    # v8 的覆盖率收集(takeCoverage/DebugGetCoverageInfo)会卡在第 187 个上不收敛——
+    # maxWorkers 调成 2 或 8 都一样,worker 满 CPU 空转十几分钟也出不来。
+    # CI 不受影响:它走 unit-coverage 的 matrix 按模块分片(vitest.ci-shard.config.ts),
+    # 每片数据量小,覆盖率报告照常产出。
+    #
+    # 必须显式给并行度:lefthook 起子进程时 vitest 的 availableParallelism() 只认到 1,
+    # 187 个测试文件会被塞进单个 worker 串行跑(实测钩子里 1 个 worker、手动跑 9 个,
+    # 同一条命令同一个目录)。不指定的话本地推一次要十几分钟还跑不完。
     test:
-      run: pnpm test:cov
+      run: pnpm exec vitest run --maxWorkers=8
     # e2e 不在 pre-push 跑:Playwright 要起服务、全量跑数分钟,是每次推送的最大等待项,
     # 且 CI 的 e2e job 跑同一套件兜底(合 main 仍有门禁)。推送前想自查可手动 pnpm test:e2e。
