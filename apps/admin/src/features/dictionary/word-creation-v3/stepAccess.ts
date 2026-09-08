@@ -20,9 +20,13 @@ export interface V3StepAccess {
 export function resolveV3StepAccess(
   word: AccessWord,
   requested: WordCreationStep,
-  editingPublished: boolean
+  editingPublished: boolean,
+  writable = true
 ): V3StepAccess {
+  // writable=false 是既有两种只读之外的第三种：别人的未发布草稿（判定见 canWriteEntry）。
+  // 落点与归档态一致——只读时只剩 preview 一步可达。
   const readOnly =
+    !writable ||
     word.status === "archived" ||
     (word.status === "published" && !editingPublished);
   if (readOnly) {

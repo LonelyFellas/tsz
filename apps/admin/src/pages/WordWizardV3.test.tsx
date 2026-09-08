@@ -33,6 +33,22 @@ import {
 } from "@/features/dictionary/word-creation-v3/fixtures";
 import { WordWizardV3Page, type V3MeaningsStepRenderer } from "./WordWizardV3";
 
+// 默认登录者 = fixture 词条的 created_by，使「未发布草稿仅本人可写」默认放行；
+// 需要验证他人草稿只读时在单测里改 authMocks.profile。
+const authMocks = vi.hoisted(() => ({
+  profile: {
+    id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
+    role: "admin"
+  } as { id: string; role: string } | null
+}));
+
+// 只覆盖 useAuthStore：@/lib/auth 的其余导出被 api/dataSource 真实依赖，整体替换会让模块加载失败。
+vi.mock("@/lib/auth", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/auth")>()),
+  useAuthStore: (selector: (state: unknown) => unknown) =>
+    selector({ profile: authMocks.profile })
+}));
+
 const WORD_ID = "019d2c55-1f9e-7f88-a189-a2b8a07153fb";
 
 function cleanMeanings(posId?: string): AdminWordV3["meanings"] {
@@ -201,6 +217,48 @@ function renderPage(
 }
 
 describe("WordWizardV3Page", () => {
+  it("别人的未发布草稿被强制成只读预览", async () => {
+    // 草稿对所有管理员可见，但只有创建者与超管能写（后端 403 entry_edit_forbidden 兜底）。
+    // 页面表现是：不论请求哪一步，都落到只读的 preview。
+    authMocks.profile = { id: "someone-else", role: "admin" };
+    try {
+      const current = word();
+      const api = source({ word: current, retired_stable_nodes: [] });
+      const router = renderPage(
+        `/words/${WORD_ID}/v3/wizard/meanings`,
+        createV3WordRequests(api)
+      );
+      await waitFor(() =>
+        expect(router.state.location.pathname).toContain("/preview")
+      );
+      expect(screen.queryByLabelText("语义区间 1 中文")).toBeNull();
+    } finally {
+      authMocks.profile = {
+        id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
+        role: "admin"
+      };
+    }
+  });
+
+  it("超管可以照常编辑别人的草稿", async () => {
+    authMocks.profile = { id: "admin-9", role: "super_admin" };
+    try {
+      const current = word();
+      const api = source({ word: current, retired_stable_nodes: [] });
+      const router = renderPage(
+        `/words/${WORD_ID}/v3/wizard/meanings`,
+        createV3WordRequests(api)
+      );
+      expect(await screen.findByLabelText("语义区间 1 中文")).toBeVisible();
+      expect(router.state.location.pathname).toContain("/meanings");
+    } finally {
+      authMocks.profile = {
+        id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
+        role: "admin"
+      };
+    }
+  });
+
   it("未保存摘要实时更新并在返回第一步时保留，期间不调用保存或校验", async () => {
     const current = word();
     const api = source({ word: current, retired_stable_nodes: [] });

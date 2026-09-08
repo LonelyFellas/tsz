@@ -41,6 +41,8 @@ import {
   shouldRetryV3Detail
 } from "@/features/dictionary/word-creation-v3/presentationErrors";
 import { resolveV3StepAccess } from "@/features/dictionary/word-creation-v3/stepAccess";
+import { canWriteEntry } from "@/features/dictionary/entryWritePermission";
+import { useAuthStore } from "@/lib/auth";
 import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
 import {
   impactReasonLabel,
@@ -564,6 +566,11 @@ export function WordWizardV3Page({
   renderMeaningsStep?: V3MeaningsStepRenderer;
 } = {}) {
   const { wordId = "", step } = useParams();
+  // 归属判定所需；门禁保证受保护页内 profile 必有值，缺失时判定一律不放行。
+  const profile = useAuthStore((s) => s.profile);
+  const writeActor = profile
+    ? { id: profile.id, role: profile.role }
+    : undefined;
   const partOfSpeechCatalog = usePartOfSpeechCatalog();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -632,7 +639,13 @@ export function WordWizardV3Page({
   const editingPublished =
     word.status === "published" && searchParams.get("mode") === "edit";
   const requestedStep = isStep(step) ? step : word.max_reachable_step;
-  const stepAccess = resolveV3StepAccess(word, requestedStep, editingPublished);
+  // 别人的未发布草稿是只读的：看得见、改不动（后端 403 entry_edit_forbidden 兜底）。
+  const stepAccess = resolveV3StepAccess(
+    word,
+    requestedStep,
+    editingPublished,
+    canWriteEntry(writeActor, word)
+  );
   const forcePreview = stepAccess.readOnly;
   const legalStep = stepAccess.effective;
   if (step !== legalStep) {

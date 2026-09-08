@@ -87,6 +87,13 @@ import {
 } from "./presentation";
 import { useLifecycleSurfaceCommand } from "./useLifecycleSurfaceCommand";
 import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
+import {
+  ENTRY_WRITE_BLOCKED_HINT,
+  canWriteEntry,
+  entryWriteForbiddenMessage,
+  isEntryOwnershipError,
+  partitionWritableRows
+} from "./entryWritePermission";
 import { newWordNodeId } from "./word-model/primitives";
 
 import { EditEntryAnnotation } from "./EditEntryAnnotation";
@@ -169,6 +176,9 @@ export function SmartDictionary({
     : undefined;
   // 删除与标注共用同一个「当前管理员」，两处归属规则都是「超管或创建人本人」。
   const annotationActor = deleteActor;
+  // 写操作（继续创建/归档/恢复）的归属规则不同：只卡**未发布**草稿，
+  // 已发布词条全员可改，见 canWriteEntry。
+  const writeActor = deleteActor;
   const [searchParams, setSearchParams] = useSearchParams();
   const [annotationEntry, setAnnotationEntry] =
     useState<AdminWordListItemAny>();
@@ -409,6 +419,19 @@ export function SmartDictionary({
     return error instanceof Error ? error.message : "永久删除失败";
   };
 
+  // 归属越权（403 entry_edit_forbidden）与普通失败对管理员意味不同：前者重试也没用。
+  // 后端 detail 是英文的，这里换成中文再显示。
+  const describeLifecycleFailure = (
+    error: unknown,
+    fallback: string
+  ): string => {
+    const code = (error as { code?: string } | undefined)?.code;
+    if (isEntryOwnershipError(code)) {
+      return entryWriteForbiddenMessage(code);
+    }
+    return error instanceof Error ? error.message : fallback;
+  };
+
   const deleteOne = (record: AdminWordListItemAny) => {
     const eligibility = evaluateDeleteEligibility(deleteActor, record);
     if (!eligibility.deletable) {
@@ -538,11 +561,10 @@ export function SmartDictionary({
             message.success(restoring ? "词条已恢复" : "词条已移入垃圾桶");
           } catch (error) {
             message.error(
-              error instanceof Error
-                ? error.message
-                : restoring
-                  ? "恢复失败"
-                  : "移入垃圾桶失败"
+              describeLifecycleFailure(
+                error,
+                restoring ? "恢复失败" : "移入垃圾桶失败"
+              )
             );
           }
         })
@@ -562,6 +584,21 @@ export function SmartDictionary({
     const hasActive = selectedRows.some((row) => row.status !== "archived");
     if (hasArchived && hasActive) {
       message.warning("垃圾桶与正常词条不能在同一批次处理");
+      return;
+    }
+    // 后端整批原子：混进一条别人的未发布草稿会拒掉整批（403 entry_edit_forbidden）。
+    // 与其让整批失败，不如提交前就把不归自己管的挑明。
+    const { blocked } = partitionWritableRows(writeActor, selectedRows);
+    if (blocked.length > 0) {
+      const detail = blocked
+        .slice(0, 3)
+        .map((row) => `「${wordListLabel(row)}」`)
+        .join("、");
+      message.warning(
+        blocked.length > 3
+          ? `${detail} 等 ${blocked.length} 条是他人的未发布草稿，无法操作`
+          : `${detail} 是他人的未发布草稿，无法操作`
+      );
       return;
     }
     const restoring = restoringSelection;
@@ -602,11 +639,10 @@ export function SmartDictionary({
             );
           } catch (error) {
             message.error(
-              error instanceof Error
-                ? error.message
-                : restoring
-                  ? "批量恢复失败"
-                  : "批量移入垃圾桶失败"
+              describeLifecycleFailure(
+                error,
+                restoring ? "批量恢复失败" : "批量移入垃圾桶失败"
+              )
             );
           }
         })
@@ -834,15 +870,16 @@ export function SmartDictionary({
       fixed: "right",
       render: (_: unknown, record: AdminWordListItemAny) => {
         const rowName = `「${wordListLabel(record)}」`;
+        const rowWritable = canWriteEntry(writeActor, record);
         return (
           <Space size={0}>
             <Button
               type="link"
               size="small"
-              aria-label={`${getWordRowActionLabel(record)}${rowName}`}
+              aria-label={`${getWordRowActionLabel(record, rowWritable)}${rowName}`}
               onClick={() => navigate(getWordRowRoute(record))}
             >
-              {getWordRowActionLabel(record)}
+              {getWordRowActionLabel(record, rowWritable)}
             </Button>
             {/* 有角标 + 改得动才给入口：入口就是「改这个角标」，没有角标时列表上
                 无从改起（判定与角标同源，见 visibleWordAnnotation）；别人的词条角标
@@ -857,35 +894,50 @@ export function SmartDictionary({
                 标注
               </Button>
             ) : null}
-            {adminWordsDataSourceCapabilities.archive && (
-              <Button
-                type="link"
-                size="small"
-                danger={record.status !== "archived"}
-                aria-label={`${record.status === "archived" ? "恢复" : "移入垃圾桶"}${rowName}`}
-                icon={
-                  record.status === "archived" ? (
-                    <RollbackOutlined />
-                  ) : (
-                    <DeleteOutlined />
-                  )
-                }
-                disabled={lifecycleInput(record) === undefined}
-                loading={
-                  lifecyclePending &&
-                  (archiveWord.variables?.wordId === record.id ||
-                    restoreWord.variables?.wordId === record.id)
-                }
-                onClick={() =>
-                  transitionOne(
-                    record,
-                    record.status === "archived" ? "restore" : "archive"
-                  )
-                }
-              >
-                {record.status === "archived" ? "恢 复" : "移入垃圾桶"}
-              </Button>
-            )}
+            {adminWordsDataSourceCapabilities.archive &&
+              (() => {
+                const button = (
+                  <Button
+                    type="link"
+                    size="small"
+                    danger={record.status !== "archived"}
+                    aria-label={`${record.status === "archived" ? "恢复" : "移入垃圾桶"}${rowName}`}
+                    icon={
+                      record.status === "archived" ? (
+                        <RollbackOutlined />
+                      ) : (
+                        <DeleteOutlined />
+                      )
+                    }
+                    disabled={
+                      !rowWritable || lifecycleInput(record) === undefined
+                    }
+                    loading={
+                      lifecyclePending &&
+                      (archiveWord.variables?.wordId === record.id ||
+                        restoreWord.variables?.wordId === record.id)
+                    }
+                    onClick={() =>
+                      transitionOne(
+                        record,
+                        record.status === "archived" ? "restore" : "archive"
+                      )
+                    }
+                  >
+                    {record.status === "archived" ? "恢 复" : "移入垃圾桶"}
+                  </Button>
+                );
+                // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
+                // 缺 lifecycle 字段那种置灰不给 Tooltip：那是数据问题，刷新即可，
+                // 与「这条不归你管」不是一回事。
+                return rowWritable ? (
+                  button
+                ) : (
+                  <Tooltip title={ENTRY_WRITE_BLOCKED_HINT}>
+                    <span>{button}</span>
+                  </Tooltip>
+                );
+              })()}
             {adminWordsDataSourceCapabilities.permanentDelete &&
               record.status === "archived" &&
               (() => {
