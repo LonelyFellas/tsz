@@ -59,6 +59,8 @@ const ISSUE_MESSAGES = {
   relation_target_stale: "关系词目标已变化，请重新选择",
   sentence_context_target_unavailable: "例句关联目标当前不可用",
   relation_pending_headword_invalid: "待关联词条名称无效",
+  relation_pending_target_unresolved:
+    "关联词还没绑定词条，发布前请选择具体词条或删除该行",
   relation_target_shape_invalid: "关联词目标信息不完整，请重新选择",
   relation_pending_gloss_without_headword: "请先填写待关联词条名称",
   relation_pending_gloss_invalid: "预定义词义不能超过 5000 个字符",

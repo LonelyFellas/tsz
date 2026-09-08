@@ -1174,8 +1174,9 @@
   border-bottom-color: #e8ebf0;
 }
 
+/* 上下留白要和行间对齐：行自带 10px padding，卡片再给 14px 会让首末两条比行间多出 3px。 */
 .word-sense-groups-card > .ant-card-body {
-  padding: 14px;
+  padding: 10px 14px;
 }
 
 .word-meaning-dialect-toolbar {
@@ -1200,19 +1201,34 @@
 .word-sense-group-list {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 10px;
+  gap: 0;
 }
 
+/* 表头与行共用同一份列模板，列宽才不会各算各的（操作列按钮组实测 32px）。 */
+.word-sense-group-heads,
 .word-sense-group-item {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr) minmax(0, 1fr) 56px;
   gap: 10px;
-  align-items: end;
   min-width: 0;
-  padding: 12px;
-  background: #fff;
-  border: 1px solid #e3e8ef;
-  border-radius: 10px;
+}
+
+.word-sense-group-heads {
+  padding-block: 0 6px;
+  color: #333a47;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 与语法结构等表格行同一套：不描边框，靠行间分割线串起来，末行不画。 */
+.word-sense-group-item {
+  align-items: end;
+  padding-block: 10px;
+  border-bottom: 1px solid #edf0f4;
+}
+
+.word-sense-group-item:last-child {
+  border-bottom: 0;
 }
 
 .word-sense-group-index,
@@ -2410,6 +2426,10 @@
 @media (max-width: 900px) {
   .word-sense-group-item {
     grid-template-columns: 1fr;
+  }
+
+  .word-sense-group-heads {
+    display: none;
   }
 
   .word-sense-group-item > .ant-btn {

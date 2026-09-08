@@ -2622,4 +2622,67 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.getByTestId("controlled-pos-count")).toHaveTextContent("1");
     expect(activeChanges).toHaveBeenCalledTimes(1);
   });
+
+  it("拖动词性标签可以重排基本词性，单个词性时不可拖", () => {
+    const twoPos: DraftFormsStepContentV3 = {
+      pos: [
+        ...formsFixture({ pos_id: uuidFromInt(901), pos: "noun" }).pos,
+        // 第二个词性不带词形，避免两份 fixture 的内部 ID 撞车
+        ...formsFixture({
+          pos_id: uuidFromInt(902),
+          pos: "verb",
+          forms: [],
+          groups: []
+        }).pos
+      ]
+    };
+    render(<Harness initial={twoPos} />);
+
+    const handles = [
+      ...document.querySelectorAll<HTMLElement>(".word-pos-tab-handle")
+    ];
+    expect(handles.map((handle) => handle.dataset.posId)).toEqual([
+      uuidFromInt(901),
+      uuidFromInt(902)
+    ]);
+    // 拖动由把手发起，外观与词形发音里的行拖动同一套
+    const grips = handles.map((handle) =>
+      handle.querySelector<HTMLElement>(".word-sort-drag-handle")!
+    );
+    expect(grips.every((grip) => grip.draggable)).toBe(true);
+    expect(grips[0]!.querySelector(".anticon-holder")).not.toBeNull();
+
+    const store = new Map<string, string>();
+    const dataTransfer = {
+      effectAllowed: "none",
+      dropEffect: "none",
+      types: ["application/x-tsz-v3-pos"],
+      setData: (type: string, data: string) => store.set(type, data),
+      getData: (type: string) => store.get(type) ?? "",
+      setDragImage: vi.fn()
+    };
+    fireEvent.dragStart(grips[0]!, { dataTransfer });
+    expect(handles[0]!).toHaveClass("is-dragging");
+    fireEvent.dragOver(handles[1]!, { dataTransfer });
+    expect(handles[1]!).toHaveClass("is-drag-over");
+    fireEvent.drop(handles[1]!, { dataTransfer });
+
+    const value = JSON.parse(
+      screen.getByTestId("canonical-value").textContent!
+    ) as DraftFormsStepContentV3;
+    expect(value.pos.map((pos) => pos.pos_id)).toEqual([
+      uuidFromInt(902),
+      uuidFromInt(901)
+    ]);
+
+    // 只剩一个词性时没有可排的顺序，把手不再可拖
+    render(<Harness initial={formsFixture({ pos_id: uuidFromInt(903) })} />);
+    const single = document.querySelectorAll<HTMLElement>(
+      `.word-pos-tab-handle[data-pos-id="${uuidFromInt(903)}"]`
+    );
+    expect(single).toHaveLength(1);
+    expect(
+      single[0]!.querySelector<HTMLElement>(".word-sort-drag-handle")
+    ).toBeDisabled();
+  });
 });

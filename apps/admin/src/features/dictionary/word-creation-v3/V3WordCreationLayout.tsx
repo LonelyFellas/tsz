@@ -10,7 +10,6 @@ import type {
 import type { ReactNode } from "react";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "./components/V3ProductProgressList";
-import type { V3IssueNavigationTarget } from "./issueNavigation";
 import type { V3Problem } from "./problem";
 import { buildV3ProductProgress } from "./readiness";
 import { v3IssueMessages } from "./presentationErrors";
@@ -45,13 +44,11 @@ interface Props {
   dirtySteps?: Readonly<{ forms: boolean; meanings: boolean }>;
   draftForms?: DraftFormsStepContentV3;
   draftMeanings?: DraftMeaningsStepContentWritableV3;
-  issues: readonly V3DraftValidationIssue[];
   problem?: V3Problem;
   conflict?: V3ConflictComparison;
   retrying?: boolean;
   refreshingConflict?: boolean;
   onStepChange: (step: WordCreationStep) => void;
-  onProgressNavigate?: (target: V3IssueNavigationTarget) => void;
   onIssueNavigate?: (issue: V3DraftValidationIssue) => void;
   onRetry?: () => void;
   onRefreshConflict?: () => void;
@@ -122,13 +119,11 @@ export function V3WordCreationLayout({
   dirtySteps = { forms: false, meanings: false },
   draftForms,
   draftMeanings,
-  issues,
   problem,
   conflict,
   retrying,
   refreshingConflict,
   onStepChange,
-  onProgressNavigate,
   onIssueNavigate,
   onRetry,
   onRefreshConflict,
@@ -152,11 +147,10 @@ export function V3WordCreationLayout({
     dirtySteps,
     completedSteps: word.completed_steps,
     forms: draftForms ?? word.forms,
-    meanings: draftMeanings ?? word.meanings,
-    issues
+    meanings: draftMeanings ?? word.meanings
   });
   const currentProgressKey = progressRows.find(
-    (row) => row.target.step === activeStep && !row.completed
+    (row) => row.step === activeStep && !row.completed
   )?.key;
   const operationValidationIssues =
     problem?.kind === "validation" &&
@@ -178,13 +172,6 @@ export function V3WordCreationLayout({
         progress: (
           <V3ProductProgressList
             currentKey={currentProgressKey}
-            disabled={readOnly}
-            onSelect={(key) => {
-              const row = progressRows.find((item) => item.key === key);
-              if (!row) return;
-              if (onProgressNavigate) onProgressNavigate(row.target);
-              else onStepChange(row.target.step);
-            }}
             rows={progressRows.map((row) => ({
               completed: row.completed,
               index: row.index,

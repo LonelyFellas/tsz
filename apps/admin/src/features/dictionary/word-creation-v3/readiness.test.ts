@@ -277,8 +277,7 @@ describe("buildV3ProductProgress", () => {
       wordId: "word-1",
       completedSteps: ["basics"],
       forms: { pos: [] },
-      meanings: { sense_groups: [], pos: [] },
-      issues: []
+      meanings: { sense_groups: [], pos: [] }
     });
 
     expect(rows.map(({ key, label }) => [key, label])).toEqual([
@@ -335,8 +334,7 @@ describe("buildV3ProductProgress", () => {
       wordId: "word-1",
       completedSteps: ["basics", "forms"],
       forms: { pos: [...first.pos, second] },
-      meanings: { sense_groups: [], pos: [] },
-      issues: []
+      meanings: { sense_groups: [], pos: [] }
     });
 
     expect(rows[1]).toMatchObject({ count: 2, completed: true });
@@ -346,15 +344,6 @@ describe("buildV3ProductProgress", () => {
       "形容词"
     ]);
     expect(rows[2]!.details.map((item) => item.count)).toEqual([1, 1]);
-    expect(rows[2]!.target).toMatchObject({
-      step: "forms",
-      pos_id: UUIDS.pos,
-      form_group_id: UUIDS.group,
-      membership_id: UUIDS.membership_2,
-      form_id: plural.id,
-      node_id: plural.id,
-      field: "form_type"
-    });
   });
 
   it("counts sense groups, grammar, sense, and nested sentence nodes across POS", () => {
@@ -363,85 +352,13 @@ describe("buildV3ProductProgress", () => {
       wordId: "word-1",
       completedSteps: ["basics", "forms"],
       forms: formsFixture(),
-      meanings: meaningsFixture(),
-      issues: []
+      meanings: meaningsFixture()
     });
 
     expect(rows.slice(3).map((row) => row.count)).toEqual([1, 3, 3, 3]);
-    expect(rows[3]!.target).toEqual({
-      step: "meanings",
-      node_id: uuidFromInt(500),
-      field: "name_zh"
-    });
-    expect(rows[4]!.target).toMatchObject({
-      step: "meanings",
-      pos_id: UUIDS.pos,
-      node_id: uuidFromInt(501),
-      field: "variants"
-    });
-    expect(rows[5]!.target).toMatchObject({
-      node_id: uuidFromInt(503),
-      field: "sense"
-    });
-    expect(rows[6]!.target).toMatchObject({
-      node_id: uuidFromInt(504),
-      field: "sentence"
-    });
   });
 
-  it("prefers the matching server issue target for its product question", () => {
-    const meanings = meaningsFixture();
-    const senseGroupIssue: V3DraftValidationIssue = {
-      schema_version: 3,
-      step: "meanings",
-      node_id: uuidFromInt(500),
-      field: "name_zh",
-      code: "sense_group_name_required",
-      message: "sense group is invalid",
-      node_location: {
-        node_role: "sense_group",
-        ancestor_node_ids: [UUIDS.pos],
-        pos_id: UUIDS.pos
-      }
-    };
-    const grammarIssue: V3DraftValidationIssue = {
-      schema_version: 3,
-      step: "meanings",
-      node_id: uuidFromInt(502),
-      field: "variants",
-      code: "node_binding_unknown",
-      message: "grammar is invalid",
-      node_location: {
-        node_role: "grammar_structure",
-        ancestor_node_ids: [UUIDS.pos],
-        pos_id: UUIDS.pos
-      }
-    };
-
-    const rows = buildV3ProductProgress({
-      language: "en",
-      wordId: "word-1",
-      completedSteps: ["basics", "forms"],
-      forms: formsFixture(),
-      meanings,
-      issues: [senseGroupIssue, grammarIssue]
-    });
-
-    expect(rows[3]!.target).toMatchObject({
-      step: "meanings",
-      pos_id: UUIDS.pos,
-      node_id: uuidFromInt(500),
-      field: "name_zh"
-    });
-    expect(rows[4]!.target).toMatchObject({
-      step: "meanings",
-      pos_id: UUIDS.pos,
-      node_id: uuidFromInt(502),
-      field: "variants"
-    });
-  });
-
-  it("keeps ungrouped regional derived forms countable and routes sentence issues to the sentence question", () => {
+  it("keeps ungrouped regional derived forms countable", () => {
     const derived = ukUsFormFixture({
       id: uuidFromInt(701),
       form_type: "plural"
@@ -482,21 +399,6 @@ describe("buildV3ProductProgress", () => {
         }
       }
     };
-    const sentenceId = meanings.pos[0]!.senses[0]!.sentences[0]!.id;
-    const sentenceIssue: V3DraftValidationIssue = {
-      schema_version: 3,
-      step: "meanings",
-      node_id: sentenceId,
-      field: "level",
-      code: "node_binding_unknown",
-      message: "sentence is invalid",
-      node_location: {
-        node_role: "sentence",
-        ancestor_node_ids: [UUIDS.pos, uuidFromInt(503)],
-        pos_id: UUIDS.pos
-      }
-    };
-
     const rows = buildV3ProductProgress({
       language: "en",
       wordId: "word-1",
@@ -505,23 +407,10 @@ describe("buildV3ProductProgress", () => {
         forms: [commonFormFixture(), derived],
         groups: []
       }),
-      meanings,
-      issues: [sentenceIssue]
+      meanings
     });
 
     expect(rows[2]).toMatchObject({ count: 1 });
-    expect(rows[2]!.target).toEqual({
-      step: "forms",
-      pos_id: UUIDS.pos,
-      node_id: derived.id,
-      field: "form_type",
-      form_id: derived.id
-    });
-    expect(rows[6]!.target).toMatchObject({
-      step: "meanings",
-      node_id: sentenceId,
-      field: "level"
-    });
   });
 });
 
@@ -574,8 +463,7 @@ describe("实时摘要明细", () => {
       language: "en",
       completedSteps: ["basics", "forms", "meanings"],
       forms,
-      meanings,
-      issues: []
+      meanings
     });
     expect(rows[3]!.details.map((item) => item.label)).toEqual([
       "1. 位置",
@@ -612,8 +500,7 @@ describe("实时摘要明细", () => {
       completedSteps: ["basics", "forms", "meanings"],
       forms,
       meanings,
-      dirtySteps: { forms: false, meanings: true },
-      issues: []
+      dirtySteps: { forms: false, meanings: true }
     });
     expect(updated[3]!.details.map((item) => item.label)).toEqual([
       "1. 待填写语义区间",

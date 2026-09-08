@@ -262,7 +262,6 @@ function V3BasicsSlot({ context }: { context: V3WizardSlotContext }) {
       draftForms={context.draftForms}
       draftMeanings={context.draftMeanings}
       dirtySteps={context.dirtySteps}
-      issues={context.issues}
       partOfSpeechCatalog={context.partOfSpeechCatalog?.items}
       onContinue={() => context.setActiveStep("forms")}
       onStepChange={context.setActiveStep}
