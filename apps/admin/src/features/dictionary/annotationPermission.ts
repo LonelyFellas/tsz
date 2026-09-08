@@ -5,7 +5,6 @@
 // 规则（2026-09-07 定盘）：超管可以改任何词条的标注；其他管理员只能改自己创建的
 // 词条（含自己的草稿）。
 import type { AdminWordListItemAny } from "@tsz/types";
-import { visibleWordAnnotation } from "./presentation";
 
 export interface AnnotationActor {
   id: string;
@@ -32,18 +31,12 @@ export function canEditAnnotationOf(
   return createdBy !== undefined && createdBy === actor.id;
 }
 
-/**
- * 列表行的「标注」入口：**先有角标，再谈归属**。
- *
- * 角标判定见 visibleWordAnnotation——入口的意义是「改这个角标」，两者必须同源。
- * 归属只砍入口不砍角标：别人的词条照常显示角标（管理列表本就没有 actor 过滤），
- * 只是没有编辑按钮。
- */
+/** 重复原型才提供标注入口；空标注也允许由有权限的管理员补填。 */
 export function canEditRowAnnotation(
   actor: AnnotationActor | undefined,
   row: AdminWordListItemAny
 ): boolean {
-  if (visibleWordAnnotation(row) === undefined) return false;
+  if (!row.annotation_visible) return false;
   return canEditAnnotationOf(actor, row.created_by);
 }
 
