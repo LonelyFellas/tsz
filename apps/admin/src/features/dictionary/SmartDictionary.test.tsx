@@ -342,6 +342,75 @@ describe("SmartDictionary", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("他人的未发布草稿：行入口降为「查看」，移入垃圾桶置灰", () => {
+    // 草稿全员可见但只有创建者与超管能写；置灰是给管理员的预告，
+    // 真正的拦截在后端（403 entry_edit_forbidden）。
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [{ ...v3Word("entry", "center"), created_by: "admin-2" }],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    expect(screen.getByLabelText("查看「center」")).toBeVisible();
+    expect(screen.queryByLabelText("继续创建「center」")).toBeNull();
+    expect(screen.getByLabelText("移入垃圾桶「center」")).toBeDisabled();
+  });
+
+  it("自己的未发布草稿照常可以继续创建与移入垃圾桶", () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [v3Word("entry", "center")],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    expect(screen.getByLabelText("继续创建「center」")).toBeVisible();
+    expect(screen.getByLabelText("移入垃圾桶「center」")).toBeEnabled();
+  });
+
+  it("他人的已发布词条不受限：收口只针对未发布草稿", () => {
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...v3Word("entry", "center"),
+            created_by: "admin-2",
+            status: "published",
+            published_revision: 3
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+    expect(screen.getByLabelText("移入垃圾桶「center」")).toBeEnabled();
+  });
+
   it("超管对他人创建的词条也有标注编辑入口", () => {
     authMocks.profile = { id: "admin-9", role: "super_admin" };
     apiMocks.useWordList.mockReturnValue({

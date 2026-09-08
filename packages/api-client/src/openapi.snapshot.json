@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-07T15:39:35.581Z",
+  "_generatedAt": "2026-09-08T04:37:11.512Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -716,6 +716,7 @@
         "entry_archived",
         "entry_not_deletable",
         "entry_delete_forbidden",
+        "entry_edit_forbidden",
         "entry_annotation_forbidden",
         "entry_has_inbound_prebound_relations",
         "entry_has_inbound_publication_refs",

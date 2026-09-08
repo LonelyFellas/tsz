@@ -41,10 +41,18 @@ export function getWordRowRoute(record: WordRouteRecord): string {
   return record.status === "published" ? `${route}?mode=edit` : route;
 }
 
+/**
+ * 行入口的动作文案。
+ *
+ * `writable=false`（别人的未发布草稿）时草稿态落到「查看」——路由不变，
+ * 进去就是只读的预览页（见 resolveV3StepAccess），文案先把这件事说清楚，
+ * 免得点进去才发现改不动。
+ */
 export function getWordRowActionLabel(
-  record: WordRouteRecord
+  record: WordRouteRecord,
+  writable = true
 ): "编辑" | "继续创建" | "继续编辑" | "查看" {
   if (record.status === "archived") return "查看";
-  if (record.status !== "published") return "继续创建";
+  if (record.status !== "published") return writable ? "继续创建" : "查看";
   return record.has_unpublished_changes ? "继续编辑" : "查看";
 }

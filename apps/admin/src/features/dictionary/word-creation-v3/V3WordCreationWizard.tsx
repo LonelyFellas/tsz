@@ -1297,8 +1297,13 @@ function V3WordCreationSession({
 
   const reachableSteps = useMemo(
     () =>
-      resolveV3StepAccess(word, activeStep, allowPublishedEditing).reachable,
-    [activeStep, allowPublishedEditing, word]
+      resolveV3StepAccess(
+        word,
+        activeStep,
+        allowPublishedEditing,
+        !sessionReadOnly
+      ).reachable,
+    [activeStep, allowPublishedEditing, sessionReadOnly, word]
   );
   const context: V3WizardSlotContext = {
     word,

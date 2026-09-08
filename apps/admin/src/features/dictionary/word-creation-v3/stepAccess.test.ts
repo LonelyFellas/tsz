@@ -48,6 +48,30 @@ describe("resolveV3StepAccess", () => {
     });
   });
 
+  it("forces someone else's draft to read-only preview", () => {
+    // 别人的未发布草稿看得见但改不动：writable=false 与归档态同样落到只读 preview。
+    expect(
+      resolveV3StepAccess(word("draft", "meanings"), "forms", false, false)
+    ).toMatchObject({
+      effective: "preview",
+      requestedReachable: false,
+      readOnly: true
+    });
+    expect(
+      resolveV3StepAccess(word("draft", "meanings"), "preview", false, false)
+        .reachable
+    ).toEqual(new Set(["preview"]));
+  });
+
+  it("leaves one's own draft writable when the flag is passed explicitly", () => {
+    expect(
+      resolveV3StepAccess(word("draft", "meanings"), "forms", false, true)
+    ).toMatchObject({
+      effective: "forms",
+      readOnly: false
+    });
+  });
+
   it("keeps published edit mode bounded by max_reachable_step", () => {
     expect(
       resolveV3StepAccess(word("published", "meanings"), "preview", true)

@@ -1947,7 +1947,7 @@ describe("空草稿创建冲突", () => {
     expect(screen.queryByText("创建并进入词形与发音")).not.toBeInTheDocument();
     expect(screen.queryByText(/稍后重试|原样重试创建/)).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: "继续创建" })
+      screen.queryByRole("link", { name: "打 开" })
     ).not.toBeInTheDocument();
     expect(supplied.createV3).toHaveBeenCalledTimes(1);
   });
@@ -1965,8 +1965,8 @@ it("创建竞态返回可见空草稿时只提供继续入口，修改输入后�
   fireEvent.change(input(), { target: { value: "center" } });
   fireEvent.click(screen.getByText("词典检测"));
   fireEvent.click(await screen.findByText("创建并进入词形与发音"));
-  expect(await screen.findByText("已有未完成草稿")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "继续创建" })).toHaveAttribute(
+  expect(await screen.findByText("已有同名的未完成草稿")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "打 开" })).toHaveAttribute(
     "href",
     "/words/existing-draft/v3/wizard/forms"
   );
@@ -1974,9 +1974,7 @@ it("创建竞态返回可见空草稿时只提供继续入口，修改输入后�
   expect(screen.queryByText(/稍后重试|原样重试创建/)).not.toBeInTheDocument();
   expect(supplied.createV3).toHaveBeenCalledTimes(1);
   fireEvent.change(input(), { target: { value: "other" } });
-  expect(
-    screen.queryByRole("link", { name: "继续创建" })
-  ).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "打 开" })).not.toBeInTheDocument();
   vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection("other"));
   fireEvent.click(screen.getByText("词典检测"));
   expect(await screen.findByText("创建并进入词形与发音")).toBeEnabled();
@@ -1990,8 +1988,8 @@ it("检测到无已保存原形的空草稿时继续已有草稿，不重复创�
   renderStep(supplied);
   fireEvent.change(input(), { target: { value: "center" } });
   fireEvent.click(screen.getByText("词典检测"));
-  expect(await screen.findByText("已有未完成草稿")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "继续创建" })).toHaveAttribute(
+  expect(await screen.findByText("已有同名的未完成草稿")).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "打 开" })).toHaveAttribute(
     "href",
     "/words/empty-draft/v3/wizard/forms"
   );
@@ -2001,9 +1999,7 @@ it("检测到无已保存原形的空草稿时继续已有草稿，不重复创�
   expect(supplied.createV3).not.toHaveBeenCalled();
   expect(supplied.getWord).not.toHaveBeenCalled();
   fireEvent.change(input(), { target: { value: "other" } });
-  expect(
-    screen.queryByRole("link", { name: "继续创建" })
-  ).not.toBeInTheDocument();
+  expect(screen.queryByRole("link", { name: "打 开" })).not.toBeInTheDocument();
 });
 
 it("空草稿与已保存原形共存时保留原形结果、阻止创建且允许修改输入", async () => {
@@ -2019,9 +2015,9 @@ it("空草稿与已保存原形共存时保留原形结果、阻止创建且允�
   renderStep(supplied);
   fireEvent.change(input(), { target: { value: "center" } });
   fireEvent.click(screen.getByText("词典检测"));
-  expect(await screen.findByText("已有未完成草稿")).toBeInTheDocument();
+  expect(await screen.findByText("已有同名的未完成草稿")).toBeInTheDocument();
   expect(await screen.findByText("已发现")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: "继续创建" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "打 开" })).toHaveAttribute(
     "href",
     "/words/empty-draft/v3/wizard/forms"
   );
@@ -2031,7 +2027,7 @@ it("空草稿与已保存原形共存时保留原形结果、阻止创建且允�
   expect(supplied.createV3).not.toHaveBeenCalled();
   expect(input()).toBeEnabled();
   fireEvent.change(input(), { target: { value: "other" } });
-  expect(screen.queryByText("已有未完成草稿")).not.toBeInTheDocument();
+  expect(screen.queryByText("已有同名的未完成草稿")).not.toBeInTheDocument();
 });
 
 it("原形确认后竞态空草稿冲突解除输入锁定，不再提交旧token", async () => {
@@ -2053,7 +2049,7 @@ it("原形确认后竞态空草稿冲突解除输入锁定，不再提交旧toke
   const create = await screen.findByText("确认并创建，进入词形与发音");
   await waitFor(() => expect(create.closest("button")).toBeEnabled());
   fireEvent.click(create);
-  expect(await screen.findByText("已有未完成草稿")).toBeInTheDocument();
+  expect(await screen.findByText("已有同名的未完成草稿")).toBeInTheDocument();
   expect(input()).toBeEnabled();
   expect(
     screen.queryByText("确认并创建，进入词形与发音")
@@ -2075,9 +2071,10 @@ it.each(["unavailable", "unknown-pos"])(
     renderStep(supplied);
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    expect(
-      await screen.findByRole("link", { name: "继续创建" })
-    ).toHaveAttribute("href", "/words/empty-draft/v3/wizard/forms");
+    expect(await screen.findByRole("link", { name: "打 开" })).toHaveAttribute(
+      "href",
+      "/words/empty-draft/v3/wizard/forms"
+    );
     expect(screen.queryByText("创建并进入词形与发音")).not.toBeInTheDocument();
     expect(supplied.createV3).not.toHaveBeenCalled();
   }
