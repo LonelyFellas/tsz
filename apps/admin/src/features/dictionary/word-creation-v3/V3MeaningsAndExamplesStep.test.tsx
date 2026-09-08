@@ -3458,7 +3458,15 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("草稿可暂时不添加词性释义")).toBeNull();
   });
 
-  it("拖动词性标签把新顺序回写到 forms", () => {
+  // TODO(词性 Tab 拖拽): 随源码里那段拖拽包裹层一起暂时下线,恢复时把 it.skip 改回 it。
+  //
+  // 把 Tab 的 label 包进带拖拽事件的 <span> 之后,整个测试文件会卡死:187 个用例里
+  // 前 59 个正常,跑到第 60 个「无语义区间时新增 sense…词性 Tab 仍由 forms 驱动」时
+  // worker 100% CPU 空转、永不退出(单独跑这个用例却正常,要累积到那里才触发)。
+  // 原因是这一改动动了 antd Tabs 的 label 结构,而 Tabs 会对 label 做测量,
+  // 在 jsdom 的 ResizeObserver 垫片下打转。给容器和手柄加 posOrderMatchesForms 守卫
+  // 都不管用,只有回退这段包裹层才恢复(hunk 二分确认)。
+  it.skip("拖动词性标签把新顺序回写到 forms", () => {
     const posFixture = (posId: string, code: string, spelling: string) => ({
       pos_id: posId,
       pos: code,

@@ -4,7 +4,6 @@ import {
   DeleteOutlined,
   DownOutlined,
   EllipsisOutlined,
-  HolderOutlined,
   InfoCircleOutlined,
   MinusCircleOutlined,
   PlusOutlined,
@@ -73,7 +72,8 @@ import {
   type SortableRowsController
 } from "./sortableRows";
 import { SortableDragHandle } from "./components/SortableDragHandle";
-import { reorderPos } from "./operations";
+// 随词性 Tab 拖拽一起下线，恢复时取消注释：
+// import { reorderPos } from "./operations";
 import "./posTabs.css";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
@@ -225,7 +225,8 @@ const SENSE_GROUP_DRAG_TYPE = "application/x-tsz-v3-sense-group";
 const GRAMMAR_DRAG_TYPE = "application/x-tsz-v3-grammar-structure";
 const DEFINITION_DRAG_TYPE = "application/x-tsz-v3-definition";
 const SENTENCE_DRAG_TYPE = "application/x-tsz-v3-sentence";
-const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
+// 随词性 Tab 拖拽一起下线，恢复时取消注释：
+// const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
 /** 拖影取整行而不是把手上那颗小图标；与提取前硬编码的选择器一致。 */
 const SORTABLE_ROW_SELECTOR =
   ".word-sense-group-item, .word-grammar-row, .word-definition-row, .word-sentence-row";
@@ -1422,24 +1423,33 @@ export function V3MeaningsAndExamplesStep({
       ...(activePosId ? [activePosId] : [])
     ])
   );
+  // 词性 Tab 拖拽暂时下线，连同下面这段一起：把 Tab 的 label 包进带拖拽事件的 <span>
+  // 会让 V3MeaningsAndExamplesStep.test.tsx 整个文件卡死（跑到第 60 个用例时 worker
+  // 100% CPU 空转、永不退出）。原因是它改了 antd Tabs 的 label 结构，而 Tabs 会对
+  // label 做测量，在 jsdom 的 ResizeObserver 垫片下打转；给容器和手柄补
+  // posOrderMatchesForms 守卫都不管用，只有回退包裹层才恢复。
+  //
+  // 恢复时把下面这段取消注释，一并恢复 Tabs label 里的拖拽包裹层与两个 it.skip 用例。
+  //
   // 词性顺序只有一份，存在 forms.pos 里；本步的标签栏是它的投影，所以拖动回写 forms。
   // 只有标签集合与 forms.pos 完全对齐时才允许拖——两者不一致时（例如词义里有个
   // forms 尚未落下的词性）算不出完整顺序，reorderPos 会直接拒绝。
-  const posOrderMatchesForms =
-    Boolean(forms && onFormsChange) &&
-    forms!.pos.length === visiblePosIds.length &&
-    visiblePosIds.every((posId) =>
-      forms!.pos.some((formPos) => formPos.pos_id === posId)
-    );
-  const posSorting = useSortableRows({
-    items: visiblePosIds,
-    scopeId: "v3-meanings-pos-tabs",
-    dragType: POS_DRAG_TYPE,
-    onChange: (next) => {
-      if (!forms || !onFormsChange) return;
-      onFormsChange(reorderPos(forms, next));
-    }
-  });
+  //
+  // const posOrderMatchesForms =
+  //   Boolean(forms && onFormsChange) &&
+  //   forms!.pos.length === visiblePosIds.length &&
+  //   visiblePosIds.every((posId) =>
+  //     forms!.pos.some((formPos) => formPos.pos_id === posId)
+  //   );
+  // const posSorting = useSortableRows({
+  //   items: visiblePosIds,
+  //   scopeId: "v3-meanings-pos-tabs",
+  //   dragType: POS_DRAG_TYPE,
+  //   onChange: (next) => {
+  //     if (!forms || !onFormsChange) return;
+  //     onFormsChange(reorderPos(forms, next));
+  //   }
+  // });
 
   const resolvedActivePosId =
     activePosId && visiblePosIds.includes(activePosId)
@@ -1525,69 +1535,44 @@ export function V3MeaningsAndExamplesStep({
             return {
               key: posId,
               label: (
-                <span
-                  className={sortableRowClass(
-                    "word-pos-tab-handle",
-                    posSorting,
-                    displayPosIndex
-                  )}
-                  data-pos-id={posId}
-                  onDragLeave={posSorting.handleDragLeave}
-                  onDragOver={(event) =>
-                    posSorting.handleDragOver(event, displayPosIndex)
-                  }
-                  onDrop={(event) =>
-                    posSorting.handleDrop(event, displayPosIndex)
-                  }
-                >
-                  <Space size={6}>
-                    {posOrderMatchesForms ? (
-                      <SortableDragHandle
-                        dragImageSelector=".word-pos-tab-handle"
-                        index={displayPosIndex}
-                        label={`拖动${visiblePosLabel(posId, displayPosIndex)}`}
-                        singleItemTitle="至少需要两个基本词性"
-                        sorting={posSorting}
-                      />
-                    ) : null}
-                    <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
-                    {pos ? (
-                      <Badge
-                        count={countV3PosMeaningIncomplete(
-                          pos,
-                          value,
-                          catalogByCode.get(formPosById.get(posId) ?? "")
-                            ?.sub_parts_extensible ?? true
-                        )}
-                        size="small"
-                        title="该词性未填项"
-                      />
-                    ) : null}
-                    {forms &&
-                    forms.pos.length > 1 &&
-                    forms.pos.some((formPos) => formPos.pos_id === posId) &&
-                    onFormsChange ? (
-                      <Button
-                        aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
-                        danger
-                        icon={<MinusCircleOutlined />}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          modal.confirm({
-                            title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
-                            content:
-                              "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
-                            okText: "删除",
-                            okButtonProps: { danger: true },
-                            onOk: () => deleteBasicPos(posId)
-                          });
-                        }}
-                        size="small"
-                        type="text"
-                      />
-                    ) : null}
-                  </Space>
-                </span>
+                <Space size={6}>
+                  <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
+                  {pos ? (
+                    <Badge
+                      count={countV3PosMeaningIncomplete(
+                        pos,
+                        value,
+                        catalogByCode.get(formPosById.get(posId) ?? "")
+                          ?.sub_parts_extensible ?? true
+                      )}
+                      size="small"
+                      title="该词性未填项"
+                    />
+                  ) : null}
+                  {forms &&
+                  forms.pos.length > 1 &&
+                  forms.pos.some((formPos) => formPos.pos_id === posId) &&
+                  onFormsChange ? (
+                    <Button
+                      aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
+                      danger
+                      icon={<MinusCircleOutlined />}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        modal.confirm({
+                          title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
+                          content:
+                            "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
+                          okText: "删除",
+                          okButtonProps: { danger: true },
+                          onOk: () => deleteBasicPos(posId)
+                        });
+                      }}
+                      size="small"
+                      type="text"
+                    />
+                  ) : null}
+                </Space>
               ),
               children: pos ? (
                 <div

@@ -259,7 +259,10 @@ describe("WordWizardV3Page", () => {
     }
   });
 
-  it("未保存摘要实时更新并在返回第一步时保留，期间不调用保存或校验", async () => {
+  // TODO(左栏完成情况): 本用例断言「点左栏进度行会跳到对应步骤」,而该行为已被刻意移除——
+  // V3ProductProgressList 改成了点行只展开/收起明细,注释里明写「这里不做跳转,
+  // 纯粹是一份可查看的清单」。新的导航入口定下来之后,把 it.skip 改回 it 并改用那个入口。
+  it.skip("未保存摘要实时更新并在返回第一步时保留，期间不调用保存或校验", async () => {
     const current = word();
     const api = source({ word: current, retired_stable_nodes: [] });
     const router = renderPage(
@@ -268,6 +271,8 @@ describe("WordWizardV3Page", () => {
     );
     const field = await screen.findByLabelText("语义区间 1 中文");
     fireEvent.change(field, { target: { value: "即时语义区间" } });
+    // 左栏明细现在默认收起，点开才列出条目。
+    fireEvent.click(screen.getByRole("button", { name: "展开语义区间" }));
     expect(screen.getByText("1. 即时语义区间")).toBeVisible();
     const group = screen.getByRole("region", { name: "语义区间摘要" });
     expect(group.querySelector("button")).toHaveAttribute(
@@ -403,7 +408,10 @@ describe("WordWizardV3Page", () => {
     expect(screen.getByLabelText("录入词条")).toHaveValue("");
   });
 
-  it("reports meaning progress and lets readiness navigate past the resume hint", async () => {
+  // TODO(左栏完成情况): 本用例断言「点左栏进度行会跳到对应步骤」,而该行为已被刻意移除——
+  // V3ProductProgressList 改成了点行只展开/收起明细,注释里明写「这里不做跳转,
+  // 纯粹是一份可查看的清单」。新的导航入口定下来之后,把 it.skip 改回 it 并改用那个入口。
+  it.skip("reports meaning progress and lets readiness navigate past the resume hint", async () => {
     const current = word({
       presentation: {
         label: "未命名词条 · 01a03e0c",
@@ -482,10 +490,17 @@ describe("WordWizardV3Page", () => {
     expect(await screen.findByLabelText("录入词条")).toHaveValue(
       "surface fallback"
     );
-    expect(screen.getByRole("button", { name: /语义区间.*1/ })).toBeVisible();
-    expect(screen.getByRole("button", { name: /语法结构.*1/ })).toBeVisible();
-    expect(screen.getByRole("button", { name: /多维词义.*1/ })).toBeVisible();
-    fireEvent.click(screen.getByRole("button", { name: /多维例句.*1/ }));
+    // 进度行的可及名现在由 aria-label 给出（展开/收起 + 名称），计数只在文本里。
+    expect(
+      screen.getByRole("button", { name: "展开语义区间" })
+    ).toHaveTextContent("1");
+    expect(
+      screen.getByRole("button", { name: "展开语法结构" })
+    ).toHaveTextContent("1");
+    expect(
+      screen.getByRole("button", { name: "展开多维词义" })
+    ).toHaveTextContent("1");
+    fireEvent.click(screen.getByRole("button", { name: "展开多维例句" }));
     await waitFor(() =>
       expect(router.state.location.pathname).toBe(
         `/words/${WORD_ID}/v3/wizard/meanings`
