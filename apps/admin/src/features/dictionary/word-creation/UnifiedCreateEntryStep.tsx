@@ -1317,13 +1317,16 @@ export function UnifiedCreateEntryStep({
         <Alert
           showIcon
           type="info"
-          title="已有未完成草稿"
+          // 这条草稿不一定是自己的：撞名检测 2026-09-08 起会报出任何人的空草稿。
+          // 文案与按钮都保持中性——别人的草稿点进去是只读预览（见 canWriteEntry），
+          // 说「继续创建」会让人以为接着做，结果落到一个改不动的页面。
+          title="已有同名的未完成草稿"
           action={
             <Button
               type="link"
               href={`/words/${existingDraftId}/v3/wizard/forms`}
             >
-              继续创建
+              打 开
             </Button>
           }
         />
