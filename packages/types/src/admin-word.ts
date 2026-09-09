@@ -13,15 +13,7 @@ export type AdminWordStatus = "draft" | "published" | "archived";
 export type WordPosTag = PartOfSpeechCode;
 
 /** 词形类别:base 每 pos+方言唯一且必有,其余类型可重复。 */
-export type WordFormType =
-  | "base"
-  | "present_participle"
-  | "past_tense"
-  | "past_participle"
-  | "third_person_singular"
-  | "plural"
-  | "comparative"
-  | "superlative";
+export type WordFormType = string;
 
 /** 细分词性稳定编码；草稿允许空串，展示与所属关系从 catalog 读取。 */
 export type WordSubPos = "" | SubPartOfSpeechCode;

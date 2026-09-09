@@ -1434,8 +1434,10 @@ describe("createHttpClient", () => {
       surfacePageWithCandidate(formCandidateFixture({ dialect: "au" }))
     ],
     [
-      "form candidate form_type 枚举",
-      surfacePageWithCandidate(formCandidateFixture({ form_type: "future" }))
+      "form candidate form_type 编码格式",
+      surfacePageWithCandidate(
+        formCandidateFixture({ form_type: "invalid-code" })
+      )
     ],
     ["existing 非对象", surfacePageWithExisting(null)],
     [
@@ -1492,8 +1494,8 @@ describe("createHttpClient", () => {
       surfacePageWithSource(formSourceFixture({ dialect: "au" }))
     ],
     [
-      "form source form_type 枚举",
-      surfacePageWithSource(formSourceFixture({ form_type: "future" }))
+      "form source form_type 编码格式",
+      surfacePageWithSource(formSourceFixture({ form_type: "invalid-code" }))
     ],
     ["context 非对象", surfacePageWithContext(null)],
     [

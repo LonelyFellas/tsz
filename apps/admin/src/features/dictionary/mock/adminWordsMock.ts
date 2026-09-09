@@ -33,6 +33,7 @@ import type {
   FormsImpactItemV2,
   PartOfSpeechCatalogResponse,
   PartOfSpeechConfig,
+  FormTypeConfig,
   PartOfSpeechConfigListQuery,
   PartOfSpeechConfigListResponse,
   PreviewFormsImpactInputV2,
@@ -155,6 +156,7 @@ interface MockWordOperationRecord {
 export interface AdminWordsMockPersistedState {
   sequence: number;
   catalog_version: number;
+  form_types?: Record<string, FormTypeConfig>;
   parts_of_speech: Record<string, PartOfSpeechConfig>;
   sub_parts: Record<string, SubPartOfSpeechConfig>;
   words: Record<string, MockWord>;
@@ -2705,11 +2707,229 @@ export function createAdminWordsMock({
     }
   }
 
+  function formTypeItems(
+    current: AdminWordsMockPersistedState
+  ): FormTypeConfig[] {
+    current.form_types ??= Object.fromEntries(
+      [
+        ["base", "原形", "Base form", "base"],
+        [
+          "third_person_singular",
+          "第三人称单数",
+          "Third person singular",
+          "3sg"
+        ],
+        ["present_participle", "现在分词", "Present participle", "pres.part."],
+        ["past_tense", "过去式", "Past tense", "past"],
+        ["past_participle", "过去分词", "Past participle", "past.part."],
+        ["plural", "复数", "Plural", "pl."],
+        ["comparative", "比较级", "Comparative", "comp."],
+        ["superlative", "最高级", "Superlative", "superl."]
+      ].map(([code, zh, en, abbreviation], index) => {
+        const id = `019f1000-0000-7000-8000-${String(index + 1).padStart(12, "0")}`;
+        return [
+          id,
+          {
+            id,
+            code: code!,
+            name_zh: zh!,
+            name_en: en!,
+            short_name_zh: zh!,
+            full_name_en: en!.toLowerCase(),
+            abbreviation: abbreviation!,
+            sort_order: index * 10,
+            revision: 1,
+            usage_count: 0,
+            created_by: { id: "system", display_name: "系统" },
+            created_at: "2026-09-09T00:00:00Z",
+            updated_at: "2026-09-09T00:00:00Z"
+          }
+        ];
+      })
+    );
+    const words = [
+      ...Object.values(current.words),
+      ...Object.values(current.publication_words)
+    ];
+    return Object.values(current.form_types)
+      .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id))
+      .map((item) => ({
+        ...item,
+        usage_count: new Set(
+          words
+            .filter((word) =>
+              word.forms.pos.some(
+                (pos) =>
+                  pos.base_form.form_type === item.code ||
+                  pos.form_groups.some((group) =>
+                    group.slots.some((slot) => slot.form_type === item.code)
+                  )
+              )
+            )
+            .map((word) => word.id)
+        ).size
+      }));
+  }
+
+  function formTypeError(
+    code: string,
+    status: number,
+    field?: string
+  ): HttpError {
+    return new HttpError(status, code, [], code, {
+      type: `urn:tsz:problem:${code}`,
+      title: code,
+      status,
+      detail: code,
+      code,
+      ...(field ? { field } : {})
+    });
+  }
+
+  async function listFormTypes(query: PartOfSpeechConfigListQuery = {}) {
+    await pause();
+    const { profile, state: current } = context();
+    requireSuperAdmin(profile);
+    const q = query.q?.trim().toLowerCase();
+    const items = formTypeItems(current).filter(
+      (f) =>
+        !q ||
+        [
+          f.code,
+          f.name_zh,
+          f.name_en,
+          f.short_name_zh,
+          f.full_name_en,
+          f.abbreviation
+        ].some((v) => v.toLowerCase().includes(q))
+    );
+    const page = query.page ?? 1,
+      page_size = query.page_size ?? 10;
+    if (
+      !Number.isInteger(page) ||
+      page < 1 ||
+      !Number.isInteger(page_size) ||
+      page_size < 1 ||
+      page_size > 100
+    )
+      throw formTypeError("invalid_query", 400);
+    return {
+      items: clone(items.slice((page - 1) * page_size, page * page_size)),
+      pagination: {
+        page,
+        page_size,
+        total: items.length,
+        total_pages: Math.ceil(items.length / page_size)
+      }
+    };
+  }
+
+  async function saveFormType(
+    raw: CreatePartOfSpeechInput | UpdatePartOfSpeechInput,
+    id?: string
+  ): Promise<FormTypeConfig> {
+    await pause();
+    const { profile, state: current } = context();
+    requireSuperAdmin(profile);
+    const items = formTypeItems(current);
+    const existing = id ? items.find((f) => f.id === id) : undefined;
+    if (id && !existing) throw formTypeError("form_type_not_found", 404);
+    if (
+      existing &&
+      (!("base_revision" in raw) || raw.base_revision !== existing.revision)
+    )
+      throw formTypeError("revision_conflict", 409, "base_revision");
+    const input = trimPartInput(raw);
+    assertPartFields(input);
+    const code = existing?.code ?? ("code" in input ? input.code : "");
+    if (!/^[a-z][a-z0-9_]{0,31}$/.test(code))
+      throw formTypeError("invalid_form_type", 400, "code");
+    for (const field of [
+      "code",
+      "name_zh",
+      "name_en",
+      "short_name_zh",
+      "abbreviation",
+      "full_name_en"
+    ] as const) {
+      const value = field === "code" ? code : input[field];
+      if (
+        items.some(
+          (f) =>
+            f.id !== id &&
+            (field.endsWith("_zh")
+              ? f[field] === value
+              : f[field].toLowerCase() === value.toLowerCase())
+        )
+      )
+        throw formTypeError("form_type_conflict", 409, field);
+    }
+    const timestamp = nextTimestamp(current),
+      actor = { id: profile.id, display_name: profile.display_name };
+    const item: FormTypeConfig = {
+      id: existing?.id ?? nextId(current, "form-type"),
+      code,
+      name_zh: input.name_zh,
+      name_en: input.name_en,
+      short_name_zh: input.short_name_zh,
+      abbreviation: input.abbreviation,
+      full_name_en: input.full_name_en,
+      sort_order: input.sort_order,
+      usage_count: existing?.usage_count ?? 0,
+      revision: (existing?.revision ?? 0) + 1,
+      created_by: existing?.created_by ?? actor,
+      created_at: existing?.created_at ?? timestamp,
+      updated_at: timestamp,
+      ...(existing ? { updated_by: actor } : {})
+    };
+    current.form_types![item.id] = item;
+    current.catalog_version++;
+    persist(current);
+    return clone(item);
+  }
+
+  async function removeFormType(id: string, query: DeletePartOfSpeechQuery) {
+    await pause();
+    const { profile, state: current } = context();
+    requireSuperAdmin(profile);
+    const item = formTypeItems(current).find((f) => f.id === id);
+    if (!item) throw formTypeError("form_type_not_found", 404);
+    assertPositiveRevision(query.base_revision, "query");
+    if (query.base_revision !== item.revision)
+      throw formTypeError("revision_conflict", 409, "base_revision");
+    if (item.code === "base") throw formTypeError("form_type_required", 409);
+    if (item.usage_count) throw formTypeError("form_type_in_use", 409);
+    delete current.form_types![id];
+    current.catalog_version++;
+    persist(current);
+  }
+
   async function partOfSpeechCatalog(): Promise<PartOfSpeechCatalogResponse> {
     await pause();
     const { state: current } = context();
     return {
       catalog_version: current.catalog_version,
+      form_types: formTypeItems(current).map(
+        ({
+          id,
+          code,
+          name_zh,
+          name_en,
+          short_name_zh,
+          abbreviation,
+          full_name_en,
+          sort_order
+        }) => ({
+          id,
+          code,
+          name_zh,
+          name_en,
+          short_name_zh,
+          abbreviation,
+          full_name_en,
+          sort_order
+        })
+      ),
       items: sortedParts(current).map((part) => ({
         id: part.id,
         code: part.code,
@@ -2719,6 +2939,12 @@ export function createAdminWordsMock({
         short_name_zh: part.short_name_zh,
         full_name_en: part.full_name_en,
         sort_order: part.sort_order,
+        allowed_form_types: formTypeItems(current)
+          .filter((f) => f.code !== "base")
+          .map((f) => f.code),
+        default_form_types: formTypeItems(current)
+          .filter((f) => f.code !== "base")
+          .map((f) => f.code),
         sub_parts_extensible: part.sub_parts_extensible,
         sub_parts: sortedSubParts(current, part.id).map((subPart) => ({
           id: subPart.id,
@@ -5033,6 +5259,11 @@ export function createAdminWordsMock({
       claim: claimPendingSentenceAssociation
     },
     partOfSpeechSettings: {
+      listFormTypes,
+      createFormType: (input: CreatePartOfSpeechInput) => saveFormType(input),
+      updateFormType: (id: string, input: UpdatePartOfSpeechInput) =>
+        saveFormType(input, id),
+      removeFormType,
       catalog: partOfSpeechCatalog,
       list: listPartOfSpeechConfigs,
       create: createPartOfSpeech,

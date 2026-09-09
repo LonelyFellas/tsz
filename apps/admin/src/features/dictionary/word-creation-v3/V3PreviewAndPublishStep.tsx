@@ -1,3 +1,4 @@
+import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import type {
   AdminWordV3,
   DraftValidationResponseV3,
@@ -184,7 +185,8 @@ function ValidationIssueSummary({
   issues: readonly V3DraftValidationIssue[];
   onNavigate?: (issue: V3DraftValidationIssue) => Promise<void>;
 }) {
-  const summary = buildV3PublicationIssueSummary(word, issues);
+  const formTypeLabel = useFormTypeLabel();
+  const summary = buildV3PublicationIssueSummary(word, issues, formTypeLabel);
   return (
     <section aria-label="发布待完成摘要" className="v3-validation-summary">
       <div className="v3-validation-summary__overview">

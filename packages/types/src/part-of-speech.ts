@@ -76,15 +76,17 @@ export interface PartOfSpeechCatalogItem {
   full_name_en: string;
   sort_order: number;
   /** 词条创编允许的派生词形；缺省时客户端保留已有数据，不提供新增候选。 */
-  allowed_form_types?: Exclude<WordFormType, "base">[];
+  allowed_form_types?: WordFormType[];
   /** “添加派生词形”的默认补齐顺序，必须是 allowed_form_types 子集。 */
-  default_form_types?: Exclude<WordFormType, "base">[];
+  default_form_types?: WordFormType[];
   /** 与 PartOfSpeechConfig.sub_parts_extensible 同源；前端据此决定能否选择/新增细分词性。 */
   sub_parts_extensible: boolean;
   sub_parts: SubPartOfSpeechCatalogItem[];
 }
 
 export interface PartOfSpeechCatalogResponse {
+  /** Absent only when connected to a pre-catalog backend. */
+  form_types?: FormTypeCatalogItem[];
   catalog_version: number;
   items: PartOfSpeechCatalogItem[];
 }
@@ -147,4 +149,29 @@ export interface DeletePartOfSpeechQuery {
 
 export interface SubPartOfSpeechListResponse {
   items: SubPartOfSpeechConfig[];
+}
+
+export interface FormTypeCatalogItem {
+  id: string;
+  code: string;
+  name_zh: string;
+  name_en: string;
+  short_name_zh: string;
+  abbreviation: string;
+  full_name_en: string;
+  sort_order: number;
+}
+
+export interface FormTypeConfig extends FormTypeCatalogItem {
+  usage_count: number;
+  revision: number;
+  created_by: Actor;
+  created_at: string;
+  updated_by?: Actor;
+  updated_at: string;
+}
+
+export interface FormTypeConfigListResponse {
+  items: FormTypeConfig[];
+  pagination: AdminPaginationMeta;
 }

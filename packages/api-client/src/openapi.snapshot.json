@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-09T01:16:14.259Z",
+  "_source": "/Users/darwish/Dev/tsz-feature-20260909/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-09-09T03:05:36.445Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -47,6 +47,8 @@
     "/admin/lexicon/surface-match-snapshots/{snapshot_id}": ["get"],
     "/admin/profile": ["get"],
     "/admin/profile/preferences": ["patch"],
+    "/admin/settings/form-types": ["get", "post"],
+    "/admin/settings/form-types/{id}": ["delete", "patch"],
     "/admin/settings/parts-of-speech": ["get", "post"],
     "/admin/settings/parts-of-speech/catalog": ["get"],
     "/admin/settings/parts-of-speech/{id}": ["delete", "patch"],
@@ -212,6 +214,45 @@
         "in": "query",
         "required": false,
         "schema": { "type": "string" }
+      }
+    ],
+    "get /admin/settings/form-types": [
+      {
+        "name": "page",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 1,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "page_size",
+        "in": "query",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32",
+          "default": 10,
+          "maximum": 100,
+          "minimum": 1
+        }
+      },
+      {
+        "name": "q",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string" }
+      }
+    ],
+    "delete /admin/settings/form-types/{id}": [
+      {
+        "name": "base_revision",
+        "in": "query",
+        "required": true,
+        "schema": { "type": "integer", "format": "int64", "minimum": 1 }
       }
     ]
   },
@@ -612,6 +653,54 @@
         "410": { "$ref": "#/components/schemas/ProblemDetails" },
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
+    },
+    "get /admin/settings/form-types": {
+      "request": null,
+      "responses": {
+        "200": {
+          "$ref": "#/components/schemas/PaginatedResponse_FormTypeConfig"
+        },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/settings/form-types": {
+      "request": { "$ref": "#/components/schemas/CreatePartRequest" },
+      "responses": {
+        "201": { "$ref": "#/components/schemas/FormTypeConfig" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "delete /admin/settings/form-types/{id}": {
+      "request": null,
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "patch /admin/settings/form-types/{id}": {
+      "request": { "$ref": "#/components/schemas/UpdatePartRequest" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/FormTypeConfig" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/settings/parts-of-speech/catalog": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/CatalogResponse" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
     }
   },
   "schemas": {
@@ -647,6 +736,83 @@
         "has_unpublished_changes": { "type": "boolean" }
       }
     },
+    "FormTypeConfig": {
+      "type": "object",
+      "required": [
+        "id",
+        "code",
+        "name_zh",
+        "name_en",
+        "short_name_zh",
+        "abbreviation",
+        "full_name_en",
+        "sort_order",
+        "usage_count",
+        "revision",
+        "created_by",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "abbreviation": { "type": "string" },
+        "code": { "type": "string" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "$ref": "#/components/schemas/Actor" },
+        "full_name_en": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "name_en": { "type": "string" },
+        "name_zh": { "type": "string" },
+        "revision": { "type": "integer", "format": "int64" },
+        "short_name_zh": { "type": "string" },
+        "sort_order": { "type": "integer", "format": "int32" },
+        "updated_at": { "type": "string", "format": "date-time" },
+        "updated_by": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/Actor" }
+          ]
+        },
+        "usage_count": { "type": "integer", "format": "int64" }
+      }
+    },
+    "FormTypeCatalogItem": {
+      "type": "object",
+      "required": [
+        "id",
+        "code",
+        "name_zh",
+        "name_en",
+        "short_name_zh",
+        "abbreviation",
+        "full_name_en",
+        "sort_order"
+      ],
+      "properties": {
+        "abbreviation": { "type": "string" },
+        "code": { "type": "string" },
+        "full_name_en": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "name_en": { "type": "string" },
+        "name_zh": { "type": "string" },
+        "short_name_zh": { "type": "string" },
+        "sort_order": { "type": "integer", "format": "int32" }
+      }
+    },
+    "CatalogResponse": {
+      "type": "object",
+      "required": ["form_types", "catalog_version", "items"],
+      "properties": {
+        "catalog_version": { "type": "integer", "format": "int64" },
+        "form_types": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/FormTypeCatalogItem" }
+        },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/CatalogPart" }
+        }
+      }
+    },
     "ErrorCode": {
       "type": "string",
       "description": "对外稳定的机器错误码。前端应依据 code 分支，不能匹配展示文案。",
@@ -657,6 +823,11 @@
         "invalid_query",
         "invalid_path_parameter",
         "payload_too_large",
+        "invalid_form_type",
+        "form_type_not_found",
+        "form_type_conflict",
+        "form_type_in_use",
+        "form_type_required",
         "invalid_part_of_speech",
         "invalid_headword",
         "unsupported_language",
@@ -1185,7 +1356,12 @@
             "candidate_type": { "type": "string", "enum": ["form"] },
             "candidate_word_id": { "type": "string", "format": "uuid" },
             "dialect": { "$ref": "#/components/schemas/Dialect" },
-            "form_type": { "$ref": "#/components/schemas/WordFormTypeV2" },
+            "form_type": {
+              "type": "string",
+              "maxLength": 32,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,31}$"
+            },
             "normalized_surface": { "type": "string" },
             "pos": { "type": "string" },
             "pos_id": { "type": "string", "format": "uuid" },
@@ -1235,7 +1411,12 @@
               "$ref": "#/components/schemas/SurfaceContentScopeV2"
             },
             "dialect": { "$ref": "#/components/schemas/Dialect" },
-            "form_type": { "$ref": "#/components/schemas/WordFormTypeV2" },
+            "form_type": {
+              "type": "string",
+              "maxLength": 32,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,31}$"
+            },
             "pos": { "type": "string" },
             "pos_id": { "type": "string", "format": "uuid" },
             "source_id": { "type": "string" },
@@ -1278,20 +1459,6 @@
           },
           "additionalProperties": false
         }
-      ]
-    },
-    "WordFormTypeV2": {
-      "type": "string",
-      "description": "Closed wire enum for every explicitly persisted form surface. Unlike the\ncatalog's derived-form capability enum this includes the base slot.",
-      "enum": [
-        "base",
-        "third_person_singular",
-        "present_participle",
-        "past_tense",
-        "past_participle",
-        "plural",
-        "comparative",
-        "superlative"
       ]
     },
     "SurfaceContentScopeV2": {
@@ -1906,7 +2073,12 @@
         "entry_id": { "type": "string", "format": "uuid" },
         "entry_kind": { "$ref": "#/components/schemas/WordEntryKindV3" },
         "form_id": { "type": "string", "format": "uuid" },
-        "form_type": { "$ref": "#/components/schemas/WordFormTypeV3" },
+        "form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
         "group_ids": {
           "type": "array",
           "items": { "type": "string", "format": "uuid" }
@@ -2208,8 +2380,11 @@
           "description": "V3 concrete form 稳定 ID；V2 issue 省略。"
         },
         "form_type": {
-          "$ref": "#/components/schemas/WordFormTypeV2",
-          "description": "所在词形槽位的类型；`base` 表示共享原形。词形之外的节点省略。"
+          "type": "string",
+          "description": "所在词形槽位的类型；`base` 表示共享原形。词形之外的节点省略。",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
         },
         "membership_id": {
           "type": "string",
@@ -2893,7 +3068,12 @@
         "kind": { "$ref": "#/components/schemas/EntryKind" },
         "matched_dialect": { "$ref": "#/components/schemas/Dialect" },
         "matched_form_id": { "type": "string", "format": "uuid" },
-        "matched_form_type": { "$ref": "#/components/schemas/WordFormTypeV3" },
+        "matched_form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
         "matched_variant_id": { "type": "string", "format": "uuid" },
         "matches": {
           "type": "array",
@@ -3168,6 +3348,43 @@
           "description": "白名单内的 MIME；客户端 PUT 时必须原样回发，否则 OSS 验签失败。"
         },
         "size": { "type": "integer", "format": "int64", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "CreatePartRequest": {
+      "type": "object",
+      "required": [
+        "code",
+        "name_zh",
+        "name_en",
+        "abbreviation",
+        "short_name_zh",
+        "full_name_en",
+        "sort_order"
+      ],
+      "properties": {
+        "abbreviation": { "type": "string", "maxLength": 16, "minLength": 1 },
+        "code": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
+        "full_name_en": {
+          "type": "string",
+          "description": "英文全称，去空白后 1–64 字，忽略大小写唯一。",
+          "maxLength": 64,
+          "minLength": 1
+        },
+        "name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "name_zh": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "short_name_zh": {
+          "type": "string",
+          "description": "简洁显示：业务页面用的短中文名，去空白后 1–16 字，全局唯一。",
+          "maxLength": 16,
+          "minLength": 1
+        },
+        "sort_order": { "type": "integer", "format": "int32" }
       },
       "additionalProperties": false
     },
@@ -3499,7 +3716,10 @@
             "target_dialect": { "$ref": "#/components/schemas/Dialect" },
             "target_form_id": { "type": "string", "format": "uuid" },
             "target_form_type": {
-              "$ref": "#/components/schemas/WordFormTypeV3"
+              "type": "string",
+              "maxLength": 32,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,31}$"
             },
             "target_gloss": { "type": "string", "maxLength": 5000 },
             "target_headword": { "type": "string", "maxLength": 500 },
@@ -4017,6 +4237,28 @@
       },
       "additionalProperties": false
     },
+    "UpdatePartRequest": {
+      "type": "object",
+      "required": [
+        "base_revision",
+        "name_zh",
+        "name_en",
+        "abbreviation",
+        "short_name_zh",
+        "full_name_en",
+        "sort_order"
+      ],
+      "properties": {
+        "abbreviation": { "type": "string", "maxLength": 16, "minLength": 1 },
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "full_name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "name_zh": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "short_name_zh": { "type": "string", "maxLength": 16, "minLength": 1 },
+        "sort_order": { "type": "integer", "format": "int32" }
+      },
+      "additionalProperties": false
+    },
     "UsDialectV3": { "type": "string", "enum": ["us"] },
     "ValidateAdminWordAnyInput": {
       "oneOf": [
@@ -4098,7 +4340,12 @@
       "type": "object",
       "required": ["id", "form_type", "regional_variants"],
       "properties": {
-        "form_type": { "$ref": "#/components/schemas/WordFormTypeV3" },
+        "form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
         "id": { "type": "string", "format": "uuid" },
         "regional_variants": {
           "$ref": "#/components/schemas/WordRegionalVariantsV3"
@@ -4297,20 +4544,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "WordFormTypeV3": {
-      "type": "string",
-      "description": "Phase 1 固定词形目录。`base` 与其余值平级且都允许重复。",
-      "enum": [
-        "base",
-        "third_person_singular",
-        "present_participle",
-        "past_tense",
-        "past_participle",
-        "plural",
-        "comparative",
-        "superlative"
-      ]
     },
     "WordFormVariantV2": {
       "type": "object",
