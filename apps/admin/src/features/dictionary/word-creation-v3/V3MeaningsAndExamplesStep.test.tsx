@@ -1656,7 +1656,9 @@ describe("V3MeaningsAndExamplesStep", () => {
                         status: "draft" as const,
                         presentation: {
                           label: "reliability",
-                          matched_surfaces: ["reliability"],
+                          matched_surfaces: [
+                            _query === "reliable" ? "reliable" : "reliability"
+                          ],
                           strategy_version: "surface_summary_v1"
                         },
                         matches: [],
@@ -1707,6 +1709,20 @@ describe("V3MeaningsAndExamplesStep", () => {
       });
       expect(relation).not.toHaveProperty("prebound_target_word_id");
       expect(relation).not.toHaveProperty("target_word_id");
+      fireEvent.click(screen.getByText(`添加${label}`).closest("button")!);
+      fireEvent.change(screen.getAllByLabelText(`${label}目标词条`).at(-1)!, {
+        target: { value: "reliable" }
+      });
+      expect(
+        screen
+          .getAllByText("reliability")
+          .at(-1)!
+          .closest(".ant-select-item-option")
+      ).toHaveClass("ant-select-item-option-disabled");
+      fireEvent.click(
+        document.querySelectorAll(`button[aria-label="删除${label}"]`).item(1)
+      );
+
       expect(screen.queryByLabelText(`${label}预定义词义`)).toBeNull();
       const glossInput = screen.getByLabelText(`${label}待关联词义`);
       const glossWrapper = glossInput.closest(".ant-input-affix-wrapper")!;

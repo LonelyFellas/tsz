@@ -1255,6 +1255,8 @@ function RelationsGrid({
                                     ) &&
                                     other.relation === relationType &&
                                     (other.target_word_id === word.word_id ||
+                                      knownWords[other.id]?.word_id ===
+                                        word.word_id ||
                                       other.pending_target_headword
                                         ?.trim()
                                         .toLowerCase() ===
