@@ -253,6 +253,10 @@ it("关联短语只展示短语及其成分，不再提供短语本身入口", a
       include_drafts: true
     })
   );
+  // 成分展开的子查询同样按词形等值、含草稿。
+  expect(search).toHaveBeenCalledWith(
+    expect.objectContaining({ q: "give", match: "exact", include_drafts: true })
+  );
   expect(
     column(0).queryByText("give", { exact: true })
   ).not.toBeInTheDocument();
@@ -427,4 +431,43 @@ it("还没保存词义的草稿列成禁用行并说明原因", async () => {
   expect(screen.queryByText("没有匹配的词条")).not.toBeInTheDocument();
   fireEvent.click(row);
   expect(onSelect).not.toHaveBeenCalled();
+});
+
+it("草稿短语的成分转关联：via_phrase 不带发布版本，词条行带草稿标记", async () => {
+  const phrase = phraseResponse();
+  search.mockImplementation(async ({ q }) =>
+    q === "give"
+      ? giveEntryResponse()
+      : {
+          ...phrase,
+          matches: phrase.matches.map((candidate) => ({
+            ...draftify(candidate),
+            senses: candidate.senses.map(draftify)
+          }))
+        }
+  );
+  const onSelect = vi.fn();
+  render(
+    <V3TextAssociationPicker
+      kind="phrase"
+      segments={segments}
+      onSelect={onSelect}
+    />
+  );
+  await screen.findByText("give up", { exact: true });
+  expect(column(0).getByText("草稿")).toBeVisible();
+  await openPhraseComponent();
+  fireEvent.click(await screen.findByText("原形 give", { exact: true }));
+  fireEvent.click(column(3).getByText("给；交给"));
+  const link = onSelect.mock.lastCall![0];
+  expect(link).toMatchObject({
+    target_word_id: "entry-give",
+    target_publication_id: "pub-give",
+    via_phrase: {
+      word_id: "phrase",
+      sense_id: "phrase-sense",
+      component_id: "component"
+    }
+  });
+  expect(link.via_phrase).not.toHaveProperty("publication_id");
 });

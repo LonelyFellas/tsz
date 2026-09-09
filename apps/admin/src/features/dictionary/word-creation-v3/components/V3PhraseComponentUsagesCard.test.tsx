@@ -483,7 +483,7 @@ describe("V3PhraseComponentUsagesCard", () => {
     expect(await screen.findByText("没有匹配的词条")).toBeInTheDocument();
   });
 
-  it("候选没有已发布词义时不产生可勾选节点", async () => {
+  it("候选没有词义时列成禁用行，不产生可勾选节点", async () => {
     searchComponentTargets.mockResolvedValueOnce({
       total: 1,
       truncated: false,

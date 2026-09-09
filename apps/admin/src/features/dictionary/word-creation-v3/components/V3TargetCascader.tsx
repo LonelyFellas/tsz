@@ -168,7 +168,7 @@ function groupsFromCandidates(
 ): CandidateEntryGroup[] {
   const byEntry = new Map<string, CandidateEntryGroup>();
   for (const candidate of candidates) {
-    // 关键字是包含匹配，正在编辑的短语自己也会命中；后端不许自指，
+    // 等值匹配也会命中正在编辑的词条自身的词面；后端不许自指，
     // 留着只会让用户选完在保存时被拒。
     if (selfEntryId !== undefined && candidate.entry_id === selfEntryId)
       continue;
@@ -447,9 +447,18 @@ export function V3TargetCascader({
         ...entry,
         disabled: components.length === 0,
         label:
-          components.length === 0
-            ? `${groups[index]!.headword}（未配置成分用词）`
-            : entry.label,
+          components.length === 0 ? (
+            <span className="v3-component-usage-entry">
+              <Typography.Text type="secondary">
+                {groups[index]!.headword}（未配置成分用词）
+              </Typography.Text>
+              {groups[index]!.draft ? (
+                <Tag className="v3-component-usage-draft">草稿</Tag>
+              ) : null}
+            </span>
+          ) : (
+            entry.label
+          ),
         children: [
           ...components.map((component): CascaderOptionNode => {
             const result = componentResults[component.key];
