@@ -278,12 +278,15 @@ export function crossesParagraph(
     .some((point) => point === "\n" || point === "\r");
 }
 
-/** 连读必须跨词且终点在右：同一个词内部连线没有意义。 */
+/** 连读支持词内字母，按正文中从左到右的端点顺序保存。 */
 export function isValidLiaison(link: LiaisonLink): boolean {
   return (
     isValidAnchor(link.start) &&
     isValidAnchor(link.end) &&
-    link.end.token > link.start.token
+    (link.end.token > link.start.token ||
+      (link.end.token === link.start.token &&
+        Math.min(...link.end.offsets) >= Math.min(...link.start.offsets) &&
+        Math.max(...link.end.offsets) >= Math.max(...link.start.offsets)))
   );
 }
 

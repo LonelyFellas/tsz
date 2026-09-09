@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-09T06:38:20.347Z",
+  "_generatedAt": "2026-09-09T09:53:36.039Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -4120,7 +4120,9 @@
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "name_en": { "type": "string", "maxLength": 200 },
-        "name_zh": { "type": "string", "maxLength": 200 }
+        "name_en_rich": { "$ref": "#/components/schemas/RichTextV3" },
+        "name_zh": { "type": "string", "maxLength": 200 },
+        "voice_profile": { "$ref": "#/components/schemas/VoiceProfileV3" }
       },
       "additionalProperties": false
     },

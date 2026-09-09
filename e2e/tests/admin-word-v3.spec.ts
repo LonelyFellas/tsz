@@ -38,16 +38,17 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
     const firstGroup = nounGroups.nth(0);
+    await expect(firstGroup.getByLabel("复数通用拼写")).toHaveValue("");
 
     // 组内只剩一个原形时类型锁死；⊕ 复制出第二个原形后放开，删回去又锁上。
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
     await firstGroup.getByLabel("在原形 1 下方添加同类型词形").click();
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(3);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeEnabled();
     await expect(firstGroup.getByLabel("变化组 1 词形 2 类型")).toBeEnabled();
     await firstGroup.getByLabel("从变化组 1 移除词形 2").click();
     await firstGroup.getByLabel("删除词形及相关发音").click();
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(1);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
 
     const firstForm = firstGroup.locator(".v3-concrete-form-row").nth(0);
@@ -72,17 +73,17 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     await page.getByRole("button", { name: "新增名词变化组" }).click();
     const secondGroup = nounGroups.nth(1);
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(1);
-    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(2);
 
     // 英美规则是词性级设置，每组都渲染一份，这里从第 1 组切换。
     await firstGroup.getByLabel("英美拼写有区别").click();
-    const ukSecondForm = secondGroup.locator(
-      ".v3-dialect-panel-uk .v3-dialect-form-cell"
-    );
-    const usSecondForm = secondGroup.locator(
-      ".v3-dialect-panel-us .v3-dialect-form-cell"
-    );
+    const ukSecondForm = secondGroup
+      .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
+      .filter({ has: page.getByLabel("原形英式拼写", { exact: true }) });
+    const usSecondForm = secondGroup
+      .locator(".v3-dialect-panel-us .v3-dialect-form-cell")
+      .filter({ has: page.getByLabel("原形美式拼写", { exact: true }) });
     await ukSecondForm.getByLabel("原形英式拼写").fill("orbit-centre");
     await ukSecondForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
     await ukSecondForm.getByLabel("第 1 条发音的实际发音").fill("orbit-uk");
@@ -100,12 +101,12 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       "true"
     );
     const verbPanel = page.getByRole("tabpanel", { name: /动词/ });
-    const ukVerb = verbPanel.locator(
-      ".v3-dialect-panel-uk .v3-dialect-form-cell"
-    );
-    const usVerb = verbPanel.locator(
-      ".v3-dialect-panel-us .v3-dialect-form-cell"
-    );
+    const ukVerb = verbPanel
+      .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
+      .filter({ has: page.getByLabel("原形英式拼写", { exact: true }) });
+    const usVerb = verbPanel
+      .locator(".v3-dialect-panel-us .v3-dialect-form-cell")
+      .filter({ has: page.getByLabel("原形美式拼写", { exact: true }) });
     await ukVerb.getByLabel("原形英式拼写").fill("orbit-verb-uk");
     await ukVerb.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
     await ukVerb.getByLabel("第 1 条发音的实际发音").fill("orbit-verb-uk");
@@ -122,6 +123,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const issueTarget = page
       .getByRole("tabpanel", { name: /动词/ })
       .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
+      .filter({ has: page.getByLabel("原形英式拼写", { exact: true }) })
       .getByLabel("第 1 条发音的实际发音");
     await expect(issueTarget).toBeFocused();
     await expect(
@@ -157,8 +159,12 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(page.getByRole("tab", { name: "动词" })).toBeVisible();
     await page.getByRole("tab", { name: "名词" }).click();
     await expect(page.locator('input[value="orbit-common"]')).toHaveCount(2);
-    await expect(page.getByText("英式拼写", { exact: true })).toHaveCount(2);
-    await expect(page.getByText("美式拼写", { exact: true })).toHaveCount(2);
+    await expect(page.getByLabel("原形英式拼写", { exact: true })).toHaveCount(
+      2
+    );
+    await expect(page.getByLabel("原形美式拼写", { exact: true })).toHaveCount(
+      2
+    );
 
     await page.getByText("预览并生效", { exact: true }).click();
     await expect(page).toHaveURL(

@@ -3,6 +3,7 @@ import type {
   V3DraftValidationIssue,
   WordSentenceWritableV3
 } from "@tsz/types";
+import { partOfSpeechCatalogFixture } from "../word-creation/partOfSpeech.test.helper";
 import { describe, expect, it } from "vitest";
 import {
   commonFormFixture,
@@ -271,6 +272,134 @@ describe("buildV3Readiness", () => {
 });
 
 describe("buildV3ProductProgress", () => {
+  it("截图规则：原形计入，跨词性同拼写同音标合并，不同音标分别计数", () => {
+    const noun = commonFormFixture({ spelling: "job" });
+    const plural = commonFormFixture({
+      id: uuidFromInt(980),
+      form_type: "plural",
+      spelling: "jobs"
+    });
+    const verb = commonFormFixture({ id: uuidFromInt(981), spelling: "job" });
+    const input = {
+      language: "en",
+      wordId: "test",
+      completedSteps: [] as const,
+      forms: {
+        pos: [
+          ...formsFixture({ forms: [noun, plural] }).pos,
+          ...formsFixture({
+            pos_id: uuidFromInt(982),
+            pos: "verb",
+            forms: [verb]
+          }).pos
+        ]
+      },
+      meanings: { sense_groups: [], pos: [] }
+    };
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 2,
+      details: [{ count: 2 }, { count: 1 }]
+    });
+    verb.regional_variants.common.pronunciations = [
+      {
+        ...verb.regional_variants.common.pronunciations[0]!,
+        dict_phonetic: "different"
+      }
+    ];
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({ count: 3 });
+  });
+
+  it("英美各侧和多条音标全部匹配才合并，音标顺序不影响判断", () => {
+    const first = ukUsFormFixture({ id: uuidFromInt(950) });
+    const second = structuredClone(first);
+    second.id = uuidFromInt(951);
+    const input = {
+      language: "en",
+      wordId: "test",
+      completedSteps: [] as const,
+      forms: formsFixture({ forms: [first, second] }),
+      meanings: { sense_groups: [], pos: [] }
+    };
+    first.regional_variants.uk.pronunciations.push({
+      ...first.regional_variants.uk.pronunciations[0]!,
+      id: uuidFromInt(952),
+      dict_phonetic: "another"
+    });
+    second.regional_variants.uk.pronunciations = [
+      ...first.regional_variants.uk.pronunciations
+    ].reverse();
+    expect(buildV3ProductProgress(input)[2]!.count).toBe(1);
+    second.regional_variants.us.spelling = "different";
+    expect(buildV3ProductProgress(input)[2]!.count).toBe(2);
+    second.regional_variants.us.spelling = first.regional_variants.us.spelling;
+    second.regional_variants.us.pronunciations[0]!.dict_phonetic = "different";
+    expect(buildV3ProductProgress(input)[2]!.count).toBe(2);
+  });
+
+  it("同一变化类型的全部行完整才计为完成，重复行和共享组不重复计数", () => {
+    const first = commonFormFixture({ form_type: "plural" });
+    const second = commonFormFixture({
+      id: uuidFromInt(990),
+      form_type: "plural",
+      pronunciations: [
+        {
+          id: uuidFromInt(991),
+          dict_phonetic: "",
+          actual_pron: "",
+          style: "normal"
+        }
+      ]
+    });
+    const input = {
+      language: "en",
+      wordId: "test",
+      completedSteps: [] as const,
+      forms: formsFixture({ forms: [first, second] }),
+      meanings: { sense_groups: [], pos: [] }
+    };
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 2,
+      completed: false,
+      details: [{ count: 2 }]
+    });
+    second.regional_variants.common.pronunciations =
+      first.regional_variants.common.pronunciations;
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 1,
+      completed: true
+    });
+    second.regional_variants.common.spelling = " ";
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 2,
+      completed: false
+    });
+  });
+
+  it("默认空白类型只计入总数，手动移除后总数减少", () => {
+    const forms = formsFixture();
+    const input = {
+      language: "en",
+      wordId: "word-1",
+      completedSteps: ["forms"] as const,
+      forms,
+      meanings: { sense_groups: [], pos: [] },
+      partOfSpeechCatalog: partOfSpeechCatalogFixture.items
+    };
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 2,
+      completed: false,
+      details: [{ count: 2 }]
+    });
+    const removed = {
+      ...input,
+      removedFormTypes: { [forms.pos[0]!.form_groups[0]!.id]: ["plural"] }
+    };
+    expect(buildV3ProductProgress(removed)[2]).toMatchObject({
+      count: 1,
+      details: [{ count: 1 }]
+    });
+  });
+
   it("returns the fixed seven product rows for an empty native draft", () => {
     const rows = buildV3ProductProgress({
       language: "en",
@@ -294,7 +423,7 @@ describe("buildV3ProductProgress", () => {
     expect(rows[0]).toMatchObject({ completed: true, value: "完成" });
   });
 
-  it("counts native POS and non-base canonical forms without multiplying shared group memberships", () => {
+  it("各词性包含原形明细，总数跨词性合并相同词形", () => {
     const base = commonFormFixture();
     const plural = commonFormFixture({
       id: UUIDS.form_2,
@@ -338,12 +467,12 @@ describe("buildV3ProductProgress", () => {
     });
 
     expect(rows[1]).toMatchObject({ count: 2, completed: true });
-    expect(rows[2]).toMatchObject({ count: 2, completed: true });
+    expect(rows[2]).toMatchObject({ count: 3, completed: true });
     expect(rows[1]!.details.map((item) => item.label)).toEqual([
       "名词",
       "形容词"
     ]);
-    expect(rows[2]!.details.map((item) => item.count)).toEqual([1, 1]);
+    expect(rows[2]!.details.map((item) => item.count)).toEqual([2, 2]);
   });
 
   it("counts sense groups, grammar, sense, and nested sentence nodes across POS", () => {
@@ -410,7 +539,7 @@ describe("buildV3ProductProgress", () => {
       meanings
     });
 
-    expect(rows[2]).toMatchObject({ count: 1 });
+    expect(rows[2]).toMatchObject({ count: 2 });
   });
 });
 

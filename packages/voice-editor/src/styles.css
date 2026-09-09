@@ -1,5 +1,6 @@
 /*
- * 标注正文统一用 Ubuntu Bold：连读弧的落点按字形墨迹量，字体一换弧的观感就变，
+ * 标注正文使用 Ubuntu：固定核心词和可替换搭配加粗，词性提示符使用常规字重。
+ * 连读弧的落点按字形墨迹量，字体一换弧的观感就变，
  * 编辑器与只读视图必须同一副字体才对得上。Ubuntu Font Licence 1.0 允许网页嵌入。
  * 无 CJK 字形，中文回落到后面的系统字体。
  */
@@ -9,6 +10,14 @@
   font-weight: 700;
   font-display: swap;
   src: url("./fonts/Ubuntu-Bold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Ubuntu";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/Ubuntu-Regular.ttf") format("truetype");
 }
 
 .tsz-ve-field {
@@ -64,6 +73,7 @@
 }
 
 .tsz-ve-emphasis[data-level="grammar"] {
+  font-weight: 400;
   color: var(--tsz-ve-role-grammar-text);
   background: none;
 }
@@ -376,13 +386,28 @@
  * "ing"，也可以拖过几个词。
  */
 .tsz-ve-letter.is-function {
+  font-weight: 700;
   color: var(--tsz-ve-role-function);
 }
 .tsz-ve-letter.is-core {
+  font-weight: 700;
   color: var(--tsz-ve-role-core);
 }
 .tsz-ve-letter.is-grammar {
+  position: relative;
+  font-weight: 400;
   color: var(--tsz-ve-role-grammar-text);
+}
+
+/* 普通字重仍保留底层 textarea 的字宽，选区与光标不会因分类改变而错位。 */
+.tsz-ve-letter.is-grammar::after {
+  content: attr(data-letter);
+  font-weight: 700;
+  visibility: hidden;
+}
+.tsz-ve-letter.is-grammar > .tsz-ve-letter-text {
+  position: absolute;
+  inset-inline-start: 0;
 }
 
 /* 上一次单击上色的字母：点一下虚线，提示同词里再点一个字母会把中间接上。 */

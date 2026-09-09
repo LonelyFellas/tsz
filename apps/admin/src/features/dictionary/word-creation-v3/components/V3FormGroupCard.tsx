@@ -1,3 +1,4 @@
+import { useRemovedFormTypes } from "../formDisplayState";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import {
   CaretDownFilled,
@@ -26,16 +27,17 @@ import type {
   WordFormGroupV3,
   WordPosFormsV3
 } from "@tsz/types";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  addConcreteForm,
   addConcreteFormAfterMembership,
   deleteConcreteForm,
   removeMembership,
   reorderMemberships,
   type V3IdFactory
 } from "../operations";
-import {} from "../presentation";
+import { newWordNodeId } from "../../word-model/primitives";
 import {
   V3ConcreteFormRow,
   V3DialectSeparatedFormMatrix,
@@ -62,21 +64,119 @@ export interface V3FormGroupCardProps {
 }
 
 export function V3FormGroupCard({
-  content,
-  group,
+  content: savedContent,
+  group: savedGroup,
   groupCount = 1,
   groupIndex,
-  pos,
+  pos: savedPos,
   issues,
   membershipCounts,
   idFactory,
-  onChange,
+  onChange: onSavedChange,
   onDelete,
   deleteDisabled = false,
   onMove,
   posCatalog,
   dialectControl
 }: V3FormGroupCardProps) {
+  const [removedTypes, setRemovedTypes] = useRemovedFormTypes(savedGroup.id);
+  const [displayOrder, setDisplayOrder] = useState<string[]>([]);
+  // 缺少的变化类型只用于展示，编辑后才进入草稿。
+  const { content, pos, group, placeholders } = useMemo(() => {
+    let content = structuredClone(savedContent);
+    const existingTypes = new Set(
+      savedGroup.members.map(
+        (member) =>
+          savedPos.forms.find((form) => form.id === member.form_id)?.form_type
+      )
+    );
+    const placeholders = new Map<string, string>();
+    for (const formType of posCatalog?.allowed_form_types ?? []) {
+      if (existingTypes.has(formType) || removedTypes.includes(formType))
+        continue;
+      const result = addConcreteForm(
+        content,
+        savedPos.pos_id,
+        savedGroup.id,
+        formType,
+        newWordNodeId
+      );
+      if (!result.ok) continue;
+      content = result.value;
+      const form = content.pos
+        .find((item) => item.pos_id === savedPos.pos_id)!
+        .forms.at(-1)!;
+      placeholders.set(form.id, JSON.stringify(form));
+      existingTypes.add(formType);
+    }
+    const pos = content.pos.find((item) => item.pos_id === savedPos.pos_id)!;
+    const group =
+      pos.form_groups.find((item) => item.id === savedGroup.id) ??
+      structuredClone(savedGroup);
+    const orderKey = (formId: string) =>
+      placeholders.has(formId)
+        ? `empty:${pos.forms.find((form) => form.id === formId)!.form_type}`
+        : formId;
+    const rank = (formId: string) => {
+      const index = displayOrder.indexOf(orderKey(formId));
+      return index < 0 ? displayOrder.length : index;
+    };
+    group.members.sort((a, b) => rank(a.form_id) - rank(b.form_id));
+    return { content, pos, group, placeholders };
+  }, [
+    savedContent,
+    savedPos,
+    savedGroup,
+    posCatalog,
+    removedTypes,
+    displayOrder
+  ]);
+  const onChange = (
+    next: DraftFormsStepContentV3,
+    retainedIds: string[] = []
+  ) => {
+    const cleaned = structuredClone(next);
+    const nextPos = cleaned.pos.find((item) => item.pos_id === pos.pos_id)!;
+    const untouched = new Set(
+      nextPos.forms
+        .filter(
+          (form) =>
+            !retainedIds.includes(form.id) &&
+            placeholders.get(form.id) === JSON.stringify(form)
+        )
+        .map((form) => form.id)
+    );
+    setDisplayOrder(
+      (
+        nextPos.form_groups.find((item) => item.id === savedGroup.id)
+          ?.members ?? []
+      ).map((member) =>
+        untouched.has(member.form_id)
+          ? `empty:${nextPos.forms.find((form) => form.id === member.form_id)!.form_type}`
+          : member.form_id
+      )
+    );
+    nextPos.forms = nextPos.forms.filter((form) => !untouched.has(form.id));
+    for (const nextGroup of nextPos.form_groups) {
+      nextGroup.members = nextGroup.members.filter(
+        (member) => !untouched.has(member.form_id)
+      );
+    }
+    const nextGroup = nextPos.form_groups.find(
+      (item) => item.id === savedGroup.id
+    );
+    const removed = savedGroup.members
+      .filter(
+        (member) => !nextGroup?.members.some((item) => item.id === member.id)
+      )
+      .map(
+        (member) =>
+          savedPos.forms.find((form) => form.id === member.form_id)!.form_type
+      );
+    if (removed.length)
+      setRemovedTypes((types) => [...new Set([...types, ...removed])]);
+    onSavedChange(cleaned);
+  };
   const formTypeLabel = useFormTypeLabel();
   const [blockedFormId, setBlockedFormId] = useState<string>();
   const [collapsed, setCollapsed] = useState(false);
@@ -137,7 +237,10 @@ export function V3FormGroupCard({
     const lockedBase = lockedBaseFormIds.has(form.id);
     const baseLabel = formTypeLabel(form.form_type);
     const formMembershipCount = membershipCounts.get(form.id) ?? 0;
-    const lastRequiredForm = pos.forms.length === 1 && formMembershipCount <= 1;
+    const lastRequiredForm =
+      !placeholders.has(form.id) &&
+      savedPos.forms.length === 1 &&
+      formMembershipCount <= 1;
     const formLabel =
       sameTypeMembers.length > 1 ? `${baseLabel} ${sameTypeIndex}` : baseLabel;
     const formPositionLabel = `${baseLabel} ${sameTypeIndex}`;
@@ -194,7 +297,7 @@ export function V3FormGroupCard({
                 member.id,
                 idFactory
               );
-              if (result.ok) onChange(result.value);
+              if (result.ok) onChange(result.value, [form.id]);
             }}
             size="small"
             type="text"
@@ -205,6 +308,10 @@ export function V3FormGroupCard({
             disabled={lastRequiredForm || member.id === soleBaseMembershipId}
             icon={<DeleteOutlined />}
             onClick={() => {
+              if (placeholders.has(form.id)) {
+                setRemovedTypes((types) => [...types, form.form_type]);
+                return;
+              }
               const result = removeMembership(content, member.id);
               if (result.ok) {
                 onChange(result.value);

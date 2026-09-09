@@ -368,7 +368,7 @@ describe("V3WordCreationWizard", () => {
     variant.common.component_usages = [
       { id: UUIDS.membership_2, state: "unresolved", literal: "hit" }
     ];
-    renderWizard(requests(), {
+    const { container } = renderWizard(requests(), {
       initialWord,
       initialStep: "forms",
       renderStep: (context) => (
@@ -385,13 +385,16 @@ describe("V3WordCreationWizard", () => {
         </>
       )
     });
+    const field = (label: string) =>
+      container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`);
+    await waitFor(() => expect(field("英美拼写有区别")).not.toBeNull());
     for (let index = 0; index < 2; index += 1) {
-      fireEvent.click(await screen.findByLabelText("英美拼写有区别"));
+      fireEvent.click(field("英美拼写有区别")!);
       expect(
         JSON.parse(screen.getByTestId("spelling-roundtrip").textContent!).pos[0]
           .dialect_rules.spelling_mode
       ).toBe("distinguish");
-      fireEvent.click(screen.getByLabelText("英美拼写无区别"));
+      fireEvent.click(field("英美拼写无区别")!);
       const pos = JSON.parse(
         screen.getByTestId("spelling-roundtrip").textContent!
       ).pos[0];
@@ -402,13 +405,11 @@ describe("V3WordCreationWizard", () => {
       expect(pos.forms[0].regional_variants.uk.component_usages).toMatchObject([
         { literal: "hit", state: "unresolved" }
       ]);
-      expect(screen.queryByLabelText("原形英式拼写")).toBeNull();
-      expect(screen.queryByLabelText("原形美式拼写")).toBeNull();
-      expect(screen.getByLabelText("原形英美共用拼写")).toHaveValue(
-        "hit the sack"
-      );
+      expect(field("原形英式拼写")).toBeNull();
+      expect(field("原形美式拼写")).toBeNull();
+      expect(field("原形英美共用拼写")).toHaveValue("hit the sack");
       expect(
-        screen.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
+        field("英美拼写无区别")!.closest(".ant-radio-wrapper")
       ).toHaveClass("ant-radio-wrapper-checked");
     }
   });
@@ -675,7 +676,7 @@ describe("V3WordCreationWizard", () => {
     const firstPosTemplate = screen.getByTestId("pos-template-ids").textContent;
     expect(firstPosTemplate).toMatch(new RegExp(`^${UUIDS.pos}:`, "u"));
     expect(screen.getByText("基本词性").parentElement).toHaveTextContent("1");
-    expect(screen.getByText("词形变化").parentElement).toHaveTextContent("0");
+    expect(screen.getByText("词形变化").parentElement).toHaveTextContent("1");
     expect(screen.getByText("语法结构").parentElement).toHaveTextContent("1");
     expect(screen.getByText("多维词义").parentElement).toHaveTextContent("1");
     expect(screen.getByText("多维例句").parentElement).toHaveTextContent("1");
@@ -762,7 +763,7 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getAllByText("多维例句").length).toBeGreaterThan(0);
     expect(screen.queryByText(/暂无语义区间/u)).toBeNull();
     expect(screen.queryByText("当前词性还没有词义内容")).toBeNull();
-    expect(screen.queryByRole("button", { name: "开始录入词义" })).toBeNull();
+    expect(screen.queryByText("开始录入词义")).toBeNull();
   }, 20_000);
 
   it("用 GET 的退役节点播种并保留 variant 身份账本", () => {
@@ -1814,6 +1815,12 @@ describe("V3WordCreationWizard", () => {
       expect(screen.getByLabelText("定义 1 通用内容")).toHaveFocus()
     );
     expect(secondTab).toHaveAttribute("aria-selected", "true");
+    expect(
+      container.querySelector(
+        '[data-v3-field="sense"][data-v3-node-id="meaning-sense-1"] .ant-collapse-header'
+      )
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(secondSenseHeader).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByLabelText("定义 1 通用内容")).toHaveValue(
       "local unsaved"
     );

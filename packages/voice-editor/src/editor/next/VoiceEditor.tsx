@@ -157,6 +157,10 @@ export function VoiceEditor({
   );
   const [loadError, setLoadError] = useState(initial.error ?? "");
   const [brush, setBrush] = useState<Brush>(DEFAULT_BRUSH);
+  const [textSelection, setTextSelection] = useState<{
+    start: number;
+    end: number;
+  }>();
   /** 正在拼的这条连读：起点/终点两个锚点，各自可含多个连续字母。 */
   const [draft, setDraft] = useState<LiaisonDraft>({});
   /** 接下来点的字母归哪一端；由面板上的「起点 / 终点」开关决定。 */
@@ -170,6 +174,7 @@ export function VoiceEditor({
   >();
   /** 换笔、改文本、撤销重做、连读成线……凡是字母会挪或语义失效的时刻，瞬态状态一起清。 */
   const resetTransient = useCallback(() => {
+    setTextSelection(undefined);
     setLinkWords([]);
     setLinkAnchor(undefined);
     setInspectedLinkId(undefined);
@@ -428,6 +433,22 @@ export function VoiceEditor({
 
   /* 语法结构与停顿选完就收起浮层，好腾出标注带落笔；连读的面板要留着用。 */
   const pickBrush = (next: Brush) => {
+    if (mode === "grammar" && next.kind === "role" && textSelection) {
+      let roles = marks.roles;
+      for (const piece of splitRangeAtParagraphs(
+        text,
+        textSelection.start,
+        textSelection.end
+      )) {
+        roles = applyRoleRange(text, roles, { ...piece, level: next.level });
+      }
+      paintRoles(roles);
+      lastRoleRef.current = next.level;
+      changeBrush({ kind: "none" });
+      setTextSelection(textSelection);
+      setOpenTool(undefined);
+      return;
+    }
     changeBrush(next);
     setOpenTool(undefined);
   };
@@ -465,6 +486,55 @@ export function VoiceEditor({
     ) {
       setOpenTool(undefined);
       changeBrush({ kind: "none" });
+      return;
+    }
+    if (
+      mode === "grammar" &&
+      textSelection &&
+      (key === "roles" || key === "liaison")
+    ) {
+      changeBrush({ kind: "none" });
+      setTextSelection(textSelection);
+      if (key === "liaison") {
+        const selected = tokens.filter(
+          (token) =>
+            token.start < textSelection.end && token.end > textSelection.start
+        );
+        const first = selected[0];
+        const last = selected.at(-1);
+        if (!first || !last) {
+          setValidationMessage("请先选中文字来添加连读");
+          return;
+        }
+        const anchor = (token: typeof first) => ({
+          token: token.index,
+          offsets: Array.from(
+            { length: token.end - token.start },
+            (_, offset) => offset
+          ).filter(
+            (offset) =>
+              token.start + offset >= textSelection.start &&
+              token.start + offset < textSelection.end
+          )
+        });
+        setDraft(
+          first.index === last.index
+            ? {
+                start: {
+                  token: first.index,
+                  offsets: [Math.max(0, textSelection.start - first.start)]
+                },
+                end: {
+                  token: last.index,
+                  offsets: [
+                    Math.min(last.end, textSelection.end) - last.start - 1
+                  ]
+                }
+              }
+            : { start: anchor(first), end: anchor(last) }
+        );
+      }
+      setOpenTool(key);
       return;
     }
     setOpenTool(key);
@@ -750,13 +820,13 @@ export function VoiceEditor({
   const commitLiaison = () => {
     if (!draft.start || !draft.end) return;
     const link =
-      draft.start.token < draft.end.token
+      draft.start.token < draft.end.token ||
+      (draft.start.token === draft.end.token &&
+        Math.min(...draft.start.offsets) <= Math.min(...draft.end.offsets))
         ? { start: draft.start, end: draft.end }
         : { start: draft.end, end: draft.start };
     if (!isValidLiaison(link)) {
-      // 界面上「添加连读」在两端同词时就已禁用，这里是兜底；一旦真的触发，
-      // 走顶部 Alert 而不是静默返回，免得出问题时什么反馈都没有。
-      setValidationMessage("连读要连接两个不同的词");
+      setValidationMessage("请选择有效的连读端点");
       return;
     }
     const sameAnchors = (a: LiaisonAnchor, b: LiaisonAnchor) =>
@@ -1211,6 +1281,7 @@ export function VoiceEditor({
         readOnly={readOnly}
         textReadOnly={textReadOnly}
         onRoleRange={handleRoleRange}
+        onTextSelection={mode === "grammar" ? setTextSelection : undefined}
         roleAnchorStart={roleAnchor?.start}
         onGapClick={handleGapClick}
         onLetterClick={handleLetterClick}

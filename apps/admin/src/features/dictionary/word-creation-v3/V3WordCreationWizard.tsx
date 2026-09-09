@@ -167,7 +167,14 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
       const toggles = node.querySelectorAll<HTMLElement>(
         '[role="button"].ant-collapse-header[aria-expanded="false"], [role="button"].word-sense-section-title[aria-expanded="false"], button[aria-expanded="false"][aria-label^="展开"]'
       );
-      for (const toggle of toggles) collapsedToggles.add(toggle);
+      for (const toggle of toggles) {
+        // 手风琴下只能打开目标词义；展开同词性的兄弟卡片会反过来收起目标。
+        const sense = toggle.matches(".ant-collapse-header")
+          ? toggle.closest<HTMLElement>('[data-v3-field="sense"]')
+          : undefined;
+        if (sense && !targetNodeIds.has(sense.dataset.v3NodeId)) continue;
+        collapsedToggles.add(toggle);
+      }
     }
     for (const toggle of collapsedToggles) toggle.click();
     const membershipScope = target.membership_id

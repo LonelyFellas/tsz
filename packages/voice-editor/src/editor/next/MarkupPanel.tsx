@@ -55,6 +55,7 @@ export interface MarkupPanelProps extends Pick<
   | "linkedRanges"
   | "onWordRange"
   | "textReadOnly"
+  | "onTextSelection"
 > {
   text: string;
   marks: MarkState;
@@ -102,6 +103,7 @@ export function MarkupPanel({
   readOnly,
   textReadOnly,
   onRoleRange,
+  onTextSelection,
   roleAnchorStart,
   onGapClick,
   onLetterClick,
@@ -245,6 +247,7 @@ export function MarkupPanel({
         readOnly={readOnly}
         textReadOnly={textReadOnly}
         onRoleRange={onRoleRange}
+        onTextSelection={onTextSelection}
         roleAnchorStart={roleAnchorStart}
         onGapClick={onGapClick}
         onLetterClick={onLetterClick}

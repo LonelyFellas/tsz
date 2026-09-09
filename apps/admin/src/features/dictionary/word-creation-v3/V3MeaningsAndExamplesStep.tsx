@@ -1,14 +1,20 @@
 import {
+  RelationSortScope,
+  RelationDeleteMenu
+} from "./components/V3RelationSorting";
+import { toRichTextV2 } from "@tsz/voice-editor/core";
+import {
+  PronunciationPreviewProvider,
+  PronunciationPreviewControls
+} from "../word-creation/PronunciationPreview";
+import {
   CaretDownFilled,
   CaretUpFilled,
   DeleteOutlined,
-  DownOutlined,
-  EllipsisOutlined,
   InfoCircleOutlined,
   MinusCircleOutlined,
   PlusOutlined,
-  SoundOutlined,
-  UpOutlined
+  SoundOutlined
 } from "@ant-design/icons";
 import {
   Alert,
@@ -18,7 +24,6 @@ import {
   Button,
   Card,
   Collapse,
-  Dropdown,
   Empty,
   Flex,
   Input,
@@ -71,14 +76,12 @@ import {
 } from "./meaningsModel";
 import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import {
-  moveItem,
   sortableRowClass,
   useSortableRows,
   type SortableRowsController
 } from "./sortableRows";
 import { SortableDragHandle } from "./components/SortableDragHandle";
-// 随词性 Tab 拖拽一起下线，恢复时取消注释：
-// import { reorderPos } from "./operations";
+import { reorderPos } from "./operations";
 import "./posTabs.css";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
@@ -101,6 +104,7 @@ export interface V3MeaningsAndExamplesStepProps {
   ) => Promise<void>;
   onPrevious?: () => void;
   saving?: boolean;
+  canSave?: boolean;
   issues?: readonly V3DraftValidationIssue[];
   activePosId?: string;
   wordId?: string;
@@ -230,7 +234,6 @@ const SENSE_GROUP_DRAG_TYPE = "application/x-tsz-v3-sense-group";
 const GRAMMAR_DRAG_TYPE = "application/x-tsz-v3-grammar-structure";
 const DEFINITION_DRAG_TYPE = "application/x-tsz-v3-definition";
 const SENTENCE_DRAG_TYPE = "application/x-tsz-v3-sentence";
-// 随词性 Tab 拖拽一起下线，恢复时取消注释：
 // const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
 /** 拖影取整行而不是把手上那颗小图标；与提取前硬编码的选择器一致。 */
 const SORTABLE_ROW_SELECTOR =
@@ -259,8 +262,9 @@ function SenseEditorShell({
   level,
   summary,
   subPosLabel,
-  length,
-  onMove,
+  sorting,
+  expanded,
+  onExpandedChange,
   onDelete,
   nodeId
 }: {
@@ -269,20 +273,30 @@ function SenseEditorShell({
   level: string;
   summary: string;
   subPosLabel?: string;
-  length: number;
-  onMove: (nextIndex: number) => void;
+  sorting: SortableRowsController;
+  expanded: boolean;
+  onExpandedChange: (expanded: boolean) => void;
   onDelete: () => void;
   nodeId: string;
 }) {
-  const [expanded, setExpanded] = useState(index === 0);
   const safeLevel = /^(?:A1|A2|B1|B2|C1|C2)$/u.test(level) ? level : "A1";
   return (
-    <div data-v3-field="sense" data-v3-node-id={nodeId} tabIndex={-1}>
+    <div
+      data-v3-field="sense"
+      data-v3-node-id={nodeId}
+      tabIndex={-1}
+      className={sortableRowClass("word-sense-sortable", sorting, index)}
+      onDragOver={(event) => sorting.handleDragOver(event, index)}
+      onDragLeave={sorting.handleDragLeave}
+      onDrop={(event) => sorting.handleDrop(event, index)}
+    >
       <Collapse
         activeKey={expanded ? [nodeId] : []}
         className={`word-sense-editor word-sense-editor-v3 word-sense-editor-${safeLevel.toLowerCase()}`}
         onChange={(keys) =>
-          setExpanded((Array.isArray(keys) ? keys : [keys]).includes(nodeId))
+          onExpandedChange(
+            (Array.isArray(keys) ? keys : [keys]).includes(nodeId)
+          )
         }
         items={[
           {
@@ -308,46 +322,23 @@ function SenseEditorShell({
               </div>
             ),
             extra: (
-              <Dropdown
-                placement="bottomRight"
-                trigger={["click"]}
-                menu={{
-                  items: [
-                    {
-                      key: "up",
-                      icon: <UpOutlined />,
-                      label: "上移词义",
-                      disabled: index === 0
-                    },
-                    {
-                      key: "down",
-                      icon: <DownOutlined />,
-                      label: "下移词义",
-                      disabled: index === length - 1
-                    },
-                    { type: "divider" },
-                    {
-                      key: "delete",
-                      icon: <DeleteOutlined />,
-                      label: "删除词义",
-                      danger: true
-                    }
-                  ],
-                  onClick: ({ key, domEvent }) => {
-                    domEvent.stopPropagation();
-                    if (key === "up") onMove(index - 1);
-                    if (key === "down") onMove(index + 1);
-                    if (key === "delete") onDelete();
-                  }
-                }}
-              >
-                <Button
-                  aria-label={`管理词义 ${index + 1}`}
-                  icon={<EllipsisOutlined />}
-                  onClick={(event) => event.stopPropagation()}
-                  type="text"
+              <Space size={2} onClick={(event) => event.stopPropagation()}>
+                <SortableDragHandle
+                  sorting={sorting}
+                  index={index}
+                  label={`拖动词义 ${index + 1}`}
+                  singleItemTitle="至少需要两个词义"
+                  dragImageSelector=".word-sense-sortable"
                 />
-              </Dropdown>
+                <Button
+                  aria-label={`删除词义 ${index + 1}`}
+                  icon={<DeleteOutlined />}
+                  danger
+                  size="small"
+                  type="text"
+                  onClick={onDelete}
+                />
+              </Space>
             ),
             children
           }
@@ -442,6 +433,16 @@ function GrammarStructuresCard({
                   >
                     <V3VoiceTextField
                       mode="grammar"
+                      leadingAction={
+                        <PronunciationPreviewControls
+                          playbackOnly
+                          pronunciationId={variant.id}
+                          dialect={variant.dialect}
+                          ariaLabelPrefix={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
+                          content={toRichTextV2(variant.content)}
+                          voiceProfile={variant.voice_profile ?? undefined}
+                        />
+                      }
                       ariaLabel={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
                       field="content"
                       nodeId={variant.id}
@@ -643,20 +644,56 @@ function SenseGroupsCard({
               />
             </div>
             <div className="word-sense-group-field">
-              <Input
-                aria-label={`语义区间 ${groupIndex + 1} 英文`}
-                data-v3-field="name_en"
-                data-v3-node-id={group.id}
-                onChange={(event) =>
+              <V3VoiceTextField
+                mode="grammar"
+                audioUploadEnabled={false}
+                ariaLabel={`语义区间 ${groupIndex + 1} 英文`}
+                field="name_en"
+                nodeId={group.id}
+                leadingAction={
+                  <PronunciationPreviewControls
+                    playbackOnly
+                    pronunciationId={group.id}
+                    dialect="common"
+                    ariaLabelPrefix={`语义区间 ${groupIndex + 1} 英文`}
+                    content={toRichTextV2(
+                      group.name_en_rich ?? {
+                        version: 2,
+                        text: group.name_en,
+                        annotations: []
+                      }
+                    )}
+                    voiceProfile={group.voice_profile}
+                  />
+                }
+                onChange={(next) =>
                   change((draft) => {
                     const target = draft.sense_groups.find(
                       (candidate) => candidate.id === group.id
                     );
-                    if (target) target.name_en = event.target.value;
+                    if (target) {
+                      target.name_en = next.text;
+                      target.name_en_rich = next;
+                    }
+                  })
+                }
+                voiceProfile={group.voice_profile}
+                onVoiceProfileChange={(voice_profile) =>
+                  change((draft) => {
+                    const target = draft.sense_groups.find(
+                      (candidate) => candidate.id === group.id
+                    );
+                    if (target) target.voice_profile = voice_profile;
                   })
                 }
                 placeholder="例如 Core geometric and physical space"
-                value={group.name_en}
+                value={
+                  group.name_en_rich ?? {
+                    version: 2,
+                    text: group.name_en,
+                    annotations: []
+                  }
+                }
               />
             </div>
             <Space
@@ -1017,13 +1054,27 @@ function RelationsGrid({
     <div className="word-relations-grid word-relations-grid-stacked">
       {RELATION_TYPES.map((relationType) => {
         const meta = RELATION_META[relationType];
-        const relations = groupRelations(sense.relations)
+        const relations = groupRelations(
+          sense.relations,
+          relationRowKeys.current
+        )
           .filter((group) => group[0]!.relation === relationType)
           .map((group) => ({ relation: group[0]!, group }));
         return (
           <Card
-            className={`word-relation-card${collapsed[relationType] ? " is-collapsed" : ""}`}
+            className={`word-relation-card word-relation-card-animated${collapsed[relationType] ? " is-collapsed" : ""}`}
             data-relation-type={relationType}
+            styles={{ header: { cursor: "pointer" } }}
+            onClick={(event) => {
+              const header = event.currentTarget.querySelector(
+                ":scope > .ant-card-head"
+              );
+              if (!header?.contains(event.target as Node)) return;
+              setCollapsed((current) => ({
+                ...current,
+                [relationType]: !current[relationType]
+              }));
+            }}
             extra={
               <Button
                 aria-label={`${collapsed[relationType] ? "展开" : "收起"}${relationLabel(relationType)}`}
@@ -1036,12 +1087,14 @@ function RelationsGrid({
                   )
                 }
                 iconPlacement="end"
-                onClick={() =>
+                aria-expanded={!collapsed[relationType]}
+                onClick={(event) => {
+                  event.stopPropagation();
                   setCollapsed((current) => ({
                     ...current,
                     [relationType]: !current[relationType]
-                  }))
-                }
+                  }));
+                }}
                 size="small"
                 type="text"
               >
@@ -1052,525 +1105,808 @@ function RelationsGrid({
             size="small"
             title={relationLabel(relationType)}
           >
-            {relations.length === 0 ? (
-              <Empty
-                description={`暂无${relationLabel(relationType)}`}
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-              />
-            ) : (
-              <Flex className="word-relation-list" vertical>
-                <div className="word-relation-column-heads">
-                  <span>{meta.metric}</span>
-                  <span>{relationLabel(relationType)}</span>
-                  <span>匹配词义</span>
-                  <span />
-                </div>
-                {relations.map(({ relation, group }) => (
-                  <div
-                    className="word-relation-row"
-                    data-v3-node-id={relation.id}
-                    key={
-                      relationRowKeys.current.get(relation.id) ?? relation.id
+            <SenseSectionBody collapsed={Boolean(collapsed[relationType])}>
+              <div style={{ padding: 10 }}>
+                {relations.length === 0 ? (
+                  <Empty
+                    description={`暂无${relationLabel(relationType)}`}
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  />
+                ) : (
+                  <RelationSortScope
+                    items={relations}
+                    scopeId={`${sense.id}:${relationType}`}
+                    onChange={(next) =>
+                      change((draft) => {
+                        const target = draft.pos[posIndex]!.senses[senseIndex]!;
+                        const ordered = next.flatMap((entry) => entry.group);
+                        let index = 0;
+                        target.relations = target.relations.map((item) =>
+                          item.relation === relationType
+                            ? ordered[index++]!
+                            : item
+                        );
+                      })
                     }
                   >
-                    <InputNumber
-                      aria-label={meta.metric}
-                      status={isUnlinkedText(relation) ? "warning" : undefined}
-                      data-v3-field="score"
-                      data-v3-node-id={relation.id}
-                      max={100}
-                      min={0}
-                      onChange={(score) =>
-                        change((draft) => {
-                          for (const item of draft.pos[posIndex]!.senses[
-                            senseIndex
-                          ]!.relations) {
-                            if (group.some((member) => member.id === item.id))
-                              item.score = String(score ?? 0);
-                          }
-                        })
-                      }
-                      precision={2}
-                      size="small"
-                      suffix="%"
-                      value={Number(relation.score)}
-                    />
-                    <AutoComplete
-                      className="word-relation-autocomplete"
-                      filterOption={false}
-                      notFoundContent={
-                        relatedSearch.exact.isFetching ||
-                        relatedSearch.contains.isFetching
-                          ? "搜索中…"
-                          : searchFailed
-                            ? "搜索失败，请重试"
-                            : searchHasNextPage
-                              ? "仍有结果未加载"
-                              : searching?.query
-                                ? "未找到匹配词条"
-                                : "输入词汇搜索"
-                      }
-                      onFocus={() => {
-                        setSenseSearch(undefined);
-                        if (searching?.relationId === relation.id) return;
-                        setSearching({
-                          relationId: relation.id,
-                          query: relationDisplayHeadword(
-                            relation,
-                            knownWordFor(relation),
-                            relationDisplaySnapshots?.[relation.id]
-                          )
-                        });
-                      }}
-                      onSearch={(query) => {
-                        const prepared = validateEntryInput(query);
-                        setSenseSearch(undefined);
-                        setSearching({ relationId: relation.id, query });
-                        setKnownWords((current) => {
-                          if (!(relation.id in current)) return current;
-                          const next = { ...current };
-                          delete next[relation.id];
-                          return next;
-                        });
-                        change((draft) => {
-                          const draftSense =
-                            draft.pos[posIndex]!.senses[senseIndex]!;
-                          draftSense.relations = replaceRelationGroup(
-                            draftSense.relations,
-                            group,
-                            [
-                              draftSense.relations.find(
-                                (item) => item.id === relation.id
-                              )!
-                            ]
-                          );
-                          const target = draft.pos[posIndex]!.senses[
-                            senseIndex
-                          ]!.relations.find((item) => item.id === relation.id)!;
-                          delete target.target_word_id;
-                          delete target.target_sense_id;
-                          if (!prepared.issue && prepared.normalized)
-                            target.pending_target_headword =
-                              prepared.normalized;
-                          else {
-                            delete target.pending_target_headword;
-                            delete target.pending_target_gloss;
-                          }
-                        });
-                      }}
-                      onSelect={(wordId) => {
-                        const word = searchWords.find(
-                          (candidate) => candidate.word_id === wordId
-                        );
-                        if (!word) return;
-                        if (word.senses.length === 0) {
-                          if (word.status !== "draft") return;
-                          setKnownWords((current) => ({
-                            ...current,
-                            [relation.id]: word
-                          }));
-                          setSearching(undefined);
-                          change((draft) => {
-                            const draftSense =
-                              draft.pos[posIndex]!.senses[senseIndex]!;
-                            draftSense.relations = replaceRelationGroup(
-                              draftSense.relations,
-                              group,
-                              [
-                                draftSense.relations.find(
-                                  (item) => item.id === relation.id
-                                )!
-                              ]
-                            );
-                            const target = draft.pos[posIndex]!.senses[
-                              senseIndex
-                            ]!.relations.find(
-                              (item) => item.id === relation.id
-                            )!;
-                            delete target.target_word_id;
-                            delete target.target_sense_id;
-                            target.pending_target_headword =
-                              word.matchedHeadword;
-                          });
-                          return;
-                        }
-                        setKnownWords((current) => ({
-                          ...current,
-                          [relation.id]: word
-                        }));
-                        setSearching(undefined);
-                        change((draft) => {
-                          const draftSense =
-                            draft.pos[posIndex]!.senses[senseIndex]!;
-                          draftSense.relations = replaceRelationGroup(
-                            draftSense.relations,
-                            group,
-                            [
-                              draftSense.relations.find(
-                                (item) => item.id === relation.id
-                              )!
-                            ]
-                          );
-                          const target = draft.pos[posIndex]!.senses[
-                            senseIndex
-                          ]!.relations.find((item) => item.id === relation.id)!;
-                          target.target_word_id = word.word_id;
-                          delete target.target_sense_id;
-                          delete target.pending_target_headword;
-                          delete target.pending_target_gloss;
-                        });
-                      }}
-                      options={
-                        searching?.relationId === relation.id
-                          ? searchWords.map((word) => ({
-                              label: (
-                                <Flex align="center" gap={6}>
-                                  <span>{word.headword}</span>
-                                  <Tag
-                                    color={
-                                      word.status === "draft"
-                                        ? "orange"
-                                        : "blue"
-                                    }
-                                  >
-                                    {word.status === "draft"
-                                      ? "草稿"
-                                      : "已发布"}
-                                  </Tag>
-                                  {word.senses.length === 0 &&
-                                  word.status !== "draft" ? (
-                                    <Typography.Text type="secondary">
-                                      暂无词义，请先添加词义
-                                    </Typography.Text>
-                                  ) : null}
-                                </Flex>
-                              ),
-                              value: word.word_id,
-                              disabled:
-                                (word.senses.length === 0 &&
-                                  word.status !== "draft") ||
-                                sense.relations.some(
-                                  (other) =>
-                                    !group.some(
-                                      (member) => member.id === other.id
-                                    ) &&
-                                    other.relation === relationType &&
-                                    (other.target_word_id === word.word_id ||
-                                      knownWords[other.id]?.word_id ===
-                                        word.word_id ||
-                                      other.pending_target_headword
-                                        ?.trim()
-                                        .toLowerCase() ===
-                                        word.matchedHeadword
-                                          .trim()
-                                          .toLowerCase())
-                                )
-                            }))
-                          : []
-                      }
-                      popupMatchSelectWidth={260}
-                      status={
-                        relationInputIssue(relation)
-                          ? "error"
-                          : isUnlinkedText(relation)
-                            ? "warning"
-                            : undefined
-                      }
-                      value={
-                        searching?.relationId === relation.id
-                          ? searching.query
-                          : relationDisplayHeadword(
-                              relation,
-                              knownWordFor(relation),
-                              relationDisplaySnapshots?.[relation.id]
-                            ) || (relation.target_word_id ? "已选择关联词" : "")
-                      }
-                    >
-                      <Input
-                        aria-label={`${relationLabel(relationType)}目标词条`}
-                        className="word-relation-target"
-                        prefix={
-                          relation.target_word_id ? (
-                            <SoundOutlined />
-                          ) : (
-                            <Tooltip title="待关联词暂不支持语音">
-                              <SoundOutlined
-                                aria-disabled="true"
-                                className="word-relation-sound-disabled"
-                              />
-                            </Tooltip>
-                          )
-                        }
-                        status={
-                          relationInputIssue(relation)
-                            ? "error"
-                            : isUnlinkedText(relation)
-                              ? "warning"
-                              : undefined
-                        }
-                        suffix={
-                          <>
-                            {searching?.relationId === relation.id &&
-                            searchFailed ? (
-                              <Button
-                                aria-label="重试关联词搜索"
-                                onClick={() => void retryRelatedSearch()}
-                                onMouseDown={(event) => event.preventDefault()}
-                                size="small"
-                                type="link"
-                              >
-                                搜索失败，重试
-                              </Button>
-                            ) : searching?.relationId === relation.id &&
-                              searchHasNextPage ? (
-                              <Button
-                                aria-label="加载更多关联词结果"
-                                onClick={() => void loadMoreSearchResults()}
-                                onMouseDown={(event) => event.preventDefault()}
-                                size="small"
-                                type="link"
-                              >
-                                加载更多
-                              </Button>
-                            ) : null}
-                            {isUnlinkedText(relation) &&
-                            !isSelectedEmptyDraft(relation) ? (
-                              <Tooltip
-                                title={`待关联的${relationLabel(relationType)}`}
-                              >
-                                <InfoCircleOutlined
-                                  aria-label={`待关联的${relationLabel(relationType)}`}
-                                  className="word-relation-unlinked-icon"
-                                  role="note"
-                                />
-                              </Tooltip>
-                            ) : null}
-                          </>
-                        }
-                        placeholder="搜索关联词"
-                        size="small"
-                      />
-                    </AutoComplete>
-                    {isUnlinkedText(relation) ? (
-                      <Input
-                        aria-label={`${relationLabel(relationType)}待关联词义`}
-                        className="word-relation-sense"
-                        data-v3-field="pending_target_gloss"
-                        data-v3-node-id={relation.id}
-                        maxLength={5000}
-                        onChange={(event) =>
-                          change((draft) => {
-                            const target = draft.pos[posIndex]!.senses[
-                              senseIndex
-                            ]!.relations.find(
-                              (item) => item.id === relation.id
-                            )!;
-                            if (event.target.value)
-                              target.pending_target_gloss = event.target.value;
-                            else delete target.pending_target_gloss;
-                          })
-                        }
-                        placeholder="输入词义"
-                        size="small"
-                        status="warning"
-                        suffix={
-                          isSelectedEmptyDraft(relation) ? (
-                            <Tooltip
-                              title={`待关联的${relationLabel(relationType)}`}
-                            >
-                              <InfoCircleOutlined
-                                aria-label={`待关联的${relationLabel(relationType)}`}
-                                className="word-relation-unlinked-icon"
-                                role="note"
-                              />
-                            </Tooltip>
-                          ) : undefined
-                        }
-                        value={relation.pending_target_gloss ?? ""}
-                      />
-                    ) : (
-                      <Select
-                        aria-label={`${relationLabel(relationType)}目标词义`}
-                        className="word-relation-sense"
-                        disabled={!relation.target_word_id}
-                        mode={
-                          relationType === "derivative" ? "multiple" : undefined
-                        }
-                        onChange={(selection: string | string[]) => {
-                          const discovered = searchWords.find(
-                            (word) => word.word_id === relation.target_word_id
-                          );
-                          if (discovered)
-                            setKnownWords((current) => ({
-                              ...current,
-                              [relation.id]: discovered
-                            }));
-                          const replacement =
-                            relationType === "derivative"
-                              ? selectDerivativeSenses(
-                                  group,
-                                  selection as string[],
-                                  idFactory
-                                )
-                              : undefined;
-                          if (replacement) {
-                            const rowKey =
-                              relationRowKeys.current.get(relation.id) ??
-                              relation.id;
-                            for (const item of replacement)
-                              relationRowKeys.current.set(item.id, rowKey);
-                          }
-                          change((draft) => {
-                            const draftSense =
-                              draft.pos[posIndex]!.senses[senseIndex]!;
-                            if (replacement) {
-                              draftSense.relations = replaceRelationGroup(
-                                draftSense.relations,
-                                group,
-                                replacement
-                              );
-                            } else {
-                              draftSense.relations.find(
-                                (item) => item.id === relation.id
-                              )!.target_sense_id = selection as string;
+                    {(relationSorting) => (
+                      <Flex className="word-relation-list" vertical>
+                        <div className="word-relation-column-heads">
+                          <span />
+                          <span>{meta.metric}</span>
+                          <span>{relationLabel(relationType)}</span>
+                          <span>匹配词义</span>
+                          <span />
+                        </div>
+                        {relations.map(({ relation, group }, relationIndex) => (
+                          <div
+                            className={sortableRowClass(
+                              "word-relation-row",
+                              relationSorting,
+                              relationIndex
+                            )}
+                            onDragOver={(event) =>
+                              relationSorting.handleDragOver(
+                                event,
+                                relationIndex
+                              )
                             }
-                          });
-                        }}
-                        onOpenChange={(open) => {
-                          setSearching(undefined);
-                          setSenseSearch(
-                            open
-                              ? {
-                                  wordId: relation.target_word_id!,
-                                  query: (
+                            onDragLeave={relationSorting.handleDragLeave}
+                            onDrop={(event) =>
+                              relationSorting.handleDrop(event, relationIndex)
+                            }
+                            data-v3-node-id={relation.id}
+                            key={
+                              relationRowKeys.current.get(relation.id) ??
+                              relation.id
+                            }
+                          >
+                            <span
+                              className="word-relation-drop-line"
+                              aria-hidden
+                            />
+                            <Flex
+                              className="word-relation-index"
+                              align="center"
+                              gap={2}
+                            >
+                              <SortableDragHandle
+                                sorting={relationSorting}
+                                index={relationIndex}
+                                label={`拖动${relationLabel(relationType)} ${relationIndex + 1}`}
+                                singleItemTitle="至少需要两个关联词"
+                                dragImageSelector=".word-relation-row"
+                              />
+                              <span className="word-grammar-index">
+                                {relationIndex + 1}
+                              </span>
+                            </Flex>
+                            <InputNumber
+                              aria-label={meta.metric}
+                              status={
+                                isUnlinkedText(relation) ? "warning" : undefined
+                              }
+                              data-v3-field="score"
+                              data-v3-node-id={relation.id}
+                              max={100}
+                              min={0}
+                              onChange={(score) =>
+                                change((draft) => {
+                                  for (const item of draft.pos[posIndex]!
+                                    .senses[senseIndex]!.relations) {
+                                    if (
+                                      group.some(
+                                        (member) => member.id === item.id
+                                      )
+                                    )
+                                      item.score = String(score ?? 0);
+                                  }
+                                })
+                              }
+                              precision={2}
+                              size="small"
+                              suffix="%"
+                              value={Number(relation.score)}
+                            />
+                            <AutoComplete
+                              className="word-relation-autocomplete"
+                              filterOption={false}
+                              notFoundContent={
+                                relatedSearch.exact.isFetching ||
+                                relatedSearch.contains.isFetching
+                                  ? "搜索中…"
+                                  : searchFailed
+                                    ? "搜索失败，请重试"
+                                    : searchHasNextPage
+                                      ? "仍有结果未加载"
+                                      : searching?.query
+                                        ? "未找到匹配词条"
+                                        : "输入词汇搜索"
+                              }
+                              onFocus={() => {
+                                setSenseSearch(undefined);
+                                if (searching?.relationId === relation.id)
+                                  return;
+                                setSearching({
+                                  relationId: relation.id,
+                                  query: relationDisplayHeadword(
+                                    relation,
+                                    knownWordFor(relation),
                                     relationDisplaySnapshots?.[relation.id]
-                                      ?.headword ??
-                                    knownWordFor(relation)?.headword ??
-                                    ""
-                                  ).split(" / ")[0]!
+                                  )
+                                });
+                              }}
+                              onSearch={(query) => {
+                                const prepared = validateEntryInput(query);
+                                setSenseSearch(undefined);
+                                setSearching({
+                                  relationId: relation.id,
+                                  query
+                                });
+                                setKnownWords((current) => {
+                                  if (!(relation.id in current)) return current;
+                                  const next = { ...current };
+                                  delete next[relation.id];
+                                  return next;
+                                });
+                                change((draft) => {
+                                  const draftSense =
+                                    draft.pos[posIndex]!.senses[senseIndex]!;
+                                  const keepManualGroup =
+                                    !relation.target_word_id &&
+                                    group.length > 1;
+                                  if (keepManualGroup) {
+                                    const rowKey =
+                                      relationRowKeys.current.get(
+                                        relation.id
+                                      ) ?? relation.id;
+                                    for (const item of group)
+                                      relationRowKeys.current.set(
+                                        item.id,
+                                        rowKey
+                                      );
+                                  }
+                                  const targets = draftSense.relations.filter(
+                                    (item) =>
+                                      keepManualGroup
+                                        ? group.some(
+                                            (member) => member.id === item.id
+                                          )
+                                        : item.id === relation.id
+                                  );
+                                  draftSense.relations = replaceRelationGroup(
+                                    draftSense.relations,
+                                    group,
+                                    targets
+                                  );
+                                  for (const target of targets) {
+                                    delete target.target_word_id;
+                                    delete target.target_sense_id;
+                                    if (keepManualGroup)
+                                      target.pending_target_headword =
+                                        prepared.normalized ?? query.trim();
+                                    else if (
+                                      !prepared.issue &&
+                                      prepared.normalized
+                                    )
+                                      target.pending_target_headword =
+                                        prepared.normalized;
+                                    else {
+                                      delete target.pending_target_headword;
+                                      delete target.pending_target_gloss;
+                                    }
+                                  }
+                                });
+                              }}
+                              onSelect={(wordId) => {
+                                const word = searchWords.find(
+                                  (candidate) => candidate.word_id === wordId
+                                );
+                                if (!word) return;
+                                if (word.senses.length === 0) {
+                                  if (word.status !== "draft") return;
+                                  setKnownWords((current) => ({
+                                    ...current,
+                                    [relation.id]: word
+                                  }));
+                                  setSearching(undefined);
+                                  change((draft) => {
+                                    const draftSense =
+                                      draft.pos[posIndex]!.senses[senseIndex]!;
+                                    draftSense.relations = replaceRelationGroup(
+                                      draftSense.relations,
+                                      group,
+                                      [
+                                        draftSense.relations.find(
+                                          (item) => item.id === relation.id
+                                        )!
+                                      ]
+                                    );
+                                    const target = draft.pos[posIndex]!.senses[
+                                      senseIndex
+                                    ]!.relations.find(
+                                      (item) => item.id === relation.id
+                                    )!;
+                                    delete target.target_word_id;
+                                    delete target.target_sense_id;
+                                    target.pending_target_headword =
+                                      word.matchedHeadword;
+                                  });
+                                  return;
                                 }
-                              : undefined
-                          );
-                        }}
-                        loading={
-                          senseSearch?.wordId === relation.target_word_id &&
-                          (relatedSearch.exact.isFetching ||
-                            relatedSearch.contains.isFetching)
-                        }
-                        popupRender={(menu) => (
-                          <>
-                            {menu}
-                            {senseSearch?.wordId === relation.target_word_id &&
-                            searchFailed ? (
-                              <Button
+                                setKnownWords((current) => ({
+                                  ...current,
+                                  [relation.id]: word
+                                }));
+                                setSearching(undefined);
+                                change((draft) => {
+                                  const draftSense =
+                                    draft.pos[posIndex]!.senses[senseIndex]!;
+                                  draftSense.relations = replaceRelationGroup(
+                                    draftSense.relations,
+                                    group,
+                                    [
+                                      draftSense.relations.find(
+                                        (item) => item.id === relation.id
+                                      )!
+                                    ]
+                                  );
+                                  const target = draft.pos[posIndex]!.senses[
+                                    senseIndex
+                                  ]!.relations.find(
+                                    (item) => item.id === relation.id
+                                  )!;
+                                  target.target_word_id = word.word_id;
+                                  delete target.target_sense_id;
+                                  delete target.pending_target_headword;
+                                  delete target.pending_target_gloss;
+                                });
+                              }}
+                              options={
+                                searching?.relationId === relation.id
+                                  ? searchWords.map((word) => ({
+                                      label: (
+                                        <Flex align="center" gap={6}>
+                                          <span>{word.headword}</span>
+                                          <Tag
+                                            color={
+                                              word.status === "draft"
+                                                ? "orange"
+                                                : "blue"
+                                            }
+                                          >
+                                            {word.status === "draft"
+                                              ? "草稿"
+                                              : "已发布"}
+                                          </Tag>
+                                          {word.senses.length === 0 &&
+                                          word.status !== "draft" ? (
+                                            <Typography.Text type="secondary">
+                                              暂无词义，请先添加词义
+                                            </Typography.Text>
+                                          ) : null}
+                                        </Flex>
+                                      ),
+                                      value: word.word_id,
+                                      disabled:
+                                        (word.senses.length === 0 &&
+                                          word.status !== "draft") ||
+                                        sense.relations.some(
+                                          (other) =>
+                                            !group.some(
+                                              (member) => member.id === other.id
+                                            ) &&
+                                            other.relation === relationType &&
+                                            (other.target_word_id ===
+                                              word.word_id ||
+                                              knownWords[other.id]?.word_id ===
+                                                word.word_id ||
+                                              other.pending_target_headword
+                                                ?.trim()
+                                                .toLowerCase() ===
+                                                word.matchedHeadword
+                                                  .trim()
+                                                  .toLowerCase())
+                                        )
+                                    }))
+                                  : []
+                              }
+                              popupMatchSelectWidth={260}
+                              status={
+                                relationInputIssue(relation)
+                                  ? "error"
+                                  : isUnlinkedText(relation)
+                                    ? "warning"
+                                    : undefined
+                              }
+                              value={
+                                searching?.relationId === relation.id
+                                  ? searching.query
+                                  : relationDisplayHeadword(
+                                      relation,
+                                      knownWordFor(relation),
+                                      relationDisplaySnapshots?.[relation.id]
+                                    ) ||
+                                    (relation.target_word_id
+                                      ? "已选择关联词"
+                                      : "")
+                              }
+                            >
+                              <Input
+                                aria-label={`${relationLabel(relationType)}目标词条`}
+                                className="word-relation-target"
+                                prefix={
+                                  relation.target_word_id ? (
+                                    <SoundOutlined />
+                                  ) : (
+                                    <Tooltip title="待关联词暂不支持语音">
+                                      <SoundOutlined
+                                        aria-disabled="true"
+                                        className="word-relation-sound-disabled"
+                                      />
+                                    </Tooltip>
+                                  )
+                                }
+                                status={
+                                  relationInputIssue(relation)
+                                    ? "error"
+                                    : isUnlinkedText(relation)
+                                      ? "warning"
+                                      : undefined
+                                }
+                                suffix={
+                                  <>
+                                    {searching?.relationId === relation.id &&
+                                    searchFailed ? (
+                                      <Button
+                                        aria-label="重试关联词搜索"
+                                        onClick={() =>
+                                          void retryRelatedSearch()
+                                        }
+                                        onMouseDown={(event) =>
+                                          event.preventDefault()
+                                        }
+                                        size="small"
+                                        type="link"
+                                      >
+                                        搜索失败，重试
+                                      </Button>
+                                    ) : searching?.relationId === relation.id &&
+                                      searchHasNextPage ? (
+                                      <Button
+                                        aria-label="加载更多关联词结果"
+                                        onClick={() =>
+                                          void loadMoreSearchResults()
+                                        }
+                                        onMouseDown={(event) =>
+                                          event.preventDefault()
+                                        }
+                                        size="small"
+                                        type="link"
+                                      >
+                                        加载更多
+                                      </Button>
+                                    ) : null}
+                                    {isUnlinkedText(relation) &&
+                                    !isSelectedEmptyDraft(relation) ? (
+                                      <Tooltip
+                                        title={`待关联的${relationLabel(relationType)}`}
+                                      >
+                                        <InfoCircleOutlined
+                                          aria-label={`待关联的${relationLabel(relationType)}`}
+                                          className="word-relation-unlinked-icon"
+                                          role="note"
+                                        />
+                                      </Tooltip>
+                                    ) : null}
+                                  </>
+                                }
+                                placeholder="搜索关联词"
                                 size="small"
-                                type="link"
-                                onClick={() => void retryRelatedSearch()}
+                              />
+                            </AutoComplete>
+                            {isUnlinkedText(relation) ||
+                            (!relation.target_word_id && group.length > 1) ? (
+                              <Flex
+                                className="word-relation-sense"
+                                vertical
+                                gap={6}
                               >
-                                搜索失败，重试
-                              </Button>
-                            ) : null}
-                            {senseSearch?.wordId === relation.target_word_id &&
-                            searchHasNextPage ? (
-                              <Button
-                                size="small"
-                                type="link"
-                                onClick={() => void loadMoreSearchResults()}
-                              >
-                                加载更多词义来源
-                              </Button>
-                            ) : null}
-                          </>
-                        )}
-                        options={Array.from(
-                          new Map(
-                            [
-                              ...group
-                                .filter((item) => item.target_sense_id)
-                                .map((item) => ({
-                                  sense_id: item.target_sense_id!,
-                                  gloss:
-                                    relationDisplaySnapshots?.[item.id]
-                                      ?.gloss ?? "已匹配词义"
-                                })),
-                              ...(Object.values(knownWords).find(
-                                (word) =>
-                                  word.word_id === relation.target_word_id
-                              )?.senses ?? []),
-                              ...(senseSearch?.wordId ===
-                              relation.target_word_id
-                                ? (searchWords.find(
+                                <RelationSortScope
+                                  items={group}
+                                  scopeId={`${sense.id}:${relation.id}:glosses`}
+                                  onChange={(next) => {
+                                    const key =
+                                      relationRowKeys.current.get(
+                                        relation.id
+                                      ) ?? relation.id;
+                                    for (const item of next)
+                                      relationRowKeys.current.set(item.id, key);
+                                    change((draft) => {
+                                      const target =
+                                        draft.pos[posIndex]!.senses[
+                                          senseIndex
+                                        ]!;
+                                      target.relations = replaceRelationGroup(
+                                        target.relations,
+                                        group,
+                                        next
+                                      );
+                                    });
+                                  }}
+                                >
+                                  {(glossSorting) => (
+                                    <Flex
+                                      vertical
+                                      gap={6}
+                                      className={
+                                        relationType === "derivative" &&
+                                        group.length > 1
+                                          ? "word-relation-glosses-connected"
+                                          : undefined
+                                      }
+                                    >
+                                      {group.map((member, glossIndex) => (
+                                        <Flex
+                                          key={member.id}
+                                          gap={6}
+                                          align="center"
+                                          className={sortableRowClass(
+                                            "word-relation-gloss-row",
+                                            glossSorting,
+                                            glossIndex
+                                          )}
+                                          onDragOver={(event) => {
+                                            event.stopPropagation();
+                                            glossSorting.handleDragOver(
+                                              event,
+                                              glossIndex
+                                            );
+                                          }}
+                                          onDragLeave={(event) => {
+                                            event.stopPropagation();
+                                            glossSorting.handleDragLeave();
+                                          }}
+                                          onDrop={(event) => {
+                                            event.stopPropagation();
+                                            glossSorting.handleDrop(
+                                              event,
+                                              glossIndex
+                                            );
+                                          }}
+                                        >
+                                          <span
+                                            className="word-relation-drop-line"
+                                            aria-hidden
+                                          />
+                                          <SortableDragHandle
+                                            sorting={glossSorting}
+                                            index={glossIndex}
+                                            label={`拖动${relationLabel(relationType)}词义 ${glossIndex + 1}`}
+                                            singleItemTitle="至少需要两个词义"
+                                            dragImageSelector=".word-relation-gloss-row"
+                                          />
+                                          <Input
+                                            aria-label={`${relationLabel(relationType)}待关联词义${group.length > 1 ? ` ${glossIndex + 1}` : ""}`}
+                                            className="word-relation-sense"
+                                            data-v3-field="pending_target_gloss"
+                                            data-v3-node-id={member.id}
+                                            maxLength={5000}
+                                            onChange={(event) =>
+                                              change((draft) => {
+                                                const target = draft.pos[
+                                                  posIndex
+                                                ]!.senses[
+                                                  senseIndex
+                                                ]!.relations.find(
+                                                  (item) =>
+                                                    item.id === member.id
+                                                )!;
+                                                if (event.target.value)
+                                                  target.pending_target_gloss =
+                                                    event.target.value;
+                                                else
+                                                  delete target.pending_target_gloss;
+                                              })
+                                            }
+                                            placeholder="输入词义"
+                                            size="small"
+                                            status="warning"
+                                            suffix={
+                                              isSelectedEmptyDraft(relation) ? (
+                                                <Tooltip
+                                                  title={`待关联的${relationLabel(relationType)}`}
+                                                >
+                                                  <InfoCircleOutlined
+                                                    aria-label={`待关联的${relationLabel(relationType)}`}
+                                                    className="word-relation-unlinked-icon"
+                                                    role="note"
+                                                  />
+                                                </Tooltip>
+                                              ) : undefined
+                                            }
+                                            value={
+                                              member.pending_target_gloss ?? ""
+                                            }
+                                          />
+
+                                          {group.length > 1 ? (
+                                            <RelationDeleteMenu
+                                              label={`${relationLabel(relationType)}词义 ${glossIndex + 1}`}
+                                              onDelete={() => {
+                                                const remaining = group.filter(
+                                                  (item) =>
+                                                    item.id !== member.id
+                                                );
+                                                const rowKey =
+                                                  relationRowKeys.current.get(
+                                                    relation.id
+                                                  ) ?? relation.id;
+                                                for (const item of remaining)
+                                                  relationRowKeys.current.set(
+                                                    item.id,
+                                                    rowKey
+                                                  );
+                                                change((draft) => {
+                                                  const target =
+                                                    draft.pos[posIndex]!.senses[
+                                                      senseIndex
+                                                    ]!;
+                                                  target.relations =
+                                                    replaceRelationGroup(
+                                                      target.relations,
+                                                      group,
+                                                      remaining
+                                                    );
+                                                });
+                                              }}
+                                            />
+                                          ) : null}
+                                        </Flex>
+                                      ))}
+                                    </Flex>
+                                  )}
+                                </RelationSortScope>
+                                <Button
+                                  aria-label={`添加${relationLabel(relationType)}词义`}
+                                  size="small"
+                                  type="dashed"
+                                  icon={<PlusOutlined />}
+                                  onClick={() =>
+                                    change((draft) => {
+                                      const target =
+                                        draft.pos[posIndex]!.senses[
+                                          senseIndex
+                                        ]!;
+                                      const added = {
+                                        ...relation,
+                                        id: idFactory()
+                                      };
+                                      delete added.pending_target_gloss;
+                                      const rowKey =
+                                        relationRowKeys.current.get(
+                                          relation.id
+                                        ) ?? relation.id;
+                                      for (const member of [...group, added])
+                                        relationRowKeys.current.set(
+                                          member.id,
+                                          rowKey
+                                        );
+                                      target.relations = replaceRelationGroup(
+                                        target.relations,
+                                        group,
+                                        [...group, added]
+                                      );
+                                    })
+                                  }
+                                >
+                                  添加词义
+                                </Button>
+                              </Flex>
+                            ) : (
+                              <Select
+                                aria-label={`${relationLabel(relationType)}目标词义`}
+                                className="word-relation-sense"
+                                disabled={!relation.target_word_id}
+                                mode={
+                                  relationType === "derivative"
+                                    ? "multiple"
+                                    : undefined
+                                }
+                                onChange={(selection: string | string[]) => {
+                                  const discovered = searchWords.find(
                                     (word) =>
                                       word.word_id === relation.target_word_id
-                                  )?.senses ?? [])
-                                : [])
-                            ].map((item) => [
-                              item.sense_id,
-                              {
-                                label: item.gloss || "（无释义）",
-                                value: item.sense_id
+                                  );
+                                  if (discovered)
+                                    setKnownWords((current) => ({
+                                      ...current,
+                                      [relation.id]: discovered
+                                    }));
+                                  const replacement =
+                                    relationType === "derivative"
+                                      ? selectDerivativeSenses(
+                                          group,
+                                          selection as string[],
+                                          idFactory
+                                        )
+                                      : undefined;
+                                  if (replacement) {
+                                    const rowKey =
+                                      relationRowKeys.current.get(
+                                        relation.id
+                                      ) ?? relation.id;
+                                    for (const item of replacement)
+                                      relationRowKeys.current.set(
+                                        item.id,
+                                        rowKey
+                                      );
+                                  }
+                                  change((draft) => {
+                                    const draftSense =
+                                      draft.pos[posIndex]!.senses[senseIndex]!;
+                                    if (replacement) {
+                                      draftSense.relations =
+                                        replaceRelationGroup(
+                                          draftSense.relations,
+                                          group,
+                                          replacement
+                                        );
+                                    } else {
+                                      draftSense.relations.find(
+                                        (item) => item.id === relation.id
+                                      )!.target_sense_id = selection as string;
+                                    }
+                                  });
+                                }}
+                                onOpenChange={(open) => {
+                                  setSearching(undefined);
+                                  setSenseSearch(
+                                    open
+                                      ? {
+                                          wordId: relation.target_word_id!,
+                                          query: (
+                                            relationDisplaySnapshots?.[
+                                              relation.id
+                                            ]?.headword ??
+                                            knownWordFor(relation)?.headword ??
+                                            ""
+                                          ).split(" / ")[0]!
+                                        }
+                                      : undefined
+                                  );
+                                }}
+                                loading={
+                                  senseSearch?.wordId ===
+                                    relation.target_word_id &&
+                                  (relatedSearch.exact.isFetching ||
+                                    relatedSearch.contains.isFetching)
+                                }
+                                popupRender={(menu) => (
+                                  <>
+                                    {menu}
+                                    {senseSearch?.wordId ===
+                                      relation.target_word_id &&
+                                    searchFailed ? (
+                                      <Button
+                                        size="small"
+                                        type="link"
+                                        onClick={() =>
+                                          void retryRelatedSearch()
+                                        }
+                                      >
+                                        搜索失败，重试
+                                      </Button>
+                                    ) : null}
+                                    {senseSearch?.wordId ===
+                                      relation.target_word_id &&
+                                    searchHasNextPage ? (
+                                      <Button
+                                        size="small"
+                                        type="link"
+                                        onClick={() =>
+                                          void loadMoreSearchResults()
+                                        }
+                                      >
+                                        加载更多词义来源
+                                      </Button>
+                                    ) : null}
+                                  </>
+                                )}
+                                options={Array.from(
+                                  new Map(
+                                    [
+                                      ...group
+                                        .filter((item) => item.target_sense_id)
+                                        .map((item) => ({
+                                          sense_id: item.target_sense_id!,
+                                          gloss:
+                                            relationDisplaySnapshots?.[item.id]
+                                              ?.gloss ?? "已匹配词义"
+                                        })),
+                                      ...(Object.values(knownWords).find(
+                                        (word) =>
+                                          word.word_id ===
+                                          relation.target_word_id
+                                      )?.senses ?? []),
+                                      ...(senseSearch?.wordId ===
+                                      relation.target_word_id
+                                        ? (searchWords.find(
+                                            (word) =>
+                                              word.word_id ===
+                                              relation.target_word_id
+                                          )?.senses ?? [])
+                                        : [])
+                                    ].map((item) => [
+                                      item.sense_id,
+                                      {
+                                        label: item.gloss || "（无释义）",
+                                        value: item.sense_id
+                                      }
+                                    ])
+                                  ).values()
+                                )}
+                                placeholder="选择词义"
+                                size="small"
+                                value={
+                                  relationType === "derivative"
+                                    ? group.flatMap((item) =>
+                                        item.target_sense_id
+                                          ? [item.target_sense_id]
+                                          : []
+                                      )
+                                    : relation.target_sense_id
+                                }
+                              />
+                            )}
+                            {relationInputIssue(relation) ? (
+                              <div
+                                className="word-relation-input-error"
+                                role="alert"
+                              >
+                                {relationInputIssue(relation)}
+                              </div>
+                            ) : null}
+                            <RelationDeleteMenu
+                              label={relationLabel(relationType)}
+                              onDelete={() =>
+                                change((draft) => {
+                                  const draftSense =
+                                    draft.pos[posIndex]!.senses[senseIndex]!;
+                                  draftSense.relations = replaceRelationGroup(
+                                    draftSense.relations,
+                                    group,
+                                    []
+                                  );
+                                })
                               }
-                            ])
-                          ).values()
-                        )}
-                        placeholder="选择词义"
-                        size="small"
-                        value={
-                          relationType === "derivative"
-                            ? group.flatMap((item) =>
-                                item.target_sense_id
-                                  ? [item.target_sense_id]
-                                  : []
-                              )
-                            : relation.target_sense_id
-                        }
-                      />
+                            />
+                          </div>
+                        ))}
+                      </Flex>
                     )}
-                    {relationInputIssue(relation) ? (
-                      <div className="word-relation-input-error" role="alert">
-                        {relationInputIssue(relation)}
-                      </div>
-                    ) : null}
-                    <Button
-                      aria-label={`删除${relationLabel(relationType)}`}
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() =>
-                        change((draft) => {
-                          const draftSense =
-                            draft.pos[posIndex]!.senses[senseIndex]!;
-                          draftSense.relations = replaceRelationGroup(
-                            draftSense.relations,
-                            group,
-                            []
-                          );
-                        })
-                      }
-                      size="small"
-                      type="text"
-                    />
-                  </div>
-                ))}
-              </Flex>
-            )}
-            <Button
-              block
-              className="word-section-add-button"
-              icon={<PlusOutlined aria-hidden />}
-              onClick={() => {
-                const relation = newRelation(idFactory, relationType);
-                change((draft) => {
-                  draft.pos[posIndex]!.senses[senseIndex]!.relations.push(
-                    relation
-                  );
-                });
-                setSearching({ relationId: relation.id, query: "" });
-              }}
-              size="small"
-              type="dashed"
-            >
-              添加{relationLabel(relationType)}
-            </Button>
+                  </RelationSortScope>
+                )}
+                <Button
+                  block
+                  className="word-section-add-button"
+                  icon={<PlusOutlined aria-hidden />}
+                  onClick={() => {
+                    const relation = newRelation(idFactory, relationType);
+                    change((draft) => {
+                      draft.pos[posIndex]!.senses[senseIndex]!.relations.push(
+                        relation
+                      );
+                    });
+                    setSearching({ relationId: relation.id, query: "" });
+                  }}
+                  size="small"
+                  type="dashed"
+                >
+                  添加{relationLabel(relationType)}
+                </Button>
+              </div>
+            </SenseSectionBody>
           </Card>
         );
       })}
@@ -1578,12 +1914,13 @@ function RelationsGrid({
   );
 }
 
-export function V3MeaningsAndExamplesStep({
+function V3MeaningsAndExamplesStepContent({
   value,
   onChange,
   onSave,
   onPrevious,
   saving = false,
+  canSave = true,
   issues = [],
   activePosId,
   wordId,
@@ -1601,6 +1938,15 @@ export function V3MeaningsAndExamplesStep({
   textLinksEnabled = false
 }: V3MeaningsAndExamplesStepProps) {
   const { modal } = App.useApp();
+  const [expandedSenseByPos, setExpandedSenseByPos] = useState<
+    Record<string, string | null>
+  >(() =>
+    Object.fromEntries(
+      value.pos
+        .filter((pos) => pos.senses.length > 0)
+        .map((pos) => [pos.pos_id, pos.senses[0]!.id])
+    )
+  );
   const [collapsedSenseSections, setCollapsedSenseSections] = useState<
     Record<string, boolean>
   >({});
@@ -1656,33 +2002,21 @@ export function V3MeaningsAndExamplesStep({
       ...(activePosId ? [activePosId] : [])
     ])
   );
-  // 词性 Tab 拖拽暂时下线，连同下面这段一起：把 Tab 的 label 包进带拖拽事件的 <span>
-  // 会让 V3MeaningsAndExamplesStep.test.tsx 整个文件卡死（跑到第 60 个用例时 worker
-  // 100% CPU 空转、永不退出）。原因是它改了 antd Tabs 的 label 结构，而 Tabs 会对
-  // label 做测量，在 jsdom 的 ResizeObserver 垫片下打转；给容器和手柄补
-  // posOrderMatchesForms 守卫都不管用，只有回退包裹层才恢复。
-  //
-  // 恢复时把下面这段取消注释，一并恢复 Tabs label 里的拖拽包裹层与两个 it.skip 用例。
-  //
-  // 词性顺序只有一份，存在 forms.pos 里；本步的标签栏是它的投影，所以拖动回写 forms。
-  // 只有标签集合与 forms.pos 完全对齐时才允许拖——两者不一致时（例如词义里有个
-  // forms 尚未落下的词性）算不出完整顺序，reorderPos 会直接拒绝。
-  //
-  // const posOrderMatchesForms =
-  //   Boolean(forms && onFormsChange) &&
-  //   forms!.pos.length === visiblePosIds.length &&
-  //   visiblePosIds.every((posId) =>
-  //     forms!.pos.some((formPos) => formPos.pos_id === posId)
-  //   );
-  // const posSorting = useSortableRows({
-  //   items: visiblePosIds,
-  //   scopeId: "v3-meanings-pos-tabs",
-  //   dragType: POS_DRAG_TYPE,
-  //   onChange: (next) => {
-  //     if (!forms || !onFormsChange) return;
-  //     onFormsChange(reorderPos(forms, next));
-  //   }
-  // });
+  // 两步共用 forms.pos 的顺序；未对齐的词性集合不能回写排序。
+  const posOrderMatchesForms =
+    Boolean(forms && onFormsChange) &&
+    forms!.pos.length === visiblePosIds.length &&
+    visiblePosIds.every((posId) =>
+      forms!.pos.some((pos) => pos.pos_id === posId)
+    );
+  const posSorting = useSortableRows({
+    items: posOrderMatchesForms ? visiblePosIds : [],
+    scopeId: "v3-meanings-pos-tabs",
+    dragType: "application/x-tsz-v3-pos",
+    onChange: (next) => {
+      if (forms && onFormsChange) onFormsChange(reorderPos(forms, next));
+    }
+  });
 
   const resolvedActivePosId =
     activePosId && visiblePosIds.includes(activePosId)
@@ -1768,44 +2102,67 @@ export function V3MeaningsAndExamplesStep({
             return {
               key: posId,
               label: (
-                <Space size={6}>
-                  <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
-                  {pos ? (
-                    <Badge
-                      count={countV3PosMeaningIncomplete(
-                        pos,
-                        value,
-                        catalogByCode.get(formPosById.get(posId) ?? "")
-                          ?.sub_parts_extensible ?? true
-                      )}
-                      size="small"
-                      title="该词性未填项"
+                <span
+                  className={sortableRowClass(
+                    "word-pos-tab-handle",
+                    posSorting,
+                    displayPosIndex
+                  )}
+                  data-pos-id={posId}
+                  onDragLeave={posSorting.handleDragLeave}
+                  onDragOver={(event) =>
+                    posSorting.handleDragOver(event, displayPosIndex)
+                  }
+                  onDrop={(event) =>
+                    posSorting.handleDrop(event, displayPosIndex)
+                  }
+                >
+                  <Space size={6}>
+                    <SortableDragHandle
+                      dragImageSelector=".word-pos-tab-handle"
+                      index={displayPosIndex}
+                      label={`拖动${visiblePosLabel(posId, displayPosIndex)}`}
+                      singleItemTitle="至少需要两个基本词性"
+                      sorting={posSorting}
                     />
-                  ) : null}
-                  {forms &&
-                  forms.pos.length > 1 &&
-                  forms.pos.some((formPos) => formPos.pos_id === posId) &&
-                  onFormsChange ? (
-                    <Button
-                      aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
-                      danger
-                      icon={<MinusCircleOutlined />}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        modal.confirm({
-                          title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
-                          content:
-                            "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
-                          okText: "删除",
-                          okButtonProps: { danger: true },
-                          onOk: () => deleteBasicPos(posId)
-                        });
-                      }}
-                      size="small"
-                      type="text"
-                    />
-                  ) : null}
-                </Space>
+                    <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
+                    {pos ? (
+                      <Badge
+                        count={countV3PosMeaningIncomplete(
+                          pos,
+                          value,
+                          catalogByCode.get(formPosById.get(posId) ?? "")
+                            ?.sub_parts_extensible ?? true
+                        )}
+                        size="small"
+                        title="该词性未填项"
+                      />
+                    ) : null}
+                    {forms &&
+                    forms.pos.length > 1 &&
+                    forms.pos.some((formPos) => formPos.pos_id === posId) &&
+                    onFormsChange ? (
+                      <Button
+                        aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
+                        danger
+                        icon={<MinusCircleOutlined />}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          modal.confirm({
+                            title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
+                            content:
+                              "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
+                            okText: "删除",
+                            okButtonProps: { danger: true },
+                            onOk: () => deleteBasicPos(posId)
+                          });
+                        }}
+                        size="small"
+                        type="text"
+                      />
+                    ) : null}
+                  </Space>
+                </span>
               ),
               children: pos ? (
                 <div
@@ -1828,1008 +2185,1077 @@ export function V3MeaningsAndExamplesStep({
                       data-v3-field="senses"
                       data-v3-node-id={pos.pos_id}
                     >
-                      {pos.senses.map((sense, senseIndex) => {
-                        const senseIssues = issues.filter(
-                          (issue) => issue.node_id === sense.id
-                        );
-                        const subPosIssue = fieldIssue(
-                          senseIssues,
-                          sense.id,
-                          "sub_pos"
-                        );
-                        const frequencyIssue = fieldIssue(
-                          senseIssues,
-                          sense.id,
-                          "frequency"
-                        );
-                        const catalogPos = catalogByCode.get(
-                          formPosById.get(pos.pos_id) ?? ""
-                        );
-                        const configuredSubParts = catalogPos?.sub_parts ?? [];
-                        const selectedSubPos = configuredSubParts.find(
-                          (item) => item.code === sense.sub_pos
-                        );
-                        const visibleSubPos = selectedSubPos?.name_zh;
-                        // 后端标记为不可扩展的基本词性不允许挂细分词性；目录里没有该词性时
-                        // 保留原有可选行为，避免目录加载失败把字段整体藏掉。
-                        const subPosExtensible =
-                          catalogPos?.sub_parts_extensible ?? true;
-                        const definitionsCollapsed = Boolean(
-                          collapsedSenseSections[`${sense.id}:definitions`]
-                        );
-                        const sentencesCollapsed = Boolean(
-                          collapsedSenseSections[`${sense.id}:sentences`]
-                        );
-                        const relationsCollapsed = Boolean(
-                          collapsedSenseSections[`${sense.id}:relations`]
-                        );
-                        // 后端未声明能力时区块整体不可编辑，默认折叠：每条释义都摊开
-                        // 一条同样的只读提示加一排点不动的按钮，只会把多维例句挤下去。
-                        const componentUsagesCollapsed =
-                          collapsedSenseSections[
-                            `${sense.id}:component_usages`
-                          ] ?? !componentUsagesEnabled;
-                        const senseComponentUsages =
-                          sense.component_usages ?? [];
-                        const componentSpelling = baseSpellingForPos(
-                          forms,
-                          pos.pos_id
-                        );
-                        return (
-                          <SenseEditorShell
-                            index={senseIndex}
-                            key={sense.id}
-                            length={pos.senses.length}
-                            level={sense.level}
-                            nodeId={sense.id}
-                            onDelete={() =>
-                              change((draft) => {
-                                draft.pos[posIndex]!.senses.splice(
-                                  senseIndex,
-                                  1
-                                );
-                              })
-                            }
-                            onMove={(nextIndex) =>
-                              change((draft) =>
-                                moveItem(
-                                  draft.pos[posIndex]!.senses,
-                                  senseIndex,
-                                  nextIndex
-                                )
-                              )
-                            }
-                            subPosLabel={
-                              visibleSubPos
-                                ? [selectedSubPos?.abbreviation, visibleSubPos]
-                                    .filter(Boolean)
-                                    .join(" ")
-                                : undefined
-                            }
-                            summary={definitionSummary(sense)}
-                          >
-                            <Flex vertical gap="small">
-                              <div className="word-sense-meta-grid">
-                                <label className="word-sense-field">
-                                  <Typography.Text type="secondary">
-                                    词义等级
-                                  </Typography.Text>
-                                  <Select
-                                    aria-label={`释义 ${senseIndex + 1} 等级`}
-                                    data-v3-field="level"
-                                    data-v3-node-id={sense.id}
-                                    onChange={(level: string) =>
-                                      change((draft) => {
-                                        draft.pos[posIndex]!.senses[
-                                          senseIndex
-                                        ]!.level = level;
-                                      })
-                                    }
-                                    options={CEFR_OPTIONS}
-                                    style={{ width: "100%" }}
-                                    value={sense.level}
-                                  />
-                                </label>
-                                <label className="word-sense-field word-sense-field-group">
-                                  <Typography.Text type="secondary">
-                                    语义区间
-                                  </Typography.Text>
-                                  <Select
-                                    aria-label={`释义 ${senseIndex + 1} 所属语义区间`}
-                                    data-v3-field="sense_group_id"
-                                    data-v3-node-id={sense.id}
-                                    onChange={(nextValue: string) =>
-                                      change((draft) => {
-                                        const target =
-                                          draft.pos[posIndex]!.senses[
-                                            senseIndex
-                                          ]!;
-                                        if (!nextValue)
-                                          delete target.sense_group_id;
-                                        else target.sense_group_id = nextValue;
-                                      })
-                                    }
-                                    options={[
-                                      { label: "不归入语义区间", value: "" },
-                                      ...senseGroupOptions
-                                    ]}
-                                    labelRender={({ value: selectedId }) =>
-                                      selectedId === ""
-                                        ? "不归入语义区间"
-                                        : (senseGroupOptions.find(
-                                            (option) =>
-                                              option.value === selectedId
-                                          )?.label ?? "未命名语义区间")
-                                    }
-                                    placeholder="选择语义区间"
-                                    value={sense.sense_group_id}
-                                  />
-                                </label>
-                                {(subPosExtensible ||
-                                  Boolean(sense.sub_pos) ||
-                                  Boolean(subPosIssue)) && (
-                                  <label className="word-sense-field word-sense-field-pos">
-                                    <Typography.Text type="secondary">
-                                      细分词性
-                                    </Typography.Text>
-                                    {subPosExtensible ? (
+                      <SortableRows
+                        items={pos.senses}
+                        scopeId={pos.pos_id}
+                        dragType="application/x-tsz-v3-sense"
+                        onChange={(next) =>
+                          change((draft) => {
+                            draft.pos[posIndex]!.senses = next;
+                          })
+                        }
+                      >
+                        {(senseSorting) =>
+                          pos.senses.map((sense, senseIndex) => {
+                            const senseIssues = issues.filter(
+                              (issue) => issue.node_id === sense.id
+                            );
+                            const subPosIssue = fieldIssue(
+                              senseIssues,
+                              sense.id,
+                              "sub_pos"
+                            );
+                            const frequencyIssue = fieldIssue(
+                              senseIssues,
+                              sense.id,
+                              "frequency"
+                            );
+                            const catalogPos = catalogByCode.get(
+                              formPosById.get(pos.pos_id) ?? ""
+                            );
+                            const configuredSubParts =
+                              catalogPos?.sub_parts ?? [];
+                            const selectedSubPos = configuredSubParts.find(
+                              (item) => item.code === sense.sub_pos
+                            );
+                            const visibleSubPos = selectedSubPos?.name_zh;
+                            // 后端标记为不可扩展的基本词性不允许挂细分词性；目录里没有该词性时
+                            // 保留原有可选行为，避免目录加载失败把字段整体藏掉。
+                            const subPosExtensible =
+                              catalogPos?.sub_parts_extensible ?? true;
+                            const definitionsCollapsed = Boolean(
+                              collapsedSenseSections[`${sense.id}:definitions`]
+                            );
+                            const sentencesCollapsed = Boolean(
+                              collapsedSenseSections[`${sense.id}:sentences`]
+                            );
+                            const relationsCollapsed = Boolean(
+                              collapsedSenseSections[`${sense.id}:relations`]
+                            );
+                            // 后端未声明能力时区块整体不可编辑，默认折叠：每条释义都摊开
+                            // 一条同样的只读提示加一排点不动的按钮，只会把多维例句挤下去。
+                            const componentUsagesCollapsed =
+                              collapsedSenseSections[
+                                `${sense.id}:component_usages`
+                              ] ?? !componentUsagesEnabled;
+                            const senseComponentUsages =
+                              sense.component_usages ?? [];
+                            const componentSpelling = baseSpellingForPos(
+                              forms,
+                              pos.pos_id
+                            );
+                            return (
+                              <SenseEditorShell
+                                index={senseIndex}
+                                key={sense.id}
+                                sorting={senseSorting}
+                                expanded={
+                                  (expandedSenseByPos[pos.pos_id] === undefined
+                                    ? pos.senses[0]?.id
+                                    : expandedSenseByPos[pos.pos_id]) ===
+                                  sense.id
+                                }
+                                onExpandedChange={(expanded) =>
+                                  setExpandedSenseByPos((current) => ({
+                                    ...current,
+                                    [pos.pos_id]: expanded ? sense.id : null
+                                  }))
+                                }
+                                level={sense.level}
+                                nodeId={sense.id}
+                                onDelete={() =>
+                                  change((draft) => {
+                                    draft.pos[posIndex]!.senses.splice(
+                                      senseIndex,
+                                      1
+                                    );
+                                  })
+                                }
+                                subPosLabel={
+                                  visibleSubPos
+                                    ? [
+                                        selectedSubPos?.abbreviation,
+                                        visibleSubPos
+                                      ]
+                                        .filter(Boolean)
+                                        .join(" ")
+                                    : undefined
+                                }
+                                summary={definitionSummary(sense)}
+                              >
+                                <Flex vertical gap="small">
+                                  <div className="word-sense-meta-grid">
+                                    <label className="word-sense-field">
+                                      <Typography.Text type="secondary">
+                                        词义等级
+                                      </Typography.Text>
                                       <Select
-                                        aria-label={`释义 ${senseIndex + 1} 子词性`}
-                                        data-v3-field="sub_pos"
+                                        aria-label={`释义 ${senseIndex + 1} 等级`}
+                                        data-v3-field="level"
                                         data-v3-node-id={sense.id}
-                                        onChange={(subPos) =>
+                                        onChange={(level: string) =>
                                           change((draft) => {
                                             draft.pos[posIndex]!.senses[
                                               senseIndex
-                                            ]!.sub_pos = subPos;
+                                            ]!.level = level;
                                           })
                                         }
-                                        options={(() => {
-                                          const code = formPosById.get(
-                                            pos.pos_id
-                                          );
-                                          const configured = code
-                                            ? (catalogByCode.get(code)
-                                                ?.sub_parts ?? [])
-                                            : [];
-                                          const known = configured.some(
-                                            (item) =>
-                                              item.code === sense.sub_pos
-                                          );
-                                          return [
-                                            {
-                                              label: "不指定子词性",
-                                              value: ""
-                                            },
-                                            ...(!sense.sub_pos || known
-                                              ? []
-                                              : [
-                                                  {
-                                                    label: "未配置子词性",
-                                                    value: sense.sub_pos
-                                                  }
-                                                ]),
-                                            ...configured.map((item) => ({
-                                              label: item.name_zh,
-                                              value: item.code
-                                            }))
-                                          ];
-                                        })()}
-                                        status={
-                                          subPosIssue ? "error" : undefined
-                                        }
-                                        value={sense.sub_pos}
+                                        options={CEFR_OPTIONS}
+                                        style={{ width: "100%" }}
+                                        value={sense.level}
                                       />
-                                    ) : (
-                                      <Typography.Text
-                                        data-v3-field="sub_pos"
-                                        data-v3-node-id={sense.id}
-                                      >
-                                        {visibleSubPos ?? sense.sub_pos}
+                                    </label>
+                                    <label className="word-sense-field word-sense-field-group">
+                                      <Typography.Text type="secondary">
+                                        语义区间
                                       </Typography.Text>
+                                      <Select
+                                        aria-label={`释义 ${senseIndex + 1} 所属语义区间`}
+                                        data-v3-field="sense_group_id"
+                                        data-v3-node-id={sense.id}
+                                        onChange={(nextValue: string) =>
+                                          change((draft) => {
+                                            const target =
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!;
+                                            if (!nextValue)
+                                              delete target.sense_group_id;
+                                            else
+                                              target.sense_group_id = nextValue;
+                                          })
+                                        }
+                                        options={[
+                                          {
+                                            label: "不归入语义区间",
+                                            value: ""
+                                          },
+                                          ...senseGroupOptions
+                                        ]}
+                                        labelRender={({ value: selectedId }) =>
+                                          selectedId === ""
+                                            ? "不归入语义区间"
+                                            : (senseGroupOptions.find(
+                                                (option) =>
+                                                  option.value === selectedId
+                                              )?.label ?? "未命名语义区间")
+                                        }
+                                        placeholder="选择语义区间"
+                                        value={sense.sense_group_id}
+                                      />
+                                    </label>
+                                    {(subPosExtensible ||
+                                      Boolean(sense.sub_pos) ||
+                                      Boolean(subPosIssue)) && (
+                                      <label className="word-sense-field word-sense-field-pos">
+                                        <Typography.Text type="secondary">
+                                          细分词性
+                                        </Typography.Text>
+                                        {subPosExtensible ? (
+                                          <Select
+                                            aria-label={`释义 ${senseIndex + 1} 子词性`}
+                                            data-v3-field="sub_pos"
+                                            data-v3-node-id={sense.id}
+                                            onChange={(subPos) =>
+                                              change((draft) => {
+                                                draft.pos[posIndex]!.senses[
+                                                  senseIndex
+                                                ]!.sub_pos = subPos;
+                                              })
+                                            }
+                                            options={(() => {
+                                              const code = formPosById.get(
+                                                pos.pos_id
+                                              );
+                                              const configured = code
+                                                ? (catalogByCode.get(code)
+                                                    ?.sub_parts ?? [])
+                                                : [];
+                                              const known = configured.some(
+                                                (item) =>
+                                                  item.code === sense.sub_pos
+                                              );
+                                              return [
+                                                {
+                                                  label: "不指定子词性",
+                                                  value: ""
+                                                },
+                                                ...(!sense.sub_pos || known
+                                                  ? []
+                                                  : [
+                                                      {
+                                                        label: "未配置子词性",
+                                                        value: sense.sub_pos
+                                                      }
+                                                    ]),
+                                                ...configured.map((item) => ({
+                                                  label: item.name_zh,
+                                                  value: item.code
+                                                }))
+                                              ];
+                                            })()}
+                                            status={
+                                              subPosIssue ? "error" : undefined
+                                            }
+                                            value={sense.sub_pos}
+                                          />
+                                        ) : (
+                                          <Typography.Text
+                                            data-v3-field="sub_pos"
+                                            data-v3-node-id={sense.id}
+                                          >
+                                            {visibleSubPos ?? sense.sub_pos}
+                                          </Typography.Text>
+                                        )}
+                                        <FieldIssueHelp issue={subPosIssue} />
+                                      </label>
                                     )}
-                                    <FieldIssueHelp issue={subPosIssue} />
-                                  </label>
-                                )}
-                                <label className="word-sense-field word-sense-field-frequency">
-                                  <Typography.Text type="secondary">
-                                    词频
-                                  </Typography.Text>
-                                  <InputNumber
-                                    aria-label={`释义 ${senseIndex + 1} 频率`}
-                                    data-v3-field="frequency"
-                                    data-v3-node-id={sense.id}
-                                    max={100}
-                                    min={0}
-                                    onChange={(nextValue) =>
-                                      change((draft) => {
-                                        const target =
-                                          draft.pos[posIndex]!.senses[
-                                            senseIndex
-                                          ]!;
-                                        if (nextValue === null)
-                                          delete target.frequency;
-                                        else
-                                          target.frequency = String(nextValue);
-                                      })
-                                    }
-                                    precision={2}
-                                    step={0.01}
-                                    suffix="%"
-                                    status={
-                                      frequencyIssue ? "error" : undefined
-                                    }
-                                    value={
-                                      sense.frequency === undefined
-                                        ? null
-                                        : Number(sense.frequency)
-                                    }
-                                  />
-                                  <FieldIssueHelp issue={frequencyIssue} />
-                                </label>
-                                <div className="word-sense-context-toggle">
-                                  <Typography.Text type="secondary">
-                                    是否依赖语境
-                                  </Typography.Text>
-                                  <div
-                                    className="word-sense-context-control"
-                                    onKeyDown={(event) => {
-                                      if (
-                                        event.key !== "Enter" &&
-                                        event.key !== " "
-                                      ) {
-                                        return;
-                                      }
-                                      event.preventDefault();
-                                      change((draft) => {
-                                        const target =
-                                          draft.pos[posIndex]!.senses[
-                                            senseIndex
-                                          ]!;
-                                        target.depends_on_context =
-                                          !target.depends_on_context;
-                                      });
-                                    }}
-                                  >
-                                    <Switch
-                                      aria-label={`释义 ${senseIndex + 1} 是否依赖语境`}
-                                      checked={sense.depends_on_context}
-                                      onChange={(checked) =>
-                                        change((draft) => {
-                                          draft.pos[posIndex]!.senses[
-                                            senseIndex
-                                          ]!.depends_on_context = checked;
-                                        })
-                                      }
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-
-                              <section
-                                className={`word-sense-section${definitionsCollapsed ? " is-collapsed" : ""}`}
-                                data-v3-field="definitions"
-                                data-v3-node-id={sense.id}
-                              >
-                                <SenseSectionTitle
-                                  collapsed={definitionsCollapsed}
-                                  count={sense.definitions.length}
-                                  label="多维释义"
-                                  onToggle={() =>
-                                    toggleSenseSection(
-                                      sense.id,
-                                      "definitions",
-                                      definitionsCollapsed
-                                    )
-                                  }
-                                  unit="条"
-                                />
-                                <SenseSectionBody
-                                  collapsed={definitionsCollapsed}
-                                >
-                                  <>
-                                    {sense.definitions.length > 0 ? (
-                                      <div className="word-list-header word-definition-list-header">
-                                        <span aria-hidden="true" />
-                                        <span>等级</span>
-                                        <span>释义语言及方式</span>
-                                        <span>释义语句</span>
-                                        <span>语法结构</span>
-                                        <span aria-hidden="true" />
+                                    <label className="word-sense-field word-sense-field-frequency">
+                                      <Typography.Text type="secondary">
+                                        词频
+                                      </Typography.Text>
+                                      <InputNumber
+                                        aria-label={`释义 ${senseIndex + 1} 频率`}
+                                        data-v3-field="frequency"
+                                        data-v3-node-id={sense.id}
+                                        placeholder="0–100"
+                                        max={100}
+                                        min={0}
+                                        onChange={(nextValue) =>
+                                          change((draft) => {
+                                            const target =
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!;
+                                            if (nextValue === null)
+                                              delete target.frequency;
+                                            else
+                                              target.frequency =
+                                                String(nextValue);
+                                          })
+                                        }
+                                        precision={2}
+                                        step={0.01}
+                                        suffix="%"
+                                        status={
+                                          frequencyIssue ? "error" : undefined
+                                        }
+                                        value={
+                                          sense.frequency === undefined
+                                            ? null
+                                            : Number(sense.frequency)
+                                        }
+                                      />
+                                      <FieldIssueHelp issue={frequencyIssue} />
+                                    </label>
+                                    <div className="word-sense-context-toggle">
+                                      <Typography.Text type="secondary">
+                                        是否依赖语境
+                                      </Typography.Text>
+                                      <div
+                                        className="word-sense-context-control"
+                                        onKeyDown={(event) => {
+                                          if (
+                                            event.key !== "Enter" &&
+                                            event.key !== " "
+                                          ) {
+                                            return;
+                                          }
+                                          event.preventDefault();
+                                          change((draft) => {
+                                            const target =
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!;
+                                            target.depends_on_context =
+                                              !target.depends_on_context;
+                                          });
+                                        }}
+                                      >
+                                        <Switch
+                                          aria-label={`释义 ${senseIndex + 1} 是否依赖语境`}
+                                          checked={sense.depends_on_context}
+                                          onChange={(checked) =>
+                                            change((draft) => {
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!.depends_on_context = checked;
+                                            })
+                                          }
+                                        />
                                       </div>
-                                    ) : null}
-                                    <SortableRows
-                                      dragType={DEFINITION_DRAG_TYPE}
-                                      items={sense.definitions}
-                                      onChange={(next) =>
-                                        change((draft) => {
-                                          draft.pos[posIndex]!.senses[
-                                            senseIndex
-                                          ]!.definitions = next;
-                                        })
+                                    </div>
+                                  </div>
+
+                                  <section
+                                    className={`word-sense-section${definitionsCollapsed ? " is-collapsed" : ""}`}
+                                    data-v3-field="definitions"
+                                    data-v3-node-id={sense.id}
+                                  >
+                                    <SenseSectionTitle
+                                      collapsed={definitionsCollapsed}
+                                      count={sense.definitions.length}
+                                      label="多维释义"
+                                      onToggle={() =>
+                                        toggleSenseSection(
+                                          sense.id,
+                                          "definitions",
+                                          definitionsCollapsed
+                                        )
                                       }
-                                      scopeId={sense.id}
+                                      unit="条"
+                                    />
+                                    <SenseSectionBody
+                                      collapsed={definitionsCollapsed}
                                     >
-                                      {(definitionSorting) =>
-                                        sense.definitions.map(
-                                          (definition, definitionIndex) => (
-                                            <div
-                                              className={sortableRowClass(
-                                                "word-table-row word-definition-row",
-                                                definitionSorting,
-                                                definitionIndex
-                                              )}
-                                              data-v3-node-id={definition.id}
-                                              key={definition.id}
-                                              onDragLeave={
-                                                definitionSorting.handleDragLeave
-                                              }
-                                              onDragOver={(event) =>
-                                                definitionSorting.handleDragOver(
-                                                  event,
-                                                  definitionIndex
-                                                )
-                                              }
-                                              onDrop={(event) =>
-                                                definitionSorting.handleDrop(
-                                                  event,
-                                                  definitionIndex
-                                                )
-                                              }
-                                            >
-                                              <span className="word-number-cell">
-                                                {definitionIndex + 1}
-                                              </span>
-                                              <>
-                                                <Select
-                                                  aria-label={`定义 ${definitionIndex + 1} 等级`}
-                                                  data-v3-field="level"
+                                      <>
+                                        {sense.definitions.length > 0 ? (
+                                          <div className="word-list-header word-definition-list-header">
+                                            <span aria-hidden="true" />
+                                            <span>等级</span>
+                                            <span>释义语言及方式</span>
+                                            <span>释义语句</span>
+                                            <span>语法结构</span>
+                                            <span aria-hidden="true" />
+                                          </div>
+                                        ) : null}
+                                        <SortableRows
+                                          dragType={DEFINITION_DRAG_TYPE}
+                                          items={sense.definitions}
+                                          onChange={(next) =>
+                                            change((draft) => {
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!.definitions = next;
+                                            })
+                                          }
+                                          scopeId={sense.id}
+                                        >
+                                          {(definitionSorting) =>
+                                            sense.definitions.map(
+                                              (definition, definitionIndex) => (
+                                                <div
+                                                  className={sortableRowClass(
+                                                    "word-table-row word-definition-row",
+                                                    definitionSorting,
+                                                    definitionIndex
+                                                  )}
                                                   data-v3-node-id={
                                                     definition.id
                                                   }
-                                                  onChange={(level: string) =>
-                                                    change((draft) => {
-                                                      draft.pos[
-                                                        posIndex
-                                                      ]!.senses[
-                                                        senseIndex
-                                                      ]!.definitions[
-                                                        definitionIndex
-                                                      ]!.level = level;
-                                                    })
+                                                  key={definition.id}
+                                                  onDragLeave={
+                                                    definitionSorting.handleDragLeave
                                                   }
-                                                  options={CEFR_OPTIONS}
-                                                  value={definition.level}
-                                                />
-                                                <Select
-                                                  aria-label={`定义 ${definitionIndex + 1} 方式`}
-                                                  data-v3-field="definition_mode"
-                                                  data-v3-node-id={
-                                                    definition.id
+                                                  onDragOver={(event) =>
+                                                    definitionSorting.handleDragOver(
+                                                      event,
+                                                      definitionIndex
+                                                    )
                                                   }
-                                                  onChange={(
-                                                    definitionMode: DefinitionModeV3
-                                                  ) => {
-                                                    const apply = () => {
-                                                      change((draft) => {
-                                                        const current =
-                                                          draft.pos[posIndex]!
-                                                            .senses[senseIndex]!
-                                                            .definitions[
+                                                  onDrop={(event) =>
+                                                    definitionSorting.handleDrop(
+                                                      event,
+                                                      definitionIndex
+                                                    )
+                                                  }
+                                                >
+                                                  <span className="word-number-cell">
+                                                    {definitionIndex + 1}
+                                                  </span>
+                                                  <>
+                                                    <Select
+                                                      aria-label={`定义 ${definitionIndex + 1} 等级`}
+                                                      data-v3-field="level"
+                                                      data-v3-node-id={
+                                                        definition.id
+                                                      }
+                                                      onChange={(
+                                                        level: string
+                                                      ) =>
+                                                        change((draft) => {
+                                                          draft.pos[
+                                                            posIndex
+                                                          ]!.senses[
+                                                            senseIndex
+                                                          ]!.definitions[
                                                             definitionIndex
-                                                          ]!;
-                                                        draft.pos[
-                                                          posIndex
-                                                        ]!.senses[
-                                                          senseIndex
-                                                        ]!.definitions[
-                                                          definitionIndex
-                                                        ] = withDefinitionMode(
-                                                          current,
-                                                          definitionMode,
-                                                          idFactory
-                                                        );
-                                                      });
-                                                    };
-                                                    const english =
-                                                      definition.definition_mode ===
-                                                        "en_definition" ||
-                                                      definition.definition_mode ===
-                                                        "en_sentence"
-                                                        ? definition.content
-                                                        : undefined;
-                                                    const variants = english
-                                                      ? english.mode ===
-                                                        "unified"
-                                                        ? [english.common]
-                                                        : [
-                                                            english.uk,
-                                                            english.us
-                                                          ].flatMap((slot) =>
-                                                            slot.state ===
-                                                            "ready"
-                                                              ? [slot.variant]
-                                                              : []
-                                                          )
-                                                      : [];
-                                                    const removesEnglishSettings =
-                                                      (definitionMode ===
-                                                        "zh_definition" ||
-                                                        definitionMode ===
-                                                          "zh_sentence") &&
-                                                      variants.some(
-                                                        (variant) =>
-                                                          variant.text_links
-                                                            ?.length ||
-                                                          variant.voice_profile ||
-                                                          variant.audio_assets
-                                                            ?.length
-                                                      );
-                                                    if (removesEnglishSettings)
-                                                      modal.confirm({
-                                                        title: "切换为中文释义",
-                                                        content:
-                                                          "切换后将移除这条释义的英文关联和发音设置。",
-                                                        okText: "切换",
-                                                        cancelText: "取消",
-                                                        onOk: apply
-                                                      });
-                                                    else apply();
-                                                  }}
-                                                  options={
-                                                    DEFINITION_MODE_OPTIONS
-                                                  }
-                                                  value={
-                                                    definition.definition_mode
-                                                  }
-                                                />
-                                              </>
-                                              <div className="word-definition-content-cell">
-                                                {definition.definition_mode ===
-                                                  "zh_definition" ||
-                                                definition.definition_mode ===
-                                                  "zh_sentence" ? (
-                                                  <Input.TextArea
-                                                    aria-label={`定义 ${definitionIndex + 1} 内容`}
-                                                    autoSize={{
-                                                      maxRows: 6,
-                                                      minRows: 1
-                                                    }}
-                                                    data-v3-field="content"
-                                                    data-v3-node-id={
-                                                      definition.id
-                                                    }
-                                                    onChange={(event) =>
-                                                      change((draft) => {
-                                                        const target =
-                                                          draft.pos[posIndex]!
-                                                            .senses[senseIndex]!
-                                                            .definitions[
-                                                            definitionIndex
-                                                          ]!;
-                                                        if (
-                                                          target.definition_mode ===
+                                                          ]!.level = level;
+                                                        })
+                                                      }
+                                                      options={CEFR_OPTIONS}
+                                                      value={definition.level}
+                                                    />
+                                                    <Select
+                                                      aria-label={`定义 ${definitionIndex + 1} 方式`}
+                                                      data-v3-field="definition_mode"
+                                                      data-v3-node-id={
+                                                        definition.id
+                                                      }
+                                                      onChange={(
+                                                        definitionMode: DefinitionModeV3
+                                                      ) => {
+                                                        const apply = () => {
+                                                          change((draft) => {
+                                                            const current =
+                                                              draft.pos[
+                                                                posIndex
+                                                              ]!.senses[
+                                                                senseIndex
+                                                              ]!.definitions[
+                                                                definitionIndex
+                                                              ]!;
+                                                            draft.pos[
+                                                              posIndex
+                                                            ]!.senses[
+                                                              senseIndex
+                                                            ]!.definitions[
+                                                              definitionIndex
+                                                            ] =
+                                                              withDefinitionMode(
+                                                                current,
+                                                                definitionMode,
+                                                                idFactory
+                                                              );
+                                                          });
+                                                        };
+                                                        const english =
+                                                          definition.definition_mode ===
+                                                            "en_definition" ||
+                                                          definition.definition_mode ===
+                                                            "en_sentence"
+                                                            ? definition.content
+                                                            : undefined;
+                                                        const variants = english
+                                                          ? english.mode ===
+                                                            "unified"
+                                                            ? [english.common]
+                                                            : [
+                                                                english.uk,
+                                                                english.us
+                                                              ].flatMap(
+                                                                (slot) =>
+                                                                  slot.state ===
+                                                                  "ready"
+                                                                    ? [
+                                                                        slot.variant
+                                                                      ]
+                                                                    : []
+                                                              )
+                                                          : [];
+                                                        const removesEnglishSettings =
+                                                          (definitionMode ===
                                                             "zh_definition" ||
-                                                          target.definition_mode ===
-                                                            "zh_sentence"
-                                                        ) {
-                                                          target.content =
-                                                            replaceRichText(
-                                                              target.content,
-                                                              event.target.value
-                                                            );
+                                                            definitionMode ===
+                                                              "zh_sentence") &&
+                                                          variants.some(
+                                                            (variant) =>
+                                                              variant.text_links
+                                                                ?.length ||
+                                                              variant.voice_profile ||
+                                                              variant
+                                                                .audio_assets
+                                                                ?.length
+                                                          );
+                                                        if (
+                                                          removesEnglishSettings
+                                                        )
+                                                          modal.confirm({
+                                                            title:
+                                                              "切换为中文释义",
+                                                            content:
+                                                              "切换后将移除这条释义的英文关联和发音设置。",
+                                                            okText: "切换",
+                                                            cancelText: "取消",
+                                                            onOk: apply
+                                                          });
+                                                        else apply();
+                                                      }}
+                                                      options={
+                                                        DEFINITION_MODE_OPTIONS
+                                                      }
+                                                      value={
+                                                        definition.definition_mode
+                                                      }
+                                                    />
+                                                  </>
+                                                  <div className="word-definition-content-cell">
+                                                    {definition.definition_mode ===
+                                                      "zh_definition" ||
+                                                    definition.definition_mode ===
+                                                      "zh_sentence" ? (
+                                                      <Input.TextArea
+                                                        aria-label={`定义 ${definitionIndex + 1} 内容`}
+                                                        placeholder={
+                                                          definition.definition_mode ===
+                                                          "zh_sentence"
+                                                            ? "请输入中文释义句"
+                                                            : "请输入中文释义"
                                                         }
-                                                      })
-                                                    }
-                                                    status={
-                                                      fieldIssue(
+                                                        autoSize={{
+                                                          maxRows: 6,
+                                                          minRows: 1
+                                                        }}
+                                                        data-v3-field="content"
+                                                        data-v3-node-id={
+                                                          definition.id
+                                                        }
+                                                        onChange={(event) =>
+                                                          change((draft) => {
+                                                            const target =
+                                                              draft.pos[
+                                                                posIndex
+                                                              ]!.senses[
+                                                                senseIndex
+                                                              ]!.definitions[
+                                                                definitionIndex
+                                                              ]!;
+                                                            if (
+                                                              target.definition_mode ===
+                                                                "zh_definition" ||
+                                                              target.definition_mode ===
+                                                                "zh_sentence"
+                                                            ) {
+                                                              target.content =
+                                                                replaceRichText(
+                                                                  target.content,
+                                                                  event.target
+                                                                    .value
+                                                                );
+                                                            }
+                                                          })
+                                                        }
+                                                        status={
+                                                          fieldIssue(
+                                                            issues,
+                                                            definition.id,
+                                                            "content"
+                                                          )
+                                                            ? "error"
+                                                            : undefined
+                                                        }
+                                                        value={
+                                                          definition.content
+                                                            .text
+                                                        }
+                                                      />
+                                                    ) : (
+                                                      <V3LinkedEnglishTextField
+                                                        value={
+                                                          definition.content as EnglishTextV3
+                                                        }
+                                                        label={`定义 ${definitionIndex + 1}`}
+                                                        suffix="内容"
+                                                        placeholder={
+                                                          definition.definition_mode ===
+                                                          "en_sentence"
+                                                            ? "请输入英文释义句"
+                                                            : "请输入英文释义"
+                                                        }
+                                                        wordId={wordId}
+                                                        linksEnabled={
+                                                          textLinksEnabled
+                                                        }
+                                                        readOnly={saving}
+                                                        onChange={(content) =>
+                                                          change((draft) => {
+                                                            const target =
+                                                              draft.pos[
+                                                                posIndex
+                                                              ]!.senses[
+                                                                senseIndex
+                                                              ]!.definitions[
+                                                                definitionIndex
+                                                              ]!;
+                                                            if (
+                                                              target.definition_mode ===
+                                                                "en_definition" ||
+                                                              target.definition_mode ===
+                                                                "en_sentence"
+                                                            )
+                                                              target.content =
+                                                                content;
+                                                          })
+                                                        }
+                                                      />
+                                                    )}
+                                                    <FieldIssueHelp
+                                                      issue={definitionContentIssue(
+                                                        issues,
+                                                        definition
+                                                      )}
+                                                    />
+                                                  </div>
+                                                  <div className="word-field-with-help">
+                                                    <Select
+                                                      aria-required="true"
+                                                      aria-label={`定义 ${definitionIndex + 1} 语法结构`}
+                                                      data-v3-field="grammar_structure_id"
+                                                      data-v3-node-id={
+                                                        definition.id
+                                                      }
+                                                      onChange={(
+                                                        nextValue: string
+                                                      ) =>
+                                                        change((draft) => {
+                                                          const target =
+                                                            draft.pos[posIndex]!
+                                                              .senses[
+                                                              senseIndex
+                                                            ]!.definitions[
+                                                              definitionIndex
+                                                            ]!;
+                                                          target.grammar_structure_id =
+                                                            nextValue;
+                                                        })
+                                                      }
+                                                      options={[
+                                                        ...(definition.grammar_structure_id &&
+                                                        !pos.grammar_structures.some(
+                                                          (item) =>
+                                                            item.id ===
+                                                            definition.grammar_structure_id
+                                                        )
+                                                          ? [
+                                                              {
+                                                                label:
+                                                                  "未找到的语法结构",
+                                                                value:
+                                                                  definition.grammar_structure_id
+                                                              }
+                                                            ]
+                                                          : []),
+                                                        ...grammarStructureOptions(
+                                                          pos.grammar_structures,
+                                                          definition.grammar_structure_id
+                                                        )
+                                                      ]}
+                                                      notFoundContent="请先在上方填写语法结构"
+                                                      placeholder="请选择语法结构"
+                                                      status={
+                                                        fieldIssue(
+                                                          issues,
+                                                          definition.id,
+                                                          "grammar_structure_id"
+                                                        )
+                                                          ? "error"
+                                                          : undefined
+                                                      }
+                                                      value={
+                                                        definition.grammar_structure_id
+                                                      }
+                                                    />
+                                                    <FieldIssueHelp
+                                                      issue={fieldIssue(
                                                         issues,
                                                         definition.id,
-                                                        "content"
-                                                      )
-                                                        ? "error"
-                                                        : undefined
+                                                        "grammar_structure_id"
+                                                      )}
+                                                    />
+                                                  </div>
+                                                  <Space
+                                                    className="word-sort-actions"
+                                                    orientation="horizontal"
+                                                  >
+                                                    <SortableDragHandle
+                                                      dragImageSelector={
+                                                        SORTABLE_ROW_SELECTOR
+                                                      }
+                                                      index={definitionIndex}
+                                                      label={`拖动定义 ${definitionIndex + 1}`}
+                                                      singleItemTitle="至少需要两条释义"
+                                                      sorting={
+                                                        definitionSorting
+                                                      }
+                                                    />
+                                                    <Button
+                                                      aria-label={`删除定义 ${definitionIndex + 1}`}
+                                                      danger
+                                                      icon={<DeleteOutlined />}
+                                                      onClick={() =>
+                                                        change((draft) => {
+                                                          draft.pos[
+                                                            posIndex
+                                                          ]!.senses[
+                                                            senseIndex
+                                                          ]!.definitions.splice(
+                                                            definitionIndex,
+                                                            1
+                                                          );
+                                                        })
+                                                      }
+                                                      size="small"
+                                                      type="text"
+                                                    />
+                                                  </Space>
+                                                </div>
+                                              )
+                                            )
+                                          }
+                                        </SortableRows>
+                                        <Button
+                                          block
+                                          className="word-section-add-button"
+                                          icon={<PlusOutlined aria-hidden />}
+                                          onClick={() =>
+                                            change((draft) => {
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!.definitions.push(
+                                                newDefinition(idFactory)
+                                              );
+                                            })
+                                          }
+                                          type="dashed"
+                                        >
+                                          添加释义
+                                        </Button>
+                                      </>
+                                    </SenseSectionBody>
+                                  </section>
+
+                                  {entryKind === "phrase" ? (
+                                    <section
+                                      className={`word-sense-section${componentUsagesCollapsed ? " is-collapsed" : ""}`}
+                                      data-v3-field="component_usages"
+                                      data-v3-node-id={sense.id}
+                                    >
+                                      <SenseSectionTitle
+                                        collapsed={componentUsagesCollapsed}
+                                        count={reachableUsageCount(
+                                          componentSpelling,
+                                          senseComponentUsages
+                                        )}
+                                        label="成分用词"
+                                        onToggle={() =>
+                                          toggleSenseSection(
+                                            sense.id,
+                                            "component_usages",
+                                            componentUsagesCollapsed
+                                          )
+                                        }
+                                        unit="条"
+                                      />
+                                      <SenseSectionBody
+                                        collapsed={componentUsagesCollapsed}
+                                      >
+                                        <V3PhraseComponentUsagesCard
+                                          discoveryEnabled={
+                                            sentenceTargetDiscoveryEnabled
+                                          }
+                                          idFactory={idFactory}
+                                          onUsagesChange={(next) =>
+                                            change((draft) => {
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!.component_usages = next;
+                                            })
+                                          }
+                                          senseComponentUsagesEnabled={
+                                            componentUsagesEnabled
+                                          }
+                                          spelling={componentSpelling}
+                                          usages={senseComponentUsages}
+                                          wordId={wordId}
+                                        />
+                                      </SenseSectionBody>
+                                    </section>
+                                  ) : null}
+
+                                  <section
+                                    className={`word-sense-section${sentencesCollapsed ? " is-collapsed" : ""}`}
+                                  >
+                                    <SenseSectionTitle
+                                      collapsed={sentencesCollapsed}
+                                      count={sense.sentences.length}
+                                      label="多维例句"
+                                      onToggle={() =>
+                                        toggleSenseSection(
+                                          sense.id,
+                                          "sentences",
+                                          sentencesCollapsed
+                                        )
+                                      }
+                                      unit="条"
+                                    />
+                                    <SenseSectionBody
+                                      collapsed={sentencesCollapsed}
+                                    >
+                                      <>
+                                        {sense.sentences.length > 0 ? (
+                                          <div className="word-list-header word-sentence-list-header">
+                                            <span aria-hidden="true" />
+                                            <span>等级</span>
+                                            <span>英文例句</span>
+                                            <span aria-hidden="true" />
+                                          </div>
+                                        ) : (
+                                          <Empty
+                                            description="暂无多维例句"
+                                            image={Empty.PRESENTED_IMAGE_SIMPLE}
+                                          />
+                                        )}
+                                        <SortableRows
+                                          dragType={SENTENCE_DRAG_TYPE}
+                                          items={sense.sentences}
+                                          onChange={(next) =>
+                                            change((draft) => {
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!.sentences = next;
+                                            })
+                                          }
+                                          scopeId={sense.id}
+                                        >
+                                          {(sentenceSorting) =>
+                                            sense.sentences.map(
+                                              (sentence, sentenceIndex) => (
+                                                <div
+                                                  className={sortableRowClass(
+                                                    "word-table-row word-sentence-row",
+                                                    sentenceSorting,
+                                                    sentenceIndex
+                                                  )}
+                                                  data-v3-field="sentence"
+                                                  data-v3-node-id={sentence.id}
+                                                  key={sentence.id}
+                                                  onDragLeave={
+                                                    sentenceSorting.handleDragLeave
+                                                  }
+                                                  onDragOver={(event) =>
+                                                    sentenceSorting.handleDragOver(
+                                                      event,
+                                                      sentenceIndex
+                                                    )
+                                                  }
+                                                  onDrop={(event) =>
+                                                    sentenceSorting.handleDrop(
+                                                      event,
+                                                      sentenceIndex
+                                                    )
+                                                  }
+                                                  tabIndex={-1}
+                                                >
+                                                  <span className="word-number-cell">
+                                                    <span className="word-grammar-index">
+                                                      {sentenceIndex + 1}
+                                                    </span>
+                                                  </span>
+                                                  <Select
+                                                    aria-label={`例句 ${sentenceIndex + 1} 等级`}
+                                                    data-v3-field="level"
+                                                    data-v3-node-id={
+                                                      sentence.id
                                                     }
-                                                    value={
-                                                      definition.content.text
-                                                    }
-                                                  />
-                                                ) : (
-                                                  <V3LinkedEnglishTextField
-                                                    value={
-                                                      definition.content as EnglishTextV3
-                                                    }
-                                                    label={`定义 ${definitionIndex + 1}`}
-                                                    suffix="内容"
-                                                    wordId={wordId}
-                                                    linksEnabled={
-                                                      textLinksEnabled
-                                                    }
-                                                    readOnly={saving}
-                                                    onChange={(content) =>
+                                                    disabled={saving}
+                                                    onChange={(level) =>
                                                       change((draft) => {
-                                                        const target =
+                                                        const next =
                                                           draft.pos[posIndex]!
                                                             .senses[senseIndex]!
-                                                            .definitions[
-                                                            definitionIndex
+                                                            .sentences[
+                                                            sentenceIndex
                                                           ]!;
-                                                        if (
-                                                          target.definition_mode ===
-                                                            "en_definition" ||
-                                                          target.definition_mode ===
-                                                            "en_sentence"
-                                                        )
-                                                          target.content =
-                                                            content;
+                                                        next.level = level;
+                                                      })
+                                                    }
+                                                    options={CEFR_OPTIONS}
+                                                    value={sentence.level}
+                                                  />
+                                                  <Space
+                                                    className="word-sentence-english-fields"
+                                                    orientation="vertical"
+                                                    size={6}
+                                                    style={{ width: "100%" }}
+                                                  >
+                                                    <V3LinkedEnglishTextField
+                                                      value={sentence.en_text}
+                                                      label={`例句 ${sentenceIndex + 1}`}
+                                                      suffix="英文"
+                                                      placeholder="请输入完整的英文例句"
+                                                      wordId={wordId}
+                                                      linksEnabled={
+                                                        textLinksEnabled
+                                                      }
+                                                      readOnly={saving}
+                                                      onChange={(en_text) =>
+                                                        change((draft) => {
+                                                          draft.pos[
+                                                            posIndex
+                                                          ]!.senses[
+                                                            senseIndex
+                                                          ]!.sentences[
+                                                            sentenceIndex
+                                                          ]!.en_text = en_text;
+                                                        })
+                                                      }
+                                                    />
+                                                  </Space>
+                                                  <V3SentenceTranslationsField
+                                                    sentence={sentence}
+                                                    index={sentenceIndex}
+                                                    disabled={saving}
+                                                    onChange={(translations) =>
+                                                      change((draft) => {
+                                                        const next =
+                                                          draft.pos[posIndex]!
+                                                            .senses[senseIndex]!
+                                                            .sentences[
+                                                            sentenceIndex
+                                                          ]!;
+                                                        next.zh_translations =
+                                                          translations;
+                                                        const alias =
+                                                          translations.find(
+                                                            (item) =>
+                                                              item.id ===
+                                                              next.zh_text_id
+                                                          ) ?? translations[0]!;
+                                                        next.zh_text_id =
+                                                          alias.id;
+                                                        next.zh_text =
+                                                          alias.content;
                                                       })
                                                     }
                                                   />
-                                                )}
-                                                <FieldIssueHelp
-                                                  issue={definitionContentIssue(
-                                                    issues,
-                                                    definition
-                                                  )}
-                                                />
-                                              </div>
-                                              <div className="word-field-with-help">
-                                                <Select
-                                                  aria-required="true"
-                                                  aria-label={`定义 ${definitionIndex + 1} 语法结构`}
-                                                  data-v3-field="grammar_structure_id"
-                                                  data-v3-node-id={
-                                                    definition.id
-                                                  }
-                                                  onChange={(
-                                                    nextValue: string
-                                                  ) =>
-                                                    change((draft) => {
-                                                      const target =
-                                                        draft.pos[posIndex]!
-                                                          .senses[senseIndex]!
-                                                          .definitions[
-                                                          definitionIndex
-                                                        ]!;
-                                                      target.grammar_structure_id =
-                                                        nextValue;
-                                                    })
-                                                  }
-                                                  options={[
-                                                    ...(definition.grammar_structure_id &&
-                                                    !pos.grammar_structures.some(
-                                                      (item) =>
-                                                        item.id ===
-                                                        definition.grammar_structure_id
-                                                    )
-                                                      ? [
-                                                          {
-                                                            label:
-                                                              "未找到的语法结构",
-                                                            value:
-                                                              definition.grammar_structure_id
-                                                          }
-                                                        ]
-                                                      : []),
-                                                    ...grammarStructureOptions(
-                                                      pos.grammar_structures,
-                                                      definition.grammar_structure_id
-                                                    )
-                                                  ]}
-                                                  notFoundContent="请先在上方填写语法结构"
-                                                  placeholder="请选择语法结构"
-                                                  status={
-                                                    fieldIssue(
-                                                      issues,
-                                                      definition.id,
-                                                      "grammar_structure_id"
-                                                    )
-                                                      ? "error"
-                                                      : undefined
-                                                  }
-                                                  value={
-                                                    definition.grammar_structure_id
-                                                  }
-                                                />
-                                                <FieldIssueHelp
-                                                  issue={fieldIssue(
-                                                    issues,
-                                                    definition.id,
-                                                    "grammar_structure_id"
-                                                  )}
-                                                />
-                                              </div>
-                                              <Space
-                                                className="word-sort-actions"
-                                                orientation="horizontal"
-                                              >
-                                                <SortableDragHandle
-                                                  dragImageSelector={
-                                                    SORTABLE_ROW_SELECTOR
-                                                  }
-                                                  index={definitionIndex}
-                                                  label={`拖动定义 ${definitionIndex + 1}`}
-                                                  singleItemTitle="至少需要两条释义"
-                                                  sorting={definitionSorting}
-                                                />
-                                                <Button
-                                                  aria-label={`删除定义 ${definitionIndex + 1}`}
-                                                  danger
-                                                  icon={<DeleteOutlined />}
-                                                  onClick={() =>
-                                                    change((draft) => {
-                                                      draft.pos[
-                                                        posIndex
-                                                      ]!.senses[
-                                                        senseIndex
-                                                      ]!.definitions.splice(
-                                                        definitionIndex,
-                                                        1
-                                                      );
-                                                    })
-                                                  }
-                                                  size="small"
-                                                  type="text"
-                                                />
-                                              </Space>
-                                            </div>
-                                          )
-                                        )
-                                      }
-                                    </SortableRows>
-                                    <Button
-                                      block
-                                      className="word-section-add-button"
-                                      icon={<PlusOutlined aria-hidden />}
-                                      onClick={() =>
-                                        change((draft) => {
-                                          draft.pos[posIndex]!.senses[
-                                            senseIndex
-                                          ]!.definitions.push(
-                                            newDefinition(idFactory)
-                                          );
-                                        })
-                                      }
-                                      type="dashed"
-                                    >
-                                      添加释义
-                                    </Button>
-                                  </>
-                                </SenseSectionBody>
-                              </section>
-
-                              {entryKind === "phrase" ? (
-                                <section
-                                  className={`word-sense-section${componentUsagesCollapsed ? " is-collapsed" : ""}`}
-                                  data-v3-field="component_usages"
-                                  data-v3-node-id={sense.id}
-                                >
-                                  <SenseSectionTitle
-                                    collapsed={componentUsagesCollapsed}
-                                    count={reachableUsageCount(
-                                      componentSpelling,
-                                      senseComponentUsages
-                                    )}
-                                    label="成分用词"
-                                    onToggle={() =>
-                                      toggleSenseSection(
-                                        sense.id,
-                                        "component_usages",
-                                        componentUsagesCollapsed
-                                      )
-                                    }
-                                    unit="条"
-                                  />
-                                  <SenseSectionBody
-                                    collapsed={componentUsagesCollapsed}
-                                  >
-                                    <V3PhraseComponentUsagesCard
-                                      discoveryEnabled={
-                                        sentenceTargetDiscoveryEnabled
-                                      }
-                                      idFactory={idFactory}
-                                      onUsagesChange={(next) =>
-                                        change((draft) => {
-                                          draft.pos[posIndex]!.senses[
-                                            senseIndex
-                                          ]!.component_usages = next;
-                                        })
-                                      }
-                                      senseComponentUsagesEnabled={
-                                        componentUsagesEnabled
-                                      }
-                                      spelling={componentSpelling}
-                                      usages={senseComponentUsages}
-                                      wordId={wordId}
-                                    />
-                                  </SenseSectionBody>
-                                </section>
-                              ) : null}
-
-                              <section
-                                className={`word-sense-section${sentencesCollapsed ? " is-collapsed" : ""}`}
-                              >
-                                <SenseSectionTitle
-                                  collapsed={sentencesCollapsed}
-                                  count={sense.sentences.length}
-                                  label="多维例句"
-                                  onToggle={() =>
-                                    toggleSenseSection(
-                                      sense.id,
-                                      "sentences",
-                                      sentencesCollapsed
-                                    )
-                                  }
-                                  unit="条"
-                                />
-                                <SenseSectionBody
-                                  collapsed={sentencesCollapsed}
-                                >
-                                  <>
-                                    {sense.sentences.length > 0 ? (
-                                      <div className="word-list-header word-sentence-list-header">
-                                        <span aria-hidden="true" />
-                                        <span>等级</span>
-                                        <span>英文例句</span>
-                                        <span aria-hidden="true" />
-                                      </div>
-                                    ) : (
-                                      <Empty
-                                        description="暂无多维例句"
-                                        image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                      />
-                                    )}
-                                    <SortableRows
-                                      dragType={SENTENCE_DRAG_TYPE}
-                                      items={sense.sentences}
-                                      onChange={(next) =>
-                                        change((draft) => {
-                                          draft.pos[posIndex]!.senses[
-                                            senseIndex
-                                          ]!.sentences = next;
-                                        })
-                                      }
-                                      scopeId={sense.id}
-                                    >
-                                      {(sentenceSorting) =>
-                                        sense.sentences.map(
-                                          (sentence, sentenceIndex) => (
-                                            <div
-                                              className={sortableRowClass(
-                                                "word-table-row word-sentence-row",
-                                                sentenceSorting,
-                                                sentenceIndex
-                                              )}
-                                              data-v3-field="sentence"
-                                              data-v3-node-id={sentence.id}
-                                              key={sentence.id}
-                                              onDragLeave={
-                                                sentenceSorting.handleDragLeave
-                                              }
-                                              onDragOver={(event) =>
-                                                sentenceSorting.handleDragOver(
-                                                  event,
-                                                  sentenceIndex
-                                                )
-                                              }
-                                              onDrop={(event) =>
-                                                sentenceSorting.handleDrop(
-                                                  event,
-                                                  sentenceIndex
-                                                )
-                                              }
-                                              tabIndex={-1}
-                                            >
-                                              <span className="word-number-cell">
-                                                {sentenceIndex + 1}
-                                              </span>
-                                              <Select
-                                                aria-label={`例句 ${sentenceIndex + 1} 等级`}
-                                                data-v3-field="level"
-                                                data-v3-node-id={sentence.id}
-                                                disabled={saving}
-                                                onChange={(level) =>
-                                                  change((draft) => {
-                                                    const next =
-                                                      draft.pos[posIndex]!
-                                                        .senses[senseIndex]!
-                                                        .sentences[
-                                                        sentenceIndex
-                                                      ]!;
-                                                    next.level = level;
-                                                  })
-                                                }
-                                                options={CEFR_OPTIONS}
-                                                value={sentence.level}
-                                              />
-                                              <Space
-                                                className="word-sentence-english-fields"
-                                                orientation="vertical"
-                                                size={6}
-                                                style={{ width: "100%" }}
-                                              >
-                                                <V3LinkedEnglishTextField
-                                                  value={sentence.en_text}
-                                                  label={`例句 ${sentenceIndex + 1}`}
-                                                  suffix="英文"
-                                                  wordId={wordId}
-                                                  linksEnabled={
-                                                    textLinksEnabled
-                                                  }
-                                                  readOnly={saving}
-                                                  onChange={(en_text) =>
-                                                    change((draft) => {
-                                                      draft.pos[
-                                                        posIndex
-                                                      ]!.senses[
-                                                        senseIndex
-                                                      ]!.sentences[
-                                                        sentenceIndex
-                                                      ]!.en_text = en_text;
-                                                    })
-                                                  }
-                                                />
-                                              </Space>
-                                              <V3SentenceTranslationsField
-                                                sentence={sentence}
-                                                index={sentenceIndex}
-                                                disabled={saving}
-                                                onChange={(translations) =>
-                                                  change((draft) => {
-                                                    const next =
-                                                      draft.pos[posIndex]!
-                                                        .senses[senseIndex]!
-                                                        .sentences[
-                                                        sentenceIndex
-                                                      ]!;
-                                                    next.zh_translations =
-                                                      translations;
-                                                    const alias =
-                                                      translations.find(
-                                                        (item) =>
-                                                          item.id ===
-                                                          next.zh_text_id
-                                                      ) ?? translations[0]!;
-                                                    next.zh_text_id = alias.id;
-                                                    next.zh_text =
-                                                      alias.content;
-                                                  })
-                                                }
-                                              />
-                                              <Space
-                                                className="word-sort-actions"
-                                                orientation="horizontal"
-                                              >
-                                                <SortableDragHandle
-                                                  dragImageSelector={
-                                                    SORTABLE_ROW_SELECTOR
-                                                  }
-                                                  index={sentenceIndex}
-                                                  label={`拖动例句 ${sentenceIndex + 1}`}
-                                                  singleItemTitle="至少需要两条例句"
-                                                  sorting={sentenceSorting}
-                                                />
-                                                <Button
-                                                  aria-label={`删除例句 ${sentenceIndex + 1}`}
-                                                  danger
-                                                  icon={<DeleteOutlined />}
-                                                  onClick={() =>
-                                                    change((draft) => {
-                                                      draft.pos[
-                                                        posIndex
-                                                      ]!.senses[
-                                                        senseIndex
-                                                      ]!.sentences.splice(
-                                                        sentenceIndex,
-                                                        1
-                                                      );
-                                                    })
-                                                  }
-                                                  size="small"
-                                                  type="text"
-                                                />
-                                              </Space>
-                                            </div>
-                                          )
-                                        )
-                                      }
-                                    </SortableRows>
-                                    <Button
-                                      block
-                                      className="word-section-add-button"
-                                      disabled={!wordId || saving}
-                                      icon={<PlusOutlined aria-hidden />}
-                                      onClick={() => {
-                                        if (!wordId) return;
-                                        change((draft) => {
-                                          const zhText = {
-                                            version: 2 as const,
-                                            text: "",
-                                            annotations: []
-                                          };
-                                          const translationId = idFactory();
-                                          draft.pos[posIndex]!.senses[
-                                            senseIndex
-                                          ]!.sentences.push({
-                                            id: idFactory(),
-                                            level: "B1",
-                                            en_text: {
-                                              mode: "unified",
-                                              common: {
+                                                  <Space
+                                                    className="word-sort-actions"
+                                                    orientation="horizontal"
+                                                  >
+                                                    <SortableDragHandle
+                                                      dragImageSelector={
+                                                        SORTABLE_ROW_SELECTOR
+                                                      }
+                                                      index={sentenceIndex}
+                                                      label={`拖动例句 ${sentenceIndex + 1}`}
+                                                      singleItemTitle="至少需要两条例句"
+                                                      sorting={sentenceSorting}
+                                                    />
+                                                    <Button
+                                                      aria-label={`删除例句 ${sentenceIndex + 1}`}
+                                                      danger
+                                                      icon={<DeleteOutlined />}
+                                                      onClick={() =>
+                                                        change((draft) => {
+                                                          draft.pos[
+                                                            posIndex
+                                                          ]!.senses[
+                                                            senseIndex
+                                                          ]!.sentences.splice(
+                                                            sentenceIndex,
+                                                            1
+                                                          );
+                                                        })
+                                                      }
+                                                      size="small"
+                                                      type="text"
+                                                    />
+                                                  </Space>
+                                                </div>
+                                              )
+                                            )
+                                          }
+                                        </SortableRows>
+                                        <Button
+                                          block
+                                          className="word-section-add-button"
+                                          disabled={!wordId || saving}
+                                          icon={<PlusOutlined aria-hidden />}
+                                          onClick={() => {
+                                            if (!wordId) return;
+                                            change((draft) => {
+                                              const zhText = {
+                                                version: 2 as const,
+                                                text: "",
+                                                annotations: []
+                                              };
+                                              const translationId = idFactory();
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!.sentences.push({
                                                 id: idFactory(),
-                                                origin: "manual",
-                                                value: {
-                                                  version: 2,
-                                                  text: "",
-                                                  annotations: []
-                                                }
-                                              }
-                                            },
-                                            zh_text_id: translationId,
-                                            zh_text: zhText,
-                                            zh_translations: [
-                                              {
-                                                id: translationId,
-                                                band: sentenceTranslationBand(
-                                                  "B1"
-                                                ),
-                                                content: zhText
-                                              }
-                                            ],
-                                            links: [
-                                              {
-                                                word_id: wordId,
-                                                sense_id: sense.id,
-                                                role: "focus"
-                                              }
-                                            ]
-                                          });
-                                        });
-                                      }}
-                                      type="dashed"
-                                    >
-                                      添加例句
-                                    </Button>
-                                  </>
-                                </SenseSectionBody>
-                              </section>
+                                                level: "B1",
+                                                en_text: {
+                                                  mode: "unified",
+                                                  common: {
+                                                    id: idFactory(),
+                                                    origin: "manual",
+                                                    value: {
+                                                      version: 2,
+                                                      text: "",
+                                                      annotations: []
+                                                    }
+                                                  }
+                                                },
+                                                zh_text_id: translationId,
+                                                zh_text: zhText,
+                                                zh_translations: [
+                                                  {
+                                                    id: translationId,
+                                                    band: sentenceTranslationBand(
+                                                      "B1"
+                                                    ),
+                                                    content: zhText
+                                                  }
+                                                ],
+                                                links: [
+                                                  {
+                                                    word_id: wordId,
+                                                    sense_id: sense.id,
+                                                    role: "focus"
+                                                  }
+                                                ]
+                                              });
+                                            });
+                                          }}
+                                          type="dashed"
+                                        >
+                                          添加例句
+                                        </Button>
+                                      </>
+                                    </SenseSectionBody>
+                                  </section>
 
-                              <section
-                                className={`word-sense-section${relationsCollapsed ? " is-collapsed" : ""}`}
-                              >
-                                <SenseSectionTitle
-                                  collapsed={relationsCollapsed}
-                                  count={groupRelations(sense.relations).length}
-                                  label="关联词"
-                                  onToggle={() =>
-                                    toggleSenseSection(
-                                      sense.id,
-                                      "relations",
-                                      relationsCollapsed
-                                    )
-                                  }
-                                  unit="个"
-                                />
-                                <SenseSectionBody
-                                  collapsed={relationsCollapsed}
-                                >
-                                  <RelationsGrid
-                                    change={change}
-                                    currentWordId={wordId}
-                                    idFactory={idFactory}
-                                    posIndex={posIndex}
-                                    sense={sense}
-                                    senseIndex={senseIndex}
-                                    relationDisplaySnapshots={
-                                      relationDisplaySnapshots
-                                    }
-                                  />
-                                </SenseSectionBody>
-                              </section>
-                            </Flex>
-                          </SenseEditorShell>
-                        );
-                      })}
+                                  <section
+                                    className={`word-sense-section${relationsCollapsed ? " is-collapsed" : ""}`}
+                                  >
+                                    <SenseSectionTitle
+                                      collapsed={relationsCollapsed}
+                                      count={
+                                        groupRelations(sense.relations).length
+                                      }
+                                      label="关联词"
+                                      onToggle={() =>
+                                        toggleSenseSection(
+                                          sense.id,
+                                          "relations",
+                                          relationsCollapsed
+                                        )
+                                      }
+                                      unit="个"
+                                    />
+                                    <SenseSectionBody
+                                      collapsed={relationsCollapsed}
+                                    >
+                                      <RelationsGrid
+                                        change={change}
+                                        currentWordId={wordId}
+                                        idFactory={idFactory}
+                                        posIndex={posIndex}
+                                        sense={sense}
+                                        senseIndex={senseIndex}
+                                        relationDisplaySnapshots={
+                                          relationDisplaySnapshots
+                                        }
+                                      />
+                                    </SenseSectionBody>
+                                  </section>
+                                </Flex>
+                              </SenseEditorShell>
+                            );
+                          })
+                        }
+                      </SortableRows>
                       <Button
                         block
                         className="word-section-add-button"
@@ -2869,7 +3295,10 @@ export function V3MeaningsAndExamplesStep({
               上一步
             </Button>
           ) : null}
-          <Button disabled={saving} onClick={() => void save("save")}>
+          <Button
+            disabled={saving || !canSave}
+            onClick={() => void save("save")}
+          >
             保存草稿
           </Button>
           <Button
@@ -2883,5 +3312,15 @@ export function V3MeaningsAndExamplesStep({
         </div>
       )}
     </Flex>
+  );
+}
+
+export function V3MeaningsAndExamplesStep(
+  props: V3MeaningsAndExamplesStepProps
+) {
+  return (
+    <PronunciationPreviewProvider>
+      <V3MeaningsAndExamplesStepContent {...props} />
+    </PronunciationPreviewProvider>
   );
 }

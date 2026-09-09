@@ -1,4 +1,5 @@
 import type {
+  WordConcreteFormV3,
   DraftFormsStepContentV3,
   DraftMeaningsStepContentV3,
   DraftMeaningsStepContentWritableV3,
@@ -11,6 +12,8 @@ import {
   type V3IssueNavigationTarget
 } from "./issueNavigation";
 
+import { isV3FormComplete } from "./posCompletion";
+import type { RemovedFormTypes } from "./formDisplayState";
 import { CEFR_OPTIONS } from "../labels";
 import { definitionSummary } from "./meaningsModel";
 import { languageSummary, partOfSpeechLabel } from "./presentation";
@@ -69,6 +72,7 @@ export interface V3ProductProgressRow {
 }
 
 export interface V3ProductProgressInput {
+  removedFormTypes?: RemovedFormTypes;
   wordId: string;
   language: string;
   partOfSpeechCatalog?: readonly PartOfSpeechCatalogItem[];
@@ -101,8 +105,41 @@ function uniqueIssues(issues: readonly V3DraftValidationIssue[]) {
   });
 }
 
+// 比较拼写和整组字典音标；英美共用等价于两侧填写相同内容。
+function formIdentity(form: WordConcreteFormV3): string {
+  const variants =
+    form.regional_variants.mode === "common"
+      ? [form.regional_variants.common, form.regional_variants.common]
+      : [form.regional_variants.uk, form.regional_variants.us];
+  if (
+    variants.some(
+      (variant) =>
+        !variant.spelling.trim() ||
+        !variant.pronunciations.length ||
+        variant.pronunciations.some(
+          (pronunciation) => !pronunciation.dict_phonetic.trim()
+        )
+    )
+  ) {
+    return `unfilled:${form.id}`;
+  }
+  return JSON.stringify(
+    variants.map((variant) => [
+      variant.spelling.trim(),
+      [
+        ...new Set(
+          variant.pronunciations.map((pronunciation) =>
+            pronunciation.dict_phonetic.trim()
+          )
+        )
+      ].sort()
+    ])
+  );
+}
+
 export function buildV3ProductProgress({
   language,
+  removedFormTypes = {},
   partOfSpeechCatalog = [],
   dirtySteps = { forms: false, meanings: false },
   completedSteps,
@@ -110,18 +147,37 @@ export function buildV3ProductProgress({
   meanings
 }: V3ProductProgressInput): V3ProductProgressRow[] {
   const completed = new Set(completedSteps);
-  const derivedForms = forms.pos.flatMap((pos) =>
-    pos.forms
-      .filter((form) => form.form_type !== "base")
-      .map((form) => {
-        const group = pos.form_groups.find((candidate) =>
-          candidate.members.some((member) => member.form_id === form.id)
+  const allIdentities = new Set<string>();
+  let allFormsComplete = forms.pos.length > 0;
+  const formCounts = new Map(
+    forms.pos.map((pos) => {
+      const identities = new Set(pos.forms.map(formIdentity));
+      const allowed =
+        partOfSpeechCatalog.find((item) => item.code === pos.pos)
+          ?.allowed_form_types ?? [];
+      for (const group of pos.form_groups) {
+        const present = new Set(
+          group.members.map(
+            (member) =>
+              pos.forms.find((form) => form.id === member.form_id)?.form_type
+          )
         );
-        const membership = group?.members.find(
-          (member) => member.form_id === form.id
-        );
-        return { pos, form, group, membership };
-      })
+        for (const type of allowed) {
+          if (
+            type !== "base" &&
+            !present.has(type) &&
+            !removedFormTypes[group.id]?.includes(type)
+          ) {
+            identities.add(`empty:${pos.pos_id}:${group.id}:${type}`);
+            allFormsComplete = false;
+          }
+        }
+      }
+      if (!pos.forms.length || !pos.forms.every(isV3FormComplete))
+        allFormsComplete = false;
+      for (const identity of identities) allIdentities.add(identity);
+      return [pos.pos_id, identities.size] as const;
+    })
   );
   const grammarEntries = meanings.pos.flatMap((pos) =>
     pos.grammar_structures.map((grammar) => ({ pos, grammar }))
@@ -199,7 +255,7 @@ export function buildV3ProductProgress({
       .map((pos) => ({
         key: pos.key,
         label: pos.label,
-        count: pos.forms.filter((form) => form.form_type !== "base").length
+        count: formCounts.get(pos.key) ?? 0
       })),
     sense_groups: meanings.sense_groups.map((group, index) => ({
       key: group.id,
@@ -256,8 +312,9 @@ export function buildV3ProductProgress({
       key: "forms",
       index: 3,
       label: "词形变化",
-      completed: completed.has("forms"),
-      count: derivedForms.length
+      completed: allFormsComplete,
+      count: allIdentities.size,
+      statusDescription: "包含原形；拼写和音标均相同的词形合并计数"
     },
     {
       key: "sense_groups",
@@ -300,9 +357,18 @@ export function buildV3ProductProgress({
       ...row,
       step,
       completed:
-        row.completed && !dirty && !(step === "meanings" && hasUnmatchedPos),
+        row.completed &&
+        (row.key === "forms" || !dirty) &&
+        !(step === "meanings" && hasUnmatchedPos),
       details: details[row.key],
-      ...(dirty ? { statusDescription: "编辑中，完成状态待确认" } : {})
+      ...(dirty
+        ? {
+            statusDescription:
+              row.key === "forms"
+                ? "按当前输入统计，尚未保存"
+                : "编辑中，完成状态待确认"
+          }
+        : {})
     };
   });
 }

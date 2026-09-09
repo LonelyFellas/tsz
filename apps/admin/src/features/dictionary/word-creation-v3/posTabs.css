@@ -46,5 +46,6 @@
 
 .word-pos-tab-handle.is-drag-over {
   outline: 2px solid rgba(22, 119, 255, 0.55);
-  outline-offset: 3px;
+  /* Tabs 导航会裁切外溢内容，将提示框内收，首尾页签也能完整显示。 */
+  outline-offset: -2px;
 }

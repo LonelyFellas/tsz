@@ -48,6 +48,7 @@ export interface V3VoiceTextFieldProps {
   readOnly?: boolean;
   invalid?: boolean;
   leadingAction?: ReactNode;
+  audioUploadEnabled?: boolean;
   /** 发音配置；与正文分开走，因为它在 wire 上是正文的兄弟字段。 */
   voiceProfile?: VoiceProfileV3 | null;
   onVoiceProfileChange?: (next: VoiceProfileV3) => void;
@@ -79,6 +80,7 @@ export function V3VoiceTextField({
   readOnly,
   invalid,
   leadingAction,
+  audioUploadEnabled = true,
   voiceProfile,
   onVoiceProfileChange,
   audioAssets,
@@ -232,7 +234,9 @@ export function V3VoiceTextField({
           onVoiceProfileChange={onVoiceProfileChange}
           // 开关关着 = 不注入适配器：面板置灰说明原因，已有的音频引用仍列出来。
           audioUploadAdapter={
-            env.VOICE_AUDIO_UPLOAD && mode !== "association"
+            env.VOICE_AUDIO_UPLOAD &&
+            audioUploadEnabled &&
+            mode !== "association"
               ? adminAudioUploadAdapter
               : undefined
           }

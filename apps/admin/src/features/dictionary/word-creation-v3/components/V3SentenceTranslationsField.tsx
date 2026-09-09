@@ -94,6 +94,7 @@ export function V3SentenceTranslationsField({
                   </Dropdown>
 
                   <Input.TextArea
+                    placeholder="请输入对应的中文译文"
                     autoSize={{ minRows: 1, maxRows: 4 }}
                     aria-label={
                       rows.length === 1

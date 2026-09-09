@@ -105,18 +105,25 @@ describe("连读锚点换算", () => {
     expect(offsetToAnchor(tokens, 1)).toBeUndefined();
   });
 
-  it("连读必须跨词且终点在右", () => {
+  it("连读允许同词内字母，保存顺序仍从左到右", () => {
     expect(
       isValidLiaison({
         start: { token: 0, offsets: [0] },
         end: { token: 1, offsets: [0] }
       })
     ).toBe(true);
-    // 同词内部连线没有意义
+    // 同词内部的不同字母也可以连接
     expect(
       isValidLiaison({
         start: { token: 1, offsets: [0] },
         end: { token: 1, offsets: [3] }
+      })
+    ).toBe(true);
+    // 完全包含的锚点无法用 start/end + 两端宽度无损表示，不能生成不可保存的标注。
+    expect(
+      isValidLiaison({
+        start: { token: 1, offsets: [0, 1, 2, 3] },
+        end: { token: 1, offsets: [1, 2] }
       })
     ).toBe(false);
     // 终点在左

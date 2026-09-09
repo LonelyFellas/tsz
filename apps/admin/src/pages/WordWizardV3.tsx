@@ -234,7 +234,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
           上一步
         </Button>
         <Button
-          disabled={Boolean(pendingIntent)}
+          disabled={Boolean(pendingIntent) || !context.dirtySteps.forms}
           loading={busy && pendingIntent === "save"}
           onClick={() => void prepareSave("save")}
         >
@@ -400,6 +400,7 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
         }}
         onPrevious={() => context.setActiveStep("forms")}
         onSave={saveMeanings}
+        canSave={context.hasUnsavedChanges}
         partOfSpeechCatalog={context.partOfSpeechCatalog}
         partOfSpeechCatalogError={context.partOfSpeechCatalogError}
         partOfSpeechCatalogPending={context.partOfSpeechCatalogPending}

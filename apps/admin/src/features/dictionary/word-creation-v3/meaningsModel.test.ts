@@ -126,6 +126,26 @@ const meaningsCanonicalFixture: DraftMeaningsStepContentV3 = {
   ]
 };
 
+it("语义区间英文富文本和发音配置在编辑转换中保留且不共享引用", () => {
+  const canonical = structuredClone(meaningsCanonicalFixture);
+  canonical.sense_groups[0]!.name_en_rich = {
+    version: 2,
+    text: "Core",
+    annotations: [{ type: "emphasis", start: 0, end: 4, level: "core" }]
+  };
+  canonical.sense_groups[0]!.voice_profile = {
+    voices: [{ voice_id: "sonia", enabled: true, rate_percent: 10 }]
+  };
+  const writable = toWritableMeanings(canonical);
+  expect(writable.sense_groups[0]).toEqual(canonical.sense_groups[0]);
+  expect(writable.sense_groups[0]!.name_en_rich).not.toBe(
+    canonical.sense_groups[0]!.name_en_rich
+  );
+  expect(writable.sense_groups[0]!.voice_profile).not.toBe(
+    canonical.sense_groups[0]!.voice_profile
+  );
+});
+
 describe("V3 meanings writable model", () => {
   it("initializes native V3 POS templates sharing one word-level sense group", () => {
     let nextId = 0;

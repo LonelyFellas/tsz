@@ -242,6 +242,8 @@ export interface SenseGroupV3 {
   id: string;
   name_zh: string;
   name_en: string;
+  name_en_rich?: RichTextV3;
+  voice_profile?: VoiceProfileV3;
 }
 
 /** 单个音色的启用选择与独立语速；未启用时仍保留语速。 */

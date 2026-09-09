@@ -2,12 +2,13 @@ import type {
   DraftMeaningsStepContentV3,
   DraftMeaningsStepContentWritableV3,
   WordConcreteFormV3,
+  WordFormTypeV3,
   WordPosFormsV3,
   WordPosMeaningsV3,
   WordPosMeaningsWritableV3
 } from "@tsz/types";
 
-function formComplete(form: WordConcreteFormV3) {
+export function isV3FormComplete(form: WordConcreteFormV3) {
   const variants =
     form.regional_variants.mode === "common"
       ? [form.regional_variants.common]
@@ -28,10 +29,29 @@ function formComplete(form: WordConcreteFormV3) {
 /**
  * POS 页签只提示还有多少块词形内容没填，不重复计算同一词形里的空字段。
  */
-export function countV3PosFormIncomplete(pos: WordPosFormsV3): number {
+export function countV3PosFormIncomplete(
+  pos: WordPosFormsV3,
+  allowedTypes: readonly WordFormTypeV3[] = [],
+  removedTypes: Readonly<Record<string, readonly WordFormTypeV3[]>> = {}
+): number {
+  const defaultBlanks = pos.form_groups.reduce((count, group) => {
+    const present = new Set(
+      group.members.map(
+        (member) =>
+          pos.forms.find((form) => form.id === member.form_id)?.form_type
+      )
+    );
+    return (
+      count +
+      [...new Set(allowedTypes)].filter(
+        (type) => !present.has(type) && !removedTypes[group.id]?.includes(type)
+      ).length
+    );
+  }, 0);
   return (
+    defaultBlanks +
     pos.form_groups.filter((group) => group.members.length === 0).length +
-    pos.forms.filter((form) => !formComplete(form)).length
+    pos.forms.filter((form) => !isV3FormComplete(form)).length
   );
 }
 
