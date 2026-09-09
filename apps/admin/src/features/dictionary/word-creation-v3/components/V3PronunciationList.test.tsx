@@ -58,8 +58,9 @@ vi.mock("@tsz/voice-editor/editor", () => ({
       <button
         onClick={() =>
           onVoiceProfileChange?.({
-            voice_ids: ["british-voice"],
-            rate_percent: -10
+            voices: [
+              { voice_id: "british-voice", enabled: true, rate_percent: -10 }
+            ]
           })
         }
       >
@@ -106,8 +107,7 @@ describe("字典音标发音编辑器", () => {
       { type: "highlight", start: 0, end: 1, color: "yellow" }
     ]);
     expect(rows[0].voice_profile).toEqual({
-      voice_ids: ["british-voice"],
-      rate_percent: -10
+      voices: [{ voice_id: "british-voice", enabled: true, rate_percent: -10 }]
     });
     expect(rows[0].audio_assets[0].original_name).toBe("test.mp3");
     expect(rows[1].audio_assets).toBeUndefined();

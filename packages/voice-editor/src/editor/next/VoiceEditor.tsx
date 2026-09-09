@@ -17,7 +17,12 @@ import {
   validateRichTextV2
 } from "../../core";
 import { rangesOverlap, remapTextLinks, wordSegments } from "../../core";
-import type { AudioAsset, VoiceOption, VoiceEditorProps } from "../../types";
+import type {
+  AudioAsset,
+  VoiceOption,
+  VoiceEditorProps,
+  VoiceSetting
+} from "../../types";
 import {
   describeUploadError,
   isSignedUrlFresh,
@@ -31,7 +36,6 @@ import {
   LiaisonIcon,
   LiaisonPanel,
   PausePanel,
-  RatePanel,
   RolePanel,
   UploadPanel,
   VoicePanel
@@ -41,8 +45,6 @@ import {
   DEFAULT_BRUSH,
   GRAMMAR_ROLES,
   PAUSE_PRESETS,
-  RATE_MULTIPLIER_MAX,
-  RATE_MULTIPLIER_MIN,
   formatPauseLabel,
   type Brush,
   type LiaisonEnd
@@ -179,15 +181,17 @@ export function VoiceEditor({
   const tokens = tokenize(text);
   const [validationMessage, setValidationMessage] = useState("");
 
-  /*
-   * enabledTouched 区分「没配过」与「配过且恰好选了这些」：
-   * 没配过时启用全部音色（清单是异步拉的，所以不能一上来就固化成一个列表）。
-   * wire 上 voice_profile 为 null 就对应「没配过」。
-   */
-  const [enabledVoiceIds, setEnabledVoiceIds] = useState<string[]>(
-    voiceProfile?.voice_ids ?? []
+  // 未配置表示尚未选择 C 端音色；只有显式保存的选择才回填。
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSetting[]>(
+    voiceProfile?.voices ?? []
   );
-  const [enabledTouched, setEnabledTouched] = useState(Boolean(voiceProfile));
+  const enabledVoiceIds = useMemo(
+    () =>
+      voiceSettings
+        .filter((voice) => voice.enabled)
+        .map((voice) => voice.voice_id),
+    [voiceSettings]
+  );
   const [upload, setUpload] = useState<UploadDraft>({
     locale: "en-GB",
     gender: "female"
@@ -210,10 +214,6 @@ export function VoiceEditor({
   const assetUrlCacheRef = useRef(
     new Map<string, { url: string; expiresAt: string }>()
   );
-  const [ratePercent, setRatePercent] = useState<number | undefined>(
-    voiceProfile?.rate_percent
-  );
-  const [customRate, setCustomRate] = useState("");
   const [customPause, setCustomPause] = useState("");
   const [openTool, setOpenTool] = useState<string>();
   /*
@@ -379,29 +379,30 @@ export function VoiceEditor({
     const incoming = JSON.stringify(voiceProfile ?? null);
     if (incoming === emittedProfileRef.current) return;
     emittedProfileRef.current = incoming;
-    setEnabledVoiceIds(voiceProfile?.voice_ids ?? []);
-    setEnabledTouched(Boolean(voiceProfile));
-    setRatePercent(voiceProfile?.rate_percent);
+    setVoiceSettings(voiceProfile?.voices ?? []);
   }, [voiceProfile]);
 
-  /**
-   * 把当前的音色与语速抛给宿主。
-   *
-   * 只在用户真的动过之后才抛：没动过时 voice_ids 该是「全部」，而「全部」在 wire 上
-   * 没有表示法——此时固化成当天的音色列表是错的（以后新增的音色就落不进来）。
-   * 一旦动过，选择就固化成显式列表，这正是「持久化」的含义。
-   */
-  const emitProfile = (next: { voiceIds: string[]; rate?: number }) => {
-    if (readOnly || !onVoiceProfileChange) return;
-    const profile = {
-      voice_ids: next.voiceIds,
-      rate_percent: next.rate ?? 0
-    };
+  /** 仅在用户编辑时保存未来 C 端音频的音色选择；试听不改变选择。 */
+  const updateVoice = (
+    voiceId: string,
+    patch: Partial<Omit<VoiceSetting, "voice_id">>
+  ) => {
+    if (readOnly) return;
+    const existing = voiceSettings.find((voice) => voice.voice_id === voiceId);
+    const next = existing
+      ? voiceSettings.map((voice) =>
+          voice.voice_id === voiceId ? { ...voice, ...patch } : voice
+        )
+      : [
+          ...voiceSettings,
+          { voice_id: voiceId, enabled: false, rate_percent: 0, ...patch }
+        ];
+    setVoiceSettings(next);
+    const profile = { voices: next };
     emittedProfileRef.current = JSON.stringify(profile);
-    onVoiceProfileChange(profile);
+    onVoiceProfileChange?.(profile);
   };
 
-  const auditionSettings = useMemo(() => ({ ratePercent }), [ratePercent]);
   const {
     voices,
     voicesLoading,
@@ -414,14 +415,9 @@ export function VoiceEditor({
     open: voicesRequested,
     language,
     content: workingValue,
-    settings: auditionSettings,
+    settings: voiceSettings,
     previewAdapter
   });
-
-  const effectiveEnabledIds = useMemo(
-    () => (enabledTouched ? enabledVoiceIds : voices.map((voice) => voice.id)),
-    [enabledTouched, enabledVoiceIds, voices]
-  );
 
   const changeBrush = (next: Brush) => {
     if (next.kind === "role") lastRoleRef.current = next.level;
@@ -816,55 +812,10 @@ export function VoiceEditor({
   };
 
   const toggleVoice = (voiceId: string) => {
-    const current = effectiveEnabledIds;
-    const next = current.includes(voiceId)
-      ? current.filter((id) => id !== voiceId)
-      : [...current, voiceId];
-    setEnabledTouched(true);
-    setEnabledVoiceIds(next);
-    emitProfile({ voiceIds: next, rate: ratePercent });
-  };
-
-  const isRateAllowed = useCallback(
-    (percent: number) => {
-      const candidates = voices.filter(
-        (voice) =>
-          effectiveEnabledIds.includes(voice.id) && voice.supportsRate !== false
-      );
-      if (candidates.length === 0) return true;
-      return candidates.some(
-        (voice) =>
-          !voice.rateRange ||
-          (voice.rateRange.min <= percent && percent <= voice.rateRange.max)
-      );
-    },
-    [effectiveEnabledIds, voices]
-  );
-
-  const applyRate = (percent: number) => {
-    setRatePercent(percent);
-    setCustomRate("");
-    setValidationMessage("");
-    emitProfile({ voiceIds: effectiveEnabledIds, rate: percent });
-  };
-
-  const applyCustomRate = (raw: string) => {
-    const multiplier = Number(raw.trim());
-    if (
-      !raw.trim() ||
-      !Number.isFinite(multiplier) ||
-      multiplier < RATE_MULTIPLIER_MIN ||
-      multiplier > RATE_MULTIPLIER_MAX
-    ) {
-      setValidationMessage(
-        `语速倍数必须在 ${RATE_MULTIPLIER_MIN.toFixed(2)}× – ${RATE_MULTIPLIER_MAX.toFixed(2)}× 之间`
-      );
-      return;
-    }
-    const percent = Math.round((multiplier - 1) * 100);
-    setRatePercent(percent);
-    setValidationMessage("");
-    emitProfile({ voiceIds: effectiveEnabledIds, rate: percent });
+    updateVoice(voiceId, {
+      enabled: !voiceSettings.find((voice) => voice.voice_id === voiceId)
+        ?.enabled
+    });
   };
 
   /** 自定义停顿按毫秒输入，与底层模型同单位，避免多一层换算。 */
@@ -1055,9 +1006,6 @@ export function VoiceEditor({
     });
   };
 
-  /* 自定义语速也要显示得出来，所以由百分比反算倍数，而不是回查预设表。 */
-  const rateSummary = `${(1 + (ratePercent ?? 0) / 100).toFixed(2)}×`;
-
   const roleLevel = brush.kind === "role" ? brush.level : lastRoleRef.current;
   const roleLabel =
     GRAMMAR_ROLES.find((role) => role.level === roleLevel)?.label ??
@@ -1150,17 +1098,21 @@ export function VoiceEditor({
       dividerBefore: true,
       label: "发音",
       className: "tsz-ve-speech-tool",
-      summary: `${enabledTouched || voices.length > 0 ? `${effectiveEnabledIds.length} 音色 · ` : ""}${rateSummary}`,
+      summary: `已选 ${enabledVoiceIds.length} 个音色`,
       icon: <SoundOutlined />,
       content: (
         <div className="tsz-ve-speech-panel" aria-label="发音设置与试听">
           <div>
-            <div className="tsz-ve-speech-panel-title">音色 · 点击喇叭试听</div>
+            <div className="tsz-ve-speech-panel-title">音色</div>
             <VoicePanel
               readOnly={readOnly}
               voices={voices}
               voicesLoading={voicesLoading}
-              enabledVoiceIds={effectiveEnabledIds}
+              enabledVoiceIds={enabledVoiceIds}
+              voiceSettings={voiceSettings}
+              onRateChange={(voiceId, rate_percent) =>
+                updateVoice(voiceId, { rate_percent })
+              }
               onToggleVoice={toggleVoice}
               pendingVoiceId={pendingVoiceId}
               playingVoiceId={playingVoiceId}
@@ -1170,21 +1122,6 @@ export function VoiceEditor({
                 previewAdapter ? auditionStatus : "TTS 后端未启用，仍可编辑"
               }
             />
-          </div>
-          <div>
-            <div className="tsz-ve-speech-panel-title">语速</div>
-            <RatePanel
-              readOnly={readOnly}
-              ratePercent={ratePercent}
-              isRateAllowed={isRateAllowed}
-              onRate={applyRate}
-              customRate={customRate}
-              onCustomRateChange={setCustomRate}
-              onCustomRateSubmit={applyCustomRate}
-            />
-          </div>
-          <div className="tsz-ve-speech-panel-hint">
-            试听使用当前文本、标注和语速，修改后可直接再次试听。
           </div>
         </div>
       )

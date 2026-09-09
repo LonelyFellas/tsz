@@ -18,6 +18,7 @@ export interface AssociationPickerProps {
 
 export interface VoiceOption {
   id: string;
+  isCommon?: boolean;
   label: string;
   locale: string;
   gender: "female" | "male" | "neutral";
@@ -152,9 +153,14 @@ export interface VoiceRichTextFieldProps {
  * 发音配置：启用哪几个音色、语速多少。结构与 wire 的 VoiceProfileV3 一致，
  * 但本包不依赖 admin 的词条类型，故在此另行定义。
  */
-export interface VoiceProfile {
-  voice_ids: string[];
+export interface VoiceSetting {
+  voice_id: string;
+  enabled: boolean;
   rate_percent: number;
+}
+
+export interface VoiceProfile {
+  voices: VoiceSetting[];
 }
 
 export interface VoiceEditorProps {
@@ -181,7 +187,7 @@ export interface VoiceEditorProps {
    */
   inputDataAttributes?: Record<string, string>;
   /**
-   * 发音配置。`null` / 缺省表示未配置——此时启用全部音色、原速。
+   * 发音配置。`null` / 缺省表示未配置——此时不选择任何 C 端音色，语速为原速。
    * 与正文分开走一条通道，因为它在 wire 上是正文的兄弟字段而不是正文的一部分。
    */
   voiceProfile?: VoiceProfile | null;

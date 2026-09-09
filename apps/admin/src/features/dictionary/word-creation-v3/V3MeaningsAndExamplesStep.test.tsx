@@ -1,3 +1,5 @@
+import { env } from "@/lib/env";
+import { adminVoicePreviewAdapter } from "@/features/dictionary/voice-editor/dataSource";
 import {
   fireEvent,
   render,
@@ -914,27 +916,50 @@ describe("V3MeaningsAndExamplesStep", () => {
   }, 30_000);
 
   it("音色与语速落到语法结构变体的 voice_profile 上", async () => {
-    render(<Harness initial={meaningsFixture} />);
-    fireEvent.click(screen.getByLabelText("打开语法结构 1 通用内容编辑器"));
-    await within(
-      document.querySelector(".word-grammar-panel") as HTMLElement
-    ).findByRole("toolbar", { name: "标注工具栏" }, { timeout: 10_000 });
-
-    const variant = () => value().pos[0]!.grammar_structures[0]!.variants[0]!;
-    // 没动过之前不该凭空写出一份配置
-    expect(variant().voice_profile).toBeUndefined();
-
-    fireEvent.click(
-      within(
+    const previous = env.VOICE_PREVIEW;
+    Object.assign(env, { VOICE_PREVIEW: true });
+    const listing = vi
+      .spyOn(adminVoicePreviewAdapter, "listVoices")
+      .mockResolvedValue([
+        {
+          id: "sonia",
+          label: "Sonia",
+          locale: "en-GB",
+          gender: "female",
+          styles: [],
+          supportsRate: true,
+          supportsPitch: false,
+          isDefault: true
+        }
+      ]);
+    try {
+      render(<Harness initial={meaningsFixture} />);
+      fireEvent.click(screen.getByLabelText("打开语法结构 1 通用内容编辑器"));
+      await within(
         document.querySelector(".word-grammar-panel") as HTMLElement
-      ).getByLabelText("发音")
-    );
-    fireEvent.click(screen.getByLabelText("语速 1.25 倍"));
+      ).findByRole("toolbar", { name: "标注工具栏" }, { timeout: 10_000 });
 
-    expect(variant().voice_profile).toEqual({
-      voice_ids: expect.any(Array),
-      rate_percent: 25
-    });
+      const variant = () => value().pos[0]!.grammar_structures[0]!.variants[0]!;
+      // 没动过之前不该凭空写出一份配置
+      expect(variant().voice_profile).toBeUndefined();
+
+      fireEvent.click(
+        within(
+          document.querySelector(".word-grammar-panel") as HTMLElement
+        ).getByLabelText("发音")
+      );
+      const rateButtons = await screen.findAllByLabelText(/^设置 .* 的语速$/);
+      fireEvent.click(rateButtons[0]!);
+      fireEvent.click(await screen.findByLabelText("语速 1.25 倍"));
+      expect(variant().voice_profile).toEqual({
+        voices: [
+          { voice_id: expect.any(String), enabled: false, rate_percent: 25 }
+        ]
+      });
+    } finally {
+      Object.assign(env, { VOICE_PREVIEW: previous });
+      listing.mockRestore();
+    }
   }, 15_000);
 
   it("语法结构复用 V2 单栏文本区且不显示地区下拉", () => {
@@ -3730,7 +3755,9 @@ it.each([false, true])(
           id: "en-def",
           origin: "manual",
           value: { version: 2, text: "mother", annotations: [] },
-          voice_profile: { voice_ids: [], rate_percent: 25 },
+          voice_profile: {
+            voices: [{ voice_id: "sonia", enabled: false, rate_percent: 25 }]
+          },
           text_links: [
             {
               id: "link",

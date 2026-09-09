@@ -6,13 +6,17 @@ import type { AudioUploadAdapter } from "@tsz/voice-editor/types";
 
 const state = vi.hoisted(() => ({
   flags: { VOICE_EDITOR: true, VOICE_PREVIEW: false, VOICE_AUDIO_UPLOAD: true },
+  listVoices: vi.fn(),
   upload: vi.fn(),
   resolveUrl: vi.fn()
 }));
 
 vi.mock("@/lib/env", () => ({ env: state.flags }));
 vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
-  adminVoicePreviewAdapter: { listVoices: vi.fn(), synthesize: vi.fn() },
+  adminVoicePreviewAdapter: {
+    listVoices: state.listVoices,
+    synthesize: vi.fn()
+  },
   voicePreviewIsMock: false,
   adminAudioUploadAdapter: {
     upload: (...args: Parameters<AudioUploadAdapter["upload"]>) =>
@@ -40,6 +44,19 @@ async function openAudioPanel() {
 
 beforeEach(() => {
   state.flags.VOICE_EDITOR = true;
+  state.flags.VOICE_PREVIEW = false;
+  state.listVoices.mockResolvedValue([
+    {
+      id: "sonia",
+      label: "Sonia",
+      locale: "en-GB",
+      gender: "female",
+      styles: [],
+      supportsRate: true,
+      supportsPitch: false,
+      isDefault: true
+    }
+  ]);
   state.flags.VOICE_AUDIO_UPLOAD = true;
   state.upload.mockReset();
   state.resolveUrl.mockReset();
@@ -176,6 +193,7 @@ it("降级文本框在插入文本后平移原标注和关联", () => {
 });
 
 it("正文在外部输入框编辑，内部只做标注；多行正文、关联和设置往返不丢失", async () => {
+  state.flags.VOICE_PREVIEW = true;
   const observe = vi.fn();
   function Host() {
     const [value, setValue] = useState<RichTextV3>({
@@ -204,7 +222,9 @@ it("正文在外部输入框编辑，内部只做标注；多行正文、关联�
         nodeId="example"
         value={value}
         textLinks={links}
-        voiceProfile={{ voice_ids: [], rate_percent: 25 }}
+        voiceProfile={{
+          voices: [{ voice_id: "sonia", enabled: false, rate_percent: 25 }]
+        }}
         onChange={(next, nextLinks) => {
           setValue(next);
           setLinks(nextLinks ?? []);
@@ -246,7 +266,10 @@ it("正文在外部输入框编辑，内部只做标注；多行正文、关联�
   fireEvent.click(screen.getByLabelText("打开英文例句编辑器"));
   await screen.findByRole("toolbar", { name: "标注工具栏" });
   expect(screen.getByLabelText("英文例句")).toHaveValue("oh hello\nthere");
-  expect(screen.getByLabelText("发音")).toHaveTextContent("1.25×");
+  fireEvent.click(screen.getByLabelText("发音"));
+  expect(await screen.findByLabelText("设置 Sonia 的语速")).toHaveTextContent(
+    "1.25×"
+  );
   expect(document.querySelectorAll(".tsz-ve-letter.is-linked")).toHaveLength(5);
 });
 

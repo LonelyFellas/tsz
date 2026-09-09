@@ -244,17 +244,16 @@ export interface SenseGroupV3 {
   name_en: string;
 }
 
-/**
- * 这段文本将来合成语音时的配置：启用哪几个发音人、语速多少。
- *
- * `voice_ids` 存的是 `/speech/voices` 的 `alias`。发音人清单来自外部 TTS 供应商，
- * alias 可能随供应商下线而失效，所以两端都不做外键式校验——读到已下线的 alias
- * 原样保留，由界面标为失效。`rate_percent` 只按全局区间（-50..100，即 0.50×–2.00×）
- * 约束，逐音色的窄区间在合成时才夹取。
- */
-export interface VoiceProfileV3 {
-  voice_ids: string[];
+/** 单个音色的启用选择与独立语速；未启用时仍保留语速。 */
+export interface VoiceSettingV3 {
+  voice_id: string;
+  enabled: boolean;
   rate_percent: number;
+}
+
+/** 未出现的音色默认不勾选、原速；voice_id 使用目录 alias。 */
+export interface VoiceProfileV3 {
+  voices: VoiceSettingV3[];
 }
 
 export type AudioAssetLocaleV3 = "en-GB" | "en-US";

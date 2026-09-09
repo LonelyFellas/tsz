@@ -1075,8 +1075,9 @@ describe("释义级成分用词在词义投影中的往返", () => {
     const canonical = structuredClone(meaningsCanonicalFixture);
     const source = canonical.pos[0]!.grammar_structures[0]!.variants[0]!;
     source.voice_profile = {
-      voice_ids: ["en-GB-SoniaNeural"],
-      rate_percent: -10
+      voices: [
+        { voice_id: "en-GB-SoniaNeural", enabled: true, rate_percent: -10 }
+      ]
     };
     source.audio_assets = [audioAsset("asset-1", "en-GB")];
     const writable = toWritableMeanings(canonical);
@@ -1091,8 +1092,9 @@ describe("释义级成分用词在词义投影中的往返", () => {
     const existing = toWritableMeanings(meaningsCanonicalFixture);
     const common = existing.pos[0]!.grammar_structures[0]!.variants[0]!;
     common.voice_profile = {
-      voice_ids: ["en-GB-SoniaNeural"],
-      rate_percent: 0
+      voices: [
+        { voice_id: "en-GB-SoniaNeural", enabled: true, rate_percent: 0 }
+      ]
     };
     common.audio_assets = [
       audioAsset("asset-uk", "en-GB"),
@@ -1206,8 +1208,7 @@ it("正文关联和语音克隆后独立保存；去除只读快照，旧后端�
   const sentence = input.pos[0]!.senses[0]!.sentences[0]!;
   if (sentence.en_text.mode !== "unified") throw new Error("fixture");
   sentence.en_text.common.voice_profile = {
-    voice_ids: ["en-GB-SoniaNeural"],
-    rate_percent: 25
+    voices: [{ voice_id: "en-GB-SoniaNeural", enabled: true, rate_percent: 25 }]
   };
   sentence.en_text.common.text_links = [
     {

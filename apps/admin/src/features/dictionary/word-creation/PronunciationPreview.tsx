@@ -114,8 +114,17 @@ function voiceForDialect(
   preference: AdminDialectPreference
 ): VoiceOption | undefined {
   const locale = localeForDialect(dialect, preference)?.toLowerCase();
+  // 扩大供应商目录后仍优先沿用已有默认发音人，缺席时再按目录顺序回退。
+  const preferredIds =
+    locale === "en-gb"
+      ? ["en-gb-sonia", "en-gb-sonianeural"]
+      : ["en-us-aria", "en-us-arianeural"];
   const matched = locale
-    ? voices.find((voice) => voice.locale.toLowerCase() === locale)
+    ? (voices.find(
+        (voice) =>
+          voice.locale.toLowerCase() === locale &&
+          preferredIds.includes(voice.id)
+      ) ?? voices.find((voice) => voice.locale.toLowerCase() === locale))
     : undefined;
   if (matched) return matched;
   // 明确标了方言的内容找不到对应发音人时不降级——否则英式词形会用美式音朗读。
@@ -186,16 +195,24 @@ export function PronunciationPreviewControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const voice = voiceProfile
-    ? voiceProfile.voice_ids
-        .map((id) => context.voices.find((voice) => voice.id === id))
-        .find((voice) => voice !== undefined)
-    : voiceForDialect(context.voices, dialect, context.dialectPreference);
+  const voice =
+    voiceProfile?.voices
+      .filter((setting) => setting.enabled)
+      .map((setting) =>
+        context.voices.find((voice) => voice.id === setting.voice_id)
+      )
+      .find((voice) => voice !== undefined) ??
+    voiceForDialect(context.voices, dialect, context.dialectPreference);
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
   );
-  const contentKey = JSON.stringify([previewContent, voiceProfile]);
+  const contentKey = JSON.stringify([
+    previewContent,
+    voice?.id,
+    voiceProfile?.voices.find((setting) => setting.voice_id === voice?.id)
+      ?.rate_percent ?? 0
+  ]);
   const text = previewContent.text.trim();
   const playLabel = ariaLabelPrefix
     ? `${ariaLabelPrefix} 播放语音`
@@ -292,7 +309,10 @@ export function PronunciationPreviewControls({
           language: "en",
           content: previewContent,
           voiceId: voice.id,
-          ...(voiceProfile ? { ratePercent: voiceProfile.rate_percent } : {})
+          ratePercent:
+            voiceProfile?.voices.find(
+              (setting) => setting.voice_id === voice.id
+            )?.rate_percent ?? 0
         },
         { signal: controller.signal }
       );

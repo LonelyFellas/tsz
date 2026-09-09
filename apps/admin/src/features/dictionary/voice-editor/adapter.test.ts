@@ -14,6 +14,8 @@ function source(): AdminSpeechDataSource {
       items: [
         {
           alias: "ava",
+          display_name: "Ava 爱娃",
+          is_common: true,
           locale: "en-US",
           gender: "female",
           capabilities: {
@@ -46,7 +48,8 @@ describe("admin voice preview adapter", () => {
     ).resolves.toEqual([
       {
         id: "ava",
-        label: "ava · en-US",
+        label: "Ava 爱娃 · en-US",
+        isCommon: true,
         locale: "en-US",
         gender: "female",
         styles: ["cheerful"],
@@ -151,6 +154,8 @@ describe("admin voice preview adapter", () => {
       items: [
         {
           alias: "edge",
+          display_name: "Edge",
+          is_common: false,
           locale: "en-US",
           gender: "neutral",
           capabilities: {

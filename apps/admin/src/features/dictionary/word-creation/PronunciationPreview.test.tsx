@@ -197,6 +197,26 @@ afterEach(() => {
 });
 
 describe("PronunciationPreview", () => {
+  it.each([
+    ["uk", "en-GB", "en-gb-sonia"],
+    ["us", "en-US", "en-us-aria"]
+  ] as const)(
+    "扩大 %s 目录后保留原默认音色",
+    async (preference, locale, id) => {
+      dialectPreference.value = preference;
+      preview.listVoices.mockResolvedValue([
+        { ...voices[0]!, id: "alphabetically-first", locale },
+        { ...voices[0]!, id, locale }
+      ]);
+      render(<PreviewHarness />);
+      const button = screen.getByLabelText("获取语音");
+      await waitFor(() => expect(button).toBeEnabled());
+      fireEvent.click(button);
+      await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(1));
+      expect(preview.synthesize.mock.calls[0]![0].voiceId).toBe(id);
+    }
+  );
+
   it("偏好切到美式后，统一内容改挑 en-US 发音人", async () => {
     dialectPreference.value = "us";
     render(<PreviewHarness />);
@@ -251,7 +271,8 @@ describe("PronunciationPreview", () => {
         language: "en",
         content: { version: 2, text: "tomato", annotations: [] },
         // 统一内容没有自己的方言，按管理员偏好（缺省英式）挑 en-GB 发音人。
-        voiceId: "british-voice"
+        voiceId: "british-voice",
+        ratePercent: 0
       },
       { signal: expect.any(AbortSignal) }
     );
@@ -575,7 +596,11 @@ it("最终读音使用编辑后的标注、选定音色和语速，并直接播�
       content={content}
       dialect="uk"
       playbackOnly
-      voiceProfile={{ voice_ids: ["american-voice"], rate_percent: -25 }}
+      voiceProfile={{
+        voices: [
+          { voice_id: "american-voice", enabled: true, rate_percent: -25 }
+        ]
+      }}
     />
   );
   expect(screen.queryByRole("button", { name: "获取语音" })).toBeNull();
@@ -589,4 +614,26 @@ it("最终读音使用编辑后的标注、选定音色和语速，并直接播�
     )
   );
   await waitFor(() => expect(AudioMock.instances[0]?.play).toHaveBeenCalled());
+});
+
+it("仅调速但不勾选仍可试听，并使用默认音色自己的语速", async () => {
+  render(
+    <PreviewHarness
+      dialect="uk"
+      voiceProfile={{
+        voices: [
+          { voice_id: "british-voice", enabled: false, rate_percent: -10 },
+          { voice_id: "american-voice", enabled: false, rate_percent: 25 }
+        ]
+      }}
+    />
+  );
+  const button = screen.getByLabelText("获取语音");
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+  expect(preview.synthesize.mock.calls[0]![0]).toMatchObject({
+    voiceId: "british-voice",
+    ratePercent: -10
+  });
 });

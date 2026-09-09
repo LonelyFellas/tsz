@@ -353,6 +353,46 @@ describe("wire format and collection boundaries", () => {
     });
   });
 
+  it("音色配置接受完整目录并保留 2000 项存储边界", () => {
+    const word = validFixture("AdminWordV3") as {
+      meanings: { pos: unknown[] };
+    };
+    const pos = buildValidValue(
+      runtimeSchemaBundle.$defs.WordPosMeaningsV3!
+    ) as {
+      grammar_structures: unknown[];
+    };
+    const grammar = buildValidValue(
+      runtimeSchemaBundle.$defs.GrammarStructureV3!
+    ) as {
+      variants: unknown[];
+    };
+    const variant = buildValidValue(
+      runtimeSchemaBundle.$defs.GrammarVariantV3!
+    ) as Record<string, unknown>;
+    const profile = {
+      voices: Array.from({ length: 2000 }, (_, i) => ({
+        voice_id: `voice-${i}`,
+        enabled: i % 2 === 0,
+        rate_percent: i % 2 === 0 ? -25 : 10
+      }))
+    };
+    variant.voice_profile = profile;
+    grammar.variants = [variant];
+    pos.grammar_structures = [grammar];
+    word.meanings.pos = [pos];
+    expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({ valid: true });
+    profile.voices.push({
+      voice_id: "one-too-many",
+      enabled: false,
+      rate_percent: 0
+    });
+    expect(validateRuntimeSchema("AdminWordV3", word)).toMatchObject({
+      valid: false,
+      reason: "too_many_items"
+    });
+  });
+
   it("maxItems 在 2000/2001 边界分别接受与拒绝", () => {
     const word = validFixture("AdminWordV3") as {
       meanings: { sense_groups: unknown[] };
