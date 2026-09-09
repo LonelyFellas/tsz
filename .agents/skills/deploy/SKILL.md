@@ -33,6 +33,8 @@ CI 的 owner/repo 从 GitHub remote 解析，按脚本查询该 SHA 的最新 `C
 从仓库根执行 `./deploy/deploy-web.sh`；其全部检查通过后再执行 `./deploy/deploy-admin.sh`。
 用户仅指定一个组件时只运行该组件。
 
+需要先发兼容前端时，可用 `DEPLOY_VOICE_EDITOR=false ./deploy/deploy-admin.sh` 暂关语音编辑入口；后端验收后再按默认 `true` 重发 admin。开关只接受 `true` / `false`，不影响精确 main、CI、隔离构建或 manifest 门禁。
+
 脚本负责 Node 版本核对、隔离构建、写服务器前 exact-main 校验、rsync、服务/nginx、smoke 和 manifest 验证；
 web 还必须先启动裁剪后的 standalone 制品确认可运行。使用可继续读取的长命令会话，不因工具提前返回而误判完成。
 脚本非零退出立即停止；已完成组件明确列为部分部署，不手工拼产物、补写 manifest 或跳过验证。

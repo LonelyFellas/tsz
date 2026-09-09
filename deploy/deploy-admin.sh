@@ -7,6 +7,13 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source deploy/deploy-source.sh
 
+# 配套后端尚未发布时，允许先发布关闭编辑器入口的兼容前端。
+deploy_voice_editor="${DEPLOY_VOICE_EDITOR:-true}"
+case "$deploy_voice_editor" in
+  true|false) ;;
+  *) echo "!! DEPLOY_VOICE_EDITOR 必须为 true 或 false" >&2; exit 1 ;;
+esac
+
 prepare_deploy_source admin
 
 deploy_tmp="$(mktemp -d /tmp/tsz-admin-deploy.XXXXXX)"
@@ -52,7 +59,7 @@ echo "==> build @tsz/admin"
 (
   cd "$DEPLOY_BUILD_ROOT"
   run_sanitized_build \
-    VITE_VOICE_EDITOR=true \
+    VITE_VOICE_EDITOR="$deploy_voice_editor" \
     VITE_VOICE_PREVIEW=true \
     VITE_VOICE_AUDIO_UPLOAD=true \
     VITE_ADMIN_TTS_MOCK=false \
