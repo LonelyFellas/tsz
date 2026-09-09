@@ -40,6 +40,7 @@ const ISSUE_MESSAGES = {
   definition_required: "请至少添加一条释义",
   definition_level_invalid: "请选择有效的释义等级",
   definition_invalid: "请完整填写释义并选择语法结构",
+  phonetic_rich_text_invalid: "音标正文与标注不一致或标注范围无效，请重新编辑",
   audio_asset_invalid: "音频资产不可用、格式错误或无权引用",
   native_definition_required: "请至少填写一条中文释义",
   sentence_level_invalid: "请选择有效的例句等级",

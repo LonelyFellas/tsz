@@ -127,6 +127,7 @@ function chooseFiles(files: File[]) {
 
 function props(overrides: Record<string, unknown> = {}) {
   return {
+    mode: "grammar" as const,
     value: { version: 2, text: TEXT, annotations: [] } as RichTextV2,
     onChange: vi.fn(),
     ...overrides
@@ -234,11 +235,12 @@ function chooseEnd(label: "起点" | "终点") {
  * toBeInTheDocument 而不是 toBeVisible。
  */
 function openTool(label: string) {
-  fireEvent.click(button(label));
+  const target = button(label);
+  if (target.getAttribute("aria-expanded") !== "true") fireEvent.click(target);
 }
 
 function openVoices() {
-  openTool("音色");
+  openTool("发音");
 }
 
 function usePauseBrush() {
@@ -1321,7 +1323,7 @@ describe("VoiceEditor 发音区", () => {
     ).toEqual(["BrE", "AmE"]);
     // 性别下沉到每一行，不再有重复两遍的女声/男声表头
     expect(
-      [...document.querySelectorAll(".tsz-ve-pop-meta")].map(
+      [...document.querySelectorAll(".tsz-ve-pop-voices .tsz-ve-pop-meta")].map(
         (meta) => meta.textContent
       )
     ).toEqual(["女声 ♀", "男声 ♂"]);
@@ -1344,7 +1346,7 @@ describe("VoiceEditor 发音区", () => {
     const synthesize = vi.fn().mockResolvedValue(previewResult());
     render(<VoiceEditor {...props({ previewAdapter: adapter(synthesize) })} />);
     // 0.50× = -50%，超出 Sonia 声明的 -10..10，必须夹到 -10。
-    openTool("语速");
+    openTool("发音");
     fireEvent.click(button("语速 0.50 倍"));
 
     openVoices();
@@ -1359,6 +1361,18 @@ describe("VoiceEditor 发音区", () => {
     // 浮层内容在 jsdom 里带 antd 动效包装，可见性断言不可靠，只断言渲染出来
     await waitFor(() =>
       expect(screen.getByText(/播放中 Sonia/)).toBeInTheDocument()
+    );
+    fireEvent.click(button("语速 0.75 倍"));
+    fireEvent.click(button("试听 Guy · 美式男声"));
+    await waitFor(() => expect(synthesize).toHaveBeenCalledTimes(2));
+    expect(synthesize.mock.calls[1]![0]).toMatchObject({
+      voiceId: "guy",
+      ratePercent: -25,
+      content: { text: TEXT, annotations: [] }
+    });
+    expect(document.querySelector('[aria-label="发音"]')).toHaveAttribute(
+      "aria-expanded",
+      "true"
     );
   });
 
@@ -1694,11 +1708,11 @@ describe("VoiceEditor 发音区", () => {
 
   it("拒绝越界、非数字与空的自定义语速", () => {
     render(<VoiceEditor {...props()} />);
-    openTool("语速");
+    openTool("发音");
     // 每次重新取输入框：报错横幅出现/消失会让浮层内容重挂，旧引用会失效。
     const rateInput = () => screen.getByLabelText("自定义语速倍数");
     const summary = () =>
-      document.querySelector('[aria-label="语速"]')!.textContent;
+      document.querySelector('[aria-label="发音"]')!.textContent;
 
     // 闭区间 0.50×–2.00× 之外、非数字、空值都要被拒
     for (const value of ["", "0.4", "2.1", "abc"]) {
@@ -1735,7 +1749,7 @@ describe("VoiceEditor 发音区", () => {
       rate_percent: 0
     });
 
-    openTool("语速");
+    openTool("发音");
     fireEvent.click(button("语速 1.25 倍"));
     expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
       voice_ids: ["guy"],
@@ -1754,7 +1768,7 @@ describe("VoiceEditor 发音区", () => {
     );
     // 已配过就不必等清单拉回来才报数
     expect(
-      document.querySelector('[aria-label="语速"]')!.textContent
+      document.querySelector('[aria-label="发音"]')!.textContent
     ).toContain("0.75×");
 
     openVoices();
@@ -1789,7 +1803,7 @@ describe("VoiceEditor 发音区", () => {
         })}
       />
     );
-    expect(document.querySelector('[aria-label="音色"]')).toBeDisabled();
+    expect(document.querySelector('[aria-label="发音"]')).toBeDisabled();
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
   });
 
@@ -1798,4 +1812,16 @@ describe("VoiceEditor 发音区", () => {
     openVoices();
     expect(screen.getByText("TTS 后端未启用，仍可编辑")).toBeInTheDocument();
   });
+});
+
+it("默认发音编辑器不带语法工具，仅语法区域显式开启", () => {
+  const view = props();
+  const { rerender } = render(<VoiceEditor {...view} mode={undefined} />);
+  expect(screen.queryByRole("button", { name: /语法结构/ })).toBeNull();
+  for (const name of ["连读", "停顿", "发音", "音频"])
+    expect(
+      screen.getByRole("button", { name: new RegExp(name) })
+    ).toBeInTheDocument();
+  rerender(<VoiceEditor {...view} mode="grammar" />);
+  expect(screen.getByRole("button", { name: /语法结构/ })).toBeInTheDocument();
 });

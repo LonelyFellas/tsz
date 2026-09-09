@@ -158,7 +158,7 @@ export interface VoiceProfile {
 }
 
 export interface VoiceEditorProps {
-  mode?: "grammar" | "association";
+  mode?: "grammar" | "association" | "pronunciation";
   textLinks?: TextLinkV3[];
   renderAssociationPicker?: (props: AssociationPickerProps) => ReactNode;
   value: RichText;

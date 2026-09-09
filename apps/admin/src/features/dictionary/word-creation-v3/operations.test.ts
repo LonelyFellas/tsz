@@ -1683,3 +1683,38 @@ describe("V3 forms operations", () => {
     expect(content).toEqual(original);
   });
 });
+
+it("英美切换保留每条发音的标注、音色和录音", () => {
+  const form = commonFormFixture();
+  const row = commonVariant(form).pronunciations[0]!;
+  row.dict_phonetic_rich = {
+    version: 2,
+    text: row.dict_phonetic,
+    annotations: [{ type: "highlight", start: 0, end: 1, color: "yellow" }]
+  };
+  row.voice_profile = { voice_ids: ["british-voice"], rate_percent: -10 };
+  row.audio_assets = [];
+  const split = normalizePosDialectRules(
+    formsFixture({ forms: [form] }),
+    UUIDS.pos,
+    { spelling_mode: "distinguish", phonetic_mode: "distinguish" },
+    "us",
+    uuidSequence(
+      UUIDS.uk_variant,
+      UUIDS.pronunciation_2,
+      UUIDS.us_variant,
+      UUIDS.pronunciation_3
+    )
+  );
+  expect(split.ok).toBe(true);
+  if (!split.ok) throw new Error("split failed");
+  const variants = split.value.pos[0]!.forms[0]!.regional_variants;
+  if (variants.mode !== "uk_us") throw new Error("expected regional variants");
+  for (const variant of [variants.uk, variants.us]) {
+    expect(variant.pronunciations[0]).toMatchObject({
+      dict_phonetic_rich: row.dict_phonetic_rich,
+      voice_profile: row.voice_profile,
+      audio_assets: []
+    });
+  }
+});

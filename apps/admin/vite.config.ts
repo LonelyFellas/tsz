@@ -1,3 +1,4 @@
+import { localSpeechMock } from "./scripts/local-speech-mock.js";
 import { fileURLToPath, URL } from "node:url";
 import react from "@vitejs/plugin-react";
 import { loadEnv } from "vite";
@@ -57,7 +58,14 @@ export default defineConfig(({ mode, command }) => {
       : undefined;
 
   return {
-    plugins: [react()],
+    plugins: [
+      react(),
+      localSpeechMock(
+        command === "serve" &&
+          !production &&
+          buildEnv.VITE_LOCAL_SPEECH_MOCK === "true"
+      )
+    ],
     resolve: {
       alias: {
         "@": fileURLToPath(new URL("./src", import.meta.url))

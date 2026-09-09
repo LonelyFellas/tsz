@@ -927,7 +927,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.click(
       within(
         document.querySelector(".word-grammar-panel") as HTMLElement
-      ).getByLabelText("语速")
+      ).getByLabelText("发音")
     );
     fireEvent.click(screen.getByLabelText("语速 1.25 倍"));
 

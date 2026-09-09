@@ -682,7 +682,12 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(groupCard).toHaveTextContent("字典音标");
     expect(groupCard).toHaveTextContent("实际发音");
     expect(within(groupCard).getAllByLabelText(/播放语音/)).toHaveLength(3);
-    expect(within(groupCard).getAllByLabelText(/获取语音/)).toHaveLength(3);
+    expect(within(groupCard).queryAllByLabelText(/获取语音/)).toHaveLength(0);
+    expect(
+      within(groupCard).getAllByLabelText("第 1 条发音的字典音标", {
+        exact: true
+      })
+    ).toHaveLength(3);
     for (const form of [base, comparative, superlative]) {
       expect(
         groupCard.querySelector(
@@ -2020,11 +2025,9 @@ describe("V3FormsAndPronunciationStep", () => {
 
     fireEvent.change(inputs[0]!, { target: { value: "sent-uk" } });
     expect(inputs[0]).toHaveValue("sent-uk");
-    expect(inputs[0]).toHaveAttribute("value", "sent-uk");
     fireEvent.change(inputs[1]!, { target: { value: "sent-us" } });
     expect(inputs[0]).toHaveValue("sent-uk");
     expect(inputs[1]).toHaveValue("sent-us");
-    expect(inputs[1]).toHaveAttribute("value", "sent-us");
 
     const updated = canonicalValue().pos[0]!.forms[0]!;
     if (updated.regional_variants.mode !== "uk_us") throw new Error("fixture");
@@ -2034,6 +2037,12 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(updated.regional_variants.us.pronunciations[0]!.dict_phonetic).toBe(
       "sent-us"
     );
+    expect(
+      updated.regional_variants.uk.pronunciations[0]!.dict_phonetic_rich
+    ).toBeUndefined();
+    expect(
+      updated.regional_variants.us.pronunciations[0]!.dict_phonetic_rich
+    ).toBeUndefined();
   });
 
   it("P1-1 从空 skeleton 经 catalog UI 构建多 POS/组/重复 base", async () => {

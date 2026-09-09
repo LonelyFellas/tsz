@@ -441,6 +441,7 @@ function GrammarStructuresCard({
                     key={variant.id}
                   >
                     <V3VoiceTextField
+                      mode="grammar"
                       ariaLabel={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
                       field="content"
                       nodeId={variant.id}
