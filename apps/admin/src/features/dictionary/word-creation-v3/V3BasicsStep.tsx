@@ -1,3 +1,4 @@
+import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import {
   CheckCircleFilled,
   InfoCircleOutlined,
@@ -27,11 +28,7 @@ import {
 } from "antd";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "./components/V3ProductProgressList";
-import {
-  formTypeLabel,
-  partOfSpeechLabel,
-  pronunciationStyleLabel
-} from "./presentation";
+import { partOfSpeechLabel, pronunciationStyleLabel } from "./presentation";
 import "../word-creation/word-creation.css";
 import { buildV3ProductProgress } from "./readiness";
 import "./v3-layout.css";
@@ -131,7 +128,8 @@ function VariantPanel({
  * 规则与词形步一致，否则这里会并排出现两个「过去式」看着像重复。
  */
 function suggestedFormLabels(
-  forms: readonly WordConcreteFormV3[]
+  forms: readonly WordConcreteFormV3[],
+  formTypeLabel: (code: string) => string
 ): Map<string, string> {
   const seen = new Map<string, number>();
   const total = new Map<string, number>();
@@ -152,7 +150,8 @@ function suggestedFormLabels(
 }
 
 function SuggestedForms({ forms }: { forms: readonly WordConcreteFormV3[] }) {
-  const labels = suggestedFormLabels(forms);
+  const formTypeLabel = useFormTypeLabel();
+  const labels = suggestedFormLabels(forms, formTypeLabel);
   return forms.map((form) => (
     <SuggestedForm
       form={form}

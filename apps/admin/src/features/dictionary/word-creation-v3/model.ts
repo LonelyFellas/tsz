@@ -17,16 +17,8 @@ export const MAX_FORMS_NODES = 2_000;
 export const MAX_FORM_TEXT_CODEPOINTS = 200;
 
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
-const FORM_TYPES = new Set<WordFormTypeV3>([
-  "base",
-  "third_person_singular",
-  "present_participle",
-  "past_tense",
-  "past_participle",
-  "plural",
-  "comparative",
-  "superlative"
-]);
+const validFormTypeCode = (value: unknown): value is string =>
+  typeof value === "string" && /^[a-z][a-z0-9_]{0,31}$/.test(value);
 
 type ValidationIntent = "save" | "complete";
 
@@ -241,7 +233,7 @@ function isPhraseComponentUsageShape(
       value.target_dialect === "uk" ||
       value.target_dialect === "us") &&
     typeof value.target_form_type === "string" &&
-    FORM_TYPES.has(value.target_form_type as WordFormTypeV3) &&
+    validFormTypeCode(value.target_form_type) &&
     typeof value.target_headword === "string" &&
     typeof value.target_gloss === "string"
   );
@@ -639,7 +631,7 @@ export function validateFormsContent(
       if (!formOwners.has(form.id)) formOwners.set(form.id, pos.pos_id);
       formTypes.set(form.id, form.form_type);
       membershipCounts.set(form.id, 0);
-      if (!FORM_TYPES.has(form.form_type)) {
+      if (!validFormTypeCode(form.form_type)) {
         issues.push(
           issue(
             "invalid_form_type_for_part_of_speech",

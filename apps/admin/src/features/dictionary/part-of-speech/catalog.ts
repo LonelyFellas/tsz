@@ -8,6 +8,7 @@ import type {
 } from "@tsz/types";
 
 export interface PartOfSpeechLookup {
+  formTypeNames: ReadonlyMap<string, string>;
   items: PartOfSpeechCatalogItem[];
   byCode: ReadonlyMap<PartOfSpeechCode, PartOfSpeechCatalogItem>;
   subPartByCode: ReadonlyMap<SubPartOfSpeechCode, SubPartOfSpeechCatalogItem>;
@@ -48,7 +49,13 @@ export function createPartOfSpeechLookup(
       subPartByCode.set(subPart.code, subPart);
     }
   }
-  return { items, byCode, subPartByCode, subPartsByPosCode };
+  return {
+    items,
+    byCode,
+    subPartByCode,
+    subPartsByPosCode,
+    formTypeNames: new Map(catalog?.form_types?.map((f) => [f.code, f.name_zh]))
+  };
 }
 
 export function partOfSpeechLabel(

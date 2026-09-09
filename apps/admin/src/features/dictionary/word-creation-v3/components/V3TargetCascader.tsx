@@ -1,3 +1,4 @@
+import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { Alert, Button, Cascader, Empty, Flex, Spin, Typography } from "antd";
 import type {
   PhraseComponentUsageV3,
@@ -9,11 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { createV3WordRequests } from "../api";
-import {
-  dialectLabel,
-  formTypeLabel,
-  partOfSpeechLabel
-} from "../presentation";
+import { dialectLabel, partOfSpeechLabel } from "../presentation";
 import "./V3SentenceTargetDiscovery.css";
 
 type ResolvedUsage = Extract<PhraseComponentUsageV3, { state: "resolved" }>;
@@ -130,7 +127,8 @@ function groupsFromCandidates(
   candidates: readonly PublishedSentenceTargetCandidateV3[],
   preference: AdminDialectPreference,
   keepVariantIds: ReadonlySet<string>,
-  selfEntryId?: string
+  selfEntryId: string | undefined,
+  formTypeLabel: (code: string) => string
 ): CandidateEntryGroup[] {
   const byEntry = new Map<string, CandidateEntryGroup>();
   for (const candidate of candidates) {
@@ -227,6 +225,7 @@ export function V3TargetCascader({
   selfEntryId?: string;
   targetKind?: "word" | "phrase";
 }) {
+  const formTypeLabel = useFormTypeLabel();
   const includePhraseComponents = targetKind === "phrase";
   const [componentResults, setComponentResults] = useState<
     Record<
@@ -298,9 +297,16 @@ export function V3TargetCascader({
         state.candidates,
         preference,
         selectedVariantIds,
-        selfEntryId
+        selfEntryId,
+        formTypeLabel
       ),
-    [preference, selectedVariantIds, selfEntryId, state.candidates]
+    [
+      preference,
+      selectedVariantIds,
+      selfEntryId,
+      state.candidates,
+      formTypeLabel
+    ]
   );
   const phraseComponents = useMemo(() => {
     const entries = new Map<string, Map<string, PhraseComponentChoice>>();
@@ -400,7 +406,8 @@ export function V3TargetCascader({
               result?.candidates ?? [],
               preference,
               selectedVariantIds,
-              selfEntryId
+              selfEntryId,
+              formTypeLabel
             );
             const forms = cascaderOptionsFromGroups(componentGroups)
               .flatMap((target) => target.children ?? [])
@@ -450,7 +457,8 @@ export function V3TargetCascader({
     preference,
     selectedVariantIds,
     selfEntryId,
-    selectedLeafKey
+    selectedLeafKey,
+    formTypeLabel
   ]);
   const value = useMemo(() => {
     if (!selected) return undefined;

@@ -31,7 +31,9 @@ const API_PREFIX = "/api/v1";
 const ADMIN_LEXICON_PREFIX = `${API_PREFIX}/admin/lexicon`;
 const HTTP_METHODS = ["get", "post", "put", "patch", "delete"];
 const QUERY_CONTRACT_OPERATIONS = new Set([
-  "get /admin/lexicon/entries/related-search"
+  "get /admin/lexicon/entries/related-search",
+  "get /admin/settings/form-types",
+  "delete /admin/settings/form-types/{id}"
 ]);
 
 const RUNTIME_SCHEMA_ROOTS = [
@@ -93,6 +95,9 @@ if (!adminWordV2?.required || !adminWordV2?.properties) {
   throw new Error(`spec 无 components.schemas.AdminWordV2: ${source}`);
 }
 const contractSchemaNames = [
+  "FormTypeConfig",
+  "FormTypeCatalogItem",
+  "CatalogResponse",
   "ErrorCode",
   "CreateAdminWordV2Input",
   "DeleteDraftInput",
@@ -108,7 +113,6 @@ const contractSchemaNames = [
   "WordDetectionSnapshotV2",
   "SurfaceMatchCandidateV2",
   "ExistingSurfaceSourceV2",
-  "WordFormTypeV2",
   "SurfaceContentScopeV2",
   "SurfaceConfirmationReasonV2",
   "SurfaceMatchCategoryV2",
@@ -377,6 +381,12 @@ function sanitizeRuntimeSchema(schema, path, referencedNames) {
         }
         sanitized.format = value;
         break;
+      case "pattern":
+        if (typeof value !== "string")
+          throw new Error(`${path}.pattern 必须是字符串`);
+        new RegExp(value);
+        sanitized.pattern = value;
+        break;
       case "minimum":
       case "maximum":
       case "minLength":
@@ -483,7 +493,11 @@ for (const [rawPath, item] of Object.entries(spec.paths)) {
     }
 
     const operationKey = `${method} ${path}`;
-    if (rawPath.startsWith(ADMIN_LEXICON_PREFIX)) {
+    if (
+      rawPath.startsWith(ADMIN_LEXICON_PREFIX) ||
+      rawPath.startsWith(`${API_PREFIX}/admin/settings/form-types`) ||
+      rawPath === `${API_PREFIX}/admin/settings/parts-of-speech/catalog`
+    ) {
       const requestSchema =
         operation?.requestBody?.content?.["application/json"]?.schema ?? null;
       const responses = Object.fromEntries(

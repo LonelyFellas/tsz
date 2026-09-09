@@ -1,3 +1,4 @@
+import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { HttpError } from "@tsz/api-client";
 import type {
   AdminWordPublicationAny,
@@ -29,7 +30,6 @@ import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import {
   definitionModeLabel,
   dialectLabel,
-  formTypeLabel,
   partOfSpeechLabel,
   pronunciationStyleLabel,
   relationLabel,
@@ -401,6 +401,7 @@ function PublicationSnapshotBody({
 }: {
   publication: AdminWordPublicationAny;
 }) {
+  const formTypeLabel = useFormTypeLabel();
   const snapshot = snapshotBody(publication);
   return (
     <Card
