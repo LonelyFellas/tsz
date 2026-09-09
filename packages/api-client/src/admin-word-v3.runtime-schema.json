@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "43384ad7008134d54663a32e108eb51ac034ecd1e5065ccbce1ec98e8a615f65",
+  "_source": "/Users/darwish/Dev/tsz-pos-pronunciation/tsz-rust/docs/openapi.json",
+  "_source_sha256": "a0c38f8c2ff6c167402188282b43a902cbed96c0a1ba74d53c93f7f8380aa9ff",
   "roots": [
     "EntryAnnotationResponse",
     "AdminWordV3",
@@ -3302,6 +3302,7 @@
         "phrase_component_target_unavailable",
         "phrase_component_target_nested",
         "phrase_component_target_stale",
+        "phonetic_rich_text_invalid",
         "voice_profile_invalid",
         "audio_asset_invalid"
       ]
@@ -3810,9 +3811,16 @@
       "required": ["id", "dict_phonetic", "actual_pron"],
       "properties": {
         "actual_pron": { "type": "string", "maxLength": 200 },
+        "audio_assets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AudioAsset" },
+          "maxItems": 8
+        },
         "dict_phonetic": { "type": "string", "maxLength": 200 },
+        "dict_phonetic_rich": { "$ref": "#/$defs/RichTextV3" },
         "id": { "type": "string", "format": "uuid" },
-        "style": { "$ref": "#/$defs/PronunciationStyle" }
+        "style": { "$ref": "#/$defs/PronunciationStyle" },
+        "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
       "additionalProperties": false
     },

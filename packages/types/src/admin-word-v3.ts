@@ -61,6 +61,9 @@ export type WordFormTypeV3 =
 export interface WordPronunciationV3 {
   id: string;
   dict_phonetic: string;
+  dict_phonetic_rich?: RichTextV3;
+  voice_profile?: VoiceProfileV3;
+  audio_assets?: AudioAssetV3[];
   actual_pron: string;
   /** Draft may omit this; complete/publish requires it. */
   style?: PronunciationStyle;
@@ -852,6 +855,7 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "phrase_component_target_unavailable",
   "phrase_component_target_nested",
   "phrase_component_target_stale",
+  "phonetic_rich_text_invalid",
   "voice_profile_invalid",
   "audio_asset_invalid"
 ] as const;

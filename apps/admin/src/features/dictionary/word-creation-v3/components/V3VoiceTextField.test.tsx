@@ -246,7 +246,7 @@ it("正文在外部输入框编辑，内部只做标注；多行正文、关联�
   fireEvent.click(screen.getByLabelText("打开英文例句编辑器"));
   await screen.findByRole("toolbar", { name: "标注工具栏" });
   expect(screen.getByLabelText("英文例句")).toHaveValue("oh hello\nthere");
-  expect(screen.getByText("1.25×")).toBeVisible();
+  expect(screen.getByLabelText("发音")).toHaveTextContent("1.25×");
   expect(document.querySelectorAll(".tsz-ve-letter.is-linked")).toHaveLength(5);
 });
 

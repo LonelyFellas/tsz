@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-09T01:16:14.259Z",
+  "_source": "/Users/darwish/Dev/tsz-pos-pronunciation/tsz-rust/docs/openapi.json",
+  "_generatedAt": "2026-09-09T02:31:55.347Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2033,6 +2033,7 @@
         "phrase_component_target_unavailable",
         "phrase_component_target_nested",
         "phrase_component_target_stale",
+        "phonetic_rich_text_invalid",
         "voice_profile_invalid",
         "audio_asset_invalid"
       ]
@@ -4443,12 +4444,22 @@
       "required": ["id", "dict_phonetic", "actual_pron"],
       "properties": {
         "actual_pron": { "type": "string", "maxLength": 200 },
+        "audio_assets": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/AudioAsset" },
+          "maxItems": 8
+        },
         "dict_phonetic": { "type": "string", "maxLength": 200 },
+        "dict_phonetic_rich": {
+          "$ref": "#/components/schemas/RichTextV3",
+          "description": "编辑器正文与 dict_phonetic 保持一致；旧记录不输出扩展字段。"
+        },
         "id": { "type": "string", "format": "uuid" },
         "style": {
           "$ref": "#/components/schemas/PronunciationStyle",
           "description": "Draft 可暂未选择；complete/publish 必须有值。"
-        }
+        },
+        "voice_profile": { "$ref": "#/components/schemas/VoiceProfileV3" }
       },
       "additionalProperties": false
     },

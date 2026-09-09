@@ -1,9 +1,9 @@
 import type {
+  PronunciationStyle,
   DialectRulesV3,
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
   PhraseComponentUsageV3,
-  PronunciationStyle,
   RetiredStableNodeV3,
   TextOriginV3,
   WordCommonFormVariantV3,
@@ -63,11 +63,7 @@ export type OperationResult<T> =
       form_id: string;
     };
 
-export interface PronunciationMapping {
-  dict_phonetic: string;
-  actual_pron: string;
-  style?: PronunciationStyle;
-}
+export type PronunciationMapping = Omit<WordPronunciationV3, "id">;
 
 export interface VariantMapping {
   spelling: string;
@@ -224,6 +220,7 @@ function mappedPronunciations(
   allocated: Set<string>
 ): WordPronunciationV3[] {
   return mapping.pronunciations.map((pronunciation) => ({
+    ...structuredClone(pronunciation),
     id: nextUuid(factory, allocated),
     dict_phonetic: pronunciation.dict_phonetic,
     actual_pron: pronunciation.actual_pron,
@@ -398,6 +395,19 @@ function variantMappingFrom(
     spelling: variant.spelling,
     origin: variant.origin,
     pronunciations: variant.pronunciations.map((pronunciation) => ({
+      ...(pronunciation.dict_phonetic_rich === undefined
+        ? {}
+        : {
+            dict_phonetic_rich: structuredClone(
+              pronunciation.dict_phonetic_rich
+            )
+          }),
+      ...(pronunciation.voice_profile === undefined
+        ? {}
+        : { voice_profile: structuredClone(pronunciation.voice_profile) }),
+      ...(pronunciation.audio_assets === undefined
+        ? {}
+        : { audio_assets: structuredClone(pronunciation.audio_assets) }),
       dict_phonetic: pronunciation.dict_phonetic,
       actual_pron: pronunciation.actual_pron,
       ...(pronunciation.style === undefined

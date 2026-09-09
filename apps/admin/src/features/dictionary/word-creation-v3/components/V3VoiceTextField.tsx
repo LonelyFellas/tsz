@@ -10,9 +10,16 @@ import {
   remapTextLinks,
   toRichTextV2
 } from "@tsz/voice-editor/core";
-import { EditOutlined } from "@ant-design/icons";
+import { AudioOutlined } from "@ant-design/icons";
 import { Button, Input, Space, message } from "antd";
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import {
+  type ReactNode,
+  Suspense,
+  lazy,
+  useEffect,
+  useRef,
+  useState
+} from "react";
 import {
   adminAudioUploadAdapter,
   adminVoicePreviewAdapter,
@@ -39,6 +46,8 @@ export interface V3VoiceTextFieldProps {
   field: string;
   placeholder?: string;
   readOnly?: boolean;
+  invalid?: boolean;
+  leadingAction?: ReactNode;
   /** 发音配置；与正文分开走，因为它在 wire 上是正文的兄弟字段。 */
   voiceProfile?: VoiceProfileV3 | null;
   onVoiceProfileChange?: (next: VoiceProfileV3) => void;
@@ -68,6 +77,8 @@ export function V3VoiceTextField({
   field,
   placeholder,
   readOnly,
+  invalid,
+  leadingAction,
   voiceProfile,
   onVoiceProfileChange,
   audioAssets,
@@ -122,6 +133,8 @@ export function V3VoiceTextField({
   const fallback = (
     <Input.TextArea
       aria-label={ariaLabel}
+      aria-invalid={invalid}
+      status={invalid ? "error" : undefined}
       autoSize={{ minRows: 1, maxRows: 6 }}
       className="word-pronunciation-phonetic-input"
       data-v3-field={field}
@@ -164,7 +177,14 @@ export function V3VoiceTextField({
     return (
       <>
         {feedbackHolder}
-        {fallback}
+        {leadingAction ? (
+          <Space.Compact block>
+            {leadingAction}
+            {fallback}
+          </Space.Compact>
+        ) : (
+          fallback
+        )}
       </>
     );
 
@@ -173,12 +193,13 @@ export function V3VoiceTextField({
       <>
         {feedbackHolder}
         <Space.Compact block>
+          {leadingAction}
           {fallback}
           <Button
             aria-label={`打开${ariaLabel}编辑器`}
             // 正文还是空的时候没有东西可标注，编辑器打开也只是一块空画布，先置灰。
             disabled={readOnly || value.text.trim() === ""}
-            icon={<EditOutlined />}
+            icon={<AudioOutlined />}
             onClick={() => setEditing(true)}
             style={{ height: "auto" }}
           />
@@ -188,7 +209,7 @@ export function V3VoiceTextField({
   }
 
   return (
-    <div className="v3-voice-text-editor">
+    <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
       {feedbackHolder}
       <Suspense fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}>
         <VoiceEditor
@@ -222,15 +243,16 @@ export function V3VoiceTextField({
           voiceProfile={voiceProfile}
         />
       </Suspense>
-      <Button
-        type="primary"
-        size="small"
-        className="v3-voice-text-editor-done"
-        aria-label={`完成${ariaLabel}编辑`}
-        onClick={() => setEditing(false)}
-      >
-        完成
-      </Button>
+      <Space className="v3-voice-text-editor-done">
+        <Button
+          type="primary"
+          size="small"
+          aria-label={`完成${ariaLabel}编辑`}
+          onClick={() => setEditing(false)}
+        >
+          完成
+        </Button>
+      </Space>
     </div>
   );
 }

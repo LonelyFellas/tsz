@@ -1,6 +1,6 @@
 import { SoundOutlined, SyncOutlined } from "@ant-design/icons";
 import { App, Button, Space, Tag, Tooltip } from "antd";
-import type { Dialect, RichTextV2 } from "@tsz/types";
+import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import type {
@@ -154,6 +154,8 @@ export function PronunciationPreviewControls({
   pronunciationId,
   spelling,
   content,
+  voiceProfile,
+  playbackOnly = false,
   dialect,
   ariaLabelPrefix,
   disabled = false,
@@ -164,6 +166,8 @@ export function PronunciationPreviewControls({
   pronunciationId: string;
   spelling?: string;
   content?: RichTextV2;
+  voiceProfile?: VoiceProfileV3;
+  playbackOnly?: boolean;
   dialect: Dialect;
   ariaLabelPrefix?: string;
   disabled?: boolean;
@@ -182,16 +186,16 @@ export function PronunciationPreviewControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const voice = voiceForDialect(
-    context.voices,
-    dialect,
-    context.dialectPreference
-  );
+  const voice = voiceProfile
+    ? voiceProfile.voice_ids
+        .map((id) => context.voices.find((voice) => voice.id === id))
+        .find((voice) => voice !== undefined)
+    : voiceForDialect(context.voices, dialect, context.dialectPreference);
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
   );
-  const contentKey = JSON.stringify(previewContent);
+  const contentKey = JSON.stringify([previewContent, voiceProfile]);
   const text = previewContent.text.trim();
   const playLabel = ariaLabelPrefix
     ? `${ariaLabelPrefix} 播放语音`
@@ -287,7 +291,8 @@ export function PronunciationPreviewControls({
         {
           language: "en",
           content: previewContent,
-          voiceId: voice.id
+          voiceId: voice.id,
+          ...(voiceProfile ? { ratePercent: voiceProfile.rate_percent } : {})
         },
         { signal: controller.signal }
       );
@@ -357,22 +362,42 @@ export function PronunciationPreviewControls({
       : context.voicesError
         ? context.voicesError
         : !text
-          ? "请先填写词形拼写"
+          ? content
+            ? "请先填写字典音标"
+            : "请先填写词形拼写"
           : !voice
             ? `${localeForDialect(dialect, context.dialectPreference) ?? "英语"} 暂无可用发音人`
             : "获取语音";
 
   const controls = (
     <>
-      <Tooltip title={status || (result ? "播放语音" : "请先获取语音")}>
-        <Button
-          className="word-pronunciation-play-action"
-          icon={<SoundOutlined />}
-          disabled={disabled || !context.enabled || !result}
-          aria-label={playLabel}
-          onClick={() => void replay()}
-        />
-      </Tooltip>
+      {
+        <Tooltip
+          title={
+            status ||
+            (result
+              ? "播放语音"
+              : playbackOnly
+                ? unavailableReason
+                : "请先获取语音")
+          }
+        >
+          <Button
+            className="word-pronunciation-play-action"
+            icon={<SoundOutlined />}
+            disabled={
+              disabled ||
+              !context.enabled ||
+              busy ||
+              (!result &&
+                (!playbackOnly || context.voicesLoading || !voice || !text))
+            }
+            aria-label={playLabel}
+            loading={playbackOnly && busy}
+            onClick={() => void (result ? replay() : generate())}
+          />
+        </Tooltip>
+      }
       {children}
       {voicePreviewIsMock && (
         <Tooltip title="当前走本地 TTS mock，试听音频不是真实合成结果">
@@ -386,23 +411,25 @@ export function PronunciationPreviewControls({
           </Tag>
         </Tooltip>
       )}
-      <Tooltip title={status || unavailableReason}>
-        <Button
-          className="word-pronunciation-voice-action word-pronunciation-sync-action"
-          aria-label={generateLabel}
-          icon={<SyncOutlined spin={busy} />}
-          loading={busy}
-          disabled={
-            disabled ||
-            !context.enabled ||
-            context.voicesLoading ||
-            !voice ||
-            !text ||
-            busy
-          }
-          onClick={() => void generate()}
-        />
-      </Tooltip>
+      {!playbackOnly && (
+        <Tooltip title={status || unavailableReason}>
+          <Button
+            className="word-pronunciation-voice-action word-pronunciation-sync-action"
+            aria-label={generateLabel}
+            icon={<SyncOutlined spin={busy} />}
+            loading={busy}
+            disabled={
+              disabled ||
+              !context.enabled ||
+              context.voicesLoading ||
+              !voice ||
+              !text ||
+              busy
+            }
+            onClick={() => void generate()}
+          />
+        </Tooltip>
+      )}
     </>
   );
   return compact ? <Space.Compact block>{controls}</Space.Compact> : controls;

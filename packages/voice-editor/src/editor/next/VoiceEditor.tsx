@@ -1,6 +1,5 @@
 import {
   AudioOutlined,
-  DashboardOutlined,
   EditOutlined,
   LinkOutlined,
   PauseOutlined,
@@ -118,7 +117,7 @@ function parseValue(value: RichText): { value: RichTextV2; error?: string } {
  */
 export function VoiceEditor({
   value,
-  mode = "grammar",
+  mode = "pronunciation",
   textLinks,
   renderAssociationPicker,
   language = "en",
@@ -1149,46 +1148,45 @@ export function VoiceEditor({
     {
       key: "voices",
       dividerBefore: true,
-      label: "音色",
-      // 清单要到面板首次打开才拉，没拉之前不报数——显示「0」会被读成「一个都没启用」。
-      // 已配过就直接报数；没配过时要等清单拉回来才知道「全部」是几个。
-      summary:
-        enabledTouched || voices.length > 0
-          ? String(effectiveEnabledIds.length)
-          : undefined,
+      label: "发音",
+      className: "tsz-ve-speech-tool",
+      summary: `${enabledTouched || voices.length > 0 ? `${effectiveEnabledIds.length} 音色 · ` : ""}${rateSummary}`,
       icon: <SoundOutlined />,
       content: (
-        <VoicePanel
-          readOnly={readOnly}
-          voices={voices}
-          voicesLoading={voicesLoading}
-          enabledVoiceIds={effectiveEnabledIds}
-          onToggleVoice={toggleVoice}
-          pendingVoiceId={pendingVoiceId}
-          playingVoiceId={playingVoiceId}
-          canAudition={Boolean(previewAdapter) && text.trim().length > 0}
-          onAudition={handleAudition}
-          auditionStatus={
-            previewAdapter ? auditionStatus : "TTS 后端未启用，仍可编辑"
-          }
-        />
-      )
-    },
-    {
-      key: "rate",
-      label: "语速",
-      summary: rateSummary,
-      icon: <DashboardOutlined />,
-      content: (
-        <RatePanel
-          readOnly={readOnly}
-          ratePercent={ratePercent}
-          isRateAllowed={isRateAllowed}
-          onRate={applyRate}
-          customRate={customRate}
-          onCustomRateChange={setCustomRate}
-          onCustomRateSubmit={applyCustomRate}
-        />
+        <div className="tsz-ve-speech-panel" aria-label="发音设置与试听">
+          <div>
+            <div className="tsz-ve-speech-panel-title">音色 · 点击喇叭试听</div>
+            <VoicePanel
+              readOnly={readOnly}
+              voices={voices}
+              voicesLoading={voicesLoading}
+              enabledVoiceIds={effectiveEnabledIds}
+              onToggleVoice={toggleVoice}
+              pendingVoiceId={pendingVoiceId}
+              playingVoiceId={playingVoiceId}
+              canAudition={Boolean(previewAdapter) && text.trim().length > 0}
+              onAudition={handleAudition}
+              auditionStatus={
+                previewAdapter ? auditionStatus : "TTS 后端未启用，仍可编辑"
+              }
+            />
+          </div>
+          <div>
+            <div className="tsz-ve-speech-panel-title">语速</div>
+            <RatePanel
+              readOnly={readOnly}
+              ratePercent={ratePercent}
+              isRateAllowed={isRateAllowed}
+              onRate={applyRate}
+              customRate={customRate}
+              onCustomRateChange={setCustomRate}
+              onCustomRateSubmit={applyCustomRate}
+            />
+          </div>
+          <div className="tsz-ve-speech-panel-hint">
+            试听使用当前文本、标注和语速，修改后可直接再次试听。
+          </div>
+        </div>
       )
     },
     {
@@ -1222,7 +1220,11 @@ export function VoiceEditor({
         />
       )
     }
-  ].filter((tool) => !textReadOnly || tool.key !== "text");
+  ].filter(
+    (tool) =>
+      (!textReadOnly || tool.key !== "text") &&
+      (mode !== "pronunciation" || tool.key !== "roles")
+  );
 
   // 外壳不另起可及名：名字归那个真正可编辑的文本框，避免同名两份。
   return (

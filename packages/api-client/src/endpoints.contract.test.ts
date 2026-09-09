@@ -494,7 +494,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "43384ad7008134d54663a32e108eb51ac034ecd1e5065ccbce1ec98e8a615f65"
+      "a0c38f8c2ff6c167402188282b43a902cbed96c0a1ba74d53c93f7f8380aa9ff"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -587,6 +587,13 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "dict_phonetic",
       "actual_pron"
     ]);
+    expect(defs.WordPronunciationV3.properties.dict_phonetic_rich).toEqual({
+      $ref: "#/$defs/RichTextV3"
+    });
+    expect(defs.WordPronunciationV3.properties.voice_profile).toEqual({
+      $ref: "#/$defs/VoiceProfileV3"
+    });
+    expect(defs.WordPronunciationV3.properties.audio_assets.maxItems).toBe(8);
     const serializedV3 = JSON.stringify(defs.AdminWordV3);
     expect(serializedV3).not.toContain("base_form");
     expect(serializedV3).not.toContain("parent_form_id");

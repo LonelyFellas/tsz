@@ -1,3 +1,6 @@
+import { toRichTextV2 } from "@tsz/voice-editor/core";
+import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
+import { V3VoiceTextField } from "./V3VoiceTextField";
 import {
   HolderOutlined,
   MinusCircleOutlined,
@@ -20,9 +23,7 @@ import {
   type V3IdFactory
 } from "../operations";
 import { pronunciationStyleLabel } from "../presentation";
-import { dialectLabel } from "../presentation";
 import { v3IssueMessage } from "../presentationErrors";
-import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 
 const PRONUNCIATION_DRAG_TYPE = "application/x-tsz-pronunciation";
 
@@ -317,44 +318,82 @@ export function V3PronunciationList({
                           </Typography.Text>
                         ) : null}
                       </label>
-                      <div className="word-pronunciation-row">
+                      <div
+                        className="word-pronunciation-row"
+                        style={{ alignItems: "start" }}
+                      >
                         <Typography.Text className="word-pronunciation-label">
                           字典音标
                         </Typography.Text>
                         <div className="word-pronunciation-phonetic-control">
-                          <PronunciationPreviewControls
-                            ariaLabelPrefix={`${dialectLabel(variant.dialect)}第 ${index + 1} 条发音`}
-                            compact
-                            dialect={variant.dialect}
-                            pronunciationId={pronunciation.id}
-                            spelling={variant.spelling}
-                          >
-                            <Form.Item noStyle>
-                              <Input
-                                aria-invalid={rowIssues.some(
-                                  (item) => item.field === "dict_phonetic"
-                                )}
-                                aria-label={`第 ${index + 1} 条发音的字典音标`}
-                                className="word-pronunciation-phonetic-input"
-                                data-v3-field="dict_phonetic"
-                                data-v3-node-id={pronunciation.id}
-                                onChange={(event) =>
-                                  onChange(
-                                    updatePronunciation(
-                                      content,
-                                      pronunciation.id,
-                                      {
-                                        dict_phonetic: event.target.value
-                                      }
-                                    )
-                                  )
+                          <Form.Item noStyle>
+                            <V3VoiceTextField
+                              mode="pronunciation"
+                              leadingAction={
+                                <PronunciationPreviewControls
+                                  playbackOnly
+                                  pronunciationId={pronunciation.id}
+                                  dialect={variant.dialect}
+                                  ariaLabelPrefix={`第 ${index + 1} 条发音 最终读音`}
+                                  content={toRichTextV2(
+                                    pronunciation.dict_phonetic_rich ?? {
+                                      version: 2,
+                                      text: pronunciation.dict_phonetic,
+                                      annotations: []
+                                    }
+                                  )}
+                                  voiceProfile={pronunciation.voice_profile}
+                                />
+                              }
+                              ariaLabel={`第 ${index + 1} 条发音的字典音标`}
+                              nodeId={pronunciation.id}
+                              field="dict_phonetic"
+                              invalid={Boolean(dictPhoneticIssue)}
+                              placeholder="字典音标"
+                              value={
+                                pronunciation.dict_phonetic_rich ?? {
+                                  version: 2,
+                                  text: pronunciation.dict_phonetic,
+                                  annotations: []
                                 }
-                                placeholder="字典音标"
-                                status={dictPhoneticIssue ? "error" : undefined}
-                                value={pronunciation.dict_phonetic}
-                              />
-                            </Form.Item>
-                          </PronunciationPreviewControls>
+                              }
+                              voiceProfile={pronunciation.voice_profile}
+                              audioAssets={pronunciation.audio_assets}
+                              onVoiceProfileChange={(voice_profile) =>
+                                onChange(
+                                  updatePronunciation(
+                                    content,
+                                    pronunciation.id,
+                                    { voice_profile }
+                                  )
+                                )
+                              }
+                              onAudioAssetsChange={(audio_assets) =>
+                                onChange(
+                                  updatePronunciation(
+                                    content,
+                                    pronunciation.id,
+                                    { audio_assets }
+                                  )
+                                )
+                              }
+                              onChange={(dict_phonetic_rich) =>
+                                onChange(
+                                  updatePronunciation(
+                                    content,
+                                    pronunciation.id,
+                                    {
+                                      dict_phonetic: dict_phonetic_rich.text,
+                                      ...(pronunciation.dict_phonetic_rich ||
+                                      dict_phonetic_rich.annotations.length > 0
+                                        ? { dict_phonetic_rich }
+                                        : {})
+                                    }
+                                  )
+                                )
+                              }
+                            />
+                          </Form.Item>
                           {dictPhoneticIssue ? (
                             <Typography.Text
                               className="word-field-help"

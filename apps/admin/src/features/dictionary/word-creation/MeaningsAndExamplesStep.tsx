@@ -331,12 +331,14 @@ function useSortableRows<T>({
  * 所以这里不再另挂一个。
  */
 function VoiceTextControl({
+  mode = "pronunciation",
   value,
   contextLabel,
   toolbarLabel,
   readOnly,
   onChange
 }: {
+  mode?: "grammar" | "pronunciation";
   value: RichText;
   contextLabel: string;
   toolbarLabel?: string;
@@ -362,6 +364,7 @@ function VoiceTextControl({
         }
       >
         <VoiceEditor
+          mode={mode}
           value={value}
           language="en"
           contextLabel={contextLabel}
@@ -522,6 +525,7 @@ function GrammarEditor({
             <div className="word-grammar-text-field">
               {env.VOICE_EDITOR ? (
                 <VoiceTextControl
+                  mode="grammar"
                   value={resolveGrammarText(grammar, preference)}
                   contextLabel={`语法结构 ${grammarIndex + 1}`}
                   readOnly={readOnly}

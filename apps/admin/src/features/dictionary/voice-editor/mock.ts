@@ -73,6 +73,26 @@ export function createMockVoicePreviewAdapter(): VoicePreviewAdapter {
       if (!voice) throw new Error("mock voice not found");
       const hash = canonicalVoiceHash(input.content, input);
       const cached = cache.has(hash);
+      if (
+        import.meta.env.DEV &&
+        import.meta.env.VITE_LOCAL_SPEECH_MOCK === "true"
+      ) {
+        const response = await fetch("/__mock/voice-preview", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+          signal: options?.signal
+        });
+        if (!response.ok) throw new Error("本机演示语音暂时不可用");
+        const audioUrl = URL.createObjectURL(await response.blob());
+        cache.add(hash);
+        return {
+          audioUrl,
+          cached,
+          expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+          dispose: () => URL.revokeObjectURL(audioUrl)
+        };
+      }
       cache.add(hash);
       return {
         audioUrl: SILENT_WAV,
