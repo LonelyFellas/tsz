@@ -357,8 +357,8 @@ describe("V3WordCreationLayout", () => {
     fireEvent.click(screen.getByRole("button", { name: "展开语言识别" }));
     const summary = screen.getByRole("region", { name: "语言识别摘要" });
     expect(within(summary).getByText("英语 English")).toBeVisible();
-    expect(within(summary).getByText("英式 BrE")).toBeVisible();
-    expect(within(summary).getByText("美式 AmE")).toBeVisible();
+    expect(within(summary).getByText("BrE")).toBeVisible();
+    expect(within(summary).getByText("AmE")).toBeVisible();
     expect(summary.querySelector(".dialect-dot-uk")).not.toBeNull();
     expect(summary.querySelector(".dialect-dot-us")).not.toBeNull();
     expect(screen.queryByText(/检测基准/u)).toBeNull();
@@ -386,8 +386,8 @@ describe("V3WordCreationLayout", () => {
     expect(
       view.container.querySelectorAll(".word-creation-summary-headword")
     ).toHaveLength(0);
-    expect(screen.getByText("英式 BrE")).toBeVisible();
-    expect(screen.getByText("美式 AmE")).toBeVisible();
+    expect(screen.getByText("BrE")).toBeVisible();
+    expect(screen.getByText("AmE")).toBeVisible();
     expect(screen.queryByText(/检测基准/u)).toBeNull();
   });
 
@@ -419,8 +419,8 @@ describe("V3WordCreationLayout", () => {
     ).toBeVisible();
     expect(screen.getByText("center · 词形与发音")).toBeVisible();
     expect(summary.queryByText("center / center")).toBeNull();
-    expect(summary.getByText("英式 BrE")).toBeVisible();
-    expect(summary.getByText("美式 AmE")).toBeVisible();
+    expect(summary.getByText("BrE")).toBeVisible();
+    expect(summary.getByText("AmE")).toBeVisible();
   });
 
   it("没有原形时回退后端 presentation label", () => {

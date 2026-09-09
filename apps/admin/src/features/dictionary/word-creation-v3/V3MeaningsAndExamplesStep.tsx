@@ -49,9 +49,14 @@ import type {
   WordSenseWritableV3
 } from "@tsz/types";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRelatedSearchAny } from "../api";
-import { CEFR_OPTIONS, cefrColor } from "../labels";
+import {
+  groupRelations,
+  replaceRelationGroup,
+  selectDerivativeSenses
+} from "./relationGroups";
+import { CEFR_OPTIONS } from "../labels";
 import { validateEntryInput } from "../word-creation/entryClassification";
 import { newWordNodeId } from "../word-model/primitives";
 import { addPartOfSpeech, deletePartOfSpeech } from "./operations";
@@ -275,7 +280,7 @@ function SenseEditorShell({
     <div data-v3-field="sense" data-v3-node-id={nodeId} tabIndex={-1}>
       <Collapse
         activeKey={expanded ? [nodeId] : []}
-        className={`word-sense-editor word-sense-editor-${safeLevel.toLowerCase()}`}
+        className={`word-sense-editor word-sense-editor-v3 word-sense-editor-${safeLevel.toLowerCase()}`}
         onChange={(keys) =>
           setExpanded((Array.isArray(keys) ? keys : [keys]).includes(nodeId))
         }
@@ -285,13 +290,17 @@ function SenseEditorShell({
             showArrow: false,
             label: (
               <div className="word-sense-header-label">
-                <Space wrap size={6}>
-                  <Tag color={cefrColor(safeLevel as "A1")}>{level}</Tag>
-                  <Typography.Text strong>
+                <div className="word-sense-header-content">
+                  <Tag className="word-sense-level-badge">{level}</Tag>
+                  <Typography.Text className="word-sense-summary">
                     {index + 1}. {summary}
                   </Typography.Text>
-                  {subPosLabel ? <Tag color="green">{subPosLabel}</Tag> : null}
-                </Space>
+                  {subPosLabel ? (
+                    <Tag className="word-sense-sub-pos-badge">
+                      {subPosLabel}
+                    </Tag>
+                  ) : null}
+                </div>
                 <span className="word-form-card-toggle-state">
                   <span>{expanded ? "收起" : "展开"}</span>
                   {expanded ? <CaretUpFilled /> : <CaretDownFilled />}
@@ -401,7 +410,7 @@ function GrammarStructuresCard({
       {pos.grammar_structures.length === 0 ? (
         <Typography.Text type="secondary">暂无语法结构</Typography.Text>
       ) : (
-        <Flex vertical gap="small">
+        <Flex vertical gap={0}>
           {pos.grammar_structures.map((structure, structureIndex) => (
             <div
               className={sortableRowClass(
@@ -848,6 +857,7 @@ const RELATION_META: Record<RelationType, { metric: string }> = {
 interface RelatedWordChoice {
   word_id: string;
   headword: string;
+  matchedHeadword: string;
   status: "draft" | "published";
   senses: Array<{ sense_id: string; gloss: string }>;
 }
@@ -868,6 +878,11 @@ function relatedWordChoices(
               result.schema_version === 3
                 ? result.presentation.label
                 : result.headword,
+            matchedHeadword:
+              result.schema_version === 3
+                ? (result.presentation.matched_surfaces[0] ??
+                  result.presentation.label)
+                : result.headword,
             status:
               result.schema_version === 3
                 ? (result.status ?? "published")
@@ -887,7 +902,7 @@ function relationDisplayHeadword(
   snapshot: RelationDisplaySnapshots[string] | undefined
 ): string {
   return (
-    known?.headword ??
+    (relation.target_word_id ? known?.headword : undefined) ??
     (relation.target_word_id ? snapshot?.headword : undefined) ??
     relation.pending_target_headword ??
     ""
@@ -935,11 +950,22 @@ function RelationsGrid({
   const [knownWords, setKnownWords] = useState<
     Record<string, RelatedWordChoice>
   >({});
-  const preparedSearch = validateEntryInput(searching?.query ?? "");
+  const knownWordFor = (relation: WordRelationWritableV3) =>
+    knownWords[relation.id] ??
+    Object.values(knownWords).find(
+      (word) => word.word_id === relation.target_word_id
+    );
+  const relationRowKeys = useRef(new Map<string, string>());
+  const [senseSearch, setSenseSearch] = useState<{
+    wordId: string;
+    query: string;
+  }>();
+  const activeSearch = searching ?? senseSearch;
+  const preparedSearch = validateEntryInput(activeSearch?.query ?? "");
   const relatedSearch = useRelatedSearchAny(
     preparedSearch.normalized,
     preparedSearch.kind,
-    Boolean(searching?.query.trim()) && !preparedSearch.issue,
+    Boolean(activeSearch?.query.trim()) && !preparedSearch.issue,
     true
   );
   const searchWords = relatedWordChoices(
@@ -982,13 +1008,17 @@ function RelationsGrid({
     Boolean(relation.pending_target_headword?.trim()) &&
     !relationInputIssue(relation);
 
+  const isSelectedEmptyDraft = (relation: WordRelationWritableV3) =>
+    knownWords[relation.id]?.status === "draft" &&
+    knownWords[relation.id]?.senses.length === 0;
+
   return (
-    <div className="word-relations-grid">
+    <div className="word-relations-grid word-relations-grid-stacked">
       {RELATION_TYPES.map((relationType) => {
         const meta = RELATION_META[relationType];
-        const relations = sense.relations
-          .map((relation, relationIndex) => ({ relation, relationIndex }))
-          .filter(({ relation }) => relation.relation === relationType);
+        const relations = groupRelations(sense.relations)
+          .filter((group) => group[0]!.relation === relationType)
+          .map((group) => ({ relation: group[0]!, group }));
         return (
           <Card
             className={`word-relation-card${collapsed[relationType] ? " is-collapsed" : ""}`}
@@ -1034,11 +1064,13 @@ function RelationsGrid({
                   <span>匹配词义</span>
                   <span />
                 </div>
-                {relations.map(({ relation, relationIndex }) => (
+                {relations.map(({ relation, group }) => (
                   <div
                     className="word-relation-row"
                     data-v3-node-id={relation.id}
-                    key={relation.id}
+                    key={
+                      relationRowKeys.current.get(relation.id) ?? relation.id
+                    }
                   >
                     <InputNumber
                       aria-label={meta.metric}
@@ -1049,9 +1081,12 @@ function RelationsGrid({
                       min={0}
                       onChange={(score) =>
                         change((draft) => {
-                          draft.pos[posIndex]!.senses[senseIndex]!.relations[
-                            relationIndex
-                          ]!.score = String(score ?? 0);
+                          for (const item of draft.pos[posIndex]!.senses[
+                            senseIndex
+                          ]!.relations) {
+                            if (group.some((member) => member.id === item.id))
+                              item.score = String(score ?? 0);
+                          }
                         })
                       }
                       precision={2}
@@ -1075,18 +1110,20 @@ function RelationsGrid({
                                 : "输入词汇搜索"
                       }
                       onFocus={() => {
+                        setSenseSearch(undefined);
                         if (searching?.relationId === relation.id) return;
                         setSearching({
                           relationId: relation.id,
                           query: relationDisplayHeadword(
                             relation,
-                            knownWords[relation.id],
+                            knownWordFor(relation),
                             relationDisplaySnapshots?.[relation.id]
                           )
                         });
                       }}
                       onSearch={(query) => {
                         const prepared = validateEntryInput(query);
+                        setSenseSearch(undefined);
                         setSearching({ relationId: relation.id, query });
                         setKnownWords((current) => {
                           if (!(relation.id in current)) return current;
@@ -1095,10 +1132,20 @@ function RelationsGrid({
                           return next;
                         });
                         change((draft) => {
-                          const target =
-                            draft.pos[posIndex]!.senses[senseIndex]!.relations[
-                              relationIndex
-                            ]!;
+                          const draftSense =
+                            draft.pos[posIndex]!.senses[senseIndex]!;
+                          draftSense.relations = replaceRelationGroup(
+                            draftSense.relations,
+                            group,
+                            [
+                              draftSense.relations.find(
+                                (item) => item.id === relation.id
+                              )!
+                            ]
+                          );
+                          const target = draft.pos[posIndex]!.senses[
+                            senseIndex
+                          ]!.relations.find((item) => item.id === relation.id)!;
                           delete target.target_word_id;
                           delete target.target_sense_id;
                           if (!prepared.issue && prepared.normalized)
@@ -1114,17 +1161,58 @@ function RelationsGrid({
                         const word = searchWords.find(
                           (candidate) => candidate.word_id === wordId
                         );
-                        if (!word || word.senses.length === 0) return;
+                        if (!word) return;
+                        if (word.senses.length === 0) {
+                          if (word.status !== "draft") return;
+                          setKnownWords((current) => ({
+                            ...current,
+                            [relation.id]: word
+                          }));
+                          setSearching(undefined);
+                          change((draft) => {
+                            const draftSense =
+                              draft.pos[posIndex]!.senses[senseIndex]!;
+                            draftSense.relations = replaceRelationGroup(
+                              draftSense.relations,
+                              group,
+                              [
+                                draftSense.relations.find(
+                                  (item) => item.id === relation.id
+                                )!
+                              ]
+                            );
+                            const target = draft.pos[posIndex]!.senses[
+                              senseIndex
+                            ]!.relations.find(
+                              (item) => item.id === relation.id
+                            )!;
+                            delete target.target_word_id;
+                            delete target.target_sense_id;
+                            target.pending_target_headword =
+                              word.matchedHeadword;
+                          });
+                          return;
+                        }
                         setKnownWords((current) => ({
                           ...current,
                           [relation.id]: word
                         }));
                         setSearching(undefined);
                         change((draft) => {
-                          const target =
-                            draft.pos[posIndex]!.senses[senseIndex]!.relations[
-                              relationIndex
-                            ]!;
+                          const draftSense =
+                            draft.pos[posIndex]!.senses[senseIndex]!;
+                          draftSense.relations = replaceRelationGroup(
+                            draftSense.relations,
+                            group,
+                            [
+                              draftSense.relations.find(
+                                (item) => item.id === relation.id
+                              )!
+                            ]
+                          );
+                          const target = draft.pos[posIndex]!.senses[
+                            senseIndex
+                          ]!.relations.find((item) => item.id === relation.id)!;
                           target.target_word_id = word.word_id;
                           delete target.target_sense_id;
                           delete target.pending_target_headword;
@@ -1148,7 +1236,8 @@ function RelationsGrid({
                                       ? "草稿"
                                       : "已发布"}
                                   </Tag>
-                                  {word.senses.length === 0 ? (
+                                  {word.senses.length === 0 &&
+                                  word.status !== "draft" ? (
                                     <Typography.Text type="secondary">
                                       暂无词义，请先添加词义
                                     </Typography.Text>
@@ -1156,7 +1245,25 @@ function RelationsGrid({
                                 </Flex>
                               ),
                               value: word.word_id,
-                              disabled: word.senses.length === 0
+                              disabled:
+                                (word.senses.length === 0 &&
+                                  word.status !== "draft") ||
+                                sense.relations.some(
+                                  (other) =>
+                                    !group.some(
+                                      (member) => member.id === other.id
+                                    ) &&
+                                    other.relation === relationType &&
+                                    (other.target_word_id === word.word_id ||
+                                      knownWords[other.id]?.word_id ===
+                                        word.word_id ||
+                                      other.pending_target_headword
+                                        ?.trim()
+                                        .toLowerCase() ===
+                                        word.matchedHeadword
+                                          .trim()
+                                          .toLowerCase())
+                                )
                             }))
                           : []
                       }
@@ -1173,7 +1280,7 @@ function RelationsGrid({
                           ? searching.query
                           : relationDisplayHeadword(
                               relation,
-                              knownWords[relation.id],
+                              knownWordFor(relation),
                               relationDisplaySnapshots?.[relation.id]
                             ) || (relation.target_word_id ? "已选择关联词" : "")
                       }
@@ -1225,7 +1332,8 @@ function RelationsGrid({
                                 加载更多
                               </Button>
                             ) : null}
-                            {isUnlinkedText(relation) ? (
+                            {isUnlinkedText(relation) &&
+                            !isSelectedEmptyDraft(relation) ? (
                               <Tooltip
                                 title={`待关联的${relationLabel(relationType)}`}
                               >
@@ -1251,9 +1359,11 @@ function RelationsGrid({
                         maxLength={5000}
                         onChange={(event) =>
                           change((draft) => {
-                            const target =
-                              draft.pos[posIndex]!.senses[senseIndex]!
-                                .relations[relationIndex]!;
+                            const target = draft.pos[posIndex]!.senses[
+                              senseIndex
+                            ]!.relations.find(
+                              (item) => item.id === relation.id
+                            )!;
                             if (event.target.value)
                               target.pending_target_gloss = event.target.value;
                             else delete target.pending_target_gloss;
@@ -1262,6 +1372,19 @@ function RelationsGrid({
                         placeholder="输入词义"
                         size="small"
                         status="warning"
+                        suffix={
+                          isSelectedEmptyDraft(relation) ? (
+                            <Tooltip
+                              title={`待关联的${relationLabel(relationType)}`}
+                            >
+                              <InfoCircleOutlined
+                                aria-label={`待关联的${relationLabel(relationType)}`}
+                                className="word-relation-unlinked-icon"
+                                role="note"
+                              />
+                            </Tooltip>
+                          ) : undefined
+                        }
                         value={relation.pending_target_gloss ?? ""}
                       />
                     ) : (
@@ -1269,32 +1392,137 @@ function RelationsGrid({
                         aria-label={`${relationLabel(relationType)}目标词义`}
                         className="word-relation-sense"
                         disabled={!relation.target_word_id}
-                        onChange={(targetSenseId) =>
-                          change((draft) => {
-                            draft.pos[posIndex]!.senses[senseIndex]!.relations[
-                              relationIndex
-                            ]!.target_sense_id = targetSenseId;
-                          })
+                        mode={
+                          relationType === "derivative" ? "multiple" : undefined
                         }
-                        options={(
-                          knownWords[relation.id]?.senses ??
-                          (relation.target_sense_id
-                            ? [
-                                {
-                                  sense_id: relation.target_sense_id,
-                                  gloss:
+                        onChange={(selection: string | string[]) => {
+                          const discovered = searchWords.find(
+                            (word) => word.word_id === relation.target_word_id
+                          );
+                          if (discovered)
+                            setKnownWords((current) => ({
+                              ...current,
+                              [relation.id]: discovered
+                            }));
+                          const replacement =
+                            relationType === "derivative"
+                              ? selectDerivativeSenses(
+                                  group,
+                                  selection as string[],
+                                  idFactory
+                                )
+                              : undefined;
+                          if (replacement) {
+                            const rowKey =
+                              relationRowKeys.current.get(relation.id) ??
+                              relation.id;
+                            for (const item of replacement)
+                              relationRowKeys.current.set(item.id, rowKey);
+                          }
+                          change((draft) => {
+                            const draftSense =
+                              draft.pos[posIndex]!.senses[senseIndex]!;
+                            if (replacement) {
+                              draftSense.relations = replaceRelationGroup(
+                                draftSense.relations,
+                                group,
+                                replacement
+                              );
+                            } else {
+                              draftSense.relations.find(
+                                (item) => item.id === relation.id
+                              )!.target_sense_id = selection as string;
+                            }
+                          });
+                        }}
+                        onOpenChange={(open) => {
+                          setSearching(undefined);
+                          setSenseSearch(
+                            open
+                              ? {
+                                  wordId: relation.target_word_id!,
+                                  query: (
                                     relationDisplaySnapshots?.[relation.id]
-                                      ?.gloss ?? "已匹配词义"
+                                      ?.headword ??
+                                    knownWordFor(relation)?.headword ??
+                                    ""
+                                  ).split(" / ")[0]!
                                 }
-                              ]
-                            : [])
-                        ).map((targetSense) => ({
-                          label: targetSense.gloss || "（无释义）",
-                          value: targetSense.sense_id
-                        }))}
+                              : undefined
+                          );
+                        }}
+                        loading={
+                          senseSearch?.wordId === relation.target_word_id &&
+                          (relatedSearch.exact.isFetching ||
+                            relatedSearch.contains.isFetching)
+                        }
+                        popupRender={(menu) => (
+                          <>
+                            {menu}
+                            {senseSearch?.wordId === relation.target_word_id &&
+                            searchFailed ? (
+                              <Button
+                                size="small"
+                                type="link"
+                                onClick={() => void retryRelatedSearch()}
+                              >
+                                搜索失败，重试
+                              </Button>
+                            ) : null}
+                            {senseSearch?.wordId === relation.target_word_id &&
+                            searchHasNextPage ? (
+                              <Button
+                                size="small"
+                                type="link"
+                                onClick={() => void loadMoreSearchResults()}
+                              >
+                                加载更多词义来源
+                              </Button>
+                            ) : null}
+                          </>
+                        )}
+                        options={Array.from(
+                          new Map(
+                            [
+                              ...group
+                                .filter((item) => item.target_sense_id)
+                                .map((item) => ({
+                                  sense_id: item.target_sense_id!,
+                                  gloss:
+                                    relationDisplaySnapshots?.[item.id]
+                                      ?.gloss ?? "已匹配词义"
+                                })),
+                              ...(Object.values(knownWords).find(
+                                (word) =>
+                                  word.word_id === relation.target_word_id
+                              )?.senses ?? []),
+                              ...(senseSearch?.wordId ===
+                              relation.target_word_id
+                                ? (searchWords.find(
+                                    (word) =>
+                                      word.word_id === relation.target_word_id
+                                  )?.senses ?? [])
+                                : [])
+                            ].map((item) => [
+                              item.sense_id,
+                              {
+                                label: item.gloss || "（无释义）",
+                                value: item.sense_id
+                              }
+                            ])
+                          ).values()
+                        )}
                         placeholder="选择词义"
                         size="small"
-                        value={relation.target_sense_id}
+                        value={
+                          relationType === "derivative"
+                            ? group.flatMap((item) =>
+                                item.target_sense_id
+                                  ? [item.target_sense_id]
+                                  : []
+                              )
+                            : relation.target_sense_id
+                        }
                       />
                     )}
                     {relationInputIssue(relation) ? (
@@ -1308,9 +1536,13 @@ function RelationsGrid({
                       icon={<DeleteOutlined />}
                       onClick={() =>
                         change((draft) => {
-                          draft.pos[posIndex]!.senses[
-                            senseIndex
-                          ]!.relations.splice(relationIndex, 1);
+                          const draftSense =
+                            draft.pos[posIndex]!.senses[senseIndex]!;
+                          draftSense.relations = replaceRelationGroup(
+                            draftSense.relations,
+                            group,
+                            []
+                          );
                         })
                       }
                       size="small"
@@ -1613,9 +1845,10 @@ export function V3MeaningsAndExamplesStep({
                           formPosById.get(pos.pos_id) ?? ""
                         );
                         const configuredSubParts = catalogPos?.sub_parts ?? [];
-                        const visibleSubPos = configuredSubParts.find(
+                        const selectedSubPos = configuredSubParts.find(
                           (item) => item.code === sense.sub_pos
-                        )?.name_zh;
+                        );
+                        const visibleSubPos = selectedSubPos?.name_zh;
                         // 后端标记为不可扩展的基本词性不允许挂细分词性；目录里没有该词性时
                         // 保留原有可选行为，避免目录加载失败把字段整体藏掉。
                         const subPosExtensible =
@@ -1665,7 +1898,13 @@ export function V3MeaningsAndExamplesStep({
                                 )
                               )
                             }
-                            subPosLabel={visibleSubPos}
+                            subPosLabel={
+                              visibleSubPos
+                                ? [selectedSubPos?.abbreviation, visibleSubPos]
+                                    .filter(Boolean)
+                                    .join(" ")
+                                : undefined
+                            }
                             summary={definitionSummary(sense)}
                           >
                             <Flex vertical gap="small">
@@ -2559,7 +2798,7 @@ export function V3MeaningsAndExamplesStep({
                               >
                                 <SenseSectionTitle
                                   collapsed={relationsCollapsed}
-                                  count={sense.relations.length}
+                                  count={groupRelations(sense.relations).length}
                                   label="关联词"
                                   onToggle={() =>
                                     toggleSenseSection(

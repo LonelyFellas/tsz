@@ -512,7 +512,7 @@ describe("实时摘要明细", () => {
     expect(updated[1]!.completed).toBe(true);
   });
 
-  it("通用不增加子行，实时类型与目录名称来自输入，未知语言不完成", () => {
+  it("通用显示子行，实时类型与目录名称来自输入，未知语言不完成", () => {
     const forms = formsFixture();
     const input = {
       wordId: "word",
@@ -523,7 +523,8 @@ describe("实时摘要明细", () => {
       issues: []
     };
     expect(buildV3ProductProgress(input)[0]!.details).toEqual([
-      { key: "language", label: "英语 English" }
+      { key: "language", label: "英语 English" },
+      { key: "common", label: "通用", dialect: "common" }
     ]);
     forms.pos[0]!.dialect_rules.phonetic_mode = "distinguish";
     const rows = buildV3ProductProgress({
@@ -546,8 +547,8 @@ describe("实时摘要明细", () => {
     });
     expect(rows[0]!.details.map((item) => item.label)).toEqual([
       "英语 English",
-      "英式 BrE",
-      "美式 AmE"
+      "BrE",
+      "AmE"
     ]);
     expect(rows[1]!.details[0]!.label).toBe("配置名词");
     expect(rows[1]!.completed).toBe(false);

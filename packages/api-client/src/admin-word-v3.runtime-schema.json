@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "91f2481221f2d0745b0c88426efd15bfcfd42bc40e5c2895005a42ab88fe51aa",
+  "_source_sha256": "43384ad7008134d54663a32e108eb51ac034ecd1e5065ccbce1ec98e8a615f65",
   "roots": [
     "EntryAnnotationResponse",
     "AdminWordV3",
@@ -3280,7 +3280,6 @@
         "relation_target_stale",
         "sentence_context_target_unavailable",
         "relation_pending_headword_invalid",
-        "relation_pending_target_unresolved",
         "relation_target_shape_invalid",
         "relation_pending_gloss_without_headword",
         "relation_pending_gloss_invalid",

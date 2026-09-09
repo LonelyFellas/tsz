@@ -1634,7 +1634,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   it.each(["近义词", "反义词", "派生词"])(
-    "%s不能选择零词义草稿，词面与词义仅保存文本",
+    "%s可以选择零词义草稿，词面与词义仅保存文本",
     (label) => {
       relatedSearchAny.mockImplementation(
         (
@@ -1656,7 +1656,9 @@ describe("V3MeaningsAndExamplesStep", () => {
                         status: "draft" as const,
                         presentation: {
                           label: "reliability",
-                          matched_surfaces: ["reliability"],
+                          matched_surfaces: [
+                            _query === "reliable" ? "reliable" : "reliability"
+                          ],
                           strategy_version: "surface_summary_v1"
                         },
                         matches: [],
@@ -1690,13 +1692,16 @@ describe("V3MeaningsAndExamplesStep", () => {
       render(<Harness initial={initial} onSave={onSave} />);
       fireEvent.click(screen.getByText(`添加${label}`).closest("button")!);
       fireEvent.change(screen.getByLabelText(`${label}目标词条`), {
-        target: { value: "reliability" }
+        target: { value: "reli" }
       });
       expect(
+        screen.getByText("reliability").closest(".ant-select-item-option")
+      ).not.toHaveClass("ant-select-item-option-disabled");
+      expect(
         screen
-          .getByText("暂无词义，请先添加词义")
-          .closest(".ant-select-item-option")
-      ).toHaveClass("ant-select-item-option-disabled");
+          .getByLabelText(`${label}目标词条`)
+          .closest(".ant-input-affix-wrapper")
+      ).toContainElement(screen.getByLabelText(`待关联的${label}`));
       fireEvent.click(screen.getAllByText("reliability").at(-1)!);
       const relation = value().pos[0]!.senses[0]!.relations[0]!;
       expect(relation).toMatchObject({
@@ -1704,10 +1709,32 @@ describe("V3MeaningsAndExamplesStep", () => {
       });
       expect(relation).not.toHaveProperty("prebound_target_word_id");
       expect(relation).not.toHaveProperty("target_word_id");
+      fireEvent.click(screen.getByText(`添加${label}`).closest("button")!);
+      fireEvent.change(screen.getAllByLabelText(`${label}目标词条`).at(-1)!, {
+        target: { value: "reliable" }
+      });
+      expect(
+        screen
+          .getAllByText("reliability")
+          .at(-1)!
+          .closest(".ant-select-item-option")
+      ).toHaveClass("ant-select-item-option-disabled");
+      fireEvent.click(
+        document.querySelectorAll(`button[aria-label="删除${label}"]`).item(1)
+      );
+
       expect(screen.queryByLabelText(`${label}预定义词义`)).toBeNull();
       const glossInput = screen.getByLabelText(`${label}待关联词义`);
-      expect(glossInput).toHaveClass("ant-input-status-warning");
-      expect(glossInput.closest(".ant-input-affix-wrapper")).toBeNull();
+      const glossWrapper = glossInput.closest(".ant-input-affix-wrapper")!;
+      expect(glossWrapper).toHaveClass("ant-input-status-warning");
+      expect(
+        within(glossWrapper as HTMLElement).getByLabelText(`待关联的${label}`)
+      ).toBeInTheDocument();
+      expect(
+        screen
+          .getByLabelText(`${label}目标词条`)
+          .closest(".ant-input-affix-wrapper")
+      ).not.toContainElement(screen.getByLabelText(`待关联的${label}`));
       fireEvent.change(glossInput, { target: { value: "可靠性" } });
       expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
         pending_target_headword: "reliability",
@@ -1715,14 +1742,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       });
       fireEvent.click(screen.getByText("保存草稿"));
       expect(onSave).toHaveBeenCalledWith(value(), "save");
-      expect(relatedSearchAny).toHaveBeenCalledWith(
-        "reliability",
-        "word",
-        true,
-        true
-      );
-      const targetInput = screen.getByLabelText(`${label}目标词条`);
-      const metricInput = screen.getByLabelText(
+      expect(relatedSearchAny).toHaveBeenCalledWith("reli", "word", true, true);
+      let targetInput = screen.getByLabelText(`${label}目标词条`);
+      let metricInput = screen.getByLabelText(
         label === "近义词" ? "相似度" : label === "反义词" ? "差异度" : "关联度"
       );
       expect(
@@ -1758,6 +1780,10 @@ describe("V3MeaningsAndExamplesStep", () => {
         target: { value: "外部" }
       });
       fireEvent.click(screen.getAllByText("outside").at(-1)!);
+      targetInput = screen.getByLabelText(`${label}目标词条`);
+      metricInput = screen.getByLabelText(
+        label === "近义词" ? "相似度" : label === "反义词" ? "差异度" : "关联度"
+      );
       expect(screen.queryByLabelText(`${label}待关联词义`)).toBeNull();
       expect(screen.getByLabelText(`${label}目标词义`)).toBeEnabled();
       expect(
@@ -1780,6 +1806,150 @@ describe("V3MeaningsAndExamplesStep", () => {
         "target_word_id",
         "external-word-1"
       );
+    }
+  );
+
+  it("派生词多选保存后合为一行，重开可取消和新增词义，改选清理整组", () => {
+    relatedSearchAny.mockImplementation((...args) => {
+      const result = defaultRelatedSearchImplementation(...args);
+      result.exact.data.pages[0]!.results[0]!.senses = [
+        { sense_id: "external-sense-1", gloss: "外部词义一" },
+        { sense_id: "external-sense-2", gloss: "外部词义二" },
+        { sense_id: "external-sense-3", gloss: "外部词义三" }
+      ];
+      return result;
+    });
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [];
+    const onSave = vi.fn();
+    const mounted = render(<Harness initial={initial} onSave={onSave} />);
+    fireEvent.click(screen.getByText("添加派生词").closest("button")!);
+    fireEvent.change(screen.getByLabelText("派生词目标词条"), {
+      target: { value: "outside" }
+    });
+    fireEvent.click(screen.getAllByText("outside").at(-1)!);
+    fireEvent.mouseDown(screen.getByLabelText("派生词目标词义"));
+    fireEvent.click(screen.getAllByText("外部词义一").at(-1)!);
+    fireEvent.click(screen.getAllByText("外部词义二").at(-1)!);
+    expect(screen.getAllByLabelText("派生词目标词条")).toHaveLength(1);
+    const selected = structuredClone(value());
+    const relations = selected.pos[0]!.senses[0]!.relations;
+    expect(relations.map((item) => item.target_sense_id)).toEqual([
+      "external-sense-1",
+      "external-sense-2"
+    ]);
+    expect(new Set(relations.map((item) => item.id)).size).toBe(2);
+    fireEvent.click(screen.getByText("保存草稿"));
+    expect(onSave).toHaveBeenCalledWith(selected, "save");
+    mounted.unmount();
+    render(
+      <Harness
+        initial={selected}
+        relationSnapshots={Object.fromEntries(
+          relations.map((item, index) => [
+            item.id,
+            {
+              headword: "outside",
+              gloss: index === 0 ? "外部词义一" : "外部词义二"
+            }
+          ])
+        )}
+      />
+    );
+    expect(screen.getAllByLabelText("派生词目标词条")).toHaveLength(1);
+    expect(screen.getByText("外部词义一")).toBeVisible();
+    expect(screen.getByText("外部词义二")).toBeVisible();
+    fireEvent.mouseDown(screen.getByLabelText("派生词目标词义"));
+    fireEvent.click(screen.getAllByText("外部词义一").at(-1)!);
+    expect(value().pos[0]!.senses[0]!.relations).toEqual([relations[1]]);
+    fireEvent.click(screen.getAllByText("外部词义三").at(-1)!);
+    expect(
+      value().pos[0]!.senses[0]!.relations.map((item) => item.target_sense_id)
+    ).toEqual(["external-sense-2", "external-sense-3"]);
+    fireEvent.keyDown(screen.getByLabelText("派生词目标词义"), {
+      key: "Escape",
+      code: "Escape"
+    });
+    expect(screen.queryByText("已匹配词义")).toBeNull();
+    expect(screen.getByLabelText("派生词目标词条")).toHaveValue("outside");
+    fireEvent.change(screen.getByLabelText("关联度"), {
+      target: { value: "45" }
+    });
+    expect(
+      value().pos[0]!.senses[0]!.relations.map((item) => item.score)
+    ).toEqual(["45", "45"]);
+    fireEvent.change(screen.getByLabelText("派生词目标词条"), {
+      target: { value: "beyond" }
+    });
+    expect(value().pos[0]!.senses[0]!.relations).toHaveLength(1);
+    expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
+      pending_target_headword: "beyond"
+    });
+    expect(value().pos[0]!.senses[0]!.relations[0]).not.toHaveProperty(
+      "target_sense_id"
+    );
+  });
+
+  it.each(["bound", "text"])(
+    "%s关联在同分类其他行置灰，删除后恢复可选",
+    (mode) => {
+      const initial = structuredClone(meaningsFixture);
+      initial.pos[0]!.senses[0]!.relations = [
+        {
+          id: "already-selected",
+          relation: "synonym",
+          score: "0",
+          ...(mode === "bound"
+            ? {
+                target_word_id: "external-word-1",
+                target_sense_id: "external-sense-1"
+              }
+            : {
+                pending_target_headword: "outside",
+                pending_target_gloss: "外部"
+              })
+        }
+      ];
+      render(<Harness initial={initial} />);
+      fireEvent.click(screen.getByText("添加近义词").closest("button")!);
+      fireEvent.change(screen.getAllByLabelText("近义词目标词条").at(-1)!, {
+        target: { value: "outs" }
+      });
+      expect(
+        screen
+          .getAllByText("outside")
+          .at(-1)!
+          .closest(".ant-select-item-option")
+      ).toHaveClass("ant-select-item-option-disabled");
+      fireEvent.click(
+        document.querySelector('button[aria-label="删除近义词"]')!
+      );
+      expect(
+        screen
+          .getAllByText("outside")
+          .at(-1)!
+          .closest(".ant-select-item-option")
+      ).not.toHaveClass("ant-select-item-option-disabled");
+      fireEvent.click(screen.getAllByText("outside").at(-1)!);
+      expect(value().pos[0]!.senses[0]!.relations[0]).toHaveProperty(
+        "target_word_id",
+        "external-word-1"
+      );
+      for (const label of ["反义词", "派生词"]) {
+        fireEvent.click(screen.getByText(`添加${label}`).closest("button")!);
+        fireEvent.change(screen.getAllByLabelText(`${label}目标词条`).at(-1)!, {
+          target: { value: "outs" }
+        });
+        const option = screen.getAllByText("outside").at(-1)!;
+        expect(option.closest(".ant-select-item-option")).not.toHaveClass(
+          "ant-select-item-option-disabled"
+        );
+        fireEvent.click(option);
+        expect(value().pos[0]!.senses[0]!.relations.at(-1)).toHaveProperty(
+          "target_word_id",
+          "external-word-1"
+        );
+      }
     }
   );
 
@@ -3001,7 +3171,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     const editor = screen.getByTestId("meanings-value").previousElementSibling;
 
     expect(screen.getByRole("tab", { name: /^名词/u })).toBeInTheDocument();
-    expect(screen.getAllByText("可数名词")).toHaveLength(2);
+    expect(screen.getByText("可数名词")).toBeVisible();
+    expect(screen.getByText("n. 可数名词")).toBeVisible();
     expect(screen.getByText("核心")).toBeInTheDocument();
     expect(screen.getAllByText("① used as a noun")).toHaveLength(1);
     expect(editor).not.toHaveTextContent("pos-1");
