@@ -36,6 +36,54 @@ function word(meanings: AdminWordV3["meanings"]): AdminWordV3 {
 }
 
 describe("V3MeaningsPreview", () => {
+  it("同一派生词的多个词义在预览中合并展示", () => {
+    render(
+      <V3MeaningsPreview
+        word={word({
+          sense_groups: [],
+          pos: [
+            {
+              pos_id: UUIDS.pos,
+              grammar_structures: [],
+              senses: [
+                {
+                  id: "source-sense",
+                  sub_pos: "N-COUNT",
+                  level: "A1",
+                  depends_on_context: false,
+                  definitions: [],
+                  sentences: [],
+                  relations: [
+                    {
+                      id: "r1",
+                      relation: "derivative",
+                      target_word_id: "target",
+                      target_sense_id: "s1",
+                      target_headword: "central",
+                      target_gloss: "中心的",
+                      score: "80"
+                    },
+                    {
+                      id: "r2",
+                      relation: "derivative",
+                      target_word_id: "target",
+                      target_sense_id: "s2",
+                      target_headword: "central",
+                      target_gloss: "主要的",
+                      score: "80"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        })}
+      />
+    );
+    expect(screen.getByText("central · 中心的；主要的")).toBeVisible();
+    expect(screen.getAllByText("派生词")).toHaveLength(1);
+  });
+
   it("以产品层级完整展示语法、释义、例句和关联且隐藏内部身份", () => {
     render(
       <V3MeaningsPreview

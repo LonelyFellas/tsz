@@ -1,6 +1,7 @@
 import type { AdminWordV3, EnglishTextV3, WordDefinitionV3 } from "@tsz/types";
 import { Card, Empty, Flex, Space, Tag, Typography } from "antd";
 import { sentenceTranslationsV3 } from "./meaningsModel";
+import { groupRelations } from "./relationGroups";
 import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import {
   definitionModeLabel,
@@ -188,18 +189,26 @@ export function V3MeaningsPreview({
                         {sense.relations.length > 0 ? (
                           <Flex vertical gap={4}>
                             <Typography.Text strong>关系词</Typography.Text>
-                            {sense.relations.map((relation) => (
-                              <Typography.Text key={relation.id}>
-                                <Tag>{relationLabel(relation.relation)}</Tag>
-                                {relation.target_headword ??
-                                  relation.pending_target_headword ??
-                                  "待补充目标词条"}
-                                {(relation.target_gloss ??
-                                relation.pending_target_gloss)
-                                  ? ` · ${relation.target_gloss ?? relation.pending_target_gloss}`
-                                  : ""}
-                              </Typography.Text>
-                            ))}
+                            {groupRelations(sense.relations).map((group) => {
+                              const relation = group[0]!;
+                              const gloss = group
+                                .map(
+                                  (item) =>
+                                    item.target_gloss ??
+                                    item.pending_target_gloss
+                                )
+                                .filter(Boolean)
+                                .join("；");
+                              return (
+                                <Typography.Text key={relation.id}>
+                                  <Tag>{relationLabel(relation.relation)}</Tag>
+                                  {relation.target_headword ??
+                                    relation.pending_target_headword ??
+                                    "待补充目标词条"}
+                                  {gloss ? ` · ${gloss}` : ""}
+                                </Typography.Text>
+                              );
+                            })}
                           </Flex>
                         ) : null}
                       </Flex>

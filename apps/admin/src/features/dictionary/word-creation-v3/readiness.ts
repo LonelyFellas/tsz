@@ -51,7 +51,7 @@ export interface V3ProductProgressDetail {
   key: string;
   label: string;
   count?: number;
-  dialect?: "uk" | "us";
+  dialect?: "uk" | "us" | "common";
   items?: readonly { key: string; label: string }[];
 }
 
@@ -184,10 +184,12 @@ export function buildV3ProductProgress({
       { key: "language", label: languageInfo.label },
       ...(distinguish
         ? ([
-            { key: "uk", label: "英式 BrE", dialect: "uk" },
-            { key: "us", label: "美式 AmE", dialect: "us" }
+            { key: "uk", label: "BrE", dialect: "uk" },
+            { key: "us", label: "AmE", dialect: "us" }
           ] as const)
-        : [])
+        : language === "en" && forms.pos.length > 0
+          ? [{ key: "common", label: "通用", dialect: "common" as const }]
+          : [])
     ],
     parts_of_speech: positions
       .filter((pos) => formPosIds.has(pos.key))
