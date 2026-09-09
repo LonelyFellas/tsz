@@ -502,8 +502,8 @@ export function VoiceEditor({
         );
         const first = selected[0];
         const last = selected.at(-1);
-        if (!first || !last || first.index === last.index) {
-          setValidationMessage("请选中跨越两个词的文字来添加连读");
+        if (!first || !last) {
+          setValidationMessage("请先选中文字来添加连读");
           return;
         }
         const anchor = (token: typeof first) => ({
@@ -517,7 +517,22 @@ export function VoiceEditor({
               token.start + offset < textSelection.end
           )
         });
-        setDraft({ start: anchor(first), end: anchor(last) });
+        setDraft(
+          first.index === last.index
+            ? {
+                start: {
+                  token: first.index,
+                  offsets: [Math.max(0, textSelection.start - first.start)]
+                },
+                end: {
+                  token: last.index,
+                  offsets: [
+                    Math.min(last.end, textSelection.end) - last.start - 1
+                  ]
+                }
+              }
+            : { start: anchor(first), end: anchor(last) }
+        );
       }
       setOpenTool(key);
       return;
@@ -805,13 +820,13 @@ export function VoiceEditor({
   const commitLiaison = () => {
     if (!draft.start || !draft.end) return;
     const link =
-      draft.start.token < draft.end.token
+      draft.start.token < draft.end.token ||
+      (draft.start.token === draft.end.token &&
+        Math.min(...draft.start.offsets) <= Math.min(...draft.end.offsets))
         ? { start: draft.start, end: draft.end }
         : { start: draft.end, end: draft.start };
     if (!isValidLiaison(link)) {
-      // 界面上「添加连读」在两端同词时就已禁用，这里是兜底；一旦真的触发，
-      // 走顶部 Alert 而不是静默返回，免得出问题时什么反馈都没有。
-      setValidationMessage("连读要连接两个不同的词");
+      setValidationMessage("请选择有效的连读端点");
       return;
     }
     const sameAnchors = (a: LiaisonAnchor, b: LiaisonAnchor) =>

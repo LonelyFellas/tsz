@@ -754,18 +754,8 @@ export function LiaisonPanel({
    */
   const color = useLiaisonColor();
   const bothPicked = Boolean(draft.start && draft.end);
-  const sameToken = bothPicked && draft.start!.token === draft.end!.token;
-  const canCommit = bothPicked && !sameToken;
-  /*
-   * 连读描述的是跨词边界的音变，同一个词里的两个字母连不起来（`isValidLiaison`
-   * 也这么判）。但光把「添加」置灰、不说为什么，用户只会以为按钮坏了——
-   * 这里把上手提示的位置让给禁用理由。
-   */
-  const hint = sameToken
-    ? "连读要连接两个不同的词"
-    : !draft.start && !draft.end
-      ? "点下面文字里的字母"
-      : undefined;
+  const canCommit = bothPicked;
+  const hint = !draft.start && !draft.end ? "点下面文字里的字母" : undefined;
   return (
     <div className="tsz-ve-pop tsz-ve-pop-liaison" aria-label="连读">
       {/* 压成两行：这层浮层开在工具栏上方，再高就顶到抽屉标题栏了。 */}
@@ -801,15 +791,8 @@ export function LiaisonPanel({
             onChange={(value) => setLiaisonColor(value.toHexString())}
           />
         </span>
-        {/* 未落锚点时是上手提示；两端同词时变成禁用理由，不留哑按钮。 */}
-        {hint && (
-          <span
-            className="tsz-ve-pop-hint"
-            role={sameToken ? "alert" : undefined}
-          >
-            {hint}
-          </span>
-        )}
+        {/* 未选择端点时提示操作方式。 */}
+        {hint && <span className="tsz-ve-pop-hint">{hint}</span>}
         <Button
           size="small"
           type="primary"

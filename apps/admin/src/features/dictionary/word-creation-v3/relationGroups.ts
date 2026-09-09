@@ -2,16 +2,19 @@ import type { WordRelationWritableV3 } from "@tsz/types";
 
 /** 同一源词义内，手动词义按关系类型与词面合组；已关联派生词按目标合组。 */
 export function groupRelations<T extends WordRelationWritableV3>(
-  relations: T[]
+  relations: T[],
+  manualRowKeys?: ReadonlyMap<string, string>
 ): T[][] {
   const groups: T[][] = [];
   const groupedTargets = new Map<string, T[]>();
   for (const relation of relations) {
     const targetKey = relation.target_word_id
       ? `word:${relation.target_word_id}`
-      : relation.pending_target_headword?.trim()
-        ? `text:${relation.pending_target_headword.trim().toLowerCase()}`
-        : undefined;
+      : manualRowKeys?.has(relation.id)
+        ? `draft:${manualRowKeys.get(relation.id)}`
+        : relation.pending_target_headword?.trim()
+          ? `text:${relation.pending_target_headword.trim().toLowerCase()}`
+          : undefined;
     if (
       targetKey &&
       (relation.relation === "derivative" || !relation.target_word_id)

@@ -494,7 +494,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "a8c0a8da03fd1dee25e6417f9e5ab23a49c32f6dea320a41af1321c3439df408"
+      "b097563210136712008c01e5b12323c91c911604b371ce75d3997381be4ca880"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -502,6 +502,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(runtimeSchemaBundle.roots).toContain("ProblemDetails");
 
     const defs = runtimeSchemaBundle.$defs;
+    expect(defs.SenseGroupV3.required).not.toContain("name_en_rich");
+    expect(defs.SenseGroupV3.required).not.toContain("voice_profile");
+    expect(defs.SenseGroupV3.properties.name_en_rich).toEqual({
+      $ref: "#/$defs/RichTextV3"
+    });
+    expect(defs.SenseGroupV3.properties.voice_profile).toEqual({
+      $ref: "#/$defs/VoiceProfileV3"
+    });
     expect(defs.WordSentenceV3.properties.zh_translations.maxItems).toBe(2000);
     expect(defs.RichTextVariantV3.required).not.toContain("text_links");
     expect(defs.RichTextVariantV3.properties.text_links.items).toEqual({

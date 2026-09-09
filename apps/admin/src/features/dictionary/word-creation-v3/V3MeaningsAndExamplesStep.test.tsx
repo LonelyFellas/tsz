@@ -195,6 +195,11 @@ const meaningsFixture: DraftMeaningsStepContentWritableV3 = {
   ]
 };
 
+function deleteRelationItem(label: string, index = 0) {
+  fireEvent.click(screen.getAllByLabelText(`管理${label}`)[index]!);
+  fireEvent.click(screen.getByLabelText(`删除${label}`));
+}
+
 function Harness({
   initial = structuredClone(meaningsFixture),
   issues = [],
@@ -830,6 +835,47 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value().pos[0]!.senses[0]!.sentences).toEqual([]);
     expect(screen.getByText("暂无多维例句")).toBeVisible();
     expect(screen.getByText("添加例句").closest("button")).toBeVisible();
+  });
+
+  it("语义区间英文使用语音编辑器，标注随草稿保存重开", async () => {
+    const initial = structuredClone(meaningsFixture);
+    const onSave = vi.fn().mockResolvedValue(undefined);
+    const mounted = render(<Harness initial={initial} onSave={onSave} />);
+    expect(
+      screen.getByLabelText("语义区间 1 英文 播放语音")
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("打开语义区间 1 英文编辑器"));
+    await screen.findByLabelText("标注工具栏");
+    const input = document.querySelector<HTMLTextAreaElement>(
+      ".tsz-ve-canvas-input"
+    )!;
+    input.focus();
+    fireEvent.mouseUp(input);
+    input.setSelectionRange(0, 0);
+    fireEvent.select(input);
+    input.setSelectionRange(0, 4);
+    fireEvent.select(input);
+    fireEvent.click(document.querySelector(".tsz-ve-role-button")!);
+    fireEvent.click(screen.getByLabelText("用固定核心词画笔"));
+    fireEvent.click(screen.getByLabelText("完成语义区间 1 英文编辑"));
+    const saved = value();
+    expect(saved.sense_groups[0]).toMatchObject({
+      name_en: "Core",
+      name_en_rich: {
+        version: 2,
+        text: "Core",
+        annotations: [{ type: "emphasis", start: 0, end: 4, level: "core" }]
+      }
+    });
+    fireEvent.click(screen.getByText("保存草稿").closest("button")!);
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(saved, "save"));
+    mounted.unmount();
+    render(<Harness initial={saved} />);
+    fireEvent.click(screen.getByLabelText("打开语义区间 1 英文编辑器"));
+    await screen.findByLabelText("标注工具栏");
+    expect(
+      document.querySelectorAll('.tsz-ve-letter[data-level="core"]')
+    ).toHaveLength(4);
   });
 
   it("语法结构、英文释义和例句在输入框前提供整段试听", async () => {
@@ -1589,6 +1635,44 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value()).toEqual(initial);
   });
 
+  it("释义卡片最多展开一张，切换和全部收起不丢失输入", () => {
+    const initial = structuredClone(meaningsFixture);
+    const first = initial.pos[0]!.senses[0]!;
+    initial.pos[0]!.senses.push({
+      ...structuredClone(first),
+      id: "sense-second",
+      definitions: [],
+      sentences: [],
+      relations: []
+    });
+    const { container } = render(<Harness initial={initial} />);
+    const cards = [...container.querySelectorAll('[data-v3-field="sense"]')];
+    const headers = cards.map((card) =>
+      card.querySelector<HTMLElement>(".ant-collapse-header")!
+    );
+    expect(
+      headers.map((header) => header.getAttribute("aria-expanded"))
+    ).toEqual(["true", "false"]);
+    fireEvent.click(headers[1]!);
+    expect(
+      headers.map((header) => header.getAttribute("aria-expanded"))
+    ).toEqual(["false", "true"]);
+    fireEvent.change(screen.getByLabelText("释义 2 频率"), {
+      target: { value: "25" }
+    });
+    fireEvent.click(headers[0]!);
+    expect(
+      headers.map((header) => header.getAttribute("aria-expanded"))
+    ).toEqual(["true", "false"]);
+    fireEvent.click(headers[1]!);
+    expect(screen.getByLabelText("释义 2 频率")).toHaveValue("25.00");
+    fireEvent.click(headers[1]!);
+    expect(
+      headers.map((header) => header.getAttribute("aria-expanded"))
+    ).toEqual(["false", "false"]);
+    expect(value().pos[0]!.senses[1]!.frequency).toBe("25");
+  });
+
   it("关联词卡片整个头部可展开收起，按钮只切换一次且不修改内容", () => {
     const { container } = render(<Harness initial={meaningsFixture} />);
     const before = value();
@@ -1849,9 +1933,7 @@ describe("V3MeaningsAndExamplesStep", () => {
           .at(-1)!
           .closest(".ant-select-item-option")
       ).toHaveClass("ant-select-item-option-disabled");
-      fireEvent.click(
-        document.querySelectorAll(`button[aria-label="删除${label}"]`).item(1)
-      );
+      deleteRelationItem(label, 1);
 
       expect(screen.queryByLabelText(`${label}预定义词义`)).toBeNull();
       const glossInput = screen.getByLabelText(`${label}待关联词义`);
@@ -1964,18 +2046,26 @@ describe("V3MeaningsAndExamplesStep", () => {
       });
       expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(1);
       fireEvent.change(screen.getByLabelText(`${label}目标词条`), {
+        target: { value: "" }
+      });
+      expect(screen.getByLabelText(`${label}待关联词义 1`)).toHaveValue(
+        "词义一"
+      );
+      expect(screen.getByLabelText(`${label}待关联词义 2`)).toHaveValue(
+        "词义二"
+      );
+      expect(value().pos[0]!.senses[0]!.relations).toHaveLength(2);
+      fireEvent.change(screen.getByLabelText(`${label}目标词条`), {
         target: { value: "outsider" }
       });
       expect(
-        [...document.querySelectorAll(".word-relation-gloss-index")].map(
+        [...document.querySelectorAll(".word-relation-index")].map(
           (item) => item.textContent
         )
-      ).toEqual(["1", "2"]);
+      ).toEqual(["1"]);
       expect(
-        document.querySelectorAll(
-          ".word-relation-manual-gloss + .word-relation-manual-gloss"
-        )
-      ).toHaveLength(1);
+        document.querySelectorAll(".word-relation-row + .word-relation-row")
+      ).toHaveLength(0);
       const saved = value();
       expect(
         saved.pos[0]!.senses[0]!.relations.map((item) => [
@@ -1997,16 +2087,176 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(screen.getByLabelText(`${label}待关联词义 2`)).toHaveValue(
         "词义二"
       );
-      fireEvent.click(screen.getByLabelText(`删除${label}词义 1`));
+      deleteRelationItem(`${label}词义 1`);
       expect(screen.getByLabelText(`${label}待关联词义`)).toHaveValue("词义二");
       expect(
-        [...document.querySelectorAll(".word-relation-gloss-index")].map(
+        [...document.querySelectorAll(".word-relation-index")].map(
           (item) => item.textContent
         )
       ).toEqual(["1"]);
       expect(value().pos[0]!.senses[0]!.relations).toEqual([
         saved.pos[0]!.senses[0]!.relations[1]
       ]);
+    }
+  );
+
+  it.each([
+    ["synonym", "近义词"],
+    ["antonym", "反义词"],
+    ["derivative", "派生词"]
+  ])("%s 的序号与分割线按词条显示，多词义不重复编号", (type, label) => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [
+      {
+        id: "r1",
+        relation: type,
+        pending_target_headword: "first",
+        pending_target_gloss: "一",
+        score: "0"
+      },
+      {
+        id: "r2",
+        relation: type,
+        pending_target_headword: "first",
+        pending_target_gloss: "二",
+        score: "0"
+      },
+      {
+        id: "r3",
+        relation: type,
+        pending_target_headword: "second",
+        pending_target_gloss: "三",
+        score: "0"
+      }
+    ];
+    const { container } = render(<Harness initial={initial} />);
+    expect(
+      [...container.querySelectorAll(".word-relation-index")].map(
+        (node) => node.textContent
+      )
+    ).toEqual(["1", "2"]);
+    expect(
+      container.querySelectorAll(".word-relation-row + .word-relation-row")
+    ).toHaveLength(1);
+    expect(
+      container.querySelectorAll(
+        ".word-relation-row .word-relation-sense > .word-relation-glosses-connected"
+      )
+    ).toHaveLength(type === "derivative" ? 1 : 0);
+    if (type === "derivative") {
+      expect(
+        container.querySelectorAll(".word-relation-glosses-connected input")
+      ).toHaveLength(2);
+      expect(
+        container.querySelector(".word-relation-list-connected")
+      ).toBeNull();
+    }
+    deleteRelationItem(label);
+    expect(
+      container.querySelector(".word-relation-glosses-connected")
+    ).toBeNull();
+    expect(
+      [...container.querySelectorAll(".word-relation-index")].map(
+        (node) => node.textContent
+      )
+    ).toEqual(["1"]);
+    expect(screen.getByLabelText(`${label}待关联词义`)).toHaveValue("三");
+  });
+
+  it.each([
+    ["synonym", "近义词"],
+    ["antonym", "反义词"],
+    ["derivative", "派生词"]
+  ])(
+    "%s 的词条和手动词义可分别排序，整组保存且不影响其他类别",
+    async (type, label) => {
+      const initial = structuredClone(meaningsFixture);
+      const other = {
+        id: "other",
+        relation: type === "synonym" ? "antonym" : "synonym",
+        pending_target_headword: "other",
+        pending_target_gloss: "其他",
+        score: "30"
+      };
+      initial.pos[0]!.senses[0]!.relations = [
+        {
+          id: "r1",
+          relation: type,
+          pending_target_headword: "first",
+          pending_target_gloss: "一",
+          score: "60"
+        },
+        other,
+        {
+          id: "r2",
+          relation: type,
+          pending_target_headword: "first",
+          pending_target_gloss: "二",
+          score: "60"
+        },
+        {
+          id: "r3",
+          relation: type,
+          pending_target_headword: "second",
+          pending_target_gloss: "三",
+          score: "70"
+        }
+      ];
+      const onSave = vi.fn().mockResolvedValue(undefined);
+      const mounted = render(<Harness initial={initial} onSave={onSave} />);
+      expect(
+        document.querySelectorAll(
+          ".word-relation-row > .ant-btn-dangerous, .word-relation-gloss-row > .ant-btn-dangerous"
+        )
+      ).toHaveLength(0);
+      fireEvent.keyDown(screen.getByLabelText(`拖动${label}词义 2`), {
+        key: "ArrowUp"
+      });
+      expect(
+        value()
+          .pos[0]!.senses[0]!.relations.filter((item) => item.relation === type)
+          .map((item) => item.id)
+      ).toEqual(["r2", "r1", "r3"]);
+      const first = screen.getByLabelText(`拖动${label} 1`);
+      const second = screen
+        .getByLabelText(`拖动${label} 2`)
+        .closest(".word-relation-row")!;
+      const store = new Map<string, string>();
+      const dataTransfer = {
+        types: ["application/x-tsz-v3-relations"],
+        effectAllowed: "none",
+        dropEffect: "none",
+        setData: (key: string, data: string) => store.set(key, data),
+        getData: (key: string) => store.get(key) ?? "",
+        setDragImage: vi.fn()
+      };
+      fireEvent.dragStart(first, { dataTransfer });
+      fireEvent.dragOver(second, { dataTransfer });
+      expect(second).toHaveClass("is-drag-over-after");
+      expect(
+        second.querySelector(":scope > .word-relation-drop-line")
+      ).not.toBeNull();
+      fireEvent.drop(second, { dataTransfer });
+      const saved = value();
+      expect(
+        saved.pos[0]!.senses[0]!.relations.filter(
+          (item) => item.relation === type
+        ).map((item) => item.id)
+      ).toEqual(["r3", "r2", "r1"]);
+      expect(
+        saved.pos[0]!.senses[0]!.relations.find((item) => item.id === "other")
+      ).toEqual(other);
+      fireEvent.click(screen.getByText("保存草稿").closest("button")!);
+      await waitFor(() => expect(onSave).toHaveBeenCalledWith(saved, "save"));
+      mounted.unmount();
+      render(<Harness initial={saved} />);
+      expect(
+        screen
+          .getAllByLabelText(`${label}目标词条`)
+          .map((input) => (input as HTMLInputElement).value)
+      ).toEqual(["second", "first"]);
+      expect(screen.getByLabelText(`${label}待关联词义 1`)).toHaveValue("二");
+      expect(screen.getByLabelText(`${label}待关联词义 2`)).toHaveValue("一");
     }
   );
 
@@ -2122,9 +2372,7 @@ describe("V3MeaningsAndExamplesStep", () => {
           .at(-1)!
           .closest(".ant-select-item-option")
       ).toHaveClass("ant-select-item-option-disabled");
-      fireEvent.click(
-        document.querySelector('button[aria-label="删除近义词"]')!
-      );
+      deleteRelationItem("近义词");
       expect(
         screen
           .getAllByText("outside")
@@ -2513,8 +2761,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.keyDown(screen.getByLabelText("拖动例句 1"), {
       key: "ArrowDown"
     });
-    fireEvent.click(screen.getByRole("button", { name: "管理词义 1" }));
-    fireEvent.click(screen.getByText("下移词义"));
+    fireEvent.keyDown(screen.getByLabelText("拖动词义 1"), {
+      key: "ArrowDown"
+    });
     expect(value()).toMatchObject({
       sense_groups: [{ id: "sense-group-2" }, { id: "sense-group-1" }],
       pos: [
@@ -2538,9 +2787,10 @@ describe("V3MeaningsAndExamplesStep", () => {
       "relation-2"
     ]);
 
-    for (const name of ["删除定义 2", "删除例句 2", "删除近义词"]) {
+    for (const name of ["删除定义 2", "删除例句 2"]) {
       clickAction(name);
     }
+    deleteRelationItem("近义词");
     const reducedSense = value().pos[0]!.senses[1]!;
     expect(reducedSense.definitions.map((item) => item.id)).toEqual([
       "definition-2"
@@ -2558,8 +2808,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value().pos[0]!.senses[1]!.definitions[0]).not.toHaveProperty(
       "grammar_structure_id"
     );
-    fireEvent.click(screen.getByRole("button", { name: "管理词义 2" }));
-    fireEvent.click(screen.getByText("删除词义"));
+    fireEvent.click(screen.getByLabelText("删除词义 2"));
     expect(value().sense_groups.map((item) => item.id)).toEqual([
       "sense-group-2"
     ]);
@@ -3546,7 +3795,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByLabelText("下移定义 1")).toBeNull();
     expect(screen.queryByLabelText("上移例句 1")).toBeNull();
     expect(screen.queryByLabelText("下移例句 1")).toBeNull();
-    expect(screen.getByLabelText("管理词义 1")).toBeEnabled();
+    expect(screen.getByLabelText("删除词义 1")).toBeEnabled();
     unmount();
     const { container: savingContainer, unmount: unmountSaving } = render(
       <AntApp>

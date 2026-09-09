@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "a8c0a8da03fd1dee25e6417f9e5ab23a49c32f6dea320a41af1321c3439df408",
+  "_source_sha256": "b097563210136712008c01e5b12323c91c911604b371ce75d3997381be4ca880",
   "roots": [
     "EntryAnnotationResponse",
     "AdminWordV3",
@@ -2432,7 +2432,9 @@
       "properties": {
         "id": { "type": "string", "format": "uuid" },
         "name_en": { "type": "string", "maxLength": 200 },
-        "name_zh": { "type": "string", "maxLength": 200 }
+        "name_en_rich": { "$ref": "#/$defs/RichTextV3" },
+        "name_zh": { "type": "string", "maxLength": 200 },
+        "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
       "additionalProperties": false
     },

@@ -217,6 +217,57 @@ function renderPage(
 }
 
 describe("WordWizardV3Page", () => {
+  it.each(["forms", "meanings"])(
+    "%s 保存按钮随未保存修改变化，失败可重试，成功后禁用",
+    async (step) => {
+      const current = word();
+      const endpoints = source({ word: current, retired_stable_nodes: [] });
+      if (step === "forms") {
+        vi.mocked(endpoints.saveFormsStepV3)
+          .mockRejectedValueOnce(new Error("temporary failure"))
+          .mockImplementation(async (_id, input) => ({
+            word: { ...current, revision: 2, forms: input.content }
+          }));
+      } else {
+        vi.mocked(endpoints.saveMeaningsStepV3)
+          .mockRejectedValueOnce(new Error("temporary failure"))
+          .mockImplementation(async (_id, input) => ({
+            word: {
+              ...current,
+              revision: 2,
+              meanings: canonicalMeaningsFromWritable(input.content)
+            }
+          }));
+      }
+      renderPage(
+        `/words/${WORD_ID}/v3/wizard/${step}`,
+        createV3WordRequests(endpoints)
+      );
+      const input = await screen.findByLabelText(
+        step === "forms" ? "原形通用拼写" : "语义区间 1 中文"
+      );
+      const save = screen.getByText("保存草稿").closest("button")!;
+      const original = (input as HTMLInputElement).value;
+      expect(save).toBeDisabled();
+      fireEvent.change(input, { target: { value: "edited" } });
+      expect(save).toBeEnabled();
+      fireEvent.change(input, { target: { value: original } });
+      expect(save).toBeDisabled();
+      fireEvent.change(input, { target: { value: "edited" } });
+      fireEvent.click(save);
+      const request =
+        step === "forms"
+          ? endpoints.saveFormsStepV3
+          : endpoints.saveMeaningsStepV3;
+      await waitFor(() => expect(request).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(save).toBeEnabled());
+      fireEvent.click(save);
+      await waitFor(() => expect(request).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(save).toBeDisabled());
+      expect(input).toHaveValue("edited");
+    }
+  );
+
   it("别人的未发布草稿被强制成只读预览", async () => {
     // 草稿对所有管理员可见，但只有创建者与超管能写（后端 403 entry_edit_forbidden 兜底）。
     // 页面表现是：不论请求哪一步，都落到只读的 preview。
@@ -598,13 +649,21 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
+    const editedForms = structuredClone(current.forms);
+    const firstVariant = editedForms.pos[0]!.forms[0]!.regional_variants;
+    if (firstVariant.mode !== "common")
+      throw new Error("expected common fixture");
+    firstVariant.common.spelling = "centre-edited";
+    fireEvent.change(await screen.findByLabelText("原形通用拼写"), {
+      target: { value: "centre-edited" }
+    });
     fireEvent.click(await screen.findByText("保存草稿"));
 
     await waitFor(() =>
       expect(endpoints.previewFormsImpactV3).toHaveBeenCalledWith(WORD_ID, {
         schema_version: 3,
         base_revision: 1,
-        content: current.forms
+        content: editedForms
       })
     );
     await waitFor(() =>
@@ -636,7 +695,7 @@ describe("WordWizardV3Page", () => {
         schema_version: 3,
         base_revision: 1,
         intent: "save",
-        content: current.forms,
+        content: editedForms,
         confirmed_surface_match_token: "surface-terminal-token",
         confirmed_impact_token: "impact-terminal-token"
       })
@@ -664,6 +723,14 @@ describe("WordWizardV3Page", () => {
       client
     );
 
+    const editedForms = structuredClone(current.forms);
+    const firstVariant = editedForms.pos[0]!.forms[0]!.regional_variants;
+    if (firstVariant.mode !== "common")
+      throw new Error("expected common fixture");
+    firstVariant.common.spelling = "centre-edited";
+    fireEvent.change(await screen.findByLabelText("原形通用拼写"), {
+      target: { value: "centre-edited" }
+    });
     fireEvent.click(await screen.findByText("保存草稿"));
 
     await waitFor(() =>
@@ -674,7 +741,7 @@ describe("WordWizardV3Page", () => {
         schema_version: 3,
         base_revision: 1,
         intent: "save",
-        content: current.forms
+        content: editedForms
       })
     );
     await waitFor(() =>
@@ -833,6 +900,14 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
+    const editedForms = structuredClone(current.forms);
+    const firstVariant = editedForms.pos[0]!.forms[0]!.regional_variants;
+    if (firstVariant.mode !== "common")
+      throw new Error("expected common fixture");
+    firstVariant.common.spelling = "centre-edited";
+    fireEvent.change(await screen.findByLabelText("原形通用拼写"), {
+      target: { value: "centre-edited" }
+    });
     fireEvent.click(await screen.findByText("保存草稿"));
     expect(await screen.findByText("确认影响并保存草稿")).toBeInTheDocument();
 
@@ -1460,7 +1535,7 @@ describe("WordWizardV3Page", () => {
     );
     expect(
       await screen.findByRole("button", { name: "保存草稿" })
-    ).toBeEnabled();
+    ).toBeDisabled();
   });
 
   it("does not offer an archived entry a continuation into edit", async () => {

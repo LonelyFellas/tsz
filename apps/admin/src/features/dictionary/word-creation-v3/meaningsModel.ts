@@ -260,7 +260,13 @@ export function toWritableMeanings(
     sense_groups: canonical.sense_groups.map((group) => ({
       id: group.id,
       name_zh: group.name_zh,
-      name_en: group.name_en
+      name_en: group.name_en,
+      ...(group.name_en_rich === undefined
+        ? {}
+        : { name_en_rich: structuredClone(group.name_en_rich) }),
+      ...(group.voice_profile === undefined
+        ? {}
+        : { voice_profile: structuredClone(group.voice_profile) })
     })),
     pos: canonical.pos.map((pos) => ({
       pos_id: pos.pos_id,
