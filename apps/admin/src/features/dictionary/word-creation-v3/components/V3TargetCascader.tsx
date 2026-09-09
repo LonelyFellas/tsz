@@ -1,5 +1,14 @@
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
-import { Alert, Button, Cascader, Empty, Flex, Spin, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Cascader,
+  Empty,
+  Flex,
+  Spin,
+  Tag,
+  Typography
+} from "antd";
 import type {
   PhraseComponentUsageV3,
   PublishedSentenceTargetCandidateV3,
@@ -38,6 +47,8 @@ interface CandidateEntryGroup {
   entryId: string;
   headword: string;
   kind: PublishedSentenceTargetCandidateV3["kind"];
+  /** 从未发布的草稿词条：候选没有 publication_id，关联上去也不带发布版本。 */
+  draft: boolean;
   formGroups: CandidateFormGroup[];
 }
 
@@ -50,7 +61,7 @@ interface PhraseComponentChoice {
 }
 
 function phraseComponentKey(via: TextLinkViaPhraseV3): string {
-  return `${via.word_id}:${via.publication_id}:${via.sense_id}:${via.component_id}`;
+  return `${via.word_id}:${via.publication_id ?? "draft"}:${via.sense_id}:${via.component_id}`;
 }
 
 interface CascaderOptionNode {
@@ -72,12 +83,37 @@ function cascaderOptionsFromGroups(
   selectedLeafKey?: string
 ): CascaderOptionNode[] {
   return groups.map((group) => {
+    const draftTag = group.draft ? (
+      <Tag className="v3-component-usage-draft">草稿</Tag>
+    ) : null;
+    // 没有词义就没有可关联的叶子：留一条禁用行说明原因（草稿常见——词义步还没保存），
+    // 免得用户以为词条不存在。
+    if (group.formGroups.length === 0) {
+      return {
+        value: group.entryId,
+        disabled: true,
+        isLeaf: true,
+        label: (
+          <span className="v3-component-usage-entry">
+            <Typography.Text type="secondary">
+              {group.headword}（暂无词义）
+            </Typography.Text>
+            {draftTag}
+          </span>
+        )
+      };
+    }
     const posLabels = new Set(
       group.formGroups.map((formGroup) => formGroup.posLabel)
     );
     return {
       value: group.entryId,
-      label: <Typography.Text strong>{group.headword}</Typography.Text>,
+      label: (
+        <span className="v3-component-usage-entry">
+          <Typography.Text strong>{group.headword}</Typography.Text>
+          {draftTag}
+        </span>
+      ),
       children: group.formGroups.map((formGroup) => ({
         value: formGroup.formKey,
         label: (
@@ -136,14 +172,19 @@ function groupsFromCandidates(
     // 留着只会让用户选完在保存时被拒。
     if (selfEntryId !== undefined && candidate.entry_id === selfEntryId)
       continue;
-    // 无已发布词义的候选无从关联；留着会渲染出可勾选却写不出数据的空节点。
-    if (candidate.senses.length === 0) continue;
     const entry: CandidateEntryGroup = byEntry.get(candidate.entry_id) ?? {
       entryId: candidate.entry_id,
       headword: candidate.headword,
       kind: candidate.kind,
+      draft: candidate.publication_id === undefined,
       formGroups: []
     };
+    // 没有词义的候选无从关联；不造可勾选却写不出数据的空节点，只留一条禁用的词条行。
+    if (candidate.senses.length === 0) {
+      if (!byEntry.has(candidate.entry_id))
+        byEntry.set(candidate.entry_id, entry);
+      continue;
+    }
     const posLabel = partOfSpeechLabel(candidate.pos);
     // 词形层来自候选的全词形清单。命中标识只在有区间证据时给：关键字检索没有句子区间，
     // 后端把 matches 置空，此时任何词形都谈不上「命中」。
@@ -189,7 +230,10 @@ function groupsFromCandidates(
             state: "resolved",
             target_word_id: candidate.entry_id,
             // 发布/词性/原形以词义自带的为准：候选层的值只对命中词形成立。
-            target_publication_id: sense.publication_id,
+            // 草稿候选没有发布版本，键也不写——后端按「缺省即草稿」判定。
+            ...(sense.publication_id
+              ? { target_publication_id: sense.publication_id }
+              : {}),
             target_pos_id: sense.pos_id,
             // 后端要求所选词形与原形同组：候选词形自带可搭配的原形清单，
             // 词义自带的原形在清单内就沿用，否则取清单里的任意一个。
@@ -261,10 +305,13 @@ export function V3TargetCascader({
     let alive = true;
     void (async () => {
       try {
-        // 所选词面作为包含匹配关键字；正文关联按按钮限定类型，成分用词沿用原范围。
+        // 所选词面按词形等值匹配（屈折形照样命中原形词条），从未发布的草稿一并列出；
+        // 正文关联按按钮限定类型，成分用词沿用原范围。
         const response = await requests.searchComponentTargets({
           schema_version: 3,
           q: literal,
+          match: "exact",
+          include_drafts: true,
           ...(targetKind ? { kind: targetKind } : {}),
           page_size: 50
         });
@@ -325,9 +372,11 @@ export function V3TargetCascader({
           )
             continue;
           const { id, literal, ...target } = usage;
-          const via = {
+          const via: TextLinkViaPhraseV3 = {
             word_id: candidate.entry_id,
-            publication_id: sense.publication_id,
+            ...(sense.publication_id
+              ? { publication_id: sense.publication_id }
+              : {}),
             sense_id: sense.sense_id,
             component_id: id
           };
@@ -358,6 +407,8 @@ export function V3TargetCascader({
         const response = await requests.searchComponentTargets({
           schema_version: 3,
           q: component.literal,
+          match: "exact",
+          include_drafts: true,
           page_size: 50
         });
         setComponentResults((previous) => ({
@@ -511,8 +562,8 @@ export function V3TargetCascader({
           description={
             // 命中被截断时不能只说「没有匹配」：可用的候选可能落在窗口之外。
             state.truncated
-              ? "前 50 条命中里没有可关联的已发布词条，请换更具体的关键字"
-              : "没有匹配的已发布词条"
+              ? "前 50 条命中里没有可关联的词条，请换更具体的关键字"
+              : "没有匹配的词条"
           }
           image={Empty.PRESENTED_IMAGE_SIMPLE}
         />

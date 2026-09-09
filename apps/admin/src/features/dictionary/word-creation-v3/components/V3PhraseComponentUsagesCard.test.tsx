@@ -480,7 +480,7 @@ describe("V3PhraseComponentUsagesCard", () => {
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
-    expect(await screen.findByText("没有匹配的已发布词条")).toBeInTheDocument();
+    expect(await screen.findByText("没有匹配的词条")).toBeInTheDocument();
   });
 
   it("候选没有已发布词义时不产生可勾选节点", async () => {
@@ -525,7 +525,13 @@ describe("V3PhraseComponentUsagesCard", () => {
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
-    expect(await screen.findByText("没有匹配的已发布词条")).toBeInTheDocument();
+    // 没有词义的候选留一条禁用行说明原因，而不是当作没搜到。
+    const row = await screen.findByText("give（暂无词义）");
+    expect(row.closest(".ant-cascader-menu-item")?.className).toContain(
+      "ant-cascader-menu-item-disabled"
+    );
+    expect(screen.queryByText("没有匹配的词条")).not.toBeInTheDocument();
+    fireEvent.click(row);
     expect(onUsagesChange).not.toHaveBeenCalled();
   });
 
@@ -777,7 +783,7 @@ describe("V3PhraseComponentUsagesCard", () => {
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
-    expect(await screen.findByText("没有匹配的已发布词条")).toBeInTheDocument();
+    expect(await screen.findByText("没有匹配的词条")).toBeInTheDocument();
   });
 
   it("候选词形层展示全词形并标注命中行", async () => {
@@ -992,7 +998,7 @@ describe("V3PhraseComponentUsagesCard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     await waitFor(() =>
-      expect(screen.getByText("没有匹配的已发布词条")).toBeInTheDocument()
+      expect(screen.getByText("没有匹配的词条")).toBeInTheDocument()
     );
     expect(
       baseElement.querySelector(".ant-cascader-menu-item-content")
@@ -1016,7 +1022,7 @@ describe("V3PhraseComponentUsagesCard", () => {
       />
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
-    expect(await screen.findByText("没有匹配的已发布词条")).toBeInTheDocument();
+    expect(await screen.findByText("没有匹配的词条")).toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: "清除关联" }));
     await waitFor(() => expect(onUsagesChange).toHaveBeenCalledWith([]));
   });
@@ -1046,10 +1052,14 @@ describe("V3PhraseComponentUsagesCard", () => {
     searchComponentTargets.mockResolvedValue({
       total: 120,
       truncated: true,
+      // 词形都没有可搭配的原形 → 候选整条被过滤掉。
       matches: [
         {
           ...giveEntryResponse().matches[0]!,
-          senses: []
+          forms: giveEntryResponse().matches[0]!.forms.map((form) => ({
+            ...form,
+            base_form_ids: []
+          }))
         }
       ]
     });
@@ -1063,7 +1073,7 @@ describe("V3PhraseComponentUsagesCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     expect(
       await screen.findByText(
-        "前 50 条命中里没有可关联的已发布词条，请换更具体的关键字"
+        "前 50 条命中里没有可关联的词条，请换更具体的关键字"
       )
     ).toBeInTheDocument();
   });

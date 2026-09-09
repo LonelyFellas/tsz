@@ -72,7 +72,8 @@ export type PhraseComponentUsageV3 =
       id: string;
       literal: string;
       target_word_id: string;
-      target_publication_id: string;
+      /** 缺省 = 目标是从未发布的草稿：保存 / 发布按目标当前草稿内容校验；目标发布后由服务端补上。 */
+      target_publication_id?: string;
       target_pos_id: string;
       target_base_form_id: string;
       target_sense_id: string;
@@ -205,7 +206,8 @@ export interface RichTextVariantV3 {
 
 export interface TextLinkViaPhraseV3 {
   word_id: string;
-  publication_id: string;
+  /** 缺省 = 该短语还是从未发布的草稿。 */
+  publication_id?: string;
   sense_id: string;
   component_id: string;
 }
@@ -214,7 +216,8 @@ export interface TextLinkV3 {
   id: string;
   source_segments: SentenceSourceRangeV3[];
   target_word_id: string;
-  target_publication_id: string;
+  /** 缺省 = 目标是从未发布的草稿：发布引用记 draft 范围；目标发布后宿主下次保存 / 发布由服务端补上。 */
+  target_publication_id?: string;
   target_pos_id: string;
   target_base_form_id: string;
   target_form_id: string;
@@ -390,7 +393,8 @@ export interface SentenceTargetMatchEvidenceV3 {
 
 export interface SentenceTargetSenseV3 {
   sense_id: string;
-  publication_id: string;
+  /** 与候选行同一个发布版本；草稿候选缺省。 */
+  publication_id?: string;
   pos_id: string;
   base_form_id: string;
   level: string;
@@ -411,7 +415,8 @@ export interface SentenceTargetCandidateFormV3 {
 
 export interface PublishedSentenceTargetCandidateV3 {
   entry_id: string;
-  publication_id: string;
+  /** 命中的发布版本。缺省即草稿候选（只在 `include_drafts` 时出现）。 */
+  publication_id?: string;
   pos_id: string;
   base_form_id: string;
   headword: string;
@@ -453,8 +458,15 @@ export interface SearchComponentTargetsV3Input {
   /** 只要单词或只要短语；不传则两者都返回。 */
   kind?: WordEntryKindV3;
   page_size?: number;
-  /** 上一页返回的 `next_cursor`；换了关键字/kind 或词面数据变动后即失效（400 invalid_query）。 */
+  /** 上一页返回的 `next_cursor`；换了关键字/kind/match/include_drafts 或词面数据变动后即失效（400 invalid_query）。 */
   cursor?: string;
+  /**
+   * 匹配方式。缺省 `contains` = 词面包含关键字；`exact` = 关键字归一化后与词形等值，
+   * 屈折词形（jobs / gave）照样命中原形词条。例句里点词做关联要用 `exact`。
+   */
+  match?: "contains" | "exact";
+  /** 把从未发布的 V3 草稿词条（不限创建者）也列为候选；草稿候选没有 `publication_id`。 */
+  include_drafts?: boolean;
 }
 
 export interface SearchComponentTargetsV3Response {
