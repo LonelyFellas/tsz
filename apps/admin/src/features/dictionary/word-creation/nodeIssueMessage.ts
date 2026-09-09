@@ -1,10 +1,11 @@
+import { formTypeLabel } from "../word-creation-v3/presentation";
 import type {
   DraftNodeLocation,
   DraftValidationIssue,
   DraftValidationIssueAny,
   DraftValidationIssueV2
 } from "@tsz/types";
-import { DIALECT_SHORT_LABEL, FORM_TYPE_LABEL } from "../editorConstants";
+import { DIALECT_SHORT_LABEL } from "../editorConstants";
 import {
   partOfSpeechLabel,
   type PartOfSpeechLookup
@@ -57,7 +58,8 @@ function locationLabel(
       : `第 ${location.form_group_index + 1} 组`,
     location.form_type === undefined
       ? undefined
-      : FORM_TYPE_LABEL[location.form_type],
+      : (lookup.formTypeNames?.get(location.form_type) ??
+        formTypeLabel(location.form_type)),
     // common 是「无需分方言」，写进文案只会让人以为漏填了某一侧。
     location.dialect === undefined || location.dialect === "common"
       ? undefined

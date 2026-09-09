@@ -1,3 +1,4 @@
+import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import {
   CaretDownFilled,
   CaretUpFilled,
@@ -34,7 +35,7 @@ import {
   reorderMemberships,
   type V3IdFactory
 } from "../operations";
-import { formTypeLabel } from "../presentation";
+import {} from "../presentation";
 import {
   V3ConcreteFormRow,
   V3DialectSeparatedFormMatrix,
@@ -76,6 +77,7 @@ export function V3FormGroupCard({
   posCatalog,
   dialectControl
 }: V3FormGroupCardProps) {
+  const formTypeLabel = useFormTypeLabel();
   const [blockedFormId, setBlockedFormId] = useState<string>();
   const [collapsed, setCollapsed] = useState(false);
   const orderedIds = group.members.map((member) => member.id);

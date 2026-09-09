@@ -1,3 +1,4 @@
+import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { HttpError } from "@tsz/api-client/http";
 import type {
   AdminWordAnyEnvelope,
@@ -727,9 +728,10 @@ export function UnifiedCreateEntryStep({
     `${pending?.detection.detection_id ?? "none"}:${page?.snapshot_id ?? "none"}`,
     fetchSurfacePage
   );
+  const formTypeLabel = useFormTypeLabel();
   const cards = useMemo(
-    () => aggregateLifecycleSurfaceMatchCards(snapshot),
-    [snapshot]
+    () => aggregateLifecycleSurfaceMatchCards(snapshot, formTypeLabel),
+    [snapshot, formTypeLabel]
   );
   const baseCandidates = useMemo(() => {
     if (!prepared) return [];

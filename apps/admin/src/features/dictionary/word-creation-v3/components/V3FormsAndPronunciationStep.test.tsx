@@ -1,3 +1,4 @@
+import { FormTypeLabelsProvider } from "../../part-of-speech/FormTypeLabels";
 import {
   act,
   fireEvent,
@@ -2694,4 +2695,43 @@ describe("V3FormsAndPronunciationStep", () => {
       single[0]!.querySelector<HTMLElement>(".word-sort-drag-handle")
     ).toBeDisabled();
   });
+});
+
+it("目录自定义词形可展示，改名后保留词形编码", async () => {
+  const custom = commonFormFixture({
+    id: uuidFromInt(501),
+    form_type: "custom_variant",
+    spelling: "custom"
+  });
+  const initial = formsFixture({ forms: [commonFormFixture(), custom] });
+  const item = {
+    id: uuidFromInt(502),
+    code: "custom_variant",
+    name_zh: "自定义词形",
+    short_name_zh: "自定义",
+    name_en: "Custom",
+    full_name_en: "custom",
+    abbreviation: "custom",
+    sort_order: 100
+  };
+  catalogState.data = structuredClone(partOfSpeechCatalogFixture);
+  catalogState.data.items[0]!.allowed_form_types = ["custom_variant"];
+  const { rerender } = render(
+    <FormTypeLabelsProvider items={[item]}>
+      <Harness initial={initial} />
+    </FormTypeLabelsProvider>
+  );
+  expect((await screen.findAllByText("自定义词形")).length).toBeGreaterThan(0);
+  rerender(
+    <FormTypeLabelsProvider items={[{ ...item, name_zh: "改名词形" }]}>
+      <Harness initial={initial} />
+    </FormTypeLabelsProvider>
+  );
+  expect((await screen.findAllByText("改名词形")).length).toBeGreaterThan(0);
+  expect(screen.queryByText("自定义词形")).toBeNull();
+  expect(
+    validateFormsContent(initial, "save", {
+      allowedFormTypes: () => ["custom_variant"]
+    })
+  ).toEqual([]);
 });

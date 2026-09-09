@@ -1,3 +1,4 @@
+import { useFormTypeLabel } from "./part-of-speech/FormTypeLabels";
 import {
   Alert,
   Button,
@@ -28,7 +29,8 @@ export function LifecycleSurfaceConfirmation({
   confirming: boolean;
   action?: "restore" | "activate";
 }) {
-  const cards = aggregateLifecycleSurfaceMatchCards(state);
+  const formTypeLabel = useFormTypeLabel();
+  const cards = aggregateLifecycleSurfaceMatchCards(state, formTypeLabel);
   const groups = [
     ["visibility", "仅公开可见性"],
     ["ordinary", "仅普通同形提示"],

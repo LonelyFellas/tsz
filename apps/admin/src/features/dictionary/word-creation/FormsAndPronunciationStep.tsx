@@ -1,3 +1,4 @@
+import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import {
   DeleteOutlined,
   DownOutlined,
@@ -618,11 +619,12 @@ function SharedSpellingVariantEditor({
 }
 
 function BaseTypeCell({ lastRow }: { lastRow: boolean }) {
+  const label = useFormTypeLabel();
   return (
     <div
       className={`word-form-type-cell${lastRow ? " word-form-matrix-last-row" : ""}`}
     >
-      <Tag>原形</Tag>
+      <Tag>{label("base")}</Tag>
     </div>
   );
 }
@@ -648,6 +650,7 @@ function DerivedTypeCell({
   onMove: (delta: -1 | 1) => void;
   onRemove: () => void;
 }) {
+  const formTypeLabel = useFormTypeLabel();
   const duplicate = usedTypes.includes(slot.form_type);
   return (
     <div
@@ -663,18 +666,13 @@ function DerivedTypeCell({
             ? undefined
             : "error"
         }
-        options={FORM_TYPE_OPTIONS.filter((option) =>
-          allowedTypes.includes(
-            option.value as WordDerivedFormSlotV2["form_type"]
-          )
-        ).map((option) => ({
-          ...option,
-          disabled:
-            option.value !== slot.form_type &&
-            usedTypes.includes(
-              option.value as WordDerivedFormSlotV2["form_type"]
-            )
-        }))}
+        options={[...new Set([slot.form_type, ...allowedTypes])].map(
+          (value) => ({
+            value,
+            label: formTypeLabel(value),
+            disabled: value !== slot.form_type && usedTypes.includes(value)
+          })
+        )}
         disabled={readOnly}
         style={{ width: "100%" }}
         onChange={(form_type) => onChange({ ...slot, form_type })}
@@ -1884,6 +1882,7 @@ function SurfaceConfirmationDetails({
   onLocate: (candidate: FormSurfaceCandidate) => void;
   onRetry: () => void;
 }) {
+  const formTypeLabel = useFormTypeLabel();
   const cards = useMemo(
     () =>
       aggregateSurfaceMatchCards(
@@ -2620,7 +2619,14 @@ export function FormsAndPronunciationStep({
         // 指名到「词形类型 · 方言侧 · 缺失字段」，只报一个计数管理员没法下手（手测 C4）。
         // incompleteCount > 0 时必然找得到首个问题，所以这里不需要兜底文案。
         const derivedIssue =
-          incompleteCount > 0 ? derivedFormIssueMessage(pos) : undefined;
+          incompleteCount > 0
+            ? derivedFormIssueMessage(
+                pos,
+                (code) =>
+                  partOfSpeechLookup.formTypeNames?.get(code) ??
+                  formTypeLabel(code)
+              )
+            : undefined;
         if (derivedIssue) {
           const more =
             incompleteCount > 1

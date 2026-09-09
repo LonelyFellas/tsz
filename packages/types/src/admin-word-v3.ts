@@ -48,15 +48,7 @@ export interface DialectRulesV3 {
 }
 
 /** `base` is a peer form type. It is neither unique nor a parent of other forms. */
-export type WordFormTypeV3 =
-  | "base"
-  | "third_person_singular"
-  | "present_participle"
-  | "past_tense"
-  | "past_participle"
-  | "plural"
-  | "comparative"
-  | "superlative";
+export type WordFormTypeV3 = string;
 
 export interface WordPronunciationV3 {
   id: string;

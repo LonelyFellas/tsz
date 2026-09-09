@@ -1047,15 +1047,15 @@ describe("admin word V3/Any runtime decoder", () => {
       reason: "missing_required_property"
     },
     {
-      name: "自由 form_type",
+      name: "非法词形编码",
       mutate: (word: Record<string, unknown>) => {
         const forms = word.forms as {
           pos: Array<{ forms: Array<{ form_type: string }> }>;
         };
-        forms.pos[0]!.forms[0]!.form_type = "prototype";
+        forms.pos[0]!.forms[0]!.form_type = "invalid-code";
       },
       path: "$.word.forms.pos[0].forms[0].form_type",
-      reason: "enum_mismatch"
+      reason: "invalid_format"
     },
     {
       name: "canonical extra key",
@@ -1333,4 +1333,12 @@ describe("admin word V3/Any runtime decoder", () => {
       });
     }
   );
+});
+
+it("V3 runtime 接受目录自定义词形编码并保留原值", () => {
+  const word = validAdminWordV3();
+  word.forms.pos[0]!.forms[0]!.form_type = "custom_variant";
+  expect(
+    decodeAdminWordV3Envelope({ word }).word.forms.pos[0]!.forms[0]!.form_type
+  ).toBe("custom_variant");
 });

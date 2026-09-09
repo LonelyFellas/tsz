@@ -1,3 +1,4 @@
+import { FormTypeSettings } from "./FormTypeSettings";
 import {
   PlusOutlined,
   ReloadOutlined,
@@ -51,8 +52,17 @@ function conflictMessage(kind: string, field: string | null | undefined) {
   return label ? `${label}与已有${kind}重复` : `${kind}名称已存在`;
 }
 
-function errorMessage(error: unknown): string {
+export function errorMessage(error: unknown): string {
   if (error instanceof HttpError) {
+    if (error.code === "form_type_conflict")
+      return conflictMessage("词形变化", error.problem?.field);
+    if (error.code === "form_type_in_use")
+      return "该词形类型已被词条或历史发布引用，只能修改";
+    if (error.code === "form_type_required") return "原形为必需类型，不能删除";
+    if (error.code === "form_type_not_found")
+      return "词形类型不存在或已被删除，请刷新后重试";
+    if (error.code === "invalid_form_type")
+      return "词形配置字段不符合要求，请检查后重试";
     // 稳定编码不对用户暴露：编码撞车只可能来自英文全称派生结果相同，提示改英文全称。
     if (error.code === "part_of_speech_conflict")
       return conflictMessage("基本词性", error.problem?.field);
@@ -90,7 +100,9 @@ export function PartOfSpeechSettings() {
   const [pageSize, setPageSize] = useState(10);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<PartOfSpeechConfig>();
-  const [activeTab, setActiveTab] = useState<"basic" | "detailed">("basic");
+  const [activeTab, setActiveTab] = useState<"basic" | "detailed" | "forms">(
+    "basic"
+  );
   const [selectedPartId, setSelectedPartId] = useState("");
   const subPanelRef = useRef<SubPartOfSpeechPanelHandle>(null);
   const list = usePartOfSpeechConfigList({
@@ -221,7 +233,7 @@ export function PartOfSpeechSettings() {
             词性配置
           </Typography.Title>
           <Typography.Text type="secondary" style={{ display: "block" }}>
-            统一维护智能词库使用的基本词性与细分词性；业务页面默认显示中文名称。
+            统一维护智能词库使用的基本词性、细分词性与词形变化；业务页面默认显示中文名称。
           </Typography.Text>
         </div>
       </Flex>
@@ -236,15 +248,20 @@ export function PartOfSpeechSettings() {
       >
         <Tabs
           activeKey={activeTab}
-          onChange={(key) => setActiveTab(key as "basic" | "detailed")}
+          onChange={(key) =>
+            setActiveTab(key as "basic" | "detailed" | "forms")
+          }
           items={[
             { key: "basic", label: "基本词性" },
-            { key: "detailed", label: "细分词性" }
+            { key: "detailed", label: "细分词性" },
+            { key: "forms", label: "词形变化" }
           ]}
         />
       </ConfigProvider>
 
-      {activeTab === "basic" ? (
+      {activeTab === "forms" ? (
+        <FormTypeSettings />
+      ) : activeTab === "basic" ? (
         <>
           <Card size="small">
             <Flex justify="space-between" align="center" wrap gap={12}>

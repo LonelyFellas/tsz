@@ -7,6 +7,11 @@ import {
   modeOf
 } from "./ConsoleLayout";
 
+vi.mock("@/features/dictionary/part-of-speech/FormTypeLabels", () => ({
+  DictionaryFormTypeLabels: ({ children }: { children: React.ReactNode }) =>
+    children
+}));
+
 vi.mock("@/features/auth/AdminRouteGuard", () => ({
   AdminRouteGuard: ({ children }: { children: React.ReactNode }) => children
 }));

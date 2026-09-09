@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-pos-pronunciation/tsz-rust/docs/openapi.json",
-  "_source_sha256": "a0c38f8c2ff6c167402188282b43a902cbed96c0a1ba74d53c93f7f8380aa9ff",
+  "_source_sha256": "c5748fdbdd538b5656bd38f8e91c6b23bb1d59b85a28e101fa0f881a3e60898d",
   "roots": [
     "EntryAnnotationResponse",
     "AdminWordV3",
@@ -910,7 +910,12 @@
         "form_group_id": { "type": "string", "format": "uuid" },
         "form_group_index": { "type": "integer", "minimum": 0 },
         "form_id": { "type": "string", "format": "uuid" },
-        "form_type": { "$ref": "#/$defs/WordFormTypeV2" },
+        "form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
         "membership_id": { "type": "string", "format": "uuid" },
         "node_role": { "type": "string" },
         "pos": { "type": "string" },
@@ -1215,6 +1220,11 @@
         "invalid_query",
         "invalid_path_parameter",
         "payload_too_large",
+        "invalid_form_type",
+        "form_type_not_found",
+        "form_type_conflict",
+        "form_type_in_use",
+        "form_type_required",
         "invalid_part_of_speech",
         "invalid_headword",
         "unsupported_language",
@@ -1354,7 +1364,12 @@
           "properties": {
             "content_scope": { "$ref": "#/$defs/SurfaceContentScopeV2" },
             "dialect": { "$ref": "#/$defs/Dialect" },
-            "form_type": { "$ref": "#/$defs/WordFormTypeV2" },
+            "form_type": {
+              "type": "string",
+              "maxLength": 32,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,31}$"
+            },
             "pos": { "type": "string" },
             "pos_id": { "type": "string", "format": "uuid" },
             "source_id": { "type": "string" },
@@ -1514,7 +1529,12 @@
         "entry_id": { "type": "string", "format": "uuid" },
         "entry_kind": { "$ref": "#/$defs/WordEntryKindV3" },
         "form_id": { "type": "string", "format": "uuid" },
-        "form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+        "form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
         "group_ids": {
           "type": "array",
           "items": { "type": "string", "format": "uuid" }
@@ -1748,7 +1768,12 @@
             "target_base_form_id": { "type": "string", "format": "uuid" },
             "target_dialect": { "$ref": "#/$defs/Dialect" },
             "target_form_id": { "type": "string", "format": "uuid" },
-            "target_form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+            "target_form_type": {
+              "type": "string",
+              "maxLength": 32,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,31}$"
+            },
             "target_gloss": { "type": "string", "maxLength": 5000 },
             "target_headword": { "type": "string", "maxLength": 500 },
             "target_pos_id": { "type": "string", "format": "uuid" },
@@ -1865,7 +1890,12 @@
         "kind": { "$ref": "#/$defs/EntryKind" },
         "matched_dialect": { "$ref": "#/$defs/Dialect" },
         "matched_form_id": { "type": "string", "format": "uuid" },
-        "matched_form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+        "matched_form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
         "matched_variant_id": { "type": "string", "format": "uuid" },
         "matches": {
           "type": "array",
@@ -1924,7 +1954,12 @@
       "properties": {
         "dialect": { "$ref": "#/$defs/Dialect" },
         "form_id": { "type": "string", "format": "uuid" },
-        "form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+        "form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
         "pos_id": { "type": "string", "format": "uuid" },
         "spelling": { "type": "string" },
         "variant_id": { "type": "string", "format": "uuid" }
@@ -2437,7 +2472,12 @@
         },
         "dialect": { "$ref": "#/$defs/Dialect" },
         "form_id": { "type": "string", "format": "uuid" },
-        "form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+        "form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
         "spelling": { "type": "string" },
         "variant_id": { "type": "string", "format": "uuid" }
       },
@@ -2613,7 +2653,12 @@
       "type": "object",
       "required": ["pos", "form_type", "regional_variants"],
       "properties": {
-        "form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+        "form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
         "pos": { "type": "string" },
         "regional_variants": { "$ref": "#/$defs/SuggestedRegionalVariantsV3" }
       },
@@ -2727,7 +2772,12 @@
             "candidate_type": { "type": "string", "enum": ["form"] },
             "candidate_word_id": { "type": "string", "format": "uuid" },
             "dialect": { "$ref": "#/$defs/Dialect" },
-            "form_type": { "$ref": "#/$defs/WordFormTypeV2" },
+            "form_type": {
+              "type": "string",
+              "maxLength": 32,
+              "minLength": 1,
+              "pattern": "^[a-z][a-z0-9_]{0,31}$"
+            },
             "normalized_surface": { "type": "string" },
             "pos": { "type": "string" },
             "pos_id": { "type": "string", "format": "uuid" },
@@ -3150,7 +3200,12 @@
         "dialect": { "$ref": "#/$defs/Dialect" },
         "form_group_id": { "type": "string", "format": "uuid" },
         "form_id": { "type": "string", "format": "uuid" },
-        "form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+        "form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
         "membership_id": { "type": "string", "format": "uuid" },
         "node_role": { "type": "string" },
         "pos_id": { "type": "string", "format": "uuid" },
@@ -3357,7 +3412,12 @@
       "type": "object",
       "required": ["id", "form_type", "regional_variants"],
       "properties": {
-        "form_type": { "$ref": "#/$defs/WordFormTypeV3" },
+        "form_type": {
+          "type": "string",
+          "maxLength": 32,
+          "minLength": 1,
+          "pattern": "^[a-z][a-z0-9_]{0,31}$"
+        },
         "id": { "type": "string", "format": "uuid" },
         "regional_variants": { "$ref": "#/$defs/WordRegionalVariantsV3" }
       },
@@ -3658,32 +3718,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "WordFormTypeV2": {
-      "type": "string",
-      "enum": [
-        "base",
-        "third_person_singular",
-        "present_participle",
-        "past_tense",
-        "past_participle",
-        "plural",
-        "comparative",
-        "superlative"
-      ]
-    },
-    "WordFormTypeV3": {
-      "type": "string",
-      "enum": [
-        "base",
-        "third_person_singular",
-        "present_participle",
-        "past_tense",
-        "past_participle",
-        "plural",
-        "comparative",
-        "superlative"
-      ]
     },
     "WordFormVariantV2": {
       "type": "object",
