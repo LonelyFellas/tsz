@@ -2260,6 +2260,48 @@ describe("V3MeaningsAndExamplesStep", () => {
     }
   );
 
+  it.each([
+    ["synonym", "近义词"],
+    ["antonym", "反义词"],
+    ["derivative", "派生词"]
+  ])("%s 改词面、排序或删除后继续添加词义仍在同一条目", (type, label) => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [
+      {
+        id: "r1",
+        relation: type,
+        pending_target_headword: "first",
+        pending_target_gloss: "一",
+        score: "60"
+      },
+      {
+        id: "r2",
+        relation: type,
+        pending_target_headword: "first",
+        pending_target_gloss: "二",
+        score: "60"
+      }
+    ];
+    render(<Harness initial={initial} />);
+    fireEvent.change(screen.getByLabelText(`${label}目标词条`), {
+      target: { value: "changed" }
+    });
+    fireEvent.click(screen.getByLabelText(`添加${label}词义`));
+    expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(1);
+    expect(screen.getByLabelText(`${label}待关联词义 3`)).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByLabelText(`拖动${label}词义 2`), {
+      key: "ArrowUp"
+    });
+    fireEvent.click(screen.getByLabelText(`添加${label}词义`));
+    expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(1);
+    expect(screen.getByLabelText(`${label}待关联词义 4`)).toBeInTheDocument();
+    deleteRelationItem(`${label}词义 1`);
+    fireEvent.click(screen.getByLabelText(`添加${label}词义`));
+    expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(1);
+    expect(screen.getByLabelText(`${label}待关联词义 4`)).toBeInTheDocument();
+    expect(value().pos[0]!.senses[0]!.relations).toHaveLength(4);
+  });
+
   it("派生词多选保存后合为一行，重开可取消和新增词义，改选清理整组", () => {
     relatedSearchAny.mockImplementation((...args) => {
       const result = defaultRelatedSearchImplementation(...args);

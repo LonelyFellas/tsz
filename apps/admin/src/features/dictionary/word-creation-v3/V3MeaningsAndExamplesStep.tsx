@@ -1683,6 +1683,15 @@ function RelationsGrid({
                                         id: idFactory()
                                       };
                                       delete added.pending_target_gloss;
+                                      const rowKey =
+                                        relationRowKeys.current.get(
+                                          relation.id
+                                        ) ?? relation.id;
+                                      for (const member of [...group, added])
+                                        relationRowKeys.current.set(
+                                          member.id,
+                                          rowKey
+                                        );
                                       target.relations = replaceRelationGroup(
                                         target.relations,
                                         group,
