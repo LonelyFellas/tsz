@@ -4,18 +4,14 @@ import type {
   VoiceOption
 } from "../../types";
 
-/**
- * 语法结构三分类。一段文字只能属于其中一类：点非当前类=替换，点当前类=取消。
- *
- * TODO(契约): wire 的 emphasis.level 仍锁死 "strong"（见 openapi
- * RichTextEmphasisLevel），三分类目前只存在于编辑态，保存时统一按既有 emphasis
- * 落盘。待后端放开该枚举后，再把 level 接到 mapping 两端。
- */
-export const GRAMMAR_ROLES: ReadonlyArray<{ level: string; label: string }> = [
-  { level: "function", label: "功能词" },
-  { level: "core", label: "核心词" },
-  { level: "grammar", label: "语法词" }
-];
+/** 界面术语标识与现有 wire 等级分离，保存格式保持兼容。 */
+export const GRAMMAR_ROLE_DEFINITIONS = {
+  replaceable_slot: { level: "function", label: "可替换搭配" },
+  fixed_core: { level: "core", label: "固定核心词" },
+  pos_indicator: { level: "grammar", label: "词性提示符" }
+} as const;
+export const GRAMMAR_ROLES: ReadonlyArray<{ level: string; label: string }> =
+  Object.values(GRAMMAR_ROLE_DEFINITIONS);
 
 /** 历史数据里的 emphasis 等级，视作「核心词」。 */
 export const LEGACY_GRAMMAR_LEVEL = "strong";

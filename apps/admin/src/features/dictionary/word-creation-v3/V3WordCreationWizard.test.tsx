@@ -675,7 +675,7 @@ describe("V3WordCreationWizard", () => {
     const firstPosTemplate = screen.getByTestId("pos-template-ids").textContent;
     expect(firstPosTemplate).toMatch(new RegExp(`^${UUIDS.pos}:`, "u"));
     expect(screen.getByText("基本词性").parentElement).toHaveTextContent("1");
-    expect(screen.getByText("词形变化").parentElement).toHaveTextContent("0");
+    expect(screen.getByText("词形变化").parentElement).toHaveTextContent("1");
     expect(screen.getByText("语法结构").parentElement).toHaveTextContent("1");
     expect(screen.getByText("多维词义").parentElement).toHaveTextContent("1");
     expect(screen.getByText("多维例句").parentElement).toHaveTextContent("1");

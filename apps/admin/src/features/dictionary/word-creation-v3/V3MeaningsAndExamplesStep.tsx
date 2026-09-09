@@ -1,3 +1,8 @@
+import { toRichTextV2 } from "@tsz/voice-editor/core";
+import {
+  PronunciationPreviewProvider,
+  PronunciationPreviewControls
+} from "../word-creation/PronunciationPreview";
 import {
   CaretDownFilled,
   CaretUpFilled,
@@ -77,8 +82,7 @@ import {
   type SortableRowsController
 } from "./sortableRows";
 import { SortableDragHandle } from "./components/SortableDragHandle";
-// 随词性 Tab 拖拽一起下线，恢复时取消注释：
-// import { reorderPos } from "./operations";
+import { reorderPos } from "./operations";
 import "./posTabs.css";
 import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
@@ -230,7 +234,6 @@ const SENSE_GROUP_DRAG_TYPE = "application/x-tsz-v3-sense-group";
 const GRAMMAR_DRAG_TYPE = "application/x-tsz-v3-grammar-structure";
 const DEFINITION_DRAG_TYPE = "application/x-tsz-v3-definition";
 const SENTENCE_DRAG_TYPE = "application/x-tsz-v3-sentence";
-// 随词性 Tab 拖拽一起下线，恢复时取消注释：
 // const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
 /** 拖影取整行而不是把手上那颗小图标；与提取前硬编码的选择器一致。 */
 const SORTABLE_ROW_SELECTOR =
@@ -442,6 +445,16 @@ function GrammarStructuresCard({
                   >
                     <V3VoiceTextField
                       mode="grammar"
+                      leadingAction={
+                        <PronunciationPreviewControls
+                          playbackOnly
+                          pronunciationId={variant.id}
+                          dialect={variant.dialect}
+                          ariaLabelPrefix={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
+                          content={toRichTextV2(variant.content)}
+                          voiceProfile={variant.voice_profile ?? undefined}
+                        />
+                      }
                       ariaLabel={`语法结构 ${structureIndex + 1} ${dialectLabel(variant.dialect)}内容`}
                       field="content"
                       nodeId={variant.id}
@@ -1022,8 +1035,19 @@ function RelationsGrid({
           .map((group) => ({ relation: group[0]!, group }));
         return (
           <Card
-            className={`word-relation-card${collapsed[relationType] ? " is-collapsed" : ""}`}
+            className={`word-relation-card word-relation-card-animated${collapsed[relationType] ? " is-collapsed" : ""}`}
             data-relation-type={relationType}
+            styles={{ header: { cursor: "pointer" } }}
+            onClick={(event) => {
+              const header = event.currentTarget.querySelector(
+                ":scope > .ant-card-head"
+              );
+              if (!header?.contains(event.target as Node)) return;
+              setCollapsed((current) => ({
+                ...current,
+                [relationType]: !current[relationType]
+              }));
+            }}
             extra={
               <Button
                 aria-label={`${collapsed[relationType] ? "展开" : "收起"}${relationLabel(relationType)}`}
@@ -1036,12 +1060,14 @@ function RelationsGrid({
                   )
                 }
                 iconPlacement="end"
-                onClick={() =>
+                aria-expanded={!collapsed[relationType]}
+                onClick={(event) => {
+                  event.stopPropagation();
                   setCollapsed((current) => ({
                     ...current,
                     [relationType]: !current[relationType]
-                  }))
-                }
+                  }));
+                }}
                 size="small"
                 type="text"
               >
@@ -1052,525 +1078,635 @@ function RelationsGrid({
             size="small"
             title={relationLabel(relationType)}
           >
-            {relations.length === 0 ? (
-              <Empty
-                description={`暂无${relationLabel(relationType)}`}
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-              />
-            ) : (
-              <Flex className="word-relation-list" vertical>
-                <div className="word-relation-column-heads">
-                  <span>{meta.metric}</span>
-                  <span>{relationLabel(relationType)}</span>
-                  <span>匹配词义</span>
-                  <span />
-                </div>
-                {relations.map(({ relation, group }) => (
-                  <div
-                    className="word-relation-row"
-                    data-v3-node-id={relation.id}
-                    key={
-                      relationRowKeys.current.get(relation.id) ?? relation.id
-                    }
-                  >
-                    <InputNumber
-                      aria-label={meta.metric}
-                      status={isUnlinkedText(relation) ? "warning" : undefined}
-                      data-v3-field="score"
-                      data-v3-node-id={relation.id}
-                      max={100}
-                      min={0}
-                      onChange={(score) =>
-                        change((draft) => {
-                          for (const item of draft.pos[posIndex]!.senses[
-                            senseIndex
-                          ]!.relations) {
-                            if (group.some((member) => member.id === item.id))
-                              item.score = String(score ?? 0);
-                          }
-                        })
-                      }
-                      precision={2}
-                      size="small"
-                      suffix="%"
-                      value={Number(relation.score)}
-                    />
-                    <AutoComplete
-                      className="word-relation-autocomplete"
-                      filterOption={false}
-                      notFoundContent={
-                        relatedSearch.exact.isFetching ||
-                        relatedSearch.contains.isFetching
-                          ? "搜索中…"
-                          : searchFailed
-                            ? "搜索失败，请重试"
-                            : searchHasNextPage
-                              ? "仍有结果未加载"
-                              : searching?.query
-                                ? "未找到匹配词条"
-                                : "输入词汇搜索"
-                      }
-                      onFocus={() => {
-                        setSenseSearch(undefined);
-                        if (searching?.relationId === relation.id) return;
-                        setSearching({
-                          relationId: relation.id,
-                          query: relationDisplayHeadword(
-                            relation,
-                            knownWordFor(relation),
-                            relationDisplaySnapshots?.[relation.id]
-                          )
-                        });
-                      }}
-                      onSearch={(query) => {
-                        const prepared = validateEntryInput(query);
-                        setSenseSearch(undefined);
-                        setSearching({ relationId: relation.id, query });
-                        setKnownWords((current) => {
-                          if (!(relation.id in current)) return current;
-                          const next = { ...current };
-                          delete next[relation.id];
-                          return next;
-                        });
-                        change((draft) => {
-                          const draftSense =
-                            draft.pos[posIndex]!.senses[senseIndex]!;
-                          draftSense.relations = replaceRelationGroup(
-                            draftSense.relations,
-                            group,
-                            [
-                              draftSense.relations.find(
-                                (item) => item.id === relation.id
-                              )!
-                            ]
-                          );
-                          const target = draft.pos[posIndex]!.senses[
-                            senseIndex
-                          ]!.relations.find((item) => item.id === relation.id)!;
-                          delete target.target_word_id;
-                          delete target.target_sense_id;
-                          if (!prepared.issue && prepared.normalized)
-                            target.pending_target_headword =
-                              prepared.normalized;
-                          else {
-                            delete target.pending_target_headword;
-                            delete target.pending_target_gloss;
-                          }
-                        });
-                      }}
-                      onSelect={(wordId) => {
-                        const word = searchWords.find(
-                          (candidate) => candidate.word_id === wordId
-                        );
-                        if (!word) return;
-                        if (word.senses.length === 0) {
-                          if (word.status !== "draft") return;
-                          setKnownWords((current) => ({
-                            ...current,
-                            [relation.id]: word
-                          }));
-                          setSearching(undefined);
-                          change((draft) => {
-                            const draftSense =
-                              draft.pos[posIndex]!.senses[senseIndex]!;
-                            draftSense.relations = replaceRelationGroup(
-                              draftSense.relations,
-                              group,
-                              [
-                                draftSense.relations.find(
-                                  (item) => item.id === relation.id
-                                )!
-                              ]
-                            );
-                            const target = draft.pos[posIndex]!.senses[
-                              senseIndex
-                            ]!.relations.find(
-                              (item) => item.id === relation.id
-                            )!;
-                            delete target.target_word_id;
-                            delete target.target_sense_id;
-                            target.pending_target_headword =
-                              word.matchedHeadword;
-                          });
-                          return;
-                        }
-                        setKnownWords((current) => ({
-                          ...current,
-                          [relation.id]: word
-                        }));
-                        setSearching(undefined);
-                        change((draft) => {
-                          const draftSense =
-                            draft.pos[posIndex]!.senses[senseIndex]!;
-                          draftSense.relations = replaceRelationGroup(
-                            draftSense.relations,
-                            group,
-                            [
-                              draftSense.relations.find(
-                                (item) => item.id === relation.id
-                              )!
-                            ]
-                          );
-                          const target = draft.pos[posIndex]!.senses[
-                            senseIndex
-                          ]!.relations.find((item) => item.id === relation.id)!;
-                          target.target_word_id = word.word_id;
-                          delete target.target_sense_id;
-                          delete target.pending_target_headword;
-                          delete target.pending_target_gloss;
-                        });
-                      }}
-                      options={
-                        searching?.relationId === relation.id
-                          ? searchWords.map((word) => ({
-                              label: (
-                                <Flex align="center" gap={6}>
-                                  <span>{word.headword}</span>
-                                  <Tag
-                                    color={
-                                      word.status === "draft"
-                                        ? "orange"
-                                        : "blue"
-                                    }
-                                  >
-                                    {word.status === "draft"
-                                      ? "草稿"
-                                      : "已发布"}
-                                  </Tag>
-                                  {word.senses.length === 0 &&
-                                  word.status !== "draft" ? (
-                                    <Typography.Text type="secondary">
-                                      暂无词义，请先添加词义
-                                    </Typography.Text>
-                                  ) : null}
-                                </Flex>
-                              ),
-                              value: word.word_id,
-                              disabled:
-                                (word.senses.length === 0 &&
-                                  word.status !== "draft") ||
-                                sense.relations.some(
-                                  (other) =>
-                                    !group.some(
-                                      (member) => member.id === other.id
-                                    ) &&
-                                    other.relation === relationType &&
-                                    (other.target_word_id === word.word_id ||
-                                      knownWords[other.id]?.word_id ===
-                                        word.word_id ||
-                                      other.pending_target_headword
-                                        ?.trim()
-                                        .toLowerCase() ===
-                                        word.matchedHeadword
-                                          .trim()
-                                          .toLowerCase())
-                                )
-                            }))
-                          : []
-                      }
-                      popupMatchSelectWidth={260}
-                      status={
-                        relationInputIssue(relation)
-                          ? "error"
-                          : isUnlinkedText(relation)
-                            ? "warning"
-                            : undefined
-                      }
-                      value={
-                        searching?.relationId === relation.id
-                          ? searching.query
-                          : relationDisplayHeadword(
-                              relation,
-                              knownWordFor(relation),
-                              relationDisplaySnapshots?.[relation.id]
-                            ) || (relation.target_word_id ? "已选择关联词" : "")
-                      }
-                    >
-                      <Input
-                        aria-label={`${relationLabel(relationType)}目标词条`}
-                        className="word-relation-target"
-                        prefix={
-                          relation.target_word_id ? (
-                            <SoundOutlined />
-                          ) : (
-                            <Tooltip title="待关联词暂不支持语音">
-                              <SoundOutlined
-                                aria-disabled="true"
-                                className="word-relation-sound-disabled"
-                              />
-                            </Tooltip>
-                          )
-                        }
-                        status={
-                          relationInputIssue(relation)
-                            ? "error"
-                            : isUnlinkedText(relation)
-                              ? "warning"
-                              : undefined
-                        }
-                        suffix={
-                          <>
-                            {searching?.relationId === relation.id &&
-                            searchFailed ? (
-                              <Button
-                                aria-label="重试关联词搜索"
-                                onClick={() => void retryRelatedSearch()}
-                                onMouseDown={(event) => event.preventDefault()}
-                                size="small"
-                                type="link"
-                              >
-                                搜索失败，重试
-                              </Button>
-                            ) : searching?.relationId === relation.id &&
-                              searchHasNextPage ? (
-                              <Button
-                                aria-label="加载更多关联词结果"
-                                onClick={() => void loadMoreSearchResults()}
-                                onMouseDown={(event) => event.preventDefault()}
-                                size="small"
-                                type="link"
-                              >
-                                加载更多
-                              </Button>
-                            ) : null}
-                            {isUnlinkedText(relation) &&
-                            !isSelectedEmptyDraft(relation) ? (
-                              <Tooltip
-                                title={`待关联的${relationLabel(relationType)}`}
-                              >
-                                <InfoCircleOutlined
-                                  aria-label={`待关联的${relationLabel(relationType)}`}
-                                  className="word-relation-unlinked-icon"
-                                  role="note"
-                                />
-                              </Tooltip>
-                            ) : null}
-                          </>
-                        }
-                        placeholder="搜索关联词"
-                        size="small"
-                      />
-                    </AutoComplete>
-                    {isUnlinkedText(relation) ? (
-                      <Input
-                        aria-label={`${relationLabel(relationType)}待关联词义`}
-                        className="word-relation-sense"
-                        data-v3-field="pending_target_gloss"
+            <SenseSectionBody collapsed={Boolean(collapsed[relationType])}>
+              <div style={{ padding: 10 }}>
+                {relations.length === 0 ? (
+                  <Empty
+                    description={`暂无${relationLabel(relationType)}`}
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  />
+                ) : (
+                  <Flex className="word-relation-list" vertical>
+                    <div className="word-relation-column-heads">
+                      <span>{meta.metric}</span>
+                      <span>{relationLabel(relationType)}</span>
+                      <span>匹配词义</span>
+                      <span />
+                    </div>
+                    {relations.map(({ relation, group }) => (
+                      <div
+                        className="word-relation-row"
                         data-v3-node-id={relation.id}
-                        maxLength={5000}
-                        onChange={(event) =>
-                          change((draft) => {
-                            const target = draft.pos[posIndex]!.senses[
-                              senseIndex
-                            ]!.relations.find(
-                              (item) => item.id === relation.id
-                            )!;
-                            if (event.target.value)
-                              target.pending_target_gloss = event.target.value;
-                            else delete target.pending_target_gloss;
-                          })
+                        key={
+                          relationRowKeys.current.get(relation.id) ??
+                          relation.id
                         }
-                        placeholder="输入词义"
-                        size="small"
-                        status="warning"
-                        suffix={
-                          isSelectedEmptyDraft(relation) ? (
-                            <Tooltip
-                              title={`待关联的${relationLabel(relationType)}`}
-                            >
-                              <InfoCircleOutlined
-                                aria-label={`待关联的${relationLabel(relationType)}`}
-                                className="word-relation-unlinked-icon"
-                                role="note"
-                              />
-                            </Tooltip>
-                          ) : undefined
-                        }
-                        value={relation.pending_target_gloss ?? ""}
-                      />
-                    ) : (
-                      <Select
-                        aria-label={`${relationLabel(relationType)}目标词义`}
-                        className="word-relation-sense"
-                        disabled={!relation.target_word_id}
-                        mode={
-                          relationType === "derivative" ? "multiple" : undefined
-                        }
-                        onChange={(selection: string | string[]) => {
-                          const discovered = searchWords.find(
-                            (word) => word.word_id === relation.target_word_id
-                          );
-                          if (discovered)
-                            setKnownWords((current) => ({
-                              ...current,
-                              [relation.id]: discovered
-                            }));
-                          const replacement =
-                            relationType === "derivative"
-                              ? selectDerivativeSenses(
-                                  group,
-                                  selection as string[],
-                                  idFactory
-                                )
-                              : undefined;
-                          if (replacement) {
-                            const rowKey =
-                              relationRowKeys.current.get(relation.id) ??
-                              relation.id;
-                            for (const item of replacement)
-                              relationRowKeys.current.set(item.id, rowKey);
+                      >
+                        <InputNumber
+                          aria-label={meta.metric}
+                          status={
+                            isUnlinkedText(relation) ? "warning" : undefined
                           }
-                          change((draft) => {
-                            const draftSense =
-                              draft.pos[posIndex]!.senses[senseIndex]!;
-                            if (replacement) {
+                          data-v3-field="score"
+                          data-v3-node-id={relation.id}
+                          max={100}
+                          min={0}
+                          onChange={(score) =>
+                            change((draft) => {
+                              for (const item of draft.pos[posIndex]!.senses[
+                                senseIndex
+                              ]!.relations) {
+                                if (
+                                  group.some((member) => member.id === item.id)
+                                )
+                                  item.score = String(score ?? 0);
+                              }
+                            })
+                          }
+                          precision={2}
+                          size="small"
+                          suffix="%"
+                          value={Number(relation.score)}
+                        />
+                        <AutoComplete
+                          className="word-relation-autocomplete"
+                          filterOption={false}
+                          notFoundContent={
+                            relatedSearch.exact.isFetching ||
+                            relatedSearch.contains.isFetching
+                              ? "搜索中…"
+                              : searchFailed
+                                ? "搜索失败，请重试"
+                                : searchHasNextPage
+                                  ? "仍有结果未加载"
+                                  : searching?.query
+                                    ? "未找到匹配词条"
+                                    : "输入词汇搜索"
+                          }
+                          onFocus={() => {
+                            setSenseSearch(undefined);
+                            if (searching?.relationId === relation.id) return;
+                            setSearching({
+                              relationId: relation.id,
+                              query: relationDisplayHeadword(
+                                relation,
+                                knownWordFor(relation),
+                                relationDisplaySnapshots?.[relation.id]
+                              )
+                            });
+                          }}
+                          onSearch={(query) => {
+                            const prepared = validateEntryInput(query);
+                            setSenseSearch(undefined);
+                            setSearching({ relationId: relation.id, query });
+                            setKnownWords((current) => {
+                              if (!(relation.id in current)) return current;
+                              const next = { ...current };
+                              delete next[relation.id];
+                              return next;
+                            });
+                            change((draft) => {
+                              const draftSense =
+                                draft.pos[posIndex]!.senses[senseIndex]!;
+                              const keepManualGroup =
+                                isUnlinkedText(relation) &&
+                                !prepared.issue &&
+                                Boolean(prepared.normalized);
+                              const targets = draftSense.relations.filter(
+                                (item) =>
+                                  keepManualGroup
+                                    ? group.some(
+                                        (member) => member.id === item.id
+                                      )
+                                    : item.id === relation.id
+                              );
                               draftSense.relations = replaceRelationGroup(
                                 draftSense.relations,
                                 group,
-                                replacement
+                                targets
                               );
-                            } else {
-                              draftSense.relations.find(
-                                (item) => item.id === relation.id
-                              )!.target_sense_id = selection as string;
-                            }
-                          });
-                        }}
-                        onOpenChange={(open) => {
-                          setSearching(undefined);
-                          setSenseSearch(
-                            open
-                              ? {
-                                  wordId: relation.target_word_id!,
-                                  query: (
-                                    relationDisplaySnapshots?.[relation.id]
-                                      ?.headword ??
-                                    knownWordFor(relation)?.headword ??
-                                    ""
-                                  ).split(" / ")[0]!
+                              for (const target of targets) {
+                                delete target.target_word_id;
+                                delete target.target_sense_id;
+                                if (!prepared.issue && prepared.normalized)
+                                  target.pending_target_headword =
+                                    prepared.normalized;
+                                else {
+                                  delete target.pending_target_headword;
+                                  delete target.pending_target_gloss;
                                 }
-                              : undefined
-                          );
-                        }}
-                        loading={
-                          senseSearch?.wordId === relation.target_word_id &&
-                          (relatedSearch.exact.isFetching ||
-                            relatedSearch.contains.isFetching)
-                        }
-                        popupRender={(menu) => (
-                          <>
-                            {menu}
-                            {senseSearch?.wordId === relation.target_word_id &&
-                            searchFailed ? (
-                              <Button
-                                size="small"
-                                type="link"
-                                onClick={() => void retryRelatedSearch()}
+                              }
+                            });
+                          }}
+                          onSelect={(wordId) => {
+                            const word = searchWords.find(
+                              (candidate) => candidate.word_id === wordId
+                            );
+                            if (!word) return;
+                            if (word.senses.length === 0) {
+                              if (word.status !== "draft") return;
+                              setKnownWords((current) => ({
+                                ...current,
+                                [relation.id]: word
+                              }));
+                              setSearching(undefined);
+                              change((draft) => {
+                                const draftSense =
+                                  draft.pos[posIndex]!.senses[senseIndex]!;
+                                draftSense.relations = replaceRelationGroup(
+                                  draftSense.relations,
+                                  group,
+                                  [
+                                    draftSense.relations.find(
+                                      (item) => item.id === relation.id
+                                    )!
+                                  ]
+                                );
+                                const target = draft.pos[posIndex]!.senses[
+                                  senseIndex
+                                ]!.relations.find(
+                                  (item) => item.id === relation.id
+                                )!;
+                                delete target.target_word_id;
+                                delete target.target_sense_id;
+                                target.pending_target_headword =
+                                  word.matchedHeadword;
+                              });
+                              return;
+                            }
+                            setKnownWords((current) => ({
+                              ...current,
+                              [relation.id]: word
+                            }));
+                            setSearching(undefined);
+                            change((draft) => {
+                              const draftSense =
+                                draft.pos[posIndex]!.senses[senseIndex]!;
+                              draftSense.relations = replaceRelationGroup(
+                                draftSense.relations,
+                                group,
+                                [
+                                  draftSense.relations.find(
+                                    (item) => item.id === relation.id
+                                  )!
+                                ]
+                              );
+                              const target = draft.pos[posIndex]!.senses[
+                                senseIndex
+                              ]!.relations.find(
+                                (item) => item.id === relation.id
+                              )!;
+                              target.target_word_id = word.word_id;
+                              delete target.target_sense_id;
+                              delete target.pending_target_headword;
+                              delete target.pending_target_gloss;
+                            });
+                          }}
+                          options={
+                            searching?.relationId === relation.id
+                              ? searchWords.map((word) => ({
+                                  label: (
+                                    <Flex align="center" gap={6}>
+                                      <span>{word.headword}</span>
+                                      <Tag
+                                        color={
+                                          word.status === "draft"
+                                            ? "orange"
+                                            : "blue"
+                                        }
+                                      >
+                                        {word.status === "draft"
+                                          ? "草稿"
+                                          : "已发布"}
+                                      </Tag>
+                                      {word.senses.length === 0 &&
+                                      word.status !== "draft" ? (
+                                        <Typography.Text type="secondary">
+                                          暂无词义，请先添加词义
+                                        </Typography.Text>
+                                      ) : null}
+                                    </Flex>
+                                  ),
+                                  value: word.word_id,
+                                  disabled:
+                                    (word.senses.length === 0 &&
+                                      word.status !== "draft") ||
+                                    sense.relations.some(
+                                      (other) =>
+                                        !group.some(
+                                          (member) => member.id === other.id
+                                        ) &&
+                                        other.relation === relationType &&
+                                        (other.target_word_id ===
+                                          word.word_id ||
+                                          knownWords[other.id]?.word_id ===
+                                            word.word_id ||
+                                          other.pending_target_headword
+                                            ?.trim()
+                                            .toLowerCase() ===
+                                            word.matchedHeadword
+                                              .trim()
+                                              .toLowerCase())
+                                    )
+                                }))
+                              : []
+                          }
+                          popupMatchSelectWidth={260}
+                          status={
+                            relationInputIssue(relation)
+                              ? "error"
+                              : isUnlinkedText(relation)
+                                ? "warning"
+                                : undefined
+                          }
+                          value={
+                            searching?.relationId === relation.id
+                              ? searching.query
+                              : relationDisplayHeadword(
+                                  relation,
+                                  knownWordFor(relation),
+                                  relationDisplaySnapshots?.[relation.id]
+                                ) ||
+                                (relation.target_word_id ? "已选择关联词" : "")
+                          }
+                        >
+                          <Input
+                            aria-label={`${relationLabel(relationType)}目标词条`}
+                            className="word-relation-target"
+                            prefix={
+                              relation.target_word_id ? (
+                                <SoundOutlined />
+                              ) : (
+                                <Tooltip title="待关联词暂不支持语音">
+                                  <SoundOutlined
+                                    aria-disabled="true"
+                                    className="word-relation-sound-disabled"
+                                  />
+                                </Tooltip>
+                              )
+                            }
+                            status={
+                              relationInputIssue(relation)
+                                ? "error"
+                                : isUnlinkedText(relation)
+                                  ? "warning"
+                                  : undefined
+                            }
+                            suffix={
+                              <>
+                                {searching?.relationId === relation.id &&
+                                searchFailed ? (
+                                  <Button
+                                    aria-label="重试关联词搜索"
+                                    onClick={() => void retryRelatedSearch()}
+                                    onMouseDown={(event) =>
+                                      event.preventDefault()
+                                    }
+                                    size="small"
+                                    type="link"
+                                  >
+                                    搜索失败，重试
+                                  </Button>
+                                ) : searching?.relationId === relation.id &&
+                                  searchHasNextPage ? (
+                                  <Button
+                                    aria-label="加载更多关联词结果"
+                                    onClick={() => void loadMoreSearchResults()}
+                                    onMouseDown={(event) =>
+                                      event.preventDefault()
+                                    }
+                                    size="small"
+                                    type="link"
+                                  >
+                                    加载更多
+                                  </Button>
+                                ) : null}
+                                {isUnlinkedText(relation) &&
+                                !isSelectedEmptyDraft(relation) ? (
+                                  <Tooltip
+                                    title={`待关联的${relationLabel(relationType)}`}
+                                  >
+                                    <InfoCircleOutlined
+                                      aria-label={`待关联的${relationLabel(relationType)}`}
+                                      className="word-relation-unlinked-icon"
+                                      role="note"
+                                    />
+                                  </Tooltip>
+                                ) : null}
+                              </>
+                            }
+                            placeholder="搜索关联词"
+                            size="small"
+                          />
+                        </AutoComplete>
+                        {isUnlinkedText(relation) ? (
+                          <Flex
+                            className="word-relation-sense"
+                            vertical
+                            gap={6}
+                          >
+                            {group.map((member, glossIndex) => (
+                              <Flex
+                                key={member.id}
+                                gap={6}
+                                align="center"
+                                className="word-relation-manual-gloss"
                               >
-                                搜索失败，重试
-                              </Button>
-                            ) : null}
-                            {senseSearch?.wordId === relation.target_word_id &&
-                            searchHasNextPage ? (
-                              <Button
-                                size="small"
-                                type="link"
-                                onClick={() => void loadMoreSearchResults()}
-                              >
-                                加载更多词义来源
-                              </Button>
-                            ) : null}
-                          </>
-                        )}
-                        options={Array.from(
-                          new Map(
-                            [
-                              ...group
-                                .filter((item) => item.target_sense_id)
-                                .map((item) => ({
-                                  sense_id: item.target_sense_id!,
-                                  gloss:
-                                    relationDisplaySnapshots?.[item.id]
-                                      ?.gloss ?? "已匹配词义"
-                                })),
-                              ...(Object.values(knownWords).find(
+                                <span className="word-relation-gloss-index">
+                                  {glossIndex + 1}
+                                </span>
+                                <Input
+                                  aria-label={`${relationLabel(relationType)}待关联词义${group.length > 1 ? ` ${glossIndex + 1}` : ""}`}
+                                  className="word-relation-sense"
+                                  data-v3-field="pending_target_gloss"
+                                  data-v3-node-id={member.id}
+                                  maxLength={5000}
+                                  onChange={(event) =>
+                                    change((draft) => {
+                                      const target = draft.pos[
+                                        posIndex
+                                      ]!.senses[senseIndex]!.relations.find(
+                                        (item) => item.id === member.id
+                                      )!;
+                                      if (event.target.value)
+                                        target.pending_target_gloss =
+                                          event.target.value;
+                                      else delete target.pending_target_gloss;
+                                    })
+                                  }
+                                  placeholder="输入词义"
+                                  size="small"
+                                  status="warning"
+                                  suffix={
+                                    isSelectedEmptyDraft(relation) ? (
+                                      <Tooltip
+                                        title={`待关联的${relationLabel(relationType)}`}
+                                      >
+                                        <InfoCircleOutlined
+                                          aria-label={`待关联的${relationLabel(relationType)}`}
+                                          className="word-relation-unlinked-icon"
+                                          role="note"
+                                        />
+                                      </Tooltip>
+                                    ) : undefined
+                                  }
+                                  value={member.pending_target_gloss ?? ""}
+                                />
+
+                                {group.length > 1 ? (
+                                  <Button
+                                    aria-label={`删除${relationLabel(relationType)}词义 ${glossIndex + 1}`}
+                                    icon={<DeleteOutlined />}
+                                    danger
+                                    size="small"
+                                    type="text"
+                                    onClick={() => {
+                                      const remaining = group.filter(
+                                        (item) => item.id !== member.id
+                                      );
+                                      const rowKey =
+                                        relationRowKeys.current.get(
+                                          relation.id
+                                        ) ?? relation.id;
+                                      for (const item of remaining)
+                                        relationRowKeys.current.set(
+                                          item.id,
+                                          rowKey
+                                        );
+                                      change((draft) => {
+                                        const target =
+                                          draft.pos[posIndex]!.senses[
+                                            senseIndex
+                                          ]!;
+                                        target.relations = replaceRelationGroup(
+                                          target.relations,
+                                          group,
+                                          remaining
+                                        );
+                                      });
+                                    }}
+                                  />
+                                ) : null}
+                              </Flex>
+                            ))}
+                            <Button
+                              aria-label={`添加${relationLabel(relationType)}词义`}
+                              size="small"
+                              type="dashed"
+                              icon={<PlusOutlined />}
+                              onClick={() =>
+                                change((draft) => {
+                                  const target =
+                                    draft.pos[posIndex]!.senses[senseIndex]!;
+                                  const added = {
+                                    ...relation,
+                                    id: idFactory()
+                                  };
+                                  delete added.pending_target_gloss;
+                                  target.relations = replaceRelationGroup(
+                                    target.relations,
+                                    group,
+                                    [...group, added]
+                                  );
+                                })
+                              }
+                            >
+                              添加词义
+                            </Button>
+                          </Flex>
+                        ) : (
+                          <Select
+                            aria-label={`${relationLabel(relationType)}目标词义`}
+                            className="word-relation-sense"
+                            disabled={!relation.target_word_id}
+                            mode={
+                              relationType === "derivative"
+                                ? "multiple"
+                                : undefined
+                            }
+                            onChange={(selection: string | string[]) => {
+                              const discovered = searchWords.find(
                                 (word) =>
                                   word.word_id === relation.target_word_id
-                              )?.senses ?? []),
-                              ...(senseSearch?.wordId ===
-                              relation.target_word_id
-                                ? (searchWords.find(
+                              );
+                              if (discovered)
+                                setKnownWords((current) => ({
+                                  ...current,
+                                  [relation.id]: discovered
+                                }));
+                              const replacement =
+                                relationType === "derivative"
+                                  ? selectDerivativeSenses(
+                                      group,
+                                      selection as string[],
+                                      idFactory
+                                    )
+                                  : undefined;
+                              if (replacement) {
+                                const rowKey =
+                                  relationRowKeys.current.get(relation.id) ??
+                                  relation.id;
+                                for (const item of replacement)
+                                  relationRowKeys.current.set(item.id, rowKey);
+                              }
+                              change((draft) => {
+                                const draftSense =
+                                  draft.pos[posIndex]!.senses[senseIndex]!;
+                                if (replacement) {
+                                  draftSense.relations = replaceRelationGroup(
+                                    draftSense.relations,
+                                    group,
+                                    replacement
+                                  );
+                                } else {
+                                  draftSense.relations.find(
+                                    (item) => item.id === relation.id
+                                  )!.target_sense_id = selection as string;
+                                }
+                              });
+                            }}
+                            onOpenChange={(open) => {
+                              setSearching(undefined);
+                              setSenseSearch(
+                                open
+                                  ? {
+                                      wordId: relation.target_word_id!,
+                                      query: (
+                                        relationDisplaySnapshots?.[relation.id]
+                                          ?.headword ??
+                                        knownWordFor(relation)?.headword ??
+                                        ""
+                                      ).split(" / ")[0]!
+                                    }
+                                  : undefined
+                              );
+                            }}
+                            loading={
+                              senseSearch?.wordId === relation.target_word_id &&
+                              (relatedSearch.exact.isFetching ||
+                                relatedSearch.contains.isFetching)
+                            }
+                            popupRender={(menu) => (
+                              <>
+                                {menu}
+                                {senseSearch?.wordId ===
+                                  relation.target_word_id && searchFailed ? (
+                                  <Button
+                                    size="small"
+                                    type="link"
+                                    onClick={() => void retryRelatedSearch()}
+                                  >
+                                    搜索失败，重试
+                                  </Button>
+                                ) : null}
+                                {senseSearch?.wordId ===
+                                  relation.target_word_id &&
+                                searchHasNextPage ? (
+                                  <Button
+                                    size="small"
+                                    type="link"
+                                    onClick={() => void loadMoreSearchResults()}
+                                  >
+                                    加载更多词义来源
+                                  </Button>
+                                ) : null}
+                              </>
+                            )}
+                            options={Array.from(
+                              new Map(
+                                [
+                                  ...group
+                                    .filter((item) => item.target_sense_id)
+                                    .map((item) => ({
+                                      sense_id: item.target_sense_id!,
+                                      gloss:
+                                        relationDisplaySnapshots?.[item.id]
+                                          ?.gloss ?? "已匹配词义"
+                                    })),
+                                  ...(Object.values(knownWords).find(
                                     (word) =>
                                       word.word_id === relation.target_word_id
-                                  )?.senses ?? [])
-                                : [])
-                            ].map((item) => [
-                              item.sense_id,
-                              {
-                                label: item.gloss || "（无释义）",
-                                value: item.sense_id
-                              }
-                            ])
-                          ).values()
+                                  )?.senses ?? []),
+                                  ...(senseSearch?.wordId ===
+                                  relation.target_word_id
+                                    ? (searchWords.find(
+                                        (word) =>
+                                          word.word_id ===
+                                          relation.target_word_id
+                                      )?.senses ?? [])
+                                    : [])
+                                ].map((item) => [
+                                  item.sense_id,
+                                  {
+                                    label: item.gloss || "（无释义）",
+                                    value: item.sense_id
+                                  }
+                                ])
+                              ).values()
+                            )}
+                            placeholder="选择词义"
+                            size="small"
+                            value={
+                              relationType === "derivative"
+                                ? group.flatMap((item) =>
+                                    item.target_sense_id
+                                      ? [item.target_sense_id]
+                                      : []
+                                  )
+                                : relation.target_sense_id
+                            }
+                          />
                         )}
-                        placeholder="选择词义"
-                        size="small"
-                        value={
-                          relationType === "derivative"
-                            ? group.flatMap((item) =>
-                                item.target_sense_id
-                                  ? [item.target_sense_id]
-                                  : []
-                              )
-                            : relation.target_sense_id
-                        }
-                      />
-                    )}
-                    {relationInputIssue(relation) ? (
-                      <div className="word-relation-input-error" role="alert">
-                        {relationInputIssue(relation)}
+                        {relationInputIssue(relation) ? (
+                          <div
+                            className="word-relation-input-error"
+                            role="alert"
+                          >
+                            {relationInputIssue(relation)}
+                          </div>
+                        ) : null}
+                        <Button
+                          aria-label={`删除${relationLabel(relationType)}`}
+                          danger
+                          icon={<DeleteOutlined />}
+                          onClick={() =>
+                            change((draft) => {
+                              const draftSense =
+                                draft.pos[posIndex]!.senses[senseIndex]!;
+                              draftSense.relations = replaceRelationGroup(
+                                draftSense.relations,
+                                group,
+                                []
+                              );
+                            })
+                          }
+                          size="small"
+                          type="text"
+                        />
                       </div>
-                    ) : null}
-                    <Button
-                      aria-label={`删除${relationLabel(relationType)}`}
-                      danger
-                      icon={<DeleteOutlined />}
-                      onClick={() =>
-                        change((draft) => {
-                          const draftSense =
-                            draft.pos[posIndex]!.senses[senseIndex]!;
-                          draftSense.relations = replaceRelationGroup(
-                            draftSense.relations,
-                            group,
-                            []
-                          );
-                        })
-                      }
-                      size="small"
-                      type="text"
-                    />
-                  </div>
-                ))}
-              </Flex>
-            )}
-            <Button
-              block
-              className="word-section-add-button"
-              icon={<PlusOutlined aria-hidden />}
-              onClick={() => {
-                const relation = newRelation(idFactory, relationType);
-                change((draft) => {
-                  draft.pos[posIndex]!.senses[senseIndex]!.relations.push(
-                    relation
-                  );
-                });
-                setSearching({ relationId: relation.id, query: "" });
-              }}
-              size="small"
-              type="dashed"
-            >
-              添加{relationLabel(relationType)}
-            </Button>
+                    ))}
+                  </Flex>
+                )}
+                <Button
+                  block
+                  className="word-section-add-button"
+                  icon={<PlusOutlined aria-hidden />}
+                  onClick={() => {
+                    const relation = newRelation(idFactory, relationType);
+                    change((draft) => {
+                      draft.pos[posIndex]!.senses[senseIndex]!.relations.push(
+                        relation
+                      );
+                    });
+                    setSearching({ relationId: relation.id, query: "" });
+                  }}
+                  size="small"
+                  type="dashed"
+                >
+                  添加{relationLabel(relationType)}
+                </Button>
+              </div>
+            </SenseSectionBody>
           </Card>
         );
       })}
@@ -1578,7 +1714,7 @@ function RelationsGrid({
   );
 }
 
-export function V3MeaningsAndExamplesStep({
+function V3MeaningsAndExamplesStepContent({
   value,
   onChange,
   onSave,
@@ -1656,33 +1792,21 @@ export function V3MeaningsAndExamplesStep({
       ...(activePosId ? [activePosId] : [])
     ])
   );
-  // 词性 Tab 拖拽暂时下线，连同下面这段一起：把 Tab 的 label 包进带拖拽事件的 <span>
-  // 会让 V3MeaningsAndExamplesStep.test.tsx 整个文件卡死（跑到第 60 个用例时 worker
-  // 100% CPU 空转、永不退出）。原因是它改了 antd Tabs 的 label 结构，而 Tabs 会对
-  // label 做测量，在 jsdom 的 ResizeObserver 垫片下打转；给容器和手柄补
-  // posOrderMatchesForms 守卫都不管用，只有回退包裹层才恢复。
-  //
-  // 恢复时把下面这段取消注释，一并恢复 Tabs label 里的拖拽包裹层与两个 it.skip 用例。
-  //
-  // 词性顺序只有一份，存在 forms.pos 里；本步的标签栏是它的投影，所以拖动回写 forms。
-  // 只有标签集合与 forms.pos 完全对齐时才允许拖——两者不一致时（例如词义里有个
-  // forms 尚未落下的词性）算不出完整顺序，reorderPos 会直接拒绝。
-  //
-  // const posOrderMatchesForms =
-  //   Boolean(forms && onFormsChange) &&
-  //   forms!.pos.length === visiblePosIds.length &&
-  //   visiblePosIds.every((posId) =>
-  //     forms!.pos.some((formPos) => formPos.pos_id === posId)
-  //   );
-  // const posSorting = useSortableRows({
-  //   items: visiblePosIds,
-  //   scopeId: "v3-meanings-pos-tabs",
-  //   dragType: POS_DRAG_TYPE,
-  //   onChange: (next) => {
-  //     if (!forms || !onFormsChange) return;
-  //     onFormsChange(reorderPos(forms, next));
-  //   }
-  // });
+  // 两步共用 forms.pos 的顺序；未对齐的词性集合不能回写排序。
+  const posOrderMatchesForms =
+    Boolean(forms && onFormsChange) &&
+    forms!.pos.length === visiblePosIds.length &&
+    visiblePosIds.every((posId) =>
+      forms!.pos.some((pos) => pos.pos_id === posId)
+    );
+  const posSorting = useSortableRows({
+    items: posOrderMatchesForms ? visiblePosIds : [],
+    scopeId: "v3-meanings-pos-tabs",
+    dragType: "application/x-tsz-v3-pos",
+    onChange: (next) => {
+      if (forms && onFormsChange) onFormsChange(reorderPos(forms, next));
+    }
+  });
 
   const resolvedActivePosId =
     activePosId && visiblePosIds.includes(activePosId)
@@ -1768,44 +1892,67 @@ export function V3MeaningsAndExamplesStep({
             return {
               key: posId,
               label: (
-                <Space size={6}>
-                  <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
-                  {pos ? (
-                    <Badge
-                      count={countV3PosMeaningIncomplete(
-                        pos,
-                        value,
-                        catalogByCode.get(formPosById.get(posId) ?? "")
-                          ?.sub_parts_extensible ?? true
-                      )}
-                      size="small"
-                      title="该词性未填项"
+                <span
+                  className={sortableRowClass(
+                    "word-pos-tab-handle",
+                    posSorting,
+                    displayPosIndex
+                  )}
+                  data-pos-id={posId}
+                  onDragLeave={posSorting.handleDragLeave}
+                  onDragOver={(event) =>
+                    posSorting.handleDragOver(event, displayPosIndex)
+                  }
+                  onDrop={(event) =>
+                    posSorting.handleDrop(event, displayPosIndex)
+                  }
+                >
+                  <Space size={6}>
+                    <SortableDragHandle
+                      dragImageSelector=".word-pos-tab-handle"
+                      index={displayPosIndex}
+                      label={`拖动${visiblePosLabel(posId, displayPosIndex)}`}
+                      singleItemTitle="至少需要两个基本词性"
+                      sorting={posSorting}
                     />
-                  ) : null}
-                  {forms &&
-                  forms.pos.length > 1 &&
-                  forms.pos.some((formPos) => formPos.pos_id === posId) &&
-                  onFormsChange ? (
-                    <Button
-                      aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
-                      danger
-                      icon={<MinusCircleOutlined />}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        modal.confirm({
-                          title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
-                          content:
-                            "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
-                          okText: "删除",
-                          okButtonProps: { danger: true },
-                          onOk: () => deleteBasicPos(posId)
-                        });
-                      }}
-                      size="small"
-                      type="text"
-                    />
-                  ) : null}
-                </Space>
+                    <strong>{visiblePosLabel(posId, displayPosIndex)}</strong>
+                    {pos ? (
+                      <Badge
+                        count={countV3PosMeaningIncomplete(
+                          pos,
+                          value,
+                          catalogByCode.get(formPosById.get(posId) ?? "")
+                            ?.sub_parts_extensible ?? true
+                        )}
+                        size="small"
+                        title="该词性未填项"
+                      />
+                    ) : null}
+                    {forms &&
+                    forms.pos.length > 1 &&
+                    forms.pos.some((formPos) => formPos.pos_id === posId) &&
+                    onFormsChange ? (
+                      <Button
+                        aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
+                        danger
+                        icon={<MinusCircleOutlined />}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          modal.confirm({
+                            title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
+                            content:
+                              "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
+                            okText: "删除",
+                            okButtonProps: { danger: true },
+                            onOk: () => deleteBasicPos(posId)
+                          });
+                        }}
+                        size="small"
+                        type="text"
+                      />
+                    ) : null}
+                  </Space>
+                </span>
               ),
               children: pos ? (
                 <div
@@ -2039,6 +2186,7 @@ export function V3MeaningsAndExamplesStep({
                                     aria-label={`释义 ${senseIndex + 1} 频率`}
                                     data-v3-field="frequency"
                                     data-v3-node-id={sense.id}
+                                    placeholder="0–100"
                                     max={100}
                                     min={0}
                                     onChange={(nextValue) =>
@@ -2291,6 +2439,12 @@ export function V3MeaningsAndExamplesStep({
                                                   "zh_sentence" ? (
                                                   <Input.TextArea
                                                     aria-label={`定义 ${definitionIndex + 1} 内容`}
+                                                    placeholder={
+                                                      definition.definition_mode ===
+                                                      "zh_sentence"
+                                                        ? "请输入中文释义句"
+                                                        : "请输入中文释义"
+                                                    }
                                                     autoSize={{
                                                       maxRows: 6,
                                                       minRows: 1
@@ -2341,6 +2495,12 @@ export function V3MeaningsAndExamplesStep({
                                                     }
                                                     label={`定义 ${definitionIndex + 1}`}
                                                     suffix="内容"
+                                                    placeholder={
+                                                      definition.definition_mode ===
+                                                      "en_sentence"
+                                                        ? "请输入英文释义句"
+                                                        : "请输入英文释义"
+                                                    }
                                                     wordId={wordId}
                                                     linksEnabled={
                                                       textLinksEnabled
@@ -2652,6 +2812,7 @@ export function V3MeaningsAndExamplesStep({
                                                   value={sentence.en_text}
                                                   label={`例句 ${sentenceIndex + 1}`}
                                                   suffix="英文"
+                                                  placeholder="请输入完整的英文例句"
                                                   wordId={wordId}
                                                   linksEnabled={
                                                     textLinksEnabled
@@ -2883,5 +3044,15 @@ export function V3MeaningsAndExamplesStep({
         </div>
       )}
     </Flex>
+  );
+}
+
+export function V3MeaningsAndExamplesStep(
+  props: V3MeaningsAndExamplesStepProps
+) {
+  return (
+    <PronunciationPreviewProvider>
+      <V3MeaningsAndExamplesStepContent {...props} />
+    </PronunciationPreviewProvider>
   );
 }

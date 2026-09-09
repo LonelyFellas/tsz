@@ -270,6 +270,76 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it("语法结构先选文本再选择分类，保持旧 wire 格式并支持撤销", () => {
+  const view = props({ value: { version: 2, text: "a job", annotations: [] } });
+  render(<VoiceEditor {...view} />);
+  const input = screen.getByLabelText("语音编辑器") as HTMLTextAreaElement;
+  input.setSelectionRange(2, 5);
+  fireEvent.select(input);
+  pickRole("固定核心词");
+  expect(view.onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      annotations: [{ type: "emphasis", start: 2, end: 5, level: "core" }]
+    })
+  );
+  expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
+    "data-brush",
+    "none"
+  );
+  input.setSelectionRange(2, 5);
+  fireEvent.select(input);
+  pickRole("词性提示符");
+  expect(view.onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      annotations: [{ type: "emphasis", start: 2, end: 5, level: "grammar" }]
+    })
+  );
+  fireEvent.click(screen.getByLabelText("上一步"));
+  expect(view.onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      annotations: [{ type: "emphasis", start: 2, end: 5, level: "core" }]
+    })
+  );
+});
+
+it("选区按码点标注，修改正文后不会沿用旧选区", () => {
+  const view = props({
+    value: { version: 2, text: "😀 a job", annotations: [] }
+  });
+  render(<VoiceEditor {...view} />);
+  const input = screen.getByLabelText("语音编辑器") as HTMLTextAreaElement;
+  input.setSelectionRange(5, 8);
+  fireEvent.select(input);
+  pickRole("可替换搭配");
+  expect(view.onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      annotations: [{ type: "emphasis", start: 4, end: 7, level: "function" }]
+    })
+  );
+  fireEvent.change(input, { target: { value: "new text" } });
+  const calls = view.onChange.mock.calls.length;
+  pickRole("固定核心词");
+  expect(view.onChange).toHaveBeenCalledTimes(calls);
+});
+
+it("先选两个词再打开连读，选区生成端点并在确认后保存", () => {
+  const view = props({ value: { version: 2, text: "a job", annotations: [] } });
+  render(<VoiceEditor {...view} />);
+  const input = screen.getByLabelText("语音编辑器") as HTMLTextAreaElement;
+  input.setSelectionRange(0, 5);
+  fireEvent.select(input);
+  useLiaisonBrush();
+  expect(view.onChange).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByLabelText("添加连读"));
+  expect(view.onChange).toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      annotations: [
+        expect.objectContaining({ type: "liaison", start: 0, end: 5 })
+      ]
+    })
+  );
+});
+
 describe("VoiceEditor 标注带", () => {
   it("把文本摊成可点的词，词缝比词少一个", () => {
     render(<VoiceEditor {...props()} />);
@@ -283,7 +353,7 @@ describe("VoiceEditor 标注带", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
 
-    pickRole("核心词");
+    pickRole("固定核心词");
     tapWord("centre");
     expect(wordLevels("centre")).toEqual(["core"]);
 
@@ -291,7 +361,7 @@ describe("VoiceEditor 标注带", () => {
     expect(wordLevels("centre")).not.toContain("core");
 
     tapWord("centre");
-    pickRole("语法词");
+    pickRole("词性提示符");
     tapWord("centre");
     // 替换而非叠加：只剩后一个分类。
     expect(wordLevels("centre")).toEqual(["grammar"]);
@@ -302,7 +372,7 @@ describe("VoiceEditor 标注带", () => {
     render(<VoiceEditor {...props()} />);
 
     // 语法结构：认字母（粒度到字母，词只是容器）
-    pickRole("核心词");
+    pickRole("固定核心词");
     expect(letter(0, 0)).toHaveAttribute("aria-disabled", "false");
     expect(gap(0)).toHaveAttribute("aria-disabled", "true");
 
@@ -595,7 +665,7 @@ describe("VoiceEditor 标注带", () => {
   it("拖过一段字母松手整段上色，落盘是一条 emphasis；拖过几个词则连空格一起", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    pickRole("核心词");
+    pickRole("固定核心词");
 
     dragWords("centre", "the");
     // centre(2-8) of(9-11) the(12-15)：一条区间，含中间的空格
@@ -610,10 +680,10 @@ describe("VoiceEditor 标注带", () => {
     expect(gap(1).className).toBe("tsz-ve-gap");
   });
 
-  it("粒度到字母：只给 centre 的 re 标语法词，其余字母不受影响", () => {
+  it("粒度到字母：只给 centre 的 re 标词性提示符，其余字母不受影响", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    pickRole("语法词");
+    pickRole("词性提示符");
     dragLetters(letter(1, 4), letter(1, 5));
     expect(applied(view).annotations).toEqual([
       { type: "emphasis", start: 6, end: 8, level: "grammar" }
@@ -621,8 +691,8 @@ describe("VoiceEditor 标注带", () => {
     expect(letter(1, 3)).not.toHaveAttribute("data-level");
     expect(letter(1, 4)).toHaveAttribute("data-level", "grammar");
 
-    // 同一个词里再给 cent 标核心词：词内两种颜色并存
-    pickRole("核心词");
+    // 同一个词里再给 cent 标固定核心词：词内两种颜色并存
+    pickRole("固定核心词");
     dragLetters(letter(1, 0), letter(1, 3));
     expect(applied(view).annotations).toEqual([
       { type: "emphasis", start: 2, end: 6, level: "core" },
@@ -634,7 +704,7 @@ describe("VoiceEditor 标注带", () => {
   it("一个字母一个字母地点：相邻同色接成一段，锚点清空后再点已上色的字母即取消", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    pickRole("核心词");
+    pickRole("固定核心词");
     dragLetters(letter(1, 0), letter(1, 0)); // c：锚点
     dragLetters(letter(1, 1), letter(1, 1)); // e：与 c 接上，锚点清空
     dragLetters(letter(1, 2), letter(1, 2)); // n：单独上色，成为新锚点
@@ -660,7 +730,7 @@ describe("VoiceEditor 标注带", () => {
   it("同一个词里先后单击两个字母，中间的字母自动接上，接上后锚点清空", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    pickRole("核心词");
+    pickRole("固定核心词");
 
     dragLetters(letter(1, 0), letter(1, 0)); // c
     expect(letter(1, 0)).toHaveClass("is-role-anchor");
@@ -681,7 +751,7 @@ describe("VoiceEditor 标注带", () => {
   it("隔着别的词的两次单击各自独立，不会被连成一大段；拖选之后也不留锚点", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    pickRole("核心词");
+    pickRole("固定核心词");
 
     dragLetters(letter(1, 0), letter(1, 0)); // centre 的 c
     dragLetters(letter(3, 0), letter(3, 0)); // the 的 t：另一个词，各自一个字母
@@ -705,7 +775,7 @@ describe("VoiceEditor 标注带", () => {
       value: { version: 2, text: "a centre\nof the city", annotations: [] }
     });
     render(<VoiceEditor {...view} />);
-    pickRole("核心词");
+    pickRole("固定核心词");
     dragLetters(letter(1, 0), letter(2, 1)); // centre → of，中间隔着换行
     expect(applied(view).annotations).toEqual([
       { type: "emphasis", start: 2, end: 8, level: "core" },
@@ -731,7 +801,7 @@ describe("VoiceEditor 标注带", () => {
       }
     });
     render(<VoiceEditor {...view} />);
-    pickRole("语法词");
+    pickRole("词性提示符");
     dragLetters(letter(1, 4), letter(1, 5)); // 只标 centre 的 re，与音标交叉
     expect(view.onChange).not.toHaveBeenCalled();
     expect(screen.getByText(/IPA/)).toBeInTheDocument();
@@ -749,7 +819,7 @@ describe("VoiceEditor 标注带", () => {
   it("右键不落笔；主键没按着时扫过字母会作废悬着的圈选", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    pickRole("核心词");
+    pickRole("固定核心词");
     fireEvent.mouseDown(letter(1, 0), { button: 2 });
     fireEvent.mouseUp(letter(1, 0), { button: 2 });
     expect(view.onChange).not.toHaveBeenCalled();
@@ -764,9 +834,9 @@ describe("VoiceEditor 标注带", () => {
   it("拖选压到已有颜色时按当前笔统一改色，一个字母只属于一种分类", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    pickRole("核心词");
+    pickRole("固定核心词");
     tapWord("the");
-    pickRole("功能词");
+    pickRole("可替换搭配");
     dragWords("centre", "the");
     expect(applied(view).annotations).toEqual([
       { type: "emphasis", start: 2, end: 15, level: "function" }
@@ -776,7 +846,7 @@ describe("VoiceEditor 标注带", () => {
   it("拖到标注带外面松手也照常落笔，不会留下悬着的圈选", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    pickRole("核心词");
+    pickRole("固定核心词");
     fireEvent.mouseDown(letter(1, 0));
     fireEvent.mouseEnter(letter(2, 1), { buttons: 1 });
     expect(letter(2, 0)).toHaveClass("is-selecting");
@@ -791,7 +861,7 @@ describe("VoiceEditor 标注带", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
 
-    pickRole("核心词");
+    pickRole("固定核心词");
     tapWord("a");
     tapWord("the");
     expect(wordLevels("a")).toEqual(["core"]);
@@ -813,7 +883,7 @@ describe("VoiceEditor 标注带", () => {
       screen.getByLabelText("语音编辑器").getAttribute("placeholder")
     ).toMatch(/直接输入/);
     openRoles();
-    expect(button("用核心词画笔")).toBeDisabled();
+    expect(button("用固定核心词画笔")).toBeDisabled();
   });
 });
 
@@ -822,7 +892,7 @@ describe("VoiceEditor 文本与落盘", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
 
-    pickRole("核心词");
+    pickRole("固定核心词");
     tapWord("a");
     tapWord("centre");
 
@@ -838,7 +908,7 @@ describe("VoiceEditor 文本与落盘", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
 
-    pickRole("核心词");
+    pickRole("固定核心词");
     tapWord("centre");
 
     expect(applied(view).annotations).toEqual([
@@ -860,7 +930,7 @@ describe("VoiceEditor 文本与落盘", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
 
-    pickRole("核心词");
+    pickRole("固定核心词");
     // 初始无历史，两个按钮都不可用
     expect(button("上一步")).toBeDisabled();
     expect(button("下一步")).toBeDisabled();
@@ -880,7 +950,7 @@ describe("VoiceEditor 文本与落盘", () => {
   it("撤销把文本和标注一起回退，两者不会各退各的", () => {
     render(<VoiceEditor {...props()} />);
 
-    pickRole("核心词");
+    pickRole("固定核心词");
     tapWord("centre");
 
     // 改写 centre：它的标注应随之消失
@@ -897,7 +967,7 @@ describe("VoiceEditor 文本与落盘", () => {
   it("新的改动会清掉重做栈", () => {
     render(<VoiceEditor {...props()} />);
 
-    pickRole("核心词");
+    pickRole("固定核心词");
     tapWord("centre");
     fireEvent.click(button("上一步"));
     expect(button("下一步")).toBeEnabled();
@@ -911,7 +981,7 @@ describe("VoiceEditor 文本与落盘", () => {
     render(<VoiceEditor {...view} />);
     expect(view.onChange).not.toHaveBeenCalled();
 
-    pickRole("核心词");
+    pickRole("固定核心词");
     tapWord("centre");
     expect(view.onChange).toHaveBeenCalled();
     expect(applied(view).annotations).toEqual([
@@ -924,7 +994,7 @@ describe("VoiceEditor 文本与落盘", () => {
     const view = props();
     const { rerender } = render(<VoiceEditor {...view} />);
 
-    pickRole("语法词");
+    pickRole("词性提示符");
     tapWord("centre");
     const emitted = applied(view);
     expect(button("上一步")).toBeEnabled();
@@ -935,14 +1005,14 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(button("上一步")).toBeEnabled();
     expect(
       document.querySelector(".tsz-ve-role-button")!.getAttribute("aria-label")
-    ).toBe("语法结构 语法词");
+    ).toBe("语法结构 词性提示符");
     expect(wordLevels("centre")).toEqual(["grammar"]);
   });
 
   it("外部换了一份新值时，才重新灌入并清掉历史", () => {
     const view = props();
     const { rerender } = render(<VoiceEditor {...view} />);
-    pickRole("核心词");
+    pickRole("固定核心词");
     tapWord("centre");
     expect(button("上一步")).toBeEnabled();
 
@@ -1159,7 +1229,7 @@ describe("VoiceEditor 文本与落盘", () => {
     const input = () => screen.getByLabelText("语音编辑器");
 
     fireEvent.change(input(), { target: { value: "a centre of the town" } });
-    pickRole("核心词");
+    pickRole("固定核心词");
     tapWord("centre");
     fireEvent.change(input(), { target: { value: "a centre of the city" } });
 
@@ -1205,7 +1275,7 @@ describe("VoiceEditor 文本与落盘", () => {
     // 挂画布上就收不到这个键。
     render(<VoiceEditor {...props()} />);
     const canvas = document.querySelector(".tsz-ve-canvas")!;
-    pickRole("核心词");
+    pickRole("固定核心词");
     expect(canvas).toHaveAttribute("data-target", "letter");
 
     fireEvent.keyDown(document.querySelector(".tsz-ve-role-button")!, {
@@ -1215,11 +1285,11 @@ describe("VoiceEditor 文本与落盘", () => {
   });
 
   it.each([
-    ["功能词", "function"],
-    ["核心词", "core"],
-    ["语法词", "grammar"]
+    ["可替换搭配", "function"],
+    ["固定核心词", "core"],
+    ["词性提示符", "grammar"]
   ])("三分类各自落盘并读得回来：%s", (label, level) => {
-    // 后端枚举放开前，三类一律写成 strong、读回来全变核心词——分类等于白做。
+    // 后端枚举放开前，三类一律写成 strong、读回来全变固定核心词——分类等于白做。
     const view = props();
     const { rerender } = render(<VoiceEditor {...view} />);
     pickRole(label);
@@ -1235,7 +1305,7 @@ describe("VoiceEditor 文本与落盘", () => {
     expect(wordLevels("centre")).toEqual([level]);
   });
 
-  it("存量 strong 读回来按核心词理解", () => {
+  it("存量 strong 读回来按固定核心词理解", () => {
     render(
       <VoiceEditor
         {...props({
@@ -1270,7 +1340,7 @@ describe("VoiceEditor 文本与落盘", () => {
     render(<VoiceEditor {...props()} />);
     const canvas = document.querySelector(".tsz-ve-canvas")!;
 
-    pickRole("核心词");
+    pickRole("固定核心词");
     expect(canvas).toHaveAttribute("data-target", "letter");
 
     fireEvent.keyDown(canvas, { key: "Escape" });
@@ -1285,7 +1355,7 @@ describe("VoiceEditor 文本与落盘", () => {
   it("直接在画布上打字，标注按词跟着重挂", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
-    pickRole("核心词");
+    pickRole("固定核心词");
     tapWord("centre");
 
     // 改的是最后一个词，前面的标注要留住

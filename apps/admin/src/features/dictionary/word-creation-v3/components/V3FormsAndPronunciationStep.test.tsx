@@ -25,6 +25,11 @@ import {
   uuidFromInt,
   uuidSequence
 } from "../fixtures";
+import {
+  V3FormDisplayProvider,
+  useFormDisplayState
+} from "../formDisplayState";
+import { buildV3ProductProgress } from "../readiness";
 import { validateFormsContent } from "../model";
 import { partOfSpeechCatalogFixture } from "../../word-creation/partOfSpeech.test.helper";
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
@@ -126,6 +131,20 @@ function multiPosFixture(): DraftFormsStepContentV3 {
   };
 }
 
+function ProgressCount({ value }: { value: DraftFormsStepContentV3 }) {
+  const state = useFormDisplayState();
+  const rows = buildV3ProductProgress({
+    wordId: "test",
+    language: "en",
+    completedSteps: [],
+    forms: value,
+    meanings: { sense_groups: [], pos: [] },
+    partOfSpeechCatalog: catalogState.data?.items,
+    removedFormTypes: state?.removedFormTypes
+  });
+  return <output data-testid="progress-count">{rows[2]!.count}</output>;
+}
+
 function Harness({
   initial,
   issues = [],
@@ -137,15 +156,18 @@ function Harness({
 }) {
   const [value, setValue] = useState(initial);
   return (
-    <AntApp>
-      <V3FormsAndPronunciationStep
-        value={value}
-        onChange={setValue}
-        issues={issues}
-        idFactory={idFactory}
-      />
-      <output data-testid="canonical-value">{JSON.stringify(value)}</output>
-    </AntApp>
+    <V3FormDisplayProvider>
+      <AntApp>
+        <V3FormsAndPronunciationStep
+          value={value}
+          onChange={setValue}
+          issues={issues}
+          idFactory={idFactory}
+        />
+        <output data-testid="canonical-value">{JSON.stringify(value)}</output>
+        <ProgressCount value={value} />
+      </AntApp>
+    </V3FormDisplayProvider>
   );
 }
 
@@ -238,6 +260,80 @@ describe("V3FormsAndPronunciationStep", () => {
       completeness: "complete",
       range_results: []
     });
+  });
+
+  it("默认展示目录中的变化类型，空行不入草稿且可手动移除", async () => {
+    const initial = formsFixture({
+      forms: [commonFormFixture({ spelling: "cat" })]
+    });
+    render(<Harness initial={initial} />);
+    expect(await screen.findByLabelText("复数通用拼写")).toHaveValue("");
+    expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled();
+    expect(canonicalValue()).toEqual(initial);
+    expect(screen.getByTestId("progress-count")).toHaveTextContent("2");
+    expect(screen.getByTitle("该词性未填项")).toHaveTextContent("1");
+    fireEvent.change(screen.getByLabelText("原形通用拼写"), {
+      target: { value: "dog" }
+    });
+    expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
+    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 2"));
+    expect(screen.queryByLabelText("复数通用拼写")).toBeNull();
+    expect(screen.getByTestId("progress-count")).toHaveTextContent("1");
+    expect(screen.getByTitle("该词性未填项")).toHaveAttribute(
+      "data-show",
+      "false"
+    );
+    fireEvent.change(screen.getByLabelText("原形通用拼写"), {
+      target: { value: "bird" }
+    });
+    expect(screen.queryByLabelText("复数通用拼写")).toBeNull();
+    expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
+  });
+
+  it("默认空行支持移动和在下方添加同类型词形", async () => {
+    const initial = formsFixture({
+      forms: [commonFormFixture({ spelling: "cat" })]
+    });
+    render(<Harness initial={initial} />);
+    await screen.findByLabelText("复数通用拼写");
+    fireEvent.click(screen.getByLabelText("上移变化组 1 的词形 2"));
+    expect(
+      screen.getByLabelText("变化组 1 词形 1 类型").closest(".ant-select")
+    ).toHaveTextContent("复数");
+    expect(canonicalValue()).toEqual(initial);
+    fireEvent.click(screen.getByLabelText("下移变化组 1 的词形 1"));
+    expect(
+      screen.getByLabelText("变化组 1 词形 2 类型").closest(".ant-select")
+    ).toHaveTextContent("复数");
+    fireEvent.click(screen.getByLabelText("在复数 1 下方添加同类型词形"));
+    expect(screen.getByLabelText("复数 1通用拼写")).toHaveValue("");
+    expect(screen.getByLabelText("复数 2通用拼写")).toHaveValue("");
+    expect(screen.getByTestId("progress-count")).toHaveTextContent("3");
+    expect(
+      canonicalValue().pos[0]!.forms.map((form) => form.form_type)
+    ).toEqual(["base", "plural", "plural"]);
+  });
+
+  it("填写默认变化行后保留输入与节点，其他空行不入草稿", async () => {
+    const initial = formsFixture({
+      forms: [commonFormFixture({ spelling: "fast" })]
+    });
+    initial.pos[0]!.pos = "adjective";
+    render(<Harness initial={initial} />);
+    const comparative = await screen.findByLabelText("比较级通用拼写");
+    expect(screen.getByLabelText("最高级通用拼写")).toHaveValue("");
+    fireEvent.change(comparative, { target: { value: "faster" } });
+    expect(screen.getByLabelText("比较级通用拼写")).toBe(comparative);
+    const forms = canonicalValue().pos[0]!.forms;
+    expect(forms.map((form) => form.form_type)).toEqual([
+      "base",
+      "comparative"
+    ]);
+    expect(screen.getByLabelText("比较级通用拼写")).toHaveValue("faster");
+    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 2"));
+    fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
+    expect(screen.queryByLabelText("比较级通用拼写")).toBeNull();
+    expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
   });
 
   it("使用 V2 Step 2 的标题、词性页签与英美词形矩阵结构", async () => {
@@ -338,7 +434,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       screen.getByLabelText("变化组 1 词形 2 类型").closest(".ant-select")
     ).toHaveTextContent("原形");
-    expect(matrices[1]!.querySelectorAll(".v3-membership-row")).toHaveLength(1);
+    expect(matrices[1]!.querySelectorAll(".v3-membership-row")).toHaveLength(2);
     expect(canonicalValue()).toEqual(content);
   });
 
@@ -383,7 +479,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.getByText("美式英语 · AmE")).toBeVisible();
     expect(
       container.querySelectorAll(".word-pronunciation-editor")
-    ).toHaveLength(2);
+    ).toHaveLength(4);
 
     fireEvent.change(screen.getByLabelText("原形英美共用拼写"), {
       target: { value: "harbour" }
@@ -490,7 +586,11 @@ describe("V3FormsAndPronunciationStep", () => {
       screen
         .getAllByLabelText(/下方添加同类型词形/)
         .map((button) => button.getAttribute("aria-label"))
-    ).toEqual(["在原形 1 下方添加同类型词形", "在原形 2 下方添加同类型词形"]);
+    ).toEqual([
+      "在原形 1 下方添加同类型词形",
+      "在原形 2 下方添加同类型词形",
+      "在复数 1 下方添加同类型词形"
+    ]);
   });
 
   it("方言独立矩阵 CSS 固定宽屏留白/圆角并在窄屏按 V2 双行堆叠", () => {
@@ -900,7 +1000,7 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toHaveLength(1);
     expect(
       container.querySelectorAll(".word-form-group-card .v3-concrete-form-row")
-    ).toHaveLength(3);
+    ).toHaveLength(5);
     expect(await screen.findByText("名词")).toBeInTheDocument();
     expect(screen.getByText("动词")).toBeInTheDocument();
 

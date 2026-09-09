@@ -1925,6 +1925,8 @@
 }
 
 .word-relations-grid-stacked .word-relation-row > .ant-btn-dangerous {
+  grid-column: 4;
+  grid-row: 1;
   position: static;
   opacity: 1;
   pointer-events: auto;
@@ -1965,12 +1967,31 @@
   display: none;
 }
 
+/* 关联词复用词义区块的高度与透明度动画，避免 display:none 截断过渡。 */
+.word-relation-card.word-relation-card-animated > .ant-card-body {
+  display: block;
+  padding: 0;
+}
+
 .word-relation-collapse {
   color: #858c98;
 }
 
 .word-relation-collapse .anticon {
   font-size: 11px;
+}
+
+.word-relation-manual-gloss + .word-relation-manual-gloss {
+  border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  padding-top: 6px;
+}
+
+.word-relation-gloss-index {
+  min-width: 16px;
+  flex-shrink: 0;
+  color: var(--ant-color-text-tertiary, #8c8c8c);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 .word-relation-list {

@@ -48,6 +48,7 @@ function draftRole(
 }
 
 export interface AnnotationStripProps {
+  onTextSelection?: (range?: { start: number; end: number }) => void;
   associationContent?: ReactNode;
   associationAnchor?: number;
   selectedLinkRanges?: CodeSpan[];
@@ -109,6 +110,7 @@ export function AnnotationStrip({
   inputPlaceholder,
   onTextChange,
   onRoleRange,
+  onTextSelection,
   roleAnchorStart,
   onGapClick,
   onLetterClick,
@@ -333,6 +335,7 @@ export function AnnotationStrip({
                         aria-disabled={target !== "letter"}
                         data-codepoint={start}
                         data-level={unit?.level}
+                        data-letter={letter}
                         onMouseDown={paint(() => {
                           if (brush.kind === "liaison") {
                             onLetterClick({
@@ -359,7 +362,7 @@ export function AnnotationStrip({
                           );
                         }}
                       >
-                        {letter}
+                        <span className="tsz-ve-letter-text">{letter}</span>
                       </span>
                     );
                   })}
@@ -413,6 +416,12 @@ export function AnnotationStrip({
         placeholder={
           inputPlaceholder ?? "在这里直接输入英文，然后用上面的工具在字上标注"
         }
+        onSelect={(event) => {
+          const input = event.currentTarget;
+          const start = Array.from(text.slice(0, input.selectionStart)).length;
+          const end = Array.from(text.slice(0, input.selectionEnd)).length;
+          onTextSelection?.(end > start ? { start, end } : undefined);
+        }}
         onChange={(event) => onTextChange(event.target.value)}
       />
     </div>

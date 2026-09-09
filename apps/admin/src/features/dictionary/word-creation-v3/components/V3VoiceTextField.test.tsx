@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
+import {
+  fireEvent,
+  render as rtlRender,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EnglishTextV3, RichTextV3, TextLinkV3 } from "@tsz/types";
 import { useState } from "react";
@@ -28,6 +34,11 @@ vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
 
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import { V3LinkedEnglishTextField } from "./V3LinkedEnglishTextField";
+
+const render = (
+  ui: Parameters<typeof rtlRender>[0],
+  options?: Parameters<typeof rtlRender>[1]
+) => rtlRender(ui, { wrapper: PronunciationPreviewProvider, ...options });
 
 const VALUE: RichTextV3 = { version: 2, text: "hello there", annotations: [] };
 

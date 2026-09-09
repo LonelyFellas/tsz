@@ -30,6 +30,7 @@ import {
 import { V3PosTab } from "./V3PosTab";
 import { V3AddBasicPosSelect } from "./V3AddBasicPosSelect";
 import { partOfSpeechLabel } from "../presentation";
+import { useFormDisplayState } from "../formDisplayState";
 import { countV3PosFormIncomplete } from "../posCompletion";
 import {
   PronunciationPreviewProvider,
@@ -89,6 +90,7 @@ export function V3FormsAndPronunciationStep({
   stableVariantIds
 }: V3FormsAndPronunciationStepProps) {
   const { modal } = App.useApp();
+  const displayState = useFormDisplayState();
   const [catalog, setCatalog] = useState<{
     data?: PartOfSpeechCatalogResponse;
     isError: boolean;
@@ -212,7 +214,12 @@ export function V3FormsAndPronunciationStep({
                   />
                   <strong>{label}</strong>
                   <Badge
-                    count={countV3PosFormIncomplete(pos)}
+                    count={countV3PosFormIncomplete(
+                      pos,
+                      catalog.data?.items.find((item) => item.code === pos.pos)
+                        ?.allowed_form_types,
+                      displayState?.removedFormTypes
+                    )}
                     size="small"
                     title="该词性未填项"
                   />

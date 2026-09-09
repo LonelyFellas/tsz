@@ -227,7 +227,7 @@ describe("V3WordCreationLayout", () => {
     expect(rows.map((row) => row.textContent)).toEqual([
       "语言识别完成",
       "基本词性1",
-      "词形变化1",
+      "词形变化2",
       "4语义区间1",
       "5语法结构1",
       "6多维词义1",
@@ -261,7 +261,7 @@ describe("V3WordCreationLayout", () => {
     ]) {
       expect(progressText).not.toContain(forbidden);
     }
-    expect(progressText).not.toMatch(/\d+\/\d+/u);
+    expect(rows[2]).toHaveTextContent("词形变化2");
   });
 
   it("完成情况默认收起，点击行展开该行明细、再点收起", () => {

@@ -1,3 +1,5 @@
+import { toRichTextV2 } from "@tsz/voice-editor/core";
+import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 import type { Dialect, EnglishTextV3, RichTextVariantV3 } from "@tsz/types";
 import { Flex } from "antd";
 import { editableEnglishText } from "../meaningsModel";
@@ -20,6 +22,7 @@ export function V3LinkedEnglishTextField({
   value,
   label,
   suffix,
+  placeholder,
   wordId,
   readOnly,
   linksEnabled,
@@ -28,6 +31,7 @@ export function V3LinkedEnglishTextField({
   value: EnglishTextV3;
   label: string;
   suffix: string;
+  placeholder?: string;
   wordId?: string;
   readOnly?: boolean;
   linksEnabled: boolean;
@@ -47,7 +51,18 @@ export function V3LinkedEnglishTextField({
           <V3VoiceTextField
             key={row.variant_id}
             value={variant.value}
+            placeholder={placeholder}
             mode="association"
+            leadingAction={
+              <PronunciationPreviewControls
+                playbackOnly
+                pronunciationId={row.variant_id}
+                dialect={row.dialect}
+                ariaLabelPrefix={`${label} ${dialectLabel(row.dialect)}${suffix}`}
+                content={toRichTextV2(variant.value)}
+                voiceProfile={variant.voice_profile ?? undefined}
+              />
+            }
             textLinks={variant.text_links}
             ariaLabel={`${label} ${dialectLabel(row.dialect)}${suffix}`}
             nodeId={row.variant_id}
