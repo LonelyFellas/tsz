@@ -5,36 +5,33 @@ import type {
   VoiceOption,
   VoicePreviewAdapter,
   VoicePreviewResult,
-  VoiceSettings
+  VoiceSettings,
+  VoiceSetting
 } from "../../types";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "试听失败，请稍后重试";
 }
 
-/**
- * 语速是全局设置，但每个音色各有 rateRange。试听前按目标音色夹取，
- * 免得把越界的 prosody rate 送出去被后端拒绝。未声明范围的音色不夹。
- */
+/** 试听使用该音色自己的语速，并按供应商能力夹取。 */
 function settingsForVoice(
-  settings: Omit<VoiceSettings, "voiceId">,
+  settings: readonly VoiceSetting[],
   voice: VoiceOption
 ): VoiceSettings {
-  const { rateRange } = voice;
-  const rate = settings.ratePercent;
-  const ratePercent =
-    rateRange && rate !== undefined
-      ? Math.min(Math.max(rate, rateRange.min), rateRange.max)
-      : rate;
-  return { ...settings, ratePercent, voiceId: voice.id };
+  const rate =
+    settings.find((item) => item.voice_id === voice.id)?.rate_percent ?? 0;
+  const ratePercent = voice.rateRange
+    ? Math.min(Math.max(rate, voice.rateRange.min), voice.rateRange.max)
+    : rate;
+  return { voiceId: voice.id, ratePercent };
 }
 
 export interface VoiceAuditionInput {
   open: boolean;
   language: string;
   content: RichTextV2;
-  /** 语速等全局参数；参与 hash，改动后已播的音频即失效。 */
-  settings: Omit<VoiceSettings, "voiceId">;
+  /** 每个音色各自的设置；未配置的音色使用原速。 */
+  settings: readonly VoiceSetting[];
   previewAdapter?: VoicePreviewAdapter;
 }
 
@@ -79,7 +76,7 @@ export function useVoiceAudition({
   const abortRef = useRef<AbortController | null>(null);
   const requestHashRef = useRef("");
 
-  const currentHash = canonicalVoiceHash(content, settings);
+  const activeVoiceRef = useRef<VoiceOption | undefined>(undefined);
 
   const stopMedia = useCallback(() => {
     audioRef.current?.pause();
@@ -92,6 +89,7 @@ export function useVoiceAudition({
   const stop = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
+    activeVoiceRef.current = undefined;
     setPendingVoiceId(undefined);
     stopMedia();
   }, [stopMedia]);
@@ -109,9 +107,16 @@ export function useVoiceAudition({
   // stop 是恒定引用（依赖链到底都是空依赖的 useCallback），进依赖数组不会多跑。
   useEffect(() => {
     if (!audioRef.current && !abortRef.current) return;
+    const voice = activeVoiceRef.current;
+    if (
+      voice &&
+      requestHashRef.current ===
+        canonicalVoiceHash(content, settingsForVoice(settings, voice))
+    )
+      return;
     stop();
     setStatus("内容或语音参数已变化，请重新试听");
-  }, [currentHash, stop]);
+  }, [content, settings, stop]);
 
   useEffect(() => {
     if (!open || !previewAdapter) {
@@ -143,6 +148,7 @@ export function useVoiceAudition({
 
       const controller = new AbortController();
       abortRef.current = controller;
+      activeVoiceRef.current = voice;
       const voiceSettings = settingsForVoice(settings, voice);
       const requestHash = canonicalVoiceHash(content, voiceSettings);
       requestHashRef.current = requestHash;

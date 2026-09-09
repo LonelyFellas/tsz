@@ -494,7 +494,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "c5748fdbdd538b5656bd38f8e91c6b23bb1d59b85a28e101fa0f881a3e60898d"
+      "a8c0a8da03fd1dee25e6417f9e5ab23a49c32f6dea320a41af1321c3439df408"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -1033,6 +1033,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
   it("speech 目录与试听 wire 和后端一致", () => {
     expect(snapshot.schemas.VoiceResponse.required).toEqual([
       "alias",
+      "display_name",
+      "is_common",
       "locale",
       "gender",
       "capabilities"

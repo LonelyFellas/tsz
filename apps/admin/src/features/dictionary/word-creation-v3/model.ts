@@ -164,9 +164,14 @@ function isPronunciationShape(value: unknown): value is WordPronunciationV3 {
             Array.isArray(value.dict_phonetic_rich.liaisons))))) &&
     (value.voice_profile === undefined ||
       (isObject(value.voice_profile) &&
-        Array.isArray(value.voice_profile.voice_ids) &&
-        value.voice_profile.voice_ids.every((id) => typeof id === "string") &&
-        Number.isInteger(value.voice_profile.rate_percent))) &&
+        Array.isArray(value.voice_profile.voices) &&
+        value.voice_profile.voices.every(
+          (voice) =>
+            isObject(voice) &&
+            typeof voice.voice_id === "string" &&
+            typeof voice.enabled === "boolean" &&
+            Number.isInteger(voice.rate_percent)
+        ))) &&
     (value.audio_assets === undefined ||
       (Array.isArray(value.audio_assets) &&
         value.audio_assets.every(

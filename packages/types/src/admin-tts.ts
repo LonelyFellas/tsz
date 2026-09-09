@@ -10,6 +10,8 @@ export interface AdminSpeechVoiceCapabilities {
 
 export interface AdminSpeechVoice {
   alias: string;
+  display_name: string;
+  is_common: boolean;
   locale: string;
   gender: string;
   capabilities: AdminSpeechVoiceCapabilities;

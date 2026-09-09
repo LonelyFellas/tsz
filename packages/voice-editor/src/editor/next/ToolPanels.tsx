@@ -4,19 +4,22 @@ import {
   ColorPicker,
   Input,
   Popconfirm,
+  Popover,
+  Space,
   Progress,
   Radio,
   Spin,
   Typography
 } from "antd";
 import type { ReactNode } from "react";
-import { Fragment, useRef } from "react";
+import { Fragment, useRef, useState } from "react";
 import { setLiaisonColor, useLiaisonColor } from "../../marks";
 import type {
   AudioAsset,
   AudioAssetGender,
   AudioAssetLocale,
-  VoiceOption
+  VoiceOption,
+  VoiceSetting
 } from "../../types";
 import {
   AUDIO_UPLOAD_ACCEPT,
@@ -29,6 +32,8 @@ import {
   LIAISON_ANCHORS,
   PAUSE_PRESETS,
   RATE_PRESETS,
+  RATE_MULTIPLIER_MIN,
+  RATE_MULTIPLIER_MAX,
   VOICE_GENDERS,
   VOICE_LOCALES,
   formatPauseLabel,
@@ -38,14 +43,7 @@ import type { Brush, LiaisonEnd } from "./roles";
 import { anchorLetters } from "./tokens";
 import type { LiaisonAnchor, LiaisonDraft, Token } from "./tokens";
 
-/**
- * 工具栏上三个下拉工具（音色 / 语速 / 音频）的面板。
- *
- * 它们挂在工具栏按钮下方的浮层里，形态就该是下拉菜单：一行一项、竖着扫、
- * 勾选态固定在最左一列。之前这里塞的是为整块「发音设置」卡片设计的宽卡片
- * （语种徽标浮在角外、女声/男声表头重复两遍），装进浮层必然溢出并被切边——
- * 那不是样式没调好，是形态选错了，所以这里重做而不是复用。
- */
+/** 工具栏中的发音、标注和音频面板。 */
 
 /** 下拉面板里的一行：左勾选位 + 名称 + 右侧附注，可选带一个尾部按钮。 */
 function PopRow({
@@ -110,6 +108,8 @@ export interface VoicePanelProps {
   voices: VoiceOption[];
   voicesLoading: boolean;
   enabledVoiceIds: string[];
+  voiceSettings?: readonly VoiceSetting[];
+  onRateChange?: (voiceId: string, ratePercent: number) => void;
   onToggleVoice: (voiceId: string) => void;
   pendingVoiceId?: string;
   playingVoiceId?: string;
@@ -124,6 +124,8 @@ export function VoicePanel({
   voices,
   voicesLoading,
   enabledVoiceIds,
+  voiceSettings,
+  onRateChange,
   onToggleVoice,
   pendingVoiceId,
   playingVoiceId,
@@ -131,6 +133,79 @@ export function VoicePanel({
   onAudition,
   auditionStatus
 }: VoicePanelProps) {
+  const [moreOpen, setMoreOpen] = useState(false);
+  const common = voices.filter((voice) => voice.isCommon !== false);
+  const uncommon = voices.filter((voice) => voice.isCommon === false);
+  const selectedUncommon = uncommon.filter((voice) =>
+    enabledVoiceIds.includes(voice.id)
+  ).length;
+  const renderGroups = (items: VoiceOption[]) =>
+    VOICE_LOCALES.map(({ locale, badge }) => {
+      const group = items.filter((voice) => voice.locale === locale);
+      if (group.length === 0) return null;
+      return (
+        <PopSection key={locale} title={badge} locale={locale}>
+          <div className="tsz-ve-voice-columns">
+            {[
+              ...VOICE_GENDERS,
+              ...(group.some((voice) => voice.gender === "neutral")
+                ? [{ gender: "neutral" as const, label: "其他" }]
+                : [])
+            ].map(({ gender, label }) => (
+              <div
+                key={gender}
+                className="tsz-ve-voice-column"
+                aria-label={`${badge} ${label}`}
+              >
+                <div className="tsz-ve-voice-column-title">{label}</div>
+                {group
+                  .filter((voice) => voice.gender === gender)
+                  .map((voice) => (
+                    <PopRow
+                      key={voice.id}
+                      selected={enabledVoiceIds.includes(voice.id)}
+                      label={voiceShortName(voice)}
+                      ariaLabel={`启用 ${voice.label}`}
+                      disabled={readOnly}
+                      onToggle={() => onToggleVoice(voice.id)}
+                      trailing={
+                        <Space size={2}>
+                          {onRateChange && (
+                            <VoiceRateControl
+                              voice={voice}
+                              ratePercent={
+                                voiceSettings?.find(
+                                  (setting) => setting.voice_id === voice.id
+                                )?.rate_percent ?? 0
+                              }
+                              readOnly={readOnly}
+                              onChange={(ratePercent) =>
+                                onRateChange(voice.id, ratePercent)
+                              }
+                            />
+                          )}
+                          <Button
+                            size="small"
+                            type="text"
+                            className="tsz-ve-audition-button"
+                            aria-label={`试听 ${voice.label}`}
+                            loading={pendingVoiceId === voice.id}
+                            disabled={!canAudition}
+                            data-playing={playingVoiceId === voice.id}
+                            onClick={() => onAudition(voice)}
+                          >
+                            <SoundOutlined />
+                          </Button>
+                        </Space>
+                      }
+                    />
+                  ))}
+              </div>
+            ))}
+          </div>
+        </PopSection>
+      );
+    });
   return (
     <div className="tsz-ve-pop tsz-ve-pop-voices" aria-label="音色清单">
       {voicesLoading ? (
@@ -138,42 +213,23 @@ export function VoicePanel({
           <Spin size="small" aria-label="正在加载音色" />
         </div>
       ) : (
-        VOICE_LOCALES.map(({ locale, badge }) => {
-          const group = voices.filter((voice) => voice.locale === locale);
-          if (group.length === 0) return null;
-          return (
-            <PopSection key={locale} title={badge} locale={locale}>
-              {group.map((voice) => (
-                <PopRow
-                  key={voice.id}
-                  selected={enabledVoiceIds.includes(voice.id)}
-                  label={voiceShortName(voice)}
-                  meta={
-                    VOICE_GENDERS.find((item) => item.gender === voice.gender)
-                      ?.label ?? voice.gender
-                  }
-                  ariaLabel={`启用 ${voice.label}`}
-                  disabled={readOnly}
-                  onToggle={() => onToggleVoice(voice.id)}
-                  trailing={
-                    <Button
-                      size="small"
-                      type="text"
-                      className="tsz-ve-audition-button"
-                      aria-label={`试听 ${voice.label}`}
-                      loading={pendingVoiceId === voice.id}
-                      disabled={!canAudition}
-                      data-playing={playingVoiceId === voice.id}
-                      onClick={() => onAudition(voice)}
-                    >
-                      <SoundOutlined />
-                    </Button>
-                  }
-                />
-              ))}
-            </PopSection>
-          );
-        })
+        <>
+          {renderGroups(common)}
+          {uncommon.length > 0 && (
+            <details className="tsz-ve-more-voices" open={moreOpen}>
+              <summary
+                onClick={(event) => {
+                  event.preventDefault();
+                  setMoreOpen((open) => !open);
+                }}
+              >
+                更多音色（{uncommon.length}）
+                {selectedUncommon > 0 ? ` · 已选 ${selectedUncommon}` : ""}
+              </summary>
+              {renderGroups(uncommon)}
+            </details>
+          )}
+        </>
       )}
       {auditionStatus && (
         <div className="tsz-ve-pop-status" aria-live="polite">
@@ -181,6 +237,81 @@ export function VoicePanel({
         </div>
       )}
     </div>
+  );
+}
+
+/** 每个音色的倍率入口，调速和勾选/试听互不联动。 */
+function VoiceRateControl({
+  voice,
+  ratePercent,
+  readOnly,
+  onChange
+}: {
+  voice: VoiceOption;
+  ratePercent: number;
+  readOnly?: boolean;
+  onChange: (ratePercent: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [customRate, setCustomRate] = useState("");
+  const [error, setError] = useState("");
+  const allowed = (percent: number) =>
+    !voice.rateRange ||
+    (voice.rateRange.min <= percent && percent <= voice.rateRange.max);
+  const apply = (percent: number) => {
+    onChange(percent);
+    setError("");
+    setCustomRate("");
+    setOpen(false);
+  };
+  return (
+    <Popover
+      trigger="click"
+      open={open}
+      onOpenChange={setOpen}
+      title={`${voiceShortName(voice)} · 语速`}
+      content={
+        <div role="group" aria-label={`${voice.label} 语速设置`}>
+          <RatePanel
+            readOnly={readOnly}
+            ratePercent={ratePercent}
+            isRateAllowed={allowed}
+            onRate={apply}
+            customRate={customRate}
+            onCustomRateChange={setCustomRate}
+            onCustomRateSubmit={(raw) => {
+              const multiplier = Number(raw.trim());
+              const percent = Math.round((multiplier - 1) * 100);
+              if (
+                !raw.trim() ||
+                !Number.isFinite(multiplier) ||
+                multiplier < RATE_MULTIPLIER_MIN ||
+                multiplier > RATE_MULTIPLIER_MAX ||
+                !allowed(percent)
+              ) {
+                setError("请输入该音色支持的语速，范围为 0.50×–2.00×");
+                return;
+              }
+              apply(percent);
+            }}
+          />
+          {error && (
+            <Typography.Text type="danger" role="alert">
+              {error}
+            </Typography.Text>
+          )}
+        </div>
+      }
+    >
+      <Button
+        size="small"
+        className="tsz-ve-voice-rate"
+        disabled={readOnly || !voice.supportsRate}
+        aria-label={`设置 ${voice.label} 的语速`}
+      >
+        {(1 + ratePercent / 100).toFixed(2)}×
+      </Button>
+    </Popover>
   );
 }
 

@@ -77,7 +77,8 @@ function mapVoice(
   const capabilities = item.capabilities;
   return {
     id: item.alias,
-    label: `${item.alias} · ${item.locale}`,
+    isCommon: item.is_common ?? true,
+    label: `${item.display_name ?? item.alias} · ${item.locale}`,
     locale: item.locale,
     gender: gender === "female" || gender === "male" ? gender : "neutral",
     styles: [...capabilities.styles],

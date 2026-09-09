@@ -1692,7 +1692,9 @@ it("英美切换保留每条发音的标注、音色和录音", () => {
     text: row.dict_phonetic,
     annotations: [{ type: "highlight", start: 0, end: 1, color: "yellow" }]
   };
-  row.voice_profile = { voice_ids: ["british-voice"], rate_percent: -10 };
+  row.voice_profile = {
+    voices: [{ voice_id: "british-voice", enabled: true, rate_percent: -10 }]
+  };
   row.audio_assets = [];
   const split = normalizePosDialectRules(
     formsFixture({ forms: [form] }),

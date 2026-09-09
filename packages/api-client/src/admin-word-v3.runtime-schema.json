@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-pos-pronunciation/tsz-rust/docs/openapi.json",
-  "_source_sha256": "c5748fdbdd538b5656bd38f8e91c6b23bb1d59b85a28e101fa0f881a3e60898d",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
+  "_source_sha256": "a8c0a8da03fd1dee25e6417f9e5ab23a49c32f6dea320a41af1321c3439df408",
   "roots": [
     "EntryAnnotationResponse",
     "AdminWordV3",
@@ -3364,14 +3364,23 @@
     },
     "VoiceProfileV3": {
       "type": "object",
-      "required": ["voice_ids", "rate_percent"],
+      "required": ["voices"],
       "properties": {
-        "rate_percent": { "type": "integer", "maximum": 100, "minimum": -50 },
-        "voice_ids": {
+        "voices": {
           "type": "array",
-          "items": { "type": "string" },
-          "maxItems": 20
+          "items": { "$ref": "#/$defs/VoiceSettingV3" },
+          "maxItems": 2000
         }
+      },
+      "additionalProperties": false
+    },
+    "VoiceSettingV3": {
+      "type": "object",
+      "required": ["voice_id", "enabled", "rate_percent"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "rate_percent": { "type": "integer", "maximum": 100, "minimum": -50 },
+        "voice_id": { "type": "string" }
       },
       "additionalProperties": false
     },

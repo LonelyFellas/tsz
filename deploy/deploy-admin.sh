@@ -54,6 +54,7 @@ echo "==> build @tsz/admin"
   run_sanitized_build \
     VITE_VOICE_EDITOR=true \
     VITE_VOICE_PREVIEW=true \
+    VITE_VOICE_AUDIO_UPLOAD=true \
     VITE_ADMIN_TTS_MOCK=false \
     VITE_ADMIN_WORDS_MOCK=false \
     VITE_ADMIN_PART_OF_SPEECH_MOCK=false \

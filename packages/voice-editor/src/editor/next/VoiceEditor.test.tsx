@@ -1,9 +1,11 @@
+import { VoicePanel } from "./ToolPanels";
 import {
   act,
   fireEvent,
   render,
   screen,
-  waitFor
+  waitFor,
+  within
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { RichTextV2 } from "@tsz/types";
@@ -1310,7 +1312,7 @@ describe("VoiceEditor 文本与落盘", () => {
 });
 
 describe("VoiceEditor 发音区", () => {
-  it("音色按语种分组成行式清单，性别写在行内", async () => {
+  it("音色按语种分组，再按男女声分列", async () => {
     render(<VoiceEditor {...props({ previewAdapter: adapter() })} />);
     openVoices();
 
@@ -1321,17 +1323,81 @@ describe("VoiceEditor 发音区", () => {
         (head) => head.textContent
       )
     ).toEqual(["BrE", "AmE"]);
-    // 性别下沉到每一行，不再有重复两遍的女声/男声表头
-    expect(
-      [...document.querySelectorAll(".tsz-ve-pop-voices .tsz-ve-pop-meta")].map(
-        (meta) => meta.textContent
-      )
-    ).toEqual(["女声 ♀", "男声 ♂"]);
+    expect(screen.getByLabelText("BrE 女声 ♀")).toContainElement(
+      screen.getByText("Sonia")
+    );
+    expect(screen.getByLabelText("AmE 男声 ♂")).toContainElement(
+      screen.getByText("Guy")
+    );
     expect(screen.getByText("Guy")).toBeInTheDocument();
   });
 
+  it("未配置时默认不勾选，试听不改变C端音色选择", async () => {
+    const onVoiceProfileChange = vi.fn();
+    const synthesize = vi.fn().mockResolvedValue(previewResult());
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: adapter(synthesize),
+          onVoiceProfileChange
+        })}
+      />
+    );
+    openVoices();
+    const sonia = await screen.findByLabelText("启用 Sonia · 英式女声");
+    expect(sonia).not.toBeChecked();
+    expect(screen.getByLabelText("启用 Guy · 美式男声")).not.toBeChecked();
+    fireEvent.click(button("试听 Sonia · 英式女声"));
+    await waitFor(() => expect(synthesize).toHaveBeenCalledOnce());
+    expect(sonia).not.toBeChecked();
+    expect(onVoiceProfileChange).not.toHaveBeenCalled();
+    fireEvent.click(sonia);
+    expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+      voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+    });
+  });
+
+  it("更多音色默认折叠，展开可选择且收起不丢失选择", () => {
+    const onToggleVoice = vi.fn();
+    const view = {
+      voices: [
+        { ...VOICES[0]!, isCommon: true },
+        { ...VOICES[1]!, isCommon: false }
+      ],
+      voicesLoading: false,
+      enabledVoiceIds: [] as string[],
+      onToggleVoice,
+      canAudition: true,
+      onAudition: vi.fn(),
+      auditionStatus: ""
+    };
+    const { rerender } = render(<VoicePanel {...view} />);
+    const guy = screen.getByLabelText("启用 Guy · 美式男声");
+    expect(guy).not.toBeVisible();
+    fireEvent.click(screen.getByText("更多音色（1）"));
+    expect(guy).toBeVisible();
+    expect(guy).not.toBeChecked();
+    fireEvent.click(guy);
+    expect(onToggleVoice).toHaveBeenLastCalledWith("guy");
+    rerender(<VoicePanel {...view} enabledVoiceIds={["guy"]} />);
+    fireEvent.click(screen.getByText("更多音色（1） · 已选 1"));
+    expect(guy).not.toBeVisible();
+    fireEvent.click(screen.getByText("更多音色（1） · 已选 1"));
+    expect(guy).toBeVisible();
+    expect(guy).toBeChecked();
+  });
+
   it("可以取消勾选某个音色", async () => {
-    render(<VoiceEditor {...props({ previewAdapter: adapter() })} />);
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: adapter(),
+          voiceProfile: {
+            voices: [{ voice_id: "sonia", enabled: true, rate_percent: 0 }]
+          }
+        })}
+      />
+    );
     openVoices();
     await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
 
@@ -1342,27 +1408,81 @@ describe("VoiceEditor 发音区", () => {
     expect(sonia).not.toBeChecked();
   });
 
-  it("逐音色试听，并把语速夹进该音色的范围", async () => {
+  it("各音色独立调速，取消勾选保留速度，改其他音色不中断当前试听", async () => {
     const synthesize = vi.fn().mockResolvedValue(previewResult());
-    render(<VoiceEditor {...props({ previewAdapter: adapter(synthesize) })} />);
-    // 0.50× = -50%，超出 Sonia 声明的 -10..10，必须夹到 -10。
-    openTool("发音");
-    fireEvent.click(button("语速 0.50 倍"));
-
+    const onVoiceProfileChange = vi.fn();
+    const source = adapter(synthesize);
+    vi.mocked(source.listVoices).mockResolvedValue(
+      VOICES.map((voice) => ({ ...voice, rateRange: { min: -50, max: 100 } }))
+    );
+    const view = props({ previewAdapter: source, onVoiceProfileChange });
+    const { rerender } = render(<VoiceEditor {...view} />);
     openVoices();
-    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+    const setRate = async (label: string, multiplier: string) => {
+      fireEvent.click(await screen.findByLabelText(`设置 ${label} 的语速`));
+      const panel = await screen.findByRole("group", {
+        name: `${label} 语速设置`
+      });
+      fireEvent.click(within(panel).getByLabelText(`语速 ${multiplier} 倍`));
+    };
+    await setRate("Sonia · 英式女声", "0.75");
+    expect(screen.getByLabelText("启用 Sonia · 英式女声")).not.toBeChecked();
     fireEvent.click(button("试听 Sonia · 英式女声"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+    await setRate("Guy · 美式男声", "1.25");
+    expect(AudioMock.instances[0]!.pause).not.toHaveBeenCalled();
+    fireEvent.click(button("试听 Guy · 美式男声"));
+    await waitFor(() => expect(synthesize).toHaveBeenCalledTimes(2));
+    expect(
+      synthesize.mock.calls.map(([request]) => [
+        request.voiceId,
+        request.ratePercent
+      ])
+    ).toEqual([
+      ["sonia", -25],
+      ["guy", 25]
+    ]);
+    fireEvent.click(screen.getByLabelText("启用 Guy · 美式男声"));
+    fireEvent.click(screen.getByLabelText("启用 Guy · 美式男声"));
+    const saved = onVoiceProfileChange.mock.calls.at(-1)![0];
+    expect(saved).toEqual({
+      voices: [
+        { voice_id: "sonia", enabled: false, rate_percent: -25 },
+        { voice_id: "guy", enabled: false, rate_percent: 25 }
+      ]
+    });
+    rerender(<VoiceEditor {...view} voiceProfile={saved} />);
+    expect(
+      screen.getByLabelText("设置 Sonia · 英式女声 的语速")
+    ).toHaveTextContent("0.75×");
+    expect(
+      screen.getByLabelText("设置 Guy · 美式男声 的语速")
+    ).toHaveTextContent("1.25×");
+  });
 
+  it("逐音色试听使用自己的语速，并按目标音色范围夹取", async () => {
+    const synthesize = vi.fn().mockResolvedValue(previewResult());
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: adapter(synthesize),
+          voiceProfile: {
+            voices: [
+              { voice_id: "sonia", enabled: false, rate_percent: -50 },
+              { voice_id: "guy", enabled: true, rate_percent: -25 }
+            ]
+          }
+        })}
+      />
+    );
+    openVoices();
+    await screen.findByText("Sonia");
+    fireEvent.click(button("试听 Sonia · 英式女声"));
     await waitFor(() => expect(synthesize).toHaveBeenCalledOnce());
     expect(synthesize.mock.calls[0]![0]).toMatchObject({
       voiceId: "sonia",
       ratePercent: -10
     });
-    // 浮层内容在 jsdom 里带 antd 动效包装，可见性断言不可靠，只断言渲染出来
-    await waitFor(() =>
-      expect(screen.getByText(/播放中 Sonia/)).toBeInTheDocument()
-    );
-    fireEvent.click(button("语速 0.75 倍"));
     fireEvent.click(button("试听 Guy · 美式男声"));
     await waitFor(() => expect(synthesize).toHaveBeenCalledTimes(2));
     expect(synthesize.mock.calls[1]![0]).toMatchObject({
@@ -1370,10 +1490,6 @@ describe("VoiceEditor 发音区", () => {
       ratePercent: -25,
       content: { text: TEXT, annotations: [] }
     });
-    expect(document.querySelector('[aria-label="发音"]')).toHaveAttribute(
-      "aria-expanded",
-      "true"
-    );
   });
 
   it("没有上传适配器时「音频」面板置灰并说明原因，不再假装能本地上传", () => {
@@ -1706,27 +1822,31 @@ describe("VoiceEditor 发音区", () => {
     expect(screen.queryByText("音频暂时无法试听，请稍后重试")).toBeNull();
   });
 
-  it("拒绝越界、非数字与空的自定义语速", () => {
-    render(<VoiceEditor {...props()} />);
-    openTool("发音");
-    // 每次重新取输入框：报错横幅出现/消失会让浮层内容重挂，旧引用会失效。
-    const rateInput = () => screen.getByLabelText("自定义语速倍数");
-    const summary = () =>
-      document.querySelector('[aria-label="发音"]')!.textContent;
-
-    // 闭区间 0.50×–2.00× 之外、非数字、空值都要被拒
+  it("单个音色拒绝越界自定义语速，合法值不改勾选", async () => {
+    const onVoiceProfileChange = vi.fn();
+    render(
+      <VoiceEditor
+        {...props({ previewAdapter: adapter(), onVoiceProfileChange })}
+      />
+    );
+    openVoices();
+    fireEvent.click(await screen.findByLabelText("设置 Guy · 美式男声 的语速"));
+    const input = await screen.findByLabelText("自定义语速倍数");
     for (const value of ["", "0.4", "2.1", "abc"]) {
-      fireEvent.change(rateInput(), { target: { value } });
-      fireEvent.keyDown(rateInput(), { key: "Enter" });
-      expect(screen.getByText(/语速倍数必须在/)).toBeVisible();
-      // 被拒后语速停在原值，不能半吊子地改掉
-      expect(summary()).toContain("1.00×");
+      fireEvent.change(input, { target: { value } });
+      fireEvent.keyDown(input, { key: "Enter" });
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+      expect(onVoiceProfileChange).not.toHaveBeenCalled();
     }
-
-    fireEvent.change(rateInput(), { target: { value: "1.5" } });
-    fireEvent.keyDown(rateInput(), { key: "Enter" });
-    expect(screen.queryByText(/语速倍数必须在/)).toBeNull();
-    expect(summary()).toContain("1.50×");
+    fireEvent.change(input, { target: { value: "1.5" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
+      voices: [{ voice_id: "guy", enabled: false, rate_percent: 50 }]
+    });
+    expect(
+      screen.getByLabelText("设置 Guy · 美式男声 的语速")
+    ).toHaveTextContent("1.50×");
+    expect(screen.getByLabelText("启用 Guy · 美式男声")).not.toBeChecked();
   });
 
   it("勾选音色与调语速都抛出 voice_profile", async () => {
@@ -1739,21 +1859,18 @@ describe("VoiceEditor 发音区", () => {
     openVoices();
     await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
 
-    // 没动过之前不抛：未配置时「全部」在 wire 上没有表示法，
-    // 固化成当天的清单会让以后新增的音色落不进来。
+    // 没动过不抛配置；用户点击后只保存明确选中的音色。
     expect(onVoiceProfileChange).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByLabelText("启用 Sonia · 英式女声"));
+    fireEvent.click(screen.getByLabelText("启用 Guy · 美式男声"));
     expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
-      voice_ids: ["guy"],
-      rate_percent: 0
+      voices: [{ voice_id: "guy", enabled: true, rate_percent: 0 }]
     });
 
-    openTool("发音");
-    fireEvent.click(button("语速 1.25 倍"));
+    fireEvent.click(screen.getByLabelText("设置 Guy · 美式男声 的语速"));
+    fireEvent.click(await screen.findByLabelText("语速 1.25 倍"));
     expect(onVoiceProfileChange).toHaveBeenLastCalledWith({
-      voice_ids: ["guy"],
-      rate_percent: 25
+      voices: [{ voice_id: "guy", enabled: true, rate_percent: 25 }]
     });
   });
 
@@ -1762,19 +1879,24 @@ describe("VoiceEditor 发音区", () => {
       <VoiceEditor
         {...props({
           previewAdapter: adapter(),
-          voiceProfile: { voice_ids: ["guy"], rate_percent: -25 }
+          voiceProfile: {
+            voices: [{ voice_id: "guy", enabled: true, rate_percent: -25 }]
+          }
         })}
       />
     );
     // 已配过就不必等清单拉回来才报数
     expect(
       document.querySelector('[aria-label="发音"]')!.textContent
-    ).toContain("0.75×");
+    ).toContain("已选 1 个音色");
 
     openVoices();
     await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
     expect(screen.getByLabelText("启用 Sonia · 英式女声")).not.toBeChecked();
     expect(screen.getByLabelText("启用 Guy · 美式男声")).toBeChecked();
+    expect(
+      screen.getByLabelText("设置 Guy · 美式男声 的语速")
+    ).toHaveTextContent("0.75×");
   });
 
   it("父组件把 voice_profile 回灌下来时不重置面板", async () => {
@@ -1788,7 +1910,7 @@ describe("VoiceEditor 发音区", () => {
     const emitted = onVoiceProfileChange.mock.calls.at(-1)![0];
     rerender(<VoiceEditor {...view} voiceProfile={emitted} />);
 
-    expect(screen.getByLabelText("启用 Sonia · 英式女声")).not.toBeChecked();
+    expect(screen.getByLabelText("启用 Sonia · 英式女声")).toBeChecked();
     expect(onVoiceProfileChange).toHaveBeenCalledTimes(1);
   });
 

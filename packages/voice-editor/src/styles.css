@@ -784,6 +784,33 @@
   padding: 2px;
 }
 
+.tsz-ve-pop-voices {
+  max-height: min(420px, 60vh);
+  overflow-y: auto;
+}
+
+.tsz-ve-more-voices > summary {
+  cursor: pointer;
+  padding: 10px 6px;
+  color: var(--ant-color-primary, #0071e3);
+  border-top: 1px solid #eaecf0;
+  margin-top: 8px;
+}
+
+.tsz-ve-voice-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tsz-ve-voice-column-title {
+  color: #667085;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-bottom: 1px solid #eaecf0;
+  margin-bottom: 4px;
+}
+
 .tsz-ve-pop-upload {
   gap: 8px;
   min-width: 288px;
@@ -863,6 +890,24 @@
 
 .tsz-ve-pop-hit[aria-checked="true"] .tsz-ve-pop-check {
   visibility: visible;
+}
+
+.tsz-ve-pop-voices .tsz-ve-pop-check {
+  height: 14px;
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-radius: 3px;
+  visibility: visible;
+}
+
+.tsz-ve-pop-voices
+  .tsz-ve-pop-hit[aria-checked="false"]
+  .tsz-ve-pop-check
+  .anticon {
+  visibility: hidden;
+}
+
+.tsz-ve-pop-voices .tsz-ve-pop-hit[aria-checked="true"] .tsz-ve-pop-check {
+  border-color: currentColor;
 }
 
 .tsz-ve-pop-name {
@@ -1035,10 +1080,7 @@
 }
 
 .tsz-ve-speech-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.65fr);
-  gap: 12px;
-  width: min(520px, calc(100vw - 48px));
+  width: min(720px, calc(100vw - 48px));
 }
 
 .tsz-ve-speech-panel .tsz-ve-pop {
@@ -1049,12 +1091,6 @@
 .tsz-ve-speech-panel-title {
   font-weight: 600;
   margin-bottom: 8px;
-}
-
-.tsz-ve-speech-panel-hint {
-  grid-column: 1 / -1;
-  font-size: 12px;
-  color: #667085;
 }
 
 /* 发音入口用一行主次信息，避免状态徽章挤成第二个按钮。 */
@@ -1088,4 +1124,10 @@
   border-bottom: 1px solid currentColor;
   transform: rotate(45deg);
   opacity: 0.5;
+}
+
+@media (max-width: 600px) {
+  .tsz-ve-voice-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
