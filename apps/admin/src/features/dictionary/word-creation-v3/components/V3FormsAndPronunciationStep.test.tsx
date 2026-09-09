@@ -2716,19 +2716,19 @@ describe("V3FormsAndPronunciationStep", () => {
       expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
     );
 
+    fireEvent.click(screen.getByLabelText("删除名词"));
     fireEvent.click(
-      screen.getByRole("button", {
-        name: "删除名词"
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: /^删\s*除$/
       })
     );
-    fireEvent.click(await screen.findByRole("button", { name: /^删\s*除$/ }));
     await waitFor(() =>
       expect(screen.getByTestId("controlled-active-pos")).toHaveTextContent(
         initial.pos[1]!.pos_id
       )
     );
     expect(activeChanges).toHaveBeenLastCalledWith(initial.pos[1]!.pos_id);
-    expect(screen.queryByRole("button", { name: "删除动词" })).toBeNull();
+    expect(screen.queryByLabelText("删除动词")).toBeNull();
     expect(screen.getByTestId("controlled-pos-count")).toHaveTextContent("1");
     expect(activeChanges).toHaveBeenCalledTimes(1);
   });

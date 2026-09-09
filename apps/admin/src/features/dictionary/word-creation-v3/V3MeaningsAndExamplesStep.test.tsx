@@ -3924,9 +3924,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       });
 
       fireEvent.click(
-        screen.getByRole("button", {
-          name: intent === "save" ? "保存草稿" : "完成并进入预览"
-        })
+        screen
+          .getByText(intent === "save" ? "保存草稿" : "完成并进入预览")
+          .closest("button")!
       );
 
       expect(onSave).toHaveBeenCalledWith(
@@ -3949,7 +3949,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.change(screen.getByLabelText("释义 1 频率"), {
       target: { value: "12.5" }
     });
-    fireEvent.click(screen.getByRole("button", { name: "保存草稿" }));
+    fireEvent.click(screen.getByText("保存草稿").closest("button")!);
     expect(screen.getByLabelText("释义 1 频率")).toHaveValue("12.50");
 
     const canonical = structuredClone(initial);

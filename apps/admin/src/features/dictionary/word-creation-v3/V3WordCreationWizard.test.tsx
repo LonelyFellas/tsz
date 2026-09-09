@@ -368,7 +368,7 @@ describe("V3WordCreationWizard", () => {
     variant.common.component_usages = [
       { id: UUIDS.membership_2, state: "unresolved", literal: "hit" }
     ];
-    renderWizard(requests(), {
+    const { container } = renderWizard(requests(), {
       initialWord,
       initialStep: "forms",
       renderStep: (context) => (
@@ -385,13 +385,16 @@ describe("V3WordCreationWizard", () => {
         </>
       )
     });
+    const field = (label: string) =>
+      container.querySelector<HTMLInputElement>(`[aria-label="${label}"]`);
+    await waitFor(() => expect(field("英美拼写有区别")).not.toBeNull());
     for (let index = 0; index < 2; index += 1) {
-      fireEvent.click(await screen.findByLabelText("英美拼写有区别"));
+      fireEvent.click(field("英美拼写有区别")!);
       expect(
         JSON.parse(screen.getByTestId("spelling-roundtrip").textContent!).pos[0]
           .dialect_rules.spelling_mode
       ).toBe("distinguish");
-      fireEvent.click(screen.getByLabelText("英美拼写无区别"));
+      fireEvent.click(field("英美拼写无区别")!);
       const pos = JSON.parse(
         screen.getByTestId("spelling-roundtrip").textContent!
       ).pos[0];
@@ -402,13 +405,11 @@ describe("V3WordCreationWizard", () => {
       expect(pos.forms[0].regional_variants.uk.component_usages).toMatchObject([
         { literal: "hit", state: "unresolved" }
       ]);
-      expect(screen.queryByLabelText("原形英式拼写")).toBeNull();
-      expect(screen.queryByLabelText("原形美式拼写")).toBeNull();
-      expect(screen.getByLabelText("原形英美共用拼写")).toHaveValue(
-        "hit the sack"
-      );
+      expect(field("原形英式拼写")).toBeNull();
+      expect(field("原形美式拼写")).toBeNull();
+      expect(field("原形英美共用拼写")).toHaveValue("hit the sack");
       expect(
-        screen.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
+        field("英美拼写无区别")!.closest(".ant-radio-wrapper")
       ).toHaveClass("ant-radio-wrapper-checked");
     }
   });
