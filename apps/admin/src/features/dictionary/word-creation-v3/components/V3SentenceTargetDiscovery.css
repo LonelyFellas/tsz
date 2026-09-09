@@ -254,3 +254,15 @@
 .v3-component-usage-cascader .v3-component-usage-matched-form {
   color: #d48806;
 }
+
+/* 候选词条行：词面与「草稿」标签并排，标签不撑高行。 */
+.v3-component-usage-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.v3-component-usage-entry .v3-component-usage-draft {
+  margin-inline-end: 0;
+  line-height: 18px;
+}

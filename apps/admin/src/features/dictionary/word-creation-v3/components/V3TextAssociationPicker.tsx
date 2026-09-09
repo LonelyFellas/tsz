@@ -18,6 +18,7 @@ export function V3TextAssociationPicker({
         <Typography.Text>
           已关联：{selected.target_headword ?? "词条"} ·{" "}
           {selected.target_gloss ?? "词义"}
+          {selected.target_publication_id ? null : "（草稿）"}
         </Typography.Text>
         <Typography.Text type="secondary">
           这些单词已有关联，请先清除原关联再重新选择。
@@ -47,7 +48,10 @@ export function V3TextAssociationPicker({
             id: newWordNodeId(),
             source_segments: segments,
             target_word_id: chosen.target_word_id,
-            target_publication_id: chosen.target_publication_id,
+            // 草稿目标没有发布版本，不写这个键；后端按「缺省即草稿」校验。
+            ...(chosen.target_publication_id
+              ? { target_publication_id: chosen.target_publication_id }
+              : {}),
             target_pos_id: chosen.target_pos_id,
             target_base_form_id: chosen.target_base_form_id,
             target_form_id: chosen.target_form_id,

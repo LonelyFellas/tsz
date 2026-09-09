@@ -93,7 +93,12 @@ it("关联单词只查询并展示单词，保留稳定目标身份", async () =
   );
   await selectGive();
   expect(search).toHaveBeenCalledWith(
-    expect.objectContaining({ q: "give", kind: "word" })
+    expect.objectContaining({
+      q: "give",
+      kind: "word",
+      match: "exact",
+      include_drafts: true
+    })
   );
   expect(
     screen.queryByText("give up", { exact: true })
@@ -241,7 +246,16 @@ it("关联短语只展示短语及其成分，不再提供短语本身入口", a
   );
   await openPhraseComponent();
   expect(search).toHaveBeenCalledWith(
-    expect.objectContaining({ q: "give up", kind: "phrase" })
+    expect.objectContaining({
+      q: "give up",
+      kind: "phrase",
+      match: "exact",
+      include_drafts: true
+    })
+  );
+  // 成分展开的子查询同样按词形等值、含草稿。
+  expect(search).toHaveBeenCalledWith(
+    expect.objectContaining({ q: "give", match: "exact", include_drafts: true })
   );
   expect(
     column(0).queryByText("give", { exact: true })
@@ -332,4 +346,128 @@ it("不同短语词义的同名成分分别展示，选择保留对应来源", a
     sense_id: "second-sense",
     component_id: "second-component"
   });
+});
+
+function draftify<T extends { publication_id?: string }>(
+  value: T
+): Omit<T, "publication_id"> {
+  const { publication_id: omitted, ...rest } = value;
+  void omitted;
+  return rest;
+}
+
+it("草稿候选带「草稿」标记，选中后的关联不带发布版本", async () => {
+  const response = giveEntryResponse();
+  const candidate = draftify(response.matches[0]!);
+  search.mockResolvedValue({
+    ...response,
+    matches: [{ ...candidate, senses: candidate.senses.map(draftify) }]
+  });
+  const onSelect = vi.fn();
+  render(
+    <V3TextAssociationPicker
+      kind="word"
+      segments={[segments[0]!]}
+      onSelect={onSelect}
+    />
+  );
+  expect(await screen.findByText("草稿")).toBeVisible();
+  await selectGive();
+  expect(onSelect).toHaveBeenCalledWith(
+    expect.objectContaining({
+      target_word_id: "entry-give",
+      target_sense_id: "sense-give-1"
+    })
+  );
+  expect(onSelect.mock.lastCall![0]).not.toHaveProperty(
+    "target_publication_id"
+  );
+});
+
+it("已关联到草稿目标时在已关联视图里标出草稿", () => {
+  render(
+    <V3TextAssociationPicker
+      kind="word"
+      segments={[segments[0]!]}
+      onSelect={vi.fn()}
+      selected={{
+        id: "link-1",
+        source_segments: [segments[0]!],
+        target_word_id: "entry-give",
+        target_pos_id: "pos-give",
+        target_base_form_id: "form-give",
+        target_form_id: "form-give",
+        target_variant_id: "variant-give",
+        target_sense_id: "sense-give-1",
+        target_headword: "give",
+        target_gloss: "给；交给"
+      }}
+    />
+  );
+  expect(screen.getByText(/已关联：give · 给；交给（草稿）/)).toBeVisible();
+});
+
+it("还没保存词义的草稿列成禁用行并说明原因", async () => {
+  const response = giveEntryResponse();
+  const candidate = draftify(response.matches[0]!);
+  search.mockResolvedValue({
+    ...response,
+    matches: [{ ...candidate, senses: [] }]
+  });
+  const onSelect = vi.fn();
+  render(
+    <V3TextAssociationPicker
+      kind="word"
+      segments={[segments[0]!]}
+      onSelect={onSelect}
+    />
+  );
+  const row = await screen.findByText("give（暂无词义）");
+  expect(row).toBeVisible();
+  expect(screen.getByText("草稿")).toBeVisible();
+  expect(row.closest(".ant-cascader-menu-item")?.className).toContain(
+    "ant-cascader-menu-item-disabled"
+  );
+  expect(screen.queryByText("没有匹配的词条")).not.toBeInTheDocument();
+  fireEvent.click(row);
+  expect(onSelect).not.toHaveBeenCalled();
+});
+
+it("草稿短语的成分转关联：via_phrase 不带发布版本，词条行带草稿标记", async () => {
+  const phrase = phraseResponse();
+  search.mockImplementation(async ({ q }) =>
+    q === "give"
+      ? giveEntryResponse()
+      : {
+          ...phrase,
+          matches: phrase.matches.map((candidate) => ({
+            ...draftify(candidate),
+            senses: candidate.senses.map(draftify)
+          }))
+        }
+  );
+  const onSelect = vi.fn();
+  render(
+    <V3TextAssociationPicker
+      kind="phrase"
+      segments={segments}
+      onSelect={onSelect}
+    />
+  );
+  await screen.findByText("give up", { exact: true });
+  expect(column(0).getByText("草稿")).toBeVisible();
+  await openPhraseComponent();
+  fireEvent.click(await screen.findByText("原形 give", { exact: true }));
+  fireEvent.click(column(3).getByText("给；交给"));
+  const link = onSelect.mock.lastCall![0];
+  expect(link).toMatchObject({
+    target_word_id: "entry-give",
+    target_publication_id: "pub-give",
+    via_phrase: {
+      word_id: "phrase",
+      sense_id: "phrase-sense",
+      component_id: "component"
+    }
+  });
+  expect(link.via_phrase).not.toHaveProperty("publication_id");
 });

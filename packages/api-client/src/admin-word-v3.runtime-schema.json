@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "b097563210136712008c01e5b12323c91c911604b371ce75d3997381be4ca880",
+  "_source_sha256": "ddd7fcb9cdc14a577afcb209f15b6e89c97fd49f5f148c59ad4d8dd29f7a6aec",
   "roots": [
     "EntryAnnotationResponse",
     "AdminWordV3",
@@ -1749,7 +1749,6 @@
             "id",
             "literal",
             "target_word_id",
-            "target_publication_id",
             "target_pos_id",
             "target_base_form_id",
             "target_sense_id",
@@ -1859,7 +1858,6 @@
       "type": "object",
       "required": [
         "entry_id",
-        "publication_id",
         "pos_id",
         "base_form_id",
         "kind",
@@ -2542,14 +2540,7 @@
     },
     "SentenceTargetSenseV3": {
       "type": "object",
-      "required": [
-        "sense_id",
-        "publication_id",
-        "pos_id",
-        "base_form_id",
-        "level",
-        "gloss"
-      ],
+      "required": ["sense_id", "pos_id", "base_form_id", "level", "gloss"],
       "properties": {
         "base_form_id": { "type": "string", "format": "uuid" },
         "component_usages": {
@@ -3132,7 +3123,6 @@
         "id",
         "source_segments",
         "target_word_id",
-        "target_publication_id",
         "target_pos_id",
         "target_base_form_id",
         "target_form_id",
@@ -3162,7 +3152,7 @@
     },
     "TextLinkViaPhraseV3": {
       "type": "object",
-      "required": ["word_id", "publication_id", "sense_id", "component_id"],
+      "required": ["word_id", "sense_id", "component_id"],
       "properties": {
         "component_id": { "type": "string", "format": "uuid" },
         "publication_id": { "type": "string", "format": "uuid" },

@@ -233,28 +233,31 @@ function isPhraseComponentUsageShape(
       typeof value.literal === "string"
     );
   }
+  // 草稿目标没有 target_publication_id（缺省即草稿），键集合允许少这一项。
+  const resolvedKeys = [
+    "id",
+    "literal",
+    "state",
+    "target_base_form_id",
+    "target_dialect",
+    "target_form_id",
+    "target_form_type",
+    "target_gloss",
+    "target_headword",
+    "target_pos_id",
+    "target_sense_id",
+    "target_variant_id",
+    "target_word_id"
+  ];
   return (
     value.state === "resolved" &&
-    ownKeysAre(value, [
-      "id",
-      "literal",
-      "state",
-      "target_base_form_id",
-      "target_dialect",
-      "target_form_id",
-      "target_form_type",
-      "target_gloss",
-      "target_headword",
-      "target_pos_id",
-      "target_publication_id",
-      "target_sense_id",
-      "target_variant_id",
-      "target_word_id"
-    ]) &&
+    (ownKeysAre(value, resolvedKeys) ||
+      ownKeysAre(value, [...resolvedKeys, "target_publication_id"].sort())) &&
     typeof value.id === "string" &&
     typeof value.literal === "string" &&
     typeof value.target_word_id === "string" &&
-    typeof value.target_publication_id === "string" &&
+    (value.target_publication_id === undefined ||
+      typeof value.target_publication_id === "string") &&
     typeof value.target_pos_id === "string" &&
     typeof value.target_base_form_id === "string" &&
     typeof value.target_sense_id === "string" &&

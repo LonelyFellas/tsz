@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-09T09:53:36.039Z",
+  "_generatedAt": "2026-09-09T14:10:11.762Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2927,9 +2927,18 @@
           "type": "string",
           "description": "上一页返回的 `next_cursor`。绑定 discovery generation 与本次 `q` / `kind`：凡是写\n`surface_sources` 的变动（发布、词形步保存等）或换了关键字/kind 后即失效（400\n`invalid_query`，`field = \"cursor\"`）。归档只写 `entries.archived_at`、不推进 generation，\n翻页期间被归档的词条只是从后续页消失，不会让游标失效。"
         },
+        "include_drafts": {
+          "type": "boolean",
+          "description": "是否把**从未发布**的 V3 草稿词条（不限创建者）也列为候选；草稿候选没有 `publication_id`。\n已发布词条只按其当前发布版本出现，草稿里未发布的改动不作候选。",
+          "default": false
+        },
         "kind": {
           "$ref": "#/components/schemas/EntryKind",
           "description": "只要单词或只要短语；不传则两者都返回。"
+        },
+        "match": {
+          "$ref": "#/components/schemas/ComponentTargetMatchV3",
+          "description": "匹配方式。不传或 `contains`：词面包含关键字（旧行为）；`exact`：关键字按词条词面同一套\n归一化后与 `normalized_surface` 等值，屈折词形（jobs / gave）照样命中原形词条。\n例句里点一个词做关联时用 `exact`，否则点 `a` 会命中一切含 a 的词条。"
         },
         "page_size": {
           "type": "integer",
@@ -2998,14 +3007,7 @@
     },
     "SentenceTargetSenseV3": {
       "type": "object",
-      "required": [
-        "sense_id",
-        "publication_id",
-        "pos_id",
-        "base_form_id",
-        "level",
-        "gloss"
-      ],
+      "required": ["sense_id", "pos_id", "base_form_id", "level", "gloss"],
       "properties": {
         "base_form_id": {
           "type": "string",
@@ -3021,7 +3023,11 @@
         "gloss": { "type": "string" },
         "level": { "type": "string" },
         "pos_id": { "type": "string", "format": "uuid" },
-        "publication_id": { "type": "string", "format": "uuid" },
+        "publication_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "与候选行同一个发布版本；草稿候选缺省。"
+        },
         "sense_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
@@ -3030,7 +3036,6 @@
       "type": "object",
       "required": [
         "entry_id",
-        "publication_id",
         "pos_id",
         "base_form_id",
         "kind",
@@ -3084,7 +3089,11 @@
         },
         "pos": { "type": "string" },
         "pos_id": { "type": "string", "format": "uuid" },
-        "publication_id": { "type": "string", "format": "uuid" },
+        "publication_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "命中的发布版本。**缺省即草稿候选**（只在 `include_drafts = true` 时出现）：词条从未发布，\n关联它时 `target_publication_id` 同样留空，保存时按目标当前草稿内容校验。"
+        },
         "senses": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/SentenceTargetSenseV3" }
@@ -3297,6 +3306,10 @@
     "AudioAssetGender": { "type": "string", "enum": ["female", "male"] },
     "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
+    "ComponentTargetMatchV3": {
+      "type": "string",
+      "enum": ["contains", "exact"]
+    },
     "ConfirmAudioAssetRequest": {
       "type": "object",
       "required": ["key", "locale", "gender", "original_name"],
@@ -3706,7 +3719,6 @@
             "id",
             "literal",
             "target_word_id",
-            "target_publication_id",
             "target_pos_id",
             "target_base_form_id",
             "target_sense_id",
@@ -3734,7 +3746,11 @@
             "target_gloss": { "type": "string", "maxLength": 5000 },
             "target_headword": { "type": "string", "maxLength": 500 },
             "target_pos_id": { "type": "string", "format": "uuid" },
-            "target_publication_id": { "type": "string", "format": "uuid" },
+            "target_publication_id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "缺省 = 目标单词还是从未发布的草稿，语义同 `TextLinkV3.target_publication_id`。"
+            },
             "target_sense_id": { "type": "string", "format": "uuid" },
             "target_variant_id": { "type": "string", "format": "uuid" },
             "target_word_id": { "type": "string", "format": "uuid" }
@@ -4178,7 +4194,6 @@
         "id",
         "source_segments",
         "target_word_id",
-        "target_publication_id",
         "target_pos_id",
         "target_base_form_id",
         "target_form_id",
@@ -4198,7 +4213,11 @@
         "target_gloss": { "type": "string", "readOnly": true },
         "target_headword": { "type": "string", "readOnly": true },
         "target_pos_id": { "type": "string", "format": "uuid" },
-        "target_publication_id": { "type": "string", "format": "uuid" },
+        "target_publication_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "缺省 = 目标是从未发布的草稿：保存 / 发布时按目标当前草稿内容校验，发布引用记 `draft` 范围；\n目标发布后，宿主下一次保存 / 发布由服务端补上当前发布版本。"
+        },
         "target_sense_id": { "type": "string", "format": "uuid" },
         "target_variant_id": { "type": "string", "format": "uuid" },
         "target_word_id": { "type": "string", "format": "uuid" },
@@ -4208,10 +4227,14 @@
     },
     "TextLinkViaPhraseV3": {
       "type": "object",
-      "required": ["word_id", "publication_id", "sense_id", "component_id"],
+      "required": ["word_id", "sense_id", "component_id"],
       "properties": {
         "component_id": { "type": "string", "format": "uuid" },
-        "publication_id": { "type": "string", "format": "uuid" },
+        "publication_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "缺省 = 该短语还是从未发布的草稿，按其当前草稿内容校验成分。"
+        },
         "sense_id": { "type": "string", "format": "uuid" },
         "word_id": { "type": "string", "format": "uuid" }
       },

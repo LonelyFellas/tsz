@@ -195,25 +195,22 @@ describe("句内目标发现 · api-client 契约", () => {
     expect(segments.maxItems).toBe(20);
   });
 
-  it("候选保留 entry/publication/POS/base/sense 身份，草稿只能转 Pending", () => {
+  it("候选保留 entry/POS/base/sense 身份，发布版本可缺省（草稿候选）；resolve 的草稿只能转 Pending", () => {
     const baseCandidate = schemaByRequiredProperties(
       "entry_id",
-      "publication_id",
       "pos_id",
       "base_form_id",
+      "matched_form_id",
       "matches",
       "senses"
     );
+    // component-targets/search 带 include_drafts 时会回从未发布的草稿：没有 publication_id。
+    expect(property(baseCandidate, "publication_id")).toBeDefined();
+    expect(baseCandidate.required).not.toContain("publication_id");
     const sense = dereference(property(baseCandidate, "senses").items);
-    required(
-      sense,
-      "sense_id",
-      "publication_id",
-      "pos_id",
-      "base_form_id",
-      "level",
-      "gloss"
-    );
+    required(sense, "sense_id", "pos_id", "base_form_id", "level", "gloss");
+    expect(property(sense, "publication_id")).toBeDefined();
+    expect(sense.required).not.toContain("publication_id");
 
     const draftCandidate = schemaByRequiredProperties(
       "entry_id",
