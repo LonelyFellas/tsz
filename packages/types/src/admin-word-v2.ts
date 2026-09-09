@@ -76,9 +76,10 @@ export interface WordBaseFormSlotV2 {
   variants: WordFormVariantV2[];
 }
 
+/** Non-base catalog code is enforced by the forms contract at runtime. */
 export interface WordDerivedFormSlotV2 {
   id: string;
-  form_type: Exclude<WordFormType, "base">;
+  form_type: WordFormType;
   variants: WordFormVariantV2[];
 }
 

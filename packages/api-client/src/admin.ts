@@ -53,6 +53,8 @@ import type {
   PermissionCatalogResponse,
   PartOfSpeechCatalogResponse,
   PartOfSpeechConfig,
+  FormTypeConfig,
+  FormTypeConfigListResponse,
   PartOfSpeechConfigListQuery,
   PartOfSpeechConfigListResponse,
   RelatedSearchResponse,
@@ -729,6 +731,18 @@ export function createAdminEndpoints(http: HttpClient) {
      * super_admin 专属。契约已在 tsz-rust 落地。
      */
     partOfSpeechSettings: {
+      listFormTypes: (query: PartOfSpeechConfigListQuery = {}) =>
+        http.get<FormTypeConfigListResponse>(
+          `/settings/form-types${qs({ ...query })}`
+        ),
+      createFormType: (input: CreatePartOfSpeechInput) =>
+        http.post<FormTypeConfig>("/settings/form-types", input),
+      updateFormType: (id: string, input: UpdatePartOfSpeechInput) =>
+        http.patch<FormTypeConfig>(`/settings/form-types/${id}`, input),
+      removeFormType: (id: string, query: DeletePartOfSpeechQuery) =>
+        http.del<void>(
+          `/settings/form-types/${id}${qs({ base_revision: query.base_revision })}`
+        ),
       /** GET /admin/settings/parts-of-speech/catalog — 完整基本/细分词性目录。 */
       catalog: () =>
         http.get<PartOfSpeechCatalogResponse>(

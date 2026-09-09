@@ -5,7 +5,7 @@ import {
   screen,
   waitFor
 } from "@testing-library/react";
-import type { Dialect, RichTextV2 } from "@tsz/types";
+import type { Dialect, RichTextV2, VoiceProfileV3 } from "@tsz/types";
 import type { VoicePreviewResult } from "@tsz/voice-editor/types";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -133,11 +133,15 @@ function result(
 function PreviewHarness({
   spelling = "tomato",
   content,
+  voiceProfile,
+  playbackOnly,
   dialect = "common",
   readOnly = false
 }: {
   spelling?: string;
   content?: RichTextV2;
+  voiceProfile?: VoiceProfileV3;
+  playbackOnly?: boolean;
   dialect?: Dialect;
   readOnly?: boolean;
 }) {
@@ -147,6 +151,8 @@ function PreviewHarness({
         pronunciationId="pronunciation-stable-id"
         spelling={spelling}
         content={content}
+        voiceProfile={voiceProfile}
+        playbackOnly={playbackOnly}
         dialect={dialect}
         disabled={readOnly}
         audioFactory={(src) =>
@@ -554,4 +560,33 @@ describe("PronunciationPreview", () => {
     expect(screen.getByLabelText("获取语音")).toBeDisabled();
     expect(preview.synthesize).not.toHaveBeenCalled();
   });
+});
+
+it("最终读音使用编辑后的标注、选定音色和语速，并直接播放", async () => {
+  preview.listVoices.mockResolvedValue(voices);
+  preview.synthesize.mockResolvedValue(result());
+  const content: RichTextV2 = {
+    version: 2,
+    text: "a b",
+    annotations: [{ type: "pause", at: 1, duration_ms: 500 }]
+  };
+  render(
+    <PreviewHarness
+      content={content}
+      dialect="uk"
+      playbackOnly
+      voiceProfile={{ voice_ids: ["american-voice"], rate_percent: -25 }}
+    />
+  );
+  expect(screen.queryByRole("button", { name: "获取语音" })).toBeNull();
+  const button = screen.getByRole("button", { name: "播放语音" });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  await waitFor(() =>
+    expect(preview.synthesize).toHaveBeenCalledWith(
+      { language: "en", content, voiceId: "american-voice", ratePercent: -25 },
+      expect.anything()
+    )
+  );
+  await waitFor(() => expect(AudioMock.instances[0]?.play).toHaveBeenCalled());
 });

@@ -60,7 +60,7 @@ export const WORD_STEP_TITLE = {
   preview: "预览并生效"
 } as const;
 
-type DerivedFormType = Exclude<WordFormType, "base">;
+type DerivedFormType = WordFormType;
 
 export function legalDerivedFormTypes(
   _pos: WordPosTag,
@@ -177,7 +177,7 @@ export function createPosForms(
 }
 
 export function createDerivedSlot(
-  type: Exclude<WordFormType, "base">,
+  type: WordFormType,
   pos: WordPosFormsV2
 ): WordDerivedFormSlotV2 {
   return {

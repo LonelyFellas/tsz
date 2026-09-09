@@ -1,3 +1,4 @@
+import { FormTypeLabelsProvider } from "../../part-of-speech/FormTypeLabels";
 import {
   act,
   fireEvent,
@@ -681,7 +682,12 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(groupCard).toHaveTextContent("字典音标");
     expect(groupCard).toHaveTextContent("实际发音");
     expect(within(groupCard).getAllByLabelText(/播放语音/)).toHaveLength(3);
-    expect(within(groupCard).getAllByLabelText(/获取语音/)).toHaveLength(3);
+    expect(within(groupCard).queryAllByLabelText(/获取语音/)).toHaveLength(0);
+    expect(
+      within(groupCard).getAllByLabelText("第 1 条发音的字典音标", {
+        exact: true
+      })
+    ).toHaveLength(3);
     for (const form of [base, comparative, superlative]) {
       expect(
         groupCard.querySelector(
@@ -2019,11 +2025,9 @@ describe("V3FormsAndPronunciationStep", () => {
 
     fireEvent.change(inputs[0]!, { target: { value: "sent-uk" } });
     expect(inputs[0]).toHaveValue("sent-uk");
-    expect(inputs[0]).toHaveAttribute("value", "sent-uk");
     fireEvent.change(inputs[1]!, { target: { value: "sent-us" } });
     expect(inputs[0]).toHaveValue("sent-uk");
     expect(inputs[1]).toHaveValue("sent-us");
-    expect(inputs[1]).toHaveAttribute("value", "sent-us");
 
     const updated = canonicalValue().pos[0]!.forms[0]!;
     if (updated.regional_variants.mode !== "uk_us") throw new Error("fixture");
@@ -2033,6 +2037,12 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(updated.regional_variants.us.pronunciations[0]!.dict_phonetic).toBe(
       "sent-us"
     );
+    expect(
+      updated.regional_variants.uk.pronunciations[0]!.dict_phonetic_rich
+    ).toBeUndefined();
+    expect(
+      updated.regional_variants.us.pronunciations[0]!.dict_phonetic_rich
+    ).toBeUndefined();
   });
 
   it("P1-1 从空 skeleton 经 catalog UI 构建多 POS/组/重复 base", async () => {
@@ -2685,4 +2695,43 @@ describe("V3FormsAndPronunciationStep", () => {
       single[0]!.querySelector<HTMLElement>(".word-sort-drag-handle")
     ).toBeDisabled();
   });
+});
+
+it("目录自定义词形可展示，改名后保留词形编码", async () => {
+  const custom = commonFormFixture({
+    id: uuidFromInt(501),
+    form_type: "custom_variant",
+    spelling: "custom"
+  });
+  const initial = formsFixture({ forms: [commonFormFixture(), custom] });
+  const item = {
+    id: uuidFromInt(502),
+    code: "custom_variant",
+    name_zh: "自定义词形",
+    short_name_zh: "自定义",
+    name_en: "Custom",
+    full_name_en: "custom",
+    abbreviation: "custom",
+    sort_order: 100
+  };
+  catalogState.data = structuredClone(partOfSpeechCatalogFixture);
+  catalogState.data.items[0]!.allowed_form_types = ["custom_variant"];
+  const { rerender } = render(
+    <FormTypeLabelsProvider items={[item]}>
+      <Harness initial={initial} />
+    </FormTypeLabelsProvider>
+  );
+  expect((await screen.findAllByText("自定义词形")).length).toBeGreaterThan(0);
+  rerender(
+    <FormTypeLabelsProvider items={[{ ...item, name_zh: "改名词形" }]}>
+      <Harness initial={initial} />
+    </FormTypeLabelsProvider>
+  );
+  expect((await screen.findAllByText("改名词形")).length).toBeGreaterThan(0);
+  expect(screen.queryByText("自定义词形")).toBeNull();
+  expect(
+    validateFormsContent(initial, "save", {
+      allowedFormTypes: () => ["custom_variant"]
+    })
+  ).toEqual([]);
 });

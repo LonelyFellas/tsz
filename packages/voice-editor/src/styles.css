@@ -1033,3 +1033,59 @@
   right: 8px;
   margin: 0;
 }
+
+.tsz-ve-speech-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 0.65fr);
+  gap: 12px;
+  width: min(520px, calc(100vw - 48px));
+}
+
+.tsz-ve-speech-panel .tsz-ve-pop {
+  min-width: 0;
+  max-width: none;
+}
+
+.tsz-ve-speech-panel-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.tsz-ve-speech-panel-hint {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  color: #667085;
+}
+
+/* 发音入口用一行主次信息，避免状态徽章挤成第二个按钮。 */
+.tsz-ve-tool-toggle.tsz-ve-speech-tool {
+  gap: 6px;
+  padding-inline: 8px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.tsz-ve-speech-tool .tsz-ve-tool-summary {
+  margin-left: 2px;
+  padding: 0;
+  background: transparent;
+  color: var(--ant-color-text-tertiary, #8c8c8c);
+  font-weight: 400;
+}
+
+.tsz-ve-speech-tool[aria-pressed="true"] .tsz-ve-tool-summary {
+  background: transparent;
+  color: var(--ant-color-primary, #0071e3);
+}
+
+.tsz-ve-speech-tool::after {
+  content: "";
+  width: 4px;
+  height: 4px;
+  margin-left: 2px;
+  margin-top: -2px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg);
+  opacity: 0.5;
+}

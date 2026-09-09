@@ -65,6 +65,7 @@ type RuntimeSchema = {
   format?: "date-time" | "uuid";
   minimum?: number;
   maximum?: number;
+  pattern?: string;
   minLength?: number;
   maxLength?: number;
   minItems?: number;
@@ -247,6 +248,14 @@ function validateSchema(
   }
 
   if (typeof value === "string") {
+    if (schema.pattern !== undefined) {
+      try {
+        if (!new RegExp(schema.pattern).test(value))
+          return failure(path, "invalid_format", value);
+      } catch {
+        return failure(path, "invalid_schema", value);
+      }
+    }
     const length = [...value].length;
     if (schema.minLength !== undefined && length < schema.minLength) {
       return failure(path, "too_short", value);

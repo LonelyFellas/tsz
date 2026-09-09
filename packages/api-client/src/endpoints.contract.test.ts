@@ -494,7 +494,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "43384ad7008134d54663a32e108eb51ac034ecd1e5065ccbce1ec98e8a615f65"
+      "c5748fdbdd538b5656bd38f8e91c6b23bb1d59b85a28e101fa0f881a3e60898d"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -572,21 +572,23 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       { mode: "common", required: ["common", "mode"] },
       { mode: "uk_us", required: ["uk", "us", "mode"] }
     ]);
-    expect(defs.WordFormTypeV3.enum).toEqual([
-      "base",
-      "third_person_singular",
-      "present_participle",
-      "past_tense",
-      "past_participle",
-      "plural",
-      "comparative",
-      "superlative"
-    ]);
+    expect(defs.WordConcreteFormV3.properties.form_type).toMatchObject({
+      type: "string",
+      pattern: "^[a-z][a-z0-9_]{0,31}$",
+      maxLength: 32
+    });
     expect(defs.WordPronunciationV3.required).toEqual([
       "id",
       "dict_phonetic",
       "actual_pron"
     ]);
+    expect(defs.WordPronunciationV3.properties.dict_phonetic_rich).toEqual({
+      $ref: "#/$defs/RichTextV3"
+    });
+    expect(defs.WordPronunciationV3.properties.voice_profile).toEqual({
+      $ref: "#/$defs/VoiceProfileV3"
+    });
+    expect(defs.WordPronunciationV3.properties.audio_assets.maxItems).toBe(8);
     const serializedV3 = JSON.stringify(defs.AdminWordV3);
     expect(serializedV3).not.toContain("base_form");
     expect(serializedV3).not.toContain("parent_form_id");
@@ -843,9 +845,10 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "pronunciation_id",
       "variant_id"
     ]);
-    expect(location.properties.form_type.$ref).toBe(
-      "#/components/schemas/WordFormTypeV2"
-    );
+    expect(location.properties.form_type).toMatchObject({
+      type: "string",
+      pattern: "^[a-z][a-z0-9_]{0,31}$"
+    });
     expect(location.properties.dialect.$ref).toBe(
       "#/components/schemas/Dialect"
     );
@@ -959,16 +962,9 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       snapshot.schemas.SurfaceMatchEnabledTerminalPageV2.properties
         .impact_confirmation_token
     ).toEqual({ type: "string", format: "uuid" });
-    expect(snapshot.schemas.WordFormTypeV2.enum).toEqual([
-      "base",
-      "third_person_singular",
-      "present_participle",
-      "past_tense",
-      "past_participle",
-      "plural",
-      "comparative",
-      "superlative"
-    ]);
+    expect(
+      snapshot.schemas.DraftNodeLocation.properties.form_type
+    ).toMatchObject({ type: "string", pattern: "^[a-z][a-z0-9_]{0,31}$" });
     expect(
       snapshot.schemas.SurfaceMatchPageBaseV2.properties.items
     ).toMatchObject({
@@ -1128,4 +1124,33 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       `以下端点后端已在 spec 中提供,请从 PENDING 白名单移除以纳入正式校验:\n  ${nowInSpec.join("\n  ")}`
     ).toEqual([]);
   });
+});
+
+it("词形配置契约包含增删改、必填revision与统一目录名称", () => {
+  expect(specPaths["/admin/settings/form-types"]).toEqual(["get", "post"]);
+  expect(specPaths["/admin/settings/form-types/{id}"]).toEqual([
+    "delete",
+    "patch"
+  ]);
+  expect(snapshot.schemas.FormTypeConfig.required).toEqual(
+    expect.arrayContaining([
+      "code",
+      "name_zh",
+      "short_name_zh",
+      "name_en",
+      "abbreviation",
+      "full_name_en",
+      "revision",
+      "usage_count"
+    ])
+  );
+  expect(
+    snapshot.schemas.CatalogResponse.properties.form_types.items.$ref
+  ).toBe("#/components/schemas/FormTypeCatalogItem");
+  expect(snapshot.schemas.UpdatePartRequest.required).toContain(
+    "base_revision"
+  );
+  expect(snapshot.schemas.UpdatePartRequest.properties).not.toHaveProperty(
+    "code"
+  );
 });

@@ -125,7 +125,11 @@ export function wordStatusLabel(status: AdminWordStatus): string {
 }
 
 export function formTypeLabel(value: WordFormTypeV3): string {
-  return FORM_TYPE_LABEL[value] ?? "未识别词形类型";
+  return Object.hasOwn(FORM_TYPE_LABEL, value)
+    ? FORM_TYPE_LABEL[value]!
+    : /^[a-z][a-z0-9_]{0,31}$/.test(value)
+      ? value
+      : "未识别词形类型";
 }
 
 export function dialectLabel(value: Dialect): string {

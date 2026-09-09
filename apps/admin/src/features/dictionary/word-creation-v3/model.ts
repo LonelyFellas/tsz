@@ -17,16 +17,8 @@ export const MAX_FORMS_NODES = 2_000;
 export const MAX_FORM_TEXT_CODEPOINTS = 200;
 
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
-const FORM_TYPES = new Set<WordFormTypeV3>([
-  "base",
-  "third_person_singular",
-  "present_participle",
-  "past_tense",
-  "past_participle",
-  "plural",
-  "comparative",
-  "superlative"
-]);
+const validFormTypeCode = (value: unknown): value is string =>
+  typeof value === "string" && /^[a-z][a-z0-9_]{0,31}$/.test(value);
 
 type ValidationIntent = "save" | "complete";
 
@@ -147,13 +139,39 @@ function isPronunciationShape(value: unknown): value is WordPronunciationV3 {
   const keys = Object.keys(value);
   return (
     keys.length >= 3 &&
-    keys.length <= 4 &&
+    keys.length <= 7 &&
     keys.every((key) =>
-      ["actual_pron", "dict_phonetic", "id", "style"].includes(key)
+      [
+        "actual_pron",
+        "dict_phonetic",
+        "id",
+        "style",
+        "dict_phonetic_rich",
+        "voice_profile",
+        "audio_assets"
+      ].includes(key)
     ) &&
     typeof value.id === "string" &&
     typeof value.dict_phonetic === "string" &&
     typeof value.actual_pron === "string" &&
+    (value.dict_phonetic_rich === undefined ||
+      (isObject(value.dict_phonetic_rich) &&
+        typeof value.dict_phonetic_rich.text === "string" &&
+        ((value.dict_phonetic_rich.version === 2 &&
+          Array.isArray(value.dict_phonetic_rich.annotations)) ||
+          (value.dict_phonetic_rich.version === 1 &&
+            Array.isArray(value.dict_phonetic_rich.spans) &&
+            Array.isArray(value.dict_phonetic_rich.liaisons))))) &&
+    (value.voice_profile === undefined ||
+      (isObject(value.voice_profile) &&
+        Array.isArray(value.voice_profile.voice_ids) &&
+        value.voice_profile.voice_ids.every((id) => typeof id === "string") &&
+        Number.isInteger(value.voice_profile.rate_percent))) &&
+    (value.audio_assets === undefined ||
+      (Array.isArray(value.audio_assets) &&
+        value.audio_assets.every(
+          (asset) => isObject(asset) && typeof asset.id === "string"
+        ))) &&
     (value.style === undefined ||
       value.style === "normal" ||
       value.style === "strong" ||
@@ -241,7 +259,7 @@ function isPhraseComponentUsageShape(
       value.target_dialect === "uk" ||
       value.target_dialect === "us") &&
     typeof value.target_form_type === "string" &&
-    FORM_TYPES.has(value.target_form_type as WordFormTypeV3) &&
+    validFormTypeCode(value.target_form_type) &&
     typeof value.target_headword === "string" &&
     typeof value.target_gloss === "string"
   );
@@ -639,7 +657,7 @@ export function validateFormsContent(
       if (!formOwners.has(form.id)) formOwners.set(form.id, pos.pos_id);
       formTypes.set(form.id, form.form_type);
       membershipCounts.set(form.id, 0);
-      if (!FORM_TYPES.has(form.form_type)) {
+      if (!validFormTypeCode(form.form_type)) {
         issues.push(
           issue(
             "invalid_form_type_for_part_of_speech",
@@ -812,6 +830,15 @@ function pronunciationWire(
   return {
     id: pronunciation.id,
     dict_phonetic: pronunciation.dict_phonetic,
+    ...(pronunciation.dict_phonetic_rich === undefined
+      ? {}
+      : { dict_phonetic_rich: pronunciation.dict_phonetic_rich }),
+    ...(pronunciation.voice_profile === undefined
+      ? {}
+      : { voice_profile: pronunciation.voice_profile }),
+    ...(pronunciation.audio_assets === undefined
+      ? {}
+      : { audio_assets: pronunciation.audio_assets }),
     actual_pron: pronunciation.actual_pron,
     ...(pronunciation.style === undefined ? {} : { style: pronunciation.style })
   };

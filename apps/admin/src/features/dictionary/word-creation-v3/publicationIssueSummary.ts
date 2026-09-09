@@ -4,7 +4,10 @@ import type {
   V3DraftValidationIssue,
   V3ValidationIssueCode
 } from "@tsz/types";
-import { formTypeLabel, partOfSpeechLabel } from "./presentation";
+import {
+  formTypeLabel as fallbackFormTypeLabel,
+  partOfSpeechLabel
+} from "./presentation";
 import { v3IssueMessage } from "./presentationErrors";
 
 const STEP_LABEL: Record<PersistedWordStep, string> = {
@@ -191,7 +194,8 @@ function emptyStepCounts(): Record<PersistedWordStep, number> {
 
 function issueScopes(
   word: AdminWordV3,
-  issues: readonly V3DraftValidationIssue[]
+  issues: readonly V3DraftValidationIssue[],
+  formTypeLabel: (code: string) => string
 ) {
   const groups = groupIssuesByPosition(word, issues);
   return groups.map((position) => {
@@ -237,7 +241,8 @@ function groupIssuesByPosition(
 
 export function buildV3PublicationIssueSummary(
   word: AdminWordV3,
-  issues: readonly V3DraftValidationIssue[]
+  issues: readonly V3DraftValidationIssue[],
+  formTypeLabel = fallbackFormTypeLabel
 ): V3PublicationIssueSummary {
   const positionedIssues = issues.map((issue) =>
     issueWithResolvedPosition(word, issue)
@@ -255,7 +260,7 @@ export function buildV3PublicationIssueSummary(
       code,
       label: v3IssueMessage(groupedIssues[0]!),
       count: groupedIssues.length,
-      scopes: issueScopes(word, groupedIssues),
+      scopes: issueScopes(word, groupedIssues, formTypeLabel),
       issues: groupedIssues
     }))
   };

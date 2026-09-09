@@ -1,3 +1,4 @@
+import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { Flex, Input, Select, Tag, Typography } from "antd";
 import type {
   DialectRulesV3,
@@ -16,7 +17,7 @@ import {
   updateVariantSpelling,
   type V3IdFactory
 } from "../operations";
-import { dialectLabel, formTypeLabel } from "../presentation";
+import { dialectLabel } from "../presentation";
 import { V3PronunciationList } from "./V3PronunciationList";
 
 function replaceForm(
@@ -77,6 +78,7 @@ function V3ConcreteFormTypeCell({
   lastRow,
   actions
 }: V3ConcreteFormTypeCellProps) {
+  const formTypeLabel = useFormTypeLabel();
   const availableFormTypes = [
     ...new Set(
       formTypeOptions.includes(form.form_type)

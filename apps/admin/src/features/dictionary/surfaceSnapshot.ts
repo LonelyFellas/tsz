@@ -374,26 +374,33 @@ function productPosLabels(values: string[]): string[] {
   );
 }
 
-function v2SourceLabel(item: LexiconSurfaceMatchV2): string {
+function v2SourceLabel(
+  item: LexiconSurfaceMatchV2,
+  label: (code: string) => string
+): string {
   const source = item.existing.source;
   return source.source_kind === "form"
-    ? `词形 · ${source.surface} · ${formTypeLabel(source.form_type)} · ${dialectLabel(source.dialect)}`
+    ? `词形 · ${source.surface} · ${label(source.form_type)} · ${dialectLabel(source.dialect)}`
     : `主词 · ${source.surface} · ${dialectLabel(source.dialect)}`;
 }
 
-function v3SourceLabel(item: SurfaceMatchItemV3): string {
+function v3SourceLabel(
+  item: SurfaceMatchItemV3,
+  label: (code: string) => string
+): string {
   if (item.match_kind === "form_variant_v3") {
-    return `词形 · ${item.match.spelling} · ${formTypeLabel(item.match.form_type)} · ${dialectLabel(item.match.dialect)}`;
+    return `词形 · ${item.match.spelling} · ${label(item.match.form_type)} · ${dialectLabel(item.match.dialect)}`;
   }
   const source = item.match.existing.source;
   return source.source_kind === "form"
-    ? `词形 · ${source.surface} · ${formTypeLabel(source.form_type)} · ${dialectLabel(source.dialect)}`
+    ? `词形 · ${source.surface} · ${label(source.form_type)} · ${dialectLabel(source.dialect)}`
     : `主词 · ${source.surface} · ${dialectLabel(source.dialect)}`;
 }
 
 /** Lifecycle confirmation uses each schema's real source and presentation fields. */
 export function aggregateLifecycleSurfaceMatchCards(
-  state: SurfaceSnapshotState<SurfaceMatchPageAny>
+  state: SurfaceSnapshotState<SurfaceMatchPageAny>,
+  typeLabel = formTypeLabel
 ): LifecycleSurfaceMatchCard[] {
   if (state.schema_version !== 3) {
     const aggregated = aggregateSurfaceMatchCards(
@@ -404,7 +411,9 @@ export function aggregateLifecycleSurfaceMatchCards(
     for (const card of aggregated) {
       const entryId = card.existing.word_id;
       const existing = cards.get(entryId);
-      const sourceLabels = card.matches.map(v2SourceLabel);
+      const sourceLabels = card.matches.map((item) =>
+        v2SourceLabel(item, typeLabel)
+      );
       if (existing) {
         existing.match_count += card.matches.length;
         existing.membership = mergeMembership(
@@ -459,7 +468,7 @@ export function aggregateLifecycleSurfaceMatchCards(
     const schemaVersion = item.match_kind === "form_variant_v3" ? 3 : 2;
     const kind =
       item.match_kind === "legacy_v2" ? item.match.existing.kind : "word";
-    const sourceLabel = v3SourceLabel(item);
+    const sourceLabel = v3SourceLabel(item, typeLabel);
     const existing = cards.get(entryId);
     if (existing) {
       existing.match_count += 1;

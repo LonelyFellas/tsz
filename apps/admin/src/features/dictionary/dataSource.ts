@@ -97,6 +97,10 @@ export type AdminPartOfSpeechDataSource = Pick<
   | "createSubPart"
   | "updateSubPart"
   | "removeSubPart"
+  | "listFormTypes"
+  | "createFormType"
+  | "updateFormType"
+  | "removeFormType"
 >;
 
 export const realAdminPartOfSpeechDataSource: AdminPartOfSpeechDataSource =
@@ -355,6 +359,14 @@ export const sentenceAssociationsDataSource: SentenceAssociationsDataSource = {
  * tshb-test 已将 words 和词性都切到真实数据源。
  */
 export const partOfSpeechDataSource: AdminPartOfSpeechDataSource = {
+  listFormTypes: async (query = {}) =>
+    (await resolveAdminPartOfSpeechDataSource()).listFormTypes(query),
+  createFormType: async (input) =>
+    (await resolveAdminPartOfSpeechDataSource()).createFormType(input),
+  updateFormType: async (id, input) =>
+    (await resolveAdminPartOfSpeechDataSource()).updateFormType(id, input),
+  removeFormType: async (id, query) =>
+    (await resolveAdminPartOfSpeechDataSource()).removeFormType(id, query),
   catalog: async () => (await resolveAdminPartOfSpeechDataSource()).catalog(),
   list: async (query = {}) =>
     (await resolveAdminPartOfSpeechDataSource()).list(query),

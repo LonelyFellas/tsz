@@ -1,9 +1,15 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   createMockAudioUploadAdapter,
   createMockVoicePreviewAdapter,
   MOCK_VOICES
 } from "./mock";
+
+beforeEach(() => vi.stubEnv("VITE_LOCAL_SPEECH_MOCK", undefined));
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
 
 const REQUEST = {
   language: "en",
@@ -100,4 +106,28 @@ describe("mock audio upload adapter", () => {
       })
     ).rejects.toMatchObject({ name: "AbortError" });
   });
+});
+
+it("本机演示返回可释放的音频，保留音色、语速与标注请求", async () => {
+  vi.stubEnv("VITE_LOCAL_SPEECH_MOCK", "true");
+  const blob = new Blob(["RIFF-demo"], { type: "audio/wav" });
+  const fetcher = vi
+    .fn()
+    .mockResolvedValue({ ok: true, blob: async () => blob });
+  const revokeObjectURL = vi.fn();
+  vi.stubGlobal("fetch", fetcher);
+  vi.stubGlobal("URL", {
+    createObjectURL: vi.fn().mockReturnValue("blob:local-speech"),
+    revokeObjectURL
+  });
+  const adapter = createMockVoicePreviewAdapter();
+  const input = { ...REQUEST, ratePercent: -25 };
+  const result = await adapter.synthesize(input);
+  expect(fetcher).toHaveBeenCalledWith(
+    "/__mock/voice-preview",
+    expect.objectContaining({ method: "POST", body: JSON.stringify(input) })
+  );
+  expect(result.audioUrl).toBe("blob:local-speech");
+  result.dispose?.();
+  expect(revokeObjectURL).toHaveBeenCalledWith("blob:local-speech");
 });

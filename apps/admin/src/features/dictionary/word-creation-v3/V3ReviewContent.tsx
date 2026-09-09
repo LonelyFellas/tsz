@@ -1,3 +1,4 @@
+import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import {
   CheckCircleFilled,
   ReadOutlined,
@@ -8,7 +9,6 @@ import type { AdminWordV3 } from "@tsz/types";
 import type { ReactNode } from "react";
 import {
   dialectLabel,
-  formTypeLabel,
   partOfSpeechLabel,
   pronunciationStyleLabel
 } from "./presentation";
@@ -23,6 +23,7 @@ interface Props {
 }
 
 function FormsReview({ word }: { word: AdminWordV3 }) {
+  const formTypeLabel = useFormTypeLabel();
   if (word.forms.pos.length === 0) {
     return <Empty description="暂无词形与发音" />;
   }

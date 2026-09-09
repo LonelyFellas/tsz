@@ -1,3 +1,4 @@
+import { formTypeLabel } from "../word-creation-v3/presentation";
 import type {
   Dialect,
   WordFormSlotV2,
@@ -5,7 +6,7 @@ import type {
   WordHeadwordsV2,
   WordPosFormsV2
 } from "@tsz/types";
-import { DIALECT_SHORT_LABEL, FORM_TYPE_LABEL } from "../editorConstants";
+import { DIALECT_SHORT_LABEL } from "../editorConstants";
 
 function expectedDialects(rules: WordPosFormsV2["dialect_rules"]) {
   return rules.spelling_mode === "distinguish" ||
@@ -244,14 +245,15 @@ export function baseFormIssueMessage(
 
 /** 派生词形的校验提示：指名词形类型、方言侧与缺失字段，而不是只报一个计数。 */
 export function derivedFormIssueMessage(
-  pos: WordPosFormsV2
+  pos: WordPosFormsV2,
+  label = formTypeLabel
 ): string | undefined {
   for (const group of pos.form_groups) {
     for (const slot of group.slots) {
       const issues = formSlotIssues(slot, pos.dialect_rules);
       const first = issues[0];
       if (!first) continue;
-      const at = `${FORM_TYPE_LABEL[slot.form_type]} · ${dialectPrefix(
+      const at = `${label(slot.form_type)} · ${dialectPrefix(
         first.dialect
       )}`.replace(/ · $/, "");
       if (PRONUNCIATION_FIELDS.some((field) => field === first.field)) {
