@@ -649,7 +649,11 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(removePos.querySelector(".anticon-minus-circle")).not.toBeNull();
     expect(removePos.querySelector(".anticon-delete")).toBeNull();
     fireEvent.click(removePos);
-    fireEvent.click(await screen.findByRole("button", { name: /^删\s*除$/ }));
+    fireEvent.click(
+      within(await screen.findByRole("dialog")).getByRole("button", {
+        name: /^删\s*除$/
+      })
+    );
 
     expect(formsValue().pos.map((pos) => pos.pos_id)).toEqual(["pos-2"]);
     expect(value().pos.map((pos) => pos.pos_id)).toEqual(["pos-2"]);
@@ -733,7 +737,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value().pos[0]!.senses[0]!.relations).toEqual([]);
     expect(screen.queryByText(/暂无语义区间/u)).toBeNull();
     expect(screen.queryByText("当前词性还没有词义内容")).toBeNull();
-    expect(screen.queryByRole("button", { name: "开始录入词义" })).toBeNull();
+    expect(screen.queryByText("开始录入词义")).toBeNull();
     expect(
       screen.getByText(
         "录入顺序：词义 → 语法结构 → 例句。系统报错触发条件：1) 某项词义缺本语言释义语句；2) 例句未配置关联单词；"
@@ -1175,7 +1179,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       content: { text: "the center" }
     });
 
-    fireEvent.click(screen.getByRole("button", { name: "添加语法结构" }));
+    fireEvent.click(screen.getByText("添加语法结构").closest("button")!);
     const structures = value().pos[0]!.grammar_structures;
     expect(structures).toHaveLength(2);
     expect(structures[1]!.variants.map((variant) => variant.dialect)).toEqual([
@@ -4120,7 +4124,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       screen.getByLabelText("拖动名词").closest('[role="tab"]')
     ).toBeVisible();
     expect(screen.queryByText("当前词性还没有词义内容")).toBeNull();
-    expect(screen.queryByRole("button", { name: "开始录入词义" })).toBeNull();
+    expect(screen.queryByText("开始录入词义")).toBeNull();
     expect(screen.queryByText(/暂无语义区间/u)).toBeNull();
     expect(screen.queryByText("草稿可暂时不添加词性释义")).toBeNull();
   });

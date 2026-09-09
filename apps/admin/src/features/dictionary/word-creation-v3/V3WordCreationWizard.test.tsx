@@ -762,7 +762,7 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getAllByText("多维例句").length).toBeGreaterThan(0);
     expect(screen.queryByText(/暂无语义区间/u)).toBeNull();
     expect(screen.queryByText("当前词性还没有词义内容")).toBeNull();
-    expect(screen.queryByRole("button", { name: "开始录入词义" })).toBeNull();
+    expect(screen.queryByText("开始录入词义")).toBeNull();
   }, 20_000);
 
   it("用 GET 的退役节点播种并保留 variant 身份账本", () => {
@@ -1814,6 +1814,12 @@ describe("V3WordCreationWizard", () => {
       expect(screen.getByLabelText("定义 1 通用内容")).toHaveFocus()
     );
     expect(secondTab).toHaveAttribute("aria-selected", "true");
+    expect(
+      container.querySelector(
+        '[data-v3-field="sense"][data-v3-node-id="meaning-sense-1"] .ant-collapse-header'
+      )
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(secondSenseHeader).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByLabelText("定义 1 通用内容")).toHaveValue(
       "local unsaved"
     );
