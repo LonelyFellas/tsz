@@ -1,8 +1,4 @@
-import {
-  PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined
-} from "@ant-design/icons";
+import { PlusOutlined } from "@ant-design/icons";
 import {
   Alert,
   App,
@@ -10,11 +6,12 @@ import {
   Card,
   Flex,
   Form,
-  Input,
   Modal,
+  Select,
   Space,
   Table,
-  Tooltip
+  Tooltip,
+  Typography
 } from "antd";
 import type { TableColumnsType } from "antd";
 import type { CreatePartOfSpeechInput, FormTypeConfig } from "@tsz/types";
@@ -29,15 +26,32 @@ import { derivePartOfSpeechCode } from "./PartOfSpeechFormModal";
 import { useDerivedNameDefaults } from "./useDerivedNameDefaults";
 import { errorMessage } from "./PartOfSpeechSettings";
 
-type Values = Omit<CreatePartOfSpeechInput, "code" | "sort_order">;
+type Values = Omit<CreatePartOfSpeechInput, "code" | "sort_order"> & {
+  /** 原形没有归属，wire 上是 null；表单里按未选处理。 */
+  part_of_speech_id?: string | null;
+};
+
+/**
+ * 词形编码全局唯一，而不同基本词性下允许重名（形容词与副词各有「比较级」），
+ * 所以派生编码要带上父词性前缀。父编码本身可长达 32 字，截到 8 字给英文全称留位置。
+ */
+function deriveFormTypeCode(parentCode: string, fullNameEn: string): string {
+  const parent = derivePartOfSpeechCode(parentCode).slice(0, 8);
+  return derivePartOfSpeechCode(`${parent} ${fullNameEn}`);
+}
 
 export function FormTypeSettings() {
   const { message, modal } = App.useApp();
   const client = useQueryClient();
   const catalog = usePartOfSpeechCatalog();
   const ready = !catalog.isError && !!catalog.data?.form_types;
-  const [query, setQuery] = useState({ q: "", page: 1, page_size: 10 });
-  const [search] = Form.useForm<{ q?: string }>();
+  const [query, setQuery] = useState<{
+    part_of_speech_id?: string;
+    page: number;
+    page_size: number;
+  }>({ page: 1, page_size: 10 });
+  const parts = catalog.data?.items ?? [];
+  const partNameById = new Map(parts.map((item) => [item.id, item.name_zh]));
   const [form] = Form.useForm<Values>();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FormTypeConfig>();
@@ -53,18 +67,30 @@ export function FormTypeSettings() {
   const refresh = () =>
     client.invalidateQueries({ queryKey: partOfSpeechKeys.all });
   const save = useMutation({
-    mutationFn: (values: Values) =>
-      editing
-        ? partOfSpeechDataSource.updateFormType(editing.id, {
-            ...values,
-            sort_order: editing.sort_order,
-            base_revision: editing.revision
-          })
-        : partOfSpeechDataSource.createFormType({
-            ...values,
-            code: derivePartOfSpeechCode(values.full_name_en),
-            sort_order: nextSortOrder(catalog.data?.form_types ?? [])
-          }),
+    mutationFn: ({ part_of_speech_id: partId, ...values }: Values) => {
+      if (editing) {
+        return partOfSpeechDataSource.updateFormType(editing.id, {
+          ...values,
+          // 原形对所有词性通用，后端不接受归属字段。
+          ...(editing.code === "base"
+            ? {}
+            : { part_of_speech_id: partId ?? undefined }),
+          sort_order: editing.sort_order,
+          base_revision: editing.revision
+        });
+      }
+      // 表单的 required 规则保证走到这里时归属已选。
+      if (!partId) throw new Error("missing part_of_speech_id");
+      const parent = parts.find((item) => item.id === partId);
+      return partOfSpeechDataSource.createFormType({
+        ...values,
+        part_of_speech_id: partId,
+        code: deriveFormTypeCode(parent?.code ?? "", values.full_name_en),
+        // 后端列表按 sort_order 全局排序，这里也取全局最大值 + 10，
+        // 否则新词形会插到别的词性中间。
+        sort_order: nextSortOrder(catalog.data?.form_types ?? [])
+      });
+    },
     onSuccess: async () => {
       await refresh();
       setOpen(false);
@@ -74,9 +100,16 @@ export function FormTypeSettings() {
   });
   useEffect(() => {
     if (!open) return;
-    if (editing) form.setFieldsValue(editing);
-    else form.resetFields();
-  }, [editing, form, open]);
+    if (editing) {
+      form.setFieldsValue(editing);
+      return;
+    }
+    form.resetFields();
+    // 「全部」视图下留空由管理员选；已经筛到某个词性时直接带上，少点一次。
+    if (query.part_of_speech_id) {
+      form.setFieldValue("part_of_speech_id", query.part_of_speech_id);
+    }
+  }, [editing, form, open, query.part_of_speech_id]);
   const remove = (item: FormTypeConfig) =>
     modal.confirm({
       title: `删除词形变化“${item.name_zh}”？`,
@@ -108,6 +141,13 @@ export function FormTypeSettings() {
     { title: "正式英文", dataIndex: "name_en", width: 160 },
     { title: "英文缩写", dataIndex: "abbreviation", width: 100 },
     { title: "英文全称", dataIndex: "full_name_en", width: 170 },
+    {
+      title: "所属基本词性",
+      dataIndex: "part_of_speech_id",
+      width: 120,
+      render: (partId?: string | null) =>
+        partId ? (partNameById.get(partId) ?? partId) : "所有词性"
+    },
     {
       title: "引用",
       dataIndex: "usage_count",
@@ -177,39 +217,34 @@ export function FormTypeSettings() {
       )}
       <Card size="small">
         <Flex justify="space-between" align="center" wrap gap={12}>
-          <Form
-            form={search}
-            layout="inline"
-            onFinish={({ q }) =>
-              setQuery({ ...query, q: q?.trim() ?? "", page: 1 })
-            }
-          >
-            <Form.Item name="q" label="关键词">
-              <Input
-                allowClear
-                placeholder="中文 / 英文 / 编码 / 缩写"
-                style={{ width: 260 }}
-              />
-            </Form.Item>
-            <Space>
-              <Button
-                type="primary"
-                htmlType="submit"
-                icon={<SearchOutlined />}
-              >
-                搜 索
-              </Button>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => {
-                  search.resetFields();
-                  setQuery({ ...query, q: "", page: 1 });
-                }}
-              >
-                重 置
-              </Button>
-            </Space>
-          </Form>
+          {/* 词形变化总量很小，一页就看完，不提供关键词搜索。 */}
+          <Flex align="center" gap={12} wrap>
+            <Typography.Text strong>所属基本词性</Typography.Text>
+            <Select
+              aria-label="所属基本词性"
+              value={query.part_of_speech_id ?? ""}
+              showSearch
+              optionFilterProp="label"
+              loading={catalog.isPending}
+              disabled={catalog.isError || parts.length === 0}
+              options={[
+                { value: "", label: "全部" },
+                ...parts.map((item) => ({
+                  value: item.id,
+                  label: item.name_zh
+                }))
+              ]}
+              onChange={(value) =>
+                setQuery({
+                  ...query,
+                  part_of_speech_id: value || undefined,
+                  page: 1
+                })
+              }
+              style={{ width: 200 }}
+              placeholder="请选择基本词性"
+            />
+          </Flex>
           <Button
             type="primary"
             icon={<PlusOutlined />}
@@ -235,6 +270,7 @@ export function FormTypeSettings() {
         )}
         <Table<FormTypeConfig>
           rowKey="id"
+          size="middle"
           columns={columns}
           dataSource={list.data?.items ?? []}
           loading={catalog.isPending || (ready && list.isPending)}
@@ -271,6 +307,31 @@ export function FormTypeSettings() {
           layout="vertical"
           onFinish={(values) => save.mutate(values)}
         >
+          {editing?.code === "base" ? (
+            <Alert
+              type="info"
+              showIcon
+              title="原形对所有基本词性通用，不归属某一个词性。"
+              style={{ marginBottom: 16 }}
+            />
+          ) : (
+            <Form.Item
+              name="part_of_speech_id"
+              label="所属基本词性"
+              rules={[{ required: true, message: "请选择所属基本词性" }]}
+            >
+              <Select
+                aria-label="所属基本词性"
+                showSearch
+                optionFilterProp="label"
+                options={parts.map((item) => ({
+                  value: item.id,
+                  label: item.name_zh
+                }))}
+                placeholder="请选择所属基本词性"
+              />
+            </Form.Item>
+          )}
           <PartOfSpeechNameFields
             placeholders={{
               name_zh: "例如 过去式",

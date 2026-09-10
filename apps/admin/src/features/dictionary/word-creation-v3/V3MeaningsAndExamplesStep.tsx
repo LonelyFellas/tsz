@@ -2132,7 +2132,7 @@ function V3MeaningsAndExamplesStepContent({
                           pos,
                           value,
                           catalogByCode.get(formPosById.get(posId) ?? "")
-                            ?.sub_parts_extensible ?? true
+                            ?.sub_pos_required ?? true
                         )}
                         size="small"
                         title="该词性未填项"
@@ -2219,8 +2219,8 @@ function V3MeaningsAndExamplesStepContent({
                               (item) => item.code === sense.sub_pos
                             );
                             const visibleSubPos = selectedSubPos?.name_zh;
-                            // 后端标记为不可扩展的基本词性不允许挂细分词性；目录里没有该词性时
-                            // 保留原有可选行为，避免目录加载失败把字段整体藏掉。
+                            // 任意基本词性都能挂细分词性；目录里没有该词性时保留原有可选行为，
+                            // 避免目录加载失败把字段整体藏掉。
                             const subPosExtensible =
                               catalogPos?.sub_parts_extensible ?? true;
                             const definitionsCollapsed = Boolean(

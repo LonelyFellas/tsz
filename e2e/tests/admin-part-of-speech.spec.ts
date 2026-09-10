@@ -19,7 +19,8 @@ const unreferencedPart = {
   sort_order: 20,
   usage_count: 0,
   sub_part_count: 0,
-  sub_parts_extensible: false,
+  sub_parts_extensible: true,
+  sub_pos_required: false,
   revision: 1,
   created_by: actor,
   created_at: "2026-08-08T00:01:00.000Z",
@@ -49,6 +50,7 @@ const catalogResponse: PartOfSpeechCatalogResponse = {
       full_name_en: unreferencedPart.full_name_en,
       sort_order: unreferencedPart.sort_order,
       sub_parts_extensible: unreferencedPart.sub_parts_extensible,
+      sub_pos_required: unreferencedPart.sub_pos_required,
       sub_parts: []
     }
   ]
@@ -127,7 +129,7 @@ test("基本词性表按原型列展示，弹窗只有展示字段、不暴露�
 
   const row = page.getByRole("row").filter({ hasText: "小品词" });
   await expect(row.getByText("未引用", { exact: true })).toBeVisible();
-  await expect(row.getByText("不可扩展", { exact: true })).toBeVisible();
+  await expect(row.getByText("0 项", { exact: true })).toBeVisible();
   await row.getByRole("button", { name: "修 改" }).click();
 
   const editDialog = page.getByRole("dialog");

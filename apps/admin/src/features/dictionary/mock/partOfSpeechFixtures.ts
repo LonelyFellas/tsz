@@ -11,10 +11,11 @@ const SYSTEM_ACTOR: PartOfSpeechActor = {
 };
 
 /**
- * 后端固定的"基础词性"编码集合：只有这五个允许挂细分词性。
- * 这是 mock 对后端派生规则的镜像，业务代码只能读 `sub_parts_extensible`，不得引用此集合。
+ * 后端固定的编码集合：只有这五个词性的释义必填细分词性。
+ * 这是 mock 对后端派生规则的镜像，业务代码只能读 `sub_pos_required`，不得引用此集合。
+ * 注意：挂细分词性不受此限，任意基本词性都可以扩展。
  */
-const BASIC_PART_OF_SPEECH_CODES: ReadonlySet<PartOfSpeechCode> = new Set([
+const SUB_POS_REQUIRED_PART_CODES: ReadonlySet<PartOfSpeechCode> = new Set([
   "noun",
   "verb",
   "pronoun",
@@ -22,8 +23,8 @@ const BASIC_PART_OF_SPEECH_CODES: ReadonlySet<PartOfSpeechCode> = new Set([
   "adverb"
 ]);
 
-export function isBasicPartOfSpeechCode(code: PartOfSpeechCode): boolean {
-  return BASIC_PART_OF_SPEECH_CODES.has(code);
+export function isSubPosRequiredCode(code: PartOfSpeechCode): boolean {
+  return SUB_POS_REQUIRED_PART_CODES.has(code);
 }
 
 // 种子只含五个基础词性（2026-09-06 拍板：介词、冠词等非基础种子不再保留）。
@@ -70,7 +71,8 @@ export function createPartOfSpeechSeed(nowIso: string): {
       sort_order: (index + 1) * 10,
       usage_count: 0,
       sub_part_count: SUB_SEED.filter(([parent]) => parent === code).length,
-      sub_parts_extensible: isBasicPartOfSpeechCode(code),
+      sub_parts_extensible: true,
+      sub_pos_required: isSubPosRequiredCode(code),
       revision: 1,
       created_by: SYSTEM_ACTOR,
       created_at: nowIso,

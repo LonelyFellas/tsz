@@ -93,7 +93,7 @@ describe("V3 basic POS completion counts", () => {
     expect(countV3PosMeaningIncomplete(pos, meanings)).toBe(0);
   });
 
-  it("非基础词性没有细分词性可选，空 sub_pos 不算未填", () => {
+  it("释义选填细分词性的词性，空 sub_pos 不算未填", () => {
     const forms = formsFixture();
     let nextId = 0;
     const meanings = ensureV3MeaningsForForms(

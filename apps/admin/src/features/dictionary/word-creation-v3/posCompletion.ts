@@ -83,7 +83,7 @@ function hasChineseDefinition(sense: MeaningsPos["senses"][number]) {
 export function countV3PosMeaningIncomplete(
   pos: MeaningsPos,
   content: MeaningsContent,
-  /** 该词性是否允许挂细分词性；非基础词性没有细分词性可选，不把空 sub_pos 算作未填。 */
+  /** 该词性的释义是否必填细分词性；选填的词性不把空 sub_pos 算作未填。 */
   subPosRequired = true
 ): number {
   const senseGroupIds = new Set(content.sense_groups.map((group) => group.id));

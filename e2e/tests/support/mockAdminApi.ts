@@ -45,6 +45,30 @@ const ADMIN_AUDIT_ID = "01900000-0000-7000-8000-000000000001";
 
 const PART_OF_SPEECH_CATALOG: PartOfSpeechCatalogResponse = {
   catalog_version: 1,
+  // 词形目录：原形对所有词性通用，其余挂在各自词性下（迁移 20260910120000）。
+  form_types: [
+    {
+      id: "form-type-base",
+      code: "base",
+      name_zh: "原形",
+      name_en: "base",
+      short_name_zh: "原形",
+      abbreviation: "base",
+      full_name_en: "base",
+      sort_order: 0
+    },
+    {
+      id: "form-type-plural",
+      part_of_speech_id: "pos-config-noun",
+      code: "plural",
+      name_zh: "复数",
+      name_en: "plural",
+      short_name_zh: "复数",
+      abbreviation: "plural",
+      full_name_en: "plural",
+      sort_order: 10
+    }
+  ],
   items: [
     {
       id: "pos-config-noun",

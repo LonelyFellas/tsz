@@ -15,6 +15,9 @@ const antdTheme = {
   algorithm: antTheme.defaultAlgorithm,
   token: {
     colorPrimary: "#0071e3",
+    // link 型按钮/链接不从 colorPrimary 派生（antd 走 colorInfo 那一系），
+    // 只设 colorPrimary 会让表格里的行内动作退回默认蓝，与主按钮撞成两种蓝。
+    colorInfo: "#0071e3",
     borderRadius: 8,
     fontFamily:
       'system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif'

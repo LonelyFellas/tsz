@@ -86,7 +86,6 @@ export function subPartOfSpeechOptions(
   lookup: PartOfSpeechLookup,
   posCode: PartOfSpeechCode
 ) {
-  if (!lookup.byCode.get(posCode)?.sub_parts_extensible) return [];
   return (lookup.subPartsByPosCode.get(posCode) ?? []).map((item) => ({
     value: item.code,
     label: item.name_zh
@@ -96,13 +95,11 @@ export function subPartOfSpeechOptions(
 /**
  * 基本词性下只配置了一个细分项时返回它的编码。目录未加载或加载失败时
  * `subPartsByPosCode` 为空，返回 undefined，避免把「拿不到目录」误判成「只有一项」。
- * 非基础词性（`sub_parts_extensible` 为 false）不允许挂细分词性，同样返回 undefined。
  */
 export function soleSubPartOfSpeechCode(
   lookup: PartOfSpeechLookup,
   posCode: PartOfSpeechCode
 ): SubPartOfSpeechCode | undefined {
-  if (!lookup.byCode.get(posCode)?.sub_parts_extensible) return undefined;
   const subParts = lookup.subPartsByPosCode.get(posCode) ?? [];
   return subParts.length === 1 ? subParts[0]!.code : undefined;
 }

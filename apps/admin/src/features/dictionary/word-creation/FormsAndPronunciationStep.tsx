@@ -2580,7 +2580,6 @@ export function FormsAndPronunciationStep({
         const posLabel = partOfSpeechLabel(partOfSpeechLookup, pos.pos);
         const configured = partOfSpeechLookup.byCode.get(pos.pos);
         const configuredAllowedTypes = configured?.allowed_form_types;
-        const allowed = legalDerivedFormTypes(pos.pos, configuredAllowedTypes);
         const duplicateCount = pos.form_groups.reduce(
           (count, group) =>
             count +
@@ -2591,6 +2590,9 @@ export function FormsAndPronunciationStep({
         if (duplicateCount > 0) {
           issues.push(`${posLabel}有 ${duplicateCount} 个重复的派生词形类型`);
         }
+        // 只拦目录里根本没有的词形。词形自 2026-09-10 起按词性归属，候选清单
+        // 随之收窄，但存量词条可能用着归属别的词性的词形，后端也不校验归属，
+        // 这里跟着拦会把老草稿卡死在「完成」上。
         const invalidCount =
           configuredAllowedTypes === undefined
             ? 0
@@ -2598,7 +2600,8 @@ export function FormsAndPronunciationStep({
                 (count, group) =>
                   count +
                   group.slots.filter(
-                    (slot) => !allowed.includes(slot.form_type)
+                    (slot) =>
+                      !partOfSpeechLookup.formTypeNames.has(slot.form_type)
                   ).length,
                 0
               );
@@ -2610,8 +2613,9 @@ export function FormsAndPronunciationStep({
             count +
             group.slots.filter(
               (slot) =>
+                // 与上面同口径：目录里有的词形都要填全，不看它归属哪个词性。
                 (configuredAllowedTypes === undefined ||
-                  allowed.includes(slot.form_type)) &&
+                  partOfSpeechLookup.formTypeNames.has(slot.form_type)) &&
                 !formSlotComplete(slot, pos.dialect_rules)
             ).length,
           0

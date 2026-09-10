@@ -42,8 +42,31 @@ const ADMIN_PROFILE = {
   preferences: { dialect: "uk" }
 };
 
+const FORM_TYPE_SEED: readonly (readonly [string, string, string | null])[] = [
+  ["base", "原形", null],
+  ["plural", "复数", "noun"],
+  ["third_person_singular", "第三人称单数", "verb"],
+  ["present_participle", "现在分词", "verb"],
+  ["past_tense", "过去式", "verb"],
+  ["past_participle", "过去分词", "verb"]
+];
+
 const PART_OF_SPEECH_CATALOG = {
   catalog_version: 1,
+  // 词形目录：原形对所有词性通用，其余挂在各自词性下（迁移 20260910120000）。
+  form_types: FORM_TYPE_SEED.map(([code, nameZh, owner], index) => ({
+    id: `form-type-${code}`,
+    ...(owner
+      ? { part_of_speech_id: owner === "noun" ? nodeId(100) : nodeId(102) }
+      : {}),
+    code,
+    name_zh: nameZh,
+    name_en: code,
+    short_name_zh: nameZh,
+    abbreviation: code,
+    full_name_en: code,
+    sort_order: index * 10
+  })),
   items: [
     {
       id: nodeId(100),

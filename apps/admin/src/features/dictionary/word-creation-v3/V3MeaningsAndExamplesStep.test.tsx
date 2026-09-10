@@ -849,7 +849,8 @@ describe("V3MeaningsAndExamplesStep", () => {
       screen.getByLabelText("语义区间 1 英文 播放语音")
     ).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("打开语义区间 1 英文编辑器"));
-    await screen.findByLabelText("标注工具栏");
+    // 编辑器是按需加载的分块，默认 1 秒在负载高的 CI runner 上不够。
+    await screen.findByLabelText("标注工具栏", undefined, { timeout: 10_000 });
     const input = document.querySelector<HTMLTextAreaElement>(
       ".tsz-ve-canvas-input"
     )!;
@@ -876,7 +877,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     mounted.unmount();
     render(<Harness initial={saved} />);
     fireEvent.click(screen.getByLabelText("打开语义区间 1 英文编辑器"));
-    await screen.findByLabelText("标注工具栏");
+    await screen.findByLabelText("标注工具栏", undefined, { timeout: 10_000 });
     expect(
       document.querySelectorAll('.tsz-ve-letter[data-level="core"]')
     ).toHaveLength(4);
@@ -3679,7 +3680,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(editor).not.toHaveTextContent("countable");
   });
 
-  it("非基础词性的释义不再提供子词性选择，历史子词性只读回显", () => {
+  it("目录把词性标记为不可扩展时不提供子词性选择，历史子词性只读回显", () => {
     const forms: DraftFormsStepContentV3 = {
       pos: [
         {
@@ -3727,7 +3728,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     render(<Harness forms={forms} partOfSpeechCatalog={partOfSpeechCatalog} />);
     const editor = screen.getByTestId("meanings-value").previousElementSibling;
 
-    // 后端标记不可扩展：没有子词性下拉，但历史 sub_pos 仍以中文名只读展示，且保留定位锚点。
+    // 后端现在恒为可扩展，这里守的是降级路径：一旦标记为不可扩展，没有子词性下拉，
+    // 但历史 sub_pos 仍以中文名只读展示，且保留定位锚点。
     expect(screen.queryByLabelText("释义 1 子词性")).toBeNull();
     const readonly = editor?.querySelector('[data-v3-field="sub_pos"]');
     expect(readonly).not.toBeNull();
@@ -4099,6 +4101,77 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(senseEditor).toHaveFocus();
     expect(editor).not.toHaveTextContent("sense-group-1");
     expect(editor).not.toHaveTextContent("definition-content-1");
+  });
+
+  it("词性未填计数认 sub_pos_required，而不是能不能挂细分词性", () => {
+    const posCatalogItem = (
+      id: string,
+      code: string,
+      nameZh: string,
+      subPosRequired: boolean
+    ) => ({
+      id,
+      code,
+      name_zh: nameZh,
+      name_en: code,
+      abbreviation: code,
+      short_name_zh: nameZh,
+      full_name_en: code,
+      sort_order: 1,
+      allowed_form_types: [],
+      default_form_types: [],
+      // 扩展权限对所有词性恒真，必填与否只看 sub_pos_required。
+      sub_parts_extensible: true,
+      sub_pos_required: subPosRequired,
+      sub_parts: []
+    });
+    const formsContent: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "particle",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
+          forms: [],
+          form_groups: []
+        }
+      ]
+    };
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.sub_pos = "";
+
+    // 自建词性：释义选填细分词性，空 sub_pos 不算未填。
+    const { unmount } = render(
+      <Harness
+        forms={formsContent}
+        initial={initial}
+        partOfSpeechCatalog={{
+          catalog_version: 1,
+          items: [
+            posCatalogItem("catalog-particle", "particle", "小品词", false)
+          ]
+        }}
+      />
+    );
+    expect(screen.queryByTitle("该词性未填项")).toBeNull();
+    unmount();
+
+    // 同一份内容，换成必填的词性：空 sub_pos 立刻计为未填。
+    render(
+      <Harness
+        forms={formsContent}
+        initial={initial}
+        partOfSpeechCatalog={{
+          catalog_version: 1,
+          items: [
+            posCatalogItem("catalog-particle", "particle", "小品词", true)
+          ]
+        }}
+      />
+    );
+    expect(screen.getByTitle("该词性未填项")).toHaveTextContent("1");
   });
 
   it("#142 derives V2-style POS tabs from forms before meanings content exists", () => {
