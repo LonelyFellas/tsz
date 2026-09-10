@@ -197,7 +197,7 @@ describe("SubPartOfSpeechPanel", () => {
     ).not.toHaveAttribute("data-tooltip");
     visible.unmount();
     renderPanel(null);
-    expect(screen.getByText("暂无可扩展的基本词性")).toBeVisible();
+    expect(screen.getByText("暂无基本词性")).toBeVisible();
   });
 
   it("新增细分词性提交父 id，编码由英文全称派生", async () => {

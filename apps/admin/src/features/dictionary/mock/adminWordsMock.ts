@@ -2445,7 +2445,10 @@ export function createAdminWordsMock({
     return {
       ...clone(item),
       usage_count: partUsageCount(current, item.code),
-      sub_part_count: sortedSubParts(current, item.id).length
+      sub_part_count: sortedSubParts(current, item.id).length,
+      form_type_count: formTypeItems(current).filter(
+        (f) => f.part_of_speech_id === item.id
+      ).length
     };
   }
 
@@ -2869,7 +2872,8 @@ export function createAdminWordsMock({
     // 原形对所有词性通用，其余词形必须挂在已存在的基本词性下。
     let partOfSpeechId: string | undefined;
     if (code !== "base") {
-      partOfSpeechId = raw.part_of_speech_id ?? existing?.part_of_speech_id;
+      partOfSpeechId =
+        raw.part_of_speech_id ?? existing?.part_of_speech_id ?? undefined;
       if (!partOfSpeechId)
         throw formTypeError("invalid_form_type", 400, "part_of_speech_id");
       if (!current.parts_of_speech[partOfSpeechId])
@@ -2948,6 +2952,7 @@ export function createAdminWordsMock({
       form_types: formTypeItems(current).map(
         ({
           id,
+          part_of_speech_id,
           code,
           name_zh,
           name_en,
@@ -2957,6 +2962,8 @@ export function createAdminWordsMock({
           sort_order
         }) => ({
           id,
+          // 原形对所有词性通用，与后端一样省略该键。
+          ...(part_of_speech_id ? { part_of_speech_id } : {}),
           code,
           name_zh,
           name_en,
@@ -2982,6 +2989,7 @@ export function createAdminWordsMock({
           .filter((f) => f.code !== "base" && f.part_of_speech_id === part.id)
           .map((f) => f.code),
         sub_parts_extensible: part.sub_parts_extensible,
+        sub_pos_required: part.sub_pos_required,
         sub_parts: sortedSubParts(current, part.id).map((subPart) => ({
           id: subPart.id,
           code: subPart.code,
@@ -3042,6 +3050,7 @@ export function createAdminWordsMock({
       sub_part_count: 0,
       sub_parts_extensible: true,
       sub_pos_required: isSubPosRequiredCode(input.code),
+      form_type_count: 0,
       revision: 1,
       created_by: { id: profile.id, display_name: profile.display_name },
       created_at: timestamp,
@@ -3144,6 +3153,16 @@ export function createAdminWordsMock({
         "part of speech still has sub parts",
         [],
         "part_of_speech_has_sub_parts",
+        [],
+        { part_of_speech_id: id, code: existing.code }
+      );
+    // 词形变化同理：外键是 RESTRICT，先清空才能删父词性。
+    if (formTypeItems(current).some((f) => f.part_of_speech_id === id))
+      throw new HttpError(
+        409,
+        "part of speech still has form types",
+        [],
+        "part_of_speech_has_form_types",
         [],
         { part_of_speech_id: id, code: existing.code }
       );

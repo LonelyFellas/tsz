@@ -39,11 +39,11 @@ export interface SubPartOfSpeechPanelHandle {
 type PanelParent = Pick<PartOfSpeechConfig, "id" | "name_zh" | "code">;
 
 interface Props {
-  /** 要展示的父级（调用方只传可扩展的基础词性）：选中具体词性时一个；「全部」时传全部。 */
+  /** 要展示的父级：选中具体词性时一个；「全部」时传全部基本词性。 */
   parents: PanelParent[];
   /** 新建细分词性时固定的父级；「全部」视图下为空，由弹窗内下拉选择。 */
   createParent?: PanelParent;
-  /** 父级目录仍在加载：表格显示加载态，而不是把空列表当成"暂无可扩展的基本词性"。 */
+  /** 父级目录仍在加载：表格显示加载态，而不是把空列表当成"暂无基本词性"。 */
   loading?: boolean;
   onSaved: (message: string) => void;
   onError: (error: unknown) => void;
@@ -352,7 +352,7 @@ export function SubPartOfSpeechPanel({
     <>
       <Card size="small">
         {!loading && parents.length === 0 ? (
-          <Empty description="暂无可扩展的基本词性" />
+          <Empty description="暂无基本词性" />
         ) : list.error ? (
           <Alert
             type="error"

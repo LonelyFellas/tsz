@@ -28,6 +28,8 @@ export interface PartOfSpeechConfig {
   sort_order: number;
   usage_count: number;
   sub_part_count: number;
+  /** 名下的词形变化数量：删除前据此给出预判。 */
+  form_type_count?: number;
   /** 任意基本词性都可以扩展细分词性，恒为 true。 */
   sub_parts_extensible: boolean;
   /** 后端按固定编码集合（名词/动词/代词/形容词/副词）派生：该词性下的释义是否必须选中细分词性。 */
@@ -157,8 +159,8 @@ export interface SubPartOfSpeechListResponse {
 
 export interface FormTypeCatalogItem {
   id: string;
-  /** 所属基本词性；原形对所有词性通用，缺省表示通用。 */
-  part_of_speech_id?: string;
+  /** 所属基本词性；原形对所有词性通用，catalog 侧省略该键，管理侧为 null。 */
+  part_of_speech_id?: string | null;
   code: string;
   name_zh: string;
   name_en: string;

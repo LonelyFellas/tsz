@@ -4102,6 +4102,77 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(editor).not.toHaveTextContent("definition-content-1");
   });
 
+  it("词性未填计数认 sub_pos_required，而不是能不能挂细分词性", () => {
+    const posCatalogItem = (
+      id: string,
+      code: string,
+      nameZh: string,
+      subPosRequired: boolean
+    ) => ({
+      id,
+      code,
+      name_zh: nameZh,
+      name_en: code,
+      abbreviation: code,
+      short_name_zh: nameZh,
+      full_name_en: code,
+      sort_order: 1,
+      allowed_form_types: [],
+      default_form_types: [],
+      // 扩展权限对所有词性恒真，必填与否只看 sub_pos_required。
+      sub_parts_extensible: true,
+      sub_pos_required: subPosRequired,
+      sub_parts: []
+    });
+    const formsContent: DraftFormsStepContentV3 = {
+      pos: [
+        {
+          pos_id: "pos-1",
+          pos: "particle",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "unified"
+          },
+          forms: [],
+          form_groups: []
+        }
+      ]
+    };
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.sub_pos = "";
+
+    // 自建词性：释义选填细分词性，空 sub_pos 不算未填。
+    const { unmount } = render(
+      <Harness
+        forms={formsContent}
+        initial={initial}
+        partOfSpeechCatalog={{
+          catalog_version: 1,
+          items: [
+            posCatalogItem("catalog-particle", "particle", "小品词", false)
+          ]
+        }}
+      />
+    );
+    expect(screen.queryByTitle("该词性未填项")).toBeNull();
+    unmount();
+
+    // 同一份内容，换成必填的词性：空 sub_pos 立刻计为未填。
+    render(
+      <Harness
+        forms={formsContent}
+        initial={initial}
+        partOfSpeechCatalog={{
+          catalog_version: 1,
+          items: [
+            posCatalogItem("catalog-particle", "particle", "小品词", true)
+          ]
+        }}
+      />
+    );
+    expect(screen.getByTitle("该词性未填项")).toHaveTextContent("1");
+  });
+
   it("#142 derives V2-style POS tabs from forms before meanings content exists", () => {
     const forms = structuredClone(meaningsFixture);
     const formsContent: DraftFormsStepContentV3 = {

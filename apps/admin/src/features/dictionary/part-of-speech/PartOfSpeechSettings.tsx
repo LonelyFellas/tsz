@@ -70,6 +70,8 @@ export function errorMessage(error: unknown): string {
       return conflictMessage("细分词性", error.problem?.field);
     if (error.code === "part_of_speech_in_use")
       return "该基本词性已被单词或短语引用，只能修改";
+    if (error.code === "part_of_speech_has_form_types")
+      return "该基本词性下还有词形变化，请先删除词形变化";
     if (error.code === "part_of_speech_has_sub_parts")
       return "该基本词性下还有细分词性，请先删除细分词性";
     if (error.code === "sub_part_of_speech_in_use")
@@ -201,13 +203,19 @@ export function PartOfSpeechSettings() {
                 ? `已有 ${item.usage_count} 个单词或短语引用，只能修改`
                 : item.sub_part_count > 0
                   ? `还有 ${item.sub_part_count} 项细分词性，请先删除细分词性`
-                  : undefined
+                  : (item.form_type_count ?? 0) > 0
+                    ? `还有 ${item.form_type_count} 项词形变化，请先删除词形变化`
+                    : undefined
             }
           >
             <Button
               size="small"
               danger
-              disabled={item.usage_count > 0 || item.sub_part_count > 0}
+              disabled={
+                item.usage_count > 0 ||
+                item.sub_part_count > 0 ||
+                (item.form_type_count ?? 0) > 0
+              }
               onClick={() => removeItem(item)}
             >
               删 除

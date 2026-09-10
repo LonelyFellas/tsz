@@ -27,7 +27,8 @@ import { useDerivedNameDefaults } from "./useDerivedNameDefaults";
 import { errorMessage } from "./PartOfSpeechSettings";
 
 type Values = Omit<CreatePartOfSpeechInput, "code" | "sort_order"> & {
-  part_of_speech_id?: string;
+  /** 原形没有归属，wire 上是 null；表单里按未选处理。 */
+  part_of_speech_id?: string | null;
 };
 
 /**
@@ -71,7 +72,9 @@ export function FormTypeSettings() {
         return partOfSpeechDataSource.updateFormType(editing.id, {
           ...values,
           // 原形对所有词性通用，后端不接受归属字段。
-          ...(editing.code === "base" ? {} : { part_of_speech_id: partId }),
+          ...(editing.code === "base"
+            ? {}
+            : { part_of_speech_id: partId ?? undefined }),
           sort_order: editing.sort_order,
           base_revision: editing.revision
         });
@@ -79,13 +82,11 @@ export function FormTypeSettings() {
       const parent = parts.find((item) => item.id === partId);
       return partOfSpeechDataSource.createFormType({
         ...values,
-        part_of_speech_id: partId!,
+        part_of_speech_id: partId as string,
         code: deriveFormTypeCode(parent?.code ?? "", values.full_name_en),
-        sort_order: nextSortOrder(
-          (catalog.data?.form_types ?? []).filter(
-            (item) => item.part_of_speech_id === partId
-          )
-        )
+        // 后端列表按 sort_order 全局排序，这里也取全局最大值 + 10，
+        // 否则新词形会插到别的词性中间。
+        sort_order: nextSortOrder(catalog.data?.form_types ?? [])
       });
     },
     onSuccess: async () => {

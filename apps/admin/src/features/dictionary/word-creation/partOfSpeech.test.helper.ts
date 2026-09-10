@@ -1,5 +1,8 @@
 import type { PartOfSpeechCatalogResponse } from "@tsz/types";
-import { createPartOfSpeechSeed } from "../mock/partOfSpeechFixtures";
+import {
+  createPartOfSpeechSeed,
+  isSubPosRequiredCode
+} from "../mock/partOfSpeechFixtures";
 
 const seed = createPartOfSpeechSeed("2026-08-08T00:00:00.000Z");
 
@@ -11,6 +14,8 @@ const formCapabilities = {
     "past_tense",
     "past_participle"
   ],
+  // 默认种子把比较级与最高级分给形容词；这里副词也配了一份，模拟管理员按需
+  // 在副词下补建或改挂之后的状态（归属是数据，不是代码常量）。
   adjective: ["comparative", "superlative"],
   adverb: ["comparative", "superlative"]
 } as const;
@@ -33,6 +38,7 @@ export const partOfSpeechCatalogFixture: PartOfSpeechCatalogResponse = {
       ...(formCapabilities[part.code as keyof typeof formCapabilities] ?? [])
     ],
     sub_parts_extensible: part.sub_parts_extensible,
+    sub_pos_required: isSubPosRequiredCode(part.code),
     sub_parts: seed.subParts
       .filter((subPart) => subPart.part_of_speech_id === part.id)
       .map((subPart) => ({
