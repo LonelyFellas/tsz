@@ -750,12 +750,8 @@ describe("SmartDictionary", () => {
       "操作"
     ]);
     expect(screen.getByText("继续创建").closest("button")).toBeEnabled();
-    expect(
-      screen
-        .getAllByText("移入垃圾桶", { exact: true })
-        .map((item) => item.closest("button"))
-        .find((item) => item?.classList.contains("ant-btn-link"))
-    ).toBeEnabled();
+    // 行内归档只剩图标，按可及名定位。
+    expect(screen.getAllByLabelText(/^移入垃圾桶「/)[0]).toBeEnabled();
   });
 
   it("创建人长名称单行省略并可通过键盘触发 Tooltip，空值显示占位", () => {
@@ -1012,10 +1008,7 @@ describe("SmartDictionary", () => {
       </MemoryRouter>
     );
 
-    const rowArchive = screen
-      .getAllByText("移入垃圾桶", { exact: true })
-      .map((item) => item.closest("button"))
-      .find((item) => item?.classList.contains("ant-btn-link"))!;
+    const rowArchive = screen.getByLabelText("移入垃圾桶「first」");
     fireEvent.click(rowArchive);
     await screen.findAllByText("移入垃圾桶「first」？");
     const confirm = screen

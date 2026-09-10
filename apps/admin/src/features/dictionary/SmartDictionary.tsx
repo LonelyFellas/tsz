@@ -684,19 +684,12 @@ export function SmartDictionary({
                   style={{
                     display: "inline-block",
                     position: "relative",
-                    top: "-0.5em",
-                    marginInlineStart: 4,
-                    minWidth: 16,
-                    height: 16,
-                    paddingInline: 4,
-                    boxSizing: "border-box",
-                    borderRadius: 999,
-                    backgroundColor: "#000",
-                    color: "#fff",
-                    fontSize: 10,
+                    top: "-0.4em",
+                    marginInlineStart: 2,
+                    color: "rgba(0, 0, 0, 0.65)",
+                    fontSize: 11,
                     fontWeight: 600,
-                    lineHeight: "16px",
-                    textAlign: "center",
+                    lineHeight: 1,
                     verticalAlign: "baseline"
                   }}
                 >
@@ -866,112 +859,126 @@ export function SmartDictionary({
     {
       title: "操作",
       key: "action",
-      width: 160,
+      // 归档视图的右组是「恢 复 + 永久删除」两个文字按钮，实测比常规页宽一倍多；
+      // 两种视图各给够用的宽度，常规页就不必为归档动作长期留白。
+      width: effectiveFilters.status === "archived" ? 280 : 180,
       fixed: "right",
       render: (_: unknown, record: AdminWordListItemAny) => {
         const rowName = `「${wordListLabel(record)}」`;
         const rowWritable = canWriteEntry(writeActor, record);
         return (
-          <Space size={0}>
-            <Button
-              type="link"
-              size="small"
-              aria-label={`${getWordRowActionLabel(record, rowWritable)}${rowName}`}
-              onClick={() => navigate(getWordRowRoute(record))}
-            >
-              {getWordRowActionLabel(record, rowWritable)}
-            </Button>
-            {/* 重复原型按归属提供入口，尚未填写标注也能补充。 */}
-            {canEditRowAnnotation(annotationActor, record) ? (
+          // 左组是进入词条的入口、右组是生命周期动作，各自贴住一边：
+          // 「标注」按行有无都不会让删除入口跟着左右跳。
+          <Flex align="center" justify="space-between" gap={8}>
+            <Space size={4}>
               <Button
                 type="link"
                 size="small"
-                aria-label={`编辑标注${rowName}`}
-                onClick={() => setAnnotationEntry(record)}
+                aria-label={`${getWordRowActionLabel(record, rowWritable)}${rowName}`}
+                onClick={() => navigate(getWordRowRoute(record))}
               >
-                标注
+                {getWordRowActionLabel(record, rowWritable)}
               </Button>
-            ) : null}
-            {adminWordsDataSourceCapabilities.archive &&
-              (() => {
-                const button = (
-                  <Button
-                    type="link"
-                    size="small"
-                    danger={record.status !== "archived"}
-                    aria-label={`${record.status === "archived" ? "恢复" : "移入垃圾桶"}${rowName}`}
-                    icon={
-                      record.status === "archived" ? (
-                        <RollbackOutlined />
-                      ) : (
-                        <DeleteOutlined />
-                      )
-                    }
-                    disabled={
-                      !rowWritable || lifecycleInput(record) === undefined
-                    }
-                    loading={
-                      lifecyclePending &&
-                      (archiveWord.variables?.wordId === record.id ||
-                        restoreWord.variables?.wordId === record.id)
-                    }
-                    onClick={() =>
-                      transitionOne(
-                        record,
-                        record.status === "archived" ? "restore" : "archive"
-                      )
-                    }
-                  >
-                    {record.status === "archived" ? "恢 复" : "移入垃圾桶"}
-                  </Button>
-                );
-                // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
-                // 缺 lifecycle 字段那种置灰不给 Tooltip：那是数据问题，刷新即可，
-                // 与「这条不归你管」不是一回事。
-                return rowWritable ? (
-                  button
-                ) : (
-                  <Tooltip title={ENTRY_WRITE_BLOCKED_HINT}>
-                    <span>{button}</span>
-                  </Tooltip>
-                );
-              })()}
-            {adminWordsDataSourceCapabilities.permanentDelete &&
-              record.status === "archived" &&
-              (() => {
-                const eligibility = evaluateDeleteEligibility(
-                  deleteActor,
-                  record
-                );
-                const button = (
-                  <Button
-                    type="link"
-                    size="small"
-                    danger
-                    aria-label={`永久删除${rowName}`}
-                    icon={<DeleteOutlined />}
-                    disabled={!eligibility.deletable}
-                    loading={
-                      deleteWord.isPending &&
-                      deleteWord.variables?.wordId === record.id
-                    }
-                    onClick={() => deleteOne(record)}
-                  >
-                    永久删除
-                  </Button>
-                );
-                // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
-                return eligibility.deletable ? (
-                  button
-                ) : (
-                  <Tooltip
-                    title={DELETE_BLOCK_REASON_TEXT[eligibility.reason!]}
-                  >
-                    <span>{button}</span>
-                  </Tooltip>
-                );
-              })()}
-          </Space>
+              {/* 重复原型按归属提供入口，尚未填写标注也能补充。 */}
+              {canEditRowAnnotation(annotationActor, record) ? (
+                <Button
+                  type="link"
+                  size="small"
+                  aria-label={`编辑标注${rowName}`}
+                  onClick={() => setAnnotationEntry(record)}
+                >
+                  标注
+                </Button>
+              ) : null}
+            </Space>
+            <Space size={4}>
+              {adminWordsDataSourceCapabilities.archive &&
+                (() => {
+                  const button = (
+                    <Button
+                      type="link"
+                      size="small"
+                      danger={record.status !== "archived"}
+                      aria-label={`${record.status === "archived" ? "恢复" : "移入垃圾桶"}${rowName}`}
+                      icon={
+                        record.status === "archived" ? (
+                          <RollbackOutlined />
+                        ) : (
+                          <DeleteOutlined />
+                        )
+                      }
+                      disabled={
+                        !rowWritable || lifecycleInput(record) === undefined
+                      }
+                      loading={
+                        lifecyclePending &&
+                        (archiveWord.variables?.wordId === record.id ||
+                          restoreWord.variables?.wordId === record.id)
+                      }
+                      onClick={() =>
+                        transitionOne(
+                          record,
+                          record.status === "archived" ? "restore" : "archive"
+                        )
+                      }
+                    >
+                      {record.status === "archived" ? "恢 复" : null}
+                    </Button>
+                  );
+                  // 移入垃圾桶只留图标：列表里它最不该抢眼，文案落到 Tooltip。
+                  // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
+                  // 缺 lifecycle 字段那种置灰不给 Tooltip：那是数据问题，刷新即可，
+                  // 与「这条不归你管」不是一回事。
+                  const hint = !rowWritable
+                    ? ENTRY_WRITE_BLOCKED_HINT
+                    : record.status === "archived"
+                      ? ""
+                      : "移入垃圾桶";
+                  return hint ? (
+                    <Tooltip title={hint}>
+                      <span>{button}</span>
+                    </Tooltip>
+                  ) : (
+                    button
+                  );
+                })()}
+              {adminWordsDataSourceCapabilities.permanentDelete &&
+                record.status === "archived" &&
+                (() => {
+                  const eligibility = evaluateDeleteEligibility(
+                    deleteActor,
+                    record
+                  );
+                  const button = (
+                    <Button
+                      type="link"
+                      size="small"
+                      danger
+                      aria-label={`永久删除${rowName}`}
+                      icon={<DeleteOutlined />}
+                      disabled={!eligibility.deletable}
+                      loading={
+                        deleteWord.isPending &&
+                        deleteWord.variables?.wordId === record.id
+                      }
+                      onClick={() => deleteOne(record)}
+                    >
+                      永久删除
+                    </Button>
+                  );
+                  // 置灰时把原因摆出来，否则管理员只看到一个不能点的按钮。
+                  return eligibility.deletable ? (
+                    button
+                  ) : (
+                    <Tooltip
+                      title={DELETE_BLOCK_REASON_TEXT[eligibility.reason!]}
+                    >
+                      <span>{button}</span>
+                    </Tooltip>
+                  );
+                })()}
+            </Space>
+          </Flex>
         );
       }
     }
