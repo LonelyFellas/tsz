@@ -360,6 +360,8 @@ function impactSurfacePage(nextCursor: string | null): SurfaceMatchPageV3 {
 }
 
 describe("V3WordCreationWizard", () => {
+  // 这条渲染整个真实向导。实际发音改成编辑器字段后每条发音多一个组件，
+  // CI 机器上会压着 5s 默认上限跑，给个明确上限而不是靠运气。
   it("短语拼写开关在真实向导中可以往返并保留成分配置", async () => {
     const initialWord = word(1, "hit the sack");
     initialWord.kind = "phrase";
@@ -412,7 +414,7 @@ describe("V3WordCreationWizard", () => {
         field("英美拼写无区别")!.closest(".ant-radio-wrapper")
       ).toHaveClass("ant-radio-wrapper-checked");
     }
-  });
+  }, 15_000);
 
   it("only replaces publication issues after check and keeps them through ordinary saves", async () => {
     const checkedIssue = validationIssue();
