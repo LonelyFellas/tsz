@@ -849,7 +849,8 @@ describe("V3MeaningsAndExamplesStep", () => {
       screen.getByLabelText("语义区间 1 英文 播放语音")
     ).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("打开语义区间 1 英文编辑器"));
-    await screen.findByLabelText("标注工具栏");
+    // 编辑器是按需加载的分块，默认 1 秒在负载高的 CI runner 上不够。
+    await screen.findByLabelText("标注工具栏", undefined, { timeout: 10_000 });
     const input = document.querySelector<HTMLTextAreaElement>(
       ".tsz-ve-canvas-input"
     )!;
@@ -876,7 +877,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     mounted.unmount();
     render(<Harness initial={saved} />);
     fireEvent.click(screen.getByLabelText("打开语义区间 1 英文编辑器"));
-    await screen.findByLabelText("标注工具栏");
+    await screen.findByLabelText("标注工具栏", undefined, { timeout: 10_000 });
     expect(
       document.querySelectorAll('.tsz-ve-letter[data-level="core"]')
     ).toHaveLength(4);
