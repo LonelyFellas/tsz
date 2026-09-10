@@ -15,7 +15,21 @@ vi.mock("../dataSource", () => ({
   partOfSpeechDataSource: {
     catalog: async () => ({
       catalog_version: 1,
-      items: [],
+      items: [
+        {
+          id: "pos-verb",
+          code: "verb",
+          name_zh: "动词",
+          name_en: "VERB",
+          abbreviation: "v.",
+          short_name_zh: "动词",
+          full_name_en: "verb",
+          sort_order: 10,
+          sub_parts_extensible: true,
+          sub_pos_required: true,
+          sub_parts: []
+        }
+      ],
       form_types: mock.items
     }),
     listFormTypes: async () => ({
@@ -76,6 +90,10 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
     ).not.toBeDisabled()
   );
   fireEvent.click(screen.getByText("新增词形变化"));
+  fireEvent.mouseDown(
+    screen.getAllByLabelText("所属基本词性").at(-1) as HTMLElement
+  );
+  fireEvent.click(await screen.findByText("动词", { exact: true }));
   fireEvent.change(screen.getByLabelText("正式中文"), {
     target: { value: "自定义词形" }
   });
@@ -91,7 +109,9 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
   fireEvent.click(screen.getByText(/^新\s*建$/));
   await waitFor(() =>
     expect(mock.create).toHaveBeenCalledWith({
-      code: "custom_variant",
+      part_of_speech_id: "pos-verb",
+      // 编码带父词性前缀：不同词性下允许重名，编码仍要全局唯一。
+      code: "verb_custom_variant",
       name_zh: "自定义词形",
       name_en: "Custom variant",
       short_name_zh: "自定义词形",
@@ -109,6 +129,7 @@ it("原形及已引用类型禁止删除，修改使用当前revision", async ()
   mock.items.push({
     ...base,
     id: "used-id",
+    part_of_speech_id: "pos-verb",
     code: "custom_variant",
     name_zh: "已引用词形",
     short_name_zh: "已引用",
@@ -137,7 +158,11 @@ it("原形及已引用类型禁止删除，修改使用当前revision", async ()
   await waitFor(() =>
     expect(mock.update).toHaveBeenCalledWith(
       "used-id",
-      expect.objectContaining({ base_revision: 4, name_zh: "修改后的词形" })
+      expect.objectContaining({
+        base_revision: 4,
+        part_of_speech_id: "pos-verb",
+        name_zh: "修改后的词形"
+      })
     )
   );
   expect(mock.remove).not.toHaveBeenCalled();

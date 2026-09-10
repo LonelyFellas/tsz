@@ -54,7 +54,10 @@ import type {
   PartOfSpeechCatalogResponse,
   PartOfSpeechConfig,
   FormTypeConfig,
+  CreateFormTypeInput,
+  FormTypeConfigListQuery,
   FormTypeConfigListResponse,
+  UpdateFormTypeInput,
   PartOfSpeechConfigListQuery,
   PartOfSpeechConfigListResponse,
   RelatedSearchResponse,
@@ -731,13 +734,13 @@ export function createAdminEndpoints(http: HttpClient) {
      * super_admin 专属。契约已在 tsz-rust 落地。
      */
     partOfSpeechSettings: {
-      listFormTypes: (query: PartOfSpeechConfigListQuery = {}) =>
+      listFormTypes: (query: FormTypeConfigListQuery = {}) =>
         http.get<FormTypeConfigListResponse>(
           `/settings/form-types${qs({ ...query })}`
         ),
-      createFormType: (input: CreatePartOfSpeechInput) =>
+      createFormType: (input: CreateFormTypeInput) =>
         http.post<FormTypeConfig>("/settings/form-types", input),
-      updateFormType: (id: string, input: UpdatePartOfSpeechInput) =>
+      updateFormType: (id: string, input: UpdateFormTypeInput) =>
         http.patch<FormTypeConfig>(`/settings/form-types/${id}`, input),
       removeFormType: (id: string, query: DeletePartOfSpeechQuery) =>
         http.del<void>(

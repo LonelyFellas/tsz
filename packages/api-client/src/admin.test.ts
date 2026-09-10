@@ -1466,6 +1466,7 @@ describe("createAdminEndpoints — 角色治理 roles", () => {
 it("词形配置CRUD发送稳定路径及版本，不转换wire字段", () => {
   const api = createAdminEndpoints(http).partOfSpeechSettings;
   const input = {
+    part_of_speech_id: "pos-verb",
     code: "custom_variant",
     name_zh: "自定义",
     name_en: "Custom",
@@ -1474,13 +1475,18 @@ it("词形配置CRUD发送稳定路径及版本，不转换wire字段", () => {
     full_name_en: "custom variant",
     sort_order: 100
   };
-  api.listFormTypes({ q: "custom", page: 2, page_size: 10 });
+  api.listFormTypes({
+    q: "custom",
+    part_of_speech_id: "pos-verb",
+    page: 2,
+    page_size: 10
+  });
   api.createFormType(input);
   const { code: _code, ...fields } = input;
   api.updateFormType("form-1", { ...fields, base_revision: 3 });
   api.removeFormType("form-1", { base_revision: 4 });
   expect(http.get).toHaveBeenCalledWith(
-    "/settings/form-types?q=custom&page=2&page_size=10"
+    "/settings/form-types?q=custom&part_of_speech_id=pos-verb&page=2&page_size=10"
   );
   expect(http.post).toHaveBeenCalledWith("/settings/form-types", input);
   expect(http.patch).toHaveBeenCalledWith("/settings/form-types/form-1", {

@@ -3558,7 +3558,7 @@ describe("part-of-speech settings mock", () => {
     ).resolves.toMatchObject({ items: expect.any(Array) });
   });
 
-  it("基本词性支持新增、修改、唯一性、revision，非基础词性禁止细分且未引用可删除", async () => {
+  it("基本词性支持新增、修改、唯一性、revision，自建词性可挂细分词性且清空后可删除", async () => {
     const settingsMock = mockFor(superAdmin);
     const created = await settingsMock.partOfSpeechSettings.create({
       code: " particle ",
@@ -3576,7 +3576,8 @@ describe("part-of-speech settings mock", () => {
       abbreviation: "part.",
       short_name_zh: "语气",
       full_name_en: "particle",
-      sub_parts_extensible: false,
+      sub_parts_extensible: true,
+      sub_pos_required: false,
       revision: 1
     });
 
@@ -3632,8 +3633,10 @@ describe("part-of-speech settings mock", () => {
       })
     ).rejects.toMatchObject({ status: 409, code: "revision_conflict" });
 
-    await expect(
-      settingsMock.partOfSpeechSettings.createSubPart(created.id, {
+    // 自建词性同样能挂细分词性；挂上之后父词性要先清空才能删。
+    const ownSub = await settingsMock.partOfSpeechSettings.createSubPart(
+      created.id,
+      {
         code: "PARTICLE-GENERAL",
         name_zh: "一般语气词",
         name_en: "General particle",
@@ -3641,12 +3644,22 @@ describe("part-of-speech settings mock", () => {
         abbreviation: "n.",
         full_name_en: "general particle",
         sort_order: 10
+      }
+    );
+    expect(ownSub.part_of_speech_id).toBe(created.id);
+    await expect(
+      settingsMock.partOfSpeechSettings.remove(created.id, {
+        base_revision: updated.revision
       })
     ).rejects.toMatchObject({
       status: 409,
-      code: "sub_part_of_speech_not_allowed",
-      meta: { part_of_speech_id: created.id, code: "particle" }
+      code: "part_of_speech_has_sub_parts"
     });
+    await settingsMock.partOfSpeechSettings.removeSubPart(
+      created.id,
+      ownSub.id,
+      { base_revision: ownSub.revision }
+    );
     await settingsMock.partOfSpeechSettings.remove(created.id, {
       base_revision: updated.revision
     });

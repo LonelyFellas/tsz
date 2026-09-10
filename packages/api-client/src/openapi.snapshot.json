@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-09T14:10:11.762Z",
+  "_generatedAt": "2026-09-10T03:36:13.162Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -239,6 +239,12 @@
           "maximum": 100,
           "minimum": 1
         }
+      },
+      {
+        "name": "part_of_speech_id",
+        "in": "query",
+        "required": false,
+        "schema": { "type": "string", "format": "uuid" }
       },
       {
         "name": "q",
@@ -665,11 +671,12 @@
       }
     },
     "post /admin/settings/form-types": {
-      "request": { "$ref": "#/components/schemas/CreatePartRequest" },
+      "request": { "$ref": "#/components/schemas/CreateFormTypeRequest" },
       "responses": {
         "201": { "$ref": "#/components/schemas/FormTypeConfig" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
         "409": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
@@ -684,7 +691,7 @@
       }
     },
     "patch /admin/settings/form-types/{id}": {
-      "request": { "$ref": "#/components/schemas/UpdatePartRequest" },
+      "request": { "$ref": "#/components/schemas/UpdateFormTypeRequest" },
       "responses": {
         "200": { "$ref": "#/components/schemas/FormTypeConfig" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -762,6 +769,11 @@
         "id": { "type": "string", "format": "uuid" },
         "name_en": { "type": "string" },
         "name_zh": { "type": "string" },
+        "part_of_speech_id": {
+          "type": ["string", "null"],
+          "format": "uuid",
+          "description": "所属基本词性；原形对所有词性通用，此处为 null。"
+        },
         "revision": { "type": "integer", "format": "int64" },
         "short_name_zh": { "type": "string" },
         "sort_order": { "type": "integer", "format": "int32" },
@@ -794,6 +806,11 @@
         "id": { "type": "string", "format": "uuid" },
         "name_en": { "type": "string" },
         "name_zh": { "type": "string" },
+        "part_of_speech_id": {
+          "type": ["string", "null"],
+          "format": "uuid",
+          "description": "所属基本词性；原形对所有词性通用，此处为 null。"
+        },
         "short_name_zh": { "type": "string" },
         "sort_order": { "type": "integer", "format": "int32" }
       }
@@ -903,6 +920,7 @@
         "sub_part_of_speech_in_use",
         "sub_part_of_speech_not_allowed",
         "part_of_speech_has_sub_parts",
+        "part_of_speech_has_form_types",
         "invalid_speech_preview",
         "speech_voice_not_found",
         "speech_preview_in_progress",
@@ -3374,9 +3392,10 @@
       },
       "additionalProperties": false
     },
-    "CreatePartRequest": {
+    "CreateFormTypeRequest": {
       "type": "object",
       "required": [
+        "part_of_speech_id",
         "code",
         "name_zh",
         "name_en",
@@ -3393,23 +3412,17 @@
           "minLength": 1,
           "pattern": "^[a-z][a-z0-9_]{0,31}$"
         },
-        "full_name_en": {
-          "type": "string",
-          "description": "英文全称，去空白后 1–64 字，忽略大小写唯一。",
-          "maxLength": 64,
-          "minLength": 1
-        },
+        "full_name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
         "name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
         "name_zh": { "type": "string", "maxLength": 64, "minLength": 1 },
-        "short_name_zh": {
+        "part_of_speech_id": {
           "type": "string",
-          "description": "简洁显示：业务页面用的短中文名，去空白后 1–16 字，全局唯一。",
-          "maxLength": 16,
-          "minLength": 1
+          "format": "uuid",
+          "description": "所属基本词性，必填：词形变化都挂在某个基本词性下。"
         },
+        "short_name_zh": { "type": "string", "maxLength": 16, "minLength": 1 },
         "sort_order": { "type": "integer", "format": "int32" }
-      },
-      "additionalProperties": false
+      }
     },
     "DetectLexiconInputAny": {
       "oneOf": [
@@ -4272,7 +4285,7 @@
       },
       "additionalProperties": false
     },
-    "UpdatePartRequest": {
+    "UpdateFormTypeRequest": {
       "type": "object",
       "required": [
         "base_revision",
@@ -4285,14 +4298,18 @@
       ],
       "properties": {
         "abbreviation": { "type": "string", "maxLength": 16, "minLength": 1 },
-        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "base_revision": { "type": "integer", "format": "int64" },
         "full_name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
         "name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
         "name_zh": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "part_of_speech_id": {
+          "type": ["string", "null"],
+          "format": "uuid",
+          "description": "改挂到另一个基本词性；原形不接受该字段。"
+        },
         "short_name_zh": { "type": "string", "maxLength": 16, "minLength": 1 },
         "sort_order": { "type": "integer", "format": "int32" }
-      },
-      "additionalProperties": false
+      }
     },
     "UsDialectV3": { "type": "string", "enum": ["us"] },
     "ValidateAdminWordAnyInput": {

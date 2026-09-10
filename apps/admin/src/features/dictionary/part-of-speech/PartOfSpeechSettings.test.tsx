@@ -125,7 +125,7 @@ vi.mock("./PartOfSpeechFormModal", () => ({
           模拟保存基本词性
         </button>
         <button onClick={() => onSaved(createdParticle)}>
-          模拟保存非基础词性
+          模拟保存选填细分的词性
         </button>
         <button onClick={onClose}>关闭基本词性表单</button>
         <button
@@ -203,7 +203,8 @@ const items: PartOfSpeechConfig[] = [
     sort_order: 20,
     usage_count: 0,
     sub_part_count: 0,
-    sub_parts_extensible: false,
+    sub_parts_extensible: true,
+    sub_pos_required: false,
     revision: 1,
     created_by: actor,
     created_at: "2026-08-08T00:01:00.000Z",
@@ -228,7 +229,7 @@ const items: PartOfSpeechConfig[] = [
   }
 ];
 
-// 模拟新建返回：动词是基础词性（可扩展细分），小品词不是。
+// 模拟新建返回：两者都能挂细分词性，区别只在释义是否必填细分词性。
 const createdVerb: PartOfSpeechConfig = {
   id: "pos-created",
   code: "verb_custom",
@@ -255,7 +256,7 @@ const createdParticle: PartOfSpeechConfig = {
   abbreviation: "np.",
   short_name_zh: "新小品",
   full_name_en: "new particle",
-  sub_parts_extensible: false
+  sub_pos_required: false
 };
 
 function renderSettings() {
@@ -289,6 +290,7 @@ beforeEach(() => {
       full_name_en: item.full_name_en,
       sort_order: item.sort_order,
       sub_parts_extensible: item.sub_parts_extensible,
+      sub_pos_required: item.sub_pos_required,
       sub_parts: []
     }))
   };
@@ -323,7 +325,7 @@ describe("PartOfSpeechSettings", () => {
     );
 
     const particleRow = screen.getByText("小品词").closest("tr")!;
-    expect(within(particleRow).getByText("不可扩展")).toBeVisible();
+    expect(within(particleRow).getByText("0 项")).toBeVisible();
     // 动词没有词条引用但还挂着 5 项细分词性：同样禁删并说明先删细分词性。
     const verbRow = screen.getByText("动词").closest("tr")!;
     const verbDelete = within(verbRow).getByText("删 除").closest("button")!;
@@ -346,13 +348,13 @@ describe("PartOfSpeechSettings", () => {
     expect(screen.getByText("修改-particle")).toBeVisible();
   });
 
-  it("细分词性 Tab 默认「全部」展示所有可扩展词性，并支持切换所属基本词性", async () => {
+  it("细分词性 Tab 默认「全部」展示所有基本词性，并支持切换所属基本词性", async () => {
     renderSettings();
 
     fireEvent.click(screen.getByRole("tab", { name: "细分词性" }));
     expect(screen.getByText("全部", { exact: true })).toBeVisible();
     expect(screen.getByTestId("sub-panel")).toHaveTextContent(
-      "细分-pos-noun,pos-verb/新建父级-无"
+      "细分-pos-noun,pos-particle,pos-verb/新建父级-无"
     );
     fireEvent.mouseDown(screen.getByLabelText("所属基本词性"));
     fireEvent.click(await screen.findByText("动词", { exact: true }));
@@ -393,18 +395,19 @@ describe("PartOfSpeechSettings", () => {
     );
   });
 
-  it("新增非基础词性后留在基本词性 Tab，不跳转细分词性", async () => {
+  it("新增释义选填细分词性的词性后同样跳到细分词性 Tab", async () => {
     renderSettings();
 
     fireEvent.click(screen.getByText("新增基本词性"));
-    fireEvent.click(screen.getByText("模拟保存非基础词性"));
+    fireEvent.click(screen.getByText("模拟保存选填细分的词性"));
 
     expect(await screen.findByText("基本词性已新增")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "基本词性" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "细分词性" })).toHaveAttribute(
       "aria-selected",
       "true"
     );
-    expect(screen.queryByTestId("sub-panel")).toBeNull();
+    // 新建的词性还没进目录快照，这里只看跳转本身：面板已经在细分词性 Tab 上。
+    expect(screen.getByTestId("sub-panel")).toBeInTheDocument();
   });
 
   it("处理基本词性与细分词性子表单的保存和错误事件", async () => {
@@ -603,13 +606,8 @@ describe("PartOfSpeechSettings", () => {
     expect(subPanelHandle.openCreate).toHaveBeenCalledTimes(1);
   });
 
-  it("没有可扩展的基本词性时新增细分词性禁用并说明", () => {
-    mock.catalog.data = {
-      catalog_version: 1,
-      items: mock.catalog.data!.items.filter(
-        (item) => !item.sub_parts_extensible
-      )
-    };
+  it("目录里没有基本词性时新增细分词性禁用并说明", () => {
+    mock.catalog.data = { catalog_version: 1, items: [] };
     renderSettings();
 
     fireEvent.click(screen.getByRole("tab", { name: "细分词性" }));
@@ -617,7 +615,7 @@ describe("PartOfSpeechSettings", () => {
     expect(addButton).toBeDisabled();
     expect(addButton.parentElement).toHaveAttribute(
       "data-tooltip",
-      "暂无可扩展的基本词性"
+      "暂无基本词性"
     );
   });
 });

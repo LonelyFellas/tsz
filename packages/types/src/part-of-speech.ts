@@ -28,8 +28,10 @@ export interface PartOfSpeechConfig {
   sort_order: number;
   usage_count: number;
   sub_part_count: number;
-  /** 后端按固定编码集合（名词/动词/代词/形容词/副词）派生：仅为 true 时允许挂细分词性。 */
+  /** 任意基本词性都可以扩展细分词性，恒为 true。 */
   sub_parts_extensible: boolean;
+  /** 后端按固定编码集合（名词/动词/代词/形容词/副词）派生：该词性下的释义是否必须选中细分词性。 */
+  sub_pos_required?: boolean;
   revision: number;
   created_by: Actor;
   created_at: string;
@@ -79,8 +81,10 @@ export interface PartOfSpeechCatalogItem {
   allowed_form_types?: WordFormType[];
   /** “添加派生词形”的默认补齐顺序，必须是 allowed_form_types 子集。 */
   default_form_types?: WordFormType[];
-  /** 与 PartOfSpeechConfig.sub_parts_extensible 同源；前端据此决定能否选择/新增细分词性。 */
+  /** 与 PartOfSpeechConfig.sub_parts_extensible 同源，恒为 true。 */
   sub_parts_extensible: boolean;
+  /** 与 PartOfSpeechConfig.sub_pos_required 同源；前端据此决定释义是否必填细分词性。 */
+  sub_pos_required?: boolean;
   sub_parts: SubPartOfSpeechCatalogItem[];
 }
 
@@ -153,6 +157,8 @@ export interface SubPartOfSpeechListResponse {
 
 export interface FormTypeCatalogItem {
   id: string;
+  /** 所属基本词性；原形对所有词性通用，缺省表示通用。 */
+  part_of_speech_id?: string;
   code: string;
   name_zh: string;
   name_en: string;
@@ -169,6 +175,21 @@ export interface FormTypeConfig extends FormTypeCatalogItem {
   created_at: string;
   updated_by?: Actor;
   updated_at: string;
+}
+
+export interface FormTypeConfigListQuery extends PartOfSpeechConfigListQuery {
+  /** 只看该基本词性名下的词形变化；缺省返回全部（含通用的原形）。 */
+  part_of_speech_id?: string;
+}
+
+export interface CreateFormTypeInput extends CreatePartOfSpeechInput {
+  /** 词形变化必须挂在某个基本词性下。 */
+  part_of_speech_id: string;
+}
+
+export interface UpdateFormTypeInput extends UpdatePartOfSpeechInput {
+  /** 改挂到另一个基本词性；原形不接受该字段。 */
+  part_of_speech_id?: string;
 }
 
 export interface FormTypeConfigListResponse {

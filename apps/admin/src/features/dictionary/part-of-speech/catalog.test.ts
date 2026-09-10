@@ -55,23 +55,31 @@ describe("part-of-speech catalog", () => {
   });
 });
 
-describe("part-of-speech catalog 基础词性规则", () => {
-  it("非基础词性即使带有 sub_parts 也不提供细分词性选项", () => {
+describe("part-of-speech catalog 细分词性选项", () => {
+  it("任意基本词性配了细分词性就提供选项，不看是不是内置词性", () => {
     const catalog = structuredClone(partOfSpeechCatalogFixture);
     const noun = catalog.items.find((item) => item.code === "noun")!;
-    const adjective = catalog.items.find((item) => item.code === "adjective")!;
-    noun.sub_parts_extensible = false;
-    adjective.sub_parts_extensible = false;
     const lookup = createPartOfSpeechLookup(catalog);
 
     expect(noun.sub_parts.length).toBeGreaterThan(0);
-    expect(subPartOfSpeechOptions(lookup, "noun")).toEqual([]);
-    expect(soleSubPartOfSpeechCode(lookup, "adjective")).toBeUndefined();
-    // 基础词性不受影响。
+    expect(subPartOfSpeechOptions(lookup, "noun").length).toBe(
+      noun.sub_parts.length
+    );
     expect(subPartOfSpeechOptions(lookup, "verb")[0]).toEqual({
       value: "V-T",
       label: "及物动词"
     });
     expect(soleSubPartOfSpeechCode(lookup, "adverb")).toBe("ADV");
+  });
+
+  it("词性名下没有细分词性时返回空，不把「拿不到目录」当成有选项", () => {
+    const catalog = structuredClone(partOfSpeechCatalogFixture);
+    const adjective = catalog.items.find((item) => item.code === "adjective")!;
+    adjective.sub_parts = [];
+    const lookup = createPartOfSpeechLookup(catalog);
+
+    expect(subPartOfSpeechOptions(lookup, "adjective")).toEqual([]);
+    expect(soleSubPartOfSpeechCode(lookup, "adjective")).toBeUndefined();
+    expect(subPartOfSpeechOptions(lookup, "unknown-code")).toEqual([]);
   });
 });

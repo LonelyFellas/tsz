@@ -33,7 +33,10 @@ import type {
   FormsImpactItemV2,
   PartOfSpeechCatalogResponse,
   PartOfSpeechConfig,
+  CreateFormTypeInput,
   FormTypeConfig,
+  FormTypeConfigListQuery,
+  UpdateFormTypeInput,
   PartOfSpeechConfigListQuery,
   PartOfSpeechConfigListResponse,
   PreviewFormsImpactInputV2,
@@ -95,7 +98,7 @@ import {
 } from "./storage";
 import {
   createPartOfSpeechSeed,
-  isBasicPartOfSpeechCode
+  isSubPosRequiredCode
 } from "./partOfSpeechFixtures";
 
 type MockWord = AdminWordV2;
@@ -980,11 +983,11 @@ function validateMeanings(
     }
     for (const sense of pos.senses) {
       if (sense.sub_pos === "") {
-        // 只有基础词性才有细分词性可选；非基础词性的释义不填 sub_pos。
+        // 只有固定五个词性的释义必填细分词性；其余词性选填。
         const senseParent = Object.values(current.parts_of_speech).find(
           (part) => part.code === formsPos.pos
         );
-        if (senseParent?.sub_parts_extensible !== false) {
+        if (senseParent?.sub_pos_required !== false) {
           issues.push({
             step: "meanings",
             node_id: sense.id,
@@ -2710,6 +2713,19 @@ export function createAdminWordsMock({
   function formTypeItems(
     current: AdminWordsMockPersistedState
   ): FormTypeConfig[] {
+    // 与后端迁移 20260910120000 同口径：原形对所有词性通用，其余各归一个基本词性。
+    const partIdByCode = new Map(
+      Object.values(current.parts_of_speech).map((part) => [part.code, part.id])
+    );
+    const ownerByFormCode: Record<string, string | undefined> = {
+      third_person_singular: "verb",
+      present_participle: "verb",
+      past_tense: "verb",
+      past_participle: "verb",
+      plural: "noun",
+      comparative: "adjective",
+      superlative: "adjective"
+    };
     current.form_types ??= Object.fromEntries(
       [
         ["base", "原形", "Base form", "base"],
@@ -2731,6 +2747,9 @@ export function createAdminWordsMock({
           id,
           {
             id,
+            ...(ownerByFormCode[code!]
+              ? { part_of_speech_id: partIdByCode.get(ownerByFormCode[code!]!) }
+              : {}),
             code: code!,
             name_zh: zh!,
             name_en: en!,
@@ -2786,22 +2805,25 @@ export function createAdminWordsMock({
     });
   }
 
-  async function listFormTypes(query: PartOfSpeechConfigListQuery = {}) {
+  async function listFormTypes(query: FormTypeConfigListQuery = {}) {
     await pause();
     const { profile, state: current } = context();
     requireSuperAdmin(profile);
     const q = query.q?.trim().toLowerCase();
+    const partId = query.part_of_speech_id;
     const items = formTypeItems(current).filter(
       (f) =>
-        !q ||
-        [
-          f.code,
-          f.name_zh,
-          f.name_en,
-          f.short_name_zh,
-          f.full_name_en,
-          f.abbreviation
-        ].some((v) => v.toLowerCase().includes(q))
+        (!q ||
+          [
+            f.code,
+            f.name_zh,
+            f.name_en,
+            f.short_name_zh,
+            f.full_name_en,
+            f.abbreviation
+          ].some((v) => v.toLowerCase().includes(q))) &&
+        // 原形对所有词性通用，按词性筛选时也留在清单里。
+        (!partId || !f.part_of_speech_id || f.part_of_speech_id === partId)
     );
     const page = query.page ?? 1,
       page_size = query.page_size ?? 10;
@@ -2825,7 +2847,7 @@ export function createAdminWordsMock({
   }
 
   async function saveFormType(
-    raw: CreatePartOfSpeechInput | UpdatePartOfSpeechInput,
+    raw: CreateFormTypeInput | UpdateFormTypeInput,
     id?: string
   ): Promise<FormTypeConfig> {
     await pause();
@@ -2844,6 +2866,17 @@ export function createAdminWordsMock({
     const code = existing?.code ?? ("code" in input ? input.code : "");
     if (!/^[a-z][a-z0-9_]{0,31}$/.test(code))
       throw formTypeError("invalid_form_type", 400, "code");
+    // 原形对所有词性通用，其余词形必须挂在已存在的基本词性下。
+    let partOfSpeechId: string | undefined;
+    if (code !== "base") {
+      partOfSpeechId = raw.part_of_speech_id ?? existing?.part_of_speech_id;
+      if (!partOfSpeechId)
+        throw formTypeError("invalid_form_type", 400, "part_of_speech_id");
+      if (!current.parts_of_speech[partOfSpeechId])
+        throw formTypeError("part_of_speech_not_found", 404);
+    } else if (raw.part_of_speech_id) {
+      throw formTypeError("invalid_form_type", 400, "part_of_speech_id");
+    }
     for (const field of [
       "code",
       "name_zh",
@@ -2857,6 +2890,8 @@ export function createAdminWordsMock({
         items.some(
           (f) =>
             f.id !== id &&
+            // 编码全局唯一；展示字段只在同一个基本词性内唯一。
+            (field === "code" || f.part_of_speech_id === partOfSpeechId) &&
             (field.endsWith("_zh")
               ? f[field] === value
               : f[field].toLowerCase() === value.toLowerCase())
@@ -2868,6 +2903,7 @@ export function createAdminWordsMock({
       actor = { id: profile.id, display_name: profile.display_name };
     const item: FormTypeConfig = {
       id: existing?.id ?? nextId(current, "form-type"),
+      ...(partOfSpeechId ? { part_of_speech_id: partOfSpeechId } : {}),
       code,
       name_zh: input.name_zh,
       name_en: input.name_en,
@@ -2940,10 +2976,10 @@ export function createAdminWordsMock({
         full_name_en: part.full_name_en,
         sort_order: part.sort_order,
         allowed_form_types: formTypeItems(current)
-          .filter((f) => f.code !== "base")
+          .filter((f) => f.code !== "base" && f.part_of_speech_id === part.id)
           .map((f) => f.code),
         default_form_types: formTypeItems(current)
-          .filter((f) => f.code !== "base")
+          .filter((f) => f.code !== "base" && f.part_of_speech_id === part.id)
           .map((f) => f.code),
         sub_parts_extensible: part.sub_parts_extensible,
         sub_parts: sortedSubParts(current, part.id).map((subPart) => ({
@@ -3004,7 +3040,8 @@ export function createAdminWordsMock({
       ...input,
       usage_count: 0,
       sub_part_count: 0,
-      sub_parts_extensible: isBasicPartOfSpeechCode(input.code),
+      sub_parts_extensible: true,
+      sub_pos_required: isSubPosRequiredCode(input.code),
       revision: 1,
       created_by: { id: profile.id, display_name: profile.display_name },
       created_at: timestamp,
@@ -3149,15 +3186,6 @@ export function createAdminWordsMock({
         "part of speech not found",
         [],
         "part_of_speech_not_found"
-      );
-    if (!parent.sub_parts_extensible)
-      throw new HttpError(
-        409,
-        "part of speech does not allow sub-parts",
-        [],
-        "sub_part_of_speech_not_allowed",
-        [],
-        { part_of_speech_id: partId, code: parent.code }
       );
     const input = trimSubPartInput({
       ...rawInput,
@@ -5260,8 +5288,8 @@ export function createAdminWordsMock({
     },
     partOfSpeechSettings: {
       listFormTypes,
-      createFormType: (input: CreatePartOfSpeechInput) => saveFormType(input),
-      updateFormType: (id: string, input: UpdatePartOfSpeechInput) =>
+      createFormType: (input: CreateFormTypeInput) => saveFormType(input),
+      updateFormType: (id: string, input: UpdateFormTypeInput) =>
         saveFormType(input, id),
       removeFormType,
       catalog: partOfSpeechCatalog,

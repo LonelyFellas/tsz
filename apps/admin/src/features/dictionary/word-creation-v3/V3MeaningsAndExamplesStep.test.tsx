@@ -3679,7 +3679,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(editor).not.toHaveTextContent("countable");
   });
 
-  it("非基础词性的释义不再提供子词性选择，历史子词性只读回显", () => {
+  it("目录把词性标记为不可扩展时不提供子词性选择，历史子词性只读回显", () => {
     const forms: DraftFormsStepContentV3 = {
       pos: [
         {
@@ -3727,7 +3727,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     render(<Harness forms={forms} partOfSpeechCatalog={partOfSpeechCatalog} />);
     const editor = screen.getByTestId("meanings-value").previousElementSibling;
 
-    // 后端标记不可扩展：没有子词性下拉，但历史 sub_pos 仍以中文名只读展示，且保留定位锚点。
+    // 后端现在恒为可扩展，这里守的是降级路径：一旦标记为不可扩展，没有子词性下拉，
+    // 但历史 sub_pos 仍以中文名只读展示，且保留定位锚点。
     expect(screen.queryByLabelText("释义 1 子词性")).toBeNull();
     const readonly = editor?.querySelector('[data-v3-field="sub_pos"]');
     expect(readonly).not.toBeNull();

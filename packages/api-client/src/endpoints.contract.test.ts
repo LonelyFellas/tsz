@@ -494,7 +494,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "ddd7fcb9cdc14a577afcb209f15b6e89c97fd49f5f148c59ad4d8dd29f7a6aec"
+      "3a1ac9d82be2b33cda32f9c0703ef57e0944ade7d21b2a4d97c6294f8b1e89f9"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
@@ -1157,10 +1157,17 @@ it("词形配置契约包含增删改、必填revision与统一目录名称", ()
   expect(
     snapshot.schemas.CatalogResponse.properties.form_types.items.$ref
   ).toBe("#/components/schemas/FormTypeCatalogItem");
-  expect(snapshot.schemas.UpdatePartRequest.required).toContain(
+  // 词形变化有自己的请求体：新建必须指定所属基本词性，修改可改挂但不改编码。
+  expect(snapshot.schemas.CreateFormTypeRequest.required).toContain(
+    "part_of_speech_id"
+  );
+  expect(snapshot.schemas.UpdateFormTypeRequest.required).toContain(
     "base_revision"
   );
-  expect(snapshot.schemas.UpdatePartRequest.properties).not.toHaveProperty(
+  expect(snapshot.schemas.UpdateFormTypeRequest.properties).toHaveProperty(
+    "part_of_speech_id"
+  );
+  expect(snapshot.schemas.UpdateFormTypeRequest.properties).not.toHaveProperty(
     "code"
   );
 });

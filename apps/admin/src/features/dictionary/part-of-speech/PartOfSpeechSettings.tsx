@@ -115,14 +115,9 @@ export function PartOfSpeechSettings() {
   const catalogReady = !catalog.isPending && !catalog.isError;
   const defaultSortOrder = nextSortOrder(catalog.data?.items ?? []);
   const remove = useRemovePartOfSpeech();
-  // 细分词性只能挂在后端标记为可扩展的基本词性下，下拉与默认选中都只看这部分。
-  const extensibleParts = (catalog.data?.items ?? []).filter(
-    (item) => item.sub_parts_extensible
-  );
-  // 空串表示「全部」：面板并排展示所有可扩展词性的细分词性；新增时在弹窗里选所属词性。
-  const selectedPart = extensibleParts.find(
-    (item) => item.id === selectedPartId
-  );
+  const parts = catalog.data?.items ?? [];
+  // 空串表示「全部」：面板并排展示所有词性的细分词性；新增时在弹窗里选所属词性。
+  const selectedPart = parts.find((item) => item.id === selectedPartId);
 
   const showError = (error: unknown) => message.error(errorMessage(error));
 
@@ -163,8 +158,7 @@ export function PartOfSpeechSettings() {
       title: "细分词性",
       dataIndex: "sub_part_count",
       width: 90,
-      render: (count: number, item) =>
-        item.sub_parts_extensible ? `${count} 项` : "不可扩展"
+      render: (count: number) => `${count} 项`
     },
     {
       title: "引用",
@@ -379,10 +373,10 @@ export function PartOfSpeechSettings() {
                   showSearch
                   optionFilterProp="label"
                   loading={catalog.isPending}
-                  disabled={catalog.isError || !extensibleParts.length}
+                  disabled={catalog.isError || !parts.length}
                   options={[
                     { value: "", label: "全部" },
-                    ...extensibleParts.map((item) => ({
+                    ...parts.map((item) => ({
                       value: item.id,
                       label: item.name_zh
                     }))
@@ -394,15 +388,15 @@ export function PartOfSpeechSettings() {
               </Flex>
               <Tooltip
                 title={
-                  !catalog.isError && extensibleParts.length === 0
-                    ? "暂无可扩展的基本词性"
+                  !catalog.isError && parts.length === 0
+                    ? "暂无基本词性"
                     : undefined
                 }
               >
                 <Button
                   type="primary"
                   icon={<PlusOutlined />}
-                  disabled={catalog.isError || extensibleParts.length === 0}
+                  disabled={catalog.isError || parts.length === 0}
                   onClick={() => subPanelRef.current?.openCreate()}
                 >
                   新增细分词性
@@ -412,7 +406,7 @@ export function PartOfSpeechSettings() {
           </Card>
           <SubPartOfSpeechPanel
             ref={subPanelRef}
-            parents={selectedPart ? [selectedPart] : extensibleParts}
+            parents={selectedPart ? [selectedPart] : parts}
             createParent={selectedPart}
             loading={catalog.isPending}
             onSaved={(text) => message.success(text)}
@@ -432,8 +426,7 @@ export function PartOfSpeechSettings() {
             return;
           }
           message.success("基本词性已新增");
-          // 只有可扩展细分词性的基础词性才值得直接跳到细分词性 Tab。
-          if (!saved.sub_parts_extensible) return;
+          // 新建的词性名下还没有细分词性，直接把管理员带到细分词性 Tab 去配。
           setSelectedPartId(saved.id);
           setActiveTab("detailed");
         }}
