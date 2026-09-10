@@ -1,6 +1,6 @@
 export * from "./core";
 export * from "./reader";
-export { VoiceEditor } from "./editor/next";
+export { LiaisonIcon, VoiceEditor } from "./editor/next";
 export type {
   VoiceOption,
   VoicePreviewAdapter,

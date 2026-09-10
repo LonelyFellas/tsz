@@ -57,6 +57,8 @@ export interface WordPronunciationV3 {
   voice_profile?: VoiceProfileV3;
   audio_assets?: AudioAssetV3[];
   actual_pron: string;
+  /** 编辑器正文与 actual_pron 一致。连读只标在这里，字典音标那侧只喂语音合成。 */
+  actual_pron_rich?: RichTextV3;
   /** Draft may omit this; complete/publish requires it. */
   style?: PronunciationStyle;
 }
@@ -322,8 +324,12 @@ export interface SentenceSourceRangeV3 {
   surface: string;
 }
 
-/** 高阶 A1/A2、中阶 B1/B2、低阶 C1/C2；同一例句的同档译文可以有多条。 */
-export type SentenceTranslationBandV3 = "a1_a2" | "b1_b2" | "c1_c2";
+/**
+ * 译文风格而非难度等级：初阶逐字直译、中阶语句通顺、高阶深层重构。
+ * 同一例句的同档译文可以有多条。
+ */
+export type SentenceTranslationBandV3 =
+  "word_for_word" | "balanced_fluency" | "adapted_creation";
 
 export interface WordSentenceTranslationV3 {
   id: string;

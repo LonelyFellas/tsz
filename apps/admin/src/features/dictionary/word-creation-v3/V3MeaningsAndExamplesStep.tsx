@@ -72,7 +72,7 @@ import {
   definitionSummary,
   replaceRichText,
   spellingModeForPos,
-  sentenceTranslationBand
+  DEFAULT_SENTENCE_TRANSLATION_BAND
 } from "./meaningsModel";
 import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import {
@@ -433,6 +433,7 @@ function GrammarStructuresCard({
                   >
                     <V3VoiceTextField
                       mode="grammar"
+                      dialect={variant.dialect}
                       leadingAction={
                         <PronunciationPreviewControls
                           playbackOnly
@@ -646,6 +647,7 @@ function SenseGroupsCard({
             <div className="word-sense-group-field">
               <V3VoiceTextField
                 mode="grammar"
+                dialect="common"
                 audioUploadEnabled={false}
                 ariaLabel={`语义区间 ${groupIndex + 1} 英文`}
                 field="name_en"
@@ -3192,9 +3194,7 @@ function V3MeaningsAndExamplesStepContent({
                                                 zh_translations: [
                                                   {
                                                     id: translationId,
-                                                    band: sentenceTranslationBand(
-                                                      "B1"
-                                                    ),
+                                                    band: DEFAULT_SENTENCE_TRANSLATION_BAND,
                                                     content: zhText
                                                   }
                                                 ],

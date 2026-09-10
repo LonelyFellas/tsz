@@ -120,6 +120,7 @@ function parseValue(value: RichText): { value: RichTextV2; error?: string } {
 export function VoiceEditor({
   value,
   mode = "pronunciation",
+  locale,
   textLinks,
   renderAssociationPicker,
   language = "en",
@@ -198,7 +199,7 @@ export function VoiceEditor({
     [voiceSettings]
   );
   const [upload, setUpload] = useState<UploadDraft>({
-    locale: "en-GB",
+    locale: locale ?? "en-GB",
     gender: "female"
   });
   /** 已落成资产的音频（受控，与 voiceProfile 同款进出）。 */
@@ -1168,7 +1169,8 @@ export function VoiceEditor({
       dividerBefore: true,
       label: "发音",
       className: "tsz-ve-speech-tool",
-      summary: `已选 ${enabledVoiceIds.length} 个音色`,
+      // 「已选」两字在窄容器里就是一行的代价，去掉后语义不减。
+      summary: `${enabledVoiceIds.length} 个音色`,
       icon: <SoundOutlined />,
       content: (
         <div className="tsz-ve-speech-panel" aria-label="发音设置与试听">
@@ -1176,6 +1178,7 @@ export function VoiceEditor({
             <div className="tsz-ve-speech-panel-title">音色</div>
             <VoicePanel
               readOnly={readOnly}
+              locale={locale}
               voices={voices}
               voicesLoading={voicesLoading}
               enabledVoiceIds={enabledVoiceIds}
@@ -1204,6 +1207,7 @@ export function VoiceEditor({
       content: (
         <UploadPanel
           readOnly={readOnly}
+          locale={locale}
           available={Boolean(audioUploadAdapter) && !storageUnavailable}
           unavailableReason={
             audioUploadAdapter
@@ -1227,11 +1231,19 @@ export function VoiceEditor({
         />
       )
     }
-  ].filter(
-    (tool) =>
-      (!textReadOnly || tool.key !== "text") &&
-      (mode !== "pronunciation" || tool.key !== "roles")
-  );
+  ].filter((tool) => {
+    if (textReadOnly && tool.key === "text") return false;
+    // 字典音标只负责喂语音合成，连读是展示用的标注，归实际发音那一侧。
+    // 判据必须是这个显式取值：默认的 pronunciation 还挂着别的调用方，
+    // 摘在默认值上会连带把它们的连读也拿掉。
+    if (mode === "dict-phonetic")
+      return tool.key !== "roles" && tool.key !== "liaison";
+    // 实际发音只用于展示，其余工具都是冲着合成去的。
+    if (mode === "actual-pron")
+      return tool.key === "text" || tool.key === "liaison";
+    if (mode === "pronunciation") return tool.key !== "roles";
+    return true;
+  });
 
   // 外壳不另起可及名：名字归那个真正可编辑的文本框，避免同名两份。
   return (

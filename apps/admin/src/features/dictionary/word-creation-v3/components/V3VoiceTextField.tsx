@@ -1,5 +1,7 @@
 import type {
+  AudioAssetLocaleV3,
   AudioAssetV3,
+  Dialect,
   RichTextV2,
   RichTextV3,
   VoiceProfileV3
@@ -10,6 +12,7 @@ import {
   remapTextLinks,
   toRichTextV2
 } from "@tsz/voice-editor/core";
+import { LiaisonIcon } from "@tsz/voice-editor";
 import { AudioOutlined } from "@ant-design/icons";
 import { Button, Input, Space, message } from "antd";
 import {
@@ -36,8 +39,20 @@ const VoiceEditor = lazy(() =>
   }))
 );
 
+/** 方言换成音色语种：通用栏没有归属，返回 undefined 表示不筛选。 */
+function voiceLocale(dialect?: Dialect): AudioAssetLocaleV3 | undefined {
+  if (dialect === "uk") return "en-GB";
+  if (dialect === "us") return "en-US";
+  return undefined;
+}
+
 export interface V3VoiceTextFieldProps {
   mode?: VoiceEditorProps["mode"];
+  /**
+   * 这段正文挂在哪一侧。英美分栏的字段传 uk / us，音色和录音归属都只留那一侧；
+   * 通用栏传 common 或不传，不做筛选。
+   */
+  dialect?: Dialect;
   textLinks?: VoiceEditorProps["textLinks"];
   renderAssociationPicker?: VoiceEditorProps["renderAssociationPicker"];
   value: RichTextV3;
@@ -70,6 +85,7 @@ export interface V3VoiceTextFieldProps {
  */
 export function V3VoiceTextField({
   mode,
+  dialect,
   textLinks,
   renderAssociationPicker,
   value,
@@ -201,7 +217,8 @@ export function V3VoiceTextField({
             aria-label={`打开${ariaLabel}编辑器`}
             // 正文还是空的时候没有东西可标注，编辑器打开也只是一块空画布，先置灰。
             disabled={readOnly || value.text.trim() === ""}
-            icon={<AudioOutlined />}
+            // 实际发音只标连读，按钮就画那条弧；其余字段仍是语音编辑器的话筒。
+            icon={mode === "actual-pron" ? <LiaisonIcon /> : <AudioOutlined />}
             onClick={() => setEditing(true)}
             style={{ height: "auto" }}
           />
@@ -217,6 +234,7 @@ export function V3VoiceTextField({
         <VoiceEditor
           textReadOnly
           mode={mode}
+          locale={voiceLocale(dialect)}
           textLinks={textLinks}
           renderAssociationPicker={renderAssociationPicker}
           contextLabel={ariaLabel}

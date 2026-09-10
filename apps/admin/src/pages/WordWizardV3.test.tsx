@@ -512,7 +512,7 @@ describe("WordWizardV3Page", () => {
                     zh_translations: [
                       {
                         id: uuidFromInt(507),
-                        band: "a1_a2",
+                        band: "adapted_creation",
                         content: {
                           version: 1,
                           text: "例句。",

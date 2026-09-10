@@ -728,18 +728,27 @@
 .tsz-ve-toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  /* 编辑器常嵌在字段列里，只有三百来像素宽：这排工具每省下十几像素就少折一行。 */
+  gap: 4px;
   align-items: center;
-  padding: 8px 10px;
+  padding: 6px 8px;
   border: 1px solid var(--ant-color-border, #d9d9d9);
   border-radius: 10px 10px 0 0;
   background: var(--ant-color-bg-container, #fff);
 }
 
+/*
+ * 文字按钮收一点左右内边距。antd 的按钮样式是运行时注入的，特异性要够才压得住，
+ * 所以类名写两遍。
+ */
+.tsz-ve-toolbar .ant-btn.ant-btn {
+  padding-inline: 6px;
+}
+
 .tsz-ve-toolbar-divider {
   width: 1px;
   align-self: stretch;
-  margin: 2px 4px;
+  margin: 2px 1px;
   background: var(--ant-color-border, #d9d9d9);
 }
 

@@ -6,7 +6,7 @@ import {
   MinusCircleOutlined,
   PlusCircleOutlined
 } from "@ant-design/icons";
-import { Button, Flex, Form, Input, Select, Typography } from "antd";
+import { Button, Flex, Form, Select, Typography } from "antd";
 import type {
   DraftFormsStepContentV3,
   V3DraftValidationIssue,
@@ -328,7 +328,8 @@ export function V3PronunciationList({
                         <div className="word-pronunciation-phonetic-control">
                           <Form.Item noStyle>
                             <V3VoiceTextField
-                              mode="pronunciation"
+                              mode="dict-phonetic"
+                              dialect={variant.dialect}
                               leadingAction={
                                 <PronunciationPreviewControls
                                   playbackOnly
@@ -412,23 +413,32 @@ export function V3PronunciationList({
                           实际发音
                         </Typography.Text>
                         <Form.Item noStyle>
-                          <Input
-                            aria-invalid={rowIssues.some(
-                              (item) => item.field === "actual_pron"
-                            )}
-                            aria-label={`第 ${index + 1} 条发音的实际发音`}
-                            data-v3-field="actual_pron"
-                            data-v3-node-id={pronunciation.id}
-                            onChange={(event) =>
+                          <V3VoiceTextField
+                            mode="actual-pron"
+                            dialect={variant.dialect}
+                            ariaLabel={`第 ${index + 1} 条发音的实际发音`}
+                            field="actual_pron"
+                            nodeId={pronunciation.id}
+                            placeholder="实际发音"
+                            invalid={Boolean(actualPronIssue)}
+                            value={
+                              pronunciation.actual_pron_rich ?? {
+                                version: 2,
+                                text: pronunciation.actual_pron,
+                                annotations: []
+                              }
+                            }
+                            onChange={(actual_pron_rich) =>
                               onChange(
                                 updatePronunciation(content, pronunciation.id, {
-                                  actual_pron: event.target.value
+                                  actual_pron: actual_pron_rich.text,
+                                  ...(pronunciation.actual_pron_rich ||
+                                  actual_pron_rich.annotations.length > 0
+                                    ? { actual_pron_rich }
+                                    : {})
                                 })
                               )
                             }
-                            placeholder="实际发音"
-                            status={actualPronIssue ? "error" : undefined}
-                            value={pronunciation.actual_pron}
                           />
                         </Form.Item>
                         {actualPronIssue ? (

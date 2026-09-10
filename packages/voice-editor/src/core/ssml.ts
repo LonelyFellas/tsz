@@ -30,6 +30,9 @@ function activeAt<T extends RichTextAnnotation["type"]>(
   );
 }
 
+/** 词性提示符只指示词性，不参与朗读；「a job」里的 a 属于这一类。 */
+const SILENT_EMPHASIS_LEVEL = "grammar";
+
 function speechKey(annotations: RichTextAnnotation[], offset: number): string {
   const emphasis = activeAt(annotations, "emphasis", offset);
   const phoneme = activeAt(annotations, "phoneme", offset);
@@ -74,9 +77,14 @@ export function buildSsmlPreview(
     ) {
       end += 1;
     }
+    const emphasis = activeAt(content.annotations, "emphasis", offset);
+    if (emphasis?.level === SILENT_EMPHASIS_LEVEL) {
+      // 整段连同挂在上面的音标一起跳过：空的 phoneme 标签会把 ph 当正文读出来。
+      offset = end;
+      continue;
+    }
     let segment = escapeXml(codePointSlice(content.text, offset, end));
     const phoneme = activeAt(content.annotations, "phoneme", offset);
-    const emphasis = activeAt(content.annotations, "emphasis", offset);
     if (phoneme) {
       segment = `<phoneme alphabet="ipa" ph="${escapeXml(phoneme.phoneme)}">${segment}</phoneme>`;
     }

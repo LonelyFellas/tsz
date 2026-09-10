@@ -3,7 +3,7 @@ export { AnnotationStrip } from "./AnnotationStrip";
 export type { AnnotationStripProps } from "./AnnotationStrip";
 export { MarkupPanel } from "./MarkupPanel";
 export type { MarkupPanelProps } from "./MarkupPanel";
-export { RatePanel, UploadPanel, VoicePanel } from "./ToolPanels";
+export { LiaisonIcon, RatePanel, UploadPanel, VoicePanel } from "./ToolPanels";
 export type {
   RatePanelProps,
   UploadDraft,

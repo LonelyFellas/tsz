@@ -44,13 +44,9 @@ export type RelationDisplaySnapshots = Readonly<
   Record<string, RelationDisplaySnapshot>
 >;
 
-export function sentenceTranslationBand(
-  level: string
-): SentenceTranslationBandV3 {
-  if (level === "C1" || level === "C2") return "c1_c2";
-  if (level === "A1" || level === "A2") return "a1_a2";
-  return "b1_b2";
-}
+// 例句难度等级与译文风格无关，拿不到风格时一律落到中阶，与后端的默认档一致。
+export const DEFAULT_SENTENCE_TRANSLATION_BAND: SentenceTranslationBandV3 =
+  "balanced_fluency";
 
 export function sentenceTranslationsV3(sentence: {
   level: string;
@@ -64,7 +60,7 @@ export function sentenceTranslationsV3(sentence: {
       : [
           {
             id: sentence.zh_text_id,
-            band: sentenceTranslationBand(sentence.level),
+            band: DEFAULT_SENTENCE_TRANSLATION_BAND,
             content: sentence.zh_text
           }
         ];
@@ -427,7 +423,7 @@ function createDefaultPosMeanings(
             zh_translations: [
               {
                 id: translationId,
-                band: "a1_a2",
+                band: DEFAULT_SENTENCE_TRANSLATION_BAND,
                 content: { version: 2, text: "", annotations: [] }
               }
             ],

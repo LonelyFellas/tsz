@@ -1692,6 +1692,14 @@ it("英美切换保留每条发音的标注、音色和录音", () => {
     text: row.dict_phonetic,
     annotations: [{ type: "highlight", start: 0, end: 1, color: "yellow" }]
   };
+  // 连读只标在实际发音上，切分方言时同样不能丢。
+  row.actual_pron_rich = {
+    version: 2,
+    text: row.actual_pron,
+    annotations: [
+      { type: "liaison", start: 0, end: 2, start_len: 1, end_len: 1 }
+    ]
+  };
   row.voice_profile = {
     voices: [{ voice_id: "british-voice", enabled: true, rate_percent: -10 }]
   };
@@ -1715,6 +1723,7 @@ it("英美切换保留每条发音的标注、音色和录音", () => {
   for (const variant of [variants.uk, variants.us]) {
     expect(variant.pronunciations[0]).toMatchObject({
       dict_phonetic_rich: row.dict_phonetic_rich,
+      actual_pron_rich: row.actual_pron_rich,
       voice_profile: row.voice_profile,
       audio_assets: []
     });

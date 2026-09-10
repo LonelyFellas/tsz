@@ -169,7 +169,7 @@ const meaningsFixture: DraftMeaningsStepContentWritableV3 = {
               zh_translations: [
                 {
                   id: "sentence-zh-1",
-                  band: "a1_a2",
+                  band: "adapted_creation",
                   content: {
                     version: 2,
                     text: "市中心很繁忙。",
@@ -799,7 +799,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       zh_text: { text: "我们打破了沉默。" },
       // 译文档位独立于英文例句等级，保留新建时的中阶。
       zh_translations: [
-        { band: "b1_b2", content: { text: "我们打破了沉默。" } }
+        { band: "balanced_fluency", content: { text: "我们打破了沉默。" } }
       ],
       links: [{ word_id: "entry-1", sense_id: "sense-1", role: "focus" }]
     });
@@ -1457,7 +1457,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     sentence.zh_translations = [
       {
         id: sentence.zh_text_id,
-        band: "a1_a2",
+        band: "adapted_creation",
         content: { version: 2, text: "高阶译文", annotations: [] }
       }
     ];
@@ -1467,7 +1467,10 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value().pos[0]!.senses[0]!.sentences[0]).toMatchObject({
       level: "C1",
       zh_translations: [
-        expect.objectContaining({ id: sentence.zh_text_id, band: "a1_a2" })
+        expect.objectContaining({
+          id: sentence.zh_text_id,
+          band: "adapted_creation"
+        })
       ]
     });
     unmount();
@@ -1478,12 +1481,12 @@ describe("V3MeaningsAndExamplesStep", () => {
     target.zh_translations = [
       {
         id: "translation-a",
-        band: "a1_a2",
+        band: "adapted_creation",
         content: { version: 2, text: "高", annotations: [] }
       },
       {
         id: "translation-b",
-        band: "b1_b2",
+        band: "balanced_fluency",
         content: { version: 2, text: "中", annotations: [] }
       }
     ];
@@ -1493,8 +1496,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     const after = value().pos[0]!.senses[0]!.sentences[0]!;
     expect(after.level).toBe("C1");
     expect(after.zh_translations!.map((item) => item.band)).toEqual([
-      "a1_a2",
-      "b1_b2"
+      "adapted_creation",
+      "balanced_fluency"
     ]);
   });
 
@@ -1503,26 +1506,26 @@ describe("V3MeaningsAndExamplesStep", () => {
     initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations = [
       {
         id: "translation-c",
-        band: "c1_c2",
-        content: { version: 2, text: "低阶译文", annotations: [] }
+        band: "word_for_word",
+        content: { version: 2, text: "初阶译文", annotations: [] }
       },
       {
         id: "translation-b",
-        band: "b1_b2",
+        band: "balanced_fluency",
         content: { version: 2, text: "中阶译文", annotations: [] }
       },
       {
         id: "translation-a",
-        band: "a1_a2",
+        band: "adapted_creation",
         content: { version: 2, text: "高阶译文", annotations: [] }
       }
     ];
     render(<Harness initial={initial} wordId="entry-1" />);
 
-    expect(screen.getByLabelText("例句 1 译文 1 中文")).toHaveValue("低阶译文");
+    expect(screen.getByLabelText("例句 1 译文 1 中文")).toHaveValue("初阶译文");
     expect(screen.getByLabelText("例句 1 译文 2 中文")).toHaveValue("中阶译文");
     expect(screen.getByLabelText("例句 1 译文 3 中文")).toHaveValue("高阶译文");
-    expect(screen.getByLabelText("低阶译文")).toHaveTextContent("低");
+    expect(screen.getByLabelText("初阶译文")).toHaveTextContent("初");
     expect(screen.getByLabelText("中阶译文")).toHaveTextContent("中");
     expect(screen.getByLabelText("高阶译文")).toHaveTextContent("高");
     fireEvent.change(screen.getByLabelText("例句 1 译文 2 中文"), {
@@ -1546,10 +1549,14 @@ describe("V3MeaningsAndExamplesStep", () => {
     const initial = structuredClone(meaningsFixture);
     const sentence = initial.pos[0]!.senses[0]!.sentences[0]!;
     sentence.zh_translations = [
-      { id: sentence.zh_text_id, band: "a1_a2", content: sentence.zh_text },
+      {
+        id: sentence.zh_text_id,
+        band: "adapted_creation",
+        content: sentence.zh_text
+      },
       {
         id: "second-high",
-        band: "a1_a2",
+        band: "adapted_creation",
         content: { version: 2, text: "另一条高阶译文", annotations: [] }
       }
     ];

@@ -916,6 +916,26 @@
   min-width: 0;
 }
 
+/*
+ * 展开语音编辑器时把标签列让出来：编辑器里横着一排工具，224px 宽要折成四行，
+ * 占满整行后能收到两行，读起来也不再是一条窄缝。
+ */
+.word-pronunciation-row:has(.v3-voice-text-editor) {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+}
+
+/* 展开后只剩一列，错误提示不能再往第 2 列放，否则会被甩出容器。 */
+.word-pronunciation-row:has(.v3-voice-text-editor) > .word-field-help {
+  grid-column: 1;
+}
+
+/* 展开时把左边那条装饰线的余量也收掉，工具栏正好少折一行。 */
+.word-pronunciation-fields:has(.v3-voice-text-editor) {
+  padding-left: 10px;
+}
+
 .word-pronunciation-phonetic-control .ant-space-compact {
   width: 100%;
 }

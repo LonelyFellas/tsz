@@ -1,5 +1,7 @@
 # 智能词库多维例句关联技术设计
 
+> 注：2026-09-10 起档位改为语义化命名 `word_for_word`（初阶）/ `balanced_fluency`（中阶）/ `adapted_creation`（高阶），初/中/高指译文风格而非 CEFR 难度，服务端也不再按例句等级推导档位。本文记录的是当时口径，其中的 `a1_a2` 一组命名与「低阶」叫法均已废弃。
+
 ## 文档状态与评审门
 
 - 功能标识：`multidimensional-example-linking`

@@ -90,8 +90,10 @@
 
 .v3-dialect-separated-matrix {
   display: grid;
-  grid-template-columns: 142px repeat(2, minmax(0, 1fr));
-  column-gap: 28px;
+  /* 类型列只放一个下拉和四个图标，142px 里大半是空的；两栏之间也不需要 28px。
+     省下来的宽度全给发音栏，那里挤得多。 */
+  grid-template-columns: 112px repeat(2, minmax(0, 1fr));
+  column-gap: 12px;
   align-items: stretch;
   margin: 16px;
   margin-bottom: 0;
@@ -110,8 +112,8 @@
    word-form-matrix 网格，这里把 V2 基础样式给类型列的灰底/边框一并剥掉，
    并把列宽、列距、外边距对齐到 .v3-dialect-separated-matrix。 */
 .v3-concrete-form-row .word-form-matrix-unified {
-  grid-template-columns: 142px minmax(620px, 1fr);
-  column-gap: 28px;
+  grid-template-columns: 112px minmax(620px, 1fr);
+  column-gap: 12px;
   margin-inline: 16px;
 }
 
@@ -135,6 +137,26 @@
 .v3-form-type-column .word-form-type-cell {
   height: 100%;
   min-width: 0;
+}
+
+/*
+ * 一行里可能挂着十来条发音，词形类型这一格会被拉到上千像素高，内容只占顶上一小块。
+ * 让它跟着滚：既填掉那片空白的观感，滚到第八条发音时也还知道自己在哪个词形上。
+ */
+/* 类型列不再有卡片底色，左右各 10px 的内边距是白留的；收掉后列宽能再窄一档。 */
+.v3-form-type-column .word-form-type-cell {
+  padding-inline: 4px;
+}
+
+.word-form-type-cell-content {
+  position: sticky;
+  top: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
 }
 
 .v3-dialect-panel {
@@ -247,21 +269,19 @@
     grid-row: var(--v3-narrow-grid-row) / span 2;
   }
 
-  .v3-dialect-panel-header,
   .v3-dialect-panel .v3-dialect-form-cell {
     grid-column: 2;
     border: 1px solid;
     border-radius: 10px;
   }
 
-  .v3-dialect-panel-header-uk {
-    grid-row: 1;
-    border-color: #8792a5;
-  }
-
-  .v3-dialect-panel-header-us {
-    grid-row: 2;
-    border-color: #f3c5de;
+  /*
+   * 堆叠后两个方言标题会连着落在最顶上，美式那条离它自己的内容隔着上千像素，
+   * 读起来像是排版坏了。每块内容里本来就写着「英式拼写 / 美式拼写」，底色也分着，
+   * 标题栏在这个断点纯属误导，直接收起来。
+   */
+  .v3-dialect-panel-header {
+    display: none;
   }
 
   .v3-dialect-panel .v3-dialect-form-cell {
