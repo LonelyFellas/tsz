@@ -1,8 +1,4 @@
-import {
-  PlusOutlined,
-  ReloadOutlined,
-  SearchOutlined
-} from "@ant-design/icons";
+import { PlusOutlined } from "@ant-design/icons";
 import {
   Alert,
   App,
@@ -10,12 +6,12 @@ import {
   Card,
   Flex,
   Form,
-  Input,
   Modal,
   Select,
   Space,
   Table,
-  Tooltip
+  Tooltip,
+  Typography
 } from "antd";
 import type { TableColumnsType } from "antd";
 import type { CreatePartOfSpeechInput, FormTypeConfig } from "@tsz/types";
@@ -49,14 +45,12 @@ export function FormTypeSettings() {
   const catalog = usePartOfSpeechCatalog();
   const ready = !catalog.isError && !!catalog.data?.form_types;
   const [query, setQuery] = useState<{
-    q: string;
     part_of_speech_id?: string;
     page: number;
     page_size: number;
-  }>({ q: "", page: 1, page_size: 10 });
+  }>({ page: 1, page_size: 10 });
   const parts = catalog.data?.items ?? [];
   const partNameById = new Map(parts.map((item) => [item.id, item.name_zh]));
-  const [search] = Form.useForm<{ q?: string }>();
   const [form] = Form.useForm<Values>();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FormTypeConfig>();
@@ -220,70 +214,34 @@ export function FormTypeSettings() {
       )}
       <Card size="small">
         <Flex justify="space-between" align="center" wrap gap={12}>
-          <Form
-            form={search}
-            layout="inline"
-            onFinish={({ q }) =>
-              setQuery({ ...query, q: q?.trim() ?? "", page: 1 })
-            }
-          >
-            <Form.Item label="所属基本词性">
-              <Select
-                aria-label="所属基本词性"
-                value={query.part_of_speech_id ?? ""}
-                showSearch
-                optionFilterProp="label"
-                loading={catalog.isPending}
-                disabled={catalog.isError || parts.length === 0}
-                options={[
-                  { value: "", label: "全部" },
-                  ...parts.map((item) => ({
-                    value: item.id,
-                    label: item.name_zh
-                  }))
-                ]}
-                onChange={(value) =>
-                  setQuery({
-                    ...query,
-                    part_of_speech_id: value || undefined,
-                    page: 1
-                  })
-                }
-                style={{ width: 200 }}
-                placeholder="请选择基本词性"
-              />
-            </Form.Item>
-            <Form.Item name="q" label="关键词">
-              <Input
-                allowClear
-                placeholder="中文 / 英文 / 编码 / 缩写"
-                style={{ width: 260 }}
-              />
-            </Form.Item>
-            <Space>
-              <Button
-                type="primary"
-                htmlType="submit"
-                icon={<SearchOutlined />}
-              >
-                搜 索
-              </Button>
-              <Button
-                icon={<ReloadOutlined />}
-                onClick={() => {
-                  search.resetFields();
-                  setQuery({
-                    ...query,
-                    q: "",
-                    part_of_speech_id: undefined,
-                    page: 1
-                  });
-                }}
-              >
-                重 置
-              </Button>
-            </Space>
-          </Form>
+          {/* 词形变化总量很小，一页就看完，不提供关键词搜索。 */}
+          <Flex align="center" gap={12} wrap>
+            <Typography.Text strong>所属基本词性</Typography.Text>
+            <Select
+              aria-label="所属基本词性"
+              value={query.part_of_speech_id ?? ""}
+              showSearch
+              optionFilterProp="label"
+              loading={catalog.isPending}
+              disabled={catalog.isError || parts.length === 0}
+              options={[
+                { value: "", label: "全部" },
+                ...parts.map((item) => ({
+                  value: item.id,
+                  label: item.name_zh
+                }))
+              ]}
+              onChange={(value) =>
+                setQuery({
+                  ...query,
+                  part_of_speech_id: value || undefined,
+                  page: 1
+                })
+              }
+              style={{ width: 200 }}
+              placeholder="请选择基本词性"
+            />
+          </Flex>
           <Button
             type="primary"
             icon={<PlusOutlined />}
