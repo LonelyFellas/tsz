@@ -1,7 +1,7 @@
-import { Col, Form, Input, Row } from "antd";
+import { Col, Form, Input, InputNumber, Row } from "antd";
 import type { DerivedNameField } from "./useDerivedNameDefaults";
 
-export interface PartOfSpeechNamePlaceholders {
+export interface PartOfSpeechSharedPlaceholders {
   name_zh: string;
   short_name_zh: string;
   name_en: string;
@@ -9,17 +9,22 @@ export interface PartOfSpeechNamePlaceholders {
   full_name_en: string;
 }
 
+/** 后端 sort_order 是 PostgreSQL INTEGER，超出范围会被 422 挡回。 */
+const SORT_ORDER_MIN = -2147483648;
+const SORT_ORDER_MAX = 2147483647;
+
 interface Props {
-  placeholders: PartOfSpeechNamePlaceholders;
+  placeholders: PartOfSpeechSharedPlaceholders;
   /** 用户手动编辑派生字段时通知 useDerivedNameDefaults 停止覆盖。 */
   onTouch: (field: DerivedNameField) => void;
 }
 
 /**
- * 基本词性与细分词性共用的五个展示字段：正式中文 / 简洁显示、正式英文 / 英文缩写、英文全称。
- * 校验规则与后端契约一致（中英文名 64、简洁显示与缩写 16、英文全称 64 且须含英文字母）。
+ * 基本词性、细分词性与词形变化共用的表单字段：正式中文 / 简洁显示、正式英文 / 英文缩写、
+ * 英文全称 / 序号。校验规则与后端契约一致（中英文名 64、简洁显示与缩写 16、
+ * 英文全称 64 且须含英文字母、序号是 32 位有符号整数）。
  */
-export function PartOfSpeechNameFields({ placeholders, onTouch }: Props) {
+export function PartOfSpeechSharedFields({ placeholders, onTouch }: Props) {
   return (
     <>
       <Row gutter={16}>
@@ -81,20 +86,40 @@ export function PartOfSpeechNameFields({ placeholders, onTouch }: Props) {
           </Form.Item>
         </Col>
       </Row>
-      <Form.Item
-        name="full_name_en"
-        label="英文全称"
-        rules={[
-          { required: true, whitespace: true, message: "请输入英文全称" },
-          { max: 64, message: "英文全称不能超过 64 个字符" },
-          { pattern: /[A-Za-z]/, message: "英文全称需包含英文字母" }
-        ]}
-      >
-        <Input
-          placeholder={placeholders.full_name_en}
-          onChange={() => onTouch("full_name_en")}
-        />
-      </Form.Item>
+      <Row gutter={16}>
+        <Col span={16}>
+          <Form.Item
+            name="full_name_en"
+            label="英文全称"
+            rules={[
+              { required: true, whitespace: true, message: "请输入英文全称" },
+              { max: 64, message: "英文全称不能超过 64 个字符" },
+              { pattern: /[A-Za-z]/, message: "英文全称需包含英文字母" }
+            ]}
+          >
+            <Input
+              placeholder={placeholders.full_name_en}
+              onChange={() => onTouch("full_name_en")}
+            />
+          </Form.Item>
+        </Col>
+        <Col span={8}>
+          <Form.Item
+            name="sort_order"
+            label="序号"
+            // 列表按序号从小到大排，相同序号再按创建时间。留出间隔就能插队。
+            extra="数字越小越靠前，允许与别的行相同"
+            rules={[{ required: true, message: "请输入序号" }]}
+          >
+            <InputNumber
+              style={{ width: "100%" }}
+              precision={0}
+              min={SORT_ORDER_MIN}
+              max={SORT_ORDER_MAX}
+            />
+          </Form.Item>
+        </Col>
+      </Row>
     </>
   );
 }

@@ -3756,6 +3756,46 @@ describe("part-of-speech settings mock", () => {
       }
     );
     expect(updated).toMatchObject({ name_zh: "集合类名词", revision: 2 });
+
+    // 代码文本落在编码上：未被引用时编码可改，正式英文允许与同父级的别的行重复。
+    const recoded = await settingsMock.partOfSpeechSettings.updateSubPart(
+      noun.id,
+      created.id,
+      {
+        base_revision: 2,
+        code: "N-COLL",
+        name_zh: "集合类名词",
+        name_en: "N-COUNT",
+        short_name_zh: "集合类名词",
+        abbreviation: "n.",
+        full_name_en: "collective noun",
+        sort_order: 15
+      }
+    );
+    expect(recoded).toMatchObject({ code: "N-COLL", name_en: "N-COUNT" });
+    const referencedSub = (
+      await settingsMock.partOfSpeechSettings.listSubParts(noun.id)
+    ).items.find((item) => item.usage_count > 0)!;
+    await expect(
+      settingsMock.partOfSpeechSettings.updateSubPart(
+        noun.id,
+        referencedSub.id,
+        {
+          base_revision: referencedSub.revision,
+          code: "N-RENAMED",
+          name_zh: referencedSub.name_zh,
+          name_en: referencedSub.name_en,
+          short_name_zh: referencedSub.short_name_zh,
+          abbreviation: referencedSub.abbreviation,
+          full_name_en: referencedSub.full_name_en,
+          sort_order: referencedSub.sort_order
+        }
+      )
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "sub_part_of_speech_in_use"
+    });
+
     await expect(
       settingsMock.partOfSpeechSettings.updateSubPart(noun.id, created.id, {
         base_revision: 1,
@@ -3797,7 +3837,7 @@ describe("part-of-speech settings mock", () => {
     });
 
     await settingsMock.partOfSpeechSettings.removeSubPart(noun.id, created.id, {
-      base_revision: updated.revision
+      base_revision: recoded.revision
     });
     const referenced = (
       await settingsMock.partOfSpeechSettings.listSubParts(noun.id)

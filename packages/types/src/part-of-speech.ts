@@ -5,8 +5,9 @@ import type { WordFormType } from "./admin-word";
 /**
  * 可配置基本词性/细分词性的稳定 wire 编码。
  *
- * 编码由系统设置目录创建并在词条中长期引用，创建后不可修改。管理端新建词性时由英文全称
- * 派生一次（用户不填不看），此后业务输入只能来自 catalog、词典检测响应或历史词条 wire，
+ * 编码由系统设置目录创建并在词条中长期引用。基本词性与词形变化的编码由英文全称派生一次
+ * （用户不填不看），创建后不可修改；细分词性的编码是代码文本，由管理员在词性配置里填写，
+ * 还没被词义引用时可以改。业务输入只能来自 catalog、词典检测响应或历史词条 wire，
  * 不得再自行拼接。
  */
 export type PartOfSpeechCode = string;
@@ -142,6 +143,8 @@ export interface CreateSubPartOfSpeechInput {
 
 export interface UpdateSubPartOfSpeechInput {
   base_revision: number;
+  /** 稳定编码；省略表示不改。只有还没被词义引用的细分词性能改编码。 */
+  code?: SubPartOfSpeechCode;
   name_zh: string;
   name_en: string;
   short_name_zh: string;

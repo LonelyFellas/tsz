@@ -17,16 +17,16 @@ import type { TableColumnsType } from "antd";
 import type { CreatePartOfSpeechInput, FormTypeConfig } from "@tsz/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { partOfSpeechDataSource } from "../dataSource";
 import { partOfSpeechKeys, usePartOfSpeechCatalog } from "./api";
 import { nextSortOrder } from "./catalog";
-import { PartOfSpeechNameFields } from "./PartOfSpeechNameFields";
+import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
 import { derivePartOfSpeechCode } from "./PartOfSpeechFormModal";
 import { useDerivedNameDefaults } from "./useDerivedNameDefaults";
 import { errorMessage } from "./PartOfSpeechSettings";
 
-type Values = Omit<CreatePartOfSpeechInput, "code" | "sort_order"> & {
+type Values = Omit<CreatePartOfSpeechInput, "code"> & {
   /** 原形没有归属，wire 上是 null；表单里按未选处理。 */
   part_of_speech_id?: string | null;
 };
@@ -51,6 +51,11 @@ export function FormTypeSettings() {
     page_size: number;
   }>({ page: 1, page_size: 10 });
   const parts = catalog.data?.items ?? [];
+  // 后端列表按 sort_order 全局排序，新建预填也取全局最大值 + 10，
+  // 否则新词形默认会插到别的词性中间；管理员可以改。放进 ref 而不是 effect 依赖：
+  // 目录随时可能重拉，跟着重跑那个 effect 会连带 resetFields 清空正在填的表单。
+  const nextSortOrderRef = useRef(0);
+  nextSortOrderRef.current = nextSortOrder(catalog.data?.form_types ?? []);
   const partNameById = new Map(parts.map((item) => [item.id, item.name_zh]));
   const [form] = Form.useForm<Values>();
   const [open, setOpen] = useState(false);
@@ -75,7 +80,6 @@ export function FormTypeSettings() {
           ...(editing.code === "base"
             ? {}
             : { part_of_speech_id: partId ?? undefined }),
-          sort_order: editing.sort_order,
           base_revision: editing.revision
         });
       }
@@ -85,10 +89,7 @@ export function FormTypeSettings() {
       return partOfSpeechDataSource.createFormType({
         ...values,
         part_of_speech_id: partId,
-        code: deriveFormTypeCode(parent?.code ?? "", values.full_name_en),
-        // 后端列表按 sort_order 全局排序，这里也取全局最大值 + 10，
-        // 否则新词形会插到别的词性中间。
-        sort_order: nextSortOrder(catalog.data?.form_types ?? [])
+        code: deriveFormTypeCode(parent?.code ?? "", values.full_name_en)
       });
     },
     onSuccess: async () => {
@@ -105,6 +106,7 @@ export function FormTypeSettings() {
       return;
     }
     form.resetFields();
+    form.setFieldValue("sort_order", nextSortOrderRef.current);
     // 「全部」视图下留空由管理员选；已经筛到某个词性时直接带上，少点一次。
     if (query.part_of_speech_id) {
       form.setFieldValue("part_of_speech_id", query.part_of_speech_id);
@@ -131,11 +133,7 @@ export function FormTypeSettings() {
       }
     });
   const columns: TableColumnsType<FormTypeConfig> = [
-    {
-      title: "序号",
-      width: 64,
-      render: (_, __, index) => (query.page - 1) * query.page_size + index + 1
-    },
+    { title: "序号", dataIndex: "sort_order", width: 64 },
     { title: "正式中文", dataIndex: "name_zh", width: 130 },
     { title: "简洁显示", dataIndex: "short_name_zh", width: 120 },
     { title: "正式英文", dataIndex: "name_en", width: 160 },
@@ -332,7 +330,7 @@ export function FormTypeSettings() {
               />
             </Form.Item>
           )}
-          <PartOfSpeechNameFields
+          <PartOfSpeechSharedFields
             placeholders={{
               name_zh: "例如 过去式",
               short_name_zh: "例如 过去式",

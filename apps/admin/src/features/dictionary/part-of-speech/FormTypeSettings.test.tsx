@@ -114,6 +114,9 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
   await waitFor(() =>
     expect(screen.getByLabelText("英文全称")).toHaveValue("custom variant")
   );
+  // 序号按目录里的全局最大值 + 10 预填，管理员可以改。
+  expect(screen.getByLabelText("序号")).toHaveValue("10");
+  fireEvent.change(screen.getByLabelText("序号"), { target: { value: "12" } });
   fireEvent.click(screen.getByText(/^新\s*建$/));
   await waitFor(() =>
     expect(mock.create).toHaveBeenCalledWith({
@@ -125,7 +128,7 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
       short_name_zh: "自定义词形",
       abbreviation: "custom",
       full_name_en: "custom variant",
-      sort_order: 10
+      sort_order: 12
     })
   );
   await waitFor(() =>
@@ -133,6 +136,16 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
   );
   expect(screen.getAllByText("自定义词形").length).toBeGreaterThan(0);
 });
+it("序号列显示真实排序值，而不是行内位置", async () => {
+  setup();
+  await waitFor(() =>
+    expect(document.querySelector("tbody tr.ant-table-row")).not.toBeNull()
+  );
+  // 原形的 sort_order 是 0，第 1 行——位置序号会显示 1。
+  const row = document.querySelector("tbody tr.ant-table-row")!;
+  expect(row.querySelectorAll("td")[0]!.textContent).toBe("0");
+});
+
 it("编辑原形时不给归属选择，也不把归属发给后端", async () => {
   mock.update.mockImplementation(async (id, input) => ({
     ...base,
