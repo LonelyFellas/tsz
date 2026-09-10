@@ -9,10 +9,26 @@ import { newWordNodeId } from "../../word-model/primitives";
 import { replaceRichText, sentenceTranslationsV3 } from "../meaningsModel";
 import "./V3SentenceTranslationsField.css";
 
+// 初/中/高是译文风格，与例句的难度等级无关，顺序固定为初、中、高。
 const TIERS = [
-  { key: "a1_a2", label: "高阶（A1/A2）", name: "高阶", short: "高" },
-  { key: "b1_b2", label: "中阶（B1/B2）", name: "中阶", short: "中" },
-  { key: "c1_c2", label: "低阶（C1/C2）", name: "低阶", short: "低" }
+  {
+    key: "word_for_word",
+    label: "初阶",
+    name: "初阶",
+    short: "初"
+  },
+  {
+    key: "balanced_fluency",
+    label: "中阶",
+    name: "中阶",
+    short: "中"
+  },
+  {
+    key: "adapted_creation",
+    label: "高阶",
+    name: "高阶",
+    short: "高"
+  }
 ] as const;
 
 export function V3SentenceTranslationsField({
@@ -82,7 +98,7 @@ export function V3SentenceTranslationsField({
                       size="small"
                       disabled={disabled}
                       className="word-sentence-translation-band-button"
-                      aria-label={`例句 ${index + 1} 译文 ${translationIndex + 1} 等级`}
+                      aria-label={`例句 ${index + 1} 译文 ${translationIndex + 1} 风格`}
                     >
                       <span
                         aria-label={`${tier.name}译文`}

@@ -16,9 +16,9 @@
 .word-sentence-translation-groups {
   grid-area: groups;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 

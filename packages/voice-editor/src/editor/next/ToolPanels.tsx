@@ -105,6 +105,8 @@ function PopSection({
 
 export interface VoicePanelProps {
   readOnly?: boolean;
+  /** 只保留这一侧的语种分组；不传表示这段正文不分英美，全部照常展示。 */
+  locale?: AudioAssetLocale;
   voices: VoiceOption[];
   voicesLoading: boolean;
   enabledVoiceIds: string[];
@@ -121,6 +123,7 @@ export interface VoicePanelProps {
 /** 音色：按语种分组的可勾选清单，每行右侧一个试听。 */
 export function VoicePanel({
   readOnly,
+  locale,
   voices,
   voicesLoading,
   enabledVoiceIds,
@@ -139,8 +142,21 @@ export function VoicePanel({
   const selectedUncommon = uncommon.filter((voice) =>
     enabledVoiceIds.includes(voice.id)
   ).length;
+  // 已勾选却不属于本侧的音色仍要露出来，否则历史配置只能看见结果、没法取消。
+  const visibleLocales = (items: VoiceOption[]) =>
+    locale
+      ? VOICE_LOCALES.filter(
+          (entry) =>
+            entry.locale === locale ||
+            items.some(
+              (voice) =>
+                voice.locale === entry.locale &&
+                enabledVoiceIds.includes(voice.id)
+            )
+        )
+      : VOICE_LOCALES;
   const renderGroups = (items: VoiceOption[]) =>
-    VOICE_LOCALES.map(({ locale, badge }) => {
+    visibleLocales(items).map(({ locale, badge }) => {
       const group = items.filter((voice) => voice.locale === locale);
       if (group.length === 0) return null;
       return (
@@ -383,6 +399,8 @@ export interface UploadDraft {
 
 export interface UploadPanelProps {
   readOnly?: boolean;
+  /** 只允许上传这一侧的录音；不传表示这段正文不分英美。 */
+  locale?: AudioAssetLocale;
   /** 没注入适配器、或存储未开通时为 false：整块置灰并说明原因。 */
   available: boolean;
   unavailableReason?: string;
@@ -414,6 +432,7 @@ const genderLabel = (gender: string) =>
  */
 export function UploadPanel({
   readOnly,
+  locale,
   available,
   unavailableReason,
   upload,
@@ -467,8 +486,10 @@ export function UploadPanel({
           value={upload.locale}
           disabled={readOnly || !available}
           onChange={(event) => onUploadChange({ locale: event.target.value })}
-          options={VOICE_LOCALES.map(({ locale, badge }) => ({
-            value: locale,
+          options={VOICE_LOCALES.filter(
+            (entry) => !locale || entry.locale === locale
+          ).map(({ locale: value, badge }) => ({
+            value,
             label: badge
           }))}
         />

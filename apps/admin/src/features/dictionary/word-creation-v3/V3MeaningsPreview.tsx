@@ -1,4 +1,9 @@
-import type { AdminWordV3, EnglishTextV3, WordDefinitionV3 } from "@tsz/types";
+import type {
+  AdminWordV3,
+  EnglishTextV3,
+  SentenceTranslationBandV3,
+  WordDefinitionV3
+} from "@tsz/types";
 import { Card, Empty, Flex, Space, Tag, Typography } from "antd";
 import { sentenceTranslationsV3 } from "./meaningsModel";
 import { groupRelations } from "./relationGroups";
@@ -22,9 +27,9 @@ function DefinitionText({ definition }: { definition: WordDefinitionV3 }) {
   return <V3EnglishTextPreview value={definition.content as EnglishTextV3} />;
 }
 
-function translationBandLabel(band: "a1_a2" | "b1_b2" | "c1_c2") {
-  if (band === "c1_c2") return "低";
-  if (band === "b1_b2") return "中";
+function translationBandLabel(band: SentenceTranslationBandV3) {
+  if (band === "word_for_word") return "初";
+  if (band === "balanced_fluency") return "中";
   return "高";
 }
 

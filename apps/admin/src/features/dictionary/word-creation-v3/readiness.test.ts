@@ -47,7 +47,7 @@ function sentence(id: string): WordSentenceWritableV3 {
     zh_translations: [
       {
         id: uuidFromInt(Number.parseInt(id.slice(-4), 16) + 20_000),
-        band: "a1_a2",
+        band: "adapted_creation",
         content: { version: 2, text: "一个中心。", annotations: [] }
       }
     ],
@@ -583,7 +583,7 @@ describe("实时摘要明细", () => {
     sense.sentences[1]!.level = "";
     sense.sentences[0]!.zh_translations.push({
       id: "advanced",
-      band: "c1_c2",
+      band: "word_for_word",
       content: { version: 2, text: "另一译文", annotations: [] }
     });
     const before = structuredClone({ forms, meanings });

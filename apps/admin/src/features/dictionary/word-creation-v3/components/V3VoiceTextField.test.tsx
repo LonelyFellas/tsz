@@ -73,6 +73,54 @@ beforeEach(() => {
   state.resolveUrl.mockReset();
 });
 
+describe("V3VoiceTextField 语种筛选", () => {
+  async function openVoicePanel() {
+    fireEvent.click(screen.getByRole("button", { name: /^打开.*编辑器$/ }));
+    await screen.findByRole(
+      "toolbar",
+      { name: "标注工具栏" },
+      { timeout: 10_000 }
+    );
+    fireEvent.click(screen.getByRole("button", { name: /发音/ }));
+  }
+
+  // uk 必须落 en-GB、us 必须落 en-US：映射写反了不会报错，只会静默上线。
+  it("英式栏只留 BrE 音色，美式栏筛掉它", async () => {
+    state.flags.VOICE_PREVIEW = true;
+    const { unmount } = render(
+      <V3VoiceTextField
+        mode="dict-phonetic"
+        dialect="uk"
+        ariaLabel="字典音标"
+        field="dict_phonetic"
+        nodeId="pronunciation"
+        value={VALUE}
+        onChange={vi.fn()}
+      />
+    );
+    await openVoicePanel();
+    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+    unmount();
+
+    render(
+      <V3VoiceTextField
+        mode="dict-phonetic"
+        dialect="us"
+        ariaLabel="字典音标"
+        field="dict_phonetic"
+        nodeId="pronunciation"
+        value={VALUE}
+        onChange={vi.fn()}
+      />
+    );
+    await openVoicePanel();
+    await waitFor(() =>
+      expect(document.querySelector(".tsz-ve-speech-panel")).not.toBeNull()
+    );
+    expect(screen.queryByText("Sonia")).toBeNull();
+  });
+});
+
 describe("V3VoiceTextField 上传音频", () => {
   it("后端仅支持语法结构音频时，正文关联模式不开放上传", async () => {
     render(

@@ -322,7 +322,7 @@ const MEANINGS: DraftMeaningsStepContentV3 = {
             zh_translations: [
               {
                 id: nodeId(79 + index * 10),
-                band: "b1_b2",
+                band: "balanced_fluency",
                 content: richText(
                   index === 0 ? "卫星进入了轨道。" : "卫星环绕地球运行。"
                 )

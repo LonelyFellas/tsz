@@ -599,9 +599,9 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(formsCss).toContain(".v3-dialect-separated-matrix {");
     expect(formsCss).toContain(
-      "grid-template-columns: 142px repeat(2, minmax(0, 1fr));"
+      "grid-template-columns: 112px repeat(2, minmax(0, 1fr));"
     );
-    expect(formsCss).toContain("column-gap: 28px;");
+    expect(formsCss).toContain("column-gap: 12px;");
     expect(formsCss).toMatch(
       /\.v3-dialect-panel \{[\s\S]*?border: 1px solid;[\s\S]*?border-radius: 14px;/
     );

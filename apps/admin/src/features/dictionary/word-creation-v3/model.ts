@@ -139,10 +139,11 @@ function isPronunciationShape(value: unknown): value is WordPronunciationV3 {
   const keys = Object.keys(value);
   return (
     keys.length >= 3 &&
-    keys.length <= 7 &&
+    keys.length <= 8 &&
     keys.every((key) =>
       [
         "actual_pron",
+        "actual_pron_rich",
         "dict_phonetic",
         "id",
         "style",
@@ -848,6 +849,9 @@ function pronunciationWire(
       ? {}
       : { audio_assets: pronunciation.audio_assets }),
     actual_pron: pronunciation.actual_pron,
+    ...(pronunciation.actual_pron_rich === undefined
+      ? {}
+      : { actual_pron_rich: pronunciation.actual_pron_rich }),
     ...(pronunciation.style === undefined ? {} : { style: pronunciation.style })
   };
 }

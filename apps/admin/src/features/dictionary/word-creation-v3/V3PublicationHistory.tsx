@@ -346,9 +346,9 @@ function snapshotBody(publication: AdminWordPublicationAny): {
           chinese: sentenceTranslationsV3(sentence).map((translation) => ({
             id: translation.id,
             label:
-              translation.band === "c1_c2"
-                ? "低"
-                : translation.band === "b1_b2"
+              translation.band === "word_for_word"
+                ? "初"
+                : translation.band === "balanced_fluency"
                   ? "中"
                   : "高",
             text: translation.content.text

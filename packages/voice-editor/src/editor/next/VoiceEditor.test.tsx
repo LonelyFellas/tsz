@@ -1411,6 +1411,48 @@ describe("VoiceEditor 发音区", () => {
     expect(screen.getByText("Guy")).toBeInTheDocument();
   });
 
+  it("正文分英美时只留本侧语种，通用正文照旧两侧都给", async () => {
+    const { unmount } = render(
+      <VoiceEditor {...props({ previewAdapter: adapter(), locale: "en-GB" })} />
+    );
+    openVoices();
+
+    await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
+    expect(
+      [...document.querySelectorAll(".tsz-ve-pop-section-head")].map(
+        (head) => head.textContent
+      )
+    ).toEqual(["BrE"]);
+    expect(screen.queryByText("Guy")).toBeNull();
+    unmount();
+
+    render(<VoiceEditor {...props({ previewAdapter: adapter() })} />);
+    openVoices();
+    await waitFor(() => expect(screen.getByText("Guy")).toBeInTheDocument());
+  });
+
+  it("对侧音色已经勾上时仍然露出来，否则没法取消", async () => {
+    render(
+      <VoiceEditor
+        {...props({
+          previewAdapter: adapter(),
+          locale: "en-GB",
+          voiceProfile: {
+            voices: [{ voice_id: "guy", enabled: true, rate_percent: 0 }]
+          }
+        })}
+      />
+    );
+    openVoices();
+
+    await waitFor(() => expect(screen.getByText("Guy")).toBeInTheDocument());
+    expect(
+      [...document.querySelectorAll(".tsz-ve-pop-section-head")].map(
+        (head) => head.textContent
+      )
+    ).toEqual(["BrE", "AmE"]);
+  });
+
   it("未配置时默认不勾选，试听不改变C端音色选择", async () => {
     const onVoiceProfileChange = vi.fn();
     const synthesize = vi.fn().mockResolvedValue(previewResult());
@@ -1967,7 +2009,7 @@ describe("VoiceEditor 发音区", () => {
     // 已配过就不必等清单拉回来才报数
     expect(
       document.querySelector('[aria-label="发音"]')!.textContent
-    ).toContain("已选 1 个音色");
+    ).toContain("1 个音色");
 
     openVoices();
     await waitFor(() => expect(screen.getByText("Sonia")).toBeInTheDocument());
@@ -2015,14 +2057,33 @@ describe("VoiceEditor 发音区", () => {
   });
 });
 
-it("默认发音编辑器不带语法工具，仅语法区域显式开启", () => {
+it("按字段分工给工具：只有字典音标那一侧收走连读", () => {
   const view = props();
+  // 缺省仍是老口径：没有语法结构，但连读还在。V2 向导那些不传 mode 的
+  // 调用方靠的就是这个默认值，摘连读不能摘在它身上。
   const { rerender } = render(<VoiceEditor {...view} mode={undefined} />);
   expect(screen.queryByRole("button", { name: /语法结构/ })).toBeNull();
   for (const name of ["连读", "停顿", "发音", "音频"])
     expect(
       screen.getByRole("button", { name: new RegExp(name) })
     ).toBeInTheDocument();
+
+  // 字典音标只负责喂语音合成：语法结构和连读都不给。
+  rerender(<VoiceEditor {...view} mode="dict-phonetic" />);
+  for (const name of ["语法结构", "连读"])
+    expect(screen.queryByRole("button", { name: new RegExp(name) })).toBeNull();
+  for (const name of ["停顿", "发音", "音频"])
+    expect(
+      screen.getByRole("button", { name: new RegExp(name) })
+    ).toBeInTheDocument();
+
   rerender(<VoiceEditor {...view} mode="grammar" />);
   expect(screen.getByRole("button", { name: /语法结构/ })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /连读/ })).toBeInTheDocument();
+
+  // 实际发音只用于展示：留连读，其余冲着合成去的工具都收起来。
+  rerender(<VoiceEditor {...view} mode="actual-pron" />);
+  expect(screen.getByRole("button", { name: /连读/ })).toBeInTheDocument();
+  for (const name of ["语法结构", "停顿", "发音", "音频"])
+    expect(screen.queryByRole("button", { name: new RegExp(name) })).toBeNull();
 });

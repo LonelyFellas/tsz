@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "3a1ac9d82be2b33cda32f9c0703ef57e0944ade7d21b2a4d97c6294f8b1e89f9",
+  "_source_sha256": "535a4679fb30388581b6e4985f76072fbb23690111e1372f8b61494605a0c8ca",
   "roots": [
     "EntryAnnotationResponse",
     "AdminWordV3",
@@ -2559,7 +2559,7 @@
     },
     "SentenceTranslationBandV3": {
       "type": "string",
-      "enum": ["a1_a2", "b1_b2", "c1_c2"]
+      "enum": ["word_for_word", "balanced_fluency", "adapted_creation"]
     },
     "SmartDictionaryResultV2": {
       "oneOf": [
@@ -3847,6 +3847,7 @@
       "required": ["id", "dict_phonetic", "actual_pron"],
       "properties": {
         "actual_pron": { "type": "string", "maxLength": 200 },
+        "actual_pron_rich": { "$ref": "#/$defs/RichTextV3" },
         "audio_assets": {
           "type": "array",
           "items": { "$ref": "#/$defs/AudioAsset" },

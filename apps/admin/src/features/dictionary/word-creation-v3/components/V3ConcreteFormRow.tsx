@@ -93,31 +93,33 @@ function V3ConcreteFormTypeCell({
       data-v3-node-id={form.id}
       tabIndex={-1}
     >
-      <div
-        className="word-form-type-select"
-        title={formTypeDisabled ? formTypeDisabledReason : undefined}
-      >
-        <Select
-          aria-label={formTypeAriaLabel}
-          disabled={formTypeDisabled}
-          onChange={(formType) =>
-            onChange(updateConcreteFormType(content, form.id, formType))
-          }
-          options={availableFormTypes.map((value) => ({
-            value,
-            label: formTypeLabel(value)
-          }))}
-          size="small"
-          style={{ width: "100%" }}
-          value={form.form_type}
-        />
+      <div className="word-form-type-cell-content">
+        <div
+          className="word-form-type-select"
+          title={formTypeDisabled ? formTypeDisabledReason : undefined}
+        >
+          <Select
+            aria-label={formTypeAriaLabel}
+            disabled={formTypeDisabled}
+            onChange={(formType) =>
+              onChange(updateConcreteFormType(content, form.id, formType))
+            }
+            options={availableFormTypes.map((value) => ({
+              value,
+              label: formTypeLabel(value)
+            }))}
+            size="small"
+            style={{ width: "100%" }}
+            value={form.form_type}
+          />
+        </div>
+        {membershipCount > 1 ? (
+          <Typography.Text type="secondary">
+            已在 {membershipCount} 个变化组中使用
+          </Typography.Text>
+        ) : null}
+        {actions}
       </div>
-      {membershipCount > 1 ? (
-        <Typography.Text type="secondary">
-          已在 {membershipCount} 个变化组中使用
-        </Typography.Text>
-      ) : null}
-      {actions}
     </div>
   );
 }

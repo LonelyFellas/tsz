@@ -2411,7 +2411,14 @@ it("历史发布快照展示释义和例句的人工关联", async () => {
   const detail = complexV3Publication();
   const sense = detail.word.meanings.pos[0]!.senses[0]!;
   sense.sentences[0]!.zh_translations = (
-    ["c1_c2", "c1_c2", "b1_b2", "b1_b2", "a1_a2", "a1_a2"] as const
+    [
+      "word_for_word",
+      "word_for_word",
+      "balanced_fluency",
+      "balanced_fluency",
+      "adapted_creation",
+      "adapted_creation"
+    ] as const
   ).map((band, index) => ({
     id: `historical-translation-${index}`,
     band,
@@ -2456,12 +2463,12 @@ it("历史发布快照展示释义和例句的人工关联", async () => {
     })
   );
   const body = await screen.findByTestId("publication-snapshot-body");
-  for (const label of ["高", "中", "低"]) {
+  for (const label of ["初", "中", "高"]) {
     expect(
       within(body).getAllByText(label, { selector: ".ant-tag" })
     ).toHaveLength(2);
   }
-  expect(within(body).queryByText("初", { selector: ".ant-tag" })).toBeNull();
+  expect(within(body).queryByText("低", { selector: ".ant-tag" })).toBeNull();
   expect(within(body).getAllByText("sentence → sentence · 句子")).toHaveLength(
     2
   );

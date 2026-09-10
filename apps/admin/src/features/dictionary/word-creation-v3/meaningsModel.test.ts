@@ -214,7 +214,7 @@ describe("V3 meanings writable model", () => {
           zh_translations: [
             {
               id: expect.any(String),
-              band: "a1_a2",
+              band: "balanced_fluency",
               content: { version: 2, text: "", annotations: [] }
             }
           ],
@@ -1050,7 +1050,7 @@ describe("V3 meanings writable model", () => {
     expect(projectedSense.sentences[0]!.zh_translations).toEqual([
       {
         id: projectedSense.sentences[0]!.zh_text_id,
-        band: "a1_a2",
+        band: "balanced_fluency",
         content: projectedSense.sentences[0]!.zh_text
       }
     ]);

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-10T03:36:13.162Z",
+  "_generatedAt": "2026-09-10T09:49:32.835Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -4178,7 +4178,8 @@
     },
     "SentenceTranslationBandV3": {
       "type": "string",
-      "enum": ["a1_a2", "b1_b2", "c1_c2"]
+      "description": "译文风格而非难度等级：初阶逐字直译、中阶语句通顺、高阶深层重构。",
+      "enum": ["word_for_word", "balanced_fluency", "adapted_creation"]
     },
     "SourceDialect": {
       "type": "string",
@@ -4738,6 +4739,10 @@
       "required": ["id", "dict_phonetic", "actual_pron"],
       "properties": {
         "actual_pron": { "type": "string", "maxLength": 200 },
+        "actual_pron_rich": {
+          "$ref": "#/components/schemas/RichTextV3",
+          "description": "编辑器正文与 actual_pron 保持一致。连读只标在这里：字典音标那一侧负责\n喂语音合成，连读是纯展示的标注，两边分工不混。旧记录不输出扩展字段。"
+        },
         "audio_assets": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/AudioAsset" },

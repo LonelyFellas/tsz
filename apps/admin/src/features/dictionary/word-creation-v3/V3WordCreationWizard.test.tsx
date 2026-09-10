@@ -1438,8 +1438,9 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByText("定位 T4"));
 
     const target = await waitFor(() => {
-      const element = container.querySelector<HTMLInputElement>(
-        `input[data-v3-node-id="${UUIDS.pronunciation_2}"][data-v3-field="actual_pron"]`
+      // 实际发音改成语音编辑器字段后折叠态是 textarea，别把选择器钉在 input 上。
+      const element = container.querySelector<HTMLTextAreaElement>(
+        `[data-v3-node-id="${UUIDS.pronunciation_2}"][data-v3-field="actual_pron"]`
       );
       expect(element).not.toBeNull();
       return element!;

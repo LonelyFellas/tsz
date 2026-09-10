@@ -885,7 +885,9 @@ describe("admin word V3/Any runtime decoder", () => {
         runtimeFixtureBundle.$defs.WordSentenceTranslationV3!
       ) as Record<string, unknown>),
       id: `00000000-0000-4000-8000-${String(index + 1).padStart(12, "0")}`,
-      band: ["a1_a2", "b1_b2", "c1_c2"][Math.floor(index / 2)]
+      band: ["adapted_creation", "balanced_fluency", "word_for_word"][
+        Math.floor(index / 2)
+      ]
     }));
     sentence.associations = [
       {

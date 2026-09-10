@@ -398,7 +398,7 @@ describe("buildV3PublicationIssueSummary", () => {
                   zh_translations: [
                     {
                       id: uuidFromInt(1609),
-                      band: "a1_a2",
+                      band: "adapted_creation",
                       content: {
                         version: 2,
                         text: "一个中心。",

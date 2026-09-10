@@ -10,7 +10,7 @@
 /* 两层同时留出完成按钮的空间，保持光标对齐，并避开末行停顿标记。 */
 .v3-voice-text-editor .tsz-ve-strip,
 .v3-voice-text-editor .tsz-ve-canvas-input {
-  padding-bottom: 78px;
+  padding-bottom: 44px;
 }
 
 .v3-voice-text-editor-done {

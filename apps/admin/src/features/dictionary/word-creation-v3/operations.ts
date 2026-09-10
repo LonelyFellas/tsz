@@ -408,6 +408,11 @@ function variantMappingFrom(
       ...(pronunciation.audio_assets === undefined
         ? {}
         : { audio_assets: structuredClone(pronunciation.audio_assets) }),
+      ...(pronunciation.actual_pron_rich === undefined
+        ? {}
+        : {
+            actual_pron_rich: structuredClone(pronunciation.actual_pron_rich)
+          }),
       dict_phonetic: pronunciation.dict_phonetic,
       actual_pron: pronunciation.actual_pron,
       ...(pronunciation.style === undefined
