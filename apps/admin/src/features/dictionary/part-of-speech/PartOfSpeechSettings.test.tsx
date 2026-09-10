@@ -487,6 +487,29 @@ describe("PartOfSpeechSettings", () => {
     expect(await screen.findByText("基本词性已删除")).toBeInTheDocument();
   });
 
+  it("名下还有词形变化的词性，删除按钮预判禁用并说明原因", async () => {
+    mock.list.data = {
+      items: [
+        {
+          ...items[1]!,
+          usage_count: 0,
+          sub_part_count: 0,
+          allowed_form_types: ["past_tense", "plural"]
+        }
+      ],
+      pagination: { page: 1, page_size: 10, total: 1, total_pages: 1 }
+    };
+    renderSettings();
+
+    const row = screen.getByText("小品词").closest("tr")!;
+    const remove = within(row).getByText("删 除").closest("button")!;
+    expect(remove).toBeDisabled();
+    expect(remove.parentElement).toHaveAttribute(
+      "data-tooltip",
+      "还有 2 项词形变化，请先删除词形变化"
+    );
+  });
+
   it.each([
     ["part_of_speech_conflict", "基本词性名称已存在"],
     ["sub_part_of_speech_conflict", "细分词性名称已存在"],
@@ -494,6 +517,10 @@ describe("PartOfSpeechSettings", () => {
     [
       "part_of_speech_has_sub_parts",
       "该基本词性下还有细分词性，请先删除细分词性"
+    ],
+    [
+      "part_of_speech_has_form_types",
+      "该基本词性下还有词形变化，请先删除词形变化"
     ],
     ["sub_part_of_speech_in_use", "该细分词性已被词义引用，只能修改"],
     ["sub_part_of_speech_not_allowed", "该基本词性不支持细分词性"],

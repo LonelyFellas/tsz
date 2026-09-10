@@ -2446,9 +2446,9 @@ export function createAdminWordsMock({
       ...clone(item),
       usage_count: partUsageCount(current, item.code),
       sub_part_count: sortedSubParts(current, item.id).length,
-      form_type_count: formTypeItems(current).filter(
-        (f) => f.part_of_speech_id === item.id
-      ).length
+      allowed_form_types: formTypeItems(current)
+        .filter((f) => f.code !== "base" && f.part_of_speech_id === item.id)
+        .map((f) => f.code)
     };
   }
 
@@ -2750,9 +2750,10 @@ export function createAdminWordsMock({
           id,
           {
             id,
-            ...(ownerByFormCode[code!]
-              ? { part_of_speech_id: partIdByCode.get(ownerByFormCode[code!]!) }
-              : {}),
+            // 管理接口恒返回该键，原形为 null；catalog 那侧才省略。
+            part_of_speech_id: ownerByFormCode[code!]
+              ? (partIdByCode.get(ownerByFormCode[code!]!) ?? null)
+              : null,
             code: code!,
             name_zh: zh!,
             name_en: en!,
@@ -2907,7 +2908,7 @@ export function createAdminWordsMock({
       actor = { id: profile.id, display_name: profile.display_name };
     const item: FormTypeConfig = {
       id: existing?.id ?? nextId(current, "form-type"),
-      ...(partOfSpeechId ? { part_of_speech_id: partOfSpeechId } : {}),
+      part_of_speech_id: partOfSpeechId ?? null,
       code,
       name_zh: input.name_zh,
       name_en: input.name_en,
@@ -3050,7 +3051,7 @@ export function createAdminWordsMock({
       sub_part_count: 0,
       sub_parts_extensible: true,
       sub_pos_required: isSubPosRequiredCode(input.code),
-      form_type_count: 0,
+      allowed_form_types: [],
       revision: 1,
       created_by: { id: profile.id, display_name: profile.display_name },
       created_at: timestamp,

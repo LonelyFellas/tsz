@@ -3660,6 +3660,31 @@ describe("part-of-speech settings mock", () => {
       ownSub.id,
       { base_revision: ownSub.revision }
     );
+
+    // 词形变化同理：挂上之后父词性删不掉，清空才能删。
+    const ownForm = await settingsMock.partOfSpeechSettings.createFormType({
+      part_of_speech_id: created.id,
+      code: "particle_emphasis",
+      name_zh: "强调式",
+      name_en: "Emphatic form",
+      short_name_zh: "强调",
+      abbreviation: "emph.",
+      full_name_en: "emphatic form",
+      sort_order: 100
+    });
+    expect(ownForm.part_of_speech_id).toBe(created.id);
+    await expect(
+      settingsMock.partOfSpeechSettings.remove(created.id, {
+        base_revision: updated.revision
+      })
+    ).rejects.toMatchObject({
+      status: 409,
+      code: "part_of_speech_has_form_types"
+    });
+    await settingsMock.partOfSpeechSettings.removeFormType(ownForm.id, {
+      base_revision: ownForm.revision
+    });
+
     await settingsMock.partOfSpeechSettings.remove(created.id, {
       base_revision: updated.revision
     });

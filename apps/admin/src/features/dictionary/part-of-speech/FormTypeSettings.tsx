@@ -79,10 +79,12 @@ export function FormTypeSettings() {
           base_revision: editing.revision
         });
       }
+      // 表单的 required 规则保证走到这里时归属已选。
+      if (!partId) throw new Error("missing part_of_speech_id");
       const parent = parts.find((item) => item.id === partId);
       return partOfSpeechDataSource.createFormType({
         ...values,
-        part_of_speech_id: partId as string,
+        part_of_speech_id: partId,
         code: deriveFormTypeCode(parent?.code ?? "", values.full_name_en),
         // 后端列表按 sort_order 全局排序，这里也取全局最大值 + 10，
         // 否则新词形会插到别的词性中间。
@@ -143,7 +145,7 @@ export function FormTypeSettings() {
       title: "所属基本词性",
       dataIndex: "part_of_speech_id",
       width: 120,
-      render: (partId?: string) =>
+      render: (partId?: string | null) =>
         partId ? (partNameById.get(partId) ?? partId) : "所有词性"
     },
     {

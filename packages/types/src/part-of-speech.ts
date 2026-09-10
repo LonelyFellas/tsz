@@ -28,8 +28,10 @@ export interface PartOfSpeechConfig {
   sort_order: number;
   usage_count: number;
   sub_part_count: number;
-  /** 名下的词形变化数量：删除前据此给出预判。 */
-  form_type_count?: number;
+  /** 该词性名下的非原形词形变化编码，按 sort_order 有序；删除前可据此预判。 */
+  allowed_form_types?: WordFormType[];
+  /** “添加派生词形”的默认补齐顺序，必须是 allowed_form_types 子集。 */
+  default_form_types?: WordFormType[];
   /** 任意基本词性都可以扩展细分词性，恒为 true。 */
   sub_parts_extensible: boolean;
   /** 后端按固定编码集合（名词/动词/代词/形容词/副词）派生：该词性下的释义是否必须选中细分词性。 */

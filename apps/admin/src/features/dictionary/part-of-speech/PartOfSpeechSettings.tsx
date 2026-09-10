@@ -203,8 +203,8 @@ export function PartOfSpeechSettings() {
                 ? `已有 ${item.usage_count} 个单词或短语引用，只能修改`
                 : item.sub_part_count > 0
                   ? `还有 ${item.sub_part_count} 项细分词性，请先删除细分词性`
-                  : (item.form_type_count ?? 0) > 0
-                    ? `还有 ${item.form_type_count} 项词形变化，请先删除词形变化`
+                  : (item.allowed_form_types?.length ?? 0) > 0
+                    ? `还有 ${item.allowed_form_types!.length} 项词形变化，请先删除词形变化`
                     : undefined
             }
           >
@@ -214,7 +214,8 @@ export function PartOfSpeechSettings() {
               disabled={
                 item.usage_count > 0 ||
                 item.sub_part_count > 0 ||
-                (item.form_type_count ?? 0) > 0
+                // 候选清单就是该词性名下的非原形词形，长度即数量。
+                (item.allowed_form_types?.length ?? 0) > 0
               }
               onClick={() => removeItem(item)}
             >
