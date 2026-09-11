@@ -787,7 +787,9 @@
 .word-pronunciation-row {
   display: grid;
   grid-template-columns: 64px minmax(0, 1fr);
-  gap: 12px;
+  /* 列距要撑开标签与控件；行距只用来接住下方的校验提示，12px 会让提示浮在半空。 */
+  column-gap: 12px;
+  row-gap: 4px;
   align-items: center;
   min-width: 0;
 }

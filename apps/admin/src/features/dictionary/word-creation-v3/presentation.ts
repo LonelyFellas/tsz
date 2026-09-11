@@ -158,10 +158,54 @@ export function sentenceLinkRoleLabel(value: string): string {
   return "其他关联";
 }
 
+const IMPACT_REASON_LABEL: Record<string, string> = {
+  node_removed_from_draft: "将从草稿移除",
+  downstream_node_removed_with_pos: "会随词性一起删除"
+};
+
 export function impactReasonLabel(value: string): string {
-  return /[\u3400-\u9fff]/u.test(value)
-    ? value
-    : "关联内容将随本次调整受到影响。";
+  if (/[\u3400-\u9fff]/u.test(value)) return value;
+  return IMPACT_REASON_LABEL[value] ?? "关联内容将随本次调整受到影响。";
+}
+
+export type FormsImpactSummaryGroup = {
+  reason: string;
+  reasonLabel: string;
+  total: number;
+  parts: { nodeType: FormsImpactNodeTypeV3; label: string; count: number }[];
+};
+
+/**
+ * 影响清单逐条铺开时会出现几十行同一句话（后端按节点粒度返回，一个词性下的
+ * 每条发音、每个地区拼写都算一条）。按「原因 → 节点类型」聚合成计数，
+ * 保留原有的类型与原因用词，只把重复折起来。
+ */
+export function summarizeFormsImpact(
+  affected: readonly { node_type: FormsImpactNodeTypeV3; reason: string }[]
+): FormsImpactSummaryGroup[] {
+  const groups = new Map<string, Map<FormsImpactNodeTypeV3, number>>();
+  for (const item of affected) {
+    const byType = groups.get(item.reason) ?? new Map();
+    byType.set(item.node_type, (byType.get(item.node_type) ?? 0) + 1);
+    groups.set(item.reason, byType);
+  }
+  return [...groups.entries()].map(([reason, byType]) => {
+    const parts = [...byType.entries()]
+      .map(([nodeType, count]) => ({
+        nodeType,
+        label: impactTypeLabel(nodeType),
+        count
+      }))
+      .sort(
+        (a, b) => b.count - a.count || a.label.localeCompare(b.label, "zh")
+      );
+    return {
+      reason,
+      reasonLabel: impactReasonLabel(reason),
+      total: parts.reduce((sum, part) => sum + part.count, 0),
+      parts
+    };
+  });
 }
 
 export function impactTypeLabel(value: FormsImpactNodeTypeV3): string {

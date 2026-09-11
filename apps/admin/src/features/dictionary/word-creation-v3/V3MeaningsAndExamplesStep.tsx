@@ -1009,6 +1009,7 @@ function RelationsGrid({
     Boolean(activeSearch?.query.trim()) && !preparedSearch.issue,
     true
   );
+  // 完全相同的排在前面，其余按整词命中的跟在后面。
   const searchWords = relatedWordChoices(
     [
       ...(relatedSearch.exact.data?.pages ?? []),
@@ -2445,6 +2446,10 @@ function V3MeaningsAndExamplesStepContent({
                             // 避免目录加载失败把字段整体藏掉。
                             const subPosExtensible =
                               catalogPos?.sub_parts_extensible ?? true;
+                            // 目录说这个基本词性必须挂细分词性时，就别把「不指定」摆成默认值，
+                            // 否则新建的每条释义一进来就是校验通不过的状态。
+                            const subPosRequired =
+                              catalogPos?.sub_pos_required ?? true;
                             const definitionsCollapsed = Boolean(
                               collapsedSenseSections[`${sense.id}:definitions`]
                             );
@@ -2598,10 +2603,14 @@ function V3MeaningsAndExamplesStepContent({
                                                   item.code === sense.sub_pos
                                               );
                                               return [
-                                                {
-                                                  label: "不指定子词性",
-                                                  value: ""
-                                                },
+                                                ...(subPosRequired
+                                                  ? []
+                                                  : [
+                                                      {
+                                                        label: "不指定子词性",
+                                                        value: ""
+                                                      }
+                                                    ]),
                                                 ...(!sense.sub_pos || known
                                                   ? []
                                                   : [
@@ -2616,10 +2625,15 @@ function V3MeaningsAndExamplesStepContent({
                                                 }))
                                               ];
                                             })()}
+                                            placeholder="请选择细分词性"
                                             status={
                                               subPosIssue ? "error" : undefined
                                             }
-                                            value={sense.sub_pos}
+                                            value={
+                                              subPosRequired && !sense.sub_pos
+                                                ? undefined
+                                                : sense.sub_pos
+                                            }
                                           />
                                         ) : (
                                           <Typography.Text

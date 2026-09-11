@@ -35,7 +35,7 @@ const ISSUE_MESSAGES = {
   level_invalid: "请选择有效的词义等级",
   sub_pos_required: "请选择细分词性",
   invalid_sub_part_of_speech: "细分词性与当前基本词性不匹配",
-  frequency_invalid: "词频必须为 0–100，且最多保留两位小数",
+  frequency_invalid: "请填写词频，取值 0–100 且最多两位小数",
   sense_group_not_found: "词义关联的语义区间不存在",
   definition_required: "请至少添加一条释义",
   definition_level_invalid: "请选择有效的释义等级",
@@ -92,10 +92,24 @@ export function v3IssueMessage(issue: V3DraftValidationIssue): string {
   return ISSUE_MESSAGES[issue.code] ?? UNKNOWN_ISSUE_MESSAGE;
 }
 
+// 同一个 code 会按字段分别下发（语义区间的中英文名各算一条）。只按文案去重会把它们
+// 并成一句，管理员填完中文再点一次完成，又看到一模一样的提示，像是改了没生效。
+const ISSUE_FIELD_SUFFIX: Record<string, string> = {
+  name_zh: "（中文）",
+  name_en: "（英文）"
+};
+
 export function v3IssueMessages(
   issues: readonly V3DraftValidationIssue[]
 ): string[] {
-  return [...new Set(issues.map(v3IssueMessage))];
+  return [
+    ...new Set(
+      issues.map(
+        (issue) =>
+          v3IssueMessage(issue) + (ISSUE_FIELD_SUFFIX[issue.field] ?? "")
+      )
+    )
+  ];
 }
 
 export interface V3DetailErrorPresentation {
