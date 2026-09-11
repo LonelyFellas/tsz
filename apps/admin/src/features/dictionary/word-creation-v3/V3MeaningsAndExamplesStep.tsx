@@ -1937,6 +1937,11 @@ function RelationsGrid({
                                             : undefined
                                         }
                                       >
+                                        {/* 不再二次过滤，让排序 items 与 glossIndex 同源。
+                                            组内不会出现「部分带 sense_id」的混合形状：
+                                            selectDerivativeSenses 只产出全绑定或单条无词义，
+                                            ensureV3MeaningsForForms 删关系是整条删，
+                                            混合形状则会被 toWritableMeanings 拦在加载期。 */}
                                         {group.map((member, glossIndex) => (
                                           <Flex
                                             key={member.id}
@@ -1977,10 +1982,15 @@ function RelationsGrid({
                                               singleItemTitle="至少需要两个词义"
                                               dragImageSelector=".word-relation-gloss-row"
                                             />
+                                            {/* tabIndex 让校验问题能定位到这一行：
+                                                focusRenderedTarget 靠 focus() 后比对
+                                                activeElement，不可聚焦的元素会让它白跑
+                                                十轮重试，等于挂了个跳不过去的假锚点。 */}
                                             <Typography.Text
                                               className="word-relation-bound-gloss"
                                               data-v3-field="target_sense_id"
                                               data-v3-node-id={member.id}
+                                              tabIndex={-1}
                                               ellipsis={{
                                                 tooltip: boundGlossText(member)
                                               }}

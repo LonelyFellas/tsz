@@ -2391,6 +2391,46 @@ describe("V3MeaningsAndExamplesStep", () => {
     ).toEqual(["external-sense-1"]);
   });
 
+  it.each([
+    ["synonym", "近义词"],
+    ["antonym", "反义词"]
+  ])("%s 收成一词面一词义后，词条行本身仍可排序", (type, label) => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [
+      {
+        id: "row-1",
+        relation: type,
+        pending_target_headword: "alpha",
+        pending_target_gloss: "甲",
+        score: "60"
+      },
+      {
+        id: "row-2",
+        relation: type,
+        pending_target_headword: "beta",
+        pending_target_gloss: "乙",
+        score: "60"
+      }
+    ];
+    render(<Harness initial={initial} />);
+    const headwords = () =>
+      screen
+        .getAllByLabelText(`${label}目标词条`)
+        .map((item) => (item as HTMLInputElement).value);
+    expect(headwords()).toEqual(["alpha", "beta"]);
+
+    // 收掉的是词义级排序，词条行之间的排序与关系类型无关，不该跟着没了。
+    fireEvent.keyDown(screen.getByLabelText(`拖动${label} 1`), {
+      key: "ArrowDown"
+    });
+    expect(headwords()).toEqual(["beta", "alpha"]);
+    expect(
+      value().pos[0]!.senses[0]!.relations.map(
+        (item) => item.pending_target_headword
+      )
+    ).toEqual(["beta", "alpha"]);
+  });
+
   it("改选目标后词义文案跟着新目标走，不留上一次保存的快照", () => {
     const initial = structuredClone(meaningsFixture);
     initial.pos[0]!.senses[0]!.relations = [
@@ -2415,6 +2455,9 @@ describe("V3MeaningsAndExamplesStep", () => {
         (item) => item.textContent
       );
     // 快照只是兜底：活数据能按 (词条, 词义) 命中时必须以它为准。
+    // 注：生产里刚重开草稿、没有活动搜索时两个活数据源都是空的，首屏显示的就是
+    // 快照文案；这里 relatedSearchAny 的 mock 无视 enabled 永远有结果，所以这条
+    // 断言钉的是优先级，真正在生产里承重的是下面"改选后不留旧快照"那半段。
     expect(glosses()).toEqual(["外部词义一"]);
 
     // 改选到另一个词条的另一条词义。快照按 relation.id 存且不带 sense_id，
@@ -2466,12 +2509,20 @@ describe("V3MeaningsAndExamplesStep", () => {
       );
     const senses = () =>
       value().pos[0]!.senses[0]!.relations.map((item) => item.target_sense_id);
+    const glosses = () =>
+      [...container.querySelectorAll(".word-relation-bound-gloss")].map(
+        (item) => item.textContent
+      );
     const before = row();
+
+    // external-sense-9 不在搜索结果里，这一条走的是快照兜底。
+    expect(glosses()).toEqual(["外部词义一", "词义乙"]);
 
     fireEvent.keyDown(screen.getByLabelText("拖动派生词词义 1"), {
       key: "ArrowDown"
     });
     expect(senses()).toEqual(["external-sense-9", "external-sense-1"]);
+    expect(glosses()).toEqual(["词义乙", "外部词义一"]);
     // 行的 React key 取自组首那条关系的 rowKey。排序换了组首却不同步 rowKey，
     // 整行就会卸载重建，真实浏览器里焦点随之丢到 body，第二次方向键便失效。
     expect(row()).toBe(before);
