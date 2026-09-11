@@ -30,7 +30,10 @@ import {
   useUpdateSubPartOfSpeech
 } from "./api";
 import { nextSortOrder } from "./catalog";
-import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
+import {
+  LabelWithHint,
+  PartOfSpeechSharedFields
+} from "./PartOfSpeechSharedFields";
 import { useDerivedNameDefaults } from "./useDerivedNameDefaults";
 
 /** 供父级页面在自己的工具栏里触发"新增细分词性"，弹窗与编辑态仍由面板自己管。 */
@@ -200,11 +203,22 @@ function SubPartFormModal({
           <Col span={12}>
             <Form.Item
               name="code"
-              label="编码"
+              // 「怎么填」收进标签旁的问号；「为什么改不了」是禁用原因，
+              // 藏起来就只剩一个灰掉的输入框，仍留在下面。
+              label={
+                codeLocked ? (
+                  "编码"
+                ) : (
+                  <LabelWithHint
+                    label="编码"
+                    hint="词条里引用这条细分词性用的代码文本，全局唯一"
+                  />
+                )
+              }
               extra={
                 codeLocked
                   ? `已有 ${value.usage_count} 个词义引用，编码不能再改`
-                  : "词条里引用这条细分词性用的代码文本，全局唯一"
+                  : undefined
               }
               rules={[
                 { required: true, message: "请输入编码" },

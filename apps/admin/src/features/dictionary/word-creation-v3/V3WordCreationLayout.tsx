@@ -11,7 +11,7 @@ import type { ReactNode } from "react";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "./components/V3ProductProgressList";
 import type { V3Problem } from "./problem";
-import { buildV3ProductProgress } from "./readiness";
+import { buildV3ProductProgress, v3ProductProgressBadge } from "./readiness";
 import { v3IssueMessages } from "./presentationErrors";
 import "./v3-layout.css";
 import { V3FormDisplayProvider, useFormDisplayState } from "./formDisplayState";
@@ -171,6 +171,7 @@ function V3WordCreationLayoutContent({
         breadcrumbTitle: `${visibleLabel} · ${STEP_TITLE[activeStep]}`,
         completedSteps: word.completed_steps,
         showEntrySummary: false,
+        progressBadge: v3ProductProgressBadge(progressRows),
         progress: (
           <V3ProductProgressList
             currentKey={currentProgressKey}

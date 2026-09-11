@@ -178,6 +178,8 @@
   text-align: start;
   background: transparent;
   border: 0;
+  /* 行是按钮，选中它的文字只会得到一片系统高亮色块——反复点开收起时很容易误选。 */
+  user-select: none;
 }
 
 .word-creation-progress-row:not(:disabled) {
@@ -2357,7 +2359,7 @@
 
   .word-creation-shell .word-creation-summary {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 10px 14px;
     padding: 14px 16px;
@@ -2366,10 +2368,18 @@
   }
 
   .word-creation-shell .word-creation-back {
+    grid-area: 1 / 1;
     margin: 0;
   }
 
+  /* 「完成情况」入口与返回按钮共用首行，词条卡另起一行占满。 */
+  .word-creation-shell .word-summary-progress-trigger {
+    grid-area: 1 / 2;
+    justify-self: end;
+  }
+
   .word-creation-shell .word-summary-entry-card {
+    grid-column: 1 / -1;
     display: grid;
     grid-template-columns: minmax(220px, 1fr) auto;
     align-items: center;
@@ -2383,33 +2393,8 @@
     justify-content: start;
   }
 
-  .word-creation-shell .word-summary-entry-card > .word-summary-kicker,
-  .word-creation-shell .word-summary-progress-title {
+  .word-creation-shell .word-summary-entry-card > .word-summary-kicker {
     display: none;
-  }
-
-  .word-creation-shell .word-creation-progress-list {
-    grid-column: 1 / -1;
-    display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: 8px !important;
-  }
-
-  .word-creation-shell .word-creation-progress-row {
-    grid-template-columns: 16px minmax(0, 1fr) auto;
-    gap: 6px;
-    padding: 7px 8px;
-    font-size: 12px;
-    background: #f7f8fa;
-    border: 1px solid #eceff3;
-    border-radius: 8px;
-  }
-
-  .word-creation-shell
-    .word-creation-progress-row
-    > .ant-typography:last-child {
-    min-width: 26px;
-    padding-inline: 5px;
   }
 
   .word-creation-content:not(.word-creation-content--basics) {
@@ -2423,17 +2408,7 @@
   }
 }
 
-@container word-creation-page (max-width: 1100px) {
-  .word-creation-shell .word-creation-progress-list {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 @container word-creation-page (max-width: 820px) {
-  .word-creation-shell .word-creation-summary {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .word-creation-shell .word-summary-entry-card {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -2442,10 +2417,6 @@
   .word-creation-shell .word-creation-summary-headword > span {
     min-width: 0;
     overflow-wrap: anywhere;
-  }
-
-  .word-creation-shell .word-creation-progress-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -2601,10 +2572,6 @@
 
   .word-sense-group-item > .ant-btn {
     width: 100%;
-  }
-
-  .word-creation-progress-row {
-    max-width: 320px;
   }
 }
 

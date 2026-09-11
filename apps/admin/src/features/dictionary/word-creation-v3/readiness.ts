@@ -137,6 +137,13 @@ function formIdentity(form: WordConcreteFormV3): string {
   );
 }
 
+/** 窄屏「完成情况」入口上的计数，如 "2/7"。 */
+export function v3ProductProgressBadge(
+  rows: readonly V3ProductProgressRow[]
+): string {
+  return `${rows.filter((row) => row.completed).length}/${rows.length}`;
+}
+
 export function buildV3ProductProgress({
   language,
   removedFormTypes = {},

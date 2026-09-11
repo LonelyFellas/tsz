@@ -30,7 +30,7 @@ import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "./components/V3ProductProgressList";
 import { partOfSpeechLabel, pronunciationStyleLabel } from "./presentation";
 import "../word-creation/word-creation.css";
-import { buildV3ProductProgress } from "./readiness";
+import { buildV3ProductProgress, v3ProductProgressBadge } from "./readiness";
 import "./v3-layout.css";
 
 interface Props {
@@ -152,13 +152,19 @@ function suggestedFormLabels(
 function SuggestedForms({ forms }: { forms: readonly WordConcreteFormV3[] }) {
   const formTypeLabel = useFormTypeLabel();
   const labels = suggestedFormLabels(forms, formTypeLabel);
-  return forms.map((form) => (
-    <SuggestedForm
-      form={form}
-      key={form.id}
-      label={labels.get(form.id) ?? formTypeLabel(form.form_type)}
-    />
-  ));
+  // 间距在这里排：组件返回的数组不参与外层 Space 的间距计算(Space 只认自己的
+  // 直接子元素)，交给外面排的话各词形会贴成一片，认不出标签属于哪一块。
+  return (
+    <Space orientation="vertical" size="large" style={{ width: "100%" }}>
+      {forms.map((form) => (
+        <SuggestedForm
+          form={form}
+          key={form.id}
+          label={labels.get(form.id) ?? formTypeLabel(form.form_type)}
+        />
+      ))}
+    </Space>
+  );
 }
 
 function SuggestedForm({
@@ -241,13 +247,7 @@ function DictionarySuggestions({ word }: { word: AdminWordV3 }) {
             size="small"
             title={partOfSpeechLabel(pos.pos)}
           >
-            <Space
-              orientation="vertical"
-              size="middle"
-              style={{ width: "100%" }}
-            >
-              <SuggestedForms forms={pos.forms} />
-            </Space>
+            <SuggestedForms forms={pos.forms} />
           </Card>
         ))}
       </Space>
@@ -403,6 +403,7 @@ export function V3BasicsStep({
         breadcrumbTitle: entryLabel ? `${entryLabel} · 创建新词条` : "创建词条",
         completedSteps: word.completed_steps,
         showEntrySummary: false,
+        progressBadge: v3ProductProgressBadge(rows),
         progress: (
           <V3ProductProgressList
             currentKey="dialect"

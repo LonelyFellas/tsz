@@ -2563,7 +2563,9 @@ function V3MeaningsAndExamplesStepContent({
                                                   }
                                                 >
                                                   <span className="word-number-cell">
-                                                    {definitionIndex + 1}
+                                                    <span className="word-grammar-index">
+                                                      {definitionIndex + 1}
+                                                    </span>
                                                   </span>
                                                   <>
                                                     <Select

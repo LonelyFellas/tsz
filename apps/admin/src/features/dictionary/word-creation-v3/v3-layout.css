@@ -321,7 +321,8 @@
   border-radius: 0;
 }
 
-.word-creation-shell .v3-product-progress-list {
+:is(.word-creation-shell, .word-creation-progress-drawer)
+  .v3-product-progress-list {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 24px 32px !important;
@@ -331,14 +332,33 @@
   min-width: 0;
 }
 
-.word-creation-shell .v3-product-progress-list .word-creation-progress-row {
+:is(.word-creation-shell, .word-creation-progress-drawer)
+  .v3-product-progress-list
+  .word-creation-progress-row {
   grid-template-columns: 18px minmax(0, 1fr) auto;
   gap: 8px;
-  padding: 0;
+  /* 负外边距让底色比文字宽出一圈,同时保持左栏里各行文字的起始位置不变。 */
+  margin-inline: -8px;
+  padding: 5px 8px;
   font-size: 13px;
   background: transparent;
   border: 0;
-  border-radius: 0;
+  border-radius: 8px;
+  transition: background-color 0.15s ease;
+}
+
+:is(.word-creation-shell, .word-creation-progress-drawer)
+  .v3-product-progress-list
+  .word-creation-progress-row:hover {
+  background: var(--ant-color-fill-tertiary, #f2f4f8);
+}
+
+/* 展开的行给一块更明显的底,免得收起来之后认不出刚才看的是哪一行。 */
+:is(.word-creation-shell, .word-creation-progress-drawer)
+  .v3-product-progress-list
+  .word-creation-progress-row[aria-expanded="true"] {
+  /* 跟着 ConfigProvider 的主色走，免得换主色时这里留一块旧蓝。 */
+  background: var(--ant-color-primary-bg, #edf4ff);
 }
 
 .word-creation-summary:has(.v3-product-progress-list)
@@ -388,18 +408,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-@container word-creation-page (max-width: 1199px) {
-  .word-creation-shell .v3-product-progress-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@container word-creation-page (max-width: 640px) {
-  .word-creation-shell .v3-product-progress-list {
-    grid-template-columns: minmax(0, 1fr);
-  }
 }
 
 @media (max-width: 991px) {

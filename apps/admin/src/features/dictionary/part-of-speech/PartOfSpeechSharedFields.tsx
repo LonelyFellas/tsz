@@ -1,5 +1,35 @@
-import { Col, Form, Input, InputNumber, Row } from "antd";
+import { InfoCircleOutlined } from "@ant-design/icons";
+import { Col, Form, Input, InputNumber, Popover, Row } from "antd";
+import type { ReactNode } from "react";
 import type { DerivedNameField } from "./useDerivedNameDefaults";
+
+/**
+ * 字段说明收进标签右侧的问号：这些话挂在输入框下面会把弹窗撑高一截，
+ * 又不是每次填都要读。标签文本只保留字段名，按标签定位的测试不受影响。
+ */
+export function LabelWithHint({
+  label,
+  hint
+}: {
+  label: string;
+  hint: ReactNode;
+}) {
+  return (
+    <span>
+      {label}
+      <Popover content={hint}>
+        <InfoCircleOutlined
+          aria-hidden
+          style={{
+            marginInlineStart: 4,
+            color: "rgba(0, 0, 0, 0.45)",
+            cursor: "help"
+          }}
+        />
+      </Popover>
+    </span>
+  );
+}
 
 export interface PartOfSpeechSharedPlaceholders {
   name_zh: string;
@@ -87,7 +117,8 @@ export function PartOfSpeechSharedFields({ placeholders, onTouch }: Props) {
         </Col>
       </Row>
       <Row gutter={16}>
-        <Col span={16}>
+        {/* 与上面两行同样对半分，四个输入框才在一条竖线上。 */}
+        <Col span={12}>
           <Form.Item
             name="full_name_en"
             label="英文全称"
@@ -103,16 +134,22 @@ export function PartOfSpeechSharedFields({ placeholders, onTouch }: Props) {
             />
           </Form.Item>
         </Col>
-        <Col span={8}>
+        <Col span={12}>
           <Form.Item
             name="sort_order"
-            label="序号"
             // 列表按序号从小到大排，相同序号再按创建时间。留出间隔就能插队。
-            extra="数字越小越靠前，允许与别的行相同"
+            label={
+              <LabelWithHint
+                label="序号"
+                hint="数字越小越靠前，允许与别的行相同"
+              />
+            }
             rules={[{ required: true, message: "请输入序号" }]}
           >
             <InputNumber
               style={{ width: "100%" }}
+              // 细分词性要选完父级才预填，空着的时候框里就是这句引导。
+              placeholder="数字越小越靠前，允许与别的行相同"
               precision={0}
               min={SORT_ORDER_MIN}
               max={SORT_ORDER_MAX}

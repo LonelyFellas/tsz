@@ -2,15 +2,22 @@ import {
   CheckCircleFilled,
   ClockCircleOutlined,
   LeftOutlined,
-  MinusCircleOutlined
+  MinusCircleOutlined,
+  UnorderedListOutlined
 } from "@ant-design/icons";
-import { Breadcrumb, Button, Flex, Steps, Tag, Typography } from "antd";
+import { Breadcrumb, Button, Drawer, Flex, Steps, Tag, Typography } from "antd";
 import type {
   AdminWordV2,
   WordCreationStep,
   WordHeadwordsV2
 } from "@tsz/types";
-import type { ReactNode } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode
+} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import type { PartOfSpeechLookup } from "../part-of-speech/catalog";
@@ -41,9 +48,15 @@ interface Props {
     showEntrySummary?: boolean;
     status?: ReactNode;
     progress: ReactNode;
+    /** 窄屏抽屉入口上的完成计数(如 "1/7")。不传就只显示「完成情况」。 */
+    progressBadge?: string;
   };
   children: ReactNode;
 }
+
+// 与 word-creation.css 里 `@container word-creation-page` 的窄屏断点同值：
+// 超过这个宽度左栏才排得下，窄于它「完成情况」改走抽屉。
+const PROGRESS_DRAWER_MAX_WIDTH = 1199;
 
 const STEP_SUBTITLE: Record<WordCreationStep, string> = {
   basics: "所属语言｜英美区分",
@@ -166,6 +179,35 @@ export function WordCreationLayout({
   children
 }: Props) {
   const navigate = useNavigate();
+  // 「完成情况」是只读清单,窄屏平铺在顶部会把主内容整个挤出首屏,改收进右侧抽屉。
+  // 量不到宽度时(jsdom、首帧)按宽屏渲染,免得清单被藏进一个没人点的抽屉里。
+  const pageRef = useRef<HTMLDivElement>(null);
+  const [narrowProgress, setNarrowProgress] = useState(false);
+  const [progressOpen, setProgressOpen] = useState(false);
+  // 抽屉退场结束时 antd 会把焦点还给触发按钮。点 X 或遮罩关闭时这是对的，
+  // 但跳步是导航走人，退场比字段聚焦慢一拍，回焦正好把光标从目标字段上拽走。
+  const leavingForNavigation = useRef(false);
+  useLayoutEffect(() => {
+    const page = pageRef.current;
+    if (!page || typeof ResizeObserver === "undefined") return;
+    const apply = (width: number) => {
+      if (width > 0) setNarrowProgress(width <= PROGRESS_DRAWER_MAX_WIDTH);
+    };
+    apply(page.clientWidth);
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) apply(entry.contentRect.width);
+    });
+    observer.observe(page);
+    return () => observer.disconnect();
+  }, []);
+  // 拖宽窗口时抽屉留在那儿会盖住已经排得下的左栏。
+  useEffect(() => {
+    if (!narrowProgress) setProgressOpen(false);
+  }, [narrowProgress]);
+  // 每次打开都从「不是跳步」重新算，标记才不会跟某一条打开路径绑死。
+  useEffect(() => {
+    if (progressOpen) leavingForNavigation.current = false;
+  }, [progressOpen]);
   const currentIndex = WORD_STEP_ORDER.indexOf(currentStep);
   const isBasicsStep = currentStep === "basics";
   const completed = new Set(
@@ -197,8 +239,21 @@ export function WordCreationLayout({
         ? "创建短语"
         : "创建词条";
 
+  const renderProgress = (onNavigate?: (target: ReadinessTarget) => void) =>
+    presentation?.progress ?? (
+      <ProgressSummary
+        word={word}
+        draft={readinessDraft}
+        partOfSpeechLookup={partOfSpeechLookup}
+        onNavigate={onNavigate}
+      />
+    );
+  const progressTriggerLabel = presentation?.progressBadge
+    ? `完成情况 ${presentation.progressBadge}`
+    : "完成情况";
+
   return (
-    <div className="word-creation-page">
+    <div className="word-creation-page" ref={pageRef}>
       <Breadcrumb
         className="word-creation-breadcrumb"
         items={[
@@ -273,18 +328,28 @@ export function WordCreationLayout({
             </div>
           )}
 
-          <div className="word-summary-progress-title">
-            <Typography.Text type="secondary" className="word-summary-kicker">
-              完成情况
-            </Typography.Text>
-          </div>
-          {presentation?.progress ?? (
-            <ProgressSummary
-              word={word}
-              draft={readinessDraft}
-              partOfSpeechLookup={partOfSpeechLookup}
-              onNavigate={onReadinessNavigate}
-            />
+          {narrowProgress ? (
+            <Button
+              // 图标的 anticon 会把「unordered-list」混进可及名，显式定名兜住。
+              aria-label={progressTriggerLabel}
+              className="word-summary-progress-trigger"
+              icon={<UnorderedListOutlined />}
+              onClick={() => setProgressOpen(true)}
+            >
+              {progressTriggerLabel}
+            </Button>
+          ) : (
+            <>
+              <div className="word-summary-progress-title">
+                <Typography.Text
+                  type="secondary"
+                  className="word-summary-kicker"
+                >
+                  完成情况
+                </Typography.Text>
+              </div>
+              {renderProgress(onReadinessNavigate)}
+            </>
           )}
         </section>
 
@@ -294,6 +359,28 @@ export function WordCreationLayout({
           {children}
         </main>
       </div>
+
+      {narrowProgress && (
+        <Drawer
+          classNames={{ body: "word-creation-progress-drawer" }}
+          focusable={{ focusTriggerAfterClose: !leavingForNavigation.current }}
+          onClose={() => setProgressOpen(false)}
+          open={progressOpen}
+          placement="right"
+          size="min(360px, 86vw)"
+          title="完成情况"
+        >
+          {/* 清单里的待完善项会跳步，跳完抽屉还盖在新那一步上，先关掉。 */}
+          {renderProgress(
+            onReadinessNavigate &&
+              ((target) => {
+                leavingForNavigation.current = true;
+                setProgressOpen(false);
+                onReadinessNavigate(target);
+              })
+          )}
+        </Drawer>
+      )}
     </div>
   );
 }
