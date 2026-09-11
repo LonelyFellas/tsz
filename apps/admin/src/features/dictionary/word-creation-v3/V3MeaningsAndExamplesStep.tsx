@@ -1053,13 +1053,17 @@ function RelationsGrid({
     knownWords[relation.id]?.status === "draft" &&
     knownWords[relation.id]?.senses.length === 0;
 
-  /** 已绑定词义的展示文案：服务端快照优先，其次取搜索结果里的词义。 */
+  /**
+   * 已绑定词义的展示文案。顺序与 relationDisplayHeadword 一致：活数据优先、
+   * 服务端快照兜底。快照只按 relation.id 存、不带 sense_id，改选目标或词义后
+   * 仍是上一次保存的值，放在前面会把旧词义显示到新绑定上。
+   */
   const boundGlossText = (relation: WordRelationWritableV3) =>
-    relationDisplaySnapshots?.[relation.id]?.gloss ||
-    Object.values(knownWords)
+    [...Object.values(knownWords), ...searchWords]
       .find((word) => word.word_id === relation.target_word_id)
       ?.senses.find((item) => item.sense_id === relation.target_sense_id)
       ?.gloss ||
+    relationDisplaySnapshots?.[relation.id]?.gloss ||
     "已匹配词义";
 
   return (
@@ -1900,7 +1904,16 @@ function RelationsGrid({
                                   <RelationSortScope
                                     items={group}
                                     scopeId={`${sense.id}:${relation.id}:bound-glosses`}
-                                    onChange={(next) =>
+                                    onChange={(next) => {
+                                      const rowKey =
+                                        relationRowKeys.current.get(
+                                          relation.id
+                                        ) ?? relation.id;
+                                      for (const item of next)
+                                        relationRowKeys.current.set(
+                                          item.id,
+                                          rowKey
+                                        );
                                       change((draft) => {
                                         const target =
                                           draft.pos[posIndex]!.senses[
@@ -1911,8 +1924,8 @@ function RelationsGrid({
                                           group,
                                           next
                                         );
-                                      })
-                                    }
+                                      });
+                                    }}
                                   >
                                     {(glossSorting) => (
                                       <Flex
@@ -1924,95 +1937,94 @@ function RelationsGrid({
                                             : undefined
                                         }
                                       >
-                                        {group
-                                          .filter(
-                                            (item) => item.target_sense_id
-                                          )
-                                          .map((member, glossIndex) => (
-                                            <Flex
-                                              key={member.id}
-                                              gap={6}
-                                              align="center"
-                                              className={sortableRowClass(
-                                                "word-relation-gloss-row",
-                                                glossSorting,
+                                        {group.map((member, glossIndex) => (
+                                          <Flex
+                                            key={member.id}
+                                            gap={6}
+                                            align="center"
+                                            className={sortableRowClass(
+                                              "word-relation-gloss-row",
+                                              glossSorting,
+                                              glossIndex
+                                            )}
+                                            onDragOver={(event) => {
+                                              event.stopPropagation();
+                                              glossSorting.handleDragOver(
+                                                event,
                                                 glossIndex
-                                              )}
-                                              onDragOver={(event) => {
-                                                event.stopPropagation();
-                                                glossSorting.handleDragOver(
-                                                  event,
-                                                  glossIndex
-                                                );
-                                              }}
-                                              onDragLeave={(event) => {
-                                                event.stopPropagation();
-                                                glossSorting.handleDragLeave();
-                                              }}
-                                              onDrop={(event) => {
-                                                event.stopPropagation();
-                                                glossSorting.handleDrop(
-                                                  event,
-                                                  glossIndex
-                                                );
+                                              );
+                                            }}
+                                            onDragLeave={(event) => {
+                                              event.stopPropagation();
+                                              glossSorting.handleDragLeave();
+                                            }}
+                                            onDrop={(event) => {
+                                              event.stopPropagation();
+                                              glossSorting.handleDrop(
+                                                event,
+                                                glossIndex
+                                              );
+                                            }}
+                                          >
+                                            <span
+                                              className="word-relation-drop-line"
+                                              aria-hidden
+                                            />
+                                            <SortableDragHandle
+                                              sorting={glossSorting}
+                                              index={glossIndex}
+                                              label={`拖动${relationLabel(relationType)}词义 ${glossIndex + 1}`}
+                                              singleItemTitle="至少需要两个词义"
+                                              dragImageSelector=".word-relation-gloss-row"
+                                            />
+                                            <Typography.Text
+                                              className="word-relation-bound-gloss"
+                                              data-v3-field="target_sense_id"
+                                              data-v3-node-id={member.id}
+                                              ellipsis={{
+                                                tooltip: boundGlossText(member)
                                               }}
                                             >
-                                              <span
-                                                className="word-relation-drop-line"
-                                                aria-hidden
-                                              />
-                                              <SortableDragHandle
-                                                sorting={glossSorting}
-                                                index={glossIndex}
-                                                label={`拖动${relationLabel(relationType)}词义 ${glossIndex + 1}`}
-                                                singleItemTitle="至少需要两个词义"
-                                                dragImageSelector=".word-relation-gloss-row"
-                                              />
-                                              <Typography.Text
-                                                className="word-relation-bound-gloss"
-                                                data-v3-field="target_sense_id"
-                                                data-v3-node-id={member.id}
-                                                ellipsis={{
-                                                  tooltip:
-                                                    boundGlossText(member)
-                                                }}
-                                              >
-                                                {boundGlossText(member)}
-                                              </Typography.Text>
+                                              {boundGlossText(member)}
+                                            </Typography.Text>
+                                            {/* 与手动词义一致：只剩一条时不给词义级删除，
+                                                  否则会留下有目标词条却没有词义的半绑定关系，
+                                                  那个形状重开词条时会被 toWritableMeanings 拒掉。
+                                                  要整条去掉走行级删除。 */}
+                                            {group.length > 1 ? (
                                               <RelationDeleteMenu
                                                 label={`${relationLabel(relationType)}词义 ${glossIndex + 1}`}
-                                                onDelete={() =>
+                                                onDelete={() => {
+                                                  const remaining =
+                                                    group.filter(
+                                                      (item) =>
+                                                        item.id !== member.id
+                                                    );
+                                                  const rowKey =
+                                                    relationRowKeys.current.get(
+                                                      relation.id
+                                                    ) ?? relation.id;
+                                                  for (const item of remaining)
+                                                    relationRowKeys.current.set(
+                                                      item.id,
+                                                      rowKey
+                                                    );
                                                   change((draft) => {
                                                     const target =
                                                       draft.pos[posIndex]!
                                                         .senses[senseIndex]!;
-                                                    const kept = group
-                                                      .filter(
-                                                        (item) =>
-                                                          item.id !== member.id
-                                                      )
-                                                      .flatMap((item) =>
-                                                        item.target_sense_id
-                                                          ? [
-                                                              item.target_sense_id
-                                                            ]
-                                                          : []
-                                                      );
                                                     target.relations =
                                                       replaceRelationGroup(
                                                         target.relations,
                                                         group,
-                                                        selectDerivativeSenses(
-                                                          group,
-                                                          kept,
-                                                          idFactory
-                                                        )
+                                                        remaining
                                                       );
-                                                  })
-                                                }
+                                                  });
+                                                }}
                                               />
-                                            </Flex>
-                                          ))}
+                                            ) : null}
+                                          </Flex>
+                                        ))}
                                       </Flex>
                                     )}
                                   </RelationSortScope>

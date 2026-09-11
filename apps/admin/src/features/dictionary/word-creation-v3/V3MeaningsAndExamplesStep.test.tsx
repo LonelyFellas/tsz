@@ -2391,6 +2391,98 @@ describe("V3MeaningsAndExamplesStep", () => {
     ).toEqual(["external-sense-1"]);
   });
 
+  it("改选目标后词义文案跟着新目标走，不留上一次保存的快照", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [
+      {
+        id: "bound-1",
+        relation: "derivative",
+        target_word_id: "external-word-1",
+        target_sense_id: "external-sense-1",
+        score: "60"
+      }
+    ];
+    const { container } = render(
+      <Harness
+        initial={initial}
+        relationSnapshots={{
+          "bound-1": { headword: "outside", gloss: "上次保存的外部词义一" }
+        }}
+      />
+    );
+    const glosses = () =>
+      [...container.querySelectorAll(".word-relation-bound-gloss")].map(
+        (item) => item.textContent
+      );
+    // 快照只是兜底：活数据能按 (词条, 词义) 命中时必须以它为准。
+    expect(glosses()).toEqual(["外部词义一"]);
+
+    // 改选到另一个词条的另一条词义。快照按 relation.id 存且不带 sense_id，
+    // 而 selectDerivativeSenses 会复用原 id，所以快照若优先就会残留在新绑定上。
+    fireEvent.change(screen.getByLabelText("派生词目标词条"), {
+      target: { value: "beyond" }
+    });
+    fireEvent.click(screen.getAllByText("beyond").at(-1)!);
+    fireEvent.mouseDown(screen.getByLabelText("派生词目标词义"));
+    fireEvent.click(screen.getAllByText("外部词义二").at(-1)!);
+    expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
+      id: "bound-1",
+      target_word_id: "external-word-2",
+      target_sense_id: "external-sense-2"
+    });
+    expect(glosses()).toEqual(["外部词义二"]);
+  });
+
+  it("已保存草稿重开后，词义排序不重建整行，方向键能连按", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [
+      {
+        id: "bound-1",
+        relation: "derivative",
+        target_word_id: "external-word-1",
+        target_sense_id: "external-sense-1",
+        score: "60"
+      },
+      {
+        id: "bound-2",
+        relation: "derivative",
+        target_word_id: "external-word-1",
+        target_sense_id: "external-sense-9",
+        score: "60"
+      }
+    ];
+    const { container } = render(
+      <Harness
+        initial={initial}
+        relationSnapshots={{
+          "bound-1": { headword: "outside", gloss: "词义甲" },
+          "bound-2": { headword: "outside", gloss: "词义乙" }
+        }}
+      />
+    );
+    const row = () =>
+      container.querySelector(
+        '.word-relation-card[data-relation-type="derivative"] .word-relation-row'
+      );
+    const senses = () =>
+      value().pos[0]!.senses[0]!.relations.map((item) => item.target_sense_id);
+    const before = row();
+
+    fireEvent.keyDown(screen.getByLabelText("拖动派生词词义 1"), {
+      key: "ArrowDown"
+    });
+    expect(senses()).toEqual(["external-sense-9", "external-sense-1"]);
+    // 行的 React key 取自组首那条关系的 rowKey。排序换了组首却不同步 rowKey，
+    // 整行就会卸载重建，真实浏览器里焦点随之丢到 body，第二次方向键便失效。
+    expect(row()).toBe(before);
+
+    fireEvent.keyDown(screen.getByLabelText("拖动派生词词义 1"), {
+      key: "ArrowDown"
+    });
+    expect(senses()).toEqual(["external-sense-1", "external-sense-9"]);
+    expect(row()).toBe(before);
+  });
+
   it("派生词多选保存后合为一行，重开可取消和新增词义，改选清理整组", () => {
     relatedSearchAny.mockImplementation((...args) => {
       const result = defaultRelatedSearchImplementation(...args);
