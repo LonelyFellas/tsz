@@ -54,7 +54,14 @@ const GROUPS: Group[] = [
     leaves: [
       { key: "/users", label: "用户管理", perm: "users.access" },
       { key: "/admins", label: "管理员管理", superOnly: true },
-      { key: "/roles", label: "角色权限管理", superOnly: true }
+      // RBAC 后端未实现（/admin/roles 与权限目录都是 404），先按未落地功能处理：
+      // 渲染成禁用占位，不给入口也不发请求。后端落地后把 key 改回 "/roles" 并恢复路由。
+      {
+        key: "todo:roles",
+        label: "角色权限管理",
+        superOnly: true,
+        disabled: true
+      }
     ]
   },
   {
@@ -96,7 +103,13 @@ const GROUPS: Group[] = [
     icon: <ReadOutlined />,
     label: "词表管理",
     leaves: [
-      { key: "/wordlists", label: "智能词表", perm: "wordlists.access" },
+      // 页面是只有标题的空壳，后端也没有 wordlists 端点，先按未落地处理。
+      {
+        key: "todo:wordlists",
+        label: "智能词表",
+        perm: "wordlists.access",
+        disabled: true
+      },
       {
         key: "todo:custom-wordlist",
         label: "自定义词表",
@@ -123,7 +136,13 @@ const GROUPS: Group[] = [
     icon: <AuditOutlined />,
     label: "审核管理",
     leaves: [
-      { key: "/reviews", label: "词表审核", perm: "reviews.access" },
+      // 同上：审核中心页面是空壳，后端无对应端点。
+      {
+        key: "todo:reviews",
+        label: "词表审核",
+        perm: "reviews.access",
+        disabled: true
+      },
       {
         key: "todo:teacher-apply",
         label: "教师申请审核",

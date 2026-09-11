@@ -44,9 +44,7 @@ import { resolveV3StepAccess } from "@/features/dictionary/word-creation-v3/step
 import { canWriteEntry } from "@/features/dictionary/entryWritePermission";
 import { useAuthStore } from "@/lib/auth";
 import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
-import {
-  summarizeFormsImpact
-} from "@/features/dictionary/word-creation-v3/presentation";
+import { summarizeFormsImpact } from "@/features/dictionary/word-creation-v3/presentation";
 import {
   CreationSourceNotice,
   creationSourceFromState

@@ -94,12 +94,6 @@ export const router = createBrowserRouter([
           },
           ...wordRoutes,
           {
-            path: "wordlists",
-            lazy: async () => ({
-              Component: (await import("@/pages/WordLists")).WordListsPage
-            })
-          },
-          {
             path: "users",
             lazy: async () => ({
               Component: (await import("@/pages/Users")).UsersPage
@@ -111,18 +105,10 @@ export const router = createBrowserRouter([
               Component: (await import("@/pages/Admins")).AdminsPage
             })
           },
-          {
-            path: "roles",
-            lazy: async () => ({
-              Component: (await import("@/pages/Roles")).RolesPage
-            })
-          },
-          {
-            path: "reviews",
-            lazy: async () => ({
-              Component: (await import("@/pages/Reviews")).ReviewsPage
-            })
-          },
+          // wordlists / reviews / roles 三条路由都待后端与页面落地：占位页与请求层
+          // 留在 pages/ 与 features/ 下不动，做好之后把路由接回来即可。
+          // roles 路由随 RBAC 后端一起待定：页面与请求层留在 pages/Roles.tsx、
+          // features/roles 下不动，后端就绪后把这段接回来即可。
           {
             // 个人设置：入口在顶栏头像菜单，不进侧栏（侧栏由后端菜单权限驱动）。
             path: "settings/profile",
