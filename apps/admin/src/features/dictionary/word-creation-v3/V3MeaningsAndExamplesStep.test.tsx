@@ -2474,6 +2474,60 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value().pos[0]!.senses[0]!.relations).toHaveLength(0);
   });
 
+  it("置灰文案按优先级排：禁用理由先于选中后会发生什么", () => {
+    relatedSearchAny.mockImplementation((...args) => {
+      const result = defaultRelatedSearchImplementation(...args);
+      // 0 词义的草稿：本身可选，选中只记文本。
+      Object.assign(result.contains.data.pages[0]!.results[0]!, {
+        status: "draft",
+        senses: []
+      });
+      // 0 词义的已发布词条：无从绑定词义，这本身就是禁用理由。
+      result.exact.data.pages[0]!.results[0]!.senses = [];
+      return result;
+    });
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [
+      {
+        id: "text-1",
+        relation: "synonym",
+        pending_target_headword: "beyond",
+        pending_target_gloss: "甲",
+        score: "60"
+      }
+    ];
+    render(<Harness initial={initial} />);
+    // 用近义词构造：派生词同词面会合组，组首接管渲染，搜索上下文对不上这一行。
+    fireEvent.click(screen.getByText("添加近义词").closest("button")!);
+    fireEvent.change(screen.getAllByLabelText("近义词目标词条").at(-1)!, {
+      target: { value: "beyond" }
+    });
+
+    const optionFor = (text: string) =>
+      screen
+        .getAllByText(text)
+        .map((item) => item.closest(".ant-select-item-option"))
+        .find((item): item is HTMLElement => item !== null)!;
+
+    // 草稿 + 0 词义 + 已被上面那行按词面关联：灰着，要说禁用理由，
+    // 不能显示「选中仅记文本」去邀请一个点不动的操作。
+    const draftOption = optionFor("beyond");
+    expect(draftOption).toHaveClass("ant-select-item-option-disabled");
+    expect(
+      within(draftOption).getByText("已被同类型的另一行关联")
+    ).toBeInTheDocument();
+    expect(
+      within(draftOption).queryByText("暂无词义，选中仅记文本")
+    ).toBeNull();
+
+    // 已发布 + 0 词义：禁用理由是没词义可绑，这条最该先说。
+    const publishedOption = optionFor("outside");
+    expect(publishedOption).toHaveClass("ant-select-item-option-disabled");
+    expect(
+      within(publishedOption).getByText("暂无词义，请先添加词义")
+    ).toBeInTheDocument();
+  });
+
   it("已被同类型另一行关联的词条，置灰时要说明原因", () => {
     const initial = structuredClone(meaningsFixture);
     initial.pos[0]!.senses[0]!.relations = [
