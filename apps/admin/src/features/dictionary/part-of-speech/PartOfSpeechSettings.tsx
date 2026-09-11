@@ -37,7 +37,7 @@ import { PartOfSpeechFormModal } from "./PartOfSpeechFormModal";
 import { SubPartOfSpeechPanel } from "./SubPartOfSpeechDrawer";
 import type { SubPartOfSpeechPanelHandle } from "./SubPartOfSpeechDrawer";
 
-// 后端 409 冲突会带上撞车的字段名；编码用户看不到，撞了只能从英文全称入手。
+// 后端 409 冲突会带上撞车的字段名。
 const CONFLICT_FIELD_LABEL: Record<string, string> = {
   name_zh: "正式中文",
   name_en: "正式英文",
@@ -46,8 +46,20 @@ const CONFLICT_FIELD_LABEL: Record<string, string> = {
   full_name_en: "英文全称"
 };
 
-function conflictMessage(kind: string, field: string | null | undefined) {
-  if (field === "code") return `英文全称与已有${kind}过于接近，请调整英文全称`;
+/**
+ * `editableCode` 区分编码的来源：细分词性的编码是管理员自己填的代码文本，撞了直接让他改编码；
+ * 基本词性与词形变化的编码由英文全称派生、用户看不到，只能提示改英文全称。
+ */
+function conflictMessage(
+  kind: string,
+  field: string | null | undefined,
+  editableCode = false
+) {
+  if (field === "code") {
+    return editableCode
+      ? `编码已被其他${kind}占用，请换一个`
+      : `英文全称与已有${kind}过于接近，请调整英文全称`;
+  }
   const label = field ? CONFLICT_FIELD_LABEL[field] : undefined;
   return label ? `${label}与已有${kind}重复` : `${kind}名称已存在`;
 }
@@ -63,11 +75,10 @@ export function errorMessage(error: unknown): string {
       return "词形类型不存在或已被删除，请刷新后重试";
     if (error.code === "invalid_form_type")
       return "词形配置字段不符合要求，请检查后重试";
-    // 稳定编码不对用户暴露：编码撞车只可能来自英文全称派生结果相同，提示改英文全称。
     if (error.code === "part_of_speech_conflict")
       return conflictMessage("基本词性", error.problem?.field);
     if (error.code === "sub_part_of_speech_conflict")
-      return conflictMessage("细分词性", error.problem?.field);
+      return conflictMessage("细分词性", error.problem?.field, true);
     if (error.code === "part_of_speech_in_use")
       return "该基本词性已被单词或短语引用，只能修改";
     if (error.code === "part_of_speech_has_form_types")
@@ -75,7 +86,7 @@ export function errorMessage(error: unknown): string {
     if (error.code === "part_of_speech_has_sub_parts")
       return "该基本词性下还有细分词性，请先删除细分词性";
     if (error.code === "sub_part_of_speech_in_use")
-      return "该细分词性已被词义引用，只能修改";
+      return "该细分词性已被词义引用，不能删除，编码也不能再改";
     if (error.code === "sub_part_of_speech_not_allowed")
       return "该基本词性不支持细分词性";
     if (error.code === "revision_conflict")
@@ -146,11 +157,7 @@ export function PartOfSpeechSettings() {
   };
 
   const columns: TableColumnsType<PartOfSpeechConfig> = [
-    {
-      title: "序号",
-      width: 56,
-      render: (_, __, index) => (page - 1) * pageSize + index + 1
-    },
+    { title: "序号", dataIndex: "sort_order", width: 64 },
     { title: "正式中文", dataIndex: "name_zh", width: 120 },
     { title: "简洁显示", dataIndex: "short_name_zh", width: 110 },
     { title: "正式英文", dataIndex: "name_en", width: 130 },

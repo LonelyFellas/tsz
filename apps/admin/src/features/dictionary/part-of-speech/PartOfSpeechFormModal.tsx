@@ -1,14 +1,14 @@
 import { Form, Modal } from "antd";
 import type { CreatePartOfSpeechInput, PartOfSpeechConfig } from "@tsz/types";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useCreatePartOfSpeech, useUpdatePartOfSpeech } from "./api";
-import { PartOfSpeechNameFields } from "./PartOfSpeechNameFields";
+import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
 import { useDerivedNameDefaults } from "./useDerivedNameDefaults";
 
 interface Props {
   open: boolean;
   value?: PartOfSpeechConfig;
-  /** 新建时自动落在目录末尾的排序值（最大排序值 + 10）；排序对用户不可见。 */
+  /** 新建时预填的序号：目录里的最大序号 + 10，管理员可以改。 */
   defaultSortOrder?: number;
   onClose: () => void;
   onSaved: (saved: PartOfSpeechConfig) => void;
@@ -28,8 +28,8 @@ export function derivePartOfSpeechCode(fullNameEn: string): string {
   return (/^[a-z]/.test(slug) ? slug : `p_${slug}`).slice(0, 32);
 }
 
-// 排序值与稳定编码都不暴露给用户：前者自动追加在末尾，后者由英文全称派生。
-type PartFormValues = Omit<CreatePartOfSpeechInput, "sort_order" | "code">;
+// 稳定编码不暴露给用户，由英文全称派生；序号是表单字段。
+type PartFormValues = Omit<CreatePartOfSpeechInput, "code">;
 
 const PLACEHOLDERS = {
   name_zh: "例如 名词",
@@ -53,6 +53,10 @@ export function PartOfSpeechFormModal({
   const pending = create.isPending || update.isPending;
   const creating = !value;
   const markTouched = useDerivedNameDefaults(form, { open, creating });
+  // 预填值放 ref 而不是 effect 依赖：目录随时可能重拉，跟着重跑那个 effect 会连带
+  // resetFields 清空正在填的表单。
+  const defaultSortOrderRef = useRef(defaultSortOrder);
+  defaultSortOrderRef.current = defaultSortOrder;
 
   useEffect(() => {
     if (!open) return;
@@ -62,10 +66,12 @@ export function PartOfSpeechFormModal({
         name_en: value.name_en,
         abbreviation: value.abbreviation,
         short_name_zh: value.short_name_zh,
-        full_name_en: value.full_name_en
+        full_name_en: value.full_name_en,
+        sort_order: value.sort_order
       });
     } else {
       form.resetFields();
+      form.setFieldValue("sort_order", defaultSortOrderRef.current);
     }
   }, [form, open, value]);
 
@@ -75,17 +81,12 @@ export function PartOfSpeechFormModal({
       if (value) {
         saved = await update.mutateAsync({
           id: value.id,
-          input: {
-            base_revision: value.revision,
-            ...values,
-            sort_order: value.sort_order
-          }
+          input: { base_revision: value.revision, ...values }
         });
       } else {
         saved = await create.mutateAsync({
           ...values,
-          code: derivePartOfSpeechCode(values.full_name_en),
-          sort_order: defaultSortOrder
+          code: derivePartOfSpeechCode(values.full_name_en)
         });
       }
       onSaved(saved);
@@ -108,7 +109,7 @@ export function PartOfSpeechFormModal({
       destroyOnHidden
     >
       <Form form={form} layout="vertical" onFinish={submit}>
-        <PartOfSpeechNameFields
+        <PartOfSpeechSharedFields
           placeholders={PLACEHOLDERS}
           onTouch={markTouched}
         />

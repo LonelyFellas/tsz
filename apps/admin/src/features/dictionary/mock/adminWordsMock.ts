@@ -2698,17 +2698,16 @@ export function createAdminWordsMock({
     for (const item of Object.values(current.sub_parts)) {
       if (item.id === excludeId) continue;
       const sameParent = item.part_of_speech_id === partId;
+      // 正式英文只是展示名，同一父级下允许重复（代码文本落在 code 上）。
       const field =
         input.code !== undefined && item.code === input.code
           ? "code"
           : sameParent && item.name_zh === input.name_zh
             ? "name_zh"
-            : sameParent && lower(item.name_en) === lower(input.name_en)
-              ? "name_en"
-              : sameParent &&
-                  lower(item.full_name_en) === lower(input.full_name_en)
-                ? "full_name_en"
-                : undefined;
+            : sameParent &&
+                lower(item.full_name_en) === lower(input.full_name_en)
+              ? "full_name_en"
+              : undefined;
       if (field) throw conflict("sub_part_of_speech_conflict", field);
     }
   }
@@ -3260,8 +3259,24 @@ export function createAdminWordsMock({
           code: existing.code
         }
       );
-    const input = trimSubPartInput(rawInput);
+    const input = trimSubPartInput({
+      ...rawInput,
+      ...(rawInput.code === undefined ? {} : { code: rawInput.code.trim() })
+    });
     assertSubPartFields(input);
+    // 编码是词条引用的口径：已被词义引用后不再放行修改。
+    if (input.code !== undefined && input.code !== existing.code) {
+      const usage_count = subPartUsageCount(current, existing.code);
+      if (usage_count > 0)
+        throw new HttpError(
+          409,
+          "sub part of speech in use",
+          [],
+          "sub_part_of_speech_in_use",
+          [],
+          { usage_count }
+        );
+    }
     assertUniqueSubPart(current, partId, input, subId);
     const updated: SubPartOfSpeechConfig = {
       ...existing,

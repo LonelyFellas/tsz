@@ -522,7 +522,10 @@ describe("PartOfSpeechSettings", () => {
       "part_of_speech_has_form_types",
       "该基本词性下还有词形变化，请先删除词形变化"
     ],
-    ["sub_part_of_speech_in_use", "该细分词性已被词义引用，只能修改"],
+    [
+      "sub_part_of_speech_in_use",
+      "该细分词性已被词义引用，不能删除，编码也不能再改"
+    ],
     ["sub_part_of_speech_not_allowed", "该基本词性不支持细分词性"],
     ["part_of_speech_not_found", "基本词性不存在或已被删除，请刷新后重试"],
     ["sub_part_of_speech_not_found", "细分词性不存在或已被删除，请刷新后重试"],
@@ -560,6 +563,36 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.click(within(dialog).getByText("删 除"));
     expect(
       await screen.findByText("英文全称与已有基本词性过于接近，请调整英文全称")
+    ).toBeInTheDocument();
+  });
+
+  it("序号列显示真实排序值，而不是行内位置", () => {
+    renderSettings();
+    const particleRow = screen.getByText("小品词").closest("tr")!;
+    // 小品词的 sort_order 是 20，排在第 2 行——位置序号也会显示 2，所以再看第 3 行。
+    expect(particleRow.cells[0]!.textContent).toBe("20");
+    const verbRow = screen.getByText("动词").closest("tr")!;
+    expect(verbRow.cells[0]!.textContent).toBe("30");
+  });
+
+  it("细分词性编码冲突时提示换编码，因为编码是管理员自己填的", async () => {
+    mock.remove.mockRejectedValueOnce(
+      new HttpError(409, "conflict", [], "sub_part_of_speech_conflict", {
+        type: "urn:tsz:problem:sub_part_of_speech_conflict",
+        title: "Conflict",
+        status: 409,
+        detail: "sub part of speech already exists",
+        code: "sub_part_of_speech_conflict",
+        field: "code"
+      })
+    );
+    renderSettings();
+    const particleRow = screen.getByText("小品词").closest("tr")!;
+    fireEvent.click(within(particleRow).getByText("删 除"));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByText("删 除"));
+    expect(
+      await screen.findByText("编码已被其他细分词性占用，请换一个")
     ).toBeInTheDocument();
   });
 

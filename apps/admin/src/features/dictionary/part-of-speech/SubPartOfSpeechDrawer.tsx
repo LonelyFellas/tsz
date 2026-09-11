@@ -3,9 +3,12 @@ import {
   App,
   Button,
   Card,
+  Col,
   Empty,
   Form,
+  Input,
   Modal,
+  Row,
   Select,
   Space,
   Table,
@@ -18,7 +21,7 @@ import type {
   PartOfSpeechConfig,
   SubPartOfSpeechConfig
 } from "@tsz/types";
-import { useEffect, useImperativeHandle, useState } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
 import type { Ref } from "react";
 import {
   useCreateSubPartOfSpeech,
@@ -27,7 +30,7 @@ import {
   useUpdateSubPartOfSpeech
 } from "./api";
 import { nextSortOrder } from "./catalog";
-import { PartOfSpeechNameFields } from "./PartOfSpeechNameFields";
+import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
 import { useDerivedNameDefaults } from "./useDerivedNameDefaults";
 
 /** 供父级页面在自己的工具栏里触发"新增细分词性"，弹窗与编辑态仍由面板自己管。 */
@@ -50,28 +53,10 @@ interface Props {
   ref?: Ref<SubPartOfSpeechPanelHandle>;
 }
 
-/**
- * 稳定编码是系统内部标识，用户不填也不看：新建时由「所属基本词性编码 + 英文全称」派生
- * （大写、非字母数字折成连字符、最长 32），创建后不可修改。带上父级前缀是因为编码全局唯一，
- * 而英文全称只在同一父级下唯一——不同父级允许同名细分词性。
- */
-export function deriveSubPartOfSpeechCode(
-  fullNameEn: string,
-  parentCode: string
-): string {
-  const slug = `${parentCode} ${fullNameEn}`
-    .trim()
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return slug.slice(0, 32);
-}
+/** 后端契约：大写字母开头，其后是大写字母、数字、连字符或下划线，最长 32。 */
+const SUB_PART_CODE_PATTERN = /^[A-Z][A-Z0-9_-]{0,31}$/;
 
-// 排序值与稳定编码都不暴露给用户：前者自动追加在末尾，后者由英文全称派生。
-type SubPartFormValues = Omit<
-  CreateSubPartOfSpeechInput,
-  "sort_order" | "code"
-> & {
+type SubPartFormValues = CreateSubPartOfSpeechInput & {
   /** 所属基本词性；固定父级或修改时由弹窗回填并锁定，「全部」视图下新建时由用户选择。 */
   part_of_speech_id: string;
 };
@@ -98,7 +83,7 @@ function SubPartFormModal({
   parent?: PanelParent;
   parentOptions: PanelParent[];
   value?: SubPartOfSpeechConfig;
-  /** 新建时按所选父级算出自动追加在末尾的排序值；排序对用户不可见。 */
+  /** 新建时按所选父级算出预填的序号（该父级下最大序号 + 10），管理员可以改。 */
   nextSortOrderFor: (parentId: string) => number;
   open: boolean;
   onClose: () => void;
@@ -110,24 +95,37 @@ function SubPartFormModal({
   const update = useUpdateSubPartOfSpeech();
   const creating = !value;
   const markTouched = useDerivedNameDefaults(form, { open, creating });
-  const parentById = new Map(parentOptions.map((item) => [item.id, item]));
+  // 编码是词条引用的口径：已经被词义引用后后端不再放行修改。
+  const codeLocked = value !== undefined && value.usage_count > 0;
+  // 预填值放 ref 而不是 effect 依赖：列表随时可能重拉，跟着重跑那个 effect 会连带
+  // resetFields 清空正在填的表单。
+  const nextSortOrderForRef = useRef(nextSortOrderFor);
+  nextSortOrderForRef.current = nextSortOrderFor;
+  // 固定父级只有 id 参与回填，取出来当依赖，免得整个对象的身份变化把表单重置掉。
+  const parentId = parent?.id;
 
   useEffect(() => {
     if (!open) return;
     if (value) {
       form.setFieldsValue({
         part_of_speech_id: value.part_of_speech_id,
+        code: value.code,
         name_zh: value.name_zh,
         name_en: value.name_en,
         short_name_zh: value.short_name_zh,
         abbreviation: value.abbreviation,
-        full_name_en: value.full_name_en
+        full_name_en: value.full_name_en,
+        sort_order: value.sort_order
       });
     } else {
       form.resetFields();
-      form.setFieldValue("part_of_speech_id", parent?.id);
+      form.setFieldValue("part_of_speech_id", parentId);
+      // 「全部」视图下没有固定父级，序号等用户选完再预填。
+      if (parentId) {
+        form.setFieldValue("sort_order", nextSortOrderForRef.current(parentId));
+      }
     }
-  }, [form, open, parent?.id, value]);
+  }, [form, open, parentId, value]);
 
   const submit = async ({
     part_of_speech_id,
@@ -138,22 +136,12 @@ function SubPartFormModal({
         await update.mutateAsync({
           partId: value.part_of_speech_id,
           subId: value.id,
-          input: {
-            base_revision: value.revision,
-            ...fields,
-            sort_order: value.sort_order
-          }
+          input: { base_revision: value.revision, ...fields }
         });
       } else {
-        const parentCode =
-          parentById.get(part_of_speech_id)?.code ?? part_of_speech_id;
         await create.mutateAsync({
           partId: part_of_speech_id,
-          input: {
-            ...fields,
-            code: deriveSubPartOfSpeechCode(fields.full_name_en, parentCode),
-            sort_order: nextSortOrderFor(part_of_speech_id)
-          }
+          input: fields
         });
       }
       onSaved(value ? "细分词性已更新" : "细分词性已新增");
@@ -182,22 +170,56 @@ function SubPartFormModal({
       destroyOnHidden
     >
       <Form form={form} layout="vertical" onFinish={submit}>
-        <Form.Item
-          name="part_of_speech_id"
-          label="所属基本词性"
-          rules={[{ required: true, message: "请选择所属基本词性" }]}
-        >
-          <Select
-            aria-label="所属基本词性"
-            disabled={Boolean(value) || Boolean(parent)}
-            options={parentOptions.map((item) => ({
-              value: item.id,
-              label: item.name_zh
-            }))}
-            placeholder="请选择所属基本词性"
-          />
-        </Form.Item>
-        <PartOfSpeechNameFields
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              name="part_of_speech_id"
+              label="所属基本词性"
+              rules={[{ required: true, message: "请选择所属基本词性" }]}
+            >
+              <Select
+                aria-label="所属基本词性"
+                disabled={Boolean(value) || Boolean(parent)}
+                options={parentOptions.map((item) => ({
+                  value: item.id,
+                  label: item.name_zh
+                }))}
+                placeholder="请选择所属基本词性"
+                // 序号在所属父级下才有意义，换父级就按新父级重新预填；
+                // 管理员已经手填过就别覆盖他。
+                onChange={(id: string) => {
+                  if (form.isFieldTouched("sort_order")) return;
+                  form.setFieldValue(
+                    "sort_order",
+                    nextSortOrderForRef.current(id)
+                  );
+                }}
+              />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              name="code"
+              label="编码"
+              extra={
+                codeLocked
+                  ? `已有 ${value.usage_count} 个词义引用，编码不能再改`
+                  : "词条里引用这条细分词性用的代码文本，全局唯一"
+              }
+              rules={[
+                { required: true, message: "请输入编码" },
+                {
+                  pattern: SUB_PART_CODE_PATTERN,
+                  message:
+                    "编码为大写字母开头的大写字母、数字、- 或 _，最长 32 位"
+                }
+              ]}
+            >
+              <Input disabled={codeLocked} placeholder="例如 N-UNCOUNT" />
+            </Form.Item>
+          </Col>
+        </Row>
+        <PartOfSpeechSharedFields
           placeholders={PLACEHOLDERS}
           onTouch={markTouched}
         />
@@ -237,7 +259,7 @@ export function SubPartOfSpeechPanel({
   const list = useSubPartOfSpeechLists(parentIds);
   const remove = useRemoveSubPartOfSpeech();
   const parentKey = parentIds.join(",");
-  // 删除或切换父级让行数变少时，antd 内部会自动回退页码但不回调 onChange，序号要按实际页算。
+  // 删除或切换父级让行数变少时，antd 内部会自动回退页码但不回调 onChange，受控页码要跟上。
   const pageCount = Math.max(1, Math.ceil(list.items.length / pageSize));
   const currentPage = Math.min(page, pageCount);
 
@@ -271,11 +293,8 @@ export function SubPartOfSpeechPanel({
   };
 
   const columns: TableColumnsType<SubPartOfSpeechConfig> = [
-    {
-      title: "序号",
-      width: 56,
-      render: (_, __, index) => (currentPage - 1) * pageSize + index + 1
-    },
+    { title: "序号", dataIndex: "sort_order", width: 64 },
+    { title: "编码", dataIndex: "code", width: 150 },
     { title: "正式中文", dataIndex: "name_zh", width: 120 },
     { title: "简洁显示", dataIndex: "short_name_zh", width: 110 },
     { title: "正式英文", dataIndex: "name_en", width: 150 },
@@ -385,7 +404,7 @@ export function SubPartOfSpeechPanel({
                 setPageSize(nextSize);
               }
             }}
-            scroll={{ x: 1300 }}
+            scroll={{ x: 1450 }}
           />
         )}
       </Card>

@@ -102,13 +102,14 @@ describe("PartOfSpeechFormModal", () => {
     expect(callbacks.onClose).toHaveBeenCalledTimes(1);
   });
 
-  it("未引用配置修改时不暴露稳定编码，提交沿用原编码与排序", async () => {
+  it("未引用配置修改时不暴露稳定编码，序号可改", async () => {
     const callbacks = renderModal(value);
     expect(screen.queryByLabelText("稳定编码")).toBeNull();
     expect(screen.queryByText(/已被词条引用/)).toBeNull();
     fireEvent.change(screen.getByLabelText("正式中文"), {
       target: { value: "语气词" }
     });
+    fireEvent.change(screen.getByLabelText("序号"), { target: { value: "5" } });
     fireEvent.click(screen.getByText("保 存"));
 
     await waitFor(() =>
@@ -121,7 +122,7 @@ describe("PartOfSpeechFormModal", () => {
           abbreviation: "part.",
           short_name_zh: "小品词",
           full_name_en: "particle",
-          sort_order: 100
+          sort_order: 5
         }
       })
     );
@@ -224,7 +225,7 @@ describe("PartOfSpeechFormModal 派生默认值", () => {
     );
   });
 
-  it("新建时排序值不暴露、自动取默认值提交；修改时保持原值且不派生", async () => {
+  it("新建时序号预填默认值、可改后提交；修改时回填原值且不派生", async () => {
     const view = render(
       <PartOfSpeechFormModal
         open
@@ -234,7 +235,10 @@ describe("PartOfSpeechFormModal 派生默认值", () => {
         onError={vi.fn()}
       />
     );
-    expect(screen.queryByLabelText("排序值")).toBeNull();
+    expect(screen.getByLabelText("序号")).toHaveValue("60");
+    fireEvent.change(screen.getByLabelText("序号"), {
+      target: { value: "35" }
+    });
     fireEvent.change(screen.getByLabelText("正式中文"), {
       target: { value: "小品词" }
     });
@@ -250,12 +254,13 @@ describe("PartOfSpeechFormModal 派生默认值", () => {
     fireEvent.click(screen.getByText("新 建"));
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith(
-        expect.objectContaining({ sort_order: 60, code: "particle" })
+        expect.objectContaining({ sort_order: 35, code: "particle" })
       )
     );
     view.unmount();
 
     renderModal(value);
+    expect(screen.getByLabelText("序号")).toHaveValue("100");
     fireEvent.change(screen.getByLabelText("正式中文"), {
       target: { value: "语气词" }
     });
