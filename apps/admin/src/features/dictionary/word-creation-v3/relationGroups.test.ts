@@ -55,8 +55,23 @@ describe("派生词展示分组", () => {
       [bound]
     ]);
   });
-  it.each(["synonym", "antonym", "derivative"])(
-    "手动 %s 的多个词义合组且不混合关系类型",
+  it("手动派生词的多个词义合组且不混合关系类型", () => {
+    const first = {
+      id: "a",
+      relation: "derivative",
+      pending_target_headword: "outside",
+      pending_target_gloss: "一",
+      score: "50"
+    };
+    const second = { ...first, id: "b", pending_target_gloss: "二" };
+    const other = { ...first, id: "c", relation: "synonym" };
+    expect(groupRelations([first, other, second])).toEqual([
+      [first, second],
+      [other]
+    ]);
+  });
+  it.each(["synonym", "antonym"])(
+    "手动 %s 同词面也各成一行：一个目标只配一条词义",
     (type) => {
       const first = {
         id: "a",
@@ -66,15 +81,7 @@ describe("派生词展示分组", () => {
         score: "50"
       };
       const second = { ...first, id: "b", pending_target_gloss: "二" };
-      const other = {
-        ...first,
-        id: "c",
-        relation: type === "synonym" ? "antonym" : "synonym"
-      };
-      expect(groupRelations([first, other, second])).toEqual([
-        [first, second],
-        [other]
-      ]);
+      expect(groupRelations([first, second])).toEqual([[first], [second]]);
     }
   );
   it("取消与新增保留未变义项 UUID，清空仍保留可编辑行，删除整组不碰其他关系", () => {
