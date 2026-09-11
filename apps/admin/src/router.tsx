@@ -45,12 +45,6 @@ export const wordRoutes: RouteObject[] = [
     })
   },
   {
-    path: "words/:wordId/wizard/:step",
-    lazy: async () => ({
-      Component: (await import("@/pages/WordWizard")).WordWizardPage
-    })
-  },
-  {
     path: "words/:wordId/v3/wizard/:step",
     lazy: async () => ({
       Component: (await import("@/pages/WordWizardV3")).WordWizardV3Page

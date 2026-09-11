@@ -1,15 +1,9 @@
 import { act, fireEvent, render, screen, within } from "@testing-library/react";
-import { ConfigProvider } from "antd";
+import { ConfigProvider, Typography } from "antd";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
-import { createPartOfSpeechLookup } from "../part-of-speech/catalog";
-import { partOfSpeechCatalogFixture } from "./partOfSpeech.test.helper";
 import { WordCreationLayout } from "./WordCreationLayout";
-import {
-  completeMeanings,
-  mockPageWidthObserver,
-  wordFixture
-} from "./wordCreation.test.helper";
+import { mockPageWidthObserver } from "./wordCreation.test.helper";
 
 function LocationProbe() {
   const location = useLocation();
@@ -21,9 +15,24 @@ function LocationProbe() {
   );
 }
 
+type LayoutProps = Omit<Parameters<typeof WordCreationLayout>[0], "children">;
+
+function presentation(
+  overrides: Partial<LayoutProps["presentation"]> = {}
+): LayoutProps["presentation"] {
+  return {
+    wordExists: true,
+    breadcrumbTitle: "centre · 词形与发音",
+    completedSteps: ["basics"],
+    showEntrySummary: false,
+    progress: <div data-testid="progress-list">清单</div>,
+    ...overrides
+  };
+}
+
 function renderLayout(
-  props: Omit<Parameters<typeof WordCreationLayout>[0], "children">,
-  initialEntry = "/words/word-center/wizard/forms"
+  props: LayoutProps,
+  initialEntry = "/words/word-center/v3/wizard/forms"
 ) {
   // 关掉动画：抽屉的退场过渡在 jsdom 里不结束，关闭后面板会一直留在可见态。
   return render(
@@ -39,166 +48,72 @@ function renderLayout(
 }
 
 describe("WordCreationLayout", () => {
-  it("创建态区分单词、短语，未知意图使用中性文案", () => {
-    const neutral = renderLayout({ currentStep: "basics" });
-    expect(screen.getByText("创建词条")).toBeInTheDocument();
-
-    neutral.unmount();
-    const word = renderLayout({ currentStep: "basics", entryKind: "word" });
-    expect(screen.getByText("创建单词")).toBeInTheDocument();
-
-    word.unmount();
-    renderLayout({ currentStep: "basics", entryKind: "phrase" });
-    expect(screen.getByText("创建短语")).toBeInTheDocument();
-  });
-
-  it("Step 1 也展示词条摘要和完成情况", () => {
-    renderLayout({ currentStep: "basics" });
-
-    expect(
-      screen.getByRole("region", { name: "词条摘要" })
-    ).toBeInTheDocument();
-    expect(screen.getByText("待检测")).toHaveClass(
-      "word-summary-pending-detection"
-    );
-    expect(screen.getByText("完成情况")).toBeInTheDocument();
-  });
-
-  it("创建态展示实时摘要并在未创建草稿前禁用后续步骤", () => {
-    const onStepChange = vi.fn();
+  it("面包屑与词条摘要都由调用方给定，壳不自行拼词条信息", () => {
     const view = renderLayout({
       currentStep: "basics",
-      draftHeadwords: {
-        mode: "distinguish",
-        uk: "centre",
-        us: "center",
-        source_dialect: "us"
-      },
-      onStepChange
+      presentation: presentation({
+        breadcrumbTitle: "创建词条",
+        showEntrySummary: true,
+        summaryHeadword: (
+          <Typography.Text className="word-summary-pending-detection">
+            待检测
+          </Typography.Text>
+        ),
+        status: <span>草稿</span>
+      })
     });
 
-    expect(screen.getByText("step-content")).toBeInTheDocument();
-    const laterStep = screen.getByText("词形与发音").closest(".ant-steps-item");
-    expect(laterStep).toHaveClass("ant-steps-item-disabled");
-
-    fireEvent.click(screen.getByText("词形与发音"));
-    expect(onStepChange).not.toHaveBeenCalled();
-    expect(
+    expect(screen.getByText("创建词条")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "词条摘要" })).toBe(
       view.container.querySelector(".word-creation-summary")
-    ).not.toBeNull();
-    expect(
-      view.container.querySelector(".word-creation-shell")
-    ).not.toHaveClass("word-creation-shell--basics");
-  });
-
-  it("英美区分时偏好侧排首位并保持主视觉，检测基准另行标注", () => {
-    const view = renderLayout({
-      currentStep: "forms",
-      draftHeadwords: {
-        mode: "distinguish",
-        uk: "centre",
-        us: "center",
-        source_dialect: "us"
-      }
-    });
-    const rows = Array.from(
-      view.container.querySelectorAll<HTMLElement>(
-        ".word-creation-summary-headword"
-      )
     );
-
-    // 缺省偏好英式：即便本次输入命中的是美式，首行也稳定是英式那一侧。
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toHaveTextContent("centre");
-    expect(rows[0]).toHaveTextContent("英式英语 · BrE");
-    expect(rows[0]).not.toHaveTextContent("检测基准");
-    expect(rows[0]!.querySelector("strong")?.textContent).toBe("centre");
-    expect(rows[0]).not.toHaveClass("word-creation-summary-alt");
-    expect(rows[1]).toHaveTextContent("center");
-    // 「检测基准」跟着真正命中的那一侧走，不再等同于首行。
-    expect(rows[1]).toHaveTextContent("美式英语 · AmE · 检测基准");
-    expect(rows[1]).toHaveClass("word-creation-summary-alt");
-    expect(rows[1]!.querySelector("strong")).toBeNull();
-
-    view.unmount();
-    const ukFirst = renderLayout({
-      currentStep: "forms",
-      draftHeadwords: {
-        mode: "distinguish",
-        uk: "centre",
-        us: "center",
-        source_dialect: "uk"
-      }
-    });
-    const ukRows = Array.from(
-      ukFirst.container.querySelectorAll<HTMLElement>(
-        ".word-creation-summary-headword"
-      )
-    );
-    expect(ukRows[0]!.querySelector("strong")?.textContent).toBe("centre");
-    expect(ukRows[0]).toHaveTextContent("英式英语 · BrE · 检测基准");
-    expect(ukRows[1]).toHaveTextContent("center");
-    expect(ukRows[1]).not.toHaveTextContent("检测基准");
-  });
-
-  it("顶部摘要在缺少 canonical word 时安全展示空状态或统一草稿主词", () => {
-    const empty = renderLayout({ currentStep: "forms" });
     expect(screen.getByText("待检测")).toHaveClass(
       "word-summary-pending-detection"
     );
-    expect(screen.getByText("方言识别").parentElement).toHaveTextContent(
-      "待完成"
-    );
-    expect(screen.getByText("基本词性").parentElement).toHaveTextContent("0");
+    expect(screen.getByText("草稿")).toBeInTheDocument();
+    expect(screen.getByText("所属语言")).toBeInTheDocument();
+  });
 
-    empty.unmount();
+  it("showEntrySummary=false 时只留返回入口与完成情况", () => {
+    renderLayout({ currentStep: "forms", presentation: presentation() });
+
+    expect(screen.queryByText("当前词条")).toBeNull();
+    expect(screen.getByTestId("progress-list")).toBeInTheDocument();
+    expect(screen.getByText("step-content")).toBeInTheDocument();
+  });
+
+  it("草稿还没创建时后续步骤不可点", () => {
+    const onStepChange = vi.fn();
+    renderLayout({
+      currentStep: "basics",
+      onStepChange,
+      presentation: presentation({
+        wordExists: false,
+        breadcrumbTitle: "创建词条",
+        completedSteps: []
+      })
+    });
+
+    const laterStep = screen.getByText("词形与发音").closest(".ant-steps-item");
+    expect(laterStep).toHaveClass("ant-steps-item-disabled");
+    fireEvent.click(screen.getByText("词形与发音"));
+    expect(onStepChange).not.toHaveBeenCalled();
+  });
+
+  it("草稿已创建后四步都可点，不受完成进度限制", () => {
+    const onStepChange = vi.fn();
     renderLayout({
       currentStep: "forms",
-      draftHeadwords: { mode: "unified", common: "far" }
+      onStepChange,
+      presentation: presentation({ completedSteps: ["basics"] })
     });
-    expect(screen.getByText("far", { exact: true })).toBeInTheDocument();
-  });
 
-  it("草稿汇总有效完成数，四步都可点击不受完成进度限制", () => {
-    const onStepChange = vi.fn();
-    const word = wordFixture({
-      ready: true,
-      max_reachable_step: "meanings",
-      completed_steps: ["basics", "forms"]
-    });
-    const view = renderLayout({ word, currentStep: "forms", onStepChange });
-    const summary = view.container.querySelector(".word-creation-summary")!;
-
-    expect(summary).toHaveTextContent("方言识别完成");
-    expect(summary).toHaveTextContent("基本词性2/2");
-    expect(summary).toHaveTextContent("原形发音2/2");
-    expect(summary).toHaveTextContent("词形变化5/5");
-    expect(summary).toHaveTextContent("语义区间1/1");
-    expect(summary).toHaveTextContent("语法结构2/2");
-    expect(summary).toHaveTextContent("多维词义2/2");
-    expect(summary).toHaveTextContent("多维例句2/2");
-
+    expect(document.querySelectorAll(".ant-steps-item-disabled")).toHaveLength(
+      0
+    );
     fireEvent.click(screen.getByText("词义与例句"));
     expect(onStepChange).toHaveBeenNthCalledWith(1, "meanings");
-    // 进度只到 meanings，preview 越过当前进度——门禁取消后照样点得动。
-    fireEvent.click(screen.getByText("预览并生效"));
-    expect(onStepChange).toHaveBeenNthCalledWith(2, "preview");
-  });
-
-  it("词形未完成的新草稿也能直接点进后续步骤", () => {
-    const onStepChange = vi.fn();
-    // 最保守的进度：只完成第 1 步，后面三步都还没做。
-    const word = wordFixture({
-      completed_steps: ["basics"],
-      max_reachable_step: "forms"
-    });
-    const view = renderLayout({ word, currentStep: "forms", onStepChange });
-
-    expect(
-      view.container.querySelectorAll(".ant-steps-item-disabled")
-    ).toHaveLength(0);
-    fireEvent.click(screen.getByText("词义与例句"));
-    expect(onStepChange).toHaveBeenNthCalledWith(1, "meanings");
+    // 进度只到 forms，preview 越过当前进度——门禁取消后照样点得动。
     fireEvent.click(screen.getByText("预览并生效"));
     expect(onStepChange).toHaveBeenNthCalledWith(2, "preview");
   });
@@ -206,11 +121,10 @@ describe("WordCreationLayout", () => {
   it("越步进入靠后步骤时，跳过的步骤不画成已完成", () => {
     // 门禁取消后能直接跳到第 4 步；此时第 2、3 步排在当前步之前但并未完成，
     // 步骤条只能按 completed_steps 如实显示，不能凭位置推断成绿勾。
-    const word = wordFixture({
-      completed_steps: ["basics"],
-      max_reachable_step: "forms"
+    renderLayout({
+      currentStep: "preview",
+      presentation: presentation({ completedSteps: ["basics"] })
     });
-    renderLayout({ word, currentStep: "preview" });
 
     const statusOf = (title: string) =>
       screen.getByText(title).closest(".ant-steps-item")!.className;
@@ -221,116 +135,18 @@ describe("WordCreationLayout", () => {
     expect(statusOf("预览并生效")).toContain("ant-steps-item-process");
   });
 
-  it("旧草稿尚无语义区间时显示未开始，不虚构默认首行", () => {
-    const word = wordFixture();
-    word.meanings.sense_groups = [];
-    const view = renderLayout({ word, currentStep: "meanings" });
-    const summary = view.container.querySelector(".word-creation-summary")!;
-
-    expect(summary).toHaveTextContent("语义区间0/1");
-    expect(screen.getByText("语义区间").parentElement).toHaveAttribute(
-      "data-readiness-state",
-      "incomplete"
-    );
-  });
-
-  it("空白初始化节点显示 0/总数且不使用完成图标", () => {
-    const word = wordFixture({
-      completed_steps: ["basics", "forms"],
-      max_reachable_step: "meanings"
-    });
-    renderLayout({ word, currentStep: "meanings" });
-
-    for (const [label, value] of [
-      ["语义区间", "0/1"],
-      ["语法结构", "0/2"],
-      ["多维词义", "0/2"],
-      ["多维例句", "0/2"]
-    ] as const) {
-      const row = screen.getByText(label).parentElement!;
-      expect(row).toHaveTextContent(value);
-      expect(row).toHaveAttribute("data-readiness-state", "incomplete");
-      expect(row.querySelector(".word-progress-done")).toBeNull();
-    }
-  });
-
-  it("缺音标只落在原形发音行，不写成基本词性未完成", () => {
-    const word = wordFixture({ ready: true });
-    word.forms.pos[0]!.base_form.variants[0]!.pronunciations[0]!.actual_pron =
-      "";
-    renderLayout({ word, currentStep: "forms" });
-
-    const partsOfSpeech = screen.getByText("基本词性").parentElement!;
-    expect(partsOfSpeech).toHaveTextContent("2/2");
-    expect(partsOfSpeech).toHaveAttribute("data-readiness-state", "complete");
-    const pronunciation = screen.getByText("原形发音").parentElement!;
-    expect(pronunciation).toHaveTextContent("1/2");
-    expect(pronunciation).toHaveAttribute("data-readiness-state", "incomplete");
-  });
-
-  it("无派生词形时词形变化显示无需填写，不打完成勾", () => {
-    const word = wordFixture({ ready: true });
-    for (const pos of word.forms.pos) pos.form_groups = [];
-    renderLayout({
-      word,
-      currentStep: "forms",
-      partOfSpeechLookup: createPartOfSpeechLookup(partOfSpeechCatalogFixture)
+  it("readOnly 时步骤条整体禁用，但仍可返回词库", () => {
+    const view = renderLayout({
+      currentStep: "preview",
+      readOnly: true,
+      presentation: presentation({
+        completedSteps: ["basics", "forms", "meanings"]
+      })
     });
 
-    const forms = screen.getByText("词形变化").parentElement!;
-    expect(forms).toHaveTextContent("无需填写");
-    expect(forms).not.toHaveTextContent("0/0");
-    expect(forms).toHaveAttribute("data-readiness-state", "not_required");
-    expect(forms.querySelector(".word-progress-done")).toBeNull();
-    expect(forms.querySelector(".word-progress-none")).not.toBeNull();
-  });
-
-  it("优先使用当前未保存草稿实时计算摘要", () => {
-    const word = wordFixture({
-      completed_steps: ["basics", "forms"],
-      max_reachable_step: "meanings"
-    });
-    const meanings = completeMeanings(word.meanings, word.headwords);
-    renderLayout({
-      word,
-      currentStep: "meanings",
-      readinessDraft: { meanings }
-    });
-
-    expect(screen.getByText("语义区间").parentElement).toHaveTextContent("1/1");
-    expect(screen.getByText("语法结构").parentElement).toHaveTextContent("2/2");
-    expect(screen.getByText("多维词义").parentElement).toHaveTextContent("2/2");
-    expect(screen.getByText("多维例句").parentElement).toHaveTextContent("2/2");
-  });
-
-  it("点击待完善项交出稳定定位目标", () => {
-    const word = wordFixture({
-      completed_steps: ["basics", "forms"],
-      max_reachable_step: "meanings"
-    });
-    const onReadinessNavigate = vi.fn();
-    renderLayout({
-      word,
-      currentStep: "meanings",
-      onReadinessNavigate
-    });
-
-    fireEvent.click(screen.getByText("语法结构"));
-    expect(onReadinessNavigate).toHaveBeenCalledWith({
-      step: "meanings",
-      pos_id: word.meanings.pos[0]!.pos_id,
-      node_id: word.meanings.pos[0]!.grammar_structures[0]!.id,
-      field: "content"
-    });
-  });
-
-  it("published 只读态在顶部摘要显示准确标识，并可返回词库", () => {
-    const word = wordFixture({ status: "published", ready: true });
-    const view = renderLayout({ word, currentStep: "preview", readOnly: true });
-
-    expect(screen.getByText("已发布 · 只读")).toBeInTheDocument();
-    // 面包屑与左栏「当前词条」一致，用偏好侧(缺省英式)。
-    expect(screen.getByText("centre · 预览并生效")).toBeInTheDocument();
+    expect(
+      view.container.querySelectorAll(".ant-steps-item-disabled").length
+    ).toBeGreaterThan(0);
     const summary = view.container.querySelector<HTMLElement>(
       ".word-creation-summary"
     )!;
@@ -338,43 +154,11 @@ describe("WordCreationLayout", () => {
     expect(screen.getByTestId("location")).toHaveTextContent("/words");
   });
 
-  it("published 编辑态与 archived 只读态显示各自状态，不误报只读或可编辑", () => {
-    const editing = wordFixture({
-      status: "published",
-      ready: true,
-      revision: 4,
-      published_revision: 3,
-      has_unpublished_changes: true
-    });
-    const view = renderLayout({
-      word: editing,
-      currentStep: "forms",
-      readOnly: false
-    });
-    expect(screen.getByText("已发布 · 编辑未发布修改")).toBeInTheDocument();
-    expect(screen.queryByText("已发布 · 只读")).toBeNull();
-
-    view.unmount();
-    renderLayout({
-      word: wordFixture({ status: "archived", ready: true }),
-      currentStep: "preview",
-      readOnly: true
-    });
-    expect(screen.getByText("垃圾桶 · 只读")).toBeInTheDocument();
-  });
-
   describe("窄屏的完成情况", () => {
-    const narrowPresentation = {
-      wordExists: true,
-      breadcrumbTitle: "centre · 词形与发音",
-      completedSteps: ["basics"] as const,
-      showEntrySummary: false,
-      progressBadge: "1/7",
-      progress: <div data-testid="progress-list">清单</div>
-    };
+    const narrow = presentation({ progressBadge: "1/7" });
 
     it("量不到宽度时按宽屏渲染，清单直接摆在左栏", () => {
-      renderLayout({ currentStep: "forms", presentation: narrowPresentation });
+      renderLayout({ currentStep: "forms", presentation: narrow });
 
       expect(screen.getByTestId("progress-list")).toBeInTheDocument();
       expect(
@@ -385,10 +169,7 @@ describe("WordCreationLayout", () => {
     it("窄屏把清单收进抽屉，入口带完成计数", () => {
       const observer = mockPageWidthObserver(900);
       try {
-        renderLayout({
-          currentStep: "forms",
-          presentation: narrowPresentation
-        });
+        renderLayout({ currentStep: "forms", presentation: narrow });
 
         // 清单不再占首屏，顶部只留一个入口
         expect(screen.queryByTestId("progress-list")).not.toBeInTheDocument();
@@ -399,41 +180,10 @@ describe("WordCreationLayout", () => {
       }
     });
 
-    it("抽屉里点待完善项，跳步的同时把抽屉关掉", () => {
-      const observer = mockPageWidthObserver(900);
-      const onReadinessNavigate = vi.fn();
-      try {
-        const word = wordFixture({
-          completed_steps: ["basics", "forms"],
-          max_reachable_step: "meanings"
-        });
-        renderLayout({ word, currentStep: "meanings", onReadinessNavigate });
-
-        fireEvent.click(screen.getByRole("button", { name: "完成情况" }));
-        fireEvent.click(screen.getByText("语法结构"));
-
-        // 连 target 一起断言：包装层若把定位目标丢了，只数调用次数看不出来
-        expect(onReadinessNavigate).toHaveBeenCalledTimes(1);
-        expect(onReadinessNavigate).toHaveBeenCalledWith({
-          step: "meanings",
-          pos_id: word.meanings.pos[0]!.pos_id,
-          node_id: word.meanings.pos[0]!.grammar_structures[0]!.id,
-          field: "content"
-        });
-        // 抽屉带遮罩，留着就盖在刚跳过去的那一步上
-        expect(screen.getByText("语法结构")).not.toBeVisible();
-      } finally {
-        observer.restore();
-      }
-    });
-
     it("抽屉开着时拖宽窗口，清单回到左栏且不会留下第二份", () => {
       const observer = mockPageWidthObserver(900);
       try {
-        renderLayout({
-          currentStep: "forms",
-          presentation: narrowPresentation
-        });
+        renderLayout({ currentStep: "forms", presentation: narrow });
         fireEvent.click(screen.getByRole("button", { name: "完成情况 1/7" }));
 
         act(() => observer.resize(1400));

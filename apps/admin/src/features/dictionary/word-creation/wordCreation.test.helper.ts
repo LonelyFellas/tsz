@@ -13,7 +13,7 @@ import {
 } from "../mock/fixtures";
 import type { DraftMeaningsWithSentenceAssociations } from "./meaningsAndExamples/sentenceAssociationTypes";
 
-export function detectionFixture(
+function detectionFixture(
   headword = "center",
   detectionId = `detection-${headword.replaceAll(" ", "-")}`
 ): DetectWordResponseV2 {
@@ -42,7 +42,7 @@ function readyEnglishText(text: string, nodeKey: string): EnglishTextV2 {
   };
 }
 
-export function completeMeanings(
+function completeMeanings(
   content: DraftMeaningsWithSentenceAssociations,
   headwords: WordHeadwordsV2,
   forms?: DraftFormsStepContent

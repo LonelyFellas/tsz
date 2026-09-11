@@ -9,7 +9,6 @@ import type {
 } from "@tsz/types";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import { wordFixture } from "../wordCreation.test.helper";
-import { toMeaningsWireContent } from "../model";
 import {
   addSentenceAssociation,
   canonicalSharedSentences,
@@ -377,31 +376,6 @@ describe("sentenceAssociationModel — 预览、改文与 wire", () => {
         ]
       }
     ]);
-  });
-
-  it("真实能力关闭时不发送 shared_sentences，mock 能力开启时只发 canonical 字段", () => {
-    const shared = sharedSentence([
-      {
-        ...linked("l-1", 0, 6, "Center"),
-        target_headword: "center",
-        form_variants: [{ dialect: "uk", spelling: "centre" }]
-      }
-    ]);
-    const content = { sense_groups: [], pos: [], shared_sentences: [shared] };
-    expect(toMeaningsWireContent(content, "uk")).toEqual({
-      sense_groups: [],
-      pos: []
-    });
-    expect(toMeaningsWireContent(content, "uk", true)).toEqual({
-      sense_groups: [],
-      pos: [],
-      shared_sentences: [
-        {
-          ...shared,
-          associations: [linked("l-1", 0, 6, "Center")]
-        }
-      ]
-    });
   });
 });
 

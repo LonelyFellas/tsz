@@ -396,7 +396,6 @@ export function V3BasicsStep({
   return (
     <WordCreationLayout
       currentStep="basics"
-      entryKind={word.kind}
       onStepChange={onStepChange}
       presentation={{
         wordExists: true,

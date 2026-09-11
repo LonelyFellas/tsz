@@ -164,7 +164,6 @@ function V3WordCreationLayoutContent({
     <WordCreationLayout
       currentStep={activeStep}
       reachableSteps={reachableSteps}
-      entryKind={word.kind}
       onStepChange={readOnly ? undefined : onStepChange}
       presentation={{
         wordExists: true,

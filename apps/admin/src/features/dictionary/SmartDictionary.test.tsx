@@ -76,7 +76,39 @@ vi.mock("./part-of-speech/api", () => ({
 
 import { SmartDictionary } from "./SmartDictionary";
 
-function word(
+/** 列表默认行：产品只剩 V3，默认 fixture 就按 V3 出。 */
+function word(id: string, headword: string): AdminWordListItemV3 {
+  return {
+    annotation_visible: false,
+    schema_version: 3,
+    id,
+    kind: "word",
+    presentation: {
+      label: headword,
+      matched_surfaces: [headword],
+      strategy_version: "surface_summary_v1"
+    },
+    dialects: ["common"],
+    gloss: "释义",
+    pos_list: ["noun"],
+    levels: ["A1"],
+    status: "draft",
+    revision: 1,
+    lifecycle_revision: 1,
+    annotation: null,
+    annotation_revision: 1,
+    max_reachable_step: "basics",
+    has_unpublished_changes: false,
+    created_by_name: "Admin",
+    created_by: "admin-1",
+    reference_summary: { total: 0, previews: [], truncated: false },
+    created_at: "2026-08-01T00:00:00Z",
+    updated_at: "2026-08-01T00:00:00Z"
+  };
+}
+
+/** 旧结构行：只用来验证「照常渲染、但进不去向导」。 */
+function legacyWord(
   id: string,
   headword: string
 ): Extract<AdminWordListItemAny, { schema_version: 2 }> {
@@ -154,10 +186,7 @@ function matchViewport(width: number) {
   }));
 }
 
-function archivedWord(
-  id: string,
-  headword: string
-): Extract<AdminWordListItemAny, { schema_version: 2 }> {
+function archivedWord(id: string, headword: string): AdminWordListItemV3 {
   return { ...word(id, headword), status: "archived" };
 }
 
@@ -467,7 +496,7 @@ describe("SmartDictionary", () => {
   it("同页混合展示 V2 phrase 与 V3，V3 只使用 presentation.label 且可进入独立路由", () => {
     matchViewport(1440);
     const legacy = {
-      ...word("v2-phrase", "legacy phrase"),
+      ...legacyWord("v2-phrase", "legacy phrase"),
       kind: "phrase" as const,
       dialects: ["uk" as const]
     };
@@ -536,14 +565,14 @@ describe("SmartDictionary", () => {
     expect(screen.queryByText("服务端 V3 展示名")).toBeNull();
   });
 
-  it("五条 V2/V3 列表显示服务端 label 与统计并按 schema 路由，不暴露内部 ID 或 strategy code", () => {
+  it("五条新旧结构列表显示服务端 label 与统计，旧结构行不给入口，不暴露内部 ID 或 strategy code", () => {
     matchViewport(1440);
-    const legacyWord = word(
+    const legacy = legacyWord(
       "01a042f8-6c7d-7401-beca-ac149624e7a1",
       "legacy word"
     );
     const legacyPhrase = {
-      ...word("01a042f8-6c7d-7401-beca-ac149624e7a2", "legacy phrase"),
+      ...legacyWord("01a042f8-6c7d-7401-beca-ac149624e7a2", "legacy phrase"),
       kind: "phrase" as const
     };
     const emptyV3 = v3Word(
@@ -561,7 +590,7 @@ describe("SmartDictionary", () => {
       "legacy bridge",
       "legacy_headwords_v1"
     );
-    const rows = [legacyWord, legacyPhrase, emptyV3, nativeV3, migratedV3];
+    const rows = [legacy, legacyPhrase, emptyV3, nativeV3, migratedV3];
     const reportUnknownPresentationStrategy = vi.fn();
     apiMocks.useWordList.mockReturnValue({
       data: {
@@ -631,15 +660,13 @@ describe("SmartDictionary", () => {
     expect(container.innerHTML).not.toContain("surface_summary_v1");
     expect(container.innerHTML).not.toContain("legacy_headwords_v1");
 
-    fireEvent.click(
+    // 旧结构行照常渲染，但进不去向导——向导只剩 V3。
+    expect(
       screen
         .getByText("legacy word")
         .closest("tr")!
         .querySelector("td:last-child button")!
-    );
-    expect(screen.getByTestId("location")).toHaveTextContent(
-      `/words/${legacyWord.id}/wizard/basics`
-    );
+    ).toBeDisabled();
     fireEvent.click(
       screen
         .getByText("未命名词条 · 01a042f8")

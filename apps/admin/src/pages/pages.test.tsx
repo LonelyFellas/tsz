@@ -9,7 +9,6 @@ import { ReviewsPage } from "./Reviews";
 import { UsersPage } from "./Users";
 import { WordListsPage } from "./WordLists";
 import { WordCreatePage } from "./WordCreate";
-import { WordWizardPage } from "./WordWizard";
 import { WordsPage } from "./Words";
 
 vi.mock("@/lib/env", () => ({
@@ -19,11 +18,6 @@ vi.mock("@/lib/env", () => ({
   }
 }));
 
-vi.mock("@/features/dictionary/word-creation/WordCreationWizard", () => ({
-  WordCreationWizard: ({ mode }: { mode: "create" | "resume" }) => (
-    <div>word-wizard-{mode}</div>
-  )
-}));
 vi.mock("@/features/dictionary/word-creation/UnifiedCreateEntryStep", () => ({
   UnifiedCreateEntryStep: () => <div>unified-create-entry</div>
 }));
@@ -157,18 +151,15 @@ describe("admin 页面烟雾测试", () => {
     expect(screen.getByRole("radio", { name: "英式（BrE）" })).toBeChecked();
   });
 
-  it.each([
-    [WordCreatePage, "unified-create-entry"],
-    [WordWizardPage, "word-wizard-resume"]
-  ] as const)("词条页面入口挂载正确流程", (Page, expected) => {
+  it("创建页挂载统一创建入口", () => {
     render(
       <MemoryRouter>
         <QueryClientProvider client={new QueryClient()}>
-          <Page />
+          <WordCreatePage />
         </QueryClientProvider>
       </MemoryRouter>
     );
-    expect(screen.getByText(expected)).toBeInTheDocument();
+    expect(screen.getByText("unified-create-entry")).toBeInTheDocument();
   });
 });
 

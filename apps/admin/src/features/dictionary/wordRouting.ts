@@ -20,17 +20,19 @@ function isWizardStep(value: unknown): value is WordCreationStep {
   return WIZARD_STEPS.includes(value as WordCreationStep);
 }
 
-/** schema 与状态共同决定既有词条的唯一详情入口。 */
-export function getWordRowRoute(record: WordRouteRecord): string {
-  if (record.schema_version !== 2 && record.schema_version !== 3) {
-    throw new Error(
-      `unsupported schema_version: ${String(record.schema_version)}`
-    );
-  }
-  const wizardPrefix =
-    record.schema_version === 3
-      ? `/words/${record.id}/v3/wizard`
-      : `/words/${record.id}/wizard`;
+/** 旧结构词条被置灰时给出的原因。 */
+export const LEGACY_SCHEMA_BLOCKED_HINT =
+  "旧结构词条，新版向导已不支持打开；需要处理请联系维护者迁移";
+
+/**
+ * schema 与状态共同决定既有词条的唯一详情入口。
+ *
+ * 只有 V3 有向导：V1/V2 向导已整条下线，列表遇到旧结构的行返回 `undefined`，
+ * 由调用方置灰入口并说明原因——这里抛异常会把整张表一起炸掉。
+ */
+export function getWordRowRoute(record: WordRouteRecord): string | undefined {
+  if (record.schema_version !== 3) return undefined;
+  const wizardPrefix = `/words/${record.id}/v3/wizard`;
   if (record.status === "published" && !record.has_unpublished_changes) {
     return `${wizardPrefix}/preview`;
   }

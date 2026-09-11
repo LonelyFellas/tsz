@@ -13,9 +13,6 @@ vi.mock("@/pages/Words", () => ({
 vi.mock("@/pages/WordCreate", () => ({
   WordCreatePage: () => <div>unified-create-page</div>
 }));
-vi.mock("@/pages/WordWizard", () => ({
-  WordWizardPage: () => <div>v2-wizard-page</div>
-}));
 vi.mock("@/pages/WordWizardV3", () => ({
   WordWizardV3Page: () => <div>v3-wizard-page</div>
 }));
@@ -78,11 +75,13 @@ describe("word route parsing", () => {
     );
   });
 
-  it.each([
-    ["/words/v2-1/wizard/forms", "v2-wizard-page"],
-    ["/words/v3-1/v3/wizard/forms", "v3-wizard-page"]
-  ])("resolves %s without crossing schema editors", async (entry, expected) => {
-    renderRoute(entry);
-    expect(await screen.findByText(expected)).toBeInTheDocument();
+  it("resolves the V3 wizard deep link", async () => {
+    renderRoute("/words/v3-1/v3/wizard/forms");
+    expect(await screen.findByText("v3-wizard-page")).toBeInTheDocument();
+  });
+
+  it("旧向导路径已下线，落到 404 而不是静默跳回某个编辑器", async () => {
+    renderRoute("/words/v2-1/wizard/forms");
+    expect(await screen.findByText("not-found")).toBeInTheDocument();
   });
 });
