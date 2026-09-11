@@ -1043,13 +1043,14 @@ function RelationsGrid({
         : (relation.pending_target_headword ?? "");
     const trimmed = raw.trim();
     if (!trimmed) return undefined;
-    const issue = validateEntryInput(trimmed).issue;
-    if (issue) return issue;
+    const prepared = validateEntryInput(trimmed);
+    if (prepared.issue) return prepared.issue;
     // 近义词与反义词一个词面只配一条词义。收口只做在了界面上，手敲两行同样的词面
     // 仍然能存下去，要等后端物化才撞名报错，所以这里当场说清楚。只报后出现的那条，
     // 免得两行互相指认。
     if (relation.relation === "derivative") return undefined;
-    const key = trimmed.toLowerCase();
+    // 存下来的是归一化词面（内部空白已折叠），只 trim 会让「look  up」漏报。
+    const key = prepared.normalized.toLowerCase();
     const position = sense.relations.findIndex(
       (item) => item.id === relation.id
     );
@@ -1435,16 +1436,22 @@ function RelationsGrid({
                                                 ? "草稿"
                                                 : "已发布"}
                                             </Tag>
-                                            {/* 「暂无词义」是可行动的那条，别被「已被关联」盖住。 */}
-                                            {word.senses.length === 0 ? (
+                                            {/* 顺序即优先级：先说禁用理由，再说选中后会发生什么。
+                                                「已发布且无词义」本身就是禁用理由，最该先说；
+                                                「选中仅记文本」不是禁用理由，不能盖住已被关联，
+                                                否则灰着的选项还在邀请一个点不动的操作。 */}
+                                            {word.senses.length === 0 &&
+                                            word.status !== "draft" ? (
                                               <Typography.Text type="secondary">
-                                                {word.status === "draft"
-                                                  ? "暂无词义，选中仅记文本"
-                                                  : "暂无词义，请先添加词义"}
+                                                暂无词义，请先添加词义
                                               </Typography.Text>
                                             ) : alreadyLinked ? (
                                               <Typography.Text type="secondary">
                                                 已被同类型的另一行关联
+                                              </Typography.Text>
+                                            ) : word.senses.length === 0 ? (
+                                              <Typography.Text type="secondary">
+                                                暂无词义，选中仅记文本
                                               </Typography.Text>
                                             ) : null}
                                           </Flex>
@@ -1819,6 +1826,9 @@ function RelationsGrid({
                                             replacement
                                           );
                                       } else {
+                                        // 单选路径没有空值兜底：写空会造出「有词条没词义」
+                                        // 的半绑定，那个形状存不进库。今天不可达只因为这个
+                                        // Select 没开 allowClear，谁开了就要在这里先接住。
                                         draftSense.relations.find(
                                           (item) => item.id === relation.id
                                         )!.target_sense_id =
@@ -2028,9 +2038,9 @@ function RelationsGrid({
                                               {boundGlossText(member)}
                                             </Typography.Text>
                                             {/* 与手动词义一致：只剩一条时不给词义级删除，
-                                                  否则会留下有目标词条却没有词义的半绑定关系，
-                                                  那个形状重开词条时会被 toWritableMeanings 拒掉。
-                                                  要整条去掉走行级删除。 */}
+                                                  免得同一个「删」在两处含义不同——这里删的是
+                                                  一条词义，整条关联去掉走行级删除。想清空也可以
+                                                  在上面的多选里取消最后一条，那等于删整条。 */}
                                             {group.length > 1 ? (
                                               <RelationDeleteMenu
                                                 label={`${relationLabel(relationType)}词义 ${glossIndex + 1}`}
