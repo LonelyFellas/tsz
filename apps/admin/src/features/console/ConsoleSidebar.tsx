@@ -234,7 +234,7 @@ export function ConsoleSidebar({
           padding: collapsed ? "18px 0" : "18px 24px",
           fontSize: 18,
           fontWeight: 700,
-          color: "#0071e3",
+          color: "#2053FF",
           overflow: "hidden",
           whiteSpace: "nowrap"
         }}

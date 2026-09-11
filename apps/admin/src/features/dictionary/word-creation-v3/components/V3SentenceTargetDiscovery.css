@@ -75,9 +75,9 @@
 }
 
 .v3-sentence-target-discovery-tokens button.is-selected {
-  border-color: #0071e3;
+  border-color: #2053ff;
   color: #fff;
-  background: #0071e3;
+  background: #2053ff;
   box-shadow: 0 4px 12px rgb(0 113 227 / 22%);
   transform: translateY(-1px);
 }
@@ -133,7 +133,7 @@
   border-color: #91caff;
   color: #005bb8;
   background: #eaf4ff;
-  box-shadow: inset 3px 0 0 #0071e3;
+  box-shadow: inset 3px 0 0 #2053ff;
 }
 
 .v3-sentence-target-discovery-occurrences button span {
@@ -237,7 +237,7 @@
 }
 
 .v3-component-usage-radio.is-checked {
-  border-color: #0071e3;
+  border-color: #2053ff;
 }
 
 .v3-component-usage-radio.is-checked::after {
@@ -247,7 +247,7 @@
   height: 6px;
   margin: 3px;
   border-radius: 50%;
-  background: #0071e3;
+  background: #2053ff;
 }
 
 /* resolve 命中的那一行：原来挂一个「命中」标签，占宽且把词形文本挤窄，改成只换文字颜色。 */

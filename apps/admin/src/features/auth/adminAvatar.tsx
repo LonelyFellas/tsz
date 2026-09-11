@@ -13,7 +13,7 @@ interface AdminAvatarStyle {
 
 const AVATAR_BY_LEVEL: Record<AdminLevel, AdminAvatarStyle> = {
   super_admin: { icon: <CrownOutlined />, background: "#faad14" },
-  admin: { icon: <UserOutlined />, background: "#0071e3" }
+  admin: { icon: <UserOutlined />, background: "#2053FF" }
 };
 
 /**
