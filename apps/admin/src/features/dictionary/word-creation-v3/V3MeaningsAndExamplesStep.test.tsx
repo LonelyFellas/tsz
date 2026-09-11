@@ -1725,21 +1725,21 @@ describe("V3MeaningsAndExamplesStep", () => {
         )
       ].map((title) => title.textContent);
 
-    expect(titles()).toEqual(["近义词", "反义词", "派生词"]);
+    expect(titles()).toEqual(["派生词", "近义词", "反义词"]);
     fireEvent.click(within(grid).getByText("添加近义词").closest("button")!);
-    expect(titles()).toEqual(["近义词", "反义词", "派生词"]);
+    expect(titles()).toEqual(["派生词", "近义词", "反义词"]);
     expect(grid.querySelectorAll(":scope > .word-relation-card")).toHaveLength(
       3
     );
 
     const synonymCard = grid.querySelector(
-      ":scope > .word-relation-card"
+      ':scope > .word-relation-card[data-relation-type="synonym"]'
     ) as HTMLElement;
     expect(within(synonymCard).queryByLabelText("关联 1 类型")).toBeNull();
     fireEvent.click(
       within(synonymCard).getByText("添加近义词").closest("button")!
     );
-    expect(titles()).toEqual(["近义词", "反义词", "派生词"]);
+    expect(titles()).toEqual(["派生词", "近义词", "反义词"]);
     expect(synonymCard.querySelectorAll(".word-relation-row")).toHaveLength(2);
   });
 
@@ -1920,9 +1920,18 @@ describe("V3MeaningsAndExamplesStep", () => {
       fireEvent.change(screen.getByLabelText(`${label}目标词条`), {
         target: { value: "reli" }
       });
+      const emptyDraftOption = screen
+        .getByText("reliability")
+        .closest(".ant-select-item-option")!;
+      expect(emptyDraftOption).not.toHaveClass(
+        "ant-select-item-option-disabled"
+      );
+      // 零词义草稿仍可选，但选项要说明选中只会记文本，别让人误以为绑上了词义。
       expect(
-        screen.getByText("reliability").closest(".ant-select-item-option")
-      ).not.toHaveClass("ant-select-item-option-disabled");
+        within(emptyDraftOption as HTMLElement).getByText(
+          "暂无词义，选中仅记文本"
+        )
+      ).toBeInTheDocument();
       expect(
         screen
           .getByLabelText(`${label}目标词条`)
@@ -2035,9 +2044,34 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it.each([
     ["synonym", "近义词"],
-    ["antonym", "反义词"],
-    ["derivative", "派生词"]
-  ])(
+    ["antonym", "反义词"]
+  ])("%s 没有添加词义入口，同词面的两条也各成一行", (type, label) => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [
+      {
+        id: "manual-1",
+        relation: type,
+        pending_target_headword: "outside",
+        pending_target_gloss: "词义一",
+        score: "60"
+      },
+      {
+        id: "manual-2",
+        relation: type,
+        pending_target_headword: "outside",
+        pending_target_gloss: "词义二",
+        score: "60"
+      }
+    ];
+    render(<Harness initial={initial} />);
+    expect(screen.queryByLabelText(`添加${label}词义`)).toBeNull();
+    // 恒为一条词义，词义级的拖动手柄没有意义，不该渲染出来占位。
+    expect(screen.queryByLabelText(`拖动${label}词义 1`)).toBeNull();
+    // 同一个词面写两次也不合组，两条各自带一个词面输入框。
+    expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(2);
+    expect(screen.getAllByLabelText(`${label}待关联词义`)).toHaveLength(2);
+  });
+  it.each([["derivative", "派生词"]])(
     "手动 %s 支持多个词义、序号与分割线，保存重开后可删除",
     async (relationType, label) => {
       const initial = structuredClone(meaningsFixture);
@@ -2112,74 +2146,69 @@ describe("V3MeaningsAndExamplesStep", () => {
     }
   );
 
-  it.each([
-    ["synonym", "近义词"],
-    ["antonym", "反义词"],
-    ["derivative", "派生词"]
-  ])("%s 的序号与分割线按词条显示，多词义不重复编号", (type, label) => {
-    const initial = structuredClone(meaningsFixture);
-    initial.pos[0]!.senses[0]!.relations = [
-      {
-        id: "r1",
-        relation: type,
-        pending_target_headword: "first",
-        pending_target_gloss: "一",
-        score: "0"
-      },
-      {
-        id: "r2",
-        relation: type,
-        pending_target_headword: "first",
-        pending_target_gloss: "二",
-        score: "0"
-      },
-      {
-        id: "r3",
-        relation: type,
-        pending_target_headword: "second",
-        pending_target_gloss: "三",
-        score: "0"
+  it.each([["derivative", "派生词"]])(
+    "%s 的序号与分割线按词条显示，多词义不重复编号",
+    (type, label) => {
+      const initial = structuredClone(meaningsFixture);
+      initial.pos[0]!.senses[0]!.relations = [
+        {
+          id: "r1",
+          relation: type,
+          pending_target_headword: "first",
+          pending_target_gloss: "一",
+          score: "0"
+        },
+        {
+          id: "r2",
+          relation: type,
+          pending_target_headword: "first",
+          pending_target_gloss: "二",
+          score: "0"
+        },
+        {
+          id: "r3",
+          relation: type,
+          pending_target_headword: "second",
+          pending_target_gloss: "三",
+          score: "0"
+        }
+      ];
+      const { container } = render(<Harness initial={initial} />);
+      expect(
+        [...container.querySelectorAll(".word-relation-index")].map(
+          (node) => node.textContent
+        )
+      ).toEqual(["1", "2"]);
+      expect(
+        container.querySelectorAll(".word-relation-row + .word-relation-row")
+      ).toHaveLength(1);
+      expect(
+        container.querySelectorAll(
+          ".word-relation-row .word-relation-sense > .word-relation-glosses-connected"
+        )
+      ).toHaveLength(type === "derivative" ? 1 : 0);
+      if (type === "derivative") {
+        expect(
+          container.querySelectorAll(".word-relation-glosses-connected input")
+        ).toHaveLength(2);
+        expect(
+          container.querySelector(".word-relation-list-connected")
+        ).toBeNull();
       }
-    ];
-    const { container } = render(<Harness initial={initial} />);
-    expect(
-      [...container.querySelectorAll(".word-relation-index")].map(
-        (node) => node.textContent
-      )
-    ).toEqual(["1", "2"]);
-    expect(
-      container.querySelectorAll(".word-relation-row + .word-relation-row")
-    ).toHaveLength(1);
-    expect(
-      container.querySelectorAll(
-        ".word-relation-row .word-relation-sense > .word-relation-glosses-connected"
-      )
-    ).toHaveLength(type === "derivative" ? 1 : 0);
-    if (type === "derivative") {
+      deleteRelationItem(label);
       expect(
-        container.querySelectorAll(".word-relation-glosses-connected input")
-      ).toHaveLength(2);
-      expect(
-        container.querySelector(".word-relation-list-connected")
+        container.querySelector(".word-relation-glosses-connected")
       ).toBeNull();
+      expect(
+        [...container.querySelectorAll(".word-relation-index")].map(
+          (node) => node.textContent
+        )
+      ).toEqual(["1"]);
+      expect(screen.getByLabelText(`${label}待关联词义`)).toHaveValue("三");
     }
-    deleteRelationItem(label);
-    expect(
-      container.querySelector(".word-relation-glosses-connected")
-    ).toBeNull();
-    expect(
-      [...container.querySelectorAll(".word-relation-index")].map(
-        (node) => node.textContent
-      )
-    ).toEqual(["1"]);
-    expect(screen.getByLabelText(`${label}待关联词义`)).toHaveValue("三");
-  });
+  );
 
-  it.each([
-    ["synonym", "近义词"],
-    ["antonym", "反义词"],
-    ["derivative", "派生词"]
-  ])(
+  it.each([["derivative", "派生词"]])(
     "%s 的词条和手动词义可分别排序，整组保存且不影响其他类别",
     async (type, label) => {
       const initial = structuredClone(meaningsFixture);
@@ -2272,46 +2301,94 @@ describe("V3MeaningsAndExamplesStep", () => {
     }
   );
 
-  it.each([
-    ["synonym", "近义词"],
-    ["antonym", "反义词"],
-    ["derivative", "派生词"]
-  ])("%s 改词面、排序或删除后继续添加词义仍在同一条目", (type, label) => {
+  it.each([["derivative", "派生词"]])(
+    "%s 改词面、排序或删除后继续添加词义仍在同一条目",
+    (type, label) => {
+      const initial = structuredClone(meaningsFixture);
+      initial.pos[0]!.senses[0]!.relations = [
+        {
+          id: "r1",
+          relation: type,
+          pending_target_headword: "first",
+          pending_target_gloss: "一",
+          score: "60"
+        },
+        {
+          id: "r2",
+          relation: type,
+          pending_target_headword: "first",
+          pending_target_gloss: "二",
+          score: "60"
+        }
+      ];
+      render(<Harness initial={initial} />);
+      fireEvent.change(screen.getByLabelText(`${label}目标词条`), {
+        target: { value: "changed" }
+      });
+      fireEvent.click(screen.getByLabelText(`添加${label}词义`));
+      expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(1);
+      expect(screen.getByLabelText(`${label}待关联词义 3`)).toBeInTheDocument();
+      fireEvent.keyDown(screen.getByLabelText(`拖动${label}词义 2`), {
+        key: "ArrowUp"
+      });
+      fireEvent.click(screen.getByLabelText(`添加${label}词义`));
+      expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(1);
+      expect(screen.getByLabelText(`${label}待关联词义 4`)).toBeInTheDocument();
+      deleteRelationItem(`${label}词义 1`);
+      fireEvent.click(screen.getByLabelText(`添加${label}词义`));
+      expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(1);
+      expect(screen.getByLabelText(`${label}待关联词义 4`)).toBeInTheDocument();
+      expect(value().pos[0]!.senses[0]!.relations).toHaveLength(4);
+    }
+  );
+
+  it("派生词的多条词义纵向逐条排，可拖动排序也可单条删除", () => {
+    relatedSearchAny.mockImplementation((...args) => {
+      const result = defaultRelatedSearchImplementation(...args);
+      result.exact.data.pages[0]!.results[0]!.senses = [
+        { sense_id: "external-sense-1", gloss: "外部词义一" },
+        { sense_id: "external-sense-2", gloss: "外部词义二" }
+      ];
+      return result;
+    });
     const initial = structuredClone(meaningsFixture);
-    initial.pos[0]!.senses[0]!.relations = [
-      {
-        id: "r1",
-        relation: type,
-        pending_target_headword: "first",
-        pending_target_gloss: "一",
-        score: "60"
-      },
-      {
-        id: "r2",
-        relation: type,
-        pending_target_headword: "first",
-        pending_target_gloss: "二",
-        score: "60"
-      }
-    ];
-    render(<Harness initial={initial} />);
-    fireEvent.change(screen.getByLabelText(`${label}目标词条`), {
-      target: { value: "changed" }
+    initial.pos[0]!.senses[0]!.relations = [];
+    const { container } = render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByText("添加派生词").closest("button")!);
+    fireEvent.change(screen.getByLabelText("派生词目标词条"), {
+      target: { value: "outside" }
     });
-    fireEvent.click(screen.getByLabelText(`添加${label}词义`));
-    expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(1);
-    expect(screen.getByLabelText(`${label}待关联词义 3`)).toBeInTheDocument();
-    fireEvent.keyDown(screen.getByLabelText(`拖动${label}词义 2`), {
-      key: "ArrowUp"
+    fireEvent.click(screen.getAllByText("outside").at(-1)!);
+    fireEvent.mouseDown(screen.getByLabelText("派生词目标词义"));
+    fireEvent.click(screen.getAllByText("外部词义一").at(-1)!);
+    fireEvent.click(screen.getAllByText("外部词义二").at(-1)!);
+    fireEvent.keyDown(screen.getByLabelText("派生词目标词义"), {
+      key: "Escape",
+      code: "Escape"
     });
-    fireEvent.click(screen.getByLabelText(`添加${label}词义`));
-    expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(1);
-    expect(screen.getByLabelText(`${label}待关联词义 4`)).toBeInTheDocument();
-    deleteRelationItem(`${label}词义 1`);
-    fireEvent.click(screen.getByLabelText(`添加${label}词义`));
-    expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(1);
-    expect(screen.getByLabelText(`${label}待关联词义 4`)).toBeInTheDocument();
-    expect(value().pos[0]!.senses[0]!.relations).toHaveLength(4);
+    const glosses = () =>
+      [...container.querySelectorAll(".word-relation-bound-gloss")].map(
+        (item) => item.textContent
+      );
+    expect(glosses()).toEqual(["外部词义一", "外部词义二"]);
+    expect(screen.getByTitle("已选 2 条词义")).toBeInTheDocument();
+
+    // 逐条排开就要能排序，顺序落到 relations 上。
+    fireEvent.keyDown(screen.getByLabelText("拖动派生词词义 1"), {
+      key: "ArrowDown"
+    });
+    expect(glosses()).toEqual(["外部词义二", "外部词义一"]);
+    expect(
+      value().pos[0]!.senses[0]!.relations.map((item) => item.target_sense_id)
+    ).toEqual(["external-sense-2", "external-sense-1"]);
+
+    // 每条词义能单独删掉，选择器的计数跟着走。
+    deleteRelationItem("派生词词义 1");
+    expect(glosses()).toEqual(["外部词义一"]);
+    expect(screen.getByTitle("已选 1 条词义")).toBeInTheDocument();
+    expect(
+      value().pos[0]!.senses[0]!.relations.map((item) => item.target_sense_id)
+    ).toEqual(["external-sense-1"]);
   });
 
   it("派生词多选保存后合为一行，重开可取消和新增词义，改选清理整组", () => {

@@ -885,7 +885,8 @@ function withDefinitionMode(
   };
 }
 
-const RELATION_TYPES = ["synonym", "antonym", "derivative"] as const;
+/** 卡片自上而下的展示顺序：派生词在前，近义词与反义词在后。 */
+const RELATION_TYPES = ["derivative", "synonym", "antonym"] as const;
 type RelationType = (typeof RELATION_TYPES)[number];
 
 const RELATION_META: Record<RelationType, { metric: string }> = {
@@ -1051,6 +1052,15 @@ function RelationsGrid({
   const isSelectedEmptyDraft = (relation: WordRelationWritableV3) =>
     knownWords[relation.id]?.status === "draft" &&
     knownWords[relation.id]?.senses.length === 0;
+
+  /** 已绑定词义的展示文案：服务端快照优先，其次取搜索结果里的词义。 */
+  const boundGlossText = (relation: WordRelationWritableV3) =>
+    relationDisplaySnapshots?.[relation.id]?.gloss ||
+    Object.values(knownWords)
+      .find((word) => word.word_id === relation.target_word_id)
+      ?.senses.find((item) => item.sense_id === relation.target_sense_id)
+      ?.gloss ||
+    "已匹配词义";
 
   return (
     <div className="word-relations-grid word-relations-grid-stacked">
@@ -1381,10 +1391,11 @@ function RelationsGrid({
                                               ? "草稿"
                                               : "已发布"}
                                           </Tag>
-                                          {word.senses.length === 0 &&
-                                          word.status !== "draft" ? (
+                                          {word.senses.length === 0 ? (
                                             <Typography.Text type="secondary">
-                                              暂无词义，请先添加词义
+                                              {word.status === "draft"
+                                                ? "暂无词义，选中仅记文本"
+                                                : "暂无词义，请先添加词义"}
                                             </Typography.Text>
                                           ) : null}
                                         </Flex>
@@ -1581,13 +1592,15 @@ function RelationsGrid({
                                             className="word-relation-drop-line"
                                             aria-hidden
                                           />
-                                          <SortableDragHandle
-                                            sorting={glossSorting}
-                                            index={glossIndex}
-                                            label={`拖动${relationLabel(relationType)}词义 ${glossIndex + 1}`}
-                                            singleItemTitle="至少需要两个词义"
-                                            dragImageSelector=".word-relation-gloss-row"
-                                          />
+                                          {relationType === "derivative" ? (
+                                            <SortableDragHandle
+                                              sorting={glossSorting}
+                                              index={glossIndex}
+                                              label={`拖动${relationLabel(relationType)}词义 ${glossIndex + 1}`}
+                                              singleItemTitle="至少需要两个词义"
+                                              dragImageSelector=".word-relation-gloss-row"
+                                            />
+                                          ) : null}
                                           <Input
                                             aria-label={`${relationLabel(relationType)}待关联词义${group.length > 1 ? ` ${glossIndex + 1}` : ""}`}
                                             className="word-relation-sense"
@@ -1669,197 +1682,342 @@ function RelationsGrid({
                                     </Flex>
                                   )}
                                 </RelationSortScope>
-                                <Button
-                                  aria-label={`添加${relationLabel(relationType)}词义`}
-                                  size="small"
-                                  type="dashed"
-                                  icon={<PlusOutlined />}
-                                  onClick={() =>
-                                    change((draft) => {
-                                      const target =
-                                        draft.pos[posIndex]!.senses[
-                                          senseIndex
-                                        ]!;
-                                      const added = {
-                                        ...relation,
-                                        id: idFactory()
-                                      };
-                                      delete added.pending_target_gloss;
+                                {relationType === "derivative" ? (
+                                  <Button
+                                    aria-label={`添加${relationLabel(relationType)}词义`}
+                                    size="small"
+                                    type="dashed"
+                                    icon={<PlusOutlined />}
+                                    onClick={() =>
+                                      change((draft) => {
+                                        const target =
+                                          draft.pos[posIndex]!.senses[
+                                            senseIndex
+                                          ]!;
+                                        const added = {
+                                          ...relation,
+                                          id: idFactory()
+                                        };
+                                        delete added.pending_target_gloss;
+                                        const rowKey =
+                                          relationRowKeys.current.get(
+                                            relation.id
+                                          ) ?? relation.id;
+                                        for (const member of [...group, added])
+                                          relationRowKeys.current.set(
+                                            member.id,
+                                            rowKey
+                                          );
+                                        target.relations = replaceRelationGroup(
+                                          target.relations,
+                                          group,
+                                          [...group, added]
+                                        );
+                                      })
+                                    }
+                                  >
+                                    添加词义
+                                  </Button>
+                                ) : null}
+                              </Flex>
+                            ) : (
+                              <Flex
+                                className="word-relation-sense"
+                                vertical
+                                gap={6}
+                              >
+                                <Select
+                                  aria-label={`${relationLabel(relationType)}目标词义`}
+                                  className="word-relation-sense"
+                                  disabled={!relation.target_word_id}
+                                  mode={
+                                    relationType === "derivative"
+                                      ? "multiple"
+                                      : undefined
+                                  }
+                                  maxTagCount={
+                                    relationType === "derivative"
+                                      ? 0
+                                      : undefined
+                                  }
+                                  maxTagPlaceholder={(omitted) =>
+                                    `已选 ${omitted.length} 条词义`
+                                  }
+                                  onChange={(selection: string | string[]) => {
+                                    const discovered = searchWords.find(
+                                      (word) =>
+                                        word.word_id === relation.target_word_id
+                                    );
+                                    if (discovered)
+                                      setKnownWords((current) => ({
+                                        ...current,
+                                        [relation.id]: discovered
+                                      }));
+                                    const replacement =
+                                      relationType === "derivative"
+                                        ? selectDerivativeSenses(
+                                            group,
+                                            selection as string[],
+                                            idFactory
+                                          )
+                                        : undefined;
+                                    if (replacement) {
                                       const rowKey =
                                         relationRowKeys.current.get(
                                           relation.id
                                         ) ?? relation.id;
-                                      for (const member of [...group, added])
+                                      for (const item of replacement)
                                         relationRowKeys.current.set(
-                                          member.id,
+                                          item.id,
                                           rowKey
                                         );
-                                      target.relations = replaceRelationGroup(
-                                        target.relations,
-                                        group,
-                                        [...group, added]
-                                      );
-                                    })
-                                  }
-                                >
-                                  添加词义
-                                </Button>
-                              </Flex>
-                            ) : (
-                              <Select
-                                aria-label={`${relationLabel(relationType)}目标词义`}
-                                className="word-relation-sense"
-                                disabled={!relation.target_word_id}
-                                mode={
-                                  relationType === "derivative"
-                                    ? "multiple"
-                                    : undefined
-                                }
-                                onChange={(selection: string | string[]) => {
-                                  const discovered = searchWords.find(
-                                    (word) =>
-                                      word.word_id === relation.target_word_id
-                                  );
-                                  if (discovered)
-                                    setKnownWords((current) => ({
-                                      ...current,
-                                      [relation.id]: discovered
-                                    }));
-                                  const replacement =
-                                    relationType === "derivative"
-                                      ? selectDerivativeSenses(
-                                          group,
-                                          selection as string[],
-                                          idFactory
-                                        )
-                                      : undefined;
-                                  if (replacement) {
-                                    const rowKey =
-                                      relationRowKeys.current.get(
-                                        relation.id
-                                      ) ?? relation.id;
-                                    for (const item of replacement)
-                                      relationRowKeys.current.set(
-                                        item.id,
-                                        rowKey
-                                      );
-                                  }
-                                  change((draft) => {
-                                    const draftSense =
-                                      draft.pos[posIndex]!.senses[senseIndex]!;
-                                    if (replacement) {
-                                      draftSense.relations =
-                                        replaceRelationGroup(
-                                          draftSense.relations,
-                                          group,
-                                          replacement
-                                        );
-                                    } else {
-                                      draftSense.relations.find(
-                                        (item) => item.id === relation.id
-                                      )!.target_sense_id = selection as string;
                                     }
-                                  });
-                                }}
-                                onOpenChange={(open) => {
-                                  setSearching(undefined);
-                                  setSenseSearch(
-                                    open
-                                      ? {
-                                          wordId: relation.target_word_id!,
-                                          query: (
-                                            relationDisplaySnapshots?.[
-                                              relation.id
-                                            ]?.headword ??
-                                            knownWordFor(relation)?.headword ??
-                                            ""
-                                          ).split(" / ")[0]!
-                                        }
-                                      : undefined
-                                  );
-                                }}
-                                loading={
-                                  senseSearch?.wordId ===
-                                    relation.target_word_id &&
-                                  (relatedSearch.exact.isFetching ||
-                                    relatedSearch.contains.isFetching)
-                                }
-                                popupRender={(menu) => (
-                                  <>
-                                    {menu}
-                                    {senseSearch?.wordId ===
-                                      relation.target_word_id &&
-                                    searchFailed ? (
-                                      <Button
-                                        size="small"
-                                        type="link"
-                                        onClick={() =>
-                                          void retryRelatedSearch()
-                                        }
-                                      >
-                                        搜索失败，重试
-                                      </Button>
-                                    ) : null}
-                                    {senseSearch?.wordId ===
-                                      relation.target_word_id &&
-                                    searchHasNextPage ? (
-                                      <Button
-                                        size="small"
-                                        type="link"
-                                        onClick={() =>
-                                          void loadMoreSearchResults()
-                                        }
-                                      >
-                                        加载更多词义来源
-                                      </Button>
-                                    ) : null}
-                                  </>
-                                )}
-                                options={Array.from(
-                                  new Map(
-                                    [
-                                      ...group
-                                        .filter((item) => item.target_sense_id)
-                                        .map((item) => ({
-                                          sense_id: item.target_sense_id!,
-                                          gloss:
-                                            relationDisplaySnapshots?.[item.id]
-                                              ?.gloss ?? "已匹配词义"
-                                        })),
-                                      ...(Object.values(knownWords).find(
-                                        (word) =>
-                                          word.word_id ===
-                                          relation.target_word_id
-                                      )?.senses ?? []),
-                                      ...(senseSearch?.wordId ===
-                                      relation.target_word_id
-                                        ? (searchWords.find(
-                                            (word) =>
-                                              word.word_id ===
-                                              relation.target_word_id
-                                          )?.senses ?? [])
-                                        : [])
-                                    ].map((item) => [
-                                      item.sense_id,
-                                      {
-                                        label: item.gloss || "（无释义）",
-                                        value: item.sense_id
+                                    change((draft) => {
+                                      const draftSense =
+                                        draft.pos[posIndex]!.senses[
+                                          senseIndex
+                                        ]!;
+                                      if (replacement) {
+                                        draftSense.relations =
+                                          replaceRelationGroup(
+                                            draftSense.relations,
+                                            group,
+                                            replacement
+                                          );
+                                      } else {
+                                        draftSense.relations.find(
+                                          (item) => item.id === relation.id
+                                        )!.target_sense_id =
+                                          selection as string;
                                       }
-                                    ])
-                                  ).values()
-                                )}
-                                placeholder="选择词义"
-                                size="small"
-                                value={
-                                  relationType === "derivative"
-                                    ? group.flatMap((item) =>
-                                        item.target_sense_id
-                                          ? [item.target_sense_id]
-                                          : []
-                                      )
-                                    : relation.target_sense_id
-                                }
-                              />
+                                    });
+                                  }}
+                                  onOpenChange={(open) => {
+                                    setSearching(undefined);
+                                    setSenseSearch(
+                                      open
+                                        ? {
+                                            wordId: relation.target_word_id!,
+                                            query: (
+                                              relationDisplaySnapshots?.[
+                                                relation.id
+                                              ]?.headword ??
+                                              knownWordFor(relation)
+                                                ?.headword ??
+                                              ""
+                                            ).split(" / ")[0]!
+                                          }
+                                        : undefined
+                                    );
+                                  }}
+                                  loading={
+                                    senseSearch?.wordId ===
+                                      relation.target_word_id &&
+                                    (relatedSearch.exact.isFetching ||
+                                      relatedSearch.contains.isFetching)
+                                  }
+                                  popupRender={(menu) => (
+                                    <>
+                                      {menu}
+                                      {senseSearch?.wordId ===
+                                        relation.target_word_id &&
+                                      searchFailed ? (
+                                        <Button
+                                          size="small"
+                                          type="link"
+                                          onClick={() =>
+                                            void retryRelatedSearch()
+                                          }
+                                        >
+                                          搜索失败，重试
+                                        </Button>
+                                      ) : null}
+                                      {senseSearch?.wordId ===
+                                        relation.target_word_id &&
+                                      searchHasNextPage ? (
+                                        <Button
+                                          size="small"
+                                          type="link"
+                                          onClick={() =>
+                                            void loadMoreSearchResults()
+                                          }
+                                        >
+                                          加载更多词义来源
+                                        </Button>
+                                      ) : null}
+                                    </>
+                                  )}
+                                  options={Array.from(
+                                    new Map(
+                                      [
+                                        ...group
+                                          .filter(
+                                            (item) => item.target_sense_id
+                                          )
+                                          .map((item) => ({
+                                            sense_id: item.target_sense_id!,
+                                            gloss:
+                                              relationDisplaySnapshots?.[
+                                                item.id
+                                              ]?.gloss ?? "已匹配词义"
+                                          })),
+                                        ...(Object.values(knownWords).find(
+                                          (word) =>
+                                            word.word_id ===
+                                            relation.target_word_id
+                                        )?.senses ?? []),
+                                        ...(senseSearch?.wordId ===
+                                        relation.target_word_id
+                                          ? (searchWords.find(
+                                              (word) =>
+                                                word.word_id ===
+                                                relation.target_word_id
+                                            )?.senses ?? [])
+                                          : [])
+                                      ].map((item) => [
+                                        item.sense_id,
+                                        {
+                                          label: item.gloss || "（无释义）",
+                                          value: item.sense_id
+                                        }
+                                      ])
+                                    ).values()
+                                  )}
+                                  placeholder="选择词义"
+                                  size="small"
+                                  value={
+                                    relationType === "derivative"
+                                      ? group.flatMap((item) =>
+                                          item.target_sense_id
+                                            ? [item.target_sense_id]
+                                            : []
+                                        )
+                                      : relation.target_sense_id
+                                  }
+                                />
+                                {relationType === "derivative" &&
+                                group.some((item) => item.target_sense_id) ? (
+                                  <RelationSortScope
+                                    items={group}
+                                    scopeId={`${sense.id}:${relation.id}:bound-glosses`}
+                                    onChange={(next) =>
+                                      change((draft) => {
+                                        const target =
+                                          draft.pos[posIndex]!.senses[
+                                            senseIndex
+                                          ]!;
+                                        target.relations = replaceRelationGroup(
+                                          target.relations,
+                                          group,
+                                          next
+                                        );
+                                      })
+                                    }
+                                  >
+                                    {(glossSorting) => (
+                                      <Flex
+                                        vertical
+                                        gap={6}
+                                        className={
+                                          group.length > 1
+                                            ? "word-relation-glosses-connected"
+                                            : undefined
+                                        }
+                                      >
+                                        {group
+                                          .filter(
+                                            (item) => item.target_sense_id
+                                          )
+                                          .map((member, glossIndex) => (
+                                            <Flex
+                                              key={member.id}
+                                              gap={6}
+                                              align="center"
+                                              className={sortableRowClass(
+                                                "word-relation-gloss-row",
+                                                glossSorting,
+                                                glossIndex
+                                              )}
+                                              onDragOver={(event) => {
+                                                event.stopPropagation();
+                                                glossSorting.handleDragOver(
+                                                  event,
+                                                  glossIndex
+                                                );
+                                              }}
+                                              onDragLeave={(event) => {
+                                                event.stopPropagation();
+                                                glossSorting.handleDragLeave();
+                                              }}
+                                              onDrop={(event) => {
+                                                event.stopPropagation();
+                                                glossSorting.handleDrop(
+                                                  event,
+                                                  glossIndex
+                                                );
+                                              }}
+                                            >
+                                              <span
+                                                className="word-relation-drop-line"
+                                                aria-hidden
+                                              />
+                                              <SortableDragHandle
+                                                sorting={glossSorting}
+                                                index={glossIndex}
+                                                label={`拖动${relationLabel(relationType)}词义 ${glossIndex + 1}`}
+                                                singleItemTitle="至少需要两个词义"
+                                                dragImageSelector=".word-relation-gloss-row"
+                                              />
+                                              <Typography.Text
+                                                className="word-relation-bound-gloss"
+                                                data-v3-field="target_sense_id"
+                                                data-v3-node-id={member.id}
+                                                ellipsis={{
+                                                  tooltip:
+                                                    boundGlossText(member)
+                                                }}
+                                              >
+                                                {boundGlossText(member)}
+                                              </Typography.Text>
+                                              <RelationDeleteMenu
+                                                label={`${relationLabel(relationType)}词义 ${glossIndex + 1}`}
+                                                onDelete={() =>
+                                                  change((draft) => {
+                                                    const target =
+                                                      draft.pos[posIndex]!
+                                                        .senses[senseIndex]!;
+                                                    const kept = group
+                                                      .filter(
+                                                        (item) =>
+                                                          item.id !== member.id
+                                                      )
+                                                      .flatMap((item) =>
+                                                        item.target_sense_id
+                                                          ? [
+                                                              item.target_sense_id
+                                                            ]
+                                                          : []
+                                                      );
+                                                    target.relations =
+                                                      replaceRelationGroup(
+                                                        target.relations,
+                                                        group,
+                                                        selectDerivativeSenses(
+                                                          group,
+                                                          kept,
+                                                          idFactory
+                                                        )
+                                                      );
+                                                  })
+                                                }
+                                              />
+                                            </Flex>
+                                          ))}
+                                      </Flex>
+                                    )}
+                                  </RelationSortScope>
+                                ) : null}
+                              </Flex>
                             )}
                             {relationInputIssue(relation) ? (
                               <div

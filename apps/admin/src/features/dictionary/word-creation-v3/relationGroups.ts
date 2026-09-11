@@ -1,6 +1,6 @@
 import type { WordRelationWritableV3 } from "@tsz/types";
 
-/** 同一源词义内，手动词义按关系类型与词面合组；已关联派生词按目标合组。 */
+/** 同一源词义内只有派生词按目标合组：近义词与反义词一个目标只配一条词义。 */
 export function groupRelations<T extends WordRelationWritableV3>(
   relations: T[],
   manualRowKeys?: ReadonlyMap<string, string>
@@ -15,10 +15,7 @@ export function groupRelations<T extends WordRelationWritableV3>(
         : relation.pending_target_headword?.trim()
           ? `text:${relation.pending_target_headword.trim().toLowerCase()}`
           : undefined;
-    if (
-      targetKey &&
-      (relation.relation === "derivative" || !relation.target_word_id)
-    ) {
+    if (targetKey && relation.relation === "derivative") {
       const key = `${relation.relation}:${targetKey}`;
       const group = groupedTargets.get(key);
       if (group) {
