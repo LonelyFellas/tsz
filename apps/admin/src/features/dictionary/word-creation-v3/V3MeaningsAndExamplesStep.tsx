@@ -72,7 +72,9 @@ import {
   definitionSummary,
   replaceRichText,
   spellingModeForPos,
-  DEFAULT_SENTENCE_TRANSLATION_BAND
+  DEFAULT_SENTENCE_TRANSLATION_BAND,
+  dropEmptySentenceTranslations,
+  newSentenceTranslations
 } from "./meaningsModel";
 import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import {
@@ -2211,7 +2213,12 @@ function V3MeaningsAndExamplesStepContent({
   const save = async (intent: StepSaveIntent) => {
     if (!onSave) return;
     try {
-      await onSave(value, intent);
+      // 默认摆出的四个译文框只是录入位；收尾提交时把没填的丢掉，
+      // 别让空行去撞后端的「请填写当前等级的中文译文」。
+      await onSave(
+        intent === "complete" ? dropEmptySentenceTranslations(value) : value,
+        intent
+      );
     } catch {
       // T5A owns error classification and retry UI. This controlled editor
       // deliberately keeps the current value untouched on rejection.
@@ -3402,12 +3409,17 @@ function V3MeaningsAndExamplesStepContent({
                                           onClick={() => {
                                             if (!wordId) return;
                                             change((draft) => {
-                                              const zhText = {
-                                                version: 2 as const,
-                                                text: "",
-                                                annotations: []
-                                              };
-                                              const translationId = idFactory();
+                                              // 初/中/高/高 四个录入位一次摆齐；主译文挂在默认档上。
+                                              const translations =
+                                                newSentenceTranslations(
+                                                  idFactory
+                                                );
+                                              const alias =
+                                                translations.find(
+                                                  (item) =>
+                                                    item.band ===
+                                                    DEFAULT_SENTENCE_TRANSLATION_BAND
+                                                ) ?? translations[0]!;
                                               draft.pos[posIndex]!.senses[
                                                 senseIndex
                                               ]!.sentences.push({
@@ -3425,15 +3437,11 @@ function V3MeaningsAndExamplesStepContent({
                                                     }
                                                   }
                                                 },
-                                                zh_text_id: translationId,
-                                                zh_text: zhText,
-                                                zh_translations: [
-                                                  {
-                                                    id: translationId,
-                                                    band: DEFAULT_SENTENCE_TRANSLATION_BAND,
-                                                    content: zhText
-                                                  }
-                                                ],
+                                                zh_text_id: alias.id,
+                                                zh_text: structuredClone(
+                                                  alias.content
+                                                ),
+                                                zh_translations: translations,
                                                 links: [
                                                   {
                                                     word_id: wordId,
