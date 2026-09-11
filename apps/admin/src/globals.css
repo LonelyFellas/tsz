@@ -4,6 +4,18 @@ body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* antd 的 fontFamily token 只作用于它自己的组件，body 不设的话，任何不在
+     antd 组件里的文字会落到浏览器默认衬线体（实测首项是 Times）。这里补齐基础层。
+     ⚠️ 这份字体栈必须与 providers.tsx 的 fontFamily token 保持一致，改一处要改两处：
+     CSS 与 CSS-in-JS 之间没有共享常量的干净办法，靠这条注释锁住关系。 */
+  font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
 }
 
 /* 视觉隐藏但保留给屏幕阅读器（tailwind sr-only 同款配方）。 */
