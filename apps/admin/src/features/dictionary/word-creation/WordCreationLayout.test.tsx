@@ -1,10 +1,15 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { ConfigProvider } from "antd";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { createPartOfSpeechLookup } from "../part-of-speech/catalog";
 import { partOfSpeechCatalogFixture } from "./partOfSpeech.test.helper";
 import { WordCreationLayout } from "./WordCreationLayout";
-import { completeMeanings, wordFixture } from "./wordCreation.test.helper";
+import {
+  completeMeanings,
+  mockPageWidthObserver,
+  wordFixture
+} from "./wordCreation.test.helper";
 
 function LocationProbe() {
   const location = useLocation();
@@ -20,13 +25,16 @@ function renderLayout(
   props: Omit<Parameters<typeof WordCreationLayout>[0], "children">,
   initialEntry = "/words/word-center/wizard/forms"
 ) {
+  // 关掉动画：抽屉的退场过渡在 jsdom 里不结束，关闭后面板会一直留在可见态。
   return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <WordCreationLayout {...props}>
-        <div>step-content</div>
-      </WordCreationLayout>
-      <LocationProbe />
-    </MemoryRouter>
+    <ConfigProvider theme={{ token: { motion: false } }}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <WordCreationLayout {...props}>
+          <div>step-content</div>
+        </WordCreationLayout>
+        <LocationProbe />
+      </MemoryRouter>
+    </ConfigProvider>
   );
 }
 
@@ -353,5 +361,90 @@ describe("WordCreationLayout", () => {
       readOnly: true
     });
     expect(screen.getByText("垃圾桶 · 只读")).toBeInTheDocument();
+  });
+
+  describe("窄屏的完成情况", () => {
+    const narrowPresentation = {
+      wordExists: true,
+      breadcrumbTitle: "centre · 词形与发音",
+      completedSteps: ["basics"] as const,
+      showEntrySummary: false,
+      progressBadge: "1/7",
+      progress: <div data-testid="progress-list">清单</div>
+    };
+
+    it("量不到宽度时按宽屏渲染，清单直接摆在左栏", () => {
+      renderLayout({ currentStep: "forms", presentation: narrowPresentation });
+
+      expect(screen.getByTestId("progress-list")).toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /完成情况/ })
+      ).not.toBeInTheDocument();
+    });
+
+    it("窄屏把清单收进抽屉，入口带完成计数", () => {
+      const observer = mockPageWidthObserver(900);
+      try {
+        renderLayout({
+          currentStep: "forms",
+          presentation: narrowPresentation
+        });
+
+        // 清单不再占首屏，顶部只留一个入口
+        expect(screen.queryByTestId("progress-list")).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole("button", { name: "完成情况 1/7" }));
+        expect(screen.getByTestId("progress-list")).toBeInTheDocument();
+      } finally {
+        observer.restore();
+      }
+    });
+
+    it("抽屉里点待完善项，跳步的同时把抽屉关掉", () => {
+      const observer = mockPageWidthObserver(900);
+      const onReadinessNavigate = vi.fn();
+      try {
+        const word = wordFixture({
+          completed_steps: ["basics", "forms"],
+          max_reachable_step: "meanings"
+        });
+        renderLayout({ word, currentStep: "meanings", onReadinessNavigate });
+
+        fireEvent.click(screen.getByRole("button", { name: "完成情况" }));
+        fireEvent.click(screen.getByText("语法结构"));
+
+        // 连 target 一起断言：包装层若把定位目标丢了，只数调用次数看不出来
+        expect(onReadinessNavigate).toHaveBeenCalledTimes(1);
+        expect(onReadinessNavigate).toHaveBeenCalledWith({
+          step: "meanings",
+          pos_id: word.meanings.pos[0]!.pos_id,
+          node_id: word.meanings.pos[0]!.grammar_structures[0]!.id,
+          field: "content"
+        });
+        // 抽屉带遮罩，留着就盖在刚跳过去的那一步上
+        expect(screen.getByText("语法结构")).not.toBeVisible();
+      } finally {
+        observer.restore();
+      }
+    });
+
+    it("抽屉开着时拖宽窗口，清单回到左栏且不会留下第二份", () => {
+      const observer = mockPageWidthObserver(900);
+      try {
+        renderLayout({
+          currentStep: "forms",
+          presentation: narrowPresentation
+        });
+        fireEvent.click(screen.getByRole("button", { name: "完成情况 1/7" }));
+
+        act(() => observer.resize(1400));
+
+        expect(
+          screen.queryByRole("button", { name: /完成情况/ })
+        ).not.toBeInTheDocument();
+        expect(screen.getAllByTestId("progress-list")).toHaveLength(1);
+      } finally {
+        observer.restore();
+      }
+    });
   });
 });

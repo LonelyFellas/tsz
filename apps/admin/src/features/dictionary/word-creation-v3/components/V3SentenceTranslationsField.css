@@ -29,6 +29,17 @@
   min-width: 0;
 }
 
+.word-sentence-translation-tier-option {
+  display: inline-flex;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.word-sentence-translation-tier-hint {
+  color: var(--ant-color-text-secondary, #595959);
+  font-size: 12px;
+}
+
 .word-sentence-translation-item > textarea {
   flex: 1;
   min-width: 0;

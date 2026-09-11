@@ -5,6 +5,13 @@ import { expect, it, vi } from "vitest";
 import type { WordSentenceWritableV3 } from "@tsz/types";
 import { V3SentenceTranslationsField } from "./V3SentenceTranslationsField";
 
+// 下拉项以「档名 + 含义」呈现，定位按档名开头匹配，含义单独断言。
+const TIER_HINTS: Record<string, string> = {
+  初阶: "逐字直译; Word-for-Word",
+  中阶: "语句通顺; Balanced Fluency",
+  高阶: "深层重构; Adapted Creation"
+};
+
 const initial: WordSentenceWritableV3 = {
   id: "sentence",
   level: "A1",
@@ -51,7 +58,11 @@ it("每档可添加多条，改档、编辑、删除以 ID 隔离", async () => 
   ).toBeDisabled();
   for (const label of ["高阶", "中阶", "中阶", "初阶", "初阶"]) {
     fireEvent.click(screen.getByRole("button", { name: "添加例句 1 译文" }));
-    fireEvent.click(await screen.findByRole("menuitem", { name: label }));
+    const item = await screen.findByRole("menuitem", {
+      name: new RegExp(`^${label}`)
+    });
+    expect(item).toHaveTextContent(TIER_HINTS[label]!);
+    fireEvent.click(item);
   }
   const before = observe.mock.lastCall![0];
   expect(before.map((row: { band: string }) => row.band)).toEqual([
@@ -76,7 +87,7 @@ it("每档可添加多条，改档、编辑、删除以 ID 隔离", async () => 
     target: { value: "第二条高阶译文" }
   });
   fireEvent.click(screen.getByRole("button", { name: "例句 1 译文 2 风格" }));
-  fireEvent.click(await screen.findByRole("menuitem", { name: "初阶" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /^初阶/ }));
   const changed = observe.mock.lastCall![0];
   expect(
     within(

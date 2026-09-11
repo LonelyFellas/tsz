@@ -15,6 +15,7 @@ import {
   uuidFromInt
 } from "./fixtures";
 import type { V3Problem } from "./problem";
+import { mockPageWidthObserver } from "../word-creation/wordCreation.test.helper";
 import {
   V3WordCreationLayout,
   type V3ConflictComparison
@@ -312,6 +313,21 @@ describe("V3WordCreationLayout", () => {
     expect(
       document.querySelectorAll(".v3-product-progress-details")
     ).toHaveLength(1);
+  });
+
+  it("窄屏入口按完成的行数报计数，清单本身不再占首屏", () => {
+    const observer = mockPageWidthObserver(900);
+    try {
+      renderLayout({ word: word() });
+
+      // fixture 里「语言识别」「基本词性」两行已完成
+      expect(
+        screen.getByRole("button", { name: "完成情况 2/7" })
+      ).toBeInTheDocument();
+      expect(screen.queryByText("多维例句")).not.toBeInTheDocument();
+    } finally {
+      observer.restore();
+    }
   });
 
   it("左栏只保留返回和完成情况，面包屑保留第一个原形", () => {

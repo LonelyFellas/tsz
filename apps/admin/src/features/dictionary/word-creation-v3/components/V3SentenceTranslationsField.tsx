@@ -15,21 +15,35 @@ const TIERS = [
     key: "word_for_word",
     label: "初阶",
     name: "初阶",
-    short: "初"
+    short: "初",
+    hint: "逐字直译; Word-for-Word"
   },
   {
     key: "balanced_fluency",
     label: "中阶",
     name: "中阶",
-    short: "中"
+    short: "中",
+    hint: "语句通顺; Balanced Fluency"
   },
   {
     key: "adapted_creation",
     label: "高阶",
     name: "高阶",
-    short: "高"
+    short: "高",
+    hint: "深层重构; Adapted Creation"
   }
 ] as const;
+
+// 两个下拉共用：光看「初/中/高」分不出该往哪一档写，把每档的含义摆在名字后面。
+const TIER_MENU_ITEMS = TIERS.map(({ key, label, hint }) => ({
+  key,
+  label: (
+    <span className="word-sentence-translation-tier-option">
+      {label}
+      <span className="word-sentence-translation-tier-hint">({hint})</span>
+    </span>
+  )
+}));
 
 export function V3SentenceTranslationsField({
   sentence,
@@ -78,7 +92,7 @@ export function V3SentenceTranslationsField({
                     disabled={disabled}
                     trigger={["click"]}
                     menu={{
-                      items: TIERS.map(({ key, label }) => ({ key, label })),
+                      items: TIER_MENU_ITEMS,
                       selectedKeys: [translation.band],
                       onClick: ({ key }) =>
                         onChange(
@@ -160,7 +174,7 @@ export function V3SentenceTranslationsField({
         disabled={disabled}
         trigger={["click"]}
         menu={{
-          items: TIERS.map(({ key, label }) => ({ key, label })),
+          items: TIER_MENU_ITEMS,
           onClick: ({ key }) =>
             onChange([
               ...rows,
