@@ -73,7 +73,6 @@ import {
   replaceRichText,
   spellingModeForPos,
   DEFAULT_SENTENCE_TRANSLATION_BAND,
-  dropEmptySentenceTranslations,
   newSentenceTranslations
 } from "./meaningsModel";
 import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
@@ -2213,12 +2212,7 @@ function V3MeaningsAndExamplesStepContent({
   const save = async (intent: StepSaveIntent) => {
     if (!onSave) return;
     try {
-      // 默认摆出的四个译文框只是录入位；收尾提交时把没填的丢掉，
-      // 别让空行去撞后端的「请填写当前等级的中文译文」。
-      await onSave(
-        intent === "complete" ? dropEmptySentenceTranslations(value) : value,
-        intent
-      );
+      await onSave(value, intent);
     } catch {
       // T5A owns error classification and retry UI. This controlled editor
       // deliberately keeps the current value untouched on rejection.

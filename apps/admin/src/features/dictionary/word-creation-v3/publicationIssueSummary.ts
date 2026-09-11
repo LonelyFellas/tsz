@@ -196,9 +196,10 @@ function emptyStepCounts(): Record<PersistedWordStep, number> {
 function issueScopes(
   word: AdminWordV3,
   issues: readonly V3DraftValidationIssue[],
-  formTypeLabel: (code: string) => string
+  formTypeLabel: (code: string) => string,
+  posLabel = fallbackPartOfSpeechLabel
 ) {
-  const groups = groupIssuesByPosition(word, issues);
+  const groups = groupIssuesByPosition(word, issues, posLabel);
   return groups.map((position) => {
     const formTypes = new Map<string, number>();
     for (const issue of position.issues) {
@@ -263,7 +264,7 @@ export function buildV3PublicationIssueSummary(
       code,
       label: v3IssueMessage(groupedIssues[0]!),
       count: groupedIssues.length,
-      scopes: issueScopes(word, groupedIssues, formTypeLabel),
+      scopes: issueScopes(word, groupedIssues, formTypeLabel, posLabel),
       issues: groupedIssues
     }))
   };

@@ -434,7 +434,12 @@ function createDefaultPosMeanings(
   idFactory: () => string
 ): WordPosMeaningsWritableV3 {
   const senseId = idFactory();
-  const translationId = idFactory();
+  // 自动播种的这条例句同样是「首次录入」，录入位要和手动添加的例句一致。
+  const translations = newSentenceTranslations(idFactory);
+  const alias =
+    translations.find(
+      (item) => item.band === DEFAULT_SENTENCE_TRANSLATION_BAND
+    ) ?? translations[0]!;
   return {
     pos_id: posId,
     grammar_structures: [newGrammarStructure(idFactory, spellingMode)],
@@ -466,15 +471,9 @@ function createDefaultPosMeanings(
                 value: { version: 2, text: "", annotations: [] }
               }
             },
-            zh_text_id: translationId,
-            zh_text: { version: 2, text: "", annotations: [] },
-            zh_translations: [
-              {
-                id: translationId,
-                band: DEFAULT_SENTENCE_TRANSLATION_BAND,
-                content: { version: 2, text: "", annotations: [] }
-              }
-            ],
+            zh_text_id: alias.id,
+            zh_text: cloneRichText(alias.content),
+            zh_translations: translations,
             links: [{ word_id: wordId, sense_id: senseId, role: "focus" }]
           }
         ],

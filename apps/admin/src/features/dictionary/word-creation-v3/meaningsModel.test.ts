@@ -213,18 +213,37 @@ describe("V3 meanings writable model", () => {
           },
           zh_text_id: expect.any(String),
           zh_text: { version: 2, text: "", annotations: [] },
+          // 自动播种的例句同样摆出初、中、高、高四个录入位。
           zh_translations: [
             {
               id: expect.any(String),
+              band: "word_for_word",
+              content: { version: 2, text: "", annotations: [] }
+            },
+            {
+              id: expect.any(String),
               band: "balanced_fluency",
+              content: { version: 2, text: "", annotations: [] }
+            },
+            {
+              id: expect.any(String),
+              band: "adapted_creation",
+              content: { version: 2, text: "", annotations: [] }
+            },
+            {
+              id: expect.any(String),
+              band: "adapted_creation",
               content: { version: 2, text: "", annotations: [] }
             }
           ],
           links: [{ word_id: "word-1", sense_id: sense.id, role: "focus" }]
         }
       ]);
-      expect(sense.sentences[0]!.zh_translations[0]!.id).toBe(
-        sense.sentences[0]!.zh_text_id
+      // 主译文挂在默认的中阶那条上，别名必须指得到它。
+      expect(sense.sentences[0]!.zh_text_id).toBe(
+        sense.sentences[0]!.zh_translations.find(
+          (item) => item.band === "balanced_fluency"
+        )!.id
       );
     }
     expect(
