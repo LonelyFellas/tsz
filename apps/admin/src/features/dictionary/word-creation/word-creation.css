@@ -119,11 +119,6 @@
   white-space: nowrap;
 }
 
-.word-creation-summary-alt {
-  font-size: 14px;
-  color: #6f7581;
-}
-
 .dialect-dot {
   width: 8px;
   height: 8px;
@@ -136,10 +131,6 @@
 
 .dialect-dot-us {
   background: var(--word-us);
-}
-
-.dialect-dot-common {
-  background: #566e62;
 }
 
 .word-summary-language,
@@ -192,14 +183,6 @@
 
 .word-progress-done {
   color: #22a06b;
-}
-
-.word-progress-wait {
-  color: #bdc2cc;
-}
-
-.word-progress-none {
-  color: #dadee5;
 }
 
 .word-creation-progress-row > .ant-typography:last-child {
@@ -285,20 +268,6 @@
   min-width: 96px;
 }
 
-.word-request-lock {
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.word-validation-focus {
-  outline: 2px solid #ffb020;
-  outline-offset: 4px;
-  border-radius: 6px;
-  transition: outline-color 180ms ease;
-}
-
 .dialect-panel {
   min-width: 0;
   padding: 16px;
@@ -376,13 +345,10 @@
 }
 
 .word-basics-input-card,
-.word-snapshot-card,
 .word-detection-result-card,
 .word-basics-input-card > .ant-card-head,
-.word-snapshot-card > .ant-card-head,
 .word-detection-result-card > .ant-card-head,
-.word-basics-input-card > .ant-card-body,
-.word-snapshot-card > .ant-card-body {
+.word-basics-input-card > .ant-card-body {
   padding: 18px;
 }
 
@@ -574,17 +540,6 @@
   padding-bottom: 10px;
 }
 
-.word-snapshot-status,
-.word-preview-status {
-  margin-bottom: 14px;
-  border-radius: 11px;
-  box-shadow: 0 6px 18px rgba(32, 38, 54, 0.035);
-}
-
-.word-forms-workbench {
-  min-width: 0;
-}
-
 .word-forms-tabs > .ant-tabs-nav {
   padding: 0 2px;
 }
@@ -633,17 +588,6 @@
   font-weight: 400;
 }
 
-.word-form-card-toggle-icon {
-  flex: none;
-  font-size: 12px;
-  transform: rotate(180deg);
-  transition: transform 160ms ease;
-}
-
-.word-form-card-toggle-icon.is-collapsed {
-  transform: rotate(0);
-}
-
 .word-form-card > .ant-card-body {
   padding: 0;
 }
@@ -659,16 +603,6 @@
   padding-inline: 18px;
 }
 
-/* 词性级设置的作用域说明:开关写的是 pos.dialect_rules,管的是整个词性,
-   卡片标题只提「基准原形」容易被读窄。 */
-.word-form-rule-hint {
-  padding-block: 10px 2px;
-}
-
-.word-form-group-empty {
-  padding: 14px 18px 0;
-}
-
 .word-form-rule-row {
   display: flex;
   align-items: center;
@@ -676,19 +610,6 @@
   gap: 16px;
   min-height: 44px;
   border-bottom: 1px solid #e5e7eb;
-}
-
-.word-form-variant {
-  padding: 12px;
-  border-radius: 10px;
-}
-
-.word-shared-form-variant {
-  min-width: 0;
-  overflow: hidden;
-  background: #fff;
-  border: 1px solid #d9dee7;
-  border-radius: 10px;
 }
 
 .word-shared-form-spelling {
@@ -828,37 +749,6 @@
   bottom: -7px;
 }
 
-.word-grammar-drag-handle {
-  width: 18px;
-  height: 27px;
-  padding: 0;
-  color: #9aa3b2;
-  font-size: 18px;
-  line-height: 1;
-  text-align: center;
-  background: transparent;
-  border: 0;
-  cursor: grab;
-  transition:
-    color 160ms ease,
-    transform 160ms ease;
-}
-
-.word-grammar-drag-handle:hover:not(:disabled),
-.word-grammar-drag-handle:focus-visible {
-  color: #1677ff;
-}
-
-.word-grammar-drag-handle:active:not(:disabled) {
-  cursor: grabbing;
-  transform: scale(1.08);
-}
-
-.word-grammar-drag-handle:disabled {
-  color: #c4cad4;
-  cursor: not-allowed;
-}
-
 .word-sense-group-item.is-dragging,
 .word-grammar-row.is-dragging,
 .word-definition-row.is-dragging,
@@ -976,33 +866,11 @@
   cursor: help;
 }
 
-.word-form-origin-tag {
-  margin-inline-end: 0;
-  padding-inline: 6px;
-  color: #7b8495;
-  font-size: 11px;
-  line-height: 18px;
-  background: rgba(255, 255, 255, 0.45);
-  border: 0;
-}
-
 .word-form-matrix {
   display: grid;
   align-items: stretch;
   margin: 16px 18px 0;
   overflow-x: auto;
-}
-
-/* 非偏好侧折叠条（A1 阶段 5）：默认只展开偏好那一栏，另一侧留一行进度摘要。 */
-.word-form-other-dialect-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  margin: 8px 18px 0;
-  padding: 6px 12px;
-  border: 1px dashed var(--word-line);
-  border-radius: 10px;
 }
 
 .word-form-matrix-unified {
@@ -1168,20 +1036,6 @@
   border-color: #1677ff;
 }
 
-.word-form-add-slot-wrap {
-  display: flex;
-  justify-content: center;
-  padding: 12px 18px 16px;
-}
-
-.word-form-add-slot {
-  min-width: 180px;
-  color: #657083;
-  background: rgba(255, 255, 255, 0.58);
-  border-color: #d5dbe4;
-  border-radius: 8px;
-}
-
 .word-sense-groups-card {
   margin-bottom: 14px;
   overflow: hidden;
@@ -1278,10 +1132,6 @@
   min-width: 0;
 }
 
-.word-sense-group-delete {
-  align-self: end;
-}
-
 .word-pos-tabs > .ant-tabs-nav {
   margin-bottom: 16px;
 }
@@ -1326,49 +1176,8 @@
   width: 100%;
 }
 
-.word-voice-text-control {
-  width: 100%;
-  min-width: 0;
-}
-
-.word-voice-text-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-bottom: 5px;
-}
-
-.word-voice-text-toolbar-labeled {
-  justify-content: space-between;
-}
-
 .word-dialect-panel-header {
   min-height: 24px;
-}
-
-.word-grammar-text-field {
-  margin-top: 8px;
-}
-
-.word-grammar-voice-toolbar {
-  margin-top: 6px;
-}
-
-.word-grammar-voice-toolbar .ant-btn {
-  height: 28px;
-}
-
-.word-grammar-voice-toolbar .word-pronunciation-play-action,
-.word-grammar-voice-toolbar .word-pronunciation-voice-action {
-  width: auto;
-  flex: none;
-  padding-inline: 8px;
-  font-size: 12px;
-}
-
-.word-grammar-drag-handle {
-  width: 32px;
 }
 
 .word-sort-actions {
@@ -1617,13 +1426,6 @@
   min-width: 0;
 }
 
-.word-sense-fixed-value {
-  display: flex;
-  align-items: center;
-  height: 32px;
-  margin-top: 6px;
-}
-
 .word-sense-context-control {
   display: flex;
   align-items: center;
@@ -1838,37 +1640,6 @@
   border-radius: 9px;
 }
 
-.word-sentence-english-card {
-  min-width: 0;
-  padding: 9px 10px 7px;
-  background: #fafbfc;
-  border: 1px solid #d9dee7;
-  border-radius: 9px;
-}
-
-.word-sentence-drawer-trigger {
-  width: 100%;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.word-sentence-drawer-trigger:hover,
-.word-sentence-drawer-trigger:focus-visible {
-  border-color: #1677ff;
-  outline: none;
-}
-
-.word-sentence-drawer-trigger .ant-typography,
-.word-sentence-translation-preview .ant-typography {
-  margin-block: 4px 0;
-}
-
-.word-sentence-translation-preview {
-  min-width: 0;
-  padding: 9px 10px 7px;
-}
-
 .word-forms-tabs-empty {
   display: grid;
   min-height: 210px;
@@ -1901,29 +1672,6 @@
 .word-add-basic-pos-select:not(.ant-select-disabled):hover
   .ant-select-selector {
   border-color: #4096ff !important;
-}
-
-.word-sentence-english-toolbar {
-  margin-bottom: 5px;
-}
-
-.word-sentence-focus-hint {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  min-height: 20px;
-  margin-top: 4px;
-  color: #62806c;
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.word-sentence-focus-hint.is-missing {
-  color: #c13b3b;
-}
-
-.word-sentence-focus-hint .anticon {
-  flex: none;
 }
 
 .word-relations-grid {
@@ -2151,30 +1899,6 @@
   white-space: nowrap;
 }
 
-/*
- * 待建条提示要独占一整行：.word-relation-row 是固定 3 列 grid（删除按钮
- * position:absolute 脱流）。不写 grid-column 会掉进隐式第二行第 1 列——那列
- * 只有 minmax(54px, .58fr)，提示会被压成竖排。
- *
- * 提示在 DOM 里必须排在「匹配词义」Select **之后**：跨满行的项塞不进第一行，
- * 会另起一行并把放置游标推到行尾，排在它后面的自动项只能落到第三行第 1 列。
- * 早先把它放在 Select 前，就把 Select 挤进了那条 54px 的窄列。
- */
-.word-relation-pending-hint {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  margin-top: 2px;
-  color: #a8690f;
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.word-relation-pending-hint .anticon {
-  flex: none;
-}
-
 .word-relation-input-error {
   grid-column: 1 / -1;
   color: #ff4d4f;
@@ -2227,83 +1951,6 @@
   color: #8a909b;
   text-align: center;
   font-variant-numeric: tabular-nums;
-}
-
-.word-preview-section {
-  margin-bottom: 0;
-  overflow: hidden;
-  background: #fff;
-  border: 1px solid var(--word-line);
-  border-radius: 13px;
-  box-shadow: 0 8px 24px rgba(32, 38, 54, 0.045);
-}
-
-.word-preview-section > .ant-card-head {
-  min-height: 46px;
-  padding-inline: 16px;
-  background: #fafbfc;
-  border-bottom-color: #e7eaf0;
-}
-
-.word-preview-section > .ant-card-body {
-  padding: 14px 16px 16px;
-}
-
-.word-preview-overview .ant-descriptions-item-label {
-  width: 150px;
-  color: #667085;
-  background: #f8fafc !important;
-}
-
-.word-preview-issues-card {
-  margin-bottom: 14px;
-  overflow: hidden;
-  border-color: #ffccc7;
-  border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(207, 19, 34, 0.05);
-}
-
-.word-preview-collapse {
-  background: transparent;
-  border-color: #dfe4ea;
-  border-radius: 10px;
-}
-
-.word-preview-collapse > .ant-collapse-item > .ant-collapse-header {
-  align-items: center;
-  padding: 11px 14px;
-  background: #f7f9fb;
-}
-
-.word-preview-collapse
-  > .ant-collapse-item
-  > .ant-collapse-content
-  > .ant-collapse-content-box {
-  padding: 12px;
-}
-
-.word-preview-inner-card,
-.word-preview-sense-card {
-  overflow: hidden;
-  border-color: #e1e5eb;
-  border-radius: 10px;
-  box-shadow: none;
-}
-
-.word-preview-inner-card > .ant-card-head,
-.word-preview-sense-card > .ant-card-head {
-  min-height: 40px;
-  padding-inline: 12px;
-  background: #fafbfc;
-}
-
-.word-preview-inner-card > .ant-card-body,
-.word-preview-sense-card > .ant-card-body {
-  padding: 12px;
-}
-
-.word-preview-sense-card {
-  border-inline-start: 3px solid #52c41a;
 }
 
 @container word-creation-content (min-width: 1080px) {

@@ -1,16 +1,6 @@
-import {
-  CheckCircleFilled,
-  ClockCircleOutlined,
-  LeftOutlined,
-  MinusCircleOutlined,
-  UnorderedListOutlined
-} from "@ant-design/icons";
-import { Breadcrumb, Button, Drawer, Flex, Steps, Tag, Typography } from "antd";
-import type {
-  AdminWordV2,
-  WordCreationStep,
-  WordHeadwordsV2
-} from "@tsz/types";
+import { LeftOutlined, UnorderedListOutlined } from "@ant-design/icons";
+import { Breadcrumb, Button, Drawer, Steps, Typography } from "antd";
+import type { WordCreationStep } from "@tsz/types";
 import {
   useEffect,
   useLayoutEffect,
@@ -19,28 +9,23 @@ import {
   type ReactNode
 } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useDialectPreference } from "@/features/settings/useDialectPreference";
-import type { PartOfSpeechLookup } from "../part-of-speech/catalog";
-import { WORD_STEP_ORDER, WORD_STEP_TITLE, wordDisplayHeadword } from "./model";
-import {
-  buildWordReadiness,
-  type ReadinessTarget,
-  type WordReadinessDraft
-} from "./readiness";
 import "./word-creation.css";
 
+const WORD_STEP_ORDER = ["basics", "forms", "meanings", "preview"] as const;
+
+const WORD_STEP_TITLE: Record<WordCreationStep, string> = {
+  basics: "创建新词条",
+  forms: "词形与发音",
+  meanings: "词义与例句",
+  preview: "预览并生效"
+};
+
 interface Props {
-  word?: AdminWordV2;
-  entryKind?: AdminWordV2["kind"];
-  draftHeadwords?: WordHeadwordsV2;
   currentStep: WordCreationStep;
   reachableSteps?: ReadonlySet<WordCreationStep>;
   readOnly?: boolean;
   onStepChange?: (step: WordCreationStep) => void;
-  readinessDraft?: WordReadinessDraft;
-  partOfSpeechLookup?: PartOfSpeechLookup;
-  onReadinessNavigate?: (target: ReadinessTarget) => void;
-  presentation?: {
+  presentation: {
     wordExists: boolean;
     breadcrumbTitle: ReactNode;
     completedSteps: readonly WordCreationStep[];
@@ -65,116 +50,11 @@ const STEP_SUBTITLE: Record<WordCreationStep, string> = {
   preview: "结构核对｜提交生效"
 };
 
-function HeadwordSummary({ headwords }: { headwords?: WordHeadwordsV2 }) {
-  const { preference } = useDialectPreference();
-  if (!headwords) {
-    return (
-      <Typography.Text className="word-summary-pending-detection">
-        待检测
-      </Typography.Text>
-    );
-  }
-  if (headwords.mode === "unified") {
-    return (
-      <div className="word-creation-summary-headword">
-        <span className="dialect-dot dialect-dot-common" />
-        <strong>{headwords.common}</strong>
-      </div>
-    );
-  }
-  // 偏好侧排首位并保持主视觉。原先按检测基准侧排(手测 C5)：输入 center 却看到
-  // centre 在前且字号更大，会被读成主词被静默换成了另一侧拼写。
-  const sides = (
-    preference === "uk" ? (["uk", "us"] as const) : (["us", "uk"] as const)
-  ).map((dialect) => ({
-    dialect,
-    spelling: dialect === "uk" ? headwords.uk : headwords.us,
-    caption: dialect === "uk" ? "英式英语 · BrE" : "美式英语 · AmE",
-    // 「检测基准」标在真正命中的那一侧，不再等同于首行——首行现在按偏好排。
-    detectionBasis: dialect === headwords.source_dialect
-  }));
-  return (
-    <Flex vertical gap={5}>
-      {sides.map(({ dialect, spelling, caption, detectionBasis }, index) => (
-        <div
-          key={dialect}
-          className={`word-creation-summary-headword${index === 0 ? "" : " word-creation-summary-alt"}`}
-        >
-          <span className={`dialect-dot dialect-dot-${dialect}`} />
-          {index === 0 ? <strong>{spelling}</strong> : <span>{spelling}</span>}
-          <small>
-            {caption}
-            {detectionBasis ? " · 检测基准" : ""}
-          </small>
-        </div>
-      ))}
-    </Flex>
-  );
-}
-
-function ProgressSummary({
-  word,
-  draft,
-  partOfSpeechLookup,
-  onNavigate
-}: {
-  word?: AdminWordV2;
-  draft?: WordReadinessDraft;
-  partOfSpeechLookup?: PartOfSpeechLookup;
-  onNavigate?: (target: ReadinessTarget) => void;
-}) {
-  // 完成度按偏好口径算：存量双份词条保存后只留偏好侧，未收敛的原值会误报未完成。
-  const { preference } = useDialectPreference();
-  const rows = buildWordReadiness(word, draft, partOfSpeechLookup, preference);
-  return (
-    <Flex vertical gap={13} className="word-creation-progress-list">
-      {rows.map((row) => {
-        const done = row.state === "complete";
-        // 「无需填写」是中性态:不打勾也不催办,避免 0/0 被读成已完成。
-        const notRequired = row.state === "not_required";
-        const value = notRequired
-          ? "无需填写"
-          : row.key === "dialect"
-            ? done
-              ? "完成"
-              : "待完成"
-            : `${row.completed}/${row.total}`;
-        return (
-          <button
-            type="button"
-            className="word-creation-progress-row"
-            data-readiness-state={row.state}
-            disabled={!row.target || !onNavigate}
-            key={row.key}
-            onClick={() => row.target && onNavigate?.(row.target)}
-          >
-            {done ? (
-              <CheckCircleFilled className="word-progress-done" />
-            ) : notRequired ? (
-              <MinusCircleOutlined className="word-progress-none" />
-            ) : (
-              <ClockCircleOutlined className="word-progress-wait" />
-            )}
-            <span>{row.label}</span>
-            <Typography.Text type="secondary">{value}</Typography.Text>
-          </button>
-        );
-      })}
-    </Flex>
-  );
-}
-
 export function WordCreationLayout({
-  word,
-  entryKind,
-  draftHeadwords,
   currentStep,
   reachableSteps,
   readOnly,
   onStepChange,
-  readinessDraft,
-  partOfSpeechLookup,
-  onReadinessNavigate,
   presentation,
   children
 }: Props) {
@@ -184,9 +64,6 @@ export function WordCreationLayout({
   const pageRef = useRef<HTMLDivElement>(null);
   const [narrowProgress, setNarrowProgress] = useState(false);
   const [progressOpen, setProgressOpen] = useState(false);
-  // 抽屉退场结束时 antd 会把焦点还给触发按钮。点 X 或遮罩关闭时这是对的，
-  // 但跳步是导航走人，退场比字段聚焦慢一拍，回焦正好把光标从目标字段上拽走。
-  const leavingForNavigation = useRef(false);
   useLayoutEffect(() => {
     const page = pageRef.current;
     if (!page || typeof ResizeObserver === "undefined") return;
@@ -204,16 +81,9 @@ export function WordCreationLayout({
   useEffect(() => {
     if (!narrowProgress) setProgressOpen(false);
   }, [narrowProgress]);
-  // 每次打开都从「不是跳步」重新算，标记才不会跟某一条打开路径绑死。
-  useEffect(() => {
-    if (progressOpen) leavingForNavigation.current = false;
-  }, [progressOpen]);
   const currentIndex = WORD_STEP_ORDER.indexOf(currentStep);
   const isBasicsStep = currentStep === "basics";
-  const completed = new Set(
-    presentation?.completedSteps ?? word?.completed_steps ?? []
-  );
-  const wordExists = presentation?.wordExists ?? Boolean(word);
+  const completed = new Set(presentation.completedSteps);
   const steps = WORD_STEP_ORDER.map((step) => ({
     title: WORD_STEP_TITLE[step],
     content: STEP_SUBTITLE[step],
@@ -222,33 +92,17 @@ export function WordCreationLayout({
     status:
       currentStep === step
         ? ("process" as const)
-        : completed.has(step as "basics" | "forms" | "meanings")
+        : completed.has(step)
           ? ("finish" as const)
           : ("wait" as const),
     // 只有「草稿还没创建」才禁用：完成度不再决定导航权限，四步随时可进。
     disabled:
-      !wordExists ||
+      !presentation.wordExists ||
       Boolean(readOnly) ||
       Boolean(reachableSteps && !reachableSteps.has(step))
   }));
-  const { preference } = useDialectPreference();
-  const createTitle =
-    entryKind === "word"
-      ? "创建单词"
-      : entryKind === "phrase"
-        ? "创建短语"
-        : "创建词条";
 
-  const renderProgress = (onNavigate?: (target: ReadinessTarget) => void) =>
-    presentation?.progress ?? (
-      <ProgressSummary
-        word={word}
-        draft={readinessDraft}
-        partOfSpeechLookup={partOfSpeechLookup}
-        onNavigate={onNavigate}
-      />
-    );
-  const progressTriggerLabel = presentation?.progressBadge
+  const progressTriggerLabel = presentation.progressBadge
     ? `完成情况 ${presentation.progressBadge}`
     : "完成情况";
 
@@ -261,13 +115,7 @@ export function WordCreationLayout({
           {
             title: <Link to="/words">智能词库</Link>
           },
-          {
-            title: presentation
-              ? presentation.breadcrumbTitle
-              : word
-                ? `${wordDisplayHeadword(word, preference)} · ${WORD_STEP_TITLE[currentStep]}`
-                : createTitle
-          }
+          { title: presentation.breadcrumbTitle }
         ]}
       />
 
@@ -292,39 +140,19 @@ export function WordCreationLayout({
             返回智能词库
           </Button>
 
-          {presentation?.showEntrySummary !== false && (
+          {presentation.showEntrySummary !== false && (
             <div className="word-summary-entry-card">
               <Typography.Text type="secondary" className="word-summary-kicker">
                 当前词条
               </Typography.Text>
-              {presentation?.summaryHeadword ?? (
-                <HeadwordSummary
-                  headwords={word?.headwords ?? draftHeadwords}
-                />
-              )}
+              {presentation.summaryHeadword}
 
               <div className="word-summary-language">
                 <Typography.Text type="secondary">所属语言</Typography.Text>
                 <strong>English</strong>
               </div>
 
-              {presentation?.status ??
-                (word?.status === "archived" ? (
-                  <Tag color="warning" style={{ alignSelf: "flex-start" }}>
-                    垃圾桶 · 只读
-                  </Tag>
-                ) : word?.status === "published" ? (
-                  <Tag
-                    color={readOnly ? "success" : "processing"}
-                    style={{ alignSelf: "flex-start" }}
-                  >
-                    {readOnly
-                      ? "已发布 · 只读"
-                      : word.has_unpublished_changes
-                        ? "已发布 · 编辑未发布修改"
-                        : "已发布 · 编辑中"}
-                  </Tag>
-                ) : null)}
+              {presentation.status}
             </div>
           )}
 
@@ -348,7 +176,7 @@ export function WordCreationLayout({
                   完成情况
                 </Typography.Text>
               </div>
-              {renderProgress(onReadinessNavigate)}
+              {presentation.progress}
             </>
           )}
         </section>
@@ -363,22 +191,13 @@ export function WordCreationLayout({
       {narrowProgress && (
         <Drawer
           classNames={{ body: "word-creation-progress-drawer" }}
-          focusable={{ focusTriggerAfterClose: !leavingForNavigation.current }}
           onClose={() => setProgressOpen(false)}
           open={progressOpen}
           placement="right"
           size="min(360px, 86vw)"
           title="完成情况"
         >
-          {/* 清单里的待完善项会跳步，跳完抽屉还盖在新那一步上，先关掉。 */}
-          {renderProgress(
-            onReadinessNavigate &&
-              ((target) => {
-                leavingForNavigation.current = true;
-                setProgressOpen(false);
-                onReadinessNavigate(target);
-              })
-          )}
+          {presentation.progress}
         </Drawer>
       )}
     </div>

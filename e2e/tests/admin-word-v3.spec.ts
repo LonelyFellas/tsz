@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import {
-  ADMIN_V2_LEGACY_WORD_ID,
   ADMIN_V3_CANARY_WORD_ID,
   ADMIN_V3_DETECTIONS_PATH,
   ADMIN_V3_ENTRIES_PATH,
@@ -246,7 +245,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     ).toBe(1);
   });
 
-  test("E02 Mock：混合词条列表展示各自投影并路由到原生向导", async ({
+  test("E02 Mock：混合词条列表展示各自投影，旧结构行进不去向导", async ({
     page
   }) => {
     await mockAdminV3Api(page);
@@ -256,12 +255,11 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const v3Row = page.locator("tbody tr", { hasText: "orbit-v3" });
     await expect(legacyRow).toBeVisible();
     await expect(v3Row).toBeVisible();
-    await legacyRow.getByRole("button", { name: /查看/ }).click();
-    await expect(page).toHaveURL(
-      new RegExp(`/words/${ADMIN_V2_LEGACY_WORD_ID}/wizard/preview$`)
-    );
+    // 向导只剩 V3：旧结构行照常展示，但入口置灰并说明原因。
+    await expect(
+      legacyRow.getByRole("button", { name: /查看/ })
+    ).toBeDisabled();
 
-    await page.goto("/words");
     await page
       .locator("tbody tr", { hasText: "orbit-v3" })
       .getByRole("button", { name: /继续创建/ })

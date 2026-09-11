@@ -89,12 +89,3 @@ export const partOfSpeechCatalogFixture: PartOfSpeechCatalogResponse = {
       }))
   }))
 };
-
-export function partOfSpeechCatalogQueryResult() {
-  return {
-    data: partOfSpeechCatalogFixture,
-    isError: false,
-    isPending: false,
-    isLoading: false
-  };
-}

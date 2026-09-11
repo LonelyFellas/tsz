@@ -86,7 +86,11 @@ import {
   wordListLabel
 } from "./presentation";
 import { useLifecycleSurfaceCommand } from "./useLifecycleSurfaceCommand";
-import { getWordRowActionLabel, getWordRowRoute } from "./wordRouting";
+import {
+  getWordRowActionLabel,
+  getWordRowRoute,
+  LEGACY_SCHEMA_BLOCKED_HINT
+} from "./wordRouting";
 import {
   ENTRY_WRITE_BLOCKED_HINT,
   canWriteEntry,
@@ -871,14 +875,29 @@ export function SmartDictionary({
           // 「标注」按行有无都不会让删除入口跟着左右跳。
           <Flex align="center" justify="space-between" gap={8}>
             <Space size={4}>
-              <Button
-                type="link"
-                size="small"
-                aria-label={`${getWordRowActionLabel(record, rowWritable)}${rowName}`}
-                onClick={() => navigate(getWordRowRoute(record))}
-              >
-                {getWordRowActionLabel(record, rowWritable)}
-              </Button>
+              {(() => {
+                // 旧结构（V1/V2）的行没有向导可进：向导已整条下线，只剩 V3。
+                // 置灰并说明原因，比点进去撞上 404 或空白页好。
+                const route = getWordRowRoute(record);
+                const button = (
+                  <Button
+                    type="link"
+                    size="small"
+                    disabled={route === undefined}
+                    aria-label={`${getWordRowActionLabel(record, rowWritable)}${rowName}`}
+                    onClick={() => route && navigate(route)}
+                  >
+                    {getWordRowActionLabel(record, rowWritable)}
+                  </Button>
+                );
+                return route === undefined ? (
+                  <Tooltip title={LEGACY_SCHEMA_BLOCKED_HINT}>
+                    <span>{button}</span>
+                  </Tooltip>
+                ) : (
+                  button
+                );
+              })()}
               {/* 重复原型按归属提供入口，尚未填写标注也能补充。 */}
               {canEditRowAnnotation(annotationActor, record) ? (
                 <Button
