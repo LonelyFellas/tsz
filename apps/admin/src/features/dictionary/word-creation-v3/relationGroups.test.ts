@@ -84,7 +84,7 @@ describe("派生词展示分组", () => {
       expect(groupRelations([first, second])).toEqual([[first], [second]]);
     }
   );
-  it("取消与新增保留未变义项 UUID，清空仍保留可编辑行，删除整组不碰其他关系", () => {
+  it("取消与新增保留未变义项 UUID，清空即删整条，删除整组不碰其他关系", () => {
     const first = relation("r1", "s1");
     const second = relation("r2", "s2");
     const other = { ...relation("other", "s3"), target_word_id: "other" };
@@ -97,15 +97,11 @@ describe("派生词展示分组", () => {
     expect(
       replaceRelationGroup([first, other, second], [first, second], selected)
     ).toEqual([...selected, other]);
+    // 清空返回空组，整条关联被删掉。此前这里保留 target_word_id 只删 target_sense_id，
+    // 那个「有词条没词义」的形状存不进库：数据库的 lexicon_relations_target_shape_check
+    // 要求关联词三选一，约束错误会被后端兜底成 500。
     expect(selectDerivativeSenses([first, second], [], () => "unused")).toEqual(
-      [
-        {
-          id: "r1",
-          relation: "derivative",
-          target_word_id: "target",
-          score: "80"
-        }
-      ]
+      []
     );
     expect(
       replaceRelationGroup([first, other, second], [first, second], [])

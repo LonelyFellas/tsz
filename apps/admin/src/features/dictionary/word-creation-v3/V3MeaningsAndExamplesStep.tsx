@@ -1041,7 +1041,28 @@ function RelationsGrid({
       searching?.relationId === relation.id
         ? searching.query
         : (relation.pending_target_headword ?? "");
-    return raw.trim() ? validateEntryInput(raw).issue : undefined;
+    const trimmed = raw.trim();
+    if (!trimmed) return undefined;
+    const issue = validateEntryInput(trimmed).issue;
+    if (issue) return issue;
+    // 近义词与反义词一个词面只配一条词义。收口只做在了界面上，手敲两行同样的词面
+    // 仍然能存下去，要等后端物化才撞名报错，所以这里当场说清楚。只报后出现的那条，
+    // 免得两行互相指认。
+    if (relation.relation === "derivative") return undefined;
+    const key = trimmed.toLowerCase();
+    const position = sense.relations.findIndex(
+      (item) => item.id === relation.id
+    );
+    const duplicated = sense.relations.some(
+      (other, index) =>
+        index < position &&
+        other.relation === relation.relation &&
+        !other.target_word_id &&
+        other.pending_target_headword?.trim().toLowerCase() === key
+    );
+    return duplicated
+      ? "同类关联里已有这个词面，一个词面只配一条词义"
+      : undefined;
   };
 
   const isUnlinkedText = (relation: WordRelationWritableV3) =>
@@ -1380,34 +1401,8 @@ function RelationsGrid({
                               }}
                               options={
                                 searching?.relationId === relation.id
-                                  ? searchWords.map((word) => ({
-                                      label: (
-                                        <Flex align="center" gap={6}>
-                                          <span>{word.headword}</span>
-                                          <Tag
-                                            color={
-                                              word.status === "draft"
-                                                ? "orange"
-                                                : "blue"
-                                            }
-                                          >
-                                            {word.status === "draft"
-                                              ? "草稿"
-                                              : "已发布"}
-                                          </Tag>
-                                          {word.senses.length === 0 ? (
-                                            <Typography.Text type="secondary">
-                                              {word.status === "draft"
-                                                ? "暂无词义，选中仅记文本"
-                                                : "暂无词义，请先添加词义"}
-                                            </Typography.Text>
-                                          ) : null}
-                                        </Flex>
-                                      ),
-                                      value: word.word_id,
-                                      disabled:
-                                        (word.senses.length === 0 &&
-                                          word.status !== "draft") ||
+                                  ? searchWords.map((word) => {
+                                      const alreadyLinked =
                                         sense.relations.some(
                                           (other) =>
                                             !group.some(
@@ -1424,8 +1419,43 @@ function RelationsGrid({
                                                 word.matchedHeadword
                                                   .trim()
                                                   .toLowerCase())
-                                        )
-                                    }))
+                                        );
+                                      return {
+                                        label: (
+                                          <Flex align="center" gap={6}>
+                                            <span>{word.headword}</span>
+                                            <Tag
+                                              color={
+                                                word.status === "draft"
+                                                  ? "orange"
+                                                  : "blue"
+                                              }
+                                            >
+                                              {word.status === "draft"
+                                                ? "草稿"
+                                                : "已发布"}
+                                            </Tag>
+                                            {/* 「暂无词义」是可行动的那条，别被「已被关联」盖住。 */}
+                                            {word.senses.length === 0 ? (
+                                              <Typography.Text type="secondary">
+                                                {word.status === "draft"
+                                                  ? "暂无词义，选中仅记文本"
+                                                  : "暂无词义，请先添加词义"}
+                                              </Typography.Text>
+                                            ) : alreadyLinked ? (
+                                              <Typography.Text type="secondary">
+                                                已被同类型的另一行关联
+                                              </Typography.Text>
+                                            ) : null}
+                                          </Flex>
+                                        ),
+                                        value: word.word_id,
+                                        disabled:
+                                          (word.senses.length === 0 &&
+                                            word.status !== "draft") ||
+                                          alreadyLinked
+                                      };
+                                    })
                                   : []
                               }
                               popupMatchSelectWidth={260}
