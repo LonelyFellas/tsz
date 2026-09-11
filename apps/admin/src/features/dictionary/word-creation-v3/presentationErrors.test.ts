@@ -53,6 +53,15 @@ describe("V3 product error presentation", () => {
     ]);
   });
 
+  it("keeps the zh and en halves of one code apart", () => {
+    expect(
+      v3IssueMessages([
+        { ...issue("sense_group_name_required"), field: "name_zh" },
+        { ...issue("sense_group_name_required"), field: "name_en" }
+      ])
+    ).toEqual(["请填写语义区间名称（中文）", "请填写语义区间名称（英文）"]);
+  });
+
   it("productizes detail errors and retries only recoverable failures", () => {
     const missing = new HttpError(404, "word not found", [], "word_not_found");
     expect(presentV3DetailError(missing)).toEqual({

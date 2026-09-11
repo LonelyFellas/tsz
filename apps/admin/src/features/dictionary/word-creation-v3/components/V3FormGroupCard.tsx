@@ -445,6 +445,10 @@ export function V3FormGroupCard({
           </div>
           {blockedFormId ? (
             <Alert
+              // 同上：提示条挂在组顶部，而「移除词形」按钮可能在很下面。
+              ref={(node) => {
+                node?.nativeElement.scrollIntoView?.({ block: "center" });
+              }}
               action={
                 blockedFormLocked ? undefined : (
                   <Button

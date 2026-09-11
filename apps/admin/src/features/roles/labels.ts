@@ -9,12 +9,7 @@ import { DISPLAY_NAME_MAX, hasDisplayNameForbiddenChars } from "@tsz/shared";
  * 待后端后续在目录里补 `landed` 字段后，删除本表改用后端下发。
  */
 export const LANDED_PERMISSIONS: ReadonlySet<PermissionKey> =
-  new Set<PermissionKey>([
-    "users.access",
-    "words.access",
-    "wordlists.access",
-    "reviews.access"
-  ]);
+  new Set<PermissionKey>(["users.access", "words.access"]);
 
 export function isPermissionLanded(key: PermissionKey): boolean {
   return LANDED_PERMISSIONS.has(key);

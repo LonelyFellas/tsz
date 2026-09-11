@@ -12,20 +12,17 @@ import {
 } from "./labels";
 
 describe("落地状态", () => {
-  it("已落地的四个 key 判 true", () => {
-    for (const k of [
-      "users.access",
-      "words.access",
-      "wordlists.access",
-      "reviews.access"
-    ] as const) {
+  it("已落地的两个 key 判 true", () => {
+    for (const k of ["users.access", "words.access"] as const) {
       expect(isPermissionLanded(k)).toBe(true);
     }
-    expect(LANDED_PERMISSIONS.size).toBe(4);
+    expect(LANDED_PERMISSIONS.size).toBe(2);
   });
 
   it("未落地的 key 判 false", () => {
     for (const k of [
+      "wordlists.access",
+      "reviews.access",
       "classes.access",
       "customdict.access",
       "sentences.access",

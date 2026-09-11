@@ -44,10 +44,7 @@ import { resolveV3StepAccess } from "@/features/dictionary/word-creation-v3/step
 import { canWriteEntry } from "@/features/dictionary/entryWritePermission";
 import { useAuthStore } from "@/lib/auth";
 import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
-import {
-  impactReasonLabel,
-  impactTypeLabel
-} from "@/features/dictionary/word-creation-v3/presentation";
+import { summarizeFormsImpact } from "@/features/dictionary/word-creation-v3/presentation";
 import {
   CreationSourceNotice,
   creationSourceFromState
@@ -195,13 +192,12 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
                   ? `正在核对同形匹配：已加载 ${snapshot.items.length}/${snapshot.total}`
                   : `本次变更影响 ${context.impact.affected.length} 个引用节点。`}
               </span>
-              {context.impact.affected.map((item) => (
-                <Typography.Text
-                  key={`${item.node_type}:${item.node_id}:${item.reason}`}
-                  type="secondary"
-                >
-                  {impactTypeLabel(item.node_type)}：
-                  {impactReasonLabel(item.reason)}
+              {summarizeFormsImpact(context.impact.affected).map((group) => (
+                <Typography.Text key={group.reason} type="secondary">
+                  {group.reasonLabel}：
+                  {group.parts
+                    .map((part) => `${part.label} ${part.count}`)
+                    .join("、")}
                 </Typography.Text>
               ))}
             </Flex>
@@ -355,13 +351,12 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
           description={
             <Flex vertical gap={4}>
               <span>{`本次词形变更影响 ${context.impact.affected.length} 个引用节点。`}</span>
-              {context.impact.affected.map((item) => (
-                <Typography.Text
-                  key={`${item.node_type}:${item.node_id}:${item.reason}`}
-                  type="secondary"
-                >
-                  {impactTypeLabel(item.node_type)}：
-                  {impactReasonLabel(item.reason)}
+              {summarizeFormsImpact(context.impact.affected).map((group) => (
+                <Typography.Text key={group.reason} type="secondary">
+                  {group.reasonLabel}：
+                  {group.parts
+                    .map((part) => `${part.label} ${part.count}`)
+                    .join("、")}
                 </Typography.Text>
               ))}
             </Flex>

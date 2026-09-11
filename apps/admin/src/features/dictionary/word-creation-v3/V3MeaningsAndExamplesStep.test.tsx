@@ -1407,19 +1407,19 @@ describe("V3MeaningsAndExamplesStep", () => {
     ).toHaveClass("ant-input-number-status-error");
     expect(screen.getByText("请选择细分词性")).toBeVisible();
     expect(
-      screen.getByText("词频必须为 0–100，且最多保留两位小数")
+      screen.getByText("请填写词频，取值 0–100 且最多两位小数")
     ).toBeVisible();
 
     fireEvent.change(screen.getByLabelText("释义 1 频率"), {
       target: { value: "25" }
     });
     expect(
-      screen.getByText("词频必须为 0–100，且最多保留两位小数")
+      screen.getByText("请填写词频，取值 0–100 且最多两位小数")
     ).toBeVisible();
 
     view.rerender(<Harness initial={meaningsFixture} issues={[]} />);
     expect(
-      screen.queryByText("词频必须为 0–100，且最多保留两位小数")
+      screen.queryByText("请填写词频，取值 0–100 且最多两位小数")
     ).toBeNull();
   });
 

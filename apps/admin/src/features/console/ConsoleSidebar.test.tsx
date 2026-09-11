@@ -129,14 +129,15 @@ describe("ConsoleSidebar", () => {
     expect(mockNavigate).toHaveBeenCalledWith("/admins");
   });
 
-  it("super_admin：用户管理分组下显示「角色权限管理」并跳转 /roles", () => {
+  it("super_admin：「角色权限管理」渲染为禁用占位，点了不跳转", () => {
     setLevel("super_admin");
     renderAt("/");
     fireEvent.click(screen.getByText("用户管理"));
     const entry = screen.getByText("角色权限管理");
     expect(entry).toBeInTheDocument();
+    mockNavigate.mockClear();
     fireEvent.click(entry);
-    expect(mockNavigate).toHaveBeenCalledWith("/roles");
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it("普通 admin：用户管理分组下无「角色权限管理」入口", () => {
@@ -190,9 +191,9 @@ describe("ConsoleSidebar", () => {
   it("未传 onNavigate 时点击已落地模块仍安全跳转", () => {
     // onNavigate 缺省：进入跳转分支后 onNavigate?.() 应短路不抛错。
     renderAt("/");
-    fireEvent.click(screen.getByText("词表管理"));
-    fireEvent.click(screen.getByRole("menuitem", { name: "智能词表" }));
-    expect(mockNavigate).toHaveBeenCalledWith("/wordlists");
+    fireEvent.click(screen.getByText("词库管理"));
+    fireEvent.click(screen.getByRole("menuitem", { name: "垃圾桶" }));
+    expect(mockNavigate).toHaveBeenCalledWith("/words/trash");
   });
 
   it("收起态隐藏站名、仅保留图标", () => {
