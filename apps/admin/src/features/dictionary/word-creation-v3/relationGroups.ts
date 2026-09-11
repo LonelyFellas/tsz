@@ -53,11 +53,11 @@ export function selectDerivativeSenses(
   idFactory: () => string
 ): WordRelationWritableV3[] {
   const first = group[0]!;
-  if (!senseIds.length) {
-    const next = { ...first };
-    delete next.target_sense_id;
-    return [next];
-  }
+  // 清空词义返回空组，由 replaceRelationGroup 把整条关联删掉。此前这里保留
+  // target_word_id 只删 target_sense_id，留下的「有词条没词义」形状存不进库：
+  // 数据库的 lexicon_relations_target_shape_check 要求关联词三选一，约束错误被
+  // 后端兜底成 500。退回待关联文本也不可行，因为这一层拿不到可靠词面，能拿到的
+  // 只有展示用的拼接串（英美双拼写会是「color / colour」）。
   return [...new Set(senseIds)].map((senseId, index) => {
     const existing = group.find(
       (relation) => relation.target_sense_id === senseId

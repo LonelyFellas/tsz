@@ -2069,6 +2069,18 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByLabelText(`拖动${label}词义 1`)).toBeNull();
     // 同一个词面写两次也不合组，两条各自带一个词面输入框。
     expect(screen.getAllByLabelText(`${label}目标词条`)).toHaveLength(2);
+    // 后出现的那条当场标红说明撞车，并按既有规则收起词义框：词面没定下来就别填词义。
+    expect(
+      screen.getByText("同类关联里已有这个词面，一个词面只配一条词义")
+    ).toBeInTheDocument();
+    expect(screen.getAllByLabelText(`${label}待关联词义`)).toHaveLength(1);
+    // 改掉撞车的词面，提示消失，词义框回来。
+    fireEvent.change(screen.getAllByLabelText(`${label}目标词条`).at(-1)!, {
+      target: { value: "elsewhere" }
+    });
+    expect(
+      screen.queryByText("同类关联里已有这个词面，一个词面只配一条词义")
+    ).toBeNull();
     expect(screen.getAllByLabelText(`${label}待关联词义`)).toHaveLength(2);
   });
   it.each([["derivative", "派生词"]])(
@@ -2429,6 +2441,125 @@ describe("V3MeaningsAndExamplesStep", () => {
         (item) => item.pending_target_headword
       )
     ).toEqual(["beta", "alpha"]);
+  });
+
+  it("清空派生词的词义会删掉整条关联，不留半绑定形状", () => {
+    relatedSearchAny.mockImplementation((...args) => {
+      const result = defaultRelatedSearchImplementation(...args);
+      result.exact.data.pages[0]!.results[0]!.senses = [
+        { sense_id: "external-sense-1", gloss: "外部词义一" }
+      ];
+      return result;
+    });
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [];
+    render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByText("添加派生词").closest("button")!);
+    fireEvent.change(screen.getByLabelText("派生词目标词条"), {
+      target: { value: "outside" }
+    });
+    fireEvent.click(screen.getAllByText("outside").at(-1)!);
+    fireEvent.mouseDown(screen.getByLabelText("派生词目标词义"));
+    fireEvent.click(screen.getAllByText("外部词义一").at(-1)!);
+    expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
+      target_word_id: "external-word-1",
+      target_sense_id: "external-sense-1"
+    });
+
+    // 再点一次取消勾选，词义清空。
+    fireEvent.click(screen.getAllByText("外部词义一").at(-1)!);
+    // 一条词义都不剩的关联没有意义，整条删掉。只删 target_sense_id 会留下
+    // 「有词条没词义」的半绑定，那个形状存不进库、后端兜底成 500；退回待关联文本
+    // 也不可行，这一层只拿得到展示用的拼接词面（英美双拼写会是「color / colour」）。
+    expect(value().pos[0]!.senses[0]!.relations).toHaveLength(0);
+  });
+
+  it("置灰文案按优先级排：禁用理由先于选中后会发生什么", () => {
+    relatedSearchAny.mockImplementation((...args) => {
+      const result = defaultRelatedSearchImplementation(...args);
+      // 0 词义的草稿：本身可选，选中只记文本。
+      Object.assign(result.contains.data.pages[0]!.results[0]!, {
+        status: "draft",
+        senses: []
+      });
+      // 0 词义的已发布词条：无从绑定词义，这本身就是禁用理由。
+      result.exact.data.pages[0]!.results[0]!.senses = [];
+      return result;
+    });
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [
+      {
+        id: "text-1",
+        relation: "synonym",
+        pending_target_headword: "beyond",
+        pending_target_gloss: "甲",
+        score: "60"
+      }
+    ];
+    render(<Harness initial={initial} />);
+    // 用近义词构造：派生词同词面会合组，组首接管渲染，搜索上下文对不上这一行。
+    fireEvent.click(screen.getByText("添加近义词").closest("button")!);
+    fireEvent.change(screen.getAllByLabelText("近义词目标词条").at(-1)!, {
+      target: { value: "beyond" }
+    });
+
+    const optionFor = (text: string) =>
+      screen
+        .getAllByText(text)
+        .map((item) => item.closest(".ant-select-item-option"))
+        .find((item): item is HTMLElement => item !== null)!;
+
+    // 草稿 + 0 词义 + 已被上面那行按词面关联：灰着，要说禁用理由，
+    // 不能显示「选中仅记文本」去邀请一个点不动的操作。
+    const draftOption = optionFor("beyond");
+    expect(draftOption).toHaveClass("ant-select-item-option-disabled");
+    expect(
+      within(draftOption).getByText("已被同类型的另一行关联")
+    ).toBeInTheDocument();
+    expect(
+      within(draftOption).queryByText("暂无词义，选中仅记文本")
+    ).toBeNull();
+
+    // 已发布 + 0 词义：禁用理由是没词义可绑，这条最该先说。
+    const publishedOption = optionFor("outside");
+    expect(publishedOption).toHaveClass("ant-select-item-option-disabled");
+    expect(
+      within(publishedOption).getByText("暂无词义，请先添加词义")
+    ).toBeInTheDocument();
+  });
+
+  it("已被同类型另一行关联的词条，置灰时要说明原因", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [
+      {
+        id: "bound-1",
+        relation: "derivative",
+        target_word_id: "external-word-1",
+        target_sense_id: "external-sense-1",
+        score: "60"
+      }
+    ];
+    render(
+      <Harness
+        initial={initial}
+        relationSnapshots={{
+          "bound-1": { headword: "outside", gloss: "外部词义一" }
+        }}
+      />
+    );
+    fireEvent.click(screen.getByText("添加派生词").closest("button")!);
+    fireEvent.change(screen.getAllByLabelText("派生词目标词条").at(-1)!, {
+      target: { value: "outside" }
+    });
+    const option = screen
+      .getAllByText("outside")
+      .map((item) => item.closest(".ant-select-item-option"))
+      .find((item): item is HTMLElement => item !== null)!;
+    expect(option).toHaveClass("ant-select-item-option-disabled");
+    // 置灰但不给原因，用户只会以为坏了。
+    expect(
+      within(option).getByText("已被同类型的另一行关联")
+    ).toBeInTheDocument();
   });
 
   it("改选目标后词义文案跟着新目标走，不留上一次保存的快照", () => {
