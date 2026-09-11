@@ -24,3 +24,6 @@ playwright/.cache/
 
 # 本地编辑器 / 工具配置
 .claude/
+
+# 设计稿过程产物：一次性 HTML/PNG，决策已留档到 docs/
+/design-demos/

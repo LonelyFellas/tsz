@@ -1,11 +1,11 @@
 import { HttpError } from "@tsz/api-client";
 import { isCode, isPhone } from "@tsz/shared";
 import { translateAuthError } from "@tsz/shared/auth";
-import { Alert, Button, Card, Form, Input, theme, Typography } from "antd";
+import { Alert, Button, Form, Input } from "antd";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 import { api, persistSession, tokens, useAuthStore } from "@/lib/auth";
+import "./admin-login.css";
 
 const LOGIN_ERRORS: Record<string, string> = {
   // 401：密码错 / 验证码错 / 查无此号逐字节一致（防枚举），前端统一文案不区分。
@@ -59,7 +59,6 @@ export function AdminLoginForm() {
   const profile = useAuthStore((s) => s.profile);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { token } = theme.useToken();
 
   // 已登录的管理员访问登录页：直接进后台。
   useEffect(() => {
@@ -167,105 +166,127 @@ export function AdminLoginForm() {
   }
 
   return (
-    <FullscreenCenter vertical>
-      <Card
-        style={{
-          width: "100%",
-          maxWidth: 400,
-          borderRadius: 12,
-          boxShadow:
-            "0 1px 2px rgba(0, 0, 0, 0.04), 0 8px 24px rgba(0, 0, 0, 0.06)"
-        }}
-        styles={{ body: { padding: 32 } }}
-      >
-        <div style={{ marginBottom: 28 }}>
-          <Typography.Text
-            strong
-            style={{
-              color: token.colorPrimary,
-              fontSize: 13,
-              letterSpacing: 1
-            }}
-          >
-            天生会背
-          </Typography.Text>
-          <Typography.Title level={3} style={{ margin: "6px 0 4px" }}>
-            平台后台
-          </Typography.Title>
-          <Typography.Text type="secondary">
-            请使用管理员账号登录
-          </Typography.Text>
-        </div>
-
-        <Form layout="vertical" onFinish={() => void handleLogin()}>
-          <Form.Item label="手机号">
-            <Input
-              size="large"
-              placeholder="请输入手机号"
-              autoComplete="username"
-              value={account}
-              onChange={(e) => onAccountChange(e.target.value)}
-            />
-          </Form.Item>
-          <Form.Item label="验证码">
-            <div style={{ display: "flex", gap: 8 }}>
-              <Input
-                size="large"
-                placeholder="请输入验证码"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                value={code}
-                onChange={(e) => onCodeChange(e.target.value)}
-                style={{ flex: 1 }}
-              />
-              <Button
-                size="large"
-                htmlType="button"
-                onClick={() => void handleSendCode()}
-                disabled={!canSendCode}
-              >
-                {countdown > 0
-                  ? `${countdown}s 后重发`
-                  : sending
-                    ? "发送中..."
-                    : "获取验证码"}
-              </Button>
+    <div className="admin-login">
+      {/* ── 品牌区 ── */}
+      <header className="admin-login__plate">
+        <div className="admin-login__masthead">
+          <div className="admin-login__brandblock admin-login__a1">
+            <div className="admin-login__mark" aria-hidden>
+              天
             </div>
-          </Form.Item>
-          <Form.Item label="密码">
-            <Input.Password
+            <div>
+              <h1 className="admin-login__brand">
+                天生会背
+                <span className="admin-login__postag">平台后台</span>
+              </h1>
+              <p className="admin-login__lede">请使用管理员账号登录</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* ── 表单 ── */}
+      <main className="admin-login__body">
+        <section className="admin-login__col admin-login__a4">
+          <div className="admin-login__col-head">
+            <span className="admin-login__zh">管理员登录</span>
+            <span className="admin-login__en">SIGN IN</span>
+          </div>
+
+          <Form onFinish={() => void handleLogin()}>
+            <div className="admin-login__field">
+              <div className="admin-login__label">
+                <span className="admin-login__t">手机号</span>
+              </div>
+              <div className="admin-login__ctl">
+                <Input
+                  size="large"
+                  placeholder="请输入手机号"
+                  aria-label="手机号"
+                  autoComplete="username"
+                  value={account}
+                  onChange={(e) => onAccountChange(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="admin-login__field">
+              <div className="admin-login__label">
+                <span className="admin-login__t">验证码</span>
+              </div>
+              <div className="admin-login__ctl">
+                <Input
+                  size="large"
+                  placeholder="请输入验证码"
+                  aria-label="验证码"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={code}
+                  onChange={(e) => onCodeChange(e.target.value)}
+                />
+                <Button
+                  size="large"
+                  htmlType="button"
+                  onClick={() => void handleSendCode()}
+                  disabled={!canSendCode}
+                >
+                  {countdown > 0
+                    ? `${countdown}s 后重发`
+                    : sending
+                      ? "发送中..."
+                      : "获取验证码"}
+                </Button>
+              </div>
+            </div>
+
+            <div className="admin-login__field">
+              <div className="admin-login__label">
+                <span className="admin-login__t">登录密码</span>
+              </div>
+              <div className="admin-login__ctl">
+                <Input.Password
+                  size="large"
+                  placeholder="请输入登录密码"
+                  aria-label="登录密码"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => onPasswordChange(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {error && (
+              <Alert
+                type="error"
+                title={error}
+                showIcon
+                style={{ marginBottom: 16 }}
+              />
+            )}
+
+            <Button
+              className={
+                loading
+                  ? "admin-login__submit admin-login__submit--busy"
+                  : "admin-login__submit"
+              }
+              type="primary"
+              htmlType="submit"
+              block
               size="large"
-              placeholder="请输入登录密码"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => onPasswordChange(e.target.value)}
-            />
-          </Form.Item>
+              loading={loading}
+              disabled={!canSubmit}
+            >
+              {loading ? "登录中..." : "登 录"}
+            </Button>
+          </Form>
+        </section>
+      </main>
 
-          {error && (
-            <Alert
-              type="error"
-              title={error}
-              showIcon
-              style={{ marginBottom: 16 }}
-            />
-          )}
-
-          <Button
-            type="primary"
-            htmlType="submit"
-            block
-            size="large"
-            loading={loading}
-            disabled={!canSubmit}
-          >
-            {loading ? "登录中..." : "登录"}
-          </Button>
-        </Form>
-      </Card>
-      <Typography.Text type="secondary" style={{ fontSize: 12, marginTop: 24 }}>
-        © {new Date().getFullYear()} 天生会背
-      </Typography.Text>
-    </FullscreenCenter>
+      <footer className="admin-login__foot">
+        <span>© {new Date().getFullYear()} 天生会背</span>
+        <span>平台后台 · 词条编辑与发布</span>
+      </footer>
+    </div>
   );
 }

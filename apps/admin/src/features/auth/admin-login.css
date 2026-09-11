@@ -1,0 +1,308 @@
+/* 登录页专属样式：一张字典样张，登录表单是它的中栏。
+ *
+ * 视觉来自 design-demos/v2-designer.html（Peter Biľak / Typotheque 的样张思路），
+ * 方向确认与三版对比见 docs/features/admin-login-redesign/design.md。
+ *
+ * 为什么不复用 FullscreenCenter：那个壳是登录页、门禁加载态、404、路由错误页四家共用的，
+ * 背景走 colorBgLayout。本页要整幅铺开，改共用壳会连带改掉另外三页，所以自带容器。
+ *
+ * 色值来自《天生会背® 开发文档》第 1.1 节品牌色板，不在 antd token 里，故在此写明；
+ * --blue 与 providers.tsx 的 colorPrimary 是同一个值，改要一起改。
+ */
+
+.admin-login {
+  --blue: #2053ff; /* 主色调 克莱因蓝 = providers.tsx colorPrimary */
+  --wash: #eaf9ff; /* 背景色 浅蓝白：天头版底 */
+  /* 墨色由品牌蓝灰 #BFC0CA 的色相 234° 压暗得到，不是新色相 */
+  --ink: #16171d; /* 正文 对白 17.6:1 */
+  --ink-2: #5a5d6e; /* 次级 6.5:1 */
+  --ink-3: #6a6d7d; /* 注记 白底 5.1:1 */
+  --rule: rgba(22, 23, 29, 0.13);
+  --rule-2: rgba(22, 23, 29, 0.26);
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+
+  min-height: 100vh;
+  background: #fff;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+}
+
+/* 入场编排：品牌区与表单区错开 40ms，总时长 210ms。
+   压得这么短不是图快——playwright 截图的抓帧时刻实测落在 400ms 到 2100ms 之间，
+   编排超过 400ms 就可能被拍到半透明的中途状态。 */
+@keyframes admin-login-rise {
+  from {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.admin-login__a1,
+.admin-login__a4 {
+  animation: admin-login-rise 170ms var(--ease) both;
+}
+.admin-login__a1 {
+  animation-delay: 0ms;
+}
+.admin-login__a4 {
+  animation-delay: 40ms;
+}
+
+/* ══ 天头版 ══════════════════════════════════════════════════════ */
+/* 品牌区。原本是压在样张正文上的「报头」，用浅蓝白与白色正文形成对照；
+   正文砍空之后那块色带失去了对照对象，变成一条无所依附的横条，与大片白的
+   下半部也失衡。改回字典的语言：整页白纸，分区靠一条发丝线而不是色块。
+   浅蓝白只留给输入框——那里它要跟白纸区分，也成了全页唯一的呼应。 */
+.admin-login__plate {
+  flex: none;
+  padding: 24px 80px 18px;
+  border-bottom: 1px solid var(--rule);
+}
+.admin-login__masthead {
+  display: flex;
+  align-items: flex-start;
+}
+.admin-login__brandblock {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+.admin-login__mark {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 9.75px; /* 52 × 18.75%，品牌标记的圆角比例 */
+  background: var(--blue);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1;
+  padding-bottom: 2px;
+}
+.admin-login__brand {
+  font-size: 40px;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+}
+.admin-login__postag {
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.24em;
+  text-indent: 0.24em;
+  color: var(--blue);
+  border: 1px solid rgba(32, 83, 255, 0.4);
+  border-radius: 3px;
+  padding: 4px 8px;
+  line-height: 1;
+  align-self: center;
+  margin-top: 3px;
+  white-space: nowrap;
+}
+.admin-login__lede {
+  margin-top: 8px;
+  font-size: 15px;
+  color: var(--ink-2);
+  letter-spacing: 0.02em;
+}
+
+/* CEFR 六级色阶：产品独有资产，在天头当刻度尺用 */
+/* 正文只剩表单一栏，居中。
+   左右两栏（完整词条树与三组对位）已撤：天头版的解剖带已经把「这是个认真做语言的
+   产品」讲完了，那两栏是在把同一件事再讲一遍，而这一页的绝大多数打开来自每天登录的
+   编辑——为一次性的观众让每天的用户穿过两栏词典，账算不过来。 */
+.admin-login__body {
+  flex: 1;
+  padding: 28px 80px 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.admin-login__col {
+  width: 100%;
+  max-width: 432px;
+  min-width: 0;
+}
+.admin-login__col-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--rule-2);
+  margin-bottom: 12px;
+}
+.admin-login__col-head .admin-login__zh {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+}
+.admin-login__col-head .admin-login__en {
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--ink-3);
+}
+
+/* 表单 */
+.admin-login__field {
+  margin-bottom: 17px;
+}
+.admin-login__label {
+  margin-bottom: 8px;
+}
+.admin-login__label .admin-login__t {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+}
+.admin-login__ctl {
+  display: flex;
+  gap: 10px;
+}
+/* 输入框边框走 antd 的边框色，与全站其它表单一致（设计稿原用品牌蓝灰 #BFC0CA）。
+   ⚠️ 实测：antd 的 #d9d9d9 对白纸只有 1.41:1，比 #BFC0CA 的 1.81:1 还低，
+   两者都达不到 WCAG 1.4.11 对非文字控件的 3:1；底色 #EAF9FF 对白纸也只有 1.08:1，
+   补不足这个缺口。换色的理由是与全站一致，不是解决了对比度——这一条仍未解决。
+   admin 不把无障碍列为阻塞项，真要修得动色板，需要单独拍板。 */
+.admin-login__ctl .ant-input,
+.admin-login__ctl .ant-input-affix-wrapper {
+  height: 54px;
+  background: var(--wash);
+  font-size: 16px;
+  letter-spacing: 0.02em;
+}
+.admin-login__ctl .ant-input-affix-wrapper .ant-input {
+  height: auto;
+  background: transparent;
+}
+.admin-login__ctl .ant-input:focus,
+.admin-login__ctl .ant-input-affix-wrapper-focused {
+  background: #fff;
+}
+.admin-login__ctl .ant-btn {
+  height: 54px;
+  flex: none;
+  white-space: nowrap;
+}
+
+.admin-login__submit.ant-btn {
+  width: 100%;
+  height: 58px;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0.4em;
+  text-indent: 0.4em;
+  margin-top: 4px;
+}
+/* 禁用态是这一页打开时的默认态（表单为空），所以它不能是视觉上最重的死块。
+   antd 默认给禁用按钮铺灰底，在这张白纸样张上会变成整页最沉的一块。
+   改成纸底 + 细边 + 读得清的字：按钮仍明显不可点，但不抢视觉重量。 */
+.admin-login__submit.ant-btn:disabled:not(.admin-login__submit--busy),
+.admin-login__submit.ant-btn:disabled:not(.admin-login__submit--busy):hover,
+.admin-login__ctl .ant-btn:disabled,
+.admin-login__ctl .ant-btn:disabled:hover {
+  background: #fff;
+  border-color: #b4b7c4;
+  color: var(--ink-2); /* 6.5:1，远高于 WCAG 对禁用控件的豁免要求 */
+}
+.admin-login__submit.ant-btn:disabled:not(.admin-login__submit--busy) {
+  border-width: 2px;
+}
+
+/* ══ 版权脚 ══════════════════════════════════════════════════════ */
+.admin-login__foot {
+  flex: none;
+  margin: 0 80px;
+  padding: 10px 0 16px;
+  border-top: 1px solid var(--rule);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.admin-login__foot span {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  color: var(--ink-3);
+}
+
+/* ══ 响应式 ══════════════════════════════════════════════════════
+   样张的三栏只在宽屏成立。收窄时按「哪一栏对当下的人最没用」依次撤：
+   先撤右栏对位（它是佐证），再撤左栏词条结构（它是展示），
+   最后只剩表单与品牌——那正是手机上唯一该留的东西。 */
+
+@media (max-width: 1380px) {
+  .admin-login__plate,
+  .admin-login__body {
+    padding-left: 40px;
+    padding-right: 40px;
+  }
+  .admin-login__foot {
+    margin: 0 40px;
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-login__plate,
+  .admin-login__body {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .admin-login__foot {
+    margin: 0 20px;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .admin-login__brand {
+    font-size: 30px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .admin-login__mark {
+    width: 44px;
+    height: 44px;
+    font-size: 25px;
+    border-radius: 8.25px;
+  }
+  .admin-login__ctl {
+    flex-direction: column;
+  }
+  .admin-login__ctl .ant-btn {
+    width: 100%;
+  }
+}
+
+/* 矮视口（1280×800 这类常见笔记本）：实测溢出 71px，版权脚要滚动才看得到。
+   这是高度不够而不是宽度不够，所以按 max-height 收，而不是按 max-width。
+   收的是天头版的留白与词头字号，表单的间距一并压紧，不动任何字段。 */
+@media (max-height: 860px) {
+  .admin-login__plate {
+    padding-top: 16px;
+    padding-bottom: 10px;
+  }
+  .admin-login__body {
+    padding-top: 18px;
+    padding-bottom: 16px;
+  }
+  .admin-login__field {
+    margin-bottom: 13px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-login *,
+  .admin-login *::before,
+  .admin-login *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
