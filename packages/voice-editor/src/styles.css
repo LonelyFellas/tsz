@@ -314,12 +314,6 @@
   font-weight: 700;
 }
 
-.tsz-ve-anchor-letters::before {
-  content: "·";
-  margin-right: 4px;
-  opacity: 0.5;
-}
-
 /*
  * 「添加」用连读自己的粉色，不用 antd 主色蓝：这一行里蓝色已经是「起点锚点」
  * 的意思，主按钮再用蓝会让同一个颜色在同一行表示两件事。

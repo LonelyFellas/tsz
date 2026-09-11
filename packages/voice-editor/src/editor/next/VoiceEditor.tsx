@@ -58,7 +58,8 @@ import {
   isValidLiaison,
   marksToAnnotations,
   crossesParagraph,
-  offsetToAnchor,
+  makeAnchor,
+  tokenIndexAt,
   remapMarks,
   splitRangeAtParagraphs,
   tokenize,
@@ -507,32 +508,18 @@ export function VoiceEditor({
           setValidationMessage("请先选中文字来添加连读");
           return;
         }
-        const anchor = (token: typeof first) => ({
-          token: token.index,
-          offsets: Array.from(
-            { length: token.end - token.start },
-            (_, offset) => offset
-          ).filter(
-            (offset) =>
-              token.start + offset >= textSelection.start &&
-              token.start + offset < textSelection.end
-          )
+        // 选区与该词的交集就是这一端；同一个词时退成选区的首尾两个字母。
+        const within = (token: typeof first) => ({
+          start: Math.max(token.start, textSelection.start),
+          end: Math.min(token.end, textSelection.end)
         });
         setDraft(
           first.index === last.index
             ? {
-                start: {
-                  token: first.index,
-                  offsets: [Math.max(0, textSelection.start - first.start)]
-                },
-                end: {
-                  token: last.index,
-                  offsets: [
-                    Math.min(last.end, textSelection.end) - last.start - 1
-                  ]
-                }
+                start: makeAnchor(Math.max(first.start, textSelection.start)),
+                end: makeAnchor(Math.min(last.end, textSelection.end) - 1)
               }
-            : { start: anchor(first), end: anchor(last) }
+            : { start: within(first), end: within(last) }
         );
       }
       setOpenTool(key);
@@ -752,7 +739,7 @@ export function VoiceEditor({
   ) => {
     if (brush.kind !== "role") return;
     const level = brush.level;
-    const token = offsetToAnchor(tokens, start)?.token;
+    const token = tokenIndexAt(tokens, start);
     if (
       mode === "click" &&
       roleAnchor &&
@@ -802,28 +789,27 @@ export function VoiceEditor({
   /**
    * 端别由面板上的「起点 / 终点」开关决定，不按点击先后推断。
    * 早先「第一个词是起点、点到另一个词就是终点」的自动判定，让人没法先定终点
-   * 再回头选起点，也没法选完终点后回去改起点。同一端内点相邻字母则扩展锚点，
-   * 点到别的词则换成那个词。成线仍由「添加连读」显式确认。
+   * 再回头选起点，也没法选完终点后回去改起点。
+   *
+   * 同一端内点第二个字母，把两次点击之间整段收进来，跨过空格也照收——一端本来
+   * 就可能盖住相邻几个词。点已经选中的字母则收回到该字母，用来就地重来。
+   * 成线仍由「添加连读」显式确认。
    */
-  const handleLetterClick = (anchor: LiaisonAnchor) => {
+  const handleLetterClick = (letter: LiaisonAnchor) => {
     if (brush.kind !== "liaison") return;
-    const offset = anchor.offsets[0]!;
     setDraft((current) => {
       const existing = current[liaisonEnd];
-      const next =
-        existing && existing.token === anchor.token
-          ? extendAnchor(existing, offset)
-          : anchor;
-      return { ...current, [liaisonEnd]: next };
+      return {
+        ...current,
+        [liaisonEnd]: existing ? extendAnchor(existing, letter) : letter
+      };
     });
   };
 
   const commitLiaison = () => {
     if (!draft.start || !draft.end) return;
     const link =
-      draft.start.token < draft.end.token ||
-      (draft.start.token === draft.end.token &&
-        Math.min(...draft.start.offsets) <= Math.min(...draft.end.offsets))
+      draft.start.start <= draft.end.start
         ? { start: draft.start, end: draft.end }
         : { start: draft.end, end: draft.start };
     if (!isValidLiaison(link)) {
@@ -831,9 +817,7 @@ export function VoiceEditor({
       return;
     }
     const sameAnchors = (a: LiaisonAnchor, b: LiaisonAnchor) =>
-      a.token === b.token &&
-      a.offsets.length === b.offsets.length &&
-      a.offsets.every((offset, index) => offset === b.offsets[index]);
+      a.start === b.start && a.end === b.end;
     if (
       marks.liaisons.some(
         (existing) =>
@@ -846,7 +830,7 @@ export function VoiceEditor({
       resetTransient();
       return;
     }
-    if (crossesParagraph(text, tokens, link)) {
+    if (crossesParagraph(text, link)) {
       // wire 不接受跨换行的标注；放进来的话本地就折算不出合法 wire，
       // 从此改动静默停止回写，比当场说清楚糟得多。
       setValidationMessage("连读不能跨越换行，请把两个词放在同一行");
@@ -1132,7 +1116,7 @@ export function VoiceEditor({
       content: (
         <LiaisonPanel
           readOnly={readOnly}
-          tokens={tokens}
+          text={text}
           draft={draft}
           activeEnd={liaisonEnd}
           onActiveEndChange={setLiaisonEnd}

@@ -41,7 +41,7 @@ import {
 } from "./roles";
 import type { Brush, LiaisonEnd } from "./roles";
 import { anchorLetters } from "./tokens";
-import type { LiaisonAnchor, LiaisonDraft, Token } from "./tokens";
+import type { LiaisonAnchor, LiaisonDraft } from "./tokens";
 
 /** 工具栏中的发音、标注和音频面板。 */
 
@@ -705,7 +705,7 @@ export function RolePanel({
 function AnchorSlot({
   label,
   slot,
-  tokens,
+  text,
   anchor,
   active,
   disabled,
@@ -713,14 +713,13 @@ function AnchorSlot({
 }: {
   label: string;
   slot: LiaisonEnd;
-  tokens: Token[];
+  text: string;
   anchor?: LiaisonAnchor;
   active: boolean;
   disabled?: boolean;
   onSelect: () => void;
 }) {
-  const word = anchor ? tokens[anchor.token]?.text : undefined;
-  const letters = anchor ? anchorLetters(tokens, anchor) : "";
+  const letters = anchor ? anchorLetters(text, anchor) : "";
   return (
     <button
       type="button"
@@ -731,9 +730,8 @@ function AnchorSlot({
       onClick={onSelect}
     >
       <Typography.Text type="secondary">{label}</Typography.Text>
-      {word ? (
+      {letters ? (
         <span className={`tsz-ve-anchor-slot is-${slot}`}>
-          {word}
           <span className="tsz-ve-anchor-letters">{letters}</span>
         </span>
       ) : (
@@ -745,7 +743,7 @@ function AnchorSlot({
 
 export interface LiaisonPanelProps {
   readOnly?: boolean;
-  tokens: Token[];
+  text: string;
   draft: LiaisonDraft;
   /** 接下来点的字母归哪一端。 */
   activeEnd: LiaisonEnd;
@@ -762,7 +760,7 @@ export interface LiaisonPanelProps {
  */
 export function LiaisonPanel({
   readOnly,
-  tokens,
+  text,
   draft,
   activeEnd,
   onActiveEndChange,
@@ -791,7 +789,7 @@ export function LiaisonPanel({
             <AnchorSlot
               label={label}
               slot={anchor}
-              tokens={tokens}
+              text={text}
               anchor={draft[anchor]}
               active={activeEnd === anchor}
               disabled={readOnly}

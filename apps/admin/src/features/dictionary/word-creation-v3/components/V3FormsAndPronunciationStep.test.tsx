@@ -612,7 +612,7 @@ describe("V3FormsAndPronunciationStep", () => {
       /@container word-creation-content \(max-width: 900px\)[\s\S]*?\.v3-form-type-column[\s\S]*?display: contents;/
     );
     expect(formsCss).toMatch(
-      /\.v3-membership-actions \{[\s\S]*?flex-wrap: wrap;[\s\S]*?min-width: 0;/
+      /\.v3-membership-actions \{[\s\S]*?grid-template-columns: repeat\(2, auto\);[\s\S]*?min-width: 0;/
     );
   });
 

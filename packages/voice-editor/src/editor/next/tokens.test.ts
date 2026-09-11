@@ -4,15 +4,15 @@ import {
   EMPTY_MARKS,
   anchorLetters,
   graphemes,
-  anchorRange,
   annotationsToMarks,
   applyRoleRange,
   splitRangeAtParagraphs,
   extendAnchor,
   isValidAnchor,
   isValidLiaison,
+  makeAnchor,
   marksToAnnotations,
-  offsetToAnchor,
+  tokenIndexAt,
   remapMarks,
   tokenize,
   type MarkState
@@ -57,80 +57,70 @@ describe("tokenize", () => {
 describe("连读锚点换算", () => {
   const tokens = tokenize(TEXT);
 
-  it("单字母锚点换算成绝对码点区间", () => {
-    // "centre" 的第 3 个字母 t
-    expect(anchorRange(tokens, { token: 1, offsets: [2] })).toEqual({
-      start: 4,
-      end: 5
-    });
-  });
-
-  it("多字母锚点覆盖整段连续字母", () => {
+  it("回显锚点选中的文字，跨词时空格一并带上", () => {
     // "centre" 的 "re"
-    expect(anchorRange(tokens, { token: 1, offsets: [4, 5] })).toEqual({
-      start: 6,
-      end: 8
-    });
+    expect(anchorLetters(TEXT, { start: 6, end: 8 })).toBe("re");
+    // 横跨 centre 与 of 之间那个空格
+    expect(anchorLetters(TEXT, { start: 7, end: 10 })).toBe("e o");
+    expect(anchorLetters(TEXT, { start: 99, end: 100 })).toBe("");
   });
 
-  it("越过词长的锚点作废，不会串到下一个词", () => {
-    expect(anchorRange(tokens, { token: 0, offsets: [1] })).toBeUndefined();
-    expect(anchorRange(tokens, { token: 1, offsets: [5, 6] })).toBeUndefined();
-    expect(anchorRange(tokens, { token: 9, offsets: [0] })).toBeUndefined();
+  it("锚点必须是非空区间", () => {
+    expect(isValidAnchor({ start: 2, end: 5 })).toBe(true);
+    expect(isValidAnchor({ start: 5, end: 5 })).toBe(false);
+    expect(isValidAnchor({ start: 5, end: 2 })).toBe(false);
   });
 
-  it("回显锚点选中的字母", () => {
-    expect(anchorLetters(tokens, { token: 1, offsets: [4, 5] })).toBe("re");
-    expect(anchorLetters(tokens, { token: 9, offsets: [0] })).toBe("");
+  it("并入字母：把两次点击之间整段填满，跨词也照填", () => {
+    const anchor = { start: 4, end: 6 };
+    // 右边隔着几个字母：中间一并收进来，不再重开
+    expect(extendAnchor(anchor, makeAnchor(7))).toEqual({ start: 4, end: 8 });
+    // 一路填到下一个词里，空格也含在内
+    expect(extendAnchor(anchor, makeAnchor(9))).toEqual({ start: 4, end: 10 });
+    // 左边同理
+    expect(extendAnchor(anchor, makeAnchor(2))).toEqual({ start: 2, end: 6 });
+    // 再点已选中的字母则收回到该字母，给一个就地重来的出口
+    expect(extendAnchor(anchor, makeAnchor(5))).toEqual({ start: 5, end: 6 });
   });
 
-  it("锚点必须是词内连续字母", () => {
-    expect(isValidAnchor({ token: 1, offsets: [1, 2, 3] })).toBe(true);
-    expect(isValidAnchor({ token: 1, offsets: [1, 3] })).toBe(false);
-    expect(isValidAnchor({ token: 1, offsets: [] })).toBe(false);
+  it("绝对位置落在第几个词里，落在空白上则无词", () => {
+    expect(tokenIndexAt(tokens, 4)).toBe(1);
+    expect(tokenIndexAt(tokens, 1)).toBeUndefined();
   });
 
-  it("并入字母：紧邻则扩展，否则重开", () => {
-    const anchor = { token: 1, offsets: [2, 3] };
-    expect(extendAnchor(anchor, 4).offsets).toEqual([2, 3, 4]);
-    expect(extendAnchor(anchor, 1).offsets).toEqual([1, 2, 3]);
-    // 隔开的字母不接龙，直接重开
-    expect(extendAnchor(anchor, 5).offsets).toEqual([5]);
-    // 再点已选中的字母也重开，给一个就地重来的出口
-    expect(extendAnchor(anchor, 2).offsets).toEqual([2]);
-  });
-
-  it("绝对位置换回锚点，落在空白上则无锚点", () => {
-    expect(offsetToAnchor(tokens, 4)).toEqual({ token: 1, offsets: [2] });
-    expect(offsetToAnchor(tokens, 1)).toBeUndefined();
-  });
-
-  it("连读允许同词内字母，保存顺序仍从左到右", () => {
+  it("连读两端从左到右且互不交叠", () => {
     expect(
       isValidLiaison({
-        start: { token: 0, offsets: [0] },
-        end: { token: 1, offsets: [0] }
+        start: { start: 0, end: 1 },
+        end: { start: 2, end: 3 }
       })
     ).toBe(true);
-    // 同词内部的不同字母也可以连接
+    // 同一个词内部的不同字母也可以连接
     expect(
       isValidLiaison({
-        start: { token: 1, offsets: [0] },
-        end: { token: 1, offsets: [3] }
+        start: { start: 2, end: 3 },
+        end: { start: 5, end: 6 }
       })
     ).toBe(true);
-    // 完全包含的锚点无法用 start/end + 两端宽度无损表示，不能生成不可保存的标注。
+    // 一端横跨空格盖住相邻两个词
     expect(
       isValidLiaison({
-        start: { token: 1, offsets: [0, 1, 2, 3] },
-        end: { token: 1, offsets: [1, 2] }
+        start: { start: 6, end: 11 },
+        end: { start: 12, end: 13 }
+      })
+    ).toBe(true);
+    // 交叠的两端无法用 start/end + 两端宽度无损表示，不能生成不可保存的标注。
+    expect(
+      isValidLiaison({
+        start: { start: 2, end: 6 },
+        end: { start: 3, end: 5 }
       })
     ).toBe(false);
     // 终点在左
     expect(
       isValidLiaison({
-        start: { token: 3, offsets: [0] },
-        end: { token: 1, offsets: [0] }
+        start: { start: 12, end: 13 },
+        end: { start: 2, end: 3 }
       })
     ).toBe(false);
   });
@@ -153,8 +143,8 @@ describe("marksToAnnotations", () => {
     const marks: MarkState = {
       roles: [],
       liaisons: [
-        // centre 的 e(末字母, offset 5) → of 的 o(offset 0)
-        { start: { token: 1, offsets: [5] }, end: { token: 2, offsets: [0] } }
+        // centre 的末字母 e → of 的 o
+        { start: { start: 7, end: 8 }, end: { start: 9, end: 10 } }
       ],
       pauses: {},
       passthrough: []
@@ -173,9 +163,7 @@ describe("marksToAnnotations", () => {
   it("连读可以跨越任意距离，不限于相邻词", () => {
     const marks: MarkState = {
       roles: [],
-      liaisons: [
-        { start: { token: 0, offsets: [0] }, end: { token: 4, offsets: [3] } }
-      ],
+      liaisons: [{ start: { start: 0, end: 1 }, end: { start: 19, end: 20 } }],
       pauses: {},
       passthrough: []
     };
@@ -194,8 +182,10 @@ describe("marksToAnnotations", () => {
     const marks: MarkState = {
       roles: [],
       liaisons: [
-        { start: { token: 0, offsets: [5] }, end: { token: 2, offsets: [0] } },
-        { start: { token: 0, offsets: [0] }, end: { token: 9, offsets: [0] } }
+        // 终点在起点左侧
+        { start: { start: 9, end: 10 }, end: { start: 3, end: 4 } },
+        // 终点越出正文
+        { start: { start: 0, end: 1 }, end: { start: 21, end: 22 } }
       ],
       pauses: {},
       passthrough: []
@@ -243,9 +233,7 @@ describe("annotationsToMarks", () => {
         { start: 0, end: 1, level: "core" },
         { start: 12, end: 15, level: "core" }
       ],
-      liaisons: [
-        { start: { token: 1, offsets: [5] }, end: { token: 2, offsets: [0] } }
-      ],
+      liaisons: [{ start: { start: 7, end: 8 }, end: { start: 9, end: 10 } }],
       pauses: { 2: 800 },
       passthrough: []
     };
@@ -350,10 +338,7 @@ describe("annotationsToMarks", () => {
       roles: [],
       liaisons: [
         // centre 的 "re" → of 的 "of"
-        {
-          start: { token: 1, offsets: [4, 5] },
-          end: { token: 2, offsets: [0, 1] }
-        }
+        { start: { start: 6, end: 8 }, end: { start: 9, end: 11 } }
       ],
       pauses: {},
       passthrough: []
@@ -384,21 +369,22 @@ describe("annotationsToMarks", () => {
       ]
     };
     expect(annotationsToMarks(value).liaisons).toEqual([
-      { start: { token: 1, offsets: [4] }, end: { token: 2, offsets: [1] } }
+      { start: { start: 6, end: 7 }, end: { start: 10, end: 11 } }
     ]);
   });
 
-  it("宽度越过词边界时退回单字母，不把弧画到别的词上", () => {
+  it("宽度越过词边界时照实读回，一端可以盖住相邻两个词", () => {
     const value: RichTextV2 = {
       version: 2,
       text: TEXT,
-      // centre 只到偏移 8，start_len=5 会越界
+      // centre 只到偏移 8，start_len=5 一路盖到 of 头上
       annotations: [
-        { type: "liaison", start: 6, end: 11, start_len: 5, end_len: 1 }
+        { type: "liaison", start: 6, end: 13, start_len: 5, end_len: 1 }
       ]
     };
     const [link] = annotationsToMarks(value).liaisons;
-    expect(link!.start.offsets).toEqual([4]);
+    expect(link!.start).toEqual({ start: 6, end: 11 });
+    expect(anchorLetters(TEXT, link!.start)).toBe("re of");
   });
 
   it("端点落在空白上的历史连读直接丢弃，不硬凑锚点", () => {
@@ -435,9 +421,10 @@ describe("annotationsToMarks", () => {
 });
 
 describe("remapMarks", () => {
+  // centre 的末字母 e → of 的 o
   const liaison = {
-    start: { token: 1, offsets: [5] },
-    end: { token: 2, offsets: [0] }
+    start: { start: 7, end: 8 },
+    end: { start: 9, end: 10 }
   };
 
   it("keeps marks when the edit leaves earlier words untouched", () => {

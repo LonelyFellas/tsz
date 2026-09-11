@@ -416,7 +416,7 @@ describe("VoiceEditor 标注带", () => {
     ]);
   });
 
-  it("两端都能扩成多字母锚点，并在工具栏按单词回显", () => {
+  it("两端都能扩成多字母锚点，并在工具栏回显选中的字母", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
     useLiaisonBrush();
@@ -433,13 +433,13 @@ describe("VoiceEditor 标注带", () => {
     fireEvent.mouseDown(letter(2, 1));
     expect(letter(2, 1)).toHaveClass("is-anchor-end");
 
-    // 锚点回显已并入工具栏，不再是标注带下方的独立一行
+    // 锚点回显已并入工具栏，不再是标注带下方的独立一行。
+    // 一端可以横跨几个词，「在哪个词」说明不了位置，回显的是选中的那几个字母。
     const slots = [...document.querySelectorAll(".tsz-ve-anchor-slot")].map(
       (slot) => slot.textContent
     );
-    expect(slots[0]).toContain("centre");
-    expect(slots[0]).toContain("re");
-    expect(slots[1]).toContain("of");
+    expect(slots[0]).toBe("re");
+    expect(slots[1]).toBe("of");
 
     fireEvent.click(button("添加连读"));
     // 两端各自的宽度也存得下：起点 "re"、终点 "of" 各占 2 个码点。
@@ -448,14 +448,44 @@ describe("VoiceEditor 标注带", () => {
     ]);
   });
 
-  it("点不相邻的字母会重开锚点，而不是选出一段断开的选区", () => {
+  it("点隔开的字母会把中间整段填满，而不是丢掉先点的那个", () => {
     render(<VoiceEditor {...props()} />);
     useLiaisonBrush();
 
     fireEvent.mouseDown(letter(1, 0));
     fireEvent.mouseDown(letter(1, 3)); // 跳开的字母
+    for (const offset of [0, 1, 2, 3]) {
+      expect(letter(1, offset)).toHaveClass("is-anchor-start");
+    }
+
+    // 再点已选中的字母则收回到该字母，给一个就地重来的出口
+    fireEvent.mouseDown(letter(1, 2));
+    expect(letter(1, 2)).toHaveClass("is-anchor-start");
     expect(letter(1, 0)).not.toHaveClass("is-anchor-start");
-    expect(letter(1, 3)).toHaveClass("is-anchor-start");
+  });
+
+  it("一端可以横跨空格盖住相邻两个词", () => {
+    const view = props();
+    render(<VoiceEditor {...view} />);
+    useLiaisonBrush();
+
+    // 起点从 centre 的 "re" 一路拉到 of 的 "o"
+    fireEvent.mouseDown(letter(1, 4));
+    fireEvent.mouseDown(letter(2, 0));
+    expect(letter(1, 4)).toHaveClass("is-anchor-start");
+    expect(letter(1, 5)).toHaveClass("is-anchor-start");
+    expect(letter(2, 0)).toHaveClass("is-anchor-start");
+    expect(document.querySelector(".tsz-ve-anchor-slot")?.textContent).toBe(
+      "re o"
+    );
+
+    chooseEnd("终点");
+    fireEvent.mouseDown(letter(3, 0));
+    fireEvent.click(button("添加连读"));
+    // 起点占 "re o" 共 4 个码点（含空格），终点是 the 的 t
+    expect(applied(view).annotations).toEqual([
+      { type: "liaison", start: 6, end: 13, start_len: 4, end_len: 1 }
+    ]);
   });
 
   it("同一个词里点第二下只是改起点，不会被当成终点", () => {
