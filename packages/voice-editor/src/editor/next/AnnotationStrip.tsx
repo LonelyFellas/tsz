@@ -30,20 +30,20 @@ interface CodeSpan {
   end: number;
 }
 
-const letterKey = (token: number, offset: number) => `${token}:${offset}`;
-
 /** 这个字母属于草稿的哪一端；都不属则为空。 */
 function draftRole(
   draft: LiaisonDraft,
-  token: number,
-  offset: number
+  start: number
 ): "start" | "end" | undefined {
-  if (draft.start?.token === token && draft.start.offsets.includes(offset)) {
-    return "start";
-  }
-  if (draft.end?.token === token && draft.end.offsets.includes(offset)) {
-    return "end";
-  }
+  /*
+   * 按字母起点落没落进锚点判，而不是要求整个字素簇被覆盖：选区入口造出来的是
+   * 单码点锚点，而组合字符、ZWJ 序列的字母元素跨两个以上码点，按覆盖判会漏掉
+   * 这类字母的端点色——数据里选中了，屏幕上却没上色。
+   */
+  const covered = (anchor?: LiaisonAnchor) =>
+    anchor !== undefined && start >= anchor.start && start < anchor.end;
+  if (covered(draft.start)) return "start";
+  if (covered(draft.end)) return "end";
   return undefined;
 }
 
@@ -128,10 +128,10 @@ export function AnnotationStrip({
     .map(Number)
     .sort((left, right) => left - right);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const letterRefs = useRef(new Map<string, HTMLElement>());
+  const letterRefs = useRef(new Map<number, HTMLElement>());
 
   const registerLetter = useCallback(
-    (key: string) => (node: HTMLElement | null) => {
+    (key: number) => (node: HTMLElement | null) => {
       if (node) letterRefs.current.set(key, node);
       else letterRefs.current.delete(key);
     },
@@ -149,17 +149,18 @@ export function AnnotationStrip({
     LiaisonLinkElements | undefined
   > => {
     const elementsOf = (anchor: LiaisonAnchor) => {
-      const offsets = [...anchor.offsets].sort((a, b) => a - b);
-      const letters = offsets.map((offset) =>
-        letterRefs.current.get(letterKey(anchor.token, offset))
-      );
+      const letters: HTMLElement[] = [];
+      for (let point = anchor.start; point < anchor.end; point += 1) {
+        const letter = letterRefs.current.get(point);
+        if (letter) letters.push(letter);
+      }
       const first = letters[0];
       const last = letters[letters.length - 1];
       if (!first || !last) return undefined;
       return {
         first,
         last,
-        text: letters.map((letter) => letter?.textContent ?? "").join("")
+        text: Array.from(text).slice(anchor.start, anchor.end).join("")
       };
     };
     return marks.liaisons.map((link) => {
@@ -318,7 +319,7 @@ export function AnnotationStrip({
                     const unit = unitAt(marks.roles, start);
                     const roleClass = unit ? ` is-${unit.level}` : "";
                     // 注意与 unit 的 level（语法分类）区分：这里是连读草稿的端别。
-                    const anchorRole = draftRole(draft, token.index, offset);
+                    const anchorRole = draftRole(draft, start);
                     const selectedClass = covers(selectedRange, start, end)
                       ? " is-selecting"
                       : "";
@@ -327,7 +328,7 @@ export function AnnotationStrip({
                     return (
                       <span
                         key={offset}
-                        ref={registerLetter(letterKey(token.index, offset))}
+                        ref={registerLetter(start)}
                         className={`tsz-ve-letter${roleClass}${anchorRole ? ` is-anchor-${anchorRole}` : ""}${selectedClass}${anchorClass}${linkedRanges?.some((range) => covers(range, start, end)) ? " is-linked" : ""}${selectedLinkRanges?.some((range) => covers(range, start, end)) ? " is-link-selected" : ""}`}
                         role="button"
                         aria-label={`${token.text} 的第 ${offset + 1} 个字母 ${letter}`}
@@ -338,10 +339,7 @@ export function AnnotationStrip({
                         data-letter={letter}
                         onMouseDown={paint(() => {
                           if (brush.kind === "liaison") {
-                            onLetterClick({
-                              token: token.index,
-                              offsets: [offset]
-                            });
+                            onLetterClick({ start, end });
                           } else if (brush.kind === "role") {
                             const span = { start, end };
                             setSelecting({ anchor: span, focus: span });

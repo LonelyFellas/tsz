@@ -51,16 +51,18 @@ export interface RoleUnit {
 }
 
 /**
- * 连读锚点：第 token 个词里的一段**连续**字母（词内偏移，按码点计）。
- * 存词内偏移而非绝对偏移，改文本时才能按词决定去留。
+ * 连读一端覆盖的绝对码点区间（右开）。
+ *
+ * 记绝对区间而不是「第几个词 + 词内第几个字母」：一端本来就可能横跨空格盖住
+ * 相邻的几个词，绑在单个词上表达不出来。wire 侧的 start_len / end_len 同样是
+ * 绝对宽度，这样两边同形，往返不用翻译。
  */
 export interface LiaisonAnchor {
-  token: number;
-  /** 升序且连续；单字母锚点就是长度 1。 */
-  offsets: number[];
+  start: number;
+  end: number;
 }
 
-/** 一条连读：起点锚点 → 终点锚点，终点必须落在起点右侧的另一个词里。 */
+/** 一条连读：起点锚点 → 终点锚点，终点在起点右侧且与它不交叠。 */
 export interface LiaisonLink {
   start: LiaisonAnchor;
   end: LiaisonAnchor;
@@ -187,74 +189,28 @@ export function splitRangeAtParagraphs(
   return pieces;
 }
 
-export function makeAnchor(token: number, offset: number): LiaisonAnchor {
-  return { token, offsets: [offset] };
+export function makeAnchor(start: number, end?: number): LiaisonAnchor {
+  return { start, end: end ?? start + 1 };
 }
 
-/** 锚点覆盖的绝对码点区间（右开）；越界或空锚点返回 undefined。 */
-export function anchorRange(
-  tokens: Token[],
-  anchor: LiaisonAnchor
-): { start: number; end: number } | undefined {
-  const token = tokens[anchor.token];
-  if (!token || anchor.offsets.length === 0) return undefined;
-  const first = Math.min(...anchor.offsets);
-  const last = Math.max(...anchor.offsets);
-  const start = token.start + first;
-  const end = token.start + last + 1;
-  return end <= token.end ? { start, end } : undefined;
-}
-
-/** 绝对码点位置 → 单字母锚点；落在空白上返回 undefined。 */
-export function offsetToAnchor(
+/** 绝对码点位置落在第几个词里；落在空白上返回 undefined。 */
+export function tokenIndexAt(
   tokens: Token[],
   position: number
-): LiaisonAnchor | undefined {
-  const token = tokens.find(
+): number | undefined {
+  return tokens.find(
     (candidate) => position >= candidate.start && position < candidate.end
-  );
-  return token ? makeAnchor(token.index, position - token.start) : undefined;
+  )?.index;
 }
 
-/**
- * 把单字母锚点按 wire 上记的宽度展开成多字母锚点。
- *
- * 只在这些码点确实同属一个词时展开：宽度越过词边界说明数据与当前正文对不上，
- * 这时退回单字母，宁可画短一点也不要画到别的词身上。
- */
-function widenAnchor(
-  tokens: Token[],
-  anchor: LiaisonAnchor | undefined,
-  from: number,
-  length: number
-): LiaisonAnchor | undefined {
-  if (!anchor || length <= 1) return anchor;
-  const token = tokens[anchor.token];
-  if (!token || from + length > token.end) return anchor;
-  return {
-    token: anchor.token,
-    offsets: Array.from({ length }, (_, index) => from - token.start + index)
-  };
+/** 锚点选中的文字，用于「起点 / 终点」那行回显。 */
+export function anchorLetters(text: string, anchor: LiaisonAnchor): string {
+  return Array.from(text).slice(anchor.start, anchor.end).join("");
 }
 
-/** 锚点选中的字母，用于「起点 / 终点」那行回显。 */
-export function anchorLetters(tokens: Token[], anchor: LiaisonAnchor): string {
-  const token = tokens[anchor.token];
-  if (!token) return "";
-  const letters = Array.from(token.text);
-  return [...anchor.offsets]
-    .sort((a, b) => a - b)
-    .map((offset) => letters[offset] ?? "")
-    .join("");
-}
-
-/** 锚点自身是否成立：非空、且词内连续。 */
+/** 锚点自身是否成立：非空区间。 */
 export function isValidAnchor(anchor: LiaisonAnchor): boolean {
-  if (anchor.offsets.length === 0) return false;
-  const sorted = [...anchor.offsets].sort((a, b) => a - b);
-  return sorted.every(
-    (offset, index) => index === 0 || offset === sorted[index - 1]! + 1
-  );
+  return anchor.start >= 0 && anchor.end > anchor.start;
 }
 
 /**
@@ -265,45 +221,41 @@ export function isValidAnchor(anchor: LiaisonAnchor): boolean {
  * 折算不出合法 wire，改动从此静默停止回写——用户看着自己的新文本，表单里存的
  * 却还是出错前那份。
  */
-export function crossesParagraph(
-  text: string,
-  tokens: Token[],
-  link: LiaisonLink
-): boolean {
-  const start = anchorRange(tokens, link.start);
-  const end = anchorRange(tokens, link.end);
-  if (!start || !end) return false;
+export function crossesParagraph(text: string, link: LiaisonLink): boolean {
   return Array.from(text)
-    .slice(start.start, end.end)
+    .slice(link.start.start, link.end.end)
     .some((point) => point === "\n" || point === "\r");
 }
 
-/** 连读支持词内字母，按正文中从左到右的端点顺序保存。 */
+/**
+ * 连读两端按正文中从左到右保存，且不许交叠。
+ *
+ * 交叠的两端在 wire 上表达不出来（start_len + end_len 超过整段长度时会被钳回
+ * 各 1 个码点），留着就等于屏幕画一条、存下去另一条。
+ */
 export function isValidLiaison(link: LiaisonLink): boolean {
   return (
     isValidAnchor(link.start) &&
     isValidAnchor(link.end) &&
-    (link.end.token > link.start.token ||
-      (link.end.token === link.start.token &&
-        Math.min(...link.end.offsets) >= Math.min(...link.start.offsets) &&
-        Math.max(...link.end.offsets) >= Math.max(...link.start.offsets)))
+    link.end.start >= link.start.end
   );
 }
 
 /**
- * 把一个字母并入锚点：紧邻则扩展，否则重开一个单字母锚点。
- * 再点已选中的字母则收回到该字母，给一个「点错了就地重来」的出口。
+ * 把一个字母并入锚点：连同中间的空隙一并填满，跨词也照填。
+ *
+ * 点已经选中的字母则收回到该字母，给一个「点错了就地重来」的出口——不这样的话
+ * 区间只进不退，选歪了就只能按「重选」从头来。
  */
 export function extendAnchor(
   anchor: LiaisonAnchor,
-  offset: number
+  letter: LiaisonAnchor
 ): LiaisonAnchor {
-  const sorted = [...anchor.offsets].sort((a, b) => a - b);
-  const first = sorted[0]!;
-  const last = sorted[sorted.length - 1]!;
-  if (offset === first - 1) return { ...anchor, offsets: [offset, ...sorted] };
-  if (offset === last + 1) return { ...anchor, offsets: [...sorted, offset] };
-  return { ...anchor, offsets: [offset] };
+  if (letter.start >= anchor.start && letter.end <= anchor.end) return letter;
+  return {
+    start: Math.min(anchor.start, letter.start),
+    end: Math.max(anchor.end, letter.end)
+  };
 }
 
 /**
@@ -370,14 +322,13 @@ export function tokenize(text: string): Token[] {
  * 各自的宽度——后端已为此加了 start_len / end_len，多字母锚点因此能完整往返。
  */
 function liaisonRange(
-  tokens: Token[],
+  length: number,
   link: LiaisonLink
 ):
   | { start: number; end: number; start_len: number; end_len: number }
   | undefined {
-  const start = anchorRange(tokens, link.start);
-  const end = anchorRange(tokens, link.end);
-  if (!start || !end || end.end <= start.start) return undefined;
+  const { start, end } = link;
+  if (!isValidLiaison(link) || end.end > length) return undefined;
   return {
     start: start.start,
     end: end.end,
@@ -415,7 +366,7 @@ export function marksToAnnotations(
   }
 
   for (const link of marks.liaisons) {
-    const range = liaisonRange(tokens, link);
+    const range = liaisonRange(length, link);
     if (!range) continue;
     annotations.push({ type: "liaison", ...range });
   }
@@ -440,6 +391,10 @@ export function marksToAnnotations(
  */
 export function annotationsToMarks(value: RichTextV2): MarkState {
   const tokens = tokenize(value.text);
+  const points = Array.from(value.text);
+  /* 锚点整段压在空白上说明这条数据与正文对不上，硬凑一个锚点只会画错。 */
+  const coversLetter = (anchor: LiaisonAnchor) =>
+    points.slice(anchor.start, anchor.end).some((point) => !/\s/u.test(point));
   let roles: RoleUnit[] = [];
   const liaisons: LiaisonLink[] = [];
   const pauses: Record<number, number> = {};
@@ -470,20 +425,13 @@ export function annotationsToMarks(value: RichTextV2): MarkState {
        * 这样三分类落地之前存的老数据仍读得回来。
        */
       const spans = liaisonAnchorSpans(annotation);
-      const start = widenAnchor(
-        tokens,
-        offsetToAnchor(tokens, spans.start.start),
-        spans.start.start,
-        spans.start.end - spans.start.start
-      );
-      const end = widenAnchor(
-        tokens,
-        offsetToAnchor(tokens, spans.end.start),
-        spans.end.start,
-        spans.end.end - spans.end.start
-      );
-      if (start && end && isValidLiaison({ start, end })) {
-        liaisons.push({ start, end });
+      const link = { start: spans.start, end: spans.end };
+      if (
+        isValidLiaison(link) &&
+        coversLetter(link.start) &&
+        coversLetter(link.end)
+      ) {
+        liaisons.push(link);
       }
     } else if (annotation.type === "pause") {
       const gap = tokens.findIndex(
@@ -524,22 +472,34 @@ export function remapMarks(
     if (gapSurvives(gap)) pauses[gap] = durationMs;
   }
 
-  // 连读两端所在的词都没被改写，且字母还在词长之内，这条连线才留得住。
-  const anchorSurvives = (anchor: LiaisonAnchor) => {
-    if (!survives(anchor.token)) return false;
-    const length = Array.from(after[anchor.token]!.text).length;
-    return anchor.offsets.every((offset) => offset < length);
+  /*
+   * 连读两端记的是绝对区间，跟着这次编辑挪：改动段之前的原样留着，之后的整体
+   * 平移。压在改动段上的那一端已经不是原来那几个字母了，整条丢掉让人重标——
+   * 与其把弧线留在一处它不再指向的文字上，不如让它消失。
+   */
+  const { cutStart, cutEnd, delta } = editedWordWindow(previousText, nextText);
+  const shiftAnchor = (anchor: LiaisonAnchor): LiaisonAnchor | undefined => {
+    if (anchor.end <= cutStart) return anchor;
+    if (anchor.start >= cutEnd) {
+      return { start: anchor.start + delta, end: anchor.end + delta };
+    }
+    return undefined;
   };
+
+  const liaisons: LiaisonLink[] = [];
+  for (const link of marks.liaisons) {
+    const start = shiftAnchor(link.start);
+    const end = shiftAnchor(link.end);
+    if (!start || !end) continue;
+    const shifted = { start, end };
+    // 两端之间新插入了换行：这条连读在 wire 上已经非法，留着会卡住回写。
+    if (crossesParagraph(nextText, shifted)) continue;
+    liaisons.push(shifted);
+  }
 
   return {
     roles,
-    liaisons: marks.liaisons.filter(
-      (link) =>
-        anchorSurvives(link.start) &&
-        anchorSurvives(link.end) &&
-        // 两词之间新插入了换行：这条连读在 wire 上已经非法，留着会卡住回写。
-        !crossesParagraph(nextText, after, link)
-    ),
+    liaisons,
     pauses,
     passthrough: remapPassthrough(previousText, nextText, marks.passthrough)
   };
@@ -578,6 +538,32 @@ function editWindow(
   };
 }
 
+/**
+ * 一次编辑作废掉的那一段（旧坐标）与改动之后的位移。
+ *
+ * 在 editWindow 的基础上把改动段撑到整词：把 centre 改成 middle，按字符比对只有
+ * 末尾的 e 没动，可那已经是另一个词了，压在上面的标注整体作废才说得通。
+ */
+function editedWordWindow(
+  previousText: string,
+  nextText: string
+): { cutStart: number; cutEnd: number; delta: number } {
+  const { prefix, changedEnd, delta } = editWindow(previousText, nextText);
+  const before = Array.from(previousText);
+  const isWordChar = (index: number) =>
+    index >= 0 && index < before.length && !/\s/u.test(before[index]!);
+
+  let cutStart = prefix;
+  if (isWordChar(cutStart - 1) && isWordChar(cutStart)) {
+    while (isWordChar(cutStart - 1)) cutStart -= 1;
+  }
+  let cutEnd = changedEnd;
+  if (isWordChar(cutEnd - 1) && isWordChar(cutEnd)) {
+    while (isWordChar(cutEnd)) cutEnd += 1;
+  }
+  return { cutStart, cutEnd, delta };
+}
+
 /** 去掉区间两端的空白码点：裁切后留下的半截单元不该带着一个空格。 */
 function trimUnit(text: string[], unit: RoleUnit): RoleUnit | undefined {
   let { start, end } = unit;
@@ -601,20 +587,8 @@ function remapRoleUnits(
   units: RoleUnit[]
 ): RoleUnit[] {
   if (previousText === nextText) return units;
-  const { prefix, changedEnd, delta } = editWindow(previousText, nextText);
-  const before = Array.from(previousText);
+  const { cutStart, cutEnd, delta } = editedWordWindow(previousText, nextText);
   const after = Array.from(nextText);
-  const isWordChar = (index: number) =>
-    index >= 0 && index < before.length && !/\s/u.test(before[index]!);
-
-  let cutStart = prefix;
-  if (isWordChar(cutStart - 1) && isWordChar(cutStart)) {
-    while (isWordChar(cutStart - 1)) cutStart -= 1;
-  }
-  let cutEnd = changedEnd;
-  if (isWordChar(cutEnd - 1) && isWordChar(cutEnd)) {
-    while (isWordChar(cutEnd)) cutEnd += 1;
-  }
 
   const kept: RoleUnit[] = [];
   for (const unit of units) {
