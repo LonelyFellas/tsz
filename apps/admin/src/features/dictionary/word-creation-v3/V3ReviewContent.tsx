@@ -1,4 +1,5 @@
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
+import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import {
   CheckCircleFilled,
   ReadOutlined,
@@ -7,11 +8,7 @@ import {
 import { Card, Collapse, Empty, Flex, Tag, Typography } from "antd";
 import type { AdminWordV3 } from "@tsz/types";
 import type { ReactNode } from "react";
-import {
-  dialectLabel,
-  partOfSpeechLabel,
-  pronunciationStyleLabel
-} from "./presentation";
+import { dialectLabel, pronunciationStyleLabel } from "./presentation";
 import { buildV3ReviewModel } from "./reviewModel";
 import { V3MeaningsPreview } from "./V3MeaningsPreview";
 import "./v3-preview.css";
@@ -24,6 +21,7 @@ interface Props {
 
 function FormsReview({ word }: { word: AdminWordV3 }) {
   const formTypeLabel = useFormTypeLabel();
+  const partOfSpeechLabel = usePartOfSpeechLabel();
   if (word.forms.pos.length === 0) {
     return <Empty description="暂无词形与发音" />;
   }

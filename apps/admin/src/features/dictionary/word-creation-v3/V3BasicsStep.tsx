@@ -1,4 +1,5 @@
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
+import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import {
   CheckCircleFilled,
   InfoCircleOutlined,
@@ -28,7 +29,7 @@ import {
 } from "antd";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "./components/V3ProductProgressList";
-import { partOfSpeechLabel, pronunciationStyleLabel } from "./presentation";
+import { pronunciationStyleLabel } from "./presentation";
 import "../word-creation/word-creation.css";
 import { buildV3ProductProgress, v3ProductProgressBadge } from "./readiness";
 import "./v3-layout.css";
@@ -209,6 +210,7 @@ function SuggestedForm({
 }
 
 function DictionarySuggestions({ word }: { word: AdminWordV3 }) {
+  const partOfSpeechLabel = usePartOfSpeechLabel();
   if (word.forms.pos.length === 0) {
     return (
       <Card
@@ -264,6 +266,7 @@ function V3BasicsContent({
   entryLabel: string;
   onContinue: () => void;
 }) {
+  const partOfSpeechLabel = usePartOfSpeechLabel();
   const suggestedPos = word.forms.pos.map((pos) => ({
     key: pos.pos_id,
     label: partOfSpeechLabel(pos.pos)

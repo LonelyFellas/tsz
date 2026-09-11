@@ -2821,14 +2821,16 @@ it("目录自定义词形可展示，改名后保留词形编码", async () => {
       <Harness initial={initial} />
     </FormTypeLabelsProvider>
   );
-  expect((await screen.findAllByText("自定义词形")).length).toBeGreaterThan(0);
+  // 业务页面展示的是「简洁显示」，正式中文名只出现在词性配置页。
+  expect((await screen.findAllByText("自定义")).length).toBeGreaterThan(0);
+  expect(screen.queryByText("自定义词形")).toBeNull();
   rerender(
-    <FormTypeLabelsProvider items={[{ ...item, name_zh: "改名词形" }]}>
+    <FormTypeLabelsProvider items={[{ ...item, short_name_zh: "改名词形" }]}>
       <Harness initial={initial} />
     </FormTypeLabelsProvider>
   );
   expect((await screen.findAllByText("改名词形")).length).toBeGreaterThan(0);
-  expect(screen.queryByText("自定义词形")).toBeNull();
+  expect(screen.queryByText("自定义")).toBeNull();
   expect(
     validateFormsContent(initial, "save", {
       allowedFormTypes: () => ["custom_variant"]

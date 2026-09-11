@@ -12,6 +12,11 @@ vi.mock("@/features/dictionary/part-of-speech/FormTypeLabels", () => ({
     children
 }));
 
+vi.mock("@/features/dictionary/part-of-speech/PartOfSpeechLabels", () => ({
+  DictionaryPartOfSpeechLabels: ({ children }: { children: React.ReactNode }) =>
+    children
+}));
+
 vi.mock("@/features/auth/AdminRouteGuard", () => ({
   AdminRouteGuard: ({ children }: { children: React.ReactNode }) => children
 }));

@@ -7,6 +7,7 @@ import type {
   WordPosTag
 } from "@tsz/types";
 
+// 业务页面一律展示「简洁显示」，正式中文名只出现在词性配置页。
 export interface PartOfSpeechLookup {
   formTypeNames: ReadonlyMap<string, string>;
   items: PartOfSpeechCatalogItem[];
@@ -62,14 +63,14 @@ export function partOfSpeechLabel(
   lookup: PartOfSpeechLookup,
   code: WordPosTag
 ): string {
-  return lookup.byCode.get(code)?.name_zh ?? code;
+  return lookup.byCode.get(code)?.short_name_zh ?? code;
 }
 
 export function subPartOfSpeechLabel(
   lookup: PartOfSpeechLookup,
   code: SubPartOfSpeechCode
 ): string {
-  return lookup.subPartByCode.get(code)?.name_zh ?? code;
+  return lookup.subPartByCode.get(code)?.short_name_zh ?? code;
 }
 
 export function availablePartOfSpeechOptions(
@@ -79,7 +80,7 @@ export function availablePartOfSpeechOptions(
   const usedCodes = new Set(used);
   return lookup.items
     .filter((item) => !usedCodes.has(item.code))
-    .map((item) => ({ value: item.code, label: item.name_zh }));
+    .map((item) => ({ value: item.code, label: item.short_name_zh }));
 }
 
 export function subPartOfSpeechOptions(
@@ -88,7 +89,7 @@ export function subPartOfSpeechOptions(
 ) {
   return (lookup.subPartsByPosCode.get(posCode) ?? []).map((item) => ({
     value: item.code,
-    label: item.name_zh
+    label: item.short_name_zh
   }));
 }
 

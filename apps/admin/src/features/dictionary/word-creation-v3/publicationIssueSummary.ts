@@ -6,7 +6,7 @@ import type {
 } from "@tsz/types";
 import {
   formTypeLabel as fallbackFormTypeLabel,
-  partOfSpeechLabel
+  partOfSpeechLabel as fallbackPartOfSpeechLabel
 } from "./presentation";
 import { v3IssueMessage } from "./presentationErrors";
 
@@ -147,7 +147,8 @@ function meaningPosOwnsIssue(
 
 function positionForIssue(
   word: AdminWordV3,
-  issue: V3DraftValidationIssue
+  issue: V3DraftValidationIssue,
+  posLabel = fallbackPartOfSpeechLabel
 ): Omit<V3PublicationIssuePosition, "by_step" | "issues"> {
   const nodeIds = issueNodeIds(issue);
   const pos = word.forms.pos.find(
@@ -160,7 +161,7 @@ function positionForIssue(
     return {
       key: `pos:${pos.pos_id}`,
       testId: `issue-pos-${pos.pos}`,
-      label: partOfSpeechLabel(pos.pos),
+      label: posLabel(pos.pos),
       pos_id: pos.pos_id
     };
   }
@@ -217,11 +218,12 @@ function issueScopes(
 
 function groupIssuesByPosition(
   word: AdminWordV3,
-  issues: readonly V3DraftValidationIssue[]
+  issues: readonly V3DraftValidationIssue[],
+  posLabel = fallbackPartOfSpeechLabel
 ) {
   const groups = new Map<string, V3PublicationIssuePosition>();
   for (const issue of issues) {
-    const position = positionForIssue(word, issue);
+    const position = positionForIssue(word, issue, posLabel);
     const current = groups.get(position.key);
     if (current) {
       current.issues.push(issue);
@@ -242,7 +244,8 @@ function groupIssuesByPosition(
 export function buildV3PublicationIssueSummary(
   word: AdminWordV3,
   issues: readonly V3DraftValidationIssue[],
-  formTypeLabel = fallbackFormTypeLabel
+  formTypeLabel = fallbackFormTypeLabel,
+  posLabel = fallbackPartOfSpeechLabel
 ): V3PublicationIssueSummary {
   const positionedIssues = issues.map((issue) =>
     issueWithResolvedPosition(word, issue)
@@ -255,7 +258,7 @@ export function buildV3PublicationIssueSummary(
   }
   return {
     total: issues.length,
-    positions: groupIssuesByPosition(word, positionedIssues),
+    positions: groupIssuesByPosition(word, positionedIssues, posLabel),
     types: [...types].map(([code, groupedIssues]) => ({
       code,
       label: v3IssueMessage(groupedIssues[0]!),

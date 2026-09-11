@@ -1,4 +1,5 @@
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
+import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { HttpError } from "@tsz/api-client";
 import type {
   AdminWordPublicationAny,
@@ -30,7 +31,6 @@ import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import {
   definitionModeLabel,
   dialectLabel,
-  partOfSpeechLabel,
   pronunciationStyleLabel,
   relationLabel,
   sentenceLinkRoleLabel
@@ -402,6 +402,7 @@ function PublicationSnapshotBody({
   publication: AdminWordPublicationAny;
 }) {
   const formTypeLabel = useFormTypeLabel();
+  const partOfSpeechLabel = usePartOfSpeechLabel();
   const snapshot = snapshotBody(publication);
   return (
     <Card

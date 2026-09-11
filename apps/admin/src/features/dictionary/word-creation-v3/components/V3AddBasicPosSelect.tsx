@@ -40,7 +40,7 @@ export function V3AddBasicPosSelect({
       }}
       options={availableItems.map((item) => ({
         value: item.code,
-        label: item.name_zh
+        label: item.short_name_zh
       }))}
       placeholder="添加基本词性"
       style={{ width: 190 }}

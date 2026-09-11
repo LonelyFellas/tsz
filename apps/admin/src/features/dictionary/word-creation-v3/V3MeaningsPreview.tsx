@@ -11,11 +11,13 @@ import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import {
   definitionModeLabel,
   dialectLabel,
-  partOfSpeechLabel,
   relationLabel,
-  sentenceLinkRoleLabel,
-  subPartOfSpeechLabel
+  sentenceLinkRoleLabel
 } from "./presentation";
+import {
+  usePartOfSpeechLabel,
+  useSubPartOfSpeechLabel
+} from "../part-of-speech/PartOfSpeechLabels";
 
 function DefinitionText({ definition }: { definition: WordDefinitionV3 }) {
   if (
@@ -40,6 +42,8 @@ export function V3MeaningsPreview({
   word: AdminWordV3;
   embedded?: boolean;
 }) {
+  const partOfSpeechLabel = usePartOfSpeechLabel();
+  const subPartOfSpeechLabel = useSubPartOfSpeechLabel();
   const posCodeById = new Map(
     word.forms.pos.map((pos) => [pos.pos_id, pos.pos] as const)
   );
