@@ -2138,6 +2138,12 @@
   color: #2563eb;
 }
 
+/* 已绑定词义的文案要占满剩余宽度，删除菜单才落在行尾，与手敲那行对齐。 */
+.word-relation-bound-gloss {
+  flex: 1;
+  min-width: 0;
+}
+
 .word-relation-sense .ant-select-selection-item,
 .word-relation-sense .ant-select-selection-placeholder {
   overflow: hidden;
