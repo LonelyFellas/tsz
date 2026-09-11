@@ -173,52 +173,6 @@ export function V3PronunciationList({
                   >
                     <div className="word-pronunciation-actions">
                       <Button
-                        aria-label={`删除第 ${index + 1} 条发音`}
-                        disabled={fields.length === 1}
-                        icon={<MinusCircleOutlined />}
-                        onClick={() => {
-                          remove(index);
-                          onChange(
-                            updateVariantPronunciations(
-                              content,
-                              variant.id,
-                              (items) =>
-                                items.filter(
-                                  (item) => item.id !== pronunciation.id
-                                )
-                            )
-                          );
-                        }}
-                        size="small"
-                        type="text"
-                      />
-                      <Button
-                        aria-label={`在第 ${index + 1} 条后新增发音`}
-                        icon={<PlusCircleOutlined />}
-                        onClick={() => {
-                          const next: WordPronunciationV3 = {
-                            id: idFactory(),
-                            dict_phonetic: "",
-                            actual_pron: "",
-                            style: "normal"
-                          };
-                          add(next, index + 1);
-                          onChange(
-                            updateVariantPronunciations(
-                              content,
-                              variant.id,
-                              (items) => [
-                                ...items.slice(0, index + 1),
-                                next,
-                                ...items.slice(index + 1)
-                              ]
-                            )
-                          );
-                        }}
-                        size="small"
-                        type="text"
-                      />
-                      <Button
                         aria-label={`拖动第 ${index + 1} 条发音`}
                         className="word-pronunciation-drag-handle"
                         disabled={fields.length < 2}
@@ -269,6 +223,55 @@ export function V3PronunciationList({
                             ? "拖动排序，也可使用上下方向键"
                             : "仅一条发音"
                         }
+                        size="small"
+                        type="text"
+                      />
+                      <Button
+                        aria-label={`在第 ${index + 1} 条后新增发音`}
+                        icon={<PlusCircleOutlined />}
+                        onClick={() => {
+                          const next: WordPronunciationV3 = {
+                            id: idFactory(),
+                            dict_phonetic: "",
+                            actual_pron: "",
+                            style: "normal"
+                          };
+                          add(next, index + 1);
+                          onChange(
+                            updateVariantPronunciations(
+                              content,
+                              variant.id,
+                              (items) => [
+                                ...items.slice(0, index + 1),
+                                next,
+                                ...items.slice(index + 1)
+                              ]
+                            )
+                          );
+                        }}
+                        size="small"
+                        type="text"
+                      />
+                      <Button
+                        aria-label={`删除第 ${index + 1} 条发音`}
+                        className="word-pronunciation-remove"
+                        danger
+                        disabled={fields.length === 1}
+                        icon={<MinusCircleOutlined />}
+                        onClick={() => {
+                          remove(index);
+                          onChange(
+                            updateVariantPronunciations(
+                              content,
+                              variant.id,
+                              (items) =>
+                                items.filter(
+                                  (item) => item.id !== pronunciation.id
+                                )
+                            )
+                          );
+                        }}
+                        size="small"
                         type="text"
                       />
                     </div>
@@ -318,10 +321,7 @@ export function V3PronunciationList({
                           </Typography.Text>
                         ) : null}
                       </label>
-                      <div
-                        className="word-pronunciation-row"
-                        style={{ alignItems: "start" }}
-                      >
+                      <div className="word-pronunciation-row">
                         <Typography.Text className="word-pronunciation-label">
                           字典音标
                         </Typography.Text>
@@ -408,7 +408,7 @@ export function V3PronunciationList({
                           ) : null}
                         </div>
                       </div>
-                      <label className="word-pronunciation-row">
+                      <div className="word-pronunciation-row">
                         <Typography.Text className="word-pronunciation-label">
                           实际发音
                         </Typography.Text>
@@ -452,7 +452,7 @@ export function V3PronunciationList({
                             )}
                           </Typography.Text>
                         ) : null}
-                      </label>
+                      </div>
                     </div>
                   </div>
                 );

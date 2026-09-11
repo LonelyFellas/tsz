@@ -60,7 +60,7 @@
    这里只留 8px，合计 24px。 */
 .v3-forms-step > .word-step-heading,
 .v3-meanings-v2 > .word-step-heading {
-  margin-bottom: 0;
+  margin-bottom: 8px;
 }
 
 /* 语义区间卡片挪到步骤顶层后，遗留的 14px margin 会与容器 gap 叠成 30px。 */
@@ -243,6 +243,12 @@
    表头、行、操作列一起继承；语法结构行在 section 之外单独配置相同列宽，语义区间沿用自身布局。 */
 .v3-meanings-v2 .word-sense-section {
   --word-ops-col: 56px;
+}
+
+/* 容器的 8px gap 同时管着「等级那排 → 第一个分组」和「分组之间」，两层读起来一样平。
+   补一档给前者，让卡片直属内容与子分组分得开。 */
+.v3-meanings-v2 .word-sense-meta-grid + .word-sense-section {
+  margin-top: 8px;
 }
 
 /* 横排后操作列只有 24px 高，而行是 align-items: start：撑到 32px 让图标与同行控件共一条中心线。 */

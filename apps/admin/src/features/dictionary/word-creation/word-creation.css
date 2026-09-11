@@ -139,7 +139,7 @@
 }
 
 .dialect-dot-common {
-  background: #22a06b;
+  background: #566e62;
 }
 
 .word-summary-language,
@@ -240,7 +240,7 @@
 
 .word-step-number {
   display: block;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
   color: #2563eb;
   font-size: 12px;
   font-weight: 800;
@@ -249,7 +249,7 @@
 
 .word-step-description {
   max-width: 920px;
-  margin-top: 4px;
+  margin-top: 8px;
   margin-bottom: 0 !important;
   color: var(--word-muted);
   line-height: 1.7;
@@ -735,7 +735,7 @@
 .word-pronunciation-editor {
   position: relative;
   display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr);
   gap: 8px;
   align-items: center;
   margin-top: 12px;
@@ -752,8 +752,9 @@
 
 .word-pronunciation-actions {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 0;
   min-width: 0;
 }
@@ -763,7 +764,8 @@
   padding-inline: 0;
 }
 
-.word-pronunciation-actions .ant-btn:not(:disabled) {
+.word-pronunciation-actions
+  .ant-btn:not(:disabled):where(:not(.word-pronunciation-remove)) {
   color: var(--word-ink);
 }
 
@@ -875,15 +877,15 @@
 .word-pronunciation-fields {
   position: relative;
   display: grid;
-  gap: 8px;
+  gap: 10px;
   min-width: 0;
   padding-left: 18px;
 }
 
 .word-pronunciation-fields::before {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  top: -3px;
+  bottom: -3px;
   left: 0;
   width: 10px;
   content: "";
@@ -894,8 +896,8 @@
 
 .word-pronunciation-row {
   display: grid;
-  grid-template-columns: 76px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 12px;
   align-items: center;
   min-width: 0;
 }
@@ -1077,7 +1079,7 @@
 
 .word-form-matrix-shared-header-common {
   grid-column: 1 / -1;
-  background: #4f6f61;
+  background: #566e62;
 }
 
 .word-form-type-cell {
@@ -1304,7 +1306,7 @@
 }
 
 .word-grammar-card > .ant-card-body {
-  padding: 4px 14px 12px;
+  padding: 10px 14px;
 }
 
 .word-grammar-add {
@@ -1661,7 +1663,7 @@
   align-items: center;
   justify-content: space-between;
   min-height: 40px;
-  margin: 0 -12px 2px;
+  margin: 0 -12px 8px;
   padding: 8px 12px;
   background: #f4f6f8;
   border-bottom: 1px solid #e3e7ed;
@@ -2597,6 +2599,8 @@
   }
 
   .word-pronunciation-actions {
+    flex-direction: row;
+    align-items: center;
     justify-content: flex-end;
   }
 

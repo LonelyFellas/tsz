@@ -4,9 +4,12 @@ import {
   CaretDownFilled,
   CaretUpFilled,
   DeleteOutlined,
+  DownCircleOutlined,
   DownOutlined,
   EllipsisOutlined,
-  PlusOutlined,
+  MinusCircleOutlined,
+  PlusCircleOutlined,
+  UpCircleOutlined,
   UpOutlined
 } from "@ant-design/icons";
 import {
@@ -255,11 +258,11 @@ export function V3FormGroupCard({
       formTypeOptions,
       membershipCount: formMembershipCount,
       actions: (
-        <Flex className="v3-membership-actions" gap={2} wrap>
+        <div className="v3-membership-actions">
           <Button
             aria-label={`上移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
             disabled={index === 0}
-            icon={<UpOutlined />}
+            icon={<UpCircleOutlined />}
             onClick={() => {
               const nextOrder = [...orderedIds];
               [nextOrder[index - 1], nextOrder[index]] = [
@@ -274,7 +277,7 @@ export function V3FormGroupCard({
           <Button
             aria-label={`下移变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
             disabled={index === group.members.length - 1}
-            icon={<DownOutlined />}
+            icon={<DownCircleOutlined />}
             onClick={() => {
               const nextOrder = [...orderedIds];
               [nextOrder[index], nextOrder[index + 1]] = [
@@ -288,7 +291,7 @@ export function V3FormGroupCard({
           />
           <Button
             aria-label={`在${formPositionLabel} 下方添加同类型词形`}
-            icon={<PlusOutlined />}
+            icon={<PlusCircleOutlined />}
             onClick={() => {
               const result = addConcreteFormAfterMembership(
                 content,
@@ -306,7 +309,7 @@ export function V3FormGroupCard({
             aria-label={`从变化组 ${groupIndex + 1} 移除词形 ${index + 1}`}
             danger
             disabled={lastRequiredForm || member.id === soleBaseMembershipId}
-            icon={<DeleteOutlined />}
+            icon={<MinusCircleOutlined />}
             onClick={() => {
               if (placeholders.has(form.id)) {
                 setRemovedTypes((types) => [...types, form.form_type]);
@@ -331,7 +334,7 @@ export function V3FormGroupCard({
             }
             type="text"
           />
-        </Flex>
+        </div>
       )
     };
   };
