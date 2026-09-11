@@ -73,7 +73,7 @@
 }
 
 .word-creation-back:hover {
-  color: #0071e3 !important;
+  color: #2053ff !important;
   background: #eef6ff !important;
 }
 
@@ -165,7 +165,7 @@
 }
 
 .word-summary-pending-detection {
-  color: #0071e3;
+  color: #2053ff;
   font-weight: 600;
 }
 
@@ -1680,7 +1680,7 @@
 .word-sense-section-title.is-interactive:focus-visible {
   position: relative;
   z-index: 1;
-  outline: 2px solid #0071e3;
+  outline: 2px solid #2053ff;
   outline-offset: -2px;
 }
 
@@ -1803,7 +1803,7 @@
   display: inline-flex;
   align-items: center;
   gap: 3px;
-  color: #0071e3;
+  color: #2053ff;
   font-size: 12px;
   white-space: nowrap;
 }
@@ -1814,7 +1814,7 @@
   height: 20px;
   color: #fff;
   font-size: 12px;
-  background: #0071e3;
+  background: #2053ff;
   border-radius: 6px;
   place-items: center;
 }

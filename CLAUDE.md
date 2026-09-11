@@ -8,7 +8,7 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 ## 布局
 
 - `apps/web` — C 端，Next App Router + tailwind + `@tsz/ui`。对体验/性能/SEO 有硬要求。
-- `apps/admin` — 平台后台，Vite + React Router + TanStack Query + **antd v6**（ConfigProvider 品牌蓝 #0071e3）。
+- `apps/admin` — 平台后台，Vite + React Router + TanStack Query + **antd v6**（ConfigProvider 品牌蓝 #2053FF，取自品牌规范的克莱因蓝）。
 - `packages/types` — 后端 wire 类型镜像；`packages/shared` — 共享逻辑（含鉴权内核）；
   `packages/api-client` — 请求层；`packages/ui` — web 专用组件库；`packages/config` — 共享配置。
 - `e2e` — Playwright（`@tsz/e2e`）。

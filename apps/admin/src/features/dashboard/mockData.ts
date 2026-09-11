@@ -120,10 +120,10 @@ export const DICTIONARY_TREND: TimePoint[] = [
   { label: "第6周", value: 100 }
 ];
 
-/** 图表配色（与品牌蓝 #0071e3 一脉）。集中一处便于统一调整。 */
+/** 图表配色（与品牌蓝 #2053FF 一脉）。集中一处便于统一调整。 */
 export const CHART_COLORS = {
-  brand: "#0071e3",
-  grant: "#0071e3",
+  brand: "#2053FF",
+  grant: "#2053FF",
   deduct: "#fa8c16",
   progress: ["#52c41a", "#faad14", "#d9d9d9"],
   axis: "#8c8c8c",
