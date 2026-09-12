@@ -652,11 +652,6 @@ export interface EntryLifecycleBatchInput {
   confirmed_surface_match_token?: string;
 }
 
-export interface EntryLifecycleBatchResponse {
-  words: AdminWordV2[];
-  affected: number;
-}
-
 /** 引用来源分类；计数不按类型拆分，但预览项标明来源便于管理员判断。 */
 export type EntryReferenceKind =
   | "relation"

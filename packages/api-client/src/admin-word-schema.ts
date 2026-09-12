@@ -1,28 +1,20 @@
 import type { EntryAnnotationResponse } from "@tsz/types";
 import type {
-  AdminWordAnyEnvelope,
-  AdminWordDraftAnyEnvelope,
-  AdminWordDraftV2Envelope,
+  AdminWordV3Envelope,
+  AdminWordDraftV3Envelope,
   AdminWordListResponseAny,
   AdminWordPublicationEnvelope,
   AdminWordPublicationListResponse,
-  AdminWordV2Envelope,
-  AdminWordV2ListResponse,
   AdminWordV3,
-  DetectLexiconResponseAny,
   DetectLexiconSurfaceResponseV3,
-  DraftValidationIssueAny,
-  DraftValidationResponseAny,
+  V3DraftValidationIssue,
   DraftValidationResponseV3,
   EntryDeleteBatchResponse,
   EntryLifecycleBatchResponse,
-  EntryLifecycleBatchResponseAny,
-  FormsImpactResponseAny,
   FormsImpactResponseV3,
   ResolveSentenceTargetsV3Response,
   SearchComponentTargetsV3Response,
   RelatedSearchResponseAny,
-  SurfaceMatchPageAny,
   SurfaceMatchPageV3
 } from "@tsz/types";
 import {
@@ -32,15 +24,11 @@ import {
   type RuntimeSchemaRoot
 } from "./runtime-schema";
 
-type AdminWordSchemaVersion = 2 | 3;
+type AdminWordSchemaVersion = 3;
 type SupportedSchemaVersions = readonly AdminWordSchemaVersion[];
 
-export const SUPPORTED_ADMIN_WORD_SCHEMA_VERSIONS = Object.freeze([2] as const);
 export const SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS = Object.freeze([
   3
-] as const);
-export const SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS = Object.freeze([
-  2, 3
 ] as const);
 
 /**
@@ -69,7 +57,7 @@ export class UnsupportedAdminWordSchemaVersionError extends Error {
   constructor(
     receivedSchemaVersion: unknown,
     readonly response_path: string,
-    readonly supported_schema_versions: SupportedSchemaVersions = SUPPORTED_ADMIN_WORD_SCHEMA_VERSIONS
+    readonly supported_schema_versions: SupportedSchemaVersions = SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS
   ) {
     super("当前前端不支持该词条数据版本，请升级后重试");
     this.name = "UnsupportedAdminWordSchemaVersionError";
@@ -274,43 +262,6 @@ function assertRuntimeContract(
   addLegacyAssociationAliases(value);
 }
 
-/** 旧 Admin UI 保持 V2-only；这里只增加版本防火墙，不改变既有 wire 消费。 */
-export function decodeAdminWordV2Envelope(value: unknown): AdminWordV2Envelope {
-  const word = isRecord(value) ? value.word : undefined;
-  assertSupportedSchemaVersion(
-    word,
-    "word.schema_version",
-    SUPPORTED_ADMIN_WORD_SCHEMA_VERSIONS
-  );
-  return value as AdminWordV2Envelope;
-}
-
-/** GET 详情的 V2 schema guard；retired slots 的完整 shape 仍由正式契约负责。 */
-export function decodeAdminWordDraftV2Envelope(
-  value: unknown
-): AdminWordDraftV2Envelope {
-  decodeAdminWordV2Envelope(value);
-  return value as AdminWordDraftV2Envelope;
-}
-
-/** 任一列表行版本未知时拒绝整个 V2-only 响应，不过滤后伪装成功。 */
-export function decodeAdminWordV2ListResponse(
-  value: unknown
-): AdminWordV2ListResponse {
-  const words = isRecord(value) ? value.words : undefined;
-  assertVersionedArray(words, "words", SUPPORTED_ADMIN_WORD_SCHEMA_VERSIONS);
-  return value as AdminWordV2ListResponse;
-}
-
-/** 旧批量命令同样不能让未知版本词条进入 V2 UI 状态。 */
-export function decodeEntryLifecycleBatchV2Response(
-  value: unknown
-): EntryLifecycleBatchResponse {
-  const words = isRecord(value) ? value.words : undefined;
-  assertVersionedArray(words, "words", SUPPORTED_ADMIN_WORD_SCHEMA_VERSIONS);
-  return value as EntryLifecycleBatchResponse;
-}
-
 /**
  * 批量永久删除只回 { affected }：词条已不存在，没有实体可校验版本。
  * 但仍要挡住结构漂移——affected 不是非负整数就说明契约变了，
@@ -339,7 +290,7 @@ export function decodeEntryDeleteBatchResponse(
 
 export function decodeAdminWordV3Envelope(
   value: unknown
-): AdminWordAnyEnvelope & { word: AdminWordV3 } {
+): AdminWordV3Envelope & { word: AdminWordV3 } {
   const word = isRecord(value) ? value.word : undefined;
   assertSupportedSchemaVersion(
     word,
@@ -347,60 +298,52 @@ export function decodeAdminWordV3Envelope(
     SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS
   );
   assertRuntimeContract("AdminWordV3", word, "$.word");
-  assertRuntimeContract("AdminWordAnyEnvelope", value);
-  return value as AdminWordAnyEnvelope & { word: AdminWordV3 };
+  assertRuntimeContract("AdminWordV3Envelope", value);
+  return value as AdminWordV3Envelope & { word: AdminWordV3 };
 }
 
 export function decodeAdminWordAnyEnvelope(
   value: unknown
-): AdminWordAnyEnvelope {
+): AdminWordV3Envelope {
   const word = isRecord(value) ? value.word : undefined;
   assertSupportedSchemaVersion(
     word,
     "word.schema_version",
-    SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS
+    SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS
   );
-  assertRuntimeContract("AdminWordAnyEnvelope", value);
-  return value as AdminWordAnyEnvelope;
+  assertRuntimeContract("AdminWordV3Envelope", value);
+  return value as AdminWordV3Envelope;
 }
 
 export function decodeAdminWordDraftAnyEnvelope(
   value: unknown
-): AdminWordDraftAnyEnvelope {
+): AdminWordDraftV3Envelope {
   const word = isRecord(value) ? value.word : undefined;
   assertSupportedSchemaVersion(
     word,
     "word.schema_version",
-    SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS
+    SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS
   );
-  assertRuntimeContract("AdminWordDraftAnyEnvelope", value);
-  return value as AdminWordDraftAnyEnvelope;
+  assertRuntimeContract("AdminWordDraftV3Envelope", value);
+  return value as AdminWordDraftV3Envelope;
 }
 
 export function decodeAdminWordAnyListResponse(
   value: unknown
 ): AdminWordListResponseAny {
   const words = isRecord(value) ? value.words : undefined;
-  assertVersionedArray(
-    words,
-    "words",
-    SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS
-  );
+  assertVersionedArray(words, "words", SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS);
   assertRuntimeContract("AdminWordListResponse", value);
   return value as AdminWordListResponseAny;
 }
 
 export function decodeEntryLifecycleBatchAnyResponse(
   value: unknown
-): EntryLifecycleBatchResponseAny {
+): EntryLifecycleBatchResponse {
   const words = isRecord(value) ? value.words : undefined;
-  assertVersionedArray(
-    words,
-    "words",
-    SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS
-  );
-  assertRuntimeContract("EntryLifecycleBatchResponseAny", value);
-  return value as EntryLifecycleBatchResponseAny;
+  assertVersionedArray(words, "words", SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS);
+  assertRuntimeContract("EntryLifecycleBatchResponse", value);
+  return value as EntryLifecycleBatchResponse;
 }
 
 function decodeVersionedRoot<T>(
@@ -410,7 +353,7 @@ function decodeVersionedRoot<T>(
   assertSupportedSchemaVersion(
     value,
     "schema_version",
-    SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS
+    SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS
   );
   assertRuntimeContract(rootName, value);
   return value as T;
@@ -431,52 +374,52 @@ function decodeV3VersionedRoot<T>(
 
 export function decodeDraftValidationResponseAny(
   value: unknown
-): DraftValidationResponseAny {
-  return decodeVersionedRoot("DraftValidationResponseAny", value);
+): DraftValidationResponseV3 {
+  return decodeVersionedRoot("DraftValidationResponseV3", value);
 }
 
 export function decodeDraftValidationResponseV3(
   value: unknown
 ): DraftValidationResponseV3 {
-  return decodeV3VersionedRoot("DraftValidationResponseAny", value);
+  return decodeV3VersionedRoot("DraftValidationResponseV3", value);
 }
 
 export function decodeFormsImpactResponseAny(
   value: unknown
-): FormsImpactResponseAny {
-  return decodeVersionedRoot("FormsImpactResponseAny", value);
+): FormsImpactResponseV3 {
+  return decodeVersionedRoot("FormsImpactResponseV3", value);
 }
 
 export function decodeFormsImpactResponseV3(
   value: unknown
 ): FormsImpactResponseV3 {
-  return decodeV3VersionedRoot("FormsImpactResponseAny", value);
+  return decodeV3VersionedRoot("FormsImpactResponseV3", value);
 }
 
-export function decodeSurfaceMatchPageAny(value: unknown): SurfaceMatchPageAny {
-  return decodeVersionedRoot("SurfaceMatchPageAny", value);
+export function decodeSurfaceMatchPageAny(value: unknown): SurfaceMatchPageV3 {
+  return decodeVersionedRoot("SurfaceMatchPageV3", value);
 }
 
 export function decodeSurfaceMatchPageV3(value: unknown): SurfaceMatchPageV3 {
-  return decodeV3VersionedRoot("SurfaceMatchPageAny", value);
+  return decodeV3VersionedRoot("SurfaceMatchPageV3", value);
 }
 
 export function decodeDetectLexiconResponseAny(
   value: unknown
-): DetectLexiconResponseAny {
-  return decodeVersionedRoot("DetectLexiconResponseAny", value);
+): DetectLexiconSurfaceResponseV3 {
+  return decodeVersionedRoot("DetectLexiconSurfaceResponseV3", value);
 }
 
 export function decodeDetectLexiconResponseV3(
   value: unknown
 ): DetectLexiconSurfaceResponseV3 {
-  return decodeV3VersionedRoot("DetectLexiconResponseAny", value);
+  return decodeV3VersionedRoot("DetectLexiconSurfaceResponseV3", value);
 }
 
 export function decodeDraftValidationIssueAny(
   value: unknown
-): DraftValidationIssueAny {
-  return decodeVersionedRoot("DraftValidationIssueAny", value);
+): V3DraftValidationIssue {
+  return decodeVersionedRoot("V3DraftValidationIssue", value);
 }
 
 export function decodeRelatedSearchResponseAny(
@@ -487,7 +430,7 @@ export function decodeRelatedSearchResponseAny(
     assertVersionedArray(
       results,
       "results",
-      SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS
+      SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS
     );
   }
   assertRuntimeContract("RelatedSearchResponse", value);
@@ -516,7 +459,7 @@ export function decodeAdminWordPublicationListResponse(
     assertVersionedArray(
       publications,
       "publications",
-      SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS
+      SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS
     );
   }
   assertRuntimeContract("AdminWordPublicationListResponse", value);
@@ -530,7 +473,7 @@ export function decodeAdminWordPublicationEnvelope(
   assertSupportedSchemaVersion(
     publication,
     "publication.schema_version",
-    SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS
+    SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS
   );
   assertRuntimeContract("AdminWordPublicationEnvelope", value);
   return value as AdminWordPublicationEnvelope;

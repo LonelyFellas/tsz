@@ -4,7 +4,6 @@ import type {
   EntryDeleteBatchInput,
   EntryLifecycleBatchInput,
   EntryLifecycleBatchResponse,
-  EntryLifecycleBatchResponseAny,
   EntryLifecycleInput
 } from "@tsz/types";
 import type { AdminWordListQuery } from "@tsz/types";
@@ -15,7 +14,7 @@ import {
   useQuery,
   useQueryClient
 } from "@tanstack/react-query";
-import { adminWordsAnyDataSource, adminWordsDataSource } from "./dataSource";
+import { adminWordsDataSource } from "./dataSource";
 
 export const wordKeys = {
   all: ["admin-words"] as const,
@@ -23,9 +22,7 @@ export const wordKeys = {
   list: (query: AdminWordListQuery) => [...wordKeys.lists(), query] as const,
   stats: () => [...wordKeys.all, "stats"] as const,
   detail: (id: string) => [...wordKeys.all, "detail", id] as const,
-  detailAny: (id: string) => [...wordKeys.all, "detail-any", id] as const,
-  relatedSearch: (q: string) => [...wordKeys.all, "related-search", q] as const,
-  relatedSearchV2: (
+  relatedSearch: (
     q: string,
     kind: "word" | "phrase" | undefined,
     matchMode: "exact" | "contains",
@@ -33,7 +30,7 @@ export const wordKeys = {
   ) =>
     [
       ...wordKeys.all,
-      "related-search-v2",
+      "related-search",
       q,
       kind,
       matchMode,
@@ -44,19 +41,9 @@ export const wordKeys = {
 export function useWordList(query: AdminWordListQuery) {
   return useQuery({
     queryKey: wordKeys.list(query),
-    queryFn: () => adminWordsAnyDataSource.listAny(query),
+    queryFn: () => adminWordsDataSource.list(query),
     // 翻页/改筛选时保留上一页数据渲染,避免表格闪空。
     placeholderData: keepPreviousData
-  });
-}
-
-export function useWordDetailAny(wordId: string, enabled = true) {
-  return useQuery({
-    queryKey: wordKeys.detailAny(wordId),
-    queryFn: () => adminWordsAnyDataSource.getAny(wordId),
-    enabled,
-    staleTime: 0,
-    gcTime: 0
   });
 }
 
@@ -78,55 +65,7 @@ export function useWordDetail(wordId: string, enabled = true) {
   });
 }
 
-/** 「添加关联词」弹窗搜索:回车才提交;弹窗关闭或空查询不发请求。 */
-export function useRelatedSearch(q: string, open: boolean) {
-  return useQuery({
-    queryKey: wordKeys.relatedSearch(q),
-    queryFn: () => adminWordsDataSource.relatedSearch(q),
-    enabled: open && q.trim() !== ""
-  });
-}
-
-export function useRelatedSearchV2(
-  q: string,
-  kind: "word" | "phrase" | undefined,
-  open: boolean
-) {
-  const normalizedQ = q.trim();
-  const enabled = open && normalizedQ !== "";
-  const exact = useInfiniteQuery({
-    queryKey: wordKeys.relatedSearchV2(normalizedQ, kind, "exact"),
-    queryFn: ({ pageParam }) =>
-      adminWordsDataSource.relatedSearch(normalizedQ, {
-        kind,
-        match_mode: "exact",
-        page_size: 20,
-        cursor: pageParam
-      }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (page) =>
-      "next_cursor" in page ? (page.next_cursor ?? undefined) : undefined,
-    enabled
-  });
-  const contains = useInfiniteQuery({
-    queryKey: wordKeys.relatedSearchV2(normalizedQ, kind, "contains"),
-    queryFn: ({ pageParam }) =>
-      adminWordsDataSource.relatedSearch(normalizedQ, {
-        kind,
-        match_mode: "contains",
-        exclude_exact: true,
-        page_size: 20,
-        cursor: pageParam
-      }),
-    initialPageParam: undefined as string | undefined,
-    getNextPageParam: (page) =>
-      "next_cursor" in page ? (page.next_cursor ?? undefined) : undefined,
-    enabled
-  });
-  return { exact, contains };
-}
-
-export function useRelatedSearchAny(
+export function useRelatedSearch(
   q: string,
   kind: "word" | "phrase" | undefined,
   open: boolean,
@@ -136,11 +75,10 @@ export function useRelatedSearchAny(
   const enabled = open && normalizedQ !== "";
   const exact = useInfiniteQuery({
     queryKey: [
-      ...wordKeys.relatedSearchV2(normalizedQ, kind, "exact", includeDrafts),
-      "any"
+      ...wordKeys.relatedSearch(normalizedQ, kind, "exact", includeDrafts)
     ],
     queryFn: ({ pageParam }) =>
-      adminWordsAnyDataSource.relatedSearchAny(normalizedQ, {
+      adminWordsDataSource.relatedSearch(normalizedQ, {
         kind,
         match_mode: "exact",
         include_drafts: includeDrafts || undefined,
@@ -154,11 +92,10 @@ export function useRelatedSearchAny(
   });
   const contains = useInfiniteQuery({
     queryKey: [
-      ...wordKeys.relatedSearchV2(normalizedQ, kind, "contains", includeDrafts),
-      "any"
+      ...wordKeys.relatedSearch(normalizedQ, kind, "contains", includeDrafts)
     ],
     queryFn: ({ pageParam }) =>
-      adminWordsAnyDataSource.relatedSearchAny(normalizedQ, {
+      adminWordsDataSource.relatedSearch(normalizedQ, {
         kind,
         match_mode: "contains",
         exclude_exact: true,
@@ -283,50 +220,6 @@ export function useRestoreWordsBatch() {
   >({
     mutationFn: ({ idempotencyKey, input }) =>
       adminWordsDataSource.restoreBatch(idempotencyKey, input),
-    onSuccess: invalidate
-  });
-}
-
-export function useArchiveWordAny() {
-  const invalidate = useInvalidateWords();
-  return useMutation({
-    mutationFn: ({ wordId, idempotencyKey, input }: WordLifecycleCommand) =>
-      adminWordsAnyDataSource.archiveAny(wordId, idempotencyKey, input),
-    onSuccess: invalidate
-  });
-}
-
-export function useRestoreWordAny() {
-  const invalidate = useInvalidateWords();
-  return useMutation({
-    mutationFn: ({ wordId, idempotencyKey, input }: WordLifecycleCommand) =>
-      adminWordsAnyDataSource.restoreAny(wordId, idempotencyKey, input),
-    onSuccess: invalidate
-  });
-}
-
-export function useArchiveWordsBatchAny() {
-  const invalidate = useInvalidateWords();
-  return useMutation<
-    EntryLifecycleBatchResponseAny,
-    Error,
-    WordLifecycleBatchCommand
-  >({
-    mutationFn: ({ idempotencyKey, input }) =>
-      adminWordsAnyDataSource.archiveBatchAny(idempotencyKey, input),
-    onSuccess: invalidate
-  });
-}
-
-export function useRestoreWordsBatchAny() {
-  const invalidate = useInvalidateWords();
-  return useMutation<
-    EntryLifecycleBatchResponseAny,
-    Error,
-    WordLifecycleBatchCommand
-  >({
-    mutationFn: ({ idempotencyKey, input }) =>
-      adminWordsAnyDataSource.restoreBatchAny(idempotencyKey, input),
     onSuccess: invalidate
   });
 }

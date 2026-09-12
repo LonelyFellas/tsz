@@ -3,7 +3,7 @@ import type {
   AdminWordPublicationV2,
   AdminWordPublicationV3,
   AdminWordV3,
-  SurfaceMatchPageAny
+  SurfaceMatchPageV3
 } from "@tsz/types";
 import {
   act,
@@ -37,7 +37,7 @@ function v3Word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
       strategy_version: "surface_summary_v1"
     },
     capabilities: {
-      publication: { mode: "migration_canary", whitelisted: true },
+      publication: { mode: "native" },
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
     forms: formsFixture(),
@@ -441,7 +441,7 @@ function activationSurfacePage(
   nextCursor: string | null,
   token?: string,
   total = nextCursor === null ? 1 : 2
-): SurfaceMatchPageAny {
+): SurfaceMatchPageV3 {
   const page = {
     schema_version: 3 as const,
     snapshot_id: snapshotId,
@@ -468,7 +468,7 @@ function activationSurfacePage(
     matched_entry_contexts: [],
     confirmation_reasons: [
       "visibility_activation"
-    ] as SurfaceMatchPageAny["confirmation_reasons"],
+    ] as SurfaceMatchPageV3["confirmation_reasons"],
     policy_name: "allow_multiple_active_exact_headword_publications" as const,
     policy_epoch: 7,
     continuation_policy: "enabled" as const
@@ -1026,8 +1026,7 @@ describe("V3PublicationHistory", () => {
       word: v3Word({
         capabilities: {
           publication: {
-            mode: "shadow_only",
-            blocked_code: "phase2_consumers_not_ready"
+            mode: "native" as const
           },
           pronunciation_normalization_version: "nfkc_trim_lower_v1"
         }
@@ -1411,7 +1410,7 @@ describe("V3PublicationHistory", () => {
       "visible-before-close",
       "cursor-2"
     );
-    const terminalPage = deferred<SurfaceMatchPageAny>();
+    const terminalPage = deferred<SurfaceMatchPageV3>();
     let pageSignal: AbortSignal | undefined;
     const fetchSurfacePage = vi.fn(
       (_snapshotId: string, _cursor: string, signal: AbortSignal) => {
@@ -2228,41 +2227,15 @@ describe("V3PublicationHistory", () => {
     }
   );
 
-  it("keeps history read-only for each current-word capability gate", async () => {
-    const scenarios = [
-      {
-        historical: { mode: "migration_canary", whitelisted: true } as const,
-        current: {
-          mode: "shadow_only",
-          blocked_code: "phase2_consumers_not_ready"
-        } as const
-      },
-      {
-        historical: { mode: "migration_canary", whitelisted: true } as const,
-        current: { mode: "migration_canary", whitelisted: false } as const
-      }
-    ];
-
-    for (const scenario of scenarios) {
+  it("当前词条未处于已发布态时，历史快照只读且无激活入口", async () => {
+    for (const status of ["draft", "archived"] as const) {
       const api = requests();
-      const historical = v3Publication({
-        word: v3Word({
-          capabilities: {
-            publication: scenario.historical,
-            pronunciation_normalization_version: "nfkc_trim_lower_v1"
-          }
-        })
-      });
+      const historical = v3Publication({ word: v3Word({}) });
       api.listPublications.mockResolvedValue({ publications: [historical] });
       api.getPublication.mockResolvedValue({ publication: historical });
       const view = render(
         <V3PublicationHistory
-          currentWord={v3Word({
-            capabilities: {
-              publication: scenario.current,
-              pronunciation_normalization_version: "nfkc_trim_lower_v1"
-            }
-          })}
+          currentWord={v3Word({ status })}
           idempotencyKeyFactory={() => "activate-key"}
           onActivated={vi.fn()}
           requests={api}

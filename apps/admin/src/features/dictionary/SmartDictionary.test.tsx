@@ -26,7 +26,7 @@ const apiMocks = vi.hoisted(() => ({
 }));
 
 const dataSourceMocks = vi.hoisted(() => ({
-  getAny: vi.fn()
+  get: vi.fn()
 }));
 
 // 默认登录者 = fixture 里词条的 created_by，使「仅本人可删」默认放行；
@@ -40,15 +40,15 @@ const authMocks = vi.hoisted(() => ({
 
 vi.mock("./api", () => ({
   ...apiMocks,
-  useArchiveWordAny: apiMocks.useArchiveWord,
-  useArchiveWordsBatchAny: apiMocks.useArchiveWordsBatch,
-  useRestoreWordAny: apiMocks.useRestoreWord,
-  useRestoreWordsBatchAny: apiMocks.useRestoreWordsBatch
+  useArchiveWord: apiMocks.useArchiveWord,
+  useArchiveWordsBatch: apiMocks.useArchiveWordsBatch,
+  useRestoreWord: apiMocks.useRestoreWord,
+  useRestoreWordsBatch: apiMocks.useRestoreWordsBatch
 }));
 
 vi.mock("./dataSource", () => ({
-  adminWordsAnyDataSource: {
-    getAny: dataSourceMocks.getAny
+  adminWordsDataSource: {
+    get: dataSourceMocks.get
   },
   adminWordsDataSourceCapabilities: {
     archive: true,
@@ -220,7 +220,7 @@ function HistoryProbe() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  dataSourceMocks.getAny.mockReset().mockResolvedValue(undefined);
+  dataSourceMocks.get.mockReset().mockResolvedValue(undefined);
   authMocks.profile = { id: "admin-1", role: "admin" };
   for (const hook of [
     apiMocks.useArchiveWord,
@@ -1605,7 +1605,7 @@ describe("SmartDictionary", () => {
     await screen.findByText("只能永久删除自己创建的词条");
   });
 
-  it("恢复 A 的 getAny 返回 B 时 fail closed 且不调用 restoreAny", async () => {
+  it("恢复 A 的 get 返回 B 时 fail closed 且不调用 restore", async () => {
     const mutateAsync = vi.fn();
     apiMocks.useRestoreWord.mockReturnValue({
       ...idleMutation(),
@@ -1621,7 +1621,7 @@ describe("SmartDictionary", () => {
       isPending: false,
       refetch: vi.fn()
     });
-    dataSourceMocks.getAny.mockResolvedValueOnce({
+    dataSourceMocks.get.mockResolvedValueOnce({
       word: archivedWord("word-2", "second")
     });
     render(
@@ -1648,7 +1648,7 @@ describe("SmartDictionary", () => {
     expect(
       await screen.findByText("词条响应格式与当前客户端契约不一致，请稍后重试")
     ).toBeInTheDocument();
-    expect(dataSourceMocks.getAny).toHaveBeenCalledWith("word-1");
+    expect(dataSourceMocks.get).toHaveBeenCalledWith("word-1");
     expect(mutateAsync).not.toHaveBeenCalled();
   });
 
@@ -1777,7 +1777,7 @@ describe("SmartDictionary", () => {
   it("批量预取期间 selection 变化会失效旧 attempt 且不发送隐藏恢复", async () => {
     const first = archivedWord("word-1", "first");
     let resolveGet!: (value: unknown) => void;
-    dataSourceMocks.getAny.mockImplementationOnce(
+    dataSourceMocks.get.mockImplementationOnce(
       () =>
         new Promise((resolve) => {
           resolveGet = resolve;
@@ -1813,9 +1813,7 @@ describe("SmartDictionary", () => {
         .map((item) => item.closest("button"))
         .find((item) => item?.closest(".ant-modal"))!
     );
-    await waitFor(() =>
-      expect(dataSourceMocks.getAny).toHaveBeenCalledTimes(1)
-    );
+    await waitFor(() => expect(dataSourceMocks.get).toHaveBeenCalledTimes(1));
 
     fireEvent.click(checkbox);
     await act(async () => resolveGet({ word: first }));

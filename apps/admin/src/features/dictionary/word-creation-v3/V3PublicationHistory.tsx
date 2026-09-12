@@ -8,7 +8,7 @@ import type {
   AdminWordV3,
   EnglishTextV2,
   EnglishTextV3,
-  SurfaceMatchPageAny,
+  SurfaceMatchPageV3,
   WordDefinitionV2,
   WordHeadwordsV2
 } from "@tsz/types";
@@ -23,7 +23,7 @@ import {
 } from "../surfaceSnapshot";
 import {
   type FetchSurfaceMatchPage,
-  useSurfaceSnapshotAny
+  useSurfaceSnapshot
 } from "../useSurfaceSnapshot";
 import { createV3WordRequests, type V3WordRequests } from "./api";
 import { sentenceTranslationsV3 } from "./meaningsModel";
@@ -55,7 +55,7 @@ interface Props {
   onActivated: (word: AdminWordV3) => void;
   onCanonicalRefreshed?: (word: AdminWordV3) => void;
   idempotencyKeyFactory?: () => string;
-  fetchSurfacePage?: FetchSurfaceMatchPage<SurfaceMatchPageAny>;
+  fetchSurfacePage?: FetchSurfaceMatchPage<SurfaceMatchPageV3>;
 }
 
 const defaultRequests = createV3WordRequests();
@@ -585,12 +585,7 @@ function canActivateV3Publication(
   if (currentWord.status !== "published" || publication.is_current) {
     return false;
   }
-  const currentCapability = currentWord.capabilities.publication;
-  return (
-    currentCapability.mode === "native" ||
-    (currentCapability.mode === "migration_canary" &&
-      currentCapability.whitelisted)
-  );
+  return currentWord.capabilities.publication.mode === "native";
 }
 
 function isCanonicalActivationConflict(error: unknown): error is HttpError {
@@ -664,7 +659,7 @@ export function V3PublicationHistory({
   const [confirming, setConfirming] = useState(false);
   const [activating, setActivating] = useState(false);
   const [activationError, setActivationError] = useState<string>();
-  const [surfacePage, setSurfacePage] = useState<SurfaceMatchPageAny>();
+  const [surfacePage, setSurfacePage] = useState<SurfaceMatchPageV3>();
   const [surfaceResetVersion, setSurfaceResetVersion] = useState(0);
   const [recovery, setRecovery] = useState<RecoveryState>();
   const mounted = useRef(true);
@@ -675,7 +670,7 @@ export function V3PublicationHistory({
   const activationKey = useRef<string | undefined>(undefined);
   const recoveryGeneration = useRef(0);
   const recoveryLock = useRef(false);
-  const surfaceSnapshot = useSurfaceSnapshotAny(
+  const surfaceSnapshot = useSurfaceSnapshot(
     surfacePage,
     `${currentWord.id}:${selectedPublicationId ?? "none"}:${surfacePage?.schema_version ?? "none"}:${surfacePage?.snapshot_id ?? "none"}:${surfaceResetVersion}`,
     fetchSurfacePage

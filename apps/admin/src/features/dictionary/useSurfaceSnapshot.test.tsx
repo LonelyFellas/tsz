@@ -1,25 +1,21 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { HttpError } from "@tsz/api-client/http";
-import type { SurfaceMatchPageAny, SurfaceMatchPageV2 } from "@tsz/types";
+import type { SurfaceMatchPageV3 } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { adminWordsAnyDataSource, adminWordsDataSource } from "./dataSource";
-import {
-  useSurfaceSnapshot,
-  useSurfaceSnapshotAny
-} from "./useSurfaceSnapshot";
+import { adminWordsDataSource } from "./dataSource";
+import { useSurfaceSnapshot } from "./useSurfaceSnapshot";
 
 vi.mock("./dataSource", () => ({
-  adminWordsDataSource: { surfaceMatchSnapshotPage: vi.fn() },
-  adminWordsAnyDataSource: { surfaceMatchSnapshotPageAny: vi.fn() }
+  adminWordsDataSource: { surfaceMatchSnapshotPage: vi.fn() }
 }));
 
 function page(
   next_cursor: string | null,
   token = "surface-token",
   impactToken?: string
-): SurfaceMatchPageV2 {
+): SurfaceMatchPageV3 {
   const base = {
-    schema_version: 2 as const,
+    schema_version: 3 as const,
     snapshot_id: "snapshot-1",
     items: [],
     total: 0,
@@ -50,7 +46,7 @@ describe("useSurfaceSnapshot", () => {
       ({ initialPage }) => useSurfaceSnapshot(initialPage, "same-key"),
       {
         initialProps: {
-          initialPage: undefined as SurfaceMatchPageV2 | undefined
+          initialPage: undefined as SurfaceMatchPageV3 | undefined
         }
       }
     );
@@ -70,7 +66,7 @@ describe("useSurfaceSnapshot", () => {
   });
 
   it("Any loader 保留 V3 schema 并顺序取得 V3 终页 token", async () => {
-    const first: SurfaceMatchPageAny = {
+    const first: SurfaceMatchPageV3 = {
       schema_version: 3,
       snapshot_id: "v3-snapshot",
       items: [],
@@ -82,21 +78,19 @@ describe("useSurfaceSnapshot", () => {
       continuation_policy: "enabled",
       next_cursor: "v3-cursor-2"
     };
-    const terminal: SurfaceMatchPageAny = {
+    const terminal: SurfaceMatchPageV3 = {
       ...first,
       continuation_policy: "enabled",
       next_cursor: null,
       surface_confirmation_token: "v3-token"
     };
-    vi.mocked(
-      adminWordsAnyDataSource.surfaceMatchSnapshotPageAny
-    ).mockResolvedValue(terminal);
-    const hook = renderHook(() => useSurfaceSnapshotAny(first, "v3-key"));
+    vi.mocked(adminWordsDataSource.surfaceMatchSnapshotPage).mockResolvedValue(
+      terminal
+    );
+    const hook = renderHook(() => useSurfaceSnapshot(first, "v3-key"));
 
     await waitFor(() => expect(hook.result.current.phase).toBe("ready"));
-    expect(
-      adminWordsAnyDataSource.surfaceMatchSnapshotPageAny
-    ).toHaveBeenCalledWith(
+    expect(adminWordsDataSource.surfaceMatchSnapshotPage).toHaveBeenCalledWith(
       "v3-snapshot",
       "v3-cursor-2",
       expect.any(AbortSignal)
@@ -160,7 +154,7 @@ describe("useSurfaceSnapshot", () => {
     let rejectRequest!: (reason: unknown) => void;
     const fetchPage = vi.fn(
       (_snapshotId: string, _cursor: string, signal: AbortSignal) =>
-        new Promise<SurfaceMatchPageV2>((_resolve, reject) => {
+        new Promise<SurfaceMatchPageV3>((_resolve, reject) => {
           rejectRequest = reject;
           signal.addEventListener("abort", () => reject(new Error("aborted")));
         })

@@ -83,7 +83,6 @@ function modelInput(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
         }
       ]
     },
-    compatibility: undefined,
     completed_steps: ["basics", "forms", "meanings"],
     max_reachable_step: "preview",
     created_by: "admin-1",

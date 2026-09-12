@@ -4,17 +4,12 @@ import {
   decodeAdminWordPublicationEnvelope,
   decodeAdminWordPublicationListResponse,
   InvalidAdminWordResponseError,
-  SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS,
   SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS,
-  SUPPORTED_ADMIN_WORD_SCHEMA_VERSIONS,
   UnsupportedAdminWordSchemaVersionError,
   decodeAdminWordAnyEnvelope,
   decodeAdminWordAnyListResponse,
-  decodeAdminWordDraftV2Envelope,
   decodeAdminWordDraftAnyEnvelope,
   decodeAdminWordV3Envelope,
-  decodeAdminWordV2Envelope,
-  decodeAdminWordV2ListResponse,
   decodeDetectLexiconResponseAny,
   decodeDetectLexiconResponseV3,
   decodeDraftValidationIssueAny,
@@ -22,7 +17,6 @@ import {
   decodeDraftValidationResponseV3,
   decodeEntryLifecycleBatchAnyResponse,
   decodeEntryDeleteBatchResponse,
-  decodeEntryLifecycleBatchV2Response,
   decodeFormsImpactResponseAny,
   decodeFormsImpactResponseV3,
   decodeRelatedSearchResponseAny,
@@ -252,104 +246,6 @@ function validAdminWordV3() {
   };
 }
 
-function validAdminWordV2() {
-  const headwords = { mode: "unified", common: "legacy" } as const;
-  return {
-    schema_version: 2,
-    id: IDS.entry,
-    language: "en",
-    kind: "word",
-    status: "draft",
-    revision: 1,
-    lifecycle_revision: 1,
-    annotation: null,
-    annotation_revision: 1,
-    has_unpublished_changes: false,
-    headwords,
-    detection_snapshot: {
-      detection_id: IDS.group1,
-      request: { language: "en", headword: "legacy" },
-      normalized_headword: "legacy",
-      entry_kind: "word",
-      matched_dialect: "common",
-      builtin_dictionary_status: "not_found",
-      headwords,
-      suggested_pos: [],
-      detected_at: "2026-08-24T12:00:00Z",
-      smart_dictionary_status: "clear"
-    },
-    forms: { pos: [] },
-    meanings: { sense_groups: [], pos: [] },
-    completed_steps: [],
-    max_reachable_step: "basics",
-    created_by: IDS.creator,
-    created_at: "2026-08-24T12:00:00Z",
-    updated_at: "2026-08-24T12:00:00Z"
-  };
-}
-
-function setV2Associations(
-  container: Record<string, unknown>,
-  associations: unknown[]
-) {
-  const pos = buildRuntimeFixture(
-    runtimeFixtureBundle.$defs.WordPosMeaningsV2!
-  ) as Record<string, unknown>;
-  const sense = buildRuntimeFixture(
-    runtimeFixtureBundle.$defs.WordSenseV2!
-  ) as Record<string, unknown>;
-  const sentence = buildRuntimeFixture(
-    runtimeFixtureBundle.$defs.WordSentenceV2!
-  ) as Record<string, unknown>;
-  sentence.associations = associations;
-  sense.sentences = [sentence];
-  pos.senses = [sense];
-  container.meanings = { sense_groups: [], pos: [pos] };
-}
-
-function addLegacyV2Association(container: Record<string, unknown>) {
-  const association = buildRuntimeFixture(
-    runtimeFixtureBundle.$defs.WordSentenceAssociationV2!
-  ) as Record<string, unknown>;
-  delete association.state;
-  Object.assign(association, {
-    target_word_id: IDS.entry,
-    target_sense_id: IDS.member2,
-    target_headword: "center",
-    target_gloss: "中心",
-    resolved_pos: "noun"
-  });
-  setV2Associations(container, [association]);
-  return association;
-}
-
-function validAdminWordListItemV2() {
-  return {
-    annotation_visible: false,
-    schema_version: 2,
-    id: IDS.entry,
-    headword: "legacy",
-    kind: "word",
-    dialects: ["common"],
-    headword_variants: [{ dialect: "common", headword: "legacy" }],
-    revision: 1,
-    lifecycle_revision: 1,
-    annotation: null,
-    annotation_revision: 1,
-    gloss: "旧词条",
-    pos_list: [],
-    levels: [],
-    status: "draft",
-    has_unpublished_changes: false,
-    max_reachable_step: "basics",
-    created_by_name: "Admin",
-    created_by: IDS.creator,
-    reference_summary: { total: 0, previews: [], truncated: false },
-    created_at: "2026-08-24T12:00:00Z",
-    updated_at: "2026-08-24T12:00:00Z"
-  };
-}
-
 function validAdminWordListItemV3() {
   return {
     annotation_visible: false,
@@ -402,157 +298,44 @@ function captureInvalid(run: () => unknown): InvalidAdminWordResponseError {
   throw new Error("expected runtime schema guard to reject the response");
 }
 
-describe("admin word V2 response schema guard", () => {
-  it("只接受精确数字 schema_version=2，并保留原响应引用", () => {
-    const envelope = { word: { schema_version: 2, id: "word-1" } };
-    const draftEnvelope = {
-      ...envelope,
-      retired_stable_slots: []
-    };
-    const list = {
-      words: [envelope.word],
-      page: { page: 1, page_size: 20, total: 1 }
-    };
-    const batch = { words: [envelope.word], affected: 1 };
-
-    expect(decodeAdminWordV2Envelope(envelope)).toBe(envelope);
-    expect(decodeAdminWordDraftV2Envelope(draftEnvelope)).toBe(draftEnvelope);
-    expect(decodeAdminWordV2ListResponse(list)).toBe(list);
-    expect(decodeEntryLifecycleBatchV2Response(batch)).toBe(batch);
-    expect(SUPPORTED_ADMIN_WORD_SCHEMA_VERSIONS).toEqual([2]);
-    expect(Object.isFrozen(SUPPORTED_ADMIN_WORD_SCHEMA_VERSIONS)).toBe(true);
-  });
-
-  describe("decodeEntryDeleteBatchResponse", () => {
-    it("接受合法的 affected 并保留原引用", () => {
-      const response = { affected: 3 };
-      expect(decodeEntryDeleteBatchResponse(response)).toBe(response);
-      const zero = { affected: 0 };
-      expect(decodeEntryDeleteBatchResponse(zero)).toBe(zero);
-    });
-
-    it.each([
-      ["缺失 affected", {}, "missing_required_property", "missing"],
-      ["affected 是字符串", { affected: "3" }, "wrong_type", "string"],
-      ["affected 是 null", { affected: null }, "wrong_type", "null"],
-      ["根不是对象", null, "missing_required_property", "missing"]
-    ])("%s 时 fail closed", (_label, value, reason, receivedType) => {
-      // 静默当 0 会让 UI 报「已删除 0 条」而掩盖真实的契约漂移。
-      try {
-        decodeEntryDeleteBatchResponse(value);
-        throw new Error("应当抛出");
-      } catch (error) {
-        expect(error).toBeInstanceOf(InvalidAdminWordResponseError);
-        const failure = error as InvalidAdminWordResponseError;
-        expect(failure.response_path).toBe("affected");
-        expect(failure.reason).toBe(reason);
-        expect(failure.received_type).toBe(receivedType);
-      }
-    });
-
-    it.each([
-      ["负数", { affected: -1 }, "below_minimum"],
-      ["小数", { affected: 1.5 }, "wrong_type"]
-    ])("%s 时 fail closed", (_label, value, reason) => {
-      try {
-        decodeEntryDeleteBatchResponse(value);
-        throw new Error("应当抛出");
-      } catch (error) {
-        expect(error).toBeInstanceOf(InvalidAdminWordResponseError);
-        expect((error as InvalidAdminWordResponseError).reason).toBe(reason);
-      }
-    });
+describe("decodeEntryDeleteBatchResponse", () => {
+  it("接受合法的 affected 并保留原引用", () => {
+    const response = { affected: 3 };
+    expect(decodeEntryDeleteBatchResponse(response)).toBe(response);
+    const zero = { affected: 0 };
+    expect(decodeEntryDeleteBatchResponse(zero)).toBe(zero);
   });
 
   it.each([
-    ["缺失", undefined, undefined, "missing", "missing"],
-    ["null", null, undefined, "null", "wrong_type"],
-    ["V3", 3, 3, "number", "unsupported"],
-    ["未来版本", 4, 4, "number", "unsupported"],
-    ["字符串 2", "2", undefined, "string", "wrong_type"]
-  ] as const)(
-    "%s schema_version fail closed",
-    (_label, schemaVersion, safeSchemaVersion, receivedType, reason) => {
-      const rawResponse = {
-        word: { id: "word-1", schema_version: schemaVersion }
-      };
-
-      const error = captureUnsupported(() =>
-        decodeAdminWordV2Envelope(rawResponse)
-      );
-
-      expect(error).toMatchObject({
-        name: "UnsupportedAdminWordSchemaVersionError",
-        code: "unsupported_schema_version",
-        source: "client_response_guard",
-        supported_schema_versions: [2],
-        received_schema_version: safeSchemaVersion,
-        received_schema_version_type: receivedType,
-        reason,
-        response_path: "word.schema_version",
-        message: "当前前端不支持该词条数据版本，请升级后重试"
-      });
-      expect(error).not.toHaveProperty("raw_response");
+    ["缺失 affected", {}, "missing_required_property", "missing"],
+    ["affected 是字符串", { affected: "3" }, "wrong_type", "string"],
+    ["affected 是 null", { affected: null }, "wrong_type", "null"],
+    ["根不是对象", null, "missing_required_property", "missing"]
+  ])("%s 时 fail closed", (_label, value, reason, receivedType) => {
+    // 静默当 0 会让 UI 报「已删除 0 条」而掩盖真实的契约漂移。
+    try {
+      decodeEntryDeleteBatchResponse(value);
+      throw new Error("应当抛出");
+    } catch (error) {
+      expect(error).toBeInstanceOf(InvalidAdminWordResponseError);
+      const failure = error as InvalidAdminWordResponseError;
+      expect(failure.response_path).toBe("affected");
+      expect(failure.reason).toBe(reason);
+      expect(failure.received_type).toBe(receivedType);
     }
-  );
-
-  it.each([
-    ["object", { secret: "do-not-log" }],
-    ["array", ["do-not-log"]]
-  ] as const)("%s schema_version 不进入错误诊断载荷", (receivedType, value) => {
-    const error = captureUnsupported(() =>
-      decodeAdminWordV2Envelope({ word: { schema_version: value } })
-    );
-
-    expect(error).toMatchObject({
-      received_schema_version: undefined,
-      received_schema_version_type: receivedType,
-      reason: "wrong_type"
-    });
-    expect(JSON.stringify(error)).not.toContain("do-not-log");
-  });
-
-  it("列表任一行不兼容时拒绝整个响应并报告精确索引", () => {
-    const rawResponse = {
-      words: [
-        { id: "word-1", schema_version: 2 },
-        { id: "word-2", schema_version: 3 }
-      ],
-      page: { page: 1, page_size: 20, total: 2 }
-    };
-
-    const error = captureUnsupported(() =>
-      decodeAdminWordV2ListResponse(rawResponse)
-    );
-
-    expect(error.received_schema_version).toBe(3);
-    expect(error.response_path).toBe("words[1].schema_version");
   });
 
   it.each([
-    ["envelope", decodeAdminWordV2Envelope, {}, "word.schema_version"],
-    ["draft", decodeAdminWordDraftV2Envelope, null, "word.schema_version"],
-    [
-      "null word",
-      decodeAdminWordV2Envelope,
-      { word: null },
-      "word.schema_version"
-    ],
-    [
-      "array word",
-      decodeAdminWordV2Envelope,
-      { word: [] },
-      "word.schema_version"
-    ],
-    ["list", decodeAdminWordV2ListResponse, {}, "words"],
-    ["list root", decodeAdminWordV2ListResponse, null, "words"],
-    ["batch", decodeEntryLifecycleBatchV2Response, { words: null }, "words"],
-    ["batch root", decodeEntryLifecycleBatchV2Response, null, "words"]
-  ] as const)("%s 容器缺失时 fail closed", (_name, decode, raw, path) => {
-    const error = captureUnsupported(() => decode(raw));
-
-    expect(error.received_schema_version).toBeUndefined();
-    expect(error.response_path).toBe(path);
+    ["负数", { affected: -1 }, "below_minimum"],
+    ["小数", { affected: 1.5 }, "wrong_type"]
+  ])("%s 时 fail closed", (_label, value, reason) => {
+    try {
+      decodeEntryDeleteBatchResponse(value);
+      throw new Error("应当抛出");
+    } catch (error) {
+      expect(error).toBeInstanceOf(InvalidAdminWordResponseError);
+      expect((error as InvalidAdminWordResponseError).reason).toBe(reason);
+    }
   });
 });
 
@@ -609,17 +392,17 @@ describe("admin word V3/Any runtime decoder", () => {
     ).toThrow(InvalidAdminWordResponseError);
   });
 
-  it("接受复杂 V3、V2/V3 混合列表和生命周期批量响应，并保留原引用", () => {
+  it("接受复杂 V3 列表和生命周期批量响应，并保留原引用", () => {
     const v3Word = validAdminWordV3();
     const v3Envelope = { word: v3Word };
     const draftEnvelope = { word: v3Word, retired_stable_nodes: [] };
     const list = {
-      words: [validAdminWordListItemV2(), validAdminWordListItemV3()],
+      words: [validAdminWordListItemV3()],
       page: { page: 1, page_size: 20, total: 2 }
     };
     const batch = {
-      words: [validAdminWordV2(), v3Word],
-      affected: 2
+      words: [v3Word],
+      affected: 1
     };
 
     expect(decodeAdminWordV3Envelope(v3Envelope)).toBe(v3Envelope);
@@ -628,11 +411,7 @@ describe("admin word V3/Any runtime decoder", () => {
     expect(decodeAdminWordAnyListResponse(list)).toBe(list);
     expect(decodeEntryLifecycleBatchAnyResponse(batch)).toBe(batch);
     expect(SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS).toEqual([3]);
-    expect(SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS).toEqual([2, 3]);
     expect(Object.isFrozen(SUPPORTED_ADMIN_WORD_V3_SCHEMA_VERSIONS)).toBe(true);
-    expect(Object.isFrozen(SUPPORTED_ADMIN_WORD_ANY_SCHEMA_VERSIONS)).toBe(
-      true
-    );
   });
 
   it("V3 词条接受可选检测基准方言并拒绝 common 或未知值", () => {
@@ -788,72 +567,6 @@ describe("admin word V3/Any runtime decoder", () => {
     expect(decodeAdminWordV3Envelope(currentEnvelope)).toBe(currentEnvelope);
   });
 
-  it("V2 含关联时保留 source_range，不误改写为 V3", () => {
-    const word = buildRuntimeFixture(
-      runtimeFixtureBundle.$defs.AdminWordV2!
-    ) as Record<string, unknown>;
-    const association = addLegacyV2Association(word);
-    const envelope = { word };
-
-    expect(decodeAdminWordAnyEnvelope(envelope)).toBe(envelope);
-    expect(association).toHaveProperty("source_range");
-    expect(association).not.toHaveProperty("source_segments");
-    expect(association).not.toHaveProperty("state");
-  });
-
-  it("V2 含旧关联的批量生命周期与发布响应继续可解码", () => {
-    const word = buildRuntimeFixture(
-      runtimeFixtureBundle.$defs.AdminWordV2!
-    ) as Record<string, unknown>;
-    addLegacyV2Association(word);
-    expect(
-      decodeEntryLifecycleBatchAnyResponse({ words: [word], affected: 1 })
-    ).toEqual({ words: [word], affected: 1 });
-
-    const publication = buildRuntimeFixture(
-      runtimeFixtureBundle.$defs.AdminWordPublicationV2!
-    ) as Record<string, unknown>;
-    addLegacyV2Association(publication.word as Record<string, unknown>);
-    expect(decodeAdminWordPublicationEnvelope({ publication })).toEqual({
-      publication
-    });
-    expect(
-      decodeAdminWordPublicationListResponse({ publications: [publication] })
-    ).toEqual({ publications: [publication] });
-  });
-
-  it.each([
-    ["linked 缺目标", "linked"],
-    ["pending 缺词头", "pending"]
-  ] as const)("V2 %s 的畸形响应 fail closed", (_name, state) => {
-    const word = buildRuntimeFixture(
-      runtimeFixtureBundle.$defs.AdminWordV2!
-    ) as Record<string, unknown>;
-    const common = {
-      id: IDS.member1,
-      source_dialect: "common",
-      source_range: { start: 0, end: 6, surface: "center" },
-      origin: "manual",
-      state
-    };
-    setV2Associations(
-      word,
-      state === "linked"
-        ? [common]
-        : [
-            {
-              ...common,
-              pending_target_kind: "phrase",
-              normalized_pending_target_headword: "center of"
-            }
-          ]
-    );
-
-    expect(() => decodeAdminWordAnyEnvelope({ word })).toThrow(
-      InvalidAdminWordResponseError
-    );
-  });
-
   it("接受新能力、分层译文、成分用词与待关联响应", () => {
     const word = validAdminWordV3() as unknown as Record<string, unknown>;
     const capabilities = word.capabilities as Record<string, unknown>;
@@ -984,18 +697,22 @@ describe("admin word V3/Any runtime decoder", () => {
     );
   });
 
-  it("V3-only decoder 拒绝合法 V2，Any decoder 接受合法 V2", () => {
-    const envelope = { word: validAdminWordV2() };
+  it("decoder 拒绝已下线的 V2 词条响应", () => {
+    const envelope = {
+      word: { ...validAdminWordV3(), schema_version: 2 }
+    };
 
-    const error = captureUnsupported(() => decodeAdminWordV3Envelope(envelope));
-
-    expect(error).toMatchObject({
-      supported_schema_versions: [3],
-      received_schema_version: 2,
-      reason: "unsupported",
-      response_path: "word.schema_version"
-    });
-    expect(decodeAdminWordAnyEnvelope(envelope)).toBe(envelope);
+    for (const decode of [
+      decodeAdminWordV3Envelope,
+      decodeAdminWordAnyEnvelope
+    ]) {
+      expect(captureUnsupported(() => decode(envelope))).toMatchObject({
+        supported_schema_versions: [3],
+        received_schema_version: 2,
+        reason: "unsupported",
+        response_path: "word.schema_version"
+      });
+    }
   });
 
   it.each([
@@ -1012,7 +729,7 @@ describe("admin word V3/Any runtime decoder", () => {
       );
 
       expect(error).toMatchObject({
-        supported_schema_versions: [2, 3],
+        supported_schema_versions: [3],
         received_schema_version: safeVersion,
         received_schema_version_type: receivedType,
         reason,
@@ -1021,10 +738,10 @@ describe("admin word V3/Any runtime decoder", () => {
     }
   );
 
-  it("混合列表任一行版本未知时拒绝整个响应并定位索引", () => {
+  it("列表任一行版本未知时拒绝整个响应并定位索引", () => {
     const list = {
       words: [
-        validAdminWordListItemV2(),
+        validAdminWordListItemV3(),
         { ...validAdminWordListItemV3(), schema_version: 4 }
       ],
       page: { page: 1, page_size: 20, total: 2 }
@@ -1035,7 +752,7 @@ describe("admin word V3/Any runtime decoder", () => {
     );
 
     expect(error).toMatchObject({
-      supported_schema_versions: [2, 3],
+      supported_schema_versions: [3],
       received_schema_version: 4,
       response_path: "words[1].schema_version"
     });
@@ -1119,7 +836,7 @@ describe("admin word V3/Any runtime decoder", () => {
   it.each([
     [
       "validation any",
-      "DraftValidationResponseAny",
+      "DraftValidationResponseV3",
       decodeDraftValidationResponseAny
     ],
     [
@@ -1127,13 +844,13 @@ describe("admin word V3/Any runtime decoder", () => {
       "DraftValidationResponseV3",
       decodeDraftValidationResponseV3
     ],
-    ["impact any", "FormsImpactResponseAny", decodeFormsImpactResponseAny],
+    ["impact any", "FormsImpactResponseV3", decodeFormsImpactResponseAny],
     ["impact v3", "FormsImpactResponseV3", decodeFormsImpactResponseV3],
-    ["surface any", "SurfaceMatchPageAny", decodeSurfaceMatchPageAny],
+    ["surface any", "SurfaceMatchPageV3", decodeSurfaceMatchPageAny],
     ["surface v3", "SurfaceMatchPageV3", decodeSurfaceMatchPageV3],
     [
       "detection any",
-      "DetectLexiconResponseAny",
+      "DetectLexiconSurfaceResponseV3",
       decodeDetectLexiconResponseAny
     ],
     [
@@ -1141,7 +858,7 @@ describe("admin word V3/Any runtime decoder", () => {
       "DetectLexiconSurfaceResponseV3",
       decodeDetectLexiconResponseV3
     ],
-    ["issue any", "DraftValidationIssueAny", decodeDraftValidationIssueAny],
+    ["issue any", "V3DraftValidationIssue", decodeDraftValidationIssueAny],
     ["related any", "RelatedSearchResponse", decodeRelatedSearchResponseAny],
     [
       "publication list",
@@ -1172,15 +889,11 @@ describe("admin word V3/Any runtime decoder", () => {
       else value.suggested_pos = suggestedPos;
 
       const error = captureInvalid(() => decodeDetectLexiconResponseV3(value));
-      expect(error).toMatchObject({
-        response_path: "$",
-        reason: "no_union_match",
-        received_type: "object"
-      });
+      expect(error.response_path).toContain("suggested_pos");
     }
   );
 
-  it.each([validAdminWordListItemV2, validAdminWordListItemV3])(
+  it.each([validAdminWordListItemV3])(
     "列表显示标志必须是boolean，隐藏仍保留原始annotation",
     (makeItem) => {
       const item: Record<string, unknown> = {
@@ -1232,20 +945,16 @@ describe("admin word V3/Any runtime decoder", () => {
     });
   });
 
-  it("V3 surface decoder 接受两种正式 match_kind，并拒绝旧裸 item", () => {
+  it("V3 surface decoder 只接受 form_variant_v3，并拒绝旧裸 item", () => {
     const page = validRuntimeDefinition("SurfaceMatchPageV3") as {
       items: unknown[];
-    };
-    const legacyItem = {
-      match_kind: "legacy_v2",
-      match: validRuntimeDefinition("LegacySurfaceMatchV3")
     };
     const formItem = {
       match_kind: "form_variant_v3",
       match: validRuntimeDefinition("FormSurfaceMatchV3")
     };
 
-    page.items = [legacyItem, formItem];
+    page.items = [formItem];
     expect(decodeSurfaceMatchPageV3(page)).toBe(page);
 
     page.items = [validRuntimeDefinition("FormSurfaceMatchV3")];
@@ -1261,15 +970,20 @@ describe("admin word V3/Any runtime decoder", () => {
     );
 
     expect(error).toMatchObject({
-      supported_schema_versions: [2, 3],
+      supported_schema_versions: [3],
       received_schema_version: 4,
       response_path: "schema_version"
     });
   });
 
-  it("V3-only response decoder 拒绝合法 V2 分支", () => {
-    const v2 = validRuntimeDefinition("FormsImpactResponseV2");
-    const error = captureUnsupported(() => decodeFormsImpactResponseV3(v2));
+  it("response decoder 拒绝已下线的 V2 分支", () => {
+    const v3 = validRuntimeDefinition("FormsImpactResponseV3") as Record<
+      string,
+      unknown
+    >;
+    const error = captureUnsupported(() =>
+      decodeFormsImpactResponseV3({ ...v3, schema_version: 2 })
+    );
 
     expect(error).toMatchObject({
       supported_schema_versions: [3],
@@ -1284,7 +998,7 @@ describe("admin word V3/Any runtime decoder", () => {
     );
 
     expect(error).toMatchObject({
-      supported_schema_versions: [2, 3],
+      supported_schema_versions: [3],
       response_path: "results[0].schema_version",
       received_schema_version: 4
     });

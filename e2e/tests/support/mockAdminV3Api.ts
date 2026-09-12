@@ -342,10 +342,7 @@ const MEANINGS: DraftMeaningsStepContentV3 = {
 function v3Word(
   id: string,
   label: string,
-  capability:
-    | { mode: "shadow_only"; blocked_code: "phase2_consumers_not_ready" }
-    | { mode: "migration_canary"; whitelisted: true },
-  compatibility?: AdminWordV3["compatibility"]
+  capability: { mode: "native" }
 ): AdminWordV3 {
   return {
     schema_version: 3,
@@ -367,7 +364,6 @@ function v3Word(
       publication: capability,
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
-    ...(compatibility ? { compatibility } : {}),
     forms: structuredClone(FORMS),
     meanings: structuredClone(MEANINGS),
     completed_steps: ["basics", "forms", "meanings"],
@@ -736,7 +732,7 @@ function surfaceMatchPage(
       ? { surface_confirmation_token: `surface-token-${surface}` }
       : {})
   };
-  assertRuntimeFixture("SurfaceMatchPageAny", page);
+  assertRuntimeFixture("SurfaceMatchPageV3", page);
   return page;
 }
 
@@ -747,8 +743,7 @@ function surfaceCandidateWord(
   kind: "word" | "phrase"
 ): AdminWordV3 {
   const candidate = v3Word(entryId, spelling, {
-    mode: "shadow_only",
-    blocked_code: "phase2_consumers_not_ready"
+    mode: "native" as const
   });
   candidate.kind = kind;
   candidate.status = status;
@@ -844,14 +839,13 @@ export async function mockAdminV3Api(
       ? v3Word(
           ADMIN_V3_CANARY_WORD_ID,
           "migrated-orbit",
-          { mode: "migration_canary", whitelisted: true },
+          { mode: "native" },
           {
             legacy_headwords: { mode: "unified", common: "legacy-orbit" }
           }
         )
       : v3Word(ADMIN_V3_MIXED_WORD_ID, "orbit-v3", {
-          mode: "shadow_only",
-          blocked_code: "phase2_consumers_not_ready"
+          mode: "native" as const
         });
   const requests: MockAdminV3Request[] = [];
   const publications: AdminWordPublicationAny[] = [clone(LEGACY_PUBLICATION)];
@@ -941,7 +935,7 @@ export async function mockAdminV3Api(
         duplicate: options.duplicate,
         surfaceWarnings: options.surfaceWarnings
       });
-      assertRuntimeFixture("DetectLexiconResponseAny", response);
+      assertRuntimeFixture("DetectLexiconSurfaceResponseV3", response);
       return json(route, 200, response);
     }
     if (
@@ -1004,8 +998,7 @@ export async function mockAdminV3Api(
       }
       word = {
         ...v3Word(ADMIN_V3_NEW_WORD_ID, surface, {
-          mode: "shadow_only",
-          blocked_code: "phase2_consumers_not_ready"
+          mode: "native" as const
         }),
         kind: input?.kind ?? surfaceKind,
         forms: { pos: [] },
@@ -1040,13 +1033,13 @@ export async function mockAdminV3Api(
           word: candidateWord,
           retired_stable_nodes: []
         };
-        assertRuntimeFixture("AdminWordDraftAnyEnvelope", response);
+        assertRuntimeFixture("AdminWordDraftV3Envelope", response);
         return json(route, 200, response);
       }
     }
     if (method === "GET" && path === `${ADMIN_V3_ENTRIES_PATH}/${word.id}`) {
       const response = { word: clone(word), retired_stable_nodes: [] };
-      assertRuntimeFixture("AdminWordDraftAnyEnvelope", response);
+      assertRuntimeFixture("AdminWordDraftV3Envelope", response);
       return json(route, 200, response);
     }
     if (

@@ -44,8 +44,7 @@ function peerForms(): DraftFormsStepContentV3 {
 
 function word(
   publication: AdminWordV3["capabilities"]["publication"] = {
-    mode: "shadow_only",
-    blocked_code: "phase2_consumers_not_ready"
+    mode: "native" as const
   }
 ): AdminWordV3 {
   return {
@@ -67,9 +66,6 @@ function word(
     capabilities: {
       publication,
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
-    },
-    compatibility: {
-      legacy_headwords: { mode: "unified", common: "legacy-learn" }
     },
     forms: peerForms(),
     meanings: { sense_groups: [], pos: [] },
@@ -108,7 +104,7 @@ function surfacePage(
 function allowedRequests(overrides: Record<string, unknown> = {}) {
   return {
     get: vi.fn().mockResolvedValue({
-      word: word({ mode: "migration_canary", whitelisted: true }),
+      word: word({ mode: "native" }),
       retired_stable_nodes: []
     }),
     validate: vi.fn().mockResolvedValue({
@@ -126,7 +122,7 @@ function allowedRequests(overrides: Record<string, unknown> = {}) {
     surfacePage: vi.fn(),
     publish: vi.fn().mockResolvedValue({
       word: {
-        ...word({ mode: "migration_canary", whitelisted: true }),
+        ...word({ mode: "native" }),
         status: "published",
         revision: 8
       }
@@ -155,7 +151,7 @@ function validationIssue(): V3DraftValidationIssue {
 
 describe("V3PreviewAndPublishStep", () => {
   it("uses only controlled Wizard state/actions and never creates a second request flow", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     let resolvePublish!: () => void;
     const publish = vi.fn(
       () =>
@@ -226,7 +222,7 @@ describe("V3PreviewAndPublishStep", () => {
     expect(directRequests.publish).not.toHaveBeenCalled();
   });
 
-  it("renders every base as a peer and stably blocks shadow-only publication", () => {
+  it("每个原形平级展示，不引入主形概念", () => {
     render(
       <V3PreviewAndPublishStep
         word={word()}
@@ -239,13 +235,6 @@ describe("V3PreviewAndPublishStep", () => {
     expect(screen.getByText("learnt")).toBeInTheDocument();
     expect(screen.getAllByText("原形")).toHaveLength(2);
     expect(screen.queryByText(/主词|主形|主原形/)).not.toBeInTheDocument();
-    expect(
-      screen.getByText("学习端尚未完成该词条结构的发布准备。")
-    ).toBeInTheDocument();
-    expect(screen.queryByText("phase2_consumers_not_ready")).toBeNull();
-    expect(
-      screen.queryByRole("button", { name: /发布/ })
-    ).not.toBeInTheDocument();
   });
 
   it("renders group membership order, shared forms once, regional sides, and every pronunciation style", () => {
@@ -399,8 +388,8 @@ describe("V3PreviewAndPublishStep", () => {
     );
   });
 
-  it("缺失成员、空音标与未入灰度能力使用产品回退", () => {
-    const current = word({ mode: "migration_canary", whitelisted: false });
+  it("缺失成员与空音标使用产品回退", () => {
+    const current = word({ mode: "native" });
     const form = commonFormFixture({
       pronunciations: [
         pronunciationFixture({
@@ -430,9 +419,6 @@ describe("V3PreviewAndPublishStep", () => {
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(906)}`)
     ).toHaveTextContent("常规");
-    expect(
-      screen.getByText("该词条暂未进入允许发布的迁移范围。")
-    ).toBeVisible();
   });
 
   it("受控校验问题统一按稳定 code 展示中文并隐藏内部代码", () => {
@@ -450,7 +436,7 @@ describe("V3PreviewAndPublishStep", () => {
     };
     render(
       <V3PreviewAndPublishStep
-        word={word({ mode: "migration_canary", whitelisted: true })}
+        word={word({ mode: "native" })}
         controller={controller}
       />
     );
@@ -464,7 +450,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("按原始总数、基本词性和问题类型汇总重复校验项并定位首项", () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const positions = [
       { code: "adjective", id: uuidFromInt(1001), count: 8 },
       { code: "noun", id: uuidFromInt(1002), count: 10 },
@@ -542,7 +528,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("passes an inferred non-current POS to publication issue navigation", () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const verbPosId = uuidFromInt(1301);
     current.forms.pos.push(
       formsFixture({ pos: "verb", pos_id: verbPosId }).pos[0]!
@@ -650,7 +636,7 @@ describe("V3PreviewAndPublishStep", () => {
 
     render(
       <V3PreviewAndPublishStep
-        word={word({ mode: "migration_canary", whitelisted: true })}
+        word={word({ mode: "native" })}
         controller={controller}
       />
     );
@@ -664,38 +650,8 @@ describe("V3PreviewAndPublishStep", () => {
     }
   });
 
-  it("shows publish controls for native or a whitelisted migration canary", () => {
-    const { rerender } = render(
-      <V3PreviewAndPublishStep
-        word={word({
-          mode: "migration_canary",
-          whitelisted: false,
-          blocked_code: "migration_canary_not_whitelisted"
-        })}
-        requests={allowedRequests()}
-        onPublished={vi.fn()}
-      />
-    );
-    expect(
-      screen.getByText("该词条暂未进入允许发布的迁移范围。")
-    ).toBeInTheDocument();
-    expect(screen.queryByText("migration_canary_not_whitelisted")).toBeNull();
-    expect(
-      screen.queryByRole("button", { name: /发布/ })
-    ).not.toBeInTheDocument();
-
-    rerender(
-      <V3PreviewAndPublishStep
-        word={word({ mode: "migration_canary", whitelisted: true })}
-        requests={allowedRequests()}
-        onPublished={vi.fn()}
-      />
-    );
-    expect(
-      screen.getByRole("button", { name: "检查发布条件" })
-    ).toBeInTheDocument();
-
-    rerender(
+  it("native 发布能力下始终展示发布入口", () => {
+    render(
       <V3PreviewAndPublishStep
         word={word({ mode: "native" })}
         requests={allowedRequests()}
@@ -708,7 +664,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("loads paged impact confirmation and binds both pages through the V3 save flow", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const impact = {
       schema_version: 3,
       base_revision: 7,
@@ -763,8 +719,8 @@ describe("V3PreviewAndPublishStep", () => {
     expect(screen.getByRole("button", { name: "发布词条" })).toBeEnabled();
   });
 
-  it("keeps compatibility read-only, omits it from publish, and single-flights a double click", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+  it("发布请求只带 schema_version 与 base_revision，双击只发一次", async () => {
+    const current = word({ mode: "native" });
     let resolvePublish!: (value: { word: AdminWordV3 }) => void;
     const publish = vi.fn(
       (
@@ -787,8 +743,6 @@ describe("V3PreviewAndPublishStep", () => {
         />
       </StrictMode>
     );
-    expect(screen.queryByText("legacy-learn")).toBeNull();
-    expect(screen.queryByText("兼容桥（只读）")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "检查发布条件" }));
     expect(await screen.findByText("影响预览：0 项")).toBeInTheDocument();
@@ -804,16 +758,13 @@ describe("V3PreviewAndPublishStep", () => {
       schema_version: 3,
       base_revision: 7
     });
-    expect(JSON.stringify(publish.mock.calls[0]?.[2])).not.toContain(
-      "compatibility"
-    );
 
     resolvePublish({ word: { ...current, revision: 8, status: "published" } });
     await waitFor(() => expect(publish).toHaveBeenCalledTimes(1));
   });
 
   it("reuses the standalone publish key when the main entry retries an unknown outcome", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const publish = vi
       .fn<
         (
@@ -847,7 +798,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("starts a new standalone publish key after a known successful response", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const publish = vi
       .fn<
         (
@@ -880,7 +831,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("paginates a publication surface warning, retries with its bound token, and preserves preview on failure", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const warning = new HttpError(
       409,
       "surface warning",
@@ -931,19 +882,10 @@ describe("V3PreviewAndPublishStep", () => {
       await screen.findByText("网络异常，发布失败，可原样重试。")
     ).toBeInTheDocument();
     expect(screen.getByText("learn / learnt")).toBeInTheDocument();
-    expect(screen.queryByText("legacy-learn")).toBeNull();
   });
 
-  it("renders a distinguish bridge and UK/US variants without deriving either into a request", () => {
+  it("英美式词形分别展示，且不派生成请求字段", () => {
     const current = word();
-    current.compatibility = {
-      legacy_headwords: {
-        mode: "distinguish",
-        uk: "legacy-uk",
-        us: "legacy-us",
-        source_dialect: "uk"
-      }
-    };
     current.forms = formsFixture({
       forms: [
         {
@@ -976,7 +918,6 @@ describe("V3PreviewAndPublishStep", () => {
         onPublished={vi.fn()}
       />
     );
-    expect(screen.queryByText("UK legacy-uk / US legacy-us")).toBeNull();
     expect(screen.getByText("colour")).toBeInTheDocument();
     expect(screen.getByText("color")).toBeInTheDocument();
   });
@@ -993,7 +934,7 @@ describe("V3PreviewAndPublishStep", () => {
     });
     render(
       <V3PreviewAndPublishStep
-        word={word({ mode: "migration_canary", whitelisted: true })}
+        word={word({ mode: "native" })}
         requests={requests}
         onPublished={vi.fn()}
       />
@@ -1006,7 +947,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("clears a standalone publish attempt and prepared state after a 422", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const issue = validationIssue();
     const publish = vi
       .fn()
@@ -1038,7 +979,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("accepts a top-level impact token before publishing the canonical response", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const published = { ...current, status: "published" as const, revision: 8 };
     const onPublished = vi.fn();
     const requests = allowedRequests({
@@ -1088,7 +1029,7 @@ describe("V3PreviewAndPublishStep", () => {
       });
       render(
         <V3PreviewAndPublishStep
-          word={word({ mode: "migration_canary", whitelisted: true })}
+          word={word({ mode: "native" })}
           requests={requests}
           onPublished={vi.fn()}
         />
@@ -1100,7 +1041,7 @@ describe("V3PreviewAndPublishStep", () => {
   );
 
   it("refreshes canonical before rotating an idempotency-conflict key and requires a fresh prepare", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     current.published_revision = 6;
     const refreshed = {
       ...current,
@@ -1201,7 +1142,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("reconciles a publish revision conflict before allowing a new revision and key", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const refreshed = {
       ...current,
       revision: 9,
@@ -1271,7 +1212,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("keeps standalone revision reconciliation blocked until a failed refresh is retried", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const refreshed = { ...current, revision: 9 };
     const get = vi
       .fn()
@@ -1306,7 +1247,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("does not apply a late revision reconciliation after the word prop changes", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const replacement = {
       ...current,
       presentation: { ...current.presentation, label: "replacement scope" }
@@ -1361,7 +1302,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("does not install a late revision reconciliation after unmount", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     let resolveGet!: (value: {
       word: AdminWordV3;
       retired_stable_nodes: [];
@@ -1407,7 +1348,7 @@ describe("V3PreviewAndPublishStep", () => {
   });
 
   it("keeps standalone publish blocked when idempotency reconciliation fails", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const publish = vi
       .fn<
         (
@@ -1449,7 +1390,7 @@ describe("V3PreviewAndPublishStep", () => {
   it.each(["validate", "impact", "publish"] as const)(
     "refreshes and renders an archived canonical when standalone %s returns entry_archived",
     async (command) => {
-      const current = word({ mode: "migration_canary", whitelisted: true });
+      const current = word({ mode: "native" });
       const archived = {
         ...current,
         status: "archived" as const,
@@ -1507,7 +1448,7 @@ describe("V3PreviewAndPublishStep", () => {
   );
 
   it("ignores a late standalone entry_archived response after the word prop scope changes", async () => {
-    const current = word({ mode: "migration_canary", whitelisted: true });
+    const current = word({ mode: "native" });
     const next = {
       ...current,
       lifecycle_revision: 3,

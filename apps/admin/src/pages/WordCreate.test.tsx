@@ -85,7 +85,7 @@ describe("WordCreatePage", () => {
       annotation: "1",
       annotation_visible: false
     });
-    client.setQueryData(wordKeys.detailAny("existing"), {
+    client.setQueryData(wordKeys.detail("existing"), {
       annotation_revision: 1
     });
     expect(client.getQueryState(listKey)?.isInvalidated).toBe(false);
@@ -108,7 +108,7 @@ describe("WordCreatePage", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(expected);
     expect(client.getQueryState(listKey)?.isInvalidated).toBe(true);
     expect(
-      client.getQueryState(wordKeys.detailAny("existing"))?.isInvalidated
+      client.getQueryState(wordKeys.detail("existing"))?.isInvalidated
     ).toBe(true);
   });
 });
