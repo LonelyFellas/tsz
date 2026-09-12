@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_generatedAt": "2026-09-12T02:22:11.620Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/phrase-pos-kind/docs/openapi.json",
+  "_generatedAt": "2026-09-12T08:01:58.033Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1683,6 +1683,7 @@
         "invalid_regional_variant_shape",
         "dialect_rules_invalid",
         "invalid_form_type_for_part_of_speech",
+        "part_of_speech_kind_mismatch",
         "forbidden_v3_field",
         "duplicate_node_id",
         "duplicate_pos_code",

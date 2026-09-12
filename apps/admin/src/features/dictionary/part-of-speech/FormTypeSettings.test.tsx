@@ -25,6 +25,7 @@ vi.mock("../dataSource", () => ({
       items: [
         {
           id: "pos-verb",
+          kind: "word",
           code: "verb",
           name_zh: "动词",
           name_en: "VERB",

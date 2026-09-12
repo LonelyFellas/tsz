@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/docs/openapi.json",
-  "_source_sha256": "5de5d7a9431364b355d72e380728a003321d160bcb9026163adf99fffcdd776d",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/phrase-pos-kind/docs/openapi.json",
+  "_source_sha256": "50ef26114f195e8027597c615730861bd094051d7d87912e9db7f5cc22e64fe9",
   "roots": [
     "EntryAnnotationResponse",
     "AdminWordV3",
@@ -1909,6 +1909,7 @@
         "invalid_regional_variant_shape",
         "dialect_rules_invalid",
         "invalid_form_type_for_part_of_speech",
+        "part_of_speech_kind_mismatch",
         "forbidden_v3_field",
         "duplicate_node_id",
         "duplicate_pos_code",

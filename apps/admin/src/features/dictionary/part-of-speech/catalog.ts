@@ -1,4 +1,5 @@
 import type {
+  AdminWordKind,
   PartOfSpeechCatalogItem,
   PartOfSpeechCatalogResponse,
   PartOfSpeechCode,
@@ -73,13 +74,19 @@ export function subPartOfSpeechLabel(
   return lookup.subPartByCode.get(code)?.short_name_zh ?? code;
 }
 
+/**
+ * 可选的基本词性。`kind` 给定时只列那一侧：单词词条挂短语词性（或反过来）会被后端
+ * 以 `part_of_speech_kind_mismatch` 拒绝，不该让它出现在候选里。
+ */
 export function availablePartOfSpeechOptions(
   lookup: PartOfSpeechLookup,
-  used: Iterable<PartOfSpeechCode> = []
+  used: Iterable<PartOfSpeechCode> = [],
+  kind?: AdminWordKind
 ) {
   const usedCodes = new Set(used);
   return lookup.items
     .filter((item) => !usedCodes.has(item.code))
+    .filter((item) => !kind || item.kind === kind)
     .map((item) => ({ value: item.code, label: item.short_name_zh }));
 }
 

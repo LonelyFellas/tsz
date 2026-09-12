@@ -15,7 +15,8 @@ import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
   PartOfSpeechCatalogResponse,
-  V3DraftValidationIssue
+  V3DraftValidationIssue,
+  WordEntryKindV3
 } from "@tsz/types";
 import { useEffect, useState } from "react";
 import { partOfSpeechDataSource } from "../../dataSource";
@@ -47,6 +48,8 @@ const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
 export interface V3FormsAndPronunciationStepProps {
   value: DraftFormsStepContentV3;
   onChange: (next: DraftFormsStepContentV3) => void;
+  /** 词条是单词还是短语；决定「添加基本词性」只列哪一侧。 */
+  entryKind?: WordEntryKindV3;
   activePosId?: string;
   onActivePosChange?: (posId: string) => void;
   issues?: readonly V3DraftValidationIssue[];
@@ -83,6 +86,7 @@ function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
 export function V3FormsAndPronunciationStep({
   value,
   onChange,
+  entryKind,
   activePosId,
   onActivePosChange,
   issues = [],
@@ -133,6 +137,7 @@ export function V3FormsAndPronunciationStep({
   const addPosSelect = (
     <V3AddBasicPosSelect
       catalog={catalog.data}
+      entryKind={entryKind}
       forms={value}
       isError={catalog.isError}
       isPending={catalog.isPending}

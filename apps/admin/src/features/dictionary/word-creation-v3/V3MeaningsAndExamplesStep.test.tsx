@@ -503,6 +503,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       items: [
         {
           id: "catalog-noun",
+          kind: "word",
           code: "noun",
           name_zh: "名词",
           name_en: "Noun",
@@ -517,6 +518,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         },
         {
           id: "catalog-verb",
+          kind: "word",
           code: "verb",
           name_zh: "动词",
           name_en: "Verb",
@@ -4031,6 +4033,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       items: [
         {
           id: "catalog-noun",
+          kind: "word",
           code: "noun",
           name_zh: "名词",
           name_en: "Noun",
@@ -4092,6 +4095,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       items: [
         {
           id: "catalog-noun",
+          kind: "word",
           code: "noun",
           name_zh: "名词",
           name_en: "Noun",
@@ -4431,6 +4435,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       items: [
         {
           id: "catalog-noun",
+          kind: "word",
           code: "noun",
           name_zh: "名词",
           name_en: "Noun",
@@ -4503,6 +4508,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       subPosRequired: boolean
     ) => ({
       id,
+      kind: "word" as const,
       code,
       name_zh: nameZh,
       name_en: code,

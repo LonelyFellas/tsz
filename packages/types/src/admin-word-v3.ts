@@ -762,6 +762,7 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "invalid_regional_variant_shape",
   "dialect_rules_invalid",
   "invalid_form_type_for_part_of_speech",
+  "part_of_speech_kind_mismatch",
   "forbidden_v3_field",
   "duplicate_node_id",
   "duplicate_pos_code",

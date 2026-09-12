@@ -23,6 +23,7 @@ vi.mock("./api", () => ({
 
 const value: PartOfSpeechConfig = {
   id: "pos-particle",
+  kind: "word",
   code: "particle",
   name_zh: "小品词",
   name_en: "PARTICLE",
@@ -46,6 +47,7 @@ function renderModal(editing?: PartOfSpeechConfig) {
   render(
     <PartOfSpeechFormModal
       open
+      kind={editing?.kind ?? "word"}
       value={editing}
       onClose={onClose}
       onSaved={onSaved}
@@ -87,6 +89,7 @@ describe("PartOfSpeechFormModal", () => {
 
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith({
+        kind: "word",
         code: "particle",
         name_zh: "小品词",
         name_en: "PARTICLE",
@@ -100,6 +103,41 @@ describe("PartOfSpeechFormModal", () => {
       expect.objectContaining({ id: value.id })
     );
     expect(callbacks.onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("短语侧提交时带上 kind 与 phrase_ 前缀的编码", async () => {
+    const onSaved = vi.fn();
+    render(
+      <PartOfSpeechFormModal
+        open
+        kind="phrase"
+        onClose={vi.fn()}
+        onSaved={onSaved}
+        onError={vi.fn()}
+      />
+    );
+    fireEvent.change(screen.getByLabelText("正式中文"), {
+      target: { value: "名词" }
+    });
+    fireEvent.change(screen.getByLabelText("正式英文"), {
+      target: { value: "NOUN" }
+    });
+    fireEvent.change(screen.getByLabelText("英文缩写"), {
+      target: { value: "n." }
+    });
+    fireEvent.change(screen.getByLabelText("简洁显示"), {
+      target: { value: "名词" }
+    });
+    fireEvent.change(screen.getByLabelText("英文全称"), {
+      target: { value: "noun" }
+    });
+    fireEvent.click(screen.getByText("新 建"));
+
+    await waitFor(() =>
+      expect(api.create).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "phrase", code: "phrase_noun" })
+      )
+    );
   });
 
   it("未引用配置修改时不暴露稳定编码，序号可改", async () => {
@@ -229,6 +267,7 @@ describe("PartOfSpeechFormModal 派生默认值", () => {
     const view = render(
       <PartOfSpeechFormModal
         open
+        kind="word"
         defaultSortOrder={60}
         onClose={vi.fn()}
         onSaved={vi.fn()}
@@ -274,11 +313,25 @@ describe("PartOfSpeechFormModal 派生默认值", () => {
 describe("derivePartOfSpeechCode", () => {
   it("把英文全称折成小写下划线编码，非字母开头时补前缀", async () => {
     const { derivePartOfSpeechCode } = await import("./PartOfSpeechFormModal");
-    expect(derivePartOfSpeechCode("noun")).toBe("noun");
-    expect(derivePartOfSpeechCode("  Focus Particle-Word  ")).toBe(
+    expect(derivePartOfSpeechCode("noun", "word")).toBe("noun");
+    expect(derivePartOfSpeechCode("  Focus Particle-Word  ", "word")).toBe(
       "focus_particle_word"
     );
-    expect(derivePartOfSpeechCode("3rd person")).toBe("p_3rd_person");
-    expect(derivePartOfSpeechCode("x".repeat(40))).toHaveLength(32);
+    expect(derivePartOfSpeechCode("3rd person", "word")).toBe("p_3rd_person");
+    expect(derivePartOfSpeechCode("x".repeat(40), "word")).toHaveLength(32);
+  });
+
+  it("phrase_ 前缀与短语双向绑定，且不超过 32 字", async () => {
+    const { derivePartOfSpeechCode } = await import("./PartOfSpeechFormModal");
+    expect(derivePartOfSpeechCode("noun", "phrase")).toBe("phrase_noun");
+    // 英文全称本就以 phrase 开头时，短语侧不重复加前缀之外的东西，单词侧必须避开这个命名空间。
+    expect(derivePartOfSpeechCode("phrase noun", "phrase")).toBe(
+      "phrase_phrase_noun"
+    );
+    expect(derivePartOfSpeechCode("phrase noun", "word")).toBe("w_phrase_noun");
+    expect(derivePartOfSpeechCode("x".repeat(40), "phrase")).toHaveLength(32);
+    expect(derivePartOfSpeechCode("x".repeat(40), "phrase")).toMatch(
+      /^phrase_/
+    );
   });
 });

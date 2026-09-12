@@ -36,7 +36,8 @@ import type {
   CefrLevel,
   Dialect,
   EntryLifecycleBatchResponse,
-  EntryReferenceKind
+  EntryReferenceKind,
+  WordPosTag
 } from "@tsz/types";
 import {
   useArchiveWord,
@@ -233,10 +234,21 @@ export function SmartDictionary({
     () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
     [partOfSpeechCatalog.data]
   );
+  // 选了词汇类型就把词性候选收到同一侧：单词词条不会挂短语词性，反过来也一样，
+  // 两者交叉筛选只会得到空列表。
+  const filterKind = Form.useWatch("kind", form);
   const partOfSpeechOptions = useMemo(
-    () => availablePartOfSpeechOptions(partOfSpeechLookup),
-    [partOfSpeechLookup]
+    () => availablePartOfSpeechOptions(partOfSpeechLookup, [], filterKind),
+    [partOfSpeechLookup, filterKind]
   );
+  // 收窄之后原来选中的词性可能已经不在候选里。不清掉的话 Select 会退化成显示原始编码，
+  // 还会跟着新类型一起提交，搜出一个空列表而界面上看不出是哪个条件冲突。
+  useEffect(() => {
+    const selected = form.getFieldValue("pos") as WordPosTag | undefined;
+    if (!selected) return;
+    if (partOfSpeechOptions.some((option) => option.value === selected)) return;
+    form.setFieldValue("pos", undefined);
+  }, [form, partOfSpeechOptions]);
   const kindOptions = adminWordsDataSourceCapabilities.phraseCreation
     ? KIND_OPTIONS
     : KIND_OPTIONS.filter((option) => option.value === "word");

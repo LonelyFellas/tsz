@@ -73,6 +73,7 @@ vi.mock("./api", () => ({
 const actor = { id: "admin-1", display_name: "管理员" };
 const parent: PartOfSpeechConfig = {
   id: "pos-noun",
+  kind: "word",
   code: "noun",
   name_zh: "名词",
   name_en: "NOUN",

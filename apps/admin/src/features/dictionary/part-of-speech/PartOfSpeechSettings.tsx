@@ -14,6 +14,7 @@ import {
   Flex,
   Form,
   Input,
+  Segmented,
   Select,
   Space,
   Table,
@@ -24,7 +25,7 @@ import {
 } from "antd";
 import type { TableColumnsType } from "antd";
 import { HttpError } from "@tsz/api-client";
-import type { PartOfSpeechConfig } from "@tsz/types";
+import type { AdminWordKind, PartOfSpeechConfig } from "@tsz/types";
 import dayjs from "dayjs";
 import { useRef, useState } from "react";
 import {
@@ -108,19 +109,35 @@ export function PartOfSpeechSettings() {
   const [activeTab, setActiveTab] = useState<"basic" | "detailed" | "forms">(
     "basic"
   );
+  // 单词与短语共用这一套配置界面，只是各看各的一侧；短语没有词形变化。
+  const [kind, setKind] = useState<AdminWordKind>("word");
   const [selectedPartId, setSelectedPartId] = useState("");
   const subPanelRef = useRef<SubPartOfSpeechPanelHandle>(null);
   const list = usePartOfSpeechConfigList({
     q: q || undefined,
+    kind,
     page,
     page_size: pageSize
   });
   const catalog = usePartOfSpeechCatalog();
   // 新建基本词性时排序值自动排在目录最后；目录没加载完前不开新建，免得算出错误的排序。
   const catalogReady = !catalog.isPending && !catalog.isError;
-  const defaultSortOrder = nextSortOrder(catalog.data?.items ?? []);
   const remove = useRemovePartOfSpeech();
-  const parts = catalog.data?.items ?? [];
+  // 目录一次返回两侧，界面按当前分页收窄：细分词性面板、序号预填都只看这一侧。
+  const parts = (catalog.data?.items ?? []).filter(
+    (item) => item.kind === kind
+  );
+  const defaultSortOrder = nextSortOrder(parts);
+
+  const switchKind = (next: AdminWordKind) => {
+    setKind(next);
+    setPage(1);
+    setSelectedPartId("");
+    // 短语没有词形变化，停在那个 Tab 上会看到一片和当前分页无关的内容。
+    setActiveTab((current) =>
+      next === "phrase" && current === "forms" ? "basic" : current
+    );
+  };
   // 空串表示「全部」：面板并排展示所有词性的细分词性；新增时在弹窗里选所属词性。
   const selectedPart = parts.find((item) => item.id === selectedPartId);
 
@@ -245,6 +262,15 @@ export function PartOfSpeechSettings() {
             统一维护智能词库使用的基本词性、细分词性与词形变化；业务页面显示「简洁显示」的名称。
           </Typography.Text>
         </div>
+        <Segmented<AdminWordKind>
+          aria-label="配置对象"
+          value={kind}
+          onChange={switchKind}
+          options={[
+            { value: "word", label: "单词" },
+            { value: "phrase", label: "短语" }
+          ]}
+        />
       </Flex>
 
       {/* Tab 自带的上内边距与下外边距会让它和上下块的间距比页面统一的 16px 大，这里归零。 */}
@@ -263,12 +289,13 @@ export function PartOfSpeechSettings() {
           items={[
             { key: "basic", label: "基本词性" },
             { key: "detailed", label: "细分词性" },
-            { key: "forms", label: "词形变化" }
+            // 短语只有基本词性与细分词性，没有词形变化。
+            ...(kind === "phrase" ? [] : [{ key: "forms", label: "词形变化" }])
           ]}
         />
       </ConfigProvider>
 
-      {activeTab === "forms" ? (
+      {activeTab === "forms" && kind === "word" ? (
         <FormTypeSettings />
       ) : activeTab === "basic" ? (
         <>
@@ -433,6 +460,7 @@ export function PartOfSpeechSettings() {
       <PartOfSpeechFormModal
         open={formOpen}
         value={editing}
+        kind={editing?.kind ?? kind}
         defaultSortOrder={defaultSortOrder}
         onClose={() => setFormOpen(false)}
         onSaved={(saved) => {

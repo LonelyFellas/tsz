@@ -62,6 +62,7 @@ export function createPartOfSpeechSeed(nowIso: string): {
   const partsOfSpeech = BASE_SEED.map(
     ([code, nameZh, nameEn, abbreviation], index): PartOfSpeechConfig => ({
       id: `pos-config-${code}`,
+      kind: "word",
       code,
       name_zh: nameZh,
       name_en: nameEn,

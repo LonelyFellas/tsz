@@ -2310,6 +2310,7 @@ function V3MeaningsAndExamplesStepContent({
     forms && addBasicPos ? (
       <V3AddBasicPosSelect
         catalog={partOfSpeechCatalog}
+        entryKind={entryKind}
         forms={forms}
         isError={partOfSpeechCatalogError}
         isPending={partOfSpeechCatalogPending}

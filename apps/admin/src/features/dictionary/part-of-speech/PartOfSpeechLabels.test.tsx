@@ -17,6 +17,7 @@ function SubPosLabel({ code }: { code: string }) {
 
 const noun: PartOfSpeechCatalogItem = {
   id: "pos-noun",
+  kind: "word",
   code: "noun",
   name_zh: "名词",
   name_en: "NOUN",

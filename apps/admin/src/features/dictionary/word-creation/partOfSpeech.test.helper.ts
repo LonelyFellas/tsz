@@ -60,6 +60,7 @@ export const partOfSpeechCatalogFixture: PartOfSpeechCatalogResponse = {
   })),
   items: seed.partsOfSpeech.map((part) => ({
     id: part.id,
+    kind: part.kind,
     code: part.code,
     name_zh: part.name_zh,
     name_en: part.name_en,
