@@ -105,6 +105,41 @@ describe("PartOfSpeechFormModal", () => {
     expect(callbacks.onClose).toHaveBeenCalledTimes(1);
   });
 
+  it("短语侧提交时带上 kind 与 phrase_ 前缀的编码", async () => {
+    const onSaved = vi.fn();
+    render(
+      <PartOfSpeechFormModal
+        open
+        kind="phrase"
+        onClose={vi.fn()}
+        onSaved={onSaved}
+        onError={vi.fn()}
+      />
+    );
+    fireEvent.change(screen.getByLabelText("正式中文"), {
+      target: { value: "名词" }
+    });
+    fireEvent.change(screen.getByLabelText("正式英文"), {
+      target: { value: "NOUN" }
+    });
+    fireEvent.change(screen.getByLabelText("英文缩写"), {
+      target: { value: "n." }
+    });
+    fireEvent.change(screen.getByLabelText("简洁显示"), {
+      target: { value: "名词" }
+    });
+    fireEvent.change(screen.getByLabelText("英文全称"), {
+      target: { value: "noun" }
+    });
+    fireEvent.click(screen.getByText("新 建"));
+
+    await waitFor(() =>
+      expect(api.create).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "phrase", code: "phrase_noun" })
+      )
+    );
+  });
+
   it("未引用配置修改时不暴露稳定编码，序号可改", async () => {
     const callbacks = renderModal(value);
     expect(screen.queryByLabelText("稳定编码")).toBeNull();
