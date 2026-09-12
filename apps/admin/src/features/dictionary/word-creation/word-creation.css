@@ -1557,8 +1557,8 @@
 
 .word-definition-list-header {
   grid-template-columns:
-    28px minmax(58px, 64px) minmax(128px, 150px) minmax(0, 1fr)
-    minmax(180px, 260px) var(--word-ops-col, 32px);
+    28px minmax(58px, 64px) minmax(72px, 88px) minmax(104px, 128px)
+    minmax(0, 1fr) minmax(180px, 260px) var(--word-ops-col, 32px);
 }
 
 .word-sentence-list-header {
@@ -1569,8 +1569,8 @@
 
 .word-table-row.word-definition-row {
   grid-template-columns:
-    28px minmax(58px, 64px) minmax(128px, 150px) minmax(0, 1fr)
-    minmax(180px, 260px) var(--word-ops-col, 32px);
+    28px minmax(58px, 64px) minmax(72px, 88px) minmax(104px, 128px)
+    minmax(0, 1fr) minmax(180px, 260px) var(--word-ops-col, 32px);
   padding-block: 9px;
 }
 
