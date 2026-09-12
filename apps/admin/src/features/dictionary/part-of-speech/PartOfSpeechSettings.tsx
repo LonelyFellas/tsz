@@ -253,25 +253,14 @@ export function PartOfSpeechSettings() {
   return (
     <Flex vertical gap={16}>
       <Breadcrumb items={[{ title: "系统设置" }, { title: "词性配置" }]} />
-      <Flex justify="space-between" align="center" wrap gap={12}>
-        <div>
-          <Typography.Title level={3} style={{ margin: 0 }}>
-            词性配置
-          </Typography.Title>
-          <Typography.Text type="secondary" style={{ display: "block" }}>
-            统一维护智能词库使用的基本词性、细分词性与词形变化；业务页面显示「简洁显示」的名称。
-          </Typography.Text>
-        </div>
-        <Segmented<AdminWordKind>
-          aria-label="配置对象"
-          value={kind}
-          onChange={switchKind}
-          options={[
-            { value: "word", label: "单词" },
-            { value: "phrase", label: "短语" }
-          ]}
-        />
-      </Flex>
+      <div>
+        <Typography.Title level={3} style={{ margin: 0 }}>
+          词性配置
+        </Typography.Title>
+        <Typography.Text type="secondary" style={{ display: "block" }}>
+          统一维护智能词库使用的基本词性、细分词性与词形变化；业务页面显示「简洁显示」的名称。
+        </Typography.Text>
+      </div>
 
       {/* Tab 自带的上内边距与下外边距会让它和上下块的间距比页面统一的 16px 大，这里归零。 */}
       <ConfigProvider
@@ -282,18 +271,27 @@ export function PartOfSpeechSettings() {
         }}
       >
         <Tabs
-          activeKey={activeTab}
-          onChange={(key) =>
-            setActiveTab(key as "basic" | "detailed" | "forms")
-          }
+          size="large"
+          activeKey={kind}
+          onChange={(key) => switchKind(key as AdminWordKind)}
           items={[
-            { key: "basic", label: "基本词性" },
-            { key: "detailed", label: "细分词性" },
-            // 短语只有基本词性与细分词性，没有词形变化。
-            ...(kind === "phrase" ? [] : [{ key: "forms", label: "词形变化" }])
+            { key: "word", label: "单词" },
+            { key: "phrase", label: "短语" }
           ]}
         />
       </ConfigProvider>
+
+      <Segmented
+        aria-label="配置分区"
+        value={activeTab}
+        onChange={(key) => setActiveTab(key as "basic" | "detailed" | "forms")}
+        style={{ alignSelf: "flex-start" }}
+        options={[
+          { value: "basic", label: "基本词性" },
+          { value: "detailed", label: "细分词性" },
+          ...(kind === "phrase" ? [] : [{ value: "forms", label: "词形变化" }])
+        ]}
+      />
 
       {activeTab === "forms" && kind === "word" ? (
         <FormTypeSettings />

@@ -308,11 +308,8 @@ describe("PartOfSpeechSettings", () => {
   it("配置页顶部显示基本/细分 Tab，默认展示基本词性管理", () => {
     renderSettings();
 
-    expect(screen.getByRole("tab", { name: "基本词性" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
-    expect(screen.getByRole("tab", { name: "细分词性" })).toBeVisible();
+    expect(sectionSelected("基本词性")).toBe(true);
+    expect(section("细分词性")).toBeVisible();
     expect(screen.getByText("正式中文", { selector: "th" })).toBeVisible();
     expect(screen.getByText("正式英文", { selector: "th" })).toBeVisible();
     expect(screen.queryByText("稳定编码")).toBeNull();
@@ -358,7 +355,7 @@ describe("PartOfSpeechSettings", () => {
   it("细分词性 Tab 默认「全部」展示所有基本词性，并支持切换所属基本词性", async () => {
     renderSettings();
 
-    fireEvent.click(screen.getByRole("tab", { name: "细分词性" }));
+    fireEvent.click(section("细分词性")!);
     expect(screen.getByText("全部", { exact: true })).toBeVisible();
     expect(screen.getByTestId("sub-panel")).toHaveTextContent(
       "细分-pos-noun,pos-particle,pos-verb/新建父级-无"
@@ -373,7 +370,7 @@ describe("PartOfSpeechSettings", () => {
   it("父级下拉支持按基本词性中文名搜索", async () => {
     renderSettings();
 
-    fireEvent.click(screen.getByRole("tab", { name: "细分词性" }));
+    fireEvent.click(section("细分词性")!);
     const selector = screen.getByLabelText("所属基本词性");
     fireEvent.mouseDown(selector);
     fireEvent.change(selector, { target: { value: "动" } });
@@ -393,9 +390,7 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.click(screen.getByText("新增基本词性"));
     fireEvent.click(screen.getByText("模拟保存基本词性"));
 
-    expect(
-      await screen.findByRole("tab", { name: "细分词性", selected: true })
-    ).toBeVisible();
+    await waitFor(() => expect(sectionSelected("细分词性")).toBe(true));
     expect(screen.getByText("新动词", { exact: true })).toBeVisible();
     expect(screen.getByTestId("sub-panel")).toHaveTextContent(
       "细分-pos-created"
@@ -409,10 +404,7 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.click(screen.getByText("模拟保存选填细分的词性"));
 
     expect(await screen.findByText("基本词性已新增")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "细分词性" })).toHaveAttribute(
-      "aria-selected",
-      "true"
-    );
+    expect(sectionSelected("细分词性")).toBe(true);
     // 新建的词性还没进目录快照，这里只看跳转本身：面板已经在细分词性 Tab 上。
     expect(screen.getByTestId("sub-panel")).toBeInTheDocument();
   });
@@ -430,14 +422,14 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.click(screen.getByText("关闭基本词性表单"));
     expect(screen.queryByTestId("part-form")).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("tab", { name: "基本词性" }));
+    fireEvent.click(section("基本词性")!);
     const particleRow = screen.getByText("小品词").closest("tr")!;
     fireEvent.click(within(particleRow).getByText("修 改"));
     fireEvent.click(screen.getByText("模拟保存基本词性"));
     expect(await screen.findByText("基本词性已更新")).toBeInTheDocument();
     fireEvent.click(screen.getByText("关闭基本词性表单"));
 
-    fireEvent.click(screen.getByRole("tab", { name: "细分词性" }));
+    fireEvent.click(section("细分词性")!);
     fireEvent.click(screen.getByText("模拟保存细分词性"));
     expect(await screen.findByText("细分词性已保存")).toBeInTheDocument();
     fireEvent.click(screen.getByText("模拟细分词性错误"));
@@ -474,27 +466,48 @@ describe("PartOfSpeechSettings", () => {
     );
   });
 
-  // 「词形变化」「细分词性」这两个词在 Tab 与表格列头上都出现，按 rc-tabs 的稳定 id 定位。
-  const tab = (key: string) =>
-    document.querySelector<HTMLElement>(`[id$="-tab-${key}"]`);
+  // 「词形变化」「细分词性」这些词在分区、表格列头上都出现，按 Segmented 的选项节点定位。
+  const section = (label: string) =>
+    Array.from(
+      document.querySelectorAll<HTMLElement>(".ant-segmented-item-label")
+    ).find((node) => node.textContent?.trim() === label) ?? null;
+
+  const sectionSelected = (label: string) =>
+    !!section(label)
+      ?.closest(".ant-segmented-item")
+      ?.classList.contains("ant-segmented-item-selected");
+
+  it("单词/短语是一级 Tab，分区降为二级", () => {
+    const { container } = renderSettings();
+    // jsdom 不做布局，量不了像素；能钉住的是 DOM 顺序——切换必须在 Tab 栏之前出现，
+    // 否则它又会被摆回标题行右端那种扫不到的位置。
+    const nodes = Array.from(
+      container.querySelectorAll(".ant-tabs-nav, .ant-segmented")
+    );
+    // 一级（单词/短语）必须排在分区之前，否则层级又会反过来。
+    expect(nodes[0]?.className).toContain("ant-tabs-nav");
+    expect(nodes[1]?.className).toContain("ant-segmented");
+    expect(screen.getByRole("tab", { name: "单词" })).toBeVisible();
+    expect(screen.getByRole("tab", { name: "短语" })).toBeVisible();
+  });
 
   it("切到短语：列表查询带上 kind，并隐藏词形变化 Tab", async () => {
     renderSettings();
     expect(mock.queries.at(-1)).toMatchObject({ kind: "word" });
-    expect(tab("forms")).not.toBeNull();
+    expect(section("词形变化")).not.toBeNull();
 
-    fireEvent.click(screen.getByText("短语"));
+    fireEvent.click(screen.getByRole("tab", { name: "短语" }));
     await waitFor(() =>
       expect(mock.queries.at(-1)).toMatchObject({ kind: "phrase", page: 1 })
     );
     // 短语没有词形变化，那个 Tab 不该留在页面上。
-    expect(tab("forms")).toBeNull();
+    expect(section("词形变化")).toBeNull();
 
-    fireEvent.click(screen.getByText("单词"));
+    fireEvent.click(screen.getByRole("tab", { name: "单词" }));
     await waitFor(() =>
       expect(mock.queries.at(-1)).toMatchObject({ kind: "word", page: 1 })
     );
-    expect(tab("forms")).not.toBeNull();
+    expect(section("词形变化")).not.toBeNull();
   });
 
   it("短语侧细分词性的父级候选只列短语词性", async () => {
@@ -515,8 +528,8 @@ describe("PartOfSpeechSettings", () => {
     };
     renderSettings();
 
-    fireEvent.click(screen.getByText("短语"));
-    fireEvent.click(tab("detailed")!);
+    fireEvent.click(screen.getByRole("tab", { name: "短语" }));
+    fireEvent.click(section("细分词性")!);
     // 面板按「全部」并排展示当前一侧的全部父级：短语侧只该有短语名词。
     await waitFor(() =>
       expect(screen.getByTestId("sub-panel")).toHaveTextContent(
@@ -705,7 +718,7 @@ describe("PartOfSpeechSettings", () => {
     mock.catalog.data = undefined;
     renderSettings();
 
-    fireEvent.click(screen.getByRole("tab", { name: "细分词性" }));
+    fireEvent.click(section("细分词性")!);
     expect(screen.getByText("基本词性目录加载失败")).toBeVisible();
     expect(screen.getByLabelText("所属基本词性")).toBeDisabled();
     expect(screen.getByText("新增细分词性").closest("button")).toBeDisabled();
@@ -716,7 +729,7 @@ describe("PartOfSpeechSettings", () => {
   it("细分词性 Tab 的新增按钮在「全部」下也可用，点击后交给面板打开新建", () => {
     renderSettings();
 
-    fireEvent.click(screen.getByRole("tab", { name: "细分词性" }));
+    fireEvent.click(section("细分词性")!);
     const addButton = screen.getByText("新增细分词性").closest("button")!;
     expect(addButton).toBeEnabled();
     expect(addButton.parentElement).not.toHaveAttribute("data-tooltip");
@@ -728,7 +741,7 @@ describe("PartOfSpeechSettings", () => {
     mock.catalog.data = { catalog_version: 1, items: [] };
     renderSettings();
 
-    fireEvent.click(screen.getByRole("tab", { name: "细分词性" }));
+    fireEvent.click(section("细分词性")!);
     const addButton = screen.getByText("新增细分词性").closest("button")!;
     expect(addButton).toBeDisabled();
     expect(addButton.parentElement).toHaveAttribute(
