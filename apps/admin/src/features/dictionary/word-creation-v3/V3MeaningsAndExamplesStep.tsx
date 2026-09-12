@@ -646,57 +646,29 @@ function SenseGroupsCard({
               />
             </div>
             <div className="word-sense-group-field">
-              <V3VoiceTextField
-                mode="grammar"
-                dialect="common"
-                audioUploadEnabled={false}
-                ariaLabel={`语义区间 ${groupIndex + 1} 英文`}
-                field="name_en"
-                nodeId={group.id}
-                leadingAction={
-                  <PronunciationPreviewControls
-                    playbackOnly
-                    pronunciationId={group.id}
-                    dialect="common"
-                    ariaLabelPrefix={`语义区间 ${groupIndex + 1} 英文`}
-                    content={toRichTextV2(
-                      group.name_en_rich ?? {
-                        version: 2,
-                        text: group.name_en,
-                        annotations: []
-                      }
-                    )}
-                    voiceProfile={group.voice_profile}
-                  />
-                }
-                onChange={(next) =>
+              <Input
+                aria-label={`语义区间 ${groupIndex + 1} 英文`}
+                data-v3-field="name_en"
+                data-v3-node-id={group.id}
+                onChange={(event) =>
                   change((draft) => {
                     const target = draft.sense_groups.find(
                       (candidate) => candidate.id === group.id
                     );
                     if (target) {
-                      target.name_en = next.text;
-                      target.name_en_rich = next;
+                      target.name_en = event.target.value;
+                      if (target.name_en_rich) {
+                        target.name_en_rich = {
+                          version: 2,
+                          text: event.target.value,
+                          annotations: []
+                        };
+                      }
                     }
                   })
                 }
-                voiceProfile={group.voice_profile}
-                onVoiceProfileChange={(voice_profile) =>
-                  change((draft) => {
-                    const target = draft.sense_groups.find(
-                      (candidate) => candidate.id === group.id
-                    );
-                    if (target) target.voice_profile = voice_profile;
-                  })
-                }
                 placeholder="例如 Core geometric and physical space"
-                value={
-                  group.name_en_rich ?? {
-                    version: 2,
-                    text: group.name_en,
-                    annotations: []
-                  }
-                }
+                value={group.name_en}
               />
             </div>
             <Space
@@ -877,8 +849,10 @@ function withDefinitionMode(
   definitionMode: DefinitionModeV3,
   idFactory: () => string
 ): WordDefinitionV3 {
+  if (definition.definition_mode === definitionMode) return definition;
+  // 语言/方式属于节点绑定；切换后正文也必须使用新的父子节点 ID。
   const base = {
-    id: definition.id,
+    id: idFactory(),
     level: definition.level,
     ...(definition.grammar_structure_id
       ? { grammar_structure_id: definition.grammar_structure_id }
@@ -888,29 +862,34 @@ function withDefinitionMode(
     return {
       ...base,
       definition_mode: definitionMode,
-      content_id:
-        definition.definition_mode === "zh_definition" ||
-        definition.definition_mode === "zh_sentence"
-          ? definition.content_id
-          : idFactory(),
+      content_id: idFactory(),
       content: definitionRichText(definition)
     };
+  }
+  if (
+    definition.definition_mode === "en_definition" ||
+    definition.definition_mode === "en_sentence"
+  ) {
+    const content = structuredClone(definition.content);
+    if (content.mode === "unified") content.common.id = idFactory();
+    else {
+      for (const slot of [content.uk, content.us]) {
+        if (slot.state === "ready") slot.variant.id = idFactory();
+      }
+    }
+    return { ...base, definition_mode: definitionMode, content };
   }
   return {
     ...base,
     definition_mode: definitionMode,
-    content:
-      definition.definition_mode === "en_definition" ||
-      definition.definition_mode === "en_sentence"
-        ? definition.content
-        : {
-            mode: "unified",
-            common: {
-              id: idFactory(),
-              origin: "manual",
-              value: definition.content as RichTextV3
-            }
-          }
+    content: {
+      mode: "unified",
+      common: {
+        id: idFactory(),
+        origin: "manual",
+        value: definition.content as RichTextV3
+      }
+    }
   };
 }
 
@@ -3469,11 +3448,15 @@ function V3MeaningsAndExamplesStepContent({
                                                     item.band ===
                                                     DEFAULT_SENTENCE_TRANSLATION_BAND
                                                 ) ?? translations[0]!;
-                                              draft.pos[posIndex]!.senses[
-                                                senseIndex
-                                              ]!.sentences.push({
+                                              const sentences =
+                                                draft.pos[posIndex]!.senses[
+                                                  senseIndex
+                                                ]!.sentences;
+                                              sentences.push({
                                                 id: idFactory(),
-                                                level: "B1",
+                                                level:
+                                                  sentences.at(-1)?.level ??
+                                                  "B1",
                                                 en_text: {
                                                   mode: "unified",
                                                   common: {
@@ -3517,7 +3500,7 @@ function V3MeaningsAndExamplesStepContent({
                                       count={
                                         groupRelations(sense.relations).length
                                       }
-                                      label="关联词"
+                                      label="拓展词"
                                       onToggle={() =>
                                         toggleSenseSection(
                                           sense.id,

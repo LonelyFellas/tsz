@@ -266,7 +266,10 @@ export function buildV3ProductProgress({
       })),
     sense_groups: meanings.sense_groups.map((group, index) => ({
       key: group.id,
-      label: `${index + 1}. ${group.name_zh.trim() || group.name_en.trim() || "待填写语义区间"}`
+      label: `${index + 1}. ${group.name_zh.trim() || group.name_en.trim() || "待填写语义区间"}`,
+      count: senseEntries.filter(
+        ({ sense }) => sense.sense_group_id === group.id
+      ).length
     })),
     grammar_structures: positions.map((pos) => ({
       key: pos.key,

@@ -143,12 +143,7 @@ function renderPanel(value: PartOfSpeechConfig | null = parent) {
   return { onSaved, onError, openCreate, ...view };
 }
 
-function fillSubForm(values: {
-  nameZh: string;
-  nameEn: string;
-  /** 编码由管理员填；只读（已被引用）时用例不要传，免得改到禁用输入。 */
-  code?: string;
-}) {
+function fillSubForm(values: { nameZh: string; nameEn: string }) {
   // 三个展示字段按同一约定派生，便于用例只关心中英文名。
   const fields: [string, string][] = [
     ["正式中文", values.nameZh],
@@ -157,7 +152,6 @@ function fillSubForm(values: {
     ["英文缩写", "n."],
     ["英文全称", values.nameEn.toLowerCase()]
   ];
-  if (values.code) fields.unshift(["编码", values.code]);
   for (const [label, value] of fields) {
     fireEvent.change(screen.getByLabelText(label), { target: { value } });
   }
@@ -207,13 +201,13 @@ describe("SubPartOfSpeechPanel", () => {
     expect(screen.getByText("暂无基本词性")).toBeVisible();
   });
 
-  it("新增细分词性提交父 id 与管理员填的编码", async () => {
+  it("新增细分词性自动生成内部编码且不展示编码列或输入", async () => {
     const callbacks = renderPanel();
     callbacks.openCreate();
+    expect(screen.queryByText("编码")).not.toBeInTheDocument();
     // 已选定具体父级：所属基本词性锁定为该词性，不再让用户改。
     expect(screen.getByLabelText("所属基本词性")).toBeDisabled();
     fillSubForm({
-      code: "N-MASS",
       nameZh: "物质名词",
       nameEn: "Mass noun"
     });
@@ -223,7 +217,7 @@ describe("SubPartOfSpeechPanel", () => {
       expect(api.create).toHaveBeenCalledWith({
         partId: "pos-noun",
         input: {
-          code: "N-MASS",
+          code: expect.stringMatching(/^SUB_[A-F0-9]{28}$/),
           name_zh: "物质名词",
           name_en: "Mass noun",
           short_name_zh: "物质名词",
@@ -236,33 +230,38 @@ describe("SubPartOfSpeechPanel", () => {
     expect(callbacks.onSaved).toHaveBeenCalledWith("细分词性已新增");
   });
 
-  it("编码不合格式时拦在前端，不发请求", async () => {
-    const callbacks = renderPanel();
-    callbacks.openCreate();
-    fillSubForm({
-      code: "n mass",
-      nameZh: "物质名词",
-      nameEn: "Mass noun"
+  it("HTTP 环境缺少 randomUUID 时仍能创建细分词性", async () => {
+    const originalCrypto = globalThis.crypto;
+    vi.stubGlobal("crypto", {
+      getRandomValues: originalCrypto.getRandomValues.bind(originalCrypto)
     });
-    fireEvent.click(screen.getByText("新 建"));
-
-    expect(
-      await screen.findByText(
-        "编码为大写字母开头的大写字母、数字、- 或 _，最长 32 位"
-      )
-    ).toBeInTheDocument();
-    expect(api.create).not.toHaveBeenCalled();
+    try {
+      const callbacks = renderPanel();
+      callbacks.openCreate();
+      fillSubForm({ nameZh: "物质名词", nameEn: "Mass noun" });
+      fireEvent.click(screen.getByText("新 建"));
+      await waitFor(() =>
+        expect(api.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            input: expect.objectContaining({
+              code: expect.stringMatching(/^SUB_[A-F0-9]{28}$/)
+            })
+          })
+        )
+      );
+      expect(callbacks.onError).not.toHaveBeenCalled();
+    } finally {
+      vi.stubGlobal("crypto", originalCrypto);
+    }
   });
 
-  it("未引用细分词性回填原编码与序号，可以改编码", async () => {
+  it("修改未引用细分词性不提交编码，仍可修改名称和序号", async () => {
     renderPanel();
     const row = screen.getByText("集合名词").closest("tr")!;
     fireEvent.click(within(row).getByText("修 改"));
-    expect(screen.getByLabelText("编码")).toHaveValue("N-COLLECTIVE");
-    expect(screen.getByLabelText("编码")).toBeEnabled();
+    expect(screen.queryByLabelText("编码")).not.toBeInTheDocument();
     expect(screen.getByLabelText("序号")).toHaveValue("20");
     fillSubForm({
-      code: "N-COLL",
       nameZh: "集合类名词",
       nameEn: "Collective noun"
     });
@@ -274,7 +273,6 @@ describe("SubPartOfSpeechPanel", () => {
         subId: "sub-collective",
         input: {
           base_revision: 1,
-          code: "N-COLL",
           name_zh: "集合类名词",
           name_en: "Collective noun",
           short_name_zh: "集合类名词",
@@ -286,20 +284,16 @@ describe("SubPartOfSpeechPanel", () => {
     );
   });
 
-  it("已被词义引用的细分词性编码只读并说明原因", () => {
+  it("已被词义引用的细分词性不展示编码且仍可编辑序号", () => {
     renderPanel();
     const row = screen.getByText("可数名词").closest("tr")!;
     fireEvent.click(within(row).getByText("修 改"));
-    expect(screen.getByLabelText("编码")).toBeDisabled();
-    // 弹窗内的节点在 jsdom 里祖先被判定为不可见，只断言存在。
-    expect(
-      screen.getByText("已有 4 个词义引用，编码不能再改")
-    ).toBeInTheDocument();
+    expect(screen.queryByLabelText("编码")).not.toBeInTheDocument();
     // 序号不受引用限制，照样能改。
     expect(screen.getByLabelText("序号")).toBeEnabled();
   });
 
-  it("编码只读时提交仍带原编码，序号照样能改", async () => {
+  it("已引用细分词性修改序号时不提交编码", async () => {
     renderPanel();
     const row = screen.getByText("可数名词").closest("tr")!;
     fireEvent.click(within(row).getByText("修 改"));
@@ -311,19 +305,18 @@ describe("SubPartOfSpeechPanel", () => {
       expect(api.update).toHaveBeenCalledWith(
         expect.objectContaining({
           subId: "sub-count",
-          input: expect.objectContaining({ code: "N-COUNT", sort_order: 5 })
+          input: expect.objectContaining({ sort_order: 5 })
         })
       )
     );
+    expect(api.update.mock.calls[0]![0].input).not.toHaveProperty("code");
   });
 
   it("正式英文在同一基本词性下允许重复", async () => {
     renderPanel();
     const row = screen.getByText("集合名词").closest("tr")!;
     fireEvent.click(within(row).getByText("修 改"));
-    // 代码文本落在编码上，两条更细的划分共用一个 Collins 编码不再是冲突。
     fillSubForm({
-      code: "N-UNCOUNT-ABSTRACT",
       nameZh: "不可数抽象名词",
       nameEn: "Countable noun"
     });
@@ -382,7 +375,7 @@ describe("SubPartOfSpeechPanel", () => {
     api.create.mockRejectedValue(failure);
     const callbacks = renderPanel();
     callbacks.openCreate();
-    fillSubForm({ code: "N-MASS", nameZh: "物质名词", nameEn: "Mass noun" });
+    fillSubForm({ nameZh: "物质名词", nameEn: "Mass noun" });
     fireEvent.click(screen.getByText("新 建"));
     await waitFor(() =>
       expect(callbacks.onError).toHaveBeenCalledWith(failure)
@@ -510,7 +503,6 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
       )!
     );
     fillSubForm({
-      code: "V-CAUS",
       nameZh: "使役动词",
       nameEn: "Causative verb"
     });
@@ -522,7 +514,7 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
       expect(api.create).toHaveBeenCalledWith({
         partId: "pos-verb",
         input: expect.objectContaining({
-          code: "V-CAUS",
+          code: expect.stringMatching(/^SUB_[A-F0-9]{28}$/),
           name_zh: "使役动词",
           sort_order: 7
         })
@@ -549,12 +541,11 @@ describe("SubPartFormModal 表单默认值", () => {
     await waitFor(() =>
       expect(screen.getByLabelText("序号")).toHaveValue("30")
     );
-    // 编码没有默认值：代码文本只能由管理员自己指定。
-    expect(screen.getByLabelText("编码")).toHaveValue("");
+    expect(screen.queryByLabelText("编码")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("序号"), {
       target: { value: "15" }
     });
-    fillSubForm({ code: "N-MASS", nameZh: "物质名词", nameEn: "Mass noun" });
+    fillSubForm({ nameZh: "物质名词", nameEn: "Mass noun" });
     // 简洁显示由正式中文异步派生，等它落定再提交，否则必填校验会拦下。
     await waitFor(() =>
       expect(screen.getByLabelText("简洁显示")).toHaveValue("物质名词")
@@ -564,7 +555,7 @@ describe("SubPartFormModal 表单默认值", () => {
       expect(api.create).toHaveBeenCalledWith(
         expect.objectContaining({
           partId: "pos-noun",
-          input: expect.objectContaining({ code: "N-MASS", sort_order: 15 })
+          input: expect.objectContaining({ sort_order: 15 })
         })
       )
     );

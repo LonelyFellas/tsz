@@ -133,6 +133,10 @@
   background: var(--word-us);
 }
 
+.dialect-dot-common {
+  background: #566e62;
+}
+
 .word-summary-language,
 .word-creation-progress-row {
   display: grid;

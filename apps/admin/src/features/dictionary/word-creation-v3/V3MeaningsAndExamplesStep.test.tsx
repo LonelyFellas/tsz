@@ -373,12 +373,12 @@ describe("V3MeaningsAndExamplesStep", () => {
         />
       </AntApp>
     );
-    // 位置：多维释义 → 成分用词 → 多维例句 → 关联词
+    // 位置：多维释义 → 成分用词 → 多维例句 → 拓展词
     const sectionTitles = Array.from(
       container.querySelectorAll(".word-sense-section-title")
     ).map((node) => node.textContent?.replace(/\s+/g, "") ?? "");
     expect(sectionTitles.join("|")).toMatch(
-      /多维释义.*\|成分用词.*\|多维例句.*\|关联词/
+      /多维释义.*\|成分用词.*\|多维例句.*\|拓展词/
     );
     const section = container.querySelector(
       '[data-v3-field="component_usages"]'
@@ -767,7 +767,15 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(result.senses[1]).toMatchObject({ id: "sense-new", relations: [] });
   });
 
-  it("页内新增例句并通过词义草稿保存等级和英中内容", async () => {
+  it("没有已有例句时新增例句默认 B1", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.sentences = [];
+    render(<Harness initial={initial} wordId="entry-1" />);
+    fireEvent.click(screen.getByText("添加例句"));
+    expect(value().pos[0]!.senses[0]!.sentences[0]!.level).toBe("B1");
+  });
+
+  it("页内新增例句继承上一条等级并通过词义草稿保存等级和英中内容", async () => {
     const onSave = vi.fn().mockResolvedValue(undefined);
     render(
       <Harness initial={meaningsFixture} onSave={onSave} wordId="entry-1" />
@@ -775,6 +783,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.click(screen.getByText("添加例句"));
     expect(document.querySelector(".ant-drawer")).toBeNull();
     expect(screen.getByLabelText("例句 2 等级")).not.toBeDisabled();
+    expect(value().pos[0]!.senses[0]!.sentences[1]!.level).toBe("A1");
     fireEvent.change(screen.getByLabelText("例句 2 通用英文"), {
       target: { value: "We broke the ice." }
     });
@@ -808,6 +817,10 @@ describe("V3MeaningsAndExamplesStep", () => {
       ],
       links: [{ word_id: "entry-1", sense_id: "sense-1", role: "focus" }]
     });
+    fireEvent.click(screen.getByText("添加例句"));
+    expect(
+      value().pos[0]!.senses[0]!.sentences.map((item) => item.level)
+    ).toEqual(["A1", "C1", "C1"]);
   });
 
   it("直接编辑保留节点和关联，保存失败后仍保留输入", async () => {
@@ -846,46 +859,33 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.getByText("添加例句").closest("button")).toBeVisible();
   });
 
-  it("语义区间英文使用语音编辑器，标注随草稿保存重开", async () => {
+  it("语义区间英文使用普通输入，保存重开保持文本且不残留旧标注", async () => {
     const initial = structuredClone(meaningsFixture);
+    initial.sense_groups[0]!.name_en_rich = {
+      version: 2,
+      text: "Core",
+      annotations: [{ type: "emphasis", start: 0, end: 4, level: "core" }]
+    };
     const onSave = vi.fn().mockResolvedValue(undefined);
     const mounted = render(<Harness initial={initial} onSave={onSave} />);
-    expect(
-      screen.getByLabelText("语义区间 1 英文 播放语音")
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText("打开语义区间 1 英文编辑器"));
-    // 编辑器是按需加载的分块，默认 1 秒在负载高的 CI runner 上不够。
-    await screen.findByLabelText("标注工具栏", undefined, { timeout: 10_000 });
-    const input = document.querySelector<HTMLTextAreaElement>(
-      ".tsz-ve-canvas-input"
-    )!;
-    input.focus();
-    fireEvent.mouseUp(input);
-    input.setSelectionRange(0, 0);
-    fireEvent.select(input);
-    input.setSelectionRange(0, 4);
-    fireEvent.select(input);
-    fireEvent.click(document.querySelector(".tsz-ve-role-button")!);
-    fireEvent.click(screen.getByLabelText("用固定核心词画笔"));
-    fireEvent.click(screen.getByLabelText("完成语义区间 1 英文编辑"));
+    const input = screen.getByLabelText("语义区间 1 英文");
+    expect(input.tagName).toBe("INPUT");
+    expect(input).toHaveValue("Core");
+    expect(screen.queryByLabelText("语义区间 1 英文 播放语音")).toBeNull();
+    expect(screen.queryByLabelText("打开语义区间 1 英文编辑器")).toBeNull();
+    fireEvent.change(input, { target: { value: "Work and career" } });
     const saved = value();
     expect(saved.sense_groups[0]).toMatchObject({
-      name_en: "Core",
-      name_en_rich: {
-        version: 2,
-        text: "Core",
-        annotations: [{ type: "emphasis", start: 0, end: 4, level: "core" }]
-      }
+      name_en: "Work and career",
+      name_en_rich: { version: 2, text: "Work and career", annotations: [] }
     });
     fireEvent.click(screen.getByText("保存草稿").closest("button")!);
     await waitFor(() => expect(onSave).toHaveBeenCalledWith(saved, "save"));
     mounted.unmount();
     render(<Harness initial={saved} />);
-    fireEvent.click(screen.getByLabelText("打开语义区间 1 英文编辑器"));
-    await screen.findByLabelText("标注工具栏", undefined, { timeout: 10_000 });
-    expect(
-      document.querySelectorAll('.tsz-ve-letter[data-level="core"]')
-    ).toHaveLength(4);
+    expect(screen.getByLabelText("语义区间 1 英文")).toHaveValue(
+      "Work and career"
+    );
   });
 
   it("语法结构、英文释义和例句在输入框前提供整段试听", async () => {
@@ -1583,14 +1583,14 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.getByLabelText("删除例句 1 译文 1")).toBeDisabled();
   });
 
-  it("多维释义、多维例句与关联词可独立收起展开且不修改草稿", () => {
+  it("多维释义、多维例句与拓展词可独立收起展开且不修改草稿", () => {
     const { container } = render(<Harness initial={meaningsFixture} />);
     const initial = value();
     const definitions = container.querySelector(
       '[data-v3-field="definitions"]'
     ) as HTMLElement;
     const sentences = screen.getByText("多维例句").closest("section")!;
-    const relations = screen.getByText("关联词").closest("section")!;
+    const relations = screen.getByText("拓展词").closest("section")!;
     const sectionButton = (section: HTMLElement, label: string) =>
       section.querySelector<HTMLButtonElement>(
         `button[aria-label="${label}"]`
@@ -1629,21 +1629,21 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(sectionBody(sentences)).not.toHaveClass("is-collapsed");
     expect(within(sentences).getByLabelText("例句 1 通用英文")).toBeVisible();
 
-    const relationsTitle = sectionTitle(relations, "关联词");
+    const relationsTitle = sectionTitle(relations, "拓展词");
     fireEvent.click(relationsTitle);
     expect(relations).toHaveClass("is-collapsed");
     expect(sectionBody(relations)).toHaveClass("is-collapsed");
     expect(sectionBody(relations)).toHaveAttribute("aria-hidden", "true");
     expect(
-      sectionButton(relations, "展开关联词").querySelector(
+      sectionButton(relations, "展开拓展词").querySelector(
         ".anticon-caret-down"
       )
     ).not.toBeNull();
-    fireEvent.click(sectionButton(relations, "展开关联词"));
+    fireEvent.click(sectionButton(relations, "展开拓展词"));
     expect(relations).not.toHaveClass("is-collapsed");
     expect(sectionBody(relations)).not.toHaveClass("is-collapsed");
     expect(relations.querySelector(".word-relations-grid")).not.toBeNull();
-    expect(sectionButton(relations, "收起关联词")).toBeVisible();
+    expect(sectionButton(relations, "收起拓展词")).toBeVisible();
     fireEvent.keyDown(relationsTitle, { key: " " });
     expect(relations).toHaveClass("is-collapsed");
     fireEvent.keyDown(relationsTitle, { key: "Enter" });
@@ -3723,8 +3723,15 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(value().pos[0]!.senses[0]).not.toHaveProperty("frequency");
   });
 
-  it("#145 four definition modes reuse the V3 definition identity and create only the required text node", () => {
-    const ids = ["english-text-variant", "chinese-content"];
+  it("切换释义语言或方式时更新释义和正文节点 ID，保留正文", () => {
+    const ids = [
+      "en-definition",
+      "english-text-variant",
+      "en-sentence",
+      "english-sentence-text",
+      "zh-sentence",
+      "chinese-content"
+    ];
     // jsdom 里点过的下拉不会被标成 hidden，按选项内容认准是哪一个下拉。
     const optionsIn = (marker: string) => {
       const dropdown = [
@@ -3748,7 +3755,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     ]);
     fireEvent.click(optionsIn("EN")[1]!);
     expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
-      id: "definition-1",
+      id: "en-definition",
       definition_mode: "en_definition",
       content: {
         mode: "unified",
@@ -3765,14 +3772,14 @@ describe("V3MeaningsAndExamplesStep", () => {
       "整句释义"
     ]);
     fireEvent.click(optionsIn("整句释义")[1]!);
-    // 只换方式不换语言：英文正文原样留着，不消耗新 id。
+    // 方式改变也会更换节点角色，正文随新的父节点一起换 ID。
     expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
-      id: "definition-1",
+      id: "en-sentence",
       definition_mode: "en_sentence",
       content: {
         mode: "unified",
         common: {
-          id: "english-text-variant",
+          id: "english-sentence-text",
           value: { text: "中心" }
         }
       }
@@ -3781,7 +3788,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.mouseDown(screen.getByLabelText("定义 1 语言"));
     fireEvent.click(optionsIn("EN")[0]!);
     expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
-      id: "definition-1",
+      id: "zh-sentence",
       definition_mode: "zh_sentence",
       content_id: "chinese-content",
       content: { text: "中心" }
@@ -4469,7 +4476,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(container.querySelector(".word-sense-editor-a1")).not.toBeNull();
     expect(screen.getByText("多维释义")).toBeVisible();
     expect(screen.getByText("多维例句")).toBeVisible();
-    expect(screen.getByText("关联词")).toBeVisible();
+    expect(screen.getByText("拓展词")).toBeVisible();
     expect(container.querySelector(".word-relations-grid")).not.toBeNull();
     expect(container.querySelectorAll(".word-relation-card")).toHaveLength(3);
     expect(screen.getAllByText("近义词").length).toBeGreaterThan(0);
