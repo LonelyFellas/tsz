@@ -1,3 +1,4 @@
+import { createSharedSentenceEndpoints } from "./shared-sentences";
 // 平台后台（admin）专用端点。后台是与 web 学员/教师**完全独立**的身份体系：
 // 独立登录 / 独立 token / 独立 refresh cookie（path=/api/v1/admin）。
 // 这些端点要绑定到 baseUrl=/api/v1/admin 的 HttpClient 上，路径才会落到 /api/v1/admin/*。
@@ -209,6 +210,7 @@ function requireLifecycleBatchIdentity<
  */
 export function createAdminEndpoints(http: HttpClient) {
   return {
+    sentences: createSharedSentenceEndpoints(http),
     auth: {
       /**
        * POST /admin/auth/login-code — 2FA 第一步：给手机号发登录验证码。

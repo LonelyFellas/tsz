@@ -440,18 +440,11 @@ export function newGrammarStructure(
 
 function createDefaultPosMeanings(
   posId: string,
-  wordId: string,
   senseGroupId: string,
   spellingMode: DialectModeV3,
   idFactory: () => string
 ): WordPosMeaningsWritableV3 {
   const senseId = idFactory();
-  // 自动播种的这条例句同样是「首次录入」，录入位要和手动添加的例句一致。
-  const translations = newSentenceTranslations(idFactory);
-  const alias =
-    translations.find(
-      (item) => item.band === DEFAULT_SENTENCE_TRANSLATION_BAND
-    ) ?? translations[0]!;
   return {
     pos_id: posId,
     grammar_structures: [newGrammarStructure(idFactory, spellingMode)],
@@ -471,24 +464,7 @@ function createDefaultPosMeanings(
             content: { version: 2, text: "", annotations: [] }
           }
         ],
-        sentences: [
-          {
-            id: idFactory(),
-            level: "A1",
-            en_text: {
-              mode: "unified",
-              common: {
-                id: idFactory(),
-                origin: "manual",
-                value: { version: 2, text: "", annotations: [] }
-              }
-            },
-            zh_text_id: alias.id,
-            zh_text: cloneRichText(alias.content),
-            zh_translations: translations,
-            links: [{ word_id: wordId, sense_id: senseId, role: "focus" }]
-          }
-        ],
+        sentences: [],
         relations: []
       }
     ]
@@ -614,7 +590,6 @@ export function ensureV3MeaningsForForms(
     nextPos.push(
       createDefaultPosMeanings(
         posId,
-        wordId,
         senseGroupId,
         spellingModeByPos.get(posId) ?? "unified",
         idFactory

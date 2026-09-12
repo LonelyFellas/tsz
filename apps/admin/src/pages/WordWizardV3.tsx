@@ -1,3 +1,4 @@
+import { SentenceLibrary } from "@/features/sentences/SentenceLibrary";
 import { wordKeys } from "@/features/dictionary/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Flex, Result, Spin, Typography } from "antd";
@@ -41,7 +42,7 @@ import {
 } from "@/features/dictionary/word-creation-v3/presentationErrors";
 import { resolveV3StepAccess } from "@/features/dictionary/word-creation-v3/stepAccess";
 import { canWriteEntry } from "@/features/dictionary/entryWritePermission";
-import { useAuthStore } from "@/lib/auth";
+import { api, useAuthStore } from "@/lib/auth";
 import { usePartOfSpeechCatalog } from "@/features/dictionary/part-of-speech/api";
 import { summarizeFormsImpact } from "@/features/dictionary/word-creation-v3/presentation";
 import {
@@ -373,6 +374,7 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
           }
         />
       ) : null}
+      <SentenceLibrary entryId={context.word.id} />
       <V3MeaningsAndExamplesStep
         textLinksEnabled={context.word.capabilities.text_links === true}
         activePosId={context.activePosId}
@@ -518,6 +520,7 @@ function V3WizardSlots({
               : undefined
           }
         />
+        <SentenceLibrary entryId={context.word.id} readOnly />
         <V3PublicationHistory
           currentWord={context.word}
           onActivated={onActivated}
@@ -541,6 +544,7 @@ function V3WizardSlots({
       return (
         <Flex vertical gap="middle">
           <V3PreviewSlot context={context} />
+          <SentenceLibrary entryId={context.word.id} readOnly />
           <V3PublicationHistory
             activationBlockedByUnsavedChanges={context.hasUnsavedChanges}
             currentWord={context.word}
@@ -561,6 +565,11 @@ export function WordWizardV3Page({
   renderMeaningsStep?: V3MeaningsStepRenderer;
 } = {}) {
   const { wordId = "", step } = useParams();
+  const sharedSentences = useQuery({
+    queryKey: ["shared-sentences", "count", wordId],
+    queryFn: () => api.sentences.list({ entry_id: wordId, page_size: 1 }),
+    enabled: !!wordId
+  });
   // 归属判定所需；门禁保证受保护页内 profile 必有值，缺失时判定一律不放行。
   const profile = useAuthStore((s) => s.profile);
   const writeActor = profile
@@ -660,6 +669,7 @@ export function WordWizardV3Page({
         allowPublishedEditing={editingPublished}
         initialStep={legalStep}
         initialWord={word}
+        sharedSentenceCount={sharedSentences.data?.total ?? 0}
         partOfSpeechCatalog={partOfSpeechCatalog.data}
         partOfSpeechCatalogError={partOfSpeechCatalog.isError}
         partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}

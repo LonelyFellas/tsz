@@ -488,7 +488,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "50ef26114f195e8027597c615730861bd094051d7d87912e9db7f5cc22e64fe9"
+      "26ab8be174465447d7b73131eb5dfdecd462448b927fa0c3e167f0ecdaa7c928"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

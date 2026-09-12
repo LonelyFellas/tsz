@@ -1,8 +1,10 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/phrase-pos-kind/docs/openapi.json",
-  "_source_sha256": "50ef26114f195e8027597c615730861bd094051d7d87912e9db7f5cc22e64fe9",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-main-local-20260912/docs/openapi.json",
+  "_source_sha256": "26ab8be174465447d7b73131eb5dfdecd462448b927fa0c3e167f0ecdaa7c928",
   "roots": [
+    "SharedSentence",
+    "SharedSentenceList",
     "EntryAnnotationResponse",
     "AdminWordV3",
     "AdminWordV3Envelope",
@@ -1415,6 +1417,28 @@
       },
       "additionalProperties": false
     },
+    "SentenceTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["target_entry_id", "state"],
+          "properties": {
+            "state": { "type": "string", "enum": ["linked"] },
+            "target_entry_id": { "type": "string", "format": "uuid" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "headword", "state"],
+          "properties": {
+            "gloss": { "type": ["string", "null"] },
+            "headword": { "type": "string" },
+            "kind": { "type": "string" },
+            "state": { "type": "string", "enum": ["pending"] }
+          }
+        }
+      ]
+    },
     "SentenceTargetCandidateFormV3": {
       "type": "object",
       "required": [
@@ -1520,6 +1544,80 @@
     "SentenceTranslationBandV3": {
       "type": "string",
       "enum": ["word_for_word", "balanced_fluency", "adapted_creation"]
+    },
+    "SharedSentence": {
+      "type": "object",
+      "required": [
+        "id",
+        "revision",
+        "content",
+        "entries",
+        "created_by",
+        "created_at",
+        "updated_at"
+      ],
+      "properties": {
+        "content": { "$ref": "#/$defs/SharedSentenceContent" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "created_by": { "type": "string" },
+        "entries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedSentenceEntry" }
+        },
+        "id": { "type": "string", "format": "uuid" },
+        "revision": { "type": "integer" },
+        "updated_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "SharedSentenceAnnotation": {
+      "type": "object",
+      "required": ["id", "source_dialect", "source_segments", "target"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "source_dialect": { "type": "string" },
+        "source_segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceSourceRangeV1" }
+        },
+        "target": { "$ref": "#/$defs/SentenceTarget" }
+      },
+      "additionalProperties": false
+    },
+    "SharedSentenceContent": {
+      "type": "object",
+      "required": ["sentence", "annotations"],
+      "properties": {
+        "annotations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedSentenceAnnotation" }
+        },
+        "sentence": { "$ref": "#/$defs/WordSentenceWritableV3" }
+      },
+      "additionalProperties": false
+    },
+    "SharedSentenceEntry": {
+      "type": "object",
+      "required": ["id", "headword", "kind", "collected"],
+      "properties": {
+        "collected": { "type": "boolean" },
+        "headword": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "kind": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "SharedSentenceList": {
+      "type": "object",
+      "required": ["items", "total"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedSentence" }
+        },
+        "total": { "type": "integer" }
+      },
+      "additionalProperties": false
     },
     "SourceDialect": { "type": "string", "enum": ["uk", "us"] },
     "SuggestedCommonFormVariantV3": {
@@ -2419,6 +2517,36 @@
           "maxItems": 2000
         },
         "associations_state": { "$ref": "#/$defs/SentenceAssociationsStateV2" },
+        "en_text": { "$ref": "#/$defs/EnglishTextV3" },
+        "id": { "type": "string", "format": "uuid" },
+        "level": { "type": "string" },
+        "links": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordSentenceLinkV3" },
+          "maxItems": 2000
+        },
+        "zh_text": { "$ref": "#/$defs/RichTextV3" },
+        "zh_text_id": { "type": "string", "format": "uuid" },
+        "zh_translations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WordSentenceTranslationV3" },
+          "maxItems": 2000
+        }
+      },
+      "additionalProperties": false
+    },
+    "WordSentenceWritableV3": {
+      "type": "object",
+      "required": [
+        "id",
+        "level",
+        "en_text",
+        "zh_text_id",
+        "zh_text",
+        "zh_translations",
+        "links"
+      ],
+      "properties": {
         "en_text": { "$ref": "#/$defs/EnglishTextV3" },
         "id": { "type": "string", "format": "uuid" },
         "level": { "type": "string" },

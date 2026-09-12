@@ -91,10 +91,9 @@ const GROUPS: Group[] = [
         disabled: true
       },
       {
-        key: "todo:sentences",
+        key: "/sentences",
         label: "多维例句",
-        perm: "sentences.access",
-        disabled: true
+        perm: "sentences.access"
       }
     ]
   },

@@ -1,0 +1,386 @@
+{
+  "frontend_base": "c294e2cb8267267812408320987edc405e53a85b",
+  "backend_base": "8a8e1575d469bb7665986cb84e4437a24167ab0f",
+  "environment": {
+    "admin": "http://localhost:3101",
+    "web": "http://localhost:3100",
+    "api": "http://127.0.0.1:8484",
+    "postgres": "127.0.0.1:55441/tsz_main_local",
+    "redis": "127.0.0.1:56392/0"
+  },
+  "retained_counts": {
+    "phrase_entries": 16,
+    "word_entries": 18,
+    "sentences": 15,
+    "linked_annotations": 57,
+    "pending_annotations": 2,
+    "collections": 21
+  },
+  "cases": [
+    {
+      "source": "give up",
+      "source_id": "01a09551-02cd-7942-8ff8-52acfdec0821",
+      "sentence_id": "4fff672f-59cd-4430-b8b9-e3db86d331e8",
+      "text": "Do not give up hope when you run into trouble.",
+      "http_status": 200,
+      "linked_entries": ["give up", "hope", "run into"],
+      "pending_entries": ["trouble"],
+      "discontinuous_annotations": 0,
+      "reload_verified": true,
+      "offline_retry": true,
+      "cancel_verified": false
+    },
+    {
+      "source": "look after",
+      "source_id": "01a09551-057d-72d2-92c3-89eccd1d550a",
+      "sentence_id": "6f686945-db2d-495e-8077-8cf780d25487",
+      "text": "Please look after your friend before you take off.",
+      "http_status": 200,
+      "linked_entries": ["look after", "friend", "take off"],
+      "pending_entries": [],
+      "discontinuous_annotations": 0,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": true
+    },
+    {
+      "source": "take off",
+      "source_id": "01a09551-0808-70a2-9df0-a1a1d41c148d",
+      "sentence_id": "d49828bf-60f2-4fd7-bc47-5d5b9ff87dcd",
+      "text": "The plane will take off after we put off the meeting.",
+      "http_status": 200,
+      "linked_entries": ["take off", "plane", "put off", "meeting"],
+      "pending_entries": [],
+      "discontinuous_annotations": 0,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    },
+    {
+      "source": "put off",
+      "source_id": "01a09551-0a8d-7f33-8a5d-5f50699a1abf",
+      "sentence_id": "e95d8eff-3e44-4356-b38e-8a0e1af13c3f",
+      "text": "We put the meeting off and look forward to tomorrow.",
+      "http_status": 200,
+      "linked_entries": ["put off", "meeting", "look forward to"],
+      "pending_entries": ["tomorrow"],
+      "discontinuous_annotations": 1,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    },
+    {
+      "source": "run into",
+      "source_id": "01a09551-0d12-7b83-882e-e512e2a49386",
+      "sentence_id": "b6ced567-0700-4e09-971e-bcee22072797",
+      "text": "I ran into my teacher and came across an old book.",
+      "http_status": 200,
+      "linked_entries": ["run into", "teacher", "come across", "book"],
+      "pending_entries": [],
+      "discontinuous_annotations": 0,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    },
+    {
+      "source": "come across",
+      "source_id": "01a09551-0f9f-7113-817b-63d4a529c741",
+      "sentence_id": "8fcd921c-3f4d-47f4-9b50-22bec6f50266",
+      "text": "We come across a story that can bring up a question.",
+      "http_status": 200,
+      "linked_entries": ["come across", "story", "bring up", "question"],
+      "pending_entries": [],
+      "discontinuous_annotations": 0,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    },
+    {
+      "source": "look forward to",
+      "source_id": "01a09551-1227-7890-aea5-9068e5834c83",
+      "sentence_id": "10dc178e-372e-4e5b-b70a-96f207d3f9d7",
+      "text": "I look forward to the holiday and get along with the team.",
+      "http_status": 200,
+      "linked_entries": [
+        "look forward to",
+        "holiday",
+        "get along with",
+        "team"
+      ],
+      "pending_entries": [],
+      "discontinuous_annotations": 0,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    },
+    {
+      "source": "get along with",
+      "source_id": "01a09551-14b6-7d00-a854-ac47cf50a995",
+      "sentence_id": "c96289ab-81d2-454a-990e-c6a41f71519a",
+      "text": "We get along with our friend and never give up hope.",
+      "http_status": 200,
+      "linked_entries": ["get along with", "friend", "give up", "hope"],
+      "pending_entries": [],
+      "discontinuous_annotations": 0,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    },
+    {
+      "source": "make up",
+      "source_id": "01a09551-1747-7e81-9d8a-c751db933cf5",
+      "sentence_id": "329ae0fd-2902-4d9d-98ec-ea7a66a4a835",
+      "text": "She made the story up before the machine broke down.",
+      "http_status": 200,
+      "linked_entries": ["make up", "story", "break down", "machine"],
+      "pending_entries": [],
+      "discontinuous_annotations": 1,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    },
+    {
+      "source": "turn down",
+      "source_id": "01a09551-19d9-74b1-9ee1-2ffa63441568",
+      "sentence_id": "d987c892-deee-4166-84b4-33dc688b8a87",
+      "text": "Do not turn the offer down before you look into it.",
+      "http_status": 200,
+      "linked_entries": ["turn down", "offer"],
+      "pending_entries": ["look into"],
+      "discontinuous_annotations": 1,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    },
+    {
+      "source": "bring up",
+      "source_id": "01a09551-1c6c-78c2-932b-e98c07c41950",
+      "sentence_id": "74e70ea5-48a7-46dd-af41-02847a5f6be7",
+      "text": "The teacher brings up a question in front of the house.",
+      "http_status": 200,
+      "linked_entries": [
+        "bring up",
+        "teacher",
+        "question",
+        "in front of",
+        "house"
+      ],
+      "pending_entries": [],
+      "discontinuous_annotations": 0,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    },
+    {
+      "source": "break down",
+      "source_id": "01a09551-1f06-7491-9b72-30b44bc7bbd8",
+      "sentence_id": "8240b355-96a4-4e92-9e35-8272f9adf331",
+      "text": "The machine broke down near an out of date report.",
+      "http_status": 200,
+      "linked_entries": ["break down", "machine", "out of date", "report"],
+      "pending_entries": [],
+      "discontinuous_annotations": 0,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    },
+    {
+      "source": "in front of",
+      "source_id": "01a09551-2192-7451-a09f-21757cfe8572",
+      "sentence_id": "ceaa3cef-af26-421f-9bc4-2b38c527875b",
+      "text": "In front of the house we look after a friend.",
+      "http_status": 200,
+      "linked_entries": ["in front of", "house", "look after", "friend"],
+      "pending_entries": [],
+      "discontinuous_annotations": 0,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    },
+    {
+      "source": "out of date",
+      "source_id": "01a09551-2418-7673-8aef-1d6911d7975f",
+      "sentence_id": "52783dcb-4bc1-44f8-bf9c-fbb954f87562",
+      "text": "This out of date report asks us to carry on with hope.",
+      "http_status": 200,
+      "linked_entries": ["out of date", "report", "hope"],
+      "pending_entries": ["carry on"],
+      "discontinuous_annotations": 0,
+      "reload_verified": true,
+      "offline_retry": false,
+      "cancel_verified": false
+    }
+  ],
+  "followups": [
+    {
+      "target": "trouble",
+      "entry_id": "01a09553-1861-7913-aac0-0f00e1ed01b7",
+      "sentence_id": "4fff672f-59cd-4430-b8b9-e3db86d331e8",
+      "pending_resolved": true,
+      "status": 200,
+      "reload_verified": true
+    },
+    {
+      "target": "tomorrow",
+      "entry_id": "01a09553-1afe-77f2-b9dc-3b6d427f6d40",
+      "sentence_id": "e95d8eff-3e44-4356-b38e-8a0e1af13c3f",
+      "pending_resolved": true,
+      "status": 200,
+      "reload_verified": true
+    },
+    {
+      "target": "carry on",
+      "entry_id": "01a09553-1d85-74e0-b08d-3b6f3da2b2e8",
+      "sentence_id": "52783dcb-4bc1-44f8-bf9c-fbb954f87562",
+      "pending_resolved": true,
+      "status": 200,
+      "reload_verified": true
+    },
+    {
+      "target": "run into",
+      "entry_id": "01a09551-0d12-7b83-882e-e512e2a49386",
+      "sentence_id": "4fff672f-59cd-4430-b8b9-e3db86d331e8",
+      "pending_resolved": false,
+      "status": 200,
+      "reload_verified": true
+    },
+    {
+      "target": "hope",
+      "entry_id": "01a09551-26aa-77d1-a8a4-7efd93225af7",
+      "sentence_id": "4fff672f-59cd-4430-b8b9-e3db86d331e8",
+      "pending_resolved": false,
+      "status": 200,
+      "reload_verified": true
+    }
+  ],
+  "homograph": {
+    "sentence_id": "b66c460a-2d2c-4b21-aab3-b2f553018c57",
+    "source_id": "01a09551-1747-7e81-9d8a-c751db933cf5",
+    "target_id": "01a09555-cba6-78f2-9315-c6c75ad4c83d",
+    "text": "They make up after an argument, then make up a story.",
+    "status": 200,
+    "first_occurrence": "和解",
+    "second_occurrence": "编造"
+  },
+  "impact": {
+    "updated_sentence_id": "4fff672f-59cd-4430-b8b9-e3db86d331e8",
+    "updated_level": "C1",
+    "verified_entries": ["give up", "run into", "hope", "trouble"],
+    "temporary_sentence_id": "22a329b4-37f0-4ce0-876d-08cc66d02a78",
+    "delete_status": 204,
+    "delete_verified_entries": ["give up", "hope"],
+    "remaining_examples": 15
+  },
+  "entries": {
+    "give up": "01a09551-02cd-7942-8ff8-52acfdec0821",
+    "look after": "01a09551-057d-72d2-92c3-89eccd1d550a",
+    "take off": "01a09551-0808-70a2-9df0-a1a1d41c148d",
+    "put off": "01a09551-0a8d-7f33-8a5d-5f50699a1abf",
+    "run into": "01a09551-0d12-7b83-882e-e512e2a49386",
+    "come across": "01a09551-0f9f-7113-817b-63d4a529c741",
+    "look forward to": "01a09551-1227-7890-aea5-9068e5834c83",
+    "get along with": "01a09551-14b6-7d00-a854-ac47cf50a995",
+    "make up": "01a09551-1747-7e81-9d8a-c751db933cf5",
+    "turn down": "01a09551-19d9-74b1-9ee1-2ffa63441568",
+    "bring up": "01a09551-1c6c-78c2-932b-e98c07c41950",
+    "break down": "01a09551-1f06-7491-9b72-30b44bc7bbd8",
+    "in front of": "01a09551-2192-7451-a09f-21757cfe8572",
+    "out of date": "01a09551-2418-7673-8aef-1d6911d7975f",
+    "hope": "01a09551-26aa-77d1-a8a4-7efd93225af7",
+    "friend": "01a09551-2933-7f51-9e66-613e1212eb1a",
+    "plane": "01a09551-2bc3-7320-95ca-e296d86e5bd1",
+    "meeting": "01a09551-2e41-78e0-9f14-58ef992a97ee",
+    "teacher": "01a09551-30c8-7b90-b04e-b875271a1043",
+    "book": "01a09551-334e-7180-b38f-58a41f55b866",
+    "holiday": "01a09551-35d1-7372-971c-709185a91110",
+    "team": "01a09551-387f-73c2-bff4-fff0b50b9c49",
+    "story": "01a09551-3b0c-7851-a1ce-d4f96a375f90",
+    "offer": "01a09551-3d95-7012-834b-c26f43895238",
+    "question": "01a09551-400e-7a91-b524-8bb30283d2a2",
+    "machine": "01a09551-428b-7353-aae0-c3ce96de67da",
+    "house": "01a09551-4518-7a81-8538-303ccc380ef1",
+    "report": "01a09551-47a1-7f93-a4cc-02ee2fc3be71",
+    "trouble": "01a09553-1861-7913-aac0-0f00e1ed01b7",
+    "tomorrow": "01a09553-1afe-77f2-b9dc-3b6d427f6d40",
+    "carry on": "01a09553-1d85-74e0-b08d-3b6f3da2b2e8",
+    "make up (reconcile)": "01a09555-cba6-78f2-9315-c6c75ad4c83d"
+  },
+  "final_browser_checks": {
+    "pagination": [10, 5],
+    "total": 15,
+    "unconfirmed_selection_blocked": true,
+    "cancel_writes": 0,
+    "text_query_verified": true,
+    "detail_verified": true
+  },
+  "validation": {
+    "frontend_full": {
+      "files_passed": 173,
+      "tests_passed": 2568,
+      "preexisting_skipped": 2,
+      "command": "pnpm test:cov -- --maxWorkers=1 --testTimeout=30000"
+    },
+    "rust_full_passed": true,
+    "shared_regression_tests_passed": 9,
+    "migration_rollback_tests_passed": 7,
+    "timeout_control": {
+      "limit_ms": 5000,
+      "with_coverage_ms": 812,
+      "without_coverage_ms": 549,
+      "both_passed": true,
+      "cause": "not conclusively isolated; no resource sample at the original failure"
+    }
+  },
+  "final_runtime": {
+    "frontend_root": "/Users/darwish/Dev/tsz-core/tsz-main-local-20260912",
+    "backend_root": "/Users/darwish/Dev/tsz-core/tsz-rust-main-local-20260912",
+    "frontend_base": "c294e2cb8267267812408320987edc405e53a85b",
+    "backend_base": "8a8e1575d469bb7665986cb84e4437a24167ab0f",
+    "version_note": "base SHA plus local uncommitted changes",
+    "api_pid": 46065,
+    "web_group": 46070,
+    "admin_pid": 97901,
+    "api_binary": "/tmp/tsz-main-local-20260912-api-final",
+    "api_binary_sha256": "fdfcf58db56d51710c9e1f90daafc40cf7497eb38e30e141c4392efddadf5fc5",
+    "web_build_id": "Jlh9xhpGeVH_kTNeEueqn",
+    "backend_url": "http://127.0.0.1:8484/api/v1",
+    "logs": "/tmp/tsz-main-local-20260912-*.log",
+    "checks": [
+      {
+        "url": "http://localhost:3100",
+        "status": 200
+      },
+      {
+        "url": "http://localhost:3101/sentences",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8484/healthz",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8484/readyz",
+        "status": 200
+      },
+      {
+        "url": "http://127.0.0.1:8484/api/v1/admin/profile",
+        "status": 401,
+        "code": "invalid_token"
+      },
+      {
+        "url": "http://127.0.0.1:3100/api/v1/admin/profile",
+        "status": 401,
+        "code": "invalid_token"
+      },
+      {
+        "url": "http://127.0.0.1:3101/api/v1/admin/profile",
+        "status": 401,
+        "code": "invalid_token"
+      }
+    ],
+    "web_pid": 46076,
+    "browser_menu_navigation_verified": true,
+    "retained_sentences_verified": 15,
+    "verified_at": "2026-09-12T11:55:09.193947+00:00"
+  }
+}
