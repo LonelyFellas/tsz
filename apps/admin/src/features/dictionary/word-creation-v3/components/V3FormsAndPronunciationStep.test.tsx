@@ -1512,6 +1512,40 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
   });
 
+  it("目录没有派生词形时，只有原形的组照样显示且能录发音", () => {
+    const content = formsFixture({ pos: "adverb" });
+    const adverbCatalog = partOfSpeechCatalogFixture.items.find(
+      (item) => item.code === "adverb"
+    )!;
+    expect(adverbCatalog.allowed_form_types).toEqual([]);
+
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3PosTab
+            content={content}
+            idFactory={() => uuidFromInt(978)}
+            issues={[]}
+            onChange={() => undefined}
+            pos={content.pos[0]!}
+            posCatalog={adverbCatalog}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    // 副词、代词这类词性只有一个原形组，藏起来就没地方录拼写与发音。
+    expect(screen.getByText("第 1 组 词形变化")).toBeVisible();
+    expect(screen.getByLabelText("原形通用拼写")).toBeVisible();
+    screen.getAllByLabelText(/第 1 条发音的实际发音/u);
+    // 没有派生词形可铺：组内只有一行，类型下拉锁死，也不给新增变化组。
+    expect(screen.getAllByLabelText(/^变化组 1 词形 \d+ 类型$/u)).toHaveLength(
+      1
+    );
+    expect(screen.getByLabelText("变化组 1 词形 1 类型")).toBeDisabled();
+    expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
+  });
+
   it("目录没有额外词形时仍保留并显示历史词形变化组", () => {
     const derived = commonFormFixture({
       id: uuidFromInt(975),

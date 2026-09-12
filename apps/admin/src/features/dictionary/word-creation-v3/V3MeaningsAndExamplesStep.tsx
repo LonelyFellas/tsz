@@ -71,13 +71,11 @@ import { addPartOfSpeech, deletePartOfSpeech } from "./operations";
 import {
   DEFAULT_DEFINITION_PLAN,
   DEFAULT_SENSE_LEVEL,
-  DEFAULT_SENTENCE_TRANSLATION_BAND,
   defaultDefinitions,
   definitionSummary,
   editableEnglishText,
   newDefinition,
   newGrammarStructure,
-  newSentenceTranslations,
   replaceRichText,
   spellingModeForPos,
   type RelationDisplaySnapshots
