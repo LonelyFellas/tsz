@@ -39,6 +39,7 @@ import {
   Typography
 } from "antd";
 import type {
+  CefrLevel,
   Dialect,
   DialectModeV3,
   DraftFormsStepContentV3,
@@ -809,46 +810,47 @@ function newDefinition(
  * 的「词义难度 × 释义难度」矩阵：中文自本级起，英文比同档中文高一级，越靠近 C2
  * 层级越收敛，所以 B2 只有三条、C1 与 C2 各两条。生成后录入者可自行增删。
  */
-const DEFAULT_DEFINITION_PLAN: Record<string, readonly DefinitionPlanV3[]> = {
-  A1: [
-    { language: "zh", level: "A1" },
-    { language: "en", level: "A2" },
-    { language: "zh", level: "A2" },
-    { language: "en", level: "B1" }
-  ],
-  A2: [
-    { language: "zh", level: "A2" },
-    { language: "en", level: "B1" },
-    { language: "zh", level: "B1" },
-    { language: "en", level: "B2" }
-  ],
-  B1: [
-    { language: "zh", level: "B1" },
-    { language: "en", level: "B1" },
-    { language: "zh", level: "B2" },
-    { language: "en", level: "B2" }
-  ],
-  B2: [
-    { language: "zh", level: "B2" },
-    { language: "en", level: "B2" },
-    { language: "zh", level: "C1" }
-  ],
-  C1: [
-    { language: "zh", level: "C1" },
-    { language: "en", level: "C1" }
-  ],
-  C2: [
-    { language: "zh", level: "C2" },
-    { language: "en", level: "C2" }
-  ]
-};
+const DEFAULT_DEFINITION_PLAN: Record<CefrLevel, readonly DefinitionPlanV3[]> =
+  {
+    A1: [
+      { language: "zh", level: "A1" },
+      { language: "en", level: "A2" },
+      { language: "zh", level: "A2" },
+      { language: "en", level: "B1" }
+    ],
+    A2: [
+      { language: "zh", level: "A2" },
+      { language: "en", level: "B1" },
+      { language: "zh", level: "B1" },
+      { language: "en", level: "B2" }
+    ],
+    B1: [
+      { language: "zh", level: "B1" },
+      { language: "en", level: "B1" },
+      { language: "zh", level: "B2" },
+      { language: "en", level: "B2" }
+    ],
+    B2: [
+      { language: "zh", level: "B2" },
+      { language: "en", level: "B2" },
+      { language: "zh", level: "C1" }
+    ],
+    C1: [
+      { language: "zh", level: "C1" },
+      { language: "en", level: "C1" }
+    ],
+    C2: [
+      { language: "zh", level: "C2" },
+      { language: "en", level: "C2" }
+    ]
+  };
 
 /** 未收录的等级不预生成，交回「添加释义」手工录入，避免凭空猜数量。 */
 function defaultDefinitions(
   level: string,
   idFactory: () => string
 ): WordDefinitionV3[] {
-  return (DEFAULT_DEFINITION_PLAN[level] ?? []).map((plan) =>
+  return (DEFAULT_DEFINITION_PLAN[level as CefrLevel] ?? []).map((plan) =>
     newDefinition(idFactory, plan)
   );
 }
@@ -870,6 +872,30 @@ function definitionIsBlank(definition: WordDefinitionV3): boolean {
           slot.state === "ready" ? [slot.variant] : []
         );
   return variants.every((variant) => variant.value.text.trim() === "");
+}
+
+/**
+ * 这组释义是否还停在某个等级的默认铺排：条数、语言、等级、释义方式全对得上，
+ * 且每条都还空着。只有这样才敢跟着词义等级整组换掉——录入者哪怕只调过一行的
+ * 语言或等级，也说明已经排过版，不能抹掉。条数对不上（包括一条都没有）同理不动。
+ */
+function definitionsStillDefault(
+  definitions: readonly WordDefinitionV3[],
+  level: string
+): boolean {
+  const plan = DEFAULT_DEFINITION_PLAN[level as CefrLevel] ?? [];
+  // 等级不在表里（后端/存量数据带来的非法值）就一律不动，别拿空计划去比空释义。
+  if (plan.length === 0) return false;
+  if (definitions.length !== plan.length) return false;
+  return definitions.every((definition, index) => {
+    const slot = plan[index]!;
+    return (
+      definitionIsBlank(definition) &&
+      definition.level === slot.level &&
+      definitionLanguageOf(definition.definition_mode) === slot.language &&
+      definitionStyleOf(definition.definition_mode) === "definition"
+    );
+  });
 }
 
 type DefinitionModeV3 =
@@ -2671,14 +2697,15 @@ function V3MeaningsAndExamplesStepContent({
                                               draft.pos[posIndex]!.senses[
                                                 senseIndex
                                               ]!;
+                                            // 先按改之前的等级判断：这组释义还是原样的
+                                            // 默认铺排才跟着换，动过一行就不碰。
+                                            const stillDefault =
+                                              definitionsStillDefault(
+                                                target.definitions,
+                                                target.level
+                                              );
                                             target.level = level;
-                                            // 一条都还没录的时候跟着等级换成该等级的默认行；
-                                            // 只要有一条填过就不动，免得抹掉录入成果。
-                                            if (
-                                              target.definitions.every(
-                                                definitionIsBlank
-                                              )
-                                            )
+                                            if (stillDefault)
                                               target.definitions =
                                                 defaultDefinitions(
                                                   level,
@@ -3230,100 +3257,116 @@ function V3MeaningsAndExamplesStepContent({
                                                       }}
                                                       optionRender={(
                                                         option
-                                                      ) => (
-                                                        <span
-                                                          className="word-grammar-option"
-                                                          onMouseLeave={() =>
-                                                            setHoveredCopyKey(
-                                                              null
-                                                            )
-                                                          }
-                                                        >
-                                                          <span className="word-grammar-option-label">
-                                                            {option.label}
-                                                          </span>
-                                                          {definitionIndex <
-                                                          sense.definitions
-                                                            .length -
-                                                            1 ? (
-                                                            <Popover
-                                                              content="填到本条及后面每条释义"
-                                                              // 触发点在 Select 浮层里，气泡得压过下拉面板（默认 1050）才不被挡住。
-                                                              zIndex={1100}
-                                                              classNames={{
-                                                                root: "word-grammar-tip"
-                                                              }}
-                                                              destroyOnHidden
-                                                              open={
-                                                                hoveredCopyKey ===
-                                                                `${definition.id}:${String(option.value)}`
-                                                              }
-                                                              placement="right"
-                                                            >
-                                                              <Button
-                                                                aria-label={`把「${String(option.label)}」套用到定义 ${definitionIndex + 1} 及后面每条释义`}
-                                                                className="word-grammar-option-copy"
-                                                                onMouseEnter={() =>
-                                                                  setHoveredCopyKey(
-                                                                    `${definition.id}:${String(option.value)}`
-                                                                  )
-                                                                }
-                                                                onMouseLeave={() =>
-                                                                  setHoveredCopyKey(
-                                                                    null
-                                                                  )
-                                                                }
-                                                                icon={
-                                                                  <CopyOutlined />
-                                                                }
-                                                                onClick={(
-                                                                  event
-                                                                ) => {
-                                                                  // 拦掉选项本身的选中：这里要一次写好本条与后面每条，
-                                                                  // 再让 rc-select 触发 onChange 会拿旧快照把它们覆盖回去。
-                                                                  event.stopPropagation();
-                                                                  const structureId =
-                                                                    String(
-                                                                      option.value
-                                                                    );
-                                                                  change(
-                                                                    (draft) => {
-                                                                      const definitions =
-                                                                        draft
-                                                                          .pos[
-                                                                          posIndex
-                                                                        ]!
-                                                                          .senses[
-                                                                          senseIndex
-                                                                        ]!
-                                                                          .definitions;
-                                                                      for (
-                                                                        let index =
-                                                                          definitionIndex;
-                                                                        index <
-                                                                        definitions.length;
-                                                                        index += 1
-                                                                      )
-                                                                        definitions[
-                                                                          index
-                                                                        ]!.grammar_structure_id =
-                                                                          structureId;
-                                                                    }
-                                                                  );
-                                                                  setStructurePickerFor(
-                                                                    null
-                                                                  );
-                                                                  setHoveredCopyKey(
-                                                                    null
-                                                                  );
+                                                      ) => {
+                                                        // 「未找到的语法结构」那条占位项不给复制按钮：
+                                                        // 把一个已失效的 id 套到后面每条，只会把一处
+                                                        // 悬空引用扩散成 N 处。
+                                                        const known =
+                                                          pos.grammar_structures.some(
+                                                            (item) =>
+                                                              item.id ===
+                                                              String(
+                                                                option.value
+                                                              )
+                                                          );
+                                                        return (
+                                                          <span
+                                                            className="word-grammar-option"
+                                                            onMouseLeave={() =>
+                                                              setHoveredCopyKey(
+                                                                null
+                                                              )
+                                                            }
+                                                          >
+                                                            <span className="word-grammar-option-label">
+                                                              {option.label}
+                                                            </span>
+                                                            {known &&
+                                                            definitionIndex <
+                                                              sense.definitions
+                                                                .length -
+                                                                1 ? (
+                                                              <Popover
+                                                                content="填到本条及后面每条释义"
+                                                                // 触发点在 Select 浮层里，气泡得压过下拉面板（默认 1050）才不被挡住。
+                                                                zIndex={1100}
+                                                                classNames={{
+                                                                  root: "word-grammar-tip"
                                                                 }}
-                                                                size="small"
-                                                                type="text"
-                                                              />
-                                                            </Popover>
-                                                          ) : null}
-                                                        </span>
-                                                      )}
+                                                                destroyOnHidden
+                                                                open={
+                                                                  hoveredCopyKey ===
+                                                                  `${definition.id}:${String(option.value)}`
+                                                                }
+                                                                placement="right"
+                                                              >
+                                                                <Button
+                                                                  aria-label={`把「${String(option.label)}」套用到定义 ${definitionIndex + 1} 及后面每条释义`}
+                                                                  className="word-grammar-option-copy"
+                                                                  onMouseEnter={() =>
+                                                                    setHoveredCopyKey(
+                                                                      `${definition.id}:${String(option.value)}`
+                                                                    )
+                                                                  }
+                                                                  onMouseLeave={() =>
+                                                                    setHoveredCopyKey(
+                                                                      null
+                                                                    )
+                                                                  }
+                                                                  icon={
+                                                                    <CopyOutlined />
+                                                                  }
+                                                                  onClick={(
+                                                                    event
+                                                                  ) => {
+                                                                    // 拦掉选项本身的选中：这里要一次写好本条与后面每条，
+                                                                    // 再让 rc-select 触发 onChange 会拿旧快照把它们覆盖回去。
+                                                                    event.stopPropagation();
+                                                                    const structureId =
+                                                                      String(
+                                                                        option.value
+                                                                      );
+                                                                    change(
+                                                                      (
+                                                                        draft
+                                                                      ) => {
+                                                                        const definitions =
+                                                                          draft
+                                                                            .pos[
+                                                                            posIndex
+                                                                          ]!
+                                                                            .senses[
+                                                                            senseIndex
+                                                                          ]!
+                                                                            .definitions;
+                                                                        for (
+                                                                          let index =
+                                                                            definitionIndex;
+                                                                          index <
+                                                                          definitions.length;
+                                                                          index += 1
+                                                                        )
+                                                                          definitions[
+                                                                            index
+                                                                          ]!.grammar_structure_id =
+                                                                            structureId;
+                                                                      }
+                                                                    );
+                                                                    setStructurePickerFor(
+                                                                      null
+                                                                    );
+                                                                    setHoveredCopyKey(
+                                                                      null
+                                                                    );
+                                                                  }}
+                                                                  size="small"
+                                                                  type="text"
+                                                                />
+                                                              </Popover>
+                                                            ) : null}
+                                                          </span>
+                                                        );
+                                                      }}
                                                       notFoundContent="请先在上方填写语法结构"
                                                       placeholder="请选择语法结构"
                                                       status={

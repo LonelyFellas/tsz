@@ -297,20 +297,19 @@
   white-space: nowrap;
 }
 
-/* 平时只占位不显形，指到这条选项（或键盘聚焦到按钮）才露出来。 */
+/* 平时只占位不显形，指到这条选项才露出来。隐形元素拿不到焦点，这颗按钮是纯鼠标的。 */
 .word-grammar-option-copy {
   flex: none;
   visibility: hidden;
 }
 
-.word-grammar-option:hover .word-grammar-option-copy,
-.word-grammar-option-copy:focus-visible {
+.word-grammar-option:hover .word-grammar-option-copy {
   visibility: visible;
 }
 
 /* 隐形的按钮收不到 mouseleave，气泡只能靠选项行的离开事件收：退场动画一长，
    换选项时上一个气泡就与新的叠着。压到近乎瞬时，动画结束回调也就立刻到。 */
-.word-grammar-tip.ant-popover {
+.word-grammar-tip {
   animation-duration: 0.01s !important;
 }
 

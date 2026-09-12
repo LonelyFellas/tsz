@@ -452,9 +452,19 @@ function V3WordCreationSession({
   // 一次把默认录入位铺齐——词形按词性配置补，语义区间摆够默认条数。目录是异步到的，
   // 等它来了铺一次即可；走两个 setter 是为了让联动与脏标记跟着走，保存后才入库。
   // 语义区间基于「词形补齐后的 meanings」再补：setDraftForms 内部会用旧值重算一遍，
-  // 这里用同样的输入算好再覆盖，免得把词性联动出来的词义冲掉。
+  // 这里用同样的输入算好再覆盖，免得把词性联动出来的词义冲掉。两次 ensure 拿到的新
+  // 节点 ID 必须一致才不会留下假脏标记——眼下 fillDefaultFormTypes 既不增删词性也不
+  // 改 spelling_mode，ensure 必定原样返回入参，这条前提变了就得改成只算一次。
+  //
+  // 「刚创建」的判据跟着草稿本身走：revision 还是 1、forms 步骤没保存过。只看
+  // location.state 不行——F5 后 history 会把它原样恢复，一刷新就把用户删掉的行铺回来。
   useEffect(() => {
-    if (!prefillNewDraft || newDraftPrefilledRef.current) return;
+    if (!prefillNewDraft || sessionReadOnly || newDraftPrefilledRef.current) {
+      return;
+    }
+    // 用会话里的活状态而不是挂载期的 prop：目录来得慢、期间已经保存过一次时，
+    // prop 还停在 revision 1，照铺就会把刚删的默认行补回去。
+    if (word.revision > 1 || word.completed_steps.includes("forms")) return;
     const items = partOfSpeechCatalog?.items;
     if (!items?.length) return;
     newDraftPrefilledRef.current = true;
@@ -476,9 +486,10 @@ function V3WordCreationSession({
     draftMeanings,
     partOfSpeechCatalog,
     prefillNewDraft,
+    sessionReadOnly,
     setDraftForms,
     setDraftMeanings,
-    word.id
+    word
   ]);
 
   const setActiveStep = useCallback(

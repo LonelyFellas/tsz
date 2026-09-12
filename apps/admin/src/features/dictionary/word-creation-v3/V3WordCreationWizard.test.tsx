@@ -5150,6 +5150,25 @@ describe("新草稿默认录入位", () => {
     expect(seen.context!.hasUnsavedChanges).toBe(true);
   });
 
+  it("草稿已经存过就不再铺，哪怕创建态的标记还在", async () => {
+    const { seen, renderStep } = capture();
+    // revision 一旦 >1 就说明这份草稿保存过：F5 会把创建态的 location.state 原样恢复，
+    // 这时再铺一次会把用户删掉的行补回来。
+    renderWizard(requests(), {
+      initialWord: word(2),
+      partOfSpeechCatalog: partOfSpeechCatalogFixture,
+      prefillNewDraft: true,
+      renderStep
+    });
+
+    await waitFor(() => expect(seen.context).toBeDefined());
+    expect(
+      seen.context!.draftForms.pos[0]!.forms.map((form) => form.form_type)
+    ).toEqual(["base"]);
+    expect(seen.context!.draftMeanings.sense_groups).toHaveLength(1);
+    expect(seen.context!.hasUnsavedChanges).toBe(false);
+  });
+
   it("打开已有草稿时一个字段都不动", async () => {
     const { seen, renderStep } = capture();
     renderWizard(requests(), {

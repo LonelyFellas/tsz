@@ -747,14 +747,12 @@ export function fillDefaultFormTypes(
     const current = next.pos.find((item) => item.pos_id === pos.pos_id);
     if (!current || current.form_groups.length !== 1) continue;
     const group = current.form_groups[0]!;
-    const formTypeById = new Map(
-      current.forms.map((form) => [form.id, form.form_type] as const)
-    );
-    const present = new Set(
-      group.members.map((member) => formTypeById.get(member.form_id))
-    );
+    // 按该词性已有的全部词形算，不只看组成员：游离词形（删组保留词形留下的）
+    // 也算数，免得同类型再补一条。补成功的类型要记进去，defaults 有重复项时不重复补。
+    const present = new Set(current.forms.map((form) => form.form_type));
     for (const formType of defaults) {
       if (present.has(formType)) continue;
+      present.add(formType);
       const added = addConcreteForm(
         next,
         pos.pos_id,

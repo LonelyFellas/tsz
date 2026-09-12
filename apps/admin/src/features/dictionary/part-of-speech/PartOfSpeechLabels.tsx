@@ -7,8 +7,8 @@ import {
 } from "../word-creation-v3/presentation";
 import { usePartOfSpeechCatalog } from "./api";
 
-// 基本词性与细分词性一律展示正式中文名；「简洁显示」只用在词性分类步骤的词性页签上
-// （那里位置紧）。目录里没有的编码才回退到内置文案。
+// 基本词性与细分词性一律展示正式中文名；仍用「简洁显示」的只剩词形变化
+// （见 FormTypeLabels）。目录里没有的编码才回退到内置文案。
 const PosLabels = createContext<(code: string) => string>(partOfSpeechLabel);
 const SubPosLabels =
   createContext<(code: string) => string>(subPartOfSpeechLabel);
