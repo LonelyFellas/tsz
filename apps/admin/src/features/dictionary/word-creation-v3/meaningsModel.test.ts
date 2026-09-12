@@ -15,6 +15,7 @@ import {
   ensureV3MeaningsForForms,
   relationDisplaySnapshots,
   replaceEnglishText,
+  sentenceTranslationsV3,
   replaceRichText,
   stripBlankRelations,
   stripSenseComponentUsages,
@@ -218,21 +219,25 @@ describe("V3 meanings writable model", () => {
             {
               id: expect.any(String),
               band: "word_for_word",
+              language: "zh",
               content: { version: 2, text: "", annotations: [] }
             },
             {
               id: expect.any(String),
               band: "balanced_fluency",
+              language: "zh",
               content: { version: 2, text: "", annotations: [] }
             },
             {
               id: expect.any(String),
               band: "adapted_creation",
+              language: "zh",
               content: { version: 2, text: "", annotations: [] }
             },
             {
               id: expect.any(String),
               band: "adapted_creation",
+              language: "zh",
               content: { version: 2, text: "", annotations: [] }
             }
           ],
@@ -1072,6 +1077,7 @@ describe("V3 meanings writable model", () => {
       {
         id: projectedSense.sentences[0]!.zh_text_id,
         band: "balanced_fluency",
+        language: "zh",
         content: projectedSense.sentences[0]!.zh_text
       }
     ]);
@@ -1368,5 +1374,53 @@ describe("例句译文的默认录入位与收尾清洗", () => {
     expect(sentence.zh_translations).toHaveLength(1);
     expect(sentence.zh_translations![0]!.band).toBe("word_for_word");
     expect(sentence.zh_text_id).toBe("translation-1");
+  });
+});
+
+describe("译文语言", () => {
+  const sentence = (
+    translations?: { id: string; band: string; language?: string }[]
+  ) => ({
+    level: "A1",
+    zh_text_id: "zh-alias",
+    zh_text: { version: 2 as const, text: "旧译文", annotations: [] },
+    ...(translations
+      ? {
+          zh_translations: translations.map((row) => ({
+            ...row,
+            band: row.band as "word_for_word",
+            language: row.language as "zh" | undefined,
+            content: { version: 2 as const, text: "旧译文", annotations: [] }
+          }))
+        }
+      : {})
+  });
+
+  it("新建的四个录入位都带汉语", () => {
+    let seq = 0;
+    const rows = newSentenceTranslations(() => `t-${++seq}`);
+    expect(rows.map((row) => row.language)).toEqual(["zh", "zh", "zh", "zh"]);
+  });
+
+  it("历史译文缺 language 时补成汉语", () => {
+    // 后端 publication_from_record 原样返回历史快照，2026-09-12 之前发布的没有这个键。
+    const rows = sentenceTranslationsV3(
+      sentence([{ id: "t-1", band: "word_for_word" }])
+    );
+    expect(rows.map((row) => row.language)).toEqual(["zh"]);
+  });
+
+  it("译文为空时兜底出来的那条也带汉语", () => {
+    const rows = sentenceTranslationsV3(sentence());
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.language).toBe("zh");
+    expect(rows[0]!.id).toBe("zh-alias");
+  });
+
+  it("已有 language 原样保留，不被默认值覆盖", () => {
+    const rows = sentenceTranslationsV3(
+      sentence([{ id: "t-1", band: "word_for_word", language: "zh" }])
+    );
+    expect(rows[0]!.language).toBe("zh");
   });
 });

@@ -128,3 +128,65 @@ it("保存期间关闭增删、改档及正文编辑", () => {
     screen.getByRole("button", { name: "删除例句 1 译文 1" })
   ).toBeDisabled();
 });
+
+it("历史译文缺 language 时按汉语展示，下拉当前只有汉语一项", async () => {
+  // initial.zh_translations 那条没有 language：后端 2026-09-12 上线前发布的快照就是这个形状。
+  render(
+    <ConfigProvider theme={{ token: { motion: false } }}>
+      <V3SentenceTranslationsField
+        sentence={initial}
+        index={0}
+        onChange={vi.fn()}
+      />
+    </ConfigProvider>
+  );
+  const picker = screen.getByRole("button", { name: "例句 1 译文语言" });
+  expect(picker).toHaveTextContent("汉语译文");
+
+  fireEvent.click(picker);
+  const options = await screen.findAllByRole("menuitem");
+  expect(options.map((option) => option.textContent)).toEqual(["汉语"]);
+});
+
+it("新增的译文行带上当前所选语言", async () => {
+  const observe = vi.fn();
+  function Host() {
+    const [sentence, setSentence] = useState(initial);
+    return (
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <V3SentenceTranslationsField
+          sentence={sentence}
+          index={0}
+          onChange={(rows) => {
+            observe(rows);
+            setSentence((current) => ({ ...current, zh_translations: rows }));
+          }}
+        />
+      </ConfigProvider>
+    );
+  }
+  render(<Host />);
+  fireEvent.click(screen.getByRole("button", { name: "添加例句 1 译文" }));
+  fireEvent.click(await screen.findByRole("menuitem", { name: /^中阶/ }));
+
+  const rows = observe.mock.lastCall![0];
+  expect(rows).toHaveLength(2);
+  expect(rows.map((row: { language?: string }) => row.language)).toEqual([
+    "zh",
+    "zh"
+  ]);
+});
+
+it("保存期间语言选择器一并关闭", () => {
+  render(
+    <V3SentenceTranslationsField
+      sentence={initial}
+      index={0}
+      disabled
+      onChange={vi.fn()}
+    />
+  );
+  expect(
+    screen.getByRole("button", { name: "例句 1 译文语言" })
+  ).toBeDisabled();
+});
