@@ -13,9 +13,9 @@ import { api } from "@/lib/auth";
 export type V3WordsApi = Pick<
   AdminEndpoints["words"],
   | "detectV3"
-  | "surfaceMatchSnapshotPageV3"
+  | "surfaceMatchSnapshotPage"
   | "createV3"
-  | "getAny"
+  | "get"
   | "previewFormsImpactV3"
   | "saveFormsStepV3"
   | "saveMeaningsStepV3"
@@ -29,7 +29,7 @@ export type V3WordsApi = Pick<
 >;
 
 function requireV3Draft(
-  envelope: Awaited<ReturnType<V3WordsApi["getAny"]>>
+  envelope: Awaited<ReturnType<V3WordsApi["get"]>>
 ): AdminWordDraftV3Envelope {
   if (envelope.word.schema_version !== 3) {
     throw new UnsupportedAdminWordSchemaVersionError(
@@ -101,7 +101,7 @@ export function createV3WordRequests(source: V3WordsApi = api.words) {
       }),
     surfacePage: (snapshotId: string, cursor: string, signal?: AbortSignal) =>
       source
-        .surfaceMatchSnapshotPageV3(snapshotId, cursor, signal)
+        .surfaceMatchSnapshotPage(snapshotId, cursor, signal)
         .then((response) => {
           requireIdentity(
             response.snapshot_id,
@@ -113,7 +113,7 @@ export function createV3WordRequests(source: V3WordsApi = api.words) {
     create: source.createV3,
     get: (wordId: string) =>
       source
-        .getAny(wordId)
+        .get(wordId)
         .then(requireV3Draft)
         .then((response) =>
           requireWordIdentity(response, wordId, "get.word.id")

@@ -1,25 +1,45 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {
-  ActivatePublicationInput,
-  AdminWordV2,
-  CreateContentCompletionJobInput,
+  AdminWordV3,
   EntryLifecycleBatchInput,
   EntryLifecycleInput,
-  PreviewFormsImpactInputV2,
-  PublishAdminWordV2Input,
   ResolveSentenceTargetsV3Input,
-  SaveFormsStepInput,
-  SaveMeaningsStepInput,
   WordRelationWritableV3,
-  WordSentenceWritableV3,
-  SuggestDialectVariantsInputV2
+  WordSentenceWritableV3
 } from "@tsz/types";
-import { createAdminEndpoints } from "./admin";
+import { createAdminEndpoints as createRawAdminEndpoints } from "./admin";
 import { UnsupportedAdminWordSchemaVersionError } from "./admin-word-schema";
 import type { HttpClient } from "./http";
 
 // 用 mock HttpClient 验证每个 admin endpoint 的 method / path / body。
 // 路径相对 baseUrl=/api/v1/admin，故此处只断言相对段（/auth/login → /api/v1/admin/auth/login）。
+//
+// 本文件多数用例只断言「发出的请求」，响应是占位值。V3 decoder 对占位响应一律
+// fail closed，于是这些没人消费的 promise 会变成未处理的 rejection——断言全过，
+// vitest 退出码却是 1。这里给每个端点方法的返回值挂一个空 catch 把它标记为已处理，
+// 原 promise 原样返回，`await expect(...).rejects` 的用例不受影响。
+function silenceUnconsumedRejections<T>(node: T): T {
+  if (typeof node === "function") {
+    return ((...args: unknown[]) => {
+      const result = (node as (...a: unknown[]) => unknown)(...args);
+      if (result instanceof Promise) result.catch(() => {});
+      return result;
+    }) as T;
+  }
+  if (node !== null && typeof node === "object") {
+    return Object.fromEntries(
+      Object.entries(node).map(([key, value]) => [
+        key,
+        silenceUnconsumedRejections(value)
+      ])
+    ) as T;
+  }
+  return node;
+}
+
+function createAdminEndpoints(client: HttpClient) {
+  return silenceUnconsumedRejections(createRawAdminEndpoints(client));
+}
 const http = {
   get: vi.fn(),
   post: vi.fn(),
@@ -38,10 +58,9 @@ const LIFECYCLE_WORD_A = "018f47b8-e3c1-7bd1-9f0a-123456789aa1";
 const LIFECYCLE_WORD_B = "018f47b8-e3c1-7bd1-9f0a-123456789aa2";
 const LIFECYCLE_WORD_C = "018f47b8-e3c1-7bd1-9f0a-123456789aa3";
 
-function lifecycleWord(id: string): AdminWordV2 {
-  const headwords = { mode: "unified", common: "legacy" } as const;
+function lifecycleWord(id: string): AdminWordV3 {
   return {
-    schema_version: 2,
+    schema_version: 3,
     id,
     language: "en",
     kind: "word",
@@ -51,18 +70,14 @@ function lifecycleWord(id: string): AdminWordV2 {
     annotation: null,
     annotation_revision: 1,
     has_unpublished_changes: false,
-    headwords,
-    detection_snapshot: {
-      detection_id: "018f47b8-e3c1-7bd1-9f0a-123456789ab3",
-      request: { language: "en", headword: "legacy" },
-      normalized_headword: "legacy",
-      entry_kind: "word",
-      matched_dialect: "common",
-      builtin_dictionary_status: "not_found",
-      headwords,
-      suggested_pos: [],
-      detected_at: "2026-08-25T00:00:00Z",
-      smart_dictionary_status: "clear"
+    presentation: {
+      label: "legacy",
+      matched_surfaces: ["legacy"],
+      strategy_version: "surface_summary_v1"
+    },
+    capabilities: {
+      publication: { mode: "native" },
+      pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
     forms: { pos: [] },
     meanings: { sense_groups: [], pos: [] },
@@ -97,7 +112,7 @@ function lifecycleBatchResponse(ids: string[], affected = ids.length) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  const wordEnvelope = { word: { schema_version: 2 } };
+  const wordEnvelope = { word: { schema_version: 3 } };
   http.get.mockImplementation((path: string) => {
     if (path.startsWith("/lexicon/entries/related-search?")) {
       return Promise.resolve({ results: [] });
@@ -108,7 +123,7 @@ beforeEach(() => {
         page: { page: 1, page_size: 20, total: 0 }
       });
     }
-    return Promise.resolve({ ...wordEnvelope, retired_stable_slots: [] });
+    return Promise.resolve({ ...wordEnvelope, retired_stable_nodes: [] });
   });
   http.post.mockImplementation((path: string) => {
     if (
@@ -300,8 +315,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
   it("list 在成功响应边界拒绝任一未知 schema 版本", async () => {
     http.get.mockResolvedValueOnce({
       words: [
-        { id: "w-1", schema_version: 2 },
-        { id: "w-2", schema_version: 3 }
+        { id: "w-1", schema_version: 3 },
+        { id: "w-2", schema_version: 4 }
       ],
       page: { page: 1, page_size: 20, total: 2 }
     });
@@ -311,7 +326,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     await expect(api.words.list()).rejects.toMatchObject({
       name: "UnsupportedAdminWordSchemaVersionError",
       response_path: "words[1].schema_version",
-      received_schema_version: 3
+      received_schema_version: 4
     });
   });
 
@@ -319,16 +334,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     const api = createAdminEndpoints(http);
     api.words.stats();
     expect(http.get).toHaveBeenCalledWith("/lexicon/entries/stats");
-  });
-
-  it("detect → POST /lexicon/detections 原样透传语言与待检测词头", () => {
-    const api = createAdminEndpoints(http);
-    const input = {
-      language: "en" as const,
-      headword: "center"
-    };
-    api.words.detect(input);
-    expect(http.post).toHaveBeenCalledWith("/lexicon/detections", input);
   });
 
   it("surfaceMatchSnapshotPage → GET 精确 snapshot/cursor 并透传取消信号", () => {
@@ -345,80 +350,55 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     );
   });
 
-  it("suggestDialectVariants → POST /lexicon/dialect-variant-suggestions 原样透传建议项", () => {
-    const api = createAdminEndpoints(http);
-    const input: SuggestDialectVariantsInputV2 = {
-      source_dialect: "uk",
-      target_dialect: "us",
-      items: [{ client_id: "form-1", field_kind: "form", value: "centre" }]
-    };
-    api.words.suggestDialectVariants(input);
-    expect(http.post).toHaveBeenCalledWith(
-      "/lexicon/dialect-variant-suggestions",
-      input
-    );
-  });
-
-  it("createV2 → POST /lexicon/entries，幂等键只进 header", () => {
-    const api = createAdminEndpoints(http);
-    const input = {
-      schema_version: 2 as const,
-      detection_id: "det-1",
-      headwords: {
-        mode: "distinguish" as const,
-        uk: "centre",
-        us: "center",
-        source_dialect: "us" as const
-      }
-    };
-    api.words.createV2("op-create-1", input);
-    expect(http.post).toHaveBeenCalledWith("/lexicon/entries", input, {
-      headers: { "Idempotency-Key": "op-create-1" }
-    });
-  });
-
   it.each([
     {
-      name: "createV2",
+      name: "createV3",
       httpMethod: "post",
       invoke: (api: ReturnType<typeof createAdminEndpoints>) =>
-        api.words.createV2("op-create-1", {
-          schema_version: 2,
+        api.words.createV3("op-create-1", {
+          schema_version: 3,
           detection_id: "det-1",
+          kind: "word",
           headwords: { mode: "unified", common: "center" }
         })
     },
     {
-      name: "saveFormsStep",
+      name: "saveFormsStepV3",
       httpMethod: "put",
       invoke: (api: ReturnType<typeof createAdminEndpoints>) =>
-        api.words.saveFormsStep("w-1", {
+        api.words.saveFormsStepV3("w-1", {
+          schema_version: 3,
           base_revision: 1,
           intent: "save",
           content: { pos: [] }
         })
     },
     {
-      name: "saveMeaningsStep",
+      name: "saveMeaningsStepV3",
       httpMethod: "put",
       invoke: (api: ReturnType<typeof createAdminEndpoints>) =>
-        api.words.saveMeaningsStep("w-1", {
+        api.words.saveMeaningsStepV3("w-1", {
+          schema_version: 3,
           base_revision: 1,
           intent: "save",
           content: { sense_groups: [], pos: [] }
         })
     },
     {
-      name: "publishV2",
+      name: "publishV3",
       httpMethod: "post",
       invoke: (api: ReturnType<typeof createAdminEndpoints>) =>
-        api.words.publishV2("w-1", "publish-key", { base_revision: 1 })
+        api.words.publishV3("w-1", "publish-key", {
+          schema_version: 3,
+          base_revision: 1
+        })
     },
     {
-      name: "activatePublication",
+      name: "activatePublicationV3",
       httpMethod: "post",
       invoke: (api: ReturnType<typeof createAdminEndpoints>) =>
-        api.words.activatePublication("w-1", "pub-1", "activate-key", {
+        api.words.activatePublicationV3("w-1", "pub-1", "activate-key", {
+          schema_version: 3,
           base_revision: 1,
           base_lifecycle_revision: 1
         })
@@ -472,63 +452,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     });
   });
 
-  it("previewFormsImpact → POST /lexicon/entries/{id}/steps/forms/impact", () => {
-    const api = createAdminEndpoints(http);
-    const input: PreviewFormsImpactInputV2 = {
-      base_revision: 3,
-      content: { pos: [] }
-    };
-    api.words.previewFormsImpact("w-2", input);
-    expect(http.post).toHaveBeenCalledWith(
-      "/lexicon/entries/w-2/steps/forms/impact",
-      input
-    );
-  });
-
-  it("saveFormsStep → PUT /lexicon/entries/{id}/steps/forms 原样透传独立双 token", () => {
-    const api = createAdminEndpoints(http);
-    const input: SaveFormsStepInput = {
-      base_revision: 3,
-      intent: "save",
-      confirmed_impact_token: "impact-token-1",
-      confirmed_surface_match_token: "surface-token-1",
-      content: { pos: [] }
-    };
-    api.words.saveFormsStep("w-2", input);
-    expect(http.put).toHaveBeenCalledWith(
-      "/lexicon/entries/w-2/steps/forms",
-      input
-    );
-  });
-
-  it("saveMeaningsStep → PUT /lexicon/entries/{id}/steps/meanings", () => {
-    const api = createAdminEndpoints(http);
-    const input: SaveMeaningsStepInput = {
-      base_revision: 4,
-      intent: "complete",
-      content: { sense_groups: [], pos: [] }
-    };
-    api.words.saveMeaningsStep("w-2", input);
-    type HasSurfaceToken =
-      "confirmed_surface_match_token" extends keyof SaveMeaningsStepInput
-        ? true
-        : false;
-    type HasImpactToken =
-      "confirmed_impact_token" extends keyof SaveMeaningsStepInput
-        ? true
-        : false;
-    const hasSurfaceToken: HasSurfaceToken = false;
-    const hasImpactToken: HasImpactToken = false;
-    expect(hasSurfaceToken).toBe(false);
-    expect(hasImpactToken).toBe(false);
-    expect(input).not.toHaveProperty("confirmed_surface_match_token");
-    expect(input).not.toHaveProperty("confirmed_impact_token");
-    expect(http.put).toHaveBeenCalledWith(
-      "/lexicon/entries/w-2/steps/meanings",
-      input
-    );
-  });
-
   it("resolveSentenceTargetsV3 走权威 resolve 路径并原样透传 snake_case 入参", () => {
     // 成分用词的目标发现仍依赖这条；原先与 replace/list/claim 合在一条用例里，
     // 草稿期关联下线后把 resolve 这部分单独保留。
@@ -553,71 +476,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(http.post).toHaveBeenCalledWith(
       "/lexicon/entries/sentence-targets/resolve",
       resolveInput
-    );
-  });
-
-  it("content completion create/get/retry 使用权威路径和独立幂等 header", () => {
-    const api = createAdminEndpoints(http);
-    const input: CreateContentCompletionJobInput = {
-      base_revision: 4,
-      scope: ["grammar_structures", "meanings", "examples"],
-      fill_policy: "missing_only"
-    };
-    api.words.createContentCompletionJob("w-2", "generate-key", input);
-    api.words.getContentCompletionJob("w-2", "job-1");
-    api.words.retryContentCompletionJob("w-2", "job-1", "retry-key", {
-      pos_ids: ["pos-1"]
-    });
-    expect(http.post).toHaveBeenNthCalledWith(
-      1,
-      "/lexicon/entries/w-2/content-completion-jobs",
-      input,
-      { headers: { "Idempotency-Key": "generate-key" } }
-    );
-    expect(http.get).toHaveBeenCalledWith(
-      "/lexicon/entries/w-2/content-completion-jobs/job-1"
-    );
-    expect(http.post).toHaveBeenNthCalledWith(
-      2,
-      "/lexicon/entries/w-2/content-completion-jobs/job-1/retries",
-      { pos_ids: ["pos-1"] },
-      { headers: { "Idempotency-Key": "retry-key" } }
-    );
-  });
-
-  it("validateV2 → POST /lexicon/entries/{id}/validate 带 base_revision", () => {
-    const api = createAdminEndpoints(http);
-    api.words.validateV2("w-2", { base_revision: 5 });
-    expect(http.post).toHaveBeenCalledWith("/lexicon/entries/w-2/validate", {
-      base_revision: 5
-    });
-  });
-
-  it("publishV2 → POST /lexicon/entries/{id}/publications，幂等键只进 header", () => {
-    const api = createAdminEndpoints(http);
-    const input: PublishAdminWordV2Input = {
-      base_revision: 5
-    };
-    api.words.publishV2("w-2", "op-publish-1", input);
-    expect(http.post).toHaveBeenCalledWith(
-      "/lexicon/entries/w-2/publications",
-      input,
-      { headers: { "Idempotency-Key": "op-publish-1" } }
-    );
-  });
-
-  it("activatePublication → 历史 publication activation 使用独立幂等键", () => {
-    const api = createAdminEndpoints(http);
-    const input: ActivatePublicationInput = {
-      base_revision: 5,
-      base_lifecycle_revision: 2,
-      confirmed_surface_match_token: "visibility-token"
-    };
-    api.words.activatePublication("w-2", "pub-1", "activation-key", input);
-    expect(http.post).toHaveBeenCalledWith(
-      "/lexicon/entries/w-2/publications/pub-1/activate",
-      input,
-      { headers: { "Idempotency-Key": "activation-key" } }
     );
   });
 
@@ -655,7 +513,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     async (method) => {
       http.post.mockResolvedValueOnce({
         words: [
-          { id: "w-1", schema_version: 2 },
+          { id: "w-1", schema_version: 3 },
           { id: "w-2", schema_version: null }
         ],
         affected: 2
@@ -781,22 +639,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     });
   });
 
-  it("relatedSearch legacy facade 过滤 mixed wire 中的 V3 结果并保留分页字段", async () => {
-    const v2 = {
-      schema_version: 2 as const,
-      word_id: "018f47b8-e3c1-7bd1-9f0a-123456789aa1",
-      headword: "legacy",
-      kind: "word" as const,
-      dialects: ["common" as const],
-      headword_variants: [{ dialect: "common" as const, headword: "legacy" }],
-      pos_labels: ["noun"],
-      senses: [
-        {
-          sense_id: "018f47b8-e3c1-7bd1-9f0a-123456789ab1",
-          gloss: "旧版词条"
-        }
-      ]
-    };
+  it("relatedSearch 保留 V3 结果与分页字段", async () => {
     const v3 = {
       schema_version: 3 as const,
       entry_id: "018f47b8-e3c1-7bd1-9f0a-123456789aa3",
@@ -815,20 +658,20 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       ]
     };
     http.get.mockResolvedValueOnce({
-      results: [v2, v3],
+      results: [v3],
       total: 27,
       next_cursor: "opaque-next"
     });
     const api = createAdminEndpoints(http);
 
     await expect(api.words.relatedSearch("mixed")).resolves.toEqual({
-      results: [v2],
+      results: [v3],
       total: 27,
       next_cursor: "opaque-next"
     });
   });
 
-  it("relatedSearch legacy facade 在过滤前拒绝未知响应 shape", async () => {
+  it("relatedSearch 对未知响应 shape fail closed", async () => {
     http.get.mockResolvedValueOnce({ results: "not-an-array" });
     const api = createAdminEndpoints(http);
 
@@ -860,19 +703,19 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     expect(writableSentenceHasAssociations).toBe(false);
     expect(writableRelationHasTargetPresentation).toBe(false);
 
-    api.words.listAny({ status: "draft" });
+    api.words.list({ status: "draft" });
     api.words.detectV3({
       schema_version: 3,
       language: "en",
       kind: "word",
       surface: "bright"
     });
-    api.words.surfaceMatchSnapshotPageAny(
+    api.words.surfaceMatchSnapshotPage(
       "snapshot-3",
       "cursor-3",
       controller.signal
     );
-    api.words.surfaceMatchSnapshotPageV3(
+    api.words.surfaceMatchSnapshotPage(
       "snapshot-3",
       "cursor-3",
       controller.signal
@@ -883,7 +726,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       kind: "word",
       headwords: { mode: "unified", common: "center" }
     });
-    api.words.getAny("w-3");
+    api.words.get("w-3");
     api.words.previewFormsImpactV3("w-3", {
       schema_version: 3,
       base_revision: 7,
@@ -912,11 +755,11 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       schema_version: 3,
       ...lifecycle
     });
-    api.words.archiveAny("w-3", "archive-any-key", lifecycle);
-    api.words.restoreAny("w-3", "restore-any-key", lifecycle);
-    api.words.archiveBatchAny("archive-batch-any-key", batch);
-    api.words.restoreBatchAny("restore-batch-any-key", batch);
-    api.words.relatedSearchAny("bright", {
+    api.words.archive("w-3", "archive-any-key", lifecycle);
+    api.words.restore("w-3", "restore-any-key", lifecycle);
+    api.words.archiveBatch("archive-batch-any-key", batch);
+    api.words.restoreBatch("restore-batch-any-key", batch);
+    api.words.relatedSearch("bright", {
       kind: "word",
       match_mode: "contains",
       exclude_exact: true,
@@ -1038,14 +881,14 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     });
   });
 
-  it("getAny 返回的 word.id 与 path 不一致时 fail closed", async () => {
+  it("get 返回的 word.id 与 path 不一致时 fail closed", async () => {
     http.get.mockResolvedValueOnce({
       word: lifecycleWord(LIFECYCLE_WORD_B),
-      retired_stable_slots: []
+      retired_stable_nodes: []
     });
     const api = createAdminEndpoints(http);
 
-    await expect(api.words.getAny(LIFECYCLE_WORD_A)).rejects.toMatchObject({
+    await expect(api.words.get(LIFECYCLE_WORD_A)).rejects.toMatchObject({
       name: "InvalidAdminWordResponseError",
       response_path: "get.word.id",
       reason: "enum_mismatch",
@@ -1055,19 +898,19 @@ describe("createAdminEndpoints — 智能词库 words", () => {
 
   it("get/archive/restore Any 保留 identity 一致的正式响应", async () => {
     const word = lifecycleWord(LIFECYCLE_WORD_A);
-    http.get.mockResolvedValueOnce({ word, retired_stable_slots: [] });
+    http.get.mockResolvedValueOnce({ word, retired_stable_nodes: [] });
     http.post.mockResolvedValue({ word });
     const api = createAdminEndpoints(http);
     const input = { base_revision: 1, base_lifecycle_revision: 1 };
 
-    await expect(api.words.getAny(LIFECYCLE_WORD_A)).resolves.toMatchObject({
+    await expect(api.words.get(LIFECYCLE_WORD_A)).resolves.toMatchObject({
       word: { id: LIFECYCLE_WORD_A }
     });
     await expect(
-      api.words.archiveAny(LIFECYCLE_WORD_A, "archive-key", input)
+      api.words.archive(LIFECYCLE_WORD_A, "archive-key", input)
     ).resolves.toMatchObject({ word: { id: LIFECYCLE_WORD_A } });
     await expect(
-      api.words.restoreAny(LIFECYCLE_WORD_A, "restore-key", input)
+      api.words.restore(LIFECYCLE_WORD_A, "restore-key", input)
     ).resolves.toMatchObject({ word: { id: LIFECYCLE_WORD_A } });
   });
 
@@ -1084,8 +927,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       const input = { base_revision: 1, base_lifecycle_revision: 1 };
       const request =
         operation === "archive"
-          ? api.words.archiveAny(LIFECYCLE_WORD_A, "archive-key", input)
-          : api.words.restoreAny(LIFECYCLE_WORD_A, "restore-key", input);
+          ? api.words.archive(LIFECYCLE_WORD_A, "archive-key", input)
+          : api.words.restore(LIFECYCLE_WORD_A, "restore-key", input);
 
       await expect(request).rejects.toMatchObject({
         name: "InvalidAdminWordResponseError",
@@ -1106,8 +949,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       const input = lifecycleBatchInput();
       const call = () =>
         operation === "archive"
-          ? api.words.archiveBatchAny("archive-batch-key", input)
-          : api.words.restoreBatchAny("restore-batch-key", input);
+          ? api.words.archiveBatch("archive-batch-key", input)
+          : api.words.restoreBatch("restore-batch-key", input);
       const cases = [
         {
           response: lifecycleBatchResponse([LIFECYCLE_WORD_A]),
@@ -1185,8 +1028,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
 
       const result =
         operation === "archive"
-          ? api.words.archiveBatchAny("archive-batch-key", input)
-          : api.words.restoreBatchAny("restore-batch-key", input);
+          ? api.words.archiveBatch("archive-batch-key", input)
+          : api.words.restoreBatch("restore-batch-key", input);
       await expect(result).resolves.toMatchObject({ affected: 1 });
     }
   );
@@ -1198,8 +1041,8 @@ describe("createAdminEndpoints — 智能词库 words", () => {
     });
     const api = createAdminEndpoints(http);
 
-    await expect(api.words.listAny()).rejects.toMatchObject({
-      supported_schema_versions: [2, 3],
+    await expect(api.words.list()).rejects.toMatchObject({
+      supported_schema_versions: [3],
       received_schema_version: 4,
       response_path: "words[0].schema_version"
     });

@@ -3,7 +3,6 @@ import type {
   Dialect,
   FormsImpactNodeTypeV3,
   PronunciationStyle,
-  V3PublicationBlockCode,
   WordFormTypeV3
 } from "@tsz/types";
 
@@ -210,12 +209,6 @@ export function summarizeFormsImpact(
 
 export function impactTypeLabel(value: FormsImpactNodeTypeV3): string {
   return IMPACT_LABEL[value] ?? "受影响内容";
-}
-
-export function publicationBlockMessage(code: V3PublicationBlockCode): string {
-  return code === "phase2_consumers_not_ready"
-    ? "学习端尚未完成该词条结构的发布准备。"
-    : "该词条暂未进入允许发布的迁移范围。";
 }
 
 export function definitionModeLabel(value: string): string {

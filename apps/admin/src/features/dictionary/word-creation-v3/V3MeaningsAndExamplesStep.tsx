@@ -55,7 +55,7 @@ import type {
 } from "@tsz/types";
 import type { ReactNode } from "react";
 import { useRef, useState } from "react";
-import { useRelatedSearchAny } from "../api";
+import { useRelatedSearch } from "../api";
 import {
   groupRelations,
   replaceRelationGroup,
@@ -1004,7 +1004,7 @@ function RelationsGrid({
   }>();
   const activeSearch = searching ?? senseSearch;
   const preparedSearch = validateEntryInput(activeSearch?.query ?? "");
-  const relatedSearch = useRelatedSearchAny(
+  const relatedSearch = useRelatedSearch(
     preparedSearch.normalized,
     preparedSearch.kind,
     Boolean(activeSearch?.query.trim()) && !preparedSearch.issue,

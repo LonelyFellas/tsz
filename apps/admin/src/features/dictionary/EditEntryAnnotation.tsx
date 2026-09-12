@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client/http";
 import type { AdminWordListItemAny, EntryAnnotationConflict } from "@tsz/types";
-import { adminWordsAnyDataSource } from "./dataSource";
+import { adminWordsDataSource } from "./dataSource";
 import { EntryAnnotationModal } from "./EntryAnnotationModal";
 import { wordListLabel } from "./presentation";
 import { annotationForbiddenMessage } from "./annotationPermission";
@@ -54,7 +54,7 @@ export function EditEntryAnnotation({
         setBusy(true);
         setError(undefined);
         try {
-          const response = await adminWordsAnyDataSource.updateAnnotation(
+          const response = await adminWordsDataSource.updateAnnotation(
             entry.id,
             {
               annotation: values[entry.id] || null,

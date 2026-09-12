@@ -29,7 +29,7 @@ function word(): AdminWordV3 {
       strategy_version: "v3"
     },
     capabilities: {
-      publication: { mode: "migration_canary", whitelisted: true },
+      publication: { mode: "native" },
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
     forms: { pos: [noun, adjective] },

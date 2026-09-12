@@ -1,6 +1,5 @@
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { V3_VALIDATION_ISSUE_CODES } from "@tsz/types";
-import type { AdminWordV2ListItem } from "@tsz/types";
 import { createAdminEndpoints } from "./admin";
 import runtimeSchemaBundle from "./admin-word-v3.runtime-schema.json";
 import { createEndpoints } from "./endpoints";
@@ -23,8 +22,6 @@ const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries/delete-batch",
   "post /admin/lexicon/entries/restore-batch",
   "post /admin/lexicon/entries/{id}/archive",
-  "post /admin/lexicon/entries/{id}/content-completion-jobs",
-  "post /admin/lexicon/entries/{id}/content-completion-jobs/{job_id}/retries",
   "post /admin/lexicon/entries/{id}/publications",
   "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate",
   "post /admin/lexicon/entries/{id}/restore"
@@ -166,9 +163,6 @@ function collectComponentSchemaRefs(value: unknown): Set<string> {
   return refs;
 }
 
-type IsRequiredKey<T, K extends keyof T> =
-  Pick<T, K> extends Required<Pick<T, K>> ? true : false;
-
 describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
   it("Admin Lexicon 每个非空 request root 的完整 schema closure 都已入快照", () => {
     const operationSchemas = snapshot.operationSchemas as Record<
@@ -210,46 +204,46 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     const cases = [
       [
         "post /admin/lexicon/detections",
-        "DetectLexiconInputAny",
+        "DetectLexiconSurfaceV3Input",
         "200",
-        "DetectLexiconResponseAny"
+        "DetectLexiconSurfaceResponseV3"
       ],
       ["get /admin/lexicon/entries", null, "200", "AdminWordListResponse"],
       [
         "post /admin/lexicon/entries",
-        "CreateAdminWordAnyInput",
+        "CreateAdminWordV3Input",
         "201",
-        "AdminWordAnyEnvelope"
+        "AdminWordV3Envelope"
       ],
       [
         "get /admin/lexicon/entries/{id}",
         null,
         "200",
-        "AdminWordDraftAnyEnvelope"
+        "AdminWordDraftV3Envelope"
       ],
       [
         "post /admin/lexicon/entries/{id}/steps/forms/impact",
-        "PreviewFormsImpactInputAny",
+        "PreviewFormsImpactInputV3",
         "200",
-        "FormsImpactResponseAny"
+        "FormsImpactResponseV3"
       ],
       [
         "put /admin/lexicon/entries/{id}/steps/forms",
-        "SaveFormsStepInputAny",
+        "SaveFormsStepInputV3",
         "200",
-        "AdminWordAnyEnvelope"
+        "AdminWordV3Envelope"
       ],
       [
         "put /admin/lexicon/entries/{id}/steps/meanings",
-        "SaveMeaningsStepInputAny",
+        "SaveMeaningsStepInputV3",
         "200",
-        "AdminWordAnyEnvelope"
+        "AdminWordV3Envelope"
       ],
       [
         "post /admin/lexicon/entries/{id}/validate",
-        "ValidateAdminWordAnyInput",
+        "ValidateAdminWordV3Input",
         "200",
-        "DraftValidationResponseAny"
+        "DraftValidationResponseV3"
       ],
       [
         "get /admin/lexicon/entries/{id}/publications",
@@ -259,9 +253,9 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       ],
       [
         "post /admin/lexicon/entries/{id}/publications",
-        "PublishAdminWordAnyInput",
+        "PublishAdminWordV3Input",
         "201",
-        "AdminWordAnyEnvelope"
+        "AdminWordV3Envelope"
       ],
       [
         "get /admin/lexicon/entries/{id}/publications/{publication_id}",
@@ -271,15 +265,15 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       ],
       [
         "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate",
-        "ActivatePublicationAnyInput",
+        "ActivatePublicationV3Input",
         "200",
-        "AdminWordAnyEnvelope"
+        "AdminWordV3Envelope"
       ],
       [
         "get /admin/lexicon/surface-match-snapshots/{snapshot_id}",
         null,
         "200",
-        "SurfaceMatchPageAny"
+        "SurfaceMatchPageV3"
       ],
       [
         "get /admin/lexicon/entries/related-search",
@@ -291,13 +285,13 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "post /admin/lexicon/entries/archive-batch",
         "EntryLifecycleBatchInput",
         "200",
-        "EntryLifecycleBatchResponseAny"
+        "EntryLifecycleBatchResponse"
       ],
       [
         "post /admin/lexicon/entries/restore-batch",
         "EntryLifecycleBatchInput",
         "200",
-        "EntryLifecycleBatchResponseAny"
+        "EntryLifecycleBatchResponse"
       ],
       [
         "post /admin/lexicon/entries/delete-batch",
@@ -309,13 +303,13 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "post /admin/lexicon/entries/{id}/archive",
         "EntryLifecycleInput",
         "200",
-        "AdminWordAnyEnvelope"
+        "AdminWordV3Envelope"
       ],
       [
         "post /admin/lexicon/entries/{id}/restore",
         "EntryLifecycleInput",
         "200",
-        "AdminWordAnyEnvelope"
+        "AdminWordV3Envelope"
       ]
     ] as const;
 
@@ -494,10 +488,10 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "124ab36f27acb5463beac7c44019e95d4fe256ebd7a9bcdfca4d8f6b58343254"
+      "5de5d7a9431364b355d72e380728a003321d160bcb9026163adf99fffcdd776d"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
-    expect(runtimeSchemaBundle.roots).toContain("AdminWordAnyEnvelope");
+    expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
     expect(runtimeSchemaBundle.roots).toContain("ProblemMeta");
     expect(runtimeSchemaBundle.roots).toContain("ProblemDetails");
 
@@ -517,10 +511,9 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     });
     expect(defs.TextLinkV3.required).toContain("source_segments");
     expect(defs.TextLinkV3.required).not.toContain("target_gloss");
-    expect(defs.AdminWordAny.oneOf).toEqual([
-      { $ref: "#/$defs/AdminWordV2" },
-      { $ref: "#/$defs/AdminWordV3" }
-    ]);
+    expect(defs.AdminWordV3Envelope.properties.word).toEqual({
+      $ref: "#/$defs/AdminWordV3"
+    });
     expect(defs.AdminWordV3.properties.schema_version.enum).toEqual([3]);
     expect(defs.WordEntryKindV3.enum).toEqual(["word", "phrase"]);
     expect(defs.WordPosFormsV3.required).toContain("dialect_rules");
@@ -607,10 +600,6 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
   it("V3 meanings 写 DTO、surface 判别联合与 validation code 对齐当前 OpenAPI", () => {
     const schemas = snapshot.schemas;
 
-    expect(schemas.SaveMeaningsStepInputAny.oneOf).toEqual([
-      { $ref: "#/components/schemas/SaveMeaningsStepInput" },
-      { $ref: "#/components/schemas/SaveMeaningsStepInputV3" }
-    ]);
     expect(schemas.SaveMeaningsStepInputV3.properties.content).toEqual({
       $ref: "#/components/schemas/DraftMeaningsStepContentWritableV3"
     });
@@ -672,29 +661,12 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "draft",
       "published"
     ]);
-    expect(schemas.WordRelationV2.properties.pending_target_gloss).toEqual({
-      type: "string",
-      maxLength: 5000
-    });
-    for (const branches of [
-      writableRelationBranches,
-      responseRelationBranches
-    ]) {
-      expect(
-        branches.some((branch) => "pending_target_gloss" in branch.properties)
-      ).toBe(true);
-    }
-
     expect(
       schemas.SurfaceMatchItemV3.oneOf.map((branch) => ({
         kind: branch.properties.match_kind.enum[0],
         match: branch.properties.match.$ref
       }))
     ).toEqual([
-      {
-        kind: "legacy_v2",
-        match: "#/components/schemas/LegacySurfaceMatchV3"
-      },
       {
         kind: "form_variant_v3",
         match: "#/components/schemas/FormSurfaceMatchV3"
@@ -723,7 +695,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     );
   });
 
-  it("V2 命令端点的 Idempotency-Key 必须是必填 UUID header", () => {
+  it("词库命令端点的 Idempotency-Key 必须是必填 UUID header", () => {
     const expectedHeader = {
       name: "Idempotency-Key",
       in: "header",
@@ -741,41 +713,38 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     );
   });
 
-  it("AdminWordV2 发布与生命周期字段的 required/可选性和后端一致", () => {
-    const adminWordV2 = snapshot.schemas.AdminWordV2;
+  it("词条发布与生命周期字段的 required/可选性和后端一致", () => {
+    const adminWord = runtimeSchemaBundle.$defs.AdminWordV3;
 
-    expect(adminWordV2.required).toContain("has_unpublished_changes");
-    expect(adminWordV2.required).toContain("lifecycle_revision");
-    expect(adminWordV2.required).not.toContain("published_revision");
-    expect(adminWordV2.properties.has_unpublished_changes).toEqual({
+    expect(adminWord.required).toContain("has_unpublished_changes");
+    expect(adminWord.required).toContain("lifecycle_revision");
+    expect(adminWord.required).not.toContain("published_revision");
+    expect(adminWord.properties.has_unpublished_changes).toEqual({
       type: "boolean"
     });
-    expect(adminWordV2.properties.published_revision).toEqual({
-      type: "integer",
-      format: "int64"
+    expect(adminWord.properties.published_revision).toEqual({
+      type: "integer"
     });
-    expect(adminWordV2.properties.lifecycle_revision).toEqual({
-      type: "integer",
-      format: "int64"
+    expect(adminWord.properties.lifecycle_revision).toEqual({
+      type: "integer"
     });
-    expect(snapshot.schemas.AdminWordListItem.required).toEqual(
+    expect(snapshot.schemas.AdminWordListItemV3.required).toEqual(
       expect.arrayContaining([
         "schema_version",
         "revision",
         "lifecycle_revision",
         "max_reachable_step",
         "has_unpublished_changes",
-        "headword_variants"
+        "presentation",
+        "dialects"
       ])
     );
-    expectTypeOf<
-      IsRequiredKey<AdminWordV2ListItem, "headword_variants">
-    >().toEqualTypeOf<true>();
     expect(snapshot.schemas.EntryLifecycleInput.required).toEqual([
       "base_revision",
       "base_lifecycle_revision"
     ]);
-    expect(snapshot.schemas.ActivatePublicationInput.required).toEqual([
+    expect(snapshot.schemas.ActivatePublicationV3Input.required).toEqual([
+      "schema_version",
       "base_revision",
       "base_lifecycle_revision"
     ]);
@@ -805,26 +774,19 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "words",
       "affected"
     ]);
-    expect(snapshot.schemas.SuggestDialectVariantsResponseV2.required).toEqual([
-      "provider",
-      "suggestions"
-    ]);
-    expect(snapshot.schemas.DuplicateWordMatchV2.required).toEqual([
-      "word_id",
-      "headword",
-      "dialect",
-      "status",
-      "match_category",
-      "inbound_relations"
-    ]);
-    expect(snapshot.schemas.DuplicateWordMatchV2.properties.status).toEqual({
-      $ref: "#/components/schemas/AdminWordStatus"
+    expect(snapshot.schemas.FormsImpactItemV3.properties.node_type).toEqual({
+      $ref: "#/components/schemas/FormsImpactNodeTypeV3"
     });
-    expect(snapshot.schemas.FormsImpactItemV2.properties.node_type).toEqual({
-      $ref: "#/components/schemas/FormsImpactNodeType"
-    });
-    expect(snapshot.schemas.FormsImpactNodeType.enum).toEqual([
+    expect(snapshot.schemas.FormsImpactNodeTypeV3.enum).toEqual([
       "pos",
+      "form_group",
+      "membership",
+      "form",
+      "variant",
+      "pronunciation",
+      "phrase_component_usage",
+      "surface",
+      "publication",
       "grammar_structure",
       "text_variant",
       "sense",
@@ -965,33 +927,31 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(
       specPaths["/admin/lexicon/surface-match-snapshots/{snapshot_id}"]
     ).toEqual(["get"]);
-    expect(snapshot.schemas.SurfaceMatchPageV2.oneOf).toHaveLength(3);
+    expect(snapshot.schemas.SurfaceMatchPageV3.oneOf).toHaveLength(3);
     expect(
-      snapshot.schemas.SurfaceMatchEnabledTerminalPageV2.properties
+      snapshot.schemas.SurfaceMatchEnabledTerminalPageV3.properties
         .impact_confirmation_token
     ).toEqual({ type: "string", format: "uuid" });
     expect(
       snapshot.schemas.DraftNodeLocation.properties.form_type
     ).toMatchObject({ type: "string", pattern: "^[a-z][a-z0-9_]{0,31}$" });
     expect(
-      snapshot.schemas.SurfaceMatchPageBaseV2.properties.items
+      snapshot.schemas.SurfaceMatchPageBaseV3.properties.items
     ).toMatchObject({
       type: "array",
-      minItems: 1,
       maxItems: 50
     });
-    expect(snapshot.schemas.DuplicateWordMatchV2.deprecated).toBe(true);
     expect(
-      snapshot.schemas.CreateAdminWordV2Input.properties
+      snapshot.schemas.CreateAdminWordV3Input.properties
         .confirmed_surface_match_token
-    ).toEqual({ type: "string" });
-    expect(snapshot.schemas.CreateAdminWordV2Input.required).not.toContain(
+    ).toMatchObject({ type: "string" });
+    expect(snapshot.schemas.CreateAdminWordV3Input.required).not.toContain(
       "confirmed_surface_match_token"
     );
     expect(snapshot.schemas.ProblemMeta.properties).toEqual(
       expect.objectContaining({
         surface_match_page: {
-          $ref: "#/components/schemas/SurfaceMatchPageAny"
+          $ref: "#/components/schemas/SurfaceMatchPageV3"
         },
         current_policy_name: {
           $ref: "#/components/schemas/SurfacePolicyNameV2"
@@ -1003,39 +963,6 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         }
       })
     );
-    const statuses = snapshot.schemas.SmartDictionaryResultV2.oneOf.map(
-      (branch) => branch.properties.status.enum[0]
-    );
-    expect(statuses).toEqual(["clear", "duplicate", "warning", "unavailable"]);
-
-    const snapshotBranches = snapshot.schemas.WordDetectionSnapshotV2.oneOf;
-    expect(snapshotBranches).toHaveLength(2);
-    const [clearSnapshot, warningSnapshot] = snapshotBranches;
-    if (!clearSnapshot || !warningSnapshot) {
-      throw new Error(
-        "WordDetectionSnapshotV2 必须恰好包含 clear/warning 两个分支"
-      );
-    }
-    expect(
-      snapshotBranches.map(
-        (branch) => branch.properties.smart_dictionary_status.enum[0]
-      )
-    ).toEqual(["clear", "warning"]);
-    expect(
-      snapshotBranches.every((branch) => branch.additionalProperties === false)
-    ).toBe(true);
-    expect(clearSnapshot.properties.surface_warning).toEqual({
-      type: "null"
-    });
-    expect(clearSnapshot.required).not.toContain("surface_warning");
-    expect(warningSnapshot.required).toContain("surface_warning");
-    expect(
-      snapshot.schemas.DetectionSurfaceWarningAuditV2.properties.acknowledged
-        .enum
-    ).toEqual([true]);
-    expect(
-      snapshot.schemas.DetectionSurfaceWarningAuditV2.additionalProperties
-    ).toBe(false);
   });
 
   it("speech 目录与试听 wire 和后端一致", () => {

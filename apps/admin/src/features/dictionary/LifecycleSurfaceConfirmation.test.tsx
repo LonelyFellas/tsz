@@ -1,47 +1,32 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { App } from "antd";
 import { describe, expect, it, vi } from "vitest";
-import type { LexiconSurfaceMatchV2, SurfaceMatchPageAny } from "@tsz/types";
+import type { SurfaceMatchItemV3, SurfaceMatchPageV3 } from "@tsz/types";
 import { LifecycleSurfaceConfirmation } from "./LifecycleSurfaceConfirmation";
 import type { SurfaceSnapshotState } from "./surfaceSnapshot";
 
-function item(
-  id: string,
-  reasons: LexiconSurfaceMatchV2["confirmation_reasons"]
-): LexiconSurfaceMatchV2 {
+function item(id: string): SurfaceMatchItemV3 {
   return {
-    match_id: id,
-    match_category: "exact_headword",
-    severity: "warning",
-    attention_level: "high",
-    can_continue: true,
-    confirmation_reasons: reasons,
-    candidate: {
-      candidate_type: "headword",
-      candidate_ref: `headword:${id}`,
-      surface: id,
-      normalized_surface: id,
-      dialect: "common",
-      entry_kind: "word"
-    },
-    existing: {
-      word_id: `word-${id}`,
-      headword: id,
-      kind: "word",
+    match_kind: "form_variant_v3",
+    match: {
+      source_schema_version: 3,
+      entry_id: `entry-${id}`,
+      entry_kind: "word",
       status: "published",
-      source: {
-        source_kind: "headword",
-        source_id: id,
-        content_scope: "current_publication",
-        surface: id,
-        dialect: "common"
-      }
+      content_scope: "current_publication",
+      pos_id: `pos-${id}`,
+      group_ids: [],
+      form_id: `form-${id}`,
+      variant_id: `variant-${id}`,
+      form_type: "base",
+      dialect: "common",
+      spelling: id
     }
   };
 }
 
 function renderPanel(
-  state: SurfaceSnapshotState<SurfaceMatchPageAny>,
+  state: SurfaceSnapshotState<SurfaceMatchPageV3>,
   onConfirm = vi.fn(),
   onRestart = vi.fn(),
   action: "restore" | "activate" = "restore"
@@ -62,7 +47,7 @@ function renderPanel(
 
 describe("LifecycleSurfaceConfirmation", () => {
   it("V3 confirmation 忠实展示服务端 presentation 与 form source", () => {
-    const state: SurfaceSnapshotState<SurfaceMatchPageAny> = {
+    const state: SurfaceSnapshotState<SurfaceMatchPageV3> = {
       generation: 1,
       schema_version: 3,
       phase: "ready",
@@ -128,7 +113,7 @@ describe("LifecycleSurfaceConfirmation", () => {
     renderPanel({
       generation: 1,
       phase: "disabled",
-      items: [item("visible", ["visibility_activation"])],
+      items: [item("visible")],
       matched_entry_contexts: [],
       total: 1,
       confirmation_reasons: ["visibility_activation"],
@@ -140,31 +125,40 @@ describe("LifecycleSurfaceConfirmation", () => {
     expect(screen.queryByText("确认并恢复")).toBeNull();
   });
 
-  it("按 ordinary、visibility、composite 分组且单 token 执行确认", () => {
+  it("快照级 reasons 同时命中两类时归入 composite 分组，单 token 确认", () => {
     const onConfirm = renderPanel({
       generation: 1,
+      schema_version: 3,
       phase: "ready",
-      items: [
-        item("ordinary", ["unacknowledged_surface_matches"]),
-        item("visibility", ["visibility_activation"]),
-        item("both", [
-          "unacknowledged_surface_matches",
-          "visibility_activation"
-        ])
-      ],
+      items: [item("alpha"), item("beta")],
       matched_entry_contexts: [],
-      total: 3,
+      total: 2,
       confirmation_reasons: [
         "unacknowledged_surface_matches",
         "visibility_activation"
       ],
       surface_confirmation_token: "one-composite-token"
     });
-    expect(screen.getByLabelText("仅普通同形提示")).toBeVisible();
-    expect(screen.getByLabelText("仅公开可见性")).toBeVisible();
     expect(screen.getByLabelText("公开可见性 + 普通同形提示")).toBeVisible();
+    expect(screen.queryByLabelText("仅普通同形提示")).toBeNull();
+    expect(screen.queryByLabelText("仅公开可见性")).toBeNull();
     fireEvent.click(screen.getByText("确认并恢复"));
     expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("快照级 reasons 只命中普通同形时归入 ordinary 分组", () => {
+    renderPanel({
+      generation: 1,
+      schema_version: 3,
+      phase: "ready",
+      items: [item("alpha")],
+      matched_entry_contexts: [],
+      total: 1,
+      confirmation_reasons: ["unacknowledged_surface_matches"],
+      surface_confirmation_token: "ordinary-token"
+    });
+    expect(screen.getByLabelText("仅普通同形提示")).toBeVisible();
+    expect(screen.queryByLabelText("仅公开可见性")).toBeNull();
   });
 
   it("snapshot 过期时重新发起命令而不是重试旧分页", () => {
@@ -173,7 +167,7 @@ describe("LifecycleSurfaceConfirmation", () => {
       {
         generation: 1,
         phase: "expired",
-        items: [item("expired", ["visibility_activation"])],
+        items: [item("expired")],
         matched_entry_contexts: [],
         total: 1,
         confirmation_reasons: ["visibility_activation"]
@@ -192,7 +186,7 @@ describe("LifecycleSurfaceConfirmation", () => {
       {
         generation: 1,
         phase: "ready",
-        items: [item("activate", ["visibility_activation"])],
+        items: [item("activate")],
         matched_entry_contexts: [],
         total: 1,
         confirmation_reasons: ["visibility_activation"],
@@ -216,7 +210,7 @@ describe("LifecycleSurfaceConfirmation", () => {
       {
         generation: 1,
         phase: "expired",
-        items: [item("expired-activate", ["visibility_activation"])],
+        items: [item("expired-activate")],
         matched_entry_contexts: [],
         total: 1,
         confirmation_reasons: ["visibility_activation"]
@@ -236,7 +230,7 @@ describe("LifecycleSurfaceConfirmation", () => {
       {
         generation: 1,
         phase: "disabled",
-        items: [item("disabled-activate", ["visibility_activation"])],
+        items: [item("disabled-activate")],
         matched_entry_contexts: [],
         total: 1,
         confirmation_reasons: ["visibility_activation"],

@@ -97,8 +97,7 @@ function word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
     },
     capabilities: {
       publication: {
-        mode: "shadow_only",
-        blocked_code: "phase2_consumers_not_ready"
+        mode: "native" as const
       },
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
@@ -116,9 +115,9 @@ function word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
 function source(getAnyValue: unknown) {
   return {
     detectV3: vi.fn(),
-    surfaceMatchSnapshotPageV3: vi.fn(),
+    surfaceMatchSnapshotPage: vi.fn(),
     createV3: vi.fn(),
-    getAny: vi.fn(async () => getAnyValue),
+    get: vi.fn(async () => getAnyValue),
     previewFormsImpactV3: vi.fn(async () => ({
       schema_version: 3,
       base_revision: 1,
@@ -339,7 +338,7 @@ describe("WordWizardV3Page", () => {
     expect(api.saveMeaningsStepV3).not.toHaveBeenCalled();
     expect(api.saveFormsStepV3).not.toHaveBeenCalled();
     expect(api.validateV3).not.toHaveBeenCalled();
-    expect(api.getAny).toHaveBeenCalledTimes(1);
+    expect(api.get).toHaveBeenCalledTimes(1);
   });
 
   it("renders the V3 basics route with the established V2 first-step structure instead of a placeholder card", async () => {
@@ -594,9 +593,9 @@ describe("WordWizardV3Page", () => {
   });
 
   // CI 慢机上这条要 ~9.7s，本地 ~1.5s（全文件最慢的两条之一，做的事也确实重：
-  // 走 getAny 加载、收窄到 V3、再把受控的 T4 forms 槽装配起来）。默认 5s 超时卡不住，
+  // 走 get 加载、收窄到 V3、再把受控的 T4 forms 槽装配起来）。默认 5s 超时卡不住，
   // 显式放宽而不是靠重跑碰运气。
-  it("loads through getAny, narrows V3 and wires the controlled T4 forms slot", async () => {
+  it("loads through get, narrows V3 and wires the controlled T4 forms slot", async () => {
     const current = word();
     const endpoints = source({ word: current, retired_stable_nodes: [] });
     renderPage(
@@ -617,7 +616,7 @@ describe("WordWizardV3Page", () => {
       screen.getByRole("button", { name: "保存草稿" })
     ).toBeInTheDocument();
     expect(screen.getByText("进入词义与例句").closest("button")).toBeVisible();
-    expect(endpoints.getAny).toHaveBeenCalledWith(WORD_ID);
+    expect(endpoints.get).toHaveBeenCalledWith(WORD_ID);
   }, 20_000);
 
   it("previews every surface page and saves forms through the wizard flow with both confirmation tokens", async () => {
@@ -638,7 +637,7 @@ describe("WordWizardV3Page", () => {
       ],
       surface_match_page: firstPage
     });
-    vi.mocked(endpoints.surfaceMatchSnapshotPageV3).mockResolvedValueOnce(
+    vi.mocked(endpoints.surfaceMatchSnapshotPage).mockResolvedValueOnce(
       terminalPage
     );
     vi.mocked(endpoints.saveFormsStepV3).mockResolvedValueOnce({
@@ -667,7 +666,7 @@ describe("WordWizardV3Page", () => {
       })
     );
     await waitFor(() =>
-      expect(endpoints.surfaceMatchSnapshotPageV3).toHaveBeenCalledWith(
+      expect(endpoints.surfaceMatchSnapshotPage).toHaveBeenCalledWith(
         "impact-snapshot",
         "cursor-2",
         expect.any(AbortSignal)
@@ -932,7 +931,7 @@ describe("WordWizardV3Page", () => {
     expect(request).not.toHaveProperty("confirmed_surface_match_token");
   });
 
-  it("fails closed when getAny is not schema V3", async () => {
+  it("fails closed when get is not schema V3", async () => {
     const endpoints = source({ word: { schema_version: 2 } });
     renderPage(
       "/words/legacy-v2/v3/wizard/forms",
@@ -951,7 +950,7 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
@@ -979,7 +978,7 @@ describe("WordWizardV3Page", () => {
       max_reachable_step: "forms",
       meanings: { sense_groups: [], pos: [] },
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
@@ -1036,7 +1035,7 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
@@ -1089,7 +1088,7 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
@@ -1234,7 +1233,7 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
@@ -1269,7 +1268,7 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
@@ -1315,7 +1314,7 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
@@ -1328,7 +1327,7 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       },
       presentation: {
@@ -1385,7 +1384,7 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
@@ -1397,7 +1396,7 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
@@ -1414,12 +1413,12 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
     const endpoints = source({ word: current, retired_stable_nodes: [] });
-    vi.mocked(endpoints.getAny)
+    vi.mocked(endpoints.get)
       .mockResolvedValueOnce({ word: current, retired_stable_nodes: [] })
       .mockResolvedValue({ word: freshWord, retired_stable_nodes: [] });
     vi.mocked(endpoints.listPublications)
@@ -1453,7 +1452,7 @@ describe("WordWizardV3Page", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "确认激活" }));
 
-    await waitFor(() => expect(endpoints.getAny).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(endpoints.get).toHaveBeenCalledTimes(2));
     expect(
       await screen.findByRole("button", { name: "检查发布条件" })
     ).toBeInTheDocument();
@@ -1490,7 +1489,7 @@ describe("WordWizardV3Page", () => {
         completed_steps: ["basics", "forms", "meanings"],
         max_reachable_step: "preview",
         capabilities: {
-          publication: { mode: "migration_canary", whitelisted: true },
+          publication: { mode: "native" },
           pronunciation_normalization_version: "nfkc_trim_lower_v1"
         }
       });
@@ -1721,7 +1720,7 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });
@@ -1936,7 +1935,7 @@ describe("WordWizardV3Page", () => {
       completed_steps: ["basics", "forms", "meanings"],
       max_reachable_step: "preview",
       capabilities: {
-        publication: { mode: "migration_canary", whitelisted: true },
+        publication: { mode: "native" },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       }
     });

@@ -22,7 +22,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", () => ({
-  useRelatedSearchAny: () => ({
+  useRelatedSearch: () => ({
     exact: { data: undefined, isFetching: false },
     contains: { data: undefined, isFetching: false }
   })
@@ -143,8 +143,7 @@ function word(revision = 1, spelling = "centre"): AdminWordV3 {
     },
     capabilities: {
       publication: {
-        mode: "shadow_only",
-        blocked_code: "phase2_consumers_not_ready"
+        mode: "native" as const
       },
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
@@ -838,10 +837,7 @@ describe("V3WordCreationWizard", () => {
   it("applies save, prepare, and publish canonicals after StrictMode replays lifecycle effects", async () => {
     const strictWord = (revision: number, spelling: string): AdminWordV3 => {
       const value = word(revision, spelling);
-      value.capabilities.publication = {
-        mode: "migration_canary",
-        whitelisted: true
-      };
+      value.capabilities.publication = { mode: "native" };
       value.completed_steps = ["basics", "forms", "meanings"];
       value.max_reachable_step = "preview";
       return value;
@@ -2505,10 +2501,7 @@ describe("V3WordCreationWizard", () => {
 
   it("maps its live context directly to T5B and returns paged terminal tokens to the one save flow", async () => {
     const initialWord = word();
-    initialWord.capabilities.publication = {
-      mode: "migration_canary",
-      whitelisted: true
-    };
+    initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
     initialWord.max_reachable_step = "preview";
     const firstPage = impactSurfacePage("cursor-2");
@@ -2619,10 +2612,7 @@ describe("V3WordCreationWizard", () => {
 
   it("confirms a token-only impact through the controlled T5B mapping", async () => {
     const initialWord = word();
-    initialWord.capabilities.publication = {
-      mode: "migration_canary",
-      whitelisted: true
-    };
+    initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
     initialWord.max_reachable_step = "preview";
     const impact = vi.fn(async () => ({
@@ -2673,10 +2663,7 @@ describe("V3WordCreationWizard", () => {
 
   it("invalidates prepared publication state when publish returns fresh validation issues", async () => {
     const initialWord = word();
-    initialWord.capabilities.publication = {
-      mode: "migration_canary",
-      whitelisted: true
-    };
+    initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
     initialWord.max_reachable_step = "preview";
     const issue = validationIssue();
@@ -2886,10 +2873,7 @@ describe("V3WordCreationWizard", () => {
 
   it("refreshes canonical before rotating a publish idempotency key and requires a fresh controlled prepare", async () => {
     const initialWord = word();
-    initialWord.capabilities.publication = {
-      mode: "migration_canary",
-      whitelisted: true
-    };
+    initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
     initialWord.max_reachable_step = "preview";
     initialWord.published_revision = 0;
@@ -3041,10 +3025,7 @@ describe("V3WordCreationWizard", () => {
 
   it("reconciles a publish revision conflict before allowing a new revision and key", async () => {
     const initialWord = word();
-    initialWord.capabilities.publication = {
-      mode: "migration_canary",
-      whitelisted: true
-    };
+    initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
     initialWord.max_reachable_step = "preview";
     const refreshed = {

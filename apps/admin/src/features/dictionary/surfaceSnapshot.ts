@@ -1,11 +1,8 @@
 import type {
-  LexiconSurfaceMatchV2,
-  MatchedEntryContextV2,
   MatchedEntryContextV3,
   SurfaceConfirmationReasonV2,
   SurfaceMatchItemV3,
-  SurfaceMatchPageAny,
-  SurfaceMatchPageV2,
+  SurfaceMatchPageV3,
   SurfacePolicyBlockCodeV2,
   SurfacePolicyNameV2
 } from "@tsz/types";
@@ -14,13 +11,13 @@ import { dialectLabel, formTypeLabel } from "./word-creation-v3/presentation";
 export type SurfaceSnapshotPhase =
   "idle" | "loading" | "ready" | "disabled" | "error" | "expired";
 
-type SurfaceSnapshotItems<TPage extends SurfaceMatchPageAny> =
-  TPage extends SurfaceMatchPageAny ? TPage["items"] : never;
-type SurfaceSnapshotContexts<TPage extends SurfaceMatchPageAny> =
-  TPage extends SurfaceMatchPageAny ? TPage["matched_entry_contexts"] : never;
+type SurfaceSnapshotItems<TPage extends SurfaceMatchPageV3> =
+  TPage extends SurfaceMatchPageV3 ? TPage["items"] : never;
+type SurfaceSnapshotContexts<TPage extends SurfaceMatchPageV3> =
+  TPage extends SurfaceMatchPageV3 ? TPage["matched_entry_contexts"] : never;
 
 export interface SurfaceSnapshotState<
-  TPage extends SurfaceMatchPageAny = SurfaceMatchPageV2
+  TPage extends SurfaceMatchPageV3 = SurfaceMatchPageV3
 > {
   generation: number;
   schema_version?: TPage["schema_version"];
@@ -39,25 +36,19 @@ export interface SurfaceSnapshotState<
   error?: unknown;
 }
 
-export function isSurfaceMatchPageV2(
-  page: SurfaceMatchPageAny | null | undefined
-): page is SurfaceMatchPageV2 {
-  return page?.schema_version === 2;
-}
-
 export function isSurfaceMatchPageAny(
   page: unknown
-): page is SurfaceMatchPageAny {
+): page is SurfaceMatchPageV3 {
   return (
     typeof page === "object" &&
     page !== null &&
     "schema_version" in page &&
-    (page.schema_version === 2 || page.schema_version === 3)
+    page.schema_version === 3
   );
 }
 
 export type SurfaceSnapshotAction<
-  TPage extends SurfaceMatchPageAny = SurfaceMatchPageV2
+  TPage extends SurfaceMatchPageV3 = SurfaceMatchPageV3
 > =
   | { type: "reset"; generation: number }
   | { type: "start"; generation: number; page: TPage }
@@ -85,7 +76,7 @@ export const EMPTY_SURFACE_SNAPSHOT_STATE: SurfaceSnapshotState = {
 };
 
 export function createEmptySurfaceSnapshotState<
-  TPage extends SurfaceMatchPageAny = SurfaceMatchPageV2
+  TPage extends SurfaceMatchPageV3 = SurfaceMatchPageV3
 >(): SurfaceSnapshotState<TPage> {
   return { ...EMPTY_SURFACE_SNAPSHOT_STATE } as SurfaceSnapshotState<TPage>;
 }
@@ -100,55 +91,33 @@ function uniqueBy<T>(values: T[], key: (value: T) => string): T[] {
   });
 }
 
-type SurfaceSnapshotItemAny = LexiconSurfaceMatchV2 | SurfaceMatchItemV3;
-type SurfaceSnapshotContextAny = MatchedEntryContextV2 | MatchedEntryContextV3;
+type SurfaceSnapshotItemAny = SurfaceMatchItemV3;
+type SurfaceSnapshotContextAny = MatchedEntryContextV3;
 
 function surfaceItemKey(item: SurfaceSnapshotItemAny): string {
-  if ("match_id" in item) return `v2:${item.match_id}`;
-  if (item.match_kind === "form_variant_v3") {
-    const match = item.match;
-    return JSON.stringify([
-      "form_variant_v3",
-      match.source_schema_version,
-      match.entry_id,
-      match.status,
-      match.content_scope,
-      match.pos_id,
-      [...match.group_ids].sort(),
-      match.form_id,
-      match.variant_id,
-      match.form_type,
-      match.dialect,
-      match.spelling,
-      match.publication_id ?? null
-    ]);
-  }
   const match = item.match;
-  const source = match.existing.source;
   return JSON.stringify([
-    "legacy_v2",
+    "form_variant_v3",
     match.source_schema_version,
-    match.existing.word_id,
-    match.existing.headword,
-    match.existing.kind,
-    match.existing.status,
-    source.source_kind,
-    source.source_id,
-    source.content_scope,
-    source.surface,
-    source.dialect,
-    ...(source.source_kind === "form"
-      ? [source.source_node_id, source.pos_id, source.pos, source.form_type]
-      : []),
+    match.entry_id,
+    match.status,
+    match.content_scope,
+    match.pos_id,
+    [...match.group_ids].sort(),
+    match.form_id,
+    match.variant_id,
+    match.form_type,
+    match.dialect,
+    match.spelling,
     match.publication_id ?? null
   ]);
 }
 
 function surfaceContextKey(context: SurfaceSnapshotContextAny): string {
-  return "word_id" in context ? context.word_id : context.entry_id;
+  return context.entry_id;
 }
 
-function pageState<TPage extends SurfaceMatchPageAny>(
+function pageState<TPage extends SurfaceMatchPageV3>(
   generation: number,
   page: TPage,
   previous?: SurfaceSnapshotState<TPage>
@@ -200,7 +169,7 @@ function pageState<TPage extends SurfaceMatchPageAny>(
   };
 }
 
-function sameSnapshot<TPage extends SurfaceMatchPageAny>(
+function sameSnapshot<TPage extends SurfaceMatchPageV3>(
   state: SurfaceSnapshotState<TPage>,
   page: TPage
 ): boolean {
@@ -213,7 +182,7 @@ function sameSnapshot<TPage extends SurfaceMatchPageAny>(
   );
 }
 
-export function surfaceSnapshotReducer<TPage extends SurfaceMatchPageAny>(
+export function surfaceSnapshotReducer<TPage extends SurfaceMatchPageV3>(
   state: SurfaceSnapshotState<TPage>,
   action: SurfaceSnapshotAction<TPage>
 ): SurfaceSnapshotState<TPage> {
@@ -255,9 +224,7 @@ export function surfaceSnapshotReducer<TPage extends SurfaceMatchPageAny>(
   return pageState(state.generation, action.page, state);
 }
 
-export function canAcknowledgeSurfaceSnapshot<
-  TPage extends SurfaceMatchPageAny
->(
+export function canAcknowledgeSurfaceSnapshot<TPage extends SurfaceMatchPageV3>(
   state: SurfaceSnapshotState<TPage>
 ): state is SurfaceSnapshotState<TPage> & {
   surface_confirmation_token: string;
@@ -271,15 +238,6 @@ export function canAcknowledgeSurfaceSnapshot<
 
 export type SurfaceMatchMembership = "ordinary" | "visibility" | "composite";
 
-export interface AggregatedSurfaceMatchCard {
-  key: string;
-  candidate: LexiconSurfaceMatchV2["candidate"];
-  existing: LexiconSurfaceMatchV2["existing"];
-  matches: LexiconSurfaceMatchV2[];
-  membership: SurfaceMatchMembership;
-  context?: MatchedEntryContextV2;
-}
-
 function membership(
   reasons: SurfaceConfirmationReasonV2[]
 ): SurfaceMatchMembership {
@@ -292,44 +250,10 @@ function membership(
       : "ordinary";
 }
 
-/** Aggregate cards by candidate + existing entry while retaining every source row. */
-export function aggregateSurfaceMatchCards(
-  items: LexiconSurfaceMatchV2[],
-  contexts: MatchedEntryContextV2[]
-): AggregatedSurfaceMatchCard[] {
-  const contextByWordId = new Map(
-    contexts.map((context) => [context.word_id, context])
-  );
-  const cards = new Map<string, AggregatedSurfaceMatchCard>();
-  for (const item of items) {
-    const key = `${item.candidate.candidate_ref}:${item.existing.word_id}`;
-    const existing = cards.get(key);
-    if (existing) {
-      existing.matches.push(item);
-      existing.membership = membership(
-        uniqueBy(
-          existing.matches.flatMap((match) => match.confirmation_reasons),
-          (reason) => reason
-        )
-      );
-      continue;
-    }
-    cards.set(key, {
-      key,
-      candidate: item.candidate,
-      existing: item.existing,
-      matches: [item],
-      membership: membership(item.confirmation_reasons),
-      context: contextByWordId.get(item.existing.word_id)
-    });
-  }
-  return [...cards.values()];
-}
-
 export interface LifecycleSurfaceMatchCard {
   key: string;
   entry_id: string;
-  schema_version: 2 | 3;
+  schema_version: 3;
   label: string;
   kind: "word" | "phrase";
   status: "draft" | "published" | "archived";
@@ -338,13 +262,6 @@ export interface LifecycleSurfaceMatchCard {
   source_labels: string[];
   pos_labels: string[];
   gloss_previews: string[];
-}
-
-function mergeMembership(
-  left: SurfaceMatchMembership,
-  right: SurfaceMatchMembership
-): SurfaceMatchMembership {
-  return left === right ? left : "composite";
 }
 
 const POS_LABELS: Record<string, string> = {
@@ -374,75 +291,18 @@ function productPosLabels(values: string[]): string[] {
   );
 }
 
-function v2SourceLabel(
-  item: LexiconSurfaceMatchV2,
-  label: (code: string) => string
-): string {
-  const source = item.existing.source;
-  return source.source_kind === "form"
-    ? `词形 · ${source.surface} · ${label(source.form_type)} · ${dialectLabel(source.dialect)}`
-    : `主词 · ${source.surface} · ${dialectLabel(source.dialect)}`;
-}
-
 function v3SourceLabel(
   item: SurfaceMatchItemV3,
   label: (code: string) => string
 ): string {
-  if (item.match_kind === "form_variant_v3") {
-    return `词形 · ${item.match.spelling} · ${label(item.match.form_type)} · ${dialectLabel(item.match.dialect)}`;
-  }
-  const source = item.match.existing.source;
-  return source.source_kind === "form"
-    ? `词形 · ${source.surface} · ${label(source.form_type)} · ${dialectLabel(source.dialect)}`
-    : `主词 · ${source.surface} · ${dialectLabel(source.dialect)}`;
+  return `词形 · ${item.match.spelling} · ${label(item.match.form_type)} · ${dialectLabel(item.match.dialect)}`;
 }
 
 /** Lifecycle confirmation uses each schema's real source and presentation fields. */
 export function aggregateLifecycleSurfaceMatchCards(
-  state: SurfaceSnapshotState<SurfaceMatchPageAny>,
+  state: SurfaceSnapshotState<SurfaceMatchPageV3>,
   typeLabel = formTypeLabel
 ): LifecycleSurfaceMatchCard[] {
-  if (state.schema_version !== 3) {
-    const aggregated = aggregateSurfaceMatchCards(
-      state.items as LexiconSurfaceMatchV2[],
-      state.matched_entry_contexts as MatchedEntryContextV2[]
-    );
-    const cards = new Map<string, LifecycleSurfaceMatchCard>();
-    for (const card of aggregated) {
-      const entryId = card.existing.word_id;
-      const existing = cards.get(entryId);
-      const sourceLabels = card.matches.map((item) =>
-        v2SourceLabel(item, typeLabel)
-      );
-      if (existing) {
-        existing.match_count += card.matches.length;
-        existing.membership = mergeMembership(
-          existing.membership,
-          card.membership
-        );
-        existing.source_labels = uniqueBy(
-          [...existing.source_labels, ...sourceLabels],
-          (value) => value
-        );
-        continue;
-      }
-      cards.set(entryId, {
-        key: entryId,
-        entry_id: entryId,
-        schema_version: 2,
-        label: card.existing.headword,
-        kind: card.existing.kind,
-        status: card.existing.status,
-        match_count: card.matches.length,
-        membership: card.membership,
-        source_labels: uniqueBy(sourceLabels, (value) => value),
-        pos_labels: productPosLabels(card.context?.pos_labels ?? []),
-        gloss_previews: card.context?.gloss_previews ?? []
-      });
-    }
-    return [...cards.values()];
-  }
-
   const contexts = new Map(
     (state.matched_entry_contexts as MatchedEntryContextV3[]).map((context) => [
       context.entry_id,
@@ -451,23 +311,10 @@ export function aggregateLifecycleSurfaceMatchCards(
   );
   const cards = new Map<string, LifecycleSurfaceMatchCard>();
   for (const item of state.items as SurfaceMatchItemV3[]) {
-    const entryId =
-      item.match_kind === "form_variant_v3"
-        ? item.match.entry_id
-        : item.match.existing.word_id;
+    const entryId = item.match.entry_id;
     const context = contexts.get(entryId);
-    const label =
-      context?.presentation.label ??
-      (item.match_kind === "form_variant_v3"
-        ? item.match.spelling
-        : item.match.existing.headword);
-    const status =
-      item.match_kind === "form_variant_v3"
-        ? item.match.status
-        : item.match.existing.status;
-    const schemaVersion = item.match_kind === "form_variant_v3" ? 3 : 2;
-    const kind =
-      item.match_kind === "legacy_v2" ? item.match.existing.kind : "word";
+    const label = context?.presentation.label ?? item.match.spelling;
+    const status = item.match.status;
     const sourceLabel = v3SourceLabel(item, typeLabel);
     const existing = cards.get(entryId);
     if (existing) {
@@ -481,9 +328,9 @@ export function aggregateLifecycleSurfaceMatchCards(
     cards.set(entryId, {
       key: entryId,
       entry_id: entryId,
-      schema_version: schemaVersion,
+      schema_version: 3,
       label,
-      kind,
+      kind: "word",
       status,
       match_count: 1,
       membership: membership(state.confirmation_reasons),

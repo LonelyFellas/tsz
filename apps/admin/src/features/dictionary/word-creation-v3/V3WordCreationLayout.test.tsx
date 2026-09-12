@@ -49,8 +49,7 @@ function word(): AdminWordV3 {
     },
     capabilities: {
       publication: {
-        mode: "shadow_only",
-        blocked_code: "phase2_consumers_not_ready"
+        mode: "native" as const
       },
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },

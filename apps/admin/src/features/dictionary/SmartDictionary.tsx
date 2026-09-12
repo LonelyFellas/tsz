@@ -31,25 +31,25 @@ import { useAuthStore } from "@/lib/auth";
 import { InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
   AdminWordKind,
-  AdminWordAnyEnvelope,
+  AdminWordV3Envelope,
   AdminWordListItemAny,
   CefrLevel,
   Dialect,
-  EntryLifecycleBatchResponseAny,
+  EntryLifecycleBatchResponse,
   EntryReferenceKind
 } from "@tsz/types";
 import {
-  useArchiveWordAny as useArchiveWord,
-  useArchiveWordsBatchAny as useArchiveWordsBatch,
+  useArchiveWord,
+  useArchiveWordsBatch,
   useDeleteWordBatch,
   useDeleteWordDraft,
-  useRestoreWordAny as useRestoreWord,
-  useRestoreWordsBatchAny as useRestoreWordsBatch,
+  useRestoreWord,
+  useRestoreWordsBatch,
   useWordList,
   useWordStats
 } from "./api";
 import {
-  adminWordsAnyDataSource,
+  adminWordsDataSource,
   adminWordsDataSourceCapabilities
 } from "./dataSource";
 import {
@@ -297,7 +297,7 @@ export function SmartDictionary({
         const ids = request.kind === "single" ? [request.id] : request.ids;
         const latest = await Promise.all(
           ids.map(async (id) => {
-            const response = await adminWordsAnyDataSource.getAny(id);
+            const response = await adminWordsDataSource.get(id);
             if (response?.word && response.word.id !== id) {
               throw new InvalidAdminWordResponseError(
                 "get.word.id",
@@ -337,7 +337,7 @@ export function SmartDictionary({
       }
       const targets = command.targets;
       const outcome = await restoreSurface.run<
-        AdminWordAnyEnvelope | EntryLifecycleBatchResponseAny
+        AdminWordV3Envelope | EntryLifecycleBatchResponse
       >((idempotencyKey, token) =>
         command.kind === "single"
           ? restoreWord.mutateAsync({
@@ -365,7 +365,7 @@ export function SmartDictionary({
         const affected =
           command.kind === "single"
             ? 1
-            : (outcome.result as EntryLifecycleBatchResponseAny).affected;
+            : (outcome.result as EntryLifecycleBatchResponse).affected;
         setSelectedKeys([]);
         setSelectedRecords({});
         setPendingRestore(undefined);

@@ -1,15 +1,14 @@
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { HttpError } from "@tsz/api-client/http";
 import type {
-  AdminWordAnyEnvelope,
+  AdminWordV3Envelope,
   EntryAnnotationConflict,
   AdminWordV3,
-  AdminWordV3Envelope,
   CreateAdminWordV3Input,
   DetectLexiconSurfaceResponseV3,
   DetectLexiconSurfaceV3Input,
   PartOfSpeechCatalogResponse,
-  SurfaceMatchPageAny,
+  SurfaceMatchPageV3,
   WordHeadwordsV2
 } from "@tsz/types";
 import {
@@ -35,7 +34,7 @@ import {
   Typography
 } from "antd";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { adminWordsAnyDataSource } from "../dataSource";
+import { adminWordsDataSource } from "../dataSource";
 import { usePartOfSpeechCatalog } from "../part-of-speech/api";
 import {
   aggregateLifecycleSurfaceMatchCards,
@@ -43,7 +42,7 @@ import {
   isSurfaceMatchPageAny,
   requiresNewIdempotencyKey
 } from "../surfaceSnapshot";
-import { useSurfaceSnapshotAny } from "../useSurfaceSnapshot";
+import { useSurfaceSnapshot } from "../useSurfaceSnapshot";
 import { createV3WordRequests } from "../word-creation-v3/api";
 import { newWordNodeId } from "../word-model/primitives";
 import { useDialectPreference } from "../../settings/useDialectPreference";
@@ -73,12 +72,12 @@ export interface UnifiedCreateRequests {
     idempotencyKey: string,
     input: CreateAdminWordV3Input
   ) => Promise<AdminWordV3Envelope>;
-  getWord: (wordId: string) => Promise<AdminWordAnyEnvelope>;
+  getWord: (wordId: string) => Promise<AdminWordV3Envelope>;
   surfacePage: (
     snapshotId: string,
     cursor: string,
     signal: AbortSignal
-  ) => Promise<SurfaceMatchPageAny>;
+  ) => Promise<SurfaceMatchPageV3>;
 }
 
 type PendingCreation = {
@@ -116,13 +115,9 @@ const v3Requests = createV3WordRequests();
 const defaultRequests: UnifiedCreateRequests = {
   detectV3: v3Requests.detect,
   createV3: v3Requests.create,
-  getWord: (wordId) => adminWordsAnyDataSource.getAny(wordId),
+  getWord: (wordId) => adminWordsDataSource.get(wordId),
   surfacePage: (snapshotId, cursor, signal) =>
-    adminWordsAnyDataSource.surfaceMatchSnapshotPageAny(
-      snapshotId,
-      cursor,
-      signal
-    )
+    adminWordsDataSource.surfaceMatchSnapshotPage(snapshotId, cursor, signal)
 };
 
 const STATUS_LABEL = {
@@ -274,7 +269,7 @@ function DetectionPresentationCard({
   catalog?: PartOfSpeechCatalogResponse;
   baseCandidates: DetectedBaseForm[];
   surfaceCards: ReturnType<typeof aggregateLifecycleSurfaceMatchCards>;
-  snapshot: ReturnType<typeof useSurfaceSnapshotAny>;
+  snapshot: ReturnType<typeof useSurfaceSnapshot>;
 }) {
   const [expanded, setExpanded] = useState<string>();
   const builtinStatus = pending.detection.builtin_dictionary.status;
@@ -299,7 +294,7 @@ function DetectionPresentationCard({
     ...baseCandidates.map((candidate) => ({
       key: candidate.key,
       entryId: candidate.entryId,
-      schemaVersion: candidate.schemaVersion,
+      schemaVersion: 3 as const,
       label: candidate.spellings.join(" / ") || candidate.label,
       status: candidate.status,
       baseSpellings: candidate.spellings,
@@ -724,7 +719,7 @@ export function UnifiedCreateEntryStep({
       requests.surfacePage(snapshotId, cursor, signal),
     [requests]
   );
-  const snapshot = useSurfaceSnapshotAny(
+  const snapshot = useSurfaceSnapshot(
     page,
     `${pending?.detection.detection_id ?? "none"}:${page?.snapshot_id ?? "none"}`,
     fetchSurfacePage
@@ -739,12 +734,11 @@ export function UnifiedCreateEntryStep({
     if (page) {
       if (!snapshot.schema_version) return [];
       return extractDetectedBaseForms(
-        snapshot.schema_version,
         snapshot.items,
         snapshot.matched_entry_contexts
       );
     }
-    return extractDetectedBaseForms(3, prepared.detection.matches, []);
+    return extractDetectedBaseForms(prepared.detection.matches, []);
   }, [
     page,
     prepared,

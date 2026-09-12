@@ -5,7 +5,6 @@ import type {
   DraftValidationResponseV3,
   FormsImpactResponseV3,
   SurfaceMatchEnabledTerminalPageV3,
-  SurfaceMatchPageAny,
   SurfaceMatchPageV3,
   V3DraftValidationIssue
 } from "@tsz/types";
@@ -16,16 +15,12 @@ import {
   canAcknowledgeSurfaceSnapshot,
   type SurfaceSnapshotState
 } from "../surfaceSnapshot";
-import { useSurfaceSnapshotAny } from "../useSurfaceSnapshot";
+import { useSurfaceSnapshot } from "../useSurfaceSnapshot";
 import { newWordNodeId } from "../word-model/primitives";
 import { createV3WordRequests, type V3WordRequests } from "./api";
 import { classifyV3Problem } from "./problem";
 import type { V3Problem } from "./problem";
-import {
-  impactReasonLabel,
-  impactTypeLabel,
-  publicationBlockMessage
-} from "./presentation";
+import { impactReasonLabel, impactTypeLabel } from "./presentation";
 import { buildV3PublicationIssueSummary } from "./publicationIssueSummary";
 import { createV3SaveFlow, type V3SaveFlow } from "./saveFlow";
 import { V3ReviewContent } from "./V3ReviewContent";
@@ -77,7 +72,7 @@ type Props =
   | (StandaloneProps & { controller?: never });
 
 function terminalPage(
-  state: SurfaceSnapshotState<SurfaceMatchPageAny>
+  state: SurfaceSnapshotState<SurfaceMatchPageV3>
 ): SurfaceMatchEnabledTerminalPageV3 | undefined {
   if (
     state.schema_version !== 3 ||
@@ -122,17 +117,7 @@ function requestErrorMessage(error: unknown): string {
 }
 
 function publicationUnavailableMessage(word: AdminWordV3): string | undefined {
-  if (word.status === "archived") return "垃圾桶中的词条不能发布。";
-  const capability = word.capabilities.publication;
-  if (capability.mode === "shadow_only") {
-    return publicationBlockMessage(capability.blocked_code);
-  }
-  if (capability.mode === "migration_canary" && !capability.whitelisted) {
-    return publicationBlockMessage(
-      capability.blocked_code ?? "migration_canary_not_whitelisted"
-    );
-  }
-  return undefined;
+  return word.status === "archived" ? "垃圾桶中的词条不能发布。" : undefined;
 }
 
 function V3WordPreview({
@@ -298,12 +283,12 @@ function ControlledV3PreviewAndPublishStep({
   const unavailablePage = async () => {
     throw new Error("controlled surface page action is unavailable");
   };
-  const impactState = useSurfaceSnapshotAny(
+  const impactState = useSurfaceSnapshot(
     impactPage,
     `${word.id}:${word.revision}:controlled-impact:${impactPage?.snapshot_id ?? "none"}`,
     fetchPage ?? unavailablePage
   );
-  const publishState = useSurfaceSnapshotAny(
+  const publishState = useSurfaceSnapshot(
     publishPage,
     `${word.id}:${word.revision}:controlled-publish:${publishPage?.snapshot_id ?? "none"}`,
     fetchPage ?? unavailablePage
@@ -485,12 +470,12 @@ function StandaloneV3PreviewAndPublishStep({
   const reconciliationRequiredRef = useRef(false);
   const reconciliationLockRef = useRef(false);
   const reconciliationScopeRef = useRef(0);
-  const impactState = useSurfaceSnapshotAny(
+  const impactState = useSurfaceSnapshot(
     impact?.surface_match_page,
     `${currentWord.id}:${currentWord.revision}:impact:${impact?.surface_match_page?.snapshot_id ?? "none"}`,
     requests.surfacePage
   );
-  const publishSurfaceState = useSurfaceSnapshotAny(
+  const publishSurfaceState = useSurfaceSnapshot(
     publishSurfacePage,
     `${currentWord.id}:${currentWord.revision}:publish:${publishSurfacePage?.snapshot_id ?? "none"}`,
     requests.surfacePage

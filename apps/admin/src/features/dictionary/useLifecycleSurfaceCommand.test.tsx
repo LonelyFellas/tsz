@@ -1,12 +1,12 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { HttpError } from "@tsz/api-client/http";
-import type { SurfaceMatchPageAny, SurfaceMatchPageV2 } from "@tsz/types";
+import type { SurfaceMatchPageV3 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import { useLifecycleSurfaceCommand } from "./useLifecycleSurfaceCommand";
 
 describe("useLifecycleSurfaceCommand", () => {
-  const page: SurfaceMatchPageV2 = {
-    schema_version: 2,
+  const page: SurfaceMatchPageV3 = {
+    schema_version: 3,
     snapshot_id: "019c0000-0000-7000-8000-000000000001",
     items: [],
     total: 0,
@@ -107,7 +107,7 @@ describe("useLifecycleSurfaceCommand", () => {
   });
 
   it("V3 restore warning 顺序加载终页并携 token 重试原命令", async () => {
-    const firstPage: SurfaceMatchPageAny = {
+    const firstPage: SurfaceMatchPageV3 = {
       schema_version: 3,
       snapshot_id: "v3-restore-snapshot",
       items: [],
@@ -119,7 +119,7 @@ describe("useLifecycleSurfaceCommand", () => {
       continuation_policy: "enabled",
       next_cursor: "v3-next"
     };
-    const terminalPage: SurfaceMatchPageAny = {
+    const terminalPage: SurfaceMatchPageV3 = {
       ...firstPage,
       continuation_policy: "enabled",
       next_cursor: null,

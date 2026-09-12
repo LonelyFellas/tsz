@@ -1,9 +1,8 @@
 import { HttpError, InvalidAdminWordResponseError } from "@tsz/api-client";
 import type {
-  AdminWordPublicationV2,
   AdminWordPublicationV3,
   AdminWordV3,
-  SurfaceMatchPageAny
+  SurfaceMatchPageV3
 } from "@tsz/types";
 import {
   act,
@@ -15,7 +14,6 @@ import {
 } from "@testing-library/react";
 import { StrictMode } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { wordFixture } from "../word-creation/wordCreation.test.helper";
 import { formsFixture, ukUsFormFixture } from "./fixtures";
 import { V3PublicationHistory } from "./V3PublicationHistory";
 
@@ -37,7 +35,7 @@ function v3Word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
       strategy_version: "surface_summary_v1"
     },
     capabilities: {
-      publication: { mode: "migration_canary", whitelisted: true },
+      publication: { mode: "native" },
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
     forms: formsFixture(),
@@ -53,19 +51,27 @@ function v3Word(overrides: Partial<AdminWordV3> = {}): AdminWordV3 {
   };
 }
 
+/** 更早的一次发布；与当前版本同为 V3，只是 publication_number 更小。 */
 function v2Publication(
-  overrides: Partial<AdminWordPublicationV2> = {}
-): AdminWordPublicationV2 {
+  overrides: Partial<AdminWordPublicationV3> = {}
+): AdminWordPublicationV3 {
   return {
-    schema_version: 2,
-    publication_id: "pub-v2",
+    schema_version: 3,
+    publication_id: "pub-earlier",
     entry_id: "word-mixed",
     publication_number: 1,
     source_revision: 3,
     published_by_admin_id: "admin-1",
     published_at: "2026-08-24T00:00:00Z",
     is_current: false,
-    word: wordFixture({ headword: "historical-v2", status: "published" }),
+    word: v3Word({
+      presentation: {
+        label: "historical-v2",
+        matched_surfaces: [],
+        strategy_version: "surface_summary_v1"
+      },
+      revision: 3
+    }),
     ...overrides
   };
 }
@@ -87,16 +93,21 @@ function v3Publication(
   };
 }
 
-function v2PublicationWithSnapshotBody(): AdminWordPublicationV2 {
-  const publication = v2Publication({
-    word: wordFixture({
-      headword: "immutable-v2-detail",
-      status: "published"
-    })
+/** 更早一次发布的只读快照，内容与当前版本不同，用来验证历史快照不被改写。 */
+function v2PublicationWithSnapshotBody(): AdminWordPublicationV3 {
+  const word = v3Word({
+    presentation: {
+      label: "immutable-v2-detail",
+      matched_surfaces: [],
+      strategy_version: "surface_summary_v1"
+    }
   });
-  const variant = publication.word.forms.pos[0]!.base_form.variants[0]!;
-  variant.spelling = "historical-v2-spelling";
-  variant.pronunciations = [
+  const form = word.forms.pos[0]!.forms[0]!;
+  if (form.regional_variants.mode !== "common") {
+    throw new Error("expected common form fixture");
+  }
+  form.regional_variants.common.spelling = "historical-v2-spelling";
+  form.regional_variants.common.pronunciations = [
     {
       id: "historical-v2-pronunciation",
       dict_phonetic: "historical-v2-dict",
@@ -104,13 +115,41 @@ function v2PublicationWithSnapshotBody(): AdminWordPublicationV2 {
       style: "weak"
     }
   ];
-  const definition =
-    publication.word.meanings.pos[0]!.senses[0]!.definitions[0]!;
-  if (definition.definition_mode !== "zh_definition") {
-    throw new Error("expected zh definition fixture");
-  }
-  definition.content.text = "historical-v2-meaning";
-  return publication;
+  word.meanings = {
+    sense_groups: [],
+    pos: [
+      {
+        pos_id: word.forms.pos[0]!.pos_id,
+        grammar_structures: [],
+        senses: [
+          {
+            id: "historical-v2-sense",
+            sub_pos: "N-COUNT",
+            level: "B1",
+            frequency: "12.50",
+            depends_on_context: false,
+            definitions: [
+              {
+                id: "historical-v2-definition",
+                level: "B1",
+                definition_mode: "zh_definition",
+                content_id: "historical-v2-content",
+                content: {
+                  version: 1,
+                  text: "historical-v2-meaning",
+                  spans: [],
+                  liaisons: []
+                }
+              }
+            ],
+            sentences: [],
+            relations: []
+          }
+        ]
+      }
+    ]
+  };
+  return v2Publication({ word });
 }
 
 function v3PublicationWithSnapshotBody(): AdminWordPublicationV3 {
@@ -169,122 +208,6 @@ function v3PublicationWithSnapshotBody(): AdminWordPublicationV3 {
     ]
   };
   return v3Publication({ word });
-}
-
-function complexV2Publication(): AdminWordPublicationV2 {
-  const publication = v2PublicationWithSnapshotBody();
-  publication.publication_id = "pub-v2-complex";
-  publication.publication_number = 21;
-  publication.source_revision = 31;
-  publication.published_by_admin_id = "v2-publisher-admin";
-  publication.word.headwords = { mode: "unified", common: "shared-snapshot" };
-  const forms = publication.word.forms.pos[0]!;
-  const baseVariant = forms.base_form.variants[0]!;
-  baseVariant.spelling = "shared-summary-spelling";
-  baseVariant.pronunciations = [
-    {
-      id: "shared-summary-pronunciation-v2",
-      dict_phonetic: "shared-summary-dict",
-      actual_pron: "shared-summary-actual",
-      style: "normal"
-    }
-  ];
-  forms.form_groups = [
-    {
-      id: "v2-form-group-first",
-      is_regular: false,
-      slots: [
-        {
-          id: "v2-ordered-slot-first",
-          form_type: "plural",
-          variants: [
-            {
-              id: "v2-ordered-variant",
-              dialect: "common",
-              spelling: "shared-structure-spelling",
-              origin: "manual",
-              pronunciations: []
-            }
-          ]
-        }
-      ]
-    }
-  ];
-  const meanings = publication.word.meanings;
-  meanings.sense_groups = [
-    {
-      id: "v2-sense-group-only",
-      name_zh: "V2 结构组",
-      name_en: "V2 structure group"
-    }
-  ];
-  const pos = meanings.pos[0]!;
-  pos.grammar_structures = [
-    {
-      id: "v2-grammar-structure-only",
-      variants: [
-        {
-          id: "v2-grammar-variant",
-          dialect: "common",
-          content: {
-            version: 1,
-            text: "V2 grammar only",
-            spans: [],
-            liaisons: []
-          }
-        }
-      ]
-    }
-  ];
-  const sense = pos.senses[0]!;
-  sense.sense_group_id = "v2-sense-group-only";
-  const definition = sense.definitions[0]!;
-  if (definition.definition_mode !== "zh_definition") {
-    throw new Error("expected zh definition fixture");
-  }
-  definition.content.text = "shared-summary-meaning";
-  sense.sentences = [
-    {
-      id: "v2-sentence-only",
-      level: "B1",
-      en_text: {
-        mode: "unified",
-        common: {
-          id: "v2-sentence-en",
-          origin: "manual",
-          value: {
-            version: 1,
-            text: "V2 sentence only.",
-            spans: [],
-            liaisons: []
-          }
-        }
-      },
-      zh_text_id: "v2-sentence-zh",
-      zh_text: {
-        version: 1,
-        text: "仅 V2 例句",
-        spans: [],
-        liaisons: []
-      },
-      links: [
-        {
-          word_id: publication.entry_id,
-          sense_id: sense.id,
-          role: "focus"
-        }
-      ]
-    }
-  ];
-  sense.relations = [
-    {
-      id: "v2-relation-only",
-      relation: "synonym",
-      pending_target_headword: "v2-related-only",
-      score: "88.5"
-    }
-  ];
-  return publication;
 }
 
 function complexV3Publication(): AdminWordPublicationV3 {
@@ -441,7 +364,7 @@ function activationSurfacePage(
   nextCursor: string | null,
   token?: string,
   total = nextCursor === null ? 1 : 2
-): SurfaceMatchPageAny {
+): SurfaceMatchPageV3 {
   const page = {
     schema_version: 3 as const,
     snapshot_id: snapshotId,
@@ -468,7 +391,7 @@ function activationSurfacePage(
     matched_entry_contexts: [],
     confirmation_reasons: [
       "visibility_activation"
-    ] as SurfaceMatchPageAny["confirmation_reasons"],
+    ] as SurfaceMatchPageV3["confirmation_reasons"],
     policy_name: "allow_multiple_active_exact_headword_publications" as const,
     policy_epoch: 7,
     continuation_policy: "enabled" as const
@@ -551,7 +474,7 @@ describe("V3PublicationHistory", () => {
     api.listPublications.mockResolvedValue({ publications: [listV2, listV3] });
     api.getPublication.mockImplementation(
       async (_wordId: string, publicationId: string) => ({
-        publication: publicationId === "pub-v2" ? detailV2 : detailV3
+        publication: publicationId === "pub-earlier" ? detailV2 : detailV3
       })
     );
 
@@ -585,7 +508,10 @@ describe("V3PublicationHistory", () => {
     expect(
       within(detail).getByRole("button", { name: "激活此发布版本" })
     ).toBeEnabled();
-    expect(api.getPublication).toHaveBeenCalledWith("word-mixed", "pub-v2");
+    expect(api.getPublication).toHaveBeenCalledWith(
+      "word-mixed",
+      "pub-earlier"
+    );
 
     fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
     fireEvent.click(screen.getByRole("button", { name: "查看第 2 次发布" }));
@@ -609,100 +535,10 @@ describe("V3PublicationHistory", () => {
     expect(api.getPublication).toHaveBeenCalledWith("word-mixed", "pub-v3");
   });
 
-  it("productizes V2 and V3 publication details without exposing wire metadata", async () => {
-    const api = requests();
-    const detailV2 = complexV2Publication();
-    const detailV3 = complexV3Publication();
-    api.listPublications.mockResolvedValue({
-      publications: [detailV2, detailV3]
-    });
-    api.getPublication.mockImplementation(
-      async (_wordId: string, publicationId: string) => ({
-        publication:
-          publicationId === detailV2.publication_id ? detailV2 : detailV3
-      })
-    );
-
-    render(
-      <V3PublicationHistory
-        currentWord={v3Word()}
-        onActivated={vi.fn()}
-        requests={api}
-      />
-    );
-
-    fireEvent.click(
-      await screen.findByRole("button", { name: "查看第 21 次发布" })
-    );
-    let detail = within(await screen.findByTestId("publication-detail"));
-    expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
-      "发布批次：第 21 次"
-    );
-    expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
-      "当前状态：历史版本"
-    );
-    expect(detail.getByText("shared-summary-spelling")).toBeInTheDocument();
-    expect(detail.getByText("shared-summary-meaning")).toBeInTheDocument();
-    expect(
-      detail.getByText("释义组 1：V2 结构组 / V2 structure group")
-    ).toBeInTheDocument();
-    expect(detail.getByText("V2 grammar only")).toBeInTheDocument();
-    expect(detail.getByText("通用：V2 sentence only.")).toBeInTheDocument();
-    expect(detail.getByText("中文：仅 V2 例句")).toBeInTheDocument();
-    expect(detail.getByText("主关联")).toBeInTheDocument();
-    expect(detail.getByText("近义词")).toBeInTheDocument();
-    expect(detail.getByText("v2-related-only")).toBeInTheDocument();
-    expect(detail.queryByText(/v2-sentence-only|v2-relation-only/)).toBeNull();
-    expect(detail.queryByText("v2-publisher-admin")).toBeNull();
-    expect(detail.queryByText(/source_revision|schema_version/)).toBeNull();
-    expect(detail.queryByTestId("publication-structure-snapshot")).toBeNull();
-
-    fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
-    fireEvent.click(screen.getByRole("button", { name: "查看第 22 次发布" }));
-    detail = within(await screen.findByTestId("publication-detail"));
-    expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
-      "发布批次：第 22 次"
-    );
-    expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
-      "当前状态：历史版本"
-    );
-    expect(detail.getByText("shared-summary-spelling")).toBeInTheDocument();
-    expect(detail.getByText("shared-summary-meaning")).toBeInTheDocument();
-    expect(
-      detail.getByText("释义组 1：V3 结构组 / V3 structure group")
-    ).toBeInTheDocument();
-    expect(detail.getByText("V3 grammar only")).toBeInTheDocument();
-    expect(detail.getByText("V3 sentence only.")).toBeInTheDocument();
-    expect(detail.getByText("仅 V3 例句")).toBeInTheDocument();
-    expect(detail.getByText("主关联")).toBeInTheDocument();
-    expect(
-      detail.getByText("上下文关联：v3-associated-only · V3 association")
-    ).toBeInTheDocument();
-    expect(detail.getByText("近义词")).toBeInTheDocument();
-    expect(detail.getByText("v3-related-only")).toBeInTheDocument();
-    expect(
-      detail.queryByText(
-        /v3-sentence-only|v3-relation-only|v3-association-only/
-      )
-    ).toBeNull();
-    expect(detail.queryByText("v3-publisher-admin")).toBeNull();
-    expect(detail.queryByText(/source_revision|schema_version/)).toBeNull();
-    expect(detail.queryByTestId("publication-structure-snapshot")).toBeNull();
-  });
-
   it("缺失词性映射、等级与关联摘要时使用只读快照回退", async () => {
     const api = requests();
-    const detailV2 = complexV2Publication();
     const detailV3 = complexV3Publication();
-    detailV2.is_current = true;
     detailV3.is_current = true;
-
-    const v2Pos = detailV2.word.meanings.pos[0]!;
-    v2Pos.pos_id = "orphan-v2-pos";
-    v2Pos.senses[0]!.sentences[0]!.level = undefined as never;
-    const v2Relation = v2Pos.senses[0]!.relations[0]!;
-    delete v2Relation.pending_target_headword;
-    v2Relation.target_gloss = "V2 待补充释义";
 
     const v3Pos = detailV3.word.meanings.pos[0]!;
     v3Pos.pos_id = "orphan-v3-pos";
@@ -715,15 +551,8 @@ describe("V3PublicationHistory", () => {
     delete v3Relation.pending_target_headword;
     v3Relation.target_gloss = "V3 待补充释义";
 
-    api.listPublications.mockResolvedValue({
-      publications: [detailV2, detailV3]
-    });
-    api.getPublication.mockImplementation(
-      async (_wordId: string, publicationId: string) => ({
-        publication:
-          publicationId === detailV2.publication_id ? detailV2 : detailV3
-      })
-    );
+    api.listPublications.mockResolvedValue({ publications: [detailV3] });
+    api.getPublication.mockResolvedValue({ publication: detailV3 });
 
     render(
       <V3PublicationHistory
@@ -734,20 +563,9 @@ describe("V3PublicationHistory", () => {
     );
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "查看第 21 次发布" })
+      await screen.findByRole("button", { name: "查看第 22 次发布" })
     );
-    let detail = within(await screen.findByTestId("publication-detail"));
-    expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
-      "当前状态：当前线上版本"
-    );
-    expect(
-      detail.getByText("待补充目标词条 · V2 待补充释义")
-    ).toBeInTheDocument();
-    expect(detail.getAllByText("其他词性").length).toBeGreaterThan(0);
-
-    fireEvent.click(screen.getByRole("button", { name: "关闭发布详情" }));
-    fireEvent.click(screen.getByRole("button", { name: "查看第 22 次发布" }));
-    detail = within(await screen.findByTestId("publication-detail"));
+    const detail = within(await screen.findByTestId("publication-detail"));
     expect(detail.getByTestId("publication-metadata")).toHaveTextContent(
       "当前状态：当前线上版本"
     );
@@ -758,109 +576,6 @@ describe("V3PublicationHistory", () => {
       detail.getByText("待补充目标词条 · V3 待补充释义")
     ).toBeInTheDocument();
     expect(detail.getAllByText("其他词性").length).toBeGreaterThan(0);
-  });
-
-  it("renders V2 common and UK/US forms plus unified and split English definitions", async () => {
-    const api = requests();
-    const detail = v2PublicationWithSnapshotBody();
-    detail.word.forms.pos[0]!.base_form.variants.push(
-      {
-        id: "historical-v2-uk-variant",
-        dialect: "uk",
-        spelling: "historical-v2-uk-spelling",
-        origin: "manual",
-        pronunciations: []
-      },
-      {
-        id: "historical-v2-us-variant",
-        dialect: "us",
-        spelling: "historical-v2-us-spelling",
-        origin: "manual",
-        pronunciations: [
-          {
-            id: "historical-v2-us-pronunciation",
-            dict_phonetic: "historical-v2-us-dict",
-            actual_pron: "historical-v2-us-actual",
-            style: "strong"
-          }
-        ]
-      }
-    );
-    detail.word.meanings.pos[0]!.senses[0]!.definitions.push(
-      {
-        id: "historical-v2-en-unified-definition",
-        level: "B1",
-        definition_mode: "en_definition",
-        content: {
-          mode: "unified",
-          common: {
-            id: "historical-v2-en-unified-content",
-            origin: "manual",
-            value: {
-              version: 1,
-              text: "historical-v2-unified-meaning",
-              spans: [],
-              liaisons: []
-            }
-          }
-        }
-      },
-      {
-        id: "historical-v2-en-split-definition",
-        level: "B1",
-        definition_mode: "en_definition",
-        content: {
-          mode: "distinguish",
-          source_dialect: "uk",
-          uk: {
-            state: "ready",
-            variant: {
-              id: "historical-v2-en-uk-content",
-              origin: "manual",
-              value: {
-                version: 1,
-                text: "historical-v2-split-ready-meaning",
-                spans: [],
-                liaisons: []
-              }
-            }
-          },
-          us: { state: "missing" }
-        }
-      }
-    );
-    api.listPublications.mockResolvedValue({ publications: [detail] });
-    api.getPublication.mockResolvedValue({ publication: detail });
-
-    render(
-      <V3PublicationHistory
-        currentWord={v3Word()}
-        onActivated={vi.fn()}
-        requests={api}
-      />
-    );
-    fireEvent.click(
-      await screen.findByRole("button", { name: "查看第 1 次发布" })
-    );
-    const snapshot = within(
-      await screen.findByTestId("publication-snapshot-body")
-    );
-
-    expect(snapshot.getByText("historical-v2-spelling")).toBeInTheDocument();
-    expect(snapshot.getByText("historical-v2-uk-spelling")).toBeInTheDocument();
-    expect(snapshot.getByText("historical-v2-us-spelling")).toBeInTheDocument();
-    expect(snapshot.getByText("无发音")).toBeInTheDocument();
-    expect(
-      snapshot.getByText(
-        "词典音标 historical-v2-us-dict · 实际发音 historical-v2-us-actual · 强读"
-      )
-    ).toBeInTheDocument();
-    expect(
-      snapshot.getByText("historical-v2-unified-meaning")
-    ).toBeInTheDocument();
-    expect(
-      snapshot.getByText("historical-v2-split-ready-meaning")
-    ).toBeInTheDocument();
   });
 
   it("renders V3 common and UK/US forms plus unified and split English definitions", async () => {
@@ -964,11 +679,15 @@ describe("V3PublicationHistory", () => {
   it("renders explicit empty snapshot states for contract-minimum V2 and V3 bodies", async () => {
     const api = requests();
     const emptyV2 = v2Publication({
-      word: {
-        ...wordFixture({ headword: "empty-v2", status: "published" }),
+      word: v3Word({
+        presentation: {
+          label: "empty-earlier",
+          matched_surfaces: [],
+          strategy_version: "surface_summary_v1"
+        },
         forms: { pos: [] },
         meanings: { sense_groups: [], pos: [] }
-      }
+      })
     });
     const emptyV3 = v3Publication({
       word: v3Word({
@@ -986,7 +705,7 @@ describe("V3PublicationHistory", () => {
     });
     api.getPublication.mockImplementation(
       async (_wordId: string, publicationId: string) => ({
-        publication: publicationId === "pub-v2" ? emptyV2 : emptyV3
+        publication: publicationId === "pub-earlier" ? emptyV2 : emptyV3
       })
     );
 
@@ -1026,8 +745,7 @@ describe("V3PublicationHistory", () => {
       word: v3Word({
         capabilities: {
           publication: {
-            mode: "shadow_only",
-            blocked_code: "phase2_consumers_not_ready"
+            mode: "native" as const
           },
           pronunciation_normalization_version: "nfkc_trim_lower_v1"
         }
@@ -1044,7 +762,7 @@ describe("V3PublicationHistory", () => {
     api.getPublication.mockImplementation(
       async (_wordId: string, publicationId: string) => ({
         publication:
-          publicationId === "pub-v2"
+          publicationId === "pub-earlier"
             ? legacy
             : publicationId === "pub-v3-shadow"
               ? historicalShadow
@@ -1090,7 +808,7 @@ describe("V3PublicationHistory", () => {
     });
     api.getPublication.mockImplementation(
       async (_wordId: string, publicationId: string) => ({
-        publication: publicationId === "pub-v2" ? legacy : historicalV3
+        publication: publicationId === "pub-earlier" ? legacy : historicalV3
       })
     );
 
@@ -1200,7 +918,7 @@ describe("V3PublicationHistory", () => {
     expect(api.activatePublication).toHaveBeenNthCalledWith(
       1,
       "word-mixed",
-      "pub-v2",
+      "pub-earlier",
       "initial-activation-key",
       {
         schema_version: 3,
@@ -1211,7 +929,7 @@ describe("V3PublicationHistory", () => {
     expect(api.activatePublication).toHaveBeenNthCalledWith(
       2,
       "word-mixed",
-      "pub-v2",
+      "pub-earlier",
       "confirmed-activation-key",
       {
         schema_version: 3,
@@ -1411,7 +1129,7 @@ describe("V3PublicationHistory", () => {
       "visible-before-close",
       "cursor-2"
     );
-    const terminalPage = deferred<SurfaceMatchPageAny>();
+    const terminalPage = deferred<SurfaceMatchPageV3>();
     let pageSignal: AbortSignal | undefined;
     const fetchSurfacePage = vi.fn(
       (_snapshotId: string, _cursor: string, signal: AbortSignal) => {
@@ -2122,33 +1840,31 @@ describe("V3PublicationHistory", () => {
     expect(onCanonicalRefreshed).not.toHaveBeenCalled();
   });
 
-  it("fails closed for split V2 labels, mismatched detail identities, and detail transport errors", async () => {
+  it("fails closed for mismatched detail identities and detail transport errors", async () => {
     const api = requests();
-    const split = v2Publication({
-      word: {
-        ...wordFixture({ headword: "centre", status: "published" }),
-        headwords: {
-          mode: "distinguish",
-          uk: "centre",
-          us: "center",
-          source_dialect: "uk"
+    const detailLabel = (label: string) =>
+      v3Word({
+        presentation: {
+          label,
+          matched_surfaces: [],
+          strategy_version: "surface_summary_v1"
         }
-      }
-    });
+      });
+    const split = v2Publication({ word: detailLabel("centre · center") });
     api.listPublications.mockResolvedValue({ publications: [split] });
     api.getPublication
       .mockResolvedValueOnce({
         publication: {
           ...split,
           publication_id: "wrong-publication",
-          word: wordFixture({ headword: "wrong-publication-detail" })
+          word: detailLabel("wrong-publication-detail")
         }
       })
       .mockResolvedValueOnce({
         publication: {
           ...split,
           entry_id: "wrong-entry",
-          word: wordFixture({ headword: "wrong-entry-detail" })
+          word: detailLabel("wrong-entry-detail")
         }
       })
       .mockRejectedValueOnce(new HttpError(503, "unavailable"));
@@ -2162,9 +1878,7 @@ describe("V3PublicationHistory", () => {
       />
     );
 
-    expect(
-      await screen.findByText("英式 centre / 美式 center")
-    ).toBeInTheDocument();
+    expect(await screen.findByText("centre · center")).toBeInTheDocument();
 
     for (const callCount of [1, 2, 3]) {
       fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
@@ -2228,41 +1942,15 @@ describe("V3PublicationHistory", () => {
     }
   );
 
-  it("keeps history read-only for each current-word capability gate", async () => {
-    const scenarios = [
-      {
-        historical: { mode: "migration_canary", whitelisted: true } as const,
-        current: {
-          mode: "shadow_only",
-          blocked_code: "phase2_consumers_not_ready"
-        } as const
-      },
-      {
-        historical: { mode: "migration_canary", whitelisted: true } as const,
-        current: { mode: "migration_canary", whitelisted: false } as const
-      }
-    ];
-
-    for (const scenario of scenarios) {
+  it("当前词条未处于已发布态时，历史快照只读且无激活入口", async () => {
+    for (const status of ["draft", "archived"] as const) {
       const api = requests();
-      const historical = v3Publication({
-        word: v3Word({
-          capabilities: {
-            publication: scenario.historical,
-            pronunciation_normalization_version: "nfkc_trim_lower_v1"
-          }
-        })
-      });
+      const historical = v3Publication({ word: v3Word({}) });
       api.listPublications.mockResolvedValue({ publications: [historical] });
       api.getPublication.mockResolvedValue({ publication: historical });
       const view = render(
         <V3PublicationHistory
-          currentWord={v3Word({
-            capabilities: {
-              publication: scenario.current,
-              pronunciation_normalization_version: "nfkc_trim_lower_v1"
-            }
-          })}
+          currentWord={v3Word({ status })}
           idempotencyKeyFactory={() => "activate-key"}
           onActivated={vi.fn()}
           requests={api}
@@ -2285,7 +1973,7 @@ describe("V3PublicationHistory", () => {
 
   it("ignores a superseded list response after the canonical revision changes", async () => {
     const api = requests();
-    const stale = deferred<{ publications: AdminWordPublicationV2[] }>();
+    const stale = deferred<{ publications: AdminWordPublicationV3[] }>();
     const fresh = v3Publication({
       word: v3Word({
         presentation: {
@@ -2323,9 +2011,12 @@ describe("V3PublicationHistory", () => {
       stale.resolve({
         publications: [
           v2Publication({
-            word: wordFixture({
-              headword: "stale-revision-history",
-              status: "published"
+            word: v3Word({
+              presentation: {
+                label: "stale-revision-history",
+                matched_surfaces: [],
+                strategy_version: "surface_summary_v1"
+              }
             })
           })
         ]
@@ -2339,7 +2030,7 @@ describe("V3PublicationHistory", () => {
 
   it("ignores stale detail and activation completions after supersede or unmount", async () => {
     const api = requests();
-    const first = deferred<{ publication: AdminWordPublicationV2 }>();
+    const first = deferred<{ publication: AdminWordPublicationV3 }>();
     const activate = deferred<{ word: AdminWordV3 }>();
     const historicalV3 = v3Publication();
     api.listPublications.mockResolvedValue({
@@ -2370,9 +2061,12 @@ describe("V3PublicationHistory", () => {
     await act(async () =>
       first.resolve({
         publication: v2Publication({
-          word: wordFixture({
-            headword: "stale-v2-detail",
-            status: "published"
+          word: v3Word({
+            presentation: {
+              label: "stale-v2-detail",
+              matched_surfaces: [],
+              strategy_version: "surface_summary_v1"
+            }
           })
         })
       })

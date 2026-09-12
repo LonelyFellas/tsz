@@ -1,5 +1,5 @@
 import { HttpError } from "@tsz/api-client/http";
-import type { SurfaceMatchPageAny } from "@tsz/types";
+import type { SurfaceMatchPageV3 } from "@tsz/types";
 import { useCallback, useRef, useState } from "react";
 import { newWordNodeId } from "./word-model/primitives";
 import {
@@ -9,16 +9,16 @@ import {
 } from "./surfaceSnapshot";
 import {
   type FetchSurfaceMatchPage,
-  useSurfaceSnapshotAny
+  useSurfaceSnapshot
 } from "./useSurfaceSnapshot";
 
 export function useLifecycleSurfaceCommand(
   resetKey: string,
-  fetchPage?: FetchSurfaceMatchPage<SurfaceMatchPageAny>
+  fetchPage?: FetchSurfaceMatchPage<SurfaceMatchPageV3>
 ) {
-  const [page, setPage] = useState<SurfaceMatchPageAny>();
+  const [page, setPage] = useState<SurfaceMatchPageV3>();
   const key = useRef(newWordNodeId());
-  const snapshot = useSurfaceSnapshotAny(
+  const snapshot = useSurfaceSnapshot(
     page,
     `${resetKey}:${page?.schema_version ?? "none"}:${page?.snapshot_id ?? "none"}`,
     fetchPage

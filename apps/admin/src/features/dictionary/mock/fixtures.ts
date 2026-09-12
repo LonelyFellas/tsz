@@ -16,9 +16,6 @@ import type {
   WordPronunciationV2
 } from "@tsz/types";
 
-// 12：词形变化加所属基本词性，旧状态的 allowed_form_types 会算成空，必须重播种。
-export const ADMIN_WORDS_MOCK_STORAGE_SCHEMA = 12;
-
 export function richText(text: string): RichText {
   return { version: 1, text, spans: [], liaisons: [] };
 }
