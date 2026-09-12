@@ -1,6 +1,8 @@
 import runtimeSchemaBundleJson from "./admin-word-v3.runtime-schema.json";
 
 export const RUNTIME_SCHEMA_ROOTS = [
+  "SharedSentence",
+  "SharedSentenceList",
   "EntryAnnotationResponse",
   "AdminWordV3",
   "AdminWordV3Envelope",

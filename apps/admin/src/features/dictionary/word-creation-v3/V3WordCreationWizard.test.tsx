@@ -562,14 +562,14 @@ describe("V3WordCreationWizard", () => {
     const view = render(inRouter(wizard));
 
     expect(screen.getByTestId("initialized-counts")).toHaveTextContent(
-      "1/2/2/2/2"
+      "1/2/2/2/0"
     );
     expect(screen.getByTestId("initialized-dirty")).toHaveTextContent(
       "false/false"
     );
     const initialIds = screen.getByTestId("initialized-node-ids").textContent;
-    expect(initialIds?.split(",")).toHaveLength(17);
-    expect(new Set(initialIds?.split(",")).size).toBe(17);
+    expect(initialIds?.split(",")).toHaveLength(11);
+    expect(new Set(initialIds?.split(",")).size).toBe(11);
 
     fireEvent.click(screen.getByText("切换步骤"));
     fireEvent.click(screen.getByText("切换步骤"));
@@ -680,7 +680,7 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByText("词形变化").parentElement).toHaveTextContent("1");
     expect(screen.getByText("语法结构").parentElement).toHaveTextContent("1");
     expect(screen.getByText("多维词义").parentElement).toHaveTextContent("1");
-    expect(screen.getByText("多维例句").parentElement).toHaveTextContent("1");
+    expect(screen.getByText("多维例句").parentElement).toHaveTextContent("0");
 
     fireEvent.click(screen.getByText("更新词形"));
     const withSecondPos = screen.getByTestId("pos-template-ids").textContent;
@@ -692,7 +692,7 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByText("基本词性").parentElement).toHaveTextContent("2");
     expect(screen.getByText("语法结构").parentElement).toHaveTextContent("2");
     expect(screen.getByText("多维词义").parentElement).toHaveTextContent("2");
-    expect(screen.getByText("多维例句").parentElement).toHaveTextContent("2");
+    expect(screen.getByText("多维例句").parentElement).toHaveTextContent("0");
 
     fireEvent.click(screen.getByText("更新词形"));
     expect(screen.getByTestId("pos-template-ids")).toHaveTextContent(

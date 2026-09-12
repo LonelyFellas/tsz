@@ -38,6 +38,7 @@ export type V3ConflictComparison = (
 
 interface Props {
   word: AdminWordV3;
+  sharedSentenceCount?: number;
   partOfSpeechCatalog?: readonly PartOfSpeechCatalogItem[];
   activeStep: WordCreationStep;
   reachableSteps?: ReadonlySet<WordCreationStep>;
@@ -117,6 +118,7 @@ function V3WordCreationLayoutContent({
   activeStep,
   reachableSteps,
   readOnly = false,
+  sharedSentenceCount,
   dirtySteps = { forms: false, meanings: false },
   draftForms,
   draftMeanings,
@@ -151,6 +153,13 @@ function V3WordCreationLayoutContent({
     forms: draftForms ?? word.forms,
     meanings: draftMeanings ?? word.meanings
   });
+  if (sharedSentenceCount !== undefined) {
+    const sentences = progressRows.find((row) => row.key === "sentences");
+    if (sentences) {
+      sentences.count = sharedSentenceCount;
+      sentences.completed = sharedSentenceCount > 0;
+    }
+  }
   const currentProgressKey = progressRows.find(
     (row) => row.step === activeStep && !row.completed
   )?.key;

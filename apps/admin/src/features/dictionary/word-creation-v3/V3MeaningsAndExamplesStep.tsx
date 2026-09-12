@@ -71,9 +71,7 @@ import {
   type RelationDisplaySnapshots,
   definitionSummary,
   replaceRichText,
-  spellingModeForPos,
-  DEFAULT_SENTENCE_TRANSLATION_BAND,
-  newSentenceTranslations
+  spellingModeForPos
 } from "./meaningsModel";
 import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import {
@@ -88,7 +86,6 @@ import { v3IssueMessage } from "./presentationErrors";
 import { countV3PosMeaningIncomplete } from "./posCompletion";
 import { V3VoiceTextField } from "./components/V3VoiceTextField";
 import { V3LinkedEnglishTextField } from "./components/V3LinkedEnglishTextField";
-import { V3SentenceTranslationsField } from "./components/V3SentenceTranslationsField";
 import { V3AddBasicPosSelect } from "./components/V3AddBasicPosSelect";
 import {
   baseSpellingForPos,
@@ -234,7 +231,6 @@ function SenseSectionBody({
 const SENSE_GROUP_DRAG_TYPE = "application/x-tsz-v3-sense-group";
 const GRAMMAR_DRAG_TYPE = "application/x-tsz-v3-grammar-structure";
 const DEFINITION_DRAG_TYPE = "application/x-tsz-v3-definition";
-const SENTENCE_DRAG_TYPE = "application/x-tsz-v3-sentence";
 // const POS_DRAG_TYPE = "application/x-tsz-v3-pos";
 /** 拖影取整行而不是把手上那颗小图标；与提取前硬编码的选择器一致。 */
 const SORTABLE_ROW_SELECTOR =
@@ -2336,8 +2332,8 @@ function V3MeaningsAndExamplesStepContent({
           词义与例句
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
-          录入顺序：词义 → 语法结构 → 例句。系统报错触发条件：1)
-          某项词义缺本语言释义语句；2) 例句未配置关联单词；
+          录入顺序：词义 → 语法结构。
+          词义需填写本语言释义语句；多维例句在上方独立创编，点完成即发布。
         </Typography.Paragraph>
       </div>
 
@@ -2504,9 +2500,6 @@ function V3MeaningsAndExamplesStepContent({
                               catalogPos?.sub_pos_required ?? true;
                             const definitionsCollapsed = Boolean(
                               collapsedSenseSections[`${sense.id}:definitions`]
-                            );
-                            const sentencesCollapsed = Boolean(
-                              collapsedSenseSections[`${sense.id}:sentences`]
                             );
                             const relationsCollapsed = Boolean(
                               collapsedSenseSections[`${sense.id}:relations`]
@@ -3235,263 +3228,6 @@ function V3MeaningsAndExamplesStepContent({
                                       </SenseSectionBody>
                                     </section>
                                   ) : null}
-
-                                  <section
-                                    className={`word-sense-section${sentencesCollapsed ? " is-collapsed" : ""}`}
-                                  >
-                                    <SenseSectionTitle
-                                      collapsed={sentencesCollapsed}
-                                      count={sense.sentences.length}
-                                      label="多维例句"
-                                      onToggle={() =>
-                                        toggleSenseSection(
-                                          sense.id,
-                                          "sentences",
-                                          sentencesCollapsed
-                                        )
-                                      }
-                                      unit="条"
-                                    />
-                                    <SenseSectionBody
-                                      collapsed={sentencesCollapsed}
-                                    >
-                                      <>
-                                        {sense.sentences.length > 0 ? (
-                                          <div className="word-list-header word-sentence-list-header">
-                                            <span aria-hidden="true" />
-                                            <span>等级</span>
-                                            <span>英文例句</span>
-                                            <span aria-hidden="true" />
-                                          </div>
-                                        ) : (
-                                          <Empty
-                                            description="暂无多维例句"
-                                            image={Empty.PRESENTED_IMAGE_SIMPLE}
-                                          />
-                                        )}
-                                        <SortableRows
-                                          dragType={SENTENCE_DRAG_TYPE}
-                                          items={sense.sentences}
-                                          onChange={(next) =>
-                                            change((draft) => {
-                                              draft.pos[posIndex]!.senses[
-                                                senseIndex
-                                              ]!.sentences = next;
-                                            })
-                                          }
-                                          scopeId={sense.id}
-                                        >
-                                          {(sentenceSorting) =>
-                                            sense.sentences.map(
-                                              (sentence, sentenceIndex) => (
-                                                <div
-                                                  className={sortableRowClass(
-                                                    "word-table-row word-sentence-row",
-                                                    sentenceSorting,
-                                                    sentenceIndex
-                                                  )}
-                                                  data-v3-field="sentence"
-                                                  data-v3-node-id={sentence.id}
-                                                  key={sentence.id}
-                                                  onDragLeave={
-                                                    sentenceSorting.handleDragLeave
-                                                  }
-                                                  onDragOver={(event) =>
-                                                    sentenceSorting.handleDragOver(
-                                                      event,
-                                                      sentenceIndex
-                                                    )
-                                                  }
-                                                  onDrop={(event) =>
-                                                    sentenceSorting.handleDrop(
-                                                      event,
-                                                      sentenceIndex
-                                                    )
-                                                  }
-                                                  tabIndex={-1}
-                                                >
-                                                  <span className="word-number-cell">
-                                                    <span className="word-grammar-index">
-                                                      {sentenceIndex + 1}
-                                                    </span>
-                                                  </span>
-                                                  <Select
-                                                    aria-label={`例句 ${sentenceIndex + 1} 等级`}
-                                                    data-v3-field="level"
-                                                    data-v3-node-id={
-                                                      sentence.id
-                                                    }
-                                                    disabled={saving}
-                                                    onChange={(level) =>
-                                                      change((draft) => {
-                                                        const next =
-                                                          draft.pos[posIndex]!
-                                                            .senses[senseIndex]!
-                                                            .sentences[
-                                                            sentenceIndex
-                                                          ]!;
-                                                        next.level = level;
-                                                      })
-                                                    }
-                                                    options={CEFR_OPTIONS}
-                                                    value={sentence.level}
-                                                  />
-                                                  <Space
-                                                    className="word-sentence-english-fields"
-                                                    orientation="vertical"
-                                                    size={6}
-                                                    style={{ width: "100%" }}
-                                                  >
-                                                    <V3LinkedEnglishTextField
-                                                      value={sentence.en_text}
-                                                      label={`例句 ${sentenceIndex + 1}`}
-                                                      suffix="英文"
-                                                      placeholder="请输入完整的英文例句"
-                                                      wordId={wordId}
-                                                      linksEnabled={
-                                                        textLinksEnabled
-                                                      }
-                                                      readOnly={saving}
-                                                      onChange={(en_text) =>
-                                                        change((draft) => {
-                                                          draft.pos[
-                                                            posIndex
-                                                          ]!.senses[
-                                                            senseIndex
-                                                          ]!.sentences[
-                                                            sentenceIndex
-                                                          ]!.en_text = en_text;
-                                                        })
-                                                      }
-                                                    />
-                                                  </Space>
-                                                  <V3SentenceTranslationsField
-                                                    sentence={sentence}
-                                                    index={sentenceIndex}
-                                                    disabled={saving}
-                                                    onChange={(translations) =>
-                                                      change((draft) => {
-                                                        const next =
-                                                          draft.pos[posIndex]!
-                                                            .senses[senseIndex]!
-                                                            .sentences[
-                                                            sentenceIndex
-                                                          ]!;
-                                                        next.zh_translations =
-                                                          translations;
-                                                        const alias =
-                                                          translations.find(
-                                                            (item) =>
-                                                              item.id ===
-                                                              next.zh_text_id
-                                                          ) ?? translations[0]!;
-                                                        next.zh_text_id =
-                                                          alias.id;
-                                                        next.zh_text =
-                                                          alias.content;
-                                                      })
-                                                    }
-                                                  />
-                                                  <Space
-                                                    className="word-sort-actions"
-                                                    orientation="horizontal"
-                                                  >
-                                                    <SortableDragHandle
-                                                      dragImageSelector={
-                                                        SORTABLE_ROW_SELECTOR
-                                                      }
-                                                      index={sentenceIndex}
-                                                      label={`拖动例句 ${sentenceIndex + 1}`}
-                                                      singleItemTitle="至少需要两条例句"
-                                                      sorting={sentenceSorting}
-                                                    />
-                                                    <Button
-                                                      aria-label={`删除例句 ${sentenceIndex + 1}`}
-                                                      danger
-                                                      icon={<DeleteOutlined />}
-                                                      onClick={() =>
-                                                        change((draft) => {
-                                                          draft.pos[
-                                                            posIndex
-                                                          ]!.senses[
-                                                            senseIndex
-                                                          ]!.sentences.splice(
-                                                            sentenceIndex,
-                                                            1
-                                                          );
-                                                        })
-                                                      }
-                                                      size="small"
-                                                      type="text"
-                                                    />
-                                                  </Space>
-                                                </div>
-                                              )
-                                            )
-                                          }
-                                        </SortableRows>
-                                        <Button
-                                          block
-                                          className="word-section-add-button"
-                                          disabled={!wordId || saving}
-                                          icon={<PlusOutlined aria-hidden />}
-                                          onClick={() => {
-                                            if (!wordId) return;
-                                            change((draft) => {
-                                              // 初/中/高/高 四个录入位一次摆齐；主译文挂在默认档上。
-                                              const translations =
-                                                newSentenceTranslations(
-                                                  idFactory
-                                                );
-                                              const alias =
-                                                translations.find(
-                                                  (item) =>
-                                                    item.band ===
-                                                    DEFAULT_SENTENCE_TRANSLATION_BAND
-                                                ) ?? translations[0]!;
-                                              const sentences =
-                                                draft.pos[posIndex]!.senses[
-                                                  senseIndex
-                                                ]!.sentences;
-                                              sentences.push({
-                                                id: idFactory(),
-                                                level:
-                                                  sentences.at(-1)?.level ??
-                                                  "B1",
-                                                en_text: {
-                                                  mode: "unified",
-                                                  common: {
-                                                    id: idFactory(),
-                                                    origin: "manual",
-                                                    value: {
-                                                      version: 2,
-                                                      text: "",
-                                                      annotations: []
-                                                    }
-                                                  }
-                                                },
-                                                zh_text_id: alias.id,
-                                                zh_text: structuredClone(
-                                                  alias.content
-                                                ),
-                                                zh_translations: translations,
-                                                links: [
-                                                  {
-                                                    word_id: wordId,
-                                                    sense_id: sense.id,
-                                                    role: "focus"
-                                                  }
-                                                ]
-                                              });
-                                            });
-                                          }}
-                                          type="dashed"
-                                        >
-                                          添加例句
-                                        </Button>
-                                      </>
-                                    </SenseSectionBody>
-                                  </section>
 
                                   <section
                                     className={`word-sense-section${relationsCollapsed ? " is-collapsed" : ""}`}

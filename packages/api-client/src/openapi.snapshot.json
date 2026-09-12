@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/phrase-pos-kind/docs/openapi.json",
-  "_generatedAt": "2026-09-12T08:01:58.033Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-main-local-20260912/docs/openapi.json",
+  "_generatedAt": "2026-09-12T11:08:48.425Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -38,6 +38,10 @@
     "/admin/lexicon/entries/{id}/steps/forms/impact": ["post"],
     "/admin/lexicon/entries/{id}/steps/meanings": ["put"],
     "/admin/lexicon/entries/{id}/validate": ["post"],
+    "/admin/lexicon/sentences": ["get", "post"],
+    "/admin/lexicon/sentences/{id}": ["delete", "get", "put"],
+    "/admin/lexicon/sentences/{id}/collections": ["post"],
+    "/admin/lexicon/sentences/{id}/collections/{entry_id}": ["delete"],
     "/admin/lexicon/surface-match-snapshots/{snapshot_id}": ["get"],
     "/admin/profile": ["get"],
     "/admin/profile/preferences": ["patch"],
@@ -569,6 +573,87 @@
         "409": { "$ref": "#/components/schemas/ProblemDetails" },
         "422": { "$ref": "#/components/schemas/ProblemDetails" },
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon/sentences": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SharedSentenceList" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/sentences": {
+      "request": { "$ref": "#/components/schemas/CreateSharedSentence" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SharedSentence" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "delete /admin/lexicon/sentences/{id}": {
+      "request": { "$ref": "#/components/schemas/SentenceRevision" },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon/sentences/{id}": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SharedSentence" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "put /admin/lexicon/sentences/{id}": {
+      "request": { "$ref": "#/components/schemas/UpdateSharedSentence" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SharedSentence" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/sentences/{id}/collections": {
+      "request": { "$ref": "#/components/schemas/CollectSharedSentence" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SharedSentence" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "delete /admin/lexicon/sentences/{id}/collections/{entry_id}": {
+      "request": { "$ref": "#/components/schemas/SentenceRevision" },
+      "responses": {
+        "204": null,
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "get /admin/lexicon/surface-match-snapshots/{snapshot_id}": {
@@ -2627,6 +2712,20 @@
     },
     "AudioAssetGender": { "type": "string", "enum": ["female", "male"] },
     "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
+    "CollectSharedSentence": {
+      "type": "object",
+      "required": ["base_revision", "entry_id", "annotation_ids"],
+      "properties": {
+        "annotation_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "description": "Only pending annotations selected by the user are bound to entry_id."
+        },
+        "base_revision": { "type": "integer", "format": "int64" },
+        "entry_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
     "ComponentTargetMatchV3": {
       "type": "string",
@@ -2691,6 +2790,19 @@
         "short_name_zh": { "type": "string", "maxLength": 16, "minLength": 1 },
         "sort_order": { "type": "integer", "format": "int32" }
       }
+    },
+    "CreateSharedSentence": {
+      "type": "object",
+      "required": ["source_entry_id", "content"],
+      "properties": {
+        "content": { "$ref": "#/components/schemas/SharedSentenceContent" },
+        "source_entry_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Stable client-generated UUID makes retries safe."
+        }
+      },
+      "additionalProperties": false
     },
     "DetectLexiconSurfaceV3Input": {
       "type": "object",
@@ -3083,6 +3195,14 @@
       },
       "additionalProperties": false
     },
+    "SentenceRevision": {
+      "type": "object",
+      "required": ["base_revision"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" }
+      },
+      "additionalProperties": false
+    },
     "SentenceSourceRangeV1": {
       "type": "object",
       "description": "例句正文里某个词的位置。\n\n`start` / `end` 是所在 [`RichText`] `text` 的 **Unicode 码点**下标，左闭右开，\n与 `RichTextAnnotation` 的 span 口径完全一致；`surface` 是该区间的原文词面，\n既供前端直接展示，也让读取时能自检区间有没有跟着正文漂走。",
@@ -3094,10 +3214,58 @@
       },
       "additionalProperties": false
     },
+    "SentenceTarget": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["target_entry_id", "state"],
+          "properties": {
+            "state": { "type": "string", "enum": ["linked"] },
+            "target_entry_id": { "type": "string", "format": "uuid" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "headword", "state"],
+          "properties": {
+            "gloss": { "type": ["string", "null"] },
+            "headword": { "type": "string" },
+            "kind": { "type": "string" },
+            "state": { "type": "string", "enum": ["pending"] }
+          }
+        }
+      ]
+    },
     "SentenceTranslationBandV3": {
       "type": "string",
       "description": "译文风格而非难度等级：初阶逐字直译、中阶语句通顺、高阶深层重构。",
       "enum": ["word_for_word", "balanced_fluency", "adapted_creation"]
+    },
+    "SharedSentenceAnnotation": {
+      "type": "object",
+      "required": ["id", "source_dialect", "source_segments", "target"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "source_dialect": { "type": "string" },
+        "source_segments": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/SentenceSourceRangeV1" }
+        },
+        "target": { "$ref": "#/components/schemas/SentenceTarget" }
+      },
+      "additionalProperties": false
+    },
+    "SharedSentenceContent": {
+      "type": "object",
+      "required": ["sentence", "annotations"],
+      "properties": {
+        "annotations": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/SharedSentenceAnnotation" }
+        },
+        "sentence": { "$ref": "#/components/schemas/WordSentenceWritableV3" }
+      },
+      "additionalProperties": false
     },
     "SourceDialect": {
       "type": "string",
@@ -3205,6 +3373,15 @@
         "short_name_zh": { "type": "string", "maxLength": 16, "minLength": 1 },
         "sort_order": { "type": "integer", "format": "int32" }
       }
+    },
+    "UpdateSharedSentence": {
+      "type": "object",
+      "required": ["base_revision", "content"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" },
+        "content": { "$ref": "#/components/schemas/SharedSentenceContent" }
+      },
+      "additionalProperties": false
     },
     "UsDialectV3": { "type": "string", "enum": ["us"] },
     "ValidateAdminWordV3Input": {

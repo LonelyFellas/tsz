@@ -110,6 +110,7 @@ export interface V3WordCreationWizardProps {
   partOfSpeechCatalogError?: boolean;
   partOfSpeechCatalogPending?: boolean;
   initialWord: AdminWordV3;
+  sharedSentenceCount?: number;
   requests: V3WordRequests;
   initialStep?: WordCreationStep;
   readOnly?: boolean;
@@ -230,6 +231,7 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
 
 function V3WordCreationSession({
   initialWord,
+  sharedSentenceCount,
   partOfSpeechCatalog,
   partOfSpeechCatalogError = false,
   partOfSpeechCatalogPending = false,
@@ -1346,6 +1348,7 @@ function V3WordCreationSession({
 
   return (
     <V3WordCreationLayout
+      sharedSentenceCount={sharedSentenceCount}
       word={word}
       partOfSpeechCatalog={partOfSpeechCatalog?.items}
       activeStep={activeStep}

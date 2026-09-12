@@ -77,18 +77,14 @@ describe("V3 basic POS completion counts", () => {
     );
     const pos = meanings.pos[0]!;
 
-    expect(countV3PosMeaningIncomplete(pos, meanings)).toBe(5);
+    expect(countV3PosMeaningIncomplete(pos, meanings)).toBe(4);
 
     pos.grammar_structures[0]!.variants[0]!.content.text = "a noun";
     pos.senses[0]!.sub_pos = "countable";
     pos.senses[0]!.frequency = "not-a-server-valid-frequency";
     const definition = pos.senses[0]!.definitions[0]!;
     if ("content_id" in definition) definition.content.text = "中心";
-    const sentence = pos.senses[0]!.sentences[0]!;
-    if (sentence.en_text.mode === "unified") {
-      sentence.en_text.common.value.text = "The center.";
-    }
-    sentence.zh_text.text = "中心。";
+    expect(pos.senses[0]!.sentences).toEqual([]);
 
     expect(countV3PosMeaningIncomplete(pos, meanings)).toBe(0);
   });
@@ -104,7 +100,7 @@ describe("V3 basic POS completion counts", () => {
     );
     const pos = meanings.pos[0]!;
 
-    expect(countV3PosMeaningIncomplete(pos, meanings)).toBe(5);
-    expect(countV3PosMeaningIncomplete(pos, meanings, false)).toBe(4);
+    expect(countV3PosMeaningIncomplete(pos, meanings)).toBe(4);
+    expect(countV3PosMeaningIncomplete(pos, meanings, false)).toBe(3);
   });
 });

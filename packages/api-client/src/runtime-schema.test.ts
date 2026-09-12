@@ -34,6 +34,8 @@ const runtimeSchemaBundle =
   runtimeSchemaBundleJson as unknown as RuntimeSchemaBundle;
 
 const ROOTS = [
+  "SharedSentence",
+  "SharedSentenceList",
   "EntryAnnotationResponse",
   "AdminWordV3",
   "AdminWordV3Envelope",

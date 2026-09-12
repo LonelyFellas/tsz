@@ -94,6 +94,12 @@ export const router = createBrowserRouter([
           },
           ...wordRoutes,
           {
+            path: "sentences",
+            lazy: async () => ({
+              Component: (await import("@/pages/Sentences")).SentencesPage
+            })
+          },
+          {
             path: "users",
             lazy: async () => ({
               Component: (await import("@/pages/Users")).UsersPage

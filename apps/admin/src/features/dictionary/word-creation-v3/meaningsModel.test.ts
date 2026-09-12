@@ -200,56 +200,7 @@ describe("V3 meanings writable model", () => {
           content: { version: 2, text: "", annotations: [] }
         }
       ]);
-      expect(sense.sentences).toEqual([
-        {
-          id: expect.any(String),
-          level: "A1",
-          en_text: {
-            mode: "unified",
-            common: {
-              id: expect.any(String),
-              origin: "manual",
-              value: { version: 2, text: "", annotations: [] }
-            }
-          },
-          zh_text_id: expect.any(String),
-          zh_text: { version: 2, text: "", annotations: [] },
-          // 自动播种的例句同样摆出初、中、高、高四个录入位。
-          zh_translations: [
-            {
-              id: expect.any(String),
-              band: "word_for_word",
-              language: "zh",
-              content: { version: 2, text: "", annotations: [] }
-            },
-            {
-              id: expect.any(String),
-              band: "balanced_fluency",
-              language: "zh",
-              content: { version: 2, text: "", annotations: [] }
-            },
-            {
-              id: expect.any(String),
-              band: "adapted_creation",
-              language: "zh",
-              content: { version: 2, text: "", annotations: [] }
-            },
-            {
-              id: expect.any(String),
-              band: "adapted_creation",
-              language: "zh",
-              content: { version: 2, text: "", annotations: [] }
-            }
-          ],
-          links: [{ word_id: "word-1", sense_id: sense.id, role: "focus" }]
-        }
-      ]);
-      // 主译文挂在默认的中阶那条上，别名必须指得到它。
-      expect(sense.sentences[0]!.zh_text_id).toBe(
-        sense.sentences[0]!.zh_translations.find(
-          (item) => item.band === "balanced_fluency"
-        )!.id
-      );
+      expect(sense.sentences).toEqual([]);
     }
     expect(
       new Set(idFactory.mock.results.map((entry) => entry.value)).size
@@ -282,13 +233,7 @@ describe("V3 meanings writable model", () => {
     expect(result.pos[0]).toBe(existingPos);
     expect(JSON.stringify(existing)).toBe(existingJson);
     expect(result.pos.map((pos) => pos.pos_id)).toEqual(["pos-1", "pos-2"]);
-    expect(result.pos[1]!.senses[0]!.sentences[0]!.links).toEqual([
-      {
-        word_id: "entry-1",
-        sense_id: result.pos[1]!.senses[0]!.id,
-        role: "focus"
-      }
-    ]);
+    expect(result.pos[1]!.senses[0]!.sentences).toEqual([]);
     expect(result.pos[1]!.senses[0]!.sense_group_id).toBe(
       result.sense_groups[0]!.id
     );

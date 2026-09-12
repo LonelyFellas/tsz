@@ -1789,16 +1789,7 @@ describe("WordWizardV3Page", () => {
                       definition_mode: "zh_definition"
                     })
                   ],
-                  sentences: [
-                    expect.objectContaining({
-                      links: [
-                        expect.objectContaining({
-                          word_id: WORD_ID,
-                          role: "focus"
-                        })
-                      ]
-                    })
-                  ],
+                  sentences: [],
                   relations: []
                 })
               ]
