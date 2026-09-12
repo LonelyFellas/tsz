@@ -6,7 +6,6 @@ import {
   Col,
   Empty,
   Form,
-  Input,
   Modal,
   Row,
   Select,
@@ -30,10 +29,8 @@ import {
   useUpdateSubPartOfSpeech
 } from "./api";
 import { nextSortOrder } from "./catalog";
-import {
-  LabelWithHint,
-  PartOfSpeechSharedFields
-} from "./PartOfSpeechSharedFields";
+import { newWordNodeId } from "../word-model/primitives";
+import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
 import { useDerivedNameDefaults } from "./useDerivedNameDefaults";
 
 /** 供父级页面在自己的工具栏里触发"新增细分词性"，弹窗与编辑态仍由面板自己管。 */
@@ -41,7 +38,7 @@ export interface SubPartOfSpeechPanelHandle {
   openCreate: () => void;
 }
 
-/** 面板需要的父级信息：id 定位、name_zh 展示、code 参与派生细分词性编码。 */
+/** 面板使用的基本词性目录信息。 */
 type PanelParent = Pick<PartOfSpeechConfig, "id" | "name_zh" | "code">;
 
 interface Props {
@@ -56,10 +53,7 @@ interface Props {
   ref?: Ref<SubPartOfSpeechPanelHandle>;
 }
 
-/** 后端契约：大写字母开头，其后是大写字母、数字、连字符或下划线，最长 32。 */
-const SUB_PART_CODE_PATTERN = /^[A-Z][A-Z0-9_-]{0,31}$/;
-
-type SubPartFormValues = CreateSubPartOfSpeechInput & {
+type SubPartFormValues = Omit<CreateSubPartOfSpeechInput, "code"> & {
   /** 所属基本词性；固定父级或修改时由弹窗回填并锁定，「全部」视图下新建时由用户选择。 */
   part_of_speech_id: string;
 };
@@ -98,8 +92,6 @@ function SubPartFormModal({
   const update = useUpdateSubPartOfSpeech();
   const creating = !value;
   const markTouched = useDerivedNameDefaults(form, { open, creating });
-  // 编码是词条引用的口径：已经被词义引用后后端不再放行修改。
-  const codeLocked = value !== undefined && value.usage_count > 0;
   // 预填值放 ref 而不是 effect 依赖：列表随时可能重拉，跟着重跑那个 effect 会连带
   // resetFields 清空正在填的表单。
   const nextSortOrderForRef = useRef(nextSortOrderFor);
@@ -112,7 +104,6 @@ function SubPartFormModal({
     if (value) {
       form.setFieldsValue({
         part_of_speech_id: value.part_of_speech_id,
-        code: value.code,
         name_zh: value.name_zh,
         name_en: value.name_en,
         short_name_zh: value.short_name_zh,
@@ -144,7 +135,10 @@ function SubPartFormModal({
       } else {
         await create.mutateAsync({
           partId: part_of_speech_id,
-          input: fields
+          input: {
+            ...fields,
+            code: `SUB_${newWordNodeId().replaceAll("-", "").slice(0, 28).toUpperCase()}`
+          }
         });
       }
       onSaved(value ? "细分词性已更新" : "细分词性已新增");
@@ -198,38 +192,6 @@ function SubPartFormModal({
                   );
                 }}
               />
-            </Form.Item>
-          </Col>
-          <Col span={12}>
-            <Form.Item
-              name="code"
-              // 「怎么填」收进标签旁的问号；「为什么改不了」是禁用原因，
-              // 藏起来就只剩一个灰掉的输入框，仍留在下面。
-              label={
-                codeLocked ? (
-                  "编码"
-                ) : (
-                  <LabelWithHint
-                    label="编码"
-                    hint="词条里引用这条细分词性用的代码文本，全局唯一"
-                  />
-                )
-              }
-              extra={
-                codeLocked
-                  ? `已有 ${value.usage_count} 个词义引用，编码不能再改`
-                  : undefined
-              }
-              rules={[
-                { required: true, message: "请输入编码" },
-                {
-                  pattern: SUB_PART_CODE_PATTERN,
-                  message:
-                    "编码为大写字母开头的大写字母、数字、- 或 _，最长 32 位"
-                }
-              ]}
-            >
-              <Input disabled={codeLocked} placeholder="例如 N-UNCOUNT" />
             </Form.Item>
           </Col>
         </Row>
@@ -308,7 +270,6 @@ export function SubPartOfSpeechPanel({
 
   const columns: TableColumnsType<SubPartOfSpeechConfig> = [
     { title: "序号", dataIndex: "sort_order", width: 64 },
-    { title: "编码", dataIndex: "code", width: 150 },
     { title: "正式中文", dataIndex: "name_zh", width: 120 },
     { title: "简洁显示", dataIndex: "short_name_zh", width: 110 },
     { title: "正式英文", dataIndex: "name_en", width: 150 },

@@ -575,7 +575,7 @@ describe("PartOfSpeechSettings", () => {
     expect(verbRow.cells[0]!.textContent).toBe("30");
   });
 
-  it("细分词性编码冲突时提示换编码，因为编码是管理员自己填的", async () => {
+  it("细分词性内部编码冲突时提示重新提交", async () => {
     mock.remove.mockRejectedValueOnce(
       new HttpError(409, "conflict", [], "sub_part_of_speech_conflict", {
         type: "urn:tsz:problem:sub_part_of_speech_conflict",
@@ -592,7 +592,7 @@ describe("PartOfSpeechSettings", () => {
     const dialog = await screen.findByRole("dialog");
     fireEvent.click(within(dialog).getByText("删 除"));
     expect(
-      await screen.findByText("编码已被其他细分词性占用，请换一个")
+      await screen.findByText("内部标识冲突，请重新提交")
     ).toBeInTheDocument();
   });
 

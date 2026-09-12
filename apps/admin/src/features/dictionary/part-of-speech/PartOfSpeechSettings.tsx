@@ -46,19 +46,9 @@ const CONFLICT_FIELD_LABEL: Record<string, string> = {
   full_name_en: "英文全称"
 };
 
-/**
- * `editableCode` 区分编码的来源：细分词性的编码是管理员自己填的代码文本，撞了直接让他改编码；
- * 基本词性与词形变化的编码由英文全称派生、用户看不到，只能提示改英文全称。
- */
-function conflictMessage(
-  kind: string,
-  field: string | null | undefined,
-  editableCode = false
-) {
+function conflictMessage(kind: string, field: string | null | undefined) {
   if (field === "code") {
-    return editableCode
-      ? `编码已被其他${kind}占用，请换一个`
-      : `英文全称与已有${kind}过于接近，请调整英文全称`;
+    return `英文全称与已有${kind}过于接近，请调整英文全称`;
   }
   const label = field ? CONFLICT_FIELD_LABEL[field] : undefined;
   return label ? `${label}与已有${kind}重复` : `${kind}名称已存在`;
@@ -78,7 +68,9 @@ export function errorMessage(error: unknown): string {
     if (error.code === "part_of_speech_conflict")
       return conflictMessage("基本词性", error.problem?.field);
     if (error.code === "sub_part_of_speech_conflict")
-      return conflictMessage("细分词性", error.problem?.field, true);
+      return error.problem?.field === "code"
+        ? "内部标识冲突，请重新提交"
+        : conflictMessage("细分词性", error.problem?.field);
     if (error.code === "part_of_speech_in_use")
       return "该基本词性已被单词或短语引用，只能修改";
     if (error.code === "part_of_speech_has_form_types")
@@ -168,6 +160,13 @@ export function PartOfSpeechSettings() {
       dataIndex: "sub_part_count",
       width: 90,
       render: (count: number) => `${count} 项`
+    },
+    {
+      title: "词形变化",
+      dataIndex: "allowed_form_types",
+      width: 100,
+      render: (types: PartOfSpeechConfig["allowed_form_types"]) =>
+        types ? `${types.length} 项` : "—"
     },
     {
       title: "引用",

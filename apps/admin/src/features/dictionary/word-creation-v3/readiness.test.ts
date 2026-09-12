@@ -544,6 +544,30 @@ describe("buildV3ProductProgress", () => {
 });
 
 describe("实时摘要明细", () => {
+  it("语义区间跨词性统计词义，归属调整和删除后重新计算，空区间为零", () => {
+    const meanings = meaningsFixture();
+    const groupId = meanings.sense_groups[0]!.id;
+    meanings.sense_groups.push({ id: "empty", name_zh: "空区间", name_en: "" });
+    meanings.pos[0]!.senses[0]!.sense_group_id = groupId;
+    meanings.pos[1]!.senses[0]!.sense_group_id = groupId;
+    const summary = () =>
+      buildV3ProductProgress({
+        wordId: "word",
+        language: "en",
+        completedSteps: [],
+        forms: formsFixture(),
+        meanings
+      })[3]!;
+    expect(summary().count).toBe(2);
+    expect(summary().details.map((item) => item.count)).toEqual([2, 0]);
+    meanings.pos[0]!.senses[1]!.sense_group_id = groupId;
+    expect(summary().details.map((item) => item.count)).toEqual([3, 0]);
+    meanings.pos[1]!.senses[0]!.sense_group_id = "empty";
+    expect(summary().details.map((item) => item.count)).toEqual([2, 1]);
+    meanings.pos[0]!.senses.pop();
+    expect(summary().details.map((item) => item.count)).toEqual([1, 1]);
+  });
+
   it("分组真实文本和数量，英美变体与多档译文不重复计数", () => {
     const forms = {
       pos: [
