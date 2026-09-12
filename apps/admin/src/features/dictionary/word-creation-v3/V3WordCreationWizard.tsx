@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { newWordNodeId } from "../word-model/primitives";
 import {
   createStableVariantIdFactory,
+  fillDefaultFormTypes,
   type V3StableVariantIdFactory
 } from "./operations";
 import type { V3WordRequests } from "./api";
@@ -27,6 +28,7 @@ import {
 import {
   dropEmptySentenceTranslations,
   ensureV3MeaningsForForms,
+  fillDefaultSenseGroups,
   prepareTextLinksForSave,
   stripBlankRelations,
   stripSenseComponentUsages,
@@ -106,6 +108,8 @@ export interface V3WizardSlotContext {
 }
 
 export interface V3WordCreationWizardProps {
+  /** 刚从创建页进来：把新草稿的默认录入位（词形、语义区间）铺好，只铺一次。 */
+  prefillNewDraft?: boolean;
   partOfSpeechCatalog?: PartOfSpeechCatalogResponse;
   partOfSpeechCatalogError?: boolean;
   partOfSpeechCatalogPending?: boolean;
@@ -232,6 +236,7 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
 function V3WordCreationSession({
   initialWord,
   sharedSentenceCount,
+  prefillNewDraft = false,
   partOfSpeechCatalog,
   partOfSpeechCatalogError = false,
   partOfSpeechCatalogPending = false,
@@ -389,6 +394,8 @@ function V3WordCreationSession({
   const hasLiveDirtyDraft = () =>
     dirtyRef.current.forms || dirtyRef.current.meanings;
 
+  const newDraftPrefilledRef = useRef(false);
+
   const setDraftForms = useCallback(
     (content: DraftFormsStepContentV3) => {
       supersede();
@@ -440,6 +447,39 @@ function V3WordCreationSession({
     },
     [clearPreviewState, supersede, updateDirty]
   );
+
+  // 刚从创建页进来的草稿：词典给几条词形就只有几条、语义区间也只有零星几个。这里
+  // 一次把默认录入位铺齐——词形按词性配置补，语义区间摆够默认条数。目录是异步到的，
+  // 等它来了铺一次即可；走两个 setter 是为了让联动与脏标记跟着走，保存后才入库。
+  // 语义区间基于「词形补齐后的 meanings」再补：setDraftForms 内部会用旧值重算一遍，
+  // 这里用同样的输入算好再覆盖，免得把词性联动出来的词义冲掉。
+  useEffect(() => {
+    if (!prefillNewDraft || newDraftPrefilledRef.current) return;
+    const items = partOfSpeechCatalog?.items;
+    if (!items?.length) return;
+    newDraftPrefilledRef.current = true;
+    const filledForms = fillDefaultFormTypes(draftForms, items, newWordNodeId);
+    const baseMeanings =
+      filledForms === draftForms
+        ? draftMeanings
+        : ensureV3MeaningsForForms(
+            word.id,
+            filledForms,
+            draftMeanings,
+            newWordNodeId
+          );
+    const filledMeanings = fillDefaultSenseGroups(baseMeanings, newWordNodeId);
+    if (filledForms !== draftForms) setDraftForms(filledForms);
+    if (filledMeanings !== draftMeanings) setDraftMeanings(filledMeanings);
+  }, [
+    draftForms,
+    draftMeanings,
+    partOfSpeechCatalog,
+    prefillNewDraft,
+    setDraftForms,
+    setDraftMeanings,
+    word.id
+  ]);
 
   const setActiveStep = useCallback(
     (step: WordCreationStep) => {

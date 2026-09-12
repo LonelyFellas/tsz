@@ -476,6 +476,27 @@ function createDefaultPosMeanings(
  * word-level and shared across POS: removing a POS never removes groups, and
  * a new POS reuses the first existing group instead of minting its own.
  */
+/** 新草稿默认摆够的语义区间录入位数量。 */
+export const DEFAULT_SENSE_GROUP_SLOTS = 5;
+
+/**
+ * 新建的草稿先把语义区间摆够默认条数，录入者不用一条条点「添加语义区间」。
+ * 已有的区间一律保留，多于默认条数也不删；名称留空，后端草稿保存不校验空名。
+ */
+export function fillDefaultSenseGroups(
+  meanings: DraftMeaningsStepContentWritableV3,
+  idFactory: () => string
+): DraftMeaningsStepContentWritableV3 {
+  if (meanings.sense_groups.length >= DEFAULT_SENSE_GROUP_SLOTS) {
+    return meanings;
+  }
+  const sense_groups = [...meanings.sense_groups];
+  while (sense_groups.length < DEFAULT_SENSE_GROUP_SLOTS) {
+    sense_groups.push({ id: idFactory(), name_zh: "", name_en: "" });
+  }
+  return { ...meanings, sense_groups };
+}
+
 export function ensureV3MeaningsForForms(
   wordId: string,
   forms: DraftFormsStepContentV3,

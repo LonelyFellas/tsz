@@ -2145,7 +2145,51 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toBeUndefined();
   });
 
+  it("添加基本词性时按配置铺好默认词形位", async () => {
+    render(
+      <Harness
+        initial={{ pos: [] }}
+        idFactory={uuidSequence(
+          ...Array.from({ length: 40 }, (_, index) =>
+            uuidFromInt(3_000 + index)
+          )
+        )}
+      />
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
+    );
+
+    chooseOption("添加基本词性", "名词");
+    const noun = canonicalValue().pos[0]!;
+    expect(noun.forms.map((form) => form.form_type)).toEqual([
+      "base",
+      "plural"
+    ]);
+    expect(noun.form_groups).toHaveLength(1);
+    expect(noun.form_groups[0]!.members).toHaveLength(2);
+
+    chooseOption("添加基本词性", "动词");
+    expect(
+      canonicalValue().pos[1]!.forms.map((form) => form.form_type)
+    ).toEqual([
+      "base",
+      "third_person_singular",
+      "present_participle",
+      "past_tense",
+      "past_participle"
+    ]);
+  });
+
   it("P1-1 从空 skeleton 经 catalog UI 构建多 POS/组/重复 base", async () => {
+    // 这条只验结构操作与节点身份：关掉默认词形补齐，免得 id 序列整体位移。
+    catalogState.data = {
+      ...partOfSpeechCatalogFixture,
+      items: partOfSpeechCatalogFixture.items.map((item) => ({
+        ...item,
+        default_form_types: []
+      }))
+    };
     const ids = Array.from({ length: 24 }, (_, index) =>
       uuidFromInt(1_000 + index)
     );

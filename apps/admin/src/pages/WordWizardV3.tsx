@@ -671,6 +671,7 @@ export function WordWizardV3Page({
         initialWord={word}
         sharedSentenceCount={sharedSentences.data?.total ?? 0}
         partOfSpeechCatalog={partOfSpeechCatalog.data}
+        prefillNewDraft={creationSourceFromState(location.state) !== undefined}
         partOfSpeechCatalogError={partOfSpeechCatalog.isError}
         partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
         retiredStableNodes={detail.data.retired_stable_nodes}
