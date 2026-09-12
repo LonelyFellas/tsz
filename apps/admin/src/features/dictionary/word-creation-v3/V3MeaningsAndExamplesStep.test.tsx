@@ -767,6 +767,106 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(result.senses[1]).toMatchObject({ id: "sense-new", relations: [] });
   });
 
+  it("新增词义按默认等级铺好该等级的释义语句行", () => {
+    render(<Harness initial={structuredClone(meaningsFixture)} />);
+    fireEvent.click(screen.getByText("添加词义"));
+
+    const created = value().pos[0]!.senses[1]!;
+    expect(created.level).toBe("A1");
+    // A1 词义的默认释义取自「词义难度 × 释义难度」矩阵：中文本级起，英文高一级。
+    expect(
+      created.definitions.map((definition) => [
+        definition.definition_mode,
+        definition.level
+      ])
+    ).toEqual([
+      ["zh_definition", "A1"],
+      ["en_definition", "A2"],
+      ["zh_definition", "A2"],
+      ["en_definition", "B1"]
+    ]);
+    // 英文行的正文得是 unified 的 EnglishTextV3，否则草稿保存会被后端判为非法结构。
+    expect(created.definitions[1]).toMatchObject({
+      content: { mode: "unified", common: { origin: "manual" } }
+    });
+    expect(created.definitions[0]).toHaveProperty("content_id");
+  });
+
+  it("语法结构能从下拉里一次套用到本条及后面每条释义", () => {
+    const initial = structuredClone(meaningsFixture);
+    const pos = initial.pos[0]!;
+    pos.grammar_structures.push({
+      id: "grammar-2",
+      variants: [
+        {
+          id: "grammar-variant-2",
+          dialect: "common",
+          content: { version: 2, text: "used as a verb", annotations: [] }
+        }
+      ]
+    });
+    const sense = pos.senses[0]!;
+    sense.definitions.push(
+      {
+        id: "definition-2",
+        level: "A2",
+        grammar_structure_id: "grammar-1",
+        definition_mode: "zh_definition",
+        content_id: "definition-content-2",
+        content: { version: 2, text: "中段", annotations: [] }
+      },
+      {
+        id: "definition-3",
+        level: "A2",
+        definition_mode: "zh_definition",
+        content_id: "definition-content-3",
+        content: { version: 2, text: "末段", annotations: [] }
+      }
+    );
+    pos.senses.push({
+      id: "sense-2",
+      sub_pos: "countable",
+      level: "A1",
+      depends_on_context: false,
+      definitions: [
+        {
+          id: "definition-4",
+          level: "A1",
+          grammar_structure_id: "grammar-2",
+          definition_mode: "zh_definition",
+          content_id: "definition-content-4",
+          content: { version: 2, text: "另一条词义", annotations: [] }
+        }
+      ],
+      sentences: [],
+      relations: []
+    });
+    render(<Harness initial={initial} />);
+
+    const structureIds = () =>
+      value().pos[0]!.senses.map((item) =>
+        item.definitions.map((definition) => definition.grammar_structure_id)
+      );
+
+    // 从第二条选起：第一条不受影响，第三条原本没选也被填上，别的词义一律不动。
+    fireEvent.mouseDown(screen.getByLabelText("定义 2 语法结构"));
+    fireEvent.click(
+      screen.getByLabelText("把「② used as a verb」套用到定义 2 及后面每条释义")
+    );
+    expect(structureIds()).toEqual([
+      ["grammar-1", "grammar-2", "grammar-2"],
+      ["grammar-2"]
+    ]);
+
+    // 末条没有「后面」，下拉里就不摆这颗按钮。
+    fireEvent.mouseDown(screen.getByLabelText("定义 3 语法结构"));
+    expect(
+      screen.queryByLabelText(
+        "把「② used as a verb」套用到定义 3 及后面每条释义"
+      )
+    ).toBeNull();
+  });
+
   it("语义区间英文使用普通输入，保存重开保持文本且不残留旧标注", async () => {
     const initial = structuredClone(meaningsFixture);
     initial.sense_groups[0]!.name_en_rich = {
@@ -3916,7 +4016,6 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.click(screen.getByText("添加词义"));
     expect(value().pos[0]!.senses[0]).toMatchObject({
       id: "sense-without-group",
-      definitions: [],
       sentences: [],
       relations: []
     });

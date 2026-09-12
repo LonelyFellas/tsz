@@ -10,6 +10,7 @@ import {
 import {
   CaretDownFilled,
   CaretUpFilled,
+  CopyOutlined,
   DeleteOutlined,
   InfoCircleOutlined,
   MinusCircleOutlined,
@@ -28,6 +29,7 @@ import {
   Flex,
   Input,
   InputNumber,
+  Popover,
   Select,
   Space,
   Switch,
@@ -528,14 +530,16 @@ function newSense(
   idFactory: () => string,
   senseGroupId?: string
 ): WordSenseWritableV3 {
+  // 新词义先按默认等级铺好该等级的释义语句行；之后改等级，只要这些行还都空着就跟着换。
+  const level = "A1";
   return {
     id: idFactory(),
     sub_pos: "",
-    level: "A1",
+    level,
     ...(senseGroupId ? { sense_group_id: senseGroupId } : {}),
     frequency: "0",
     depends_on_context: false,
-    definitions: [],
+    definitions: defaultDefinitions(level, idFactory),
     sentences: [],
     relations: []
   };
@@ -770,14 +774,102 @@ function grammarStructureOptions(
   );
 }
 
-function newDefinition(idFactory: () => string): WordDefinitionV3 {
+/** 一条待生成的释义行：只定语言与等级，正文与语法结构留给录入者填。 */
+type DefinitionPlanV3 = { language: DefinitionLanguageV3; level: string };
+
+function newDefinition(
+  idFactory: () => string,
+  plan: DefinitionPlanV3 = { language: "zh", level: "A1" }
+): WordDefinitionV3 {
+  if (plan.language === "zh")
+    return {
+      id: idFactory(),
+      level: plan.level,
+      definition_mode: "zh_definition",
+      content_id: idFactory(),
+      content: { version: 2, text: "", annotations: [] }
+    };
   return {
     id: idFactory(),
-    level: "A1",
-    definition_mode: "zh_definition",
-    content_id: idFactory(),
-    content: { version: 2, text: "", annotations: [] }
+    level: plan.level,
+    definition_mode: "en_definition",
+    content: {
+      mode: "unified",
+      common: {
+        id: idFactory(),
+        origin: "manual",
+        value: { version: 2, text: "", annotations: [] }
+      }
+    }
   };
+}
+
+/**
+ * 词义等级 → 默认释义语句（语言 + 释义等级）。取自《天生会背® 智能词库 数据整理》
+ * 的「词义难度 × 释义难度」矩阵：中文自本级起，英文比同档中文高一级，越靠近 C2
+ * 层级越收敛，所以 B2 只有三条、C1 与 C2 各两条。生成后录入者可自行增删。
+ */
+const DEFAULT_DEFINITION_PLAN: Record<string, readonly DefinitionPlanV3[]> = {
+  A1: [
+    { language: "zh", level: "A1" },
+    { language: "en", level: "A2" },
+    { language: "zh", level: "A2" },
+    { language: "en", level: "B1" }
+  ],
+  A2: [
+    { language: "zh", level: "A2" },
+    { language: "en", level: "B1" },
+    { language: "zh", level: "B1" },
+    { language: "en", level: "B2" }
+  ],
+  B1: [
+    { language: "zh", level: "B1" },
+    { language: "en", level: "B1" },
+    { language: "zh", level: "B2" },
+    { language: "en", level: "B2" }
+  ],
+  B2: [
+    { language: "zh", level: "B2" },
+    { language: "en", level: "B2" },
+    { language: "zh", level: "C1" }
+  ],
+  C1: [
+    { language: "zh", level: "C1" },
+    { language: "en", level: "C1" }
+  ],
+  C2: [
+    { language: "zh", level: "C2" },
+    { language: "en", level: "C2" }
+  ]
+};
+
+/** 未收录的等级不预生成，交回「添加释义」手工录入，避免凭空猜数量。 */
+function defaultDefinitions(
+  level: string,
+  idFactory: () => string
+): WordDefinitionV3[] {
+  return (DEFAULT_DEFINITION_PLAN[level] ?? []).map((plan) =>
+    newDefinition(idFactory, plan)
+  );
+}
+
+/** 这条释义还没录入任何东西：正文空白（英文两侧都算）且没选语法结构。 */
+function definitionIsBlank(definition: WordDefinitionV3): boolean {
+  if (definition.grammar_structure_id) return false;
+  if (
+    definition.definition_mode === "zh_definition" ||
+    definition.definition_mode === "zh_sentence"
+  )
+    return (definition.content as RichTextV3).text.trim() === "";
+  // 与 definitionRichText 同一处理：交叉类型下 definition_mode 收窄不到 content，显式断言。
+  const english = definition.content as EnglishTextV3;
+  const variants =
+    english.mode === "unified"
+      ? [english.common]
+      : [english.uk, english.us].flatMap((slot) =>
+          slot.state === "ready" ? [slot.variant] : []
+        );
+  return variants.every((variant) => variant.value.text.trim() === "");
 }
 
 type DefinitionModeV3 =
@@ -2220,6 +2312,14 @@ function V3MeaningsAndExamplesStepContent({
   const [collapsedSenseSections, setCollapsedSenseSections] = useState<
     Record<string, boolean>
   >({});
+  // 语法结构下拉里「同时套用到后面每条」的按钮要自己收起面板：它拦掉了选项的点击，
+  // 不走 rc-select 的选中路径，面板不会自动关。同一时刻只可能开一个，存 definition id。
+  const [structurePickerFor, setStructurePickerFor] = useState<string | null>(
+    null
+  );
+  // 那颗按钮平时被 CSS 藏起来，隐形时收不到 mouseleave，交给 antd 自己管 hover
+  // 会留下关不掉的气泡。改成受控：只认当前这一个键，换一个就把上一个顶掉。
+  const [hoveredCopyKey, setHoveredCopyKey] = useState<string | null>(null);
   // 取反用的是当前**生效**的折叠态而不是 `current[key]`：成分区块在能力关闭时默认
   // 折叠，键尚未写入时 `!current[key]` 恒为 true，第一次点击会是无反馈的空操作。
   const toggleSenseSection = (
@@ -2567,9 +2667,23 @@ function V3MeaningsAndExamplesStepContent({
                                         data-v3-node-id={sense.id}
                                         onChange={(level: string) =>
                                           change((draft) => {
-                                            draft.pos[posIndex]!.senses[
-                                              senseIndex
-                                            ]!.level = level;
+                                            const target =
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!;
+                                            target.level = level;
+                                            // 一条都还没录的时候跟着等级换成该等级的默认行；
+                                            // 只要有一条填过就不动，免得抹掉录入成果。
+                                            if (
+                                              target.definitions.every(
+                                                definitionIsBlank
+                                              )
+                                            )
+                                              target.definitions =
+                                                defaultDefinitions(
+                                                  level,
+                                                  idFactory
+                                                );
                                           })
                                         }
                                         options={CEFR_OPTIONS}
@@ -3097,6 +3211,119 @@ function V3MeaningsAndExamplesStepContent({
                                                           definition.grammar_structure_id
                                                         )
                                                       ]}
+                                                      open={
+                                                        structurePickerFor ===
+                                                        definition.id
+                                                      }
+                                                      onOpenChange={(
+                                                        open: boolean
+                                                      ) => {
+                                                        setStructurePickerFor(
+                                                          open
+                                                            ? definition.id
+                                                            : null
+                                                        );
+                                                        if (!open)
+                                                          setHoveredCopyKey(
+                                                            null
+                                                          );
+                                                      }}
+                                                      optionRender={(
+                                                        option
+                                                      ) => (
+                                                        <span
+                                                          className="word-grammar-option"
+                                                          onMouseLeave={() =>
+                                                            setHoveredCopyKey(
+                                                              null
+                                                            )
+                                                          }
+                                                        >
+                                                          <span className="word-grammar-option-label">
+                                                            {option.label}
+                                                          </span>
+                                                          {definitionIndex <
+                                                          sense.definitions
+                                                            .length -
+                                                            1 ? (
+                                                            <Popover
+                                                              content="填到本条及后面每条释义"
+                                                              // 触发点在 Select 浮层里，气泡得压过下拉面板（默认 1050）才不被挡住。
+                                                              zIndex={1100}
+                                                              classNames={{
+                                                                root: "word-grammar-tip"
+                                                              }}
+                                                              destroyOnHidden
+                                                              open={
+                                                                hoveredCopyKey ===
+                                                                `${definition.id}:${String(option.value)}`
+                                                              }
+                                                              placement="right"
+                                                            >
+                                                              <Button
+                                                                aria-label={`把「${String(option.label)}」套用到定义 ${definitionIndex + 1} 及后面每条释义`}
+                                                                className="word-grammar-option-copy"
+                                                                onMouseEnter={() =>
+                                                                  setHoveredCopyKey(
+                                                                    `${definition.id}:${String(option.value)}`
+                                                                  )
+                                                                }
+                                                                onMouseLeave={() =>
+                                                                  setHoveredCopyKey(
+                                                                    null
+                                                                  )
+                                                                }
+                                                                icon={
+                                                                  <CopyOutlined />
+                                                                }
+                                                                onClick={(
+                                                                  event
+                                                                ) => {
+                                                                  // 拦掉选项本身的选中：这里要一次写好本条与后面每条，
+                                                                  // 再让 rc-select 触发 onChange 会拿旧快照把它们覆盖回去。
+                                                                  event.stopPropagation();
+                                                                  const structureId =
+                                                                    String(
+                                                                      option.value
+                                                                    );
+                                                                  change(
+                                                                    (draft) => {
+                                                                      const definitions =
+                                                                        draft
+                                                                          .pos[
+                                                                          posIndex
+                                                                        ]!
+                                                                          .senses[
+                                                                          senseIndex
+                                                                        ]!
+                                                                          .definitions;
+                                                                      for (
+                                                                        let index =
+                                                                          definitionIndex;
+                                                                        index <
+                                                                        definitions.length;
+                                                                        index += 1
+                                                                      )
+                                                                        definitions[
+                                                                          index
+                                                                        ]!.grammar_structure_id =
+                                                                          structureId;
+                                                                    }
+                                                                  );
+                                                                  setStructurePickerFor(
+                                                                    null
+                                                                  );
+                                                                  setHoveredCopyKey(
+                                                                    null
+                                                                  );
+                                                                }}
+                                                                size="small"
+                                                                type="text"
+                                                              />
+                                                            </Popover>
+                                                          ) : null}
+                                                        </span>
+                                                      )}
                                                       notFoundContent="请先在上方填写语法结构"
                                                       placeholder="请选择语法结构"
                                                       status={
