@@ -192,7 +192,7 @@ export function V3FormsAndPronunciationStep({
       : value.pos.map((pos, posIndex) => {
           const label =
             catalog.data?.items.find((item) => item.code === pos.pos)
-              ?.short_name_zh ?? partOfSpeechLabel(pos.pos);
+              ?.name_zh ?? partOfSpeechLabel(pos.pos);
           return {
             key: pos.pos_id,
             label: (

@@ -2352,7 +2352,7 @@ function V3MeaningsAndExamplesStepContent({
   const visiblePosLabel = (posId: string, index: number) => {
     const code = formPosById.get(posId);
     if (!code) return `词性 ${index + 1}`;
-    return catalogByCode.get(code)?.short_name_zh ?? partOfSpeechLabel(code);
+    return catalogByCode.get(code)?.name_zh ?? partOfSpeechLabel(code);
   };
 
   const save = async (intent: StepSaveIntent) => {
@@ -2589,7 +2589,7 @@ function V3MeaningsAndExamplesStepContent({
                             const selectedSubPos = configuredSubParts.find(
                               (item) => item.code === sense.sub_pos
                             );
-                            const visibleSubPos = selectedSubPos?.short_name_zh;
+                            const visibleSubPos = selectedSubPos?.name_zh;
                             // 任意基本词性都能挂细分词性；目录里没有该词性时保留原有可选行为，
                             // 避免目录加载失败把字段整体藏掉。
                             const subPosExtensible =
@@ -2779,7 +2779,7 @@ function V3MeaningsAndExamplesStepContent({
                                                       }
                                                     ]),
                                                 ...configured.map((item) => ({
-                                                  label: item.short_name_zh,
+                                                  label: item.name_zh,
                                                   value: item.code
                                                 }))
                                               ];

@@ -7,8 +7,8 @@ import {
 } from "../word-creation-v3/presentation";
 import { usePartOfSpeechCatalog } from "./api";
 
-// 业务页面一律展示「简洁显示」，正式中文名只出现在词性配置页；
-// 目录里没有的编码才回退到内置文案。
+// 基本词性与细分词性一律展示正式中文名；「简洁显示」只用在词性分类步骤的词性页签上
+// （那里位置紧）。目录里没有的编码才回退到内置文案。
 const PosLabels = createContext<(code: string) => string>(partOfSpeechLabel);
 const SubPosLabels =
   createContext<(code: string) => string>(subPartOfSpeechLabel);
@@ -21,9 +21,9 @@ export function PartOfSpeechLabelsProvider({
     const posNames = new Map<string, string>();
     const subPosNames = new Map<string, string>();
     for (const item of items ?? []) {
-      posNames.set(item.code, item.short_name_zh);
+      posNames.set(item.code, item.name_zh);
       for (const subPart of item.sub_parts) {
-        subPosNames.set(subPart.code, subPart.short_name_zh);
+        subPosNames.set(subPart.code, subPart.name_zh);
       }
     }
     return [
