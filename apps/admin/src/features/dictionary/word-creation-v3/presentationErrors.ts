@@ -15,6 +15,8 @@ const ISSUE_MESSAGES = {
   duplicate_node_id: "词条内容存在重复标识，请刷新后重试",
   duplicate_pos_code: "同一词条不能重复添加相同词性",
   pos_required: "请至少添加一个词性",
+  part_of_speech_kind_mismatch:
+    "该词性不属于当前词条所在的目录，请改选同一侧的词性",
   form_group_membership_invalid: "词形变化组中的词形引用无效",
   orphan_form: "每个词形都必须加入至少一个词形变化组",
   form_group_required: "每个词性都需要至少一个词形变化组",

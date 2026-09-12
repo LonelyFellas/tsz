@@ -233,9 +233,12 @@ export function SmartDictionary({
     () => createPartOfSpeechLookup(partOfSpeechCatalog.data),
     [partOfSpeechCatalog.data]
   );
+  // 选了词汇类型就把词性候选收到同一侧：单词词条不会挂短语词性，反过来也一样，
+  // 两者交叉筛选只会得到空列表。
+  const filterKind = Form.useWatch("kind", form);
   const partOfSpeechOptions = useMemo(
-    () => availablePartOfSpeechOptions(partOfSpeechLookup),
-    [partOfSpeechLookup]
+    () => availablePartOfSpeechOptions(partOfSpeechLookup, [], filterKind),
+    [partOfSpeechLookup, filterKind]
   );
   const kindOptions = adminWordsDataSourceCapabilities.phraseCreation
     ? KIND_OPTIONS

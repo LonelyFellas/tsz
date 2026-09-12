@@ -104,6 +104,7 @@ vi.mock("./PartOfSpeechFormModal", () => ({
                   ...mock.catalog.data.items,
                   {
                     id: createdVerb.id,
+                    kind: createdVerb.kind,
                     code: createdVerb.code,
                     name_zh: createdVerb.name_zh,
                     name_en: createdVerb.name_en,
@@ -177,6 +178,7 @@ const actor = { id: "admin-1", display_name: "超级管理员" };
 const items: PartOfSpeechConfig[] = [
   {
     id: "pos-noun",
+    kind: "word",
     code: "noun",
     name_zh: "名词",
     name_en: "NOUN",
@@ -194,6 +196,7 @@ const items: PartOfSpeechConfig[] = [
   },
   {
     id: "pos-particle",
+    kind: "word",
     code: "particle",
     name_zh: "小品词",
     name_en: "PARTICLE",
@@ -212,6 +215,7 @@ const items: PartOfSpeechConfig[] = [
   },
   {
     id: "pos-verb",
+    kind: "word",
     code: "verb",
     name_zh: "动词",
     name_en: "VERB",
@@ -232,6 +236,7 @@ const items: PartOfSpeechConfig[] = [
 // 模拟新建返回：两者都能挂细分词性，区别只在释义是否必填细分词性。
 const createdVerb: PartOfSpeechConfig = {
   id: "pos-created",
+  kind: "word",
   code: "verb_custom",
   name_zh: "新动词",
   name_en: "NEW VERB",
@@ -250,6 +255,7 @@ const createdVerb: PartOfSpeechConfig = {
 const createdParticle: PartOfSpeechConfig = {
   ...createdVerb,
   id: "pos-created-particle",
+  kind: "word",
   code: "particle_custom",
   name_zh: "新小品词",
   name_en: "NEW PARTICLE",
@@ -282,6 +288,7 @@ beforeEach(() => {
     catalog_version: 1,
     items: items.map((item) => ({
       id: item.id,
+      kind: item.kind,
       code: item.code,
       name_zh: item.name_zh,
       name_en: item.name_en,
@@ -464,6 +471,57 @@ describe("PartOfSpeechSettings", () => {
     fireEvent.click(screen.getByText("重 置"));
     await waitFor(() =>
       expect(mock.queries.at(-1)).toMatchObject({ q: undefined, page: 1 })
+    );
+  });
+
+  // 「词形变化」「细分词性」这两个词在 Tab 与表格列头上都出现，按 rc-tabs 的稳定 id 定位。
+  const tab = (key: string) =>
+    document.querySelector<HTMLElement>(`[id$="-tab-${key}"]`);
+
+  it("切到短语：列表查询带上 kind，并隐藏词形变化 Tab", async () => {
+    renderSettings();
+    expect(mock.queries.at(-1)).toMatchObject({ kind: "word" });
+    expect(tab("forms")).not.toBeNull();
+
+    fireEvent.click(screen.getByText("短语"));
+    await waitFor(() =>
+      expect(mock.queries.at(-1)).toMatchObject({ kind: "phrase", page: 1 })
+    );
+    // 短语没有词形变化，那个 Tab 不该留在页面上。
+    expect(tab("forms")).toBeNull();
+
+    fireEvent.click(screen.getByText("单词"));
+    await waitFor(() =>
+      expect(mock.queries.at(-1)).toMatchObject({ kind: "word", page: 1 })
+    );
+    expect(tab("forms")).not.toBeNull();
+  });
+
+  it("短语侧细分词性的父级候选只列短语词性", async () => {
+    const catalog = mock.catalog.data!;
+    mock.catalog.data = {
+      ...catalog,
+      items: [
+        ...catalog.items,
+        {
+          ...catalog.items[0]!,
+          id: "pos-phrase-noun",
+          kind: "phrase",
+          code: "phrase_noun",
+          name_zh: "短语名词",
+          short_name_zh: "短语名词"
+        }
+      ]
+    };
+    renderSettings();
+
+    fireEvent.click(screen.getByText("短语"));
+    fireEvent.click(tab("detailed")!);
+    // 面板按「全部」并排展示当前一侧的全部父级：短语侧只该有短语名词。
+    await waitFor(() =>
+      expect(screen.getByTestId("sub-panel")).toHaveTextContent(
+        "细分-pos-phrase-noun/新建父级-无"
+      )
     );
   });
 

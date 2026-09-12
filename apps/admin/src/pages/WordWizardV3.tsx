@@ -167,6 +167,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
     <Flex vertical gap="middle">
       <V3FormsAndPronunciationStep
         activePosId={context.activePosId}
+        entryKind={context.word.kind}
         issues={context.issues.filter((issue) => issue.step === "forms")}
         onActivePosChange={(posId) => {
           resetConfirmation();

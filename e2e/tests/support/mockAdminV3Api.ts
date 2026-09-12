@@ -68,6 +68,7 @@ const PART_OF_SPEECH_CATALOG = {
   items: [
     {
       id: nodeId(100),
+      kind: "word",
       code: "noun",
       name_zh: "名词",
       name_en: "NOUN",
@@ -93,6 +94,7 @@ const PART_OF_SPEECH_CATALOG = {
     },
     {
       id: nodeId(102),
+      kind: "word",
       code: "verb",
       name_zh: "动词",
       name_en: "VERB",

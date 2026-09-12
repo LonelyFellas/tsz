@@ -22,7 +22,7 @@ import { partOfSpeechDataSource } from "../dataSource";
 import { partOfSpeechKeys, usePartOfSpeechCatalog } from "./api";
 import { nextSortOrder } from "./catalog";
 import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
-import { derivePartOfSpeechCode } from "./PartOfSpeechFormModal";
+import { slugifyCode } from "./PartOfSpeechFormModal";
 import { useDerivedNameDefaults } from "./useDerivedNameDefaults";
 import { errorMessage } from "./PartOfSpeechSettings";
 
@@ -36,8 +36,8 @@ type Values = Omit<CreatePartOfSpeechInput, "code"> & {
  * 所以派生编码要带上父词性前缀。父编码本身可长达 32 字，截到 8 字给英文全称留位置。
  */
 function deriveFormTypeCode(parentCode: string, fullNameEn: string): string {
-  const parent = derivePartOfSpeechCode(parentCode).slice(0, 8);
-  return derivePartOfSpeechCode(`${parent} ${fullNameEn}`);
+  const parent = slugifyCode(parentCode).slice(0, 8);
+  return slugifyCode(`${parent} ${fullNameEn}`);
 }
 
 export function FormTypeSettings() {
@@ -50,7 +50,10 @@ export function FormTypeSettings() {
     page: number;
     page_size: number;
   }>({ page: 1, page_size: 10 });
-  const parts = catalog.data?.items ?? [];
+  // 短语没有词形变化，后端也只接受挂在单词词性下：候选只列单词侧。
+  const parts = (catalog.data?.items ?? []).filter(
+    (item) => item.kind === "word"
+  );
   // 后端列表按 sort_order 全局排序，新建预填也取全局最大值 + 10，
   // 否则新词形默认会插到别的词性中间；管理员可以改。放进 ref 而不是 effect 依赖：
   // 目录随时可能重拉，跟着重跑那个 effect 会连带 resetFields 清空正在填的表单。

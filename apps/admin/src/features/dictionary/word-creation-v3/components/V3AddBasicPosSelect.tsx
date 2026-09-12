@@ -3,11 +3,14 @@ import { Select } from "antd";
 import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
-  PartOfSpeechCatalogResponse
+  PartOfSpeechCatalogResponse,
+  WordEntryKindV3
 } from "@tsz/types";
 
 export interface V3AddBasicPosSelectProps {
   catalog?: PartOfSpeechCatalogResponse;
+  /** 词条自身是单词还是短语；给定时候选只列同一侧的词性。 */
+  entryKind?: WordEntryKindV3;
   forms: DraftFormsStepContentV3;
   isError?: boolean;
   isPending?: boolean;
@@ -16,14 +19,17 @@ export interface V3AddBasicPosSelectProps {
 
 export function V3AddBasicPosSelect({
   catalog,
+  entryKind,
   forms,
   isError = false,
   isPending = false,
   onAdd
 }: V3AddBasicPosSelectProps) {
   const usedPosCodes = new Set(forms.pos.map((pos) => pos.pos));
+  // 挂错一侧后端会以 part_of_speech_kind_mismatch 拒绝，不放进候选。
   const availableItems = (catalog?.items ?? []).filter(
-    (item) => !usedPosCodes.has(item.code)
+    (item) =>
+      !usedPosCodes.has(item.code) && (!entryKind || item.kind === entryKind)
   );
 
   return (

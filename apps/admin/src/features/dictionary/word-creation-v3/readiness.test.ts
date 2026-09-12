@@ -686,6 +686,7 @@ describe("实时摘要明细", () => {
       partOfSpeechCatalog: [
         {
           id: "catalog",
+          kind: "word",
           code: "noun",
           name_zh: "配置名词",
           name_en: "Noun",

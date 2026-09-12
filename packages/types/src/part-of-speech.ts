@@ -1,6 +1,6 @@
 import type { AdminPaginationMeta } from "./admin";
 import type { Actor } from "./api";
-import type { WordFormType } from "./admin-word";
+import type { AdminWordKind, WordFormType } from "./admin-word";
 
 /**
  * 可配置基本词性/细分词性的稳定 wire 编码。
@@ -17,6 +17,8 @@ export type PartOfSpeechActor = Actor;
 
 export interface PartOfSpeechConfig {
   id: string;
+  /** 单词或短语一侧；两侧的展示名互不冲突，编码仍全局唯一。创建后不可修改。 */
+  kind: AdminWordKind;
   code: PartOfSpeechCode;
   name_zh: string;
   name_en: string;
@@ -74,6 +76,8 @@ export interface SubPartOfSpeechCatalogItem {
 
 export interface PartOfSpeechCatalogItem {
   id: string;
+  /** 与 PartOfSpeechConfig.kind 同源；词条创编按词条 kind 过滤可选词性。 */
+  kind: AdminWordKind;
   code: PartOfSpeechCode;
   name_zh: string;
   name_en: string;
@@ -101,6 +105,8 @@ export interface PartOfSpeechCatalogResponse {
 
 export interface PartOfSpeechConfigListQuery {
   q?: string;
+  /** 只看单词或短语一侧；缺省两侧都返回。 */
+  kind?: AdminWordKind;
   page?: number;
   page_size?: number;
 }
@@ -111,6 +117,8 @@ export interface PartOfSpeechConfigListResponse {
 }
 
 export interface CreatePartOfSpeechInput {
+  /** 缺省 word。短语词性的编码必须以 `phrase_` 开头，单词词性不许占用该前缀。 */
+  kind?: AdminWordKind;
   code: PartOfSpeechCode;
   name_zh: string;
   name_en: string;

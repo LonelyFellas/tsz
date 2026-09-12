@@ -10,6 +10,7 @@ const actor = {
 };
 const unreferencedPart = {
   id: "pos-particle",
+  kind: "word" as const,
   code: "particle",
   name_zh: "小品词",
   name_en: "PARTICLE",
@@ -42,6 +43,7 @@ const catalogResponse: PartOfSpeechCatalogResponse = {
   items: [
     {
       id: unreferencedPart.id,
+      kind: unreferencedPart.kind,
       code: unreferencedPart.code,
       name_zh: unreferencedPart.name_zh,
       name_en: unreferencedPart.name_en,
