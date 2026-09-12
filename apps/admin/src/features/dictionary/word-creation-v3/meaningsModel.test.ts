@@ -13,6 +13,8 @@ import {
   newSentenceTranslations,
   prepareTextLinksForSave,
   ensureV3MeaningsForForms,
+  fillDefaultSenseGroups,
+  DEFAULT_SENSE_GROUP_SLOTS,
   relationDisplaySnapshots,
   replaceEnglishText,
   sentenceTranslationsV3,
@@ -191,15 +193,25 @@ describe("V3 meanings writable model", () => {
         depends_on_context: false,
         relations: []
       });
-      expect(sense.definitions).toEqual([
-        {
-          id: expect.any(String),
-          level: "A1",
-          definition_mode: "zh_definition",
-          content_id: expect.any(String),
-          content: { version: 2, text: "", annotations: [] }
-        }
+      // 自动播种的词义按 A1 的默认计划铺四行释义位。
+      expect(
+        sense.definitions.map((definition) => [
+          definition.definition_mode,
+          definition.level
+        ])
+      ).toEqual([
+        ["zh_definition", "A1"],
+        ["en_definition", "A2"],
+        ["zh_definition", "A2"],
+        ["en_definition", "B1"]
       ]);
+      expect(sense.definitions[0]).toEqual({
+        id: expect.any(String),
+        level: "A1",
+        definition_mode: "zh_definition",
+        content_id: expect.any(String),
+        content: { version: 2, text: "", annotations: [] }
+      });
       expect(sense.sentences).toEqual([]);
     }
     expect(
@@ -1367,5 +1379,48 @@ describe("译文语言", () => {
       sentence([{ id: "t-1", band: "word_for_word", language: "zh" }])
     );
     expect(rows[0]!.language).toBe("zh");
+  });
+});
+
+describe("fillDefaultSenseGroups", () => {
+  const meanings = (count: number) => ({
+    sense_groups: Array.from({ length: count }, (_, index) => ({
+      id: `group-${index + 1}`,
+      name_zh: index === 0 ? "核心" : "",
+      name_en: ""
+    })),
+    pos: []
+  });
+
+  it("不够默认条数就补空区间，已填的保持原样", () => {
+    let seq = 0;
+    const filled = fillDefaultSenseGroups(
+      meanings(1),
+      () => `new-${(seq += 1)}`
+    );
+    expect(filled.sense_groups).toHaveLength(DEFAULT_SENSE_GROUP_SLOTS);
+    expect(filled.sense_groups[0]).toEqual({
+      id: "group-1",
+      name_zh: "核心",
+      name_en: ""
+    });
+    expect(filled.sense_groups.slice(1).map((group) => group.id)).toEqual([
+      "new-1",
+      "new-2",
+      "new-3",
+      "new-4"
+    ]);
+    expect(
+      filled.sense_groups
+        .slice(1)
+        .every((group) => group.name_zh === "" && group.name_en === "")
+    ).toBe(true);
+  });
+
+  it("已经够条数或更多时原样返回，不删多出来的", () => {
+    const exact = meanings(DEFAULT_SENSE_GROUP_SLOTS);
+    expect(fillDefaultSenseGroups(exact, newWordNodeId)).toBe(exact);
+    const more = meanings(DEFAULT_SENSE_GROUP_SLOTS + 2);
+    expect(fillDefaultSenseGroups(more, newWordNodeId)).toBe(more);
   });
 });

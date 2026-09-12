@@ -32,6 +32,7 @@ import type { V3WordRequests } from "./api";
 import { V3FormsAndPronunciationStep } from "./components/V3FormsAndPronunciationStep";
 import { toWritableMeanings } from "./meaningsModel";
 import { V3MeaningsAndExamplesStep } from "./V3MeaningsAndExamplesStep";
+import { partOfSpeechCatalogFixture } from "../word-creation/partOfSpeech.test.helper";
 import {
   commonFormFixture,
   formsFixture,
@@ -294,12 +295,18 @@ function renderWizard(
     retiredStableNodes?: Parameters<
       typeof V3WordCreationWizard
     >[0]["retiredStableNodes"];
+    prefillNewDraft?: boolean;
+    partOfSpeechCatalog?: Parameters<
+      typeof V3WordCreationWizard
+    >[0]["partOfSpeechCatalog"];
   } = {}
 ) {
   return render(
     inRouter(
       <V3WordCreationWizard
         initialWord={options.initialWord ?? word()}
+        prefillNewDraft={options.prefillNewDraft}
+        partOfSpeechCatalog={options.partOfSpeechCatalog}
         requests={source}
         initialStep={options.initialStep}
         readOnly={options.readOnly}
@@ -568,8 +575,9 @@ describe("V3WordCreationWizard", () => {
       "false/false"
     );
     const initialIds = screen.getByTestId("initialized-node-ids").textContent;
-    expect(initialIds?.split(",")).toHaveLength(11);
-    expect(new Set(initialIds?.split(",")).size).toBe(11);
+    // 空词性模板的全部节点；词义那条按 A1 计划铺四行释义位，数目随之上去。
+    expect(initialIds?.split(",")).toHaveLength(19);
+    expect(new Set(initialIds?.split(",")).size).toBe(19);
 
     fireEvent.click(screen.getByText("切换步骤"));
     fireEvent.click(screen.getByText("切换步骤"));
@@ -5111,4 +5119,69 @@ it("正文关联校验失败定位到所属英文正文输入框", async () => {
   await waitFor(() =>
     expect(screen.getByLabelText("关联出错正文")).toHaveFocus()
   );
+});
+
+describe("新草稿默认录入位", () => {
+  const capture = () => {
+    const seen: { context?: V3WizardSlotContext } = {};
+    return {
+      seen,
+      renderStep: (context: V3WizardSlotContext) => {
+        seen.context = context;
+        return null;
+      }
+    };
+  };
+
+  it("刚创建时按词性配置铺词形、把语义区间摆够默认条数", async () => {
+    const { seen, renderStep } = capture();
+    renderWizard(requests(), {
+      partOfSpeechCatalog: partOfSpeechCatalogFixture,
+      prefillNewDraft: true,
+      renderStep
+    });
+
+    await waitFor(() =>
+      expect(
+        seen.context!.draftForms.pos[0]!.forms.map((form) => form.form_type)
+      ).toEqual(["base", "plural"])
+    );
+    expect(seen.context!.draftMeanings.sense_groups).toHaveLength(5);
+    // 铺出来的是未保存改动，得由录入者保存才入库。
+    expect(seen.context!.hasUnsavedChanges).toBe(true);
+  });
+
+  it("草稿已经存过就不再铺，哪怕创建态的标记还在", async () => {
+    const { seen, renderStep } = capture();
+    // revision 一旦 >1 就说明这份草稿保存过：F5 会把创建态的 location.state 原样恢复，
+    // 这时再铺一次会把用户删掉的行补回来。
+    renderWizard(requests(), {
+      initialWord: word(2),
+      partOfSpeechCatalog: partOfSpeechCatalogFixture,
+      prefillNewDraft: true,
+      renderStep
+    });
+
+    await waitFor(() => expect(seen.context).toBeDefined());
+    expect(
+      seen.context!.draftForms.pos[0]!.forms.map((form) => form.form_type)
+    ).toEqual(["base"]);
+    expect(seen.context!.draftMeanings.sense_groups).toHaveLength(1);
+    expect(seen.context!.hasUnsavedChanges).toBe(false);
+  });
+
+  it("打开已有草稿时一个字段都不动", async () => {
+    const { seen, renderStep } = capture();
+    renderWizard(requests(), {
+      partOfSpeechCatalog: partOfSpeechCatalogFixture,
+      renderStep
+    });
+
+    await waitFor(() => expect(seen.context).toBeDefined());
+    expect(
+      seen.context!.draftForms.pos[0]!.forms.map((form) => form.form_type)
+    ).toEqual(["base"]);
+    expect(seen.context!.draftMeanings.sense_groups).toHaveLength(1);
+    expect(seen.context!.hasUnsavedChanges).toBe(false);
+  });
 });

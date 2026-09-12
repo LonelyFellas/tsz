@@ -1784,9 +1784,23 @@ describe("WordWizardV3Page", () => {
                   id: expect.any(String),
                   level: "A1",
                   sense_group_id: expect.any(String),
+                  // 自动播种的词义按 A1 计划铺四行释义位。
                   definitions: [
                     expect.objectContaining({
-                      definition_mode: "zh_definition"
+                      definition_mode: "zh_definition",
+                      level: "A1"
+                    }),
+                    expect.objectContaining({
+                      definition_mode: "en_definition",
+                      level: "A2"
+                    }),
+                    expect.objectContaining({
+                      definition_mode: "zh_definition",
+                      level: "A2"
+                    }),
+                    expect.objectContaining({
+                      definition_mode: "en_definition",
+                      level: "B1"
                     })
                   ],
                   sentences: [],

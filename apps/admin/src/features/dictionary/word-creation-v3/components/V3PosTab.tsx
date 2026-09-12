@@ -60,7 +60,7 @@ export function V3PosTab({
     changed: boolean;
   }>();
   const [dialectChangeError, setDialectChangeError] = useState<string>();
-  const posLabel = posCatalog?.short_name_zh ?? partOfSpeechLabel(pos.pos);
+  const posLabel = posCatalog?.name_zh ?? partOfSpeechLabel(pos.pos);
   const { preference } = useDialectPreference();
   const allowedDerivedTypes = posCatalog?.allowed_form_types ?? [];
   const membershipCounts = new Map<string, number>();

@@ -41,26 +41,26 @@ const noun: PartOfSpeechCatalogItem = {
 };
 
 describe("PartOfSpeechLabelsProvider", () => {
-  it("基本词性用简洁显示而不是正式中文名", () => {
+  it("基本词性用正式中文名而不是简洁显示", () => {
     render(
       <PartOfSpeechLabelsProvider items={[noun]}>
         <PosLabel code="noun" />
       </PartOfSpeechLabelsProvider>
     );
 
-    expect(screen.getByText("名")).toBeInTheDocument();
-    expect(screen.queryByText("名词")).toBeNull();
+    expect(screen.getByText("名词")).toBeInTheDocument();
+    expect(screen.queryByText("名")).toBeNull();
   });
 
-  it("细分词性同样用简洁显示", () => {
+  it("细分词性同样用正式中文名", () => {
     render(
       <PartOfSpeechLabelsProvider items={[noun]}>
         <SubPosLabel code="N-COUNT" />
       </PartOfSpeechLabelsProvider>
     );
 
-    expect(screen.getByText("可数名词")).toBeInTheDocument();
-    expect(screen.queryByText("可数个体名词")).toBeNull();
+    expect(screen.getByText("可数个体名词")).toBeInTheDocument();
+    expect(screen.queryByText("可数名词")).toBeNull();
   });
 
   it("目录里没有的编码回退到内置文案", () => {

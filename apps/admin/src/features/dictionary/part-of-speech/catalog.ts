@@ -64,14 +64,14 @@ export function partOfSpeechLabel(
   lookup: PartOfSpeechLookup,
   code: WordPosTag
 ): string {
-  return lookup.byCode.get(code)?.short_name_zh ?? code;
+  return lookup.byCode.get(code)?.name_zh ?? code;
 }
 
 export function subPartOfSpeechLabel(
   lookup: PartOfSpeechLookup,
   code: SubPartOfSpeechCode
 ): string {
-  return lookup.subPartByCode.get(code)?.short_name_zh ?? code;
+  return lookup.subPartByCode.get(code)?.name_zh ?? code;
 }
 
 /**
@@ -87,7 +87,7 @@ export function availablePartOfSpeechOptions(
   return lookup.items
     .filter((item) => !usedCodes.has(item.code))
     .filter((item) => !kind || item.kind === kind)
-    .map((item) => ({ value: item.code, label: item.short_name_zh }));
+    .map((item) => ({ value: item.code, label: item.name_zh }));
 }
 
 export function subPartOfSpeechOptions(
@@ -96,7 +96,7 @@ export function subPartOfSpeechOptions(
 ) {
   return (lookup.subPartsByPosCode.get(posCode) ?? []).map((item) => ({
     value: item.code,
-    label: item.short_name_zh
+    label: item.name_zh
   }));
 }
 

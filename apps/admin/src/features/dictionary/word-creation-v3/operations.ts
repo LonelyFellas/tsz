@@ -724,6 +724,48 @@ export function addPartOfSpeech(
   return { ok: true, value: next };
 }
 
+/**
+ * 按词性配置里的「默认词形类型」，把缺的派生词形补成空行，让录入者一进第二步
+ * 就看到该词性完整的词形位。只处理恰好一个变化组的词性：分了组说明规则/不规则
+ * 已经人工编排过，再自动塞行容易塞错组。传 onlyPosId 可限定只补某一个词性。
+ */
+export function fillDefaultFormTypes(
+  content: DraftFormsStepContentV3,
+  catalogItems: readonly PartOfSpeechCatalogItem[] | undefined,
+  idFactory: V3IdFactory = defaultIdFactory,
+  onlyPosId?: string
+): DraftFormsStepContentV3 {
+  if (!catalogItems?.length) return content;
+  let next = content;
+  for (const pos of content.pos) {
+    if (onlyPosId && pos.pos_id !== onlyPosId) continue;
+    const defaults =
+      catalogItems.find((item) => item.code === pos.pos)?.default_form_types ??
+      [];
+    if (defaults.length === 0) continue;
+    // 每轮都从最新结果里取：上一条补齐已经换过这个词性的对象。
+    const current = next.pos.find((item) => item.pos_id === pos.pos_id);
+    if (!current || current.form_groups.length !== 1) continue;
+    const group = current.form_groups[0]!;
+    // 按该词性已有的全部词形算，不只看组成员：游离词形（删组保留词形留下的）
+    // 也算数，免得同类型再补一条。补成功的类型要记进去，defaults 有重复项时不重复补。
+    const present = new Set(current.forms.map((form) => form.form_type));
+    for (const formType of defaults) {
+      if (present.has(formType)) continue;
+      present.add(formType);
+      const added = addConcreteForm(
+        next,
+        pos.pos_id,
+        group.id,
+        formType,
+        idFactory
+      );
+      if (added.ok) next = added.value;
+    }
+  }
+  return next;
+}
+
 export function deletePartOfSpeech(
   content: DraftFormsStepContentV3,
   posId: string

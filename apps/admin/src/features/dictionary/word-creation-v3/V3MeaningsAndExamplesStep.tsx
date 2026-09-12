@@ -10,6 +10,7 @@ import {
 import {
   CaretDownFilled,
   CaretUpFilled,
+  CopyOutlined,
   DeleteOutlined,
   InfoCircleOutlined,
   MinusCircleOutlined,
@@ -28,6 +29,7 @@ import {
   Flex,
   Input,
   InputNumber,
+  Popover,
   Select,
   Space,
   Switch,
@@ -37,6 +39,7 @@ import {
   Typography
 } from "antd";
 import type {
+  CefrLevel,
   Dialect,
   DialectModeV3,
   DraftFormsStepContentV3,
@@ -66,12 +69,18 @@ import { validateEntryInput } from "../word-creation/entryClassification";
 import { newWordNodeId } from "../word-model/primitives";
 import { addPartOfSpeech, deletePartOfSpeech } from "./operations";
 import {
-  editableEnglishText,
-  newGrammarStructure,
-  type RelationDisplaySnapshots,
+  DEFAULT_DEFINITION_PLAN,
+  DEFAULT_SENSE_LEVEL,
+  DEFAULT_SENTENCE_TRANSLATION_BAND,
+  defaultDefinitions,
   definitionSummary,
+  editableEnglishText,
+  newDefinition,
+  newGrammarStructure,
+  newSentenceTranslations,
   replaceRichText,
-  spellingModeForPos
+  spellingModeForPos,
+  type RelationDisplaySnapshots
 } from "./meaningsModel";
 import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import {
@@ -528,14 +537,16 @@ function newSense(
   idFactory: () => string,
   senseGroupId?: string
 ): WordSenseWritableV3 {
+  // 新词义先按默认等级铺好该等级的释义语句行；之后改等级，只要这些行还都空着就跟着换。
+  const level = DEFAULT_SENSE_LEVEL;
   return {
     id: idFactory(),
     sub_pos: "",
-    level: "A1",
+    level,
     ...(senseGroupId ? { sense_group_id: senseGroupId } : {}),
     frequency: "0",
     depends_on_context: false,
-    definitions: [],
+    definitions: defaultDefinitions(level, idFactory),
     sentences: [],
     relations: []
   };
@@ -770,14 +781,47 @@ function grammarStructureOptions(
   );
 }
 
-function newDefinition(idFactory: () => string): WordDefinitionV3 {
-  return {
-    id: idFactory(),
-    level: "A1",
-    definition_mode: "zh_definition",
-    content_id: idFactory(),
-    content: { version: 2, text: "", annotations: [] }
-  };
+/** 这条释义还没录入任何东西：正文空白（英文两侧都算）且没选语法结构。 */
+function definitionIsBlank(definition: WordDefinitionV3): boolean {
+  if (definition.grammar_structure_id) return false;
+  if (
+    definition.definition_mode === "zh_definition" ||
+    definition.definition_mode === "zh_sentence"
+  )
+    return (definition.content as RichTextV3).text.trim() === "";
+  // 与 definitionRichText 同一处理：交叉类型下 definition_mode 收窄不到 content，显式断言。
+  const english = definition.content as EnglishTextV3;
+  const variants =
+    english.mode === "unified"
+      ? [english.common]
+      : [english.uk, english.us].flatMap((slot) =>
+          slot.state === "ready" ? [slot.variant] : []
+        );
+  return variants.every((variant) => variant.value.text.trim() === "");
+}
+
+/**
+ * 这组释义是否还停在某个等级的默认铺排：条数、语言、等级、释义方式全对得上，
+ * 且每条都还空着。只有这样才敢跟着词义等级整组换掉——录入者哪怕只调过一行的
+ * 语言或等级，也说明已经排过版，不能抹掉。条数对不上（包括一条都没有）同理不动。
+ */
+function definitionsStillDefault(
+  definitions: readonly WordDefinitionV3[],
+  level: string
+): boolean {
+  const plan = DEFAULT_DEFINITION_PLAN[level as CefrLevel] ?? [];
+  // 等级不在表里（后端/存量数据带来的非法值）就一律不动，别拿空计划去比空释义。
+  if (plan.length === 0) return false;
+  if (definitions.length !== plan.length) return false;
+  return definitions.every((definition, index) => {
+    const slot = plan[index]!;
+    return (
+      definitionIsBlank(definition) &&
+      definition.level === slot.level &&
+      definitionLanguageOf(definition.definition_mode) === slot.language &&
+      definitionStyleOf(definition.definition_mode) === "definition"
+    );
+  });
 }
 
 type DefinitionModeV3 =
@@ -2220,6 +2264,14 @@ function V3MeaningsAndExamplesStepContent({
   const [collapsedSenseSections, setCollapsedSenseSections] = useState<
     Record<string, boolean>
   >({});
+  // 语法结构下拉里「同时套用到后面每条」的按钮要自己收起面板：它拦掉了选项的点击，
+  // 不走 rc-select 的选中路径，面板不会自动关。同一时刻只可能开一个，存 definition id。
+  const [structurePickerFor, setStructurePickerFor] = useState<string | null>(
+    null
+  );
+  // 那颗按钮平时被 CSS 藏起来，隐形时收不到 mouseleave，交给 antd 自己管 hover
+  // 会留下关不掉的气泡。改成受控：只认当前这一个键，换一个就把上一个顶掉。
+  const [hoveredCopyKey, setHoveredCopyKey] = useState<string | null>(null);
   // 取反用的是当前**生效**的折叠态而不是 `current[key]`：成分区块在能力关闭时默认
   // 折叠，键尚未写入时 `!current[key]` 恒为 true，第一次点击会是无反馈的空操作。
   const toggleSenseSection = (
@@ -2252,7 +2304,7 @@ function V3MeaningsAndExamplesStepContent({
   const visiblePosLabel = (posId: string, index: number) => {
     const code = formPosById.get(posId);
     if (!code) return `词性 ${index + 1}`;
-    return catalogByCode.get(code)?.short_name_zh ?? partOfSpeechLabel(code);
+    return catalogByCode.get(code)?.name_zh ?? partOfSpeechLabel(code);
   };
 
   const save = async (intent: StepSaveIntent) => {
@@ -2489,7 +2541,7 @@ function V3MeaningsAndExamplesStepContent({
                             const selectedSubPos = configuredSubParts.find(
                               (item) => item.code === sense.sub_pos
                             );
-                            const visibleSubPos = selectedSubPos?.short_name_zh;
+                            const visibleSubPos = selectedSubPos?.name_zh;
                             // 任意基本词性都能挂细分词性；目录里没有该词性时保留原有可选行为，
                             // 避免目录加载失败把字段整体藏掉。
                             const subPosExtensible =
@@ -2567,9 +2619,24 @@ function V3MeaningsAndExamplesStepContent({
                                         data-v3-node-id={sense.id}
                                         onChange={(level: string) =>
                                           change((draft) => {
-                                            draft.pos[posIndex]!.senses[
-                                              senseIndex
-                                            ]!.level = level;
+                                            const target =
+                                              draft.pos[posIndex]!.senses[
+                                                senseIndex
+                                              ]!;
+                                            // 先按改之前的等级判断：这组释义还是原样的
+                                            // 默认铺排才跟着换，动过一行就不碰。
+                                            const stillDefault =
+                                              definitionsStillDefault(
+                                                target.definitions,
+                                                target.level
+                                              );
+                                            target.level = level;
+                                            if (stillDefault)
+                                              target.definitions =
+                                                defaultDefinitions(
+                                                  level,
+                                                  idFactory
+                                                );
                                           })
                                         }
                                         options={CEFR_OPTIONS}
@@ -2665,7 +2732,7 @@ function V3MeaningsAndExamplesStepContent({
                                                       }
                                                     ]),
                                                 ...configured.map((item) => ({
-                                                  label: item.short_name_zh,
+                                                  label: item.name_zh,
                                                   value: item.code
                                                 }))
                                               ];
@@ -3097,6 +3164,135 @@ function V3MeaningsAndExamplesStepContent({
                                                           definition.grammar_structure_id
                                                         )
                                                       ]}
+                                                      open={
+                                                        structurePickerFor ===
+                                                        definition.id
+                                                      }
+                                                      onOpenChange={(
+                                                        open: boolean
+                                                      ) => {
+                                                        setStructurePickerFor(
+                                                          open
+                                                            ? definition.id
+                                                            : null
+                                                        );
+                                                        if (!open)
+                                                          setHoveredCopyKey(
+                                                            null
+                                                          );
+                                                      }}
+                                                      optionRender={(
+                                                        option
+                                                      ) => {
+                                                        // 「未找到的语法结构」那条占位项不给复制按钮：
+                                                        // 把一个已失效的 id 套到后面每条，只会把一处
+                                                        // 悬空引用扩散成 N 处。
+                                                        const known =
+                                                          pos.grammar_structures.some(
+                                                            (item) =>
+                                                              item.id ===
+                                                              String(
+                                                                option.value
+                                                              )
+                                                          );
+                                                        return (
+                                                          <span
+                                                            className="word-grammar-option"
+                                                            onMouseLeave={() =>
+                                                              setHoveredCopyKey(
+                                                                null
+                                                              )
+                                                            }
+                                                          >
+                                                            <span className="word-grammar-option-label">
+                                                              {option.label}
+                                                            </span>
+                                                            {known &&
+                                                            definitionIndex <
+                                                              sense.definitions
+                                                                .length -
+                                                                1 ? (
+                                                              <Popover
+                                                                content="填到本条及后面每条释义"
+                                                                // 触发点在 Select 浮层里，气泡得压过下拉面板（默认 1050）才不被挡住。
+                                                                zIndex={1100}
+                                                                classNames={{
+                                                                  root: "word-grammar-tip"
+                                                                }}
+                                                                destroyOnHidden
+                                                                open={
+                                                                  hoveredCopyKey ===
+                                                                  `${definition.id}:${String(option.value)}`
+                                                                }
+                                                                placement="right"
+                                                              >
+                                                                <Button
+                                                                  aria-label={`把「${String(option.label)}」套用到定义 ${definitionIndex + 1} 及后面每条释义`}
+                                                                  className="word-grammar-option-copy"
+                                                                  onMouseEnter={() =>
+                                                                    setHoveredCopyKey(
+                                                                      `${definition.id}:${String(option.value)}`
+                                                                    )
+                                                                  }
+                                                                  onMouseLeave={() =>
+                                                                    setHoveredCopyKey(
+                                                                      null
+                                                                    )
+                                                                  }
+                                                                  icon={
+                                                                    <CopyOutlined />
+                                                                  }
+                                                                  onClick={(
+                                                                    event
+                                                                  ) => {
+                                                                    // 拦掉选项本身的选中：这里要一次写好本条与后面每条，
+                                                                    // 再让 rc-select 触发 onChange 会拿旧快照把它们覆盖回去。
+                                                                    event.stopPropagation();
+                                                                    const structureId =
+                                                                      String(
+                                                                        option.value
+                                                                      );
+                                                                    change(
+                                                                      (
+                                                                        draft
+                                                                      ) => {
+                                                                        const definitions =
+                                                                          draft
+                                                                            .pos[
+                                                                            posIndex
+                                                                          ]!
+                                                                            .senses[
+                                                                            senseIndex
+                                                                          ]!
+                                                                            .definitions;
+                                                                        for (
+                                                                          let index =
+                                                                            definitionIndex;
+                                                                          index <
+                                                                          definitions.length;
+                                                                          index += 1
+                                                                        )
+                                                                          definitions[
+                                                                            index
+                                                                          ]!.grammar_structure_id =
+                                                                            structureId;
+                                                                      }
+                                                                    );
+                                                                    setStructurePickerFor(
+                                                                      null
+                                                                    );
+                                                                    setHoveredCopyKey(
+                                                                      null
+                                                                    );
+                                                                  }}
+                                                                  size="small"
+                                                                  type="text"
+                                                                />
+                                                              </Popover>
+                                                            ) : null}
+                                                          </span>
+                                                        );
+                                                      }}
                                                       notFoundContent="请先在上方填写语法结构"
                                                       placeholder="请选择语法结构"
                                                       status={

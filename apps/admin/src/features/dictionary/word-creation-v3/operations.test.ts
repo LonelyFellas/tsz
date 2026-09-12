@@ -13,6 +13,7 @@ import {
   deleteFormGroup,
   deleteGroupAndOrphanForms,
   deletePartOfSpeech,
+  fillDefaultFormTypes,
   normalizePosDialectRules,
   removeMembership,
   reorderFormGroups,
@@ -1728,4 +1729,99 @@ it("英美切换保留每条发音的标注、音色和录音", () => {
       audio_assets: []
     });
   }
+});
+
+describe("fillDefaultFormTypes", () => {
+  const catalogItems = partOfSpeechCatalogFixture.items;
+  const byCode = (code: string) =>
+    catalogItems.find((item) => item.code === code)!;
+
+  const onlyBase = (code: string) => {
+    let seq = 900;
+    const result = addPartOfSpeech({ pos: [] }, byCode(code), () =>
+      uuidFromInt(seq++)
+    );
+    if (!result.ok) throw new Error("setup failed");
+    return result.value;
+  };
+
+  it("按词性配置补齐缺的默认词形，补过的不再重复补", () => {
+    let seq = 500;
+    const content = onlyBase("verb");
+    expect(content.pos[0]!.forms.map((form) => form.form_type)).toEqual([
+      "base"
+    ]);
+
+    const filled = fillDefaultFormTypes(content, catalogItems, () =>
+      uuidFromInt(seq++)
+    );
+    expect(filled.pos[0]!.forms.map((form) => form.form_type)).toEqual([
+      "base",
+      "third_person_singular",
+      "present_participle",
+      "past_tense",
+      "past_participle"
+    ]);
+    // 补出来的行都进同一个变化组，拼写与音标留空等录入。
+    expect(filled.pos[0]!.form_groups[0]!.members).toHaveLength(5);
+    expect(
+      filled.pos[0]!.forms.slice(1).map((form) => commonVariant(form).spelling)
+    ).toEqual(["", "", "", ""]);
+
+    expect(
+      fillDefaultFormTypes(filled, catalogItems, () => uuidFromInt(seq++))
+    ).toBe(filled);
+  });
+
+  it("分了多个变化组的词性不补，避免塞错组", () => {
+    let seq = 600;
+    const content = onlyBase("verb");
+    const twoGroups = addFormGroup(content, content.pos[0]!.pos_id, () =>
+      uuidFromInt(seq++)
+    );
+    expect(twoGroups.ok).toBe(true);
+    if (!twoGroups.ok) return;
+
+    expect(
+      fillDefaultFormTypes(twoGroups.value, catalogItems, () =>
+        uuidFromInt(seq++)
+      )
+    ).toBe(twoGroups.value);
+  });
+
+  it("没有配默认词形的词性原样返回", () => {
+    let seq = 700;
+    const content = onlyBase("adverb");
+    expect(
+      fillDefaultFormTypes(content, catalogItems, () => uuidFromInt(seq++))
+    ).toBe(content);
+  });
+
+  it("目录缺失时不动内容", () => {
+    const content = onlyBase("noun");
+    expect(fillDefaultFormTypes(content, undefined)).toBe(content);
+    expect(fillDefaultFormTypes(content, [])).toBe(content);
+  });
+
+  it("onlyPosId 只补指定的那个词性", () => {
+    let seq = 800;
+    const withNoun = onlyBase("noun");
+    const withVerb = addPartOfSpeech(withNoun, byCode("verb"), () =>
+      uuidFromInt(seq++)
+    );
+    expect(withVerb.ok).toBe(true);
+    if (!withVerb.ok) return;
+    const verbPosId = withVerb.value.pos[1]!.pos_id;
+
+    const filled = fillDefaultFormTypes(
+      withVerb.value,
+      catalogItems,
+      () => uuidFromInt(seq++),
+      verbPosId
+    );
+    expect(filled.pos[0]!.forms.map((form) => form.form_type)).toEqual([
+      "base"
+    ]);
+    expect(filled.pos[1]!.forms).toHaveLength(5);
+  });
 });

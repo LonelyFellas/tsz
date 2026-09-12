@@ -281,6 +281,38 @@
   width: 100%;
 }
 
+/* 语法结构下拉的选项行：文案占满余宽，「同时套用到后面每条」按钮贴右。
+   选项渲染在 body 下的浮层里，不在 .v3-meanings-v2 容器内，故不带容器前缀。 */
+.word-grammar-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.word-grammar-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 平时只占位不显形，指到这条选项才露出来。隐形元素拿不到焦点，这颗按钮是纯鼠标的。 */
+.word-grammar-option-copy {
+  flex: none;
+  visibility: hidden;
+}
+
+.word-grammar-option:hover .word-grammar-option-copy {
+  visibility: visible;
+}
+
+/* 隐形的按钮收不到 mouseleave，气泡只能靠选项行的离开事件收：退场动画一长，
+   换选项时上一个气泡就与新的叠着。压到近乎瞬时，动画结束回调也就立刻到。 */
+.word-grammar-tip {
+  animation-duration: 0.01s !important;
+}
+
 .v3-product-progress-list .word-progress-done {
   color: #252c3c;
   font-size: 18px;
