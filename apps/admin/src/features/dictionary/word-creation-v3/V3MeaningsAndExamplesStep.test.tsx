@@ -1321,7 +1321,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect([...header.children].map((item) => item.textContent)).toEqual([
       "",
       "等级",
-      "释义语言及方式",
+      "语言",
+      "释义方式",
       "释义语句",
       "语法结构",
       ""
@@ -1329,16 +1330,18 @@ describe("V3MeaningsAndExamplesStep", () => {
     const row = container.querySelector(".word-definition-row") as HTMLElement;
     expect(row).not.toBeNull();
     const columns = [...row.children] as HTMLElement[];
-    expect(columns).toHaveLength(6);
+    expect(columns).toHaveLength(7);
     const level = columns[1]!;
-    const mode = columns[2]!;
-    const body = columns[3]!;
-    const grammarCell = columns[4]!;
-    const actions = columns[5]!;
+    const language = columns[2]!;
+    const style = columns[3]!;
+    const body = columns[4]!;
+    const grammarCell = columns[5]!;
+    const actions = columns[6]!;
     expect(columns[0]).toHaveClass("word-number-cell");
     expect(columns[0]).not.toHaveClass("word-definition-index");
     expect(within(level).getByLabelText("定义 1 等级")).toBeVisible();
-    expect(within(mode).getByLabelText("定义 1 方式")).toBeVisible();
+    expect(within(language).getByLabelText("定义 1 语言")).toBeVisible();
+    expect(within(style).getByLabelText("定义 1 释义方式")).toBeVisible();
     const content = within(body).getByLabelText("定义 1 内容");
     const grammar = within(grammarCell).getByLabelText("定义 1 语法结构");
     expect(content.tagName).toBe("TEXTAREA");
@@ -3722,17 +3725,28 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("#145 four definition modes reuse the V3 definition identity and create only the required text node", () => {
     const ids = ["english-text-variant", "chinese-content"];
+    // jsdom 里点过的下拉不会被标成 hidden，按选项内容认准是哪一个下拉。
+    const optionsIn = (marker: string) => {
+      const dropdown = [
+        ...document.querySelectorAll<HTMLElement>(
+          ".ant-select-dropdown:not(.ant-select-dropdown-hidden)"
+        )
+      ].find((item) => item.textContent?.includes(marker))!;
+      return [
+        ...dropdown.querySelectorAll<HTMLElement>(
+          ".ant-select-item-option-content"
+        )
+      ];
+    };
     render(<Harness idFactory={() => ids.shift()!} />);
 
-    fireEvent.mouseDown(screen.getByLabelText("定义 1 方式"));
-    expect(
-      [
-        ...document.querySelectorAll<HTMLElement>(
-          ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
-        )
-      ].map((option) => option.textContent)
-    ).toEqual(["中文定义释义", "英文定义释义", "中文整句释义", "英文整句释义"]);
-    fireEvent.click(screen.getByText("英文定义释义"));
+    // 语言与释义方式各自独立选，四个组合都要能走到。
+    fireEvent.mouseDown(screen.getByLabelText("定义 1 语言"));
+    expect(optionsIn("EN").map((option) => option.textContent)).toEqual([
+      "中文",
+      "EN"
+    ]);
+    fireEvent.click(optionsIn("EN")[1]!);
     expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
       id: "definition-1",
       definition_mode: "en_definition",
@@ -3745,8 +3759,27 @@ describe("V3MeaningsAndExamplesStep", () => {
       }
     });
 
-    fireEvent.mouseDown(screen.getByLabelText("定义 1 方式"));
-    fireEvent.click(screen.getByText("中文整句释义"));
+    fireEvent.mouseDown(screen.getByLabelText("定义 1 释义方式"));
+    expect(optionsIn("整句释义").map((option) => option.textContent)).toEqual([
+      "定义释义",
+      "整句释义"
+    ]);
+    fireEvent.click(optionsIn("整句释义")[1]!);
+    // 只换方式不换语言：英文正文原样留着，不消耗新 id。
+    expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
+      id: "definition-1",
+      definition_mode: "en_sentence",
+      content: {
+        mode: "unified",
+        common: {
+          id: "english-text-variant",
+          value: { text: "中心" }
+        }
+      }
+    });
+
+    fireEvent.mouseDown(screen.getByLabelText("定义 1 语言"));
+    fireEvent.click(optionsIn("EN")[0]!);
     expect(value().pos[0]!.senses[0]!.definitions[0]).toMatchObject({
       id: "definition-1",
       definition_mode: "zh_sentence",
@@ -4683,8 +4716,12 @@ it.each([false, true])(
         <Harness initial={initial} />
       </ConfigProvider>
     );
-    fireEvent.mouseDown(screen.getByLabelText("定义 1 方式"));
-    fireEvent.click(screen.getByText("中文整句释义"));
+    fireEvent.mouseDown(screen.getByLabelText("定义 1 语言"));
+    fireEvent.click(
+      document.querySelectorAll<HTMLElement>(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )[0]!
+    );
     // jsdom 不执行 antd 弹窗布局；验证确认内容和真实取消/确认回调。
     expect(
       await screen.findByText("切换后将移除这条释义的英文关联和发音设置。")

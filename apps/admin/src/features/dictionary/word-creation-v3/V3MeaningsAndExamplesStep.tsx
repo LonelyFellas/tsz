@@ -815,15 +815,43 @@ function newDefinition(idFactory: () => string): WordDefinitionV3 {
 type DefinitionModeV3 =
   "zh_definition" | "zh_sentence" | "en_definition" | "en_sentence";
 
-const DEFINITION_MODE_OPTIONS: Array<{
+type DefinitionLanguageV3 = "zh" | "en";
+type DefinitionStyleV3 = "definition" | "sentence";
+
+const DEFINITION_LANGUAGE_OPTIONS: Array<{
   label: string;
-  value: DefinitionModeV3;
+  value: DefinitionLanguageV3;
 }> = [
-  { label: "中文定义释义", value: "zh_definition" },
-  { label: "英文定义释义", value: "en_definition" },
-  { label: "中文整句释义", value: "zh_sentence" },
-  { label: "英文整句释义", value: "en_sentence" }
+  { label: "中文", value: "zh" },
+  { label: "EN", value: "en" }
 ];
+
+const DEFINITION_STYLE_OPTIONS: Array<{
+  label: string;
+  value: DefinitionStyleV3;
+}> = [
+  { label: "定义释义", value: "definition" },
+  { label: "整句释义", value: "sentence" }
+];
+
+/** 语言与释义方式分两列选，落 wire 前合回后端唯一认的 definition_mode。 */
+const DEFINITION_MODE_BY_PARTS: Record<
+  DefinitionLanguageV3,
+  Record<DefinitionStyleV3, DefinitionModeV3>
+> = {
+  zh: { definition: "zh_definition", sentence: "zh_sentence" },
+  en: { definition: "en_definition", sentence: "en_sentence" }
+};
+
+function definitionLanguageOf(mode: DefinitionModeV3): DefinitionLanguageV3 {
+  return mode === "zh_definition" || mode === "zh_sentence" ? "zh" : "en";
+}
+
+function definitionStyleOf(mode: DefinitionModeV3): DefinitionStyleV3 {
+  return mode === "zh_definition" || mode === "en_definition"
+    ? "definition"
+    : "sentence";
+}
 
 function definitionRichText(definition: WordDefinitionV3) {
   if (
@@ -884,6 +912,49 @@ function withDefinitionMode(
             }
           }
   };
+}
+
+type ModalApi = ReturnType<typeof App.useApp>["modal"];
+
+/** 切到中文会丢掉英文侧的关联与发音设置，先让用户确认；其余切换直接生效。 */
+function requestDefinitionMode(
+  definition: WordDefinitionV3,
+  definitionMode: DefinitionModeV3,
+  idFactory: () => string,
+  modal: ModalApi,
+  commit: (next: WordDefinitionV3) => void
+): void {
+  const apply = () =>
+    commit(withDefinitionMode(definition, definitionMode, idFactory));
+  const english =
+    definition.definition_mode === "en_definition" ||
+    definition.definition_mode === "en_sentence"
+      ? definition.content
+      : undefined;
+  const variants = english
+    ? english.mode === "unified"
+      ? [english.common]
+      : [english.uk, english.us].flatMap((slot) =>
+          slot.state === "ready" ? [slot.variant] : []
+        )
+    : [];
+  const removesEnglishSettings =
+    (definitionMode === "zh_definition" || definitionMode === "zh_sentence") &&
+    variants.some(
+      (variant) =>
+        variant.text_links?.length ||
+        variant.voice_profile ||
+        variant.audio_assets?.length
+    );
+  if (removesEnglishSettings)
+    modal.confirm({
+      title: "切换为中文释义",
+      content: "切换后将移除这条释义的英文关联和发音设置。",
+      okText: "切换",
+      cancelText: "取消",
+      onOk: apply
+    });
+  else apply();
 }
 
 /** 卡片自上而下的展示顺序：派生词在前，近义词与反义词在后。 */
@@ -2750,7 +2821,8 @@ function V3MeaningsAndExamplesStepContent({
                                           <div className="word-list-header word-definition-list-header">
                                             <span aria-hidden="true" />
                                             <span>等级</span>
-                                            <span>释义语言及方式</span>
+                                            <span>语言</span>
+                                            <span>释义方式</span>
                                             <span>释义语句</span>
                                             <span>语法结构</span>
                                             <span aria-hidden="true" />
@@ -2826,96 +2898,79 @@ function V3MeaningsAndExamplesStepContent({
                                                       value={definition.level}
                                                     />
                                                     <Select
-                                                      aria-label={`定义 ${definitionIndex + 1} 方式`}
+                                                      aria-label={`定义 ${definitionIndex + 1} 语言`}
                                                       data-v3-field="definition_mode"
                                                       data-v3-node-id={
                                                         definition.id
                                                       }
                                                       onChange={(
-                                                        definitionMode: DefinitionModeV3
-                                                      ) => {
-                                                        const apply = () => {
-                                                          change((draft) => {
-                                                            const current =
+                                                        language: DefinitionLanguageV3
+                                                      ) =>
+                                                        requestDefinitionMode(
+                                                          definition,
+                                                          DEFINITION_MODE_BY_PARTS[
+                                                            language
+                                                          ][
+                                                            definitionStyleOf(
+                                                              definition.definition_mode
+                                                            )
+                                                          ],
+                                                          idFactory,
+                                                          modal,
+                                                          (next) =>
+                                                            change((draft) => {
                                                               draft.pos[
                                                                 posIndex
                                                               ]!.senses[
                                                                 senseIndex
                                                               ]!.definitions[
                                                                 definitionIndex
-                                                              ]!;
-                                                            draft.pos[
-                                                              posIndex
-                                                            ]!.senses[
-                                                              senseIndex
-                                                            ]!.definitions[
-                                                              definitionIndex
-                                                            ] =
-                                                              withDefinitionMode(
-                                                                current,
-                                                                definitionMode,
-                                                                idFactory
-                                                              );
-                                                          });
-                                                        };
-                                                        const english =
-                                                          definition.definition_mode ===
-                                                            "en_definition" ||
-                                                          definition.definition_mode ===
-                                                            "en_sentence"
-                                                            ? definition.content
-                                                            : undefined;
-                                                        const variants = english
-                                                          ? english.mode ===
-                                                            "unified"
-                                                            ? [english.common]
-                                                            : [
-                                                                english.uk,
-                                                                english.us
-                                                              ].flatMap(
-                                                                (slot) =>
-                                                                  slot.state ===
-                                                                  "ready"
-                                                                    ? [
-                                                                        slot.variant
-                                                                      ]
-                                                                    : []
-                                                              )
-                                                          : [];
-                                                        const removesEnglishSettings =
-                                                          (definitionMode ===
-                                                            "zh_definition" ||
-                                                            definitionMode ===
-                                                              "zh_sentence") &&
-                                                          variants.some(
-                                                            (variant) =>
-                                                              variant.text_links
-                                                                ?.length ||
-                                                              variant.voice_profile ||
-                                                              variant
-                                                                .audio_assets
-                                                                ?.length
-                                                          );
-                                                        if (
-                                                          removesEnglishSettings
+                                                              ] = next;
+                                                            })
                                                         )
-                                                          modal.confirm({
-                                                            title:
-                                                              "切换为中文释义",
-                                                            content:
-                                                              "切换后将移除这条释义的英文关联和发音设置。",
-                                                            okText: "切换",
-                                                            cancelText: "取消",
-                                                            onOk: apply
-                                                          });
-                                                        else apply();
-                                                      }}
+                                                      }
                                                       options={
-                                                        DEFINITION_MODE_OPTIONS
+                                                        DEFINITION_LANGUAGE_OPTIONS
                                                       }
-                                                      value={
+                                                      value={definitionLanguageOf(
                                                         definition.definition_mode
+                                                      )}
+                                                    />
+                                                    <Select
+                                                      aria-label={`定义 ${definitionIndex + 1} 释义方式`}
+                                                      data-v3-node-id={
+                                                        definition.id
                                                       }
+                                                      onChange={(
+                                                        style: DefinitionStyleV3
+                                                      ) =>
+                                                        requestDefinitionMode(
+                                                          definition,
+                                                          DEFINITION_MODE_BY_PARTS[
+                                                            definitionLanguageOf(
+                                                              definition.definition_mode
+                                                            )
+                                                          ][style],
+                                                          idFactory,
+                                                          modal,
+                                                          (next) =>
+                                                            change((draft) => {
+                                                              draft.pos[
+                                                                posIndex
+                                                              ]!.senses[
+                                                                senseIndex
+                                                              ]!.definitions[
+                                                                definitionIndex
+                                                              ] = next;
+                                                            })
+                                                        )
+                                                      }
+                                                      options={
+                                                        DEFINITION_STYLE_OPTIONS
+                                                      }
+                                                      value={definitionStyleOf(
+                                                        definition.definition_mode
+                                                      )}
                                                     />
                                                   </>
                                                   <div className="word-definition-content-cell">
