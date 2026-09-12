@@ -778,7 +778,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.change(screen.getByLabelText("例句 2 通用英文"), {
       target: { value: "We broke the ice." }
     });
-    fireEvent.change(screen.getByLabelText("例句 2 中文"), {
+    // 新建例句默认摆出初、中、高、高四个录入位，主译文挂在第二个（中阶）上。
+    expect(screen.getAllByLabelText(/^例句 2 译文 \d 中文$/)).toHaveLength(4);
+    fireEvent.change(screen.getByLabelText("例句 2 译文 2 中文"), {
       target: { value: "我们打破了沉默。" }
     });
     fireEvent.mouseDown(screen.getByLabelText("例句 2 等级"));
@@ -797,9 +799,12 @@ describe("V3MeaningsAndExamplesStep", () => {
         common: { origin: "manual", value: { text: "We broke the ice." } }
       },
       zh_text: { text: "我们打破了沉默。" },
-      // 译文档位独立于英文例句等级，保留新建时的中阶。
+      // 译文档位独立于英文例句等级；存草稿不清理空行，四个录入位原样留着。
       zh_translations: [
-        { band: "balanced_fluency", content: { text: "我们打破了沉默。" } }
+        { band: "word_for_word", content: { text: "" } },
+        { band: "balanced_fluency", content: { text: "我们打破了沉默。" } },
+        { band: "adapted_creation", content: { text: "" } },
+        { band: "adapted_creation", content: { text: "" } }
       ],
       links: [{ word_id: "entry-1", sense_id: "sense-1", role: "focus" }]
     });

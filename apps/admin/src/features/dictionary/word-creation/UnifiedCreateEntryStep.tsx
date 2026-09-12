@@ -177,7 +177,8 @@ function partOfSpeechLabel(
   catalog?: PartOfSpeechCatalogResponse
 ): string {
   return (
-    catalog?.items.find((item) => item.code === code)?.name_zh ?? "未识别词性"
+    catalog?.items.find((item) => item.code === code)?.short_name_zh ??
+    "未识别词性"
   );
 }
 

@@ -1,4 +1,5 @@
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
+import { usePartOfSpeechLabel } from "../../part-of-speech/PartOfSpeechLabels";
 import {
   Alert,
   Button,
@@ -19,7 +20,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { createV3WordRequests } from "../api";
-import { dialectLabel, partOfSpeechLabel } from "../presentation";
+import { dialectLabel } from "../presentation";
 import "./V3SentenceTargetDiscovery.css";
 
 type ResolvedUsage = Extract<PhraseComponentUsageV3, { state: "resolved" }>;
@@ -164,7 +165,8 @@ function groupsFromCandidates(
   preference: AdminDialectPreference,
   keepVariantIds: ReadonlySet<string>,
   selfEntryId: string | undefined,
-  formTypeLabel: (code: string) => string
+  formTypeLabel: (code: string) => string,
+  posLabelOf: (code: string) => string
 ): CandidateEntryGroup[] {
   const byEntry = new Map<string, CandidateEntryGroup>();
   for (const candidate of candidates) {
@@ -185,7 +187,7 @@ function groupsFromCandidates(
         byEntry.set(candidate.entry_id, entry);
       continue;
     }
-    const posLabel = partOfSpeechLabel(candidate.pos);
+    const posName = posLabelOf(candidate.pos);
     // 词形层来自候选的全词形清单。命中标识只在有区间证据时给：关键字检索没有句子区间，
     // 后端把 matches 置空，此时任何词形都谈不上「命中」。
     const hasEvidence = candidate.matches.length > 0;
@@ -211,7 +213,7 @@ function groupsFromCandidates(
             form.dialect === "common" || form.dialect === preference
               ? `${formTypeLabel(form.form_type)} ${form.spelling}`
               : `${formTypeLabel(form.form_type)} ${form.spelling}（${dialectLabel(form.dialect)}）`,
-          posLabel,
+          posLabel: posName,
           matched:
             hasEvidence &&
             form.form_id === candidate.matched_form_id &&
@@ -270,6 +272,7 @@ export function V3TargetCascader({
   targetKind?: "word" | "phrase";
 }) {
   const formTypeLabel = useFormTypeLabel();
+  const posLabelOf = usePartOfSpeechLabel();
   const includePhraseComponents = targetKind === "phrase";
   const [componentResults, setComponentResults] = useState<
     Record<
@@ -345,14 +348,16 @@ export function V3TargetCascader({
         preference,
         selectedVariantIds,
         selfEntryId,
-        formTypeLabel
+        formTypeLabel,
+        posLabelOf
       ),
     [
       preference,
       selectedVariantIds,
       selfEntryId,
       state.candidates,
-      formTypeLabel
+      formTypeLabel,
+      posLabelOf
     ]
   );
   const phraseComponents = useMemo(() => {
@@ -467,7 +472,8 @@ export function V3TargetCascader({
               preference,
               selectedVariantIds,
               selfEntryId,
-              formTypeLabel
+              formTypeLabel,
+              posLabelOf
             );
             const forms = cascaderOptionsFromGroups(componentGroups)
               .flatMap((target) => target.children ?? [])
@@ -514,6 +520,7 @@ export function V3TargetCascader({
     includePhraseComponents,
     phraseComponents,
     componentResults,
+    posLabelOf,
     preference,
     selectedVariantIds,
     selfEntryId,

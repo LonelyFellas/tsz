@@ -4404,6 +4404,68 @@ describe("V3WordCreationWizard", () => {
     await waitFor(() => expect(validate).toHaveBeenCalledTimes(1));
   });
 
+  it("收尾提交在向导管线里丢掉没填的译文录入位", async () => {
+    const empty = () => ({ version: 2 as const, text: "", annotations: [] });
+    const localMeanings = toWritableMeanings(word().meanings);
+    const sentence = localMeanings.pos[0]!.senses[0]!.sentences[0]!;
+    // 初/中/高/高 四个录入位，只填了中阶那条。
+    sentence.zh_translations = [
+      { id: "translation-1", band: "word_for_word", content: empty() },
+      {
+        id: "translation-2",
+        band: "balanced_fluency",
+        content: { version: 2, text: "一个中心。", annotations: [] }
+      },
+      { id: "translation-3", band: "adapted_creation", content: empty() },
+      { id: "translation-4", band: "adapted_creation", content: empty() }
+    ];
+    sentence.zh_text_id = "translation-2";
+    const saveForms = vi.fn(async () => ({ word: word(2) }));
+    const saveMeanings = vi.fn(
+      async (
+        _wordId: string,
+        _input: Parameters<V3WordRequests["saveMeanings"]>[1]
+      ) => ({ word: word(3) })
+    );
+
+    renderWizard(requests({ saveForms, saveMeanings }), {
+      renderStep: (context) => (
+        <>
+          <button
+            type="button"
+            onClick={() => context.setDraftMeanings(localMeanings)}
+          >
+            摆出四个录入位
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              void context.actions.saveMeanings(
+                context.draftMeanings,
+                "complete"
+              )
+            }
+          >
+            收尾提交
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("摆出四个录入位"));
+    fireEvent.click(screen.getByText("收尾提交"));
+
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(1));
+    // 出站 payload 只保留填过的那条；清洗必须发生在 wizard 这一层，
+    // 挪回步骤组件里会让「确认影响并完成」那条旁路重新漏掉。
+    expect(
+      saveMeanings.mock.calls[0]![1].content.pos[0]!.senses[0]!.sentences[0]!
+        .zh_translations
+    ).toEqual([
+      expect.objectContaining({ id: "translation-2", band: "balanced_fluency" })
+    ]);
+  });
+
   it("saves dirty forms before an ordinary meanings save and uses the accepted revision", async () => {
     const localMeanings: DraftMeaningsStepContentWritableV3 = {
       sense_groups: [

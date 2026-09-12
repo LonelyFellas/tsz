@@ -11,7 +11,10 @@ export function FormTypeLabelsProvider({
   children
 }: PropsWithChildren<{ items?: readonly FormTypeCatalogItem[] }>) {
   const label = useMemo(() => {
-    const names = new Map(items?.map((item) => [item.code, item.name_zh]));
+    // 非配置页一律用「简洁显示」，配置页才展示正式中文名。
+    const names = new Map(
+      items?.map((item) => [item.code, item.short_name_zh])
+    );
     return (code: string) => names.get(code) ?? formTypeLabel(code);
   }, [items]);
   return <Labels.Provider value={label}>{children}</Labels.Provider>;

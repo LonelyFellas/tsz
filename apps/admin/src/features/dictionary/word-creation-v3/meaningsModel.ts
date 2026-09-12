@@ -48,6 +48,54 @@ export type RelationDisplaySnapshots = Readonly<
 export const DEFAULT_SENTENCE_TRANSLATION_BAND: SentenceTranslationBandV3 =
   "balanced_fluency";
 
+// 新建例句默认摆出的译文档位：初、中、高、高。高阶给两条是产品要的录入位，
+// 后端自 20260907 的迁移起允许同句同档多条。
+export const DEFAULT_SENTENCE_TRANSLATION_BANDS: readonly SentenceTranslationBandV3[] =
+  ["word_for_word", "balanced_fluency", "adapted_creation", "adapted_creation"];
+
+export function newSentenceTranslations(
+  idFactory: () => string
+): WordSentenceTranslationV3[] {
+  return DEFAULT_SENTENCE_TRANSLATION_BANDS.map((band) => ({
+    id: idFactory(),
+    band,
+    content: { version: 2, text: "", annotations: [] }
+  }));
+}
+
+/**
+ * 收尾提交前丢掉一个字都没填的译文行：默认摆四个框只是录入位，不是必填项。
+ * 一条都没填时留下第一行，让后端照常报「请填写当前等级的中文译文」，
+ * 而不是把例句提交成没有译文。
+ */
+export function dropEmptySentenceTranslations(
+  content: DraftMeaningsStepContentWritableV3
+): DraftMeaningsStepContentWritableV3 {
+  return {
+    ...content,
+    pos: content.pos.map((pos) => ({
+      ...pos,
+      senses: pos.senses.map((sense) => ({
+        ...sense,
+        sentences: sense.sentences.map((sentence) => {
+          const rows = sentenceTranslationsV3(sentence);
+          const filled = rows.filter((row) => row.content.text.trim() !== "");
+          const kept = filled.length > 0 ? filled : rows.slice(0, 1);
+          // 主译文别名必须跟着留下来的行走，否则 zh_text 会指向已删除的译文。
+          const alias =
+            kept.find((row) => row.id === sentence.zh_text_id) ?? kept[0]!;
+          return {
+            ...sentence,
+            zh_translations: kept,
+            zh_text_id: alias.id,
+            zh_text: cloneRichText(alias.content)
+          };
+        })
+      }))
+    }))
+  };
+}
+
 export function sentenceTranslationsV3(sentence: {
   level: string;
   zh_text_id: string;
@@ -386,7 +434,12 @@ function createDefaultPosMeanings(
   idFactory: () => string
 ): WordPosMeaningsWritableV3 {
   const senseId = idFactory();
-  const translationId = idFactory();
+  // 自动播种的这条例句同样是「首次录入」，录入位要和手动添加的例句一致。
+  const translations = newSentenceTranslations(idFactory);
+  const alias =
+    translations.find(
+      (item) => item.band === DEFAULT_SENTENCE_TRANSLATION_BAND
+    ) ?? translations[0]!;
   return {
     pos_id: posId,
     grammar_structures: [newGrammarStructure(idFactory, spellingMode)],
@@ -418,15 +471,9 @@ function createDefaultPosMeanings(
                 value: { version: 2, text: "", annotations: [] }
               }
             },
-            zh_text_id: translationId,
-            zh_text: { version: 2, text: "", annotations: [] },
-            zh_translations: [
-              {
-                id: translationId,
-                band: DEFAULT_SENTENCE_TRANSLATION_BAND,
-                content: { version: 2, text: "", annotations: [] }
-              }
-            ],
+            zh_text_id: alias.id,
+            zh_text: cloneRichText(alias.content),
+            zh_translations: translations,
             links: [{ word_id: wordId, sense_id: senseId, role: "focus" }]
           }
         ],
