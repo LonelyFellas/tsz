@@ -1,6 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from "vitest";
 import type {
-  AdminWordDraftAnyEnvelope,
   AdminWordDraftV3Envelope,
   AdminWordPublicationV3,
   AdminWordV3Envelope,
@@ -17,9 +16,9 @@ import { createV3WordRequests, type V3WordsApi } from "./api";
 function endpointDoubles(): V3WordsApi {
   return {
     detectV3: vi.fn(),
-    surfaceMatchSnapshotPageV3: vi.fn(),
+    surfaceMatchSnapshotPage: vi.fn(),
     createV3: vi.fn(),
-    getAny: vi.fn(),
+    get: vi.fn(),
     previewFormsImpactV3: vi.fn(),
     saveFormsStepV3: vi.fn(),
     saveMeaningsStepV3: vi.fn(),
@@ -91,8 +90,7 @@ function v3Draft(wordId = WORD_ID): AdminWordDraftV3Envelope {
       },
       capabilities: {
         publication: {
-          mode: "shadow_only",
-          blocked_code: "phase2_consumers_not_ready"
+          mode: "native" as const
         },
         pronunciation_normalization_version: "nfkc_trim_lower_v1"
       },
@@ -131,7 +129,7 @@ describe("createV3WordRequests", () => {
     const requests = createV3WordRequests(endpoints);
     const canonical: AdminWordV3Envelope = { word: v3Draft().word };
     vi.mocked(endpoints.detectV3).mockResolvedValue(detectionResponse());
-    vi.mocked(endpoints.surfaceMatchSnapshotPageV3).mockResolvedValue(
+    vi.mocked(endpoints.surfaceMatchSnapshotPage).mockResolvedValue(
       surfacePage()
     );
     vi.mocked(endpoints.previewFormsImpactV3).mockResolvedValue({
@@ -226,7 +224,7 @@ describe("createV3WordRequests", () => {
     );
 
     expect(endpoints.detectV3).toHaveBeenCalledWith(detectInput);
-    expect(endpoints.surfaceMatchSnapshotPageV3).toHaveBeenCalledWith(
+    expect(endpoints.surfaceMatchSnapshotPage).toHaveBeenCalledWith(
       SNAPSHOT_ID,
       "cursor-2",
       undefined
@@ -317,7 +315,7 @@ describe("createV3WordRequests", () => {
   it("rejects a surface page whose snapshot identity differs from the path", async () => {
     const endpoints = endpointDoubles();
     const requests = createV3WordRequests(endpoints);
-    vi.mocked(endpoints.surfaceMatchSnapshotPageV3).mockResolvedValue(
+    vi.mocked(endpoints.surfaceMatchSnapshotPage).mockResolvedValue(
       surfacePage("019d2c55-1f9e-7f88-a189-a2b8a0715402")
     );
 
@@ -375,24 +373,24 @@ describe("createV3WordRequests", () => {
     });
   });
 
-  it("narrows getAny to a V3 draft and rejects a legacy response", async () => {
+  it("narrows get to a V3 draft and rejects a legacy response", async () => {
     const endpoints = endpointDoubles();
     const requests = createV3WordRequests(endpoints);
     const v3 = v3Draft();
-    vi.mocked(endpoints.getAny).mockResolvedValueOnce(v3);
+    vi.mocked(endpoints.get).mockResolvedValueOnce(v3);
 
     await expect(requests.get(WORD_ID)).resolves.toBe(v3);
 
-    vi.mocked(endpoints.getAny).mockResolvedValueOnce({
+    vi.mocked(endpoints.get).mockResolvedValueOnce({
       word: { schema_version: 2, id: "word-2" },
       retired_stable_slots: []
-    } as unknown as AdminWordDraftAnyEnvelope);
+    } as unknown as AdminWordDraftV3Envelope);
     await expect(requests.get("word-2")).rejects.toMatchObject({
       name: "UnsupportedAdminWordSchemaVersionError",
       received_schema_version: 2
     });
 
-    vi.mocked(endpoints.getAny).mockResolvedValueOnce({
+    vi.mocked(endpoints.get).mockResolvedValueOnce({
       word: { schema_version: 3, id: "malformed" },
       retired_stable_nodes: []
     } as unknown as AdminWordDraftV3Envelope);
@@ -417,7 +415,7 @@ describe("createV3WordRequests", () => {
       intent: "save",
       content: { sense_groups: [], pos: [] }
     };
-    vi.mocked(endpoints.getAny).mockResolvedValue(v3Draft(OTHER_WORD_ID));
+    vi.mocked(endpoints.get).mockResolvedValue(v3Draft(OTHER_WORD_ID));
     vi.mocked(endpoints.saveFormsStepV3).mockResolvedValue(mismatched);
     vi.mocked(endpoints.saveMeaningsStepV3).mockResolvedValue(mismatched);
     vi.mocked(endpoints.publishV3).mockResolvedValue(mismatched);
@@ -517,7 +515,7 @@ describe("createV3WordRequests", () => {
     const requests = createV3WordRequests(endpoints);
     const controller = new AbortController();
     const aborted = new DOMException("cancelled", "AbortError");
-    vi.mocked(endpoints.surfaceMatchSnapshotPageV3).mockRejectedValue(aborted);
+    vi.mocked(endpoints.surfaceMatchSnapshotPage).mockRejectedValue(aborted);
 
     const pending = requests.surfacePage(
       "snapshot-1",
@@ -527,7 +525,7 @@ describe("createV3WordRequests", () => {
     controller.abort();
 
     await expect(pending).rejects.toBe(aborted);
-    expect(endpoints.surfaceMatchSnapshotPageV3).toHaveBeenCalledWith(
+    expect(endpoints.surfaceMatchSnapshotPage).toHaveBeenCalledWith(
       "snapshot-1",
       "cursor-1",
       controller.signal

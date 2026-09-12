@@ -25,10 +25,11 @@ import {
   type V3IssueNavigationTarget
 } from "./issueNavigation";
 import {
+  dropEmptySentenceTranslations,
   ensureV3MeaningsForForms,
+  prepareTextLinksForSave,
   stripBlankRelations,
   stripSenseComponentUsages,
-  prepareTextLinksForSave,
   toWritableMeanings
 } from "./meaningsModel";
 import { classifyV3Problem, type V3Problem } from "./problem";
@@ -850,6 +851,13 @@ function V3WordCreationSession({
         if (!formsSaved) return;
       }
       const baseRevision = flow.canonical().revision;
+      // 四个译文框只是录入位，收尾提交时丢掉一个字都没填的行。放在这条所有保存
+      // 都会经过的管线上，「确认影响并完成」那种旁路才不会漏掉清洗；保存失败或
+      // 撞版本冲突时，回填用的本地编辑态也仍是未清洗的，录入位不会凭空少几行。
+      const meaningsPayload =
+        intent === "complete"
+          ? dropEmptySentenceTranslations(content)
+          : content;
       const scope = scopeRef.current;
       const done = markPending("save_meanings");
       const retry = async () => {
@@ -865,8 +873,8 @@ function V3WordCreationSession({
             content: prepareTextLinksForSave(
               stripBlankRelations(
                 flow.canonical().capabilities.sense_component_usages === true
-                  ? content
-                  : stripSenseComponentUsages(content)
+                  ? meaningsPayload
+                  : stripSenseComponentUsages(meaningsPayload)
               ),
               flow.canonical().capabilities.text_links === true
             )

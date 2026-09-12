@@ -6,39 +6,31 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { wordFixture } from "./word-creation/wordCreation.test.helper";
 
 const dataSource = vi.hoisted(() => ({
-  deleteDraft: vi.fn(),
+  archive: vi.fn(),
+  archiveBatch: vi.fn(),
   deleteBatch: vi.fn(),
+  deleteDraft: vi.fn(),
   get: vi.fn(),
-  relatedSearch: vi.fn()
-}));
-
-const anyDataSource = vi.hoisted(() => ({
-  archiveAny: vi.fn(),
-  archiveBatchAny: vi.fn(),
-  getAny: vi.fn(),
-  listAny: vi.fn(),
-  relatedSearchAny: vi.fn(),
-  restoreAny: vi.fn(),
-  restoreBatchAny: vi.fn()
+  list: vi.fn(),
+  relatedSearch: vi.fn(),
+  restore: vi.fn(),
+  restoreBatch: vi.fn()
 }));
 
 vi.mock("./dataSource", () => ({
-  adminWordsDataSource: dataSource,
-  adminWordsAnyDataSource: anyDataSource
+  adminWordsDataSource: dataSource
 }));
 
 import {
-  useArchiveWordAny,
-  useArchiveWordsBatchAny,
+  useArchiveWord,
+  useArchiveWordsBatch,
   useDeleteWordDraft,
   useDeleteWordBatch,
-  useRelatedSearchAny,
-  useRelatedSearchV2,
-  useRestoreWordAny,
-  useRestoreWordsBatchAny,
-  useWordDetailAny,
-  useWordList,
+  useRelatedSearch,
+  useRestoreWord,
+  useRestoreWordsBatch,
   useWordDetail,
+  useWordList,
   wordKeys
 } from "./api";
 
@@ -110,7 +102,7 @@ beforeEach(() => {
 
 describe("dictionary React Query hooks", () => {
   it("mixed 关联搜索通过 schema-aware facade 并保留精确/包含分页", async () => {
-    anyDataSource.relatedSearchAny.mockImplementation(
+    dataSource.relatedSearch.mockImplementation(
       async (_q: string, query: Record<string, unknown>) => ({
         results: [],
         total: 0,
@@ -120,7 +112,7 @@ describe("dictionary React Query hooks", () => {
     );
     const { wrapper } = queryWrapper();
     const hook = renderHook(
-      () => useRelatedSearchAny("  outside  ", "word", true),
+      () => useRelatedSearch("  outside  ", "word", true),
       { wrapper }
     );
 
@@ -128,13 +120,13 @@ describe("dictionary React Query hooks", () => {
       expect(hook.result.current.exact.isSuccess).toBe(true);
       expect(hook.result.current.contains.isSuccess).toBe(true);
     });
-    expect(anyDataSource.relatedSearchAny).toHaveBeenCalledWith("outside", {
+    expect(dataSource.relatedSearch).toHaveBeenCalledWith("outside", {
       kind: "word",
       match_mode: "exact",
       page_size: 20,
       cursor: undefined
     });
-    expect(anyDataSource.relatedSearchAny).toHaveBeenCalledWith("outside", {
+    expect(dataSource.relatedSearch).toHaveBeenCalledWith("outside", {
       kind: "word",
       match_mode: "contains",
       exclude_exact: true,
@@ -146,11 +138,11 @@ describe("dictionary React Query hooks", () => {
       await hook.result.current.exact.fetchNextPage();
       await hook.result.current.contains.fetchNextPage();
     });
-    expect(anyDataSource.relatedSearchAny).toHaveBeenCalledWith(
+    expect(dataSource.relatedSearch).toHaveBeenCalledWith(
       "outside",
       expect.objectContaining({ cursor: "exact-next" })
     );
-    expect(anyDataSource.relatedSearchAny).toHaveBeenCalledWith(
+    expect(dataSource.relatedSearch).toHaveBeenCalledWith(
       "outside",
       expect.objectContaining({ cursor: "contains-next" })
     );
@@ -168,8 +160,7 @@ describe("dictionary React Query hooks", () => {
         language: "en" as const,
         capabilities: {
           publication: {
-            mode: "shadow_only" as const,
-            blocked_code: "phase2_consumers_not_ready" as const
+            mode: "native" as const
           },
           pronunciation_normalization_version: "nfkc_trim_lower_v1" as const
         },
@@ -180,13 +171,13 @@ describe("dictionary React Query hooks", () => {
       },
       retired_stable_nodes: []
     };
-    anyDataSource.listAny.mockResolvedValue(list);
-    anyDataSource.getAny.mockResolvedValue(detail);
+    dataSource.list.mockResolvedValue(list);
+    dataSource.get.mockResolvedValue(detail);
     const { wrapper } = queryWrapper();
     const hook = renderHook(
       () => ({
         list: useWordList({ page: 1, page_size: 20 }),
-        detail: useWordDetailAny("v3-1")
+        detail: useWordDetail("v3-1")
       }),
       { wrapper }
     );
@@ -195,27 +186,27 @@ describe("dictionary React Query hooks", () => {
       expect(hook.result.current.list.isSuccess).toBe(true);
       expect(hook.result.current.detail.isSuccess).toBe(true);
     });
-    expect(anyDataSource.listAny).toHaveBeenCalledWith({
+    expect(dataSource.list).toHaveBeenCalledWith({
       page: 1,
       page_size: 20
     });
-    expect(anyDataSource.getAny).toHaveBeenCalledWith("v3-1");
+    expect(dataSource.get).toHaveBeenCalledWith("v3-1");
     expect(hook.result.current.list.data).toEqual(list);
     expect(hook.result.current.detail.data).toEqual(detail);
   });
 
   it("单条与批量生命周期写入全部调用 Any facade", async () => {
-    anyDataSource.archiveAny.mockResolvedValue({ word: {} });
-    anyDataSource.restoreAny.mockResolvedValue({ word: {} });
-    anyDataSource.archiveBatchAny.mockResolvedValue({ words: [], affected: 1 });
-    anyDataSource.restoreBatchAny.mockResolvedValue({ words: [], affected: 1 });
+    dataSource.archive.mockResolvedValue({ word: {} });
+    dataSource.restore.mockResolvedValue({ word: {} });
+    dataSource.archiveBatch.mockResolvedValue({ words: [], affected: 1 });
+    dataSource.restoreBatch.mockResolvedValue({ words: [], affected: 1 });
     const { wrapper } = queryWrapper();
     const hook = renderHook(
       () => ({
-        archive: useArchiveWordAny(),
-        restore: useRestoreWordAny(),
-        archiveBatch: useArchiveWordsBatchAny(),
-        restoreBatch: useRestoreWordsBatchAny()
+        archive: useArchiveWord(),
+        restore: useRestoreWord(),
+        archiveBatch: useArchiveWordsBatch(),
+        restoreBatch: useRestoreWordsBatch()
       }),
       { wrapper }
     );
@@ -242,29 +233,27 @@ describe("dictionary React Query hooks", () => {
       });
     });
 
-    expect(anyDataSource.archiveAny).toHaveBeenCalledWith(
+    expect(dataSource.archive).toHaveBeenCalledWith(
       "v3-1",
       "archive-key",
       input
     );
-    expect(anyDataSource.restoreAny).toHaveBeenCalledWith(
+    expect(dataSource.restore).toHaveBeenCalledWith(
       "v3-1",
       "restore-key",
       input
     );
-    expect(anyDataSource.archiveBatchAny).toHaveBeenCalledWith(
-      "archive-batch-key",
-      { entries: [{ id: "v3-1", ...input }] }
-    );
-    expect(anyDataSource.restoreBatchAny).toHaveBeenCalledWith(
-      "restore-batch-key",
-      { entries: [{ id: "v3-1", ...input }] }
-    );
+    expect(dataSource.archiveBatch).toHaveBeenCalledWith("archive-batch-key", {
+      entries: [{ id: "v3-1", ...input }]
+    });
+    expect(dataSource.restoreBatch).toHaveBeenCalledWith("restore-batch-key", {
+      entries: [{ id: "v3-1", ...input }]
+    });
   });
 
   it("归档、恢复和删除后实际重取列表显示标志，支持单条与批量", async () => {
     let visible = true;
-    anyDataSource.listAny.mockImplementation(async () => ({
+    dataSource.list.mockImplementation(async () => ({
       words: [
         { ...listItemFixture(), annotation: "007", annotation_visible: visible }
       ],
@@ -274,10 +263,10 @@ describe("dictionary React Query hooks", () => {
     const hook = renderHook(
       () => ({
         list: useWordList({ page: 1 }),
-        archive: useArchiveWordAny(),
-        restore: useRestoreWordAny(),
-        archiveBatch: useArchiveWordsBatchAny(),
-        restoreBatch: useRestoreWordsBatchAny(),
+        archive: useArchiveWord(),
+        restore: useRestoreWord(),
+        archiveBatch: useArchiveWordsBatch(),
+        restoreBatch: useRestoreWordsBatch(),
         deletion: useDeleteWordDraft(),
         deleteBatch: useDeleteWordBatch()
       }),
@@ -322,12 +311,12 @@ describe("dictionary React Query hooks", () => {
     ];
     for (const [index, mutate] of actions.entries()) {
       visible = index === 1 || index === 3;
-      const previousCalls = anyDataSource.listAny.mock.calls.length;
+      const previousCalls = dataSource.list.mock.calls.length;
       await act(async () => {
         await mutate();
       });
       await waitFor(() =>
-        expect(anyDataSource.listAny.mock.calls.length).toBe(previousCalls + 1)
+        expect(dataSource.list.mock.calls.length).toBe(previousCalls + 1)
       );
       expect(hook.result.current.list.data?.words[0]).toMatchObject({
         annotation: "007",
@@ -336,7 +325,7 @@ describe("dictionary React Query hooks", () => {
     }
   });
 
-  it("V2 exact 与 contains 独立请求，并分别按 cursor 累积全部页", async () => {
+  it("exact 与 contains 独立请求，并分别按 cursor 累积全部页", async () => {
     const firstExact = relatedWord("workspace-1", "workspace");
     const secondExact = relatedWord("workspace-2", "workspace");
     const partial = relatedWord("workspace-tools", "workspace tools");
@@ -364,7 +353,7 @@ describe("dictionary React Query hooks", () => {
     );
     const { client, wrapper } = queryWrapper();
     const hook = renderHook(
-      () => useRelatedSearchV2("  workspace  ", "word", true),
+      () => useRelatedSearch("  workspace  ", "word", true),
       { wrapper }
     );
 
@@ -397,7 +386,7 @@ describe("dictionary React Query hooks", () => {
     });
     const exactCache = client.getQueryData<{
       pages: Array<{ results: ReturnType<typeof relatedWord>[] }>;
-    }>(wordKeys.relatedSearchV2("workspace", "word", "exact"));
+    }>(wordKeys.relatedSearch("workspace", "word", "exact"));
     expect(exactCache?.pages.flatMap((page) => page.results)).toEqual([
       firstExact,
       secondExact
@@ -416,7 +405,7 @@ describe("dictionary React Query hooks", () => {
     await waitFor(() => {
       const containsCache = client.getQueryData<{
         pages: Array<{ results: ReturnType<typeof relatedWord>[] }>;
-      }>(wordKeys.relatedSearchV2("workspace", "word", "contains"));
+      }>(wordKeys.relatedSearch("workspace", "word", "contains"));
       expect(containsCache?.pages.flatMap((page) => page.results)).toEqual([
         partial,
         secondPartial
@@ -460,7 +449,7 @@ describe("dictionary React Query hooks", () => {
     const { wrapper } = queryWrapper();
     const hook = renderHook(
       ({ q, kind }: { q: string; kind: "word" | "phrase" }) =>
-        useRelatedSearchV2(q, kind, true),
+        useRelatedSearch(q, kind, true),
       { wrapper, initialProps: { q: "old", kind: "word" } }
     );
     await waitFor(() =>

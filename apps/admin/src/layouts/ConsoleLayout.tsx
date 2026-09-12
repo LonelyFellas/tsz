@@ -1,4 +1,5 @@
 import { DictionaryFormTypeLabels } from "@/features/dictionary/part-of-speech/FormTypeLabels";
+import { DictionaryPartOfSpeechLabels } from "@/features/dictionary/part-of-speech/PartOfSpeechLabels";
 import { MenuFoldOutlined, MenuUnfoldOutlined } from "@ant-design/icons";
 import { Button, Drawer, Layout, Tooltip } from "antd";
 import { useEffect, useState } from "react";
@@ -160,7 +161,9 @@ export function ConsoleLayout() {
           <Content style={{ padding: isDrawer ? 16 : 24 }}>
             {pathname.startsWith("/words") ? (
               <DictionaryFormTypeLabels>
-                <Outlet />
+                <DictionaryPartOfSpeechLabels>
+                  <Outlet />
+                </DictionaryPartOfSpeechLabels>
               </DictionaryFormTypeLabels>
             ) : (
               <Outlet />

@@ -200,7 +200,7 @@ export function buildV3ProductProgress({
   const catalogNames = new Map(
     partOfSpeechCatalog.map((part) => [
       part.code,
-      part.name_zh.trim() || part.name_en.trim()
+      part.short_name_zh.trim() || part.name_en.trim()
     ])
   );
   const meaningsByPos = new Map(meanings.pos.map((pos) => [pos.pos_id, pos]));

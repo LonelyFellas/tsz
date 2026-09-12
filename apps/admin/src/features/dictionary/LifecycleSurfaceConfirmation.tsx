@@ -14,7 +14,7 @@ import {
   canAcknowledgeSurfaceSnapshot,
   type SurfaceSnapshotState
 } from "./surfaceSnapshot";
-import type { SurfaceMatchPageAny } from "@tsz/types";
+import type { SurfaceMatchPageV3 } from "@tsz/types";
 
 export function LifecycleSurfaceConfirmation({
   state,
@@ -23,7 +23,7 @@ export function LifecycleSurfaceConfirmation({
   confirming,
   action = "restore"
 }: {
-  state: SurfaceSnapshotState<SurfaceMatchPageAny> & { retry: () => void };
+  state: SurfaceSnapshotState<SurfaceMatchPageV3> & { retry: () => void };
   onConfirm: () => void;
   onRestart: () => void;
   confirming: boolean;

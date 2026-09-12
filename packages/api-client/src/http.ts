@@ -1,7 +1,7 @@
 // 运行环境无关的请求层。web 与 admin 各自注入 baseUrl / token。
 
 import type {
-  DraftValidationIssueAny,
+  V3DraftValidationIssue,
   ProblemDetails,
   ProblemMeta
 } from "@tsz/types";
@@ -32,7 +32,7 @@ export class HttpError extends Error {
   /** 完整 RFC 9457 响应；响应不完整或畸形时为空。 */
   public problem?: ProblemDetails;
   /** V2/V3 分步保存/发布的字段级问题；legacy 错误为空数组。 */
-  public field_issues: DraftValidationIssueAny[];
+  public field_issues: V3DraftValidationIssue[];
   /** 版本化冲突/影响确认的结构化上下文；legacy 错误缺省。 */
   public meta?: ProblemMeta;
 
@@ -46,7 +46,7 @@ export class HttpError extends Error {
      * 需要按错误码分支的全局处理据此判定,而非匹配 message。多数错误无此字段。
      */
     public code?: string,
-    problemOrFieldIssues?: ProblemDetails | DraftValidationIssueAny[],
+    problemOrFieldIssues?: ProblemDetails | V3DraftValidationIssue[],
     meta?: ProblemMeta,
     problem?: ProblemDetails
   ) {
@@ -68,7 +68,7 @@ interface ParsedError {
   details: string[];
   code: string | undefined;
   problem: ProblemDetails | undefined;
-  field_issues: DraftValidationIssueAny[];
+  field_issues: V3DraftValidationIssue[];
   meta: ProblemMeta | undefined;
 }
 
@@ -90,17 +90,17 @@ function stringArray(value: unknown): string[] {
 
 function toDraftValidationIssues(
   value: unknown
-): DraftValidationIssueAny[] | undefined {
+): V3DraftValidationIssue[] | undefined {
   if (value === undefined) return undefined;
   if (
     !Array.isArray(value) ||
     !value.every(
-      (issue) => validateRuntimeSchema("DraftValidationIssueAny", issue).valid
+      (issue) => validateRuntimeSchema("V3DraftValidationIssue", issue).valid
     )
   ) {
     return undefined;
   }
-  return value as DraftValidationIssueAny[];
+  return value as V3DraftValidationIssue[];
 }
 function toProblemMeta(value: unknown): ProblemMeta | undefined {
   if (value === undefined) return undefined;

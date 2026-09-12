@@ -46,11 +46,9 @@ export function observeWordListPresentation(
   return true;
 }
 
-/** 列表展示名由各 schema 的服务端响应决定；V3 禁止从具体词形反推。 */
+/** 列表展示名一律用服务端 presentation，禁止从具体词形反推。 */
 export function wordListLabel(record: AdminWordListItemAny): string {
-  return record.schema_version === 2
-    ? record.headword
-    : record.presentation.label;
+  return record.presentation.label;
 }
 
 /**

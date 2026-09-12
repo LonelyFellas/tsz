@@ -42,7 +42,7 @@ const v3LayoutCss = readFileSync(
   "utf8"
 );
 
-const relatedSearchAny = vi.hoisted(() =>
+const relatedSearch = vi.hoisted(() =>
   vi.fn(
     (_query: string, _kind: "word" | "phrase" | undefined, _open: boolean) => ({
       exact: {
@@ -109,9 +109,9 @@ const relatedSearchAny = vi.hoisted(() =>
   )
 );
 
-vi.mock("../api", () => ({ useRelatedSearchAny: relatedSearchAny }));
+vi.mock("../api", () => ({ useRelatedSearch: relatedSearch }));
 const defaultRelatedSearchImplementation =
-  relatedSearchAny.getMockImplementation()!;
+  relatedSearch.getMockImplementation()!;
 
 const meaningsFixture: DraftMeaningsStepContentWritableV3 = {
   sense_groups: [{ id: "sense-group-1", name_zh: "核心", name_en: "Core" }],
@@ -302,7 +302,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   beforeEach(() => {
-    relatedSearchAny.mockImplementation(defaultRelatedSearchImplementation);
+    relatedSearch.mockImplementation(defaultRelatedSearchImplementation);
   });
 
   it("短语在每条释义卡内渲染成分用词区块（多维释义与多维例句之间），单词不渲染", () => {
@@ -778,7 +778,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.change(screen.getByLabelText("例句 2 通用英文"), {
       target: { value: "We broke the ice." }
     });
-    fireEvent.change(screen.getByLabelText("例句 2 中文"), {
+    // 新建例句默认摆出初、中、高、高四个录入位，主译文挂在第二个（中阶）上。
+    expect(screen.getAllByLabelText(/^例句 2 译文 \d 中文$/)).toHaveLength(4);
+    fireEvent.change(screen.getByLabelText("例句 2 译文 2 中文"), {
       target: { value: "我们打破了沉默。" }
     });
     fireEvent.mouseDown(screen.getByLabelText("例句 2 等级"));
@@ -797,9 +799,12 @@ describe("V3MeaningsAndExamplesStep", () => {
         common: { origin: "manual", value: { text: "We broke the ice." } }
       },
       zh_text: { text: "我们打破了沉默。" },
-      // 译文档位独立于英文例句等级，保留新建时的中阶。
+      // 译文档位独立于英文例句等级；存草稿不清理空行，四个录入位原样留着。
       zh_translations: [
-        { band: "balanced_fluency", content: { text: "我们打破了沉默。" } }
+        { band: "word_for_word", content: { text: "" } },
+        { band: "balanced_fluency", content: { text: "我们打破了沉默。" } },
+        { band: "adapted_creation", content: { text: "" } },
+        { band: "adapted_creation", content: { text: "" } }
       ],
       links: [{ word_id: "entry-1", sense_id: "sense-1", role: "focus" }]
     });
@@ -1536,16 +1541,18 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
     const translations =
       value().pos[0]!.senses[0]!.sentences[0]!.zh_translations;
-    expect(translations[0]).toEqual(
-      initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations[0]
-    );
+    expect(translations[0]).toEqual({
+      ...initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations[0]!,
+      language: "zh"
+    });
     expect(translations[1]).toMatchObject({
       id: "translation-b",
       content: { text: "更新中阶译文" }
     });
-    expect(translations[2]).toEqual(
-      initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations[2]
-    );
+    expect(translations[2]).toEqual({
+      ...initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations[2]!,
+      language: "zh"
+    });
   });
 
   it("删除兼容译文后更新别名，其他同档译文与英文关联保持不变", () => {
@@ -1566,7 +1573,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     render(<Harness initial={initial} wordId="entry-1" />);
     fireEvent.click(screen.getByLabelText("删除例句 1 译文 1"));
     const after = value().pos[0]!.senses[0]!.sentences[0]!;
-    expect(after.zh_translations).toEqual([sentence.zh_translations[1]]);
+    expect(after.zh_translations).toEqual([
+      { ...sentence.zh_translations[1]!, language: "zh" }
+    ]);
     expect(after.zh_text_id).toBe("second-high");
     expect(after.zh_text).toEqual(sentence.zh_translations[1]!.content);
     expect(after.en_text).toEqual(sentence.en_text);
@@ -1778,12 +1787,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       score: "0",
       pending_target_headword: "outside"
     });
-    expect(relatedSearchAny).toHaveBeenCalledWith(
-      "outside",
-      "word",
-      true,
-      true
-    );
+    expect(relatedSearch).toHaveBeenCalledWith("outside", "word", true, true);
     fireEvent.click(screen.getAllByText("outside").at(-1)!);
     expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
       target_word_id: "external-word-1"
@@ -1833,23 +1837,13 @@ describe("V3MeaningsAndExamplesStep", () => {
       .at(-1)!;
     fireEvent.change(pendingTarget, { target: { value: "苹果" } });
     expect(within(synonymCard).getByText(/仅支持英文词条/u)).toBeVisible();
-    expect(relatedSearchAny).not.toHaveBeenCalledWith(
-      "苹果",
-      "word",
-      true,
-      true
-    );
+    expect(relatedSearch).not.toHaveBeenCalledWith("苹果", "word", true, true);
     expect(value().pos[0]!.senses[0]!.relations[2]).not.toHaveProperty(
       "pending_target_headword"
     );
 
     fireEvent.change(pendingTarget, { target: { value: "  give   up  " } });
-    expect(relatedSearchAny).toHaveBeenCalledWith(
-      "give up",
-      "phrase",
-      true,
-      true
-    );
+    expect(relatedSearch).toHaveBeenCalledWith("give up", "phrase", true, true);
     expect(value().pos[0]!.senses[0]!.relations[2]).toMatchObject({
       pending_target_headword: "give up"
     });
@@ -1865,7 +1859,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   it.each(["近义词", "反义词", "派生词"])(
     "%s可以选择零词义草稿，词面与词义仅保存文本",
     (label) => {
-      relatedSearchAny.mockImplementation(
+      relatedSearch.mockImplementation(
         (
           _query: string,
           _kind: "word" | "phrase" | undefined,
@@ -1978,7 +1972,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       });
       fireEvent.click(screen.getByText("保存草稿"));
       expect(onSave).toHaveBeenCalledWith(value(), "save");
-      expect(relatedSearchAny).toHaveBeenCalledWith("reli", "word", true, true);
+      expect(relatedSearch).toHaveBeenCalledWith("reli", "word", true, true);
       let targetInput = screen.getByLabelText(`${label}目标词条`);
       let metricInput = screen.getByLabelText(
         label === "近义词" ? "相似度" : label === "反义词" ? "差异度" : "关联度"
@@ -2009,7 +2003,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(value().pos[0]!.senses[0]!.relations[0]).not.toHaveProperty(
         "pending_target_gloss"
       );
-      relatedSearchAny.mockImplementation(defaultRelatedSearchImplementation);
+      relatedSearch.mockImplementation(defaultRelatedSearchImplementation);
       fireEvent.change(targetInput, { target: { value: "outside" } });
       expect(screen.getByLabelText(`待关联的${label}`)).toBeInTheDocument();
       fireEvent.change(screen.getByLabelText(`${label}待关联词义`), {
@@ -2358,7 +2352,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   );
 
   it("派生词的多条词义纵向逐条排，可拖动排序也可单条删除", () => {
-    relatedSearchAny.mockImplementation((...args) => {
+    relatedSearch.mockImplementation((...args) => {
       const result = defaultRelatedSearchImplementation(...args);
       result.exact.data.pages[0]!.results[0]!.senses = [
         { sense_id: "external-sense-1", gloss: "外部词义一" },
@@ -2447,7 +2441,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   it("清空派生词的词义会删掉整条关联，不留半绑定形状", () => {
-    relatedSearchAny.mockImplementation((...args) => {
+    relatedSearch.mockImplementation((...args) => {
       const result = defaultRelatedSearchImplementation(...args);
       result.exact.data.pages[0]!.results[0]!.senses = [
         { sense_id: "external-sense-1", gloss: "外部词义一" }
@@ -2478,7 +2472,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   it("置灰文案按优先级排：禁用理由先于选中后会发生什么", () => {
-    relatedSearchAny.mockImplementation((...args) => {
+    relatedSearch.mockImplementation((...args) => {
       const result = defaultRelatedSearchImplementation(...args);
       // 0 词义的草稿：本身可选，选中只记文本。
       Object.assign(result.contains.data.pages[0]!.results[0]!, {
@@ -2590,7 +2584,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       );
     // 快照只是兜底：活数据能按 (词条, 词义) 命中时必须以它为准。
     // 注：生产里刚重开草稿、没有活动搜索时两个活数据源都是空的，首屏显示的就是
-    // 快照文案；这里 relatedSearchAny 的 mock 无视 enabled 永远有结果，所以这条
+    // 快照文案；这里 relatedSearch 的 mock 无视 enabled 永远有结果，所以这条
     // 断言钉的是优先级，真正在生产里承重的是下面"改选后不留旧快照"那半段。
     expect(glosses()).toEqual(["外部词义一"]);
 
@@ -2669,7 +2663,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   });
 
   it("派生词多选保存后合为一行，重开可取消和新增词义，改选清理整组", () => {
-    relatedSearchAny.mockImplementation((...args) => {
+    relatedSearch.mockImplementation((...args) => {
       const result = defaultRelatedSearchImplementation(...args);
       result.exact.data.pages[0]!.results[0]!.senses = [
         { sense_id: "external-sense-1", gloss: "外部词义一" },
@@ -2826,7 +2820,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         matches: [],
         senses: [{ sense_id: `${entryId}-sense`, gloss: `${headword} 的词义` }]
       });
-      relatedSearchAny.mockImplementation(
+      relatedSearch.mockImplementation(
         () =>
           ({
             exact: {
@@ -2878,7 +2872,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   );
 
   it("有词义的草稿仍可显式选择词条和词义", () => {
-    relatedSearchAny.mockImplementation((query, kind, open) => {
+    relatedSearch.mockImplementation((query, kind, open) => {
       const result = defaultRelatedSearchImplementation(query, kind, open);
       Object.assign(result.contains.data.pages[0]!.results[0]!, {
         status: "draft"
@@ -2906,7 +2900,7 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("关联词搜索有后页时提供加载入口，未完成 exact 前不宣称无匹配", () => {
     const fetchExactNextPage = vi.fn().mockResolvedValue(undefined);
-    relatedSearchAny.mockImplementation((query, kind, open) =>
+    relatedSearch.mockImplementation((query, kind, open) =>
       query === "laterexact"
         ? ({
             exact: {
@@ -2949,7 +2943,7 @@ describe("V3MeaningsAndExamplesStep", () => {
 
   it("关联词搜索失败显示错误和重试，不伪装成未找到", () => {
     const retryExact = vi.fn().mockResolvedValue(undefined);
-    relatedSearchAny.mockImplementation((query, kind, open) =>
+    relatedSearch.mockImplementation((query, kind, open) =>
       query === "networkfail"
         ? ({
             exact: {
@@ -2989,7 +2983,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   it("exact 已完成但 contains 有后页时从 contains 加载更多", () => {
     const fetchExactNextPage = vi.fn().mockResolvedValue(undefined);
     const fetchContainsNextPage = vi.fn().mockResolvedValue(undefined);
-    relatedSearchAny.mockImplementation((query, kind, open) =>
+    relatedSearch.mockImplementation((query, kind, open) =>
       query === "containsmore"
         ? ({
             exact: {
@@ -3031,7 +3025,7 @@ describe("V3MeaningsAndExamplesStep", () => {
   it("仅 contains 搜索失败时只重试 contains", () => {
     const retryExact = vi.fn().mockResolvedValue(undefined);
     const retryContains = vi.fn().mockResolvedValue(undefined);
-    relatedSearchAny.mockImplementation((query, kind, open) =>
+    relatedSearch.mockImplementation((query, kind, open) =>
       query === "containsfail"
         ? ({
             exact: {

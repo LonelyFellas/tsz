@@ -7,7 +7,6 @@ import type {
   DraftMeaningsStepContentWritableV3,
   StepSaveIntent,
   SurfaceMatchEnabledTerminalPageV3,
-  SurfaceMatchPageAny,
   SurfaceMatchPageV3,
   WordCreationStep
 } from "@tsz/types";
@@ -28,7 +27,7 @@ import {
   canAcknowledgeSurfaceSnapshot,
   type SurfaceSnapshotState
 } from "@/features/dictionary/surfaceSnapshot";
-import { useSurfaceSnapshotAny } from "@/features/dictionary/useSurfaceSnapshot";
+import { useSurfaceSnapshot } from "@/features/dictionary/useSurfaceSnapshot";
 import { V3FormsAndPronunciationStep } from "@/features/dictionary/word-creation-v3/components/V3FormsAndPronunciationStep";
 import { V3BasicsStep } from "@/features/dictionary/word-creation-v3/V3BasicsStep";
 import { V3MeaningsAndExamplesStep } from "@/features/dictionary/word-creation-v3/V3MeaningsAndExamplesStep";
@@ -70,7 +69,7 @@ function isStep(value: unknown): value is WordCreationStep {
 }
 
 function terminalSurfacePage(
-  state: SurfaceSnapshotState<SurfaceMatchPageAny>
+  state: SurfaceSnapshotState<SurfaceMatchPageV3>
 ): SurfaceMatchEnabledTerminalPageV3 | undefined {
   if (
     state.schema_version !== 3 ||
@@ -105,7 +104,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
   const [pendingIntent, setPendingIntent] = useState<StepSaveIntent>();
   const preparingRef = useRef(false);
   const impactPage = context.impactSurfacePage;
-  const snapshot = useSurfaceSnapshotAny(
+  const snapshot = useSurfaceSnapshot(
     impactPage,
     `${context.word.id}:${context.word.revision}:forms-impact:${impactPage?.snapshot_id ?? "none"}`,
     context.actions.fetchSurfacePage

@@ -8,11 +8,14 @@ import { describe, expect, it, vi } from "vitest";
 import { newWordNodeId } from "../word-model/primitives";
 import { formsFixture } from "./fixtures";
 import {
+  dropEmptySentenceTranslations,
   editableEnglishText,
+  newSentenceTranslations,
   prepareTextLinksForSave,
   ensureV3MeaningsForForms,
   relationDisplaySnapshots,
   replaceEnglishText,
+  sentenceTranslationsV3,
   replaceRichText,
   stripBlankRelations,
   stripSenseComponentUsages,
@@ -211,18 +214,41 @@ describe("V3 meanings writable model", () => {
           },
           zh_text_id: expect.any(String),
           zh_text: { version: 2, text: "", annotations: [] },
+          // 自动播种的例句同样摆出初、中、高、高四个录入位。
           zh_translations: [
             {
               id: expect.any(String),
+              band: "word_for_word",
+              language: "zh",
+              content: { version: 2, text: "", annotations: [] }
+            },
+            {
+              id: expect.any(String),
               band: "balanced_fluency",
+              language: "zh",
+              content: { version: 2, text: "", annotations: [] }
+            },
+            {
+              id: expect.any(String),
+              band: "adapted_creation",
+              language: "zh",
+              content: { version: 2, text: "", annotations: [] }
+            },
+            {
+              id: expect.any(String),
+              band: "adapted_creation",
+              language: "zh",
               content: { version: 2, text: "", annotations: [] }
             }
           ],
           links: [{ word_id: "word-1", sense_id: sense.id, role: "focus" }]
         }
       ]);
-      expect(sense.sentences[0]!.zh_translations[0]!.id).toBe(
-        sense.sentences[0]!.zh_text_id
+      // 主译文挂在默认的中阶那条上，别名必须指得到它。
+      expect(sense.sentences[0]!.zh_text_id).toBe(
+        sense.sentences[0]!.zh_translations.find(
+          (item) => item.band === "balanced_fluency"
+        )!.id
       );
     }
     expect(
@@ -1051,6 +1077,7 @@ describe("V3 meanings writable model", () => {
       {
         id: projectedSense.sentences[0]!.zh_text_id,
         band: "balanced_fluency",
+        language: "zh",
         content: projectedSense.sentences[0]!.zh_text
       }
     ]);
@@ -1283,4 +1310,117 @@ it("正文关联和语音克隆后独立保存；去除只读快照，旧后端�
   expect(
     JSON.stringify(prepareTextLinksForSave(toWritableMeanings(empty), false))
   ).not.toContain("text_links");
+});
+
+describe("例句译文的默认录入位与收尾清洗", () => {
+  const withTranslations = (texts: readonly string[], aliasIndex: number) => {
+    const writable = toWritableMeanings(meaningsCanonicalFixture);
+    const sentence = writable.pos[0]!.senses[0]!.sentences[0]!;
+    const rows = texts.map((text, index) => ({
+      id: `translation-${index + 1}`,
+      band: newSentenceTranslations(() => "x")[index]!.band,
+      content: { version: 2 as const, text, annotations: [] }
+    }));
+    sentence.zh_translations = rows;
+    sentence.zh_text_id = rows[aliasIndex]!.id;
+    sentence.zh_text = rows[aliasIndex]!.content;
+    return writable;
+  };
+
+  it("新建例句摆出初、中、高、高四个录入位且各自独立", () => {
+    let seq = 0;
+    const rows = newSentenceTranslations(() => `translation-${++seq}`);
+
+    expect(rows.map((row) => row.band)).toEqual([
+      "word_for_word",
+      "balanced_fluency",
+      "adapted_creation",
+      "adapted_creation"
+    ]);
+    expect(rows.every((row) => row.content.text === "")).toBe(true);
+    expect(new Set(rows.map((row) => row.id)).size).toBe(4);
+  });
+
+  it("收尾提交丢掉没填的行，主译文改指向留下来的那条", () => {
+    const content = withTranslations(["", "", "深层重构译文", ""], 1);
+
+    const cleaned = dropEmptySentenceTranslations(content);
+
+    const sentence = cleaned.pos[0]!.senses[0]!.sentences[0]!;
+    expect(sentence.zh_translations!.map((row) => row.content.text)).toEqual([
+      "深层重构译文"
+    ]);
+    expect(sentence.zh_text_id).toBe("translation-3");
+    expect(sentence.zh_text.text).toBe("深层重构译文");
+  });
+
+  it("主译文自己有内容时保持原来的指向", () => {
+    const content = withTranslations(["逐字直译", "语句通顺", "", ""], 1);
+
+    const sentence =
+      dropEmptySentenceTranslations(content).pos[0]!.senses[0]!.sentences[0]!;
+
+    expect(sentence.zh_translations).toHaveLength(2);
+    expect(sentence.zh_text_id).toBe("translation-2");
+    expect(sentence.zh_text.text).toBe("语句通顺");
+  });
+
+  it("一条都没填时留下第一行，交给后端报缺译文", () => {
+    const content = withTranslations(["", "", "", ""], 1);
+
+    const sentence =
+      dropEmptySentenceTranslations(content).pos[0]!.senses[0]!.sentences[0]!;
+
+    expect(sentence.zh_translations).toHaveLength(1);
+    expect(sentence.zh_translations![0]!.band).toBe("word_for_word");
+    expect(sentence.zh_text_id).toBe("translation-1");
+  });
+});
+
+describe("译文语言", () => {
+  const sentence = (
+    translations?: { id: string; band: string; language?: string }[]
+  ) => ({
+    level: "A1",
+    zh_text_id: "zh-alias",
+    zh_text: { version: 2 as const, text: "旧译文", annotations: [] },
+    ...(translations
+      ? {
+          zh_translations: translations.map((row) => ({
+            ...row,
+            band: row.band as "word_for_word",
+            language: row.language as "zh" | undefined,
+            content: { version: 2 as const, text: "旧译文", annotations: [] }
+          }))
+        }
+      : {})
+  });
+
+  it("新建的四个录入位都带汉语", () => {
+    let seq = 0;
+    const rows = newSentenceTranslations(() => `t-${++seq}`);
+    expect(rows.map((row) => row.language)).toEqual(["zh", "zh", "zh", "zh"]);
+  });
+
+  it("历史译文缺 language 时补成汉语", () => {
+    // 后端 publication_from_record 原样返回历史快照，2026-09-12 之前发布的没有这个键。
+    const rows = sentenceTranslationsV3(
+      sentence([{ id: "t-1", band: "word_for_word" }])
+    );
+    expect(rows.map((row) => row.language)).toEqual(["zh"]);
+  });
+
+  it("译文为空时兜底出来的那条也带汉语", () => {
+    const rows = sentenceTranslationsV3(sentence());
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.language).toBe("zh");
+    expect(rows[0]!.id).toBe("zh-alias");
+  });
+
+  it("已有 language 原样保留，不被默认值覆盖", () => {
+    const rows = sentenceTranslationsV3(
+      sentence([{ id: "t-1", band: "word_for_word", language: "zh" }])
+    );
+    expect(rows[0]!.language).toBe("zh");
+  });
 });

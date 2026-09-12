@@ -155,15 +155,10 @@ export interface FormSurfaceMatchV3 {
   publication_id?: string;
 }
 
-export interface LegacySurfaceMatchV3 {
-  source_schema_version: 2;
-  existing: ExistingSurfaceMatchV2;
-  publication_id?: string;
-}
-
-export type SurfaceMatchItemV3 =
-  | { match_kind: "legacy_v2"; match: LegacySurfaceMatchV3 }
-  | { match_kind: "form_variant_v3"; match: FormSurfaceMatchV3 };
+export type SurfaceMatchItemV3 = {
+  match_kind: "form_variant_v3";
+  match: FormSurfaceMatchV3;
+};
 
 export interface RelationReferencePreviewV3 {
   source_entry_id: string;
@@ -236,5 +231,3 @@ export type SurfaceMatchPageV3 =
   | SurfaceMatchEnabledNextPageV3
   | SurfaceMatchEnabledTerminalPageV3
   | SurfaceMatchTemporarilyDisabledPageV3;
-
-export type SurfaceMatchPageAny = SurfaceMatchPageV2 | SurfaceMatchPageV3;

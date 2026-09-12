@@ -8,7 +8,6 @@ import {
   impactTypeLabel,
   partOfSpeechLabel,
   pronunciationStyleLabel,
-  publicationBlockMessage,
   relationLabel,
   sentenceLinkRoleLabel,
   subPartOfSpeechLabel,
@@ -52,16 +51,13 @@ describe("V3 product presentation", () => {
     expect(sentenceLinkRoleLabel("future-role")).toBe("其他关联");
   });
 
-  it("映射影响、定义与发布阻断，不返回原始代码", () => {
+  it("映射影响与定义，不返回原始代码", () => {
     expect(impactTypeLabel("membership")).toBe("词形使用位置");
     expect(impactReasonLabel("例句仍引用词形")).toBe("例句仍引用词形");
     expect(impactReasonLabel("referenced")).toBe(
       "关联内容将随本次调整受到影响。"
     );
     expect(definitionModeLabel("en_sentence")).toBe("英文例句");
-    expect(publicationBlockMessage("phase2_consumers_not_ready")).not.toContain(
-      "phase2_consumers_not_ready"
-    );
   });
 
   it("未知枚举统一回退到产品文案", () => {

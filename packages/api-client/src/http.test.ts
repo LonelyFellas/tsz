@@ -108,22 +108,6 @@ function formSourceFixture(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function relationSourceFixture(overrides: Record<string, unknown> = {}) {
-  return {
-    source_kind: "relation",
-    source_id: "existing-relation-1",
-    source_node_id: UUIDS.sense,
-    content_scope: "current_publication",
-    surface: "workspace",
-    dialect: "common",
-    relation_type: "synonym",
-    referencing_word_id: UUIDS.sourceEntry,
-    referencing_headword: "workplace",
-    referencing_status: "published",
-    ...overrides
-  };
-}
-
 function existingSurfaceMatchFixture(overrides: Record<string, unknown> = {}) {
   return {
     word_id: UUIDS.entry,
@@ -137,15 +121,22 @@ function existingSurfaceMatchFixture(overrides: Record<string, unknown> = {}) {
 
 function lexiconSurfaceMatchFixture(overrides: Record<string, unknown> = {}) {
   return {
-    match_id: "match-1",
-    match_category: "exact_headword",
-    severity: "warning",
-    attention_level: "high",
-    can_continue: true,
-    confirmation_reasons: ["unacknowledged_surface_matches"],
-    candidate: headwordCandidateFixture(),
-    existing: existingSurfaceMatchFixture(),
-    ...overrides
+    match_kind: "form_variant_v3",
+    match: {
+      source_schema_version: 3,
+      entry_id: UUIDS.entry,
+      entry_kind: "word",
+      status: "published",
+      content_scope: "current_publication",
+      pos_id: UUIDS.pos,
+      group_ids: [UUIDS.group],
+      form_id: UUIDS.form,
+      variant_id: UUIDS.variant,
+      form_type: "base",
+      dialect: "common",
+      spelling: "workspace",
+      ...overrides
+    }
   };
 }
 
@@ -160,8 +151,12 @@ function relationCountsFixture(overrides: Record<string, unknown> = {}) {
 
 function relationPreviewFixture(overrides: Record<string, unknown> = {}) {
   return {
-    source_word_id: UUIDS.sourceEntry,
-    source_headword: "workplace",
+    source_entry_id: UUIDS.sourceEntry,
+    source_presentation: {
+      label: "workplace",
+      matched_surfaces: ["workplace"],
+      strategy_version: "surface_summary_v1"
+    },
     source_status: "published",
     relation: "synonym",
     ...overrides
@@ -180,7 +175,14 @@ function relationSummaryFixture(overrides: Record<string, unknown> = {}) {
 
 function matchedEntryContextFixture(overrides: Record<string, unknown> = {}) {
   return {
-    word_id: UUIDS.entry,
+    entry_id: UUIDS.entry,
+    annotation: null,
+    annotation_revision: 1,
+    presentation: {
+      label: "workspace",
+      matched_surfaces: ["workspace"],
+      strategy_version: "surface_summary_v1"
+    },
     pos_labels: ["noun"],
     gloss_previews: ["a place to work"],
     updated_at: "2026-08-15T10:30:00Z",
@@ -191,34 +193,23 @@ function matchedEntryContextFixture(overrides: Record<string, unknown> = {}) {
 
 function surfacePageBaseFixture(overrides: Record<string, unknown> = {}) {
   return {
-    schema_version: 2,
+    schema_version: 3,
     snapshot_id: UUIDS.snapshot,
     items: [
       lexiconSurfaceMatchFixture(),
       lexiconSurfaceMatchFixture({
-        match_id: "match-2",
-        match_category: "form_headword",
-        attention_level: "normal",
-        can_continue: true,
-        confirmation_reasons: [
-          "unacknowledged_surface_matches",
-          "visibility_activation"
-        ],
-        candidate: formCandidateFixture(),
-        existing: existingSurfaceMatchFixture({
-          word_id: UUIDS.sourceEntry,
-          headword: "workspaces",
-          kind: "phrase",
-          status: "archived",
-          source: formSourceFixture()
-        })
+        entry_id: UUIDS.sourceEntry,
+        entry_kind: "phrase",
+        status: "archived",
+        content_scope: "draft",
+        spelling: "workspaces"
       })
     ],
     total: 2,
     matched_entry_contexts: [
       matchedEntryContextFixture(),
       matchedEntryContextFixture({
-        word_id: UUIDS.sourceEntry,
+        entry_id: UUIDS.sourceEntry,
         pos_labels: [],
         gloss_previews: [],
         inbound_relations: relationSummaryFixture({
@@ -233,7 +224,7 @@ function surfacePageBaseFixture(overrides: Record<string, unknown> = {}) {
       "unacknowledged_surface_matches",
       "visibility_activation"
     ],
-    policy_name: "allow_new_exact_headword_entries",
+    policy_name: "surface_warning_acknowledgement",
     policy_epoch: 7,
     ...overrides
   };
@@ -864,19 +855,18 @@ describe("createHttpClient", () => {
     });
   });
 
-  it("V2 结构化错误保留 code、field_issues 与 meta", async () => {
+  it("结构化错误保留 code、field_issues 与 meta", async () => {
     const fieldIssue = {
-      schema_version: 2 as const,
+      schema_version: 3 as const,
       step: "meanings" as const,
       node_id: UUIDS.sense,
       field: "definitions",
       code: "native_definition_required",
       message: "至少填写一条本语言释义",
-      reference_location: {
-        source_entry_id: UUIDS.sourceEntry,
-        source_publication_id: UUIDS.publication,
-        source_node_id: UUIDS.form,
-        reference_kind: "definition"
+      node_location: {
+        node_role: "meanings.definition",
+        ancestor_node_ids: [UUIDS.entry, UUIDS.pos, UUIDS.sense],
+        pos_id: UUIDS.pos
       }
     };
     fetchMock.mockResolvedValueOnce(
@@ -940,16 +930,8 @@ describe("createHttpClient", () => {
     });
   });
 
-  it("ProblemDetails.field_issues 按 schema_version 保留 V2/V3 可判别联合", async () => {
+  it("ProblemDetails.field_issues 保留 V3 节点定位字段", async () => {
     const field_issues = [
-      {
-        schema_version: 2,
-        step: "meanings",
-        node_id: UUIDS.sense,
-        field: "definitions",
-        code: "native_definition_required",
-        message: "至少填写一条本语言释义"
-      },
       {
         schema_version: 3,
         step: "forms",
@@ -1150,24 +1132,6 @@ describe("createHttpClient", () => {
     expect(error.meta).toEqual({ surface_match_page });
   });
 
-  it("ProblemMeta.surface_match_page 支持 V3 中显式保留的 legacy V2 命中", async () => {
-    const surface_match_page = v3SurfacePageFixture({
-      items: [
-        {
-          match_kind: "legacy_v2",
-          match: {
-            source_schema_version: 2,
-            existing: existingSurfaceMatchFixture(),
-            publication_id: UUIDS.publication
-          }
-        }
-      ]
-    });
-    const error = await surfacePageHttpError(surface_match_page);
-
-    expect(error.meta).toEqual({ surface_match_page });
-  });
-
   it("V3 surface page 拒绝 C1 旧版裸 FormSurfaceMatchV3 item", async () => {
     const surface_match_page = v3SurfacePageFixture({
       items: [
@@ -1186,23 +1150,6 @@ describe("createHttpClient", () => {
     const error = await surfacePageHttpError(surface_match_page);
 
     expect(error.meta).toBeUndefined();
-  });
-
-  it("V2 surface page 接受 schema_version、source_status、headword_relation 与 relation source", async () => {
-    const page = terminalSurfacePageFixture({
-      items: [
-        lexiconSurfaceMatchFixture({
-          match_category: "headword_relation",
-          existing: existingSurfaceMatchFixture({
-            source: relationSourceFixture()
-          })
-        })
-      ],
-      total: 1
-    });
-    const error = await surfacePageHttpError(page);
-
-    expect(error.meta).toEqual({ surface_match_page: page });
   });
 
   it("畸形 surface 子树 fail closed，错误对象不泄露原始正文", async () => {
@@ -1237,17 +1184,6 @@ describe("createHttpClient", () => {
         policy_block_code:
           "multiple_active_exact_headword_publications_not_enabled"
       })
-    ],
-    [
-      "headword candidate 无可选 word_id",
-      (() => {
-        const candidate = headwordCandidateFixture();
-        Reflect.deleteProperty(candidate, "candidate_word_id");
-        return nextSurfacePageFixture({
-          items: [lexiconSurfaceMatchFixture({ candidate })],
-          total: 1
-        });
-      })()
     ]
   ])("ProblemMeta 保留合法 surface page：%s", async (_name, page) => {
     const error = await surfacePageHttpError(page);
@@ -1263,7 +1199,6 @@ describe("createHttpClient", () => {
     ["page 多余字段", terminalSurfacePageFixture({ unexpected: true })],
     ["snapshot_id 非空", terminalSurfacePageFixture({ snapshot_id: " " })],
     ["items 必须为数组", terminalSurfacePageFixture({ items: "matches" })],
-    ["items minItems=1", terminalSurfacePageFixture({ items: [] })],
     [
       "items maxItems=50",
       terminalSurfacePageFixture({
@@ -1275,10 +1210,6 @@ describe("createHttpClient", () => {
     [
       "matched_entry_contexts 必须为数组",
       terminalSurfacePageFixture({ matched_entry_contexts: "contexts" })
-    ],
-    [
-      "matched_entry_contexts minItems=1",
-      terminalSurfacePageFixture({ matched_entry_contexts: [] })
     ],
     [
       "matched_entry_contexts maxItems=50",

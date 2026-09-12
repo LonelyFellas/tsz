@@ -3,7 +3,6 @@ import type { RichTextEmphasisLevel } from "./rich-text";
 import type {
   AdminWordListPage,
   AdminWordStatus,
-  AdminWordV2ListItem,
   Dialect,
   PronunciationStyle,
   RelatedWordResult,
@@ -11,14 +10,9 @@ import type {
 } from "./admin-word";
 import type {
   ActivatePublicationInput,
-  AdminWordDraftV2Envelope,
   AdminWordV2,
   CreateAdminWordV2Input,
   DetectWordInputV2,
-  DetectWordResponseV2,
-  DraftValidationIssueV2,
-  DraftValidationResponse,
-  FormsImpactResponseV2,
   PersistedWordStep,
   PreviewFormsImpactInputV2,
   PublishAdminWordV2Input,
@@ -331,10 +325,18 @@ export interface SentenceSourceRangeV3 {
 export type SentenceTranslationBandV3 =
   "word_for_word" | "balanced_fluency" | "adapted_creation";
 
+/** 译文语言。现阶段只开放汉语，结构为将来的多语言译文预留。 */
+export type TranslationLanguageV3 = "zh";
+
 export interface WordSentenceTranslationV3 {
   id: string;
   band: SentenceTranslationBandV3;
   content: RichTextV3;
+  /**
+   * 缺省按汉语处理，因而在 wire 上非必填。
+   * 后端 2026-09-12 上线之前发布的历史快照里没有这个键（发布快照原样返回、不经规范化）。
+   */
+  language?: TranslationLanguageV3;
 }
 
 interface WordSentenceAssociationBaseV3 {
@@ -609,20 +611,7 @@ export interface EntryPresentationV3 {
   strategy_version: string;
 }
 
-export type V3PublicationBlockCode =
-  "phase2_consumers_not_ready" | "migration_canary_not_whitelisted";
-
-export type V3PublicationCapability =
-  | { mode: "native" }
-  | {
-      mode: "shadow_only";
-      blocked_code: V3PublicationBlockCode;
-    }
-  | {
-      mode: "migration_canary";
-      whitelisted: boolean;
-      blocked_code?: V3PublicationBlockCode;
-    };
+export type V3PublicationCapability = { mode: "native" };
 
 export interface AdminWordV3Capabilities {
   text_links?: boolean;
@@ -636,20 +625,6 @@ export interface AdminWordV3Capabilities {
   draft_relation_prebinding?: boolean;
   /** 释义级成分用词（B1 起恒 true）；缺失表示后端尚不支持，前端不得发送 sense.component_usages。 */
   sense_component_usages?: boolean;
-}
-
-export type LegacyHeadwordsCompatibilityV3 =
-  | { mode: "unified"; common: string }
-  | {
-      mode: "distinguish";
-      uk: string;
-      us: string;
-      source_dialect: SourceDialect;
-    };
-
-export interface AdminWordV3Compatibility {
-  /** Response-only compatibility bridge; never a V3 canonical write field. */
-  legacy_headwords: LegacyHeadwordsCompatibilityV3;
 }
 
 export interface AdminWordV3 {
@@ -668,7 +643,6 @@ export interface AdminWordV3 {
   presentation: EntryPresentationV3;
   capabilities: AdminWordV3Capabilities;
   detection_basis_dialect?: SourceDialect;
-  compatibility?: AdminWordV3Compatibility;
   forms: DraftFormsStepContentV3;
   meanings: DraftMeaningsStepContentV3;
   /** 已通过完整性校验并由服务端标记完成；不表达页面访问权限。 */
@@ -684,13 +658,6 @@ export interface AdminWordV3 {
   published_at?: string;
 }
 
-export type AdminWordAny = AdminWordV2 | AdminWordV3;
-
-export interface AdminWordAnyEnvelope {
-  word: AdminWordAny;
-}
-
-/** V3-only endpoint view used after narrowing an AdminWordAnyEnvelope. */
 export interface AdminWordV3Envelope {
   word: AdminWordV3;
 }
@@ -717,9 +684,6 @@ export interface AdminWordDraftV3Envelope {
   word: AdminWordV3;
   retired_stable_nodes: RetiredStableNodeV3[];
 }
-
-export type AdminWordDraftAnyEnvelope =
-  AdminWordDraftV2Envelope | AdminWordDraftV3Envelope;
 
 export interface CreateAdminWordV3Input {
   schema_version: 3;
@@ -896,18 +860,12 @@ export interface V3DraftValidationIssue {
   node_location: V3DraftNodeLocation;
 }
 
-export type DraftValidationIssueAny =
-  DraftValidationIssueV2 | V3DraftValidationIssue;
-
 export interface DraftValidationResponseV3 {
   schema_version: 3;
   validated_revision: number;
   valid: boolean;
   issues: V3DraftValidationIssue[];
 }
-
-export type DraftValidationResponseAny =
-  DraftValidationResponse | DraftValidationResponseV3;
 
 export type FormsImpactNodeTypeV3 =
   | "pos"
@@ -940,9 +898,6 @@ export interface FormsImpactResponseV3 {
   confirmation_token?: string;
   surface_match_page?: SurfaceMatchPageV3;
 }
-
-export type FormsImpactResponseAny =
-  FormsImpactResponseV2 | FormsImpactResponseV3;
 
 export type PreviewFormsImpactResponseV3 = FormsImpactResponseV3;
 
@@ -1043,9 +998,6 @@ export interface DetectLexiconSurfaceResponseV3 {
   surface_match_page?: SurfaceMatchPageV3;
 }
 
-export type DetectLexiconResponseAny =
-  DetectWordResponseV2 | DetectLexiconSurfaceResponseV3;
-
 export interface AdminWordListItemV3 {
   annotation_visible: boolean;
   schema_version: 3;
@@ -1080,7 +1032,7 @@ export interface AdminWordListItemV3 {
   updated_at: string;
 }
 
-export type AdminWordListItemAny = AdminWordV2ListItem | AdminWordListItemV3;
+export type AdminWordListItemAny = AdminWordListItemV3;
 
 /** Mixed-version list response from the current OpenAPI. */
 export interface AdminWordListResponseAny {
@@ -1152,8 +1104,7 @@ export interface AdminWordPublicationV3 extends AdminWordPublicationBase {
   word: AdminWordV3;
 }
 
-export type AdminWordPublicationAny =
-  AdminWordPublicationV2 | AdminWordPublicationV3;
+export type AdminWordPublicationAny = AdminWordPublicationV3;
 
 export interface AdminWordPublicationEnvelope {
   publication: AdminWordPublicationAny;
@@ -1163,7 +1114,7 @@ export interface AdminWordPublicationListResponse {
   publications: AdminWordPublicationAny[];
 }
 
-export interface EntryLifecycleBatchResponseAny {
-  words: AdminWordAny[];
+export interface EntryLifecycleBatchResponse {
+  words: AdminWordV3[];
   affected: number;
 }

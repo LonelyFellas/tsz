@@ -1,136 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type {
-  LexiconSurfaceMatchV2,
   MatchedEntryContextV3,
-  MatchedEntryContextV2,
   SurfaceMatchItemV3,
-  SurfaceMatchPageAny,
-  SurfaceMatchPageV3,
-  SurfaceMatchPageV2
+  SurfaceMatchPageV3
 } from "@tsz/types";
 import {
-  EMPTY_SURFACE_SNAPSHOT_STATE,
   aggregateLifecycleSurfaceMatchCards,
-  aggregateSurfaceMatchCards,
   canAcknowledgeSurfaceSnapshot,
   createEmptySurfaceSnapshotState,
-  isSurfaceMatchPageV2,
   requiresNewIdempotencyKey,
   surfaceSnapshotReducer
 } from "./surfaceSnapshot";
-
-function match(
-  match_id: string,
-  word_id: string,
-  source_id = match_id,
-  reasons: LexiconSurfaceMatchV2["confirmation_reasons"] = [
-    "unacknowledged_surface_matches"
-  ]
-): LexiconSurfaceMatchV2 {
-  return {
-    match_id,
-    match_category: "exact_headword",
-    severity: "warning",
-    attention_level: "high",
-    can_continue: true,
-    confirmation_reasons: reasons,
-    candidate: {
-      candidate_type: "headword",
-      candidate_ref: "headword:common",
-      surface: "workspace",
-      normalized_surface: "workspace",
-      dialect: "common",
-      entry_kind: "word"
-    },
-    existing: {
-      word_id,
-      headword: "workspace",
-      kind: "word",
-      status: "draft",
-      source: {
-        source_kind: "headword",
-        source_id,
-        content_scope: "draft",
-        surface: "workspace",
-        dialect: "common"
-      }
-    }
-  };
-}
-
-describe("surface page version guard", () => {
-  it("只接受 V2 page，V3 与缺失值均 fail closed", () => {
-    const v3Page: SurfaceMatchPageV3 = {
-      schema_version: 3,
-      snapshot_id: "019c0000-0000-7000-8000-000000000003",
-      items: [],
-      total: 0,
-      matched_entry_contexts: [],
-      confirmation_reasons: ["unacknowledged_surface_matches"],
-      policy_name: "allow_new_exact_headword_entries",
-      policy_epoch: 1,
-      continuation_policy: "enabled",
-      next_cursor: null,
-      surface_confirmation_token: "v3-token"
-    };
-
-    expect(isSurfaceMatchPageV2(page([], null))).toBe(true);
-    expect(isSurfaceMatchPageV2(v3Page)).toBe(false);
-    expect(isSurfaceMatchPageV2(undefined)).toBe(false);
-  });
-});
-
-function context(word_id: string): MatchedEntryContextV2 {
-  return {
-    word_id,
-    pos_labels: ["noun"],
-    gloss_previews: ["工作空间"],
-    updated_at: "2026-08-15T00:00:00Z",
-    inbound_relations: {
-      total: 0,
-      by_type: { synonym: 0, antonym: 0, derivative: 0 },
-      previews: [],
-      truncated: false
-    }
-  };
-}
-
-function page(
-  items: LexiconSurfaceMatchV2[],
-  next_cursor: string | null,
-  options: { disabled?: boolean; token?: string; impactToken?: string } = {}
-): SurfaceMatchPageV2 {
-  const base = {
-    schema_version: 2 as const,
-    snapshot_id: "snapshot-1",
-    items,
-    total: 2,
-    matched_entry_contexts: items.map((item) => context(item.existing.word_id)),
-    confirmation_reasons: ["unacknowledged_surface_matches" as const],
-    policy_name: "allow_new_exact_headword_entries" as const,
-    policy_epoch: 4
-  };
-  if (options.disabled) {
-    return {
-      ...base,
-      continuation_policy: "temporarily_disabled",
-      next_cursor,
-      policy_block_code: "exact_headword_creation_temporarily_disabled"
-    };
-  }
-  if (next_cursor !== null) {
-    return { ...base, continuation_policy: "enabled", next_cursor };
-  }
-  return {
-    ...base,
-    continuation_policy: "enabled",
-    next_cursor: null,
-    surface_confirmation_token: options.token ?? "token-1",
-    ...(options.impactToken
-      ? { impact_confirmation_token: options.impactToken }
-      : {})
-  };
-}
 
 function v3Item(
   entryId: string,
@@ -182,24 +62,27 @@ function v3Page(
   items: SurfaceMatchItemV3[],
   nextCursor: string | null,
   token = "v3-terminal-token",
-  total = 2
+  total = 2,
+  options: { disabled?: boolean } = {}
 ): SurfaceMatchPageV3 {
   const base = {
     schema_version: 3 as const,
     snapshot_id: "v3-snapshot",
     items,
     total,
-    matched_entry_contexts: items.map((item) =>
-      v3Context(
-        item.match_kind === "form_variant_v3"
-          ? item.match.entry_id
-          : item.match.existing.word_id
-      )
-    ),
+    matched_entry_contexts: items.map((item) => v3Context(item.match.entry_id)),
     confirmation_reasons: ["visibility_activation" as const],
     policy_name: "allow_multiple_active_exact_headword_publications" as const,
     policy_epoch: 8
   };
+  if (options.disabled) {
+    return {
+      ...base,
+      continuation_policy: "temporarily_disabled",
+      next_cursor: nextCursor,
+      policy_block_code: "exact_headword_creation_temporarily_disabled"
+    };
+  }
   return nextCursor === null
     ? {
         ...base,
@@ -213,7 +96,7 @@ function v3Page(
 describe("surfaceSnapshotReducer", () => {
   it("V3 顺序合并分页、按 V3 identity 去重并只在终页开放 token", () => {
     const first = surfaceSnapshotReducer(
-      createEmptySurfaceSnapshotState<SurfaceMatchPageAny>(),
+      createEmptySurfaceSnapshotState<SurfaceMatchPageV3>(),
       {
         type: "start",
         generation: 3,
@@ -263,7 +146,7 @@ describe("surfaceSnapshotReducer", () => {
       }
     ];
     const first = surfaceSnapshotReducer(
-      createEmptySurfaceSnapshotState<SurfaceMatchPageAny>(),
+      createEmptySurfaceSnapshotState<SurfaceMatchPageV3>(),
       {
         type: "start",
         generation: 4,
@@ -286,10 +169,10 @@ describe("surfaceSnapshotReducer", () => {
     expect(canAcknowledgeSurfaceSnapshot(terminal)).toBe(true);
   });
   it("顺序合并全部页，终页前不暴露 token，终页后才允许确认", () => {
-    const first = surfaceSnapshotReducer(EMPTY_SURFACE_SNAPSHOT_STATE, {
+    const first = surfaceSnapshotReducer(createEmptySurfaceSnapshotState(), {
       type: "start",
       generation: 1,
-      page: page([match("m1", "word-1")], "cursor-2")
+      page: v3Page([v3Item("entry-1", "variant-1")], "cursor-2")
     });
     expect(first).toMatchObject({
       phase: "loading",
@@ -302,28 +185,32 @@ describe("surfaceSnapshotReducer", () => {
       type: "page_loaded",
       generation: 1,
       requested_cursor: "cursor-2",
-      page: page([match("m2", "word-2")], null, {
-        token: "terminal-token",
-        impactToken: "terminal-impact-token"
-      })
+      page: v3Page([v3Item("entry-2", "variant-2")], null, "terminal-token")
     });
-    expect(terminal.items.map((item) => item.match_id)).toEqual(["m1", "m2"]);
-    expect(terminal.matched_entry_contexts.map((item) => item.word_id)).toEqual(
-      ["word-1", "word-2"]
-    );
+    expect(terminal.items.map((item) => item.match.entry_id)).toEqual([
+      "entry-1",
+      "entry-2"
+    ]);
+    expect(
+      terminal.matched_entry_contexts.map((item) => item.entry_id)
+    ).toEqual(["entry-1", "entry-2"]);
     expect(terminal.surface_confirmation_token).toBe("terminal-token");
-    expect(terminal.impact_confirmation_token).toBe("terminal-impact-token");
     expect(canAcknowledgeSurfaceSnapshot(terminal)).toBe(true);
   });
 
   it("reset 与 generation 会丢弃晚到响应并清除旧 token", () => {
-    const terminal = surfaceSnapshotReducer(EMPTY_SURFACE_SNAPSHOT_STATE, {
+    const terminal = surfaceSnapshotReducer(createEmptySurfaceSnapshotState(), {
       type: "start",
       generation: 1,
       page: {
-        ...page([match("m1", "word-1"), match("m2", "word-2")], null, {
-          impactToken: "old-impact-token"
-        }),
+        ...v3Page(
+          [v3Item("entry-1", "variant-1"), v3Item("entry-2", "variant-2")],
+          null
+        ),
+        continuation_policy: "enabled" as const,
+        next_cursor: null,
+        surface_confirmation_token: "v3-terminal-token",
+        impact_confirmation_token: "old-impact-token",
         total: 2
       }
     });
@@ -335,7 +222,7 @@ describe("surfaceSnapshotReducer", () => {
       type: "page_loaded",
       generation: 1,
       requested_cursor: "cursor-2",
-      page: page([match("late", "word-late")], null)
+      page: v3Page([v3Item("entry-late", "variant-late")], null)
     });
     expect(late).toEqual(reset);
     expect(late.surface_confirmation_token).toBeUndefined();
@@ -343,10 +230,10 @@ describe("surfaceSnapshotReducer", () => {
   });
 
   it("页失败/过期、snapshot identity 变化均 fail closed 并清 token", () => {
-    const first = surfaceSnapshotReducer(EMPTY_SURFACE_SNAPSHOT_STATE, {
+    const first = surfaceSnapshotReducer(createEmptySurfaceSnapshotState(), {
       type: "start",
       generation: 1,
-      page: page([match("m1", "word-1")], "cursor-2")
+      page: v3Page([v3Item("entry-1", "variant-1")], "cursor-2")
     });
     const failed = surfaceSnapshotReducer(
       { ...first, impact_confirmation_token: "stale-impact-token" },
@@ -368,7 +255,10 @@ describe("surfaceSnapshotReducer", () => {
         type: "page_loaded",
         generation: 1,
         requested_cursor: "cursor-2",
-        page: { ...page([match("m2", "word-2")], null), policy_epoch: 5 }
+        page: {
+          ...v3Page([v3Item("entry-2", "variant-2")], null),
+          policy_epoch: 5
+        }
       }
     );
     expect(mismatched.phase).toBe("error");
@@ -377,16 +267,20 @@ describe("surfaceSnapshotReducer", () => {
   });
 
   it("disabled snapshot 可加载完全部页，但任何阶段都不允许确认", () => {
-    const first = surfaceSnapshotReducer(EMPTY_SURFACE_SNAPSHOT_STATE, {
+    const first = surfaceSnapshotReducer(createEmptySurfaceSnapshotState(), {
       type: "start",
       generation: 1,
-      page: page([match("m1", "word-1")], "cursor-2", { disabled: true })
+      page: v3Page([v3Item("entry-1", "variant-1")], "cursor-2", undefined, 2, {
+        disabled: true
+      })
     });
     const terminal = surfaceSnapshotReducer(first, {
       type: "page_loaded",
       generation: 1,
       requested_cursor: "cursor-2",
-      page: page([match("m2", "word-2")], null, { disabled: true })
+      page: v3Page([v3Item("entry-2", "variant-2")], null, undefined, 2, {
+        disabled: true
+      })
     });
     expect(terminal.phase).toBe("disabled");
     expect(terminal.items).toHaveLength(2);
@@ -398,7 +292,7 @@ describe("surfaceSnapshotReducer", () => {
 describe("surface snapshot selectors", () => {
   it("V3 lifecycle 卡片按 entry 归并并只返回产品化候选详情", () => {
     const state = surfaceSnapshotReducer(
-      createEmptySurfaceSnapshotState<SurfaceMatchPageAny>(),
+      createEmptySurfaceSnapshotState<SurfaceMatchPageV3>(),
       {
         type: "start",
         generation: 1,
@@ -433,85 +327,19 @@ describe("surface snapshot selectors", () => {
       })
     ]);
   });
-  it("按 candidate + word_id 聚合卡片且保留同 entry 多 source/reason membership", () => {
-    const cards = aggregateSurfaceMatchCards(
-      [
-        match("m1", "word-1", "source-headword"),
-        match("m2", "word-1", "source-form", ["visibility_activation"]),
-        match("m3", "word-2")
-      ],
-      [context("word-1"), context("word-2")]
-    );
-    expect(cards).toHaveLength(2);
-    expect(cards[0]).toMatchObject({
-      key: "headword:common:word-1",
-      membership: "composite",
-      context: { word_id: "word-1" }
-    });
-    expect(cards[0]!.matches.map((item) => item.match_id)).toEqual([
-      "m1",
-      "m2"
-    ]);
-  });
 
-  it("兼容历史词条候选、缺失摘要与词形来源并使用产品回退", () => {
-    const formSource = match("form-match", "legacy-word");
-    formSource.existing.source = {
-      source_kind: "form",
-      source_id: "legacy-form",
-      source_node_id: "legacy-form-node",
-      content_scope: "draft",
-      surface: "workspaces",
-      dialect: "common",
-      form_type: "plural",
-      pos_id: "legacy-pos",
-      pos: "noun"
-    };
-    const v2State = surfaceSnapshotReducer(
-      createEmptySurfaceSnapshotState<SurfaceMatchPageAny>(),
-      {
-        type: "start",
-        generation: 1,
-        page: {
-          ...page([formSource], null),
-          total: 1,
-          matched_entry_contexts: [
-            {
-              ...context("legacy-word"),
-              pos_labels: ["自定义词性", "future-pos"]
-            }
-          ]
-        }
-      }
-    );
-    expect(aggregateLifecycleSurfaceMatchCards(v2State)[0]).toMatchObject({
-      source_labels: ["词形 · workspaces · 复数 · 通用"],
-      pos_labels: ["自定义词性", "其他词性"]
-    });
-
-    const legacyItem: SurfaceMatchItemV3 = {
-      match_kind: "legacy_v2",
-      match: {
-        source_schema_version: 2,
-        existing: {
-          ...formSource.existing,
-          headword: "legacy phrase",
-          kind: "phrase",
-          status: "archived"
-        }
-      }
-    };
+  it("缺少 entry 摘要时回落到匹配词形，词性标签按产品词表归一", () => {
     const withoutContext = surfaceSnapshotReducer(
-      createEmptySurfaceSnapshotState<SurfaceMatchPageAny>(),
+      createEmptySurfaceSnapshotState<SurfaceMatchPageV3>(),
       {
         type: "start",
         generation: 2,
         page: {
           ...v3Page(
-            [v3Item("no-context", "variant-no-context"), legacyItem],
+            [v3Item("no-context", "variant-no-context")],
             null,
             "fallback-token",
-            2
+            1
           ),
           matched_entry_contexts: []
         }
@@ -523,14 +351,30 @@ describe("surface snapshot selectors", () => {
         kind: "word",
         pos_labels: [],
         gloss_previews: []
-      }),
-      expect.objectContaining({
-        label: "legacy phrase",
-        kind: "phrase",
-        status: "archived",
-        source_labels: ["词形 · workspaces · 复数 · 通用"]
       })
     ]);
+  });
+
+  it("未知词性编码回落到「其他词性」，中文自定义词性原样保留", () => {
+    const state = surfaceSnapshotReducer(
+      createEmptySurfaceSnapshotState<SurfaceMatchPageV3>(),
+      {
+        type: "start",
+        generation: 3,
+        page: {
+          ...v3Page([v3Item("entry-1", "variant-1")], null, undefined, 1),
+          matched_entry_contexts: [
+            {
+              ...v3Context("entry-1"),
+              pos_labels: ["自定义词性", "future-pos"]
+            }
+          ]
+        }
+      }
+    );
+    expect(aggregateLifecycleSurfaceMatchCards(state)[0]).toMatchObject({
+      pos_labels: ["自定义词性", "其他词性"]
+    });
   });
 
   it.each([

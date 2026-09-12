@@ -1,15 +1,13 @@
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
+import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { HttpError } from "@tsz/api-client";
 import type {
   AdminWordPublicationAny,
   AdminWordPublicationEnvelope,
   AdminWordPublicationListResponse,
   AdminWordV3,
-  EnglishTextV2,
   EnglishTextV3,
-  SurfaceMatchPageAny,
-  WordDefinitionV2,
-  WordHeadwordsV2
+  SurfaceMatchPageV3
 } from "@tsz/types";
 import { Alert, Button, Card, Flex, Modal, Spin, Tag, Typography } from "antd";
 import dayjs from "dayjs";
@@ -22,7 +20,7 @@ import {
 } from "../surfaceSnapshot";
 import {
   type FetchSurfaceMatchPage,
-  useSurfaceSnapshotAny
+  useSurfaceSnapshot
 } from "../useSurfaceSnapshot";
 import { createV3WordRequests, type V3WordRequests } from "./api";
 import { sentenceTranslationsV3 } from "./meaningsModel";
@@ -30,7 +28,6 @@ import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import {
   definitionModeLabel,
   dialectLabel,
-  partOfSpeechLabel,
   pronunciationStyleLabel,
   relationLabel,
   sentenceLinkRoleLabel
@@ -55,21 +52,13 @@ interface Props {
   onActivated: (word: AdminWordV3) => void;
   onCanonicalRefreshed?: (word: AdminWordV3) => void;
   idempotencyKeyFactory?: () => string;
-  fetchSurfacePage?: FetchSurfaceMatchPage<SurfaceMatchPageAny>;
+  fetchSurfacePage?: FetchSurfaceMatchPage<SurfaceMatchPageV3>;
 }
 
 const defaultRequests = createV3WordRequests();
 
-function v2Headword(headwords: WordHeadwordsV2): string {
-  return headwords.mode === "unified"
-    ? headwords.common
-    : `英式 ${headwords.uk} / 美式 ${headwords.us}`;
-}
-
 function publicationLabel(publication: AdminWordPublicationAny): string {
-  return publication.schema_version === 2
-    ? v2Headword(publication.word.headwords)
-    : publication.word.presentation.label;
+  return publication.word.presentation.label;
 }
 
 interface SnapshotFormLine {
@@ -125,30 +114,6 @@ interface SnapshotSenseGroupLine {
   label: string;
 }
 
-function v2EnglishRows(value: EnglishTextV2) {
-  if (value.mode === "unified") {
-    return [
-      {
-        id: value.common.id,
-        dialect: "common",
-        text: value.common.value.text
-      }
-    ];
-  }
-  return (["uk", "us"] as const).flatMap((dialect) => {
-    const slot = value[dialect];
-    return slot.state === "ready"
-      ? [
-          {
-            id: slot.variant.id,
-            dialect,
-            text: slot.variant.value.text
-          }
-        ]
-      : [];
-  });
-}
-
 function v3EnglishRows(value: EnglishTextV3) {
   if (value.mode === "unified") {
     return [
@@ -173,18 +138,6 @@ function v3EnglishRows(value: EnglishTextV3) {
   });
 }
 
-function v2DefinitionTexts(definition: WordDefinitionV2): string[] {
-  if ("content_id" in definition) {
-    return [definition.content.text];
-  }
-  if (definition.content.mode === "unified") {
-    return [definition.content.common.value.text];
-  }
-  return [definition.content.uk, definition.content.us].flatMap((slot) =>
-    slot.state === "ready" ? [slot.variant.value.text] : []
-  );
-}
-
 function snapshotBody(publication: AdminWordPublicationAny): {
   forms: SnapshotFormLine[];
   meanings: SnapshotMeaningLine[];
@@ -193,98 +146,6 @@ function snapshotBody(publication: AdminWordPublicationAny): {
   sentences: SnapshotSentenceLine[];
   relations: SnapshotRelationLine[];
 } {
-  if (publication.schema_version === 2) {
-    const posById = new Map(
-      publication.word.forms.pos.map((pos) => [pos.pos_id, pos.pos])
-    );
-    return {
-      forms: publication.word.forms.pos.flatMap((pos) =>
-        [
-          pos.base_form,
-          ...pos.form_groups.flatMap((group) => group.slots)
-        ].flatMap((form) =>
-          form.variants.map((variant) => ({
-            id: variant.id,
-            pos: pos.pos,
-            formType: form.form_type,
-            dialect: variant.dialect,
-            spelling: variant.spelling,
-            pronunciations: variant.pronunciations.map((pronunciation) => ({
-              id: pronunciation.id,
-              dictPhonetic: pronunciation.dict_phonetic,
-              actualPron: pronunciation.actual_pron,
-              style: pronunciation.style
-            }))
-          }))
-        )
-      ),
-      meanings: publication.word.meanings.pos.flatMap((pos) =>
-        pos.senses.flatMap((sense) =>
-          sense.definitions.flatMap((definition) =>
-            v2DefinitionTexts(definition).map((text, index) => ({
-              id: `${definition.id}-${index}`,
-              pos: posById.get(pos.pos_id) ?? pos.pos_id,
-              mode: definition.definition_mode,
-              text
-            }))
-          )
-        )
-      ),
-      senseGroups: publication.word.meanings.sense_groups.map((group) => ({
-        id: group.id,
-        label: [group.name_zh, group.name_en].filter(Boolean).join(" / ")
-      })),
-      grammar: publication.word.meanings.pos.flatMap((pos) =>
-        pos.grammar_structures.flatMap((structure) =>
-          structure.variants.map((variant) => ({
-            id: variant.id,
-            pos: posById.get(pos.pos_id) ?? pos.pos_id,
-            dialect: variant.dialect,
-            text: variant.content.text
-          }))
-        )
-      ),
-      sentences: publication.word.meanings.pos.flatMap((pos) =>
-        pos.senses.flatMap((sense) =>
-          sense.sentences.map((sentence) => ({
-            id: sentence.id,
-            pos: posById.get(pos.pos_id) ?? pos.pos_id,
-            level: sentence.level,
-            english: v2EnglishRows(sentence.en_text),
-            chinese: [
-              {
-                id: sentence.zh_text_id,
-                text: sentence.zh_text.text
-              }
-            ],
-            roles: sentence.links.map((link) =>
-              sentenceLinkRoleLabel(link.role)
-            ),
-            associations: []
-          }))
-        )
-      ),
-      relations: publication.word.meanings.pos.flatMap((pos) =>
-        pos.senses.flatMap((sense) =>
-          sense.relations.map((relation) => ({
-            id: relation.id,
-            pos: posById.get(pos.pos_id) ?? pos.pos_id,
-            relation: relation.relation,
-            target:
-              relation.target_headword ??
-              relation.pending_target_headword ??
-              "待补充目标词条",
-            ...((relation.target_gloss ?? relation.pending_target_gloss)
-              ? {
-                  gloss: relation.target_gloss ?? relation.pending_target_gloss
-                }
-              : {})
-          }))
-        )
-      )
-    };
-  }
-
   const posById = new Map(
     publication.word.forms.pos.map((pos) => [pos.pos_id, pos.pos])
   );
@@ -402,6 +263,7 @@ function PublicationSnapshotBody({
   publication: AdminWordPublicationAny;
 }) {
   const formTypeLabel = useFormTypeLabel();
+  const partOfSpeechLabel = usePartOfSpeechLabel();
   const snapshot = snapshotBody(publication);
   return (
     <Card
@@ -584,12 +446,7 @@ function canActivateV3Publication(
   if (currentWord.status !== "published" || publication.is_current) {
     return false;
   }
-  const currentCapability = currentWord.capabilities.publication;
-  return (
-    currentCapability.mode === "native" ||
-    (currentCapability.mode === "migration_canary" &&
-      currentCapability.whitelisted)
-  );
+  return currentWord.capabilities.publication.mode === "native";
 }
 
 function isCanonicalActivationConflict(error: unknown): error is HttpError {
@@ -663,7 +520,7 @@ export function V3PublicationHistory({
   const [confirming, setConfirming] = useState(false);
   const [activating, setActivating] = useState(false);
   const [activationError, setActivationError] = useState<string>();
-  const [surfacePage, setSurfacePage] = useState<SurfaceMatchPageAny>();
+  const [surfacePage, setSurfacePage] = useState<SurfaceMatchPageV3>();
   const [surfaceResetVersion, setSurfaceResetVersion] = useState(0);
   const [recovery, setRecovery] = useState<RecoveryState>();
   const mounted = useRef(true);
@@ -674,7 +531,7 @@ export function V3PublicationHistory({
   const activationKey = useRef<string | undefined>(undefined);
   const recoveryGeneration = useRef(0);
   const recoveryLock = useRef(false);
-  const surfaceSnapshot = useSurfaceSnapshotAny(
+  const surfaceSnapshot = useSurfaceSnapshot(
     surfacePage,
     `${currentWord.id}:${selectedPublicationId ?? "none"}:${surfacePage?.schema_version ?? "none"}:${surfacePage?.snapshot_id ?? "none"}:${surfaceResetVersion}`,
     fetchSurfacePage

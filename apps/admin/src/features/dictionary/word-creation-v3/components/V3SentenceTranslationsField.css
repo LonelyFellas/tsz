@@ -7,10 +7,19 @@
   width: 100%;
 }
 
-.word-sentence-translation-label {
+/*
+ * 语言选择器占标题位。它是 Button 而非纯文本，需要三处校正才不破坏原有排版：
+ * 高度对齐同行输入框的 32px（Button sm 默认 24px 会让文字上浮 4px）；
+ * 收紧左右内边距，因为 64px 的列宽下「汉语译文」四个字只剩 2px 余量；
+ * 颜色回到次要色，否则 Button 的默认文本色会让标题比正文还重。
+ */
+.word-sentence-translation-label.word-sentence-translation-label {
   grid-area: label;
+  justify-self: start;
+  height: 32px;
+  padding: 0 2px;
   font-size: 12px;
-  line-height: 32px;
+  color: var(--ant-color-text-secondary);
 }
 
 .word-sentence-translation-groups {

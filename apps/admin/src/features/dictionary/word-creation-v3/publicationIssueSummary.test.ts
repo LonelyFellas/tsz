@@ -29,7 +29,7 @@ function word(): AdminWordV3 {
       strategy_version: "v3"
     },
     capabilities: {
-      publication: { mode: "migration_canary", whitelisted: true },
+      publication: { mode: "native" },
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
     forms: { pos: [noun, adjective] },
@@ -83,6 +83,22 @@ function issue(
 }
 
 describe("buildV3PublicationIssueSummary", () => {
+  it("词性标签一路透传，定位列表与问题分布用同一份文案", () => {
+    const current = word();
+    const posLabel = (code: string) => (code === "noun" ? "名" : `其他${code}`);
+
+    const summary = buildV3PublicationIssueSummary(
+      current,
+      [issue(1400)],
+      (code) => code,
+      posLabel
+    );
+
+    expect(summary.positions[0]!.label).toBe("名");
+    // 问题分布走的是另一条调用链：漏传标签函数时这里会退回写死的正式全名。
+    expect(summary.types[0]!.scopes).toEqual(["名：base 1 项"]);
+  });
+
   it("keeps the raw total while grouping repeated messages by POS and code", () => {
     const current = word();
     const issues = [

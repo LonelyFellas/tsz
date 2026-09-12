@@ -6,9 +6,7 @@ import { loadEnv } from "vite";
 // 从而把测试配置并入本文件——@ 别名与 plugins 只此一处，避免三处（vite/vitest/tsconfig）漂移。
 import { defineConfig } from "vitest/config";
 import {
-  assertAdminPartOfSpeechMockAllowed,
   assertAdminTtsMockAllowed,
-  assertAdminWordsMockAllowed,
   parseBooleanEnvFlag
 } from "./src/lib/env-flags.js";
 import { buildAdminDevProxy } from "./src/lib/dev-proxy.js";
@@ -29,16 +27,6 @@ function buildDevProxy(mode: string) {
 export default defineConfig(({ mode, command }) => {
   const buildEnv = loadEnv(mode, process.cwd(), "");
   const production = command === "build" || mode === "production";
-  const adminWordsMock = parseBooleanEnvFlag(
-    buildEnv.VITE_ADMIN_WORDS_MOCK,
-    "VITE_ADMIN_WORDS_MOCK",
-    false
-  );
-  const adminPartOfSpeechMock = parseBooleanEnvFlag(
-    buildEnv.VITE_ADMIN_PART_OF_SPEECH_MOCK,
-    "VITE_ADMIN_PART_OF_SPEECH_MOCK",
-    false
-  );
   const adminTtsMock = parseBooleanEnvFlag(
     buildEnv.VITE_ADMIN_TTS_MOCK,
     "VITE_ADMIN_TTS_MOCK",
@@ -46,8 +34,6 @@ export default defineConfig(({ mode, command }) => {
   );
 
   // production mode 禁止携带 mock；仅 tshb-test 的显式 test mode 构建可用于验收。
-  assertAdminWordsMockAllowed(adminWordsMock, production, mode);
-  assertAdminPartOfSpeechMockAllowed(adminPartOfSpeechMock, production, mode);
   assertAdminTtsMockAllowed(adminTtsMock, production, mode);
 
   // dev 代理只在启动开发服务器（command === "serve"）时需要；`vite build` 产出的是纯

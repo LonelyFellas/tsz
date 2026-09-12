@@ -36,20 +36,20 @@ const runtimeSchemaBundle =
 const ROOTS = [
   "EntryAnnotationResponse",
   "AdminWordV3",
-  "AdminWordAnyEnvelope",
-  "AdminWordDraftAnyEnvelope",
+  "AdminWordV3Envelope",
+  "AdminWordDraftV3Envelope",
   "AdminWordListResponse",
-  "EntryLifecycleBatchResponseAny",
-  "DraftValidationResponseAny",
-  "FormsImpactResponseAny",
-  "SurfaceMatchPageAny",
+  "EntryLifecycleBatchResponse",
+  "DraftValidationResponseV3",
+  "FormsImpactResponseV3",
+  "SurfaceMatchPageV3",
   "RelatedSearchResponse",
-  "DetectLexiconResponseAny",
+  "DetectLexiconSurfaceResponseV3",
   "ResolveSentenceTargetsV3Response",
   "SearchComponentTargetsV3Response",
   "AdminWordPublicationListResponse",
   "AdminWordPublicationEnvelope",
-  "DraftValidationIssueAny",
+  "V3DraftValidationIssue",
   "ProblemMeta",
   "ProblemDetails"
 ] as const satisfies readonly RuntimeSchemaRoot[];
@@ -444,10 +444,10 @@ describe("evaluator supported-keyword matrix", () => {
               { type: "string", maxLength: 3 }
             ]
           },
-          AdminWordAnyEnvelope: { $ref: "#/unsupported/Ref" },
-          AdminWordDraftAnyEnvelope: { $ref: "#/$defs/Missing" },
+          AdminWordV3Envelope: { $ref: "#/unsupported/Ref" },
+          AdminWordDraftV3Envelope: { $ref: "#/$defs/Missing" },
           AdminWordListResponse: { type: "unsupported" },
-          EntryLifecycleBatchResponseAny: { type: "array" },
+          EntryLifecycleBatchResponse: { type: "array" },
           Label: { type: "string", minLength: 2 }
         }
       }
@@ -494,20 +494,20 @@ describe("evaluator supported-keyword matrix", () => {
       mocked.validateRuntimeSchema("AdminWordV3", { ...valid, ambiguous: 1 })
     ).toMatchObject({ reason: "ambiguous_union_match", path: "$.ambiguous" });
     expect(
-      mocked.validateRuntimeSchema("AdminWordAnyEnvelope", {})
+      mocked.validateRuntimeSchema("AdminWordV3Envelope", {})
     ).toMatchObject({ reason: "invalid_schema", path: "$" });
     expect(
-      mocked.validateRuntimeSchema("AdminWordDraftAnyEnvelope", {})
+      mocked.validateRuntimeSchema("AdminWordDraftV3Envelope", {})
     ).toMatchObject({ reason: "invalid_schema", path: "$" });
     expect(
       mocked.validateRuntimeSchema("AdminWordListResponse", {})
     ).toMatchObject({ reason: "wrong_type", path: "$" });
     expect(
-      mocked.validateRuntimeSchema("EntryLifecycleBatchResponseAny", [])
+      mocked.validateRuntimeSchema("EntryLifecycleBatchResponse", [])
     ).toEqual({ valid: true });
     expect(
       mocked.validateRuntimeSchema(
-        "DetectLexiconResponseAny" as RuntimeSchemaRoot,
+        "DetectLexiconSurfaceResponseV3" as RuntimeSchemaRoot,
         {}
       )
     ).toMatchObject({ reason: "invalid_schema", path: "$" });

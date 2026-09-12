@@ -22,7 +22,7 @@ import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../api", () => ({
-  useRelatedSearchAny: () => ({
+  useRelatedSearch: () => ({
     exact: { data: undefined, isFetching: false },
     contains: { data: undefined, isFetching: false }
   })
@@ -143,8 +143,7 @@ function word(revision = 1, spelling = "centre"): AdminWordV3 {
     },
     capabilities: {
       publication: {
-        mode: "shadow_only",
-        blocked_code: "phase2_consumers_not_ready"
+        mode: "native" as const
       },
       pronunciation_normalization_version: "nfkc_trim_lower_v1"
     },
@@ -838,10 +837,7 @@ describe("V3WordCreationWizard", () => {
   it("applies save, prepare, and publish canonicals after StrictMode replays lifecycle effects", async () => {
     const strictWord = (revision: number, spelling: string): AdminWordV3 => {
       const value = word(revision, spelling);
-      value.capabilities.publication = {
-        mode: "migration_canary",
-        whitelisted: true
-      };
+      value.capabilities.publication = { mode: "native" };
       value.completed_steps = ["basics", "forms", "meanings"];
       value.max_reachable_step = "preview";
       return value;
@@ -2505,10 +2501,7 @@ describe("V3WordCreationWizard", () => {
 
   it("maps its live context directly to T5B and returns paged terminal tokens to the one save flow", async () => {
     const initialWord = word();
-    initialWord.capabilities.publication = {
-      mode: "migration_canary",
-      whitelisted: true
-    };
+    initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
     initialWord.max_reachable_step = "preview";
     const firstPage = impactSurfacePage("cursor-2");
@@ -2619,10 +2612,7 @@ describe("V3WordCreationWizard", () => {
 
   it("confirms a token-only impact through the controlled T5B mapping", async () => {
     const initialWord = word();
-    initialWord.capabilities.publication = {
-      mode: "migration_canary",
-      whitelisted: true
-    };
+    initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
     initialWord.max_reachable_step = "preview";
     const impact = vi.fn(async () => ({
@@ -2673,10 +2663,7 @@ describe("V3WordCreationWizard", () => {
 
   it("invalidates prepared publication state when publish returns fresh validation issues", async () => {
     const initialWord = word();
-    initialWord.capabilities.publication = {
-      mode: "migration_canary",
-      whitelisted: true
-    };
+    initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
     initialWord.max_reachable_step = "preview";
     const issue = validationIssue();
@@ -2886,10 +2873,7 @@ describe("V3WordCreationWizard", () => {
 
   it("refreshes canonical before rotating a publish idempotency key and requires a fresh controlled prepare", async () => {
     const initialWord = word();
-    initialWord.capabilities.publication = {
-      mode: "migration_canary",
-      whitelisted: true
-    };
+    initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
     initialWord.max_reachable_step = "preview";
     initialWord.published_revision = 0;
@@ -3041,10 +3025,7 @@ describe("V3WordCreationWizard", () => {
 
   it("reconciles a publish revision conflict before allowing a new revision and key", async () => {
     const initialWord = word();
-    initialWord.capabilities.publication = {
-      mode: "migration_canary",
-      whitelisted: true
-    };
+    initialWord.capabilities.publication = { mode: "native" };
     initialWord.completed_steps = ["basics", "forms", "meanings"];
     initialWord.max_reachable_step = "preview";
     const refreshed = {
@@ -4402,6 +4383,68 @@ describe("V3WordCreationWizard", () => {
     );
     fireEvent.click(screen.getByText("尝试校验"));
     await waitFor(() => expect(validate).toHaveBeenCalledTimes(1));
+  });
+
+  it("收尾提交在向导管线里丢掉没填的译文录入位", async () => {
+    const empty = () => ({ version: 2 as const, text: "", annotations: [] });
+    const localMeanings = toWritableMeanings(word().meanings);
+    const sentence = localMeanings.pos[0]!.senses[0]!.sentences[0]!;
+    // 初/中/高/高 四个录入位，只填了中阶那条。
+    sentence.zh_translations = [
+      { id: "translation-1", band: "word_for_word", content: empty() },
+      {
+        id: "translation-2",
+        band: "balanced_fluency",
+        content: { version: 2, text: "一个中心。", annotations: [] }
+      },
+      { id: "translation-3", band: "adapted_creation", content: empty() },
+      { id: "translation-4", band: "adapted_creation", content: empty() }
+    ];
+    sentence.zh_text_id = "translation-2";
+    const saveForms = vi.fn(async () => ({ word: word(2) }));
+    const saveMeanings = vi.fn(
+      async (
+        _wordId: string,
+        _input: Parameters<V3WordRequests["saveMeanings"]>[1]
+      ) => ({ word: word(3) })
+    );
+
+    renderWizard(requests({ saveForms, saveMeanings }), {
+      renderStep: (context) => (
+        <>
+          <button
+            type="button"
+            onClick={() => context.setDraftMeanings(localMeanings)}
+          >
+            摆出四个录入位
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              void context.actions.saveMeanings(
+                context.draftMeanings,
+                "complete"
+              )
+            }
+          >
+            收尾提交
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("摆出四个录入位"));
+    fireEvent.click(screen.getByText("收尾提交"));
+
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(1));
+    // 出站 payload 只保留填过的那条；清洗必须发生在 wizard 这一层，
+    // 挪回步骤组件里会让「确认影响并完成」那条旁路重新漏掉。
+    expect(
+      saveMeanings.mock.calls[0]![1].content.pos[0]!.senses[0]!.sentences[0]!
+        .zh_translations
+    ).toEqual([
+      expect.objectContaining({ id: "translation-2", band: "balanced_fluency" })
+    ]);
   });
 
   it("saves dirty forms before an ordinary meanings save and uses the accepted revision", async () => {
