@@ -13,6 +13,7 @@ import type {
   WordDefinitionV3,
   WordPosMeaningsWritableV3,
   WordRelationWritableV3,
+  TranslationLanguageV3,
   WordSentenceTranslationV3
 } from "@tsz/types";
 
@@ -53,12 +54,19 @@ export const DEFAULT_SENTENCE_TRANSLATION_BAND: SentenceTranslationBandV3 =
 export const DEFAULT_SENTENCE_TRANSLATION_BANDS: readonly SentenceTranslationBandV3[] =
   ["word_for_word", "balanced_fluency", "adapted_creation", "adapted_creation"];
 
+// 译文语言现阶段只有汉语；后端缺省也按汉语处理，这里显式写出来，
+// 免得新建的译文行落到「服务端补默认值」这条隐式路径上。
+export const DEFAULT_SENTENCE_TRANSLATION_LANGUAGE: TranslationLanguageV3 =
+  "zh";
+
 export function newSentenceTranslations(
-  idFactory: () => string
+  idFactory: () => string,
+  language: TranslationLanguageV3 = DEFAULT_SENTENCE_TRANSLATION_LANGUAGE
 ): WordSentenceTranslationV3[] {
   return DEFAULT_SENTENCE_TRANSLATION_BANDS.map((band) => ({
     id: idFactory(),
     band,
+    language,
     content: { version: 2, text: "", annotations: [] }
   }));
 }
@@ -109,12 +117,16 @@ export function sentenceTranslationsV3(sentence: {
           {
             id: sentence.zh_text_id,
             band: DEFAULT_SENTENCE_TRANSLATION_BAND,
+            language: DEFAULT_SENTENCE_TRANSLATION_LANGUAGE,
             content: sentence.zh_text
           }
         ];
+  // language 在 wire 上非必填：后端 2026-09-12 之前发布的历史快照原样返回、不带这个键。
+  // 在这条读路径上一次性补齐，编辑器与发布快照预览就都不必各自兜底。
   return translations.map((translation) => ({
     id: translation.id,
     band: translation.band,
+    language: translation.language ?? DEFAULT_SENTENCE_TRANSLATION_LANGUAGE,
     content: cloneRichText(translation.content)
   }));
 }

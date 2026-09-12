@@ -1,12 +1,17 @@
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
-import { Button, Dropdown, Flex, Input, Typography } from "antd";
+import { Button, Dropdown, Flex, Input } from "antd";
 import type {
   SentenceTranslationBandV3,
+  TranslationLanguageV3,
   WordSentenceTranslationV3,
   WordSentenceWritableV3
 } from "@tsz/types";
 import { newWordNodeId } from "../../word-model/primitives";
-import { replaceRichText, sentenceTranslationsV3 } from "../meaningsModel";
+import {
+  DEFAULT_SENTENCE_TRANSLATION_LANGUAGE,
+  replaceRichText,
+  sentenceTranslationsV3
+} from "../meaningsModel";
 import "./V3SentenceTranslationsField.css";
 
 // 初/中/高是译文风格，与例句的难度等级无关，顺序固定为初、中、高。
@@ -45,6 +50,13 @@ const TIER_MENU_ITEMS = TIERS.map(({ key, label, hint }) => ({
   )
 }));
 
+// 译文语言现阶段只开放汉语；下拉就一项，位置留给将来的多语言译文。
+const LANGUAGES = [{ key: "zh", label: "汉语" }] as const;
+const LANGUAGE_LABELS: Record<TranslationLanguageV3, string> = {
+  zh: "汉语"
+};
+const LANGUAGE_MENU_ITEMS = LANGUAGES.map(({ key, label }) => ({ key, label }));
+
 export function V3SentenceTranslationsField({
   sentence,
   index,
@@ -57,14 +69,35 @@ export function V3SentenceTranslationsField({
   onChange: (translations: WordSentenceTranslationV3[]) => void;
 }) {
   const rows = sentenceTranslationsV3(sentence);
+  // sentenceTranslationsV3 已经把缺席的 language 补成汉语，这里直接读第一行即可。
+  const language = rows[0]?.language ?? DEFAULT_SENTENCE_TRANSLATION_LANGUAGE;
   return (
     <div className="word-sentence-translation-list">
-      <Typography.Text
-        type="secondary"
-        className="word-sentence-translation-label"
+      <Dropdown
+        disabled={disabled}
+        trigger={["click"]}
+        menu={{
+          items: LANGUAGE_MENU_ITEMS,
+          selectedKeys: [language],
+          onClick: ({ key }) =>
+            onChange(
+              rows.map((item) => ({
+                ...item,
+                language: key as TranslationLanguageV3
+              }))
+            )
+        }}
       >
-        汉语译文
-      </Typography.Text>
+        <Button
+          type="text"
+          size="small"
+          disabled={disabled}
+          className="word-sentence-translation-label"
+          aria-label={`例句 ${index + 1} 译文语言`}
+        >
+          {LANGUAGE_LABELS[language]}译文
+        </Button>
+      </Dropdown>
       <div className="word-sentence-translation-groups">
         {TIERS.map((tier) => {
           const groupRows = rows
@@ -181,6 +214,7 @@ export function V3SentenceTranslationsField({
               {
                 id: newWordNodeId(),
                 band: key as SentenceTranslationBandV3,
+                language,
                 content: { version: 2, text: "", annotations: [] }
               }
             ])

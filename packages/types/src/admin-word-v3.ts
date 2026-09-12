@@ -325,10 +325,18 @@ export interface SentenceSourceRangeV3 {
 export type SentenceTranslationBandV3 =
   "word_for_word" | "balanced_fluency" | "adapted_creation";
 
+/** 译文语言。现阶段只开放汉语，结构为将来的多语言译文预留。 */
+export type TranslationLanguageV3 = "zh";
+
 export interface WordSentenceTranslationV3 {
   id: string;
   band: SentenceTranslationBandV3;
   content: RichTextV3;
+  /**
+   * 缺省按汉语处理，因而在 wire 上非必填。
+   * 后端 2026-09-12 上线之前发布的历史快照里没有这个键（发布快照原样返回、不经规范化）。
+   */
+  language?: TranslationLanguageV3;
 }
 
 interface WordSentenceAssociationBaseV3 {

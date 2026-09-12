@@ -1538,16 +1538,18 @@ describe("V3MeaningsAndExamplesStep", () => {
     });
     const translations =
       value().pos[0]!.senses[0]!.sentences[0]!.zh_translations;
-    expect(translations[0]).toEqual(
-      initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations[0]
-    );
+    expect(translations[0]).toEqual({
+      ...initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations[0]!,
+      language: "zh"
+    });
     expect(translations[1]).toMatchObject({
       id: "translation-b",
       content: { text: "更新中阶译文" }
     });
-    expect(translations[2]).toEqual(
-      initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations[2]
-    );
+    expect(translations[2]).toEqual({
+      ...initial.pos[0]!.senses[0]!.sentences[0]!.zh_translations[2]!,
+      language: "zh"
+    });
   });
 
   it("删除兼容译文后更新别名，其他同档译文与英文关联保持不变", () => {
@@ -1568,7 +1570,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     render(<Harness initial={initial} wordId="entry-1" />);
     fireEvent.click(screen.getByLabelText("删除例句 1 译文 1"));
     const after = value().pos[0]!.senses[0]!.sentences[0]!;
-    expect(after.zh_translations).toEqual([sentence.zh_translations[1]]);
+    expect(after.zh_translations).toEqual([
+      { ...sentence.zh_translations[1]!, language: "zh" }
+    ]);
     expect(after.zh_text_id).toBe("second-high");
     expect(after.zh_text).toEqual(sentence.zh_translations[1]!.content);
     expect(after.en_text).toEqual(sentence.en_text);
