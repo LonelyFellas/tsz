@@ -193,15 +193,25 @@ describe("V3 meanings writable model", () => {
         depends_on_context: false,
         relations: []
       });
-      expect(sense.definitions).toEqual([
-        {
-          id: expect.any(String),
-          level: "A1",
-          definition_mode: "zh_definition",
-          content_id: expect.any(String),
-          content: { version: 2, text: "", annotations: [] }
-        }
+      // 自动播种的词义按 A1 的默认计划铺四行释义位。
+      expect(
+        sense.definitions.map((definition) => [
+          definition.definition_mode,
+          definition.level
+        ])
+      ).toEqual([
+        ["zh_definition", "A1"],
+        ["en_definition", "A2"],
+        ["zh_definition", "A2"],
+        ["en_definition", "B1"]
       ]);
+      expect(sense.definitions[0]).toEqual({
+        id: expect.any(String),
+        level: "A1",
+        definition_mode: "zh_definition",
+        content_id: expect.any(String),
+        content: { version: 2, text: "", annotations: [] }
+      });
       expect(sense.sentences).toEqual([]);
     }
     expect(

@@ -69,12 +69,18 @@ import { validateEntryInput } from "../word-creation/entryClassification";
 import { newWordNodeId } from "../word-model/primitives";
 import { addPartOfSpeech, deletePartOfSpeech } from "./operations";
 import {
-  editableEnglishText,
-  newGrammarStructure,
-  type RelationDisplaySnapshots,
+  DEFAULT_DEFINITION_PLAN,
+  DEFAULT_SENSE_LEVEL,
+  DEFAULT_SENTENCE_TRANSLATION_BAND,
+  defaultDefinitions,
   definitionSummary,
+  editableEnglishText,
+  newDefinition,
+  newGrammarStructure,
+  newSentenceTranslations,
   replaceRichText,
-  spellingModeForPos
+  spellingModeForPos,
+  type RelationDisplaySnapshots
 } from "./meaningsModel";
 import { dialectLabel, partOfSpeechLabel, relationLabel } from "./presentation";
 import {
@@ -532,7 +538,7 @@ function newSense(
   senseGroupId?: string
 ): WordSenseWritableV3 {
   // 新词义先按默认等级铺好该等级的释义语句行；之后改等级，只要这些行还都空着就跟着换。
-  const level = "A1";
+  const level = DEFAULT_SENSE_LEVEL;
   return {
     id: idFactory(),
     sub_pos: "",
@@ -772,86 +778,6 @@ function grammarStructureOptions(
           }
         ]
       : []
-  );
-}
-
-/** 一条待生成的释义行：只定语言与等级，正文与语法结构留给录入者填。 */
-type DefinitionPlanV3 = { language: DefinitionLanguageV3; level: string };
-
-function newDefinition(
-  idFactory: () => string,
-  plan: DefinitionPlanV3 = { language: "zh", level: "A1" }
-): WordDefinitionV3 {
-  if (plan.language === "zh")
-    return {
-      id: idFactory(),
-      level: plan.level,
-      definition_mode: "zh_definition",
-      content_id: idFactory(),
-      content: { version: 2, text: "", annotations: [] }
-    };
-  return {
-    id: idFactory(),
-    level: plan.level,
-    definition_mode: "en_definition",
-    content: {
-      mode: "unified",
-      common: {
-        id: idFactory(),
-        origin: "manual",
-        value: { version: 2, text: "", annotations: [] }
-      }
-    }
-  };
-}
-
-/**
- * 词义等级 → 默认释义语句（语言 + 释义等级）。取自《天生会背® 智能词库 数据整理》
- * 的「词义难度 × 释义难度」矩阵：中文自本级起，英文比同档中文高一级，越靠近 C2
- * 层级越收敛，所以 B2 只有三条、C1 与 C2 各两条。生成后录入者可自行增删。
- */
-const DEFAULT_DEFINITION_PLAN: Record<CefrLevel, readonly DefinitionPlanV3[]> =
-  {
-    A1: [
-      { language: "zh", level: "A1" },
-      { language: "en", level: "A2" },
-      { language: "zh", level: "A2" },
-      { language: "en", level: "B1" }
-    ],
-    A2: [
-      { language: "zh", level: "A2" },
-      { language: "en", level: "B1" },
-      { language: "zh", level: "B1" },
-      { language: "en", level: "B2" }
-    ],
-    B1: [
-      { language: "zh", level: "B1" },
-      { language: "en", level: "B1" },
-      { language: "zh", level: "B2" },
-      { language: "en", level: "B2" }
-    ],
-    B2: [
-      { language: "zh", level: "B2" },
-      { language: "en", level: "B2" },
-      { language: "zh", level: "C1" }
-    ],
-    C1: [
-      { language: "zh", level: "C1" },
-      { language: "en", level: "C1" }
-    ],
-    C2: [
-      { language: "zh", level: "C2" },
-      { language: "en", level: "C2" }
-    ]
-  };
-
-/** 未收录的等级不预生成，交回「添加释义」手工录入，避免凭空猜数量。 */
-function defaultDefinitions(
-  level: string,
-  idFactory: () => string
-): WordDefinitionV3[] {
-  return (DEFAULT_DEFINITION_PLAN[level as CefrLevel] ?? []).map((plan) =>
-    newDefinition(idFactory, plan)
   );
 }
 

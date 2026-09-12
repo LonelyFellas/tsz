@@ -714,7 +714,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       "definition-new",
       "definition-content-new",
       "relation-new",
-      "sense-new"
+      "sense-new",
+      // 新词义按 A1 计划铺四行释义位：中文行各 2 个 id、英文行各 2 个，共 8 个。
+      ...Array.from({ length: 8 }, (_, index) => `sense-definition-${index}`)
     ];
     render(
       <Harness
@@ -732,7 +734,8 @@ describe("V3MeaningsAndExamplesStep", () => {
     };
     expect(value().sense_groups).toHaveLength(1);
     expect(value().pos[0]!.grammar_structures).toHaveLength(1);
-    expect(value().pos[0]!.senses[0]!.definitions).toHaveLength(1);
+    // 自动播种的词义按 A1 计划铺好四行释义位；主线已不再播种例句。
+    expect(value().pos[0]!.senses[0]!.definitions).toHaveLength(4);
     expect(value().pos[0]!.senses[0]!.sentences).toHaveLength(0);
     expect(value().pos[0]!.senses[0]!.relations).toEqual([]);
     expect(screen.queryByText(/暂无语义区间/u)).toBeNull();
@@ -757,7 +760,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       id: "grammar-new",
       variants: [{ id: "grammar-variant-new", dialect: "common" }]
     });
-    expect(result.senses[0]!.definitions[1]).toMatchObject({
+    expect(result.senses[0]!.definitions[4]).toMatchObject({
       id: "definition-new",
       content_id: "definition-content-new"
     });

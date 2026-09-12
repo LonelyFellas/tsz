@@ -575,8 +575,9 @@ describe("V3WordCreationWizard", () => {
       "false/false"
     );
     const initialIds = screen.getByTestId("initialized-node-ids").textContent;
-    expect(initialIds?.split(",")).toHaveLength(11);
-    expect(new Set(initialIds?.split(",")).size).toBe(11);
+    // 空词性模板的全部节点；词义那条按 A1 计划铺四行释义位，数目随之上去。
+    expect(initialIds?.split(",")).toHaveLength(19);
+    expect(new Set(initialIds?.split(",")).size).toBe(19);
 
     fireEvent.click(screen.getByText("切换步骤"));
     fireEvent.click(screen.getByText("切换步骤"));
