@@ -5133,7 +5133,7 @@ describe("新草稿默认录入位", () => {
     };
   };
 
-  it("刚创建时按词性配置铺词形、把语义区间摆够默认条数", async () => {
+  it("刚创建时把语义区间摆够默认条数，词形交给占位行不物化", async () => {
     const { seen, renderStep } = capture();
     renderWizard(requests(), {
       partOfSpeechCatalog: partOfSpeechCatalogFixture,
@@ -5142,11 +5142,12 @@ describe("新草稿默认录入位", () => {
     });
 
     await waitFor(() =>
-      expect(
-        seen.context!.draftForms.pos[0]!.forms.map((form) => form.form_type)
-      ).toEqual(["base", "plural"])
+      expect(seen.context!.draftMeanings.sense_groups).toHaveLength(5)
     );
-    expect(seen.context!.draftMeanings.sense_groups).toHaveLength(5);
+    // 词形不写进草稿：每个变化组渲染时会按词性配置铺占位行，物化只会把人删掉的写回来。
+    expect(
+      seen.context!.draftForms.pos[0]!.forms.map((form) => form.form_type)
+    ).toEqual(["base"]);
     // 铺出来的是未保存改动，得由录入者保存才入库。
     expect(seen.context!.hasUnsavedChanges).toBe(true);
   });

@@ -135,14 +135,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect.poll(() => api.getWord().revision).toBe(2);
     const savedForms = api.getWord().forms;
     expect(savedForms.pos.map((item) => item.pos)).toEqual(["noun", "verb"]);
-    // 新建词条进第二步时按词性配置铺默认词形位，名词的默认是复数，落在第 1 组。
+    // 默认词形只以占位行出现在界面上，不物化进草稿，所以保存的仍是这两条原形。
     expect(savedForms.pos[0]?.forms.map((item) => item.form_type)).toEqual([
       "base",
-      "plural",
       "base"
     ]);
     expect(savedForms.pos[0]?.form_groups).toHaveLength(2);
-    expect(savedForms.pos[0]?.form_groups[0]?.members).toHaveLength(2);
+    expect(savedForms.pos[0]?.form_groups[0]?.members).toHaveLength(1);
     expect(savedForms.pos[0]?.form_groups[1]?.members).toHaveLength(1);
     expect(savedForms.pos[0]?.dialect_rules).toEqual({
       spelling_mode: "distinguish",

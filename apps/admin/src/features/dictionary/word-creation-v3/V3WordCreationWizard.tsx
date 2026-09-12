@@ -16,7 +16,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { newWordNodeId } from "../word-model/primitives";
 import {
   createStableVariantIdFactory,
-  fillDefaultFormTypes,
   type V3StableVariantIdFactory
 } from "./operations";
 import type { V3WordRequests } from "./api";
@@ -108,7 +107,7 @@ export interface V3WizardSlotContext {
 }
 
 export interface V3WordCreationWizardProps {
-  /** 刚从创建页进来：把新草稿的默认录入位（词形、语义区间）铺好，只铺一次。 */
+  /** 刚从创建页进来：把新草稿的语义区间录入位摆够默认条数，只铺一次。 */
   prefillNewDraft?: boolean;
   partOfSpeechCatalog?: PartOfSpeechCatalogResponse;
   partOfSpeechCatalogError?: boolean;
@@ -448,49 +447,21 @@ function V3WordCreationSession({
     [clearPreviewState, supersede, updateDirty]
   );
 
-  // 刚从创建页进来的草稿：词典给几条词形就只有几条、语义区间也只有零星几个。这里
-  // 一次把默认录入位铺齐——词形按词性配置补，语义区间摆够默认条数。目录是异步到的，
-  // 等它来了铺一次即可；走两个 setter 是为了让联动与脏标记跟着走，保存后才入库。
-  // 语义区间基于「词形补齐后的 meanings」再补：setDraftForms 内部会用旧值重算一遍，
-  // 这里用同样的输入算好再覆盖，免得把词性联动出来的词义冲掉。两次 ensure 拿到的新
-  // 节点 ID 必须一致才不会留下假脏标记——眼下 fillDefaultFormTypes 既不增删词性也不
-  // 改 spelling_mode，ensure 必定原样返回入参，这条前提变了就得改成只算一次。
+  // 刚从创建页进来的草稿只有零星几个语义区间，这里把录入位摆够默认条数。词形不在
+  // 这里补——每个变化组渲染时都会按词性配置铺出占位行（见 V3FormGroupCard），那套
+  // 不写进草稿、不分新旧，天然「一律铺满」，再物化一遍只会把人删掉的行写回来。
   //
-  // 「刚创建」的判据跟着草稿本身走：revision 还是 1、forms 步骤没保存过。只看
-  // location.state 不行——F5 后 history 会把它原样恢复，一刷新就把用户删掉的行铺回来。
+  // 「刚创建」的判据跟着草稿本身走：revision 还是 1、meanings 步骤没保存过。只看
+  // location.state 不行——F5 后 history 会把它原样恢复，一刷新就把删掉的区间铺回来。
   useEffect(() => {
     if (!prefillNewDraft || sessionReadOnly || newDraftPrefilledRef.current) {
       return;
     }
-    // 用会话里的活状态而不是挂载期的 prop：目录来得慢、期间已经保存过一次时，
-    // prop 还停在 revision 1，照铺就会把刚删的默认行补回去。
-    if (word.revision > 1 || word.completed_steps.includes("forms")) return;
-    const items = partOfSpeechCatalog?.items;
-    if (!items?.length) return;
+    if (word.revision > 1 || word.completed_steps.includes("meanings")) return;
     newDraftPrefilledRef.current = true;
-    const filledForms = fillDefaultFormTypes(draftForms, items, newWordNodeId);
-    const baseMeanings =
-      filledForms === draftForms
-        ? draftMeanings
-        : ensureV3MeaningsForForms(
-            word.id,
-            filledForms,
-            draftMeanings,
-            newWordNodeId
-          );
-    const filledMeanings = fillDefaultSenseGroups(baseMeanings, newWordNodeId);
-    if (filledForms !== draftForms) setDraftForms(filledForms);
-    if (filledMeanings !== draftMeanings) setDraftMeanings(filledMeanings);
-  }, [
-    draftForms,
-    draftMeanings,
-    partOfSpeechCatalog,
-    prefillNewDraft,
-    sessionReadOnly,
-    setDraftForms,
-    setDraftMeanings,
-    word
-  ]);
+    const filled = fillDefaultSenseGroups(draftMeanings, newWordNodeId);
+    if (filled !== draftMeanings) setDraftMeanings(filled);
+  }, [draftMeanings, prefillNewDraft, sessionReadOnly, setDraftMeanings, word]);
 
   const setActiveStep = useCallback(
     (step: WordCreationStep) => {

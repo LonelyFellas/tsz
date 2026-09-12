@@ -24,7 +24,6 @@ import { newWordNodeId } from "../../word-model/primitives";
 import {
   addPartOfSpeech,
   deletePartOfSpeech,
-  fillDefaultFormTypes,
   reorderPos,
   type V3IdFactory,
   type V3StableVariantIdFactory
@@ -119,15 +118,7 @@ export function V3FormsAndPronunciationStep({
     const result = addPartOfSpeech(value, item, idFactory);
     if (!result.ok) return;
     const added = result.value.pos.at(-1)!;
-    // 新词性直接按该词性配置的默认词形类型铺好空行，省得逐个「添加派生词形」。
-    onChange(
-      fillDefaultFormTypes(
-        result.value,
-        catalog.data?.items,
-        idFactory,
-        added.pos_id
-      )
-    );
+    onChange(result.value);
     onActivePosChange?.(added.pos_id);
   };
 
