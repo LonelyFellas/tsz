@@ -3,7 +3,6 @@ import { validateRuntimeSchema, type RuntimeSchemaRoot } from "@tsz/api-client";
 import type {
   AdminWordListItemAny,
   AdminWordPublicationAny,
-  AdminWordV2,
   AdminWordV3,
   DetectLexiconSurfaceResponseV3,
   DraftFormsStepContentV3,
@@ -18,7 +17,6 @@ export const ADMIN_V3_DETECTIONS_PATH = "/lexicon/detections";
 export const ADMIN_V3_NEW_WORD_ID = "01990000-0000-7000-8000-000000000001";
 export const ADMIN_V3_MIXED_WORD_ID = "01990000-0000-7000-8000-000000000002";
 export const ADMIN_V3_CANARY_WORD_ID = "01990000-0000-7000-8000-000000000003";
-export const ADMIN_V2_LEGACY_WORD_ID = "01990000-0000-7000-8000-000000000004";
 export const ADMIN_V3_SECOND_POS_ID = "01990000-0000-7000-8000-000000000012";
 export const ADMIN_V3_ERROR_PRONUNCIATION_ID =
   "01990000-0000-7000-8000-000000000042";
@@ -374,123 +372,6 @@ function v3Word(
   };
 }
 
-const LEGACY_WORD: AdminWordV2 = {
-  schema_version: 2,
-  id: ADMIN_V2_LEGACY_WORD_ID,
-  language: "en",
-  kind: "word",
-  status: "published",
-  revision: 7,
-  lifecycle_revision: 2,
-  annotation: null,
-  annotation_revision: 1,
-  headwords: { mode: "unified", common: "legacy-orbit" },
-  detection_snapshot: {
-    detection_id: nodeId(205),
-    request: { language: "en", headword: "legacy-orbit" },
-    normalized_headword: "legacy-orbit",
-    entry_kind: "word",
-    matched_dialect: "common",
-    builtin_dictionary_status: "matched",
-    smart_dictionary_status: "clear",
-    headwords: { mode: "unified", common: "legacy-orbit" },
-    suggested_pos: ["noun"],
-    detected_at: NOW
-  },
-  forms: {
-    pos: [
-      {
-        pos_id: nodeId(201),
-        pos: "noun",
-        dialect_rules: {
-          spelling_mode: "unified",
-          phonetic_mode: "unified"
-        },
-        base_form: {
-          id: nodeId(202),
-          form_type: "base",
-          variants: [
-            {
-              id: nodeId(203),
-              dialect: "common",
-              spelling: "legacy-orbit",
-              origin: "manual",
-              pronunciations: [
-                {
-                  id: nodeId(204),
-                  dict_phonetic: "ˈɔːbɪt",
-                  actual_pron: "ˈɔːbɪt",
-                  style: "normal"
-                }
-              ]
-            }
-          ]
-        },
-        form_groups: []
-      }
-    ]
-  },
-  meanings: {
-    sense_groups: [
-      {
-        id: nodeId(206),
-        name_zh: "旧版轨道",
-        name_en: "Legacy orbit"
-      }
-    ],
-    pos: [
-      {
-        pos_id: nodeId(201),
-        grammar_structures: [],
-        senses: [
-          {
-            id: nodeId(207),
-            sub_pos: "N-COUNT",
-            level: "B1",
-            sense_group_id: nodeId(206),
-            frequency: "12.50",
-            depends_on_context: false,
-            definitions: [
-              {
-                id: nodeId(208),
-                level: "B1",
-                definition_mode: "zh_definition",
-                content_id: nodeId(209),
-                content: richText("历史旧版轨道释义")
-              }
-            ],
-            sentences: [],
-            relations: []
-          }
-        ]
-      }
-    ]
-  },
-  completed_steps: ["basics", "forms", "meanings"],
-  max_reachable_step: "preview",
-  created_by: ACTOR_ID,
-  created_at: NOW,
-  updated_at: NOW,
-  published_revision: 7,
-  has_unpublished_changes: false,
-  published_at: NOW
-};
-
-const LEGACY_PUBLICATION: AdminWordPublicationAny = {
-  schema_version: 2,
-  publication_id: nodeId(211),
-  entry_id: ADMIN_V3_CANARY_WORD_ID,
-  publication_number: 1,
-  source_revision: 7,
-  published_by_admin_id: ACTOR_ID,
-  published_at: NOW,
-  is_current: false,
-  word: {
-    ...structuredClone(LEGACY_WORD),
-    id: ADMIN_V3_CANARY_WORD_ID
-  }
-};
-
 function listItem(word: AdminWordV3): AdminWordListItemAny {
   return {
     annotation_visible: false,
@@ -519,32 +400,6 @@ function listItem(word: AdminWordV3): AdminWordListItemAny {
     updated_at: word.updated_at
   };
 }
-
-const LEGACY_LIST_ITEM: AdminWordListItemAny = {
-  annotation_visible: false,
-  schema_version: 2,
-  id: ADMIN_V2_LEGACY_WORD_ID,
-  headword: "legacy-orbit",
-  kind: "word",
-  dialects: ["common"],
-  headword_variants: [{ dialect: "common", headword: "legacy-orbit" }],
-  gloss: "旧版轨道",
-  pos_list: ["noun"],
-  levels: ["B1"],
-  status: "published",
-  revision: 7,
-  lifecycle_revision: 2,
-  annotation: null,
-  annotation_revision: 1,
-  max_reachable_step: "preview",
-  published_revision: 7,
-  has_unpublished_changes: false,
-  created_by_name: "Legacy Admin",
-  created_by: ACTOR_ID,
-  reference_summary: { total: 0, previews: [], truncated: false },
-  created_at: NOW,
-  updated_at: NOW
-};
 
 export interface MockAdminV3Request {
   method: string;
@@ -836,19 +691,12 @@ export async function mockAdminV3Api(
 ): Promise<MockAdminV3ApiController> {
   let word =
     options.initial === "canary"
-      ? v3Word(
-          ADMIN_V3_CANARY_WORD_ID,
-          "migrated-orbit",
-          { mode: "native" },
-          {
-            legacy_headwords: { mode: "unified", common: "legacy-orbit" }
-          }
-        )
+      ? v3Word(ADMIN_V3_CANARY_WORD_ID, "migrated-orbit", { mode: "native" })
       : v3Word(ADMIN_V3_MIXED_WORD_ID, "orbit-v3", {
           mode: "native" as const
         });
   const requests: MockAdminV3Request[] = [];
-  const publications: AdminWordPublicationAny[] = [clone(LEGACY_PUBLICATION)];
+  const publications: AdminWordPublicationAny[] = [];
   let formsFailurePending = true;
   let surfaceSnapshotExpiryRemaining = options.expireSurfaceSnapshotOnce
     ? 1
@@ -895,7 +743,7 @@ export async function mockAdminV3Api(
       return json(route, 200, { total: 2, today: 1, month: 2 });
     }
     if (method === "GET" && path === ADMIN_V3_ENTRIES_PATH) {
-      const words = [LEGACY_LIST_ITEM, listItem(word)];
+      const words = [listItem(word)];
       const response = {
         words,
         page: { page: 1, page_size: 20, total: words.length }
@@ -1008,15 +856,6 @@ export async function mockAdminV3Api(
       };
       assertRuntimeFixture("AdminWordV3", word);
       return json(route, 200, { word: clone(word) });
-    }
-    if (
-      method === "GET" &&
-      path === `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V2_LEGACY_WORD_ID}`
-    ) {
-      return json(route, 200, {
-        word: clone(LEGACY_WORD),
-        retired_stable_slots: []
-      });
     }
     if (method === "GET") {
       const candidate = surfaceCandidates.get(

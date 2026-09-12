@@ -3,7 +3,6 @@ import type { RichTextEmphasisLevel } from "./rich-text";
 import type {
   AdminWordListPage,
   AdminWordStatus,
-  AdminWordV2ListItem,
   Dialect,
   PronunciationStyle,
   RelatedWordResult,
@@ -1025,7 +1024,7 @@ export interface AdminWordListItemV3 {
   updated_at: string;
 }
 
-export type AdminWordListItemAny = AdminWordV2ListItem | AdminWordListItemV3;
+export type AdminWordListItemAny = AdminWordListItemV3;
 
 /** Mixed-version list response from the current OpenAPI. */
 export interface AdminWordListResponseAny {
@@ -1097,8 +1096,7 @@ export interface AdminWordPublicationV3 extends AdminWordPublicationBase {
   word: AdminWordV3;
 }
 
-export type AdminWordPublicationAny =
-  AdminWordPublicationV2 | AdminWordPublicationV3;
+export type AdminWordPublicationAny = AdminWordPublicationV3;
 
 export interface AdminWordPublicationEnvelope {
   publication: AdminWordPublicationAny;

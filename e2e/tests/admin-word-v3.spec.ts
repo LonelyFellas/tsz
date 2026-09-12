@@ -1,6 +1,5 @@
 import { expect, test } from "@playwright/test";
 import {
-  ADMIN_V3_CANARY_WORD_ID,
   ADMIN_V3_DETECTIONS_PATH,
   ADMIN_V3_ENTRIES_PATH,
   ADMIN_V3_NEW_WORD_ID,
@@ -181,84 +180,12 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     ).toBe(2);
   });
 
-  test("E01b Mock：迁移词条发布且旧历史快照保持不变", async ({ page }) => {
-    const api = await mockAdminV3Api(page, { initial: "canary" });
-    const legacyBefore = api.getPublications()[0];
-
-    await page.goto(`/words/${ADMIN_V3_CANARY_WORD_ID}/v3/wizard/preview`);
-    await expect(
-      page.getByText("legacy-orbit", { exact: true }).first()
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "查看第 1 次发布" })
-    ).toBeVisible();
-    await expect(page.getByText("发布历史加载失败")).toHaveCount(0);
-    await page.getByRole("button", { name: "查看第 1 次发布" }).click();
-    const legacyDetail = page.getByTestId("publication-detail");
-    const legacySnapshot = legacyDetail.getByTestId(
-      "publication-snapshot-body"
-    );
-    await expect(legacySnapshot.getByText("legacy-orbit")).toBeVisible();
-    await expect(
-      legacySnapshot.getByText("词典音标 ˈɔːbɪt · 实际发音 ˈɔːbɪt · 常规")
-    ).toBeVisible();
-    await expect(legacySnapshot.getByText("历史旧版轨道释义")).toBeVisible();
-    await expect(legacySnapshot.getByText("orbital centre")).toHaveCount(0);
-    await expect(legacySnapshot.getByText("运行轨道")).toHaveCount(0);
-    await legacyDetail.getByRole("button", { name: "关闭发布详情" }).click();
-    await page.getByRole("button", { name: "检查发布条件" }).click();
-    await expect(page.getByText("影响预览：0 项")).toBeVisible();
-    await page.getByRole("button", { name: "发布词条" }).click();
-    await expect(page.getByText("已发布", { exact: true })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: "查看第 1 次发布" })
-    ).toBeVisible();
-    await expect(page.getByText("发布历史加载失败")).toHaveCount(0);
-
-    const publications = api.getPublications();
-    expect(publications).toHaveLength(2);
-    expect(publications[0]).toEqual(legacyBefore);
-    expect(publications[0]).toMatchObject({
-      schema_version: 2,
-      publication_number: 1,
-      word: {
-        schema_version: 2,
-        headwords: { mode: "unified", common: "legacy-orbit" }
-      }
-    });
-    expect(publications[1]).toMatchObject({
-      schema_version: 3,
-      publication_number: 2,
-      word: { schema_version: 3, status: "published" }
-    });
-    expect(
-      api.count(
-        "POST",
-        `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_CANARY_WORD_ID}/validate`
-      )
-    ).toBe(1);
-    expect(
-      api.count(
-        "POST",
-        `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_CANARY_WORD_ID}/publications`
-      )
-    ).toBe(1);
-  });
-
-  test("E02 Mock：混合词条列表展示各自投影，旧结构行进不去向导", async ({
-    page
-  }) => {
+  test("E02 Mock：列表行展示 V3 投影并能进向导", async ({ page }) => {
     await mockAdminV3Api(page);
     await page.goto("/words");
 
-    const legacyRow = page.locator("tbody tr", { hasText: "legacy-orbit" });
     const v3Row = page.locator("tbody tr", { hasText: "orbit-v3" });
-    await expect(legacyRow).toBeVisible();
     await expect(v3Row).toBeVisible();
-    // 向导只剩 V3：旧结构行照常展示，但入口置灰并说明原因。
-    await expect(
-      legacyRow.getByRole("button", { name: /查看/ })
-    ).toBeDisabled();
 
     await page
       .locator("tbody tr", { hasText: "orbit-v3" })

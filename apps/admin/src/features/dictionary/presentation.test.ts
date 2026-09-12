@@ -34,40 +34,6 @@ const v3Row = (
 });
 
 describe("mixed word list presentation", () => {
-  it("V2 保留既有 headword 与 dialects", () => {
-    const row: AdminWordListItemAny = {
-      annotation_visible: false,
-      schema_version: 2,
-      id: "v2-entry",
-      headword: "centre / center",
-      kind: "word",
-      dialects: ["uk", "us"],
-      headword_variants: [
-        { dialect: "uk", headword: "centre" },
-        { dialect: "us", headword: "center" }
-      ],
-      source_dialect: "uk",
-      gloss: "中心",
-      pos_list: ["noun"],
-      levels: ["A1"],
-      status: "draft",
-      revision: 1,
-      lifecycle_revision: 1,
-      annotation: null,
-      annotation_revision: 1,
-      max_reachable_step: "forms",
-      has_unpublished_changes: false,
-      created_by_name: "Admin",
-      created_by: "admin-1",
-      reference_summary: { total: 0, previews: [], truncated: false },
-      created_at: "2026-08-25T00:00:00Z",
-      updated_at: "2026-08-25T00:00:00Z"
-    };
-
-    expect(wordListLabel(row)).toBe("centre / center");
-    expect(wordListDialects(row)).toEqual(["uk", "us"]);
-  });
-
   it("V3 忠实消费服务端 presentation 与 dialects，不从具体词形猜展示名或方言", () => {
     const row = v3Row({
       label: "legacy: centre · center",
@@ -122,37 +88,6 @@ describe("mixed word list presentation", () => {
       expect(report).not.toHaveBeenCalled();
     }
   );
-
-  it("V2 不进入 V3 presentation 观测", () => {
-    const report = vi.fn();
-    const row = {
-      annotation_visible: false,
-      schema_version: 2,
-      id: "v2-entry",
-      headword: "word",
-      kind: "word",
-      dialects: ["common"],
-      headword_variants: [{ dialect: "common", headword: "word" }],
-      gloss: "词",
-      pos_list: [],
-      levels: [],
-      status: "draft",
-      revision: 1,
-      lifecycle_revision: 1,
-      annotation: null,
-      annotation_revision: 1,
-      max_reachable_step: "basics",
-      has_unpublished_changes: false,
-      created_by_name: "Admin",
-      created_by: "admin-1",
-      reference_summary: { total: 0, previews: [], truncated: false },
-      created_at: "2026-08-25T00:00:00Z",
-      updated_at: "2026-08-25T00:00:00Z"
-    } as const satisfies AdminWordListItemAny;
-
-    expect(observeWordListPresentation(row, report)).toBe(false);
-    expect(report).not.toHaveBeenCalled();
-  });
 });
 
 describe("visibleWordAnnotation", () => {
@@ -161,28 +96,16 @@ describe("visibleWordAnnotation", () => {
     annotation_visible: boolean
   ): AdminWordListItemAny {
     return {
-      schema_version: 2,
-      id: "v2-entry",
-      headword: "center",
-      kind: "word",
+      ...v3Row({
+        label: "center",
+        matched_surfaces: ["center"],
+        strategy_version: "surface_summary_v1"
+      }),
       dialects: ["common"],
-      headword_variants: [{ dialect: "common", headword: "center" }],
-      gloss: "中心",
       pos_list: [],
       levels: [],
-      status: "draft",
-      revision: 1,
-      lifecycle_revision: 1,
       annotation,
-      annotation_revision: 1,
-      annotation_visible,
-      max_reachable_step: "basics",
-      has_unpublished_changes: false,
-      created_by_name: "Admin",
-      created_by: "admin-1",
-      reference_summary: { total: 0, previews: [], truncated: false },
-      created_at: "2026-08-25T00:00:00Z",
-      updated_at: "2026-08-25T00:00:00Z"
+      annotation_visible
     };
   }
 
