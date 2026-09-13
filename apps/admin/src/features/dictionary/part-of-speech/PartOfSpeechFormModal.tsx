@@ -7,7 +7,6 @@ import type {
 import { useEffect, useRef } from "react";
 import { useCreatePartOfSpeech, useUpdatePartOfSpeech } from "./api";
 import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
-import { useDerivedNameDefaults } from "./useDerivedNameDefaults";
 
 interface Props {
   open: boolean;
@@ -77,8 +76,6 @@ export function PartOfSpeechFormModal({
   const create = useCreatePartOfSpeech();
   const update = useUpdatePartOfSpeech();
   const pending = create.isPending || update.isPending;
-  const creating = !value;
-  const markTouched = useDerivedNameDefaults(form, { open, creating });
   // 预填值放 ref 而不是 effect 依赖：目录随时可能重拉，跟着重跑那个 effect 会连带
   // resetFields 清空正在填的表单。
   const defaultSortOrderRef = useRef(defaultSortOrder);
@@ -136,10 +133,7 @@ export function PartOfSpeechFormModal({
       destroyOnHidden
     >
       <Form form={form} layout="vertical" onFinish={submit}>
-        <PartOfSpeechSharedFields
-          placeholders={PLACEHOLDERS}
-          onTouch={markTouched}
-        />
+        <PartOfSpeechSharedFields placeholders={PLACEHOLDERS} />
       </Form>
     </Modal>
   );

@@ -32,7 +32,6 @@ import {
 import { nextSortOrder } from "./catalog";
 import { newWordNodeId } from "../word-model/primitives";
 import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
-import { useDerivedNameDefaults } from "./useDerivedNameDefaults";
 
 /** 供父级页面在自己的工具栏里触发"新增细分词性"，弹窗与编辑态仍由面板自己管。 */
 export interface SubPartOfSpeechPanelHandle {
@@ -91,8 +90,6 @@ function SubPartFormModal({
   const [form] = Form.useForm<SubPartFormValues>();
   const create = useCreateSubPartOfSpeech();
   const update = useUpdateSubPartOfSpeech();
-  const creating = !value;
-  const markTouched = useDerivedNameDefaults(form, { open, creating });
   // 预填值放 ref 而不是 effect 依赖：列表随时可能重拉，跟着重跑那个 effect 会连带
   // resetFields 清空正在填的表单。
   const nextSortOrderForRef = useRef(nextSortOrderFor);
@@ -196,10 +193,7 @@ function SubPartFormModal({
             </Form.Item>
           </Col>
         </Row>
-        <PartOfSpeechSharedFields
-          placeholders={PLACEHOLDERS}
-          onTouch={markTouched}
-        />
+        <PartOfSpeechSharedFields placeholders={PLACEHOLDERS} />
       </Form>
     </Modal>
   );

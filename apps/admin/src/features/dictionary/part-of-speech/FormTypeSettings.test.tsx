@@ -9,6 +9,7 @@ import { App as AntApp } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { FormTypeConfig } from "@tsz/types";
 import { beforeEach, expect, it, vi } from "vitest";
+import { expectDisplayNamesNotDerived } from "./displayName.test.helper";
 import { FormTypeSettings } from "./FormTypeSettings";
 
 const mock = vi.hoisted(() => ({
@@ -112,9 +113,14 @@ it("新增沿用五名称字段，派生编码与排序并刷新列表", async (
   fireEvent.change(screen.getByLabelText("英文缩写"), {
     target: { value: "custom" }
   });
-  await waitFor(() =>
-    expect(screen.getByLabelText("英文全称")).toHaveValue("custom variant")
-  );
+  // 新建时不从正式中文、正式英文带出简洁显示与英文全称，由管理员自己填。
+  await expectDisplayNamesNotDerived();
+  fireEvent.change(screen.getByLabelText("简洁显示"), {
+    target: { value: "自定义词形" }
+  });
+  fireEvent.change(screen.getByLabelText("英文全称"), {
+    target: { value: "custom variant" }
+  });
   // 序号按目录里的全局最大值 + 10 预填，管理员可以改。
   expect(screen.getByLabelText("序号")).toHaveValue("10");
   fireEvent.change(screen.getByLabelText("序号"), { target: { value: "12" } });

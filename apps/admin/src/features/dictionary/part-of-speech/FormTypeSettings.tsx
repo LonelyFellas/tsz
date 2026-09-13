@@ -24,7 +24,6 @@ import { partOfSpeechKeys, usePartOfSpeechCatalog } from "./api";
 import { nextSortOrder } from "./catalog";
 import { PartOfSpeechSharedFields } from "./PartOfSpeechSharedFields";
 import { slugifyCode } from "./PartOfSpeechFormModal";
-import { useDerivedNameDefaults } from "./useDerivedNameDefaults";
 import { errorMessage } from "./PartOfSpeechSettings";
 
 type Values = Omit<CreatePartOfSpeechInput, "code"> & {
@@ -64,10 +63,6 @@ export function FormTypeSettings() {
   const [form] = Form.useForm<Values>();
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<FormTypeConfig>();
-  const markTouched = useDerivedNameDefaults(form, {
-    open,
-    creating: !editing
-  });
   const list = useQuery({
     queryKey: [...partOfSpeechKeys.all, "form-types", query],
     queryFn: () => partOfSpeechDataSource.listFormTypes(query),
@@ -347,7 +342,6 @@ export function FormTypeSettings() {
               abbreviation: "例如 past",
               full_name_en: "例如 past tense"
             }}
-            onTouch={markTouched}
           />
         </Form>
       </Modal>

@@ -11,6 +11,7 @@ import type { PartOfSpeechConfig, SubPartOfSpeechConfig } from "@tsz/types";
 import { createRef } from "react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { expectDisplayNamesNotDerived } from "./displayName.test.helper";
 import { SubPartOfSpeechPanel } from "./SubPartOfSpeechDrawer";
 import type { SubPartOfSpeechPanelHandle } from "./SubPartOfSpeechDrawer";
 
@@ -145,7 +146,7 @@ function renderPanel(value: PartOfSpeechConfig | null = parent) {
 }
 
 function fillSubForm(values: { nameZh: string; nameEn: string }) {
-  // 三个展示字段按同一约定派生，便于用例只关心中英文名。
+  // 展示字段按同一约定填写，便于用例只关心中英文名。
   const fields: [string, string][] = [
     ["正式中文", values.nameZh],
     ["简洁显示", values.nameZh],
@@ -507,9 +508,6 @@ describe("SubPartOfSpeechPanel 「全部」视图", () => {
       nameZh: "使役动词",
       nameEn: "Causative verb"
     });
-    await waitFor(() =>
-      expect(screen.getByLabelText("简洁显示")).toHaveValue("使役动词")
-    );
     fireEvent.click(screen.getByText("新 建"));
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith({
@@ -546,11 +544,14 @@ describe("SubPartFormModal 表单默认值", () => {
     fireEvent.change(screen.getByLabelText("序号"), {
       target: { value: "15" }
     });
+    fireEvent.change(screen.getByLabelText("正式中文"), {
+      target: { value: "物质名词" }
+    });
+    fireEvent.change(screen.getByLabelText("正式英文"), {
+      target: { value: "Mass noun" }
+    });
+    await expectDisplayNamesNotDerived();
     fillSubForm({ nameZh: "物质名词", nameEn: "Mass noun" });
-    // 简洁显示由正式中文异步派生，等它落定再提交，否则必填校验会拦下。
-    await waitFor(() =>
-      expect(screen.getByLabelText("简洁显示")).toHaveValue("物质名词")
-    );
     fireEvent.click(screen.getByText("新 建"));
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith(
