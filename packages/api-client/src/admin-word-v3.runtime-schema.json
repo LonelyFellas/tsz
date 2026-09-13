@@ -1,10 +1,11 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-main-local-20260912/docs/openapi.json",
-  "_source_sha256": "26ab8be174465447d7b73131eb5dfdecd462448b927fa0c3e167f0ecdaa7c928",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-sentence-senses-20260913/docs/openapi.json",
+  "_source_sha256": "7a45ee034080ffa8e7556373c158155b34bbe80acddd7294fdf99b4fdd99d3c4",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
+    "SentenceEntryTargets",
     "EntryAnnotationResponse",
     "AdminWordV3",
     "AdminWordV3Envelope",
@@ -1407,6 +1408,41 @@
       "type": "string",
       "enum": ["unresolved", "resolved"]
     },
+    "SentenceEntryTarget": {
+      "type": "object",
+      "required": ["id", "headword", "kind", "surfaces"],
+      "properties": {
+        "headword": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" },
+        "kind": { "type": "string" },
+        "surfaces": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceTargetSurface" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "SentenceEntryTargets": {
+      "type": "object",
+      "required": ["items", "total"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceEntryTarget" }
+        },
+        "total": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
+    "SentenceSenseSummary": {
+      "type": "object",
+      "required": ["id", "gloss"],
+      "properties": {
+        "gloss": { "type": "string" },
+        "id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "SentenceSourceRangeV1": {
       "type": "object",
       "required": ["start", "end", "surface"],
@@ -1421,9 +1457,31 @@
       "oneOf": [
         {
           "type": "object",
-          "required": ["target_entry_id", "state"],
+          "required": [
+            "target_entry_id",
+            "target_pos_id",
+            "target_base_form_id",
+            "target_form_id",
+            "target_variant_id",
+            "target_sense_id",
+            "state"
+          ],
           "properties": {
             "state": { "type": "string", "enum": ["linked"] },
+            "target_base_form_id": { "type": "string", "format": "uuid" },
+            "target_entry_id": { "type": "string", "format": "uuid" },
+            "target_form_id": { "type": "string", "format": "uuid" },
+            "target_pos_id": { "type": "string", "format": "uuid" },
+            "target_publication_id": { "type": "string", "format": "uuid" },
+            "target_sense_id": { "type": "string", "format": "uuid" },
+            "target_variant_id": { "type": "string", "format": "uuid" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["target_entry_id", "state"],
+          "properties": {
+            "state": { "type": "string", "enum": ["entry_only"] },
             "target_entry_id": { "type": "string", "format": "uuid" }
           }
         },
@@ -1541,6 +1599,15 @@
       },
       "additionalProperties": false
     },
+    "SentenceTargetSurface": {
+      "type": "object",
+      "required": ["surface", "dialect"],
+      "properties": {
+        "dialect": { "type": "string" },
+        "surface": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "SentenceTranslationBandV3": {
       "type": "string",
       "enum": ["word_for_word", "balanced_fluency", "adapted_creation"]
@@ -1598,12 +1665,15 @@
     },
     "SharedSentenceEntry": {
       "type": "object",
-      "required": ["id", "headword", "kind", "collected"],
+      "required": ["id", "headword", "kind", "senses"],
       "properties": {
-        "collected": { "type": "boolean" },
         "headword": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
-        "kind": { "type": "string" }
+        "kind": { "type": "string" },
+        "senses": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceSenseSummary" }
+        }
       },
       "additionalProperties": false
     },

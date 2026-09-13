@@ -2,6 +2,7 @@ import type { SharedSentenceContent, SentenceSourceRangeV3 } from "@tsz/types";
 import { newSentenceTranslations } from "../dictionary/word-creation-v3/meaningsModel";
 import type { SentenceToken } from "../dictionary/word-creation-v3/tokens";
 
+/** 只有新建例句时提供初 / 中 / 高 / 高空白模板。 */
 export function newSentence(): SharedSentenceContent {
   const translations = newSentenceTranslations(() => crypto.randomUUID());
   const alias = translations[1]!;

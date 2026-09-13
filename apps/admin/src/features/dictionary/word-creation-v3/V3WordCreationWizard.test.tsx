@@ -2131,6 +2131,97 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("forms-error-issues")).toBeEmptyDOMElement();
   });
 
+  it("未完成例句阻止离开时，不提前保存词形或词义", async () => {
+    const initialWord = word();
+    initialWord.completed_steps = ["basics", "forms"];
+    initialWord.max_reachable_step = "meanings";
+    const guard = vi.fn(async () => false);
+    const saveForms = vi.fn<V3WordRequests["saveForms"]>();
+    const saveMeanings = vi.fn<V3WordRequests["saveMeanings"]>();
+    renderWizard(requests({ saveForms, saveMeanings }), {
+      initialWord,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <>
+          <output data-testid="guarded-step">{context.activeStep}</output>
+          <button
+            onClick={() => {
+              context.setDraftForms({ ...context.draftForms, pos: [] });
+              context.registerSentenceLeaveGuard?.(guard);
+            }}
+          >
+            准备未完成例句
+          </button>
+          <button
+            onClick={() =>
+              void context.actions.saveMeanings(
+                context.draftMeanings,
+                "complete"
+              )
+            }
+          >
+            完成词义
+          </button>
+        </>
+      )
+    });
+    fireEvent.click(screen.getByText("准备未完成例句"));
+    fireEvent.click(screen.getByText("完成词义"));
+    await waitFor(() => expect(guard).toHaveBeenCalledOnce());
+    expect(saveForms).not.toHaveBeenCalled();
+    expect(saveMeanings).not.toHaveBeenCalled();
+    expect(screen.getByTestId("guarded-step")).toHaveTextContent("meanings");
+  });
+
+  it("词义保存不提交共享例句关系，失败重试仍只保存词义内容", async () => {
+    const initialWord = word();
+    initialWord.completed_steps = ["basics", "forms"];
+    initialWord.max_reachable_step = "meanings";
+    const saveMeanings = vi
+      .fn<V3WordRequests["saveMeanings"]>()
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockImplementationOnce(async (_id, input) => ({
+        word: {
+          ...initialWord,
+          revision: 2,
+          meanings: input.content as AdminWordV3["meanings"]
+        }
+      }));
+    renderWizard(requests({ saveMeanings }), {
+      initialWord,
+      initialStep: "meanings",
+      renderStep: (context) => (
+        <>
+          <output data-testid="sentence-free-save-problem">
+            {context.problem?.kind}
+          </output>
+          <button
+            onClick={() =>
+              void context.actions.saveMeanings(context.draftMeanings, "save")
+            }
+          >
+            保存词义
+          </button>
+        </>
+      )
+    });
+    fireEvent.click(screen.getByText("保存词义"));
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledOnce());
+    expect(saveMeanings.mock.calls[0]![1]).not.toHaveProperty(
+      "sentence_collections"
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("sentence-free-save-problem")
+      ).toHaveTextContent("network")
+    );
+    fireEvent.click(screen.getByText("保存词义"));
+    await waitFor(() => expect(saveMeanings).toHaveBeenCalledTimes(2));
+    expect(saveMeanings.mock.calls[1]![1]).not.toHaveProperty(
+      "sentence_collections"
+    );
+  });
+
   it("keeps one forms and one meanings request under same-tick complete calls", async () => {
     const initialWord = word();
     const saveForms = vi.fn(

@@ -36,6 +36,7 @@ const runtimeSchemaBundle =
 const ROOTS = [
   "SharedSentence",
   "SharedSentenceList",
+  "SentenceEntryTargets",
   "EntryAnnotationResponse",
   "AdminWordV3",
   "AdminWordV3Envelope",

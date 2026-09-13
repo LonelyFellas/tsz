@@ -1,13 +1,7 @@
 import { wordKeys } from "@/features/dictionary/api";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { App as AntApp } from "antd";
 import type {
   AdminWordPublicationV3,
@@ -613,7 +607,7 @@ describe("WordWizardV3Page", () => {
     expect(screen.getByRole("tab", { name: /名词/u })).toBeInTheDocument();
     expect(screen.getByText("上一步").closest("button")).toBeVisible();
     expect(
-      screen.getByRole("button", { name: "保存草稿" })
+      screen.getByText("保存草稿", { exact: true }).closest("button")!
     ).toBeInTheDocument();
     expect(screen.getByText("进入词义与例句").closest("button")).toBeVisible();
     expect(endpoints.get).toHaveBeenCalledWith(WORD_ID);
@@ -1025,7 +1019,9 @@ describe("WordWizardV3Page", () => {
     expect(
       await screen.findByRole("region", { name: "发布待完成摘要" })
     ).toBeVisible();
-    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
+    expect(
+      screen.queryByText("发布词条", { exact: true })?.closest("button") ?? null
+    ).toBeNull();
     expect(endpoints.publishV3).not.toHaveBeenCalled();
   });
 
@@ -1056,9 +1052,8 @@ describe("WordWizardV3Page", () => {
       target: { value: "centre-local-draft" }
     });
     fireEvent.click(screen.getByText("词义与例句"));
-    await screen.findAllByRole("main");
     expect(
-      within(screen.getAllByRole("main").at(-1)!).getByText("语义区间")
+      await screen.findByText("添加语义区间", { exact: true })
     ).toBeInTheDocument();
     fireEvent.click(screen.getByText("词形与发音"));
     expect(await screen.findByLabelText(`原形通用拼写`)).toHaveValue(
@@ -1068,16 +1063,19 @@ describe("WordWizardV3Page", () => {
     fireEvent.click(screen.getByText("预览并生效"));
 
     expect(await screen.findByText("请先保存未保存的草稿")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "检查发布条件" })).toBeNull();
+    expect(
+      screen.queryByText("检查发布条件", { exact: true })?.closest("button") ??
+        null
+    ).toBeNull();
     expect(endpoints.validateV3).not.toHaveBeenCalled();
     expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
     expect(endpoints.publishV3).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
+    fireEvent.click(screen.getByLabelText("查看第 1 次发布"));
     expect(
       await screen.findByText("请先保存或放弃未保存的草稿")
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "激活此发布版本" })
+      screen.getByText("激活此发布版本", { exact: true }).closest("button")!
     ).toBeDisabled();
     expect(endpoints.activatePublicationV3).not.toHaveBeenCalled();
   });
@@ -1120,16 +1118,19 @@ describe("WordWizardV3Page", () => {
     fireEvent.click(screen.getByText("预览并生效"));
 
     expect(await screen.findByText("请先保存未保存的草稿")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "检查发布条件" })).toBeNull();
+    expect(
+      screen.queryByText("检查发布条件", { exact: true })?.closest("button") ??
+        null
+    ).toBeNull();
     expect(endpoints.validateV3).not.toHaveBeenCalled();
     expect(endpoints.previewFormsImpactV3).not.toHaveBeenCalled();
     expect(endpoints.publishV3).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
+    fireEvent.click(screen.getByLabelText("查看第 1 次发布"));
     expect(
       await screen.findByText("请先保存或放弃未保存的草稿")
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "激活此发布版本" })
+      screen.getByText("激活此发布版本", { exact: true }).closest("button")!
     ).toBeDisabled();
     expect(endpoints.activatePublicationV3).not.toHaveBeenCalled();
   });
@@ -1252,15 +1253,22 @@ describe("WordWizardV3Page", () => {
     );
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "检查发布条件" })
+      (await screen.findByText("检查发布条件", { exact: true })).closest(
+        "button"
+      )!
     );
-    fireEvent.click(await screen.findByRole("button", { name: "发布词条" }));
+    fireEvent.click(
+      (await screen.findByText("发布词条", { exact: true })).closest("button")!
+    );
 
     await waitFor(() => expect(endpoints.publishV3).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(screen.getByText("当前词条为只读查看")).toBeInTheDocument()
     );
-    expect(screen.queryByRole("button", { name: "检查发布条件" })).toBeNull();
+    expect(
+      screen.queryByText("检查发布条件", { exact: true })?.closest("button") ??
+        null
+    ).toBeNull();
   });
 
   it("makes immutable publication history and detail reachable from the real preview route", async () => {
@@ -1298,7 +1306,7 @@ describe("WordWizardV3Page", () => {
     );
 
     expect(await screen.findByText("发布历史")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
+    fireEvent.click(screen.getByLabelText("查看第 1 次发布"));
     expect(
       await screen.findByText("immutable history detail")
     ).toBeInTheDocument();
@@ -1352,13 +1360,15 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(endpoints)
     );
 
+    fireEvent.click(await screen.findByLabelText("查看第 1 次发布"));
     fireEvent.click(
-      await screen.findByRole("button", { name: "查看第 1 次发布" })
+      (await screen.findByText("激活此发布版本", { exact: true })).closest(
+        "button"
+      )!
     );
     fireEvent.click(
-      await screen.findByRole("button", { name: "激活此发布版本" })
+      screen.getByText("确认激活", { exact: true }).closest("button")!
     );
-    fireEvent.click(screen.getByRole("button", { name: "确认激活" }));
 
     await waitFor(() =>
       expect(endpoints.activatePublicationV3).toHaveBeenCalledWith(
@@ -1441,31 +1451,47 @@ describe("WordWizardV3Page", () => {
     );
 
     fireEvent.click(
-      await screen.findByRole("button", { name: "检查发布条件" })
+      (await screen.findByText("检查发布条件", { exact: true })).closest(
+        "button"
+      )!
     );
     expect(
-      await screen.findByRole("button", { name: "发布词条" })
+      (await screen.findByText("发布词条", { exact: true })).closest("button")!
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
+    fireEvent.click(screen.getByLabelText("查看第 1 次发布"));
     fireEvent.click(
-      await screen.findByRole("button", { name: "激活此发布版本" })
+      (await screen.findByText("激活此发布版本", { exact: true })).closest(
+        "button"
+      )!
     );
-    fireEvent.click(screen.getByRole("button", { name: "确认激活" }));
+    fireEvent.click(
+      screen.getByText("确认激活", { exact: true }).closest("button")!
+    );
 
     await waitFor(() => expect(endpoints.get).toHaveBeenCalledTimes(2));
     expect(
-      await screen.findByRole("button", { name: "检查发布条件" })
+      (await screen.findByText("检查发布条件", { exact: true })).closest(
+        "button"
+      )!
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
-    expect(screen.queryByRole("button", { name: "确认激活" })).toBeNull();
+    expect(
+      screen.queryByText("发布词条", { exact: true })?.closest("button") ?? null
+    ).toBeNull();
+    expect(
+      screen.queryByText("确认激活", { exact: true })?.closest("button") ?? null
+    ).toBeNull();
 
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
     fireEvent.click(
-      await screen.findByRole("button", { name: "激活此发布版本" })
+      (await screen.findByText("激活此发布版本", { exact: true })).closest(
+        "button"
+      )!
     );
-    fireEvent.click(screen.getByRole("button", { name: "确认激活" }));
+    fireEvent.click(
+      screen.getByText("确认激活", { exact: true }).closest("button")!
+    );
 
     await waitFor(() =>
       expect(endpoints.activatePublicationV3).toHaveBeenCalledTimes(2)
@@ -1500,9 +1526,19 @@ describe("WordWizardV3Page", () => {
       );
 
       expect((await screen.findAllByText("centre")).length).toBeGreaterThan(0);
-      expect(screen.queryByRole("button", { name: "检查发布条件" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "发布词条" })).toBeNull();
-      expect(screen.queryByRole("button", { name: "保存草稿" })).toBeNull();
+      expect(
+        screen
+          .queryByText("检查发布条件", { exact: true })
+          ?.closest("button") ?? null
+      ).toBeNull();
+      expect(
+        screen.queryByText("发布词条", { exact: true })?.closest("button") ??
+          null
+      ).toBeNull();
+      expect(
+        screen.queryByText("保存草稿", { exact: true })?.closest("button") ??
+          null
+      ).toBeNull();
       expect(
         screen.getAllByText("词形与发音")[0]?.closest(".ant-steps-item")
       ).toHaveClass("ant-steps-item-disabled");
@@ -1524,7 +1560,9 @@ describe("WordWizardV3Page", () => {
       createV3WordRequests(source({ word: current, retired_stable_nodes: [] }))
     );
 
-    fireEvent.click(await screen.findByRole("button", { name: "继续编辑" }));
+    fireEvent.click(
+      (await screen.findByText("继续编辑", { exact: true })).closest("button")!
+    );
 
     await waitFor(() =>
       expect(router.state.location).toMatchObject({
@@ -1533,7 +1571,7 @@ describe("WordWizardV3Page", () => {
       })
     );
     expect(
-      await screen.findByRole("button", { name: "保存草稿" })
+      (await screen.findByText("保存草稿", { exact: true })).closest("button")!
     ).toBeDisabled();
   });
 
@@ -1550,7 +1588,9 @@ describe("WordWizardV3Page", () => {
     );
 
     expect((await screen.findAllByText("centre")).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: "继续编辑" })).toBeNull();
+    expect(
+      screen.queryByText("继续编辑", { exact: true })?.closest("button") ?? null
+    ).toBeNull();
   });
 
   it("renders the read-only POS groups, shared form identity, regional sides, and pronunciation styles", async () => {
@@ -1818,11 +1858,15 @@ describe("WordWizardV3Page", () => {
     expect(screen.queryByText("有未保存的草稿")).toBeNull();
     fireEvent.click(screen.getByText("预览并生效"));
     expect(
-      await screen.findByRole("button", { name: "检查发布条件" })
+      (await screen.findByText("检查发布条件", { exact: true })).closest(
+        "button"
+      )!
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "查看第 1 次发布" }));
+    fireEvent.click(screen.getByLabelText("查看第 1 次发布"));
     expect(
-      await screen.findByRole("button", { name: "激活此发布版本" })
+      (await screen.findByText("激活此发布版本", { exact: true })).closest(
+        "button"
+      )!
     ).toBeEnabled();
   }, 20_000);
 

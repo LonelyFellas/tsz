@@ -38,12 +38,14 @@ describe("liaisonPath", () => {
     expect(path).toBe("M 0 100 C 0 58.72, 96 58.72, 96 100");
   });
 
-  it("keeps both control points on one line for uneven tip heights", () => {
+  it("lets both control points follow uneven tip heights", () => {
     const path = liaisonPath({ x: 10, tipY: 100 }, { x: 106, tipY: 80 }, 96);
     const control = /C \S+ (\S+),/.exec(path)?.[1];
     expect(path.startsWith("M 10 100")).toBe(true);
     expect(path.endsWith("106 80")).toBe(true);
     expect(Number(control)).toBeLessThan(80);
+    const points = path.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+    expect(points[3]! - points[5]!).toBeCloseTo(20);
   });
 
   it("produces a flatter arc per em as the span grows", () => {

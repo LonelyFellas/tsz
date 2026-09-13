@@ -1,13 +1,10 @@
 import { useCallback, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import type { RichText, RichTextAnnotation } from "@tsz/types";
-import {
-  RichTextValidationError,
-  codePointSlice,
-  liaisonAnchorSpans
-} from "../core";
+import { RichTextValidationError, liaisonAnchorSpans } from "../core";
 import {
   LiaisonArcLayer,
+  collectLiaisonGlyphs,
   useLiaisonArcs,
   type LiaisonAnchorElements,
   type LiaisonLinkElements
@@ -36,18 +33,6 @@ function liaisonAnchorEnd(
   if (segment.end <= spans.start.end) return "start";
   if (segment.start >= spans.end.start) return "end";
   return undefined;
-}
-
-/**
- * 量锚点位置时只量它的**文本内容**，不量元素盒：锚点里可能套着音标标注，
- * 其 ::after 会把 IPA 后缀画在字母后面，元素盒会把后缀也算进去、弧线端点右偏。
- * Range 不含伪元素。拿不到 Range（老环境 / jsdom）就退回元素盒。
- */
-function contentBox(element: Element): { getBoundingClientRect(): DOMRect } {
-  if (typeof document.createRange !== "function") return element;
-  const range = document.createRange();
-  range.selectNodeContents(element);
-  return typeof range.getBoundingClientRect === "function" ? range : element;
 }
 
 function renderMarkedText(segment: TextSegment, key: string): ReactNode {
@@ -151,15 +136,8 @@ export function RichTextReadOnly({
       const nodes = container.querySelectorAll(
         `.tsz-ve-liaison-anchor[data-liaison="${liaisonKey(liaison)}"][data-end="${end}"]`
       );
-      const first = nodes[0];
-      const last = nodes[nodes.length - 1];
-      if (!first || !last) return undefined;
-      const span = liaisonAnchorSpans(liaison)[end];
-      return {
-        first: contentBox(first),
-        last: contentBox(last),
-        text: codePointSlice(text, span.start, span.end)
-      };
+      const glyphs = Array.from(nodes).flatMap(collectLiaisonGlyphs);
+      return glyphs.length ? { glyphs } : undefined;
     };
     return liaisons.map((liaison) => {
       const start = anchorOf(liaison, "start");

@@ -318,3 +318,56 @@ it.each(["word", "phrase"] as const)(
     );
   }
 );
+
+it("例句的关联恢复跟随撤销重做，主动清除后不再自动恢复", async () => {
+  const original = {
+    ...target,
+    source_segments: [{ start: 0, end: 7, surface: "make up" }]
+  };
+  const observe = vi.fn();
+  function Host() {
+    const [value, setValue] = useState<RichTextV2>({
+      version: 2,
+      text: "make up",
+      annotations: []
+    });
+    const [links, setLinks] = useState([original]);
+    return (
+      <VoiceEditor
+        mode="association"
+        restoreTextLinksOnCorrection
+        value={value}
+        textLinks={links}
+        contextLabel="例句正文"
+        renderAssociationPicker={({ onSelect }) => (
+          <button onClick={() => onSelect(undefined)}>清除原关联</button>
+        )}
+        onChange={(next, nextLinks) => {
+          observe(next, nextLinks);
+          setValue(next);
+          setLinks(nextLinks ?? []);
+        }}
+      />
+    );
+  }
+  render(<Host />);
+  const input = screen.getByLabelText("例句正文");
+  fireEvent.change(input, { target: { value: "makke up" } });
+  await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
+  fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+  await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([original]));
+  fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+  await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
+  fireEvent.change(input, { target: { value: "make up" } });
+  await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([original]));
+  expect(screen.queryByText(/部分关联暂时失效/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "关联短语" }));
+  fireEvent.mouseDown(screen.getByLabelText("关联 make（1）"), { button: 0 });
+  fireEvent.click(await screen.findByText("清除原关联"));
+  await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
+  fireEvent.click(screen.getByRole("button", { name: "编辑文本" }));
+  fireEvent.change(input, { target: { value: "makke up" } });
+  fireEvent.change(input, { target: { value: "make up" } });
+  await waitFor(() => expect(observe.mock.lastCall?.[0]?.text).toBe("make up"));
+  expect(observe.mock.lastCall?.[1]).toEqual([]);
+});

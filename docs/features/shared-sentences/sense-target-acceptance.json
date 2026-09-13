@@ -1,0 +1,71 @@
+{
+  "environment": {
+    "front": "/Users/darwish/Dev/tsz-core/tsz-sentence-senses-20260913",
+    "back": "/Users/darwish/Dev/tsz-core/tsz-rust-sentence-senses-20260913",
+    "database": "tsz_sentence_senses_20260913",
+    "postgres_port": 55441,
+    "redis_url": "redis://127.0.0.1:56392/2",
+    "api_port": 8485,
+    "admin_port": 3102,
+    "admin_url": "http://127.0.0.1:3102",
+    "source_backup": "/tmp/tsz-sentence-senses-20260913"
+  },
+  "api": {
+    "pid": 60695,
+    "cwd": "/Users/darwish/Dev/tsz-core/tsz-rust-sentence-senses-20260913",
+    "binary": "/tmp/tsz-sentence-senses-20260913/tsz-rust-api-final",
+    "sha256": "862f804f4d04cf6684237160b96b635f06c31595343b746a8238d65aa7574c57"
+  },
+  "admin": {
+    "pid": 53206,
+    "cwd": "/Users/darwish/Dev/tsz-core/tsz-sentence-senses-20260913"
+  },
+  "openapi_sha256": "7a45ee034080ffa8e7556373c158155b34bbe80acddd7294fdf99b4fdd99d3c4",
+  "version_note": "origin/main SHA + preserved previous changes + current uncommitted sense-target changes",
+  "frontend_base": "9ae727533ab159627d7c493e3eeb325574a552b2",
+  "backend_base": "d5bddc49ed9c9b29aa2b1f3f2933ca8ce57f9e59",
+  "checks": {
+    "frontend_native": "2609 passed, 2 skipped",
+    "frontend_final_focused": "9 passed",
+    "backend_full": "890 passed, 1 ignored",
+    "backend_final_shared_sentences": "19 passed",
+    "clippy": "passed",
+    "sqlx_prepare": "passed; no cache diff",
+    "migration_roundtrip": "up/down/up rolled back in isolated cloned DB",
+    "admin_typecheck_lint_build": "passed",
+    "browser_create_reload": "passed",
+    "browser_unsaved_sense_disabled": "passed",
+    "browser_leave_guard": "passed"
+  },
+  "fixture": {
+    "api_origin": "http://127.0.0.1:3102/api/v1/admin",
+    "get_status": 200,
+    "sentence_id": "9f0ef4c9-2814-4638-b43a-6043d829d7bc",
+    "revision": 1,
+    "target": {
+      "state": "linked",
+      "target_entry_id": "01a09551-1747-7e81-9d8a-c751db933cf5",
+      "target_pos_id": "8d650bb0-2f53-4270-9c71-b566e3336abd",
+      "target_base_form_id": "ffb3c38d-fef7-4ca3-b27f-ed3346cbeb36",
+      "target_form_id": "ffb3c38d-fef7-4ca3-b27f-ed3346cbeb36",
+      "target_variant_id": "860a9bef-0380-441b-994e-0c63d07bad99",
+      "target_sense_id": "791d271a-d9f2-47cc-b411-8db2dcf0fce7"
+    },
+    "entries": [
+      {
+        "id": "01a09551-1747-7e81-9d8a-c751db933cf5",
+        "headword": "make up",
+        "kind": "phrase",
+        "senses": [
+          {
+            "id": "791d271a-d9f2-47cc-b411-8db2dcf0fce7",
+            "gloss": "编造（故事、借口等）"
+          }
+        ]
+      }
+    ],
+    "sense_filtered_total": 1,
+    "legacy_global_count": 19,
+    "translation_count": 1
+  }
+}

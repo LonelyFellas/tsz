@@ -1,4 +1,5 @@
 import { SentenceLibrary } from "@/features/sentences/SentenceLibrary";
+import { WordSentences } from "@/features/sentences/WordSentences";
 import { wordKeys } from "@/features/dictionary/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Flex, Result, Spin, Typography } from "antd";
@@ -6,6 +7,7 @@ import type {
   AdminWordDraftV3Envelope,
   AdminWordV3,
   DraftMeaningsStepContentWritableV3,
+  SharedSentence,
   StepSaveIntent,
   SurfaceMatchEnabledTerminalPageV3,
   SurfaceMatchPageV3,
@@ -267,6 +269,21 @@ function V3BasicsSlot({ context }: { context: V3WizardSlotContext }) {
 }
 
 function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
+  const [sentenceEditor, setSentenceEditor] = useState<{
+    senseId: string;
+    value: SharedSentence | "new";
+  }>();
+  const leaveSentence = async () => {
+    if (
+      sentenceEditor &&
+      context.requestSentenceLeave &&
+      !(await context.requestSentenceLeave())
+    )
+      return false;
+    setSentenceEditor(undefined);
+    return true;
+  };
+
   // 词义步里的成分用词卡片会改词形内容，保存时向导要先存脏词形。删除已有成分属于
   // 下游变更，后端要 confirmed_impact_token，直接 PUT 会 409 downstream_confirmation_required
   // 而整次保存中止。所以这里和词形步一样：先预览影响，需要确认就把保存挂起等确认。
@@ -374,8 +391,28 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
           }
         />
       ) : null}
-      <SentenceLibrary entryId={context.word.id} />
       <V3MeaningsAndExamplesStep
+        renderSentenceSection={(senseId) => (
+          <WordSentences
+            key={senseId}
+            sourceWord={context.word}
+            senseId={senseId}
+            registerLeaveGuard={context.registerSentenceLeaveGuard}
+            editor={
+              sentenceEditor?.senseId === senseId
+                ? sentenceEditor.value
+                : undefined
+            }
+            onOpen={(value) => {
+              void (async () => {
+                if (await leaveSentence())
+                  setSentenceEditor({ senseId, value });
+              })();
+            }}
+            onClose={() => setSentenceEditor(undefined)}
+            readOnly={context.readOnly}
+          />
+        )}
         textLinksEnabled={context.word.capabilities.text_links === true}
         activePosId={context.activePosId}
         componentUsagesEnabled={
@@ -387,13 +424,37 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
         onActivePosChange={(posId) => {
           // 切词性同样会作废影响令牌，条子留着的话点确认是无反馈的空操作。
           setPendingIntent(undefined);
-          context.setActivePosId(posId);
+          void (async () => {
+            if (await leaveSentence()) context.setActivePosId(posId);
+          })();
         }}
-        onChange={context.setDraftMeanings}
+        onChange={(next) => {
+          if (
+            sentenceEditor &&
+            !next.pos.some((pos) =>
+              pos.senses.some((sense) => sense.id === sentenceEditor.senseId)
+            )
+          ) {
+            void (async () => {
+              if (await leaveSentence()) context.setDraftMeanings(next);
+            })();
+          } else context.setDraftMeanings(next);
+        }}
         onFormsChange={(next) => {
           // 词形一改，上一轮预览拿到的影响令牌就失效了，先把确认条收起来。
           setPendingIntent(undefined);
-          context.setDraftForms(next);
+          const activeSensePos = context.draftMeanings.pos.find((pos) =>
+            pos.senses.some((sense) => sense.id === sentenceEditor?.senseId)
+          );
+          if (
+            sentenceEditor &&
+            activeSensePos &&
+            !next.pos.some((pos) => pos.pos_id === activeSensePos.pos_id)
+          ) {
+            void (async () => {
+              if (await leaveSentence()) context.setDraftForms(next);
+            })();
+          } else context.setDraftForms(next);
         }}
         onPrevious={() => context.setActiveStep("forms")}
         onSave={saveMeanings}

@@ -47,24 +47,63 @@ describe("shared sentence wire contract", () => {
       .mockResolvedValueOnce({ ...body, unpublished: true });
     const api = createSharedSentenceEndpoints({ get } as unknown as HttpClient);
     await expect(
-      api.list({ q: "give up", entry_id: id, candidates: true })
-    ).resolves.toEqual({ items: [body], total: 1 });
+      api.list({ q: "give up", entry_id: id, sense_id: id })
+    ).resolves.toEqual({
+      items: [body],
+      total: 1
+    });
     expect(get).toHaveBeenCalledWith(
-      `/lexicon/sentences?q=give+up&entry_id=${id}&candidates=true`
+      `/lexicon/sentences?q=give+up&entry_id=${id}&sense_id=${id}`
     );
     await expect(api.get(id)).rejects.toThrow("revision");
     await expect(api.get(id)).rejects.toThrow("unexpected_property");
   });
-  it("收录显式发送 revision、具体词条与用户确认的 pending 标记", async () => {
-    const post = vi.fn().mockResolvedValue(body);
+  it("独立编辑携带当前上下文，解除发送词义和 revision；目标查询使用严格契约", async () => {
+    const del = vi.fn().mockResolvedValue(undefined);
+    const put = vi.fn().mockResolvedValue(body);
+    const targets = {
+      items: [
+        {
+          id,
+          kind: "word",
+          headword: "flower",
+          surfaces: [{ surface: "flower", dialect: "uk" }]
+        }
+      ],
+      total: 1
+    };
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce(targets)
+      .mockResolvedValueOnce({ ...targets, extra: true });
     const api = createSharedSentenceEndpoints({
-      post
+      del,
+      put,
+      get
     } as unknown as HttpClient);
-    const input = { base_revision: 1, entry_id: id, annotation_ids: [id] };
-    await api.collect(id, input);
-    expect(post).toHaveBeenCalledWith(
-      `/lexicon/sentences/${id}/collections`,
-      input
+    await api.unlink(id, id, { base_revision: 1, sense_id: id });
+    expect(del).toHaveBeenCalledWith(
+      `/lexicon/sentences/${id}/associations/${id}`,
+      { base_revision: 1, sense_id: id }
+    );
+    await api.update(id, {
+      base_revision: 1,
+      context_entry_id: id,
+      context_sense_id: id,
+      content: body.content as never
+    });
+    expect(put).toHaveBeenCalledWith(
+      `/lexicon/sentences/${id}`,
+      expect.objectContaining({ context_entry_id: id, base_revision: 1 })
+    );
+    await expect(
+      api.targets({ q: "flower", context_entry_id: id, page: 2 })
+    ).resolves.toEqual(targets);
+    expect(get).toHaveBeenCalledWith(
+      `/lexicon/sentences/targets?q=flower&context_entry_id=${id}&page=2`
+    );
+    await expect(api.targets({ entry_id: id })).rejects.toThrow(
+      "unexpected_property"
     );
   });
 });

@@ -221,9 +221,10 @@ export function V3SentenceTranslationsField({
         }}
       >
         <Button
+          block
           size="small"
-          type="text"
-          className="word-sentence-translation-add"
+          type="dashed"
+          className="word-sentence-translation-add word-section-add-button"
           disabled={disabled}
           icon={<PlusOutlined />}
           aria-label={`添加例句 ${index + 1} 译文`}

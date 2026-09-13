@@ -6,11 +6,50 @@ export interface RectSource {
   getBoundingClientRect(): DOMRect;
 }
 
-/** 一个锚点落在屏幕上的位置：首尾两个字母，以及锚点文字（量字形高度用）。 */
-export interface LiaisonAnchorElements {
-  first: RectSource;
-  last: RectSource;
+/** 一个可见字素的文本盒与实际字体来源；不包含占位伪元素。 */
+export interface LiaisonGlyph {
+  source: RectSource;
+  element: Element;
   text: string;
+}
+
+export interface LiaisonAnchorElements {
+  glyphs: LiaisonGlyph[];
+}
+
+/** 编辑与只读视图共用：逐字素量文本 Range，音标后缀和粗体占位不参与。 */
+export function collectLiaisonGlyphs(element: Element): LiaisonGlyph[] {
+  const glyphs: LiaisonGlyph[] = [];
+  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+  const segmenter =
+    typeof Intl.Segmenter === "function"
+      ? new Intl.Segmenter(undefined, { granularity: "grapheme" })
+      : undefined;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    const text = node.textContent ?? "";
+    const parts = segmenter
+      ? Array.from(segmenter.segment(text), (part) => part.segment)
+      : Array.from(text);
+    let offset = 0;
+    for (const part of parts) {
+      const start = offset;
+      offset += part.length;
+      if (!part.trim()) continue;
+      const range = document.createRange();
+      range.setStart(node, start);
+      range.setEnd(node, offset);
+      const fontElement = node.parentElement ?? element;
+      glyphs.push({
+        source:
+          typeof range.getBoundingClientRect === "function"
+            ? range
+            : fontElement,
+        element: fontElement,
+        text: part
+      });
+    }
+  }
+  return glyphs;
 }
 
 export interface LiaisonLinkElements {
@@ -40,7 +79,10 @@ export interface GlyphMetrics {
   inkAscent: number;
 }
 
-export type GlyphMeasurer = (text: string) => GlyphMetrics | undefined;
+export type GlyphMeasurer = (
+  text: string,
+  element?: Element
+) => GlyphMetrics | undefined;
 
 /** 端点比墨迹顶端再抬高一点，弧线不压在字上；沿用参考实现的 0.06em。 */
 const TIP_GAP_EM = 0.06;
@@ -51,7 +93,7 @@ const SAME_LINE_TOLERANCE_EM = 0.5;
 export const EMPTY_LIAISON_LAYOUT: LiaisonLayout = { arcs: [], strokeWidth: 0 };
 
 /**
- * 用 canvas 量出容器字体下一段文字的字形高度。
+ * 用 canvas 按落点字母实际生效的字体和字重量出墨迹高度。
  *
  * 拿不到 canvas（jsdom）或浏览器不给 actualBoundingBoxAscent 时返回 undefined，
  * 调用方退回按字盒顶端起笔——弧线会飘高一截，但不至于画不出来。
@@ -65,20 +107,18 @@ export function createGlyphMeasurer(container: Element): GlyphMeasurer {
       "CanvasRenderingContext2D" in globalThis
         ? document.createElement("canvas").getContext("2d")
         : null;
-    if (context) {
-      const style = getComputedStyle(container);
-      context.font = [
-        style.fontStyle,
-        style.fontWeight,
-        style.fontSize,
-        style.fontFamily
-      ].join(" ");
-    }
     return context;
   };
-  return (text) => {
+  return (text, element = container) => {
     const ready = acquire();
     if (!ready) return undefined;
+    const style = getComputedStyle(element);
+    ready.font = [
+      style.fontStyle,
+      style.fontWeight,
+      style.fontSize,
+      style.fontFamily
+    ].join(" ");
     const metrics = ready.measureText(text);
     const { fontBoundingBoxAscent, actualBoundingBoxAscent } = metrics;
     if (
@@ -104,7 +144,7 @@ export interface AnchorBox {
 /**
  * 锚点盒 → 弧线端点。
  *
- * 落点取选区中心；起笔高度不取字盒顶端而取**墨迹顶端**：字盒顶端是字体上伸
+ * 落点取中心附近的实际字母；起笔高度取该字母的**墨迹顶端**：字盒顶端是字体上伸
  * 高度，比 x 高度字母（w、o、u）的墨迹高出半个字号，弧线会整体飘在字上方。
  * 按墨迹起笔，弧线两端才贴着字，与参考件一致。
  */
@@ -147,16 +187,29 @@ export function buildLiaisonArcs(
   const innerRight = base.width - (Number.parseFloat(style.paddingRight) || 0);
 
   const geometryOf = (anchor: LiaisonAnchorElements) => {
-    const head = anchor.first.getBoundingClientRect();
-    const tail = anchor.last.getBoundingClientRect();
+    const glyphs = anchor.glyphs.map((glyph) => ({
+      ...glyph,
+      box: glyph.source.getBoundingClientRect()
+    }));
+    const first = glyphs[0];
+    const last = glyphs[glyphs.length - 1];
+    if (!first || !last) return undefined;
+    const middleX = (first.box.left + last.box.right) / 2;
+    // 贴着实际字母，而非选区中点的空隙或整段文字里最高的字母。
+    const distance = (glyph: typeof first) =>
+      Math.abs((glyph.box.left + glyph.box.right) / 2 - middleX);
+    const chosen = glyphs.reduce(
+      (best, glyph) => (distance(glyph) < distance(best) ? glyph : best),
+      first
+    );
     const box: AnchorBox = {
-      left: head.left - base.left,
-      right: tail.right - base.left,
-      top: Math.min(head.top, tail.top) - base.top,
-      bottom: Math.max(head.bottom, tail.bottom) - base.top
+      left: chosen.box.left - base.left,
+      right: chosen.box.right - base.left,
+      top: chosen.box.top - base.top,
+      bottom: chosen.box.bottom - base.top
     };
     return {
-      ...anchorTip(box, fontSize, measure(anchor.text)),
+      ...anchorTip(box, fontSize, measure(chosen.text, chosen.element)),
       lineTop: box.top
     };
   };
@@ -166,6 +219,7 @@ export function buildLiaisonArcs(
     if (!link) return;
     const left = geometryOf(link.start);
     const right = geometryOf(link.end);
+    if (!left || !right) return;
     const sameLine =
       Math.abs(left.lineTop - right.lineTop) <
       fontSize * SAME_LINE_TOLERANCE_EM;

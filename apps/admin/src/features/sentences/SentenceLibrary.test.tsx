@@ -1,10 +1,4 @@
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within
-} from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { App, ConfigProvider } from "antd";
 import zhCN from "antd/locale/zh_CN";
@@ -19,9 +13,8 @@ vi.mock("@/lib/auth", () => ({
     sentences: {
       list: vi.fn(),
       get: vi.fn(),
-      collect: vi.fn(),
       delete: vi.fn(),
-      uncollect: vi.fn()
+      unlink: vi.fn()
     }
   }
 }));
@@ -75,6 +68,12 @@ function show(entryId?: string) {
 
 describe("独立多维例句库", () => {
   beforeEach(() => vi.clearAllMocks());
+  it("词条的例句列表不再提供创编入口，添加由 voice-editor 承接", async () => {
+    vi.mocked(api.sentences.list).mockResolvedValue({ items: [], total: 0 });
+    show("source-entry");
+    await waitFor(() => expect(api.sentences.list).toHaveBeenCalled());
+    expect(screen.queryByRole("button", { name: "创编例句" })).toBeNull();
+  });
   it("列表只提供查询查看编辑删除，没有创建、审核或发布入口", async () => {
     const item = fixture();
     vi.mocked(api.sentences.list).mockResolvedValue({
@@ -100,33 +99,15 @@ describe("独立多维例句库", () => {
       )
     );
   });
-  it("发现 pending 候选不会自动收录，确认显式绑定当前词条；冲突保留弹窗", async () => {
-    const item = fixture();
-    vi.mocked(api.sentences.list).mockImplementation(async (q) =>
-      q?.candidates ? { items: [item], total: 1 } : { items: [], total: 0 }
-    );
-    vi.mocked(api.sentences.get).mockResolvedValue(item);
-    vi.mocked(api.sentences.collect).mockRejectedValue(
-      new Error("标记已被其他词条关联，请刷新")
-    );
+  it("词条汇总保留查看入口，解除关联在具体词义区块处理", async () => {
+    vi.mocked(api.sentences.list).mockResolvedValue({
+      items: [fixture()],
+      total: 1
+    });
     show("specific-flower-entry");
     await screen.findByText("A wonderful flower.");
-    expect(api.sentences.collect).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("确认收录").closest("button")!);
-    const dialog = await screen.findByRole("dialog");
-    expect(
-      within(dialog).getByRole("button", { name: /确\s*定/ })
-    ).toBeDisabled();
-    fireEvent.click(within(dialog).getByRole("checkbox"));
-    fireEvent.click(within(dialog).getByRole("button", { name: /确\s*定/ }));
-    await waitFor(() =>
-      expect(api.sentences.collect).toHaveBeenCalledWith(item.id, {
-        base_revision: 3,
-        entry_id: "specific-flower-entry",
-        annotation_ids: ["pending-flower"]
-      })
-    );
-    await screen.findByText("标记已被其他词条关联，请刷新");
-    await waitFor(() => expect(screen.getByRole("dialog")).toBeVisible());
+    expect(screen.queryByText("确认收录")).toBeNull();
+    expect(screen.queryByText("从当前词条解除关联")).toBeNull();
+    expect(api.sentences.unlink).not.toHaveBeenCalled();
   });
 });

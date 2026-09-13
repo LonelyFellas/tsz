@@ -17,24 +17,18 @@ export function liaisonRiseEm(spanEm: number): number {
   return Math.min(1, 0.484 + 0.16 * Math.sqrt(spanEm - 1.5));
 }
 
-/**
- * 生成连读弧的三次贝塞尔路径。两个控制点共用同一个 Y，使曲线左右对称。
- *
- * controlY 由目标顶点反解而来：三次贝塞尔在 t=0.5 处的值是
- * (P0 + 3·P1 + 3·P2 + P3) / 8，两控制点同 Y 时即
- * apexY = (tipY0 + tipY3) / 8 + 6·controlY / 8，解出 controlY。
- */
+/** 两个控制点各自从端点向上抬升；等高时对称，不等高时沿端点连线自然倾斜。 */
 export function liaisonPath(
   left: LiaisonAnchorGeometry,
   right: LiaisonAnchorGeometry,
   fontSize: number
 ): string {
   const spanEm = (right.x - left.x) / fontSize;
-  const apexY = (left.tipY + right.tipY) / 2 - liaisonRiseEm(spanEm) * fontSize;
-  const controlY = (apexY - 0.125 * (left.tipY + right.tipY)) / 0.75;
+  // 贝塞尔中点的抬升是控制点抬升的 3/4，保持原来的弧高规则。
+  const rise = (liaisonRiseEm(spanEm) * fontSize) / 0.75;
   return [
     `M ${round(left.x)} ${round(left.tipY)}`,
-    `C ${round(left.x)} ${round(controlY)}, ${round(right.x)} ${round(controlY)}, ${round(right.x)} ${round(right.tipY)}`
+    `C ${round(left.x)} ${round(left.tipY - rise)}, ${round(right.x)} ${round(right.tipY - rise)}, ${round(right.x)} ${round(right.tipY)}`
   ].join(" ");
 }
 
