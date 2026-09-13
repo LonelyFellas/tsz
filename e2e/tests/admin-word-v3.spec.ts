@@ -39,14 +39,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(firstGroup.getByLabel("复数通用拼写")).toHaveValue("");
 
     // 组内只剩一个原形时类型锁死；⊕ 复制出第二个原形后放开，删回去又锁上。
+    // 一个空组是 6 行：原形 1 行，加配置表里 5 个非原形类型各占 1 个空位（空位不入草稿）。
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
     await firstGroup.getByLabel("在原形 1 下方添加同类型词形").click();
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(3);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(7);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeEnabled();
     await expect(firstGroup.getByLabel("变化组 1 词形 2 类型")).toBeEnabled();
     await firstGroup.getByLabel("从变化组 1 移除词形 2").click();
     await firstGroup.getByLabel("删除词形及相关发音").click();
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(6);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
 
     const firstForm = firstGroup.locator(".v3-concrete-form-row").nth(0);
@@ -71,8 +72,8 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     await page.getByRole("button", { name: "新增名词变化组" }).click();
     const secondGroup = nounGroups.nth(1);
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
-    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(6);
+    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(6);
 
     // 英美规则是词性级设置，每组都渲染一份，这里从第 1 组切换。
     await firstGroup.getByLabel("英美拼写有区别").click();

@@ -49,6 +49,18 @@ const formsCss = readFileSync(
   "utf8"
 );
 
+/**
+ * 产品口径是每个词性下都摆出配置表里的全部词形类型（禅道 TASK#7），但本文件的用例
+ * 大多在验方言矩阵、类型候选这类结构，全量铺满只是把每个用例的渲染量翻倍，实测把
+ * 文件耗时推到用例超时线附近。所以本文件默认用这份收窄目录：不送 form_types，组件
+ * 退回该词性名下的类型。全量铺满由「每个词性都摆出配置表里的全部词形类型」那条用例
+ * 显式切回完整 fixture 单独守。
+ */
+const narrowFormTypes = () => ({
+  ...partOfSpeechCatalogFixture,
+  form_types: undefined
+});
+
 const catalogState = vi.hoisted(() => ({
   data: undefined as typeof partOfSpeechCatalogFixture | undefined,
   isError: false,
@@ -249,7 +261,7 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   beforeEach(() => {
-    catalogState.data = partOfSpeechCatalogFixture;
+    catalogState.data = narrowFormTypes();
     catalogState.isError = false;
     catalogState.pending = undefined;
     componentLookupState.resolve.mockReset();
@@ -367,6 +379,7 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("DD 多条 form 使用独立类型列与两张完整方言面板", async () => {
+    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const firstBase = ukUsFormFixture({
       id: uuidFromInt(2101),
       uk: { id: uuidFromInt(2111), spelling: "centre" },
@@ -439,6 +452,7 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("UD 只显示共用拼写并保持双方言发音独立", async () => {
+    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const ukPronunciation = pronunciationFixture({ id: uuidFromInt(2141) });
     const usPronunciation = pronunciationFixture({
       id: uuidFromInt(2142),
@@ -532,6 +546,7 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("类型单元加号在当前行下方新增同类型 form，并移除底部类型选择入口", async () => {
+    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const base = commonFormFixture({
       id: uuidFromInt(2161),
       variant_id: uuidFromInt(2162),
@@ -617,6 +632,7 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("以实际产品图为基准恢复词性 Tab 与同组词形矩阵层级", async () => {
+    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const base = commonFormFixture({
       id: uuidFromInt(701),
       variant_id: uuidFromInt(711),
@@ -726,6 +742,7 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("按实际产品图把原形与其他词形放在同一变化组矩阵", async () => {
+    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const base = commonFormFixture({
       id: uuidFromInt(741),
       variant_id: uuidFromInt(751),
@@ -978,6 +995,7 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("I02 完整显示多 POS/多组/同类型多行，共享 form 同步编辑但不复制", async () => {
+    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const content = multiPosFixture();
     const sharedId = content.pos[0]!.forms[0]!.id;
     const secondId = content.pos[0]!.forms[1]!.id;
@@ -1512,6 +1530,35 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
   });
 
+  it("每个词性都摆出配置表里的全部词形类型，本词性的排在前面", async () => {
+    catalogState.data = partOfSpeechCatalogFixture;
+    const initial = formsFixture({ forms: [commonFormFixture()] });
+    render(<Harness initial={initial} />);
+
+    await screen.findByLabelText("复数通用拼写");
+    const types = [
+      ...document.querySelectorAll<HTMLElement>(
+        '[aria-label^="变化组 1 词形 "][aria-label$=" 类型"]'
+      )
+    ].map((select) => select.closest(".ant-select")?.textContent?.trim());
+    // 名词名下只有复数，其余五个类型也照摆，录入者不需要的自己删（禅道 TASK#7）。
+    expect(types).toEqual([
+      "原形",
+      "复数",
+      // 共享 fixture 里简洁显示与正式名同值，生产上这栏显示的是「三单」。
+      "第三人称单数",
+      "现在分词",
+      "过去式",
+      "过去分词",
+      "比较级",
+      "最高级"
+    ]);
+    // 摆出来的只是占位，一个字都没填就不进草稿。
+    expect(
+      canonicalValue().pos[0]!.forms.map((form) => form.form_type)
+    ).toEqual(["base"]);
+  });
+
   it("目录没有派生词形时，只有原形的组照样显示且能录发音", () => {
     const content = formsFixture({ pos: "adverb" });
     const adverbCatalog = partOfSpeechCatalogFixture.items.find(
@@ -1544,6 +1591,40 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(screen.getByLabelText("变化组 1 词形 1 类型")).toBeDisabled();
     expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
+  });
+
+  it("配置表里没有派生词形的词性，拿到全量类型后同样铺满", () => {
+    const content = formsFixture({ pos: "adverb" });
+    const adverbCatalog = partOfSpeechCatalogFixture.items.find(
+      (item) => item.code === "adverb"
+    )!;
+    const formTypes = (partOfSpeechCatalogFixture.form_types ?? [])
+      .filter((item) => item.code !== "base")
+      .sort((left, right) => left.sort_order - right.sort_order)
+      .map((item) => item.code);
+
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3PosTab
+            content={content}
+            formTypes={formTypes}
+            idFactory={() => uuidFromInt(979)}
+            issues={[]}
+            onChange={() => undefined}
+            pos={content.pos[0]!}
+            posCatalog={adverbCatalog}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    // 副词名下一个派生词形都没配，产品仍要求摆满全部类型（禅道 TASK#7）；
+    // 随之而来的是这类词性也拿到了「增加一组词性变化」入口。
+    expect(screen.getAllByLabelText(/^变化组 1 词形 \d+ 类型$/u)).toHaveLength(
+      formTypes.length + 1
+    );
+    expect(screen.getByLabelText("新增副词变化组")).toBeVisible();
   });
 
   it("目录没有额外词形时仍保留并显示历史词形变化组", () => {
@@ -2461,6 +2542,8 @@ describe("V3FormsAndPronunciationStep", () => {
     const noun = dynamicCatalog.items.find((item) => item.code === "noun")!;
     noun.allowed_form_types = ["comparative"];
     noun.default_form_types = [];
+    // 这条只验候选来源，按词性收窄词形类型，免得全量占位行把候选与行数冲乱。
+    dynamicCatalog.form_types = undefined;
     catalogState.data = dynamicCatalog;
     const historical = commonFormFixture();
     historical.form_type = "plural";
@@ -2483,6 +2566,8 @@ describe("V3FormsAndPronunciationStep", () => {
     const noun = dynamicCatalog.items.find((item) => item.code === "noun")!;
     noun.allowed_form_types = ["comparative"];
     noun.default_form_types = [];
+    // 这条只验候选来源，按词性收窄词形类型，免得全量占位行把候选与行数冲乱。
+    dynamicCatalog.form_types = undefined;
     catalogState.data = dynamicCatalog;
     const base = commonFormFixture({
       id: uuidFromInt(1_090),
@@ -2848,7 +2933,7 @@ it("目录自定义词形可展示，改名后保留词形编码", async () => {
     abbreviation: "custom",
     sort_order: 100
   };
-  catalogState.data = structuredClone(partOfSpeechCatalogFixture);
+  catalogState.data = structuredClone(narrowFormTypes());
   catalogState.data.items[0]!.allowed_form_types = ["custom_variant"];
   const { rerender } = render(
     <FormTypeLabelsProvider items={[item]}>

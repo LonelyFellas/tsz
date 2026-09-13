@@ -63,6 +63,12 @@ export interface V3FormGroupCardProps {
   deleteDisabled?: boolean;
   onMove?: (offset: -1 | 1) => void;
   posCatalog?: PartOfSpeechCatalogItem;
+  /**
+   * 配置表里除原形外的全部词形类型，按序号排。禅道 TASK#7 的口径是「一组词形变化
+   * 建起来时把所有可能的词形类型都罗列出来，不需要的再删」，产品这次明确要求不按
+   * 「所属基本词性」收窄，所以名词下面也会摆出三单、比较级这些位置。
+   */
+  formTypes?: readonly WordFormTypeV3[];
   dialectControl?: ReactNode;
 }
 
@@ -80,9 +86,19 @@ export function V3FormGroupCard({
   deleteDisabled = false,
   onMove,
   posCatalog,
+  formTypes,
   dialectControl
 }: V3FormGroupCardProps) {
   const [removedTypes, setRemovedTypes] = useRemovedFormTypes(savedGroup.id);
+  // 目录没送全量类型时（老后端）退回该词性名下的那几个，至少不会一个位置都不摆。
+  // 本词性名下的类型排在前面，其余类型跟在后面：名词先看到复数，三单这些垫底。
+  const derivedFormTypes = useMemo(() => {
+    const all = formTypes ?? posCatalog?.allowed_form_types ?? [];
+    const own = new Set(posCatalog?.allowed_form_types ?? []);
+    return [...all].sort(
+      (left, right) => Number(own.has(right)) - Number(own.has(left))
+    );
+  }, [formTypes, posCatalog]);
   const [displayOrder, setDisplayOrder] = useState<string[]>([]);
   // 缺少的变化类型只用于展示，编辑后才进入草稿。
   const { content, pos, group, placeholders } = useMemo(() => {
@@ -94,7 +110,7 @@ export function V3FormGroupCard({
       )
     );
     const placeholders = new Map<string, string>();
-    for (const formType of posCatalog?.allowed_form_types ?? []) {
+    for (const formType of derivedFormTypes) {
       if (existingTypes.has(formType) || removedTypes.includes(formType))
         continue;
       const result = addConcreteForm(
@@ -130,6 +146,7 @@ export function V3FormGroupCard({
     savedContent,
     savedPos,
     savedGroup,
+    derivedFormTypes,
     posCatalog,
     removedTypes,
     displayOrder
@@ -185,7 +202,7 @@ export function V3FormGroupCard({
   const [collapsed, setCollapsed] = useState(false);
   const orderedIds = group.members.map((member) => member.id);
   const formTypeOptions = posCatalog
-    ? (["base", ...(posCatalog.allowed_form_types ?? [])] as WordFormTypeV3[])
+    ? (["base", ...derivedFormTypes] as WordFormTypeV3[])
     : [];
   const baseMembersOf = (candidate: WordFormGroupV3) =>
     candidate.members.filter(
