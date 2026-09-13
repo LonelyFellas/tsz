@@ -1,12 +1,14 @@
 import { validateRuntimeSchema } from "./runtime-schema";
 import type {
-  CollectSharedSentence,
   CreateSharedSentence,
   SentenceListQuery,
   SentenceRevision,
+  UnlinkSentenceSense,
   SharedSentence,
   SharedSentenceList,
-  UpdateSharedSentence
+  UpdateSharedSentence,
+  SentenceEntryTargets,
+  SentenceTargetQuery
 } from "@tsz/types";
 import type { HttpClient } from "./http";
 
@@ -43,11 +45,20 @@ export function createSharedSentenceEndpoints(http: HttpClient) {
       http.put<unknown>(`${root}/${id}`, input).then(decodeSentence),
     delete: (id: string, input: SentenceRevision) =>
       http.del<void>(`${root}/${id}`, input),
-    collect: (id: string, input: CollectSharedSentence) =>
-      http
-        .post<unknown>(`${root}/${id}/collections`, input)
-        .then(decodeSentence),
-    uncollect: (id: string, entryId: string, input: SentenceRevision) =>
-      http.del<void>(`${root}/${id}/collections/${entryId}`, input)
+    unlink: (id: string, entryId: string, input: UnlinkSentenceSense) =>
+      http.del<void>(`${root}/${id}/associations/${entryId}`, input),
+    targets: (query: SentenceTargetQuery) => {
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(query))
+        if (value !== undefined) params.set(key, String(value));
+      return http.get<unknown>(`${root}/targets?${params}`).then((value) => {
+        const result = validateRuntimeSchema("SentenceEntryTargets", value);
+        if (!result.valid)
+          throw new Error(
+            `关联候选响应不符合接口契约：${result.path} (${result.reason})`
+          );
+        return value as SentenceEntryTargets;
+      });
+    }
   };
 }

@@ -8,12 +8,16 @@ import type {
 import type { SentenceSourceRangeV3, TextLinkV3 } from "@tsz/types";
 import type { ReactNode } from "react";
 
-export interface AssociationPickerProps {
+export type VoiceAssociation = Pick<TextLinkV3, "id" | "source_segments">;
+
+export interface AssociationPickerProps<
+  TLink extends VoiceAssociation = TextLinkV3
+> {
   kind: "word" | "phrase";
   segments: SentenceSourceRangeV3[];
   /** 已有关联只供查看与清除；必须解除后才能重新选择。 */
-  selected?: TextLinkV3;
-  onSelect: (link?: TextLinkV3) => void;
+  selected?: TLink;
+  onSelect: (link?: TLink) => void;
 }
 
 export interface VoiceOption {
@@ -163,7 +167,7 @@ export interface VoiceProfile {
   voices: VoiceSetting[];
 }
 
-export interface VoiceEditorProps {
+export interface VoiceEditorProps<TLink extends VoiceAssociation = TextLinkV3> {
   mode?:
     | "grammar"
     | "association"
@@ -175,8 +179,11 @@ export interface VoiceEditorProps {
    * 不分英美（通用栏）的字段不传，此时不做筛选。
    */
   locale?: AudioAssetLocale;
-  textLinks?: TextLinkV3[];
-  renderAssociationPicker?: (props: AssociationPickerProps) => ReactNode;
+  textLinks?: TLink[];
+  /** 改字失效的关联在改回原文时恢复；显式清除不自动恢复。 */
+  restoreTextLinksOnCorrection?: boolean;
+  renderAssociationPicker?: (props: AssociationPickerProps<TLink>) => ReactNode;
+  onAssociationPendingChange?: (pending: boolean) => void;
   value: RichText;
   language?: string;
   /** 无障碍名，同时用于区分同一页面上的多个编辑器。 */
@@ -214,5 +221,5 @@ export interface VoiceEditorProps {
   onAudioAssetsChange?: (next: AudioAsset[]) => void;
   /** 每段文本最多几条音频；缺省用 wire 的上限。 */
   audioAssetLimit?: number;
-  onChange: (value: RichTextV2, textLinks?: TextLinkV3[]) => void;
+  onChange: (value: RichTextV2, textLinks?: TLink[]) => void;
 }

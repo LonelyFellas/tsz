@@ -80,6 +80,8 @@ export interface V3WizardActions {
 }
 
 export interface V3WizardSlotContext {
+  requestSentenceLeave?: () => Promise<boolean>;
+  registerSentenceLeaveGuard?: (guard?: () => Promise<boolean>) => void;
   word: AdminWordV3;
   partOfSpeechCatalog?: PartOfSpeechCatalogResponse;
   partOfSpeechCatalogError: boolean;
@@ -293,6 +295,25 @@ function V3WordCreationSession({
     meanings: false
   });
   const [activeStep, setActiveStepState] = useState(initialStep);
+  const sentenceLeaveGuard = useRef<(() => Promise<boolean>) | undefined>(
+    undefined
+  );
+  const registerSentenceLeaveGuard = useCallback(
+    (guard?: () => Promise<boolean>) => {
+      sentenceLeaveGuard.current = guard;
+    },
+    []
+  );
+  const sentenceLeaveRequest = useRef<Promise<boolean> | undefined>(undefined);
+  const requestSentenceLeave = useCallback(() => {
+    if (sentenceLeaveRequest.current) return sentenceLeaveRequest.current;
+    const request = sentenceLeaveGuard.current?.() ?? Promise.resolve(true);
+    sentenceLeaveRequest.current = request;
+    void request.finally(() => {
+      sentenceLeaveRequest.current = undefined;
+    });
+    return request;
+  }, []);
   const [activePosId, setActivePosIdState] = useState(
     initialWord.forms.pos[0]?.pos_id
   );
@@ -501,8 +522,15 @@ function V3WordCreationSession({
         allowPublishedEditing
       ).effective;
       if (effective === activeStep) return;
-      supersede();
-      setActiveStepState(effective);
+      const leave = () => {
+        supersede();
+        setActiveStepState(effective);
+      };
+      if (sentenceLeaveGuard.current)
+        void sentenceLeaveGuard.current().then((accepted) => {
+          if (accepted) leave();
+        });
+      else leave();
     },
     [activeStep, allowPublishedEditing, sessionReadOnly, supersede]
   );
@@ -889,6 +917,12 @@ function V3WordCreationSession({
       intent: StepSaveIntent
     ) => {
       const flow = flowRef.current;
+      if (
+        intent === "complete" &&
+        sentenceLeaveGuard.current &&
+        !(await sentenceLeaveGuard.current())
+      )
+        return;
       if (
         archivedReconciliationRequiredRef.current ||
         flow.canonical().status === "archived"
@@ -1360,6 +1394,8 @@ function V3WordCreationSession({
     [activeStep, allowPublishedEditing, sessionReadOnly, word]
   );
   const context: V3WizardSlotContext = {
+    registerSentenceLeaveGuard,
+    requestSentenceLeave,
     word,
     partOfSpeechCatalog,
     partOfSpeechCatalogError,

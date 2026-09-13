@@ -3,6 +3,7 @@ export type { LiaisonArcLayerProps } from "./LiaisonArcLayer";
 export {
   anchorTip,
   buildLiaisonArcs,
+  collectLiaisonGlyphs,
   createGlyphMeasurer,
   EMPTY_LIAISON_LAYOUT,
   isSameLiaisonLayout
@@ -12,6 +13,7 @@ export type {
   GlyphMeasurer,
   GlyphMetrics,
   LiaisonAnchorElements,
+  LiaisonGlyph,
   LiaisonArc,
   LiaisonLayout,
   LiaisonLinkElements,

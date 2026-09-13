@@ -263,17 +263,22 @@ export function V3TargetCascader({
   targets,
   onReplace,
   selfEntryId,
-  targetKind
+  targetKind,
+  phraseSelection = "components",
+  sourceDialect
 }: {
   literal: string;
   targets: readonly ResolvedTarget[];
   onReplace: (next: ResolvedTarget[], viaPhrase?: TextLinkViaPhraseV3) => void;
   selfEntryId?: string;
   targetKind?: "word" | "phrase";
+  phraseSelection?: "components" | "entry";
+  sourceDialect?: "common" | "uk" | "us";
 }) {
   const formTypeLabel = useFormTypeLabel();
   const posLabelOf = usePartOfSpeechLabel();
-  const includePhraseComponents = targetKind === "phrase";
+  const includePhraseComponents =
+    targetKind === "phrase" && phraseSelection === "components";
   const [componentResults, setComponentResults] = useState<
     Record<
       string,
@@ -341,21 +346,55 @@ export function V3TargetCascader({
     };
   }, [literal, requests, targetKind]);
 
+  const directCandidates = useMemo(() => {
+    if (phraseSelection !== "entry") return state.candidates;
+    const normalize = (text: string) =>
+      text
+        .normalize("NFKC")
+        .trim()
+        .replace(/\s+/gu, " ")
+        .replace(/[‘’ʼ]/gu, "'")
+        .replace(/[‐‑‒–—−]/gu, "-")
+        .toLowerCase();
+    return state.candidates.map((candidate) => ({
+      ...candidate,
+      forms: candidate.forms.filter(
+        (form) =>
+          normalize(form.spelling) === normalize(literal) &&
+          (!sourceDialect ||
+            sourceDialect === "common" ||
+            form.dialect === "common" ||
+            form.dialect === sourceDialect)
+      )
+    }));
+  }, [state.candidates, phraseSelection, sourceDialect, literal]);
+  const availableVariantIds = useMemo(
+    () =>
+      phraseSelection === "entry"
+        ? new Set([
+            ...selectedVariantIds,
+            ...directCandidates.flatMap((candidate) =>
+              candidate.forms.map((form) => form.variant_id)
+            )
+          ])
+        : selectedVariantIds,
+    [phraseSelection, selectedVariantIds, directCandidates]
+  );
   const groups = useMemo(
     () =>
       groupsFromCandidates(
-        state.candidates,
+        directCandidates,
         preference,
-        selectedVariantIds,
+        availableVariantIds,
         selfEntryId,
         formTypeLabel,
         posLabelOf
       ),
     [
       preference,
-      selectedVariantIds,
+      availableVariantIds,
       selfEntryId,
-      state.candidates,
+      directCandidates,
       formTypeLabel,
       posLabelOf
     ]

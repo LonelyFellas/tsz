@@ -4,8 +4,6 @@ import {
   Alert,
   App,
   Button,
-  Card,
-  Checkbox,
   Col,
   DatePicker,
   Descriptions,
@@ -37,7 +35,10 @@ function entryLink(entry: SharedSentence["entries"][number]) {
       title={`词条 ID：${entry.id}`}
       to={`/words/${entry.id}/v3/wizard/meanings`}
     >
-      {entry.headword || entry.id} {entry.kind === "phrase" ? "短语" : "单词"}
+      {entry.headword || entry.id} ·{" "}
+      {entry.senses.length
+        ? entry.senses.map((sense) => sense.gloss || "暂无释义").join(" / ")
+        : "待选择词义"}
     </Link>
   );
 }
@@ -58,27 +59,12 @@ export function SentenceLibrary({
   const [keyword, setKeyword] = useState("");
   const [level, setLevel] = useState<string>();
   const [dates, setDates] = useState<[Dayjs | null, Dayjs | null] | null>(null);
-  const [editor, setEditor] = useState<SharedSentence | "new">();
+  const [editor, setEditor] = useState<SharedSentence>();
   const [detail, setDetail] = useState<SharedSentence>();
   const [selected, setSelected] = useState<React.Key[]>([]);
-  const [candidatePage, setCandidatePage] = useState(1);
-  const [pending, setPending] = useState(false);
-  const [claim, setClaim] = useState<SharedSentence>();
-  const [claimIds, setClaimIds] = useState<string[]>([]);
   const query = useQuery({
     queryKey: ["shared-sentences", entryId, filters],
     queryFn: () => api.sentences.list({ ...filters, entry_id: entryId })
-  });
-  const candidates = useQuery({
-    queryKey: ["shared-sentences", "candidates", entryId, candidatePage],
-    queryFn: () =>
-      api.sentences.list({
-        entry_id: entryId,
-        candidates: true,
-        page: candidatePage,
-        page_size: 5
-      }),
-    enabled: !!entryId && !readOnly
   });
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["shared-sentences"] });
@@ -102,8 +88,8 @@ export function SentenceLibrary({
         <Flex vertical gap="small">
           {items.map((item) => (
             <Typography.Text key={item.id}>
-              {sentenceText(item).slice(0, 100)}：影响{" "}
-              {item.entries.filter((e) => e.collected).length} 个已收录词条。
+              {sentenceText(item).slice(0, 100)}：影响 {item.entries.length}{" "}
+              个关联词条。
             </Typography.Text>
           ))}
           <Typography.Text type="danger">
@@ -130,55 +116,29 @@ export function SentenceLibrary({
           modal.error({ title: "部分例句未删除", content: errors.join("；") });
       }
     });
-  const uncollect = (item: SharedSentence) =>
-    modal.confirm({
-      title: "从当前词条移除收录？",
-      content: "例句及其他词条收录保留。",
-      onOk: async () => {
-        try {
-          await api.sentences.uncollect(item.id, entryId!, {
-            base_revision: item.revision
-          });
-          refresh();
-        } catch (e) {
-          void failure(e);
-          throw e;
-        }
-      }
-    });
-  const collect = async () => {
-    if (!claim || !entryId) return;
-    setPending(true);
-    try {
-      await api.sentences.collect(claim.id, {
-        base_revision: claim.revision,
-        entry_id: entryId,
-        annotation_ids: claimIds
-      });
-      setClaim(undefined);
-      refresh();
-    } catch (e) {
-      void failure(e);
-    } finally {
-      setPending(false);
-    }
-  };
   const rows = query.data?.items ?? [];
+  if (editor)
+    return (
+      <SentenceEditor
+        key={`${editor.id}:${editor.revision}`}
+        sentence={editor}
+        onClose={() => setEditor(undefined)}
+        onSaved={() => {
+          setEditor(undefined);
+          refresh();
+        }}
+      />
+    );
   return (
     <Flex vertical gap="middle">
       <Flex justify="space-between" align="center">
         <Typography.Title level={entryId ? 4 : 2} style={{ margin: 0 }}>
           多维例句
         </Typography.Title>
-        {entryId && !readOnly && (
-          <Button type="primary" onClick={() => setEditor("new")}>
-            创编例句
-          </Button>
-        )}
       </Flex>
       {entryId && (
         <Typography.Text type="secondary">
-          例句独立保存并发布；当前词条收录与句内关联分别维护。
+          展示句内关联到当前词条的例句。修改会同步到例句库。
         </Typography.Text>
       )}
       {!entryId && (
@@ -258,7 +218,7 @@ export function SentenceLibrary({
         />
       )}
       <Row gutter={[16, 16]}>
-        <Col xs={24} xl={entryId && !readOnly ? 16 : 24}>
+        <Col xs={24} xl={24}>
           <Table<SharedSentence>
             rowKey="id"
             dataSource={rows}
@@ -319,14 +279,7 @@ export function SentenceLibrary({
                 render: (_, row) => (
                   <Flex vertical>
                     {row.entries.slice(0, 2).map((e) => (
-                      <span key={e.id}>
-                        {entryLink(e)}{" "}
-                        {e.collected ? (
-                          <Tag>已收录</Tag>
-                        ) : (
-                          <Tag color="blue">已标注</Tag>
-                        )}
-                      </span>
+                      <span key={e.id}>{entryLink(e)} </span>
                     ))}
                     {row.entries.length > 2 && (
                       <Typography.Text
@@ -378,11 +331,7 @@ export function SentenceLibrary({
                         >
                           编辑
                         </Button>
-                        {entryId ? (
-                          <Button size="small" onClick={() => uncollect(row)}>
-                            移除收录
-                          </Button>
-                        ) : (
+                        {!entryId && (
                           <Button
                             size="small"
                             danger
@@ -399,84 +348,8 @@ export function SentenceLibrary({
             ]}
           />
         </Col>
-        {entryId && !readOnly && (
-          <Col xs={24} xl={8}>
-            <Card title={`可收录例句（${candidates.data?.total ?? 0}）`}>
-              <Typography.Paragraph type="secondary">
-                以下例句已标注此词条，或含可能匹配的待关联文字。请核对上下文和具体词条后确认。
-              </Typography.Paragraph>
-              {candidates.isError && (
-                <Alert
-                  type="error"
-                  title="候选加载失败"
-                  action={
-                    <Button onClick={() => void candidates.refetch()}>
-                      重试
-                    </Button>
-                  }
-                />
-              )}
-              <Table<SharedSentence>
-                size="small"
-                rowKey="id"
-                loading={candidates.isFetching}
-                dataSource={candidates.data?.items ?? []}
-                pagination={{
-                  current: candidatePage,
-                  pageSize: 5,
-                  total: candidates.data?.total,
-                  onChange: setCandidatePage,
-                  showSizeChanger: false
-                }}
-                columns={[
-                  { title: "例句", render: (_, row) => sentenceText(row) },
-                  {
-                    title: "操作",
-                    width: 180,
-                    render: (_, row) => (
-                      <Space>
-                        <Button
-                          size="small"
-                          onClick={() => void open(row.id, false)}
-                        >
-                          查看
-                        </Button>
-                        <Button
-                          size="small"
-                          type="primary"
-                          onClick={async () => {
-                            try {
-                              setClaim(await api.sentences.get(row.id));
-                              setClaimIds([]);
-                            } catch (e) {
-                              void failure(e);
-                            }
-                          }}
-                        >
-                          确认收录
-                        </Button>
-                      </Space>
-                    )
-                  }
-                ]}
-              />
-            </Card>
-          </Col>
-        )}
       </Row>
-      {editor && (
-        <SentenceEditor
-          key={editor === "new" ? "new" : `${editor.id}:${editor.revision}`}
-          sentence={editor === "new" ? undefined : editor}
-          sourceEntryId={entryId}
-          onClose={() => setEditor(undefined)}
-          onSaved={() => {
-            setEditor(undefined);
-            refresh();
-            void message.success("例句已保存并发布");
-          }}
-        />
-      )}
+
       {detail && (
         <Modal
           open
@@ -509,9 +382,7 @@ export function SentenceLibrary({
             ))}
             <Space wrap>
               {detail.entries.map((e) => (
-                <span key={e.id}>
-                  {entryLink(e)}（{e.collected ? "已收录" : "仅标注"}）
-                </span>
+                <span key={e.id}>{entryLink(e)}</span>
               ))}
             </Space>
             {detail.content.annotations.map((a) => (
@@ -525,48 +396,12 @@ export function SentenceLibrary({
                           ? a.target.target_entry_id
                           : "")
                     )?.headword ?? a.target.target_entry_id)
-                  : `待关联：${a.target.headword} ${a.target.gloss ?? ""}`}
+                  : a.target.state === "entry_only"
+                    ? "待选择词义"
+                    : `待关联：${a.target.headword} ${a.target.gloss ?? ""}`}
               </Typography.Text>
             ))}
           </Flex>
-        </Modal>
-      )}
-      {claim && (
-        <Modal
-          open
-          title="确认关联并收录到当前词条"
-          onCancel={() => !pending && setClaim(undefined)}
-          confirmLoading={pending}
-          onOk={() => void collect()}
-          okButtonProps={{
-            disabled:
-              !claim.content.annotations.some(
-                (a) =>
-                  a.target.state === "linked" &&
-                  a.target.target_entry_id === entryId
-              ) && claimIds.length === 0
-          }}
-        >
-          <Typography.Paragraph>{sentenceText(claim)}</Typography.Paragraph>
-          <Typography.Paragraph>
-            当前词条 ID：{entryId}。同拼写的词条不会自动合并，请核对语境。
-          </Typography.Paragraph>
-          <Checkbox.Group
-            value={claimIds}
-            onChange={(values) => setClaimIds(values as string[])}
-            options={claim.content.annotations
-              .filter((a) => a.target.state === "pending")
-              .map((a) => ({
-                value: a.id,
-                label:
-                  a.target.state === "pending"
-                    ? `${a.source_segments.map((s) => s.surface).join(" … ")} → ${a.target.headword}（${a.target.kind === "phrase" ? "短语" : "单词"}） ${a.target.gloss ?? ""}`
-                    : ""
-              }))}
-          />
-          <Typography.Paragraph type="secondary">
-            勾选的待关联标记将绑定此具体词条；未勾选的保持待关联。
-          </Typography.Paragraph>
         </Modal>
       )}
     </Flex>

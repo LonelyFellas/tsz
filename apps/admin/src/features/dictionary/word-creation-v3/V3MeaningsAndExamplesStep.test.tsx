@@ -743,7 +743,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("开始录入词义")).toBeNull();
     expect(
       screen.getByText(
-        "录入顺序：词义 → 语法结构。 词义需填写本语言释义语句；多维例句在上方独立创编，点完成即发布。"
+        "录入顺序：词义 → 语法结构。 词义需填写本语言释义语句；在下方多维例句区块添加，使用 voice-editor 编辑并独立保存。"
       )
     ).toBeVisible();
     expect(

@@ -16,11 +16,18 @@ import {
   toRichTextV2,
   validateRichTextV2
 } from "../../core";
-import { rangesOverlap, remapTextLinks, wordSegments } from "../../core";
+import {
+  rangesOverlap,
+  remapTextLinks,
+  remapTextLinksWithRecovery,
+  wordSegments,
+  type RecoverableTextLink
+} from "../../core";
 import type {
   AudioAsset,
   VoiceOption,
   VoiceEditorProps,
+  VoiceAssociation,
   VoiceSetting
 } from "../../types";
 import {
@@ -118,12 +125,14 @@ function parseValue(value: RichText): { value: RichTextV2; error?: string } {
  * 需要富文本编辑器——词级/词间标注本就不该允许落在半个单词上，纯文本 + 码点
  * 区间反而更贴合 wire 模型。
  */
-export function VoiceEditor({
+export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
   value,
   mode = "pronunciation",
   locale,
   textLinks,
+  restoreTextLinksOnCorrection = false,
   renderAssociationPicker,
+  onAssociationPendingChange,
   language = "en",
   contextLabel = "语音编辑器",
   previewAdapter,
@@ -139,14 +148,17 @@ export function VoiceEditor({
   onAudioAssetsChange,
   audioAssetLimit = AUDIO_ASSETS_PER_VARIANT_MAX,
   onChange
-}: VoiceEditorProps) {
+}: VoiceEditorProps<TLink>) {
   /*
    * 初值直接从 value 灌，而不是先置空再由 effect 补。先置空的话，首帧折算出的是
    * 空内容，实时回调会把这份空值抛给宿主——一挂载就把表单里原有的文本清掉。
    */
   const [initial] = useState(() => parseValue(value));
   const [text, setText] = useState(initial.value.text);
-  const [links, setLinks] = useState<TextLinkV3[]>(textLinks ?? []);
+  const [links, setLinks] = useState<TLink[]>(textLinks ?? []);
+  const [recoverableLinks, setRecoverableLinks] = useState<
+    RecoverableTextLink<TLink>[]
+  >([]);
   const [linkWords, setLinkWords] = useState<
     Array<{ start: number; end: number }>
   >([]);
@@ -234,8 +246,8 @@ export function VoiceEditor({
    * 撤销/重做栈。快照存「文本 + 全部标注」，因为改文本会连带重挂标注，
    * 只回退其中一半会得到自相矛盾的状态。深度设上限，避免长时间编辑无限增长。
    */
-  const [past, setPast] = useState<EditorSnapshot[]>([]);
-  const [future, setFuture] = useState<EditorSnapshot[]>([]);
+  const [past, setPast] = useState<EditorSnapshot<TLink>[]>([]);
+  const [future, setFuture] = useState<EditorSnapshot<TLink>[]>([]);
 
   /*
    * 受控内联下值是双向流动的（自己改 → 抛给父组件 → 父组件灌回来），要两个基准，
@@ -341,6 +353,7 @@ export function VoiceEditor({
     emittedRef.current = undefined;
     setText(parsed.value.text);
     setLinks(textLinks ?? []);
+    setRecoverableLinks([]);
     setMarks(annotationsToMarks(parsed.value));
     setLoadError(parsed.error ?? "");
     typingRunRef.current = 0;
@@ -544,11 +557,21 @@ export function VoiceEditor({
    * 这段输入开始之前的状态，所以续写时不再推新快照。
    */
   const commit = (
-    next: (current: EditorSnapshot) => EditorSnapshot,
+    next: (current: EditorSnapshot<TLink>) => EditorSnapshot<TLink>,
     options?: { typing?: boolean }
   ) => {
-    const before: EditorSnapshot = { text, marks, textLinks: links };
+    const before: EditorSnapshot<TLink> = {
+      text,
+      marks,
+      textLinks: links,
+      recoverableTextLinks: recoverableLinks
+    };
     const after = next(before);
+    if (!options?.typing && after.textLinks !== before.textLinks) {
+      // 主动改动关联后以新选择为准；只有撤销该操作才会恢复旧记录。
+      after.recoverableTextLinks = [];
+      setLinkNotice("");
+    }
     const now = Date.now();
     const continuingRun =
       options?.typing === true &&
@@ -561,6 +584,7 @@ export function VoiceEditor({
     setText(after.text);
     setMarks(after.marks);
     setLinks(after.textLinks ?? []);
+    setRecoverableLinks(after.recoverableTextLinks ?? []);
     setValidationMessage("");
   };
 
@@ -570,11 +594,20 @@ export function VoiceEditor({
     typingRunRef.current = 0;
     setPast((stack) => stack.slice(0, -1));
     setFuture((stack) =>
-      [{ text, marks, textLinks: links }, ...stack].slice(0, MAX_HISTORY)
+      [
+        {
+          text,
+          marks,
+          textLinks: links,
+          recoverableTextLinks: recoverableLinks
+        },
+        ...stack
+      ].slice(0, MAX_HISTORY)
     );
     setText(previous.text);
     setMarks(previous.marks);
     setLinks(previous.textLinks ?? []);
+    setRecoverableLinks(previous.recoverableTextLinks ?? []);
     setLinkNotice("");
     resetTransient();
     setValidationMessage("");
@@ -585,11 +618,20 @@ export function VoiceEditor({
     if (!next) return;
     setFuture((stack) => stack.slice(1));
     setPast((stack) =>
-      [...stack, { text, marks, textLinks: links }].slice(-MAX_HISTORY)
+      [
+        ...stack,
+        {
+          text,
+          marks,
+          textLinks: links,
+          recoverableTextLinks: recoverableLinks
+        }
+      ].slice(-MAX_HISTORY)
     );
     setText(next.text);
     setMarks(next.marks);
     setLinks(next.textLinks ?? []);
+    setRecoverableLinks(next.recoverableTextLinks ?? []);
     setLinkNotice("");
     resetTransient();
     setValidationMessage("");
@@ -597,20 +639,23 @@ export function VoiceEditor({
 
   const changeText = (nextText: string) => {
     if (readOnly || textReadOnly) return;
+    const mapped = restoreTextLinksOnCorrection
+      ? remapTextLinksWithRecovery(text, nextText, links, recoverableLinks)
+      : { links: remapTextLinks(text, nextText, links), recoverable: [] };
     setLinkNotice(
-      remapTextLinks(text, nextText, links).length < links.length
-        ? "被修改词段的关联已移除，请重新选择；可撤销恢复。"
-        : ""
+      restoreTextLinksOnCorrection
+        ? mapped.recoverable.length
+          ? "部分关联暂时失效，改回原文后会自动恢复；也可撤销。"
+          : ""
+        : mapped.links.length < links.length
+          ? "被修改词段的关联已移除，请重新选择；可撤销恢复。"
+          : ""
     );
-    // 改文本时按词重挂标注：词没动的保留，被改写的连同它的标注一起消失。
     commit(
       (current) => ({
         text: nextText,
-        textLinks: remapTextLinks(
-          current.text,
-          nextText,
-          current.textLinks ?? []
-        ),
+        textLinks: mapped.links,
+        recoverableTextLinks: mapped.recoverable,
         marks: remapMarks(current.text, nextText, current.marks)
       }),
       { typing: true }
@@ -620,6 +665,11 @@ export function VoiceEditor({
 
   const linkSegments = wordSegments(text, linkWords);
   const selectedLink = links.find((link) => link.id === inspectedLinkId);
+  useEffect(() => {
+    onAssociationPendingChange?.(
+      brush.kind === "association" && linkWords.length > 0 && !selectedLink
+    );
+  }, [brush.kind, linkWords.length, selectedLink, onAssociationPendingChange]);
   const selectWord = (range: { start: number; end: number }) => {
     if (readOnly || !renderAssociationPicker || brush.kind !== "association")
       return;
@@ -685,7 +735,10 @@ export function VoiceEditor({
           resetTransient();
           return;
         }
-        if (!next) return;
+        if (!next) {
+          resetTransient();
+          return;
+        }
         if (
           links.some((link) =>
             rangesOverlap(link.source_segments, linkSegments)
@@ -1313,7 +1366,7 @@ export function VoiceEditor({
                             {!renderAssociationPicker
                               ? "当前后端尚不支持正文关联，已有关联保留。"
                               : targetKind === "word"
-                                ? "点击一个未关联的单词，再选择单词、词形和词义。"
+                                ? "点击一个未关联的单词，再选择关联目标。"
                                 : linkWords.length > 0
                                   ? `已选 ${linkWords.length} 个单词：${linkSegments.map((segment) => segment.surface).join(" … ")}`
                                   : "依次点击至少两个未关联的单词，可不连续；再次点击取消选择。"}

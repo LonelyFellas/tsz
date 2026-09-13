@@ -1,35 +1,67 @@
-# 共享例句设计
+# 共享例句词义目标设计
 
-依赖：共享实体/收录与独立保存事务 → OpenAPI/wire/request 同步 → 例句库及词条例句编辑器 → 集成与真实浏览器验收。
+2026-09-13。本方案替代此前只按 entry_id 绑定的方案；独立句子与按真实标注反查的原则保持。用户已决定先保存新词义，再添加例句。
 
-可复用：V3 多档译文、富文本/语音、码点片段选择、目标发现与具体词条选择、管理员鉴权、既有草稿 entry_id。新增：独立共享表、标注、收录、候选及页面。两仓基线 c294e2c / 8a8e157；工作树均 codex/local-main-20260912。
+## 基线、隔离与依赖
 
-新增 lexicon.shared_sentences（完整 typed 内容、revision、creator、时间、软删除）、shared_sentence_annotations（linked/pending 及片段）、shared_sentence_collections（sentence_id/entry_id 唯一）。来源词条仅创建入口上下文，词义节点未保存也可完成。创建稳定 UUID 幂等；修改删除 revision 乐观锁，冲突保留本地输入，要求刷新。新端点在 /api/v1/admin/lexicon/sentences；每次核实活跃管理员。收录/创建校验词条可编辑（未发布草稿仅创建人/超管）。共享例句为已发布资源，活跃管理员可改。
+源环境为 tsz-main-local-20260912 / tsz-rust-main-local-20260912，用户页面 3101 和 API 8484 保留。
 
-“完成”在单事务创建正文、标注和当前词条收录，不更改词条 revision；外层保存不回写共享正文。片段以 Unicode 码点保存；linked 必须真实 entry_id，可关联自己的草稿；pending 保留 kind/headword/gloss。候选匹配仅为提示，绑定和收录必须显式确认。收录数量改变也推进例句 revision，删除确认不会静默遗漏新引用。
+新工作树：tsz-sentence-senses-20260913、tsz-rust-sentence-senses-20260913；均使用 `codex/shared-sentence-sense-targets`，以各自 origin/main 为基线并复制完整源工作区差异。前端 main 为 9ae7275，后端为 d5bddc4。原差异和数据已备份；新数据库是 tsz_sentence_senses_20260913（原隔离库的克隆），Redis 使用 56392/2，计划 API 8485、前端 127.0.0.1:3102。
 
-不兼容旧数据，不回填旧例句、不写双读双写。用户上线前自行清理旧测试数据。本次只新增共享结构并将当前例句入口切换到新模型，词条 meanings 不再负责例句创建或更新。新旧服务需同批发布。
+关键路径：词义目标身份与引用保护 → 原生契约同步 → 词义卡片与选择器 → 本地验收。
 
-测试围绕独立保存、幂等、revision、权限、pending 候选/绑定、共享编辑删除、迁移 up/down 。API 契约按两工作树明确路径生成；前端最终 test:cov/typecheck/lint，后端 fmt/clippy/test，一次全量门。真实环境使用此次独立 Postgres 55441、Redis 56392，web build+next start；不得影响其他服务。
+- 已有：共享实体、标注位置、幂等、revision、鉴权、独立保存、关联恢复与连读渲染。
+- 可复用：多维释义的 V3TargetCascader、TextLinkV3 目标身份校验、词形候选服务与稳定 nodes。
+- 小改动：将例句区块放回每个词义内、增加已保存词义门禁、影响提示。
+- 新工作：annotation 保存完整词义目标、按 entry+sense 反查、按词义解除、引用节点保护、旧 entry-only 过渡。
 
-详细本地样例和验证记录见 `local-acceptance.md`。来源词条 ID 只作不可变溯源，不通过 ON DELETE SET NULL 反向更新例句；标注目标保留真实外键。写路径先取得词条上下文与行锁，再锁例句；列表在一个 repeatable-read 快照内读完整分页。存在任何共享例句时，结构回退拒绝删除表，必须先明确处理数据。
+## 目标与存储
 
-验收命令：`SQLX_OFFLINE=true cargo test --locked --test shared_sentences`
+Linked 保留 target_entry_id，并增加 target_pos_id、target_base_form_id、target_form_id、target_variant_id、target_sense_id 和可选 target_publication_id。与现有 TextLinkV3 的目标身份一致；不支持将短语选择绕到其成分词后忽略该路径。
 
-## 数据方案比较与选择
+annotations 表增加 target_sense_id 和 target_ref JSONB。target_ref 保存完整 Linked 目标，entry/sense 两列用于查询与约束；CHECK 保证二者与 JSON 中对应 ID 一致，并增加复合查询索引。sense 外键指向稳定 `lexicon.nodes(id,entry_id)`，不引用正常保存会重写的 senses 行。
 
-1. **共享正文 JSONB + 关系表（选定）**：正文沿用现有 typed 富文本/多档译文 DTO，以一句为编辑和 revision 单位；句内标注独立表，目标词条外键或 pending 元数据；正式收录单独关系表。保存正文、标注及首次收录在同一事务完成。pending 规范化索引用于候选，不自动绑定。正确性有外键/唯一约束与乐观锁支持；复用现有编辑器，改动集中，维护成本最低。代价是译文内部结构依赖应用校验，当前整句编辑模型适合此边界。
-2. **全文关系化**：共享例句、英语变体、译文、音频、每个片段分别建表。支持更细粒度约束及检索，适合未来多作者分字段编辑；但当前所有内容一起“完成”，会重复现有 rich text DTO 与转换逻辑，事务/SQL 数量多，增加实现及维护成本，没有当前产品收益。
-3. **完整文档 JSONB（标注/收录均嵌入）**：一句一次写入，最容易复用 DTO；但具体词条引用缺少外键，收录反查、pending 索引与并发合并要额外触发器或表达式逻辑。当前强关系和候选确认需求已经存在，应用层补完整性后的复杂度高于方案 1。
+旧行没有 target_ref/sense 时返回显式的待选择词义状态，不冒充完整 Linked。过渡列可空，新写入服务层拒绝不完整目标。down 在存在新词义目标时拒绝有损删除；不删除历史 collection/sense collection 表。
 
-采用方案 1。点“完成”即发布当前例句，无额外审核状态；已有 source_entry_id 真实身份可用。词条保存只处理词条自身，当前例句显示总是从收录关系读取 canonical 共享内容，不复制至词条 draft/publication JSON；因此活跃引用同步看到修改/删除，无需遍历改写各词条发布内容。例句本身有独立生命周期，外层取消不回滚。图片不要求例句历史版本，故不新增例句版本历史功能。词条已发布状态不影响当前例句关联关系的独立维护。
+## 服务与校验
 
-并发：同一句内容修改、收录/解绑、pending 绑定和删除以 sentence 行锁串行化，revision 覆盖正文和引用集合；读取整句内容/标注/引用使用一致快照，避免混合 revision。列表仅分页返回；批量删除逐条提示失败，成功结果不回滚其他条目，不隐瞒部分失败。
+保留现有完整 token、码点位置、登记形式匹配。提取 text_links 的纯目标身份验证（POS、form、variant、base group、sense 从属关系）供两处复用；共享例句不调用会禁止自指、写宿主 publication_sense_refs 的整套 TextLink 流程。
 
-## 前端 PR 交付边界
+目标加载采用已保存草稿/明确发布快照的现有规则。查询和保存都使用明确目标及其词形；不靠截断候选列表证明某 ID 不存在。当前词义可成为目标，历史 source 不成为永久约束。
 
-本次 ship 只包含前端。配套后端基于 `8a8e157` 的共享例句实现和两条结构迁移仍是本地修改，尚无可发布的后端候选提交/PR；现网前后端来源未在本次交付中核实。新前端需要 `/api/v1/admin/lexicon/sentences` 及收录 API，不能单独连接旧 API 上线。PR 保持草稿，等待后端形成配套候选。
+新增上下文 source_sense_id / context_sense_id：上下文 entry 与 sense 成对验证，至少一条完整标注同时匹配二者。新词义尚未保存时没有权威节点，不自动造空节点、不隐式保存整个词义表单。
 
-用户已决定上线前清理旧测试数据，不实现历史兼容。配套发布应在维护窗口暂停访问，完成已确认的数据清理和后端结构/API切换，再切前端并验收后恢复访问；这份说明不授权清理、合并或部署。已有共享数据时 down 迁移会拒绝删表，回退不能仅恢复旧二进制。
+锁顺序维持词条上下文在前、句子在后。词义/词形保存时在已锁定 entry 的事务内检查真实共享引用：拟保留的 forms/meanings 必须仍包含引用身份。发布与切换发布版本同样检查，不向其他宿主引用表伪造行。
 
-前端已快进到 `02422241b125c9b26f3818bd079c79a593483779`，补齐超过50个匹配词条时的检索分页。提交前本地验收记录保留其实际版本；最终提交的测试和独立审查证据以 PR 为准。
+## 查询、解除与响应
+
+- GET sentences 增加 sense_id；必须与 entry_id 配对，并在同一个 EXISTS annotation 条件中同时过滤。词义内按句 ID 去重；词条汇总可以跨词义去重。
+- POST 必传 source_entry_id/source_sense_id；PUT 的可选 context_entry_id/context_sense_id 成对出现；其余全局编辑语义不变。
+- 显式解除携带当前 sense_id，只移除该 entry+sense 的标注。旧 entry-only 状态从全局编辑器补全或清除。
+- 响应关联词条中带词义 ID/摘要，已有关联面板能明确展示“make up · 编造”。摘要从权威目标内容读取，不信任客户端文案。
+
+## 前端
+
+WordSentences 改为词义级查询；V3MeaningsAndExamplesStep 在每个 sense 卡片内渲染区块。源 sense 是否保存从 canonical word 判断，草稿新 UUID 不构成已保存证据。删除/切换界面不暗中保存例句。
+
+SharedSentenceAssociationPicker 复用 V3TargetCascader 的词条→词形→词义界面。共享例句允许当前词条，短语选择使用自身词义；现有多维释义的自指过滤和短语成分路径保持默认行为。Pending 继续独立于完整目标。
+
+自动检测仅在当前词义有明确合法词形时给出确认入口；有多个词形身份时需要选择，不能用第一条任意候选。自动恢复同时携带完整目标身份，不丢 sense/form 字段。
+
+新增/编辑仍直接显示 voice-editor，保存与未保存离开保护独立于词义表单。新环境验收使用任务专用样例，不改动源环境正在编辑的数据。
+
+## 兼容、发布、回退
+
+目标 union、必填上下文及响应字段改变，与旧严格 runtime 客户端不兼容。通过后端原生 export_openapi 和前端 sync:openapi 同步；不得手改生成字段或扩大 PENDING。
+
+发布顺序：同批发布。后续获授权后，在维护窗口备份与清点数据，切换配套 API/客户端并修复明确的存量关系；不能猜配第一词义。此次只交付独立本地环境。旧环境与源工作树保留作为人工验收和回退依据，不恢复快照覆盖新增数据。
+
+## 验证
+
+重点验证同一词条不同词义隔离、同一句共享及局部解除、精确身份链、未保存词义门禁、旧数据修复、引用删除保护、权限、幂等与并发。迁移 up/down 在 SQLx 隔离数据库验证，不能对源库执行 down。
+
+在后端工作树且已准备隔离测试依赖时执行：
+
+```sh
+SQLX_OFFLINE=true cargo test --locked --test shared_sentences
+```

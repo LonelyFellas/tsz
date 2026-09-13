@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-main-local-20260912/docs/openapi.json",
-  "_generatedAt": "2026-09-12T11:08:48.425Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-sentence-senses-20260913/docs/openapi.json",
+  "_generatedAt": "2026-09-13T02:37:24.742Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -39,9 +39,9 @@
     "/admin/lexicon/entries/{id}/steps/meanings": ["put"],
     "/admin/lexicon/entries/{id}/validate": ["post"],
     "/admin/lexicon/sentences": ["get", "post"],
+    "/admin/lexicon/sentences/targets": ["get"],
     "/admin/lexicon/sentences/{id}": ["delete", "get", "put"],
-    "/admin/lexicon/sentences/{id}/collections": ["post"],
-    "/admin/lexicon/sentences/{id}/collections/{entry_id}": ["delete"],
+    "/admin/lexicon/sentences/{id}/associations/{entry_id}": ["delete"],
     "/admin/lexicon/surface-match-snapshots/{snapshot_id}": ["get"],
     "/admin/profile": ["get"],
     "/admin/profile/preferences": ["patch"],
@@ -596,6 +596,17 @@
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /admin/lexicon/sentences/targets": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SentenceEntryTargets" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "delete /admin/lexicon/sentences/{id}": {
       "request": { "$ref": "#/components/schemas/SentenceRevision" },
       "responses": {
@@ -632,20 +643,8 @@
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
-    "post /admin/lexicon/sentences/{id}/collections": {
-      "request": { "$ref": "#/components/schemas/CollectSharedSentence" },
-      "responses": {
-        "200": { "$ref": "#/components/schemas/SharedSentence" },
-        "400": { "$ref": "#/components/schemas/ProblemDetails" },
-        "401": { "$ref": "#/components/schemas/ProblemDetails" },
-        "403": { "$ref": "#/components/schemas/ProblemDetails" },
-        "404": { "$ref": "#/components/schemas/ProblemDetails" },
-        "409": { "$ref": "#/components/schemas/ProblemDetails" },
-        "422": { "$ref": "#/components/schemas/ProblemDetails" }
-      }
-    },
-    "delete /admin/lexicon/sentences/{id}/collections/{entry_id}": {
-      "request": { "$ref": "#/components/schemas/SentenceRevision" },
+    "delete /admin/lexicon/sentences/{id}/associations/{entry_id}": {
+      "request": { "$ref": "#/components/schemas/UnlinkSentenceSense" },
       "responses": {
         "204": null,
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -2712,20 +2711,6 @@
     },
     "AudioAssetGender": { "type": "string", "enum": ["female", "male"] },
     "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
-    "CollectSharedSentence": {
-      "type": "object",
-      "required": ["base_revision", "entry_id", "annotation_ids"],
-      "properties": {
-        "annotation_ids": {
-          "type": "array",
-          "items": { "type": "string", "format": "uuid" },
-          "description": "Only pending annotations selected by the user are bound to entry_id."
-        },
-        "base_revision": { "type": "integer", "format": "int64" },
-        "entry_id": { "type": "string", "format": "uuid" }
-      },
-      "additionalProperties": false
-    },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
     "ComponentTargetMatchV3": {
       "type": "string",
@@ -2793,14 +2778,15 @@
     },
     "CreateSharedSentence": {
       "type": "object",
-      "required": ["source_entry_id", "content"],
+      "required": ["source_entry_id", "source_sense_id", "content"],
       "properties": {
         "content": { "$ref": "#/components/schemas/SharedSentenceContent" },
         "source_entry_id": {
           "type": "string",
           "format": "uuid",
           "description": "Stable client-generated UUID makes retries safe."
-        }
+        },
+        "source_sense_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },
@@ -3218,9 +3204,32 @@
       "oneOf": [
         {
           "type": "object",
-          "required": ["target_entry_id", "state"],
+          "required": [
+            "target_entry_id",
+            "target_pos_id",
+            "target_base_form_id",
+            "target_form_id",
+            "target_variant_id",
+            "target_sense_id",
+            "state"
+          ],
           "properties": {
             "state": { "type": "string", "enum": ["linked"] },
+            "target_base_form_id": { "type": "string", "format": "uuid" },
+            "target_entry_id": { "type": "string", "format": "uuid" },
+            "target_form_id": { "type": "string", "format": "uuid" },
+            "target_pos_id": { "type": "string", "format": "uuid" },
+            "target_publication_id": { "type": "string", "format": "uuid" },
+            "target_sense_id": { "type": "string", "format": "uuid" },
+            "target_variant_id": { "type": "string", "format": "uuid" }
+          }
+        },
+        {
+          "type": "object",
+          "description": "Historical entry-only association, readable for repair but not writable.",
+          "required": ["target_entry_id", "state"],
+          "properties": {
+            "state": { "type": "string", "enum": ["entry_only"] },
             "target_entry_id": { "type": "string", "format": "uuid" }
           }
         },
@@ -3335,6 +3344,15 @@
       "enum": ["zh"]
     },
     "UkDialectV3": { "type": "string", "enum": ["uk"] },
+    "UnlinkSentenceSense": {
+      "type": "object",
+      "required": ["base_revision", "sense_id"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" },
+        "sense_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "UpdateEntryAnnotationInput": {
       "type": "object",
       "required": ["base_annotation_revision"],
@@ -3379,7 +3397,9 @@
       "required": ["base_revision", "content"],
       "properties": {
         "base_revision": { "type": "integer", "format": "int64" },
-        "content": { "$ref": "#/components/schemas/SharedSentenceContent" }
+        "content": { "$ref": "#/components/schemas/SharedSentenceContent" },
+        "context_entry_id": { "type": "string", "format": "uuid" },
+        "context_sense_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
     },

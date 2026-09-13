@@ -71,13 +71,11 @@ import { addPartOfSpeech, deletePartOfSpeech } from "./operations";
 import {
   DEFAULT_DEFINITION_PLAN,
   DEFAULT_SENSE_LEVEL,
-  DEFAULT_SENTENCE_TRANSLATION_BAND,
   defaultDefinitions,
   definitionSummary,
   editableEnglishText,
   newDefinition,
   newGrammarStructure,
-  newSentenceTranslations,
   replaceRichText,
   spellingModeForPos,
   type RelationDisplaySnapshots
@@ -110,6 +108,7 @@ export interface V3MeaningsAndExamplesStepProps {
     intent: StepSaveIntent
   ) => Promise<void>;
   onPrevious?: () => void;
+  renderSentenceSection?: (senseId: string) => ReactNode;
   saving?: boolean;
   canSave?: boolean;
   issues?: readonly V3DraftValidationIssue[];
@@ -169,7 +168,7 @@ type DraftMutation = (draft: DraftMeaningsStepContentWritableV3) => void;
 type SenseSectionKind =
   "definitions" | "component_usages" | "sentences" | "relations";
 
-function SenseSectionTitle({
+export function SenseSectionTitle({
   label,
   count,
   unit,
@@ -219,7 +218,7 @@ function SenseSectionTitle({
   );
 }
 
-function SenseSectionBody({
+export function SenseSectionBody({
   collapsed,
   children
 }: {
@@ -2233,6 +2232,7 @@ function V3MeaningsAndExamplesStepContent({
   onChange,
   onSave,
   onPrevious,
+  renderSentenceSection,
   saving = false,
   canSave = true,
   issues = [],
@@ -2385,7 +2385,8 @@ function V3MeaningsAndExamplesStepContent({
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
           录入顺序：词义 → 语法结构。
-          词义需填写本语言释义语句；多维例句在上方独立创编，点完成即发布。
+          词义需填写本语言释义语句；在下方多维例句区块添加，使用 voice-editor
+          编辑并独立保存。
         </Typography.Paragraph>
       </div>
 
@@ -3376,6 +3377,8 @@ function V3MeaningsAndExamplesStepContent({
                                       </>
                                     </SenseSectionBody>
                                   </section>
+
+                                  {renderSentenceSection?.(sense.id)}
 
                                   {entryKind === "phrase" ? (
                                     <section

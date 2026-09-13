@@ -1,7 +1,9 @@
 .word-sentence-translation-list {
   display: grid;
-  grid-template-columns: 64px minmax(0, 1fr) auto;
-  grid-template-areas: "label groups add";
+  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-areas:
+    "label groups"
+    "add add";
   gap: 8px;
   min-width: 0;
   width: 100%;
@@ -73,17 +75,15 @@
 
 .word-sentence-translation-add {
   grid-area: add;
-  align-self: start;
-  margin-top: 4px;
-  color: var(--ant-color-primary, #0071e3);
 }
 
 @container (width <= 760px) {
   .word-sentence-translation-list {
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr);
     grid-template-areas:
-      "label add"
-      "groups groups";
+      "label"
+      "groups"
+      "add";
     gap: 6px;
   }
 }

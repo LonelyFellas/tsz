@@ -4,9 +4,13 @@ import type {
   Dialect,
   RichTextV2,
   RichTextV3,
-  VoiceProfileV3
+  VoiceProfileV3,
+  TextLinkV3
 } from "@tsz/types";
-import type { VoiceEditorProps } from "@tsz/voice-editor/types";
+import type {
+  VoiceAssociation,
+  VoiceEditorProps
+} from "@tsz/voice-editor/types";
 import {
   editRichText,
   remapTextLinks,
@@ -37,7 +41,7 @@ const VoiceEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((module) => ({
     default: module.VoiceEditor
   }))
-);
+) as typeof import("@tsz/voice-editor/editor").VoiceEditor;
 
 /** 方言换成音色语种：通用栏没有归属，返回 undefined 表示不筛选。 */
 function voiceLocale(dialect?: Dialect): AudioAssetLocaleV3 | undefined {
@@ -46,15 +50,26 @@ function voiceLocale(dialect?: Dialect): AudioAssetLocaleV3 | undefined {
   return undefined;
 }
 
-export interface V3VoiceTextFieldProps {
-  mode?: VoiceEditorProps["mode"];
+export interface V3VoiceTextFieldProps<
+  TLink extends VoiceAssociation = TextLinkV3
+> {
+  onDone?: () => void;
+  doneLoading?: boolean;
+  doneDisabled?: boolean;
+  showDone?: boolean;
+  onEditingChange?: (editing: boolean) => void;
+  onAssociationPendingChange?: (pending: boolean) => void;
+  mode?: VoiceEditorProps<TLink>["mode"];
+  /** 独立正文编辑直接展示可输入文字的编辑器；其他字段仍使用输入框入口。 */
+  presentation?: "field" | "editor";
   /**
    * 这段正文挂在哪一侧。英美分栏的字段传 uk / us，音色和录音归属都只留那一侧；
    * 通用栏传 common 或不传，不做筛选。
    */
   dialect?: Dialect;
-  textLinks?: VoiceEditorProps["textLinks"];
-  renderAssociationPicker?: VoiceEditorProps["renderAssociationPicker"];
+  textLinks?: VoiceEditorProps<TLink>["textLinks"];
+  restoreTextLinksOnCorrection?: boolean;
+  renderAssociationPicker?: VoiceEditorProps<TLink>["renderAssociationPicker"];
   value: RichTextV3;
   ariaLabel: string;
   nodeId: string;
@@ -70,7 +85,7 @@ export interface V3VoiceTextFieldProps {
   /** 挂在这段文本上的真人录音；与 voice_profile 一样是正文的兄弟字段。 */
   audioAssets?: AudioAssetV3[] | null;
   onAudioAssetsChange?: (next: AudioAssetV3[]) => void;
-  onChange: VoiceEditorProps["onChange"];
+  onChange: VoiceEditorProps<TLink>["onChange"];
 }
 
 /**
@@ -83,10 +98,18 @@ export interface V3VoiceTextFieldProps {
  * 错误定位是 `querySelector` 之后 `focus()` 再校验 `activeElement`，挂在外层
  * 容器上会让「跳到出错字段」失效。
  */
-export function V3VoiceTextField({
+export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
+  onDone,
+  doneLoading,
+  doneDisabled,
+  showDone = true,
+  onEditingChange,
+  onAssociationPendingChange,
   mode,
+  presentation = "field",
   dialect,
   textLinks,
+  restoreTextLinksOnCorrection,
   renderAssociationPicker,
   value,
   ariaLabel,
@@ -96,14 +119,19 @@ export function V3VoiceTextField({
   readOnly,
   invalid,
   leadingAction,
-  audioUploadEnabled = true,
+  audioUploadEnabled = mode !== "association",
   voiceProfile,
   onVoiceProfileChange,
   audioAssets,
   onAudioAssetsChange,
   onChange
-}: V3VoiceTextFieldProps) {
+}: V3VoiceTextFieldProps<TLink>) {
   const [editing, setEditing] = useState(false);
+  const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
+  useEffect(() => {
+    onEditingChange?.(expanded);
+    if (!expanded) onAssociationPendingChange?.(false);
+  }, [expanded, onEditingChange, onAssociationPendingChange]);
   const [feedback, feedbackHolder] = message.useMessage();
   type Snapshot = { value: RichTextV3; links: typeof textLinks };
   const history = useRef<{
@@ -130,7 +158,7 @@ export function V3VoiceTextField({
     ]);
     onChange(toRichTextV2(next), nextLinks);
   };
-  const change: VoiceEditorProps["onChange"] = (next, links) => {
+  const change: VoiceEditorProps<TLink>["onChange"] = (next, links) => {
     if (readOnly) return;
     history.current.past = [
       ...history.current.past.slice(-99),
@@ -186,7 +214,7 @@ export function V3VoiceTextField({
           void feedback.info("已移除受改字影响的关联或标注，可撤销恢复");
       }}
       placeholder={placeholder}
-      readOnly={readOnly || (env.VOICE_EDITOR && editing)}
+      readOnly={readOnly || (expanded && presentation !== "editor")}
       value={value.text}
     />
   );
@@ -206,7 +234,7 @@ export function V3VoiceTextField({
       </>
     );
 
-  if (!editing) {
+  if (!expanded) {
     return (
       <>
         {feedbackHolder}
@@ -231,11 +259,13 @@ export function V3VoiceTextField({
     <div className="v3-voice-text-editor" style={{ minWidth: 0 }}>
       {feedbackHolder}
       <Suspense fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}>
-        <VoiceEditor
-          textReadOnly
+        <VoiceEditor<TLink>
+          onAssociationPendingChange={onAssociationPendingChange}
+          textReadOnly={presentation !== "editor"}
           mode={mode}
           locale={voiceLocale(dialect)}
           textLinks={textLinks}
+          restoreTextLinksOnCorrection={restoreTextLinksOnCorrection}
           renderAssociationPicker={renderAssociationPicker}
           contextLabel={ariaLabel}
           inputDataAttributes={{
@@ -252,9 +282,7 @@ export function V3VoiceTextField({
           onVoiceProfileChange={onVoiceProfileChange}
           // 开关关着 = 不注入适配器：面板置灰说明原因，已有的音频引用仍列出来。
           audioUploadAdapter={
-            env.VOICE_AUDIO_UPLOAD &&
-            audioUploadEnabled &&
-            mode !== "association"
+            env.VOICE_AUDIO_UPLOAD && audioUploadEnabled
               ? adminAudioUploadAdapter
               : undefined
           }
@@ -265,16 +293,20 @@ export function V3VoiceTextField({
           voiceProfile={voiceProfile}
         />
       </Suspense>
-      <Space className="v3-voice-text-editor-done">
-        <Button
-          type="primary"
-          size="small"
-          aria-label={`完成${ariaLabel}编辑`}
-          onClick={() => setEditing(false)}
-        >
-          完成
-        </Button>
-      </Space>
+      {showDone && (
+        <Space className="v3-voice-text-editor-done">
+          <Button
+            type="primary"
+            size="small"
+            aria-label={`完成${ariaLabel}编辑`}
+            loading={doneLoading}
+            disabled={doneDisabled}
+            onClick={onDone ?? (() => setEditing(false))}
+          >
+            完成
+          </Button>
+        </Space>
+      )}
     </div>
   );
 }

@@ -75,10 +75,11 @@ export interface LiaisonDraft {
 }
 
 /** 一次撤销/重做的完整快照：文本与标注必须成对回退。 */
-export interface EditorSnapshot {
+export interface EditorSnapshot<TLink = TextLinkV3> {
   text: string;
   marks: MarkState;
-  textLinks?: TextLinkV3[];
+  textLinks?: TLink[];
+  recoverableTextLinks?: { text: string; link: TLink }[];
 }
 
 export const EMPTY_MARKS: MarkState = {

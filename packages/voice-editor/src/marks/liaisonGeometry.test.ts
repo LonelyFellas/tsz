@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   anchorTip,
   buildLiaisonArcs,
+  collectLiaisonGlyphs,
   createGlyphMeasurer,
   type LiaisonLinkElements
 } from "./liaisonGeometry";
@@ -30,7 +31,7 @@ function element(box: DOMRect, text = "w"): HTMLElement {
 
 function anchor(box: DOMRect, text = "w") {
   const node = element(box, text);
-  return { first: node, last: node, text };
+  return { glyphs: [{ source: node, element: node, text }] };
 }
 
 describe("anchorTip", () => {
@@ -83,18 +84,42 @@ describe("buildLiaisonArcs", () => {
     ]);
   });
 
-  it("spans a multi-letter anchor from its first to its last letter", () => {
+  it("uses a real glyph near the centre of a multi-letter anchor", () => {
     vi.spyOn(window, "getComputedStyle").mockReturnValue(style);
     const link: LiaisonLinkElements = {
       start: {
-        first: element(rect(20, 50, 10, 25), "c"),
-        last: element(rect(30, 50, 10, 25), "k"),
-        text: "ck"
+        glyphs: [
+          ...anchor(rect(20, 50, 10, 25), "c").glyphs,
+          ...anchor(rect(30, 50, 10, 25), "k").glyphs
+        ]
       },
       end: anchor(rect(120, 50, 10, 25), "i")
     };
     const [arc] = buildLiaisonArcs(container, [link], measure).arcs;
-    expect(arc?.d.startsWith("M 30 ")).toBe(true);
+    expect(arc?.d.startsWith("M 25 ")).toBe(true);
+  });
+
+  it("attaches a multi-letter anchor to the short glyph under its centre", () => {
+    vi.spyOn(window, "getComputedStyle").mockReturnValue(style);
+    const leftL = element(rect(20, 50, 6, 25), "l");
+    const leftA = element(rect(26, 50, 20, 25), "a");
+    const link: LiaisonLinkElements = {
+      start: {
+        glyphs: [
+          { source: leftL, element: leftL, text: "l" },
+          { source: leftA, element: leftA, text: "a" }
+        ]
+      },
+      end: anchor(rect(120, 50, 10, 25), "k")
+    };
+    const measured = (text: string) => ({
+      fontAscent: 20,
+      inkAscent: text === "a" ? 10 : 18
+    });
+    const [arc] = buildLiaisonArcs(container, [link], measured).arcs;
+    expect(arc?.d).toBe(
+      liaisonPath({ x: 36, tipY: 58.8 }, { x: 125, tipY: 50.8 }, 20)
+    );
   });
 
   it("splits a wrapped link into a head and a tail reaching the padding edges", () => {
@@ -154,4 +179,42 @@ describe("createGlyphMeasurer", () => {
     // jsdom 没有 canvas：退回按字盒顶端起笔，而不是抛错。
     expect(createGlyphMeasurer(document.body)("w")).toBeUndefined();
   });
+});
+
+it("collects visible graphemes and their own font elements without splitting combining characters", () => {
+  const element = document.createElement("span");
+  element.innerHTML = '<strong>l</strong><span class="normal">é a</span>';
+  const glyphs = collectLiaisonGlyphs(element);
+  expect(glyphs.map((g) => g.text)).toEqual(["l", "é", "a"]);
+  expect(glyphs[0]!.element.tagName).toBe("STRONG");
+  expect(glyphs[1]!.element).toBe(element.querySelector(".normal"));
+});
+
+it("measures the font of the actual glyph instead of the container font", () => {
+  const container = document.createElement("div");
+  container.style.font = "700 26px Ubuntu";
+  const glyph = document.createElement("span");
+  glyph.style.font = "400 20px Ubuntu";
+  const context = {
+    font: "",
+    measureText: vi.fn(() => ({
+      fontBoundingBoxAscent: 20,
+      actualBoundingBoxAscent: 10
+    }))
+  };
+  vi.stubGlobal("CanvasRenderingContext2D", class {});
+  const getContext = vi
+    .spyOn(HTMLCanvasElement.prototype, "getContext")
+    .mockReturnValue(context as unknown as CanvasRenderingContext2D);
+  try {
+    expect(createGlyphMeasurer(container)("a", glyph)).toEqual({
+      fontAscent: 20,
+      inkAscent: 10
+    });
+    expect(context.font).toContain("400 20px");
+    expect(context.measureText).toHaveBeenCalledWith("a");
+  } finally {
+    getContext.mockRestore();
+    vi.unstubAllGlobals();
+  }
 });

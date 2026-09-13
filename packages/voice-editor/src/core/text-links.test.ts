@@ -4,6 +4,7 @@ import {
   associationWords,
   rangesOverlap,
   remapTextLinks,
+  remapTextLinksWithRecovery,
   wordSegments
 } from "./text-links";
 
@@ -71,4 +72,53 @@ it("关联切词排除句尾标点，逗号两侧独立且保留词内连接符"
     { start: 9, end: 14, surface: "don't" },
     { start: 15, end: 23, surface: "dress-up" }
   ]);
+});
+
+it("打错时不保留无效关联，原文还原后恢复原 ID，不移植到其他重复词", () => {
+  const original = link(0, 4, "make");
+  const changed = remapTextLinksWithRecovery(
+    "make make",
+    "makke make",
+    [original],
+    []
+  );
+  expect(changed.links).toEqual([]);
+  expect(changed.recoverable).toHaveLength(1);
+  const replaced = remapTextLinksWithRecovery(
+    "makke make",
+    "make",
+    changed.links,
+    changed.recoverable
+  );
+  expect(replaced.links).toEqual([]);
+  const restored = remapTextLinksWithRecovery(
+    "makke make",
+    "make make",
+    changed.links,
+    changed.recoverable
+  );
+  expect(restored.links).toEqual([original]);
+  expect(restored.recoverable).toEqual([]);
+});
+
+it("原位置已有新的关联时不覆盖或重复恢复", () => {
+  const original = link(0, 4, "make");
+  const changed = remapTextLinksWithRecovery(
+    "make make",
+    "makke make",
+    [original],
+    []
+  );
+  const replacement = {
+    ...original,
+    id: "replacement",
+    target_word_id: "another-entry"
+  };
+  const result = remapTextLinksWithRecovery(
+    "make make",
+    "make make",
+    [replacement],
+    changed.recoverable
+  );
+  expect(result.links).toEqual([replacement]);
 });

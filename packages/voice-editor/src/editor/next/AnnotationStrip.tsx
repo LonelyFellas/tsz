@@ -11,6 +11,7 @@ import {
 } from "react";
 import {
   LiaisonArcLayer,
+  collectLiaisonGlyphs,
   useLiaisonArcs,
   type LiaisonLinkElements
 } from "../../marks";
@@ -142,7 +143,7 @@ export function AnnotationStrip({
    * 每条连读两端的字母元素，按 marks.liaisons 的序号对位（缺元素的留空位，
    * 弧线序号才能继续指回原来那条连读，点弧线删除靠它）。
    *
-   * target 与 text 也要进依赖：换文本、切画笔都会改字母的渲染方式与横向位置，
+   * target、text、roles 都要进依赖：改字、切画笔或字重变化都会影响位置和墨迹高度，
    * 而容器宽度不变、ResizeObserver 不会触发，弧线不重算就会错位。
    */
   const collectLinks = useCallback((): Array<
@@ -154,21 +155,15 @@ export function AnnotationStrip({
         const letter = letterRefs.current.get(point);
         if (letter) letters.push(letter);
       }
-      const first = letters[0];
-      const last = letters[letters.length - 1];
-      if (!first || !last) return undefined;
-      return {
-        first,
-        last,
-        text: Array.from(text).slice(anchor.start, anchor.end).join("")
-      };
+      const glyphs = letters.flatMap(collectLiaisonGlyphs);
+      return glyphs.length ? { glyphs } : undefined;
     };
     return marks.liaisons.map((link) => {
       const start = elementsOf(link.start);
       const end = elementsOf(link.end);
       return start && end ? { start, end } : undefined;
     });
-  }, [marks.liaisons, target, text]);
+  }, [marks.liaisons, marks.roles, target, text]);
 
   const { arcs, strokeWidth } = useLiaisonArcs(containerRef, collectLinks);
 
