@@ -197,7 +197,8 @@ describe("当前词条关联与离开保护", () => {
         match: "exact",
         kind: "word",
         include_drafts: true
-      })
+      }),
+      expect.any(AbortSignal)
     );
   });
   it("正文方言匹配的词形不被管理员默认方言偏好过滤", async () => {

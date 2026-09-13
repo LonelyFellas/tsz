@@ -466,6 +466,8 @@ export interface SearchComponentTargetsV3Input {
   /** 只要单词或只要短语；不传则两者都返回。 */
   kind?: WordEntryKindV3;
   page_size?: number;
+  /** 已知目标词条时直接限定目标，仍校验词面及可用状态。 */
+  entry_id?: string;
   /** 上一页返回的 `next_cursor`；换了关键字/kind/match/include_drafts 或词面数据变动后即失效（400 invalid_query）。 */
   cursor?: string;
   /**
@@ -484,7 +486,7 @@ export interface SearchComponentTargetsV3Response {
    * 每条候选的 `matches` 恒为空数组，前端据此不渲染「命中」标识。
    */
   matches: PublishedSentenceTargetCandidateV3[];
-  /** 扫描窗口内命中的候选总数；`truncated` 为 true 时是下界，不是全库命中数。 */
+  /** 完整匹配集的候选总数；旧后端触及扫描上限时可能只返回下界。 */
   total: number;
   /** 还有未返回的候选：有下一页（同时给出 `next_cursor`），或触到后端扫描上限（此时无 `next_cursor`）。 */
   truncated: boolean;

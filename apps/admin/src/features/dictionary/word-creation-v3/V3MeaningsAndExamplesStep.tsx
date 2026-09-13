@@ -3378,8 +3378,6 @@ function V3MeaningsAndExamplesStepContent({
                                     </SenseSectionBody>
                                   </section>
 
-                                  {renderSentenceSection?.(sense.id)}
-
                                   {entryKind === "phrase" ? (
                                     <section
                                       className={`word-sense-section${componentUsagesCollapsed ? " is-collapsed" : ""}`}
@@ -3427,6 +3425,8 @@ function V3MeaningsAndExamplesStepContent({
                                       </SenseSectionBody>
                                     </section>
                                   ) : null}
+
+                                  {renderSentenceSection?.(sense.id)}
 
                                   <section
                                     className={`word-sense-section${relationsCollapsed ? " is-collapsed" : ""}`}

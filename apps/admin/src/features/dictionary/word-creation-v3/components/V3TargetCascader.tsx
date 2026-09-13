@@ -16,15 +16,33 @@ import type {
   TextLinkViaPhraseV3
 } from "@tsz/types";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AdminDialectPreference } from "@tsz/shared";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { createV3WordRequests } from "../api";
 import { dialectLabel } from "../presentation";
 import "./V3SentenceTargetDiscovery.css";
+import { HttpError } from "@tsz/api-client/http";
 
 type ResolvedUsage = Extract<PhraseComponentUsageV3, { state: "resolved" }>;
 export type ResolvedTarget = Omit<ResolvedUsage, "id" | "literal">;
+
+interface CandidateSearchState {
+  pending: boolean;
+  loadingMore: boolean;
+  candidates: PublishedSentenceTargetCandidateV3[];
+  nextCursor?: string;
+  truncated: boolean;
+  error?: string;
+  stale?: boolean;
+}
+
+const initialSearchState: CandidateSearchState = {
+  pending: true,
+  loadingMore: false,
+  candidates: [],
+  truncated: false
+};
 
 interface CandidateSense {
   senseId: string;
@@ -300,51 +318,103 @@ export function V3TargetCascader({
   const [selectedVariantIds] = useState(
     () => new Set(targets.map((target) => target.target_variant_id))
   );
-  // 只存原始候选。分组依赖 targets 与方言偏好，放在渲染期算——挂进取数依赖里会让
-  // 每次勾选（targets 换身份）都重打一次后端。
-  const [state, setState] = useState<{
-    pending: boolean;
-    error?: string;
-    truncated: boolean;
-    candidates: readonly PublishedSentenceTargetCandidateV3[];
-  }>({ pending: true, truncated: false, candidates: [] });
+  const [searchState, setSearchState] = useState(initialSearchState);
+  const searchActions = useRef<{ more: () => void; reload: () => void } | null>(
+    null
+  );
 
   useEffect(() => {
-    let alive = true;
-    void (async () => {
+    let active = true;
+    let busy = false;
+    let nextCursor: string | undefined;
+    const controller = new AbortController();
+    const load = async (append: boolean) => {
+      if (busy || !active || (append && !nextCursor)) return;
+      busy = true;
+      const cursor = append ? nextCursor : undefined;
+      setSearchState((previous) =>
+        append
+          ? { ...previous, loadingMore: true, error: undefined, stale: false }
+          : initialSearchState
+      );
       try {
-        // 所选词面按词形等值匹配（屈折形照样命中原形词条），从未发布的草稿一并列出；
-        // 正文关联按按钮限定类型，成分用词沿用原范围。
-        const response = await requests.searchComponentTargets({
-          schema_version: 3,
-          q: literal,
-          match: "exact",
-          include_drafts: true,
-          ...(targetKind ? { kind: targetKind } : {}),
-          page_size: 50
-        });
-        if (alive)
-          setState({
-            pending: false,
-            truncated: response.truncated,
-            candidates: response.matches.filter(
-              (candidate) => !targetKind || candidate.kind === targetKind
-            )
-          });
-      } catch {
-        if (alive)
-          setState({
-            pending: false,
-            truncated: false,
-            candidates: [],
-            error: "词库查询失败，请稍后重试；已有关联未受影响。"
-          });
+        const response = await requests.searchComponentTargets(
+          {
+            schema_version: 3,
+            q: literal,
+            match: "exact",
+            include_drafts: true,
+            ...(targetKind ? { kind: targetKind } : {}),
+            page_size: 50,
+            ...(cursor ? { cursor } : {})
+          },
+          controller.signal
+        );
+        if (!active) return;
+        nextCursor = response.next_cursor;
+        const candidates = response.matches.filter(
+          (candidate) => !targetKind || candidate.kind === targetKind
+        );
+        setSearchState((previous) => ({
+          pending: false,
+          loadingMore: false,
+          candidates: append
+            ? [...previous.candidates, ...candidates]
+            : candidates,
+          truncated: response.truncated,
+          nextCursor
+        }));
+      } catch (error) {
+        if (!active) return;
+        const stale =
+          append &&
+          error instanceof HttpError &&
+          error.code === "invalid_query" &&
+          error.problem?.field === "cursor";
+        setSearchState((previous) => ({
+          ...previous,
+          pending: false,
+          loadingMore: false,
+          stale,
+          error: stale
+            ? "词库已更新，请重新加载候选；已有关联保留。"
+            : append
+              ? "加载更多失败，已加载的候选保留，请重试。"
+              : "词库查询失败，请稍后重试；已有关联未受影响。"
+        }));
+      } finally {
+        busy = false;
       }
-    })();
-    return () => {
-      alive = false;
     };
-  }, [literal, requests, targetKind]);
+    searchActions.current = {
+      more: () => void load(true),
+      reload: () => void load(false)
+    };
+    void load(false);
+    return () => {
+      active = false;
+      searchActions.current = null;
+      controller.abort();
+    };
+  }, [literal, targetKind, requests]);
+
+  const state = {
+    ...searchState,
+    loadMore: () => searchActions.current?.more(),
+    reload: () => searchActions.current?.reload()
+  };
+  const componentGeneration = useRef({ active: false });
+  const componentPending = useRef(new Set<string>());
+  useEffect(() => {
+    const context = componentGeneration;
+    context.current = { active: true };
+    componentPending.current.clear();
+    setComponentResults({});
+    setFailedComponent(undefined);
+    return () => {
+      context.current.active = false;
+    };
+  }, [literal, targetKind]);
 
   const directCandidates = useMemo(() => {
     if (phraseSelection !== "entry") return state.candidates;
@@ -442,36 +512,51 @@ export function V3TargetCascader({
 
   const loadComponent = useCallback(
     async (component: PhraseComponentChoice) => {
+      if (componentPending.current.has(component.key)) return;
+      componentPending.current.add(component.key);
+      const generation = componentGeneration.current;
       setFailedComponent(undefined);
       setComponentResults((previous) => ({
         ...previous,
         [component.key]: { pending: true, candidates: [] }
       }));
       try {
-        const response = await requests.searchComponentTargets({
-          schema_version: 3,
-          q: component.literal,
-          match: "exact",
-          include_drafts: true,
-          page_size: 50
-        });
-        setComponentResults((previous) => ({
-          ...previous,
-          [component.key]: {
-            pending: false,
-            truncated: response.truncated,
-            candidates: response.matches.filter(
+        const candidates: PublishedSentenceTargetCandidateV3[] = [];
+        let cursor: string | undefined;
+        let truncated = false;
+        do {
+          const response = await requests.searchComponentTargets({
+            schema_version: 3,
+            q: component.literal,
+            entry_id: component.target.target_word_id,
+            match: "exact",
+            include_drafts: true,
+            page_size: 50,
+            ...(cursor ? { cursor } : {})
+          });
+          if (!generation.active) return;
+          candidates.push(
+            ...response.matches.filter(
               (candidate) =>
                 candidate.entry_id === component.target.target_word_id
             )
-          }
+          );
+          cursor = response.next_cursor;
+          truncated = response.truncated;
+        } while (cursor);
+        setComponentResults((previous) => ({
+          ...previous,
+          [component.key]: { pending: false, truncated, candidates }
         }));
       } catch {
+        if (!generation.active) return;
         setComponentResults((previous) => ({
           ...previous,
           [component.key]: { pending: false, candidates: [], error: true }
         }));
         setFailedComponent(component);
+      } finally {
+        if (generation.active) componentPending.current.delete(component.key);
       }
     },
     [requests]
@@ -545,7 +630,7 @@ export function V3TargetCascader({
                           label: result.error
                             ? "词形词义加载失败"
                             : result.truncated
-                              ? "前 50 条命中里未找到此成分的词形词义"
+                              ? "候选未完整返回，暂未找到此成分的词形词义"
                               : "没有可关联的词形词义"
                         }
                       ]
@@ -601,35 +686,67 @@ export function V3TargetCascader({
       </Flex>
     );
   }
-  if (state.error) {
-    return (
-      <Flex vertical gap="small" style={{ width: 360 }}>
-        {clearControl}
+  const reloadCandidates = () => {
+    componentGeneration.current.active = false;
+    componentGeneration.current = { active: true };
+    componentPending.current.clear();
+    setComponentResults({});
+    setFailedComponent(undefined);
+    state.reload();
+  };
+  const pagination = (
+    <>
+      {state.error ? (
         <Alert showIcon title={state.error} type="warning" />
-      </Flex>
-    );
-  }
+      ) : null}
+      {state.stale || (state.error && !state.nextCursor) ? (
+        <Button
+          key="reload"
+          aria-label="重新加载"
+          size="small"
+          onClick={reloadCandidates}
+        >
+          重新加载
+        </Button>
+      ) : state.nextCursor ? (
+        <Button
+          key="more"
+          aria-label={state.error ? "重试加载更多" : "加载更多"}
+          size="small"
+          loading={state.loadingMore}
+          onClick={state.loadMore}
+        >
+          {state.error ? "重试加载更多" : "加载更多"}
+        </Button>
+      ) : state.truncated ? (
+        <Alert
+          showIcon
+          type="info"
+          title="候选未完整返回，当前服务暂不支持继续加载。"
+        />
+      ) : null}
+    </>
+  );
   if (options.length === 0) {
     return (
       <Flex vertical gap="small">
         {clearControl}
-        <Empty
-          description={
-            // 命中被截断时不能只说「没有匹配」：可用的候选可能落在窗口之外。
-            state.truncated
-              ? "前 50 条命中里没有可关联的词条，请换更具体的关键字"
-              : "没有匹配的词条"
-          }
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-        />
+        {!state.error && (
+          <Empty
+            description={
+              state.nextCursor || state.truncated
+                ? "已加载的候选中没有可关联的词条"
+                : "没有匹配的词条"
+            }
+            image={Empty.PRESENTED_IMAGE_SIMPLE}
+          />
+        )}
+        {pagination}
       </Flex>
     );
   }
   return (
     <Flex vertical gap="small">
-      {state.truncated ? (
-        <Alert showIcon title="匹配过多，只列出前 50 条" type="info" />
-      ) : null}
       {clearControl}
       {failedComponent && (
         <Alert
@@ -666,6 +783,7 @@ export function V3TargetCascader({
         options={options}
         value={value}
       />
+      {pagination}
     </Flex>
   );
 }

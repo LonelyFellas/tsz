@@ -1340,3 +1340,32 @@ it("词形配置CRUD发送稳定路径及版本，不转换wire字段", () => {
     "/settings/form-types/form-1?base_revision=4"
   );
 });
+
+it("成分查询原样透传目标 entry_id、cursor 与取消信号", async () => {
+  const api = createRawAdminEndpoints(http as unknown as HttpClient);
+  const response = {
+    schema_version: 3,
+    matches: [],
+    total: 0,
+    truncated: false
+  };
+  http.post.mockResolvedValueOnce(response);
+  const input = {
+    schema_version: 3 as const,
+    q: "give",
+    entry_id: "entry-give",
+    match: "exact" as const,
+    include_drafts: true,
+    page_size: 50,
+    cursor: "next"
+  };
+  const signal = new AbortController().signal;
+  await expect(
+    api.words.searchComponentTargetsV3(input, signal)
+  ).resolves.toEqual(response);
+  expect(http.post).toHaveBeenCalledWith(
+    "/lexicon/entries/component-targets/search",
+    input,
+    { signal }
+  );
+});

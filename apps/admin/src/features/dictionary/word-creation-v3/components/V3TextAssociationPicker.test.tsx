@@ -471,3 +471,47 @@ it("草稿短语的成分转关联：via_phrase 不带发布版本，词条行�
   });
   expect(link.via_phrase).not.toHaveProperty("publication_id");
 });
+
+it("短语成分按目标词条检索并读完其后续候选，后页词义可选", async () => {
+  search.mockClear();
+  search.mockImplementation(async (input) => {
+    if (input.q !== "give") return phraseResponse();
+    const response = giveEntryResponse();
+    if (!input.cursor)
+      return { ...response, next_cursor: "target-page-2", truncated: true };
+    response.matches[0]!.senses = [
+      {
+        ...response.matches[0]!.senses[0]!,
+        sense_id: "later-sense",
+        gloss: "后页词义"
+      }
+    ];
+    return response;
+  });
+  const onSelect = vi.fn();
+  render(
+    <V3TextAssociationPicker
+      kind="phrase"
+      segments={segments}
+      onSelect={onSelect}
+    />
+  );
+  await openPhraseComponent();
+  fireEvent.click(await screen.findByText("原形 give", { exact: true }));
+  fireEvent.click(await screen.findByText("后页词义"));
+  expect(
+    search.mock.calls
+      .filter(([input]) => input.q === "give")
+      .map(([input]) => ({ entry_id: input.entry_id, cursor: input.cursor }))
+  ).toEqual([
+    { entry_id: "entry-give", cursor: undefined },
+    { entry_id: "entry-give", cursor: "target-page-2" }
+  ]);
+  expect(onSelect).toHaveBeenCalledWith(
+    expect.objectContaining({
+      target_word_id: "entry-give",
+      target_sense_id: "later-sense",
+      via_phrase: expect.objectContaining({ component_id: "component" })
+    })
+  );
+});
