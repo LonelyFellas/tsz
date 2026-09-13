@@ -4,16 +4,16 @@
 
 新增独立 workspace 包 `packages/voice-editor`（包名 `@tsz/voice-editor`），在包内实现基于 TipTap 3 的定制语音富文本编辑器。业务页面不为每个深层字段常驻编辑器实例：它调用包提供的轻量 `VoiceRichTextField` 展示结构化标注预览，并复用一个 `VoiceRichTextEditor` 加载当前字段临时副本，完成编辑、TTS 试听和 PDF 导出，点击“应用”时再一次性写回业务表单。
 
-TipTap 只负责编辑事务、选择和历史记录；持久化格式仍是 `@tsz/types` 的纯文本 + Unicode 码点标注。新增 `RichText version: 2` 作为可判别联合，兼容读取 `version: 1`，绝不保存 HTML 或 TipTap JSON。纯数据归一化、码点换算、V1→V2 迁移、SSML 序列化、TipTap 扩展、React 组件和只读 renderer 都由 `@tsz/voice-editor` 拥有。
+TipTap 只负责编辑事务、选择和历史记录；持久化格式仍是 `@tsz/types` 的纯文本 + Unicode 码点标注。新增 `RichText version: 2` 作为可判别联合，兼容读取 `version: 1`，绝不保存 HTML 或 TipTap JSON。纯数据归一化、码点换算、V1→V2 迁移、TipTap 扩展、React 组件和只读 renderer 都由 `@tsz/voice-editor` 拥有。
 
-TTS 采用供应商无关的 adapter。`@tsz/voice-editor` 只声明 `VoicePreviewAdapter` 并编排交互，不 import `@tsz/api-client`、鉴权或业务 data source；`apps/admin` 负责把后端“能力目录 + 临时试听”接口适配为该 adapter。后端重新校验结构化富文本并生成 SSML、缓存音频，再返回短期音频 URL 与实际使用的 SSML。本期不修改词条节点的 `audio_url`。
+TTS 采用供应商无关的 adapter。`@tsz/voice-editor` 只声明 `VoicePreviewAdapter` 并编排交互，不 import `@tsz/api-client`、鉴权或业务 data source；`apps/admin` 负责把后端“能力目录 + 临时试听”接口适配为该 adapter。后端重新校验结构化富文本并生成 SSML、缓存音频，再返回短期音频 URL。本期不修改词条节点的 `audio_url`。
 
 ## 包分层与依赖方向
 
 ```text
 apps/admin（词条字段、权限、dirty/revision、TTS data source）
     ↓ 只调用公开 exports，注入 adapter/callback
-@tsz/voice-editor（编辑器 UI、TipTap、标注、只读渲染、SSML、打印）
+@tsz/voice-editor（编辑器 UI、TipTap、标注、只读渲染、打印）
     ↓
 @tsz/types（RichText V1/V2 wire 类型）
 ```
@@ -43,7 +43,7 @@ apps/admin（词条字段、权限、dirty/revision、TTS data source）
 ```
 
 - `@tsz/voice-editor`：完整便利入口与公开 props / adapter 类型；
-- `@tsz/voice-editor/core`：码点工具、V1/V2 转换、normalizer、validator、SSML builder、canonical hash；
+- `@tsz/voice-editor/core`：码点工具、V1/V2 转换、normalizer、validator、canonical hash；
 - `@tsz/voice-editor/types`：不加载 UI 的 TTS adapter、领域错误与组件公开类型；
 - `@tsz/voice-editor/reader`：不加载 TipTap 的 `VoiceRichTextField`、`RichTextReadOnly`；
 - `@tsz/voice-editor/editor`：可动态 import 的 `VoiceRichTextEditor` 与编辑器专用类型；
@@ -88,7 +88,7 @@ export interface VoicePreviewAdapter {
 - Demo 是独立 Vite 页面、全局 CSS 和单个编辑器；tsz 是包含大量深层字段、revision 与 dirty guard 的 admin 向导。
 - Demo 直接 POST `application/ssml+xml` 并硬编码 Azure voice；生产前端不应持有供应商耦合或让后端执行任意 SSML。
 - Demo 用 TipTap JSON 作为组件内部状态，但 tsz 的训练端契约要求 Unicode 码点偏移的结构化 `RichText`。
-- Demo 的右侧 SSML 常驻占半屏；在词条向导内应降级为可折叠高级面板。
+- Demo 的右侧 SSML 常驻占半屏；词条向导内不展示 SSML，统一由服务端生成。
 
 ### 不采用的备选方案
 
@@ -116,8 +116,7 @@ export interface VoicePreviewAdapter {
 2. 标注工具栏：重音、连读、五色高亮、停顿预设、IPA、清除；
 3. 主区：TipTap 正文编辑器；停顿和 IPA 使用锚定式 antd Popover；
 4. 语音区：发音人、风格、语速、音高、生成试听、重播、状态；
-5. 高级折叠区：实时 SSML；
-6. 底部：取消、导出 PDF、应用。
+5. 底部：取消、导出 PDF、应用。
 
 编辑器内部持有 `workingValue`，并通过公开 `onDirtyChange` 告知调用方。切换字段前的业务级确认由 admin 控制；编辑器自己的关闭确认、应用和取消由包处理。“应用”只回调 canonical `RichTextV2`，不保存词条。步骤级 dirty guard 仍只由现有 `MeaningsAndExamplesStep` / wizard 管理。
 
@@ -414,7 +413,7 @@ sequenceDiagram
 ## 复用与项目约定
 
 - wire 类型继续集中在 `@tsz/types`；`@tsz/voice-editor` 不复制 `RichText` 与 TTS wire 类型。
-- 用户明确要求编辑器作为独立 package 交付，因此编辑器领域内的码点、标注、SSML 和 TipTap 映射由该包内聚拥有，不再拆到 `@tsz/shared` 形成跨包双向耦合；其他业务不得复制这些逻辑。
+- 用户明确要求编辑器作为独立 package 交付，因此编辑器领域内的码点、标注和 TipTap 映射由该包内聚拥有，不再拆到 `@tsz/shared` 形成跨包双向耦合；其他业务不得复制这些逻辑。
 - 真实 HTTP 请求仍只经过 `@tsz/api-client`，但调用发生在 admin 的 adapter/data source，编辑器包只看到领域化异步接口。
 - admin 组合 UI 使用 antd v6；包不引入 tailwind 或 `@tsz/ui`，不影响 web 的 UI 分叉约定。
 - `@tsz/types` / API 保持 snake_case，组件 props 与包内状态使用 camelCase。
@@ -444,7 +443,7 @@ sequenceDiagram
 
 ### 单元测试
 
-- `@tsz/voice-editor/core`：码点映射、范围合并、交叉标注、pause 边界、V1 迁移、XML escape、SSML 嵌套、canonical hash 与稳定排序，覆盖 emoji/组合字符/IPA/换行。
+- `@tsz/voice-editor/core`：码点映射、范围合并、交叉标注、pause 边界、V1 迁移、canonical hash 与稳定排序，覆盖 emoji/组合字符/IPA/换行。
 - 包内 TipTap mapping：V1/V2 → editor → V2 往返；正文插删后标注位置；atom pause；粘贴清洗。
 - TTS data source：能力目录、缓存命中、错误码、过期响应。
 
@@ -474,7 +473,7 @@ sequenceDiagram
 - **包边界被业务侵蚀**：用 ESLint/import 测试禁止包依赖 apps、api-client、router 和 query；业务 DTO 映射只放调用方。
 - **TipTap 与深层表单性能**：字段轻量渲染、包组件单实例、稳定 node id、按需加载 `@tsz/voice-editor` chunk。
 - **供应商能力差异**：voice catalog 描述能力；UI 只允许可支持组合；服务端再次验证。
-- **SSML 注入/不一致**：前端只预览，服务端从 canonical 数据重建；属性和值统一 escape。
+- **SSML 注入/不一致**：前端不生成 SSML，服务端从 canonical 数据重建；属性和值统一 escape。
 - **试听计费与滥用**：服务端按 admin、内容 hash 和时间窗限流并缓存；前端防重复只是体验优化，不替代后端控制。
 - **打印污染整页**：scoped body class + 专用 print root + 双清理机制，并在 e2e/手测覆盖取消打印。
 - **音频与内容版本错配**：试听结果绑定 canonical hash，内容/参数变化立即 stale，不把 preview 写入正式 audio 字段。
