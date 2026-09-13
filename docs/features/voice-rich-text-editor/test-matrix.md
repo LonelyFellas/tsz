@@ -49,4 +49,4 @@
 - `packages/voice-editor` 纳入根 Vitest project 与 `packages/**` 100% 覆盖率门槛。
 - TTS fixture 使用 snake_case wire；包内 adapter/props 使用 camelCase。
 - 后端未就绪期间，P01/P02 与 typed mock 共同防止“自证自话”的伪接口。
-- SSML 语义与 XML 转义只由 tsz-rust `src/speech/ssml.rs` 生成并测试，前端不生成 SSML，本矩阵不再列相应用例。
+- SSML 语义与 XML 转义只由 tsz-rust `src/speech/ssml.rs` 生成、`src/speech/tests.rs` 覆盖，前端不生成 SSML，本矩阵不再列相应用例。
