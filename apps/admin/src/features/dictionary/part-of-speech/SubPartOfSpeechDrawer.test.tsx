@@ -11,7 +11,7 @@ import type { PartOfSpeechConfig, SubPartOfSpeechConfig } from "@tsz/types";
 import { createRef } from "react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { expectDisplayNamesNotDerived } from "./displayNameTestHelpers";
+import { expectDisplayNamesNotDerived } from "./displayName.test.helper";
 import { SubPartOfSpeechPanel } from "./SubPartOfSpeechDrawer";
 import type { SubPartOfSpeechPanelHandle } from "./SubPartOfSpeechDrawer";
 

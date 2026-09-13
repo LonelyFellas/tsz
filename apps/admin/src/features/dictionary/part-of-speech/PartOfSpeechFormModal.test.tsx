@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { PartOfSpeechConfig } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { expectDisplayNamesNotDerived } from "./displayNameTestHelpers";
+import { expectDisplayNamesNotDerived } from "./displayName.test.helper";
 import { PartOfSpeechFormModal } from "./PartOfSpeechFormModal";
 
 const api = vi.hoisted(() => ({

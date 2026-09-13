@@ -9,7 +9,7 @@ import { App as AntApp } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { FormTypeConfig } from "@tsz/types";
 import { beforeEach, expect, it, vi } from "vitest";
-import { expectDisplayNamesNotDerived } from "./displayNameTestHelpers";
+import { expectDisplayNamesNotDerived } from "./displayName.test.helper";
 import { FormTypeSettings } from "./FormTypeSettings";
 
 const mock = vi.hoisted(() => ({
