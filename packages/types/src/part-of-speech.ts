@@ -25,7 +25,7 @@ export interface PartOfSpeechConfig {
   abbreviation: string;
   /** 简洁显示：业务页面用的短中文名，去空白后 1–16 字，全局唯一。 */
   short_name_zh: string;
-  /** 英文全称，去空白后 1–64 字，忽略大小写唯一。 */
+  /** 英文全称，去空白后 1–200 字，忽略大小写唯一。 */
   full_name_en: string;
   sort_order: number;
   usage_count: number;

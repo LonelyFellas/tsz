@@ -170,6 +170,29 @@ describe("PartOfSpeechFormModal", () => {
     );
   });
 
+  it("英文全称最多 200 个字符，超出时拦在前端不提交", async () => {
+    renderModal(value);
+    fireEvent.change(screen.getByLabelText("英文全称"), {
+      target: { value: "f".repeat(201) }
+    });
+    fireEvent.click(screen.getByText("保 存"));
+    expect(
+      await screen.findByText("英文全称不能超过 200 个字符")
+    ).toBeInTheDocument();
+    expect(api.update).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText("英文全称"), {
+      target: { value: "f".repeat(200) }
+    });
+    fireEvent.click(screen.getByText("保 存"));
+    await waitFor(() =>
+      expect(api.update).toHaveBeenCalledWith({
+        id: "pos-particle",
+        input: expect.objectContaining({ full_name_en: "f".repeat(200) })
+      })
+    );
+  });
+
   it("已引用配置修改时同样不暴露稳定编码，也不提示引用", () => {
     renderModal({ ...value, usage_count: 4 });
     expect(screen.queryByLabelText("稳定编码")).toBeNull();
