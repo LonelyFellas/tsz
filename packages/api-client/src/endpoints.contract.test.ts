@@ -488,7 +488,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "c75a8a1394b93ba7e75e912bd23f90871e50c29b5060d06a3e06be83c044598d"
+      "d94ce9ed1a6f17cb9d6dc6cc6e8fbdd05ff809f185f926888238dcd12469b87b"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -1097,4 +1097,14 @@ it("词形配置契约包含增删改、必填revision与统一目录名称", ()
   expect(snapshot.schemas.UpdateFormTypeRequest.properties).not.toHaveProperty(
     "code"
   );
+});
+
+it("成分定向查询 entry_id 是可选 UUID，保留分页游标契约", () => {
+  const input = snapshot.schemas.SearchComponentTargetsV3Input;
+  expect(input.properties.entry_id).toMatchObject({
+    type: "string",
+    format: "uuid"
+  });
+  expect(input.required).not.toContain("entry_id");
+  expect(input.properties.cursor).toMatchObject({ type: "string" });
 });

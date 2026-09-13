@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/pos-full-name-en-200/docs/openapi.json",
-  "_source_sha256": "c75a8a1394b93ba7e75e912bd23f90871e50c29b5060d06a3e06be83c044598d",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-component-pagination/docs/openapi.json",
+  "_source_sha256": "d94ce9ed1a6f17cb9d6dc6cc6e8fbdd05ff809f185f926888238dcd12469b87b",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",

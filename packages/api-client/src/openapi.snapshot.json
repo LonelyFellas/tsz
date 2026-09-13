@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/pos-full-name-en-200/docs/openapi.json",
-  "_generatedAt": "2026-09-13T03:53:36.992Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-component-pagination/docs/openapi.json",
+  "_generatedAt": "2026-09-13T07:07:29.148Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2357,7 +2357,12 @@
       "properties": {
         "cursor": {
           "type": "string",
-          "description": "上一页返回的 `next_cursor`。绑定 discovery generation 与本次 `q` / `kind`：凡是写\n`surface_sources` 的变动（发布、词形步保存等）或换了关键字/kind 后即失效（400\n`invalid_query`，`field = \"cursor\"`）。归档只写 `entries.archived_at`、不推进 generation，\n翻页期间被归档的词条只是从后续页消失，不会让游标失效。"
+          "description": "上一页返回的 `next_cursor`。绑定 discovery generation 与本次 `q` / `kind`：凡是写\n`surface_sources` 的变动（发布、词形步保存等）或换了关键字/kind 后即失效（400\n`invalid_query`，`field = \"cursor\"`）。游标同时绑定可用词条集合，归档导致结果集变化时也失效。"
+        },
+        "entry_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "已知目标词条时直接限定该词条；仍校验词面、类型、发布/草稿与归档状态。"
         },
         "include_drafts": {
           "type": "boolean",
@@ -2407,12 +2412,12 @@
         "total": {
           "type": "integer",
           "format": "int64",
-          "description": "本次扫描窗口内命中的候选总数（跨所有页）；撞了窗口上限时它是下界，不是全库命中数。",
+          "description": "完整匹配集的候选总数（跨所有页，同一词条可能有多条词形候选）。",
           "minimum": 0
         },
         "truncated": {
           "type": "boolean",
-          "description": "还有未返回的候选：有下一页（同时给出 `next_cursor`），或触到了后端的扫描行/词条数上限\n（此时没有 `next_cursor`，只能换更具体的关键字）。"
+          "description": "还有未返回的候选；为 true 时同时给出 `next_cursor`。"
         }
       },
       "additionalProperties": false

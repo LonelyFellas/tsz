@@ -1072,9 +1072,7 @@ describe("V3PhraseComponentUsagesCard", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "关联第 1 个词 give" }));
     expect(
-      await screen.findByText(
-        "前 50 条命中里没有可关联的词条，请换更具体的关键字"
-      )
+      await screen.findByText("候选未完整返回，当前服务暂不支持继续加载。")
     ).toBeInTheDocument();
   });
 });
