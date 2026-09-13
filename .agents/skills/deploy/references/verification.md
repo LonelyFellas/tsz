@@ -1,6 +1,6 @@
 # 前端部署验收
 
-按请求的组件执行。期望 web/admin 页面为 200、未登录 API 为 401、tsz-web active、nginx 配置有效：
+先复用部署脚本已输出的同状态结果，以下命令只用于缺项、状态变化或结果不明时补查。按请求的组件执行。期望 web/admin 页面为 200、未登录 API 为 401、tsz-web active、nginx 配置有效：
 
 ```bash
 curl -fsS -m 8 -o /dev/null -w "%{http_code}" http://47.121.142.19/
@@ -12,7 +12,7 @@ ssh tshb-test '/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verif
 ssh tshb-test '/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify --manifest /opt/tsz-deploy-manifests/admin.json --artifact-root /opt/tsz-admin/dist'
 ```
 
-两份 verify 必须实际复算制品，输出与相应目标一致的 git_sha、CI run、artifact_sha256/file_count 与 accepted_at；只读 JSON 不足以验收。
+本次部署组件对应的 verify 必须实际复算制品，输出与相应目标一致的 git_sha、CI run、artifact_sha256/file_count 与 accepted_at；只读 JSON 不足以验收。
 web 目录为 /opt/tsz-web，admin 为 /opt/tsz-admin/dist；nginx 80/8081 的 /api/v1/ 均代理 127.0.0.1:8383。
 
 web 启动期 502 仅在脚本定义的 30 秒窗口内复查；超时、manifest 不符或 API 404/5xx 均算失败。
