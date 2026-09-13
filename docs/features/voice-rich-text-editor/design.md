@@ -217,7 +217,7 @@ TipTap 内部使用 Document / Paragraph / Text / UndoRedo 加五个自定义扩
 
 ## SSML 语义
 
-客户端 `buildSsmlPreview` 与服务端实现共用同一份语义规则，但服务端是最终权威：
+SSML 只由服务端依据结构化富文本生成，前端不构造 SSML。最初约定的语义规则如下，现行规则以服务端实现为准：
 
 - 文本、voice/style 属性和 IPA 全部 XML escape；
 - emphasis → `<emphasis level="strong">`；
@@ -228,7 +228,7 @@ TipTap 内部使用 Document / Paragraph / Text / UndoRedo 加五个自定义扩
 - 整体 rate/pitch 包裹 `<prosody>`；
 - style 仅在 voice capability 明确支持时生成供应商扩展节点。
 
-标注嵌套顺序必须确定：phoneme 在内、emphasis 在外；禁止会产生交叉 XML 的区间组合，或在序列化前按文本片段切分成合法嵌套。SSML 预览不使用 `dangerouslySetInnerHTML`，只作为 `<pre>` 文本呈现。
+标注嵌套顺序必须确定：phoneme 在内、emphasis 在外；禁止会产生交叉 XML 的区间组合，或在序列化前按文本片段切分成合法嵌套。
 
 ## TTS 后端对接建议
 
@@ -317,7 +317,7 @@ export interface AdminSpeechPreviewResponse {
 在 admin dictionary data source 旁新增 `AdminSpeechDataSource`：
 
 - mock voice catalog 提供美音女/男、英音女/男和至少一个支持风格的 voice；
-- preview mock 返回稳定的短音频 fixture 与 `cached` 状态；SSML 始终由编辑器根据 canonical 内容本地预览；
+- preview mock 返回稳定的短音频 fixture 与 `cached` 状态；
 - typed mock 默认关闭，须显式 `VITE_ADMIN_TTS_MOCK=true` 才启用；启用时试听
   控件旁显示「模拟」标记，避免把假音频当成真实合成；
 - 生产构建禁止启用 TTS mock，由 `vite.config.ts` 在构建期 fail-closed 校验，
@@ -339,7 +339,7 @@ sequenceDiagram
     F->>D: 传入字段值、方言、读音提示
     D->>S: V1/V2 -> TipTap 工作态
     A->>D: 编辑正文与标注
-    D->>S: transaction -> canonical 工作副本 + SSML 预览
+    D->>S: transaction -> canonical 工作副本
     A->>D: 生成试听
     D->>T: voice options + RichTextV2
     T-->>D: audio_url + cache_status + expires_at
@@ -368,13 +368,12 @@ sequenceDiagram
 - 新增 `packages/voice-editor/tsconfig.json`、`vitest.config.ts` 与 `vitest.setup.ts`，沿用 `@tsz/config`；jsdom setup 提供 antd v6 需要的 `matchMedia / ResizeObserver` 垫片。
 - 新增 `packages/voice-editor/src/core/codepoints.ts`：Unicode 码点索引与位置映射。
 - 新增 `src/core/normalize.ts`：V2 校验、排序、合并与 V1→V2 工作态迁移。
-- 新增 `src/core/ssml.ts`：客户端只读 SSML 预览构造器。
 - 新增 `src/core/hash.ts`：canonical 内容与 voice options 的稳定 hash。
 - 新增 `src/editor/extensions.ts`：emphasis、phoneme、liaison、highlight、pause TipTap 扩展。
 - 新增 `src/editor/mapping.ts`：TipTap JSON / selection 与 canonical RichText 的双向转换。
 - 新增 `src/reader/VoiceRichTextField.tsx`：轻量字段展示与编辑入口。
 - 新增 `src/editor/VoiceRichTextEditor.tsx`：唯一活动编辑器、Drawer 工作副本、应用/取消、语音与打印编排。
-- 新增 `src/reader/RichTextReadOnly.tsx`；标注浮层、语音控制和 SSML 预览由 `VoiceRichTextEditor.tsx` 内聚编排。
+- 新增 `src/reader/RichTextReadOnly.tsx`；标注浮层与语音控制由 `VoiceRichTextEditor.tsx` 内聚编排。
 - 新增 `src/types.ts`：camelCase 组件 props、`VoicePreviewAdapter` 与领域状态。
 - 新增各公开入口的 `index.ts` 和局部 `src/styles.css`；样式只作用于包根 class。
 - 包内纯逻辑与组件按 `packages/**` 质量门补齐 100% 覆盖率。
