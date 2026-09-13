@@ -4554,9 +4554,34 @@ describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
     );
   };
 
-  it("本词性没有专用组时不渲染选择器", () => {
-    render(<Harness forms={formsFixture({ pos_id: "pos-1" })} />);
+  it("本词性没有专用组时不渲染选择器，带着组相关问题时仍渲染以便定位", () => {
+    const { unmount } = render(
+      <Harness forms={formsFixture({ pos_id: "pos-1" })} />
+    );
     expect(screen.queryByLabelText("释义 1 词形与发音")).toBeNull();
+    unmount();
+
+    const senseId = meaningsFixture.pos[0]!.senses[0]!.id;
+    const issue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "meanings",
+      node_id: senseId,
+      field: "form_group_id",
+      code: "sense_form_group_required",
+      message: "form group required",
+      node_location: { node_role: "sense", ancestor_node_ids: [] }
+    };
+    const { container } = render(
+      <Harness forms={formsFixture({ pos_id: "pos-1" })} issues={[issue]} />
+    );
+    expect(
+      container.querySelector(
+        `[data-v3-field="form_group_id"][data-v3-node-id="${senseId}"]`
+      )
+    ).not.toBeNull();
+    expect(
+      screen.getByText("本词性没有通用变化组，请为该词义选择专用组或添加通用组")
+    ).toBeInTheDocument();
   });
 
   it("只列通用与本词性专用组，选择后写入并可改回通用", () => {

@@ -2865,7 +2865,10 @@ function V3MeaningsAndExamplesStepContent({
                                         />
                                       </div>
                                     </div>
-                                    {formsPos && formGroupOptions.length > 1 ? (
+                                    {/* 没有专用组时通常不必选；但带着组相关问题时仍要渲染，问题定位才有落点。 */}
+                                    {formsPos &&
+                                    (formGroupOptions.length > 1 ||
+                                      formGroupIssue) ? (
                                       <label
                                         className="word-sense-field word-sense-field-form-group"
                                         // antd Select 把 data-* 挂在不可聚焦的根节点上，问题定位 focus 不进去；

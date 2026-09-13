@@ -837,7 +837,8 @@ export function addFormGroup(
   }
   const groupId = nextUuid(idFactory, allNodeIds(content));
   // 新组默认通用，英美规则沿用本词性最后一组；之后与其他组互不影响。
-  const previousRules = pos.form_groups.at(-1)?.dialect_rules;
+  const previousGroup = pos.form_groups.at(-1);
+  const previousRules = previousGroup?.dialect_rules;
   const next = clone(content);
   next.pos
     .find((item) => item.pos_id === posId)!
@@ -850,10 +851,15 @@ export function addFormGroup(
         : { spelling_mode: "unified", phonetic_mode: "unified" },
       members: []
     });
-  // 每组词形变化的初始形态一致：新组自带一个原形，拼写沿用本词性已有的原形。
+  // 每组词形变化的初始形态一致：新组自带一个原形。拼写沿用规则来源那一组的原形，
+  // 那组还没有原形时退回本词性首个原形。
   const added = addConcreteForm(next, posId, groupId, "base", idFactory);
   if (!added.ok) return added;
-  const template = pos.forms.find((form) => form.form_type === "base");
+  const template =
+    previousGroup?.members
+      .map((member) => pos.forms.find((form) => form.id === member.form_id))
+      .find((form) => form?.form_type === "base") ??
+    pos.forms.find((form) => form.form_type === "base");
   if (template) {
     const spelling = baseSpellings(template);
     const createdPos = added.value.pos.find((item) => item.pos_id === posId)!;
@@ -865,7 +871,9 @@ export function addFormGroup(
       created.regional_variants.common.spelling = spelling.uk;
     } else {
       created.regional_variants.uk.spelling = spelling.uk;
-      created.regional_variants.us.spelling = spelling.us;
+      // 拼写统一的组两侧必须同拼写；退回的模板可能来自拼写区分英美的组。
+      created.regional_variants.us.spelling =
+        previousRules?.spelling_mode === "unified" ? spelling.uk : spelling.us;
     }
   }
   return added;

@@ -2579,7 +2579,9 @@ describe("V3FormsAndPronunciationStep", () => {
     await waitFor(() =>
       expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("general")
     );
-    expect(screen.getByText("保存时将解除 2 个词义的绑定")).toBeVisible();
+    expect(
+      screen.getByText("2 个词义仍绑定此组，改为通用后绑定将失效")
+    ).toBeVisible();
   });
 
   it("组内唯一原形摘不掉，本组还有别的原形时照常放行", async () => {

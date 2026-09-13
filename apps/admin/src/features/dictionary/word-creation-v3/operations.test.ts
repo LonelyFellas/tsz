@@ -1218,6 +1218,89 @@ describe("V3 forms operations", () => {
     expect(createdForm.regional_variants.mode).toBe("common");
   });
 
+  it("新增变化组的原形拼写与复制来的英美规则一致", () => {
+    const ud = {
+      spelling_mode: "unified",
+      phonetic_mode: "distinguish"
+    } as const;
+    const distinguished = ukUsFormFixture();
+    const unifiedBase = ukUsFormFixture({
+      id: uuidFromInt(9_410),
+      uk: {
+        id: uuidFromInt(9_411),
+        spelling: "center",
+        pronunciations: [pronunciationFixture({ id: uuidFromInt(9_412) })]
+      },
+      us: {
+        id: uuidFromInt(9_413),
+        spelling: "center",
+        pronunciations: [pronunciationFixture({ id: uuidFromInt(9_414) })]
+      }
+    });
+    const content = formsFixture({
+      forms: [distinguished, unifiedBase],
+      groups: [
+        {
+          id: UUIDS.group,
+          is_regular: true,
+          members: [{ id: UUIDS.membership, form_id: distinguished.id }]
+        },
+        {
+          id: UUIDS.group_2,
+          is_regular: true,
+          dialect_rules: ud,
+          members: [{ id: UUIDS.membership_2, form_id: unifiedBase.id }]
+        }
+      ]
+    });
+    const createdBase = (value: typeof content, groupId: string) => {
+      const pos = value.pos[0]!;
+      const group = pos.form_groups.find((item) => item.id === groupId)!;
+      const form = pos.forms.find(
+        (item) => item.id === group.members[0]!.form_id
+      )!;
+      if (form.regional_variants.mode !== "uk_us") throw new Error("uk_us");
+      return [
+        form.regional_variants.uk.spelling,
+        form.regional_variants.us.spelling
+      ];
+    };
+
+    // 上一组（UD）有自己的原形：拼写取自它，而不是第 1 组的 centre / center。
+    const added = addFormGroup(
+      content,
+      UUIDS.pos,
+      uuidSequence(
+        ...[9_421, 9_422, 9_423, 9_424, 9_425, 9_426, 9_427].map(uuidFromInt)
+      )
+    );
+    expect(added.ok).toBe(true);
+    if (!added.ok) return;
+    expect(added.value.pos[0]!.form_groups[2]!.dialect_rules).toEqual(ud);
+    expect(createdBase(added.value, uuidFromInt(9_421))).toEqual([
+      "center",
+      "center"
+    ]);
+
+    // 上一组没有原形时退回第 1 组的原形，拼写统一的规则下两侧仍写同一拼写。
+    const emptyLast = structuredClone(content);
+    emptyLast.pos[0]!.form_groups[1]!.members = [];
+    emptyLast.pos[0]!.forms = [distinguished];
+    const fallback = addFormGroup(
+      emptyLast,
+      UUIDS.pos,
+      uuidSequence(
+        ...[9_431, 9_432, 9_433, 9_434, 9_435, 9_436, 9_437].map(uuidFromInt)
+      )
+    );
+    expect(fallback.ok).toBe(true);
+    if (!fallback.ok) return;
+    expect(createdBase(fallback.value, uuidFromInt(9_431))).toEqual([
+      "centre",
+      "centre"
+    ]);
+  });
+
   it("P1-3 普通删除组若会产生 orphan form 则结构化拒绝且不修改输入", () => {
     const only = formsFixture();
     expect(

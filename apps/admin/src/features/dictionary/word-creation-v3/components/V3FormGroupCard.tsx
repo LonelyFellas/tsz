@@ -393,7 +393,7 @@ export function V3FormGroupCard({
             >
               {group.scope === "dedicated"
                 ? `已绑定 ${boundSenseCount} 个词义`
-                : `保存时将解除 ${boundSenseCount} 个词义的绑定`}
+                : `${boundSenseCount} 个词义仍绑定此组，改为通用后绑定将失效`}
             </Typography.Text>
           ) : null}
           {onScopeChange ? (

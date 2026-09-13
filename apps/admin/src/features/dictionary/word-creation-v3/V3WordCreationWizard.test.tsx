@@ -1524,11 +1524,8 @@ describe("V3WordCreationWizard", () => {
       field: "form_group_id",
       code: "sense_form_group_required",
       message: "需要选择变化组",
-      node_location: {
-        node_role: "sense",
-        ancestor_node_ids: [pos.pos_id],
-        pos_id: pos.pos_id
-      }
+      // 与后端 meanings_issue 同形：词义问题不带 pos_id，也没有祖先节点。
+      node_location: { node_role: "meanings", ancestor_node_ids: [] }
     };
 
     function MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
