@@ -38,15 +38,17 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const firstGroup = nounGroups.nth(0);
     await expect(firstGroup.getByLabel("复数通用拼写")).toHaveValue("");
 
+    // 加词性时按配置表铺出新建模板：原形加 mock 目录里 5 个非原形类型，共 6 行。
     // 组内只剩一个原形时类型锁死；⊕ 复制出第二个原形后放开，删回去又锁上。
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(6);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
     await firstGroup.getByLabel("在原形 1 下方添加同类型词形").click();
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(3);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(7);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeEnabled();
     await expect(firstGroup.getByLabel("变化组 1 词形 2 类型")).toBeEnabled();
     await firstGroup.getByLabel("从变化组 1 移除词形 2").click();
     await firstGroup.getByLabel("删除词形及相关发音").click();
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(6);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
 
     const firstForm = firstGroup.locator(".v3-concrete-form-row").nth(0);
@@ -71,7 +73,8 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     await page.getByRole("button", { name: "新增名词变化组" }).click();
     const secondGroup = nounGroups.nth(1);
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(6);
+    // 手动加的组不铺模板，只有自带的原形，加上按词性铺的那一个复数占位行。
     await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(2);
 
     // 英美规则是词性级设置，每组都渲染一份，这里从第 1 组切换。
@@ -135,14 +138,18 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect.poll(() => api.getWord().revision).toBe(2);
     const savedForms = api.getWord().forms;
     expect(savedForms.pos.map((item) => item.pos)).toEqual(["noun", "verb"]);
-    // 新建词条进第二步时按词性配置铺默认词形位，名词的默认是复数，落在第 1 组。
+    // 新建模板是真实数据，一个字没填也会保存；手动加的第二组只带自己的原形。
     expect(savedForms.pos[0]?.forms.map((item) => item.form_type)).toEqual([
       "base",
       "plural",
+      "third_person_singular",
+      "present_participle",
+      "past_tense",
+      "past_participle",
       "base"
     ]);
     expect(savedForms.pos[0]?.form_groups).toHaveLength(2);
-    expect(savedForms.pos[0]?.form_groups[0]?.members).toHaveLength(2);
+    expect(savedForms.pos[0]?.form_groups[0]?.members).toHaveLength(6);
     expect(savedForms.pos[0]?.form_groups[1]?.members).toHaveLength(1);
     expect(savedForms.pos[0]?.dialect_rules).toEqual({
       spelling_mode: "distinguish",

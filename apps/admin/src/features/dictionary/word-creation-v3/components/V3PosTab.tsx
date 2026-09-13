@@ -72,16 +72,12 @@ export function V3PosTab({
       );
     }
   }
+  // 没配派生词形的词性（副词、代词）只有一个原形组，也要照常渲染：原形的拼写与
+  // 发音得有地方录，完成度本来就把原形发音算作未填项。只有空组才继续藏起来——
+  // 没有成员的组对这类词性没有意义，「增加一组词性变化」入口同样不给。
   const visibleGroups = pos.form_groups.filter(
     (group) =>
-      !posCatalog ||
-      allowedDerivedTypes.length > 0 ||
-      group.members.some((member) => {
-        const form = pos.forms.find(
-          (candidate) => candidate.id === member.form_id
-        );
-        return form && form.form_type !== "base";
-      })
+      !posCatalog || allowedDerivedTypes.length > 0 || group.members.length > 0
   );
   const dialectRulesConsistent = pos.forms.every((form) =>
     formMatchesDialectRules(form, pos.dialect_rules)

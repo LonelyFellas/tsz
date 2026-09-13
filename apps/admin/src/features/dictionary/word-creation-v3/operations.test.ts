@@ -12,8 +12,9 @@ import {
   deleteConcreteForm,
   deleteFormGroup,
   deleteGroupAndOrphanForms,
+  catalogFormTypeCodes,
   deletePartOfSpeech,
-  fillDefaultFormTypes,
+  fillFormTypeTemplate,
   normalizePosDialectRules,
   removeMembership,
   reorderFormGroups,
@@ -1731,8 +1732,11 @@ it("英美切换保留每条发音的标注、音色和录音", () => {
   }
 });
 
-describe("fillDefaultFormTypes", () => {
+describe("fillFormTypeTemplate", () => {
   const catalogItems = partOfSpeechCatalogFixture.items;
+  const allFormTypes = catalogFormTypeCodes(
+    partOfSpeechCatalogFixture.form_types
+  );
   const byCode = (code: string) =>
     catalogItems.find((item) => item.code === code)!;
 
@@ -1745,35 +1749,90 @@ describe("fillDefaultFormTypes", () => {
     return result.value;
   };
 
-  it("按词性配置补齐缺的默认词形，补过的不再重复补", () => {
+  /** 期望的模板顺序：该词性名下的类型在前，配置表里其余类型跟在后面。 */
+  const expectedTemplate = (code: string) => {
+    const own = byCode(code).allowed_form_types ?? [];
+    return [
+      "base",
+      ...own,
+      ...(allFormTypes ?? []).filter((item) => !own.includes(item))
+    ];
+  };
+
+  it("铺出配置表里的全部词形类型，铺过的不再重复铺", () => {
     let seq = 500;
     const content = onlyBase("verb");
     expect(content.pos[0]!.forms.map((form) => form.form_type)).toEqual([
       "base"
     ]);
 
-    const filled = fillDefaultFormTypes(content, catalogItems, () =>
-      uuidFromInt(seq++)
+    const filled = fillFormTypeTemplate(
+      content,
+      catalogItems,
+      allFormTypes,
+      () => uuidFromInt(seq++)
     );
-    expect(filled.pos[0]!.forms.map((form) => form.form_type)).toEqual([
-      "base",
-      "third_person_singular",
-      "present_participle",
-      "past_tense",
-      "past_participle"
-    ]);
-    // 补出来的行都进同一个变化组，拼写与音标留空等录入。
-    expect(filled.pos[0]!.form_groups[0]!.members).toHaveLength(5);
+    expect(filled.pos[0]!.forms.map((form) => form.form_type)).toEqual(
+      expectedTemplate("verb")
+    );
+    // 铺出来的行都进同一个变化组，拼写与音标留空等录入。
+    expect(filled.pos[0]!.form_groups[0]!.members).toHaveLength(
+      expectedTemplate("verb").length
+    );
     expect(
       filled.pos[0]!.forms.slice(1).map((form) => commonVariant(form).spelling)
-    ).toEqual(["", "", "", ""]);
+    ).toEqual(
+      expectedTemplate("verb")
+        .slice(1)
+        .map(() => "")
+    );
 
     expect(
-      fillDefaultFormTypes(filled, catalogItems, () => uuidFromInt(seq++))
+      fillFormTypeTemplate(filled, catalogItems, allFormTypes, () =>
+        uuidFromInt(seq++)
+      )
     ).toBe(filled);
   });
 
-  it("分了多个变化组的词性不补，避免塞错组", () => {
+  it("目录没送全量类型时退回该词性名下的那几个", () => {
+    let seq = 520;
+    const filled = fillFormTypeTemplate(
+      onlyBase("noun"),
+      catalogItems,
+      undefined,
+      () => uuidFromInt(seq++)
+    );
+    expect(filled.pos[0]!.forms.map((form) => form.form_type)).toEqual([
+      "base",
+      ...(byCode("noun").allowed_form_types ?? [])
+    ]);
+  });
+
+  it("短语的词性不铺：短语没有词形变化", () => {
+    let seq = 540;
+    const content = onlyBase("noun");
+    const phraseItems = catalogItems.map((item) =>
+      item.code === "noun" ? { ...item, kind: "phrase" as const } : item
+    );
+    expect(
+      fillFormTypeTemplate(content, phraseItems, allFormTypes, () =>
+        uuidFromInt(seq++)
+      )
+    ).toBe(content);
+  });
+
+  it("草稿里的词性不在目录里就不铺", () => {
+    let seq = 560;
+    const content = onlyBase("noun");
+    const without = catalogItems.filter((item) => item.code !== "noun");
+    expect(
+      fillFormTypeTemplate(content, without, allFormTypes, () =>
+        uuidFromInt(seq++)
+      )
+    ).toBe(content);
+  });
+
+  it("分了多个变化组的词性不铺，避免塞错组", () => {
     let seq = 600;
     const content = onlyBase("verb");
     const twoGroups = addFormGroup(content, content.pos[0]!.pos_id, () =>
@@ -1783,27 +1842,21 @@ describe("fillDefaultFormTypes", () => {
     if (!twoGroups.ok) return;
 
     expect(
-      fillDefaultFormTypes(twoGroups.value, catalogItems, () =>
+      fillFormTypeTemplate(twoGroups.value, catalogItems, allFormTypes, () =>
         uuidFromInt(seq++)
       )
     ).toBe(twoGroups.value);
   });
 
-  it("没有配默认词形的词性原样返回", () => {
-    let seq = 700;
-    const content = onlyBase("adverb");
-    expect(
-      fillDefaultFormTypes(content, catalogItems, () => uuidFromInt(seq++))
-    ).toBe(content);
-  });
-
   it("目录缺失时不动内容", () => {
     const content = onlyBase("noun");
-    expect(fillDefaultFormTypes(content, undefined)).toBe(content);
-    expect(fillDefaultFormTypes(content, [])).toBe(content);
+    expect(fillFormTypeTemplate(content, undefined, allFormTypes)).toBe(
+      content
+    );
+    expect(fillFormTypeTemplate(content, [], allFormTypes)).toBe(content);
   });
 
-  it("onlyPosId 只补指定的那个词性", () => {
+  it("onlyPosId 只铺指定的那个词性", () => {
     let seq = 800;
     const withNoun = onlyBase("noun");
     const withVerb = addPartOfSpeech(withNoun, byCode("verb"), () =>
@@ -1813,15 +1866,33 @@ describe("fillDefaultFormTypes", () => {
     if (!withVerb.ok) return;
     const verbPosId = withVerb.value.pos[1]!.pos_id;
 
-    const filled = fillDefaultFormTypes(
+    const filled = fillFormTypeTemplate(
       withVerb.value,
       catalogItems,
+      allFormTypes,
       () => uuidFromInt(seq++),
       verbPosId
     );
     expect(filled.pos[0]!.forms.map((form) => form.form_type)).toEqual([
       "base"
     ]);
-    expect(filled.pos[1]!.forms).toHaveLength(5);
+    expect(filled.pos[1]!.forms.map((form) => form.form_type)).toEqual(
+      expectedTemplate("verb")
+    );
+  });
+});
+
+describe("catalogFormTypeCodes", () => {
+  it("去掉原形、按排序值排，老后端不送就交回 undefined", () => {
+    expect(catalogFormTypeCodes(undefined)).toBeUndefined();
+    expect(catalogFormTypeCodes([])).toBeUndefined();
+    const codes = catalogFormTypeCodes(partOfSpeechCatalogFixture.form_types);
+    expect(codes).not.toContain("base");
+    expect(codes).toEqual(
+      [...(partOfSpeechCatalogFixture.form_types ?? [])]
+        .filter((item) => item.code !== "base")
+        .sort((left, right) => left.sort_order - right.sort_order)
+        .map((item) => item.code)
+    );
   });
 });

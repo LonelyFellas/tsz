@@ -23,8 +23,9 @@ import { partOfSpeechDataSource } from "../../dataSource";
 import { newWordNodeId } from "../../word-model/primitives";
 import {
   addPartOfSpeech,
+  catalogFormTypeCodes,
   deletePartOfSpeech,
-  fillDefaultFormTypes,
+  fillFormTypeTemplate,
   reorderPos,
   type V3IdFactory,
   type V3StableVariantIdFactory
@@ -119,11 +120,12 @@ export function V3FormsAndPronunciationStep({
     const result = addPartOfSpeech(value, item, idFactory);
     if (!result.ok) return;
     const added = result.value.pos.at(-1)!;
-    // 新词性直接按该词性配置的默认词形类型铺好空行，省得逐个「添加派生词形」。
+    // 手动加的词性也按配置表铺一遍「新建模板」，省得逐个「添加派生词形」。
     onChange(
-      fillDefaultFormTypes(
+      fillFormTypeTemplate(
         result.value,
         catalog.data?.items,
+        catalogFormTypeCodes(catalog.data?.form_types),
         idFactory,
         added.pos_id
       )

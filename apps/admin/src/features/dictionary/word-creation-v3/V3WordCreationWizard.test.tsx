@@ -5133,7 +5133,7 @@ describe("新草稿默认录入位", () => {
     };
   };
 
-  it("刚创建时按词性配置铺词形、把语义区间摆够默认条数", async () => {
+  it("刚创建时铺出词形模板并把语义区间摆够默认条数", async () => {
     const { seen, renderStep } = capture();
     renderWizard(requests(), {
       partOfSpeechCatalog: partOfSpeechCatalogFixture,
@@ -5142,11 +5142,30 @@ describe("新草稿默认录入位", () => {
     });
 
     await waitFor(() =>
-      expect(
-        seen.context!.draftForms.pos[0]!.forms.map((form) => form.form_type)
-      ).toEqual(["base", "plural"])
+      expect(seen.context!.draftMeanings.sense_groups).toHaveLength(5)
     );
-    expect(seen.context!.draftMeanings.sense_groups).toHaveLength(5);
+    // 新建词条摆一次配置表里的全部词形类型（禅道 TASK#7），本词性的排在前面；
+    // 摆完就是普通草稿数据，删掉哪行就是哪行，再进草稿不会补回来。
+    const expected = [
+      "base",
+      ...(partOfSpeechCatalogFixture.items.find((item) => item.code === "noun")
+        ?.allowed_form_types ?? []),
+      ...(partOfSpeechCatalogFixture.form_types ?? [])
+        .filter(
+          (item) =>
+            item.code !== "base" &&
+            !(
+              partOfSpeechCatalogFixture.items.find(
+                (pos) => pos.code === "noun"
+              )?.allowed_form_types ?? []
+            ).includes(item.code)
+        )
+        .sort((left, right) => left.sort_order - right.sort_order)
+        .map((item) => item.code)
+    ];
+    expect(
+      seen.context!.draftForms.pos[0]!.forms.map((form) => form.form_type)
+    ).toEqual(expected);
     // 铺出来的是未保存改动，得由录入者保存才入库。
     expect(seen.context!.hasUnsavedChanges).toBe(true);
   });
