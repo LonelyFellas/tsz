@@ -1694,8 +1694,10 @@
 
 .word-relations-grid-stacked .word-relation-column-heads,
 .word-relations-grid-stacked .word-relation-row {
+  /* 度量列定宽不收缩：InputNumber 悬停时右侧箭头（22px）会把 % 往左推，
+     112px 才能让 100.00 完整显示。 */
   grid-template-columns:
-    50px minmax(54px, 90px) minmax(0, 1fr) minmax(0, 2fr)
+    50px 112px minmax(0, 1fr) minmax(0, 2fr)
     24px;
   gap: 10px;
 }
