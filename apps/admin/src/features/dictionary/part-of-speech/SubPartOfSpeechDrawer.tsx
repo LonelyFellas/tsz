@@ -274,7 +274,12 @@ export function SubPartOfSpeechPanel({
     { title: "简洁显示", dataIndex: "short_name_zh", width: 110 },
     { title: "正式英文", dataIndex: "name_en", width: 150 },
     { title: "英文缩写", dataIndex: "abbreviation", width: 90 },
-    { title: "英文全称", dataIndex: "full_name_en", width: 160 },
+    {
+      title: "英文全称",
+      dataIndex: "full_name_en",
+      width: 160,
+      ellipsis: true
+    },
     {
       title: "所属基本词性",
       dataIndex: "part_of_speech_id",

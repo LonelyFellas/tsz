@@ -141,7 +141,12 @@ export function FormTypeSettings() {
     { title: "简洁显示", dataIndex: "short_name_zh", width: 120 },
     { title: "正式英文", dataIndex: "name_en", width: 160 },
     { title: "英文缩写", dataIndex: "abbreviation", width: 100 },
-    { title: "英文全称", dataIndex: "full_name_en", width: 170 },
+    {
+      title: "英文全称",
+      dataIndex: "full_name_en",
+      width: 170,
+      ellipsis: true
+    },
     {
       title: "所属基本词性",
       dataIndex: "part_of_speech_id",
