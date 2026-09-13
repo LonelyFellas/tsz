@@ -41,6 +41,6 @@ web 还必须先启动裁剪后的 standalone 制品确认可运行。使用可�
 
 ## 3. 验收与汇报
 
-按 [验收清单](references/verification.md) 复核实际服务、页面、API 反代和两份制品摘要。
+按 [验收清单](references/verification.md) 复核本次部署组件的实际服务、页面、API 反代和对应制品摘要。
 报告每个组件的 SHA、CI run、HTTP/服务结果、manifest verify 结果及未完成部分。
 故障先只读检查；nginx 配置无效不强制 reload，API 失败不擅自重启后端。
