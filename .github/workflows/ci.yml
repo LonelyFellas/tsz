@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # 手动补跑入口:main 的 push 事件偶发没触发 CI 时(#270 合并后遇到过),在 main 上手动跑一次;
+  # 部署门禁按精确 SHA 认 CI 运行、不区分触发事件。缓存写入仍只认 push。
+  workflow_dispatch:
 
 # 默认只给只读权限,按需在单个 job 内提权(最小权限,降低 token 被滥用的风险)。
 permissions:

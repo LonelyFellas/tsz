@@ -37,6 +37,8 @@ test("W01: workflow identity, triggers, permissions and concurrency stay stable"
   assert.match(source, /^name: CI$/m);
   assert.match(source, /^  push:\n    branches: \[main\]$/m);
   assert.match(source, /^  pull_request:$/m);
+  // main 的 push 事件偶发不触发 CI 时靠它补跑，否则部署门禁找不到精确 SHA 的运行。
+  assert.match(source, /^  workflow_dispatch:$/m);
   assert.match(source, /^permissions:\n  contents: read$/m);
   assert.match(
     source,
