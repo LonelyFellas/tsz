@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { PartOfSpeechConfig } from "@tsz/types";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { expectDisplayNamesNotDerived } from "./displayNameTestHelpers";
 import { PartOfSpeechFormModal } from "./PartOfSpeechFormModal";
 
 const api = vi.hoisted(() => ({
@@ -55,26 +56,6 @@ function renderModal(editing?: PartOfSpeechConfig) {
     />
   );
   return { onClose, onSaved, onError };
-}
-
-/**
- * 新建时不再从正式中文、正式英文带出简洁显示与英文全称。表单的 useWatch 通知是异步的，
- * 改完立刻断言空值抓不到联动，所以给它一段时间：期间两个字段一旦被填上就算失败。
- */
-async function expectDisplayNamesNotDerived() {
-  await expect(
-    waitFor(
-      () => {
-        const derived = ["简洁显示", "英文全称"]
-          .map(
-            (label) => (screen.getByLabelText(label) as HTMLInputElement).value
-          )
-          .join("");
-        if (!derived) throw new Error("简洁显示与英文全称仍为空");
-      },
-      { timeout: 300 }
-    )
-  ).rejects.toThrow("简洁显示与英文全称仍为空");
 }
 
 beforeEach(() => {
@@ -267,6 +248,24 @@ describe("PartOfSpeechFormModal 新建默认值", () => {
         })
       )
     );
+  });
+
+  it("新建时简洁显示与英文全称留空，提示必填且不提交", async () => {
+    renderModal();
+    fireEvent.change(screen.getByLabelText("正式中文"), {
+      target: { value: "小品词" }
+    });
+    fireEvent.change(screen.getByLabelText("正式英文"), {
+      target: { value: "PARTICLE" }
+    });
+    fireEvent.change(screen.getByLabelText("英文缩写"), {
+      target: { value: "part." }
+    });
+    fireEvent.click(screen.getByText("新 建"));
+
+    expect(await screen.findByText("请输入简洁显示名称")).toBeInTheDocument();
+    expect(screen.getByText("请输入英文全称")).toBeInTheDocument();
+    expect(api.create).not.toHaveBeenCalled();
   });
 
   it("新建时序号预填默认值、可改后提交；修改时回填原值", async () => {
