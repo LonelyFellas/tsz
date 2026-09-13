@@ -5,7 +5,6 @@ import type {
   DraftFormsStepContentV3,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
-  WordFormTypeV3,
   WordPosFormsV3
 } from "@tsz/types";
 import {
@@ -43,8 +42,6 @@ export interface V3PosTabProps {
   idFactory: V3IdFactory;
   onChange: (next: DraftFormsStepContentV3) => void;
   posCatalog?: PartOfSpeechCatalogItem;
-  /** 配置表里除原形外的全部词形类型；不按「所属基本词性」收窄，见 TASK#7。 */
-  formTypes?: readonly WordFormTypeV3[];
   stableVariantIds?: V3StableVariantIdFactory;
 }
 
@@ -55,7 +52,6 @@ export function V3PosTab({
   idFactory,
   onChange,
   posCatalog,
-  formTypes,
   stableVariantIds
 }: V3PosTabProps) {
   const [pendingGroupDeletion, setPendingGroupDeletion] = useState<{
@@ -66,11 +62,7 @@ export function V3PosTab({
   const [dialectChangeError, setDialectChangeError] = useState<string>();
   const posLabel = posCatalog?.name_zh ?? partOfSpeechLabel(pos.pos);
   const { preference } = useDialectPreference();
-  // 短语没有词形变化：这类词性不吃全量类型，免得页签里摆出一排复数、三单，
-  // 也别因此多出「增加一组词性变化」入口。
-  const posFormTypes = posCatalog?.kind === "phrase" ? undefined : formTypes;
-  const allowedDerivedTypes =
-    posFormTypes ?? posCatalog?.allowed_form_types ?? [];
+  const allowedDerivedTypes = posCatalog?.allowed_form_types ?? [];
   const membershipCounts = new Map<string, number>();
   for (const group of pos.form_groups) {
     for (const member of group.members) {
@@ -355,7 +347,6 @@ export function V3PosTab({
               onMove={(offset) => moveGroup(index, offset)}
               pos={pos}
               posCatalog={posCatalog}
-              formTypes={formTypes}
             />
           ))}
         </Space>

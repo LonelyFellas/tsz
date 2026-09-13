@@ -2,6 +2,7 @@ import type {
   PronunciationStyle,
   DialectRulesV3,
   DraftFormsStepContentV3,
+  FormTypeCatalogItem,
   PartOfSpeechCatalogItem,
   PhraseComponentUsageV3,
   RetiredStableNodeV3,
@@ -722,6 +723,70 @@ export function addPartOfSpeech(
     ]
   });
   return { ok: true, value: next };
+}
+
+/**
+ * 配置表里除原形以外的全部词形类型，按排序值。老后端不送 form_types 时交回
+ * undefined，让调用方退回该词性名下的那几个，而不是拿一个空数组当「没有类型」。
+ */
+export function catalogFormTypeCodes(
+  formTypes: readonly FormTypeCatalogItem[] | undefined
+): WordFormTypeV3[] | undefined {
+  const codes = [...(formTypes ?? [])]
+    .filter((item) => item.code !== "base")
+    .sort((left, right) => left.sort_order - right.sort_order)
+    .map((item) => item.code);
+  return codes.length > 0 ? codes : undefined;
+}
+
+/**
+ * 新建词条、手动添加词性时把词形类型铺成真实空行写进草稿，也就是产品说的「新建
+ * 模板」：只摆这一次，之后录入者删掉哪行就是哪行，再进草稿不会补回来（禅道 TASK#7）。
+ * formTypes 是配置表里除原形以外的全部类型，不按「所属基本词性」收窄；不送就退回
+ * 该词性名下的那几个。
+ */
+export function fillFormTypeTemplate(
+  content: DraftFormsStepContentV3,
+  catalogItems: readonly PartOfSpeechCatalogItem[] | undefined,
+  formTypes: readonly WordFormTypeV3[] | undefined,
+  idFactory: V3IdFactory = defaultIdFactory,
+  onlyPosId?: string
+): DraftFormsStepContentV3 {
+  if (!catalogItems?.length) return content;
+  let next = content;
+  for (const pos of content.pos) {
+    if (onlyPosId && pos.pos_id !== onlyPosId) continue;
+    const catalogItem = catalogItems.find((item) => item.code === pos.pos);
+    // 目录里没有这个词性就不铺，跟着目录 fail closed；短语没有词形变化，后端的
+    // 词形类型也只挂在单词词性下。
+    if (!catalogItem || catalogItem.kind === "phrase") continue;
+    const own = catalogItem.allowed_form_types ?? [];
+    // 并集而不是替换：两处字段万一不同源，本词性独有的类型也得有录入位，
+    // 否则完成度把它算作未填却没地方填。本词性的类型排在前面。
+    const template = [...new Set([...own, ...(formTypes ?? own)])];
+    if (template.length === 0) continue;
+    // 每轮都从最新结果里取：上一条补齐已经换过这个词性的对象。
+    const current = next.pos.find((item) => item.pos_id === pos.pos_id);
+    // 只给刚建起来的唯一一组铺：后面手动加的组不是「新建模板」的场景。
+    if (!current || current.form_groups.length !== 1) continue;
+    const group = current.form_groups[0]!;
+    // 按该词性已有的全部词形算，不只看组成员：游离词形（删组保留词形留下的）
+    // 也算数，免得同类型再补一条。
+    const present = new Set(current.forms.map((form) => form.form_type));
+    for (const formType of template) {
+      if (present.has(formType)) continue;
+      present.add(formType);
+      const added = addConcreteForm(
+        next,
+        pos.pos_id,
+        group.id,
+        formType,
+        idFactory
+      );
+      if (added.ok) next = added.value;
+    }
+  }
+  return next;
 }
 
 export function deletePartOfSpeech(

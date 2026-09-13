@@ -18,12 +18,14 @@ import type {
   V3DraftValidationIssue,
   WordEntryKindV3
 } from "@tsz/types";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { partOfSpeechDataSource } from "../../dataSource";
 import { newWordNodeId } from "../../word-model/primitives";
 import {
   addPartOfSpeech,
+  catalogFormTypeCodes,
   deletePartOfSpeech,
+  fillFormTypeTemplate,
   reorderPos,
   type V3IdFactory,
   type V3StableVariantIdFactory
@@ -114,23 +116,20 @@ export function V3FormsAndPronunciationStep({
       cancelled = true;
     };
   }, []);
-  // 配置表里除原形外的全部词形类型，按序号排。产品口径：每个词性下面都摆出所有
-  // 可能的类型，不按「所属基本词性」收窄，录入者不需要的自己删（禅道 TASK#7）。
-  const derivedFormTypes = useMemo(() => {
-    const codes = [...(catalog.data?.form_types ?? [])]
-      .filter((item) => item.code !== "base")
-      .sort((left, right) => left.sort_order - right.sort_order)
-      .map((item) => item.code);
-    // 老后端不送 form_types：交回 undefined，让下游退回该词性名下的类型，
-    // 而不是拿一个空数组把占位行全抹掉。
-    return codes.length > 0 ? codes : undefined;
-  }, [catalog.data]);
-
   const addPos = (item: PartOfSpeechCatalogItem) => {
     const result = addPartOfSpeech(value, item, idFactory);
     if (!result.ok) return;
     const added = result.value.pos.at(-1)!;
-    onChange(result.value);
+    // 手动加的词性也按配置表铺一遍「新建模板」，省得逐个「添加派生词形」。
+    onChange(
+      fillFormTypeTemplate(
+        result.value,
+        catalog.data?.items,
+        catalogFormTypeCodes(catalog.data?.form_types),
+        idFactory,
+        added.pos_id
+      )
+    );
     onActivePosChange?.(added.pos_id);
   };
 
@@ -274,7 +273,6 @@ export function V3FormsAndPronunciationStep({
                 posCatalog={catalog.data?.items.find(
                   (item) => item.code === pos.pos
                 )}
-                formTypes={derivedFormTypes}
               />
             )
           };

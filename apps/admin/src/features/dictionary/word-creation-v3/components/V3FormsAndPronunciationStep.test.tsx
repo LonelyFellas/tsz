@@ -49,24 +49,17 @@ const formsCss = readFileSync(
   "utf8"
 );
 
-/**
- * 产品口径是每个词性下都摆出配置表里的全部词形类型（禅道 TASK#7），但本文件的用例
- * 大多在验方言矩阵、类型候选这类结构，全量铺满只是把每个用例的渲染量翻倍，实测把
- * 文件耗时推到用例超时线附近。所以本文件默认用这份收窄目录：不送 form_types，组件
- * 退回该词性名下的类型。全量铺满由「每个词性都摆出配置表里的全部词形类型」那条用例
- * 显式切回完整 fixture 单独守。
- */
-const narrowFormTypes = () => ({
-  ...partOfSpeechCatalogFixture,
-  form_types: undefined
-});
-
-/** 配置表里除原形外的全部词形类型，按排序值，和第二步下传的算法同款。 */
-const fullFormTypes = () =>
-  (partOfSpeechCatalogFixture.form_types ?? [])
-    .filter((item) => item.code !== "base")
+/** 新建模板的期望类型序列：原形，该词性名下的类型，再是配置表里其余类型。 */
+const templateFormTypes = (posCode: string) => {
+  const own =
+    partOfSpeechCatalogFixture.items.find((item) => item.code === posCode)
+      ?.allowed_form_types ?? [];
+  const rest = (partOfSpeechCatalogFixture.form_types ?? [])
+    .filter((item) => item.code !== "base" && !own.includes(item.code))
     .sort((left, right) => left.sort_order - right.sort_order)
     .map((item) => item.code);
+  return ["base", ...own, ...rest];
+};
 
 const catalogState = vi.hoisted(() => ({
   data: undefined as typeof partOfSpeechCatalogFixture | undefined,
@@ -268,7 +261,7 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   beforeEach(() => {
-    catalogState.data = narrowFormTypes();
+    catalogState.data = partOfSpeechCatalogFixture;
     catalogState.isError = false;
     catalogState.pending = undefined;
     componentLookupState.resolve.mockReset();
@@ -386,7 +379,6 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("DD 多条 form 使用独立类型列与两张完整方言面板", async () => {
-    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const firstBase = ukUsFormFixture({
       id: uuidFromInt(2101),
       uk: { id: uuidFromInt(2111), spelling: "centre" },
@@ -459,7 +451,6 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("UD 只显示共用拼写并保持双方言发音独立", async () => {
-    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const ukPronunciation = pronunciationFixture({ id: uuidFromInt(2141) });
     const usPronunciation = pronunciationFixture({
       id: uuidFromInt(2142),
@@ -553,7 +544,6 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("类型单元加号在当前行下方新增同类型 form，并移除底部类型选择入口", async () => {
-    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const base = commonFormFixture({
       id: uuidFromInt(2161),
       variant_id: uuidFromInt(2162),
@@ -639,7 +629,6 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("以实际产品图为基准恢复词性 Tab 与同组词形矩阵层级", async () => {
-    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const base = commonFormFixture({
       id: uuidFromInt(701),
       variant_id: uuidFromInt(711),
@@ -749,7 +738,6 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("按实际产品图把原形与其他词形放在同一变化组矩阵", async () => {
-    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const base = commonFormFixture({
       id: uuidFromInt(741),
       variant_id: uuidFromInt(751),
@@ -1002,7 +990,6 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("I02 完整显示多 POS/多组/同类型多行，共享 form 同步编辑但不复制", async () => {
-    // 这条只验结构与候选，按词性收窄词形类型，免得全量占位行把行数冲乱。
     const content = multiPosFixture();
     const sharedId = content.pos[0]!.forms[0]!.id;
     const secondId = content.pos[0]!.forms[1]!.id;
@@ -1537,35 +1524,6 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
   });
 
-  it("每个词性都摆出配置表里的全部词形类型，本词性的排在前面", async () => {
-    catalogState.data = partOfSpeechCatalogFixture;
-    const initial = formsFixture({ forms: [commonFormFixture()] });
-    render(<Harness initial={initial} />);
-
-    await screen.findByLabelText("复数通用拼写");
-    const types = [
-      ...document.querySelectorAll<HTMLElement>(
-        '[aria-label^="变化组 1 词形 "][aria-label$=" 类型"]'
-      )
-    ].map((select) => select.closest(".ant-select")?.textContent?.trim());
-    // 名词名下只有复数，其余五个类型也照摆，录入者不需要的自己删（禅道 TASK#7）。
-    expect(types).toEqual([
-      "原形",
-      "复数",
-      // 共享 fixture 里简洁显示与正式名同值，生产上这栏显示的是「三单」。
-      "第三人称单数",
-      "现在分词",
-      "过去式",
-      "过去分词",
-      "比较级",
-      "最高级"
-    ]);
-    // 摆出来的只是占位，一个字都没填就不进草稿。
-    expect(
-      canonicalValue().pos[0]!.forms.map((form) => form.form_type)
-    ).toEqual(["base"]);
-  });
-
   it("目录没有派生词形时，只有原形的组照样显示且能录发音", () => {
     const content = formsFixture({ pos: "adverb" });
     const adverbCatalog = partOfSpeechCatalogFixture.items.find(
@@ -1598,86 +1556,6 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(screen.getByLabelText("变化组 1 词形 1 类型")).toBeDisabled();
     expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
-  });
-
-  it("全量铺满后行内类型下拉的候选也是全部类型", async () => {
-    catalogState.data = partOfSpeechCatalogFixture;
-    render(
-      <Harness initial={formsFixture({ forms: [commonFormFixture()] })} />
-    );
-
-    const select = await screen.findByLabelText("变化组 1 词形 2 类型");
-    fireEvent.mouseDown(select);
-    const choices = [
-      ...document.querySelectorAll<HTMLElement>(
-        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
-      )
-    ].map((item) => item.textContent);
-    // 录入者要能把一行改成非本词性的类型，候选是原形加配置表里的全部类型。
-    expect(choices).toHaveLength(fullFormTypes().length + 1);
-    expect(choices).toContain("过去式");
-    expect(choices).toContain("最高级");
-  });
-
-  it("短语的词性不铺全量类型，也不给新增变化组入口", () => {
-    const content = formsFixture({ pos: "adverb" });
-    const adverbCatalog = partOfSpeechCatalogFixture.items.find(
-      (item) => item.code === "adverb"
-    )!;
-    // 短语没有词形变化，词形类型在后端也只挂在单词词性下。
-    const phraseCatalog = { ...adverbCatalog, kind: "phrase" as const };
-
-    render(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3PosTab
-            content={content}
-            formTypes={fullFormTypes()}
-            idFactory={() => uuidFromInt(980)}
-            issues={[]}
-            onChange={() => undefined}
-            pos={content.pos[0]!}
-            posCatalog={phraseCatalog}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
-    );
-
-    expect(screen.getAllByLabelText(/^变化组 1 词形 \d+ 类型$/u)).toHaveLength(
-      1
-    );
-    expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
-  });
-
-  it("配置表里没有派生词形的词性，拿到全量类型后同样铺满", () => {
-    const content = formsFixture({ pos: "adverb" });
-    const adverbCatalog = partOfSpeechCatalogFixture.items.find(
-      (item) => item.code === "adverb"
-    )!;
-    const formTypes = fullFormTypes();
-
-    render(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3PosTab
-            content={content}
-            formTypes={formTypes}
-            idFactory={() => uuidFromInt(979)}
-            issues={[]}
-            onChange={() => undefined}
-            pos={content.pos[0]!}
-            posCatalog={adverbCatalog}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
-    );
-
-    // 副词名下一个派生词形都没配，产品仍要求摆满全部类型（禅道 TASK#7）；
-    // 随之而来的是这类词性也拿到了「增加一组词性变化」入口。
-    expect(screen.getAllByLabelText(/^变化组 1 词形 \d+ 类型$/u)).toHaveLength(
-      formTypes.length + 1
-    );
-    expect(screen.getByLabelText("新增副词变化组")).toBeVisible();
   });
 
   it("目录没有额外词形时仍保留并显示历史词形变化组", () => {
@@ -2314,7 +2192,7 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("P1-1 从空 skeleton 经 catalog UI 构建多 POS/组/重复 base", async () => {
-    const ids = Array.from({ length: 24 }, (_, index) =>
+    const ids = Array.from({ length: 120 }, (_, index) =>
       uuidFromInt(1_000 + index)
     );
     render(<Harness initial={{ pos: [] }} idFactory={uuidSequence(...ids)} />);
@@ -2323,38 +2201,51 @@ describe("V3FormsAndPronunciationStep", () => {
       expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
     );
     chooseOption("添加基本词性", "名词");
-    expect(canonicalValue().pos[0]).toMatchObject({
-      pos_id: ids[0],
-      pos: "noun",
-      forms: [{ id: ids[2], form_type: "base" }],
-      form_groups: [
-        {
-          id: ids[1],
-          members: [{ id: ids[4], form_id: ids[2] }]
-        }
-      ]
+    const addedNoun = canonicalValue().pos[0]!;
+    expect(addedNoun).toMatchObject({ pos_id: ids[0], pos: "noun" });
+    // 加词性就按配置表铺出新建模板：原形加全部词形类型，本词性的排在前面。
+    expect(addedNoun.forms.map((form) => form.form_type)).toEqual(
+      templateFormTypes("noun")
+    );
+    expect(addedNoun.forms[0]).toMatchObject({ id: ids[2], form_type: "base" });
+    expect(addedNoun.form_groups).toHaveLength(1);
+    expect(addedNoun.form_groups[0]!.id).toBe(ids[1]);
+    expect(addedNoun.form_groups[0]!.members[0]).toMatchObject({
+      id: ids[4],
+      form_id: ids[2]
     });
+    // 模板行也进了同一组，和原形一起排着。
+    expect(addedNoun.form_groups[0]!.members).toHaveLength(
+      addedNoun.forms.length
+    );
 
     const firstGroupId = ids[1]!;
-    fireEvent.click(screen.getByLabelText("在原形 1 下方添加同类型词形"));
     const firstFormId = ids[2]!;
     const firstMembershipId = ids[4]!;
-    const secondFormId = ids[6]!;
+    fireEvent.click(screen.getByLabelText("在原形 1 下方添加同类型词形"));
+    // ⊕ 复制出的第二个原形排在原形后面，模板行的 ID 由同一个工厂顺次发，
+    // 这里只认结构：两个原形同组、第二个是新节点。
+    const copied = canonicalValue().pos[0]!;
     expect(
-      canonicalValue().pos[0]!.forms.map((item) => item.form_type)
-    ).toEqual(["base", "base"]);
+      copied.forms.filter((form) => form.form_type === "base")
+    ).toHaveLength(2);
+    const secondFormId = copied.forms.filter(
+      (form) => form.form_type === "base"
+    )[1]!.id;
+    expect(secondFormId).not.toBe(firstFormId);
 
     fireEvent.click(screen.getByRole("button", { name: "新增名词变化组" }));
-    const secondGroupId = ids[10]!;
-    const secondGroupFormId = ids[11]!;
     expect(screen.queryByText("复用已有词形")).toBeNull();
 
-    // 新增的组自带原形，已有词形留在原组。
+    // 新增的组自带原形，已有词形留在原组；手动加的组不铺模板，只有一个原形。
     const noun = canonicalValue().pos[0]!;
-    expect(noun.forms).toHaveLength(3);
+    const secondGroupId = noun.form_groups[1]!.id;
+    const secondGroupFormId = noun.form_groups[1]!.members[0]!.form_id;
+    expect(noun.forms).toHaveLength(templateFormTypes("noun").length + 2);
     expect(noun.form_groups[0]!.members.map((item) => item.form_id)).toEqual([
       firstFormId,
-      secondFormId
+      secondFormId,
+      ...noun.form_groups[0]!.members.slice(2).map((member) => member.form_id)
     ]);
     expect(noun.form_groups[1]!.members.map((item) => item.form_id)).toEqual([
       secondGroupFormId
@@ -2381,26 +2272,20 @@ describe("V3FormsAndPronunciationStep", () => {
       "verb"
     ]);
     const verb = canonicalValue().pos[1]!;
-    expect(verb).toMatchObject({
-      pos_id: ids[15],
-      pos: "verb",
-      forms: [
-        {
-          id: ids[17],
-          form_type: "base",
-          regional_variants: {
-            mode: "common",
-            common: { spelling: "orbit" }
-          }
-        }
-      ],
-      form_groups: [
-        {
-          id: ids[16],
-          members: [{ id: ids[19], form_id: ids[17] }]
-        }
-      ]
+    expect(verb.pos).toBe("verb");
+    // 动词页签同样铺满模板，本词性名下的三单、现在分词这些排在前面。
+    expect(verb.forms.map((form) => form.form_type)).toEqual(
+      templateFormTypes("verb")
+    );
+    expect(verb.forms[0]).toMatchObject({
+      form_type: "base",
+      regional_variants: {
+        mode: "common",
+        common: { spelling: "orbit" }
+      }
     });
+    expect(verb.form_groups).toHaveLength(1);
+    expect(verb.form_groups[0]!.members[0]!.form_id).toBe(verb.forms[0]!.id);
   }, 15_000);
 
   it("#110-111 就地修改词形类型并保留 V3 节点身份与共享关系", async () => {
@@ -2595,8 +2480,6 @@ describe("V3FormsAndPronunciationStep", () => {
     const noun = dynamicCatalog.items.find((item) => item.code === "noun")!;
     noun.allowed_form_types = ["comparative"];
     noun.default_form_types = [];
-    // 这条只验候选来源，按词性收窄词形类型，免得全量占位行把候选与行数冲乱。
-    dynamicCatalog.form_types = undefined;
     catalogState.data = dynamicCatalog;
     const historical = commonFormFixture();
     historical.form_type = "plural";
@@ -2619,8 +2502,6 @@ describe("V3FormsAndPronunciationStep", () => {
     const noun = dynamicCatalog.items.find((item) => item.code === "noun")!;
     noun.allowed_form_types = ["comparative"];
     noun.default_form_types = [];
-    // 这条只验候选来源，按词性收窄词形类型，免得全量占位行把候选与行数冲乱。
-    dynamicCatalog.form_types = undefined;
     catalogState.data = dynamicCatalog;
     const base = commonFormFixture({
       id: uuidFromInt(1_090),
@@ -2986,7 +2867,7 @@ it("目录自定义词形可展示，改名后保留词形编码", async () => {
     abbreviation: "custom",
     sort_order: 100
   };
-  catalogState.data = structuredClone(narrowFormTypes());
+  catalogState.data = structuredClone(partOfSpeechCatalogFixture);
   catalogState.data.items[0]!.allowed_form_types = ["custom_variant"];
   const { rerender } = render(
     <FormTypeLabelsProvider items={[item]}>
