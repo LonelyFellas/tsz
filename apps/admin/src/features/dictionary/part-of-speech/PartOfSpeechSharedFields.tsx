@@ -52,7 +52,7 @@ interface Props {
 /**
  * 基本词性、细分词性与词形变化共用的表单字段：正式中文 / 简洁显示、正式英文 / 英文缩写、
  * 英文全称 / 序号。校验规则与后端契约一致（中英文名 64、简洁显示与缩写 16、
- * 英文全称 64 且须含英文字母、序号是 32 位有符号整数）。
+ * 英文全称 200 且须含英文字母、序号是 32 位有符号整数）。
  */
 export function PartOfSpeechSharedFields({ placeholders, onTouch }: Props) {
   return (
@@ -124,7 +124,7 @@ export function PartOfSpeechSharedFields({ placeholders, onTouch }: Props) {
             label="英文全称"
             rules={[
               { required: true, whitespace: true, message: "请输入英文全称" },
-              { max: 64, message: "英文全称不能超过 64 个字符" },
+              { max: 200, message: "英文全称不能超过 200 个字符" },
               { pattern: /[A-Za-z]/, message: "英文全称需包含英文字母" }
             ]}
           >

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-sentence-senses-20260913/docs/openapi.json",
-  "_source_sha256": "7a45ee034080ffa8e7556373c158155b34bbe80acddd7294fdf99b4fdd99d3c4",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/pos-full-name-en-200/docs/openapi.json",
+  "_source_sha256": "c75a8a1394b93ba7e75e912bd23f90871e50c29b5060d06a3e06be83c044598d",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",

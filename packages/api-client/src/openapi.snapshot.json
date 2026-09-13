@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-sentence-senses-20260913/docs/openapi.json",
-  "_generatedAt": "2026-09-13T02:37:24.742Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/pos-full-name-en-200/docs/openapi.json",
+  "_generatedAt": "2026-09-13T03:53:36.992Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2764,7 +2764,7 @@
           "minLength": 1,
           "pattern": "^[a-z][a-z0-9_]{0,31}$"
         },
-        "full_name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "full_name_en": { "type": "string", "maxLength": 200, "minLength": 1 },
         "name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
         "name_zh": { "type": "string", "maxLength": 64, "minLength": 1 },
         "part_of_speech_id": {
@@ -3380,7 +3380,7 @@
       "properties": {
         "abbreviation": { "type": "string", "maxLength": 16, "minLength": 1 },
         "base_revision": { "type": "integer", "format": "int64" },
-        "full_name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
+        "full_name_en": { "type": "string", "maxLength": 200, "minLength": 1 },
         "name_en": { "type": "string", "maxLength": 64, "minLength": 1 },
         "name_zh": { "type": "string", "maxLength": 64, "minLength": 1 },
         "part_of_speech_id": {
