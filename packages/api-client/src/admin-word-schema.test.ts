@@ -162,10 +162,6 @@ function validAdminWordV3() {
         {
           pos_id: IDS.pos,
           pos: "adjective",
-          dialect_rules: {
-            spelling_mode: "distinguish",
-            phonetic_mode: "distinguish"
-          },
           forms: [
             {
               id: IDS.form1,
@@ -223,6 +219,11 @@ function validAdminWordV3() {
             {
               id: IDS.group1,
               is_regular: true,
+              scope: "general",
+              dialect_rules: {
+                spelling_mode: "distinguish",
+                phonetic_mode: "distinguish"
+              },
               members: [
                 { id: IDS.member1, form_id: IDS.form1 },
                 { id: IDS.member2, form_id: IDS.form2 }
@@ -231,6 +232,11 @@ function validAdminWordV3() {
             {
               id: IDS.group2,
               is_regular: false,
+              scope: "dedicated",
+              dialect_rules: {
+                spelling_mode: "unified",
+                phonetic_mode: "unified"
+              },
               members: [{ id: IDS.member3, form_id: IDS.form1 }]
             }
           ]

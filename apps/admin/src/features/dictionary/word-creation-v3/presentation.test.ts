@@ -54,6 +54,9 @@ describe("V3 product presentation", () => {
   it("映射影响与定义，不返回原始代码", () => {
     expect(impactTypeLabel("membership")).toBe("词形使用位置");
     expect(impactReasonLabel("例句仍引用词形")).toBe("例句仍引用词形");
+    expect(impactReasonLabel("form_group_binding_cleared")).toBe(
+      "绑定的专用变化组被删除或改回通用，将改用通用词形"
+    );
     expect(impactReasonLabel("referenced")).toBe(
       "关联内容将随本次调整受到影响。"
     );

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-component-pagination/docs/openapi.json",
-  "_generatedAt": "2026-09-13T07:07:29.148Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/clever-swirles-f4f4de/docs/openapi.json",
+  "_generatedAt": "2026-09-13T10:30:15.585Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1838,7 +1838,10 @@
         "phrase_component_target_stale",
         "phonetic_rich_text_invalid",
         "voice_profile_invalid",
-        "audio_asset_invalid"
+        "audio_asset_invalid",
+        "sense_form_group_invalid",
+        "dedicated_form_group_unused",
+        "sense_form_group_required"
       ]
     },
     "RelatedWordSenseV3": {
@@ -2911,6 +2914,7 @@
       "additionalProperties": false
     },
     "EntryKind": { "type": "string", "enum": ["word", "phrase"] },
+    "FormGroupScopeV3": { "type": "string", "enum": ["general", "dedicated"] },
     "GrammarStructureV3": {
       "type": "object",
       "required": ["id", "variants"],
@@ -3564,8 +3568,12 @@
     },
     "WordFormGroupV3": {
       "type": "object",
-      "required": ["id", "is_regular", "members"],
+      "required": ["id", "is_regular", "scope", "dialect_rules", "members"],
       "properties": {
+        "dialect_rules": {
+          "$ref": "#/components/schemas/DialectRulesV3",
+          "description": "组内词形按本组规则校验，组与组互不影响。"
+        },
         "id": { "type": "string", "format": "uuid" },
         "is_regular": {
           "type": "boolean",
@@ -3575,6 +3583,10 @@
           "type": "array",
           "items": { "$ref": "#/components/schemas/WordFormGroupMemberV3" },
           "maxItems": 2000
+        },
+        "scope": {
+          "$ref": "#/components/schemas/FormGroupScopeV3",
+          "description": "通用组服务本词性下没有绑定专用组的词义；专用组只服务绑定了它的词义。"
         }
       },
       "additionalProperties": false
@@ -3610,9 +3622,8 @@
     },
     "WordPosFormsV3": {
       "type": "object",
-      "required": ["pos_id", "pos", "dialect_rules", "forms", "form_groups"],
+      "required": ["pos_id", "pos", "forms", "form_groups"],
       "properties": {
-        "dialect_rules": { "$ref": "#/components/schemas/DialectRulesV3" },
         "form_groups": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/WordFormGroupV3" },
@@ -3766,6 +3777,11 @@
           "maxItems": 2000
         },
         "depends_on_context": { "type": "boolean" },
+        "form_group_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "缺省 = 通用：使用本词性的通用变化组；只能指向同词性下 `scope = dedicated` 的组。"
+        },
         "frequency": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
         "level": { "type": "string" },

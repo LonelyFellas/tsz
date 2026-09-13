@@ -159,7 +159,8 @@ export function sentenceLinkRoleLabel(value: string): string {
 
 const IMPACT_REASON_LABEL: Record<string, string> = {
   node_removed_from_draft: "将从草稿移除",
-  downstream_node_removed_with_pos: "会随词性一起删除"
+  downstream_node_removed_with_pos: "会随词性一起删除",
+  form_group_binding_cleared: "绑定的专用变化组被删除或改回通用，将改用通用词形"
 };
 
 export function impactReasonLabel(value: string): string {

@@ -800,9 +800,6 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "invalid_sub_part_of_speech",
   "frequency_invalid",
   "sense_group_not_found",
-  "sense_form_group_invalid",
-  "dedicated_form_group_unused",
-  "sense_form_group_required",
   "definition_required",
   "definition_level_invalid",
   "definition_invalid",
@@ -847,7 +844,10 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "phrase_component_target_stale",
   "phonetic_rich_text_invalid",
   "voice_profile_invalid",
-  "audio_asset_invalid"
+  "audio_asset_invalid",
+  "sense_form_group_invalid",
+  "dedicated_form_group_unused",
+  "sense_form_group_required"
 ] as const;
 
 export type V3ValidationIssueCode = (typeof V3_VALIDATION_ISSUE_CODES)[number];
