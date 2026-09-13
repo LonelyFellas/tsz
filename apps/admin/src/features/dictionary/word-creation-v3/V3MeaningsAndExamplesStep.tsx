@@ -77,6 +77,7 @@ import {
   newDefinition,
   newGrammarStructure,
   replaceRichText,
+  formGroupLabel,
   spellingModeForPos,
   type RelationDisplaySnapshots
 } from "./meaningsModel";
@@ -2534,6 +2535,36 @@ function V3MeaningsAndExamplesStepContent({
                               sense.id,
                               "frequency"
                             );
+                            const formGroupIssue = fieldIssue(
+                              senseIssues,
+                              sense.id,
+                              "form_group_id"
+                            );
+                            const formsPos = forms?.pos.find(
+                              (item) => item.pos_id === pos.pos_id
+                            );
+                            // 只列本词性的专用组。已绑定的组被删或改回通用时仍留一项，
+                            // 让校验问题有落点，也让人看见并改掉。
+                            const formGroupOptions = [
+                              { label: "通用（默认）", value: "" },
+                              ...(formsPos?.form_groups ?? [])
+                                .filter((group) => group.scope === "dedicated")
+                                .map((group) => ({
+                                  label: formGroupLabel(formsPos!, group.id)!,
+                                  value: group.id
+                                }))
+                            ];
+                            if (
+                              sense.form_group_id &&
+                              !formGroupOptions.some(
+                                (option) => option.value === sense.form_group_id
+                              )
+                            ) {
+                              formGroupOptions.push({
+                                label: "已失效的变化组，请重新选择",
+                                value: sense.form_group_id
+                              });
+                            }
                             const catalogPos = catalogByCode.get(
                               formPosById.get(pos.pos_id) ?? ""
                             );
@@ -2834,6 +2865,47 @@ function V3MeaningsAndExamplesStepContent({
                                         />
                                       </div>
                                     </div>
+                                    {/* 没有专用组时通常不必选；但带着组相关问题时仍要渲染，问题定位才有落点。 */}
+                                    {formsPos &&
+                                    (formGroupOptions.length > 1 ||
+                                      formGroupIssue) ? (
+                                      <label
+                                        className="word-sense-field word-sense-field-form-group"
+                                        // antd Select 把 data-* 挂在不可聚焦的根节点上，问题定位 focus 不进去；
+                                        // 锚点放在可聚焦的外层，与英美规则行同一做法，且全局只留这一个。
+                                        data-v3-field="form_group_id"
+                                        data-v3-node-id={sense.id}
+                                        tabIndex={-1}
+                                      >
+                                        <Typography.Text type="secondary">
+                                          词形与发音
+                                        </Typography.Text>
+                                        <Select
+                                          aria-label={`释义 ${senseIndex + 1} 词形与发音`}
+                                          onChange={(nextValue: string) =>
+                                            change((draft) => {
+                                              const target =
+                                                draft.pos[posIndex]!.senses[
+                                                  senseIndex
+                                                ]!;
+                                              if (!nextValue)
+                                                delete target.form_group_id;
+                                              else
+                                                target.form_group_id =
+                                                  nextValue;
+                                            })
+                                          }
+                                          options={formGroupOptions}
+                                          status={
+                                            formGroupIssue ? "error" : undefined
+                                          }
+                                          value={sense.form_group_id ?? ""}
+                                        />
+                                        <FieldIssueHelp
+                                          issue={formGroupIssue}
+                                        />
+                                      </label>
+                                    ) : null}
                                   </div>
 
                                   <section

@@ -20,6 +20,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   commonFormFixture,
   formsFixture,
+  type FormGroupFixture,
   pronunciationFixture,
   ukUsFormFixture,
   uuidFromInt,
@@ -86,11 +87,23 @@ vi.mock("../api", () => ({
   })
 }));
 
+/** 范围与英美规则留给 formsFixture 按词形推断；直接拼内容时用 generalGroup。 */
 function group(
   id: string,
   members: Array<{ id: string; form_id: string }>
-): WordFormGroupV3 {
+): FormGroupFixture {
   return { id, is_regular: true, members };
+}
+
+function generalGroup(
+  id: string,
+  members: Array<{ id: string; form_id: string }>
+): WordFormGroupV3 {
+  return {
+    ...group(id, members),
+    scope: "general",
+    dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" }
+  };
 }
 
 function multiPosFixture(): DraftFormsStepContentV3 {
@@ -109,34 +122,36 @@ function multiPosFixture(): DraftFormsStepContentV3 {
     variant_id: uuidFromInt(203),
     spelling: "verb-base"
   });
+  // 一个词形只属于一个变化组，第 2 组有自己的原形。
+  const groupTwoBase = commonFormFixture({
+    id: uuidFromInt(104),
+    variant_id: uuidFromInt(204),
+    spelling: "group-two-base"
+  });
   return {
     pos: [
       {
         pos_id: uuidFromInt(1),
         pos: "noun",
-        dialect_rules: {
-          spelling_mode: "unified",
-          phonetic_mode: "unified"
-        },
-        forms: [shared, secondBase],
+        forms: [shared, secondBase, groupTwoBase],
         form_groups: [
-          group(uuidFromInt(11), [
+          generalGroup(uuidFromInt(11), [
             { id: uuidFromInt(21), form_id: shared.id },
             { id: uuidFromInt(22), form_id: secondBase.id }
           ]),
-          group(uuidFromInt(12), [{ id: uuidFromInt(23), form_id: shared.id }])
+          generalGroup(uuidFromInt(12), [
+            { id: uuidFromInt(23), form_id: groupTwoBase.id }
+          ])
         ]
       },
       {
         pos_id: uuidFromInt(2),
         pos: "verb",
-        dialect_rules: {
-          spelling_mode: "unified",
-          phonetic_mode: "unified"
-        },
         forms: [verb],
         form_groups: [
-          group(uuidFromInt(13), [{ id: uuidFromInt(24), form_id: verb.id }])
+          generalGroup(uuidFromInt(13), [
+            { id: uuidFromInt(24), form_id: verb.id }
+          ])
         ]
       }
     ]
@@ -288,7 +303,7 @@ describe("V3FormsAndPronunciationStep", () => {
       target: { value: "dog" }
     });
     expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
-    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 2"));
+    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
     expect(screen.queryByLabelText("复数通用拼写")).toBeNull();
     expect(screen.getByTestId("progress-count")).toHaveTextContent("1");
     expect(screen.getByTitle("该词性未填项")).toHaveAttribute(
@@ -342,7 +357,7 @@ describe("V3FormsAndPronunciationStep", () => {
       "comparative"
     ]);
     expect(screen.getByLabelText("比较级通用拼写")).toHaveValue("faster");
-    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 2"));
+    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
     fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
     expect(screen.queryByLabelText("比较级通用拼写")).toBeNull();
     expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
@@ -566,11 +581,11 @@ describe("V3FormsAndPronunciationStep", () => {
       "上移变化组 1 的词形 1",
       "下移变化组 1 的词形 1",
       "在原形 1 下方添加同类型词形",
-      "从变化组 1 移除词形 1"
+      "删除变化组 1 的词形 1"
     ]);
     expect(screen.queryByLabelText("变化组 1 新增词形类型")).toBeNull();
     expect(screen.queryByLabelText("变化组 1 新增词形")).toBeNull();
-    expect(screen.getByLabelText("从变化组 1 移除词形 1")).toBeDisabled();
+    expect(screen.getByLabelText("删除变化组 1 的词形 1")).toBeDisabled();
 
     fireEvent.click(addButton);
 
@@ -592,8 +607,8 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(next.pos[0]!.form_groups[0]!.members[0]).toEqual(
       content.pos[0]!.form_groups[0]!.members[0]
     );
-    expect(screen.getByLabelText("从变化组 1 移除词形 1")).not.toBeDisabled();
-    expect(screen.getByLabelText("从变化组 1 移除词形 2")).not.toBeDisabled();
+    expect(screen.getByLabelText("删除变化组 1 的词形 1")).not.toBeDisabled();
+    expect(screen.getByLabelText("删除变化组 1 的词形 2")).not.toBeDisabled();
     expect(
       screen
         .getAllByLabelText(/下方添加同类型词形/)
@@ -715,8 +730,9 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(screen.queryByText("词形是否规则变化？")).toBeNull();
     fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
+    // 卡片头部的通用 / 专用切换也是 radio，只取规则区里的那组。
     const regularRadios = groupCard.querySelectorAll<HTMLInputElement>(
-      'input[type="radio"]'
+      '.word-form-rules input[type="radio"]'
     );
     fireEvent.click(regularRadios[1]!);
     expect(canonicalValue().pos[0]!.form_groups[0]!.is_regular).toBe(false);
@@ -811,13 +827,17 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText("变化组 1 新增词形类型")).toBeNull();
   });
 
-  it("每组都显示三行规则，词性级英美规则在各组同步回显", async () => {
+  it("每组都显示三行规则，英美规则按组各自回显", async () => {
     const form = commonFormFixture({ spelling: "center" });
+    const other = commonFormFixture({
+      id: uuidFromInt(778),
+      spelling: "Center"
+    });
     const content = formsFixture({
-      forms: [form],
+      forms: [form, other],
       groups: [
         group(uuidFromInt(774), [{ id: uuidFromInt(775), form_id: form.id }]),
-        group(uuidFromInt(776), [{ id: uuidFromInt(777), form_id: form.id }])
+        group(uuidFromInt(776), [{ id: uuidFromInt(777), form_id: other.id }])
       ]
     });
     const { container } = render(<Harness initial={content} />);
@@ -831,25 +851,21 @@ describe("V3FormsAndPronunciationStep", () => {
     });
     const first = within(cards[0]!);
     const second = within(cards[1]!);
-    expect(first.getByText("词形是否规则变化？")).toBeVisible();
-    expect(first.getByText("英美拼写是否有区别？")).toBeVisible();
-    expect(first.getByText("英美音标是否有区别？")).toBeVisible();
-    expect(
-      first.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
-    expect(
-      first.getByLabelText("英美音标无区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
-    expect(second.getByText("词形是否规则变化？")).toBeVisible();
-    expect(second.getByText("英美拼写是否有区别？")).toBeVisible();
-    expect(second.getByText("英美音标是否有区别？")).toBeVisible();
-    // 英美规则是词性级设置：任一组里的选择对所有组同步生效。
-    expect(
-      second.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
-    ).toHaveClass("ant-radio-wrapper-checked");
+    for (const card of [first, second]) {
+      expect(card.getByText("词形是否规则变化？")).toBeVisible();
+      expect(card.getByText("英美拼写是否有区别？")).toBeVisible();
+      expect(card.getByText("英美音标是否有区别？")).toBeVisible();
+      expect(
+        card.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
+      ).toHaveClass("ant-radio-wrapper-checked");
+    }
+    // 英美规则按组生效：第 2 组切换不影响第 1 组。
     fireEvent.click(second.getByLabelText("英美拼写有区别"));
     expect(
-      first.getByLabelText("英美拼写有区别").closest(".ant-radio-wrapper")
+      second.getByLabelText("英美拼写有区别").closest(".ant-radio-wrapper")
+    ).toHaveClass("ant-radio-wrapper-checked");
+    expect(
+      first.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
     ).toHaveClass("ant-radio-wrapper-checked");
   });
 
@@ -892,7 +908,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(updated.regional_variants.us.spelling).toBe("centred");
   });
 
-  it("词性级 UU 切换 DD 并逐条显式映射唯一词形", async () => {
+  it("组级 UU 切换 DD 并逐条显式映射唯一词形", async () => {
     const base = commonFormFixture({
       id: uuidFromInt(781),
       variant_id: uuidFromInt(791),
@@ -948,7 +964,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       converted.every((form) => form.regional_variants.mode === "uk_us")
     ).toBe(true);
-    expect(canonicalValue().pos[0]!.dialect_rules).toEqual({
+    expect(canonicalValue().pos[0]!.form_groups[0]!.dialect_rules).toEqual({
       spelling_mode: "distinguish",
       phonetic_mode: "distinguish"
     });
@@ -969,13 +985,13 @@ describe("V3FormsAndPronunciationStep", () => {
       />
     );
 
-    expect(await screen.findByText("当前词性的英美结构待统一")).toBeVisible();
+    expect(await screen.findByText("本组的英美结构待统一")).toBeVisible();
     expect(
       screen.getByLabelText("英美拼写有区别").closest(".ant-radio-wrapper")
     ).toHaveClass("ant-radio-wrapper-checked");
     fireEvent.click(screen.getByLabelText("英美拼写无区别"));
     await waitFor(() =>
-      expect(screen.queryByText("当前词性的英美结构待统一")).toBeNull()
+      expect(screen.queryByText("本组的英美结构待统一")).toBeNull()
     );
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(
@@ -983,16 +999,17 @@ describe("V3FormsAndPronunciationStep", () => {
         (item) => item.regional_variants.mode === "uk_us"
       )
     ).toBe(true);
-    expect(canonicalValue().pos[0]!.dialect_rules).toEqual({
+    expect(canonicalValue().pos[0]!.form_groups[0]!.dialect_rules).toEqual({
       spelling_mode: "unified",
       phonetic_mode: "distinguish"
     });
   });
 
-  it("I02 完整显示多 POS/多组/同类型多行，共享 form 同步编辑但不复制", async () => {
+  it("I02 完整显示多 POS/多组/同类型多行，每个词形只在所属组出现", async () => {
     const content = multiPosFixture();
-    const sharedId = content.pos[0]!.forms[0]!.id;
+    const firstId = content.pos[0]!.forms[0]!.id;
     const secondId = content.pos[0]!.forms[1]!.id;
+    const groupTwoId = content.pos[0]!.forms[2]!.id;
     const { container } = render(<Harness initial={content} />);
 
     await waitFor(() =>
@@ -1000,45 +1017,41 @@ describe("V3FormsAndPronunciationStep", () => {
         2
       )
     );
-    expect(
-      container.querySelectorAll(
-        `.word-form-group-card [data-form-id="${sharedId}"] .v3-concrete-form-row`
-      )
-    ).toHaveLength(2);
-    expect(
-      container.querySelectorAll(
-        `.word-form-group-card [data-form-id="${secondId}"] .v3-concrete-form-row`
-      )
-    ).toHaveLength(1);
+    for (const formId of [firstId, secondId, groupTwoId]) {
+      expect(
+        container.querySelectorAll(
+          `.word-form-group-card [data-form-id="${formId}"] .v3-concrete-form-row`
+        )
+      ).toHaveLength(1);
+    }
     expect(
       container.querySelectorAll(".word-form-group-card .v3-concrete-form-row")
     ).toHaveLength(5);
     expect(await screen.findByText("名词")).toBeInTheDocument();
     expect(screen.getByText("动词")).toBeInTheDocument();
 
-    const sharedInput = screen.getByLabelText("原形 1通用拼写");
-    fireEvent.change(sharedInput, { target: { value: "shared-edited" } });
-
-    expect(screen.getByLabelText("原形 1通用拼写")).toHaveValue(
-      "shared-edited"
-    );
-    expect(screen.getByLabelText("原形通用拼写")).toHaveValue("shared-edited");
+    fireEvent.change(screen.getByLabelText("原形 1通用拼写"), {
+      target: { value: "first-edited" }
+    });
+    expect(screen.getByLabelText("原形 1通用拼写")).toHaveValue("first-edited");
+    expect(screen.getByLabelText("原形通用拼写")).toHaveValue("group-two-base");
     expect(screen.getByLabelText("原形 2通用拼写")).toHaveValue("second-base");
-    expect(content.pos[0]!.forms).toHaveLength(2);
-    expect(canonicalValue().pos[0]!.forms).toHaveLength(2);
 
-    // 从组 1 摘掉共享原形：组 1 还剩另一个原形所以放行，canonical form 留着，
-    // 组 2 的那条 membership 也不受影响——移除只作用于当前组。
-    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 1"));
-    expect(canonicalValue().pos[0]!.forms).toHaveLength(2);
+    // 组 1 还剩另一个原形，删除走确认；只删这一个词形，组 2 不受影响。
+    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 1"));
+    fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
+    expect(canonicalValue().pos[0]!.forms.map((form) => form.id)).toEqual([
+      secondId,
+      groupTwoId
+    ]);
     expect(canonicalValue().pos[0]!.form_groups[0]!.members).toEqual([
       { id: uuidFromInt(22), form_id: secondId }
     ]);
-    expect(canonicalValue().pos[0]!.form_groups[1]!.members).toEqual([
-      { id: uuidFromInt(23), form_id: sharedId }
-    ]);
-    // 组 2 里它成了唯一原形，摘不掉。
-    expect(screen.getByLabelText("从变化组 2 移除词形 1")).toBeDisabled();
+    expect(canonicalValue().pos[0]!.form_groups[1]).toEqual(
+      content.pos[0]!.form_groups[1]
+    );
+    // 组 2 里它是唯一原形，删不掉。
+    expect(screen.getByLabelText("删除变化组 2 的词形 1")).toBeDisabled();
   });
 
   it("I02 使用 form UUID key，membership 重排时输入节点与焦点保持", async () => {
@@ -1081,7 +1094,7 @@ describe("V3FormsAndPronunciationStep", () => {
         expect(
           screen.getByLabelText("英美拼写无区别").closest(".ant-radio-wrapper")
         ).toHaveClass("ant-radio-wrapper-checked");
-        expect(canonicalValue().pos[0]!.dialect_rules).toEqual({
+        expect(canonicalValue().pos[0]!.form_groups[0]!.dialect_rules).toEqual({
           spelling_mode: "unified",
           phonetic_mode: "distinguish"
         });
@@ -1150,7 +1163,7 @@ describe("V3FormsAndPronunciationStep", () => {
         us: { spelling: "centre" }
       }
     });
-    expect(canonicalValue().pos[0]!.dialect_rules).toEqual({
+    expect(canonicalValue().pos[0]!.form_groups[0]!.dialect_rules).toEqual({
       spelling_mode: "unified",
       phonetic_mode: "distinguish"
     });
@@ -1177,7 +1190,7 @@ describe("V3FormsAndPronunciationStep", () => {
     const rendered = render(<Harness initial={content} />);
 
     const lastFormDelete =
-      await screen.findByLabelText("从变化组 1 移除词形 1");
+      await screen.findByLabelText("删除变化组 1 的词形 1");
     expect(lastFormDelete).toBeDisabled();
     expect(lastFormDelete).toHaveAttribute("title", "每个词性至少保留一个词形");
     expect(screen.queryByLabelText("删除名词")).toBeNull();
@@ -1195,8 +1208,8 @@ describe("V3FormsAndPronunciationStep", () => {
         initial={formsFixture({ forms: [form, second] })}
       />
     );
-    fireEvent.click(await screen.findByLabelText("从变化组 1 移除词形 2"));
-    expect(screen.getByText("此词形仅在当前变化组中使用")).toBeInTheDocument();
+    fireEvent.click(await screen.findByLabelText("删除变化组 1 的词形 2"));
+    expect(screen.getByText("确认删除此词形？")).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
     expect(canonicalValue().pos[0]!.forms).toEqual([form]);
   });
@@ -1206,15 +1219,11 @@ describe("V3FormsAndPronunciationStep", () => {
     const removed = commonFormFixture({ id: uuidFromInt(451) });
     render(<Harness initial={formsFixture({ forms: [keeper, removed] })} />);
 
-    fireEvent.click(await screen.findByLabelText("从变化组 1 移除词形 2"));
+    fireEvent.click(await screen.findByLabelText("删除变化组 1 的词形 2"));
 
-    const alert = screen
-      .getByText("此词形仅在当前变化组中使用")
-      .closest(".ant-alert");
+    const alert = screen.getByText("确认删除此词形？").closest(".ant-alert");
     expect(alert).not.toBeNull();
-    expect(alert).toHaveTextContent(
-      "不能只从当前组移除。若不再需要此词形，可将它及相关发音一并删除。"
-    );
+    expect(alert).toHaveTextContent("词形的拼写与发音会一并删除。");
     expect(alert).not.toHaveTextContent(/孤立词形|membership|使用位置/);
     const deleteButton = screen.getByLabelText("删除词形及相关发音");
     expect(deleteButton).toHaveTextContent("删除词形");
@@ -1234,49 +1243,20 @@ describe("V3FormsAndPronunciationStep", () => {
     );
   });
 
-  it("#214 共享词形仍只从当前变化组移除并保留 canonical form", async () => {
-    const shared = commonFormFixture({ id: uuidFromInt(452) });
-    const keeper = commonFormFixture({ id: uuidFromInt(453) });
-    const firstMembership = uuidFromInt(454);
-    const keeperMembership = uuidFromInt(455);
-    const secondMembership = uuidFromInt(456);
-    const initial = formsFixture({
-      forms: [shared, keeper],
-      groups: [
-        group(uuidFromInt(457), [
-          { id: firstMembership, form_id: shared.id },
-          { id: keeperMembership, form_id: keeper.id }
-        ]),
-        group(uuidFromInt(458), [{ id: secondMembership, form_id: shared.id }])
-      ]
-    });
-    render(<Harness initial={initial} />);
-
-    fireEvent.click(await screen.findByLabelText("从变化组 1 移除词形 1"));
-
-    const next = canonicalValue();
-    expect(screen.queryByText("此词形仅在当前变化组中使用")).toBeNull();
-    expect(next.pos[0]!.forms).toEqual(initial.pos[0]!.forms);
-    expect(next.pos[0]!.form_groups[0]!.members).toEqual([
-      { id: keeperMembership, form_id: keeper.id }
-    ]);
-    expect(next.pos[0]!.form_groups[1]).toEqual(initial.pos[0]!.form_groups[1]);
-  });
-
   it("#216 关闭提示表示取消并完整保留 draft", async () => {
     const keeper = commonFormFixture();
     const retained = commonFormFixture({ id: uuidFromInt(459) });
     render(<Harness initial={formsFixture({ forms: [keeper, retained] })} />);
     const before = canonicalValue();
 
-    fireEvent.click(await screen.findByLabelText("从变化组 1 移除词形 2"));
+    fireEvent.click(await screen.findByLabelText("删除变化组 1 的词形 2"));
     const closeButton = screen.getByLabelText("取消删除词形并保留");
     expect(closeButton.tagName).toBe("BUTTON");
     expect(closeButton.tabIndex).toBe(0);
 
     fireEvent.click(closeButton);
 
-    expect(screen.queryByText("此词形仅在当前变化组中使用")).toBeNull();
+    expect(screen.queryByText("确认删除此词形？")).toBeNull();
     expect(canonicalValue()).toEqual(before);
   });
 
@@ -1472,11 +1452,21 @@ describe("V3FormsAndPronunciationStep", () => {
         {
           id: uuidFromInt(981),
           is_regular: false,
+          scope: "general" as const,
+          dialect_rules: {
+            spelling_mode: "unified" as const,
+            phonetic_mode: "unified" as const
+          },
           members: []
         },
         {
           id: uuidFromInt(982),
           is_regular: false,
+          scope: "general" as const,
+          dialect_rules: {
+            spelling_mode: "unified" as const,
+            phonetic_mode: "unified" as const
+          },
           members: [{ id: uuidFromInt(983), form_id: missingFormId }]
         }
       ]
@@ -1603,6 +1593,8 @@ describe("V3FormsAndPronunciationStep", () => {
     const formGroup: WordFormGroupV3 = {
       id: uuidFromInt(610),
       is_regular: false,
+      scope: "general",
+      dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
       members: forms.map((form, index) => ({
         id: uuidFromInt(620 + index),
         form_id: form.id
@@ -1675,9 +1667,10 @@ describe("V3FormsAndPronunciationStep", () => {
       </AntApp>
     );
 
-    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 1"));
+    // 一形一组后点删除只弹确认，陈旧内容也不会提前改动草稿。
+    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 1"));
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.queryByText("此词形仅在当前变化组中使用")).toBeNull();
+    expect(screen.getByText("确认删除此词形？")).toBeInTheDocument();
 
     rerender(
       <AntApp>
@@ -1695,8 +1688,8 @@ describe("V3FormsAndPronunciationStep", () => {
         </PronunciationPreviewProvider>
       </AntApp>
     );
-    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 1"));
-    expect(screen.getByText("此词形仅在当前变化组中使用")).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 1"));
+    expect(screen.getByText("确认删除此词形？")).toBeInTheDocument();
 
     const missingForm = formsFixture({ forms: [], groups: [] });
     rerender(
@@ -1717,7 +1710,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.queryByText("此词形仅在当前变化组中使用")).toBeNull();
+    expect(screen.queryByText("确认删除此词形？")).toBeNull();
 
     rerender(
       <AntApp>
@@ -1735,9 +1728,9 @@ describe("V3FormsAndPronunciationStep", () => {
         </PronunciationPreviewProvider>
       </AntApp>
     );
-    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 1"));
+    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 1"));
     fireEvent.click(screen.getByLabelText("取消删除词形并保留"));
-    expect(screen.queryByText("此词形仅在当前变化组中使用")).toBeNull();
+    expect(screen.queryByText("确认删除此词形？")).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -2288,13 +2281,8 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(verb.form_groups[0]!.members[0]!.form_id).toBe(verb.forms[0]!.id);
   }, 15_000);
 
-  it("#110-111 就地修改词形类型并保留 V3 节点身份与共享关系", async () => {
+  it("#110-111 就地修改词形类型并保留 V3 节点身份与分组", async () => {
     const initial = multiPosFixture();
-    // 共享原形在两个组里都不是唯一原形时才允许改型（每组至少保留一个原形）。
-    initial.pos[0]!.form_groups[1]!.members.push({
-      id: uuidFromInt(25),
-      form_id: initial.pos[0]!.forms[1]!.id
-    });
     const original = structuredClone(initial.pos[0]!.forms[0]!);
     const originalGroups = structuredClone(initial.pos[0]!.form_groups);
     render(<Harness initial={initial} />);
@@ -2314,7 +2302,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(updated).toEqual({ ...original, form_type: "plural" });
     expect(
       canonicalValue().pos[0]!.forms.map((form) => form.form_type)
-    ).toEqual(["plural", "base"]);
+    ).toEqual(["plural", "base", "base"]);
     expect(canonicalValue().pos[0]!.form_groups).toEqual(originalGroups);
     expect(screen.getAllByLabelText("变化组 1 词形 1 类型")).toHaveLength(1);
     expect(screen.getByLabelText("变化组 2 词形 1 类型")).toHaveValue("");
@@ -2392,8 +2380,8 @@ describe("V3FormsAndPronunciationStep", () => {
     await waitFor(() =>
       expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled()
     );
-    fireEvent.click(screen.getByLabelText("从变化组 1 移除词形 2"));
-    expect(await screen.findByText("此词形仅在当前变化组中使用")).toBeVisible();
+    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
+    expect(await screen.findByText("确认删除此词形？")).toBeVisible();
 
     // 提示还开着时把第 1 个原形改成复数，第 2 个就成了本组唯一原形
     chooseOption("变化组 1 词形 1 类型", "复数");
@@ -2408,19 +2396,194 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toEqual(["plural", "base", "plural"]);
   });
 
-  it("多个变化组时点明英美设置是词性级，单组不啰嗦", async () => {
-    const note =
-      "英美设置按词性生效，在任一变化组内修改都会同步到本词性的全部变化组。";
-    render(<Harness initial={formsFixture()} />);
-
+  it("每个变化组各有一份英美开关，切换只作用于本组", async () => {
+    render(
+      <Harness
+        initial={formsFixture({
+          forms: [commonFormFixture({ spelling: "job" })]
+        })}
+      />
+    );
     await waitFor(() =>
       expect(screen.getByText("英美拼写是否有区别？")).toBeVisible()
     );
-    expect(screen.queryByText(note)).toBeNull();
-
     fireEvent.click(screen.getByRole("button", { name: "新增名词变化组" }));
+    await waitFor(() =>
+      expect(screen.getAllByText("英美拼写是否有区别？")).toHaveLength(2)
+    );
+    expect(screen.queryByText(/英美设置按词性生效/)).toBeNull();
 
-    await waitFor(() => expect(screen.getAllByText(note)).toHaveLength(2));
+    const secondCard = document.querySelectorAll<HTMLElement>(
+      ".v3-form-group-card"
+    )[1]!;
+    fireEvent.click(within(secondCard).getByLabelText("英美拼写有区别"));
+
+    const [first, second] = canonicalValue().pos[0]!.form_groups;
+    expect(first!.dialect_rules).toEqual({
+      spelling_mode: "unified",
+      phonetic_mode: "unified"
+    });
+    expect(second!.dialect_rules).toEqual({
+      spelling_mode: "distinguish",
+      phonetic_mode: "distinguish"
+    });
+    expect(
+      formById(canonicalValue(), first!.members[0]!.form_id).regional_variants
+        .mode
+    ).toBe("common");
+    expect(
+      formById(canonicalValue(), second!.members[0]!.form_id).regional_variants
+        .mode
+    ).toBe("uk_us");
+  });
+
+  it("第 2 组独立合并英美发音，合并冲突只提示在发起切换的那一组", async () => {
+    // 两组英美分栏再各铺一批目录占位行，CI 慢机上会超时；本用例不依赖目录。
+    catalogState.data = undefined;
+    const job = ukUsFormFixture({
+      id: uuidFromInt(1_501),
+      uk: {
+        id: uuidFromInt(1_502),
+        spelling: "job",
+        pronunciations: [
+          pronunciationFixture({
+            id: uuidFromInt(1_503),
+            dict_phonetic: "dʒɒb"
+          })
+        ]
+      },
+      us: {
+        id: uuidFromInt(1_504),
+        spelling: "job",
+        pronunciations: [
+          pronunciationFixture({
+            id: uuidFromInt(1_505),
+            dict_phonetic: "dʒɑːb"
+          })
+        ]
+      }
+    });
+    const capital = ukUsFormFixture({
+      id: uuidFromInt(1_511),
+      uk: {
+        id: uuidFromInt(1_512),
+        spelling: "Job",
+        pronunciations: [
+          pronunciationFixture({
+            id: uuidFromInt(1_513),
+            dict_phonetic: "dʒəʊb"
+          })
+        ]
+      },
+      us: {
+        id: uuidFromInt(1_514),
+        spelling: "Job",
+        pronunciations: [
+          pronunciationFixture({
+            id: uuidFromInt(1_515),
+            dict_phonetic: "dʒəʊb"
+          })
+        ]
+      }
+    });
+    const initial = formsFixture({
+      forms: [job, capital],
+      groups: [
+        {
+          id: uuidFromInt(1_521),
+          is_regular: true,
+          members: [{ id: uuidFromInt(1_522), form_id: job.id }]
+        },
+        {
+          id: uuidFromInt(1_523),
+          is_regular: true,
+          members: [{ id: uuidFromInt(1_524), form_id: capital.id }]
+        }
+      ]
+    });
+    const { container } = render(<Harness initial={initial} />);
+    await waitFor(() =>
+      expect(container.querySelectorAll(".v3-form-group-card")).toHaveLength(2)
+    );
+    const [firstCard, secondCard] = container.querySelectorAll<HTMLElement>(
+      ".v3-form-group-card"
+    );
+
+    fireEvent.click(within(secondCard!).getByLabelText("英美拼写无区别"));
+    fireEvent.click(within(secondCard!).getByLabelText("英美音标无区别"));
+    await waitFor(() =>
+      expect(canonicalValue().pos[0]!.form_groups[1]!.dialect_rules).toEqual({
+        spelling_mode: "unified",
+        phonetic_mode: "unified"
+      })
+    );
+    expect(formById(canonicalValue(), capital.id).regional_variants.mode).toBe(
+      "common"
+    );
+    expect(canonicalValue().pos[0]!.form_groups[0]!.dialect_rules).toEqual({
+      spelling_mode: "distinguish",
+      phonetic_mode: "distinguish"
+    });
+    expect(formById(canonicalValue(), job.id)).toEqual(job);
+    expect(screen.queryByText("暂不能合并英美配置")).toBeNull();
+
+    fireEvent.click(within(firstCard!).getByLabelText("英美拼写无区别"));
+    fireEvent.click(within(firstCard!).getByLabelText("英美音标无区别"));
+    expect(
+      within(firstCard!).getByText("暂不能合并英美配置")
+    ).toBeInTheDocument();
+    expect(within(secondCard!).queryByText("暂不能合并英美配置")).toBeNull();
+    expect(canonicalValue().pos[0]!.form_groups[0]!.dialect_rules).toEqual({
+      spelling_mode: "unified",
+      phonetic_mode: "distinguish"
+    });
+  }, 15_000);
+
+  it("组卡片头部切换通用 / 专用，并按词义绑定数提示影响", async () => {
+    const initial = formsFixture();
+    const groupId = initial.pos[0]!.form_groups[0]!.id;
+    function ScopeHarness({ counts }: { counts: ReadonlyMap<string, number> }) {
+      const [value, setValue] = useState(initial);
+      return (
+        <V3FormDisplayProvider>
+          <AntApp>
+            <V3FormsAndPronunciationStep
+              formGroupBindingCounts={counts}
+              onChange={setValue}
+              value={value}
+            />
+            <output data-testid="canonical-value">
+              {JSON.stringify(value)}
+            </output>
+          </AntApp>
+        </V3FormDisplayProvider>
+      );
+    }
+    const { container, rerender } = render(<ScopeHarness counts={new Map()} />);
+    const scope = await waitFor(() => {
+      const element = container.querySelector<HTMLElement>(
+        `[data-v3-field="scope"][data-v3-node-id="${groupId}"]`
+      );
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    expect(scope).toHaveAttribute("tabindex", "-1");
+    expect(screen.queryByText(/个词义/)).toBeNull();
+
+    fireEvent.click(within(scope).getByText("专用"));
+    await waitFor(() =>
+      expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("dedicated")
+    );
+    rerender(<ScopeHarness counts={new Map([[groupId, 2]])} />);
+    expect(screen.getByText("已绑定 2 个词义")).toBeVisible();
+
+    fireEvent.click(within(scope).getByText("通用"));
+    await waitFor(() =>
+      expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("general")
+    );
+    expect(
+      screen.getByText("2 个词义仍绑定此组，改为通用后绑定将失效")
+    ).toBeVisible();
   });
 
   it("组内唯一原形摘不掉，本组还有别的原形时照常放行", async () => {
@@ -2438,11 +2601,11 @@ describe("V3FormsAndPronunciationStep", () => {
     render(<Harness initial={formsFixture({ forms: [base, plural] })} />);
 
     // 组里只有这一个原形：摘掉它组就空了原形，禁用并说明理由。
-    const removeBase = await screen.findByLabelText("从变化组 1 移除词形 1");
+    const removeBase = await screen.findByLabelText("删除变化组 1 的词形 1");
     expect(removeBase).toBeDisabled();
     expect(removeBase).toHaveAttribute("title", "每组词形变化至少保留一个原形");
     // 派生词形不受影响。
-    expect(screen.getByLabelText("从变化组 1 移除词形 2")).not.toBeDisabled();
+    expect(screen.getByLabelText("删除变化组 1 的词形 2")).not.toBeDisabled();
   });
 
   it("组里有两个原形时谁都能摘", async () => {
@@ -2459,20 +2622,9 @@ describe("V3FormsAndPronunciationStep", () => {
     render(<Harness initial={formsFixture({ forms: [base, secondBase] })} />);
 
     await waitFor(() =>
-      expect(screen.getByLabelText("从变化组 1 移除词形 1")).not.toBeDisabled()
+      expect(screen.getByLabelText("删除变化组 1 的词形 1")).not.toBeDisabled()
     );
-    expect(screen.getByLabelText("从变化组 1 移除词形 2")).not.toBeDisabled();
-  });
-
-  it("跨组共享的原形按最严的组锁定类型", async () => {
-    render(<Harness initial={multiPosFixture()} />);
-
-    // 共享原形在第 1 组还有同伴，但在第 2 组是唯一原形，两处都锁。
-    await waitFor(() =>
-      expect(screen.getAllByLabelText("变化组 1 词形 1 类型")[0]).toBeDisabled()
-    );
-    expect(screen.getByLabelText("变化组 2 词形 1 类型")).toBeDisabled();
-    expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled();
+    expect(screen.getByLabelText("删除变化组 1 的词形 2")).not.toBeDisabled();
   });
 
   it("#111 历史词形类型不在当前目录时仍产品化回显且不扩散候选", async () => {
@@ -2603,7 +2755,7 @@ describe("V3FormsAndPronunciationStep", () => {
         expect(within(addedCell).queryByText("暂无发音")).toBeNull();
       }
       expect(screen.queryByLabelText("复数通用拼写")).toBeNull();
-      expect(screen.queryByText("当前词性的英美结构待统一")).toBeNull();
+      expect(screen.queryByText("本组的英美结构待统一")).toBeNull();
       if (rules.spelling_mode === "distinguish") {
         expect(screen.getByLabelText("复数美式拼写")).toBeVisible();
       }
@@ -2697,25 +2849,26 @@ describe("V3FormsAndPronunciationStep", () => {
     unmount();
   }, 15_000);
 
-  it("P1-3 删除仅含 shared form 的组无需破坏性确认且保留 form", async () => {
-    const shared = commonFormFixture({ id: uuidFromInt(1_150) });
-    const firstGroup = group(uuidFromInt(1_151), [
-      { id: uuidFromInt(1_153), form_id: shared.id }
-    ]);
-    const secondGroup = group(uuidFromInt(1_152), [
-      { id: uuidFromInt(1_154), form_id: shared.id }
-    ]);
+  it("P1-3 删除空变化组无需破坏性确认且保留其他组", async () => {
+    const kept = commonFormFixture({ id: uuidFromInt(1_150) });
     const content = formsFixture({
-      forms: [shared],
-      groups: [firstGroup, secondGroup]
+      forms: [kept],
+      groups: [
+        group(uuidFromInt(1_151), [
+          { id: uuidFromInt(1_153), form_id: kept.id }
+        ]),
+        group(uuidFromInt(1_152), [])
+      ]
     });
     render(<Harness initial={content} />);
 
-    await chooseGroupAction(1, "删除本组");
+    await chooseGroupAction(2, "删除本组");
 
     expect(screen.queryByText("删除变化组需要额外确认")).toBeNull();
-    expect(canonicalValue().pos[0]!.forms).toEqual([shared]);
-    expect(canonicalValue().pos[0]!.form_groups).toEqual([secondGroup]);
+    expect(canonicalValue().pos[0]!.forms).toEqual([kept]);
+    expect(canonicalValue().pos[0]!.form_groups).toEqual([
+      content.pos[0]!.form_groups[0]
+    ]);
   });
 
   it("catalog 请求在卸载后失败时不回写已卸载组件", async () => {

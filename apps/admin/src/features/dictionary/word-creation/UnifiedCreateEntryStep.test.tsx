@@ -111,10 +111,6 @@ function v3PrefilledWord(): AdminWordV3 {
     {
       pos_id: "prefilled-pos",
       pos: "noun",
-      dialect_rules: {
-        spelling_mode: "unified",
-        phonetic_mode: "unified"
-      },
       forms: [
         {
           id: "prefilled-form",
@@ -135,6 +131,8 @@ function v3PrefilledWord(): AdminWordV3 {
         {
           id: "prefilled-group",
           is_regular: true,
+          scope: "general",
+          dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
           members: [{ id: "prefilled-membership", form_id: "prefilled-form" }]
         }
       ]
@@ -263,10 +261,6 @@ function existingV3Word(): AdminWordV3 {
     {
       pos_id: "existing-pos",
       pos: "noun",
-      dialect_rules: {
-        spelling_mode: "distinguish",
-        phonetic_mode: "distinguish"
-      },
       forms: [
         {
           id: "existing-base",

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-component-pagination/docs/openapi.json",
-  "_source_sha256": "d94ce9ed1a6f17cb9d6dc6cc6e8fbdd05ff809f185f926888238dcd12469b87b",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/clever-swirles-f4f4de/docs/openapi.json",
+  "_source_sha256": "d5aca3a6dbbc5a77d4adbbd00fa517c6e97ecd40e0d1c535009a153a987f9b45",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
@@ -731,6 +731,7 @@
         "internal_error"
       ]
     },
+    "FormGroupScopeV3": { "type": "string", "enum": ["general", "dedicated"] },
     "FormsImpactItemV3": {
       "type": "object",
       "required": ["node_id", "node_type", "reason"],
@@ -2148,7 +2149,10 @@
         "phrase_component_target_stale",
         "phonetic_rich_text_invalid",
         "voice_profile_invalid",
-        "audio_asset_invalid"
+        "audio_asset_invalid",
+        "sense_form_group_invalid",
+        "dedicated_form_group_unused",
+        "sense_form_group_required"
       ]
     },
     "VoiceProfileV3": {
@@ -2291,23 +2295,24 @@
     },
     "WordFormGroupV3": {
       "type": "object",
-      "required": ["id", "is_regular", "members"],
+      "required": ["id", "is_regular", "scope", "dialect_rules", "members"],
       "properties": {
+        "dialect_rules": { "$ref": "#/$defs/DialectRulesV3" },
         "id": { "type": "string", "format": "uuid" },
         "is_regular": { "type": "boolean" },
         "members": {
           "type": "array",
           "items": { "$ref": "#/$defs/WordFormGroupMemberV3" },
           "maxItems": 2000
-        }
+        },
+        "scope": { "$ref": "#/$defs/FormGroupScopeV3" }
       },
       "additionalProperties": false
     },
     "WordPosFormsV3": {
       "type": "object",
-      "required": ["pos_id", "pos", "dialect_rules", "forms", "form_groups"],
+      "required": ["pos_id", "pos", "forms", "form_groups"],
       "properties": {
-        "dialect_rules": { "$ref": "#/$defs/DialectRulesV3" },
         "form_groups": {
           "type": "array",
           "items": { "$ref": "#/$defs/WordFormGroupV3" },
@@ -2445,6 +2450,7 @@
           "maxItems": 2000
         },
         "depends_on_context": { "type": "boolean" },
+        "form_group_id": { "type": "string", "format": "uuid" },
         "frequency": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
         "level": { "type": "string" },

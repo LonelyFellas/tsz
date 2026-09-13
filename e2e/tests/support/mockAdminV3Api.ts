@@ -153,10 +153,6 @@ const FORMS: DraftFormsStepContentV3 = {
     {
       pos_id: nodeId(11),
       pos: "noun",
-      dialect_rules: {
-        spelling_mode: "unified",
-        phonetic_mode: "unified"
-      },
       forms: [
         {
           id: nodeId(21),
@@ -211,16 +207,18 @@ const FORMS: DraftFormsStepContentV3 = {
         {
           id: nodeId(51),
           is_regular: true,
-          members: [
-            { id: nodeId(61), form_id: nodeId(21) },
-            { id: nodeId(62), form_id: nodeId(22) }
-          ]
+          scope: "general",
+          dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
+          members: [{ id: nodeId(61), form_id: nodeId(21) }]
         },
         {
+          // 一个词形只属于一个变化组：第 2 组用自己的原形。
           id: nodeId(52),
           is_regular: false,
+          scope: "general",
+          dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
           members: [
-            { id: nodeId(63), form_id: nodeId(21) },
+            { id: nodeId(62), form_id: nodeId(22) },
             { id: nodeId(64), form_id: nodeId(23) }
           ]
         }
@@ -229,10 +227,6 @@ const FORMS: DraftFormsStepContentV3 = {
     {
       pos_id: ADMIN_V3_SECOND_POS_ID,
       pos: "verb",
-      dialect_rules: {
-        spelling_mode: "unified",
-        phonetic_mode: "unified"
-      },
       forms: [
         {
           id: nodeId(24),
@@ -256,6 +250,8 @@ const FORMS: DraftFormsStepContentV3 = {
         {
           id: nodeId(53),
           is_regular: true,
+          scope: "general",
+          dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
           members: [{ id: nodeId(65), form_id: nodeId(24) }]
         }
       ]
@@ -423,6 +419,8 @@ export interface MockAdminV3ApiOptions {
   entryKind?: "word" | "phrase";
   expireSurfaceSnapshotOnce?: boolean;
   surfaceWarnings?: boolean;
+  /** 默认第一次保存词形步返回 422（E01a 的问题定位）；只建一个词性的用例要关掉。 */
+  formsFailureOnce?: boolean;
 }
 
 function clone<T>(value: T): T {
@@ -699,7 +697,7 @@ export async function mockAdminV3Api(
         });
   const requests: MockAdminV3Request[] = [];
   const publications: AdminWordPublicationAny[] = [];
-  let formsFailurePending = true;
+  let formsFailurePending = options.formsFailureOnce ?? true;
   let surfaceSnapshotExpiryRemaining = options.expireSurfaceSnapshotOnce
     ? 1
     : 0;

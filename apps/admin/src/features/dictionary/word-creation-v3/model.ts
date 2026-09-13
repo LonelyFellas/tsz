@@ -384,6 +384,7 @@ function containerShapeIssue(
         !isObject(groupValue) ||
         typeof groupValue.id !== "string" ||
         typeof groupValue.is_regular !== "boolean" ||
+        (groupValue.scope !== "general" && groupValue.scope !== "dedicated") ||
         !Array.isArray(groupValue.members)
       ) {
         return forbiddenShapeIssue(
@@ -620,17 +621,17 @@ export function validateFormsContent(
   for (const pos of content.pos) {
     const posLocation = location("forms.pos", { pos_id: pos.pos_id });
     registerNode(pos.pos_id, "forms.pos", posLocation);
-    const dialectRulesValid = isDialectRulesValid(pos.dialect_rules);
-    if (!dialectRulesValid) {
-      issues.push(
-        issue(
-          "dialect_rules_invalid",
-          "dialect_rules",
-          pos.pos_id,
-          "英美拼写与音标规则组合无效",
-          posLocation
-        )
-      );
+    // 词形按所属变化组的英美规则校验。一形多组由 membership 校验另报，这里取首个所属组；
+    // 组规则本身非法时记 null，只报组上的 dialect_rules_invalid，不再逐个词形叠报。
+    const formRules = new Map<string, DialectRulesV3 | null>();
+    for (const group of pos.form_groups) {
+      const rules = isDialectRulesValid(group.dialect_rules)
+        ? group.dialect_rules
+        : null;
+      for (const member of group.members) {
+        if (!formRules.has(member.form_id))
+          formRules.set(member.form_id, rules);
+      }
     }
     if (posCodes.has(pos.pos)) {
       issues.push(
@@ -704,16 +705,14 @@ export function validateFormsContent(
         );
         continue;
       }
-      if (
-        dialectRulesValid &&
-        !regionalVariantsMatchRules(form.regional_variants, pos.dialect_rules)
-      ) {
+      const rules = formRules.get(form.id);
+      if (rules && !regionalVariantsMatchRules(form.regional_variants, rules)) {
         issues.push(
           issue(
             "invalid_regional_variant_shape",
             "regional_variants",
             form.id,
-            "词形地区结构与当前词性的英美规则不一致",
+            "词形地区结构与所属变化组的英美规则不一致",
             formLocation
           )
         );
@@ -732,6 +731,17 @@ export function validateFormsContent(
         [pos.pos_id]
       );
       registerNode(group.id, "forms.form_group", groupLocation);
+      if (!isDialectRulesValid(group.dialect_rules)) {
+        issues.push(
+          issue(
+            "dialect_rules_invalid",
+            "dialect_rules",
+            group.id,
+            "英美拼写与音标规则组合无效",
+            groupLocation
+          )
+        );
+      }
       // 与后端 base_form_required_in_group 同一口径：一组词形变化描述同一个词的
       // 一套变化范式，缺了原形就没有落脚点。空组已由 empty_form_group 说明，不叠报。
       const groupHasBase = group.members.some(
@@ -799,10 +809,20 @@ export function validateFormsContent(
           );
           continue;
         }
-        membershipCounts.set(
-          member.form_id,
-          (membershipCounts.get(member.form_id) ?? 0) + 1
-        );
+        const memberships = membershipCounts.get(member.form_id) ?? 0;
+        if (memberships > 0) {
+          issues.push(
+            issue(
+              "form_group_membership_invalid",
+              "form_id",
+              member.id,
+              "一个词形只能属于一个变化组",
+              memberLocation
+            )
+          );
+          continue;
+        }
+        membershipCounts.set(member.form_id, memberships + 1);
       }
     }
   }
@@ -882,7 +902,6 @@ export function toFormsWire(
     pos: content.pos.map((pos) => ({
       pos_id: pos.pos_id,
       pos: pos.pos,
-      dialect_rules: { ...pos.dialect_rules },
       forms: pos.forms.map((form) => ({
         id: form.id,
         form_type: form.form_type,
@@ -901,6 +920,8 @@ export function toFormsWire(
       form_groups: pos.form_groups.map((group) => ({
         id: group.id,
         is_regular: group.is_regular,
+        scope: group.scope,
+        dialect_rules: { ...group.dialect_rules },
         members: group.members.map((member) => ({
           id: member.id,
           form_id: member.form_id

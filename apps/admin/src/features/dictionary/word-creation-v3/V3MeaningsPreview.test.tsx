@@ -1,7 +1,7 @@
 import type { AdminWordV3 } from "@tsz/types";
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { formsFixture, UUIDS } from "./fixtures";
+import { commonFormFixture, formsFixture, UUIDS } from "./fixtures";
 import { V3MeaningsPreview } from "./V3MeaningsPreview";
 
 function word(meanings: AdminWordV3["meanings"]): AdminWordV3 {
@@ -391,5 +391,57 @@ describe("V3MeaningsPreview", () => {
     expect(screen.getByText("用于说明回退分支。")).toBeVisible();
     expect(screen.getByText("上下文关联：fallback")).toBeVisible();
     expect(screen.getByText("待补充目标词条 · 待补充释义")).toBeVisible();
+  });
+});
+
+describe("V3MeaningsPreview 词形与发音绑定", () => {
+  it("词义绑定专用组时显示组名，组已不存在时提示失效，未绑定不显示", () => {
+    const sense = (id: string, formGroupId?: string) => ({
+      id,
+      sub_pos: "",
+      level: "B1",
+      depends_on_context: false,
+      ...(formGroupId ? { form_group_id: formGroupId } : {}),
+      definitions: [],
+      sentences: [],
+      relations: []
+    });
+    const current = word({
+      sense_groups: [],
+      pos: [
+        {
+          pos_id: UUIDS.pos,
+          grammar_structures: [],
+          senses: [
+            sense("job-sense", UUIDS.group_2),
+            sense("stale-sense", "missing-group"),
+            sense("general-sense")
+          ]
+        }
+      ]
+    });
+    current.forms = formsFixture({
+      forms: [
+        commonFormFixture({ spelling: "job" }),
+        commonFormFixture({ id: UUIDS.form_2, spelling: "Job" })
+      ],
+      groups: [
+        {
+          id: UUIDS.group,
+          is_regular: true,
+          members: [{ id: UUIDS.membership, form_id: UUIDS.form }]
+        },
+        {
+          id: UUIDS.group_2,
+          is_regular: true,
+          scope: "dedicated",
+          members: [{ id: UUIDS.membership_2, form_id: UUIDS.form_2 }]
+        }
+      ]
+    });
+    render(<V3MeaningsPreview word={current} />);
+    expect(screen.getByText("词形与发音：第 2 组 · Job")).toBeVisible();
+    expect(screen.getByText("词形与发音：已失效的变化组")).toBeVisible();
+    expect(screen.getAllByText(/^词形与发音：/)).toHaveLength(2);
   });
 });

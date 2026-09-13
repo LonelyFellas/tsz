@@ -488,7 +488,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "d94ce9ed1a6f17cb9d6dc6cc6e8fbdd05ff809f185f926888238dcd12469b87b"
+      "d5aca3a6dbbc5a77d4adbbd00fa517c6e97ecd40e0d1c535009a153a987f9b45"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -516,7 +516,20 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     });
     expect(defs.AdminWordV3.properties.schema_version.enum).toEqual([3]);
     expect(defs.WordEntryKindV3.enum).toEqual(["word", "phrase"]);
-    expect(defs.WordPosFormsV3.required).toContain("dialect_rules");
+    expect(defs.WordPosFormsV3.required).not.toContain("dialect_rules");
+    expect(defs.WordFormGroupV3.required).toEqual([
+      "id",
+      "is_regular",
+      "scope",
+      "dialect_rules",
+      "members"
+    ]);
+    expect(defs.FormGroupScopeV3.enum).toEqual(["general", "dedicated"]);
+    expect(defs.WordSenseV3.required).not.toContain("form_group_id");
+    expect(defs.WordSenseV3.properties.form_group_id).toEqual({
+      type: "string",
+      format: "uuid"
+    });
     expect(defs.DialectModeV3.enum).toEqual(["unified", "distinguish"]);
     expect(Object.keys(defs.AdminWordV3.properties)).not.toContain("headwords");
     expect(defs.AdminWordV3.properties.detection_basis_dialect).toEqual({
@@ -544,7 +557,6 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(defs.WordPosFormsV3.required).toEqual([
       "pos_id",
       "pos",
-      "dialect_rules",
       "forms",
       "form_groups"
     ]);
@@ -561,6 +573,8 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(defs.WordFormGroupV3.required).toEqual([
       "id",
       "is_regular",
+      "scope",
+      "dialect_rules",
       "members"
     ]);
     expect(defs.WordFormGroupMemberV3.required).toEqual(["id", "form_id"]);

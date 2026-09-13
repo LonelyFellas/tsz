@@ -477,7 +477,7 @@ function V3WordCreationSession({
   // 语义区间基于「词形补齐后的 meanings」再补：setDraftForms 内部会用旧值重算一遍，
   // 这里用同样的输入算好再覆盖，免得把词性联动出来的词义冲掉。两次 ensure 拿到的新
   // 节点 ID 必须一致才不会留下假脏标记——眼下 fillFormTypeTemplate 既不增删词性也不
-  // 改 spelling_mode，ensure 必定原样返回入参，这条前提变了就得改成只算一次。
+  // 改变化组的英美规则，ensure 必定原样返回入参，这条前提变了就得改成只算一次。
   //
   // 「刚创建」的判据跟着草稿本身走：revision 还是 1、两个步骤都没保存过。只看
   // location.state 不行——F5 后 history 会把它原样恢复，一刷新就把删掉的行铺回来。

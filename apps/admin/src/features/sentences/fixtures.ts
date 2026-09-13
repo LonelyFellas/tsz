@@ -30,7 +30,6 @@ export function sentenceWord(id = "entry", spelling = "make up"): AdminWordV3 {
         {
           pos_id: "pos",
           pos: "verb",
-          dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
           forms: [
             {
               id: "base",

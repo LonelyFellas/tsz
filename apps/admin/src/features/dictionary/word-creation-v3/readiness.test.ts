@@ -665,6 +665,46 @@ describe("实时摘要明细", () => {
     expect(updated[1]!.completed).toBe(true);
   });
 
+  it("英美判断按变化组：同词性只要有一组区分英美就显示 BrE / AmE", () => {
+    const forms = formsFixture({
+      forms: [commonFormFixture(), ukUsFormFixture()],
+      groups: [
+        {
+          id: UUIDS.group,
+          is_regular: true,
+          dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
+          members: [{ id: UUIDS.membership, form_id: UUIDS.form }]
+        },
+        {
+          id: UUIDS.group_2,
+          is_regular: true,
+          scope: "dedicated",
+          dialect_rules: {
+            spelling_mode: "unified",
+            phonetic_mode: "distinguish"
+          },
+          members: [{ id: UUIDS.membership_2, form_id: UUIDS.form_2 }]
+        }
+      ]
+    });
+    const dialectKeys = (content: typeof forms) =>
+      buildV3ProductProgress({
+        wordId: "word",
+        language: "en",
+        completedSteps: ["basics"] as const,
+        forms: content,
+        meanings: { sense_groups: [], pos: [] }
+      })[0]!.details.map((item) => item.key);
+    expect(dialectKeys(forms)).toEqual(["language", "uk", "us"]);
+
+    const unified = structuredClone(forms);
+    unified.pos[0]!.form_groups[1]!.dialect_rules = {
+      spelling_mode: "unified",
+      phonetic_mode: "unified"
+    };
+    expect(dialectKeys(unified)).toEqual(["language", "common"]);
+  });
+
   it("通用显示子行，实时类型与目录名称来自输入，未知语言不完成", () => {
     const forms = formsFixture();
     const input = {
@@ -679,7 +719,7 @@ describe("实时摘要明细", () => {
       { key: "language", label: "英语 English" },
       { key: "common", label: "通用", dialect: "common" }
     ]);
-    forms.pos[0]!.dialect_rules.phonetic_mode = "distinguish";
+    forms.pos[0]!.form_groups[0]!.dialect_rules.phonetic_mode = "distinguish";
     const rows = buildV3ProductProgress({
       ...input,
       dirtySteps: { forms: true, meanings: false },

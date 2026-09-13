@@ -46,7 +46,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(7);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeEnabled();
     await expect(firstGroup.getByLabel("变化组 1 词形 2 类型")).toBeEnabled();
-    await firstGroup.getByLabel("从变化组 1 移除词形 2").click();
+    await firstGroup.getByLabel("删除变化组 1 的词形 2").click();
     await firstGroup.getByLabel("删除词形及相关发音").click();
     await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(6);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
@@ -77,8 +77,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     // 手动加的组不铺模板，只有自带的原形，加上按词性铺的那一个复数占位行。
     await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(2);
 
-    // 英美规则是词性级设置，每组都渲染一份，这里从第 1 组切换。
+    // 英美规则按组生效，两组各自切换。
     await firstGroup.getByLabel("英美拼写有区别").click();
+    await secondGroup.getByLabel("英美拼写有区别").click();
     const ukSecondForm = secondGroup
       .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
       .filter({ has: page.getByLabel("原形英式拼写", { exact: true }) });
@@ -151,10 +152,12 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     expect(savedForms.pos[0]?.form_groups).toHaveLength(2);
     expect(savedForms.pos[0]?.form_groups[0]?.members).toHaveLength(6);
     expect(savedForms.pos[0]?.form_groups[1]?.members).toHaveLength(1);
-    expect(savedForms.pos[0]?.dialect_rules).toEqual({
-      spelling_mode: "distinguish",
-      phonetic_mode: "distinguish"
-    });
+    expect(
+      savedForms.pos[0]?.form_groups.map((group) => group.dialect_rules)
+    ).toEqual([
+      { spelling_mode: "distinguish", phonetic_mode: "distinguish" },
+      { spelling_mode: "distinguish", phonetic_mode: "distinguish" }
+    ]);
     expect(
       savedForms.pos[0]?.forms.every(
         (item) => item.regional_variants.mode === "uk_us"
@@ -190,6 +193,60 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_NEW_WORD_ID}/steps/forms`
       )
     ).toBe(2);
+  });
+
+  test("E03 Mock：同一词性第 2 组独立设为英美共用，保存后两组规则各自落库", async ({
+    page
+  }) => {
+    const api = await mockAdminV3Api(page, { formsFailureOnce: false });
+    await page.goto("/words");
+    await page.getByRole("button", { name: "创建词条" }).click();
+    await page.getByPlaceholder("例如 center 或 give up").fill("orbit");
+    await page.getByRole("button", { name: "词典检测" }).click();
+    await page.getByRole("button", { name: "创建并进入词形与发音" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/forms$`)
+    );
+
+    await page.getByLabel("添加基本词性").click();
+    await page
+      .locator(".ant-select-dropdown:visible")
+      .getByText("名词", { exact: true })
+      .click();
+    const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
+    const firstGroup = nounGroups.nth(0);
+    await firstGroup.getByLabel("英美拼写有区别").click();
+
+    await page.getByRole("button", { name: "新增名词变化组" }).click();
+    const secondGroup = nounGroups.nth(1);
+    // 新组沿用上一组的英美规则；这里只把第 2 组改成英美共用，第 1 组保持区分。
+    await expect(secondGroup.getByLabel("英美拼写有区别")).toBeChecked();
+    await secondGroup.getByLabel("英美拼写无区别").click();
+    await secondGroup.getByLabel("英美音标无区别").click();
+    await expect(secondGroup.getByLabel("英美音标无区别")).toBeChecked();
+    await expect(firstGroup.getByLabel("英美拼写有区别")).toBeChecked();
+    await expect(page.getByText("暂不能合并英美配置")).toHaveCount(0);
+
+    await page.getByRole("button", { name: "保存草稿" }).click();
+    await expect.poll(() => api.getWord().revision).toBe(2);
+    const savedPos = api.getWord().forms.pos[0]!;
+    const [first, second] = savedPos.form_groups;
+    expect(first?.dialect_rules).toEqual({
+      spelling_mode: "distinguish",
+      phonetic_mode: "distinguish"
+    });
+    expect(second?.dialect_rules).toEqual({
+      spelling_mode: "unified",
+      phonetic_mode: "unified"
+    });
+    const modeOf = (formId: string) =>
+      savedPos.forms.find((form) => form.id === formId)?.regional_variants.mode;
+    expect(
+      first?.members.map((member) => modeOf(member.form_id))
+    ).not.toContain("common");
+    expect(second?.members.map((member) => modeOf(member.form_id))).toEqual([
+      "common"
+    ]);
   });
 
   test("E02 Mock：列表行展示 V3 投影并能进向导", async ({ page }) => {

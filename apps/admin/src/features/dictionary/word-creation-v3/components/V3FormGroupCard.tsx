@@ -20,10 +20,12 @@ import {
   Empty,
   Flex,
   Radio,
+  Segmented,
   Typography
 } from "antd";
 import type {
   DraftFormsStepContentV3,
+  FormGroupScopeV3,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
   WordFormTypeV3,
@@ -36,7 +38,6 @@ import {
   addConcreteForm,
   addConcreteFormAfterMembership,
   deleteConcreteForm,
-  removeMembership,
   reorderMemberships,
   type V3IdFactory
 } from "../operations";
@@ -64,6 +65,9 @@ export interface V3FormGroupCardProps {
   onMove?: (offset: -1 | 1) => void;
   posCatalog?: PartOfSpeechCatalogItem;
   dialectControl?: ReactNode;
+  onScopeChange?: (scope: FormGroupScopeV3) => void;
+  /** 词义步里绑定到本组的词义数；只做提示，不在本地清除绑定。 */
+  boundSenseCount?: number;
 }
 
 export function V3FormGroupCard({
@@ -80,7 +84,9 @@ export function V3FormGroupCard({
   deleteDisabled = false,
   onMove,
   posCatalog,
-  dialectControl
+  dialectControl,
+  onScopeChange,
+  boundSenseCount = 0
 }: V3FormGroupCardProps) {
   const [removedTypes, setRemovedTypes] = useRemovedFormTypes(savedGroup.id);
   const [displayOrder, setDisplayOrder] = useState<string[]>([]);
@@ -207,6 +213,7 @@ export function V3FormGroupCard({
     const baseMembers = baseMembersOf(group);
     return baseMembers.length === 1 ? baseMembers[0]!.id : undefined;
   })();
+  // 确认条开着时本组另一个原形可能被改成派生类型，待删词形就成了唯一原形，不能再删。
   const blockedFormLocked =
     blockedFormId !== undefined && lockedBaseFormIds.has(blockedFormId);
   const setRegular = (isRegular: boolean) => {
@@ -306,7 +313,7 @@ export function V3FormGroupCard({
             type="text"
           />
           <Button
-            aria-label={`从变化组 ${groupIndex + 1} 移除词形 ${index + 1}`}
+            aria-label={`删除变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
             danger
             disabled={lastRequiredForm || member.id === soleBaseMembershipId}
             icon={<MinusCircleOutlined />}
@@ -315,14 +322,8 @@ export function V3FormGroupCard({
                 setRemovedTypes((types) => [...types, form.form_type]);
                 return;
               }
-              const result = removeMembership(content, member.id);
-              if (result.ok) {
-                onChange(result.value);
-                return;
-              }
-              if (result.reason === "last_membership_requires_form_deletion") {
-                setBlockedFormId(result.form_id);
-              }
+              // 一个词形只属于一个组，「从本组移除」就是删除词形，统一走删除确认。
+              setBlockedFormId(form.id);
             }}
             size="small"
             title={
@@ -340,7 +341,7 @@ export function V3FormGroupCard({
   };
 
   const useSeparatedMatrix =
-    pos.dialect_rules.spelling_mode === "distinguish" &&
+    group.dialect_rules.spelling_mode === "distinguish" &&
     group.members.length > 0 &&
     group.members.every((member) => {
       const form = pos.forms.find((item) => item.id === member.form_id);
@@ -385,47 +386,77 @@ export function V3FormGroupCard({
         </button>
       }
       extra={
-        onDelete ? (
-          <Dropdown
-            menu={{
-              items: [
-                {
-                  key: "move-up",
-                  icon: <UpOutlined />,
-                  label: "上移本组",
-                  disabled: groupIndex === 0 || !onMove
-                },
-                {
-                  key: "move-down",
-                  icon: <DownOutlined />,
-                  label: "下移本组",
-                  disabled: groupIndex === groupCount - 1 || !onMove
-                },
-                { type: "divider" },
-                {
-                  key: "delete",
-                  icon: <DeleteOutlined />,
-                  label: deleteDisabled ? "至少保留一个词形" : "删除本组",
-                  danger: true,
-                  disabled: deleteDisabled || !onDelete
+        <Flex align="center" gap="small" wrap>
+          {boundSenseCount > 0 ? (
+            <Typography.Text
+              type={group.scope === "dedicated" ? "secondary" : "warning"}
+            >
+              {group.scope === "dedicated"
+                ? `已绑定 ${boundSenseCount} 个词义`
+                : `${boundSenseCount} 个词义仍绑定此组，改为通用后绑定将失效`}
+            </Typography.Text>
+          ) : null}
+          {onScopeChange ? (
+            <div
+              className="v3-form-group-scope"
+              data-v3-field="scope"
+              data-v3-node-id={group.id}
+              tabIndex={-1}
+            >
+              <Segmented<FormGroupScopeV3>
+                aria-label={`第 ${groupIndex + 1} 组使用范围`}
+                onChange={onScopeChange}
+                options={[
+                  { label: "通用", value: "general" },
+                  { label: "专用", value: "dedicated" }
+                ]}
+                size="small"
+                value={group.scope}
+              />
+            </div>
+          ) : null}
+          {onDelete ? (
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: "move-up",
+                    icon: <UpOutlined />,
+                    label: "上移本组",
+                    disabled: groupIndex === 0 || !onMove
+                  },
+                  {
+                    key: "move-down",
+                    icon: <DownOutlined />,
+                    label: "下移本组",
+                    disabled: groupIndex === groupCount - 1 || !onMove
+                  },
+                  { type: "divider" },
+                  {
+                    key: "delete",
+                    icon: <DeleteOutlined />,
+                    label: deleteDisabled ? "至少保留一个词形" : "删除本组",
+                    danger: true,
+                    disabled: deleteDisabled || !onDelete
+                  }
+                ],
+                onClick: ({ key }) => {
+                  if (key === "move-up") onMove?.(-1);
+                  if (key === "move-down") onMove?.(1);
+                  if (key === "delete") onDelete?.();
                 }
-              ],
-              onClick: ({ key }) => {
-                if (key === "move-up") onMove?.(-1);
-                if (key === "move-down") onMove?.(1);
-                if (key === "delete") onDelete?.();
-              }
-            }}
-            placement="bottomRight"
-            trigger={["click"]}
-          >
-            <Button
-              aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
-              icon={<EllipsisOutlined />}
-              type="text"
-            />
-          </Dropdown>
-        ) : null
+              }}
+              placement="bottomRight"
+              trigger={["click"]}
+            >
+              <Button
+                aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
+                icon={<EllipsisOutlined />}
+                type="text"
+              />
+            </Dropdown>
+          ) : null}
+        </Flex>
       }
     >
       {!collapsed ? (
@@ -445,7 +476,7 @@ export function V3FormGroupCard({
           </div>
           {blockedFormId ? (
             <Alert
-              // 同上：提示条挂在组顶部，而「移除词形」按钮可能在很下面。
+              // 同上：提示条挂在组顶部，而「删除词形」按钮可能在很下面。
               ref={(node) => {
                 node?.nativeElement.scrollIntoView?.({ block: "center" });
               }}
@@ -478,13 +509,13 @@ export function V3FormGroupCard({
               description={
                 blockedFormLocked
                   ? `${BASE_REQUIRED_HINT}。要删除它，请先在本组添加另一个原形。`
-                  : "不能只从当前组移除。若不再需要此词形，可将它及相关发音一并删除。"
+                  : "词形的拼写与发音会一并删除。"
               }
               showIcon
               title={
                 blockedFormLocked
                   ? "此词形是本组唯一的原形"
-                  : "此词形仅在当前变化组中使用"
+                  : "确认删除此词形？"
               }
               type="warning"
             />
@@ -498,7 +529,7 @@ export function V3FormGroupCard({
           {separatedRows ? (
             <V3DialectSeparatedFormMatrix
               content={content}
-              dialectRules={pos.dialect_rules}
+              dialectRules={group.dialect_rules}
               idFactory={idFactory}
               issues={issues}
               onChange={onChange}
@@ -533,7 +564,7 @@ export function V3FormGroupCard({
                   <V3ConcreteFormRow
                     actions={row.actions}
                     content={content}
-                    dialectRules={pos.dialect_rules}
+                    dialectRules={group.dialect_rules}
                     form={form}
                     formLabel={row.formLabel}
                     formTypeAriaLabel={row.formTypeAriaLabel}

@@ -39,6 +39,12 @@ const ISSUE_MESSAGES = {
   invalid_sub_part_of_speech: "细分词性与当前基本词性不匹配",
   frequency_invalid: "请填写词频，取值 0–100 且最多两位小数",
   sense_group_not_found: "词义关联的语义区间不存在",
+  sense_form_group_invalid:
+    "词义绑定的词形变化组无效，请重新选择本词性的专用组",
+  dedicated_form_group_unused:
+    "专用变化组还没有词义使用，请在词义中绑定或改为通用",
+  sense_form_group_required:
+    "本词性没有通用变化组，请为该词义选择专用组或添加通用组",
   definition_required: "请至少添加一条释义",
   definition_level_invalid: "请选择有效的释义等级",
   definition_invalid: "请完整填写释义并选择语法结构",

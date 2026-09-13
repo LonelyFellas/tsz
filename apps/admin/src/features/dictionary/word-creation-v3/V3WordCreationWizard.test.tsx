@@ -400,13 +400,13 @@ describe("V3WordCreationWizard", () => {
       fireEvent.click(field("英美拼写有区别")!);
       expect(
         JSON.parse(screen.getByTestId("spelling-roundtrip").textContent!).pos[0]
-          .dialect_rules.spelling_mode
+          .form_groups[0].dialect_rules.spelling_mode
       ).toBe("distinguish");
       fireEvent.click(field("英美拼写无区别")!);
       const pos = JSON.parse(
         screen.getByTestId("spelling-roundtrip").textContent!
       ).pos[0];
-      expect(pos.dialect_rules).toEqual({
+      expect(pos.form_groups[0].dialect_rules).toEqual({
         spelling_mode: "unified",
         phonetic_mode: "distinguish"
       });
@@ -1460,6 +1460,115 @@ describe("V3WordCreationWizard", () => {
     await waitFor(() => expect(target).toHaveFocus());
   });
 
+  it("专用组未被使用的问题定位到组卡片的通用 / 专用切换", async () => {
+    const initialWord = word();
+    const pos = initialWord.forms.pos[0]!;
+    const group = pos.form_groups[0]!;
+    group.scope = "dedicated";
+    const issue: V3DraftValidationIssue = {
+      ...validationIssue(),
+      node_id: group.id,
+      field: "scope",
+      code: "dedicated_form_group_unused",
+      message: "专用组还没有词义使用",
+      node_location: {
+        node_role: "form_group",
+        ancestor_node_ids: [pos.pos_id],
+        pos_id: pos.pos_id,
+        form_group_id: group.id
+      }
+    };
+    const { container } = renderWizard(requests(), {
+      initialWord,
+      renderStep: (context) => (
+        <>
+          <V3FormsAndPronunciationStep
+            activePosId={context.activePosId}
+            issues={context.issues}
+            onActivePosChange={context.setActivePosId}
+            onChange={context.setDraftForms}
+            value={context.draftForms}
+          />
+          <button
+            type="button"
+            onClick={() => void context.actions.navigateIssue(issue)}
+          >
+            定位专用组
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("定位专用组"));
+
+    const target = await waitFor(() => {
+      const element = container.querySelector<HTMLElement>(
+        `[data-v3-node-id="${group.id}"][data-v3-field="scope"]`
+      );
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    await waitFor(() => expect(target).toHaveFocus());
+  });
+
+  it("词义缺少可用变化组的问题定位到词义卡片的词形与发音选择", async () => {
+    const initialWord = word();
+    const pos = initialWord.forms.pos[0]!;
+    pos.form_groups[0]!.scope = "dedicated";
+    const initialMeanings = toWritableMeanings(initialWord.meanings);
+    const sense = initialMeanings.pos[0]!.senses[0]!;
+    const issue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "meanings",
+      node_id: sense.id,
+      field: "form_group_id",
+      code: "sense_form_group_required",
+      message: "需要选择变化组",
+      // 与后端 meanings_issue 同形：词义问题不带 pos_id，也没有祖先节点。
+      node_location: { node_role: "meanings", ancestor_node_ids: [] }
+    };
+
+    function MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
+      const [content, setContent] = useState(initialMeanings);
+      return (
+        <>
+          <V3MeaningsAndExamplesStep
+            activePosId={context.activePosId}
+            forms={context.draftForms}
+            issues={context.issues}
+            onActivePosChange={context.setActivePosId}
+            onChange={setContent}
+            value={content}
+          />
+          <button
+            type="button"
+            onClick={() => void context.actions.navigateIssue(issue)}
+          >
+            定位词形与发音
+          </button>
+        </>
+      );
+    }
+
+    const { container } = renderWizard(requests(), {
+      initialWord,
+      renderStep: (context) => <MeaningsSlot context={context} />
+    });
+
+    fireEvent.click(screen.getByText("定位词形与发音"));
+
+    await waitFor(() => {
+      const anchor = container.querySelector<HTMLElement>(
+        `[data-v3-field="form_group_id"][data-v3-node-id="${sense.id}"]`
+      );
+      expect(anchor).not.toBeNull();
+      expect(
+        anchor === document.activeElement ||
+          anchor!.contains(document.activeElement)
+      ).toBe(true);
+    });
+  });
+
   it.each(["uk", "us"] as const)(
     "UD 将 %s variant 的拼写问题映射到同一个共用拼写输入",
     async (dialect) => {
@@ -1583,6 +1692,8 @@ describe("V3WordCreationWizard", () => {
     pos.form_groups.push({
       id: UUIDS.group_2,
       is_regular: false,
+      scope: "general",
+      dialect_rules: { ...pos.form_groups[0]!.dialect_rules },
       members: [{ id: UUIDS.membership_2, form_id: sharedForm.id }]
     });
     const variant = sharedForm.regional_variants;

@@ -20,7 +20,13 @@ import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ensureV3MeaningsForForms, toWritableMeanings } from "./meaningsModel";
 import { V3MeaningsAndExamplesStep } from "./V3MeaningsAndExamplesStep";
-import { uuidFromInt, uuidSequence } from "./fixtures";
+import {
+  UUIDS,
+  commonFormFixture,
+  formsFixture,
+  uuidFromInt,
+  uuidSequence
+} from "./fixtures";
 
 const meaningsCss = readFileSync(
   resolve(
@@ -311,10 +317,6 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "verb",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [
             {
               id: "form-base",
@@ -419,10 +421,6 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "verb",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [
             {
               id: "form-base",
@@ -487,10 +485,6 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -596,20 +590,12 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         },
         {
           pos_id: "pos-2",
           pos: "verb",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -673,10 +659,6 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -692,10 +674,6 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -1229,12 +1207,19 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "distinguish",
-            phonetic_mode: "distinguish"
-          },
           forms: [],
-          form_groups: []
+          form_groups: [
+            {
+              id: "group-1",
+              is_regular: true,
+              scope: "general",
+              dialect_rules: {
+                spelling_mode: "distinguish",
+                phonetic_mode: "distinguish"
+              },
+              members: []
+            }
+          ]
         }
       ]
     };
@@ -3243,20 +3228,12 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         },
         {
           pos_id: "pos-2",
           pos: "verb",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -3845,10 +3822,6 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -3907,10 +3880,6 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -4228,10 +4197,6 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -4335,10 +4300,6 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "particle",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -4386,10 +4347,6 @@ describe("V3MeaningsAndExamplesStep", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -4564,3 +4521,123 @@ it.each([false, true])(
     }
   }
 );
+
+describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
+  const dedicatedGroupId = uuidFromInt(9_012);
+  const dedicatedForms = () =>
+    formsFixture({
+      pos_id: "pos-1",
+      forms: [
+        commonFormFixture({ spelling: "job" }),
+        commonFormFixture({ id: uuidFromInt(9_002), spelling: "Job" })
+      ],
+      groups: [
+        {
+          id: uuidFromInt(9_011),
+          is_regular: true,
+          members: [{ id: uuidFromInt(9_021), form_id: UUIDS.form }]
+        },
+        {
+          id: dedicatedGroupId,
+          is_regular: true,
+          scope: "dedicated",
+          members: [{ id: uuidFromInt(9_022), form_id: uuidFromInt(9_002) }]
+        }
+      ]
+    });
+  const openOptions = (select: HTMLElement) => {
+    fireEvent.mouseDown(select);
+    return Array.from(
+      document.querySelectorAll<HTMLElement>(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )
+    );
+  };
+
+  it("本词性没有专用组时不渲染选择器，带着组相关问题时仍渲染以便定位", () => {
+    const { unmount } = render(
+      <Harness forms={formsFixture({ pos_id: "pos-1" })} />
+    );
+    expect(screen.queryByLabelText("释义 1 词形与发音")).toBeNull();
+    unmount();
+
+    const senseId = meaningsFixture.pos[0]!.senses[0]!.id;
+    const issue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "meanings",
+      node_id: senseId,
+      field: "form_group_id",
+      code: "sense_form_group_required",
+      message: "form group required",
+      node_location: { node_role: "sense", ancestor_node_ids: [] }
+    };
+    const { container } = render(
+      <Harness forms={formsFixture({ pos_id: "pos-1" })} issues={[issue]} />
+    );
+    expect(
+      container.querySelector(
+        `[data-v3-field="form_group_id"][data-v3-node-id="${senseId}"]`
+      )
+    ).not.toBeNull();
+    expect(
+      screen.getByText("本词性没有通用变化组，请为该词义选择专用组或添加通用组")
+    ).toBeInTheDocument();
+  });
+
+  it("只列通用与本词性专用组，选择后写入并可改回通用", () => {
+    render(<Harness forms={dedicatedForms()} />);
+    const select = screen.getByLabelText("释义 1 词形与发音");
+    expect(select.closest(".ant-select")).toHaveTextContent("通用（默认）");
+
+    const options = openOptions(select);
+    expect(options.map((option) => option.textContent)).toEqual([
+      "通用（默认）",
+      "第 2 组 · Job"
+    ]);
+    fireEvent.click(options[1]!);
+    expect(value().pos[0]!.senses[0]!.form_group_id).toBe(dedicatedGroupId);
+    expect(select.closest(".ant-select")).toHaveTextContent("第 2 组 · Job");
+
+    fireEvent.click(openOptions(select)[0]!);
+    expect(Object.keys(value().pos[0]!.senses[0]!)).not.toContain(
+      "form_group_id"
+    );
+  });
+
+  it("绑定失效时保留一项供改选，校验问题落在选择器锚点上", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.form_group_id = "deleted-group";
+    const senseId = initial.pos[0]!.senses[0]!.id;
+    const issue: V3DraftValidationIssue = {
+      schema_version: 3,
+      step: "meanings",
+      node_id: senseId,
+      field: "form_group_id",
+      code: "sense_form_group_invalid",
+      message: "form group invalid",
+      node_location: {
+        node_role: "sense",
+        ancestor_node_ids: ["pos-1"],
+        pos_id: "pos-1"
+      }
+    };
+    const { container } = render(
+      <Harness
+        forms={formsFixture({ pos_id: "pos-1" })}
+        initial={initial}
+        issues={[issue]}
+      />
+    );
+    expect(
+      container.querySelector(
+        `[data-v3-field="form_group_id"][data-v3-node-id="${senseId}"]`
+      )
+    ).not.toBeNull();
+    expect(
+      screen.getByLabelText("释义 1 词形与发音").closest(".ant-select")
+    ).toHaveTextContent("已失效的变化组，请重新选择");
+    expect(
+      screen.getByText("词义绑定的词形变化组无效，请重新选择本词性的专用组")
+    ).toBeInTheDocument();
+  });
+});
