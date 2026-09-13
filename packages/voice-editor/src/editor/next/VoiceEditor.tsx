@@ -725,12 +725,22 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       onSelect: (next) => {
         if (readOnly) return;
         if (selectedLink) {
-          if (next) return;
           commit((current) => ({
             ...current,
-            textLinks: (current.textLinks ?? []).filter(
-              (link) => link.id !== selectedLink.id
-            )
+            // 补全旧目标时仍沿用原标注的身份与片段，选择器只更新目标信息。
+            textLinks: next
+              ? (current.textLinks ?? []).map((link) =>
+                  link.id === selectedLink.id
+                    ? {
+                        ...next,
+                        id: link.id,
+                        source_segments: link.source_segments
+                      }
+                    : link
+                )
+              : (current.textLinks ?? []).filter(
+                  (link) => link.id !== selectedLink.id
+                )
           }));
           resetTransient();
           return;

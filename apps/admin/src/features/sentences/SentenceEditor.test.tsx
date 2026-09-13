@@ -122,6 +122,50 @@ describe("当前词条关联与离开保护", () => {
       expect(api.sentences.update).not.toHaveBeenCalled();
     }
   );
+  it("旧词条级关联可以直接补选词义，保留片段和标注ID后保存", async () => {
+    const old: SharedSentenceAnnotation = {
+      id: "legacy-link",
+      source_dialect: "common",
+      source_segments: [{ start: 3, end: 7, surface: "make" }],
+      target: { state: "entry_only", target_entry_id: "source" }
+    };
+    const item = example([old]);
+    vi.mocked(api.sentences.update).mockImplementation(async (_id, input) => ({
+      ...item,
+      content: input.content,
+      revision: 4
+    }));
+    show(
+      <SentenceEditor
+        sentence={item}
+        sourceWord={sentenceWord("source", "make")}
+        sourceSenseId="sense"
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+    const toolbar = await screen.findByRole("toolbar", { name: "标注工具栏" });
+    fireEvent.click(within(toolbar).getByRole("button", { name: "关联单词" }));
+    fireEvent.mouseDown(screen.getByLabelText("关联 make（2）"), { button: 0 });
+    await screen.findByText("旧关联尚未选择具体词义，请补全或清除。");
+    fireEvent.click(
+      await screen.findByText("make", {
+        selector: ".v3-component-usage-entry strong"
+      })
+    );
+    fireEvent.click(await screen.findByText(/原形 make/));
+    fireEvent.click(await screen.findByText("编造（故事、借口等）"));
+    fireEvent.click(screen.getByRole("button", { name: "确认关联" }));
+    const done = screen.getByRole("button", { name: "完成例句编辑" });
+    await waitFor(() => expect(done).toBeEnabled());
+    fireEvent.click(done);
+    await waitFor(() => expect(api.sentences.update).toHaveBeenCalledOnce());
+    expect(vi.mocked(api.sentences.update).mock.calls[0]![1]).toMatchObject({
+      context_entry_id: "source",
+      context_sense_id: "sense",
+      content: { annotations: [{ ...old, target: sentenceTarget("source") }] }
+    });
+  });
   it("关联层级为词条、匹配词形、词义，不能只选择词条就提交", async () => {
     const select = vi.fn();
     show(

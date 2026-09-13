@@ -15,7 +15,7 @@ export interface AssociationPickerProps<
 > {
   kind: "word" | "phrase";
   segments: SentenceSourceRangeV3[];
-  /** 已有关联只供查看与清除；必须解除后才能重新选择。 */
+  /** 已有关联可查看、清除或补全目标；更新时保留原标注 ID 与片段。 */
   selected?: TLink;
   onSelect: (link?: TLink) => void;
 }
