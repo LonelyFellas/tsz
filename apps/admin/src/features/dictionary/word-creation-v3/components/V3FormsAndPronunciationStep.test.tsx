@@ -2438,6 +2438,8 @@ describe("V3FormsAndPronunciationStep", () => {
   });
 
   it("第 2 组独立合并英美发音，合并冲突只提示在发起切换的那一组", async () => {
+    // 两组英美分栏再各铺一批目录占位行，CI 慢机上会超时；本用例不依赖目录。
+    catalogState.data = undefined;
     const job = ukUsFormFixture({
       id: uuidFromInt(1_501),
       uk: {
@@ -2535,7 +2537,7 @@ describe("V3FormsAndPronunciationStep", () => {
       spelling_mode: "unified",
       phonetic_mode: "distinguish"
     });
-  });
+  }, 15_000);
 
   it("组卡片头部切换通用 / 专用，并按词义绑定数提示影响", async () => {
     const initial = formsFixture();
