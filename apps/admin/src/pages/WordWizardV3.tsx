@@ -34,7 +34,10 @@ import { useSurfaceSnapshot } from "@/features/dictionary/useSurfaceSnapshot";
 import { V3FormsAndPronunciationStep } from "@/features/dictionary/word-creation-v3/components/V3FormsAndPronunciationStep";
 import { V3BasicsStep } from "@/features/dictionary/word-creation-v3/V3BasicsStep";
 import { V3MeaningsAndExamplesStep } from "@/features/dictionary/word-creation-v3/V3MeaningsAndExamplesStep";
-import { relationDisplaySnapshots } from "@/features/dictionary/word-creation-v3/meaningsModel";
+import {
+  countFormGroupBindings,
+  relationDisplaySnapshots
+} from "@/features/dictionary/word-creation-v3/meaningsModel";
 import { V3PreviewAndPublishStep } from "@/features/dictionary/word-creation-v3/V3PreviewAndPublishStep";
 import { V3PublicationHistory } from "@/features/dictionary/word-creation-v3/V3PublicationHistory";
 import { V3ReviewContent } from "@/features/dictionary/word-creation-v3/V3ReviewContent";
@@ -171,6 +174,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
       <V3FormsAndPronunciationStep
         activePosId={context.activePosId}
         entryKind={context.word.kind}
+        formGroupBindingCounts={countFormGroupBindings(context.draftMeanings)}
         issues={context.issues.filter((issue) => issue.step === "forms")}
         onActivePosChange={(posId) => {
           resetConfirmation();

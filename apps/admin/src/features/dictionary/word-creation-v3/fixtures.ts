@@ -158,7 +158,14 @@ export function ukUsFormFixture(
   };
 }
 
-function defaultGroups(forms: WordConcreteFormV3[]): WordFormGroupV3[] {
+/** 组的 scope / dialect_rules 可省略：formsFixture 统一补成通用组与词性默认规则。 */
+export type FormGroupFixture = Omit<
+  WordFormGroupV3,
+  "scope" | "dialect_rules"
+> &
+  Partial<Pick<WordFormGroupV3, "scope" | "dialect_rules">>;
+
+function defaultGroups(forms: WordConcreteFormV3[]): FormGroupFixture[] {
   return [
     {
       id: UUIDS.group,
@@ -174,28 +181,32 @@ function defaultGroups(forms: WordConcreteFormV3[]): WordFormGroupV3[] {
 export function formsFixture(
   options: {
     forms?: WordConcreteFormV3[];
-    groups?: WordFormGroupV3[];
+    groups?: FormGroupFixture[];
     pos_id?: string;
     pos?: string;
     dialect_rules?: DialectRulesV3;
   } = {}
 ): DraftFormsStepContentV3 {
   const forms = options.forms ?? [commonFormFixture()];
+  // 组没写规则时沿用规则搬到组上之前的推断口径：词性里有 uk_us 词形即区分英美。
+  const dialectRules: DialectRulesV3 =
+    options.dialect_rules ??
+    (forms.some((form) => form.regional_variants.mode === "uk_us")
+      ? { spelling_mode: "distinguish", phonetic_mode: "distinguish" }
+      : { spelling_mode: "unified", phonetic_mode: "unified" });
   return {
     pos: [
       {
         pos_id: options.pos_id ?? UUIDS.pos,
         pos: options.pos ?? "noun",
-        dialect_rules:
-          options.dialect_rules ??
-          (forms.some((form) => form.regional_variants.mode === "uk_us")
-            ? {
-                spelling_mode: "distinguish",
-                phonetic_mode: "distinguish"
-              }
-            : { spelling_mode: "unified", phonetic_mode: "unified" }),
         forms,
-        form_groups: options.groups ?? defaultGroups(forms)
+        form_groups: (options.groups ?? defaultGroups(forms)).map((group) => ({
+          id: group.id,
+          is_regular: group.is_regular,
+          scope: group.scope ?? "general",
+          dialect_rules: group.dialect_rules ?? { ...dialectRules },
+          members: group.members
+        }))
       }
     ]
   };

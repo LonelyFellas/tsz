@@ -102,7 +102,7 @@ describe("V3 forms model", () => {
     ]);
   });
 
-  it("词性级 dialect_rules 只接受 UU、UD、DD 并约束所有 form 地区形状", () => {
+  it("组级 dialect_rules 只接受 UU、UD、DD 并约束组内 form 地区形状", () => {
     const illegal = formsFixture({
       dialect_rules: {
         spelling_mode: "distinguish",
@@ -113,8 +113,11 @@ describe("V3 forms model", () => {
       expect.objectContaining({
         code: "dialect_rules_invalid",
         field: "dialect_rules",
-        node_id: UUIDS.pos,
-        node_location: expect.objectContaining({ pos_id: UUIDS.pos })
+        node_id: UUIDS.group,
+        node_location: expect.objectContaining({
+          pos_id: UUIDS.pos,
+          form_group_id: UUIDS.group
+        })
       })
     );
 
@@ -157,6 +160,73 @@ describe("V3 forms model", () => {
         node_id: regional.id
       })
     );
+  });
+
+  it("英美规则按组校验：两组可各自区分或共用，非法组合只报在该组", () => {
+    const dd = {
+      spelling_mode: "distinguish",
+      phonetic_mode: "distinguish"
+    } as const;
+    const uu = { spelling_mode: "unified", phonetic_mode: "unified" } as const;
+    const job = ukUsFormFixture();
+    const capital = commonFormFixture();
+    const content = formsFixture({
+      forms: [job, capital],
+      groups: [
+        {
+          id: UUIDS.group,
+          is_regular: true,
+          dialect_rules: dd,
+          members: [{ id: UUIDS.membership, form_id: job.id }]
+        },
+        {
+          id: UUIDS.group_2,
+          is_regular: true,
+          scope: "dedicated",
+          dialect_rules: uu,
+          members: [{ id: UUIDS.membership_2, form_id: capital.id }]
+        }
+      ]
+    });
+    expect(validateFormsContent(content, "complete")).toEqual([]);
+
+    const invalidSecond = structuredClone(content);
+    invalidSecond.pos[0]!.form_groups[1]!.dialect_rules = {
+      spelling_mode: "distinguish",
+      phonetic_mode: "unified"
+    };
+    expect(validateFormsContent(invalidSecond, "save")).toEqual([
+      expect.objectContaining({
+        code: "dialect_rules_invalid",
+        node_id: UUIDS.group_2,
+        node_location: expect.objectContaining({ form_group_id: UUIDS.group_2 })
+      })
+    ]);
+
+    const mismatched = structuredClone(content);
+    mismatched.pos[0]!.form_groups[1]!.dialect_rules = dd;
+    expect(validateFormsContent(mismatched, "save")).toEqual([
+      expect.objectContaining({
+        code: "invalid_regional_variant_shape",
+        node_id: capital.id,
+        message: "词形地区结构与所属变化组的英美规则不一致"
+      })
+    ]);
+
+    const badScope = structuredClone(content) as unknown as {
+      pos: { form_groups: { scope: string }[] }[];
+    };
+    badScope.pos[0]!.form_groups[0]!.scope = "exclusive";
+    expect(codes(badScope)).toEqual(["forbidden_v3_field"]);
+
+    const wire = toFormsWire(content).pos[0]!;
+    expect(Object.keys(wire)).not.toContain("dialect_rules");
+    expect(
+      wire.form_groups.map((group) => [group.scope, group.dialect_rules])
+    ).toEqual([
+      ["general", dd],
+      ["dedicated", uu]
+    ]);
   });
 
   it("U04 同组多个 base 与 comparative 合法且不去重", () => {
@@ -328,9 +398,12 @@ describe("V3 forms model", () => {
     }
   );
 
-  it("U06/U06a 同 POS 跨组共享合法，跨 POS 与同组重复引用精确拒绝", () => {
+  it("U06/U06a 一个词形只属于一个变化组，跨组、跨 POS 与同组重复引用精确拒绝", () => {
     const shared = commonFormFixture();
-    const valid = formsFixture({
+    const valid = formsFixture({ forms: [shared] });
+    expect(validateFormsContent(valid, "complete")).toEqual([]);
+
+    const crossGroup = formsFixture({
       forms: [shared],
       groups: [
         {
@@ -345,7 +418,15 @@ describe("V3 forms model", () => {
         }
       ]
     });
-    expect(validateFormsContent(valid, "complete")).toEqual([]);
+    expect(validateFormsContent(crossGroup, "save")).toEqual([
+      expect.objectContaining({
+        code: "form_group_membership_invalid",
+        field: "form_id",
+        node_id: UUIDS.membership_2,
+        message: "一个词形只能属于一个变化组",
+        node_location: expect.objectContaining({ form_group_id: UUIDS.group_2 })
+      })
+    ]);
 
     const duplicate = structuredClone(valid);
     duplicate.pos[0]!.form_groups[0]!.members.push({
@@ -365,15 +446,13 @@ describe("V3 forms model", () => {
     crossPos.pos.push({
       pos_id: UUIDS.pos_2,
       pos: "verb",
-      dialect_rules: {
-        spelling_mode: "unified",
-        phonetic_mode: "unified"
-      },
       forms: [secondPosForm],
       form_groups: [
         {
           id: UUIDS.group_2,
           is_regular: true,
+          scope: "general",
+          dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
           members: [
             { id: UUIDS.membership_2, form_id: secondPosForm.id },
             { id: UUIDS.membership_3, form_id: shared.id }
@@ -403,10 +482,6 @@ describe("V3 forms model", () => {
         {
           pos_id: UUIDS.pos,
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -420,12 +495,19 @@ describe("V3 forms model", () => {
         {
           pos_id: UUIDS.pos,
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
-          form_groups: [{ id: UUIDS.group, is_regular: false, members: [] }]
+          form_groups: [
+            {
+              id: UUIDS.group,
+              is_regular: false,
+              scope: "general",
+              dialect_rules: {
+                spelling_mode: "unified",
+                phonetic_mode: "unified"
+              },
+              members: []
+            }
+          ]
         }
       ]
     };
@@ -453,7 +535,13 @@ describe("V3 forms model", () => {
     // 空组已由 empty_form_group 说明，不叠报缺原形。
     const emptyGroup = formsFixture({ forms: [], groups: [] });
     emptyGroup.pos[0]!.form_groups = [
-      { id: UUIDS.group, is_regular: false, members: [] }
+      {
+        id: UUIDS.group,
+        is_regular: false,
+        scope: "general",
+        dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
+        members: []
+      }
     ];
     const emptyCodes = codes(emptyGroup, "complete");
     expect(emptyCodes).toContain("empty_form_group");

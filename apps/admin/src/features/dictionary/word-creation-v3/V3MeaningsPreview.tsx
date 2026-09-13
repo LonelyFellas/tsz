@@ -2,10 +2,11 @@ import type {
   AdminWordV3,
   EnglishTextV3,
   SentenceTranslationBandV3,
-  WordDefinitionV3
+  WordDefinitionV3,
+  WordPosFormsV3
 } from "@tsz/types";
 import { Card, Empty, Flex, Space, Tag, Typography } from "antd";
-import { sentenceTranslationsV3 } from "./meaningsModel";
+import { formGroupLabel, sentenceTranslationsV3 } from "./meaningsModel";
 import { groupRelations } from "./relationGroups";
 import { V3EnglishTextPreview } from "./components/V3EnglishTextPreview";
 import {
@@ -29,6 +30,10 @@ function DefinitionText({ definition }: { definition: WordDefinitionV3 }) {
   return <V3EnglishTextPreview value={definition.content as EnglishTextV3} />;
 }
 
+function boundFormGroupLabel(pos: WordPosFormsV3 | undefined, groupId: string) {
+  return (pos && formGroupLabel(pos, groupId)) ?? "已失效的变化组";
+}
+
 function translationBandLabel(band: SentenceTranslationBandV3) {
   if (band === "word_for_word") return "初";
   if (band === "balanced_fluency") return "中";
@@ -46,6 +51,9 @@ export function V3MeaningsPreview({
   const subPartOfSpeechLabel = useSubPartOfSpeechLabel();
   const posCodeById = new Map(
     word.forms.pos.map((pos) => [pos.pos_id, pos.pos] as const)
+  );
+  const formsPosById = new Map(
+    word.forms.pos.map((pos) => [pos.pos_id, pos] as const)
   );
   const senseGroupById = new Map(
     word.meanings.sense_groups.map((group, index) => [
@@ -124,6 +132,15 @@ export function V3MeaningsPreview({
                           {group ? (
                             <Tag color="purple">
                               释义组 {group.index}：{group.label}
+                            </Tag>
+                          ) : null}
+                          {sense.form_group_id ? (
+                            <Tag color="cyan">
+                              词形与发音：
+                              {boundFormGroupLabel(
+                                formsPosById.get(pos.pos_id),
+                                sense.form_group_id
+                              )}
                             </Tag>
                           ) : null}
                           {sense.depends_on_context ? (

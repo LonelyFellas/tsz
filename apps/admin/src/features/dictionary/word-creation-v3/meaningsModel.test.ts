@@ -2,13 +2,22 @@ import type {
   AudioAssetV3,
   DraftFormsStepContentV3,
   DraftMeaningsStepContentV3,
-  EnglishTextV3
+  EnglishTextV3,
+  WordSenseV3
 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import { newWordNodeId } from "../word-model/primitives";
-import { formsFixture } from "./fixtures";
 import {
+  UUIDS,
+  commonFormFixture,
+  formsFixture,
+  ukUsFormFixture
+} from "./fixtures";
+import {
+  countFormGroupBindings,
   dropEmptySentenceTranslations,
+  formGroupLabel,
+  spellingModeForPos,
   editableEnglishText,
   newSentenceTranslations,
   prepareTextLinksForSave,
@@ -1422,5 +1431,103 @@ describe("fillDefaultSenseGroups", () => {
     expect(fillDefaultSenseGroups(exact, newWordNodeId)).toBe(exact);
     const more = meanings(DEFAULT_SENSE_GROUP_SLOTS + 2);
     expect(fillDefaultSenseGroups(more, newWordNodeId)).toBe(more);
+  });
+});
+
+describe("词义绑定变化组", () => {
+  const job = ukUsFormFixture({
+    uk: { spelling: "job" },
+    us: { spelling: "job" }
+  });
+  const capital = commonFormFixture({ spelling: "Job" });
+  const forms = formsFixture({
+    forms: [job, capital],
+    groups: [
+      {
+        id: UUIDS.group,
+        is_regular: true,
+        dialect_rules: {
+          spelling_mode: "unified",
+          phonetic_mode: "distinguish"
+        },
+        members: [{ id: UUIDS.membership, form_id: job.id }]
+      },
+      {
+        id: UUIDS.group_2,
+        is_regular: true,
+        scope: "dedicated",
+        dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
+        members: [{ id: UUIDS.membership_2, form_id: capital.id }]
+      }
+    ]
+  });
+
+  it("语法结构形态按本词性任一变化组区分拼写派生", () => {
+    expect(spellingModeForPos(forms, UUIDS.pos)).toBe("unified");
+    const distinguished = structuredClone(forms);
+    distinguished.pos[0]!.form_groups[1]!.dialect_rules = {
+      spelling_mode: "distinguish",
+      phonetic_mode: "distinguish"
+    };
+    expect(spellingModeForPos(distinguished, UUIDS.pos)).toBe("distinguish");
+    expect(spellingModeForPos(distinguished, "missing-pos")).toBe("unified");
+    expect(spellingModeForPos(undefined, UUIDS.pos)).toBe("unified");
+  });
+
+  it("组名按本词性顺序编号并带原形拼写，英美拼写不同时并列", () => {
+    const pos = forms.pos[0]!;
+    expect(formGroupLabel(pos, UUIDS.group)).toBe("第 1 组 · job");
+    expect(formGroupLabel(pos, UUIDS.group_2)).toBe("第 2 组 · Job");
+    expect(formGroupLabel(pos, "missing-group")).toBeUndefined();
+    expect(
+      formGroupLabel(
+        formsFixture({ forms: [ukUsFormFixture()] }).pos[0]!,
+        UUIDS.group
+      )
+    ).toBe("第 1 组 · centre / center");
+    const derivedOnly = formsFixture({
+      forms: [commonFormFixture({ form_type: "plural", spelling: "jobs" })]
+    });
+    expect(formGroupLabel(derivedOnly.pos[0]!, UUIDS.group)).toBe(
+      "第 1 组 · 未填写原形"
+    );
+  });
+
+  it("写入投影保留绑定，并统计每个变化组被多少词义绑定", () => {
+    const sense = (id: string, formGroupId?: string): WordSenseV3 => ({
+      id,
+      sub_pos: "",
+      level: "B1",
+      depends_on_context: false,
+      ...(formGroupId ? { form_group_id: formGroupId } : {}),
+      definitions: [],
+      sentences: [],
+      relations: []
+    });
+    const meanings = toWritableMeanings({
+      sense_groups: [],
+      pos: [
+        {
+          pos_id: UUIDS.pos,
+          grammar_structures: [],
+          senses: [
+            sense("job-1", UUIDS.group_2),
+            sense("job-2", UUIDS.group_2),
+            sense("general")
+          ]
+        }
+      ]
+    });
+    expect(meanings.pos[0]!.senses.map((item) => item.form_group_id)).toEqual([
+      UUIDS.group_2,
+      UUIDS.group_2,
+      undefined
+    ]);
+    expect(Object.keys(meanings.pos[0]!.senses[2]!)).not.toContain(
+      "form_group_id"
+    );
+    expect(countFormGroupBindings(meanings)).toEqual(
+      new Map([[UUIDS.group_2, 2]])
+    );
   });
 });

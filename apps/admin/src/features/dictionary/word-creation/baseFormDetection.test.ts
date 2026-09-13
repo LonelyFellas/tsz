@@ -31,10 +31,6 @@ function v3Word(): AdminWordV3 {
         {
           pos_id: "pos-v3",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "distinguish",
-            phonetic_mode: "distinguish"
-          },
           forms: [
             {
               id: "base-v3",

@@ -2,6 +2,7 @@ import type {
   PronunciationStyle,
   DialectRulesV3,
   DraftFormsStepContentV3,
+  FormGroupScopeV3,
   FormTypeCatalogItem,
   PartOfSpeechCatalogItem,
   PhraseComponentUsageV3,
@@ -35,8 +36,6 @@ type OperationFailureReason =
   | "group_not_found"
   | "form_not_found"
   | "membership_not_found"
-  | "cross_pos_membership"
-  | "duplicate_group_membership"
   | "explicit_mapping_required"
   | "invalid_dialect_rules"
   | "component_merge_required"
@@ -57,11 +56,6 @@ export type OperationResult<T> =
       ok: false;
       reason: "orphan_forms_changed_since_confirmation";
       form_ids: string[];
-    }
-  | {
-      ok: false;
-      reason: "last_membership_requires_form_deletion";
-      form_id: string;
     };
 
 export type PronunciationMapping = Omit<WordPronunciationV3, "id">;
@@ -368,9 +362,10 @@ function validDialectRules(rules: DialectRulesV3) {
   );
 }
 
-export function updatePosDialectRules(
+export function updateGroupDialectRules(
   content: DraftFormsStepContentV3,
   posId: string,
+  groupId: string,
   rules: DialectRulesV3
 ): OperationResult<DraftFormsStepContentV3> {
   if (!validDialectRules(rules)) {
@@ -379,7 +374,25 @@ export function updatePosDialectRules(
   const next = clone(content);
   const pos = next.pos.find((item) => item.pos_id === posId);
   if (!pos) return { ok: false, reason: "pos_not_found" };
-  pos.dialect_rules = { ...rules };
+  const group = pos.form_groups.find((item) => item.id === groupId);
+  if (!group) return { ok: false, reason: "group_not_found" };
+  group.dialect_rules = { ...rules };
+  return { ok: true, value: next };
+}
+
+/** 只改标记；专用组改回通用时已绑定的词义不在本地清除，交给保存时的影响预览确认。 */
+export function updateFormGroupScope(
+  content: DraftFormsStepContentV3,
+  posId: string,
+  groupId: string,
+  scope: FormGroupScopeV3
+): OperationResult<DraftFormsStepContentV3> {
+  const next = clone(content);
+  const pos = next.pos.find((item) => item.pos_id === posId);
+  if (!pos) return { ok: false, reason: "pos_not_found" };
+  const group = pos.form_groups.find((item) => item.id === groupId);
+  if (!group) return { ok: false, reason: "group_not_found" };
+  group.scope = scope;
   return { ok: true, value: next };
 }
 
@@ -423,9 +436,11 @@ function variantMappingFrom(
   };
 }
 
-export function normalizePosDialectRules(
+/** 英美规则按组生效：只转换本组成员词形，同词性其他组的词形与规则原样保留。 */
+export function normalizeGroupDialectRules(
   content: DraftFormsStepContentV3,
   posId: string,
+  groupId: string,
   rules: DialectRulesV3,
   preferredDialect: "uk" | "us" = "us",
   idFactory: V3IdFactory = defaultIdFactory,
@@ -437,6 +452,9 @@ export function normalizePosDialectRules(
   const next = clone(content);
   const pos = next.pos.find((item) => item.pos_id === posId);
   if (!pos) return { ok: false, reason: "pos_not_found" };
+  const group = pos.form_groups.find((item) => item.id === groupId);
+  if (!group) return { ok: false, reason: "group_not_found" };
+  const memberFormIds = new Set(group.members.map((member) => member.form_id));
   const allocated = allNodeIds(next);
   const batchIdFactory = () => nextUuid(idFactory, allocated);
   const stableVariantId = (formId: string, role: V3StableVariantRole) => {
@@ -454,6 +472,7 @@ export function normalizePosDialectRules(
 
   for (let index = 0; index < pos.forms.length; index += 1) {
     const form = pos.forms[index]!;
+    if (!memberFormIds.has(form.id)) continue;
     if (
       rules.spelling_mode === "unified" &&
       rules.phonetic_mode === "unified"
@@ -515,7 +534,7 @@ export function normalizePosDialectRules(
     }
   }
 
-  pos.dialect_rules = { ...rules };
+  group.dialect_rules = { ...rules };
   return { ok: true, value: next };
 }
 
@@ -645,12 +664,14 @@ export function addPartOfSpeech(
   const template = templateOwner?.forms.find(
     (form) => form.form_type === "base"
   );
-  const dialectRules = templateOwner
-    ? { ...templateOwner.dialect_rules }
-    : {
-        spelling_mode: "unified" as const,
-        phonetic_mode: "unified" as const
-      };
+  // 模板原形所在组的英美规则落到新词性的初始组；之后各组各改各的。
+  const templateGroup =
+    templateOwner?.form_groups.find((group) =>
+      group.members.some((member) => member.form_id === template?.id)
+    ) ?? templateOwner?.form_groups[0];
+  const dialectRules: DialectRulesV3 = templateGroup
+    ? { ...templateGroup.dialect_rules }
+    : { spelling_mode: "unified", phonetic_mode: "unified" };
   const commonDialect =
     dialectRules.spelling_mode === "unified" &&
     dialectRules.phonetic_mode === "unified";
@@ -706,7 +727,6 @@ export function addPartOfSpeech(
   next.pos.push({
     pos_id: posId,
     pos: catalogItem.code,
-    dialect_rules: dialectRules,
     forms: [
       {
         id: formId,
@@ -718,6 +738,8 @@ export function addPartOfSpeech(
       {
         id: groupId,
         is_regular: true,
+        scope: "general",
+        dialect_rules: dialectRules,
         members: [{ id: membershipId, form_id: formId }]
       }
     ]
@@ -814,12 +836,18 @@ export function addFormGroup(
     return { ok: false, reason: "pos_not_found" };
   }
   const groupId = nextUuid(idFactory, allNodeIds(content));
+  // 新组默认通用，英美规则沿用本词性最后一组；之后与其他组互不影响。
+  const previousRules = pos.form_groups.at(-1)?.dialect_rules;
   const next = clone(content);
   next.pos
     .find((item) => item.pos_id === posId)!
     .form_groups.push({
       id: groupId,
       is_regular: true,
+      scope: "general",
+      dialect_rules: previousRules
+        ? { ...previousRules }
+        : { spelling_mode: "unified", phonetic_mode: "unified" },
       members: []
     });
   // 每组词形变化的初始形态一致：新组自带一个原形，拼写沿用本词性已有的原形。
@@ -933,15 +961,14 @@ export function addConcreteForm(
 ): OperationResult<DraftFormsStepContentV3> {
   const pos = content.pos.find((item) => item.pos_id === posId);
   if (!pos) return { ok: false, reason: "pos_not_found" };
-  if (!pos.form_groups.some((item) => item.id === groupId)) {
-    return { ok: false, reason: "group_not_found" };
-  }
+  const group = pos.form_groups.find((item) => item.id === groupId);
+  if (!group) return { ok: false, reason: "group_not_found" };
 
   const allocated = allNodeIds(content);
   const formId = nextUuid(idFactory, allocated);
   const commonDialect =
-    pos.dialect_rules.spelling_mode === "unified" &&
-    pos.dialect_rules.phonetic_mode === "unified";
+    group.dialect_rules.spelling_mode === "unified" &&
+    group.dialect_rules.phonetic_mode === "unified";
   const firstVariantId = nextUuid(idFactory, allocated);
   const secondVariantId = commonDialect
     ? undefined
@@ -1039,76 +1066,6 @@ export function addConcreteFormAfterMembership(
   targetPos.forms.splice(sourceFormIndex + 1, 0, newForm);
   targetGroup.members.splice(sourceMembershipIndex + 1, 0, newMembership);
   return added;
-}
-
-export function addMembership(
-  content: DraftFormsStepContentV3,
-  posId: string,
-  groupId: string,
-  formId: string,
-  idFactory: V3IdFactory = defaultIdFactory
-): OperationResult<DraftFormsStepContentV3> {
-  const pos = content.pos.find((item) => item.pos_id === posId);
-  if (!pos) return { ok: false, reason: "pos_not_found" };
-  const group = pos.form_groups.find((item) => item.id === groupId);
-  if (!group) return { ok: false, reason: "group_not_found" };
-  const owner = content.pos.find((item) =>
-    item.forms.some((form) => form.id === formId)
-  );
-  if (!owner) return { ok: false, reason: "form_not_found" };
-  if (owner.pos_id !== posId) {
-    return { ok: false, reason: "cross_pos_membership" };
-  }
-  if (group.members.some((member) => member.form_id === formId)) {
-    return { ok: false, reason: "duplicate_group_membership" };
-  }
-  const allocated = allNodeIds(content);
-  const membershipId = nextUuid(idFactory, allocated);
-  const next = clone(content);
-  next.pos
-    .find((item) => item.pos_id === posId)!
-    .form_groups.find((item) => item.id === groupId)!
-    .members.push({ id: membershipId, form_id: formId });
-  return { ok: true, value: next };
-}
-
-export function removeMembership(
-  content: DraftFormsStepContentV3,
-  membershipId: string
-): OperationResult<DraftFormsStepContentV3> {
-  let formId: string | undefined;
-  for (const pos of content.pos) {
-    for (const group of pos.form_groups) {
-      const member = group.members.find((item) => item.id === membershipId);
-      if (member) formId = member.form_id;
-    }
-  }
-  if (!formId) return { ok: false, reason: "membership_not_found" };
-  const referenceCount = content.pos.reduce(
-    (total, pos) =>
-      total +
-      pos.form_groups.reduce(
-        (subtotal, group) =>
-          subtotal +
-          group.members.filter((item) => item.form_id === formId).length,
-        0
-      ),
-    0
-  );
-  if (referenceCount <= 1) {
-    return {
-      ok: false,
-      reason: "last_membership_requires_form_deletion",
-      form_id: formId
-    };
-  }
-  const next = clone(content);
-  for (const pos of next.pos) {
-    for (const group of pos.form_groups) {
-      group.members = group.members.filter((item) => item.id !== membershipId);
-    }
-  }
-  return { ok: true, value: next };
 }
 
 export function deleteConcreteForm(

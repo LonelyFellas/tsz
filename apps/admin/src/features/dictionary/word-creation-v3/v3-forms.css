@@ -11,23 +11,8 @@
   padding-inline-start: 20px;
 }
 
-.v3-pos-dialect-rules {
-  padding-inline: 18px;
-  background: #fff;
-  border: 1px solid #d9dde5;
-  border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(32, 38, 54, 0.04);
-}
-
 .v3-pos-dialect-rule {
   border-bottom: 0;
-}
-
-.v3-pos-dialect-note {
-  margin: 0;
-  color: var(--word-muted);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .v3-form-group-card .v3-pos-dialect-rule {
@@ -306,12 +291,6 @@
 }
 
 @media (max-width: 767px) {
-  .v3-pos-dialect-rules .word-form-rule-row {
-    align-items: flex-start;
-    flex-direction: column;
-    padding-block: 10px;
-  }
-
   .v3-form-group-card > .ant-card-head {
     align-items: flex-start;
   }

@@ -41,6 +41,9 @@ export interface DialectRulesV3 {
   phonetic_mode: DialectModeV3;
 }
 
+/** 变化组的使用范围：通用组服务本词性未绑定的词义；专用组只服务绑定了它的词义。 */
+export type FormGroupScopeV3 = "general" | "dedicated";
+
 /** `base` is a peer form type. It is neither unique nor a parent of other forms. */
 export type WordFormTypeV3 = string;
 
@@ -114,13 +117,15 @@ export interface WordFormGroupV3 {
   id: string;
   /** Migration metadata only; it does not imply a base/derived hierarchy. */
   is_regular: boolean;
+  scope: FormGroupScopeV3;
+  /** 英美拼写 / 音标规则按组生效，组内词形的地区结构必须与之匹配。 */
+  dialect_rules: DialectRulesV3;
   members: WordFormGroupMemberV3[];
 }
 
 export interface WordPosFormsV3 {
   pos_id: string;
   pos: string;
-  dialect_rules: DialectRulesV3;
   forms: WordConcreteFormV3[];
   form_groups: WordFormGroupV3[];
 }
@@ -538,6 +543,8 @@ export interface WordSenseV3 {
   sub_pos: string;
   level: string;
   sense_group_id?: string;
+  /** 缺省 = 使用本词性的通用组；只能指向同词性下 scope=dedicated 的组。 */
+  form_group_id?: string;
   frequency?: string;
   depends_on_context: boolean;
   definitions: WordDefinitionV3[];
@@ -587,6 +594,8 @@ export interface WordSenseWritableV3 {
   sub_pos: string;
   level: string;
   sense_group_id?: string;
+  /** 缺省 = 使用本词性的通用组；只能指向同词性下 scope=dedicated 的组。 */
+  form_group_id?: string;
   frequency?: string;
   depends_on_context: boolean;
   definitions: WordDefinitionV3[];
@@ -791,6 +800,9 @@ export const V3_VALIDATION_ISSUE_CODES = [
   "invalid_sub_part_of_speech",
   "frequency_invalid",
   "sense_group_not_found",
+  "sense_form_group_invalid",
+  "dedicated_form_group_unused",
+  "sense_form_group_required",
   "definition_required",
   "definition_level_invalid",
   "definition_invalid",

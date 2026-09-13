@@ -230,10 +230,12 @@ export function buildV3ProductProgress({
   );
   const distinguish =
     language === "en" &&
-    forms.pos.some(
-      (pos) =>
-        pos.dialect_rules.spelling_mode === "distinguish" ||
-        pos.dialect_rules.phonetic_mode === "distinguish"
+    forms.pos.some((pos) =>
+      pos.form_groups.some(
+        (group) =>
+          group.dialect_rules.spelling_mode === "distinguish" ||
+          group.dialect_rules.phonetic_mode === "distinguish"
+      )
     );
   const levelCounts = new Map<string, number>();
   for (const { sentence } of sentenceEntries) {

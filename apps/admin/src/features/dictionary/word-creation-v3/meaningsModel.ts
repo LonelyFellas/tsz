@@ -12,6 +12,7 @@ import type {
   RichTextVariantV3,
   SentenceTranslationBandV3,
   WordDefinitionV3,
+  WordPosFormsV3,
   WordPosMeaningsWritableV3,
   WordRelationWritableV3,
   TranslationLanguageV3,
@@ -343,6 +344,9 @@ export function toWritableMeanings(
         ...(sense.sense_group_id === undefined
           ? {}
           : { sense_group_id: sense.sense_group_id }),
+        ...(sense.form_group_id === undefined
+          ? {}
+          : { form_group_id: sense.form_group_id }),
         ...(sense.frequency === undefined
           ? {}
           : { frequency: sense.frequency }),
@@ -415,14 +419,65 @@ function grammarVariantDialects(
   return spellingMode === "distinguish" ? ["uk", "us"] : ["common"];
 }
 
+/** 语法结构挂在词性上不分组：本词性任一变化组区分英美拼写，就按区分出英 / 美两条。 */
+function posSpellingMode(pos: WordPosFormsV3): DialectModeV3 {
+  return pos.form_groups.some(
+    (group) => group.dialect_rules.spelling_mode === "distinguish"
+  )
+    ? "distinguish"
+    : "unified";
+}
+
 export function spellingModeForPos(
   forms: DraftFormsStepContentV3 | undefined,
   posId: string
 ): DialectModeV3 {
-  return (
-    forms?.pos.find((pos) => pos.pos_id === posId)?.dialect_rules
-      .spelling_mode ?? "unified"
-  );
+  const pos = forms?.pos.find((item) => item.pos_id === posId);
+  return pos ? posSpellingMode(pos) : "unified";
+}
+
+/**
+ * 变化组的展示名「第 N 组 · 原形拼写」，N 按本词性变化组顺序。原形取组内首个原形，
+ * 英美拼写不同时并列；词义步选组与预览都用它，Job 与 job 才分得开。
+ */
+export function formGroupLabel(
+  pos: WordPosFormsV3,
+  groupId: string
+): string | undefined {
+  const index = pos.form_groups.findIndex((group) => group.id === groupId);
+  if (index < 0) return undefined;
+  const base = pos.form_groups[index]!.members.map((member) =>
+    pos.forms.find((form) => form.id === member.form_id)
+  ).find((form) => form?.form_type === "base");
+  const spellings = !base
+    ? []
+    : base.regional_variants.mode === "common"
+      ? [base.regional_variants.common.spelling]
+      : [
+          base.regional_variants.uk.spelling,
+          base.regional_variants.us.spelling
+        ];
+  const spelling = [
+    ...new Set(spellings.map((value) => value.trim()).filter(Boolean))
+  ].join(" / ");
+  return `第 ${index + 1} 组 · ${spelling || "未填写原形"}`;
+}
+
+/** 每个变化组被多少条词义绑定；第 2 步组卡片据此提示影响面。 */
+export function countFormGroupBindings(
+  meanings: Pick<DraftMeaningsStepContentWritableV3, "pos">
+): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const pos of meanings.pos) {
+    for (const sense of pos.senses) {
+      if (!sense.form_group_id) continue;
+      counts.set(
+        sense.form_group_id,
+        (counts.get(sense.form_group_id) ?? 0) + 1
+      );
+    }
+  }
+  return counts;
 }
 
 export function newGrammarStructure(
@@ -648,9 +703,7 @@ export function ensureV3MeaningsForForms(
   }
 
   const spellingModeByPos = new Map(
-    forms.pos.map(
-      (pos) => [pos.pos_id, pos.dialect_rules.spelling_mode] as const
-    )
+    forms.pos.map((pos) => [pos.pos_id, posSpellingMode(pos)] as const)
   );
   const existingPosIds = new Set(nextPos.map((pos) => pos.pos_id));
   const missingPosIds: string[] = [];

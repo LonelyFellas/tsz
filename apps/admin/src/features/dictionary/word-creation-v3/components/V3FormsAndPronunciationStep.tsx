@@ -57,6 +57,8 @@ export interface V3FormsAndPronunciationStepProps {
   issues?: readonly V3DraftValidationIssue[];
   idFactory?: V3IdFactory;
   stableVariantIds?: V3StableVariantIdFactory;
+  /** 变化组 id → 词义步里绑定它的词义数；组卡片据此提示专用组的影响面。 */
+  formGroupBindingCounts?: ReadonlyMap<string, number>;
 }
 
 function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
@@ -93,7 +95,8 @@ export function V3FormsAndPronunciationStep({
   onActivePosChange,
   issues = [],
   idFactory = newWordNodeId,
-  stableVariantIds
+  stableVariantIds,
+  formGroupBindingCounts
 }: V3FormsAndPronunciationStepProps) {
   const { modal } = App.useApp();
   const displayState = useFormDisplayState();
@@ -265,6 +268,7 @@ export function V3FormsAndPronunciationStep({
             children: (
               <V3PosTab
                 content={value}
+                formGroupBindingCounts={formGroupBindingCounts}
                 idFactory={idFactory}
                 issues={issues}
                 onChange={onChange}

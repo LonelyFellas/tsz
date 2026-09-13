@@ -80,6 +80,11 @@
   width: min(112px, 100%);
 }
 
+/* 网格是固定列宽的一行，词形与发音放在最后另起一行，跨两列免得挤进 64px 的等级列。 */
+.v3-meanings-v2 .word-sense-field-form-group {
+  grid-column: 1 / span 2;
+}
+
 @container (min-width: 981px) {
   .v3-meanings-v2 .word-sense-meta-grid {
     grid-template-columns:

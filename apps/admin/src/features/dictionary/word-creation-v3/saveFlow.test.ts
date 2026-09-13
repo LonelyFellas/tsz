@@ -328,10 +328,6 @@ describe("createV3SaveFlow", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -372,10 +368,6 @@ describe("createV3SaveFlow", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -386,10 +378,6 @@ describe("createV3SaveFlow", () => {
         {
           pos_id: "pos-1",
           pos: "verb",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -441,10 +429,6 @@ describe("createV3SaveFlow", () => {
         {
           pos_id: "pos-1",
           pos: "noun",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }
@@ -455,10 +439,6 @@ describe("createV3SaveFlow", () => {
         {
           form_groups: [],
           forms: [],
-          dialect_rules: {
-            phonetic_mode: "unified",
-            spelling_mode: "unified"
-          },
           pos: "noun",
           pos_id: "pos-1"
         }
@@ -469,10 +449,6 @@ describe("createV3SaveFlow", () => {
         {
           pos_id: "pos-1",
           pos: "verb",
-          dialect_rules: {
-            spelling_mode: "unified",
-            phonetic_mode: "unified"
-          },
           forms: [],
           form_groups: []
         }

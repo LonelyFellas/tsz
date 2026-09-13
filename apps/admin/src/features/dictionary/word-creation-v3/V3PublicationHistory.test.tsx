@@ -240,11 +240,15 @@ function complexV3Publication(): AdminWordPublicationV3 {
     {
       id: "v3-form-group-first",
       is_regular: false,
+      scope: "general",
+      dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
       members: [{ id: "v3-membership-first", form_id: formId }]
     },
     {
       id: "v3-form-group-second",
       is_regular: true,
+      scope: "general",
+      dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
       members: [{ id: "v3-membership-second", form_id: formId }]
     }
   ];

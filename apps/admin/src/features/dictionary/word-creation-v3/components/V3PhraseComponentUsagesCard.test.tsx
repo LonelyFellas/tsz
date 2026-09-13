@@ -162,10 +162,6 @@ function makeForms(
       {
         pos_id: "pos-1",
         pos: "verb",
-        dialect_rules: {
-          spelling_mode: mode === "common" ? "unified" : "distinguish",
-          phonetic_mode: "unified"
-        },
         forms: [
           {
             id: "form-base",
