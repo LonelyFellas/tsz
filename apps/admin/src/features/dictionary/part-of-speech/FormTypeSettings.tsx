@@ -13,6 +13,7 @@ import {
   Tooltip,
   Typography
 } from "antd";
+import { FullNameEnCell } from "./FullNameEnCell";
 import type { TableColumnsType } from "antd";
 import type { CreatePartOfSpeechInput, FormTypeConfig } from "@tsz/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -145,7 +146,7 @@ export function FormTypeSettings() {
       title: "英文全称",
       dataIndex: "full_name_en",
       width: 170,
-      ellipsis: true
+      render: (value: string) => <FullNameEnCell value={value} />
     },
     {
       title: "所属基本词性",

@@ -13,6 +13,7 @@ import {
   Table,
   Tooltip
 } from "antd";
+import { FullNameEnCell } from "./FullNameEnCell";
 import type { TableColumnsType } from "antd";
 import dayjs from "dayjs";
 import type {
@@ -278,7 +279,7 @@ export function SubPartOfSpeechPanel({
       title: "英文全称",
       dataIndex: "full_name_en",
       width: 160,
-      ellipsis: true
+      render: (value: string) => <FullNameEnCell value={value} />
     },
     {
       title: "所属基本词性",

@@ -23,6 +23,7 @@ import {
   Tooltip,
   Typography
 } from "antd";
+import { FullNameEnCell } from "./FullNameEnCell";
 import type { TableColumnsType } from "antd";
 import { HttpError } from "@tsz/api-client";
 import type { AdminWordKind, PartOfSpeechConfig } from "@tsz/types";
@@ -175,7 +176,7 @@ export function PartOfSpeechSettings() {
       title: "英文全称",
       dataIndex: "full_name_en",
       width: 140,
-      ellipsis: true
+      render: (value: string) => <FullNameEnCell value={value} />
     },
     {
       title: "细分词性",
