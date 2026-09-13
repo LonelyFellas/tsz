@@ -57,6 +57,26 @@ function renderModal(editing?: PartOfSpeechConfig) {
   return { onClose, onSaved, onError };
 }
 
+/**
+ * 新建时不再从正式中文、正式英文带出简洁显示与英文全称。表单的 useWatch 通知是异步的，
+ * 改完立刻断言空值抓不到联动，所以给它一段时间：期间两个字段一旦被填上就算失败。
+ */
+async function expectDisplayNamesNotDerived() {
+  await expect(
+    waitFor(
+      () => {
+        const derived = ["简洁显示", "英文全称"]
+          .map(
+            (label) => (screen.getByLabelText(label) as HTMLInputElement).value
+          )
+          .join("");
+        if (!derived) throw new Error("简洁显示与英文全称仍为空");
+      },
+      { timeout: 300 }
+    )
+  ).rejects.toThrow("简洁显示与英文全称仍为空");
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   api.createPending = false;
@@ -214,56 +234,42 @@ describe("PartOfSpeechFormModal", () => {
   });
 });
 
-describe("PartOfSpeechFormModal 派生默认值", () => {
-  it("新建时简洁显示、英文全称跟随来源字段，手动改过后不再覆盖，编码由英文全称派生", async () => {
+describe("PartOfSpeechFormModal 新建默认值", () => {
+  it("新建时填正式中文、正式英文不会带出简洁显示与英文全称，编码仍由英文全称派生", async () => {
     renderModal();
 
     fireEvent.change(screen.getByLabelText("正式中文"), {
       target: { value: "小品词" }
     });
-    await waitFor(() =>
-      expect(screen.getByLabelText("简洁显示")).toHaveValue("小品词")
-    );
-
     fireEvent.change(screen.getByLabelText("正式英文"), {
       target: { value: "PARTICLE" }
     });
-    await waitFor(() =>
-      expect(screen.getByLabelText("英文全称")).toHaveValue("particle")
-    );
+    fireEvent.change(screen.getByLabelText("英文缩写"), {
+      target: { value: "part." }
+    });
+    await expectDisplayNamesNotDerived();
     expect(screen.queryByLabelText("稳定编码")).toBeNull();
 
-    // 手动改过简洁显示后，再改正式中文不再覆盖。
+    // 英文全称带空格与大小写时，提交的编码折成小写下划线。
     fireEvent.change(screen.getByLabelText("简洁显示"), {
       target: { value: "小品" }
     });
-    fireEvent.change(screen.getByLabelText("正式中文"), {
-      target: { value: "语气词" }
-    });
-    await waitFor(() =>
-      expect(screen.getByLabelText("正式中文")).toHaveValue("语气词")
-    );
-    expect(screen.getByLabelText("简洁显示")).toHaveValue("小品");
-
-    // 英文全称带空格与大小写时，提交的编码折成小写下划线。
     fireEvent.change(screen.getByLabelText("英文全称"), {
       target: { value: "Focus Particle Word" }
-    });
-    fireEvent.change(screen.getByLabelText("英文缩写"), {
-      target: { value: "part." }
     });
     fireEvent.click(screen.getByText("新 建"));
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith(
         expect.objectContaining({
           code: "focus_particle_word",
+          short_name_zh: "小品",
           full_name_en: "Focus Particle Word"
         })
       )
     );
   });
 
-  it("新建时序号预填默认值、可改后提交；修改时回填原值且不派生", async () => {
+  it("新建时序号预填默认值、可改后提交；修改时回填原值", async () => {
     const view = render(
       <PartOfSpeechFormModal
         open
@@ -287,9 +293,12 @@ describe("PartOfSpeechFormModal 派生默认值", () => {
     fireEvent.change(screen.getByLabelText("英文缩写"), {
       target: { value: "part." }
     });
-    await waitFor(() =>
-      expect(screen.getByLabelText("英文全称")).toHaveValue("particle")
-    );
+    fireEvent.change(screen.getByLabelText("简洁显示"), {
+      target: { value: "小品词" }
+    });
+    fireEvent.change(screen.getByLabelText("英文全称"), {
+      target: { value: "particle" }
+    });
     fireEvent.click(screen.getByText("新 建"));
     await waitFor(() =>
       expect(api.create).toHaveBeenCalledWith(

@@ -147,10 +147,10 @@ test("基本词性表按原型列展示，弹窗只有展示字段、不暴露�
   const createDialog = page.getByRole("dialog");
   await createDialog.getByLabel("正式中文").fill("语气词");
   await createDialog.getByLabel("正式英文").fill("PARTICLE WORD");
-  await expect(createDialog.getByLabel("简洁显示")).toHaveValue("语气词");
-  await expect(createDialog.getByLabel("英文全称")).toHaveValue(
-    "particle word"
-  );
+  await createDialog.getByLabel("英文缩写").fill("pw.");
+  // 新建时不从正式中文、正式英文带出简洁显示与英文全称。
+  await expect(createDialog.getByLabel("简洁显示")).toHaveValue("");
+  await expect(createDialog.getByLabel("英文全称")).toHaveValue("");
   await expect(createDialog.getByLabel("稳定编码")).toHaveCount(0);
   await expect(createDialog.getByLabel("排序值")).toHaveCount(0);
 });

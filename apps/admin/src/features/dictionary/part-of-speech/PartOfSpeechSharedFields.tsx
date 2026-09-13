@@ -1,7 +1,6 @@
 import { InfoCircleOutlined } from "@ant-design/icons";
 import { Col, Form, Input, InputNumber, Popover, Row } from "antd";
 import type { ReactNode } from "react";
-import type { DerivedNameField } from "./useDerivedNameDefaults";
 
 /**
  * 字段说明收进标签右侧的问号：这些话挂在输入框下面会把弹窗撑高一截，
@@ -45,8 +44,6 @@ const SORT_ORDER_MAX = 2147483647;
 
 interface Props {
   placeholders: PartOfSpeechSharedPlaceholders;
-  /** 用户手动编辑派生字段时通知 useDerivedNameDefaults 停止覆盖。 */
-  onTouch: (field: DerivedNameField) => void;
 }
 
 /**
@@ -54,7 +51,7 @@ interface Props {
  * 英文全称 / 序号。校验规则与后端契约一致（中英文名 64、简洁显示与缩写 16、
  * 英文全称 64 且须含英文字母、序号是 32 位有符号整数）。
  */
-export function PartOfSpeechSharedFields({ placeholders, onTouch }: Props) {
+export function PartOfSpeechSharedFields({ placeholders }: Props) {
   return (
     <>
       <Row gutter={16}>
@@ -83,10 +80,7 @@ export function PartOfSpeechSharedFields({ placeholders, onTouch }: Props) {
               { max: 16, message: "简洁显示不能超过 16 个字符" }
             ]}
           >
-            <Input
-              placeholder={placeholders.short_name_zh}
-              onChange={() => onTouch("short_name_zh")}
-            />
+            <Input placeholder={placeholders.short_name_zh} />
           </Form.Item>
         </Col>
       </Row>
@@ -128,10 +122,7 @@ export function PartOfSpeechSharedFields({ placeholders, onTouch }: Props) {
               { pattern: /[A-Za-z]/, message: "英文全称需包含英文字母" }
             ]}
           >
-            <Input
-              placeholder={placeholders.full_name_en}
-              onChange={() => onTouch("full_name_en")}
-            />
+            <Input placeholder={placeholders.full_name_en} />
           </Form.Item>
         </Col>
         <Col span={12}>
