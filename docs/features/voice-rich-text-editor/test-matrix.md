@@ -9,8 +9,6 @@
 | C03 | 单元       | V2 校验边界            | 空区间、越界、跨段、重叠 phoneme、pause 0/5001/小数、正文/标注超限 | 返回精确错误，不能静默截断或输出非法值                                   | P0     |
 | C04 | 单元       | V1 兼容迁移            | bold、blue、首/中/尾 liaison point 与 emoji                        | 映射为 V2 工作态；原 V1 引用和值不变                                     | P0     |
 | C05 | 单元       | canonical hash         | 同义但顺序不同的标注、文本/voice 参数变化                          | 规范化后 hash 稳定；任一有效语义变化产生不同 hash                        | P0     |
-| C06 | 单元       | SSML 基本语义          | emphasis、phoneme、pause、多段、rate、pitch、style                 | 生成合法确定的嵌套；段落插 500ms；纯视觉标注不进入 SSML                  | P0     |
-| C07 | 单元       | SSML 安全              | 文本/IPA/voice/style 含 `&<>"`                                     | 全部 XML escape，不形成注入或交叉 XML                                    | P0     |
 | M01 | 单元       | TipTap ↔ RichText 往返 | 含五类标注的 V2、多段文本                                          | 编辑器 JSON 往返后正文与 canonical 标注等价                              | P0     |
 | M02 | 单元       | 编辑后的区间位置       | 在标注前/内/后插入和删除，删除 pause 邻接文本                      | 导出偏移与 TipTap transaction 后的真实位置一致                           | P0     |
 | R01 | 组件       | 轻量只读渲染           | V1、V2、空文本、五类标注                                           | 展示正确语义 class/IPA/停顿；不创建 contenteditable                      | P0     |
@@ -20,7 +18,7 @@
 | E03 | 组件       | 重音/连读/高亮/清除    | 同一选区重复操作、不同颜色、重叠选区                               | toggle 语义正确；清除不删正文和选区外标注                                | P0     |
 | E04 | 组件       | IPA 标注               | 已有 IPA、pronunciationHints 命中/未命中、空值/Escape              | 回填优先级正确；应用/清除/取消行为正确                                   | P0     |
 | E05 | 组件       | pause 原子节点         | 光标插入、预设/自定义修改、非法值、删除                            | 正确显示和更新；非法值阻止应用并给出反馈                                 | P0     |
-| E06 | 组件       | 无 TTS adapter 降级    | 不传 `previewAdapter`                                              | 编辑/SSML/PDF 仍可用；生成按钮禁用且说明原因                             | P0     |
+| E06 | 组件       | 无 TTS adapter 降级    | 不传 `previewAdapter`                                              | 编辑/PDF 仍可用；生成按钮禁用且说明原因                                  | P0     |
 | E07 | 组件       | voice capability 联动  | 支持/不支持 style、rate、pitch 的 voice                            | 只展示/启用合法组合，切 voice 后非法旧选项被清理                         | P0     |
 | E08 | 组件       | TTS 成功与缓存         | adapter 成功返回新合成/缓存命中                                    | 防重复、自动播放、状态正确、可重播                                       | P0     |
 | E09 | 组件       | TTS 错误、过期与清理   | reject、内容变化、关闭、迟到响应                                   | 保留编辑内容；旧音频 stale；请求 abort；Audio/URL/监听器释放             | P0     |
@@ -51,3 +49,4 @@
 - `packages/voice-editor` 纳入根 Vitest project 与 `packages/**` 100% 覆盖率门槛。
 - TTS fixture 使用 snake_case wire；包内 adapter/props 使用 camelCase。
 - 后端未就绪期间，P01/P02 与 typed mock 共同防止“自证自话”的伪接口。
+- SSML 语义与 XML 转义只由 tsz-rust `src/speech/ssml.rs` 生成、`src/speech/tests.rs` 覆盖，前端不生成 SSML，本矩阵不再列相应用例。

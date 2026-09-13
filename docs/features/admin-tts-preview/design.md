@@ -4,7 +4,7 @@
 
 沿用现有三层边界：`@tsz/types` 镜像 snake_case wire；`@tsz/api-client` 只负责鉴权 HTTP；admin adapter 把 wire 映射为 `@tsz/voice-editor` camelCase 领域模型。播放器和短期 URL 生命周期留在编辑器组件内，不进入词条 model/store。
 
-不采用浏览器构造 SSML 或直接选择 provider voice id：服务端必须掌握规范化、供应商映射、缓存键和签名 URL。高级 SSML 面板只是本地教学预览，绝不作为试听请求字段。
+不采用浏览器构造 SSML 或直接选择 provider voice id：服务端必须掌握规范化、供应商映射、缓存键和签名 URL。
 
 ## 影响文件
 

@@ -7,7 +7,6 @@ import {
   MAX_RICH_TEXT_ANNOTATIONS,
   MAX_RICH_TEXT_CODE_POINTS,
   RichTextValidationError,
-  buildSsmlPreview,
   canonicalVoiceHash,
   codePointLength,
   codePointSlice,
@@ -283,84 +282,5 @@ describe("RichText compatibility and canonical hash", () => {
       canonicalVoiceHash(equivalent, { ...SETTINGS, pitchSemitones: 2 })
     ).not.toBe(hash);
     expect(canonicalVoiceHash(equivalent)).toHaveLength(8);
-  });
-});
-
-describe("SSML", () => {
-  it("renders speech annotations, paragraph and trailing pauses, prosody, and style deterministically", () => {
-    const value: RichTextV2 = {
-      version: 2,
-      text: "hello\nworld",
-      annotations: [
-        { type: "emphasis", start: 0, end: 5, level: "strong" },
-        {
-          type: "phoneme",
-          start: 0,
-          end: 5,
-          alphabet: "ipa",
-          phoneme: "həˈləʊ"
-        },
-        { type: "pause", at: 6, duration_ms: 300 },
-        { type: "pause", at: 11, duration_ms: 800 },
-        { type: "liaison", start: 6, end: 8 },
-        { type: "highlight", start: 8, end: 11, color: "pink" }
-      ]
-    };
-
-    const result = buildSsmlPreview(value, {
-      ...SETTINGS,
-      locale: "en-US"
-    });
-    expect(result).toContain(
-      '<emphasis level="strong"><phoneme alphabet="ipa" ph="həˈləʊ">hello</phoneme></emphasis>'
-    );
-    expect(result).toContain('<break time="500ms"/><break time="300ms"/>world');
-    expect(result).toContain('<break time="800ms"/>');
-    expect(result).toContain('<prosody rate="+10%" pitch="-1st">');
-    expect(result).toContain(
-      '<mstts:express-as style="cheerful&lt;&amp;&quot;&apos;" styledegree="1">'
-    );
-    expect(result).not.toContain("liaison");
-    expect(result).not.toContain("highlight");
-  });
-
-  it("escapes every XML-controlled field and omits zero prosody", () => {
-    const result = buildSsmlPreview(
-      {
-        version: 2,
-        text: "<&>\"'",
-        annotations: [
-          {
-            type: "phoneme",
-            start: 0,
-            end: 5,
-            alphabet: "ipa",
-            phoneme: "<&>\"'"
-          }
-        ]
-      },
-      {
-        voiceId: SETTINGS.voiceId,
-        locale: "en<&>\"'",
-        ratePercent: 0,
-        pitchSemitones: 0
-      }
-    );
-    expect(result).toContain('xml:lang="en&lt;&amp;&gt;&quot;&apos;"');
-    expect(result).toContain('name="en-US-Ava&lt;&amp;&quot;&apos;"');
-    expect(result).toContain('ph="&lt;&amp;&gt;&quot;&apos;"');
-    expect(result).toContain("&lt;&amp;&gt;&quot;&apos;</phoneme>");
-    expect(result).not.toContain("<prosody");
-    expect(
-      buildSsmlPreview(
-        { version: 2, text: "test", annotations: [] },
-        {
-          voiceId: "voice",
-          locale: "en-US",
-          ratePercent: -5,
-          pitchSemitones: 2
-        }
-      )
-    ).toContain('<prosody rate="-5%" pitch="+2st">');
   });
 });

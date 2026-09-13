@@ -593,19 +593,6 @@
   cursor: help;
 }
 
-.tsz-ve-ssml {
-  max-height: 260px;
-  margin: 0;
-  overflow: auto;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  font:
-    12px/1.55 ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    monospace;
-}
-
 .tsz-ve-print-root {
   display: none;
 }
