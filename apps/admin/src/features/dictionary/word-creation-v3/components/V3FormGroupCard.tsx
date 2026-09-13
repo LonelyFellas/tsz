@@ -90,14 +90,15 @@ export function V3FormGroupCard({
   dialectControl
 }: V3FormGroupCardProps) {
   const [removedTypes, setRemovedTypes] = useRemovedFormTypes(savedGroup.id);
-  // 目录没送全量类型时（老后端）退回该词性名下的那几个，至少不会一个位置都不摆。
   // 本词性名下的类型排在前面，其余类型跟在后面：名词先看到复数，三单这些垫底。
   const derivedFormTypes = useMemo(() => {
-    const all = formTypes ?? posCatalog?.allowed_form_types ?? [];
-    const own = new Set(posCatalog?.allowed_form_types ?? []);
-    return [...all].sort(
-      (left, right) => Number(own.has(right)) - Number(own.has(left))
-    );
+    // 草稿里的词性在目录里找不到时一个位置都不摆，跟着目录 fail closed。
+    if (!posCatalog) return [];
+    const own = posCatalog.allowed_form_types ?? [];
+    // 短语没有词形变化，词形类型也只挂在单词词性下，这类词性不铺全量。
+    if (posCatalog.kind === "phrase") return own;
+    // 目录没送全量类型时（老后端）退回该词性名下的那几个，至少不会一个位置都不摆。
+    return [...new Set([...own, ...(formTypes ?? own)])];
   }, [formTypes, posCatalog]);
   const [displayOrder, setDisplayOrder] = useState<string[]>([]);
   // 缺少的变化类型只用于展示，编辑后才进入草稿。

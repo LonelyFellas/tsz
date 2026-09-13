@@ -61,6 +61,13 @@ const narrowFormTypes = () => ({
   form_types: undefined
 });
 
+/** 配置表里除原形外的全部词形类型，按排序值，和第二步下传的算法同款。 */
+const fullFormTypes = () =>
+  (partOfSpeechCatalogFixture.form_types ?? [])
+    .filter((item) => item.code !== "base")
+    .sort((left, right) => left.sort_order - right.sort_order)
+    .map((item) => item.code);
+
 const catalogState = vi.hoisted(() => ({
   data: undefined as typeof partOfSpeechCatalogFixture | undefined,
   isError: false,
@@ -1593,15 +1600,61 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
   });
 
+  it("全量铺满后行内类型下拉的候选也是全部类型", async () => {
+    catalogState.data = partOfSpeechCatalogFixture;
+    render(
+      <Harness initial={formsFixture({ forms: [commonFormFixture()] })} />
+    );
+
+    const select = await screen.findByLabelText("变化组 1 词形 2 类型");
+    fireEvent.mouseDown(select);
+    const choices = [
+      ...document.querySelectorAll<HTMLElement>(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )
+    ].map((item) => item.textContent);
+    // 录入者要能把一行改成非本词性的类型，候选是原形加配置表里的全部类型。
+    expect(choices).toHaveLength(fullFormTypes().length + 1);
+    expect(choices).toContain("过去式");
+    expect(choices).toContain("最高级");
+  });
+
+  it("短语的词性不铺全量类型，也不给新增变化组入口", () => {
+    const content = formsFixture({ pos: "adverb" });
+    const adverbCatalog = partOfSpeechCatalogFixture.items.find(
+      (item) => item.code === "adverb"
+    )!;
+    // 短语没有词形变化，词形类型在后端也只挂在单词词性下。
+    const phraseCatalog = { ...adverbCatalog, kind: "phrase" as const };
+
+    render(
+      <AntApp>
+        <PronunciationPreviewProvider>
+          <V3PosTab
+            content={content}
+            formTypes={fullFormTypes()}
+            idFactory={() => uuidFromInt(980)}
+            issues={[]}
+            onChange={() => undefined}
+            pos={content.pos[0]!}
+            posCatalog={phraseCatalog}
+          />
+        </PronunciationPreviewProvider>
+      </AntApp>
+    );
+
+    expect(screen.getAllByLabelText(/^变化组 1 词形 \d+ 类型$/u)).toHaveLength(
+      1
+    );
+    expect(screen.queryByLabelText(/新增.*变化组/u)).toBeNull();
+  });
+
   it("配置表里没有派生词形的词性，拿到全量类型后同样铺满", () => {
     const content = formsFixture({ pos: "adverb" });
     const adverbCatalog = partOfSpeechCatalogFixture.items.find(
       (item) => item.code === "adverb"
     )!;
-    const formTypes = (partOfSpeechCatalogFixture.form_types ?? [])
-      .filter((item) => item.code !== "base")
-      .sort((left, right) => left.sort_order - right.sort_order)
-      .map((item) => item.code);
+    const formTypes = fullFormTypes();
 
     render(
       <AntApp>

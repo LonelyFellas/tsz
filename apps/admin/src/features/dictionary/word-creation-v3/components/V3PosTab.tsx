@@ -66,7 +66,11 @@ export function V3PosTab({
   const [dialectChangeError, setDialectChangeError] = useState<string>();
   const posLabel = posCatalog?.name_zh ?? partOfSpeechLabel(pos.pos);
   const { preference } = useDialectPreference();
-  const allowedDerivedTypes = formTypes ?? posCatalog?.allowed_form_types ?? [];
+  // 短语没有词形变化：这类词性不吃全量类型，免得页签里摆出一排复数、三单，
+  // 也别因此多出「增加一组词性变化」入口。
+  const posFormTypes = posCatalog?.kind === "phrase" ? undefined : formTypes;
+  const allowedDerivedTypes =
+    posFormTypes ?? posCatalog?.allowed_form_types ?? [];
   const membershipCounts = new Map<string, number>();
   for (const group of pos.form_groups) {
     for (const member of group.members) {
