@@ -1,6 +1,6 @@
 # 前端部署验收
 
-按请求的组件执行。期望 web/admin 页面为 200、未登录 API 为 401、tsz-web active、nginx 配置有效：
+先复用部署脚本已输出的同状态结果，以下命令只用于缺项、状态变化或结果不明时补查。按请求的组件执行。期望 web/admin 页面为 200、未登录 API 为 401、tsz-web active、nginx 配置有效：
 
 ```bash
 curl -fsS -m 8 -o /dev/null -w "%{http_code}" http://47.121.142.19/

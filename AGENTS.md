@@ -55,7 +55,7 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 ## 质量门
 
 - git hooks（lefthook）：pre-commit = prettier + eslint（按包），commit-msg = commitlint
-  （conventional commits），pre-push = typecheck + test:cov。e2e 由 CI 兜底。
+  （conventional commits），pre-push 的实际检查以 `lefthook.yml` 为准（当前为 typecheck + 普通测试）。e2e 由 CI 兜底。
 - **绝不绕过钩子**（`LEFTHOOK=0`、`--no-verify` 一律禁止）。push 报
   `failed to push some refs` 时读取完整输出，区分 hooks、远端拒绝、网络和认证问题，修复根因后重推。
 - 覆盖率规则以根 `vitest.shared-config.ts` 及各项目 Vitest 配置为准：当前生成报告，不设百分比门槛。
