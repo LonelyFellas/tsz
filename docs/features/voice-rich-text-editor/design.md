@@ -189,7 +189,7 @@ export type RichText = RichTextV1 | RichTextV2;
 
 - 校验正文 ≤ 5000 码点、annotations ≤ 500；
 - 检测空区间与越界标注并返回显式校验错误，不能静默删除或截断用户输入；
-- 同类型、同属性、相邻或重叠的 emphasis/highlight/liaison 合并；
+- 同类型、同属性、相邻或重叠的 emphasis/highlight 合并；liaison 是两点之间的连线，不合并，只去掉 `start`/`end`/`start_len`/`end_len` 全同的重复；
 - phoneme 之间不允许重叠，同一范围以最后一次明确操作替换；
 - 同一 `at` 最多一个 pause，后设置值替换旧值；
 - pause `duration_ms` 为整数 `1..5000`；

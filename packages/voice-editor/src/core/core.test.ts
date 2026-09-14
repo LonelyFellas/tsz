@@ -96,6 +96,43 @@ describe("RichText V2 normalization and validation", () => {
     expect(input).toEqual(snapshot);
   });
 
+  it("keeps overlapping, adjacent, and differently anchored liaisons apart, dropping only exact duplicates", () => {
+    const normalized = normalizeRichTextV2({
+      version: 2,
+      text: "hello",
+      annotations: [
+        { type: "liaison", start: 1, end: 5 },
+        { type: "liaison", start: 0, end: 3, start_len: 1, end_len: 1 },
+        { type: "liaison", start: 3, end: 5 },
+        { type: "liaison", start: 0, end: 3, start_len: 2 },
+        // 端宽缺省按 1：与上面第二条是同一条，只留一份。
+        { type: "liaison", start: 0, end: 3 },
+        { type: "liaison", start: 1, end: 5 }
+      ]
+    });
+    const links = normalized.annotations.map((annotation) =>
+      annotation.type === "liaison"
+        ? [
+            annotation.start,
+            annotation.end,
+            annotation.start_len ?? 1,
+            annotation.end_len ?? 1
+          ]
+        : annotation
+    );
+    // h‿l [0,3) 与 e‿o [1,5) 交叠、[0,3) 与 [3,5) 首尾相接、[0,3) 换了起点宽度，各是一条弧。
+    expect(links).toHaveLength(4);
+    expect(links).toEqual(
+      expect.arrayContaining([
+        [0, 3, 1, 1],
+        [0, 3, 2, 1],
+        [1, 5, 1, 1],
+        [3, 5, 1, 1]
+      ])
+    );
+    expect(normalizeRichTextV2(normalized)).toEqual(normalized);
+  });
+
   it("returns precise issues for every invalid boundary", () => {
     const tooMany = Array.from(
       { length: MAX_RICH_TEXT_ANNOTATIONS + 1 },
@@ -228,18 +265,19 @@ describe("RichText compatibility and canonical hash", () => {
 
     const migrated = migrateRichTextV1(input);
     /*
-     * 连读点 0、2、3 里，点 1 不是连读点，所以 [0,2) 与 [2,4) 只是首尾相接、
-     * 并非同一段，必须分开——早先它们被合并成 [0,5)，等于凭空多出一处点 1
-     * 的连读。点 2 与点 3 相邻，[2,4) 与 [3,5) 真重叠，合并成 [2,5) 是对的。
+     * 每个连读点各是一条连线：[0,2) 与 [2,4) 首尾相接、[2,4) 与 [3,5) 交叠，
+     * 都不能合并——合并成 [2,5) 等于把点 2、点 3 两处连读画成一道长弧。
      */
     expect(migrated.annotations).toEqual(
       expect.arrayContaining([
         { type: "emphasis", start: 0, end: 1, level: "strong" },
         { type: "highlight", start: 1, end: 3, color: "blue" },
         { type: "liaison", start: 0, end: 2 },
-        { type: "liaison", start: 2, end: 5 }
+        { type: "liaison", start: 2, end: 4 },
+        { type: "liaison", start: 3, end: 5 }
       ])
     );
+    expect(migrated.annotations).toHaveLength(5);
     expect(input).toEqual(snapshot);
     expect(toRichTextV2(input)).toEqual(migrated);
     expect(selectedText(input, 0, 2)).toBe("😀a");
