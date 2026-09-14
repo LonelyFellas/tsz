@@ -1375,6 +1375,116 @@ describe("V3WordCreationWizard", () => {
     );
   });
 
+  it("词义保存先补存词形期间收到别处的新版本：词形存完后不再发出词义保存", async () => {
+    let resolveForms!: (value: AdminWordV3Envelope) => void;
+    const initial = word(1, "centre");
+    const localMeanings = toWritableMeanings(initial.meanings);
+    localMeanings.sense_groups[0]!.name_zh = "本地改的区间";
+    const source = requests({
+      saveForms: vi.fn(
+        () =>
+          new Promise<AdminWordV3Envelope>((resolve) => {
+            resolveForms = resolve;
+          })
+      )
+    });
+    const renderStep = (context: V3WizardSlotContext) => (
+      <>
+        <button
+          type="button"
+          onClick={() => context.setDraftForms(editedForms(context))}
+        >
+          编辑词形
+        </button>
+        <button
+          type="button"
+          onClick={() => context.setDraftMeanings(localMeanings)}
+        >
+          编辑区间
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            void context.actions.saveMeanings(context.draftMeanings, "save")
+          }
+        >
+          保存词义
+        </button>
+      </>
+    );
+    const view = renderWizard(source, { initialWord: initial, renderStep });
+
+    fireEvent.click(screen.getByText("编辑词形"));
+    fireEvent.click(screen.getByText("编辑区间"));
+    fireEvent.click(screen.getByText("保存词义"));
+    await waitFor(() => expect(source.saveForms).toHaveBeenCalledTimes(1));
+    view.rerender(
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={word(3, "other editor")}
+          requests={source}
+          renderStep={renderStep}
+        />
+      )
+    );
+    const [, formsInput] = vi.mocked(source.saveForms).mock.calls[0]!;
+    await act(async () =>
+      resolveForms({
+        word: { ...word(2, "local edit"), forms: formsInput.content }
+      })
+    );
+
+    expect(await screen.findByText("版本冲突")).toBeInTheDocument();
+    expect(source.saveMeanings).not.toHaveBeenCalled();
+  });
+
+  it("完成词义时先补存词形，期间收到的新版本已整体替换会话：不再按旧会话发出词义保存", async () => {
+    let resolveForms!: (value: AdminWordV3Envelope) => void;
+    const source = requests({
+      saveForms: vi.fn(
+        () =>
+          new Promise<AdminWordV3Envelope>((resolve) => {
+            resolveForms = resolve;
+          })
+      )
+    });
+    const renderStep = (context: V3WizardSlotContext) => (
+      <>
+        <output data-testid="replaced-revision">{context.word.revision}</output>
+        <button
+          type="button"
+          onClick={() =>
+            void context.actions.saveMeanings(context.draftMeanings, "complete")
+          }
+        >
+          完成词义
+        </button>
+      </>
+    );
+    const view = renderWizard(source, {
+      initialWord: word(1, "centre"),
+      renderStep
+    });
+
+    fireEvent.click(screen.getByText("完成词义"));
+    await waitFor(() => expect(source.saveForms).toHaveBeenCalledTimes(1));
+    view.rerender(
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={word(3, "other editor")}
+          requests={source}
+          renderStep={renderStep}
+        />
+      )
+    );
+    await act(async () => resolveForms(envelope(2, "centre")));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("replaced-revision")).toHaveTextContent("3")
+    );
+    expect(source.saveMeanings).not.toHaveBeenCalled();
+  });
+
   it("只有生命周期变化、内容版本号不变时不提示冲突，保存沿用原基线", async () => {
     const lifecycleOnly = word(1, "centre");
     lifecycleOnly.lifecycle_revision = 2;

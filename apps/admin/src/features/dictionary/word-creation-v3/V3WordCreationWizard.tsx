@@ -1135,8 +1135,14 @@ function V3WordCreationSession({
         (intent === "complete" &&
           !flow.canonical().completed_steps.includes("forms"))
       ) {
-        const formsSaved = await saveFormsContent(draftForms, intent);
+        // 用当前草稿：未完成例句的确认弹窗期间词形也可能被改过。
+        const formsSaved = await saveFormsContent(
+          draftFormsRef.current,
+          intent
+        );
         if (!formsSaved) return;
+        // 词形保存结束时可能处理了暂存的新版本（挂起提示或整体替换会话），不再按旧基线续发词义。
+        if (blockedByRemoteUpdate() || flowRef.current !== flow) return;
       }
       const baseRevision = flow.canonical().revision;
       // 四个译文框只是录入位，收尾提交时丢掉一个字都没填的行。放在这条所有保存
@@ -1214,7 +1220,6 @@ function V3WordCreationSession({
     [
       applyCanonical,
       allowPublishedEditing,
-      draftForms,
       finishSaveInFlight,
       handleEntryArchived,
       handleError,
@@ -1347,6 +1352,7 @@ function V3WordCreationSession({
         (dirtyRef.current.forms || dirtyRef.current.meanings)
       ) {
         // 本地有未保存输入：对账拿到的新版本同样不能静默换基线，交给统一的新版本判定。
+        // 对账锁仍交给下面的 finally 释放，所以这里不复用 resetReconciliationState。
         publishAttemptRef.current = undefined;
         publishReconciliationRequiredRef.current = false;
         retryRef.current = undefined;
