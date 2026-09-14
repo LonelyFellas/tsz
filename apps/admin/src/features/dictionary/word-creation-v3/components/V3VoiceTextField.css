@@ -46,10 +46,6 @@
   pointer-events: none;
 }
 
-.v3-voice-text-liaison-content {
-  box-sizing: border-box;
-}
-
 .v3-voice-text-liaison-overlay .tsz-ve-readonly.has-liaison {
   display: block;
   max-width: none;

@@ -136,13 +136,13 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
 }: V3VoiceTextFieldProps<TLink>) {
   const [editing, setEditing] = useState(false);
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
-  // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。
+  // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。展开编辑时用不上，不算。
   const liaisons = useMemo(
     () =>
-      mode !== undefined && LIAISON_OVERLAY_MODES.has(mode)
+      !expanded && mode !== undefined && LIAISON_OVERLAY_MODES.has(mode)
         ? liaisonOnly(value)
         : undefined,
-    [mode, value]
+    [expanded, mode, value]
   );
   useEffect(() => {
     onEditingChange?.(expanded);
@@ -372,8 +372,8 @@ function liaisonOnly(value: RichTextV3): RichTextV2 | undefined {
 /**
  * 收起态输入框上的连读弧：透明文字与输入框同排版，弧线按它量位置。
  *
- * 超过 maxRows 后输入框自己滚动：内层宽度取 clientWidth（滚动条占宽的平台上要扣掉，
- * 否则折行位置不同），并随 scrollTop 平移；外层按视口裁掉滚出去的弧线。
+ * 超过 maxRows 后输入框自己滚动：内层扣掉滚动条宽度（滚动条占宽的平台上不扣，折行位置
+ * 就不同），并随 scrollTop 平移；外层按视口裁掉滚出去的弧线。
  * jsdom 不做布局，对齐与裁剪只能在真浏览器里量。
  */
 function LiaisonOverlay({ value }: { value: RichTextV2 }) {
@@ -398,8 +398,18 @@ function LiaisonOverlay({ value }: { value: RichTextV2 }) {
       (Number.parseFloat(style.borderBottomWidth) || 0) +
       (Number.parseFloat(style.paddingBottom) || 0)
     }px`;
+    const horizontalBorders =
+      (Number.parseFloat(style.borderLeftWidth) || 0) +
+      (Number.parseFloat(style.borderRightWidth) || 0);
     const follow = () => {
-      content.style.width = `${input.clientWidth}px`;
+      // 内层自动撑满外层内容盒（即输入框内边距盒的精确宽度），只扣滚动条。不能拿 clientWidth
+      // 当宽度：它是取整值，外框宽度带小数（英美双栏平分、系统缩放）时折行会对不上；
+      // offsetWidth 与 clientWidth 取整方式一致，相减后误差抵消。
+      const scrollbar = Math.max(
+        0,
+        Math.round(input.offsetWidth - input.clientWidth - horizontalBorders)
+      );
+      content.style.marginRight = `${scrollbar}px`;
       content.style.transform = `translateY(${-input.scrollTop}px)`;
     };
     follow();

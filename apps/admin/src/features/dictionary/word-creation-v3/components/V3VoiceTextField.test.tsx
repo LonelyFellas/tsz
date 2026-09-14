@@ -647,31 +647,68 @@ it("字典音标收起态不叠弧线层", () => {
   expect(container.querySelector(".tsz-ve-liaison-anchor")).toBeNull();
 });
 
-it("弧线层内层宽度取输入框 clientWidth（扣掉滚动条），并随输入框滚动平移", () => {
-  const { container } = render(
-    <V3VoiceTextField
-      mode="association"
-      ariaLabel="英文例句"
-      field="value"
-      nodeId="s"
-      value={LIAISON_TEXT}
-      onChange={vi.fn()}
-    />
+it("弧线层内层扣掉输入框滚动条宽度，并随输入框滚动和尺寸变化跟进", () => {
+  let resizeInput: (() => void) | undefined;
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      callback: ResizeObserverCallback;
+      constructor(callback: ResizeObserverCallback) {
+        this.callback = callback;
+      }
+      observe(target: Element) {
+        // 只读视图自己也建观察器，这里只接住挂在输入框上的那个。
+        if (target instanceof HTMLTextAreaElement)
+          resizeInput = () =>
+            this.callback([], this as unknown as ResizeObserver);
+      }
+      unobserve() {}
+      disconnect() {}
+    }
   );
-  const input = screen.getByLabelText("英文例句");
-  const content = container.querySelector<HTMLElement>(
-    ".v3-voice-text-liaison-content"
-  );
-  expect(content).not.toBeNull();
-  // jsdom 不做布局：直接给出输入框出现 15px 滚动条、往下滚两行之后的读数。
-  Object.defineProperty(input, "clientWidth", {
-    configurable: true,
-    value: 185
-  });
-  Object.defineProperty(input, "scrollTop", { configurable: true, value: 44 });
-  fireEvent.scroll(input);
-  expect(content!.style.width).toBe("185px");
-  expect(content!.style.transform).toBe("translateY(-44px)");
+  try {
+    const { container } = render(
+      <V3VoiceTextField
+        mode="association"
+        ariaLabel="英文例句"
+        field="value"
+        nodeId="s"
+        value={LIAISON_TEXT}
+        onChange={vi.fn()}
+      />
+    );
+    const input = screen.getByLabelText("英文例句");
+    const content = container.querySelector<HTMLElement>(
+      ".v3-voice-text-liaison-content"
+    );
+    expect(content).not.toBeNull();
+    // 宽度不能写死成取整的 clientWidth：内层自动撑满，只用右外边距扣滚动条。
+    expect(content!.style.width).toBe("");
+    const style = getComputedStyle(input);
+    const borders =
+      (Number.parseFloat(style.borderLeftWidth) || 0) +
+      (Number.parseFloat(style.borderRightWidth) || 0);
+    const define = (key: string, value: number) =>
+      Object.defineProperty(input, key, { configurable: true, value });
+
+    // jsdom 不做布局：直接给出输入框出现 15px 滚动条、往下滚两行之后的读数。
+    define("clientWidth", 184);
+    define("offsetWidth", 184 + 15 + borders);
+    define("scrollTop", 44);
+    fireEvent.scroll(input);
+    expect(content!.style.marginRight).toBe("15px");
+    expect(content!.style.transform).toBe("translateY(-44px)");
+
+    // 删短内容后滚动条消失、scrollTop 归零，只保证有尺寸变化回调。
+    define("offsetWidth", 184 + borders);
+    define("scrollTop", 0);
+    expect(resizeInput).toBeDefined();
+    resizeInput!();
+    expect(content!.style.marginRight).toBe("0px");
+    expect(content!.style.transform).toBe("translateY(0px)");
+  } finally {
+    vi.unstubAllGlobals();
+  }
 });
 
 it("弧线层压在紧凑组员之上、点击穿透，并按输入框视口裁剪", () => {
