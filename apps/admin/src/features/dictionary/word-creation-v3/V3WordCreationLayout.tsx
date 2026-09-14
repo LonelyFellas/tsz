@@ -295,64 +295,70 @@ function V3WordCreationLayoutContent({
           />
         ) : null}
 
-        {problem && (
-          <Alert
-            showIcon
-            type={problem.kind === "validation" ? "warning" : "error"}
-            title={problemTitle(problem)}
-            description={
-              conflict ? (
-                <Flex vertical gap={4}>
-                  <span>
-                    <strong>
-                      {conflict.step === "forms"
-                        ? "词形与发音冲突"
-                        : "词义与例句冲突"}
-                    </strong>
-                    ：本地输入仍已保留。
-                  </span>
-                  {conflict.serverWord && <span>已获取服务端最新内容。</span>}
-                </Flex>
-              ) : operationValidationIssues.length > 0 ? (
-                <Flex vertical gap={4}>
-                  {v3IssueMessages(operationValidationIssues).map((message) => (
-                    <span key={message}>{message}</span>
-                  ))}
-                </Flex>
-              ) : undefined
-            }
-            action={
-              problem.kind === "revision_conflict" &&
-              conflict &&
-              onRefreshConflict ? (
-                <Flex gap="small" wrap="wrap">
+        {/* 挂起的新版本已经给出保留/放弃的选择，同一冲突的 409 提示不再并列显示。 */}
+        {problem &&
+          !(showRemoteUpdate && problem.kind === "revision_conflict") && (
+            <Alert
+              showIcon
+              type={problem.kind === "validation" ? "warning" : "error"}
+              title={problemTitle(problem)}
+              description={
+                conflict ? (
+                  <Flex vertical gap={4}>
+                    <span>
+                      <strong>
+                        {conflict.step === "forms"
+                          ? "词形与发音冲突"
+                          : "词义与例句冲突"}
+                      </strong>
+                      ：本地输入仍已保留。
+                    </span>
+                    {conflict.serverWord && <span>已获取服务端最新内容。</span>}
+                  </Flex>
+                ) : operationValidationIssues.length > 0 ? (
+                  <Flex vertical gap={4}>
+                    {v3IssueMessages(operationValidationIssues).map(
+                      (message) => (
+                        <span key={message}>{message}</span>
+                      )
+                    )}
+                  </Flex>
+                ) : undefined
+              }
+              action={
+                problem.kind === "revision_conflict" &&
+                conflict &&
+                onRefreshConflict ? (
+                  <Flex gap="small" wrap="wrap">
+                    <Button
+                      loading={refreshingConflict}
+                      onClick={onRefreshConflict}
+                    >
+                      刷新并比较
+                    </Button>
+                    {conflict.serverWord && onDiscardLocalChanges ? (
+                      <DiscardLocalChangesButton
+                        revision={conflict.serverWord.revision}
+                        onConfirm={onDiscardLocalChanges}
+                      />
+                    ) : null}
+                  </Flex>
+                ) : operationValidationIssues[0] && onIssueNavigate ? (
                   <Button
-                    loading={refreshingConflict}
-                    onClick={onRefreshConflict}
+                    onClick={() =>
+                      onIssueNavigate(operationValidationIssues[0]!)
+                    }
                   >
-                    刷新并比较
+                    去处理首项
                   </Button>
-                  {conflict.serverWord && onDiscardLocalChanges ? (
-                    <DiscardLocalChangesButton
-                      revision={conflict.serverWord.revision}
-                      onConfirm={onDiscardLocalChanges}
-                    />
-                  ) : null}
-                </Flex>
-              ) : operationValidationIssues[0] && onIssueNavigate ? (
-                <Button
-                  onClick={() => onIssueNavigate(operationValidationIssues[0]!)}
-                >
-                  去处理首项
-                </Button>
-              ) : problem.retryable && onRetry ? (
-                <Button loading={retrying} onClick={onRetry}>
-                  重试
-                </Button>
-              ) : undefined
-            }
-          />
-        )}
+                ) : problem.retryable && onRetry ? (
+                  <Button loading={retrying} onClick={onRetry}>
+                    重试
+                  </Button>
+                ) : undefined
+              }
+            />
+          )}
 
         {children}
       </Flex>

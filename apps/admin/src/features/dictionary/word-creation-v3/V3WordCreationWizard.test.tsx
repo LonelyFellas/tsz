@@ -19,7 +19,7 @@ import {
 import type { ReactNode } from "react";
 import { StrictMode, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 
 vi.mock("../api", () => ({
   useRelatedSearch: () => ({
@@ -752,8 +752,22 @@ describe("V3WordCreationWizard", () => {
   it("本地词形未保存时收到更新的服务端版本：立即提示冲突，选择前不发写请求", async () => {
     const newer = word(2, "other editor");
     const source = requests();
+    const scrollIntoView = vi.fn();
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+    onTestFinished(() => {
+      Element.prototype.scrollIntoView = originalScrollIntoView;
+    });
     const renderStep = (context: V3WizardSlotContext) => (
-      <Slot context={context} />
+      <>
+        <Slot context={context} />
+        <button
+          type="button"
+          onClick={() => void context.actions.previewFormsSaveImpact()}
+        >
+          保存前影响预览
+        </button>
+      </>
     );
     const view = renderWizard(source, {
       initialWord: word(1, "centre"),
@@ -782,13 +796,30 @@ describe("V3WordCreationWizard", () => {
     expect(screen.queryByText("有未保存的草稿")).toBeNull();
 
     fireEvent.click(screen.getByText("保存"));
+    fireEvent.click(screen.getByText("保存前影响预览"));
     await act(async () => {});
     expect(source.saveForms).not.toHaveBeenCalled();
     expect(source.impact).not.toHaveBeenCalled();
+    // 被拦下的写操作把冲突提示滚回视野。
+    expect(scrollIntoView).toHaveBeenCalled();
 
     // 继续编辑不会让待决的冲突提示消失。
     fireEvent.click(screen.getByText("编辑"));
     expect(screen.getByText("版本冲突")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "保留本地修改" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("revision")).toHaveTextContent("2")
+    );
+    fireEvent.click(screen.getByText("保存"));
+    await waitFor(() => expect(source.saveForms).toHaveBeenCalledTimes(1));
+    const [, savedInput] = vi.mocked(source.saveForms).mock.calls[0]!;
+    expect(savedInput.base_revision).toBe(2);
+    const savedVariants =
+      savedInput.content.pos[0]!.forms[0]!.regional_variants;
+    expect(
+      savedVariants.mode === "common" ? savedVariants.common.spelling : ""
+    ).toBe("local edit");
   });
 
   it("本地词义未保存时收到更新的服务端版本：保留本地修改后才以新版本为基线保存", async () => {
@@ -903,7 +934,7 @@ describe("V3WordCreationWizard", () => {
     expect(source.saveForms).not.toHaveBeenCalled();
   });
 
-  it("刷新先于自己的保存响应到达时，保存完成后撤销冲突提示", async () => {
+  it("自己的保存在途时刷新先到：不闪冲突提示，保存完成后追平到该版本", async () => {
     let resolveSave!: (value: AdminWordV3Envelope) => void;
     const saved = word(2, "local edit");
     const source = requests({
@@ -934,13 +965,414 @@ describe("V3WordCreationWizard", () => {
         />
       )
     );
-    expect(await screen.findByText("版本冲突")).toBeInTheDocument();
+    await act(async () => {});
+    // 保存还在途：拉到的新版本先暂存，不闪冲突提示。
+    expect(screen.queryByText("版本冲突")).toBeNull();
+    expect(screen.getByTestId("revision")).toHaveTextContent("1");
 
     await act(async () => resolveSave({ word: saved }));
 
-    await waitFor(() => expect(screen.queryByText("版本冲突")).toBeNull());
-    expect(screen.getByTestId("revision")).toHaveTextContent("2");
+    await waitFor(() =>
+      expect(screen.getByTestId("revision")).toHaveTextContent("2")
+    );
+    expect(screen.queryByText("版本冲突")).toBeNull();
     expect(source.saveForms).toHaveBeenCalledTimes(1);
+  });
+
+  it("409 刷新并比较取回服务端内容后，放弃本地修改改用该版本", async () => {
+    const source = requests({
+      saveForms: vi.fn(async () => {
+        throw new HttpError(409, "stale", [], "revision_conflict", [], {
+          current_revision: 4
+        });
+      }),
+      get: vi.fn(async () => draftEnvelope(4, "server latest"))
+    });
+    const renderStep = (context: V3WizardSlotContext) => (
+      <>
+        <Slot context={context} />
+        <output data-testid="discard-409-dirty">
+          {String(context.dirtySteps.forms)}
+        </output>
+      </>
+    );
+    renderWizard(source, { renderStep });
+
+    fireEvent.click(screen.getByText("编辑"));
+    fireEvent.click(screen.getByText("保存"));
+    fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("revision")).toHaveTextContent("4")
+    );
+    expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
+
+    fireEvent.click(screen.getByRole("button", { name: "放弃本地修改" }));
+    fireEvent.click(await screen.findByRole("button", { name: "放弃修改" }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("spelling")).toHaveTextContent("server latest")
+    );
+    expect(screen.getByTestId("discard-409-dirty")).toHaveTextContent("false");
+    expect(screen.queryByText("版本冲突")).toBeNull();
+    expect(source.saveForms).toHaveBeenCalledTimes(1);
+  });
+
+  it("被新输入取代的自己的保存写出新版本后，刷新拉到它不提示冲突，保留本地输入换基线", async () => {
+    let resolveSave!: (value: AdminWordV3Envelope) => void;
+    const ownSaved = word(2, "local edit");
+    const source = requests({
+      saveForms: vi.fn(
+        () =>
+          new Promise<AdminWordV3Envelope>((resolve) => {
+            resolveSave = resolve;
+          })
+      )
+    });
+    const renderStep = (context: V3WizardSlotContext) => (
+      <>
+        <Slot context={context} />
+        <button
+          type="button"
+          onClick={() => {
+            const next = structuredClone(context.draftForms);
+            const variants = next.pos[0]!.forms[0]!.regional_variants;
+            if (variants.mode === "common") {
+              variants.common.spelling = "later edit";
+            }
+            context.setDraftForms(next);
+          }}
+        >
+          继续输入
+        </button>
+      </>
+    );
+    const view = renderWizard(source, {
+      initialWord: word(1, "centre"),
+      renderStep
+    });
+
+    fireEvent.click(screen.getByText("编辑"));
+    fireEvent.click(screen.getByText("保存"));
+    await waitFor(() => expect(source.saveForms).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText("继续输入"));
+    await act(async () => resolveSave({ word: ownSaved }));
+    expect(screen.getByTestId("revision")).toHaveTextContent("1");
+
+    view.rerender(
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={ownSaved}
+          requests={source}
+          renderStep={renderStep}
+        />
+      )
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("revision")).toHaveTextContent("2")
+    );
+    expect(screen.queryByText("版本冲突")).toBeNull();
+    expect(screen.getByTestId("spelling")).toHaveTextContent("later edit");
+    expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+  });
+
+  it("待决期间撤回本地修改、已无未保存输入时直接采用新版本", async () => {
+    const newer = word(2, "other editor");
+    const source = requests();
+    const renderStep = (context: V3WizardSlotContext) => (
+      <>
+        <Slot context={context} />
+        <button
+          type="button"
+          onClick={() => {
+            const next = structuredClone(context.draftForms);
+            const variants = next.pos[0]!.forms[0]!.regional_variants;
+            if (variants.mode === "common") variants.common.spelling = "centre";
+            context.setDraftForms(next);
+          }}
+        >
+          撤回修改
+        </button>
+      </>
+    );
+    const view = renderWizard(source, {
+      initialWord: word(1, "centre"),
+      renderStep
+    });
+
+    fireEvent.click(screen.getByText("编辑"));
+    view.rerender(
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={newer}
+          requests={source}
+          renderStep={renderStep}
+        />
+      )
+    );
+    expect(await screen.findByText("版本冲突")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("撤回修改"));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("spelling")).toHaveTextContent("other editor")
+    );
+    expect(screen.getByTestId("revision")).toHaveTextContent("2");
+    expect(screen.queryByText("版本冲突")).toBeNull();
+    expect(source.saveForms).not.toHaveBeenCalled();
+  });
+
+  it("待决期间又拉到更新的版本：提示改为最新版本，保留后以它为基线", async () => {
+    const source = requests();
+    const renderStep = (context: V3WizardSlotContext) => (
+      <Slot context={context} />
+    );
+    const view = renderWizard(source, {
+      initialWord: word(1, "centre"),
+      renderStep
+    });
+    const rerenderWith = (initialWord: AdminWordV3) =>
+      view.rerender(
+        inRouter(
+          <V3WordCreationWizard
+            initialWord={initialWord}
+            requests={source}
+            renderStep={renderStep}
+          />
+        )
+      );
+
+    fireEvent.click(screen.getByText("编辑"));
+    rerenderWith(word(2, "second"));
+    expect(
+      await screen.findByText(/已在别处保存为第 2 版/)
+    ).toBeInTheDocument();
+    rerenderWith(word(3, "third"));
+    expect(
+      await screen.findByText(/已在别处保存为第 3 版/)
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "保留本地修改" }));
+    await waitFor(() =>
+      expect(screen.getByTestId("revision")).toHaveTextContent("3")
+    );
+    expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
+  });
+
+  it("发布对账未完成时选择保留本地修改，保存后仍能再次发布", async () => {
+    const publish = vi
+      .fn<V3WordRequests["publish"]>()
+      .mockRejectedValueOnce(
+        new HttpError(409, "stale", [], "revision_conflict")
+      )
+      .mockResolvedValueOnce(envelope(7, "published"));
+    const source = requests({
+      publish,
+      get: vi.fn(() => new Promise<AdminWordDraftV3Envelope>(() => {})),
+      saveForms: vi.fn(async (_wordId, input) => ({
+        word: { ...word(6, "local edit"), forms: input.content }
+      }))
+    });
+    const renderStep = (context: V3WizardSlotContext) => (
+      <>
+        <Slot context={context} />
+        <output data-testid="publish-dirty">
+          {String(context.dirtySteps.forms)}
+        </output>
+        <button type="button" onClick={() => void context.actions.publish()}>
+          发布一次
+        </button>
+      </>
+    );
+    const view = renderWizard(source, { initialWord: word(), renderStep });
+
+    fireEvent.click(screen.getByText("发布一次"));
+    await waitFor(() => expect(source.get).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText("编辑"));
+    view.rerender(
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={word(5, "other editor")}
+          requests={source}
+          renderStep={renderStep}
+        />
+      )
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "保留本地修改" })
+    );
+    await waitFor(() =>
+      expect(screen.getByTestId("revision")).toHaveTextContent("5")
+    );
+
+    fireEvent.click(screen.getByText("保存"));
+    await waitFor(() =>
+      expect(screen.getByTestId("publish-dirty")).toHaveTextContent("false")
+    );
+    fireEvent.click(screen.getByText("发布一次"));
+
+    await waitFor(() => expect(publish).toHaveBeenCalledTimes(2));
+  });
+
+  it("发布对账重试时本地有未保存输入：不静默换基线，挂起对账拿到的最新版本", async () => {
+    let resolveFirstGet!: (value: AdminWordDraftV3Envelope) => void;
+    const get = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<AdminWordDraftV3Envelope>((resolve) => {
+            resolveFirstGet = resolve;
+          })
+      )
+      .mockResolvedValueOnce(draftEnvelope(4, "reconciled latest"));
+    const publish = vi
+      .fn<V3WordRequests["publish"]>()
+      .mockRejectedValueOnce(
+        new HttpError(409, "stale", [], "revision_conflict")
+      );
+    const source = requests({ get, publish });
+    const renderStep = (context: V3WizardSlotContext) => (
+      <>
+        <Slot context={context} />
+        <button type="button" onClick={() => void context.actions.publish()}>
+          发布一次
+        </button>
+      </>
+    );
+    renderWizard(source, { initialWord: word(), renderStep });
+
+    fireEvent.click(screen.getByText("发布一次"));
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByText("编辑"));
+    await act(async () =>
+      resolveFirstGet(draftEnvelope(3, "stale reconciliation"))
+    );
+    fireEvent.click((await screen.findByText("重 试")).closest("button")!);
+
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+    expect(
+      await screen.findByText(
+        "词条已在别处保存为第 4 版；你在「词形与发音」的修改尚未保存，本地输入仍已保留。"
+      )
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("revision")).toHaveTextContent("1");
+    expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
+    expect(source.saveForms).not.toHaveBeenCalled();
+  });
+
+  it("未完成例句确认期间收到新版本：确认后不再发出词义保存", async () => {
+    const initialWord = word();
+    initialWord.completed_steps = ["basics", "forms"];
+    initialWord.max_reachable_step = "meanings";
+    const newer = word(2, "centre");
+    newer.completed_steps = ["basics", "forms"];
+    newer.max_reachable_step = "meanings";
+    const localMeanings = toWritableMeanings(initialWord.meanings);
+    localMeanings.sense_groups[0]!.name_zh = "本地改的区间";
+    let resolveGuard!: (value: boolean) => void;
+    const guard = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolveGuard = resolve;
+        })
+    );
+    const source = requests();
+    const renderStep = (context: V3WizardSlotContext) => (
+      <>
+        <button
+          type="button"
+          onClick={() => {
+            context.setDraftMeanings(localMeanings);
+            context.registerSentenceLeaveGuard?.(guard);
+          }}
+        >
+          准备确认
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            void context.actions.saveMeanings(context.draftMeanings, "complete")
+          }
+        >
+          完成词义
+        </button>
+      </>
+    );
+    const view = renderWizard(source, {
+      initialWord,
+      initialStep: "meanings",
+      renderStep
+    });
+
+    fireEvent.click(screen.getByText("准备确认"));
+    fireEvent.click(screen.getByText("完成词义"));
+    await waitFor(() => expect(guard).toHaveBeenCalledOnce());
+    view.rerender(
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={newer}
+          requests={source}
+          renderStep={renderStep}
+        />
+      )
+    );
+    expect(await screen.findByText("版本冲突")).toBeInTheDocument();
+
+    await act(async () => resolveGuard(true));
+
+    expect(source.saveMeanings).not.toHaveBeenCalled();
+    expect(source.saveForms).not.toHaveBeenCalled();
+  });
+
+  it("只有词义未保存时保留本地修改，本地词义按最新词形对齐词性", async () => {
+    const initial = word(1, "centre");
+    const newer = word(2, "centre");
+    const addedPos = formsFixture({ pos_id: "pos-added", pos: "verb" }).pos[0]!;
+    newer.forms = { ...newer.forms, pos: [...newer.forms.pos, addedPos] };
+    const localMeanings = toWritableMeanings(initial.meanings);
+    localMeanings.sense_groups[0]!.name_zh = "本地改的区间";
+    const source = requests();
+    const renderStep = (context: V3WizardSlotContext) => (
+      <>
+        <output data-testid="aligned-pos">
+          {context.draftMeanings.pos.map((pos) => pos.pos_id).join(",")}
+        </output>
+        <output data-testid="aligned-group">
+          {context.draftMeanings.sense_groups[0]?.name_zh}
+        </output>
+        <button
+          type="button"
+          onClick={() => context.setDraftMeanings(localMeanings)}
+        >
+          编辑区间
+        </button>
+      </>
+    );
+    const view = renderWizard(source, { initialWord: initial, renderStep });
+
+    fireEvent.click(screen.getByText("编辑区间"));
+    expect(screen.getByTestId("aligned-pos")).not.toHaveTextContent(
+      "pos-added"
+    );
+    view.rerender(
+      inRouter(
+        <V3WordCreationWizard
+          initialWord={newer}
+          requests={source}
+          renderStep={renderStep}
+        />
+      )
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "保留本地修改" })
+    );
+
+    await waitFor(() =>
+      expect(screen.getByTestId("aligned-pos")).toHaveTextContent("pos-added")
+    );
+    expect(screen.getByTestId("aligned-group")).toHaveTextContent(
+      "本地改的区间"
+    );
   });
 
   it("只有生命周期变化、内容版本号不变时不提示冲突，保存沿用原基线", async () => {
@@ -3658,9 +4090,23 @@ describe("V3WordCreationWizard", () => {
     await act(async () =>
       getResolvers[1]!(draftEnvelope(9, "current scope canonical"))
     );
+    // 本地仍有未保存输入：对账拿到的第 9 版先挂起提示，不静默换基线。
+    expect(
+      await screen.findByText(
+        "词条已在别处保存为第 9 版；你在「词形与发音」的修改尚未保存，本地输入仍已保留。"
+      )
+    ).toBeInTheDocument();
     expect(
       screen.getByTestId("superseded-reconcile-revision")
-    ).toHaveTextContent("9");
+    ).toHaveTextContent("1");
+    expect(publish).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "保留本地修改" }));
+    await waitFor(() =>
+      expect(
+        screen.getByTestId("superseded-reconcile-revision")
+      ).toHaveTextContent("9")
+    );
     expect(screen.getByTestId("superseded-reconcile-draft")).toHaveTextContent(
       "local edit/true"
     );

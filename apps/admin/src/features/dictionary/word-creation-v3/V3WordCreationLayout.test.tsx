@@ -607,17 +607,31 @@ describe("V3WordCreationLayout", () => {
     expect(screen.queryByRole("button", { name: "保留本地修改" })).toBeNull();
   });
 
-  it("被拦下的写操作把冲突提示滚回视野", () => {
+  it("每次被拦下的写操作都把冲突提示滚回视野", () => {
     const scrollIntoView = vi.fn();
     const original = Element.prototype.scrollIntoView;
     Element.prototype.scrollIntoView = scrollIntoView;
+    const layout = (notice: number) => (
+      <MemoryRouter>
+        <V3WordCreationLayout
+          word={word()}
+          activeStep="forms"
+          dirtySteps={{ forms: true, meanings: false }}
+          remoteUpdate={{ ...word(), revision: 3 }}
+          remoteUpdateNotice={notice}
+          onStepChange={() => {}}
+        >
+          <div>step body</div>
+        </V3WordCreationLayout>
+      </MemoryRouter>
+    );
     try {
-      renderLayout({
-        remoteUpdate: { ...word(), revision: 3 },
-        remoteUpdateNotice: 1,
-        dirtySteps: { forms: true, meanings: false }
-      });
+      const view = render(layout(0));
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      view.rerender(layout(1));
       expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      view.rerender(layout(2));
+      expect(scrollIntoView).toHaveBeenCalledTimes(2);
     } finally {
       Element.prototype.scrollIntoView = original;
     }
@@ -646,5 +660,33 @@ describe("V3WordCreationLayout", () => {
     fireEvent.click(screen.getByRole("button", { name: "放弃本地修改" }));
     fireEvent.click(await screen.findByRole("button", { name: "放弃修改" }));
     expect(onDiscardLocalChanges).toHaveBeenCalledTimes(1);
+  });
+
+  it("服务端新版本待决时不再并列显示同名的 409 冲突提示", () => {
+    renderLayout({
+      problem: {
+        kind: "revision_conflict",
+        status: 409,
+        retryable: false,
+        invalidates_confirmation: true
+      },
+      conflict: {
+        step: "forms",
+        baseRevision: 1,
+        localForms: formsFixture(),
+        serverWord: { ...word(), revision: 2 }
+      },
+      remoteUpdate: { ...word(), revision: 3 },
+      dirtySteps: { forms: true, meanings: false },
+      onRefreshConflict: vi.fn(),
+      onKeepLocalChanges: vi.fn(),
+      onDiscardLocalChanges: vi.fn()
+    });
+
+    expect(screen.getAllByText("版本冲突")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "刷新并比较" })).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: "放弃本地修改" })
+    ).toHaveLength(1);
   });
 });
