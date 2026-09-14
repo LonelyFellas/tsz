@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import {
   ADMIN_V3_DETECTIONS_PATH,
   ADMIN_V3_ENTRIES_PATH,
+  ADMIN_V3_MIXED_WORD_ID,
   ADMIN_V3_NEW_WORD_ID,
   mockAdminV3Api
 } from "./support/mockAdminV3Api";
@@ -261,6 +262,51 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       .click();
     await expect(page).toHaveURL(
       /\/words\/01990000-0000-7000-8000-000000000002\/v3\/wizard\/preview$/
+    );
+  });
+
+  test("E04 Mock 身份：普通管理员看他人未发布草稿只读", async ({ page }) => {
+    await mockAdminV3Api(page, { entryCreator: "other" });
+    await page.goto("/words");
+
+    const row = page.locator("tbody tr", { hasText: "orbit-v3" });
+    await expect(
+      row.getByRole("button", { name: "查看「orbit-v3」" })
+    ).toBeVisible();
+    await expect(
+      row.getByRole("button", { name: "继续创建「orbit-v3」" })
+    ).toHaveCount(0);
+    await expect(
+      row.getByRole("button", { name: "移入垃圾桶「orbit-v3」" })
+    ).toBeDisabled();
+
+    // 只读词条只剩预览可达，直链进词形步也会被改写到预览。
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    await expect(page).toHaveURL(
+      new RegExp(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/preview$`)
+    );
+  });
+
+  test("E05 Mock 身份：超管对他人未发布草稿仍可写", async ({ page }) => {
+    await mockAdminV3Api(page, {
+      entryCreator: "other",
+      viewerRole: "super_admin"
+    });
+    await page.goto("/words");
+
+    const row = page.locator("tbody tr", { hasText: "orbit-v3" });
+    await expect(
+      row.getByRole("button", { name: "继续创建「orbit-v3」" })
+    ).toBeVisible();
+    await expect(
+      row.getByRole("button", { name: "移入垃圾桶「orbit-v3」" })
+    ).toBeEnabled();
+
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+    // 先等词形步内容渲染出来：详情加载前 URL 本来就是 /forms，直接断言会恒真。
+    await expect(page.getByRole("tab", { name: "名词" })).toBeVisible();
+    await expect(page).toHaveURL(
+      new RegExp(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms$`)
     );
   });
 });

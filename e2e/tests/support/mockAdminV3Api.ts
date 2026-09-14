@@ -40,6 +40,12 @@ const ADMIN_PROFILE = {
   preferences: { dialect: "uk" }
 };
 
+const OTHER_ADMIN_ID = "01990000-0000-7000-8000-000000000098";
+const ADMIN_DISPLAY_NAMES: Record<string, string> = {
+  [ACTOR_ID]: ADMIN_PROFILE.display_name,
+  [OTHER_ADMIN_ID]: "V3 Mock E2E Other Admin"
+};
+
 const FORM_TYPE_SEED: readonly (readonly [string, string, string | null])[] = [
   ["base", "原形", null],
   ["plural", "复数", "noun"],
@@ -391,8 +397,9 @@ function listItem(word: AdminWordV3): AdminWordListItemAny {
     ...(word.published_revision === undefined
       ? {}
       : { published_revision: word.published_revision }),
-    created_by_name: "V3 Mock E2E Admin",
-    created_by: ACTOR_ID,
+    created_by_name:
+      ADMIN_DISPLAY_NAMES[word.created_by] ?? ADMIN_PROFILE.display_name,
+    created_by: word.created_by,
     reference_summary: { total: 0, previews: [], truncated: false },
     created_at: word.created_at,
     updated_at: word.updated_at
@@ -421,6 +428,14 @@ export interface MockAdminV3ApiOptions {
   surfaceWarnings?: boolean;
   /** 默认第一次保存词形步返回 422（E01a 的问题定位）；只建一个词性的用例要关掉。 */
   formsFailureOnce?: boolean;
+  /** 当前登录管理员的角色，默认普通管理员。真实 profile 的 permissions 不分角色，这里只切 role。 */
+  viewerRole?: "admin" | "super_admin";
+  /**
+   * 初始那条 mock 词条（列表行与详情）由谁创建，默认当前登录管理员本人；
+   * "other" 用来测「他人未发布草稿」的只读分支。本页新建的词条始终记在当前管理员名下，
+   * 同形候选的 matched_entry_contexts 也不受影响。
+   */
+  entryCreator?: "viewer" | "other";
 }
 
 function clone<T>(value: T): T {
@@ -689,12 +704,14 @@ export async function mockAdminV3Api(
   page: Page,
   options: MockAdminV3ApiOptions = {}
 ): Promise<MockAdminV3ApiController> {
-  let word =
-    options.initial === "canary"
+  let word: AdminWordV3 = {
+    ...(options.initial === "canary"
       ? v3Word(ADMIN_V3_CANARY_WORD_ID, "migrated-orbit", { mode: "native" })
       : v3Word(ADMIN_V3_MIXED_WORD_ID, "orbit-v3", {
           mode: "native" as const
-        });
+        })),
+    created_by: options.entryCreator === "other" ? OTHER_ADMIN_ID : ACTOR_ID
+  };
   const requests: MockAdminV3Request[] = [];
   const publications: AdminWordPublicationAny[] = [];
   let formsFailurePending = options.formsFailureOnce ?? true;
@@ -734,7 +751,10 @@ export async function mockAdminV3Api(
       });
     }
     if (method === "GET" && path === "/profile") {
-      return json(route, 200, ADMIN_PROFILE);
+      return json(route, 200, {
+        ...ADMIN_PROFILE,
+        role: options.viewerRole ?? "admin"
+      });
     }
     if (method === "GET" && path === "/settings/parts-of-speech/catalog") {
       return json(route, 200, PART_OF_SPEECH_CATALOG);
