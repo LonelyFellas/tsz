@@ -888,7 +888,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
           sameAnchors(existing.end, link.end)
       )
     ) {
-      // 重复添加会画出两道重合的弧，落盘时被 normalize 合并成一条，数据与屏幕分叉。
+      // 重复添加会画出两道重合的弧，落盘时被 normalize 去重成一条，数据与屏幕分叉。
       setValidationMessage("这两处已经连过了");
       resetTransient();
       return;

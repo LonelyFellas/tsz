@@ -20,9 +20,12 @@ export interface RichTextReadOnlyProps {
 type TextSegment = Extract<RichTextRenderSegment, { kind: "text" }>;
 type LiaisonAnnotation = Extract<RichTextAnnotation, { type: "liaison" }>;
 
-/** 归一化后同一区间不会有两条连读，起止偏移就能唯一标识一条。 */
+/**
+ * 连读不合并，同一区间可以有端宽不同的几条；归一化只去掉四个字段全同的重复，
+ * 区间加两端宽度才能唯一标识一条。
+ */
 const liaisonKey = (liaison: LiaisonAnnotation) =>
-  `${liaison.start}:${liaison.end}`;
+  `${liaison.start}:${liaison.end}:${liaison.start_len ?? 1}:${liaison.end_len ?? 1}`;
 
 /** 这段文字落在连读的哪一端锚点上；落在两端之间（弧线中段）则为空。 */
 function liaisonAnchorEnd(
@@ -40,7 +43,9 @@ function renderMarkedText(segment: TextSegment, key: string): ReactNode {
   let node: ReactNode = text;
   const phoneme = annotations.find((item) => item.type === "phoneme");
   const emphasis = annotations.find((item) => item.type === "emphasis");
-  const liaison = annotations.find((item) => item.type === "liaison");
+  const liaisons = annotations.filter(
+    (item): item is LiaisonAnnotation => item.type === "liaison"
+  );
   const highlight = annotations.find((item) => item.type === "highlight");
   if (phoneme?.type === "phoneme") {
     node = (
@@ -57,20 +62,20 @@ function renderMarkedText(segment: TextSegment, key: string): ReactNode {
       </strong>
     );
   }
-  if (liaison?.type === "liaison") {
+  // 交叠或共用字母的连读会让同一段文字同时落在几条连读上，每条都要标，否则会漏画弧。
+  for (const liaison of liaisons) {
     // 两端锚点各自标出来，弧线层按 data-liaison / data-end 找到它们量位置。
     const end = liaisonAnchorEnd(segment, liaison);
-    if (end) {
-      node = (
-        <span
-          className="tsz-ve-liaison-anchor"
-          data-liaison={liaisonKey(liaison)}
-          data-end={end}
-        >
-          {node}
-        </span>
-      );
-    }
+    if (!end) continue;
+    node = (
+      <span
+        className="tsz-ve-liaison-anchor"
+        data-liaison={liaisonKey(liaison)}
+        data-end={end}
+      >
+        {node}
+      </span>
+    );
   }
   if (highlight?.type === "highlight") {
     node = (

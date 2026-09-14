@@ -42,7 +42,11 @@ export class RichTextValidationError extends Error {
 }
 
 type RangeAnnotation = Exclude<RichTextAnnotation, { type: "pause" }>;
-type MergeableAnnotation = Exclude<RangeAnnotation, { type: "phoneme" }>;
+type LiaisonAnnotation = Extract<RichTextAnnotation, { type: "liaison" }>;
+type MergeableAnnotation = Extract<
+  RangeAnnotation,
+  { type: "emphasis" | "highlight" }
+>;
 
 function positionOf(annotation: RichTextAnnotation): number {
   return annotation.type === "pause" ? annotation.at : annotation.start;
@@ -65,7 +69,20 @@ function sameMergeAttributes(
   if (left.type === "highlight" && right.type === "highlight") {
     return left.color === right.color;
   }
-  return left.type === "liaison" && right.type === "liaison";
+  return false;
+}
+
+/** 四个字段全同才是同一条连读；端宽缺省按 1 算，与后端反序列化口径一致。 */
+function sameLiaison(
+  left: LiaisonAnnotation,
+  right: LiaisonAnnotation
+): boolean {
+  return (
+    left.start === right.start &&
+    left.end === right.end &&
+    (left.start_len ?? 1) === (right.start_len ?? 1) &&
+    (left.end_len ?? 1) === (right.end_len ?? 1)
+  );
 }
 
 export function validateRichTextV2(
@@ -241,25 +258,28 @@ export function normalizeRichTextV2(value: RichTextV2): RichTextV2 {
       merged.push(annotation);
       continue;
     }
+    /*
+     * liaison 是「两点之间的一条连线」，不是一段文字的属性：连读链 pick‿it‿up 的
+     * [3,6) 与 [6,9) 首尾相接、hello 里 h‿l 与 e‿o 交叠，都是各自独立的弧。合并会让
+     * 保存后读回的弧线与编辑时画的对不上，所以只去掉完全相同的重复。
+     */
+    if (annotation.type === "liaison") {
+      const duplicate = merged.some(
+        (candidate) =>
+          candidate.type === "liaison" && sameLiaison(candidate, annotation)
+      );
+      if (!duplicate) merged.push(annotation);
+      continue;
+    }
+    // emphasis / highlight 是「一段文字的属性」，重叠或首尾相接的同属性两段本就是同一段。
     const previous = [...merged]
       .reverse()
       .find(
         (candidate): candidate is MergeableAnnotation =>
-          candidate.type !== "phoneme" &&
+          (candidate.type === "emphasis" || candidate.type === "highlight") &&
           sameMergeAttributes(candidate, annotation)
       );
-    /*
-     * 首尾相接（start === previous.end）算不算同一段，按类型分：
-     *
-     * - emphasis / highlight 是「一段文字的属性」，相接的两段本就是同一段，合并对；
-     * - liaison 是「两点之间的一条连线」。pick‿it 落 [3,6)、it‿up 落 [6,9) 恰好相接，
-     *   合并就变成 pick‿up 一道长弧——而连读链正是最常见的用法，必须留成两条。
-     */
-    const overlaps = previous
-      ? annotation.start < previous.end ||
-        (annotation.start === previous.end && annotation.type !== "liaison")
-      : false;
-    if (previous && overlaps) {
+    if (previous && annotation.start <= previous.end) {
       previous.end = Math.max(previous.end, annotation.end);
     } else {
       merged.push(annotation);

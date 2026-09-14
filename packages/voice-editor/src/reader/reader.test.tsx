@@ -84,12 +84,55 @@ describe("RichText reader", () => {
       ["end", "i"]
     ]);
     expect(
-      anchors.every((node) => node.getAttribute("data-liaison") === "2:6")
+      anchors.every((node) => node.getAttribute("data-liaison") === "2:6:2:1")
     ).toBe(true);
     expect(screen.getByTestId("voice-rich-text-readonly")).toHaveClass(
       "has-liaison"
     );
     expect(container.querySelector("svg.tsz-ve-arc-layer")).not.toBeNull();
+  });
+
+  it("marks both anchors of every overlapping liaison, including ones sharing a letter or a span", () => {
+    const { container } = render(
+      <RichTextReadOnly
+        value={{
+          version: 2,
+          text: "hello",
+          annotations: [
+            { type: "liaison", start: 0, end: 3 },
+            { type: "liaison", start: 0, end: 3, start_len: 2 },
+            { type: "liaison", start: 1, end: 5 },
+            { type: "liaison", start: 2, end: 5 }
+          ]
+        }}
+      />
+    );
+    const anchorsOf = (key: string) =>
+      Array.from(
+        container.querySelectorAll(
+          `.tsz-ve-liaison-anchor[data-liaison="${key}"]`
+        ),
+        (node) => [node.getAttribute("data-end"), node.textContent]
+      );
+
+    // h‿l、he‿l 同区间不同起点宽度；e‿o 与它们交叠；l‿o 的起点就是 h‿l 的终点。
+    expect(anchorsOf("0:3:1:1")).toEqual([
+      ["start", "h"],
+      ["end", "l"]
+    ]);
+    expect(anchorsOf("0:3:2:1")).toEqual([
+      ["start", "h"],
+      ["start", "e"],
+      ["end", "l"]
+    ]);
+    expect(anchorsOf("1:5:1:1")).toEqual([
+      ["start", "e"],
+      ["end", "o"]
+    ]);
+    expect(anchorsOf("2:5:1:1")).toEqual([
+      ["start", "l"],
+      ["end", "o"]
+    ]);
   });
 
   it("renders V1, empty, and invalid values defensively", () => {

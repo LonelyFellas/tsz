@@ -1209,6 +1209,30 @@ describe("VoiceEditor 文本与落盘", () => {
     ]);
   });
 
+  it("交叠的两条连读落盘仍是两条，不会被并成一条", () => {
+    // hello 里 h‿l 与 e‿o 交叠，曾被 normalize 并成 [0,5) 一道弧，点完成后屏幕与数据分叉。
+    const view = props({
+      value: { version: 2, text: "hello", annotations: [] }
+    });
+    render(<VoiceEditor {...view} />);
+    useLiaisonBrush();
+
+    fireEvent.mouseDown(letter(0, 0));
+    chooseEnd("终点");
+    fireEvent.mouseDown(letter(0, 2));
+    fireEvent.click(button("添加连读"));
+
+    fireEvent.mouseDown(letter(0, 1));
+    chooseEnd("终点");
+    fireEvent.mouseDown(letter(0, 4));
+    fireEvent.click(button("添加连读"));
+
+    expect(applied(view).annotations).toEqual([
+      { type: "liaison", start: 0, end: 3, start_len: 1, end_len: 1 },
+      { type: "liaison", start: 1, end: 5, start_len: 1, end_len: 1 }
+    ]);
+  });
+
   it("拿不同时长的笔点已有停顿的缝是改时长，不是删掉", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
