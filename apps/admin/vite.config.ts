@@ -24,6 +24,33 @@ function buildDevProxy(mode: string) {
   return buildAdminDevProxy(env.BACKEND_API_URL);
 }
 
+// 第三方库分包：默认分包按「被哪些页面引用」把库代码与业务代码混排，库 chunk 还会
+// import 业务入口 index-*.js；入口内嵌全部懒加载 chunk 的文件名，任何业务改动都会让它
+// 换哈希，进而连带所有库 chunk 换哈希——每次部署用户都得重下整套 antd。
+// 这里按固定身份分组，归属不随页面用法变化，业务改动不再波及库 chunk：
+//   1. 入口静态依赖的第三方模块（react-dom、antd 基础设施等）→ vendor-initial；
+//   2. 其余 antd 模块按组件目录（antd/es/<组件>）各成一块；
+//   3. 其余第三方包按包名各成一块。
+function nodeModulePath(moduleId: string): string[] | null {
+  const index = moduleId.lastIndexOf("node_modules");
+  if (index < 0) return null;
+  return moduleId.slice(index + "node_modules".length + 1).split(/[\\/]/);
+}
+
+function antdComponentChunk(moduleId: string): string | null {
+  const parts = nodeModulePath(moduleId);
+  return parts?.[0] === "antd" && parts[1] === "es" && parts[2]
+    ? `antd-${parts[2]}`
+    : null;
+}
+
+function packageChunk(moduleId: string): string | null {
+  const [first, second = ""] = nodeModulePath(moduleId) ?? [];
+  if (!first || first === "antd") return null;
+  const pkg = first.startsWith("@") ? `${first.slice(1)}-${second}` : first;
+  return `vendor-${pkg.replace(/[^\w-]/g, "-")}`;
+}
+
 export default defineConfig(({ mode, command }) => {
   const buildEnv = loadEnv(mode, process.cwd(), "");
   const production = command === "build" || mode === "production";
@@ -58,6 +85,27 @@ export default defineConfig(({ mode, command }) => {
       }
     },
     server,
+    build: {
+      // vendor-initial 约 700KB（gzip 约 230KB），是刻意合成的长期缓存块，放宽告警阈值。
+      chunkSizeWarningLimit: 800,
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            // priority 高的先认领模块（连同其未被认领的依赖）。
+            groups: [
+              {
+                name: "vendor-initial",
+                test: /[\\/]node_modules[\\/]/,
+                tags: ["$initial"],
+                priority: 30
+              },
+              { name: antdComponentChunk, priority: 20 },
+              { name: packageChunk, priority: 10 }
+            ]
+          }
+        }
+      }
+    },
     // 平台后台应用层测试：jsdom + React。别名复用上面的 resolve.alias。
     test: {
       name: "admin",
