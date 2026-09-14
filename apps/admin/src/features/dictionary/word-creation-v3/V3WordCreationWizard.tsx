@@ -15,7 +15,6 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { newWordNodeId } from "../word-model/primitives";
 import {
-  catalogFormTypeCodes,
   createStableVariantIdFactory,
   fillFormTypeTemplate,
   type V3StableVariantIdFactory
@@ -471,7 +470,7 @@ function V3WordCreationSession({
   );
 
   // 刚从创建页进来的草稿：词典给几条词形就只有几条、语义区间也只有零星几个。这里
-  // 一次把录入位铺齐——词形按配置表铺出「新建模板」，语义区间摆够默认条数。铺完就是
+  // 一次把录入位铺齐——词形按该词性的配置铺出「新建模板」，语义区间摆够默认条数。铺完就是
   // 普通草稿数据：录入者删掉哪行就是哪行，再进草稿不会补回来。目录是异步到的，等它
   // 来了铺一次即可；走两个 setter 是为了让联动与脏标记跟着走，保存后才入库。
   // 语义区间基于「词形补齐后的 meanings」再补：setDraftForms 内部会用旧值重算一遍，
@@ -495,12 +494,7 @@ function V3WordCreationSession({
     const items = partOfSpeechCatalog?.items;
     if (!items?.length) return;
     newDraftPrefilledRef.current = true;
-    const filledForms = fillFormTypeTemplate(
-      draftForms,
-      items,
-      catalogFormTypeCodes(partOfSpeechCatalog?.form_types),
-      newWordNodeId
-    );
+    const filledForms = fillFormTypeTemplate(draftForms, items, newWordNodeId);
     const baseMeanings =
       filledForms === draftForms
         ? draftMeanings

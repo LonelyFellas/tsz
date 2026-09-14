@@ -50,17 +50,12 @@ const formsCss = readFileSync(
   "utf8"
 );
 
-/** 新建模板的期望类型序列：原形，该词性名下的类型，再是配置表里其余类型。 */
-const templateFormTypes = (posCode: string) => {
-  const own =
-    partOfSpeechCatalogFixture.items.find((item) => item.code === posCode)
-      ?.allowed_form_types ?? [];
-  const rest = (partOfSpeechCatalogFixture.form_types ?? [])
-    .filter((item) => item.code !== "base" && !own.includes(item.code))
-    .sort((left, right) => left.sort_order - right.sort_order)
-    .map((item) => item.code);
-  return ["base", ...own, ...rest];
-};
+/** 新建模板的期望类型序列：原形加该词性名下的类型。 */
+const templateFormTypes = (posCode: string) => [
+  "base",
+  ...(partOfSpeechCatalogFixture.items.find((item) => item.code === posCode)
+    ?.allowed_form_types ?? [])
+];
 
 const catalogState = vi.hoisted(() => ({
   data: undefined as typeof partOfSpeechCatalogFixture | undefined,
@@ -242,6 +237,13 @@ function chooseOption(label: string, option: string) {
   ].find((item) => item.textContent === option);
   if (!choice) throw new Error(`option not found: ${option}`);
   fireEvent.click(choice);
+}
+
+// jsdom 里 antd 的收起动画不会结束，关掉的确认框停在 -leave 状态留在 DOM 里，开合只能按类名判断。
+function openDeleteConfirm() {
+  return document.querySelector<HTMLElement>(
+    ".ant-popconfirm:not(.ant-zoom-big-leave)"
+  );
 }
 
 async function chooseGroupAction(groupIndex: number, action: string) {
@@ -1232,10 +1234,10 @@ describe("V3FormsAndPronunciationStep", () => {
 
     fireEvent.click(await screen.findByLabelText("删除变化组 1 的词形 2"));
 
-    const alert = screen.getByText("确认删除此词形？").closest(".ant-alert");
-    expect(alert).not.toBeNull();
-    expect(alert).toHaveTextContent("词形的拼写与发音会一并删除。");
-    expect(alert).not.toHaveTextContent(/孤立词形|membership|使用位置/);
+    const confirm = openDeleteConfirm();
+    expect(confirm).toHaveTextContent("确认删除此词形？");
+    expect(confirm).toHaveTextContent("词形的拼写与发音会一并删除。");
+    expect(confirm).not.toHaveTextContent(/孤立词形|membership|使用位置/);
     const deleteButton = screen.getByLabelText("删除词形及相关发音");
     expect(deleteButton).toHaveTextContent("删除词形");
     expect(deleteButton.tagName).toBe("BUTTON");
@@ -1267,7 +1269,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     fireEvent.click(closeButton);
 
-    expect(screen.queryByText("确认删除此词形？")).toBeNull();
+    expect(openDeleteConfirm()).toBeNull();
     expect(canonicalValue()).toEqual(before);
   });
 
@@ -1641,7 +1643,7 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toEqual([forms[0]!.id, forms[2]!.id, forms[1]!.id]);
   });
 
-  it("覆盖 membership stale 失败、最后删除失败与关闭 gate", () => {
+  it("覆盖 membership stale、词形缺失与取消删除", () => {
     const form = commonFormFixture({ id: uuidFromInt(701) });
     const keeper = commonFormFixture({ id: uuidFromInt(703) });
     const displayed = formsFixture({
@@ -1681,7 +1683,7 @@ describe("V3FormsAndPronunciationStep", () => {
     // 一形一组后点删除只弹确认，陈旧内容也不会提前改动草稿。
     fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 1"));
     expect(onChange).not.toHaveBeenCalled();
-    expect(screen.getByText("确认删除此词形？")).toBeInTheDocument();
+    expect(openDeleteConfirm()).toHaveTextContent("确认删除此词形？");
 
     rerender(
       <AntApp>
@@ -1699,8 +1701,11 @@ describe("V3FormsAndPronunciationStep", () => {
         </PronunciationPreviewProvider>
       </AntApp>
     );
-    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 1"));
-    expect(screen.getByText("确认删除此词形？")).toBeInTheDocument();
+    // 内容刷新后确认框仍开着，取消不改动草稿。
+    expect(openDeleteConfirm()).not.toBeNull();
+    fireEvent.click(screen.getByLabelText("取消删除词形并保留"));
+    expect(openDeleteConfirm()).toBeNull();
+    expect(onChange).not.toHaveBeenCalled();
 
     const missingForm = formsFixture({ forms: [], groups: [] });
     rerender(
@@ -1719,29 +1724,11 @@ describe("V3FormsAndPronunciationStep", () => {
         </PronunciationPreviewProvider>
       </AntApp>
     );
-    fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
-    expect(onChange).not.toHaveBeenCalled();
-    expect(screen.queryByText("确认删除此词形？")).toBeNull();
-
-    rerender(
-      <AntApp>
-        <PronunciationPreviewProvider>
-          <V3FormGroupCard
-            content={displayed}
-            group={displayedGroup}
-            groupIndex={0}
-            idFactory={() => uuidFromInt(702)}
-            issues={[]}
-            membershipCounts={new Map([[form.id, 1]])}
-            onChange={onChange}
-            pos={displayed.pos[0]!}
-          />
-        </PronunciationPreviewProvider>
-      </AntApp>
-    );
-    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 1"));
-    fireEvent.click(screen.getByLabelText("取消删除词形并保留"));
-    expect(screen.queryByText("确认删除此词形？")).toBeNull();
+    // 引用的词形已不在草稿里：整行换成错误提示，删除入口随之消失。
+    expect(
+      screen.getAllByText("该变化组引用的词形不存在，已停止编辑。")
+    ).toHaveLength(2);
+    expect(screen.queryByLabelText("删除变化组 1 的词形 1")).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
   });
 
@@ -2207,7 +2194,7 @@ describe("V3FormsAndPronunciationStep", () => {
     chooseOption("添加基本词性", "名词");
     const addedNoun = canonicalValue().pos[0]!;
     expect(addedNoun).toMatchObject({ pos_id: ids[0], pos: "noun" });
-    // 加词性就按配置表铺出新建模板：原形加全部词形类型，本词性的排在前面。
+    // 加词性就按配置铺出新建模板：原形加该词性名下的词形类型。
     expect(addedNoun.forms.map((form) => form.form_type)).toEqual(
       templateFormTypes("noun")
     );
@@ -2278,7 +2265,7 @@ describe("V3FormsAndPronunciationStep", () => {
     ]);
     const verb = canonicalValue().pos[1]!;
     expect(verb.pos).toBe("verb");
-    // 动词页签同样铺满模板，本词性名下的三单、现在分词这些排在前面。
+    // 动词页签同样铺模板，只摆动词名下的三单、现在分词这些。
     expect(verb.forms.map((form) => form.form_type)).toEqual(
       templateFormTypes("verb")
     );
@@ -2393,16 +2380,22 @@ describe("V3FormsAndPronunciationStep", () => {
       expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled()
     );
     fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
-    expect(await screen.findByText("确认删除此词形？")).toBeVisible();
+    expect(openDeleteConfirm()).not.toBeNull();
 
-    // 提示还开着时把第 1 个原形改成复数，第 2 个就成了本组唯一原形
+    // 确认框还开着时把第 1 个原形改成复数，第 2 个就成了本组唯一原形
     chooseOption("变化组 1 词形 1 类型", "复数");
     await waitFor(() =>
       expect(screen.getByLabelText("变化组 1 词形 2 类型")).toBeDisabled()
     );
 
-    expect(screen.getByText("此词形是本组唯一的原形")).toBeVisible();
-    expect(screen.queryByLabelText("删除词形及相关发音")).toBeNull();
+    // 确认框随之收起，删除按钮锁住并给出原因
+    expect(openDeleteConfirm()).toBeNull();
+    const deleteButton = screen.getByLabelText("删除变化组 1 的词形 2");
+    expect(deleteButton).toBeDisabled();
+    expect(deleteButton).toHaveAttribute(
+      "title",
+      "每组词形变化至少保留一个原形"
+    );
     expect(
       canonicalValue().pos[0]!.forms.map((item) => item.form_type)
     ).toEqual(["plural", "base", "plural"]);
