@@ -19,3 +19,33 @@
   bottom: 8px;
   z-index: 1;
 }
+
+/*
+ * 收起态输入框上的连读弧：盖一层与输入框同排版的透明文字，只给弧线定位。
+ * 字体、内边距、边框宽度在运行时照抄输入框的计算样式；点击穿透到输入框。
+ */
+.v3-voice-text-field-input {
+  position: relative;
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  /* 紧凑组靠 -1px 让相邻两框共用一条边；外层成了组员，后面总跟着编辑器按钮，得由它来叠。 */
+  margin-inline-end: -1px;
+}
+
+.v3-voice-text-liaison-overlay {
+  position: absolute;
+  inset: 0;
+  /* 紧凑组样式给组员的 z-index 最高到 4，弧线层要始终压在输入框上面。 */
+  z-index: 5;
+  box-sizing: border-box;
+  border: 0 solid transparent;
+  color: transparent;
+  pointer-events: none;
+}
+
+.v3-voice-text-liaison-overlay .tsz-ve-readonly.has-liaison {
+  display: block;
+  max-width: none;
+  padding-top: 0;
+}
