@@ -17,6 +17,7 @@ import {
   toRichTextV2
 } from "@tsz/voice-editor/core";
 import { LiaisonIcon } from "@tsz/voice-editor";
+import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { AudioOutlined } from "@ant-design/icons";
 import { Button, Input, Space, message } from "antd";
 import {
@@ -24,6 +25,7 @@ import {
   Suspense,
   lazy,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState
 } from "react";
@@ -235,12 +237,18 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     );
 
   if (!expanded) {
+    // 只给实际发音叠：它只标连读，叠出来就是编辑器里的样子；例句类字段会折到滚动，弧线层跟不上。
+    const liaisons = mode === "actual-pron" ? liaisonOnly(value) : undefined;
     return (
       <>
         {feedbackHolder}
         <Space.Compact block>
           {leadingAction}
-          {fallback}
+          {/* 外层常驻：连读有无切换时只增删弧线层，输入框不重挂，打字的光标不丢。 */}
+          <div className="v3-voice-text-field-input">
+            {fallback}
+            {liaisons && <LiaisonOverlay value={liaisons} />}
+          </div>
           <Button
             aria-label={`打开${ariaLabel}编辑器`}
             // 正文还是空的时候没有东西可标注，编辑器打开也只是一块空画布，先置灰。
@@ -307,6 +315,61 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
           </Button>
         </Space>
       )}
+    </div>
+  );
+}
+
+/** 输入框的排版逐项照抄到弧线层上，字母才落在同一个位置。 */
+const MIRRORED_STYLES = [
+  "font-family",
+  "font-size",
+  "font-style",
+  "font-weight",
+  "letter-spacing",
+  "line-height",
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left",
+  "border-top-width",
+  "border-right-width",
+  "border-bottom-width",
+  "border-left-width",
+  "tab-size",
+  "text-indent",
+  "word-spacing"
+] as const;
+
+/**
+ * 只留连读：弧线层只要两端锚点，语法结构加粗、停顿记号都会改字宽，和输入框错位。
+ * 没有连读返回 undefined，收起态就不叠弧线层。
+ */
+function liaisonOnly(value: RichTextV3): RichTextV2 | undefined {
+  const content = toRichTextV2(value);
+  const annotations = content.annotations.filter(
+    (annotation) => annotation.type === "liaison"
+  );
+  return annotations.length > 0 ? { ...content, annotations } : undefined;
+}
+
+/** 收起态输入框上的连读弧：透明文字与输入框同排版，弧线按它量位置。 */
+function LiaisonOverlay({ value }: { value: RichTextV2 }) {
+  const overlayRef = useRef<HTMLDivElement | null>(null);
+  const [mirrored, setMirrored] = useState(false);
+  // 先抄样式再挂只读视图：子组件的布局副作用先于父组件执行，样式没到位就量会量偏。
+  useLayoutEffect(() => {
+    const overlay = overlayRef.current;
+    const input = overlay?.parentElement?.querySelector("textarea");
+    if (!overlay || !input) return;
+    const style = getComputedStyle(input);
+    for (const property of MIRRORED_STYLES) {
+      overlay.style.setProperty(property, style.getPropertyValue(property));
+    }
+    setMirrored(true);
+  }, []);
+  return (
+    <div ref={overlayRef} className="v3-voice-text-liaison-overlay" aria-hidden>
+      {mirrored && <RichTextReadOnly value={value} />}
     </div>
   );
 }

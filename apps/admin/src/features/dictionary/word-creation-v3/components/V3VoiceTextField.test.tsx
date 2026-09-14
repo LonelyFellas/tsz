@@ -568,3 +568,40 @@ it.each([false, true])(
     expect(screen.getByRole("textbox")).toHaveValue("hello there");
   }
 );
+
+it("收起态输入框上标出连读两端；改字去掉连读后弧线层撤掉，输入框仍是同一个节点", () => {
+  function Harness() {
+    const [value, setValue] = useState<RichTextV3>({
+      version: 2,
+      text: "pick it up",
+      annotations: [{ type: "liaison", start: 3, end: 6 }]
+    });
+    return (
+      <V3VoiceTextField
+        mode="actual-pron"
+        ariaLabel="实际发音"
+        field="actual_pron"
+        nodeId="p"
+        value={value}
+        onChange={(next) => setValue(next)}
+      />
+    );
+  }
+  const { container } = render(<Harness />);
+  const anchors = () =>
+    Array.from(container.querySelectorAll(".tsz-ve-liaison-anchor")).map(
+      (node) => [node.getAttribute("data-end"), node.textContent]
+    );
+  const input = screen.getByLabelText("实际发音");
+  expect(input.tagName).toBe("TEXTAREA");
+  expect(input).toHaveAttribute("data-v3-field", "actual_pron");
+  expect(anchors()).toEqual([
+    ["start", "k"],
+    ["end", "i"]
+  ]);
+
+  // 删掉起点字母 k，连读随之移除；弧线层撤掉时不能把输入框重挂，否则正在打字的光标会丢。
+  fireEvent.change(input, { target: { value: "pic it up" } });
+  expect(anchors()).toEqual([]);
+  expect(screen.getByLabelText("实际发音")).toBe(input);
+});
