@@ -105,6 +105,7 @@ describe("RichText V2 normalization and validation", () => {
         { type: "liaison", start: 0, end: 3, start_len: 1, end_len: 1 },
         { type: "liaison", start: 3, end: 5 },
         { type: "liaison", start: 0, end: 3, start_len: 2 },
+        { type: "liaison", start: 0, end: 3, end_len: 2 },
         // 端宽缺省按 1：与上面第二条是同一条，只留一份。
         { type: "liaison", start: 0, end: 3 },
         { type: "liaison", start: 1, end: 5 }
@@ -120,12 +121,13 @@ describe("RichText V2 normalization and validation", () => {
           ]
         : annotation
     );
-    // h‿l [0,3) 与 e‿o [1,5) 交叠、[0,3) 与 [3,5) 首尾相接、[0,3) 换了起点宽度，各是一条弧。
-    expect(links).toHaveLength(4);
+    // h‿l [0,3) 与 e‿o [1,5) 交叠、[0,3) 与 [3,5) 首尾相接、[0,3) 换了起点或终点宽度，各是一条弧。
+    expect(links).toHaveLength(5);
     expect(links).toEqual(
       expect.arrayContaining([
         [0, 3, 1, 1],
         [0, 3, 2, 1],
+        [0, 3, 1, 2],
         [1, 5, 1, 1],
         [3, 5, 1, 1]
       ])
