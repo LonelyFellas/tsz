@@ -657,8 +657,9 @@ it("弧线层内层扣掉输入框滚动条宽度，并随输入框滚动和尺�
         this.callback = callback;
       }
       observe(target: Element) {
-        // 只读视图自己也建观察器，这里只接住挂在输入框上的那个。
-        if (target instanceof HTMLTextAreaElement)
+        // 只接住第一个观察输入框的，即弧线层在布局副作用里建的那个；antd 自适应高度的共享观察器
+        // 在被动副作用里才观察输入框，单独跑本用例时由桩创建，不能让它覆盖掉。
+        if (target instanceof HTMLTextAreaElement && !resizeInput)
           resizeInput = () =>
             this.callback([], this as unknown as ResizeObserver);
       }
