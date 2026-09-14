@@ -93,6 +93,10 @@ function renderLayout(
     onStepChange?: (step: WordCreationStep) => void;
     onIssueNavigate?: (issue: V3DraftValidationIssue) => void;
     onRefreshConflict?: () => void;
+    remoteUpdate?: AdminWordV3;
+    remoteUpdateNotice?: number;
+    onKeepLocalChanges?: () => void;
+    onDiscardLocalChanges?: () => void;
     word?: AdminWordV3;
   } = {}
 ) {
@@ -110,6 +114,10 @@ function renderLayout(
         onStepChange={(step) => options.onStepChange?.(step)}
         onIssueNavigate={(issue) => options.onIssueNavigate?.(issue)}
         onRefreshConflict={options.onRefreshConflict}
+        remoteUpdate={options.remoteUpdate}
+        remoteUpdateNotice={options.remoteUpdateNotice}
+        onKeepLocalChanges={options.onKeepLocalChanges}
+        onDiscardLocalChanges={options.onDiscardLocalChanges}
       >
         <div>step body</div>
       </V3WordCreationLayout>
@@ -557,5 +565,128 @@ describe("V3WordCreationLayout", () => {
 
     expect(screen.getByText("词义与例句冲突")).toBeInTheDocument();
     expect(onRefreshConflict).toHaveBeenCalledTimes(1);
+  });
+
+  it("服务端新版本待决时给出保留或放弃本地修改的选择", async () => {
+    const onKeepLocalChanges = vi.fn();
+    const onDiscardLocalChanges = vi.fn();
+    renderLayout({
+      remoteUpdate: { ...word(), revision: 3 },
+      dirtySteps: { forms: true, meanings: true },
+      onKeepLocalChanges,
+      onDiscardLocalChanges
+    });
+
+    expect(screen.getByText("版本冲突")).toBeVisible();
+    expect(
+      screen.getByText(
+        "词条已在别处保存为第 3 版；你在「词形与发音、词义与例句」的修改尚未保存，本地输入仍已保留。"
+      )
+    ).toBeVisible();
+    // 待决时不能再提示「请先保存草稿」：做出选择前保存会被拦下。
+    expect(screen.queryByText("有未保存的草稿")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "保留本地修改" }));
+    expect(onKeepLocalChanges).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "放弃本地修改" }));
+    expect(onDiscardLocalChanges).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole("button", { name: "放弃修改" }));
+    expect(onDiscardLocalChanges).toHaveBeenCalledTimes(1);
+  });
+
+  it("只读会话不显示服务端新版本的冲突选择", () => {
+    renderLayout({
+      remoteUpdate: { ...word(), revision: 3 },
+      readOnly: true,
+      onKeepLocalChanges: vi.fn(),
+      onDiscardLocalChanges: vi.fn()
+    });
+
+    expect(screen.queryByText("版本冲突")).toBeNull();
+    expect(screen.queryByRole("button", { name: "保留本地修改" })).toBeNull();
+  });
+
+  it("每次被拦下的写操作都把冲突提示滚回视野", () => {
+    const scrollIntoView = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const layout = (notice: number) => (
+      <MemoryRouter>
+        <V3WordCreationLayout
+          word={word()}
+          activeStep="forms"
+          dirtySteps={{ forms: true, meanings: false }}
+          remoteUpdate={{ ...word(), revision: 3 }}
+          remoteUpdateNotice={notice}
+          onStepChange={() => {}}
+        >
+          <div>step body</div>
+        </V3WordCreationLayout>
+      </MemoryRouter>
+    );
+    try {
+      const view = render(layout(0));
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      view.rerender(layout(1));
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      view.rerender(layout(2));
+      expect(scrollIntoView).toHaveBeenCalledTimes(2);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it("刷新并比较取回服务端内容后也可以放弃本地修改", async () => {
+    const onDiscardLocalChanges = vi.fn();
+    renderLayout({
+      problem: {
+        kind: "revision_conflict",
+        status: 409,
+        retryable: false,
+        invalidates_confirmation: true
+      },
+      conflict: {
+        step: "forms",
+        baseRevision: 1,
+        localForms: formsFixture(),
+        serverWord: { ...word(), revision: 4 }
+      },
+      onRefreshConflict: vi.fn(),
+      onDiscardLocalChanges
+    });
+
+    expect(screen.getByText("已获取服务端最新内容。")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "放弃本地修改" }));
+    fireEvent.click(await screen.findByRole("button", { name: "放弃修改" }));
+    expect(onDiscardLocalChanges).toHaveBeenCalledTimes(1);
+  });
+
+  it("服务端新版本待决时不再并列显示同名的 409 冲突提示", () => {
+    renderLayout({
+      problem: {
+        kind: "revision_conflict",
+        status: 409,
+        retryable: false,
+        invalidates_confirmation: true
+      },
+      conflict: {
+        step: "forms",
+        baseRevision: 1,
+        localForms: formsFixture(),
+        serverWord: { ...word(), revision: 2 }
+      },
+      remoteUpdate: { ...word(), revision: 3 },
+      dirtySteps: { forms: true, meanings: false },
+      onRefreshConflict: vi.fn(),
+      onKeepLocalChanges: vi.fn(),
+      onDiscardLocalChanges: vi.fn()
+    });
+
+    expect(screen.getAllByText("版本冲突")).toHaveLength(1);
+    expect(screen.queryByRole("button", { name: "刷新并比较" })).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: "放弃本地修改" })
+    ).toHaveLength(1);
   });
 });

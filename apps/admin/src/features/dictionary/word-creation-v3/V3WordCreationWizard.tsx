@@ -325,6 +325,23 @@ function V3WordCreationSession({
   const [impactConfirmed, setImpactConfirmed] = useState(false);
   const [problem, setProblem] = useState<V3Problem>();
   const [conflict, setConflict] = useState<V3ConflictComparison>();
+  // 本地有未保存输入时收到的更新服务端版本。录入者决定保留还是放弃本地修改之前，保存
+  // 基线停在旧版本、写请求一律不发，免得带着旧内容宣称基于新版本覆盖别处的改动。
+  const [remoteUpdate, setRemoteUpdateState] = useState<AdminWordV3>();
+  const remoteUpdateRef = useRef<AdminWordV3 | undefined>(undefined);
+  const [remoteUpdateNotice, setRemoteUpdateNotice] = useState(0);
+  // 本会话自己保存写出的最高 revision（响应被新输入取代也算）：刷新拉到的版本不超过它，
+  // 就是自己的写入而不是别处的改动。
+  const ownRevisionRef = useRef(0);
+  // 在途的保存请求数，不随 supersede 清零；在途时拉到的新版本先暂存，保存结束后再判定，
+  // 免得把自己即将写出的版本误报成冲突。
+  const savesInFlightRef = useRef(0);
+  const deferredNewerRef = useRef<AdminWordV3 | undefined>(undefined);
+  // 异步回调里换基线要用当前草稿，不能用创建回调时闭包里的旧值。
+  const draftFormsRef = useRef(draftForms);
+  draftFormsRef.current = draftForms;
+  const draftMeaningsRef = useRef(draftMeanings);
+  draftMeaningsRef.current = draftMeanings;
   const [pending, setPending] = useState<Set<string>>(new Set());
   const sessionReadOnly =
     readOnly ||
@@ -414,6 +431,32 @@ function V3WordCreationSession({
 
   const hasLiveDirtyDraft = () =>
     dirtyRef.current.forms || dirtyRef.current.meanings;
+
+  const setRemoteUpdate = useCallback((next?: AdminWordV3) => {
+    remoteUpdateRef.current = next;
+    setRemoteUpdateState(next);
+  }, []);
+
+  /** 服务端新版本待决时拦下写请求，并把录入者的注意力引回冲突提示。 */
+  const blockedByRemoteUpdate = () => {
+    if (!remoteUpdateRef.current) return false;
+    setRemoteUpdateNotice((current) => current + 1);
+    return true;
+  };
+
+  const resetReconciliationState = () => {
+    publishAttemptRef.current = undefined;
+    publishReconciliationRequiredRef.current = false;
+    publishReconciliationLockRef.current = false;
+    archivedReconciliationRequiredRef.current = false;
+    archivedReconciliationLockRef.current = false;
+    retryRef.current = undefined;
+  };
+
+  const noteOwnRevision = (saved: AdminWordV3) => {
+    if (saved.id !== flowRef.current.canonical().id) return;
+    ownRevisionRef.current = Math.max(ownRevisionRef.current, saved.revision);
+  };
 
   const newDraftPrefilledRef = useRef(false);
 
@@ -571,44 +614,176 @@ function V3WordCreationSession({
     [navigationAdapter, setActivePosId, setActiveStep]
   );
 
+  // 用一份更新的服务端版本整体替换会话。keepDirtyDrafts 时只同步没有未保存输入的步骤，
+  // 否则连同本地输入一起丢弃。
+  const replaceSession = useCallback(
+    (latest: AdminWordV3, keepDirtyDrafts: boolean) => {
+      supersede();
+      flowRef.current.dispose();
+      flowRef.current = createV3SaveFlow(latest);
+      resetReconciliationState();
+      setWord(latest);
+      if (!keepDirtyDrafts || !dirtyRef.current.forms) {
+        setDraftFormsState(latest.forms);
+        setActivePosIdState((current) =>
+          current && latest.forms.pos.some((pos) => pos.pos_id === current)
+            ? current
+            : latest.forms.pos[0]?.pos_id
+        );
+        updateDirty("forms", false);
+      }
+      if (!keepDirtyDrafts || !dirtyRef.current.meanings) {
+        const nextMeanings = initializedMeanings(latest);
+        cleanMeaningsRef.current = nextMeanings.draft;
+        setDraftMeaningsState(nextMeanings.draft);
+        updateDirty("meanings", false);
+      }
+      setRemoteUpdate(undefined);
+      if ((deferredNewerRef.current?.revision ?? 0) <= latest.revision) {
+        deferredNewerRef.current = undefined;
+      }
+      setPublicationIssues([]);
+      setProblem(undefined);
+      setConflict(undefined);
+      clearPreviewState();
+    },
+    [clearPreviewState, setRemoteUpdate, supersede, updateDirty]
+  );
+
+  // 以服务端版本为保存基线，同时保留本地输入：「刷新并比较」「保留本地修改」与识别出的
+  // 自己的写入共用。
+  const rebaseKeepingLocalDrafts = useCallback(
+    (
+      latest: AdminWordV3,
+      localForms: DraftFormsStepContentV3,
+      localMeanings: DraftMeaningsStepContentWritableV3
+    ) => {
+      // 对方可能增删了词性：本地词义先按要保留的词形对齐。
+      const alignedMeanings = ensureV3MeaningsForForms(
+        latest.id,
+        localForms,
+        localMeanings,
+        newWordNodeId
+      );
+      flowRef.current.dispose();
+      flowRef.current = createV3SaveFlow(latest);
+      scopeRef.current += 1;
+      setWord(latest);
+      setDraftFormsState(localForms);
+      updateDirty(
+        "forms",
+        JSON.stringify(localForms) !== JSON.stringify(latest.forms)
+      );
+      cleanMeaningsRef.current = dirtyRef.current.meanings
+        ? ensureV3MeaningsForForms(
+            latest.id,
+            localForms,
+            cleanMeaningsRef.current,
+            newWordNodeId,
+            alignedMeanings
+          )
+        : alignedMeanings;
+      setDraftMeaningsState(alignedMeanings);
+      updateDirty(
+        "meanings",
+        JSON.stringify(alignedMeanings) !==
+          JSON.stringify(cleanMeaningsRef.current)
+      );
+      setActivePosIdState((current) =>
+        current && localForms.pos.some((pos) => pos.pos_id === current)
+          ? current
+          : localForms.pos[0]?.pos_id
+      );
+      if (
+        remoteUpdateRef.current &&
+        latest.revision >= remoteUpdateRef.current.revision
+      ) {
+        setRemoteUpdate(undefined);
+      }
+    },
+    [setRemoteUpdate, updateDirty]
+  );
+
+  // 录入者知情后（或新版本就是自己写出的）继续用本地输入：基线换成该版本，之后的保存是有意覆盖。
+  const adoptKeepingLocalDrafts = useCallback(
+    (latest: AdminWordV3) => {
+      supersede();
+      resetReconciliationState();
+      const localForms = dirtyRef.current.forms
+        ? draftFormsRef.current
+        : latest.forms;
+      const localMeanings = dirtyRef.current.meanings
+        ? draftMeaningsRef.current
+        : initializedMeanings(latest, localForms).draft;
+      rebaseKeepingLocalDrafts(latest, localForms, localMeanings);
+      setProblem(undefined);
+      setConflict(undefined);
+      clearPreviewState();
+    },
+    [clearPreviewState, rebaseKeepingLocalDrafts, supersede]
+  );
+
+  // 服务端送来比当前基线更新的内容版本（刷新或对账）。保存在途就等保存结束再判定；本地没有
+  // 未保存输入直接采用；新版本就是自己写出的就保留本地输入换基线；否则挂起，交给录入者决定。
+  // 静默换基线会让下次保存带着旧内容宣称基于新版本，绕过乐观锁覆盖别处的改动。
+  const receiveNewerRevision = useCallback(
+    (latest: AdminWordV3) => {
+      const canonical = flowRef.current.canonical();
+      if (latest.id !== canonical.id || latest.revision <= canonical.revision) {
+        return;
+      }
+      if (savesInFlightRef.current > 0) {
+        if ((deferredNewerRef.current?.revision ?? 0) < latest.revision) {
+          deferredNewerRef.current = latest;
+        }
+        return;
+      }
+      if (!dirtyRef.current.forms && !dirtyRef.current.meanings) {
+        replaceSession(latest, true);
+        return;
+      }
+      if (latest.revision <= ownRevisionRef.current) {
+        adoptKeepingLocalDrafts(latest);
+        return;
+      }
+      if ((remoteUpdateRef.current?.revision ?? 0) < latest.revision) {
+        setRemoteUpdate(latest);
+      }
+    },
+    [adoptKeepingLocalDrafts, replaceSession, setRemoteUpdate]
+  );
+
+  const finishSaveInFlight = useCallback(() => {
+    savesInFlightRef.current = Math.max(0, savesInFlightRef.current - 1);
+    if (savesInFlightRef.current > 0 || !mountedRef.current) return;
+    const deferred = deferredNewerRef.current;
+    deferredNewerRef.current = undefined;
+    if (deferred) receiveNewerRevision(deferred);
+  }, [receiveNewerRevision]);
+
+  // 待决期间本地已经没有未保存输入（撤回了修改）：没有要保护的内容，直接采用新版本。
+  useEffect(() => {
+    const pending = remoteUpdateRef.current;
+    if (!pending || dirtySteps.forms || dirtySteps.meanings) return;
+    if (pending.revision > flowRef.current.canonical().revision) {
+      replaceSession(pending, true);
+    } else {
+      setRemoteUpdate(undefined);
+    }
+  }, [dirtySteps, remoteUpdate, replaceSession, setRemoteUpdate]);
+
   useEffect(() => {
     const canonical = flowRef.current.canonical();
-    const hasNewerCanonicalVersion =
-      initialWord.id === canonical.id &&
-      (initialWord.revision > canonical.revision ||
-        (initialWord.revision === canonical.revision &&
-          initialWord.lifecycle_revision > canonical.lifecycle_revision));
-    if (!hasNewerCanonicalVersion) return;
-
-    supersede();
-    flowRef.current.dispose();
-    flowRef.current = createV3SaveFlow(initialWord);
-    publishAttemptRef.current = undefined;
-    publishReconciliationRequiredRef.current = false;
-    publishReconciliationLockRef.current = false;
-    archivedReconciliationRequiredRef.current = false;
-    archivedReconciliationLockRef.current = false;
-    retryRef.current = undefined;
-    setWord(initialWord);
-    if (!dirtyRef.current.forms) {
-      setDraftFormsState(initialWord.forms);
-      setActivePosIdState((current) =>
-        current && initialWord.forms.pos.some((pos) => pos.pos_id === current)
-          ? current
-          : initialWord.forms.pos[0]?.pos_id
-      );
+    if (initialWord.id !== canonical.id) return;
+    if (initialWord.revision > canonical.revision) {
+      receiveNewerRevision(initialWord);
+    } else if (
+      initialWord.revision === canonical.revision &&
+      initialWord.lifecycle_revision > canonical.lifecycle_revision
+    ) {
+      replaceSession(initialWord, true);
     }
-    if (!dirtyRef.current.meanings) {
-      const nextMeanings = initializedMeanings(initialWord);
-      cleanMeaningsRef.current = nextMeanings.draft;
-      setDraftMeaningsState(nextMeanings.draft);
-      updateDirty("meanings", false);
-    }
-    setPublicationIssues([]);
-    setProblem(undefined);
-    setConflict(undefined);
-    clearPreviewState();
-  }, [clearPreviewState, initialWord, supersede, updateDirty]);
+  }, [initialWord, receiveNewerRevision, replaceSession]);
 
   const applyCanonical = useCallback(
     (canonical: AdminWordV3, replacement: "forms" | "meanings" | "all") => {
@@ -638,12 +813,20 @@ function V3WordCreationSession({
         setDraftMeaningsState(nextMeanings.draft);
       }
       clearDirty(syncForms && syncMeanings ? "all" : replacement);
+      // 挂起的「服务端新版本」其实是这次保存自己写出的版本（刷新先于保存响应到达），
+      // 基线已经追平，冲突不成立。
+      if (
+        remoteUpdateRef.current &&
+        canonical.revision >= remoteUpdateRef.current.revision
+      ) {
+        setRemoteUpdate(undefined);
+      }
       setProblem(undefined);
       setConflict(undefined);
       clearPreviewState();
       onWordChange?.(canonical);
     },
-    [clearDirty, clearPreviewState, onWordChange]
+    [clearDirty, clearPreviewState, onWordChange, setRemoteUpdate]
   );
 
   const replaceStepIssues = useCallback(
@@ -729,6 +912,9 @@ function V3WordCreationSession({
       publishReconciliationLockRef.current = false;
       archivedReconciliationRequiredRef.current = false;
       retryRef.current = undefined;
+      // 词条已进垃圾桶、会话只读：挂起的新版本不再有保留或放弃的意义。
+      setRemoteUpdate(undefined);
+      deferredNewerRef.current = undefined;
       setWord(latest.word);
       if (!dirtyRef.current.forms) {
         setDraftFormsState(latest.word.forms);
@@ -772,6 +958,7 @@ function V3WordCreationSession({
     markPending,
     onWordChange,
     requests,
+    setRemoteUpdate,
     updateDirty
   ]);
 
@@ -808,12 +995,14 @@ function V3WordCreationSession({
       ) {
         return false;
       }
+      if (blockedByRemoteUpdate()) return false;
       const baseRevision = flow.canonical().revision;
       const scope = scopeRef.current;
       const done = markPending("save_forms");
       const retry = async () => {
         await saveFormsContent(content, intent, confirmationContext);
       };
+      savesInFlightRef.current += 1;
       try {
         const tokens = flow.confirmations({
           base_revision: baseRevision,
@@ -829,6 +1018,7 @@ function V3WordCreationSession({
             ...tokens
           })
         );
+        noteOwnRevision(result.value.word);
         if (result.accepted && scope === scopeRef.current) {
           if (intent === "complete") replaceStepIssues(["forms"], []);
           applyCanonical(result.value.word, "forms");
@@ -854,10 +1044,12 @@ function V3WordCreationSession({
         return false;
       } finally {
         done();
+        finishSaveInFlight();
       }
     },
     [
       applyCanonical,
+      finishSaveInFlight,
       handleEntryArchived,
       handleError,
       markPending,
@@ -876,6 +1068,7 @@ function V3WordCreationSession({
       ) {
         return undefined;
       }
+      if (blockedByRemoteUpdate()) return undefined;
       const content = draftForms;
       const baseRevision = flow.canonical().revision;
       const scope = scopeRef.current;
@@ -921,13 +1114,16 @@ function V3WordCreationSession({
       content: DraftMeaningsStepContentWritableV3,
       intent: StepSaveIntent
     ) => {
-      const flow = flowRef.current;
+      if (blockedByRemoteUpdate()) return;
       if (
         intent === "complete" &&
         sentenceLeaveGuard.current &&
         !(await sentenceLeaveGuard.current())
       )
         return;
+      // 未完成例句的确认可能停留很久，期间可能已经收到服务端新版本。
+      if (blockedByRemoteUpdate()) return;
+      const flow = flowRef.current;
       if (
         archivedReconciliationRequiredRef.current ||
         flow.canonical().status === "archived"
@@ -939,8 +1135,14 @@ function V3WordCreationSession({
         (intent === "complete" &&
           !flow.canonical().completed_steps.includes("forms"))
       ) {
-        const formsSaved = await saveFormsContent(draftForms, intent);
+        // 用当前草稿：未完成例句的确认弹窗期间词形也可能被改过。
+        const formsSaved = await saveFormsContent(
+          draftFormsRef.current,
+          intent
+        );
         if (!formsSaved) return;
+        // 词形保存结束时可能处理了暂存的新版本（挂起提示或整体替换会话），不再按旧基线续发词义。
+        if (blockedByRemoteUpdate() || flowRef.current !== flow) return;
       }
       const baseRevision = flow.canonical().revision;
       // 四个译文框只是录入位，收尾提交时丢掉一个字都没填的行。放在这条所有保存
@@ -955,6 +1157,7 @@ function V3WordCreationSession({
       const retry = async () => {
         await saveMeanings(content, intent);
       };
+      savesInFlightRef.current += 1;
       try {
         const result = await flow.runCanonical("save_meanings", () =>
           requests.saveMeanings(flow.canonical().id, {
@@ -972,6 +1175,7 @@ function V3WordCreationSession({
             )
           })
         );
+        noteOwnRevision(result.value.word);
         if (result.accepted && scope === scopeRef.current) {
           if (intent === "complete") {
             // meanings 完成成功隐含服务端已认可 forms 完成态（后端仅在内容
@@ -1010,12 +1214,13 @@ function V3WordCreationSession({
         }
       } finally {
         done();
+        finishSaveInFlight();
       }
     },
     [
       applyCanonical,
       allowPublishedEditing,
-      draftForms,
+      finishSaveInFlight,
       handleEntryArchived,
       handleError,
       markPending,
@@ -1026,7 +1231,7 @@ function V3WordCreationSession({
   );
 
   const validate = useCallback(async () => {
-    if (hasLiveDirtyDraft()) return undefined;
+    if (hasLiveDirtyDraft() || blockedByRemoteUpdate()) return undefined;
     const flow = flowRef.current;
     if (
       archivedReconciliationRequiredRef.current ||
@@ -1142,6 +1347,23 @@ function V3WordCreationSession({
         }
         return;
       }
+      if (
+        latest.word.revision > flowRef.current.canonical().revision &&
+        (dirtyRef.current.forms || dirtyRef.current.meanings)
+      ) {
+        // 本地有未保存输入：对账拿到的新版本同样不能静默换基线，交给统一的新版本判定。
+        // 对账锁仍交给下面的 finally 释放，所以这里不复用 resetReconciliationState。
+        publishAttemptRef.current = undefined;
+        publishReconciliationRequiredRef.current = false;
+        retryRef.current = undefined;
+        setPublicationIssues([]);
+        setProblem(undefined);
+        setConflict(undefined);
+        clearPreviewState();
+        receiveNewerRevision(latest.word);
+        onWordChange?.(latest.word);
+        return;
+      }
       flowRef.current.dispose();
       flowRef.current = createV3SaveFlow(latest.word);
       scopeRef.current += 1;
@@ -1181,6 +1403,7 @@ function V3WordCreationSession({
     handleError,
     markPending,
     onWordChange,
+    receiveNewerRevision,
     requests,
     updateDirty
   ]);
@@ -1258,6 +1481,7 @@ function V3WordCreationSession({
     (confirmedSurfaceToken?: string) => {
       if (
         hasLiveDirtyDraft() ||
+        blockedByRemoteUpdate() ||
         archivedReconciliationRequiredRef.current ||
         flowRef.current.canonical().status === "archived" ||
         publishReconciliationRequiredRef.current ||
@@ -1286,9 +1510,6 @@ function V3WordCreationSession({
     try {
       const latest = await requests.get(word.id);
       if (!mountedRef.current || scope !== scopeRef.current) return;
-      flowRef.current.dispose();
-      flowRef.current = createV3SaveFlow(latest.word);
-      scopeRef.current += 1;
       const localForms =
         localConflict.step === "forms"
           ? localConflict.localForms
@@ -1304,28 +1525,7 @@ function V3WordCreationSession({
                 const next = initializedMeanings(latest.word, localForms);
                 return next.draft;
               })();
-      setWord(latest.word);
-      setDraftFormsState(localForms);
-      cleanMeaningsRef.current = dirtyRef.current.meanings
-        ? ensureV3MeaningsForForms(
-            latest.word.id,
-            localForms,
-            cleanMeaningsRef.current,
-            newWordNodeId,
-            localMeanings
-          )
-        : localMeanings;
-      setDraftMeaningsState(localMeanings);
-      updateDirty(
-        "meanings",
-        JSON.stringify(localMeanings) !==
-          JSON.stringify(cleanMeaningsRef.current)
-      );
-      setActivePosIdState((current) =>
-        current && localForms.pos.some((pos) => pos.pos_id === current)
-          ? current
-          : localForms.pos[0]?.pos_id
-      );
+      rebaseKeepingLocalDrafts(latest.word, localForms, localMeanings);
       setConflict({ ...localConflict, serverWord: latest.word });
       clearPreviewState();
       onWordChange?.(latest.word);
@@ -1344,10 +1544,23 @@ function V3WordCreationSession({
     handleError,
     markPending,
     onWordChange,
+    rebaseKeepingLocalDrafts,
     requests,
-    updateDirty,
     word.id
   ]);
+
+  // 录入者知情后继续用本地输入：基线换成挂起的新版本，之后的保存是有意覆盖。
+  const keepLocalChanges = useCallback(() => {
+    const latest = remoteUpdateRef.current;
+    if (latest) adoptKeepingLocalDrafts(latest);
+  }, [adoptKeepingLocalDrafts]);
+
+  // 放弃本地输入，整体改用服务端最新版本（挂起的新版本，或「刷新并比较」取回的版本）。
+  const discardLocalChanges = useCallback(() => {
+    const latest = remoteUpdateRef.current ?? conflict?.serverWord;
+    if (!latest) return;
+    replaceSession(latest, false);
+  }, [conflict, replaceSession]);
 
   const retry = useCallback(async () => {
     await retryRef.current?.();
@@ -1451,12 +1664,16 @@ function V3WordCreationSession({
       draftMeanings={draftMeanings}
       problem={problem}
       conflict={conflict}
+      remoteUpdate={remoteUpdate}
+      remoteUpdateNotice={remoteUpdateNotice}
       retrying={pending.size > 0}
       refreshingConflict={pending.has("refresh_conflict")}
       onStepChange={setActiveStep}
       onIssueNavigate={(issue) => void navigateIssue(issue)}
       onRetry={() => void retry()}
       onRefreshConflict={() => void refreshConflict()}
+      onKeepLocalChanges={keepLocalChanges}
+      onDiscardLocalChanges={discardLocalChanges}
     >
       {renderedStep}
     </V3WordCreationLayout>
