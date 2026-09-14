@@ -40,17 +40,18 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     // 拼写统一 / 英美区分都会出 BrE 表头，只有共用结构没有。
     await expect(firstGroup.getByText("英式英语 · BrE")).toHaveCount(0);
 
-    // 加词性时按配置表铺出新建模板：原形加 mock 目录里 5 个非原形类型，共 6 行。
+    // 加词性时按词性配置铺出新建模板：原形加名词名下的复数，共 2 行。
     // 组内只剩一个原形时类型锁死；⊕ 复制出第二个原形后放开，删回去又锁上。
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(6);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
     await firstGroup.getByLabel("在原形 1 下方添加同类型词形").click();
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(7);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(3);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeEnabled();
     await expect(firstGroup.getByLabel("变化组 1 词形 2 类型")).toBeEnabled();
     await firstGroup.getByLabel("删除变化组 1 的词形 2").click();
-    await firstGroup.getByLabel("删除词形及相关发音").click();
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(6);
+    // 确认框挂在 body 上，不在组卡片里
+    await page.getByLabel("删除词形及相关发音").click();
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
 
     const firstForm = firstGroup.locator(".v3-concrete-form-row").nth(0);
@@ -75,7 +76,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     await page.getByRole("button", { name: "新增名词变化组" }).click();
     const secondGroup = nounGroups.nth(1);
-    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(6);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
     // 手动加的组不铺模板，只有自带的原形，加上按词性铺的那一个复数占位行。
     await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(2);
 
@@ -145,14 +146,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     expect(savedForms.pos[0]?.forms.map((item) => item.form_type)).toEqual([
       "base",
       "plural",
-      "third_person_singular",
-      "present_participle",
-      "past_tense",
-      "past_participle",
       "base"
     ]);
     expect(savedForms.pos[0]?.form_groups).toHaveLength(2);
-    expect(savedForms.pos[0]?.form_groups[0]?.members).toHaveLength(6);
+    expect(savedForms.pos[0]?.form_groups[0]?.members).toHaveLength(2);
     expect(savedForms.pos[0]?.form_groups[1]?.members).toHaveLength(1);
     expect(
       savedForms.pos[0]?.form_groups.map((group) => group.dialect_rules)

@@ -19,6 +19,7 @@ import {
   Dropdown,
   Empty,
   Flex,
+  Popconfirm,
   Radio,
   Segmented,
   Typography
@@ -213,9 +214,9 @@ export function V3FormGroupCard({
     const baseMembers = baseMembersOf(group);
     return baseMembers.length === 1 ? baseMembers[0]!.id : undefined;
   })();
-  // 确认条开着时本组另一个原形可能被改成派生类型，待删词形就成了唯一原形，不能再删。
-  const blockedFormLocked =
-    blockedFormId !== undefined && lockedBaseFormIds.has(blockedFormId);
+  // 确认框开着时本组另一个原形可能被改成派生类型，待删词形就成了唯一原形，不能再删，直接收起。
+  if (blockedFormId !== undefined && lockedBaseFormIds.has(blockedFormId))
+    setBlockedFormId(undefined);
   const setRegular = (isRegular: boolean) => {
     const next = structuredClone(content);
     const nextPos = next.pos.find((item) => item.pos_id === pos.pos_id);
@@ -254,6 +255,7 @@ export function V3FormGroupCard({
     const formLabel =
       sameTypeMembers.length > 1 ? `${baseLabel} ${sameTypeIndex}` : baseLabel;
     const formPositionLabel = `${baseLabel} ${sameTypeIndex}`;
+    const deleteLocked = lastRequiredForm || member.id === soleBaseMembershipId;
 
     return {
       membershipId: member.id,
@@ -312,29 +314,44 @@ export function V3FormGroupCard({
             size="small"
             type="text"
           />
-          <Button
-            aria-label={`删除变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
-            danger
-            disabled={lastRequiredForm || member.id === soleBaseMembershipId}
-            icon={<MinusCircleOutlined />}
-            onClick={() => {
-              if (placeholders.has(form.id)) {
-                setRemovedTypes((types) => [...types, form.form_type]);
-                return;
-              }
-              // 一个词形只属于一个组，「从本组移除」就是删除词形，统一走删除确认。
-              setBlockedFormId(form.id);
+          {/* 一个词形只属于一个组，「从本组移除」就是删除词形，统一走删除确认；占位行直接收起不用确认。 */}
+          <Popconfirm
+            cancelButtonProps={{ "aria-label": "取消删除词形并保留" }}
+            cancelText="取消"
+            description="词形的拼写与发音会一并删除。"
+            disabled={deleteLocked || placeholders.has(form.id)}
+            okButtonProps={{ "aria-label": "删除词形及相关发音", danger: true }}
+            okText="删除词形"
+            onConfirm={() => {
+              const result = deleteConcreteForm(content, pos.pos_id, form.id);
+              if (result.ok) onChange(result.value);
             }}
-            size="small"
-            title={
-              lastRequiredForm
-                ? "每个词性至少保留一个词形"
-                : member.id === soleBaseMembershipId
-                  ? BASE_REQUIRED_HINT
-                  : undefined
+            onOpenChange={(open) =>
+              setBlockedFormId(open ? form.id : undefined)
             }
-            type="text"
-          />
+            open={blockedFormId === form.id}
+            title="确认删除此词形？"
+          >
+            <Button
+              aria-label={`删除变化组 ${groupIndex + 1} 的词形 ${index + 1}`}
+              danger
+              disabled={deleteLocked}
+              icon={<MinusCircleOutlined />}
+              onClick={() => {
+                if (placeholders.has(form.id))
+                  setRemovedTypes((types) => [...types, form.form_type]);
+              }}
+              size="small"
+              title={
+                lastRequiredForm
+                  ? "每个词性至少保留一个词形"
+                  : member.id === soleBaseMembershipId
+                    ? BASE_REQUIRED_HINT
+                    : undefined
+              }
+              type="text"
+            />
+          </Popconfirm>
         </div>
       )
     };
@@ -474,52 +491,6 @@ export function V3FormGroupCard({
             </div>
             {dialectControl}
           </div>
-          {blockedFormId ? (
-            <Alert
-              // 同上：提示条挂在组顶部，而「删除词形」按钮可能在很下面。
-              ref={(node) => {
-                node?.nativeElement.scrollIntoView?.({ block: "center" });
-              }}
-              action={
-                blockedFormLocked ? undefined : (
-                  <Button
-                    aria-label="删除词形及相关发音"
-                    danger
-                    onClick={() => {
-                      const result = deleteConcreteForm(
-                        content,
-                        pos.pos_id,
-                        blockedFormId
-                      );
-                      if (result.ok) onChange(result.value);
-                      setBlockedFormId(undefined);
-                    }}
-                    size="small"
-                  >
-                    删除词形
-                  </Button>
-                )
-              }
-              closable={{
-                "aria-label": blockedFormLocked
-                  ? "知道了并保留词形"
-                  : "取消删除词形并保留",
-                onClose: () => setBlockedFormId(undefined)
-              }}
-              description={
-                blockedFormLocked
-                  ? `${BASE_REQUIRED_HINT}。要删除它，请先在本组添加另一个原形。`
-                  : "词形的拼写与发音会一并删除。"
-              }
-              showIcon
-              title={
-                blockedFormLocked
-                  ? "此词形是本组唯一的原形"
-                  : "确认删除此词形？"
-              }
-              type="warning"
-            />
-          ) : null}
           {group.members.length === 0 ? (
             <Empty
               description="草稿可暂时保留空变化组"

@@ -5346,24 +5346,12 @@ describe("新草稿默认录入位", () => {
     await waitFor(() =>
       expect(seen.context!.draftMeanings.sense_groups).toHaveLength(5)
     );
-    // 新建词条摆一次配置表里的全部词形类型（禅道 TASK#7），本词性的排在前面；
+    // 新建词条摆一次该词性名下的词形类型（禅道 TASK#7），挂在别的词性下的不摆；
     // 摆完就是普通草稿数据，删掉哪行就是哪行，再进草稿不会补回来。
     const expected = [
       "base",
       ...(partOfSpeechCatalogFixture.items.find((item) => item.code === "noun")
-        ?.allowed_form_types ?? []),
-      ...(partOfSpeechCatalogFixture.form_types ?? [])
-        .filter(
-          (item) =>
-            item.code !== "base" &&
-            !(
-              partOfSpeechCatalogFixture.items.find(
-                (pos) => pos.code === "noun"
-              )?.allowed_form_types ?? []
-            ).includes(item.code)
-        )
-        .sort((left, right) => left.sort_order - right.sort_order)
-        .map((item) => item.code)
+        ?.allowed_form_types ?? [])
     ];
     expect(
       seen.context!.draftForms.pos[0]!.forms.map((form) => form.form_type)

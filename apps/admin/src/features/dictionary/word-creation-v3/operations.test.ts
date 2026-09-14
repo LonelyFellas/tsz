@@ -11,7 +11,6 @@ import {
   deleteConcreteForm,
   deleteFormGroup,
   deleteGroupAndOrphanForms,
-  catalogFormTypeCodes,
   deletePartOfSpeech,
   fillFormTypeTemplate,
   normalizeGroupDialectRules,
@@ -1918,9 +1917,6 @@ it("英美切换保留每条发音的标注、音色和录音", () => {
 
 describe("fillFormTypeTemplate", () => {
   const catalogItems = partOfSpeechCatalogFixture.items;
-  const allFormTypes = catalogFormTypeCodes(
-    partOfSpeechCatalogFixture.form_types
-  );
   const byCode = (code: string) =>
     catalogItems.find((item) => item.code === code)!;
 
@@ -1933,31 +1929,28 @@ describe("fillFormTypeTemplate", () => {
     return result.value;
   };
 
-  /** 期望的模板顺序：该词性名下的类型在前，配置表里其余类型跟在后面。 */
-  const expectedTemplate = (code: string) => {
-    const own = byCode(code).allowed_form_types ?? [];
-    return [
-      "base",
-      ...own,
-      ...(allFormTypes ?? []).filter((item) => !own.includes(item))
-    ];
-  };
+  /** 期望的模板：原形加该词性名下的类型，挂在别的词性下的不摆。 */
+  const expectedTemplate = (code: string) => [
+    "base",
+    ...(byCode(code).allowed_form_types ?? [])
+  ];
 
-  it("铺出配置表里的全部词形类型，铺过的不再重复铺", () => {
+  it("只铺该词性名下的词形类型，铺过的不再重复铺", () => {
     let seq = 500;
     const content = onlyBase("verb");
     expect(content.pos[0]!.forms.map((form) => form.form_type)).toEqual([
       "base"
     ]);
 
-    const filled = fillFormTypeTemplate(
-      content,
-      catalogItems,
-      allFormTypes,
-      () => uuidFromInt(seq++)
+    const filled = fillFormTypeTemplate(content, catalogItems, () =>
+      uuidFromInt(seq++)
     );
     expect(filled.pos[0]!.forms.map((form) => form.form_type)).toEqual(
       expectedTemplate("verb")
+    );
+    // 复数挂在名词下，动词的模板里不摆。
+    expect(filled.pos[0]!.forms.map((form) => form.form_type)).not.toContain(
+      "plural"
     );
     // 铺出来的行都进同一个变化组，拼写与音标留空等录入。
     expect(filled.pos[0]!.form_groups[0]!.members).toHaveLength(
@@ -1972,24 +1965,17 @@ describe("fillFormTypeTemplate", () => {
     );
 
     expect(
-      fillFormTypeTemplate(filled, catalogItems, allFormTypes, () =>
-        uuidFromInt(seq++)
-      )
+      fillFormTypeTemplate(filled, catalogItems, () => uuidFromInt(seq++))
     ).toBe(filled);
   });
 
-  it("目录没送全量类型时退回该词性名下的那几个", () => {
+  it("词性名下没有派生词形时不铺", () => {
     let seq = 520;
-    const filled = fillFormTypeTemplate(
-      onlyBase("noun"),
-      catalogItems,
-      undefined,
-      () => uuidFromInt(seq++)
-    );
-    expect(filled.pos[0]!.forms.map((form) => form.form_type)).toEqual([
-      "base",
-      ...(byCode("noun").allowed_form_types ?? [])
-    ]);
+    const content = onlyBase("adverb");
+    expect(byCode("adverb").allowed_form_types).toEqual([]);
+    expect(
+      fillFormTypeTemplate(content, catalogItems, () => uuidFromInt(seq++))
+    ).toBe(content);
   });
 
   it("短语的词性不铺：短语没有词形变化", () => {
@@ -1999,9 +1985,7 @@ describe("fillFormTypeTemplate", () => {
       item.code === "noun" ? { ...item, kind: "phrase" as const } : item
     );
     expect(
-      fillFormTypeTemplate(content, phraseItems, allFormTypes, () =>
-        uuidFromInt(seq++)
-      )
+      fillFormTypeTemplate(content, phraseItems, () => uuidFromInt(seq++))
     ).toBe(content);
   });
 
@@ -2010,9 +1994,7 @@ describe("fillFormTypeTemplate", () => {
     const content = onlyBase("noun");
     const without = catalogItems.filter((item) => item.code !== "noun");
     expect(
-      fillFormTypeTemplate(content, without, allFormTypes, () =>
-        uuidFromInt(seq++)
-      )
+      fillFormTypeTemplate(content, without, () => uuidFromInt(seq++))
     ).toBe(content);
   });
 
@@ -2026,7 +2008,7 @@ describe("fillFormTypeTemplate", () => {
     if (!twoGroups.ok) return;
 
     expect(
-      fillFormTypeTemplate(twoGroups.value, catalogItems, allFormTypes, () =>
+      fillFormTypeTemplate(twoGroups.value, catalogItems, () =>
         uuidFromInt(seq++)
       )
     ).toBe(twoGroups.value);
@@ -2034,10 +2016,8 @@ describe("fillFormTypeTemplate", () => {
 
   it("目录缺失时不动内容", () => {
     const content = onlyBase("noun");
-    expect(fillFormTypeTemplate(content, undefined, allFormTypes)).toBe(
-      content
-    );
-    expect(fillFormTypeTemplate(content, [], allFormTypes)).toBe(content);
+    expect(fillFormTypeTemplate(content, undefined)).toBe(content);
+    expect(fillFormTypeTemplate(content, [])).toBe(content);
   });
 
   it("onlyPosId 只铺指定的那个词性", () => {
@@ -2053,7 +2033,6 @@ describe("fillFormTypeTemplate", () => {
     const filled = fillFormTypeTemplate(
       withVerb.value,
       catalogItems,
-      allFormTypes,
       () => uuidFromInt(seq++),
       verbPosId
     );
@@ -2062,21 +2041,6 @@ describe("fillFormTypeTemplate", () => {
     ]);
     expect(filled.pos[1]!.forms.map((form) => form.form_type)).toEqual(
       expectedTemplate("verb")
-    );
-  });
-});
-
-describe("catalogFormTypeCodes", () => {
-  it("去掉原形、按排序值排，老后端不送就交回 undefined", () => {
-    expect(catalogFormTypeCodes(undefined)).toBeUndefined();
-    expect(catalogFormTypeCodes([])).toBeUndefined();
-    const codes = catalogFormTypeCodes(partOfSpeechCatalogFixture.form_types);
-    expect(codes).not.toContain("base");
-    expect(codes).toEqual(
-      [...(partOfSpeechCatalogFixture.form_types ?? [])]
-        .filter((item) => item.code !== "base")
-        .sort((left, right) => left.sort_order - right.sort_order)
-        .map((item) => item.code)
     );
   });
 });
