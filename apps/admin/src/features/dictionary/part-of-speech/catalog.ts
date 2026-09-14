@@ -4,8 +4,7 @@ import type {
   PartOfSpeechCatalogResponse,
   PartOfSpeechCode,
   SubPartOfSpeechCatalogItem,
-  SubPartOfSpeechCode,
-  WordPosTag
+  SubPartOfSpeechCode
 } from "@tsz/types";
 
 // 业务页面一律展示「简洁显示」，正式中文名只出现在词性配置页。
@@ -58,13 +57,6 @@ export function createPartOfSpeechLookup(
     subPartsByPosCode,
     formTypeNames: new Map(catalog?.form_types?.map((f) => [f.code, f.name_zh]))
   };
-}
-
-export function partOfSpeechLabel(
-  lookup: PartOfSpeechLookup,
-  code: WordPosTag
-): string {
-  return lookup.byCode.get(code)?.name_zh ?? code;
 }
 
 export function subPartOfSpeechLabel(

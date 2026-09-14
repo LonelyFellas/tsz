@@ -181,7 +181,7 @@ function SuggestedForm({
       {form.regional_variants.mode === "common" ? (
         <VariantPanel
           className="dialect-panel-common"
-          label="通用拼写"
+          label="英美通用拼写"
           spelling={form.regional_variants.common.spelling}
           pronunciations={form.regional_variants.common.pronunciations}
         />

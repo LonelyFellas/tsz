@@ -253,7 +253,7 @@ export function buildV3ProductProgress({
             { key: "us", label: "AmE", dialect: "us" }
           ] as const)
         : language === "en" && forms.pos.length > 0
-          ? [{ key: "common", label: "通用", dialect: "common" as const }]
+          ? [{ key: "common", label: "英美通用", dialect: "common" as const }]
           : [])
     ],
     parts_of_speech: positions

@@ -70,7 +70,7 @@ import {
 import {
   availablePartOfSpeechOptions,
   createPartOfSpeechLookup,
-  partOfSpeechLabel
+  type PartOfSpeechLookup
 } from "./part-of-speech/catalog";
 import { usePartOfSpeechCatalog } from "./part-of-speech/api";
 import { toListQuery, type WordFilterValues } from "./listQuery";
@@ -118,8 +118,29 @@ const ENTRY_REFERENCE_KIND_LABEL: Record<EntryReferenceKind, string> = {
 const DIALECT_LABEL: Record<Dialect, string> = {
   uk: "BrE",
   us: "AmE",
-  common: "Common"
+  common: "英美通用"
 };
+
+/** 基本词性按英文缩写展示，只斜体字母、点号保持正体（如 *adj*.）；目录里没有的编码原样显示。 */
+function PartOfSpeechAbbreviation({
+  lookup,
+  code
+}: {
+  lookup: PartOfSpeechLookup;
+  code: string;
+}) {
+  const abbreviation = lookup.byCode.get(code)?.abbreviation;
+  if (!abbreviation) return code;
+  return (
+    <>
+      {abbreviation
+        .split(/([A-Za-z]+)/)
+        .map((part, index) =>
+          /^[A-Za-z]+$/.test(part) ? <i key={index}>{part}</i> : part
+        )}
+    </>
+  );
+}
 
 const CEFR_LEVELS = new Set<CefrLevel>(["A1", "A2", "B1", "B2", "C1", "C2"]);
 
@@ -756,7 +777,7 @@ export function SmartDictionary({
         <Space size={[4, 4]} wrap>
           {list.map((p) => (
             <Tag key={p} style={{ margin: 0 }}>
-              {partOfSpeechLabel(partOfSpeechLookup, p)}
+              <PartOfSpeechAbbreviation lookup={partOfSpeechLookup} code={p} />
             </Tag>
           ))}
         </Space>

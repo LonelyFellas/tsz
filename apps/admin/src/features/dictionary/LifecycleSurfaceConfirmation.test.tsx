@@ -101,7 +101,9 @@ describe("LifecycleSurfaceConfirmation", () => {
     expect(screen.getByText("单词")).toBeVisible();
     expect(screen.getByText("已发布")).toBeVisible();
     fireEvent.click(screen.getByText("查看候选详情"));
-    expect(screen.getByText("词形 · colour · 原形 · 通用")).toBeInTheDocument();
+    expect(
+      screen.getByText("词形 · colour · 原形 · 英美通用")
+    ).toBeInTheDocument();
     expect(screen.getByText("名词")).toBeInTheDocument();
     expect(screen.getByText("释义：颜色")).toBeInTheDocument();
     expect(screen.queryByText("12345678")).toBeNull();

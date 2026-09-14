@@ -43,7 +43,7 @@ describe("editorConstants — 编辑器枚举", () => {
   });
 
   it("固定方言与词形枚举的中文标签齐全", () => {
-    expect(DIALECT_LABEL.common).toBe("默认");
+    expect(DIALECT_LABEL.common).toBe("英美通用");
     expect(DIALECT_LABEL.uk).toBe("英式英语");
     expect(DIALECT_LABEL.us).toBe("美式英语");
     expect(FORM_TYPE_OPTIONS).toContainEqual({ value: "base", label: "原形" });

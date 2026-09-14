@@ -479,7 +479,7 @@ describe("UnifiedCreateEntryStep", () => {
     expect(await screen.findByLabelText("英式主词")).toBeDisabled();
     expect(screen.getByLabelText("美式主词")).toBeEnabled();
     fireEvent.click(screen.getByLabelText("区分英美词形"));
-    const common = screen.getByLabelText("统一主词");
+    const common = screen.getByLabelText("英美通用主词");
     expect(common).toHaveValue("centre");
     fireEvent.change(common, { target: { value: "central" } });
     fireEvent.click(screen.getByLabelText("区分英美词形"));
@@ -504,7 +504,7 @@ describe("UnifiedCreateEntryStep", () => {
     );
   });
 
-  it("词典未命中时统一主词仍可编辑并作为最终创建值", async () => {
+  it("词典未命中时英美通用主词仍可编辑并作为最终创建值", async () => {
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue(v3Detection("novel-term"));
     vi.mocked(supplied.createV3).mockResolvedValue({ word: v3Word() });
@@ -512,7 +512,7 @@ describe("UnifiedCreateEntryStep", () => {
 
     fireEvent.change(input(), { target: { value: "novel-term" } });
     fireEvent.click(screen.getByText("词典检测"));
-    const common = await screen.findByLabelText("统一主词");
+    const common = await screen.findByLabelText("英美通用主词");
     fireEvent.change(common, { target: { value: "novel-final" } });
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
 
@@ -532,7 +532,7 @@ describe("UnifiedCreateEntryStep", () => {
 
     fireEvent.change(input(), { target: { value: "novel-term" } });
     fireEvent.click(screen.getByText("词典检测"));
-    fireEvent.change(await screen.findByLabelText("统一主词"), {
+    fireEvent.change(await screen.findByLabelText("英美通用主词"), {
       target: { value: "苹果" }
     });
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
@@ -979,7 +979,7 @@ describe("UnifiedCreateEntryStep", () => {
     await act(async () => creation.resolve({ word: phraseWord }));
   });
 
-  it("V3 phrase not_found 使用本次输入填充统一主词", async () => {
+  it("V3 phrase not_found 使用本次输入填充英美通用主词", async () => {
     const supplied = requests();
     vi.mocked(supplied.detectV3).mockResolvedValue(
       v3PhraseDetection("in common")
@@ -989,12 +989,14 @@ describe("UnifiedCreateEntryStep", () => {
     fireEvent.change(input(), { target: { value: "in common" } });
     fireEvent.click(screen.getByText("词典检测"));
 
-    expect(await screen.findByLabelText("统一主词")).toHaveValue("in common");
+    expect(await screen.findByLabelText("英美通用主词")).toHaveValue(
+      "in common"
+    );
     expect(screen.getByText("短语词条")).toBeVisible();
     expect(screen.getByText("来源：本次输入")).toBeVisible();
   });
 
-  it("not_found 使用本次输入填充统一主词并等待确认，unavailable 则阻断", async () => {
+  it("not_found 使用本次输入填充英美通用主词并等待确认，unavailable 则阻断", async () => {
     const notFoundRequests = requests();
     const creation = deferred<{ word: AdminWordV3 }>();
     vi.mocked(notFoundRequests.detectV3).mockResolvedValue(
@@ -1013,7 +1015,7 @@ describe("UnifiedCreateEntryStep", () => {
     fireEvent.change(input(), { target: { value: "invented" } });
     fireEvent.click(screen.getByText("词典检测"));
     expect(await screen.findByText("确认英美主词")).toBeVisible();
-    expect(screen.getByLabelText("统一主词")).toHaveValue("invented");
+    expect(screen.getByLabelText("英美通用主词")).toHaveValue("invented");
     expect(screen.getByText("来源：本次输入")).toBeVisible();
     expect(notFoundRequests.createV3).not.toHaveBeenCalled();
     unmount();
@@ -1088,7 +1090,7 @@ describe("UnifiedCreateEntryStep", () => {
       await screen.findByText("网络异常，创建结果未知。请原样重试。")
     ).toBeVisible();
 
-    const frozenHeadword = screen.getByLabelText("统一主词");
+    const frozenHeadword = screen.getByLabelText("英美通用主词");
     expect(frozenHeadword).toBeDisabled();
     expect(screen.getByRole("switch", { name: "区分英美词形" })).toBeDisabled();
     expect(input()).toBeDisabled();
@@ -1125,7 +1127,7 @@ describe("UnifiedCreateEntryStep", () => {
     expect(
       await screen.findByText("响应异常，创建结果未知。请原样重试。")
     ).toBeVisible();
-    expect(screen.getByLabelText("统一主词")).toBeDisabled();
+    expect(screen.getByLabelText("英美通用主词")).toBeDisabled();
     fireEvent.click(screen.getByText("原样重试创建"));
     await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(2));
     expect(vi.mocked(supplied.createV3).mock.calls[1]).toEqual(
@@ -1614,7 +1616,7 @@ describe("真实词条标注创建", () => {
     const created = renderStep(supplied);
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    await screen.findByLabelText("统一主词");
+    await screen.findByLabelText("英美通用主词");
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
     const dialog = await screen.findByRole("dialog");
     const fields = within(dialog).getAllByPlaceholderText("请输入标注");
@@ -1649,7 +1651,7 @@ describe("真实词条标注创建", () => {
     renderStep(supplied);
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    await screen.findByLabelText("统一主词");
+    await screen.findByLabelText("英美通用主词");
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
     const dialog = await screen.findByRole("dialog");
     fireEvent.change(within(dialog).getAllByPlaceholderText("请输入标注")[0]!, {
@@ -1695,7 +1697,7 @@ describe("真实词条标注创建", () => {
     const created = renderStep(supplied);
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    await screen.findByLabelText("统一主词");
+    await screen.findByLabelText("英美通用主词");
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
     const dialog = await screen.findByRole("dialog");
     const fields = within(dialog).getAllByPlaceholderText("请输入标注");
@@ -1761,7 +1763,7 @@ describe("真实词条标注创建", () => {
   async function openConflict() {
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    await screen.findByLabelText("统一主词");
+    await screen.findByLabelText("英美通用主词");
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
     return screen.findByRole("dialog");
   }
@@ -1901,7 +1903,7 @@ describe("真实词条标注创建", () => {
     const created = renderStep(supplied);
     fireEvent.change(input(), { target: { value: "center" } });
     fireEvent.click(screen.getByText("词典检测"));
-    await screen.findByLabelText("统一主词");
+    await screen.findByLabelText("英美通用主词");
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
     const dialog = await screen.findByRole("dialog");
     const fields = within(dialog).getAllByPlaceholderText("请输入标注");

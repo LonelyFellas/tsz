@@ -248,7 +248,7 @@ describe("V3MeaningsPreview", () => {
 
     expect(screen.getByText("释义组 1：空间位置 / Place")).toBeVisible();
     expect(screen.getByText("名词")).toBeVisible();
-    expect(screen.getByText("通用：at the center of")).toBeVisible();
+    expect(screen.getByText("英美通用：at the center of")).toBeVisible();
     expect(screen.getByText("可数名词")).toBeVisible();
     expect(screen.getByText("依赖上下文")).toBeVisible();
     expect(screen.getByText("中心位置")).toBeVisible();

@@ -3,7 +3,6 @@ import { partOfSpeechCatalogFixture } from "../word-creation/partOfSpeech.test.h
 import {
   availablePartOfSpeechOptions,
   createPartOfSpeechLookup,
-  partOfSpeechLabel,
   soleSubPartOfSpeechCode,
   subPartOfSpeechLabel,
   subPartOfSpeechOptions
@@ -33,8 +32,6 @@ describe("part-of-speech catalog", () => {
   it("生成中文 options、排除已用词性并对未知编码安全回退", () => {
     const lookup = createPartOfSpeechLookup(partOfSpeechCatalogFixture);
 
-    expect(partOfSpeechLabel(lookup, "noun")).toBe("名词");
-    expect(partOfSpeechLabel(lookup, "unknown-pos")).toBe("unknown-pos");
     expect(subPartOfSpeechLabel(lookup, "N-COUNT")).toBe("可数名词");
     expect(subPartOfSpeechLabel(lookup, "UNKNOWN-SUB")).toBe("UNKNOWN-SUB");
     expect(

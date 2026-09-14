@@ -415,7 +415,7 @@ describe("V3WordCreationWizard", () => {
       ]);
       expect(field("原形英式拼写")).toBeNull();
       expect(field("原形美式拼写")).toBeNull();
-      expect(field("原形英美共用拼写")).toHaveValue("hit the sack");
+      expect(field("原形英美通用拼写")).toHaveValue("hit the sack");
       expect(
         field("英美拼写无区别")!.closest(".ant-radio-wrapper")
       ).toHaveClass("ant-radio-wrapper-checked");
@@ -1668,8 +1668,8 @@ describe("V3WordCreationWizard", () => {
           "variant_spelling_required"
         )
       );
-      expect(screen.getAllByLabelText("原形英美共用拼写")).toHaveLength(1);
-      const sharedInput = screen.getByLabelText("原形英美共用拼写");
+      expect(screen.getAllByLabelText("原形英美通用拼写")).toHaveLength(1);
+      const sharedInput = screen.getByLabelText("原形英美通用拼写");
       expect(sharedInput).toHaveAttribute("aria-invalid", "true");
       expect(sharedInput).toHaveClass("ant-input-status-error");
       for (const candidate of issues) {
@@ -1909,7 +1909,7 @@ describe("V3WordCreationWizard", () => {
       .closest<HTMLElement>('[role="button"]');
     expect(secondSenseHeader).not.toBeNull();
     fireEvent.click(secondSenseHeader!);
-    fireEvent.change(screen.getByLabelText("定义 1 通用内容"), {
+    fireEvent.change(screen.getByLabelText("定义 1 英美通用内容"), {
       target: { value: "local unsaved" }
     });
     const secondSense = secondSenseHeader!.closest<HTMLElement>(
@@ -1930,7 +1930,7 @@ describe("V3WordCreationWizard", () => {
     fireEvent.click(screen.getByText("定位词义"));
 
     await waitFor(() =>
-      expect(screen.getByLabelText("定义 1 通用内容")).toHaveFocus()
+      expect(screen.getByLabelText("定义 1 英美通用内容")).toHaveFocus()
     );
     expect(secondTab).toHaveAttribute("aria-selected", "true");
     expect(
@@ -1939,7 +1939,7 @@ describe("V3WordCreationWizard", () => {
       )
     ).toHaveAttribute("aria-expanded", "false");
     expect(secondSenseHeader).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByLabelText("定义 1 通用内容")).toHaveValue(
+    expect(screen.getByLabelText("定义 1 英美通用内容")).toHaveValue(
       "local unsaved"
     );
   });

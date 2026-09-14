@@ -25,6 +25,10 @@ const apiMocks = vi.hoisted(() => ({
   useWordStats: vi.fn()
 }));
 
+const catalogMocks = vi.hoisted(() => ({
+  items: [] as Array<Record<string, unknown>>
+}));
+
 const dataSourceMocks = vi.hoisted(() => ({
   get: vi.fn()
 }));
@@ -67,7 +71,7 @@ vi.mock("@/lib/auth", () => ({
 
 vi.mock("./part-of-speech/api", () => ({
   usePartOfSpeechCatalog: () => ({
-    data: { catalog_version: 1, items: [] },
+    data: { catalog_version: 1, items: catalogMocks.items },
     isError: false,
     isPending: false,
     refetch: vi.fn()
@@ -191,6 +195,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   dataSourceMocks.get.mockReset().mockResolvedValue(undefined);
   authMocks.profile = { id: "admin-1", role: "admin" };
+  catalogMocks.items = [];
   for (const hook of [
     apiMocks.useArchiveWord,
     apiMocks.useArchiveWordsBatch,
@@ -514,6 +519,55 @@ describe("SmartDictionary", () => {
     expect(screen.getByTestId("location")).toHaveTextContent(
       "/words/v3-entry-12345678/v3/wizard/forms"
     );
+  });
+
+  it("方言通用显示「英美通用」，基本词性显示英文缩写且只斜体字母", () => {
+    matchViewport(1440);
+    catalogMocks.items = [
+      {
+        id: "pos-adjective",
+        code: "adjective",
+        abbreviation: "adj.",
+        sort_order: 1,
+        sub_parts: []
+      },
+      {
+        id: "pos-noun",
+        code: "noun",
+        abbreviation: "n.",
+        sort_order: 2,
+        sub_parts: []
+      }
+    ];
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...word("entry", "hot"),
+            pos_list: ["adjective", "noun", "unknown-pos"]
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+
+    const cells = screen.getByText("hot").closest("tr")!.querySelectorAll("td");
+    expect(cells[3]).toHaveTextContent("英美通用");
+    expect(screen.queryByText("Common")).toBeNull();
+    // 点号不在斜体里；目录里没有的编码原样显示、不斜体。
+    expect(cells[5]).toHaveTextContent("adj.n.unknown-pos");
+    expect(
+      [...cells[5]!.querySelectorAll("i")].map((node) => node.textContent)
+    ).toEqual(["adj", "n"]);
   });
 
   it("unknown schema 解码失败时 fail closed 显示列表错误，不渲染猜测数据", () => {

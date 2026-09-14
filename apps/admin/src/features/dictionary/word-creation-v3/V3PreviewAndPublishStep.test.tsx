@@ -376,7 +376,7 @@ describe("V3PreviewAndPublishStep", () => {
     ).toHaveTextContent("原形");
     expect(
       screen.getByTestId(`preview-form-${formWithoutPronunciation.id}`)
-    ).toHaveTextContent("通用");
+    ).toHaveTextContent("英美通用");
     expect(
       screen.getByTestId(`preview-form-${formWithoutPronunciation.id}`)
     ).toHaveTextContent("plain");

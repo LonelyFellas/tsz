@@ -906,10 +906,10 @@ describe("V3PublicationHistory", () => {
       fireEvent.click(detailsButton);
     }
     expect(
-      await screen.findByText("词形 · first-source · 原形 · 通用")
+      await screen.findByText("词形 · first-source · 原形 · 英美通用")
     ).toBeInTheDocument();
     expect(
-      await screen.findByText("词形 · terminal-source · 原形 · 通用")
+      await screen.findByText("词形 · terminal-source · 原形 · 英美通用")
     ).toBeInTheDocument();
     expect(fetchSurfacePage).toHaveBeenCalledWith(
       "activation-snapshot",
@@ -1010,9 +1010,11 @@ describe("V3PublicationHistory", () => {
       fireEvent.click(detailsButton);
     }
     expect(
-      await screen.findByText("词形 · replacement-source · 原形 · 通用")
+      await screen.findByText("词形 · replacement-source · 原形 · 英美通用")
     ).toBeInTheDocument();
-    expect(screen.queryByText("词形 · old-source · 原形 · 通用")).toBeNull();
+    expect(
+      screen.queryByText("词形 · old-source · 原形 · 英美通用")
+    ).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: /确认并激活/ }));
     await waitFor(() =>
       expect(api.activatePublication).toHaveBeenCalledTimes(3)
@@ -1286,7 +1288,7 @@ describe("V3PublicationHistory", () => {
       await screen.findByRole("button", { name: "查看候选详情" })
     );
     expect(
-      await screen.findByText("词形 · dirty-source · 原形 · 通用")
+      await screen.findByText("词形 · dirty-source · 原形 · 英美通用")
     ).toBeInTheDocument();
 
     view.rerender(
