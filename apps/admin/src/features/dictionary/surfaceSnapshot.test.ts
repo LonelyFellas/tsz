@@ -319,8 +319,8 @@ describe("surface snapshot selectors", () => {
         match_count: 2,
         membership: "visibility",
         source_labels: [
-          "词形 · surface-entry-1 · 原形 · 通用",
-          "词形 · second-surface · 原形 · 通用"
+          "词形 · surface-entry-1 · 原形 · 英美通用",
+          "词形 · second-surface · 原形 · 英美通用"
         ],
         pos_labels: ["名词"],
         gloss_previews: ["释义"]

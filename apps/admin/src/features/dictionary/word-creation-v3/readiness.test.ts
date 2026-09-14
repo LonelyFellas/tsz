@@ -717,7 +717,7 @@ describe("实时摘要明细", () => {
     };
     expect(buildV3ProductProgress(input)[0]!.details).toEqual([
       { key: "language", label: "英语 English" },
-      { key: "common", label: "通用", dialect: "common" }
+      { key: "common", label: "英美通用", dialect: "common" }
     ]);
     forms.pos[0]!.form_groups[0]!.dialect_rules.phonetic_mode = "distinguish";
     const rows = buildV3ProductProgress({

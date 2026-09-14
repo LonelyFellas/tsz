@@ -572,15 +572,15 @@ function HeadwordConfirmationCard({
       {value.mode === "unified" ? (
         <div className="dialect-panel">
           <Form.Item
-            label="统一主词"
+            label="英美通用主词"
             required
             validateStatus={
               value.common.trim() === "" || issues.uk ? "error" : undefined
             }
-            help={value.common.trim() === "" ? "请输入统一主词" : issues.uk}
+            help={value.common.trim() === "" ? "请输入英美通用主词" : issues.uk}
           >
             <Input
-              aria-label="统一主词"
+              aria-label="英美通用主词"
               disabled={disabled}
               value={value.common}
               onChange={(event) =>

@@ -36,7 +36,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
     const firstGroup = nounGroups.nth(0);
-    await expect(firstGroup.getByLabel("复数通用拼写")).toHaveValue("");
+    await expect(firstGroup.getByLabel("复数英美通用拼写")).toHaveValue("");
 
     // 加词性时按配置表铺出新建模板：原形加 mock 目录里 5 个非原形类型，共 6 行。
     // 组内只剩一个原形时类型锁死；⊕ 复制出第二个原形后放开，删回去又锁上。
@@ -52,7 +52,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
 
     const firstForm = firstGroup.locator(".v3-concrete-form-row").nth(0);
-    await firstForm.getByLabel("原形通用拼写").fill("orbit-common");
+    await firstForm.getByLabel("原形英美通用拼写").fill("orbit-common");
     await firstForm.getByRole("button", { name: /新增发音/ }).click();
     await firstForm
       .getByLabel(/第 \d+ 条发音的字典音标/)
@@ -195,7 +195,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     ).toBe(2);
   });
 
-  test("E03 Mock：同一词性第 2 组独立设为英美共用，保存后两组规则各自落库", async ({
+  test("E03 Mock：同一词性第 2 组独立设为英美通用，保存后两组规则各自落库", async ({
     page
   }) => {
     const api = await mockAdminV3Api(page, { formsFailureOnce: false });

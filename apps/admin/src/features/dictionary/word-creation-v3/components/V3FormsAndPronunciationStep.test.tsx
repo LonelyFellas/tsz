@@ -294,26 +294,26 @@ describe("V3FormsAndPronunciationStep", () => {
       forms: [commonFormFixture({ spelling: "cat" })]
     });
     render(<Harness initial={initial} />);
-    expect(await screen.findByLabelText("复数通用拼写")).toHaveValue("");
+    expect(await screen.findByLabelText("复数英美通用拼写")).toHaveValue("");
     expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled();
     expect(canonicalValue()).toEqual(initial);
     expect(screen.getByTestId("progress-count")).toHaveTextContent("2");
     expect(screen.getByTitle("该词性未填项")).toHaveTextContent("1");
-    fireEvent.change(screen.getByLabelText("原形通用拼写"), {
+    fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "dog" }
     });
     expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
     fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
-    expect(screen.queryByLabelText("复数通用拼写")).toBeNull();
+    expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
     expect(screen.getByTestId("progress-count")).toHaveTextContent("1");
     expect(screen.getByTitle("该词性未填项")).toHaveAttribute(
       "data-show",
       "false"
     );
-    fireEvent.change(screen.getByLabelText("原形通用拼写"), {
+    fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "bird" }
     });
-    expect(screen.queryByLabelText("复数通用拼写")).toBeNull();
+    expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
     expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
   });
 
@@ -322,7 +322,7 @@ describe("V3FormsAndPronunciationStep", () => {
       forms: [commonFormFixture({ spelling: "cat" })]
     });
     render(<Harness initial={initial} />);
-    await screen.findByLabelText("复数通用拼写");
+    await screen.findByLabelText("复数英美通用拼写");
     fireEvent.click(screen.getByLabelText("上移变化组 1 的词形 2"));
     expect(
       screen.getByLabelText("变化组 1 词形 1 类型").closest(".ant-select")
@@ -333,8 +333,8 @@ describe("V3FormsAndPronunciationStep", () => {
       screen.getByLabelText("变化组 1 词形 2 类型").closest(".ant-select")
     ).toHaveTextContent("复数");
     fireEvent.click(screen.getByLabelText("在复数 1 下方添加同类型词形"));
-    expect(screen.getByLabelText("复数 1通用拼写")).toHaveValue("");
-    expect(screen.getByLabelText("复数 2通用拼写")).toHaveValue("");
+    expect(screen.getByLabelText("复数 1英美通用拼写")).toHaveValue("");
+    expect(screen.getByLabelText("复数 2英美通用拼写")).toHaveValue("");
     expect(screen.getByTestId("progress-count")).toHaveTextContent("3");
     expect(
       canonicalValue().pos[0]!.forms.map((form) => form.form_type)
@@ -347,19 +347,19 @@ describe("V3FormsAndPronunciationStep", () => {
     });
     initial.pos[0]!.pos = "adjective";
     render(<Harness initial={initial} />);
-    const comparative = await screen.findByLabelText("比较级通用拼写");
-    expect(screen.getByLabelText("最高级通用拼写")).toHaveValue("");
+    const comparative = await screen.findByLabelText("比较级英美通用拼写");
+    expect(screen.getByLabelText("最高级英美通用拼写")).toHaveValue("");
     fireEvent.change(comparative, { target: { value: "faster" } });
-    expect(screen.getByLabelText("比较级通用拼写")).toBe(comparative);
+    expect(screen.getByLabelText("比较级英美通用拼写")).toBe(comparative);
     const forms = canonicalValue().pos[0]!.forms;
     expect(forms.map((form) => form.form_type)).toEqual([
       "base",
       "comparative"
     ]);
-    expect(screen.getByLabelText("比较级通用拼写")).toHaveValue("faster");
+    expect(screen.getByLabelText("比较级英美通用拼写")).toHaveValue("faster");
     fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
     fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
-    expect(screen.queryByLabelText("比较级通用拼写")).toBeNull();
+    expect(screen.queryByLabelText("比较级英美通用拼写")).toBeNull();
     expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
   });
 
@@ -496,7 +496,7 @@ describe("V3FormsAndPronunciationStep", () => {
       />
     );
 
-    expect(await screen.findByLabelText("原形英美共用拼写")).toHaveValue(
+    expect(await screen.findByLabelText("原形英美通用拼写")).toHaveValue(
       "harbor"
     );
     expect(container.querySelector(".v3-dialect-separated-matrix")).toBeNull();
@@ -508,11 +508,11 @@ describe("V3FormsAndPronunciationStep", () => {
       container.querySelectorAll(".word-pronunciation-editor")
     ).toHaveLength(4);
 
-    fireEvent.change(screen.getByLabelText("原形英美共用拼写"), {
+    fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "harbour" }
     });
 
-    expect(screen.getByLabelText("原形英美共用拼写")).toHaveValue("harbour");
+    expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("harbour");
     const updated = formById(canonicalValue(), form.id);
     expect(updated).toMatchObject({
       id: form.id,
@@ -535,12 +535,12 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(canonicalValue()).toEqual(beforeMerge);
     expect(
       screen.getByText(
-        "英式与美式发音内容不同，请先统一需要保留的发音，再合并为英美共用。"
+        "英式与美式发音内容不同，请先统一需要保留的发音，再合并为英美通用。"
       )
     ).toBeVisible();
   });
 
-  it("UU 保持英美共用结构且不渲染独立 BrE/AmE 面板", async () => {
+  it("UU 保持英美通用结构且不渲染独立 BrE/AmE 面板", async () => {
     const common = commonFormFixture({
       id: uuidFromInt(2151),
       variant_id: uuidFromInt(2152),
@@ -550,12 +550,12 @@ describe("V3FormsAndPronunciationStep", () => {
       <Harness initial={formsFixture({ forms: [common] })} />
     );
 
-    expect((await screen.findAllByText("英美共用")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("英美通用")).length).toBeGreaterThan(0);
     expect(container.querySelector(".word-form-matrix-unified")).not.toBeNull();
     expect(container.querySelector(".v3-dialect-separated-matrix")).toBeNull();
     expect(container.querySelector(".v3-dialect-panel-uk")).toBeNull();
     expect(container.querySelector(".v3-dialect-panel-us")).toBeNull();
-    expect(screen.getByLabelText("原形通用拼写")).toHaveValue("harbor");
+    expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("harbor");
   });
 
   it("类型单元加号在当前行下方新增同类型 form，并移除底部类型选择入口", async () => {
@@ -801,7 +801,7 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toHaveClass("ant-radio-wrapper-checked");
     expect(
       groupCard.querySelector(".word-form-matrix-shared-header")
-    ).toHaveTextContent("英美共用");
+    ).toHaveTextContent("英美通用");
     expect(groupCard.querySelectorAll(".v3-concrete-form-row")).toHaveLength(3);
     expect(
       groupCard.querySelectorAll(".word-form-type-cell .v3-membership-actions")
@@ -895,13 +895,13 @@ describe("V3FormsAndPronunciationStep", () => {
       screen.getByLabelText("英美音标有区别").closest(".ant-radio-wrapper")
     ).toHaveClass("ant-radio-wrapper-checked");
     expect(screen.getByLabelText("英美音标无区别")).not.toBeDisabled();
-    expect(screen.getByLabelText("原形英美共用拼写")).toHaveValue("center");
+    expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("center");
     expect(container.querySelector(".v3-dialect-separated-matrix")).toBeNull();
     expect(container.querySelector(".word-form-matrix-distinguish")).toBeNull();
-    fireEvent.change(screen.getByLabelText("原形英美共用拼写"), {
+    fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "centred" }
     });
-    expect(screen.getByLabelText("原形英美共用拼写")).toHaveValue("centred");
+    expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("centred");
     const updated = formById(canonicalValue(), form.id);
     if (updated.regional_variants.mode !== "uk_us") throw new Error("fixture");
     expect(updated.regional_variants.uk.spelling).toBe("centred");
@@ -1030,12 +1030,18 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(await screen.findByText("名词")).toBeInTheDocument();
     expect(screen.getByText("动词")).toBeInTheDocument();
 
-    fireEvent.change(screen.getByLabelText("原形 1通用拼写"), {
+    fireEvent.change(screen.getByLabelText("原形 1英美通用拼写"), {
       target: { value: "first-edited" }
     });
-    expect(screen.getByLabelText("原形 1通用拼写")).toHaveValue("first-edited");
-    expect(screen.getByLabelText("原形通用拼写")).toHaveValue("group-two-base");
-    expect(screen.getByLabelText("原形 2通用拼写")).toHaveValue("second-base");
+    expect(screen.getByLabelText("原形 1英美通用拼写")).toHaveValue(
+      "first-edited"
+    );
+    expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue(
+      "group-two-base"
+    );
+    expect(screen.getByLabelText("原形 2英美通用拼写")).toHaveValue(
+      "second-base"
+    );
 
     // 组 1 还剩另一个原形，删除走确认；只删这一个词形，组 2 不受影响。
     fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 1"));
@@ -1059,7 +1065,7 @@ describe("V3FormsAndPronunciationStep", () => {
     const formId = content.pos[0]!.forms[0]!.id;
     const groupId = content.pos[0]!.form_groups[0]!.id;
     const { container } = render(<Harness initial={content} />);
-    const target = screen.getByLabelText("原形 1通用拼写");
+    const target = screen.getByLabelText("原形 1英美通用拼写");
     target.focus();
     const row = target.closest(`[data-form-id="${formId}"]`);
 
@@ -1356,7 +1362,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
 
     expect(screen.getByText("词形与发音尚未完成")).toBeInTheDocument();
-    expect(screen.getByLabelText("原形通用拼写")).toHaveAttribute(
+    expect(screen.getByLabelText("原形英美通用拼写")).toHaveAttribute(
       "aria-invalid",
       "true"
     );
@@ -1538,7 +1544,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     // 副词、代词这类词性只有一个原形组，藏起来就没地方录拼写与发音。
     expect(screen.getByText("第 1 组 词形变化")).toBeVisible();
-    expect(screen.getByLabelText("原形通用拼写")).toBeVisible();
+    expect(screen.getByLabelText("原形英美通用拼写")).toBeVisible();
     screen.getAllByLabelText(/第 1 条发音的实际发音/u);
     // 没有派生词形可铺：组内只有一行，类型下拉锁死，也不给新增变化组。
     expect(screen.getAllByLabelText(/^变化组 1 词形 \d+ 类型$/u)).toHaveLength(
@@ -1580,7 +1586,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     expect(screen.getByText("第 1 组 词形变化")).toBeVisible();
     expect(screen.queryByText("当前词性无需其他词形变化")).toBeNull();
-    expect(screen.getByLabelText("复数通用拼写")).toHaveValue("centres");
+    expect(screen.getByLabelText("复数英美通用拼写")).toHaveValue("centres");
     expect(document.body.textContent).not.toMatch(/基本词性|派生词形|派生词性/);
   });
 
@@ -2248,11 +2254,12 @@ describe("V3FormsAndPronunciationStep", () => {
     const firstGroupCard = document.querySelector<HTMLElement>(
       `[data-group-id="${firstGroupId}"]`
     )!;
-    const firstInput = within(firstGroupCard).getByLabelText("原形 1通用拼写");
+    const firstInput =
+      within(firstGroupCard).getByLabelText("原形 1英美通用拼写");
     fireEvent.change(firstInput, { target: { value: "orbit" } });
-    expect(within(firstGroupCard).getByLabelText("原形 1通用拼写")).toHaveValue(
-      "orbit"
-    );
+    expect(
+      within(firstGroupCard).getByLabelText("原形 1英美通用拼写")
+    ).toHaveValue("orbit");
 
     await chooseGroupAction(2, "上移本组");
     expect(canonicalValue().pos[0]!.form_groups.map((item) => item.id)).toEqual(
@@ -2689,7 +2696,7 @@ describe("V3FormsAndPronunciationStep", () => {
         spelling_mode: "unified" as const,
         phonetic_mode: "distinguish" as const
       },
-      expectedLabel: "复数英美共用拼写"
+      expectedLabel: "复数英美通用拼写"
     },
     {
       name: "DD",
@@ -2754,7 +2761,10 @@ describe("V3FormsAndPronunciationStep", () => {
         ).toHaveLength(1);
         expect(within(addedCell).queryByText("暂无发音")).toBeNull();
       }
-      expect(screen.queryByLabelText("复数通用拼写")).toBeNull();
+      // UD 只有自己那一个英美通用拼写框（没有变成共用变体，见上面的 mode 断言）；DD 没有。
+      expect(screen.queryAllByLabelText("复数英美通用拼写")).toHaveLength(
+        rules.spelling_mode === "unified" ? 1 : 0
+      );
       expect(screen.queryByText("本组的英美结构待统一")).toBeNull();
       if (rules.spelling_mode === "distinguish") {
         expect(screen.getByLabelText("复数美式拼写")).toBeVisible();

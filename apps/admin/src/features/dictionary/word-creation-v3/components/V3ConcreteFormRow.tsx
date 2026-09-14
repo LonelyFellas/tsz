@@ -257,7 +257,7 @@ export function V3ConcreteFormRow({
             {commonVariant ? (
               <div className="word-form-matrix-shared-header">
                 <span className="word-form-matrix-shared-header-common">
-                  英美共用
+                  英美通用
                 </span>
               </div>
             ) : unifiedSpellingVariants ? (
@@ -301,7 +301,7 @@ export function V3ConcreteFormRow({
             <div className="word-shared-form-spelling">
               <Flex align="center" justify="space-between">
                 <Typography.Text strong>词形拼写</Typography.Text>
-                <Tag color="blue">英美共用</Tag>
+                <Tag color="blue">英美通用</Tag>
               </Flex>
               <Input
                 aria-invalid={issues.some(
@@ -309,7 +309,7 @@ export function V3ConcreteFormRow({
                     issue.node_location.variant_id === commonVariant.id &&
                     issue.field === "spelling"
                 )}
-                aria-label={`${formLabel}通用拼写`}
+                aria-label={`${formLabel}英美通用拼写`}
                 data-v3-field="spelling"
                 data-v3-node-id={commonVariant.id}
                 onChange={(event) =>
@@ -346,11 +346,11 @@ export function V3ConcreteFormRow({
             <div className="word-shared-form-spelling">
               <Flex align="center" justify="space-between">
                 <Typography.Text strong>词形拼写</Typography.Text>
-                <Tag color="blue">英美共用</Tag>
+                <Tag color="blue">英美通用</Tag>
               </Flex>
               <Input
                 aria-invalid={unifiedSpellingInvalid}
-                aria-label={`${formLabel}英美共用拼写`}
+                aria-label={`${formLabel}英美通用拼写`}
                 data-v3-field="spelling"
                 data-v3-node-aliases={unifiedSpellingVariantIds.join(" ")}
                 data-v3-node-id={form.id}

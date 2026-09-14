@@ -38,7 +38,7 @@ describe("V3 product presentation", () => {
     expect(wordStatusLabel("published")).toBe("已发布");
     expect(formTypeLabel("base")).toBe("原形");
     expect(formTypeLabel("past_participle")).toBe("过去分词");
-    expect(dialectLabel("common")).toBe("通用");
+    expect(dialectLabel("common")).toBe("英美通用");
     expect(pronunciationStyleLabel("weak")).toBe("弱读");
     expect(partOfSpeechLabel("noun")).toBe("名词");
     expect(partOfSpeechLabel("future-pos")).toBe("其他词性");

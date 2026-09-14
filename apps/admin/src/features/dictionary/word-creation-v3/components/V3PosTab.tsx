@@ -106,13 +106,13 @@ export function V3PosTab({
       setDialectChangeError({
         groupId,
         message:
-          "英式与美式成分用词配置不同，请先统一需要保留的配置，再合并为英美共用。"
+          "英式与美式成分用词配置不同，请先统一需要保留的配置，再合并为英美通用。"
       });
     } else if (result.reason === "pronunciation_merge_required") {
       setDialectChangeError({
         groupId,
         message:
-          "英式与美式发音内容不同，请先统一需要保留的发音，再合并为英美共用。"
+          "英式与美式发音内容不同，请先统一需要保留的发音，再合并为英美通用。"
       });
     }
   };

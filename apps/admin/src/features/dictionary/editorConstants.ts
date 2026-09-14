@@ -12,14 +12,14 @@ import { CEFR_LEVELS, recordToOptions } from "./labels";
 export const DIALECT_LABEL: Record<Dialect, string> = {
   uk: "英式英语",
   us: "美式英语",
-  common: "默认"
+  common: "英美通用"
 };
 
 /** 用于“英式词形”“美式语法结构”等组合文案，避免重复“英语”。 */
 export const DIALECT_SHORT_LABEL: Record<Dialect, string> = {
   uk: "英式",
   us: "美式",
-  common: "默认"
+  common: "英美通用"
 };
 
 export const DIALECT_OPTIONS = (["uk", "us"] as const).map((d) => ({

@@ -18,7 +18,7 @@ const FORM_TYPE_LABEL: Record<WordFormTypeV3, string> = {
 };
 
 const DIALECT_LABEL: Record<Dialect, string> = {
-  common: "通用",
+  common: "英美通用",
   uk: "英式",
   us: "美式"
 };

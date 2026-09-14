@@ -989,7 +989,7 @@ describe("V3MeaningsAndExamplesStep", () => {
         }
       };
       render(<Harness initial={initial} />);
-      for (const label of ["语法结构 1 通用内容", "定义 1 通用内容"]) {
+      for (const label of ["语法结构 1 英美通用内容", "定义 1 英美通用内容"]) {
         const input = screen.getByLabelText(label);
         const button = screen.getByLabelText(`${label} 播放语音`);
         expect(
@@ -1009,11 +1009,11 @@ describe("V3MeaningsAndExamplesStep", () => {
           )
         );
       }
-      fireEvent.change(screen.getByLabelText("语法结构 1 通用内容"), {
+      fireEvent.change(screen.getByLabelText("语法结构 1 英美通用内容"), {
         target: { value: "" }
       });
       expect(
-        screen.getByLabelText("语法结构 1 通用内容 播放语音")
+        screen.getByLabelText("语法结构 1 英美通用内容 播放语音")
       ).toBeDisabled();
     } finally {
       voices.mockRestore();
@@ -1026,17 +1026,17 @@ describe("V3MeaningsAndExamplesStep", () => {
     // 关联编辑器共存时，语法结构仍使用原来的标注工具。
     render(<Harness initial={meaningsFixture} />);
 
-    fireEvent.change(screen.getByLabelText("语法结构 1 通用内容"), {
+    fireEvent.change(screen.getByLabelText("语法结构 1 英美通用内容"), {
       target: { value: "a centre of the city" }
     });
-    fireEvent.click(screen.getByLabelText("打开语法结构 1 通用内容编辑器"));
+    fireEvent.click(screen.getByLabelText("打开语法结构 1 英美通用内容编辑器"));
     // 等的是按需加载的编辑器分块，给足超时：默认 1 秒在负载高的 CI runner 上不够
     const editor = await within(
       document.querySelector(".word-grammar-panel") as HTMLElement
     ).findByRole("toolbar", { name: "标注工具栏" }, { timeout: 10_000 });
     expect(editor).toBeInTheDocument();
 
-    const input = screen.getByLabelText("语法结构 1 通用内容");
+    const input = screen.getByLabelText("语法结构 1 英美通用内容");
     // 错误定位靠 focus() + activeElement 校验，属性必须落在输入框本身
     expect(input).toHaveAttribute("data-v3-field", "content");
     expect(input.tagName).toBe("TEXTAREA");
@@ -1081,7 +1081,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       }
     ];
     render(<Harness initial={initial} />);
-    fireEvent.click(screen.getByLabelText("打开语法结构 1 通用内容编辑器"));
+    fireEvent.click(screen.getByLabelText("打开语法结构 1 英美通用内容编辑器"));
     const grammarPanel = document.querySelector(
       ".word-grammar-panel"
     ) as HTMLElement;
@@ -1127,7 +1127,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       ]);
     try {
       render(<Harness initial={meaningsFixture} />);
-      fireEvent.click(screen.getByLabelText("打开语法结构 1 通用内容编辑器"));
+      fireEvent.click(
+        screen.getByLabelText("打开语法结构 1 英美通用内容编辑器")
+      );
       await within(
         document.querySelector(".word-grammar-panel") as HTMLElement
       ).findByRole("toolbar", { name: "标注工具栏" }, { timeout: 10_000 });
@@ -1164,7 +1166,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       within(grammarPanel as HTMLElement).queryByLabelText("语法结构 1 地区 1")
     ).toBeNull();
     const content = within(grammarPanel as HTMLElement).getByLabelText(
-      "语法结构 1 通用内容"
+      "语法结构 1 英美通用内容"
     );
     expect(content.tagName).toBe("TEXTAREA");
     expect(content).toHaveAttribute(
@@ -3481,7 +3483,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     fireEvent.change(screen.getByLabelText("释义 1 频率"), {
       target: { value: "42.5" }
     });
-    fireEvent.change(screen.getByLabelText("语法结构 1 通用内容"), {
+    fireEvent.change(screen.getByLabelText("语法结构 1 英美通用内容"), {
       target: { value: "updated grammar" }
     });
     fireEvent.change(screen.getByLabelText("定义 1 内容"), {
