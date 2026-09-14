@@ -37,6 +37,8 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
     const firstGroup = nounGroups.nth(0);
     await expect(firstGroup.getByLabel("复数英美通用拼写")).toHaveValue("");
+    // 拼写统一 / 英美区分都会出 BrE 表头，只有共用结构没有。
+    await expect(firstGroup.getByText("英式英语 · BrE")).toHaveCount(0);
 
     // 加词性时按配置表铺出新建模板：原形加 mock 目录里 5 个非原形类型，共 6 行。
     // 组内只剩一个原形时类型锁死；⊕ 复制出第二个原形后放开，删回去又锁上。

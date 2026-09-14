@@ -556,6 +556,11 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(container.querySelector(".v3-dialect-panel-uk")).toBeNull();
     expect(container.querySelector(".v3-dialect-panel-us")).toBeNull();
     expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("harbor");
+    // 「拼写统一的 uk_us」也叫英美通用拼写，但锚在 form 上；共用变体锚在 variant 上。
+    expect(screen.getByLabelText("原形英美通用拼写")).toHaveAttribute(
+      "data-v3-node-id",
+      uuidFromInt(2152)
+    );
   });
 
   it("类型单元加号在当前行下方新增同类型 form，并移除底部类型选择入口", async () => {
