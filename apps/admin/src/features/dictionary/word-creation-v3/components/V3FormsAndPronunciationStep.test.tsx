@@ -2382,8 +2382,22 @@ describe("V3FormsAndPronunciationStep", () => {
     fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
     expect(openDeleteConfirm()).not.toBeNull();
 
-    // 确认框还开着时把第 1 个原形改成复数，第 2 个就成了本组唯一原形
-    chooseOption("变化组 1 词形 1 类型", "复数");
+    // 确认框还开着时用键盘把第 1 个原形改成复数，第 2 个就成了本组唯一原形。
+    // 不能走 chooseOption：它的 mouseDown 落在确认框外，会先把确认框点关，
+    // 就测不到「锁定后自动收起」这条守卫（真实浏览器里键盘操作走的正是这条路）。
+    fireEvent.keyDown(screen.getByLabelText("变化组 1 词形 1 类型"), {
+      key: "ArrowDown",
+      keyCode: 40,
+      which: 40
+    });
+    const pluralOption = [
+      ...document.querySelectorAll<HTMLElement>(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )
+    ].find((item) => item.textContent === "复数");
+    expect(pluralOption).toBeDefined();
+    expect(openDeleteConfirm()).not.toBeNull();
+    fireEvent.click(pluralOption!);
     await waitFor(() =>
       expect(screen.getByLabelText("变化组 1 词形 2 类型")).toBeDisabled()
     );
