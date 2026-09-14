@@ -177,7 +177,7 @@ export function V3PhraseComponentUsagesCard({
       ) : null}
       <div
         aria-label="短语单词选择区"
-        className="v3-sentence-target-discovery-tokens"
+        className="v3-sentence-target-discovery-tokens tsz-entry-en"
         style={{
           marginTop: 9,
           padding: 0,

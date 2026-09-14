@@ -94,7 +94,10 @@ export function V3MeaningsPreview({
                     <Flex key={structure.id} gap="small" wrap>
                       <Tag>语法结构 {index + 1}</Tag>
                       {structure.variants.map((variant) => (
-                        <Typography.Text key={variant.id}>
+                        <Typography.Text
+                          className="tsz-entry-en"
+                          key={variant.id}
+                        >
                           {dialectLabel(variant.dialect)}：
                           {variant.content.text}
                           {variant.audio_assets?.length ? (
@@ -135,7 +138,7 @@ export function V3MeaningsPreview({
                             </Tag>
                           ) : null}
                           {sense.form_group_id ? (
-                            <Tag color="cyan">
+                            <Tag className="tsz-entry-en" color="cyan">
                               词形与发音：
                               {boundFormGroupLabel(
                                 formsPosById.get(pos.pos_id),
@@ -198,7 +201,7 @@ export function V3MeaningsPreview({
                                     <Tag color={pending ? "orange" : "green"}>
                                       {pending ? "待关联" : "已关联"}
                                     </Tag>
-                                    <Typography.Text>
+                                    <Typography.Text className="tsz-entry-en">
                                       {pending ? "待关联词条" : "上下文关联"}：
                                       {headword ??
                                         association.source_segments
@@ -226,7 +229,10 @@ export function V3MeaningsPreview({
                                 .filter(Boolean)
                                 .join("；");
                               return (
-                                <Typography.Text key={relation.id}>
+                                <Typography.Text
+                                  className="tsz-entry-en"
+                                  key={relation.id}
+                                >
                                   <Tag>{relationLabel(relation.relation)}</Tag>
                                   {relation.target_headword ??
                                     relation.pending_target_headword ??

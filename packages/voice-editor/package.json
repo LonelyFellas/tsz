@@ -11,7 +11,8 @@
     "./types": "./src/types.ts",
     "./reader": "./src/reader/index.ts",
     "./editor": "./src/editor/index.ts",
-    "./styles.css": "./src/styles.css"
+    "./styles.css": "./src/styles.css",
+    "./fonts.css": "./src/fonts.css"
   },
   "scripts": {
     "lint": "eslint .",

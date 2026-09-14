@@ -312,7 +312,7 @@ function SenseEditorShell({
               <div className="word-sense-header-label">
                 <div className="word-sense-header-content">
                   <Tag className="word-sense-level-badge">{level}</Tag>
-                  <Typography.Text className="word-sense-summary">
+                  <Typography.Text className="word-sense-summary tsz-entry-en">
                     {index + 1}. {summary}
                   </Typography.Text>
                   {subPosLabel ? (
@@ -655,6 +655,7 @@ function SenseGroupsCard({
             <div className="word-sense-group-field">
               <Input
                 aria-label={`语义区间 ${groupIndex + 1} 英文`}
+                className="tsz-entry-en"
                 data-v3-field="name_en"
                 data-v3-node-id={group.id}
                 onChange={(event) =>
@@ -1516,7 +1517,9 @@ function RelationsGrid({
                                       return {
                                         label: (
                                           <Flex align="center" gap={6}>
-                                            <span>{word.headword}</span>
+                                            <span className="tsz-entry-en">
+                                              {word.headword}
+                                            </span>
                                             <Tag
                                               color={
                                                 word.status === "draft"
@@ -1580,7 +1583,7 @@ function RelationsGrid({
                             >
                               <Input
                                 aria-label={`${relationLabel(relationType)}目标词条`}
-                                className="word-relation-target"
+                                className="word-relation-target tsz-entry-en"
                                 prefix={
                                   relation.target_word_id ? (
                                     <SoundOutlined />
@@ -3197,6 +3200,7 @@ function V3MeaningsAndExamplesStepContent({
                                                     <Select
                                                       aria-required="true"
                                                       aria-label={`定义 ${definitionIndex + 1} 语法结构`}
+                                                      className="tsz-entry-en"
                                                       data-v3-field="grammar_structure_id"
                                                       data-v3-node-id={
                                                         definition.id
@@ -3277,7 +3281,7 @@ function V3MeaningsAndExamplesStepContent({
                                                               )
                                                             }
                                                           >
-                                                            <span className="word-grammar-option-label">
+                                                            <span className="word-grammar-option-label tsz-entry-en">
                                                               {option.label}
                                                             </span>
                                                             {known &&

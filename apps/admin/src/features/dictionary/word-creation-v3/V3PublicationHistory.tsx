@@ -284,7 +284,9 @@ function PublicationSnapshotBody({
                   <Tag>{partOfSpeechLabel(form.pos)}</Tag>
                   <Tag>{formTypeLabel(form.formType as never)}</Tag>
                   <Tag>{dialectLabel(form.dialect as never)}</Tag>
-                  <Typography.Text>{form.spelling}</Typography.Text>
+                  <Typography.Text className="tsz-entry-en">
+                    {form.spelling}
+                  </Typography.Text>
                 </Flex>
                 {form.pronunciations.length === 0 ? (
                   <Typography.Text type="secondary">无发音</Typography.Text>
@@ -340,7 +342,9 @@ function PublicationSnapshotBody({
               <Flex key={grammar.id} gap="small" wrap>
                 <Tag>{partOfSpeechLabel(grammar.pos)}</Tag>
                 <Tag>{dialectLabel(grammar.dialect as never)}</Tag>
-                <Typography.Text>{grammar.text}</Typography.Text>
+                <Typography.Text className="tsz-entry-en">
+                  {grammar.text}
+                </Typography.Text>
               </Flex>
             ))}
           </Flex>
@@ -364,7 +368,7 @@ function PublicationSnapshotBody({
                     <V3EnglishTextPreview value={sentence.richEnglish} />
                   ) : (
                     sentence.english.map((row) => (
-                      <Typography.Text key={row.id}>
+                      <Typography.Text className="tsz-entry-en" key={row.id}>
                         {dialectLabel(row.dialect as never)}：{row.text}
                       </Typography.Text>
                     ))
@@ -380,7 +384,10 @@ function PublicationSnapshotBody({
                     </Typography.Text>
                   ))}
                   {sentence.associations.map((association) => (
-                    <Typography.Text key={association.id}>
+                    <Typography.Text
+                      className="tsz-entry-en"
+                      key={association.id}
+                    >
                       上下文关联：{association.target}
                       {association.gloss ? ` · ${association.gloss}` : ""}
                     </Typography.Text>
@@ -399,7 +406,7 @@ function PublicationSnapshotBody({
               <Flex key={relation.id} gap="small" wrap>
                 <Tag>{partOfSpeechLabel(relation.pos)}</Tag>
                 <Tag>{relationLabel(relation.relation)}</Tag>
-                <Typography.Text>
+                <Typography.Text className="tsz-entry-en">
                   {relation.target}
                   {relation.gloss ? ` · ${relation.gloss}` : ""}
                 </Typography.Text>
@@ -860,7 +867,7 @@ export function V3PublicationHistory({
               >
                 <Flex vertical gap={2}>
                   <Flex align="center" gap="small" wrap>
-                    <Typography.Text strong>
+                    <Typography.Text className="tsz-entry-en" strong>
                       {publicationLabel(publication)}
                     </Typography.Text>
                     <Typography.Text type="secondary">
@@ -902,7 +909,11 @@ export function V3PublicationHistory({
           {detail ? (
             <>
               <Flex align="center" gap="small" wrap>
-                <Typography.Title level={5} style={{ margin: 0 }}>
+                <Typography.Title
+                  className="tsz-entry-en"
+                  level={5}
+                  style={{ margin: 0 }}
+                >
                   {publicationLabel(detail)}
                 </Typography.Title>
                 <Typography.Text type="secondary">

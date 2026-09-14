@@ -114,7 +114,7 @@ function cascaderOptionsFromGroups(
         isLeaf: true,
         label: (
           <span className="v3-component-usage-entry">
-            <Typography.Text type="secondary">
+            <Typography.Text className="tsz-entry-en" type="secondary">
               {group.headword}（暂无词义）
             </Typography.Text>
             {draftTag}
@@ -129,7 +129,9 @@ function cascaderOptionsFromGroups(
       value: group.entryId,
       label: (
         <span className="v3-component-usage-entry">
-          <Typography.Text strong>{group.headword}</Typography.Text>
+          <Typography.Text className="tsz-entry-en" strong>
+            {group.headword}
+          </Typography.Text>
           {draftTag}
         </span>
       ),
@@ -139,7 +141,9 @@ function cascaderOptionsFromGroups(
           // 命中行只靠颜色区分，不再占一个「命中」标签的宽度。
           <span
             className={
-              formGroup.matched ? "v3-component-usage-matched-form" : undefined
+              formGroup.matched
+                ? "tsz-entry-en v3-component-usage-matched-form"
+                : "tsz-entry-en"
             }
           >
             {posLabels.size > 1
@@ -578,7 +582,7 @@ export function V3TargetCascader({
         label:
           components.length === 0 ? (
             <span className="v3-component-usage-entry">
-              <Typography.Text type="secondary">
+              <Typography.Text className="tsz-entry-en" type="secondary">
                 {groups[index]!.headword}（未配置成分用词）
               </Typography.Text>
               {groups[index]!.draft ? (

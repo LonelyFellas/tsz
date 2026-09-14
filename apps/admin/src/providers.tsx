@@ -35,12 +35,11 @@ const antdTheme = {
     // Alert 的警告态会退化成一个看不见的框。铬黄要用就在具体组件里当背景色用，不当种子。
 
     // ── 字体 ────────────────────────────────────────────────
-    // 保持系统字体栈。规范要求西文用 Ubuntu，但实测撤回：fontsource 分发的 Ubuntu
-    // 六个子集都不含 ə ʌ θ ŋ 这几个常用国际音标字形，全局启用会让一串音标里
-    // 部分字符回退到系统字体、基线与 x-height 对不齐，而音标是词典后台的核心内容。
-    // 另有两处未解的冲突：packages/voice-editor 已自托管同名 "Ubuntu" 的未裁剪 TTF
-    // （666 KB），两套 @font-face 抢同一 family，谁生效取决于 CSS chunk 注入顺序。
-    // 要用 Ubuntu 需先给音标场景单独指定字体栈，那是独立的一块改动。
+    // 界面保持系统字体栈。规范要求西文用 Ubuntu，现只落在词条英文内容上（globals.css
+    // 的 .tsz-entry-en）：Ubuntu 连未裁剪的 TTF 都缺 ə ʌ ɪ ʊ ɔ ɑ ɜ ɒ ː ˈ ˌ 等常用音标字形，
+    // 全局启用会让一串音标里部分字符回退到系统字体、基线与 x-height 对不齐，
+    // 而音标是词典后台的核心内容。Ubuntu 的 @font-face 只在 @tsz/voice-editor/fonts.css
+    // 声明一处，别再引第二套同名字体，否则谁生效取决于 CSS chunk 注入顺序。
     fontFamily:
       'system-ui, -apple-system, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif',
 

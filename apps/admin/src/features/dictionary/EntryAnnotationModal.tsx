@@ -128,6 +128,7 @@ export function EntryAnnotationModal({
               <Space orientation="vertical" size={0} style={{ width: "100%" }}>
                 <Space size={8} wrap style={{ minHeight: 32 }}>
                   <Typography.Text
+                    className="tsz-entry-en"
                     strong
                     style={{ fontSize: 15, overflowWrap: "anywhere" }}
                   >

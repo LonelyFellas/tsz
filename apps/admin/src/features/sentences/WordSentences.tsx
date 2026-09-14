@@ -175,6 +175,7 @@ export function WordSentences({
                 <Tag>{item.content.sentence.level}</Tag>
                 <Flex vertical style={{ flex: "1 1 240px", minWidth: 0 }}>
                   <Typography.Paragraph
+                    className="tsz-entry-en"
                     ellipsis={{ rows: 2, tooltip: textOf(item) }}
                     style={{ marginBottom: 4 }}
                   >

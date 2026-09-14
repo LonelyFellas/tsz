@@ -79,7 +79,9 @@ export function LifecycleSurfaceConfirmation({
             renderItem={(card) => (
               <List.Item>
                 <Space wrap>
-                  <Typography.Text strong>{card.label}</Typography.Text>
+                  <Typography.Text className="tsz-entry-en" strong>
+                    {card.label}
+                  </Typography.Text>
                   <Tag>{card.kind === "word" ? "单词" : "短语"}</Tag>
                   <Tag>{statusLabel[card.status]}</Tag>
                   <Typography.Text type="secondary">
@@ -95,7 +97,11 @@ export function LifecycleSurfaceConfirmation({
                       children: (
                         <Space orientation="vertical" size="small">
                           {card.source_labels.map((source) => (
-                            <Typography.Text key={source} type="secondary">
+                            <Typography.Text
+                              className="tsz-entry-en"
+                              key={source}
+                              type="secondary"
+                            >
                               {source}
                             </Typography.Text>
                           ))}
