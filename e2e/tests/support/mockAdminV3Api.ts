@@ -434,6 +434,8 @@ export interface MockAdminV3ApiOptions {
    * 初始那条 mock 词条（列表行与详情）由谁创建，默认当前登录管理员本人；
    * "other" 用来测「他人未发布草稿」的只读分支。本页新建的词条始终记在当前管理员名下，
    * 同形候选的 matched_entry_contexts 也不受影响。
+   * 只影响前端展示与判定，不模拟后端归属拦截：普通管理员写他人草稿在这里照样成功，
+   * 真实后端会返回 403 entry_edit_forbidden。
    */
   entryCreator?: "viewer" | "other";
 }

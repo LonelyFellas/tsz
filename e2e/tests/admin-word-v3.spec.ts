@@ -303,8 +303,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     ).toBeEnabled();
 
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
-    // 先等词形步内容渲染出来：详情加载前 URL 本来就是 /forms，直接断言会恒真。
-    await expect(page.getByRole("tab", { name: "名词" })).toBeVisible();
+    // 先等词形步独有的内容渲染出来：详情加载前 URL 本来就是 /forms，直接断言会恒真。
+    await expect(
+      page.getByRole("button", { name: "新增名词变化组" })
+    ).toBeVisible();
     await expect(page).toHaveURL(
       new RegExp(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms$`)
     );
