@@ -26,6 +26,7 @@ import {
   lazy,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState
 } from "react";
@@ -51,6 +52,11 @@ function voiceLocale(dialect?: Dialect): AudioAssetLocaleV3 | undefined {
   if (dialect === "us") return "en-US";
   return undefined;
 }
+
+/** 收起态也显示连读弧的字段：编辑器里怎么连，收起后就怎么显示。字典音标不带连读，不叠。 */
+const LIAISON_OVERLAY_MODES: ReadonlySet<
+  NonNullable<VoiceEditorProps["mode"]>
+> = new Set(["actual-pron", "grammar", "association"]);
 
 export interface V3VoiceTextFieldProps<
   TLink extends VoiceAssociation = TextLinkV3
@@ -130,6 +136,14 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
 }: V3VoiceTextFieldProps<TLink>) {
   const [editing, setEditing] = useState(false);
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
+  // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。展开编辑时用不上，不算。
+  const liaisons = useMemo(
+    () =>
+      !expanded && mode !== undefined && LIAISON_OVERLAY_MODES.has(mode)
+        ? liaisonOnly(value)
+        : undefined,
+    [expanded, mode, value]
+  );
   useEffect(() => {
     onEditingChange?.(expanded);
     if (!expanded) onAssociationPendingChange?.(false);
@@ -237,8 +251,6 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     );
 
   if (!expanded) {
-    // 只给实际发音叠：它只标连读，叠出来就是编辑器里的样子；例句类字段会折到滚动，弧线层跟不上。
-    const liaisons = mode === "actual-pron" ? liaisonOnly(value) : undefined;
     return (
       <>
         {feedbackHolder}
@@ -319,18 +331,17 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   );
 }
 
-/** 输入框的排版逐项照抄到弧线层上，字母才落在同一个位置。 */
-const MIRRORED_STYLES = [
+/**
+ * 输入框的排版逐项照抄到弧线层上，字母才落在同一个位置。边框宽度抄到外层，
+ * 外层的内边距盒就是输入框的滚动视口；内边距抄到内层，它和文字一起滚。
+ */
+const MIRRORED_OUTER_STYLES = [
   "font-family",
   "font-size",
   "font-style",
   "font-weight",
   "letter-spacing",
   "line-height",
-  "padding-top",
-  "padding-right",
-  "padding-bottom",
-  "padding-left",
   "border-top-width",
   "border-right-width",
   "border-bottom-width",
@@ -338,6 +349,12 @@ const MIRRORED_STYLES = [
   "tab-size",
   "text-indent",
   "word-spacing"
+] as const;
+const MIRRORED_INNER_STYLES = [
+  "padding-top",
+  "padding-right",
+  "padding-bottom",
+  "padding-left"
 ] as const;
 
 /**
@@ -352,24 +369,65 @@ function liaisonOnly(value: RichTextV3): RichTextV2 | undefined {
   return annotations.length > 0 ? { ...content, annotations } : undefined;
 }
 
-/** 收起态输入框上的连读弧：透明文字与输入框同排版，弧线按它量位置。 */
+/**
+ * 收起态输入框上的连读弧：透明文字与输入框同排版，弧线按它量位置。
+ *
+ * 超过 maxRows 后输入框自己滚动：内层扣掉滚动条宽度（滚动条占宽的平台上不扣，折行位置
+ * 就不同），并随 scrollTop 平移；外层按视口裁掉滚出去的弧线。
+ * jsdom 不做布局，对齐与裁剪只能在真浏览器里量。
+ */
 function LiaisonOverlay({ value }: { value: RichTextV2 }) {
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLDivElement | null>(null);
   const [mirrored, setMirrored] = useState(false);
   // 先抄样式再挂只读视图：子组件的布局副作用先于父组件执行，样式没到位就量会量偏。
   useLayoutEffect(() => {
     const overlay = overlayRef.current;
+    const content = contentRef.current;
     const input = overlay?.parentElement?.querySelector("textarea");
-    if (!overlay || !input) return;
+    if (!overlay || !content || !input) return;
     const style = getComputedStyle(input);
-    for (const property of MIRRORED_STYLES) {
+    for (const property of MIRRORED_OUTER_STYLES) {
       overlay.style.setProperty(property, style.getPropertyValue(property));
     }
+    for (const property of MIRRORED_INNER_STYLES) {
+      content.style.setProperty(property, style.getPropertyValue(property));
+    }
+    // 视口底部那条内边距里只会露出下一行字上方的弧线（字还在视口外），裁剪线提到内容盒底边。
+    overlay.style.borderBottomWidth = `${
+      (Number.parseFloat(style.borderBottomWidth) || 0) +
+      (Number.parseFloat(style.paddingBottom) || 0)
+    }px`;
+    const horizontalBorders =
+      (Number.parseFloat(style.borderLeftWidth) || 0) +
+      (Number.parseFloat(style.borderRightWidth) || 0);
+    const follow = () => {
+      // 内层自动撑满外层内容盒（即输入框内边距盒的精确宽度），只扣滚动条。不能拿 clientWidth
+      // 当宽度：它是取整值，外框宽度带小数（英美双栏平分、系统缩放）时折行会对不上；
+      // offsetWidth 与 clientWidth 取整方式一致，相减后误差抵消。
+      const scrollbar = Math.max(
+        0,
+        Math.round(input.offsetWidth - input.clientWidth - horizontalBorders)
+      );
+      content.style.marginRight = `${scrollbar}px`;
+      content.style.transform = `translateY(${-input.scrollTop}px)`;
+    };
+    follow();
+    input.addEventListener("scroll", follow);
+    // 输入框随内容增高、滚动条出现或消失，内容盒尺寸都会变。
+    const observer = new ResizeObserver(follow);
+    observer.observe(input);
     setMirrored(true);
+    return () => {
+      input.removeEventListener("scroll", follow);
+      observer.disconnect();
+    };
   }, []);
   return (
     <div ref={overlayRef} className="v3-voice-text-liaison-overlay" aria-hidden>
-      {mirrored && <RichTextReadOnly value={value} />}
+      <div ref={contentRef} className="v3-voice-text-liaison-content">
+        {mirrored && <RichTextReadOnly value={value} />}
+      </div>
     </div>
   );
 }
