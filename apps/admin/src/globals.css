@@ -1,5 +1,7 @@
 /* admin 全局样式：UI 已全量 antd（组件样式走 CSS-in-JS，主题见 providers.tsx 的
    ConfigProvider），这里只保留浏览器默认样式的最小修正，不再引 tailwind。 */
+@import "@tsz/voice-editor/fonts.css";
+
 body {
   margin: 0;
   -webkit-font-smoothing: antialiased;
@@ -9,6 +11,26 @@ body {
      ⚠️ 这份字体栈必须与 providers.tsx 的 fontFamily token 保持一致，改一处要改两处：
      CSS 与 CSS-in-JS 之间没有共享常量的干净办法，靠这条注释锁住关系。 */
   font-family:
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+}
+
+/* 词条里的英文内容（词头、词形、英文释义、例句、关联词）用 Ubuntu，即视觉规范的西文正文字体；
+   按钮、表头、菜单等界面文字仍走上面的系统字体栈。回落段与 body 一致，中文落到苹方/雅黑。
+   ⚠️ Ubuntu 缺 ə ʌ ɪ ʊ ɔ ɑ ɜ ɒ ː ˈ ˌ 等音标字形：音标不许挂这个类，
+   也别把它挂在同时包着音标的容器上，否则音标里一半字符回退系统字体、基线对不齐。
+   antd Input 带前后缀或用 Input.Search 时 className 落在外层包裹上，内部 input 另有 antd 的
+   font-family，要显式跟上。 */
+.tsz-entry-en,
+.tsz-entry-en input,
+.tsz-entry-en textarea {
+  font-family:
+    "Ubuntu",
     system-ui,
     -apple-system,
     "Segoe UI",

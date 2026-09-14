@@ -1,24 +1,9 @@
 /*
  * 标注正文使用 Ubuntu：固定核心词和可替换搭配加粗，词性提示符使用常规字重。
  * 连读弧的落点按字形墨迹量，字体一换弧的观感就变，
- * 编辑器与只读视图必须同一副字体才对得上。Ubuntu Font Licence 1.0 允许网页嵌入。
- * 无 CJK 字形，中文回落到后面的系统字体。
+ * 编辑器与只读视图必须同一副字体才对得上。@font-face 见 fonts.css。
  */
-@font-face {
-  font-family: "Ubuntu";
-  font-style: normal;
-  font-weight: 700;
-  font-display: swap;
-  src: url("./fonts/Ubuntu-Bold.ttf") format("truetype");
-}
-
-@font-face {
-  font-family: "Ubuntu";
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url("./fonts/Ubuntu-Regular.ttf") format("truetype");
-}
+@import "./fonts.css";
 
 .tsz-ve-field {
   border: 1px solid var(--ant-color-border, #d9d9d9);

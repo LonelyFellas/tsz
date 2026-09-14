@@ -58,6 +58,10 @@ const LIAISON_OVERLAY_MODES: ReadonlySet<
   NonNullable<VoiceEditorProps["mode"]>
 > = new Set(["actual-pron", "grammar", "association"]);
 
+/** 录词条英文的字段（释义、例句、语法结构）用 Ubuntu；两种音标字段不能用，Ubuntu 缺音标字形。 */
+const ENTRY_ENGLISH_MODES: ReadonlySet<NonNullable<VoiceEditorProps["mode"]>> =
+  new Set(["grammar", "association"]);
+
 export interface V3VoiceTextFieldProps<
   TLink extends VoiceAssociation = TextLinkV3
 > {
@@ -198,7 +202,11 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       aria-invalid={invalid}
       status={invalid ? "error" : undefined}
       autoSize={{ minRows: 1, maxRows: 6 }}
-      className="word-pronunciation-phonetic-input"
+      className={
+        mode !== undefined && ENTRY_ENGLISH_MODES.has(mode)
+          ? "word-pronunciation-phonetic-input tsz-entry-en"
+          : "word-pronunciation-phonetic-input"
+      }
       data-v3-field={field}
       data-v3-node-id={nodeId}
       onKeyDown={(event) => {

@@ -19,10 +19,11 @@ export function V3EnglishTextPreview({ value }: { value: EnglishTextV3 }) {
       {rows.map(({ dialect, variant }) => (
         <div key={variant.id}>
           <Tag>{dialectLabel(dialect)}</Tag>
-          <RichTextReadOnly value={variant.value} />
+          <RichTextReadOnly className="tsz-entry-en" value={variant.value} />
           {variant.text_links?.map((link) => (
             <Typography.Text
               key={link.id}
+              className="tsz-entry-en"
               type="secondary"
               style={{ display: "block" }}
             >

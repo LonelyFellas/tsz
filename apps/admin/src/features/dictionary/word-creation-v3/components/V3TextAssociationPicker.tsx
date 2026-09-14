@@ -14,8 +14,10 @@ export function V3TextAssociationPicker({
   if (selected) {
     return (
       <Flex vertical gap="small" style={{ maxWidth: "min(360px, 85vw)" }}>
-        <Typography.Text strong>{literal}</Typography.Text>
-        <Typography.Text>
+        <Typography.Text className="tsz-entry-en" strong>
+          {literal}
+        </Typography.Text>
+        <Typography.Text className="tsz-entry-en">
           已关联：{selected.target_headword ?? "词条"} ·{" "}
           {selected.target_gloss ?? "词义"}
           {selected.target_publication_id ? null : "（草稿）"}
@@ -31,7 +33,9 @@ export function V3TextAssociationPicker({
   }
   return (
     <Flex vertical gap="small" style={{ maxWidth: "min(760px, 85vw)" }}>
-      <Typography.Text strong>{literal}</Typography.Text>
+      <Typography.Text className="tsz-entry-en" strong>
+        {literal}
+      </Typography.Text>
       <V3TargetCascader
         key={`${kind}:${literal}`}
         literal={literal.trim()}

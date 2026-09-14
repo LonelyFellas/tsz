@@ -61,6 +61,7 @@ function FormsReview({ word }: { word: AdminWordV3 }) {
                           : form?.regional_variants.uk;
                       return (
                         <Tag
+                          className="tsz-entry-en"
                           data-testid={`preview-membership-${member.id}`}
                           key={member.id}
                         >
@@ -102,7 +103,7 @@ function FormsReview({ word }: { word: AdminWordV3 }) {
                           <Tag color="blue">
                             {dialectLabel(variant.dialect)}
                           </Tag>
-                          <Typography.Text strong>
+                          <Typography.Text className="tsz-entry-en" strong>
                             {variant.spelling || "待填写拼写"}
                           </Typography.Text>
                         </Flex>
@@ -174,7 +175,7 @@ export function V3ReviewContent({ word, actions, readiness }: Props) {
             <Typography.Text className="v3-review-kicker">
               当前词条
             </Typography.Text>
-            <Typography.Title level={2}>
+            <Typography.Title className="tsz-entry-en" level={2}>
               {model.identity.label}
             </Typography.Title>
             <Flex gap="small" wrap>

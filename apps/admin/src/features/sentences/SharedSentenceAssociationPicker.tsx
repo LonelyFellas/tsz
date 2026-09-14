@@ -28,8 +28,10 @@ export function SharedSentenceAssociationPicker({
     const target = selected.target;
     return (
       <Flex vertical gap="small" style={{ maxWidth: "min(460px, 85vw)" }}>
-        <Typography.Text strong>{literal}</Typography.Text>
-        <Typography.Text>
+        <Typography.Text className="tsz-entry-en" strong>
+          {literal}
+        </Typography.Text>
+        <Typography.Text className="tsz-entry-en">
           {target.state === "linked"
             ? `已关联：${labels[`${target.target_entry_id}:${target.target_sense_id}`] ?? "具体词义"}`
             : `待关联：${target.headword}${target.gloss ? ` · ${target.gloss}` : ""}`}
@@ -51,7 +53,7 @@ export function SharedSentenceAssociationPicker({
       gap="small"
       style={{ maxWidth: "min(760px, 85vw)" }}
     >
-      <Typography.Text strong>
+      <Typography.Text className="tsz-entry-en" strong>
         {segments.map((segment) => segment.surface).join(" … ")}
       </Typography.Text>
       {selected?.target.state === "entry_only" && (
@@ -78,6 +80,7 @@ export function SharedSentenceAssociationPicker({
         <>
           <Input
             aria-label="待关联词面"
+            className="tsz-entry-en"
             value={literal}
             readOnly
             title="由选中的正文片段确定"

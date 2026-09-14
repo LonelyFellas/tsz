@@ -1,0 +1,21 @@
+/*
+ * Ubuntu 字体的唯一声明处：编辑器样式与 admin 全局样式都从这里引，
+ * 同名 family 只能有一套 src，否则谁生效取决于 CSS chunk 注入顺序。
+ * Ubuntu Font Licence 1.0 允许网页嵌入。无 CJK 字形，中文回落到后面的系统字体；
+ * 也缺 ə ʌ ɪ ʊ ɔ ɑ ɜ ɒ ː ˈ ˌ 等音标字形，音标不要用它。
+ */
+@font-face {
+  font-family: "Ubuntu";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("./fonts/Ubuntu-Bold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Ubuntu";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("./fonts/Ubuntu-Regular.ttf") format("truetype");
+}

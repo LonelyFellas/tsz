@@ -170,6 +170,7 @@ function V3DialectFormCell({
         <Input
           aria-invalid={spellingInvalid}
           aria-label={`${formLabel}${dialectLabel(dialect)}拼写`}
+          className="tsz-entry-en"
           data-v3-field="spelling"
           data-v3-node-id={variant.id}
           placeholder={`${dialectLabel(dialect)}拼写`}
@@ -310,6 +311,7 @@ export function V3ConcreteFormRow({
                     issue.field === "spelling"
                 )}
                 aria-label={`${formLabel}英美通用拼写`}
+                className="tsz-entry-en"
                 data-v3-field="spelling"
                 data-v3-node-id={commonVariant.id}
                 onChange={(event) =>
@@ -351,6 +353,7 @@ export function V3ConcreteFormRow({
               <Input
                 aria-invalid={unifiedSpellingInvalid}
                 aria-label={`${formLabel}英美通用拼写`}
+                className="tsz-entry-en"
                 data-v3-field="spelling"
                 data-v3-node-aliases={unifiedSpellingVariantIds.join(" ")}
                 data-v3-node-id={form.id}

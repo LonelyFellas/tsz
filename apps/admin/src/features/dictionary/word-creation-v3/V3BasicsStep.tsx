@@ -117,7 +117,12 @@ function VariantPanel({
     <div className={`dialect-panel ${className}`}>
       <Space orientation="vertical" size="small" style={{ width: "100%" }}>
         <Typography.Text strong>{label}</Typography.Text>
-        <Input aria-label={label} readOnly value={spelling} />
+        <Input
+          aria-label={label}
+          className="tsz-entry-en"
+          readOnly
+          value={spelling}
+        />
         <Pronunciations pronunciations={pronunciations} />
       </Space>
     </div>
@@ -304,6 +309,7 @@ function V3BasicsContent({
             <Typography.Text>录入词条</Typography.Text>
             <Input
               aria-label="录入词条"
+              className="tsz-entry-en"
               readOnly
               placeholder="暂无词条名称"
               size="large"

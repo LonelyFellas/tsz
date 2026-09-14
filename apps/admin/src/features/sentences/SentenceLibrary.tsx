@@ -266,6 +266,7 @@ export function SentenceLibrary({
                 width: 350,
                 render: (_, row) => (
                   <Typography.Paragraph
+                    className="tsz-entry-en"
                     style={{ margin: 0 }}
                     ellipsis={{ rows: 2, tooltip: sentenceText(row) }}
                   >
@@ -279,7 +280,9 @@ export function SentenceLibrary({
                 render: (_, row) => (
                   <Flex vertical>
                     {row.entries.slice(0, 2).map((e) => (
-                      <span key={e.id}>{entryLink(e)} </span>
+                      <span className="tsz-entry-en" key={e.id}>
+                        {entryLink(e)}{" "}
+                      </span>
                     ))}
                     {row.entries.length > 2 && (
                       <Typography.Text
@@ -369,7 +372,9 @@ export function SentenceLibrary({
                 }
               ]}
             />
-            <Typography.Paragraph>{sentenceText(detail)}</Typography.Paragraph>
+            <Typography.Paragraph className="tsz-entry-en">
+              {sentenceText(detail)}
+            </Typography.Paragraph>
             {detail.content.sentence.zh_translations.map((t) => (
               <Typography.Paragraph key={t.id}>
                 {t.band === "word_for_word"
@@ -382,11 +387,13 @@ export function SentenceLibrary({
             ))}
             <Space wrap>
               {detail.entries.map((e) => (
-                <span key={e.id}>{entryLink(e)}</span>
+                <span className="tsz-entry-en" key={e.id}>
+                  {entryLink(e)}
+                </span>
               ))}
             </Space>
             {detail.content.annotations.map((a) => (
-              <Typography.Text key={a.id}>
+              <Typography.Text className="tsz-entry-en" key={a.id}>
                 {a.source_segments.map((s) => s.surface).join(" … ")} →{" "}
                 {a.target.state === "linked"
                   ? (detail.entries.find(
