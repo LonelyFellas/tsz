@@ -237,7 +237,8 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     );
 
   if (!expanded) {
-    const liaisons = liaisonOnly(value);
+    // 只给实际发音叠：它只标连读，叠出来就是编辑器里的样子；例句类字段会折到滚动，弧线层跟不上。
+    const liaisons = mode === "actual-pron" ? liaisonOnly(value) : undefined;
     return (
       <>
         {feedbackHolder}
