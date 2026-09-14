@@ -1,4 +1,6 @@
 import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import {
   fireEvent,
   render as rtlRender,
@@ -41,6 +43,16 @@ const render = (
 ) => rtlRender(ui, { wrapper: PronunciationPreviewProvider, ...options });
 
 const VALUE: RichTextV3 = { version: 2, text: "hello there", annotations: [] };
+
+const fieldCss = readFileSync(
+  resolve(
+    process.cwd(),
+    process.cwd().endsWith("/apps/admin")
+      ? "src/features/dictionary/word-creation-v3/components/V3VoiceTextField.css"
+      : "apps/admin/src/features/dictionary/word-creation-v3/components/V3VoiceTextField.css"
+  ),
+  "utf8"
+);
 
 async function openAudioPanel() {
   fireEvent.click(screen.getByRole("button", { name: /^打开.*编辑器$/ }));
@@ -569,39 +581,108 @@ it.each([false, true])(
   }
 );
 
-it("收起态输入框上标出连读两端；改字去掉连读后弧线层撤掉，输入框仍是同一个节点", () => {
-  function Harness() {
-    const [value, setValue] = useState<RichTextV3>({
-      version: 2,
-      text: "pick it up",
-      annotations: [{ type: "liaison", start: 3, end: 6 }]
-    });
-    return (
-      <V3VoiceTextField
-        mode="actual-pron"
-        ariaLabel="实际发音"
-        field="actual_pron"
-        nodeId="p"
-        value={value}
-        onChange={(next) => setValue(next)}
-      />
-    );
-  }
-  const { container } = render(<Harness />);
-  const anchors = () =>
-    Array.from(container.querySelectorAll(".tsz-ve-liaison-anchor")).map(
-      (node) => [node.getAttribute("data-end"), node.textContent]
-    );
-  const input = screen.getByLabelText("实际发音");
-  expect(input.tagName).toBe("TEXTAREA");
-  expect(input).toHaveAttribute("data-v3-field", "actual_pron");
-  expect(anchors()).toEqual([
-    ["start", "k"],
-    ["end", "i"]
-  ]);
+const LIAISON_TEXT: RichTextV3 = {
+  version: 2,
+  text: "pick it up",
+  annotations: [{ type: "liaison", start: 3, end: 6 }]
+};
 
-  // 删掉起点字母 k，连读随之移除；弧线层撤掉时不能把输入框重挂，否则正在打字的光标会丢。
-  fireEvent.change(input, { target: { value: "pic it up" } });
-  expect(anchors()).toEqual([]);
-  expect(screen.getByLabelText("实际发音")).toBe(input);
+// 编辑器里怎么连，收起后就怎么显示：实际发音、语法结构、英文正文（释义）三类字段都叠。
+it.each([
+  ["actual-pron", "实际发音"],
+  ["grammar", "语法结构 1 英美通用内容"],
+  ["association", "定义 1 英美通用内容"]
+] as const)(
+  "%s 收起态输入框上标出连读两端；改字去掉连读后弧线层撤掉，输入框仍是同一个节点",
+  (mode, label) => {
+    function Harness() {
+      const [value, setValue] = useState<RichTextV3>(LIAISON_TEXT);
+      return (
+        <V3VoiceTextField
+          mode={mode}
+          ariaLabel={label}
+          field="content"
+          nodeId="p"
+          value={value}
+          onChange={(next) => setValue(next)}
+        />
+      );
+    }
+    const { container } = render(<Harness />);
+    const anchors = () =>
+      Array.from(container.querySelectorAll(".tsz-ve-liaison-anchor")).map(
+        (node) => [node.getAttribute("data-end"), node.textContent]
+      );
+    const input = screen.getByLabelText(label);
+    expect(input.tagName).toBe("TEXTAREA");
+    expect(input).toHaveAttribute("data-v3-field", "content");
+    expect(anchors()).toEqual([
+      ["start", "k"],
+      ["end", "i"]
+    ]);
+
+    // 删掉起点字母 k，连读随之移除；弧线层撤掉时不能把输入框重挂，否则正在打字的光标会丢。
+    fireEvent.change(input, { target: { value: "pic it up" } });
+    expect(anchors()).toEqual([]);
+    expect(
+      container.querySelector(".v3-voice-text-liaison-overlay")
+    ).toBeNull();
+    expect(screen.getByLabelText(label)).toBe(input);
+  }
+);
+
+it("字典音标收起态不叠弧线层", () => {
+  const { container } = render(
+    <V3VoiceTextField
+      mode="dict-phonetic"
+      ariaLabel="字典音标"
+      field="dict_phonetic"
+      nodeId="d"
+      value={LIAISON_TEXT}
+      onChange={vi.fn()}
+    />
+  );
+  expect(screen.getByLabelText("字典音标").tagName).toBe("TEXTAREA");
+  expect(container.querySelector(".v3-voice-text-liaison-overlay")).toBeNull();
+  expect(container.querySelector(".tsz-ve-liaison-anchor")).toBeNull();
+});
+
+it("弧线层内层宽度取输入框 clientWidth（扣掉滚动条），并随输入框滚动平移", () => {
+  const { container } = render(
+    <V3VoiceTextField
+      mode="association"
+      ariaLabel="英文例句"
+      field="value"
+      nodeId="s"
+      value={LIAISON_TEXT}
+      onChange={vi.fn()}
+    />
+  );
+  const input = screen.getByLabelText("英文例句");
+  const content = container.querySelector<HTMLElement>(
+    ".v3-voice-text-liaison-content"
+  );
+  expect(content).not.toBeNull();
+  // jsdom 不做布局：直接给出输入框出现 15px 滚动条、往下滚两行之后的读数。
+  Object.defineProperty(input, "clientWidth", {
+    configurable: true,
+    value: 185
+  });
+  Object.defineProperty(input, "scrollTop", { configurable: true, value: 44 });
+  fireEvent.scroll(input);
+  expect(content!.style.width).toBe("185px");
+  expect(content!.style.transform).toBe("translateY(-44px)");
+});
+
+it("弧线层压在紧凑组员之上、点击穿透，并按输入框视口裁剪", () => {
+  // jsdom 不做布局，层级、穿透和裁剪的回归单测拦不住，只能断言样式本身。
+  const overlayRule =
+    /\.v3-voice-text-liaison-overlay\s*\{([^}]*)\}/su.exec(fieldCss)?.[1] ?? "";
+  expect(overlayRule).toMatch(/z-index:\s*5;/u);
+  expect(overlayRule).toMatch(/pointer-events:\s*none;/u);
+  expect(overlayRule).toMatch(/overflow:\s*hidden;/u);
+  expect(overlayRule).toMatch(/color:\s*transparent;/u);
+  expect(fieldCss).toMatch(
+    /\.v3-voice-text-field-input\s*\{[^}]*margin-inline-end:\s*-1px;/su
+  );
 });

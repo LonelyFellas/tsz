@@ -22,7 +22,7 @@
 
 /*
  * 收起态输入框上的连读弧：盖一层与输入框同排版的透明文字，只给弧线定位。
- * 字体、内边距、边框宽度在运行时照抄输入框的计算样式；点击穿透到输入框。
+ * 字体、边框宽度照抄到外层，内边距与宽度照抄到随滚动平移的内层；点击穿透到输入框。
  */
 .v3-voice-text-field-input {
   position: relative;
@@ -40,8 +40,14 @@
   z-index: 5;
   box-sizing: border-box;
   border: 0 solid transparent;
+  /* 超过 maxRows 后输入框自己滚动：裁掉滚出视口的弧线，不压到下方内容（底边见组件里的说明）。 */
+  overflow: hidden;
   color: transparent;
   pointer-events: none;
+}
+
+.v3-voice-text-liaison-content {
+  box-sizing: border-box;
 }
 
 .v3-voice-text-liaison-overlay .tsz-ve-readonly.has-liaison {
