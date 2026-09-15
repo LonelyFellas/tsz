@@ -18,7 +18,38 @@ import {
   type V3IdFactory
 } from "../operations";
 import { dialectLabel } from "../presentation";
+import { spellingConflictReferences } from "../referenceGuard";
+import { useV3ReferenceGuard } from "../referenceGuardContext";
+import { V3DisabledReason } from "./V3DisabledReason";
 import { V3PronunciationList } from "./V3PronunciationList";
+
+/** 拼写与多维例句标注片段对不上时即时标红（Q2）：输入框照常可编辑，保存由确认条与后端拦。 */
+function SpellingConflictNote({ literals }: { literals: readonly string[] }) {
+  if (literals.length === 0) return null;
+  return (
+    <Typography.Text
+      className="v3-spelling-conflict"
+      role="status"
+      type="danger"
+    >
+      与被引用片段“{literals.join("”“")}”不一致，需改回一致或先解除引用
+    </Typography.Text>
+  );
+}
+
+function conflictLiterals(
+  references: ReturnType<typeof spellingConflictReferences>
+): string[] {
+  return [
+    ...new Set(
+      references.map((reference) =>
+        (reference.source.segments ?? [])
+          .map((segment) => segment.surface)
+          .join(" ")
+      )
+    )
+  ];
+}
 
 function replaceForm(
   content: DraftFormsStepContentV3,
@@ -51,6 +82,8 @@ export interface V3ConcreteFormRowProps {
   showMatrixHeader?: boolean;
   lastRow?: boolean;
   actions?: ReactNode;
+  /** 类型下拉上方的引用徽标，占的是与右侧「词形拼写」标签对齐的那一行。 */
+  referenceBadge?: ReactNode;
 }
 
 interface V3ConcreteFormTypeCellProps {
@@ -64,6 +97,8 @@ interface V3ConcreteFormTypeCellProps {
   onChange: (next: DraftFormsStepContentV3) => void;
   lastRow?: boolean;
   actions?: ReactNode;
+  /** 类型下拉上方的引用徽标，占的是与右侧「词形拼写」标签对齐的那一行。 */
+  referenceBadge?: ReactNode;
 }
 
 function V3ConcreteFormTypeCell({
@@ -76,7 +111,8 @@ function V3ConcreteFormTypeCell({
   membershipCount,
   onChange,
   lastRow,
-  actions
+  actions,
+  referenceBadge
 }: V3ConcreteFormTypeCellProps) {
   const formTypeLabel = useFormTypeLabel();
   const availableFormTypes = [
@@ -94,25 +130,28 @@ function V3ConcreteFormTypeCell({
       tabIndex={-1}
     >
       <div className="word-form-type-cell-content">
-        <div
-          className="word-form-type-select"
-          title={formTypeDisabled ? formTypeDisabledReason : undefined}
+        <div className="word-form-type-cell-header">{referenceBadge}</div>
+        <V3DisabledReason
+          block
+          reason={formTypeDisabled ? formTypeDisabledReason : undefined}
         >
-          <Select
-            aria-label={formTypeAriaLabel}
-            disabled={formTypeDisabled}
-            onChange={(formType) =>
-              onChange(updateConcreteFormType(content, form.id, formType))
-            }
-            options={availableFormTypes.map((value) => ({
-              value,
-              label: formTypeLabel(value)
-            }))}
-            size="small"
-            style={{ width: "100%" }}
-            value={form.form_type}
-          />
-        </div>
+          <div className="word-form-type-select">
+            <Select
+              aria-label={formTypeAriaLabel}
+              disabled={formTypeDisabled}
+              onChange={(formType) =>
+                onChange(updateConcreteFormType(content, form.id, formType))
+              }
+              options={availableFormTypes.map((value) => ({
+                value,
+                label: formTypeLabel(value)
+              }))}
+              size="small"
+              style={{ width: "100%" }}
+              value={form.form_type}
+            />
+          </div>
+        </V3DisabledReason>
         {membershipCount > 1 ? (
           <Typography.Text type="secondary">
             已在 {membershipCount} 个变化组中使用
@@ -149,13 +188,23 @@ function V3DialectFormCell({
   lastRow,
   narrowGridRow
 }: V3DialectFormCellProps) {
+  const referenceGuard = useV3ReferenceGuard();
   if (form.regional_variants.mode !== "uk_us") return null;
   const variant = form.regional_variants[dialect];
-  const spellingInvalid = issues.some(
-    (issue) =>
-      issue.node_location.variant_id === variant.id &&
-      issue.field === "spelling"
+  const conflictLiteralList = conflictLiterals(
+    spellingConflictReferences(
+      referenceGuard.index,
+      [variant.id],
+      variant.spelling
+    )
   );
+  const spellingInvalid =
+    conflictLiteralList.length > 0 ||
+    issues.some(
+      (issue) =>
+        issue.node_location.variant_id === variant.id &&
+        issue.field === "spelling"
+    );
   const style = {
     "--v3-narrow-grid-row": narrowGridRow
   } as CSSProperties;
@@ -184,8 +233,10 @@ function V3DialectFormCell({
               updateVariantSpelling(content, variant.id, event.target.value)
             );
           }}
+          status={conflictLiteralList.length > 0 ? "error" : undefined}
           value={variant.spelling}
         />
+        <SpellingConflictNote literals={conflictLiteralList} />
         <V3PronunciationList
           content={content}
           idFactory={idFactory}
@@ -213,8 +264,10 @@ export function V3ConcreteFormRow({
   onChange,
   showMatrixHeader = true,
   lastRow = true,
-  actions
+  actions,
+  referenceBadge
 }: V3ConcreteFormRowProps) {
+  const referenceGuard = useV3ReferenceGuard();
   const variants: Array<
     WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3
   > =
@@ -233,12 +286,32 @@ export function V3ConcreteFormRow({
   const unifiedSpellingVariantIds = unifiedSpellingVariants
     ? [unifiedSpellingVariants.uk.id, unifiedSpellingVariants.us.id]
     : [];
-  const unifiedSpellingInvalid = issues.some(
-    (issue) =>
-      issue.field === "spelling" &&
-      issue.node_location.variant_id !== undefined &&
-      unifiedSpellingVariantIds.includes(issue.node_location.variant_id)
-  );
+  const unifiedConflictLiterals = unifiedSpellingVariants
+    ? conflictLiterals(
+        spellingConflictReferences(
+          referenceGuard.index,
+          unifiedSpellingVariantIds,
+          unifiedSpellingVariants.uk.spelling
+        )
+      )
+    : [];
+  const unifiedSpellingInvalid =
+    unifiedConflictLiterals.length > 0 ||
+    issues.some(
+      (issue) =>
+        issue.field === "spelling" &&
+        issue.node_location.variant_id !== undefined &&
+        unifiedSpellingVariantIds.includes(issue.node_location.variant_id)
+    );
+  const commonConflictLiterals = commonVariant
+    ? conflictLiterals(
+        spellingConflictReferences(
+          referenceGuard.index,
+          [commonVariant.id],
+          commonVariant.spelling
+        )
+      )
+    : [];
   return (
     <div
       className={`v3-concrete-form-row${showMatrixHeader ? "" : " v3-concrete-form-row-continuation"}`}
@@ -293,6 +366,7 @@ export function V3ConcreteFormRow({
           lastRow={lastRow}
           membershipCount={membershipCount}
           onChange={onChange}
+          referenceBadge={referenceBadge}
         />
         {commonVariant ? (
           <div
@@ -305,11 +379,14 @@ export function V3ConcreteFormRow({
                 <Tag color="blue">英美通用</Tag>
               </Flex>
               <Input
-                aria-invalid={issues.some(
-                  (issue) =>
-                    issue.node_location.variant_id === commonVariant.id &&
-                    issue.field === "spelling"
-                )}
+                aria-invalid={
+                  commonConflictLiterals.length > 0 ||
+                  issues.some(
+                    (issue) =>
+                      issue.node_location.variant_id === commonVariant.id &&
+                      issue.field === "spelling"
+                  )
+                }
                 aria-label={`${formLabel}英美通用拼写`}
                 className="tsz-entry-en"
                 data-v3-field="spelling"
@@ -324,9 +401,11 @@ export function V3ConcreteFormRow({
                   )
                 }
                 placeholder="词形拼写"
+                status={commonConflictLiterals.length > 0 ? "error" : undefined}
                 style={{ marginTop: 10 }}
                 value={commonVariant.spelling}
               />
+              <SpellingConflictNote literals={commonConflictLiterals} />
             </div>
             <div className="word-shared-pronunciation-grid word-shared-pronunciation-grid-single">
               <div className="word-shared-pronunciation word-shared-pronunciation-common">
@@ -366,6 +445,7 @@ export function V3ConcreteFormRow({
                 style={{ marginTop: 10 }}
                 value={unifiedSpellingVariants.uk.spelling}
               />
+              <SpellingConflictNote literals={unifiedConflictLiterals} />
             </div>
             <div className="word-shared-pronunciation-grid">
               {[unifiedSpellingVariants.uk, unifiedSpellingVariants.us].map(
@@ -418,6 +498,8 @@ export interface V3DialectSeparatedFormRow {
   formTypeOptions: readonly WordFormTypeV3[];
   membershipCount: number;
   actions?: ReactNode;
+  /** 类型下拉上方的引用徽标，占的是与右侧「词形拼写」标签对齐的那一行。 */
+  referenceBadge?: ReactNode;
 }
 
 export function V3DialectSeparatedFormMatrix({
@@ -472,6 +554,7 @@ export function V3DialectSeparatedFormMatrix({
                 lastRow={index === rows.length - 1}
                 membershipCount={row.membershipCount}
                 onChange={onChange}
+                referenceBadge={row.referenceBadge}
               />
             </div>
           </div>

@@ -15,6 +15,18 @@
   border-bottom: 0;
 }
 
+/* 选项靠最右，引用徽标贴在选项左边；窄屏放不下时徽标和选项整组折到下一行，仍靠右。 */
+.v3-form-group-card .word-form-rule-row {
+  flex-wrap: wrap;
+  column-gap: 16px;
+  row-gap: 4px;
+  padding-block: 8px;
+}
+
+.v3-form-group-card .word-form-rule-row > :last-child {
+  margin-inline-start: auto;
+}
+
 .v3-form-group-card .v3-pos-dialect-rule {
   border-bottom: 1px solid #e5e7eb;
 }
@@ -203,10 +215,10 @@
 }
 
 /* 类型下拉要和右侧方言面板里的拼写输入框对齐：方言格第一行是字段标签，
-   这里用一个等高的占位顶掉那一行，剩下的 8px 由格子自身的 gap 补齐。 */
-.v3-concrete-form-row .word-form-type-cell::before {
-  content: "";
-  display: block;
+   这里用一行等高的头部顶掉那一行（引用徽标就放在这行里，随下拉一起吸顶），剩下的 8px 由内容区的 gap 补齐。 */
+.word-form-type-cell-header {
+  display: flex;
+  align-items: center;
   height: 22px;
 }
 

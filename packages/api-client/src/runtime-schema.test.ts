@@ -45,6 +45,7 @@ const ROOTS = [
   "EntryLifecycleBatchResponse",
   "DraftValidationResponseV3",
   "FormsImpactResponseV3",
+  "InboundReferencesV3",
   "SurfaceMatchPageV3",
   "RelatedSearchResponse",
   "DetectLexiconSurfaceResponseV3",

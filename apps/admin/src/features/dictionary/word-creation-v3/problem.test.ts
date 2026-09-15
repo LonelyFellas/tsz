@@ -65,6 +65,44 @@ describe("classifyV3Problem", () => {
     ).toMatchObject({ kind: "request", status: 422 });
   });
 
+  it("引用冲突带上后端引用明细；旧 reference_conflict 只能提示重试", () => {
+    const reference = {
+      id: "draft_relation:relation-1",
+      kind: "draft_relation" as const,
+      target: { sense_id: "sense-1" },
+      stale: true,
+      source: { entry_id: "entry-2", node_id: "relation-1" }
+    };
+    expect(
+      classifyV3Problem(
+        new HttpError(
+          409,
+          "本次修改会破坏其他内容对本词条的引用",
+          [],
+          "inbound_reference_conflict",
+          [],
+          { inbound_references: [reference] }
+        )
+      )
+    ).toEqual({
+      kind: "inbound_reference",
+      status: 409,
+      code: "inbound_reference_conflict",
+      references: [reference],
+      detail: "本次修改会破坏其他内容对本词条的引用",
+      retryable: false
+    });
+    expect(
+      classifyV3Problem(
+        new HttpError(409, "retry", [], "reference_conflict", [], undefined)
+      )
+    ).toMatchObject({
+      kind: "inbound_reference",
+      references: [],
+      retryable: true
+    });
+  });
+
   it("separates revision, idempotency, and surface-token conflicts", () => {
     expect(
       classifyV3Problem(

@@ -1,0 +1,14 @@
+.v3-disabled-reason {
+  display: inline-flex;
+  cursor: not-allowed;
+}
+
+.v3-disabled-reason-block {
+  display: flex;
+  width: 100%;
+}
+
+/* 禁用控件不派发鼠标事件，指针事件交给外层 span 去触发提示。 */
+.v3-disabled-reason > * {
+  pointer-events: none;
+}

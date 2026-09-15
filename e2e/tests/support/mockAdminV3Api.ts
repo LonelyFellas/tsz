@@ -7,7 +7,9 @@ import type {
   DetectLexiconSurfaceResponseV3,
   DraftFormsStepContentV3,
   DraftMeaningsStepContentV3,
+  InboundReferencesV3,
   PartOfSpeechCatalogResponse,
+  SharedSentence,
   SurfaceMatchPageV3,
   V3DraftValidationIssue
 } from "@tsz/types";
@@ -20,6 +22,9 @@ export const ADMIN_V3_CANARY_WORD_ID = "01990000-0000-7000-8000-000000000003";
 export const ADMIN_V3_SECOND_POS_ID = "01990000-0000-7000-8000-000000000012";
 export const ADMIN_V3_ERROR_PRONUNCIATION_ID =
   "01990000-0000-7000-8000-000000000042";
+/** 引用保护用例：一条共享例句标注指向 mixed 词条名词原形（通用变体）与第一条词义。 */
+export const ADMIN_V3_REFERENCED_SENTENCE_ID =
+  "01990000-0000-7000-8000-000000000901";
 const ADMIN_V3_SURFACE_ARCHIVED_ID = "01990000-0000-7000-8000-000000000401";
 const ADMIN_V3_SURFACE_PUBLISHED_ID = "01990000-0000-7000-8000-000000000402";
 const ADMIN_V3_SURFACE_SECOND_ID = "01990000-0000-7000-8000-000000000403";
@@ -438,6 +443,111 @@ export interface MockAdminV3ApiOptions {
    * 真实后端会返回 403 entry_edit_forbidden。
    */
   entryCreator?: "viewer" | "other";
+  /**
+   * 是否给初始词条挂一条指向名词原形（通用变体）和第一条词义的共享例句标注。
+   * 用来测被引用节点保护：英美切换 / 删词形 / 删词性禁用、徽标与就地跳转。
+   */
+  referencedByShared?: boolean;
+}
+
+function inboundReferencesFixture(
+  word: AdminWordV3,
+  referenced: boolean
+): InboundReferencesV3 {
+  if (!referenced) {
+    return {
+      entry_id: word.id,
+      revision: word.revision,
+      nodes: [],
+      items: [],
+      truncated: false
+    };
+  }
+  const target = {
+    pos_id: nodeId(11),
+    base_form_id: nodeId(21),
+    form_id: nodeId(21),
+    variant_id: nodeId(31),
+    sense_id: nodeId(74)
+  };
+  return {
+    entry_id: word.id,
+    revision: word.revision,
+    nodes: [
+      { node_id: target.pos_id, node_type: "pos", total: 1 },
+      { node_id: target.form_id, node_type: "form", total: 1 },
+      { node_id: target.variant_id, node_type: "variant", total: 1 },
+      { node_id: target.sense_id, node_type: "sense", total: 1 }
+    ],
+    items: [
+      {
+        id: `shared_sentence:${nodeId(902)}`,
+        kind: "shared_sentence",
+        target,
+        stale: false,
+        source: {
+          sentence_id: ADMIN_V3_REFERENCED_SENTENCE_ID,
+          sentence_revision: 1,
+          sentence_text: "The satellite entered orbit.",
+          source_dialect: "common",
+          segments: [{ start: 22, end: 27, surface: "orbit" }]
+        }
+      }
+    ],
+    truncated: false
+  };
+}
+
+function sharedSentenceFixture(word: AdminWordV3): SharedSentence {
+  return {
+    id: ADMIN_V3_REFERENCED_SENTENCE_ID,
+    revision: 1,
+    content: {
+      sentence: {
+        id: ADMIN_V3_REFERENCED_SENTENCE_ID,
+        level: "B1",
+        en_text: {
+          mode: "unified",
+          common: {
+            id: nodeId(903),
+            origin: "manual",
+            value: richText("The satellite entered orbit.")
+          }
+        },
+        zh_text_id: nodeId(904),
+        zh_text: richText("卫星进入了轨道。"),
+        zh_translations: [],
+        links: []
+      },
+      annotations: [
+        {
+          id: nodeId(902),
+          source_dialect: "common",
+          source_segments: [{ start: 22, end: 27, surface: "orbit" }],
+          target: {
+            state: "linked",
+            target_entry_id: word.id,
+            target_pos_id: nodeId(11),
+            target_base_form_id: nodeId(21),
+            target_form_id: nodeId(21),
+            target_variant_id: nodeId(31),
+            target_sense_id: nodeId(74)
+          }
+        }
+      ]
+    },
+    entries: [
+      {
+        id: word.id,
+        headword: "orbit",
+        kind: "word",
+        senses: [{ id: nodeId(74), gloss: "运行轨道" }]
+      }
+    ],
+    created_by: ADMIN_PROFILE.display_name,
+    created_at: NOW,
+    updated_at: NOW
+  };
 }
 
 function clone<T>(value: T): T {
@@ -901,6 +1011,30 @@ export async function mockAdminV3Api(
     if (method === "GET" && path === `${ADMIN_V3_ENTRIES_PATH}/${word.id}`) {
       const response = { word: clone(word), retired_stable_nodes: [] };
       assertRuntimeFixture("AdminWordDraftV3Envelope", response);
+      return json(route, 200, response);
+    }
+    if (
+      method === "GET" &&
+      path === `${ADMIN_V3_ENTRIES_PATH}/${word.id}/inbound-references`
+    ) {
+      const response = inboundReferencesFixture(
+        word,
+        options.referencedByShared ?? false
+      );
+      assertRuntimeFixture("InboundReferencesV3", response);
+      return json(route, 200, response);
+    }
+    if (method === "GET" && path === "/lexicon/sentences") {
+      const response = { items: [], total: 0 };
+      assertRuntimeFixture("SharedSentenceList", response);
+      return json(route, 200, response);
+    }
+    if (
+      method === "GET" &&
+      path === `/lexicon/sentences/${ADMIN_V3_REFERENCED_SENTENCE_ID}`
+    ) {
+      const response = sharedSentenceFixture(word);
+      assertRuntimeFixture("SharedSentence", response);
       return json(route, 200, response);
     }
     if (

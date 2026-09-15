@@ -1,0 +1,7 @@
+/* 只放图标和计数，高度向红色未填计数靠拢，页签、问答行、卡片头里都不比旁边的文字抢眼。类名叠写一次压过 antd Tag 的默认尺寸。 */
+.v3-reference-badge.v3-reference-badge {
+  height: 18px;
+  padding-inline: 5px;
+  font-size: 12px;
+  line-height: 16px;
+}

@@ -39,6 +39,15 @@ import { V3FormGroupCard } from "./V3FormGroupCard";
 import { V3FormsAndPronunciationStep } from "./V3FormsAndPronunciationStep";
 import { V3PosTab } from "./V3PosTab";
 import { V3PronunciationList } from "./V3PronunciationList";
+import { buildReferenceIndex } from "../referenceGuard";
+import {
+  inboundReferences,
+  sharedSentenceReference
+} from "../referenceGuard.test.helper";
+import {
+  V3ReferenceGuardProvider,
+  type V3ReferenceGuard
+} from "../referenceGuardContext";
 
 const formsCss = readFileSync(
   resolve(
@@ -251,6 +260,151 @@ async function chooseGroupAction(groupIndex: number, action: string) {
   const choices = await screen.findAllByText(action);
   fireEvent.click(choices.at(-1)!);
 }
+
+function guardFor(
+  index: V3ReferenceGuard["index"],
+  openReference = vi.fn()
+): V3ReferenceGuard {
+  return {
+    index,
+    openReference,
+    refresh: vi.fn(),
+    registerNavigator: vi.fn()
+  };
+}
+
+/** 禁用原因挂在外层 Tooltip 上：悬停外层后弹出的提示里要有这句原因。 */
+async function expectDisabledReason(control: HTMLElement, reason: string) {
+  const wrapper = control.closest<HTMLElement>(".v3-disabled-reason");
+  expect(wrapper).not.toBeNull();
+  fireEvent.mouseEnter(wrapper!);
+  await waitFor(() =>
+    expect(
+      screen
+        .getAllByRole("tooltip")
+        .some((tooltip) => tooltip.textContent === reason)
+    ).toBe(true)
+  );
+  fireEvent.mouseLeave(wrapper!);
+}
+
+describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
+  beforeEach(() => {
+    catalogState.data = partOfSpeechCatalogFixture;
+    catalogState.isError = false;
+    catalogState.pending = undefined;
+  });
+
+  it("原形变体被例句标注：英美切换、删词形、改类型、删词性都不可点，徽标可点开并跳转", async () => {
+    const initial = multiPosFixture();
+    const pos = initial.pos[0]!;
+    const base = pos.forms[0]!;
+    const variantId =
+      base.regional_variants.mode === "common"
+        ? base.regional_variants.common.id
+        : base.regional_variants.uk.id;
+    const reference = sharedSentenceReference(
+      {
+        pos_id: pos.pos_id,
+        form_id: base.id,
+        variant_id: variantId,
+        sense_id: "sense-1"
+      },
+      { surface: "shared-base", text: "A shared-base example." }
+    );
+    const openReference = vi.fn();
+    render(
+      <V3ReferenceGuardProvider
+        value={guardFor(
+          buildReferenceIndex(inboundReferences([reference])),
+          openReference
+        )}
+      >
+        <Harness initial={initial} />
+      </V3ReferenceGuardProvider>
+    );
+    await screen.findByLabelText("原形英美通用拼写");
+
+    const hint = "被 1 处引用，需先解除引用";
+    const firstGroup = within(
+      document.querySelector<HTMLElement>(
+        `[data-group-id="${uuidFromInt(11)}"]`
+      )!
+    );
+    const secondGroup = within(
+      document.querySelector<HTMLElement>(
+        `[data-group-id="${uuidFromInt(12)}"]`
+      )!
+    );
+    expect(firstGroup.getByLabelText("英美拼写有区别")).toBeDisabled();
+    expect(firstGroup.getByLabelText("英美音标有区别")).toBeDisabled();
+    // 通用变体被引用只锁「拆成英美」；合并方向的「否」本来就是当前值。
+    expect(firstGroup.getByLabelText("英美拼写无区别")).not.toBeDisabled();
+    // 同词性里没被引用的第 2 组照常可切。
+    expect(secondGroup.getByLabelText("英美拼写有区别")).not.toBeDisabled();
+    const deleteForm = screen.getByLabelText("删除变化组 1 的词形 1");
+    expect(deleteForm).toBeDisabled();
+    await expectDisabledReason(deleteForm, hint);
+    expect(screen.getByLabelText("变化组 1 词形 1 类型")).toBeDisabled();
+    await expectDisabledReason(
+      screen.getByLabelText("变化组 1 词形 1 类型"),
+      hint
+    );
+    const deletePos = screen.getByLabelText("删除名词");
+    expect(deletePos).toBeDisabled();
+    await expectDisabledReason(deletePos, hint);
+    // 同组没被引用的第 2 个词形不受影响（第 2 组唯一原形本就按原形规则锁删）。
+    const deleteOther = screen.getByLabelText("删除变化组 1 的词形 2");
+    expect(deleteOther).not.toBeDisabled();
+    expect(deleteOther.closest(".v3-disabled-reason")).toBeNull();
+    expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled();
+
+    const badges = screen.getAllByRole("button", { name: "被引用 1" });
+    expect(badges.length).toBeGreaterThanOrEqual(2);
+    fireEvent.click(badges[0]!);
+    fireEvent.click(await screen.findByRole("button", { name: "查看例句" }));
+    expect(openReference).toHaveBeenCalledWith(reference);
+    // 两个词性、三个词形加目录加载，全量并行跑时接近默认 5s，显式放宽而不是靠重跑。
+  }, 20_000);
+
+  it("拼写与被引用片段对不上时即时标红，改回一致（大小写除外）即恢复", async () => {
+    const initial = formsFixture({
+      forms: [commonFormFixture({ spelling: "orbit" })]
+    });
+    const pos = initial.pos[0]!;
+    const base = pos.forms[0]!;
+    const variantId =
+      base.regional_variants.mode === "common"
+        ? base.regional_variants.common.id
+        : base.regional_variants.uk.id;
+    render(
+      <V3ReferenceGuardProvider
+        value={guardFor(
+          buildReferenceIndex(
+            inboundReferences([
+              sharedSentenceReference({
+                pos_id: pos.pos_id,
+                form_id: base.id,
+                variant_id: variantId,
+                sense_id: "sense-1"
+              })
+            ])
+          )
+        )}
+      >
+        <Harness initial={initial} />
+      </V3ReferenceGuardProvider>
+    );
+    const spelling = await screen.findByLabelText("原形英美通用拼写");
+    expect(spelling).not.toHaveAttribute("aria-invalid", "true");
+    fireEvent.change(spelling, { target: { value: "orbits" } });
+    expect(spelling).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getByText(/与被引用片段“orbit”不一致/)).toBeInTheDocument();
+    fireEvent.change(spelling, { target: { value: " ORBIT " } });
+    expect(spelling).not.toHaveAttribute("aria-invalid", "true");
+    expect(screen.queryByText(/与被引用片段/)).toBeNull();
+  });
+});
 
 describe("V3FormsAndPronunciationStep", () => {
   it("基本词性徽标按本地词形草稿实时递减且不依赖发布问题", () => {
@@ -1205,7 +1359,7 @@ describe("V3FormsAndPronunciationStep", () => {
     const lastFormDelete =
       await screen.findByLabelText("删除变化组 1 的词形 1");
     expect(lastFormDelete).toBeDisabled();
-    expect(lastFormDelete).toHaveAttribute("title", "每个词性至少保留一个词形");
+    await expectDisabledReason(lastFormDelete, "每个词性至少保留一个词形");
     expect(screen.queryByLabelText("删除名词")).toBeNull();
     fireEvent.click(screen.getByLabelText("管理第 1 组词形变化"));
     const lastGroupDelete = await screen.findByText("至少保留一个词形");
@@ -2327,10 +2481,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     const locked = await screen.findByLabelText("变化组 1 词形 1 类型");
     expect(locked).toBeDisabled();
-    expect(locked.closest(".word-form-type-select")).toHaveAttribute(
-      "title",
-      "每组词形变化至少保留一个原形"
-    );
+    await expectDisabledReason(locked, "每组词形变化至少保留一个原形");
 
     fireEvent.click(screen.getByLabelText("在原形 1 下方添加同类型词形"));
 
@@ -2348,10 +2499,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     const relocked = screen.getByLabelText("变化组 1 词形 1 类型");
     expect(relocked).toBeDisabled();
-    expect(relocked.closest(".word-form-type-select")).toHaveAttribute(
-      "title",
-      "每组词形变化至少保留一个原形"
-    );
+    await expectDisabledReason(relocked, "每组词形变化至少保留一个原形");
   });
 
   it("陈旧的删除提示不会删掉此刻已成为本组唯一原形的词形", async () => {
@@ -2406,10 +2554,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(openDeleteConfirm()).toBeNull();
     const deleteButton = screen.getByLabelText("删除变化组 1 的词形 2");
     expect(deleteButton).toBeDisabled();
-    expect(deleteButton).toHaveAttribute(
-      "title",
-      "每组词形变化至少保留一个原形"
-    );
+    await expectDisabledReason(deleteButton, "每组词形变化至少保留一个原形");
     expect(
       canonicalValue().pos[0]!.forms.map((item) => item.form_type)
     ).toEqual(["plural", "base", "plural"]);
@@ -2622,7 +2767,7 @@ describe("V3FormsAndPronunciationStep", () => {
     // 组里只有这一个原形：摘掉它组就空了原形，禁用并说明理由。
     const removeBase = await screen.findByLabelText("删除变化组 1 的词形 1");
     expect(removeBase).toBeDisabled();
-    expect(removeBase).toHaveAttribute("title", "每组词形变化至少保留一个原形");
+    await expectDisabledReason(removeBase, "每组词形变化至少保留一个原形");
     // 派生词形不受影响。
     expect(screen.getByLabelText("删除变化组 1 的词形 2")).not.toBeDisabled();
   });

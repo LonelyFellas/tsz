@@ -4,6 +4,7 @@ import {
   ADMIN_V3_ENTRIES_PATH,
   ADMIN_V3_MIXED_WORD_ID,
   ADMIN_V3_NEW_WORD_ID,
+  ADMIN_V3_REFERENCED_SENTENCE_ID,
   mockAdminV3Api
 } from "./support/mockAdminV3Api";
 
@@ -263,6 +264,51 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(page).toHaveURL(
       /\/words\/01990000-0000-7000-8000-000000000002\/v3\/wizard\/preview$/
     );
+  });
+
+  test("E06 Mock 引用保护：被例句标注的原形禁用英美切换与删除，徽标可跳到例句", async ({
+    page
+  }) => {
+    const api = await mockAdminV3Api(page, {
+      formsFailureOnce: false,
+      referencedByShared: true
+    });
+    await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
+
+    const firstGroup = page.locator("[data-pos-id] .v3-form-group-card").nth(0);
+    await expect(firstGroup.getByLabel("英美拼写有区别")).toBeDisabled();
+    await expect(firstGroup.getByLabel("英美音标有区别")).toBeDisabled();
+    await expect(
+      firstGroup.getByRole("button", { name: "删除变化组 1 的词形 1" })
+    ).toBeDisabled();
+    await expect(page.getByRole("button", { name: "删除名词" })).toBeDisabled();
+    // 没被引用的第 2 组照常可切英美规则。
+    await expect(
+      page
+        .locator("[data-pos-id] .v3-form-group-card")
+        .nth(1)
+        .getByLabel("英美拼写有区别")
+    ).toBeEnabled();
+
+    await firstGroup.getByRole("button", { name: "被引用 1" }).first().click();
+    const popover = page.locator(".ant-popover:visible");
+    await expect(
+      popover.getByText("The satellite entered orbit.")
+    ).toBeVisible();
+    await expect(popover.locator("mark")).toHaveText("orbit");
+    await popover.getByRole("button", { name: "查看例句" }).click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/meanings$`)
+    );
+    await expect
+      .poll(() =>
+        api.count(
+          "GET",
+          `/lexicon/sentences/${ADMIN_V3_REFERENCED_SENTENCE_ID}`
+        )
+      )
+      .toBe(1);
   });
 
   test("E04 Mock 身份：普通管理员看他人未发布草稿只读", async ({ page }) => {

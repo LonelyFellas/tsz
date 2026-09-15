@@ -16,6 +16,7 @@ export type V3WordsApi = Pick<
   | "surfaceMatchSnapshotPage"
   | "createV3"
   | "get"
+  | "inboundReferencesV3"
   | "previewFormsImpactV3"
   | "saveFormsStepV3"
   | "saveMeaningsStepV3"
@@ -118,6 +119,15 @@ export function createV3WordRequests(source: V3WordsApi = api.words) {
         .then((response) =>
           requireWordIdentity(response, wordId, "get.word.id")
         ),
+    inboundReferences: (wordId: string) =>
+      source.inboundReferencesV3(wordId).then((response) => {
+        requireIdentity(
+          response.entry_id,
+          wordId,
+          "inbound_references.entry_id"
+        );
+        return response;
+      }),
     impact: (
       wordId: string,
       input: Parameters<V3WordsApi["previewFormsImpactV3"]>[1]

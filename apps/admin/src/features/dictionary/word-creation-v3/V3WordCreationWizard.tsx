@@ -22,8 +22,10 @@ import {
 import type { V3WordRequests } from "./api";
 import {
   navigateToV3Issue,
+  navigateToV3Target,
   type V3IssueNavigationAdapter,
-  type V3IssueNavigationTarget
+  type V3IssueNavigationTarget,
+  scrollV3TargetIntoView
 } from "./issueNavigation";
 import {
   dropEmptySentenceTranslations,
@@ -77,6 +79,8 @@ export interface V3WizardActions {
   retry(): Promise<void>;
   refreshConflict(): Promise<void>;
   navigateIssue(issue: V3DraftValidationIssue): Promise<void>;
+  /** 引用跳转与深链定位：同 navigateIssue 的容器展开与聚焦，但目标不来自校验问题。 */
+  navigateTarget(target: V3IssueNavigationTarget): Promise<void>;
 }
 
 export interface V3WizardSlotContext {
@@ -227,7 +231,7 @@ async function focusRenderedTarget(target: V3IssueNavigationTarget) {
         : undefined;
     const element = scopedElement ?? uniqueGlobalFallback;
     if (element) {
-      element.scrollIntoView?.({ block: "center" });
+      scrollV3TargetIntoView(element);
       element.focus();
       if (document.activeElement === element) return;
     }
@@ -590,6 +594,28 @@ function V3WordCreationSession({
       setActivePosIdState(posId);
     },
     [activePosId, supersede]
+  );
+
+  const navigateTarget = useCallback(
+    async (target: V3IssueNavigationTarget) => {
+      await navigateToV3Target(target, {
+        activateStep: (next) => setActiveStep(next.step),
+        activatePos: (next) => {
+          if (next.pos_id) setActivePosId(next.pos_id);
+        },
+        expandGroup: navigationAdapter?.expandGroup,
+        revealForm: navigationAdapter?.revealForm,
+        revealVariant: navigationAdapter?.revealVariant,
+        revealPronunciation: navigationAdapter?.revealPronunciation,
+        focusField: (next) => {
+          if (navigationAdapter?.focusField) {
+            return navigationAdapter.focusField(next);
+          }
+          setPendingFocusTarget(next);
+        }
+      });
+    },
+    [navigationAdapter, setActivePosId, setActiveStep]
   );
 
   const navigateIssue = useCallback(
@@ -1300,7 +1326,12 @@ function V3WordCreationSession({
   );
 
   const confirmImpact = useCallback(() => {
-    if (!impact || impact.surface_match_page) {
+    // 会破坏引用的词形变更没有可确认的余地：保存必 409，确认条由槽位直接改成阻断提示。
+    if (
+      !impact ||
+      impact.surface_match_page ||
+      impact.blocked_references?.length
+    ) {
       setImpactConfirmed(false);
       return false;
     }
@@ -1583,7 +1614,8 @@ function V3WordCreationSession({
       fetchSurfacePage,
       retry,
       refreshConflict,
-      navigateIssue
+      navigateIssue,
+      navigateTarget
     }),
     [
       draftForms,
@@ -1591,6 +1623,7 @@ function V3WordCreationSession({
       confirmImpactSurface,
       fetchSurfacePage,
       navigateIssue,
+      navigateTarget,
       previewFormsImpact,
       publish,
       refreshConflict,

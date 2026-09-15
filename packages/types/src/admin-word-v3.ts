@@ -912,6 +912,79 @@ export interface FormsImpactResponseV3 {
   affected: FormsImpactItemV3[];
   confirmation_token?: string;
   surface_match_page?: SurfaceMatchPageV3;
+  /** 本次词形变更会破坏的入站引用；非空时保存必 409 `inbound_reference_conflict`。无违例时省略。 */
+  blocked_references?: InboundReferenceV3[];
+}
+
+/** 入站引用的来源类型：多维例句标注 / 已发布内容的词义引用 / 草稿关联词 / 短语成分用词。 */
+export type InboundReferenceKindV3 =
+  | "shared_sentence"
+  | "publication_sense_ref"
+  | "draft_relation"
+  | "phrase_component";
+
+export type InboundReferenceNodeTypeV3 = "pos" | "form" | "variant" | "sense";
+
+/** 引用指向本词条的节点；原形作为引用的 `base_form_id` 同样受保护。 */
+export interface InboundReferenceTargetV3 {
+  pos_id?: string;
+  base_form_id?: string;
+  form_id?: string;
+  variant_id?: string;
+  sense_id?: string;
+}
+
+/** 引用来源摘要，字段按 `kind` 取用：例句给 sentence_*，其余给来源词条与节点。 */
+export interface InboundReferenceSourceV3 {
+  entry_id?: string;
+  entry_headword?: string;
+  entry_kind?: WordEntryKindV3;
+  entry_status?: AdminWordStatus;
+  /** 来源词条里持有该引用的词义（关联词、释义级成分）。 */
+  sense_id?: string;
+  sense_gloss?: string;
+  /** 来源侧引用节点：关联 id、成分 id 或发布引用的 source_node_id。 */
+  node_id?: string;
+  publication_id?: string;
+  /** synonym / antonym / derivative。 */
+  relation_type?: string;
+  /** 发布引用的 reference_kind：relation / sentence_context / phrase_component / text_link。 */
+  reference_kind?: string;
+  sentence_id?: string;
+  sentence_revision?: number;
+  /** 例句英文原文（按标注方言取对应一侧）。 */
+  sentence_text?: string;
+  source_dialect?: Dialect;
+  /** 被标注片段，码点下标，与 `sentence_text` 对应。 */
+  segments?: SentenceSourceRangeV3[];
+}
+
+export interface InboundReferenceV3 {
+  /** `kind` + 来源行主键，跨请求稳定。 */
+  id: string;
+  kind: InboundReferenceKindV3;
+  target: InboundReferenceTargetV3;
+  /** 目标在当前草稿已不成立；与保存校验同一判定。 */
+  stale: boolean;
+  source: InboundReferenceSourceV3;
+}
+
+export interface InboundReferenceNodeV3 {
+  node_id: string;
+  node_type: InboundReferenceNodeTypeV3;
+  /** 指向该节点的引用完整计数，不受明细截断影响。 */
+  total: number;
+}
+
+/** GET /admin/lexicon/entries/{id}/inbound-references */
+export interface InboundReferencesV3 {
+  entry_id: string;
+  /** 计算时的草稿 revision。 */
+  revision: number;
+  nodes: InboundReferenceNodeV3[];
+  /** 失效项优先，最多 500 条。 */
+  items: InboundReferenceV3[];
+  truncated: boolean;
 }
 
 export type PreviewFormsImpactResponseV3 = FormsImpactResponseV3;
