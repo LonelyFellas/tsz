@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/clever-swirles-f4f4de/docs/openapi.json",
-  "_generatedAt": "2026-09-13T10:30:15.585Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/referenced-node-guard/docs/openapi.json",
+  "_generatedAt": "2026-09-15T02:00:46.054Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -28,6 +28,7 @@
     "/admin/lexicon/entries/{id}": ["delete", "get"],
     "/admin/lexicon/entries/{id}/annotation": ["patch"],
     "/admin/lexicon/entries/{id}/archive": ["post"],
+    "/admin/lexicon/entries/{id}/inbound-references": ["get"],
     "/admin/lexicon/entries/{id}/publications": ["get", "post"],
     "/admin/lexicon/entries/{id}/publications/{publication_id}": ["get"],
     "/admin/lexicon/entries/{id}/publications/{publication_id}/activate": [
@@ -454,6 +455,19 @@
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "get /admin/lexicon/entries/{id}/inbound-references": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/InboundReferencesV3" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "500": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /admin/lexicon/entries/{id}/publications": {
       "request": null,
       "responses": {
@@ -860,6 +874,7 @@
         "relation_prebinding_fanout_exceeded",
         "stable_node_id_changed",
         "form_reference_conflict",
+        "inbound_reference_conflict",
         "detection_mismatch",
         "detection_expired",
         "duplicate_word",
@@ -1655,6 +1670,12 @@
           "$ref": "#/components/schemas/SurfacePolicyNameV2"
         },
         "current_revision": { "type": "integer", "format": "int64" },
+        "inbound_references": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/InboundReferenceV3" },
+          "description": "`inbound_reference_conflict`：本次写入会破坏或已失效的入站引用，最多 500 条。",
+          "maxItems": 500
+        },
         "max_reachable_step": { "type": "string" },
         "part_of_speech_id": { "type": "string", "format": "uuid" },
         "reference_locations": {
@@ -1958,12 +1979,150 @@
           "items": { "$ref": "#/components/schemas/FormsImpactItemV3" }
         },
         "base_revision": { "type": "integer", "format": "int64" },
+        "blocked_references": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/InboundReferenceV3" },
+          "description": "本次词形变更会破坏的入站引用；非空时保存必 409 `inbound_reference_conflict`。无违例时省略。",
+          "maxItems": 500
+        },
         "confirmation_token": { "type": "string", "format": "uuid" },
         "requires_confirmation": { "type": "boolean" },
         "schema_version": { "type": "integer", "enum": [3] },
         "surface_match_page": {
           "$ref": "#/components/schemas/SurfaceMatchPageV3"
         }
+      },
+      "additionalProperties": false
+    },
+    "InboundReferencesV3": {
+      "type": "object",
+      "required": ["entry_id", "revision", "nodes", "items", "truncated"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/InboundReferenceV3" },
+          "description": "失效项优先，最多 500 条。",
+          "maxItems": 500
+        },
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/InboundReferenceNodeV3" }
+        },
+        "revision": {
+          "type": "integer",
+          "format": "int64",
+          "description": "计算时的草稿 revision。"
+        },
+        "truncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "InboundReferenceV3": {
+      "type": "object",
+      "required": ["id", "kind", "target", "stale", "source"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "`kind` + 来源行主键，跨请求稳定。"
+        },
+        "kind": { "$ref": "#/components/schemas/InboundReferenceKindV3" },
+        "source": { "$ref": "#/components/schemas/InboundReferenceSourceV3" },
+        "stale": {
+          "type": "boolean",
+          "description": "目标在当前（或本次提交的）内容里已不成立；与保存校验同一判定。"
+        },
+        "target": { "$ref": "#/components/schemas/InboundReferenceTargetV3" }
+      },
+      "additionalProperties": false
+    },
+    "InboundReferenceKindV3": {
+      "type": "string",
+      "description": "入站引用的来源类型。",
+      "enum": [
+        "shared_sentence",
+        "publication_sense_ref",
+        "draft_relation",
+        "phrase_component"
+      ]
+    },
+    "InboundReferenceNodeTypeV3": {
+      "type": "string",
+      "enum": ["pos", "form", "variant", "sense"]
+    },
+    "InboundReferenceNodeV3": {
+      "type": "object",
+      "required": ["node_id", "node_type", "total"],
+      "properties": {
+        "node_id": { "type": "string", "format": "uuid" },
+        "node_type": {
+          "$ref": "#/components/schemas/InboundReferenceNodeTypeV3"
+        },
+        "total": {
+          "type": "integer",
+          "format": "int32",
+          "description": "指向该节点的引用完整计数，不受明细截断影响。",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "InboundReferenceTargetV3": {
+      "type": "object",
+      "description": "引用指向本词条的节点；原形作为引用的 `base_form_id` 同样受保护。",
+      "properties": {
+        "base_form_id": { "type": "string", "format": "uuid" },
+        "form_id": { "type": "string", "format": "uuid" },
+        "pos_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "词义类引用在当前草稿找不到该词义时省略。"
+        },
+        "sense_id": { "type": "string", "format": "uuid" },
+        "variant_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "InboundReferenceSourceV3": {
+      "type": "object",
+      "description": "引用来源摘要，字段按 `kind` 取用：例句给 sentence_*，其余给来源词条与节点。",
+      "properties": {
+        "entry_headword": { "type": "string" },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "entry_kind": { "$ref": "#/components/schemas/WordEntryKindV3" },
+        "entry_status": { "$ref": "#/components/schemas/AdminWordStatus" },
+        "node_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "来源侧引用节点：关联 id、成分 id 或发布引用的 source_node_id。"
+        },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "reference_kind": {
+          "type": "string",
+          "description": "发布引用的 `reference_kind`：relation / sentence_context / phrase_component / text_link。"
+        },
+        "relation_type": {
+          "type": "string",
+          "description": "`synonym` / `antonym` / `derivative`。"
+        },
+        "segments": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/SentenceSourceRangeV1" },
+          "description": "被标注片段，码点下标，与 `sentence_text` 对应。"
+        },
+        "sense_gloss": { "type": "string" },
+        "sense_id": {
+          "type": "string",
+          "format": "uuid",
+          "description": "来源词条里持有该引用的词义（关联词、释义级成分）。"
+        },
+        "sentence_id": { "type": "string", "format": "uuid" },
+        "sentence_revision": { "type": "integer", "format": "int64" },
+        "sentence_text": {
+          "type": "string",
+          "description": "例句英文原文（按标注方言取对应一侧）。"
+        },
+        "source_dialect": { "$ref": "#/components/schemas/Dialect" }
       },
       "additionalProperties": false
     },

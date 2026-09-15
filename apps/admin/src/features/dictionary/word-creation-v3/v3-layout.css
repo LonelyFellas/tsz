@@ -498,3 +498,8 @@
     max-width: 100%;
   }
 }
+
+/* 问题定位与深链滚到节点时让出 64px 的吸顶导航栏，再留一点空隙。 */
+[data-v3-node-id] {
+  scroll-margin-top: 80px;
+}

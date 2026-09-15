@@ -12,6 +12,7 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "EntryLifecycleBatchResponse",
   "DraftValidationResponseV3",
   "FormsImpactResponseV3",
+  "InboundReferencesV3",
   "SurfaceMatchPageV3",
   "RelatedSearchResponse",
   "DetectLexiconSurfaceResponseV3",

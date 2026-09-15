@@ -1,6 +1,10 @@
 import type { V3DraftValidationIssue } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
-import { navigateToV3Issue, v3IssueNavigationTarget } from "./issueNavigation";
+import {
+  navigateToV3Issue,
+  v3IssueNavigationTarget,
+  scrollV3TargetIntoView
+} from "./issueNavigation";
 
 const deepIssue: V3DraftValidationIssue = {
   schema_version: 3,
@@ -114,5 +118,26 @@ describe("V3 issue navigation", () => {
     expect(adapter.focusField).toHaveBeenCalledWith(
       expect.objectContaining({ node_id: "pron-2", field: "actual_pron" })
     );
+  });
+});
+
+describe("scrollV3TargetIntoView", () => {
+  function element(height: number) {
+    const node = document.createElement("div");
+    node.getBoundingClientRect = () => ({ height }) as DOMRect;
+    node.scrollIntoView = vi.fn();
+    return node;
+  }
+
+  it("普通字段居中滚动", () => {
+    const node = element(40);
+    scrollV3TargetIntoView(node);
+    expect(node.scrollIntoView).toHaveBeenCalledWith({ block: "center" });
+  });
+
+  it("比半屏还高的节点顶端对齐，卡片头不会被推出视口", () => {
+    const node = element(window.innerHeight);
+    scrollV3TargetIntoView(node);
+    expect(node.scrollIntoView).toHaveBeenCalledWith({ block: "start" });
   });
 });

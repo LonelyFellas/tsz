@@ -70,7 +70,14 @@ export async function navigateToV3Issue(
   issue: V3DraftValidationIssue,
   adapter: V3IssueNavigationAdapter
 ): Promise<V3IssueNavigationTarget> {
-  const target = v3IssueNavigationTarget(issue);
+  return navigateToV3Target(v3IssueNavigationTarget(issue), adapter);
+}
+
+/** 同一套定位，但目标不来自校验问题（引用跳转、深链定位）。 */
+export async function navigateToV3Target(
+  target: V3IssueNavigationTarget,
+  adapter: V3IssueNavigationAdapter
+): Promise<V3IssueNavigationTarget> {
   await adapter.activateStep(target);
   if (target.pos_id) await adapter.activatePos?.(target);
   if (target.form_group_id) await adapter.expandGroup?.(target);
@@ -79,4 +86,13 @@ export async function navigateToV3Issue(
   if (target.pronunciation_id) await adapter.revealPronunciation?.(target);
   await adapter.focusField(target);
   return target;
+}
+
+/**
+ * 定位滚动：比半屏还高的节点（展开的词义卡片常有一千多像素）居中会把卡片头推出视口上方，
+ * 改成顶端对齐；吸顶导航栏的高度由 v3-layout.css 给定位锚点的 scroll-margin-top 让出。
+ */
+export function scrollV3TargetIntoView(element: HTMLElement): void {
+  const tall = element.getBoundingClientRect().height > window.innerHeight / 2;
+  element.scrollIntoView?.({ block: tall ? "start" : "center" });
 }

@@ -79,6 +79,7 @@ import {
   decodeDraftValidationResponseV3,
   decodeEntryLifecycleBatchAnyResponse,
   decodeFormsImpactResponseV3,
+  decodeInboundReferencesV3,
   decodeResolveSentenceTargetsV3Response,
   decodeSearchComponentTargetsV3Response,
   InvalidAdminWordResponseError,
@@ -336,6 +337,11 @@ export function createAdminEndpoints(http: HttpClient) {
           .then((response) =>
             requireWordPathIdentity(response, wordId, "get.word.id")
           ),
+      /** GET /admin/lexicon/entries/{id}/inbound-references — 指向本词条草稿节点的入站引用。 */
+      inboundReferencesV3: (wordId: string) =>
+        http
+          .get<unknown>(`/lexicon/entries/${wordId}/inbound-references`)
+          .then(decodeInboundReferencesV3),
       previewFormsImpactV3: (
         wordId: string,
         input: PreviewFormsImpactInputV3

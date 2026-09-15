@@ -3,7 +3,11 @@ import {
   InvalidAdminWordResponseError,
   UnsupportedAdminWordSchemaVersionError
 } from "@tsz/api-client";
-import type { ProblemMeta, V3DraftValidationIssue } from "@tsz/types";
+import type {
+  InboundReferenceV3,
+  ProblemMeta,
+  V3DraftValidationIssue
+} from "@tsz/types";
 
 const SURFACE_CONFIRMATION_CODES = new Set([
   "surface_match_acknowledgement_required",
@@ -64,6 +68,13 @@ export type V3Problem =
       kind: "entry_archived";
       status: 409;
       invalidates_confirmation: true;
+    })
+  | (HttpProblemBase & {
+      /** 写入会破坏别处对本词条的引用（409 inbound_reference_conflict），或引用目标正在变更。 */
+      kind: "inbound_reference";
+      status: 409;
+      references: InboundReferenceV3[];
+      detail?: string;
     })
   | (HttpProblemBase & {
       kind: "surface_confirmation";
@@ -189,6 +200,22 @@ export function classifyV3Problem(
       retryable: false,
       action: "re_preview",
       invalidates_confirmation: true
+    };
+  }
+  if (
+    error.status === 409 &&
+    (error.code === "inbound_reference_conflict" ||
+      // 旧码：锁忙 / 例句引用兜底，后端不带引用明细，只能提示刷新引用后重试。
+      error.code === "reference_conflict" ||
+      error.code === "form_reference_conflict")
+  ) {
+    return {
+      ...base,
+      kind: "inbound_reference",
+      status: 409,
+      references: error.meta?.inbound_references ?? [],
+      ...(error.message ? { detail: error.message } : {}),
+      retryable: error.code === "reference_conflict"
     };
   }
   if (error.status === 409 && error.code === "entry_archived") {

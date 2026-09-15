@@ -159,6 +159,45 @@ describe("V3WordCreationLayout", () => {
     expect(onIssueNavigate).toHaveBeenCalledWith(currentIssue);
   });
 
+  it("引用冲突 409 展示后端原因与引用列表，而不是「操作未完成」", () => {
+    renderLayout({
+      problem: {
+        kind: "inbound_reference",
+        status: 409,
+        code: "inbound_reference_conflict",
+        detail:
+          "本次修改会破坏其他内容对本词条的引用，请先解除或调整这些引用。",
+        references: [
+          {
+            id: "draft_relation:relation-1",
+            kind: "draft_relation",
+            target: { sense_id: "sense-1" },
+            stale: true,
+            source: {
+              entry_id: "entry-2",
+              entry_headword: "circle",
+              entry_status: "draft",
+              sense_gloss: "圆圈",
+              node_id: "relation-1",
+              relation_type: "antonym"
+            }
+          }
+        ],
+        retryable: false
+      }
+    });
+
+    expect(
+      screen.getByText("本次修改会破坏其他内容对本词条的引用")
+    ).toBeVisible();
+    expect(screen.queryByText("操作未完成")).toBeNull();
+    expect(screen.getByText("反义词")).toBeVisible();
+    expect(screen.getByText("circle")).toBeVisible();
+    expect(
+      screen.getByRole("link", { name: "打开来源词条" }).getAttribute("href")
+    ).toBe("/words/entry-2/v3/wizard/meanings?focus_node=relation-1");
+  });
+
   it("shows the seven product completion rows without engineering step copy", () => {
     const current = word();
     current.completed_steps = ["basics", "forms"];

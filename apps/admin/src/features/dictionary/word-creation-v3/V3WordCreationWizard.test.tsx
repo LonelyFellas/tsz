@@ -5681,6 +5681,69 @@ describe("V3WordCreationWizard", () => {
     );
   });
 
+  it("影响预览带 blocked_references 时仍可确认影响，发布步不会点了没反应", async () => {
+    const impact = vi.fn(async () => ({
+      schema_version: 3 as const,
+      base_revision: 1,
+      requires_confirmation: true,
+      confirmation_token: "publish-impact-token",
+      affected: [],
+      blocked_references: [
+        {
+          id: "draft_relation:relation-1",
+          kind: "draft_relation" as const,
+          target: { pos_id: "pos-1", sense_id: "sense-1" },
+          stale: true,
+          source: { entry_id: "entry-source" }
+        }
+      ]
+    }));
+    const confirmations: boolean[] = [];
+    renderWizard(requests({ impact }), {
+      renderStep: (context) => (
+        <>
+          <output data-testid="blocked-impact-ready">
+            {context.impact ? "ready" : "none"}
+          </output>
+          <output data-testid="blocked-impact-confirmed">
+            {String(context.impactConfirmed)}
+          </output>
+          <button
+            type="button"
+            onClick={() => void context.actions.previewFormsImpact()}
+          >
+            预览发布影响
+          </button>
+          <button
+            type="button"
+            onClick={() => confirmations.push(context.actions.confirmImpact())}
+          >
+            确认发布影响
+          </button>
+        </>
+      )
+    });
+
+    fireEvent.click(screen.getByText("预览发布影响"));
+    await waitFor(() =>
+      expect(screen.getByTestId("blocked-impact-ready")).toHaveTextContent(
+        "ready"
+      )
+    );
+    expect(screen.getByTestId("blocked-impact-confirmed")).toHaveTextContent(
+      "false"
+    );
+    fireEvent.click(screen.getByText("确认发布影响"));
+    // 发布只查例句与已发布引用：草稿关联词这类 blocked_references 不能把确认卡死，
+    // 真被拒时由发布的 409 列出引用。
+    expect(confirmations).toEqual([true]);
+    await waitFor(() =>
+      expect(screen.getByTestId("blocked-impact-confirmed")).toHaveTextContent(
+        "true"
+      )
+    );
+  });
+
   it("invalidates a confirmed impact token after canonical save advances revision", async () => {
     const impact = vi.fn(async () => ({
       schema_version: 3 as const,

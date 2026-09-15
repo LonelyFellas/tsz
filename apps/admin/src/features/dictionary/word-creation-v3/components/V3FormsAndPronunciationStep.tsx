@@ -30,6 +30,13 @@ import {
   type V3StableVariantIdFactory
 } from "../operations";
 import { V3PosTab } from "./V3PosTab";
+import { V3DisabledReason } from "./V3DisabledReason";
+import { V3ReferenceBadge } from "./V3ReferenceBadge";
+import { posNodeIds, posReferenceCount } from "../referenceGuard";
+import {
+  referenceBlockedHint,
+  useV3ReferenceGuard
+} from "../referenceGuardContext";
 import { V3AddBasicPosSelect } from "./V3AddBasicPosSelect";
 import { partOfSpeechLabel } from "../presentation";
 import { useFormDisplayState } from "../formDisplayState";
@@ -134,6 +141,7 @@ export function V3FormsAndPronunciationStep({
     onActivePosChange?.(added.pos_id);
   };
 
+  const referenceGuard = useV3ReferenceGuard();
   const deletePos = (posId: string) => {
     const index = value.pos.findIndex((pos) => pos.pos_id === posId);
     const result = deletePartOfSpeech(value, posId);
@@ -205,6 +213,7 @@ export function V3FormsAndPronunciationStep({
           const label =
             catalog.data?.items.find((item) => item.code === pos.pos)
               ?.name_zh ?? partOfSpeechLabel(pos.pos);
+          const posReferences = posReferenceCount(referenceGuard.index, pos);
           return {
             key: pos.pos_id,
             label: (
@@ -240,25 +249,35 @@ export function V3FormsAndPronunciationStep({
                     size="small"
                     title="该词性未填项"
                   />
+                  <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
                   {value.pos.length > 1 ? (
-                    <Button
-                      aria-label={`删除${label}`}
-                      danger
-                      icon={<MinusCircleOutlined />}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        modal.confirm({
-                          title: `删除词性“${label}”？`,
-                          content:
-                            "保存时会同时预览该词性下游词义、例句和关系的影响。",
-                          okText: "删除",
-                          okButtonProps: { danger: true },
-                          onOk: () => deletePos(pos.pos_id)
-                        });
-                      }}
-                      size="small"
-                      type="text"
-                    />
+                    <V3DisabledReason
+                      reason={
+                        posReferences > 0
+                          ? referenceBlockedHint(posReferences)
+                          : undefined
+                      }
+                    >
+                      <Button
+                        aria-label={`删除${label}`}
+                        danger
+                        disabled={posReferences > 0}
+                        icon={<MinusCircleOutlined />}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          modal.confirm({
+                            title: `删除词性“${label}”？`,
+                            content:
+                              "保存时会同时预览该词性下游词义、例句和关系的影响。",
+                            okText: "删除",
+                            okButtonProps: { danger: true },
+                            onOk: () => deletePos(pos.pos_id)
+                          });
+                        }}
+                        size="small"
+                        type="text"
+                      />
+                    </V3DisabledReason>
                   ) : null}
                 </Space>
               </span>
