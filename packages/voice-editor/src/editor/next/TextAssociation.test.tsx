@@ -358,6 +358,7 @@ it("例句的关联恢复跟随撤销重做，主动清除后不再自动恢复"
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([original]));
   fireEvent.click(screen.getByRole("button", { name: "下一步" }));
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
+  expect(screen.getByText(/部分关联暂时失效/)).toBeVisible();
   fireEvent.change(input, { target: { value: "make up" } });
   await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([original]));
   expect(screen.queryByText(/部分关联暂时失效/)).toBeNull();
@@ -371,3 +372,71 @@ it("例句的关联恢复跟随撤销重做，主动清除后不再自动恢复"
   await waitFor(() => expect(observe.mock.lastCall?.[0]?.text).toBe("make up"));
   expect(observe.mock.lastCall?.[1]).toEqual([]);
 });
+
+it.each([
+  {
+    name: "单词",
+    text: "for a job",
+    changed: "to a job",
+    segments: [{ start: 0, end: 3, surface: "for" }]
+  },
+  {
+    name: "连续短语",
+    text: "look for a job",
+    changed: "look at a job",
+    segments: [{ start: 0, end: 8, surface: "look for" }]
+  },
+  {
+    name: "非连续短语",
+    text: "look it up",
+    changed: "take it up",
+    segments: [
+      { start: 0, end: 4, surface: "look" },
+      { start: 8, end: 10, surface: "up" }
+    ]
+  }
+])(
+  "$name 修改、连续输入、撤销和重做都同步关联与提示",
+  async ({ text, changed, segments }) => {
+    const original = { ...target, source_segments: segments };
+    const observe = vi.fn();
+    function Host() {
+      const [value, setValue] = useState<RichTextV2>({
+        version: 2,
+        text,
+        annotations: []
+      });
+      const [links, setLinks] = useState([original]);
+      return (
+        <VoiceEditor
+          mode="association"
+          restoreTextLinksOnCorrection
+          value={value}
+          textLinks={links}
+          contextLabel="例句正文"
+          onChange={(next, nextLinks) => {
+            observe(next, nextLinks);
+            setValue(next);
+            setLinks(nextLinks ?? []);
+          }}
+        />
+      );
+    }
+    render(<Host />);
+    const input = screen.getByLabelText("例句正文");
+    fireEvent.change(input, { target: { value: changed } });
+    await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
+    expect(screen.getByText(/部分关联暂时失效/)).toBeVisible();
+    fireEvent.change(input, { target: { value: `${changed}!` } });
+    expect(screen.getByText(/部分关联暂时失效/)).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "上一步" }));
+    await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([original]));
+    expect(screen.queryByText(/部分关联暂时失效/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "下一步" }));
+    await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([]));
+    expect(screen.getByText(/部分关联暂时失效/)).toBeVisible();
+    fireEvent.change(input, { target: { value: text } });
+    await waitFor(() => expect(observe.mock.lastCall?.[1]).toEqual([original]));
+    expect(screen.queryByText(/部分关联暂时失效/)).toBeNull();
+  }
+);

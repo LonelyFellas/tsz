@@ -8,6 +8,7 @@ import {
   Empty,
   Flex,
   Pagination,
+  Popover,
   Space,
   Tag,
   Typography
@@ -18,13 +19,9 @@ import {
   SenseSectionBody,
   SenseSectionTitle
 } from "../dictionary/word-creation-v3/V3MeaningsAndExamplesStep";
-import { editableEnglishText } from "../dictionary/word-creation-v3/meaningsModel";
+import { V3EnglishTextPreview } from "../dictionary/word-creation-v3/components/V3EnglishTextPreview";
 import { SentenceEditor } from "./SentenceEditor";
-
-const textOf = (item: SharedSentence) =>
-  editableEnglishText(item.content.sentence.en_text)
-    .map((row) => row.text)
-    .join(" / ");
+import "./WordSentences.css";
 
 const TRANSLATION_BANDS = [
   { band: "word_for_word", label: "初" },
@@ -197,21 +194,43 @@ export function WordSentences({
             {rows.map((item) => (
               <Flex
                 key={item.id}
-                align="start"
-                gap="small"
+                vertical
+                gap={12}
                 className="shared-sentence-row"
-                wrap
               >
-                <Tag>{item.content.sentence.level}</Tag>
-                <Flex vertical style={{ flex: "1 1 240px", minWidth: 0 }}>
-                  <Typography.Paragraph
-                    className="tsz-entry-en"
-                    ellipsis={{ rows: 2, tooltip: textOf(item) }}
-                    style={{ marginBottom: 4 }}
+                <Flex
+                  align="center"
+                  justify="space-between"
+                  gap="small"
+                  className="shared-sentence-header"
+                >
+                  <Tag>{item.content.sentence.level}</Tag>
+                  {!readOnly && (
+                    <Space>
+                      <Button size="small" onClick={() => void edit(item)}>
+                        编辑
+                      </Button>
+                      <Popover content="从当前词义解除关联" trigger="hover">
+                        <Button size="small" onClick={() => remove(item)}>
+                          解除
+                        </Button>
+                      </Popover>
+                    </Space>
+                  )}
+                </Flex>
+                <Flex vertical gap={12} style={{ minWidth: 0 }}>
+                  <div className="shared-sentence-english">
+                    <V3EnglishTextPreview
+                      value={item.content.sentence.en_text}
+                      hideCommonDialect
+                      showPlayback
+                    />
+                  </div>
+                  <Flex
+                    vertical
+                    gap={8}
+                    className="shared-sentence-translations"
                   >
-                    {textOf(item)}
-                  </Typography.Paragraph>
-                  <Flex vertical gap={4}>
                     {TRANSLATION_BANDS.flatMap(({ band, label }) =>
                       item.content.sentence.zh_translations
                         .filter(
@@ -225,7 +244,8 @@ export function WordSentences({
                             role="group"
                             aria-label={`${label}阶译文`}
                             align="start"
-                            gap={6}
+                            gap={10}
+                            className="shared-sentence-translation"
                           >
                             <Tag
                               color="blue"
@@ -244,16 +264,6 @@ export function WordSentences({
                     )}
                   </Flex>
                 </Flex>
-                {!readOnly && (
-                  <Space>
-                    <Button size="small" onClick={() => void edit(item)}>
-                      编辑
-                    </Button>
-                    <Button size="small" onClick={() => remove(item)}>
-                      从当前词义解除关联
-                    </Button>
-                  </Space>
-                )}
               </Flex>
             ))}
             {(query.data?.total ?? 0) > 5 && (

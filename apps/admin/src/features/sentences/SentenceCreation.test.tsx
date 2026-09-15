@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PronunciationPreviewProvider } from "../dictionary/word-creation/PronunciationPreview";
 import { sentenceWord, sentenceTarget, sentenceCandidate } from "./fixtures";
 import {
   fireEvent,
@@ -82,7 +83,9 @@ function show(ui: React.ReactNode) {
       }
     >
       <ConfigProvider locale={zhCN} theme={{ token: { motion: false } }}>
-        <App>{ui}</App>
+        <App>
+          <PronunciationPreviewProvider>{ui}</PronunciationPreviewProvider>
+        </App>
       </ConfigProvider>
     </QueryClientProvider>
   );
@@ -114,6 +117,31 @@ beforeEach(() => {
 // 耗时贴近超时的用例里，这类定位已改用 ByLabelText（有 aria-label）或 ByText（纯文案）；
 // 「改错再改回」余量充足，暂保留原查询，CI 再抖时优先改它。
 describe("按词条关联反查共享多维例句", () => {
+  it("词条 Step 4 例句保留连读，隐藏英美通用标签", async () => {
+    const content = newSentence();
+    if (content.sentence.en_text.mode === "unified") {
+      content.sentence.en_text.common.value = {
+        version: 2,
+        text: "He is looking for a job.",
+        annotations: [{ type: "liaison", start: 12, end: 15 }]
+      };
+    }
+    vi.mocked(api.sentences.list).mockResolvedValue({
+      items: [shared(content)],
+      total: 1
+    });
+    show(<SenseSentences />);
+    await waitFor(() => {
+      const reader = document.querySelector(".tsz-ve-readonly");
+      expect(reader).toHaveClass("tsz-entry-en", "has-liaison");
+      expect(
+        reader?.querySelectorAll(".tsz-ve-liaison-anchor").length
+      ).toBeGreaterThanOrEqual(2);
+    });
+    expect(screen.queryByText("英美通用")).toBeNull();
+    expect(screen.getByRole("button", { name: "整句 播放语音" })).toBeVisible();
+  });
+
   it("未保存的新词义禁用添加，保存后按具体词义查询", async () => {
     const word = sentenceWord();
     const original = structuredClone(word.meanings.pos[0]!.senses[0]!);
@@ -510,7 +538,7 @@ describe("按词条关联反查共享多维例句", () => {
     });
     show(<SenseSentences />);
     await screen.findByText("We make the story up.");
-    fireEvent.click(screen.getByRole("button", { name: "从当前词义解除关联" }));
+    fireEvent.click(screen.getByRole("button", { name: /解\s*除/ }));
     fireEvent.click(
       within(await screen.findByRole("dialog")).getByRole("button", {
         name: /确\s*定/

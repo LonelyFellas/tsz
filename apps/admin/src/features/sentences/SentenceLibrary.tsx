@@ -23,6 +23,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/auth";
 import { editableEnglishText } from "../dictionary/word-creation-v3/meaningsModel";
 import { SentenceEditor } from "./SentenceEditor";
+import { V3EnglishTextPreview } from "../dictionary/word-creation-v3/components/V3EnglishTextPreview";
 
 function sentenceText(item: SharedSentence) {
   return editableEnglishText(item.content.sentence.en_text)
@@ -281,13 +282,10 @@ export function SentenceLibrary({
                 title: "例句",
                 width: 350,
                 render: (_, row) => (
-                  <Typography.Paragraph
-                    className="tsz-entry-en"
-                    style={{ margin: 0 }}
-                    ellipsis={{ rows: 2, tooltip: sentenceText(row) }}
-                  >
-                    {sentenceText(row)}
-                  </Typography.Paragraph>
+                  <V3EnglishTextPreview
+                    value={row.content.sentence.en_text}
+                    hideCommonDialect
+                  />
                 )
               },
               {
@@ -388,9 +386,10 @@ export function SentenceLibrary({
                 }
               ]}
             />
-            <Typography.Paragraph className="tsz-entry-en">
-              {sentenceText(detail)}
-            </Typography.Paragraph>
+            <V3EnglishTextPreview
+              value={detail.content.sentence.en_text}
+              hideCommonDialect
+            />
             {detail.content.sentence.zh_translations.map((t) => (
               <Typography.Paragraph key={t.id}>
                 {t.band === "word_for_word"

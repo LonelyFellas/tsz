@@ -201,6 +201,50 @@ describe("当前词条关联与离开保护", () => {
       expect.any(AbortSignal)
     );
   });
+  it("已关联仍查询候选并可展开词形词义，但不能直接更换关联", async () => {
+    searchTargets.mockResolvedValue({
+      matches: [sentenceCandidate("source", "for")],
+      truncated: false
+    });
+    const select = vi.fn();
+    show(
+      <SharedSentenceAssociationPicker
+        kind="word"
+        dialect="common"
+        segments={[{ start: 0, end: 3, surface: "for" }]}
+        selected={{
+          id: "existing",
+          source_dialect: "common",
+          source_segments: [{ start: 0, end: 3, surface: "for" }],
+          target: sentenceTarget("source")
+        }}
+        labels={{ "source:sense": "for · 对于" }}
+        onSelect={select}
+        onTargetLabel={vi.fn()}
+      />
+    );
+    fireEvent.click(
+      await screen.findByText("for", {
+        selector: ".v3-component-usage-entry strong"
+      })
+    );
+    expect(searchTargets).toHaveBeenCalledWith(
+      expect.objectContaining({ q: "for", match: "exact", kind: "word" }),
+      expect.any(AbortSignal)
+    );
+    fireEvent.click(await screen.findByText(/原形 for/));
+    const sense = await screen.findByText("编造（故事、借口等）");
+    expect(sense.closest("li")).toHaveClass("ant-cascader-menu-item-disabled");
+    expect(sense.querySelector(".v3-component-usage-radio")).toHaveClass(
+      "is-checked"
+    );
+    fireEvent.click(sense);
+    fireEvent.keyDown(sense.closest("li")!, { key: "Enter" });
+    expect(select).not.toHaveBeenCalled();
+    expect(screen.queryByText("确认关联")).toBeNull();
+    fireEvent.click(screen.getByText("清除关联"));
+    expect(select).toHaveBeenCalledExactlyOnceWith(undefined);
+  });
   it("正文方言匹配的词形不被管理员默认方言偏好过滤", async () => {
     const candidate = sentenceCandidate("source", "color");
     candidate.forms[0]!.dialect = "us";

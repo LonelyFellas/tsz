@@ -16,6 +16,34 @@ export function remapTextLinks<
   if (previous === next) return [...links];
   const before = Array.from(previous);
   const after = Array.from(next);
+  // 词序完全一致时按字符位置映射，可处理一次粘贴调整多处空格。
+  // 保留词边界：look for 与 lookfor 不等价，重复词也按原顺序对应。
+  if (
+    JSON.stringify(previous.match(/[^\t ]+/gu)) ===
+    JSON.stringify(next.match(/[^\t ]+/gu))
+  ) {
+    const positions = new Map<number, number>();
+    let cursor = 0;
+    before.forEach((char, index) => {
+      if (/[\t ]/u.test(char)) return;
+      while (/[\t ]/u.test(after[cursor] ?? "")) cursor++;
+      positions.set(index, cursor++);
+    });
+    return links.flatMap((link) => {
+      const segments: SentenceSourceRangeV3[] = [];
+      for (const segment of link.source_segments) {
+        const start = positions.get(segment.start);
+        const last = positions.get(segment.end - 1);
+        if (start === undefined || last === undefined) return [];
+        segments.push({
+          start,
+          end: last + 1,
+          surface: after.slice(start, last + 1).join("")
+        });
+      }
+      return [{ ...link, source_segments: segments }];
+    });
+  }
   let start = 0;
   while (
     start < before.length &&
@@ -50,7 +78,7 @@ export function remapTextLinks<
         };
       } else return [];
       if (
-        after.slice(mapped.start, mapped.end).join("") !== segment.surface ||
+        after.slice(mapped.start, mapped.end).join("") !== mapped.surface ||
         (word(after[mapped.start - 1]) && word(after[mapped.start])) ||
         (word(after[mapped.end - 1]) && word(after[mapped.end]))
       )

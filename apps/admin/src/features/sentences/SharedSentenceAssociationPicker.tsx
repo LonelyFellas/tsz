@@ -27,7 +27,7 @@ export function SharedSentenceAssociationPicker({
   if (selected && selected.target.state !== "entry_only") {
     const target = selected.target;
     return (
-      <Flex vertical gap="small" style={{ maxWidth: "min(460px, 85vw)" }}>
+      <Flex vertical gap="small" style={{ maxWidth: "min(760px, 85vw)" }}>
         <Typography.Text className="tsz-entry-en" strong>
           {literal}
         </Typography.Text>
@@ -37,8 +37,28 @@ export function SharedSentenceAssociationPicker({
             : `待关联：${target.headword}${target.gloss ? ` · ${target.gloss}` : ""}`}
         </Typography.Text>
         <Typography.Text type="secondary">
-          清除后可以重新选择词形和词义。
+          可查看关联列表，清除后可以重新选择词形和词义。
         </Typography.Text>
+        <V3TargetCascader
+          literal={literal}
+          targetKind={kind}
+          phraseSelection="entry"
+          sourceDialect={dialect}
+          selectedTarget={
+            target.state === "linked"
+              ? {
+                  target_word_id: target.target_entry_id,
+                  target_pos_id: target.target_pos_id,
+                  target_form_id: target.target_form_id,
+                  target_variant_id: target.target_variant_id,
+                  target_sense_id: target.target_sense_id
+                }
+              : undefined
+          }
+          targets={[]}
+          onReplace={() => {}}
+          readOnly
+        />
         <Button size="small" onClick={() => onSelect(undefined)}>
           清除关联
         </Button>

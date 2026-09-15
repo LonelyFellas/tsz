@@ -608,7 +608,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setMarks(previous.marks);
     setLinks(previous.textLinks ?? []);
     setRecoverableLinks(previous.recoverableTextLinks ?? []);
-    setLinkNotice("");
+    setLinkNotice(
+      previous.recoverableTextLinks?.length
+        ? "部分关联暂时失效，改回原文后会自动恢复；也可撤销。"
+        : ""
+    );
     resetTransient();
     setValidationMessage("");
   };
@@ -632,7 +636,11 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     setMarks(next.marks);
     setLinks(next.textLinks ?? []);
     setRecoverableLinks(next.recoverableTextLinks ?? []);
-    setLinkNotice("");
+    setLinkNotice(
+      next.recoverableTextLinks?.length
+        ? "部分关联暂时失效，改回原文后会自动恢复；也可撤销。"
+        : ""
+    );
     resetTransient();
     setValidationMessage("");
   };
