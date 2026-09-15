@@ -14,6 +14,13 @@ case "$deploy_voice_editor" in
   *) echo "!! DEPLOY_VOICE_EDITOR 必须为 true 或 false" >&2; exit 1 ;;
 esac
 
+# 新合成字段先以兼容 reader 发布，配套后端就绪后显式打开 writer。
+deploy_azure_pronunciation_inputs="${DEPLOY_AZURE_PRONUNCIATION_INPUTS:-false}"
+case "$deploy_azure_pronunciation_inputs" in
+  true|false) ;;
+  *) echo "!! DEPLOY_AZURE_PRONUNCIATION_INPUTS 必须为 true 或 false" >&2; exit 1 ;;
+esac
+
 prepare_deploy_source admin
 
 deploy_tmp="$(mktemp -d /tmp/tsz-admin-deploy.XXXXXX)"
@@ -61,6 +68,7 @@ echo "==> build @tsz/admin"
   cd "$DEPLOY_BUILD_ROOT"
   run_sanitized_build \
     VITE_VOICE_EDITOR="$deploy_voice_editor" \
+    VITE_AZURE_PRONUNCIATION_INPUTS="$deploy_azure_pronunciation_inputs" \
     VITE_VOICE_PREVIEW=true \
     VITE_VOICE_AUDIO_UPLOAD=true \
     VITE_ADMIN_TTS_MOCK=false \

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/referenced-node-guard/docs/openapi.json",
-  "_generatedAt": "2026-09-15T02:00:46.054Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-azure-pronunciation-inputs/docs/openapi.json",
+  "_generatedAt": "2026-09-15T14:09:21.295Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -3170,6 +3170,17 @@
       "type": "string",
       "enum": ["normal", "strong", "weak"]
     },
+    "PronunciationSynthesisV3": {
+      "type": "object",
+      "description": "Independent Azure synthesis candidates; dictionary notation remains display-only.",
+      "required": ["alphabet", "ipa", "ups"],
+      "properties": {
+        "alphabet": { "$ref": "#/components/schemas/RichTextPhonemeAlphabet" },
+        "ipa": { "type": "string", "maxLength": 200 },
+        "ups": { "type": "string", "maxLength": 1600 }
+      },
+      "additionalProperties": false
+    },
     "PublishAdminWordV3Input": {
       "type": "object",
       "required": ["schema_version", "base_revision"],
@@ -3201,7 +3212,7 @@
               "$ref": "#/components/schemas/RichTextPhonemeAlphabet"
             },
             "end": { "type": "integer", "minimum": 0 },
-            "phoneme": { "type": "string", "maxLength": 200 },
+            "phoneme": { "type": "string", "maxLength": 1600 },
             "start": { "type": "integer", "minimum": 0 },
             "type": { "type": "string", "enum": ["phoneme"] }
           },
@@ -3266,7 +3277,7 @@
       "type": "string",
       "enum": ["yellow", "green", "pink", "blue", "orange"]
     },
-    "RichTextPhonemeAlphabet": { "type": "string", "enum": ["ipa"] },
+    "RichTextPhonemeAlphabet": { "type": "string", "enum": ["ipa", "ups"] },
     "RichTextSpanKind": { "type": "string", "enum": ["bold", "blue"] },
     "RichTextSpanV3": {
       "type": "object",
@@ -3823,7 +3834,7 @@
         "actual_pron": { "type": "string", "maxLength": 200 },
         "actual_pron_rich": {
           "$ref": "#/components/schemas/RichTextV3",
-          "description": "编辑器正文与 actual_pron 保持一致。连读只标在这里：字典音标那一侧负责\n喂语音合成，连读是纯展示的标注，两边分工不混。旧记录不输出扩展字段。"
+          "description": "编辑器正文与 actual_pron 保持一致；连读仅用于展示。旧记录不输出扩展字段。"
         },
         "audio_assets": {
           "type": "array",
@@ -3839,6 +3850,9 @@
         "style": {
           "$ref": "#/components/schemas/PronunciationStyle",
           "description": "Draft 可暂未选择；complete/publish 必须有值。"
+        },
+        "synthesis": {
+          "$ref": "#/components/schemas/PronunciationSynthesisV3"
         },
         "voice_profile": { "$ref": "#/components/schemas/VoiceProfileV3" }
       },

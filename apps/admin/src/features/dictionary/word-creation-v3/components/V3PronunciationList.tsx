@@ -1,5 +1,5 @@
-import { toRichTextV2 } from "@tsz/voice-editor/core";
-import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
+import { env } from "@/lib/env";
+import { V3SynthesisInputs } from "./V3SynthesisInputs";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import {
   HolderOutlined,
@@ -329,23 +329,8 @@ export function V3PronunciationList({
                           <Form.Item noStyle>
                             <V3VoiceTextField
                               mode="dict-phonetic"
+                              editingEnabled={false}
                               dialect={variant.dialect}
-                              leadingAction={
-                                <PronunciationPreviewControls
-                                  playbackOnly
-                                  pronunciationId={pronunciation.id}
-                                  dialect={variant.dialect}
-                                  ariaLabelPrefix={`第 ${index + 1} 条发音 最终读音`}
-                                  content={toRichTextV2(
-                                    pronunciation.dict_phonetic_rich ?? {
-                                      version: 2,
-                                      text: pronunciation.dict_phonetic,
-                                      annotations: []
-                                    }
-                                  )}
-                                  voiceProfile={pronunciation.voice_profile}
-                                />
-                              }
                               ariaLabel={`第 ${index + 1} 条发音的字典音标`}
                               nodeId={pronunciation.id}
                               field="dict_phonetic"
@@ -357,26 +342,6 @@ export function V3PronunciationList({
                                   text: pronunciation.dict_phonetic,
                                   annotations: []
                                 }
-                              }
-                              voiceProfile={pronunciation.voice_profile}
-                              audioAssets={pronunciation.audio_assets}
-                              onVoiceProfileChange={(voice_profile) =>
-                                onChange(
-                                  updatePronunciation(
-                                    content,
-                                    pronunciation.id,
-                                    { voice_profile }
-                                  )
-                                )
-                              }
-                              onAudioAssetsChange={(audio_assets) =>
-                                onChange(
-                                  updatePronunciation(
-                                    content,
-                                    pronunciation.id,
-                                    { audio_assets }
-                                  )
-                                )
                               }
                               onChange={(dict_phonetic_rich) =>
                                 onChange(
@@ -408,6 +373,24 @@ export function V3PronunciationList({
                           ) : null}
                         </div>
                       </div>
+                      <V3SynthesisInputs
+                        key={pronunciation.id}
+                        synthesisEditable={env.AZURE_PRONUNCIATION_INPUTS}
+                        pronunciation={pronunciation}
+                        spelling={variant.spelling}
+                        dialect={variant.dialect}
+                        index={index}
+                        issues={rowIssues}
+                        onChange={(patch) =>
+                          onChange(
+                            updatePronunciation(
+                              content,
+                              pronunciation.id,
+                              patch
+                            )
+                          )
+                        }
+                      />
                       <div className="word-pronunciation-row">
                         <Typography.Text className="word-pronunciation-label">
                           实际发音

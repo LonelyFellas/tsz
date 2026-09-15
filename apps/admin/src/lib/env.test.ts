@@ -10,6 +10,7 @@ describe("env", () => {
   it("未配置时回退到 API 默认路径，词库与试听默认连接真实后端", async () => {
     vi.stubEnv("VITE_API_BASE_URL", undefined);
     vi.stubEnv("VITE_VOICE_EDITOR", undefined);
+    vi.stubEnv("VITE_AZURE_PRONUNCIATION_INPUTS", undefined);
     vi.stubEnv("VITE_VOICE_PREVIEW", undefined);
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.stubEnv("VITE_RELATED_SEARCH_V2", undefined);
@@ -21,6 +22,7 @@ describe("env", () => {
     // 后端契约落地前默认关，dev 也不例外
     expect(env.VOICE_AUDIO_UPLOAD).toBe(false);
     expect(env.VOICE_EDITOR).toBe(true);
+    expect(env.AZURE_PRONUNCIATION_INPUTS).toBe(true);
     expect(env.VOICE_PREVIEW).toBe(true);
     expect(env.ADMIN_TTS_MOCK).toBe(false);
     expect(env.RELATED_SEARCH_V2).toBe(false);
@@ -37,16 +39,20 @@ describe("env", () => {
   it("生产环境未配置时默认关闭 mock 与语音实验能力", async () => {
     vi.stubEnv("PROD", true);
     vi.stubEnv("VITE_VOICE_EDITOR", undefined);
+    vi.stubEnv("VITE_AZURE_PRONUNCIATION_INPUTS", undefined);
     vi.stubEnv("VITE_VOICE_PREVIEW", undefined);
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.resetModules();
     const { env } = await import("./env");
     expect(env.VOICE_EDITOR).toBe(false);
+    expect(env.AZURE_PRONUNCIATION_INPUTS).toBe(false);
     expect(env.VOICE_PREVIEW).toBe(false);
     expect(env.ADMIN_TTS_MOCK).toBe(false);
   });
 
   it.each([
+    ["VITE_AZURE_PRONUNCIATION_INPUTS", "true", true],
+    ["VITE_AZURE_PRONUNCIATION_INPUTS", "false", false],
     ["VITE_VOICE_EDITOR", "true", true],
     ["VITE_VOICE_EDITOR", "false", false],
     ["VITE_VOICE_PREVIEW", "true", true],
@@ -64,6 +70,7 @@ describe("env", () => {
     vi.resetModules();
     const { env } = await import("./env");
     const key = name.replace("VITE_", "") as
+      | "AZURE_PRONUNCIATION_INPUTS"
       | "VOICE_EDITOR"
       | "VOICE_PREVIEW"
       | "ADMIN_TTS_MOCK"

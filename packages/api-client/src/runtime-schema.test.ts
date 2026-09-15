@@ -523,3 +523,29 @@ describe("evaluator supported-keyword matrix", () => {
     vi.doUnmock("./admin-word-v3.runtime-schema.json");
   });
 });
+
+it("新 reader 接受缺省旧记录和新 synthesis，同时仍拒绝未知格式", () => {
+  const value = buildValidValue(
+    runtimeSchemaBundle.$defs.AdminWordV3!
+  ) as Record<string, unknown>;
+  const pos = buildValidValue(
+    runtimeSchemaBundle.$defs.WordPosFormsV3!
+  ) as Record<string, unknown>;
+  const form = buildValidValue(
+    runtimeSchemaBundle.$defs.WordConcreteFormV3!
+  ) as Record<string, unknown>;
+  const row = buildValidValue(
+    runtimeSchemaBundle.$defs.WordPronunciationV3!
+  ) as Record<string, unknown>;
+  const variant = (
+    form.regional_variants as { common: { pronunciations: unknown[] } }
+  ).common;
+  variant.pronunciations = [row];
+  pos.forms = [form];
+  value.forms = { pos: [pos] };
+  expect(validateRuntimeSchema("AdminWordV3", value)).toEqual({ valid: true });
+  row.synthesis = { alphabet: "ups", ipa: "kæt", ups: "K AE T" };
+  expect(validateRuntimeSchema("AdminWordV3", value)).toEqual({ valid: true });
+  row.synthesis = { alphabet: "sapi", ipa: "kæt", ups: "K AE T" };
+  expect(validateRuntimeSchema("AdminWordV3", value).valid).toBe(false);
+});

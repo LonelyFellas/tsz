@@ -1,3 +1,4 @@
+import { env } from "@/lib/env";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -6,7 +7,9 @@ import { formsFixture, commonFormFixture } from "../fixtures";
 import { toFormsWire } from "../model";
 import { V3PronunciationList } from "./V3PronunciationList";
 
-vi.mock("@/lib/env", () => ({ env: { VOICE_EDITOR: true } }));
+vi.mock("@/lib/env", () => ({
+  env: { VOICE_EDITOR: true, AZURE_PRONUNCIATION_INPUTS: true }
+}));
 vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
   adminVoicePreviewAdapter: {},
   adminAudioUploadAdapter: {},
@@ -70,10 +73,17 @@ vi.mock("@tsz/voice-editor/editor", () => ({
   )
 }));
 
-function Harness() {
-  const [content, setContent] = useState(() =>
-    formsFixture({ forms: [commonFormFixture()] })
-  );
+function Harness({ configured = false }: { configured?: boolean } = {}) {
+  const [content, setContent] = useState(() => {
+    const form = commonFormFixture();
+    if (configured)
+      form.regional_variants.common.pronunciations[0]!.synthesis = {
+        alphabet: "ups",
+        ipa: "kæt",
+        ups: "K AE T"
+      };
+    return formsFixture({ forms: [form] });
+  });
   const form = content.pos[0]!.forms[0]!;
   if (form.regional_variants.mode !== "common")
     throw new Error("common expected");
@@ -91,33 +101,122 @@ function Harness() {
   );
 }
 
-describe("字典音标发音编辑器", () => {
-  it("保存标注与音色配置，关闭重开保留数据，其他发音行独立", async () => {
+describe("独立发音输入", () => {
+  it("正确组装拼写+UPS，保留共享音色、真人录音和另一行", async () => {
     render(<Harness />);
     fireEvent.click(screen.getByLabelText("在第 1 条后新增发音"));
-    fireEvent.click(screen.getByLabelText("打开第 1 条发音的字典音标编辑器"));
-    fireEvent.click(await screen.findByText("标注音标"));
-    fireEvent.click(screen.getByText("配置音色"));
+    fireEvent.change(screen.getByLabelText("第 1 条发音的Azure IPA"), {
+      target: { value: "kæt" }
+    });
+    fireEvent.change(screen.getByLabelText("第 1 条发音的Azure UPS"), {
+      target: { value: "K AE T" }
+    });
+    fireEvent.click(screen.getAllByLabelText("Azure UPS")[0]!);
+    fireEvent.click(
+      screen.getByLabelText("第 1 条发音打开 Azure UPS 发音设置")
+    );
+    fireEvent.click(await screen.findByText("配置音色"));
     fireEvent.click(screen.getByText("保存录音"));
-    fireEvent.click(screen.getByLabelText("完成第 1 条发音的字典音标编辑"));
+    const editor = JSON.parse(
+      screen.getByTestId("editor-content").textContent!
+    );
+    expect(editor.text).not.toBe("K AE T");
+    expect(editor.annotations).toEqual([
+      {
+        type: "phoneme",
+        start: 0,
+        end: Array.from(editor.text).length,
+        alphabet: "ups",
+        phoneme: "K AE T"
+      }
+    ]);
+    fireEvent.click(screen.getByText("收起设置"));
     const wire = JSON.parse(screen.getByTestId("wire").textContent!);
     const rows = wire.pos[0].forms[0].regional_variants.common.pronunciations;
-    expect(rows[0].dict_phonetic_rich.text).toBe(rows[0].dict_phonetic);
-    expect(rows[0].dict_phonetic_rich.annotations).toEqual([
-      { type: "highlight", start: 0, end: 1, color: "yellow" }
-    ]);
-    expect(rows[0].voice_profile).toEqual({
-      voices: [{ voice_id: "british-voice", enabled: true, rate_percent: -10 }]
+    expect(rows[0].synthesis).toEqual({
+      alphabet: "ups",
+      ipa: "kæt",
+      ups: "K AE T"
     });
+    expect(rows[0].voice_profile.voices[0].voice_id).toBe("british-voice");
     expect(rows[0].audio_assets[0].original_name).toBe("test.mp3");
-    expect(rows[1].audio_assets).toBeUndefined();
-    expect(rows[1].dict_phonetic_rich).toBeUndefined();
-    expect(rows[1].voice_profile).toBeUndefined();
-    fireEvent.click(screen.getByLabelText("打开第 1 条发音的字典音标编辑器"));
+    expect(rows[1].synthesis).toBeUndefined();
+    fireEvent.click(
+      screen.getByLabelText("第 1 条发音打开 Azure UPS 发音设置")
+    );
     await waitFor(() =>
       expect(screen.getByTestId("editor-content")).toHaveTextContent(
-        '"type":"highlight"'
+        '"alphabet":"ups"'
       )
     );
+    expect(
+      screen.queryByLabelText("打开第 1 条发音的字典音标编辑器")
+    ).not.toBeInTheDocument();
   });
+  it("两个转换都取字典，替换须确认且能撤销，不切换来源", async () => {
+    render(<Harness />);
+    fireEvent.change(screen.getByLabelText("第 1 条发音的字典音标"), {
+      target: { value: "/kæt/" }
+    });
+    fireEvent.change(screen.getByLabelText("第 1 条发音的Azure IPA"), {
+      target: { value: "human IPA" }
+    });
+    fireEvent.change(screen.getByLabelText("第 1 条发音的Azure UPS"), {
+      target: { value: "H U M" }
+    });
+    fireEvent.click(screen.getByLabelText("第 1 条发音转换为 Azure UPS"));
+    expect(await screen.findByText("K AE T")).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/取\s*消/));
+    expect(screen.getByLabelText("第 1 条发音的Azure UPS")).toHaveValue(
+      "H U M"
+    );
+    fireEvent.click(screen.getByLabelText("第 1 条发音转换为 Azure UPS"));
+    fireEvent.click(screen.getByText("应用转换结果"));
+    expect(screen.getByLabelText("第 1 条发音的Azure UPS")).toHaveValue(
+      "K AE T"
+    );
+    expect(screen.getByLabelText("第 1 条发音的Azure IPA")).toHaveValue(
+      "human IPA"
+    );
+    expect(screen.getByLabelText("Azure IPA")).toBeChecked();
+    fireEvent.click(screen.getByLabelText("第 1 条发音撤销 Azure UPS"));
+    expect(screen.getByLabelText("第 1 条发音的Azure UPS")).toHaveValue(
+      "H U M"
+    );
+    fireEvent.change(screen.getByLabelText("第 1 条发音的字典音标"), {
+      target: { value: "/kæt?/" }
+    });
+    fireEvent.click(screen.getByLabelText("第 1 条发音转换为 Azure IPA"));
+    expect(screen.getByText(/第 5 个字符/)).toBeInTheDocument();
+    expect(screen.getByLabelText("第 1 条发音的Azure IPA")).toHaveValue(
+      "human IPA"
+    );
+  });
+});
+
+it("关闭新入口仍保留音色录音入口，读取和保存已有 synthesis，不能编辑新字段", async () => {
+  env.AZURE_PRONUNCIATION_INPUTS = false;
+  try {
+    render(<Harness configured />);
+    expect(
+      screen.queryByLabelText("第 1 条发音的Azure IPA")
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/Azure UPS（当前来源）/)).toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("第 1 条发音发音设置与真人录音"));
+    fireEvent.click(await screen.findByText("保存录音"));
+    fireEvent.click(screen.getByText("配置音色"));
+    fireEvent.change(screen.getByLabelText("第 1 条发音的实际发音"), {
+      target: { value: "actual" }
+    });
+    const wire = JSON.parse(screen.getByTestId("wire").textContent!);
+    expect(
+      wire.pos[0].forms[0].regional_variants.common.pronunciations[0].synthesis
+    ).toEqual({ alphabet: "ups", ipa: "kæt", ups: "K AE T" });
+    expect(
+      wire.pos[0].forms[0].regional_variants.common.pronunciations[0]
+        .audio_assets
+    ).toHaveLength(1);
+  } finally {
+    env.AZURE_PRONUNCIATION_INPUTS = true;
+  }
 });

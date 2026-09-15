@@ -2044,3 +2044,44 @@ describe("fillFormTypeTemplate", () => {
     );
   });
 });
+
+it("英美复制保留两套 synthesis，合并差异不能静默选边", () => {
+  const form = commonFormFixture();
+  const source = commonVariant(form);
+  source.pronunciations[0]!.synthesis = {
+    alphabet: "ups",
+    ipa: "kæt",
+    ups: "K AE T"
+  };
+  const content = formsFixture({ forms: [form] });
+  const group = content.pos[0]!.form_groups[0]!;
+  const split = normalizeGroupDialectRules(
+    content,
+    content.pos[0]!.pos_id,
+    group.id,
+    { spelling_mode: "unified", phonetic_mode: "distinguish" },
+    "uk",
+    uuidSequence(
+      ...Array.from({ length: 20 }, (_, index) => uuidFromInt(9000 + index))
+    )
+  );
+  expect(split.ok).toBe(true);
+  if (!split.ok) throw new Error(split.reason);
+  const regional = split.value.pos[0]!.forms[0]!.regional_variants;
+  if (regional.mode !== "uk_us") throw new Error("split expected");
+  expect(regional.uk.pronunciations[0]!.synthesis).toEqual(
+    source.pronunciations[0]!.synthesis
+  );
+  expect(regional.us.pronunciations[0]!.synthesis).toEqual(
+    source.pronunciations[0]!.synthesis
+  );
+  regional.us.pronunciations[0]!.synthesis!.ups = "K AH T";
+  expect(regional.uk.pronunciations[0]!.synthesis!.ups).toBe("K AE T");
+  const merge = normalizeGroupDialectRules(
+    split.value,
+    content.pos[0]!.pos_id,
+    group.id,
+    { spelling_mode: "unified", phonetic_mode: "unified" }
+  );
+  expect(merge).toEqual({ ok: false, reason: "pronunciation_merge_required" });
+});

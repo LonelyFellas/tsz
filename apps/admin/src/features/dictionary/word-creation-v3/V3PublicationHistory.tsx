@@ -7,6 +7,7 @@ import type {
   AdminWordPublicationListResponse,
   AdminWordV3,
   EnglishTextV3,
+  PronunciationSynthesisV3,
   SurfaceMatchPageV3
 } from "@tsz/types";
 import { Alert, Button, Card, Flex, Modal, Spin, Tag, Typography } from "antd";
@@ -70,6 +71,7 @@ interface SnapshotFormLine {
   pronunciations: Array<{
     id: string;
     dictPhonetic: string;
+    synthesis?: PronunciationSynthesisV3;
     actualPron: string;
     style?: string;
   }>;
@@ -165,6 +167,9 @@ function snapshotBody(publication: AdminWordPublicationAny): {
           pronunciations: variant.pronunciations.map((pronunciation) => ({
             id: pronunciation.id,
             dictPhonetic: pronunciation.dict_phonetic,
+            ...("synthesis" in pronunciation
+              ? { synthesis: pronunciation.synthesis }
+              : {}),
             actualPron: pronunciation.actual_pron,
             style: pronunciation.style
           }))
@@ -295,6 +300,9 @@ function PublicationSnapshotBody({
                     <Typography.Text key={pronunciation.id} type="secondary">
                       词典音标 {pronunciation.dictPhonetic} · 实际发音{" "}
                       {pronunciation.actualPron}
+                      {pronunciation.synthesis
+                        ? ` · Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`
+                        : ""}
                       {pronunciation.style
                         ? ` · ${pronunciationStyleLabel(pronunciation.style as never)}`
                         : ""}

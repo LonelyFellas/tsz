@@ -310,7 +310,8 @@ export function V3FormsAndPronunciationStep({
           <Typography.Paragraph className="word-step-description">
             先添加基本词性，再录入各种词形。录入词形时，不要遗漏 1)
             英式或美式、2)
-            规则变化或不规则变化。录入字典音标获取音频，录入实际发音时需严格按照
+            规则变化或不规则变化。字典音标用于展示与主动转换，选择 Azure IPA 或
+            UPS 输入进行合成。录入实际发音时需严格按照
             “天生之®通用英语音标字母表” 进行操作。
           </Typography.Paragraph>
         </div>

@@ -158,6 +158,16 @@ function FormsReview({
                                       )
                                     : "未选择发音方式"}
                                 </small>
+                                {pronunciation.synthesis && (
+                                  <small>
+                                    Azure{" "}
+                                    {pronunciation.synthesis.alphabet.toUpperCase()}
+                                    ：
+                                    {pronunciation.synthesis[
+                                      pronunciation.synthesis.alphabet
+                                    ] || "未填写"}
+                                  </small>
+                                )}
                               </>
                             ) : (
                               "暂无发音"
