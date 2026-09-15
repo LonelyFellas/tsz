@@ -823,6 +823,14 @@ describe("WordWizardV3Page", () => {
       await screen.findAllByRole("button", { name: "被引用 1" })
     ).not.toHaveLength(0);
     expect(screen.getByLabelText("英美拼写有区别")).toBeDisabled();
+    // 未失效的引用：本次把拼写改坏就禁用保存并给出原因。
+    fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
+      target: { value: "center" }
+    });
+    expect(screen.getByText("保存草稿").closest("button")).toBeDisabled();
+    expect(
+      screen.getByText("保存草稿").closest(".v3-disabled-reason")
+    ).not.toBeNull();
     const referenceCallsBeforeSave = vi.mocked(endpoints.inboundReferencesV3)
       .mock.calls.length;
     // 拼写改成与片段一致但大小写不同：允许保存，交给服务端判定。
@@ -941,6 +949,11 @@ describe("WordWizardV3Page", () => {
     expect(
       screen.getByText("保存草稿").closest(".v3-disabled-reason")
     ).toBeNull();
+    // 有改动、拼写仍与失效片段对不上：旧冲突不挡，保存照样可点。
+    fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
+      target: { value: "centres" }
+    });
+    expect(screen.getByText("保存草稿").closest("button")).not.toBeDisabled();
   });
 
   it("引用接口不可用时给出提示但不阻塞编辑与保存", async () => {

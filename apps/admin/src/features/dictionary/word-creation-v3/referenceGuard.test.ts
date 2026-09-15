@@ -84,6 +84,40 @@ describe("referenceGuard 判定", () => {
     expect(referencesForNodes(index, [base.id])).toEqual([]);
   });
 
+  it("已失效的引用不锁编辑：只挡发布不挡保存，锁住反而挡住本地修复；徽标照常计数", () => {
+    const stale = sharedSentenceReference(target, { stale: true });
+    const staleComponent = phraseComponentReference(target, { stale: true });
+    const onlyStale = buildReferenceIndex(
+      inboundReferences([stale, staleComponent])
+    );
+    expect(nodesReferenceCount(onlyStale, [base.id, baseVariantId])).toBe(2);
+    expect(formReferenceCount(onlyStale, base)).toBe(0);
+    expect(posReferenceCount(onlyStale, pos, ["sense-1"])).toBe(0);
+    expect(senseReferenceCount(onlyStale, "sense-1")).toBe(0);
+    expect(groupDeleteReferenceCount(onlyStale, pos, group)).toBe(0);
+    expect(dialectRuleLocks(onlyStale, pos, group)).toEqual({
+      split: 0,
+      merge: 0
+    });
+
+    const fresh = sharedSentenceReference(target, {
+      sentence_id: "sentence-2"
+    });
+    expect(
+      formReferenceCount(
+        buildReferenceIndex(inboundReferences([stale, fresh])),
+        base
+      )
+    ).toBe(1);
+
+    // 明细被截断：完整计数减去明细里的失效条数（后端把失效项排在前面）。
+    const truncated = buildReferenceIndex(
+      inboundReferences([stale, fresh], { items: [stale], truncated: true })
+    );
+    expect(nodesReferenceCount(truncated, [base.id])).toBe(2);
+    expect(formReferenceCount(truncated, base)).toBe(1);
+  });
+
   it("英美规则：通用变体被引用锁拆分，英美变体被引用锁合并，计数按引用去重", () => {
     const commonIndex = buildReferenceIndex(
       inboundReferences([

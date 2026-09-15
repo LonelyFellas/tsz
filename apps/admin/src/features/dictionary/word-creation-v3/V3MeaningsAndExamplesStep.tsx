@@ -103,7 +103,7 @@ import {
 import { V3DisabledReason } from "./components/V3DisabledReason";
 import { V3ReferenceBadge } from "./components/V3ReferenceBadge";
 import {
-  nodesReferenceCount,
+  nodesBlockingReferenceCount,
   posNodeIds,
   senseReferenceCount
 } from "./referenceGuard";
@@ -2396,7 +2396,7 @@ function V3MeaningsAndExamplesStepContent({
       value.pos
         .find((pos) => pos.pos_id === posId)
         ?.senses.map((sense) => sense.id) ?? [];
-    return nodesReferenceCount(
+    return nodesBlockingReferenceCount(
       referenceGuard.index,
       formPos ? posNodeIds(formPos, senseIds) : [posId, ...senseIds]
     );

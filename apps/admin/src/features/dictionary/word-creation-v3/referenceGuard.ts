@@ -12,7 +12,8 @@ import type { V3IssueNavigationTarget } from "./issueNavigation";
 
 /**
  * 被引用节点保护的纯判定：把 GET inbound-references 的响应建成索引，各编辑控件据此
- * 决定禁用与徽标。禁用只看 `nodes` 的完整计数；明细最多 500 条，只用来展示。
+ * 决定禁用与徽标。禁用只算未失效的引用（见 nodesBlockingReferenceCount），徽标与列表显示全部；
+ * 明细最多 500 条。
  * 本地新增、尚未保存的节点不在索引里，天然不受限。
  */
 export type V3ReferenceGuardStatus = "loaded" | "loading" | "unavailable";
@@ -24,6 +25,8 @@ export interface V3ReferenceIndex {
   counts: ReadonlyMap<string, number>;
   /** node_id → 明细（可能被截断）。 */
   byNode: ReadonlyMap<string, readonly InboundReferenceV3[]>;
+  /** node_id → 明细里指向它的失效引用数；明细被截断时从完整计数里扣掉失效项用。 */
+  staleCounts: ReadonlyMap<string, number>;
   items: readonly InboundReferenceV3[];
   stale: readonly InboundReferenceV3[];
   truncated: boolean;
@@ -49,6 +52,7 @@ export function buildReferenceIndex(
 ): V3ReferenceIndex {
   const counts = new Map<string, number>();
   const byNode = new Map<string, InboundReferenceV3[]>();
+  const staleCounts = new Map<string, number>();
   for (const node of response?.nodes ?? []) {
     counts.set(node.node_id, node.total);
   }
@@ -57,6 +61,8 @@ export function buildReferenceIndex(
       const bucket = byNode.get(nodeId);
       if (bucket) bucket.push(item);
       else byNode.set(nodeId, [item]);
+      if (item.stale)
+        staleCounts.set(nodeId, (staleCounts.get(nodeId) ?? 0) + 1);
     }
   }
   return {
@@ -64,6 +70,7 @@ export function buildReferenceIndex(
     ...(response ? { revision: response.revision } : {}),
     counts,
     byNode,
+    staleCounts,
     items: response?.items ?? [],
     stale: (response?.items ?? []).filter((item) => item.stale),
     truncated: response?.truncated ?? false
@@ -107,6 +114,30 @@ export function nodesReferenceCount(
   );
 }
 
+/**
+ * 会挡住编辑的引用数：只算未失效的。草稿保存只拦本次改动破坏的引用，已失效的旧引用改不改都
+ * 不挡保存（只挡发布），把它算进锁里反而会挡住本地修复。明细被截断时用单节点完整计数减去明细
+ * 里的失效条数兜底（后端把失效项排在前面），同样取最大值。徽标与列表照常用全部引用。
+ */
+export function nodesBlockingReferenceCount(
+  index: V3ReferenceIndex,
+  nodeIds: readonly string[]
+): number {
+  if (!index.truncated) {
+    return referencesForNodes(index, nodeIds).filter(
+      (reference) => !reference.stale
+    ).length;
+  }
+  return nodeIds.reduce(
+    (max, nodeId) =>
+      Math.max(
+        max,
+        (index.counts.get(nodeId) ?? 0) - (index.staleCounts.get(nodeId) ?? 0)
+      ),
+    0
+  );
+}
+
 export function nodeReferenceCount(
   index: V3ReferenceIndex,
   nodeId: string
@@ -129,7 +160,7 @@ export function formReferenceCount(
   index: V3ReferenceIndex,
   form: WordConcreteFormV3
 ): number {
-  return nodesReferenceCount(index, formNodeIds(form));
+  return nodesBlockingReferenceCount(index, formNodeIds(form));
 }
 
 /** 词性下已保存的全部节点；词义 id 由词义步另传（词形步拿不到）。 */
@@ -145,7 +176,7 @@ export function posReferenceCount(
   pos: WordPosFormsV3,
   senseIds: readonly string[] = []
 ): number {
-  return nodesReferenceCount(index, posNodeIds(pos, senseIds));
+  return nodesBlockingReferenceCount(index, posNodeIds(pos, senseIds));
 }
 
 function groupForms(
@@ -164,7 +195,7 @@ export function groupDeleteReferenceCount(
   pos: WordPosFormsV3,
   group: WordFormGroupV3
 ): number {
-  return nodesReferenceCount(
+  return nodesBlockingReferenceCount(
     index,
     groupForms(pos, group).flatMap(formNodeIds)
   );
@@ -192,8 +223,8 @@ export function dialectRuleLocks(
       .filter((form) => form.regional_variants.mode === mode)
       .flatMap(variantIdsOf);
   return {
-    split: nodesReferenceCount(index, variantIds("common")),
-    merge: nodesReferenceCount(index, variantIds("uk_us"))
+    split: nodesBlockingReferenceCount(index, variantIds("common")),
+    merge: nodesBlockingReferenceCount(index, variantIds("uk_us"))
   };
 }
 
@@ -201,7 +232,7 @@ export function senseReferenceCount(
   index: V3ReferenceIndex,
   senseId: string
 ): number {
-  return nodeReferenceCount(index, senseId);
+  return nodesBlockingReferenceCount(index, [senseId]);
 }
 
 export interface V3SpellingConflict {
