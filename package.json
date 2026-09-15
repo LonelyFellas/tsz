@@ -25,6 +25,7 @@
     "test:cov": "pnpm check:node && pnpm test:node-runtime && pnpm test:coverage-lock && pnpm test:ci-modules && pnpm test:deploy-provenance && node scripts/run-coverage-locked.mjs",
     "ci:test-module": "node scripts/ci-test-modules.mjs run",
     "ci:validate-test-inventories": "node scripts/ci-test-modules.mjs validate-inventories",
+    "ci:collect-test-artifacts": "node scripts/ci-test-modules.mjs collect-artifacts",
     "test:e2e": "pnpm --filter @tsz/e2e test:e2e",
     "test:e2e:admin": "pnpm --filter @tsz/e2e test:e2e:admin",
     "prepare": "lefthook install || true"

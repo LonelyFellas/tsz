@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFile, readdir } from "node:fs/promises";
+import { cp, readFile, readdir } from "node:fs/promises";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { buildCoverageVitestArgs } from "./coverage-runner-args.mjs";
@@ -342,6 +342,52 @@ export async function validateInventoryFiles(
   return inventory;
 }
 
+// 同一 run 重跑后，各 attempt 的产物并存；每个模块只取 attempt 最大的一份。
+export async function collectModuleArtifacts(
+  downloadDirectory,
+  outputDirectory
+) {
+  validateModuleManifest();
+  const attemptsByModule = new Map(
+    ciTestModules.map((module) => [module.name, []])
+  );
+  for (const entry of await readdir(downloadDirectory, {
+    withFileTypes: true
+  })) {
+    const module = ciTestModules.find((candidate) =>
+      new RegExp(`^${candidate.artifact}-attempt-[1-9]\\d*$`).test(entry.name)
+    );
+    if (!module || !entry.isDirectory()) {
+      throw new Error(`unexpected coverage artifact: ${entry.name}`);
+    }
+    attemptsByModule
+      .get(module.name)
+      .push(Number(entry.name.slice(`${module.artifact}-attempt-`.length)));
+  }
+
+  const missing = ciTestModules
+    .filter((module) => attemptsByModule.get(module.name).length === 0)
+    .map((module) => module.name);
+  if (missing.length > 0) {
+    throw new Error(`missing coverage artifacts: ${missing.join(", ")}`);
+  }
+
+  for (const module of ciTestModules) {
+    const attempts = attemptsByModule
+      .get(module.name)
+      .sort((left, right) => left - right);
+    const attempt = attempts.at(-1);
+    await cp(
+      resolve(downloadDirectory, `${module.artifact}-attempt-${attempt}`),
+      outputDirectory,
+      { recursive: true }
+    );
+    console.log(
+      `[ci-test-artifacts] ${module.name} uses attempt ${attempt} of [${attempts.join(", ")}]`
+    );
+  }
+}
+
 async function runModule(moduleName, outputDirectory) {
   const module = moduleByName(moduleName);
   const repositoryRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -389,8 +435,12 @@ async function main(rawArgs) {
     );
     return;
   }
+  if (command === "collect-artifacts" && commandArgs.length === 2) {
+    await collectModuleArtifacts(commandArgs[0], commandArgs[1]);
+    return;
+  }
   throw new Error(
-    "usage: ci-test-modules.mjs run <module> <output-dir> | validate-inventories <full-inventory.json> <inventory-dir> <report-dir>"
+    "usage: ci-test-modules.mjs run <module> <output-dir> | validate-inventories <full-inventory.json> <inventory-dir> <report-dir> | collect-artifacts <download-dir> <output-dir>"
   );
 }
 
