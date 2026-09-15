@@ -88,16 +88,17 @@ echo "==> recheck exact main before server writes"
 recheck_deploy_source admin
 ssh tshb-test 'install -d -m 0755 /opt/tsz-deploy-manifests /opt/tsz-deploy-tools'
 remote_candidate="$(ssh tshb-test "mktemp '/opt/tsz-deploy-manifests/.admin.${DEPLOY_GIT_SHA}.XXXXXX.partial'")"
-rsync -az "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" tshb-test:/opt/tsz-deploy-tools/frontend-provenance.mjs
+# 推到 tshb-test 的 rsync 一律带 --no-o --no-g：不把本机 uid/gid（如 501）带到服务器——那边没有
+# 对应用户，文件会变成「不存在的用户」所有；产物与部署工具以 root 运行，必须保持 root 属主。
+rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" tshb-test:/opt/tsz-deploy-tools/frontend-provenance.mjs
 
 echo "==> rsync dist -> tshb-test:/opt/tsz-admin/dist"
 # --delete 仅限 dist 目录：产物文件名带内容 hash，清掉旧版本避免无限堆积。
-rsync -az --delete "$DEPLOY_BUILD_ROOT/apps/admin/dist/" tshb-test:/opt/tsz-admin/dist/
-rsync -az "$candidate_manifest" "tshb-test:$remote_candidate"
+rsync -az --no-o --no-g --delete "$DEPLOY_BUILD_ROOT/apps/admin/dist/" tshb-test:/opt/tsz-admin/dist/
+rsync -az --no-o --no-g "$candidate_manifest" "tshb-test:$remote_candidate"
 ssh tshb-test "/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify-candidate --manifest '$remote_candidate' --artifact-root /opt/tsz-admin/dist"
 
 echo "==> sync nginx conf + reload"
-# --no-o --no-g：不把本机 uid/gid 带到服务器（那边没有对应用户），nginx 配置保持 root 属主。
 rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test.conf" tshb-test:/etc/nginx/conf.d/tsz.conf
 rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test-domains.conf" tshb-test:/etc/nginx/conf.d/tsz-test-domains.conf
 ssh tshb-test 'nginx -t && systemctl reload nginx'
