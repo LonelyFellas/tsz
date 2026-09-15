@@ -589,6 +589,8 @@ const LIAISON_TEXT: RichTextV3 = {
 
 // 编辑器里怎么连，收起后就怎么显示：实际发音、语法结构、英文正文（释义）三类字段都叠。
 it.each([
+  [undefined, "默认语音字段"],
+  ["pronunciation", "通用发音"],
   ["actual-pron", "实际发音"],
   ["grammar", "语法结构 1 英美通用内容"],
   ["association", "定义 1 英美通用内容"]
@@ -615,6 +617,11 @@ it.each([
       );
     const input = screen.getByLabelText(label);
     expect(input.tagName).toBe("TEXTAREA");
+    if (mode === "actual-pron") {
+      expect(input).toHaveClass("v3-voice-text-large-preview");
+      expect(input).not.toHaveClass("tsz-entry-en");
+    }
+    expect((input as HTMLTextAreaElement).style.paddingTop).toBe("1em");
     expect(input).toHaveAttribute("data-v3-field", "content");
     expect(anchors()).toEqual([
       ["start", "k"],
@@ -628,6 +635,7 @@ it.each([
       container.querySelector(".v3-voice-text-liaison-overlay")
     ).toBeNull();
     expect(screen.getByLabelText(label)).toBe(input);
+    expect((input as HTMLTextAreaElement).style.paddingTop).toBe("");
   }
 );
 

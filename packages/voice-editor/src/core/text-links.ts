@@ -34,6 +34,9 @@ export function remapTextLinks<
     newEnd--;
   }
   const delta = newEnd - oldEnd;
+  const spacingOnly =
+    /^[\t ]*$/u.test(before.slice(start, oldEnd).join("")) &&
+    /^[\t ]*$/u.test(after.slice(start, newEnd).join(""));
   const word = (char: string | undefined) =>
     char !== undefined && /[\p{L}\p{N}'’\-]/u.test(char);
   return links.flatMap((link) => {
@@ -48,9 +51,17 @@ export function remapTextLinks<
           start: segment.start + delta,
           end: segment.end + delta
         };
+      } else if (spacingOnly) {
+        mapped.end += delta;
+        mapped.surface = after.slice(mapped.start, mapped.end).join("");
+        if (
+          mapped.surface.replace(/[\t ]+/gu, " ") !==
+          segment.surface.replace(/[\t ]+/gu, " ")
+        )
+          return [];
       } else return [];
       if (
-        after.slice(mapped.start, mapped.end).join("") !== segment.surface ||
+        after.slice(mapped.start, mapped.end).join("") !== mapped.surface ||
         (word(after[mapped.start - 1]) && word(after[mapped.start])) ||
         (word(after[mapped.end - 1]) && word(after[mapped.end]))
       )

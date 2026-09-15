@@ -1,10 +1,21 @@
+import { toRichTextV2 } from "@tsz/voice-editor/core";
 import type { EnglishTextV3 } from "@tsz/types";
-import { Flex, Tag, Typography } from "antd";
+import { ConfigProvider, Flex, Tag, Typography } from "antd";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { dialectLabel } from "../presentation";
 import "@tsz/voice-editor/styles.css";
+import "./V3EnglishTextPreview.css";
+import { PronunciationPreviewControls } from "../../word-creation/PronunciationPreview";
 
-export function V3EnglishTextPreview({ value }: { value: EnglishTextV3 }) {
+export function V3EnglishTextPreview({
+  value,
+  hideCommonDialect = false,
+  showPlayback = false
+}: {
+  value: EnglishTextV3;
+  hideCommonDialect?: boolean;
+  showPlayback?: boolean;
+}) {
   const rows =
     value.mode === "unified"
       ? [{ dialect: "common" as const, variant: value.common }]
@@ -18,8 +29,33 @@ export function V3EnglishTextPreview({ value }: { value: EnglishTextV3 }) {
     <Flex vertical gap={4}>
       {rows.map(({ dialect, variant }) => (
         <div key={variant.id}>
-          <Tag>{dialectLabel(dialect)}</Tag>
-          <RichTextReadOnly className="tsz-entry-en" value={variant.value} />
+          <Flex align="stretch">
+            {showPlayback && (
+              <div className="v3-english-preview-playback">
+                <ConfigProvider wave={{ disabled: true }}>
+                  <PronunciationPreviewControls
+                    pronunciationId={variant.id}
+                    content={toRichTextV2(variant.value)}
+                    voiceProfile={variant.voice_profile ?? undefined}
+                    dialect={dialect}
+                    ariaLabelPrefix="整句"
+                    playbackOnly
+                  />
+                </ConfigProvider>
+              </div>
+            )}
+            <div
+              className={showPlayback ? "v3-english-preview-text" : undefined}
+            >
+              {(!hideCommonDialect || dialect !== "common") && (
+                <Tag>{dialectLabel(dialect)}</Tag>
+              )}
+              <RichTextReadOnly
+                className="tsz-entry-en"
+                value={variant.value}
+              />
+            </div>
+          </Flex>
           {variant.text_links?.map((link) => (
             <Typography.Text
               key={link.id}

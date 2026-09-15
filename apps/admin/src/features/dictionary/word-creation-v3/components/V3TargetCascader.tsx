@@ -27,6 +27,15 @@ import { HttpError } from "@tsz/api-client/http";
 type ResolvedUsage = Extract<PhraseComponentUsageV3, { state: "resolved" }>;
 export type ResolvedTarget = Omit<ResolvedUsage, "id" | "literal">;
 
+type TargetIdentity = Pick<
+  ResolvedTarget,
+  | "target_word_id"
+  | "target_pos_id"
+  | "target_form_id"
+  | "target_variant_id"
+  | "target_sense_id"
+>;
+
 interface CandidateSearchState {
   pending: boolean;
   loadingMore: boolean;
@@ -99,7 +108,8 @@ interface CascaderOptionNode {
 
 function cascaderOptionsFromGroups(
   groups: CandidateEntryGroup[],
-  selectedLeafKey?: string
+  selectedLeafKey?: string,
+  readOnly = false
 ): CascaderOptionNode[] {
   return groups.map((group) => {
     const draftTag = group.draft ? (
@@ -157,6 +167,7 @@ function cascaderOptionsFromGroups(
           return {
             value: sense.senseId,
             target: sense.usage,
+            disabled: readOnly,
             label: (
               <span className="v3-component-usage-sense">
                 <span
@@ -173,11 +184,11 @@ function cascaderOptionsFromGroups(
   });
 }
 
-function formKeyOf(target: ResolvedTarget): string {
+function formKeyOf(target: TargetIdentity): string {
   return `${target.target_word_id}#${target.target_pos_id}#${target.target_form_id}#${target.target_variant_id}`;
 }
 
-function leafKeyOf(target: ResolvedTarget): string {
+function leafKeyOf(target: TargetIdentity): string {
   return `${formKeyOf(target)}:${target.target_sense_id}`;
 }
 
@@ -287,9 +298,13 @@ export function V3TargetCascader({
   selfEntryId,
   targetKind,
   phraseSelection = "components",
-  sourceDialect
+  sourceDialect,
+  readOnly = false,
+  selectedTarget
 }: {
   literal: string;
+  readOnly?: boolean;
+  selectedTarget?: TargetIdentity;
   targets: readonly ResolvedTarget[];
   onReplace: (next: ResolvedTarget[], viaPhrase?: TextLinkViaPhraseV3) => void;
   selfEntryId?: string;
@@ -320,7 +335,11 @@ export function V3TargetCascader({
   // 取打开那一刻的快照——跟着 targets 走的话，取消勾选会让该行当场从级联里消失，
   // 误点无法回勾。面板每次打开都按 key 重挂，所以快照不会过期。
   const [selectedVariantIds] = useState(
-    () => new Set(targets.map((target) => target.target_variant_id))
+    () =>
+      new Set([
+        ...targets.map((target) => target.target_variant_id),
+        ...(selectedTarget ? [selectedTarget.target_variant_id] : [])
+      ])
   );
   const [searchState, setSearchState] = useState(initialSearchState);
   const searchActions = useRef<{ more: () => void; reload: () => void } | null>(
@@ -567,9 +586,16 @@ export function V3TargetCascader({
   );
   // 单选：至多一条关联。回填单条路径（存量多于一条时以第一条为准，选新词义时整组替换）。
   const selected = targets[0];
-  const selectedLeafKey = selected ? leafKeyOf(selected) : undefined;
+  const displayedTarget = selectedTarget ?? selected;
+  const selectedLeafKey = displayedTarget
+    ? leafKeyOf(displayedTarget)
+    : undefined;
   const options = useMemo(() => {
-    const entries = cascaderOptionsFromGroups(groups, selectedLeafKey);
+    const entries = cascaderOptionsFromGroups(
+      groups,
+      selectedLeafKey,
+      readOnly
+    );
     if (!includePhraseComponents) return entries;
     return entries.map((entry, index) => {
       if (groups[index]!.kind !== "phrase") return entry;
@@ -603,7 +629,11 @@ export function V3TargetCascader({
               formTypeLabel,
               posLabelOf
             );
-            const forms = cascaderOptionsFromGroups(componentGroups)
+            const forms = cascaderOptionsFromGroups(
+              componentGroups,
+              undefined,
+              readOnly
+            )
               .flatMap((target) => target.children ?? [])
               .map((form) => ({
                 ...form,
@@ -653,29 +683,31 @@ export function V3TargetCascader({
     selectedVariantIds,
     selfEntryId,
     selectedLeafKey,
+    readOnly,
     formTypeLabel
   ]);
   const value = useMemo(() => {
-    if (!selected) return undefined;
-    const leaf = [formKeyOf(selected), selected.target_sense_id];
+    if (!displayedTarget) return undefined;
+    const leaf = [formKeyOf(displayedTarget), displayedTarget.target_sense_id];
     if (includePhraseComponents) return undefined;
-    return [selected.target_word_id, ...leaf];
-  }, [selected, includePhraseComponents]);
+    return [displayedTarget.target_word_id, ...leaf];
+  }, [displayedTarget, includePhraseComponents]);
 
   // 单选没有「反选」：已有关联的解除全靠这个入口，把该单词的关联整组清空。
   // 无候选/查询失败时也要出现——否则指向已下架目标的孤儿关联再也删不掉。
-  const clearControl = selected ? (
-    <Flex justify="flex-end">
-      <Button
-        onClick={() => onReplace([])}
-        size="small"
-        style={{ paddingInline: 0, height: "auto" }}
-        type="link"
-      >
-        清除关联
-      </Button>
-    </Flex>
-  ) : null;
+  const clearControl =
+    selected && !readOnly ? (
+      <Flex justify="flex-end">
+        <Button
+          onClick={() => onReplace([])}
+          size="small"
+          style={{ paddingInline: 0, height: "auto" }}
+          type="link"
+        >
+          清除关联
+        </Button>
+      </Flex>
+    ) : null;
 
   if (state.pending) {
     return (
@@ -775,6 +807,7 @@ export function V3TargetCascader({
             void loadComponent(component);
         }}
         onChange={(next, selectedOptions) => {
+          if (readOnly) return;
           const path = next as string[];
           const leaf = selectedOptions.at(-1);
           const selection =

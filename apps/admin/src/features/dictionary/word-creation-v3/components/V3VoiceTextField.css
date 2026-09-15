@@ -51,3 +51,17 @@
   max-width: none;
   padding-top: 0;
 }
+
+/* 英文与实际发音收起态使用统一字号和字重，叠加层会同步这些字体度量。 */
+textarea.v3-voice-text-large-preview.ant-input {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.6;
+  padding: 8px 12px;
+}
+
+@media (max-width: 600px) {
+  textarea.v3-voice-text-large-preview.ant-input {
+    font-size: 18px;
+  }
+}

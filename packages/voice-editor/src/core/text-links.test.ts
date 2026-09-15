@@ -122,3 +122,139 @@ it("原位置已有新的关联时不覆盖或重复恢复", () => {
   );
   expect(result.links).toEqual([replacement]);
 });
+
+it.each([
+  {
+    name: "单词改写",
+    before: "for a job",
+    after: "to a job",
+    surface: "for",
+    keep: false
+  },
+  {
+    name: "单词删除",
+    before: "for a job",
+    after: "a job",
+    surface: "for",
+    keep: false
+  },
+  {
+    name: "单词拼接成新词",
+    before: "for a job",
+    after: "forever a job",
+    surface: "for",
+    keep: false
+  },
+  {
+    name: "关联外修改",
+    before: "for a job",
+    after: "for a career",
+    surface: "for",
+    keep: true
+  },
+  {
+    name: "单词前插入 emoji",
+    before: "for a job",
+    after: "👩 for a job",
+    surface: "for",
+    keep: true
+  },
+  {
+    name: "单词旁加标点",
+    before: "for a job",
+    after: "for, a job",
+    surface: "for",
+    keep: true
+  },
+  {
+    name: "短语改写组成词",
+    before: "look for a job",
+    after: "look at a job",
+    surface: "look for",
+    keep: false
+  },
+  {
+    name: "短语删除组成词",
+    before: "look for a job",
+    after: "look a job",
+    surface: "look for",
+    keep: false
+  },
+  {
+    name: "短语插入新词",
+    before: "look for a job",
+    after: "look hard for a job",
+    surface: "look for",
+    keep: false
+  },
+  {
+    name: "短语只增加空格",
+    before: "look for a job",
+    after: "look  for a job",
+    surface: "look for",
+    keep: true
+  },
+  {
+    name: "短语合并为一个词",
+    before: "look for a job",
+    after: "lookfor a job",
+    surface: "look for",
+    keep: false
+  },
+  {
+    name: "短语末尾标点",
+    before: "look for",
+    after: "look for!",
+    surface: "look for",
+    keep: true
+  }
+])("$name：只保留仍准确匹配的关联", ({ before, after, surface, keep }) => {
+  const original = link(0, surface.length, surface);
+  const result = remapTextLinksWithRecovery(before, after, [original], []);
+  expect(result.links).toHaveLength(keep ? 1 : 0);
+  if (keep) {
+    expect(result.recoverable).toEqual([]);
+    expect(result.links[0]).toMatchObject({
+      id: original.id,
+      target_word_id: original.target_word_id
+    });
+    const segment = result.links[0]!.source_segments[0]!;
+    expect(Array.from(after).slice(segment.start, segment.end).join("")).toBe(
+      segment.surface
+    );
+  } else {
+    expect(result.recoverable).toHaveLength(1);
+    expect(
+      remapTextLinksWithRecovery(
+        after,
+        before,
+        result.links,
+        result.recoverable
+      ).links
+    ).toEqual([original]);
+  }
+});
+
+it("非连续短语只改间隔词时平移，改任一组成词时整条解除，其他单词关联不受影响", () => {
+  const phrase = {
+    ...link(0, 4, "look"),
+    id: "phrase",
+    source_segments: [
+      { start: 0, end: 4, surface: "look" },
+      { start: 8, end: 10, surface: "up" }
+    ]
+  };
+  const word = { ...link(5, 7, "it"), id: "word" };
+  expect(remapTextLinks("look it up", "look this up", [phrase, word])).toEqual([
+    {
+      ...phrase,
+      source_segments: [
+        { start: 0, end: 4, surface: "look" },
+        { start: 10, end: 12, surface: "up" }
+      ]
+    }
+  ]);
+  expect(remapTextLinks("look it up", "take it up", [phrase, word])).toEqual([
+    word
+  ]);
+});
