@@ -107,6 +107,85 @@ wait_for_http_status() {
   return 1
 }
 
+# 服务器上 nginx 配置所在目录。部署脚本 source 本文件时总是这个值；测试会把它指到假服务器目录。
+DEPLOY_NGINX_CONF_DIR=/etc/nginx/conf.d
+# install_nginx_configs 在服务器上建的暂存目录：远端事务结束时自己删；事务没跑到
+# （rsync 失败、被打断）时由部署脚本 EXIT trap 里的 remove_nginx_stage 兜底。
+DEPLOY_NGINX_STAGE=""
+
+remove_nginx_stage() {
+  local stage="${DEPLOY_NGINX_STAGE:-}"
+  [[ -n "$stage" ]] || return 0
+  DEPLOY_NGINX_STAGE=""
+  case "$stage" in
+    "${DEPLOY_NGINX_CONF_DIR%/*}/.tsz-deploy-nginx."??????) ssh tshb-test "rm -rf -- '$stage'" ;;
+    *)
+      printf '!! refusing to clean unexpected nginx stage: %s\n' "$stage" >&2
+      return 1
+      ;;
+  esac
+}
+
+# 把 tsz.conf 与 tsz-test-domains.conf 换装到服务器并 reload。直接 rsync 覆盖的话，nginx -t
+# 不过时坏配置就留在磁盘上：在跑的 nginx 不受影响，但下次 restart / 整机重启时 ExecStartPre 的
+# nginx -t 失败，IP 入口、8081、禅道全起不来，certbot 续期时的 reload 也会失败。
+# 所以先传到暂存目录（与 conf.d 同一文件系统、不在 nginx 任何 include 通配里），再在一次远端
+# 事务里备份 -> mv 原子替换 -> nginx -t：不过就恢复原文件、不 reload、非零退出；通过才 reload。
+install_nginx_configs() {
+  local build_root="$1"
+  local stage_prefix="${DEPLOY_NGINX_CONF_DIR%/*}/.tsz-deploy-nginx."
+  DEPLOY_NGINX_STAGE="$(ssh tshb-test "mktemp -d '${stage_prefix}XXXXXX'")" || return 1
+  [[ "$DEPLOY_NGINX_STAGE" = "$stage_prefix"?????? ]] || {
+    printf '!! unexpected nginx stage path: %s\n' "$DEPLOY_NGINX_STAGE" >&2
+    return 1
+  }
+  rsync -az --no-o --no-g "$build_root/deploy/nginx/tshb-test.conf" \
+    "tshb-test:$DEPLOY_NGINX_STAGE/tsz.conf" || return 1
+  rsync -az --no-o --no-g "$build_root/deploy/nginx/tshb-test-domains.conf" \
+    "tshb-test:$DEPLOY_NGINX_STAGE/tsz-test-domains.conf" || return 1
+  # 远端脚本整段包在 { } 里：bash -s 边读边执行，包起来才保证读完整段再动手，
+  # 不会因连接中途断开只执行到「已替换、未测试」。
+  ssh tshb-test "bash -s -- '$DEPLOY_NGINX_STAGE' '$DEPLOY_NGINX_CONF_DIR' tsz.conf tsz-test-domains.conf" <<'REMOTE' || return 1
+{
+  stage="$1"
+  conf_dir="$2"
+  shift 2
+  names=("$@")
+  trap 'rm -rf -- "$stage"' EXIT
+
+  rollback() {
+    local name failed=0
+    for name in "${names[@]}"; do
+      if [[ -e "$stage/backup/$name" ]]; then
+        mv -f -- "$stage/backup/$name" "$conf_dir/$name" || failed=1
+      else
+        rm -f -- "$conf_dir/$name" || failed=1
+      fi
+    done
+    if ((failed)); then
+      printf '!! %s，且恢复原配置失败；未 reload\n' "$1" >&2
+    else
+      printf '!! %s：已恢复原配置，未 reload\n' "$1" >&2
+    fi
+    exit 1
+  }
+
+  mkdir -- "$stage/backup" || exit 1
+  for name in "${names[@]}"; do
+    if [[ -e "$conf_dir/$name" ]]; then
+      cp -p -- "$conf_dir/$name" "$stage/backup/$name" || exit 1
+    fi
+  done
+  for name in "${names[@]}"; do
+    mv -f -- "$stage/$name" "$conf_dir/$name" || rollback "替换 $name 失败"
+  done
+  nginx -t || rollback "nginx -t 未通过"
+  systemctl reload nginx
+}
+REMOTE
+  DEPLOY_NGINX_STAGE=""
+}
+
 # 本地 boot 闸起的子进程句柄：verify_standalone_boot 起服务前写入，收进程只走
 # stop_standalone_boot 一条路径（deploy-web.sh 的 EXIT trap 里再兜一次）。
 DEPLOY_BOOT_PID=""

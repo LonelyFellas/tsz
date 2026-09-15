@@ -24,6 +24,7 @@ cleanup() {
   if [[ -n "$remote_candidate" ]]; then
     ssh tshb-test "rm -f -- '$remote_candidate'" >/dev/null 2>&1 || status=1
   fi
+  remove_nginx_stage >/dev/null 2>&1 || status=1
   remove_deploy_build_tree || status=1
   case "$deploy_tmp" in
     /tmp/tsz-admin-deploy.*) rm -rf -- "$deploy_tmp" ;;
@@ -99,9 +100,8 @@ rsync -az --no-o --no-g "$candidate_manifest" "tshb-test:$remote_candidate"
 ssh tshb-test "/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify-candidate --manifest '$remote_candidate' --artifact-root /opt/tsz-admin/dist"
 
 echo "==> sync nginx conf + reload"
-rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test.conf" tshb-test:/etc/nginx/conf.d/tsz.conf
-rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test-domains.conf" tshb-test:/etc/nginx/conf.d/tsz-test-domains.conf
-ssh tshb-test 'nginx -t && systemctl reload nginx'
+# nginx -t 不过会恢复原配置、不 reload 并非零退出（见 deploy-source.sh）。
+install_nginx_configs "$DEPLOY_BUILD_ROOT"
 
 echo "==> smoke"
 ssh tshb-test 'curl -fsS -m 8 -o /dev/null -w "GET  /        -> %{http_code}\n" http://127.0.0.1:8081/'
@@ -109,6 +109,10 @@ ssh tshb-test 'curl -fsS -m 8 -o /dev/null -w "GET  /login   -> %{http_code}\n" 
 code=$(ssh tshb-test 'curl -sS -m 8 -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/api/v1/admin/profile')
 echo "GET  /api/v1/admin/profile -> ${code} (无 token，预期 401)"
 [ "$code" = "401" ] || { echo "!! API 反代异常"; exit 1; }
+# HTTPS 域名入口在服务器本机按域名走 443 验证（--resolve 保留 SNI 与证书校验）。
+code=$(ssh tshb-test 'curl -sS -m 8 -o /dev/null -w "%{http_code}" --resolve admin-test.tianshengzhi.com:443:127.0.0.1 https://admin-test.tianshengzhi.com/login' || true)
+echo "GET  https://admin-test.tianshengzhi.com/login -> ${code} (预期 200)"
+[ "$code" = "200" ] || { echo "!! HTTPS 域名入口异常"; exit 1; }
 
 echo "==> accept and verify admin provenance manifest"
 ssh tshb-test "/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs accept --manifest '$remote_candidate' --artifact-root /opt/tsz-admin/dist --output /opt/tsz-deploy-manifests/admin.json"
