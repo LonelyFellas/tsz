@@ -138,13 +138,6 @@ export function nodesBlockingReferenceCount(
   );
 }
 
-export function nodeReferenceCount(
-  index: V3ReferenceIndex,
-  nodeId: string
-): number {
-  return index.counts.get(nodeId) ?? 0;
-}
-
 export function variantIdsOf(form: WordConcreteFormV3): string[] {
   return form.regional_variants.mode === "common"
     ? [form.regional_variants.common.id]
