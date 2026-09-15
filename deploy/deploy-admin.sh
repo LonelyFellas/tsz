@@ -97,8 +97,9 @@ rsync -az "$candidate_manifest" "tshb-test:$remote_candidate"
 ssh tshb-test "/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify-candidate --manifest '$remote_candidate' --artifact-root /opt/tsz-admin/dist"
 
 echo "==> sync nginx conf + reload"
-rsync -az "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test.conf" tshb-test:/etc/nginx/conf.d/tsz.conf
-rsync -az "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test-domains.conf" tshb-test:/etc/nginx/conf.d/tsz-test-domains.conf
+# --no-o --no-g：不把本机 uid/gid 带到服务器（那边没有对应用户），nginx 配置保持 root 属主。
+rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test.conf" tshb-test:/etc/nginx/conf.d/tsz.conf
+rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test-domains.conf" tshb-test:/etc/nginx/conf.d/tsz-test-domains.conf
 ssh tshb-test 'nginx -t && systemctl reload nginx'
 
 echo "==> smoke"
