@@ -98,6 +98,7 @@ ssh tshb-test "/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verif
 
 echo "==> sync nginx conf + reload"
 rsync -az "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test.conf" tshb-test:/etc/nginx/conf.d/tsz.conf
+rsync -az "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test-domains.conf" tshb-test:/etc/nginx/conf.d/tsz-test-domains.conf
 ssh tshb-test 'nginx -t && systemctl reload nginx'
 
 echo "==> smoke"
