@@ -109,21 +109,25 @@ wait_for_http_status() {
 
 # 服务器上 nginx 配置所在目录。部署脚本 source 本文件时总是这个值；测试会把它指到假服务器目录。
 DEPLOY_NGINX_CONF_DIR=/etc/nginx/conf.d
-# install_nginx_configs 在服务器上建的暂存目录：远端事务结束时自己删；事务没跑到
-# （rsync 失败、被打断）时由部署脚本 EXIT trap 里的 remove_nginx_stage 兜底。
+# install_nginx_configs 在服务器上建的暂存目录，只在远端事务开始前由部署脚本 EXIT trap 里的
+# remove_nginx_stage 兜底清理（rsync 失败、被打断）；事务一开始清理就交给远端自己。
 DEPLOY_NGINX_STAGE=""
+
+# 暂存路径会拼进远端 rm -rf：只认 mktemp 在固定前缀后生成的 6 位字母数字。
+is_nginx_stage_path() {
+  local suffix="${1#"${DEPLOY_NGINX_CONF_DIR%/*}/.tsz-deploy-nginx."}"
+  [[ "$suffix" != "$1" && "$suffix" =~ ^[A-Za-z0-9]{6}$ ]]
+}
 
 remove_nginx_stage() {
   local stage="${DEPLOY_NGINX_STAGE:-}"
   [[ -n "$stage" ]] || return 0
   DEPLOY_NGINX_STAGE=""
-  case "$stage" in
-    "${DEPLOY_NGINX_CONF_DIR%/*}/.tsz-deploy-nginx."??????) ssh tshb-test "rm -rf -- '$stage'" ;;
-    *)
-      printf '!! refusing to clean unexpected nginx stage: %s\n' "$stage" >&2
-      return 1
-      ;;
-  esac
+  is_nginx_stage_path "$stage" || {
+    printf '!! refusing to clean unexpected nginx stage: %s\n' "$stage" >&2
+    return 1
+  }
+  ssh tshb-test "rm -rf -- '$stage'"
 }
 
 # 把 tsz.conf 与 tsz-test-domains.conf 换装到服务器并 reload。直接 rsync 覆盖的话，nginx -t
@@ -135,7 +139,7 @@ install_nginx_configs() {
   local build_root="$1"
   local stage_prefix="${DEPLOY_NGINX_CONF_DIR%/*}/.tsz-deploy-nginx."
   DEPLOY_NGINX_STAGE="$(ssh tshb-test "mktemp -d '${stage_prefix}XXXXXX'")" || return 1
-  [[ "$DEPLOY_NGINX_STAGE" = "$stage_prefix"?????? ]] || {
+  is_nginx_stage_path "$DEPLOY_NGINX_STAGE" || {
     printf '!! unexpected nginx stage path: %s\n' "$DEPLOY_NGINX_STAGE" >&2
     return 1
   }
@@ -143,27 +147,36 @@ install_nginx_configs() {
     "tshb-test:$DEPLOY_NGINX_STAGE/tsz.conf" || return 1
   rsync -az --no-o --no-g "$build_root/deploy/nginx/tshb-test-domains.conf" \
     "tshb-test:$DEPLOY_NGINX_STAGE/tsz-test-domains.conf" || return 1
+  # 事务一开始，暂存目录（含备份）就只归远端管：本地被 Ctrl-C 时 ssh 客户端退出，远端事务
+  # 没有 pty 收不到 SIGHUP、会继续跑完，本地 trap 若再并发 rm -rf 就会删掉回滚要用的备份。
+  # 代价是远端 bash 没起来时 /etc/nginx 下会留一个不被 include 的隐藏目录。
+  local stage="$DEPLOY_NGINX_STAGE"
+  DEPLOY_NGINX_STAGE=""
   # 远端脚本整段包在 { } 里：bash -s 边读边执行，包起来才保证读完整段再动手，
   # 不会因连接中途断开只执行到「已替换、未测试」。
-  ssh tshb-test "bash -s -- '$DEPLOY_NGINX_STAGE' '$DEPLOY_NGINX_CONF_DIR' tsz.conf tsz-test-domains.conf" <<'REMOTE' || return 1
+  ssh tshb-test "bash -s -- '$stage' '$DEPLOY_NGINX_CONF_DIR' tsz.conf tsz-test-domains.conf" <<'REMOTE'
 {
   stage="$1"
   conf_dir="$2"
   shift 2
   names=("$@")
+  existed=" "
   trap 'rm -rf -- "$stage"' EXIT
 
+  # 原来有没有这份配置按备份时的记录判断，不按备份文件还在不在推断：
+  # 原来有而备份不见了只能算恢复失败，绝不能把线上文件删掉。
   rollback() {
     local name failed=0
     for name in "${names[@]}"; do
-      if [[ -e "$stage/backup/$name" ]]; then
+      if [[ "$existed" = *" $name "* ]]; then
         mv -f -- "$stage/backup/$name" "$conf_dir/$name" || failed=1
       else
         rm -f -- "$conf_dir/$name" || failed=1
       fi
     done
     if ((failed)); then
-      printf '!! %s，且恢复原配置失败；未 reload\n' "$1" >&2
+      trap - EXIT
+      printf '!! %s，且恢复原配置失败；未 reload，配置状态未知，剩余备份（若有）在 %s/backup\n' "$1" "$stage" >&2
     else
       printf '!! %s：已恢复原配置，未 reload\n' "$1" >&2
     fi
@@ -174,6 +187,7 @@ install_nginx_configs() {
   for name in "${names[@]}"; do
     if [[ -e "$conf_dir/$name" ]]; then
       cp -p -- "$conf_dir/$name" "$stage/backup/$name" || exit 1
+      existed+="$name "
     fi
   done
   for name in "${names[@]}"; do
@@ -183,7 +197,6 @@ install_nginx_configs() {
   systemctl reload nginx
 }
 REMOTE
-  DEPLOY_NGINX_STAGE=""
 }
 
 # 本地 boot 闸起的子进程句柄：verify_standalone_boot 起服务前写入，收进程只走

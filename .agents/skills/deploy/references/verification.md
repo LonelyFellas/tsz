@@ -19,5 +19,5 @@ HTTPS 域名在服务器本机用 `--resolve` 指到 127.0.0.1 验证（保留 S
 web 目录为 /opt/tsz-web，admin 为 /opt/tsz-admin/dist；nginx 80/8081 与两个 HTTPS 域名的 /api/v1/ 均代理 127.0.0.1:8383。
 
 web 启动期 502 仅在脚本定义的 30 秒窗口内复查；超时、manifest 不符或 API 404/5xx 均算失败。
-nginx -t 未通过时脚本已恢复原配置、未 reload 并非零退出：报告写明 nginx 配置未更新，不手工覆盖或强制 reload。
+nginx -t 未通过时脚本已恢复原配置、未 reload 并非零退出：报告写明 nginx 配置未更新，不手工覆盖或强制 reload；若输出「恢复原配置失败」，报告写明 conf.d 配置状态未知，先只读核对 nginx -t 与剩余备份，不 restart nginx。
 远端曾被写入但验收失败时，说明制品、服务和来源记录各处于什么状态；禁止手工伪造 manifest，不声称自动回退已发生。

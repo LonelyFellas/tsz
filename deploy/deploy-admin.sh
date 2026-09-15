@@ -24,7 +24,7 @@ cleanup() {
   if [[ -n "$remote_candidate" ]]; then
     ssh tshb-test "rm -f -- '$remote_candidate'" >/dev/null 2>&1 || status=1
   fi
-  remove_nginx_stage >/dev/null 2>&1 || status=1
+  remove_nginx_stage >/dev/null || status=1
   remove_deploy_build_tree || status=1
   case "$deploy_tmp" in
     /tmp/tsz-admin-deploy.*) rm -rf -- "$deploy_tmp" ;;
