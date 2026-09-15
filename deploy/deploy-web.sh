@@ -20,6 +20,7 @@ cleanup() {
   if [[ -n "$remote_candidate" ]]; then
     ssh tshb-test "rm -f -- '$remote_candidate'" >/dev/null 2>&1 || status=1
   fi
+  remove_nginx_stage >/dev/null || status=1
   remove_deploy_build_tree || status=1
   case "$deploy_tmp" in
     /tmp/tsz-web-deploy.*) rm -rf -- "$deploy_tmp" ;;
@@ -50,9 +51,9 @@ echo "==> prepare clean build tree from the target commit"
 prepare_deploy_build_tree web
 
 echo "==> build @tsz/web (standalone)"
-# NEXT_PUBLIC_* 会在构建时内联进产物。测试服默认使用公网 IP，避免 canonical、
-# sitemap 与 Open Graph URL 回退到 localhost；域名启用后可在执行脚本时显式覆盖。
-TSZ_DEPLOY_SITE_URL="${NEXT_PUBLIC_SITE_URL:-http://47.121.142.19}"
+# NEXT_PUBLIC_* 会在构建时内联进产物。测试服默认使用 HTTPS 域名，让 canonical、sitemap 与
+# Open Graph URL 既不回退到 localhost、也不指向裸 IP 入口；需要时可在执行脚本时显式覆盖。
+TSZ_DEPLOY_SITE_URL="${NEXT_PUBLIC_SITE_URL:-https://test.tianshengzhi.com}"
 echo "==> canonical site URL: ${TSZ_DEPLOY_SITE_URL}"
 (
   cd "$DEPLOY_BUILD_ROOT"
@@ -104,9 +105,9 @@ ssh tshb-test "/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verif
 
 echo "==> restart tsz-web + sync nginx"
 rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/systemd/tsz-web.service" tshb-test:/etc/systemd/system/tsz-web.service
-rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test.conf" tshb-test:/etc/nginx/conf.d/tsz.conf
-rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test-domains.conf" tshb-test:/etc/nginx/conf.d/tsz-test-domains.conf
-ssh tshb-test 'systemctl daemon-reload && systemctl restart tsz-web && nginx -t && systemctl reload nginx'
+# 先重启 tsz-web，成功后才换装 nginx 配置（nginx -t 不过会恢复原配置并非零退出）。
+ssh tshb-test 'systemctl daemon-reload && systemctl restart tsz-web'
+install_nginx_configs "$DEPLOY_BUILD_ROOT"
 
 echo "==> smoke"
 wait_for_http_status "GET /" "http://47.121.142.19/" 200 7 5 || {
@@ -116,6 +117,11 @@ wait_for_http_status "GET /" "http://47.121.142.19/" 200 7 5 || {
 code=$(curl -sS -m 8 -o /dev/null -w "%{http_code}" http://47.121.142.19/api/v1/auth/me)
 echo "GET /api/v1/auth/me -> ${code} (无 token，预期 401)"
 [ "$code" = "401" ] || { echo "!! API 反代异常"; exit 1; }
+# HTTPS 域名入口在服务器本机按域名走 443 验证（--resolve 保留 SNI 与证书校验）；
+# 本机经代理的 fake-ip 解析结果不作数。
+code=$(ssh tshb-test 'curl -sS -m 8 -o /dev/null -w "%{http_code}" --resolve test.tianshengzhi.com:443:127.0.0.1 https://test.tianshengzhi.com/' || true)
+echo "GET https://test.tianshengzhi.com/ -> ${code} (预期 200)"
+[ "$code" = "200" ] || { echo "!! HTTPS 域名入口异常"; exit 1; }
 ssh tshb-test 'systemctl is-active tsz-web' >/dev/null || { echo "!! tsz-web 未运行"; exit 1; }
 
 echo "==> accept and verify web provenance manifest"

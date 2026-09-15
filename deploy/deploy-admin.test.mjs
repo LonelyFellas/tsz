@@ -26,6 +26,7 @@ function runDeploy(value) {
 prepare_deploy_source() { DEPLOY_GIT_SHA=test; }
 prepare_deploy_build_tree() { DEPLOY_BUILD_ROOT="$PWD"; }
 remove_deploy_build_tree() { :; }
+remove_nginx_stage() { :; }
 run_sanitized_build() { printf '%s\\n' "$@" > "$TEST_CAPTURE"; exit 73; }
 `
     );
