@@ -570,6 +570,48 @@ describe("SmartDictionary", () => {
     ).toEqual(["adj", "n"]);
   });
 
+  it("鼠标移到基本词性缩写上浮层显示正式中文，目录里没有的编码不出浮层", async () => {
+    matchViewport(1440);
+    catalogMocks.items = [
+      {
+        id: "pos-adverb",
+        code: "adverb",
+        name_zh: "副词",
+        // 与正式中文刻意不同，防止误用简洁显示。
+        short_name_zh: "副",
+        abbreviation: "adv.",
+        sort_order: 1,
+        sub_parts: []
+      }
+    ];
+    apiMocks.useWordList.mockReturnValue({
+      data: {
+        words: [
+          {
+            ...word("entry", "fast"),
+            pos_list: ["unknown-pos", "adverb"]
+          }
+        ],
+        page: { page: 1, page_size: 20, total: 1 }
+      },
+      isPending: false,
+      isError: false
+    });
+    render(
+      <AntApp>
+        <MemoryRouter>
+          <SmartDictionary />
+        </MemoryRouter>
+      </AntApp>
+    );
+
+    // 先悬停未知编码：它若也挂了浮层，会与下面等到的那个一起出现。
+    fireEvent.mouseEnter(screen.getByText("unknown-pos"));
+    fireEvent.mouseEnter(screen.getByText("adv").closest(".ant-tag")!);
+    expect(await screen.findByRole("tooltip")).toHaveTextContent(/^副词$/);
+    expect(document.querySelectorAll('[role="tooltip"]')).toHaveLength(1);
+  });
+
   it("unknown schema 解码失败时 fail closed 显示列表错误，不渲染猜测数据", () => {
     const refetch = vi.fn();
     apiMocks.useWordList.mockReturnValue({
