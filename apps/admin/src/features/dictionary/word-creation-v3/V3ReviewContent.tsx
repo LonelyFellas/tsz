@@ -125,6 +125,9 @@ function FormsReview({ word }: { word: AdminWordV3 }) {
                                 {pronunciation.dict_phonetic
                                   ? ` · 词典音标 ${pronunciation.dict_phonetic}`
                                   : ""}
+                                {pronunciation.synthesis
+                                  ? ` · Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`
+                                  : ""}
                                 {pronunciation.actual_pron
                                   ? ` · 实际发音 ${pronunciation.actual_pron}`
                                   : ""}

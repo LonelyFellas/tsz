@@ -10,6 +10,8 @@ import {
 import { App as AntApp } from "antd";
 import type {
   DraftFormsStepContentV3,
+  Dialect,
+  WordPronunciationV3,
   V3DraftValidationIssue,
   WordFormGroupV3
 } from "@tsz/types";
@@ -33,7 +35,11 @@ import {
 import { buildV3ProductProgress } from "../readiness";
 import { validateFormsContent } from "../model";
 import { partOfSpeechCatalogFixture } from "../../word-creation/partOfSpeech.test.helper";
-import { PronunciationPreviewProvider } from "../../word-creation/PronunciationPreview";
+import { pronunciationSynthesisContent } from "@tsz/shared";
+import {
+  PronunciationPreviewProvider,
+  PronunciationPreviewControls
+} from "../../word-creation/PronunciationPreview";
 import { V3ConcreteFormRow } from "./V3ConcreteFormRow";
 import { V3FormGroupCard } from "./V3FormGroupCard";
 import { V3FormsAndPronunciationStep } from "./V3FormsAndPronunciationStep";
@@ -48,6 +54,38 @@ import {
   V3ReferenceGuardProvider,
   type V3ReferenceGuard
 } from "../referenceGuardContext";
+
+// 本文件验证词形矩阵/步骤定位；音素编辑与试听由 V3PronunciationList 和 VoiceEditor 测试覆盖。
+// 避免每个父级场景重复挂载整套语音控件，保持原有 5 秒超时与全部业务断言。
+vi.mock("./V3SynthesisInputs", () => ({
+  V3SynthesisInputs: ({
+    pronunciation,
+    spelling,
+    dialect,
+    index
+  }: {
+    pronunciation: WordPronunciationV3;
+    spelling: string;
+    dialect: Dialect;
+    index: number;
+  }) => {
+    const content = pronunciationSynthesisContent(
+      spelling,
+      pronunciation.synthesis
+    );
+    return (
+      <PronunciationPreviewControls
+        playbackOnly
+        pronunciationId={pronunciation.id}
+        dialect={dialect}
+        ariaLabelPrefix={`第 ${index + 1} 条发音 最终读音`}
+        content={content ?? { version: 2, text: "", annotations: [] }}
+        disabled={!content}
+        voiceProfile={pronunciation.voice_profile}
+      />
+    );
+  }
+}));
 
 const formsCss = readFileSync(
   resolve(
@@ -879,7 +917,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(await screen.findByText("名词")).toBeVisible();
     expect(
       screen.getByText(
-        "先添加基本词性，再录入各种词形。录入词形时，不要遗漏 1) 英式或美式、2) 规则变化或不规则变化。录入字典音标获取音频，录入实际发音时需严格按照 “天生之®通用英语音标字母表” 进行操作。"
+        "先添加基本词性，再录入各种词形。录入词形时，不要遗漏 1) 英式或美式、2) 规则变化或不规则变化。字典音标用于展示与主动转换，选择 Azure IPA 或 UPS 输入进行合成。录入实际发音时需严格按照 “天生之®通用英语音标字母表” 进行操作。"
       )
     ).toBeVisible();
     const addBasicPosSelect = screen

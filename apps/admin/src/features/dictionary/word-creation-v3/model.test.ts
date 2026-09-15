@@ -689,3 +689,20 @@ describe("V3 forms model", () => {
     );
   });
 });
+
+it("synthesis 保真，草稿可缺选中侧，完成定位缺失，旧记录不回填", () => {
+  const form = commonFormFixture();
+  const row = commonVariant(form).pronunciations[0]!;
+  const content = formsFixture({ forms: [form] });
+  expect(
+    toFormsWire(content).pos[0]!.forms[0]!.regional_variants
+  ).not.toHaveProperty("common.pronunciations.0.synthesis");
+  row.synthesis = { alphabet: "ups", ipa: "kæt", ups: "" };
+  expect(validateFormsContent(content, "save")).toEqual([]);
+  expect(validateFormsContent(content, "complete")).toContainEqual(
+    expect.objectContaining({ field: "synthesis.ups", node_id: row.id })
+  );
+  row.synthesis.ups = "K AE T";
+  expect(validateFormsContent(content, "complete")).toEqual([]);
+  expect(toFormsWire(content)).toEqual(content);
+});

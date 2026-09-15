@@ -38,7 +38,7 @@ export type RichTextAnnotation =
       type: "phoneme";
       start: number;
       end: number;
-      alphabet: "ipa";
+      alphabet: "ipa" | "ups";
       phoneme: string;
     }
   | {

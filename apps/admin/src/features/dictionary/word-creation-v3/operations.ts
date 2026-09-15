@@ -415,6 +415,9 @@ function variantMappingFrom(
               pronunciation.dict_phonetic_rich
             )
           }),
+      ...(pronunciation.synthesis === undefined
+        ? {}
+        : { synthesis: structuredClone(pronunciation.synthesis) }),
       ...(pronunciation.voice_profile === undefined
         ? {}
         : { voice_profile: structuredClone(pronunciation.voice_profile) }),

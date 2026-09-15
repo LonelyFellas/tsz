@@ -1,3 +1,4 @@
+import { synthesisInputIssue, SYNTHESIS_LIMITS } from "@tsz/shared";
 import type {
   Dialect,
   DialectRulesV3,
@@ -139,7 +140,7 @@ function isPronunciationShape(value: unknown): value is WordPronunciationV3 {
   const keys = Object.keys(value);
   return (
     keys.length >= 3 &&
-    keys.length <= 8 &&
+    keys.length <= 9 &&
     keys.every((key) =>
       [
         "actual_pron",
@@ -149,9 +150,17 @@ function isPronunciationShape(value: unknown): value is WordPronunciationV3 {
         "style",
         "dict_phonetic_rich",
         "voice_profile",
-        "audio_assets"
+        "audio_assets",
+        "synthesis"
       ].includes(key)
     ) &&
+    (value.synthesis === undefined ||
+      (isObject(value.synthesis) &&
+        Object.keys(value.synthesis).length === 3 &&
+        (value.synthesis.alphabet === "ipa" ||
+          value.synthesis.alphabet === "ups") &&
+        typeof value.synthesis.ipa === "string" &&
+        typeof value.synthesis.ups === "string")) &&
     typeof value.id === "string" &&
     typeof value.dict_phonetic === "string" &&
     typeof value.actual_pron === "string" &&
@@ -534,6 +543,45 @@ function variantIssues(
         );
       }
     }
+    const synthesis = pronunciation.synthesis;
+    if (synthesis) {
+      for (const alphabet of ["ipa", "ups"] as const) {
+        const value = synthesis[alphabet];
+        if (
+          Array.from(value).length > SYNTHESIS_LIMITS[alphabet] ||
+          /\p{Cc}/u.test(value)
+        ) {
+          issues.push(
+            issue(
+              "content_limit_exceeded",
+              `synthesis.${alphabet}`,
+              pronunciation.id,
+              `Azure ${alphabet.toUpperCase()} 超长或包含控制字符`,
+              pronunciationLocation
+            )
+          );
+        }
+      }
+      if (
+        intent === "complete" &&
+        (synthesis.ipa.trim() || synthesis.ups.trim())
+      ) {
+        const problem = synthesisInputIssue(
+          synthesis.alphabet,
+          synthesis[synthesis.alphabet]
+        );
+        if (problem)
+          issues.push(
+            issue(
+              "pronunciation_required",
+              `synthesis.${synthesis.alphabet}`,
+              pronunciation.id,
+              problem,
+              pronunciationLocation
+            )
+          );
+      }
+    }
     if (intent === "complete") {
       const missingField =
         pronunciation.dict_phonetic.trim() === ""
@@ -862,6 +910,9 @@ function pronunciationWire(
     ...(pronunciation.dict_phonetic_rich === undefined
       ? {}
       : { dict_phonetic_rich: pronunciation.dict_phonetic_rich }),
+    ...(pronunciation.synthesis === undefined
+      ? {}
+      : { synthesis: pronunciation.synthesis }),
     ...(pronunciation.voice_profile === undefined
       ? {}
       : { voice_profile: pronunciation.voice_profile }),

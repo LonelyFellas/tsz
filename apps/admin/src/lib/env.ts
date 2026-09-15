@@ -3,6 +3,12 @@
 // Vite 仅暴露以 VITE_ 前缀的前端变量（import.meta.env.VITE_*）。
 import { assertAdminTtsMockAllowed, parseBooleanEnvFlag } from "./env-flags";
 
+// Reader-first rollout: production writers are enabled only after the matching backend is ready.
+const AZURE_PRONUNCIATION_INPUTS = parseBooleanEnvFlag(
+  import.meta.env.VITE_AZURE_PRONUNCIATION_INPUTS,
+  "VITE_AZURE_PRONUNCIATION_INPUTS",
+  !import.meta.env.PROD
+);
 const VOICE_EDITOR = parseBooleanEnvFlag(
   import.meta.env.VITE_VOICE_EDITOR,
   "VITE_VOICE_EDITOR",
@@ -45,6 +51,7 @@ assertAdminTtsMockAllowed(
 );
 
 export const env = {
+  AZURE_PRONUNCIATION_INPUTS,
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL ?? "/api/v1",
   VOICE_EDITOR,
   VOICE_PREVIEW,

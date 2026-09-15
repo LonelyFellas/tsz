@@ -47,14 +47,21 @@ export type FormGroupScopeV3 = "general" | "dedicated";
 /** `base` is a peer form type. It is neither unique nor a parent of other forms. */
 export type WordFormTypeV3 = string;
 
+export interface PronunciationSynthesisV3 {
+  alphabet: "ipa" | "ups";
+  ipa: string;
+  ups: string;
+}
+
 export interface WordPronunciationV3 {
+  synthesis?: PronunciationSynthesisV3;
   id: string;
   dict_phonetic: string;
   dict_phonetic_rich?: RichTextV3;
   voice_profile?: VoiceProfileV3;
   audio_assets?: AudioAssetV3[];
   actual_pron: string;
-  /** 编辑器正文与 actual_pron 一致。连读只标在这里，字典音标那侧只喂语音合成。 */
+  /** 编辑器正文与 actual_pron 一致。连读只标在这里；合成使用独立 synthesis。 */
   actual_pron_rich?: RichTextV3;
   /** Draft may omit this; complete/publish requires it. */
   style?: PronunciationStyle;
@@ -151,7 +158,7 @@ export type RichTextAnnotationV3 =
       type: "phoneme";
       start: number;
       end: number;
-      alphabet: "ipa";
+      alphabet: "ipa" | "ups";
       phoneme: string;
     }
   | {

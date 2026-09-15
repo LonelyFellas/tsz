@@ -488,7 +488,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "265af94b052d2ff1042dbf512be654643d9107f0bf23899de966244e22e15dc4"
+      "4ab216ca44138a0421788029ff7235220ef75bd9e1c26451ce2baef9e2323ef0"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -604,6 +604,18 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       $ref: "#/$defs/VoiceProfileV3"
     });
     expect(defs.WordPronunciationV3.properties.audio_assets.maxItems).toBe(8);
+    expect(defs.WordPronunciationV3.properties.synthesis).toEqual({
+      $ref: "#/$defs/PronunciationSynthesisV3"
+    });
+    expect(defs.PronunciationSynthesisV3.required).toEqual([
+      "alphabet",
+      "ipa",
+      "ups"
+    ]);
+    expect(defs.PronunciationSynthesisV3.additionalProperties).toBe(false);
+    expect(defs.PronunciationSynthesisV3.properties.ipa.maxLength).toBe(200);
+    expect(defs.PronunciationSynthesisV3.properties.ups.maxLength).toBe(1600);
+    expect(defs.RichTextPhonemeAlphabet.enum).toEqual(["ipa", "ups"]);
     const serializedV3 = JSON.stringify(defs.AdminWordV3);
     expect(serializedV3).not.toContain("base_form");
     expect(serializedV3).not.toContain("parent_form_id");

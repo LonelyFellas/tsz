@@ -49,6 +49,11 @@ import {
   type V3WizardSlotContext
 } from "./V3WordCreationWizard";
 
+// 步骤导航测试保留实际发音字段；独立合成面板由专用组件测试与真实联调验证。
+vi.mock("./components/V3SynthesisInputs", () => ({
+  V3SynthesisInputs: () => null
+}));
+
 function canonicalMeanings(posId: string): AdminWordV3["meanings"] {
   return {
     sense_groups: [

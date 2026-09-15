@@ -13,7 +13,7 @@ import {
 // 上限常量的唯一来源在 ./limits（同时供保存路径的预检复用）。
 import {
   MAX_PAUSE_MS,
-  MAX_PHONEME_CODE_POINTS,
+  phonemeCodePointLimit,
   MAX_RICH_TEXT_ANNOTATIONS,
   MAX_RICH_TEXT_CODE_POINTS,
   MIN_PAUSE_MS
@@ -155,12 +155,13 @@ export function validateRichTextV2(
     if (
       annotation.type === "phoneme" &&
       (!annotation.phoneme.trim() ||
-        codePointLength(annotation.phoneme.trim()) > MAX_PHONEME_CODE_POINTS)
+        codePointLength(annotation.phoneme.trim()) >
+          phonemeCodePointLimit(annotation.alphabet))
     ) {
       issues.push({
         code: "invalid_phoneme",
         path,
-        message: `IPA 不能为空且不能超过 ${MAX_PHONEME_CODE_POINTS} 个码点`
+        message: `${annotation.alphabet.toUpperCase()} 不能为空且不能超过 ${phonemeCodePointLimit(annotation.alphabet)} 个码点`
       });
     }
   });
