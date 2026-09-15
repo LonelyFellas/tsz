@@ -104,7 +104,7 @@ synthesis?: {
 
 实际验证表明旧前端严格 schema 拒绝带 synthesis 的记录，新 reader 能同时读取旧记录和新记录。旧后端 DTO `deny_unknown_fields` 也不接受新字段。
 
-`VITE_AZURE_PRONUNCIATION_INPUTS`：dev 默认 true，生产默认 false；示例环境显式 false。
+`VITE_AZURE_PRONUNCIATION_INPUTS`：dev 默认 true，生产默认 false；示例环境显式 false。部署入口使用严格布尔值 `DEPLOY_AZURE_PRONUNCIATION_INPUTS`（默认 false）显式传入清洁构建环境；兼容阶段用 false，后端验收后用 true 重发 admin。
 
 1. 先发布入口关闭的兼容 reader：旧数据不自动生成 synthesis；已有 synthesis 只读展示并在其他编辑保存中原样保留，仍提供共享音色设置与真人录音上传/播放入口。旧后端期间不能从新入口写入新字段。
 2. 再切换支持字段/UPS 的后端；缺省旧记录仍不输出字段。
