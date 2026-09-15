@@ -168,6 +168,7 @@ export function PronunciationPreviewControls({
   dialect,
   ariaLabelPrefix,
   disabled = false,
+  disabledReason,
   compact = false,
   audioFactory = (src) => new Audio(src),
   children
@@ -180,6 +181,7 @@ export function PronunciationPreviewControls({
   dialect: Dialect;
   ariaLabelPrefix?: string;
   disabled?: boolean;
+  disabledReason?: string;
   compact?: boolean;
   audioFactory?: (src: string) => HTMLAudioElement;
   children?: ReactNode;
@@ -394,6 +396,7 @@ export function PronunciationPreviewControls({
       {
         <Tooltip
           title={
+            (disabled ? disabledReason : undefined) ||
             status ||
             (result
               ? "播放语音"

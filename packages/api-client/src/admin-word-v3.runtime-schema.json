@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/referenced-node-guard/docs/openapi.json",
-  "_source_sha256": "265af94b052d2ff1042dbf512be654643d9107f0bf23899de966244e22e15dc4",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-azure-pronunciation-inputs/docs/openapi.json",
+  "_source_sha256": "4ab216ca44138a0421788029ff7235220ef75bd9e1c26451ce2baef9e2323ef0",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
@@ -1114,6 +1114,16 @@
       "type": "string",
       "enum": ["normal", "strong", "weak"]
     },
+    "PronunciationSynthesisV3": {
+      "type": "object",
+      "required": ["alphabet", "ipa", "ups"],
+      "properties": {
+        "alphabet": { "$ref": "#/$defs/RichTextPhonemeAlphabet" },
+        "ipa": { "type": "string", "maxLength": 200 },
+        "ups": { "type": "string", "maxLength": 1600 }
+      },
+      "additionalProperties": false
+    },
     "PublishedSentenceTargetCandidateV3": {
       "type": "object",
       "required": [
@@ -1359,7 +1369,7 @@
           "properties": {
             "alphabet": { "$ref": "#/$defs/RichTextPhonemeAlphabet" },
             "end": { "type": "integer", "minimum": 0 },
-            "phoneme": { "type": "string", "maxLength": 200 },
+            "phoneme": { "type": "string", "maxLength": 1600 },
             "start": { "type": "integer", "minimum": 0 },
             "type": { "type": "string", "enum": ["phoneme"] }
           },
@@ -1408,7 +1418,7 @@
       "type": "string",
       "enum": ["yellow", "green", "pink", "blue", "orange"]
     },
-    "RichTextPhonemeAlphabet": { "type": "string", "enum": ["ipa"] },
+    "RichTextPhonemeAlphabet": { "type": "string", "enum": ["ipa", "ups"] },
     "RichTextSpanKind": { "type": "string", "enum": ["bold", "blue"] },
     "RichTextSpanV3": {
       "type": "object",
@@ -2462,6 +2472,7 @@
         "dict_phonetic_rich": { "$ref": "#/$defs/RichTextV3" },
         "id": { "type": "string", "format": "uuid" },
         "style": { "$ref": "#/$defs/PronunciationStyle" },
+        "synthesis": { "$ref": "#/$defs/PronunciationSynthesisV3" },
         "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
       },
       "additionalProperties": false

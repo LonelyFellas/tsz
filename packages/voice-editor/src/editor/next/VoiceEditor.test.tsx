@@ -2141,3 +2141,70 @@ it("按字段分工给工具：只有字典音标那一侧收走连读", () => {
   for (const name of ["语法结构", "停顿", "发音", "音频"])
     expect(screen.queryByRole("button", { name: new RegExp(name) })).toBeNull();
 });
+
+it("synthesis 面板直接使用 phoneme 内容，隐藏正文工具，换格式丢弃旧回包", async () => {
+  vi.stubGlobal("Audio", AudioMock);
+  let resolveFirst!: (result: VoicePreviewResult) => void;
+  const synthesize = vi
+    .fn()
+    .mockImplementationOnce(
+      () =>
+        new Promise<VoicePreviewResult>((resolve) => {
+          resolveFirst = resolve;
+        })
+    )
+    .mockResolvedValue(previewResult());
+  const adapter: VoicePreviewAdapter = {
+    listVoices: vi.fn().mockResolvedValue(VOICES),
+    synthesize
+  };
+  const onChange = vi.fn();
+  const ipa: RichTextV2 = {
+    version: 2,
+    text: "cat",
+    annotations: [
+      { type: "phoneme", start: 0, end: 3, alphabet: "ipa", phoneme: "kæt" }
+    ]
+  };
+  const { rerender } = render(
+    <VoiceEditor
+      mode="synthesis"
+      value={ipa}
+      previewAdapter={adapter}
+      onChange={onChange}
+    />
+  );
+  fireEvent.click(await screen.findByLabelText("试听 Sonia · 英式女声"));
+  expect(synthesize).toHaveBeenLastCalledWith(
+    expect.objectContaining({ content: ipa }),
+    expect.anything()
+  );
+  const ups: RichTextV2 = {
+    ...ipa,
+    annotations: [
+      { type: "phoneme", start: 0, end: 3, alphabet: "ups", phoneme: "K AE T" }
+    ]
+  };
+  rerender(
+    <VoiceEditor
+      mode="synthesis"
+      value={ups}
+      previewAdapter={adapter}
+      onChange={onChange}
+    />
+  );
+  const dispose = vi.fn();
+  await act(async () => {
+    resolveFirst({ ...previewResult(), dispose });
+  });
+  expect(dispose).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByLabelText("试听 Sonia · 英式女声"));
+  await waitFor(() =>
+    expect(synthesize).toHaveBeenLastCalledWith(
+      expect.objectContaining({ content: ups }),
+      expect.anything()
+    )
+  );
+  expect(onChange).not.toHaveBeenCalled();
+  expect(screen.queryByLabelText("编辑文本")).not.toBeInTheDocument();
+});

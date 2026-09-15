@@ -96,6 +96,12 @@ const ISSUE_MESSAGES = {
 } satisfies Record<V3ValidationIssueCode, string>;
 
 export function v3IssueMessage(issue: V3DraftValidationIssue): string {
+  if (issue.field === "synthesis.ipa" || issue.field === "synthesis.ups") {
+    const name = issue.field === "synthesis.ipa" ? "Azure IPA" : "Azure UPS";
+    return issue.code === "content_limit_exceeded"
+      ? `${name} 超长或包含控制字符，请检查输入`
+      : `请填写有效的 ${name} 合成音素`;
+  }
   if (issue.field === "text_links") return "正文关联无效，请重新选择或清除关联";
   return ISSUE_MESSAGES[issue.code] ?? UNKNOWN_ISSUE_MESSAGE;
 }

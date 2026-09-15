@@ -72,6 +72,7 @@ export interface V3VoiceTextFieldProps<
   onEditingChange?: (editing: boolean) => void;
   onAssociationPendingChange?: (pending: boolean) => void;
   mode?: VoiceEditorProps<TLink>["mode"];
+  editingEnabled?: boolean;
   /** 独立正文编辑直接展示可输入文字的编辑器；其他字段仍使用输入框入口。 */
   presentation?: "field" | "editor";
   /**
@@ -118,6 +119,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onEditingChange,
   onAssociationPendingChange,
   mode,
+  editingEnabled = true,
   presentation = "field",
   dialect,
   textLinks,
@@ -243,7 +245,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     />
   );
 
-  if (!env.VOICE_EDITOR)
+  if (!env.VOICE_EDITOR || !editingEnabled)
     return (
       <>
         {feedbackHolder}

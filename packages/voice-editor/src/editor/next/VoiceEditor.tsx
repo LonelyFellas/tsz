@@ -376,7 +376,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       emittedRef.current = serialized;
       return;
     }
-    if (readOnly || working.error) return;
+    if (readOnly || mode === "synthesis" || working.error) return;
     if (serialized === emittedRef.current) return;
     emittedRef.current = serialized;
     // 自己抛出去的这份，等父组件回灌时不能再被当成外部改动。
@@ -432,9 +432,9 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     audition,
     stop: stopAudition
   } = useVoiceAudition({
-    open: voicesRequested,
+    open: mode === "synthesis" || voicesRequested,
     language,
-    content: workingValue,
+    content: mode === "synthesis" ? toRichTextV2(value) : workingValue,
     settings: voiceSettings,
     previewAdapter
   });
@@ -1291,6 +1291,19 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
     if (mode === "pronunciation") return tool.key !== "roles";
     return true;
   });
+
+  if (mode === "synthesis") {
+    return (
+      <section className="tsz-ve-editor" aria-label={contextLabel}>
+        {previewIsMock && <Tag color="warning">模拟试听</Tag>}
+        {tools
+          .filter((tool) => tool.key === "voices" || tool.key === "uploads")
+          .map((tool) => (
+            <div key={tool.key}>{tool.content}</div>
+          ))}
+      </section>
+    );
+  }
 
   // 外壳不另起可及名：名字归那个真正可编辑的文本框，避免同名两份。
   return (

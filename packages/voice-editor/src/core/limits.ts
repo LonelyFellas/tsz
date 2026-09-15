@@ -14,6 +14,9 @@ export const MAX_RICH_TEXT_CODE_POINTS = 5000;
 export const MAX_RICH_TEXT_ANNOTATIONS = 500;
 /** 单个 IPA 音素长度上限（码点）；音素同时不能为空。 */
 export const MAX_PHONEME_CODE_POINTS = 200;
+export const MAX_UPS_CODE_POINTS = 1600;
+export const phonemeCodePointLimit = (alphabet: "ipa" | "ups") =>
+  alphabet === "ups" ? MAX_UPS_CODE_POINTS : MAX_PHONEME_CODE_POINTS;
 /** 单个停顿时长范围（毫秒），且必须是整数。 */
 export const MIN_PAUSE_MS = 1;
 export const MAX_PAUSE_MS = 5000;
@@ -52,17 +55,19 @@ function annotationIssues(
     if (annotation.type === "phoneme") {
       const phoneme = annotation.phoneme.trim();
       const length = codePointLength(phoneme);
+      const limit = phonemeCodePointLimit(annotation.alphabet);
+      const label = annotation.alphabet.toUpperCase();
       if (!phoneme) {
         issues.push({
           code: "invalid_phoneme",
-          message: `第 ${ordinal} 个 IPA 标注为空，请填写音素或删除该标注`
+          message: `第 ${ordinal} 个 ${label} 标注为空，请填写音素或删除该标注`
         });
-      } else if (length > MAX_PHONEME_CODE_POINTS) {
+      } else if (length > limit) {
         issues.push({
           code: "invalid_phoneme",
-          message: `第 ${ordinal} 个 IPA 标注 ${overBy(
+          message: `第 ${ordinal} 个 ${label} 标注 ${overBy(
             length,
-            MAX_PHONEME_CODE_POINTS,
+            limit,
             "个字符"
           )}`
         });
