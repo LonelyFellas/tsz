@@ -53,11 +53,6 @@ function voiceLocale(dialect?: Dialect): AudioAssetLocaleV3 | undefined {
   return undefined;
 }
 
-/** 收起态也显示连读弧的字段：编辑器里怎么连，收起后就怎么显示。字典音标不带连读，不叠。 */
-const LIAISON_OVERLAY_MODES: ReadonlySet<
-  NonNullable<VoiceEditorProps["mode"]>
-> = new Set(["actual-pron", "grammar", "association"]);
-
 /** 录词条英文的字段（释义、例句、语法结构）用 Ubuntu；两种音标字段不能用，Ubuntu 缺音标字形。 */
 const ENTRY_ENGLISH_MODES: ReadonlySet<NonNullable<VoiceEditorProps["mode"]>> =
   new Set(["grammar", "association"]);
@@ -145,9 +140,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。展开编辑时用不上，不算。
   const liaisons = useMemo(
     () =>
-      !expanded && mode !== undefined && LIAISON_OVERLAY_MODES.has(mode)
-        ? liaisonOnly(value)
-        : undefined,
+      !expanded && mode !== "dict-phonetic" ? liaisonOnly(value) : undefined,
     [expanded, mode, value]
   );
   useEffect(() => {
@@ -198,17 +191,17 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     destination.push({ value, links: textLinks });
     publish(snapshot.value, snapshot.links);
   };
+  const englishContent = mode !== undefined && ENTRY_ENGLISH_MODES.has(mode);
+  const largePreview = englishContent || mode === "actual-pron";
   const fallback = (
     <Input.TextArea
       aria-label={ariaLabel}
       aria-invalid={invalid}
       status={invalid ? "error" : undefined}
-      autoSize={{ minRows: 1, maxRows: 6 }}
-      className={
-        mode !== undefined && ENTRY_ENGLISH_MODES.has(mode)
-          ? "word-pronunciation-phonetic-input tsz-entry-en"
-          : "word-pronunciation-phonetic-input"
-      }
+      // 有连读时为弧线留出高度；增删标注也会触发自动重新测量。
+      autoSize={{ minRows: liaisons && !largePreview ? 2 : 1, maxRows: 6 }}
+      style={liaisons ? { paddingTop: "1em" } : undefined}
+      className={`word-pronunciation-phonetic-input${englishContent ? " tsz-entry-en" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}`}
       data-v3-field={field}
       data-v3-node-id={nodeId}
       onKeyDown={(event) => {
@@ -412,6 +405,20 @@ function LiaisonOverlay({ value }: { value: RichTextV2 }) {
       (Number.parseFloat(style.borderLeftWidth) || 0) +
       (Number.parseFloat(style.borderRightWidth) || 0);
     const follow = () => {
+      const currentStyle = getComputedStyle(input);
+      for (const property of MIRRORED_OUTER_STYLES) {
+        overlay.style.setProperty(
+          property,
+          currentStyle.getPropertyValue(property)
+        );
+      }
+      overlay.style.borderBottomWidth = `${(Number.parseFloat(currentStyle.borderBottomWidth) || 0) + (Number.parseFloat(currentStyle.paddingBottom) || 0)}px`;
+      for (const property of MIRRORED_INNER_STYLES) {
+        content.style.setProperty(
+          property,
+          currentStyle.getPropertyValue(property)
+        );
+      }
       // 内层自动撑满外层内容盒（即输入框内边距盒的精确宽度），只扣滚动条。不能拿 clientWidth
       // 当宽度：它是取整值，外框宽度带小数（英美双栏平分、系统缩放）时折行会对不上；
       // offsetWidth 与 clientWidth 取整方式一致，相减后误差抵消。
@@ -432,7 +439,7 @@ function LiaisonOverlay({ value }: { value: RichTextV2 }) {
       input.removeEventListener("scroll", follow);
       observer.disconnect();
     };
-  }, []);
+  }, [value]);
   return (
     <div ref={overlayRef} className="v3-voice-text-liaison-overlay" aria-hidden>
       <div ref={contentRef} className="v3-voice-text-liaison-content">

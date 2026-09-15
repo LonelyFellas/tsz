@@ -68,6 +68,34 @@ function show(entryId?: string) {
 
 describe("独立多维例句库", () => {
   beforeEach(() => vi.clearAllMocks());
+  it("列表与查看详情保留连读标注及英文展示字体类", async () => {
+    const item = fixture();
+    if (item.content.sentence.en_text.mode === "unified") {
+      item.content.sentence.en_text.common.value = {
+        version: 2,
+        text: "He is looking for a job.",
+        annotations: [{ type: "liaison", start: 12, end: 15 }]
+      };
+    }
+    vi.mocked(api.sentences.list).mockResolvedValue({
+      items: [item],
+      total: 1
+    });
+    vi.mocked(api.sentences.get).mockResolvedValue(item);
+    show();
+    await screen.findByText(/查\s*看/);
+    const reader = document.querySelector(".tsz-ve-readonly");
+    expect(reader).toHaveClass("tsz-entry-en", "has-liaison");
+    expect(
+      reader?.querySelectorAll(".tsz-ve-liaison-anchor").length
+    ).toBeGreaterThanOrEqual(2);
+    fireEvent.click(screen.getByText(/查\s*看/).closest("button")!);
+    await screen.findByText("查看例句");
+    expect(document.querySelector(".ant-modal .tsz-ve-readonly")).toHaveClass(
+      "tsz-entry-en",
+      "has-liaison"
+    );
+  });
   it("词条的例句列表不再提供创编入口，添加由 voice-editor 承接", async () => {
     vi.mocked(api.sentences.list).mockResolvedValue({ items: [], total: 0 });
     show("source-entry");
