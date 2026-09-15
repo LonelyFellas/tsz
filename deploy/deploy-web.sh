@@ -93,16 +93,17 @@ echo "==> recheck exact main before server writes"
 recheck_deploy_source web
 ssh tshb-test 'install -d -m 0755 /opt/tsz-deploy-manifests /opt/tsz-deploy-tools'
 remote_candidate="$(ssh tshb-test "mktemp '/opt/tsz-deploy-manifests/.web.${DEPLOY_GIT_SHA}.XXXXXX.partial'")"
-rsync -az "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" tshb-test:/opt/tsz-deploy-tools/frontend-provenance.mjs
+# 推到 tshb-test 的 rsync 一律带 --no-o --no-g：不把本机 uid/gid（如 501）带到服务器——那边没有
+# 对应用户，文件会变成「不存在的用户」所有；产物与部署工具以 root 运行，必须保持 root 属主。
+rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" tshb-test:/opt/tsz-deploy-tools/frontend-provenance.mjs
 
 echo "==> rsync staged artifact -> tshb-test:/opt/tsz-web"
-rsync -az --delete "$artifact_stage/" tshb-test:/opt/tsz-web/
-rsync -az "$candidate_manifest" "tshb-test:$remote_candidate"
+rsync -az --no-o --no-g --delete "$artifact_stage/" tshb-test:/opt/tsz-web/
+rsync -az --no-o --no-g "$candidate_manifest" "tshb-test:$remote_candidate"
 ssh tshb-test "/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify-candidate --manifest '$remote_candidate' --artifact-root /opt/tsz-web"
 
 echo "==> restart tsz-web + sync nginx"
-rsync -az "$DEPLOY_BUILD_ROOT/deploy/systemd/tsz-web.service" tshb-test:/etc/systemd/system/tsz-web.service
-# --no-o --no-g：不把本机 uid/gid 带到服务器（那边没有对应用户），nginx 配置保持 root 属主。
+rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/systemd/tsz-web.service" tshb-test:/etc/systemd/system/tsz-web.service
 rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test.conf" tshb-test:/etc/nginx/conf.d/tsz.conf
 rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/tshb-test-domains.conf" tshb-test:/etc/nginx/conf.d/tsz-test-domains.conf
 ssh tshb-test 'systemctl daemon-reload && systemctl restart tsz-web && nginx -t && systemctl reload nginx'
