@@ -367,6 +367,48 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     // 两个词性、三个词形加目录加载，全量并行跑时接近默认 5s，显式放宽而不是靠重跑。
   }, 20_000);
 
+  it("删除词形的确认框开着时引用数据才到：待删词形被引用就收起确认框并禁用删除", async () => {
+    const initial = multiPosFixture();
+    const pos = initial.pos[0]!;
+    const secondBase = pos.forms[1]!;
+    const variantId =
+      secondBase.regional_variants.mode === "common"
+        ? secondBase.regional_variants.common.id
+        : secondBase.regional_variants.uk.id;
+    const reference = sharedSentenceReference(
+      {
+        pos_id: pos.pos_id,
+        form_id: secondBase.id,
+        variant_id: variantId,
+        sense_id: "sense-1"
+      },
+      { surface: "second-base", text: "A second-base example." }
+    );
+    // 同一个组件类型重渲染，Harness 里的草稿与确认框状态保留，只换引用索引。
+    function Guarded({
+      references
+    }: {
+      references: ReturnType<typeof sharedSentenceReference>[];
+    }) {
+      return (
+        <V3ReferenceGuardProvider
+          value={guardFor(buildReferenceIndex(inboundReferences(references)))}
+        >
+          <Harness initial={initial} />
+        </V3ReferenceGuardProvider>
+      );
+    }
+    const rendered = render(<Guarded references={[]} />);
+    const deleteSecond = await screen.findByLabelText("删除变化组 1 的词形 2");
+    expect(deleteSecond).not.toBeDisabled();
+    fireEvent.click(deleteSecond);
+    expect(openDeleteConfirm()).not.toBeNull();
+
+    rendered.rerender(<Guarded references={[reference]} />);
+    await waitFor(() => expect(openDeleteConfirm()).toBeNull());
+    expect(screen.getByLabelText("删除变化组 1 的词形 2")).toBeDisabled();
+  }, 20_000);
+
   it("拼写与被引用片段对不上时即时标红，改回一致（大小写除外）即恢复", async () => {
     const initial = formsFixture({
       forms: [commonFormFixture({ spelling: "orbit" })]

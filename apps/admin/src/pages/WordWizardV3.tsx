@@ -1,11 +1,7 @@
 import { SentenceLibrary } from "@/features/sentences/SentenceLibrary";
 import { WordSentences } from "@/features/sentences/WordSentences";
 import { wordKeys } from "@/features/dictionary/api";
-import {
-  keepPreviousData,
-  useQuery,
-  useQueryClient
-} from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Alert, Button, Flex, Result, Spin, Typography } from "antd";
 import type {
   AdminWordDraftV3Envelope,
@@ -882,7 +878,12 @@ export function WordWizardV3Page({
     queryKey: ["inbound-references", wordId, detailRevision] as const,
     queryFn: () => requests.inboundReferences(wordId),
     enabled: wordId !== "" && detailRevision !== undefined,
-    placeholderData: keepPreviousData,
+    // 保存后 revision 变了还沿用上一份当占位，免得徽标闪没；但换了词条就不能沿用，
+    // 否则新词条的引用到达前会显示、定位到上一个词条的引用。
+    placeholderData: (previous) =>
+      previous?.entry_id === wordId ? previous : undefined,
+    // 在来源词条的标签页解除引用后切回要立刻解锁：全局 staleTime 60s 会让窗口聚焦时不重取。
+    staleTime: 0,
     // 只是辅助信息：失败就提示不可用，不用重试拖慢首屏；保存被拦时会再拉。
     retry: false
   });

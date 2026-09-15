@@ -1326,12 +1326,10 @@ function V3WordCreationSession({
   );
 
   const confirmImpact = useCallback(() => {
-    // 会破坏引用的词形变更没有可确认的余地：保存必 409，确认条由槽位直接改成阻断提示。
-    if (
-      !impact ||
-      impact.surface_match_page ||
-      impact.blocked_references?.length
-    ) {
+    // blocked_references 不在这里拦：词形步、词义步在预检拿到它时就不进确认。发布也走这份
+    // 影响确认，而发布只查例句与已发布引用，在这里拦会让「确认影响并允许发布」点了没反应；
+    // 真被拒时由发布的 409 列出引用。
+    if (!impact || impact.surface_match_page) {
       setImpactConfirmed(false);
       return false;
     }

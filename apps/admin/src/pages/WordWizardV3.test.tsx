@@ -1,7 +1,17 @@
 import { wordKeys } from "@/features/dictionary/api";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  focusManager
+} from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  act
+} from "@testing-library/react";
 import { App as AntApp } from "antd";
 import type {
   AdminWordPublicationV3,
@@ -837,6 +847,40 @@ describe("WordWizardV3Page", () => {
     );
     expect(screen.queryByText("确认影响并保存草稿")).toBeNull();
     expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+  });
+
+  it("窗口重新聚焦时重取引用：在来源词条标签页解除引用后切回即可解锁", async () => {
+    const current = word();
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    // 和线上 admin 一样带全局 staleTime：没单独设 staleTime 的查询一分钟内聚焦不会重取。
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 60_000 } }
+    });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints),
+      undefined,
+      undefined,
+      client
+    );
+    await waitFor(() =>
+      expect(endpoints.inboundReferencesV3).toHaveBeenCalled()
+    );
+    const callsBeforeFocus = vi.mocked(endpoints.inboundReferencesV3).mock.calls
+      .length;
+    try {
+      act(() => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+      await waitFor(() =>
+        expect(
+          vi.mocked(endpoints.inboundReferencesV3).mock.calls.length
+        ).toBeGreaterThan(callsBeforeFocus)
+      );
+    } finally {
+      focusManager.setFocused(undefined);
+    }
   });
 
   it("失效引用只在「引用已失效」里列一次，不在拼写冲突提示里重复", async () => {

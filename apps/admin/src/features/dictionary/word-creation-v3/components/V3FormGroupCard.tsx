@@ -225,8 +225,17 @@ export function V3FormGroupCard({
     const baseMembers = baseMembersOf(group);
     return baseMembers.length === 1 ? baseMembers[0]!.id : undefined;
   })();
-  // 确认框开着时本组另一个原形可能被改成派生类型，待删词形就成了唯一原形，不能再删，直接收起。
-  if (blockedFormId !== undefined && lockedBaseFormIds.has(blockedFormId))
+  // 确认框开着时本组另一个原形可能被改成派生类型，待删词形就成了唯一原形，不能再删，直接收起；
+  // 引用数据晚到、发现待删词形被引用时同理（受控的 open 不受 Popconfirm disabled 约束）。
+  const blockedForm =
+    blockedFormId === undefined
+      ? undefined
+      : pos.forms.find((item) => item.id === blockedFormId);
+  if (
+    blockedForm &&
+    (lockedBaseFormIds.has(blockedForm.id) ||
+      formReferenceCount(referenceGuard.index, blockedForm) > 0)
+  )
     setBlockedFormId(undefined);
   const setRegular = (isRegular: boolean) => {
     const next = structuredClone(content);
