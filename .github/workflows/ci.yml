@@ -178,11 +178,13 @@ jobs:
           .ci-artifacts/${{ matrix.module }}/.vitest-reports
           .ci-artifacts/${{ matrix.module }}/.ci-inventories
 
+      # 名字带 run_attempt：同一 run 重跑后旧 attempt 的同名产物仍在，download-artifact
+      # 按名去重时挑 artifact ID 最大的一份，而 ID 不随时间递增，会拿到旧结果。
       - name: Upload blob and actual-run inventory
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: vitest-blob-${{ matrix.module }}
+          name: vitest-blob-${{ matrix.module }}-attempt-${{ github.run_attempt }}
           path: |
             .ci-artifacts/${{ matrix.module }}/.vitest-reports/
             .ci-artifacts/${{ matrix.module }}/.ci-inventories/
@@ -207,12 +209,18 @@ jobs:
           node scripts/ci-metrics.mjs run install --
           pnpm install --frozen-lockfile
 
+      # 不合并下载，每份产物各占一个目录，再由脚本给每个模块挑最近一次 attempt。
+      # 不能只收当前 attempt：只重跑失败任务时，没重跑的模块用的仍是之前 attempt 的产物。
       - name: Download coverage modules
         uses: actions/download-artifact@v7
         with:
           pattern: vitest-blob-*
-          path: .ci-artifacts
-          merge-multiple: true
+          path: .ci-downloads
+
+      - name: Select latest attempt of each coverage module
+        run: >-
+          node scripts/ci-metrics.mjs run collect-test-artifacts --
+          pnpm ci:collect-test-artifacts .ci-downloads .ci-artifacts
 
       - name: Generate full test inventory
         run: >-

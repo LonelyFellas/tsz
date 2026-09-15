@@ -206,7 +206,9 @@ workflow 调用脚本获取受控参数或让脚本直接 spawn Vitest，避免�
 
 依赖完整 `unit-coverage` matrix，并在未被取消时运行：
 
-1. 下载所有 `vitest-blob-*` artifacts，`merge-multiple: true`；
+1. 下载所有 `vitest-blob-<module>-attempt-<run_attempt>` artifacts（不合并下载），每个 module 只取
+   attempt 最大的一份：同一 run 重跑后各 attempt 的产物并存，download-artifact 对同名产物按
+   artifact ID 取最大的一份，而 ID 不随时间递增；只重跑失败任务时，没重跑的 module 沿用之前 attempt 的产物；
 2. 核对 module、artifact、blob、inventory 名称均与 manifest 精确一致；
 3. 用根 project 配置执行 `vitest list --filesOnly --json`，动态生成完整权威 inventory；
 4. 解析五份 module inventory，拒绝任一重复 tuple，并要求其并集与完整 inventory 在
