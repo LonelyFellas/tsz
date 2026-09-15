@@ -141,7 +141,7 @@ function V3ReferenceNotices() {
           description={
             <Flex vertical gap={4}>
               <span>
-                这些引用指向的词形或词义在当前草稿里已对不上，处理完之前本词条无法保存。
+                这些引用指向的词形或词义在当前草稿里已对不上。草稿照常可以保存，处理完之前本词条无法发布。
               </span>
               <V3ReferenceList references={index.stale} />
             </Flex>
@@ -185,7 +185,8 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         .map((reference) => [reference.id, reference] as const)
     ).values()
   ];
-  // 已经列在「引用已失效」里的不再在拼写冲突提示里重复一遍；保存按钮仍按全部冲突禁用。
+  // 已经列在「引用已失效」里的旧冲突不在拼写冲突提示里重复，也不禁用保存：草稿保存只拦本次改动
+  // 破坏的引用，已失效的旧引用由后端只挡发布与切换版本。
   const staleReferenceIds = new Set(
     referenceGuard.index.stale.map((reference) => reference.id)
   );
@@ -348,7 +349,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         </Button>
         <V3DisabledReason
           reason={
-            conflictReferences.length > 0
+            conflictNoticeReferences.length > 0
               ? "拼写与被引用片段不一致，先改回一致或解除引用"
               : undefined
           }
@@ -357,7 +358,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
             disabled={
               Boolean(pendingIntent) ||
               !context.dirtySteps.forms ||
-              conflictReferences.length > 0
+              conflictNoticeReferences.length > 0
             }
             loading={busy && pendingIntent === "save"}
             onClick={() => void prepareSave("save")}
@@ -893,12 +894,13 @@ export function WordWizardV3Page({
   >(undefined);
   const referenceGuard = useMemo<V3ReferenceGuard>(
     () => ({
+      // 聚焦重取偶发失败时还有上一份数据就照常用，不弹「引用信息暂不可用」。
       index: buildReferenceIndex(
         references.data,
-        references.isError
-          ? "unavailable"
-          : references.data
-            ? "loaded"
+        references.data
+          ? "loaded"
+          : references.isError
+            ? "unavailable"
             : "loading"
       ),
       openReference: (reference) => referenceNavigatorRef.current?.(reference),

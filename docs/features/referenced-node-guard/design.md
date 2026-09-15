@@ -165,6 +165,8 @@ InboundReferenceV3 {
 - 引用索引查询失败只提示「引用信息暂不可用」，不重试、不阻塞；保存被 409 拦下时重拉。
 - 跳转：同词条例句 → `navigateTarget` 定位词义卡片 + `WordSentences.focusSentenceId` 直接 `GET /sentences/{id}` 打开；跨词条 → 新标签页 `/words/{id}/v3/wizard/{step}?focus_node=<节点>`（来源已发布时加 `mode=edit`），页面用 `locateV3Node` 按节点 id 落到词形类型 / 拼写 / 词义卡片；例句库 `/sentences?sentence=<id>` 打开详情。
 
+- **草稿保存只拦本次改动破坏的引用**（推送前审查后确认，见 requirements Q6）：`ensure_inbound_references` 在词形保存、词义保存、影响预览时带上已保存内容作为基线，只拦「基线里成立、提交后失效」的引用；发布与切换版本不带基线，按现状拦。前端失效提示改为「处理完之前本词条无法发布」，拼写冲突只在本次改动造成时禁用保存；聚焦重取失败但仍有上一份数据时不提示「引用信息暂不可用」。
+
 测试服存量统计（2026-09-15，只读 psql，tshb-test `/opt/tsz-rust/.env` 的库）：16 条草稿；类型 2 / 3 / 4 引用各 0 条、失效 0 条；类型 1 标注 5 条、失效 0 条。补齐校验不会让任何存量草稿开始报错。
 
 验证：后端 `cargo clippy` 无告警，`--lib` 273 通过、`--test shared_sentences` 24 通过、`--test lexicon_handler` 91 通过（含新增 7 条与改写 3 条）；前端 `pnpm typecheck` / `pnpm lint` 通过，admin vitest 新增 `referenceGuard` / `V3ReferenceBadge` / 词形步 / 布局 / 页面用例，e2e E06（`ADMIN_E2E_PORT=3007 CI=1`）12 通过；本地真实后端（8483，本分支构建）按验收标准 1–5、7、9 走通，6 由后端集成测试覆盖，8 由后端集成测试 + 前端布局单测覆盖。

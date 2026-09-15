@@ -936,6 +936,11 @@ describe("WordWizardV3Page", () => {
     expect(screen.getByText(/与被引用片段“center”不一致/)).toBeInTheDocument();
     expect(screen.queryByText("拼写与被引用片段不一致，无法保存")).toBeNull();
     expect(document.querySelectorAll(".v3-reference-item")).toHaveLength(1);
+    // 草稿保存只拦本次改动破坏的引用：旧的失效引用只挡发布，保存按钮不因它禁用、不挂原因提示。
+    expect(screen.getByText(/处理完之前本词条无法发布/)).toBeInTheDocument();
+    expect(
+      screen.getByText("保存草稿").closest(".v3-disabled-reason")
+    ).toBeNull();
   });
 
   it("引用接口不可用时给出提示但不阻塞编辑与保存", async () => {
