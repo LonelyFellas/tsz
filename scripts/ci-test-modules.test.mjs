@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
   ciTestModules,
   buildModuleVitestArgs,
+  collectModuleArtifacts,
   validateInventoryFiles,
   validateInventorySet,
   validateModuleManifest,
@@ -270,6 +271,88 @@ test("M09: inventory and blob files reject missing or extra artifacts", async ()
         "/repo"
       ),
       /blob files mismatch/
+    );
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("M10: each module merges its latest attempt artifact and fails closed", async () => {
+  const root = await mkdtemp(join(tmpdir(), "tsz-ci-artifacts-"));
+  const downloadDirectory = join(root, "downloads");
+  const writeArtifact = async (module, attempt) => {
+    const artifactDirectory = join(
+      downloadDirectory,
+      `${module.artifact}-attempt-${attempt}`
+    );
+    await mkdir(join(artifactDirectory, ".vitest-reports"), {
+      recursive: true
+    });
+    await mkdir(join(artifactDirectory, ".ci-inventories"), {
+      recursive: true
+    });
+    await writeFile(
+      join(artifactDirectory, ".vitest-reports", module.blobFile),
+      `attempt-${attempt}`
+    );
+    await writeFile(
+      join(artifactDirectory, ".ci-inventories", module.inventoryFile),
+      `attempt-${attempt}`
+    );
+  };
+  try {
+    await Promise.all(ciTestModules.map((module) => writeArtifact(module, 1)));
+    const admin1 = ciTestModules.find((module) => module.name === "admin-1");
+    // 按数值比较，attempt 10 要胜过 9。
+    await writeArtifact(admin1, 10);
+    await writeArtifact(admin1, 9);
+    // 旧 attempt 独有的文件不能混进来：只拷最新一份，而不是按顺序全拷一遍。
+    await writeFile(
+      join(
+        downloadDirectory,
+        "vitest-blob-admin-1-attempt-9",
+        ".vitest-reports",
+        "stale.blob.json"
+      ),
+      "attempt-9"
+    );
+
+    const outputDirectory = join(root, "output");
+    await collectModuleArtifacts(downloadDirectory, outputDirectory);
+    const readOutput = (...segments) =>
+      readFile(join(outputDirectory, ...segments), "utf8");
+    assert.equal(
+      await readOutput(".vitest-reports", "admin-1.blob.json"),
+      "attempt-10"
+    );
+    assert.equal(
+      await readOutput(".ci-inventories", "admin-1.inventory.json"),
+      "attempt-10"
+    );
+    await assert.rejects(readOutput(".vitest-reports", "stale.blob.json"), {
+      code: "ENOENT"
+    });
+    // 只重跑失败任务时，没重跑的模块沿用之前 attempt 的产物。
+    assert.equal(
+      await readOutput(".vitest-reports", "web.blob.json"),
+      "attempt-1"
+    );
+
+    await mkdir(join(downloadDirectory, "vitest-blob-admin-1"));
+    await assert.rejects(
+      collectModuleArtifacts(downloadDirectory, join(root, "unexpected")),
+      /unexpected coverage artifact: vitest-blob-admin-1$/
+    );
+    await rm(join(downloadDirectory, "vitest-blob-admin-1"), {
+      recursive: true
+    });
+
+    await rm(join(downloadDirectory, "vitest-blob-web-attempt-1"), {
+      recursive: true
+    });
+    await assert.rejects(
+      collectModuleArtifacts(downloadDirectory, join(root, "missing")),
+      /missing coverage artifacts: web$/
     );
   } finally {
     await rm(root, { recursive: true, force: true });

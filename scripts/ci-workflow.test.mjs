@@ -60,10 +60,15 @@ test("W02: coverage matrix has five fixed modules and fail-fast disabled", async
   }
   assert.match(block, /pnpm ci:test-module/);
   assert.match(block, /actions\/upload-artifact@v7/);
+  // 重跑后各 attempt 的同名产物并存，名字不带 attempt 就分不出新旧。
+  assert.match(
+    block,
+    /name: vitest-blob-\$\{\{ matrix\.module \}\}-attempt-\$\{\{ github\.run_attempt \}\}/
+  );
   assert.match(block, /include-hidden-files: true/);
 });
 
-test("W03: coverage merge downloads, validates and merges every module", async () => {
+test("W03: coverage merge downloads, picks latest attempts, validates and merges every module", async () => {
   const { jobs } = await workflowFixture();
   const block = jobs.get("coverage-merge");
   assert.ok(block);
@@ -71,6 +76,11 @@ test("W03: coverage merge downloads, validates and merges every module", async (
   assert.match(block, /always\(\).*![ ]*cancelled\(\)/);
   assert.match(block, /actions\/download-artifact@v7/);
   assert.match(block, /pattern: vitest-blob-\*/);
+  // 合并下载会把同一模块多个 attempt 的产物解压进同一目录互相覆盖。
+  assert.doesNotMatch(block, /merge-multiple/);
+  const collectIndex = block.indexOf("pnpm ci:collect-test-artifacts");
+  assert.notEqual(collectIndex, -1);
+  assert.ok(collectIndex < block.indexOf("pnpm ci:validate-test-inventories"));
   assert.match(block, /pnpm ci:validate-test-inventories/);
   assert.match(block, /--merge-reports=.*--coverage/);
 });
