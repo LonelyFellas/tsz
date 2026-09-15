@@ -111,7 +111,8 @@ beforeEach(() => {
 
 // 编辑器里每个字母都是 role="button"：打开编辑器后整页按 button 角色查询，jsdom 要对每个
 // 候选逐层算样式和可及名，覆盖率下单次上百毫秒（CI 再慢数倍），曾把用例拖过 5s 超时。
-// 编辑器打开时，带 aria-label 的控件用 ByLabelText 定位，纯文案按钮用 ByText。
+// 耗时贴近超时的用例里，这类定位已改用 ByLabelText（有 aria-label）或 ByText（纯文案）；
+// 「改错再改回」余量充足，暂保留原查询，CI 再抖时优先改它。
 describe("按词条关联反查共享多维例句", () => {
   it("未保存的新词义禁用添加，保存后按具体词义查询", async () => {
     const word = sentenceWord();
