@@ -241,7 +241,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       <>
         {feedbackHolder}
         {leadingAction ? (
-          <Space.Compact block>
+          <Space.Compact block className="v3-voice-text-field-compact">
             {leadingAction}
             {fallback}
           </Space.Compact>
@@ -255,7 +255,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     return (
       <>
         {feedbackHolder}
-        <Space.Compact block>
+        <Space.Compact block className="v3-voice-text-field-compact">
           {leadingAction}
           {/* 外层常驻：连读有无切换时只增删弧线层，输入框不重挂，打字的光标不丢。 */}
           <div className="v3-voice-text-field-input">

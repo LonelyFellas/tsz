@@ -20,6 +20,10 @@
   z-index: 1;
 }
 
+.v3-voice-text-field-compact > .word-pronunciation-play-action {
+  height: auto;
+}
+
 /*
  * 收起态输入框上的连读弧：盖一层与输入框同排版的透明文字，只给弧线定位。
  * 字体、边框宽度照抄到外层；内边距照抄到随滚动平移的内层，内层只用右外边距扣掉滚动条；点击穿透到输入框。

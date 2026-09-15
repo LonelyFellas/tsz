@@ -41,11 +41,16 @@ export function resolveV3StepAccess(
   }
 
   if (word.status === "draft") {
-    const reachable = new Set(STEP_ORDER);
+    const reachable = new Set(
+      word.max_reachable_step === "preview"
+        ? STEP_ORDER
+        : STEP_ORDER.slice(0, 3)
+    );
+    const requestedReachable = reachable.has(requested);
     return {
       requested,
-      effective: requested,
-      requestedReachable: true,
+      effective: requestedReachable ? requested : "meanings",
+      requestedReachable,
       reachable,
       readOnly
     };

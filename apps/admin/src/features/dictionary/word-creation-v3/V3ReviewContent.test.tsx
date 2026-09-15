@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { Button } from "antd";
 import type { AdminWordV3 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
@@ -40,6 +40,18 @@ function word(): AdminWordV3 {
 }
 
 describe("V3ReviewContent", () => {
+  it("概览使用独立例句总数，未加载时不显示假零值", () => {
+    const view = render(<V3ReviewContent word={word()} sentenceCount={4} />);
+    const summary = screen.getByLabelText("内容概览");
+    expect(
+      within(summary).getByText("例句", { exact: false })
+    ).toHaveTextContent("4 例句");
+    view.rerender(<V3ReviewContent word={word()} sentenceCount={null} />);
+    expect(
+      within(summary).getByText("例句", { exact: false })
+    ).toHaveTextContent("— 例句");
+  });
+
   it("renders a production review hierarchy without exposing internal IDs", () => {
     const consoleError = vi
       .spyOn(console, "error")
@@ -58,7 +70,12 @@ describe("V3ReviewContent", () => {
     expect(screen.getByRole("button", { name: "继续编辑" })).toBeVisible();
     expect(screen.getByText("当前内容已通过发布检查")).toBeVisible();
     expect(screen.getByText("内容概览")).toBeVisible();
-    expect(screen.getByRole("button", { name: /词形与发音/ })).toBeVisible();
+    expect(
+      screen.getByRole("navigation", { name: "词条阅读目录" })
+    ).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /词形与发音/ }).length).toBe(
+      2
+    );
     expect(screen.getByRole("button", { name: /词义结构/ })).toBeVisible();
     expect(screen.queryByText("word-internal-id")).toBeNull();
     expect(

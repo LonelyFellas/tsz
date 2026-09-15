@@ -1,155 +1,241 @@
+import { RichTextReadOnly } from "@tsz/voice-editor/reader";
+import { toRichTextV2 } from "@tsz/voice-editor/core";
+import { PronunciationPreviewControls } from "../word-creation/PronunciationPreview";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
-import {
-  CheckCircleFilled,
-  ReadOutlined,
-  SoundOutlined
-} from "@ant-design/icons";
-import { Card, Collapse, Empty, Flex, Tag, Typography } from "antd";
+import { ReadOutlined, SoundOutlined } from "@ant-design/icons";
+import { Button, Card, Collapse, Empty, Flex, Tag, Typography } from "antd";
 import type { AdminWordV3 } from "@tsz/types";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { dialectLabel, pronunciationStyleLabel } from "./presentation";
 import { buildV3ReviewModel } from "./reviewModel";
-import { V3MeaningsPreview } from "./V3MeaningsPreview";
+import { V3MeaningsPreview, reviewSenseTitle } from "./V3MeaningsPreview";
 import "./v3-preview.css";
 
 interface Props {
   word: AdminWordV3;
   actions?: ReactNode;
   readiness?: ReactNode;
+  sentenceCount?: number | null;
+  playback?: boolean;
+  renderSentences?: (senseId: string) => ReactNode;
+  onEdit?: (nodeId: string) => void;
 }
 
-function FormsReview({ word }: { word: AdminWordV3 }) {
+function FormsReview({
+  word,
+  playback = false
+}: {
+  word: AdminWordV3;
+  playback?: boolean;
+}) {
   const formTypeLabel = useFormTypeLabel();
   const partOfSpeechLabel = usePartOfSpeechLabel();
-  if (word.forms.pos.length === 0) {
+  if (word.forms.pos.length === 0)
     return <Empty description="暂无词形与发音" />;
-  }
   return (
     <Flex vertical gap="middle">
       {word.forms.pos.map((pos) => (
         <section className="v3-review-pos" key={pos.pos_id}>
-          <Flex align="center" justify="space-between" wrap gap="small">
+          <Flex align="center" justify="space-between">
             <Typography.Title level={4} style={{ margin: 0 }}>
               {partOfSpeechLabel(pos.pos)}
             </Typography.Title>
             <Tag>{pos.form_groups.length} 个变化组</Tag>
           </Flex>
-          <Typography.Text strong className="v3-review-section-label">
-            词形变化组
-          </Typography.Text>
-          {pos.form_groups.length > 0 ? (
-            <ul className="v3-review-group-list">
-              {pos.form_groups.map((group, groupIndex) => (
-                <li
-                  className="v3-review-group"
-                  data-testid={`preview-group-${group.id}`}
-                  key={group.id}
-                >
-                  <Flex gap="small" wrap>
-                    <Tag>变化组 {groupIndex + 1}</Tag>
-                    <Typography.Text type="secondary">
-                      {group.is_regular ? "规则组" : "非规则组"}
-                    </Typography.Text>
-                    {group.members.map((member, memberIndex) => {
-                      const form = pos.forms.find(
-                        (candidate) => candidate.id === member.form_id
-                      );
-                      const variant =
-                        form?.regional_variants.mode === "common"
-                          ? form.regional_variants.common
-                          : form?.regional_variants.uk;
-                      return (
-                        <Tag
-                          className="tsz-entry-en"
-                          data-testid={`preview-membership-${member.id}`}
-                          key={member.id}
+          <div className="v3-review-group-list">
+            {pos.form_groups.length === 0 && (
+              <Typography.Text type="secondary">暂无变化组</Typography.Text>
+            )}
+            {pos.form_groups.map((group, index) => (
+              <div
+                className="v3-review-group"
+                data-testid={`preview-group-${group.id}`}
+                key={group.id}
+              >
+                <Tag>变化组 {index + 1}</Tag>
+                <span>{group.is_regular ? "规则组" : "非规则组"}</span>
+                <span className="v3-review-form-chain">
+                  {group.members.map((member, i) => {
+                    const form = pos.forms.find((f) => f.id === member.form_id);
+                    const variant =
+                      form?.regional_variants.mode === "common"
+                        ? form.regional_variants.common
+                        : form?.regional_variants.uk;
+                    return (
+                      <span
+                        data-testid={`preview-membership-${member.id}`}
+                        key={member.id}
+                      >
+                        {i > 0 && <small> → </small>}
+                        {i + 1}.{" "}
+                        {form ? formTypeLabel(form.form_type) : "未知词形"}
+                        {variant ? ` · ${variant.spelling}` : ""}
+                      </span>
+                    );
+                  })}
+                </span>
+              </div>
+            ))}
+          </div>
+          <div className="v3-review-table-scroll">
+            <table className="v3-review-form-table">
+              <thead>
+                <tr>
+                  <th>词形</th>
+                  <th>拼写 / 方言</th>
+                  <th>字典音标</th>
+                  <th>实际发音</th>
+                </tr>
+              </thead>
+              {pos.forms.map((form) => {
+                const variants =
+                  form.regional_variants.mode === "common"
+                    ? [form.regional_variants.common]
+                    : [form.regional_variants.uk, form.regional_variants.us];
+                return (
+                  <tbody key={form.id} data-testid={`preview-form-${form.id}`}>
+                    {variants.flatMap((variant) =>
+                      (variant.pronunciations.length
+                        ? variant.pronunciations
+                        : [null]
+                      ).map((pronunciation, index) => (
+                        <tr
+                          key={`${variant.id}:${pronunciation?.id ?? "empty"}`}
+                          data-testid={
+                            pronunciation
+                              ? `preview-pronunciation-${pronunciation.id}`
+                              : undefined
+                          }
                         >
-                          {memberIndex + 1}.{" "}
-                          {form ? formTypeLabel(form.form_type) : "未知词形"}
-                          {variant ? ` · ${variant.spelling}` : ""}
-                        </Tag>
-                      );
-                    })}
-                  </Flex>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <Typography.Text type="secondary">暂无变化组</Typography.Text>
-          )}
-          <Typography.Text strong className="v3-review-section-label">
-            词形与发音
-          </Typography.Text>
-          <ul className="v3-review-list">
-            {pos.forms.map((form) => {
-              const variants =
-                form.regional_variants.mode === "common"
-                  ? [form.regional_variants.common]
-                  : [form.regional_variants.uk, form.regional_variants.us];
-              return (
-                <li
-                  className="v3-review-form"
-                  data-testid={`preview-form-${form.id}`}
-                  key={form.id}
-                >
-                  <div className="v3-review-form-type">
-                    {formTypeLabel(form.form_type)}
-                  </div>
-                  <div className="v3-review-form-variants">
-                    {variants.map((variant) => (
-                      <div className="v3-review-variant" key={variant.id}>
-                        <Flex align="center" gap="small" wrap>
-                          <Tag color="blue">
-                            {dialectLabel(variant.dialect)}
-                          </Tag>
-                          <Typography.Text className="tsz-entry-en" strong>
-                            {variant.spelling || "待填写拼写"}
-                          </Typography.Text>
-                        </Flex>
-                        <Flex
-                          vertical
-                          gap={2}
-                          className="v3-review-pronunciations"
-                        >
-                          {variant.pronunciations.length > 0 ? (
-                            variant.pronunciations.map((pronunciation) => (
-                              <Typography.Text
-                                data-testid={`preview-pronunciation-${pronunciation.id}`}
-                                key={pronunciation.id}
-                                type="secondary"
-                              >
-                                {pronunciation.style
-                                  ? pronunciationStyleLabel(pronunciation.style)
-                                  : "未选择发音方式"}
-                                {pronunciation.dict_phonetic
-                                  ? ` · 词典音标 ${pronunciation.dict_phonetic}`
-                                  : ""}
-                                {pronunciation.actual_pron
-                                  ? ` · 实际发音 ${pronunciation.actual_pron}`
-                                  : ""}
-                              </Typography.Text>
-                            ))
-                          ) : (
-                            <Typography.Text type="secondary">
-                              暂无发音
-                            </Typography.Text>
-                          )}
-                        </Flex>
-                      </div>
-                    ))}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                          <td>
+                            {index === 0 && formTypeLabel(form.form_type)}
+                          </td>
+                          <td>
+                            {index === 0 && (
+                              <>
+                                <strong className="tsz-entry-en">
+                                  {variant.spelling || "待填写拼写"}
+                                </strong>
+                                <small>{dialectLabel(variant.dialect)}</small>
+                              </>
+                            )}
+                          </td>
+                          <td>
+                            {pronunciation ? (
+                              <>
+                                <div className="v3-review-pronunciation-cell">
+                                  {playback && (
+                                    <PronunciationPreviewControls
+                                      playbackOnly
+                                      dialect={variant.dialect}
+                                      pronunciationId={pronunciation.id}
+                                      ariaLabelPrefix={`${variant.spelling} 字典音标`}
+                                      content={toRichTextV2(
+                                        pronunciation.dict_phonetic_rich ?? {
+                                          version: 2,
+                                          text: pronunciation.dict_phonetic,
+                                          annotations: []
+                                        }
+                                      )}
+                                      voiceProfile={pronunciation.voice_profile}
+                                    />
+                                  )}
+                                  <RichTextReadOnly
+                                    value={
+                                      pronunciation.dict_phonetic_rich ?? {
+                                        version: 2,
+                                        text: pronunciation.dict_phonetic,
+                                        annotations: []
+                                      }
+                                    }
+                                  />
+                                </div>
+                                <small>
+                                  {pronunciation.style
+                                    ? pronunciationStyleLabel(
+                                        pronunciation.style
+                                      )
+                                    : "未选择发音方式"}
+                                </small>
+                              </>
+                            ) : (
+                              "暂无发音"
+                            )}
+                          </td>
+                          <td>
+                            {pronunciation && (
+                              <RichTextReadOnly
+                                value={
+                                  pronunciation.actual_pron_rich ?? {
+                                    version: 2,
+                                    text: pronunciation.actual_pron,
+                                    annotations: []
+                                  }
+                                }
+                              />
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                );
+              })}
+            </table>
+          </div>
         </section>
       ))}
     </Flex>
   );
 }
 
-export function V3ReviewContent({ word, actions, readiness }: Props) {
+export function V3ReviewContent({
+  word,
+  actions,
+  readiness,
+  sentenceCount,
+  playback,
+  renderSentences,
+  onEdit
+}: Props) {
+  const posLabel = usePartOfSpeechLabel();
+  const [openSections, setOpenSections] = useState<string[]>([
+    "forms",
+    "meanings"
+  ]);
+  const [activeId, setActiveId] = useState("review-forms");
+  useEffect(() => {
+    if (typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) setActiveId(visible[0].target.id);
+      },
+      { rootMargin: "-80px 0px -55% 0px", threshold: 0 }
+    );
+    document
+      .querySelectorAll(
+        ".v3-review [id^=review-sense-], .v3-review #review-forms"
+      )
+      .forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [word.id, word.revision]);
+  const jump = (id: string) => {
+    setActiveId(id);
+    setOpenSections((current) =>
+      Array.from(
+        new Set([...current, id === "review-forms" ? "forms" : "meanings"])
+      )
+    );
+    requestAnimationFrame(() =>
+      document
+        .getElementById(id)
+        ?.scrollIntoView({ behavior: "smooth", block: "start" })
+    );
+  };
   const model = buildV3ReviewModel(word);
   const statusColor =
     model.state.status === "published"
@@ -163,7 +249,12 @@ export function V3ReviewContent({ word, actions, readiness }: Props) {
     ["全部词形", model.summary.formCount],
     ["发音", model.summary.pronunciationCount],
     ["词义", model.summary.senseCount],
-    ["例句", model.summary.sentenceCount],
+    [
+      "例句",
+      sentenceCount === null
+        ? "—"
+        : (sentenceCount ?? model.summary.sentenceCount)
+    ],
     ["关系词", model.summary.relationCount]
   ] as const;
 
@@ -198,66 +289,112 @@ export function V3ReviewContent({ word, actions, readiness }: Props) {
         </Flex>
       </Card>
 
-      <div className="v3-review-overview">
-        <Card
-          className="v3-review-readiness"
-          title={
-            <Flex align="center" gap="small">
-              <CheckCircleFilled />
-              发布就绪
-            </Flex>
-          }
-        >
-          {readiness ?? (
-            <Typography.Text type="secondary">
-              当前内容已保存，可查看内容或发布历史。
-            </Typography.Text>
-          )}
-        </Card>
-        <Card className="v3-review-summary" title="内容概览">
-          <div className="v3-review-summary-grid">
-            {summaryItems.map(([label, value]) => (
-              <div className="v3-review-summary-item" key={label}>
-                <strong>{value}</strong>
-                <span>{label}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
+      <div className="v3-review-summary" aria-label="内容概览">
+        <span>内容概览</span>
+        {summaryItems.map(([label, value]) => (
+          <span key={label}>
+            <strong>{value}</strong> {label}
+          </span>
+        ))}
       </div>
-
-      <Card className="v3-review-content" title="内容核对">
-        <Collapse
-          defaultActiveKey={["forms", "meanings"]}
-          items={[
-            {
-              key: "forms",
-              label: (
-                <Flex align="center" gap="small">
-                  <SoundOutlined />
-                  词形与发音
-                </Flex>
-              ),
-              children: <FormsReview word={word} />
-            },
-            {
-              key: "meanings",
-              label: (
-                <Flex align="center" gap="small">
-                  <ReadOutlined />
-                  词义结构
-                </Flex>
-              ),
-              extra: (
-                <Typography.Text type="secondary">
-                  释义、例句与关系
-                </Typography.Text>
-              ),
-              children: <V3MeaningsPreview embedded word={word} />
-            }
-          ]}
-        />
-      </Card>
+      <div className="v3-review-reading-layout">
+        <nav className="v3-review-index" aria-label="词条阅读目录">
+          <div className="v3-review-index-title">本词条</div>
+          <button
+            type="button"
+            aria-current={activeId === "review-forms" ? "location" : undefined}
+            onClick={() => jump("review-forms")}
+          >
+            词形与发音
+          </button>
+          {word.meanings.pos.map((pos) => (
+            <div key={pos.pos_id}>
+              <strong>
+                {posLabel(
+                  word.forms.pos.find((p) => p.pos_id === pos.pos_id)?.pos ?? ""
+                )}
+              </strong>
+              {pos.senses.map((sense, index) => (
+                <button
+                  key={sense.id}
+                  type="button"
+                  aria-current={
+                    activeId === `review-sense-${sense.id}`
+                      ? "location"
+                      : undefined
+                  }
+                  onClick={() => jump(`review-sense-${sense.id}`)}
+                >
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  {reviewSenseTitle(sense)}
+                </button>
+              ))}
+            </div>
+          ))}
+          <a href="#review-publish">发布检查 ↓</a>
+        </nav>
+        <div className="v3-review-paper">
+          <div className="v3-review-readiness" role="status">
+            {readiness ?? "当前内容已保存，可查看内容或发布历史。"}
+          </div>
+          <div className="v3-review-content">
+            <Collapse
+              activeKey={openSections}
+              onChange={(keys) =>
+                setOpenSections(Array.isArray(keys) ? keys : [keys])
+              }
+              items={[
+                {
+                  key: "forms",
+                  label: (
+                    <Flex align="center" gap="small">
+                      <SoundOutlined />
+                      词形与发音
+                    </Flex>
+                  ),
+                  children: (
+                    <section id="review-forms">
+                      {onEdit && (
+                        <Button
+                          type="link"
+                          onClick={() =>
+                            onEdit(word.forms.pos[0]?.pos_id ?? word.id)
+                          }
+                        >
+                          编辑词形与发音
+                        </Button>
+                      )}
+                      <FormsReview word={word} playback={playback} />
+                    </section>
+                  )
+                },
+                {
+                  key: "meanings",
+                  label: (
+                    <Flex align="center" gap="small">
+                      <ReadOutlined />
+                      词义结构
+                    </Flex>
+                  ),
+                  extra: (
+                    <Typography.Text type="secondary">
+                      释义、例句与关系
+                    </Typography.Text>
+                  ),
+                  children: (
+                    <V3MeaningsPreview
+                      embedded
+                      word={word}
+                      renderSentences={renderSentences}
+                      onEdit={onEdit}
+                    />
+                  )
+                }
+              ]}
+            />
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
