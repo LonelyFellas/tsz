@@ -778,9 +778,15 @@ export function SmartDictionary({
       render: (list: AdminWordListItemAny["pos_list"]) => (
         <Space size={[4, 4]} wrap>
           {list.map((p) => (
-            <Tag key={p} style={{ margin: 0 }}>
-              <PartOfSpeechAbbreviation lookup={partOfSpeechLookup} code={p} />
-            </Tag>
+            // 缩写不直观，悬停补正式中文；目录里没有的编码无名可补，不出浮层。
+            <Tooltip key={p} title={partOfSpeechLookup.byCode.get(p)?.name_zh}>
+              <Tag style={{ margin: 0 }}>
+                <PartOfSpeechAbbreviation
+                  lookup={partOfSpeechLookup}
+                  code={p}
+                />
+              </Tag>
+            </Tooltip>
           ))}
         </Space>
       )
