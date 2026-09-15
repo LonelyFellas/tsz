@@ -195,6 +195,13 @@ it.each([
     keep: true
   },
   {
+    name: "一次调整多处空格",
+    before: "look for a job",
+    after: "look  for  a job",
+    surface: "look for",
+    keep: true
+  },
+  {
     name: "短语合并为一个词",
     before: "look for a job",
     after: "lookfor a job",
