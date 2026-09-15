@@ -1,11 +1,15 @@
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
-import { toRichTextV2 } from "@tsz/voice-editor/core";
+import {
+  EMPTY_SYNTHESIS,
+  pronunciationSynthesisContent,
+  synthesisInputIssue
+} from "@tsz/shared";
 import { PronunciationPreviewControls } from "../word-creation/PronunciationPreview";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { ReadOutlined, SoundOutlined } from "@ant-design/icons";
 import { Button, Card, Collapse, Empty, Flex, Tag, Typography } from "antd";
-import type { AdminWordV3 } from "@tsz/types";
+import type { AdminWordV3, Dialect, WordPronunciationV3 } from "@tsz/types";
 import { useEffect, useState, type ReactNode } from "react";
 import { dialectLabel, pronunciationStyleLabel } from "./presentation";
 import { buildV3ReviewModel } from "./reviewModel";
@@ -20,6 +24,36 @@ interface Props {
   playback?: boolean;
   renderSentences?: (senseId: string) => ReactNode;
   onEdit?: (nodeId: string) => void;
+}
+
+function ReviewPronunciationPlayback({
+  pronunciation,
+  spelling,
+  dialect
+}: {
+  pronunciation: WordPronunciationV3;
+  spelling: string;
+  dialect: Dialect;
+}) {
+  const synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
+  const content = pronunciationSynthesisContent(spelling, synthesis);
+  return (
+    <PronunciationPreviewControls
+      playbackOnly
+      pronunciationId={pronunciation.id}
+      dialect={dialect}
+      ariaLabelPrefix={`${spelling} 最终读音`}
+      disabled={!content}
+      disabledReason={
+        synthesisInputIssue(
+          synthesis.alphabet,
+          synthesis[synthesis.alphabet]
+        ) ?? (!spelling.trim() ? "请先填写词形拼写" : undefined)
+      }
+      content={content ?? { version: 2, text: "", annotations: [] }}
+      voiceProfile={pronunciation.voice_profile}
+    />
+  );
 }
 
 function FormsReview({
@@ -126,19 +160,10 @@ function FormsReview({
                               <>
                                 <div className="v3-review-pronunciation-cell">
                                   {playback && (
-                                    <PronunciationPreviewControls
-                                      playbackOnly
+                                    <ReviewPronunciationPlayback
+                                      pronunciation={pronunciation}
+                                      spelling={variant.spelling}
                                       dialect={variant.dialect}
-                                      pronunciationId={pronunciation.id}
-                                      ariaLabelPrefix={`${variant.spelling} 字典音标`}
-                                      content={toRichTextV2(
-                                        pronunciation.dict_phonetic_rich ?? {
-                                          version: 2,
-                                          text: pronunciation.dict_phonetic,
-                                          annotations: []
-                                        }
-                                      )}
-                                      voiceProfile={pronunciation.voice_profile}
                                     />
                                   )}
                                   <RichTextReadOnly

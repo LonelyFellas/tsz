@@ -5,6 +5,21 @@ import { describe, expect, it, vi } from "vitest";
 import { formsFixture } from "./fixtures";
 import { V3ReviewContent } from "./V3ReviewContent";
 
+const { playbackSpy } = vi.hoisted(() => ({ playbackSpy: vi.fn() }));
+vi.mock("../word-creation/PronunciationPreview", () => ({
+  PronunciationPreviewControls: (props: {
+    disabled?: boolean;
+    disabledReason?: string;
+  }) => {
+    playbackSpy(props);
+    return (
+      <button disabled={props.disabled}>
+        {props.disabledReason ?? "试听"}
+      </button>
+    );
+  }
+}));
+
 function word(): AdminWordV3 {
   const forms = formsFixture();
   return {
@@ -40,6 +55,58 @@ function word(): AdminWordV3 {
 }
 
 describe("V3ReviewContent", () => {
+  it("预览按选中的 UPS 合成，缺失或非法数据禁止试听", () => {
+    const current = word();
+    const form = current.forms.pos[0]!.forms[0]!;
+    if (form.regional_variants.mode !== "common")
+      throw new Error("expected common");
+    const variant = form.regional_variants.common;
+    const pronunciation = variant.pronunciations[0]!;
+    pronunciation.synthesis = {
+      alphabet: "ups",
+      ipa: "ignored",
+      ups: "S EH N T AX R"
+    };
+    playbackSpy.mockClear();
+    const view = render(<V3ReviewContent word={current} playback />);
+    expect(playbackSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        disabled: false,
+        content: {
+          version: 2,
+          text: variant.spelling,
+          annotations: [
+            {
+              type: "phoneme",
+              start: 0,
+              end: Array.from(variant.spelling).length,
+              alphabet: "ups",
+              phoneme: "S EH N T AX R"
+            }
+          ]
+        }
+      })
+    );
+    delete pronunciation.synthesis;
+    playbackSpy.mockClear();
+    view.rerender(<V3ReviewContent word={current} playback />);
+    expect(playbackSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        disabled: true,
+        disabledReason: "请填写 Azure IPA"
+      })
+    );
+    pronunciation.synthesis = { alphabet: "ups", ipa: "", ups: "非法" };
+    playbackSpy.mockClear();
+    view.rerender(<V3ReviewContent word={current} playback />);
+    expect(playbackSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        disabled: true,
+        disabledReason: expect.stringContaining("ASCII")
+      })
+    );
+  });
+
   it("概览使用独立例句总数，未加载时不显示假零值", () => {
     const view = render(<V3ReviewContent word={word()} sentenceCount={4} />);
     const summary = screen.getByLabelText("内容概览");
