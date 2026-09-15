@@ -306,6 +306,16 @@ test("M10: each module merges its latest attempt artifact and fails closed", asy
     // 按数值比较，attempt 10 要胜过 9。
     await writeArtifact(admin1, 10);
     await writeArtifact(admin1, 9);
+    // 旧 attempt 独有的文件不能混进来：只拷最新一份，而不是按顺序全拷一遍。
+    await writeFile(
+      join(
+        downloadDirectory,
+        "vitest-blob-admin-1-attempt-9",
+        ".vitest-reports",
+        "stale.blob.json"
+      ),
+      "attempt-9"
+    );
 
     const outputDirectory = join(root, "output");
     await collectModuleArtifacts(downloadDirectory, outputDirectory);
@@ -319,6 +329,9 @@ test("M10: each module merges its latest attempt artifact and fails closed", asy
       await readOutput(".ci-inventories", "admin-1.inventory.json"),
       "attempt-10"
     );
+    await assert.rejects(readOutput(".vitest-reports", "stale.blob.json"), {
+      code: "ENOENT"
+    });
     // 只重跑失败任务时，没重跑的模块沿用之前 attempt 的产物。
     assert.equal(
       await readOutput(".vitest-reports", "web.blob.json"),
