@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Alert,
@@ -19,7 +19,7 @@ import {
 } from "antd";
 import type { Dayjs } from "dayjs";
 import type { SharedSentence, SentenceListQuery } from "@tsz/types";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { api } from "@/lib/auth";
 import { editableEnglishText } from "../dictionary/word-creation-v3/meaningsModel";
 import { SentenceEditor } from "./SentenceEditor";
@@ -116,6 +116,22 @@ export function SentenceLibrary({
           modal.error({ title: "部分例句未删除", content: errors.join("；") });
       }
     });
+  // 词条向导里的引用列表用 /sentences?sentence=<id> 深链到这条例句的详情。
+  const [searchParams, setSearchParams] = useSearchParams();
+  const linkedSentenceId = entryId ? undefined : searchParams.get("sentence");
+  useEffect(() => {
+    if (!linkedSentenceId) return;
+    void open(linkedSentenceId, false);
+    setSearchParams(
+      (current) => {
+        current.delete("sentence");
+        return current;
+      },
+      { replace: true }
+    );
+    // 只在深链参数出现时打开一次；open / setSearchParams 每次渲染都是新函数。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedSentenceId]);
   const rows = query.data?.items ?? [];
   if (editor)
     return (

@@ -100,6 +100,17 @@ import {
   reachableUsageCount,
   V3PhraseComponentUsagesCard
 } from "./components/V3PhraseComponentUsagesCard";
+import { V3DisabledReason } from "./components/V3DisabledReason";
+import { V3ReferenceBadge } from "./components/V3ReferenceBadge";
+import {
+  nodesBlockingReferenceCount,
+  posNodeIds,
+  senseReferenceCount
+} from "./referenceGuard";
+import {
+  referenceBlockedHint,
+  useV3ReferenceGuard
+} from "./referenceGuardContext";
 
 export interface V3MeaningsAndExamplesStepProps {
   value: DraftMeaningsStepContentWritableV3;
@@ -272,7 +283,8 @@ function SenseEditorShell({
   expanded,
   onExpandedChange,
   onDelete,
-  nodeId
+  nodeId,
+  referenceCount = 0
 }: {
   children: ReactNode;
   index: number;
@@ -284,6 +296,8 @@ function SenseEditorShell({
   onExpandedChange: (expanded: boolean) => void;
   onDelete: () => void;
   nodeId: string;
+  /** 指向本词义的引用数；大于 0 时不能删除。 */
+  referenceCount?: number;
 }) {
   const safeLevel = /^(?:A1|A2|B1|B2|C1|C2)$/u.test(level) ? level : "A1";
   return (
@@ -320,6 +334,7 @@ function SenseEditorShell({
                       {subPosLabel}
                     </Tag>
                   ) : null}
+                  <V3ReferenceBadge label="词义" nodeIds={[nodeId]} />
                 </div>
                 <span className="word-form-card-toggle-state">
                   <span>{expanded ? "收起" : "展开"}</span>
@@ -336,14 +351,23 @@ function SenseEditorShell({
                   singleItemTitle="至少需要两个词义"
                   dragImageSelector=".word-sense-sortable"
                 />
-                <Button
-                  aria-label={`删除词义 ${index + 1}`}
-                  icon={<DeleteOutlined />}
-                  danger
-                  size="small"
-                  type="text"
-                  onClick={onDelete}
-                />
+                <V3DisabledReason
+                  reason={
+                    referenceCount > 0
+                      ? referenceBlockedHint(referenceCount)
+                      : undefined
+                  }
+                >
+                  <Button
+                    aria-label={`删除词义 ${index + 1}`}
+                    icon={<DeleteOutlined />}
+                    danger
+                    disabled={referenceCount > 0}
+                    size="small"
+                    type="text"
+                    onClick={onDelete}
+                  />
+                </V3DisabledReason>
               </Space>
             ),
             children
@@ -1238,12 +1262,8 @@ function RelationsGrid({
           >
             <SenseSectionBody collapsed={Boolean(collapsed[relationType])}>
               <div style={{ padding: 10 }}>
-                {relations.length === 0 ? (
-                  <Empty
-                    description={`暂无${relationLabel(relationType)}`}
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                  />
-                ) : (
+                {/* 空分区不画空状态插图：下面的「添加近义词」虚线按钮已经说明了这里能加什么，三个空分区各占一百多像素只剩留白。 */}
+                {relations.length === 0 ? null : (
                   <RelationSortScope
                     items={relations}
                     scopeId={`${sense.id}:${relationType}`}
@@ -2369,6 +2389,18 @@ function V3MeaningsAndExamplesStepContent({
         onAdd={addBasicPos}
       />
     ) : null;
+  const referenceGuard = useV3ReferenceGuard();
+  const posReferenceCount = (posId: string) => {
+    const formPos = forms?.pos.find((pos) => pos.pos_id === posId);
+    const senseIds =
+      value.pos
+        .find((pos) => pos.pos_id === posId)
+        ?.senses.map((sense) => sense.id) ?? [];
+    return nodesBlockingReferenceCount(
+      referenceGuard.index,
+      formPos ? posNodeIds(formPos, senseIds) : [posId, ...senseIds]
+    );
+  };
   const deleteBasicPos = (posId: string) => {
     if (!forms || !onFormsChange || forms.pos.length <= 1) return;
     const formsResult = deletePartOfSpeech(forms, posId);
@@ -2470,24 +2502,33 @@ function V3MeaningsAndExamplesStepContent({
                     forms.pos.length > 1 &&
                     forms.pos.some((formPos) => formPos.pos_id === posId) &&
                     onFormsChange ? (
-                      <Button
-                        aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
-                        danger
-                        icon={<MinusCircleOutlined />}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          modal.confirm({
-                            title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
-                            content:
-                              "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
-                            okText: "删除",
-                            okButtonProps: { danger: true },
-                            onOk: () => deleteBasicPos(posId)
-                          });
-                        }}
-                        size="small"
-                        type="text"
-                      />
+                      <V3DisabledReason
+                        reason={
+                          posReferenceCount(posId) > 0
+                            ? referenceBlockedHint(posReferenceCount(posId))
+                            : undefined
+                        }
+                      >
+                        <Button
+                          aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
+                          danger
+                          disabled={posReferenceCount(posId) > 0}
+                          icon={<MinusCircleOutlined />}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            modal.confirm({
+                              title: `删除词性“${visiblePosLabel(posId, displayPosIndex)}”？`,
+                              content:
+                                "会移除该词性下的词形、词义、例句和关联词；保存草稿时会继续预览下游影响。",
+                              okText: "删除",
+                              okButtonProps: { danger: true },
+                              onOk: () => deleteBasicPos(posId)
+                            });
+                          }}
+                          size="small"
+                          type="text"
+                        />
+                      </V3DisabledReason>
                     ) : null}
                   </Space>
                 </span>
@@ -2622,6 +2663,10 @@ function V3MeaningsAndExamplesStepContent({
                                 }
                                 level={sense.level}
                                 nodeId={sense.id}
+                                referenceCount={senseReferenceCount(
+                                  referenceGuard.index,
+                                  sense.id
+                                )}
                                 onDelete={() =>
                                   change((draft) => {
                                     draft.pos[posIndex]!.senses.splice(

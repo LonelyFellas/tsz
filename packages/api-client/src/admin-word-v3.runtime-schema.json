@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/clever-swirles-f4f4de/docs/openapi.json",
-  "_source_sha256": "d5aca3a6dbbc5a77d4adbbd00fa517c6e97ecd40e0d1c535009a153a987f9b45",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust/.claude/worktrees/referenced-node-guard/docs/openapi.json",
+  "_source_sha256": "265af94b052d2ff1042dbf512be654643d9107f0bf23899de966244e22e15dc4",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
@@ -14,6 +14,7 @@
     "EntryLifecycleBatchResponse",
     "DraftValidationResponseV3",
     "FormsImpactResponseV3",
+    "InboundReferencesV3",
     "SurfaceMatchPageV3",
     "RelatedSearchResponse",
     "DetectLexiconSurfaceResponseV3",
@@ -680,6 +681,7 @@
         "relation_prebinding_fanout_exceeded",
         "stable_node_id_changed",
         "form_reference_conflict",
+        "inbound_reference_conflict",
         "detection_mismatch",
         "detection_expired",
         "duplicate_word",
@@ -776,6 +778,11 @@
           "items": { "$ref": "#/$defs/FormsImpactItemV3" }
         },
         "base_revision": { "type": "integer" },
+        "blocked_references": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/InboundReferenceV3" },
+          "maxItems": 500
+        },
         "confirmation_token": { "type": "string", "format": "uuid" },
         "requires_confirmation": { "type": "boolean" },
         "schema_version": { "type": "integer", "enum": [3] },
@@ -850,6 +857,95 @@
         "dialect": { "$ref": "#/$defs/Dialect" },
         "id": { "type": "string", "format": "uuid" },
         "voice_profile": { "$ref": "#/$defs/VoiceProfileV3" }
+      },
+      "additionalProperties": false
+    },
+    "InboundReferenceKindV3": {
+      "type": "string",
+      "enum": [
+        "shared_sentence",
+        "publication_sense_ref",
+        "draft_relation",
+        "phrase_component"
+      ]
+    },
+    "InboundReferenceNodeTypeV3": {
+      "type": "string",
+      "enum": ["pos", "form", "variant", "sense"]
+    },
+    "InboundReferenceNodeV3": {
+      "type": "object",
+      "required": ["node_id", "node_type", "total"],
+      "properties": {
+        "node_id": { "type": "string", "format": "uuid" },
+        "node_type": { "$ref": "#/$defs/InboundReferenceNodeTypeV3" },
+        "total": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "InboundReferenceSourceV3": {
+      "type": "object",
+      "properties": {
+        "entry_headword": { "type": "string" },
+        "entry_id": { "type": "string", "format": "uuid" },
+        "entry_kind": { "$ref": "#/$defs/WordEntryKindV3" },
+        "entry_status": { "$ref": "#/$defs/AdminWordStatus" },
+        "node_id": { "type": "string", "format": "uuid" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "reference_kind": { "type": "string" },
+        "relation_type": { "type": "string" },
+        "segments": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceSourceRangeV1" }
+        },
+        "sense_gloss": { "type": "string" },
+        "sense_id": { "type": "string", "format": "uuid" },
+        "sentence_id": { "type": "string", "format": "uuid" },
+        "sentence_revision": { "type": "integer" },
+        "sentence_text": { "type": "string" },
+        "source_dialect": { "$ref": "#/$defs/Dialect" }
+      },
+      "additionalProperties": false
+    },
+    "InboundReferencesV3": {
+      "type": "object",
+      "required": ["entry_id", "revision", "nodes", "items", "truncated"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/InboundReferenceV3" },
+          "maxItems": 500
+        },
+        "nodes": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/InboundReferenceNodeV3" }
+        },
+        "revision": { "type": "integer" },
+        "truncated": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "InboundReferenceTargetV3": {
+      "type": "object",
+      "properties": {
+        "base_form_id": { "type": "string", "format": "uuid" },
+        "form_id": { "type": "string", "format": "uuid" },
+        "pos_id": { "type": "string", "format": "uuid" },
+        "sense_id": { "type": "string", "format": "uuid" },
+        "variant_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "InboundReferenceV3": {
+      "type": "object",
+      "required": ["id", "kind", "target", "stale", "source"],
+      "properties": {
+        "id": { "type": "string" },
+        "kind": { "$ref": "#/$defs/InboundReferenceKindV3" },
+        "source": { "$ref": "#/$defs/InboundReferenceSourceV3" },
+        "stale": { "type": "boolean" },
+        "target": { "$ref": "#/$defs/InboundReferenceTargetV3" }
       },
       "additionalProperties": false
     },
@@ -975,6 +1071,11 @@
         "current_policy_epoch": { "type": "integer", "minimum": 0 },
         "current_policy_name": { "$ref": "#/$defs/SurfacePolicyNameV2" },
         "current_revision": { "type": "integer" },
+        "inbound_references": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/InboundReferenceV3" },
+          "maxItems": 500
+        },
         "max_reachable_step": { "type": "string" },
         "part_of_speech_id": { "type": "string", "format": "uuid" },
         "reference_locations": {

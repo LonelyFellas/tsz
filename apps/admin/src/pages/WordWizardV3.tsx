@@ -7,6 +7,7 @@ import type {
   AdminWordDraftV3Envelope,
   AdminWordV3,
   DraftMeaningsStepContentWritableV3,
+  InboundReferenceV3,
   SharedSentence,
   StepSaveIntent,
   SurfaceMatchEnabledTerminalPageV3,
@@ -58,6 +59,19 @@ import {
   V3WordCreationWizard,
   type V3WizardSlotContext
 } from "@/features/dictionary/word-creation-v3/V3WordCreationWizard";
+import { V3DisabledReason } from "@/features/dictionary/word-creation-v3/components/V3DisabledReason";
+import { V3ReferenceList } from "@/features/dictionary/word-creation-v3/components/V3ReferenceList";
+import {
+  buildReferenceIndex,
+  locateV3Node,
+  referenceLink,
+  spellingConflicts
+} from "@/features/dictionary/word-creation-v3/referenceGuard";
+import {
+  V3ReferenceGuardProvider,
+  useV3ReferenceGuard,
+  type V3ReferenceGuard
+} from "@/features/dictionary/word-creation-v3/referenceGuardContext";
 
 const STEPS = new Set<WordCreationStep>([
   "basics",
@@ -106,7 +120,80 @@ function terminalSurfacePage(
   };
 }
 
+/** 引用索引不可用 / 已失效引用的顶部提示，词形步与词义步共用。 */
+function V3ReferenceNotices() {
+  const { index } = useV3ReferenceGuard();
+  return (
+    <>
+      {index.status === "unavailable" ? (
+        <Alert
+          showIcon
+          type="info"
+          title="引用信息暂不可用"
+          description="无法判断哪些词性、词形或词义被别处引用；编辑不受影响，保存时仍由服务端校验。"
+        />
+      ) : null}
+      {index.stale.length > 0 ? (
+        <Alert
+          showIcon
+          type="error"
+          title={`有 ${index.stale.length} 条引用已失效，需先处理`}
+          description={
+            <Flex vertical gap={4}>
+              <span>
+                这些引用指向的词形或词义在当前草稿里已对不上。草稿照常可以保存，处理完之前本词条无法发布。
+              </span>
+              <V3ReferenceList references={index.stale} />
+            </Flex>
+          }
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** 词形影响预览判定会破坏的引用：确认条让位给它，保存直接不发。 */
+function V3BlockedReferencesAlert({
+  references
+}: {
+  references: readonly InboundReferenceV3[];
+}) {
+  if (references.length === 0) return null;
+  return (
+    <Alert
+      showIcon
+      type="error"
+      title={`本次词形变更会破坏 ${references.length} 处引用，无法保存`}
+      description={
+        <Flex vertical gap={4}>
+          <span>撤销对应的词形改动，或先到来源处解除、调整这些引用。</span>
+          <V3ReferenceList references={references} staleLabel="将失效" />
+        </Flex>
+      }
+    />
+  );
+}
+
 function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
+  const referenceGuard = useV3ReferenceGuard();
+  // Q2：拼写输入框保持可编辑，但与被引用片段对不上就即时标红、禁止保存并列出引用。
+  const conflicts = spellingConflicts(referenceGuard.index, context.draftForms);
+  const conflictReferences = [
+    ...new Map(
+      conflicts
+        .flatMap((conflict) => conflict.references)
+        .map((reference) => [reference.id, reference] as const)
+    ).values()
+  ];
+  // 已经列在「引用已失效」里的旧冲突不在拼写冲突提示里重复，也不禁用保存：草稿保存只拦本次改动
+  // 破坏的引用，已失效的旧引用由后端只挡发布与切换版本。
+  const staleReferenceIds = new Set(
+    referenceGuard.index.stale.map((reference) => reference.id)
+  );
+  const conflictNoticeReferences = conflictReferences.filter(
+    (reference) => !staleReferenceIds.has(reference.id)
+  );
+  const blockedReferences = context.impact?.blocked_references ?? [];
   const [pendingIntent, setPendingIntent] = useState<StepSaveIntent>();
   const preparingRef = useRef(false);
   const impactPage = context.impactSurfacePage;
@@ -130,6 +217,13 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
       const impact = await context.actions.previewFormsSaveImpact();
       if (!impact) {
         setPendingIntent(undefined);
+        return;
+      }
+      if (impact.blocked_references?.length) {
+        // 服务端已判定会破坏引用：保存必 409，不进确认，交给阻断提示。
+        // 能被拦下说明本地引用索引已经旧了（别处刚加了引用），徽标与禁用态跟着重取。
+        setPendingIntent(undefined);
+        referenceGuard.refresh();
         return;
       }
       if (!impact.requires_confirmation && !impact.surface_match_page) {
@@ -171,6 +265,23 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
   const resetConfirmation = () => setPendingIntent(undefined);
   return (
     <Flex vertical gap="middle">
+      <V3ReferenceNotices />
+      {conflictNoticeReferences.length > 0 ? (
+        <Alert
+          showIcon
+          type="error"
+          title="拼写与被引用片段不一致，无法保存"
+          description={
+            <Flex vertical gap={4}>
+              <span>
+                改回与片段一致的拼写（大小写、空白差异不算），或先到例句处解除引用。
+              </span>
+              <V3ReferenceList references={conflictNoticeReferences} />
+            </Flex>
+          }
+        />
+      ) : null}
+      <V3BlockedReferencesAlert references={blockedReferences} />
       <V3FormsAndPronunciationStep
         activePosId={context.activePosId}
         entryKind={context.word.kind}
@@ -236,13 +347,25 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         >
           上一步
         </Button>
-        <Button
-          disabled={Boolean(pendingIntent) || !context.dirtySteps.forms}
-          loading={busy && pendingIntent === "save"}
-          onClick={() => void prepareSave("save")}
+        <V3DisabledReason
+          reason={
+            conflictNoticeReferences.length > 0
+              ? "拼写与被引用片段不一致，先改回一致或解除引用"
+              : undefined
+          }
         >
-          保存草稿
-        </Button>
+          <Button
+            disabled={
+              Boolean(pendingIntent) ||
+              !context.dirtySteps.forms ||
+              conflictNoticeReferences.length > 0
+            }
+            loading={busy && pendingIntent === "save"}
+            onClick={() => void prepareSave("save")}
+          >
+            保存草稿
+          </Button>
+        </V3DisabledReason>
         <Button
           type="primary"
           disabled={Boolean(pendingIntent)}
@@ -272,11 +395,26 @@ function V3BasicsSlot({ context }: { context: V3WizardSlotContext }) {
   );
 }
 
-function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
+interface V3FocusSentence {
+  senseId: string;
+  sentenceId: string;
+}
+
+function V3MeaningsSlot({
+  context,
+  focusSentence,
+  onFocusSentenceHandled
+}: {
+  context: V3WizardSlotContext;
+  focusSentence?: V3FocusSentence;
+  onFocusSentenceHandled?: () => void;
+}) {
+  const referenceGuard = useV3ReferenceGuard();
   const [sentenceEditor, setSentenceEditor] = useState<{
     senseId: string;
     value: SharedSentence | "new";
   }>();
+  const blockedReferences = context.impact?.blocked_references ?? [];
   const leaveSentence = async () => {
     if (
       sentenceEditor &&
@@ -308,6 +446,11 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
       if (context.dirtySteps.forms) {
         const impact = await context.actions.previewFormsSaveImpact();
         if (!impact) return;
+        // 会破坏引用的词形改动：保存必 409，阻断提示直接列出引用；本地引用索引已旧，顺带重取。
+        if (impact.blocked_references?.length) {
+          referenceGuard.refresh();
+          return;
+        }
         if (impact.surface_match_page) {
           // 同形匹配的确认要带 snapshot/policy 上下文，只有词形步的保存入口能透传，
           // 这里不复制那套状态机，直接把人引回词形步确认。
@@ -344,6 +487,8 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
     (sentenceTargetDiscoveryCapability === undefined && import.meta.env.DEV);
   return (
     <Flex vertical gap="middle">
+      <V3ReferenceNotices />
+      <V3BlockedReferencesAlert references={blockedReferences} />
       {surfaceBlocked ? (
         <Alert
           showIcon
@@ -415,6 +560,12 @@ function V3MeaningsSlot({ context }: { context: V3WizardSlotContext }) {
             }}
             onClose={() => setSentenceEditor(undefined)}
             readOnly={context.readOnly}
+            focusSentenceId={
+              focusSentence?.senseId === senseId
+                ? focusSentence.sentenceId
+                : undefined
+            }
+            onFocusHandled={onFocusSentenceHandled}
           />
         )}
         textLinksEnabled={context.word.capabilities.text_links === true}
@@ -552,6 +703,44 @@ function V3WizardSlots({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const referenceGuard = useV3ReferenceGuard();
+  const [focusSentence, setFocusSentence] = useState<V3FocusSentence>();
+  // 引用列表的「查看例句」：切到词义步、定位到该词义卡片，再由例句区块直接打开这条例句。
+  // 只读会话没有例句区块，改在例句库里看。
+  const { navigateTarget } = context.actions;
+  const readOnly = context.readOnly;
+  const { registerNavigator } = referenceGuard;
+  useEffect(() => {
+    registerNavigator((reference: InboundReferenceV3) => {
+      const link = referenceLink(reference);
+      if (link.kind === "none") return;
+      if (link.kind !== "local_sentence" || readOnly) {
+        const href =
+          link.kind === "local_sentence" ? link.libraryHref : link.href;
+        window.open(href, "_blank", "noopener");
+        return;
+      }
+      setFocusSentence({ senseId: link.senseId, sentenceId: link.sentenceId });
+      void navigateTarget({
+        step: "meanings",
+        node_id: link.senseId,
+        field: "sense",
+        ...(link.posId ? { pos_id: link.posId } : {}),
+        ancestor_node_ids: link.posId ? [link.posId] : []
+      });
+    });
+    return () => registerNavigator(undefined);
+  }, [navigateTarget, readOnly, registerNavigator]);
+  // 跨词条跳转的深链：?focus_node=<来源节点 id>，加载后定位一次。
+  const focusNodeHandledRef = useRef(false);
+  const focusNode = new URLSearchParams(location.search).get("focus_node");
+  const word = context.word;
+  useEffect(() => {
+    if (!focusNode || focusNodeHandledRef.current || readOnly) return;
+    focusNodeHandledRef.current = true;
+    const target = locateV3Node(word, focusNode);
+    if (target) void navigateTarget(target);
+  }, [focusNode, navigateTarget, readOnly, word]);
   useEffect(() => {
     if (context.readOnly) return;
     const pathname = `/words/${wordId}/v3/wizard/${context.activeStep}`;
@@ -603,7 +792,13 @@ function V3WizardSlots({
       return <V3FormsSlot context={context} />;
     case "meanings":
       return (
-        renderMeaningsStep?.(context) ?? <V3MeaningsSlot context={context} />
+        renderMeaningsStep?.(context) ?? (
+          <V3MeaningsSlot
+            context={context}
+            focusSentence={focusSentence}
+            onFocusSentenceHandled={() => setFocusSentence(undefined)}
+          />
+        )
       );
     case "preview":
       return (
@@ -678,6 +873,44 @@ export function WordWizardV3Page({
     gcTime: 0,
     retry: shouldRetryV3Detail
   });
+  // 入站引用按 revision 拉：保存成功 revision 就变，索引自然重取；加载失败不阻塞编辑。
+  const detailRevision = detail.data?.word.revision;
+  const references = useQuery({
+    queryKey: ["inbound-references", wordId, detailRevision] as const,
+    queryFn: () => requests.inboundReferences(wordId),
+    enabled: wordId !== "" && detailRevision !== undefined,
+    // 保存后 revision 变了还沿用上一份当占位，免得徽标闪没；但换了词条就不能沿用，
+    // 否则新词条的引用到达前会显示、定位到上一个词条的引用。
+    placeholderData: (previous) =>
+      previous?.entry_id === wordId ? previous : undefined,
+    // 在来源词条的标签页解除引用后切回要立刻解锁：全局 staleTime 60s 会让窗口聚焦时不重取。
+    staleTime: 0,
+    // 只是辅助信息：失败就提示不可用，不用重试拖慢首屏；保存被拦时会再拉。
+    retry: false
+  });
+  const referencesRefetch = references.refetch;
+  const referenceNavigatorRef = useRef<
+    ((reference: InboundReferenceV3) => void) | undefined
+  >(undefined);
+  const referenceGuard = useMemo<V3ReferenceGuard>(
+    () => ({
+      // 聚焦重取偶发失败时还有上一份数据就照常用，不弹「引用信息暂不可用」。
+      index: buildReferenceIndex(
+        references.data,
+        references.data
+          ? "loaded"
+          : references.isError
+            ? "unavailable"
+            : "loading"
+      ),
+      openReference: (reference) => referenceNavigatorRef.current?.(reference),
+      refresh: () => void referencesRefetch(),
+      registerNavigator: (navigator) => {
+        referenceNavigatorRef.current = navigator;
+      }
+    }),
+    [references.data, references.isError, referencesRefetch]
+  );
 
   if (detail.isPending) {
     return (
@@ -729,30 +962,34 @@ export function WordWizardV3Page({
   return (
     <Flex vertical gap="middle">
       <CreationSourceNotice source={creationSourceFromState(location.state)} />
-      <V3WordCreationWizard
-        key={`${word.id}:activation-${activationGeneration}:${editingPublished ? "edit" : "read"}`}
-        allowPublishedEditing={editingPublished}
-        initialStep={legalStep}
-        initialWord={word}
-        sharedSentenceCount={sharedSentences.data?.total ?? 0}
-        partOfSpeechCatalog={partOfSpeechCatalog.data}
-        prefillNewDraft={creationSourceFromState(location.state) !== undefined}
-        partOfSpeechCatalogError={partOfSpeechCatalog.isError}
-        partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
-        retiredStableNodes={detail.data.retired_stable_nodes}
-        readOnly={forcePreview}
-        requests={requests}
-        onWordChange={replaceCanonical}
-        renderStep={(context) => (
-          <V3WizardSlots
-            context={context}
-            onActivated={replaceActivatedCanonical}
-            renderMeaningsStep={renderMeaningsStep}
-            requests={requests}
-            wordId={word.id}
-          />
-        )}
-      />
+      <V3ReferenceGuardProvider value={referenceGuard}>
+        <V3WordCreationWizard
+          key={`${word.id}:activation-${activationGeneration}:${editingPublished ? "edit" : "read"}`}
+          allowPublishedEditing={editingPublished}
+          initialStep={legalStep}
+          initialWord={word}
+          sharedSentenceCount={sharedSentences.data?.total ?? 0}
+          partOfSpeechCatalog={partOfSpeechCatalog.data}
+          prefillNewDraft={
+            creationSourceFromState(location.state) !== undefined
+          }
+          partOfSpeechCatalogError={partOfSpeechCatalog.isError}
+          partOfSpeechCatalogPending={partOfSpeechCatalog.isPending}
+          retiredStableNodes={detail.data.retired_stable_nodes}
+          readOnly={forcePreview}
+          requests={requests}
+          onWordChange={replaceCanonical}
+          renderStep={(context) => (
+            <V3WizardSlots
+              context={context}
+              onActivated={replaceActivatedCanonical}
+              renderMeaningsStep={renderMeaningsStep}
+              requests={requests}
+              wordId={word.id}
+            />
+          )}
+        />
+      </V3ReferenceGuardProvider>
     </Flex>
   );
 }

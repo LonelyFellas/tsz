@@ -12,6 +12,7 @@ import type {
   EntryDeleteBatchResponse,
   EntryLifecycleBatchResponse,
   FormsImpactResponseV3,
+  InboundReferencesV3,
   ResolveSentenceTargetsV3Response,
   SearchComponentTargetsV3Response,
   RelatedSearchResponseAny,
@@ -394,6 +395,12 @@ export function decodeFormsImpactResponseV3(
   value: unknown
 ): FormsImpactResponseV3 {
   return decodeV3VersionedRoot("FormsImpactResponseV3", value);
+}
+
+/** 入站引用响应没有 schema_version：整棵按 runtime schema 严格校验即可。 */
+export function decodeInboundReferencesV3(value: unknown): InboundReferencesV3 {
+  assertRuntimeContract("InboundReferencesV3", value);
+  return value as InboundReferencesV3;
 }
 
 export function decodeSurfaceMatchPageAny(value: unknown): SurfaceMatchPageV3 {

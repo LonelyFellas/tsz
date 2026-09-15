@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusOutlined } from "@ant-design/icons";
 import {
@@ -39,7 +39,9 @@ export function WordSentences({
   onOpen,
   onClose,
   readOnly,
-  registerLeaveGuard
+  registerLeaveGuard,
+  focusSentenceId,
+  onFocusHandled
 }: {
   sourceWord: AdminWordV3;
   senseId: string;
@@ -48,6 +50,9 @@ export function WordSentences({
   onClose: () => void;
   readOnly?: boolean;
   registerLeaveGuard?: (guard?: () => Promise<boolean>) => void;
+  /** 引用跳转落点：展开区块并直接打开这条例句，不依赖它在哪一页。 */
+  focusSentenceId?: string;
+  onFocusHandled?: () => void;
 }) {
   const entryId = sourceWord.id;
   const savedSense = sourceWord.meanings.pos
@@ -71,6 +76,10 @@ export function WordSentences({
   const rows = query.data?.items ?? [];
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["shared-sentences"] });
+    // 例句关联改了，本词条被引用的节点也跟着变：让向导的引用索引重取，禁用态即时更新。
+    void client.invalidateQueries({
+      queryKey: ["inbound-references", entryId]
+    });
   };
   const failure = (error: unknown) => {
     void message.error(
@@ -84,6 +93,27 @@ export function WordSentences({
       failure(error);
     }
   };
+  useEffect(() => {
+    if (!focusSentenceId) return;
+    let cancelled = false;
+    setCollapsed(false);
+    void api.sentences
+      .get(focusSentenceId)
+      .then((sentence) => {
+        if (!cancelled) onOpen(sentence);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) failure(error);
+      })
+      .finally(() => {
+        if (!cancelled) onFocusHandled?.();
+      });
+    return () => {
+      cancelled = true;
+    };
+    // 只按目标例句 id 触发；onOpen / onFocusHandled 每次渲染都是新函数。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusSentenceId]);
   const remove = (item: SharedSentence) => {
     const confirmation = modal.confirm({
       title: "从当前词义解除关联？",

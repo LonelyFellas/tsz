@@ -11,6 +11,8 @@ import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "./components/V3ProductProgressList";
+import { V3ReferenceList } from "./components/V3ReferenceList";
+import { useV3ReferenceGuard } from "./referenceGuardContext";
 import type { V3Problem } from "./problem";
 import { buildV3ProductProgress, v3ProductProgressBadge } from "./readiness";
 import { v3IssueMessages } from "./presentationErrors";
@@ -76,6 +78,10 @@ function problemTitle(problem: V3Problem) {
     // 正常路径由词形步/词义步的确认条挡在前面。
     case "impact_confirmation":
       return "词形影响需要重新确认";
+    case "inbound_reference":
+      return problem.references.length > 0
+        ? "本次修改会破坏其他内容对本词条的引用"
+        : "引用目标正在变更或仍被引用";
     case "network":
     case "server":
     case "service_unavailable":
@@ -165,6 +171,15 @@ function V3WordCreationLayoutContent({
   children
 }: Props) {
   const remoteUpdateAlertRef = useRef<HTMLDivElement>(null);
+  const referenceGuard = useV3ReferenceGuard();
+  // 保存被引用拦下多半是别处刚新增了引用（或索引过期）：重新拉一次，界面禁用态跟着更新。
+  const inboundReferenceProblem =
+    problem?.kind === "inbound_reference" ? problem : undefined;
+  useEffect(() => {
+    if (inboundReferenceProblem) referenceGuard.refresh();
+    // 只在收到新的引用冲突时刷新；refresh 身份随查询变化，不作依赖。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inboundReferenceProblem]);
   useEffect(() => {
     if (!remoteUpdateNotice) return;
     remoteUpdateAlertRef.current?.scrollIntoView?.({
@@ -314,6 +329,16 @@ function V3WordCreationLayoutContent({
                       ：本地输入仍已保留。
                     </span>
                     {conflict.serverWord && <span>已获取服务端最新内容。</span>}
+                  </Flex>
+                ) : inboundReferenceProblem ? (
+                  <Flex vertical gap={4}>
+                    {inboundReferenceProblem.detail ? (
+                      <span>{inboundReferenceProblem.detail}</span>
+                    ) : null}
+                    <V3ReferenceList
+                      emptyText="后端未返回引用明细；请刷新页面后重试，仍失败时到来源处解除引用。"
+                      references={inboundReferenceProblem.references}
+                    />
                   </Flex>
                 ) : operationValidationIssues.length > 0 ? (
                   <Flex vertical gap={4}>

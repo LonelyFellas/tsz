@@ -1,7 +1,17 @@
 import { wordKeys } from "@/features/dictionary/api";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  focusManager
+} from "@tanstack/react-query";
 import { HttpError } from "@tsz/api-client";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  act
+} from "@testing-library/react";
 import { App as AntApp } from "antd";
 import type {
   AdminWordPublicationV3,
@@ -112,6 +122,13 @@ function source(getAnyValue: unknown) {
     surfaceMatchSnapshotPage: vi.fn(),
     createV3: vi.fn(),
     get: vi.fn(async () => getAnyValue),
+    inboundReferencesV3: vi.fn(async (wordId: string) => ({
+      entry_id: wordId,
+      revision: 1,
+      nodes: [],
+      items: [],
+      truncated: false
+    })),
     previewFormsImpactV3: vi.fn(async () => ({
       schema_version: 3,
       base_revision: 1,
@@ -748,6 +765,217 @@ describe("WordWizardV3Page", () => {
         WORD_ID
       ])?.word.revision
     ).toBe(2);
+  });
+
+  it("影响预览判定会破坏引用时不再发保存，改为列出引用；被引用节点带徽标", async () => {
+    const current = word();
+    const pos = current.forms.pos[0]!;
+    const base = pos.forms[0]!;
+    const variantId =
+      base.regional_variants.mode === "common"
+        ? base.regional_variants.common.id
+        : base.regional_variants.uk.id;
+    const reference = {
+      id: "shared_sentence:annotation-1",
+      kind: "shared_sentence" as const,
+      target: {
+        pos_id: pos.pos_id,
+        base_form_id: base.id,
+        form_id: base.id,
+        variant_id: variantId,
+        sense_id: "sense-1"
+      },
+      stale: false,
+      source: {
+        sentence_id: "sentence-1",
+        sentence_revision: 1,
+        sentence_text: "The centre holds.",
+        source_dialect: "common" as const,
+        segments: [{ start: 4, end: 10, surface: "centre" }]
+      }
+    };
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.inboundReferencesV3).mockResolvedValue({
+      entry_id: WORD_ID,
+      revision: 1,
+      nodes: [
+        { node_id: pos.pos_id, node_type: "pos", total: 1 },
+        { node_id: base.id, node_type: "form", total: 1 },
+        { node_id: variantId, node_type: "variant", total: 1 },
+        { node_id: "sense-1", node_type: "sense", total: 1 }
+      ],
+      items: [reference],
+      truncated: false
+    });
+    vi.mocked(endpoints.previewFormsImpactV3).mockResolvedValueOnce({
+      schema_version: 3,
+      base_revision: 1,
+      requires_confirmation: false,
+      affected: [],
+      blocked_references: [{ ...reference, stale: true }]
+    });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints)
+    );
+
+    // 整页按角色查会逐个元素算继承样式，jsdom 里这一页会卡死；徽标的可及名就是 aria-label，按标签查。
+    expect(await screen.findAllByLabelText("被引用 1")).not.toHaveLength(0);
+    expect(screen.getByLabelText("英美拼写有区别")).toBeDisabled();
+    // 未失效的引用：本次把拼写改坏就禁用保存并给出原因。
+    fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
+      target: { value: "center" }
+    });
+    expect(screen.getByText("保存草稿").closest("button")).toBeDisabled();
+    expect(
+      screen.getByText("保存草稿").closest(".v3-disabled-reason")
+    ).not.toBeNull();
+    const referenceCallsBeforeSave = vi.mocked(endpoints.inboundReferencesV3)
+      .mock.calls.length;
+    // 拼写改成与片段一致但大小写不同：允许保存，交给服务端判定。
+    fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
+      target: { value: "Centre" }
+    });
+    fireEvent.click(screen.getByText("保存草稿"));
+    await waitFor(() =>
+      expect(endpoints.previewFormsImpactV3).toHaveBeenCalledTimes(1)
+    );
+    expect(
+      await screen.findByText("本次词形变更会破坏 1 处引用，无法保存")
+    ).toBeInTheDocument();
+    // 预检列出的是改了才会失效的引用，标成「已失效」会误导。
+    expect(screen.getByText("将失效")).toBeInTheDocument();
+    expect(screen.queryByText("已失效")).toBeNull();
+    // 被预检拦下说明本地引用索引旧了：重取一次，徽标与禁用态跟上服务端。
+    await waitFor(() =>
+      expect(
+        vi.mocked(endpoints.inboundReferencesV3).mock.calls.length
+      ).toBeGreaterThan(referenceCallsBeforeSave)
+    );
+    expect(screen.queryByText("确认影响并保存草稿")).toBeNull();
+    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+  });
+
+  it("窗口重新聚焦时重取引用：在来源词条标签页解除引用后切回即可解锁", async () => {
+    const current = word();
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    // 和线上 admin 一样带全局 staleTime：没单独设 staleTime 的查询一分钟内聚焦不会重取。
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: 60_000 } }
+    });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints),
+      undefined,
+      undefined,
+      client
+    );
+    await waitFor(() =>
+      expect(endpoints.inboundReferencesV3).toHaveBeenCalled()
+    );
+    const callsBeforeFocus = vi.mocked(endpoints.inboundReferencesV3).mock.calls
+      .length;
+    try {
+      act(() => {
+        focusManager.setFocused(false);
+        focusManager.setFocused(true);
+      });
+      await waitFor(() =>
+        expect(
+          vi.mocked(endpoints.inboundReferencesV3).mock.calls.length
+        ).toBeGreaterThan(callsBeforeFocus)
+      );
+    } finally {
+      focusManager.setFocused(undefined);
+    }
+  });
+
+  it("失效引用只在「引用已失效」里列一次，不在拼写冲突提示里重复", async () => {
+    const current = word();
+    const pos = current.forms.pos[0]!;
+    const base = pos.forms[0]!;
+    const variantId =
+      base.regional_variants.mode === "common"
+        ? base.regional_variants.common.id
+        : base.regional_variants.uk.id;
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.inboundReferencesV3).mockResolvedValue({
+      entry_id: WORD_ID,
+      revision: 1,
+      nodes: [
+        { node_id: pos.pos_id, node_type: "pos", total: 1 },
+        { node_id: base.id, node_type: "form", total: 1 },
+        { node_id: variantId, node_type: "variant", total: 1 }
+      ],
+      items: [
+        {
+          id: "shared_sentence:annotation-stale",
+          kind: "shared_sentence" as const,
+          target: {
+            pos_id: pos.pos_id,
+            base_form_id: base.id,
+            form_id: base.id,
+            variant_id: variantId,
+            sense_id: "sense-1"
+          },
+          // 片段已被改成 center，和草稿里的 centre 对不上：既是失效引用，也是拼写冲突。
+          stale: true,
+          source: {
+            sentence_id: "sentence-1",
+            sentence_revision: 1,
+            sentence_text: "The center holds.",
+            source_dialect: "common" as const,
+            segments: [{ start: 4, end: 10, surface: "center" }]
+          }
+        }
+      ],
+      truncated: false
+    });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints)
+    );
+
+    expect(
+      await screen.findByText("有 1 条引用已失效，需先处理")
+    ).toBeInTheDocument();
+    // 输入框旁的即时标红照常；顶部只是不再多出一条列同一引用的红条。
+    expect(screen.getByText(/与被引用片段“center”不一致/)).toBeInTheDocument();
+    expect(screen.queryByText("拼写与被引用片段不一致，无法保存")).toBeNull();
+    expect(document.querySelectorAll(".v3-reference-item")).toHaveLength(1);
+    // 草稿保存只拦本次改动破坏的引用：旧的失效引用只挡发布，保存按钮不因它禁用、不挂原因提示。
+    expect(screen.getByText(/处理完之前本词条无法发布/)).toBeInTheDocument();
+    expect(
+      screen.getByText("保存草稿").closest(".v3-disabled-reason")
+    ).toBeNull();
+    // 有改动、拼写仍与失效片段对不上：旧冲突不挡，保存照样可点。
+    fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
+      target: { value: "centres" }
+    });
+    expect(screen.getByText("保存草稿").closest("button")).not.toBeDisabled();
+  });
+
+  it("引用接口不可用时给出提示但不阻塞编辑与保存", async () => {
+    const current = word();
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    vi.mocked(endpoints.inboundReferencesV3).mockRejectedValue(
+      new HttpError(500, "boom", [], "internal_error")
+    );
+    vi.mocked(endpoints.saveFormsStepV3).mockResolvedValueOnce({
+      word: { ...current, revision: 2 }
+    });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms`,
+      createV3WordRequests(endpoints)
+    );
+    expect(await screen.findByText("引用信息暂不可用")).toBeInTheDocument();
+    fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
+      target: { value: "centre-edited" }
+    });
+    fireEvent.click(screen.getByText("保存草稿"));
+    await waitFor(() =>
+      expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1)
+    );
   });
 
   it("#136 不完整词形可直接进入词义且纯导航不发请求", async () => {

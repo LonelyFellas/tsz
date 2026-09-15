@@ -1,6 +1,9 @@
 // 通用 API 包裹类型。
 
-import type { V3DraftValidationIssue } from "./admin-word-v3";
+import type {
+  InboundReferenceV3,
+  V3DraftValidationIssue
+} from "./admin-word-v3";
 import type { EntryAnnotationConflict } from "./entry-annotation";
 import type { SurfaceMatchPageV3, SurfacePolicyNameV2 } from "./surface-match";
 
@@ -34,6 +37,8 @@ export interface ProblemMeta {
   part_of_speech_id?: string;
   code?: string;
   reference_locations?: ProblemReferenceLocation[];
+  /** `409 inbound_reference_conflict`：本次写入会破坏或已失效的入站引用，最多 500 条。 */
+  inbound_references?: InboundReferenceV3[];
   surface_match_page?: SurfaceMatchPageV3;
   current_policy_name?: SurfacePolicyNameV2;
   current_policy_epoch?: number;
