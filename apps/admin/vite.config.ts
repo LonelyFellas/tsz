@@ -24,6 +24,46 @@ function buildDevProxy(mode: string) {
   return buildAdminDevProxy(env.BACKEND_API_URL);
 }
 
+// 第三方库分包：默认分包按「被哪些页面引用」把库代码与业务代码混排，库 chunk 还会
+// import 业务入口 index-*.js；入口内嵌全部懒加载 chunk 的文件名，任何业务改动都会让它
+// 换哈希，进而连带所有库 chunk 换哈希——每次部署用户都得重下整套 antd。
+// 这里按包名 / antd 组件目录固定分组，只改业务代码时库 chunk 文件名不变：
+//   1. 入口静态依赖的第三方模块按包名 → vendor-initial-<包>；
+//   2. 其余 antd 模块按组件目录（antd/es/<组件>）→ antd-<组件>；
+//   3. 其余第三方包按包名 → vendor-<包>。
+// 每组会连带认领尚未被认领的依赖，块名只代表认领方：antd 的共享内部模块（select、
+// menu 等）会落进先认领的组件块。库代码自身用量变化（新用某个库 API、增删组件）
+// 仍会让对应库 chunk 及引用它的 chunk 换哈希。
+function nodeModulePath(moduleId: string): string[] | null {
+  const index = moduleId.lastIndexOf("node_modules");
+  if (index < 0) return null;
+  return moduleId.slice(index + "node_modules".length + 1).split(/[\\/]/);
+}
+
+function packageName(moduleId: string): string | null {
+  const [first, second = ""] = nodeModulePath(moduleId) ?? [];
+  if (!first) return null;
+  const pkg = first.startsWith("@") ? `${first.slice(1)}-${second}` : first;
+  return pkg.replace(/[^\w-]/g, "-");
+}
+
+function initialPackageChunk(moduleId: string): string | null {
+  const pkg = packageName(moduleId);
+  return pkg ? `vendor-initial-${pkg}` : null;
+}
+
+function antdComponentChunk(moduleId: string): string | null {
+  const parts = nodeModulePath(moduleId);
+  return parts?.[0] === "antd" && parts[1] === "es" && parts[2]
+    ? `antd-${parts[2]}`
+    : null;
+}
+
+function packageChunk(moduleId: string): string | null {
+  const pkg = packageName(moduleId);
+  return pkg && pkg !== "antd" ? `vendor-${pkg}` : null;
+}
+
 export default defineConfig(({ mode, command }) => {
   const buildEnv = loadEnv(mode, process.cwd(), "");
   const production = command === "build" || mode === "production";
@@ -58,6 +98,20 @@ export default defineConfig(({ mode, command }) => {
       }
     },
     server,
+    build: {
+      rolldownOptions: {
+        output: {
+          codeSplitting: {
+            // priority 高的先认领模块（连同其未被认领的依赖）。
+            groups: [
+              { name: initialPackageChunk, tags: ["$initial"], priority: 30 },
+              { name: antdComponentChunk, priority: 20 },
+              { name: packageChunk, priority: 10 }
+            ]
+          }
+        }
+      }
+    },
     // 平台后台应用层测试：jsdom + React。别名复用上面的 resolve.alias。
     test: {
       name: "admin",
