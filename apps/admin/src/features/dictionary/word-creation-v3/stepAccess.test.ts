@@ -12,24 +12,31 @@ function word(
 }
 
 describe("resolveV3StepAccess", () => {
-  it("allows draft navigation to every step regardless of the resume hint", () => {
-    for (const requested of [
-      "basics",
-      "forms",
-      "meanings",
-      "preview"
-    ] as const) {
+  it("未完成的草稿可切换前三步，但不能直接进入预览", () => {
+    for (const max of ["basics", "forms", "meanings"] as const) {
+      for (const requested of ["basics", "forms", "meanings"] as const) {
+        expect(
+          resolveV3StepAccess(word("draft", max), requested, false)
+        ).toMatchObject({ effective: requested, requestedReachable: true });
+      }
       expect(
-        resolveV3StepAccess(word("draft", "forms"), requested, false)
+        resolveV3StepAccess(word("draft", max), "preview", false)
       ).toMatchObject({
-        requested,
-        effective: requested,
-        requestedReachable: true
+        effective: "meanings",
+        requestedReachable: false,
+        reachable: new Set(["basics", "forms", "meanings"])
       });
     }
+  });
+
+  it("完成词义步骤后允许草稿进入预览", () => {
     expect(
-      resolveV3StepAccess(word("draft", "forms"), "preview", false).reachable
-    ).toEqual(new Set(["basics", "forms", "meanings", "preview"]));
+      resolveV3StepAccess(word("draft", "preview"), "preview", false)
+    ).toMatchObject({
+      effective: "preview",
+      requestedReachable: true,
+      reachable: new Set(["basics", "forms", "meanings", "preview"])
+    });
   });
 
   it("forces archived and published read-only entries to preview", () => {

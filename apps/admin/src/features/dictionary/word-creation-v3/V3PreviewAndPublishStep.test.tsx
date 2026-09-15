@@ -326,16 +326,16 @@ describe("V3PreviewAndPublishStep", () => {
     );
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation}`)
-    ).toHaveTextContent("常规 · 词典音标 sen-tre · 实际发音 centre");
+    ).toHaveTextContent(/sen\-tre.*常规.*centre/);
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_2}`)
-    ).toHaveTextContent("强读 · 词典音标 sen-tr · 实际发音 centr");
+    ).toHaveTextContent(/sen\-tr.*强读.*centr/);
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_3}`)
-    ).toHaveTextContent("弱读 · 词典音标 sen-ter · 实际发音 center");
+    ).toHaveTextContent(/sen\-ter.*弱读.*center/);
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(904)}`)
-    ).toHaveTextContent("常规 · 词典音标 sen-tre-uk · 实际发音 centre-uk");
+    ).toHaveTextContent(/sen\-tre\-uk.*常规.*centre\-uk/);
   });
 
   it("keeps an empty group list and an empty pronunciation list explicit", () => {
@@ -384,7 +384,7 @@ describe("V3PreviewAndPublishStep", () => {
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(905)}`)
     ).toHaveTextContent(
-      "未选择发音方式 · 词典音标 pending-phonetic · 实际发音 pending-pronunciation"
+      /pending-phonetic.*未选择发音方式.*pending-pronunciation/
     );
   });
 

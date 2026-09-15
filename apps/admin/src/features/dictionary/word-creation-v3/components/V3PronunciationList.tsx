@@ -335,7 +335,7 @@ export function V3PronunciationList({
                               nodeId={pronunciation.id}
                               field="dict_phonetic"
                               invalid={Boolean(dictPhoneticIssue)}
-                              placeholder="字典音标"
+                              placeholder="Dictionary Pronunciation"
                               value={
                                 pronunciation.dict_phonetic_rich ?? {
                                   version: 2,
@@ -402,7 +402,7 @@ export function V3PronunciationList({
                             ariaLabel={`第 ${index + 1} 条发音的实际发音`}
                             field="actual_pron"
                             nodeId={pronunciation.id}
-                            placeholder="实际发音"
+                            placeholder="Connected Speech"
                             invalid={Boolean(actualPronIssue)}
                             value={
                               pronunciation.actual_pron_rich ?? {

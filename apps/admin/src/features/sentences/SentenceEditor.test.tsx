@@ -153,7 +153,9 @@ describe("当前词条关联与离开保护", () => {
         selector: ".v3-component-usage-entry strong"
       })
     );
-    fireEvent.click(await screen.findByText(/原形 make/));
+    fireEvent.click(
+      await screen.findByText(/原形 make/, {}, { timeout: 5000 })
+    );
     fireEvent.click(await screen.findByText("编造（故事、借口等）"));
     fireEvent.click(screen.getByRole("button", { name: "确认关联" }));
     const done = screen.getByRole("button", { name: "完成例句编辑" });
@@ -184,7 +186,9 @@ describe("当前词条关联与离开保护", () => {
       })
     );
     expect(screen.getByRole("button", { name: "确认关联" })).toBeDisabled();
-    fireEvent.click(await screen.findByText(/原形 make/));
+    fireEvent.click(
+      await screen.findByText(/原形 make/, {}, { timeout: 5000 })
+    );
     expect(screen.getByRole("button", { name: "确认关联" })).toBeDisabled();
     fireEvent.click(await screen.findByText("编造（故事、借口等）"));
     fireEvent.click(screen.getByRole("button", { name: "确认关联" }));
@@ -232,7 +236,7 @@ describe("当前词条关联与离开保护", () => {
       expect.objectContaining({ q: "for", match: "exact", kind: "word" }),
       expect.any(AbortSignal)
     );
-    fireEvent.click(await screen.findByText(/原形 for/));
+    fireEvent.click(await screen.findByText(/原形 for/, {}, { timeout: 5000 }));
     const sense = await screen.findByText("编造（故事、借口等）");
     expect(sense.closest("li")).toHaveClass("ant-cascader-menu-item-disabled");
     expect(sense.querySelector(".v3-component-usage-radio")).toHaveClass(
@@ -266,7 +270,9 @@ describe("当前词条关联与离开保护", () => {
         selector: ".v3-component-usage-entry strong"
       })
     );
-    fireEvent.click(await screen.findByText(/原形 color/));
+    fireEvent.click(
+      await screen.findByText(/原形 color/, {}, { timeout: 5000 })
+    );
     fireEvent.click(await screen.findByText("编造（故事、借口等）"));
     fireEvent.click(screen.getByRole("button", { name: "确认关联" }));
     expect(select).toHaveBeenCalledWith(

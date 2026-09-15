@@ -1,4 +1,5 @@
-import { SentenceLibrary } from "@/features/sentences/SentenceLibrary";
+import { PronunciationPreviewProvider } from "@/features/dictionary/word-creation/PronunciationPreview";
+import { V3ReviewSentences } from "@/features/dictionary/word-creation-v3/V3ReviewSentences";
 import { WordSentences } from "@/features/sentences/WordSentences";
 import { wordKeys } from "@/features/dictionary/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -633,6 +634,48 @@ function V3MeaningsSlot({
   );
 }
 
+function V3LiveReview({
+  word,
+  readiness,
+  actions,
+  onEdit
+}: {
+  word: AdminWordV3;
+  readiness?: React.ReactNode;
+  actions?: React.ReactNode;
+  onEdit?: (nodeId: string) => void;
+}) {
+  const sentences = useQuery({
+    queryKey: ["shared-sentences", "count", word.id],
+    queryFn: () => api.sentences.list({ entry_id: word.id, page_size: 1 })
+  });
+  const legacyCount = word.meanings.pos
+    .flatMap((pos) => pos.senses)
+    .reduce((sum, sense) => sum + sense.sentences.length, 0);
+  return (
+    <PronunciationPreviewProvider>
+      <V3ReviewContent
+        playback
+        word={word}
+        readiness={readiness}
+        actions={actions}
+        onEdit={onEdit}
+        sentenceCount={
+          sentences.data ? sentences.data.total + legacyCount : null
+        }
+        renderSentences={(senseId) => (
+          <V3ReviewSentences
+            key={`${word.id}:${senseId}`}
+            entryId={word.id}
+            senseId={senseId}
+            revision={word.revision}
+          />
+        )}
+      />
+    </PronunciationPreviewProvider>
+  );
+}
+
 function V3ReadOnlyPreview({
   word,
   onEdit
@@ -641,7 +684,7 @@ function V3ReadOnlyPreview({
   onEdit?: () => void;
 }) {
   return (
-    <V3ReviewContent
+    <V3LiveReview
       actions={
         onEdit ? (
           <Button type="primary" onClick={onEdit}>
@@ -666,6 +709,17 @@ function V3PreviewSlot({ context }: { context: V3WizardSlotContext }) {
     );
   }
   const controller = {
+    renderPreview: (readiness: React.ReactNode) => (
+      <V3LiveReview
+        word={context.word}
+        readiness={readiness}
+        onEdit={(nodeId) => {
+          const target = locateV3Node(context.word, nodeId);
+          if (target) void context.actions.navigateTarget(target);
+          else context.setActiveStep("forms");
+        }}
+      />
+    ),
     ...(context.validation ? { validation: context.validation } : {}),
     ...(context.impact ? { impact: context.impact } : {}),
     impactConfirmed: context.impactConfirmed,
@@ -774,7 +828,6 @@ function V3WizardSlots({
               : undefined
           }
         />
-        <SentenceLibrary entryId={context.word.id} readOnly />
         <V3PublicationHistory
           currentWord={context.word}
           onActivated={onActivated}
@@ -804,7 +857,6 @@ function V3WizardSlots({
       return (
         <Flex vertical gap="middle">
           <V3PreviewSlot context={context} />
-          <SentenceLibrary entryId={context.word.id} readOnly />
           <V3PublicationHistory
             activationBlockedByUnsavedChanges={context.hasUnsavedChanges}
             currentWord={context.word}
