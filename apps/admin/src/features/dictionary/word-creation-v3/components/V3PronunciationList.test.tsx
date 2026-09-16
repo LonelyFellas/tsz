@@ -2,6 +2,7 @@ import { env } from "@/lib/env";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
+import type { RichTextV2 } from "@tsz/types";
 import type { VoiceEditorProps } from "@tsz/voice-editor/types";
 import { formsFixture, commonFormFixture } from "../fixtures";
 import { toFormsWire } from "../model";
@@ -16,7 +17,17 @@ vi.mock("@/features/dictionary/voice-editor/dataSource", () => ({
   voicePreviewIsMock: false
 }));
 vi.mock("../../word-creation/PronunciationPreview", () => ({
-  PronunciationPreviewControls: () => <button>最终读音</button>
+  PronunciationPreviewControls: ({
+    content,
+    ariaLabelPrefix
+  }: {
+    content: RichTextV2;
+    ariaLabelPrefix: string;
+  }) => (
+    <button aria-label={ariaLabelPrefix} data-content={JSON.stringify(content)}>
+      最终读音
+    </button>
+  )
 }));
 vi.mock("@tsz/voice-editor/editor", () => ({
   VoiceEditor: ({
@@ -130,7 +141,7 @@ describe("独立发音输入", () => {
         phoneme: "K AE T"
       }
     ]);
-    fireEvent.click(screen.getByText("收起设置"));
+    fireEvent.click(screen.getByLabelText("收起设置"));
     const wire = JSON.parse(screen.getByTestId("wire").textContent!);
     const rows = wire.pos[0].forms[0].regional_variants.common.pronunciations;
     expect(rows[0].synthesis).toEqual({
@@ -179,7 +190,10 @@ describe("独立发音输入", () => {
       "human IPA"
     );
     expect(screen.getByLabelText("Azure IPA")).toBeChecked();
-    fireEvent.click(screen.getByLabelText("第 1 条发音撤销 Azure UPS"));
+    fireEvent.keyDown(screen.getByLabelText("第 1 条发音的Azure UPS"), {
+      key: "z",
+      ctrlKey: true
+    });
     expect(screen.getByLabelText("第 1 条发音的Azure UPS")).toHaveValue(
       "H U M"
     );
@@ -219,4 +233,47 @@ it("关闭新入口仍保留音色录音入口，读取和保存已有 synthesis
   } finally {
     env.AZURE_PRONUNCIATION_INPUTS = true;
   }
+});
+
+it("两行试听各自使用对应音素，切换来源保留内容", () => {
+  render(<Harness />);
+  fireEvent.change(screen.getByLabelText("第 1 条发音的Azure IPA"), {
+    target: { value: "kæt" }
+  });
+  fireEvent.change(screen.getByLabelText("第 1 条发音的Azure UPS"), {
+    target: { value: "K AE T" }
+  });
+  for (const alphabet of ["IPA", "UPS"]) {
+    fireEvent.click(screen.getByLabelText(`Azure ${alphabet}`));
+    for (const [source, phoneme] of [
+      ["IPA", "kæt"],
+      ["UPS", "K AE T"]
+    ]) {
+      const content = JSON.parse(
+        screen
+          .getByLabelText(`第 1 条发音 Azure ${source} 最终读音`)
+          .getAttribute("data-content")!
+      );
+      expect(content.annotations).toEqual([
+        expect.objectContaining({ alphabet: source!.toLowerCase(), phoneme })
+      ]);
+      expect(screen.getByLabelText(`第 1 条发音的Azure ${source}`)).toHaveValue(
+        phoneme
+      );
+    }
+  }
+});
+
+it("格式错误提示不会拼接成操作指令", async () => {
+  render(<Harness />);
+  fireEvent.change(screen.getByLabelText("第 1 条发音的Azure UPS"), {
+    target: { value: "中文" }
+  });
+  fireEvent.click(screen.getByLabelText("Azure UPS"));
+  fireEvent.click(screen.getByLabelText("第 1 条发音打开 Azure UPS 发音设置"));
+  expect(
+    await screen.findByText(
+      "UPS 使用区分大小写、以空格分隔的 ASCII 音素。音色可先配置。"
+    )
+  ).toBeInTheDocument();
 });

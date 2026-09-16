@@ -125,16 +125,24 @@ assert.equal(
   spawnSync("systemctl", ["enable", "--now", "tsz-web@3100.service"]).status,
   0
 );
+// 此端口会在 W4 发布时重启，探针不保留跨进程复用的连接。
+const webProbeOptions = { headers: { Connection: "close" } };
 for (let attempt = 0; attempt < 30; attempt++) {
   try {
-    if ((await fetch("http://127.0.0.1:3100/")).ok) break;
+    if ((await fetch("http://127.0.0.1:3100/", webProbeOptions)).ok) break;
   } catch {}
   await new Promise((resolve) => setTimeout(resolve, 100));
 }
-assert.equal(await (await fetch("http://127.0.0.1:3100/")).text(), "W1");
+assert.equal(
+  await (await fetch("http://127.0.0.1:3100/", webProbeOptions)).text(),
+  "W1"
+);
 await stage("web", "W4");
 publish("/opt/stage-W4", "web", true);
-assert.equal(await (await fetch("http://127.0.0.1:3100/")).text(), "W4");
+assert.equal(
+  await (await fetch("http://127.0.0.1:3100/", webProbeOptions)).text(),
+  "W4"
+);
 console.log(
   "PASS: first migration, accepted manifest, tamper rejection, admin/web HTTP failure rollback, web slot switch, legacy IP forwarding"
 );

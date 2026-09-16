@@ -1,14 +1,9 @@
-import { AudioOutlined, SwapOutlined, UndoOutlined } from "@ant-design/icons";
 import {
-  Alert,
-  Button,
-  Input,
-  Modal,
-  Radio,
-  Space,
-  Tooltip,
-  Typography
-} from "antd";
+  AudioOutlined,
+  SwapOutlined,
+  CaretUpOutlined
+} from "@ant-design/icons";
+import { Alert, Button, Input, Modal, Radio, Space, Typography } from "antd";
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type {
   Dialect,
@@ -28,6 +23,7 @@ import {
   voicePreviewIsMock
 } from "../../voice-editor/dataSource";
 import { env } from "@/lib/env";
+import "./V3SynthesisInputs.css";
 
 const VoiceEditor = lazy(() =>
   import("@tsz/voice-editor/editor").then((module) => ({
@@ -119,106 +115,108 @@ export function V3SynthesisInputs({
     <div className="word-pronunciation-synthesis">
       {synthesisEditable ? (
         <>
-          <Space wrap>
-            <Typography.Text>合成来源</Typography.Text>
-            <Radio.Group
-              aria-label={`${label}的合成来源`}
-              value={synthesis.alphabet}
-              options={[
-                { label: "Azure IPA", value: "ipa" },
-                { label: "Azure UPS", value: "ups" }
-              ]}
-              onChange={(event) =>
-                onChange({
-                  synthesis: { ...synthesis, alphabet: event.target.value }
-                })
-              }
-            />
-            <PronunciationPreviewControls
-              playbackOnly
-              pronunciationId={pronunciation.id}
-              dialect={dialect}
-              ariaLabelPrefix={`${label} 最终读音`}
-              disabled={!content}
-              disabledReason={
-                selectedIssue ??
-                (!spelling.trim() ? "请先填写词形拼写" : undefined)
-              }
-              content={content ?? { version: 2, text: "", annotations: [] }}
-              voiceProfile={pronunciation.voice_profile}
-            />
-          </Space>
-          {(["ipa", "ups"] as const).map((alphabet) => {
-            const name = `Azure ${alphabet.toUpperCase()}`;
-            const invalid = issues.some(
-              (issue) => issue.field === `synthesis.${alphabet}`
-            );
-            return (
-              <div className="word-pronunciation-row" key={alphabet}>
-                <Typography.Text className="word-pronunciation-label">
-                  {name}
-                </Typography.Text>
-                <Space.Compact block>
-                  <Tooltip
-                    title={`从字典音标转换为 ${name}${alphabet === "ups" ? "，不读取或覆盖人工 IPA" : ""}`}
+          <Radio.Group
+            className="word-synthesis-source"
+            aria-label={`${label}的合成来源`}
+            value={synthesis.alphabet}
+            onChange={(event) =>
+              onChange({
+                synthesis: { ...synthesis, alphabet: event.target.value }
+              })
+            }
+          >
+            {(["ipa", "ups"] as const).map((alphabet) => {
+              const name = `Azure ${alphabet.toUpperCase()}`;
+              const rowContent = pronunciationSynthesisContent(spelling, {
+                ...synthesis,
+                alphabet
+              });
+              const invalid = issues.some(
+                (issue) => issue.field === `synthesis.${alphabet}`
+              );
+              return (
+                <div className="word-pronunciation-row" key={alphabet}>
+                  <Radio
+                    value={alphabet}
+                    aria-label={name}
+                    className="word-pronunciation-label word-synthesis-choice"
                   >
+                    {alphabet.toUpperCase()}
+                  </Radio>
+                  <div className="word-synthesis-input">
+                    <Space.Compact className="word-synthesis-control">
+                      <PronunciationPreviewControls
+                        playbackOnly
+                        pronunciationId={pronunciation.id}
+                        dialect={dialect}
+                        ariaLabelPrefix={`${label} ${name} 最终读音`}
+                        disabled={!rowContent}
+                        disabledReason={
+                          synthesisInputIssue(alphabet, synthesis[alphabet]) ??
+                          (!spelling.trim() ? "请先填写词形拼写" : undefined)
+                        }
+                        content={
+                          rowContent ?? {
+                            version: 2,
+                            text: "",
+                            annotations: []
+                          }
+                        }
+                        voiceProfile={pronunciation.voice_profile}
+                      />
+                      <Input.TextArea
+                        autoSize={{ minRows: 1, maxRows: 6 }}
+                        aria-label={`${label}的${name}`}
+                        data-v3-node-id={pronunciation.id}
+                        data-v3-field={`synthesis.${alphabet}`}
+                        status={invalid ? "error" : undefined}
+                        aria-invalid={invalid}
+                        value={synthesis[alphabet]}
+                        placeholder={`输入 ${alphabet.toUpperCase()} 音素`}
+                        onChange={(event) =>
+                          change(alphabet, event.target.value)
+                        }
+                        onKeyDown={(event) => {
+                          if (
+                            (event.metaKey || event.ctrlKey) &&
+                            event.key.toLowerCase() === "z" &&
+                            !event.shiftKey
+                          ) {
+                            event.preventDefault();
+                            undo(alphabet);
+                          }
+                        }}
+                      />
+                      <Button
+                        icon={<AudioOutlined />}
+                        aria-label={`${label}打开 ${name} 发音设置`}
+                        title={
+                          synthesis.alphabet === alphabet
+                            ? "发音设置与真人录音"
+                            : `请先选择 ${name} 作为合成来源`
+                        }
+                        disabled={synthesis.alphabet !== alphabet}
+                        onClick={() => setExpanded((value) => !value)}
+                      />
+                    </Space.Compact>
                     <Button
+                      type="text"
                       icon={<SwapOutlined />}
                       aria-label={`${label}转换为 ${name}`}
+                      title={`从字典音标转换为 ${alphabet.toUpperCase()}`}
                       onClick={() => convert(alphabet)}
                     />
-                  </Tooltip>
-                  <Input.TextArea
-                    autoSize={{ minRows: 1, maxRows: 6 }}
-                    aria-label={`${label}的${name}`}
-                    data-v3-node-id={pronunciation.id}
-                    data-v3-field={`synthesis.${alphabet}`}
-                    status={invalid ? "error" : undefined}
-                    aria-invalid={invalid}
-                    value={synthesis[alphabet]}
-                    placeholder={`输入 ${name} 音素`}
-                    onChange={(event) => change(alphabet, event.target.value)}
-                    onKeyDown={(event) => {
-                      if (
-                        (event.metaKey || event.ctrlKey) &&
-                        event.key.toLowerCase() === "z" &&
-                        !event.shiftKey
-                      ) {
-                        event.preventDefault();
-                        undo(alphabet);
-                      }
-                    }}
-                  />
-                  <Button
-                    icon={<UndoOutlined />}
-                    aria-label={`${label}撤销 ${name}`}
-                    disabled={!history.current[alphabet].length}
-                    onClick={() => undo(alphabet)}
-                  />
-                  <Tooltip
-                    title={
-                      synthesis.alphabet === alphabet
-                        ? "发音设置与真人录音"
-                        : `请先选择 ${name} 作为合成来源`
-                    }
-                  >
-                    <Button
-                      icon={<AudioOutlined />}
-                      aria-label={`${label}打开 ${name} 发音设置`}
-                      disabled={synthesis.alphabet !== alphabet}
-                      onClick={() => setExpanded((value) => !value)}
-                    />
-                  </Tooltip>
-                </Space.Compact>
-                {invalid && (
-                  <Typography.Text type="danger">
-                    {synthesisInputIssue(alphabet, synthesis[alphabet]) ??
-                      "请检查合成输入"}
-                  </Typography.Text>
-                )}
-              </div>
-            );
-          })}
+                  </div>
+                  {invalid && (
+                    <Typography.Text className="word-field-help" type="danger">
+                      {synthesisInputIssue(alphabet, synthesis[alphabet]) ??
+                        "请检查合成输入"}
+                    </Typography.Text>
+                  )}
+                </div>
+              );
+            })}
+          </Radio.Group>
           {diagnostic && <Alert type="warning" title={diagnostic} showIcon />}
         </>
       ) : (
@@ -239,12 +237,26 @@ export function V3SynthesisInputs({
         </Space>
       )}
       {expanded && (
-        <>
-          <Typography.Text>
-            当前使用 Azure {synthesis.alphabet.toUpperCase()}
-          </Typography.Text>
+        <div className="word-synthesis-settings">
+          <div className="word-synthesis-settings-header">
+            <Typography.Text strong>
+              {synthesis.alphabet.toUpperCase()} 发音设置
+            </Typography.Text>
+            <Button
+              type="text"
+              size="small"
+              icon={<CaretUpOutlined />}
+              aria-label="收起设置"
+              onClick={() => setExpanded(false)}
+            />
+          </div>
           {!content && (
-            <Alert type="info" title={selectedIssue ?? "请先填写词形拼写"} />
+            <Typography.Text
+              type="secondary"
+              className="word-synthesis-settings-hint"
+            >
+              {selectedIssue ?? "请先填写词形拼写"}。音色可先配置。
+            </Typography.Text>
           )}
           <Suspense
             fallback={<Typography.Text>正在加载发音设置…</Typography.Text>}
@@ -277,8 +289,7 @@ export function V3SynthesisInputs({
               }
             />
           </Suspense>
-          <Button onClick={() => setExpanded(false)}>收起设置</Button>
-        </>
+        </div>
       )}
       <Modal
         open={Boolean(pending)}

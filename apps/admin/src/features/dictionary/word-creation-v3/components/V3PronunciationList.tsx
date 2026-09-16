@@ -373,24 +373,6 @@ export function V3PronunciationList({
                           ) : null}
                         </div>
                       </div>
-                      <V3SynthesisInputs
-                        key={pronunciation.id}
-                        synthesisEditable={env.AZURE_PRONUNCIATION_INPUTS}
-                        pronunciation={pronunciation}
-                        spelling={variant.spelling}
-                        dialect={variant.dialect}
-                        index={index}
-                        issues={rowIssues}
-                        onChange={(patch) =>
-                          onChange(
-                            updatePronunciation(
-                              content,
-                              pronunciation.id,
-                              patch
-                            )
-                          )
-                        }
-                      />
                       <div className="word-pronunciation-row">
                         <Typography.Text className="word-pronunciation-label">
                           实际发音
@@ -436,6 +418,24 @@ export function V3PronunciationList({
                           </Typography.Text>
                         ) : null}
                       </div>
+                      <V3SynthesisInputs
+                        key={pronunciation.id}
+                        synthesisEditable={env.AZURE_PRONUNCIATION_INPUTS}
+                        pronunciation={pronunciation}
+                        spelling={variant.spelling}
+                        dialect={variant.dialect}
+                        index={index}
+                        issues={rowIssues}
+                        onChange={(patch) =>
+                          onChange(
+                            updatePronunciation(
+                              content,
+                              pronunciation.id,
+                              patch
+                            )
+                          )
+                        }
+                      />
                     </div>
                   </div>
                 );

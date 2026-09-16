@@ -2425,9 +2425,8 @@ function V3MeaningsAndExamplesStepContent({
           词义与例句
         </Typography.Title>
         <Typography.Paragraph className="word-step-description">
-          录入顺序：词义 → 语法结构。
-          词义需填写本语言释义语句；在下方多维例句区块添加，使用 voice-editor
-          编辑并独立保存。
+          录入顺序：词义 → 语法结构 → 例句。系统报错触发条件：1)
+          某项词义缺本语言释义语句；2) 例句未配置关联单词；
         </Typography.Paragraph>
       </div>
 
