@@ -1,5 +1,6 @@
 "use client";
 
+import { useUnsavedChanges } from "@tsz/shared/recovery";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { assessmentClient } from "../lib/client";
@@ -46,6 +47,7 @@ export function PlacementFlow() {
   const [startError, setStartError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(false);
+  useUnsavedChanges("placement", screen === "quiz" || starting || submitting);
   const [confirm, setConfirm] = useState<ConfirmState | null>(null);
 
   const sessionRef = useRef<string | null>(null);

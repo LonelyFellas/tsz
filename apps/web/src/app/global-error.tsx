@@ -1,5 +1,8 @@
 "use client";
 
+import { useEffect } from "react";
+import { isResourceError } from "@tsz/shared/recovery";
+
 // 捕获根 layout 自身的错误。必须是 client 组件,且自带 <html><body>
 // (此时根 layout 已失效,无法复用)。仅在生产构建生效。
 export default function GlobalError({
@@ -9,6 +12,10 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const resourceError = isResourceError(error);
+  useEffect(() => {
+    if (resourceError) window.dispatchEvent(new Event("tsz:resource-error"));
+  }, [resourceError]);
   return (
     <html lang="zh-CN">
       <body className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background text-foreground">

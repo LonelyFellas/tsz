@@ -154,49 +154,7 @@ install_nginx_configs() {
   DEPLOY_NGINX_STAGE=""
   # 远端脚本整段包在 { } 里：bash -s 边读边执行，包起来才保证读完整段再动手，
   # 不会因连接中途断开只执行到「已替换、未测试」。
-  ssh tshb-test "bash -s -- '$stage' '$DEPLOY_NGINX_CONF_DIR' tsz.conf tsz-test-domains.conf" <<'REMOTE'
-{
-  stage="$1"
-  conf_dir="$2"
-  shift 2
-  names=("$@")
-  existed=" "
-  trap 'rm -rf -- "$stage"' EXIT
-
-  # 原来有没有这份配置按备份时的记录判断，不按备份文件还在不在推断：
-  # 原来有而备份不见了只能算恢复失败，绝不能把线上文件删掉。
-  rollback() {
-    local name failed=0
-    for name in "${names[@]}"; do
-      if [[ "$existed" = *" $name "* ]]; then
-        mv -f -- "$stage/backup/$name" "$conf_dir/$name" || failed=1
-      else
-        rm -f -- "$conf_dir/$name" || failed=1
-      fi
-    done
-    if ((failed)); then
-      trap - EXIT
-      printf '!! %s，且恢复原配置失败；未 reload，配置状态未知，剩余备份（若有）在 %s/backup\n' "$1" "$stage" >&2
-    else
-      printf '!! %s：已恢复原配置，未 reload\n' "$1" >&2
-    fi
-    exit 1
-  }
-
-  mkdir -- "$stage/backup" || exit 1
-  for name in "${names[@]}"; do
-    if [[ -e "$conf_dir/$name" ]]; then
-      cp -p -- "$conf_dir/$name" "$stage/backup/$name" || exit 1
-      existed+="$name "
-    fi
-  done
-  for name in "${names[@]}"; do
-    mv -f -- "$stage/$name" "$conf_dir/$name" || rollback "替换 $name 失败"
-  done
-  nginx -t || rollback "nginx -t 未通过"
-  systemctl reload nginx
-}
-REMOTE
+  ssh tshb-test "bash -s -- '$stage' '$DEPLOY_NGINX_CONF_DIR' tsz.conf tsz-test-domains.conf" < "$build_root/deploy/install-nginx-local.sh"
 }
 
 # 本地 boot 闸起的子进程句柄：verify_standalone_boot 起服务前写入，收进程只走

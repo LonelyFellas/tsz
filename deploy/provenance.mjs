@@ -2,6 +2,7 @@
 import { createHash } from "node:crypto";
 import {
   lstat,
+  stat,
   mkdir,
   readFile,
   readdir,
@@ -16,13 +17,15 @@ import { pathToFileURL } from "node:url";
 const COMPONENTS = {
   web: {
     kind: "directory",
-    path: "/opt/tsz-web",
+    path: "/opt/tsz-releases/web/current",
+    legacyPath: "/opt/tsz-web",
     repository: "LonelyFellas/tsz",
     excludedPaths: ["apps/web/.next/cache"]
   },
   admin: {
     kind: "directory",
-    path: "/opt/tsz-admin/dist",
+    path: "/opt/tsz-releases/admin/current",
+    legacyPath: "/opt/tsz-admin/dist",
     repository: "LonelyFellas/tsz",
     excludedPaths: []
   },
@@ -133,7 +136,10 @@ export function validateManifest(manifest, { allowCandidate = false } = {}) {
   if (manifest.artifact.kind !== componentConfig.kind) {
     fail("artifact.kind does not match component");
   }
-  if (manifest.artifact.path !== componentConfig.path) {
+  if (
+    manifest.artifact.path !== componentConfig.path &&
+    manifest.artifact.path !== componentConfig.legacyPath
+  ) {
     fail("artifact.path does not match component");
   }
   if (
@@ -220,7 +226,7 @@ async function collectDirectoryRecords(
 }
 
 export async function digestDirectory(root, { excludedPaths = [] } = {}) {
-  const rootStat = await lstat(root).catch(() =>
+  const rootStat = await stat(root).catch(() =>
     fail(`artifact root does not exist: ${root}`)
   );
   if (!rootStat.isDirectory()) fail("artifact root must be a directory");

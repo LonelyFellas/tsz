@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+import { isResourceError } from "@tsz/shared/recovery";
 import { Button, Result } from "antd";
 import { useRouteError } from "react-router-dom";
 import { FullscreenCenter } from "@/layouts/FullscreenCenter";
@@ -7,8 +9,15 @@ import { FullscreenCenter } from "@/layouts/FullscreenCenter";
 // 提示与「刷新重试」，避免整页 shell 消失后用户无路可走。
 export function RouteErrorPage() {
   const error = useRouteError();
-  const message =
-    error instanceof Error ? error.message : "发生了未知错误，请稍后重试。";
+  const resourceError = isResourceError(error);
+  useEffect(() => {
+    if (resourceError) window.dispatchEvent(new Event("tsz:resource-error"));
+  }, [resourceError]);
+  const message = resourceError
+    ? "页面资源加载失败，请检查网络或刷新重试。编辑备份可在原页面恢复。"
+    : error instanceof Error
+      ? error.message
+      : "发生了未知错误，请稍后重试。";
 
   return (
     <FullscreenCenter>
