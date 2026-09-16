@@ -180,9 +180,18 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       2
     );
 
+    // 未完成词义时，顶部入口及直达链接都不能跳过完成校验。
+    const previewStep = page.locator(".ant-steps-item").filter({
+      has: page.getByText("预览并生效", { exact: true })
+    });
+    await expect(previewStep).toHaveClass(/ant-steps-item-disabled/);
     await page.getByText("预览并生效", { exact: true }).click();
     await expect(page).toHaveURL(
-      new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/preview$`)
+      new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/forms$`)
+    );
+    await page.goto(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/preview`);
+    await expect(page).toHaveURL(
+      new RegExp(`/words/${ADMIN_V3_NEW_WORD_ID}/v3/wizard/meanings$`)
     );
     await expect(page.getByRole("button", { name: "发布词条" })).toHaveCount(0);
 
