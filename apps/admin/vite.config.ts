@@ -1,3 +1,5 @@
+import { resourceRecoveryScript } from "../../packages/shared/src/recovery/bootstrap";
+import { randomUUID } from "node:crypto";
 import { localSpeechMock } from "./scripts/local-speech-mock.js";
 import { fileURLToPath, URL } from "node:url";
 import react from "@vitejs/plugin-react";
@@ -83,9 +85,27 @@ export default defineConfig(({ mode, command }) => {
       ? { port: 3001, proxy: buildDevProxy(mode) }
       : undefined;
 
+  const releaseId = process.env.TSZ_RELEASE_ID ?? `local-${randomUUID()}`;
   return {
     plugins: [
       react(),
+      {
+        name: "release-identity",
+        apply: "build",
+        transformIndexHtml(html) {
+          return html.replace(
+            '<meta charset="UTF-8" />',
+            `<meta charset="UTF-8" /><script>${resourceRecoveryScript(releaseId, ["/assets/"])}</script>`
+          );
+        },
+        generateBundle() {
+          this.emitFile({
+            type: "asset",
+            fileName: "version.json",
+            source: JSON.stringify({ release_id: releaseId })
+          });
+        }
+      },
       localSpeechMock(
         command === "serve" &&
           !production &&

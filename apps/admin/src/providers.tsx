@@ -1,3 +1,4 @@
+import { RecoverySession } from "@/features/recovery/RecoverySession";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { browserQueryDefaults } from "@tsz/shared";
 import { App as AntApp, ConfigProvider, theme as antTheme } from "antd";
@@ -58,6 +59,7 @@ export function RootProviders() {
     <QueryClientProvider client={queryClient}>
       <ConfigProvider locale={zhCN} theme={antdTheme}>
         <AntApp>
+          <RecoverySession />
           <Outlet />
         </AntApp>
       </ConfigProvider>
