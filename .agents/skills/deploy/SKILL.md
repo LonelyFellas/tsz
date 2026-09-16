@@ -35,7 +35,9 @@ CI 的 owner/repo 从 GitHub remote 解析，按脚本查询该 SHA 的最新 `C
 
 需要先发兼容前端时，可用 `DEPLOY_VOICE_EDITOR=false ./deploy/deploy-admin.sh` 暂关语音编辑入口；后端验收后再按默认 `true` 重发 admin。开关只接受 `true` / `false`，不影响精确 main、CI、隔离构建或 manifest 门禁。
 
-脚本负责 Node 版本核对、隔离构建、写服务器前 exact-main 校验、rsync、服务/nginx、smoke 和 manifest 验证；
+脚本负责 Node 版本核对、隔离构建、写服务器前 exact-main 校验、独立 release 上传、远端发布锁、原子入口切换、服务/nginx、smoke 和 manifest 验证；
+历史静态资源保留 30 天，当前与回滚版本始终保留。web 使用双端口 systemd 实例，当前端口记录在 `/opt/tsz-releases/web/port`。
+存在 `/opt/tsz-frontend-transaction` 时先核对其中记录的暂存目录、旧版本与备份，不直接删除记录继续发布。
 web 还必须先启动裁剪后的 standalone 制品确认可运行。使用可继续读取的长命令会话，不因工具提前返回而误判完成。
 脚本非零退出立即停止；已完成组件明确列为部分部署，不手工拼产物、补写 manifest 或跳过验证。
 

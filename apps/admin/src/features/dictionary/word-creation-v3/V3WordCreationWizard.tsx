@@ -1,3 +1,6 @@
+import { UNSAFE_DataRouterContext } from "react-router-dom";
+import { WordNavigationGuard } from "@/features/recovery/WordNavigationGuard";
+import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
 import type {
   AdminWordV3,
   PartOfSpeechCatalogResponse,
@@ -12,7 +15,14 @@ import type {
   WordCreationStep
 } from "@tsz/types";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { newWordNodeId } from "../word-model/primitives";
 import {
   createStableVariantIdFactory,
@@ -299,12 +309,15 @@ function V3WordCreationSession({
     meanings: false
   });
   const [activeStep, setActiveStepState] = useState(initialStep);
+  const routerContext = useContext(UNSAFE_DataRouterContext);
+  const [hasSentenceGuard, setHasSentenceGuard] = useState(false);
   const sentenceLeaveGuard = useRef<(() => Promise<boolean>) | undefined>(
     undefined
   );
   const registerSentenceLeaveGuard = useCallback(
     (guard?: () => Promise<boolean>) => {
       sentenceLeaveGuard.current = guard;
+      setHasSentenceGuard(!!guard);
     },
     []
   );
@@ -1677,7 +1690,32 @@ function V3WordCreationSession({
     actions
   };
 
-  const renderedStep = renderStep(context);
+  const recovery = useDraftRecovery({
+    entity: `word-v3:${word.id}`,
+    revision: word.revision,
+    value: { forms: draftForms, meanings: draftMeanings },
+    dirty: dirtySteps.forms || dirtySteps.meanings,
+    busy: pending.size > 0,
+    restoreAllowed: !sessionReadOnly,
+    restore: (value) => {
+      setDraftForms(value.forms);
+      setDraftMeanings(value.meanings);
+    }
+  });
+  const renderedStep = (
+    <>
+      {routerContext && (
+        <WordNavigationGuard
+          wordId={word.id}
+          dirty={context.hasUnsavedChanges || hasSentenceGuard}
+          busy={pending.size > 0}
+          requestSentenceLeave={requestSentenceLeave}
+        />
+      )}
+      {recovery.notice}
+      {renderStep(context)}
+    </>
+  );
   if (!sessionReadOnly && activeStep === "basics") {
     return renderedStep;
   }

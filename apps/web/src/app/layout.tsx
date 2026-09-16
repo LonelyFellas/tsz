@@ -1,3 +1,4 @@
+import { resourceRecoveryScript } from "@tsz/shared/recovery";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { site } from "@/lib/site";
@@ -52,6 +53,16 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: resourceRecoveryScript(
+              process.env.TSZ_RELEASE_ID ?? "local",
+              ["/_next/static/"]
+            )
+          }}
+        />
+      </head>
       <body className="min-h-screen bg-background font-sans text-foreground antialiased">
         {/* 首屏前置:在 paint 前给 <html> 打上明/暗 class,杜绝主题闪烁。 */}
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
