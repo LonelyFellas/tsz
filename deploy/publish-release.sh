@@ -79,6 +79,9 @@ if [[ "$component" = web ]]; then
   mkdir -p "$root/slots"
   cp systemd/tsz-web@.service /etc/systemd/system/tsz-web@.service
   systemctl daemon-reload
+  # 上次发布排空中断可能留下仍 active 的备用实例；enable --now 不会重启它。
+  # 先停备用端口，再换链接，确保启动的是本次已校验的 release。
+  systemctl stop "tsz-web@$new_port.service"
   ln -sfn "$release" "$root/slots/$new_port"
   started=true
   systemctl enable --now "tsz-web@$new_port.service"

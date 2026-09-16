@@ -1,3 +1,4 @@
+import { clearOtherSnapshots } from "@tsz/shared/recovery";
 import { api, tokens, useAuthStore } from "@/lib/auth";
 
 /**
@@ -13,6 +14,12 @@ function useFinishLocalLogout() {
   const setProfile = useAuthStore((s) => s.setProfile);
 
   return function finishLocalLogout() {
+    // 仅明确登出清全部草稿；会话恢复/续期失败保留备份供重新登录后恢复。
+    try {
+      clearOtherSnapshots(null, sessionStorage);
+    } catch {
+      // 存储不可用不能阻断本地退出登录。
+    }
     tokens.setAccessToken(null);
     setProfile(null);
     window.location.replace("/login");

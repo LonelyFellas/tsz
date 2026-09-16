@@ -9,9 +9,10 @@ export function RecoverySession() {
   const userId = useAuthStore((state) => state.profile?.id);
   const hydrated = useAuthStore((state) => state.hydrated);
   useEffect(() => {
-    if (!hydrated) return;
+    // 恢复失败也会 hydrated=true；只有确认身份后才能清理其他账号备份。
+    if (!hydrated || !userId) return;
     try {
-      clearOtherSnapshots(userId ?? null, sessionStorage);
+      clearOtherSnapshots(userId, sessionStorage);
     } catch {
       /* 编辑器会显示存储失败。 */
     }

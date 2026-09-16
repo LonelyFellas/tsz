@@ -35,13 +35,14 @@ case "$1" in
  reload) nginx -s reload; exit 0 ;;
  enable)
    unit="${@: -1}"
+   if [[ -f "/tmp/$unit.pid" ]] && kill -0 "$(cat "/tmp/$unit.pid")" 2>/dev/null; then exit 0; fi
    port="${unit#tsz-web@}"; port="${port%.service}"
    cd "/opt/tsz-releases/web/slots/$port"
    PORT="$port" HOSTNAME=127.0.0.1 nohup node apps/web/server.js 9>&- >/tmp/web-$port.log 2>&1 &
    echo $! > "/tmp/$unit.pid" ;;
- disable)
+ disable|stop)
    unit="${@: -1}"
-   if [[ -f "/tmp/$unit.pid" ]]; then kill "$(cat "/tmp/$unit.pid")" || true; rm "/tmp/$unit.pid"; fi ;;
+   if [[ -f "/tmp/$unit.pid" ]]; then kill "$(cat "/tmp/$unit.pid")" || true; rm "/tmp/$unit.pid"; /bin/sleep 0.1; fi ;;
  *) exit 1 ;;
 esac
 CONTROL

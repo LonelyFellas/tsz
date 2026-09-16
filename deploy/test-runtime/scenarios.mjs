@@ -120,6 +120,21 @@ await stage("web", "W3");
 publish("/opt/stage-W3", "web", true);
 assert.equal((await file("/opt/tsz-releases/web/port")).trim(), "3101");
 assert.match(await file("/tmp/systemctl-calls"), /disable --now tsz-web@3100/);
+// 模拟上一次发布切流后未完成排空：备用端口仍运行旧 release。
+assert.equal(
+  spawnSync("systemctl", ["enable", "--now", "tsz-web@3100.service"]).status,
+  0
+);
+for (let attempt = 0; attempt < 30; attempt++) {
+  try {
+    if ((await fetch("http://127.0.0.1:3100/")).ok) break;
+  } catch {}
+  await new Promise((resolve) => setTimeout(resolve, 100));
+}
+assert.equal(await (await fetch("http://127.0.0.1:3100/")).text(), "W1");
+await stage("web", "W4");
+publish("/opt/stage-W4", "web", true);
+assert.equal(await (await fetch("http://127.0.0.1:3100/")).text(), "W4");
 console.log(
   "PASS: first migration, accepted manifest, tamper rejection, admin/web HTTP failure rollback, web slot switch, legacy IP forwarding"
 );
