@@ -185,13 +185,15 @@ export function SenseSectionTitle({
   count,
   unit,
   collapsed,
-  onToggle
+  onToggle,
+  extra
 }: {
   label: string;
   count: number;
   unit: string;
   collapsed: boolean;
   onToggle: () => void;
+  extra?: ReactNode;
 }) {
   return (
     <div
@@ -210,6 +212,7 @@ export function SenseSectionTitle({
     >
       <Typography.Text strong>{label}</Typography.Text>
       <div className="word-sense-section-title-actions">
+        {extra}
         <Tag>{`${count} ${unit}`}</Tag>
         <Button
           aria-label={`${collapsed ? "展开" : "收起"}${label}`}
@@ -2968,6 +2971,12 @@ function V3MeaningsAndExamplesStepContent({
                                     <SenseSectionTitle
                                       collapsed={definitionsCollapsed}
                                       count={sense.definitions.length}
+                                      extra={
+                                        <V3ReferenceBadge
+                                          label="绑定"
+                                          nodeIds={[sense.id]}
+                                        />
+                                      }
                                       label="多维释义"
                                       onToggle={() =>
                                         toggleSenseSection(
