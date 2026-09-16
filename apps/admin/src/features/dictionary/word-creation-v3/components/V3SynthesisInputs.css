@@ -1,0 +1,114 @@
+.word-pronunciation-synthesis {
+  container-type: inline-size;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.word-synthesis-source {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.word-pronunciation-synthesis .word-pronunciation-row {
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 6px 12px;
+}
+
+.word-synthesis-input {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.word-synthesis-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.word-synthesis-control > .ant-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.word-synthesis-control > .ant-btn,
+.word-synthesis-input > .ant-btn {
+  flex-shrink: 0;
+}
+
+.word-synthesis-settings {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  border-radius: 8px;
+  background: var(--ant-color-bg-container, #fff);
+}
+
+.word-synthesis-settings > .ant-btn {
+  justify-self: start;
+}
+
+/* 内嵌设置按所在英/美音栏布局，不能沿用浮层的 720px 宽度。 */
+.word-synthesis-settings .tsz-ve-speech-panel {
+  width: 100%;
+}
+
+.word-synthesis-settings .tsz-ve-editor {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.word-synthesis-settings .tsz-ve-pop-upload,
+.word-synthesis-settings .tsz-ve-upload-list {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.word-synthesis-settings .tsz-ve-pop-upload {
+  padding-top: 12px;
+  border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+}
+
+@container (max-width: 480px) {
+  .word-synthesis-settings .tsz-ve-voice-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.word-synthesis-choice.ant-radio-wrapper {
+  margin-inline-end: 0;
+}
+
+.word-synthesis-settings-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.word-synthesis-settings-hint {
+  font-size: 12px;
+}
+
+.word-synthesis-settings
+  .tsz-ve-synthesis[data-locale="en-GB"]
+  .tsz-ve-pop-section[data-locale="en-GB"]
+  > .tsz-ve-pop-section-head,
+.word-synthesis-settings
+  .tsz-ve-synthesis[data-locale="en-US"]
+  .tsz-ve-pop-section[data-locale="en-US"]
+  > .tsz-ve-pop-section-head {
+  display: none;
+}
+
+.word-synthesis-settings .tsz-ve-synthesis-upload-unavailable {
+  padding-top: 12px;
+  border-top: 1px solid var(--ant-color-border-secondary, #f0f0f0);
+  color: var(--ant-color-text-secondary, #8c8c8c);
+  font-size: 12px;
+}

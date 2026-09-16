@@ -1230,7 +1230,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
       content: (
         <div className="tsz-ve-speech-panel" aria-label="发音设置与试听">
           <div>
-            <div className="tsz-ve-speech-panel-title">音色</div>
+            <div className="tsz-ve-speech-panel-title">
+              {mode === "synthesis" && locale === "en-GB"
+                ? "英式音色"
+                : mode === "synthesis" && locale === "en-US"
+                  ? "美式音色"
+                  : "音色"}
+            </div>
             <VoicePanel
               readOnly={readOnly}
               locale={locale}
@@ -1302,12 +1308,26 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   if (mode === "synthesis") {
     return (
-      <section className="tsz-ve-editor" aria-label={contextLabel}>
+      <section
+        className="tsz-ve-editor tsz-ve-synthesis"
+        data-locale={locale}
+        aria-label={contextLabel}
+      >
         {previewIsMock && <Tag color="warning">模拟试听</Tag>}
         {tools
           .filter((tool) => tool.key === "voices" || tool.key === "uploads")
           .map((tool) => (
-            <div key={tool.key}>{tool.content}</div>
+            <div key={tool.key}>
+              {tool.key === "uploads" &&
+              !audioUploadAdapter &&
+              assets.length === 0 ? (
+                <div className="tsz-ve-synthesis-upload-unavailable">
+                  真人录音 · 暂未启用
+                </div>
+              ) : (
+                tool.content
+              )}
+            </div>
           ))}
       </section>
     );
