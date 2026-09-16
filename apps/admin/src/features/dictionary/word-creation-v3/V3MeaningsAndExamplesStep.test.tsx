@@ -897,7 +897,21 @@ describe("V3MeaningsAndExamplesStep", () => {
     chooseSenseLevel("C1");
     expect(languages()).toEqual([
       ["zh_definition", "C1"],
-      ["en_definition", "C1"]
+      ["en_sentence", "C1"],
+      ["zh_sentence", "C2"]
+    ]);
+    chooseSenseLevel("C2");
+    expect(languages()).toEqual([
+      ["zh_definition", "C1"],
+      ["zh_sentence", "C2"],
+      ["en_sentence", "C2"]
+    ]);
+    chooseSenseLevel("A1");
+    expect(languages()).toEqual([
+      ["zh_definition", "A1"],
+      ["en_definition", "A2"],
+      ["zh_definition", "A2"],
+      ["en_definition", "B1"]
     ]);
     view.unmount();
 

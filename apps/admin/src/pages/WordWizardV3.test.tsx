@@ -1194,62 +1194,30 @@ describe("WordWizardV3Page", () => {
     );
   });
 
-  it("max=forms 的 draft 可进入预览但完整性校验仍阻止发布", async () => {
+  it("未完成的草稿直达预览时返回词义步骤，且预览入口禁用", async () => {
     const current = word({
       completed_steps: ["basics"],
-      max_reachable_step: "forms",
-      meanings: { sense_groups: [], pos: [] },
-      capabilities: {
-        publication: { mode: "native" },
-        pronunciation_normalization_version: "nfkc_trim_lower_v1"
-      }
+      max_reachable_step: "forms"
     });
     const endpoints = source({ word: current, retired_stable_nodes: [] });
-    vi.mocked(endpoints.validateV3).mockResolvedValue({
-      schema_version: 3,
-      validated_revision: 1,
-      valid: false,
-      issues: [
-        {
-          schema_version: 3,
-          step: "forms",
-          node_id: current.forms.pos[0]!.forms[0]!.id,
-          field: "pronunciations",
-          code: "pronunciation_required",
-          message: "pronunciation is required",
-          node_location: {
-            node_role: "concrete_form",
-            ancestor_node_ids: [current.forms.pos[0]!.pos_id],
-            pos_id: current.forms.pos[0]!.pos_id,
-            form_id: current.forms.pos[0]!.forms[0]!.id,
-            form_type: "base"
-          }
-        }
-      ]
-    });
     const router = renderPage(
       `/words/${WORD_ID}/v3/wizard/preview`,
       createV3WordRequests(endpoints)
     );
-
-    const validate = await screen.findByRole("button", {
-      name: "检查发布条件"
-    });
-    expect(router.state.location.pathname).toBe(
-      `/words/${WORD_ID}/v3/wizard/preview`
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe(
+        `/words/${WORD_ID}/v3/wizard/meanings`
+      )
     );
-    fireEvent.click(validate);
-
-    await waitFor(() => expect(endpoints.validateV3).toHaveBeenCalledTimes(1));
+    const previewStep = (await screen.findByText("预览并生效")).closest(
+      ".ant-steps-item"
+    )!;
+    expect(previewStep).toHaveClass("ant-steps-item-disabled");
+    fireEvent.click(previewStep);
     expect(router.state.location.pathname).toBe(
-      `/words/${WORD_ID}/v3/wizard/preview`
+      `/words/${WORD_ID}/v3/wizard/meanings`
     );
-    expect(
-      await screen.findByRole("region", { name: "发布待完成摘要" })
-    ).toBeVisible();
-    expect(
-      screen.queryByText("发布词条", { exact: true })?.closest("button") ?? null
-    ).toBeNull();
+    expect(endpoints.validateV3).not.toHaveBeenCalled();
     expect(endpoints.publishV3).not.toHaveBeenCalled();
   });
 
@@ -1909,16 +1877,16 @@ describe("WordWizardV3Page", () => {
     );
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation}`)
-    ).toHaveTextContent("常规 · 词典音标 sen-tre · 实际发音 centre");
+    ).toHaveTextContent(/sen\-tre.*常规.*centre/);
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_2}`)
-    ).toHaveTextContent("强读 · 词典音标 sen-tr · 实际发音 centr");
+    ).toHaveTextContent(/sen\-tr.*强读.*centr/);
     expect(
       screen.getByTestId(`preview-pronunciation-${UUIDS.pronunciation_3}`)
-    ).toHaveTextContent("弱读 · 词典音标 sen-ter · 实际发音 center");
+    ).toHaveTextContent(/sen\-ter.*弱读.*center/);
     expect(
       screen.getByTestId(`preview-pronunciation-${uuidFromInt(904)}`)
-    ).toHaveTextContent("常规 · 词典音标 sen-tre-uk · 实际发音 centre-uk");
+    ).toHaveTextContent(/sen\-tre\-uk.*常规.*centre\-uk/);
   });
 
   it("keeps empty read-only groups and pronunciations visible", async () => {

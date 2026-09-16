@@ -246,12 +246,12 @@ describe("V3MeaningsPreview", () => {
       />
     );
 
-    expect(screen.getByText("释义组 1：空间位置 / Place")).toBeVisible();
+    expect(screen.getByText("语义区间 1：空间位置 / Place")).toBeVisible();
     expect(screen.getByText("名词")).toBeVisible();
     expect(screen.getByText("英美通用：at the center of")).toBeVisible();
     expect(screen.getByText("可数名词")).toBeVisible();
     expect(screen.getByText("依赖上下文")).toBeVisible();
-    expect(screen.getByText("中心位置")).toBeVisible();
+    expect(screen.getByRole("heading", { name: "中心位置" })).toBeVisible();
     expect(screen.getByText("the middle point")).toBeVisible();
     expect(screen.getByText("Stand in the center.")).toBeVisible();
     expect(screen.getByText("站在中心。")).toBeVisible();
@@ -261,7 +261,7 @@ describe("V3MeaningsPreview", () => {
     expect(screen.getByText("上下文关联：middle · 中间")).toBeVisible();
     expect(screen.getByText("待关联词条：stand · 站立")).toBeVisible();
     expect(screen.getByText("已关联")).toBeVisible();
-    expect(screen.getByText("待关联")).toBeVisible();
+    expect(screen.getAllByText("待关联").length).toBeGreaterThan(0);
     expect(document.body).not.toHaveTextContent(/\b(?:Linked|Pending)\b/u);
     expect(screen.getByText("近义词")).toBeVisible();
     expect(screen.getByText("midpoint · 中点")).toBeVisible();
@@ -387,8 +387,10 @@ describe("V3MeaningsPreview", () => {
 
     expect(screen.getByText("其他词性")).toBeVisible();
     expect(screen.getByText("暂无释义")).toBeVisible();
-    expect(screen.getByText("释义组 2：释义组 2")).toBeVisible();
-    expect(screen.getByText("用于说明回退分支。")).toBeVisible();
+    expect(screen.getByText("语义区间 2：语义区间 2")).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "用于说明回退分支。" })
+    ).toBeVisible();
     expect(screen.getByText("上下文关联：fallback")).toBeVisible();
     expect(screen.getByText("待补充目标词条 · 待补充释义")).toBeVisible();
   });

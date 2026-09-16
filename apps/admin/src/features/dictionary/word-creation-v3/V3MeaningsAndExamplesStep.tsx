@@ -844,7 +844,8 @@ function definitionsStillDefault(
       definitionIsBlank(definition) &&
       definition.level === slot.level &&
       definitionLanguageOf(definition.definition_mode) === slot.language &&
-      definitionStyleOf(definition.definition_mode) === "definition"
+      definitionStyleOf(definition.definition_mode) ===
+        (slot.style ?? "definition")
     );
   });
 }
@@ -1262,8 +1263,12 @@ function RelationsGrid({
           >
             <SenseSectionBody collapsed={Boolean(collapsed[relationType])}>
               <div style={{ padding: 10 }}>
-                {/* 空分区不画空状态插图：下面的「添加近义词」虚线按钮已经说明了这里能加什么，三个空分区各占一百多像素只剩留白。 */}
-                {relations.length === 0 ? null : (
+                {relations.length === 0 ? (
+                  <Empty
+                    description={`暂无${relationLabel(relationType)}`}
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  />
+                ) : (
                   <RelationSortScope
                     items={relations}
                     scopeId={`${sense.id}:${relationType}`}

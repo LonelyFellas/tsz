@@ -520,8 +520,12 @@ function createDefaultPosMeanings(
   };
 }
 
-/** 一条待生成的释义行：只定语言与等级，正文与语法结构留给录入者填。 */
-export type DefinitionPlanV3 = { language: "zh" | "en"; level: string };
+/** 一条待生成的释义行：正文与语法结构留给录入者填。 */
+export type DefinitionPlanV3 = {
+  language: "zh" | "en";
+  level: string;
+  style?: "definition" | "sentence";
+};
 
 export function newDefinition(
   idFactory: () => string,
@@ -531,14 +535,16 @@ export function newDefinition(
     return {
       id: idFactory(),
       level: plan.level,
-      definition_mode: "zh_definition",
+      definition_mode:
+        plan.style === "sentence" ? "zh_sentence" : "zh_definition",
       content_id: idFactory(),
       content: { version: 2, text: "", annotations: [] }
     };
   return {
     id: idFactory(),
     level: plan.level,
-    definition_mode: "en_definition",
+    definition_mode:
+      plan.style === "sentence" ? "en_sentence" : "en_definition",
     content: {
       mode: "unified",
       common: {
@@ -551,9 +557,8 @@ export function newDefinition(
 }
 
 /**
- * 词义等级 → 默认释义语句（语言 + 释义等级）。取自《天生会背® 智能词库 数据整理》
- * 的「词义难度 × 释义难度」矩阵：中文自本级起，英文比同档中文高一级，越靠近 C2
- * 层级越收敛，所以 B2 只有三条、C1 与 C2 各两条。生成后录入者可自行增删。
+ * 词义等级 → 默认释义语句（语言、释义等级与方式）。A1–B2 沿用数据整理矩阵，
+ * C1、C2 按产品更新使用三条释义，包含整句释义。生成后录入者可自行增删。
  */
 export const DEFAULT_DEFINITION_PLAN: Record<
   CefrLevel,
@@ -584,11 +589,13 @@ export const DEFAULT_DEFINITION_PLAN: Record<
   ],
   C1: [
     { language: "zh", level: "C1" },
-    { language: "en", level: "C1" }
+    { language: "en", level: "C1", style: "sentence" },
+    { language: "zh", level: "C2", style: "sentence" }
   ],
   C2: [
-    { language: "zh", level: "C2" },
-    { language: "en", level: "C2" }
+    { language: "zh", level: "C1" },
+    { language: "zh", level: "C2", style: "sentence" },
+    { language: "en", level: "C2", style: "sentence" }
   ]
 };
 

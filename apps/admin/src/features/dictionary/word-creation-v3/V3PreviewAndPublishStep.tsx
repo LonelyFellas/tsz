@@ -39,6 +39,7 @@ interface StandaloneProps {
 }
 
 export interface V3PreviewPublishController {
+  renderPreview?: (readiness: ReactNode) => ReactNode;
   validation?: DraftValidationResponseV3;
   impact?: FormsImpactResponseV3;
   impactConfirmed?: boolean;
@@ -122,12 +123,18 @@ function publicationUnavailableMessage(word: AdminWordV3): string | undefined {
 
 function V3WordPreview({
   word,
-  readiness
+  readiness,
+  render
 }: {
   word: AdminWordV3;
   readiness?: ReactNode;
+  render?: (readiness: ReactNode) => ReactNode;
 }) {
-  return <V3ReviewContent readiness={readiness} word={word} />;
+  return render ? (
+    render(readiness)
+  ) : (
+    <V3ReviewContent readiness={readiness} word={word} />
+  );
 }
 
 function ImpactDescription({
@@ -334,6 +341,7 @@ function ControlledV3PreviewAndPublishStep({
   return (
     <Space orientation="vertical" size="middle" style={{ width: "100%" }}>
       <V3WordPreview
+        render={controller.renderPreview}
         readiness={
           unavailableMessage ? (
             <Typography.Text type="secondary">当前词条不可发布</Typography.Text>
@@ -357,7 +365,12 @@ function ControlledV3PreviewAndPublishStep({
           description={unavailableMessage}
         />
       ) : (
-        <Card size="small" title="发布检查">
+        <Card
+          id="review-publish"
+          className="v3-review-publish"
+          size="small"
+          title="发布检查"
+        >
           <Space orientation="vertical" style={{ width: "100%" }}>
             <Button
               loading={
@@ -782,7 +795,12 @@ function StandaloneV3PreviewAndPublishStep({
           description={unavailableMessage}
         />
       ) : (
-        <Card size="small" title="发布检查">
+        <Card
+          id="review-publish"
+          className="v3-review-publish"
+          size="small"
+          title="发布检查"
+        >
           <Space orientation="vertical" style={{ width: "100%" }}>
             <Button
               disabled={reconciliationRequired}
