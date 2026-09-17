@@ -94,7 +94,7 @@ describe("词形组的专用词义交互", () => {
       );
     }
     render(<ScopeHarness />);
-    // 外层词形矩阵较大，按明确的 aria-label 定位区域；区域内仍按角色断言交互。
+    // 按标签与可见文案定位；复选框类型、按钮禁用及可见性仍独立断言。
     expect(screen.queryByText("通用", { exact: true })).not.toBeInTheDocument();
     const headerEntry = await screen.findByLabelText("第 1 组专用词义");
     expect(headerEntry.closest(".ant-card-head")).not.toBeNull();
@@ -105,18 +105,20 @@ describe("词形组的专用词义交互", () => {
     let dialog = await screen.findByLabelText("第 1 组适用词义编辑");
     expect(within(dialog).queryByText(/其他词性/)).not.toBeInTheDocument();
     expect(
-      within(dialog).getByRole("button", { name: "确认选择" })
+      within(dialog).getByText("确认选择").closest("button")!
     ).toBeDisabled();
-    fireEvent.click(
-      within(dialog).getByRole("checkbox", { name: /本词性释义1/ })
-    );
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByLabelText(/本词性释义1/));
+    expect(
+      document.querySelector('[role="dialog"], dialog')
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
     fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
-    expect(
-      within(dialog).getByRole("checkbox", { name: /本词性释义1/ })
-    ).toBeChecked();
-    fireEvent.click(within(dialog).getByRole("button", { name: /取\s*消/ }));
+    expect(within(dialog).getByLabelText(/本词性释义1/)).toBeChecked();
+    fireEvent.click(
+      within(dialog)
+        .getByText(/^取\s*消$/)
+        .closest("button")!
+    );
     expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("general");
     await waitFor(() =>
       expect(
@@ -125,9 +127,11 @@ describe("词形组的专用词义交互", () => {
     );
     fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
     dialog = await screen.findByLabelText("第 1 组适用词义编辑");
-    for (const checkbox of within(dialog).getAllByRole("checkbox"))
+    for (const checkbox of within(dialog).getAllByLabelText(/本词性释义[12]/)) {
+      expect(checkbox).toHaveAttribute("type", "checkbox");
       fireEvent.click(checkbox);
-    fireEvent.click(within(dialog).getByRole("button", { name: "确认选择" }));
+    }
+    fireEvent.click(within(dialog).getByText("确认选择").closest("button")!);
     expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("dedicated");
     expect(screen.getByLabelText("第 1 组适用词义")).toBeVisible();
     const summary = screen.getByLabelText("第 1 组适用词义");
@@ -155,12 +159,18 @@ describe("词形组的专用词义交互", () => {
     );
     fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
     dialog = await screen.findByLabelText("第 1 组适用词义编辑");
-    for (const checkbox of within(dialog).getAllByRole("checkbox"))
+    for (const checkbox of within(dialog).getAllByLabelText(/本词性释义[12]/)) {
+      expect(checkbox).toHaveAttribute("type", "checkbox");
       fireEvent.click(checkbox);
+    }
     expect(
-      within(dialog).getByRole("button", { name: "确认选择" })
+      within(dialog).getByText("确认选择").closest("button")!
     ).toBeDisabled();
-    fireEvent.click(within(dialog).getByRole("button", { name: /取\s*消/ }));
+    fireEvent.click(
+      within(dialog)
+        .getByText(/^取\s*消$/)
+        .closest("button")!
+    );
     expect(screen.getByLabelText("第 1 组适用词义")).toBeVisible();
     await waitFor(() =>
       expect(
@@ -170,7 +180,7 @@ describe("词形组的专用词义交互", () => {
     fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
     dialog = await screen.findByLabelText("第 1 组适用词义编辑");
     fireEvent.click(
-      within(dialog).getByRole("button", { name: "恢复适用全部词义" })
+      within(dialog).getByText("恢复适用全部词义").closest("button")!
     );
     await waitFor(() =>
       expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("general")
@@ -200,10 +210,10 @@ describe("词形组的专用词义交互", () => {
     fireEvent.click(await screen.findByLabelText("第 1 组专用词义"));
     const dialog = await screen.findByLabelText("第 1 组适用词义编辑");
     expect(
-      within(dialog).getByRole("button", { name: "确认选择" })
+      within(dialog).getByText("确认选择").closest("button")!
     ).toBeDisabled();
     fireEvent.click(
-      within(dialog).getByRole("button", { name: "前往添加词义" })
+      within(dialog).getByText("前往添加词义").closest("button")!
     );
     expect(go).toHaveBeenCalledWith(initial.pos[0]!.pos_id);
     expect(change).not.toHaveBeenCalled();

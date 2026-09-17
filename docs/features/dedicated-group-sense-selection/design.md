@@ -61,7 +61,7 @@ OpenAPI、types、api-client 快照与严格运行时 schema 使用原生生成�
 前端根目录：
 
 ```bash
-pnpm --filter @tsz/admin test src/features/dictionary/word-creation-v3/components/V3FormsAndPronunciationStep.test.tsx src/features/dictionary/word-creation-v3/components/V3TextAssociationPicker.test.tsx src/features/dictionary/word-creation-v3/V3WordCreationWizard.test.tsx src/features/dictionary/word-creation-v3/saveFlow.test.ts
+pnpm --filter @tsz/admin test src/features/dictionary/word-creation-v3/components/V3FormGroupBindings.test.tsx src/features/dictionary/word-creation-v3/components/V3FormsAndPronunciationStep.test.tsx src/features/dictionary/word-creation-v3/components/V3TextAssociationPicker.test.tsx src/features/dictionary/word-creation-v3/V3WordCreationWizard.test.tsx src/features/dictionary/word-creation-v3/saveFlow.test.ts
 pnpm --filter @tsz/api-client test
 pnpm --filter @tsz/admin typecheck
 ```
