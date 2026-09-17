@@ -2786,7 +2786,11 @@ describe("V3FormsAndPronunciationStep", () => {
   }, 15_000);
 
   it("必须选择同词性词义才设为专用，取消不修改，编辑不能清空最后绑定", async () => {
-    const initial = formsFixture();
+    // 绑定交互不依赖派生词形或语音控件，使用仅有原形的最小草稿。
+    const initial = formsFixture({
+      pos: "adverb",
+      forms: [commonFormFixture({ spelling: "fast", pronunciations: [] })]
+    });
     const posId = initial.pos[0]!.pos_id;
     const initialMeanings: DraftMeaningsStepContentWritableV3 = {
       sense_groups: [],
@@ -2839,18 +2843,15 @@ describe("V3FormsAndPronunciationStep", () => {
       );
     }
     render(<ScopeHarness />);
+    // 外层词形矩阵较大，按明确的 aria-label 定位区域；区域内仍按角色断言交互。
     expect(screen.queryByText("通用", { exact: true })).not.toBeInTheDocument();
     const headerEntry = await screen.findByLabelText("第 1 组专用词义");
     expect(headerEntry.closest(".ant-card-head")).not.toBeNull();
     expect(headerEntry).toHaveTextContent("专用词义");
     expect(screen.queryByText("限定适用词义")).not.toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "收起第 1 组词形变化" })
-    );
+    fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
     fireEvent.click(headerEntry);
-    let dialog = await screen.findByRole("region", {
-      name: "第 1 组适用词义编辑"
-    });
+    let dialog = await screen.findByLabelText("第 1 组适用词义编辑");
     expect(within(dialog).queryByText(/其他词性/)).not.toBeInTheDocument();
     expect(
       within(dialog).getByRole("button", { name: "确认选择" })
@@ -2859,12 +2860,8 @@ describe("V3FormsAndPronunciationStep", () => {
       within(dialog).getByRole("checkbox", { name: /本词性释义1/ })
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole("button", { name: "收起第 1 组词形变化" })
-    );
-    fireEvent.click(
-      screen.getByRole("button", { name: "展开第 1 组词形变化" })
-    );
+    fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
+    fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
     expect(
       within(dialog).getByRole("checkbox", { name: /本词性释义1/ })
     ).toBeChecked();
@@ -2872,28 +2869,22 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("general");
     await waitFor(() =>
       expect(
-        screen.queryByRole("region", { name: "第 1 组适用词义编辑" })
+        screen.queryByLabelText("第 1 组适用词义编辑")
       ).not.toBeInTheDocument()
     );
     fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
-    dialog = await screen.findByRole("region", { name: "第 1 组适用词义编辑" });
+    dialog = await screen.findByLabelText("第 1 组适用词义编辑");
     for (const checkbox of within(dialog).getAllByRole("checkbox"))
       fireEvent.click(checkbox);
     fireEvent.click(within(dialog).getByRole("button", { name: "确认选择" }));
     expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("dedicated");
-    expect(
-      screen.getByRole("region", { name: "第 1 组适用词义" })
-    ).toBeVisible();
-    const summary = screen.getByRole("region", { name: "第 1 组适用词义" });
+    expect(screen.getByLabelText("第 1 组适用词义")).toBeVisible();
+    const summary = screen.getByLabelText("第 1 组适用词义");
     expect(within(summary).getByText("本词性释义1")).toBeVisible();
     expect(within(summary).getByText("本词性释义2")).toBeVisible();
-    fireEvent.click(
-      screen.getByRole("button", { name: "收起第 1 组词形变化" })
-    );
+    fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
     expect(screen.getByText("2 个词义")).toBeVisible();
-    fireEvent.click(
-      screen.getByRole("button", { name: "展开第 1 组词形变化" })
-    );
+    fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
     const stored = JSON.parse(
       screen.getByTestId("binding-meanings").textContent!
     );
@@ -2908,40 +2899,40 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(stored.pos[1].senses[0].form_group_id).toBeUndefined();
     await waitFor(() =>
       expect(
-        screen.queryByRole("region", { name: "第 1 组适用词义编辑" })
+        screen.queryByLabelText("第 1 组适用词义编辑")
       ).not.toBeInTheDocument()
     );
     fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
-    dialog = await screen.findByRole("region", { name: "第 1 组适用词义编辑" });
+    dialog = await screen.findByLabelText("第 1 组适用词义编辑");
     for (const checkbox of within(dialog).getAllByRole("checkbox"))
       fireEvent.click(checkbox);
     expect(
       within(dialog).getByRole("button", { name: "确认选择" })
     ).toBeDisabled();
     fireEvent.click(within(dialog).getByRole("button", { name: /取\s*消/ }));
-    expect(
-      screen.getByRole("region", { name: "第 1 组适用词义" })
-    ).toBeVisible();
+    expect(screen.getByLabelText("第 1 组适用词义")).toBeVisible();
     await waitFor(() =>
       expect(
-        screen.queryByRole("region", { name: "第 1 组适用词义编辑" })
+        screen.queryByLabelText("第 1 组适用词义编辑")
       ).not.toBeInTheDocument()
     );
     fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
-    dialog = await screen.findByRole("region", { name: "第 1 组适用词义编辑" });
+    dialog = await screen.findByLabelText("第 1 组适用词义编辑");
     fireEvent.click(
       within(dialog).getByRole("button", { name: "恢复适用全部词义" })
     );
     await waitFor(() =>
       expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("general")
     );
-    expect(
-      screen.queryByRole("region", { name: "第 1 组适用词义" })
-    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("第 1 组适用词义")).not.toBeInTheDocument();
   });
 
   it("无词义时不能设为专用，提供前往当前词性添加词义入口", async () => {
-    const initial = formsFixture();
+    // 绑定交互不依赖派生词形或语音控件，使用仅有原形的最小草稿。
+    const initial = formsFixture({
+      pos: "adverb",
+      forms: [commonFormFixture({ spelling: "fast", pronunciations: [] })]
+    });
     const go = vi.fn();
     const change = vi.fn();
     render(
@@ -2956,9 +2947,7 @@ describe("V3FormsAndPronunciationStep", () => {
       </AntApp>
     );
     fireEvent.click(await screen.findByLabelText("第 1 组专用词义"));
-    const dialog = await screen.findByRole("region", {
-      name: "第 1 组适用词义编辑"
-    });
+    const dialog = await screen.findByLabelText("第 1 组适用词义编辑");
     expect(
       within(dialog).getByRole("button", { name: "确认选择" })
     ).toBeDisabled();
