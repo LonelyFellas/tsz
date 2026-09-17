@@ -971,7 +971,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(screen.queryByText("词形是否规则变化？")).toBeNull();
     fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
-    // 卡片头部的通用 / 专用切换也是 radio，只取规则区里的那组。
+    // 只取规则区里的选项，避免匹配其他规则的 radio。
     const regularRadios = groupCard.querySelectorAll<HTMLInputElement>(
       '.word-form-rules input[type="radio"]'
     );
@@ -2782,53 +2782,6 @@ describe("V3FormsAndPronunciationStep", () => {
       phonetic_mode: "distinguish"
     });
   }, 15_000);
-
-  it("组卡片头部切换通用 / 专用，并按词义绑定数提示影响", async () => {
-    const initial = formsFixture();
-    const groupId = initial.pos[0]!.form_groups[0]!.id;
-    function ScopeHarness({ counts }: { counts: ReadonlyMap<string, number> }) {
-      const [value, setValue] = useState(initial);
-      return (
-        <V3FormDisplayProvider>
-          <AntApp>
-            <V3FormsAndPronunciationStep
-              formGroupBindingCounts={counts}
-              onChange={setValue}
-              value={value}
-            />
-            <output data-testid="canonical-value">
-              {JSON.stringify(value)}
-            </output>
-          </AntApp>
-        </V3FormDisplayProvider>
-      );
-    }
-    const { container, rerender } = render(<ScopeHarness counts={new Map()} />);
-    const scope = await waitFor(() => {
-      const element = container.querySelector<HTMLElement>(
-        `[data-v3-field="scope"][data-v3-node-id="${groupId}"]`
-      );
-      expect(element).not.toBeNull();
-      return element!;
-    });
-    expect(scope).toHaveAttribute("tabindex", "-1");
-    expect(screen.queryByText(/个词义/)).toBeNull();
-
-    fireEvent.click(within(scope).getByText("专用"));
-    await waitFor(() =>
-      expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("dedicated")
-    );
-    rerender(<ScopeHarness counts={new Map([[groupId, 2]])} />);
-    expect(screen.getByText("已绑定 2 个词义")).toBeVisible();
-
-    fireEvent.click(within(scope).getByText("通用"));
-    await waitFor(() =>
-      expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("general")
-    );
-    expect(
-      screen.getByText("2 个词义仍绑定此组，改为通用后绑定将失效")
-    ).toBeVisible();
-  });
 
   it("组内唯一原形摘不掉，本组还有别的原形时照常放行", async () => {
     const base = commonFormFixture({

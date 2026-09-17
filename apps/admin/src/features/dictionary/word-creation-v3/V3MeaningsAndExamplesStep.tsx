@@ -2594,6 +2594,18 @@ function V3MeaningsAndExamplesStepContent({
                             const formsPos = forms?.pos.find(
                               (item) => item.pos_id === pos.pos_id
                             );
+                            const isLastDedicatedBinding = Boolean(
+                              sense.form_group_id &&
+                              pos.senses.filter(
+                                (item) =>
+                                  item.form_group_id === sense.form_group_id
+                              ).length === 1 &&
+                              formsPos?.form_groups.some(
+                                (group) =>
+                                  group.id === sense.form_group_id &&
+                                  group.scope === "dedicated"
+                              )
+                            );
                             // 只列本词性的专用组。已绑定的组被删或改回通用时仍留一项，
                             // 让校验问题有落点，也让人看见并改掉。
                             const formGroupOptions = [
@@ -2950,12 +2962,25 @@ function V3MeaningsAndExamplesStepContent({
                                                   nextValue;
                                             })
                                           }
-                                          options={formGroupOptions}
+                                          options={formGroupOptions.map(
+                                            (option) => ({
+                                              ...option,
+                                              disabled:
+                                                isLastDedicatedBinding &&
+                                                option.value !==
+                                                  sense.form_group_id
+                                            })
+                                          )}
                                           status={
                                             formGroupIssue ? "error" : undefined
                                           }
                                           value={sense.form_group_id ?? ""}
                                         />
+                                        {isLastDedicatedBinding ? (
+                                          <Typography.Text type="secondary">
+                                            这是该专用组最后一个词义；解除限制请在词形组的“修改”中恢复适用全部词义。
+                                          </Typography.Text>
+                                        ) : null}
                                         <FieldIssueHelp
                                           issue={formGroupIssue}
                                         />

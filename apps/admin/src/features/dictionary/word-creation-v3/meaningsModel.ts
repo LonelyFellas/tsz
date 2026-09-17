@@ -1,5 +1,6 @@
 import type {
   CefrLevel,
+  SenseFormGroupBindingV3,
   Dialect,
   DialectModeV3,
   DraftFormsStepContentV3,
@@ -461,6 +462,74 @@ export function formGroupLabel(
     ...new Set(spellings.map((value) => value.trim()).filter(Boolean))
   ].join(" / ");
   return `第 ${index + 1} 组 · ${spelling || "未填写原形"}`;
+}
+
+export function formGroupBindingPatches(
+  meanings: DraftMeaningsStepContentWritableV3,
+  saved: DraftMeaningsStepContentV3
+): SenseFormGroupBindingV3[] {
+  return saved.pos
+    .flatMap((pos) => {
+      const local = meanings.pos.find((item) => item.pos_id === pos.pos_id);
+      return pos.senses.flatMap((sense) => {
+        const next = local?.senses.find((item) => item.id === sense.id);
+        return next && next.form_group_id !== sense.form_group_id
+          ? [
+              {
+                sense_id: sense.id,
+                ...(next.form_group_id
+                  ? { form_group_id: next.form_group_id }
+                  : {})
+              }
+            ]
+          : [];
+      });
+    })
+    .sort((a, b) => a.sense_id.localeCompare(b.sense_id));
+}
+
+export function syncFormGroupBindings(
+  meanings: DraftMeaningsStepContentWritableV3,
+  saved: DraftMeaningsStepContentV3
+): DraftMeaningsStepContentWritableV3 {
+  const next = structuredClone(meanings);
+  for (const pos of next.pos) {
+    const source = saved.pos.find((item) => item.pos_id === pos.pos_id);
+    for (const sense of pos.senses) {
+      const binding = source?.senses.find((item) => item.id === sense.id);
+      if (!binding) continue;
+      if (binding.form_group_id) sense.form_group_id = binding.form_group_id;
+      else delete sense.form_group_id;
+    }
+  }
+  return next;
+}
+
+/** 绑定变更也能从词形页保存；不把其他未保存的词义编辑误判为绑定变更。 */
+export function formGroupBindingsChanged(
+  left: Pick<
+    DraftMeaningsStepContentV3 | DraftMeaningsStepContentWritableV3,
+    "pos"
+  >,
+  right: Pick<
+    DraftMeaningsStepContentV3 | DraftMeaningsStepContentWritableV3,
+    "pos"
+  >
+): boolean {
+  const bindings = (
+    value: Pick<
+      DraftMeaningsStepContentV3 | DraftMeaningsStepContentWritableV3,
+      "pos"
+    >
+  ) =>
+    value.pos
+      .flatMap((pos) =>
+        pos.senses
+          .filter((sense) => sense.form_group_id)
+          .map((sense) => `${pos.pos_id}:${sense.id}:${sense.form_group_id}`)
+      )
+      .sort();
+  return JSON.stringify(bindings(left)) !== JSON.stringify(bindings(right));
 }
 
 /** 每个变化组被多少条词义绑定；第 2 步组卡片据此提示影响面。 */

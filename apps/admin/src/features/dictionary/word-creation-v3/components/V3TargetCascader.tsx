@@ -147,6 +147,8 @@ function cascaderOptionsFromGroups(
       ),
       children: group.formGroups.map((formGroup) => ({
         value: formGroup.formKey,
+        disabled: formGroup.senses.length === 0,
+        isLeaf: formGroup.senses.length === 0,
         label: (
           // 命中行只靠颜色区分，不再占一个「命中」标签的宽度。
           <span
@@ -159,6 +161,7 @@ function cascaderOptionsFromGroups(
             {posLabels.size > 1
               ? `${formGroup.formLabel}（${formGroup.posLabel}）`
               : formGroup.formLabel}
+            {formGroup.senses.length === 0 ? "（暂无可关联词义）" : null}
           </span>
         ),
         children: formGroup.senses.map((sense) => {
@@ -256,6 +259,11 @@ function groupsFromCandidates(
         entry.formGroups.push(formGroup);
       }
       for (const sense of candidate.senses) {
+        if (
+          form.allowed_sense_ids !== undefined &&
+          !form.allowed_sense_ids.includes(sense.sense_id)
+        )
+          continue;
         if (formGroup.senses.some((item) => item.senseId === sense.sense_id))
           continue;
         formGroup.senses.push({
@@ -501,7 +509,17 @@ export function V3TargetCascader({
       const components =
         entries.get(candidate.entry_id) ??
         new Map<string, PhraseComponentChoice>();
+      const matchedForm = candidate.forms.find(
+        (form) =>
+          form.form_id === candidate.matched_form_id &&
+          form.variant_id === candidate.matched_variant_id
+      );
       for (const sense of candidate.senses) {
+        if (
+          matchedForm?.allowed_sense_ids !== undefined &&
+          !matchedForm.allowed_sense_ids.includes(sense.sense_id)
+        )
+          continue;
         for (const usage of sense.component_usages ?? []) {
           if (
             usage.state !== "resolved" ||

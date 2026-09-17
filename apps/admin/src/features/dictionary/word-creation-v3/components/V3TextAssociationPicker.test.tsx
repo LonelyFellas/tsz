@@ -1,3 +1,4 @@
+import type { PublishedSentenceTargetCandidateV3 } from "@tsz/types";
 import {
   fireEvent,
   render,
@@ -513,5 +514,108 @@ it("短语成分按目标词条检索并读完其后续候选，后页词义可�
       target_sense_id: "later-sense",
       via_phrase: expect.objectContaining({ component_id: "component" })
     })
+  );
+});
+
+it.each(["word", "phrase"] as const)(
+  "%s 关联按词形筛选：通用全义、专用多义、同拼写不串组",
+  async (kind) => {
+    const candidate: PublishedSentenceTargetCandidateV3 = {
+      ...giveEntryResponse().matches[0]!,
+      senses: [
+        ...giveEntryResponse().matches[0]!.senses,
+        ...[2, 3].map((index) => ({
+          ...giveEntryResponse().matches[0]!.senses[0]!,
+          sense_id: `sense-give-${index}`,
+          gloss: `专用词义 ${index}`
+        }))
+      ]
+    };
+    const general = candidate.forms[0]!;
+    general.allowed_sense_ids = candidate.senses.map((sense) => sense.sense_id);
+    candidate.forms.push(
+      {
+        ...general,
+        form_id: "dedicated-form",
+        variant_id: "dedicated-variant",
+        base_form_ids: ["dedicated-form"],
+        allowed_sense_ids: ["sense-give-2", "sense-give-3"]
+      },
+      {
+        ...general,
+        form_id: "empty-form",
+        variant_id: "empty-variant",
+        spelling: "unused",
+        base_form_ids: ["empty-form"],
+        allowed_sense_ids: []
+      }
+    );
+    search.mockImplementation(async ({ q }) =>
+      q === "give"
+        ? { ...giveEntryResponse(), matches: [candidate] }
+        : phraseResponse()
+    );
+    const onSelect = vi.fn();
+    render(
+      <V3TextAssociationPicker
+        kind={kind}
+        segments={kind === "word" ? [segments[0]!] : segments}
+        onSelect={onSelect}
+      />
+    );
+    if (kind === "phrase") await openPhraseComponent();
+    else
+      await waitFor(() => {
+        fireEvent.click(column(0).getByText("give", { exact: true }));
+        expect(column(1).getAllByText("原形 give")).toHaveLength(2);
+      });
+    const formColumn = kind === "word" ? 1 : 2;
+    await waitFor(() =>
+      expect(column(formColumn).getAllByText("原形 give")).toHaveLength(2)
+    );
+    fireEvent.click(column(formColumn).getAllByText("原形 give")[0]!);
+    expect(column(formColumn + 1).getByText("给；交给")).toBeVisible();
+    expect(column(formColumn + 1).getByText("专用词义 2")).toBeVisible();
+    expect(column(formColumn + 1).getByText("专用词义 3")).toBeVisible();
+    fireEvent.click(column(formColumn).getAllByText("原形 give")[1]!);
+    expect(
+      column(formColumn + 1).queryByText("给；交给")
+    ).not.toBeInTheDocument();
+    expect(column(formColumn + 1).getByText("专用词义 3")).toBeVisible();
+    expect(
+      column(formColumn)
+        .getByText(/unused.*暂无可关联词义/)
+        .closest(".ant-cascader-menu-item")
+    ).toHaveClass("ant-cascader-menu-item-disabled");
+    fireEvent.click(column(formColumn + 1).getByText("专用词义 2"));
+    expect(onSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        target_form_id: "dedicated-form",
+        target_sense_id: "sense-give-2",
+        target_base_form_id: "dedicated-form"
+      })
+    );
+  }
+);
+
+it("关联短语只展开命中短语词形允许的词义成分", async () => {
+  const response = phraseResponse();
+  const matches: PublishedSentenceTargetCandidateV3[] = response.matches.map(
+    (candidate) => ({
+      ...candidate,
+      forms: candidate.forms.map((form) => ({ ...form, allowed_sense_ids: [] }))
+    })
+  );
+  search.mockResolvedValue({ ...response, matches });
+  render(
+    <V3TextAssociationPicker
+      kind="phrase"
+      segments={segments}
+      onSelect={vi.fn()}
+    />
+  );
+  const item = await screen.findByText(/give up（未配置成分用词）/);
+  expect(item.closest(".ant-cascader-menu-item")).toHaveClass(
+    "ant-cascader-menu-item-disabled"
   );
 });

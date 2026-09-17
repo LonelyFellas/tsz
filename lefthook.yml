@@ -38,10 +38,10 @@ pre-push:
     # CI 不受影响:它走 unit-coverage 的 matrix 按模块分片(vitest.ci-shard.config.ts),
     # 每片数据量小,覆盖率报告照常产出。
     #
-    # 必须显式给并行度:lefthook 起子进程时 vitest 的 availableParallelism() 只认到 1,
-    # 187 个测试文件会被塞进单个 worker 串行跑(实测钩子里 1 个 worker、手动跑 9 个,
-    # 同一条命令同一个目录)。不指定的话本地推一次要十几分钟还跑不完。
+    # 显式并行，避免 lefthook 环境退成单 worker。8 worker 在本地同时运行多个
+    # jsdom UI 文件时会争抢 CPU，使原本通过的用例触发 5 秒超时；限制为 4，
+    # 检查范围、断言和单项超时不变，不跳过任何测试。
     test:
-      run: pnpm exec vitest run --maxWorkers=8
+      run: pnpm exec vitest run --maxWorkers=4
     # e2e 不在 pre-push 跑:Playwright 要起服务、全量跑数分钟,是每次推送的最大等待项,
     # 且 CI 的 e2e job 跑同一套件兜底(合 main 仍有门禁)。推送前想自查可手动 pnpm test:e2e。

@@ -4600,7 +4600,7 @@ describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
     ).toBeInTheDocument();
   });
 
-  it("只列通用与本词性专用组，选择后写入并可改回通用", () => {
+  it("只列本词性专用组，最后一个绑定不能直接改回通用", async () => {
     render(<Harness forms={dedicatedForms()} />);
     const select = screen.getByLabelText("释义 1 词形与发音");
     expect(select.closest(".ant-select")).toHaveTextContent("通用（默认）");
@@ -4614,10 +4614,21 @@ describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
     expect(value().pos[0]!.senses[0]!.form_group_id).toBe(dedicatedGroupId);
     expect(select.closest(".ant-select")).toHaveTextContent("第 2 组 · Job");
 
-    fireEvent.click(openOptions(select)[0]!);
-    expect(Object.keys(value().pos[0]!.senses[0]!)).not.toContain(
-      "form_group_id"
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "这是该专用组最后一个词义；解除限制请在词形组的“修改”中恢复适用全部词义。"
+        )
+      ).toBeVisible()
     );
+    const generalOption = openOptions(select)[0]!;
+    await waitFor(() =>
+      expect(generalOption.closest(".ant-select-item-option")).toHaveClass(
+        "ant-select-item-option-disabled"
+      )
+    );
+    fireEvent.click(generalOption);
+    expect(value().pos[0]!.senses[0]!.form_group_id).toBe(dedicatedGroupId);
   });
 
   it("绑定失效时保留一项供改选，校验问题落在选择器锚点上", () => {

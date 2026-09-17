@@ -41,7 +41,7 @@ export interface DialectRulesV3 {
   phonetic_mode: DialectModeV3;
 }
 
-/** 变化组的使用范围：通用组服务本词性未绑定的词义；专用组只服务绑定了它的词义。 */
+/** 变化组的使用范围：通用组服务本词性全部词义；专用组只服务同词性下绑定了它的词义。 */
 export type FormGroupScopeV3 = "general" | "dedicated";
 
 /** `base` is a peer form type. It is neither unique nor a parent of other forms. */
@@ -424,6 +424,8 @@ export interface SentenceTargetSenseV3 {
 }
 
 export interface SentenceTargetCandidateFormV3 {
+  /** 可选词义（同基本词性）；缺省兼容旧后端，空数组明确不可选。 */
+  allowed_sense_ids?: string[];
   form_id: string;
   variant_id: string;
   form_type: WordFormTypeV3;
@@ -632,6 +634,8 @@ export interface EntryPresentationV3 {
 export type V3PublicationCapability = { mode: "native" };
 
 export interface AdminWordV3Capabilities {
+  /** 支持词形与既有词义绑定的原子保存。 */
+  atomic_form_sense_bindings?: boolean;
   text_links?: boolean;
   publication: V3PublicationCapability;
   pronunciation_normalization_version: PronunciationNormalizationVersionV3;
@@ -719,10 +723,17 @@ export interface CreateAdminWordV3Input {
 export type CreateAdminWordAnyInput =
   CreateAdminWordV2Input | CreateAdminWordV3Input;
 
+export interface SenseFormGroupBindingV3 {
+  sense_id: string;
+  /** 缺省表示解除该词义的专用组绑定。 */
+  form_group_id?: string;
+}
+
 export interface SaveFormsStepInputV3 {
   schema_version: 3;
   base_revision: number;
   intent: StepSaveIntent;
+  sense_bindings?: SenseFormGroupBindingV3[];
   content: DraftFormsStepContentV3;
   confirmed_impact_token?: string;
   confirmed_surface_match_token?: string;
@@ -743,6 +754,7 @@ export type SaveMeaningsStepInputAny =
 export interface PreviewFormsImpactInputV3 {
   schema_version: 3;
   base_revision: number;
+  sense_bindings?: SenseFormGroupBindingV3[];
   content: DraftFormsStepContentV3;
 }
 
