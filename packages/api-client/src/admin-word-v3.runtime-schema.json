@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-azure-pronunciation-inputs/docs/openapi.json",
-  "_source_sha256": "4ab216ca44138a0421788029ff7235220ef75bd9e1c26451ce2baef9e2323ef0",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dedicated-group-sense-assessment/docs/openapi.json",
+  "_source_sha256": "b3764a34bafebc28d8f875b91611ceec876f7abf5307343bd3d8836ab4547e25",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
@@ -219,6 +219,7 @@
       "type": "object",
       "required": ["publication", "pronunciation_normalization_version"],
       "properties": {
+        "atomic_form_sense_bindings": { "type": "boolean" },
         "draft_relation_prebinding": { "type": "boolean" },
         "pronunciation_normalization_version": {
           "$ref": "#/$defs/PronunciationNormalizationVersionV3"
@@ -1620,6 +1621,11 @@
         "base_form_ids"
       ],
       "properties": {
+        "allowed_sense_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "maxItems": 2000
+        },
         "base_form_ids": {
           "type": "array",
           "items": { "type": "string", "format": "uuid" },

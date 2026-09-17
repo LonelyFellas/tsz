@@ -1,3 +1,4 @@
+import { V3FormGroupSenseEditor } from "./V3FormGroupSenseEditor";
 import { FormTypeLabelsProvider } from "../../part-of-speech/FormTypeLabels";
 import {
   act,
@@ -10,6 +11,7 @@ import {
 import { App as AntApp } from "antd";
 import type {
   DraftFormsStepContentV3,
+  DraftMeaningsStepContentWritableV3,
   Dialect,
   WordPronunciationV3,
   V3DraftValidationIssue,
@@ -971,7 +973,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(screen.queryByText("词形是否规则变化？")).toBeNull();
     fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
-    // 卡片头部的通用 / 专用切换也是 radio，只取规则区里的那组。
+    // 只取规则区里的选项，避免匹配其他规则的 radio。
     const regularRadios = groupCard.querySelectorAll<HTMLInputElement>(
       '.word-form-rules input[type="radio"]'
     );
@@ -2783,51 +2785,188 @@ describe("V3FormsAndPronunciationStep", () => {
     });
   }, 15_000);
 
-  it("组卡片头部切换通用 / 专用，并按词义绑定数提示影响", async () => {
+  it("必须选择同词性词义才设为专用，取消不修改，编辑不能清空最后绑定", async () => {
     const initial = formsFixture();
-    const groupId = initial.pos[0]!.form_groups[0]!.id;
-    function ScopeHarness({ counts }: { counts: ReadonlyMap<string, number> }) {
+    const posId = initial.pos[0]!.pos_id;
+    const initialMeanings: DraftMeaningsStepContentWritableV3 = {
+      sense_groups: [],
+      pos: [posId, "other-pos"].map((pos_id) => ({
+        pos_id,
+        grammar_structures: [],
+        senses: [1, 2].map((index) => ({
+          id: `${pos_id}-${index}`,
+          sub_pos: "",
+          level: "A1",
+          depends_on_context: false,
+          definitions: [
+            {
+              definition_mode: "zh_definition",
+              id: `def-${index}`,
+              content_id: `text-${index}`,
+              level: "A1",
+              content: {
+                version: 2,
+                text: `${pos_id === posId ? "本词性" : "其他词性"}释义${index}`,
+                annotations: []
+              }
+            }
+          ],
+          sentences: [],
+          relations: []
+        }))
+      }))
+    };
+    function ScopeHarness() {
       const [value, setValue] = useState(initial);
+      const [meanings, setMeanings] = useState(initialMeanings);
       return (
         <V3FormDisplayProvider>
           <AntApp>
             <V3FormsAndPronunciationStep
-              formGroupBindingCounts={counts}
-              onChange={setValue}
               value={value}
+              onChange={setValue}
+              meanings={meanings}
+              onMeaningsChange={setMeanings}
             />
             <output data-testid="canonical-value">
               {JSON.stringify(value)}
+            </output>
+            <output data-testid="binding-meanings">
+              {JSON.stringify(meanings)}
             </output>
           </AntApp>
         </V3FormDisplayProvider>
       );
     }
-    const { container, rerender } = render(<ScopeHarness counts={new Map()} />);
-    const scope = await waitFor(() => {
-      const element = container.querySelector<HTMLElement>(
-        `[data-v3-field="scope"][data-v3-node-id="${groupId}"]`
-      );
-      expect(element).not.toBeNull();
-      return element!;
-    });
-    expect(scope).toHaveAttribute("tabindex", "-1");
-    expect(screen.queryByText(/个词义/)).toBeNull();
-
-    fireEvent.click(within(scope).getByText("专用"));
-    await waitFor(() =>
-      expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("dedicated")
+    render(<ScopeHarness />);
+    expect(screen.queryByText("通用", { exact: true })).not.toBeInTheDocument();
+    const headerEntry = await screen.findByLabelText("第 1 组专用词义");
+    expect(headerEntry.closest(".ant-card-head")).not.toBeNull();
+    expect(headerEntry).toHaveTextContent("专用词义");
+    expect(screen.queryByText("限定适用词义")).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "收起第 1 组词形变化" })
     );
-    rerender(<ScopeHarness counts={new Map([[groupId, 2]])} />);
-    expect(screen.getByText("已绑定 2 个词义")).toBeVisible();
-
-    fireEvent.click(within(scope).getByText("通用"));
+    fireEvent.click(headerEntry);
+    let dialog = await screen.findByRole("region", {
+      name: "第 1 组适用词义编辑"
+    });
+    expect(within(dialog).queryByText(/其他词性/)).not.toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("button", { name: "确认选择" })
+    ).toBeDisabled();
+    fireEvent.click(
+      within(dialog).getByRole("checkbox", { name: /本词性释义1/ })
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "收起第 1 组词形变化" })
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "展开第 1 组词形变化" })
+    );
+    expect(
+      within(dialog).getByRole("checkbox", { name: /本词性释义1/ })
+    ).toBeChecked();
+    fireEvent.click(within(dialog).getByRole("button", { name: /取\s*消/ }));
+    expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("general");
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("region", { name: "第 1 组适用词义编辑" })
+      ).not.toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
+    dialog = await screen.findByRole("region", { name: "第 1 组适用词义编辑" });
+    for (const checkbox of within(dialog).getAllByRole("checkbox"))
+      fireEvent.click(checkbox);
+    fireEvent.click(within(dialog).getByRole("button", { name: "确认选择" }));
+    expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("dedicated");
+    expect(
+      screen.getByRole("region", { name: "第 1 组适用词义" })
+    ).toBeVisible();
+    const summary = screen.getByRole("region", { name: "第 1 组适用词义" });
+    expect(within(summary).getByText("本词性释义1")).toBeVisible();
+    expect(within(summary).getByText("本词性释义2")).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "收起第 1 组词形变化" })
+    );
+    expect(screen.getByText("2 个词义")).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: "展开第 1 组词形变化" })
+    );
+    const stored = JSON.parse(
+      screen.getByTestId("binding-meanings").textContent!
+    );
+    expect(
+      stored.pos[0].senses.map(
+        (sense: { form_group_id?: string }) => sense.form_group_id
+      )
+    ).toEqual([
+      initial.pos[0]!.form_groups[0]!.id,
+      initial.pos[0]!.form_groups[0]!.id
+    ]);
+    expect(stored.pos[1].senses[0].form_group_id).toBeUndefined();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("region", { name: "第 1 组适用词义编辑" })
+      ).not.toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
+    dialog = await screen.findByRole("region", { name: "第 1 组适用词义编辑" });
+    for (const checkbox of within(dialog).getAllByRole("checkbox"))
+      fireEvent.click(checkbox);
+    expect(
+      within(dialog).getByRole("button", { name: "确认选择" })
+    ).toBeDisabled();
+    fireEvent.click(within(dialog).getByRole("button", { name: /取\s*消/ }));
+    expect(
+      screen.getByRole("region", { name: "第 1 组适用词义" })
+    ).toBeVisible();
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("region", { name: "第 1 组适用词义编辑" })
+      ).not.toBeInTheDocument()
+    );
+    fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
+    dialog = await screen.findByRole("region", { name: "第 1 组适用词义编辑" });
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "恢复适用全部词义" })
+    );
     await waitFor(() =>
       expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("general")
     );
     expect(
-      screen.getByText("2 个词义仍绑定此组，改为通用后绑定将失效")
-    ).toBeVisible();
+      screen.queryByRole("region", { name: "第 1 组适用词义" })
+    ).not.toBeInTheDocument();
+  });
+
+  it("无词义时不能设为专用，提供前往当前词性添加词义入口", async () => {
+    const initial = formsFixture();
+    const go = vi.fn();
+    const change = vi.fn();
+    render(
+      <AntApp>
+        <V3FormsAndPronunciationStep
+          value={initial}
+          onChange={change}
+          meanings={{ sense_groups: [], pos: [] }}
+          onMeaningsChange={vi.fn()}
+          onGoToMeanings={go}
+        />
+      </AntApp>
+    );
+    fireEvent.click(await screen.findByLabelText("第 1 组专用词义"));
+    const dialog = await screen.findByRole("region", {
+      name: "第 1 组适用词义编辑"
+    });
+    expect(
+      within(dialog).getByRole("button", { name: "确认选择" })
+    ).toBeDisabled();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "前往添加词义" })
+    );
+    expect(go).toHaveBeenCalledWith(initial.pos[0]!.pos_id);
+    expect(change).not.toHaveBeenCalled();
   });
 
   it("组内唯一原形摘不掉，本组还有别的原形时照常放行", async () => {
@@ -3289,4 +3428,56 @@ it("目录自定义词形可展示，改名后保留词形编码", async () => {
       allowedFormTypes: () => ["custom_variant"]
     })
   ).toEqual([]);
+});
+
+it("编辑专用组保留已绑定的空释义，未保存的新词义不能直接绑定", () => {
+  const pos = formsFixture().pos[0]!;
+  const group = { ...pos.form_groups[0]!, scope: "dedicated" as const };
+  const blank: DraftMeaningsStepContentWritableV3["pos"][number]["senses"][number] =
+    {
+      id: "saved-blank",
+      form_group_id: group.id,
+      sub_pos: "",
+      level: "A1",
+      depends_on_context: false,
+      definitions: [],
+      sentences: [],
+      relations: []
+    };
+  const unsaved = {
+    ...blank,
+    id: "unsaved",
+    form_group_id: undefined,
+    definitions: [
+      {
+        definition_mode: "zh_definition" as const,
+        id: "new-definition",
+        content_id: "new-content",
+        level: "A1",
+        content: {
+          version: 2 as const,
+          text: "尚未保存的词义",
+          annotations: []
+        }
+      }
+    ]
+  };
+  const confirm = vi.fn();
+  render(
+    <V3FormGroupSenseEditor
+      pos={pos}
+      group={group}
+      senses={[blank, unsaved]}
+      savedSenseIds={new Set([blank.id])}
+      onConfirm={confirm}
+      onCancel={vi.fn()}
+      onGoToMeanings={vi.fn()}
+    />
+  );
+  expect(screen.getByRole("checkbox", { name: /待填写释义/ })).toBeChecked();
+  expect(
+    screen.getByRole("checkbox", { name: /尚未保存的词义/ })
+  ).toBeDisabled();
+  fireEvent.click(screen.getByRole("button", { name: "确认选择" }));
+  expect(confirm).toHaveBeenCalledWith([blank.id]);
 });

@@ -59,6 +59,26 @@
   background: var(--word-ink);
 }
 
+.v3-form-group-heading {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.v3-form-group-heading .ant-tag {
+  margin-inline-end: 0;
+}
+
+.v3-form-group-status {
+  color: #dbeafe;
+  font-size: 12px;
+}
+
+.v3-form-group-menu.ant-btn {
+  color: #fff;
+}
+
 /* 收起/展开用实心三角，与 STEP 03 的折叠控件一致（换图标而不是旋转箭头）。 */
 .word-form-card-toggle-caret {
   flex: none;
@@ -314,4 +334,69 @@
   .v3-membership-actions {
     justify-content: flex-start;
   }
+}
+
+.v3-group-sense-summary,
+.v3-group-sense-editor {
+  padding: 16px;
+  border-bottom: 1px solid #e5e7eb;
+  background: #f8faff;
+}
+
+.v3-group-sense-summary ul {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.v3-group-sense-summary li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  line-height: 1.6;
+}
+
+.v3-group-sense-number {
+  flex: none;
+  color: #667085;
+  font-variant-numeric: tabular-nums;
+}
+
+.v3-group-sense-editor > .ant-flex:first-child {
+  margin-bottom: 8px;
+}
+
+.v3-group-sense-editor-actions {
+  padding-top: 12px;
+  margin-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.v3-form-group-card > .ant-card-head .ant-card-extra {
+  margin-inline-start: 16px;
+}
+
+.v3-group-sense-options {
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.v3-group-sense-options .ant-checkbox-wrapper {
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.v3-group-sense-options .ant-checkbox-wrapper-checked {
+  border-color: #91caff;
+  background: #f0f7ff;
+}
+
+.v3-group-sense-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }

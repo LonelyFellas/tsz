@@ -13,8 +13,12 @@ import {
 import type {
   Dialect,
   DraftFormsStepContentV3,
+  DraftMeaningsStepContentWritableV3,
+  FormGroupScopeV3,
   PartOfSpeechCatalogItem,
   PartOfSpeechCatalogResponse,
+  WordPosFormsV3,
+  WordFormGroupV3,
   V3DraftValidationIssue,
   WordEntryKindV3
 } from "@tsz/types";
@@ -26,9 +30,12 @@ import {
   deletePartOfSpeech,
   fillFormTypeTemplate,
   reorderPos,
+  updateFormGroupScope,
   type V3IdFactory,
   type V3StableVariantIdFactory
 } from "../operations";
+import { V3FormGroupSenseEditor } from "./V3FormGroupSenseEditor";
+import { countFormGroupBindings, definitionSummary } from "../meaningsModel";
 import { V3PosTab } from "./V3PosTab";
 import { V3DisabledReason } from "./V3DisabledReason";
 import { V3ReferenceBadge } from "./V3ReferenceBadge";
@@ -65,6 +72,11 @@ export interface V3FormsAndPronunciationStepProps {
   stableVariantIds?: V3StableVariantIdFactory;
   /** 变化组 id → 词义步里绑定它的词义数；组卡片据此提示专用组的影响面。 */
   formGroupBindingCounts?: ReadonlyMap<string, number>;
+  meanings?: DraftMeaningsStepContentWritableV3;
+  savedSenseIds?: ReadonlySet<string>;
+  bindingEditingAvailable?: boolean;
+  onMeaningsChange?: (meanings: DraftMeaningsStepContentWritableV3) => void;
+  onGoToMeanings?: (posId: string) => void;
 }
 
 function V3VoiceNotice({ value }: { value: DraftFormsStepContentV3 }) {
@@ -102,9 +114,115 @@ export function V3FormsAndPronunciationStep({
   issues = [],
   idFactory = newWordNodeId,
   stableVariantIds,
-  formGroupBindingCounts
+  formGroupBindingCounts,
+  meanings,
+  savedSenseIds,
+  bindingEditingAvailable = true,
+  onMeaningsChange,
+  onGoToMeanings
 }: V3FormsAndPronunciationStepProps) {
   const { modal } = App.useApp();
+  const [bindingGroup, setBindingGroup] = useState<{
+    posId: string;
+    groupId: string;
+  }>();
+  const bindingCounts = meanings
+    ? countFormGroupBindings(meanings)
+    : formGroupBindingCounts;
+  const applyBindings = (
+    posId: string,
+    groupId: string,
+    scope: FormGroupScopeV3,
+    senseIds: string[]
+  ) => {
+    if (!meanings || !onMeaningsChange) return;
+    const nextForms = updateFormGroupScope(value, posId, groupId, scope);
+    if (!nextForms.ok) return;
+    const nextMeanings = structuredClone(meanings);
+    const pos = nextMeanings.pos.find((item) => item.pos_id === posId);
+    if (
+      !pos ||
+      (scope === "dedicated" &&
+        (senseIds.length === 0 ||
+          senseIds.some(
+            (id) =>
+              !pos.senses.some(
+                (sense) =>
+                  sense.id === id &&
+                  (!sense.form_group_id || sense.form_group_id === groupId)
+              )
+          )))
+    )
+      return;
+    for (const sense of pos.senses) {
+      if (scope === "dedicated" && senseIds.includes(sense.id))
+        sense.form_group_id = groupId;
+      else if (sense.form_group_id === groupId) delete sense.form_group_id;
+    }
+    onChange(nextForms.value);
+    onMeaningsChange(nextMeanings);
+    setBindingGroup(undefined);
+  };
+  const renderGroupSenses = (pos: WordPosFormsV3, group: WordFormGroupV3) => {
+    const senses =
+      meanings?.pos.find((item) => item.pos_id === pos.pos_id)?.senses ?? [];
+    const editing =
+      bindingGroup?.posId === pos.pos_id && bindingGroup.groupId === group.id;
+    const groupNumber =
+      pos.form_groups.findIndex((item) => item.id === group.id) + 1;
+    if (editing && bindingEditingAvailable)
+      return (
+        <V3FormGroupSenseEditor
+          key={group.id}
+          pos={pos}
+          group={group}
+          senses={senses}
+          savedSenseIds={savedSenseIds}
+          onCancel={() => setBindingGroup(undefined)}
+          onConfirm={(ids) =>
+            applyBindings(pos.pos_id, group.id, "dedicated", ids)
+          }
+          onRestoreGeneral={() =>
+            applyBindings(pos.pos_id, group.id, "general", [])
+          }
+          onGoToMeanings={
+            onGoToMeanings
+              ? () => {
+                  setBindingGroup(undefined);
+                  onGoToMeanings(pos.pos_id);
+                }
+              : undefined
+          }
+        />
+      );
+    if (group.scope !== "dedicated") return null;
+    const bound = senses.filter((sense) => sense.form_group_id === group.id);
+    return (
+      <section
+        className="v3-group-sense-summary"
+        aria-label={`第 ${groupNumber} 组适用词义`}
+      >
+        <Typography.Text strong>适用词义</Typography.Text>
+        {bound.length ? (
+          <ul>
+            {bound.map((sense) => (
+              <li key={sense.id}>
+                <span className="v3-group-sense-number">
+                  {senses.findIndex((item) => item.id === sense.id) + 1}.
+                </span>
+                <span>{definitionSummary(sense)}</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <Typography.Text type="warning">
+            尚未选择适用词义，请补充。
+          </Typography.Text>
+        )}
+      </section>
+    );
+  };
+
   const displayState = useFormDisplayState();
   const [catalog, setCatalog] = useState<{
     data?: PartOfSpeechCatalogResponse;
@@ -285,7 +403,19 @@ export function V3FormsAndPronunciationStep({
             children: (
               <V3PosTab
                 content={value}
-                formGroupBindingCounts={formGroupBindingCounts}
+                formGroupBindingCounts={bindingCounts}
+                renderGroupSenses={(group) => renderGroupSenses(pos, group)}
+                editingGroupId={
+                  bindingGroup?.posId === pos.pos_id
+                    ? bindingGroup.groupId
+                    : undefined
+                }
+                onEditGroupSenses={
+                  bindingEditingAvailable
+                    ? (groupId) =>
+                        setBindingGroup({ posId: pos.pos_id, groupId })
+                    : undefined
+                }
                 idFactory={idFactory}
                 issues={issues}
                 onChange={onChange}

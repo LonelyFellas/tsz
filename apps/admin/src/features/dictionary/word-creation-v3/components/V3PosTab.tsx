@@ -3,7 +3,6 @@ import { Alert, Button, Empty, Flex, Radio, Space, Typography } from "antd";
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
-  FormGroupScopeV3,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
   WordFormGroupV3,
@@ -15,11 +14,11 @@ import {
   deleteGroupAndOrphanForms,
   normalizeGroupDialectRules,
   reorderFormGroups,
-  updateFormGroupScope,
   type V3IdFactory,
   type V3StableVariantIdFactory
 } from "../operations";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { V3FormGroupCard } from "./V3FormGroupCard";
 import { partOfSpeechLabel } from "../presentation";
 import {
@@ -59,6 +58,9 @@ export interface V3PosTabProps {
   stableVariantIds?: V3StableVariantIdFactory;
   /** 变化组 id → 词义步里绑定它的词义数。 */
   formGroupBindingCounts?: ReadonlyMap<string, number>;
+  renderGroupSenses?: (group: WordFormGroupV3) => ReactNode;
+  onEditGroupSenses?: (groupId: string) => void;
+  editingGroupId?: string;
 }
 
 export function V3PosTab({
@@ -69,7 +71,10 @@ export function V3PosTab({
   onChange,
   posCatalog,
   stableVariantIds,
-  formGroupBindingCounts
+  formGroupBindingCounts,
+  renderGroupSenses,
+  onEditGroupSenses,
+  editingGroupId
 }: V3PosTabProps) {
   const [pendingGroupDeletion, setPendingGroupDeletion] = useState<{
     groupId: string;
@@ -276,11 +281,6 @@ export function V3PosTab({
     if (result.ok) onChange(result.value);
   };
 
-  const changeScope = (groupId: string, scope: FormGroupScopeV3) => {
-    const result = updateFormGroupScope(content, pos.pos_id, groupId, scope);
-    if (result.ok) onChange(result.value);
-  };
-
   const deleteGroup = (groupId: string) => {
     const result = deleteFormGroup(content, pos.pos_id, groupId);
     if (result.ok) {
@@ -420,7 +420,13 @@ export function V3PosTab({
               onChange={onChange}
               onDelete={() => deleteGroup(group.id)}
               onMove={(offset) => moveGroup(index, offset)}
-              onScopeChange={(scope) => changeScope(group.id, scope)}
+              senseScope={renderGroupSenses?.(group)}
+              onEditSenses={
+                onEditGroupSenses
+                  ? () => onEditGroupSenses(group.id)
+                  : undefined
+              }
+              editingSenses={editingGroupId === group.id}
               pos={pos}
               posCatalog={posCatalog}
             />
