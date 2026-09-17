@@ -1,3 +1,4 @@
+import { boundFormGroupIds } from "./meaningsModel";
 import type {
   AdminWordV3,
   EnglishTextV3,
@@ -184,15 +185,19 @@ export function V3MeaningsPreview({
                               语义区间 {group.index}：{group.label}
                             </Tag>
                           ) : null}
-                          {sense.form_group_id ? (
-                            <Tag className="tsz-entry-en" color="cyan">
+                          {boundFormGroupIds(sense).map((groupId) => (
+                            <Tag
+                              key={groupId}
+                              className="tsz-entry-en"
+                              color="cyan"
+                            >
                               词形与发音：
                               {boundFormGroupLabel(
                                 formsPosById.get(pos.pos_id),
-                                sense.form_group_id
+                                groupId
                               )}
                             </Tag>
-                          ) : null}
+                          ))}
                           {sense.depends_on_context ? (
                             <Tag color="gold">依赖上下文</Tag>
                           ) : null}

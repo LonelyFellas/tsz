@@ -1,7 +1,9 @@
+import { boundFormGroupIds } from "./meaningsModel";
 import type {
   AdminWordV3,
   AdminWordV3Envelope,
   DraftFormsStepContentV3,
+  DraftMeaningsStepContentWritableV3,
   FormsImpactResponseV3,
   SenseFormGroupBindingV3,
   SurfaceMatchPageV3,
@@ -110,6 +112,23 @@ function normalizeJson(value: unknown): unknown {
 /** 比较实际 JSON 内容：对象字段顺序不算修改，数组顺序仍有意义。 */
 export function v3ContentFingerprint(value: unknown): string {
   return JSON.stringify(normalizeJson(value));
+}
+
+/** 绑定是集合；历史单组与等价数组不应产生未保存状态。 */
+export function v3MeaningsContentFingerprint(
+  value: DraftMeaningsStepContentWritableV3
+): string {
+  return v3ContentFingerprint({
+    ...value,
+    pos: value.pos.map((pos) => ({
+      ...pos,
+      senses: pos.senses.map((sense) => ({
+        ...sense,
+        form_group_id: undefined,
+        form_group_ids: [...boundFormGroupIds(sense)].sort()
+      }))
+    }))
+  });
 }
 
 /** Stable local fingerprint of the exact forms body used for impact preview. */

@@ -333,7 +333,8 @@ export function referenceLink(reference: InboundReferenceV3): V3ReferenceLink {
   }
   if (!source.entry_id) return { kind: "none" };
   const step =
-    reference.kind === "phrase_component" && !source.sense_id
+    reference.kind === "form_group_sense_binding" ||
+    (reference.kind === "phrase_component" && !source.sense_id)
       ? "forms"
       : "meanings";
   const params = new URLSearchParams();

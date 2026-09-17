@@ -61,6 +61,7 @@ export interface V3PosTabProps {
   renderGroupSenses?: (group: WordFormGroupV3) => ReactNode;
   onEditGroupSenses?: (groupId: string) => void;
   editingGroupId?: string;
+  onCloseGroupSenses?: () => void;
 }
 
 export function V3PosTab({
@@ -74,7 +75,8 @@ export function V3PosTab({
   formGroupBindingCounts,
   renderGroupSenses,
   onEditGroupSenses,
-  editingGroupId
+  editingGroupId,
+  onCloseGroupSenses
 }: V3PosTabProps) {
   const [pendingGroupDeletion, setPendingGroupDeletion] = useState<{
     groupId: string;
@@ -426,6 +428,7 @@ export function V3PosTab({
                   ? () => onEditGroupSenses(group.id)
                   : undefined
               }
+              onCloseSenses={onCloseGroupSenses}
               editingSenses={editingGroupId === group.id}
               pos={pos}
               posCatalog={posCatalog}

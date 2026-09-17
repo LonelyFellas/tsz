@@ -1,3 +1,4 @@
+import { boundFormGroupIds, setFormGroupBindings } from "../meaningsModel";
 import { MinusCircleOutlined } from "@ant-design/icons";
 import {
   Alert,
@@ -144,20 +145,16 @@ export function V3FormsAndPronunciationStep({
       !pos ||
       (scope === "dedicated" &&
         (senseIds.length === 0 ||
-          senseIds.some(
-            (id) =>
-              !pos.senses.some(
-                (sense) =>
-                  sense.id === id &&
-                  (!sense.form_group_id || sense.form_group_id === groupId)
-              )
-          )))
+          senseIds.some((id) => !pos.senses.some((sense) => sense.id === id))))
     )
       return;
     for (const sense of pos.senses) {
+      const ids = boundFormGroupIds(sense).filter((id) => id !== groupId);
       if (scope === "dedicated" && senseIds.includes(sense.id))
-        sense.form_group_id = groupId;
-      else if (sense.form_group_id === groupId) delete sense.form_group_id;
+        ids.push(groupId);
+      if (ids.length || boundFormGroupIds(sense).includes(groupId)) {
+        setFormGroupBindings(sense, ids);
+      }
     }
     onChange(nextForms.value);
     onMeaningsChange(nextMeanings);
@@ -196,7 +193,9 @@ export function V3FormsAndPronunciationStep({
         />
       );
     if (group.scope !== "dedicated") return null;
-    const bound = senses.filter((sense) => sense.form_group_id === group.id);
+    const bound = senses.filter((sense) =>
+      boundFormGroupIds(sense).includes(group.id)
+    );
     return (
       <section
         className="v3-group-sense-summary"
@@ -405,6 +404,7 @@ export function V3FormsAndPronunciationStep({
                 content={value}
                 formGroupBindingCounts={bindingCounts}
                 renderGroupSenses={(group) => renderGroupSenses(pos, group)}
+                onCloseGroupSenses={() => setBindingGroup(undefined)}
                 editingGroupId={
                   bindingGroup?.posId === pos.pos_id
                     ? bindingGroup.groupId

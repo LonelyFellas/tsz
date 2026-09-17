@@ -1,75 +1,50 @@
-# 专用词形组：技术设计与交付
+# 专用词形组：多组词义绑定、Popover 与引用保护
 
-基线：tsz `617f7db`、tsz-rust `02de3eb`。两仓共用本设计；产品规则见 [requirements.md](requirements.md)。
+2026-09-17 修订。沿用原任务工作树，前端交付分支 `codex/multi-group-sense-bindings`、后端交付分支 `dev`；旧版验收不代表本次通过。
 
-## 现有能力与最终改动
+## 依赖与方案
 
-一形一组、组的 general/dedicated、词义的可选 form_group_id、同词性约束与原有影响预览均已在主线。
-本次补齐关联筛选与保存校验，并在词形卡片内提供词义绑定编辑。
+已有可复用能力：组 scope、一形一组、原子保存、词形允许词义筛选、入站引用接口、引用来源列表和保存保护。
+关键路径：关系存储与契约 → 校验/保存/引用 → 前端选择和回显 → 回归与契约验证。
 
-- 后端 `service/form_senses.rs::allowed_form_senses` 统一判定：同基本词性，通用组全义，专用组仅绑定义。
-- `sentence_association.rs` 为每个候选词形计算允许列表；保留完整候选词义集合，以便跨组切换。
-- `phrase_component_matches_target`、`text_links::target_content_gloss`、自动关联复用规则；正文/成分保存、发布和共享例句校验一致。
-- 发布重新复核固定版本成分，避免旧版保存的错配绕过新规则；保留目标归档及并发锁的 reference_conflict 语义。
-- 前端 `V3TargetCascader` 按具体词形过滤；短语来源词义的成分入口也按命中词形过滤。
-- `V3FormGroupSenseEditor` 在卡片内选择，头部“专用词义”负责进入；数据仍保存在原有词义模型。
-- 词义草稿比较复用规范化 JSON：对象字段顺序不算修改，数组顺序和真实内容变化仍算修改。
+- 词义与专用组采用多对多关系。同一词义可被本基本词性多个组绑定。
+- `WordSenseV3`、写入词义、内部 V2 投影和 `SenseFormGroupBindingV3` 增加可选 `form_group_ids`。
+- 新字段存在时以其为准（包括空数组）；缺省时读取历史 `form_group_id`。新前端写数组并移除旧字段；不将多绑定压成首组，也不将两个字段合并。
+- 每个 sense patch 替换该词义的完整绑定集合；未提交该 sense 不修改。绑定数组按集合比较，重复组和跨词性/通用组绑定拒绝。
+- `allowed_form_senses` 按集合包含筛选；沿用正文、短语成分、多维例句、保存和发布的既有调用链。历史发布快照不改写，旧单值仍可读取。
+- reconcile 只清理已删除或恢复通用的组，保留其他绑定；部分解绑也进入影响预览。
 
-## API 契约
+## 存储与迁移
 
-| 接口/类型                                                     | 变化                                            |
-| ------------------------------------------------------------- | ----------------------------------------------- |
-| `POST /api/v1/admin/lexicon/entries/component-targets/search` | `forms[].allowed_sense_ids?: UUID[]`            |
-| `POST /api/v1/admin/lexicon/entries/sentence-targets/resolve` | 同上                                            |
-| `PreviewFormsImpactInputV3`、`SaveFormsStepInputV3`           | `sense_bindings?: [{sense_id, form_group_id?}]` |
-| `AdminWordV3.capabilities`                                    | `atomic_form_sense_bindings?: boolean`          |
+新增 `20260917120000_multi_group_sense_bindings` up/down。关系表 `sense_form_group_bindings` 每个 `(sense_id, form_group_id)` 一行，双方复合外键保证同词性同词条。
+从原 senses 单列回填；保留旧列兼容旧单组数据。组外键延迟校验且不得级联删除，因为保存事务会删后重插组。
+词义投影同事务写入全部边；词义删除级联清理边，但删除前必须执行引用保护。
+down 在存在新数组 JSON 时拒绝，避免旧程序读不懂或丢绑定；不自动清数据或改不可变发布快照。
 
-新后端始终返回 allowed_sense_ids，包括空数组。缺省供新前端兼容旧服务，空数组明确不可选，不能被省略或当作全量。
-sense_bindings 只修改当前词条既有词义的绑定；缺省 group 表示解除，空列表不修改。拒绝重复/未知词义及跨词性绑定，不创建词义或保存其他词义草稿内容。
-OpenAPI、types、api-client 快照与严格运行时 schema 使用原生生成链同步。
+## 引用与删除
 
-## 保存与确认
+`GET /entries/{id}/inbound-references` 新增 `form_group_sense_binding` 类型，每组对每义一条，source.node_id 为组 ID。
+候选从已保存关系及 legacy 单列合并去重读取，兼容迁移后旧写实例尚未补关系表的窗口，累计入词义节点引用数；不增加按外部词条去重的列表引用词条数。
+复用 `Rule::Sense` 和 `ensure_inbound_references`：正常解绑允许，但删除仍被组绑定的词义被拒绝。词义保存、词形保存/影响预览均检查；组绑定属于草稿来源，不干扰历史发布版本切换。
+删除必须先解除引用并保存，再删除词义；短语、多维例句等已有保护保留。
 
-影响预览和词形保存都对拟议 forms + bindings 做同词性及入站引用校验。后端已有事务同时写词形、词义和投影，复用它实现原子保存。
-普通影响 token 和词面确认 token 的命令摘要包含按 sense_id 排序的补丁；纯词面证据的 forms digest 保持不变。
-前端确认指纹同样包含补丁，保存成功只同步词义绑定基线，其他未保存词义编辑继续保留；失败不丢失选择。
-仅当 atomic_form_sense_bindings=true 时显示绑定入口并发送补丁。
+## 前端
 
-## 兼容、历史数据与发布顺序
+复用 antd Popover 与词义选择组件。点击头部入口打开浮层，不展开卡片；编辑控件和确认/取消位于浮层，取消或点外部关闭不修改草稿。
+其他组已选词义仍可选，更新当前组仅增删当前边。词义页多选与预览展示全部绑定。
+引用列表显示词形组来源并链接到 forms 对应组；删除按钮沿用引用保护，后端防止绕过。
 
-无 schema migration、词形 ID 重建或清库。
+## 契约和兼容
 
-| 组合            | 行为                                               |
-| --------------- | -------------------------------------------------- |
-| 新前端 + 旧 API | 接受缺省字段；维持原关联行为，不开放原子组绑定入口 |
-| 旧前端 + 新 API | 旧严格 schema 会拒绝新增响应字段，不能作为过渡组合 |
-| 新前端 + 新 API | 候选按允许列表筛选，组状态和绑定原子保存           |
+相关词条读取/保存/预览响应及请求的词义字段扩展；入站引用 kind 增加枚举值；capabilities 增加 `multi_group_sense_bindings`。
+通过后端导出 OpenAPI、前端 sync:openapi 生成严格运行时 schema 和端点快照。
+新前端读取两种绑定形状，仅新能力为 true 时开放多组编辑；旧后端阶段保留原词义单组编辑。
+先更新兼容前端，再迁移及更新后端；旧浏览器必须刷新。旧前端全量保存不能默默截断多组，后端应明确拒绝缺少数组的旧写入。
+本轮已授权提交、推送与 PR；不执行合并或部署。
 
-先发布兼容前端，再发布后端；旧标签页需要刷新。回退两个组件时先回退后端再回退前端，后端回退会恢复旧的宽松校验。
-固定 publication ID 只校验指定不可变快照。未固定发布版本的草稿成分继续受已有入站引用保护；正文草稿未全部纳入入站收集，来源保存/发布会重新校验，不声称所有目标编辑均能立即拦截它。
-旧错误配对在再次保存/发布时可能被拒，应定位后重选，不自动换义。线上存量盘点尚未执行，应在部署准备时只读进行。
+## 验收
 
-## 验证与审核
-
-- 已运行后端库测试 279 项、词条 HTTP 集成 95 项、共享例句集成 24 项，全部通过；fmt 与全目标、全特性 Clippy 通过。
-- 前端全仓检查及后续定向回归证据见浏览器验收记录。一个未改动的包加载测试曾在并发检查时超时，单独复跑通过，未放宽超时或断言。
-- Chrome 真实后端已验证三种关联入口、设置/保存/刷新/恢复、取消与折叠、多词性隔离、空态跳转及 1024px 窗口。
-- 最终提交/推送门禁由原生 hooks 执行；独立提交审查与 CI 结果记录在 PR。
-
-## 可执行验收
-
-前端根目录：
-
-```bash
-pnpm --filter @tsz/admin test src/features/dictionary/word-creation-v3/components/V3FormGroupBindings.test.tsx src/features/dictionary/word-creation-v3/components/V3FormsAndPronunciationStep.test.tsx src/features/dictionary/word-creation-v3/components/V3TextAssociationPicker.test.tsx src/features/dictionary/word-creation-v3/V3WordCreationWizard.test.tsx src/features/dictionary/word-creation-v3/saveFlow.test.ts
-pnpm --filter @tsz/api-client test
-pnpm --filter @tsz/admin typecheck
-```
-
-后端根目录，DATABASE_URL / TEST_REDIS_URL / REDIS_URL 显式指向任务隔离实例：
-
-```bash
-SQLX_OFFLINE=true cargo test --locked --lib --test lexicon_handler --test shared_sentences
-```
-
-预期全部通过；HTTP 用例包括有入站引用时原子设专用、绑定不匹配的保存/发布拒绝、解绑确认不可换补丁复用。浏览器人工验收入口与样例见 [browser-acceptance.md](browser-acceptance.md)。
+前端：`pnpm --filter @tsz/admin typecheck`、词形组绑定/meaningsModel/词义页/引用保护回归，以及 `pnpm --filter @tsz/api-client test`。
+后端：`SQLX_OFFLINE=true cargo test --locked --lib`，隔离 PostgreSQL/Redis 下运行 `cargo test --locked --test lexicon_handler --test shared_sentences`；最后 fmt/clippy。
+迁移在任务隔离数据库验证 up/down；不对未知或共享数据库运行迁移。
+关键判据：同义两组保存后仍共存；解除一组保留另一组；跨词性及重复绑定拒绝；两个组都能关联同义；引用按组累计；直接请求删除绑定词义被拒；解除后可删；旧单值兼容；Popover 位于卡片外且卡片折叠不变。

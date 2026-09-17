@@ -6353,8 +6353,8 @@ it("解除专用绑定后选回原词义不应留下假脏状态，实际释义�
         const forms = structuredClone(context.draftForms);
         forms.pos[0]!.form_groups[0]!.scope = bound ? "dedicated" : "general";
         const meanings = structuredClone(context.draftMeanings);
-        if (bound) meanings.pos[0]!.senses[0]!.form_group_id = groupId;
-        else delete meanings.pos[0]!.senses[0]!.form_group_id;
+        delete meanings.pos[0]!.senses[0]!.form_group_id;
+        meanings.pos[0]!.senses[0]!.form_group_ids = bound ? [groupId] : [];
         context.setDraftForms(forms);
         context.setDraftMeanings(meanings);
       };

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dedicated-group-sense-assessment/docs/openapi.json",
-  "_generatedAt": "2026-09-17T07:04:54.944Z",
+  "_generatedAt": "2026-09-17T09:37:16.811Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2053,7 +2053,8 @@
         "shared_sentence",
         "publication_sense_ref",
         "draft_relation",
-        "phrase_component"
+        "phrase_component",
+        "form_group_sense_binding"
       ]
     },
     "InboundReferenceNodeTypeV3": {
@@ -2101,6 +2102,7 @@
         "entry_id": { "type": "string", "format": "uuid" },
         "entry_kind": { "$ref": "#/components/schemas/WordEntryKindV3" },
         "entry_status": { "$ref": "#/components/schemas/AdminWordStatus" },
+        "form_group_label": { "type": "string" },
         "node_id": {
           "type": "string",
           "format": "uuid",
@@ -3364,6 +3366,12 @@
       "required": ["sense_id"],
       "properties": {
         "form_group_id": { "type": "string", "format": "uuid" },
+        "form_group_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "description": "同词性的专用组集合；显式空集合解除全部绑定，缺省兼容历史单组字段。",
+          "maxItems": 2000
+        },
         "sense_id": { "type": "string", "format": "uuid" }
       },
       "additionalProperties": false
@@ -3974,6 +3982,12 @@
           "type": "string",
           "format": "uuid",
           "description": "缺省 = 通用：使用本词性的通用变化组；只能指向同词性下 `scope = dedicated` 的组。"
+        },
+        "form_group_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "description": "同词性的专用组集合；显式空集合解除全部绑定，缺省兼容历史单组字段。",
+          "maxItems": 2000
         },
         "frequency": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },

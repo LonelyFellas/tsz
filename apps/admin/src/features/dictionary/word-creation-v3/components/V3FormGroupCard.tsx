@@ -20,6 +20,7 @@ import {
   Empty,
   Flex,
   Popconfirm,
+  Popover,
   Radio,
   Tag,
   Typography
@@ -77,6 +78,7 @@ export interface V3FormGroupCardProps {
   senseScope?: ReactNode;
   onEditSenses?: () => void;
   editingSenses?: boolean;
+  onCloseSenses?: () => void;
   /** 词义步里绑定到本组的词义数；只做提示，不在本地清除绑定。 */
   boundSenseCount?: number;
 }
@@ -100,6 +102,7 @@ export function V3FormGroupCard({
   senseScope,
   onEditSenses,
   editingSenses = false,
+  onCloseSenses,
   boundSenseCount = 0
 }: V3FormGroupCardProps) {
   const [removedTypes, setRemovedTypes] = useRemovedFormTypes(savedGroup.id);
@@ -443,19 +446,26 @@ export function V3FormGroupCard({
           tabIndex={-1}
         >
           {onEditSenses ? (
-            <Button
-              ghost
-              size="small"
-              aria-label={`第 ${groupIndex + 1} 组专用词义`}
-              aria-expanded={editingSenses && !collapsed}
-              aria-controls={senseScope ? `${bodyId}-senses` : undefined}
-              onClick={() => {
-                setCollapsed(false);
-                onEditSenses();
-              }}
+            <Popover
+              trigger="click"
+              placement="bottomRight"
+              open={editingSenses}
+              onOpenChange={(open) =>
+                open ? onEditSenses() : onCloseSenses?.()
+              }
+              destroyOnHidden
+              fresh
+              content={editingSenses ? senseScope : <span />}
             >
-              专用词义
-            </Button>
+              <Button
+                ghost
+                size="small"
+                aria-label={`第 ${groupIndex + 1} 组专用词义`}
+                aria-expanded={editingSenses}
+              >
+                专用词义
+              </Button>
+            </Popover>
           ) : null}
           <Button
             type="text"
@@ -522,7 +532,7 @@ export function V3FormGroupCard({
         </Flex>
       }
     >
-      {senseScope ? (
+      {senseScope && !editingSenses ? (
         <div id={`${bodyId}-senses`} hidden={collapsed}>
           {senseScope}
         </div>
