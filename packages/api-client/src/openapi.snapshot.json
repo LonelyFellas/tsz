@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dedicated-group-sense-assessment/docs/openapi.json",
-  "_generatedAt": "2026-09-17T09:37:16.811Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-form-spelling-regularity/docs/openapi.json",
+  "_generatedAt": "2026-09-17T12:28:28.775Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -3660,6 +3660,10 @@
         },
         "dialect": { "$ref": "#/components/schemas/CommonDialectV3" },
         "id": { "type": "string", "format": "uuid" },
+        "is_regular": {
+          "type": "boolean",
+          "description": "该拼写是否规则变化；缺省兼容历史组级值。"
+        },
         "origin": { "$ref": "#/components/schemas/TextOrigin" },
         "pronunciations": {
           "type": "array",
@@ -4073,6 +4077,10 @@
         },
         "dialect": { "$ref": "#/components/schemas/UkDialectV3" },
         "id": { "type": "string", "format": "uuid" },
+        "is_regular": {
+          "type": "boolean",
+          "description": "该拼写是否规则变化；缺省兼容历史组级值。"
+        },
         "origin": { "$ref": "#/components/schemas/TextOrigin" },
         "pronunciations": {
           "type": "array",
@@ -4094,6 +4102,10 @@
         },
         "dialect": { "$ref": "#/components/schemas/UsDialectV3" },
         "id": { "type": "string", "format": "uuid" },
+        "is_regular": {
+          "type": "boolean",
+          "description": "该拼写是否规则变化；缺省兼容历史组级值。"
+        },
         "origin": { "$ref": "#/components/schemas/TextOrigin" },
         "pronunciations": {
           "type": "array",

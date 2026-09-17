@@ -372,3 +372,8 @@
   max-height: 320px;
   overflow-y: auto;
 }
+
+.v3-spelling-regularity {
+  flex-shrink: 0;
+  white-space: nowrap;
+}

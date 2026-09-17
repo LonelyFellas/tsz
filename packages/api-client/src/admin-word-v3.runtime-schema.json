@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-dedicated-group-sense-assessment/docs/openapi.json",
-  "_source_sha256": "5a31b83d8810d7478243fad43d895790d93148bddfdb6da50db4e21eccd304a8",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-form-spelling-regularity/docs/openapi.json",
+  "_source_sha256": "c37bf1b88d6e2749a1f69b202e421d9984206f0b4db8e42269e77cf1abdf9134",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
@@ -2308,6 +2308,7 @@
         },
         "dialect": { "$ref": "#/$defs/CommonDialectV3" },
         "id": { "type": "string", "format": "uuid" },
+        "is_regular": { "type": "boolean" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
         "pronunciations": {
           "type": "array",
@@ -2778,6 +2779,7 @@
         },
         "dialect": { "$ref": "#/$defs/UkDialectV3" },
         "id": { "type": "string", "format": "uuid" },
+        "is_regular": { "type": "boolean" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
         "pronunciations": {
           "type": "array",
@@ -2799,6 +2801,7 @@
         },
         "dialect": { "$ref": "#/$defs/UsDialectV3" },
         "id": { "type": "string", "format": "uuid" },
+        "is_regular": { "type": "boolean" },
         "origin": { "$ref": "#/$defs/TextOrigin" },
         "pronunciations": {
           "type": "array",

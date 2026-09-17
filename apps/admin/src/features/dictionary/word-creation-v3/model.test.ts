@@ -706,3 +706,23 @@ it("synthesis 保真，草稿可缺选中侧，完成定位缺失，旧记录不
   expect(validateFormsContent(content, "complete")).toEqual([]);
   expect(toFormsWire(content)).toEqual(content);
 });
+
+it("拼写规则标记通过显式 wire 投影且统一拼写不得保存矛盾值", () => {
+  const form = ukUsFormFixture();
+  form.regional_variants.uk.is_regular = false;
+  form.regional_variants.us.is_regular = true;
+  const content = formsFixture({ forms: [form] });
+  expect(validateFormsContent(content, "save")).toEqual([]);
+  expect(
+    toFormsWire(content).pos[0]!.forms[0]!.regional_variants
+  ).toMatchObject({ uk: { is_regular: false }, us: { is_regular: true } });
+  content.pos[0]!.form_groups[0]!.dialect_rules = {
+    spelling_mode: "unified",
+    phonetic_mode: "distinguish"
+  };
+  form.regional_variants.us.spelling = form.regional_variants.uk.spelling;
+  content.pos[0]!.forms[0] = form;
+  expect(codes(content)).toContain("invalid_regional_variant_shape");
+  form.regional_variants.us.is_regular = false;
+  expect(validateFormsContent(content, "save")).toEqual([]);
+});

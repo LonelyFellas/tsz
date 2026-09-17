@@ -88,7 +88,6 @@ function FormsReview({
                 key={group.id}
               >
                 <Tag>变化组 {index + 1}</Tag>
-                <span>{group.is_regular ? "规则组" : "非规则组"}</span>
                 <span className="v3-review-form-chain">
                   {group.members.map((member, i) => {
                     const form = pos.forms.find((f) => f.id === member.form_id);

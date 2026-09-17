@@ -95,6 +95,8 @@ interface WordFormVariantBaseV3<TDialect extends Dialect> {
   id: string;
   dialect: TDialect;
   spelling: string;
+  /** 是否规则变化；旧数据缺省时沿用所属组的历史值。 */
+  is_regular?: boolean;
   origin: TextOriginV3;
   pronunciations: WordPronunciationV3[];
   component_usages?: PhraseComponentUsageV3[];

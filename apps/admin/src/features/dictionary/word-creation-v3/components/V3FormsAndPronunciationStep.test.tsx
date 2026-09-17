@@ -701,6 +701,26 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(canonicalValue()).toEqual(content);
   });
 
+  it("英美拼写各自设置规则变化，合并不同值时提示先统一", async () => {
+    const form = ukUsFormFixture();
+    render(<Harness initial={formsFixture({ forms: [form] })} />);
+    const uk = await screen.findByLabelText("原形英式拼写是否规则变化");
+    const us = screen.getByLabelText("原形美式拼写是否规则变化");
+    fireEvent.click(within(uk).getByLabelText("否"));
+    expect(within(us).getByLabelText("是")).toBeChecked();
+    expect(formById(canonicalValue(), form.id)).toMatchObject({
+      regional_variants: { uk: { is_regular: false } }
+    });
+    const before = canonicalValue();
+    fireEvent.click(screen.getByLabelText("英美拼写无区别"));
+    expect(
+      screen.getByText(
+        "英式与美式的规则变化设置不同，请先统一设置，再合并拼写。"
+      )
+    ).toBeVisible();
+    expect(canonicalValue()).toEqual(before);
+  });
+
   it("UD 只显示共用拼写并保持双方言发音独立", async () => {
     const ukPronunciation = pronunciationFixture({ id: uuidFromInt(2141) });
     const usPronunciation = pronunciationFixture({
@@ -766,6 +786,15 @@ describe("V3FormsAndPronunciationStep", () => {
         }
       }
     });
+    const regularity = screen.getByLabelText("原形英美通用拼写是否规则变化");
+    expect(screen.queryByLabelText("原形英式拼写是否规则变化")).toBeNull();
+    fireEvent.click(within(regularity).getByLabelText("否"));
+    expect(formById(canonicalValue(), form.id)).toMatchObject({
+      regional_variants: {
+        uk: { is_regular: false },
+        us: { is_regular: false }
+      }
+    });
     const beforeMerge = canonicalValue();
     fireEvent.click(screen.getByLabelText("英美音标无区别"));
     expect(canonicalValue()).toEqual(beforeMerge);
@@ -792,6 +821,14 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(container.querySelector(".v3-dialect-panel-uk")).toBeNull();
     expect(container.querySelector(".v3-dialect-panel-us")).toBeNull();
     expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("harbor");
+    fireEvent.click(
+      within(
+        screen.getByLabelText("原形英美通用拼写是否规则变化")
+      ).getByLabelText("否")
+    );
+    expect(formById(canonicalValue(), common.id)).toMatchObject({
+      regional_variants: { common: { is_regular: false } }
+    });
     // 「拼写统一的 uk_us」也叫英美通用拼写，但锚在 form 上；共用变体锚在 variant 上。
     expect(screen.getByLabelText("原形英美通用拼写")).toHaveAttribute(
       "data-v3-node-id",
@@ -949,7 +986,10 @@ describe("V3FormsAndPronunciationStep", () => {
     ).not.toBeNull();
 
     expect(screen.getByText("第 1 组 词形变化")).toBeVisible();
-    expect(screen.getByText("词形是否规则变化？")).toBeVisible();
+    expect(screen.queryByText("词形是否规则变化？")).toBeNull();
+    expect(groupCard.querySelectorAll(".v3-spelling-regularity")).toHaveLength(
+      4
+    );
     expect(screen.getByLabelText("收起第 1 组词形变化")).toHaveAttribute(
       "aria-expanded",
       "true"
@@ -971,14 +1011,19 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(screen.queryByText("词形是否规则变化？")).toBeNull();
     fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
-    // 只取规则区里的选项，避免匹配其他规则的 radio。
     const regularRadios = groupCard.querySelectorAll<HTMLInputElement>(
-      '.word-form-rules input[type="radio"]'
+      '.v3-spelling-regularity input[type="radio"]'
     );
     fireEvent.click(regularRadios[1]!);
-    expect(canonicalValue().pos[0]!.form_groups[0]!.is_regular).toBe(false);
-    fireEvent.click(regularRadios[0]!);
+    expect(formById(canonicalValue(), base.id)).toMatchObject({
+      regional_variants: { common: { is_regular: false } }
+    });
     expect(canonicalValue().pos[0]!.form_groups[0]!.is_regular).toBe(true);
+    expect(formById(canonicalValue(), secondBase.id)).toEqual(secondBase);
+    fireEvent.click(regularRadios[0]!);
+    expect(formById(canonicalValue(), base.id)).toMatchObject({
+      regional_variants: { common: { is_regular: true } }
+    });
   });
 
   it("以 82203e0 为基准把多词性的删除入口放回 Tab 标签", async () => {
@@ -1068,7 +1113,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText("变化组 1 新增词形类型")).toBeNull();
   });
 
-  it("每组都显示三行规则，英美规则按组各自回显", async () => {
+  it("每组显示英美两行规则，规则变化设置在拼写旁", async () => {
     const form = commonFormFixture({ spelling: "center" });
     const other = commonFormFixture({
       id: uuidFromInt(778),
@@ -1093,7 +1138,8 @@ describe("V3FormsAndPronunciationStep", () => {
     const first = within(cards[0]!);
     const second = within(cards[1]!);
     for (const card of [first, second]) {
-      expect(card.getByText("词形是否规则变化？")).toBeVisible();
+      expect(card.queryByText("词形是否规则变化？")).toBeNull();
+      expect(card.getAllByText("是否规则变化？").length).toBeGreaterThan(0);
       expect(card.getByText("英美拼写是否有区别？")).toBeVisible();
       expect(card.getByText("英美音标是否有区别？")).toBeVisible();
       expect(

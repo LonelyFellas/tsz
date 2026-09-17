@@ -38,7 +38,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
     const firstGroup = nounGroups.nth(0);
-    await expect(firstGroup.getByLabel("复数英美通用拼写")).toHaveValue("");
+    await expect(
+      firstGroup.getByRole("textbox", { name: "复数英美通用拼写", exact: true })
+    ).toHaveValue("");
     // 拼写统一 / 英美区分都会出 BrE 表头，只有共用结构没有。
     await expect(firstGroup.getByText("英式英语 · BrE")).toHaveCount(0);
 
@@ -57,7 +59,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
 
     const firstForm = firstGroup.locator(".v3-concrete-form-row").nth(0);
-    await firstForm.getByLabel("原形英美通用拼写").fill("orbit-common");
+    await firstForm
+      .getByRole("textbox", { name: "原形英美通用拼写", exact: true })
+      .fill("orbit-common");
     await firstForm.getByRole("button", { name: /新增发音/ }).click();
     await firstForm
       .getByLabel(/第 \d+ 条发音的字典音标/)
@@ -91,10 +95,14 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const usSecondForm = secondGroup
       .locator(".v3-dialect-panel-us .v3-dialect-form-cell")
       .filter({ has: page.getByLabel("原形美式拼写", { exact: true }) });
-    await ukSecondForm.getByLabel("原形英式拼写").fill("orbit-centre");
+    await ukSecondForm
+      .getByRole("textbox", { name: "原形英式拼写", exact: true })
+      .fill("orbit-centre");
     await ukSecondForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
     await ukSecondForm.getByLabel("第 1 条发音的实际发音").fill("orbit-uk");
-    await usSecondForm.getByLabel("原形美式拼写").fill("orbit-center");
+    await usSecondForm
+      .getByRole("textbox", { name: "原形美式拼写", exact: true })
+      .fill("orbit-center");
     await usSecondForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔrbɪt");
     await usSecondForm.getByLabel("第 1 条发音的实际发音").fill("orbit-us");
 
@@ -114,10 +122,14 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const usVerb = verbPanel
       .locator(".v3-dialect-panel-us .v3-dialect-form-cell")
       .filter({ has: page.getByLabel("原形美式拼写", { exact: true }) });
-    await ukVerb.getByLabel("原形英式拼写").fill("orbit-verb-uk");
+    await ukVerb
+      .getByRole("textbox", { name: "原形英式拼写", exact: true })
+      .fill("orbit-verb-uk");
     await ukVerb.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
     await ukVerb.getByLabel("第 1 条发音的实际发音").fill("orbit-verb-uk");
-    await usVerb.getByLabel("原形美式拼写").fill("orbit-verb-us");
+    await usVerb
+      .getByRole("textbox", { name: "原形美式拼写", exact: true })
+      .fill("orbit-verb-us");
     await usVerb.getByLabel("第 1 条发音的字典音标").fill("ˈɔrbɪt");
     await usVerb.getByLabel("第 1 条发音的实际发音").fill("orbit-verb-us");
 
