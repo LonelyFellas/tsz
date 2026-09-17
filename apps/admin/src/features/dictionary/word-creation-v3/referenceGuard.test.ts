@@ -253,6 +253,33 @@ describe("referenceGuard 判定", () => {
     ).toEqual({ kind: "none" });
   });
 
+  it("词形组引用链接能切换到来源词性并展开定位具体组", () => {
+    const reference = draftRelationReference("sense-1", {
+      kind: "form_group_sense_binding",
+      source: { entry_id: "entry-source", node_id: group.id }
+    });
+    const link = referenceLink(reference);
+    expect(link.kind).toBe("entry");
+    if (link.kind !== "entry") throw new Error("expected entry link");
+    const url = new URL(link.href, "https://admin.test");
+    expect(url.pathname).toBe("/words/entry-source/v3/wizard/forms");
+    const word = {
+      forms: {
+        ...forms,
+        pos: [{ ...pos, pos_id: "other-pos", forms: [], form_groups: [] }, pos]
+      },
+      meanings: { sense_groups: [], pos: [] }
+    };
+    expect(locateV3Node(word, url.searchParams.get("focus_node")!)).toEqual({
+      step: "forms",
+      node_id: group.id,
+      field: "scope",
+      pos_id: pos.pos_id,
+      form_group_id: group.id,
+      ancestor_node_ids: [pos.pos_id]
+    });
+  });
+
   it("locateV3Node：词形与变体落到词形步，词义及其关联 / 成分落到词义卡片", () => {
     const word: Pick<AdminWordV3, "forms" | "meanings"> = {
       forms,

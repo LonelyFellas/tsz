@@ -376,6 +376,17 @@ export function locateV3Node(
         ancestor_node_ids: []
       };
     }
+    const sourceGroup = pos.form_groups.find((group) => group.id === nodeId);
+    if (sourceGroup) {
+      return {
+        step: "forms",
+        node_id: sourceGroup.id,
+        field: "scope",
+        pos_id: pos.pos_id,
+        form_group_id: sourceGroup.id,
+        ancestor_node_ids: [pos.pos_id]
+      };
+    }
     for (const form of pos.forms) {
       const group = pos.form_groups.find((candidate) =>
         candidate.members.some((member) => member.form_id === form.id)
