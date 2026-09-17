@@ -98,7 +98,8 @@ describe("词形组的专用词义交互", () => {
     expect(screen.queryByText("通用", { exact: true })).not.toBeInTheDocument();
     const headerEntry = await screen.findByLabelText("第 1 组专用词义");
     expect(headerEntry.closest(".ant-card-head")).not.toBeNull();
-    expect(headerEntry).toHaveTextContent("专用词义");
+    expect(headerEntry).toHaveTextContent("设置专用词义");
+    expect(screen.queryByText("专用", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText("限定适用词义")).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
     fireEvent.click(headerEntry);
@@ -111,8 +112,9 @@ describe("词形组的专用词义交互", () => {
     expect(
       document.querySelector('[role="dialog"], dialog')
     ).not.toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
-    fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
+    expect(dialog.closest(".ant-popover")).not.toBeNull();
+    expect(dialog.closest(".ant-card-body")).toBeNull();
+    expect(screen.getByLabelText("展开第 1 组词形变化")).toBeVisible();
     expect(within(dialog).getByLabelText(/本词性释义1/)).toBeChecked();
     fireEvent.click(
       within(dialog)
@@ -133,23 +135,23 @@ describe("词形组的专用词义交互", () => {
     }
     fireEvent.click(within(dialog).getByText("确认选择").closest("button")!);
     expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("dedicated");
-    expect(screen.getByLabelText("第 1 组适用词义")).toBeVisible();
-    const summary = screen.getByLabelText("第 1 组适用词义");
-    expect(within(summary).getByText("本词性释义1")).toBeVisible();
-    expect(within(summary).getByText("本词性释义2")).toBeVisible();
+    expect(headerEntry).toHaveTextContent("专用词义 · 2");
+    expect(screen.queryByText("专用", { exact: true })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
+    expect(screen.queryByLabelText("第 1 组适用词义")).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
-    expect(screen.getByText("2 个词义")).toBeVisible();
+    expect(headerEntry).toHaveTextContent("专用词义 · 2");
     fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
     const stored = JSON.parse(
       screen.getByTestId("binding-meanings").textContent!
     );
     expect(
       stored.pos[0].senses.map(
-        (sense: { form_group_id?: string }) => sense.form_group_id
+        (sense: { form_group_ids?: string[] }) => sense.form_group_ids
       )
     ).toEqual([
-      initial.pos[0]!.form_groups[0]!.id,
-      initial.pos[0]!.form_groups[0]!.id
+      [initial.pos[0]!.form_groups[0]!.id],
+      [initial.pos[0]!.form_groups[0]!.id]
     ]);
     expect(stored.pos[1].senses[0].form_group_id).toBeUndefined();
     await waitFor(() =>
@@ -171,7 +173,7 @@ describe("词形组的专用词义交互", () => {
         .getByText(/^取\s*消$/)
         .closest("button")!
     );
-    expect(screen.getByLabelText("第 1 组适用词义")).toBeVisible();
+    expect(screen.queryByLabelText("第 1 组适用词义")).not.toBeInTheDocument();
     await waitFor(() =>
       expect(
         screen.queryByLabelText("第 1 组适用词义编辑")
@@ -270,4 +272,75 @@ it("编辑专用组保留已绑定的空释义，未保存的新词义不能直�
   ).toBeDisabled();
   fireEvent.click(screen.getByRole("button", { name: "确认选择" }));
   expect(confirm).toHaveBeenCalledWith([blank.id]);
+});
+
+it("同一词义可在多个组的 Popover 勾选，恢复一组不移除其他组绑定", async () => {
+  const forms = formsFixture({
+    forms: [commonFormFixture({ pronunciations: [] })]
+  });
+  const pos = forms.pos[0]!;
+  const first = pos.form_groups[0]!;
+  first.scope = "dedicated";
+  pos.form_groups.push({
+    ...first,
+    id: "second-group",
+    scope: "general",
+    members: []
+  });
+  const meanings: DraftMeaningsStepContentWritableV3 = {
+    sense_groups: [],
+    pos: [
+      {
+        pos_id: pos.pos_id,
+        grammar_structures: [],
+        senses: [
+          {
+            id: "shared-sense",
+            form_group_ids: [first.id],
+            sub_pos: "",
+            level: "A1",
+            depends_on_context: false,
+            definitions: [],
+            sentences: [],
+            relations: []
+          }
+        ]
+      }
+    ]
+  };
+  function Harness() {
+    const [value, setValue] = useState(forms);
+    const [current, setCurrent] = useState(meanings);
+    return (
+      <AntApp>
+        <V3FormsAndPronunciationStep
+          value={value}
+          onChange={setValue}
+          meanings={current}
+          onMeaningsChange={setCurrent}
+          savedSenseIds={new Set(["shared-sense"])}
+        />
+        <output data-testid="multi-bindings">
+          {JSON.stringify(current.pos[0]!.senses[0]!.form_group_ids)}
+        </output>
+      </AntApp>
+    );
+  }
+  render(<Harness />);
+  fireEvent.click(await screen.findByLabelText("第 2 组专用词义"));
+  const editor = await screen.findByLabelText("第 2 组适用词义编辑");
+  const checkbox = within(editor).getByLabelText(/待填写释义/);
+  expect(checkbox).toBeEnabled();
+  fireEvent.click(checkbox);
+  fireEvent.click(within(editor).getByText("确认选择"));
+  expect(JSON.parse(screen.getByTestId("multi-bindings").textContent!)).toEqual(
+    [first.id, "second-group"].sort()
+  );
+  fireEvent.click(screen.getByLabelText("第 1 组专用词义"));
+  const firstEditor = await screen.findByLabelText("第 1 组适用词义编辑");
+  expect(within(firstEditor).getByLabelText(/待填写释义/)).toBeChecked();
+  fireEvent.click(within(firstEditor).getByText("恢复适用全部词义"));
+  expect(JSON.parse(screen.getByTestId("multi-bindings").textContent!)).toEqual(
+    ["second-group"]
+  );
 });

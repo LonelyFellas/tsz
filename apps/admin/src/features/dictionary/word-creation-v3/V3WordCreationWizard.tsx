@@ -51,7 +51,7 @@ import {
 import { classifyV3Problem, type V3Problem } from "./problem";
 import {
   createV3SaveFlow,
-  v3ContentFingerprint,
+  v3MeaningsContentFingerprint,
   type V3ConfirmationContext,
   type V3RequestCommand,
   type V3SaveFlow
@@ -503,8 +503,8 @@ function V3WordCreationSession({
       }
       updateDirty(
         "meanings",
-        v3ContentFingerprint(nextMeanings) !==
-          v3ContentFingerprint(nextCleanMeanings)
+        v3MeaningsContentFingerprint(nextMeanings) !==
+          v3MeaningsContentFingerprint(nextCleanMeanings)
       );
       updateDirty(
         "forms",
@@ -524,8 +524,8 @@ function V3WordCreationSession({
       setDraftMeaningsState(content);
       updateDirty(
         "meanings",
-        v3ContentFingerprint(content) !==
-          v3ContentFingerprint(cleanMeaningsRef.current)
+        v3MeaningsContentFingerprint(content) !==
+          v3MeaningsContentFingerprint(cleanMeaningsRef.current)
       );
       if (!publishReconciliationRequiredRef.current) setProblem(undefined);
       setConflict(undefined);
@@ -730,8 +730,8 @@ function V3WordCreationSession({
       setDraftMeaningsState(alignedMeanings);
       updateDirty(
         "meanings",
-        v3ContentFingerprint(alignedMeanings) !==
-          v3ContentFingerprint(cleanMeaningsRef.current)
+        v3MeaningsContentFingerprint(alignedMeanings) !==
+          v3MeaningsContentFingerprint(cleanMeaningsRef.current)
       );
       setActivePosIdState((current) =>
         current && localForms.pos.some((pos) => pos.pos_id === current)
@@ -1081,8 +1081,8 @@ function V3WordCreationSession({
             );
             updateDirty(
               "meanings",
-              v3ContentFingerprint(draftMeaningsRef.current) !==
-                v3ContentFingerprint(cleanMeaningsRef.current)
+              v3MeaningsContentFingerprint(draftMeaningsRef.current) !==
+                v3MeaningsContentFingerprint(cleanMeaningsRef.current)
             );
           }
           applyCanonical(result.value.word, "forms");

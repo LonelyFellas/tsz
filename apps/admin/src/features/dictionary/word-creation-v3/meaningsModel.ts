@@ -345,6 +345,9 @@ export function toWritableMeanings(
         ...(sense.sense_group_id === undefined
           ? {}
           : { sense_group_id: sense.sense_group_id }),
+        ...(sense.form_group_ids === undefined
+          ? {}
+          : { form_group_ids: [...sense.form_group_ids] }),
         ...(sense.form_group_id === undefined
           ? {}
           : { form_group_id: sense.form_group_id }),
@@ -464,6 +467,23 @@ export function formGroupLabel(
   return `第 ${index + 1} 组 · ${spelling || "未填写原形"}`;
 }
 
+export function boundFormGroupIds(sense: {
+  form_group_id?: string;
+  form_group_ids?: readonly string[];
+}): readonly string[] {
+  return (
+    sense.form_group_ids ?? (sense.form_group_id ? [sense.form_group_id] : [])
+  );
+}
+
+export function setFormGroupBindings(
+  sense: { form_group_id?: string; form_group_ids?: string[] },
+  ids: readonly string[]
+) {
+  delete sense.form_group_id;
+  sense.form_group_ids = [...new Set(ids)].sort();
+}
+
 export function formGroupBindingPatches(
   meanings: DraftMeaningsStepContentWritableV3,
   saved: DraftMeaningsStepContentV3
@@ -473,13 +493,17 @@ export function formGroupBindingPatches(
       const local = meanings.pos.find((item) => item.pos_id === pos.pos_id);
       return pos.senses.flatMap((sense) => {
         const next = local?.senses.find((item) => item.id === sense.id);
-        return next && next.form_group_id !== sense.form_group_id
+        return next &&
+          JSON.stringify([...boundFormGroupIds(next)].sort()) !==
+            JSON.stringify([...boundFormGroupIds(sense)].sort())
           ? [
               {
                 sense_id: sense.id,
-                ...(next.form_group_id
-                  ? { form_group_id: next.form_group_id }
-                  : {})
+                ...(next.form_group_ids !== undefined
+                  ? { form_group_ids: [...next.form_group_ids] }
+                  : next.form_group_id
+                    ? { form_group_id: next.form_group_id }
+                    : {})
               }
             ]
           : [];
@@ -498,6 +522,9 @@ export function syncFormGroupBindings(
     for (const sense of pos.senses) {
       const binding = source?.senses.find((item) => item.id === sense.id);
       if (!binding) continue;
+      if (binding.form_group_ids !== undefined)
+        sense.form_group_ids = [...binding.form_group_ids];
+      else delete sense.form_group_ids;
       if (binding.form_group_id) sense.form_group_id = binding.form_group_id;
       else delete sense.form_group_id;
     }
@@ -524,9 +551,11 @@ export function formGroupBindingsChanged(
   ) =>
     value.pos
       .flatMap((pos) =>
-        pos.senses
-          .filter((sense) => sense.form_group_id)
-          .map((sense) => `${pos.pos_id}:${sense.id}:${sense.form_group_id}`)
+        pos.senses.flatMap((sense) =>
+          boundFormGroupIds(sense).map(
+            (id) => `${pos.pos_id}:${sense.id}:${id}`
+          )
+        )
       )
       .sort();
   return JSON.stringify(bindings(left)) !== JSON.stringify(bindings(right));
@@ -539,11 +568,9 @@ export function countFormGroupBindings(
   const counts = new Map<string, number>();
   for (const pos of meanings.pos) {
     for (const sense of pos.senses) {
-      if (!sense.form_group_id) continue;
-      counts.set(
-        sense.form_group_id,
-        (counts.get(sense.form_group_id) ?? 0) + 1
-      );
+      for (const id of boundFormGroupIds(sense)) {
+        counts.set(id, (counts.get(id) ?? 0) + 1);
+      }
     }
   }
   return counts;

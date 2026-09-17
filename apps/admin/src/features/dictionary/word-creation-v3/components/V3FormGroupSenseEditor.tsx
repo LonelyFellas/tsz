@@ -5,7 +5,7 @@ import type {
   WordPosFormsV3,
   WordSenseWritableV3
 } from "@tsz/types";
-import { definitionSummary } from "../meaningsModel";
+import { boundFormGroupIds, definitionSummary } from "../meaningsModel";
 
 export function V3FormGroupSenseEditor({
   pos,
@@ -29,18 +29,16 @@ export function V3FormGroupSenseEditor({
   const senses = allSenses.filter(
     (sense) =>
       savedSenseIds?.has(sense.id) ||
-      Boolean(sense.form_group_id) ||
+      boundFormGroupIds(sense).length > 0 ||
       definitionSummary(sense) !== "待填写释义"
   );
   const [selected, setSelected] = useState(() =>
     senses
-      .filter((sense) => sense.form_group_id === group.id)
+      .filter((sense) => boundFormGroupIds(sense).includes(group.id))
       .map((sense) => sense.id)
   );
   const available = senses.filter(
-    (sense) =>
-      (!savedSenseIds || savedSenseIds.has(sense.id)) &&
-      (!sense.form_group_id || sense.form_group_id === group.id)
+    (sense) => !savedSenseIds || savedSenseIds.has(sense.id)
   );
   const validIds = selected.filter((id) =>
     available.some((sense) => sense.id === id)
@@ -73,16 +71,11 @@ export function V3FormGroupSenseEditor({
           <Flex vertical gap="small" className="v3-group-sense-options">
             {senses.map((sense, index) => {
               const unsaved = savedSenseIds && !savedSenseIds.has(sense.id);
-              const otherGroup =
-                sense.form_group_id && sense.form_group_id !== group.id;
-              const ownerIndex = pos.form_groups.findIndex(
-                (item) => item.id === sense.form_group_id
-              );
               return (
                 <Checkbox
                   key={sense.id}
                   checked={validIds.includes(sense.id)}
-                  disabled={Boolean(otherGroup || unsaved)}
+                  disabled={Boolean(unsaved)}
                   onChange={(event) =>
                     setSelected(
                       event.target.checked
@@ -99,13 +92,6 @@ export function V3FormGroupSenseEditor({
                     {unsaved ? (
                       <Typography.Text type="secondary">
                         尚未保存，请先保存词义
-                      </Typography.Text>
-                    ) : null}
-                    {otherGroup ? (
-                      <Typography.Text type="secondary">
-                        {ownerIndex >= 0
-                          ? `已绑定第 ${ownerIndex + 1} 组`
-                          : "已绑定其他专用组"}
                       </Typography.Text>
                     ) : null}
                   </span>

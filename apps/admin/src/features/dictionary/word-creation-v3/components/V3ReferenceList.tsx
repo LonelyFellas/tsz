@@ -15,6 +15,8 @@ export function referenceKindLabel(reference: InboundReferenceV3): string {
       return reference.source.relation_type
         ? relationLabel(reference.source.relation_type)
         : "关联词";
+    case "form_group_sense_binding":
+      return "词形组绑定";
     case "phrase_component":
       return "短语成分";
   }
@@ -77,6 +79,9 @@ function sourceSummary(reference: InboundReferenceV3): ReactNode {
       <Typography.Text className="tsz-entry-en" strong>
         {source.entry_headword || source.entry_id || "未知词条"}
       </Typography.Text>
+      {source.form_group_label ? (
+        <Typography.Text>{source.form_group_label}</Typography.Text>
+      ) : null}
       {source.sense_gloss ? (
         <Typography.Text type="secondary">{source.sense_gloss}</Typography.Text>
       ) : null}

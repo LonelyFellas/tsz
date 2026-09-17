@@ -333,7 +333,8 @@ export function referenceLink(reference: InboundReferenceV3): V3ReferenceLink {
   }
   if (!source.entry_id) return { kind: "none" };
   const step =
-    reference.kind === "phrase_component" && !source.sense_id
+    reference.kind === "form_group_sense_binding" ||
+    (reference.kind === "phrase_component" && !source.sense_id)
       ? "forms"
       : "meanings";
   const params = new URLSearchParams();
@@ -373,6 +374,17 @@ export function locateV3Node(
         field: "pos",
         pos_id: pos.pos_id,
         ancestor_node_ids: []
+      };
+    }
+    const sourceGroup = pos.form_groups.find((group) => group.id === nodeId);
+    if (sourceGroup) {
+      return {
+        step: "forms",
+        node_id: sourceGroup.id,
+        field: "scope",
+        pos_id: pos.pos_id,
+        form_group_id: sourceGroup.id,
+        ancestor_node_ids: [pos.pos_id]
       };
     }
     for (const form of pos.forms) {

@@ -295,7 +295,7 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         entryKind={context.word.kind}
         formGroupBindingCounts={countFormGroupBindings(context.draftMeanings)}
         bindingEditingAvailable={
-          context.word.capabilities.atomic_form_sense_bindings === true
+          context.word.capabilities.multi_group_sense_bindings === true
         }
         meanings={context.draftMeanings}
         savedSenseIds={
@@ -569,6 +569,9 @@ function V3MeaningsSlot({
         />
       ) : null}
       <V3MeaningsAndExamplesStep
+        multiGroupBindingsEnabled={
+          context.word.capabilities.multi_group_sense_bindings === true
+        }
         renderSentenceSection={(senseId) => (
           <WordSentences
             key={senseId}
