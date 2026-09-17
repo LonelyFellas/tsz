@@ -14,6 +14,7 @@ import type {
   WordUkFormVariantV3,
   WordUsFormVariantV3
 } from "@tsz/types";
+import { variantRegularity } from "./model";
 import { newWordNodeId } from "../word-model/primitives";
 
 export type V3IdFactory = () => string;
@@ -37,6 +38,7 @@ type OperationFailureReason =
   | "membership_not_found"
   | "explicit_mapping_required"
   | "invalid_dialect_rules"
+  | "regularity_merge_required"
   | "component_merge_required"
   | "pronunciation_merge_required"
   | "last_form_required"
@@ -60,6 +62,7 @@ export type OperationResult<T> =
 export type PronunciationMapping = Omit<WordPronunciationV3, "id">;
 
 export interface VariantMapping {
+  is_regular?: boolean;
   spelling: string;
   origin: TextOriginV3;
   pronunciations: PronunciationMapping[];
@@ -274,6 +277,10 @@ export function convertCommonToUkUs(
           id: ukId,
           dialect: "uk",
           spelling: mapping.uk.spelling,
+          is_regular:
+            mapping.uk.is_regular ??
+            form.regional_variants.common.is_regular ??
+            true,
           origin: mapping.uk.origin,
           pronunciations: ukPronunciations,
           component_usages: clonedComponentUsages(
@@ -286,6 +293,10 @@ export function convertCommonToUkUs(
           id: usId,
           dialect: "us",
           spelling: mapping.us.spelling,
+          is_regular:
+            mapping.us.is_regular ??
+            form.regional_variants.common.is_regular ??
+            true,
           origin: mapping.us.origin,
           pronunciations: usPronunciations,
           component_usages: clonedComponentUsages(
@@ -309,6 +320,12 @@ export function convertUkUsToCommon(
   }
   if (mapping.confirmed !== true || !explicitMapping(mapping.common)) {
     return { ok: false, reason: "explicit_mapping_required" };
+  }
+  if (
+    (form.regional_variants.uk.is_regular ?? true) !==
+    (form.regional_variants.us.is_regular ?? true)
+  ) {
+    return { ok: false, reason: "regularity_merge_required" };
   }
   const ukComponents = form.regional_variants.uk.component_usages ?? [];
   const usComponents = form.regional_variants.us.component_usages ?? [];
@@ -337,6 +354,10 @@ export function convertUkUsToCommon(
           id: commonId,
           dialect: "common",
           spelling: mapping.common.spelling,
+          is_regular:
+            mapping.common.is_regular ??
+            form.regional_variants.uk.is_regular ??
+            true,
           origin: mapping.common.origin,
           pronunciations: mappedPronunciations(
             mapping.common,
@@ -406,6 +427,7 @@ function variantMappingFrom(
 ): VariantMapping {
   return {
     spelling: variant.spelling,
+    is_regular: variant.is_regular,
     origin: variant.origin,
     pronunciations: variant.pronunciations.map((pronunciation) => ({
       ...(pronunciation.dict_phonetic_rich === undefined
@@ -475,6 +497,21 @@ export function normalizeGroupDialectRules(
   for (let index = 0; index < pos.forms.length; index += 1) {
     const form = pos.forms[index]!;
     if (!memberFormIds.has(form.id)) continue;
+    const variants =
+      form.regional_variants.mode === "common"
+        ? [form.regional_variants.common]
+        : [form.regional_variants.uk, form.regional_variants.us];
+    for (const variant of variants) {
+      variant.is_regular = variantRegularity(content, form.id, variant);
+    }
+    if (
+      rules.spelling_mode === "unified" &&
+      form.regional_variants.mode === "uk_us" &&
+      form.regional_variants.uk.is_regular !==
+        form.regional_variants.us.is_regular
+    ) {
+      return { ok: false, reason: "regularity_merge_required" };
+    }
     if (
       rules.spelling_mode === "unified" &&
       rules.phonetic_mode === "unified"
@@ -581,6 +618,33 @@ function mutateVariant(
     }
   }
   throw new Error(`variant not found: ${variantId}`);
+}
+
+export function updateFormRegularity(
+  content: DraftFormsStepContentV3,
+  formId: string,
+  dialect: "common" | "uk" | "us",
+  isRegular: boolean,
+  spellingMode: DialectRulesV3["spelling_mode"]
+): DraftFormsStepContentV3 {
+  const next = clone(content);
+  for (const pos of next.pos) {
+    const form = pos.forms.find((item) => item.id === formId);
+    if (!form) continue;
+    if (form.regional_variants.mode === "common") {
+      form.regional_variants.common.is_regular = isRegular;
+    } else {
+      for (const variant of [
+        form.regional_variants.uk,
+        form.regional_variants.us
+      ]) {
+        if (spellingMode === "unified" || variant.dialect === dialect)
+          variant.is_regular = isRegular;
+      }
+    }
+    return next;
+  }
+  throw new Error(`form not found: ${formId}`);
 }
 
 export function updateVariantSpelling(
@@ -704,6 +768,7 @@ export function addPartOfSpeech(
           id: firstVariantId,
           dialect: "common" as const,
           spelling: templateSpelling.uk,
+          is_regular: true,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         }
@@ -714,6 +779,7 @@ export function addPartOfSpeech(
           id: firstVariantId,
           dialect: "uk" as const,
           spelling: templateSpelling.uk,
+          is_regular: true,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         },
@@ -721,6 +787,7 @@ export function addPartOfSpeech(
           id: secondVariantId!,
           dialect: "us" as const,
           spelling: templateSpelling.us,
+          is_regular: true,
           origin: "manual" as const,
           pronunciations: [pronunciation(secondPronunciationId!)]
         }
@@ -982,6 +1049,7 @@ export function addConcreteForm(
           id: firstVariantId,
           dialect: "common" as const,
           spelling: "",
+          is_regular: true,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         }
@@ -992,6 +1060,7 @@ export function addConcreteForm(
           id: firstVariantId,
           dialect: "uk" as const,
           spelling: "",
+          is_regular: true,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         },
@@ -999,6 +1068,7 @@ export function addConcreteForm(
           id: secondVariantId!,
           dialect: "us" as const,
           spelling: "",
+          is_regular: true,
           origin: "manual" as const,
           pronunciations: [pronunciation(secondPronunciationId!)]
         }

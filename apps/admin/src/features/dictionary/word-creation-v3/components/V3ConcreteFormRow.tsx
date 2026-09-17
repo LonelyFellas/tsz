@@ -1,5 +1,5 @@
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
-import { Flex, Input, Select, Tag, Typography } from "antd";
+import { Flex, Input, Radio, Select, Typography } from "antd";
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
@@ -10,13 +10,15 @@ import type {
   WordUkFormVariantV3,
   WordUsFormVariantV3
 } from "@tsz/types";
-import type { CSSProperties, ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
 import {
   unifyUkUsSpelling,
   updateConcreteFormType,
   updateVariantSpelling,
+  updateFormRegularity,
   type V3IdFactory
 } from "../operations";
+import { variantRegularity } from "../model";
 import { dialectLabel } from "../presentation";
 import { spellingConflictReferences } from "../referenceGuard";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
@@ -163,6 +165,48 @@ function V3ConcreteFormTypeCell({
   );
 }
 
+function SpellingRegularity({
+  content,
+  form,
+  dialectRules,
+  variant,
+  label,
+  onChange
+}: {
+  content: DraftFormsStepContentV3;
+  form: WordConcreteFormV3;
+  dialectRules: DialectRulesV3;
+  variant: WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3;
+  label: string;
+  onChange: (next: DraftFormsStepContentV3) => void;
+}) {
+  const name = useId();
+  return (
+    <Flex align="center" gap="small" className="v3-spelling-regularity">
+      <Typography.Text>是否规则变化？</Typography.Text>
+      <Radio.Group
+        name={`${name}-${variant.id}-regularity`}
+        aria-label={`${label}是否规则变化`}
+        value={variantRegularity(content, form.id, variant)}
+        onChange={(event) =>
+          onChange(
+            updateFormRegularity(
+              content,
+              form.id,
+              variant.dialect,
+              event.target.value,
+              dialectRules.spelling_mode
+            )
+          )
+        }
+      >
+        <Radio value>是</Radio>
+        <Radio value={false}>否</Radio>
+      </Radio.Group>
+    </Flex>
+  );
+}
+
 interface V3DialectFormCellProps {
   content: DraftFormsStepContentV3;
   dialectRules: DialectRulesV3;
@@ -215,7 +259,17 @@ function V3DialectFormCell({
       style={style}
     >
       <Flex vertical gap="small">
-        <Typography.Text strong>{dialectLabel(dialect)}拼写</Typography.Text>
+        <Flex align="center" justify="space-between" gap="small" wrap>
+          <Typography.Text strong>{dialectLabel(dialect)}拼写</Typography.Text>
+          <SpellingRegularity
+            content={content}
+            form={form}
+            dialectRules={dialectRules}
+            variant={variant}
+            label={`${formLabel}${dialectLabel(dialect)}拼写`}
+            onChange={onChange}
+          />
+        </Flex>
         <Input
           aria-invalid={spellingInvalid}
           aria-label={`${formLabel}${dialectLabel(dialect)}拼写`}
@@ -374,9 +428,16 @@ export function V3ConcreteFormRow({
             data-v3-node-id={commonVariant.id}
           >
             <div className="word-shared-form-spelling">
-              <Flex align="center" justify="space-between">
+              <Flex align="center" justify="space-between" gap="small" wrap>
                 <Typography.Text strong>词形拼写</Typography.Text>
-                <Tag color="blue">英美通用</Tag>
+                <SpellingRegularity
+                  content={content}
+                  form={form}
+                  dialectRules={dialectRules}
+                  variant={commonVariant}
+                  label={`${formLabel}英美通用拼写`}
+                  onChange={onChange}
+                />
               </Flex>
               <Input
                 aria-invalid={
@@ -425,9 +486,16 @@ export function V3ConcreteFormRow({
             data-v3-node-id={form.id}
           >
             <div className="word-shared-form-spelling">
-              <Flex align="center" justify="space-between">
+              <Flex align="center" justify="space-between" gap="small" wrap>
                 <Typography.Text strong>词形拼写</Typography.Text>
-                <Tag color="blue">英美通用</Tag>
+                <SpellingRegularity
+                  content={content}
+                  form={form}
+                  dialectRules={dialectRules}
+                  variant={unifiedSpellingVariants.uk}
+                  label={`${formLabel}英美通用拼写`}
+                  onChange={onChange}
+                />
               </Flex>
               <Input
                 aria-invalid={unifiedSpellingInvalid}

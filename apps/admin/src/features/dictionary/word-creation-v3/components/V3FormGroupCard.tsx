@@ -20,7 +20,6 @@ import {
   Empty,
   Flex,
   Popconfirm,
-  Radio,
   Segmented,
   Typography
 } from "antd";
@@ -237,15 +236,6 @@ export function V3FormGroupCard({
       formReferenceCount(referenceGuard.index, blockedForm) > 0)
   )
     setBlockedFormId(undefined);
-  const setRegular = (isRegular: boolean) => {
-    const next = structuredClone(content);
-    const nextPos = next.pos.find((item) => item.pos_id === pos.pos_id);
-    const nextGroup = nextPos?.form_groups.find((item) => item.id === group.id);
-    if (!nextGroup) return;
-    nextGroup.is_regular = isRegular;
-    onChange(next);
-  };
-
   const formRow = (
     member: WordFormGroupV3["members"][number],
     index: number,
@@ -522,19 +512,7 @@ export function V3FormGroupCard({
     >
       {!collapsed ? (
         <Flex id={bodyId} vertical>
-          <div className="word-form-rules">
-            <div className="word-form-rule-row">
-              <Typography.Text strong>词形是否规则变化？</Typography.Text>
-              <Radio.Group
-                onChange={(event) => setRegular(event.target.value)}
-                value={group.is_regular}
-              >
-                <Radio value>是</Radio>
-                <Radio value={false}>否</Radio>
-              </Radio.Group>
-            </div>
-            {dialectControl}
-          </div>
+          <div className="word-form-rules">{dialectControl}</div>
           {group.members.length === 0 ? (
             <Empty
               description="草稿可暂时保留空变化组"

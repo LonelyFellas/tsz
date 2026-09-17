@@ -14,6 +14,7 @@ import {
   deletePartOfSpeech,
   fillFormTypeTemplate,
   normalizeGroupDialectRules,
+  updateFormRegularity,
   reorderFormGroups,
   reorderForms,
   reorderMemberships,
@@ -155,6 +156,7 @@ describe("V3 forms operations", () => {
       uk: {
         id: UUIDS.uk_variant,
         dialect: "uk",
+        is_regular: true,
         spelling: "centre",
         origin: "manual",
         component_usages: [],
@@ -170,6 +172,7 @@ describe("V3 forms operations", () => {
       us: {
         id: UUIDS.us_variant,
         dialect: "us",
+        is_regular: true,
         spelling: "center",
         origin: "dictionary",
         component_usages: [],
@@ -894,6 +897,7 @@ describe("V3 forms operations", () => {
                     id: UUIDS.common_variant,
                     dialect: "common",
                     spelling: "",
+                    is_regular: true,
                     origin: "manual",
                     pronunciations: [
                       {
@@ -963,6 +967,7 @@ describe("V3 forms operations", () => {
                     id: UUIDS.common_variant_2,
                     dialect: "common",
                     spelling: "",
+                    is_regular: true,
                     origin: "manual",
                     pronunciations: [
                       {
@@ -1027,6 +1032,7 @@ describe("V3 forms operations", () => {
               id: ids[3],
               dialect: "uk",
               spelling: "centre",
+              is_regular: true,
               origin: "manual",
               pronunciations: [
                 {
@@ -1041,6 +1047,7 @@ describe("V3 forms operations", () => {
               id: ids[4],
               dialect: "us",
               spelling: "center",
+              is_regular: true,
               origin: "manual",
               pronunciations: [
                 {
@@ -1141,6 +1148,7 @@ describe("V3 forms operations", () => {
           id: uuidFromInt(9_203),
           dialect: "uk",
           spelling: "centre",
+          is_regular: true,
           origin: "manual",
           pronunciations: [
             {
@@ -1155,6 +1163,7 @@ describe("V3 forms operations", () => {
           id: uuidFromInt(9_204),
           dialect: "us",
           spelling: "center",
+          is_regular: true,
           origin: "manual",
           pronunciations: [
             {
@@ -1488,6 +1497,7 @@ describe("V3 forms operations", () => {
           id: UUIDS.common_variant,
           dialect: "common",
           spelling: "",
+          is_regular: true,
           origin: "manual",
           pronunciations: [
             {
@@ -1759,6 +1769,7 @@ describe("V3 forms operations", () => {
           id: UUIDS.uk_variant,
           dialect: "uk",
           spelling: "",
+          is_regular: true,
           origin: "manual",
           pronunciations: [
             {
@@ -1773,6 +1784,7 @@ describe("V3 forms operations", () => {
           id: UUIDS.us_variant,
           dialect: "us",
           spelling: "",
+          is_regular: true,
           origin: "manual",
           pronunciations: [
             {
@@ -2084,4 +2096,102 @@ it("英美复制保留两套 synthesis，合并差异不能静默选边", () => 
     { spelling_mode: "unified", phonetic_mode: "unified" }
   );
   expect(merge).toEqual({ ok: false, reason: "pronunciation_merge_required" });
+});
+
+it("规则标记按拼写独立保存，统一拼写同步英美且转换不丢值", () => {
+  const form = ukUsFormFixture();
+  let content = formsFixture({ forms: [form] });
+  content = updateFormRegularity(content, form.id, "uk", false, "distinguish");
+  let regional = content.pos[0]!.forms[0]!.regional_variants;
+  expect(regional).toMatchObject({
+    uk: { is_regular: false },
+    us: { spelling: "center" }
+  });
+  expect(form.regional_variants.uk.is_regular).toBeUndefined();
+  const blocked = normalizeGroupDialectRules(content, UUIDS.pos, UUIDS.group, {
+    spelling_mode: "unified",
+    phonetic_mode: "distinguish"
+  });
+  expect(blocked).toEqual({ ok: false, reason: "regularity_merge_required" });
+  content = updateFormRegularity(content, form.id, "us", false, "distinguish");
+  const merged = normalizeGroupDialectRules(content, UUIDS.pos, UUIDS.group, {
+    spelling_mode: "unified",
+    phonetic_mode: "distinguish"
+  });
+  expect(merged.ok).toBe(true);
+  if (!merged.ok) return;
+  content = updateFormRegularity(merged.value, form.id, "uk", true, "unified");
+  regional = content.pos[0]!.forms[0]!.regional_variants;
+  expect(regional).toMatchObject({
+    uk: { is_regular: true },
+    us: { is_regular: true }
+  });
+});
+
+it("旧通用拼写拆分继承组值，显式新值优先于组值", () => {
+  const content = formsFixture();
+  content.pos[0]!.form_groups[0]!.is_regular = false;
+  const result = normalizeGroupDialectRules(content, UUIDS.pos, UUIDS.group, {
+    spelling_mode: "distinguish",
+    phonetic_mode: "distinguish"
+  });
+  expect(result).toMatchObject({
+    ok: true,
+    value: {
+      pos: [
+        {
+          forms: [
+            {
+              regional_variants: {
+                uk: { is_regular: false },
+                us: { is_regular: false }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  });
+  const edited = updateFormRegularity(
+    content,
+    UUIDS.form,
+    "common",
+    true,
+    "unified"
+  );
+  const explicit = normalizeGroupDialectRules(edited, UUIDS.pos, UUIDS.group, {
+    spelling_mode: "distinguish",
+    phonetic_mode: "distinguish"
+  });
+  expect(explicit).toMatchObject({
+    ok: true,
+    value: {
+      pos: [
+        {
+          forms: [
+            {
+              regional_variants: {
+                uk: { is_regular: true },
+                us: { is_regular: true }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  });
+});
+
+it("历史非规则组新增词形默认规则，不继承旧组标记", () => {
+  const content = formsFixture();
+  content.pos[0]!.form_groups[0]!.is_regular = false;
+  let id = 9000;
+  const added = addConcreteForm(content, UUIDS.pos, UUIDS.group, "plural", () =>
+    uuidFromInt(id++)
+  );
+  expect(added.ok).toBe(true);
+  if (!added.ok) return;
+  expect(added.value.pos[0]!.forms.at(-1)!.regional_variants).toMatchObject({
+    common: { is_regular: true }
+  });
 });

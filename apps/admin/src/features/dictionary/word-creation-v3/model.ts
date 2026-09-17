@@ -211,16 +211,18 @@ function isVariantShape(
         "component_usages",
         "dialect",
         "id",
+        "is_regular",
         "origin",
         "pronunciations",
         "spelling"
       ].includes(key)
     ) &&
     Object.keys(value).length >= 5 &&
-    Object.keys(value).length <= 6 &&
+    Object.keys(value).length <= 7 &&
     typeof value.id === "string" &&
     value.dialect === dialect &&
     typeof value.spelling === "string" &&
+    (value.is_regular === undefined || typeof value.is_regular === "boolean") &&
     (value.origin === "dictionary" ||
       value.origin === "converted" ||
       value.origin === "manual") &&
@@ -332,7 +334,8 @@ function regionalVariantsMatchRules(
   if (variants.mode !== "uk_us") return false;
   return (
     rules.spelling_mode === "distinguish" ||
-    variants.uk.spelling === variants.us.spelling
+    (variants.uk.spelling === variants.us.spelling &&
+      variants.uk.is_regular === variants.us.is_regular)
   );
 }
 
@@ -927,7 +930,25 @@ function pronunciationWire(
   };
 }
 
+export function variantRegularity(
+  content: DraftFormsStepContentV3,
+  formId: string,
+  variant: { is_regular?: boolean }
+): boolean {
+  return (
+    variant.is_regular ??
+    content.pos.every((pos) =>
+      pos.form_groups.every(
+        (group) =>
+          !group.members.some((member) => member.form_id === formId) ||
+          group.is_regular
+      )
+    )
+  );
+}
+
 function variantWire<TDialect extends Dialect>(variant: {
+  is_regular?: boolean;
   id: string;
   dialect: TDialect;
   spelling: string;
@@ -939,6 +960,9 @@ function variantWire<TDialect extends Dialect>(variant: {
     id: variant.id,
     dialect: variant.dialect,
     spelling: variant.spelling,
+    ...(variant.is_regular === undefined
+      ? {}
+      : { is_regular: variant.is_regular }),
     origin: variant.origin,
     pronunciations: variant.pronunciations.map(pronunciationWire),
     component_usages: structuredClone(variant.component_usages ?? [])

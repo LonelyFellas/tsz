@@ -204,6 +204,63 @@ describe("OpenAPI generated runtime schema", () => {
 });
 
 describe("runtime schema fail-closed diagnostics", () => {
+  it.each(["common", "uk", "us"] as const)(
+    "拼写规则标记接受 %s 的布尔值、兼容缺省并拒绝 null",
+    (dialect) => {
+      const word = validFixture("AdminWordV3") as { forms: { pos: unknown[] } };
+      const pos = buildValidValue(
+        runtimeSchemaBundle.$defs.WordPosFormsV3!
+      ) as { forms: unknown[] };
+      const form = buildValidValue(
+        runtimeSchemaBundle.$defs.WordConcreteFormV3!
+      ) as Record<string, unknown>;
+      const variant = buildValidValue(
+        runtimeSchemaBundle.$defs[
+          dialect === "common"
+            ? "WordCommonFormVariantV3"
+            : dialect === "uk"
+              ? "WordUkFormVariantV3"
+              : "WordUsFormVariantV3"
+        ]!
+      ) as Record<string, unknown>;
+      form.regional_variants =
+        dialect === "common"
+          ? { mode: "common", common: variant }
+          : {
+              mode: "uk_us",
+              uk:
+                dialect === "uk"
+                  ? variant
+                  : buildValidValue(
+                      runtimeSchemaBundle.$defs.WordUkFormVariantV3!
+                    ),
+              us:
+                dialect === "us"
+                  ? variant
+                  : buildValidValue(
+                      runtimeSchemaBundle.$defs.WordUsFormVariantV3!
+                    )
+            };
+      pos.forms = [form];
+      word.forms.pos = [pos];
+      expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({
+        valid: true
+      });
+      variant.is_regular = false;
+      expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({
+        valid: true
+      });
+      variant.is_regular = true;
+      expect(validateRuntimeSchema("AdminWordV3", word)).toEqual({
+        valid: true
+      });
+      variant.is_regular = null;
+      expect(validateRuntimeSchema("AdminWordV3", word)).toMatchObject({
+        valid: false
+      });
+    }
+  );
+
   it.each([
     {
       name: "根类型错误",

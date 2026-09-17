@@ -114,6 +114,11 @@ export function V3PosTab({
     if (result.ok) {
       setDialectChangeError(undefined);
       onChange(result.value);
+    } else if (result.reason === "regularity_merge_required") {
+      setDialectChangeError({
+        groupId,
+        message: "英式与美式的规则变化设置不同，请先统一设置，再合并拼写。"
+      });
     } else if (result.reason === "component_merge_required") {
       setDialectChangeError({
         groupId,
