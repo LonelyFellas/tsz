@@ -2829,53 +2829,6 @@ describe("V3FormsAndPronunciationStep", () => {
     });
   }, 15_000);
 
-  it("组卡片头部切换通用 / 专用，并按词义绑定数提示影响", async () => {
-    const initial = formsFixture();
-    const groupId = initial.pos[0]!.form_groups[0]!.id;
-    function ScopeHarness({ counts }: { counts: ReadonlyMap<string, number> }) {
-      const [value, setValue] = useState(initial);
-      return (
-        <V3FormDisplayProvider>
-          <AntApp>
-            <V3FormsAndPronunciationStep
-              formGroupBindingCounts={counts}
-              onChange={setValue}
-              value={value}
-            />
-            <output data-testid="canonical-value">
-              {JSON.stringify(value)}
-            </output>
-          </AntApp>
-        </V3FormDisplayProvider>
-      );
-    }
-    const { container, rerender } = render(<ScopeHarness counts={new Map()} />);
-    const scope = await waitFor(() => {
-      const element = container.querySelector<HTMLElement>(
-        `[data-v3-field="scope"][data-v3-node-id="${groupId}"]`
-      );
-      expect(element).not.toBeNull();
-      return element!;
-    });
-    expect(scope).toHaveAttribute("tabindex", "-1");
-    expect(screen.queryByText(/个词义/)).toBeNull();
-
-    fireEvent.click(within(scope).getByText("专用"));
-    await waitFor(() =>
-      expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("dedicated")
-    );
-    rerender(<ScopeHarness counts={new Map([[groupId, 2]])} />);
-    expect(screen.getByText("已绑定 2 个词义")).toBeVisible();
-
-    fireEvent.click(within(scope).getByText("通用"));
-    await waitFor(() =>
-      expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("general")
-    );
-    expect(
-      screen.getByText("2 个词义仍绑定此组，改为通用后绑定将失效")
-    ).toBeVisible();
-  });
-
   it("组内唯一原形摘不掉，本组还有别的原形时照常放行", async () => {
     const base = commonFormFixture({
       id: uuidFromInt(1_260),

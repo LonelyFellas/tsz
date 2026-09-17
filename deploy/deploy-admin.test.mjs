@@ -90,7 +90,7 @@ test("invalid rollout flag fails before building or server writes", () => {
 });
 
 for (const [input, expected] of [
-  [undefined, "false"],
+  [undefined, "true"],
   ["false", "false"],
   ["true", "true"]
 ]) {

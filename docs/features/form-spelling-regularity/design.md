@@ -1,8 +1,8 @@
 # 实现与验证
 
-前端：`/Users/darwish/Dev/tsz-core/tsz`，复用当前 `codex/pronunciation-layout` 工作树。
-后端：`/Users/darwish/Dev/tsz-core/tsz-rust-form-spelling-regularity`，基于 `041e9a1` 的隔离分支。
-同步生成物附带该后端主线已有的可选 sense_bindings、atomic_form_sense_bindings 和 allowed_sense_ids 契约；本次不改其业务逻辑。
+前端：`/Users/darwish/Dev/tsz-core/tsz`，保留当前工作树，交付分支为 `codex/form-spelling-regularity`。
+后端：`/Users/darwish/Dev/tsz-core/tsz-rust-form-spelling-regularity`，实现基于 `041e9a1`，ship 时合入 `e07d7e4` 主线的隔离分支。
+ship 时同步前端 `f8f545a` / 后端 `e07d7e4` 已合入的多组词义绑定能力；本次不改其业务逻辑。
 
 ## 依赖与方案
 
@@ -33,5 +33,9 @@ OpenAPI 按官方 export_openapi 生成并显式指定本次后端路径同步�
 - 前端全仓普通测试覆盖 184 个文件：首轮 179 个文件通过；修正新字段默认值及契约指纹的预期后，剩余 5 个文件单 worker 复验全过（包含首轮 worker 启动超时的文件）。合计 2756 项通过、2 项原有跳过；未修改超时阈值。
 - `pnpm typecheck` 七个项目通过；受影响文件 ESLint、Prettier 和 `git diff --check` 通过。
 - 后端全量 `--lib`：281 项通过；handler 往返/发布/旧请求兼容及迁移回填/回退保护各一项通过；Clippy all-targets/all-features 与 fmt 通过。
-- PostgreSQL 16 与 Redis 7 使用本任务新建的隔离容器，未访问业务环境。未执行浏览器视觉验收、提交、推送或部署。
-- OpenAPI 官方生成物与前端 runtime bundle 来源 SHA256 一致。当前产物来源为 `041e9a1 + 本任务工作区差异`，不代表已部署版本。
+- PostgreSQL 16 与 Redis 7 使用本任务新建的隔离容器，未访问业务环境。实现阶段未执行浏览器视觉验收、提交、推送或部署；后续 ship 记录见配套 PR。
+- OpenAPI 官方生成物与前端 runtime bundle 来源 SHA256 一致。产物来源为本任务后端 checkout，ship 时重新生成，不代表已部署版本。
+
+## Ship 基线整合
+
+前端已合入 `f8f545a`，后端已合入 `e07d7e4`；保留主线词义多组绑定与引用保护。本次迁移编号顺延为 `20260917180000_add_form_variant_regularity`，排在主线 `20260917120000` 之后。后端保留任务工作树，从完整已审提交推送到 `dev` 并创建面向 `main` 的 PR，不改动其他 worktree。

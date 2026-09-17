@@ -488,7 +488,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "d56cbc0a6ae8936620fd245354f965023a5beee1ad04a2a69d54a0e8020d77c2"
+      "c37bf1b88d6e2749a1f69b202e421d9984206f0b4db8e42269e77cf1abdf9134"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -530,6 +530,18 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       type: "string",
       format: "uuid"
     });
+    expect(defs.WordSenseV3.required).not.toContain("form_group_ids");
+    expect(defs.WordSenseV3.properties.form_group_ids).toMatchObject({
+      type: "array",
+      items: { type: "string", format: "uuid" },
+      maxItems: 2000
+    });
+    expect(defs.InboundReferenceKindV3.enum).toContain(
+      "form_group_sense_binding"
+    );
+    expect(defs.AdminWordV3Capabilities.required ?? []).not.toContain(
+      "multi_group_sense_bindings"
+    );
     expect(defs.DialectModeV3.enum).toEqual(["unified", "distinguish"]);
     expect(Object.keys(defs.AdminWordV3.properties)).not.toContain("headwords");
     expect(defs.AdminWordV3.properties.detection_basis_dialect).toEqual({

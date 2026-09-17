@@ -15,6 +15,11 @@ import {
 } from "./fixtures";
 import {
   countFormGroupBindings,
+  boundFormGroupIds,
+  setFormGroupBindings,
+  formGroupBindingPatches,
+  formGroupBindingsChanged,
+  syncFormGroupBindings,
   dropEmptySentenceTranslations,
   formGroupLabel,
   spellingModeForPos,
@@ -1530,4 +1535,49 @@ describe("词义绑定变化组", () => {
       new Map([[UUIDS.group_2, 2]])
     );
   });
+});
+
+it("多组绑定投影与保存保留完整集合，空数组优先于旧单组且顺序不产生假修改", () => {
+  const saved: DraftMeaningsStepContentV3 = {
+    sense_groups: [],
+    pos: [
+      {
+        pos_id: UUIDS.pos,
+        grammar_structures: [],
+        senses: [
+          {
+            id: "sense",
+            sub_pos: "",
+            level: "A1",
+            depends_on_context: false,
+            definitions: [],
+            sentences: [],
+            relations: [],
+            form_group_ids: [UUIDS.group, UUIDS.group_2]
+          }
+        ]
+      }
+    ]
+  };
+  const local = toWritableMeanings(saved);
+  expect(countFormGroupBindings(local)).toEqual(
+    new Map([
+      [UUIDS.group, 1],
+      [UUIDS.group_2, 1]
+    ])
+  );
+  const sense = local.pos[0]!.senses[0]!;
+  sense.form_group_ids!.reverse();
+  expect(formGroupBindingsChanged(local, saved)).toBe(false);
+  expect(formGroupBindingPatches(local, saved)).toEqual([]);
+  setFormGroupBindings(sense, [UUIDS.group_2]);
+  expect(formGroupBindingPatches(local, saved)).toEqual([
+    { sense_id: "sense", form_group_ids: [UUIDS.group_2] }
+  ]);
+  expect(
+    boundFormGroupIds(syncFormGroupBindings(local, saved).pos[0]!.senses[0]!)
+  ).toEqual([UUIDS.group, UUIDS.group_2]);
+  expect(
+    boundFormGroupIds({ form_group_id: UUIDS.group, form_group_ids: [] })
+  ).toEqual([]);
 });

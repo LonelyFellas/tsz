@@ -1,8 +1,11 @@
+import { boundFormGroupIds } from "./meaningsModel";
 import type {
   AdminWordV3,
   AdminWordV3Envelope,
   DraftFormsStepContentV3,
+  DraftMeaningsStepContentWritableV3,
   FormsImpactResponseV3,
+  SenseFormGroupBindingV3,
   SurfaceMatchPageV3,
   SurfacePolicyNameV2
 } from "@tsz/types";
@@ -18,6 +21,7 @@ export interface V3ConfirmationContext {
   policy_name?: SurfacePolicyNameV2;
   policy_epoch?: number;
   impact_content?: DraftFormsStepContentV3;
+  sense_bindings?: SenseFormGroupBindingV3[];
 }
 
 export interface V3ConfirmationTokens {
@@ -79,7 +83,8 @@ export interface V3SaveFlow {
   ): boolean;
   bindImpactConfirmation(
     impact: FormsImpactResponseV3,
-    content: DraftFormsStepContentV3
+    content: DraftFormsStepContentV3,
+    senseBindings?: SenseFormGroupBindingV3[]
   ): boolean;
   bindImpactSurfaceConfirmation(page: SurfaceMatchPageV3): boolean;
   confirmations(context?: V3ConfirmationContext): V3ConfirmationTokens;
@@ -104,13 +109,48 @@ function normalizeJson(value: unknown): unknown {
   return value;
 }
 
-/** Stable local fingerprint of the exact forms body used for impact preview. */
-function formsContentFingerprint(content: DraftFormsStepContentV3): string {
-  return JSON.stringify(normalizeJson(content));
+/** 比较实际 JSON 内容：对象字段顺序不算修改，数组顺序仍有意义。 */
+export function v3ContentFingerprint(value: unknown): string {
+  return JSON.stringify(normalizeJson(value));
 }
 
-export function formsContentDigest(content: DraftFormsStepContentV3): string {
-  const serialized = formsContentFingerprint(content);
+/** 绑定是集合；历史单组与等价数组不应产生未保存状态。 */
+export function v3MeaningsContentFingerprint(
+  value: DraftMeaningsStepContentWritableV3
+): string {
+  return v3ContentFingerprint({
+    ...value,
+    pos: value.pos.map((pos) => ({
+      ...pos,
+      senses: pos.senses.map((sense) => ({
+        ...sense,
+        form_group_id: undefined,
+        form_group_ids: [...boundFormGroupIds(sense)].sort()
+      }))
+    }))
+  });
+}
+
+/** Stable local fingerprint of the exact forms body used for impact preview. */
+function formsContentFingerprint(
+  content: DraftFormsStepContentV3,
+  bindings: SenseFormGroupBindingV3[] = []
+): string {
+  return v3ContentFingerprint(
+    bindings.length
+      ? [
+          content,
+          [...bindings].sort((a, b) => a.sense_id.localeCompare(b.sense_id))
+        ]
+      : content
+  );
+}
+
+export function formsContentDigest(
+  content: DraftFormsStepContentV3,
+  bindings: SenseFormGroupBindingV3[] = []
+): string {
+  const serialized = formsContentFingerprint(content, bindings);
   let hash = 0x811c9dc5;
   for (let index = 0; index < serialized.length; index += 1) {
     hash ^= serialized.charCodeAt(index);
@@ -142,10 +182,13 @@ export function createV3SaveFlow(initialWord: AdminWordV3): V3SaveFlow {
     impactPreviewBinding = undefined;
   };
 
-  const exactContentBinding = (content: DraftFormsStepContentV3) => ({
+  const exactContentBinding = (
+    content: DraftFormsStepContentV3,
+    bindings: SenseFormGroupBindingV3[] = []
+  ) => ({
     base_revision: canonicalWord.revision,
-    content_digest: formsContentDigest(content),
-    content_fingerprint: formsContentFingerprint(content)
+    content_digest: formsContentDigest(content, bindings),
+    content_fingerprint: formsContentFingerprint(content, bindings)
   });
 
   const bindSurfacePage = (
@@ -269,10 +312,10 @@ export function createV3SaveFlow(initialWord: AdminWordV3): V3SaveFlow {
       impactBinding = undefined;
       return bindSurfacePage(page, exactContentBinding(content));
     },
-    bindImpactConfirmation(impact, content) {
+    bindImpactConfirmation(impact, content, bindings = []) {
       invalidateConfirmations();
       if (impact.base_revision !== canonicalWord.revision) return false;
-      const exactContent = exactContentBinding(content);
+      const exactContent = exactContentBinding(content, bindings);
       const surfacePage = impact.surface_match_page;
       if (surfacePage) {
         impactPreviewBinding = {
@@ -303,9 +346,12 @@ export function createV3SaveFlow(initialWord: AdminWordV3): V3SaveFlow {
         context?.base_revision === canonicalWord.revision &&
         context.impact_content !== undefined &&
         impactBinding.content_digest ===
-          formsContentDigest(context.impact_content) &&
+          formsContentDigest(context.impact_content, context.sense_bindings) &&
         impactBinding.content_fingerprint ===
-          formsContentFingerprint(context.impact_content)
+          formsContentFingerprint(
+            context.impact_content,
+            context.sense_bindings
+          )
       ) {
         result.confirmed_impact_token = impactBinding.token;
       }
@@ -316,9 +362,12 @@ export function createV3SaveFlow(initialWord: AdminWordV3): V3SaveFlow {
         context.base_revision === surfaceBinding.base_revision &&
         context.impact_content !== undefined &&
         surfaceBinding.content_digest ===
-          formsContentDigest(context.impact_content) &&
+          formsContentDigest(context.impact_content, context.sense_bindings) &&
         surfaceBinding.content_fingerprint ===
-          formsContentFingerprint(context.impact_content) &&
+          formsContentFingerprint(
+            context.impact_content,
+            context.sense_bindings
+          ) &&
         context.snapshot_id === surfaceBinding.snapshot_id &&
         context.policy_name === surfaceBinding.policy_name &&
         context.policy_epoch === surfaceBinding.policy_epoch

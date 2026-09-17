@@ -20,12 +20,11 @@ import {
   Empty,
   Flex,
   Popconfirm,
-  Segmented,
+  Popover,
   Typography
 } from "antd";
 import type {
   DraftFormsStepContentV3,
-  FormGroupScopeV3,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
   WordFormTypeV3,
@@ -74,7 +73,10 @@ export interface V3FormGroupCardProps {
   onMove?: (offset: -1 | 1) => void;
   posCatalog?: PartOfSpeechCatalogItem;
   dialectControl?: ReactNode;
-  onScopeChange?: (scope: FormGroupScopeV3) => void;
+  senseScope?: ReactNode;
+  onEditSenses?: () => void;
+  editingSenses?: boolean;
+  onCloseSenses?: () => void;
   /** 词义步里绑定到本组的词义数；只做提示，不在本地清除绑定。 */
   boundSenseCount?: number;
 }
@@ -95,7 +97,10 @@ export function V3FormGroupCard({
   onMove,
   posCatalog,
   dialectControl,
-  onScopeChange,
+  senseScope,
+  onEditSenses,
+  editingSenses = false,
+  onCloseSenses,
   boundSenseCount = 0
 }: V3FormGroupCardProps) {
   const [removedTypes, setRemovedTypes] = useRemovedFormTypes(savedGroup.id);
@@ -401,6 +406,7 @@ export function V3FormGroupCard({
     : undefined;
 
   const bodyId = `v3-form-group-${group.id}-body`;
+  const hasBoundSenses = group.scope === "dedicated" && boundSenseCount > 0;
 
   return (
     <Card
@@ -409,55 +415,55 @@ export function V3FormGroupCard({
       data-v3-node-id={group.id}
       size="small"
       title={
-        <button
-          aria-controls={bodyId}
-          aria-expanded={!collapsed}
-          aria-label={`${collapsed ? "展开" : "收起"}第 ${groupIndex + 1} 组词形变化`}
-          className="word-form-card-toggle"
-          onClick={() => setCollapsed((value) => !value)}
-          type="button"
-        >
-          <span>{`第 ${groupIndex + 1} 组 词形变化`}</span>
-          <span className="word-form-card-toggle-state">
-            <span>{collapsed ? "展开" : "收起"}</span>
-            {collapsed ? (
-              <CaretDownFilled className="word-form-card-toggle-caret" />
-            ) : (
-              <CaretUpFilled className="word-form-card-toggle-caret" />
-            )}
-          </span>
-        </button>
+        <span className="v3-form-group-heading">{`第 ${groupIndex + 1} 组 词形变化`}</span>
       }
       extra={
-        <Flex align="center" gap="small" wrap>
-          {boundSenseCount > 0 ? (
-            <Typography.Text
-              type={group.scope === "dedicated" ? "secondary" : "warning"}
+        <Flex
+          align="center"
+          gap="small"
+          wrap
+          className="v3-form-group-scope"
+          data-v3-field="scope"
+          data-v3-node-id={group.id}
+          tabIndex={-1}
+        >
+          {onEditSenses ? (
+            <Popover
+              trigger="click"
+              placement="bottomRight"
+              open={editingSenses}
+              onOpenChange={(open) =>
+                open ? onEditSenses() : onCloseSenses?.()
+              }
+              destroyOnHidden
+              fresh
+              content={editingSenses ? senseScope : <span />}
             >
-              {group.scope === "dedicated"
-                ? `已绑定 ${boundSenseCount} 个词义`
-                : `${boundSenseCount} 个词义仍绑定此组，改为通用后绑定将失效`}
-            </Typography.Text>
-          ) : null}
-          {onScopeChange ? (
-            <div
-              className="v3-form-group-scope"
-              data-v3-field="scope"
-              data-v3-node-id={group.id}
-              tabIndex={-1}
-            >
-              <Segmented<FormGroupScopeV3>
-                aria-label={`第 ${groupIndex + 1} 组使用范围`}
-                onChange={onScopeChange}
-                options={[
-                  { label: "通用", value: "general" },
-                  { label: "专用", value: "dedicated" }
-                ]}
+              <Button
+                type={hasBoundSenses ? "primary" : "default"}
+                ghost={!hasBoundSenses}
                 size="small"
-                value={group.scope}
-              />
-            </div>
+                aria-label={`第 ${groupIndex + 1} 组专用词义`}
+                aria-expanded={editingSenses}
+              >
+                {hasBoundSenses
+                  ? `专用词义 · ${boundSenseCount}`
+                  : "设置专用词义"}
+              </Button>
+            </Popover>
           ) : null}
+          <Button
+            type="text"
+            size="small"
+            className="v3-form-group-menu word-form-card-toggle-state"
+            aria-label={`${collapsed ? "展开" : "收起"}第 ${groupIndex + 1} 组词形变化`}
+            aria-controls={bodyId}
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed((value) => !value)}
+          >
+            {collapsed ? "展开" : "收起"}
+            {collapsed ? <CaretDownFilled /> : <CaretUpFilled />}
+          </Button>
           {onDelete ? (
             <Dropdown
               menu={{
@@ -502,6 +508,7 @@ export function V3FormGroupCard({
             >
               <Button
                 aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
+                className="v3-form-group-menu"
                 icon={<EllipsisOutlined />}
                 type="text"
               />

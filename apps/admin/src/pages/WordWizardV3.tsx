@@ -38,6 +38,7 @@ import { V3BasicsStep } from "@/features/dictionary/word-creation-v3/V3BasicsSte
 import { V3MeaningsAndExamplesStep } from "@/features/dictionary/word-creation-v3/V3MeaningsAndExamplesStep";
 import {
   countFormGroupBindings,
+  formGroupBindingsChanged,
   relationDisplaySnapshots
 } from "@/features/dictionary/word-creation-v3/meaningsModel";
 import { V3PreviewAndPublishStep } from "@/features/dictionary/word-creation-v3/V3PreviewAndPublishStep";
@@ -208,7 +209,13 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
     context.impact &&
     (context.impact.requires_confirmation || context.impactSurfacePage)
   );
-  const busy = context.isPending("impact") || context.isPending("save_forms");
+  const bindingsDirty =
+    context.word.capabilities.atomic_form_sense_bindings === true &&
+    formGroupBindingsChanged(context.draftMeanings, context.word.meanings);
+  const busy =
+    context.isPending("impact") ||
+    context.isPending("save_forms") ||
+    context.isPending("save_meanings");
 
   const prepareSave = async (intent: StepSaveIntent) => {
     if (preparingRef.current) return;
@@ -287,6 +294,25 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         activePosId={context.activePosId}
         entryKind={context.word.kind}
         formGroupBindingCounts={countFormGroupBindings(context.draftMeanings)}
+        bindingEditingAvailable={
+          context.word.capabilities.multi_group_sense_bindings === true
+        }
+        meanings={context.draftMeanings}
+        savedSenseIds={
+          new Set(
+            context.word.meanings.pos.flatMap((pos) =>
+              pos.senses.map((sense) => sense.id)
+            )
+          )
+        }
+        onMeaningsChange={(meanings) => {
+          resetConfirmation();
+          context.setDraftMeanings(meanings);
+        }}
+        onGoToMeanings={(posId) => {
+          context.setActivePosId(posId);
+          context.setActiveStep("meanings");
+        }}
         issues={context.issues.filter((issue) => issue.step === "forms")}
         onActivePosChange={(posId) => {
           resetConfirmation();
@@ -358,7 +384,8 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
           <Button
             disabled={
               Boolean(pendingIntent) ||
-              !context.dirtySteps.forms ||
+              (!context.dirtySteps.forms && !bindingsDirty) ||
+              busy ||
               conflictNoticeReferences.length > 0
             }
             loading={busy && pendingIntent === "save"}
@@ -542,6 +569,9 @@ function V3MeaningsSlot({
         />
       ) : null}
       <V3MeaningsAndExamplesStep
+        multiGroupBindingsEnabled={
+          context.word.capabilities.multi_group_sense_bindings === true
+        }
         renderSentenceSection={(senseId) => (
           <WordSentences
             key={senseId}

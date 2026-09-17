@@ -6272,3 +6272,128 @@ describe("新草稿默认录入位", () => {
     expect(seen.context!.hasUnsavedChanges).toBe(false);
   });
 });
+
+it("词形页将专用状态与绑定一次保存；失败保留选择，成功后清除绑定脏状态", async () => {
+  const initial = word();
+  initial.capabilities.atomic_form_sense_bindings = true;
+  const groupId = initial.forms.pos[0]!.form_groups[0]!.id;
+  const senseId = initial.meanings.pos[0]!.senses[0]!.id;
+  let server = structuredClone(initial);
+  let attempt = 0;
+  const source = requests({
+    saveForms: vi.fn(async (_id, input) => {
+      expect(input.sense_bindings).toEqual([
+        { sense_id: senseId, form_group_id: groupId }
+      ]);
+      if (attempt++ === 0) throw new HttpError(500, "temporary failure");
+      server = {
+        ...server,
+        revision: server.revision + 1,
+        forms: input.content,
+        meanings: structuredClone(server.meanings)
+      };
+      server.meanings.pos[0]!.senses[0]!.form_group_id = groupId;
+      return { word: server };
+    })
+  });
+  renderWizard(source, {
+    initialWord: initial,
+    renderStep: (context) => (
+      <>
+        <button
+          onClick={() => {
+            const forms = structuredClone(context.draftForms);
+            forms.pos[0]!.form_groups[0]!.scope = "dedicated";
+            const meanings = structuredClone(context.draftMeanings);
+            meanings.pos[0]!.senses[0]!.form_group_id = groupId;
+            context.setDraftForms(forms);
+            context.setDraftMeanings(meanings);
+          }}
+        >
+          配置绑定
+        </button>
+        <button onClick={() => void context.actions.saveForms("save")}>
+          保存绑定
+        </button>
+        <output data-testid="binding-dirty">
+          {String(context.dirtySteps.forms)}/
+          {String(context.dirtySteps.meanings)}
+        </output>
+        <output data-testid="local-binding">
+          {context.draftMeanings.pos[0]!.senses[0]!.form_group_id}
+        </output>
+        <output data-testid="binding-revision">{context.word.revision}</output>
+      </>
+    )
+  });
+  fireEvent.click(screen.getByText("配置绑定"));
+  fireEvent.click(screen.getByText("保存绑定"));
+  await waitFor(() => expect(source.saveForms).toHaveBeenCalledTimes(1));
+  expect(screen.getByTestId("binding-dirty")).toHaveTextContent("true/true");
+  expect(screen.getByTestId("local-binding")).toHaveTextContent(groupId);
+  await waitFor(() => expect(screen.getByText("保存绑定")).toBeEnabled());
+  fireEvent.click(screen.getByText("保存绑定"));
+  await waitFor(() =>
+    expect(screen.getByTestId("binding-revision")).toHaveTextContent("2")
+  );
+  expect(screen.getByTestId("binding-dirty")).toHaveTextContent("false/false");
+  expect(source.saveMeanings).not.toHaveBeenCalled();
+});
+
+it("解除专用绑定后选回原词义不应留下假脏状态，实际释义修改仍标记未保存", () => {
+  const initial = word();
+  const groupId = initial.forms.pos[0]!.form_groups[0]!.id;
+  initial.forms.pos[0]!.form_groups[0]!.scope = "dedicated";
+  initial.meanings.pos[0]!.senses[0]!.form_group_id = groupId;
+  const source = requests();
+  renderWizard(source, {
+    initialWord: initial,
+    renderStep: (context) => {
+      const setBound = (bound: boolean) => {
+        const forms = structuredClone(context.draftForms);
+        forms.pos[0]!.form_groups[0]!.scope = bound ? "dedicated" : "general";
+        const meanings = structuredClone(context.draftMeanings);
+        delete meanings.pos[0]!.senses[0]!.form_group_id;
+        meanings.pos[0]!.senses[0]!.form_group_ids = bound ? [groupId] : [];
+        context.setDraftForms(forms);
+        context.setDraftMeanings(meanings);
+      };
+      return (
+        <>
+          <button onClick={() => setBound(false)}>解除专用绑定</button>
+          <button onClick={() => setBound(true)}>选回原绑定</button>
+          <button
+            onClick={() => {
+              const meanings = structuredClone(context.draftMeanings);
+              const definition = meanings.pos[0]!.senses[0]!.definitions[0]!;
+              if (definition.definition_mode === "zh_definition")
+                definition.content.text = "真正改过的释义";
+              context.setDraftMeanings(meanings);
+            }}
+          >
+            改释义
+          </button>
+          <output data-testid="restored-binding-dirty">
+            {String(context.dirtySteps.forms)}/
+            {String(context.dirtySteps.meanings)}/
+            {String(context.hasUnsavedChanges)}
+          </output>
+        </>
+      );
+    }
+  });
+  fireEvent.click(screen.getByText("解除专用绑定"));
+  expect(screen.getByTestId("restored-binding-dirty")).toHaveTextContent(
+    "true/true/true"
+  );
+  fireEvent.click(screen.getByText("选回原绑定"));
+  expect(screen.getByTestId("restored-binding-dirty")).toHaveTextContent(
+    "false/false/false"
+  );
+  fireEvent.click(screen.getByText("改释义"));
+  expect(screen.getByTestId("restored-binding-dirty")).toHaveTextContent(
+    "false/true/true"
+  );
+  expect(source.saveForms).not.toHaveBeenCalled();
+  expect(source.saveMeanings).not.toHaveBeenCalled();
+});

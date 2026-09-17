@@ -379,6 +379,20 @@ describe("admin word V3/Any runtime decoder", () => {
     };
 
     expect(decodeSearchComponentTargetsV3Response(response)).toBe(response);
+    const form = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.SentenceTargetCandidateFormV3!
+    ) as Record<string, unknown>;
+    (candidate as { forms: Record<string, unknown>[] }).forms.push(form);
+    form.allowed_sense_ids = [];
+    expect(decodeSearchComponentTargetsV3Response(response)).toBe(response);
+    form.allowed_sense_ids = ["019d2a80-0000-7000-8000-000000000002"];
+    expect(decodeSearchComponentTargetsV3Response(response)).toBe(response);
+    form.allowed_sense_ids = ["invalid-uuid"];
+    expect(() => decodeSearchComponentTargetsV3Response(response)).toThrow(
+      InvalidAdminWordResponseError
+    );
+    delete form.allowed_sense_ids;
+    expect(decodeSearchComponentTargetsV3Response(response)).toBe(response);
     // 命中超过 page_size 时后端附带 next_cursor：可选字段，严格 schema 必须放行
     const paged = { ...response, truncated: true, next_cursor: "c1" };
     expect(decodeSearchComponentTargetsV3Response(paged)).toBe(paged);

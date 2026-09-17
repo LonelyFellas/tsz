@@ -610,4 +610,41 @@ describe("createV3SaveFlow", () => {
       flow.confirmations({ base_revision: 8, impact_content: content })
     ).toEqual({});
   });
+  it("绑定补丁变化后不能复用词形影响与词面确认 token", () => {
+    const flow = createV3SaveFlow(word(8));
+    const content = { pos: [] };
+    const bindings = [{ sense_id: "sense-1", form_group_id: "group-1" }];
+    const page = terminalSurfacePage("binding-impact-token");
+    flow.bindImpactConfirmation(
+      {
+        schema_version: 3,
+        base_revision: 8,
+        requires_confirmation: true,
+        affected: [],
+        surface_match_page: page
+      },
+      content,
+      bindings
+    );
+    const context = {
+      base_revision: 8,
+      snapshot_id: "snapshot-1",
+      policy_name: "surface_warning_acknowledgement" as const,
+      policy_epoch: 7,
+      impact_content: content
+    };
+    expect(
+      flow.confirmations({ ...context, sense_bindings: bindings })
+    ).toEqual({
+      confirmed_impact_token: "binding-impact-token",
+      confirmed_surface_match_token: "surface-token"
+    });
+    expect(
+      flow.confirmations({
+        ...context,
+        sense_bindings: [{ sense_id: "sense-1", form_group_id: "group-2" }]
+      })
+    ).toEqual({});
+    expect(flow.confirmations(context)).toEqual({});
+  });
 });

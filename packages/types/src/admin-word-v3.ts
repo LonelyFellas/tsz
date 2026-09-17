@@ -41,7 +41,7 @@ export interface DialectRulesV3 {
   phonetic_mode: DialectModeV3;
 }
 
-/** 变化组的使用范围：通用组服务本词性未绑定的词义；专用组只服务绑定了它的词义。 */
+/** 变化组的使用范围：通用组服务本词性全部词义；专用组只服务同词性下绑定了它的词义。 */
 export type FormGroupScopeV3 = "general" | "dedicated";
 
 /** `base` is a peer form type. It is neither unique nor a parent of other forms. */
@@ -426,6 +426,8 @@ export interface SentenceTargetSenseV3 {
 }
 
 export interface SentenceTargetCandidateFormV3 {
+  /** 可选词义（同基本词性）；缺省兼容旧后端，空数组明确不可选。 */
+  allowed_sense_ids?: string[];
   form_id: string;
   variant_id: string;
   form_type: WordFormTypeV3;
@@ -554,6 +556,8 @@ export interface WordSenseV3 {
   sense_group_id?: string;
   /** 缺省 = 使用本词性的通用组；只能指向同词性下 scope=dedicated 的组。 */
   form_group_id?: string;
+  /** 显式数组优先于历史单组字段，空数组解除全部绑定。 */
+  form_group_ids?: string[];
   frequency?: string;
   depends_on_context: boolean;
   definitions: WordDefinitionV3[];
@@ -605,6 +609,8 @@ export interface WordSenseWritableV3 {
   sense_group_id?: string;
   /** 缺省 = 使用本词性的通用组；只能指向同词性下 scope=dedicated 的组。 */
   form_group_id?: string;
+  /** 显式数组优先于历史单组字段，空数组解除全部绑定。 */
+  form_group_ids?: string[];
   frequency?: string;
   depends_on_context: boolean;
   definitions: WordDefinitionV3[];
@@ -634,6 +640,9 @@ export interface EntryPresentationV3 {
 export type V3PublicationCapability = { mode: "native" };
 
 export interface AdminWordV3Capabilities {
+  /** 支持词形与既有词义绑定的原子保存。 */
+  atomic_form_sense_bindings?: boolean;
+  multi_group_sense_bindings?: boolean;
   text_links?: boolean;
   publication: V3PublicationCapability;
   pronunciation_normalization_version: PronunciationNormalizationVersionV3;
@@ -721,10 +730,19 @@ export interface CreateAdminWordV3Input {
 export type CreateAdminWordAnyInput =
   CreateAdminWordV2Input | CreateAdminWordV3Input;
 
+export interface SenseFormGroupBindingV3 {
+  sense_id: string;
+  /** 缺省表示解除该词义的专用组绑定。 */
+  form_group_id?: string;
+  /** 显式数组优先于历史单组字段，空数组解除全部绑定。 */
+  form_group_ids?: string[];
+}
+
 export interface SaveFormsStepInputV3 {
   schema_version: 3;
   base_revision: number;
   intent: StepSaveIntent;
+  sense_bindings?: SenseFormGroupBindingV3[];
   content: DraftFormsStepContentV3;
   confirmed_impact_token?: string;
   confirmed_surface_match_token?: string;
@@ -745,6 +763,7 @@ export type SaveMeaningsStepInputAny =
 export interface PreviewFormsImpactInputV3 {
   schema_version: 3;
   base_revision: number;
+  sense_bindings?: SenseFormGroupBindingV3[];
   content: DraftFormsStepContentV3;
 }
 
@@ -930,7 +949,8 @@ export type InboundReferenceKindV3 =
   | "shared_sentence"
   | "publication_sense_ref"
   | "draft_relation"
-  | "phrase_component";
+  | "phrase_component"
+  | "form_group_sense_binding";
 
 export type InboundReferenceNodeTypeV3 = "pos" | "form" | "variant" | "sense";
 
@@ -945,6 +965,7 @@ export interface InboundReferenceTargetV3 {
 
 /** 引用来源摘要，字段按 `kind` 取用：例句给 sentence_*，其余给来源词条与节点。 */
 export interface InboundReferenceSourceV3 {
+  form_group_label?: string;
   entry_id?: string;
   entry_headword?: string;
   entry_kind?: WordEntryKindV3;

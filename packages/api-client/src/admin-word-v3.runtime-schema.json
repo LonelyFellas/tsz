@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
   "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-form-spelling-regularity/docs/openapi.json",
-  "_source_sha256": "d56cbc0a6ae8936620fd245354f965023a5beee1ad04a2a69d54a0e8020d77c2",
+  "_source_sha256": "c37bf1b88d6e2749a1f69b202e421d9984206f0b4db8e42269e77cf1abdf9134",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
@@ -221,6 +221,7 @@
       "properties": {
         "atomic_form_sense_bindings": { "type": "boolean" },
         "draft_relation_prebinding": { "type": "boolean" },
+        "multi_group_sense_bindings": { "type": "boolean" },
         "pronunciation_normalization_version": {
           "$ref": "#/$defs/PronunciationNormalizationVersionV3"
         },
@@ -867,7 +868,8 @@
         "shared_sentence",
         "publication_sense_ref",
         "draft_relation",
-        "phrase_component"
+        "phrase_component",
+        "form_group_sense_binding"
       ]
     },
     "InboundReferenceNodeTypeV3": {
@@ -891,6 +893,7 @@
         "entry_id": { "type": "string", "format": "uuid" },
         "entry_kind": { "$ref": "#/$defs/WordEntryKindV3" },
         "entry_status": { "$ref": "#/$defs/AdminWordStatus" },
+        "form_group_label": { "type": "string" },
         "node_id": { "type": "string", "format": "uuid" },
         "publication_id": { "type": "string", "format": "uuid" },
         "reference_kind": { "type": "string" },
@@ -2570,6 +2573,11 @@
         },
         "depends_on_context": { "type": "boolean" },
         "form_group_id": { "type": "string", "format": "uuid" },
+        "form_group_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "maxItems": 2000
+        },
         "frequency": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
         "level": { "type": "string" },

@@ -1,3 +1,4 @@
+import { boundFormGroupIds, setFormGroupBindings } from "./meaningsModel";
 import {
   RelationSortScope,
   RelationDeleteMenu
@@ -139,6 +140,7 @@ export interface V3MeaningsAndExamplesStepProps {
   /** 后端释义级成分用词能力（capabilities.sense_component_usages）；关闭时成分区块只读、不发送。 */
   componentUsagesEnabled?: boolean;
   textLinksEnabled?: boolean;
+  multiGroupBindingsEnabled?: boolean;
 }
 
 function fieldIssue(
@@ -185,13 +187,15 @@ export function SenseSectionTitle({
   count,
   unit,
   collapsed,
-  onToggle
+  onToggle,
+  extra
 }: {
   label: string;
   count: number;
   unit: string;
   collapsed: boolean;
   onToggle: () => void;
+  extra?: ReactNode;
 }) {
   return (
     <div
@@ -210,6 +214,7 @@ export function SenseSectionTitle({
     >
       <Typography.Text strong>{label}</Typography.Text>
       <div className="word-sense-section-title-actions">
+        {extra}
         <Tag>{`${count} ${unit}`}</Tag>
         <Button
           aria-label={`${collapsed ? "展开" : "收起"}${label}`}
@@ -2278,7 +2283,8 @@ function V3MeaningsAndExamplesStepContent({
   relationDisplaySnapshots,
   sentenceTargetDiscoveryEnabled = true,
   componentUsagesEnabled = false,
-  textLinksEnabled = false
+  textLinksEnabled = false,
+  multiGroupBindingsEnabled = false
 }: V3MeaningsAndExamplesStepProps) {
   const { modal } = App.useApp();
   const [expandedSenseByPos, setExpandedSenseByPos] = useState<
@@ -2591,6 +2597,18 @@ function V3MeaningsAndExamplesStepContent({
                             const formsPos = forms?.pos.find(
                               (item) => item.pos_id === pos.pos_id
                             );
+                            const isLastDedicatedBinding = Boolean(
+                              sense.form_group_id &&
+                              pos.senses.filter(
+                                (item) =>
+                                  item.form_group_id === sense.form_group_id
+                              ).length === 1 &&
+                              formsPos?.form_groups.some(
+                                (group) =>
+                                  group.id === sense.form_group_id &&
+                                  group.scope === "dedicated"
+                              )
+                            );
                             // 只列本词性的专用组。已绑定的组被删或改回通用时仍留一项，
                             // 让校验问题有落点，也让人看见并改掉。
                             const formGroupOptions = [
@@ -2602,17 +2620,31 @@ function V3MeaningsAndExamplesStepContent({
                                   value: group.id
                                 }))
                             ];
-                            if (
-                              sense.form_group_id &&
-                              !formGroupOptions.some(
-                                (option) => option.value === sense.form_group_id
-                              )
-                            ) {
-                              formGroupOptions.push({
-                                label: "已失效的变化组，请重新选择",
-                                value: sense.form_group_id
-                              });
+                            for (const groupId of boundFormGroupIds(sense)) {
+                              if (
+                                !formGroupOptions.some(
+                                  (option) => option.value === groupId
+                                )
+                              ) {
+                                formGroupOptions.push({
+                                  label: "已失效的变化组，请重新选择",
+                                  value: groupId
+                                });
+                              }
                             }
+                            const lastBindingIds = boundFormGroupIds(
+                              sense
+                            ).filter(
+                              (id) =>
+                                formsPos?.form_groups.some(
+                                  (group) =>
+                                    group.id === id &&
+                                    group.scope === "dedicated"
+                                ) &&
+                                pos.senses.filter((item) =>
+                                  boundFormGroupIds(item).includes(id)
+                                ).length === 1
+                            );
                             const catalogPos = catalogByCode.get(
                               formPosById.get(pos.pos_id) ?? ""
                             );
@@ -2667,9 +2699,12 @@ function V3MeaningsAndExamplesStepContent({
                                 }
                                 level={sense.level}
                                 nodeId={sense.id}
-                                referenceCount={senseReferenceCount(
-                                  referenceGuard.index,
-                                  sense.id
+                                referenceCount={Math.max(
+                                  senseReferenceCount(
+                                    referenceGuard.index,
+                                    sense.id
+                                  ),
+                                  boundFormGroupIds(sense).length
                                 )}
                                 onDelete={() =>
                                   change((draft) => {
@@ -2932,27 +2967,87 @@ function V3MeaningsAndExamplesStepContent({
                                         <Typography.Text type="secondary">
                                           词形与发音
                                         </Typography.Text>
-                                        <Select
-                                          aria-label={`释义 ${senseIndex + 1} 词形与发音`}
-                                          onChange={(nextValue: string) =>
-                                            change((draft) => {
-                                              const target =
-                                                draft.pos[posIndex]!.senses[
-                                                  senseIndex
-                                                ]!;
-                                              if (!nextValue)
-                                                delete target.form_group_id;
-                                              else
-                                                target.form_group_id =
-                                                  nextValue;
-                                            })
-                                          }
-                                          options={formGroupOptions}
-                                          status={
-                                            formGroupIssue ? "error" : undefined
-                                          }
-                                          value={sense.form_group_id ?? ""}
-                                        />
+                                        {multiGroupBindingsEnabled ? (
+                                          <Select
+                                            mode="multiple"
+                                            aria-label={`释义 ${senseIndex + 1} 词形与发音`}
+                                            placeholder="通用（默认）"
+                                            value={[
+                                              ...boundFormGroupIds(sense)
+                                            ]}
+                                            options={formGroupOptions
+                                              .filter((option) => option.value)
+                                              .map((option) => ({
+                                                ...option,
+                                                disabled:
+                                                  lastBindingIds.includes(
+                                                    option.value
+                                                  )
+                                              }))}
+                                            status={
+                                              formGroupIssue
+                                                ? "error"
+                                                : undefined
+                                            }
+                                            onChange={(ids: string[]) => {
+                                              if (
+                                                lastBindingIds.some(
+                                                  (id) => !ids.includes(id)
+                                                )
+                                              )
+                                                return;
+                                              change((draft) =>
+                                                setFormGroupBindings(
+                                                  draft.pos[posIndex]!.senses[
+                                                    senseIndex
+                                                  ]!,
+                                                  ids
+                                                )
+                                              );
+                                            }}
+                                          />
+                                        ) : (
+                                          <Select
+                                            aria-label={`释义 ${senseIndex + 1} 词形与发音`}
+                                            onChange={(nextValue: string) =>
+                                              change((draft) => {
+                                                const target =
+                                                  draft.pos[posIndex]!.senses[
+                                                    senseIndex
+                                                  ]!;
+                                                if (!nextValue)
+                                                  delete target.form_group_id;
+                                                else
+                                                  target.form_group_id =
+                                                    nextValue;
+                                              })
+                                            }
+                                            options={formGroupOptions.map(
+                                              (option) => ({
+                                                ...option,
+                                                disabled:
+                                                  isLastDedicatedBinding &&
+                                                  option.value !==
+                                                    sense.form_group_id
+                                              })
+                                            )}
+                                            status={
+                                              formGroupIssue
+                                                ? "error"
+                                                : undefined
+                                            }
+                                            value={sense.form_group_id ?? ""}
+                                          />
+                                        )}
+                                        {(
+                                          multiGroupBindingsEnabled
+                                            ? lastBindingIds.length > 0
+                                            : isLastDedicatedBinding
+                                        ) ? (
+                                          <Typography.Text type="secondary">
+                                            这是专用组最后一个词义；解除限制请在词形组的“专用词义”中恢复适用全部词义。
+                                          </Typography.Text>
+                                        ) : null}
                                         <FieldIssueHelp
                                           issue={formGroupIssue}
                                         />
@@ -2968,6 +3063,12 @@ function V3MeaningsAndExamplesStepContent({
                                     <SenseSectionTitle
                                       collapsed={definitionsCollapsed}
                                       count={sense.definitions.length}
+                                      extra={
+                                        <V3ReferenceBadge
+                                          label="绑定"
+                                          nodeIds={[sense.id]}
+                                        />
+                                      }
                                       label="多维释义"
                                       onToggle={() =>
                                         toggleSenseSection(
