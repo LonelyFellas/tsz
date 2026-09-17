@@ -14,8 +14,8 @@ case "$deploy_voice_editor" in
   *) echo "!! DEPLOY_VOICE_EDITOR 必须为 true 或 false" >&2; exit 1 ;;
 esac
 
-# 新合成字段先以兼容 reader 发布，配套后端就绪后显式打开 writer。
-deploy_azure_pronunciation_inputs="${DEPLOY_AZURE_PRONUNCIATION_INPUTS:-false}"
+# 配套后端已上线，默认启用独立合成输入；兼容发布仍可显式关闭。
+deploy_azure_pronunciation_inputs="${DEPLOY_AZURE_PRONUNCIATION_INPUTS:-true}"
 case "$deploy_azure_pronunciation_inputs" in
   true|false) ;;
   *) echo "!! DEPLOY_AZURE_PRONUNCIATION_INPUTS 必须为 true 或 false" >&2; exit 1 ;;
