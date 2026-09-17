@@ -66,15 +66,6 @@
   gap: 8px;
 }
 
-.v3-form-group-heading .ant-tag {
-  margin-inline-end: 0;
-}
-
-.v3-form-group-status {
-  color: #dbeafe;
-  font-size: 12px;
-}
-
 .v3-form-group-menu.ant-btn {
   color: #fff;
 }
@@ -334,33 +325,6 @@
   .v3-membership-actions {
     justify-content: flex-start;
   }
-}
-
-.v3-group-sense-summary {
-  padding: 16px;
-  border-bottom: 1px solid #e5e7eb;
-  background: #f8faff;
-}
-
-.v3-group-sense-summary ul {
-  display: grid;
-  gap: 8px;
-  margin: 8px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.v3-group-sense-summary li {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  line-height: 1.6;
-}
-
-.v3-group-sense-number {
-  flex: none;
-  color: #667085;
-  font-variant-numeric: tabular-nums;
 }
 
 .v3-group-sense-editor > .ant-flex:first-child {

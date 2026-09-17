@@ -36,7 +36,7 @@ import {
   type V3StableVariantIdFactory
 } from "../operations";
 import { V3FormGroupSenseEditor } from "./V3FormGroupSenseEditor";
-import { countFormGroupBindings, definitionSummary } from "../meaningsModel";
+import { countFormGroupBindings } from "../meaningsModel";
 import { V3PosTab } from "./V3PosTab";
 import { V3DisabledReason } from "./V3DisabledReason";
 import { V3ReferenceBadge } from "./V3ReferenceBadge";
@@ -165,8 +165,6 @@ export function V3FormsAndPronunciationStep({
       meanings?.pos.find((item) => item.pos_id === pos.pos_id)?.senses ?? [];
     const editing =
       bindingGroup?.posId === pos.pos_id && bindingGroup.groupId === group.id;
-    const groupNumber =
-      pos.form_groups.findIndex((item) => item.id === group.id) + 1;
     if (editing && bindingEditingAvailable)
       return (
         <V3FormGroupSenseEditor
@@ -192,34 +190,7 @@ export function V3FormsAndPronunciationStep({
           }
         />
       );
-    if (group.scope !== "dedicated") return null;
-    const bound = senses.filter((sense) =>
-      boundFormGroupIds(sense).includes(group.id)
-    );
-    return (
-      <section
-        className="v3-group-sense-summary"
-        aria-label={`第 ${groupNumber} 组适用词义`}
-      >
-        <Typography.Text strong>适用词义</Typography.Text>
-        {bound.length ? (
-          <ul>
-            {bound.map((sense) => (
-              <li key={sense.id}>
-                <span className="v3-group-sense-number">
-                  {senses.findIndex((item) => item.id === sense.id) + 1}.
-                </span>
-                <span>{definitionSummary(sense)}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <Typography.Text type="warning">
-            尚未选择适用词义，请补充。
-          </Typography.Text>
-        )}
-      </section>
-    );
+    return null;
   };
 
   const displayState = useFormDisplayState();

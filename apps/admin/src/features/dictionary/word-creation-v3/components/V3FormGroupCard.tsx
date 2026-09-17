@@ -22,7 +22,6 @@ import {
   Popconfirm,
   Popover,
   Radio,
-  Tag,
   Typography
 } from "antd";
 import type {
@@ -417,6 +416,7 @@ export function V3FormGroupCard({
     : undefined;
 
   const bodyId = `v3-form-group-${group.id}-body`;
+  const hasBoundSenses = group.scope === "dedicated" && boundSenseCount > 0;
 
   return (
     <Card
@@ -425,15 +425,7 @@ export function V3FormGroupCard({
       data-v3-node-id={group.id}
       size="small"
       title={
-        <span className="v3-form-group-heading">
-          <span>{`第 ${groupIndex + 1} 组 词形变化`}</span>
-          {group.scope === "dedicated" ? <Tag color="blue">专用</Tag> : null}
-          {collapsed && group.scope === "dedicated" ? (
-            <span className="v3-form-group-status">
-              {boundSenseCount} 个词义
-            </span>
-          ) : null}
-        </span>
+        <span className="v3-form-group-heading">{`第 ${groupIndex + 1} 组 词形变化`}</span>
       }
       extra={
         <Flex
@@ -458,12 +450,15 @@ export function V3FormGroupCard({
               content={editingSenses ? senseScope : <span />}
             >
               <Button
-                ghost
+                type={hasBoundSenses ? "primary" : "default"}
+                ghost={!hasBoundSenses}
                 size="small"
                 aria-label={`第 ${groupIndex + 1} 组专用词义`}
                 aria-expanded={editingSenses}
               >
-                专用词义
+                {hasBoundSenses
+                  ? `专用词义 · ${boundSenseCount}`
+                  : "设置专用词义"}
               </Button>
             </Popover>
           ) : null}
@@ -472,7 +467,7 @@ export function V3FormGroupCard({
             size="small"
             className="v3-form-group-menu word-form-card-toggle-state"
             aria-label={`${collapsed ? "展开" : "收起"}第 ${groupIndex + 1} 组词形变化`}
-            aria-controls={senseScope ? `${bodyId} ${bodyId}-senses` : bodyId}
+            aria-controls={bodyId}
             aria-expanded={!collapsed}
             onClick={() => setCollapsed((value) => !value)}
           >
@@ -532,11 +527,6 @@ export function V3FormGroupCard({
         </Flex>
       }
     >
-      {senseScope && !editingSenses ? (
-        <div id={`${bodyId}-senses`} hidden={collapsed}>
-          {senseScope}
-        </div>
-      ) : null}
       {!collapsed ? (
         <Flex id={bodyId} vertical>
           <div className="word-form-rules">

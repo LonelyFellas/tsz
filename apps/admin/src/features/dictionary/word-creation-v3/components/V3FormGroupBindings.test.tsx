@@ -98,7 +98,8 @@ describe("词形组的专用词义交互", () => {
     expect(screen.queryByText("通用", { exact: true })).not.toBeInTheDocument();
     const headerEntry = await screen.findByLabelText("第 1 组专用词义");
     expect(headerEntry.closest(".ant-card-head")).not.toBeNull();
-    expect(headerEntry).toHaveTextContent("专用词义");
+    expect(headerEntry).toHaveTextContent("设置专用词义");
+    expect(screen.queryByText("专用", { exact: true })).not.toBeInTheDocument();
     expect(screen.queryByText("限定适用词义")).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
     fireEvent.click(headerEntry);
@@ -134,13 +135,12 @@ describe("词形组的专用词义交互", () => {
     }
     fireEvent.click(within(dialog).getByText("确认选择").closest("button")!);
     expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("dedicated");
+    expect(headerEntry).toHaveTextContent("专用词义 · 2");
+    expect(screen.queryByText("专用", { exact: true })).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
-    expect(screen.getByLabelText("第 1 组适用词义")).toBeVisible();
-    const summary = screen.getByLabelText("第 1 组适用词义");
-    expect(within(summary).getByText("本词性释义1")).toBeVisible();
-    expect(within(summary).getByText("本词性释义2")).toBeVisible();
+    expect(screen.queryByLabelText("第 1 组适用词义")).not.toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("收起第 1 组词形变化"));
-    expect(screen.getByText("2 个词义")).toBeVisible();
+    expect(headerEntry).toHaveTextContent("专用词义 · 2");
     fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
     const stored = JSON.parse(
       screen.getByTestId("binding-meanings").textContent!
@@ -173,7 +173,7 @@ describe("词形组的专用词义交互", () => {
         .getByText(/^取\s*消$/)
         .closest("button")!
     );
-    expect(screen.getByLabelText("第 1 组适用词义")).toBeVisible();
+    expect(screen.queryByLabelText("第 1 组适用词义")).not.toBeInTheDocument();
     await waitFor(() =>
       expect(
         screen.queryByLabelText("第 1 组适用词义编辑")
