@@ -47,7 +47,6 @@ import {
 } from "../referenceGuardContext";
 import { V3AddBasicPosSelect } from "./V3AddBasicPosSelect";
 import { partOfSpeechLabel } from "../presentation";
-import { useFormDisplayState } from "../formDisplayState";
 import { countV3PosFormIncomplete } from "../posCompletion";
 import {
   PronunciationPreviewProvider,
@@ -193,7 +192,6 @@ export function V3FormsAndPronunciationStep({
     return null;
   };
 
-  const displayState = useFormDisplayState();
   const [catalog, setCatalog] = useState<{
     data?: PartOfSpeechCatalogResponse;
     isError: boolean;
@@ -328,12 +326,7 @@ export function V3FormsAndPronunciationStep({
                   />
                   <strong>{label}</strong>
                   <Badge
-                    count={countV3PosFormIncomplete(
-                      pos,
-                      catalog.data?.items.find((item) => item.code === pos.pos)
-                        ?.allowed_form_types,
-                      displayState?.removedFormTypes
-                    )}
+                    count={countV3PosFormIncomplete(pos)}
                     size="small"
                     title="该词性未填项"
                   />

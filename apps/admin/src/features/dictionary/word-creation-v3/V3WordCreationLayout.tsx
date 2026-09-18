@@ -17,7 +17,6 @@ import type { V3Problem } from "./problem";
 import { buildV3ProductProgress, v3ProductProgressBadge } from "./readiness";
 import { v3IssueMessages } from "./presentationErrors";
 import "./v3-layout.css";
-import { V3FormDisplayProvider, useFormDisplayState } from "./formDisplayState";
 
 const STEP_TITLE: Record<WordCreationStep, string> = {
   basics: "基础信息",
@@ -199,7 +198,6 @@ function V3WordCreationLayoutContent({
             !/^未命名词条(?:\s*·.*)?$/u.test(surface.trim())
         ) ?? "新词条"));
   const progressRows = buildV3ProductProgress({
-    removedFormTypes: useFormDisplayState()?.removedFormTypes,
     wordId: word.id,
     language: word.language,
     partOfSpeechCatalog,
@@ -392,9 +390,5 @@ function V3WordCreationLayoutContent({
 }
 
 export function V3WordCreationLayout(props: Props) {
-  return (
-    <V3FormDisplayProvider key={props.word.id}>
-      <V3WordCreationLayoutContent {...props} />
-    </V3FormDisplayProvider>
-  );
+  return <V3WordCreationLayoutContent key={props.word.id} {...props} />;
 }

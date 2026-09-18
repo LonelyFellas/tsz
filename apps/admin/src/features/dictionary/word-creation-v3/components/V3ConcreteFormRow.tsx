@@ -159,7 +159,18 @@ function V3ConcreteFormTypeCell({
           <div className="word-form-type-select">
             <Select
               aria-label={formTypeAriaLabel}
+              classNames={{ popup: { root: "v3-form-type-popup" } }}
               disabled={formTypeDisabled}
+              popupMatchSelectWidth={240}
+              styles={{
+                content: {
+                  whiteSpace: "normal",
+                  overflowWrap: "anywhere",
+                  textOverflow: "clip"
+                },
+                popup: { root: { maxWidth: "calc(100vw - 32px)" } }
+              }}
+              virtual={false}
               onChange={(formType) =>
                 onChange(updateConcreteFormType(content, form.id, formType))
               }
