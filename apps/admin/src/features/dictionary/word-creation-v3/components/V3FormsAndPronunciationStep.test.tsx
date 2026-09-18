@@ -28,10 +28,6 @@ import {
   uuidFromInt,
   uuidSequence
 } from "../fixtures";
-import {
-  V3FormDisplayProvider,
-  useFormDisplayState
-} from "../formDisplayState";
 import { buildV3ProductProgress } from "../readiness";
 import { validateFormsContent } from "../model";
 import { partOfSpeechCatalogFixture } from "../../word-creation/partOfSpeech.test.helper";
@@ -201,17 +197,19 @@ function multiPosFixture(): DraftFormsStepContentV3 {
 }
 
 function ProgressCount({ value }: { value: DraftFormsStepContentV3 }) {
-  const state = useFormDisplayState();
   const rows = buildV3ProductProgress({
     wordId: "test",
     language: "en",
     completedSteps: [],
     forms: value,
     meanings: { sense_groups: [], pos: [] },
-    partOfSpeechCatalog: catalogState.data?.items,
-    removedFormTypes: state?.removedFormTypes
+    partOfSpeechCatalog: catalogState.data?.items
   });
-  return <output data-testid="progress-count">{rows[2]!.count}</output>;
+  return (
+    <output data-testid="progress-count" data-completed={rows[2]!.completed}>
+      {rows[2]!.count}
+    </output>
+  );
 }
 
 function Harness({
@@ -225,18 +223,16 @@ function Harness({
 }) {
   const [value, setValue] = useState(initial);
   return (
-    <V3FormDisplayProvider>
-      <AntApp>
-        <V3FormsAndPronunciationStep
-          value={value}
-          onChange={setValue}
-          issues={issues}
-          idFactory={idFactory}
-        />
-        <output data-testid="canonical-value">{JSON.stringify(value)}</output>
-        <ProgressCount value={value} />
-      </AntApp>
-    </V3FormDisplayProvider>
+    <AntApp>
+      <V3FormsAndPronunciationStep
+        value={value}
+        onChange={setValue}
+        issues={issues}
+        idFactory={idFactory}
+      />
+      <output data-testid="canonical-value">{JSON.stringify(value)}</output>
+      <ProgressCount value={value} />
+    </AntApp>
   );
 }
 
@@ -525,26 +521,27 @@ describe("V3FormsAndPronunciationStep", () => {
     });
   });
 
-  it("默认展示目录中的变化类型，空行不入草稿且可手动移除", async () => {
+  it("已有词条只展示实际草稿，目录加载和编辑不补缺失类型", async () => {
     const initial = formsFixture({
       forms: [commonFormFixture({ spelling: "cat" })]
     });
     render(<Harness initial={initial} />);
-    expect(await screen.findByLabelText("复数英美通用拼写")).toHaveValue("");
-    expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled();
+    await waitFor(() =>
+      expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
+    );
+    expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
     expect(canonicalValue()).toEqual(initial);
-    expect(screen.getByTestId("progress-count")).toHaveTextContent("2");
-    expect(screen.getByTitle("该词性未填项")).toHaveTextContent("1");
+    expect(screen.getByTestId("progress-count")).toHaveTextContent("1");
     fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "dog" }
     });
     expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
-    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
     expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
     expect(screen.getByTestId("progress-count")).toHaveTextContent("1");
-    expect(screen.getByTitle("该词性未填项")).toHaveAttribute(
-      "data-show",
-      "false"
+    expect(screen.queryByTitle("该词性未填项")).toBeNull();
+    expect(screen.getByTestId("progress-count")).toHaveAttribute(
+      "data-completed",
+      "true"
     );
     fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "bird" }
@@ -553,9 +550,16 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
   });
 
-  it("默认空行支持移动和在下方添加同类型词形", async () => {
+  it("实际模板空行支持移动和在下方添加同类型词形", async () => {
     const initial = formsFixture({
-      forms: [commonFormFixture({ spelling: "cat" })]
+      forms: [
+        commonFormFixture({ spelling: "cat" }),
+        commonFormFixture({
+          id: uuidFromInt(901),
+          form_type: "plural",
+          spelling: ""
+        })
+      ]
     });
     render(<Harness initial={initial} />);
     await screen.findByLabelText("复数英美通用拼写");
@@ -563,7 +567,11 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       screen.getByLabelText("变化组 1 词形 1 类型").closest(".ant-select")
     ).toHaveTextContent("复数");
-    expect(canonicalValue()).toEqual(initial);
+    expect(
+      canonicalValue().pos[0]!.form_groups[0]!.members.map(
+        (member) => member.form_id
+      )
+    ).toEqual([...initial.pos[0]!.forms].reverse().map((form) => form.id));
     fireEvent.click(screen.getByLabelText("下移变化组 1 的词形 1"));
     expect(
       screen.getByLabelText("变化组 1 词形 2 类型").closest(".ant-select")
@@ -577,27 +585,43 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toEqual(["base", "plural", "plural"]);
   });
 
-  it("填写默认变化行后保留输入与节点，其他空行不入草稿", async () => {
-    const initial = formsFixture({
-      forms: [commonFormFixture({ spelling: "fast" })]
-    });
-    initial.pos[0]!.pos = "adjective";
-    render(<Harness initial={initial} />);
-    const comparative = await screen.findByLabelText("比较级英美通用拼写");
-    expect(screen.getByLabelText("最高级英美通用拼写")).toHaveValue("");
-    fireEvent.change(comparative, { target: { value: "faster" } });
-    expect(screen.getByLabelText("比较级英美通用拼写")).toBe(comparative);
-    const forms = canonicalValue().pos[0]!.forms;
-    expect(forms.map((form) => form.form_type)).toEqual([
-      "base",
-      "comparative"
-    ]);
-    expect(screen.getByLabelText("比较级英美通用拼写")).toHaveValue("faster");
-    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
-    fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
-    expect(screen.queryByLabelText("比较级英美通用拼写")).toBeNull();
-    expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
-  });
+  it.each(["", "cats"])(
+    "删除实际词形 %j 后序列化草稿并重建全部 Provider 不回补",
+    async (spelling) => {
+      const initial = formsFixture({
+        forms: [
+          commonFormFixture({ spelling: "cat" }),
+          commonFormFixture({
+            id: uuidFromInt(901),
+            form_type: "plural",
+            spelling
+          })
+        ]
+      });
+      const view = render(<Harness initial={initial} />);
+      await screen.findByLabelText("复数英美通用拼写");
+      fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
+      fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
+      const persisted = canonicalValue();
+      expect(persisted.pos[0]!.forms).toEqual([initial.pos[0]!.forms[0]]);
+      expect(persisted.pos[0]!.form_groups[0]!.members).toEqual([
+        initial.pos[0]!.form_groups[0]!.members[0]
+      ]);
+      view.unmount();
+      render(<Harness initial={JSON.parse(JSON.stringify(persisted))} />);
+      await waitFor(() =>
+        expect(screen.getByLabelText("添加基本词性")).not.toBeDisabled()
+      );
+      expect(screen.queryByLabelText("复数英美通用拼写")).toBeNull();
+      expect(canonicalValue()).toEqual(persisted);
+      expect(screen.getByTestId("progress-count")).toHaveTextContent("1");
+      expect(screen.queryByTitle("该词性未填项")).toBeNull();
+      expect(screen.getByTestId("progress-count")).toHaveAttribute(
+        "data-completed",
+        "true"
+      );
+    }
+  );
 
   it("使用 V2 Step 2 的标题、词性页签与英美词形矩阵结构", async () => {
     const regional = ukUsFormFixture({
@@ -697,7 +721,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(
       screen.getByLabelText("变化组 1 词形 2 类型").closest(".ant-select")
     ).toHaveTextContent("原形");
-    expect(matrices[1]!.querySelectorAll(".v3-membership-row")).toHaveLength(2);
+    expect(matrices[1]!.querySelectorAll(".v3-membership-row")).toHaveLength(1);
     expect(canonicalValue()).toEqual(content);
   });
 
@@ -742,7 +766,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.getByText("美式英语 · AmE")).toBeVisible();
     expect(
       container.querySelectorAll(".word-pronunciation-editor")
-    ).toHaveLength(4);
+    ).toHaveLength(2);
 
     fireEvent.change(screen.getByLabelText("原形英美通用拼写"), {
       target: { value: "harbour" }
@@ -854,11 +878,7 @@ describe("V3FormsAndPronunciationStep", () => {
       screen
         .getAllByLabelText(/下方添加同类型词形/)
         .map((button) => button.getAttribute("aria-label"))
-    ).toEqual([
-      "在原形 1 下方添加同类型词形",
-      "在原形 2 下方添加同类型词形",
-      "在复数 1 下方添加同类型词形"
-    ]);
+    ).toEqual(["在原形 1 下方添加同类型词形", "在原形 2 下方添加同类型词形"]);
   });
 
   it("方言独立矩阵 CSS 固定宽屏留白/圆角并在窄屏按 V2 双行堆叠", () => {
@@ -867,7 +887,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(formsCss).toContain(".v3-dialect-separated-matrix {");
     expect(formsCss).toContain(
-      "grid-template-columns: 112px repeat(2, minmax(0, 1fr));"
+      "grid-template-columns: 144px repeat(2, minmax(0, 1fr));"
     );
     expect(formsCss).toContain("column-gap: 12px;");
     expect(formsCss).toMatch(
@@ -1267,7 +1287,7 @@ describe("V3FormsAndPronunciationStep", () => {
     }
     expect(
       container.querySelectorAll(".word-form-group-card .v3-concrete-form-row")
-    ).toHaveLength(5);
+    ).toHaveLength(3);
     expect(await screen.findByText("名词")).toBeInTheDocument();
     expect(screen.getByText("动词")).toBeInTheDocument();
 
@@ -1677,6 +1697,56 @@ describe("V3FormsAndPronunciationStep", () => {
     field!.focus();
     expect(document.activeElement).toBe(field);
   });
+
+  it.each(["unified", "distinguish"] as const)(
+    "合法空组显式添加原形，保留组 ID、范围和 %s 规则且不补模板",
+    (mode) => {
+      const content = formsFixture();
+      const emptyGroup: WordFormGroupV3 = {
+        ...generalGroup(uuidFromInt(970), []),
+        is_regular: false,
+        scope: "dedicated",
+        dialect_rules: { spelling_mode: mode, phonetic_mode: mode }
+      };
+      content.pos[0]!.form_groups.push(emptyGroup);
+      const onChange = vi.fn();
+      render(
+        <V3FormGroupCard
+          content={content}
+          group={emptyGroup}
+          groupIndex={1}
+          pos={content.pos[0]!}
+          posCatalog={partOfSpeechCatalogFixture.items.find(
+            (item) => item.code === "noun"
+          )}
+          issues={[]}
+          membershipCounts={new Map()}
+          idFactory={uuidSequence(
+            ...Array.from({ length: 6 }, (_, index) => uuidFromInt(980 + index))
+          )}
+          onChange={onChange}
+        />
+      );
+      expect(onChange).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: /添加原形/ }));
+      expect(onChange).toHaveBeenCalledTimes(1);
+      const next: DraftFormsStepContentV3 = onChange.mock.calls[0]![0];
+      const pos = next.pos[0]!;
+      expect(pos.forms).toHaveLength(2);
+      expect(pos.forms[0]).toEqual(content.pos[0]!.forms[0]);
+      expect(pos.form_groups[0]).toEqual(content.pos[0]!.form_groups[0]);
+      const added = pos.forms[1]!;
+      expect(added.form_type).toBe("base");
+      expect(added.regional_variants.mode).toBe(
+        mode === "unified" ? "common" : "uk_us"
+      );
+      expect(pos.form_groups[1]).toEqual({
+        ...emptyGroup,
+        members: [{ id: expect.any(String), form_id: added.id }]
+      });
+      expect(emptyGroup.members).toEqual([]);
+    }
+  );
 
   it("覆盖默认受控参数、无变化组与空组/缺失 form 的草稿分支", () => {
     const onChange = vi.fn();
@@ -2789,18 +2859,14 @@ describe("V3FormsAndPronunciationStep", () => {
     function ScopeHarness({ counts }: { counts: ReadonlyMap<string, number> }) {
       const [value, setValue] = useState(initial);
       return (
-        <V3FormDisplayProvider>
-          <AntApp>
-            <V3FormsAndPronunciationStep
-              formGroupBindingCounts={counts}
-              onChange={setValue}
-              value={value}
-            />
-            <output data-testid="canonical-value">
-              {JSON.stringify(value)}
-            </output>
-          </AntApp>
-        </V3FormDisplayProvider>
+        <AntApp>
+          <V3FormsAndPronunciationStep
+            formGroupBindingCounts={counts}
+            onChange={setValue}
+            value={value}
+          />
+          <output data-testid="canonical-value">{JSON.stringify(value)}</output>
+        </AntApp>
       );
     }
     const { container, rerender } = render(<ScopeHarness counts={new Map()} />);
@@ -3249,6 +3315,82 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toBeDisabled();
   });
 });
+
+it.each([false, true])(
+  "词形选择完整显示长标签，popup 独立宽度并可换行（英美分栏：%s）",
+  async (separated) => {
+    const labels = [
+      "原形所有格",
+      "复数所有格",
+      "需要完整展示的自定义超长词形类型"
+    ];
+    const items = labels.map((label, index) => ({
+      id: uuidFromInt(950 + index),
+      code: `custom_${index}`,
+      name_zh: label,
+      short_name_zh: label,
+      name_en: label,
+      full_name_en: label,
+      abbreviation: label,
+      sort_order: index
+    }));
+    catalogState.data = structuredClone(partOfSpeechCatalogFixture);
+    catalogState.data.items[0]!.allowed_form_types = items.map(
+      (item) => item.code
+    );
+    const initial = formsFixture({
+      forms: [
+        separated ? ukUsFormFixture() : commonFormFixture(),
+        ...items.map((item, index) =>
+          separated
+            ? ukUsFormFixture({
+                id: uuidFromInt(960 + index),
+                form_type: item.code
+              })
+            : commonFormFixture({
+                id: uuidFromInt(960 + index),
+                form_type: item.code
+              })
+        )
+      ]
+    });
+    render(
+      <FormTypeLabelsProvider items={items}>
+        <Harness initial={initial} />
+      </FormTypeLabelsProvider>
+    );
+    await waitFor(() =>
+      expect(screen.getByLabelText("变化组 1 词形 2 类型")).not.toBeDisabled()
+    );
+    for (const [index, label] of labels.entries()) {
+      const select = screen
+        .getByLabelText(`变化组 1 词形 ${index + 2} 类型`)
+        .closest(".ant-select")!;
+      expect(select.querySelector(".ant-select-content")).toHaveTextContent(
+        label
+      );
+      expect(select.querySelector(".ant-select-content")).toHaveStyle({
+        whiteSpace: "normal",
+        overflowWrap: "anywhere",
+        textOverflow: "clip"
+      });
+    }
+    fireEvent.mouseDown(screen.getByLabelText("变化组 1 词形 2 类型"));
+    const popup = await waitFor(() => {
+      const element = document.querySelector(".v3-form-type-popup");
+      expect(element).not.toBeNull();
+      return element!;
+    });
+    expect(popup).toHaveStyle({ width: "240px" });
+    expect((popup as HTMLElement).style.maxWidth).toBe("calc(100vw - 32px)");
+    expect(popup).not.toHaveClass("ant-select-dropdown-hidden");
+    for (const label of labels)
+      expect(within(popup as HTMLElement).getByText(label)).toBeInTheDocument();
+    expect(formsCss).toMatch(
+      /\.v3-form-type-popup \.ant-select-item-option-content\s*\{[^}]*white-space: normal;[^}]*overflow-wrap: anywhere;/
+    );
+  }
+);
 
 it("目录自定义词形可展示，改名后保留词形编码", async () => {
   const custom = commonFormFixture({

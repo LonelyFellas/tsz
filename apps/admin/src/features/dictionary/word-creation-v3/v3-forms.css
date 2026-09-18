@@ -88,9 +88,8 @@
 
 .v3-dialect-separated-matrix {
   display: grid;
-  /* 类型列只放一个下拉和四个图标，142px 里大半是空的；两栏之间也不需要 28px。
-     省下来的宽度全给发音栏，那里挤得多。 */
-  grid-template-columns: 112px repeat(2, minmax(0, 1fr));
+  /* 常见词形名完整显示；更长的目录标签在下拉内换行。 */
+  grid-template-columns: 144px repeat(2, minmax(0, 1fr));
   column-gap: 12px;
   align-items: stretch;
   margin: 16px;
@@ -110,7 +109,7 @@
    word-form-matrix 网格，这里把 V2 基础样式给类型列的灰底/边框一并剥掉，
    并把列宽、列距、外边距对齐到 .v3-dialect-separated-matrix。 */
 .v3-concrete-form-row .word-form-matrix-unified {
-  grid-template-columns: 112px minmax(620px, 1fr);
+  grid-template-columns: 144px minmax(620px, 1fr);
   column-gap: 12px;
   margin-inline: 16px;
 }
@@ -224,6 +223,13 @@
 
 .word-form-type-select {
   width: 100%;
+}
+
+/* popup 挂在 body 下，不受矩阵类型列宽度约束。 */
+.v3-form-type-popup .ant-select-item-option-content {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
 }
 
 .v3-membership-actions {

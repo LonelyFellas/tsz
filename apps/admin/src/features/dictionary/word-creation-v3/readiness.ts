@@ -13,7 +13,6 @@ import {
 } from "./issueNavigation";
 
 import { isV3FormComplete } from "./posCompletion";
-import type { RemovedFormTypes } from "./formDisplayState";
 import { CEFR_OPTIONS } from "../labels";
 import { definitionSummary } from "./meaningsModel";
 import { languageSummary, partOfSpeechLabel } from "./presentation";
@@ -72,7 +71,6 @@ export interface V3ProductProgressRow {
 }
 
 export interface V3ProductProgressInput {
-  removedFormTypes?: RemovedFormTypes;
   wordId: string;
   language: string;
   partOfSpeechCatalog?: readonly PartOfSpeechCatalogItem[];
@@ -146,7 +144,6 @@ export function v3ProductProgressBadge(
 
 export function buildV3ProductProgress({
   language,
-  removedFormTypes = {},
   partOfSpeechCatalog = [],
   dirtySteps = { forms: false, meanings: false },
   completedSteps,
@@ -159,28 +156,11 @@ export function buildV3ProductProgress({
   const formCounts = new Map(
     forms.pos.map((pos) => {
       const identities = new Set(pos.forms.map(formIdentity));
-      const allowed =
-        partOfSpeechCatalog.find((item) => item.code === pos.pos)
-          ?.allowed_form_types ?? [];
-      for (const group of pos.form_groups) {
-        const present = new Set(
-          group.members.map(
-            (member) =>
-              pos.forms.find((form) => form.id === member.form_id)?.form_type
-          )
-        );
-        for (const type of allowed) {
-          if (
-            type !== "base" &&
-            !present.has(type) &&
-            !removedFormTypes[group.id]?.includes(type)
-          ) {
-            identities.add(`empty:${pos.pos_id}:${group.id}:${type}`);
-            allFormsComplete = false;
-          }
-        }
-      }
-      if (!pos.forms.length || !pos.forms.every(isV3FormComplete))
+      if (
+        !pos.forms.length ||
+        !pos.forms.every(isV3FormComplete) ||
+        pos.form_groups.some((group) => group.members.length === 0)
+      )
         allFormsComplete = false;
       for (const identity of identities) allIdentities.add(identity);
       return [pos.pos_id, identities.size] as const;
