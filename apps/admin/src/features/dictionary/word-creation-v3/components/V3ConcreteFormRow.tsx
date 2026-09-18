@@ -258,6 +258,7 @@ function V3DialectFormCell({
   const conflictLiteralList = conflictLiterals(
     spellingConflictReferences(
       referenceGuard.index,
+      form,
       [variant.id],
       variant.spelling
     )
@@ -365,6 +366,7 @@ export function V3ConcreteFormRow({
     ? conflictLiterals(
         spellingConflictReferences(
           referenceGuard.index,
+          form,
           unifiedSpellingVariantIds,
           unifiedSpellingVariants.uk.spelling
         )
@@ -382,6 +384,7 @@ export function V3ConcreteFormRow({
     ? conflictLiterals(
         spellingConflictReferences(
           referenceGuard.index,
+          form,
           [commonVariant.id],
           commonVariant.spelling
         )

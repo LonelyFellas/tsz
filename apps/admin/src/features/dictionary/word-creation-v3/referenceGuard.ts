@@ -144,6 +144,15 @@ export function variantIdsOf(form: WordConcreteFormV3): string[] {
     : [form.regional_variants.uk.id, form.regional_variants.us.id];
 }
 
+/** 词形当前全部变体拼写的归一形式；结构漂移后判定「与任何一侧都对不上」用。 */
+function variantSpellings(form: WordConcreteFormV3): string[] {
+  const variants =
+    form.regional_variants.mode === "common"
+      ? [form.regional_variants.common]
+      : [form.regional_variants.uk, form.regional_variants.us];
+  return variants.map((variant) => normalizeSpelling(variant.spelling));
+}
+
 /** 词形本身加它的变体：删词形、改词形类型都按这一组节点判定。 */
 export function formNodeIds(form: WordConcreteFormV3): string[] {
   return [form.id, ...variantIdsOf(form)];
@@ -251,19 +260,40 @@ export function normalizeSpelling(value: string): string {
 /**
  * 变体拼写与多维例句标注片段规范化后是否对不上（Q2）。短语成分不比对拼写文案，
  * 只有例句标注会因拼写改动失效。
+ *
+ * 关联分两档：
+ * - 引用记的变体实例 id 仍是本格的 id → 按原语义直接判定；
+ * - 实例 id 已因 common ↔ uk_us 结构漂移被换掉（不再是本形任何一侧的 id）→ 只有片段与
+ *   该词形**任何一侧**的拼写都对不上才报冲突。后端 `shared_target_matches` 对 common 引用
+ *   是「任一侧拼写匹配即成立」，所以在另一侧硬比会误报；拿不准时宁可不报，保存仍有后端 409 兜底。
  */
 export function spellingConflictReferences(
   index: V3ReferenceIndex,
+  form: WordConcreteFormV3,
   variantIds: readonly string[],
   spelling: string
 ): InboundReferenceV3[] {
   const normalized = normalizeSpelling(spelling);
-  return referencesForNodes(index, variantIds).filter((reference) => {
-    if (reference.kind !== "shared_sentence") return false;
-    if (!variantIds.includes(reference.target.variant_id ?? "")) return false;
-    const literal = segmentLiteral(reference);
-    return literal !== undefined && normalizeSpelling(literal) !== normalized;
-  });
+  const formSpellings = variantSpellings(form);
+  const formVariantIds = variantIdsOf(form);
+  return referencesForNodes(index, [form.id, ...variantIds]).filter(
+    (reference) => {
+      if (reference.kind !== "shared_sentence") return false;
+      if (reference.target.form_id && reference.target.form_id !== form.id)
+        return false;
+      const literal = segmentLiteral(reference);
+      if (literal === undefined) return false;
+      const normalizedLiteral = normalizeSpelling(literal);
+      if (normalizedLiteral === normalized) return false;
+      const referenceVariantId = reference.target.variant_id ?? "";
+      // 本格命中：按原语义直接判定。
+      if (variantIds.includes(referenceVariantId)) return true;
+      // 命中的是同词形另一侧：由那一格负责，不在本格重复报。
+      if (formVariantIds.includes(referenceVariantId)) return false;
+      // 实例 id 已因结构漂移被换掉：只有片段与该词形任何一侧都对不上才报。
+      return !formSpellings.includes(normalizedLiteral);
+    }
+  );
 }
 
 export function spellingConflicts(
@@ -280,6 +310,7 @@ export function spellingConflicts(
       for (const variant of variants) {
         const references = spellingConflictReferences(
           index,
+          form,
           [variant.id],
           variant.spelling
         );
