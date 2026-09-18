@@ -487,8 +487,10 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
   });
 
   it("generated runtime closure 固定无主词、平级 concrete forms 与 common xor uk_us", () => {
+    // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
+    // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "c37bf1b88d6e2749a1f69b202e421d9984206f0b4db8e42269e77cf1abdf9134"
+      "f94e6c5bf41701e8a2af2ac74017c18d4fb7958035a42fc78578f789b48ca0b3"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
