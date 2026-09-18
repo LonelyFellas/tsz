@@ -35,6 +35,10 @@ CI 的 owner/repo 从 GitHub remote 解析，按脚本查询该 SHA 的最新 `C
 
 需要先发兼容前端时，可用 `DEPLOY_VOICE_EDITOR=false ./deploy/deploy-admin.sh` 暂关语音编辑入口；后端验收后再按默认 `true` 重发 admin。开关只接受 `true` / `false`，不影响精确 main、CI、隔离构建或 manifest 门禁。
 
+规则变化标记配套发布：旧后端不接受变体 `is_regular`。先用
+`DEPLOY_FORM_SPELLING_REGULARITY=false ./deploy/deploy-admin.sh` 发布兼容前端；它隐藏新开关，不向旧后端生成新字段，但保留新后端已返回的值。
+后端完成验收、旧标签页已刷新后，用 `DEPLOY_FORM_SPELLING_REGULARITY=true ./deploy/deploy-admin.sh` 开启录入。此开关默认 true，只接受 true/false，不替代 main/CI/manifest 门禁。
+
 脚本负责 Node 版本核对、隔离构建、写服务器前 exact-main 校验、独立 release 上传、远端发布锁、原子入口切换、服务/nginx、smoke 和 manifest 验证；
 历史静态资源保留 30 天，当前与回滚版本始终保留。web 使用双端口 systemd 实例，当前端口记录在 `/opt/tsz-releases/web/port`。
 存在 `/opt/tsz-frontend-transaction` 时先核对其中记录的暂存目录、旧版本与备份，不直接删除记录继续发布。

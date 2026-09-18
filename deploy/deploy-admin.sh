@@ -21,6 +21,13 @@ case "$deploy_azure_pronunciation_inputs" in
   *) echo "!! DEPLOY_AZURE_PRONUNCIATION_INPUTS 必须为 true 或 false" >&2; exit 1 ;;
 esac
 
+# 首次配套发布先显式关闭写入口；新后端验收后再开启。
+deploy_form_spelling_regularity="${DEPLOY_FORM_SPELLING_REGULARITY:-true}"
+case "$deploy_form_spelling_regularity" in
+  true|false) ;;
+  *) echo "!! DEPLOY_FORM_SPELLING_REGULARITY 必须为 true 或 false" >&2; exit 1 ;;
+esac
+
 prepare_deploy_source admin
 release_id="${DEPLOY_GIT_SHA}-$(node -e 'console.log(require("crypto").randomUUID())')"
 
@@ -64,6 +71,7 @@ echo "==> build @tsz/admin"
   cd "$DEPLOY_BUILD_ROOT"
   run_sanitized_build \
     TSZ_RELEASE_ID="$release_id" \
+    VITE_FORM_SPELLING_REGULARITY="$deploy_form_spelling_regularity" \
     VITE_VOICE_EDITOR="$deploy_voice_editor" \
     VITE_AZURE_PRONUNCIATION_INPUTS="$deploy_azure_pronunciation_inputs" \
     VITE_VOICE_PREVIEW=true \

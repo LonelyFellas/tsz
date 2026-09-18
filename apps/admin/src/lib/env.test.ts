@@ -11,6 +11,7 @@ describe("env", () => {
     vi.stubEnv("VITE_API_BASE_URL", undefined);
     vi.stubEnv("VITE_VOICE_EDITOR", undefined);
     vi.stubEnv("VITE_AZURE_PRONUNCIATION_INPUTS", undefined);
+    vi.stubEnv("VITE_FORM_SPELLING_REGULARITY", undefined);
     vi.stubEnv("VITE_VOICE_PREVIEW", undefined);
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.stubEnv("VITE_RELATED_SEARCH_V2", undefined);
@@ -23,6 +24,7 @@ describe("env", () => {
     expect(env.VOICE_AUDIO_UPLOAD).toBe(false);
     expect(env.VOICE_EDITOR).toBe(true);
     expect(env.AZURE_PRONUNCIATION_INPUTS).toBe(true);
+    expect(env.FORM_SPELLING_REGULARITY).toBe(true);
     expect(env.VOICE_PREVIEW).toBe(true);
     expect(env.ADMIN_TTS_MOCK).toBe(false);
     expect(env.RELATED_SEARCH_V2).toBe(false);
@@ -40,17 +42,21 @@ describe("env", () => {
     vi.stubEnv("PROD", true);
     vi.stubEnv("VITE_VOICE_EDITOR", undefined);
     vi.stubEnv("VITE_AZURE_PRONUNCIATION_INPUTS", undefined);
+    vi.stubEnv("VITE_FORM_SPELLING_REGULARITY", undefined);
     vi.stubEnv("VITE_VOICE_PREVIEW", undefined);
     vi.stubEnv("VITE_ADMIN_TTS_MOCK", undefined);
     vi.resetModules();
     const { env } = await import("./env");
     expect(env.VOICE_EDITOR).toBe(false);
     expect(env.AZURE_PRONUNCIATION_INPUTS).toBe(false);
+    expect(env.FORM_SPELLING_REGULARITY).toBe(false);
     expect(env.VOICE_PREVIEW).toBe(false);
     expect(env.ADMIN_TTS_MOCK).toBe(false);
   });
 
   it.each([
+    ["VITE_FORM_SPELLING_REGULARITY", "true", true],
+    ["VITE_FORM_SPELLING_REGULARITY", "false", false],
     ["VITE_AZURE_PRONUNCIATION_INPUTS", "true", true],
     ["VITE_AZURE_PRONUNCIATION_INPUTS", "false", false],
     ["VITE_VOICE_EDITOR", "true", true],
@@ -70,6 +76,7 @@ describe("env", () => {
     vi.resetModules();
     const { env } = await import("./env");
     const key = name.replace("VITE_", "") as
+      | "FORM_SPELLING_REGULARITY"
       | "AZURE_PRONUNCIATION_INPUTS"
       | "VOICE_EDITOR"
       | "VOICE_PREVIEW"
