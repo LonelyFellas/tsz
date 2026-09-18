@@ -1,10 +1,11 @@
 import type { SentenceTarget } from "@tsz/types";
-import { sentenceTarget } from "./fixtures";
+import { sentenceTarget, sentenceWord } from "./fixtures";
 import { describe, expect, it } from "vitest";
 import {
   currentSentenceCandidates,
   matchesSentenceTarget,
-  sameSentenceTarget
+  sameSentenceTarget,
+  savedSenseTargets
 } from "./associationModel";
 const phrase = {
   id: "entry",
@@ -95,6 +96,54 @@ describe("当前词条关联的即时检查", () => {
       ])
     ).toEqual([candidates[1]]);
   });
+});
+
+it("快捷关联按组与成员顺序去重，调序不改变候选身份且保留未入组历史词形", () => {
+  const word = sentenceWord();
+  const pos = word.forms.pos[0]!;
+  const base = pos.forms[0]!;
+  pos.forms.push(
+    { ...base, id: "past", form_type: "past_tense" },
+    { ...base, id: "second-only", form_type: "past_participle" },
+    { ...base, id: "historical-base" }
+  );
+  pos.form_groups = ["first", "second"].map((id) => ({
+    id,
+    is_regular: true,
+    scope: "general",
+    dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
+    members: (id === "first"
+      ? ["base", "past"]
+      : ["base", "second-only", "past"]
+    ).map((form_id) => ({
+      id: `${id}-${form_id}`,
+      form_id
+    }))
+  }));
+  const before = savedSenseTargets(word, "sense");
+  expect(before.map((item) => item.target.target_form_id)).toEqual([
+    "base",
+    "past",
+    "second-only",
+    "historical-base"
+  ]);
+  pos.form_groups[0]!.members.reverse();
+  const after = savedSenseTargets(word, "sense");
+  expect(after).toEqual([before[1], before[0], before[2], before[3]]);
+  pos.form_groups.reverse();
+  expect(savedSenseTargets(word, "sense")).toEqual([
+    before[0],
+    before[2],
+    before[1],
+    before[3]
+  ]);
+  expect(pos.forms.map((form) => form.id)).toEqual([
+    "base",
+    "past",
+    "second-only",
+    "historical-base"
+  ]);
+  expect(savedSenseTargets(word, "missing-sense")).toEqual([]);
 });
 
 type Linked = Extract<SentenceTarget, { state: "linked" }>;

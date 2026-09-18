@@ -103,7 +103,19 @@ export function savedSenseTargets(word: AdminWordV3, senseId: string) {
     definition?.definition_mode === "zh_sentence"
       ? definition.content.text
       : "暂无释义";
-  return forms.forms.flatMap((form) => {
+  // 快捷入口不经过后端候选接口，使用相同的组/成员顺序与历史词形兜底规则。
+  const byId = new Map(forms.forms.map((form) => [form.id, form]));
+  const orderedIds = new Set([
+    ...forms.form_groups.flatMap((group) =>
+      group.members.map((member) => member.form_id)
+    ),
+    ...forms.forms.map((form) => form.id)
+  ]);
+  const orderedForms = Array.from(orderedIds).flatMap((id) => {
+    const form = byId.get(id);
+    return form ? [form] : [];
+  });
+  return orderedForms.flatMap((form) => {
     const bases =
       form.form_type === "base"
         ? [form]

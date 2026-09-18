@@ -77,6 +77,55 @@ beforeEach(() => {
   search.mockResolvedValue({ matches: [candidate()], truncated: false });
 });
 
+it.each([false, true])(
+  "按配置顺序展示词形，方言过滤与同拼写合并不改变顺序或旧关联（反序=%s）",
+  async (reverse) => {
+    const item = candidate();
+    const pastForms = (["past_tense", "past_participle"] as const).flatMap(
+      (form_type) =>
+        (["us", "uk"] as const).map((dialect) => ({
+          form_id: form_type,
+          variant_id: `${form_type}-${dialect}`,
+          form_type,
+          dialect,
+          spelling: "jobbed",
+          base_form_ids: ["base"]
+        }))
+    );
+    // 原形是命中项但配置在最后；过去式与过去分词拼写相同，不能跨词形合并。
+    item.forms = reverse
+      ? [...pastForms.slice(2), ...pastForms.slice(0, 2), ...item.forms]
+      : [...pastForms, ...item.forms];
+    item.matches = [
+      { surface: "job", normalized_surface: "job", match_kind: "word" }
+    ];
+    search.mockResolvedValue({ matches: [item], truncated: false });
+    const old = target("us");
+    const onReplace = vi.fn();
+    render(
+      <V3TargetCascader literal="job" targets={[old]} onReplace={onReplace} />
+    );
+    await expandJob();
+    const labels = Array.from(
+      document.querySelectorAll(".ant-cascader-menu .tsz-entry-en")
+    )
+      .map((node) => node.textContent)
+      .filter((text) => text !== "job");
+    const expected = reverse
+      ? ["过去分词 jobbed", "过去式 jobbed", "原形 job"]
+      : ["过去式 jobbed", "过去分词 jobbed", "原形 job"];
+    expect(labels).toEqual(expected);
+    expect(onReplace).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("原形 job"));
+    const sense = await screen.findByText("工作");
+    expect(sense.querySelector(".v3-component-usage-radio")).toHaveClass(
+      "is-checked"
+    );
+    fireEvent.click(sense);
+    expect(onReplace).toHaveBeenLastCalledWith([old], undefined);
+  }
+);
+
 it("通用正文的同词形同拼写只展示一行，新关联提交偏好侧真实坐标", async () => {
   const onReplace = vi.fn();
   render(
