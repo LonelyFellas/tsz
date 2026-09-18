@@ -1,8 +1,10 @@
+import type { SentenceTarget } from "@tsz/types";
 import { sentenceTarget } from "./fixtures";
 import { describe, expect, it } from "vitest";
 import {
   currentSentenceCandidates,
-  matchesSentenceTarget
+  matchesSentenceTarget,
+  sameSentenceTarget
 } from "./associationModel";
 const phrase = {
   id: "entry",
@@ -92,5 +94,85 @@ describe("当前词条关联的即时检查", () => {
         }
       ])
     ).toEqual([candidates[1]]);
+  });
+});
+
+type Linked = Extract<SentenceTarget, { state: "linked" }>;
+
+function linkedTarget(overrides: Partial<Linked> = {}): Linked {
+  return {
+    state: "linked",
+    target_entry_id: "entry",
+    target_pos_id: "pos",
+    target_base_form_id: "base",
+    target_form_id: "form",
+    target_variant_id: "variant",
+    target_sense_id: "sense",
+    ...overrides
+  };
+}
+
+describe("sameSentenceTarget：结构漂移后的认领口径", () => {
+  it("实例 id 相同即同一引用", () => {
+    expect(sameSentenceTarget(linkedTarget(), linkedTarget())).toBe(true);
+  });
+
+  it("结构漂移换了实例 id：按 target_dialect 重新认领（TASK#58 解锁后的常态路径）", () => {
+    const stored = linkedTarget({
+      target_variant_id: "variant-old",
+      target_dialect: "uk"
+    });
+    const current = linkedTarget({
+      target_variant_id: "variant-new",
+      target_dialect: "uk"
+    });
+    expect(sameSentenceTarget(stored, current)).toBe(true);
+    // 侧别不同不是同一引用。
+    expect(
+      sameSentenceTarget(
+        stored,
+        linkedTarget({ target_variant_id: "variant-us", target_dialect: "us" })
+      )
+    ).toBe(false);
+  });
+
+  it("common 引用可落到任一侧（与后端 shared_target_matches 同口径）", () => {
+    const common = linkedTarget({
+      target_variant_id: "variant-common",
+      target_dialect: "common"
+    });
+    expect(
+      sameSentenceTarget(
+        common,
+        linkedTarget({ target_variant_id: "variant-uk", target_dialect: "uk" })
+      )
+    ).toBe(true);
+  });
+
+  it("存量引用缺 target_dialect：用调用方传的 source_dialect 兜底", () => {
+    const legacy = linkedTarget({ target_variant_id: "variant-old" });
+    const current = linkedTarget({
+      target_variant_id: "variant-uk",
+      target_dialect: "uk"
+    });
+    expect(sameSentenceTarget(legacy, current, "uk")).toBe(true);
+    expect(sameSentenceTarget(legacy, current, "us")).toBe(false);
+    // 两边都拿不到方言时只有实例 id 相等才算。
+    expect(sameSentenceTarget(legacy, current)).toBe(false);
+  });
+
+  it("词形 / 词义 / 原形不同一律不算同一引用", () => {
+    expect(
+      sameSentenceTarget(linkedTarget(), linkedTarget({ target_form_id: "x" }))
+    ).toBe(false);
+    expect(
+      sameSentenceTarget(linkedTarget(), linkedTarget({ target_sense_id: "x" }))
+    ).toBe(false);
+    expect(
+      sameSentenceTarget(
+        linkedTarget(),
+        linkedTarget({ target_base_form_id: "x" })
+      )
+    ).toBe(false);
   });
 });

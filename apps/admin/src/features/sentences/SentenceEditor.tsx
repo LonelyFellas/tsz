@@ -179,7 +179,11 @@ export function SentenceEditor({
       !!source &&
       currentTargets.some(
         (candidate) =>
-          sameSentenceTarget(annotation.target, candidate.target) &&
+          sameSentenceTarget(
+            annotation.target,
+            candidate.target,
+            annotation.source_dialect
+          ) &&
           matchesSentenceTarget(
             source.text,
             annotation.source_segments,

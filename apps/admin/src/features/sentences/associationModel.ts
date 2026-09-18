@@ -147,9 +147,34 @@ export function savedSenseTargets(word: AdminWordV3, senseId: string) {
   });
 }
 
+/**
+ * 两个引用是否指向同一个「词形 + 方言侧」。
+ *
+ * 变体实例 id 会随「英美通用 ↔ 英/美」结构切换而换（TASK#58 解锁后这是常态路径），所以 id
+ * 不等时改按方言侧判：`target_dialect` 优先——自 TASK#58 起新引用都会写入；缺字段的存量引用用
+ * `fallbackDialect`（通常是标注的 `source_dialect`）——它在上层是宽松的 `string`，取值与
+ * `Dialect` 同口径。方言侧判定与后端 `shared_target_matches` 对齐：common 引用可落到任一侧，
+ * uk/us 只认同侧。（拼写比对不在本函数，由调用方的 `matchesSentenceTarget` 按 `source_dialect`
+ * 完成；方言与拼写侧不一致的异常数据下前端比后端更保守：可能漏认，不会误认。）
+ */
+function sameVariantCoordinate(
+  left: Extract<SentenceTarget, { state: "linked" }>,
+  right: Extract<SentenceTarget, { state: "linked" }>,
+  fallbackDialect?: string
+): boolean {
+  if (left.target_variant_id === right.target_variant_id) return true;
+  const leftSide = left.target_dialect ?? fallbackDialect;
+  const rightSide = right.target_dialect ?? fallbackDialect;
+  if (leftSide === undefined || rightSide === undefined) return false;
+  return (
+    leftSide === "common" || rightSide === "common" || leftSide === rightSide
+  );
+}
+
 export function sameSentenceTarget(
   left: SentenceTarget,
-  right: SentenceTarget
+  right: SentenceTarget,
+  fallbackDialect?: string
 ) {
   return (
     left.state === "linked" &&
@@ -159,6 +184,6 @@ export function sameSentenceTarget(
     left.target_pos_id === right.target_pos_id &&
     left.target_base_form_id === right.target_base_form_id &&
     left.target_form_id === right.target_form_id &&
-    left.target_variant_id === right.target_variant_id
+    sameVariantCoordinate(left, right, fallbackDialect)
   );
 }
