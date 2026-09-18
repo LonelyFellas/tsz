@@ -83,24 +83,15 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.getByRole("button", { name: "新增名词变化组" }).click();
     const secondGroup = nounGroups.nth(1);
     await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
-    // 手动加的组只有真实原形，不再按词性自动补复数占位行。
-    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
-    await expect(
-      secondGroup.getByRole("textbox", {
-        name: "原形英美通用拼写",
-        exact: true
-      })
-    ).toHaveValue("orbit-common");
-    await expect(
-      secondGroup.getByRole("textbox", {
-        name: "复数英美通用拼写",
-        exact: true
-      })
-    ).toHaveCount(0);
+    // 手动加的组是空组：不再自动带原形，也不按词性自动补复数占位行。
+    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(0);
+    await expect(secondGroup.getByText("草稿可暂时保留空变化组")).toBeVisible();
 
-    // 英美规则按组生效，两组各自切换。
+    // 英美规则按组生效，两组各自切换；第 2 组手动加原形后再填拼写。
     await firstGroup.getByLabel("英美拼写有区别").click();
     await secondGroup.getByLabel("英美拼写有区别").click();
+    await secondGroup.getByRole("button", { name: "添加原形" }).click();
+    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
     const ukSecondForm = secondGroup
       .locator(".v3-dialect-panel-uk .v3-dialect-form-cell")
       .filter({ has: page.getByLabel("原形英式拼写", { exact: true }) });
@@ -308,6 +299,10 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(secondGroup.getByLabel("英美音标无区别")).toBeChecked();
     await expect(firstGroup.getByLabel("英美拼写有区别")).toBeChecked();
     await expect(page.getByText("暂不能合并英美配置")).toHaveCount(0);
+
+    // 第 2 组默认为空组，手动加一个原形验证词形跟随本组英美规则。
+    await secondGroup.getByRole("button", { name: "添加原形" }).click();
+    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
 
     await page.getByRole("button", { name: "保存草稿" }).click();
     await expect.poll(() => api.getWord().revision).toBe(2);

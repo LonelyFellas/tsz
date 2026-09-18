@@ -51,7 +51,7 @@ import {
   useV3ReferenceGuard
 } from "../referenceGuardContext";
 
-const BASE_REQUIRED_HINT = "每组词形变化至少保留一个原形";
+const BASE_REQUIRED_HINT = "第 1 组词形变化至少保留一个原形";
 
 export interface V3FormGroupCardProps {
   content: DraftFormsStepContentV3;
@@ -114,18 +114,19 @@ export function V3FormGroupCard({
         pos.forms.find((item) => item.id === member.form_id)?.form_type ===
         "base"
     );
-  // 改类型和删词形动的是 form 本身，所有引用它的组都会受影响，所以按最严的组算：
-  // 只要它在任一所属组里是唯一原形就锁。
+  // 改类型和删词形动的是 form 本身，所有引用它的组都会受影响；但只有第 1 组要求
+  // 必须保留原形，所以只按第 1 组算：只要它是第 1 组的唯一原形就锁。
   const referenceGuard = useV3ReferenceGuard();
   const lockedBaseFormIds = new Set(
-    pos.form_groups.flatMap((candidate) => {
+    pos.form_groups.slice(0, 1).flatMap((candidate) => {
       const baseMembers = baseMembersOf(candidate);
       return baseMembers.length === 1 ? [baseMembers[0]!.form_id] : [];
     })
   );
-  // 「从本组移除」只摘掉当前组的一条 membership，其他组不受影响，所以只看本组：
-  // 本组还有别的原形就照常放行，跨组共享与否都不影响这一判断。
+  // 「从本组移除」只摘掉当前组的一条 membership，其他组不受影响，所以只看本组；
+  // 且只有第 1 组要求必须保留原形：本组还有别的原形就照常放行，跨组共享与否都不影响。
   const soleBaseMembershipId = (() => {
+    if (group.id !== pos.form_groups[0]?.id) return undefined;
     const baseMembers = baseMembersOf(group);
     return baseMembers.length === 1 ? baseMembers[0]!.id : undefined;
   })();

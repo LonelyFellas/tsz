@@ -515,7 +515,7 @@ describe("V3 forms model", () => {
     expect(codes(emptyGroup, "complete")).toContain("empty_form_group");
   });
 
-  it("complete 要求每个变化组都留住原形，草稿放行", () => {
+  it("complete 只要求第 1 组留住原形，草稿放行", () => {
     const derived = commonFormFixture({ spelling: "centers" });
     derived.form_type = "plural";
     const withoutBase = formsFixture({ forms: [derived] });
@@ -529,6 +529,29 @@ describe("V3 forms model", () => {
     // 组里挂着原形就不该被这条规则误伤。
     const withBase = formsFixture({ forms: [commonFormFixture()] });
     expect(codes(withBase, "complete")).not.toContain(
+      "base_form_required_in_group"
+    );
+
+    // 第 2 组起不需要原形：第 1 组有原形、第 2 组只有屈折形时放行。
+    const firstBase = commonFormFixture({ spelling: "run" });
+    const secondPlural = ukUsFormFixture();
+    secondPlural.form_type = "plural";
+    const twoGroups = formsFixture({
+      forms: [firstBase, secondPlural],
+      groups: [
+        {
+          id: UUIDS.group,
+          is_regular: true,
+          members: [{ id: UUIDS.membership, form_id: firstBase.id }]
+        },
+        {
+          id: UUIDS.group_2,
+          is_regular: true,
+          members: [{ id: UUIDS.membership_2, form_id: secondPlural.id }]
+        }
+      ]
+    });
+    expect(codes(twoGroups, "complete")).not.toContain(
       "base_form_required_in_group"
     );
 

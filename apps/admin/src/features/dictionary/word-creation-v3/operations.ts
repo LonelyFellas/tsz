@@ -888,6 +888,7 @@ export function addFormGroup(
   if (!pos) {
     return { ok: false, reason: "pos_not_found" };
   }
+  const isFirstGroup = pos.form_groups.length === 0;
   const groupId = nextUuid(idFactory, allNodeIds(content));
   // 新组默认通用，英美规则沿用本词性最后一组；之后与其他组互不影响。
   const previousGroup = pos.form_groups.at(-1);
@@ -904,8 +905,12 @@ export function addFormGroup(
         : { spelling_mode: "unified", phonetic_mode: "unified" },
       members: []
     });
-  // 每组词形变化的初始形态一致：新组自带一个原形。拼写沿用规则来源那一组的原形，
-  // 那组还没有原形时退回本词性首个原形。
+  // 只有第 1 组需要原形作为这个词的落脚点：新增时自带一个原形，拼写沿用规则来源
+  // 那一组的原形，那组还没有原形时退回本词性首个原形。第 2 组起不再默认塞原形，
+  // 用户按需自行添加（原形或屈折形）。
+  if (!isFirstGroup) {
+    return { ok: true, value: next };
+  }
   const added = addConcreteForm(next, posId, groupId, "base", idFactory);
   if (!added.ok) return added;
   const template =

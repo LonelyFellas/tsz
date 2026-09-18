@@ -775,7 +775,7 @@ export function validateFormsContent(
   }
 
   for (const pos of content.pos) {
-    for (const group of pos.form_groups) {
+    for (const [groupIndex, group] of pos.form_groups.entries()) {
       const groupLocation = location(
         "forms.form_group",
         { pos_id: pos.pos_id, form_group_id: group.id },
@@ -793,8 +793,8 @@ export function validateFormsContent(
           )
         );
       }
-      // 与后端 base_form_required_in_group 同一口径：一组词形变化描述同一个词的
-      // 一套变化范式，缺了原形就没有落脚点。空组已由 empty_form_group 说明，不叠报。
+      // 与后端 base_form_required_in_group 同一口径：只有第 1 组必须有原形作为这个
+      // 词的落脚点，第 2 组起可只有屈折形。空组已由 empty_form_group 说明，不叠报。
       const groupHasBase = group.members.some(
         (member) => formTypes.get(member.form_id) === "base"
       );
@@ -808,13 +808,13 @@ export function validateFormsContent(
             groupLocation
           )
         );
-      } else if (intent === "complete" && !groupHasBase) {
+      } else if (intent === "complete" && groupIndex === 0 && !groupHasBase) {
         issues.push(
           issue(
             "base_form_required_in_group",
             "members",
             group.id,
-            "完整词条的每个变化组都需要一个原形",
+            "完整词条的第 1 组需要至少一个原形",
             groupLocation
           )
         );

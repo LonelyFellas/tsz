@@ -1123,7 +1123,7 @@ describe("V3 forms operations", () => {
     });
   });
 
-  it("新增变化组自带原形并沿用本词性已有原形的拼写", () => {
+  it("新增第 2 组不再自带原形，只追加空组并沿用上一组英美规则", () => {
     const content = formsFixture({ forms: [ukUsFormFixture()] });
     const added = addFormGroup(
       content,
@@ -1140,44 +1140,7 @@ describe("V3 forms operations", () => {
     );
     expect(added.ok).toBe(true);
     if (!added.ok) return;
-    const [, created] = added.value.pos[0]!.forms;
-    expect(created).toEqual({
-      id: uuidFromInt(9_202),
-      form_type: "base",
-      regional_variants: {
-        mode: "uk_us",
-        uk: {
-          id: uuidFromInt(9_203),
-          dialect: "uk",
-          spelling: "centre",
-          is_regular: true,
-          origin: "manual",
-          pronunciations: [
-            {
-              id: uuidFromInt(9_206),
-              dict_phonetic: "",
-              actual_pron: "",
-              style: "normal"
-            }
-          ]
-        },
-        us: {
-          id: uuidFromInt(9_204),
-          dialect: "us",
-          spelling: "center",
-          is_regular: true,
-          origin: "manual",
-          pronunciations: [
-            {
-              id: uuidFromInt(9_207),
-              dict_phonetic: "",
-              actual_pron: "",
-              style: "normal"
-            }
-          ]
-        }
-      }
-    });
+    // 第 2 组起不再默认塞原形：组是空的，词形列表也不新增。
     expect(added.value.pos[0]!.form_groups[1]).toEqual({
       id: uuidFromInt(9_201),
       is_regular: true,
@@ -1186,12 +1149,13 @@ describe("V3 forms operations", () => {
         spelling_mode: "distinguish",
         phonetic_mode: "distinguish"
       },
-      members: [{ id: uuidFromInt(9_205), form_id: uuidFromInt(9_202) }]
+      members: []
     });
+    expect(added.value.pos[0]!.forms).toHaveLength(1);
     expect(content.pos[0]!.form_groups).toHaveLength(1);
   });
 
-  it("新增变化组默认通用，英美规则沿用本词性最后一组", () => {
+  it("新增第 3 组也不再自带原形，默认通用并沿用本词性最后一组规则", () => {
     const content = formsFixture({
       forms: [ukUsFormFixture(), commonFormFixture()],
       groups: [
@@ -1220,95 +1184,32 @@ describe("V3 forms operations", () => {
     expect(created).toMatchObject({
       id: uuidFromInt(9_301),
       scope: "general",
-      dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" }
+      dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
+      members: []
     });
-    const createdForm = added.value.pos[0]!.forms.find(
-      (form) => form.id === created.members[0]!.form_id
-    )!;
-    expect(createdForm.regional_variants.mode).toBe("common");
+    expect(added.value.pos[0]!.forms).toHaveLength(2);
   });
 
-  it("新增变化组的原形拼写与复制来的英美规则一致", () => {
-    const ud = {
-      spelling_mode: "unified",
-      phonetic_mode: "distinguish"
-    } as const;
-    const distinguished = ukUsFormFixture();
-    const unifiedBase = ukUsFormFixture({
-      id: uuidFromInt(9_410),
-      uk: {
-        id: uuidFromInt(9_411),
-        spelling: "center",
-        pronunciations: [pronunciationFixture({ id: uuidFromInt(9_412) })]
-      },
-      us: {
-        id: uuidFromInt(9_413),
-        spelling: "center",
-        pronunciations: [pronunciationFixture({ id: uuidFromInt(9_414) })]
-      }
-    });
-    const content = formsFixture({
-      forms: [distinguished, unifiedBase],
-      groups: [
-        {
-          id: UUIDS.group,
-          is_regular: true,
-          members: [{ id: UUIDS.membership, form_id: distinguished.id }]
-        },
-        {
-          id: UUIDS.group_2,
-          is_regular: true,
-          dialect_rules: ud,
-          members: [{ id: UUIDS.membership_2, form_id: unifiedBase.id }]
-        }
-      ]
-    });
-    const createdBase = (value: typeof content, groupId: string) => {
-      const pos = value.pos[0]!;
-      const group = pos.form_groups.find((item) => item.id === groupId)!;
-      const form = pos.forms.find(
-        (item) => item.id === group.members[0]!.form_id
-      )!;
-      if (form.regional_variants.mode !== "uk_us") throw new Error("uk_us");
-      return [
-        form.regional_variants.uk.spelling,
-        form.regional_variants.us.spelling
-      ];
-    };
-
-    // 上一组（UD）有自己的原形：拼写取自它，而不是第 1 组的 centre / center。
+  it("新增第 1 组仍自带一个原形", () => {
     const added = addFormGroup(
-      content,
+      formsFixture({ forms: [], groups: [] }),
       UUIDS.pos,
       uuidSequence(
-        ...[9_421, 9_422, 9_423, 9_424, 9_425, 9_426, 9_427].map(uuidFromInt)
+        uuidFromInt(9_201),
+        uuidFromInt(9_202),
+        uuidFromInt(9_203),
+        uuidFromInt(9_204),
+        uuidFromInt(9_205)
       )
     );
     expect(added.ok).toBe(true);
     if (!added.ok) return;
-    expect(added.value.pos[0]!.form_groups[2]!.dialect_rules).toEqual(ud);
-    expect(createdBase(added.value, uuidFromInt(9_421))).toEqual([
-      "center",
-      "center"
-    ]);
-
-    // 上一组没有原形时退回第 1 组的原形，拼写统一的规则下两侧仍写同一拼写。
-    const emptyLast = structuredClone(content);
-    emptyLast.pos[0]!.form_groups[1]!.members = [];
-    emptyLast.pos[0]!.forms = [distinguished];
-    const fallback = addFormGroup(
-      emptyLast,
-      UUIDS.pos,
-      uuidSequence(
-        ...[9_431, 9_432, 9_433, 9_434, 9_435, 9_436, 9_437].map(uuidFromInt)
-      )
-    );
-    expect(fallback.ok).toBe(true);
-    if (!fallback.ok) return;
-    expect(createdBase(fallback.value, uuidFromInt(9_431))).toEqual([
-      "centre",
-      "centre"
-    ]);
+    const [createdGroup] = added.value.pos[0]!.form_groups;
+    expect(createdGroup!.members).toHaveLength(1);
+    const createdForm = added.value.pos[0]!.forms.find(
+      (form) => form.id === createdGroup!.members[0]!.form_id
+    )!;
+    expect(createdForm.form_type).toBe("base");
   });
 
   it("P1-3 普通删除组若会产生 orphan form 则结构化拒绝且不修改输入", () => {
@@ -1358,7 +1259,7 @@ describe("V3 forms operations", () => {
       {
         id: UUIDS.group_2,
         is_regular: true,
-        members: [{ id: uuidFromInt(9_113), form_id: uuidFromInt(9_111) }]
+        members: []
       }
     ]);
     const reordered = reorderFormGroups(secondGroup.value, UUIDS.pos, [
