@@ -821,7 +821,8 @@ describe("WordWizardV3Page", () => {
 
     // 整页按角色查会逐个元素算继承样式，jsdom 里这一页会卡死；徽标的可及名就是 aria-label，按标签查。
     expect(await screen.findAllByLabelText("被引用 1")).not.toHaveLength(0);
-    expect(screen.getByLabelText("英美拼写有区别")).toBeDisabled();
+    // TASK#58：被引用不再锁英美结构开关（引用按语义坐标重解析）。
+    expect(screen.getByLabelText("英美拼写有区别")).not.toBeDisabled();
     // 未失效的引用：本次把拼写改坏就禁用保存并给出原因。
     fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
       target: { value: "center" }

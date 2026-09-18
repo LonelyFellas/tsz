@@ -1,3 +1,6 @@
+import { UNSAFE_DataRouterContext } from "react-router-dom";
+import { WordNavigationGuard } from "@/features/recovery/WordNavigationGuard";
+import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
 import type {
   AdminWordV3,
   PartOfSpeechCatalogResponse,
@@ -12,7 +15,14 @@ import type {
   WordCreationStep
 } from "@tsz/types";
 import type { ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { newWordNodeId } from "../word-model/primitives";
 import {
   createStableVariantIdFactory,
@@ -29,6 +39,8 @@ import {
 } from "./issueNavigation";
 import {
   dropEmptySentenceTranslations,
+  formGroupBindingPatches,
+  syncFormGroupBindings,
   ensureV3MeaningsForForms,
   fillDefaultSenseGroups,
   prepareTextLinksForSave,
@@ -39,6 +51,7 @@ import {
 import { classifyV3Problem, type V3Problem } from "./problem";
 import {
   createV3SaveFlow,
+  v3MeaningsContentFingerprint,
   type V3ConfirmationContext,
   type V3RequestCommand,
   type V3SaveFlow
@@ -299,12 +312,15 @@ function V3WordCreationSession({
     meanings: false
   });
   const [activeStep, setActiveStepState] = useState(initialStep);
+  const routerContext = useContext(UNSAFE_DataRouterContext);
+  const [hasSentenceGuard, setHasSentenceGuard] = useState(false);
   const sentenceLeaveGuard = useRef<(() => Promise<boolean>) | undefined>(
     undefined
   );
   const registerSentenceLeaveGuard = useCallback(
     (guard?: () => Promise<boolean>) => {
       sentenceLeaveGuard.current = guard;
+      setHasSentenceGuard(!!guard);
     },
     []
   );
@@ -487,7 +503,8 @@ function V3WordCreationSession({
       }
       updateDirty(
         "meanings",
-        JSON.stringify(nextMeanings) !== JSON.stringify(nextCleanMeanings)
+        v3MeaningsContentFingerprint(nextMeanings) !==
+          v3MeaningsContentFingerprint(nextCleanMeanings)
       );
       updateDirty(
         "forms",
@@ -507,7 +524,8 @@ function V3WordCreationSession({
       setDraftMeaningsState(content);
       updateDirty(
         "meanings",
-        JSON.stringify(content) !== JSON.stringify(cleanMeaningsRef.current)
+        v3MeaningsContentFingerprint(content) !==
+          v3MeaningsContentFingerprint(cleanMeaningsRef.current)
       );
       if (!publishReconciliationRequiredRef.current) setProblem(undefined);
       setConflict(undefined);
@@ -712,8 +730,8 @@ function V3WordCreationSession({
       setDraftMeaningsState(alignedMeanings);
       updateDirty(
         "meanings",
-        JSON.stringify(alignedMeanings) !==
-          JSON.stringify(cleanMeaningsRef.current)
+        v3MeaningsContentFingerprint(alignedMeanings) !==
+          v3MeaningsContentFingerprint(cleanMeaningsRef.current)
       );
       setActivePosIdState((current) =>
         current && localForms.pos.some((pos) => pos.pos_id === current)
@@ -1022,6 +1040,13 @@ function V3WordCreationSession({
         return false;
       }
       if (blockedByRemoteUpdate()) return false;
+      const senseBindings =
+        flow.canonical().capabilities.atomic_form_sense_bindings === true
+          ? formGroupBindingPatches(
+              draftMeaningsRef.current,
+              flow.canonical().meanings
+            )
+          : [];
       const baseRevision = flow.canonical().revision;
       const scope = scopeRef.current;
       const done = markPending("save_forms");
@@ -1033,6 +1058,7 @@ function V3WordCreationSession({
         const tokens = flow.confirmations({
           base_revision: baseRevision,
           impact_content: content,
+          sense_bindings: senseBindings,
           ...confirmationContext
         });
         const result = await flow.runCanonical("save_forms", () =>
@@ -1041,12 +1067,24 @@ function V3WordCreationSession({
             base_revision: baseRevision,
             intent,
             content,
+            ...(senseBindings.length ? { sense_bindings: senseBindings } : {}),
             ...tokens
           })
         );
         noteOwnRevision(result.value.word);
         if (result.accepted && scope === scopeRef.current) {
           if (intent === "complete") replaceStepIssues(["forms"], []);
+          if (senseBindings.length) {
+            cleanMeaningsRef.current = syncFormGroupBindings(
+              cleanMeaningsRef.current,
+              result.value.word.meanings
+            );
+            updateDirty(
+              "meanings",
+              v3MeaningsContentFingerprint(draftMeaningsRef.current) !==
+                v3MeaningsContentFingerprint(cleanMeaningsRef.current)
+            );
+          }
           applyCanonical(result.value.word, "forms");
           return true;
         }
@@ -1080,6 +1118,7 @@ function V3WordCreationSession({
       handleError,
       markPending,
       replaceStepIssues,
+      updateDirty,
       requests
     ]
   );
@@ -1095,6 +1134,13 @@ function V3WordCreationSession({
         return undefined;
       }
       if (blockedByRemoteUpdate()) return undefined;
+      const senseBindings =
+        flow.canonical().capabilities.atomic_form_sense_bindings === true
+          ? formGroupBindingPatches(
+              draftMeaningsRef.current,
+              flow.canonical().meanings
+            )
+          : [];
       const content = draftForms;
       const baseRevision = flow.canonical().revision;
       const scope = scopeRef.current;
@@ -1109,11 +1155,12 @@ function V3WordCreationSession({
           requests.impact(flow.canonical().id, {
             schema_version: 3,
             base_revision: baseRevision,
+            ...(senseBindings.length ? { sense_bindings: senseBindings } : {}),
             content
           })
         );
         if (!result.accepted || scope !== scopeRef.current) return undefined;
-        flow.bindImpactConfirmation(result.value, content);
+        flow.bindImpactConfirmation(result.value, content, senseBindings);
         setImpact(result.value);
         setImpactConfirmed(
           !result.value.requires_confirmation &&
@@ -1313,7 +1360,14 @@ function V3WordCreationSession({
         snapshot_id: impact.surface_match_page.snapshot_id,
         policy_name: impact.surface_match_page.policy_name,
         policy_epoch: impact.surface_match_page.policy_epoch,
-        impact_content: draftForms
+        impact_content: draftForms,
+        sense_bindings:
+          flow.canonical().capabilities.atomic_form_sense_bindings === true
+            ? formGroupBindingPatches(
+                draftMeaningsRef.current,
+                flow.canonical().meanings
+              )
+            : []
       });
       const confirmed = Boolean(
         tokens.confirmed_surface_match_token &&
@@ -1336,7 +1390,14 @@ function V3WordCreationSession({
     const flow = flowRef.current;
     const tokens = flow.confirmations({
       base_revision: flow.canonical().revision,
-      impact_content: draftForms
+      impact_content: draftForms,
+      sense_bindings:
+        flow.canonical().capabilities.atomic_form_sense_bindings === true
+          ? formGroupBindingPatches(
+              draftMeaningsRef.current,
+              flow.canonical().meanings
+            )
+          : []
     });
     const confirmed =
       !impact.requires_confirmation || Boolean(tokens.confirmed_impact_token);
@@ -1677,7 +1738,32 @@ function V3WordCreationSession({
     actions
   };
 
-  const renderedStep = renderStep(context);
+  const recovery = useDraftRecovery({
+    entity: `word-v3:${word.id}`,
+    revision: word.revision,
+    value: { forms: draftForms, meanings: draftMeanings },
+    dirty: dirtySteps.forms || dirtySteps.meanings,
+    busy: pending.size > 0,
+    restoreAllowed: !sessionReadOnly,
+    restore: (value) => {
+      setDraftForms(value.forms);
+      setDraftMeanings(value.meanings);
+    }
+  });
+  const renderedStep = (
+    <>
+      {routerContext && (
+        <WordNavigationGuard
+          wordId={word.id}
+          dirty={context.hasUnsavedChanges || hasSentenceGuard}
+          busy={pending.size > 0}
+          requestSentenceLeave={requestSentenceLeave}
+        />
+      )}
+      {recovery.notice}
+      {renderStep(context)}
+    </>
+  );
   if (!sessionReadOnly && activeStep === "basics") {
     return renderedStep;
   }

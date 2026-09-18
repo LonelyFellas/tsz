@@ -38,7 +38,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
 
     const nounGroups = page.locator("[data-pos-id] .v3-form-group-card");
     const firstGroup = nounGroups.nth(0);
-    await expect(firstGroup.getByLabel("复数英美通用拼写")).toHaveValue("");
+    await expect(
+      firstGroup.getByRole("textbox", { name: "复数英美通用拼写", exact: true })
+    ).toHaveValue("");
     // 拼写统一 / 英美区分都会出 BrE 表头，只有共用结构没有。
     await expect(firstGroup.getByText("英式英语 · BrE")).toHaveCount(0);
 
@@ -57,7 +59,9 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(firstGroup.getByLabel("变化组 1 词形 1 类型")).toBeDisabled();
 
     const firstForm = firstGroup.locator(".v3-concrete-form-row").nth(0);
-    await firstForm.getByLabel("原形英美通用拼写").fill("orbit-common");
+    await firstForm
+      .getByRole("textbox", { name: "原形英美通用拼写", exact: true })
+      .fill("orbit-common");
     await firstForm.getByRole("button", { name: /新增发音/ }).click();
     await firstForm
       .getByLabel(/第 \d+ 条发音的字典音标/)
@@ -91,10 +95,14 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const usSecondForm = secondGroup
       .locator(".v3-dialect-panel-us .v3-dialect-form-cell")
       .filter({ has: page.getByLabel("原形美式拼写", { exact: true }) });
-    await ukSecondForm.getByLabel("原形英式拼写").fill("orbit-centre");
+    await ukSecondForm
+      .getByRole("textbox", { name: "原形英式拼写", exact: true })
+      .fill("orbit-centre");
     await ukSecondForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
     await ukSecondForm.getByLabel("第 1 条发音的实际发音").fill("orbit-uk");
-    await usSecondForm.getByLabel("原形美式拼写").fill("orbit-center");
+    await usSecondForm
+      .getByRole("textbox", { name: "原形美式拼写", exact: true })
+      .fill("orbit-center");
     await usSecondForm.getByLabel("第 1 条发音的字典音标").fill("ˈɔrbɪt");
     await usSecondForm.getByLabel("第 1 条发音的实际发音").fill("orbit-us");
 
@@ -114,10 +122,14 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     const usVerb = verbPanel
       .locator(".v3-dialect-panel-us .v3-dialect-form-cell")
       .filter({ has: page.getByLabel("原形美式拼写", { exact: true }) });
-    await ukVerb.getByLabel("原形英式拼写").fill("orbit-verb-uk");
+    await ukVerb
+      .getByRole("textbox", { name: "原形英式拼写", exact: true })
+      .fill("orbit-verb-uk");
     await ukVerb.getByLabel("第 1 条发音的字典音标").fill("ˈɔːbɪt");
     await ukVerb.getByLabel("第 1 条发音的实际发音").fill("orbit-verb-uk");
-    await usVerb.getByLabel("原形美式拼写").fill("orbit-verb-us");
+    await usVerb
+      .getByRole("textbox", { name: "原形美式拼写", exact: true })
+      .fill("orbit-verb-us");
     await usVerb.getByLabel("第 1 条发音的字典音标").fill("ˈɔrbɪt");
     await usVerb.getByLabel("第 1 条发音的实际发音").fill("orbit-verb-us");
 
@@ -275,7 +287,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     );
   });
 
-  test("E06 Mock 引用保护：被例句标注的原形禁用英美切换与删除，徽标可跳到例句", async ({
+  test("E06 Mock 引用保护：被例句标注的原形只锁删除，英美切换与改类型放行，徽标可跳到例句", async ({
     page
   }) => {
     const api = await mockAdminV3Api(page, {
@@ -285,8 +297,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
 
     const firstGroup = page.locator("[data-pos-id] .v3-form-group-card").nth(0);
-    await expect(firstGroup.getByLabel("英美拼写有区别")).toBeDisabled();
-    await expect(firstGroup.getByLabel("英美音标有区别")).toBeDisabled();
+    // TASK#58：被引用不再锁英美结构切换与词形类型（引用按「词形 + 方言侧」重解析），
+    // 改类型给漂移提示而不是硬锁；删除仍锁（引用失去锚点）。
+    await expect(firstGroup.getByLabel("英美拼写有区别")).toBeEnabled();
+    await expect(firstGroup.getByLabel("英美音标有区别")).toBeEnabled();
+    await expect(
+      firstGroup.getByLabel(/修改词形类型会让 \d+ 处引用漂移/)
+    ).toBeVisible();
     await expect(
       firstGroup.getByRole("button", { name: "删除变化组 1 的词形 1" })
     ).toBeDisabled();

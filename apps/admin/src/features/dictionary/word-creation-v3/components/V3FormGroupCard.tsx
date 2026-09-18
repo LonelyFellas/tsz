@@ -19,13 +19,10 @@ import {
   Empty,
   Flex,
   Popconfirm,
-  Radio,
-  Segmented,
-  Typography
+  Popover
 } from "antd";
 import type {
   DraftFormsStepContentV3,
-  FormGroupScopeV3,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
   WordFormTypeV3,
@@ -73,7 +70,10 @@ export interface V3FormGroupCardProps {
   onMove?: (offset: -1 | 1) => void;
   posCatalog?: PartOfSpeechCatalogItem;
   dialectControl?: ReactNode;
-  onScopeChange?: (scope: FormGroupScopeV3) => void;
+  senseScope?: ReactNode;
+  onEditSenses?: () => void;
+  editingSenses?: boolean;
+  onCloseSenses?: () => void;
   /** 词义步里绑定到本组的词义数；只做提示，不在本地清除绑定。 */
   boundSenseCount?: number;
 }
@@ -94,7 +94,10 @@ export function V3FormGroupCard({
   onMove,
   posCatalog,
   dialectControl,
-  onScopeChange,
+  senseScope,
+  onEditSenses,
+  editingSenses = false,
+  onCloseSenses,
   boundSenseCount = 0
 }: V3FormGroupCardProps) {
   // 模板仅在新建或显式新增词性时初始化；展示以草稿成员为准。
@@ -138,15 +141,6 @@ export function V3FormGroupCard({
       formReferenceCount(referenceGuard.index, blockedForm) > 0)
   )
     setBlockedFormId(undefined);
-  const setRegular = (isRegular: boolean) => {
-    const next = structuredClone(content);
-    const nextPos = next.pos.find((item) => item.pos_id === pos.pos_id);
-    const nextGroup = nextPos?.form_groups.find((item) => item.id === group.id);
-    if (!nextGroup) return;
-    nextGroup.is_regular = isRegular;
-    onChange(next);
-  };
-
   const formRow = (
     member: WordFormGroupV3["members"][number],
     index: number,
@@ -167,10 +161,17 @@ export function V3FormGroupCard({
         return candidateForm?.form_type === form.form_type;
       }).length;
     const lockedBase = lockedBaseFormIds.has(form.id);
-    // 词形或它的变体被别处引用：删词形、改类型都会让引用失效，保存必被拒。
+    // 词形或它的变体被别处引用：**删除**仍锁（引用失去锚点），**改类型**放行（保护式）。
+    // 改类型不换 `form.id`，引用按「词形 + 方言侧」重解析后仍成立；但类型本身是引用记录的一部分，
+    // 改动会让指向它的引用“漂移”，因此给提示而不是硬锁。
     const formReferences = formReferenceCount(referenceGuard.index, form);
     const referenceHint =
       formReferences > 0 ? referenceBlockedHint(formReferences) : undefined;
+    // 改类型的提示：告知会影响多少处引用，但不阻断编辑。
+    const formTypeChangeHint =
+      formReferences > 0
+        ? `修改词形类型会让 ${formReferences} 处引用漂移，保存后请核对`
+        : undefined;
     const baseLabel = formTypeLabel(form.form_type);
     const formMembershipCount = membershipCounts.get(form.id) ?? 0;
     const lastRequiredForm = pos.forms.length === 1 && formMembershipCount <= 1;
@@ -194,9 +195,9 @@ export function V3FormGroupCard({
       form,
       formLabel,
       formTypeAriaLabel: `变化组 ${groupIndex + 1} 词形 ${index + 1} 类型`,
-      formTypeDisabled: !posCatalog || lockedBase || formReferences > 0,
-      formTypeDisabledReason:
-        referenceHint ?? (lockedBase ? BASE_REQUIRED_HINT : undefined),
+      formTypeDisabled: !posCatalog || lockedBase,
+      formTypeDisabledReason: lockedBase ? BASE_REQUIRED_HINT : undefined,
+      formTypeChangeHint,
       formTypeOptions,
       membershipCount: formMembershipCount,
       referenceBadge: (
@@ -305,6 +306,7 @@ export function V3FormGroupCard({
     : undefined;
 
   const bodyId = `v3-form-group-${group.id}-body`;
+  const hasBoundSenses = group.scope === "dedicated" && boundSenseCount > 0;
 
   return (
     <Card
@@ -313,55 +315,55 @@ export function V3FormGroupCard({
       data-v3-node-id={group.id}
       size="small"
       title={
-        <button
-          aria-controls={bodyId}
-          aria-expanded={!collapsed}
-          aria-label={`${collapsed ? "展开" : "收起"}第 ${groupIndex + 1} 组词形变化`}
-          className="word-form-card-toggle"
-          onClick={() => setCollapsed((value) => !value)}
-          type="button"
-        >
-          <span>{`第 ${groupIndex + 1} 组 词形变化`}</span>
-          <span className="word-form-card-toggle-state">
-            <span>{collapsed ? "展开" : "收起"}</span>
-            {collapsed ? (
-              <CaretDownFilled className="word-form-card-toggle-caret" />
-            ) : (
-              <CaretUpFilled className="word-form-card-toggle-caret" />
-            )}
-          </span>
-        </button>
+        <span className="v3-form-group-heading">{`第 ${groupIndex + 1} 组 词形变化`}</span>
       }
       extra={
-        <Flex align="center" gap="small" wrap>
-          {boundSenseCount > 0 ? (
-            <Typography.Text
-              type={group.scope === "dedicated" ? "secondary" : "warning"}
+        <Flex
+          align="center"
+          gap="small"
+          wrap
+          className="v3-form-group-scope"
+          data-v3-field="scope"
+          data-v3-node-id={group.id}
+          tabIndex={-1}
+        >
+          {onEditSenses ? (
+            <Popover
+              trigger="click"
+              placement="bottomRight"
+              open={editingSenses}
+              onOpenChange={(open) =>
+                open ? onEditSenses() : onCloseSenses?.()
+              }
+              destroyOnHidden
+              fresh
+              content={editingSenses ? senseScope : <span />}
             >
-              {group.scope === "dedicated"
-                ? `已绑定 ${boundSenseCount} 个词义`
-                : `${boundSenseCount} 个词义仍绑定此组，改为通用后绑定将失效`}
-            </Typography.Text>
-          ) : null}
-          {onScopeChange ? (
-            <div
-              className="v3-form-group-scope"
-              data-v3-field="scope"
-              data-v3-node-id={group.id}
-              tabIndex={-1}
-            >
-              <Segmented<FormGroupScopeV3>
-                aria-label={`第 ${groupIndex + 1} 组使用范围`}
-                onChange={onScopeChange}
-                options={[
-                  { label: "通用", value: "general" },
-                  { label: "专用", value: "dedicated" }
-                ]}
+              <Button
+                type={hasBoundSenses ? "primary" : "default"}
+                ghost={!hasBoundSenses}
                 size="small"
-                value={group.scope}
-              />
-            </div>
+                aria-label={`第 ${groupIndex + 1} 组专用词义`}
+                aria-expanded={editingSenses}
+              >
+                {hasBoundSenses
+                  ? `专用词义 · ${boundSenseCount}`
+                  : "设置专用词义"}
+              </Button>
+            </Popover>
           ) : null}
+          <Button
+            type="text"
+            size="small"
+            className="v3-form-group-menu word-form-card-toggle-state"
+            aria-label={`${collapsed ? "展开" : "收起"}第 ${groupIndex + 1} 组词形变化`}
+            aria-controls={bodyId}
+            aria-expanded={!collapsed}
+            onClick={() => setCollapsed((value) => !value)}
+          >
+            {collapsed ? "展开" : "收起"}
+            {collapsed ? <CaretDownFilled /> : <CaretUpFilled />}
+          </Button>
           {onDelete ? (
             <Dropdown
               menu={{
@@ -406,6 +408,7 @@ export function V3FormGroupCard({
             >
               <Button
                 aria-label={`管理第 ${groupIndex + 1} 组词形变化`}
+                className="v3-form-group-menu"
                 icon={<EllipsisOutlined />}
                 type="text"
               />
@@ -416,19 +419,7 @@ export function V3FormGroupCard({
     >
       {!collapsed ? (
         <Flex id={bodyId} vertical>
-          <div className="word-form-rules">
-            <div className="word-form-rule-row">
-              <Typography.Text strong>词形是否规则变化？</Typography.Text>
-              <Radio.Group
-                onChange={(event) => setRegular(event.target.value)}
-                value={group.is_regular}
-              >
-                <Radio value>是</Radio>
-                <Radio value={false}>否</Radio>
-              </Radio.Group>
-            </div>
-            {dialectControl}
-          </div>
+          <div className="word-form-rules">{dialectControl}</div>
           {group.members.length === 0 ? (
             <Empty
               description="草稿可暂时保留空变化组"
@@ -495,6 +486,7 @@ export function V3FormGroupCard({
                     formTypeAriaLabel={row.formTypeAriaLabel}
                     formTypeDisabled={row.formTypeDisabled}
                     formTypeDisabledReason={row.formTypeDisabledReason}
+                    formTypeChangeHint={row.formTypeChangeHint}
                     formTypeOptions={row.formTypeOptions}
                     idFactory={idFactory}
                     issues={issues}

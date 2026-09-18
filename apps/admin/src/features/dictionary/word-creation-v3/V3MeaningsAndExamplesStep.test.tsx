@@ -217,8 +217,10 @@ function Harness({
   partOfSpeechCatalogError,
   partOfSpeechCatalogPending,
   wordId,
-  relationSnapshots
+  relationSnapshots,
+  multiGroupBindingsEnabled = false
 }: {
+  multiGroupBindingsEnabled?: boolean;
   initial?: DraftMeaningsStepContentWritableV3;
   issues?: V3DraftValidationIssue[];
   onSave?: (
@@ -251,6 +253,7 @@ function Harness({
   return (
     <AntApp>
       <V3MeaningsAndExamplesStep
+        multiGroupBindingsEnabled={multiGroupBindingsEnabled}
         activePosId={activePosId}
         forms={formsValue}
         idFactory={idFactory}
@@ -721,7 +724,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("开始录入词义")).toBeNull();
     expect(
       screen.getByText(
-        "录入顺序：词义 → 语法结构。 词义需填写本语言释义语句；在下方多维例句区块添加，使用 voice-editor 编辑并独立保存。"
+        "录入顺序：词义 → 语法结构 → 例句。系统报错触发条件：1) 某项词义缺本语言释义语句；2) 例句未配置关联单词；"
       )
     ).toBeVisible();
     expect(
@@ -4600,7 +4603,28 @@ describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
     ).toBeInTheDocument();
   });
 
-  it("只列通用与本词性专用组，选择后写入并可改回通用", () => {
+  it("多组模式下词义页可同时选择两个专用组并回显", () => {
+    const forms = dedicatedForms();
+    forms.pos[0]!.form_groups[0]!.scope = "dedicated";
+    render(<Harness forms={forms} multiGroupBindingsEnabled />);
+    const select = screen.getByLabelText("释义 1 词形与发音");
+    const options = openOptions(select);
+    expect(options.map((option) => option.textContent)).toEqual([
+      "第 1 组 · job",
+      "第 2 组 · Job"
+    ]);
+    fireEvent.click(options[0]!);
+    fireEvent.click(options[1]!);
+    expect(value().pos[0]!.senses[0]!.form_group_ids).toEqual([
+      uuidFromInt(9_011),
+      dedicatedGroupId
+    ]);
+    expect(select.closest(".ant-select")).toHaveTextContent("第 1 组 · job");
+    expect(select.closest(".ant-select")).toHaveTextContent("第 2 组 · Job");
+    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
+  });
+
+  it("只列本词性专用组，最后一个绑定不能直接改回通用", async () => {
     render(<Harness forms={dedicatedForms()} />);
     const select = screen.getByLabelText("释义 1 词形与发音");
     expect(select.closest(".ant-select")).toHaveTextContent("通用（默认）");
@@ -4614,10 +4638,21 @@ describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
     expect(value().pos[0]!.senses[0]!.form_group_id).toBe(dedicatedGroupId);
     expect(select.closest(".ant-select")).toHaveTextContent("第 2 组 · Job");
 
-    fireEvent.click(openOptions(select)[0]!);
-    expect(Object.keys(value().pos[0]!.senses[0]!)).not.toContain(
-      "form_group_id"
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          "这是专用组最后一个词义；解除限制请在词形组的“专用词义”中恢复适用全部词义。"
+        )
+      ).toBeVisible()
     );
+    const generalOption = openOptions(select)[0]!;
+    await waitFor(() =>
+      expect(generalOption.closest(".ant-select-item-option")).toHaveClass(
+        "ant-select-item-option-disabled"
+      )
+    );
+    fireEvent.click(generalOption);
+    expect(value().pos[0]!.senses[0]!.form_group_id).toBe(dedicatedGroupId);
   });
 
   it("绑定失效时保留一项供改选，校验问题落在选择器锚点上", () => {

@@ -30,6 +30,9 @@ const ReactQueryDevtools = dynamic(
 
 function SessionRestorer() {
   useSessionRestore();
+  useEffect(() => {
+    window.dispatchEvent(new Event("tsz:app-ready"));
+  }, []);
   return null;
 }
 

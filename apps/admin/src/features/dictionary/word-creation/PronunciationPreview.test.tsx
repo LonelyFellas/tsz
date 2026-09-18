@@ -637,3 +637,56 @@ it("仅调速但不勾选仍可试听，并使用默认音色自己的语速", a
     ratePercent: -10
   });
 });
+
+function PairedPreview() {
+  return (
+    <PronunciationPreviewProvider>
+      {["IPA", "UPS"].map((name) => (
+        <PronunciationPreviewControls
+          key={name}
+          pronunciationId="same-pronunciation"
+          spelling="cat"
+          dialect="uk"
+          playbackOnly
+          ariaLabelPrefix={name}
+          audioFactory={(src) =>
+            new AudioMock(src) as unknown as HTMLAudioElement
+          }
+        />
+      ))}
+    </PronunciationPreviewProvider>
+  );
+}
+
+it("开始另一行试听会停止正在播放的音频", async () => {
+  render(<PairedPreview />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("IPA 播放语音")).toBeEnabled()
+  );
+  fireEvent.click(screen.getByLabelText("IPA 播放语音"));
+  await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+  const first = AudioMock.instances[0]!;
+  fireEvent.click(screen.getByLabelText("UPS 播放语音"));
+  await waitFor(() => expect(AudioMock.instances).toHaveLength(2));
+  expect(first.pause).toHaveBeenCalled();
+  expect(AudioMock.instances[1]!.play).toHaveBeenCalledOnce();
+});
+
+it("切换试听会取消旧请求，旧响应不会抢播，且原按钮可以重试", async () => {
+  const pending = deferred<VoicePreviewResult>();
+  preview.synthesize.mockImplementationOnce(() => pending.promise);
+  render(<PairedPreview />);
+  await waitFor(() =>
+    expect(screen.getByLabelText("IPA 播放语音")).toBeEnabled()
+  );
+  fireEvent.click(screen.getByLabelText("IPA 播放语音"));
+  const signal = preview.synthesize.mock.calls[0]![1].signal as AbortSignal;
+  fireEvent.click(screen.getByLabelText("UPS 播放语音"));
+  await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+  expect(signal.aborted).toBe(true);
+  const dispose = vi.fn();
+  await act(async () => pending.resolve(result({ dispose })));
+  expect(dispose).toHaveBeenCalledOnce();
+  expect(AudioMock.instances).toHaveLength(1);
+  expect(screen.getByLabelText("IPA 播放语音")).toBeEnabled();
+});

@@ -56,7 +56,8 @@ const initialSearchState: CandidateSearchState = {
 interface CandidateSense {
   senseId: string;
   gloss: string;
-  usage: ResolvedTarget;
+  // 展示合并不改变持久化身份：每个词义保留所有可用地区坐标。
+  usages: ResolvedTarget[];
 }
 
 /**
@@ -108,8 +109,9 @@ interface CascaderOptionNode {
 
 function cascaderOptionsFromGroups(
   groups: CandidateEntryGroup[],
-  selectedLeafKey?: string,
-  readOnly = false
+  selectedTarget?: TargetIdentity,
+  readOnly = false,
+  preferredTarget?: TargetIdentity
 ): CascaderOptionNode[] {
   return groups.map((group) => {
     const draftTag = group.draft ? (
@@ -147,6 +149,8 @@ function cascaderOptionsFromGroups(
       ),
       children: group.formGroups.map((formGroup) => ({
         value: formGroup.formKey,
+        disabled: formGroup.senses.length === 0,
+        isLeaf: formGroup.senses.length === 0,
         label: (
           // 命中行只靠颜色区分，不再占一个「命中」标签的宽度。
           <span
@@ -159,20 +163,28 @@ function cascaderOptionsFromGroups(
             {posLabels.size > 1
               ? `${formGroup.formLabel}（${formGroup.posLabel}）`
               : formGroup.formLabel}
+            {formGroup.senses.length === 0 ? "（暂无可关联词义）" : null}
           </span>
         ),
         children: formGroup.senses.map((sense) => {
           // 单选：词义叶子前挂一个 radio 圆点回显选中态；选择本身仍由级联叶子的点击驱动。
-          const leafKey = `${formGroup.formKey}:${sense.senseId}`;
+          const selected = sense.usages.find(
+            (usage) =>
+              selectedTarget && leafKeyOf(usage) === leafKeyOf(selectedTarget)
+          );
+          const preferred = sense.usages.find(
+            (usage) =>
+              preferredTarget && leafKeyOf(usage) === leafKeyOf(preferredTarget)
+          );
           return {
             value: sense.senseId,
-            target: sense.usage,
+            target: selected ?? preferred ?? sense.usages[0],
             disabled: readOnly,
             label: (
               <span className="v3-component-usage-sense">
                 <span
                   aria-hidden
-                  className={`v3-component-usage-radio${selectedLeafKey === leafKey ? " is-checked" : ""}`}
+                  className={`v3-component-usage-radio${selected ? " is-checked" : ""}`}
                 />
                 {sense.gloss || "暂无释义"}
               </span>
@@ -199,7 +211,9 @@ function groupsFromCandidates(
   keepVariantIds: ReadonlySet<string>,
   selfEntryId: string | undefined,
   formTypeLabel: (code: string) => string,
-  posLabelOf: (code: string) => string
+  posLabelOf: (code: string) => string,
+  // 正文会先过滤方言；标签仍需全量拼写信息，避免把通用拼写误标成美式拼写。
+  spellingCandidates: readonly PublishedSentenceTargetCandidateV3[] = candidates
 ): CandidateEntryGroup[] {
   const byEntry = new Map<string, CandidateEntryGroup>();
   for (const candidate of candidates) {
@@ -235,55 +249,93 @@ function groupsFromCandidates(
         !keepVariantIds.has(form.variant_id)
       )
         continue;
-      const formKey = `${candidate.entry_id}#${candidate.pos_id}#${form.form_id}#${form.variant_id}`;
+      // 只折叠同一具体词形的完全相同拼写；不归一化大小写或跨词性／变化组去重。
+      const formKey = JSON.stringify([
+        candidate.entry_id,
+        candidate.pos_id,
+        form.form_id,
+        form.spelling
+      ]);
       let formGroup = entry.formGroups.find((item) => item.formKey === formKey);
       if (!formGroup) {
         formGroup = {
           formKey,
-          // 正常只剩一侧，方言后缀没有区分作用。但存量关联会把非偏好侧也放行，
-          // 两侧拼写相同时不标方言就成了两行一模一样。
+          // 方言后缀仅用于区分实际拼写差异，不把发音差异展示成词形差异。
           formLabel:
-            form.dialect === "common" || form.dialect === preference
+            form.dialect === "common" ||
+            form.dialect === preference ||
+            spellingCandidates.some(
+              (otherCandidate) =>
+                otherCandidate.entry_id === candidate.entry_id &&
+                otherCandidate.pos_id === candidate.pos_id &&
+                otherCandidate.forms.some(
+                  (other) =>
+                    other.form_id === form.form_id &&
+                    other.variant_id !== form.variant_id &&
+                    other.spelling === form.spelling
+                )
+            )
               ? `${formTypeLabel(form.form_type)} ${form.spelling}`
               : `${formTypeLabel(form.form_type)} ${form.spelling}（${dialectLabel(form.dialect)}）`,
           posLabel: posName,
-          matched:
-            hasEvidence &&
-            form.form_id === candidate.matched_form_id &&
-            form.variant_id === candidate.matched_variant_id,
+          matched: false,
           senses: []
         };
         entry.formGroups.push(formGroup);
       }
+      formGroup.matched ||=
+        hasEvidence &&
+        form.form_id === candidate.matched_form_id &&
+        form.variant_id === candidate.matched_variant_id;
       for (const sense of candidate.senses) {
-        if (formGroup.senses.some((item) => item.senseId === sense.sense_id))
+        if (
+          form.allowed_sense_ids !== undefined &&
+          !form.allowed_sense_ids.includes(sense.sense_id)
+        )
           continue;
-        formGroup.senses.push({
-          senseId: sense.sense_id,
-          gloss: sense.gloss,
-          usage: {
-            state: "resolved",
-            target_word_id: candidate.entry_id,
-            // 发布/词性/原形以词义自带的为准：候选层的值只对命中词形成立。
-            // 草稿候选没有发布版本，键也不写——后端按「缺省即草稿」判定。
-            ...(sense.publication_id
-              ? { target_publication_id: sense.publication_id }
-              : {}),
-            target_pos_id: sense.pos_id,
-            // 后端要求所选词形与原形同组：候选词形自带可搭配的原形清单，
-            // 词义自带的原形在清单内就沿用，否则取清单里的任意一个。
-            target_base_form_id: form.base_form_ids.includes(sense.base_form_id)
-              ? sense.base_form_id
-              : form.base_form_ids[0]!,
-            target_sense_id: sense.sense_id,
-            target_form_id: form.form_id,
-            target_variant_id: form.variant_id,
-            target_dialect: form.dialect,
-            target_form_type: form.form_type,
-            target_headword: candidate.headword,
-            target_gloss: sense.gloss
-          }
-        });
+        let groupedSense = formGroup.senses.find(
+          (item) => item.senseId === sense.sense_id
+        );
+        if (!groupedSense) {
+          groupedSense = {
+            senseId: sense.sense_id,
+            gloss: sense.gloss,
+            usages: []
+          };
+          formGroup.senses.push(groupedSense);
+        }
+        if (
+          groupedSense.usages.some(
+            (usage) => usage.target_variant_id === form.variant_id
+          )
+        )
+          continue;
+        const usage: ResolvedTarget = {
+          state: "resolved",
+          target_word_id: candidate.entry_id,
+          // 发布/词性/原形以词义自带的为准：候选层的值只对命中词形成立。
+          // 草稿候选没有发布版本，键也不写——后端按「缺省即草稿」判定。
+          ...(sense.publication_id
+            ? { target_publication_id: sense.publication_id }
+            : {}),
+          target_pos_id: sense.pos_id,
+          // 后端要求所选词形与原形同组：候选词形自带可搭配的原形清单，
+          // 词义自带的原形在清单内就沿用，否则取清单里的任意一个。
+          target_base_form_id: form.base_form_ids.includes(sense.base_form_id)
+            ? sense.base_form_id
+            : form.base_form_ids[0]!,
+          target_sense_id: sense.sense_id,
+          target_form_id: form.form_id,
+          target_variant_id: form.variant_id,
+          target_dialect: form.dialect,
+          target_form_type: form.form_type,
+          target_headword: candidate.headword,
+          target_gloss: sense.gloss
+        };
+        // 无旧关联时按偏好选真实变体，而不是依赖返回顺序；非偏好侧仍可回显。
+        if (form.dialect === "common" || form.dialect === preference)
+          groupedSense.usages.unshift(usage);
+        else groupedSense.usages.push(usage);
       }
     }
     if (entry.formGroups.length > 0) byEntry.set(candidate.entry_id, entry);
@@ -341,6 +393,7 @@ export function V3TargetCascader({
         ...(selectedTarget ? [selectedTarget.target_variant_id] : [])
       ])
   );
+  const [initialTarget] = useState(() => selectedTarget ?? targets[0]);
   const [searchState, setSearchState] = useState(initialSearchState);
   const searchActions = useRef<{ more: () => void; reload: () => void } | null>(
     null
@@ -481,13 +534,15 @@ export function V3TargetCascader({
         availableVariantIds,
         selfEntryId,
         formTypeLabel,
-        posLabelOf
+        posLabelOf,
+        state.candidates
       ),
     [
       preference,
       availableVariantIds,
       selfEntryId,
       directCandidates,
+      state.candidates,
       formTypeLabel,
       posLabelOf
     ]
@@ -501,7 +556,17 @@ export function V3TargetCascader({
       const components =
         entries.get(candidate.entry_id) ??
         new Map<string, PhraseComponentChoice>();
+      const matchedForm = candidate.forms.find(
+        (form) =>
+          form.form_id === candidate.matched_form_id &&
+          form.variant_id === candidate.matched_variant_id
+      );
       for (const sense of candidate.senses) {
+        if (
+          matchedForm?.allowed_sense_ids !== undefined &&
+          !matchedForm.allowed_sense_ids.includes(sense.sense_id)
+        )
+          continue;
         for (const usage of sense.component_usages ?? []) {
           if (
             usage.state !== "resolved" ||
@@ -587,14 +652,13 @@ export function V3TargetCascader({
   // 单选：至多一条关联。回填单条路径（存量多于一条时以第一条为准，选新词义时整组替换）。
   const selected = targets[0];
   const displayedTarget = selectedTarget ?? selected;
-  const selectedLeafKey = displayedTarget
-    ? leafKeyOf(displayedTarget)
-    : undefined;
+  const preferredTarget = displayedTarget ?? initialTarget;
   const options = useMemo(() => {
     const entries = cascaderOptionsFromGroups(
       groups,
-      selectedLeafKey,
-      readOnly
+      displayedTarget,
+      readOnly,
+      preferredTarget
     );
     if (!includePhraseComponents) return entries;
     return entries.map((entry, index) => {
@@ -632,7 +696,8 @@ export function V3TargetCascader({
             const forms = cascaderOptionsFromGroups(
               componentGroups,
               undefined,
-              readOnly
+              readOnly,
+              preferredTarget
             )
               .flatMap((target) => target.children ?? [])
               .map((form) => ({
@@ -682,16 +747,31 @@ export function V3TargetCascader({
     preference,
     selectedVariantIds,
     selfEntryId,
-    selectedLeafKey,
+    displayedTarget,
+    preferredTarget,
     readOnly,
     formTypeLabel
   ]);
   const value = useMemo(() => {
     if (!displayedTarget) return undefined;
-    const leaf = [formKeyOf(displayedTarget), displayedTarget.target_sense_id];
     if (includePhraseComponents) return undefined;
-    return [displayedTarget.target_word_id, ...leaf];
-  }, [displayedTarget, includePhraseComponents]);
+    const form = groups
+      .find((group) => group.entryId === displayedTarget.target_word_id)
+      ?.formGroups.find((group) =>
+        group.senses.some((sense) =>
+          sense.usages.some(
+            (usage) => leafKeyOf(usage) === leafKeyOf(displayedTarget)
+          )
+        )
+      );
+    return form
+      ? [
+          displayedTarget.target_word_id,
+          form.formKey,
+          displayedTarget.target_sense_id
+        ]
+      : undefined;
+  }, [displayedTarget, includePhraseComponents, groups]);
 
   // 单选没有「反选」：已有关联的解除全靠这个入口，把该单词的关联整组清空。
   // 无候选/查询失败时也要出现——否则指向已下架目标的孤儿关联再也删不掉。
@@ -806,15 +886,15 @@ export function V3TargetCascader({
           if (component && !componentResults[component.key])
             void loadComponent(component);
         }}
-        onChange={(next, selectedOptions) => {
+        onChange={(_next, selectedOptions) => {
           if (readOnly) return;
-          const path = next as string[];
           const leaf = selectedOptions.at(-1);
           const selection =
-            leaf?.target ??
-            (selected && leafKeyOf(selected) === `${path.at(-2)}:${path.at(-1)}`
+            selected &&
+            leaf?.target &&
+            leafKeyOf(selected) === leafKeyOf(leaf.target)
               ? selected
-              : undefined);
+              : leaf?.target;
           onReplace(selection ? [selection] : [], leaf?.viaPhrase);
         }}
         options={options}

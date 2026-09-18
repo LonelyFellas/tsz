@@ -1,5 +1,7 @@
+import { env } from "../../../../lib/env";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
-import { Flex, Input, Select, Tag, Typography } from "antd";
+import { WarningOutlined } from "@ant-design/icons";
+import { Flex, Input, Radio, Select, Tooltip, Typography } from "antd";
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
@@ -10,13 +12,15 @@ import type {
   WordUkFormVariantV3,
   WordUsFormVariantV3
 } from "@tsz/types";
-import type { CSSProperties, ReactNode } from "react";
+import { useId, type CSSProperties, type ReactNode } from "react";
 import {
   unifyUkUsSpelling,
   updateConcreteFormType,
   updateVariantSpelling,
+  updateFormRegularity,
   type V3IdFactory
 } from "../operations";
+import { variantRegularity } from "../model";
 import { dialectLabel } from "../presentation";
 import { spellingConflictReferences } from "../referenceGuard";
 import { useV3ReferenceGuard } from "../referenceGuardContext";
@@ -74,6 +78,8 @@ export interface V3ConcreteFormRowProps {
   formTypeAriaLabel?: string;
   formTypeDisabled?: boolean;
   formTypeDisabledReason?: string;
+  /** 改类型会让多少处引用漂移的提示；不阻断编辑（保护式放开）。 */
+  formTypeChangeHint?: string;
   formTypeOptions?: readonly WordFormTypeV3[];
   issues: readonly V3DraftValidationIssue[];
   membershipCount: number;
@@ -92,6 +98,8 @@ interface V3ConcreteFormTypeCellProps {
   formTypeAriaLabel: string;
   formTypeDisabled: boolean;
   formTypeDisabledReason?: string;
+  /** 改类型会让多少处引用漂移的提示；不阻断编辑（保护式放开）。 */
+  formTypeChangeHint?: string;
   formTypeOptions: readonly WordFormTypeV3[];
   membershipCount: number;
   onChange: (next: DraftFormsStepContentV3) => void;
@@ -107,6 +115,7 @@ function V3ConcreteFormTypeCell({
   formTypeAriaLabel,
   formTypeDisabled,
   formTypeDisabledReason,
+  formTypeChangeHint,
   formTypeOptions,
   membershipCount,
   onChange,
@@ -130,7 +139,19 @@ function V3ConcreteFormTypeCell({
       tabIndex={-1}
     >
       <div className="word-form-type-cell-content">
-        <div className="word-form-type-cell-header">{referenceBadge}</div>
+        <div className="word-form-type-cell-header">
+          {referenceBadge}
+          {/* 改类型不换 form.id，引用按「词形 + 方言侧」重解析后仍成立，但引用记录里的类型会"漂移"。
+              文案长、类型列只有 112px，硬塞会折成好几行；收成警示图标 + 悬停说明。 */}
+          {formTypeChangeHint ? (
+            <Tooltip title={formTypeChangeHint}>
+              <WarningOutlined
+                aria-label={formTypeChangeHint}
+                className="word-form-type-change-hint"
+              />
+            </Tooltip>
+          ) : null}
+        </div>
         <V3DisabledReason
           block
           reason={formTypeDisabled ? formTypeDisabledReason : undefined}
@@ -174,6 +195,49 @@ function V3ConcreteFormTypeCell({
   );
 }
 
+function SpellingRegularity({
+  content,
+  form,
+  dialectRules,
+  variant,
+  label,
+  onChange
+}: {
+  content: DraftFormsStepContentV3;
+  form: WordConcreteFormV3;
+  dialectRules: DialectRulesV3;
+  variant: WordCommonFormVariantV3 | WordUkFormVariantV3 | WordUsFormVariantV3;
+  label: string;
+  onChange: (next: DraftFormsStepContentV3) => void;
+}) {
+  const name = useId();
+  if (!env.FORM_SPELLING_REGULARITY) return null;
+  return (
+    <Flex align="center" gap="small" className="v3-spelling-regularity">
+      <Typography.Text>是否规则变化？</Typography.Text>
+      <Radio.Group
+        name={`${name}-${variant.id}-regularity`}
+        aria-label={`${label}是否规则变化`}
+        value={variantRegularity(content, form.id, variant)}
+        onChange={(event) =>
+          onChange(
+            updateFormRegularity(
+              content,
+              form.id,
+              variant.dialect,
+              event.target.value,
+              dialectRules.spelling_mode
+            )
+          )
+        }
+      >
+        <Radio value>是</Radio>
+        <Radio value={false}>否</Radio>
+      </Radio.Group>
+    </Flex>
+  );
+}
+
 interface V3DialectFormCellProps {
   content: DraftFormsStepContentV3;
   dialectRules: DialectRulesV3;
@@ -205,6 +269,7 @@ function V3DialectFormCell({
   const conflictLiteralList = conflictLiterals(
     spellingConflictReferences(
       referenceGuard.index,
+      form,
       [variant.id],
       variant.spelling
     )
@@ -226,7 +291,17 @@ function V3DialectFormCell({
       style={style}
     >
       <Flex vertical gap="small">
-        <Typography.Text strong>{dialectLabel(dialect)}拼写</Typography.Text>
+        <Flex align="center" justify="space-between" gap="small" wrap>
+          <Typography.Text strong>{dialectLabel(dialect)}拼写</Typography.Text>
+          <SpellingRegularity
+            content={content}
+            form={form}
+            dialectRules={dialectRules}
+            variant={variant}
+            label={`${formLabel}${dialectLabel(dialect)}拼写`}
+            onChange={onChange}
+          />
+        </Flex>
         <Input
           aria-invalid={spellingInvalid}
           aria-label={`${formLabel}${dialectLabel(dialect)}拼写`}
@@ -268,6 +343,7 @@ export function V3ConcreteFormRow({
   formTypeAriaLabel = `${formLabel}类型`,
   formTypeDisabled = false,
   formTypeDisabledReason,
+  formTypeChangeHint,
   formTypeOptions = [form.form_type],
   issues,
   membershipCount,
@@ -301,6 +377,7 @@ export function V3ConcreteFormRow({
     ? conflictLiterals(
         spellingConflictReferences(
           referenceGuard.index,
+          form,
           unifiedSpellingVariantIds,
           unifiedSpellingVariants.uk.spelling
         )
@@ -318,6 +395,7 @@ export function V3ConcreteFormRow({
     ? conflictLiterals(
         spellingConflictReferences(
           referenceGuard.index,
+          form,
           [commonVariant.id],
           commonVariant.spelling
         )
@@ -373,6 +451,7 @@ export function V3ConcreteFormRow({
           formTypeAriaLabel={formTypeAriaLabel}
           formTypeDisabled={formTypeDisabled}
           formTypeDisabledReason={formTypeDisabledReason}
+          formTypeChangeHint={formTypeChangeHint}
           formTypeOptions={formTypeOptions}
           lastRow={lastRow}
           membershipCount={membershipCount}
@@ -385,9 +464,16 @@ export function V3ConcreteFormRow({
             data-v3-node-id={commonVariant.id}
           >
             <div className="word-shared-form-spelling">
-              <Flex align="center" justify="space-between">
+              <Flex align="center" justify="space-between" gap="small" wrap>
                 <Typography.Text strong>词形拼写</Typography.Text>
-                <Tag color="blue">英美通用</Tag>
+                <SpellingRegularity
+                  content={content}
+                  form={form}
+                  dialectRules={dialectRules}
+                  variant={commonVariant}
+                  label={`${formLabel}英美通用拼写`}
+                  onChange={onChange}
+                />
               </Flex>
               <Input
                 aria-invalid={
@@ -436,9 +522,16 @@ export function V3ConcreteFormRow({
             data-v3-node-id={form.id}
           >
             <div className="word-shared-form-spelling">
-              <Flex align="center" justify="space-between">
+              <Flex align="center" justify="space-between" gap="small" wrap>
                 <Typography.Text strong>词形拼写</Typography.Text>
-                <Tag color="blue">英美通用</Tag>
+                <SpellingRegularity
+                  content={content}
+                  form={form}
+                  dialectRules={dialectRules}
+                  variant={unifiedSpellingVariants.uk}
+                  label={`${formLabel}英美通用拼写`}
+                  onChange={onChange}
+                />
               </Flex>
               <Input
                 aria-invalid={unifiedSpellingInvalid}
@@ -506,6 +599,8 @@ export interface V3DialectSeparatedFormRow {
   formTypeAriaLabel: string;
   formTypeDisabled: boolean;
   formTypeDisabledReason?: string;
+  /** 改类型会让多少处引用漂移的提示；不阻断编辑（保护式放开）。 */
+  formTypeChangeHint?: string;
   formTypeOptions: readonly WordFormTypeV3[];
   membershipCount: number;
   actions?: ReactNode;
@@ -561,6 +656,7 @@ export function V3DialectSeparatedFormMatrix({
                 formTypeAriaLabel={row.formTypeAriaLabel}
                 formTypeDisabled={row.formTypeDisabled}
                 formTypeDisabledReason={row.formTypeDisabledReason}
+                formTypeChangeHint={row.formTypeChangeHint}
                 formTypeOptions={row.formTypeOptions}
                 lastRow={index === rows.length - 1}
                 membershipCount={row.membershipCount}

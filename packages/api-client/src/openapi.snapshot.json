@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-azure-pronunciation-inputs/docs/openapi.json",
-  "_generatedAt": "2026-09-15T14:09:21.295Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-task-58/docs/openapi.json",
+  "_generatedAt": "2026-09-18T02:51:46.606Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1696,7 +1696,12 @@
       "properties": {
         "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
         "content": { "$ref": "#/components/schemas/DraftFormsStepContentV3" },
-        "schema_version": { "type": "integer", "enum": [3] }
+        "schema_version": { "type": "integer", "enum": [3] },
+        "sense_bindings": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/SenseFormGroupBindingV3" },
+          "maxItems": 2000
+        }
       },
       "additionalProperties": false
     },
@@ -1709,7 +1714,12 @@
         "confirmed_surface_match_token": { "type": "string" },
         "content": { "$ref": "#/components/schemas/DraftFormsStepContentV3" },
         "intent": { "$ref": "#/components/schemas/StepSaveIntent" },
-        "schema_version": { "type": "integer", "enum": [3] }
+        "schema_version": { "type": "integer", "enum": [3] },
+        "sense_bindings": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/SenseFormGroupBindingV3" },
+          "maxItems": 2000
+        }
       },
       "additionalProperties": false
     },
@@ -2043,7 +2053,8 @@
         "shared_sentence",
         "publication_sense_ref",
         "draft_relation",
-        "phrase_component"
+        "phrase_component",
+        "form_group_sense_binding"
       ]
     },
     "InboundReferenceNodeTypeV3": {
@@ -2091,6 +2102,7 @@
         "entry_id": { "type": "string", "format": "uuid" },
         "entry_kind": { "$ref": "#/components/schemas/WordEntryKindV3" },
         "entry_status": { "$ref": "#/components/schemas/AdminWordStatus" },
+        "form_group_label": { "type": "string" },
         "node_id": {
           "type": "string",
           "format": "uuid",
@@ -3348,6 +3360,22 @@
       },
       "additionalProperties": false
     },
+    "SenseFormGroupBindingV3": {
+      "type": "object",
+      "description": "随词形变更原子保存的既有词义绑定；缺省 form_group_id 表示解除绑定。",
+      "required": ["sense_id"],
+      "properties": {
+        "form_group_id": { "type": "string", "format": "uuid" },
+        "form_group_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "description": "同词性的专用组集合；显式空集合解除全部绑定，缺省兼容历史单组字段。",
+          "maxItems": 2000
+        },
+        "sense_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "SenseGroupV3": {
       "type": "object",
       "required": ["id", "name_zh", "name_en"],
@@ -3395,6 +3423,10 @@
           "properties": {
             "state": { "type": "string", "enum": ["linked"] },
             "target_base_form_id": { "type": "string", "format": "uuid" },
+            "target_dialect": {
+              "$ref": "#/components/schemas/Dialect",
+              "description": "目标变体的方言侧。变体实例 id 随英美结构切换而变，引用按「词形 + 方言侧」重解析\n时需要它；缺省兼容存量条目（退化为宽容匹配）。"
+            },
             "target_entry_id": { "type": "string", "format": "uuid" },
             "target_form_id": { "type": "string", "format": "uuid" },
             "target_pos_id": { "type": "string", "format": "uuid" },
@@ -3482,6 +3514,10 @@
           "minItems": 1
         },
         "target_base_form_id": { "type": "string", "format": "uuid" },
+        "target_dialect": {
+          "$ref": "#/components/schemas/Dialect",
+          "description": "目标变体的方言侧。变体实例 id 会随「英美通用 ↔ 英/美」结构切换而改变，引用在业务上\n绑的是「词形 + 方言侧」；缺省时判定退化为按来源方言与任一侧拼写宽容匹配（兼容存量）。"
+        },
         "target_form_id": { "type": "string", "format": "uuid" },
         "target_gloss": { "type": "string", "readOnly": true },
         "target_headword": { "type": "string", "readOnly": true },
@@ -3632,6 +3668,10 @@
         },
         "dialect": { "$ref": "#/components/schemas/CommonDialectV3" },
         "id": { "type": "string", "format": "uuid" },
+        "is_regular": {
+          "type": "boolean",
+          "description": "该拼写是否规则变化；缺省兼容历史组级值。"
+        },
         "origin": { "$ref": "#/components/schemas/TextOrigin" },
         "pronunciations": {
           "type": "array",
@@ -3756,7 +3796,7 @@
         },
         "scope": {
           "$ref": "#/components/schemas/FormGroupScopeV3",
-          "description": "通用组服务本词性下没有绑定专用组的词义；专用组只服务绑定了它的词义。"
+          "description": "通用组服务本词性下全部词义；专用组只服务同词性下绑定了它的词义。"
         }
       },
       "additionalProperties": false
@@ -3955,6 +3995,12 @@
           "format": "uuid",
           "description": "缺省 = 通用：使用本词性的通用变化组；只能指向同词性下 `scope = dedicated` 的组。"
         },
+        "form_group_ids": {
+          "type": "array",
+          "items": { "type": "string", "format": "uuid" },
+          "description": "同词性的专用组集合；显式空集合解除全部绑定，缺省兼容历史单组字段。",
+          "maxItems": 2000
+        },
         "frequency": { "type": "string" },
         "id": { "type": "string", "format": "uuid" },
         "level": { "type": "string" },
@@ -4039,6 +4085,10 @@
         },
         "dialect": { "$ref": "#/components/schemas/UkDialectV3" },
         "id": { "type": "string", "format": "uuid" },
+        "is_regular": {
+          "type": "boolean",
+          "description": "该拼写是否规则变化；缺省兼容历史组级值。"
+        },
         "origin": { "$ref": "#/components/schemas/TextOrigin" },
         "pronunciations": {
           "type": "array",
@@ -4060,6 +4110,10 @@
         },
         "dialect": { "$ref": "#/components/schemas/UsDialectV3" },
         "id": { "type": "string", "format": "uuid" },
+        "is_regular": {
+          "type": "boolean",
+          "description": "该拼写是否规则变化；缺省兼容历史组级值。"
+        },
         "origin": { "$ref": "#/components/schemas/TextOrigin" },
         "pronunciations": {
           "type": "array",

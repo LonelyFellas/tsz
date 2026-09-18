@@ -3,7 +3,6 @@ import { Alert, Button, Empty, Flex, Radio, Space, Typography } from "antd";
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
-  FormGroupScopeV3,
   PartOfSpeechCatalogItem,
   V3DraftValidationIssue,
   WordFormGroupV3,
@@ -15,22 +14,15 @@ import {
   deleteGroupAndOrphanForms,
   normalizeGroupDialectRules,
   reorderFormGroups,
-  updateFormGroupScope,
   type V3IdFactory,
   type V3StableVariantIdFactory
 } from "../operations";
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { V3FormGroupCard } from "./V3FormGroupCard";
 import { partOfSpeechLabel } from "../presentation";
-import {
-  dialectRuleLocks,
-  groupDeleteReferenceCount,
-  variantIdsOf
-} from "../referenceGuard";
-import {
-  referenceBlockedHint,
-  useV3ReferenceGuard
-} from "../referenceGuardContext";
+import { groupDeleteReferenceCount, variantIdsOf } from "../referenceGuard";
+import { useV3ReferenceGuard } from "../referenceGuardContext";
 import { V3DisabledReason } from "./V3DisabledReason";
 import { V3ReferenceBadge } from "./V3ReferenceBadge";
 import { useDialectPreference } from "@/features/settings/useDialectPreference";
@@ -59,6 +51,10 @@ export interface V3PosTabProps {
   stableVariantIds?: V3StableVariantIdFactory;
   /** 变化组 id → 词义步里绑定它的词义数。 */
   formGroupBindingCounts?: ReadonlyMap<string, number>;
+  renderGroupSenses?: (group: WordFormGroupV3) => ReactNode;
+  onEditGroupSenses?: (groupId: string) => void;
+  editingGroupId?: string;
+  onCloseGroupSenses?: () => void;
 }
 
 export function V3PosTab({
@@ -69,7 +65,11 @@ export function V3PosTab({
   onChange,
   posCatalog,
   stableVariantIds,
-  formGroupBindingCounts
+  formGroupBindingCounts,
+  renderGroupSenses,
+  onEditGroupSenses,
+  editingGroupId,
+  onCloseGroupSenses
 }: V3PosTabProps) {
   const [pendingGroupDeletion, setPendingGroupDeletion] = useState<{
     groupId: string;
@@ -114,6 +114,11 @@ export function V3PosTab({
     if (result.ok) {
       setDialectChangeError(undefined);
       onChange(result.value);
+    } else if (result.reason === "regularity_merge_required") {
+      setDialectChangeError({
+        groupId,
+        message: "英式与美式的规则变化设置不同，请先统一设置，再合并拼写。"
+      });
     } else if (result.reason === "component_merge_required") {
       setDialectChangeError({
         groupId,
@@ -134,13 +139,9 @@ export function V3PosTab({
       const form = pos.forms.find((item) => item.id === member.form_id);
       return !form || formMatchesDialectRules(form, rules);
     });
-    // 被引用的变体：拆成英 / 美会换掉通用变体 id，合并成通用会丢掉英 / 美变体；
-    // 两种切换都会让引用失效，保存必被拒，索性不让点。
-    const locks = dialectRuleLocks(referenceGuard.index, pos, group);
-    const splitHint =
-      locks.split > 0 ? referenceBlockedHint(locks.split) : undefined;
-    const mergeHint =
-      locks.merge > 0 ? referenceBlockedHint(locks.merge) : undefined;
+    // 被引用的变体不再锁开关：引用按「词形 + 方言侧」语义坐标重解析，common ↔ uk_us 切换后
+    // 引用自动跟随，不必先解除。计数仍保留（徽标展示「被 N 处引用」），但不阻断编辑。
+    // 与引用无关的结构约束（如区分拼写时音标必须区分）继续拦。
     const memberForms = group.members.flatMap((member) => {
       const form = pos.forms.find((item) => item.id === member.form_id);
       return form ? [form] : [];
@@ -188,15 +189,9 @@ export function V3PosTab({
                 }
                 value={rules.spelling_mode}
               >
-                <V3DisabledReason reason={splitHint}>
-                  <Radio
-                    aria-label="英美拼写有区别"
-                    disabled={Boolean(splitHint)}
-                    value="distinguish"
-                  >
-                    是
-                  </Radio>
-                </V3DisabledReason>
+                <Radio aria-label="英美拼写有区别" value="distinguish">
+                  是
+                </Radio>
                 <Radio aria-label="英美拼写无区别" value="unified">
                   否
                 </Radio>
@@ -224,22 +219,19 @@ export function V3PosTab({
                 }
                 value={rules.phonetic_mode}
               >
-                <V3DisabledReason reason={splitHint}>
-                  <Radio
-                    aria-label="英美音标有区别"
-                    disabled={Boolean(splitHint)}
-                    value="distinguish"
-                  >
-                    是
-                  </Radio>
-                </V3DisabledReason>
-                <V3DisabledReason reason={mergeHint}>
+                <Radio aria-label="英美音标有区别" value="distinguish">
+                  是
+                </Radio>
+                <V3DisabledReason
+                  reason={
+                    rules.spelling_mode === "distinguish"
+                      ? "英美拼写有区别时，音标也必须区分"
+                      : undefined
+                  }
+                >
                   <Radio
                     aria-label="英美音标无区别"
-                    disabled={
-                      rules.spelling_mode === "distinguish" ||
-                      Boolean(mergeHint)
-                    }
+                    disabled={rules.spelling_mode === "distinguish"}
                     value="unified"
                   >
                     否
@@ -273,11 +265,6 @@ export function V3PosTab({
 
   const addGroup = () => {
     const result = addFormGroup(content, pos.pos_id, idFactory);
-    if (result.ok) onChange(result.value);
-  };
-
-  const changeScope = (groupId: string, scope: FormGroupScopeV3) => {
-    const result = updateFormGroupScope(content, pos.pos_id, groupId, scope);
     if (result.ok) onChange(result.value);
   };
 
@@ -420,7 +407,14 @@ export function V3PosTab({
               onChange={onChange}
               onDelete={() => deleteGroup(group.id)}
               onMove={(offset) => moveGroup(index, offset)}
-              onScopeChange={(scope) => changeScope(group.id, scope)}
+              senseScope={renderGroupSenses?.(group)}
+              onEditSenses={
+                onEditGroupSenses
+                  ? () => onEditGroupSenses(group.id)
+                  : undefined
+              }
+              onCloseSenses={onCloseGroupSenses}
+              editingSenses={editingGroupId === group.id}
               pos={pos}
               posCatalog={posCatalog}
             />

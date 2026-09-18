@@ -14,24 +14,27 @@ case "$deploy_voice_editor" in
   *) echo "!! DEPLOY_VOICE_EDITOR 必须为 true 或 false" >&2; exit 1 ;;
 esac
 
-# 新合成字段先以兼容 reader 发布，配套后端就绪后显式打开 writer。
-deploy_azure_pronunciation_inputs="${DEPLOY_AZURE_PRONUNCIATION_INPUTS:-false}"
+# 配套后端已上线，默认启用独立合成输入；兼容发布仍可显式关闭。
+deploy_azure_pronunciation_inputs="${DEPLOY_AZURE_PRONUNCIATION_INPUTS:-true}"
 case "$deploy_azure_pronunciation_inputs" in
   true|false) ;;
   *) echo "!! DEPLOY_AZURE_PRONUNCIATION_INPUTS 必须为 true 或 false" >&2; exit 1 ;;
 esac
 
+# 首次配套发布先显式关闭写入口；新后端验收后再开启。
+deploy_form_spelling_regularity="${DEPLOY_FORM_SPELLING_REGULARITY:-true}"
+case "$deploy_form_spelling_regularity" in
+  true|false) ;;
+  *) echo "!! DEPLOY_FORM_SPELLING_REGULARITY 必须为 true 或 false" >&2; exit 1 ;;
+esac
+
 prepare_deploy_source admin
+release_id="${DEPLOY_GIT_SHA}-$(node -e 'console.log(require("crypto").randomUUID())')"
 
 deploy_tmp="$(mktemp -d /tmp/tsz-admin-deploy.XXXXXX)"
-remote_candidate=""
 deploy_interrupted=""
 cleanup() {
   local status="${deploy_interrupted:-$?}"
-  if [[ -n "$remote_candidate" ]]; then
-    ssh tshb-test "rm -f -- '$remote_candidate'" >/dev/null 2>&1 || status=1
-  fi
-  remove_nginx_stage >/dev/null || status=1
   remove_deploy_build_tree || status=1
   case "$deploy_tmp" in
     /tmp/tsz-admin-deploy.*) rm -rf -- "$deploy_tmp" ;;
@@ -67,6 +70,8 @@ echo "==> build @tsz/admin"
 (
   cd "$DEPLOY_BUILD_ROOT"
   run_sanitized_build \
+    TSZ_RELEASE_ID="$release_id" \
+    VITE_FORM_SPELLING_REGULARITY="$deploy_form_spelling_regularity" \
     VITE_VOICE_EDITOR="$deploy_voice_editor" \
     VITE_AZURE_PRONUNCIATION_INPUTS="$deploy_azure_pronunciation_inputs" \
     VITE_VOICE_PREVIEW=true \
@@ -87,7 +92,7 @@ node "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" create-candidate \
   --ci-run-id "$DEPLOY_CI_RUN_ID" \
   --ci-run-url "$DEPLOY_CI_RUN_URL" \
   --artifact-root "$DEPLOY_BUILD_ROOT/apps/admin/dist" \
-  --artifact-path /opt/tsz-admin/dist \
+  --artifact-path /opt/tsz-releases/admin/current \
   --output "$candidate_manifest"
 # provenance.mjs 静默跳过 CLI 时会退出 0（见 deploy-source.sh 里构建目录前缀的注释）：
 # 在往服务器写任何东西之前先确认候选 manifest 真的生成了。
@@ -95,34 +100,19 @@ node "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" create-candidate \
 
 echo "==> recheck exact main before server writes"
 recheck_deploy_source admin
-ssh tshb-test 'install -d -m 0755 /opt/tsz-deploy-manifests /opt/tsz-deploy-tools'
-remote_candidate="$(ssh tshb-test "mktemp '/opt/tsz-deploy-manifests/.admin.${DEPLOY_GIT_SHA}.XXXXXX.partial'")"
-# 推到 tshb-test 的 rsync 一律带 --no-o --no-g：不把本机 uid/gid（如 501）带到服务器——那边没有
-# 对应用户，文件会变成「不存在的用户」所有；产物与部署工具以 root 运行，必须保持 root 属主。
-rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" tshb-test:/opt/tsz-deploy-tools/frontend-provenance.mjs
-
-echo "==> rsync dist -> tshb-test:/opt/tsz-admin/dist"
-# --delete 仅限 dist 目录：产物文件名带内容 hash，清掉旧版本避免无限堆积。
-rsync -az --no-o --no-g --delete "$DEPLOY_BUILD_ROOT/apps/admin/dist/" tshb-test:/opt/tsz-admin/dist/
-rsync -az --no-o --no-g "$candidate_manifest" "tshb-test:$remote_candidate"
-ssh tshb-test "/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify-candidate --manifest '$remote_candidate' --artifact-root /opt/tsz-admin/dist"
-
-echo "==> sync nginx conf + reload"
-# nginx -t 不过会恢复原配置、不 reload 并非零退出（见 deploy-source.sh）。
-install_nginx_configs "$DEPLOY_BUILD_ROOT"
-
-echo "==> smoke"
-ssh tshb-test 'curl -fsS -m 8 -o /dev/null -w "GET  /        -> %{http_code}\n" http://127.0.0.1:8081/'
-ssh tshb-test 'curl -fsS -m 8 -o /dev/null -w "GET  /login   -> %{http_code}\n" http://127.0.0.1:8081/login'
-code=$(ssh tshb-test 'curl -sS -m 8 -o /dev/null -w "%{http_code}" http://127.0.0.1:8081/api/v1/admin/profile')
-echo "GET  /api/v1/admin/profile -> ${code} (无 token，预期 401)"
-[ "$code" = "401" ] || { echo "!! API 反代异常"; exit 1; }
-# HTTPS 域名入口在服务器本机按域名走 443 验证（--resolve 保留 SNI 与证书校验）。
-code=$(ssh tshb-test 'curl -sS -m 8 -o /dev/null -w "%{http_code}" --resolve admin-test.tianshengzhi.com:443:127.0.0.1 https://admin-test.tianshengzhi.com/login' || true)
-echo "GET  https://admin-test.tianshengzhi.com/login -> ${code} (预期 200)"
-[ "$code" = "200" ] || { echo "!! HTTPS 域名入口异常"; exit 1; }
-
-echo "==> accept and verify admin provenance manifest"
-ssh tshb-test "/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs accept --manifest '$remote_candidate' --artifact-root /opt/tsz-admin/dist --output /opt/tsz-deploy-manifests/admin.json"
-ssh tshb-test '/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify --manifest /opt/tsz-deploy-manifests/admin.json --artifact-root /opt/tsz-admin/dist'
+# 独立暂存不触碰在线目录；事务在远端持有发布锁直到验证及回滚结束。
+remote_stage="$(ssh tshb-test "mktemp -d /opt/tsz-release-stage.XXXXXX")"
+[[ "$remote_stage" =~ ^/opt/tsz-release-stage\.[a-zA-Z0-9]{6}$ ]] || { echo "!! 无效的远端暂存路径" >&2; exit 1; }
+rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/apps/admin/dist/" "tshb-test:$remote_stage/artifact/"
+rsync -az --no-o --no-g "$candidate_manifest" "tshb-test:$remote_stage/candidate.json"
+printf '%s\n' "$release_id" > "$deploy_tmp/release-id"
+rsync -az --no-o --no-g "$deploy_tmp/release-id" "tshb-test:$remote_stage/release-id"
+for file in releases.mjs provenance.mjs publish-release.sh install-nginx-local.sh; do
+  rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/$file" "tshb-test:$remote_stage/$file"
+done
+rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/" "tshb-test:$remote_stage/nginx/"
+rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/systemd/" "tshb-test:$remote_stage/systemd/"
+# 断连时保留暂存与回滚证据；只在成功结束后清理。
+ssh tshb-test "bash '$remote_stage/publish-release.sh' '$remote_stage' admin"
+ssh tshb-test "rm -rf -- '$remote_stage'"
 echo "✓ done"

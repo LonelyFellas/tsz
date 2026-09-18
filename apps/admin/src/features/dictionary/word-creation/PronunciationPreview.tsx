@@ -27,6 +27,8 @@ import {
 } from "../voice-editor/dataSource";
 
 interface PreviewContextValue {
+  claimPlayback: (stop: () => void) => void;
+  releasePlayback: (stop: () => void) => void;
   enabled: boolean;
   voices: VoiceOption[];
   voicesLoading: boolean;
@@ -49,6 +51,14 @@ export function PronunciationPreviewProvider({
   children: ReactNode;
   readOnly?: boolean;
 }) {
+  const activePlayback = useRef<(() => void) | null>(null);
+  const claimPlayback = useCallback((stop: () => void) => {
+    if (activePlayback.current !== stop) activePlayback.current?.();
+    activePlayback.current = stop;
+  }, []);
+  const releasePlayback = useCallback((stop: () => void) => {
+    if (activePlayback.current === stop) activePlayback.current = null;
+  }, []);
   const enabled = env.VOICE_PREVIEW && !readOnly;
   const { preference: dialectPreference } = useDialectPreference();
   const [voices, setVoices] = useState<VoiceOption[]>([]);
@@ -83,6 +93,8 @@ export function PronunciationPreviewProvider({
 
   const value = useMemo(
     () => ({
+      claimPlayback,
+      releasePlayback,
       enabled,
       voices,
       voicesLoading,
@@ -90,7 +102,15 @@ export function PronunciationPreviewProvider({
       dialectPreference,
       adapter: adminVoicePreviewAdapter
     }),
-    [dialectPreference, enabled, voices, voicesError, voicesLoading]
+    [
+      claimPlayback,
+      releasePlayback,
+      dialectPreference,
+      enabled,
+      voices,
+      voicesError,
+      voicesLoading
+    ]
   );
   return (
     <PreviewContext.Provider value={value}>{children}</PreviewContext.Provider>
@@ -243,6 +263,14 @@ export function PronunciationPreviewControls({
     discardResult();
   }, [discardResult]);
 
+  const stopPlayback = useCallback(() => {
+    generationRef.current = null;
+    cleanup();
+    setBusy(false);
+    setStatus("");
+  }, [cleanup]);
+  const { claimPlayback, releasePlayback } = context;
+
   useLayoutEffect(() => {
     generationRef.current = null;
     cleanup();
@@ -254,8 +282,9 @@ export function PronunciationPreviewControls({
     () => () => {
       generationRef.current = null;
       cleanup();
+      releasePlayback(stopPlayback);
     },
-    [cleanup]
+    [cleanup, releasePlayback, stopPlayback]
   );
 
   const attachAudio = useCallback(
@@ -298,6 +327,7 @@ export function PronunciationPreviewControls({
     ) {
       return;
     }
+    claimPlayback(stopPlayback);
     const generation = Symbol("pronunciation-preview-generation");
     generationRef.current = generation;
     cleanup();
@@ -365,6 +395,7 @@ export function PronunciationPreviewControls({
 
   const replay = async () => {
     if (disabled || !context.enabled || !result) return;
+    claimPlayback(stopPlayback);
     const audio = attachAudio(result);
     try {
       await audio.play();

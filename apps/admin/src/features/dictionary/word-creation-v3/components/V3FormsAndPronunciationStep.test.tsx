@@ -1,3 +1,4 @@
+import { env } from "../../../../lib/env";
 import { FormTypeLabelsProvider } from "../../part-of-speech/FormTypeLabels";
 import {
   act,
@@ -329,7 +330,7 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     catalogState.pending = undefined;
   });
 
-  it("原形变体被例句标注：英美切换、删词形、改类型、删词性都不可点，徽标可点开并跳转", async () => {
+  it("原形变体被例句标注：英美切换与改类型可点、删词形与删词性仍锁，徽标可点开并跳转", async () => {
     const initial = multiPosFixture();
     const pos = initial.pos[0]!;
     const base = pos.forms[0]!;
@@ -370,20 +371,20 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
         `[data-group-id="${uuidFromInt(12)}"]`
       )!
     );
-    expect(firstGroup.getByLabelText("英美拼写有区别")).toBeDisabled();
-    expect(firstGroup.getByLabelText("英美音标有区别")).toBeDisabled();
-    // 通用变体被引用只锁「拆成英美」；合并方向的「否」本来就是当前值。
+    // TASK#58：英美结构切换解锁——引用按「词形 + 方言侧」语义坐标重解析，不必先解除引用。
+    expect(firstGroup.getByLabelText("英美拼写有区别")).not.toBeDisabled();
+    expect(firstGroup.getByLabelText("英美音标有区别")).not.toBeDisabled();
     expect(firstGroup.getByLabelText("英美拼写无区别")).not.toBeDisabled();
     // 同词性里没被引用的第 2 组照常可切。
     expect(secondGroup.getByLabelText("英美拼写有区别")).not.toBeDisabled();
+    // 删词形仍锁：引用失去锚点。
     const deleteForm = screen.getByLabelText("删除变化组 1 的词形 1");
     expect(deleteForm).toBeDisabled();
     await expectDisabledReason(deleteForm, hint);
-    expect(screen.getByLabelText("变化组 1 词形 1 类型")).toBeDisabled();
-    await expectDisabledReason(
-      screen.getByLabelText("变化组 1 词形 1 类型"),
-      hint
-    );
+    // TASK#58：改类型保护式放开——可点，但给漂移提示。
+    expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled();
+    // 漂移提示收成警示图标 + 悬停说明，可及名保留完整文案。
+    await screen.findByLabelText(/修改词形类型会让 1 处引用漂移/);
     const deletePos = screen.getByLabelText("删除名词");
     expect(deletePos).toBeDisabled();
     await expectDisabledReason(deletePos, hint);
@@ -725,6 +726,46 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(canonicalValue()).toEqual(content);
   });
 
+  it("兼容发布隐藏规则开关但保留已有标记和拼写编辑", async () => {
+    const enabled = env.FORM_SPELLING_REGULARITY;
+    env.FORM_SPELLING_REGULARITY = false;
+    try {
+      const form = commonFormFixture();
+      form.regional_variants.common.is_regular = false;
+      const { container } = render(
+        <Harness initial={formsFixture({ forms: [form] })} />
+      );
+      const input = await screen.findByLabelText("原形英美通用拼写");
+      expect(container.querySelector(".v3-spelling-regularity")).toBeNull();
+      fireEvent.change(input, { target: { value: "edited" } });
+      expect(formById(canonicalValue(), form.id)).toMatchObject({
+        regional_variants: { common: { spelling: "edited", is_regular: false } }
+      });
+    } finally {
+      env.FORM_SPELLING_REGULARITY = enabled;
+    }
+  });
+
+  it("英美拼写各自设置规则变化，合并不同值时提示先统一", async () => {
+    const form = ukUsFormFixture();
+    render(<Harness initial={formsFixture({ forms: [form] })} />);
+    const uk = await screen.findByLabelText("原形英式拼写是否规则变化");
+    const us = screen.getByLabelText("原形美式拼写是否规则变化");
+    fireEvent.click(within(uk).getByLabelText("否"));
+    expect(within(us).getByLabelText("是")).toBeChecked();
+    expect(formById(canonicalValue(), form.id)).toMatchObject({
+      regional_variants: { uk: { is_regular: false } }
+    });
+    const before = canonicalValue();
+    fireEvent.click(screen.getByLabelText("英美拼写无区别"));
+    expect(
+      screen.getByText(
+        "英式与美式的规则变化设置不同，请先统一设置，再合并拼写。"
+      )
+    ).toBeVisible();
+    expect(canonicalValue()).toEqual(before);
+  });
+
   it("UD 只显示共用拼写并保持双方言发音独立", async () => {
     const ukPronunciation = pronunciationFixture({ id: uuidFromInt(2141) });
     const usPronunciation = pronunciationFixture({
@@ -790,6 +831,15 @@ describe("V3FormsAndPronunciationStep", () => {
         }
       }
     });
+    const regularity = screen.getByLabelText("原形英美通用拼写是否规则变化");
+    expect(screen.queryByLabelText("原形英式拼写是否规则变化")).toBeNull();
+    fireEvent.click(within(regularity).getByLabelText("否"));
+    expect(formById(canonicalValue(), form.id)).toMatchObject({
+      regional_variants: {
+        uk: { is_regular: false },
+        us: { is_regular: false }
+      }
+    });
     const beforeMerge = canonicalValue();
     fireEvent.click(screen.getByLabelText("英美音标无区别"));
     expect(canonicalValue()).toEqual(beforeMerge);
@@ -816,6 +866,14 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(container.querySelector(".v3-dialect-panel-uk")).toBeNull();
     expect(container.querySelector(".v3-dialect-panel-us")).toBeNull();
     expect(screen.getByLabelText("原形英美通用拼写")).toHaveValue("harbor");
+    fireEvent.click(
+      within(
+        screen.getByLabelText("原形英美通用拼写是否规则变化")
+      ).getByLabelText("否")
+    );
+    expect(formById(canonicalValue(), common.id)).toMatchObject({
+      regional_variants: { common: { is_regular: false } }
+    });
     // 「拼写统一的 uk_us」也叫英美通用拼写，但锚在 form 上；共用变体锚在 variant 上。
     expect(screen.getByLabelText("原形英美通用拼写")).toHaveAttribute(
       "data-v3-node-id",
@@ -969,7 +1027,10 @@ describe("V3FormsAndPronunciationStep", () => {
     ).not.toBeNull();
 
     expect(screen.getByText("第 1 组 词形变化")).toBeVisible();
-    expect(screen.getByText("词形是否规则变化？")).toBeVisible();
+    expect(screen.queryByText("词形是否规则变化？")).toBeNull();
+    expect(groupCard.querySelectorAll(".v3-spelling-regularity")).toHaveLength(
+      4
+    );
     expect(screen.getByLabelText("收起第 1 组词形变化")).toHaveAttribute(
       "aria-expanded",
       "true"
@@ -991,14 +1052,19 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     expect(screen.queryByText("词形是否规则变化？")).toBeNull();
     fireEvent.click(screen.getByLabelText("展开第 1 组词形变化"));
-    // 卡片头部的通用 / 专用切换也是 radio，只取规则区里的那组。
     const regularRadios = groupCard.querySelectorAll<HTMLInputElement>(
-      '.word-form-rules input[type="radio"]'
+      '.v3-spelling-regularity input[type="radio"]'
     );
     fireEvent.click(regularRadios[1]!);
-    expect(canonicalValue().pos[0]!.form_groups[0]!.is_regular).toBe(false);
-    fireEvent.click(regularRadios[0]!);
+    expect(formById(canonicalValue(), base.id)).toMatchObject({
+      regional_variants: { common: { is_regular: false } }
+    });
     expect(canonicalValue().pos[0]!.form_groups[0]!.is_regular).toBe(true);
+    expect(formById(canonicalValue(), secondBase.id)).toEqual(secondBase);
+    fireEvent.click(regularRadios[0]!);
+    expect(formById(canonicalValue(), base.id)).toMatchObject({
+      regional_variants: { common: { is_regular: true } }
+    });
   });
 
   it("以 82203e0 为基准把多词性的删除入口放回 Tab 标签", async () => {
@@ -1088,7 +1154,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(screen.queryByLabelText("变化组 1 新增词形类型")).toBeNull();
   });
 
-  it("每组都显示三行规则，英美规则按组各自回显", async () => {
+  it("每组显示英美两行规则，规则变化设置在拼写旁", async () => {
     const form = commonFormFixture({ spelling: "center" });
     const other = commonFormFixture({
       id: uuidFromInt(778),
@@ -1113,7 +1179,8 @@ describe("V3FormsAndPronunciationStep", () => {
     const first = within(cards[0]!);
     const second = within(cards[1]!);
     for (const card of [first, second]) {
-      expect(card.getByText("词形是否规则变化？")).toBeVisible();
+      expect(card.queryByText("词形是否规则变化？")).toBeNull();
+      expect(card.getAllByText("是否规则变化？").length).toBeGreaterThan(0);
       expect(card.getByText("英美拼写是否有区别？")).toBeVisible();
       expect(card.getByText("英美音标是否有区别？")).toBeVisible();
       expect(
@@ -2852,49 +2919,6 @@ describe("V3FormsAndPronunciationStep", () => {
       phonetic_mode: "distinguish"
     });
   }, 15_000);
-
-  it("组卡片头部切换通用 / 专用，并按词义绑定数提示影响", async () => {
-    const initial = formsFixture();
-    const groupId = initial.pos[0]!.form_groups[0]!.id;
-    function ScopeHarness({ counts }: { counts: ReadonlyMap<string, number> }) {
-      const [value, setValue] = useState(initial);
-      return (
-        <AntApp>
-          <V3FormsAndPronunciationStep
-            formGroupBindingCounts={counts}
-            onChange={setValue}
-            value={value}
-          />
-          <output data-testid="canonical-value">{JSON.stringify(value)}</output>
-        </AntApp>
-      );
-    }
-    const { container, rerender } = render(<ScopeHarness counts={new Map()} />);
-    const scope = await waitFor(() => {
-      const element = container.querySelector<HTMLElement>(
-        `[data-v3-field="scope"][data-v3-node-id="${groupId}"]`
-      );
-      expect(element).not.toBeNull();
-      return element!;
-    });
-    expect(scope).toHaveAttribute("tabindex", "-1");
-    expect(screen.queryByText(/个词义/)).toBeNull();
-
-    fireEvent.click(within(scope).getByText("专用"));
-    await waitFor(() =>
-      expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("dedicated")
-    );
-    rerender(<ScopeHarness counts={new Map([[groupId, 2]])} />);
-    expect(screen.getByText("已绑定 2 个词义")).toBeVisible();
-
-    fireEvent.click(within(scope).getByText("通用"));
-    await waitFor(() =>
-      expect(canonicalValue().pos[0]!.form_groups[0]!.scope).toBe("general")
-    );
-    expect(
-      screen.getByText("2 个词义仍绑定此组，改为通用后绑定将失效")
-    ).toBeVisible();
-  });
 
   it("组内唯一原形摘不掉，本组还有别的原形时照常放行", async () => {
     const base = commonFormFixture({

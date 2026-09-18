@@ -167,10 +167,11 @@ describe("referenceGuard 判定", () => {
       ])
     );
     expect(
-      spellingConflictReferences(index, [baseVariantId], "Rock'n'Roll ")
+      spellingConflictReferences(index, base, [baseVariantId], "Rock'n'Roll ")
     ).toEqual([]);
     const conflicting = spellingConflictReferences(
       index,
+      base,
       [baseVariantId],
       "rock and roll"
     );
@@ -178,7 +179,49 @@ describe("referenceGuard 判定", () => {
       "shared_sentence"
     ]);
     // 未被引用的变体改拼写不受影响。
-    expect(spellingConflictReferences(index, ["other"], "x")).toEqual([]);
+    expect(spellingConflictReferences(index, base, ["other"], "x")).toEqual([]);
+  });
+
+  it("结构漂移后实例 id 变了：片段与任何一侧都对不上才报冲突，不误报", () => {
+    const driftedForm = ukUsFormFixture({
+      id: "form-drift",
+      uk: { id: "variant-uk", spelling: "harbour" },
+      us: { id: "variant-us", spelling: "harbor" }
+    });
+    const driftedTarget = {
+      pos_id: pos.pos_id,
+      form_id: "form-drift",
+      variant_id: "variant-gone",
+      sense_id: "sense-1"
+    };
+    // 片段与 us 侧一致：uk 格容忍（后端是「任一侧拼写匹配即成立」），不误报。
+    const matchesOtherSide = buildReferenceIndex(
+      inboundReferences([
+        sharedSentenceReference(driftedTarget, { surface: "harbor" })
+      ])
+    );
+    expect(
+      spellingConflictReferences(
+        matchesOtherSide,
+        driftedForm,
+        ["variant-uk"],
+        "harbour"
+      )
+    ).toEqual([]);
+    // 片段与任何一侧都对不上：报冲突。
+    const matchesNoSide = buildReferenceIndex(
+      inboundReferences([
+        sharedSentenceReference(driftedTarget, { surface: "harbourx" })
+      ])
+    );
+    expect(
+      spellingConflictReferences(
+        matchesNoSide,
+        driftedForm,
+        ["variant-uk"],
+        "harbour"
+      )
+    ).toHaveLength(1);
   });
 
   it("spellingConflicts 扫整份词形草稿并定位到变体", () => {
@@ -251,6 +294,33 @@ describe("referenceGuard 判定", () => {
     expect(
       referenceLink(draftRelationReference("sense-1", { source: {} }))
     ).toEqual({ kind: "none" });
+  });
+
+  it("词形组引用链接能切换到来源词性并展开定位具体组", () => {
+    const reference = draftRelationReference("sense-1", {
+      kind: "form_group_sense_binding",
+      source: { entry_id: "entry-source", node_id: group.id }
+    });
+    const link = referenceLink(reference);
+    expect(link.kind).toBe("entry");
+    if (link.kind !== "entry") throw new Error("expected entry link");
+    const url = new URL(link.href, "https://admin.test");
+    expect(url.pathname).toBe("/words/entry-source/v3/wizard/forms");
+    const word = {
+      forms: {
+        ...forms,
+        pos: [{ ...pos, pos_id: "other-pos", forms: [], form_groups: [] }, pos]
+      },
+      meanings: { sense_groups: [], pos: [] }
+    };
+    expect(locateV3Node(word, url.searchParams.get("focus_node")!)).toEqual({
+      step: "forms",
+      node_id: group.id,
+      field: "scope",
+      pos_id: pos.pos_id,
+      form_group_id: group.id,
+      ancestor_node_ids: [pos.pos_id]
+    });
   });
 
   it("locateV3Node：词形与变体落到词形步，词义及其关联 / 成分落到词义卡片", () => {

@@ -1,26 +1,21 @@
 #!/usr/bin/env bash
 # C 端 web（Next standalone）部署到 tshb-test：从 origin/main 导出干净源码到临时目录构建
-# -> 本地起一次 staged 产物验活 -> rsync 三件套 -> 重启服务。
+# -> 本地 standalone 验活 -> 上传独立 release -> 备用实例验活并切流。
 # 前置：ssh 别名 tshb-test 可用（root）；服务器 /usr/bin/node 与 .node-version 精确一致，
-# 且已安装 systemd unit tsz-web
-# （首次搭建：deploy/systemd/tsz-web.service -> /etc/systemd/system/ 后 daemon-reload enable）。
+# 且存在可迁移的旧部署；发布事务安装 systemd 模板并保留旧版本。
 # 用法：deploy/deploy-web.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source deploy/deploy-source.sh
 
 prepare_deploy_source web
+release_id="${DEPLOY_GIT_SHA}-$(node -e 'console.log(require("crypto").randomUUID())')"
 
 deploy_tmp="$(mktemp -d /tmp/tsz-web-deploy.XXXXXX)"
-remote_candidate=""
 deploy_interrupted=""
 cleanup() {
   local status="${deploy_interrupted:-$?}"
   stop_standalone_boot
-  if [[ -n "$remote_candidate" ]]; then
-    ssh tshb-test "rm -f -- '$remote_candidate'" >/dev/null 2>&1 || status=1
-  fi
-  remove_nginx_stage >/dev/null || status=1
   remove_deploy_build_tree || status=1
   case "$deploy_tmp" in
     /tmp/tsz-web-deploy.*) rm -rf -- "$deploy_tmp" ;;
@@ -58,6 +53,7 @@ echo "==> canonical site URL: ${TSZ_DEPLOY_SITE_URL}"
 (
   cd "$DEPLOY_BUILD_ROOT"
   run_sanitized_build \
+    TSZ_RELEASE_ID="$release_id" \
     NEXT_TELEMETRY_DISABLED=1 \
     NEXT_PUBLIC_SITE_URL="$TSZ_DEPLOY_SITE_URL" \
     pnpm --filter @tsz/web build
@@ -70,6 +66,7 @@ mkdir -p "$artifact_stage/apps/web/.next/static"
 rsync -a "$DEPLOY_BUILD_ROOT/apps/web/.next/standalone/" "$artifact_stage/"
 rsync -a "$DEPLOY_BUILD_ROOT/apps/web/.next/static/" "$artifact_stage/apps/web/.next/static/"
 
+node -e 'require("fs").writeFileSync(process.argv[1], JSON.stringify({release_id: process.argv[2]}))' "$artifact_stage/version.json" "$release_id"
 echo "==> boot staged standalone artifact locally"
 # 坏产物必须在 rsync --delete 覆盖掉服务器上那份能用的之前被挡下（原因见 deploy-source.sh）。
 verify_standalone_boot "$artifact_stage" apps/web/server.js
@@ -84,7 +81,7 @@ node "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" create-candidate \
   --ci-run-id "$DEPLOY_CI_RUN_ID" \
   --ci-run-url "$DEPLOY_CI_RUN_URL" \
   --artifact-root "$artifact_stage" \
-  --artifact-path /opt/tsz-web \
+  --artifact-path /opt/tsz-releases/web/current \
   --output "$candidate_manifest"
 # provenance.mjs 静默跳过 CLI 时会退出 0（见 deploy-source.sh 里构建目录前缀的注释）：
 # 在往服务器写任何东西之前先确认候选 manifest 真的生成了。
@@ -92,39 +89,19 @@ node "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" create-candidate \
 
 echo "==> recheck exact main before server writes"
 recheck_deploy_source web
-ssh tshb-test 'install -d -m 0755 /opt/tsz-deploy-manifests /opt/tsz-deploy-tools'
-remote_candidate="$(ssh tshb-test "mktemp '/opt/tsz-deploy-manifests/.web.${DEPLOY_GIT_SHA}.XXXXXX.partial'")"
-# 推到 tshb-test 的 rsync 一律带 --no-o --no-g：不把本机 uid/gid（如 501）带到服务器——那边没有
-# 对应用户，文件会变成「不存在的用户」所有；产物与部署工具以 root 运行，必须保持 root 属主。
-rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" tshb-test:/opt/tsz-deploy-tools/frontend-provenance.mjs
-
-echo "==> rsync staged artifact -> tshb-test:/opt/tsz-web"
-rsync -az --no-o --no-g --delete "$artifact_stage/" tshb-test:/opt/tsz-web/
-rsync -az --no-o --no-g "$candidate_manifest" "tshb-test:$remote_candidate"
-ssh tshb-test "/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify-candidate --manifest '$remote_candidate' --artifact-root /opt/tsz-web"
-
-echo "==> restart tsz-web + sync nginx"
-rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/systemd/tsz-web.service" tshb-test:/etc/systemd/system/tsz-web.service
-# 先重启 tsz-web，成功后才换装 nginx 配置（nginx -t 不过会恢复原配置并非零退出）。
-ssh tshb-test 'systemctl daemon-reload && systemctl restart tsz-web'
-install_nginx_configs "$DEPLOY_BUILD_ROOT"
-
-echo "==> smoke"
-wait_for_http_status "GET /" "http://47.121.142.19/" 200 7 5 || {
-  echo "!! web 页面在 30 秒启动窗口内未恢复"
-  exit 1
-}
-code=$(curl -sS -m 8 -o /dev/null -w "%{http_code}" http://47.121.142.19/api/v1/auth/me)
-echo "GET /api/v1/auth/me -> ${code} (无 token，预期 401)"
-[ "$code" = "401" ] || { echo "!! API 反代异常"; exit 1; }
-# HTTPS 域名入口在服务器本机按域名走 443 验证（--resolve 保留 SNI 与证书校验）；
-# 本机经代理的 fake-ip 解析结果不作数。
-code=$(ssh tshb-test 'curl -sS -m 8 -o /dev/null -w "%{http_code}" --resolve test.tianshengzhi.com:443:127.0.0.1 https://test.tianshengzhi.com/' || true)
-echo "GET https://test.tianshengzhi.com/ -> ${code} (预期 200)"
-[ "$code" = "200" ] || { echo "!! HTTPS 域名入口异常"; exit 1; }
-ssh tshb-test 'systemctl is-active tsz-web' >/dev/null || { echo "!! tsz-web 未运行"; exit 1; }
-
-echo "==> accept and verify web provenance manifest"
-ssh tshb-test "/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs accept --manifest '$remote_candidate' --artifact-root /opt/tsz-web --output /opt/tsz-deploy-manifests/web.json"
-ssh tshb-test '/usr/bin/node /opt/tsz-deploy-tools/frontend-provenance.mjs verify --manifest /opt/tsz-deploy-manifests/web.json --artifact-root /opt/tsz-web'
+# 独立暂存不触碰在线目录；事务在远端持有发布锁直到验证及回滚结束。
+remote_stage="$(ssh tshb-test "mktemp -d /opt/tsz-release-stage.XXXXXX")"
+[[ "$remote_stage" =~ ^/opt/tsz-release-stage\.[a-zA-Z0-9]{6}$ ]] || { echo "!! 无效的远端暂存路径" >&2; exit 1; }
+rsync -az --no-o --no-g "$artifact_stage/" "tshb-test:$remote_stage/artifact/"
+rsync -az --no-o --no-g "$candidate_manifest" "tshb-test:$remote_stage/candidate.json"
+printf '%s\n' "$release_id" > "$deploy_tmp/release-id"
+rsync -az --no-o --no-g "$deploy_tmp/release-id" "tshb-test:$remote_stage/release-id"
+for file in releases.mjs provenance.mjs publish-release.sh install-nginx-local.sh; do
+  rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/$file" "tshb-test:$remote_stage/$file"
+done
+rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/" "tshb-test:$remote_stage/nginx/"
+rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/systemd/" "tshb-test:$remote_stage/systemd/"
+# 断连时保留暂存与回滚证据；只在成功结束后清理。
+ssh tshb-test "bash '$remote_stage/publish-release.sh' '$remote_stage' web"
+ssh tshb-test "rm -rf -- '$remote_stage'"
 echo "✓ done"

@@ -1,3 +1,4 @@
+import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
 import { useContext, useEffect, useRef, useState } from "react";
 import { UNSAFE_DataRouterContext, useBlocker } from "react-router-dom";
 import {
@@ -95,6 +96,14 @@ export function SentenceEditor({
   const [dialect, setDialect] = useState<Dialect>("common");
   const [pendingAnnotation, setPendingAnnotation] = useState(false);
   const [error, setError] = useState("");
+  const recovery = useDraftRecovery({
+    entity: `sentence:${sentence?.id ?? `new:${sourceEntryId}:${sourceSenseId}`}`,
+    revision: sentence?.revision ?? 0,
+    value: content,
+    dirty,
+    busy: saving,
+    restore: setContent
+  });
   const finish = async (afterSave?: () => void) => {
     if (pendingAnnotation) {
       setError("请先确认当前句内标注，或取消所选片段。");
@@ -141,6 +150,7 @@ export function SentenceEditor({
           content: next
         });
       else throw new Error("请先保存词义，再从具体词义内创建例句");
+      recovery.discard();
       afterSave?.();
       onSaved(saved);
       return true;
@@ -154,7 +164,10 @@ export function SentenceEditor({
     modal.confirm({
       title: "放弃本次未完成的例句编辑？",
       content: "尚未点完成的修改不会保存。此前已经完成的例句不受影响。",
-      onOk: onClose
+      onOk: () => {
+        recovery.discard();
+        onClose();
+      }
     });
   const rows = editableEnglishText(content.sentence.en_text);
   const row = rows.find((item) => item.dialect === dialect) ?? rows[0]!;
@@ -166,7 +179,11 @@ export function SentenceEditor({
       !!source &&
       currentTargets.some(
         (candidate) =>
-          sameSentenceTarget(annotation.target, candidate.target) &&
+          sameSentenceTarget(
+            annotation.target,
+            candidate.target,
+            annotation.source_dialect
+          ) &&
           matchesSentenceTarget(
             source.text,
             annotation.source_segments,
@@ -305,7 +322,8 @@ export function SentenceEditor({
   return (
     <PronunciationPreviewProvider>
       <Flex vertical gap="middle">
-        {router && (
+        {recovery.notice}
+        {router && !registerLeaveGuard && (
           <SentenceNavigationGuard
             dirty={dirty}
             saving={saving}

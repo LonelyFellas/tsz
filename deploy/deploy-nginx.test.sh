@@ -77,6 +77,7 @@ reset_case() {
   printf 'old ip entry\n' >"$DEPLOY_NGINX_CONF_DIR/tsz.conf"
   printf 'old domains\n' >"$DEPLOY_NGINX_CONF_DIR/tsz-test-domains.conf"
   printf 'zentao\n' >"$DEPLOY_NGINX_CONF_DIR/zentao-ip.conf"
+  cp "$repo_root/deploy/install-nginx-local.sh" "$build/deploy/install-nginx-local.sh"
   printf 'new ip entry\n' >"$build/deploy/nginx/tshb-test.conf"
   printf 'new domains\n' >"$build/deploy/nginx/tshb-test-domains.conf"
   : >"$FAKE_CALLS"

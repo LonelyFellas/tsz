@@ -1,0 +1,16 @@
+[Unit]
+Description=tsz-web release slot %i
+After=network.target
+
+[Service]
+WorkingDirectory=/opt/tsz-releases/web/slots/%i
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=%i
+ExecStart=/usr/bin/node apps/web/server.js
+Restart=on-failure
+RestartSec=2
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
