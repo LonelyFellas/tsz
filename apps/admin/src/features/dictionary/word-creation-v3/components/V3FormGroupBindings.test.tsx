@@ -13,7 +13,6 @@ import type {
   DraftMeaningsStepContentWritableV3
 } from "@tsz/types";
 import { commonFormFixture, formsFixture } from "../fixtures";
-import { V3FormDisplayProvider } from "../formDisplayState";
 import { partOfSpeechCatalogFixture } from "../../word-creation/partOfSpeech.test.helper";
 import { V3FormsAndPronunciationStep } from "./V3FormsAndPronunciationStep";
 import { V3FormGroupSenseEditor } from "./V3FormGroupSenseEditor";
@@ -75,22 +74,18 @@ describe("词形组的专用词义交互", () => {
       const [value, setValue] = useState(initial);
       const [meanings, setMeanings] = useState(initialMeanings);
       return (
-        <V3FormDisplayProvider>
-          <AntApp>
-            <V3FormsAndPronunciationStep
-              value={value}
-              onChange={setValue}
-              meanings={meanings}
-              onMeaningsChange={setMeanings}
-            />
-            <output data-testid="canonical-value">
-              {JSON.stringify(value)}
-            </output>
-            <output data-testid="binding-meanings">
-              {JSON.stringify(meanings)}
-            </output>
-          </AntApp>
-        </V3FormDisplayProvider>
+        <AntApp>
+          <V3FormsAndPronunciationStep
+            value={value}
+            onChange={setValue}
+            meanings={meanings}
+            onMeaningsChange={setMeanings}
+          />
+          <output data-testid="canonical-value">{JSON.stringify(value)}</output>
+          <output data-testid="binding-meanings">
+            {JSON.stringify(meanings)}
+          </output>
+        </AntApp>
       );
     }
     render(<ScopeHarness />);

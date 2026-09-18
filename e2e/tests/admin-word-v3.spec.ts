@@ -83,8 +83,20 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.getByRole("button", { name: "新增名词变化组" }).click();
     const secondGroup = nounGroups.nth(1);
     await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
-    // 手动加的组不铺模板，只有自带的原形，加上按词性铺的那一个复数占位行。
-    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(2);
+    // 手动加的组只有真实原形，不再按词性自动补复数占位行。
+    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
+    await expect(
+      secondGroup.getByRole("textbox", {
+        name: "原形英美通用拼写",
+        exact: true
+      })
+    ).toHaveValue("orbit-common");
+    await expect(
+      secondGroup.getByRole("textbox", {
+        name: "复数英美通用拼写",
+        exact: true
+      })
+    ).toHaveCount(0);
 
     // 英美规则按组生效，两组各自切换。
     await firstGroup.getByLabel("英美拼写有区别").click();
@@ -192,6 +204,54 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
       2
     );
 
+    await expect(nounGroups).toHaveCount(2);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(2);
+    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
+
+    // 删除首次添加词性时生成的真实复数；保存、刷新后不能再自动补回。
+    await expect(
+      firstGroup.getByRole("textbox", { name: "复数英式拼写", exact: true })
+    ).toHaveValue("");
+    await firstGroup.getByLabel("删除变化组 1 的词形 2").click();
+    await page.getByLabel("删除词形及相关发音").click();
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(1);
+    await page.getByRole("button", { name: "保存草稿" }).click();
+    await expect.poll(() => api.getWord().revision).toBe(3);
+    const savedNoun = savedForms.pos[0]!;
+    const deletedPlural = savedNoun.forms.find(
+      (form) => form.form_type === "plural"
+    )!;
+    expect(api.getWord().forms.pos[0]).toEqual({
+      ...savedNoun,
+      forms: savedNoun.forms.filter((form) => form.id !== deletedPlural.id),
+      form_groups: savedNoun.form_groups.map((group) => ({
+        ...group,
+        members: group.members.filter(
+          (member) => member.form_id !== deletedPlural.id
+        )
+      }))
+    });
+    expect(api.getWord().forms.pos[1]).toEqual(savedForms.pos[1]);
+
+    await page.reload();
+    await page.getByRole("tab", { name: "名词" }).click();
+    await expect(nounGroups).toHaveCount(2);
+    await expect(firstGroup.locator(".v3-membership-row")).toHaveCount(1);
+    await expect(secondGroup.locator(".v3-membership-row")).toHaveCount(1);
+    await expect(page.getByRole("textbox", { name: /^复数/ })).toHaveCount(0);
+    await expect(
+      firstGroup.getByRole("textbox", { name: "原形英式拼写", exact: true })
+    ).toHaveValue("orbit-common");
+    await expect(
+      firstGroup.getByRole("textbox", { name: "原形美式拼写", exact: true })
+    ).toHaveValue("orbit-common");
+    await expect(
+      secondGroup.getByRole("textbox", { name: "原形英式拼写", exact: true })
+    ).toHaveValue("orbit-centre");
+    await expect(
+      secondGroup.getByRole("textbox", { name: "原形美式拼写", exact: true })
+    ).toHaveValue("orbit-center");
+
     // 未完成词义时，顶部入口及直达链接都不能跳过完成校验。
     const previewStep = page.locator(".ant-steps-item").filter({
       has: page.getByText("预览并生效", { exact: true })
@@ -214,7 +274,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
         "PUT",
         `${ADMIN_V3_ENTRIES_PATH}/${ADMIN_V3_NEW_WORD_ID}/steps/forms`
       )
-    ).toBe(2);
+    ).toBe(3);
   });
 
   test("E03 Mock：同一词性第 2 组独立设为英美通用，保存后两组规则各自落库", async ({

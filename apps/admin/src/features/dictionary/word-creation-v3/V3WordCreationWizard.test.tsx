@@ -6236,6 +6236,91 @@ describe("新草稿默认录入位", () => {
     ).toEqual(expected);
     // 铺出来的是未保存改动，得由录入者保存才入库。
     expect(seen.context!.hasUnsavedChanges).toBe(true);
+    const withoutTemplate = structuredClone(seen.context!.draftForms);
+    const pos = withoutTemplate.pos[0]!;
+    pos.forms = pos.forms.filter((form) => form.form_type === "base");
+    pos.form_groups[0]!.members = pos.form_groups[0]!.members.filter((member) =>
+      pos.forms.some((form) => form.id === member.form_id)
+    );
+    act(() => seen.context!.setDraftForms(withoutTemplate));
+    expect(seen.context!.draftForms).toEqual(withoutTemplate);
+    // 新建标记仍在，后续编辑触发重渲染也不能再铺一次。
+    act(() => seen.context!.setDraftForms(structuredClone(withoutTemplate)));
+    expect(seen.context!.draftForms).toEqual(withoutTemplate);
+  });
+
+  it("删除模板行后经过保存请求和 canonical 响应，重新挂载不回补", async () => {
+    const initialWord = word();
+    let savedWord: AdminWordV3 | undefined;
+    const saveForms = vi.fn<V3WordRequests["saveForms"]>(
+      async (_wordId, input) => {
+        savedWord = {
+          ...initialWord,
+          revision: 2,
+          forms: structuredClone(input.content)
+        };
+        return { word: savedWord };
+      }
+    );
+    const { seen, renderStep: captureStep } = capture();
+    const renderStep = (context: V3WizardSlotContext) => {
+      captureStep(context);
+      return (
+        <V3FormsAndPronunciationStep
+          value={context.draftForms}
+          onChange={context.setDraftForms}
+          issues={[]}
+          stableVariantIds={context.stableVariantIds}
+        />
+      );
+    };
+    const view = renderWizard(requests({ saveForms }), {
+      initialWord,
+      initialStep: "forms",
+      partOfSpeechCatalog: partOfSpeechCatalogFixture,
+      prefillNewDraft: true,
+      renderStep
+    });
+    await waitFor(() =>
+      expect(seen.context!.draftForms.pos[0]!.forms.length).toBeGreaterThan(1)
+    );
+    const deleted = seen.context!.draftForms.pos[0]!.forms[1]!;
+    fireEvent.click(screen.getByLabelText("删除变化组 1 的词形 2"));
+    fireEvent.click(await screen.findByLabelText("删除词形及相关发音"));
+    await waitFor(() =>
+      expect(seen.context!.draftForms.pos[0]!.forms).not.toContainEqual(deleted)
+    );
+    const expectedForms = structuredClone(seen.context!.draftForms);
+    await act(async () => {
+      await seen.context!.actions.saveForms("save");
+    });
+    expect(saveForms).toHaveBeenCalledTimes(1);
+    expect(saveForms.mock.calls[0]![1]).toMatchObject({
+      base_revision: 1,
+      intent: "save",
+      content: expectedForms
+    });
+    expect(seen.context!.word.revision).toBe(2);
+    expect(seen.context!.word.forms).toEqual(expectedForms);
+    expect(seen.context!.draftForms).toEqual(expectedForms);
+    view.unmount();
+
+    const reopened = capture();
+    renderWizard(requests(), {
+      initialWord: savedWord!,
+      initialStep: "forms",
+      partOfSpeechCatalog: partOfSpeechCatalogFixture,
+      prefillNewDraft: true,
+      renderStep: reopened.renderStep
+    });
+    await waitFor(() => expect(reopened.seen.context).toBeDefined());
+    expect(reopened.seen.context!.draftForms).toEqual(expectedForms);
+    expect(reopened.seen.context!.hasUnsavedChanges).toBe(false);
+    expect(
+      reopened.seen.context!.draftForms.pos[0]!.forms.some(
+        (form) => form.form_type === deleted.form_type
+      )
+    ).toBe(false);
   });
 
   it("草稿已经存过就不再铺，哪怕创建态的标记还在", async () => {

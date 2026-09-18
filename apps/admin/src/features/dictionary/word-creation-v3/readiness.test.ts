@@ -375,7 +375,7 @@ describe("buildV3ProductProgress", () => {
     });
   });
 
-  it("默认空白类型只计入总数，手动移除后总数减少", () => {
+  it("完整词形之外有空组时未完成，计数仍只含真实词形", () => {
     const forms = formsFixture();
     const input = {
       language: "en",
@@ -386,16 +386,35 @@ describe("buildV3ProductProgress", () => {
       partOfSpeechCatalog: partOfSpeechCatalogFixture.items
     };
     expect(buildV3ProductProgress(input)[2]).toMatchObject({
-      count: 2,
-      completed: false,
-      details: [{ count: 2 }]
-    });
-    const removed = {
-      ...input,
-      removedFormTypes: { [forms.pos[0]!.form_groups[0]!.id]: ["plural"] }
-    };
-    expect(buildV3ProductProgress(removed)[2]).toMatchObject({
       count: 1,
+      completed: true,
+      details: [{ count: 1 }]
+    });
+    forms.pos[0]!.form_groups.push({
+      ...structuredClone(forms.pos[0]!.form_groups[0]!),
+      id: uuidFromInt(995),
+      members: []
+    });
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 1,
+      completed: false,
+      details: [{ count: 1 }]
+    });
+  });
+
+  it("已有草稿缺少目录类型时只统计实际词形，不降低完成度", () => {
+    const forms = formsFixture();
+    const input = {
+      language: "en",
+      wordId: "word-1",
+      completedSteps: ["forms"] as const,
+      forms,
+      meanings: { sense_groups: [], pos: [] },
+      partOfSpeechCatalog: partOfSpeechCatalogFixture.items
+    };
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 1,
+      completed: true,
       details: [{ count: 1 }]
     });
   });
