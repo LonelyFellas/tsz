@@ -1,5 +1,6 @@
 import type {
   AdminWordV3,
+  Dialect,
   PublishedSentenceTargetCandidateV3,
   SentenceTarget
 } from "@tsz/types";
@@ -90,7 +91,8 @@ export function sentenceWord(id = "entry", spelling = "make up"): AdminWordV3 {
   };
 }
 export function sentenceTarget(
-  id = "entry"
+  id = "entry",
+  dialect: Dialect = "common"
 ): Extract<SentenceTarget, { state: "linked" }> {
   return {
     state: "linked",
@@ -99,6 +101,7 @@ export function sentenceTarget(
     target_base_form_id: "base",
     target_form_id: "base",
     target_variant_id: "variant",
+    target_dialect: dialect,
     target_sense_id: "sense"
   };
 }

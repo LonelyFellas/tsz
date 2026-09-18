@@ -60,6 +60,10 @@ export function V3TextAssociationPicker({
             target_base_form_id: chosen.target_base_form_id,
             target_form_id: chosen.target_form_id,
             target_variant_id: chosen.target_variant_id,
+            // 记录目标方言侧：变体 id 会随英美结构切换而变，引用按「词形 + 方言侧」重解析。
+            ...(chosen.target_dialect
+              ? { target_dialect: chosen.target_dialect }
+              : {}),
             target_sense_id: chosen.target_sense_id,
             target_headword: chosen.target_headword,
             target_gloss: chosen.target_gloss,

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-form-spelling-regularity/docs/openapi.json",
-  "_generatedAt": "2026-09-17T12:28:28.775Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-task-58/docs/openapi.json",
+  "_generatedAt": "2026-09-18T02:51:46.606Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -3423,6 +3423,10 @@
           "properties": {
             "state": { "type": "string", "enum": ["linked"] },
             "target_base_form_id": { "type": "string", "format": "uuid" },
+            "target_dialect": {
+              "$ref": "#/components/schemas/Dialect",
+              "description": "目标变体的方言侧。变体实例 id 随英美结构切换而变，引用按「词形 + 方言侧」重解析\n时需要它；缺省兼容存量条目（退化为宽容匹配）。"
+            },
             "target_entry_id": { "type": "string", "format": "uuid" },
             "target_form_id": { "type": "string", "format": "uuid" },
             "target_pos_id": { "type": "string", "format": "uuid" },
@@ -3510,6 +3514,10 @@
           "minItems": 1
         },
         "target_base_form_id": { "type": "string", "format": "uuid" },
+        "target_dialect": {
+          "$ref": "#/components/schemas/Dialect",
+          "description": "目标变体的方言侧。变体实例 id 会随「英美通用 ↔ 英/美」结构切换而改变，引用在业务上\n绑的是「词形 + 方言侧」；缺省时判定退化为按来源方言与任一侧拼写宽容匹配（兼容存量）。"
+        },
         "target_form_id": { "type": "string", "format": "uuid" },
         "target_gloss": { "type": "string", "readOnly": true },
         "target_headword": { "type": "string", "readOnly": true },

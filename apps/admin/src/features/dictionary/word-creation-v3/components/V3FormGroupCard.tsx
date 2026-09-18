@@ -261,10 +261,17 @@ export function V3FormGroupCard({
         return candidateForm?.form_type === form.form_type;
       }).length;
     const lockedBase = lockedBaseFormIds.has(form.id);
-    // 词形或它的变体被别处引用：删词形、改类型都会让引用失效，保存必被拒。
+    // 词形或它的变体被别处引用：**删除**仍锁（引用失去锚点），**改类型**放行（保护式）。
+    // 改类型不换 `form.id`，引用按「词形 + 方言侧」重解析后仍成立；但类型本身是引用记录的一部分，
+    // 改动会让指向它的引用“漂移”，因此给提示而不是硬锁。
     const formReferences = formReferenceCount(referenceGuard.index, form);
     const referenceHint =
       formReferences > 0 ? referenceBlockedHint(formReferences) : undefined;
+    // 改类型的提示：告知会影响多少处引用，但不阻断编辑。
+    const formTypeChangeHint =
+      formReferences > 0
+        ? `修改词形类型会让 ${formReferences} 处引用漂移，保存后请核对`
+        : undefined;
     const baseLabel = formTypeLabel(form.form_type);
     const formMembershipCount = membershipCounts.get(form.id) ?? 0;
     const lastRequiredForm =
@@ -291,9 +298,9 @@ export function V3FormGroupCard({
       form,
       formLabel,
       formTypeAriaLabel: `变化组 ${groupIndex + 1} 词形 ${index + 1} 类型`,
-      formTypeDisabled: !posCatalog || lockedBase || formReferences > 0,
-      formTypeDisabledReason:
-        referenceHint ?? (lockedBase ? BASE_REQUIRED_HINT : undefined),
+      formTypeDisabled: !posCatalog || lockedBase,
+      formTypeDisabledReason: lockedBase ? BASE_REQUIRED_HINT : undefined,
+      formTypeChangeHint,
       formTypeOptions,
       membershipCount: formMembershipCount,
       referenceBadge: (
@@ -570,6 +577,7 @@ export function V3FormGroupCard({
                     formTypeAriaLabel={row.formTypeAriaLabel}
                     formTypeDisabled={row.formTypeDisabled}
                     formTypeDisabledReason={row.formTypeDisabledReason}
+                    formTypeChangeHint={row.formTypeChangeHint}
                     formTypeOptions={row.formTypeOptions}
                     idFactory={idFactory}
                     issues={issues}

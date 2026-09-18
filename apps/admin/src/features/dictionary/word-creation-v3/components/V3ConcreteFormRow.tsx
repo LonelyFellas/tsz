@@ -1,6 +1,7 @@
 import { env } from "../../../../lib/env";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
-import { Flex, Input, Radio, Select, Typography } from "antd";
+import { WarningOutlined } from "@ant-design/icons";
+import { Flex, Input, Radio, Select, Tooltip, Typography } from "antd";
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
@@ -77,6 +78,8 @@ export interface V3ConcreteFormRowProps {
   formTypeAriaLabel?: string;
   formTypeDisabled?: boolean;
   formTypeDisabledReason?: string;
+  /** 改类型会让多少处引用漂移的提示；不阻断编辑（保护式放开）。 */
+  formTypeChangeHint?: string;
   formTypeOptions?: readonly WordFormTypeV3[];
   issues: readonly V3DraftValidationIssue[];
   membershipCount: number;
@@ -95,6 +98,8 @@ interface V3ConcreteFormTypeCellProps {
   formTypeAriaLabel: string;
   formTypeDisabled: boolean;
   formTypeDisabledReason?: string;
+  /** 改类型会让多少处引用漂移的提示；不阻断编辑（保护式放开）。 */
+  formTypeChangeHint?: string;
   formTypeOptions: readonly WordFormTypeV3[];
   membershipCount: number;
   onChange: (next: DraftFormsStepContentV3) => void;
@@ -110,6 +115,7 @@ function V3ConcreteFormTypeCell({
   formTypeAriaLabel,
   formTypeDisabled,
   formTypeDisabledReason,
+  formTypeChangeHint,
   formTypeOptions,
   membershipCount,
   onChange,
@@ -133,7 +139,19 @@ function V3ConcreteFormTypeCell({
       tabIndex={-1}
     >
       <div className="word-form-type-cell-content">
-        <div className="word-form-type-cell-header">{referenceBadge}</div>
+        <div className="word-form-type-cell-header">
+          {referenceBadge}
+          {/* 改类型不换 form.id，引用按「词形 + 方言侧」重解析后仍成立，但引用记录里的类型会"漂移"。
+              文案长、类型列只有 112px，硬塞会折成好几行；收成警示图标 + 悬停说明。 */}
+          {formTypeChangeHint ? (
+            <Tooltip title={formTypeChangeHint}>
+              <WarningOutlined
+                aria-label={formTypeChangeHint}
+                className="word-form-type-change-hint"
+              />
+            </Tooltip>
+          ) : null}
+        </div>
         <V3DisabledReason
           block
           reason={formTypeDisabled ? formTypeDisabledReason : undefined}
@@ -240,6 +258,7 @@ function V3DialectFormCell({
   const conflictLiteralList = conflictLiterals(
     spellingConflictReferences(
       referenceGuard.index,
+      form,
       [variant.id],
       variant.spelling
     )
@@ -313,6 +332,7 @@ export function V3ConcreteFormRow({
   formTypeAriaLabel = `${formLabel}类型`,
   formTypeDisabled = false,
   formTypeDisabledReason,
+  formTypeChangeHint,
   formTypeOptions = [form.form_type],
   issues,
   membershipCount,
@@ -346,6 +366,7 @@ export function V3ConcreteFormRow({
     ? conflictLiterals(
         spellingConflictReferences(
           referenceGuard.index,
+          form,
           unifiedSpellingVariantIds,
           unifiedSpellingVariants.uk.spelling
         )
@@ -363,6 +384,7 @@ export function V3ConcreteFormRow({
     ? conflictLiterals(
         spellingConflictReferences(
           referenceGuard.index,
+          form,
           [commonVariant.id],
           commonVariant.spelling
         )
@@ -418,6 +440,7 @@ export function V3ConcreteFormRow({
           formTypeAriaLabel={formTypeAriaLabel}
           formTypeDisabled={formTypeDisabled}
           formTypeDisabledReason={formTypeDisabledReason}
+          formTypeChangeHint={formTypeChangeHint}
           formTypeOptions={formTypeOptions}
           lastRow={lastRow}
           membershipCount={membershipCount}
@@ -565,6 +588,8 @@ export interface V3DialectSeparatedFormRow {
   formTypeAriaLabel: string;
   formTypeDisabled: boolean;
   formTypeDisabledReason?: string;
+  /** 改类型会让多少处引用漂移的提示；不阻断编辑（保护式放开）。 */
+  formTypeChangeHint?: string;
   formTypeOptions: readonly WordFormTypeV3[];
   membershipCount: number;
   actions?: ReactNode;
@@ -620,6 +645,7 @@ export function V3DialectSeparatedFormMatrix({
                 formTypeAriaLabel={row.formTypeAriaLabel}
                 formTypeDisabled={row.formTypeDisabled}
                 formTypeDisabledReason={row.formTypeDisabledReason}
+                formTypeChangeHint={row.formTypeChangeHint}
                 formTypeOptions={row.formTypeOptions}
                 lastRow={index === rows.length - 1}
                 membershipCount={row.membershipCount}

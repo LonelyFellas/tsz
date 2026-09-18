@@ -167,10 +167,11 @@ describe("referenceGuard 判定", () => {
       ])
     );
     expect(
-      spellingConflictReferences(index, [baseVariantId], "Rock'n'Roll ")
+      spellingConflictReferences(index, base, [baseVariantId], "Rock'n'Roll ")
     ).toEqual([]);
     const conflicting = spellingConflictReferences(
       index,
+      base,
       [baseVariantId],
       "rock and roll"
     );
@@ -178,7 +179,49 @@ describe("referenceGuard 判定", () => {
       "shared_sentence"
     ]);
     // 未被引用的变体改拼写不受影响。
-    expect(spellingConflictReferences(index, ["other"], "x")).toEqual([]);
+    expect(spellingConflictReferences(index, base, ["other"], "x")).toEqual([]);
+  });
+
+  it("结构漂移后实例 id 变了：片段与任何一侧都对不上才报冲突，不误报", () => {
+    const driftedForm = ukUsFormFixture({
+      id: "form-drift",
+      uk: { id: "variant-uk", spelling: "harbour" },
+      us: { id: "variant-us", spelling: "harbor" }
+    });
+    const driftedTarget = {
+      pos_id: pos.pos_id,
+      form_id: "form-drift",
+      variant_id: "variant-gone",
+      sense_id: "sense-1"
+    };
+    // 片段与 us 侧一致：uk 格容忍（后端是「任一侧拼写匹配即成立」），不误报。
+    const matchesOtherSide = buildReferenceIndex(
+      inboundReferences([
+        sharedSentenceReference(driftedTarget, { surface: "harbor" })
+      ])
+    );
+    expect(
+      spellingConflictReferences(
+        matchesOtherSide,
+        driftedForm,
+        ["variant-uk"],
+        "harbour"
+      )
+    ).toEqual([]);
+    // 片段与任何一侧都对不上：报冲突。
+    const matchesNoSide = buildReferenceIndex(
+      inboundReferences([
+        sharedSentenceReference(driftedTarget, { surface: "harbourx" })
+      ])
+    );
+    expect(
+      spellingConflictReferences(
+        matchesNoSide,
+        driftedForm,
+        ["variant-uk"],
+        "harbour"
+      )
+    ).toHaveLength(1);
   });
 
   it("spellingConflicts 扫整份词形草稿并定位到变体", () => {

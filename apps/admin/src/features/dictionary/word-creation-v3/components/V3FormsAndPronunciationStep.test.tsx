@@ -334,7 +334,7 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     catalogState.pending = undefined;
   });
 
-  it("原形变体被例句标注：英美切换、删词形、改类型、删词性都不可点，徽标可点开并跳转", async () => {
+  it("原形变体被例句标注：英美切换与改类型可点、删词形与删词性仍锁，徽标可点开并跳转", async () => {
     const initial = multiPosFixture();
     const pos = initial.pos[0]!;
     const base = pos.forms[0]!;
@@ -375,20 +375,20 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
         `[data-group-id="${uuidFromInt(12)}"]`
       )!
     );
-    expect(firstGroup.getByLabelText("英美拼写有区别")).toBeDisabled();
-    expect(firstGroup.getByLabelText("英美音标有区别")).toBeDisabled();
-    // 通用变体被引用只锁「拆成英美」；合并方向的「否」本来就是当前值。
+    // TASK#58：英美结构切换解锁——引用按「词形 + 方言侧」语义坐标重解析，不必先解除引用。
+    expect(firstGroup.getByLabelText("英美拼写有区别")).not.toBeDisabled();
+    expect(firstGroup.getByLabelText("英美音标有区别")).not.toBeDisabled();
     expect(firstGroup.getByLabelText("英美拼写无区别")).not.toBeDisabled();
     // 同词性里没被引用的第 2 组照常可切。
     expect(secondGroup.getByLabelText("英美拼写有区别")).not.toBeDisabled();
+    // 删词形仍锁：引用失去锚点。
     const deleteForm = screen.getByLabelText("删除变化组 1 的词形 1");
     expect(deleteForm).toBeDisabled();
     await expectDisabledReason(deleteForm, hint);
-    expect(screen.getByLabelText("变化组 1 词形 1 类型")).toBeDisabled();
-    await expectDisabledReason(
-      screen.getByLabelText("变化组 1 词形 1 类型"),
-      hint
-    );
+    // TASK#58：改类型保护式放开——可点，但给漂移提示。
+    expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled();
+    // 漂移提示收成警示图标 + 悬停说明，可及名保留完整文案。
+    await screen.findByLabelText(/修改词形类型会让 1 处引用漂移/);
     const deletePos = screen.getByLabelText("删除名词");
     expect(deletePos).toBeDisabled();
     await expectDisabledReason(deletePos, hint);

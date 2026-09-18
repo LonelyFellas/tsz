@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-form-spelling-regularity/docs/openapi.json",
-  "_source_sha256": "c37bf1b88d6e2749a1f69b202e421d9984206f0b4db8e42269e77cf1abdf9134",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-task-58/docs/openapi.json",
+  "_source_sha256": "f94e6c5bf41701e8a2af2ac74017c18d4fb7958035a42fc78578f789b48ca0b3",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
@@ -1585,6 +1585,7 @@
           "properties": {
             "state": { "type": "string", "enum": ["linked"] },
             "target_base_form_id": { "type": "string", "format": "uuid" },
+            "target_dialect": { "$ref": "#/$defs/Dialect" },
             "target_entry_id": { "type": "string", "format": "uuid" },
             "target_form_id": { "type": "string", "format": "uuid" },
             "target_pos_id": { "type": "string", "format": "uuid" },
@@ -2091,6 +2092,7 @@
           "minItems": 1
         },
         "target_base_form_id": { "type": "string", "format": "uuid" },
+        "target_dialect": { "$ref": "#/$defs/Dialect" },
         "target_form_id": { "type": "string", "format": "uuid" },
         "target_gloss": { "type": "string" },
         "target_headword": { "type": "string" },

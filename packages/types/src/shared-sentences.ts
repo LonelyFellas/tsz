@@ -2,6 +2,7 @@ import type {
   SentenceSourceRangeV3,
   WordSentenceWritableV3
 } from "./admin-word-v3";
+import type { Dialect } from "./admin-word";
 
 export type SentenceTarget =
   | {
@@ -12,6 +13,8 @@ export type SentenceTarget =
       target_form_id: string;
       target_variant_id: string;
       target_sense_id: string;
+      /** 目标变体的方言侧。变体实例 id 随英美结构切换而变，引用按「词形 + 方言侧」重解析时需要它。 */
+      target_dialect?: Dialect;
       target_publication_id?: string;
     }
   | { state: "entry_only"; target_entry_id: string }

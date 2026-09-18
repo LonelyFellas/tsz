@@ -287,7 +287,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     );
   });
 
-  test("E06 Mock 引用保护：被例句标注的原形禁用英美切换与删除，徽标可跳到例句", async ({
+  test("E06 Mock 引用保护：被例句标注的原形只锁删除，英美切换与改类型放行，徽标可跳到例句", async ({
     page
   }) => {
     const api = await mockAdminV3Api(page, {
@@ -297,8 +297,13 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
 
     const firstGroup = page.locator("[data-pos-id] .v3-form-group-card").nth(0);
-    await expect(firstGroup.getByLabel("英美拼写有区别")).toBeDisabled();
-    await expect(firstGroup.getByLabel("英美音标有区别")).toBeDisabled();
+    // TASK#58：被引用不再锁英美结构切换与词形类型（引用按「词形 + 方言侧」重解析），
+    // 改类型给漂移提示而不是硬锁；删除仍锁（引用失去锚点）。
+    await expect(firstGroup.getByLabel("英美拼写有区别")).toBeEnabled();
+    await expect(firstGroup.getByLabel("英美音标有区别")).toBeEnabled();
+    await expect(
+      firstGroup.getByLabel(/修改词形类型会让 \d+ 处引用漂移/)
+    ).toBeVisible();
     await expect(
       firstGroup.getByRole("button", { name: "删除变化组 1 的词形 1" })
     ).toBeDisabled();
