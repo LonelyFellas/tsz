@@ -195,15 +195,16 @@ export function groupDeleteReferenceCount(
 }
 
 export interface V3DialectRuleLocks {
-  /** 指向英美通用变体的引用数：拆成英 / 美会换掉变体 id。 */
+  /** 指向英美通用变体的引用数（仅作计数展示，不再阻断开关）。 */
   split: number;
-  /** 指向英式 / 美式变体的引用数：合并成英美通用会丢掉它们。 */
+  /** 指向英式 / 美式变体的引用数（仅作计数展示，不再阻断开关）。 */
   merge: number;
 }
 
 /**
- * 英美规则切换只在改变 common ↔ uk_us 结构时才会破坏引用；uk_us 内部只改拼写模式
- * 不换变体 id，改坏拼写由拼写一致性校验兜底。
+ * 统计本组词形变体被引用的情况。**自 TASK#58 起不再用于阻断英美结构切换**：引用已改为按
+ * 「词形 + 方言侧」语义坐标重解析，common ↔ uk_us 切换后引用自动跟随，不必先解除引用。
+ * 保留此函数供徽标 / 提示展示引用计数。改坏拼写仍由拼写一致性校验兜底，结构合并冲突仍硬拦。
  */
 export function dialectRuleLocks(
   index: V3ReferenceIndex,

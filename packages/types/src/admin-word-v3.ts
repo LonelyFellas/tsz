@@ -233,6 +233,8 @@ export interface TextLinkV3 {
   target_form_id: string;
   target_variant_id: string;
   target_sense_id: string;
+  /** 目标变体的方言侧。变体实例 id 随英美结构切换而变，引用按「词形 + 方言侧」重解析时需要它。 */
+  target_dialect?: Dialect;
   via_phrase?: TextLinkViaPhraseV3;
   /** 服务端生成；保存请求不发送。 */
   target_headword?: string;

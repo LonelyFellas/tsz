@@ -278,7 +278,7 @@ describe("当前词条关联与离开保护", () => {
     expect(select).toHaveBeenCalledWith(
       expect.objectContaining({
         source_dialect: "us",
-        target: sentenceTarget("source")
+        target: sentenceTarget("source", "us")
       })
     );
   });

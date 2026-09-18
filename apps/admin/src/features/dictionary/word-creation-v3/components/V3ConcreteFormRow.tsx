@@ -77,6 +77,8 @@ export interface V3ConcreteFormRowProps {
   formTypeAriaLabel?: string;
   formTypeDisabled?: boolean;
   formTypeDisabledReason?: string;
+  /** 改类型会让多少处引用漂移的提示；不阻断编辑（保护式放开）。 */
+  formTypeChangeHint?: string;
   formTypeOptions?: readonly WordFormTypeV3[];
   issues: readonly V3DraftValidationIssue[];
   membershipCount: number;
@@ -95,6 +97,8 @@ interface V3ConcreteFormTypeCellProps {
   formTypeAriaLabel: string;
   formTypeDisabled: boolean;
   formTypeDisabledReason?: string;
+  /** 改类型会让多少处引用漂移的提示；不阻断编辑（保护式放开）。 */
+  formTypeChangeHint?: string;
   formTypeOptions: readonly WordFormTypeV3[];
   membershipCount: number;
   onChange: (next: DraftFormsStepContentV3) => void;
@@ -110,6 +114,7 @@ function V3ConcreteFormTypeCell({
   formTypeAriaLabel,
   formTypeDisabled,
   formTypeDisabledReason,
+  formTypeChangeHint,
   formTypeOptions,
   membershipCount,
   onChange,
@@ -159,6 +164,9 @@ function V3ConcreteFormTypeCell({
           <Typography.Text type="secondary">
             已在 {membershipCount} 个变化组中使用
           </Typography.Text>
+        ) : null}
+        {formTypeChangeHint ? (
+          <Typography.Text type="warning">{formTypeChangeHint}</Typography.Text>
         ) : null}
         {actions}
       </div>
@@ -313,6 +321,7 @@ export function V3ConcreteFormRow({
   formTypeAriaLabel = `${formLabel}类型`,
   formTypeDisabled = false,
   formTypeDisabledReason,
+  formTypeChangeHint,
   formTypeOptions = [form.form_type],
   issues,
   membershipCount,
@@ -418,6 +427,7 @@ export function V3ConcreteFormRow({
           formTypeAriaLabel={formTypeAriaLabel}
           formTypeDisabled={formTypeDisabled}
           formTypeDisabledReason={formTypeDisabledReason}
+          formTypeChangeHint={formTypeChangeHint}
           formTypeOptions={formTypeOptions}
           lastRow={lastRow}
           membershipCount={membershipCount}
@@ -565,6 +575,8 @@ export interface V3DialectSeparatedFormRow {
   formTypeAriaLabel: string;
   formTypeDisabled: boolean;
   formTypeDisabledReason?: string;
+  /** 改类型会让多少处引用漂移的提示；不阻断编辑（保护式放开）。 */
+  formTypeChangeHint?: string;
   formTypeOptions: readonly WordFormTypeV3[];
   membershipCount: number;
   actions?: ReactNode;
@@ -620,6 +632,7 @@ export function V3DialectSeparatedFormMatrix({
                 formTypeAriaLabel={row.formTypeAriaLabel}
                 formTypeDisabled={row.formTypeDisabled}
                 formTypeDisabledReason={row.formTypeDisabledReason}
+                formTypeChangeHint={row.formTypeChangeHint}
                 formTypeOptions={row.formTypeOptions}
                 lastRow={index === rows.length - 1}
                 membershipCount={row.membershipCount}

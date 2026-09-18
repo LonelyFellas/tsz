@@ -141,6 +141,10 @@ export function SharedSentenceAssociationPicker({
                       target_base_form_id: choice.target_base_form_id,
                       target_form_id: choice.target_form_id,
                       target_variant_id: choice.target_variant_id,
+                      // 记录目标方言侧：变体 id 会随英美结构切换而变，引用按「词形 + 方言侧」重解析。
+                      ...(choice.target_dialect
+                        ? { target_dialect: choice.target_dialect }
+                        : {}),
                       target_sense_id: choice.target_sense_id,
                       ...(choice.target_publication_id
                         ? {

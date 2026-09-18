@@ -129,6 +129,7 @@ export function savedSenseTargets(word: AdminWordV3, senseId: string) {
           target_base_form_id: base.id,
           target_form_id: form.id,
           target_variant_id: variant.id,
+          target_dialect: variant.dialect,
           target_sense_id: senseId
         } satisfies Extract<SentenceTarget, { state: "linked" }>,
         gloss,
