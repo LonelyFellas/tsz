@@ -124,7 +124,7 @@ describe("buildV3ReviewModel", () => {
       variant_id: uuidFromInt(4_102),
       spelling: "center"
     });
-    // 新增变化组会造出拼写相同的独立原形，概览不该把同一个词数成两个。
+    // 不同变化组可各有一个拼写相同的原形，概览按拼写去重不该数成两个。
     const duplicate = commonFormFixture({
       id: uuidFromInt(4_103),
       variant_id: uuidFromInt(4_104),

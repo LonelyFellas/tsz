@@ -388,7 +388,7 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     const deletePos = screen.getByLabelText("删除名词");
     expect(deletePos).toBeDisabled();
     await expectDisabledReason(deletePos, hint);
-    // 同组没被引用的第 2 个词形不受影响（第 2 组唯一原形本就按原形规则锁删）。
+    // 同组没被引用的第 2 个词形不受影响（它非本组唯一原形，不受锁删规则影响）。
     const deleteOther = screen.getByLabelText("删除变化组 1 的词形 2");
     expect(deleteOther).not.toBeDisabled();
     expect(deleteOther.closest(".v3-disabled-reason")).toBeNull();
@@ -1384,8 +1384,8 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(canonicalValue().pos[0]!.form_groups[1]).toEqual(
       content.pos[0]!.form_groups[1]
     );
-    // 组 2 里它是唯一原形，删不掉。
-    expect(screen.getByLabelText("删除变化组 2 的词形 1")).toBeDisabled();
+    // 第 2 组起不再要求保留原形：组 2 的唯一原形现在也可以删。
+    expect(screen.getByLabelText("删除变化组 2 的词形 1")).not.toBeDisabled();
   });
 
   it("I02 使用 form UUID key，membership 重排时输入节点与焦点保持", async () => {
@@ -2599,19 +2599,16 @@ describe("V3FormsAndPronunciationStep", () => {
     fireEvent.click(screen.getByRole("button", { name: "新增名词变化组" }));
     expect(screen.queryByText("复用已有词形")).toBeNull();
 
-    // 新增的组自带原形，已有词形留在原组；手动加的组不铺模板，只有一个原形。
+    // 新增的第 2 组不再自带原形：只追加一个空组，已有词形留在原组。
     const noun = canonicalValue().pos[0]!;
     const secondGroupId = noun.form_groups[1]!.id;
-    const secondGroupFormId = noun.form_groups[1]!.members[0]!.form_id;
-    expect(noun.forms).toHaveLength(templateFormTypes("noun").length + 2);
+    expect(noun.forms).toHaveLength(templateFormTypes("noun").length + 1);
     expect(noun.form_groups[0]!.members.map((item) => item.form_id)).toEqual([
       firstFormId,
       secondFormId,
       ...noun.form_groups[0]!.members.slice(2).map((member) => member.form_id)
     ]);
-    expect(noun.form_groups[1]!.members.map((item) => item.form_id)).toEqual([
-      secondGroupFormId
-    ]);
+    expect(noun.form_groups[1]!.members).toEqual([]);
     expect(noun.form_groups[0]!.members[0]!.id).toBe(firstMembershipId);
 
     const firstGroupCard = document.querySelector<HTMLElement>(
@@ -2698,7 +2695,7 @@ describe("V3FormsAndPronunciationStep", () => {
 
     const locked = await screen.findByLabelText("变化组 1 词形 1 类型");
     expect(locked).toBeDisabled();
-    await expectDisabledReason(locked, "每组词形变化至少保留一个原形");
+    await expectDisabledReason(locked, "第 1 组词形变化至少保留一个原形");
 
     fireEvent.click(screen.getByLabelText("在原形 1 下方添加同类型词形"));
 
@@ -2716,7 +2713,7 @@ describe("V3FormsAndPronunciationStep", () => {
     );
     const relocked = screen.getByLabelText("变化组 1 词形 1 类型");
     expect(relocked).toBeDisabled();
-    await expectDisabledReason(relocked, "每组词形变化至少保留一个原形");
+    await expectDisabledReason(relocked, "第 1 组词形变化至少保留一个原形");
   });
 
   it("陈旧的删除提示不会删掉此刻已成为本组唯一原形的词形", async () => {
@@ -2771,7 +2768,7 @@ describe("V3FormsAndPronunciationStep", () => {
     expect(openDeleteConfirm()).toBeNull();
     const deleteButton = screen.getByLabelText("删除变化组 1 的词形 2");
     expect(deleteButton).toBeDisabled();
-    await expectDisabledReason(deleteButton, "每组词形变化至少保留一个原形");
+    await expectDisabledReason(deleteButton, "第 1 组词形变化至少保留一个原形");
     expect(
       canonicalValue().pos[0]!.forms.map((item) => item.form_type)
     ).toEqual(["plural", "base", "plural"]);
@@ -2812,10 +2809,9 @@ describe("V3FormsAndPronunciationStep", () => {
       formById(canonicalValue(), first!.members[0]!.form_id).regional_variants
         .mode
     ).toBe("common");
-    expect(
-      formById(canonicalValue(), second!.members[0]!.form_id).regional_variants
-        .mode
-    ).toBe("uk_us");
+    // 第 2 组起新增不再自带原形：切换只改本组规则，不新增词形。
+    expect(second!.members).toEqual([]);
+    expect(canonicalValue().pos[0]!.forms).toHaveLength(1);
   });
 
   it("第 2 组独立合并英美发音，合并冲突只提示在发起切换的那一组", async () => {
@@ -2937,7 +2933,7 @@ describe("V3FormsAndPronunciationStep", () => {
     // 组里只有这一个原形：摘掉它组就空了原形，禁用并说明理由。
     const removeBase = await screen.findByLabelText("删除变化组 1 的词形 1");
     expect(removeBase).toBeDisabled();
-    await expectDisabledReason(removeBase, "每组词形变化至少保留一个原形");
+    await expectDisabledReason(removeBase, "第 1 组词形变化至少保留一个原形");
     // 派生词形不受影响。
     expect(screen.getByLabelText("删除变化组 1 的词形 2")).not.toBeDisabled();
   });
