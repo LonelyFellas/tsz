@@ -230,7 +230,15 @@
 .word-form-type-cell-header {
   display: flex;
   align-items: center;
+  gap: 6px;
   height: 22px;
+}
+
+/* 改词形类型的漂移警示：类型列窄，长文案折行难看，收成一个图标 + 悬停说明。 */
+.word-form-type-change-hint {
+  color: #faad14;
+  cursor: help;
+  font-size: 14px;
 }
 
 .word-form-type-select {

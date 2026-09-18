@@ -387,7 +387,8 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     await expectDisabledReason(deleteForm, hint);
     // TASK#58：改类型保护式放开——可点，但给漂移提示。
     expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled();
-    await screen.findByText(/修改词形类型会让 1 处引用漂移/);
+    // 漂移提示收成警示图标 + 悬停说明，可及名保留完整文案。
+    await screen.findByLabelText(/修改词形类型会让 1 处引用漂移/);
     const deletePos = screen.getByLabelText("删除名词");
     expect(deletePos).toBeDisabled();
     await expectDisabledReason(deletePos, hint);

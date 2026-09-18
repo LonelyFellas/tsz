@@ -1,6 +1,7 @@
 import { env } from "../../../../lib/env";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
-import { Flex, Input, Radio, Select, Typography } from "antd";
+import { WarningOutlined } from "@ant-design/icons";
+import { Flex, Input, Radio, Select, Tooltip, Typography } from "antd";
 import type {
   DialectRulesV3,
   DraftFormsStepContentV3,
@@ -138,7 +139,19 @@ function V3ConcreteFormTypeCell({
       tabIndex={-1}
     >
       <div className="word-form-type-cell-content">
-        <div className="word-form-type-cell-header">{referenceBadge}</div>
+        <div className="word-form-type-cell-header">
+          {referenceBadge}
+          {/* 改类型不换 form.id，引用按「词形 + 方言侧」重解析后仍成立，但引用记录里的类型会"漂移"。
+              文案长、类型列只有 112px，硬塞会折成好几行；收成警示图标 + 悬停说明。 */}
+          {formTypeChangeHint ? (
+            <Tooltip title={formTypeChangeHint}>
+              <WarningOutlined
+                aria-label={formTypeChangeHint}
+                className="word-form-type-change-hint"
+              />
+            </Tooltip>
+          ) : null}
+        </div>
         <V3DisabledReason
           block
           reason={formTypeDisabled ? formTypeDisabledReason : undefined}
@@ -164,9 +177,6 @@ function V3ConcreteFormTypeCell({
           <Typography.Text type="secondary">
             已在 {membershipCount} 个变化组中使用
           </Typography.Text>
-        ) : null}
-        {formTypeChangeHint ? (
-          <Typography.Text type="warning">{formTypeChangeHint}</Typography.Text>
         ) : null}
         {actions}
       </div>
