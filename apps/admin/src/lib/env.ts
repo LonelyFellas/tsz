@@ -9,6 +9,11 @@ const AZURE_PRONUNCIATION_INPUTS = parseBooleanEnvFlag(
   "VITE_AZURE_PRONUNCIATION_INPUTS",
   !import.meta.env.PROD
 );
+const FORM_SPELLING_REGULARITY = parseBooleanEnvFlag(
+  import.meta.env.VITE_FORM_SPELLING_REGULARITY,
+  "VITE_FORM_SPELLING_REGULARITY",
+  !import.meta.env.PROD
+);
 const VOICE_EDITOR = parseBooleanEnvFlag(
   import.meta.env.VITE_VOICE_EDITOR,
   "VITE_VOICE_EDITOR",
@@ -51,6 +56,7 @@ assertAdminTtsMockAllowed(
 );
 
 export const env = {
+  FORM_SPELLING_REGULARITY,
   AZURE_PRONUNCIATION_INPUTS,
   API_BASE_URL: import.meta.env.VITE_API_BASE_URL ?? "/api/v1",
   VOICE_EDITOR,

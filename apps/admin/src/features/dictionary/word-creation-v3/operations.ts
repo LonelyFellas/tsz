@@ -1,3 +1,4 @@
+import { env } from "../../../lib/env";
 import type {
   PronunciationStyle,
   DialectRulesV3,
@@ -280,7 +281,7 @@ export function convertCommonToUkUs(
           is_regular:
             mapping.uk.is_regular ??
             form.regional_variants.common.is_regular ??
-            true,
+            (env.FORM_SPELLING_REGULARITY ? true : undefined),
           origin: mapping.uk.origin,
           pronunciations: ukPronunciations,
           component_usages: clonedComponentUsages(
@@ -296,7 +297,7 @@ export function convertCommonToUkUs(
           is_regular:
             mapping.us.is_regular ??
             form.regional_variants.common.is_regular ??
-            true,
+            (env.FORM_SPELLING_REGULARITY ? true : undefined),
           origin: mapping.us.origin,
           pronunciations: usPronunciations,
           component_usages: clonedComponentUsages(
@@ -357,7 +358,7 @@ export function convertUkUsToCommon(
           is_regular:
             mapping.common.is_regular ??
             form.regional_variants.uk.is_regular ??
-            true,
+            (env.FORM_SPELLING_REGULARITY ? true : undefined),
           origin: mapping.common.origin,
           pronunciations: mappedPronunciations(
             mapping.common,
@@ -502,7 +503,9 @@ export function normalizeGroupDialectRules(
         ? [form.regional_variants.common]
         : [form.regional_variants.uk, form.regional_variants.us];
     for (const variant of variants) {
-      variant.is_regular = variantRegularity(content, form.id, variant);
+      if (env.FORM_SPELLING_REGULARITY) {
+        variant.is_regular = variantRegularity(content, form.id, variant);
+      }
     }
     if (
       rules.spelling_mode === "unified" &&
@@ -768,7 +771,7 @@ export function addPartOfSpeech(
           id: firstVariantId,
           dialect: "common" as const,
           spelling: templateSpelling.uk,
-          is_regular: true,
+          is_regular: env.FORM_SPELLING_REGULARITY ? true : undefined,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         }
@@ -779,7 +782,7 @@ export function addPartOfSpeech(
           id: firstVariantId,
           dialect: "uk" as const,
           spelling: templateSpelling.uk,
-          is_regular: true,
+          is_regular: env.FORM_SPELLING_REGULARITY ? true : undefined,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         },
@@ -787,7 +790,7 @@ export function addPartOfSpeech(
           id: secondVariantId!,
           dialect: "us" as const,
           spelling: templateSpelling.us,
-          is_regular: true,
+          is_regular: env.FORM_SPELLING_REGULARITY ? true : undefined,
           origin: "manual" as const,
           pronunciations: [pronunciation(secondPronunciationId!)]
         }
@@ -1049,7 +1052,7 @@ export function addConcreteForm(
           id: firstVariantId,
           dialect: "common" as const,
           spelling: "",
-          is_regular: true,
+          is_regular: env.FORM_SPELLING_REGULARITY ? true : undefined,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         }
@@ -1060,7 +1063,7 @@ export function addConcreteForm(
           id: firstVariantId,
           dialect: "uk" as const,
           spelling: "",
-          is_regular: true,
+          is_regular: env.FORM_SPELLING_REGULARITY ? true : undefined,
           origin: "manual" as const,
           pronunciations: [pronunciation(firstPronunciationId)]
         },
@@ -1068,7 +1071,7 @@ export function addConcreteForm(
           id: secondVariantId!,
           dialect: "us" as const,
           spelling: "",
-          is_regular: true,
+          is_regular: env.FORM_SPELLING_REGULARITY ? true : undefined,
           origin: "manual" as const,
           pronunciations: [pronunciation(secondPronunciationId!)]
         }

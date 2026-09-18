@@ -1,3 +1,5 @@
+import { env } from "../../../lib/env";
+import { toFormsWire } from "./model";
 import type { WordConcreteFormV3 } from "@tsz/types";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -2194,4 +2196,125 @@ it("历史非规则组新增词形默认规则，不继承旧组标记", () => {
   expect(added.value.pos[0]!.forms.at(-1)!.regional_variants).toMatchObject({
     common: { is_regular: true }
   });
+});
+
+it("兼容发布不向旧 API 生成规则标记：新增、编辑和英美转换均保持缺省", () => {
+  const enabled = env.FORM_SPELLING_REGULARITY;
+  env.FORM_SPELLING_REGULARITY = false;
+  try {
+    let nextId = 20000;
+    const ids = () => uuidFromInt(nextId++);
+    const noun = partOfSpeechCatalogFixture.items.find(
+      (item) => item.code === "noun"
+    )!;
+    const assertLegacyWire = (content: Parameters<typeof toFormsWire>[0]) => {
+      for (const pos of toFormsWire(content).pos) {
+        for (const form of pos.forms) {
+          const regional = form.regional_variants;
+          for (const variant of regional.mode === "common"
+            ? [regional.common]
+            : [regional.uk, regional.us]) {
+            expect(variant).not.toHaveProperty("is_regular");
+          }
+        }
+      }
+    };
+    const added = addPartOfSpeech({ pos: [] }, noun, ids);
+    expect(added.ok).toBe(true);
+    if (!added.ok) return;
+    assertLegacyWire(added.value);
+    let content = formsFixture();
+    content.pos[0]!.form_groups[0]!.is_regular = false;
+    content = updateVariantSpelling(content, UUIDS.common_variant, "edited");
+    const withPlural = addConcreteForm(
+      content,
+      UUIDS.pos,
+      UUIDS.group,
+      "plural",
+      ids
+    );
+    expect(withPlural.ok).toBe(true);
+    if (!withPlural.ok) return;
+    content = withPlural.value;
+    assertLegacyWire(content);
+    for (const rules of [
+      { spelling_mode: "distinguish", phonetic_mode: "distinguish" },
+      { spelling_mode: "unified", phonetic_mode: "distinguish" },
+      { spelling_mode: "unified", phonetic_mode: "unified" }
+    ] as const) {
+      const result = normalizeGroupDialectRules(
+        content,
+        UUIDS.pos,
+        UUIDS.group,
+        rules,
+        "uk",
+        ids
+      );
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      content = result.value;
+      assertLegacyWire(content);
+    }
+  } finally {
+    env.FORM_SPELLING_REGULARITY = enabled;
+  }
+});
+
+it("兼容发布保留新 API 已有规则值，拆分和合并也不丢失 false", () => {
+  const enabled = env.FORM_SPELLING_REGULARITY;
+  env.FORM_SPELLING_REGULARITY = false;
+  try {
+    const common = commonFormFixture();
+    common.regional_variants.common.is_regular = false;
+    const content = formsFixture({ forms: [common] });
+    let nextId = 21000;
+    const ids = () => uuidFromInt(nextId++);
+    const split = normalizeGroupDialectRules(
+      content,
+      UUIDS.pos,
+      UUIDS.group,
+      { spelling_mode: "distinguish", phonetic_mode: "distinguish" },
+      "uk",
+      ids
+    );
+    expect(split.ok).toBe(true);
+    if (!split.ok) return;
+    expect(
+      toFormsWire(split.value).pos[0]!.forms[0]!.regional_variants
+    ).toMatchObject({ uk: { is_regular: false }, us: { is_regular: false } });
+    const merged = normalizeGroupDialectRules(
+      split.value,
+      UUIDS.pos,
+      UUIDS.group,
+      { spelling_mode: "unified", phonetic_mode: "unified" },
+      "uk",
+      ids
+    );
+    expect(merged).toMatchObject({
+      ok: true,
+      value: {
+        pos: [
+          { forms: [{ regional_variants: { common: { is_regular: false } } }] }
+        ]
+      }
+    });
+    const distinct = updateFormRegularity(
+      split.value,
+      common.id,
+      "us",
+      true,
+      "distinguish"
+    );
+    expect(
+      toFormsWire(distinct).pos[0]!.forms[0]!.regional_variants
+    ).toMatchObject({ uk: { is_regular: false }, us: { is_regular: true } });
+    expect(
+      normalizeGroupDialectRules(distinct, UUIDS.pos, UUIDS.group, {
+        spelling_mode: "unified",
+        phonetic_mode: "distinguish"
+      })
+    ).toEqual({ ok: false, reason: "regularity_merge_required" });
+  } finally {
+    env.FORM_SPELLING_REGULARITY = enabled;
+  }
 });

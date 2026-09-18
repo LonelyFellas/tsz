@@ -1,3 +1,4 @@
+import { env } from "../../../../lib/env";
 import { FormTypeLabelsProvider } from "../../part-of-speech/FormTypeLabels";
 import {
   act,
@@ -699,6 +700,26 @@ describe("V3FormsAndPronunciationStep", () => {
     ).toHaveTextContent("原形");
     expect(matrices[1]!.querySelectorAll(".v3-membership-row")).toHaveLength(2);
     expect(canonicalValue()).toEqual(content);
+  });
+
+  it("兼容发布隐藏规则开关但保留已有标记和拼写编辑", async () => {
+    const enabled = env.FORM_SPELLING_REGULARITY;
+    env.FORM_SPELLING_REGULARITY = false;
+    try {
+      const form = commonFormFixture();
+      form.regional_variants.common.is_regular = false;
+      const { container } = render(
+        <Harness initial={formsFixture({ forms: [form] })} />
+      );
+      const input = await screen.findByLabelText("原形英美通用拼写");
+      expect(container.querySelector(".v3-spelling-regularity")).toBeNull();
+      fireEvent.change(input, { target: { value: "edited" } });
+      expect(formById(canonicalValue(), form.id)).toMatchObject({
+        regional_variants: { common: { spelling: "edited", is_regular: false } }
+      });
+    } finally {
+      env.FORM_SPELLING_REGULARITY = enabled;
+    }
   });
 
   it("英美拼写各自设置规则变化，合并不同值时提示先统一", async () => {

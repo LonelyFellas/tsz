@@ -39,3 +39,12 @@ OpenAPI 按官方 export_openapi 生成并显式指定本次后端路径同步�
 ## Ship 基线整合
 
 前端已合入 `f8f545a`，后端已合入 `e07d7e4`；保留主线词义多组绑定与引用保护。本次迁移编号顺延为 `20260917180000_add_form_variant_regularity`，排在主线 `20260917120000` 之后。后端保留任务工作树，从完整已审提交推送到 `dev` 并创建面向 `main` 的 PR，不改动其他 worktree。
+
+## 兼容部署补丁
+
+现网 admin=f8f545a、API=e07d7e4，二者旧协议不能直接与本功能的另一端混用。
+新增 `VITE_FORM_SPELLING_REGULARITY`，生产缺省关闭、开发缺省开启；部署脚本显式接受 `DEPLOY_FORM_SPELLING_REGULARITY`（默认 true），先显式 false 发布兼容读取前端。
+关闭时隐藏规则选项，不在新建及旧数据英美转换时生成变体字段；始终保留新 API 返回的显式值（包括 false），wire 不做统一剥离。
+规范顺序为：该补丁合 main 且精确 CI 成功 → admin false → 确认所有录入人员已保存并刷新/关闭旧标签页 → 专用 backend_deploy_runner 部署 API 并验收 → 同一 frontend main 的 admin true。两次 admin 制品来源相同但构建开关不同，制品摘要分别验证。
+
+切换 API 前必须确认旧页面已处理；现有资源更新提示不会自动刷新有编辑内容的页面，不能把发布静态资源当作所有客户端已升级。无法确认时停在兼容 admin + 旧 API，不切换后端。

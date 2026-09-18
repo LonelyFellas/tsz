@@ -1,3 +1,4 @@
+import { env } from "../../../../lib/env";
 import { useFormTypeLabel } from "../../part-of-speech/FormTypeLabels";
 import { Flex, Input, Radio, Select, Typography } from "antd";
 import type {
@@ -181,6 +182,7 @@ function SpellingRegularity({
   onChange: (next: DraftFormsStepContentV3) => void;
 }) {
   const name = useId();
+  if (!env.FORM_SPELLING_REGULARITY) return null;
   return (
     <Flex align="center" gap="small" className="v3-spelling-regularity">
       <Typography.Text>是否规则变化？</Typography.Text>
