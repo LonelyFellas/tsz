@@ -85,6 +85,51 @@ beforeEach(() => {
   });
 });
 describe("当前词条关联与离开保护", () => {
+  it.each(["made", "make"])(
+    "调序后首候选文案跟随配置，%s 不会自动绑定或绕过同拼写歧义保护",
+    async (spelling) => {
+      const word = sentenceWord("source", "make");
+      const pos = word.forms.pos[0]!;
+      const past = structuredClone(pos.forms[0]!);
+      past.id = "past";
+      past.form_type = "past_tense";
+      if (past.regional_variants.mode !== "common")
+        throw new Error("fixture must be common");
+      past.regional_variants.common.id = "past-variant";
+      past.regional_variants.common.spelling = spelling;
+      pos.forms.push(past);
+      pos.form_groups = [
+        {
+          id: "group",
+          is_regular: true,
+          scope: "general",
+          dialect_rules: { spelling_mode: "unified", phonetic_mode: "unified" },
+          members: [
+            { id: "past-member", form_id: "past" },
+            { id: "base-member", form_id: pos.forms[0]!.id }
+          ]
+        }
+      ];
+      show(
+        <SentenceEditor
+          sentence={example()}
+          sourceWord={word}
+          sourceSenseId="sense"
+          onClose={vi.fn()}
+          onSaved={vi.fn()}
+        />
+      );
+      await screen.findByText(new RegExp(`请关联当前词义：${spelling}`));
+      const shortcut = screen.queryByRole("button", { name: /确认关联 make/ });
+      if (spelling === "make") expect(shortcut).not.toBeInTheDocument();
+      else expect(shortcut).toBeEnabled();
+      expect(
+        screen.getByRole("button", { name: "完成例句编辑" })
+      ).toBeDisabled();
+      expect(api.sentences.update).not.toHaveBeenCalled();
+      expect(api.sentences.create).not.toHaveBeenCalled();
+    }
+  );
   it.each(["homograph", "pending", "other-sense", "entry_only"])(
     "%s 不能满足当前关联，但仍允许进入编辑器修复",
     async (state) => {
