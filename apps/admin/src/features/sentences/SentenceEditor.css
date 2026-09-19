@@ -1,0 +1,53 @@
+.sentence-editor .tsz-ve-toolbar {
+  gap: 4px;
+  padding: 8px;
+  border-radius: 8px 8px 0 0;
+}
+
+/* 分隔线跟随工具换行，关联、标注、音频各自成组。 */
+.sentence-editor .tsz-ve-toolbar-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sentence-editor [data-tool="pause"] .tsz-ve-toolbar-divider {
+  display: none;
+}
+
+.sentence-editor .tsz-ve-toolbar-divider {
+  margin-inline: 4px;
+}
+
+/* 工具槽之外的分隔线将历史操作推到右侧。 */
+.sentence-editor .tsz-ve-toolbar > .tsz-ve-toolbar-divider {
+  margin-inline-start: auto;
+}
+
+.sentence-editor .tsz-ve-toolbar .ant-btn.ant-btn {
+  height: 28px;
+  border-radius: 6px;
+}
+
+.sentence-editor .tsz-ve-markup .tsz-ve-canvas {
+  border-radius: 0 0 8px 8px;
+}
+
+/* 显色层与输入层必须保持相同度量；上下仍留出连读、停顿标注空间。 */
+.sentence-editor .v3-voice-text-editor .tsz-ve-strip,
+.sentence-editor .v3-voice-text-editor .tsz-ve-canvas-input {
+  padding: 24px 14px 32px;
+  font-size: 20px;
+  line-height: 1.6;
+}
+
+.sentence-editor .tsz-ve-strip {
+  box-sizing: border-box;
+  min-height: 88px;
+}
+
+.sentence-editor .tsz-ve-canvas-input::placeholder {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--ant-color-text-placeholder, #bfbfbf);
+}
