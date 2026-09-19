@@ -1,7 +1,11 @@
 import { useState } from "react";
 import { Alert, Button, Flex, Input, Radio, Typography } from "antd";
 import type { AssociationPickerProps } from "@tsz/voice-editor/types";
-import type { Dialect, SharedSentenceAnnotation } from "@tsz/types";
+import type {
+  AdminWordV3,
+  Dialect,
+  SharedSentenceAnnotation
+} from "@tsz/types";
 import {
   V3TargetCascader,
   type ResolvedTarget
@@ -14,10 +18,19 @@ export function SharedSentenceAssociationPicker({
   onSelect,
   dialect,
   labels,
+  sourceEntryId,
+  sourceSenseId,
+  sourcePosId,
+  sourceForms,
   onTargetLabel
 }: AssociationPickerProps<SharedSentenceAnnotation> & {
   dialect: Dialect;
   labels: Record<string, string>;
+  /** 例句所处词条／词义：候选排序时默认置顶（任务 #34）。 */
+  sourceEntryId?: string;
+  sourceSenseId?: string;
+  sourcePosId?: string;
+  sourceForms?: AdminWordV3["forms"];
   onTargetLabel: (id: string, label: string) => void;
 }) {
   const literal = segments.map((segment) => segment.surface).join(" ");
@@ -44,6 +57,10 @@ export function SharedSentenceAssociationPicker({
           targetKind={kind}
           phraseSelection="entry"
           sourceDialect={dialect}
+          prioritizedEntryId={sourceEntryId}
+          prioritizedSenseId={sourceSenseId}
+          prioritizedPosId={sourcePosId}
+          prioritizedForms={sourceForms}
           selectedTarget={
             target.state === "linked"
               ? {
@@ -93,6 +110,10 @@ export function SharedSentenceAssociationPicker({
           targetKind={kind}
           phraseSelection="entry"
           sourceDialect={dialect}
+          prioritizedEntryId={sourceEntryId}
+          prioritizedSenseId={sourceSenseId}
+          prioritizedPosId={sourcePosId}
+          prioritizedForms={sourceForms}
           targets={choice ? [choice] : []}
           onReplace={(targets) => setChoice(targets[0])}
         />

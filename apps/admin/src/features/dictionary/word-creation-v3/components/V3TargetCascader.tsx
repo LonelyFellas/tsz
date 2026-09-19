@@ -11,6 +11,7 @@ import {
   Typography
 } from "antd";
 import type {
+  AdminWordV3,
   PhraseComponentUsageV3,
   PublishedSentenceTargetCandidateV3,
   TextLinkViaPhraseV3
@@ -66,6 +67,8 @@ interface CandidateSense {
  */
 interface CandidateFormGroup {
   formKey: string;
+  posId: string;
+  formId: string;
   formLabel: string;
   posLabel: string;
   matched: boolean;
@@ -147,51 +150,63 @@ function cascaderOptionsFromGroups(
           {draftTag}
         </span>
       ),
-      children: group.formGroups.map((formGroup) => ({
-        value: formGroup.formKey,
-        disabled: formGroup.senses.length === 0,
-        isLeaf: formGroup.senses.length === 0,
-        label: (
-          // 命中行只靠颜色区分，不再占一个「命中」标签的宽度。
-          <span
-            className={
-              formGroup.matched
-                ? "tsz-entry-en v3-component-usage-matched-form"
-                : "tsz-entry-en"
-            }
-          >
-            {posLabels.size > 1
-              ? `${formGroup.formLabel}（${formGroup.posLabel}）`
-              : formGroup.formLabel}
-            {formGroup.senses.length === 0 ? "（暂无可关联词义）" : null}
-          </span>
-        ),
-        children: formGroup.senses.map((sense) => {
-          // 单选：词义叶子前挂一个 radio 圆点回显选中态；选择本身仍由级联叶子的点击驱动。
-          const selected = sense.usages.find(
-            (usage) =>
-              selectedTarget && leafKeyOf(usage) === leafKeyOf(selectedTarget)
-          );
-          const preferred = sense.usages.find(
-            (usage) =>
-              preferredTarget && leafKeyOf(usage) === leafKeyOf(preferredTarget)
-          );
-          return {
-            value: sense.senseId,
-            target: selected ?? preferred ?? sense.usages[0],
-            disabled: readOnly,
-            label: (
-              <span className="v3-component-usage-sense">
-                <span
-                  aria-hidden
-                  className={`v3-component-usage-radio${selected ? " is-checked" : ""}`}
-                />
-                {sense.gloss || "暂无释义"}
-              </span>
+      children: group.formGroups.map((formGroup) => {
+        // 空白词义不可新选；已有绑定保留回显，避免隐藏需要清理的关联。
+        const senses = formGroup.senses.filter(
+          (sense) =>
+            sense.gloss.trim().length > 0 ||
+            sense.usages.some(
+              (usage) =>
+                selectedTarget && leafKeyOf(usage) === leafKeyOf(selectedTarget)
             )
-          };
-        })
-      }))
+        );
+        return {
+          value: formGroup.formKey,
+          disabled: senses.length === 0,
+          isLeaf: senses.length === 0,
+          label: (
+            // 命中行只靠颜色区分，不再占一个「命中」标签的宽度。
+            <span
+              className={
+                formGroup.matched
+                  ? "tsz-entry-en v3-component-usage-matched-form"
+                  : "tsz-entry-en"
+              }
+            >
+              {posLabels.size > 1
+                ? `${formGroup.formLabel}（${formGroup.posLabel}）`
+                : formGroup.formLabel}
+              {senses.length === 0 ? "（暂无可关联词义）" : null}
+            </span>
+          ),
+          children: senses.map((sense) => {
+            // 单选：词义叶子前挂一个 radio 圆点回显选中态；选择本身仍由级联叶子的点击驱动。
+            const selected = sense.usages.find(
+              (usage) =>
+                selectedTarget && leafKeyOf(usage) === leafKeyOf(selectedTarget)
+            );
+            const preferred = sense.usages.find(
+              (usage) =>
+                preferredTarget &&
+                leafKeyOf(usage) === leafKeyOf(preferredTarget)
+            );
+            return {
+              value: sense.senseId,
+              target: selected ?? preferred ?? sense.usages[0],
+              disabled: readOnly || sense.gloss.trim().length === 0,
+              label: (
+                <span className="v3-component-usage-sense">
+                  <span
+                    aria-hidden
+                    className={`v3-component-usage-radio${selected ? " is-checked" : ""}`}
+                  />
+                  {sense.gloss.trim() || "词义未填写"}
+                </span>
+              )
+            };
+          })
+        };
+      })
     };
   });
 }
@@ -260,6 +275,8 @@ function groupsFromCandidates(
       if (!formGroup) {
         formGroup = {
           formKey,
+          posId: candidate.pos_id,
+          formId: form.form_id,
           // 方言后缀仅用于区分实际拼写差异，不把发音差异展示成词形差异。
           formLabel:
             form.dialect === "common" ||
@@ -343,11 +360,90 @@ function groupsFromCandidates(
   return [...byEntry.values()];
 }
 
+function moveToFront<T>(items: readonly T[], index: number): T[] {
+  if (index <= 0 || index >= items.length) return [...items];
+  const next = [...items];
+  const [item] = next.splice(index, 1);
+  next.unshift(item!);
+  return next;
+}
+
+/**
+ * 任务 #34：给例句里的片段选「关联单词」时，把例句所处的词义默认排到第一位。
+ * 当前词条优先，当前词性的全部词形优先；词性及组内词形按 Step 2 顺序排列。
+ * 词形内仍将当前词义置顶。目标词条不在候选里时不改变既有候选顺序。
+ */
+function prioritizeDefaultTarget(
+  groups: CandidateEntryGroup[],
+  entryId: string | undefined,
+  senseId: string | undefined,
+  posId: string | undefined,
+  forms: AdminWordV3["forms"] | undefined
+): CandidateEntryGroup[] {
+  if (entryId === undefined) return groups;
+  const entryIndex = groups.findIndex((group) => group.entryId === entryId);
+  if (entryIndex === -1) return groups;
+  const entry = groups[entryIndex]!;
+  const formGroups = entry.formGroups.map((form) => {
+    const senseIndex =
+      senseId === undefined
+        ? -1
+        : form.senses.findIndex((sense) => sense.senseId === senseId);
+    return senseIndex <= 0
+      ? form
+      : { ...form, senses: moveToFront(form.senses, senseIndex) };
+  });
+  // Step 2 按词性 → 变化组 → 成员顺序展示。同一词形跨组出现时取首次位置。
+  const posOrder = new Map(forms?.pos.map((pos, index) => [pos.pos_id, index]));
+  const formOrder = new Map(
+    forms?.pos.map((pos) => [
+      pos.pos_id,
+      new Map(
+        [
+          ...new Set([
+            ...pos.form_groups.flatMap((group) =>
+              group.members.map((member) => member.form_id)
+            ),
+            ...pos.forms.map((form) => form.id)
+          ])
+        ].map((id, index) => [id, index])
+      )
+    ])
+  );
+  const currentPosId =
+    posId ??
+    formGroups.find((form) =>
+      form.senses.some((sense) => sense.senseId === senseId)
+    )?.posId;
+  const rank = (order: ReadonlyMap<string, number> | undefined, id: string) =>
+    order?.get(id) ?? Number.MAX_SAFE_INTEGER;
+  const orderedEntry: CandidateEntryGroup = {
+    ...entry,
+    formGroups: [...formGroups].sort(
+      (a, b) =>
+        Number(b.posId === currentPosId) - Number(a.posId === currentPosId) ||
+        rank(posOrder, a.posId) - rank(posOrder, b.posId) ||
+        (a.posId === b.posId
+          ? rank(formOrder.get(a.posId), a.formId) -
+            rank(formOrder.get(b.posId), b.formId)
+          : 0)
+    )
+  };
+  return moveToFront(
+    groups.map((group, index) => (index === entryIndex ? orderedEntry : group)),
+    entryIndex
+  );
+}
+
 export function V3TargetCascader({
   literal,
   targets,
   onReplace,
   selfEntryId,
+  prioritizedEntryId,
+  prioritizedSenseId,
+  prioritizedPosId,
+  prioritizedForms,
   targetKind,
   phraseSelection = "components",
   sourceDialect,
@@ -360,6 +456,13 @@ export function V3TargetCascader({
   targets: readonly ResolvedTarget[];
   onReplace: (next: ResolvedTarget[], viaPhrase?: TextLinkViaPhraseV3) => void;
   selfEntryId?: string;
+  /** 例句所处词条：有值时把它（及其词义）排到候选首位，见 prioritizeDefaultTarget。 */
+  prioritizedEntryId?: string;
+  /** 例句所处词义：在各词形的词义列表中优先显示。 */
+  prioritizedSenseId?: string;
+  /** 当前词性全部置顶，其余按当前词条 Step 2 的词性、组、成员顺序。 */
+  prioritizedPosId?: string;
+  prioritizedForms?: AdminWordV3["forms"];
   targetKind?: "word" | "phrase";
   phraseSelection?: "components" | "entry";
   sourceDialect?: "common" | "uk" | "us";
@@ -528,14 +631,20 @@ export function V3TargetCascader({
   );
   const groups = useMemo(
     () =>
-      groupsFromCandidates(
-        directCandidates,
-        preference,
-        availableVariantIds,
-        selfEntryId,
-        formTypeLabel,
-        posLabelOf,
-        state.candidates
+      prioritizeDefaultTarget(
+        groupsFromCandidates(
+          directCandidates,
+          preference,
+          availableVariantIds,
+          selfEntryId,
+          formTypeLabel,
+          posLabelOf,
+          state.candidates
+        ),
+        prioritizedEntryId,
+        prioritizedSenseId,
+        prioritizedPosId,
+        prioritizedForms
       ),
     [
       preference,
@@ -544,7 +653,11 @@ export function V3TargetCascader({
       directCandidates,
       state.candidates,
       formTypeLabel,
-      posLabelOf
+      posLabelOf,
+      prioritizedEntryId,
+      prioritizedSenseId,
+      prioritizedPosId,
+      prioritizedForms
     ]
   );
   const phraseComponents = useMemo(() => {

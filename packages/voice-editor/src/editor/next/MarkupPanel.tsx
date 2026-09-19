@@ -134,7 +134,11 @@ export function MarkupPanel({
        */}
       <div className="tsz-ve-toolbar" role="toolbar" aria-label="标注工具栏">
         {tools.map((tool, index) => (
-          <span key={tool.key} className="tsz-ve-toolbar-slot">
+          <span
+            key={tool.key}
+            className="tsz-ve-toolbar-slot"
+            data-tool={tool.key}
+          >
             {index > 0 && tool.dividerBefore && (
               <span className="tsz-ve-toolbar-divider" aria-hidden />
             )}

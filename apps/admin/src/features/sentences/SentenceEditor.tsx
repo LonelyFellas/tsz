@@ -33,6 +33,7 @@ import { V3SentenceTranslationsField } from "../dictionary/word-creation-v3/comp
 import { editableEnglishText } from "../dictionary/word-creation-v3/meaningsModel";
 import { SharedSentenceAssociationPicker } from "./SharedSentenceAssociationPicker";
 import { newSentence } from "./model";
+import "./SentenceEditor.css";
 const LEVELS = ["A1", "A2", "B1", "B2", "C1", "C2"].map((value) => ({
   value,
   label: value
@@ -321,7 +322,7 @@ export function SentenceEditor({
   };
   return (
     <PronunciationPreviewProvider>
-      <Flex vertical gap="middle">
+      <Flex className="sentence-editor" vertical gap="middle">
         {recovery.notice}
         {router && !registerLeaveGuard && (
           <SentenceNavigationGuard
@@ -464,6 +465,14 @@ export function SentenceEditor({
                 key={`${props.kind}:${props.selected?.id ?? props.segments.map((segment) => `${segment.start}:${segment.end}`).join(",")}`}
                 dialect={row.dialect}
                 labels={targetLabels}
+                sourceEntryId={sourceEntryId}
+                sourceSenseId={sourceSenseId}
+                sourcePosId={
+                  sourceWord?.meanings.pos.find((pos) =>
+                    pos.senses.some((sense) => sense.id === sourceSenseId)
+                  )?.pos_id
+                }
+                sourceForms={sourceWord?.forms}
                 onTargetLabel={(id, label) =>
                   setTargetLabels((current) => ({ ...current, [id]: label }))
                 }
