@@ -32,6 +32,7 @@ import {
   Input,
   InputNumber,
   Popover,
+  Popconfirm,
   Select,
   Space,
   Switch,
@@ -289,6 +290,7 @@ function SenseEditorShell({
   expanded,
   onExpandedChange,
   onDelete,
+  confirmDelete,
   nodeId,
   referenceCount = 0
 }: {
@@ -301,6 +303,7 @@ function SenseEditorShell({
   expanded: boolean;
   onExpandedChange: (expanded: boolean) => void;
   onDelete: () => void;
+  confirmDelete: boolean;
   nodeId: string;
   /** 指向本词义的引用数；大于 0 时不能删除。 */
   referenceCount?: number;
@@ -364,15 +367,25 @@ function SenseEditorShell({
                       : undefined
                   }
                 >
-                  <Button
-                    aria-label={`删除词义 ${index + 1}`}
-                    icon={<DeleteOutlined />}
-                    danger
-                    disabled={referenceCount > 0}
-                    size="small"
-                    type="text"
-                    onClick={onDelete}
-                  />
+                  <Popconfirm
+                    title="确定删除该词义吗？"
+                    description={summary}
+                    okText="确认删除"
+                    cancelText="取消"
+                    okButtonProps={{ danger: true }}
+                    disabled={!confirmDelete || referenceCount > 0}
+                    onConfirm={onDelete}
+                  >
+                    <Button
+                      aria-label={`删除词义 ${index + 1}`}
+                      icon={<DeleteOutlined />}
+                      danger
+                      disabled={referenceCount > 0}
+                      size="small"
+                      type="text"
+                      onClick={confirmDelete ? undefined : onDelete}
+                    />
+                  </Popconfirm>
                 </V3DisabledReason>
               </Space>
             ),
@@ -914,6 +927,41 @@ function definitionsStillDefault(
         (slot.style ?? "definition")
     );
   });
+}
+
+/** 默认空白模板可直接移除；录入内容或调整过配置的词义需要确认。 */
+export function senseNeedsDeleteConfirmation(
+  sense: WordSenseWritableV3,
+  inheritedGroupId?: string
+): boolean {
+  return Boolean(
+    sense.sense_group_id !== inheritedGroupId ||
+    sense.sub_pos.trim() ||
+    sense.level !== DEFAULT_SENSE_LEVEL ||
+    (sense.frequency && sense.frequency !== "0") ||
+    sense.depends_on_context ||
+    boundFormGroupIds(sense).length ||
+    sense.sentences.length ||
+    sense.relations.length ||
+    sense.component_usages?.length ||
+    !definitionsStillDefault(sense.definitions, DEFAULT_SENSE_LEVEL) ||
+    sense.definitions.some((definition) => {
+      if (
+        definition.definition_mode === "zh_definition" ||
+        definition.definition_mode === "zh_sentence"
+      )
+        return false;
+      const english = definition.content as EnglishTextV3;
+      return (
+        english.mode !== "unified" ||
+        Boolean(
+          english.common.voice_profile ||
+          english.common.audio_assets?.length ||
+          english.common.text_links?.length
+        )
+      );
+    })
+  );
 }
 
 type DefinitionModeV3 =
@@ -2348,6 +2396,8 @@ function V3MeaningsAndExamplesStepContent({
   multiGroupBindingsEnabled = false
 }: V3MeaningsAndExamplesStepProps) {
   const { modal } = App.useApp();
+  // 仅本次新增词义的自动继承值可视为空白；已保存的归属保守地要求确认。
+  const inheritedSenseGroups = useRef(new Map<string, string | undefined>());
   const [expandedSenseByPos, setExpandedSenseByPos] = useState<
     Record<string, string | null>
   >(() =>
@@ -2760,6 +2810,10 @@ function V3MeaningsAndExamplesStepContent({
                                 }
                                 level={sense.level}
                                 nodeId={sense.id}
+                                confirmDelete={senseNeedsDeleteConfirmation(
+                                  sense,
+                                  inheritedSenseGroups.current.get(sense.id)
+                                )}
                                 referenceCount={Math.max(
                                   senseReferenceCount(
                                     referenceGuard.index,
@@ -3788,9 +3842,15 @@ function V3MeaningsAndExamplesStepContent({
                                 .reverse()
                                 .find((sense) => sense.sense_group_id)
                                 ?.sense_group_id ?? draft.sense_groups[0]?.id;
-                            posDraft.senses.push(
-                              newSense(idFactory, inheritedGroupId)
+                            const addedSense = newSense(
+                              idFactory,
+                              inheritedGroupId
                             );
+                            inheritedSenseGroups.current.set(
+                              addedSense.id,
+                              inheritedGroupId
+                            );
+                            posDraft.senses.push(addedSense);
                           })
                         }
                         size="large"

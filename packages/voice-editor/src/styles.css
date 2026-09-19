@@ -148,6 +148,9 @@
   /* 行高必须写死数值：textarea 的 normal 与 div 的 normal 不一定同值。 */
   line-height: 1.6;
   letter-spacing: normal;
+  /* 正文逐字绘制，禁用跨字形排版，避免隐藏度量字与 textarea 的字距不同。 */
+  font-kerning: none;
+  font-variant-ligatures: none;
   /* 换行规则也要一致，否则长词的折行位置两层会不同。 */
   overflow-wrap: break-word;
   white-space: pre-wrap;
@@ -372,18 +375,23 @@
   font-weight: 700;
   color: var(--tsz-ve-role-core);
 }
+.tsz-ve-letter:not([data-level]),
 .tsz-ve-letter.is-grammar {
   position: relative;
   font-weight: 400;
+}
+.tsz-ve-letter.is-grammar {
   color: var(--tsz-ve-role-grammar-text);
 }
 
-/* 普通字重仍保留底层 textarea 的字宽，选区与光标不会因分类改变而错位。 */
+/* 未标注与语法成分使用普通字重，仍以隐藏的粗体字保留 textarea 的字宽，避免光标错位。 */
+.tsz-ve-letter:not([data-level])::after,
 .tsz-ve-letter.is-grammar::after {
   content: attr(data-letter);
   font-weight: 700;
   visibility: hidden;
 }
+.tsz-ve-letter:not([data-level]) > .tsz-ve-letter-text,
 .tsz-ve-letter.is-grammar > .tsz-ve-letter-text {
   position: absolute;
   inset-inline-start: 0;

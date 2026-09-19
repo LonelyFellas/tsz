@@ -1,3 +1,4 @@
+import stylesSource from "../../styles.css?raw";
 import { VoicePanel } from "./ToolPanels";
 import {
   act,
@@ -341,6 +342,59 @@ it("先选两个词再打开连读，选区生成端点并在确认后保存", (
 });
 
 describe("VoiceEditor 标注带", () => {
+  it("未标注文本默认常规字重，设置分类后才加粗，清除后恢复", () => {
+    const style = document.createElement("style");
+    style.textContent = stylesSource;
+    document.head.append(style);
+    try {
+      const view = props({
+        value: { version: 2, text: "jobs", annotations: [] }
+      });
+      const mounted = render(<VoiceEditor {...view} />);
+      const firstLetter = () =>
+        mounted.container.querySelector<HTMLElement>(".tsz-ve-letter")!;
+      expect(getComputedStyle(firstLetter()).fontWeight).toBe("400");
+      expect(getComputedStyle(firstLetter().firstElementChild!).position).toBe(
+        "absolute"
+      );
+      for (const [level, weight] of [
+        ["core", "700"],
+        ["function", "700"],
+        ["grammar", "400"]
+      ] as const) {
+        mounted.rerender(
+          <VoiceEditor
+            {...view}
+            value={{
+              version: 2,
+              text: "jobs",
+              annotations: [{ type: "emphasis", start: 0, end: 4, level }]
+            }}
+          />
+        );
+        expect(firstLetter()).toHaveAttribute("data-level", level);
+        expect(getComputedStyle(firstLetter()).fontWeight).toBe(weight);
+      }
+      mounted.rerender(<VoiceEditor {...view} />);
+      expect(firstLetter()).not.toHaveAttribute("data-level");
+      expect(getComputedStyle(firstLetter()).fontWeight).toBe("400");
+      // 可视层和透明输入层继续共用粗体度量，样式切换不移动输入光标。
+      expect(
+        getComputedStyle(
+          mounted.container.querySelector(".tsz-ve-canvas-input")!
+        ).fontWeight
+      ).toBe("700");
+      for (const selector of [".tsz-ve-strip", ".tsz-ve-canvas-input"]) {
+        const computed = getComputedStyle(
+          mounted.container.querySelector(selector)!
+        );
+        expect(computed.fontKerning).toBe("none");
+        expect(computed.fontVariantLigatures).toBe("none");
+      }
+    } finally {
+      style.remove();
+    }
+  });
   it("把文本摊成可点的词，词缝比词少一个", () => {
     render(<VoiceEditor {...props()} />);
     expect(
