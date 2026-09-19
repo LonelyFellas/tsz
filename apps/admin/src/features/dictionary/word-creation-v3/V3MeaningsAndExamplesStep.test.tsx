@@ -11,6 +11,7 @@ import { App as AntApp, ConfigProvider } from "antd";
 import type {
   DraftFormsStepContentV3,
   DraftMeaningsStepContentWritableV3,
+  EnglishTextV3,
   PartOfSpeechCatalogResponse,
   V3DraftValidationIssue
 } from "@tsz/types";
@@ -331,6 +332,62 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.queryByText("确定删除该词义吗？")).not.toBeInTheDocument();
   });
 
+  it("新增空白词义调整继承的语义区间后，取消删除保留归属", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByText("添加词义"));
+    const added = value().pos[0]!.senses[1]!;
+    expect(added.sense_group_id).toBeTruthy();
+    expect(senseNeedsDeleteConfirmation(added, added.sense_group_id)).toBe(
+      false
+    );
+    fireEvent.click(document.querySelectorAll(".word-sense-header-label")[1]!);
+    fireEvent.mouseDown(screen.getByLabelText("释义 2 所属语义区间"));
+    fireEvent.click(
+      document.querySelector(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )!
+    );
+    const before = value();
+    expect(before.pos[0]!.senses[1]!.sense_group_id).toBeUndefined();
+    fireEvent.click(screen.getByLabelText("删除词义 2"));
+    expect(screen.getByText("确定删除该词义吗？")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByText(/取\s*消/u, { selector: ".ant-popconfirm button span" })
+    );
+    expect(value()).toEqual(before);
+  });
+
+  it("仅配置英文释义发音也需要确认，取消后保留配置", () => {
+    const initial = structuredClone(meaningsFixture);
+    const sense = initial.pos[0]!.senses[0]!;
+    Object.assign(sense, {
+      sub_pos: "",
+      level: "A1",
+      frequency: "0",
+      depends_on_context: false,
+      definitions: defaultDefinitions("A1", () => crypto.randomUUID()),
+      sentences: [],
+      relations: []
+    });
+    delete sense.sense_group_id;
+    const english = sense.definitions.find(
+      (item) => item.definition_mode === "en_definition"
+    )!.content as EnglishTextV3;
+    if (english.mode !== "unified") throw new Error("expected unified default");
+    expect(senseNeedsDeleteConfirmation(sense)).toBe(false);
+    english.common.voice_profile = {
+      voices: [{ voice_id: "sonia", enabled: true, rate_percent: 20 }]
+    };
+    expect(senseNeedsDeleteConfirmation(sense)).toBe(true);
+    render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByLabelText("删除词义 1"));
+    expect(screen.getByText("确定删除该词义吗？")).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByText(/取\s*消/u, { selector: ".ant-popconfirm button span" })
+    );
+    expect(value()).toEqual(initial);
+  });
+
   it("仅编辑配置或添加关联内容也需要删除确认", () => {
     const blank = {
       id: "blank",
@@ -344,6 +401,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     };
     expect(senseNeedsDeleteConfirmation(blank)).toBe(false);
     for (const patch of [
+      { sense_group_id: "chosen-group" },
       { sub_pos: "countable" },
       { level: "B1" },
       { frequency: "50" },

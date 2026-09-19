@@ -931,9 +931,11 @@ function definitionsStillDefault(
 
 /** 默认空白模板可直接移除；录入内容或调整过配置的词义需要确认。 */
 export function senseNeedsDeleteConfirmation(
-  sense: WordSenseWritableV3
+  sense: WordSenseWritableV3,
+  inheritedGroupId?: string
 ): boolean {
   return Boolean(
+    sense.sense_group_id !== inheritedGroupId ||
     sense.sub_pos.trim() ||
     sense.level !== DEFAULT_SENSE_LEVEL ||
     (sense.frequency && sense.frequency !== "0") ||
@@ -942,7 +944,23 @@ export function senseNeedsDeleteConfirmation(
     sense.sentences.length ||
     sense.relations.length ||
     sense.component_usages?.length ||
-    !definitionsStillDefault(sense.definitions, DEFAULT_SENSE_LEVEL)
+    !definitionsStillDefault(sense.definitions, DEFAULT_SENSE_LEVEL) ||
+    sense.definitions.some((definition) => {
+      if (
+        definition.definition_mode === "zh_definition" ||
+        definition.definition_mode === "zh_sentence"
+      )
+        return false;
+      const english = definition.content as EnglishTextV3;
+      return (
+        english.mode !== "unified" ||
+        Boolean(
+          english.common.voice_profile ||
+          english.common.audio_assets?.length ||
+          english.common.text_links?.length
+        )
+      );
+    })
   );
 }
 
@@ -2378,6 +2396,8 @@ function V3MeaningsAndExamplesStepContent({
   multiGroupBindingsEnabled = false
 }: V3MeaningsAndExamplesStepProps) {
   const { modal } = App.useApp();
+  // 仅本次新增词义的自动继承值可视为空白；已保存的归属保守地要求确认。
+  const inheritedSenseGroups = useRef(new Map<string, string | undefined>());
   const [expandedSenseByPos, setExpandedSenseByPos] = useState<
     Record<string, string | null>
   >(() =>
@@ -2791,7 +2811,8 @@ function V3MeaningsAndExamplesStepContent({
                                 level={sense.level}
                                 nodeId={sense.id}
                                 confirmDelete={senseNeedsDeleteConfirmation(
-                                  sense
+                                  sense,
+                                  inheritedSenseGroups.current.get(sense.id)
                                 )}
                                 referenceCount={Math.max(
                                   senseReferenceCount(
@@ -3821,9 +3842,15 @@ function V3MeaningsAndExamplesStepContent({
                                 .reverse()
                                 .find((sense) => sense.sense_group_id)
                                 ?.sense_group_id ?? draft.sense_groups[0]?.id;
-                            posDraft.senses.push(
-                              newSense(idFactory, inheritedGroupId)
+                            const addedSense = newSense(
+                              idFactory,
+                              inheritedGroupId
                             );
+                            inheritedSenseGroups.current.set(
+                              addedSense.id,
+                              inheritedGroupId
+                            );
+                            posDraft.senses.push(addedSense);
                           })
                         }
                         size="large"
