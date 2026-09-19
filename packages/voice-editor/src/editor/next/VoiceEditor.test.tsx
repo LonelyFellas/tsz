@@ -384,6 +384,13 @@ describe("VoiceEditor 标注带", () => {
           mounted.container.querySelector(".tsz-ve-canvas-input")!
         ).fontWeight
       ).toBe("700");
+      for (const selector of [".tsz-ve-strip", ".tsz-ve-canvas-input"]) {
+        const computed = getComputedStyle(
+          mounted.container.querySelector(selector)!
+        );
+        expect(computed.fontKerning).toBe("none");
+        expect(computed.fontVariantLigatures).toBe("none");
+      }
     } finally {
       style.remove();
     }
