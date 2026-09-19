@@ -380,7 +380,10 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     // 删词形仍锁：引用失去锚点。
     const deleteForm = screen.getByLabelText("删除变化组 1 的词形 1");
     expect(deleteForm).toBeDisabled();
-    await expectDisabledReason(deleteForm, hint);
+    await expectDisabledReason(
+      deleteForm,
+      "存在 1 处关联，解除所有关联才能删除词形"
+    );
     // TASK#58：改类型保护式放开——可点，但给漂移提示。
     expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled();
     // 漂移提示收成警示图标 + 悬停说明，可及名保留完整文案。
