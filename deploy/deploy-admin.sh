@@ -2,7 +2,7 @@
 # admin 前端部署到 tshb-test：从 origin/main 导出干净源码到临时目录构建 -> rsync 静态产物
 # -> 同步 nginx 配置并 reload。
 # 前置：ssh 别名 tshb-test 可用（root）；服务器已装 nginx（首次搭建见 nginx/tshb-test.conf 头注）。
-# 用法：deploy/deploy-admin.sh
+# 用法：[DEPLOY_EXPECTED_SHA=<当前main完整SHA>] deploy/deploy-admin.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source deploy/deploy-source.sh
@@ -98,7 +98,8 @@ node "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" create-candidate \
 # 在往服务器写任何东西之前先确认候选 manifest 真的生成了。
 [ -s "$candidate_manifest" ] || { echo "!! 候选 manifest 未生成"; exit 1; }
 
-echo "==> recheck exact main before server writes"
+verify_deploy_candidate admin "$candidate_manifest" "$DEPLOY_BUILD_ROOT/apps/admin/dist"
+echo "==> recheck exact main and CI before server writes"
 recheck_deploy_source admin
 # 独立暂存不触碰在线目录；事务在远端持有发布锁直到验证及回滚结束。
 remote_stage="$(ssh tshb-test "mktemp -d /opt/tsz-release-stage.XXXXXX")"
@@ -112,6 +113,9 @@ for file in releases.mjs provenance.mjs publish-release.sh install-nginx-local.s
 done
 rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/nginx/" "tshb-test:$remote_stage/nginx/"
 rsync -az --no-o --no-g "$DEPLOY_BUILD_ROOT/deploy/systemd/" "tshb-test:$remote_stage/systemd/"
+# 上传期间 main/CI 可能变化；失败保留独立暂存，不启动发布事务。
+# GitHub 复核与远端锁/切换不具备跨系统原子性。
+recheck_deploy_source admin
 # 断连时保留暂存与回滚证据；只在成功结束后清理。
 ssh tshb-test "bash '$remote_stage/publish-release.sh' '$remote_stage' admin"
 ssh tshb-test "rm -rf -- '$remote_stage'"
