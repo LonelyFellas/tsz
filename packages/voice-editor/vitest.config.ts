@@ -6,6 +6,7 @@ export default defineConfig({
   test: {
     name: "voice-editor",
     environment: "jsdom",
+    css: true,
     setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"]
   }

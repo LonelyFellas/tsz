@@ -372,18 +372,23 @@
   font-weight: 700;
   color: var(--tsz-ve-role-core);
 }
+.tsz-ve-letter:not([data-level]),
 .tsz-ve-letter.is-grammar {
   position: relative;
   font-weight: 400;
+}
+.tsz-ve-letter.is-grammar {
   color: var(--tsz-ve-role-grammar-text);
 }
 
-/* 普通字重仍保留底层 textarea 的字宽，选区与光标不会因分类改变而错位。 */
+/* 未标注与语法成分使用普通字重，仍以隐藏的粗体字保留 textarea 的字宽，避免光标错位。 */
+.tsz-ve-letter:not([data-level])::after,
 .tsz-ve-letter.is-grammar::after {
   content: attr(data-letter);
   font-weight: 700;
   visibility: hidden;
 }
+.tsz-ve-letter:not([data-level]) > .tsz-ve-letter-text,
 .tsz-ve-letter.is-grammar > .tsz-ve-letter-text {
   position: absolute;
   inset-inline-start: 0;
