@@ -1706,7 +1706,17 @@ describe("真实词条标注创建", () => {
     fireEvent.click(within(dialog).getByText("保存标注并创建"));
     await screen.findByText("匹配结果已更新，请重新确认后继续创建。");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText("确认并创建，进入词形与发音"));
+    expect(supplied.createV3).toHaveBeenCalledTimes(2);
+    const confirmButton = screen.getByRole("button", {
+      name: "确认并创建，进入词形与发音"
+    });
+    // 提示先于 snapshot 和地区详情就绪出现，须等待按钮真正可交互。
+    await waitFor(() => {
+      expect(confirmButton).toBeEnabled();
+      expect(confirmButton).not.toHaveClass("ant-btn-loading");
+    });
+    fireEvent.click(confirmButton);
+    await waitFor(() => expect(supplied.createV3).toHaveBeenCalledTimes(3));
     const latest = await screen.findByRole("dialog");
     expect(within(latest).getAllByPlaceholderText("请输入标注")[0]).toHaveValue(
       "003"
@@ -1720,6 +1730,7 @@ describe("真实词条标注创建", () => {
     });
     fireEvent.click(within(latest).getByText("保存标注并创建"));
     await waitFor(() => expect(created).toHaveBeenCalledOnce());
+    expect(supplied.createV3).toHaveBeenCalledTimes(4);
     expect(calls[3]![1].annotation_updates?.[0]).toMatchObject({
       annotation: "003",
       base_annotation_revision: 2
