@@ -791,7 +791,7 @@ function grammarStructureOptionLabel(
   return `${circledIndex(index)} ${preview}`;
 }
 
-// 只生成展示副本：trim 和 24 码点截断后重定位颜色标注，省略号不带标注。
+// 只生成展示副本：重定位颜色标注，仅保留 trim 和 24 码点截断内的完整连读；省略号不带标注。
 function grammarStructurePreview(structure: GrammarStructureV3, index: number) {
   const content = structure.variants.find((variant) =>
     variant.content.text.trim()
@@ -802,28 +802,40 @@ function grammarStructurePreview(structure: GrammarStructureV3, index: number) {
   const text = [...rich.text.trim()];
   const length = Math.min(text.length, GRAMMAR_STRUCTURE_PREVIEW_LIMIT);
   const annotations = rich.annotations.flatMap((annotation) => {
-    if (annotation.type !== "emphasis" && annotation.type !== "highlight")
+    // 连读连接两个锚点，不能像颜色区间一样裁剪，否则会凭空改变端点。
+    if (
+      annotation.type !== "emphasis" &&
+      annotation.type !== "highlight" &&
+      annotation.type !== "liaison"
+    )
+      return [];
+    if (
+      annotation.type === "liaison" &&
+      (annotation.start < start || annotation.end > start + length)
+    )
       return [];
     const from = Math.max(0, annotation.start - start);
     const to = Math.min(length, annotation.end - start);
     return from < to ? [{ ...annotation, start: from, end: to }] : [];
   });
-  if (annotations.length === 0)
-    return grammarStructureOptionLabel(structure, index);
   return (
-    <>
-      {circledIndex(index)}{" "}
-      <RichTextReadOnly
-        className="word-grammar-reference"
-        value={{
-          version: 2,
-          text: text.slice(0, length).join(""),
-          annotations
-        }}
-        emptyText=""
-      />
-      {text.length > length ? "…" : ""}
-    </>
+    <span className="word-grammar-reference-label">
+      <span className="word-grammar-reference-index">
+        {circledIndex(index)}{" "}
+      </span>
+      <span className="word-grammar-reference-text">
+        <RichTextReadOnly
+          className="word-grammar-reference"
+          value={{
+            version: 2,
+            text: text.slice(0, length).join(""),
+            annotations
+          }}
+          emptyText=""
+        />
+        {text.length > length ? "…" : ""}
+      </span>
+    </span>
   );
 }
 
@@ -3399,7 +3411,12 @@ function V3MeaningsAndExamplesStepContent({
                                                     <Select
                                                       aria-required="true"
                                                       aria-label={`定义 ${definitionIndex + 1} 语法结构`}
-                                                      className="tsz-entry-en"
+                                                      className="tsz-entry-en word-grammar-select"
+                                                      classNames={{
+                                                        popup: {
+                                                          root: "word-grammar-dropdown"
+                                                        }
+                                                      }}
                                                       data-v3-field="grammar_structure_id"
                                                       data-v3-node-id={
                                                         definition.id

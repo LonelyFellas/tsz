@@ -1373,7 +1373,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     ).toEqual(["① "]);
   });
 
-  it("语法引用及选项保留颜色粗体，去掉连读，按码点裁剪且不改变草稿", () => {
+  it("语法引用及选项保留颜色粗体和连读，按码点裁剪且不改变草稿", () => {
     const initial = structuredClone(meaningsFixture);
     initial.pos[0]!.grammar_structures[0]!.variants[0]!.content = {
       version: 2,
@@ -1387,25 +1387,73 @@ describe("V3MeaningsAndExamplesStep", () => {
     const select = screen.getByLabelText("定义 1 语法结构");
     const selected = select.closest(".ant-select")!;
     expect(
-      selected.querySelector('strong[data-level="core"]')
-    ).toHaveTextContent(`😀${"a".repeat(23)}`);
+      [...selected.querySelectorAll('strong[data-level="core"]')]
+        .map((node) => node.textContent)
+        .join("")
+    ).toBe(`😀${"a".repeat(23)}`);
     expect(selected).toHaveTextContent(`① 😀${"a".repeat(23)}…`);
-    expect(selected.querySelector(".tsz-ve-liaison-anchor")).toBeNull();
+    expect(selected.querySelectorAll('[data-liaison="1:4:1:1"]')).toHaveLength(
+      2
+    );
     fireEvent.mouseDown(select);
     const option = document.querySelector(
       ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
     )!;
-    expect(option.querySelector('strong[data-level="core"]')).toHaveTextContent(
-      `😀${"a".repeat(23)}`
-    );
-    expect(option.querySelector(".tsz-ve-liaison-anchor")).toBeNull();
+    expect(
+      [...option.querySelectorAll('strong[data-level="core"]')]
+        .map((node) => node.textContent)
+        .join("")
+    ).toBe(`😀${"a".repeat(23)}`);
+    expect(option.querySelectorAll('[data-liaison="1:4:1:1"]')).toHaveLength(2);
     expect(option.querySelector(".is-invalid")).toBeNull();
     expect(option.querySelector(".word-grammar-reference")).not.toBeNull();
     expect(v3LayoutCss).toMatch(
-      /\.tsz-ve-readonly\.word-grammar-reference\s*\{[^}]*display:\s*inline;[^}]*white-space:\s*nowrap;/su
+      /\.word-grammar-reference-label\s*\{[^}]*align-items:\s*baseline;/su
+    );
+    expect(v3LayoutCss).toMatch(
+      /\.word-grammar-reference-text\s*\{[^}]*padding-top:\s*1em;[^}]*overflow:\s*hidden;/su
     );
     expect(value()).toEqual(initial);
   });
+
+  it.each([
+    { start: 22, end: 26, start_len: 2, end_len: 2, kept: true },
+    { start: 22, end: 27, start_len: 2, end_len: 2, kept: false },
+    { start: 0, end: 4, start_len: 2, end_len: 1, kept: false },
+    { start: 27, end: 29, start_len: 1, end_len: 1, kept: false },
+    { text: "  ab  ", start: 3, end: 5, kept: false }
+  ])(
+    "连读仅在两端完整落入预览时保留：%j",
+    ({ kept, text = `  😀${"a".repeat(25)}  `, ...range }) => {
+      const initial = structuredClone(meaningsFixture);
+      initial.pos[0]!.grammar_structures[0]!.variants[0]!.content = {
+        version: 2,
+        text,
+        annotations: [{ type: "liaison", ...range }]
+      };
+      render(<Harness initial={initial} />);
+      const select = screen.getByLabelText("定义 1 语法结构");
+      fireEvent.mouseDown(select);
+      const option = document.querySelector(
+        ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+      )!;
+      for (const preview of [select.closest(".ant-select")!, option]) {
+        expect(preview).toHaveTextContent(
+          text.trim() === "ab" ? "① ab" : `① 😀${"a".repeat(23)}…`
+        );
+        expect(preview.querySelector(".is-invalid")).toBeNull();
+        const anchors = preview.querySelectorAll(".tsz-ve-liaison-anchor");
+        expect(anchors).toHaveLength(kept ? 2 : 0);
+        if (kept) {
+          expect(anchors[0]).toHaveAttribute("data-liaison", "20:24:2:2");
+          expect(anchors[1]).toHaveAttribute("data-liaison", "20:24:2:2");
+          expect(anchors[0]).toHaveTextContent("aa");
+          expect(anchors[1]).toHaveTextContent("aa");
+        }
+      }
+      expect(value()).toEqual(initial);
+    }
+  );
 
   it("过长的语法结构预览截断到 24 字并留省略号", () => {
     const long = structuredClone(meaningsFixture);
@@ -3843,7 +3891,7 @@ describe("V3MeaningsAndExamplesStep", () => {
 
     select("释义 1 所属语义区间", "次要");
     change("释义 1 频率", "37.25");
-    select("定义 1 语法结构", "② used as a verb");
+    select("定义 1 语法结构", "used as a verb");
     select("释义 1 等级", "B1");
     select("定义 1 等级", "B2");
     fireEvent.click(
@@ -3927,7 +3975,9 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(screen.getByText("可数名词")).toBeVisible();
     expect(screen.getByText("n. 可数名词")).toBeVisible();
     expect(screen.getByText("核心")).toBeInTheDocument();
-    expect(screen.getAllByText("① used as a noun")).toHaveLength(1);
+    expect(
+      screen.getByLabelText("定义 1 语法结构").closest(".ant-select")
+    ).toHaveTextContent("① used as a noun");
     expect(editor).not.toHaveTextContent("pos-1");
     expect(editor).not.toHaveTextContent("sense-group-1");
     expect(editor).not.toHaveTextContent("grammar-1");

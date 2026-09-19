@@ -439,3 +439,159 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     );
   });
 });
+
+test("语法引用：选中与下拉保留富文本、基线和稳定弧线空间", async ({ page }) => {
+  const api = await mockAdminV3Api(page);
+  const word = api.getWord();
+  const pos = word.meanings.pos[0]!;
+  const grammar = pos.grammar_structures[0]!;
+  grammar.variants[0]!.content = {
+    version: 2,
+    text: "a center of the wall",
+    annotations: [
+      { type: "emphasis", start: 2, end: 8, level: "core" },
+      { type: "emphasis", start: 16, end: 20, level: "core" },
+      { type: "liaison", start: 9, end: 20 }
+    ]
+  };
+  const plain = structuredClone(grammar);
+  plain.id = "00000000-0000-4000-8000-000000000991";
+  plain.variants[0]!.id = "00000000-0000-4000-8000-000000000992";
+  plain.variants[0]!.content = {
+    version: 2,
+    text: "a center of the wall",
+    annotations: []
+  };
+  const long = structuredClone(grammar);
+  long.id = "00000000-0000-4000-8000-000000000993";
+  long.variants[0]!.id = "00000000-0000-4000-8000-000000000994";
+  long.variants[0]!.content.text += " WWWWWWWWWWWWWWWWWWWW";
+  pos.grammar_structures.push(plain, long);
+  pos.senses[0]!.definitions[0]!.grammar_structure_id = grammar.id;
+  await page.route(
+    `**/api/v1/admin${ADMIN_V3_ENTRIES_PATH}/${word.id}`,
+    (route) => route.fulfill({ json: { word, retired_stable_nodes: [] } })
+  );
+  await page.goto(`/words/${word.id}/v3/wizard/meanings`);
+  const input = page.getByLabel("定义 1 语法结构", { exact: true }).first();
+  const select = page.locator(".word-grammar-select").first();
+  await expect(select.locator(".tsz-ve-arc")).toHaveCount(1);
+  await expect(select.locator("strong")).toHaveText(["center", "wal", "l"]);
+  await input.click();
+  const dropdown = page.locator(".ant-select-dropdown:visible");
+  await expect(dropdown.locator(".word-grammar-reference-label")).toHaveCount(
+    3
+  );
+  const labels = dropdown.locator(".word-grammar-reference-label");
+  await expect(dropdown).toHaveCSS("opacity", "1");
+  await dropdown.screenshot({
+    path: "/tmp/task62-grammar-desktop-dropdown.png"
+  });
+  await page.screenshot({
+    path: "/tmp/task62-grammar-desktop.png",
+    fullPage: true
+  });
+  const heights = await labels.evaluateAll((nodes) =>
+    nodes.map((node) => node.getBoundingClientRect().height)
+  );
+  expect(heights[0]).toBe(heights[1]);
+  const selectedHeight = (await select.boundingBox())!.height;
+
+  // 用真实排版基线探针与 SVG 几何验证，不依赖 jsdom 的零尺寸布局。
+  async function checkLayout() {
+    for (const label of [
+      select.locator(".word-grammar-reference-label"),
+      labels.first()
+    ]) {
+      const geometry = await label.evaluate((el) => {
+        const index = el.querySelector(".word-grammar-reference-index")!;
+        const reader = el.querySelector(".word-grammar-reference")!;
+        const baseline = (parent: Element) => {
+          const marker = document.createElement("span");
+          marker.style.cssText =
+            "display:inline-block;width:0;height:0;padding:0;vertical-align:baseline";
+          parent.append(marker);
+          const y = marker.getBoundingClientRect().y;
+          marker.remove();
+          return y;
+        };
+        const path = el.querySelector(".tsz-ve-arc")!;
+        const arc = path.getBoundingClientRect();
+        const start = el
+          .querySelector('[data-end="start"]')!
+          .getBoundingClientRect();
+        const end = el
+          .querySelector('[data-end="end"]')!
+          .getBoundingClientRect();
+        const clip = el
+          .querySelector(".word-grammar-reference-text")!
+          .getBoundingClientRect();
+        return {
+          startDelta: Math.abs(arc.left - (start.left + start.width / 2)),
+          endDelta: Math.abs(arc.right - (end.left + end.width / 2)),
+          baselineDelta: Math.abs(baseline(index) - baseline(reader)),
+          arcTop: arc.top - 1,
+          clipTop: clip.top,
+          arcBottom: arc.bottom + 1,
+          clipBottom: clip.bottom,
+          height: el.getBoundingClientRect().height
+        };
+      });
+      expect(geometry.startDelta).toBeLessThan(3);
+      expect(geometry.endDelta).toBeLessThan(3);
+      expect(geometry.baselineDelta).toBeLessThan(1);
+      expect(geometry.arcTop).toBeGreaterThanOrEqual(geometry.clipTop);
+      expect(geometry.arcBottom).toBeLessThanOrEqual(geometry.clipBottom);
+      expect(geometry.height).toBe(heights[0]);
+    }
+    const arrow = await select.locator(".ant-select-suffix").boundingBox();
+    const box = (await select.boundingBox())!;
+    expect(
+      Math.abs(arrow!.y + arrow!.height / 2 - box.y - box.height / 2)
+    ).toBeLessThan(1);
+  }
+  await checkLayout();
+  await labels.nth(1).click();
+  await expect(dropdown).not.toBeVisible();
+  await expect(select.locator(".tsz-ve-arc")).toHaveCount(0);
+  expect((await select.boundingBox())!.height).toBe(selectedHeight);
+  await select.screenshot({ path: "/tmp/task62-grammar-plain-selected.png" });
+  await input.click();
+  await labels.first().click();
+  await expect(dropdown).not.toBeVisible();
+  await expect(select.locator(".tsz-ve-arc")).toHaveCount(1);
+  await select.screenshot({ path: "/tmp/task62-grammar-desktop-selected.png" });
+
+  await page.setViewportSize({ width: 320, height: 844 });
+  await select.scrollIntoViewIfNeeded();
+  await input.click();
+  await expect(dropdown).toBeVisible();
+  await expect(dropdown).toHaveCSS("opacity", "1");
+  await dropdown.screenshot({
+    path: "/tmp/task62-grammar-narrow-dropdown.png"
+  });
+  await checkLayout();
+  const box = (await select.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(320);
+  await labels.first().click();
+  await expect(dropdown).not.toBeVisible();
+  await select.screenshot({ path: "/tmp/task62-grammar-narrow-selected.png" });
+  await page.screenshot({ path: "/tmp/task62-grammar-narrow.png" });
+  await input.click();
+  await labels.nth(2).click();
+  await expect(dropdown).not.toBeVisible();
+  const overflow = await select
+    .locator(".word-grammar-reference-text")
+    .evaluate((el) => ({
+      scroll: el.scrollWidth,
+      client: el.clientWidth,
+      overflow: getComputedStyle(el).overflowX,
+      ellipsis: getComputedStyle(el).textOverflow
+    }));
+  expect(overflow.scroll).toBeGreaterThan(overflow.client);
+  expect(overflow.overflow).toBe("hidden");
+  expect(overflow.ellipsis).toBe("ellipsis");
+  await expect(select).toContainText("…");
+  await select.screenshot({ path: "/tmp/task62-grammar-narrow-truncated.png" });
+});
