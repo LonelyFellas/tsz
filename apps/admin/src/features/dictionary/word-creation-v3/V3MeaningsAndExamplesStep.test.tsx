@@ -18,8 +18,15 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ensureV3MeaningsForForms, toWritableMeanings } from "./meaningsModel";
-import { V3MeaningsAndExamplesStep } from "./V3MeaningsAndExamplesStep";
+import {
+  defaultDefinitions,
+  ensureV3MeaningsForForms,
+  toWritableMeanings
+} from "./meaningsModel";
+import {
+  senseNeedsDeleteConfirmation,
+  V3MeaningsAndExamplesStep
+} from "./V3MeaningsAndExamplesStep";
 import {
   UUIDS,
   commonFormFixture,
@@ -292,6 +299,62 @@ function formsValue(): DraftFormsStepContentV3 {
 }
 
 describe("V3MeaningsAndExamplesStep", () => {
+  it("有内容的词义取消删除时保持内容和展开状态，确认后才删除", () => {
+    render(<Harness />);
+    const before = value();
+    const expanded = document.querySelector(
+      ".word-sense-editor .ant-collapse-item"
+    )?.className;
+    fireEvent.click(screen.getByLabelText("删除词义 1"));
+    expect(screen.getByText("确定删除该词义吗？")).toBeInTheDocument();
+    expect(value()).toEqual(before);
+    expect(
+      document.querySelector(".word-sense-editor .ant-collapse-item")?.className
+    ).toBe(expanded);
+    fireEvent.click(
+      screen.getByText(/取\s*消/u, { selector: ".ant-popconfirm button span" })
+    );
+    expect(value()).toEqual(before);
+    fireEvent.click(screen.getByLabelText("删除词义 1"));
+    fireEvent.click(
+      screen.getByText("确认删除", { selector: ".ant-popconfirm button span" })
+    );
+    expect(value().pos[0]!.senses).toHaveLength(0);
+  });
+
+  it("新增空白词义直接删除，不弹确认", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByText("添加词义"));
+    expect(value().pos[0]!.senses).toHaveLength(2);
+    fireEvent.click(screen.getByLabelText("删除词义 2"));
+    expect(value().pos[0]!.senses).toHaveLength(1);
+    expect(screen.queryByText("确定删除该词义吗？")).not.toBeInTheDocument();
+  });
+
+  it("仅编辑配置或添加关联内容也需要删除确认", () => {
+    const blank = {
+      id: "blank",
+      sub_pos: "",
+      level: "A1",
+      frequency: "0",
+      depends_on_context: false,
+      definitions: defaultDefinitions("A1", () => crypto.randomUUID()),
+      sentences: [],
+      relations: []
+    };
+    expect(senseNeedsDeleteConfirmation(blank)).toBe(false);
+    for (const patch of [
+      { sub_pos: "countable" },
+      { level: "B1" },
+      { frequency: "50" },
+      { depends_on_context: true },
+      { definitions: [] },
+      { sentences: meaningsFixture.pos[0]!.senses[0]!.sentences },
+      { relations: meaningsFixture.pos[0]!.senses[0]!.relations }
+    ]) {
+      expect(senseNeedsDeleteConfirmation({ ...blank, ...patch })).toBe(true);
+    }
+  });
   it("基本词性徽标按本地词义草稿实时递减且不产生字段错误", () => {
     const initial = structuredClone(meaningsFixture);
     delete initial.pos[0]!.senses[0]!.frequency;
@@ -3214,6 +3277,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       "grammar_structure_id"
     );
     fireEvent.click(screen.getByLabelText("删除词义 2"));
+    fireEvent.click(
+      screen.getByText("确认删除", { selector: ".ant-popconfirm button span" })
+    );
     expect(value().sense_groups.map((item) => item.id)).toEqual([
       "sense-group-2"
     ]);
