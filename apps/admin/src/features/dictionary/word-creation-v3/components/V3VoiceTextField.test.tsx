@@ -639,6 +639,92 @@ it.each([
   }
 );
 
+it("grammar 未聚焦展示颜色粗体和连读，聚焦改字、撤销后失焦恢复且不重挂输入框", () => {
+  const initial: RichTextV3 = {
+    ...LIAISON_TEXT,
+    version: 2,
+    annotations: [
+      ...LIAISON_TEXT.annotations,
+      { type: "emphasis", start: 0, end: 4, level: "core" }
+    ]
+  };
+  function Harness() {
+    const [value, setValue] = useState(initial);
+    return (
+      <V3VoiceTextField
+        mode="grammar"
+        ariaLabel="语法正文"
+        nodeId="g"
+        field="content"
+        value={value}
+        onChange={setValue}
+        invalid
+      />
+    );
+  }
+  const { container } = render(<Harness />);
+  const input = screen.getByLabelText("语法正文");
+  const emphasis = () =>
+    Array.from(container.querySelectorAll('strong[data-level="core"]'))
+      .map((node) => node.textContent)
+      .join("");
+  expect(emphasis()).toBe("pick");
+  expect(container.querySelector(".tsz-ve-liaison-anchor")).not.toBeNull();
+  expect(input).toHaveAttribute("aria-invalid", "true");
+  fireEvent.focus(input);
+  expect(emphasis()).toBe("");
+  fireEvent.change(input, { target: { value: "pic it up" } });
+  fireEvent.keyDown(input, { key: "z", ctrlKey: true });
+  expect(input).toHaveValue("pick it up");
+  fireEvent.blur(input);
+  expect(emphasis()).toBe("pick");
+  expect(screen.getByLabelText("语法正文")).toBe(input);
+});
+
+it.each([true, false])("grammar 只读和空值兼容语音开关=%s", (enabled) => {
+  state.flags.VOICE_EDITOR = enabled;
+  const onChange = vi.fn();
+  const props = {
+    mode: "grammar" as const,
+    ariaLabel: "语法",
+    nodeId: "g",
+    field: "content",
+    onChange
+  };
+  const { container, rerender } = render(
+    <V3VoiceTextField {...props} value={LIAISON_TEXT} readOnly />
+  );
+  const input = screen.getByLabelText("语法");
+  expect(container.querySelector(".tsz-ve-liaison-anchor")).not.toBeNull();
+  expect(input).toHaveAttribute("readonly");
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: "changed" } });
+  expect(onChange).not.toHaveBeenCalled();
+  rerender(
+    <V3VoiceTextField
+      {...props}
+      value={{ version: 2, text: "", annotations: [] }}
+    />
+  );
+  fireEvent.blur(input);
+  expect(container.querySelector(".v3-grammar-preview-content")).toBeNull();
+  fireEvent.change(input, { target: { value: "new grammar" } });
+  expect(onChange).toHaveBeenCalledWith(
+    { version: 2, text: "new grammar", annotations: [] },
+    undefined
+  );
+});
+
+it("grammar 富文本位于紧凑组背景上方，透明输入框覆盖长预览以承接尾行点击", () => {
+  // jsdom 不做布局；对应的长文本尾行点击和可见性另用 Chromium 验证。
+  expect(fieldCss).toMatch(
+    /\.v3-grammar-preview-content\s*\{[^}]*z-index:\s*5;/su
+  );
+  expect(fieldCss).toMatch(
+    /\.v3-grammar-preview\s*>\s*textarea\.ant-input\s*\{[^}]*height:\s*100%\s*!important;[^}]*max-height:\s*none\s*!important;/su
+  );
+});
+
 it("字典音标收起态不叠弧线层", () => {
   const { container } = render(
     <V3VoiceTextField

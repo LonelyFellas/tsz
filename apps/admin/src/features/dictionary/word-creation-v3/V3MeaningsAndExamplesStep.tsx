@@ -4,6 +4,7 @@ import {
   RelationDeleteMenu
 } from "./components/V3RelationSorting";
 import { toRichTextV2 } from "@tsz/voice-editor/core";
+import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import {
   PronunciationPreviewProvider,
   PronunciationPreviewControls
@@ -788,6 +789,54 @@ function grammarStructureOptionLabel(
       ? `${codepoints.slice(0, GRAMMAR_STRUCTURE_PREVIEW_LIMIT).join("")}…`
       : text;
   return `${circledIndex(index)} ${preview}`;
+}
+
+// 只生成展示副本：trim 和 24 码点截断后重定位颜色标注，省略号不带标注。
+function grammarStructurePreview(structure: GrammarStructureV3, index: number) {
+  const content = structure.variants.find((variant) =>
+    variant.content.text.trim()
+  )?.content;
+  if (!content) return `${circledIndex(index)} `;
+  const rich = toRichTextV2(content);
+  const start = [...rich.text].length - [...rich.text.trimStart()].length;
+  const text = [...rich.text.trim()];
+  const length = Math.min(text.length, GRAMMAR_STRUCTURE_PREVIEW_LIMIT);
+  const annotations = rich.annotations.flatMap((annotation) => {
+    if (annotation.type !== "emphasis" && annotation.type !== "highlight")
+      return [];
+    const from = Math.max(0, annotation.start - start);
+    const to = Math.min(length, annotation.end - start);
+    return from < to ? [{ ...annotation, start: from, end: to }] : [];
+  });
+  if (annotations.length === 0)
+    return grammarStructureOptionLabel(structure, index);
+  return (
+    <>
+      {circledIndex(index)}{" "}
+      <RichTextReadOnly
+        className="word-grammar-reference"
+        value={{
+          version: 2,
+          text: text.slice(0, length).join(""),
+          annotations
+        }}
+        emptyText=""
+      />
+      {text.length > length ? "…" : ""}
+    </>
+  );
+}
+
+function renderGrammarStructureLabel(
+  structures: readonly GrammarStructureV3[],
+  id: string,
+  fallback: ReactNode
+) {
+  const index = structures.findIndex((structure) => structure.id === id);
+  const structure = structures[index];
+  return structure && grammarStructureText(structure)
+    ? grammarStructurePreview(structure, index)
+    : fallback;
 }
 
 /**
@@ -3408,6 +3457,16 @@ function V3MeaningsAndExamplesStepContent({
                                                             null
                                                           );
                                                       }}
+                                                      labelRender={({
+                                                        value,
+                                                        label
+                                                      }) =>
+                                                        renderGrammarStructureLabel(
+                                                          pos.grammar_structures,
+                                                          String(value),
+                                                          label
+                                                        )
+                                                      }
                                                       optionRender={(
                                                         option
                                                       ) => {
@@ -3432,7 +3491,13 @@ function V3MeaningsAndExamplesStepContent({
                                                             }
                                                           >
                                                             <span className="word-grammar-option-label tsz-entry-en">
-                                                              {option.label}
+                                                              {renderGrammarStructureLabel(
+                                                                pos.grammar_structures,
+                                                                String(
+                                                                  option.value
+                                                                ),
+                                                                option.label
+                                                              )}
                                                             </span>
                                                             {known &&
                                                             definitionIndex <

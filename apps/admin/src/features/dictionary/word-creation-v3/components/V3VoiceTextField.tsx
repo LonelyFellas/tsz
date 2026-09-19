@@ -136,6 +136,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onChange
 }: V3VoiceTextFieldProps<TLink>) {
   const [editing, setEditing] = useState(false);
+  const [focused, setFocused] = useState(false);
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
   // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。展开编辑时用不上，不算。
   const liaisons = useMemo(
@@ -193,8 +194,12 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   };
   const englishContent = mode !== undefined && ENTRY_ENGLISH_MODES.has(mode);
   const largePreview = englishContent || mode === "actual-pron";
+  const grammarPreview =
+    mode === "grammar" && !expanded && !focused && value.text !== "";
   const fallback = (
     <Input.TextArea
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       aria-label={ariaLabel}
       aria-invalid={invalid}
       status={invalid ? "error" : undefined}
@@ -238,6 +243,22 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
     />
   );
 
+  // textarea 始终保留：Tab、错误定位 focus()、撤销和改字重映射仍走原来的输入路径。
+  const collapsedField = (
+    <div
+      className={`v3-voice-text-field-input${grammarPreview ? " v3-grammar-preview" : ""}`}
+    >
+      {fallback}
+      {grammarPreview ? (
+        <div className="v3-grammar-preview-content tsz-entry-en" aria-hidden>
+          <RichTextReadOnly value={value} />
+        </div>
+      ) : mode !== "grammar" && liaisons ? (
+        <LiaisonOverlay value={liaisons} />
+      ) : null}
+    </div>
+  );
+
   if (!env.VOICE_EDITOR || !editingEnabled)
     return (
       <>
@@ -245,8 +266,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         {leadingAction ? (
           <Space.Compact block className="v3-voice-text-field-compact">
             {leadingAction}
-            {fallback}
+            {mode === "grammar" ? collapsedField : fallback}
           </Space.Compact>
+        ) : mode === "grammar" ? (
+          collapsedField
         ) : (
           fallback
         )}
@@ -260,10 +283,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         <Space.Compact block className="v3-voice-text-field-compact">
           {leadingAction}
           {/* 外层常驻：连读有无切换时只增删弧线层，输入框不重挂，打字的光标不丢。 */}
-          <div className="v3-voice-text-field-input">
-            {fallback}
-            {liaisons && <LiaisonOverlay value={liaisons} />}
-          </div>
+          {collapsedField}
           <Button
             aria-label={`打开${ariaLabel}编辑器`}
             // 正文还是空的时候没有东西可标注，编辑器打开也只是一块空画布，先置灰。

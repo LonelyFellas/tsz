@@ -1080,6 +1080,13 @@ describe("V3MeaningsAndExamplesStep", () => {
     expect(content.version === 2 ? content.annotations : []).toEqual([
       { type: "emphasis", start: 2, end: 8, level: "core" }
     ]);
+    fireEvent.click(screen.getByLabelText("完成语法结构 1 英美通用内容编辑"));
+    expect(
+      document.querySelector('.v3-grammar-preview strong[data-level="core"]')
+    ).toHaveTextContent("centre");
+    expect(value().pos[0]!.grammar_structures[0]!.variants[0]!.content).toEqual(
+      content
+    );
   }, 15_000);
 
   it("语法结构变体上已有的 audio_assets 列在音频面板里，移除后从草稿去掉引用", async () => {
@@ -1364,6 +1371,40 @@ describe("V3MeaningsAndExamplesStep", () => {
         )
       ].map((option) => option.textContent)
     ).toEqual(["① "]);
+  });
+
+  it("语法引用及选项保留颜色粗体，去掉连读，按码点裁剪且不改变草稿", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.grammar_structures[0]!.variants[0]!.content = {
+      version: 2,
+      text: `  😀${"a".repeat(25)}  `,
+      annotations: [
+        { type: "emphasis", start: 2, end: 28, level: "core" },
+        { type: "liaison", start: 3, end: 6 }
+      ]
+    };
+    render(<Harness initial={initial} />);
+    const select = screen.getByLabelText("定义 1 语法结构");
+    const selected = select.closest(".ant-select")!;
+    expect(
+      selected.querySelector('strong[data-level="core"]')
+    ).toHaveTextContent(`😀${"a".repeat(23)}`);
+    expect(selected).toHaveTextContent(`① 😀${"a".repeat(23)}…`);
+    expect(selected.querySelector(".tsz-ve-liaison-anchor")).toBeNull();
+    fireEvent.mouseDown(select);
+    const option = document.querySelector(
+      ".ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option-content"
+    )!;
+    expect(option.querySelector('strong[data-level="core"]')).toHaveTextContent(
+      `😀${"a".repeat(23)}`
+    );
+    expect(option.querySelector(".tsz-ve-liaison-anchor")).toBeNull();
+    expect(option.querySelector(".is-invalid")).toBeNull();
+    expect(option.querySelector(".word-grammar-reference")).not.toBeNull();
+    expect(v3LayoutCss).toMatch(
+      /\.tsz-ve-readonly\.word-grammar-reference\s*\{[^}]*display:\s*inline;[^}]*white-space:\s*nowrap;/su
+    );
+    expect(value()).toEqual(initial);
   });
 
   it("过长的语法结构预览截断到 24 字并留省略号", () => {

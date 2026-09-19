@@ -302,6 +302,13 @@
   white-space: nowrap;
 }
 
+/* 引用保持单行，由选中值/选项外层省略；不影响完整语法正文的换行。 */
+.tsz-ve-readonly.word-grammar-reference {
+  display: inline;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
 /* 平时只占位不显形，指到这条选项才露出来。隐形元素拿不到焦点，这颗按钮是纯鼠标的。 */
 .word-grammar-option-copy {
   flex: none;
