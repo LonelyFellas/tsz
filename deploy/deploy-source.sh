@@ -285,6 +285,30 @@ verify_standalone_boot() {
   return 1
 }
 
+# 同一精确 SHA 的最新 run/attempt；重新查询只能比较，不能更新已绑定的证据。
+deploy_ci_record() {
+  local repository="$1" target_sha="$2" record
+  record="$(gh api "repos/$repository/actions/runs?branch=main&head_sha=$target_sha&per_page=100" \
+    --jq '[.workflow_runs[] | select(.name == "CI")] | sort_by([.created_at, .id]) | last | if . == null then empty else [.id, .status, (.conclusion // "-"), .html_url, .run_attempt, .head_sha, .head_branch] | @tsv end')" || {
+    deploy_source_error "GitHub CI query failed"; return 1;
+  }
+  [[ -n "$record" && "$record" != *$'\n'* ]] || {
+    deploy_source_error "no unique CI run exists for the exact main SHA"; return 1;
+  }
+  local id status conclusion url attempt sha branch extra
+  IFS=$'\t' read -r id status conclusion url attempt sha branch extra <<<"$record"
+  [[ "$id" =~ ^[1-9][0-9]{0,14}$ && "$attempt" =~ ^[1-9][0-9]{0,14}$ ]] || {
+    deploy_source_error "CI run ID or attempt is invalid"; return 1;
+  }
+  [[ "$status" = completed && "$conclusion" = success ]] || {
+    deploy_source_error "exact main CI is not completed/success"; return 1;
+  }
+  [[ "$url" = "https://github.com/$repository/actions/runs/$id" && "$sha" = "$target_sha" && "$branch" = main && -z "$extra" ]] || {
+    deploy_source_error "CI run source does not match repository and exact main SHA"; return 1;
+  }
+  printf '%s\n' "$record"
+}
+
 prepare_deploy_source() {
   local component="$1"
   case "$component" in
@@ -306,6 +330,12 @@ prepare_deploy_source() {
     deploy_source_error "origin/main is not a full lowercase commit SHA"
     return 1
   }
+  if [[ "${DEPLOY_EXPECTED_SHA+x}" = x ]]; then
+    [[ "$DEPLOY_EXPECTED_SHA" =~ ^[0-9a-f]{40}$ && "$DEPLOY_EXPECTED_SHA" = "$target_sha" ]] || {
+      deploy_source_error "DEPLOY_EXPECTED_SHA must equal current origin/main (full lowercase SHA)"
+      return 1
+    }
+  fi
   if ! git cat-file -e "${target_sha}^{commit}" 2>/dev/null; then
     git fetch --no-tags --quiet origin main || {
       deploy_source_error "cannot fetch origin/main"
@@ -327,32 +357,15 @@ prepare_deploy_source() {
 
   origin_url="$(git remote get-url origin)"
   repository="$(deploy_github_repository "$origin_url")" || return 1
-  ci_run="$(
-    gh api "repos/$repository/actions/runs?branch=main&head_sha=$target_sha&per_page=100" \
-      --jq '[.workflow_runs[] | select(.name == "CI")] | sort_by(.created_at) | last | if . == null then empty else [.id, .status, (.conclusion // "-"), .html_url] | @tsv end'
-  )" || {
-    deploy_source_error "GitHub CI query failed"
-    return 1
-  }
-  [[ -n "$ci_run" ]] || {
-    deploy_source_error "no CI run exists for the exact main SHA"
-    return 1
-  }
-
-  local run_id run_status run_conclusion run_url
-  IFS=$'\t' read -r run_id run_status run_conclusion run_url <<<"$ci_run"
-  [[ "$run_id" =~ ^[1-9][0-9]{0,14}$ ]] || {
-    deploy_source_error "CI run ID is invalid"
-    return 1
-  }
-  [[ "$run_status" = completed && "$run_conclusion" = success ]] || {
-    deploy_source_error "exact main CI is not completed/success"
-    return 1
-  }
-  [[ "$run_url" = "https://github.com/$repository/actions/runs/$run_id" ]] || {
-    deploy_source_error "CI run URL does not match repository and run ID"
-    return 1
-  }
+  ci_run="$(deploy_ci_record "$repository" "$target_sha")" || return 1
+  local run_id run_status run_conclusion run_url run_attempt
+  IFS=$'\t' read -r run_id run_status run_conclusion run_url run_attempt _ <<<"$ci_run"
+  if [[ "${DEPLOY_EXPECTED_CI_RUN_ID+x}" = x || "${DEPLOY_EXPECTED_CI_RUN_ATTEMPT+x}" = x ]]; then
+    [[ "${DEPLOY_EXPECTED_CI_RUN_ID:-}" = "$run_id" && "${DEPLOY_EXPECTED_CI_RUN_ATTEMPT:-}" = "$run_attempt" ]] || {
+      deploy_source_error "expected CI run/attempt changed"; return 1;
+    }
+  fi
+  DEPLOY_CI_RECORD="$ci_run"
 
   # 工作区状态不再是门，但保留提醒：让人一眼看出「跑脚本的这棵树不是被部署的东西」。
   local worktree_status worktree_head
@@ -368,6 +381,7 @@ prepare_deploy_source() {
   export DEPLOY_REPOSITORY="$repository"
   export DEPLOY_CI_RUN_ID="$run_id"
   export DEPLOY_CI_RUN_URL="$run_url"
+  export DEPLOY_CI_RUN_ATTEMPT="$run_attempt"
   printf 'deployment source gate: %s @ %s, CI %s\n' \
     "$repository" "$target_sha" "$run_url"
 }
@@ -416,6 +430,23 @@ remove_deploy_build_tree() {
   esac
 }
 
+# 复用原生 candidate 验证（含制品摘要），额外把来源与本次不可变的门禁证据绑定。
+# schema v1 没有 attempt 字段；attempt 保存在本次门禁状态/日志中，变化即拒绝，绝不重标 manifest。
+verify_deploy_candidate() {
+  local component="$1" manifest="$2" artifact="$3"
+  node --input-type=module - "$DEPLOY_BUILD_ROOT/deploy/provenance.mjs" "$manifest" "$artifact" \
+    "$component" "$DEPLOY_REPOSITORY" "$DEPLOY_GIT_SHA" "$DEPLOY_GIT_TREE" "$DEPLOY_CI_RUN_ID" "$DEPLOY_CI_RUN_URL" <<'NODE'
+import assert from 'node:assert/strict';
+import { pathToFileURL } from 'node:url';
+const [modulePath, manifestPath, artifactRoot, component, repository, sha, tree, id, url] = process.argv.slice(2);
+const { verifyCandidateManifest } = await import(pathToFileURL(modulePath));
+const candidate = await verifyCandidateManifest({ manifestPath, artifactRoot });
+assert.equal(candidate.component, component);
+assert.deepEqual(candidate.source, {repository, git_sha: sha, git_tree: tree, remote_ref: 'refs/heads/main'});
+assert.deepEqual(candidate.ci, {workflow: 'CI', run_id: Number(id), run_url: url, conclusion: 'success'});
+NODE
+}
+
 recheck_deploy_source() {
   local component="$1"
   [[ "${DEPLOY_GIT_SHA:-}" =~ ^[0-9a-f]{40}$ ]] || {
@@ -427,7 +458,11 @@ recheck_deploy_source() {
     return 1
   }
   reject_ignored_build_env "$component" "$DEPLOY_BUILD_ROOT" || return 1
-  local remote_sha
+  local remote_sha latest_ci
+  latest_ci="$(deploy_ci_record "$DEPLOY_REPOSITORY" "$DEPLOY_GIT_SHA")" || return 1
+  [[ "$latest_ci" = "${DEPLOY_CI_RECORD:-}" ]] || {
+    deploy_source_error "latest CI run/attempt changed after source gate"; return 1;
+  }
   remote_sha="$(deploy_remote_main_sha)" || {
     deploy_source_error "cannot re-read origin/main"
     return 1
@@ -436,4 +471,5 @@ recheck_deploy_source() {
     deploy_source_error "origin/main advanced after source gate"
     return 1
   }
+  printf 'deployment source recheck: %s CI %s attempt %s\n' "$DEPLOY_GIT_SHA" "$DEPLOY_CI_RUN_ID" "$DEPLOY_CI_RUN_ATTEMPT"
 }

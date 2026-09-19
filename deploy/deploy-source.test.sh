@@ -41,7 +41,8 @@ set -euo pipefail
 if [[ "${FAKE_GH_FAIL:-0}" = 1 ]]; then
   exit 1
 fi
-printf '%s\n' "${FAKE_CI_TSV:-}"
+[[ -n "${FAKE_CI_TSV:-}" ]] || exit 0
+printf '%s\t%s\t%s\t%s\n' "$FAKE_CI_TSV" "${FAKE_ATTEMPT-1}" "${FAKE_CI_SHA-$FAKE_HEAD}" "${FAKE_CI_BRANCH-main}"
 FAKE_GH
 
 # 构建树里的 pnpm install 在用例里只记录一次调用：这里要证的是「谁调用、以什么顺序、
@@ -144,6 +145,7 @@ prepare_deploy_source web >/dev/null 2>&1 ||
 export FAKE_GIT_STATUS_FAIL=0
 
 # 本地在别的分支上照样部署 origin/main，只是要说清楚。
+export FAKE_CI_SHA="$FAKE_REMOTE_SHA"
 export FAKE_HEAD="$(printf 'd%.0s' {1..40})"
 expect_warning "S02 detached worktree" '*不是 origin/main，产物仍按 origin/main 构建*' \
   prepare_deploy_source web
@@ -297,4 +299,38 @@ DEPLOY_GIT_SHA="$saved_sha"
 expect_rejection "S09 recheck needs a build tree" '*build tree has not been prepared*' \
   recheck_deploy_source web
 
+# S10 显式批准目标不允许旧 SHA 或空值；不设接口仍按当前 main（S01–S09）。
+export DEPLOY_EXPECTED_SHA="$(printf 'c%.0s' {1..40})"
+expect_rejection 'S10 stale approval' '*DEPLOY_EXPECTED_SHA must equal current origin/main*' prepare_deploy_source web
+export DEPLOY_EXPECTED_SHA=''
+expect_failure 'S10 empty approval' prepare_deploy_source web
+export DEPLOY_EXPECTED_SHA="$FAKE_REMOTE_SHA"
+export DEPLOY_EXPECTED_CI_RUN_ID=123456789 DEPLOY_EXPECTED_CI_RUN_ATTEMPT=2
+expect_rejection 'S10 stale approved attempt' '*expected CI run/attempt changed*' prepare_deploy_source web
+export DEPLOY_EXPECTED_CI_RUN_ATTEMPT=1
+prepare_deploy_source web
+prepare_deploy_build_tree web >/dev/null
+
+# S11 每次复核均要求原 run/attempt 且 completed/success，不能把 manifest 重新标成新 CI。
+export FAKE_ATTEMPT=2
+expect_rejection 'S11 rerun attempt' '*latest CI run/attempt changed*' recheck_deploy_source web
+export FAKE_ATTEMPT=1
+saved_ci="$FAKE_CI_TSV"
+export FAKE_CI_TSV=$'123456790\tcompleted\tsuccess\thttps://github.com/LonelyFellas/tsz/actions/runs/123456790'
+expect_rejection 'S11 newer run' '*latest CI run/attempt changed*' recheck_deploy_source web
+for conclusion in failure skipped cancelled unknown -; do
+  export FAKE_CI_TSV=$'123456789\tcompleted\t'"$conclusion"$'\thttps://github.com/LonelyFellas/tsz/actions/runs/123456789'
+  expect_rejection 'S11 unsuccessful CI' '*not completed/success*' recheck_deploy_source web
+done
+export FAKE_CI_TSV="$saved_ci"
+export FAKE_ATTEMPT=''
+expect_failure 'S11 missing attempt' recheck_deploy_source web
+export FAKE_ATTEMPT=1 FAKE_GH_FAIL=1
+expect_failure 'S11 API unavailable' recheck_deploy_source web
+export FAKE_GH_FAIL=0 FAKE_CI_BRANCH=dev
+expect_failure 'S11 wrong CI branch' recheck_deploy_source web
+export FAKE_CI_BRANCH=main
+recheck_deploy_source web || fail 'S11 stable success'
+unset DEPLOY_EXPECTED_SHA DEPLOY_EXPECTED_CI_RUN_ID DEPLOY_EXPECTED_CI_RUN_ATTEMPT
+remove_deploy_build_tree
 printf 'deploy-source tests: PASS\n'

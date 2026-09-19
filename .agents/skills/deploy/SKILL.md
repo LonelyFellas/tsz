@@ -21,7 +21,7 @@ description: 将已合入 GitHub main 且精确 CI 成功的 tsz 前端部署到
 CI 的 owner/repo 从 GitHub remote 解析，按脚本查询该 SHA 的最新 `CI` workflow run：
 `repos/<owner>/<repo>/actions/runs?branch=main&head_sha=<sha>&per_page=100`。
 
-- 成功：记录 SHA、run ID 与链接后继续。
+- 成功：记录 SHA、最新 run ID、run_attempt 与链接后继续；run 的 head_sha/head_branch 必须精确匹配该 main。
 - 正在运行：使用 [CI 等待与续跑](references/ci-wait.md)，成功后沿用原部署授权。
 - 失败、取消、超时、无记录或无法确定：停止并报告具体状态，不手动豁免脚本门禁。
 
@@ -33,13 +33,25 @@ CI 的 owner/repo 从 GitHub remote 解析，按脚本查询该 SHA 的最新 `C
 从仓库根执行 `./deploy/deploy-web.sh`；其全部检查通过后再执行 `./deploy/deploy-admin.sh`。
 用户仅指定一个组件时只运行该组件。
 
+编排已批准版本组合时，必须把完整小写 SHA 和 CI 元组传给原生入口，例如：
+
+```bash
+DEPLOY_EXPECTED_SHA="$approved_sha" \
+DEPLOY_EXPECTED_CI_RUN_ID="$approved_run_id" \
+DEPLOY_EXPECTED_CI_RUN_ATTEMPT="$approved_attempt" ./deploy/deploy-admin.sh
+```
+
+web 同理。`DEPLOY_EXPECTED_SHA` 必须等于入口首次读取的当前 main，不能用来发布历史 SHA；CI 两个参数必须成对提供且匹配最新成功 run/attempt。不传参数的普通调用保持自动选择当前 main，但一旦选定就绑定同一 SHA/run/attempt，不自动追新版本。
+构建后先复用原生 candidate manifest 验证制品摘要及 repository/SHA/tree/CI 来源，再在首次远端写入前和上传完成、调用发布事务前复核当前 main 与最新成功 run/attempt。变化/未知即非零停止，不把 manifest 重标成新 CI。schema v1 没有 attempt 字段，attempt 记录在入口门禁状态及日志，release 状态另存该证据，不另建 manifest。
+这是两个边界的 fail-closed 复核，不是 GitHub 与服务器之间的原子事务：查询后到远端命令执行/锁等待/切换仍有竞态窗口；上传后检查失败可能已写入独立暂存，但不会启动发布事务，需保留并核对现场，不声称零服务器写入。
+
 需要先发兼容前端时，可用 `DEPLOY_VOICE_EDITOR=false ./deploy/deploy-admin.sh` 暂关语音编辑入口；后端验收后再按默认 `true` 重发 admin。开关只接受 `true` / `false`，不影响精确 main、CI、隔离构建或 manifest 门禁。
 
 规则变化标记配套发布：旧后端不接受变体 `is_regular`。先用
 `DEPLOY_FORM_SPELLING_REGULARITY=false ./deploy/deploy-admin.sh` 发布兼容前端；它隐藏新开关，不向旧后端生成新字段，但保留新后端已返回的值。
 兼容 admin 验收后、切换 API 前，必须确认录入人员已保存并刷新/关闭全部旧标签页；无法确认时保持兼容 admin + 旧 API，不执行后端切换。后端完成验收后，用 `DEPLOY_FORM_SPELLING_REGULARITY=true ./deploy/deploy-admin.sh` 开启录入。此开关默认 true，只接受 true/false，不替代 main/CI/manifest 门禁。
 
-脚本负责 Node 版本核对、隔离构建、写服务器前 exact-main 校验、独立 release 上传、远端发布锁、原子入口切换、服务/nginx、smoke 和 manifest 验证；
+脚本负责 Node 版本核对、隔离构建、写服务器前 exact-main/最新 CI run-attempt 校验、独立 release 上传、远端发布锁、原子入口切换、服务/nginx、smoke 和 manifest 验证；
 历史静态资源保留 30 天，当前与回滚版本始终保留。web 使用双端口 systemd 实例，当前端口记录在 `/opt/tsz-releases/web/port`。
 存在 `/opt/tsz-frontend-transaction` 时先核对其中记录的暂存目录、旧版本与备份，不直接删除记录继续发布。
 web 还必须先启动裁剪后的 standalone 制品确认可运行。使用可继续读取的长命令会话，不因工具提前返回而误判完成。
