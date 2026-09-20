@@ -1118,7 +1118,13 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
 
   // TTS 试听与资产试听同一时间只响一路；历史冲突保留数据，先由编辑者处理。
   const handleAudition = (voice: VoiceOption) => {
-    if (conflictCount > 0) return;
+    if (
+      conflictCount > 0 ||
+      (mode === "synthesis" &&
+        locale &&
+        voice.locale.toLowerCase() !== locale.toLowerCase())
+    )
+      return;
     stopAssetPlayback();
     audition(voice);
   };
@@ -1462,6 +1468,7 @@ export function VoiceEditor<TLink extends VoiceAssociation = TextLinkV3>({
             <VoicePanel
               readOnly={readOnly}
               locale={locale}
+              auditionLocale={mode === "synthesis" ? locale : undefined}
               voices={voices}
               voicesLoading={voicesLoading}
               enabledVoiceIds={enabledVoiceIds}

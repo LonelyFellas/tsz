@@ -78,8 +78,9 @@ export function pronunciationSynthesisContent(
     return undefined;
   if (
     synthesis.alphabet === "ups" &&
-    spelling.trim().split(/\s+/u).length > 1 &&
-    (synthesis.use_spelling === false || synthesis.ups_words != null)
+    (synthesis.ups_words != null ||
+      (synthesis.use_spelling === false &&
+        spelling.trim().split(/\s+/u).length > 1))
   ) {
     const words = synthesis.ups_words;
     const matches = [...spelling.matchAll(/\S+/gu)];

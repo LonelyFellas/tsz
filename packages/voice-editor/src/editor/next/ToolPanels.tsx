@@ -106,6 +106,8 @@ export interface VoicePanelProps {
   readOnly?: boolean;
   /** 只保留这一侧的语种分组；不传表示这段正文不分英美，全部照常展示。 */
   locale?: AudioAssetLocale;
+  /** Synthesis phonemes must not be auditioned with a different accent. */
+  auditionLocale?: AudioAssetLocale;
   voices: VoiceOption[];
   voicesLoading: boolean;
   enabledVoiceIds: string[];
@@ -123,6 +125,7 @@ export interface VoicePanelProps {
 export function VoicePanel({
   readOnly,
   locale,
+  auditionLocale,
   voices,
   voicesLoading,
   enabledVoiceIds,
@@ -207,7 +210,21 @@ export function VoicePanel({
                             loading={pendingVoiceId === voice.id}
                             icon={<SoundOutlined />}
                             aria-busy={pendingVoiceId === voice.id}
-                            disabled={!canAudition}
+                            disabled={
+                              !canAudition ||
+                              Boolean(
+                                auditionLocale &&
+                                voice.locale.toLowerCase() !==
+                                  auditionLocale.toLowerCase()
+                              )
+                            }
+                            title={
+                              auditionLocale &&
+                              voice.locale.toLowerCase() !==
+                                auditionLocale.toLowerCase()
+                                ? `当前音素为 ${auditionLocale}，不能使用另一口音试听；可取消该历史音色`
+                                : undefined
+                            }
                             data-playing={playingVoiceId === voice.id}
                             onClick={() => onAudition(voice)}
                           />

@@ -107,6 +107,13 @@ test("phrase conversion is atomic and stores word boundaries separately", () => 
     ]
   );
   assert.isUndefined(pronunciationSynthesisContent("hello dog", synthesis));
+  assert.isUndefined(pronunciationSynthesisContent("hello", synthesis));
+  assert.isUndefined(
+    pronunciationSynthesisContent("hello", {
+      ...synthesis,
+      use_spelling: undefined
+    })
+  );
   assert.isUndefined(
     pronunciationSynthesisContent("hello cat", {
       ...synthesis,
