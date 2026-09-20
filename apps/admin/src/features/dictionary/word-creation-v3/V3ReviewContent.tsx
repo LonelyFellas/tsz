@@ -2,8 +2,11 @@ import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import {
   EMPTY_SYNTHESIS,
   pronunciationSynthesisContent,
-  synthesisInputIssue
+  synthesisInputIssue,
+  synthesisLocaleIssue,
+  pronunciationLocale
 } from "@tsz/shared";
+import { useDialectPreference } from "@/features/settings/useDialectPreference";
 import { PronunciationPreviewControls } from "../word-creation/PronunciationPreview";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
@@ -36,7 +39,14 @@ function ReviewPronunciationPlayback({
   dialect: Dialect;
 }) {
   const synthesis = pronunciation.synthesis ?? EMPTY_SYNTHESIS;
-  const content = pronunciationSynthesisContent(spelling, synthesis);
+  const { preference } = useDialectPreference();
+  const locale = pronunciationLocale(dialect, preference);
+  const content = pronunciationSynthesisContent(
+    spelling,
+    pronunciation.synthesis,
+    locale,
+    dialect === "common"
+  );
   return (
     <PronunciationPreviewControls
       playbackOnly
@@ -45,10 +55,19 @@ function ReviewPronunciationPlayback({
       ariaLabelPrefix={`${spelling} 最终读音`}
       disabled={!content}
       disabledReason={
-        synthesisInputIssue(
-          synthesis.alphabet,
-          synthesis[synthesis.alphabet]
-        ) ?? (!spelling.trim() ? "请先填写词形拼写" : undefined)
+        content
+          ? undefined
+          : (synthesisInputIssue(
+              synthesis.alphabet,
+              synthesis[synthesis.alphabet]
+            ) ??
+            synthesisLocaleIssue(
+              synthesis,
+              synthesis.alphabet,
+              locale,
+              dialect === "common"
+            ) ??
+            (!spelling.trim() ? "请先填写词形拼写" : undefined))
       }
       content={content ?? { version: 2, text: "", annotations: [] }}
       voiceProfile={pronunciation.voice_profile}
@@ -184,12 +203,9 @@ function FormsReview({
                                 </small>
                                 {pronunciation.synthesis && (
                                   <small>
-                                    Azure{" "}
-                                    {pronunciation.synthesis.alphabet.toUpperCase()}
-                                    ：
-                                    {pronunciation.synthesis[
-                                      pronunciation.synthesis.alphabet
-                                    ] || "未填写"}
+                                    {pronunciation.synthesis.use_spelling
+                                      ? "词形拼写（语音来源）"
+                                      : `Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`}
                                   </small>
                                 )}
                               </>

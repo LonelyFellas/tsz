@@ -16,9 +16,8 @@ import {
   remapTextLinks,
   toRichTextV2
 } from "@tsz/voice-editor/core";
-import { LiaisonIcon } from "@tsz/voice-editor";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
-import { AudioOutlined } from "@ant-design/icons";
+import { AudioOutlined, EditOutlined } from "@ant-design/icons";
 import { flushSync } from "react-dom";
 import { Button, Input, Space, message } from "antd";
 import {
@@ -357,8 +356,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             aria-label={`打开${ariaLabel}编辑器`}
             // 正文还是空的时候没有东西可标注，编辑器打开也只是一块空画布，先置灰。
             disabled={readOnly || value.text.trim() === ""}
-            // 实际发音只标连读，按钮就画那条弧；其余字段仍是语音编辑器的话筒。
-            icon={mode === "actual-pron" ? <LiaisonIcon /> : <AudioOutlined />}
+            title={
+              mode === "actual-pron" ? "编辑实际发音与连读标注" : undefined
+            }
+            icon={mode === "actual-pron" ? <EditOutlined /> : <AudioOutlined />}
             onClick={() => {
               session.current = captureSession();
               setEditing(true);

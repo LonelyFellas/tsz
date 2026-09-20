@@ -301,7 +301,9 @@ function PublicationSnapshotBody({
                       词典音标 {pronunciation.dictPhonetic} · 实际发音{" "}
                       {pronunciation.actualPron}
                       {pronunciation.synthesis
-                        ? ` · Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`
+                        ? pronunciation.synthesis.use_spelling
+                          ? " · 词形拼写（语音来源）"
+                          : ` · Azure ${pronunciation.synthesis.alphabet.toUpperCase()}：${pronunciation.synthesis[pronunciation.synthesis.alphabet] || "未填写"}`
                         : ""}
                       {pronunciation.style
                         ? ` · ${pronunciationStyleLabel(pronunciation.style as never)}`

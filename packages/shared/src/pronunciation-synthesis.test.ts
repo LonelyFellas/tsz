@@ -52,10 +52,6 @@ describe("独立合成输入", () => {
       ok: false,
       position: 0
     });
-    expect(convertDictionaryPhonetic("təˈmeɪtoʊ", "ipa")).toMatchObject({
-      ok: false,
-      position: 2
-    });
     expect(convertDictionaryPhonetic("iː", "ups")).toMatchObject({
       ok: false,
       position: 0
@@ -66,6 +62,30 @@ describe("独立合成输入", () => {
     });
     expect(convertDictionaryPhonetic(".", "ipa")).toMatchObject({ ok: false });
     expect(convertDictionaryPhonetic("ɔɪ", "ups")).toMatchObject({ ok: false });
+  });
+  it.each(["həˈləʊ", "təˈmeɪtoʊ", "ˌʌndəˈstænd", "hə.ˈləʊ"])(
+    "IPA 保留重音位置，不要求重音前额外加音节点：%s",
+    (value) => {
+      expect(convertDictionaryPhonetic(value, "ipa")).toEqual({
+        ok: true,
+        value
+      });
+    }
+  );
+  it.each(["həˈ", "həˈ.ləʊ", "həˈˌləʊ", "hə..ləʊ"])(
+    "仍拒绝非法重音或音节边界：%s",
+    (value) => {
+      expect(convertDictionaryPhonetic(value, "ipa")).toMatchObject({
+        ok: false
+      });
+    }
+  );
+  it("不将 IPA 重音直接转换为 UPS", () => {
+    expect(convertDictionaryPhonetic("həˈləʊ", "ups")).toMatchObject({
+      ok: false,
+      position: 2,
+      symbol: "ˈ"
+    });
   });
   it("UPS 有独立展开长度，控制字符与非 ASCII UPS 不发起试听", () => {
     expect(synthesisInputIssue("ipa", "a".repeat(201))).toContain("200");

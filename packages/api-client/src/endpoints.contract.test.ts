@@ -490,7 +490,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "f94e6c5bf41701e8a2af2ac74017c18d4fb7958035a42fc78578f789b48ca0b3"
+      "6ecdcf8e96ec6d36abb5743dab0dd913f585f778bfceab2fc545dd31632246e5"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -629,6 +629,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     expect(defs.PronunciationSynthesisV3.additionalProperties).toBe(false);
     expect(defs.PronunciationSynthesisV3.properties.ipa.maxLength).toBe(200);
     expect(defs.PronunciationSynthesisV3.properties.ups.maxLength).toBe(1600);
+    expect(defs.PronunciationSynthesisV3.properties.ups_words.maxItems).toBe(
+      30
+    );
+    expect(defs.PronunciationSynthesisV3.properties.use_spelling).toBeDefined();
+    expect(defs.PhonemeLocaleV3.enum).toEqual(["en-GB", "en-US"]);
+    expect(defs.PronunciationSynthesisV3.properties.ipa_locale).toBeDefined();
+    expect(defs.PronunciationSynthesisV3.properties.ups_locale).toBeDefined();
+    expect(defs.PronunciationSynthesisV3.properties).not.toHaveProperty("sapi");
     expect(defs.RichTextPhonemeAlphabet.enum).toEqual(["ipa", "ups"]);
     const serializedV3 = JSON.stringify(defs.AdminWordV3);
     expect(serializedV3).not.toContain("base_form");

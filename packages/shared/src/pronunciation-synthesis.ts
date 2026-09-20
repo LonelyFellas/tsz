@@ -1,37 +1,116 @@
-import type { PronunciationSynthesisV3, RichTextV2 } from "@tsz/types";
+import type {
+  PronunciationSynthesisV3,
+  RichTextV2,
+  PhonemeLocaleV3,
+  Dialect
+} from "@tsz/types";
 
+import { ipaWordToUps } from "./ipa-ups";
 export const SYNTHESIS_LIMITS = { ipa: 200, ups: 1600 } as const;
 export const EMPTY_SYNTHESIS: PronunciationSynthesisV3 = {
   alphabet: "ipa",
   ipa: "",
-  ups: ""
+  ups: "",
+  use_spelling: true
 };
 
 /** Candidates may be unfinished in a draft; only the selected side is required to synthesize. */
 export function synthesisInputIssue(
   alphabet: "ipa" | "ups",
-  value: string
+  input: string | null | undefined
 ): string | undefined {
+  const value = input ?? "";
   if (!value.trim()) return `请填写 Azure ${alphabet.toUpperCase()}`;
   if (Array.from(value).length > SYNTHESIS_LIMITS[alphabet])
     return `Azure ${alphabet.toUpperCase()} 最多 ${SYNTHESIS_LIMITS[alphabet]} 个字符`;
   if (/\p{Cc}/u.test(value)) return "音素不能包含换行、制表符或其他控制字符";
-  if (alphabet === "ups" && /[^\x20-\x7e]/u.test(value))
-    return "UPS 使用区分大小写、以空格分隔的 ASCII 音素";
+  if (alphabet !== "ipa" && /[^\x20-\x7e]/u.test(value))
+    return `${alphabet.toUpperCase()} 使用区分大小写、以空格分隔的 ASCII 音素`;
+  return undefined;
+}
+
+export function pronunciationLocale(
+  dialect: Dialect,
+  preference: "uk" | "us"
+): PhonemeLocaleV3 {
+  return (dialect === "common" ? preference : dialect) === "uk"
+    ? "en-GB"
+    : "en-US";
+}
+export function pronunciationLocaleLabel(locale: PhonemeLocaleV3): string {
+  return locale === "en-GB" ? "英式" : "美式";
+}
+export function synthesisLocaleIssue(
+  synthesis: PronunciationSynthesisV3,
+  alphabet: "ipa" | "ups",
+  locale: PhonemeLocaleV3,
+  requireConfirmation = false
+): string | undefined {
+  const recorded = synthesis[alphabet === "ipa" ? "ipa_locale" : "ups_locale"];
+  if (!recorded && requireConfirmation && synthesis[alphabet].trim())
+    return `该 ${alphabet.toUpperCase()} 尚未确认英美口音，请先确认或重新转换`;
+  if (recorded && recorded !== locale)
+    return `该 ${alphabet.toUpperCase()} 已确认为${pronunciationLocaleLabel(recorded)}，当前为${pronunciationLocaleLabel(locale)}；请重新填写或转换，不会自动改变口音`;
   return undefined;
 }
 
 /** Spelling is the readable body, never the phoneme string. Offsets count Unicode code points. */
 export function pronunciationSynthesisContent(
   spelling: string,
-  synthesis?: PronunciationSynthesisV3
+  synthesis?: PronunciationSynthesisV3,
+  targetLocale?: PhonemeLocaleV3,
+  requireLocaleConfirmation = false
 ): RichTextV2 | undefined {
+  if (!spelling.trim()) return undefined;
+  if (synthesis?.use_spelling)
+    return { version: 2, text: spelling, annotations: [] };
   if (
-    !spelling.trim() ||
     !synthesis ||
-    synthesisInputIssue(synthesis.alphabet, synthesis[synthesis.alphabet])
+    synthesisInputIssue(synthesis.alphabet, synthesis[synthesis.alphabet]) ||
+    (targetLocale &&
+      synthesisLocaleIssue(
+        synthesis,
+        synthesis.alphabet,
+        targetLocale,
+        requireLocaleConfirmation
+      ))
   )
     return undefined;
+  if (
+    synthesis.alphabet === "ups" &&
+    spelling.trim().split(/\s+/u).length > 1 &&
+    (synthesis.use_spelling === false || synthesis.ups_words != null)
+  ) {
+    const words = synthesis.ups_words;
+    const matches = [...spelling.matchAll(/\S+/gu)];
+    if (
+      !words ||
+      words.length > 30 ||
+      words.length !== matches.length ||
+      words.some(
+        (word, index) =>
+          word.text !== matches[index]![0] ||
+          synthesisInputIssue("ups", word.phoneme)
+      ) ||
+      words.map((word) => word.phoneme).join(" ") !== synthesis.ups.trim()
+    )
+      return undefined;
+    return {
+      version: 2,
+      text: spelling,
+      annotations: words.map((word, index) => {
+        const match = matches[index]!;
+        const start = Array.from(spelling.slice(0, match.index)).length;
+        return {
+          type: "phoneme",
+          start,
+          end: start + Array.from(word.text).length,
+          alphabet: "ups",
+          phoneme: word.phoneme
+        };
+      })
+    };
+  }
   return {
     version: 2,
     text: spelling,
@@ -41,9 +120,58 @@ export function pronunciationSynthesisContent(
         start: 0,
         end: Array.from(spelling).length,
         alphabet: synthesis.alphabet,
-        phoneme: synthesis[synthesis.alphabet].trim()
+        phoneme: synthesis[synthesis.alphabet]!.trim()
       }
     ]
+  };
+}
+
+/** Atomic conversion from actual IPA, retaining phrase word boundaries separately. */
+export function convertActualPronunciation(
+  input: string,
+  spelling: string,
+  alphabet: "ipa" | "ups",
+  locale: string
+) {
+  if (/\p{Cc}/u.test(input))
+    return { ok: false as const, message: "实际发音不能包含控制字符" };
+  const source = input.trim().replace(/^\/(.*)\/$/u, "$1");
+  const textWords = spelling.trim().split(/\s+/u).filter(Boolean);
+  const phones = source.split(/\s+/u).filter(Boolean);
+  if (!source) return { ok: false as const, message: "请先填写实际发音" };
+  if (
+    !textWords.length ||
+    textWords.length > 30 ||
+    textWords.length !== phones.length
+  )
+    return {
+      ok: false as const,
+      message:
+        "实际发音与正文词数不一致，请用空格明确逐词音标；不自动推断连读词界"
+    };
+  const values: string[] = [];
+  for (const [index, phone] of phones.entries()) {
+    const result =
+      alphabet === "ups"
+        ? ipaWordToUps(phone, locale)
+        : convertDictionaryPhonetic(phone, "ipa");
+    if (!result.ok)
+      return {
+        ok: false as const,
+        message: `第 ${index + 1} 个词：${result.message}`
+      };
+    values.push(result.value);
+  }
+  const value = values.join(" ");
+  const issue = synthesisInputIssue(alphabet, value);
+  if (issue) return { ok: false as const, message: issue };
+  return {
+    ok: true as const,
+    value,
+    ups_words:
+      alphabet === "ups"
+        ? values.map((phoneme, index) => ({ text: textWords[index]!, phoneme }))
+        : undefined
   };
 }
 
@@ -177,15 +305,8 @@ export function convertDictionaryPhonetic(
         start + index,
         "字典 r 的目标音值未确定，请确认 ɹ/ɻ 等规则或手工输入"
       );
-    if (
-      (phone === "ˈ" || phone === "ˌ") &&
-      index > 0 &&
-      phones[index - 1] !== "."
-    )
-      return fail(
-        start + index,
-        "非首音节重音缺少明确音节边界，请补充转换规则或手工输入"
-      );
+    // IPA stress marks already locate the following syllable; no extra dot is required.
+    // UPS stress remains unsupported and is rejected by its own rules below.
     if (!(phone in BASIC_UPS) && !IPA_EXTRA.has(phone))
       return fail(start + index, "此符号或组合尚无确认的转换规则，请手工输入");
     if (alphabet === "ups") {

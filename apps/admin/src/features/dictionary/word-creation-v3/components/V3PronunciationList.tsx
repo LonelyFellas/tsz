@@ -1,5 +1,6 @@
 import { env } from "@/lib/env";
 import { V3SynthesisInputs } from "./V3SynthesisInputs";
+import { V3ActualPronunciationCopy } from "./V3ActualPronunciationCopy";
 import { V3VoiceTextField } from "./V3VoiceTextField";
 import {
   HolderOutlined,
@@ -377,35 +378,53 @@ export function V3PronunciationList({
                         <Typography.Text className="word-pronunciation-label">
                           实际发音
                         </Typography.Text>
-                        <Form.Item noStyle>
-                          <V3VoiceTextField
-                            mode="actual-pron"
-                            dialect={variant.dialect}
-                            ariaLabel={`第 ${index + 1} 条发音的实际发音`}
-                            field="actual_pron"
-                            nodeId={pronunciation.id}
-                            placeholder="Connected Speech"
-                            invalid={Boolean(actualPronIssue)}
-                            value={
-                              pronunciation.actual_pron_rich ?? {
-                                version: 2,
-                                text: pronunciation.actual_pron,
-                                annotations: []
-                              }
-                            }
-                            onChange={(actual_pron_rich) =>
+                        <div className="word-actual-pronunciation-control">
+                          <V3ActualPronunciationCopy
+                            pronunciation={pronunciation}
+                            onChange={(patch) =>
                               onChange(
-                                updatePronunciation(content, pronunciation.id, {
-                                  actual_pron: actual_pron_rich.text,
-                                  ...(pronunciation.actual_pron_rich ||
-                                  actual_pron_rich.annotations.length > 0
-                                    ? { actual_pron_rich }
-                                    : {})
-                                })
+                                updatePronunciation(
+                                  content,
+                                  pronunciation.id,
+                                  patch
+                                )
                               )
                             }
                           />
-                        </Form.Item>
+                          <Form.Item noStyle>
+                            <V3VoiceTextField
+                              mode="actual-pron"
+                              dialect={variant.dialect}
+                              ariaLabel={`第 ${index + 1} 条发音的实际发音`}
+                              field="actual_pron"
+                              nodeId={pronunciation.id}
+                              placeholder="Connected Speech"
+                              invalid={Boolean(actualPronIssue)}
+                              value={
+                                pronunciation.actual_pron_rich ?? {
+                                  version: 2,
+                                  text: pronunciation.actual_pron,
+                                  annotations: []
+                                }
+                              }
+                              onChange={(actual_pron_rich) =>
+                                onChange(
+                                  updatePronunciation(
+                                    content,
+                                    pronunciation.id,
+                                    {
+                                      actual_pron: actual_pron_rich.text,
+                                      ...(pronunciation.actual_pron_rich ||
+                                      actual_pron_rich.annotations.length > 0
+                                        ? { actual_pron_rich }
+                                        : {})
+                                    }
+                                  )
+                                )
+                              }
+                            />
+                          </Form.Item>
+                        </div>
                         {actualPronIssue ? (
                           <Typography.Text
                             className="word-field-help"

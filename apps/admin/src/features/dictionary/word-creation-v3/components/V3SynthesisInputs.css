@@ -12,8 +12,43 @@
 }
 
 .word-pronunciation-synthesis .word-pronunciation-row {
-  grid-template-columns: 64px minmax(0, 1fr);
+  grid-template-columns: 96px minmax(0, 1fr);
   gap: 6px 12px;
+}
+
+.word-actual-pronunciation-control {
+  display: flex;
+  align-items: flex-start;
+  min-width: 0;
+}
+.word-actual-pronunciation-control > .ant-btn {
+  flex-shrink: 0;
+}
+.word-actual-pronunciation-control > :last-child {
+  flex: 1;
+  min-width: 0;
+}
+.word-actual-pronunciation-control textarea {
+  font-weight: 400;
+}
+.word-actual-pronunciation-control
+  textarea.v3-voice-text-large-preview.ant-input {
+  font-weight: 400;
+  padding-block: 6px;
+  line-height: 1.5;
+}
+.word-actual-pronunciation-control
+  .v3-voice-text-field-compact
+  > .ant-btn:last-child {
+  width: 38px;
+  border-inline-start-color: transparent;
+  color: var(--ant-color-text-secondary, #666);
+}
+.word-actual-pronunciation-control
+  .v3-voice-text-field-compact
+  > .ant-btn:last-child:hover {
+  color: var(--ant-color-primary, #2053ff);
+  border-color: var(--ant-color-primary-hover, #597ef7);
 }
 
 .word-synthesis-input {
@@ -38,21 +73,62 @@
   flex-shrink: 0;
 }
 
+.word-synthesis-locale-notice {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.word-synthesis-locale-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ant-color-text-secondary, #666);
+}
+.word-synthesis-locale-warning {
+  grid-column: 2;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.word-synthesis-source-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  min-width: 0;
+}
+.word-synthesis-source-actions > .ant-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+}
+.word-synthesis-source-actions > .ant-btn {
+  flex-shrink: 0;
+}
+
 .word-synthesis-settings {
+  container-type: inline-size;
+  width: min(560px, calc(100vw - 48px));
   display: grid;
   gap: 12px;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--ant-color-border-secondary, #f0f0f0);
-  border-radius: 8px;
-  background: var(--ant-color-bg-container, #fff);
+}
+.word-synthesis-settings-body {
+  display: grid;
+  gap: 12px;
+  max-height: min(540px, calc(100dvh - 180px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0 4px 4px;
+}
+.word-synthesis-settings-source {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 400;
 }
 
-.word-synthesis-settings > .ant-btn {
-  justify-self: start;
-}
-
-/* 内嵌设置按所在英/美音栏布局，不能沿用浮层的 720px 宽度。 */
+/* 弹层宽度独立于所在英/美音栏，窄屏内部转为单列。 */
 .word-synthesis-settings .tsz-ve-speech-panel {
   width: 100%;
 }
@@ -89,6 +165,8 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--ant-color-border-secondary, #f0f0f0);
 }
 
 .word-synthesis-settings-hint {
