@@ -1,6 +1,6 @@
 import { ClearOutlined, RedoOutlined, UndoOutlined } from "@ant-design/icons";
 import { Button, Popover, Tooltip } from "antd";
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { AnnotationStrip, type AnnotationStripProps } from "./AnnotationStrip";
 import type { Brush } from "./roles";
 import type { LiaisonAnchor, LiaisonDraft, MarkState } from "./tokens";
@@ -45,6 +45,9 @@ export interface DropdownTool {
    * 的字母，那属于「外部点击」，默认行为会把面板关掉，选完就够不着「添加」。
    */
   stayOpen?: boolean;
+  /** 语法分类使用行内面板，不遮挡需要选择的正文。 */
+  inline?: boolean;
+  suppressPopup?: boolean;
 }
 
 export interface MarkupPanelProps extends Pick<
@@ -56,6 +59,10 @@ export interface MarkupPanelProps extends Pick<
   | "onWordRange"
   | "textReadOnly"
   | "onTextSelection"
+  | "onCaretChange"
+  | "onInspectPause"
+  | "pausePopover"
+  | "selectedPauseGap"
 > {
   text: string;
   marks: MarkState;
@@ -81,6 +88,8 @@ export interface MarkupPanelProps extends Pick<
   onRedo: () => void;
   tools: DropdownTool[];
   openTool?: string;
+  /** 选中文字时自动显示分类，无需先找工具菜单。 */
+  showRoleSelection?: boolean;
   onOpenToolChange: (key?: string) => void;
 }
 
@@ -104,6 +113,10 @@ export function MarkupPanel({
   textReadOnly,
   onRoleRange,
   onTextSelection,
+  onCaretChange,
+  onInspectPause,
+  pausePopover,
+  selectedPauseGap,
   roleAnchorStart,
   onGapClick,
   onLetterClick,
@@ -119,15 +132,37 @@ export function MarkupPanel({
   onRedo,
   tools,
   openTool,
+  showRoleSelection,
   onOpenToolChange
 }: MarkupPanelProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(Infinity);
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const initialWidth = container.getBoundingClientRect().width;
+    if (initialWidth > 0) setWidth(initialWidth);
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry && entry.contentRect.width > 0)
+        setWidth(entry.contentRect.width);
+    });
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+  // 正文关联多一个工具，提早切换纯图标，但所有入口始终保留。
+  const compact = width <= 640 + Math.max(0, tools.length - 6) * 80;
+
   const marked =
     marks.roles.length +
     marks.liaisons.length +
     Object.keys(marks.pauses).length;
 
   return (
-    <div className="tsz-ve-markup">
+    <div
+      className="tsz-ve-markup"
+      ref={containerRef}
+      data-compact={compact || undefined}
+    >
       {/*
        * 工具栏贴在编辑区顶部、与之连成一体（工具栏无下边框、标注带无上边框），
        * 与富文本编辑器的头部同构：一条横排、按功能分组、组间用竖线隔开。
@@ -142,21 +177,35 @@ export function MarkupPanel({
             {index > 0 && tool.dividerBefore && (
               <span className="tsz-ve-toolbar-divider" aria-hidden />
             )}
-            {tool.content === undefined ? (
-              <Button
-                size="small"
-                className={`tsz-ve-tool-toggle ${tool.className ?? ""}`}
-                aria-label={tool.ariaLabel ?? tool.label}
-                aria-pressed={tool.active ?? false}
-                disabled={readOnly}
-                onClick={() => onOpenToolChange(tool.key)}
-              >
-                {tool.icon}
-                {tool.label}
-              </Button>
+            {tool.content === undefined || tool.inline ? (
+              <Tooltip title={tool.ariaLabel ?? tool.label}>
+                <Button
+                  size="small"
+                  className={`tsz-ve-tool-toggle ${tool.icon ? "tsz-ve-icon-tool" : ""} ${tool.className ?? ""}`}
+                  aria-label={tool.ariaLabel ?? tool.label}
+                  aria-pressed={tool.active ?? false}
+                  aria-expanded={
+                    tool.inline
+                      ? openTool === tool.key || !!showRoleSelection
+                      : undefined
+                  }
+                  disabled={readOnly}
+                  onMouseDown={
+                    tool.inline ? (event) => event.preventDefault() : undefined
+                  }
+                  onClick={() =>
+                    onOpenToolChange(
+                      tool.inline && openTool === tool.key ? "text" : tool.key
+                    )
+                  }
+                >
+                  {tool.icon}
+                  <span className="tsz-ve-tool-label">{tool.label}</span>
+                </Button>
+              </Tooltip>
             ) : (
               <Popover
-                open={openTool === tool.key}
+                open={openTool === tool.key && !tool.suppressPopup}
                 onOpenChange={
                   tool.stayOpen
                     ? undefined
@@ -165,73 +214,88 @@ export function MarkupPanel({
                 trigger={tool.stayOpen ? [] : "click"}
                 placement={tool.placement ?? "bottomLeft"}
                 overlayClassName="tsz-ve-pop-overlay"
-                content={tool.content}
+                content={tool.suppressPopup ? null : tool.content}
+                destroyOnHidden={tool.key === "pause"}
               >
-                <Button
-                  size="small"
-                  className={`tsz-ve-tool-toggle ${tool.className ?? ""}`}
-                  aria-label={tool.ariaLabel ?? tool.label}
-                  aria-pressed={tool.active ?? openTool === tool.key}
-                  aria-expanded={openTool === tool.key}
-                  disabled={readOnly}
-                  onClick={
-                    tool.stayOpen
-                      ? () =>
-                          onOpenToolChange(
-                            openTool === tool.key ? undefined : tool.key
-                          )
-                      : undefined
+                <Tooltip
+                  title={
+                    openTool === tool.key
+                      ? null
+                      : `${tool.ariaLabel ?? tool.label}${tool.summary ? `：${tool.summary}` : ""}`
                   }
                 >
-                  {tool.icon}
-                  {tool.label}
-                  {tool.summary !== undefined && (
-                    <span className="tsz-ve-tool-summary">{tool.summary}</span>
-                  )}
-                </Button>
+                  <Button
+                    size="small"
+                    className={`tsz-ve-tool-toggle ${tool.icon ? "tsz-ve-icon-tool" : ""} ${tool.className ?? ""}`}
+                    aria-label={tool.ariaLabel ?? tool.label}
+                    aria-pressed={tool.active ?? openTool === tool.key}
+                    aria-expanded={openTool === tool.key}
+                    disabled={readOnly}
+                    onClick={
+                      tool.stayOpen
+                        ? () =>
+                            onOpenToolChange(
+                              openTool === tool.key ? undefined : tool.key
+                            )
+                        : undefined
+                    }
+                  >
+                    {tool.icon}
+                    <span className="tsz-ve-tool-label">{tool.label}</span>
+                    {tool.summary !== undefined && (
+                      <span className="tsz-ve-tool-summary">
+                        {tool.summary}
+                      </span>
+                    )}
+                  </Button>
+                </Tooltip>
               </Popover>
             )}
           </span>
         ))}
 
-        <span className="tsz-ve-toolbar-divider" aria-hidden />
-
-        <Tooltip title="上一步">
-          <Button
-            size="small"
-            type="text"
-            className="tsz-ve-icon-button"
-            aria-label="上一步"
-            disabled={readOnly || !canUndo}
-            onClick={onUndo}
-          >
-            <UndoOutlined />
-          </Button>
-        </Tooltip>
-        <Tooltip title="下一步">
-          <Button
-            size="small"
-            type="text"
-            className="tsz-ve-icon-button"
-            aria-label="下一步"
-            disabled={readOnly || !canRedo}
-            onClick={onRedo}
-          >
-            <RedoOutlined />
-          </Button>
-        </Tooltip>
-        <Tooltip title="清空标注">
-          <Button
-            size="small"
-            type="text"
-            className="tsz-ve-icon-button"
-            aria-label="清空标注"
-            disabled={readOnly || marked === 0}
-            onClick={onClearAll}
-          >
-            <ClearOutlined />
-          </Button>
-        </Tooltip>
+        <span className="tsz-ve-toolbar-actions">
+          <>
+            <Tooltip title="撤销">
+              <Button
+                size="small"
+                type="text"
+                className="tsz-ve-icon-button"
+                aria-label="上一步"
+                disabled={readOnly || !canUndo}
+                onClick={onUndo}
+              >
+                <UndoOutlined />
+              </Button>
+            </Tooltip>
+            <Tooltip title="重做">
+              <Button
+                size="small"
+                type="text"
+                className="tsz-ve-icon-button"
+                aria-label="下一步"
+                disabled={readOnly || !canRedo}
+                onClick={onRedo}
+              >
+                <RedoOutlined />
+              </Button>
+            </Tooltip>
+          </>
+          <>
+            <Tooltip title="清空标注">
+              <Button
+                size="small"
+                type="text"
+                className="tsz-ve-icon-button"
+                aria-label="清空标注"
+                disabled={readOnly || marked === 0}
+                onClick={onClearAll}
+              >
+                <ClearOutlined />
+              </Button>
+            </Tooltip>
+          </>
+        </span>
       </div>
 
       <AnnotationStrip
@@ -252,11 +316,23 @@ export function MarkupPanel({
         textReadOnly={textReadOnly}
         onRoleRange={onRoleRange}
         onTextSelection={onTextSelection}
+        onCaretChange={onCaretChange}
+        onInspectPause={onInspectPause}
+        pausePopover={pausePopover}
+        pausePlacement={openTool === "pause" && brush.kind === "none"}
+        selectedPauseGap={selectedPauseGap}
         roleAnchorStart={roleAnchorStart}
         onGapClick={onGapClick}
         onLetterClick={onLetterClick}
         onLiaisonClick={onLiaisonClick}
       />
+      {tools.map((tool) =>
+        tool.inline && (openTool === tool.key || showRoleSelection) ? (
+          <div key={tool.key} className="tsz-ve-role-inline">
+            {tool.content}
+          </div>
+        ) : null
+      )}
     </div>
   );
 }

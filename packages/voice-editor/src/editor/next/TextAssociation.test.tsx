@@ -115,7 +115,8 @@ it.each(["grammar", "association"] as const)(
     fireEvent.change(input, { target: { value: "不可写入" } });
     expect(observe).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "停顿" }));
-    fireEvent.click(screen.getByLabelText("用停顿画笔 500ms"));
+    fireEvent.click(screen.getByRole("button", { name: "连续添加" }));
+    fireEvent.click(screen.getByLabelText("停顿 0.5 秒"));
     fireEvent.mouseDown(screen.getByLabelText("第 1 处词缝"), { button: 0 });
     await waitFor(() =>
       expect(observe.mock.lastCall?.[0]).toMatchObject({

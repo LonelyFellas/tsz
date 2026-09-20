@@ -1,5 +1,5 @@
 import type { MouseEvent as ReactMouseEvent, ReactNode } from "react";
-import { Popover } from "antd";
+import { Popover, Tooltip } from "antd";
 import { associationWords } from "../../core/text-links";
 import {
   Fragment,
@@ -49,6 +49,12 @@ function draftRole(
 }
 
 export interface AnnotationStripProps {
+  /** 停顿面板打开时显示词间插入位，不必预先拿起连续画笔。 */
+  pausePlacement?: boolean;
+  selectedPauseGap?: number;
+  onCaretChange?: (position: number) => void;
+  onInspectPause?: (gap: number) => void;
+  pausePopover?: { gap: number; content: ReactNode };
   onTextSelection?: (range?: { start: number; end: number }) => void;
   associationContent?: ReactNode;
   associationAnchor?: number;
@@ -112,13 +118,22 @@ export function AnnotationStrip({
   onTextChange,
   onRoleRange,
   onTextSelection,
+  onCaretChange,
+  onInspectPause,
+  pausePlacement,
+  selectedPauseGap,
+  pausePopover,
   roleAnchorStart,
   onGapClick,
   onLetterClick,
   onLiaisonClick
 }: AnnotationStripProps) {
   const tokens = tokenize(text);
-  const target = readOnly ? "none" : brushTarget(brush);
+  const target = readOnly
+    ? "none"
+    : pausePlacement
+      ? "gap"
+      : brushTarget(brush);
   const painting = target !== "none";
   /*
    * 停顿标签按「相邻两条交替上下」排布：500ms 这类标签比词缝间距还宽，同一行
@@ -163,7 +178,7 @@ export function AnnotationStrip({
       const end = elementsOf(link.end);
       return start && end ? { start, end } : undefined;
     });
-  }, [marks.liaisons, marks.roles, target, text]);
+  }, [marks.liaisons, marks.roles, marks.pauses, target, text]);
 
   const { arcs, strokeWidth } = useLiaisonArcs(containerRef, collectLinks);
 
@@ -364,18 +379,22 @@ export function AnnotationStrip({
 
               {hasNext && (
                 <span
-                  className={`tsz-ve-gap${pause === undefined ? "" : " has-pause"}${gapClass}`}
+                  className={`tsz-ve-gap${pause === undefined ? "" : " has-pause"}${gapClass}${pausePlacement && selectedPauseGap === position ? " is-pause-selected" : ""}`}
                   role="button"
                   aria-label={gapLabel(position, pause)}
                   aria-pressed={pause !== undefined}
-                  aria-disabled={target !== "gap"}
+                  aria-disabled={
+                    pause !== undefined && brush.kind === "none"
+                      ? undefined
+                      : target !== "gap"
+                  }
                   onMouseDown={paint(() => {
                     if (target === "gap") onGapClick(position);
                   })}
                 >
                   {/*
-                   * 停顿记号绝对定位在词缝下方，不占行内宽度：一旦占宽，词就被
-                   * 推开，两层的对齐、词距和跨过此处的连读弧全都会跟着错。
+                   * 已添加的停顿在同一词间插入位点亮；绝对定位不撑开文字，
+                   * 时长由悬停提示与编辑浮层显示，不再额外绘制下方标记。
                    */}
                   {pause !== undefined && (
                     <span
@@ -383,10 +402,42 @@ export function AnnotationStrip({
                       data-row={pausedGaps.indexOf(position) % 2}
                       aria-hidden
                     >
-                      <span className="tsz-ve-gap-pause-bar" />
-                      <span className="tsz-ve-gap-pause-value">
-                        {formatPauseLabel(pause)}
-                      </span>
+                      <Popover
+                        open={pausePopover?.gap === position}
+                        content={
+                          pausePopover?.gap === position
+                            ? pausePopover.content
+                            : undefined
+                        }
+                        placement="bottomLeft"
+                        trigger={[]}
+                      >
+                        <Tooltip
+                          title={
+                            pausePopover?.gap === position
+                              ? null
+                              : `停顿 ${pause / 1000} 秒 · 点击调整`
+                          }
+                        >
+                          <button
+                            type="button"
+                            className="tsz-ve-gap-pause-value tsz-ve-pause-chip"
+                            aria-label={`编辑第 ${position + 1} 处停顿 ${pause / 1000} 秒`}
+                            disabled={
+                              readOnly ||
+                              (brush.kind !== "none" && brush.kind !== "pause")
+                            }
+                            onMouseDown={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                            }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              onInspectPause?.(position);
+                            }}
+                          />
+                        </Tooltip>
+                      </Popover>
                     </span>
                   )}
                   {textBetween(text, token.end, tokens[position + 1]!.start)}
@@ -414,7 +465,13 @@ export function AnnotationStrip({
           const start = Array.from(text.slice(0, input.selectionStart)).length;
           const end = Array.from(text.slice(0, input.selectionEnd)).length;
           onTextSelection?.(end > start ? { start, end } : undefined);
+          onCaretChange?.(end);
         }}
+        onClick={(event) =>
+          onCaretChange?.(
+            Array.from(text.slice(0, event.currentTarget.selectionEnd)).length
+          )
+        }
         onChange={(event) => onTextChange(event.target.value)}
       />
     </div>

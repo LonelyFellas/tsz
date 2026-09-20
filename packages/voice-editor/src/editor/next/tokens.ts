@@ -448,9 +448,8 @@ export function annotationsToMarks(value: RichTextV2): MarkState {
 }
 
 /**
- * 改文本后重挂标注：只保留「同一序号上的词一字未变」的标注。
- * 词被改写/删除就丢掉它的标注——与其把标签留在一个已经不是那个词的位置上，
- * 不如让它消失，让人重标。
+ * 改文本后重挂标注。停顿跟随原词间边界的码点位置，不依赖会随前插文字变化的词序号。
+ * 只有边界无法对应到新文本的同一词缝时才丢弃，不猜测相近单词或重复词的归属。
  */
 export function remapMarks(
   previousText: string,
@@ -459,18 +458,52 @@ export function remapMarks(
 ): MarkState {
   const before = tokenize(previousText);
   const after = tokenize(nextText);
-  const survives = (index: number) =>
-    before[index] !== undefined && before[index]!.text === after[index]?.text;
-
   const roles = remapRoleUnits(previousText, nextText, marks.roles);
 
-  // 词缝两侧的词都还在原位，这条缝上的停顿才有意义。
-  const gapSurvives = (gap: number) => survives(gap) && survives(gap + 1);
+  const edit = editWindow(previousText, nextText);
+  const nextPoints = Array.from(nextText);
+  const gapByLeftEnd = new Map(after.map((token, index) => [token.end, index]));
+  const mapBoundary = (position: number, rightBias: boolean) => {
+    if (position < edit.prefix || (position === edit.prefix && !rightBias))
+      return position;
+    if (position >= edit.changedEnd) return position + edit.delta;
+    return undefined;
+  };
+  const replaced = (token: Token) =>
+    edit.prefix < edit.changedEnd &&
+    edit.prefix <= token.start &&
+    edit.changedEnd >= token.end;
 
   const pauses: Record<number, number> = {};
   for (const [rawGap, durationMs] of Object.entries(marks.pauses)) {
-    const gap = Number(rawGap);
-    if (gapSurvives(gap)) pauses[gap] = durationMs;
+    const left = before[Number(rawGap)];
+    const right = before[Number(rawGap) + 1];
+    if (!left || !right || replaced(left) || replaced(right)) continue;
+    // 两边同时定位：增加空白可以保留，插入新词则不能把停顿误挂到新词旁。
+    const leftEnd = mapBoundary(left.end, false);
+    const rightStart = mapBoundary(right.start, true);
+    const rightEnd = mapBoundary(right.end, false);
+    if (
+      leftEnd === undefined ||
+      rightStart === undefined ||
+      rightEnd === undefined
+    )
+      continue;
+    const gap = gapByLeftEnd.get(leftEnd);
+    // 右词的末端也要存活，避免删除 two 后把共同首字母 t 误认成 three。
+    if (
+      gap === undefined ||
+      after[gap + 1]?.start !== rightStart ||
+      after[gap + 1]?.end !== rightEnd
+    )
+      continue;
+    if (
+      nextPoints
+        .slice(leftEnd, rightStart)
+        .some((point) => point === "\n" || point === "\r")
+    )
+      continue;
+    pauses[gap] = durationMs;
   }
 
   /*

@@ -6,6 +6,7 @@ import {
   useState
 } from "react";
 import type { RefObject } from "react";
+import { fitPauseHitAreas } from "./pauseHitAreas";
 import {
   EMPTY_LIAISON_LAYOUT,
   buildLiaisonArcs,
@@ -32,6 +33,7 @@ export function useLiaisonArcs(
   const measure = useCallback(() => {
     const container = containerRef.current;
     if (!container) return;
+    fitPauseHitAreas(container);
     const next = buildLiaisonArcs(
       container,
       collectRef.current(),

@@ -1171,7 +1171,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     // 等的是按需加载的编辑器分块，给足超时：默认 1 秒在负载高的 CI runner 上不够
     const editor = await within(
       document.querySelector(".word-grammar-panel") as HTMLElement
-    ).findByRole("toolbar", { name: "标注工具栏" }, { timeout: 10_000 });
+    ).findByLabelText("标注工具栏", {}, { timeout: 10_000 });
     expect(editor).toBeInTheDocument();
 
     const input = screen.getByLabelText("语法结构 1 英美通用内容");
@@ -1184,9 +1184,14 @@ describe("V3MeaningsAndExamplesStep", () => {
       value().pos[0]!.grammar_structures[0]!.variants[0]!.content.text
     ).toBe("a centre of the city");
 
-    // 取语法结构画笔从词的首字母拖到末字母（上色粒度是字母），标注应实时落到草稿里
-    fireEvent.click(document.querySelector(".tsz-ve-role-button")!);
-    fireEvent.click(screen.getByLabelText("用固定核心词画笔"));
+    // 显式开启连续标注后，原有字母画笔仍应实时回写草稿。
+    const activeEditor = input.closest(".tsz-ve-editor") as HTMLElement;
+    fireEvent.click(activeEditor.querySelector(".tsz-ve-role-button")!);
+    // 只查询当前编辑器，避免全页大量字段的可及名计算拖慢并发测试。
+    fireEvent.click(
+      within(activeEditor).getByText("连续标注", { exact: true })
+    );
+    fireEvent.click(within(activeEditor).getByLabelText("用固定核心词画笔"));
     const word = [
       ...input.closest(".tsz-ve-editor")!.querySelectorAll(".tsz-ve-token")
     ].find((node) => node.textContent === "centre")!;

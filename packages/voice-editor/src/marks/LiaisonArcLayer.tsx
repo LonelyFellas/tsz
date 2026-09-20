@@ -34,7 +34,12 @@ export function LiaisonArcLayer({
               onMouseDown={(event) => onArcMouseDown(arc.index, event)}
             />
           )}
-          <path className="tsz-ve-arc" d={arc.d} strokeWidth={strokeWidth} />
+          <path
+            className="tsz-ve-arc"
+            data-arc-key={arc.key}
+            d={arc.d}
+            strokeWidth={strokeWidth}
+          />
         </g>
       ))}
     </svg>

@@ -1,0 +1,274 @@
+/* 工具栏仅改变排布与视觉，功能面板复用原组件。 */
+.tsz-ve-editor .tsz-ve-toolbar {
+  box-sizing: border-box;
+  padding: 7px 10px;
+  gap: 5px;
+  background: #f8f9fc;
+  border-color: #dfe4ec;
+  min-height: 46px;
+}
+.tsz-ve-editor .tsz-ve-toolbar .ant-btn.ant-btn {
+  height: 30px;
+  border-radius: 6px;
+  padding-inline: 8px;
+  font-weight: 400;
+  color: #657286;
+  box-shadow: none;
+}
+.tsz-ve-toolbar .tsz-ve-tool-toggle.ant-btn {
+  border-color: transparent;
+  background: transparent;
+  gap: 6px;
+}
+.tsz-ve-toolbar .tsz-ve-tool-toggle.ant-btn:hover:not(:disabled),
+.tsz-ve-toolbar .tsz-ve-icon-button.ant-btn:hover:not(:disabled) {
+  background: #fff;
+  border-color: #e1e6ef;
+  color: #354a6b;
+}
+.tsz-ve-toolbar .tsz-ve-tool-toggle.ant-btn[aria-pressed="true"] {
+  border-color: #d0dcf7;
+  background: #eaf0ff;
+  color: #315ce1;
+  box-shadow: 0 1px 2px #23468208;
+}
+.tsz-ve-toolbar .tsz-ve-tool-summary {
+  background: transparent;
+  color: #98a1b0;
+  font-size: 11px;
+}
+.tsz-ve-toolbar .ant-btn.ant-btn:disabled {
+  color: #b7c0ce;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  opacity: 0.65;
+}
+.tsz-ve-editor .tsz-ve-toolbar-divider {
+  height: 15px;
+  align-self: center;
+  margin: 0 2px;
+  background: #e0e5ed;
+}
+.tsz-ve-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.tsz-ve-toolbar .tsz-ve-icon-button.ant-btn {
+  width: 30px;
+  min-width: 30px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+}
+.tsz-ve-markup[data-compact="true"] .tsz-ve-toolbar {
+  padding: 7px 6px;
+  gap: 3px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.tsz-ve-markup[data-compact="true"] .tsz-ve-toolbar button {
+  flex-shrink: 0;
+}
+.tsz-ve-markup[data-compact="true"] .tsz-ve-toolbar-divider,
+.tsz-ve-markup[data-compact="true"] .tsz-ve-tool-label,
+.tsz-ve-markup[data-compact="true"] .tsz-ve-tool-summary {
+  display: none;
+}
+.tsz-ve-markup[data-compact="true"] .tsz-ve-toolbar .tsz-ve-icon-tool.ant-btn,
+.tsz-ve-markup[data-compact="true"]
+  .tsz-ve-toolbar
+  .tsz-ve-icon-button.ant-btn {
+  width: 28px;
+  min-width: 28px;
+  height: 30px;
+  padding: 0;
+  gap: 0;
+}
+/* 停顿定位时显示词间灰色插入位；绝对定位，不改变字距和连读端点。 */
+.tsz-ve-editor .tsz-ve-gap[aria-disabled="false"]:not(.has-pause)::before {
+  top: 50%;
+  bottom: auto;
+  width: 4px;
+  height: 16px;
+  margin-left: -2px;
+  transform: translateY(-50%);
+  border-radius: 3px;
+  background: #d7dce5;
+  box-shadow: inset 0 0 0 1px #cbd2de;
+}
+.tsz-ve-editor .tsz-ve-gap[aria-disabled="false"]:not(.has-pause):hover::before,
+.tsz-ve-editor .tsz-ve-gap.is-pause-selected:not(.has-pause)::before {
+  background: #7b9eff;
+  box-shadow: 0 0 0 2px #2053ff20;
+}
+.tsz-ve-editor .tsz-ve-gap.is-pause-selected .tsz-ve-pause-chip {
+  background: #2053ff;
+  box-shadow: 0 0 0 2px #2053ff20;
+}
+/* 分类底栏：类别与提示一行，次要操作单独靠左，完成按钮由宿主放在同一行右侧。 */
+.tsz-ve-editor .tsz-ve-role-inline {
+  padding: 10px 12px 8px;
+  border-top: 1px solid #e8ecf2;
+  background: #fbfcfe;
+}
+.tsz-ve-editor .tsz-ve-grammar-panel {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: center;
+}
+.tsz-ve-editor .tsz-ve-grammar-hint {
+  font-size: 11px;
+  color: #929aaa;
+}
+.tsz-ve-editor .tsz-ve-grammar-option.ant-btn {
+  font-size: 12px;
+  height: 26px;
+  padding-inline: 9px;
+}
+.tsz-ve-editor .tsz-ve-grammar-option.ant-btn:disabled {
+  background: #fff;
+  border-color: #e4e8ef;
+  opacity: 1;
+  color: #9da6b5;
+}
+.tsz-ve-editor .tsz-ve-grammar-option:disabled .tsz-ve-pop-swatch {
+  opacity: 0.5;
+}
+.tsz-ve-editor .tsz-ve-grammar-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  margin-left: 0;
+  min-height: 26px;
+  gap: 6px;
+}
+.tsz-ve-editor .tsz-ve-grammar-actions .ant-btn {
+  height: 26px;
+  padding-inline: 6px;
+  font-size: 12px;
+  color: #788499;
+}
+.tsz-ve-editor .tsz-ve-grammar-actions .ant-btn:disabled {
+  color: #b6bfcc;
+}
+@container tsz-voice-editor (max-width: 340px) {
+  .tsz-ve-editor .tsz-ve-grammar-panel {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .tsz-ve-editor .tsz-ve-grammar-hint {
+    display: none;
+  }
+  .tsz-ve-editor .tsz-ve-grammar-option.ant-btn {
+    padding-inline: 6px;
+  }
+  .tsz-ve-editor .tsz-ve-grammar-actions {
+    gap: 0;
+  }
+  .tsz-ve-editor .tsz-ve-grammar-actions .ant-btn {
+    padding-inline: 3px;
+    font-size: 11px;
+  }
+}
+/* 双层正文保持相同度量；固定行距给上下标记留通道，不加行内占位、不改变词缝。 */
+.tsz-ve-editor .tsz-ve-strip,
+.tsz-ve-editor .tsz-ve-canvas-input {
+  line-height: 2.25;
+}
+.tsz-ve-editor .tsz-ve-gap-pause {
+  z-index: 3;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+.tsz-ve-editor .tsz-ve-gap-pause-bar {
+  display: none;
+}
+.tsz-ve-editor .tsz-ve-pause-chip {
+  box-sizing: border-box;
+  pointer-events: auto;
+  width: 4px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: #648cff;
+  font-size: 0;
+  cursor: pointer;
+  margin-top: 0;
+}
+.tsz-ve-editor .tsz-ve-pause-chip:hover,
+.tsz-ve-editor .tsz-ve-pause-chip:focus-visible {
+  background: #2053ff;
+  outline: 2px solid #bed0ff;
+  outline-offset: 1px;
+}
+.tsz-ve-pause-chip:disabled {
+  pointer-events: none;
+  opacity: 0.6;
+}
+.tsz-ve-pause-editor {
+  width: 258px;
+  max-width: calc(100vw - 48px);
+  font-size: 12px;
+  color: #364259;
+}
+.tsz-ve-pause-editor-head,
+.tsz-ve-pause-editor-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.tsz-ve-pause-editor-head strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+.tsz-ve-pause-location {
+  font-size: 12px;
+  color: #8a93a2;
+  margin: 5px 0;
+  overflow-wrap: anywhere;
+}
+.tsz-ve-pause-location b {
+  font-weight: 400;
+  color: #67758a;
+}
+.tsz-ve-pause-location span {
+  margin: 0 5px;
+  color: #849bc1;
+}
+.tsz-ve-pause-presets {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 12px 0;
+}
+.tsz-ve-pause-custom {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.tsz-ve-pause-custom .ant-input {
+  min-width: 0;
+  width: 100%;
+  flex: 1;
+}
+.tsz-ve-pause-unit {
+  color: #8992a0;
+  font-size: 12px;
+}
+.tsz-ve-pause-note {
+  color: #a0a7b1;
+  font-size: 11px;
+  margin: 6px 0;
+}
+.tsz-ve-pause-editor-foot {
+  border-top: 1px solid #f0f2f5;
+  padding-top: 7px;
+  margin-top: 7px;
+}
