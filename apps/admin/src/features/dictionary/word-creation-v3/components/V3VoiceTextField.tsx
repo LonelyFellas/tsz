@@ -19,6 +19,7 @@ import {
 import { LiaisonIcon } from "@tsz/voice-editor";
 import { RichTextReadOnly } from "@tsz/voice-editor/reader";
 import { AudioOutlined } from "@ant-design/icons";
+import { flushSync } from "react-dom";
 import { Button, Input, Space, message } from "antd";
 import {
   type ReactNode,
@@ -61,6 +62,7 @@ export interface V3VoiceTextFieldProps<
   TLink extends VoiceAssociation = TextLinkV3
 > {
   onDone?: () => void;
+  onCancel?: () => void;
   doneLoading?: boolean;
   doneDisabled?: boolean;
   showDone?: boolean;
@@ -108,6 +110,7 @@ export interface V3VoiceTextFieldProps<
  */
 export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
   onDone,
+  onCancel,
   doneLoading,
   doneDisabled,
   showDone = true,
@@ -137,6 +140,57 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
 }: V3VoiceTextFieldProps<TLink>) {
   const [editing, setEditing] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [editorSession, setEditorSession] = useState(0);
+  const captureSession = () =>
+    structuredClone({ nodeId, value, textLinks, voiceProfile, audioAssets });
+  const session = useRef<ReturnType<typeof captureSession>>(captureSession());
+  const callbacks = useRef({
+    onChange,
+    onVoiceProfileChange,
+    onAudioAssetsChange
+  });
+  useLayoutEffect(() => {
+    callbacks.current = { onChange, onVoiceProfileChange, onAudioAssetsChange };
+  });
+  const cancelEditing = () => {
+    if (doneLoading) return;
+    const before = session.current;
+    // 切换到另一字段时，不允许把旧会话覆盖到新字段。
+    if (!readOnly && before.nodeId === nodeId) {
+      // 宿主三个回调可能各自捕获旧草稿；每次回写后刷新闭包，避免互相覆盖恢复结果。
+      if (
+        JSON.stringify([value, textLinks]) !==
+        JSON.stringify([before.value, before.textLinks])
+      ) {
+        flushSync(() =>
+          callbacks.current.onChange(
+            toRichTextV2(before.value),
+            before.textLinks
+          )
+        );
+      }
+      if (
+        JSON.stringify(voiceProfile) !== JSON.stringify(before.voiceProfile)
+      ) {
+        flushSync(() =>
+          callbacks.current.onVoiceProfileChange?.(
+            before.voiceProfile ?? { voices: [] }
+          )
+        );
+      }
+      if (JSON.stringify(audioAssets) !== JSON.stringify(before.audioAssets)) {
+        flushSync(() =>
+          callbacks.current.onAudioAssetsChange?.(before.audioAssets ?? [])
+        );
+      }
+    }
+    history.current.past = [];
+    history.current.future = [];
+    setEditing(false);
+    setEditorSession((current) => current + 1);
+    onAssociationPendingChange?.(false);
+    onCancel?.();
+  };
   const expanded = env.VOICE_EDITOR && (presentation === "editor" || editing);
   // 缓存住：每次渲染都新建对象会让弧线层跟着重量一遍。展开编辑时用不上，不算。
   const liaisons = useMemo(
@@ -205,8 +259,12 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       status={invalid ? "error" : undefined}
       // 有连读时为弧线留出高度；增删标注也会触发自动重新测量。
       autoSize={{ minRows: liaisons && !largePreview ? 2 : 1, maxRows: 6 }}
-      style={liaisons ? { paddingTop: "1em" } : undefined}
-      className={`word-pronunciation-phonetic-input${englishContent ? " tsz-entry-en" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}`}
+      style={
+        liaisons
+          ? { paddingTop: mode === "grammar" ? "calc(4px + 0.5em)" : "1em" }
+          : undefined
+      }
+      className={`word-pronunciation-phonetic-input${englishContent ? " tsz-entry-en" : ""}${largePreview ? " v3-voice-text-large-preview" : ""}${mode === "grammar" ? " v3-grammar-input" : ""}`}
       data-v3-field={field}
       data-v3-node-id={nodeId}
       onKeyDown={(event) => {
@@ -251,7 +309,18 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       {fallback}
       {grammarPreview ? (
         <div className="v3-grammar-preview-content tsz-entry-en" aria-hidden>
-          <RichTextReadOnly value={value} />
+          <RichTextReadOnly
+            value={
+              value.version === 2
+                ? {
+                    ...value,
+                    annotations: value.annotations.filter(
+                      (annotation) => annotation.type !== "pause"
+                    )
+                  }
+                : value
+            }
+          />
         </div>
       ) : mode !== "grammar" && liaisons ? (
         <LiaisonOverlay value={liaisons} />
@@ -290,7 +359,10 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
             disabled={readOnly || value.text.trim() === ""}
             // 实际发音只标连读，按钮就画那条弧；其余字段仍是语音编辑器的话筒。
             icon={mode === "actual-pron" ? <LiaisonIcon /> : <AudioOutlined />}
-            onClick={() => setEditing(true)}
+            onClick={() => {
+              session.current = captureSession();
+              setEditing(true);
+            }}
             style={{ height: "auto" }}
           />
         </Space.Compact>
@@ -303,6 +375,7 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
       {feedbackHolder}
       <Suspense fallback={<div style={{ paddingBottom: 32 }}>{fallback}</div>}>
         <VoiceEditor<TLink>
+          key={`${nodeId}:${editorSession}`}
           onAssociationPendingChange={onAssociationPendingChange}
           textReadOnly={presentation !== "editor"}
           mode={mode}
@@ -337,14 +410,26 @@ export function V3VoiceTextField<TLink extends VoiceAssociation = TextLinkV3>({
         />
       </Suspense>
       {showDone && (
-        <Space className="v3-voice-text-editor-done">
+        <Space className="v3-voice-text-editor-done" size={6}>
+          <Button
+            size="small"
+            aria-label={`取消${ariaLabel}编辑`}
+            disabled={doneLoading}
+            onClick={cancelEditing}
+          >
+            取消
+          </Button>
           <Button
             type="primary"
             size="small"
             aria-label={`完成${ariaLabel}编辑`}
             loading={doneLoading}
             disabled={doneDisabled}
-            onClick={onDone ?? (() => setEditing(false))}
+            onClick={() => {
+              session.current = captureSession();
+              if (onDone) onDone();
+              else setEditing(false);
+            }}
           >
             完成
           </Button>

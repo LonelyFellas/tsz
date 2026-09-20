@@ -6,7 +6,7 @@ import {
   createGlyphMeasurer,
   type LiaisonLinkElements
 } from "./liaisonGeometry";
-import { liaisonPath } from "./liaisonPath";
+import { liaisonHalfPaths, liaisonPath } from "./liaisonPath";
 
 function rect(left: number, top: number, width: number, height: number) {
   return {
@@ -64,6 +64,7 @@ describe("buildLiaisonArcs", () => {
   const tipY = 50 + 10 - 1.2;
 
   afterEach(() => {
+    container.replaceChildren();
     vi.restoreAllMocks();
   });
 
@@ -122,7 +123,7 @@ describe("buildLiaisonArcs", () => {
     );
   });
 
-  it("splits a wrapped link into a head and a tail reaching the padding edges", () => {
+  it("splits a wrapped link into matched halves without tiny line-start hooks", () => {
     vi.spyOn(window, "getComputedStyle").mockReturnValue(style);
     const link: LiaisonLinkElements = {
       start: anchor(rect(300, 50, 10, 25)),
@@ -130,13 +131,75 @@ describe("buildLiaisonArcs", () => {
     };
     const { arcs } = buildLiaisonArcs(container, [link], measure);
     expect(arcs.map((arc) => arc.key)).toEqual(["0-head", "0-tail"]);
-    expect(arcs[0]!.d).toBe(
-      liaisonPath({ x: 305, tipY }, { x: 390, tipY }, 20)
+    const halves = liaisonHalfPaths(
+      { x: 305, tipY },
+      { x: 25, tipY: tipY + 40 },
+      20,
+      11
     );
-    expect(arcs[1]!.d).toBe(
-      liaisonPath({ x: 10, tipY: tipY + 40 }, { x: 25, tipY: tipY + 40 }, 20)
-    );
+    expect(arcs[0]!.d).toBe(halves.head);
+    expect(arcs[1]!.d).toBe(halves.tail);
     expect(arcs.every((arc) => arc.index === 0)).toBe(true);
+  });
+
+  function addPause(left: number, top: number, rowTop: number) {
+    const gap = element(rect(left + 8, rowTop, 6, 25));
+    gap.className = "tsz-ve-gap";
+    const chip = element(rect(left, top, 22, 22));
+    chip.className = "tsz-ve-pause-chip";
+    gap.append(chip);
+    container.append(gap);
+  }
+
+  it("前一行停顿占用通道时才限制弧高，移除后恢复原曲线", () => {
+    vi.spyOn(window, "getComputedStyle").mockReturnValue(style);
+    const link = {
+      start: anchor(rect(20, 70, 10, 25)),
+      end: anchor(rect(220, 70, 10, 25))
+    };
+    const normal = buildLiaisonArcs(container, [link], measure).arcs[0]!.d;
+    addPause(80, 40, 20);
+    const constrained = buildLiaisonArcs(container, [link], measure).arcs[0]!.d;
+    expect(constrained).not.toBe(normal);
+    const points = constrained.match(/-?\d+(?:\.\d+)?/g)!.map(Number);
+    // 控制点也不得进入命中区 + 2px 留白 + 半个笔画宽度。
+    expect(
+      Math.min(points[1]!, points[3]!, points[5]!, points[7]!)
+    ).toBeGreaterThanOrEqual(64.7);
+    container.replaceChildren();
+    expect(buildLiaisonArcs(container, [link], measure).arcs[0]!.d).toBe(
+      normal
+    );
+  });
+
+  it("不相关水平位置及本行下方的停顿，不改变正常连读弧", () => {
+    vi.spyOn(window, "getComputedStyle").mockReturnValue(style);
+    const link = {
+      start: anchor(rect(20, 70, 10, 25)),
+      end: anchor(rect(120, 70, 10, 25))
+    };
+    const normal = buildLiaisonArcs(container, [link], measure).arcs[0]!.d;
+    addPause(300, 40, 20);
+    addPause(60, 100, 70);
+    expect(buildLiaisonArcs(container, [link], measure).arcs[0]!.d).toBe(
+      normal
+    );
+  });
+
+  it("跨行只碰到一侧障碍时，两半弧仍然等高等宽", () => {
+    vi.spyOn(window, "getComputedStyle").mockReturnValue(style);
+    const link = {
+      start: anchor(rect(300, 70, 10, 25)),
+      end: anchor(rect(20, 110, 10, 25))
+    };
+    addPause(308, 50, 20);
+    const { arcs } = buildLiaisonArcs(container, [link], measure);
+    const [head, tail] = arcs.map((arc) =>
+      arc.d.match(/-?\d+(?:\.\d+)?/g)!.map(Number)
+    );
+    expect(head![6]! - head![0]!).toBeCloseTo(tail![6]! - tail![0]!, 2);
+    expect(head![1]! - head![7]!).toBeCloseTo(tail![7]! - tail![1]!, 2);
+    expect(head![7]).toBeGreaterThanOrEqual(74.7);
   });
 
   it("treats anchors whose box tops differ by a pixel as one line", () => {

@@ -185,6 +185,7 @@
 
 .tsz-ve-canvas-input::placeholder {
   color: var(--ant-color-text-quaternary, #bfbfbf);
+  font-weight: 400;
 }
 
 /* 拿起笔时鼠标归标注层；空手时归 textarea，好放光标、拉选区。 */
@@ -697,6 +698,7 @@
 
 .tsz-ve-markup {
   width: 100%;
+  container: tsz-voice-editor / inline-size;
 }
 
 .tsz-ve-toolbar {
@@ -734,6 +736,28 @@
 
 .tsz-ve-toolbar .tsz-ve-custom-input {
   width: 132px;
+}
+
+/* 按编辑器自身宽度收起文案，兼容宽屏内的窄字段列；不改变工具点击行为。 */
+@container tsz-voice-editor (max-width: 520px) {
+  .tsz-ve-toolbar {
+    gap: 1px;
+    padding-inline: 4px;
+  }
+
+  .tsz-ve-toolbar .tsz-ve-icon-tool .tsz-ve-tool-label,
+  .tsz-ve-toolbar .tsz-ve-icon-tool .tsz-ve-tool-summary,
+  .tsz-ve-toolbar-divider {
+    display: none;
+  }
+
+  .tsz-ve-toolbar .tsz-ve-icon-tool.ant-btn,
+  .tsz-ve-toolbar .tsz-ve-icon-button.ant-btn {
+    width: 24px;
+    min-width: 24px;
+    padding-inline: 0;
+    gap: 0;
+  }
 }
 
 /* 每枚工具连同它前面的分隔线占一格，工具栏因此是恒定宽度的一排。 */
@@ -968,7 +992,71 @@
   margin-top: 4px;
 }
 
-/* 语法结构那三行左侧的色块，与标注带上的字色一致。 */
+/* 分类底栏接入编辑框边界，不侵占正文及连读、停顿标记的布局区域。 */
+.tsz-ve-markup:has(> .tsz-ve-role-inline) > .tsz-ve-canvas {
+  border-bottom: 0;
+  border-radius: 0;
+}
+
+.tsz-ve-role-inline {
+  padding: 8px 12px;
+  border: 1px solid var(--ant-color-border, #d9d9d9);
+  border-top: 0;
+  border-radius: 0 0 10px 10px;
+  background: var(--ant-color-bg-layout, #fafafa);
+}
+
+.tsz-ve-grammar-panel,
+.tsz-ve-grammar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--ant-color-text-secondary, #666);
+  font-size: 12px;
+}
+
+.tsz-ve-grammar-hint {
+  min-width: 0;
+  flex: 1 1 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tsz-ve-grammar-actions {
+  margin-left: auto;
+  gap: 4px;
+}
+
+.tsz-ve-grammar-hint strong {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+  color: var(--ant-color-text, #262626);
+}
+
+.tsz-ve-grammar-option .tsz-ve-pop-swatch {
+  width: 8px;
+  height: 8px;
+  margin-right: 0;
+}
+
+.tsz-ve-grammar-option:hover:not(:disabled),
+.tsz-ve-grammar-option[aria-pressed="true"] {
+  border-color: var(--tsz-ve-role-core);
+  background: var(--ant-color-primary-bg, #f0f5ff);
+}
+
+.tsz-ve-grammar-option:focus-visible {
+  outline: 2px solid var(--tsz-ve-role-core);
+  outline-offset: 2px;
+}
+
+/* 语法结构分类色块与原有标注字色一致。 */
 .tsz-ve-pop-swatch {
   display: inline-block;
   flex: none;

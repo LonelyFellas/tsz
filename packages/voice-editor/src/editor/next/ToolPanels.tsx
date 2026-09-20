@@ -9,6 +9,7 @@ import {
   Progress,
   Radio,
   Spin,
+  Tooltip,
   Typography
 } from "antd";
 import type { ReactNode } from "react";
@@ -30,13 +31,11 @@ import {
 import {
   GRAMMAR_ROLES,
   LIAISON_ANCHORS,
-  PAUSE_PRESETS,
   RATE_PRESETS,
   RATE_MULTIPLIER_MIN,
   RATE_MULTIPLIER_MAX,
   VOICE_GENDERS,
   VOICE_LOCALES,
-  formatPauseLabel,
   voiceShortName
 } from "./roles";
 import type { Brush, LiaisonEnd } from "./roles";
@@ -206,12 +205,12 @@ export function VoicePanel({
                             className="tsz-ve-audition-button"
                             aria-label={`试听 ${voice.label}`}
                             loading={pendingVoiceId === voice.id}
+                            icon={<SoundOutlined />}
+                            aria-busy={pendingVoiceId === voice.id}
                             disabled={!canAudition}
                             data-playing={playingVoiceId === voice.id}
                             onClick={() => onAudition(voice)}
-                          >
-                            <SoundOutlined />
-                          </Button>
+                          />
                         </Space>
                       }
                     />
@@ -664,35 +663,138 @@ export interface RolePanelProps {
   hasWords: boolean;
   brush: Brush;
   onBrushChange: (brush: Brush) => void;
+  selectionText?: string;
+  selectedLevel?: string;
+  canRemove: boolean;
+  onRemove: () => void;
+  onContinuousChange: () => void;
 }
 
-/** 语法结构：三分类各一行，色块在最左，选中即换笔。 */
+const ROLE_DESCRIPTIONS: Record<string, string> = {
+  function: "可以替换成其他内容的部分",
+  core: "句型中保持不变的部分",
+  grammar: "例如 n.、adj. 等词性提示"
+};
+
+const ROLE_SHORT_LABELS: Record<string, string> = {
+  function: "可替换",
+  core: "核心词",
+  grammar: "词性"
+};
+
+/** 默认先选文字再分类；连续画笔需要显式开启，原有精细落笔能力保留。 */
 export function RolePanel({
   readOnly,
   hasWords,
   brush,
-  onBrushChange
+  onBrushChange,
+  selectionText,
+  selectedLevel,
+  canRemove,
+  onRemove,
+  onContinuousChange
 }: RolePanelProps) {
+  const continuous = brush.kind === "role";
   return (
-    <div className="tsz-ve-pop tsz-ve-pop-roles" aria-label="语法结构">
-      {GRAMMAR_ROLES.map((role) => (
-        <PopRow
-          key={role.level}
-          selected={brush.kind === "role" && brush.level === role.level}
-          label={
-            <>
+    <div
+      className="tsz-ve-grammar-panel"
+      aria-label="语法结构标注"
+      onMouseDown={(event) => event.preventDefault()}
+    >
+      <Space.Compact role="group" aria-label="语法标注类别" size="small">
+        {GRAMMAR_ROLES.map((role) => (
+          <Tooltip
+            key={role.level}
+            title={`${role.label}：${ROLE_DESCRIPTIONS[role.level]}`}
+          >
+            <Button
+              className="tsz-ve-grammar-option"
+              color={
+                (
+                  continuous
+                    ? brush.level === role.level
+                    : selectedLevel === role.level
+                )
+                  ? "primary"
+                  : "default"
+              }
+              variant={
+                (
+                  continuous
+                    ? brush.level === role.level
+                    : selectedLevel === role.level
+                )
+                  ? "filled"
+                  : "outlined"
+              }
+              aria-label={
+                continuous ? `用${role.label}画笔` : `标记为${role.label}`
+              }
+              aria-pressed={
+                continuous
+                  ? brush.level === role.level
+                  : selectedLevel === role.level
+              }
+              disabled={
+                readOnly ||
+                !hasWords ||
+                (!continuous && selectionText === undefined)
+              }
+              onClick={() => onBrushChange({ kind: "role", level: role.level })}
+            >
               <span
                 className={`tsz-ve-pop-swatch is-${role.level}`}
                 aria-hidden
               />
-              {role.label}
-            </>
-          }
-          ariaLabel={`用${role.label}画笔`}
+              {ROLE_SHORT_LABELS[role.level]}
+            </Button>
+          </Tooltip>
+        ))}
+      </Space.Compact>
+      <div
+        className="tsz-ve-grammar-hint"
+        role="status"
+        title={
+          continuous
+            ? "连续标注中：点击或拖过字母上色，按 Esc 退出"
+            : selectionText !== undefined
+              ? `已选中「${selectionText}」`
+              : "拖选文字或双击选词，再设置类别；选中已有标注可修改或移除"
+        }
+      >
+        {continuous ? (
+          <>连续标注中：点击或拖过字母上色，按 Esc 退出</>
+        ) : selectionText !== undefined ? (
+          <>
+            已选中 <strong title={selectionText}>「{selectionText}」</strong>
+          </>
+        ) : hasWords ? (
+          <>拖选文字或双击选词</>
+        ) : (
+          <>先输入句型或短语，再选中文字标注</>
+        )}
+      </div>
+      <div className="tsz-ve-grammar-actions">
+        {!continuous && (
+          <Button
+            size="small"
+            type="text"
+            disabled={readOnly || !canRemove}
+            onClick={onRemove}
+          >
+            移除选区标注
+          </Button>
+        )}
+        <Button
+          size="small"
+          type="text"
           disabled={readOnly || !hasWords}
-          onToggle={() => onBrushChange({ kind: "role", level: role.level })}
-        />
-      ))}
+          aria-pressed={continuous}
+          onClick={onContinuousChange}
+        >
+          {continuous ? "退出连续标注" : "连续标注"}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -840,59 +942,132 @@ export interface PausePanelProps {
   readOnly?: boolean;
   hasWords: boolean;
   brush: Brush;
-  onBrushChange: (brush: Brush) => void;
+  location?: { before: string; after: string };
+  duration?: number;
+  onApply: (duration: number) => void;
+  onRemove: () => void;
+  onContinuousChange: () => void;
+  onClose: () => void;
   customPause: string;
   onCustomPauseChange: (value: string) => void;
   onCustomPauseSubmit: (raw: string) => void;
 }
 
-/** 停顿：预设时长各一行，末尾留自定义入口。 */
+/** 定位、插入和编辑同一个停顿对象；连续画笔保留为次级入口。 */
 export function PausePanel({
   readOnly,
   hasWords,
   brush,
-  onBrushChange,
+  location,
+  duration,
+  onApply,
+  onRemove,
+  onContinuousChange,
+  onClose,
   customPause,
   onCustomPauseChange,
   onCustomPauseSubmit
 }: PausePanelProps) {
-  const current = brush.kind === "pause" ? brush.durationMs : undefined;
-  /* 自定义值不在预设里时也补成一行，保证「当前armed的是哪个时长」始终可见。 */
-  const choices =
-    current === undefined || PAUSE_PRESETS.includes(current)
-      ? [...PAUSE_PRESETS]
-      : [...PAUSE_PRESETS, current].sort((a, b) => a - b);
+  const continuous = brush.kind === "pause";
+  const current = continuous ? brush.durationMs : duration;
+  const choices = [250, 500, 1000, 2000];
+  const disabled = readOnly || !hasWords || (!continuous && !location);
+  const submit = () => {
+    const raw = customPause.trim();
+    // 仅接收最多三位小数的秒数；避免 1.001 * 1000 的浮点尾差误判非法毫秒。
+    const valid = /^(?:\d+(?:\.\d{1,3})?|\.\d{1,3})$/.test(raw);
+    onCustomPauseSubmit(valid ? String(Math.round(Number(raw) * 1000)) : "");
+  };
   return (
-    <div className="tsz-ve-pop tsz-ve-pop-pause" aria-label="停顿">
-      {choices.map((duration) => (
-        <PopRow
-          key={duration}
-          selected={current === duration}
-          label={formatPauseLabel(duration)}
-          ariaLabel={`用停顿画笔 ${formatPauseLabel(duration)}`}
-          disabled={readOnly || !hasWords}
-          onToggle={() =>
-            onBrushChange({ kind: "pause", durationMs: duration })
-          }
-        />
-      ))}
-      <div className="tsz-ve-pop-divider" aria-hidden />
-      <div className="tsz-ve-pop-foot">
-        <Typography.Text type="secondary">自定义</Typography.Text>
+    <div className="tsz-ve-pause-editor" aria-label="停顿设置">
+      <div className="tsz-ve-pause-editor-head">
+        <strong>
+          {continuous
+            ? "连续添加停顿"
+            : duration !== undefined
+              ? "编辑停顿"
+              : "插入停顿"}
+        </strong>
+        <Button
+          size="small"
+          type="text"
+          aria-label="关闭停顿设置"
+          onClick={onClose}
+        >
+          关闭
+        </Button>
+      </div>
+      <div className="tsz-ve-pause-location" role="status">
+        {continuous ? (
+          "选择时长后，依次点击词间空隙；Esc 退出"
+        ) : location ? (
+          <>
+            <b>{location.before}</b>
+            <span> Ⅱ </span>
+            <b>{location.after}</b>
+          </>
+        ) : (
+          "点击正文词间的灰色插入位，再选择停顿时长"
+        )}
+      </div>
+      <div className="tsz-ve-pause-presets">
+        {choices.map((ms) => (
+          <Button
+            key={ms}
+            size="small"
+            disabled={disabled}
+            color={current === ms ? "primary" : "default"}
+            variant={current === ms ? "filled" : "outlined"}
+            aria-label={`停顿 ${ms / 1000} 秒`}
+            aria-pressed={current === ms}
+            onClick={() => onApply(ms)}
+          >
+            {ms / 1000} 秒
+          </Button>
+        ))}
+      </div>
+      <div className="tsz-ve-pause-custom">
         <Input
           size="small"
-          className="tsz-ve-custom-input"
-          aria-label="自定义停顿毫秒"
-          placeholder="毫秒，回车"
+          aria-label="自定义停顿秒"
+          placeholder={current ? `${current / 1000}` : "自定义秒数"}
           value={customPause}
-          disabled={readOnly}
-          onChange={(event) => onCustomPauseChange(event.target.value)}
-          // 同 RatePanel：antd v6 的 onPressEnter 只触发一次，这里自己判回车。
-          onKeyDown={(event) => {
-            if (event.key !== "Enter") return;
-            onCustomPauseSubmit((event.target as HTMLInputElement).value);
+          disabled={disabled}
+          onChange={(e) => onCustomPauseChange(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
           }}
         />
+        <span className="tsz-ve-pause-unit">秒</span>
+        <Button
+          size="small"
+          disabled={disabled || !customPause.trim()}
+          onClick={submit}
+        >
+          应用
+        </Button>
+      </div>
+      <div className="tsz-ve-pause-note">0.001–5 秒 · Enter 确认</div>
+      <div className="tsz-ve-pause-editor-foot">
+        <Button
+          size="small"
+          type="text"
+          onClick={onContinuousChange}
+          disabled={readOnly || !hasWords}
+        >
+          {continuous ? "退出连续添加" : "连续添加"}
+        </Button>
+        {!continuous && duration !== undefined && (
+          <Button
+            size="small"
+            type="text"
+            danger
+            disabled={readOnly}
+            onClick={onRemove}
+          >
+            移除停顿
+          </Button>
+        )}
       </div>
     </div>
   );

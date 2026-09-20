@@ -85,6 +85,84 @@ beforeEach(() => {
   state.resolveUrl.mockReset();
 });
 
+describe("V3VoiceTextField 取消和收起态", () => {
+  function Host() {
+    const [value, setValue] = useState<RichTextV3>({
+      version: 2,
+      text: "hello there",
+      annotations: [{ type: "pause", at: 5, duration_ms: 500 }]
+    });
+    return (
+      <>
+        <V3VoiceTextField
+          mode="grammar"
+          value={value}
+          onChange={(next) => setValue(next as RichTextV3)}
+          ariaLabel="测试语法"
+          nodeId="cancel-test"
+          field="content"
+        />
+        <output data-testid="cancel-value">{JSON.stringify(value)}</output>
+      </>
+    );
+  }
+
+  it("收起态隐藏停顿标签但不删除数据，编辑态仍可查看与调整", async () => {
+    render(<Host />);
+    expect(
+      document.querySelector(".v3-grammar-preview-content")?.textContent
+    ).not.toContain("500");
+    expect(
+      JSON.parse(screen.getByTestId("cancel-value").textContent!).annotations
+    ).toHaveLength(1);
+    fireEvent.click(screen.getByLabelText("打开测试语法编辑器"));
+    expect(
+      await screen.findByLabelText(
+        "编辑第 1 处停顿 0.5 秒",
+        {},
+        { timeout: 10000 }
+      )
+    ).toBeInTheDocument();
+  });
+
+  it("取消恢复本次展开前的标注，完成保留本次修改，再次取消不回退前一会话", async () => {
+    render(<Host />);
+    const open = async () => {
+      fireEvent.click(screen.getByLabelText("打开测试语法编辑器"));
+      await screen.findByRole(
+        "toolbar",
+        { name: "标注工具栏" },
+        { timeout: 10000 }
+      );
+    };
+    await open();
+    fireEvent.click(screen.getByLabelText("编辑第 1 处停顿 0.5 秒"));
+    fireEvent.click(screen.getByLabelText("停顿 1 秒"));
+    expect(
+      JSON.parse(screen.getByTestId("cancel-value").textContent!).annotations[0]
+        .duration_ms
+    ).toBe(1000);
+    fireEvent.click(screen.getByLabelText("取消测试语法编辑"));
+    expect(screen.queryByRole("toolbar")).not.toBeInTheDocument();
+    expect(
+      JSON.parse(screen.getByTestId("cancel-value").textContent!).annotations[0]
+        .duration_ms
+    ).toBe(500);
+    await open();
+    fireEvent.click(screen.getByLabelText("编辑第 1 处停顿 0.5 秒"));
+    fireEvent.click(screen.getByLabelText("停顿 2 秒"));
+    fireEvent.click(screen.getByLabelText("完成测试语法编辑"));
+    await open();
+    fireEvent.click(screen.getByLabelText("编辑第 1 处停顿 2 秒"));
+    fireEvent.click(screen.getByRole("button", { name: "移除停顿" }));
+    fireEvent.click(screen.getByLabelText("取消测试语法编辑"));
+    expect(
+      JSON.parse(screen.getByTestId("cancel-value").textContent!).annotations[0]
+        .duration_ms
+    ).toBe(2000);
+  });
+});
+
 describe("V3VoiceTextField 语种筛选", () => {
   async function openVoicePanel() {
     fireEvent.click(screen.getByRole("button", { name: /^打开.*编辑器$/ }));
@@ -621,7 +699,9 @@ it.each([
       expect(input).toHaveClass("v3-voice-text-large-preview");
       expect(input).not.toHaveClass("tsz-entry-en");
     }
-    expect((input as HTMLTextAreaElement).style.paddingTop).toBe("1em");
+    expect((input as HTMLTextAreaElement).style.paddingTop).toBe(
+      mode === "grammar" ? "calc(0.5em + 4px)" : "1em"
+    );
     expect(input).toHaveAttribute("data-v3-field", "content");
     expect(anchors()).toEqual([
       ["start", "k"],

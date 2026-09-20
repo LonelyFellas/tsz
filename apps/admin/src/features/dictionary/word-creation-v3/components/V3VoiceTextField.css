@@ -20,6 +20,30 @@
   z-index: 1;
 }
 
+/* 完成按钮与底栏次要操作共用最后一行，不再额外占一行。 */
+.v3-voice-text-editor:has(.v3-voice-text-editor-done) .tsz-ve-grammar-actions {
+  padding-right: 126px;
+}
+.v3-voice-text-editor:has(.tsz-ve-role-inline)
+  .v3-voice-text-editor-done
+  .ant-btn {
+  height: 26px;
+  border-radius: 6px;
+  padding-inline: 12px;
+  font-size: 12px;
+}
+
+/* 窄栏无法同时容纳四个操作时，取消/完成独占最后一行，避免遮挡。 */
+@container tsz-voice-editor (max-width: 330px) {
+  .v3-voice-text-editor:has(.v3-voice-text-editor-done) .tsz-ve-role-inline {
+    padding-bottom: 44px;
+  }
+  .v3-voice-text-editor:has(.v3-voice-text-editor-done)
+    .tsz-ve-grammar-actions {
+    padding-right: 0;
+  }
+}
+
 .v3-voice-text-field-compact > .word-pronunciation-play-action {
   height: auto;
 }
@@ -56,12 +80,18 @@
   padding-top: 0;
 }
 
-/* 英文与实际发音收起态使用统一字号和字重，叠加层会同步这些字体度量。 */
+/* 普通英文与实际发音不默认加粗；语法标记由只读渲染器按分类控制字重。 */
 textarea.v3-voice-text-large-preview.ant-input {
   font-size: 20px;
-  font-weight: 700;
+  font-weight: 400;
   line-height: 1.6;
   padding: 8px 12px;
+}
+
+/* 语法结构收起态保持紧凑，聚焦输入与富文本预览使用同样的行高和内边距。 */
+textarea.v3-grammar-input.ant-input {
+  line-height: 1.5;
+  padding: 4px 12px;
 }
 
 /* grammar 用真实富文本排版撑高；透明输入框保留边框、点击和可访问焦点。 */
@@ -69,6 +99,8 @@ textarea.v3-voice-text-large-preview.ant-input {
   position: absolute;
   inset: 0;
   height: 100% !important;
+  /* autoSize 写入的行高下限不适用于绝对定位叠层，否则会比撑高容器多出 2px。 */
+  min-height: 0 !important;
   max-height: none !important;
   color: transparent;
   caret-color: transparent;
@@ -80,11 +112,11 @@ textarea.v3-voice-text-large-preview.ant-input {
   z-index: 5;
   box-sizing: border-box;
   width: 100%;
-  padding: 8px 12px;
+  padding: 4px 12px;
   border: 1px solid transparent;
   font-size: 20px;
   font-weight: 400;
-  line-height: 1.6;
+  line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   pointer-events: none;

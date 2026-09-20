@@ -210,16 +210,20 @@ function letter(token: number, offset: number): HTMLElement {
   return found;
 }
 
-/**
- * 六个工具都收在浮层里：先点工具栏上的按钮开面板，再在面板里选具体选项。
- * 点开语法结构/连读/停顿的按钮同时就换上了那支笔。
- */
+/** 语法分类默认按选区操作；旧画笔用例通过显式连续标注入口继续验证。 */
 function openRoles() {
-  fireEvent.click(document.querySelector(".tsz-ve-role-button")!);
+  const target = document.querySelector(".tsz-ve-role-button")!;
+  if (target.getAttribute("aria-expanded") !== "true") fireEvent.click(target);
 }
 
 function pickRole(label: string) {
   openRoles();
+  const selectionAction = screen.queryByLabelText(`标记为${label}`);
+  if (selectionAction && !(selectionAction as HTMLButtonElement).disabled) {
+    fireEvent.click(selectionAction);
+    return;
+  }
+  if (selectionAction) fireEvent.click(button("连续标注"));
   fireEvent.click(button(`用${label}画笔`));
 }
 
@@ -247,12 +251,23 @@ function openVoices() {
 }
 
 function usePauseBrush() {
-  fireEvent.click(document.querySelector(".tsz-ve-pause-button")!);
+  const trigger = document.querySelector(".tsz-ve-pause-button")!;
+  if (trigger.getAttribute("aria-expanded") !== "true")
+    fireEvent.click(trigger);
+  if (
+    document.querySelector(".tsz-ve-canvas")?.getAttribute("data-brush") !==
+    "pause"
+  ) {
+    fireEvent.click(button("连续添加"));
+  }
 }
 
 function pickPause(label: string) {
   usePauseBrush();
-  fireEvent.click(button(`用停顿画笔 ${label}`));
+  const seconds = label.endsWith("ms")
+    ? Number(label.slice(0, -2)) / 1000
+    : Number(label.slice(0, -1));
+  fireEvent.click(button(`停顿 ${seconds} 秒`));
 }
 
 function applied(view: ReturnType<typeof props>): RichTextV2 {
@@ -269,6 +284,114 @@ afterEach(() => {
   // vi.spyOn 对已监听的方法会复用同一个 spy，不还原的话调用记录会跨用例累积。
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+it("打开语法分类不拿起画笔，空选区先引导选择文字", () => {
+  const view = props();
+  render(<VoiceEditor {...view} />);
+  openRoles();
+  expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
+    "data-brush",
+    "none"
+  );
+  expect(screen.getByLabelText("标记为固定核心词")).toBeDisabled();
+  expect(screen.getByText(/拖选文字或双击选词/)).toBeInTheDocument();
+  expect(view.onChange).not.toHaveBeenCalled();
+});
+
+it("选择文字自动展示分类，重复应用不取消；局部移除不影响连读、停顿和历史标注", () => {
+  const view = props({
+    value: {
+      version: 2,
+      text: "a centre of the city",
+      annotations: [
+        { type: "emphasis", start: 2, end: 8, level: "core" },
+        { type: "liaison", start: 0, end: 8 },
+        { type: "pause", at: 8, duration_ms: 500 }
+      ]
+    }
+  });
+  render(<VoiceEditor {...view} />);
+  const input = screen.getByLabelText("语音编辑器") as HTMLTextAreaElement;
+  input.setSelectionRange(2, 8);
+  fireEvent.select(input);
+  const core = screen.getByLabelText("标记为固定核心词");
+  expect(core).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(core);
+  expect(
+    document.querySelectorAll(".tsz-ve-letter.is-core").length
+  ).toBeGreaterThan(0);
+  input.setSelectionRange(4, 6);
+  fireEvent.select(input);
+  fireEvent.click(button("移除选区标注"));
+  expect(applied(view).annotations).toEqual(
+    expect.arrayContaining([
+      { type: "emphasis", start: 2, end: 4, level: "core" },
+      { type: "emphasis", start: 6, end: 8, level: "core" },
+      expect.objectContaining({ type: "liaison", start: 0, end: 8 }),
+      { type: "pause", at: 8, duration_ms: 500 }
+    ])
+  );
+  fireEvent.click(button("上一步"));
+  expect(applied(view).annotations).toEqual(
+    expect.arrayContaining([
+      { type: "emphasis", start: 2, end: 8, level: "core" }
+    ])
+  );
+});
+
+it("选区标注按码点跨段落应用，移除后可重做；只读不能修改", () => {
+  const view = props({
+    value: { version: 2, text: "😀 a\njob", annotations: [] }
+  });
+  const { rerender } = render(<VoiceEditor {...view} />);
+  const input = screen.getByLabelText("语音编辑器") as HTMLTextAreaElement;
+  input.setSelectionRange(3, 8);
+  fireEvent.select(input);
+  fireEvent.click(screen.getByLabelText("标记为固定核心词"));
+  expect(applied(view).annotations).toEqual([
+    { type: "emphasis", start: 2, end: 3, level: "core" },
+    { type: "emphasis", start: 4, end: 7, level: "core" }
+  ]);
+  fireEvent.click(button("移除选区标注"));
+  expect(applied(view).annotations).toEqual([]);
+  fireEvent.click(button("上一步"));
+  expect(applied(view).annotations).toHaveLength(2);
+  fireEvent.click(button("下一步"));
+  expect(applied(view).annotations).toEqual([]);
+  input.setSelectionRange(0, 0);
+  fireEvent.select(input);
+  input.setSelectionRange(3, 8);
+  fireEvent.select(input);
+  rerender(<VoiceEditor {...view} readOnly />);
+  const calls = view.onChange.mock.calls.length;
+  expect(screen.getByLabelText("标记为固定核心词")).toBeDisabled();
+  expect(button("移除选区标注")).toBeDisabled();
+  expect(button("连续标注")).toBeDisabled();
+  fireEvent.click(screen.getByLabelText("标记为固定核心词"));
+  expect(view.onChange).toHaveBeenCalledTimes(calls);
+});
+
+it("连续标注明确进入和退出，收起分类不残留画笔", () => {
+  render(<VoiceEditor {...props()} />);
+  openRoles();
+  fireEvent.click(button("连续标注"));
+  expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
+    "data-brush",
+    "role"
+  );
+  fireEvent.click(button("退出连续标注"));
+  expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
+    "data-brush",
+    "none"
+  );
+  fireEvent.click(button("连续标注"));
+  fireEvent.keyDown(button("退出连续标注"), { key: "Escape" });
+  expect(document.querySelector(".tsz-ve-canvas")).toHaveAttribute(
+    "data-brush",
+    "none"
+  );
+  expect(screen.queryByLabelText("语法结构标注")).not.toBeInTheDocument();
 });
 
 it("语法结构先选文本再选择分类，保持旧 wire 格式并支持撤销", () => {
@@ -689,18 +812,18 @@ describe("VoiceEditor 标注带", () => {
     ]);
   });
 
-  it("点时长一步完成「启用停顿 + 设为该时长」", () => {
+  it("显式进入连续添加后选择时长，工具栏回显当前画笔", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
 
-    // 不需要先激活画笔再调时长
+    // 连续画笔是显式的次级入口
     pickPause("2s");
     // 选完就收起面板，当前时长直接写在工具栏按钮上
     expect(
       document.querySelector(".tsz-ve-pause-button")!.textContent
     ).toContain("2s");
     usePauseBrush();
-    expect(button("用停顿画笔 2s")).toHaveAttribute("aria-checked", "true");
+    expect(button("停顿 2 秒")).toHaveAttribute("aria-pressed", "true");
 
     fireEvent.mouseDown(gap(1));
     expect(applied(view).annotations).toEqual([
@@ -708,26 +831,29 @@ describe("VoiceEditor 标注带", () => {
     ]);
   });
 
-  it("自定义时长补成一枚按钮，当前值始终看得见", () => {
+  it("自定义时长在工具栏和输入框提示中回显", () => {
     render(<VoiceEditor {...props()} />);
     usePauseBrush();
-    const input = screen.getByLabelText("自定义停顿毫秒");
-    fireEvent.change(input, { target: { value: "750" } });
+    const input = screen.getByLabelText("自定义停顿秒");
+    fireEvent.change(input, { target: { value: "0.75" } });
     fireEvent.keyDown(input, { key: "Enter" });
 
     expect(
       document.querySelector(".tsz-ve-pause-button")!.textContent
     ).toContain("750ms");
     usePauseBrush();
-    expect(button("用停顿画笔 750ms")).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByLabelText("自定义停顿秒")).toHaveAttribute(
+      "placeholder",
+      "0.75"
+    );
   });
 
-  it("自定义停顿按毫秒生效，并落到词缝上", () => {
+  it("自定义停顿以秒输入，以整数毫秒保存到词缝上", () => {
     const view = props();
     render(<VoiceEditor {...view} />);
     usePauseBrush();
-    const input = screen.getByLabelText("自定义停顿毫秒");
-    fireEvent.change(input, { target: { value: "750" } });
+    const input = screen.getByLabelText("自定义停顿秒");
+    fireEvent.change(input, { target: { value: "0.75" } });
     fireEvent.keyDown(input, { key: "Enter" });
 
     fireEvent.mouseDown(gap(1));
@@ -739,9 +865,9 @@ describe("VoiceEditor 标注带", () => {
   it("拒绝越界、非整数与空的自定义停顿", () => {
     render(<VoiceEditor {...props()} />);
     usePauseBrush();
-    const input = screen.getByLabelText("自定义停顿毫秒");
+    const input = screen.getByLabelText("自定义停顿秒");
 
-    for (const value of ["", "0", "6000", "12.5", "abc"]) {
+    for (const value of ["", "0", "6", "0.0005", "abc"]) {
       fireEvent.change(input, { target: { value } });
       fireEvent.keyDown(input, { key: "Enter" });
       expect(screen.getByText(/停顿时长必须是/)).toBeVisible();
@@ -976,7 +1102,11 @@ describe("VoiceEditor 标注带", () => {
       screen.getByLabelText("语音编辑器").getAttribute("placeholder")
     ).toMatch(/直接输入/);
     openRoles();
-    expect(button("用固定核心词画笔")).toBeDisabled();
+    expect(button("标记为固定核心词")).toBeDisabled();
+    expect(button("连续标注")).toBeDisabled();
+    expect(
+      screen.getByText("先输入句型或短语，再选中文字标注")
+    ).toBeInTheDocument();
   });
 });
 
@@ -1302,8 +1432,12 @@ describe("VoiceEditor 文本与落盘", () => {
       { type: "pause", at: 8, duration_ms: 2000 }
     ]);
 
-    // 点同一个时长才是取消
+    // 重复落同一时长是幂等操作，删除必须显式完成。
+    const calls = view.onChange.mock.calls.length;
     fireEvent.mouseDown(gap(1));
+    expect(view.onChange).toHaveBeenCalledTimes(calls);
+    fireEvent.click(screen.getByLabelText("编辑第 2 处停顿 2 秒"));
+    fireEvent.click(button("移除停顿"));
     expect(applied(view).annotations).toEqual([]);
   });
 
@@ -1559,6 +1693,59 @@ describe("VoiceEditor 发音区", () => {
         (head) => head.textContent
       )
     ).toEqual(["BrE", "AmE"]);
+  });
+
+  it("修改停顿使在飞试听失效，新请求携带最新时长而不播放旧回包", async () => {
+    let resolveFirst!: (value: VoicePreviewResult) => void;
+    const synthesize = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<VoicePreviewResult>((resolve) => {
+            resolveFirst = resolve;
+          })
+      )
+      .mockResolvedValue(previewResult());
+    render(
+      <VoiceEditor
+        {...props({
+          value: {
+            version: 2,
+            text: TEXT,
+            annotations: [{ type: "pause", at: 8, duration_ms: 500 }]
+          },
+          previewAdapter: adapter(synthesize)
+        })}
+      />
+    );
+    openVoices();
+    fireEvent.click(await screen.findByLabelText("试听 Sonia · 英式女声"));
+    const signal = synthesize.mock.calls[0]![1].signal as AbortSignal;
+    fireEvent.click(screen.getByLabelText("编辑第 2 处停顿 0.5 秒"));
+    fireEvent.click(button("停顿 1 秒"));
+    expect(signal.aborted).toBe(true);
+    const dispose = vi.fn();
+    await act(async () => resolveFirst({ ...previewResult(), dispose }));
+    expect(dispose).toHaveBeenCalledOnce();
+    expect(AudioMock.instances).toHaveLength(0);
+    openVoices();
+    fireEvent.click(button("试听 Sonia · 英式女声"));
+    await waitFor(() => expect(AudioMock.instances).toHaveLength(1));
+    expect(synthesize.mock.lastCall![0].content.annotations).toEqual([
+      { type: "pause", at: 8, duration_ms: 1000 }
+    ]);
+  });
+
+  it("试听加载时只显示一个转圈图标，不与喇叭叠加", async () => {
+    const synthesize = vi.fn(() => new Promise<VoicePreviewResult>(() => {}));
+    render(<VoiceEditor {...props({ previewAdapter: adapter(synthesize) })} />);
+    openVoices();
+    const play = await screen.findByLabelText("试听 Sonia · 英式女声");
+    expect(play.querySelector('[aria-label="sound"]')).not.toBeNull();
+    fireEvent.click(play);
+    expect(play).toHaveAttribute("aria-busy", "true");
+    expect(play.querySelectorAll('[aria-label="loading"]')).toHaveLength(1);
+    expect(play.querySelector('[aria-label="sound"]')).toBeNull();
   });
 
   it("未配置时默认不勾选，试听不改变C端音色选择", async () => {

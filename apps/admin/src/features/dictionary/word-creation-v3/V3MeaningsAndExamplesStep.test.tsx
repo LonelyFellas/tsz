@@ -1184,8 +1184,9 @@ describe("V3MeaningsAndExamplesStep", () => {
       value().pos[0]!.grammar_structures[0]!.variants[0]!.content.text
     ).toBe("a centre of the city");
 
-    // 取语法结构画笔从词的首字母拖到末字母（上色粒度是字母），标注应实时落到草稿里
+    // 显式开启连续标注后，原有字母画笔仍应实时回写草稿。
     fireEvent.click(document.querySelector(".tsz-ve-role-button")!);
+    fireEvent.click(screen.getByRole("button", { name: "连续标注" }));
     fireEvent.click(screen.getByLabelText("用固定核心词画笔"));
     const word = [
       ...input.closest(".tsz-ve-editor")!.querySelectorAll(".tsz-ve-token")

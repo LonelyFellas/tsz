@@ -1,4 +1,8 @@
-import { liaisonPath, liaisonStrokeWidth } from "./liaisonPath";
+import {
+  liaisonHalfPaths,
+  liaisonPath,
+  liaisonStrokeWidth
+} from "./liaisonPath";
 import type { LiaisonAnchorGeometry } from "./liaisonPath";
 
 /** 能量出位置的东西：元素，或只含文本内容的 Range（不带伪元素）。 */
@@ -165,7 +169,7 @@ export function anchorTip(
 /**
  * 量出每条连读两端字母的位置，换算成容器坐标系里的弧线路径。
  *
- * 两端落在不同行时像乐谱里跨行的连音线那样断成两截，各自延到行边缘。
+ * 两端落在不同行时显示同一条弧的左右两半，尺寸配对，不各自拱回基线。
  * 换行纯粹是排版结果（同样两个词换个宽度就同行了），标注本身合法，
  * 不能因为画不出一条完整弧就整条不画——那会留下「统计里有、屏幕上没有」
  * 的隐形状态，既看不见也点不掉。
@@ -183,8 +187,40 @@ export function buildLiaisonArcs(
   const fontSize = Number.parseFloat(style.fontSize);
   // 没有排版信息（jsdom）时什么都画不出来，也别把 NaN 写进 path。
   if (!Number.isFinite(fontSize) || fontSize <= 0) return EMPTY_LIAISON_LAYOUT;
-  const innerLeft = Number.parseFloat(style.paddingLeft) || 0;
-  const innerRight = base.width - (Number.parseFloat(style.paddingRight) || 0);
+
+  // 前一行停顿的命中区是保留通道。仅在水平相交时限制弧高，不抬高整段正文。
+  const pauseZones = Array.from(
+    container.querySelectorAll(".tsz-ve-pause-chip")
+  ).map((chip) => {
+    const box = chip.getBoundingClientRect();
+    const gap = chip.closest(".tsz-ve-gap")?.getBoundingClientRect();
+    return {
+      left: box.left - base.left,
+      right: box.right - base.left,
+      bottom: box.bottom - base.top,
+      rowTop: (gap?.top ?? box.top) - base.top
+    };
+  });
+  const clearance =
+    Math.max(2, fontSize * 0.1) + liaisonStrokeWidth(fontSize) / 2;
+  const availableRise = (
+    fromX: number,
+    toX: number,
+    lineTop: number,
+    tipY: number
+  ) => {
+    const obstacles = pauseZones.filter(
+      (zone) =>
+        zone.rowTop < lineTop - fontSize * SAME_LINE_TOLERANCE_EM &&
+        zone.right + clearance > fromX &&
+        zone.left - clearance < toX
+    );
+    const floor = Math.max(
+      -Infinity,
+      ...obstacles.map((zone) => zone.bottom + clearance)
+    );
+    return Math.max(0, tipY - floor);
+  };
 
   const geometryOf = (anchor: LiaisonAnchorElements) => {
     const glyphs = anchor.glyphs.map((glyph) => ({
@@ -227,20 +263,37 @@ export function buildLiaisonArcs(
       arcs.push({
         key: `${index}`,
         index,
-        d: liaisonPath(left, right, fontSize)
+        d: liaisonPath(
+          left,
+          right,
+          fontSize,
+          Math.min(
+            availableRise(left.x, right.x, left.lineTop, left.tipY),
+            availableRise(left.x, right.x, right.lineTop, right.tipY)
+          )
+        )
       });
       return;
     }
-    arcs.push({
-      key: `${index}-head`,
-      index,
-      d: liaisonPath(left, { x: innerRight, tipY: left.tipY }, fontSize)
-    });
-    arcs.push({
-      key: `${index}-tail`,
-      index,
-      d: liaisonPath({ x: innerLeft, tipY: right.tipY }, right, fontSize)
-    });
+    // 两段使用同一宽度；必要时一起收窄，笔画始终留在容器内。
+    // 允许进入文字内边距，不把行首的半弧挤成几像素小钩。
+    const inset = liaisonStrokeWidth(fontSize);
+    const halfSpan = Math.max(
+      0,
+      Math.min(fontSize * 0.55, base.width - inset - left.x, right.x - inset)
+    );
+    const halves = liaisonHalfPaths(
+      left,
+      right,
+      fontSize,
+      halfSpan,
+      Math.min(
+        availableRise(left.x, left.x + halfSpan, left.lineTop, left.tipY),
+        availableRise(right.x - halfSpan, right.x, right.lineTop, right.tipY)
+      )
+    );
+    arcs.push({ key: `${index}-head`, index, d: halves.head });
+    arcs.push({ key: `${index}-tail`, index, d: halves.tail });
   });
   return { arcs, strokeWidth: liaisonStrokeWidth(fontSize) };
 }
