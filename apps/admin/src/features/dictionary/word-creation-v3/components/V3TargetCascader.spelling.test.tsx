@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type { PublishedSentenceTargetCandidateV3 } from "@tsz/types";
 import { V3TargetCascader, type ResolvedTarget } from "./V3TargetCascader";
@@ -65,11 +65,14 @@ function target(dialect: "uk" | "us"): ResolvedTarget {
   };
 }
 async function expandJob() {
-  fireEvent.click(
-    await screen.findByText("job", {
-      selector: ".v3-component-usage-entry strong"
-    })
-  );
+  const entry = await screen.findByText("job", {
+    selector: ".v3-component-usage-entry strong"
+  });
+  await act(async () => {
+    fireEvent.click(entry);
+  });
+  // 点击完成不等于下一列已提交到 DOM；返回前等待真实词形，调用方仍断言数量/顺序。
+  await screen.findAllByText(/原形 job/);
 }
 beforeEach(() => {
   settings.preference = "uk";

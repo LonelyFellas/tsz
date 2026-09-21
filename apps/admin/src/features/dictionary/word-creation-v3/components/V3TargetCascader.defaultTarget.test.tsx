@@ -1,4 +1,10 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor
+} from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type {
   AdminWordV3,
@@ -16,6 +22,13 @@ vi.mock("@/features/settings/useDialectPreference", () => ({
 beforeEach(() => {
   search.mockReset();
 });
+
+async function clickOption(element: HTMLElement) {
+  // fireEvent 的同步 act 不等待后续更新；异步边界让级联展开完成后再断言。
+  await act(async () => {
+    fireEvent.click(element);
+  });
+}
 
 function candidate(
   entryId: string,
@@ -87,9 +100,9 @@ it("把例句所处词条、词形和词义一起前移到候选首位", async (
   await screen.findByText("bank");
   expect(columnTexts(0)[0]).toContain("work");
   expect(columnTexts(0)[1]).toContain("bank");
-  fireEvent.click(screen.getByText("work"));
+  await clickOption(screen.getByText("work"));
   await waitFor(() => expect(columnTexts(1)[0]).toContain("原形 work"));
-  fireEvent.click(screen.getByText("原形 work"));
+  await clickOption(screen.getByText("原形 work"));
   await waitFor(() => {
     expect(columnTexts(2)[0]).toContain("职业");
     expect(columnTexts(2)[1]).toContain("工作");
@@ -194,7 +207,7 @@ it.each(["pronoun", "noun"])(
         prioritizedForms={step2}
       />
     );
-    fireEvent.click(await screen.findByText("some"));
+    await clickOption(await screen.findByText("some"));
     const orderedPos = [
       pos,
       ...step2.pos.map((item) => item.pos).filter((item) => item !== pos)
@@ -207,7 +220,7 @@ it.each(["pronoun", "noun"])(
         .flatMap((item) => [2, 1].map((n) => `some-${item}-${n}`))
         .forEach((label, index) => expect(labels[index]).toContain(label));
     });
-    fireEvent.click(screen.getByText(new RegExp(`原形 some-${pos}-1`)));
+    await clickOption(screen.getByText(new RegExp(`原形 some-${pos}-1`)));
     await waitFor(() =>
       expect(columnTexts(2)).toEqual([`${pos}当前词义`, `${pos}其他词义`])
     );
@@ -228,7 +241,7 @@ it("当前词义未进入候选时仍能按当前词性置顶", async () => {
       prioritizedForms={step2}
     />
   );
-  fireEvent.click(await screen.findByText("some"));
+  await clickOption(await screen.findByText("some"));
   await waitFor(() => {
     expect(columnTexts(1)[0]).toContain("some-pronoun-2");
     expect(columnTexts(1)[1]).toContain("some-pronoun-1");
