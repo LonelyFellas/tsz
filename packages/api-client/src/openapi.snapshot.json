@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-ipa-ups-release/docs/openapi.json",
-  "_generatedAt": "2026-09-20T14:59:29.039Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-2-completion/docs/openapi.json",
+  "_generatedAt": "2026-09-21T07:25:43.159Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -2475,7 +2475,7 @@
           "properties": {
             "cursor": {
               "type": "string",
-              "description": "由同一位置上一页返回；绑定 discovery generation、source dialect 与片段指纹。"
+              "description": "由同一位置上一页返回；绑定 source dialect、片段指纹与稳定节点排序键，不绑定词库代数。"
             },
             "include_drafts": { "type": "boolean" },
             "mode": { "type": "string", "enum": ["selected_segments"] },
@@ -2531,7 +2531,7 @@
       "properties": {
         "cursor": {
           "type": "string",
-          "description": "上一页返回的 `next_cursor`。绑定 discovery generation 与本次 `q` / `kind`：凡是写\n`surface_sources` 的变动（发布、词形步保存等）或换了关键字/kind 后即失效（400\n`invalid_query`，`field = \"cursor\"`）。游标同时绑定可用词条集合，归档导致结果集变化时也失效。"
+          "description": "上一页返回的 `next_cursor`。绑定 `q` / `kind` / `match` / `include_drafts` / `entry_id`\n及最后返回的稳定节点排序键；查询条件改变或游标无效返回 400 `invalid_query`。\n无关保存、发布及归档不会使游标失效；并发修改下搜索弱一致，保存/发布仍严格验证。"
         },
         "entry_id": {
           "type": "string",
@@ -2586,7 +2586,7 @@
         "total": {
           "type": "integer",
           "format": "int64",
-          "description": "完整匹配集的候选总数（跨所有页，同一词条可能有多条词形候选）。",
+          "description": "本次请求可见的完整匹配集候选总数（弱一致；同一词条可能有多条词形候选），不控制分页结束。",
           "minimum": 0
         },
         "truncated": {
@@ -3424,7 +3424,7 @@
     },
     "SentenceSourceRangeV1": {
       "type": "object",
-      "description": "例句正文里某个词的位置。\n\n`start` / `end` 是所在 [`RichText`] `text` 的 **Unicode 码点**下标，左闭右开，\n与 `RichTextAnnotation` 的 span 口径完全一致；`surface` 是该区间的原文词面，\n既供前端直接展示，也让读取时能自检区间有没有跟着正文漂走。",
+      "description": "正文内的 Unicode 码点区间 [start, end)，surface 用于验证区间未漂移。",
       "required": ["start", "end", "surface"],
       "properties": {
         "end": { "type": "integer", "minimum": 0 },
