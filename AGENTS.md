@@ -61,7 +61,7 @@ PENDING 白名单为准。本仓库负责前端与部署编排。
 - 覆盖率规则以根 `vitest.shared-config.ts` 及各项目 Vitest 配置为准：当前生成报告，不设百分比门槛。
   不为提高数字补弱断言，也不通过 exclude 有分支逻辑来掩盖缺失测试。
 - 测试以可观察风险、回归价值和关键契约为中心；覆盖率用于发现盲区，不为提高数字堆叠低价值测试。
-- 默认分支 `main`，一律走 PR；绝不直接提交/推送 main。
+- 前后端统一使用任务分支 → main：新任务先 `git fetch origin`，从最新 `origin/main` 创建独立任务分支和 worktree；已有本任务 worktree 则复用。一律走 PR，不在 main 或 dev 直接开发、提交、推送；旧 Skill 中与此冲突的分支约定不再适用。
 
 ## API 文档
 
