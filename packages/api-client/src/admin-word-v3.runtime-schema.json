@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-ipa-ups-release/docs/openapi.json",
-  "_source_sha256": "6ecdcf8e96ec6d36abb5743dab0dd913f585f778bfceab2fc545dd31632246e5",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-2-completion/docs/openapi.json",
+  "_source_sha256": "38932a97455223f421bbeb7b2bf5a636cc92f2e119d54194c5037260e5573922",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
