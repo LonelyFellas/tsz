@@ -972,7 +972,7 @@ describe("V3MeaningsAndExamplesStep", () => {
     ).toBeNull();
   });
 
-  it("改词义等级：还是默认铺排才整组换掉，动过一行就不碰", () => {
+  describe("改词义等级", () => {
     const blankZh = (id: string, level: string) => ({
       id,
       level,
@@ -1014,51 +1014,53 @@ describe("V3MeaningsAndExamplesStep", () => {
         definition.level
       ]);
 
-    // 一、原样的默认铺排：跟着换成新等级的默认行。
-    const untouched = structuredClone(meaningsFixture);
-    untouched.pos[0]!.senses[0]!.definitions = defaultA1();
-    const view = render(<Harness initial={untouched} />);
-    chooseSenseLevel("C1");
-    expect(languages()).toEqual([
-      ["zh_definition", "C1"],
-      ["en_sentence", "C1"],
-      ["zh_sentence", "C2"]
-    ]);
-    chooseSenseLevel("C2");
-    expect(languages()).toEqual([
-      ["zh_definition", "C1"],
-      ["zh_sentence", "C2"],
-      ["en_sentence", "C2"]
-    ]);
-    chooseSenseLevel("A1");
-    expect(languages()).toEqual([
-      ["zh_definition", "A1"],
-      ["en_definition", "A2"],
-      ["zh_definition", "A2"],
-      ["en_definition", "B1"]
-    ]);
-    view.unmount();
+    // 保留连续切换链路，另两种独立草稿场景各自挂载/清理，不共用一次超时预算。
+    it("默认铺排随 A1 → C1 → C2 → A1 连续切换", () => {
+      const untouched = structuredClone(meaningsFixture);
+      untouched.pos[0]!.senses[0]!.definitions = defaultA1();
+      render(<Harness initial={untouched} />);
+      chooseSenseLevel("C1");
+      expect(languages()).toEqual([
+        ["zh_definition", "C1"],
+        ["en_sentence", "C1"],
+        ["zh_sentence", "C2"]
+      ]);
+      chooseSenseLevel("C2");
+      expect(languages()).toEqual([
+        ["zh_definition", "C1"],
+        ["zh_sentence", "C2"],
+        ["en_sentence", "C2"]
+      ]);
+      chooseSenseLevel("A1");
+      expect(languages()).toEqual([
+        ["zh_definition", "A1"],
+        ["en_definition", "A2"],
+        ["zh_definition", "A2"],
+        ["en_definition", "B1"]
+      ]);
+    });
 
-    // 二、只把一行的语言改过（正文仍空）：说明已经排过版，整组不动。
-    const edited = structuredClone(meaningsFixture);
-    edited.pos[0]!.senses[0]!.definitions = defaultA1();
-    edited.pos[0]!.senses[0]!.definitions[1] = blankZh("definition-b", "A2");
-    const editedView = render(<Harness initial={edited} />);
-    chooseSenseLevel("C1");
-    expect(languages()).toEqual([
-      ["zh_definition", "A1"],
-      ["zh_definition", "A2"],
-      ["zh_definition", "A2"],
-      ["en_definition", "B1"]
-    ]);
-    editedView.unmount();
+    it("只改过一行语言、正文仍空时不覆盖已有铺排", () => {
+      const edited = structuredClone(meaningsFixture);
+      edited.pos[0]!.senses[0]!.definitions = defaultA1();
+      edited.pos[0]!.senses[0]!.definitions[1] = blankZh("definition-b", "A2");
+      render(<Harness initial={edited} />);
+      chooseSenseLevel("C1");
+      expect(languages()).toEqual([
+        ["zh_definition", "A1"],
+        ["zh_definition", "A2"],
+        ["zh_definition", "A2"],
+        ["en_definition", "B1"]
+      ]);
+    });
 
-    // 三、释义被删光的草稿：改等级不凭空长出四行。
-    const emptied = structuredClone(meaningsFixture);
-    emptied.pos[0]!.senses[0]!.definitions = [];
-    render(<Harness initial={emptied} />);
-    chooseSenseLevel("C1");
-    expect(value().pos[0]!.senses[0]!.definitions).toEqual([]);
+    it("释义被删光的草稿不因改等级重新长出默认行", () => {
+      const emptied = structuredClone(meaningsFixture);
+      emptied.pos[0]!.senses[0]!.definitions = [];
+      render(<Harness initial={emptied} />);
+      chooseSenseLevel("C1");
+      expect(value().pos[0]!.senses[0]!.definitions).toEqual([]);
+    });
   });
 
   it("语义区间英文使用普通输入，保存重开保持文本且不残留旧标注", async () => {
