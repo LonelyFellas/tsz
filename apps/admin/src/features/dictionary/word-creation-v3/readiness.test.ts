@@ -309,6 +309,128 @@ describe("buildV3ProductProgress", () => {
     expect(buildV3ProductProgress(input)[2]).toMatchObject({ count: 3 });
   });
 
+  it.each([
+    {
+      name: "TASK#8：record 名词与动词同形不同音，分别计数",
+      spelling: "record",
+      otherSpelling: "record",
+      phonetic: "ˈrekɔːd",
+      otherPhonetic: "rɪˈkɔːd",
+      otherType: "base" as const,
+      count: 2
+    },
+    {
+      name: "TASK#8：同音但拼写不同，不合并",
+      spelling: "sale",
+      otherSpelling: "sail",
+      phonetic: "seɪl",
+      otherPhonetic: "seɪl",
+      otherType: "base" as const,
+      count: 2
+    },
+    {
+      name: "TASK#8：原形与过去式同形同音，忽略词形类型合并",
+      spelling: "cut",
+      otherSpelling: "cut",
+      phonetic: "kʌt",
+      otherPhonetic: "kʌt",
+      otherType: "past_tense" as const,
+      count: 1
+    }
+  ])(
+    "$name",
+    ({
+      spelling,
+      otherSpelling,
+      phonetic,
+      otherPhonetic,
+      otherType,
+      count
+    }) => {
+      const first = commonFormFixture({ spelling });
+      const second = commonFormFixture({
+        id: uuidFromInt(996),
+        spelling: otherSpelling,
+        form_type: otherType
+      });
+      first.regional_variants.common.pronunciations[0]!.dict_phonetic =
+        phonetic;
+      second.regional_variants.common.pronunciations[0]!.dict_phonetic =
+        otherPhonetic;
+      const input = {
+        language: "en",
+        wordId: "test",
+        completedSteps: [] as const,
+        forms:
+          otherType === "base"
+            ? {
+                pos: [
+                  ...formsFixture({ forms: [first] }).pos,
+                  ...formsFixture({
+                    pos_id: uuidFromInt(998),
+                    pos: "verb",
+                    forms: [second]
+                  }).pos
+                ]
+              }
+            : formsFixture({ pos: "verb", forms: [first, second] }),
+        meanings: { sense_groups: [], pos: [] }
+      };
+      expect(buildV3ProductProgress(input)[2]).toMatchObject({
+        count,
+        details:
+          otherType === "base" ? [{ count: 1 }, { count: 1 }] : [{ count }]
+      });
+      // 删除其中一条后，只剩原形仍计 1；不依赖保存或完成步骤状态。
+      input.forms = formsFixture({ forms: [first] });
+      expect(buildV3ProductProgress(input)[2]).toMatchObject({
+        count: 1,
+        details: [{ count: 1 }]
+      });
+    }
+  );
+
+  it("TASK#8：英美共用与两侧内容相同的独立变体等价，任一侧音标变化立即拆分", () => {
+    const common = commonFormFixture({ spelling: "job" });
+    const variant = common.regional_variants.common;
+    const separate = ukUsFormFixture({
+      uk: {
+        spelling: variant.spelling,
+        pronunciations: structuredClone(variant.pronunciations)
+      },
+      us: {
+        spelling: variant.spelling,
+        pronunciations: structuredClone(variant.pronunciations)
+      }
+    });
+    const input = {
+      language: "en",
+      wordId: "test",
+      completedSteps: [] as const,
+      forms: {
+        pos: [
+          ...formsFixture({ forms: [common] }).pos,
+          ...formsFixture({
+            pos_id: uuidFromInt(997),
+            pos: "verb",
+            forms: [separate]
+          }).pos
+        ]
+      },
+      meanings: { sense_groups: [], pos: [] }
+    };
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 1,
+      details: [{ count: 1 }, { count: 1 }]
+    });
+    separate.regional_variants.us.pronunciations[0]!.dict_phonetic =
+      "different";
+    expect(buildV3ProductProgress(input)[2]).toMatchObject({
+      count: 2,
+      details: [{ count: 1 }, { count: 1 }]
+    });
+  });
+
   it("英美各侧和多条音标全部匹配才合并，音标顺序不影响判断", () => {
     const first = ukUsFormFixture({ id: uuidFromInt(950) });
     const second = structuredClone(first);
