@@ -242,18 +242,17 @@ describe("PronunciationPreview", () => {
     expect(preview.synthesize).not.toHaveBeenCalled();
   });
 
-  it("偏好侧发音人缺席时，统一内容回退目录默认，仍可试听", async () => {
+  it("偏好侧发音人缺席时，通用内容也禁止跨口音回退", async () => {
     preview.listVoices.mockResolvedValue(
       voices.filter((voice) => voice.locale !== "en-GB")
     );
     render(<PreviewHarness />);
 
     const getButton = screen.getByLabelText("获取语音");
-    await waitFor(() => expect(getButton).toBeEnabled());
+    await waitFor(() => expect(preview.listVoices).toHaveBeenCalled());
+    expect(getButton).toBeDisabled();
     fireEvent.click(getButton);
-
-    await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(1));
-    expect(preview.synthesize.mock.calls[0]![0].voiceId).toBe("common-default");
+    expect(preview.synthesize).not.toHaveBeenCalled();
   });
 
   it("统一内容按方言偏好挑发音人，获取后自动播放且可手动重播", async () => {
@@ -594,7 +593,7 @@ it("最终读音使用编辑后的标注、选定音色和语速，并直接播�
   render(
     <PreviewHarness
       content={content}
-      dialect="uk"
+      dialect="us"
       playbackOnly
       voiceProfile={{
         voices: [
@@ -616,6 +615,56 @@ it("最终读音使用编辑后的标注、选定音色和语速，并直接播�
   await waitFor(() => expect(AudioMock.instances[0]?.play).toHaveBeenCalled());
 });
 
+it("音色配置按实际口音过滤，而不是取第一个启用项", async () => {
+  render(
+    <PreviewHarness
+      dialect="uk"
+      voiceProfile={{
+        voices: [
+          { voice_id: "american-voice", enabled: true, rate_percent: 25 },
+          { voice_id: "british-voice", enabled: true, rate_percent: -10 }
+        ]
+      }}
+    />
+  );
+  const button = screen.getByLabelText("获取语音");
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledOnce());
+  expect(preview.synthesize.mock.calls[0]![0]).toMatchObject({
+    voiceId: "british-voice",
+    ratePercent: -10
+  });
+});
+it("仅启用了另一口音时禁用，切换到匹配口音后才能试听", async () => {
+  const profile = {
+    voices: [{ voice_id: "american-voice", enabled: true, rate_percent: 25 }]
+  };
+  const view = render(<PreviewHarness dialect="uk" voiceProfile={profile} />);
+  await waitFor(() => expect(preview.listVoices).toHaveBeenCalled());
+  expect(screen.getByLabelText("获取语音")).toBeDisabled();
+  expect(preview.synthesize).not.toHaveBeenCalled();
+  view.rerender(<PreviewHarness dialect="us" voiceProfile={profile} />);
+  await waitFor(() => expect(screen.getByLabelText("获取语音")).toBeEnabled());
+});
+it("切换通用栏口音时停止旧音频并丢弃缓存，下一次只请求新口音", async () => {
+  const dispose = vi.fn();
+  preview.synthesize.mockResolvedValue(result({ dispose }));
+  const view = render(<PreviewHarness playbackOnly />);
+  const play = screen.getByLabelText("播放语音");
+  await waitFor(() => expect(play).toBeEnabled());
+  fireEvent.click(play);
+  await waitFor(() => expect(AudioMock.instances[0]?.play).toHaveBeenCalled());
+  const oldAudio = AudioMock.instances[0]!;
+  dialectPreference.value = "us";
+  view.rerender(<PreviewHarness playbackOnly />);
+  await waitFor(() => expect(oldAudio.pause).toHaveBeenCalled());
+  expect(dispose).toHaveBeenCalled();
+  fireEvent.click(play);
+  await waitFor(() => expect(preview.synthesize).toHaveBeenCalledTimes(2));
+  expect(preview.synthesize.mock.calls[0]![0].voiceId).toBe("british-voice");
+  expect(preview.synthesize.mock.calls[1]![0].voiceId).toBe("american-voice");
+});
 it("仅调速但不勾选仍可试听，并使用默认音色自己的语速", async () => {
   render(
     <PreviewHarness

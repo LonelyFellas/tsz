@@ -47,10 +47,19 @@ export type FormGroupScopeV3 = "general" | "dedicated";
 /** `base` is a peer form type. It is neither unique nor a parent of other forms. */
 export type WordFormTypeV3 = string;
 
+export interface UpsWordV3 {
+  text: string;
+  phoneme: string;
+}
+export type PhonemeLocaleV3 = "en-GB" | "en-US";
 export interface PronunciationSynthesisV3 {
   alphabet: "ipa" | "ups";
   ipa: string;
   ups: string;
+  use_spelling?: boolean | null;
+  ipa_locale?: PhonemeLocaleV3 | null;
+  ups_locale?: PhonemeLocaleV3 | null;
+  ups_words?: UpsWordV3[] | null;
 }
 
 export interface WordPronunciationV3 {

@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-task-58/docs/openapi.json",
-  "_generatedAt": "2026-09-18T02:51:46.606Z",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-ipa-ups-release/docs/openapi.json",
+  "_generatedAt": "2026-09-20T14:59:29.039Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -3119,6 +3119,7 @@
       },
       "additionalProperties": false
     },
+    "PhonemeLocaleV3": { "type": "string", "enum": ["en-GB", "en-US"] },
     "PhraseComponentUsageV3": {
       "oneOf": [
         {
@@ -3189,7 +3190,32 @@
       "properties": {
         "alphabet": { "$ref": "#/components/schemas/RichTextPhonemeAlphabet" },
         "ipa": { "type": "string", "maxLength": 200 },
-        "ups": { "type": "string", "maxLength": 1600 }
+        "ipa_locale": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "$ref": "#/components/schemas/PhonemeLocaleV3",
+              "description": "Each candidate retains its own accent; changing preferences cannot relabel old phonemes."
+            }
+          ]
+        },
+        "ups": { "type": "string", "maxLength": 1600 },
+        "ups_locale": {
+          "oneOf": [
+            { "type": "null" },
+            { "$ref": "#/components/schemas/PhonemeLocaleV3" }
+          ]
+        },
+        "ups_words": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/components/schemas/UpsWordV3" },
+          "description": "Word boundaries for the single-line UPS candidate, never inferred from phone spaces.",
+          "maxItems": 30
+        },
+        "use_spelling": {
+          "type": ["boolean", "null"],
+          "description": "Missing in legacy drafts means use the selected phoneme alphabet."
+        }
       },
       "additionalProperties": false
     },
@@ -3615,6 +3641,15 @@
         "content": { "$ref": "#/components/schemas/SharedSentenceContent" },
         "context_entry_id": { "type": "string", "format": "uuid" },
         "context_sense_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "UpsWordV3": {
+      "type": "object",
+      "required": ["text", "phoneme"],
+      "properties": {
+        "phoneme": { "type": "string", "maxLength": 1600, "minLength": 1 },
+        "text": { "type": "string", "maxLength": 200, "minLength": 1 }
       },
       "additionalProperties": false
     },

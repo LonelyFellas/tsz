@@ -65,7 +65,8 @@ describe("V3ReviewContent", () => {
     pronunciation.synthesis = {
       alphabet: "ups",
       ipa: "ignored",
-      ups: "S EH N T AX R"
+      ups: "S EH N T AX R",
+      ups_locale: "en-GB"
     };
     playbackSpy.mockClear();
     const view = render(<V3ReviewContent word={current} playback />);
@@ -87,6 +88,15 @@ describe("V3ReviewContent", () => {
         }
       })
     );
+    pronunciation.synthesis.ups_locale = "en-US";
+    playbackSpy.mockClear();
+    view.rerender(<V3ReviewContent word={current} playback />);
+    expect(playbackSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        disabled: true,
+        disabledReason: expect.stringContaining("已确认为美式")
+      })
+    );
     delete pronunciation.synthesis;
     playbackSpy.mockClear();
     view.rerender(<V3ReviewContent word={current} playback />);
@@ -94,6 +104,21 @@ describe("V3ReviewContent", () => {
       expect.objectContaining({
         disabled: true,
         disabledReason: "请填写 Azure IPA"
+      })
+    );
+    pronunciation.synthesis = {
+      alphabet: "ipa",
+      ipa: "",
+      ups: "",
+      use_spelling: true
+    };
+    playbackSpy.mockClear();
+    view.rerender(<V3ReviewContent word={current} playback />);
+    expect(playbackSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        disabled: false,
+        disabledReason: undefined,
+        content: { version: 2, text: variant.spelling, annotations: [] }
       })
     );
     pronunciation.synthesis = { alphabet: "ups", ipa: "", ups: "非法" };

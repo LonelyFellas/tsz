@@ -2383,6 +2383,47 @@ it("按字段分工给工具：只有字典音标那一侧收走连读", () => {
     expect(screen.queryByRole("button", { name: new RegExp(name) })).toBeNull();
 });
 
+it("synthesis 面板保留异口音历史配置供取消，但禁止其试听音素", async () => {
+  vi.stubGlobal("Audio", AudioMock);
+  const synthesize = vi.fn().mockResolvedValue(previewResult());
+  const onVoiceProfileChange = vi.fn();
+  render(
+    <VoiceEditor
+      mode="synthesis"
+      locale="en-GB"
+      value={{
+        version: 2,
+        text: "cat",
+        annotations: [
+          { type: "phoneme", start: 0, end: 3, alphabet: "ipa", phoneme: "kæt" }
+        ]
+      }}
+      onChange={vi.fn()}
+      previewAdapter={adapter(synthesize)}
+      voiceProfile={{
+        voices: [{ voice_id: "guy", enabled: true, rate_percent: 0 }]
+      }}
+      onVoiceProfileChange={onVoiceProfileChange}
+    />
+  );
+  const other = await screen.findByLabelText("试听 Guy · 美式男声");
+  expect(screen.getByLabelText("启用 Guy · 美式男声")).toBeChecked();
+  expect(other).toBeDisabled();
+  fireEvent.click(other);
+  expect(synthesize).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByLabelText("试听 Sonia · 英式女声"));
+  await waitFor(() =>
+    expect(synthesize).toHaveBeenCalledWith(
+      expect.objectContaining({ voiceId: "sonia" }),
+      expect.anything()
+    )
+  );
+  fireEvent.click(screen.getByLabelText("启用 Guy · 美式男声"));
+  expect(onVoiceProfileChange).toHaveBeenCalledWith({
+    voices: [{ voice_id: "guy", enabled: false, rate_percent: 0 }]
+  });
+});
+
 it("synthesis 面板直接使用 phoneme 内容，隐藏正文工具，换格式丢弃旧回包", async () => {
   vi.stubGlobal("Audio", AudioMock);
   let resolveFirst!: (result: VoicePreviewResult) => void;

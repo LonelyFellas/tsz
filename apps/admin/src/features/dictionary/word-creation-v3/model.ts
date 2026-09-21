@@ -1,4 +1,10 @@
-import { synthesisInputIssue, SYNTHESIS_LIMITS } from "@tsz/shared";
+import {
+  synthesisInputIssue,
+  SYNTHESIS_LIMITS,
+  pronunciationSynthesisContent,
+  synthesisLocaleIssue,
+  pronunciationLocale
+} from "@tsz/shared";
 import type {
   Dialect,
   DialectRulesV3,
@@ -156,7 +162,32 @@ function isPronunciationShape(value: unknown): value is WordPronunciationV3 {
     ) &&
     (value.synthesis === undefined ||
       (isObject(value.synthesis) &&
-        Object.keys(value.synthesis).length === 3 &&
+        Object.keys(value.synthesis).every((key) =>
+          [
+            "alphabet",
+            "ipa",
+            "ups",
+            "use_spelling",
+            "ups_words",
+            "ipa_locale",
+            "ups_locale"
+          ].includes(key)
+        ) &&
+        (value.synthesis.use_spelling == null ||
+          typeof value.synthesis.use_spelling === "boolean") &&
+        (value.synthesis.ipa_locale == null ||
+          ["en-GB", "en-US"].includes(value.synthesis.ipa_locale as string)) &&
+        (value.synthesis.ups_locale == null ||
+          ["en-GB", "en-US"].includes(value.synthesis.ups_locale as string)) &&
+        (value.synthesis.ups_words == null ||
+          (Array.isArray(value.synthesis.ups_words) &&
+            value.synthesis.ups_words.every(
+              (word) =>
+                isObject(word) &&
+                Object.keys(word).length === 2 &&
+                typeof word.text === "string" &&
+                typeof word.phoneme === "string"
+            ))) &&
         (value.synthesis.alphabet === "ipa" ||
           value.synthesis.alphabet === "ups") &&
         typeof value.synthesis.ipa === "string" &&
@@ -567,12 +598,31 @@ function variantIssues(
       }
       if (
         intent === "complete" &&
-        (synthesis.ipa.trim() || synthesis.ups.trim())
+        !synthesis.use_spelling &&
+        (synthesis.use_spelling === false ||
+          synthesis.ipa.trim() ||
+          synthesis.ups.trim())
       ) {
-        const problem = synthesisInputIssue(
-          synthesis.alphabet,
-          synthesis[synthesis.alphabet]
-        );
+        const problem =
+          synthesisInputIssue(
+            synthesis.alphabet,
+            synthesis[synthesis.alphabet]
+          ) ??
+          (variant.dialect === "common"
+            ? synthesis.use_spelling === false &&
+              !synthesis[
+                synthesis.alphabet === "ipa" ? "ipa_locale" : "ups_locale"
+              ]
+              ? "请先确认当前合成音标的英美口音"
+              : undefined
+            : synthesisLocaleIssue(
+                synthesis,
+                synthesis.alphabet,
+                pronunciationLocale(variant.dialect, "us")
+              )) ??
+          (!pronunciationSynthesisContent(variant.spelling, synthesis)
+            ? "短语 UPS 词界缺失或已失效，请重新转换"
+            : undefined);
         if (problem)
           issues.push(
             issue(

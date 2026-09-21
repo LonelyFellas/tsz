@@ -603,6 +603,23 @@ it("新 reader 接受缺省旧记录和新 synthesis，同时仍拒绝未知格�
   expect(validateRuntimeSchema("AdminWordV3", value)).toEqual({ valid: true });
   row.synthesis = { alphabet: "ups", ipa: "kæt", ups: "K AE T" };
   expect(validateRuntimeSchema("AdminWordV3", value)).toEqual({ valid: true });
+  row.synthesis = {
+    alphabet: "ups",
+    ipa: "kæt",
+    ups: "K AE T",
+    use_spelling: false,
+    ipa_locale: "en-GB",
+    ups_locale: "en-US",
+    ups_words: [{ text: "cat", phoneme: "K AE T" }]
+  };
+  expect(validateRuntimeSchema("AdminWordV3", value)).toEqual({ valid: true });
+  row.synthesis = {
+    alphabet: "ups",
+    ipa: "kæt",
+    ups: "K AE T",
+    ups_locale: "en-AU"
+  };
+  expect(validateRuntimeSchema("AdminWordV3", value).valid).toBe(false);
   row.synthesis = { alphabet: "sapi", ipa: "kæt", ups: "K AE T" };
   expect(validateRuntimeSchema("AdminWordV3", value).valid).toBe(false);
 });

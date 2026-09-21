@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-task-58/docs/openapi.json",
-  "_source_sha256": "f94e6c5bf41701e8a2af2ac74017c18d4fb7958035a42fc78578f789b48ca0b3",
+  "_source": "/Users/darwish/Dev/tsz-core/tsz-rust-ipa-ups-release/docs/openapi.json",
+  "_source_sha256": "6ecdcf8e96ec6d36abb5743dab0dd913f585f778bfceab2fc545dd31632246e5",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
@@ -990,6 +990,7 @@
       "type": "string",
       "enum": ["basics", "forms", "meanings"]
     },
+    "PhonemeLocaleV3": { "type": "string", "enum": ["en-GB", "en-US"] },
     "PhraseComponentUsageV3": {
       "oneOf": [
         {
@@ -1124,7 +1125,19 @@
       "properties": {
         "alphabet": { "$ref": "#/$defs/RichTextPhonemeAlphabet" },
         "ipa": { "type": "string", "maxLength": 200 },
-        "ups": { "type": "string", "maxLength": 1600 }
+        "ipa_locale": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/PhonemeLocaleV3" }]
+        },
+        "ups": { "type": "string", "maxLength": 1600 },
+        "ups_locale": {
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/PhonemeLocaleV3" }]
+        },
+        "ups_words": {
+          "type": ["array", "null"],
+          "items": { "$ref": "#/$defs/UpsWordV3" },
+          "maxItems": 30
+        },
+        "use_spelling": { "type": ["boolean", "null"] }
       },
       "additionalProperties": false
     },
@@ -2122,6 +2135,15 @@
     },
     "TranslationLanguageV3": { "type": "string", "enum": ["zh"] },
     "UkDialectV3": { "type": "string", "enum": ["uk"] },
+    "UpsWordV3": {
+      "type": "object",
+      "required": ["text", "phoneme"],
+      "properties": {
+        "phoneme": { "type": "string", "maxLength": 1600, "minLength": 1 },
+        "text": { "type": "string", "maxLength": 200, "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
     "UsDialectV3": { "type": "string", "enum": ["us"] },
     "V3DraftNodeLocation": {
       "type": "object",

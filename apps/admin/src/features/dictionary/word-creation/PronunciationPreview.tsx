@@ -146,11 +146,8 @@ function voiceForDialect(
           preferredIds.includes(voice.id)
       ) ?? voices.find((voice) => voice.locale.toLowerCase() === locale))
     : undefined;
-  if (matched) return matched;
-  // 明确标了方言的内容找不到对应发音人时不降级——否则英式词形会用美式音朗读。
-  // 统一内容本来就没有自己的方言，偏好侧发音人缺席时回退目录默认，保持可试听。
-  if (dialect !== "common") return undefined;
-  return voices.find((voice) => voice.isDefault) ?? voices[0];
+  // Common content also resolves to an explicit locale; never cross accents to keep playback enabled.
+  return matched;
 }
 
 /**
@@ -217,20 +214,25 @@ export function PronunciationPreviewControls({
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const resultRef = useRef<VoicePreviewResult | null>(null);
   const expiryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const voice =
-    voiceProfile?.voices
-      .filter((setting) => setting.enabled)
-      .map((setting) =>
-        context.voices.find((voice) => voice.id === setting.voice_id)
-      )
-      .find((voice) => voice !== undefined) ??
-    voiceForDialect(context.voices, dialect, context.dialectPreference);
+  const targetLocale = localeForDialect(dialect, context.dialectPreference);
+  const enabledSettings =
+    voiceProfile?.voices.filter((setting) => setting.enabled) ?? [];
+  const voice = enabledSettings.length
+    ? enabledSettings
+        .map((setting) =>
+          context.voices.find((voice) => voice.id === setting.voice_id)
+        )
+        .find(
+          (voice) => voice?.locale.toLowerCase() === targetLocale?.toLowerCase()
+        )
+    : voiceForDialect(context.voices, dialect, context.dialectPreference);
   const previewContent = useMemo<RichTextV2>(
     () => content ?? { version: 2, text: spelling ?? "", annotations: [] },
     [content, spelling]
   );
   const contentKey = JSON.stringify([
     previewContent,
+    targetLocale,
     voice?.id,
     voiceProfile?.voices.find((setting) => setting.voice_id === voice?.id)
       ?.rate_percent ?? 0
@@ -276,7 +278,7 @@ export function PronunciationPreviewControls({
     cleanup();
     setBusy(false);
     setStatus("");
-  }, [cleanup, contentKey, pronunciationId, voice?.id]);
+  }, [cleanup, contentKey, pronunciationId, voice?.id, disabled]);
 
   useEffect(
     () => () => {
@@ -419,7 +421,9 @@ export function PronunciationPreviewControls({
             ? "请先填写字典音标"
             : "请先填写词形拼写"
           : !voice
-            ? `${localeForDialect(dialect, context.dialectPreference) ?? "英语"} 暂无可用发音人`
+            ? enabledSettings.length
+              ? `已选音色不匹配 ${targetLocale ?? "当前口音"}，请在发音设置中选择对应音色`
+              : `${targetLocale ?? "英语"} 暂无可用发音人`
             : "获取语音";
 
   const controls = (
