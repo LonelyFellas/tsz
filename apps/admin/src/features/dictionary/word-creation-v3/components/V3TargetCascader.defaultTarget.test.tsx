@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import type {
   AdminWordV3,
@@ -88,10 +88,12 @@ it("把例句所处词条、词形和词义一起前移到候选首位", async (
   expect(columnTexts(0)[0]).toContain("work");
   expect(columnTexts(0)[1]).toContain("bank");
   fireEvent.click(screen.getByText("work"));
-  expect(columnTexts(1)[0]).toContain("原形 work");
+  await waitFor(() => expect(columnTexts(1)[0]).toContain("原形 work"));
   fireEvent.click(screen.getByText("原形 work"));
-  expect(columnTexts(2)[0]).toContain("职业");
-  expect(columnTexts(2)[1]).toContain("工作");
+  await waitFor(() => {
+    expect(columnTexts(2)[0]).toContain("职业");
+    expect(columnTexts(2)[1]).toContain("工作");
+  });
 });
 
 it("目标词条不在候选里时保持后端候选顺序", async () => {
@@ -197,13 +199,18 @@ it.each(["pronoun", "noun"])(
       pos,
       ...step2.pos.map((item) => item.pos).filter((item) => item !== pos)
     ];
-    const labels = columnTexts(1);
-    expect(labels).toHaveLength(6);
-    orderedPos
-      .flatMap((item) => [2, 1].map((n) => `some-${item}-${n}`))
-      .forEach((label, index) => expect(labels[index]).toContain(label));
+    // 级联展开后的列渲染可能晚于点击；每次重读 DOM，仍完整核对数量与顺序。
+    await waitFor(() => {
+      const labels = columnTexts(1);
+      expect(labels).toHaveLength(6);
+      orderedPos
+        .flatMap((item) => [2, 1].map((n) => `some-${item}-${n}`))
+        .forEach((label, index) => expect(labels[index]).toContain(label));
+    });
     fireEvent.click(screen.getByText(new RegExp(`原形 some-${pos}-1`)));
-    expect(columnTexts(2)).toEqual([`${pos}当前词义`, `${pos}其他词义`]);
+    await waitFor(() =>
+      expect(columnTexts(2)).toEqual([`${pos}当前词义`, `${pos}其他词义`])
+    );
     expect(input).toEqual(original);
   }
 );
@@ -222,6 +229,8 @@ it("当前词义未进入候选时仍能按当前词性置顶", async () => {
     />
   );
   fireEvent.click(await screen.findByText("some"));
-  expect(columnTexts(1)[0]).toContain("some-pronoun-2");
-  expect(columnTexts(1)[1]).toContain("some-pronoun-1");
+  await waitFor(() => {
+    expect(columnTexts(1)[0]).toContain("some-pronoun-2");
+    expect(columnTexts(1)[1]).toContain("some-pronoun-1");
+  });
 });
