@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-2-remaining/docs/openapi.json",
-  "_source_sha256": "93d87d405f4957c9744b585f3eb07cf55b2e5674f80b91a19183bc2866e116fa",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-3/docs/openapi.json",
+  "_source_sha256": "1920c2a506e783a55605795ce17d193b1c025b3b9017859e0d07d20fdef2b7bb",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
@@ -9,6 +9,7 @@
     "EntryAnnotationResponse",
     "AdminWordV3",
     "AdminWordV3Envelope",
+    "BatchPublicationResponseV3",
     "AdminWordDraftV3Envelope",
     "AdminWordListResponse",
     "EntryLifecycleBatchResponse",
@@ -151,6 +152,7 @@
         "publication_number": { "type": "integer" },
         "published_at": { "type": "string", "format": "date-time" },
         "published_by_admin_id": { "type": "string", "format": "uuid" },
+        "rollback_of_publication_id": { "type": "string", "format": "uuid" },
         "schema_version": { "type": "integer", "enum": [3] },
         "source_revision": { "type": "integer" },
         "word": { "$ref": "#/$defs/AdminWordV3" }
@@ -264,6 +266,14 @@
     },
     "AudioAssetGender": { "type": "string", "enum": ["female", "male"] },
     "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
+    "BatchPublicationResponseV3": {
+      "type": "object",
+      "required": ["words"],
+      "properties": {
+        "words": { "type": "array", "items": { "$ref": "#/$defs/AdminWordV3" } }
+      },
+      "additionalProperties": false
+    },
     "BuiltinDictionaryEvidenceV3": {
       "oneOf": [
         {

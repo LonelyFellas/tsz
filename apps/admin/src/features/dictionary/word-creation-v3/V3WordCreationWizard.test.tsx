@@ -1,3 +1,4 @@
+import { useAuthStore } from "@/lib/auth";
 import { HttpError } from "@tsz/api-client";
 import type {
   AdminWordDraftV3Envelope,
@@ -19,7 +20,7 @@ import {
 import type { ReactNode } from "react";
 import { StrictMode, useState } from "react";
 import { MemoryRouter } from "react-router-dom";
-import { describe, expect, it, onTestFinished, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 vi.mock("../api", () => ({
   useRelatedSearch: () => ({
@@ -6481,4 +6482,18 @@ it("解除专用绑定后选回原词义不应留下假脏状态，实际释义�
   );
   expect(source.saveForms).not.toHaveBeenCalled();
   expect(source.saveMeanings).not.toHaveBeenCalled();
+});
+
+beforeEach(() => {
+  useAuthStore.setState({
+    profile: {
+      id: "admin-1",
+      role: "super_admin",
+      can_publish_lexicon: true,
+      phone: "13800138000",
+      display_name: "向导发布测试",
+      permissions: [],
+      preferences: { dialect: "uk" }
+    }
+  });
 });

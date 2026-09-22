@@ -40,6 +40,7 @@ const plainAdmin: Admin = {
   phone: "13800138000",
   display_name: "审核员小王",
   role: "admin",
+  can_publish_lexicon: false,
   status: "active",
   created_at: "2026-07-01T00:00:00Z",
   updated_at: "2026-07-01T00:00:00Z",
@@ -51,6 +52,7 @@ const superAdmin: Admin = {
   // 昵称刻意区别于「超级管理员」这个 role 文案，避免 getByText 撞车。
   display_name: "总管阿强",
   role: "super_admin",
+  can_publish_lexicon: true,
   status: "active",
   created_at: "2026-06-01T00:00:00Z",
   updated_at: "2026-06-01T00:00:00Z",
@@ -130,6 +132,7 @@ describe("AdminManagement", () => {
         phone: "13900000000",
         display_name: "新来的",
         role: "admin",
+        can_publish_lexicon: false,
         status: "active",
         created_at: "2026-07-07T00:00:00Z",
         updated_at: "2026-07-07T00:00:00Z",

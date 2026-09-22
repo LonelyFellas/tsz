@@ -24,6 +24,7 @@ function signIn(id: string, dialect?: "uk" | "us"): AdminProfile {
     phone: "13800138000",
     display_name: "词库管理员",
     role: "admin",
+    can_publish_lexicon: true,
     permissions: [],
     ...(dialect === undefined ? {} : { preferences: { dialect } })
   } as AdminProfile;

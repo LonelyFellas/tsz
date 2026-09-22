@@ -18,6 +18,7 @@ import {
   Select,
   Space,
   Table,
+  Switch,
   Tag
 } from "antd";
 import type { TableColumnsType } from "antd";
@@ -25,7 +26,12 @@ import dayjs from "dayjs";
 import { useState } from "react";
 import type { Admin, AdminLevel, AdminListQuery } from "@tsz/types";
 import { GatedButton } from "@/components/GatedButton";
-import { useAdminList, useResetAdminPassword, useSetAdminStatus } from "./api";
+import {
+  useAdminList,
+  useResetAdminPassword,
+  useSetAdminStatus,
+  useSetPublicationPermission
+} from "./api";
 import { CreateAdminModal } from "./CreateAdminModal";
 import {
   ADMIN_LEVEL_LABEL,
@@ -61,6 +67,7 @@ export function AdminManagement() {
   };
   const listQuery = useAdminList(query);
   const setStatus = useSetAdminStatus();
+  const setPublicationPermission = useSetPublicationPermission();
   const resetPassword = useResetAdminPassword();
 
   const rows = listQuery.data?.items ?? [];
@@ -130,6 +137,28 @@ export function AdminManagement() {
   const columns: TableColumnsType<Admin> = [
     { title: "手机号", dataIndex: "phone", width: 140, fixed: "left" },
     { title: "昵称", dataIndex: "display_name", width: 160 },
+    {
+      title: "词库发布",
+      key: "can_publish_lexicon",
+      width: 120,
+      render: (_, record) => (
+        <Switch
+          aria-label={`允许${record.display_name}发布词库`}
+          checked={record.role === "super_admin" || record.can_publish_lexicon}
+          disabled={
+            record.role === "super_admin" || setPublicationPermission.isPending
+          }
+          onChange={(allowed) => {
+            void setPublicationPermission
+              .mutateAsync({ id: record.id, allowed })
+              .then(() =>
+                message.success(allowed ? "已授予发布权限" : "已收回发布权限")
+              )
+              .catch(() => message.error("更新发布权限失败"));
+          }}
+        />
+      )
+    },
     {
       title: "权限等级",
       dataIndex: "role",

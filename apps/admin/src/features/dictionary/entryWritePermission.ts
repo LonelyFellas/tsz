@@ -10,6 +10,7 @@ import type { AdminWordListItemAny } from "@tsz/types";
 export interface EntryWriteActor {
   id: string;
   role: string;
+  can_publish_lexicon?: boolean;
 }
 
 /** 判定只需要归属与「是否发布过」，列表行与详情都满足这个形状。 */
@@ -37,7 +38,7 @@ export function isEntryOwnershipError(code: string | undefined): boolean {
  * `published_revision` 才与后端的 `current_publication_id IS NULL` 同口径。
  */
 export function canWriteEntry(
-  actor: EntryWriteActor | undefined,
+  actor: EntryWriteActor | null | undefined,
   entry: WritableEntry
 ): boolean {
   // 拿不到当前管理员身份就无法判定归属——保守不放行，与 deletePermission 一致。
@@ -63,7 +64,7 @@ export function entryWriteForbiddenMessage(code: string | undefined): string {
 
 /** 批量入口：返回可提交的行与被挡下的行（供提交前拦截时列出）。 */
 export function partitionWritableRows(
-  actor: EntryWriteActor | undefined,
+  actor: EntryWriteActor | null | undefined,
   rows: AdminWordListItemAny[]
 ): { writable: AdminWordListItemAny[]; blocked: AdminWordListItemAny[] } {
   const writable: AdminWordListItemAny[] = [];
@@ -77,3 +78,30 @@ export function partitionWritableRows(
   }
   return { writable, blocked };
 }
+
+/** 发布权与编辑权独立；普通发布者仅能发布本人创建的词条草稿。 */
+export function canPublishEntry(
+  actor: EntryWriteActor | null | undefined,
+  entry: WritableEntry
+): boolean {
+  return Boolean(
+    actor &&
+    (actor.role === "super_admin" ||
+      (actor.can_publish_lexicon === true && entry.created_by === actor.id))
+  );
+}
+
+export function canTransitionEntry(
+  actor: EntryWriteActor | null | undefined,
+  entry: WritableEntry
+): boolean {
+  return (
+    canWriteEntry(actor, entry) &&
+    (entry.published_revision === undefined ||
+      actor?.role === "super_admin" ||
+      actor?.can_publish_lexicon === true)
+  );
+}
+
+export const ENTRY_PUBLISH_BLOCKED_HINT =
+  "需要词库发布权限，且仅超管可以发布他人的草稿";

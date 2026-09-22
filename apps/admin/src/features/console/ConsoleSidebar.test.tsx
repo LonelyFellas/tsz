@@ -39,6 +39,7 @@ function setLevel(
           phone: "13800138000",
           display_name: "管理员",
           role: level,
+          can_publish_lexicon: false,
           permissions,
           preferences: { dialect: "uk" }
         }

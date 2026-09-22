@@ -1,3 +1,8 @@
+import { useAuthStore } from "@/lib/auth";
+import {
+  canPublishEntry,
+  ENTRY_PUBLISH_BLOCKED_HINT
+} from "../entryWritePermission";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import type {
@@ -300,7 +305,10 @@ function ControlledV3PreviewAndPublishStep({
     `${word.id}:${word.revision}:controlled-publish:${publishPage?.snapshot_id ?? "none"}`,
     fetchPage ?? unavailablePage
   );
-  const unavailableMessage = publicationUnavailableMessage(word);
+  const profile = useAuthStore((state) => state.profile);
+  const unavailableMessage = !canPublishEntry(profile, word)
+    ? ENTRY_PUBLISH_BLOCKED_HINT
+    : publicationUnavailableMessage(word);
   const requiresImpactConfirmation = Boolean(
     controller.impact && (controller.impact.requires_confirmation || impactPage)
   );
@@ -493,7 +501,10 @@ function StandaloneV3PreviewAndPublishStep({
     `${currentWord.id}:${currentWord.revision}:publish:${publishSurfacePage?.snapshot_id ?? "none"}`,
     requests.surfacePage
   );
-  const unavailableMessage = publicationUnavailableMessage(currentWord);
+  const profile = useAuthStore((state) => state.profile);
+  const unavailableMessage = !canPublishEntry(profile, currentWord)
+    ? ENTRY_PUBLISH_BLOCKED_HINT
+    : publicationUnavailableMessage(currentWord);
   const needsImpactAcknowledgement = Boolean(
     impact && (impact.requires_confirmation || impact.surface_match_page)
   );

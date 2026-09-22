@@ -35,6 +35,7 @@ const PROFILE = {
   phone: "13800138000",
   display_name: "审核员小王",
   role: "admin" as const,
+  can_publish_lexicon: true,
   permissions: [],
   preferences: { dialect: "uk" as const }
 };

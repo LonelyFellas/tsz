@@ -1,3 +1,4 @@
+import { decodeBatchPublicationResponseV3 } from "./admin-word-schema";
 import { describe, expect, it } from "vitest";
 import runtimeSchemaBundleJson from "./admin-word-v3.runtime-schema.json";
 import {
@@ -1149,4 +1150,19 @@ it("V3 runtime 接受目录自定义词形编码并保留原值", () => {
   expect(
     decodeAdminWordV3Envelope({ word }).word.forms.pos[0]!.forms[0]!.form_type
   ).toBe("custom_variant");
+});
+
+it("批次发布响应必须包含完整且不重复的请求身份集合", () => {
+  const word = validAdminWordV3();
+  const response = { words: [word] };
+  expect(decodeBatchPublicationResponseV3(response, [word.id])).toBe(response);
+  expect(() =>
+    decodeBatchPublicationResponseV3(response, ["another-entry"])
+  ).toThrow();
+  expect(() =>
+    decodeBatchPublicationResponseV3({ words: [word, word] }, [
+      word.id,
+      "another-entry"
+    ])
+  ).toThrow();
 });

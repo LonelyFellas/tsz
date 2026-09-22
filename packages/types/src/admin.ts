@@ -62,6 +62,7 @@ export interface AdminPreferences {
 
 /** GET /admin/profile 的响应：登录管理员自身身份，用于门禁探针 + 顶栏「已登录为 X」+ 动态菜单。 */
 export interface AdminProfile {
+  can_publish_lexicon: boolean;
   id: string;
   phone: string;
   display_name: string;
@@ -88,6 +89,7 @@ export interface UpdateAdminPreferencesResponse {
 
 /** 账号管理里看到的完整 admin 对象（含状态与创建时间）。 */
 export interface Admin {
+  can_publish_lexicon: boolean;
   id: string;
   phone: string;
   display_name: string;

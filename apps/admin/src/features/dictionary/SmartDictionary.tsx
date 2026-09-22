@@ -1,3 +1,4 @@
+import { BatchPublicationModal } from "./BatchPublicationModal";
 import {
   DeleteOutlined,
   PlusOutlined,
@@ -95,6 +96,8 @@ import {
 import {
   ENTRY_WRITE_BLOCKED_HINT,
   canWriteEntry,
+  canPublishEntry,
+  canTransitionEntry,
   entryWriteForbiddenMessage,
   isEntryOwnershipError,
   partitionWritableRows
@@ -204,7 +207,7 @@ export function SmartDictionary({
   const annotationActor = deleteActor;
   // 写操作（继续创建/归档/恢复）的归属规则不同：只卡**未发布**草稿，
   // 已发布词条全员可改，见 canWriteEntry。
-  const writeActor = deleteActor;
+  const writeActor = profile;
   const [searchParams, setSearchParams] = useSearchParams();
   const [annotationEntry, setAnnotationEntry] =
     useState<AdminWordListItemAny>();
@@ -219,6 +222,8 @@ export function SmartDictionary({
   const { filters, page, pageSize } = listSearch;
 
   // 服务端分页 + 筛选:三者共同构成列表查询,任何变化都触发重取。
+  const [publicationRows, setPublicationRows] =
+    useState<AdminWordListItemAny[]>();
   const [selectedKeys, setSelectedKeys] = useState<React.Key[]>([]);
   const [selectedRecords, setSelectedRecords] = useState<
     Record<string, AdminWordListItemAny>
@@ -625,6 +630,10 @@ export function SmartDictionary({
     }
     // 后端整批原子：混进一条别人的未发布草稿会拒掉整批（403 entry_edit_forbidden）。
     // 与其让整批失败，不如提交前就把不归自己管的挑明。
+    if (selectedRows.some((row) => !canTransitionEntry(writeActor, row))) {
+      message.warning("当前账号没有操作所选词条的权限；已发布词条需要发布权限");
+      return;
+    }
     const { blocked } = partitionWritableRows(writeActor, selectedRows);
     if (blocked.length > 0) {
       const detail = blocked
@@ -971,7 +980,8 @@ export function SmartDictionary({
                         )
                       }
                       disabled={
-                        !rowWritable || lifecycleInput(record) === undefined
+                        !canTransitionEntry(writeActor, record) ||
+                        lifecycleInput(record) === undefined
                       }
                       loading={
                         lifecyclePending &&
@@ -994,9 +1004,11 @@ export function SmartDictionary({
                   // 与「这条不归你管」不是一回事。
                   const hint = !rowWritable
                     ? ENTRY_WRITE_BLOCKED_HINT
-                    : record.status === "archived"
-                      ? ""
-                      : "移入垃圾桶";
+                    : !canTransitionEntry(writeActor, record)
+                      ? "操作已发布词条需要词库发布权限"
+                      : record.status === "archived"
+                        ? ""
+                        : "移入垃圾桶";
                   return hint ? (
                     <Tooltip title={hint}>
                       <span>{button}</span>
@@ -1180,6 +1192,25 @@ export function SmartDictionary({
           <Space wrap>
             {!trashMode && (
               <Button
+                disabled={
+                  selectedRows.length === 0 ||
+                  selectedRows.length !== selectedKeys.length ||
+                  selectedRows.length > 50 ||
+                  selectedRows.some(
+                    (row) =>
+                      row.status === "archived" ||
+                      !row.revision ||
+                      !row.lifecycle_revision ||
+                      !canPublishEntry(profile, row)
+                  )
+                }
+                onClick={() => setPublicationRows([...selectedRows])}
+              >
+                发布所选
+              </Button>
+            )}
+            {!trashMode && (
+              <Button
                 type="primary"
                 icon={<PlusOutlined />}
                 onClick={() => navigate("/words/new")}
@@ -1331,6 +1362,18 @@ export function SmartDictionary({
           }}
         />
       </Card>
+      {publicationRows && (
+        <BatchPublicationModal
+          rows={publicationRows}
+          onClose={() => setPublicationRows(undefined)}
+          onPublished={() => {
+            setPublicationRows(undefined);
+            setSelectedKeys([]);
+            setSelectedRecords({});
+            message.success("所选词条已全部发布");
+          }}
+        />
+      )}
     </Flex>
   );
 }

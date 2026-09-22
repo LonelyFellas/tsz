@@ -394,10 +394,10 @@ describe("createAdminEndpoints — 智能词库 words", () => {
         })
     },
     {
-      name: "activatePublicationV3",
+      name: "rollbackPublicationV3",
       httpMethod: "post",
       invoke: (api: ReturnType<typeof createAdminEndpoints>) =>
-        api.words.activatePublicationV3("w-1", "pub-1", "activate-key", {
+        api.words.rollbackPublicationV3("w-1", "pub-1", "activate-key", {
           schema_version: 3,
           base_revision: 1,
           base_lifecycle_revision: 1
@@ -751,7 +751,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       schema_version: 3,
       base_revision: 7
     });
-    api.words.activatePublicationV3("w-3", "publication-3", "activate-v3-key", {
+    api.words.rollbackPublicationV3("w-3", "publication-3", "activate-v3-key", {
       schema_version: 3,
       ...lifecycle
     });
@@ -823,7 +823,7 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       { headers: { "Idempotency-Key": "publish-v3-key" } }
     );
     expect(http.post).toHaveBeenCalledWith(
-      "/lexicon/entries/w-3/publications/publication-3/activate",
+      "/lexicon/entries/w-3/publications/publication-3/rollback",
       { schema_version: 3, ...lifecycle },
       { headers: { "Idempotency-Key": "activate-v3-key" } }
     );
@@ -1280,12 +1280,14 @@ describe("createAdminEndpoints — 角色治理 roles", () => {
     const input = {
       name: "词库管理员",
       description: "管理智能词库与词表",
+
       permissions: ["words.access", "wordlists.access"] as const
     };
     api.roles.create({ ...input, permissions: [...input.permissions] });
     expect(http.post).toHaveBeenCalledWith("/roles", {
       name: "词库管理员",
       description: "管理智能词库与词表",
+
       permissions: ["words.access", "wordlists.access"]
     });
   });
@@ -1295,6 +1297,7 @@ describe("createAdminEndpoints — 角色治理 roles", () => {
     api.roles.update("r-1", { name: "高级词库管理员", permissions: [] });
     expect(http.patch).toHaveBeenCalledWith("/roles/r-1", {
       name: "高级词库管理员",
+
       permissions: []
     });
   });

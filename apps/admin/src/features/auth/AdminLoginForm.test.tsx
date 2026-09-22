@@ -75,6 +75,7 @@ function profileResponse(role: "admin" | "super_admin"): AdminProfile {
     phone: "13800138000",
     display_name: "审核员小王",
     role,
+    can_publish_lexicon: role === "super_admin",
     permissions: role === "super_admin" ? [] : ["users.access"],
     preferences: { dialect: "uk" }
   };
@@ -423,6 +424,7 @@ describe("AdminLoginForm — 2FA", () => {
         phone: "1",
         display_name: "X",
         role: "admin",
+        can_publish_lexicon: true,
         permissions: [],
         preferences: { dialect: "uk" }
       },
@@ -442,6 +444,7 @@ describe("AdminLoginForm — 2FA", () => {
           phone: "1",
           display_name: "X",
           role: "admin",
+          can_publish_lexicon: true,
           permissions: [],
           preferences: { dialect: "uk" }
         },

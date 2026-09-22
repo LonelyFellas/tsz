@@ -29,7 +29,7 @@ function renderPanel(
   state: SurfaceSnapshotState<SurfaceMatchPageV3>,
   onConfirm = vi.fn(),
   onRestart = vi.fn(),
-  action: "restore" | "activate" = "restore"
+  action: "restore" | "rollback" = "restore"
 ) {
   render(
     <App>
@@ -188,7 +188,7 @@ describe("LifecycleSurfaceConfirmation", () => {
       {
         generation: 1,
         phase: "ready",
-        items: [item("activate")],
+        items: [item("rollback")],
         matched_entry_contexts: [],
         total: 1,
         confirmation_reasons: ["visibility_activation"],
@@ -196,17 +196,17 @@ describe("LifecycleSurfaceConfirmation", () => {
       },
       onConfirm,
       vi.fn(),
-      "activate"
+      "rollback"
     );
 
-    expect(screen.getByText("激活前需要确认同名公开范围")).toBeVisible();
-    expect(screen.getByText(/确认后将按当前结果继续激活/)).toBeInTheDocument();
+    expect(screen.getByText("回退前需要确认同名公开范围")).toBeVisible();
+    expect(screen.getByText(/确认后将按当前结果继续回退/)).toBeInTheDocument();
     expect(screen.queryByText(/恢复/)).toBeNull();
-    fireEvent.click(screen.getByText("确认并激活"));
+    fireEvent.click(screen.getByText("确认并回退"));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
-  it("activate 模式的过期快照要求重新检查激活条件", () => {
+  it("activate 模式的过期快照要求重新检查回退条件", () => {
     const onRestart = vi.fn();
     renderPanel(
       {
@@ -219,10 +219,10 @@ describe("LifecycleSurfaceConfirmation", () => {
       },
       vi.fn(),
       onRestart,
-      "activate"
+      "rollback"
     );
 
-    fireEvent.click(screen.getByText("重新检查激活条件"));
+    fireEvent.click(screen.getByText("重新检查回退条件"));
     expect(onRestart).toHaveBeenCalledTimes(1);
     expect(screen.queryByText(/恢复/)).toBeNull();
   });
@@ -241,11 +241,11 @@ describe("LifecycleSurfaceConfirmation", () => {
       },
       vi.fn(),
       vi.fn(),
-      "activate"
+      "rollback"
     );
 
-    expect(screen.getByText(/当前不能继续激活/)).toBeInTheDocument();
+    expect(screen.getByText(/当前不能继续回退/)).toBeInTheDocument();
     expect(screen.queryByText(/恢复/)).toBeNull();
-    expect(screen.queryByText("确认并激活")).toBeNull();
+    expect(screen.queryByText("确认并回退")).toBeNull();
   });
 });

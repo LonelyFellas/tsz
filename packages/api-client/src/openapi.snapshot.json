@@ -1,10 +1,11 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-2-remaining/docs/openapi.json",
-  "_generatedAt": "2026-09-22T04:00:23.292Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-3/docs/openapi.json",
+  "_generatedAt": "2026-09-22T07:27:53.015Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
+    "/admin/admins/{admin_id}/lexicon-publication-permission": ["patch"],
     "/admin/admins/{admin_id}/reset-password": ["post"],
     "/admin/admins/{admin_id}/status": ["patch"],
     "/admin/auth/change-password": ["post"],
@@ -21,6 +22,7 @@
     "/admin/lexicon/entries/archive-batch": ["post"],
     "/admin/lexicon/entries/component-targets/search": ["post"],
     "/admin/lexicon/entries/delete-batch": ["post"],
+    "/admin/lexicon/entries/publications/batch": ["post"],
     "/admin/lexicon/entries/related-search": ["get"],
     "/admin/lexicon/entries/restore-batch": ["post"],
     "/admin/lexicon/entries/sentence-targets/resolve": ["post"],
@@ -31,7 +33,7 @@
     "/admin/lexicon/entries/{id}/inbound-references": ["get"],
     "/admin/lexicon/entries/{id}/publications": ["get", "post"],
     "/admin/lexicon/entries/{id}/publications/{publication_id}": ["get"],
-    "/admin/lexicon/entries/{id}/publications/{publication_id}/activate": [
+    "/admin/lexicon/entries/{id}/publications/{publication_id}/rollback": [
       "post"
     ],
     "/admin/lexicon/entries/{id}/restore": ["post"],
@@ -96,6 +98,14 @@
         "schema": { "type": "string", "format": "uuid" }
       }
     ],
+    "post /admin/lexicon/entries/publications/batch": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
     "post /admin/lexicon/entries/restore-batch": [
       {
         "name": "Idempotency-Key",
@@ -120,7 +130,7 @@
         "schema": { "type": "string", "format": "uuid" }
       }
     ],
-    "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate": [
+    "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback": [
       {
         "name": "Idempotency-Key",
         "in": "header",
@@ -359,6 +369,20 @@
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
+    "post /admin/lexicon/entries/publications/batch": {
+      "request": { "$ref": "#/components/schemas/BatchPublicationInputV3" },
+      "responses": {
+        "201": { "$ref": "#/components/schemas/BatchPublicationResponseV3" },
+        "400": { "$ref": "#/components/schemas/ProblemDetails" },
+        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" },
+        "410": { "$ref": "#/components/schemas/ProblemDetails" },
+        "422": { "$ref": "#/components/schemas/ProblemDetails" },
+        "503": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
     "get /admin/lexicon/entries/related-search": {
       "request": null,
       "responses": {
@@ -509,10 +533,10 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
-    "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate": {
-      "request": { "$ref": "#/components/schemas/ActivatePublicationV3Input" },
+    "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback": {
+      "request": { "$ref": "#/components/schemas/RollbackPublicationV3Input" },
       "responses": {
-        "200": { "$ref": "#/components/schemas/AdminWordV3Envelope" },
+        "201": { "$ref": "#/components/schemas/AdminWordV3Envelope" },
         "400": { "$ref": "#/components/schemas/ProblemDetails" },
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
@@ -2420,7 +2444,7 @@
         }
       }
     },
-    "ActivatePublicationV3Input": {
+    "RollbackPublicationV3Input": {
       "type": "object",
       "required": [
         "schema_version",
@@ -2436,6 +2460,31 @@
         "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
         "confirmed_surface_match_token": { "type": "string" },
         "schema_version": { "type": "integer", "enum": [3] }
+      },
+      "additionalProperties": false
+    },
+    "BatchPublicationInputV3": {
+      "type": "object",
+      "required": ["schema_version", "items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/BatchPublicationItemV3" },
+          "maxItems": 50,
+          "minItems": 1
+        },
+        "schema_version": { "type": "integer", "enum": [3] }
+      },
+      "additionalProperties": false
+    },
+    "BatchPublicationResponseV3": {
+      "type": "object",
+      "required": ["words"],
+      "properties": {
+        "words": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/AdminWordV3" }
+        }
       },
       "additionalProperties": false
     },
@@ -2872,6 +2921,21 @@
     },
     "AudioAssetGender": { "type": "string", "enum": ["female", "male"] },
     "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
+    "BatchPublicationItemV3": {
+      "type": "object",
+      "required": ["entry_id", "base_revision", "base_lifecycle_revision"],
+      "properties": {
+        "base_lifecycle_revision": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
+        },
+        "base_revision": { "type": "integer", "format": "int64", "minimum": 1 },
+        "confirmed_surface_match_token": { "type": "string" },
+        "entry_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
     "CommonDialectV3": { "type": "string", "enum": ["common"] },
     "ComponentTargetMatchV3": {
       "type": "string",
