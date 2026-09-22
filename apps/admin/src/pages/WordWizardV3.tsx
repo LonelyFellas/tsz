@@ -61,7 +61,6 @@ import {
   V3WordCreationWizard,
   type V3WizardSlotContext
 } from "@/features/dictionary/word-creation-v3/V3WordCreationWizard";
-import { V3DisabledReason } from "@/features/dictionary/word-creation-v3/components/V3DisabledReason";
 import { V3ReferenceList } from "@/features/dictionary/word-creation-v3/components/V3ReferenceList";
 import {
   buildReferenceIndex,
@@ -132,20 +131,23 @@ function V3ReferenceNotices() {
           showIcon
           type="info"
           title="引用信息暂不可用"
-          description="无法判断哪些词性、词形或词义被别处引用；编辑不受影响，保存时仍由服务端校验。"
+          description="引用影响信息暂不可用；可以编辑草稿，发布前仍由服务端严格校验。"
         />
       ) : null}
       {index.stale.length > 0 ? (
         <Alert
           showIcon
           type="error"
-          title={`有 ${index.stale.length} 条引用已失效，需先处理`}
+          title={`当前草稿有 ${index.stale.length} 条引用待修复，暂不可发布`}
           description={
             <Flex vertical gap={4}>
               <span>
-                这些引用指向的词形或词义在当前草稿里已对不上。草稿照常可以保存，处理完之前本词条无法发布。
+                这些引用在当前草稿里已不成立。草稿可继续保存，当前发布内容不受影响；修复引用后才能发布。
               </span>
-              <V3ReferenceList references={index.stale} />
+              <V3ReferenceList
+                references={index.stale}
+                staleLabel="草稿内不成立"
+              />
             </Flex>
           }
         />
@@ -154,7 +156,7 @@ function V3ReferenceNotices() {
   );
 }
 
-/** 词形影响预览判定会破坏的引用：确认条让位给它，保存直接不发。 */
+/** 草稿影响提示：不阻断保存，破坏性引用必须在发布前修复。 */
 function V3BlockedReferencesAlert({
   references
 }: {
@@ -165,10 +167,10 @@ function V3BlockedReferencesAlert({
     <Alert
       showIcon
       type="error"
-      title={`本次词形变更会破坏 ${references.length} 处引用，无法保存`}
+      title={`本次词形变更会影响 ${references.length} 处引用，发布前需修复`}
       description={
         <Flex vertical gap={4}>
-          <span>撤销对应的词形改动，或先到来源处解除、调整这些引用。</span>
+          <span>可先保存草稿，再到来源处调整这些引用；修复前不能发布。</span>
           <V3ReferenceList references={references} staleLabel="将失效" />
         </Flex>
       }
@@ -178,7 +180,7 @@ function V3BlockedReferencesAlert({
 
 function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
   const referenceGuard = useV3ReferenceGuard();
-  // Q2：拼写输入框保持可编辑，但与被引用片段对不上就即时标红、禁止保存并列出引用。
+  // 草稿可编辑；即时列出拼写影响，发布前必须修复引用。
   const conflicts = spellingConflicts(referenceGuard.index, context.draftForms);
   const conflictReferences = [
     ...new Map(
@@ -227,13 +229,6 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         setPendingIntent(undefined);
         return;
       }
-      if (impact.blocked_references?.length) {
-        // 服务端已判定会破坏引用：保存必 409，不进确认，交给阻断提示。
-        // 能被拦下说明本地引用索引已经旧了（别处刚加了引用），徽标与禁用态跟着重取。
-        setPendingIntent(undefined);
-        referenceGuard.refresh();
-        return;
-      }
       if (!impact.requires_confirmation && !impact.surface_match_page) {
         setPendingIntent(undefined);
         await context.actions.saveForms(intent);
@@ -278,11 +273,11 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         <Alert
           showIcon
           type="error"
-          title="拼写与被引用片段不一致，无法保存"
+          title="拼写变更会影响引用，发布前需修复"
           description={
             <Flex vertical gap={4}>
               <span>
-                改回与片段一致的拼写（大小写、空白差异不算），或先到例句处解除引用。
+                可以先保存草稿，再到引用来源修复；当前发布内容不随草稿保存改变。
               </span>
               <V3ReferenceList references={conflictNoticeReferences} />
             </Flex>
@@ -374,26 +369,17 @@ function V3FormsSlot({ context }: { context: V3WizardSlotContext }) {
         >
           上一步
         </Button>
-        <V3DisabledReason
-          reason={
-            conflictNoticeReferences.length > 0
-              ? "拼写与被引用片段不一致，先改回一致或解除引用"
-              : undefined
+        <Button
+          disabled={
+            Boolean(pendingIntent) ||
+            (!context.dirtySteps.forms && !bindingsDirty) ||
+            busy
           }
+          loading={busy && pendingIntent === "save"}
+          onClick={() => void prepareSave("save")}
         >
-          <Button
-            disabled={
-              Boolean(pendingIntent) ||
-              (!context.dirtySteps.forms && !bindingsDirty) ||
-              busy ||
-              conflictNoticeReferences.length > 0
-            }
-            loading={busy && pendingIntent === "save"}
-            onClick={() => void prepareSave("save")}
-          >
-            保存草稿
-          </Button>
-        </V3DisabledReason>
+          保存草稿
+        </Button>
         <Button
           type="primary"
           disabled={Boolean(pendingIntent)}
@@ -437,7 +423,6 @@ function V3MeaningsSlot({
   focusSentence?: V3FocusSentence;
   onFocusSentenceHandled?: () => void;
 }) {
-  const referenceGuard = useV3ReferenceGuard();
   const [sentenceEditor, setSentenceEditor] = useState<{
     senseId: string;
     value: SharedSentence | "new";
@@ -474,11 +459,6 @@ function V3MeaningsSlot({
       if (context.dirtySteps.forms) {
         const impact = await context.actions.previewFormsSaveImpact();
         if (!impact) return;
-        // 会破坏引用的词形改动：保存必 409，阻断提示直接列出引用；本地引用索引已旧，顺带重取。
-        if (impact.blocked_references?.length) {
-          referenceGuard.refresh();
-          return;
-        }
         if (impact.surface_match_page) {
           // 同形匹配的确认要带 snapshot/policy 上下文，只有词形步的保存入口能透传，
           // 这里不复制那套状态机，直接把人引回词形步确认。
@@ -816,12 +796,16 @@ function V3WizardSlots({
     return () => registerNavigator(undefined);
   }, [navigateTarget, readOnly, registerNavigator]);
   // 跨词条跳转的深链：?focus_node=<来源节点 id>，加载后定位一次。
-  const focusNodeHandledRef = useRef(false);
+  const focusNodeHandledRef = useRef<string | null>(null);
   const focusNode = new URLSearchParams(location.search).get("focus_node");
   const word = context.word;
   useEffect(() => {
-    if (!focusNode || focusNodeHandledRef.current || readOnly) return;
-    focusNodeHandledRef.current = true;
+    if (!focusNode) {
+      focusNodeHandledRef.current = null;
+      return;
+    }
+    if (focusNodeHandledRef.current === focusNode || readOnly) return;
+    focusNodeHandledRef.current = focusNode;
     const target = locateV3Node(word, focusNode);
     if (target) void navigateTarget(target);
   }, [focusNode, navigateTarget, readOnly, word]);
@@ -853,7 +837,12 @@ function V3WizardSlots({
             context.word.status === "published"
               ? () =>
                   navigate(
-                    `/words/${context.word.id}/v3/wizard/forms?mode=edit`
+                    `/words/${context.word.id}/v3/wizard/forms?${new URLSearchParams(
+                      {
+                        mode: "edit",
+                        ...(focusNode ? { focus_node: focusNode } : {})
+                      }
+                    )}`
                   )
               : undefined
           }
@@ -1036,7 +1025,7 @@ export function WordWizardV3Page({
     return (
       <Navigate
         replace
-        to={`/words/${word.id}/v3/wizard/${legalStep}${editingPublished ? "?mode=edit" : ""}`}
+        to={`/words/${word.id}/v3/wizard/${legalStep}${location.search}`}
       />
     );
   }
@@ -1044,6 +1033,15 @@ export function WordWizardV3Page({
   return (
     <Flex vertical gap="middle">
       <CreationSourceNotice source={creationSourceFromState(location.state)} />
+      {searchParams.get("focus_node") &&
+        !locateV3Node(word, searchParams.get("focus_node")!) && (
+          <Alert
+            showIcon
+            type="warning"
+            title="引用来源节点已不存在"
+            description="该引用来源节点未出现在当前内容中，可能已被删除或修改。请核对当前草稿和发布版本，修复后返回目标词条刷新引用；本提示不代表引用已解除。"
+          />
+        )}
       <V3ReferenceGuardProvider value={referenceGuard}>
         <V3WordCreationWizard
           key={`${word.id}:activation-${activationGeneration}:${editingPublished ? "edit" : "read"}`}

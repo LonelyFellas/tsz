@@ -227,6 +227,33 @@ function renderPage(
 }
 
 describe("WordWizardV3Page", () => {
+  it("来源节点已移除时明确提示，并在步骤重定向后保留定位参数", async () => {
+    const endpoints = source({ word: word(), retired_stable_nodes: [] });
+    const router = renderPage(
+      `/words/${WORD_ID}/v3/wizard/preview?focus_node=removed-source`,
+      createV3WordRequests(endpoints)
+    );
+    expect(await screen.findByText("引用来源节点已不存在")).toBeVisible();
+    expect(router.state.location.pathname).toContain("/wizard/meanings");
+    expect(
+      new URLSearchParams(router.state.location.search).get("focus_node")
+    ).toBe("removed-source");
+    expect(screen.getByText(/请核对当前草稿和发布版本/)).toBeVisible();
+    await act(() => router.navigate(`/words/${WORD_ID}/v3/wizard/forms`));
+    expect(screen.queryByText("引用来源节点已不存在")).not.toBeInTheDocument();
+  });
+
+  it("有效来源节点不会提示丢失", async () => {
+    const current = word();
+    const endpoints = source({ word: current, retired_stable_nodes: [] });
+    renderPage(
+      `/words/${WORD_ID}/v3/wizard/forms?focus_node=${current.forms.pos[0]!.pos_id}`,
+      createV3WordRequests(endpoints)
+    );
+    await screen.findByLabelText("原形英美通用拼写");
+    expect(screen.queryByText("引用来源节点已不存在")).not.toBeInTheDocument();
+  });
+
   it.each(["forms", "meanings"])(
     "%s 保存按钮随未保存修改变化，失败可重试，成功后禁用",
     async (step) => {
@@ -767,7 +794,7 @@ describe("WordWizardV3Page", () => {
     ).toBe(2);
   });
 
-  it("影响预览判定会破坏引用时不再发保存，改为列出引用；被引用节点带徽标", async () => {
+  it("影响预览提示引用破坏但允许保存草稿，节点徽标仍保留", async () => {
     const current = word();
     const pos = current.forms.pos[0]!;
     const base = pos.forms[0]!;
@@ -814,6 +841,12 @@ describe("WordWizardV3Page", () => {
       affected: [],
       blocked_references: [{ ...reference, stale: true }]
     });
+    vi.mocked(endpoints.saveFormsStepV3).mockImplementation(
+      async (_id, input) => ({
+        word: { ...current, revision: 2, forms: input.content },
+        retired_stable_nodes: []
+      })
+    );
     renderPage(
       `/words/${WORD_ID}/v3/wizard/forms`,
       createV3WordRequests(endpoints)
@@ -823,38 +856,29 @@ describe("WordWizardV3Page", () => {
     expect(await screen.findAllByLabelText("被引用 1")).not.toHaveLength(0);
     // TASK#58：被引用不再锁英美结构开关（引用按语义坐标重解析）。
     expect(screen.getByLabelText("英美拼写有区别")).not.toBeDisabled();
-    // 未失效的引用：本次把拼写改坏就禁用保存并给出原因。
     fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
       target: { value: "center" }
     });
-    expect(screen.getByText("保存草稿").closest("button")).toBeDisabled();
-    expect(
-      screen.getByText("保存草稿").closest(".v3-disabled-reason")
-    ).not.toBeNull();
-    const referenceCallsBeforeSave = vi.mocked(endpoints.inboundReferencesV3)
-      .mock.calls.length;
-    // 拼写改成与片段一致但大小写不同：允许保存，交给服务端判定。
-    fireEvent.change(await screen.findByLabelText("原形英美通用拼写"), {
-      target: { value: "Centre" }
-    });
+    expect(screen.getByText("保存草稿").closest("button")).toBeEnabled();
+    expect(screen.getByText("拼写变更会影响引用，发布前需修复")).toBeVisible();
     fireEvent.click(screen.getByText("保存草稿"));
     await waitFor(() =>
       expect(endpoints.previewFormsImpactV3).toHaveBeenCalledTimes(1)
     );
-    expect(
-      await screen.findByText("本次词形变更会破坏 1 处引用，无法保存")
-    ).toBeInTheDocument();
-    // 预检列出的是改了才会失效的引用，标成「已失效」会误导。
-    expect(screen.getByText("将失效")).toBeInTheDocument();
-    expect(screen.queryByText("已失效")).toBeNull();
-    // 被预检拦下说明本地引用索引旧了：重取一次，徽标与禁用态跟上服务端。
     await waitFor(() =>
-      expect(
-        vi.mocked(endpoints.inboundReferencesV3).mock.calls.length
-      ).toBeGreaterThan(referenceCallsBeforeSave)
+      expect(endpoints.saveFormsStepV3).toHaveBeenCalledTimes(1)
     );
-    expect(screen.queryByText("确认影响并保存草稿")).toBeNull();
-    expect(endpoints.saveFormsStepV3).not.toHaveBeenCalled();
+    expect(
+      vi.mocked(endpoints.saveFormsStepV3).mock.calls[0]![1]
+    ).toMatchObject({
+      base_revision: 1,
+      intent: "save",
+      content: {
+        pos: [
+          { forms: [{ regional_variants: { common: { spelling: "center" } } }] }
+        ]
+      }
+    });
   });
 
   it("窗口重新聚焦时重取引用：在来源词条标签页解除引用后切回即可解锁", async () => {
@@ -938,14 +962,14 @@ describe("WordWizardV3Page", () => {
     );
 
     expect(
-      await screen.findByText("有 1 条引用已失效，需先处理")
+      await screen.findByText("当前草稿有 1 条引用待修复，暂不可发布")
     ).toBeInTheDocument();
     // 输入框旁的即时标红照常；顶部只是不再多出一条列同一引用的红条。
     expect(screen.getByText(/与被引用片段“center”不一致/)).toBeInTheDocument();
-    expect(screen.queryByText("拼写与被引用片段不一致，无法保存")).toBeNull();
+    expect(screen.queryByText("拼写变更会影响引用，发布前需修复")).toBeNull();
     expect(document.querySelectorAll(".v3-reference-item")).toHaveLength(1);
     // 草稿保存只拦本次改动破坏的引用：旧的失效引用只挡发布，保存按钮不因它禁用、不挂原因提示。
-    expect(screen.getByText(/处理完之前本词条无法发布/)).toBeInTheDocument();
+    expect(screen.getByText(/修复引用后才能发布/)).toBeInTheDocument();
     expect(
       screen.getByText("保存草稿").closest(".v3-disabled-reason")
     ).toBeNull();

@@ -19,6 +19,7 @@ import {
   decodeEntryDeleteBatchResponse,
   decodeFormsImpactResponseAny,
   decodeFormsImpactResponseV3,
+  decodeInboundReferencesV3,
   decodeRelatedSearchResponseAny,
   decodeResolveSentenceTargetsV3Response,
   decodeSearchComponentTargetsV3Response,
@@ -346,6 +347,41 @@ describe("decodeEntryDeleteBatchResponse", () => {
 });
 
 describe("admin word V3/Any runtime decoder", () => {
+  it("解码草稿正文引用并保留完整目标与来源定位", () => {
+    const response = {
+      entry_id: IDS.entry,
+      revision: 2,
+      nodes: [],
+      truncated: false,
+      items: [
+        {
+          id: "draft_text_link:test",
+          kind: "draft_text_link",
+          stale: true,
+          target: {
+            pos_id: IDS.pos,
+            base_form_id: IDS.form1,
+            form_id: IDS.form2,
+            variant_id: IDS.uk,
+            sense_id: IDS.group1
+          },
+          source: {
+            entry_id: IDS.creator,
+            node_id: IDS.common,
+            reference_kind: "text_link"
+          }
+        }
+      ]
+    };
+    expect(decodeInboundReferencesV3(response)).toEqual(response);
+    expect(() =>
+      decodeInboundReferencesV3({
+        ...response,
+        items: [{ ...response.items[0], kind: "unknown_reference" }]
+      })
+    ).toThrow(InvalidAdminWordResponseError);
+  });
+
   it("目标发现响应完整解码并拒绝未知 schema_version", () => {
     const range = buildRuntimeFixture(
       runtimeFixtureBundle.$defs.SentenceTargetRangeResultV3!
@@ -365,6 +401,42 @@ describe("admin word V3/Any runtime decoder", () => {
         schema_version: 4
       })
     ).toThrow(InvalidAdminWordResponseError);
+  });
+
+  it("句中草稿使用完整节点候选，拒绝旧 entry 级 pending-only 结果", () => {
+    const range = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.SentenceTargetRangeResultV3!
+    ) as Record<string, unknown>;
+    const draft = buildRuntimeFixture(
+      runtimeFixtureBundle.$defs.PublishedSentenceTargetCandidateV3!
+    ) as Record<string, unknown>;
+    delete draft.publication_id;
+    Object.assign(range, {
+      published_matches: [],
+      published_total: 0,
+      draft_total: 1,
+      draft_matches: [draft]
+    });
+    const response = {
+      schema_version: 3,
+      sentence_hash: "hash",
+      discovery_generation: 1,
+      completeness: "complete",
+      range_results: [range]
+    };
+    expect(decodeResolveSentenceTargetsV3Response(response)).toBe(response);
+    range.draft_matches = [
+      {
+        entry_id: IDS.entry,
+        entry_revision: 1,
+        headword: "word",
+        target_state: "draft",
+        linkability: "pending_only"
+      }
+    ];
+    expect(() => decodeResolveSentenceTargetsV3Response(response)).toThrow(
+      InvalidAdminWordResponseError
+    );
   });
 
   it("成分目标关键字检索响应完整解码并拒绝未知 schema_version", () => {

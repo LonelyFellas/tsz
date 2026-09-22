@@ -1,5 +1,7 @@
 import type {
   AdminWordV3,
+  Dialect,
+  PhraseComponentUsageV3,
   SentenceTarget,
   SentenceEntryTarget,
   SharedSentenceAnnotation,
@@ -11,6 +13,38 @@ import {
   rangesOverlap,
   wordSegments
 } from "@tsz/voice-editor/core";
+
+/** 手动选择与句中发现共用写入形状，只保存稳定身份，不把展示文案写入目标。 */
+export function linkedSentenceAnnotation(
+  source_dialect: Dialect,
+  source_segments: SentenceSourceRangeV3[],
+  choice: Omit<
+    Extract<PhraseComponentUsageV3, { state: "resolved" }>,
+    "id" | "literal"
+  >,
+  id: string = crypto.randomUUID()
+): SharedSentenceAnnotation {
+  return {
+    id,
+    source_dialect,
+    source_segments: source_segments.map((segment) => ({ ...segment })),
+    target: {
+      state: "linked",
+      target_entry_id: choice.target_word_id,
+      target_pos_id: choice.target_pos_id,
+      target_base_form_id: choice.target_base_form_id,
+      target_form_id: choice.target_form_id,
+      target_variant_id: choice.target_variant_id,
+      target_sense_id: choice.target_sense_id,
+      ...(choice.target_dialect
+        ? { target_dialect: choice.target_dialect }
+        : {}),
+      ...(choice.target_publication_id
+        ? { target_publication_id: choice.target_publication_id }
+        : {})
+    }
+  };
+}
 
 // Mirrors the backend's versioned headword normalization for immediate feedback.
 export const normalizeSentenceSurface = (text: string) =>

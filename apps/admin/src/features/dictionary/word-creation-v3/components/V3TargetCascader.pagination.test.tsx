@@ -101,7 +101,7 @@ it("首批50条后加载第51条并选中完整目标，加载期间阻止重复
     schema_version: 3,
     q: "give",
     match: "exact",
-    include_drafts: true,
+    include_drafts: false,
     kind: "word",
     page_size: 50,
     cursor: "page-2"
@@ -126,6 +126,79 @@ it("首批50条后加载第51条并选中完整目标，加载期间阻止重复
   );
   expect(screen.queryByRole("button", { name: "加载更多" })).toBeNull();
 });
+
+it("默认仅发布候选，主动展开草稿重新查首页且忽略旧分页响应", async () => {
+  const latePage = pending<SearchComponentTargetsV3Response>();
+  search
+    .mockResolvedValueOnce(response([candidate(0)], "published-page-2"))
+    .mockReturnValueOnce(latePage.promise)
+    .mockResolvedValueOnce(response([candidate(1)]))
+    .mockResolvedValueOnce(response([candidate(0)]));
+  const onReplace = vi.fn();
+  render(
+    <V3TargetCascader literal="give" targets={[]} onReplace={onReplace} />
+  );
+  fireEvent.click(await screen.findByRole("button", { name: "加载更多" }));
+  expect(search.mock.calls[0]![0].include_drafts).toBe(false);
+  fireEvent.click(screen.getByRole("checkbox", { name: "显示草稿候选" }));
+  await screen.findByText("give 1");
+  expect(search.mock.calls[2]![0]).toEqual(
+    expect.objectContaining({ include_drafts: true })
+  );
+  expect(search.mock.calls[2]![0]).not.toHaveProperty("cursor");
+  latePage.resolve(response([candidate(2)]));
+  await waitFor(() =>
+    expect(screen.queryByText("give 2")).not.toBeInTheDocument()
+  );
+  fireEvent.click(screen.getByRole("checkbox", { name: "显示草稿候选" }));
+  await screen.findByText("give 0");
+  expect(search.mock.calls[3]![0].include_drafts).toBe(false);
+  expect(search.mock.calls[3]![0]).not.toHaveProperty("cursor");
+  expect(onReplace).not.toHaveBeenCalled();
+});
+
+it.each([true, false])(
+  "同词条发布与草稿共存时按具体节点标识依赖（草稿先到=%s）",
+  async (draftFirst) => {
+    const published = candidate(0);
+    const draft = structuredClone(published);
+    delete draft.publication_id;
+    delete draft.senses[0]!.publication_id;
+    draft.senses[0]!.gloss = "已有词义草稿文案";
+    draft.senses.push({
+      ...draft.senses[0]!,
+      sense_id: "new-sense",
+      gloss: "新增未发布词义"
+    });
+    search.mockResolvedValue(
+      response(draftFirst ? [draft, published] : [published, draft])
+    );
+    const onReplace = vi.fn();
+    render(
+      <V3TargetCascader literal="give" targets={[]} onReplace={onReplace} />
+    );
+    fireEvent.click(await screen.findByText("give 0"));
+    fireEvent.click(await screen.findByText("原形 give"));
+    expect(screen.getAllByText("未发布目标")).toHaveLength(1);
+    fireEvent.click(screen.getByText("释义 0"));
+    expect(onReplace).toHaveBeenLastCalledWith(
+      [
+        expect.objectContaining({
+          target_publication_id: "pub-0",
+          target_sense_id: "sense-0"
+        })
+      ],
+      undefined
+    );
+    fireEvent.click(screen.getByText("新增未发布词义"));
+    expect(onReplace.mock.lastCall![0][0]).toMatchObject({
+      target_sense_id: "new-sense"
+    });
+    expect(onReplace.mock.lastCall![0][0]).not.toHaveProperty(
+      "target_publication_id"
+    );
+  }
+);
 
 it("跨页同词条合并词形和词义，不重复第一列或丢后页词义", async () => {
   const first = candidate(0);

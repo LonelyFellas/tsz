@@ -34,5 +34,5 @@ export function useV3ReferenceGuard(): V3ReferenceGuard {
 }
 
 export function referenceBlockedHint(count: number): string {
-  return `被 ${count} 处引用，需先解除引用`;
+  return `被 ${count} 处引用，可编辑并保存草稿，发布前需修复影响`;
 }

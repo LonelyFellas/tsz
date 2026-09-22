@@ -62,7 +62,7 @@ export interface V3FormGroupCardProps {
   onChange: (next: DraftFormsStepContentV3) => void;
   onDelete?: () => void;
   deleteDisabled?: boolean;
-  /** 本组词形被引用的处数；大于 0 时删组不可点（会连带删掉被引用的词形）。 */
+  /** 本组词形被引用的处数；只作发布前影响提示，不阻断草稿编辑。 */
   deleteBlockedByReferences?: number;
   onMove?: (offset: -1 | 1) => void;
   posCatalog?: PartOfSpeechCatalogItem;
@@ -133,11 +133,7 @@ export function V3FormGroupCard({
     blockedFormId === undefined
       ? undefined
       : pos.forms.find((item) => item.id === blockedFormId);
-  if (
-    blockedForm &&
-    (lockedBaseFormIds.has(blockedForm.id) ||
-      formReferenceCount(referenceGuard.index, blockedForm) > 0)
-  )
+  if (blockedForm && lockedBaseFormIds.has(blockedForm.id))
     setBlockedFormId(undefined);
   const formRow = (
     member: WordFormGroupV3["members"][number],
@@ -165,7 +161,7 @@ export function V3FormGroupCard({
     const formReferences = formReferenceCount(referenceGuard.index, form);
     const referenceHint =
       formReferences > 0
-        ? `存在 ${formReferences} 处关联，解除所有关联才能删除词形`
+        ? `存在 ${formReferences} 处关联，可保存删除草稿，发布前需修复`
         : undefined;
     // 改类型的提示：告知会影响多少处引用，但不阻断编辑。
     const formTypeChangeHint =
@@ -178,17 +174,12 @@ export function V3FormGroupCard({
     const formLabel =
       sameTypeMembers.length > 1 ? `${baseLabel} ${sameTypeIndex}` : baseLabel;
     const formPositionLabel = `${baseLabel} ${sameTypeIndex}`;
-    const deleteLocked =
-      lastRequiredForm ||
-      member.id === soleBaseMembershipId ||
-      formReferences > 0;
-    const deleteReason =
-      referenceHint ??
-      (lastRequiredForm
-        ? "每个词性至少保留一个词形"
-        : member.id === soleBaseMembershipId
-          ? BASE_REQUIRED_HINT
-          : undefined);
+    const deleteLocked = lastRequiredForm || member.id === soleBaseMembershipId;
+    const deleteReason = lastRequiredForm
+      ? "每个词性至少保留一个词形"
+      : member.id === soleBaseMembershipId
+        ? BASE_REQUIRED_HINT
+        : undefined;
 
     return {
       membershipId: member.id,
@@ -256,7 +247,7 @@ export function V3FormGroupCard({
             <Popconfirm
               cancelButtonProps={{ "aria-label": "取消删除词形并保留" }}
               cancelText="取消"
-              description="词形的拼写与发音会一并删除。"
+              description={`词形的拼写与发音会一并删除。${referenceHint ?? ""}`}
               disabled={deleteLocked}
               okButtonProps={{
                 "aria-label": "删除词形及相关发音",
@@ -386,15 +377,12 @@ export function V3FormGroupCard({
                     icon: <DeleteOutlined />,
                     label:
                       deleteBlockedByReferences > 0
-                        ? "本组词形被引用，不能删除"
+                        ? "删除草稿词形组（发布前需修复引用）"
                         : deleteDisabled
                           ? "至少保留一个词形"
                           : "删除本组",
                     danger: true,
-                    disabled:
-                      deleteDisabled ||
-                      deleteBlockedByReferences > 0 ||
-                      !onDelete
+                    disabled: deleteDisabled || !onDelete
                   }
                 ],
                 onClick: ({ key }) => {

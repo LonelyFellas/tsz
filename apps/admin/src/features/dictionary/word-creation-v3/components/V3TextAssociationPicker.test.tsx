@@ -98,7 +98,7 @@ it("关联单词只查询并展示单词，保留稳定目标身份", async () =
       q: "give",
       kind: "word",
       match: "exact",
-      include_drafts: true
+      include_drafts: false
     })
   );
   expect(
@@ -251,12 +251,16 @@ it("关联短语只展示短语及其成分，不再提供短语本身入口", a
       q: "give up",
       kind: "phrase",
       match: "exact",
-      include_drafts: true
+      include_drafts: false
     })
   );
-  // 成分展开的子查询同样按词形等值、含草稿。
+  // 成分展开的子查询同样按词形等值，默认仅发布目标。
   expect(search).toHaveBeenCalledWith(
-    expect.objectContaining({ q: "give", match: "exact", include_drafts: true })
+    expect.objectContaining({
+      q: "give",
+      match: "exact",
+      include_drafts: false
+    })
   );
   expect(
     column(0).queryByText("give", { exact: true })

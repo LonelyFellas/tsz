@@ -330,7 +330,7 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     catalogState.pending = undefined;
   });
 
-  it("原形变体被例句标注：英美切换与改类型可点、删词形与删词性仍锁，徽标可点开并跳转", async () => {
+  it("被引用节点可编辑删除草稿，徽标仍可打开来源", async () => {
     const initial = multiPosFixture();
     const pos = initial.pos[0]!;
     const base = pos.forms[0]!;
@@ -360,7 +360,6 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     );
     await screen.findByLabelText("原形英美通用拼写");
 
-    const hint = "被 1 处引用，需先解除引用";
     const firstGroup = within(
       document.querySelector<HTMLElement>(
         `[data-group-id="${uuidFromInt(11)}"]`
@@ -377,20 +376,14 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     expect(firstGroup.getByLabelText("英美拼写无区别")).not.toBeDisabled();
     // 同词性里没被引用的第 2 组照常可切。
     expect(secondGroup.getByLabelText("英美拼写有区别")).not.toBeDisabled();
-    // 删词形仍锁：引用失去锚点。
     const deleteForm = screen.getByLabelText("删除变化组 1 的词形 1");
-    expect(deleteForm).toBeDisabled();
-    await expectDisabledReason(
-      deleteForm,
-      "存在 1 处关联，解除所有关联才能删除词形"
-    );
+    expect(deleteForm).toBeEnabled();
     // TASK#58：改类型保护式放开——可点，但给漂移提示。
     expect(screen.getByLabelText("变化组 1 词形 1 类型")).not.toBeDisabled();
     // 漂移提示收成警示图标 + 悬停说明，可及名保留完整文案。
     await screen.findByLabelText(/修改词形类型会让 1 处引用漂移/);
     const deletePos = screen.getByLabelText("删除名词");
-    expect(deletePos).toBeDisabled();
-    await expectDisabledReason(deletePos, hint);
+    expect(deletePos).toBeEnabled();
     // 同组没被引用的第 2 个词形不受影响（它非本组唯一原形，不受锁删规则影响）。
     const deleteOther = screen.getByLabelText("删除变化组 1 的词形 2");
     expect(deleteOther).not.toBeDisabled();
@@ -405,7 +398,7 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     // 两个词性、三个词形加目录加载，全量并行跑时接近默认 5s，显式放宽而不是靠重跑。
   }, 20_000);
 
-  it("删除词形的确认框开着时引用数据才到：待删词形被引用就收起确认框并禁用删除", async () => {
+  it("删除确认期间引用数据到达：保留确认并提示发布前需修复，仍可删除草稿", async () => {
     const initial = multiPosFixture();
     const pos = initial.pos[0]!;
     const secondBase = pos.forms[1]!;
@@ -443,8 +436,15 @@ describe("V3FormsAndPronunciationStep 被引用节点保护", () => {
     expect(openDeleteConfirm()).not.toBeNull();
 
     rendered.rerender(<Guarded references={[reference]} />);
-    await waitFor(() => expect(openDeleteConfirm()).toBeNull());
-    expect(screen.getByLabelText("删除变化组 1 的词形 2")).toBeDisabled();
+    expect(openDeleteConfirm()).not.toBeNull();
+    expect(screen.getByLabelText("删除变化组 1 的词形 2")).toBeEnabled();
+    expect(openDeleteConfirm()).toHaveTextContent(
+      "存在 1 处关联，可保存删除草稿，发布前需修复"
+    );
+    fireEvent.click(screen.getByLabelText("删除词形及相关发音"));
+    await waitFor(() =>
+      expect(screen.queryByDisplayValue("second-base")).toBeNull()
+    );
   }, 20_000);
 
   it("拼写与被引用片段对不上时即时标红，改回一致（大小写除外）即恢复", async () => {

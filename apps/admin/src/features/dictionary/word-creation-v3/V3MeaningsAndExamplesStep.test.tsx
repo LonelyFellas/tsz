@@ -58,7 +58,12 @@ const v3LayoutCss = readFileSync(
 
 const relatedSearch = vi.hoisted(() =>
   vi.fn(
-    (_query: string, _kind: "word" | "phrase" | undefined, _open: boolean) => ({
+    (
+      _query: string,
+      _kind: "word" | "phrase" | undefined,
+      _open: boolean,
+      _includeDrafts = false
+    ) => ({
       exact: {
         data: {
           pages: [
@@ -1926,7 +1931,28 @@ describe("V3MeaningsAndExamplesStep", () => {
       score: "0",
       pending_target_headword: "outside"
     });
-    expect(relatedSearch).toHaveBeenCalledWith("outside", "word", true, true);
+    expect(relatedSearch).toHaveBeenLastCalledWith(
+      "outside",
+      "word",
+      true,
+      false
+    );
+    const beforeToggle = value();
+    fireEvent.click(screen.getByRole("switch", { name: "显示关联词草稿候选" }));
+    expect(relatedSearch).toHaveBeenLastCalledWith(
+      "outside",
+      "word",
+      true,
+      true
+    );
+    expect(value()).toEqual(beforeToggle);
+    fireEvent.click(screen.getByRole("switch", { name: "显示关联词草稿候选" }));
+    expect(relatedSearch).toHaveBeenLastCalledWith(
+      "outside",
+      "word",
+      true,
+      false
+    );
     fireEvent.click(screen.getAllByText("outside").at(-1)!);
     expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
       target_word_id: "external-word-1"
@@ -1976,13 +2002,18 @@ describe("V3MeaningsAndExamplesStep", () => {
       .at(-1)!;
     fireEvent.change(pendingTarget, { target: { value: "苹果" } });
     expect(within(synonymCard).getByText(/仅支持英文词条/u)).toBeVisible();
-    expect(relatedSearch).not.toHaveBeenCalledWith("苹果", "word", true, true);
+    expect(relatedSearch).not.toHaveBeenCalledWith("苹果", "word", true, false);
     expect(value().pos[0]!.senses[0]!.relations[2]).not.toHaveProperty(
       "pending_target_headword"
     );
 
     fireEvent.change(pendingTarget, { target: { value: "  give   up  " } });
-    expect(relatedSearch).toHaveBeenCalledWith("give up", "phrase", true, true);
+    expect(relatedSearch).toHaveBeenCalledWith(
+      "give up",
+      "phrase",
+      true,
+      false
+    );
     expect(value().pos[0]!.senses[0]!.relations[2]).toMatchObject({
       pending_target_headword: "give up"
     });
@@ -2111,7 +2142,7 @@ describe("V3MeaningsAndExamplesStep", () => {
       });
       fireEvent.click(screen.getByText("保存草稿"));
       expect(onSave).toHaveBeenCalledWith(value(), "save");
-      expect(relatedSearch).toHaveBeenCalledWith("reli", "word", true, true);
+      expect(relatedSearch).toHaveBeenCalledWith("reli", "word", true, false);
       let targetInput = screen.getByLabelText(`${label}目标词条`);
       let metricInput = screen.getByLabelText(
         label === "近义词" ? "相似度" : label === "反义词" ? "差异度" : "关联度"
@@ -3009,6 +3040,75 @@ describe("V3MeaningsAndExamplesStep", () => {
       expect(options.some((text) => text?.includes("selfword"))).toBe(false);
     }
   );
+
+  it("同词条跨页发布和草稿结果合并，新增词义单独标识且仍可选择", () => {
+    relatedSearch.mockImplementation((query, kind, open, includeDrafts) => {
+      const result = defaultRelatedSearchImplementation(query, kind, open);
+      const published = result.contains.data.pages[0]!.results[0]!;
+      Object.assign(published, { status: "published" });
+      if (includeDrafts) {
+        result.contains.data.pages.push({
+          results: [
+            {
+              ...published,
+              status: "draft",
+              senses: [{ sense_id: "new-draft-sense", gloss: "新增草稿义" }]
+            } as never
+          ],
+          total: 2,
+          next_cursor: null
+        });
+      }
+      return result;
+    });
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [];
+    render(<Harness initial={initial} />);
+    fireEvent.click(screen.getByText("添加近义词").closest("button")!);
+    fireEvent.change(screen.getByLabelText("近义词目标词条"), {
+      target: { value: "beyond" }
+    });
+    fireEvent.click(screen.getByRole("switch", { name: "显示关联词草稿候选" }));
+    fireEvent.click(screen.getAllByText("beyond").at(-1)!);
+    fireEvent.mouseDown(screen.getByLabelText("近义词目标词义"));
+    expect(screen.getAllByText("外部词义二").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("未发布词义").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getAllByText("新增草稿义").at(-1)!);
+    expect(value().pos[0]!.senses[0]!.relations[0]).toMatchObject({
+      target_word_id: "external-word-2",
+      target_sense_id: "new-draft-sense"
+    });
+  });
+
+  it("刷新后无需展开草稿也显示已保存关联的未发布词义状态", () => {
+    const initial = structuredClone(meaningsFixture);
+    initial.pos[0]!.senses[0]!.relations = [
+      {
+        id: "saved-draft-relation",
+        relation: "synonym",
+        score: "80",
+        target_word_id: "published-word-with-new-sense",
+        target_sense_id: "new-sense"
+      }
+    ];
+    render(
+      <Harness
+        initial={initial}
+        relationSnapshots={{
+          "saved-draft-relation": {
+            headword: "harbour",
+            gloss: "新增词义",
+            target_status: "draft"
+          }
+        }}
+      />
+    );
+    expect(screen.getByText("未发布词义")).toBeVisible();
+    expect(
+      screen.getByRole("switch", { name: "显示关联词草稿候选" })
+    ).not.toBeChecked();
+    expect(value()).toEqual(initial);
+  });
 
   it("有词义的草稿仍可显式选择词条和词义", () => {
     relatedSearch.mockImplementation((query, kind, open) => {
@@ -4825,7 +4925,7 @@ describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
     ).toBeInTheDocument();
   });
 
-  it("多组模式下词义页可同时选择两个专用组并回显", () => {
+  it("多组模式下词义页可同时选择两个专用组并回显", async () => {
     const forms = dedicatedForms();
     forms.pos[0]!.form_groups[0]!.scope = "dedicated";
     render(<Harness forms={forms} multiGroupBindingsEnabled />);
@@ -4843,7 +4943,10 @@ describe("V3MeaningsAndExamplesStep 词形与发音绑定", () => {
     ]);
     expect(select.closest(".ant-select")).toHaveTextContent("第 1 组 · job");
     expect(select.closest(".ant-select")).toHaveTextContent("第 2 组 · Job");
-    expect(screen.getByLabelText("删除词义 1")).toBeDisabled();
+    expect(screen.getByLabelText("删除词义 1")).toBeEnabled();
+    fireEvent.click(screen.getByLabelText("删除词义 1"));
+    fireEvent.click(await screen.findByText("确认删除"));
+    expect(value().pos[0]!.senses).toHaveLength(0);
   });
 
   it("只列本词性专用组，最后一个绑定不能直接改回通用", async () => {

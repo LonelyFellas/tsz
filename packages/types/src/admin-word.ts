@@ -151,6 +151,7 @@ export interface RelatedSearchQuery {
   kind?: AdminWordKind;
   match_mode?: RelatedSearchMatchMode;
   exclude_exact?: boolean;
+  /** 默认仅发布内容；展开后同词条可分别返回发布词义与新增草稿词义，需合并并保留具体状态。 */
   include_drafts?: boolean;
   page_size?: number;
   /** deprecated legacy alias; cannot be combined with page_size */

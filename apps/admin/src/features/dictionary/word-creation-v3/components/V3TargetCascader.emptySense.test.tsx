@@ -114,7 +114,7 @@ it("全部词义为空时禁用词形，不产生可选空白叶子", async () =
     <V3TargetCascader literal="some" targets={[]} onReplace={onReplace} />
   );
   fireEvent.click(await screen.findByText("some"));
-  const form = screen.getByText("原形 some（暂无可关联词义）");
+  const form = await screen.findByText("原形 some（暂无可关联词义）");
   expect(form.closest("li")).toHaveClass("ant-cascader-menu-item-disabled");
   fireEvent.click(form);
   expect(onReplace).not.toHaveBeenCalled();
