@@ -553,73 +553,79 @@ export function SentenceEditor({
             )}
           />
         )}
-        {variant && (
-          <V3SentenceTargetDiscovery
-            key={`discovery:${row.variant_id}`}
-            sentenceText={row.text}
-            dialect={row.dialect}
-            disabled={saving || pendingAnnotation}
-            selectionBlocked={discoveryBlocked}
-            onDiscover={async (request, signal) =>
-              discoveryResult(
-                await discoveryRequests.resolveSentenceTargets(
-                  discoveryInput(request),
-                  signal
-                ),
-                request.dialect,
-                { pos: posLabel, form: formLabel }
-              )
-            }
-            onSelectSense={(occurrence, candidate, sense) => {
-              if (
-                normalizeSentenceSurface(
-                  occurrence.segments
-                    .map((segment) => segment.surface)
-                    .join(" ")
-                ) !== normalizeSentenceSurface(candidate.matchedForm)
-              ) {
-                setError("目标词形与当前片段不一致，请重新查询");
-                return;
+        {variant &&
+          sourceWord?.capabilities.sentence_target_discovery !== false && (
+            <V3SentenceTargetDiscovery
+              key={`discovery:${row.variant_id}`}
+              sentenceText={row.text}
+              dialect={row.dialect}
+              disabled={saving || pendingAnnotation}
+              selectionBlocked={discoveryBlocked}
+              onDiscover={async (request, signal) =>
+                discoveryResult(
+                  await discoveryRequests.resolveSentenceTargets(
+                    discoveryInput(request),
+                    signal
+                  ),
+                  request.dialect,
+                  { pos: posLabel, form: formLabel }
+                )
               }
-              addDiscoveredAnnotation(
-                occurrence,
-                discoveredAnnotation(row.dialect, occurrence, candidate, sense)
-              );
-              setTargetLabels((current) => ({
-                ...current,
-                [`${candidate.entryId}:${sense.id}`]: `${candidate.headword} · ${sense.gloss}`
-              }));
-            }}
-            onViewDraft={(_occurrence, candidate) => {
-              const query = new URLSearchParams({
-                mode: "edit",
-                ...(candidate.senses[0]
-                  ? { focus_node: candidate.senses[0].id }
-                  : {})
-              });
-              window.open(
-                `/words/${encodeURIComponent(candidate.entryId)}/v3/wizard/meanings?${query}`,
-                "_blank",
-                "noopener"
-              );
-            }}
-            onCreatePending={(occurrence) =>
-              addDiscoveredAnnotation(occurrence, {
-                id: crypto.randomUUID(),
-                source_dialect: row.dialect,
-                source_segments: occurrence.segments,
-                target: {
-                  state: "pending",
-                  kind: occurrence.kind === "word" ? "word" : "phrase",
-                  headword: occurrence.segments
-                    .map((segment) => segment.surface)
-                    .join(" "),
-                  gloss: null
+              onSelectSense={(occurrence, candidate, sense) => {
+                if (
+                  normalizeSentenceSurface(
+                    occurrence.segments
+                      .map((segment) => segment.surface)
+                      .join(" ")
+                  ) !== normalizeSentenceSurface(candidate.matchedForm)
+                ) {
+                  setError("目标词形与当前片段不一致，请重新查询");
+                  return;
                 }
-              })
-            }
-          />
-        )}
+                addDiscoveredAnnotation(
+                  occurrence,
+                  discoveredAnnotation(
+                    row.dialect,
+                    occurrence,
+                    candidate,
+                    sense
+                  )
+                );
+                setTargetLabels((current) => ({
+                  ...current,
+                  [`${candidate.entryId}:${sense.id}`]: `${candidate.headword} · ${sense.gloss}`
+                }));
+              }}
+              onViewDraft={(_occurrence, candidate) => {
+                const query = new URLSearchParams({
+                  mode: "edit",
+                  ...(candidate.senses[0]
+                    ? { focus_node: candidate.senses[0].id }
+                    : {})
+                });
+                window.open(
+                  `/words/${encodeURIComponent(candidate.entryId)}/v3/wizard/meanings?${query}`,
+                  "_blank",
+                  "noopener"
+                );
+              }}
+              onCreatePending={(occurrence) =>
+                addDiscoveredAnnotation(occurrence, {
+                  id: crypto.randomUUID(),
+                  source_dialect: row.dialect,
+                  source_segments: occurrence.segments,
+                  target: {
+                    state: "pending",
+                    kind: occurrence.kind === "word" ? "word" : "phrase",
+                    headword: occurrence.segments
+                      .map((segment) => segment.surface)
+                      .join(" "),
+                    gloss: null
+                  }
+                })
+              }
+            />
+          )}
         <V3SentenceTranslationsField
           sentence={content.sentence}
           index={0}

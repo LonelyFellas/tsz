@@ -126,6 +126,23 @@ beforeEach(() => {
   });
 });
 describe("当前词条关联与离开保护", () => {
+  it("后端明确关闭发现能力时隐藏发现入口，保留例句编辑", () => {
+    const sourceWord = sentenceWord("source", "make");
+    sourceWord.capabilities.sentence_target_discovery = false;
+    show(
+      <SentenceEditor
+        sentence={example()}
+        sourceWord={sourceWord}
+        sourceSenseId="sense"
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole("button", { name: "一键发现" })).toBeNull();
+    expect(screen.getByRole("textbox", { name: "例句正文" })).toBeEnabled();
+    expect(discoverTargets).not.toHaveBeenCalled();
+  });
+
   it("自动发现接入真实请求接口形状，选择只更新抽屉，完成时保存具体节点", async () => {
     const current = example();
     discoverTargets.mockResolvedValue(
