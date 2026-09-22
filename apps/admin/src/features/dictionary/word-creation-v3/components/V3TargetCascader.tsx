@@ -4,6 +4,7 @@ import {
   Alert,
   Button,
   Cascader,
+  Checkbox,
   Empty,
   Flex,
   Spin,
@@ -79,7 +80,7 @@ interface CandidateEntryGroup {
   entryId: string;
   headword: string;
   kind: PublishedSentenceTargetCandidateV3["kind"];
-  /** 从未发布的草稿词条：候选没有 publication_id，关联上去也不带发布版本。 */
+  /** 当前候选集合没有该词条的发布快照；具体依赖还需看叶子目标的 publication_id。 */
   draft: boolean;
   formGroups: CandidateFormGroup[];
 }
@@ -190,9 +191,10 @@ function cascaderOptionsFromGroups(
                 preferredTarget &&
                 leafKeyOf(usage) === leafKeyOf(preferredTarget)
             );
+            const target = selected ?? preferred ?? sense.usages[0];
             return {
               value: sense.senseId,
-              target: selected ?? preferred ?? sense.usages[0],
+              target,
               disabled: readOnly || sense.gloss.trim().length === 0,
               label: (
                 <span className="v3-component-usage-sense">
@@ -201,6 +203,9 @@ function cascaderOptionsFromGroups(
                     className={`v3-component-usage-radio${selected ? " is-checked" : ""}`}
                   />
                   {sense.gloss.trim() || "词义未填写"}
+                  {target && !target.target_publication_id && (
+                    <Tag className="v3-component-usage-draft">未发布目标</Tag>
+                  )}
                 </span>
               )
             };
@@ -243,6 +248,8 @@ function groupsFromCandidates(
       draft: candidate.publication_id === undefined,
       formGroups: []
     };
+    entry.draft &&= candidate.publication_id === undefined;
+    if (candidate.publication_id) entry.headword = candidate.headword;
     // 没有词义的候选无从关联；不造可勾选却写不出数据的空节点，只留一条禁用的词条行。
     if (candidate.senses.length === 0) {
       if (!byEntry.has(candidate.entry_id))
@@ -321,12 +328,19 @@ function groupsFromCandidates(
           };
           formGroup.senses.push(groupedSense);
         }
-        if (
-          groupedSense.usages.some(
-            (usage) => usage.target_variant_id === form.variant_id
+        if (sense.publication_id) groupedSense.gloss = sense.gloss;
+        const existingUsage = groupedSense.usages.findIndex(
+          (usage) => usage.target_variant_id === form.variant_id
+        );
+        if (existingUsage !== -1) {
+          // 同一具体节点优先发布快照，不依赖查询排序或分页到达顺序。
+          if (
+            groupedSense.usages[existingUsage]!.target_publication_id ||
+            !sense.publication_id
           )
-        )
-          continue;
+            continue;
+          groupedSense.usages.splice(existingUsage, 1);
+        }
         const usage: ResolvedTarget = {
           state: "resolved",
           target_word_id: candidate.entry_id,
@@ -497,6 +511,7 @@ export function V3TargetCascader({
       ])
   );
   const [initialTarget] = useState(() => selectedTarget ?? targets[0]);
+  const [includeDrafts, setIncludeDrafts] = useState(false);
   const [searchState, setSearchState] = useState(initialSearchState);
   const searchActions = useRef<{ more: () => void; reload: () => void } | null>(
     null
@@ -522,7 +537,7 @@ export function V3TargetCascader({
             schema_version: 3,
             q: literal,
             match: "exact",
-            include_drafts: true,
+            include_drafts: includeDrafts,
             ...(targetKind ? { kind: targetKind } : {}),
             page_size: 50,
             ...(cursor ? { cursor } : {})
@@ -575,7 +590,7 @@ export function V3TargetCascader({
       searchActions.current = null;
       controller.abort();
     };
-  }, [literal, targetKind, requests]);
+  }, [literal, targetKind, requests, includeDrafts]);
 
   const state = {
     ...searchState,
@@ -593,7 +608,7 @@ export function V3TargetCascader({
     return () => {
       context.current.active = false;
     };
-  }, [literal, targetKind]);
+  }, [literal, targetKind, includeDrafts]);
 
   const directCandidates = useMemo(() => {
     if (phraseSelection !== "entry") return state.candidates;
@@ -731,7 +746,7 @@ export function V3TargetCascader({
             q: component.literal,
             entry_id: component.target.target_word_id,
             match: "exact",
-            include_drafts: true,
+            include_drafts: includeDrafts,
             page_size: 50,
             ...(cursor ? { cursor } : {})
           });
@@ -760,7 +775,7 @@ export function V3TargetCascader({
         if (generation.active) componentPending.current.delete(component.key);
       }
     },
-    [requests]
+    [requests, includeDrafts]
   );
   // 单选：至多一条关联。回填单条路径（存量多于一条时以第一条为准，选新词义时整组替换）。
   const selected = targets[0];
@@ -925,6 +940,17 @@ export function V3TargetCascader({
   };
   const pagination = (
     <>
+      <Checkbox
+        checked={includeDrafts}
+        onChange={(event) => setIncludeDrafts(event.target.checked)}
+      >
+        显示草稿候选
+      </Checkbox>
+      {includeDrafts && (
+        <Typography.Text type="secondary">
+          草稿目标尚未发布，保存关联不代表可以发布。
+        </Typography.Text>
+      )}
       {state.error ? (
         <Alert showIcon title={state.error} type="warning" />
       ) : null}

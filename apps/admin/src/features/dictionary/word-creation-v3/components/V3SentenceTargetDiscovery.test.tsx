@@ -30,6 +30,18 @@ function renderDiscovery(
   return { ...props, onDiscover, ...view };
 }
 
+function nodeIdentity(entry: string, kind: "word" | "phrase" = "word") {
+  return {
+    posId: `${entry}-pos`,
+    baseFormId: `${entry}-base`,
+    kind,
+    matchedDialect: "common" as const,
+    matchedFormId: `${entry}-base`,
+    matchedVariantId: `${entry}-variant`,
+    matchedFormType: "base" as const
+  };
+}
+
 function discoveryResult(): V3SentenceTargetDiscoveryResult {
   return {
     complete: true,
@@ -38,6 +50,7 @@ function discoveryResult(): V3SentenceTargetDiscoveryResult {
       {
         candidates: [
           {
+            ...nodeIdentity("entry-location"),
             baseForm: "location",
             entryId: "entry-location",
             headword: "location",
@@ -61,6 +74,7 @@ function discoveryResult(): V3SentenceTargetDiscoveryResult {
       {
         candidates: [
           {
+            ...nodeIdentity("entry-central-location", "phrase"),
             baseForm: "central location",
             entryId: "entry-central-location",
             headword: "central location",
@@ -133,10 +147,17 @@ describe("V3SentenceTargetDiscovery", () => {
     expect(onDiscover.mock.calls[0]?.[0]).toEqual(
       expect.objectContaining({
         mode: "selected_segments",
-        scope: "published_and_draft",
+        scope: "published",
         segments: [expect.objectContaining({ surface: "turn the light off" })]
       })
     );
+    fireEvent.click(screen.getByRole("checkbox", { name: "显示草稿候选" }));
+    expect(onDiscover).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "查询所选单词或短语" }));
+    await waitFor(() => expect(onDiscover).toHaveBeenCalledTimes(2));
+    expect(onDiscover.mock.calls[1]?.[0]).toMatchObject({
+      scope: "published_and_draft"
+    });
   });
 
   it("手动查询完成后修改 segments 会立即清空旧结果且不自动重查", async () => {
@@ -213,8 +234,8 @@ describe("V3SentenceTargetDiscovery", () => {
     ).toBeNull();
   });
 
-  it("草稿候选只提供查看或转为待关联词条，且界面不出现英文状态名", async () => {
-    const onConvertDraftToPending = vi.fn();
+  it("主动展开草稿后可选择具体词义，并明确提示未发布依赖", async () => {
+    const onSelectSense = vi.fn();
     const onViewDraft = vi.fn();
     const result: V3SentenceTargetDiscoveryResult = {
       complete: true,
@@ -223,6 +244,7 @@ describe("V3SentenceTargetDiscovery", () => {
         {
           candidates: [
             {
+              ...nodeIdentity("entry-turn-off", "phrase"),
               baseForm: "turn off",
               entryId: "entry-turn-off",
               headword: "turn off",
@@ -245,12 +267,13 @@ describe("V3SentenceTargetDiscovery", () => {
       ]
     };
     renderDiscovery({
-      onConvertDraftToPending,
+      onSelectSense,
       onDiscover: vi.fn().mockResolvedValue(result),
       onViewDraft
     });
 
     fireEvent.click(screen.getByLabelText("手动选择"));
+    fireEvent.click(screen.getByRole("checkbox", { name: "显示草稿候选" }));
     fireEvent.click(
       screen.getByRole("button", { name: /选择第 2 个词 turn/u })
     );
@@ -259,11 +282,20 @@ describe("V3SentenceTargetDiscovery", () => {
 
     expect(await screen.findByText("草稿候选")).toBeVisible();
     expect(document.body).not.toHaveTextContent(/\b(?:Linked|Pending)\b/u);
-    expect(screen.queryByRole("button", { name: /关联词义/u })).toBeNull();
+    expect(screen.getByText(/具体目标尚未发布/)).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "查看草稿" }));
-    fireEvent.click(screen.getByRole("button", { name: "转为待关联词条" }));
     expect(onViewDraft).toHaveBeenCalledTimes(1);
-    expect(onConvertDraftToPending).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "查看 1 个词义" }));
+    fireEvent.click(screen.getByRole("button", { name: "关联词义：关闭" }));
+    expect(onSelectSense).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "occurrence-turn-off" }),
+      expect.objectContaining({
+        entryId: "entry-turn-off",
+        posId: "entry-turn-off-pos",
+        state: "draft"
+      }),
+      expect.objectContaining({ id: "draft-sense" })
+    );
   });
 
   it("加载、过载和空结果通过 aria-live 清晰反馈", async () => {
@@ -374,6 +406,7 @@ describe("V3SentenceTargetDiscovery", () => {
             segments: [{ start: 0, end: 5, surface: "wrong" }],
             candidates: [
               {
+                ...nodeIdentity("wrong-entry"),
                 id: "wrong-candidate",
                 entryId: "wrong-entry",
                 headword: "wrong",
@@ -654,6 +687,7 @@ describe("V3SentenceTargetDiscovery", () => {
           publishedTotal: 3,
           candidates: [
             {
+              ...nodeIdentity("phrase-entry", "phrase"),
               id: "phrase-candidate",
               entryId: "phrase-entry",
               headword: "central location",
@@ -696,7 +730,7 @@ describe("V3SentenceTargetDiscovery", () => {
     fireEvent.click(screen.getByRole("button", { name: "一键发现" }));
 
     expect(
-      await screen.findByText(/已显示 1 \/ 3 个已发布候选/u)
+      await screen.findByText(/已加载 1 个具体候选.*本次检索约 3 个/u)
     ).toBeVisible();
     expect(screen.getByText("当前词形的成分用词")).toBeVisible();
     expect(screen.getByText("待选择词义")).toBeVisible();

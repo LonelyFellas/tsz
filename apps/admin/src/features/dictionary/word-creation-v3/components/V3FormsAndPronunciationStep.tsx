@@ -9,6 +9,7 @@ import {
   Flex,
   Space,
   Tabs,
+  Tooltip,
   Typography
 } from "antd";
 import type {
@@ -38,7 +39,6 @@ import {
 import { V3FormGroupSenseEditor } from "./V3FormGroupSenseEditor";
 import { countFormGroupBindings } from "../meaningsModel";
 import { V3PosTab } from "./V3PosTab";
-import { V3DisabledReason } from "./V3DisabledReason";
 import { V3ReferenceBadge } from "./V3ReferenceBadge";
 import { posNodeIds, posReferenceCount } from "../referenceGuard";
 import {
@@ -332,8 +332,8 @@ export function V3FormsAndPronunciationStep({
                   />
                   <V3ReferenceBadge label={label} nodeIds={posNodeIds(pos)} />
                   {value.pos.length > 1 ? (
-                    <V3DisabledReason
-                      reason={
+                    <Tooltip
+                      title={
                         posReferences > 0
                           ? referenceBlockedHint(posReferences)
                           : undefined
@@ -342,7 +342,6 @@ export function V3FormsAndPronunciationStep({
                       <Button
                         aria-label={`删除${label}`}
                         danger
-                        disabled={posReferences > 0}
                         icon={<MinusCircleOutlined />}
                         onClick={(event) => {
                           event.stopPropagation();
@@ -358,7 +357,7 @@ export function V3FormsAndPronunciationStep({
                         size="small"
                         type="text"
                       />
-                    </V3DisabledReason>
+                    </Tooltip>
                   ) : null}
                 </Space>
               </span>

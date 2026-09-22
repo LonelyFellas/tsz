@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-2-completion/docs/openapi.json",
-  "_source_sha256": "38932a97455223f421bbeb7b2bf5a636cc92f2e119d54194c5037260e5573922",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-2-remaining/docs/openapi.json",
+  "_source_sha256": "93d87d405f4957c9744b585f3eb07cf55b2e5674f80b91a19183bc2866e116fa",
   "roots": [
     "SharedSentence",
     "SharedSentenceList",
@@ -470,24 +470,6 @@
       },
       "additionalProperties": false
     },
-    "DraftSentenceTargetCandidateV3": {
-      "type": "object",
-      "required": [
-        "entry_id",
-        "entry_revision",
-        "headword",
-        "target_state",
-        "linkability"
-      ],
-      "properties": {
-        "entry_id": { "type": "string", "format": "uuid" },
-        "entry_revision": { "type": "integer" },
-        "headword": { "type": "string" },
-        "linkability": { "$ref": "#/$defs/SentenceTargetDraftLinkabilityV3" },
-        "target_state": { "$ref": "#/$defs/SentenceTargetDraftStateV3" }
-      },
-      "additionalProperties": false
-    },
     "DraftValidationResponseV3": {
       "type": "object",
       "required": ["schema_version", "validated_revision", "valid", "issues"],
@@ -869,7 +851,8 @@
         "publication_sense_ref",
         "draft_relation",
         "phrase_component",
-        "form_group_sense_binding"
+        "form_group_sense_binding",
+        "draft_text_link"
       ]
     },
     "InboundReferenceNodeTypeV3": {
@@ -1665,11 +1648,6 @@
       "type": "string",
       "enum": ["complete", "overloaded"]
     },
-    "SentenceTargetDraftLinkabilityV3": {
-      "type": "string",
-      "enum": ["pending_only"]
-    },
-    "SentenceTargetDraftStateV3": { "type": "string", "enum": ["draft"] },
     "SentenceTargetMatchEvidenceV3": {
       "type": "object",
       "required": ["surface", "normalized_surface", "match_kind"],
@@ -1691,14 +1669,16 @@
         "segments_fingerprint",
         "normalized_surface",
         "published_total",
+        "draft_total",
         "published_matches",
         "draft_matches"
       ],
       "properties": {
         "draft_matches": {
           "type": "array",
-          "items": { "$ref": "#/$defs/DraftSentenceTargetCandidateV3" }
+          "items": { "$ref": "#/$defs/PublishedSentenceTargetCandidateV3" }
         },
+        "draft_total": { "type": "integer", "minimum": 0 },
         "next_cursor": { "type": "string" },
         "normalized_surface": { "type": "string" },
         "published_matches": {

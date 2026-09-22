@@ -10,7 +10,13 @@ import { App } from "antd";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, Link, RouterProvider } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { SharedSentence, SharedSentenceAnnotation } from "@tsz/types";
+import type {
+  SharedSentence,
+  SharedSentenceAnnotation,
+  PublishedSentenceTargetCandidateV3,
+  ResolveSentenceTargetsV3Response,
+  ResolveSentenceTargetsV3Input
+} from "@tsz/types";
 import { SentenceEditor } from "./SentenceEditor";
 import { SharedSentenceAssociationPicker } from "./SharedSentenceAssociationPicker";
 import { newSentence } from "./model";
@@ -37,8 +43,12 @@ vi.mock("@/lib/auth", () => ({
   api: { sentences: { targets: vi.fn(), update: vi.fn(), create: vi.fn() } }
 }));
 const searchTargets = vi.hoisted(() => vi.fn());
+const discoverTargets = vi.hoisted(() => vi.fn());
 vi.mock("../dictionary/word-creation-v3/api", () => ({
-  createV3WordRequests: () => ({ searchComponentTargets: searchTargets })
+  createV3WordRequests: () => ({
+    searchComponentTargets: searchTargets,
+    resolveSentenceTargets: discoverTargets
+  })
 }));
 const target = {
   id: "source",
@@ -73,8 +83,39 @@ function show(ui: React.ReactNode) {
     </QueryClientProvider>
   );
 }
+function discoveryResponse(
+  published: PublishedSentenceTargetCandidateV3[],
+  drafts: PublishedSentenceTargetCandidateV3[] = []
+): ResolveSentenceTargetsV3Response {
+  return {
+    schema_version: 3,
+    sentence_hash: "sentence-hash",
+    discovery_generation: 1,
+    completeness: "complete",
+    range_results: [
+      {
+        source_segments: [{ start: 3, end: 7, surface: "make" }],
+        normalized_surface: "make",
+        segments_fingerprint: "make-range",
+        published_total: published.length,
+        draft_total: drafts.length,
+        published_matches: published,
+        draft_matches: drafts
+      }
+    ]
+  };
+}
+function publishedCandidate() {
+  const candidate = sentenceCandidate("target", "make");
+  candidate.publication_id = "target-publication";
+  candidate.senses.forEach((sense) => {
+    sense.publication_id = "target-publication";
+  });
+  return candidate;
+}
 beforeEach(() => {
   vi.resetAllMocks();
+  discoverTargets.mockResolvedValue(discoveryResponse([]));
   searchTargets.mockResolvedValue({
     matches: [sentenceCandidate("source", "make")],
     truncated: false
@@ -85,6 +126,172 @@ beforeEach(() => {
   });
 });
 describe("当前词条关联与离开保护", () => {
+  it("后端明确关闭发现能力时隐藏发现入口，保留例句编辑", () => {
+    const sourceWord = sentenceWord("source", "make");
+    sourceWord.capabilities.sentence_target_discovery = false;
+    show(
+      <SentenceEditor
+        sentence={example()}
+        sourceWord={sourceWord}
+        sourceSenseId="sense"
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole("button", { name: "一键发现" })).toBeNull();
+    expect(screen.getByRole("textbox", { name: "例句正文" })).toBeEnabled();
+    expect(discoverTargets).not.toHaveBeenCalled();
+  });
+
+  it("自动发现接入真实请求接口形状，选择只更新抽屉，完成时保存具体节点", async () => {
+    const current = example();
+    discoverTargets.mockResolvedValue(
+      discoveryResponse([publishedCandidate()])
+    );
+    vi.mocked(api.sentences.update).mockImplementation(async (_id, input) => ({
+      ...current,
+      content: input.content,
+      revision: 4
+    }));
+    const onSaved = vi.fn();
+    show(
+      <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={onSaved} />
+    );
+    expect(discoverTargets).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "一键发现" }));
+    await waitFor(() =>
+      expect(discoverTargets).toHaveBeenCalledWith(
+        {
+          schema_version: 3,
+          mode: "all_published_targets",
+          sentence_text: "We make stories.",
+          source_dialect: "common",
+          page_size_per_range: 50
+        },
+        expect.any(AbortSignal)
+      )
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "查看 1 个词义" })
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "关联词义：编造（故事、借口等）" })
+    );
+    expect(api.sentences.update).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    await waitFor(() => expect(api.sentences.update).toHaveBeenCalledTimes(1));
+    expect(
+      vi.mocked(api.sentences.update).mock.calls[0]![1].content.annotations
+    ).toEqual([
+      expect.objectContaining({
+        source_dialect: "common",
+        source_segments: [{ start: 3, end: 7, surface: "make" }],
+        target: {
+          ...sentenceTarget("target"),
+          target_publication_id: "target-publication"
+        }
+      })
+    ]);
+    await waitFor(() =>
+      expect(onSaved).toHaveBeenCalledWith(
+        expect.objectContaining({ revision: 4 })
+      )
+    );
+  });
+
+  it("主动展开已发布词条的新增草稿词义，保存时不误带旧发布号", async () => {
+    const current = example();
+    const published = publishedCandidate();
+    const draft = sentenceCandidate("target", "make");
+    draft.senses[0]!.sense_id = "new-draft-sense";
+    draft.senses[0]!.gloss = "新增草稿词义";
+    discoverTargets.mockImplementation(
+      async (input: ResolveSentenceTargetsV3Input) =>
+        discoveryResponse(
+          [published],
+          input.mode === "selected_segments" && input.include_drafts
+            ? [draft]
+            : []
+        )
+    );
+    vi.mocked(api.sentences.update).mockImplementation(async (_id, input) => ({
+      ...current,
+      content: input.content,
+      revision: 4
+    }));
+    show(
+      <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
+    );
+    fireEvent.click(screen.getByLabelText("手动选择"));
+    fireEvent.click(screen.getByRole("button", { name: "选择第 2 个词 make" }));
+    fireEvent.click(screen.getByRole("button", { name: "查询所选单词或短语" }));
+    await screen.findByText("已发布");
+    expect(discoverTargets.mock.calls[0]![0].include_drafts).toBe(false);
+    expect(screen.queryByText("草稿候选")).toBeNull();
+    fireEvent.click(screen.getByRole("checkbox", { name: "显示草稿候选" }));
+    expect(discoverTargets).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "查询所选单词或短语" }));
+    const card = (await screen.findByText("草稿候选")).closest("article")!;
+    expect(discoverTargets.mock.calls[1]![0].include_drafts).toBe(true);
+    expect(within(card).getByText(/具体目标尚未发布/)).toBeVisible();
+    fireEvent.click(
+      within(card).getByRole("button", { name: "查看 1 个词义" })
+    );
+    fireEvent.click(
+      within(card).getByRole("button", { name: "关联词义：新增草稿词义" })
+    );
+    expect(api.sentences.update).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    await waitFor(() => expect(api.sentences.update).toHaveBeenCalledTimes(1));
+    const annotation = vi.mocked(api.sentences.update).mock.calls[0]![1].content
+      .annotations[0]!;
+    expect(annotation.target).toEqual({
+      ...sentenceTarget("target"),
+      target_sense_id: "new-draft-sense"
+    });
+    expect(annotation.target).not.toHaveProperty("target_publication_id");
+  });
+
+  it("发现结果不覆盖已有标注，也不能绕过当前词义的关联要求", async () => {
+    const original: SharedSentenceAnnotation = {
+      id: "existing",
+      source_dialect: "common",
+      source_segments: [{ start: 3, end: 7, surface: "make" }],
+      target: sentenceTarget("source")
+    };
+    discoverTargets.mockResolvedValue(
+      discoveryResponse([publishedCandidate()])
+    );
+    const current = example([original]);
+    vi.mocked(api.sentences.update).mockImplementation(async (_id, input) => ({
+      ...current,
+      content: input.content,
+      revision: 4
+    }));
+    show(
+      <SentenceEditor
+        sentence={current}
+        sourceWord={sentenceWord("source", "make")}
+        sourceSenseId="sense"
+        onClose={vi.fn()}
+        onSaved={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: "一键发现" }));
+    expect(
+      await screen.findByText("该片段已有标注，请先清除或修改原关联")
+    ).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "查看 1 个词义" }));
+    expect(
+      screen.getByRole("button", { name: "关联词义：编造（故事、借口等）" })
+    ).toBeDisabled();
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    await waitFor(() => expect(api.sentences.update).toHaveBeenCalledTimes(1));
+    expect(
+      vi.mocked(api.sentences.update).mock.calls[0]![1].content.annotations
+    ).toEqual([original]);
+  });
+
   it.each(["made", "make"])(
     "调序后首候选文案跟随配置，%s 不会自动绑定或绕过同拼写歧义保护",
     async (spelling) => {
@@ -245,7 +452,7 @@ describe("当前词条关联与离开保护", () => {
         q: "make",
         match: "exact",
         kind: "word",
-        include_drafts: true
+        include_drafts: false
       }),
       expect.any(AbortSignal)
     );

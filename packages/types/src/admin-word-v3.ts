@@ -467,22 +467,17 @@ export interface PublishedSentenceTargetCandidateV3 {
   senses: SentenceTargetSenseV3[];
 }
 
-export interface DraftSentenceTargetCandidateV3 {
-  entry_id: string;
-  entry_revision: number;
-  headword: string;
-  target_state: "draft";
-  linkability: "pending_only";
-}
-
 export interface SentenceTargetRangeResultV3 {
   source_segments: SentenceSourceRangeV3[];
   segments_fingerprint: string;
   normalized_surface: string;
   published_total: number;
+  /** 排除同一已发布目标组合后的草稿节点候选数。 */
+  draft_total: number;
   published_matches: PublishedSentenceTargetCandidateV3[];
+  /** 两种候选共用稳定游标和页容量，绑定展开草稿的查询范围。 */
   next_cursor?: string;
-  draft_matches: DraftSentenceTargetCandidateV3[];
+  draft_matches: PublishedSentenceTargetCandidateV3[];
 }
 
 /** 按关键字检索短语成分目标：对已发布词面做包含匹配，与 resolve 的候选同构。 */
@@ -502,7 +497,7 @@ export interface SearchComponentTargetsV3Input {
    * 屈折词形（jobs / gave）照样命中原形词条。例句里点词做关联要用 `exact`。
    */
   match?: "contains" | "exact";
-  /** 把从未发布的 V3 草稿词条（不限创建者）也列为候选；草稿候选没有 `publication_id`。 */
+  /** 把当前 V3 草稿（不限创建者，包含已发布词条的新增节点）也列为候选；草稿候选没有 `publication_id`。 */
   include_drafts?: boolean;
 }
 
@@ -951,7 +946,7 @@ export interface FormsImpactResponseV3 {
   affected: FormsImpactItemV3[];
   confirmation_token?: string;
   surface_match_page?: SurfaceMatchPageV3;
-  /** 本次词形变更会破坏的入站引用；非空时保存必 409 `inbound_reference_conflict`。无违例时省略。 */
+  /** 草稿变更的引用影响；不阻止保存，发布前必须修复。发布冲突返回 `inbound_reference_conflict`。 */
   blocked_references?: InboundReferenceV3[];
 }
 
@@ -959,6 +954,7 @@ export interface FormsImpactResponseV3 {
 export type InboundReferenceKindV3 =
   | "shared_sentence"
   | "publication_sense_ref"
+  | "draft_text_link"
   | "draft_relation"
   | "phrase_component"
   | "form_group_sense_binding";

@@ -103,7 +103,6 @@ import {
   reachableUsageCount,
   V3PhraseComponentUsagesCard
 } from "./components/V3PhraseComponentUsagesCard";
-import { V3DisabledReason } from "./components/V3DisabledReason";
 import { V3ReferenceBadge } from "./components/V3ReferenceBadge";
 import {
   nodesBlockingReferenceCount,
@@ -360,8 +359,8 @@ function SenseEditorShell({
                   singleItemTitle="至少需要两个词义"
                   dragImageSelector=".word-sense-sortable"
                 />
-                <V3DisabledReason
-                  reason={
+                <Tooltip
+                  title={
                     referenceCount > 0
                       ? referenceBlockedHint(referenceCount)
                       : undefined
@@ -373,20 +372,19 @@ function SenseEditorShell({
                     okText="确认删除"
                     cancelText="取消"
                     okButtonProps={{ danger: true }}
-                    disabled={!confirmDelete || referenceCount > 0}
+                    disabled={!confirmDelete}
                     onConfirm={onDelete}
                   >
                     <Button
                       aria-label={`删除词义 ${index + 1}`}
                       icon={<DeleteOutlined />}
                       danger
-                      disabled={referenceCount > 0}
                       size="small"
                       type="text"
                       onClick={confirmDelete ? undefined : onDelete}
                     />
                   </Popconfirm>
-                </V3DisabledReason>
+                </Tooltip>
               </Space>
             ),
             children
@@ -1131,20 +1129,38 @@ interface RelatedWordChoice {
   headword: string;
   matchedHeadword: string;
   status: "draft" | "published";
-  senses: Array<{ sense_id: string; gloss: string }>;
+  senses: Array<{
+    sense_id: string;
+    gloss: string;
+    status: "draft" | "published";
+  }>;
 }
 
 function relatedWordChoices(
   results: RelatedWordResultAny[]
 ): RelatedWordChoice[] {
-  return Array.from(
-    new Map(
-      results.map((result) => {
-        const wordId =
-          result.schema_version === 3 ? result.entry_id : result.word_id;
-        return [
-          wordId,
-          {
+  const words = new Map<string, RelatedWordChoice>();
+  for (const result of results) {
+    const wordId =
+      result.schema_version === 3 ? result.entry_id : result.word_id;
+    const status =
+      result.schema_version === 3
+        ? (result.status ?? "published")
+        : "published";
+    const existing = words.get(wordId);
+    const senses = new Map(
+      existing?.senses.map((sense) => [sense.sense_id, sense])
+    );
+    for (const sense of result.senses) {
+      if (senses.get(sense.sense_id)?.status !== "published") {
+        senses.set(sense.sense_id, { ...sense, status });
+      }
+    }
+    // 同一词条可能跨页同时返回发布词义及新增草稿词义；不能以 entry_id 覆盖整条结果。
+    words.set(wordId, {
+      ...(existing?.status === "published"
+        ? existing
+        : {
             word_id: wordId,
             headword:
               result.schema_version === 3
@@ -1155,16 +1171,12 @@ function relatedWordChoices(
                 ? (result.presentation.matched_surfaces[0] ??
                   result.presentation.label)
                 : result.headword,
-            status:
-              result.schema_version === 3
-                ? (result.status ?? "published")
-                : "published",
-            senses: result.senses
-          }
-        ] as const;
-      })
-    ).values()
-  );
+            status
+          }),
+      senses: [...senses.values()]
+    });
+  }
+  return [...words.values()];
 }
 
 /** 未保存选择优先用搜索结果，已绑定关系回显服务端快照。 */
@@ -1232,13 +1244,14 @@ function RelationsGrid({
     wordId: string;
     query: string;
   }>();
+  const [includeDrafts, setIncludeDrafts] = useState(false);
   const activeSearch = searching ?? senseSearch;
   const preparedSearch = validateEntryInput(activeSearch?.query ?? "");
   const relatedSearch = useRelatedSearch(
     preparedSearch.normalized,
     preparedSearch.kind,
     Boolean(activeSearch?.query.trim()) && !preparedSearch.issue,
-    true
+    includeDrafts
   );
   // 完全相同的排在前面，其余按整词命中的跟在后面。
   const searchWords = relatedWordChoices(
@@ -1322,6 +1335,20 @@ function RelationsGrid({
 
   return (
     <div className="word-relations-grid word-relations-grid-stacked">
+      <Flex align="center" gap="small">
+        <Switch
+          aria-label="显示关联词草稿候选"
+          checked={includeDrafts}
+          onChange={setIncludeDrafts}
+          size="small"
+        />
+        <Typography.Text>显示关联词草稿候选</Typography.Text>
+        {includeDrafts && (
+          <Typography.Text type="secondary">
+            草稿目标尚未发布，保存关联不代表可以发布。
+          </Typography.Text>
+        )}
+      </Flex>
       {RELATION_TYPES.map((relationType) => {
         const meta = RELATION_META[relationType];
         const relations = groupRelations(
@@ -2134,6 +2161,10 @@ function RelationsGrid({
                                           )
                                           .map((item) => ({
                                             sense_id: item.target_sense_id!,
+                                            status:
+                                              relationDisplaySnapshots?.[
+                                                item.id
+                                              ]?.target_status,
                                             gloss:
                                               relationDisplaySnapshots?.[
                                                 item.id
@@ -2155,7 +2186,17 @@ function RelationsGrid({
                                       ].map((item) => [
                                         item.sense_id,
                                         {
-                                          label: item.gloss || "（无释义）",
+                                          label: (
+                                            <span>
+                                              {item.gloss || "（无释义）"}
+                                              {"status" in item &&
+                                                item.status === "draft" && (
+                                                  <Tag color="warning">
+                                                    未发布词义
+                                                  </Tag>
+                                                )}
+                                            </span>
+                                          ),
                                           value: item.sense_id
                                         }
                                       ])
@@ -2623,8 +2664,8 @@ function V3MeaningsAndExamplesStepContent({
                     forms.pos.length > 1 &&
                     forms.pos.some((formPos) => formPos.pos_id === posId) &&
                     onFormsChange ? (
-                      <V3DisabledReason
-                        reason={
+                      <Tooltip
+                        title={
                           posReferenceCount(posId) > 0
                             ? referenceBlockedHint(posReferenceCount(posId))
                             : undefined
@@ -2633,7 +2674,6 @@ function V3MeaningsAndExamplesStepContent({
                         <Button
                           aria-label={`删除${visiblePosLabel(posId, displayPosIndex)}`}
                           danger
-                          disabled={posReferenceCount(posId) > 0}
                           icon={<MinusCircleOutlined />}
                           onClick={(event) => {
                             event.stopPropagation();
@@ -2649,7 +2689,7 @@ function V3MeaningsAndExamplesStepContent({
                           size="small"
                           type="text"
                         />
-                      </V3DisabledReason>
+                      </Tooltip>
                     ) : null}
                   </Space>
                 </span>

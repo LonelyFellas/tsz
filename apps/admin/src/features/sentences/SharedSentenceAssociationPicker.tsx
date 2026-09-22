@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { linkedSentenceAnnotation } from "./associationModel";
 import { Alert, Button, Flex, Input, Radio, Typography } from "antd";
 import type { AssociationPickerProps } from "@tsz/voice-editor/types";
 import type {
@@ -149,37 +150,26 @@ export function SharedSentenceAssociationPicker({
                 `${choice.target_word_id}:${choice.target_sense_id}`,
                 `${choice.target_headword} · ${choice.target_gloss}`
               );
-            onSelect({
-              id: selected?.id ?? crypto.randomUUID(),
-              source_dialect: dialect,
-              source_segments: segments,
-              target:
-                mode === "linked" && choice
-                  ? {
-                      state: "linked",
-                      target_entry_id: choice.target_word_id,
-                      target_pos_id: choice.target_pos_id,
-                      target_base_form_id: choice.target_base_form_id,
-                      target_form_id: choice.target_form_id,
-                      target_variant_id: choice.target_variant_id,
-                      // 记录目标方言侧：变体 id 会随英美结构切换而变，引用按「词形 + 方言侧」重解析。
-                      ...(choice.target_dialect
-                        ? { target_dialect: choice.target_dialect }
-                        : {}),
-                      target_sense_id: choice.target_sense_id,
-                      ...(choice.target_publication_id
-                        ? {
-                            target_publication_id: choice.target_publication_id
-                          }
-                        : {})
-                    }
-                  : {
+            onSelect(
+              mode === "linked" && choice
+                ? linkedSentenceAnnotation(
+                    dialect,
+                    segments,
+                    choice,
+                    selected?.id
+                  )
+                : {
+                    id: selected?.id ?? crypto.randomUUID(),
+                    source_dialect: dialect,
+                    source_segments: segments,
+                    target: {
                       state: "pending",
                       kind,
                       headword: literal.trim(),
                       gloss: gloss.trim() || null
                     }
-            });
+                  }
+            );
           }}
         >
           确认关联

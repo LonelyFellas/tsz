@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-2-completion/docs/openapi.json",
-  "_generatedAt": "2026-09-21T07:25:43.159Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-2-remaining/docs/openapi.json",
+  "_generatedAt": "2026-09-22T04:00:23.292Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1992,7 +1992,7 @@
         "blocked_references": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/InboundReferenceV3" },
-          "description": "本次词形变更会破坏的入站引用；非空时保存必 409 `inbound_reference_conflict`。无违例时省略。",
+          "description": "本次词形变更会影响的入站引用。允许保存草稿；破坏性影响必须在发布前修复，发布冲突返回 `inbound_reference_conflict`。无违例时省略。",
           "maxItems": 500
         },
         "confirmation_token": { "type": "string", "format": "uuid" },
@@ -2054,7 +2054,8 @@
         "publication_sense_ref",
         "draft_relation",
         "phrase_component",
-        "form_group_sense_binding"
+        "form_group_sense_binding",
+        "draft_text_link"
       ]
     },
     "InboundReferenceNodeTypeV3": {
@@ -2111,7 +2112,7 @@
         "publication_id": { "type": "string", "format": "uuid" },
         "reference_kind": {
           "type": "string",
-          "description": "发布引用的 `reference_kind`：relation / sentence_context / phrase_component / text_link。"
+          "description": "内容引用种类：relation / sentence_context / phrase_component / text_link；草稿正文也使用 text_link。"
         },
         "relation_type": {
           "type": "string",
@@ -2540,7 +2541,7 @@
         },
         "include_drafts": {
           "type": "boolean",
-          "description": "是否把**从未发布**的 V3 草稿词条（不限创建者）也列为候选；草稿候选没有 `publication_id`。\n已发布词条只按其当前发布版本出现，草稿里未发布的改动不作候选。",
+          "description": "是否把当前 V3 草稿（不限创建者，包括已发布词条的新增节点）也列为候选；草稿候选没有 `publication_id`。\n已发布词条只按其当前发布版本出现，草稿里未发布的改动不作候选。",
           "default": false
         },
         "kind": {
@@ -2703,38 +2704,11 @@
         "publication_id": {
           "type": "string",
           "format": "uuid",
-          "description": "命中的发布版本。**缺省即草稿候选**（只在 `include_drafts = true` 时出现）：词条从未发布，\n关联它时 `target_publication_id` 同样留空，保存时按目标当前草稿内容校验。"
+          "description": "命中的发布版本。**缺省即草稿候选**（只在 `include_drafts = true` 时出现），包括已发布词条的当前草稿；\n关联它时 `target_publication_id` 同样留空，保存时按目标当前草稿内容校验。"
         },
         "senses": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/SentenceTargetSenseV3" }
-        }
-      },
-      "additionalProperties": false
-    },
-    "SentenceTargetDraftStateV3": { "type": "string", "enum": ["draft"] },
-    "SentenceTargetDraftLinkabilityV3": {
-      "type": "string",
-      "enum": ["pending_only"]
-    },
-    "DraftSentenceTargetCandidateV3": {
-      "type": "object",
-      "required": [
-        "entry_id",
-        "entry_revision",
-        "headword",
-        "target_state",
-        "linkability"
-      ],
-      "properties": {
-        "entry_id": { "type": "string", "format": "uuid" },
-        "entry_revision": { "type": "integer", "format": "int64" },
-        "headword": { "type": "string" },
-        "linkability": {
-          "$ref": "#/components/schemas/SentenceTargetDraftLinkabilityV3"
-        },
-        "target_state": {
-          "$ref": "#/components/schemas/SentenceTargetDraftStateV3"
         }
       },
       "additionalProperties": false
@@ -2746,6 +2720,7 @@
         "segments_fingerprint",
         "normalized_surface",
         "published_total",
+        "draft_total",
         "published_matches",
         "draft_matches"
       ],
@@ -2753,8 +2728,15 @@
         "draft_matches": {
           "type": "array",
           "items": {
-            "$ref": "#/components/schemas/DraftSentenceTargetCandidateV3"
-          }
+            "$ref": "#/components/schemas/PublishedSentenceTargetCandidateV3"
+          },
+          "description": "与发布候选共用完整节点结构，publication_id 缺省。保存绑定稳定节点，发布前仍须处理未发布依赖。\n与 published_matches 共用 page_size_per_range 和 next_cursor，已发布候选优先。"
+        },
+        "draft_total": {
+          "type": "integer",
+          "format": "int64",
+          "description": "主动展开时当前可见的未发布具体节点候选数；不包含已发布的同一目标组合。",
+          "minimum": 0
         },
         "next_cursor": {
           "type": "string",

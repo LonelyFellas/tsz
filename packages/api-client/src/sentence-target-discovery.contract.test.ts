@@ -185,6 +185,7 @@ describe("句内目标发现 · api-client 契约", () => {
       "source_segments",
       "segments_fingerprint",
       "published_total",
+      "draft_total",
       "published_matches",
       "draft_matches"
     );
@@ -195,7 +196,7 @@ describe("句内目标发现 · api-client 契约", () => {
     expect(segments.maxItems).toBe(20);
   });
 
-  it("候选保留 entry/POS/base/sense 身份，发布版本可缺省（草稿候选）；resolve 的草稿只能转 Pending", () => {
+  it("发布与草稿共用完整节点身份，草稿可选择具体词义而非只能转 Pending", () => {
     const baseCandidate = schemaByRequiredProperties(
       "entry_id",
       "pos_id",
@@ -212,16 +213,13 @@ describe("句内目标发现 · api-client 契约", () => {
     expect(property(sense, "publication_id")).toBeDefined();
     expect(sense.required).not.toContain("publication_id");
 
-    const draftCandidate = schemaByRequiredProperties(
-      "entry_id",
-      "entry_revision",
-      "target_state",
-      "linkability"
+    const response = dereference(
+      operationSchemas[operationKey]?.responses["200"]
     );
-    expect(literal(draftCandidate.properties?.target_state)).toBe("draft");
-    expect(literal(draftCandidate.properties?.linkability)).toBe(
-      "pending_only"
-    );
-    expect(draftCandidate.properties?.publication_id).toBeUndefined();
+    const range = dereference(property(response, "range_results").items);
+    const draftCandidate = dereference(property(range, "draft_matches").items);
+    expect(draftCandidate).toEqual(baseCandidate);
+    expect(draftCandidate.properties?.linkability).toBeUndefined();
+    expect(draftCandidate.properties?.entry_revision).toBeUndefined();
   });
 });

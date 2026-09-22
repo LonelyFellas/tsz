@@ -10,6 +10,7 @@ import {
   Alert,
   Button,
   Card,
+  Checkbox,
   Empty,
   Flex,
   Radio,
@@ -18,7 +19,7 @@ import {
   Typography
 } from "antd";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { PhraseComponentUsageV3 } from "@tsz/types";
+import type { PhraseComponentUsageV3, WordFormTypeV3 } from "@tsz/types";
 import { sentenceTokens, type SentenceToken } from "../tokens";
 import "./V3SentenceTargetDiscovery.css";
 
@@ -43,6 +44,9 @@ export type V3SentenceTargetDiscoveryCandidateState =
 export interface V3SentenceTargetDiscoveryCandidate {
   id: string;
   entryId: string;
+  posId: string;
+  baseFormId: string;
+  kind: "word" | "phrase";
   publicationId?: string;
   headword: string;
   baseForm: string;
@@ -53,9 +57,10 @@ export interface V3SentenceTargetDiscoveryCandidate {
   senses: V3SentenceTargetDiscoverySense[];
   senseTotal: number;
   componentUsages?: PhraseComponentUsageV3[];
-  matchedDialect?: V3SentenceTargetDiscoveryDialect;
-  matchedFormId?: string;
-  matchedVariantId?: string;
+  matchedDialect: V3SentenceTargetDiscoveryDialect;
+  matchedFormId: string;
+  matchedVariantId: string;
+  matchedFormType: WordFormTypeV3;
 }
 
 export type V3SentenceTargetDiscoveryKind =
@@ -68,6 +73,7 @@ export interface V3SentenceTargetDiscoveryOccurrence {
   segments: V3SentenceTargetDiscoverySegment[];
   candidates: V3SentenceTargetDiscoveryCandidate[];
   publishedTotal?: number;
+  draftTotal?: number;
   nextCursor?: string;
   componentWords?: string[];
   coveredByPhrase?: string;
@@ -88,7 +94,7 @@ export type V3SentenceTargetDiscoveryRequest =
     }
   | {
       mode: "selected_segments";
-      scope: "published_and_draft";
+      scope: "published" | "published_and_draft";
       sentenceText: string;
       dialect: V3SentenceTargetDiscoveryDialect;
       segments: V3SentenceTargetDiscoverySegment[];
@@ -97,6 +103,10 @@ export type V3SentenceTargetDiscoveryRequest =
 
 interface Props {
   sentenceText: string;
+  disabled?: boolean;
+  selectionBlocked?: (
+    occurrence: V3SentenceTargetDiscoveryOccurrence
+  ) => string | undefined;
   dialect: V3SentenceTargetDiscoveryDialect;
   onDiscover: (
     request: V3SentenceTargetDiscoveryRequest,
@@ -196,9 +206,12 @@ export function V3SentenceTargetDiscovery({
   onSelectSense,
   onViewDraft,
   onConvertDraftToPending,
-  onCreatePending
+  onCreatePending,
+  disabled = false,
+  selectionBlocked
 }: Props) {
   const [mode, setMode] = useState<DiscoveryMode>("automatic");
+  const [includeDrafts, setIncludeDrafts] = useState(false);
   const [selectedIndexes, setSelectedIndexes] = useState<Set<number>>(
     () => new Set()
   );
@@ -223,6 +236,7 @@ export function V3SentenceTargetDiscovery({
   const contextFingerprint = JSON.stringify({
     dialect,
     mode,
+    includeDrafts,
     segments,
     sentenceText
   });
@@ -237,7 +251,7 @@ export function V3SentenceTargetDiscovery({
     setResult(undefined);
     setActiveOccurrenceId(undefined);
     setExpandedCandidates(new Set());
-  }, [dialect, mode, segmentsFingerprint, sentenceText]);
+  }, [dialect, mode, includeDrafts, segmentsFingerprint, sentenceText]);
 
   useEffect(
     () => () => {
@@ -261,7 +275,7 @@ export function V3SentenceTargetDiscovery({
         : {
             dialect,
             mode: "selected_segments",
-            scope: "published_and_draft",
+            scope: includeDrafts ? "published_and_draft" : "published",
             segments,
             sentenceText
           };
@@ -317,7 +331,7 @@ export function V3SentenceTargetDiscovery({
   const loadMoreCandidates = async (
     occurrence: V3SentenceTargetDiscoveryOccurrence
   ) => {
-    if (!occurrence.nextCursor) return;
+    if (disabled || loading || loadingMore || !occurrence.nextCursor) return;
     const requestFingerprint = contextFingerprintRef.current;
     const requestId = ++requestIdRef.current;
     abortRef.current?.abort();
@@ -330,7 +344,10 @@ export function V3SentenceTargetDiscovery({
         {
           dialect,
           mode: "selected_segments",
-          scope: "published_and_draft",
+          scope:
+            mode === "manual" && includeDrafts
+              ? "published_and_draft"
+              : "published",
           segments: occurrence.segments,
           sentenceText,
           cursor: occurrence.nextCursor
@@ -369,7 +386,8 @@ export function V3SentenceTargetDiscovery({
                         ).values()
                       ),
                       nextCursor: incoming.nextCursor,
-                      publishedTotal: incoming.publishedTotal
+                      publishedTotal: incoming.publishedTotal,
+                      draftTotal: incoming.draftTotal
                     }
                   : item
               )
@@ -389,6 +407,9 @@ export function V3SentenceTargetDiscovery({
     }
   };
 
+  const blockedReason = activeOccurrence
+    ? selectionBlocked?.(activeOccurrence)
+    : undefined;
   const statusText = loading
     ? "正在发现句中的已发布单词和连续短语"
     : error
@@ -416,11 +437,12 @@ export function V3SentenceTargetDiscovery({
         <div className="v3-sentence-target-discovery-intro">
           <Typography.Text strong>从例句中发现已有词条</Typography.Text>
           <Typography.Paragraph type="secondary">
-            自动发现当前匹配已发布单词和连续短语；手动选择支持不连续成分并可同时查看草稿。保存抽屉后才会写入数据库。
+            自动发现已发布词条；手动选词可主动展开草稿。选择具体词义后只更新当前编辑内容，点击完成才会保存。
           </Typography.Paragraph>
         </div>
         <Radio.Group
           aria-label="发现方式"
+          disabled={disabled}
           buttonStyle="solid"
           onChange={(event) => setMode(event.target.value as DiscoveryMode)}
           optionType="button"
@@ -440,10 +462,10 @@ export function V3SentenceTargetDiscovery({
         <div className="v3-sentence-target-discovery-action">
           <Flex align="center" gap={12} justify="space-between" wrap>
             <Typography.Text type="secondary">
-              一次查询句中的单词和连续短语；重叠时优先加入最长短语，多词义结果仍由你确认。
+              查询单词和连续短语；具体词义由你确认，不自动覆盖已有标注。
             </Typography.Text>
             <Button
-              disabled={!sentenceText.trim()}
+              disabled={disabled || !sentenceText.trim()}
               icon={<SearchOutlined aria-hidden />}
               loading={loading}
               onClick={() => void runDiscovery()}
@@ -463,7 +485,7 @@ export function V3SentenceTargetDiscovery({
               </Typography.Paragraph>
             </div>
             <Button
-              disabled={segments.length === 0}
+              disabled={disabled || segments.length === 0}
               icon={<FileSearchOutlined aria-hidden />}
               loading={loading}
               onClick={() => void runDiscovery()}
@@ -472,6 +494,13 @@ export function V3SentenceTargetDiscovery({
               查询所选单词或短语
             </Button>
           </Flex>
+          <Checkbox
+            checked={includeDrafts}
+            disabled={disabled}
+            onChange={(event) => setIncludeDrafts(event.target.checked)}
+          >
+            显示草稿候选
+          </Checkbox>
           {tokens.length > 0 ? (
             <div
               aria-label="例句单词选择区"
@@ -483,6 +512,7 @@ export function V3SentenceTargetDiscovery({
                   <button
                     aria-label={`选择第 ${token.wordIndex + 1} 个词 ${token.text}`}
                     aria-pressed={selected}
+                    disabled={disabled}
                     className={selected ? "is-selected" : undefined}
                     key={token.key}
                     onClick={() =>
@@ -531,6 +561,9 @@ export function V3SentenceTargetDiscovery({
         {statusText}
       </div>
 
+      {blockedReason ? (
+        <Alert showIcon type="info" title={blockedReason} />
+      ) : null}
       {error ? (
         <Alert showIcon title="发现失败" description={error} type="error" />
       ) : null}
@@ -587,13 +620,10 @@ export function V3SentenceTargetDiscovery({
                   </Tag>
                 </Space>
                 <Typography.Text type="secondary">
-                  {activeOccurrence.publishedTotal !== undefined &&
-                  activeOccurrence.publishedTotal >
-                    activeOccurrence.candidates.filter(
-                      (candidate) => candidate.state !== "draft"
-                    ).length
-                    ? `已显示 ${activeOccurrence.candidates.filter((candidate) => candidate.state !== "draft").length} / ${activeOccurrence.publishedTotal} 个已发布候选，请缩小手动选择范围查看其余结果`
-                    : `${activeOccurrence.candidates.length} 个候选词条`}
+                  已加载 {activeOccurrence.candidates.length} 个具体候选
+                  {activeOccurrence.publishedTotal !== undefined
+                    ? `（本次检索约 ${activeOccurrence.publishedTotal + (activeOccurrence.draftTotal ?? 0)} 个）`
+                    : ""}
                 </Typography.Text>
               </Flex>
 
@@ -695,33 +725,38 @@ export function V3SentenceTargetDiscovery({
                               </Flex>
                             ) : null}
                           </div>
-                          {draft ? (
-                            <Space size={6}>
+                          <Space size={6}>
+                            {draft && onViewDraft ? (
                               <Button
                                 icon={<EyeOutlined aria-hidden />}
-                                onClick={() =>
-                                  onViewDraft?.(activeOccurrence, candidate)
-                                }
                                 size="small"
+                                onClick={() =>
+                                  onViewDraft(activeOccurrence, candidate)
+                                }
                               >
                                 查看草稿
                               </Button>
+                            ) : null}
+                            {draft &&
+                            candidate.senses.length === 0 &&
+                            onConvertDraftToPending ? (
                               <Button
-                                icon={<PlusOutlined aria-hidden />}
+                                disabled={disabled || Boolean(blockedReason)}
+                                size="small"
                                 onClick={() =>
-                                  onConvertDraftToPending?.(
+                                  onConvertDraftToPending(
                                     activeOccurrence,
                                     candidate
                                   )
                                 }
-                                size="small"
-                                type="primary"
                               >
                                 转为待关联词条
                               </Button>
-                            </Space>
-                          ) : (
+                            ) : null}
                             <Button
+                              disabled={
+                                disabled || candidate.senses.length === 0
+                              }
                               onClick={() =>
                                 setExpandedCandidates((current) => {
                                   const next = new Set(current);
@@ -738,21 +773,15 @@ export function V3SentenceTargetDiscovery({
                                 ? "收起词义"
                                 : `查看 ${candidate.senseTotal} 个词义`}
                             </Button>
-                          )}
+                          </Space>
                         </Flex>
 
-                        {draft && candidate.senses[0] ? (
-                          <div className="v3-sentence-target-discovery-draft-gloss">
-                            <Typography.Text type="secondary">
-                              预填词义
-                            </Typography.Text>
-                            <Typography.Text>
-                              {candidate.senses[0].gloss}
-                            </Typography.Text>
-                          </div>
+                        {draft ? (
+                          <Typography.Text type="warning">
+                            具体目标尚未发布，保存引用不代表已满足发布条件。
+                          </Typography.Text>
                         ) : null}
-
-                        {!draft && expanded ? (
+                        {expanded ? (
                           <div className="v3-sentence-target-discovery-senses">
                             {candidate.senses.map((sense) => (
                               <Flex
@@ -790,6 +819,11 @@ export function V3SentenceTargetDiscovery({
                                 ) : (
                                   <Button
                                     aria-label={`关联词义：${sense.gloss || "未填写释义"}`}
+                                    disabled={
+                                      disabled ||
+                                      Boolean(blockedReason) ||
+                                      !sense.gloss.trim()
+                                    }
                                     icon={<LinkOutlined aria-hidden />}
                                     onClick={() =>
                                       onSelectSense?.(
@@ -826,6 +860,9 @@ export function V3SentenceTargetDiscovery({
                 >
                   <Button
                     icon={<PlusOutlined aria-hidden />}
+                    disabled={
+                      disabled || Boolean(blockedReason) || !onCreatePending
+                    }
                     onClick={() => onCreatePending?.(activeOccurrence)}
                     type="primary"
                   >
@@ -837,6 +874,7 @@ export function V3SentenceTargetDiscovery({
                 <Button
                   block
                   loading={loadingMore}
+                  disabled={disabled}
                   onClick={() => void loadMoreCandidates(activeOccurrence)}
                 >
                   加载更多候选
