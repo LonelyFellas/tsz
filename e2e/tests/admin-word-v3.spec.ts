@@ -342,7 +342,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     );
   });
 
-  test("E06 Mock 引用保护：被例句标注的原形只锁删除，英美切换与改类型放行，徽标可跳到例句", async ({
+  test("E06 Mock 引用影响：草稿词性可删除，保留必要原形保护及引用跳转", async ({
     page
   }) => {
     const api = await mockAdminV3Api(page, {
@@ -352,8 +352,7 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await page.goto(`/words/${ADMIN_V3_MIXED_WORD_ID}/v3/wizard/forms`);
 
     const firstGroup = page.locator("[data-pos-id] .v3-form-group-card").nth(0);
-    // TASK#58：被引用不再锁英美结构切换与词形类型（引用按「词形 + 方言侧」重解析），
-    // 改类型给漂移提示而不是硬锁；删除仍锁（引用失去锚点）。
+    // 引用只提示影响，不锁草稿编辑；本组唯一原形仍受结构性保护。
     await expect(firstGroup.getByLabel("英美拼写有区别")).toBeEnabled();
     await expect(firstGroup.getByLabel("英美音标有区别")).toBeEnabled();
     await expect(
@@ -362,7 +361,17 @@ test.describe("Smart Lexicon 管理端 Mock E2E（非真实后端联调）", () 
     await expect(
       firstGroup.getByRole("button", { name: "删除变化组 1 的词形 1" })
     ).toBeDisabled();
-    await expect(page.getByRole("button", { name: "删除名词" })).toBeDisabled();
+    const deletePos = page.getByRole("button", { name: "删除名词" });
+    await expect(deletePos).toBeEnabled();
+    await deletePos.click();
+    const confirmation = page.getByRole("dialog", {
+      name: "删除词性“名词”？",
+      exact: true
+    });
+    await expect(confirmation).toBeVisible();
+    await confirmation.getByRole("button", { name: /取\s*消/ }).click();
+    await expect(confirmation).toBeHidden();
+    await expect(deletePos).toBeEnabled();
     // 没被引用的第 2 组照常可切英美规则。
     await expect(
       page
