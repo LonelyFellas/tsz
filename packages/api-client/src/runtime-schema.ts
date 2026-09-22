@@ -7,6 +7,7 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "EntryAnnotationResponse",
   "AdminWordV3",
   "AdminWordV3Envelope",
+  "BatchPublicationResponseV3",
   "AdminWordDraftV3Envelope",
   "AdminWordListResponse",
   "EntryLifecycleBatchResponse",

@@ -87,6 +87,7 @@ async function mockPartOfSpeechSettingsApi(page: Page) {
         phone: "13800138000",
         display_name: actor.display_name,
         role: "super_admin",
+        can_publish_lexicon: true,
         permissions: []
       });
     }

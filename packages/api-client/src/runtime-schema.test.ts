@@ -40,6 +40,7 @@ const ROOTS = [
   "EntryAnnotationResponse",
   "AdminWordV3",
   "AdminWordV3Envelope",
+  "BatchPublicationResponseV3",
   "AdminWordDraftV3Envelope",
   "AdminWordListResponse",
   "EntryLifecycleBatchResponse",

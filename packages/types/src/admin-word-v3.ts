@@ -793,7 +793,7 @@ export interface PublishAdminWordV3Input {
 export type PublishAdminWordAnyInput =
   PublishAdminWordV2Input | PublishAdminWordV3Input;
 
-export interface ActivatePublicationV3Input {
+export interface RollbackPublicationV3Input {
   schema_version: 3;
   base_revision: number;
   base_lifecycle_revision: number;
@@ -801,7 +801,7 @@ export interface ActivatePublicationV3Input {
 }
 
 export type ActivatePublicationAnyInput =
-  ActivatePublicationInput | ActivatePublicationV3Input;
+  ActivatePublicationInput | RollbackPublicationV3Input;
 
 export const V3_VALIDATION_ISSUE_CODES = [
   "invalid_regional_variant_shape",
@@ -1225,6 +1225,7 @@ export interface AdminWordPublicationV2 extends AdminWordPublicationBase {
 }
 
 export interface AdminWordPublicationV3 extends AdminWordPublicationBase {
+  rollback_of_publication_id?: string;
   schema_version: 3;
   word: AdminWordV3;
 }
@@ -1242,4 +1243,18 @@ export interface AdminWordPublicationListResponse {
 export interface EntryLifecycleBatchResponse {
   words: AdminWordV3[];
   affected: number;
+}
+
+export interface BatchPublicationItemV3 {
+  entry_id: string;
+  base_revision: number;
+  base_lifecycle_revision: number;
+  confirmed_surface_match_token?: string;
+}
+export interface BatchPublicationInputV3 {
+  schema_version: 3;
+  items: BatchPublicationItemV3[];
+}
+export interface BatchPublicationResponseV3 {
+  words: AdminWordV3[];
 }

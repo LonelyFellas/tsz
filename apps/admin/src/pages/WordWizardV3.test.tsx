@@ -42,8 +42,9 @@ import { WordWizardV3Page, type V3MeaningsStepRenderer } from "./WordWizardV3";
 const authMocks = vi.hoisted(() => ({
   profile: {
     id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
+    can_publish_lexicon: true,
     role: "admin"
-  } as { id: string; role: string } | null
+  } as { id: string; role: string; can_publish_lexicon?: boolean } | null
 }));
 
 // 只覆盖 useAuthStore：@/lib/auth 的其余导出被 api/dataSource 真实依赖，整体替换会让模块加载失败。
@@ -146,7 +147,7 @@ function source(getAnyValue: unknown) {
     publishV3: vi.fn(),
     listPublications: vi.fn(async () => ({ publications: [] })),
     getPublication: vi.fn(),
-    activatePublicationV3: vi.fn()
+    rollbackPublicationV3: vi.fn()
   } as unknown as V3WordsApi;
 }
 
@@ -323,6 +324,7 @@ describe("WordWizardV3Page", () => {
     } finally {
       authMocks.profile = {
         id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
+        can_publish_lexicon: true,
         role: "admin"
       };
     }
@@ -342,6 +344,7 @@ describe("WordWizardV3Page", () => {
     } finally {
       authMocks.profile = {
         id: "019d2c55-1f9e-7f88-a189-a2b8a07153fc",
+        can_publish_lexicon: true,
         role: "admin"
       };
     }
@@ -1296,9 +1299,9 @@ describe("WordWizardV3Page", () => {
       await screen.findByText("请先保存或放弃未保存的草稿")
     ).toBeInTheDocument();
     expect(
-      screen.getByText("激活此发布版本", { exact: true }).closest("button")!
+      screen.getByText("回退为新版本", { exact: true }).closest("button")!
     ).toBeDisabled();
-    expect(endpoints.activatePublicationV3).not.toHaveBeenCalled();
+    expect(endpoints.rollbackPublicationV3).not.toHaveBeenCalled();
   });
 
   it("preserves an unsaved meanings draft across steps and gates canonical preview actions", async () => {
@@ -1353,9 +1356,9 @@ describe("WordWizardV3Page", () => {
       await screen.findByText("请先保存或放弃未保存的草稿")
     ).toBeInTheDocument();
     expect(
-      screen.getByText("激活此发布版本", { exact: true }).closest("button")!
+      screen.getByText("回退为新版本", { exact: true }).closest("button")!
     ).toBeDisabled();
-    expect(endpoints.activatePublicationV3).not.toHaveBeenCalled();
+    expect(endpoints.rollbackPublicationV3).not.toHaveBeenCalled();
   });
 
   it("retains an unsaved meanings draft when saving forms advances canonical revision", async () => {
@@ -1574,7 +1577,7 @@ describe("WordWizardV3Page", () => {
     vi.mocked(endpoints.getPublication).mockResolvedValue({
       publication: historical
     });
-    vi.mocked(endpoints.activatePublicationV3).mockResolvedValue({
+    vi.mocked(endpoints.rollbackPublicationV3).mockResolvedValue({
       word: activated
     });
 
@@ -1585,16 +1588,16 @@ describe("WordWizardV3Page", () => {
 
     fireEvent.click(await screen.findByLabelText("查看第 1 次发布"));
     fireEvent.click(
-      (await screen.findByText("激活此发布版本", { exact: true })).closest(
+      (await screen.findByText("回退为新版本", { exact: true })).closest(
         "button"
       )!
     );
     fireEvent.click(
-      screen.getByText("确认激活", { exact: true }).closest("button")!
+      screen.getByText("确认回退", { exact: true }).closest("button")!
     );
 
     await waitFor(() =>
-      expect(endpoints.activatePublicationV3).toHaveBeenCalledWith(
+      expect(endpoints.rollbackPublicationV3).toHaveBeenCalledWith(
         WORD_ID,
         "publication-v3-history",
         expect.any(String),
@@ -1662,7 +1665,7 @@ describe("WordWizardV3Page", () => {
         publication: publicationId === "publication-v3-fresh" ? fresh : expired
       })
     );
-    vi.mocked(endpoints.activatePublicationV3)
+    vi.mocked(endpoints.rollbackPublicationV3)
       .mockRejectedValueOnce(
         new HttpError(409, "stale revision", [], "revision_conflict")
       )
@@ -1683,12 +1686,12 @@ describe("WordWizardV3Page", () => {
     ).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("查看第 1 次发布"));
     fireEvent.click(
-      (await screen.findByText("激活此发布版本", { exact: true })).closest(
+      (await screen.findByText("回退为新版本", { exact: true })).closest(
         "button"
       )!
     );
     fireEvent.click(
-      screen.getByText("确认激活", { exact: true }).closest("button")!
+      screen.getByText("确认回退", { exact: true }).closest("button")!
     );
 
     await waitFor(() => expect(endpoints.get).toHaveBeenCalledTimes(2));
@@ -1701,25 +1704,25 @@ describe("WordWizardV3Page", () => {
       screen.queryByText("发布词条", { exact: true })?.closest("button") ?? null
     ).toBeNull();
     expect(
-      screen.queryByText("确认激活", { exact: true })?.closest("button") ?? null
+      screen.queryByText("确认回退", { exact: true })?.closest("button") ?? null
     ).toBeNull();
 
     fireEvent.click(
       await screen.findByRole("button", { name: "查看第 2 次发布" })
     );
     fireEvent.click(
-      (await screen.findByText("激活此发布版本", { exact: true })).closest(
+      (await screen.findByText("回退为新版本", { exact: true })).closest(
         "button"
       )!
     );
     fireEvent.click(
-      screen.getByText("确认激活", { exact: true }).closest("button")!
+      screen.getByText("确认回退", { exact: true }).closest("button")!
     );
 
     await waitFor(() =>
-      expect(endpoints.activatePublicationV3).toHaveBeenCalledTimes(2)
+      expect(endpoints.rollbackPublicationV3).toHaveBeenCalledTimes(2)
     );
-    const activationCalls = vi.mocked(endpoints.activatePublicationV3).mock
+    const activationCalls = vi.mocked(endpoints.rollbackPublicationV3).mock
       .calls;
     expect(activationCalls[1]![3]).toEqual({
       schema_version: 3,
@@ -2087,7 +2090,7 @@ describe("WordWizardV3Page", () => {
     ).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText("查看第 1 次发布"));
     expect(
-      (await screen.findByText("激活此发布版本", { exact: true })).closest(
+      (await screen.findByText("回退为新版本", { exact: true })).closest(
         "button"
       )!
     ).toBeEnabled();

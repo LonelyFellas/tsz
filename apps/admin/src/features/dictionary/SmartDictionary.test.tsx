@@ -385,7 +385,7 @@ describe("SmartDictionary", () => {
     expect(screen.getByLabelText("移入垃圾桶「center」")).toBeEnabled();
   });
 
-  it("他人的已发布词条不受限：收口只针对未发布草稿", () => {
+  it("普通管理员仍可编辑已发布词条，但无发布权不能归档", () => {
     apiMocks.useWordList.mockReturnValue({
       data: {
         words: [
@@ -408,7 +408,7 @@ describe("SmartDictionary", () => {
         </MemoryRouter>
       </AntApp>
     );
-    expect(screen.getByLabelText("移入垃圾桶「center」")).toBeEnabled();
+    expect(screen.getByLabelText("移入垃圾桶「center」")).toBeDisabled();
   });
 
   it("超管对他人创建的词条也有标注编辑入口", () => {

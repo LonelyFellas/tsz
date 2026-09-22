@@ -73,6 +73,7 @@ const libRole: AdminRole = {
   description: "管理智能词库与词表",
   is_system: false,
   // 后端按 key 字母序返回：'wordlists' < 'words'。
+
   permissions: ["wordlists.access", "words.access"],
   member_count: 3,
   created_at: "2026-06-02T00:00:00Z",
@@ -83,6 +84,7 @@ const emptyRole: AdminRole = {
   name: "新人",
   description: "",
   is_system: false,
+
   permissions: [],
   member_count: 0,
   created_at: "2026-06-03T00:00:00Z",
@@ -93,6 +95,7 @@ const manyRole: AdminRole = {
   name: "全组长",
   description: "跨组",
   is_system: false,
+
   permissions: [
     "classes.access",
     "customdict.access",
@@ -108,6 +111,7 @@ const manyRole: AdminRole = {
 };
 
 const plainAdmin = {
+  can_publish_lexicon: false,
   id: "a-plain",
   phone: "13800138000",
   display_name: "审核员小王",
@@ -226,6 +230,7 @@ describe("RoleManagement — 建角色", () => {
       expect(mockCreate).toHaveBeenCalledWith({
         name: "审核专员",
         description: "",
+
         permissions: ["reviews.access"]
       })
     );
@@ -332,6 +337,7 @@ describe("RoleManagement — 改角色", () => {
       expect(mockUpdate).toHaveBeenCalledWith("r-lib", {
         name: "词库管理员Plus",
         description: "管理智能词库与词表",
+
         permissions: ["wordlists.access", "words.access"]
       })
     );

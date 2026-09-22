@@ -492,3 +492,20 @@ export function decodeEntryAnnotationResponse(
   assertRuntimeContract("EntryAnnotationResponse", value);
   return value as EntryAnnotationResponse;
 }
+
+export function decodeBatchPublicationResponseV3(
+  value: unknown,
+  ids: readonly string[]
+): import("@tsz/types").BatchPublicationResponseV3 {
+  assertRuntimeContract("BatchPublicationResponseV3", value);
+  const response = value as import("@tsz/types").BatchPublicationResponseV3;
+  const received = new Set(response.words.map((word) => word.id));
+  if (
+    response.words.length !== ids.length ||
+    received.size !== ids.length ||
+    ids.some((id) => !received.has(id))
+  ) {
+    throw new InvalidAdminWordResponseError("$.words", "wrong_type", "array");
+  }
+  return response;
+}

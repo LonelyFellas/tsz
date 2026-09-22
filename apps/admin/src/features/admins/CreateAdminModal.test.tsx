@@ -28,6 +28,7 @@ function createResponse(
       phone: "13800138000",
       display_name: "小王",
       role: "admin",
+      can_publish_lexicon: false,
       status: "active",
       created_at: "2026-07-06T00:00:00Z",
       updated_at: "2026-07-06T00:00:00Z",

@@ -26,7 +26,7 @@ export type V3WordsApi = Pick<
   | "publishV3"
   | "listPublications"
   | "getPublication"
-  | "activatePublicationV3"
+  | "rollbackPublicationV3"
 >;
 
 function requireV3Draft(
@@ -209,14 +209,14 @@ export function createV3WordRequests(source: V3WordsApi = api.words) {
         );
         return response;
       }),
-    activatePublication: (
+    rollbackPublication: (
       wordId: string,
       publicationId: string,
       idempotencyKey: string,
-      input: Parameters<V3WordsApi["activatePublicationV3"]>[3]
+      input: Parameters<V3WordsApi["rollbackPublicationV3"]>[3]
     ) =>
       source
-        .activatePublicationV3(wordId, publicationId, idempotencyKey, input)
+        .rollbackPublicationV3(wordId, publicationId, idempotencyKey, input)
         .then((response) =>
           requireWordIdentity(response, wordId, "activate_publication.word.id")
         )

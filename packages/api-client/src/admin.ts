@@ -4,7 +4,7 @@ import { createSharedSentenceEndpoints } from "./shared-sentences";
 // 这些端点要绑定到 baseUrl=/api/v1/admin 的 HttpClient 上，路径才会落到 /api/v1/admin/*。
 import type {
   UpdateEntryAnnotationInput,
-  ActivatePublicationV3Input,
+  RollbackPublicationV3Input,
   AdminListQuery,
   AdminListResponse,
   AdminRole,
@@ -75,6 +75,7 @@ import {
   decodeAdminWordPublicationEnvelope,
   decodeAdminWordPublicationListResponse,
   decodeAdminWordV3Envelope,
+  decodeBatchPublicationResponseV3,
   decodeDetectLexiconResponseV3,
   decodeDraftValidationResponseV3,
   decodeEntryLifecycleBatchAnyResponse,
@@ -405,6 +406,20 @@ export function createAdminEndpoints(http: HttpClient) {
             `/lexicon/entries/${wordId}/publications/${publicationId}`
           )
           .then(decodeAdminWordPublicationEnvelope),
+      publishBatchV3: (
+        idempotencyKey: string,
+        input: import("@tsz/types").BatchPublicationInputV3
+      ) =>
+        http
+          .post<unknown>("/lexicon/entries/publications/batch", input, {
+            headers: { "Idempotency-Key": idempotencyKey }
+          })
+          .then((response) =>
+            decodeBatchPublicationResponseV3(
+              response,
+              input.items.map((item) => item.entry_id)
+            )
+          ),
       publishV3: (
         wordId: string,
         idempotencyKey: string,
@@ -415,15 +430,15 @@ export function createAdminEndpoints(http: HttpClient) {
             headers: { "Idempotency-Key": idempotencyKey }
           })
           .then(decodeAdminWordV3Envelope),
-      activatePublicationV3: (
+      rollbackPublicationV3: (
         wordId: string,
         publicationId: string,
         idempotencyKey: string,
-        input: ActivatePublicationV3Input
+        input: RollbackPublicationV3Input
       ) =>
         http
           .post<unknown>(
-            `/lexicon/entries/${wordId}/publications/${publicationId}/activate`,
+            `/lexicon/entries/${wordId}/publications/${publicationId}/rollback`,
             input,
             { headers: { "Idempotency-Key": idempotencyKey } }
           )
@@ -613,6 +628,14 @@ export function createAdminEndpoints(http: HttpClient) {
      * 契约见 tsz-rust openapi `admin-accounts` 标签。
      */
     admins: {
+      setPublicationPermission: (
+        adminId: string,
+        can_publish_lexicon: boolean
+      ) =>
+        http.patch<{ can_publish_lexicon: boolean }>(
+          `/admins/${adminId}/lexicon-publication-permission`,
+          { can_publish_lexicon }
+        ),
       /** GET /admin/admins — 列表：role/手机号/昵称筛选 + 分页。 */
       list: (query: AdminListQuery = {}) =>
         http.get<AdminListResponse>(`/admins${qs({ ...query })}`),

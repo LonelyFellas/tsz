@@ -27,6 +27,7 @@ const profile: AdminProfile = {
   phone: "13800138000",
   display_name: "编辑员",
   role: "admin",
+  can_publish_lexicon: true,
   permissions: [],
   preferences: { dialect: "uk" }
 };

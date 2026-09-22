@@ -1,3 +1,8 @@
+import { useAuthStore } from "@/lib/auth";
+import {
+  canPublishEntry,
+  ENTRY_PUBLISH_BLOCKED_HINT
+} from "../entryWritePermission";
 import { useFormTypeLabel } from "../part-of-speech/FormTypeLabels";
 import { usePartOfSpeechLabel } from "../part-of-speech/PartOfSpeechLabels";
 import { HttpError } from "@tsz/api-client";
@@ -36,7 +41,7 @@ import {
 
 type PublicationRequests = Pick<
   V3WordRequests,
-  "get" | "listPublications" | "getPublication" | "activatePublication"
+  "get" | "listPublications" | "getPublication" | "rollbackPublication"
 >;
 
 type RecoveryStatus = 409 | 410;
@@ -456,11 +461,8 @@ function PublicationMetadata({
   );
 }
 
-function canActivateV3Publication(
-  publication: AdminWordPublicationAny,
-  currentWord: AdminWordV3
-): boolean {
-  if (currentWord.status !== "published" || publication.is_current) {
+function canRollbackV3Publication(currentWord: AdminWordV3): boolean {
+  if (currentWord.status !== "published") {
     return false;
   }
   return currentWord.capabilities.publication.mode === "native";
@@ -481,7 +483,7 @@ function surfaceActivationErrorMessage(code: string | undefined): string {
     code === "surface_match_snapshot_expired" ||
     code === "surface_policy_changed"
   ) {
-    return "同名公开范围确认已失效，请重新检查激活条件。";
+    return "同名公开范围确认已失效，请重新检查回退条件。";
   }
   if (
     code === "exact_headword_creation_temporarily_disabled" ||
@@ -489,26 +491,26 @@ function surfaceActivationErrorMessage(code: string | undefined): string {
   ) {
     return "学习端暂不支持多个同名公开词条。";
   }
-  return "激活需要确认同名公开范围，但服务端未返回可确认快照。";
+  return "回退需要确认同名公开范围，但服务端未返回可确认快照。";
 }
 
 function activationErrorMessage(error: unknown): string {
   if (error instanceof HttpError) {
     switch (error.status) {
       case 403:
-        return "当前账号没有激活发布版本的权限。";
+        return "当前账号没有回退发布版本的权限。";
       case 422:
-        return "激活请求校验未通过。";
+        return "回退请求校验未通过。";
       case 503:
         return "发布服务暂不可用，请稍后重试。";
       default:
-        return "激活发布版本失败，请稍后重试。";
+        return "回退发布版本失败，请稍后重试。";
     }
   }
   if (error instanceof TypeError) {
-    return "网络异常，激活状态未知，请刷新发布历史后再重试。";
+    return "网络异常，回退状态未知，请刷新发布历史后再重试。";
   }
-  return "激活发布版本失败，请稍后重试。";
+  return "回退发布版本失败，请稍后重试。";
 }
 
 function newIdempotencyKey(): string {
@@ -536,6 +538,8 @@ export function V3PublicationHistory({
   const [detailError, setDetailError] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [activating, setActivating] = useState(false);
+  const profile = useAuthStore((state) => state.profile);
+  const allowedToPublish = canPublishEntry(profile, currentWord);
   const [activationError, setActivationError] = useState<string>();
   const [surfacePage, setSurfacePage] = useState<SurfaceMatchPageV3>();
   const [surfaceResetVersion, setSurfaceResetVersion] = useState(0);
@@ -712,10 +716,11 @@ export function V3PublicationHistory({
   const activate = useCallback(
     (confirmedSurfaceToken?: string) => {
       if (
+        !allowedToPublish ||
         activationBlockedByUnsavedChanges ||
         activationLock.current ||
         !detail ||
-        !canActivateV3Publication(detail, currentWord)
+        !canRollbackV3Publication(currentWord)
       ) {
         return;
       }
@@ -725,7 +730,7 @@ export function V3PublicationHistory({
       setActivating(true);
       setActivationError(undefined);
       void requests
-        .activatePublication(currentWord.id, detail.publication_id, key, {
+        .rollbackPublication(currentWord.id, detail.publication_id, key, {
           schema_version: 3,
           base_revision: currentWord.revision,
           base_lifecycle_revision: currentWord.lifecycle_revision,
@@ -789,6 +794,7 @@ export function V3PublicationHistory({
         });
     },
     [
+      allowedToPublish,
       activationBlockedByUnsavedChanges,
       currentWord,
       detail,
@@ -850,7 +856,7 @@ export function V3PublicationHistory({
           }
           description={
             recovery.phase === "error"
-              ? "旧发布详情与确认已失效。刷新成功并重新打开发布详情前，不会再次发送激活请求。"
+              ? "旧发布详情与确认已失效。刷新成功并重新打开发布详情前，不会再次发送回退请求。"
               : "旧发布详情与确认已失效，正在获取最新词条和发布历史。"
           }
           action={
@@ -883,6 +889,9 @@ export function V3PublicationHistory({
                     <Typography.Text type="secondary">
                       第 {publication.publication_number} 次发布
                     </Typography.Text>
+                    {publication.rollback_of_publication_id ? (
+                      <Tag>历史内容回退</Tag>
+                    ) : null}
                     {publication.is_current ? (
                       <Tag color="green">当前</Tag>
                     ) : null}
@@ -933,9 +942,12 @@ export function V3PublicationHistory({
               <Alert showIcon type="info" title="正在查看只读的历史发布快照" />
               <PublicationMetadata publication={detail} />
               <PublicationSnapshotBody publication={detail} />
+              {!allowedToPublish ? (
+                <Alert type="info" title={ENTRY_PUBLISH_BLOCKED_HINT} />
+              ) : null}
               {surfacePage ? (
                 <LifecycleSurfaceConfirmation
-                  action="activate"
+                  action="rollback"
                   state={surfaceSnapshot}
                   confirming={activating}
                   onConfirm={confirmSurfaceActivation}
@@ -945,29 +957,32 @@ export function V3PublicationHistory({
               {activationError ? (
                 <Alert showIcon type="error" title={activationError} />
               ) : null}
-              {canActivateV3Publication(detail, currentWord) && !surfacePage ? (
+              {canRollbackV3Publication(currentWord) && !surfacePage ? (
                 <>
                   {activationBlockedByUnsavedChanges ? (
                     <Alert
                       showIcon
                       type="warning"
                       title="请先保存或放弃未保存的草稿"
-                      description="当前有未保存的词形或释义草稿。请先保存或主动放弃草稿，再激活历史发布；查看历史详情不受影响。"
+                      description="当前有未保存的词形或释义草稿。请先保存或主动放弃草稿，再将历史内容发布为新版本；查看历史详情不受影响。"
                     />
                   ) : null}
                   {confirming ? (
                     <Alert
                       showIcon
                       type="warning"
-                      title="确认激活历史发布"
-                      description="激活会把该不可变快照设为当前线上版本。"
+                      title="确认将历史内容发布为新版本"
+                      description="将历史内容按当前规则重新校验并发布为新版本，保留当前草稿。"
                       action={
                         <Button
-                          disabled={activationBlockedByUnsavedChanges}
+                          disabled={
+                            activationBlockedByUnsavedChanges ||
+                            !allowedToPublish
+                          }
                           loading={activating}
                           onClick={() => void activate()}
                         >
-                          确认激活
+                          确认回退
                         </Button>
                       }
                     />
@@ -985,15 +1000,17 @@ export function V3PublicationHistory({
               关 闭
             </Button>
             {detail &&
-            canActivateV3Publication(detail, currentWord) &&
+            canRollbackV3Publication(currentWord) &&
             !surfacePage &&
             !confirming ? (
               <Button
                 type="primary"
-                disabled={activationBlockedByUnsavedChanges}
+                disabled={
+                  activationBlockedByUnsavedChanges || !allowedToPublish
+                }
                 onClick={() => beginActivation()}
               >
-                激活此发布版本
+                回退为新版本
               </Button>
             ) : null}
           </Flex>

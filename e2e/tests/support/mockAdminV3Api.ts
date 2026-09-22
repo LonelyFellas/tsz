@@ -41,6 +41,7 @@ const ADMIN_PROFILE = {
   phone: "13800138000",
   display_name: "V3 Mock E2E Admin",
   role: "admin",
+  can_publish_lexicon: true,
   permissions: ["words.access"],
   preferences: { dialect: "uk" }
 };

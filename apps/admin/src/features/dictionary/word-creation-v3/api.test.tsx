@@ -26,7 +26,7 @@ function endpointDoubles(): V3WordsApi {
     publishV3: vi.fn(),
     listPublications: vi.fn(),
     getPublication: vi.fn(),
-    activatePublicationV3: vi.fn()
+    rollbackPublicationV3: vi.fn()
   } as unknown as V3WordsApi;
 }
 
@@ -153,7 +153,7 @@ describe("createV3WordRequests", () => {
     vi.mocked(endpoints.getPublication).mockResolvedValue({
       publication: v3Publication()
     });
-    vi.mocked(endpoints.activatePublicationV3).mockResolvedValue(canonical);
+    vi.mocked(endpoints.rollbackPublicationV3).mockResolvedValue(canonical);
     const detectInput = {
       schema_version: 3,
       language: "en",
@@ -212,7 +212,7 @@ describe("createV3WordRequests", () => {
       WORD_ID,
       "019d2c55-1f9e-7f88-a189-a2b8a07153fe"
     );
-    await requests.activatePublication(
+    await requests.rollbackPublication(
       WORD_ID,
       "019d2c55-1f9e-7f88-a189-a2b8a07153fe",
       "activate-key",
@@ -253,7 +253,7 @@ describe("createV3WordRequests", () => {
       WORD_ID,
       "019d2c55-1f9e-7f88-a189-a2b8a07153fe"
     );
-    expect(endpoints.activatePublicationV3).toHaveBeenCalledWith(
+    expect(endpoints.rollbackPublicationV3).toHaveBeenCalledWith(
       WORD_ID,
       "019d2c55-1f9e-7f88-a189-a2b8a07153fe",
       "activate-key",
@@ -419,7 +419,7 @@ describe("createV3WordRequests", () => {
     vi.mocked(endpoints.saveFormsStepV3).mockResolvedValue(mismatched);
     vi.mocked(endpoints.saveMeaningsStepV3).mockResolvedValue(mismatched);
     vi.mocked(endpoints.publishV3).mockResolvedValue(mismatched);
-    vi.mocked(endpoints.activatePublicationV3).mockResolvedValue(mismatched);
+    vi.mocked(endpoints.rollbackPublicationV3).mockResolvedValue(mismatched);
 
     await expect(requests.get(WORD_ID)).rejects.toMatchObject({
       name: "InvalidAdminWordResponseError",
@@ -447,7 +447,7 @@ describe("createV3WordRequests", () => {
       response_path: "publish.word.id"
     });
     await expect(
-      requests.activatePublication(
+      requests.rollbackPublication(
         WORD_ID,
         "019d2c55-1f9e-7f88-a189-a2b8a07153fe",
         "activation-key",

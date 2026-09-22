@@ -1,3 +1,4 @@
+import { useAuthStore } from "@/lib/auth";
 import { HttpError } from "@tsz/api-client";
 import type {
   AdminWordV3,
@@ -16,7 +17,7 @@ import {
   within
 } from "@testing-library/react";
 import { StrictMode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   commonFormFixture,
   formsFixture,
@@ -1488,5 +1489,19 @@ describe("V3PreviewAndPublishStep", () => {
 
     expect(await screen.findByText("new prop canonical")).toBeInTheDocument();
     expect(requests.get).not.toHaveBeenCalled();
+  });
+});
+
+beforeEach(() => {
+  useAuthStore.setState({
+    profile: {
+      id: "admin-1",
+      role: "admin",
+      can_publish_lexicon: true,
+      phone: "13800138000",
+      display_name: "发布测试",
+      permissions: [],
+      preferences: { dialect: "uk" }
+    }
   });
 });

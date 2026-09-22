@@ -7,6 +7,7 @@ const PROFILE: AdminProfile = {
   phone: "13800138000",
   display_name: "Administrator",
   role: "super_admin",
+  can_publish_lexicon: true,
   permissions: [],
   preferences: { dialect: "uk" }
 };

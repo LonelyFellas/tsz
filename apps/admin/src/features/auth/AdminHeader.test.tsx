@@ -41,6 +41,7 @@ const PROFILE: AdminProfile = {
   phone: "13800138000",
   display_name: "审核员小王",
   role: "admin",
+  can_publish_lexicon: true,
   permissions: [],
   preferences: { dialect: "uk" as const }
 };

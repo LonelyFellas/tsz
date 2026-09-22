@@ -23,8 +23,9 @@ const IDEMPOTENT_LEXICON_OPERATIONS = [
   "post /admin/lexicon/entries/restore-batch",
   "post /admin/lexicon/entries/{id}/archive",
   "post /admin/lexicon/entries/{id}/publications",
-  "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate",
-  "post /admin/lexicon/entries/{id}/restore"
+  "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback",
+  "post /admin/lexicon/entries/{id}/restore",
+  "post /admin/lexicon/entries/publications/batch"
 ] as const;
 
 // 已知「后端尚未提供 / 待对接」的端点白名单。每条都必须真不在 spec 里——
@@ -264,9 +265,9 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "AdminWordPublicationEnvelope"
       ],
       [
-        "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate",
-        "ActivatePublicationV3Input",
-        "200",
+        "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback",
+        "RollbackPublicationV3Input",
+        "201",
         "AdminWordV3Envelope"
       ],
       [
@@ -397,7 +398,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
         "500",
         "503"
       ],
-      "post /admin/lexicon/entries/{id}/publications/{publication_id}/activate":
+      "post /admin/lexicon/entries/{id}/publications/{publication_id}/rollback":
         ["400", "401", "403", "404", "409", "410", "422", "503"],
       "get /admin/lexicon/surface-match-snapshots/{snapshot_id}": [
         "400",
@@ -490,7 +491,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "93d87d405f4957c9744b585f3eb07cf55b2e5674f80b91a19183bc2866e116fa"
+      "1920c2a506e783a55605795ce17d193b1c025b3b9017859e0d07d20fdef2b7bb"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");
@@ -791,14 +792,14 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       "base_revision",
       "base_lifecycle_revision"
     ]);
-    expect(snapshot.schemas.ActivatePublicationV3Input.required).toEqual([
+    expect(snapshot.schemas.RollbackPublicationV3Input.required).toEqual([
       "schema_version",
       "base_revision",
       "base_lifecycle_revision"
     ]);
     expect(
       snapshot.paths[
-        "/admin/lexicon/entries/{id}/publications/{publication_id}/activate"
+        "/admin/lexicon/entries/{id}/publications/{publication_id}/rollback"
       ]
     ).toEqual(["post"]);
     expect(snapshot.schemas.DeleteDraftInput).toEqual({

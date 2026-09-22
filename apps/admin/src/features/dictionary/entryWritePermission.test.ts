@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { AdminWordListItemAny } from "@tsz/types";
 import {
   canWriteEntry,
+  canPublishEntry,
+  canTransitionEntry,
   entryWriteForbiddenMessage,
   isEntryOwnershipError,
   partitionWritableRows
@@ -125,5 +127,41 @@ describe("错误分流", () => {
       "自己创建"
     );
     expect(entryWriteForbiddenMessage(undefined)).toContain("没有执行该操作");
+  });
+});
+
+describe("独立发布权限", () => {
+  it("编辑能力不授予发布权，普通发布者不能发布他人的草稿", () => {
+    expect(canWriteEntry(owner, row())).toBe(true);
+    expect(canPublishEntry(owner, row())).toBe(false);
+    expect(
+      canPublishEntry({ ...owner, can_publish_lexicon: true }, row())
+    ).toBe(true);
+    expect(
+      canPublishEntry({ ...stranger, can_publish_lexicon: true }, row())
+    ).toBe(false);
+    expect(
+      canPublishEntry(
+        { ...stranger, can_publish_lexicon: true },
+        row({ published_revision: 2 })
+      )
+    ).toBe(false);
+    expect(canPublishEntry(superAdmin, row())).toBe(true);
+  });
+  it("已发布词条归档恢复需要发布权，草稿归属限制仍生效", () => {
+    expect(canTransitionEntry(owner, row())).toBe(true);
+    expect(canTransitionEntry(owner, row({ published_revision: 2 }))).toBe(
+      false
+    );
+    expect(
+      canTransitionEntry(
+        { ...owner, can_publish_lexicon: true },
+        row({ published_revision: 2 })
+      )
+    ).toBe(true);
+    expect(
+      canTransitionEntry({ ...stranger, can_publish_lexicon: true }, row())
+    ).toBe(false);
+    expect(canTransitionEntry(superAdmin, row())).toBe(true);
   });
 });
