@@ -16,6 +16,47 @@ const groups = [
 ];
 
 describe("词条标注", () => {
+  it("服务端同原型分组消失后不扩大说明必填范围", () => {
+    const save = vi.fn();
+    render(
+      <EntryAnnotationModal
+        rows={[
+          { key: "incoming", label: "center", annotation: "3", incoming: true }
+        ]}
+        groups={[]}
+        creating
+        onSave={save}
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByText("保存标注并创建"));
+    expect(save).toHaveBeenCalledWith({ incoming: "3" }, undefined);
+  });
+  it("同原型新建必须填写独立文本说明，不能用数字标注替代", () => {
+    const save = vi.fn();
+    render(
+      <EntryAnnotationModal
+        rows={[
+          { key: "incoming", label: "center", annotation: "3", incoming: true }
+        ]}
+        groups={groups}
+        creating
+        onSave={save}
+        onClose={vi.fn()}
+      />
+    );
+    const button = screen.getByText("保存标注并创建").closest("button")!;
+    const reason = screen.getByLabelText("区分说明");
+    for (const value of ["", "   ", "x".repeat(501), "bad\u0000reason"]) {
+      fireEvent.change(reason, { target: { value } });
+      expect(button).toBeDisabled();
+      fireEvent.click(button);
+      expect(save).not.toHaveBeenCalled();
+    }
+    fireEvent.change(reason, { target: { value: "  独立术语含义  " } });
+    fireEvent.click(button);
+    expect(save).toHaveBeenCalledWith({ incoming: "3" }, "独立术语含义");
+  });
   it("第三条校验旧旧、旧新重复和空白，trim后保持前导0字符串", () => {
     const save = vi.fn();
     render(
@@ -23,6 +64,7 @@ describe("词条标注", () => {
         rows={rows}
         groups={groups}
         creating
+        initialCreationReason="独立词义"
         onSave={save}
         onClose={vi.fn()}
       />
@@ -40,7 +82,10 @@ describe("词条标注", () => {
     expect(button).toBeDisabled();
     fireEvent.change(incoming, { target: { value: " 1 " } });
     fireEvent.click(button);
-    expect(save).toHaveBeenCalledWith({ a: "01", b: "02", incoming: "1" });
+    expect(save).toHaveBeenCalledWith(
+      { a: "01", b: "02", incoming: "1" },
+      "独立词义"
+    );
   });
 
   it.each([true, false])(
@@ -52,6 +97,7 @@ describe("词条标注", () => {
           rows={[{ key: "a", label: "center", annotation: null }]}
           groups={[]}
           creating={creating}
+          initialCreationReason="独立词义"
           onSave={save}
           onClose={vi.fn()}
         />
@@ -85,7 +131,9 @@ describe("词条标注", () => {
       expect(button).toBeDisabled();
       fireEvent.change(input, { target: { value: ` ${"0".repeat(20)} ` } });
       fireEvent.click(button);
-      expect(save).toHaveBeenCalledWith({ a: "0".repeat(20) });
+      if (creating)
+        expect(save).toHaveBeenCalledWith({ a: "0".repeat(20) }, "独立词义");
+      else expect(save).toHaveBeenCalledWith({ a: "0".repeat(20) });
     }
   );
 
@@ -128,6 +176,7 @@ describe("词条标注", () => {
         rows={historical}
         groups={groups}
         creating
+        initialCreationReason="独立词义"
         onSave={save}
         onClose={close}
       />
@@ -150,6 +199,7 @@ describe("词条标注", () => {
         rows={historical}
         groups={groups}
         creating
+        initialCreationReason="独立词义"
         onSave={save}
         onClose={close}
       />
@@ -172,6 +222,7 @@ describe("词条标注", () => {
         ]}
         groups={groups}
         creating
+        initialCreationReason="独立词义"
         onSave={vi.fn()}
         onClose={vi.fn()}
       />

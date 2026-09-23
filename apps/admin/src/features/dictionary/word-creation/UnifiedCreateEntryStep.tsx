@@ -696,7 +696,10 @@ export function UnifiedCreateEntryStep({
     version: number;
   }>();
   const annotationDraft = useRef<
-    Pick<CreateAdminWordV3Input, "annotation" | "annotation_updates">
+    Pick<
+      CreateAdminWordV3Input,
+      "annotation" | "annotation_updates" | "homograph_reason"
+    >
   >({});
   const [regionalDisplay, setRegionalDisplay] = useState<RegionalDisplayState>({
     status: "idle"
@@ -1250,6 +1253,9 @@ export function UnifiedCreateEntryStep({
         <EntryAnnotationModal
           key={annotationSession.version}
           creating
+          initialCreationReason={
+            annotationSession.attempt.input.homograph_reason
+          }
           busy={busy === "creating"}
           frozen={createAttempt !== undefined && busy !== "creating"}
           error={error}
@@ -1293,12 +1299,13 @@ export function UnifiedCreateEntryStep({
             annotationDraft.current = {};
             setError(undefined);
           }}
-          onSave={(values) => {
+          onSave={(values, creationReason) => {
             if (createAttempt) {
               void createPending(createAttempt);
               return;
             }
             const annotations = {
+              homograph_reason: creationReason,
               annotation: values.incoming ?? null,
               // 只提交自己有权改的：非超管带上别人的词条会被后端整单 403 驳回。
               annotation_updates: annotationSession.conflict.entries

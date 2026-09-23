@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-4/docs/openapi.json",
-  "_generatedAt": "2026-09-23T05:11:03.175Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-5/docs/openapi.json",
+  "_generatedAt": "2026-09-23T09:05:40.182Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -1044,6 +1044,12 @@
         "headwords": {
           "$ref": "#/components/schemas/WordHeadwordsV2",
           "description": "Step 1 最终确认值；兼容窗口内旧客户端可省略，由服务端按旧检测规则补齐。"
+        },
+        "homograph_reason": {
+          "type": "string",
+          "description": "同原型组另建词条的区分说明，仅写入创建审计，不替代数字标注。",
+          "maxLength": 500,
+          "minLength": 1
         },
         "kind": { "$ref": "#/components/schemas/WordEntryKindV3" },
         "schema_version": { "type": "integer", "enum": [3] }

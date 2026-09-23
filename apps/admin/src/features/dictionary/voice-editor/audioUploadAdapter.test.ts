@@ -51,6 +51,20 @@ const http = (status: number, code?: string) =>
   new HttpError(status, `http ${status}`, [], code);
 
 describe("admin audio upload adapter", () => {
+  it("missing historical audio fails explicitly without uploading a replacement", async () => {
+    const dataSource = source({
+      url: vi.fn().mockRejectedValue(http(404, "audio_asset_not_found"))
+    });
+    const put = vi.fn<DirectUploader>();
+    const adapter = createAdminAudioUploadAdapter(dataSource, put);
+    await expect(adapter.resolveUrl(ASSET.id)).rejects.toBeInstanceOf(
+      AudioUploadError
+    );
+    expect(dataSource.url).toHaveBeenCalledWith(ASSET.id, undefined);
+    expect(dataSource.createUpload).not.toHaveBeenCalled();
+    expect(dataSource.confirm).not.toHaveBeenCalled();
+    expect(put).not.toHaveBeenCalled();
+  });
   it("runs the three steps: ticket → direct PUT with the signed headers → confirm, returning the wire asset as-is", async () => {
     const dataSource = source();
     const put = vi.fn<DirectUploader>(async ({ onProgress }) => {

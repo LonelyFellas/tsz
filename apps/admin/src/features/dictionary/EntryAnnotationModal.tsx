@@ -54,6 +54,7 @@ export function EntryAnnotationModal({
   rows,
   groups,
   creating = false,
+  initialCreationReason = "",
   busy = false,
   frozen = false,
   error,
@@ -63,16 +64,24 @@ export function EntryAnnotationModal({
   rows: AnnotationRow[];
   groups: EntryAnnotationGroup[];
   creating?: boolean;
+  initialCreationReason?: string;
   busy?: boolean;
   frozen?: boolean;
   error?: string;
-  onSave: (values: Record<string, string>) => void;
+  onSave: (values: Record<string, string>, creationReason?: string) => void;
   onClose: () => void;
 }) {
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(rows.map((row) => [row.key, row.annotation ?? ""]))
   );
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [creationReason, setCreationReason] = useState(initialCreationReason);
+  const reason = creationReason.trim();
+  const reasonInvalid =
+    creating &&
+    ((groups.length > 0 && !reason) ||
+      Array.from(reason).length > 500 ||
+      /\p{Cc}/u.test(reason));
   const errors = annotationErrors(
     rows,
     values,
@@ -91,16 +100,18 @@ export function EntryAnnotationModal({
       keyboard={!busy && !frozen}
       cancelButtonProps={{ disabled: busy || frozen }}
       onOk={() => {
-        if (Object.keys(errors).length) return;
-        onSave(
-          Object.fromEntries(
-            Object.entries(values).map(([id, value]) => [id, value.trim()])
-          )
+        if (Object.keys(errors).length || reasonInvalid) return;
+        const normalized = Object.fromEntries(
+          Object.entries(values).map(([id, value]) => [id, value.trim()])
         );
+        if (creating) onSave(normalized, reason || undefined);
+        else onSave(normalized);
       }}
       okText={creating ? "保存标注并创建" : "保存标注"}
       confirmLoading={busy}
-      okButtonProps={{ disabled: Object.keys(errors).length > 0 }}
+      okButtonProps={{
+        disabled: Object.keys(errors).length > 0 || reasonInvalid
+      }}
       destroyOnHidden
     >
       {error ? (
@@ -111,6 +122,20 @@ export function EntryAnnotationModal({
           style={{ marginBottom: 16 }}
         />
       ) : null}
+      {creating && (
+        <Form.Item
+          label="区分说明"
+          required={groups.length > 0}
+          help="请说明为何不复用已有词条（1–500 字，无控制字符）；仅记入创建审计，不替代数字标注。"
+        >
+          <Input
+            aria-label="区分说明"
+            value={creationReason}
+            disabled={busy || frozen}
+            onChange={(event) => setCreationReason(event.target.value)}
+          />
+        </Form.Item>
+      )}
       <Table<AnnotationRow>
         size="small"
         tableLayout="fixed"

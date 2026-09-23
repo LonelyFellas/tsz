@@ -1619,6 +1619,9 @@ describe("真实词条标注创建", () => {
     await screen.findByLabelText("英美通用主词");
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
     const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("区分说明"), {
+      target: { value: "  独立术语含义  " }
+    });
     const fields = within(dialog).getAllByPlaceholderText("请输入标注");
     fireEvent.change(fields[0]!, { target: { value: " 001 " } });
     fireEvent.change(fields[1]!, { target: { value: " 002 " } });
@@ -1628,6 +1631,7 @@ describe("真实词条标注创建", () => {
     expect(fields[0]).toBeDisabled();
     const attempt = vi.mocked(supplied.createV3).mock.calls[1]!;
     expect(attempt[1]).toMatchObject({
+      homograph_reason: "独立术语含义",
       annotation: "002",
       annotation_updates: [
         {
@@ -1654,6 +1658,9 @@ describe("真实词条标注创建", () => {
     await screen.findByLabelText("英美通用主词");
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
     const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("区分说明"), {
+      target: { value: "  独立术语含义  " }
+    });
     fireEvent.change(within(dialog).getAllByPlaceholderText("请输入标注")[0]!, {
       target: { value: "999" }
     });
@@ -1700,6 +1707,9 @@ describe("真实词条标注创建", () => {
     await screen.findByLabelText("英美通用主词");
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
     const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("区分说明"), {
+      target: { value: "  独立术语含义  " }
+    });
     const fields = within(dialog).getAllByPlaceholderText("请输入标注");
     fireEvent.change(fields[0]!, { target: { value: "001" } });
     fireEvent.change(fields[1]!, { target: { value: "002" } });
@@ -1722,6 +1732,9 @@ describe("真实词条标注创建", () => {
       "003"
     );
     expect(within(latest).getByLabelText("新建词条标注")).toHaveValue("002");
+    expect(within(latest).getByLabelText("区分说明")).toHaveValue(
+      "独立术语含义"
+    );
     const calls = vi.mocked(supplied.createV3).mock.calls;
     expect(calls[2]![0]).not.toBe(calls[1]![0]);
     expect(calls[2]![1]).toMatchObject({
@@ -1776,7 +1789,11 @@ describe("真实词条标注创建", () => {
     fireEvent.click(screen.getByText("词典检测"));
     await screen.findByLabelText("英美通用主词");
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
-    return screen.findByRole("dialog");
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("区分说明"), {
+      target: { value: "独立术语含义" }
+    });
+    return dialog;
   }
 
   it("他人词条在冲突弹窗里只读、不参与必填，提交只带自己有权改的", async () => {
@@ -1917,6 +1934,9 @@ describe("真实词条标注创建", () => {
     await screen.findByLabelText("英美通用主词");
     fireEvent.click(screen.getByText("创建并进入词形与发音"));
     const dialog = await screen.findByRole("dialog");
+    fireEvent.change(within(dialog).getByLabelText("区分说明"), {
+      target: { value: "  独立术语含义  " }
+    });
     const fields = within(dialog).getAllByPlaceholderText("请输入标注");
     fireEvent.change(fields[0]!, { target: { value: "001" } });
     fireEvent.change(fields[1]!, { target: { value: "002" } });
