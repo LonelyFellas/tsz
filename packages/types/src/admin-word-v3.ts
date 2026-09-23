@@ -396,25 +396,6 @@ export type WordSentenceAssociationV3 = WordSentenceAssociationBaseV3 &
       }
   );
 
-export type ResolveSentenceTargetsV3Input =
-  | {
-      schema_version: 3;
-      sentence_text: string;
-      source_dialect: Dialect;
-      mode: "all_published_targets";
-      page_size_per_range?: number;
-    }
-  | {
-      schema_version: 3;
-      sentence_text: string;
-      source_dialect: Dialect;
-      mode: "selected_segments";
-      selected_segments: SentenceSourceRangeV3[];
-      include_drafts: boolean;
-      page_size_per_range?: number;
-      cursor?: string;
-    };
-
 export type SentenceTargetMatchKindV3 =
   "word" | "contiguous_phrase" | "separable_phrase";
 
@@ -467,20 +448,7 @@ export interface PublishedSentenceTargetCandidateV3 {
   senses: SentenceTargetSenseV3[];
 }
 
-export interface SentenceTargetRangeResultV3 {
-  source_segments: SentenceSourceRangeV3[];
-  segments_fingerprint: string;
-  normalized_surface: string;
-  published_total: number;
-  /** 排除同一已发布目标组合后的草稿节点候选数。 */
-  draft_total: number;
-  published_matches: PublishedSentenceTargetCandidateV3[];
-  /** 两种候选共用稳定游标和页容量，绑定展开草稿的查询范围。 */
-  next_cursor?: string;
-  draft_matches: PublishedSentenceTargetCandidateV3[];
-}
-
-/** 按关键字检索短语成分目标：对已发布词面做包含匹配，与 resolve 的候选同构。 */
+/** 按关键字检索短语成分目标：对已发布词面做包含匹配。 */
 export interface SearchComponentTargetsV3Input {
   schema_version: 3;
   /** 关键字，1..=100 码点且两端不留空白；带空白后端直接 422。 */
@@ -504,7 +472,7 @@ export interface SearchComponentTargetsV3Input {
 export interface SearchComponentTargetsV3Response {
   schema_version: 3;
   /**
-   * 与 resolve 的 `published_matches` 同构。关键字检索没有句子区间，
+   * 关键字检索没有句子区间，
    * 每条候选的 `matches` 恒为空数组，前端据此不渲染「命中」标识。
    */
   matches: PublishedSentenceTargetCandidateV3[];
@@ -514,14 +482,6 @@ export interface SearchComponentTargetsV3Response {
   truncated: boolean;
   /** 还有下一页时返回；下一页用相同的 `q` / `kind` / `page_size` 携带此值。 */
   next_cursor?: string;
-}
-
-export interface ResolveSentenceTargetsV3Response {
-  schema_version: 3;
-  sentence_hash: string;
-  discovery_generation: number;
-  completeness: "complete" | "overloaded";
-  range_results: SentenceTargetRangeResultV3[];
 }
 
 export interface WordSentenceLinkV3 {
@@ -655,7 +615,6 @@ export interface AdminWordV3Capabilities {
   /** Absent only when talking to a pre-capability backend. */
   sentence_associations?: boolean;
   /** Absent only when talking to a pre-capability backend. */
-  sentence_target_discovery?: boolean;
   /** Absent only when talking to a pre-capability backend. */
   draft_relation_prebinding?: boolean;
   /** 释义级成分用词（B1 起恒 true）；缺失表示后端尚不支持，前端不得发送 sense.component_usages。 */
@@ -1254,7 +1213,9 @@ export interface BatchPublicationItemV3 {
 export interface BatchPublicationInputV3 {
   schema_version: 3;
   items: BatchPublicationItemV3[];
+  sentences?: import("./shared-sentences").SentenceBatchItem[];
 }
 export interface BatchPublicationResponseV3 {
   words: AdminWordV3[];
+  sentences: import("./shared-sentences").SharedSentence[];
 }

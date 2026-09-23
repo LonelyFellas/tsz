@@ -1,25 +1,11 @@
 import { useDraftRecovery } from "@/features/recovery/useDraftRecovery";
-import { useContext, useEffect, useMemo, useRef, useState } from "react";
-import { codePointSlice, rangesOverlap } from "@tsz/voice-editor/core";
-import { createV3WordRequests } from "../dictionary/word-creation-v3/api";
-import { useFormTypeLabel } from "../dictionary/part-of-speech/FormTypeLabels";
-import { usePartOfSpeechLabel } from "../dictionary/part-of-speech/PartOfSpeechLabels";
-import {
-  V3SentenceTargetDiscovery,
-  type V3SentenceTargetDiscoveryOccurrence
-} from "../dictionary/word-creation-v3/components/V3SentenceTargetDiscovery";
-import {
-  discoveryInput,
-  discoveryResult,
-  discoveredAnnotation
-} from "./sentenceDiscovery";
+import { useContext, useEffect, useRef, useState } from "react";
 import { UNSAFE_DataRouterContext, useBlocker } from "react-router-dom";
 import {
   currentSentenceCandidates,
   savedSenseTargets,
   sameSentenceTarget,
-  matchesSentenceTarget,
-  normalizeSentenceSurface
+  matchesSentenceTarget
 } from "./associationModel";
 import {
   Alert,
@@ -71,9 +57,6 @@ export function SentenceEditor({
   onSaved: (sentence: SharedSentence) => void;
 }) {
   const { modal } = App.useApp();
-  const discoveryRequests = useMemo(() => createV3WordRequests(), []);
-  const posLabel = usePartOfSpeechLabel();
-  const formLabel = useFormTypeLabel();
   const sourceEntryId = sourceWord?.id;
   const currentTargets =
     sourceWord && sourceSenseId
@@ -337,62 +320,6 @@ export function SentenceEditor({
     });
     setContent(next);
   };
-  const discoveryBlocked = (
-    occurrence: V3SentenceTargetDiscoveryOccurrence
-  ) => {
-    if (
-      !occurrence.id.startsWith(`${row.dialect}:`) ||
-      occurrence.segments.some(
-        (segment) =>
-          codePointSlice(row.text, segment.start, segment.end) !==
-          segment.surface
-      )
-    )
-      return "正文或方言已变化，请重新发现";
-    if (
-      content.annotations.some(
-        (annotation) =>
-          annotation.source_dialect === row.dialect &&
-          rangesOverlap(annotation.source_segments, occurrence.segments)
-      )
-    )
-      return "该片段已有标注，请先清除或修改原关联";
-    return undefined;
-  };
-  const addDiscoveredAnnotation = (
-    occurrence: V3SentenceTargetDiscoveryOccurrence,
-    annotation: SharedSentenceAnnotation
-  ) => {
-    const blocked = discoveryBlocked(occurrence);
-    if (blocked || saving || pendingAnnotation) {
-      setError(blocked ?? "请先完成当前标注或等待保存结束");
-      return;
-    }
-    setContent((current) => {
-      const currentRow = editableEnglishText(current.sentence.en_text).find(
-        (item) => item.dialect === annotation.source_dialect
-      );
-      if (
-        !currentRow ||
-        annotation.source_segments.some(
-          (segment) =>
-            codePointSlice(currentRow.text, segment.start, segment.end) !==
-            segment.surface
-        ) ||
-        current.annotations.some(
-          (item) =>
-            item.source_dialect === annotation.source_dialect &&
-            rangesOverlap(item.source_segments, annotation.source_segments)
-        )
-      )
-        return current;
-      return {
-        ...current,
-        annotations: [...current.annotations, structuredClone(annotation)]
-      };
-    });
-    setError("");
-  };
   return (
     <PronunciationPreviewProvider>
       <Flex className="sentence-editor" vertical gap="middle">
@@ -408,8 +335,8 @@ export function SentenceEditor({
         <Flex justify="space-between" align="center">
           <Typography.Text type="secondary">
             {sentence
-              ? `修改会同步影响 ${sentence.entries.length} 个词条的 ${sentence.entries.reduce((count, entry) => count + entry.senses.length, 0)} 个词义`
-              : "例句独立保存到例句库，句内关联决定展示在哪些词义下。"}
+              ? `保存仅更新草稿；发布后影响 ${sentence.entries.length} 个词条的 ${sentence.entries.reduce((count, entry) => count + entry.senses.length, 0)} 个词义`
+              : "例句独立保存为草稿，发布后按句内关联展示到对应词义。"}
           </Typography.Text>
           <Space>
             <Typography.Text>等级</Typography.Text>
@@ -553,79 +480,6 @@ export function SentenceEditor({
             )}
           />
         )}
-        {variant &&
-          sourceWord?.capabilities.sentence_target_discovery !== false && (
-            <V3SentenceTargetDiscovery
-              key={`discovery:${row.variant_id}`}
-              sentenceText={row.text}
-              dialect={row.dialect}
-              disabled={saving || pendingAnnotation}
-              selectionBlocked={discoveryBlocked}
-              onDiscover={async (request, signal) =>
-                discoveryResult(
-                  await discoveryRequests.resolveSentenceTargets(
-                    discoveryInput(request),
-                    signal
-                  ),
-                  request.dialect,
-                  { pos: posLabel, form: formLabel }
-                )
-              }
-              onSelectSense={(occurrence, candidate, sense) => {
-                if (
-                  normalizeSentenceSurface(
-                    occurrence.segments
-                      .map((segment) => segment.surface)
-                      .join(" ")
-                  ) !== normalizeSentenceSurface(candidate.matchedForm)
-                ) {
-                  setError("目标词形与当前片段不一致，请重新查询");
-                  return;
-                }
-                addDiscoveredAnnotation(
-                  occurrence,
-                  discoveredAnnotation(
-                    row.dialect,
-                    occurrence,
-                    candidate,
-                    sense
-                  )
-                );
-                setTargetLabels((current) => ({
-                  ...current,
-                  [`${candidate.entryId}:${sense.id}`]: `${candidate.headword} · ${sense.gloss}`
-                }));
-              }}
-              onViewDraft={(_occurrence, candidate) => {
-                const query = new URLSearchParams({
-                  mode: "edit",
-                  ...(candidate.senses[0]
-                    ? { focus_node: candidate.senses[0].id }
-                    : {})
-                });
-                window.open(
-                  `/words/${encodeURIComponent(candidate.entryId)}/v3/wizard/meanings?${query}`,
-                  "_blank",
-                  "noopener"
-                );
-              }}
-              onCreatePending={(occurrence) =>
-                addDiscoveredAnnotation(occurrence, {
-                  id: crypto.randomUUID(),
-                  source_dialect: row.dialect,
-                  source_segments: occurrence.segments,
-                  target: {
-                    state: "pending",
-                    kind: occurrence.kind === "word" ? "word" : "phrase",
-                    headword: occurrence.segments
-                      .map((segment) => segment.surface)
-                      .join(" "),
-                    gloss: null
-                  }
-                })
-              }
-            />
-          )}
         <V3SentenceTranslationsField
           sentence={content.sentence}
           index={0}

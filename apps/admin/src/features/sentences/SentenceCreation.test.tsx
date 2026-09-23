@@ -33,7 +33,7 @@ vi.mock("@/lib/auth", () => ({
       create: vi.fn(),
       update: vi.fn(),
       targets: vi.fn(),
-      unlink: vi.fn()
+      setVisibility: vi.fn()
     }
   }
 }));
@@ -68,6 +68,8 @@ function shared(content: SharedSentenceContent): SharedSentence {
   return {
     id: content.sentence.id,
     revision: 1,
+    lifecycle_revision: 1,
+    view: "draft",
     content,
     entries: [],
     created_by: "测试",
@@ -171,6 +173,7 @@ describe("按词条关联反查共享多维例句", () => {
     );
     await waitFor(() =>
       expect(api.sentences.list).toHaveBeenCalledWith({
+        view: "draft",
         entry_id: "entry",
         sense_id: "sense",
         page: 1,
@@ -434,6 +437,7 @@ describe("按词条关联反查共享多维例句", () => {
     expect(retry![0]).toHaveProperty("source_sense_id", "sense");
     expect(retry![0].content.annotations[0]!.target).toEqual(sentenceTarget());
     expect(api.sentences.list).toHaveBeenLastCalledWith({
+      view: "draft",
       entry_id: "entry",
       sense_id: "sense",
       page: 1,
@@ -524,7 +528,7 @@ describe("按词条关联反查共享多维例句", () => {
     ]);
   });
 
-  it("解除当前词义时发送例句版本，刷新反查列表而不删除全局例句", async () => {
+  it("移除当前词义时发送宿主版本，刷新反查列表而不删除全局例句", async () => {
     const content = newSentence();
     if (content.sentence.en_text.mode === "unified")
       content.sentence.en_text.common.value.text = "We make the story up.";
@@ -533,20 +537,28 @@ describe("按词条关联反查共享多维例句", () => {
       items: [item],
       total: 1
     });
-    vi.mocked(api.sentences.unlink).mockImplementation(async () => {
+    vi.mocked(api.sentences.setVisibility).mockImplementation(async () => {
       vi.mocked(api.sentences.list).mockResolvedValue({ items: [], total: 0 });
+      return {
+        entry_id: "entry",
+        sentence_id: item.id,
+        sense_id: "sense",
+        hidden: true,
+        revision: 2
+      };
     });
     show(<SenseSentences />);
     await screen.findByText("We make the story up.");
-    fireEvent.click(screen.getByRole("button", { name: /解\s*除/ }));
+    fireEvent.click(screen.getByRole("button", { name: /移\s*除/ }));
     fireEvent.click(
       within(await screen.findByRole("dialog")).getByRole("button", {
         name: /确\s*定/
       })
     );
     await screen.findByText("暂无关联例句");
-    expect(api.sentences.unlink).toHaveBeenCalledWith(item.id, "entry", {
-      base_revision: 1,
+    expect(api.sentences.setVisibility).toHaveBeenCalledWith("entry", item.id, {
+      base_revision: sentenceWord().revision,
+      hidden: true,
       sense_id: "sense"
     });
   });

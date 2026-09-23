@@ -22,7 +22,6 @@ import {
   decodeFormsImpactResponseV3,
   decodeInboundReferencesV3,
   decodeRelatedSearchResponseAny,
-  decodeResolveSentenceTargetsV3Response,
   decodeSearchComponentTargetsV3Response,
   decodeSurfaceMatchPageAny,
   decodeSurfaceMatchPageV3
@@ -383,63 +382,6 @@ describe("admin word V3/Any runtime decoder", () => {
     ).toThrow(InvalidAdminWordResponseError);
   });
 
-  it("目标发现响应完整解码并拒绝未知 schema_version", () => {
-    const range = buildRuntimeFixture(
-      runtimeFixtureBundle.$defs.SentenceTargetRangeResultV3!
-    );
-    const response = {
-      schema_version: 3,
-      sentence_hash: "sentence-hash",
-      discovery_generation: 7,
-      completeness: "complete",
-      range_results: [range]
-    };
-
-    expect(decodeResolveSentenceTargetsV3Response(response)).toBe(response);
-    expect(() =>
-      decodeResolveSentenceTargetsV3Response({
-        ...response,
-        schema_version: 4
-      })
-    ).toThrow(InvalidAdminWordResponseError);
-  });
-
-  it("句中草稿使用完整节点候选，拒绝旧 entry 级 pending-only 结果", () => {
-    const range = buildRuntimeFixture(
-      runtimeFixtureBundle.$defs.SentenceTargetRangeResultV3!
-    ) as Record<string, unknown>;
-    const draft = buildRuntimeFixture(
-      runtimeFixtureBundle.$defs.PublishedSentenceTargetCandidateV3!
-    ) as Record<string, unknown>;
-    delete draft.publication_id;
-    Object.assign(range, {
-      published_matches: [],
-      published_total: 0,
-      draft_total: 1,
-      draft_matches: [draft]
-    });
-    const response = {
-      schema_version: 3,
-      sentence_hash: "hash",
-      discovery_generation: 1,
-      completeness: "complete",
-      range_results: [range]
-    };
-    expect(decodeResolveSentenceTargetsV3Response(response)).toBe(response);
-    range.draft_matches = [
-      {
-        entry_id: IDS.entry,
-        entry_revision: 1,
-        headword: "word",
-        target_state: "draft",
-        linkability: "pending_only"
-      }
-    ];
-    expect(() => decodeResolveSentenceTargetsV3Response(response)).toThrow(
-      InvalidAdminWordResponseError
-    );
-  });
-
   it("成分目标关键字检索响应完整解码并拒绝未知 schema_version", () => {
     const candidate = buildRuntimeFixture(
       runtimeFixtureBundle.$defs.PublishedSentenceTargetCandidateV3!
@@ -664,7 +606,6 @@ describe("admin word V3/Any runtime decoder", () => {
     const word = validAdminWordV3() as unknown as Record<string, unknown>;
     const capabilities = word.capabilities as Record<string, unknown>;
     capabilities.sentence_associations = true;
-    capabilities.sentence_target_discovery = true;
     const posForms = (
       (word.forms as Record<string, unknown>).pos as Array<
         Record<string, unknown>
@@ -1154,15 +1095,35 @@ it("V3 runtime 接受目录自定义词形编码并保留原值", () => {
 
 it("批次发布响应必须包含完整且不重复的请求身份集合", () => {
   const word = validAdminWordV3();
-  const response = { words: [word] };
+  const response = { words: [word], sentences: [] };
   expect(decodeBatchPublicationResponseV3(response, [word.id])).toBe(response);
   expect(() =>
     decodeBatchPublicationResponseV3(response, ["another-entry"])
   ).toThrow();
   expect(() =>
-    decodeBatchPublicationResponseV3({ words: [word, word] }, [
+    decodeBatchPublicationResponseV3({ words: [word, word], sentences: [] }, [
       word.id,
       "another-entry"
     ])
+  ).toThrow();
+});
+
+it("混合批次响应分别核对词条和例句身份，不接受漏项或重复项", () => {
+  const sentence = buildRuntimeFixture(
+    runtimeFixtureBundle.$defs.SharedSentence!
+  ) as Record<string, unknown>;
+  const id = sentence.id as string;
+  const response = { words: [], sentences: [sentence] };
+  expect(decodeBatchPublicationResponseV3(response, [], [id])).toBe(response);
+  expect(() => decodeBatchPublicationResponseV3(response, [], [])).toThrow();
+  expect(() =>
+    decodeBatchPublicationResponseV3(response, [], ["another-sentence"])
+  ).toThrow();
+  expect(() =>
+    decodeBatchPublicationResponseV3(
+      { words: [], sentences: [sentence, sentence] },
+      [],
+      [id, "another-sentence"]
+    )
   ).toThrow();
 });

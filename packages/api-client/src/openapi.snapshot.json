@@ -1,7 +1,7 @@
 {
   "_note": "AUTO-GENERATED from backend docs/openapi.json via `pnpm --filter @tsz/api-client sync:openapi`. 勿手改。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-3/docs/openapi.json",
-  "_generatedAt": "2026-09-22T07:27:53.015Z",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-4/docs/openapi.json",
+  "_generatedAt": "2026-09-23T05:11:03.175Z",
   "paths": {
     "/admin/admins": ["get", "post"],
     "/admin/admins/create-code": ["post"],
@@ -25,8 +25,10 @@
     "/admin/lexicon/entries/publications/batch": ["post"],
     "/admin/lexicon/entries/related-search": ["get"],
     "/admin/lexicon/entries/restore-batch": ["post"],
-    "/admin/lexicon/entries/sentence-targets/resolve": ["post"],
     "/admin/lexicon/entries/stats": ["get"],
+    "/admin/lexicon/entries/{entry_id}/sentences/{sentence_id}/visibility": [
+      "put"
+    ],
     "/admin/lexicon/entries/{id}": ["delete", "get"],
     "/admin/lexicon/entries/{id}/annotation": ["patch"],
     "/admin/lexicon/entries/{id}/archive": ["post"],
@@ -44,7 +46,14 @@
     "/admin/lexicon/sentences": ["get", "post"],
     "/admin/lexicon/sentences/targets": ["get"],
     "/admin/lexicon/sentences/{id}": ["delete", "get", "put"],
-    "/admin/lexicon/sentences/{id}/associations/{entry_id}": ["delete"],
+    "/admin/lexicon/sentences/{id}/publications": ["get", "post"],
+    "/admin/lexicon/sentences/{id}/publications/{publication_id}": ["get"],
+    "/admin/lexicon/sentences/{id}/publications/{publication_id}/rollback": [
+      "post"
+    ],
+    "/admin/lexicon/sentences/{id}/restore": ["post"],
+    "/admin/lexicon/sentences/{id}/withdraw": ["post"],
+    "/admin/lexicon/sentences/{id}/withdrawal-impact": ["get"],
     "/admin/lexicon/surface-match-snapshots/{snapshot_id}": ["get"],
     "/admin/profile": ["get"],
     "/admin/profile/preferences": ["patch"],
@@ -139,6 +148,38 @@
       }
     ],
     "post /admin/lexicon/entries/{id}/restore": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/sentences/{id}/publications": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/sentences/{id}/publications/{publication_id}/rollback": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/sentences/{id}/restore": [
+      {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": { "type": "string", "format": "uuid" }
+      }
+    ],
+    "post /admin/lexicon/sentences/{id}/withdraw": [
       {
         "name": "Idempotency-Key",
         "in": "header",
@@ -408,21 +449,6 @@
         "503": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
-    "post /admin/lexicon/entries/sentence-targets/resolve": {
-      "request": {
-        "$ref": "#/components/schemas/ResolveSentenceTargetsV3Input"
-      },
-      "responses": {
-        "200": {
-          "$ref": "#/components/schemas/ResolveSentenceTargetsV3Response"
-        },
-        "400": { "$ref": "#/components/schemas/ProblemDetails" },
-        "401": { "$ref": "#/components/schemas/ProblemDetails" },
-        "403": { "$ref": "#/components/schemas/ProblemDetails" },
-        "422": { "$ref": "#/components/schemas/ProblemDetails" },
-        "503": { "$ref": "#/components/schemas/ProblemDetails" }
-      }
-    },
     "get /admin/lexicon/entries/stats": {
       "request": null,
       "responses": {
@@ -430,6 +456,14 @@
         "401": { "$ref": "#/components/schemas/ProblemDetails" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
         "500": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "put /admin/lexicon/entries/{entry_id}/sentences/{sentence_id}/visibility": {
+      "request": { "$ref": "#/components/schemas/SentenceVisibilityInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SentenceVisibilityResponse" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "delete /admin/lexicon/entries/{id}": {
@@ -681,16 +715,59 @@
         "422": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
-    "delete /admin/lexicon/sentences/{id}/associations/{entry_id}": {
-      "request": { "$ref": "#/components/schemas/UnlinkSentenceSense" },
+    "get /admin/lexicon/sentences/{id}/publications": {
+      "request": null,
       "responses": {
-        "204": null,
-        "400": { "$ref": "#/components/schemas/ProblemDetails" },
-        "401": { "$ref": "#/components/schemas/ProblemDetails" },
+        "200": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/SentencePublication" }
+        }
+      }
+    },
+    "post /admin/lexicon/sentences/{id}/publications": {
+      "request": { "$ref": "#/components/schemas/SentencePublicationInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SharedSentence" },
         "403": { "$ref": "#/components/schemas/ProblemDetails" },
-        "404": { "$ref": "#/components/schemas/ProblemDetails" },
-        "409": { "$ref": "#/components/schemas/ProblemDetails" },
-        "422": { "$ref": "#/components/schemas/ProblemDetails" }
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon/sentences/{id}/publications/{publication_id}": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SentencePublication" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/sentences/{id}/publications/{publication_id}/rollback": {
+      "request": { "$ref": "#/components/schemas/SentencePublicationInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SharedSentence" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/sentences/{id}/restore": {
+      "request": { "$ref": "#/components/schemas/SentencePublicationInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SharedSentence" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "post /admin/lexicon/sentences/{id}/withdraw": {
+      "request": { "$ref": "#/components/schemas/WithdrawSentenceInput" },
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SharedSentence" },
+        "403": { "$ref": "#/components/schemas/ProblemDetails" },
+        "409": { "$ref": "#/components/schemas/ProblemDetails" }
+      }
+    },
+    "get /admin/lexicon/sentences/{id}/withdrawal-impact": {
+      "request": null,
+      "responses": {
+        "200": { "$ref": "#/components/schemas/SentenceWithdrawalImpact" },
+        "404": { "$ref": "#/components/schemas/ProblemDetails" }
       }
     },
     "get /admin/lexicon/surface-match-snapshots/{snapshot_id}": {
@@ -1706,6 +1783,7 @@
           "type": "array",
           "items": { "$ref": "#/components/schemas/ProblemReferenceLocation" }
         },
+        "sentence_id": { "type": "string", "format": "uuid" },
         "surface_match_page": {
           "$ref": "#/components/schemas/SurfaceMatchPageV3"
         },
@@ -2470,108 +2548,29 @@
         "items": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/BatchPublicationItemV3" },
-          "maxItems": 50,
-          "minItems": 1
+          "maxItems": 50
         },
-        "schema_version": { "type": "integer", "enum": [3] }
+        "schema_version": { "type": "integer", "enum": [3] },
+        "sentences": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/SentenceBatchItem" },
+          "maxItems": 50
+        }
       },
       "additionalProperties": false
     },
     "BatchPublicationResponseV3": {
       "type": "object",
-      "required": ["words"],
+      "required": ["words", "sentences"],
       "properties": {
+        "sentences": {
+          "type": "array",
+          "items": { "$ref": "#/components/schemas/SharedSentence" }
+        },
         "words": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/AdminWordV3" }
         }
-      },
-      "additionalProperties": false
-    },
-    "ResolveSentenceTargetsV3Input": {
-      "oneOf": [
-        {
-          "type": "object",
-          "required": [
-            "schema_version",
-            "sentence_text",
-            "source_dialect",
-            "mode"
-          ],
-          "properties": {
-            "mode": { "type": "string", "enum": ["all_published_targets"] },
-            "page_size_per_range": {
-              "type": "integer",
-              "format": "int32",
-              "maximum": 100,
-              "minimum": 1
-            },
-            "schema_version": { "type": "integer", "enum": [3] },
-            "sentence_text": { "type": "string", "maxLength": 1000 },
-            "source_dialect": { "$ref": "#/components/schemas/Dialect" }
-          },
-          "additionalProperties": false
-        },
-        {
-          "type": "object",
-          "required": [
-            "schema_version",
-            "sentence_text",
-            "source_dialect",
-            "selected_segments",
-            "include_drafts",
-            "mode"
-          ],
-          "properties": {
-            "cursor": {
-              "type": "string",
-              "description": "由同一位置上一页返回；绑定 source dialect、片段指纹与稳定节点排序键，不绑定词库代数。"
-            },
-            "include_drafts": { "type": "boolean" },
-            "mode": { "type": "string", "enum": ["selected_segments"] },
-            "page_size_per_range": {
-              "type": "integer",
-              "format": "int32",
-              "maximum": 100,
-              "minimum": 1
-            },
-            "schema_version": { "type": "integer", "enum": [3] },
-            "selected_segments": {
-              "type": "array",
-              "items": { "$ref": "#/components/schemas/SentenceSourceRangeV1" },
-              "maxItems": 20,
-              "minItems": 1
-            },
-            "sentence_text": { "type": "string", "maxLength": 1000 },
-            "source_dialect": { "$ref": "#/components/schemas/Dialect" }
-          },
-          "additionalProperties": false
-        }
-      ],
-      "discriminator": { "propertyName": "mode" }
-    },
-    "ResolveSentenceTargetsV3Response": {
-      "type": "object",
-      "required": [
-        "schema_version",
-        "sentence_hash",
-        "discovery_generation",
-        "completeness",
-        "range_results"
-      ],
-      "properties": {
-        "completeness": {
-          "$ref": "#/components/schemas/SentenceTargetDiscoveryCompletenessV3"
-        },
-        "discovery_generation": { "type": "integer", "format": "int64" },
-        "range_results": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/SentenceTargetRangeResultV3"
-          }
-        },
-        "schema_version": { "type": "integer", "enum": [3] },
-        "sentence_hash": { "type": "string" }
       },
       "additionalProperties": false
     },
@@ -2645,10 +2644,6 @@
         }
       },
       "additionalProperties": false
-    },
-    "SentenceTargetDiscoveryCompletenessV3": {
-      "type": "string",
-      "enum": ["complete", "overloaded"]
     },
     "SentenceTargetMatchKindV3": {
       "type": "string",
@@ -2758,57 +2753,6 @@
         "senses": {
           "type": "array",
           "items": { "$ref": "#/components/schemas/SentenceTargetSenseV3" }
-        }
-      },
-      "additionalProperties": false
-    },
-    "SentenceTargetRangeResultV3": {
-      "type": "object",
-      "required": [
-        "source_segments",
-        "segments_fingerprint",
-        "normalized_surface",
-        "published_total",
-        "draft_total",
-        "published_matches",
-        "draft_matches"
-      ],
-      "properties": {
-        "draft_matches": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/PublishedSentenceTargetCandidateV3"
-          },
-          "description": "与发布候选共用完整节点结构，publication_id 缺省。保存绑定稳定节点，发布前仍须处理未发布依赖。\n与 published_matches 共用 page_size_per_range 和 next_cursor，已发布候选优先。"
-        },
-        "draft_total": {
-          "type": "integer",
-          "format": "int64",
-          "description": "主动展开时当前可见的未发布具体节点候选数；不包含已发布的同一目标组合。",
-          "minimum": 0
-        },
-        "next_cursor": {
-          "type": "string",
-          "description": "自动发现或手选详情被截断时返回；下一页改用相同 `selected_segments` 携带此值。"
-        },
-        "normalized_surface": { "type": "string" },
-        "published_matches": {
-          "type": "array",
-          "items": {
-            "$ref": "#/components/schemas/PublishedSentenceTargetCandidateV3"
-          }
-        },
-        "published_total": {
-          "type": "integer",
-          "format": "int64",
-          "minimum": 0
-        },
-        "segments_fingerprint": { "type": "string" },
-        "source_segments": {
-          "type": "array",
-          "items": { "$ref": "#/components/schemas/SentenceSourceRangeV1" },
-          "maxItems": 20,
-          "minItems": 1
         }
       },
       "additionalProperties": false
@@ -3460,6 +3404,25 @@
       },
       "additionalProperties": false
     },
+    "SentenceBatchItem": {
+      "type": "object",
+      "required": ["sentence_id", "base_revision", "base_lifecycle_revision"],
+      "properties": {
+        "base_lifecycle_revision": { "type": "integer", "format": "int64" },
+        "base_revision": { "type": "integer", "format": "int64" },
+        "sentence_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "SentencePublicationInput": {
+      "type": "object",
+      "required": ["base_revision", "base_lifecycle_revision"],
+      "properties": {
+        "base_lifecycle_revision": { "type": "integer", "format": "int64" },
+        "base_revision": { "type": "integer", "format": "int64" }
+      },
+      "additionalProperties": false
+    },
     "SentenceRevision": {
       "type": "object",
       "required": ["base_revision"],
@@ -3532,6 +3495,16 @@
       "type": "string",
       "description": "译文风格而非难度等级：初阶逐字直译、中阶语句通顺、高阶深层重构。",
       "enum": ["word_for_word", "balanced_fluency", "adapted_creation"]
+    },
+    "SentenceVisibilityInput": {
+      "type": "object",
+      "required": ["base_revision", "sense_id", "hidden"],
+      "properties": {
+        "base_revision": { "type": "integer", "format": "int64" },
+        "hidden": { "type": "boolean" },
+        "sense_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
     },
     "SharedSentenceAnnotation": {
       "type": "object",
@@ -3631,15 +3604,6 @@
       "enum": ["zh"]
     },
     "UkDialectV3": { "type": "string", "enum": ["uk"] },
-    "UnlinkSentenceSense": {
-      "type": "object",
-      "required": ["base_revision", "sense_id"],
-      "properties": {
-        "base_revision": { "type": "integer", "format": "int64" },
-        "sense_id": { "type": "string", "format": "uuid" }
-      },
-      "additionalProperties": false
-    },
     "UpdateEntryAnnotationInput": {
       "type": "object",
       "required": ["base_annotation_revision"],
@@ -3735,6 +3699,22 @@
           "minimum": -50
         },
         "voice_id": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "WithdrawSentenceInput": {
+      "type": "object",
+      "required": [
+        "base_revision",
+        "base_lifecycle_revision",
+        "reason",
+        "impact_fingerprint"
+      ],
+      "properties": {
+        "base_lifecycle_revision": { "type": "integer", "format": "int64" },
+        "base_revision": { "type": "integer", "format": "int64" },
+        "impact_fingerprint": { "type": "string" },
+        "reason": { "type": "string" }
       },
       "additionalProperties": false
     },

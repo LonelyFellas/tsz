@@ -20,7 +20,12 @@ import {
 import type { Dayjs } from "dayjs";
 import type { SharedSentence, SentenceListQuery } from "@tsz/types";
 import { Link, useSearchParams } from "react-router-dom";
-import { api } from "@/lib/auth";
+import { api, useAuthStore } from "@/lib/auth";
+import { BatchPublicationModal } from "../dictionary/BatchPublicationModal";
+import {
+  SentencePublicationModal,
+  type SentencePublicationAction
+} from "./SentencePublicationModal";
 import { editableEnglishText } from "../dictionary/word-creation-v3/meaningsModel";
 import { SentenceEditor } from "./SentenceEditor";
 import { V3EnglishTextPreview } from "../dictionary/word-creation-v3/components/V3EnglishTextPreview";
@@ -52,6 +57,16 @@ export function SentenceLibrary({
   readOnly?: boolean;
 }) {
   const { modal, message } = App.useApp();
+  const profile = useAuthStore((state) => state.profile);
+  const canPublish =
+    !readOnly &&
+    Boolean(
+      profile && (profile.role === "super_admin" || profile.can_publish_lexicon)
+    );
+  const [publication, setPublication] = useState<{
+    sentence: SharedSentence;
+    action: SentencePublicationAction;
+  }>();
   const client = useQueryClient();
   const [filters, setFilters] = useState<SentenceListQuery>({
     page: 1,
@@ -62,10 +77,16 @@ export function SentenceLibrary({
   const [dates, setDates] = useState<[Dayjs | null, Dayjs | null] | null>(null);
   const [editor, setEditor] = useState<SharedSentence>();
   const [detail, setDetail] = useState<SharedSentence>();
+  const [batch, setBatch] = useState<SharedSentence[]>();
   const [selected, setSelected] = useState<React.Key[]>([]);
   const query = useQuery({
-    queryKey: ["shared-sentences", entryId, filters],
-    queryFn: () => api.sentences.list({ ...filters, entry_id: entryId })
+    queryKey: ["shared-sentences", entryId, filters, readOnly],
+    queryFn: () =>
+      api.sentences.list({
+        ...filters,
+        view: readOnly ? "published" : "draft",
+        entry_id: entryId
+      })
   });
   const refresh = () => {
     void client.invalidateQueries({ queryKey: ["shared-sentences"] });
@@ -75,16 +96,32 @@ export function SentenceLibrary({
     message.error(e instanceof Error ? e.message : "操作失败，请重试");
   const open = async (id: string, editing: boolean) => {
     try {
-      const fresh = await api.sentences.get(id);
+      const fresh = await api.sentences.get(
+        id,
+        editing || !readOnly ? "draft" : "published"
+      );
       if (editing) setEditor(fresh);
       else setDetail(fresh);
     } catch (e) {
       void failure(e);
     }
   };
+  const openPublication = async (
+    row: SharedSentence,
+    action: SentencePublicationAction
+  ) => {
+    try {
+      setPublication({
+        sentence: await api.sentences.get(row.id, "draft"),
+        action
+      });
+    } catch (error) {
+      void failure(error);
+    }
+  };
   const remove = (items: SharedSentence[]) =>
     modal.confirm({
-      title: `删除 ${items.length} 条共享例句？`,
+      title: `删除 ${items.length} 条未发布草稿？`,
       content: (
         <Flex vertical gap="small">
           {items.map((item) => (
@@ -94,7 +131,7 @@ export function SentenceLibrary({
             </Typography.Text>
           ))}
           <Typography.Text type="danger">
-            删除后所有词条的当前引用一起消失。
+            仅从未发布的草稿可删除；已发布例句必须使用全局下架。
           </Typography.Text>
         </Flex>
       ),
@@ -216,9 +253,27 @@ export function SentenceLibrary({
           >
             重置
           </Button>
+          {canPublish && (
+            <Button
+              disabled={!selected.length}
+              onClick={() =>
+                setBatch(rows.filter((row) => selected.includes(row.id)))
+              }
+            >
+              发布所选
+            </Button>
+          )}
           <Button
             danger
-            disabled={!selected.length}
+            disabled={
+              readOnly ||
+              !selected.length ||
+              rows.some(
+                (row) =>
+                  selected.includes(row.id) &&
+                  row.current_publication_id != null
+              )
+            }
             onClick={() =>
               remove(rows.filter((row) => selected.includes(row.id)))
             }
@@ -242,7 +297,7 @@ export function SentenceLibrary({
             loading={query.isFetching}
             scroll={{ x: entryId ? 700 : 1350 }}
             rowSelection={
-              !entryId
+              !entryId && !readOnly
                 ? { selectedRowKeys: selected, onChange: setSelected }
                 : undefined
             }
@@ -273,6 +328,19 @@ export function SentenceLibrary({
                     }
                   ]
                 : []),
+              {
+                title: "状态",
+                width: 100,
+                render: (_, row) => (
+                  <Tag>
+                    {row.withdrawn_at
+                      ? "已下架"
+                      : row.current_publication_id
+                        ? "已有发布"
+                        : "未发布"}
+                  </Tag>
+                )
+              },
               {
                 title: "等级",
                 width: 65,
@@ -331,7 +399,7 @@ export function SentenceLibrary({
               {
                 title: "操作",
                 fixed: "right",
-                width: readOnly ? 70 : 220,
+                width: readOnly ? 140 : 380,
                 render: (_, row) => (
                   <Space>
                     <Button
@@ -339,6 +407,12 @@ export function SentenceLibrary({
                       onClick={() => void open(row.id, false)}
                     >
                       查看
+                    </Button>
+                    <Button
+                      size="small"
+                      onClick={() => void openPublication(row, "history")}
+                    >
+                      历史
                     </Button>
                     {!readOnly && (
                       <>
@@ -348,7 +422,33 @@ export function SentenceLibrary({
                         >
                           编辑
                         </Button>
-                        {!entryId && (
+                        {canPublish && (
+                          <>
+                            <Button
+                              size="small"
+                              onClick={() =>
+                                void openPublication(row, "publish")
+                              }
+                            >
+                              发布
+                            </Button>
+                            {row.current_publication_id && (
+                              <Button
+                                size="small"
+                                danger={!row.withdrawn_at}
+                                onClick={() =>
+                                  void openPublication(
+                                    row,
+                                    row.withdrawn_at ? "restore" : "withdraw"
+                                  )
+                                }
+                              >
+                                {row.withdrawn_at ? "恢复" : "下架"}
+                              </Button>
+                            )}
+                          </>
+                        )}
+                        {!entryId && !row.current_publication_id && (
                           <Button
                             size="small"
                             danger
@@ -367,6 +467,27 @@ export function SentenceLibrary({
         </Col>
       </Row>
 
+      {batch && (
+        <BatchPublicationModal
+          rows={[]}
+          sentences={batch}
+          onClose={() => setBatch(undefined)}
+          onPublished={() => {
+            setBatch(undefined);
+            refresh();
+          }}
+        />
+      )}
+      {publication && (
+        <SentencePublicationModal
+          key={`${publication.sentence.id}:${publication.action}`}
+          sentence={publication.sentence}
+          action={publication.action}
+          canPublish={canPublish}
+          onClose={() => setPublication(undefined)}
+          onChanged={refresh}
+        />
+      )}
       {detail && (
         <Modal
           open

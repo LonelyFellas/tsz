@@ -20,7 +20,6 @@ export type V3WordsApi = Pick<
   | "previewFormsImpactV3"
   | "saveFormsStepV3"
   | "saveMeaningsStepV3"
-  | "resolveSentenceTargetsV3"
   | "searchComponentTargetsV3"
   | "validateV3"
   | "publishV3"
@@ -158,10 +157,6 @@ export function createV3WordRequests(source: V3WordsApi = api.words) {
         .then((response) =>
           requireWordIdentity(response, wordId, "save_meanings.word.id")
         ),
-    resolveSentenceTargets: (
-      input: Parameters<V3WordsApi["resolveSentenceTargetsV3"]>[0],
-      signal?: AbortSignal
-    ) => source.resolveSentenceTargetsV3(input, signal),
     searchComponentTargets: (
       input: Parameters<V3WordsApi["searchComponentTargetsV3"]>[0],
       signal?: AbortSignal

@@ -3,7 +3,6 @@ import type {
   AdminWordV3,
   EntryLifecycleBatchInput,
   EntryLifecycleInput,
-  ResolveSentenceTargetsV3Input,
   WordRelationWritableV3,
   WordSentenceWritableV3
 } from "@tsz/types";
@@ -450,33 +449,6 @@ describe("createAdminEndpoints — 智能词库 words", () => {
       response_path: "word.schema_version",
       received_schema_version: undefined
     });
-  });
-
-  it("resolveSentenceTargetsV3 走权威 resolve 路径并原样透传 snake_case 入参", () => {
-    // 成分用词的目标发现仍依赖这条；原先与 replace/list/claim 合在一条用例里，
-    // 草稿期关联下线后把 resolve 这部分单独保留。
-    const pending = new Promise<never>(() => {});
-    http.post.mockReturnValue(pending);
-    const api = createAdminEndpoints(http);
-    const resolveInput: ResolveSentenceTargetsV3Input = {
-      schema_version: 3,
-      sentence_text: "It is centered on the center of the wall.",
-      source_dialect: "common",
-      mode: "selected_segments",
-      selected_segments: [
-        { start: 22, end: 40, surface: "center of the wall" }
-      ],
-      include_drafts: true,
-      page_size_per_range: 20,
-      cursor: "resolve-cursor"
-    };
-
-    api.words.resolveSentenceTargetsV3(resolveInput);
-
-    expect(http.post).toHaveBeenCalledWith(
-      "/lexicon/entries/sentence-targets/resolve",
-      resolveInput
-    );
   });
 
   it.each([

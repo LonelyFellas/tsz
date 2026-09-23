@@ -60,9 +60,17 @@ export function WordSentences({
   const [collapsed, setCollapsed] = useState(false);
   const [page, setPage] = useState(1);
   const query = useQuery({
-    queryKey: ["shared-sentences", entryId, senseId, sourceWord.revision, page],
+    queryKey: [
+      "shared-sentences",
+      entryId,
+      senseId,
+      sourceWord.revision,
+      page,
+      readOnly
+    ],
     queryFn: () =>
       api.sentences.list({
+        view: readOnly ? "published" : "draft",
         entry_id: entryId,
         sense_id: senseId,
         page,
@@ -85,7 +93,7 @@ export function WordSentences({
   };
   const edit = async (item: SharedSentence) => {
     try {
-      onOpen(await api.sentences.get(item.id));
+      onOpen(await api.sentences.get(item.id, "draft"));
     } catch (error) {
       failure(error);
     }
@@ -95,7 +103,7 @@ export function WordSentences({
     let cancelled = false;
     setCollapsed(false);
     void api.sentences
-      .get(focusSentenceId)
+      .get(focusSentenceId, "draft")
       .then((sentence) => {
         if (!cancelled) onOpen(sentence);
       })
@@ -113,20 +121,23 @@ export function WordSentences({
   }, [focusSentenceId]);
   const remove = (item: SharedSentence) => {
     const confirmation = modal.confirm({
-      title: "从当前词义解除关联？",
-      content: "解除这条例句与当前词义的全部关联，例句和其他词义的关联将保留。",
+      title: "从当前词义移除例句？",
+      content:
+        "移除只写入当前词条草稿，发布词条后生效。共享标注和其他词义的展示不变。",
       onOk: (close) => {
         confirmation.update({
           okButtonProps: { loading: true },
           cancelButtonProps: { disabled: true }
         });
         void api.sentences
-          .unlink(item.id, entryId, {
-            base_revision: item.revision,
+          .setVisibility(entryId, item.id, {
+            base_revision: sourceWord.revision,
+            hidden: true,
             sense_id: senseId
           })
           .then(() => {
             setPage(1);
+            void client.invalidateQueries({ queryKey: ["admin-words"] });
             refresh();
             close();
           })
@@ -173,7 +184,7 @@ export function WordSentences({
           <Flex vertical gap="small">
             <Typography.Text type="secondary">
               {savedSense
-                ? "展示句内关联到当前词义的例句。修改会同步到例句库。"
+                ? "保存只更新例句草稿；例句发布后才更新展示。局部移除随词条发布生效。"
                 : "先保存词义，再添加例句。"}
             </Typography.Text>
             {query.isError && (
@@ -210,9 +221,12 @@ export function WordSentences({
                       <Button size="small" onClick={() => void edit(item)}>
                         编辑
                       </Button>
-                      <Popover content="从当前词义解除关联" trigger="hover">
+                      <Popover
+                        content="从当前词义移除，随词条发布生效"
+                        trigger="hover"
+                      >
                         <Button size="small" onClick={() => remove(item)}>
-                          解除
+                          移除
                         </Button>
                       </Popover>
                     </Space>

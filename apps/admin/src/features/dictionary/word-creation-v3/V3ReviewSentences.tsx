@@ -39,6 +39,7 @@ export function V3ReviewSentences({
     queryKey: ["shared-sentences", "review", entryId, senseId, revision, page],
     queryFn: () =>
       api.sentences.list({
+        view: "published",
         entry_id: entryId,
         sense_id: senseId,
         page,

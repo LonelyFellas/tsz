@@ -6,6 +6,8 @@ const id = "00000000-0000-4000-8000-000000000001";
 const body = {
   id,
   revision: 1,
+  lifecycle_revision: 1,
+  view: "draft",
   content: {
     sentence: {
       id,
@@ -60,7 +62,17 @@ describe("shared sentence wire contract", () => {
   });
   it("独立编辑携带当前上下文，解除发送词义和 revision；目标查询使用严格契约", async () => {
     const del = vi.fn().mockResolvedValue(undefined);
-    const put = vi.fn().mockResolvedValue(body);
+    const visibility = {
+      entry_id: id,
+      sentence_id: id,
+      sense_id: id,
+      revision: 2,
+      hidden: true
+    };
+    const put = vi
+      .fn()
+      .mockResolvedValueOnce(visibility)
+      .mockResolvedValue(body);
     const targets = {
       items: [
         {
@@ -81,10 +93,14 @@ describe("shared sentence wire contract", () => {
       put,
       get
     } as unknown as HttpClient);
-    await api.unlink(id, id, { base_revision: 1, sense_id: id });
-    expect(del).toHaveBeenCalledWith(
-      `/lexicon/sentences/${id}/associations/${id}`,
-      { base_revision: 1, sense_id: id }
+    await api.setVisibility(id, id, {
+      base_revision: 1,
+      sense_id: id,
+      hidden: true
+    });
+    expect(put).toHaveBeenCalledWith(
+      `/lexicon/entries/${id}/sentences/${id}/visibility`,
+      { base_revision: 1, sense_id: id, hidden: true }
     );
     await api.update(id, {
       base_revision: 1,
@@ -106,4 +122,80 @@ describe("shared sentence wire contract", () => {
       "unexpected_property"
     );
   });
+});
+
+it("发布、回退、下架、恢复分别走独立路径并携带双版本与幂等键", async () => {
+  const post = vi.fn().mockResolvedValue(body);
+  const api = createSharedSentenceEndpoints({ post } as unknown as HttpClient);
+  const input = { base_revision: 1, base_lifecycle_revision: 2 };
+  const headers = { headers: { "Idempotency-Key": "command-key" } };
+  await api.publish(id, "command-key", input);
+  await api.rollback(id, id, "command-key", input);
+  await api.withdraw(id, "command-key", {
+    ...input,
+    reason: "修正",
+    impact_fingerprint: "digest"
+  });
+  await api.restore(id, "command-key", input);
+  expect(post.mock.calls).toEqual([
+    [`/lexicon/sentences/${id}/publications`, input, headers],
+    [`/lexicon/sentences/${id}/publications/${id}/rollback`, input, headers],
+    [
+      `/lexicon/sentences/${id}/withdraw`,
+      { ...input, reason: "修正", impact_fingerprint: "digest" },
+      headers
+    ],
+    [`/lexicon/sentences/${id}/restore`, input, headers]
+  ]);
+});
+
+it("编辑显式读取草稿，历史支持游标并拒绝畸形响应", async () => {
+  const publication = {
+    id,
+    sentence_id: id,
+    publication_number: 1,
+    source_revision: 1,
+    snapshot: body.content,
+    published_at: body.created_at,
+    published_by_admin_id: id
+  };
+  const get = vi
+    .fn()
+    .mockResolvedValueOnce(body)
+    .mockResolvedValueOnce([publication])
+    .mockResolvedValueOnce(publication)
+    .mockResolvedValueOnce({})
+    .mockResolvedValueOnce([{ ...publication, snapshot: null }]);
+  const api = createSharedSentenceEndpoints({ get } as unknown as HttpClient);
+  await api.get(id, "draft");
+  expect(get).toHaveBeenLastCalledWith(`/lexicon/sentences/${id}?view=draft`);
+  await expect(api.publications(id, 5)).resolves.toEqual([publication]);
+  expect(get).toHaveBeenLastCalledWith(
+    `/lexicon/sentences/${id}/publications?before_number=5`
+  );
+  await expect(api.publication(id, id)).resolves.toEqual(publication);
+  await expect(api.publications(id)).rejects.toThrow("数组");
+  await expect(api.publications(id)).rejects.toThrow("接口契约");
+});
+
+it("下架影响预览保持目标身份并拒绝缺失指纹", async () => {
+  const impact = {
+    sentence_id: id,
+    publication_id: id,
+    lifecycle_revision: 2,
+    targets: [
+      { entry_id: id, sense_id: id, lifecycle_revision: 4, hidden: false }
+    ],
+    fingerprint: "digest"
+  };
+  const get = vi
+    .fn()
+    .mockResolvedValueOnce(impact)
+    .mockResolvedValueOnce({ ...impact, fingerprint: undefined });
+  const api = createSharedSentenceEndpoints({ get } as unknown as HttpClient);
+  await expect(api.withdrawalImpact(id)).resolves.toEqual(impact);
+  expect(get).toHaveBeenLastCalledWith(
+    `/lexicon/sentences/${id}/withdrawal-impact`
+  );
+  await expect(api.withdrawalImpact(id)).rejects.toThrow("fingerprint");
 });
