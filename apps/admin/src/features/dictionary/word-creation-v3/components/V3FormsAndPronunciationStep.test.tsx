@@ -122,7 +122,7 @@ vi.mock("../../dataSource", () => ({
 
 vi.mock("../api", () => ({
   createV3WordRequests: () => ({
-    resolveSentenceTargets: componentLookupState.resolve
+    searchComponentTargets: componentLookupState.resolve
   })
 }));
 
@@ -518,10 +518,9 @@ describe("V3FormsAndPronunciationStep", () => {
     componentLookupState.resolve.mockReset();
     componentLookupState.resolve.mockResolvedValue({
       schema_version: 3,
-      sentence_hash: "hash",
-      discovery_generation: 1,
-      completeness: "complete",
-      range_results: []
+      matches: [],
+      total: 0,
+      truncated: false
     });
   });
 

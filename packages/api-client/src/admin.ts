@@ -34,7 +34,6 @@ import type {
   EntryLifecycleInput,
   PreviewFormsImpactInputV3,
   PublishAdminWordV3Input,
-  ResolveSentenceTargetsV3Input,
   SearchComponentTargetsV3Input,
   Admin,
   AdminAuthResponse,
@@ -81,7 +80,6 @@ import {
   decodeEntryLifecycleBatchAnyResponse,
   decodeFormsImpactResponseV3,
   decodeInboundReferencesV3,
-  decodeResolveSentenceTargetsV3Response,
   decodeSearchComponentTargetsV3Response,
   InvalidAdminWordResponseError,
   decodeRelatedSearchResponseAny,
@@ -358,22 +356,6 @@ export function createAdminEndpoints(http: HttpClient) {
         http
           .put<unknown>(`/lexicon/entries/${wordId}/steps/meanings`, input)
           .then(decodeAdminWordV3Envelope),
-      /** 一次发现句中的已发布单词、短语；手选模式可同时查看草稿。 */
-      resolveSentenceTargetsV3: (
-        input: ResolveSentenceTargetsV3Input,
-        signal?: AbortSignal
-      ) =>
-        signal
-          ? http
-              .post<unknown>(
-                "/lexicon/entries/sentence-targets/resolve",
-                input,
-                { signal }
-              )
-              .then(decodeResolveSentenceTargetsV3Response)
-          : http
-              .post<unknown>("/lexicon/entries/sentence-targets/resolve", input)
-              .then(decodeResolveSentenceTargetsV3Response),
       /** 按关键字检索可做短语成分目标的已发布词条。 */
       searchComponentTargetsV3: (
         input: SearchComponentTargetsV3Input,
@@ -417,7 +399,8 @@ export function createAdminEndpoints(http: HttpClient) {
           .then((response) =>
             decodeBatchPublicationResponseV3(
               response,
-              input.items.map((item) => item.entry_id)
+              input.items.map((item) => item.entry_id),
+              input.sentences?.map((item) => item.sentence_id) ?? []
             )
           ),
       publishV3: (

@@ -13,7 +13,6 @@ import type {
   EntryLifecycleBatchResponse,
   FormsImpactResponseV3,
   InboundReferencesV3,
-  ResolveSentenceTargetsV3Response,
   SearchComponentTargetsV3Response,
   RelatedSearchResponseAny,
   SurfaceMatchPageV3
@@ -444,13 +443,6 @@ export function decodeRelatedSearchResponseAny(
   return value as RelatedSearchResponseAny;
 }
 
-export function decodeResolveSentenceTargetsV3Response(
-  value: unknown
-): ResolveSentenceTargetsV3Response {
-  assertRuntimeContract("ResolveSentenceTargetsV3Response", value);
-  return value as ResolveSentenceTargetsV3Response;
-}
-
 export function decodeSearchComponentTargetsV3Response(
   value: unknown
 ): SearchComponentTargetsV3Response {
@@ -495,7 +487,8 @@ export function decodeEntryAnnotationResponse(
 
 export function decodeBatchPublicationResponseV3(
   value: unknown,
-  ids: readonly string[]
+  ids: readonly string[],
+  sentenceIds: readonly string[] = []
 ): import("@tsz/types").BatchPublicationResponseV3 {
   assertRuntimeContract("BatchPublicationResponseV3", value);
   const response = value as import("@tsz/types").BatchPublicationResponseV3;
@@ -506,6 +499,20 @@ export function decodeBatchPublicationResponseV3(
     ids.some((id) => !received.has(id))
   ) {
     throw new InvalidAdminWordResponseError("$.words", "wrong_type", "array");
+  }
+  const receivedSentences = new Set(
+    response.sentences.map((sentence) => sentence.id)
+  );
+  if (
+    response.sentences.length !== sentenceIds.length ||
+    receivedSentences.size !== sentenceIds.length ||
+    sentenceIds.some((id) => !receivedSentences.has(id))
+  ) {
+    throw new InvalidAdminWordResponseError(
+      "$.sentences",
+      "wrong_type",
+      "array"
+    );
   }
   return response;
 }

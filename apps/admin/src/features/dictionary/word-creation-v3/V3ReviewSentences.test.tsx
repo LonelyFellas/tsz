@@ -18,6 +18,8 @@ function sentence(id: string, text: string): SharedSentence {
   return {
     id,
     revision: 1,
+    lifecycle_revision: 1,
+    view: "draft",
     created_by: "admin",
     created_at: "",
     updated_at: "",
@@ -78,6 +80,7 @@ describe("词义预览的独立例句", () => {
     expect(screen.getByText("这是分层译文。")).toBeVisible();
     expect(screen.getByText("6 条")).toBeVisible();
     expect(list).toHaveBeenCalledWith({
+      view: "published",
       entry_id: "book",
       sense_id: "reserve",
       page: 1,
@@ -87,6 +90,7 @@ describe("词义预览的独立例句", () => {
     expect(await screen.findByText("Book a table.")).toBeVisible();
     expect(screen.queryByText("Book a room.")).toBeNull();
     expect(list).toHaveBeenLastCalledWith({
+      view: "published",
       entry_id: "book",
       sense_id: "reserve",
       page: 2,

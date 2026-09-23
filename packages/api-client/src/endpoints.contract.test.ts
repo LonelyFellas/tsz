@@ -17,6 +17,10 @@ import snapshot from "./openapi.snapshot.json";
 
 const specPaths = snapshot.paths as Record<string, string[]>;
 const IDEMPOTENT_LEXICON_OPERATIONS = [
+  "post /admin/lexicon/sentences/{id}/publications",
+  "post /admin/lexicon/sentences/{id}/publications/{publication_id}/rollback",
+  "post /admin/lexicon/sentences/{id}/withdraw",
+  "post /admin/lexicon/sentences/{id}/restore",
   "post /admin/lexicon/entries",
   "post /admin/lexicon/entries/archive-batch",
   "post /admin/lexicon/entries/delete-batch",
@@ -199,7 +203,10 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
       string,
       {
         request: { $ref: string } | null;
-        responses: Record<string, { $ref: string } | null>;
+        responses: Record<
+          string,
+          { $ref?: string; type?: string; items?: unknown } | null
+        >;
       }
     >;
     const cases = [
@@ -491,7 +498,7 @@ describe("api-client 契约:前端端点 vs 后端 openapi 快照", () => {
     // canary：把生成输入（后端 docs/openapi.json 的 sha256）钉成常量，后端 spec 变了就必须重新
     // sync 并显式改这里。每次契约同步后记得同步该值。
     expect(runtimeSchemaBundle._source_sha256).toBe(
-      "1920c2a506e783a55605795ce17d193b1c025b3b9017859e0d07d20fdef2b7bb"
+      "5598b79b3eabf7059c96ed3341d47d5c1f7a1a8f2780ff00d6350b3e063da20f"
     );
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3");
     expect(runtimeSchemaBundle.roots).toContain("AdminWordV3Envelope");

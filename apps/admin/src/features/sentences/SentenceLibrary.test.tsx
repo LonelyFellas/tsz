@@ -9,12 +9,14 @@ import { SentenceLibrary } from "./SentenceLibrary";
 import { newSentence } from "./model";
 import { api } from "@/lib/auth";
 vi.mock("@/lib/auth", () => ({
+  useAuthStore: (select: (state: { profile: null }) => unknown) =>
+    select({ profile: null }),
   api: {
     sentences: {
       list: vi.fn(),
       get: vi.fn(),
       delete: vi.fn(),
-      unlink: vi.fn()
+      setVisibility: vi.fn()
     }
   }
 }));
@@ -41,6 +43,8 @@ function fixture(): SharedSentence {
   return {
     id: content.sentence.id,
     revision: 3,
+    lifecycle_revision: 1,
+    view: "draft",
     content,
     entries: [],
     created_by: "测试管理员",
@@ -136,6 +140,19 @@ describe("独立多维例句库", () => {
     await screen.findByText("A wonderful flower.");
     expect(screen.queryByText("确认收录")).toBeNull();
     expect(screen.queryByText("从当前词条解除关联")).toBeNull();
-    expect(api.sentences.unlink).not.toHaveBeenCalled();
+    expect(api.sentences.setVisibility).not.toHaveBeenCalled();
   });
+});
+
+it("已发布例句不提供永久删除，编辑读取草稿而不是发布快照", async () => {
+  const item = { ...fixture(), current_publication_id: "publication" };
+  vi.mocked(api.sentences.list).mockResolvedValue({ items: [item], total: 1 });
+  vi.mocked(api.sentences.get).mockResolvedValue(item);
+  show();
+  await screen.findByText("已有发布");
+  expect(screen.queryByText(/^删\s*除$/)).toBeNull();
+  fireEvent.click(screen.getByText(/^编\s*辑$/).closest("button")!);
+  await screen.findByText("独立例句编辑器");
+  expect(api.sentences.get).toHaveBeenLastCalledWith(item.id, "draft");
+  expect(api.sentences.delete).not.toHaveBeenCalled();
 });

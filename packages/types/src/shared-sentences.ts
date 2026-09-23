@@ -43,9 +43,6 @@ export interface UpdateSharedSentence {
 export interface SentenceRevision {
   base_revision: number;
 }
-export interface UnlinkSentenceSense extends SentenceRevision {
-  sense_id: string;
-}
 export interface SharedSentenceEntry {
   id: string;
   headword: string;
@@ -73,6 +70,11 @@ export interface SentenceTargetQuery {
 export interface SharedSentence {
   id: string;
   revision: number;
+  lifecycle_revision: number;
+  current_publication_id?: string | null;
+  withdrawn_at?: string | null;
+  withdrawn_reason?: string | null;
+  view: "draft" | "published";
   content: SharedSentenceContent;
   entries: SharedSentenceEntry[];
   created_by: string;
@@ -80,6 +82,7 @@ export interface SharedSentence {
   updated_at: string;
 }
 export interface SentenceListQuery {
+  view?: "draft" | "published";
   sense_id?: string;
   q?: string;
   level?: string;
@@ -92,4 +95,50 @@ export interface SentenceListQuery {
 export interface SharedSentenceList {
   items: SharedSentence[];
   total: number;
+}
+
+export interface SentencePublicationInput {
+  base_revision: number;
+  base_lifecycle_revision: number;
+}
+export interface SentenceBatchItem extends SentencePublicationInput {
+  sentence_id: string;
+}
+export interface SentencePublication {
+  id: string;
+  sentence_id: string;
+  publication_number: number;
+  source_revision: number;
+  snapshot: SharedSentenceContent;
+  published_at: string;
+  published_by_admin_id: string;
+  rollback_of_publication_id?: string | null;
+}
+export interface SentenceWithdrawalImpact {
+  sentence_id: string;
+  lifecycle_revision: number;
+  publication_id: string;
+  targets: {
+    entry_id: string;
+    sense_id: string;
+    lifecycle_revision: number;
+    hidden: boolean;
+  }[];
+  fingerprint: string;
+}
+export interface WithdrawSentenceInput extends SentencePublicationInput {
+  reason: string;
+  impact_fingerprint: string;
+}
+export interface SentenceVisibilityInput {
+  base_revision: number;
+  sense_id: string;
+  hidden: boolean;
+}
+export interface SentenceVisibilityResponse {
+  entry_id: string;
+  revision: number;
+  sense_id: string;
+  sentence_id: string;
+  hidden: boolean;
 }

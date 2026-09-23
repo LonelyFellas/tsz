@@ -1,9 +1,12 @@
 {
   "_note": "AUTO-GENERATED minimal response/error schema closure. 勿手改；重新运行 sync:openapi。",
-  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-3/docs/openapi.json",
-  "_source_sha256": "1920c2a506e783a55605795ce17d193b1c025b3b9017859e0d07d20fdef2b7bb",
+  "_source": "/Users/darwish/Dev/tsz-core/.worktrees/backend/lexicon-domain-batch-4/docs/openapi.json",
+  "_source_sha256": "5598b79b3eabf7059c96ed3341d47d5c1f7a1a8f2780ff00d6350b3e063da20f",
   "roots": [
     "SharedSentence",
+    "SentencePublication",
+    "SentenceWithdrawalImpact",
+    "SentenceVisibilityResponse",
     "SharedSentenceList",
     "SentenceEntryTargets",
     "EntryAnnotationResponse",
@@ -19,7 +22,6 @@
     "SurfaceMatchPageV3",
     "RelatedSearchResponse",
     "DetectLexiconSurfaceResponseV3",
-    "ResolveSentenceTargetsV3Response",
     "SearchComponentTargetsV3Response",
     "AdminWordPublicationListResponse",
     "AdminWordPublicationEnvelope",
@@ -230,7 +232,6 @@
         "publication": { "$ref": "#/$defs/V3PublicationCapability" },
         "sense_component_usages": { "type": "boolean" },
         "sentence_associations": { "type": "boolean" },
-        "sentence_target_discovery": { "type": "boolean" },
         "text_links": { "type": "boolean" }
       },
       "additionalProperties": false
@@ -268,8 +269,12 @@
     "AudioAssetLocale": { "type": "string", "enum": ["en-GB", "en-US"] },
     "BatchPublicationResponseV3": {
       "type": "object",
-      "required": ["words"],
+      "required": ["words", "sentences"],
       "properties": {
+        "sentences": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SharedSentence" }
+        },
         "words": { "type": "array", "items": { "$ref": "#/$defs/AdminWordV3" } }
       },
       "additionalProperties": false
@@ -1080,6 +1085,7 @@
           "type": "array",
           "items": { "$ref": "#/$defs/ProblemReferenceLocation" }
         },
+        "sentence_id": { "type": "string", "format": "uuid" },
         "surface_match_page": { "$ref": "#/$defs/SurfaceMatchPageV3" },
         "usage_count": { "type": "integer" },
         "word_id": { "type": "string", "format": "uuid" }
@@ -1326,29 +1332,6 @@
       "type": "string",
       "enum": ["synonym", "antonym", "derivative"]
     },
-    "ResolveSentenceTargetsV3Response": {
-      "type": "object",
-      "required": [
-        "schema_version",
-        "sentence_hash",
-        "discovery_generation",
-        "completeness",
-        "range_results"
-      ],
-      "properties": {
-        "completeness": {
-          "$ref": "#/$defs/SentenceTargetDiscoveryCompletenessV3"
-        },
-        "discovery_generation": { "type": "integer" },
-        "range_results": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/SentenceTargetRangeResultV3" }
-        },
-        "schema_version": { "type": "integer", "enum": [3] },
-        "sentence_hash": { "type": "string" }
-      },
-      "additionalProperties": false
-    },
     "RetiredStableNodeV3": {
       "type": "object",
       "required": ["id", "node_role", "retired_at"],
@@ -1556,6 +1539,43 @@
       },
       "additionalProperties": false
     },
+    "SentenceImpactTarget": {
+      "type": "object",
+      "required": ["entry_id", "sense_id", "lifecycle_revision", "hidden"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "hidden": { "type": "boolean" },
+        "lifecycle_revision": { "type": "integer" },
+        "sense_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "SentencePublication": {
+      "type": "object",
+      "required": [
+        "id",
+        "sentence_id",
+        "publication_number",
+        "source_revision",
+        "snapshot",
+        "published_at",
+        "published_by_admin_id"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "publication_number": { "type": "integer" },
+        "published_at": { "type": "string", "format": "date-time" },
+        "published_by_admin_id": { "type": "string", "format": "uuid" },
+        "rollback_of_publication_id": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
+        "sentence_id": { "type": "string", "format": "uuid" },
+        "snapshot": { "$ref": "#/$defs/SharedSentenceContent" },
+        "source_revision": { "type": "integer" }
+      },
+      "additionalProperties": false
+    },
     "SentenceSenseSummary": {
       "type": "object",
       "required": ["id", "gloss"],
@@ -1654,10 +1674,6 @@
       },
       "additionalProperties": false
     },
-    "SentenceTargetDiscoveryCompletenessV3": {
-      "type": "string",
-      "enum": ["complete", "overloaded"]
-    },
     "SentenceTargetMatchEvidenceV3": {
       "type": "object",
       "required": ["surface", "normalized_surface", "match_kind"],
@@ -1671,40 +1687,6 @@
     "SentenceTargetMatchKindV3": {
       "type": "string",
       "enum": ["word", "contiguous_phrase", "separable_phrase"]
-    },
-    "SentenceTargetRangeResultV3": {
-      "type": "object",
-      "required": [
-        "source_segments",
-        "segments_fingerprint",
-        "normalized_surface",
-        "published_total",
-        "draft_total",
-        "published_matches",
-        "draft_matches"
-      ],
-      "properties": {
-        "draft_matches": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/PublishedSentenceTargetCandidateV3" }
-        },
-        "draft_total": { "type": "integer", "minimum": 0 },
-        "next_cursor": { "type": "string" },
-        "normalized_surface": { "type": "string" },
-        "published_matches": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/PublishedSentenceTargetCandidateV3" }
-        },
-        "published_total": { "type": "integer", "minimum": 0 },
-        "segments_fingerprint": { "type": "string" },
-        "source_segments": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/SentenceSourceRangeV1" },
-          "maxItems": 20,
-          "minItems": 1
-        }
-      },
-      "additionalProperties": false
     },
     "SentenceTargetSenseV3": {
       "type": "object",
@@ -1737,11 +1719,47 @@
       "type": "string",
       "enum": ["word_for_word", "balanced_fluency", "adapted_creation"]
     },
+    "SentenceView": { "type": "string", "enum": ["draft", "published"] },
+    "SentenceVisibilityResponse": {
+      "type": "object",
+      "required": ["entry_id", "revision", "sense_id", "sentence_id", "hidden"],
+      "properties": {
+        "entry_id": { "type": "string", "format": "uuid" },
+        "hidden": { "type": "boolean" },
+        "revision": { "type": "integer" },
+        "sense_id": { "type": "string", "format": "uuid" },
+        "sentence_id": { "type": "string", "format": "uuid" }
+      },
+      "additionalProperties": false
+    },
+    "SentenceWithdrawalImpact": {
+      "type": "object",
+      "required": [
+        "sentence_id",
+        "lifecycle_revision",
+        "publication_id",
+        "targets",
+        "fingerprint"
+      ],
+      "properties": {
+        "fingerprint": { "type": "string" },
+        "lifecycle_revision": { "type": "integer" },
+        "publication_id": { "type": "string", "format": "uuid" },
+        "sentence_id": { "type": "string", "format": "uuid" },
+        "targets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SentenceImpactTarget" }
+        }
+      },
+      "additionalProperties": false
+    },
     "SharedSentence": {
       "type": "object",
       "required": [
         "id",
         "revision",
+        "lifecycle_revision",
+        "view",
         "content",
         "entries",
         "created_by",
@@ -1752,13 +1770,21 @@
         "content": { "$ref": "#/$defs/SharedSentenceContent" },
         "created_at": { "type": "string", "format": "date-time" },
         "created_by": { "type": "string" },
+        "current_publication_id": {
+          "type": ["string", "null"],
+          "format": "uuid"
+        },
         "entries": {
           "type": "array",
           "items": { "$ref": "#/$defs/SharedSentenceEntry" }
         },
         "id": { "type": "string", "format": "uuid" },
+        "lifecycle_revision": { "type": "integer" },
         "revision": { "type": "integer" },
-        "updated_at": { "type": "string", "format": "date-time" }
+        "updated_at": { "type": "string", "format": "date-time" },
+        "view": { "$ref": "#/$defs/SentenceView" },
+        "withdrawn_at": { "type": ["string", "null"], "format": "date-time" },
+        "withdrawn_reason": { "type": ["string", "null"] }
       },
       "additionalProperties": false
     },

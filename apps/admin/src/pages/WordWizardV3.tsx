@@ -488,11 +488,6 @@ function V3MeaningsSlot({
     await context.actions.saveMeanings(context.draftMeanings, intent);
   };
 
-  const sentenceTargetDiscoveryCapability =
-    context.word.capabilities.sentence_target_discovery;
-  const sentenceTargetDiscoveryEnabled =
-    sentenceTargetDiscoveryCapability === true ||
-    (sentenceTargetDiscoveryCapability === undefined && import.meta.env.DEV);
   return (
     <Flex vertical gap="middle">
       <V3ReferenceNotices />
@@ -631,7 +626,6 @@ function V3MeaningsSlot({
         relationDisplaySnapshots={relationDisplaySnapshots(
           context.word.meanings
         )}
-        sentenceTargetDiscoveryEnabled={sentenceTargetDiscoveryEnabled}
         saving={
           context.isPending("impact") ||
           context.isPending("save_forms") ||
@@ -656,8 +650,9 @@ function V3LiveReview({
   onEdit?: (nodeId: string) => void;
 }) {
   const sentences = useQuery({
-    queryKey: ["shared-sentences", "count", word.id],
-    queryFn: () => api.sentences.list({ entry_id: word.id, page_size: 1 })
+    queryKey: ["shared-sentences", "count", word.id, "published"],
+    queryFn: () =>
+      api.sentences.list({ view: "published", entry_id: word.id, page_size: 1 })
   });
   const legacyCount = word.meanings.pos
     .flatMap((pos) => pos.senses)
@@ -897,8 +892,9 @@ export function WordWizardV3Page({
 } = {}) {
   const { wordId = "", step } = useParams();
   const sharedSentences = useQuery({
-    queryKey: ["shared-sentences", "count", wordId],
-    queryFn: () => api.sentences.list({ entry_id: wordId, page_size: 1 }),
+    queryKey: ["shared-sentences", "count", wordId, "draft"],
+    queryFn: () =>
+      api.sentences.list({ view: "draft", entry_id: wordId, page_size: 1 }),
     enabled: !!wordId
   });
   // 归属判定所需；门禁保证受保护页内 profile 必有值，缺失时判定一律不放行。

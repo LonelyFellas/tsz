@@ -137,7 +137,6 @@ export interface V3MeaningsAndExamplesStepProps {
   entryKind?: WordEntryKindV3;
   idFactory?: () => string;
   relationDisplaySnapshots?: RelationDisplaySnapshots;
-  sentenceTargetDiscoveryEnabled?: boolean;
   /** 后端释义级成分用词能力（capabilities.sense_component_usages）；关闭时成分区块只读、不发送。 */
   componentUsagesEnabled?: boolean;
   textLinksEnabled?: boolean;
@@ -2431,7 +2430,6 @@ function V3MeaningsAndExamplesStepContent({
   entryKind,
   idFactory = newWordNodeId,
   relationDisplaySnapshots,
-  sentenceTargetDiscoveryEnabled = true,
   componentUsagesEnabled = false,
   textLinksEnabled = false,
   multiGroupBindingsEnabled = false
@@ -3806,9 +3804,6 @@ function V3MeaningsAndExamplesStepContent({
                                         collapsed={componentUsagesCollapsed}
                                       >
                                         <V3PhraseComponentUsagesCard
-                                          discoveryEnabled={
-                                            sentenceTargetDiscoveryEnabled
-                                          }
                                           idFactory={idFactory}
                                           onUsagesChange={(next) =>
                                             change((draft) => {

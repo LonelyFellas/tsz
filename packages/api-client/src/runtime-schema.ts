@@ -2,6 +2,9 @@ import runtimeSchemaBundleJson from "./admin-word-v3.runtime-schema.json";
 
 export const RUNTIME_SCHEMA_ROOTS = [
   "SharedSentence",
+  "SentencePublication",
+  "SentenceWithdrawalImpact",
+  "SentenceVisibilityResponse",
   "SharedSentenceList",
   "SentenceEntryTargets",
   "EntryAnnotationResponse",
@@ -17,7 +20,6 @@ export const RUNTIME_SCHEMA_ROOTS = [
   "SurfaceMatchPageV3",
   "RelatedSearchResponse",
   "DetectLexiconSurfaceResponseV3",
-  "ResolveSentenceTargetsV3Response",
   "SearchComponentTargetsV3Response",
   "AdminWordPublicationListResponse",
   "AdminWordPublicationEnvelope",

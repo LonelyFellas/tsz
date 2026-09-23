@@ -35,6 +35,9 @@ const runtimeSchemaBundle =
 
 const ROOTS = [
   "SharedSentence",
+  "SentencePublication",
+  "SentenceWithdrawalImpact",
+  "SentenceVisibilityResponse",
   "SharedSentenceList",
   "SentenceEntryTargets",
   "EntryAnnotationResponse",
@@ -50,7 +53,6 @@ const ROOTS = [
   "SurfaceMatchPageV3",
   "RelatedSearchResponse",
   "DetectLexiconSurfaceResponseV3",
-  "ResolveSentenceTargetsV3Response",
   "SearchComponentTargetsV3Response",
   "AdminWordPublicationListResponse",
   "AdminWordPublicationEnvelope",

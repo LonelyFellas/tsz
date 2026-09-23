@@ -28,6 +28,7 @@ export interface Actor {
 
 /** RFC 9457 领域错误的通用结构化上下文。 */
 export interface ProblemMeta {
+  sentence_id?: string;
   current_revision?: number;
   current_lifecycle_revision?: number;
   word_id?: string;

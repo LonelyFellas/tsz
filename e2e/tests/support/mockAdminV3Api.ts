@@ -503,6 +503,8 @@ function sharedSentenceFixture(word: AdminWordV3): SharedSentence {
   return {
     id: ADMIN_V3_REFERENCED_SENTENCE_ID,
     revision: 1,
+    lifecycle_revision: 1,
+    view: "draft",
     content: {
       sentence: {
         id: ADMIN_V3_REFERENCED_SENTENCE_ID,
