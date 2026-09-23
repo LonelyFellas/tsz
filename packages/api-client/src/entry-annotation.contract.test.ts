@@ -39,6 +39,43 @@ const conflict = {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("词条标注 wire 契约", () => {
+  it("同形说明按独立 snake_case 字段发送，字段校验错误不会被吞掉", async () => {
+    const fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          type: "urn:tsz:problem:invalid_request_body",
+          title: "Invalid request body",
+          status: 400,
+          code: "invalid_request_body",
+          field: "homograph_reason",
+          detail: "invalid reason"
+        }),
+        { status: 400 }
+      )
+    );
+    vi.stubGlobal("fetch", fetch);
+    const api = createAdminEndpoints(
+      createHttpClient({ baseUrl: "/api/v1/admin" })
+    );
+    const input = {
+      schema_version: 3 as const,
+      detection_id: id,
+      kind: "word" as const,
+      homograph_reason: "独立含义",
+      annotation: "2"
+    };
+    await expect(api.words.createV3(id, input)).rejects.toMatchObject({
+      status: 400,
+      problem: { field: "homograph_reason" }
+    });
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/v1/admin/lexicon/entries",
+      expect.objectContaining({ body: JSON.stringify(input) })
+    );
+    expect(
+      snapshot.schemas.CreateAdminWordV3Input.properties.homograph_reason
+    ).toMatchObject({ type: "string", minLength: 1, maxLength: 500 });
+  });
   it("PATCH来自权威OpenAPI，发送snake_case修订并解码响应", async () => {
     const response = {
       entry_id: id,

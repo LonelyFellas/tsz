@@ -1812,6 +1812,52 @@ describe("V3WordCreationWizard", () => {
     expect(screen.getByTestId("spelling")).toHaveTextContent("local edit");
     expect(screen.getByTestId("revision")).toHaveTextContent("4");
     expect(screen.getByText("有未保存的草稿")).toBeInTheDocument();
+    const comparison = screen.getByRole("region", { name: "草稿差异" });
+    expect(comparison).toHaveTextContent("server latest");
+    expect(comparison).toHaveTextContent("local edit");
+  });
+
+  it("比较请求在途期间的继续输入不会被旧的失败请求覆盖", async () => {
+    let resolve!: (value: ReturnType<typeof draftEnvelope>) => void;
+    const response = new Promise<ReturnType<typeof draftEnvelope>>((done) => {
+      resolve = done;
+    });
+    const source = requests({
+      saveForms: vi
+        .fn()
+        .mockRejectedValue(
+          new HttpError(409, "stale", [], "revision_conflict")
+        ),
+      get: vi.fn(() => response)
+    });
+    renderWizard(source, {
+      renderStep: (context) => (
+        <>
+          <Slot context={context} />
+          <button
+            onClick={() => {
+              const next = editedForms(context);
+              const variant = next.pos[0]!.forms[0]!.regional_variants;
+              if (variant.mode === "common")
+                variant.common.spelling = "newer local input";
+              context.setDraftForms(next);
+            }}
+          >
+            继续输入
+          </button>
+        </>
+      )
+    });
+    fireEvent.click(screen.getByText("编辑"));
+    fireEvent.click(screen.getByText("保存"));
+    fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
+    fireEvent.click(screen.getByText("继续输入"));
+    await act(async () => resolve(draftEnvelope(4, "server latest")));
+    expect(screen.getByTestId("spelling")).toHaveTextContent(
+      "newer local input"
+    );
+    expect(screen.getByTestId("revision")).toHaveTextContent("1");
+    expect(screen.queryByRole("region", { name: "草稿差异" })).toBeNull();
   });
 
   it("refreshes a meanings 409 after forms save without losing the writable meanings draft", async () => {

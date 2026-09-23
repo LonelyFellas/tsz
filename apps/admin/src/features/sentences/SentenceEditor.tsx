@@ -26,6 +26,8 @@ import type {
   SharedSentenceAnnotation,
   SharedSentenceContent
 } from "@tsz/types";
+import { HttpError } from "@tsz/api-client";
+import { DraftComparison } from "../dictionary/DraftComparison";
 import { api } from "@/lib/auth";
 import { PronunciationPreviewProvider } from "../dictionary/word-creation/PronunciationPreview";
 import { V3VoiceTextField } from "../dictionary/word-creation-v3/components/V3VoiceTextField";
@@ -97,15 +99,42 @@ export function SentenceEditor({
   const [dialect, setDialect] = useState<Dialect>("common");
   const [pendingAnnotation, setPendingAnnotation] = useState(false);
   const [error, setError] = useState("");
+  const [baseRevision, setBaseRevision] = useState(sentence?.revision ?? 0);
+  const [conflict, setConflict] = useState(false);
+  const [latest, setLatest] = useState<SharedSentence>();
   const recovery = useDraftRecovery({
     entity: `sentence:${sentence?.id ?? `new:${sourceEntryId}:${sourceSenseId}`}`,
-    revision: sentence?.revision ?? 0,
+    revision: baseRevision,
     value: content,
     dirty,
     busy: saving,
     restore: setContent
   });
+  const refreshConflict = async () => {
+    if (!sentence || saving) return;
+    setSaving(true);
+    try {
+      setLatest(await api.sentences.get(sentence.id, "draft"));
+      setError("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "获取最新草稿失败，请重试");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const resolveConflict = (discard: boolean) => {
+    if (!latest) return;
+    setBaseRevision(latest.revision);
+    initialContent.current = JSON.stringify(latest.content);
+    if (discard) {
+      setContent(structuredClone(latest.content));
+      recovery.discard();
+    }
+    setConflict(false);
+    setError("");
+  };
   const finish = async (afterSave?: () => void) => {
+    if (conflict || saving) return false;
     if (pendingAnnotation) {
       setError("请先确认当前句内标注，或取消所选片段。");
       return;
@@ -135,7 +164,7 @@ export function SentenceEditor({
       let saved: SharedSentence;
       if (sentence)
         saved = await api.sentences.update(sentence.id, {
-          base_revision: sentence.revision,
+          base_revision: baseRevision,
           ...(sourceEntryId
             ? {
                 context_entry_id: sourceEntryId,
@@ -156,6 +185,14 @@ export function SentenceEditor({
       onSaved(saved);
       return true;
     } catch (e) {
+      if (
+        e instanceof HttpError &&
+        e.status === 409 &&
+        e.code === "revision_conflict"
+      ) {
+        setConflict(true);
+        setLatest(undefined);
+      }
       setError(e instanceof Error ? e.message : "保存失败，输入已保留，请重试");
     } finally {
       setSaving(false);
@@ -355,12 +392,46 @@ export function SentenceEditor({
           </Space>
         </Flex>
         {error && (
+          <Alert type="error" title={error} description="输入已保留。" />
+        )}
+        {conflict && (
           <Alert
-            type="error"
-            title={error}
-            description="输入已保留；版本冲突时请保留内容，重新打开最新例句再编辑。"
+            type="warning"
+            title="例句版本冲突"
+            description="本地输入仍已保留。比较最新草稿并选择保留或放弃后，才能再次保存。"
+            action={
+              <Space wrap>
+                <Button loading={saving} onClick={() => void refreshConflict()}>
+                  刷新并比较
+                </Button>
+                {latest && (
+                  <>
+                    <Button
+                      disabled={saving}
+                      onClick={() => resolveConflict(false)}
+                    >
+                      保留本地修改
+                    </Button>
+                    <Button
+                      disabled={saving}
+                      danger
+                      onClick={() =>
+                        modal.confirm({
+                          title: "放弃本地修改？",
+                          content: `未保存的输入会被丢弃，改用第 ${latest.revision} 版内容。`,
+                          onOk: () => resolveConflict(true)
+                        })
+                      }
+                    >
+                      放弃本地修改
+                    </Button>
+                  </>
+                )}
+              </Space>
+            }
           />
         )}
+        {latest && <DraftComparison local={content} remote={latest.content} />}
         {content.annotations.some(
           (annotation) => annotation.target.state === "entry_only"
         ) && (

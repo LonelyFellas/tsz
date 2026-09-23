@@ -9,6 +9,8 @@ import type {
 } from "@tsz/types";
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
+import { DraftComparison } from "../DraftComparison";
+import { toWritableMeanings } from "./meaningsModel";
 import { WordCreationLayout } from "../word-creation/WordCreationLayout";
 import { V3ProductProgressList } from "./components/V3ProductProgressList";
 import { V3ReferenceList } from "./components/V3ReferenceList";
@@ -229,6 +231,7 @@ function V3WordCreationLayoutContent({
     .filter(Boolean)
     .join("、");
   const showRemoteUpdate = Boolean(remoteUpdate) && !readOnly;
+  const comparisonWord = remoteUpdate ?? conflict?.serverWord;
   return (
     <WordCreationLayout
       currentStep={activeStep}
@@ -383,6 +386,38 @@ function V3WordCreationLayoutContent({
             />
           )}
 
+        {!readOnly && comparisonWord && (
+          <DraftComparison
+            local={{
+              ...(dirtySteps.forms || conflict?.step === "forms"
+                ? {
+                    词形与发音:
+                      draftForms ??
+                      (conflict?.step === "forms"
+                        ? conflict.localForms
+                        : word.forms)
+                  }
+                : {}),
+              ...(dirtySteps.meanings || conflict?.step === "meanings"
+                ? {
+                    词义与例句:
+                      draftMeanings ??
+                      (conflict?.step === "meanings"
+                        ? conflict.localMeanings
+                        : toWritableMeanings(word.meanings))
+                  }
+                : {})
+            }}
+            remote={{
+              ...(dirtySteps.forms || conflict?.step === "forms"
+                ? { 词形与发音: comparisonWord.forms }
+                : {}),
+              ...(dirtySteps.meanings || conflict?.step === "meanings"
+                ? { 词义与例句: toWritableMeanings(comparisonWord.meanings) }
+                : {})
+            }}
+          />
+        )}
         {children}
       </Flex>
     </WordCreationLayout>

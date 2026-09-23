@@ -14,6 +14,7 @@ import type { SharedSentence, SharedSentenceAnnotation } from "@tsz/types";
 import { SentenceEditor } from "./SentenceEditor";
 import { SharedSentenceAssociationPicker } from "./SharedSentenceAssociationPicker";
 import { newSentence } from "./model";
+import { HttpError } from "@tsz/api-client";
 import { api } from "@/lib/auth";
 vi.mock("@/lib/env", () => ({
   env: { VOICE_EDITOR: true, VOICE_PREVIEW: false, VOICE_AUDIO_UPLOAD: false }
@@ -34,7 +35,14 @@ vi.mock("@/lib/auth", () => ({
   useAuthStore: (
     select: (state: { profile: null; setProfile: () => void }) => unknown
   ) => select({ profile: null, setProfile: vi.fn() }),
-  api: { sentences: { targets: vi.fn(), update: vi.fn(), create: vi.fn() } }
+  api: {
+    sentences: {
+      get: vi.fn(),
+      targets: vi.fn(),
+      update: vi.fn(),
+      create: vi.fn()
+    }
+  }
 }));
 const searchTargets = vi.hoisted(() => vi.fn());
 vi.mock("../dictionary/word-creation-v3/api", () => ({
@@ -89,6 +97,106 @@ beforeEach(() => {
   });
 });
 describe("当前词条关联与离开保护", () => {
+  it("冲突后保留输入，比较最新草稿，显式确认后用最新 revision 重提", async () => {
+    const current = example();
+    const latest = structuredClone(current);
+    latest.revision = 4;
+    if (latest.content.sentence.en_text.mode === "unified")
+      latest.content.sentence.en_text.common.value.text = "Remote sentence.";
+    vi.mocked(api.sentences.get).mockResolvedValue(latest);
+    vi.mocked(api.sentences.update)
+      .mockRejectedValueOnce(
+        new HttpError(409, "stale", [], "revision_conflict")
+      )
+      .mockImplementation(async (_id, input) => ({
+        ...latest,
+        content: input.content,
+        revision: 5
+      }));
+    const onSaved = vi.fn();
+    show(
+      <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={onSaved} />
+    );
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
+    const comparison = await screen.findByRole("region", { name: "草稿差异" });
+    expect(comparison).toHaveTextContent("Remote sentence.");
+    expect(comparison).toHaveTextContent("We make stories.");
+    expect(api.sentences.get).toHaveBeenCalledWith(current.id, "draft");
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    expect(api.sentences.update).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "保留本地修改" }));
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    await waitFor(() => expect(onSaved).toHaveBeenCalled());
+    expect(vi.mocked(api.sentences.update).mock.calls[1]![1]).toMatchObject({
+      base_revision: 4,
+      content: { sentence: { en_text: current.content.sentence.en_text } }
+    });
+  });
+
+  it("获取最新内容失败和再次版本冲突都不会自动重试写入", async () => {
+    const current = example();
+    vi.mocked(api.sentences.update).mockRejectedValue(
+      new HttpError(409, "stale", [], "revision_conflict")
+    );
+    vi.mocked(api.sentences.get)
+      .mockRejectedValueOnce(new Error("暂时无法读取"))
+      .mockResolvedValue({ ...current, revision: 4 });
+    show(
+      <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
+    );
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
+    expect(await screen.findByText("暂时无法读取")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "保留本地修改" })).toBeNull();
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    expect(api.sentences.update).toHaveBeenCalledTimes(1);
+    fireEvent.click(await screen.findByRole("button", { name: /刷新并比较/ }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "保留本地修改" })
+    );
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    await waitFor(() => expect(api.sentences.update).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText("例句版本冲突")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "草稿差异" })).toBeNull();
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    expect(api.sentences.update).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("textbox", { name: "例句正文" })).toHaveValue(
+      "We make stories."
+    );
+  });
+
+  it("放弃输入须二次确认，确认后改用最新内容但不自动保存", async () => {
+    const current = example();
+    const latest = structuredClone(current);
+    latest.revision = 4;
+    if (latest.content.sentence.en_text.mode === "unified")
+      latest.content.sentence.en_text.common.value.text = "Remote sentence.";
+    vi.mocked(api.sentences.update).mockRejectedValue(
+      new HttpError(409, "stale", [], "revision_conflict")
+    );
+    vi.mocked(api.sentences.get).mockResolvedValue(latest);
+    show(
+      <SentenceEditor sentence={current} onClose={vi.fn()} onSaved={vi.fn()} />
+    );
+    fireEvent.click(screen.getByLabelText("完成例句编辑"));
+    fireEvent.click(await screen.findByRole("button", { name: "刷新并比较" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "放弃本地修改" })
+    );
+    expect(screen.getByRole("textbox", { name: "例句正文" })).toHaveValue(
+      "We make stories."
+    );
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: /OK|确.*定/ }));
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "例句正文" })).toHaveValue(
+        "Remote sentence."
+      )
+    );
+    expect(api.sentences.update).toHaveBeenCalledTimes(1);
+  });
+
   it("删除整个发现区域，只保留 voice-editor 编辑与关联", () => {
     show(
       <SentenceEditor
