@@ -88,15 +88,18 @@ const candidates = [
 
 it("把例句所处词条、词形和词义一起前移到候选首位", async () => {
   search.mockResolvedValue({ matches: candidates, truncated: false });
-  render(
-    <V3TargetCascader
-      literal="work"
-      targets={[]}
-      onReplace={vi.fn()}
-      prioritizedEntryId="work"
-      prioritizedSenseId="work-sense-2"
-    />
-  );
+  // 等候异步候选加载及 Cascader 的初始展开 effect，避免初始化清空首次点击。
+  await act(async () => {
+    render(
+      <V3TargetCascader
+        literal="work"
+        targets={[]}
+        onReplace={vi.fn()}
+        prioritizedEntryId="work"
+        prioritizedSenseId="work-sense-2"
+      />
+    );
+  });
   await screen.findByText("bank");
   expect(columnTexts(0)[0]).toContain("work");
   expect(columnTexts(0)[1]).toContain("bank");
