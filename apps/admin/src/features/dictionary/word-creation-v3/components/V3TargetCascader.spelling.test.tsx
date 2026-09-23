@@ -65,6 +65,8 @@ function target(dialect: "uk" | "us"): ResolvedTarget {
   };
 }
 async function expandJob() {
+  // 候选 DOM 出现时，Panel 的初始展开 effect 可能尚未完成；先刷新再点击，避免初始化覆盖点击。
+  await act(async () => {});
   const entry = await screen.findByText("job", {
     selector: ".v3-component-usage-entry strong"
   });
